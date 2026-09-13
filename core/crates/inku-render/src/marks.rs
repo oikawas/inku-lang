@@ -27,6 +27,26 @@ use crate::types::{
 
 pub(crate) const MIN_STROKE_WIDTH: f64 = 0.5;
 
+fn rotated_instruction_point(
+    instruction: &Instruction,
+    context: MarkContext<'_>,
+    point: Point,
+) -> Point {
+    instruction.rotation.map_or(point, |degrees| {
+        let pivot = point_to_pixels(
+            instruction_anchor_on_canvas(instruction, Some(context.canvas)),
+            context.canvas,
+        );
+        let radians = degrees.to_radians();
+        let dx = point.x - pivot.x;
+        let dy = point.y - pivot.y;
+        Point::new(
+            pivot.x + dx * radians.cos() - dy * radians.sin(),
+            pivot.y + dx * radians.sin() + dy * radians.cos(),
+        )
+    })
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct MarkError {
     pub primitive: Primitive,
@@ -81,19 +101,7 @@ pub(crate) fn geometry_point(
     if context.geometry_transform.is_identity() {
         return point;
     }
-    let rotated = instruction.rotation.map_or(point, |degrees| {
-        let pivot = point_to_pixels(
-            instruction_anchor_on_canvas(instruction, Some(context.canvas)),
-            context.canvas,
-        );
-        let radians = degrees.to_radians();
-        let dx = point.x - pivot.x;
-        let dy = point.y - pivot.y;
-        Point::new(
-            pivot.x + dx * radians.cos() - dy * radians.sin(),
-            pivot.y + dx * radians.sin() + dy * radians.cos(),
-        )
-    });
+    let rotated = rotated_instruction_point(instruction, context, point);
     context.geometry_transform.apply(rotated)
 }
 
@@ -544,6 +552,137 @@ fn render_affine_closed(
     }
 }
 
+fn arc_centerline_points(
+    instruction: &Instruction,
+    context: MarkContext<'_>,
+    affine_sampling: bool,
+) -> Result<Vec<Point>, MarkError> {
+    let center = point_to_pixels(
+        instruction
+            .center
+            .ok_or_else(|| missing(instruction, "center"))?,
+        context.canvas,
+    );
+    let radius = instruction
+        .radius
+        .ok_or_else(|| missing(instruction, "radius"))?
+        * context.canvas.unit();
+    let start = instruction
+        .angle_start
+        .ok_or_else(|| missing(instruction, "angle_start"))?;
+    let end = instruction
+        .angle_end
+        .ok_or_else(|| missing(instruction, "angle_end"))?;
+    let length = radius * (end - start).to_radians().abs();
+    let points = if let Some(variation) = instruction
+        .variation
+        .as_ref()
+        .filter(|variation| needs_contour_variation(variation))
+    {
+        arc_points_with_variation(
+            ArcGeometry {
+                center,
+                radius,
+                start_degrees: start,
+                end_degrees: end,
+            },
+            variation,
+            context.seed_for(instruction),
+            amplitude(instruction, context.canvas),
+            context.canvas,
+        )
+    } else {
+        let current = stroke_sample_count(length, context.canvas);
+        let samples = if affine_sampling {
+            let provisional = arc_points(center, radius, start, end, current);
+            affine_curve_samples(instruction, context, &provisional, false, current)
+        } else {
+            current
+        };
+        arc_points(center, radius, start, end, samples)
+    };
+    Ok(if context.geometry_transform.is_identity() {
+        points
+    } else {
+        geometry_points(instruction, context, &points)
+    })
+}
+
+fn performed_arc_centerline(
+    instruction: &Instruction,
+    context: MarkContext<'_>,
+) -> Result<Vec<Point>, MarkError> {
+    let points = arc_centerline_points(
+        instruction,
+        context,
+        !context.geometry_transform.is_identity(),
+    )?;
+    if context.geometry_transform.is_identity() {
+        Ok(points
+            .into_iter()
+            .map(|point| rotated_instruction_point(instruction, context, point))
+            .collect())
+    } else {
+        Ok(points)
+    }
+}
+
+pub(crate) fn render_closed_arc_pair_fill(
+    first: &Instruction,
+    first_context: MarkContext<'_>,
+    follower: &Instruction,
+    follower_context: MarkContext<'_>,
+) -> Result<Option<Element>, MarkError> {
+    if first.primitive != Primitive::Arc
+        || follower.primitive != Primitive::Arc
+        || first.arc_form.is_some()
+        || follower.arc_form.is_some()
+        || !accepted_fills::solid_fill(follower)
+    {
+        return Ok(None);
+    }
+    let first_points = performed_arc_centerline(first, first_context)?;
+    let follower_points = performed_arc_centerline(follower, follower_context)?;
+    if first_points.len() < 2 || follower_points.len() < 2 {
+        return Ok(None);
+    }
+    let distance = |left: Point, right: Point| (right.x - left.x).hypot(right.y - left.y);
+    let same_direction = distance(first_points[0], follower_points[0])
+        + distance(
+            *first_points.last().expect("non-empty Arc"),
+            *follower_points.last().expect("non-empty Arc"),
+        );
+    let opposite_direction = distance(
+        first_points[0],
+        *follower_points.last().expect("non-empty Arc"),
+    ) + distance(
+        *first_points.last().expect("non-empty Arc"),
+        follower_points[0],
+    );
+    let follower_boundary = if same_direction <= opposite_direction {
+        follower_points.into_iter().rev().collect::<Vec<_>>()
+    } else {
+        follower_points
+    };
+    let mut contour = first_points;
+    contour.extend(follower_boundary.into_iter().skip(1));
+    let mut style = mark_style(follower, follower_context);
+    accepted_fills::prepare_closed_contour_style(follower, &mut style);
+    let fill = if follower.weight == Weight::OilPaint {
+        render_interior_fill(follower, &contour, &style, follower_context)
+    } else {
+        accepted_fills::closed_contour_interior(follower, &contour, &style, follower_context)
+    };
+    let Some(fill) = fill else {
+        return Ok(None);
+    };
+    let mut group = Element::new("g").attr("class", "closed-arc-pair-fill-v1");
+    let mut material = accepted_fills::closed_contour_group(follower, follower_context);
+    material.push(fill);
+    group.push(material);
+    Ok(Some(group))
+}
+
 fn render_affine_instruction(
     instruction: &Instruction,
     style: &MarkStyle,
@@ -770,48 +909,7 @@ fn render_affine_instruction(
             ))
         }
         Primitive::Arc => {
-            let center = point_to_pixels(
-                instruction
-                    .center
-                    .ok_or_else(|| missing(instruction, "center"))?,
-                context.canvas,
-            );
-            let radius = instruction
-                .radius
-                .ok_or_else(|| missing(instruction, "radius"))?
-                * context.canvas.unit();
-            let start = instruction
-                .angle_start
-                .ok_or_else(|| missing(instruction, "angle_start"))?;
-            let end = instruction
-                .angle_end
-                .ok_or_else(|| missing(instruction, "angle_end"))?;
-            let length = radius * (end - start).to_radians().abs();
-            let centerline = if let Some(variation) = instruction
-                .variation
-                .as_ref()
-                .filter(|variation| needs_contour_variation(variation))
-            {
-                arc_points_with_variation(
-                    ArcGeometry {
-                        center,
-                        radius,
-                        start_degrees: start,
-                        end_degrees: end,
-                    },
-                    variation,
-                    context.seed_for(instruction),
-                    amplitude(instruction, context.canvas),
-                    context.canvas,
-                )
-            } else {
-                let current = stroke_sample_count(length, context.canvas);
-                let provisional = arc_points(center, radius, start, end, current);
-                let samples =
-                    affine_curve_samples(instruction, context, &provisional, false, current);
-                arc_points(center, radius, start, end, samples)
-            };
-            let centerline = geometry_points(instruction, context, &centerline);
+            let centerline = arc_centerline_points(instruction, context, true)?;
             if uses_hand_stroke(instruction.weight) {
                 if centerline
                     .windows(2)
@@ -1069,33 +1167,7 @@ pub(crate) fn render_instruction_with_line_centerline(
                 .angle_end
                 .ok_or_else(|| missing(instruction, "angle_end"))?;
             if uses_hand_stroke(instruction.weight) {
-                let length = radius * (end - start).to_radians().abs();
-                let centerline = if let Some(variation) = instruction
-                    .variation
-                    .as_ref()
-                    .filter(|variation| needs_contour_variation(variation))
-                {
-                    arc_points_with_variation(
-                        ArcGeometry {
-                            center,
-                            radius,
-                            start_degrees: start,
-                            end_degrees: end,
-                        },
-                        variation,
-                        context.seed_for(instruction),
-                        amplitude(instruction, context.canvas),
-                        context.canvas,
-                    )
-                } else {
-                    arc_points(
-                        center,
-                        radius,
-                        start,
-                        end,
-                        stroke_sample_count(length, context.canvas),
-                    )
-                };
+                let centerline = arc_centerline_points(instruction, context, false)?;
                 Ok(rotate(
                     hand_contour(
                         instruction,

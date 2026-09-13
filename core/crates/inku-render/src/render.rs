@@ -12,7 +12,9 @@ use crate::determinism::hash01;
 use crate::fills::{is_noncomputer_solid_fill, solid_mottle_filter, solid_mottle_filter_id};
 use crate::ground::render_ground;
 use crate::layers::render_presence_layer;
-use crate::marks::{MarkContext, MarkError, render_instruction_with_line_centerline};
+use crate::marks::{
+    MarkContext, MarkError, render_closed_arc_pair_fill, render_instruction_with_line_centerline,
+};
 use crate::materials::{performance_touch_filter, texture_filter};
 use crate::palette::{default_color, work_color_assignment};
 use crate::performance::PerformanceRequest;
@@ -414,6 +416,50 @@ fn render_impl(
         let mut instruction_group = Element::new("g");
         if structured {
             instruction_group.set_attr("id", instruction_id(instruction, instruction_index));
+        }
+        if expanded.len() == 1
+            && let Some(follower_performed_index) =
+                performance.closed_arc_pair_followers[performed_index]
+            && let Some(follower) = performance.score.instructions.get(follower_performed_index)
+            && follower.arrangement.is_none()
+            && follower.mode_ == instruction.mode_
+            && performance.instruction_fill_scope_indices[follower_performed_index] == fill_scope
+        {
+            let first_context = MarkContext {
+                canvas: request.options.canvas,
+                color_map: &request.options.resolved_color_map,
+                work_assignment: &assignment,
+                render_seed: request.options.render_seed,
+                instruction_seed_override,
+                instruction_index,
+                mark_index: 0,
+                wild: request.options.wild,
+                use_filters,
+                profile,
+                support,
+                geometry_transform: instruction_transform.in_pixels(request.options.canvas.unit()),
+            };
+            let follower_context = MarkContext {
+                instruction_seed_override: performance.instruction_seed_overrides
+                    [follower_performed_index],
+                instruction_index: performance.instruction_indices[follower_performed_index],
+                geometry_transform: performance.instruction_transforms[follower_performed_index]
+                    .in_pixels(request.options.canvas.unit()),
+                ..first_context
+            };
+            if let Some(fill) =
+                render_closed_arc_pair_fill(instruction, first_context, follower, follower_context)?
+            {
+                material_definitions.extend(accepted_fills::closed_contour_definitions(
+                    follower,
+                    follower_context,
+                ));
+                if structured || has_fill_scopes {
+                    instruction_group.push(fill);
+                } else {
+                    content.push(fill);
+                }
+            }
         }
         for (mark_index, single) in expanded.iter().enumerate() {
             let context = MarkContext {

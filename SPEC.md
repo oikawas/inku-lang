@@ -310,7 +310,7 @@ recorded lack them. A resource-aware Score 0.10 performance also records
 omitted for budget excess, their causes, and relations omitted with a missing
 target. The current engine metadata is
 `render_engine_id: "default"` and
-`render_engine_version: "59"`.  The full catalog `map` / `swatches` / `palette`
+`render_engine_version: "61"`.  The full catalog `map` / `swatches` / `palette`
 snapshot is not duplicated in render JSON because `render_color_map` is the
 concrete color record needed for replay and audit.
 `render_hash` is the work-edition identifier; what it is derived from, and why
@@ -523,6 +523,18 @@ compatibility design; nothing is added implicitly to MacroDefinition v1.
   uniformly loose — distance ranges that the performance resolves — and that
   uniformity is gone.  The cost is judged smaller than the expressive absence of
   being unable to write a closed form.
+
+Only when a checked `Touching` to the immediately preceding ordinary Arc
+succeeds, the follower's explicit Solid fill intent reaches renderer input
+either as `filled=true` with `surface=None` or as a `surface.texture=solid`
+compatible surface, and both members retain the same performed fill scope and
+mode, the follower uses the two arcs as one closed contour. An explicit Macro
+Solid normalizes through the common lowerer to the former representation, while
+a saved direct Score may retain the latter. Variation, each rotation, enclosing
+Transforms, repetition occurrence, and the successful relation placement feed
+that contour. Its interior uses the follower's resolved color and material
+below both unchanged outlines. `wash` / `none`, crescents, unchecked, failed,
+or omitted `Touching`, and arbitrary overlap do not create this fill.
 
 Questions any future proposal to change this boundary must answer:
 

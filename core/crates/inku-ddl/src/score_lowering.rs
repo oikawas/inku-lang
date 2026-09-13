@@ -4697,7 +4697,9 @@ fn resolve_complete_object<'a>(
                 (false, None)
             }
             Some(identity) if identity.category == "surface" && identity.id == "solid" => {
-                (closes_area, None)
+                // An explicit fill can belong to the closed contour formed by
+                // two checked Touching arcs. Keep that intent for performance.
+                (closes_area || primitive == Primitive::Arc, None)
             }
             Some(identity) => match surface_spec_from_identity(identity) {
                 Ok(spec) => (closes_area, Some(spec)),

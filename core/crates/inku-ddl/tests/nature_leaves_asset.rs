@@ -159,6 +159,16 @@ fn bundled_nature_leaves_are_valid_bounded_definitions_that_reach_normal_score_l
         ) {
             assert!(!execution.anchor_origins().is_empty(), "{qualified_name}");
         }
+        assert!(
+            score
+                .instructions
+                .iter()
+                .filter(|instruction| {
+                    matches!(instruction.primitive, Primitive::Arc | Primitive::Cloudform)
+                })
+                .all(|instruction| instruction.filled),
+            "{qualified_name}: every leaf requests its interior fill"
+        );
         if *qualified_name == "Nature.青葉" {
             let branch = &score.instructions[0];
             assert_eq!(branch.primitive, Primitive::Line);
@@ -182,9 +192,7 @@ fn bundled_nature_leaves_are_valid_bounded_definitions_that_reach_normal_score_l
             assert!(score.instructions[1..].iter().all(|instruction| {
                 instruction.color == Color::Green
                     && instruction.weight == inku_score::Weight::BrushThin
-                    && instruction.surface.as_ref().is_some_and(|surface| {
-                        surface.texture == inku_score::SurfaceTexture::Wash
-                    })
+                    && instruction.filled
             }));
         }
         if *qualified_name == "Nature.落葉" {

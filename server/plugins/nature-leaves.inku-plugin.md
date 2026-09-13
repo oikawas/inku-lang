@@ -23,14 +23,14 @@ preview: nature-leaves/wakaba.png
 
 member 葉形: 弧を置き、前の弧に両端で触れる
 葉形を 4〜6枚、{領域: 上半分} に散らす。
-鉛筆で、緑で。細かく震える。
+鉛筆で、緑で。細かく震える。内側も線と同じ緑で塗る。
 葉先は上向き(斜めの範囲で、枚ごとに別のかたむき)。
 
 ### 展開 (en)
 
 member leaf form: place an arc, then an arc touching the previous arc at both ends
 Scatter 4-6 leaf forms in {region: upper half}.
-In pencil, in green. Fine trembling.
+In pencil, in green. Fine trembling. Fill the interiors with the same green.
 Tips upward (within a diagonal range, a different lean per leaf).
 
 ## 語: 下草
@@ -48,7 +48,7 @@ preview: nature-leaves/shitakusa.png
 member 葉形: 弧を置き、前の弧に両端で触れる(膨らみは細く)
 anchor 根元 を {領域: 下端の帯} に 1〜2箇所 置く。
 各根元から 縦長の葉形を 3〜5本、上へ並べる。丈は本ごとに違え、かたむきは垂直から斜めの間で本ごとに違える。
-細筆で、緑で。
+細筆で、緑で。内側も線と同じ緑で塗る。
 注: 地面は描かない。
 
 ### 展開 (en)
@@ -56,7 +56,7 @@ anchor 根元 を {領域: 下端の帯} に 1〜2箇所 置く。
 member blade: place an arc, then an arc touching the previous arc at both ends (bulge kept slim)
 anchor roots in {region: bottom band}, at 1-2 spots.
 From each root, arrange 3-5 tall blades upward. Vary the height per blade; vary the lean per blade between vertical and diagonal.
-In fine-brush, in green.
+In fine-brush, in green. Fill the interiors with the same green.
 note: The ground is never drawn.
 
 ## 語: 青葉
@@ -74,14 +74,14 @@ preview: nature-leaves/aoba.png
 member 葉形: 弧を置き、前の弧に両端で触れる
 anchor 枝 を {領域: 中域} に置く: 太筆の線、灰で、水平に、ゆっくり波打つ。
 葉形を 6〜8枚、枝に沿って置く。
-細筆で、緑で。面: 薄墨。
+細筆で、緑で。二弧で囲む内側を線と同じ緑で塗る。
 
 ### 展開 (en)
 
 member leaf form: place an arc, then an arc touching the previous arc at both ends
 anchor branch in {region: middle}: a thick-brush line, gray, horizontal, slowly undulating.
 Place 6-8 leaf forms along the branch.
-In fine-brush, in green. Surface: wash.
+In fine-brush, in green. Fill the interior enclosed by the two arcs with the same green as their outlines.
 
 ## 語: 紅葉
 
@@ -98,7 +98,7 @@ preview: nature-leaves/momiji.png
 member 葉形: 弧を置き、前の弧に両端で触れる(膨らみは細く)
 anchor 掌の中心 を {領域: 中域} に置く。
 縦長の葉形を 5〜7枚、掌の中心から放射に並べる。
-ロットリングで、赤で。
+ロットリングで、赤で。内側も線と同じ赤で塗る。
 掌の中心から 線を下へ引く。
 
 ### 展開 (en)
@@ -106,7 +106,7 @@ anchor 掌の中心 を {領域: 中域} に置く。
 member blade: place an arc, then an arc touching the previous arc at both ends (bulge kept slim)
 anchor palm-center in {region: middle}.
 Arrange 5-7 tall blades radially from the palm-center.
-In rotring, in red.
+In rotring, in red. Fill the interiors with the same red.
 From the palm-center, draw a line downward.
 
 ## 語: 落葉
@@ -123,7 +123,7 @@ preview: nature-leaves/ochiba.png
 
 member 葉形: 弧を置き、前の弧に両端で触れる
 葉形を 8〜12枚、{領域: 左上から右下への斜めの帯} に散らす。
-クレヨンで。赤と灰を枚ごとに交互に。
+クレヨンで。赤と灰を枚ごとに交互に。各葉の内側を線と同じ色で塗る。
 回転は枚ごとにばらばら。端は滲む。
 注: 下ほど密に——密度勾配は将来の展開層構文の候補。
 
@@ -131,7 +131,7 @@ member 葉形: 弧を置き、前の弧に両端で触れる
 
 member leaf form: place an arc, then an arc touching the previous arc at both ends
 Scatter 8-12 leaf forms in {region: diagonal band, upper-left to lower-right}.
-In crayon. Red and gray alternating per leaf.
+In crayon. Red and gray alternating per leaf. Fill each interior with its outline color.
 Rotation varies per leaf. Edges blurring.
 note: Denser toward the bottom — a density-gradient construct is a future candidate.
 
@@ -150,7 +150,7 @@ preview: nature-leaves/karekusa.png
 member 葉形: 弧を置き、前の弧に両端で触れる(膨らみは細く)
 anchor 根元 を {領域: 下端の帯} に 1〜2箇所 置く。
 各根元から 縦長の葉形を 3〜5本、上へ並べる。かたむきは垂直から斜め・右下がりまで本ごとに大きく違える。
-チョークで、灰で。速く。端は滲む。
+チョークで、灰で。速く。端は滲む。内側も線と同じ灰で塗る。
 注: 地面は描かない。
 
 ### 展開 (en)
@@ -158,7 +158,7 @@ anchor 根元 を {領域: 下端の帯} に 1〜2箇所 置く。
 member blade: place an arc, then an arc touching the previous arc at both ends (bulge kept slim)
 anchor roots in {region: bottom band}, at 1-2 spots.
 From each root, arrange 3-5 tall blades upward. Vary the lean strongly per blade, from vertical through diagonal to falling.
-In chalk, in gray. Quickly. Edges blurring.
+In chalk, in gray. Quickly. Edges blurring. Fill the interiors with the same gray.
 note: The ground is never drawn.
 
 ## 語: 枯葉
@@ -175,10 +175,10 @@ preview: nature-leaves/kareha.png
 
 雲形を 2〜4個、{領域: 下の隅} に置く。
 チョークで、灰で。輪郭は細かく震える。
-注: 面は満たさない——輪郭主体。
+内側も輪郭と同じ灰で塗る。
 
 ### 展開 (en)
 
 Place 2-4 cloudforms in {region: lower corner}.
 In chalk, in gray. Outlines finely trembling.
-note: Surfaces left unfilled — outline foremost.
+Fill the interiors with the same gray as their outlines.

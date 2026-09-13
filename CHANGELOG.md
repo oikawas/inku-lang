@@ -6,11 +6,15 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 34 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-14 — Fill the interior of leaves closed by two arcs
+
+All seven Nature leaf motifs now fill their selected interior. For the six two-Arc leaf motifs, only a successful checked `Touching` to the immediately preceding ordinary Arc with explicit Solid fill intent resolves one closed contour in the resolved shared line color. Its two outlines remain unchanged. The fallen-leaf cloudform also fills its closed-form interior. Initial edition adoption remains pending. This changes DDL engine 39 and render engine 61; the Score wire format is unchanged.
+
 ### 2026-09-14 — Connect to the performed branch and revise Nature proposals
 
 Explicit Macro Connected path positions reach Score 0.11. Connection resolution and drawing share the same varied Line centerline, retaining contact through later rotation, scaling, and translation. General Along and adjacent Connected keep their semantics; invalid relations are diagnosed and removed while other drawing continues. Works without the new field retain flat 0.9 or compact 0.10. These changes use DDL engine 38 and render engine 60.
 
-The Nature proposals add summer leaves and use shared Transform and Cycle expressions for rooted grass directions, radial red leaves with a downward stem, and 8–12 strictly alternating red/gray fallen leaves. Images and author adoption remain pending. Summer-leaf wash currently affects each Arc contour and does not fill the closed two-arc interior. Application version, deployment, and iOS remain unchanged.
+The Nature proposals add summer leaves and use shared Transform and Cycle expressions for rooted grass directions, radial red leaves with a downward stem, and 8–12 strictly alternating red/gray fallen leaves. Images and author adoption remain pending. In this version, summer-leaf wash affects each Arc contour and does not fill the closed two-arc interior. Application version, deployment, and iOS remain unchanged.
 
 ### 2026-09-13 — Add finite cyclic selection to Macros
 

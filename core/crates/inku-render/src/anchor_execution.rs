@@ -1401,6 +1401,51 @@ impl Execution<'_> {
     }
 }
 
+fn closed_arc_pair_followers(
+    score: &Score,
+    omitted_relations: &[bool],
+    original_instruction_indices: &[usize],
+) -> Vec<Option<usize>> {
+    let mut result = vec![None; original_instruction_indices.len()];
+    for (follower_owner, follower) in score.instructions.iter().enumerate() {
+        let Some(relation) = follower.relation.as_ref() else {
+            continue;
+        };
+        let Some(target_owner) = relation.target_instruction_index else {
+            continue;
+        };
+        if omitted_relations
+            .get(follower_owner)
+            .copied()
+            .unwrap_or(true)
+            || !is_checked_touching(relation)
+            || target_owner.checked_add(1) != Some(follower_owner)
+            || follower.primitive != Primitive::Arc
+            || follower.arc_form.is_some()
+            || !crate::accepted_fills::solid_fill(follower)
+            || !score.instructions.get(target_owner).is_some_and(|target| {
+                target.primitive == Primitive::Arc && target.arc_form.is_none()
+            })
+        {
+            continue;
+        }
+        let targets = original_instruction_indices
+            .iter()
+            .enumerate()
+            .filter_map(|(performed, &owner)| (owner == target_owner).then_some(performed));
+        let followers = original_instruction_indices
+            .iter()
+            .enumerate()
+            .filter_map(|(performed, &owner)| (owner == follower_owner).then_some(performed));
+        for (target, follower) in targets.zip(followers) {
+            if target < follower && result[target].is_none() {
+                result[target] = Some(follower);
+            }
+        }
+    }
+    result
+}
+
 fn resolve_impl(
     request: PerformanceRequest<'_>,
     _policy: ScoreErrorPolicy,
@@ -1695,6 +1740,11 @@ fn resolve_impl(
         .iter()
         .map(|(_, value)| value.line_centerline.clone())
         .collect();
+    let closed_arc_pair_followers = closed_arc_pair_followers(
+        request.score,
+        &execution.omitted_relations,
+        &original_instruction_indices,
+    );
     let mut score = request.score.clone();
     score.instructions = rendered
         .into_iter()
@@ -1793,6 +1843,7 @@ fn resolve_impl(
         instruction_seed_overrides,
         instruction_transforms,
         line_centerlines,
+        closed_arc_pair_followers,
         fill_scopes,
         instruction_fill_scope_indices,
         resource_demand: None,

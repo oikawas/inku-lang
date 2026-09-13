@@ -48,6 +48,9 @@ pub struct PerformancePlan {
     /// Performed centerlines for Lines targeted by explicit path connections.
     /// Points are in physical short-side units and already include every transform.
     pub line_centerlines: Vec<Option<Vec<Point>>>,
+    /// Performed follower Arc index for a successful checked-Touching closed pair.
+    /// Entries are keyed by the earlier Arc so its fill can paint below both outlines.
+    pub closed_arc_pair_followers: Vec<Option<usize>>,
     /// Prepared fill targets after their enclosing placement/relation/affine transforms.
     pub fill_scopes: Vec<PerformedFillScope>,
     /// Fill scope index parallel to `score.instructions`.
@@ -204,6 +207,7 @@ pub fn resolve_performance(request: PerformanceRequest<'_>) -> PerformancePlan {
                 instruction_seed_overrides.len()
             ],
             line_centerlines: vec![None; expanded_len],
+            closed_arc_pair_followers: vec![None; expanded_len],
             instruction_seed_overrides,
             fill_scopes: Vec::new(),
             instruction_fill_scope_indices: vec![None; expanded_len],
@@ -255,6 +259,7 @@ pub fn resolve_performance(request: PerformanceRequest<'_>) -> PerformancePlan {
             instruction_seed_overrides.len()
         ],
         line_centerlines: vec![None; score_len],
+        closed_arc_pair_followers: vec![None; score_len],
         instruction_seed_overrides,
         fill_scopes: Vec::new(),
         instruction_fill_scope_indices: vec![None; score_len],

@@ -32,20 +32,26 @@ pub(crate) fn solid_fill(instruction: &Instruction) -> bool {
             .is_some_and(|surface| surface.texture == SurfaceTexture::Solid))
 }
 
-pub(crate) fn active(instruction: &Instruction) -> bool {
+fn active_for_closed_contour(instruction: &Instruction, closed_contour: bool) -> bool {
     instruction.weight != Weight::OilPaint
         && solid_fill(instruction)
-        && (matches!(
-            instruction.primitive,
-            Primitive::Circle
-                | Primitive::Ellipse
-                | Primitive::Square
-                | Primitive::Triangle
-                | Primitive::Polygon
-                | Primitive::Cloudform
-                | Primitive::Point
-        ) || instruction.primitive == Primitive::Arc
-            && instruction.arc_form == Some(ArcForm::Crescent))
+        && (closed_contour
+            || matches!(
+                instruction.primitive,
+                Primitive::Circle
+                    | Primitive::Ellipse
+                    | Primitive::Square
+                    | Primitive::Triangle
+                    | Primitive::Polygon
+                    | Primitive::Cloudform
+                    | Primitive::Point
+            )
+            || instruction.primitive == Primitive::Arc
+                && instruction.arc_form == Some(ArcForm::Crescent))
+}
+
+pub(crate) fn active(instruction: &Instruction) -> bool {
+    active_for_closed_contour(instruction, false)
 }
 
 fn identifier(context: MarkContext<'_>) -> String {
@@ -62,7 +68,21 @@ fn seed(base: u32, context: MarkContext<'_>) -> u32 {
 }
 
 pub(crate) fn prepare_style(instruction: &Instruction, style: &mut MarkStyle) {
-    if active(instruction) && instruction.weight != Weight::Computer {
+    prepare_style_for_closed_contour(instruction, style, false);
+}
+
+pub(crate) fn prepare_closed_contour_style(instruction: &Instruction, style: &mut MarkStyle) {
+    prepare_style_for_closed_contour(instruction, style, true);
+}
+
+fn prepare_style_for_closed_contour(
+    instruction: &Instruction,
+    style: &mut MarkStyle,
+    closed_contour: bool,
+) {
+    if active_for_closed_contour(instruction, closed_contour)
+        && instruction.weight != Weight::Computer
+    {
         let baseline = weight_opacity(instruction.weight);
         style.stroke_opacity = (style.stroke_opacity / baseline).min(1.0);
         style.fill_opacity = style.fill_opacity.map(|alpha| (alpha / baseline).min(1.0));
@@ -70,8 +90,22 @@ pub(crate) fn prepare_style(instruction: &Instruction, style: &mut MarkStyle) {
 }
 
 pub(crate) fn group(instruction: &Instruction, context: MarkContext<'_>) -> Element {
+    group_for_closed_contour(instruction, context, false)
+}
+
+pub(crate) fn closed_contour_group(instruction: &Instruction, context: MarkContext<'_>) -> Element {
+    group_for_closed_contour(instruction, context, true)
+}
+
+fn group_for_closed_contour(
+    instruction: &Instruction,
+    context: MarkContext<'_>,
+    closed_contour: bool,
+) -> Element {
     let group = Element::new("g");
-    if !active(instruction) || instruction.weight == Weight::Computer {
+    if !active_for_closed_contour(instruction, closed_contour)
+        || instruction.weight == Weight::Computer
+    {
         return group;
     }
     if instruction.weight == Weight::Rotring {
@@ -100,7 +134,26 @@ pub(crate) fn interior(
     style: &MarkStyle,
     context: MarkContext<'_>,
 ) -> Option<Element> {
-    if !active(instruction) || !style.fill || contour.len() < 3 {
+    interior_for_closed_contour(instruction, contour, style, context, false)
+}
+
+pub(crate) fn closed_contour_interior(
+    instruction: &Instruction,
+    contour: &[Point],
+    style: &MarkStyle,
+    context: MarkContext<'_>,
+) -> Option<Element> {
+    interior_for_closed_contour(instruction, contour, style, context, true)
+}
+
+fn interior_for_closed_contour(
+    instruction: &Instruction,
+    contour: &[Point],
+    style: &MarkStyle,
+    context: MarkContext<'_>,
+    closed_contour: bool,
+) -> Option<Element> {
+    if !active_for_closed_contour(instruction, closed_contour) || !style.fill || contour.len() < 3 {
         return None;
     }
     let path = polygon_path(contour);
@@ -694,7 +747,22 @@ fn computer(instruction: &Instruction, context: MarkContext<'_>) -> Vec<Element>
 }
 
 pub(crate) fn definitions(instruction: &Instruction, context: MarkContext<'_>) -> Vec<Element> {
-    if !active(instruction) {
+    definitions_for_closed_contour(instruction, context, false)
+}
+
+pub(crate) fn closed_contour_definitions(
+    instruction: &Instruction,
+    context: MarkContext<'_>,
+) -> Vec<Element> {
+    definitions_for_closed_contour(instruction, context, true)
+}
+
+fn definitions_for_closed_contour(
+    instruction: &Instruction,
+    context: MarkContext<'_>,
+    closed_contour: bool,
+) -> Vec<Element> {
+    if !active_for_closed_contour(instruction, closed_contour) {
         return Vec::new();
     }
     if instruction.weight == Weight::Computer {

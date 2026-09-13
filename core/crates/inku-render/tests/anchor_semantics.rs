@@ -58,6 +58,61 @@ fn near(actual: Point, x: f64, y: f64) {
     );
 }
 
+fn filled_contour(svg: &str, occurrence: usize) -> Vec<Point> {
+    let class_index = svg
+        .match_indices("class=\"solid-base-fill-v1\"")
+        .nth(occurrence)
+        .expect("paired Arc solid fill")
+        .0;
+    let prefix = &svg[..class_index];
+    let path_start = prefix.rfind(" d=\"").expect("fill path data") + 4;
+    let path_end = svg[path_start..class_index]
+        .find('"')
+        .map(|offset| path_start + offset)
+        .expect("fill path terminator");
+    let coordinates = svg[path_start..path_end]
+        .split_ascii_whitespace()
+        .filter_map(|token| token.parse::<f64>().ok())
+        .collect::<Vec<_>>();
+    assert_eq!(coordinates.len() % 2, 0);
+    coordinates
+        .chunks_exact(2)
+        .map(|pair| Point::new(pair[0], pair[1]))
+        .collect()
+}
+
+fn assert_simple_filled_contour(points: &[Point]) {
+    assert!(points.len() > 4);
+    let area = (0..points.len())
+        .map(|index| {
+            let next = (index + 1) % points.len();
+            points[index].x * points[next].y - points[next].x * points[index].y
+        })
+        .sum::<f64>()
+        .abs()
+        / 2.0;
+    assert!(area > 1.0, "paired Arc contour has no interior: {area}");
+    let orientation =
+        |a: Point, b: Point, c: Point| (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
+    for first in 0..points.len() {
+        let first_next = (first + 1) % points.len();
+        for second in first + 1..points.len() {
+            let second_next = (second + 1) % points.len();
+            if first_next == second || second_next == first {
+                continue;
+            }
+            let ab_c = orientation(points[first], points[first_next], points[second]);
+            let ab_d = orientation(points[first], points[first_next], points[second_next]);
+            let cd_a = orientation(points[second], points[second_next], points[first]);
+            let cd_b = orientation(points[second], points[second_next], points[first_next]);
+            assert!(
+                !(ab_c * ab_d < -1.0e-8 && cd_a * cd_b < -1.0e-8),
+                "paired Arc contour crosses between edges {first} and {second}"
+            );
+        }
+    }
+}
+
 #[test]
 fn forward_anchor_and_ordinary_dependent_use_final_position_without_extra_svg() {
     let input = score(
@@ -328,7 +383,8 @@ fn path_connected_closed_leaves_follow_one_varied_branch_through_outer_affine() 
        "angle_start":0,"angle_end":120,
        "relation":{"type":"touching","target_instruction_index":1,
                    "position_authority":"named_movable",
-                   "touching_constraints":{"dimensions_fixed":true,"direction_fixed":false}}},
+                   "touching_constraints":{"dimensions_fixed":true,"direction_fixed":false}},
+       "filled":true},
       {"primitive":"arc","center":[0.65,0.3],"radius":0.06,
        "angle_start":0,"angle_end":120,
        "relation":{"type":"connected","target_instruction_index":0,
@@ -337,7 +393,8 @@ fn path_connected_closed_leaves_follow_one_varied_branch_through_outer_affine() 
        "angle_start":0,"angle_end":120,
        "relation":{"type":"touching","target_instruction_index":3,
                    "position_authority":"named_movable",
-                   "touching_constraints":{"dimensions_fixed":true,"direction_fixed":false}}}
+                   "touching_constraints":{"dimensions_fixed":true,"direction_fixed":false}},
+       "surface":{"texture":"solid"}}
     ],"transform_groups":[
       {"start":1,"end":3,"rotation_degrees":35},
       {"start":3,"end":5,"rotation_degrees":-28},
@@ -355,6 +412,10 @@ fn path_connected_closed_leaves_follow_one_varied_branch_through_outer_affine() 
     )
     .unwrap();
     assert!(performed.execution.is_none(), "{:?}", performed.execution);
+    assert_eq!(
+        performed.closed_arc_pair_followers,
+        [None, Some(2), None, Some(4), None]
+    );
     let centerline = performed.line_centerlines[0]
         .as_deref()
         .expect("the targeted varied branch fixes one performed centerline");
@@ -387,7 +448,7 @@ fn path_connected_closed_leaves_follow_one_varied_branch_through_outer_affine() 
             catalog_id: None,
             canvas,
             canvas_aspect_id: "landscape".to_owned(),
-            svg_profile: SvgProfile::Editable,
+            svg_profile: SvgProfile::Display,
             render_seed: Some(71),
             composition_seed: Some(71),
             wild: false,
@@ -395,6 +456,71 @@ fn path_connected_closed_leaves_follow_one_varied_branch_through_outer_affine() 
         },
     })
     .unwrap();
-    assert!(output.svg.contains("instruction_000_line"));
-    assert!(output.svg.contains("instruction_004_arc"));
+    let fills = output
+        .svg
+        .match_indices("class=\"closed-arc-pair-fill-v1\"")
+        .map(|(index, _)| index)
+        .collect::<Vec<_>>();
+    assert_eq!(fills.len(), 2);
+    let outlines = output
+        .svg
+        .match_indices("class=\"contour-stroke-v1")
+        .map(|(index, _)| index)
+        .collect::<Vec<_>>();
+    assert_eq!(outlines.len(), 4);
+    assert!(fills[0] < outlines[0]);
+    assert!(fills[1] < outlines[2]);
+    assert_eq!(
+        output.svg.matches("class=\"solid-base-fill-v1\"").count(),
+        2
+    );
+    assert_simple_filled_contour(&filled_contour(&output.svg, 0));
+    assert_simple_filled_contour(&filled_contour(&output.svg, 1));
+}
+
+#[test]
+fn closed_arc_pair_fill_requires_solid_and_a_successful_checked_touching() {
+    let render_svg = |input: Score, error_policy| {
+        render(RenderRequest {
+            score: input,
+            options: RenderOptions {
+                resolved_color_map: Default::default(),
+                catalog_id: None,
+                canvas: CanvasSize::new(1000.0, 1000.0),
+                canvas_aspect_id: "square".to_owned(),
+                svg_profile: SvgProfile::Editable,
+                render_seed: Some(71),
+                composition_seed: Some(71),
+                wild: false,
+                error_policy,
+            },
+        })
+        .unwrap()
+        .svg
+    };
+    let wash = score(
+        r#"{"version":"0.11.0","instructions":[
+      {"primitive":"arc","center":[0.35,0.5],"radius":0.12,"angle_start":0,"angle_end":120},
+      {"primitive":"arc","center":[0.65,0.5],"radius":0.12,"angle_start":0,"angle_end":120,
+       "surface":{"texture":"wash"},
+       "relation":{"type":"touching","target_instruction_index":0,
+                   "position_authority":"named_movable",
+                   "touching_constraints":{"dimensions_fixed":true,"direction_fixed":false}}}
+    ]}"#,
+    );
+    assert!(!render_svg(wash, ScoreErrorPolicy::Stop).contains("closed-arc-pair-fill-v1"));
+
+    let failed = score(
+        r#"{"version":"0.11.0","instructions":[
+      {"primitive":"arc","center":[0.25,0.5],"radius":0.12,"angle_start":0,"angle_end":120},
+      {"primitive":"arc","center":[0.75,0.5],"radius":0.12,"angle_start":0,"angle_end":120,
+       "surface":{"texture":"solid"},
+       "relation":{"type":"touching","target_instruction_index":0,
+                   "position_authority":"numeric_fixed",
+                   "touching_constraints":{"dimensions_fixed":true,"direction_fixed":false}}}
+    ]}"#,
+    );
+    assert!(
+        !render_svg(failed, ScoreErrorPolicy::OmitAndContinue).contains("closed-arc-pair-fill-v1")
+    );
 }

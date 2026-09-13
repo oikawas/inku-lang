@@ -76,6 +76,11 @@
                     "category": "shape",
                     "id": "arc"
                   },
+                  "surface": {
+                    "expr": "semantic_ref",
+                    "category": "surface",
+                    "id": "solid"
+                  },
                   "touch": {
                     "expr": "semantic_ref",
                     "category": "touch",
@@ -119,6 +124,11 @@
                     "expr": "semantic_ref",
                     "category": "shape",
                     "id": "arc"
+                  },
+                  "surface": {
+                    "expr": "semantic_ref",
+                    "category": "surface",
+                    "id": "solid"
                   },
                   "touch": {
                     "expr": "semantic_ref",
@@ -272,8 +282,8 @@
         ]
       },
       "summaries": {
-        "ja": "若葉を4〜6枚、上半分へ散らす。各葉は両端で触れる二つの弧で、鉛筆の緑、細かな震え、上向きの異なる傾きを持つ。",
-        "en": "Scatter 4–6 young leaves across the upper half. Each leaf is two arcs touching at both ends, in trembling fine green pencil with a separately chosen upward lean."
+        "ja": "若葉を4〜6枚、上半分へ散らす。各葉は両端で触れる二つの弧で、鉛筆の緑、細かな震え、上向きの異なる傾きを持つ。各葉の内側を輪郭と同じ色で塗る。",
+        "en": "Scatter 4–6 young leaves across the upper half. Each leaf is two arcs touching at both ends, in trembling fine green pencil with a separately chosen upward lean. Fill each leaf interior with the same color as its outline."
       }
     },
     {
@@ -362,6 +372,11 @@
                         "category": "shape",
                         "id": "arc"
                       },
+                      "surface": {
+                        "expr": "semantic_ref",
+                        "category": "surface",
+                        "id": "solid"
+                      },
                       "touch": {
                         "expr": "semantic_ref",
                         "category": "touch",
@@ -395,6 +410,11 @@
                         "expr": "semantic_ref",
                         "category": "shape",
                         "id": "arc"
+                      },
+                      "surface": {
+                        "expr": "semantic_ref",
+                        "category": "surface",
+                        "id": "solid"
                       },
                       "touch": {
                         "expr": "semantic_ref",
@@ -571,8 +591,8 @@
         ]
       },
       "summaries": {
-        "ja": "下端の1〜2箇所の同じ根元から、細い縦長の葉を3〜5本ずつ上へ並べる。丈と傾きを葉ごとに変え、細筆の緑で描き、地面は描かない。",
-        "en": "From 1–2 shared root spots at the bottom edge, raise 3–5 slim tall blades per root. Their heights and upward leans vary; they use a fine green brush and draw no ground."
+        "ja": "下端の1〜2箇所の同じ根元から、細い縦長の葉を3〜5本ずつ上へ並べる。丈と傾きを葉ごとに変え、細筆の緑で描き、地面は描かない。各葉の内側を輪郭と同じ色で塗る。",
+        "en": "From 1–2 shared root spots at the bottom edge, raise 3–5 slim tall blades per root. Their heights and upward leans vary; they use a fine green brush and draw no ground. Fill each leaf interior with the same color as its outline."
       }
     },
     {
@@ -751,7 +771,7 @@
                           "surface": {
                             "expr": "semantic_ref",
                             "category": "surface",
-                            "id": "wash"
+                            "id": "solid"
                           },
                           "touch": {
                             "expr": "semantic_ref",
@@ -790,7 +810,7 @@
                           "surface": {
                             "expr": "semantic_ref",
                             "category": "surface",
-                            "id": "wash"
+                            "id": "solid"
                           },
                           "touch": {
                             "expr": "semantic_ref",
@@ -861,8 +881,8 @@
         ]
       },
       "summaries": {
-        "ja": "中域の水平な灰の太筆枝をゆっくり波打たせ、その実線上の別々の接点へ閉じた二弧の青葉6〜8枚を結ぶ。葉は細筆の緑で、薄墨の線肌を持つ。",
-        "en": "Draw one horizontal gray thick-brush branch slowly undulating through the middle, then join 6–8 closed two-arc summer leaves to distinct points on its performed line. The leaves use a fine green brush with a wash-treated contour."
+        "ja": "中域の水平な灰の太筆枝をゆっくり波打たせ、その実線上の別々の接点へ閉じた二弧の青葉6〜8枚を結ぶ。葉は細筆の緑で描き、二弧で囲む内側も同じ緑で塗る。",
+        "en": "Draw one horizontal gray thick-brush branch slowly undulating through the middle, then join 6–8 closed two-arc summer leaves to distinct points on its performed line. Draw the leaves with a fine green brush and fill the interior enclosed by each pair of arcs with the same green."
       }
     },
     {
@@ -995,6 +1015,11 @@
                             "category": "shape",
                             "id": "arc"
                           },
+                          "surface": {
+                            "expr": "semantic_ref",
+                            "category": "surface",
+                            "id": "solid"
+                          },
                           "touch": {
                             "expr": "semantic_ref",
                             "category": "touch",
@@ -1028,6 +1053,11 @@
                             "expr": "semantic_ref",
                             "category": "shape",
                             "id": "arc"
+                          },
+                          "surface": {
+                            "expr": "semantic_ref",
+                            "category": "surface",
+                            "id": "solid"
                           },
                           "touch": {
                             "expr": "semantic_ref",
@@ -1098,8 +1128,8 @@
         ]
       },
       "summaries": {
-        "ja": "中域の掌の中心から、細い縦長の紅葉5〜7枚を放射に並べる。各葉は両端で触れる二弧を赤のロットリングで描き、中心から下へ茎を引く。",
-        "en": "Arrange 5–7 slim tall red leaves radially from a palm center in the middle. Each is a rotring two-arc form touching at both ends, with a stem drawn downward from the center."
+        "ja": "中域の掌の中心から、細い縦長の紅葉5〜7枚を放射に並べる。各葉は両端で触れる二弧を赤のロットリングで描き、中心から下へ茎を引く。各葉の内側を輪郭と同じ色で塗る。",
+        "en": "Arrange 5–7 slim tall red leaves radially from a palm center in the middle. Each is a rotring two-arc form touching at both ends, with a stem drawn downward from the center. Fill each leaf interior with the same color as its outline."
       }
     },
     {
@@ -1173,6 +1203,11 @@
                     "category": "shape",
                     "id": "arc"
                   },
+                  "surface": {
+                    "expr": "semantic_ref",
+                    "category": "surface",
+                    "id": "solid"
+                  },
                   "touch": {
                     "expr": "semantic_ref",
                     "category": "touch",
@@ -1210,6 +1245,11 @@
                     "expr": "semantic_ref",
                     "category": "shape",
                     "id": "arc"
+                  },
+                  "surface": {
+                    "expr": "semantic_ref",
+                    "category": "surface",
+                    "id": "solid"
                   },
                   "touch": {
                     "expr": "semantic_ref",
@@ -1455,8 +1495,8 @@
         ]
       },
       "summaries": {
-        "ja": "落葉8〜12枚を左上から右下へ順に流れる斜めの帯に置く。各葉は両端で触れる二弧で、クレヨンの赤と灰を厳密に交互にし、傾きをばらし、端を滲ませる。",
-        "en": "Place 8–12 fallen leaves in order along a diagonal band from upper left to lower right. Each is a blurred crayon two-arc form touching at both ends, with strictly alternating red and gray and varied rotations."
+        "ja": "落葉8〜12枚を左上から右下へ順に流れる斜めの帯に置く。各葉は両端で触れる二弧で、クレヨンの赤と灰を厳密に交互にし、傾きをばらし、端を滲ませる。各葉の内側を輪郭と同じ色で塗る。",
+        "en": "Place 8–12 fallen leaves in order along a diagonal band from upper left to lower right. Each is a blurred crayon two-arc form touching at both ends, with strictly alternating red and gray and varied rotations. Fill each leaf interior with the same color as its outline."
       }
     },
     {
@@ -1555,6 +1595,11 @@
                         "category": "shape",
                         "id": "arc"
                       },
+                      "surface": {
+                        "expr": "semantic_ref",
+                        "category": "surface",
+                        "id": "solid"
+                      },
                       "touch": {
                         "expr": "semantic_ref",
                         "category": "touch",
@@ -1598,6 +1643,11 @@
                         "expr": "semantic_ref",
                         "category": "shape",
                         "id": "arc"
+                      },
+                      "surface": {
+                        "expr": "semantic_ref",
+                        "category": "surface",
+                        "id": "solid"
                       },
                       "touch": {
                         "expr": "semantic_ref",
@@ -1774,8 +1824,8 @@
         ]
       },
       "summaries": {
-        "ja": "下端の1〜2箇所の同じ根元から、枯れた縦長の葉を3〜5本ずつ上へ並べる。丈と傾きを垂直から右下がりまで大きく変え、チョークの灰で速く滲ませ、地面は描かない。",
-        "en": "From 1–2 shared root spots at the bottom edge, raise 3–5 tall withered blades per root. Heights and leans vary strongly from vertical to falling; gray chalk moves quickly with blurred edges, and no ground is drawn."
+        "ja": "下端の1〜2箇所の同じ根元から、枯れた縦長の葉を3〜5本ずつ上へ並べる。丈と傾きを垂直から右下がりまで大きく変え、チョークの灰で速く滲ませ、地面は描かない。各葉の内側を輪郭と同じ色で塗る。",
+        "en": "From 1–2 shared root spots at the bottom edge, raise 3–5 tall withered blades per root. Heights and leans vary strongly from vertical to falling; gray chalk moves quickly with blurred edges, and no ground is drawn. Fill each leaf interior with the same color as its outline."
       }
     },
     {
@@ -1900,7 +1950,7 @@
                               "surface": {
                                 "expr": "semantic_ref",
                                 "category": "surface",
-                                "id": "none"
+                                "id": "solid"
                               },
                               "touch": {
                                 "expr": "semantic_ref",
@@ -1920,8 +1970,8 @@
         ]
       },
       "summaries": {
-        "ja": "輪郭主体の雲形2〜4個を下の左右の隅に置く。面は空のまま、チョークの灰で輪郭を細かく震わせる。",
-        "en": "Place 2–4 outline-first cloudforms in the lower left or right corners. Their surfaces stay explicitly empty while fine trembling gray chalk carries the outlines."
+        "ja": "雲形2〜4個を下の左右の隅に置く。チョークの灰で輪郭を細かく震わせ、内側も同じ灰で塗る。",
+        "en": "Place 2–4 cloudforms in the lower left or right corners. Their outlines tremble in fine gray chalk, and their interiors are filled with the same gray."
       }
     }
   ]

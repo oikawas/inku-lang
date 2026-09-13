@@ -280,7 +280,9 @@
 # repetition, and fill recipes while preserving exact counts and atomic omission.
 # 38: Bounded cyclic Macro expressions preserve ordered variable counts; explicit
 # path connections reach Score 0.11 without changing ordinary adjacent relations.
-DDL_ENGINE_VERSION = "38"
+# 39: Preserve an explicit solid fill on an Arc for the closed contour formed
+# by a successfully performed Touching pair.
+DDL_ENGINE_VERSION = "39"
 # 4 (2026-07-30): yellow, orange, and purple become abstract Score colors, and
 # coerce recognizes the corresponding Japanese and English DDL markers.
 # 3 (2026-07-30): 黄 / 橙 / 紫 joined the saijiki color words, so an author can write

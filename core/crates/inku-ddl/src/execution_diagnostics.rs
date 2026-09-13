@@ -1,9 +1,12 @@
 //! Source-owned diagnostics for the compile-once Score execution facade.
 
+use serde::Serialize;
+
 use crate::SourceSpan;
 
 /// The original typed compiler bucket that produced an execution diagnostic.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
 pub enum CompilerExecutionIssueKind {
     Hole,
     Conflict,
@@ -12,7 +15,8 @@ pub enum CompilerExecutionIssueKind {
 }
 
 /// A typed source unit removed from the internal recovery projection.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
 pub enum CompilerExecutionOmissionUnit {
     SourceInstructions {
         instruction_indices: Vec<usize>,
@@ -40,7 +44,8 @@ pub enum CompilerExecutionOmissionUnit {
 }
 
 /// Actual treatment of one original compiler issue.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
 pub enum CompilerExecutionDisposition {
     Stopped,
     /// The source instruction remains after its unresolved relation is removed.
@@ -53,7 +58,7 @@ pub enum CompilerExecutionDisposition {
 }
 
 /// Original compiler identity plus the exact execution treatment.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 pub struct CompilerExecutionDiagnostic {
     pub issue_kind: CompilerExecutionIssueKind,
     pub issue_id: String,

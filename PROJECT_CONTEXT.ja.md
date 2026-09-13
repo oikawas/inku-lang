@@ -174,6 +174,8 @@ saijiki テーブルは単一の情報源で、Stage 1 プロンプトの語彙�
 閾値以上は代表化の領分なので触らない。**帯に別の名前を与えない。**
 **強制した数が命令ごとの上限か作品全体の上限を越えるときは、切り詰めずに強制しない** ——
 切り詰めると、述べた数でも代表数でもない中途半端な数が絵に出るからである。
+- **共有authoring pipeline候補（runtime未接続）** — version付きsnapshotへcommandを与える純粋なstate machineで、LLMとvisible DDL保存はtyped action/resultとしてhostへ外出しする。Stage 1 promptはSaijiki由来の有限語彙、解決済みcanvas/catalog、検証済みMacroのidentity・parameter・localized summaryだけをbounded projectionとして持つ。Typed holeの補完は明示holeのspanとdigestに閉じ、provider patchをそのまま採用せず、作者の承認、CAS save、host acknowledgment、保存bytesの再parseの順を守る。
+Variationのoriginは不変で、description authorityはexact bytesの変わる最初のユーザーDDL確定後にDDL authorityへ単調にlockする。同一bytesの確定はlockせず、undoや再生成でunlockしない。由来不明の旧recordは推測移行しない。Commandと最終effect resultだけのtranscriptは決定的にreplayでき、薄いUniFFI候補はsnapshot bytesとinput-envelope bytesを受けてstable JSON bytesを返すだけである。保存・承認・replay、authority／prompt境界と代表bindingの限定確認は成功し、独立完了reviewは未実施である。Server／Androidの現行authoring runtimeはStep 13/14のcandidate統合とStep 16/17のacceptance／cutoverまでlegacyのままである。
 - **Render Engine 41** — 共有Rust coreが所有し、Serverの薄いPython adapterとAndroidの薄いJNI adapterが同じ1 requestで呼ぶSVGの演奏。
 Androidのmain preview、thumbnail、PNG exportはcanonicalな保存済み／現行SVGを別crate
 `inku-svg-raster`（`resvg`）でpixel化する。pixelは派生presentationであり、保存の正本はSVGのままである。

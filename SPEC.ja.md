@@ -912,6 +912,18 @@ Lock検証済みtyped経路では、Stage 2 consumerの失敗方針をStop（既
 
 作者が明示したかたむきは、元meaningとtag付き`composition_seed`、logical occurrence、angle identityに束縛した共通resolverで、direct instructionとflat Macro Emitから一度だけ`Score.rotation`へ届く。Stage 2はeffective focus、variation seed、render seed、source spellingをこの選択へ混ぜない。
 
+### 12.7.1 共有authoring state machine候補
+
+製品runtime未接続の共有Rust候補は、authoringをversion付きsnapshotへの決定的なcommandとして扱う。Coreは次のsnapshot、進行event、最大1個の`EffectAction`を返し、hostはLLM呼出またはvisible normalized DDLの保存だけを実行して、action identityをechoするtyped `EffectResult`を返す。再試行では同じaction idとrequest digestを保ってattemptだけを進め、古いsequence、異なるdigest、遅れて届いたresultを状態へ適用しない。Hostの成功をcoreが先取りして主張することはない。
+
+Variationの作成元は`stage1_generated`または`user_authored_ddl`として不変に保存し、authoring authorityは`description_authoritative`、`ddl_authoritative`、`legacy_unknown`のいずれかを単調に進める。記述から生成したvariationで、ユーザーがexact source bytesの変わるDDLを初めて確定するとDDL authorityへlockされる。同一bytesの確定はlockせず、確定後に以前のbytesへ戻しても記述authorityへ戻らない。Direct DDLは最初からDDL authorityである。`legacy_unknown`は由来を推測して移行せず、記述再生成とDDL mutationを明示的なcompatibility-required結果で拒む。すべての変更はdecimal-string revisionのcompare-and-set proposalであり、hostの一致するatomic save acknowledgmentを受け取るまでactive authorityとsourceを変えない。
+
+Typed Stage 1 requestは、Saijikiから導出した有限語彙、解決済みcatalog/canvas identity、検証済みMacroのqualified name・version・definition digest・parameter・host提供のlocalized summaryだけをbounded projectionとして持ち、応答schemaはvisible normalized DDLだけを許す。Hole補完はtyped compilerが明示したholeだけを対象とし、選択したhole id、許可span、range digest、base source digest、compiler-lock digestでpatchを閉じる。Providerのpatchは候補にすぎない。作者の明示承認時にbaseへ再検証し、sourceと次authorityを1個のCAS save actionとしてhostへ渡す。一致するsave acknowledgmentの後だけ、保存されたvisible bytesを再parseして共有compilerへ渡す。
+
+Transcript replayはcommandと最終effect resultの入力envelopeだけから同じsnapshotと出力を再構成し、出力専用の進行eventやhost effectを再入力しない。二つのowned byte bufferからなる入口は、空または直前snapshotのUTF-8 JSON bytesとinput envelope bytesを受け、outputまたはstable errorのJSON bytesを返す。UniFFI候補はこの`Vec<u8>, Vec<u8> -> Vec<u8>`とbinding/protocol version reportだけを公開し、意味分岐を持たない。Panicもplatform例外文ではなくstableな`internal_invariant` error envelopeへ閉じる。
+
+この候補の保存・承認・再parse／replay、authorityとprompt境界、代表binding呼出しの限定確認は成功した。独立完了reviewは未実施である。現行ServerとAndroidのauthoring runtimeは引き続きlegacy経路を使い、Step 13/14のcandidate host統合とStep 16/17のacceptance／cutoverが完了するまで、このstate machine、二buffer ABI、または生成bindingが製品へ接続・出荷済みとは扱わない。
+
 ### 12.8 エラー回復戦略
 
 各 LLM 段は、空・短すぎる・schema 不適合の応答に対して理由を明示した再試行を一度だけ行う。再試行後も使えない場合は別モデルへ切り替えず、決定的フォールバックで有限に完了するか、明示的に失敗する。フォールバックは DDL の明示要素を配達するための互換経路であって、新しい内容を補う経路ではない。

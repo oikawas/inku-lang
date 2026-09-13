@@ -4,7 +4,17 @@
 
 This file records changes chronologically. If a historical note conflicts with the current specification, the current specification wins. The more detailed canonical history is maintained in Japanese in [CHANGELOG.ja.md](CHANGELOG.ja.md).
 
-**This file holds the 31 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
+**This file holds the 32 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
+
+### 2026-09-13 — Add the host-neutral shared authoring-pipeline candidate
+
+A shared Rust state machine now advances a versioned snapshot. Core returns progress events and at most one typed effect action, then accepts a final result that echoes the action identity. Core decides retries and catalog selection progress; hosts perform LLM transport and atomic persistence of visible normalized DDL. Stale sequences, digests, and results are rejected. A transcript containing only commands and final effect results deterministically replays the same snapshots and outputs without re-running host effects.
+
+Immutable origins distinguish description-started and direct-DDL variations, while authoring authority and decimal-string revisions advance monotonically as CAS proposals. The first user DDL commit that changes exact source bytes on a description-started variation locks DDL authority; an identical-byte no-op does not. Undo after a commit does not unlock it, and `legacy_unknown` is never migrated by inference. Generated DDL, user DDL, and an approved hole patch each propose source plus next authority as one save action. They become active only after the matching host acknowledgment, after which the saved bytes are parsed again to produce a Score candidate.
+
+The typed Stage 1 prompt contains bounded projections of finite Saijiki-derived vocabulary, resolved catalog and canvas identities, and validated Macro identities, parameters, and localized summaries. Hole completion is limited to hole IDs, allowed spans, range digests, and base-source and compiler-lock digests explicitly reported by the typed compiler, and requires explicit author approval. The shared compiler result serializes the Score, complete diagnostic metadata, and source, semantic, effective, and resource identities; rendering also checks that canvas geometry and palette still match the compile context.
+
+A two-buffer boundary now accepts UTF-8 JSON snapshot bytes and input-envelope bytes and returns JSON bytes. A UniFFI candidate with binding API 1.0.0 exposes that boundary unchanged, contains no semantic branch, and converts a panic to a stable `internal_invariant` envelope rather than platform exception text. The representative commit/approval/reparse/replay flow, authority lock, and prompt boundary checks passed. The UniFFI facade build and a representative byte call through the generated Python binding also passed; independent completion review remains pending. Existing DDL and Score schema versions, DDL engine 37, Score 0.10, render engine 59, APP_VERSION 2.14.2, and BUILD_NUMBER 1073 are unchanged. Current server and Android authoring runtimes remain on legacy paths; Step 13/14 candidate host integration, Step 16/17 acceptance and cutover, binding integration into each host, deployment, and release are not included.
 
 ### 2026-09-13 — Add the resource-aware compact Score 0.10 performance core
 

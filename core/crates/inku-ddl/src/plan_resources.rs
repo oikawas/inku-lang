@@ -5,6 +5,8 @@
 
 use std::collections::{HashMap, HashSet};
 
+use serde::Serialize;
+
 use inku_score::{
     HardResourcePolicy, OperationalResourceBudget, RESOURCE_ACCOUNTING_ID, ResourceAuthority,
     ResourceBudgetExceeded, ResourceDemand, ResourceDimension,
@@ -15,7 +17,8 @@ use crate::{
     PlacementMemberPlan, PlacementRecipe, ScoreAnchorOrigin, ScoreInstructionOrigin,
 };
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[serde(tag = "kind", content = "value", rename_all = "snake_case")]
 pub enum PlanResourceOwner {
     Plan,
     Object(ScoreInstructionOrigin),
@@ -26,7 +29,8 @@ pub enum PlanResourceOwner {
     Transform(crate::GeneratedNodeProvenance),
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[serde(tag = "kind", content = "value", rename_all = "snake_case")]
 pub enum PlanResourceFailure {
     StoppedPlan,
     InvalidContract(&'static str),
@@ -34,7 +38,7 @@ pub enum PlanResourceFailure {
     BudgetExceeded(ResourceBudgetExceeded),
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 pub struct PlanResourceError {
     pub owner: PlanResourceOwner,
     pub reason: PlanResourceFailure,
@@ -602,7 +606,7 @@ pub struct CompositionPlanSelection {
     pub standalone_macro_repetition_indices: Vec<usize>,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 pub struct PlanResourceOmission {
     /// Atomic placement or complete source head omitted, without reducing count.
     pub owner: PlanResourceOwner,

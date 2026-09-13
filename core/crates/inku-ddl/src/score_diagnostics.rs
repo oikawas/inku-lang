@@ -1,9 +1,12 @@
 //! Typed ownership and execution dispositions for Score lowering diagnostics.
 
+use serde::Serialize;
+
 use crate::{ExpansionPathSegment, SemanticPreviousReference, SemanticRelationKind, SourceSpan};
 
 /// Closed gaps that preserve unsupported source meaning without a fallback or clamp.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[serde(tag = "type", content = "value", rename_all = "snake_case")]
 pub enum ScoreFieldGap {
     FillRegionHasNoArea,
     InvalidFillTarget,
@@ -165,7 +168,8 @@ impl ScoreFieldGap {
 }
 
 /// One independently omittable appearance dimension.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
 pub enum ScoreAppearanceField {
     Color,
     Touch,
@@ -175,7 +179,8 @@ pub enum ScoreAppearanceField {
 }
 
 /// Actual default or retained value used after one appearance omission.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
 pub enum ScoreAppearanceResolution {
     ContrastColor,
     Pen,
@@ -186,7 +191,8 @@ pub enum ScoreAppearanceResolution {
 }
 
 /// Exact source or generated owner for one lowering diagnostic.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
 pub enum ScoreDiagnosticOwner {
     SourceInstruction {
         instruction_index: usize,
@@ -218,7 +224,8 @@ pub enum ScoreDiagnosticOwner {
 }
 
 /// The smallest execution projection removed by OmitAndContinue.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
 pub enum ScoreOmissionUnit {
     AppearanceField {
         field: ScoreAppearanceField,
@@ -253,7 +260,8 @@ pub enum ScoreOmissionUnit {
 }
 
 /// Actual treatment of a diagnostic under the selected mode.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
 pub enum ScoreDiagnosticDisposition {
     /// The error is reported while the authorized smaller geometry is rendered.
     Recovered,
@@ -267,7 +275,7 @@ pub enum ScoreDiagnosticDisposition {
 }
 
 /// Stable reason, exact owner, and actual execution treatment.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 pub struct ScoreLoweringDiagnostic {
     pub reason: ScoreFieldGap,
     pub owner: ScoreDiagnosticOwner,

@@ -5,6 +5,7 @@ use inku_score::{
     RelationGap, RelationType, SurfaceIntensity, SurfaceSpec, Thinness, TouchingConstraints,
     Variation, Weight,
 };
+use serde::Serialize;
 
 pub use crate::score_lowering::{Rational, ResolvedGeometryDimensions};
 use crate::{
@@ -286,7 +287,8 @@ pub struct FillGroupPlan {
     pub recipe: PlacementRecipe,
 }
 
-#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
 pub enum FillPlanOwner {
     CoordinatedGroup { group_index: usize },
     Instruction { source_instruction_index: usize },

@@ -2,6 +2,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
+use serde::Serialize;
 use serde_json::{Number, Value};
 use sha2::{Digest, Sha256};
 
@@ -48,7 +49,8 @@ pub const EXPANDED_GENERATED_PROVENANCE_SCHEMA_ID: &str = "inku.expanded-generat
 pub const EXPANDED_MACRO_MEANING_SCHEMA_ID: &str = "inku.expanded-macro-meaning.v2";
 
 /// Closed compiler state. This is not a Score-readiness decision.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
 pub enum CompilerLockState {
     CanonicalReady,
     IncompleteKnownHole,
@@ -240,7 +242,7 @@ pub struct CompilerBlockingDiagnostic {
 }
 
 /// Sidecar and resolved definition identity retained separately from semantic meaning.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 pub struct CompilerDefinitionIdentity {
     pub qualified_name: String,
     pub version: String,
@@ -250,7 +252,7 @@ pub struct CompilerDefinitionIdentity {
 
 /// One exact I-533 seed identity. `ordinal` is the post-resolution semantic execution ordinal
 /// hashed by the compiler, distinct from the retained source occurrence ordinal.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 pub struct CompilerSeedIdentity {
     pub qualified_name: String,
     pub ordinal: u64,
@@ -375,7 +377,7 @@ pub(crate) fn compiler_seed_identity(seed: &MacroSeed) -> CompilerSeedIdentity {
 }
 
 /// Complete deterministic identity for one integrity-valid compilation attempt.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 pub struct TypedDdlCompilerLock {
     pub schema_id: &'static str,
     pub state: CompilerLockState,

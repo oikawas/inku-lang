@@ -2,6 +2,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
+use serde::Serialize;
 use serde_json::{Number, Value};
 
 use crate::{
@@ -80,7 +81,8 @@ pub enum SemanticIssueCausalProvenance {
 }
 
 /// Closed semantic identity of one accepted explicit previous-object relation.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
 pub enum SemanticRelationKind {
     Along,
     NotTouching,
@@ -104,7 +106,8 @@ impl SemanticRelationKind {
 }
 
 /// Closed source-order reference depth for one explicit relation.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
 pub enum SemanticPreviousReference {
     PreviousOne,
     PreviousTwo,

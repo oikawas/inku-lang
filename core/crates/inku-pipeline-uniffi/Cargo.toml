@@ -1,0 +1,24 @@
+[package]
+name = "inku-pipeline-uniffi"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "UniFFI byte facade for the host-neutral inku pipeline"
+publish = false
+
+[lib]
+crate-type = ["cdylib", "staticlib", "rlib"]
+
+[features]
+default = []
+cli = ["uniffi/cli"]
+
+[dependencies]
+inku-pipeline = { path = "../inku-pipeline" }
+uniffi = { version = "=0.32.0", default-features = false }
+
+[[bin]]
+name = "uniffi-bindgen"
+path = "src/bin/uniffi-bindgen.rs"
+required-features = ["cli"]

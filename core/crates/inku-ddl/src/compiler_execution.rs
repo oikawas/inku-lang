@@ -1,6 +1,7 @@
 //! Compile-once facade from one source-owned normalized document to an actual Score.
 
 use inku_score::{Canvas, HardResourcePolicy, OperationalResourceBudget, ResourceDemand, Score};
+use serde::Serialize;
 
 use crate::{
     CompilerExecutionDiagnostic, CompilerLockState, CompositionPlanOutcome, MacroDefinition,
@@ -85,7 +86,8 @@ impl CompilerExecutionResult {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[serde(tag = "kind", content = "value", rename_all = "snake_case")]
 pub enum CompilerResourceExecutionFailure {
     Plan(PlanResourceError),
     Materialization(ScoreMaterializationError),

@@ -4,7 +4,17 @@
 
 この文書は時系列の実装・設計記録である。仕様との不一致がある場合は、現行契約を記す `SPEC.ja.md` を優先する。
 
-**本書が持つのは v2.5.0（2026-07-25、render engine 12）以降**の 31 版である。それより前は書庫にある。
+**本書が持つのは v2.5.0（2026-07-25、render engine 12）以降**の 32 版である。それより前は書庫にある。
+
+### 2026-09-13 — host-neutralな共有authoring pipeline候補を追加
+
+Version付きsnapshotを進める共有Rust state machineを追加した。Coreは進行eventと最大1個のtyped effect actionを返し、hostからaction identityをechoした最終resultを受け取る。Coreが再試行とcatalog選択の進行を決め、LLM transportとvisible normalized DDLのatomic保存をhost effectとして分離する。Stale sequence／digest／resultを拒む。Commandと最終effect resultだけを記録したtranscriptは、host effectを再実行せずに同じsnapshotと出力を決定的にreplayできる。
+
+記述起点とdirect DDL起点を不変のoriginで区別し、authoring authorityとdecimal-string revisionをCAS proposalとして単調に進める。記述起点でexact source bytesの変わる最初のユーザーDDL確定はDDL authorityへlockし、同一bytesのno-opはlockしない。確定後のundoはunlockせず、`legacy_unknown`は由来を推測して移行しない。生成DDL、ユーザーDDL、承認済みhole patchはいずれも、sourceと次authorityを一つのsave actionとして提案し、一致するhost acknowledgmentの後だけactive stateへ入り、その保存bytesを再parseしてScore候補を作る。
+
+Typed Stage 1 promptはSaijiki由来の有限語彙、解決済みcatalog／canvas identity、検証済みMacroのidentity・parameter・localized summaryをbounded projectionとして持つ。Hole補完はtyped compilerが明示したhole id、許可span、range digest、base source／compiler-lock digestだけを編集候補にし、作者の明示承認を要求する。共有compiler resultはScore、完全な診断metadata、source／semantic／effective／resource identityをserializableな形で保持し、render時にはcompile済みcanvas geometryとpaletteの一致も検査する。
+
+UTF-8 JSONのsnapshot bytesとinput-envelope bytesを受けてJSON bytesを返す二buffer境界と、そのまま公開するbinding API 1.0.0のUniFFI候補を追加した。Bindingは意味を分岐せず、panicをplatform例外文ではなくstableな`internal_invariant` envelopeへ閉じる。保存・承認・再parseとreplayの代表flow、authority lock、prompt境界の限定確認が成功した。UniFFI facadeのbuildと生成Python bindingの代表byte呼出しも成功し、独立完了reviewは未実施である。既存のDDL／Score schema version、DDL engine 37、Score 0.10、render engine 59、APP_VERSION 2.14.2、BUILD_NUMBER 1073は変更しない。Server／Androidの現行authoring runtimeはlegacyのままで、Step 13/14のcandidate host統合、Step 16/17のacceptance／cutover、各hostへのbinding組込み、配備、releaseは含めない。
 
 ### 2026-09-13 — compact Score 0.10のresource-aware演奏coreを追加
 

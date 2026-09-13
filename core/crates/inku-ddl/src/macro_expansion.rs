@@ -2,6 +2,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
+use serde::Serialize;
 use sha2::{Digest, Sha256};
 
 use crate::{
@@ -49,7 +50,8 @@ pub enum ExpandedMacroValue {
 }
 
 /// One typed segment of expansion identity.
-#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
 pub enum ExpansionPathSegment {
     RootStatement {
         statement_index: u64,
@@ -75,7 +77,7 @@ pub enum ExpansionPathSegment {
 }
 
 /// A collision-free target identity resolved inside one lexical expansion scope.
-#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize)]
 pub struct GeneratedTargetId {
     pub invocation_ordinal: u64,
     pub expansion_path: Vec<ExpansionPathSegment>,
@@ -83,7 +85,7 @@ pub struct GeneratedTargetId {
 }
 
 /// Definition and seed provenance shared by an expanded invocation and all of its nodes.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 pub struct MacroInvocationProvenance {
     pub schema_id: &'static str,
     pub invocation_index: usize,
@@ -99,7 +101,7 @@ pub struct MacroInvocationProvenance {
 }
 
 /// Complete provenance repeated on every generated node.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 pub struct GeneratedNodeProvenance {
     pub invocation: MacroInvocationProvenance,
     pub generated_ordinal: u64,

@@ -8,6 +8,8 @@ use crate::composition_plan::{
 };
 use std::collections::{BTreeMap, BTreeSet};
 
+use serde::Serialize;
+
 use inku_score::{
     AnchorPoint, AtRegion, Canvas, CanvasFormat, CanvasGroundSpec, CanvasSpec, Color,
     ConnectedPositionAuthority, GroundMaterial, Instruction, InstructionMode, LineStyle, Point,
@@ -1871,7 +1873,8 @@ impl<'a> ExplicitScoreLoweringResult<'a> {
 }
 
 /// Exact source or generated owner for one instruction in a successful Score.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
 pub enum ScoreInstructionOrigin {
     SourceInstruction {
         instruction_index: usize,
@@ -1884,7 +1887,8 @@ pub enum ScoreInstructionOrigin {
 }
 
 /// Exact generated owner for one non-drawing Anchor in a successful Score.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
 pub enum ScoreAnchorOrigin {
     MacroAnchor {
         source_instruction_index: usize,
@@ -5949,7 +5953,7 @@ fn ensure_centered_extent(
     Ok(())
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
 pub struct Rational {
     numerator: i128,
     denominator: i128,

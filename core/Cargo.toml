@@ -1,6 +1,8 @@
 [workspace]
 members = [
     "crates/inku-ddl",
+    "crates/inku-pipeline",
+    "crates/inku-pipeline-uniffi",
     "crates/inku-score",
     "crates/inku-render",
     "crates/inku-render-android",
@@ -16,6 +18,8 @@ rust-version = "1.95"
 license = "MIT"
 
 [workspace.dependencies]
+inku-ddl = { path = "crates/inku-ddl" }
+inku-pipeline = { path = "crates/inku-pipeline" }
 inku-score = { path = "crates/inku-score" }
 inku-render = { path = "crates/inku-render" }
 inku-svg-raster = { path = "crates/inku-svg-raster" }
@@ -25,3 +29,4 @@ resvg = { version = "=0.48.1", default-features = false }
 serde = { version = "=1.0.229", features = ["derive"] }
 serde_json = "=1.0.151"
 sha2 = "=0.11.0"
+uniffi = { version = "=0.32.0", default-features = false }

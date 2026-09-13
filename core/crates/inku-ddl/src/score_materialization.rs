@@ -2,6 +2,8 @@
 
 use std::collections::HashSet;
 
+use serde::Serialize;
+
 use inku_score::{
     Arrangement, ArrangementPath, Canvas, CanvasSpec, CountOrigin, Density, Fade, FillBoundary,
     FillGroup, FillGroupOwner, FillRecipe, FillTarget, FillTargetAnchor, FillTargetGeometry,
@@ -22,7 +24,7 @@ use crate::{
 
 const ORDINAL_SCHEME: InstanceOrdinalScheme = InstanceOrdinalScheme::SourceMemberThenInstanceV1;
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 pub struct MaterializedRelationOmission {
     pub owner: ScoreInstructionOrigin,
     pub target_object_index: Option<usize>,
@@ -39,7 +41,8 @@ pub struct MaterializedComposition {
     pub relation_omissions: Vec<MaterializedRelationOmission>,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[serde(tag = "kind", content = "value", rename_all = "snake_case")]
 pub enum ScoreMaterializationError {
     Geometry {
         owner: ScoreInstructionOrigin,

@@ -2,6 +2,8 @@
 
 use std::collections::HashSet;
 
+use serde::Serialize;
+
 use crate::{
     CanonicalRelationForm, CanonicalRelationIdentity, ExactDecimal, GeometryKeyword,
     NormalizedDdlDocument, ResolvedInstructionLanguage, SAIJIKI_ASSET_ID,
@@ -13,7 +15,7 @@ use crate::{
 pub const NEUTRAL_LEXEME_PARSER_SCHEMA_ID: &str = "inku.neutral-lexeme-parser.v8";
 
 /// A half-open UTF-8 byte span into the source document.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
 pub struct SourceSpan {
     pub start_byte: usize,
     pub end_byte: usize,
@@ -48,7 +50,8 @@ impl CoreModifierDimension {
 }
 
 /// Closed core modifier value independent of localized source spelling.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(tag = "kind", content = "value", rename_all = "snake_case")]
 pub enum CoreModifierValue {
     Regular,
     Sides(u64),

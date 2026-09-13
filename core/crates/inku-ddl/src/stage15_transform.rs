@@ -2,6 +2,7 @@
 
 use std::collections::BTreeMap;
 
+use serde::{Deserialize, Serialize};
 use serde_json::{Number, Value};
 use sha2::{Digest, Sha256};
 
@@ -60,7 +61,8 @@ impl FocusRegion {
 }
 
 /// Closed explicit variation amplitude. Partial or unknown values cannot enter the core.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
 pub enum Stage15VariationAmplitude {
     Small,
     Medium,

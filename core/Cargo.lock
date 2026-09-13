@@ -428,6 +428,7 @@ dependencies = [
 name = "inku-render-android"
 version = "0.1.0"
 dependencies = [
+ "inku-pipeline-uniffi",
  "inku-render",
  "inku-svg-raster",
  "jni",

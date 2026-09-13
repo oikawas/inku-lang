@@ -3,6 +3,8 @@ package app.inku.mobile
 import android.app.Application
 import app.inku.mobile.data.db.InkuDatabase
 import app.inku.mobile.data.db.RoomV10ResetCoordinator
+import app.inku.mobile.data.model.CanvasAspects
+import app.inku.mobile.pipeline.NativePipelineBridge
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -23,6 +25,11 @@ class InkuApplication : Application() {
             }
             return checkNotNull(databaseInstance)
         }
+
+    override fun onCreate() {
+        super.onCreate()
+        CanvasAspects.installRegistry(NativePipelineBridge.canvasRegistry())
+    }
 
     fun prepareDatabase(): RoomV10ResetCoordinator.Result = synchronized(databaseLock) {
         databaseInstance?.let {

@@ -50,7 +50,7 @@ class RoomV10ResetTest {
     }
 
     @Test
-    fun versions1Through9AreResetToFreshV10WithOnlyDerivedFilesDeleted() {
+    fun versions1Through9AreResetToFreshCurrentSchemaWithOnlyDerivedFilesDeleted() {
         for (version in 1..9) {
             val target = newTargets("reset-v$version")
             createMarkerDatabase(target, version)
@@ -78,7 +78,7 @@ class RoomV10ResetTest {
             assertArrayEquals("model bytes are outside the reset boundary", modelBytes, target.modelSentinel.readBytes())
 
             val db = openPrepared(target)
-            assertEquals(10, userVersion(db.openHelper.writableDatabase))
+            assertEquals(InkuDatabase.SCHEMA_VERSION, userVersion(db.openHelper.writableDatabase))
             assertEquals(
                 "the pre-v10 marker is not migrated into the replacement",
                 0,
@@ -187,7 +187,7 @@ class RoomV10ResetTest {
     }
 
     @Test
-    fun missingAndZeroByteDatabasesOpenAsFreshV10() {
+    fun missingAndZeroByteDatabasesOpenAsFreshCurrentSchema() {
         listOf("missing" to false, "empty" to true).forEach { (label, createEmptyFile) ->
             val target = newTargets(label)
             if (createEmptyFile) {
@@ -201,14 +201,18 @@ class RoomV10ResetTest {
                 prepare(target),
             )
             val db = openPrepared(target)
-            assertEquals("$label database is created at v10", 10, userVersion(db.openHelper.writableDatabase))
+            assertEquals(
+                "$label database is created at the current schema",
+                InkuDatabase.SCHEMA_VERSION,
+                userVersion(db.openHelper.writableDatabase),
+            )
             closeDatabase(db)
         }
     }
 
     @Test
-    fun existingV10KeepsItsRowsAndThumbnails() {
-        val target = newTargets("keep-v10")
+    fun existingCurrentSchemaKeepsItsRowsAndThumbnails() {
+        val target = newTargets("keep-current")
         val initial = openPrepared(target)
         initial.openHelper.writableDatabase.execSQL(
             "CREATE TABLE reset_marker (value TEXT NOT NULL)",
@@ -229,7 +233,7 @@ class RoomV10ResetTest {
         assertArrayEquals(modelBytes, target.modelSentinel.readBytes())
 
         val reopened = openPrepared(target)
-        assertEquals(10, userVersion(reopened.openHelper.writableDatabase))
+        assertEquals(InkuDatabase.SCHEMA_VERSION, userVersion(reopened.openHelper.writableDatabase))
         reopened.openHelper.writableDatabase.query("SELECT value FROM reset_marker").use { cursor ->
             assertTrue(cursor.moveToFirst())
             assertEquals("keep-me", cursor.getString(0))
@@ -239,13 +243,13 @@ class RoomV10ResetTest {
 
     @Test
     fun futureVersionNonemptyV0AndUnreadableDatabaseAreBytePreservingRefusals() {
-        val future = newTargets("refuse-v11")
-        createMarkerDatabase(future, 11)
+        val future = newTargets("refuse-v12")
+        createMarkerDatabase(future, 12)
         assertRefusalPreserves(
             future,
             RoomV10ResetCoordinator.Result.Refused(
                 RoomV10ResetCoordinator.RefusalReason.UnexpectedVersion,
-                detectedVersion = 11,
+                detectedVersion = 12,
             ),
         )
 
@@ -271,7 +275,7 @@ class RoomV10ResetTest {
     }
 
     @Test
-    fun freshV10EnforcesLineageUniquenessSelfEdgeAndNullSemantics() {
+    fun freshCurrentSchemaEnforcesLineageUniquenessSelfEdgeAndNullSemantics() {
         val target = newTargets("constraints")
         assertEquals(
             RoomV10ResetCoordinator.Result.Ready(resetPerformed = false),

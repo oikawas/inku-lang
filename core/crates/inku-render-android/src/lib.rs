@@ -1,5 +1,7 @@
 //! Thin synchronous JNI transport for the shared render and raster cores.
 
+mod pipeline;
+
 use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::ptr::null_mut;
 

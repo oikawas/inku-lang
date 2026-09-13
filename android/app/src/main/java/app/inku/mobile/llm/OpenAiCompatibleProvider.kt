@@ -47,7 +47,7 @@ class OpenAiCompatibleProvider(
         if (request.stopSequences.isNotEmpty()) {
             payload.put("stop", JSONArray(request.stopSequences))
         }
-        val response = postJson(endpoint("/chat/completions"), payload)
+        val response = postJson(endpoint("/chat/completions"), payload, request.timeoutMs)
         val choices = response.optJSONArray("choices") ?: error("Chat Completions response did not contain choices.")
         val first = choices.optJSONObject(0) ?: error("Chat Completions response was empty.")
         val message = first.optJSONObject("message")
@@ -92,8 +92,8 @@ class OpenAiCompatibleProvider(
         }.distinct()
     }
 
-    private fun postJson(url: String, payload: JSONObject): JSONObject {
-        val connection = open(url, "POST")
+    private fun postJson(url: String, payload: JSONObject, timeoutMs: Long?): JSONObject {
+        val connection = open(url, "POST", timeoutMs)
         try {
             connection.setRequestProperty("Content-Type", "application/json")
             connection.doOutput = true
@@ -107,7 +107,7 @@ class OpenAiCompatibleProvider(
     }
 
     private fun getJson(url: String): JSONObject {
-        val connection = open(url, "GET")
+        val connection = open(url, "GET", null)
         try {
             return readJson(connection)
         } finally {
@@ -115,11 +115,11 @@ class OpenAiCompatibleProvider(
         }
     }
 
-    private fun open(url: String, method: String): HttpURLConnection {
+    private fun open(url: String, method: String, timeoutMs: Long?): HttpURLConnection {
         val parsedUrl = URL(url)
         ProviderUrlValidator.validateRemoteBaseUrl(parsedUrl.toString())
         return (parsedUrl.openConnection() as HttpURLConnection).also { connection ->
-            configureRemoteConnection(connection, method, apiKey)
+            configureRemoteConnection(connection, method, apiKey, timeoutMs)
         }
     }
 
@@ -130,7 +130,10 @@ class OpenAiCompatibleProvider(
         if (!success) {
             val host = connection.url.host.orEmpty()
             val suffix = if (truncated) " [truncated]" else ""
-            error("HTTP ${connection.responseCode} from $host: ${DisplaySanitizer.redact(body).take(180)}$suffix")
+            throw ModelProviderHttpException(
+                connection.responseCode,
+                "HTTP ${connection.responseCode} from $host: ${DisplaySanitizer.redact(body).take(180)}$suffix",
+            )
         }
         require(!truncated) { "Remote response was too large." }
         return JSONObject(body)
@@ -168,13 +171,21 @@ class OpenAiCompatibleProvider(
     }
 }
 
-internal fun configureRemoteConnection(connection: HttpURLConnection, method: String, apiKey: String?) {
+internal fun configureRemoteConnection(
+    connection: HttpURLConnection,
+    method: String,
+    apiKey: String?,
+    timeoutMs: Long? = null,
+) {
     connection.requestMethod = method
     // A configured provider URL is the credential boundary. Never replay its
     // Authorization header to an automatic redirect target.
     connection.instanceFollowRedirects = false
-    connection.connectTimeout = REMOTE_REQUEST_TIMEOUT_MS
-    connection.readTimeout = REMOTE_REQUEST_TIMEOUT_MS
+    val attemptTimeout = (timeoutMs ?: REMOTE_REQUEST_TIMEOUT_MS.toLong())
+        .coerceIn(1L, Int.MAX_VALUE.toLong())
+        .toInt()
+    connection.connectTimeout = attemptTimeout
+    connection.readTimeout = attemptTimeout
     connection.setRequestProperty("Accept", "application/json")
     apiKey?.takeIf { it.isNotBlank() }?.let { connection.setRequestProperty("Authorization", "Bearer $it") }
 }

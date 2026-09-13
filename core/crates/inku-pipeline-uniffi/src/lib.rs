@@ -6,6 +6,8 @@ use inku_pipeline::protocol::{ProtocolError, error_bytes};
 
 mod macro_catalog;
 
+pub use macro_catalog::resolve_macro_catalog;
+
 const BINDING_VERSION: &str = "1.0.0";
 const PROTOCOL_VERSION: &str = "1.0.0";
 

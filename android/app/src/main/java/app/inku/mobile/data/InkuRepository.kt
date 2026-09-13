@@ -11,8 +11,11 @@ import app.inku.mobile.data.db.HistoryItemEntity
 import app.inku.mobile.data.db.HistoryListItem
 import app.inku.mobile.data.db.InkuDatabase
 import app.inku.mobile.data.db.LineageEdgeEntity
+import app.inku.mobile.data.db.ManagedHistoryLinkInput
+import app.inku.mobile.data.db.ManagedHistoryRead
 import app.inku.mobile.data.db.ModelAssetEntity
 import app.inku.mobile.data.db.ProviderSettingEntity
+import app.inku.mobile.data.db.RoomSharedPipelineStore
 import app.inku.mobile.data.lineage.LineageDeclaration
 import app.inku.mobile.data.lineage.LineageGraph
 import app.inku.mobile.data.lineage.LineageGraphResult
@@ -36,11 +39,15 @@ import app.inku.mobile.llm.VisionAnalysisRequest
 import app.inku.mobile.llm.VisionAnalysisResult
 import app.inku.mobile.llm.ProviderUrlValidator
 import app.inku.mobile.llm.RoutingModelProvider
-import app.inku.mobile.pipeline.LocalFallbackPipeline
+import app.inku.mobile.pipeline.AndroidWorkPipeline
+import app.inku.mobile.pipeline.NativePipelineBridge
+import app.inku.mobile.pipeline.PipelineView
 import app.inku.mobile.pipeline.ComposeFromDdlProgress
 import app.inku.mobile.pipeline.PaintRequest
 import app.inku.mobile.pipeline.PaintResult
 import app.inku.mobile.pipeline.InterpretResult
+import app.inku.mobile.pipeline.PipelineCommitStore
+import app.inku.mobile.pipeline.PipelineExecutionStore
 import app.inku.mobile.pipeline.SketchInput
 import app.inku.mobile.render.RustArtworkRasterizer
 import java.io.File
@@ -86,7 +93,16 @@ class InkuRepository(
     // Every model call in this class goes through this one, so an override
     // reaches Stage 1, Stage 2 and the demo prompt alike.
     private val activeModelProvider: ModelProvider = modelProviderOverride ?: modelRouter
-    private val pipeline = LocalFallbackPipeline(modelProvider = activeModelProvider)
+    private val sharedPipelineStore = RoomSharedPipelineStore(database)
+    private val pipeline by lazy {
+        AndroidWorkPipeline(
+            binding = NativePipelineBridge,
+            modelProvider = activeModelProvider,
+            commitStore = sharedPipelineStore,
+            executionStore = sharedPipelineStore,
+            readHistory = { id -> sharedPipelineStore.readHistory(AndroidWorkPipeline.OWNER_ID, id) },
+        )
+    }
     private val modelDownloader = LocalModelDownloader(context.applicationContext, database.modelAssetDao())
     private val thumbnailScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -130,6 +146,97 @@ class InkuRepository(
     }
 
     suspend fun getHistoryById(id: String): HistoryItemEntity? = database.historyDao().getById(id)
+
+    fun pipelineCommitStore(): PipelineCommitStore = sharedPipelineStore
+
+    fun pipelineExecutionStore(): PipelineExecutionStore = sharedPipelineStore
+
+    suspend fun pipelineViewFor(item: HistoryItemEntity): PipelineView? {
+        val executionId = JSONObject(item.renderMetadataJson).optString("pipeline_execution_id")
+        return executionId.takeIf { it.isNotBlank() }?.let { pipeline.view(it) }
+    }
+
+    suspend fun restoreActivePipeline(): PipelineView? {
+        val execution = database.sharedPipelineDao().latestExecution(AndroidWorkPipeline.OWNER_ID) ?: return null
+        val view = pipeline.restore(execution.executionId)
+        if (view.phaseTag == "completed" && database.historyDao().getById(pipelineHistoryId(view)) != null) {
+            return null
+        }
+        return view
+    }
+
+    private fun pipelineHistoryId(view: PipelineView): String =
+        java.util.UUID.nameUUIDFromBytes("pipeline:${view.executionId}:${view.sequence}".encodeToByteArray()).toString()
+
+    suspend fun declinePipelinePatch(executionId: String): PipelineView = pipeline.declinePatch(executionId)
+
+    suspend fun cancelPipeline(executionId: String): PipelineView = pipeline.cancel(executionId)
+
+    suspend fun approvePipelinePatch(executionId: String): HistoryItemEntity =
+        saveResumedPerformance(pipeline.approvePatch(executionId))
+
+    suspend fun resumePipeline(executionId: String): HistoryItemEntity =
+        saveResumedPerformance(pipeline.resume(executionId))
+
+    private suspend fun saveResumedPerformance(result: PaintResult): HistoryItemEntity {
+        val metadata = JSONObject(result.renderMetadataJson)
+        val parent = metadata.optString("parent_history_id").takeIf { it.isNotBlank() }
+            ?.let { database.historyDao().getById(it) }
+        val lineage = parent?.lineageNodeId?.let {
+            val kind = when (metadata.optString("pipeline_derivation_kind")) {
+                "description_fork", "legacy_description_fork" -> "description_edit"
+                else -> "ddl_edit"
+            }
+            LineageDeclaration(parentNodeId = it, derivationKind = kind)
+        } ?: LineageDeclaration()
+        return saveResult(
+            result,
+            metadata.getString("catalog_id"),
+            metadata.getString("canvas_aspect_id"),
+            metadata.optString("stage1_model"),
+            metadata.optString("stage2_model"),
+            elapsedMs = 0,
+            lineage = lineage,
+        )
+    }
+
+    suspend fun readManagedHistory(ownerId: String, historyId: String): ManagedHistoryRead? =
+        sharedPipelineStore.readHistory(ownerId, historyId)
+
+    /**
+     * Saves one shared-core performance and its exact authoring revision as one
+     * Room transaction. A caller never has a history row without its fork
+     * context, or a fork context pointing at a rolled-back history row.
+     */
+    suspend fun saveManagedPerformance(
+        item: HistoryItemEntity,
+        lineage: LineageDeclaration,
+        historyVisibility: String?,
+        link: ManagedHistoryLinkInput,
+    ): HistoryItemEntity {
+        require(item.id.isNotEmpty() && item.normalizedDdl.isNotEmpty()) {
+            "managed history identity and source must not be empty"
+        }
+        val nodeId = item.lineageNodeId ?: newLineageId()
+        val saved = item.copy(lineageNodeId = nodeId)
+        val descriptionSource = saved.sourceText ?: saved.originalInput
+        val write = LineagePlanner.plan(
+            nodeId = nodeId,
+            edgeId = newLineageId(),
+            historyId = saved.id,
+            at = saved.createdAt,
+            descriptionHash = pipeline.descriptionHash(descriptionSource),
+            renderHash = saved.renderHash,
+            historyVisibility = historyVisibility,
+            declaration = lineage,
+            parentNode = lineage.parentNodeId
+                ?.takeIf { it.isNotEmpty() }
+                ?.let { database.lineageDao().getNodeById(it) },
+        )
+        sharedPipelineStore.saveManagedHistory(saved, write, link)
+        scheduleThumbnailGeneration(saved.id, saved.displaySvg, saved.renderHash)
+        return saved
+    }
 
     /**
      * Gathers the rows around [focusNodeId] and hands them to [LineageGraph].
@@ -412,7 +519,7 @@ class InkuRepository(
         )
     }
 
-    suspend fun paint(description: String, catalogId: String, canvasAspect: String, stage1ModelId: String, stage2ModelId: String, autoRepair: Boolean = true, historyInput: String? = null, litertStage1PromptOptimization: Boolean = false, lineage: LineageDeclaration = LineageDeclaration(), historyVisibility: String? = null, seeds: PaintSeeds = PaintSeeds(), instructionLang: String? = null, uiLang: String? = null, sourceText: String? = null, sketch: SketchInput = SketchInput()): HistoryItemEntity {
+    suspend fun paint(description: String, catalogId: String, canvasAspect: String, stage1ModelId: String, stage2ModelId: String, autoRepair: Boolean = true, historyInput: String? = null, litertStage1PromptOptimization: Boolean = false, lineage: LineageDeclaration = LineageDeclaration(), historyVisibility: String? = null, seeds: PaintSeeds = PaintSeeds(), instructionLang: String? = null, uiLang: String? = null, sourceText: String? = null, sketch: SketchInput = SketchInput(), parentHistoryId: String? = null, inputProvenance: CameraInputProvenance? = null): HistoryItemEntity {
         val started = System.currentTimeMillis()
         val stage1Text = description
         val result = pipeline.paint(
@@ -434,12 +541,14 @@ class InkuRepository(
                 instructionLang = instructionLang,
                 uiLang = uiLang,
                 sketch = sketch,
+                parentHistoryId = parentHistoryId,
+                inputProvenance = inputProvenance,
             ),
         )
-        return saveResult(result, catalogId, canvasAspect, stage1ModelId, stage2ModelId, System.currentTimeMillis() - started, historyInput, lineage, historyVisibility, sourceText)
+        return saveResult(result, catalogId, canvasAspect, stage1ModelId, stage2ModelId, System.currentTimeMillis() - started, historyInput, lineage, historyVisibility, sourceText, inputProvenance)
     }
 
-    suspend fun interpret(description: String, catalogId: String, canvasAspect: String, stage1ModelId: String, stage2ModelId: String, autoRepair: Boolean = true, litertStage1PromptOptimization: Boolean = false, instructionLang: String? = null, uiLang: String? = null, sketch: SketchInput = SketchInput()): InterpretResult {
+    suspend fun interpret(description: String, catalogId: String, canvasAspect: String, stage1ModelId: String, stage2ModelId: String, autoRepair: Boolean = true, litertStage1PromptOptimization: Boolean = false, instructionLang: String? = null, uiLang: String? = null, sketch: SketchInput = SketchInput(), inputProvenance: CameraInputProvenance? = null): InterpretResult {
         val stage1Text = description
         return pipeline.interpret(
             PaintRequest(
@@ -454,11 +563,12 @@ class InkuRepository(
                 instructionLang = instructionLang,
                 uiLang = uiLang,
                 sketch = sketch,
+                inputProvenance = inputProvenance,
             ),
         )
     }
 
-    suspend fun composeFromDdl(description: String, ddl: String, catalogId: String, canvasAspect: String, stage1ModelId: String, stage2ModelId: String, autoRepair: Boolean = true, litertStage1PromptOptimization: Boolean = false, lineage: LineageDeclaration = LineageDeclaration(), historyVisibility: String? = null, seeds: PaintSeeds = PaintSeeds(), instructionLang: String? = null, uiLang: String? = null, sourceText: String? = null, sketch: SketchInput = SketchInput(), inputProvenance: CameraInputProvenance? = null, onProgress: suspend (ComposeFromDdlProgress) -> Unit = {}, beforeSave: suspend () -> Unit = {}): HistoryItemEntity {
+    suspend fun composeFromDdl(description: String, ddl: String, catalogId: String, canvasAspect: String, stage1ModelId: String, stage2ModelId: String, autoRepair: Boolean = true, litertStage1PromptOptimization: Boolean = false, lineage: LineageDeclaration = LineageDeclaration(), historyVisibility: String? = null, seeds: PaintSeeds = PaintSeeds(), instructionLang: String? = null, uiLang: String? = null, sourceText: String? = null, sketch: SketchInput = SketchInput(), inputProvenance: CameraInputProvenance? = null, onProgress: suspend (ComposeFromDdlProgress) -> Unit = {}, beforeSave: suspend () -> Unit = {}, parentHistoryId: String? = null, executionId: String? = null): HistoryItemEntity {
         val started = System.currentTimeMillis()
         val result = pipeline.composeFromDdl(
             ddl,
@@ -480,6 +590,9 @@ class InkuRepository(
                 instructionLang = instructionLang,
                 uiLang = uiLang,
                 sketch = sketch,
+                parentHistoryId = parentHistoryId,
+                executionId = executionId,
+                inputProvenance = inputProvenance,
             ),
             onProgress = onProgress,
         )
@@ -515,14 +628,9 @@ class InkuRepository(
         selectedCatalogId: String,
         sourceText: String,
         stage1ModelId: String,
-    ): String = CatalogSelection.resolveCatalogIdForRun(
-        selectedCatalogId = selectedCatalogId,
-        sourceText = sourceText,
-        stage1ModelId = stage1ModelId,
-        modelProvider = activeModelProvider,
-    )
+    ): String = selectedCatalogId
 
-    suspend fun renderFromScore(description: String, scoreJson: String, catalogId: String, canvasAspect: String, stage1ModelId: String, stage2ModelId: String, lineage: LineageDeclaration = LineageDeclaration(), historyVisibility: String? = null, seeds: PaintSeeds = PaintSeeds(), sourceText: String? = null): HistoryItemEntity {
+    suspend fun renderFromScore(description: String, scoreJson: String, catalogId: String, canvasAspect: String, stage1ModelId: String, stage2ModelId: String, lineage: LineageDeclaration = LineageDeclaration(), historyVisibility: String? = null, seeds: PaintSeeds = PaintSeeds(), sourceText: String? = null, parentHistoryId: String? = null): HistoryItemEntity {
         val started = System.currentTimeMillis()
         val result = pipeline.renderFromScore(
             scoreJson,
@@ -534,6 +642,7 @@ class InkuRepository(
                 colorCatalogId = catalogId,
                 canvasAspect = canvasAspect,
                 autoRepair = false,
+                parentHistoryId = parentHistoryId,
                 renderSeed = seeds.renderSeed,
                 compositionSeed = seeds.compositionSeed,
                 interpretationSeed = seeds.interpretationSeed,
@@ -581,6 +690,7 @@ class InkuRepository(
             // being asked of the layer, and the state derives from the prose.
             sketch = SketchInput(text = parent.sketchText, grain = parent.sketchGrain),
             workColorSnapshot = refinementColorSnapshot(parent, plan),
+            parentHistoryId = parent.historyId,
         )
         return when (plan.route) {
             RefinementRoute.RenderFromScore -> pipeline.renderFromScore(parent.scoreJson, request)
@@ -592,7 +702,7 @@ class InkuRepository(
             // does not have.
             RefinementRoute.Paint -> if (plan.stage1Lang != null || plan.stage2Lang != null) {
                 val interpreted = pipeline.interpret(request.copy(instructionLang = plan.stage1Lang))
-                pipeline.composeFromDdl(interpreted.ddlForDisplay, request.copy(instructionLang = plan.stage2Lang))
+                pipeline.composeFromDdl(interpreted.ddlForDisplay, request.copy(instructionLang = plan.stage2Lang, executionId = interpreted.executionId))
             } else {
                 pipeline.paint(request)
             }
@@ -642,13 +752,20 @@ class InkuRepository(
         val renderSeedText = result.renderSeed?.let { java.lang.Long.toUnsignedString(it) }
         val renderMetadata = mergeInputProvenance(
             JSONObject(result.renderMetadataJson),
-            inputProvenance,
+            inputProvenance ?: result.inputProvenance,
         )
         val renderMetadataJson = renderMetadata
             .put("render_hash", result.renderHash)
             .put("render_hash_short", result.renderHashShort)
             .toString()
-        val historyId = pipeline.newHistoryId()
+        val historyId = result.pipelineView?.takeIf { result.managedHistoryLink != null }
+            ?.let(::pipelineHistoryId) ?: pipeline.newHistoryId()
+        database.historyDao().getById(historyId)?.let { saved ->
+            check(saved.normalizedDdl == result.normalizedDdl && saved.renderHash == result.renderHash) {
+                "pipeline_history_identity_conflict"
+            }
+            return saved
+        }
         val originalInput = historyInput ?: result.originalInput
         // `source_text` if there is one, `input` if there is not, and the
         // description hash is taken from whichever it was (`db.py:2049-2051`).
@@ -685,8 +802,8 @@ class InkuRepository(
             renderMetadataJson = renderMetadataJson,
             renderHash = result.renderHash,
             renderHashShort = result.renderHashShort,
-            colorCatalogId = catalogId,
-            canvasAspect = canvasAspect,
+            colorCatalogId = renderMetadata.optString("catalog_id").ifBlank { catalogId },
+            canvasAspect = renderMetadata.optString("canvas_aspect_id").ifBlank { canvasAspect },
             starred = false,
             trashed = false,
             elapsedMs = elapsedMs,
@@ -715,6 +832,16 @@ class InkuRepository(
         // One transaction, and the edge after the node: the edge points at a
         // child that has to exist first. A failing edge takes the node and the
         // history row down with it, the way the server's rollback does.
+        result.managedHistoryLink?.let { link ->
+            sharedPipelineStore.saveManagedHistory(item, write, link)
+            scheduleThumbnailGeneration(item.id, result.displaySvg, result.renderHash)
+            return item
+        }
+        result.managedHistoryReplay?.let { replay ->
+            sharedPipelineStore.saveManagedReplayHistory(item, write, replay)
+            scheduleThumbnailGeneration(item.id, result.displaySvg, result.renderHash)
+            return item
+        }
         database.withTransaction {
             database.historyDao().insert(item)
             database.lineageDao().insertNode(write.node)

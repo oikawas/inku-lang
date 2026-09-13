@@ -1,5 +1,7 @@
 package app.inku.mobile.pipeline
 
+import app.inku.mobile.data.db.ManagedHistoryLinkInput
+import app.inku.mobile.data.db.ManagedHistoryReplayInput
 import app.inku.mobile.data.model.WorkColorSnapshot
 
 import app.inku.mobile.llm.ModelProvider
@@ -125,6 +127,11 @@ data class PaintRequest(
     val sketch: SketchInput = SketchInput(),
     val workColorSnapshot: WorkColorSnapshot? = null,
     val renderWild: Boolean? = null,
+    /** Saved work being forked; null creates an unrelated new variation. */
+    val parentHistoryId: String? = null,
+    /** Durable shared-core execution returned by [InterpretResult]. */
+    val executionId: String? = null,
+    val inputProvenance: app.inku.mobile.data.model.CameraInputProvenance? = null,
 )
 
 /**
@@ -176,6 +183,10 @@ data class PaintResult(
     val sketchText: String? = null,
     val sketchGrain: String? = null,
     val sketchState: String? = null,
+    val managedHistoryLink: ManagedHistoryLinkInput? = null,
+    val managedHistoryReplay: ManagedHistoryReplayInput? = null,
+    val pipelineView: PipelineView? = null,
+    val inputProvenance: app.inku.mobile.data.model.CameraInputProvenance? = null,
 )
 
 data class InterpretResult(
@@ -202,6 +213,7 @@ data class InterpretResult(
     val sketchText: String? = null,
     val sketchGrain: String? = null,
     val sketchState: String? = null,
+    val executionId: String? = null,
 )
 
 /**

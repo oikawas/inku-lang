@@ -24,6 +24,18 @@ object InkuStringsJa : InkuStrings {
     override val statusComposeFailed = "Compose failed."
     override val statusSaved: (String) -> String = { hash -> "保存しました $hash" }
     override val statusSaveFailed = "保存に失敗しました。"
+    override val pipelineProposal = "DDLの変更案を確認してください。"
+    override val pipelineOriginalDdl = "現在のDDL"
+    override val pipelineProposedDdl = "変更後のDDL"
+    override val pipelineApprove = "変更を承認して描画"
+    override val pipelineDecline = "変更しない"
+    override val pipelineResume = "描画を続ける"
+    override val pipelineDdlAuthority = "この変奏はDDLをもとに描画します。"
+    override val pipelineNewDescription = "記述から新しい変奏を作る"
+    override val pipelineNewDescriptionNotice = "次の描画は、新しい変奏として保存します。"
+    override val pipelineCheckDdl = "DDLと描画の診断を確認してください。"
+    override val pipelineDiagnostics = "描画の診断"
+    override val pipelineOmissions: (Int) -> String = { count -> "省略した配置・関係: $count 件。ほかの部分は描画を続けます。" }
 
     override val batchTooManyItems: (Int, Int) -> String = { max, actual ->
         "バッチは最大 $max 件までです。現在: $actual 件"
@@ -201,6 +213,8 @@ object InkuStringsJa : InkuStrings {
     override val stagesShared = "Stage 1 / Stage 2 共通"
     override val languageComboNote = "Stage 1 と Stage 2 の言語の組を選びます。"
     override val uiModeSubtitle = "UIの表示密度・構成"
+    override val displaySafeMarginsSubtitle = "全画面表示でカメラ穴や画面端を避けます。用紙の比率は変わりません。"
+    override val displaySafeMarginsToggle = "横方向の安全領域を使う"
     override val exportSubtitle = "Web版の出力設定"
     override val historySelectionSubtitle = "Web版の履歴反映設定"
     override val svgDisplayNote = "Web表示向けの標準SVG"
@@ -332,6 +346,7 @@ object InkuStringsJa : InkuStrings {
     override val colorCatalogAuto = "記述から自動選択"
     override val colorCatalogAutoDescription = "描画ごとに記述を読み、合う色カタログを選びます。"
     override val uiModeTitle = "表示モード"
+    override val displaySafeMarginsTitle = "端末表示余白"
     override val svgDisplay = "表示用SVG"
     override val demoInterval = "表示間隔"
     override val autoRepair = "補正"

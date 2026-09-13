@@ -14,7 +14,14 @@ data class ModelRequest(
     val stopSequences: List<String> = emptyList(),
     val systemInstruction: String? = null,
     val tool: ModelTool? = null,
+    /** Host-enforced bound for one transport attempt. */
+    val timeoutMs: Long? = null,
 )
+
+class ModelProviderHttpException(
+    val statusCode: Int,
+    message: String,
+) : IllegalStateException(message)
 
 data class ModelResponse(
     val text: String,

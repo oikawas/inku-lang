@@ -48,6 +48,18 @@ interface InkuStrings {
     val statusComposeFailed: String
     val statusSaved: (String) -> String
     val statusSaveFailed: String
+    val pipelineProposal: String
+    val pipelineOriginalDdl: String
+    val pipelineProposedDdl: String
+    val pipelineApprove: String
+    val pipelineDecline: String
+    val pipelineResume: String
+    val pipelineDdlAuthority: String
+    val pipelineNewDescription: String
+    val pipelineNewDescriptionNotice: String
+    val pipelineCheckDdl: String
+    val pipelineDiagnostics: String
+    val pipelineOmissions: (Int) -> String
 
     // --- Batch --------------------------------------------------------------
     val batchTooManyItems: (Int, Int) -> String
@@ -147,6 +159,8 @@ interface InkuStrings {
     val stagesShared: String
     val languageComboNote: String
     val uiModeSubtitle: String
+    val displaySafeMarginsSubtitle: String
+    val displaySafeMarginsToggle: String
     val exportSubtitle: String
     val historySelectionSubtitle: String
     val svgDisplayNote: String
@@ -278,6 +292,7 @@ interface InkuStrings {
     val colorCatalogAuto: String
     val colorCatalogAutoDescription: String
     val uiModeTitle: String
+    val displaySafeMarginsTitle: String
     val svgDisplay: String
     val demoInterval: String
     val autoRepair: String

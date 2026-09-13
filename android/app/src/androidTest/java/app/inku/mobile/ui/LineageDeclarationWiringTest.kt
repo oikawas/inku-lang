@@ -511,7 +511,7 @@ class LineageDeclarationWiringTest {
         const val FIRST_DRAWING = "赤い円を5個、横に並べる"
         const val SECOND_DRAWING = "黒い太筆の線を3本、斜めに置く"
         const val PARENT_CANVAS = "square"
-        const val CHILD_CANVAS = "pixel9_landscape_safe"
+        const val CHILD_CANVAS = "hd_monitor"
         const val TIMEOUT_MS = 120_000L
         const val POLL_MS = 200L
         const val SETTLE_AFTER_CLEAR_MS = 500L

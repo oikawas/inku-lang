@@ -60,6 +60,7 @@ object RoomV10ResetCoordinator {
 
         return when {
             version == InkuDatabase.SCHEMA_VERSION -> Result.Ready(resetPerformed = false)
+            version == 10 -> Result.Ready(resetPerformed = false)
             version in RESETTABLE_VERSIONS -> resetPreV10Database(
                 context = applicationContext,
                 databaseName = databaseName,

@@ -51,16 +51,21 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.relocation.BringIntoViewRequester
 import androidx.compose.foundation.relocation.bringIntoViewRequester
@@ -1110,7 +1115,7 @@ private fun CanvasAspectSelectionDialog(state: InkuUiState, viewModel: InkuViewM
                             )
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(aspect.label, style = MaterialTheme.typography.bodySmall)
-                                Text("${aspect.ratioW}:${aspect.ratioH}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text(aspect.ratioLabel, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                             if (active) Text("✓", color = MaterialTheme.colorScheme.secondary)
                         }
@@ -1332,7 +1337,7 @@ private fun canvasLabel(state: InkuUiState): String {
 }
 
 private fun canvasLabelFor(id: String): String {
-    return CanvasAspects.all.firstOrNull { it.id == id }?.label ?: id
+    return CanvasAspects.labelFor(id)
 }
 
 private fun shortCanvasLabel(state: InkuUiState): String {
@@ -1759,9 +1764,6 @@ private fun DrawSettingsPanel(state: InkuUiState, viewModel: InkuViewModel) {
                 modifier = Modifier.widthIn(max = Dimens.panelMinHeight),
             )
         }
-        if (state.composeMode == ComposeMode.Write) {
-            SketchModeRow(state, viewModel)
-        }
     }
 }
 
@@ -1795,7 +1797,12 @@ private fun CanvasHeroCard(
     }
     val presentation = state.canvasPresentationMode
     val historyItems by viewModel.historyItems.collectAsState()
-    BoxWithConstraints(modifier = modifier) {
+    val canvasBoundsModifier = if (presentation && state.displaySafeMarginsEnabled) {
+        modifier.windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal))
+    } else {
+        modifier
+    }
+    BoxWithConstraints(modifier = canvasBoundsModifier) {
         val screenWidth = maxWidth
         val screenHeight = maxHeight
         val ratio = remember(item?.id, item?.displaySvg, canvasAspectId) {
@@ -2306,6 +2313,12 @@ private fun DrawPanel(
 ) {
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
         CompactLabel(S.description)
+        if (state.descriptionLocked && !state.historyAuthorityLoading) {
+            Text(S.pipelineDdlAuthority, style = MaterialTheme.typography.bodySmall)
+            TextButton(onClick = viewModel::startDescriptionVariation, enabled = !state.historyAuthorityLoading && !state.isDrawing) {
+                Text(S.pipelineNewDescription)
+            }
+        }
         DenseMultilineInput(
             value = state.prompt,
             onValueChange = viewModel::setPrompt,
@@ -2315,6 +2328,7 @@ private fun DrawPanel(
                 .onGloballyPositioned { onDescriptionPositioned(it.positionInWindow().y) },
             minLines = 5,
             maxLines = 8,
+            enabled = !state.descriptionLocked && !state.isDrawing,
             onFocusChanged = onDescriptionFocusChanged,
         )
         cameraStatusText(state.cameraCaptureState)?.let { cameraStatus ->
@@ -2339,6 +2353,7 @@ private fun DrawPanel(
         state.message?.takeIf { it.isNotBlank() }?.let { message ->
             Text(message, color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelSmall)
         }
+        PipelineStatusPanel(state, viewModel)
         // 解釈 is the half of this screen one reaches for after the drawing, so
         // it is what the simple display mode leaves out. Before this stage the
         // mode's only effect was hiding the mascot and a duplicated chip row,
@@ -3654,6 +3669,17 @@ private fun MiscSettingsPanel(state: InkuUiState, viewModel: InkuViewModel, modi
                 ChipButton(S.uiModeFull, selected = state.uiMode == "full", onClick = { viewModel.setUiMode("full") })
                 ChipButton(S.uiModeSimple, selected = state.uiMode == "simple", onClick = { viewModel.setUiMode("simple") })
             }
+        }
+        SettingsCard(
+            S.displaySafeMarginsTitle,
+            S.displaySafeMarginsSubtitle,
+            if (state.displaySafeMarginsEnabled) "ON" else "OFF",
+        ) {
+            SettingCheckRow(
+                checked = state.displaySafeMarginsEnabled,
+                text = S.displaySafeMarginsToggle,
+                onCheckedChange = viewModel::setDisplaySafeMarginsEnabled,
+            )
         }
         SettingsCard(
             S.cameraVisionModeTitle,
@@ -5700,7 +5726,59 @@ private fun kotlinx.coroutines.CoroutineScope.launchImeBringIntoViewGuard(reques
 private fun DdlActionRow(state: InkuUiState, viewModel: InkuViewModel) {
     WrapRow(horizontal = Dimens.spaceM, vertical = Dimens.spaceM) {
         MiniPill(S.saijiki, selected = state.saijikiOpen, onClick = viewModel::toggleSaijiki)
-        MiniPill(S.autoRepair, selected = state.ddlAutoRepairEnabled, onClick = viewModel::toggleDdlAutoRepair)
+    }
+}
+
+@Composable
+private fun PipelineStatusPanel(state: InkuUiState, viewModel: InkuViewModel) {
+    val view = state.pipelineView
+    val proposal = view?.patchProposal
+    val savedCurrentRevision = remember(view?.executionId, view?.revision, state.selectedHistory?.renderMetadataJson) {
+        runCatching {
+            val metadata = JSONObject(state.selectedHistory?.renderMetadataJson ?: "{}")
+            metadata.optString("pipeline_execution_id") == view?.executionId &&
+                metadata.optString("pipeline_revision") == view?.revision
+        }.getOrDefault(false)
+    }
+    if (proposal != null) {
+        Surface(color = MaterialTheme.colorScheme.surfaceVariant, shape = RoundedCornerShape(Dimens.radiusCard)) {
+            Column(Modifier.fillMaxWidth().padding(Dimens.spaceM), verticalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
+                Text(S.pipelineProposal, style = MaterialTheme.typography.titleSmall)
+                Text(S.pipelineOriginalDdl, style = MaterialTheme.typography.labelSmall)
+                Text(view.visibleDdl.orEmpty(), style = MaterialTheme.typography.bodySmall)
+                Text(S.pipelineProposedDdl, style = MaterialTheme.typography.labelSmall)
+                Text(proposal.candidateDdl, style = MaterialTheme.typography.bodySmall)
+                WrapRow {
+                    TextButton(onClick = viewModel::approvePipelinePatch, enabled = !state.isDrawing) { Text(S.pipelineApprove) }
+                    TextButton(onClick = viewModel::declinePipelinePatch, enabled = !state.isDrawing) { Text(S.pipelineDecline) }
+                }
+            }
+        }
+    } else if (view?.phaseTag == "score_ready" || (view?.phaseTag == "completed" && !savedCurrentRevision)) {
+        TextButton(onClick = viewModel::resumePipeline, enabled = !state.isDrawing) { Text(S.pipelineResume) }
+    }
+    val diagnostics = remember(view?.deliveryJson, state.selectedHistory?.renderMetadataJson) {
+        runCatching {
+            view?.deliveryJson?.let(::JSONObject)
+                ?: state.selectedHistory?.renderMetadataJson?.let(::JSONObject)?.optJSONObject("pipeline_diagnostics")
+        }.getOrNull()
+    }
+    if (diagnostics != null) {
+        val issueKeys = listOf("upstream_diagnostics", "downstream_diagnostics", "resource_omissions", "relation_omissions")
+        val issues = issueKeys.flatMap { key ->
+            val array = diagnostics.optJSONArray(key)
+            (0 until (array?.length() ?: 0)).mapNotNull { array?.optJSONObject(it) }
+        }
+        if (issues.isNotEmpty()) {
+            Text(S.pipelineDiagnostics, style = MaterialTheme.typography.labelMedium)
+            val omissions = (diagnostics.optJSONArray("resource_omissions")?.length() ?: 0) +
+                (diagnostics.optJSONArray("relation_omissions")?.length() ?: 0)
+            if (omissions > 0) Text(S.pipelineOmissions(omissions), style = MaterialTheme.typography.bodySmall)
+            issues.forEach { issue ->
+                val reason = issue.optString("reason").ifBlank { issue.optString("issue_id") }
+                if (reason.isNotBlank()) Text(reason, style = MaterialTheme.typography.bodySmall)
+            }
+        }
     }
 }
 

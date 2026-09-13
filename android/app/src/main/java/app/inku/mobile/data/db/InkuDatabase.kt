@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Database(
@@ -17,6 +18,10 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         ExportTemplateEntity::class,
         LineageNodeEntity::class,
         LineageEdgeEntity::class,
+        VariationAuthorityEntity::class,
+        VariationAuthorityActionEntity::class,
+        PipelineExecutionEntity::class,
+        PipelineHistoryLinkEntity::class,
     ],
     version = InkuDatabase.SCHEMA_VERSION,
     exportSchema = true,
@@ -30,10 +35,90 @@ abstract class InkuDatabase : RoomDatabase() {
     abstract fun pluginSettingDao(): PluginSettingDao
     abstract fun exportTemplateDao(): ExportTemplateDao
     abstract fun lineageDao(): LineageDao
+    abstract fun sharedPipelineDao(): SharedPipelineDao
 
     companion object {
-        const val SCHEMA_VERSION = 10
+        const val SCHEMA_VERSION = 11
         private const val DB_NAME = "inku.sqlite"
+
+        val MIGRATION_10_11 = object : Migration(10, 11) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `variation_authority` (
+                        `owner_id` TEXT NOT NULL,
+                        `variation_id` TEXT NOT NULL,
+                        `protocol_version` TEXT NOT NULL,
+                        `revision` TEXT NOT NULL,
+                        `origin` TEXT NOT NULL,
+                        `authority` TEXT NOT NULL,
+                        `source` TEXT NOT NULL,
+                        `document_json` TEXT NOT NULL,
+                        `ddl_digest` TEXT NOT NULL,
+                        `authority_digest` TEXT NOT NULL,
+                        `description` TEXT NOT NULL,
+                        `derivation_kind` TEXT NOT NULL,
+                        `parent_legacy_history_id` TEXT,
+                        `parent_variation_id` TEXT,
+                        `updated_at` INTEGER NOT NULL,
+                        PRIMARY KEY(`owner_id`, `variation_id`)
+                    )
+                    """.trimIndent(),
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_variation_authority_owner_id_parent_legacy_history_id` ON `variation_authority` (`owner_id`, `parent_legacy_history_id`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_variation_authority_owner_id_parent_variation_id` ON `variation_authority` (`owner_id`, `parent_variation_id`)")
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `variation_authority_actions` (
+                        `owner_id` TEXT NOT NULL,
+                        `action_id` TEXT NOT NULL,
+                        `variation_id` TEXT NOT NULL,
+                        `request_digest` TEXT NOT NULL,
+                        `action_fingerprint` TEXT NOT NULL,
+                        `context_fingerprint` TEXT NOT NULL,
+                        `ddl_digest` TEXT NOT NULL,
+                        `revision` TEXT NOT NULL,
+                        `authority_digest` TEXT NOT NULL,
+                        `committed_at` INTEGER NOT NULL,
+                        PRIMARY KEY(`owner_id`, `action_id`)
+                    )
+                    """.trimIndent(),
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_variation_authority_actions_owner_id_variation_id_revision_ddl_digest` ON `variation_authority_actions` (`owner_id`, `variation_id`, `revision`, `ddl_digest`)")
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `pipeline_candidate_executions` (
+                        `owner_id` TEXT NOT NULL,
+                        `execution_id` TEXT NOT NULL,
+                        `variation_id` TEXT NOT NULL,
+                        `sequence` TEXT NOT NULL,
+                        `state_bytes` BLOB NOT NULL,
+                        `state_digest` TEXT NOT NULL,
+                        `created_at` INTEGER NOT NULL,
+                        `updated_at` INTEGER NOT NULL,
+                        PRIMARY KEY(`owner_id`, `execution_id`)
+                    )
+                    """.trimIndent(),
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_pipeline_candidate_executions_owner_id_variation_id_updated_at` ON `pipeline_candidate_executions` (`owner_id`, `variation_id`, `updated_at`)")
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `pipeline_history_links` (
+                        `owner_id` TEXT NOT NULL,
+                        `history_id` TEXT NOT NULL,
+                        `variation_id` TEXT NOT NULL,
+                        `revision` TEXT NOT NULL,
+                        `ddl_digest` TEXT NOT NULL,
+                        `fork_context_bytes` BLOB NOT NULL,
+                        `fork_context_digest` TEXT NOT NULL,
+                        PRIMARY KEY(`owner_id`, `history_id`)
+                    )
+                    """.trimIndent(),
+                )
+                db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_pipeline_history_links_history_id` ON `pipeline_history_links` (`history_id`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_pipeline_history_links_owner_id_variation_id` ON `pipeline_history_links` (`owner_id`, `variation_id`)")
+            }
+        }
 
         val FRESH_SCHEMA_CALLBACK = object : RoomDatabase.Callback() {
             override fun onCreate(db: SupportSQLiteDatabase) {
@@ -78,7 +163,7 @@ abstract class InkuDatabase : RoomDatabase() {
                 context.applicationContext,
                 InkuDatabase::class.java,
                 databaseName,
-            ).addCallback(FRESH_SCHEMA_CALLBACK).build()
+            ).addMigrations(MIGRATION_10_11).addCallback(FRESH_SCHEMA_CALLBACK).build()
         }
     }
 }

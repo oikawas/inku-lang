@@ -30,6 +30,18 @@ object InkuStringsEn : InkuStrings {
     override val statusComposeFailed = "Composing failed."
     override val statusSaved: (String) -> String = { hash -> "Saved $hash" }
     override val statusSaveFailed = "Saving failed."
+    override val pipelineProposal = "Review the proposed DDL changes."
+    override val pipelineOriginalDdl = "Current DDL"
+    override val pipelineProposedDdl = "Proposed DDL"
+    override val pipelineApprove = "Approve changes and draw"
+    override val pipelineDecline = "Keep current DDL"
+    override val pipelineResume = "Continue drawing"
+    override val pipelineDdlAuthority = "This variation is drawn from its DDL."
+    override val pipelineNewDescription = "Create a new variation from the description"
+    override val pipelineNewDescriptionNotice = "The next drawing will be saved as a new variation."
+    override val pipelineCheckDdl = "Check the DDL and drawing diagnostics."
+    override val pipelineDiagnostics = "Drawing diagnostics"
+    override val pipelineOmissions: (Int) -> String = { count -> "Omitted placements or relations: $count. The other parts continue drawing." }
 
     override val batchTooManyItems: (Int, Int) -> String = { max, actual ->
         "A batch holds at most $max lines. There are $actual."
@@ -229,6 +241,8 @@ object InkuStringsEn : InkuStrings {
     override val stagesShared = "Stage 1 / Stage 2 shared"
     override val languageComboNote = "Choose a pairing of Stage 1 and Stage 2 languages."
     override val uiModeSubtitle = "Interface density and layout"
+    override val displaySafeMarginsSubtitle = "Avoids camera cutouts and screen edges in full screen without changing the paper ratio."
+    override val displaySafeMarginsToggle = "Use horizontal safe areas"
     override val exportSubtitle = "The web export settings"
     override val historySelectionSubtitle = "The web history settings"
     override val svgDisplayNote = "Standard SVG for viewing on the web"
@@ -360,6 +374,7 @@ object InkuStringsEn : InkuStrings {
     override val colorCatalogAuto = "Choose from description"
     override val colorCatalogAutoDescription = "Reads each description and chooses a matching color catalog."
     override val uiModeTitle = "Layout"
+    override val displaySafeMarginsTitle = "Device display margins"
     override val svgDisplay = "Display SVG"
     override val demoInterval = "Interval"
     override val autoRepair = "Auto-repair"

@@ -4,7 +4,15 @@
 
 この文書は時系列の実装・設計記録である。仕様との不一致がある場合は、現行契約を記す `SPEC.ja.md` を優先する。
 
-**本書が持つのは v2.5.0（2026-07-25、render engine 12）以降**の 33 版である。それより前は書庫にある。
+**本書が持つのは v2.5.0（2026-07-25、render engine 12）以降**の 34 版である。それより前は書庫にある。
+
+### 2026-09-13 — Androidのstandalone authoringを共有Rustへ接続
+
+AndroidのKotlin hostをinku serverを介さずproviderと共有Rust JNIへ接続し、通常の記述・直接DDL、batch／demo、推敲、カメラ出力を同じauthoring state machineへ通した。共有coreがknown holeの補完を追加操作なしで要求し、通常描画画面は現在のDDLと可視patchを示して作者の承認後だけ保存へ進む。カメラ画像の前処理と端末内local LLMはhostに残し、非画像provenanceは補完承認と再開をまたいで保持する。
+
+Roomは既存作品を消さずv10からv11へ移行し、origin／authority／sourceの原子CAS、action ACK、opaque execution、当該history revisionの不変contextを保存する。保存済みScoreの再演奏は再compileせず元のDDL・authority revision・資源上限を保ち、色やタッチを変えた新しい演奏だけを履歴・系譜・linkと一つのtransactionで保存する。旧作品のauthorityは本文から推測せず、表示と保存済み再演奏を維持し、DDL変更と記述再生成は元作品を残す新variationへforkする。
+
+新作用紙は共有Rust registryの11形式を正本とする。旧`pixel9_landscape_safe`は端末表示余白として扱い、既存作品の9:5比率と保存画像を保つ。旧設定からの新作用紙は`square`を既定とし、9:5を16:9へ別名化しない。これはsource接続の記録であり、実機acceptanceとStep 14の完了判定は保留中である。iOSは今回の範囲に含めず、別のStep 15として保留する。版番号と配備状態は変更しない。
 
 ### 2026-09-13 — 履歴の判別完了を待って描画する
 

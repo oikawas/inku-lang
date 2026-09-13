@@ -25,7 +25,7 @@
 
 派生プロジェクトは `inku-` プレフィックスで統一する：
 
-- `inku-core` — Rustで実装された共通core。Serverの現行runtimeはRendererとTyped Compilerの両方を共有authoring pipelineから使用する
+- `inku-core` — Rustで実装された共通core。ServerとAndroidはRendererとTyped Compilerの両方を共有authoring pipelineから使用する
 - `inku-saijiki` — 語彙辞書、最小限かつ必要十分を目指す
 - `inku-plugin` — 描画拡張 plugin、語彙自体は拡張されない、一種のマクロセット
 - `inku-web` — コンテナベースのWeb UI 実装
@@ -912,9 +912,13 @@ Lock検証済みtyped経路では、Stage 2 consumerの失敗方針をStop（既
 
 作者が明示したかたむきは、元meaningとtag付き`composition_seed`、logical occurrence、angle identityに束縛した共通resolverで、direct instructionとflat Macro Emitから一度だけ`Score.rotation`へ届く。Stage 2はeffective focus、variation seed、render seed、source spellingをこの選択へ混ぜない。
 
-### 12.7.1 共有authoring state machine候補
+### 12.7.1 共有authoring state machine
 
-共有Rust候補は、authoringをversion付きsnapshotへの決定的なcommandとして扱う。通常Server／Web経路はこのsnapshotとhostへ接続済みである。Coreは次のsnapshot、進行event、最大1個の`EffectAction`を返し、hostはLLM呼出またはvisible normalized DDLの保存だけを実行して、action identityをechoするtyped `EffectResult`を返す。Provider transportは一つのactionにつき一回だけ呼び、再試行の要否と次actionはcoreが決める。古いsequence、異なるdigest、遅れて届いたresultを状態へ適用せず、hostの成功をcoreが先取りして主張しない。
+共有Rustは、authoringをversion付きsnapshotへの決定的なcommandとして扱う。通常Server／WebとAndroid経路はこのsnapshotとhostへ接続する。Coreは次のsnapshot、進行event、最大1個の`EffectAction`を返し、hostはLLM呼出またはvisible normalized DDLの保存だけを実行して、action identityをechoするtyped `EffectResult`を返す。Provider transportは一つのactionにつき一回だけ呼び、再試行の要否と次actionはcoreが決める。古いsequence、異なるdigest、遅れて届いたresultを状態へ適用せず、hostの成功をcoreが先取りして主張しない。
+
+Androidはinku serverを介さず、Kotlin hostからproviderと共有Rust JNIへ接続する。通常の記述、直接DDL、batch／demo、推敲とカメラの送出は同じ共有pipelineを使用する。カメラ画像の前処理と端末内local LLMはhostに残し、得られた記述またはDDLを正規入口へ渡す。カメラの非画像provenanceは補完承認や再開をまたいで保持する。新規authoringでStage0.5を呼ばず、旧写生文を元記述の代わりに挿入しない。可視patchは通常描画画面に現在のDDLと変更案を示して承認を受ける。iOS接続はこのAndroid接続に含めず、別のStep 15として保留する。
+
+Room v10からv11へ既存作品を保持して移行し、origin／authority／sourceの原子保存、action ACK、opaque execution、履歴revisionの不変contextを追加する。同じexecutionの保存再開は同じ演奏の履歴を重複作成しない。保存済みScoreの再演奏も元の短いDDLと当該revisionのauthorityを保持し、独立して保存した資源予算で検証する。新作用紙のIDと整数比は共有Rustの11形式を正本とする。Android専用だった`pixel9_landscape_safe`は端末の表示余白へ移し、旧作品の9:5比率と保存画像は保持する。旧端末設定からの新作用紙選択は既定の`square`とし、9:5を16:9へ別名化しない。
 
 Variationの作成元は`stage1_generated`または`user_authored_ddl`として不変に保存し、authoring authorityは`description_authoritative`、`ddl_authoritative`、`legacy_unknown`のいずれかを単調に進める。記述から生成したvariationで、ユーザーがexact source bytesの変わるDDLを初めて確定するとDDL authorityへlockされる。同一bytesの確定はlockせず、確定後に以前のbytesへ戻しても記述authorityへ戻らない。Direct DDLは最初からDDL authorityである。すべての変更はdecimal-string revisionのcompare-and-set proposalであり、hostの一致するatomic save acknowledgmentを受け取るまでactive authorityとsourceを変えない。既存historyは`legacy_unknown`の由来を本文から推測せず、表示と保存済みSVGによる再演を維持する。旧DDLの変更は`user_authored_ddl`／`ddl_authoritative`、旧記述からの再生成は`stage1_generated`／`description_authoritative`の新variationへforkし、元historyと新旧関係を保存して元行を変更しない。共有pipelineで保存した過去の演奏を選んだ場合も、そのhistoryのsource、revision、seed、catalog、資源上限、definition lockを正とし、同じvariationの最新状態へ置き換えない。新しい演奏はraw compact Scoreとauthority revisionをhistory linkで結び、その時点のconfigとhost contextをfork用sidecarとして保存する。Sidecarのrevision／source digestがhistory linkと一致しなければforkを停止し、最新snapshotから推測しない。Core snapshot configは一つのvariation内で不変に保ち、既存variationから記述を生成し直す通常UI操作は、現在選択中のoptionsを渡した新variation／new editionとして保存する。
 

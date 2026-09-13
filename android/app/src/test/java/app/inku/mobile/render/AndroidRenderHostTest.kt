@@ -1,6 +1,7 @@
 package app.inku.mobile.render
 
 import app.inku.mobile.data.model.WorkColorSnapshot
+import app.inku.mobile.data.model.installCanvasRegistryForJvmTest
 import app.inku.mobile.pipeline.RenderRequest
 import java.math.BigInteger
 import org.json.JSONObject
@@ -8,9 +9,15 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Test
 
 class AndroidRenderHostTest {
+    @Before
+    fun installCanvasRegistry() {
+        installCanvasRegistryForJvmTest()
+    }
+
     @Test
     fun requestJsonCarriesRawScoreResolvedHostInputsAndExplicitWild() {
         val bridge = CapturingRenderBridge()

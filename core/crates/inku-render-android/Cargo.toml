@@ -13,6 +13,7 @@ crate-type = ["cdylib", "rlib"]
 path = "src/lib.rs"
 
 [dependencies]
+inku-pipeline-uniffi = { path = "../inku-pipeline-uniffi" }
 inku-render.workspace = true
 inku-svg-raster.workspace = true
 jni.workspace = true

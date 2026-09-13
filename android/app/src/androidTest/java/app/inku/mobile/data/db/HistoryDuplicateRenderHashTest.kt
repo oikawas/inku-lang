@@ -41,7 +41,7 @@ class HistoryDuplicateRenderHashTest {
         database?.close()
     }
 
-    /** A version 10 database, made from the entity rather than migrated into. */
+    /** A current-schema database, made from the entity rather than migrated into. */
     private fun openFresh(): InkuDatabase =
         Room.inMemoryDatabaseBuilder(context, InkuDatabase::class.java)
             .build()

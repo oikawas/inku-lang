@@ -43,10 +43,12 @@ import app.inku.mobile.llm.VisionAnalysisRequest
 import app.inku.mobile.llm.VisionImagePreparer
 import app.inku.mobile.llm.VisionOutputMode
 import app.inku.mobile.pipeline.InstructionLanguages
-import app.inku.mobile.pipeline.LocalVisionDdlValidation
 import app.inku.mobile.pipeline.ComposeFromDdlProgress
 import app.inku.mobile.pipeline.InterpretResult
 import app.inku.mobile.pipeline.PaintResult
+import app.inku.mobile.pipeline.AndroidWorkPipeline
+import app.inku.mobile.pipeline.PipelineInteractionRequired
+import app.inku.mobile.pipeline.PipelineView
 import app.inku.mobile.pipeline.SketchInput
 import app.inku.mobile.pipeline.SketchMode
 import app.inku.mobile.pipeline.Sketches
@@ -90,7 +92,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 const val DefaultDemoSeedPhrase = "世界の人と動物、自然と都市を主題として96文字の短文を作って。感情豊かに、季節や、人生と人のつながり、人生、世代、神。色々な観点から。"
-const val DemoCanvasAspectId = "pixel9_landscape_safe"
+const val DemoCanvasAspectId = CanvasAspects.DEFAULT_ID
 /** Bookkeeping the demo loop puts in front of the prose it saves. */
 const val DemoHistoryInputPrefix = "[demo] "
 
@@ -104,6 +106,7 @@ const val SETTING_KEY_UI_LANGUAGE = "ui_lang"
 const val SETTING_KEY_REFINEMENT_ELEMENT = "refinement_element"
 /** 写生 (Stage 0.5): which of the three states the control was left in. */
 const val SETTING_KEY_SKETCH_MODE = "sketch_mode"
+const val SETTING_KEY_DISPLAY_SAFE_MARGINS = "display_safe_margins"
 /** Said by every generating entry point that refuses while candidates are drawn. */
 val REFINEMENT_IN_PROGRESS: (InkuStrings) -> String = { it.refinementInProgress }
 /** 「固定モードでは固定側を1モデル、比較側を最大4モデル選ぶ」(SPEC `:616`). */
@@ -131,11 +134,19 @@ const val CANVAS_ZOOM_EPSILON = 0.01f
 /** 日本語 / English, the two names the language grid shows. */
 fun languageLabel(lang: String): String = if (lang == "en") "English" else "日本語"
 
+val InkuUiState.descriptionLocked: Boolean
+    get() = historyAuthorityLoading || (!descriptionForkRequested &&
+        (pipelineView?.authority == "ddl_authoritative" || historyAuthority == "ddl_authoritative"))
+
 data class InkuUiState(
     val prompt: String = "青い鉛筆の線を12本、波打つ軌跡に沿って散らす",
     val ddl: String = "",
     val ddlEditedAfterGeneration: Boolean = false,
     val confirmDdlOverwrite: Boolean = false,
+    val pipelineView: PipelineView? = null,
+    val historyAuthority: String? = null,
+    val historyAuthorityLoading: Boolean = false,
+    val descriptionForkRequested: Boolean = false,
     val batchText: String = "赤い円を5個、横に並べる\n黒い太筆の線を3本、斜めに置く\n緑の四角を12個、散らす",
     val batchPromptHistory: List<String> = emptyList(),
     val batchTotal: Int = 0,
@@ -182,7 +193,7 @@ data class InkuUiState(
     val lineageLoading: Boolean = false,
     val historySearchQuery: String = "",
     val historyStarredOnly: Boolean = false,
-    val canvasAspectPluginEnabled: Boolean = true,
+    val displaySafeMarginsEnabled: Boolean = false,
     val pngAlphaWhite: Boolean = false,
     val saveReplayAsNewVersion: Boolean = true,
     val historySelectionCanvas: HistorySelectionBehavior = HistorySelectionBehavior.Current,
@@ -329,6 +340,7 @@ data class RefinementCandidate(
     val saveState: RefinementSaveState = RefinementSaveState.Unsaved,
     val savedHistoryId: String? = null,
     val savedNodeId: String? = null,
+    val pipelineResult: PaintResult? = null,
 )
 
 enum class AppTab {
@@ -454,6 +466,16 @@ class InkuViewModel @JvmOverloads constructor(
             repository.ensureDefaultProviderSettings()
             repository.ensureDefaultExportTemplates()
             restorePersistedSettings()
+            runCatching { withContext(Dispatchers.IO) { repository.restoreActivePipeline() } }
+                .onSuccess { view ->
+                    if (view != null && view.phaseTag != "cancelled" &&
+                        !promptEditedByUser && !localState.value.isDrawing
+                    ) {
+                        restoredInitialHistory = true
+                        presentPipelineView(view)
+                    }
+                }
+                .onFailure { error -> localState.value = localState.value.copy(message = safeErrorMessage(error, "Could not restore drawing.")) }
             withContext(Dispatchers.IO) {
                 repeat(4) {
                     repository.backfillMissingThumbnails(limit = 8)
@@ -472,24 +494,8 @@ class InkuViewModel @JvmOverloads constructor(
                 // a state that no longer exists -- among them `lineageDetached`,
                 // which decides whether the next save has a parent at all.
                 val current = localState.value
-                if (!restoredInitialHistory && !promptEditedByUser && current.selectedHistory == null) {
-                    restoredInitialHistory = true
-                    localState.value = current.copy(
-                        selectedHistory = full,
-                        // Restored for display only. web has no such restore --
-                        // `displayedHistoryItem` starts null (+page.svelte:2604)
-                        // and `onMount` (:5789) puts nothing back -- so counting
-                        // it as a parent would make this client alone record a
-                        // `replay` for opening the app and drawing. Only an
-                        // explicit pick from history becomes a parent, which is
-                        // what web's `loadIterationItem` does.
-                        lineageDetached = true,
-                        prompt = full.originalInput,
-                        ddl = full.normalizedDdl,
-                        ddlEditedAfterGeneration = false,
-                        selectedCatalogId = full.colorCatalogId,
-                        selectedCanvasAspect = full.canvasAspect,
-                    )
+                if (!restoredInitialHistory && !promptEditedByUser && current.selectedHistory == null && !current.isDrawing) {
+                    applyHistorySelection(full, current.tab)
                 }
             }
         }
@@ -516,8 +522,108 @@ class InkuViewModel @JvmOverloads constructor(
     }
 
     fun setPrompt(value: String) {
+        if (localState.value.descriptionLocked) return
         promptEditedByUser = true
         localState.value = localState.value.copy(prompt = value, message = null)
+    }
+
+    fun startDescriptionVariation() {
+        if (localState.value.isDrawing || localState.value.historyAuthorityLoading) return
+        localState.value = localState.value.copy(
+            pipelineView = null,
+            descriptionForkRequested = true,
+            message = strings().pipelineNewDescriptionNotice,
+        )
+    }
+
+    private fun presentPipelineView(view: PipelineView) {
+        val context = JSONObject(view.hostContextJson)
+        val options = context.optJSONObject("host_options")
+        val parentId = context.optJSONObject("result_options")?.optString("parent_history_id")
+        val selected = localState.value.selectedHistory?.takeIf { item ->
+            item.id == parentId || runCatching {
+                JSONObject(item.renderMetadataJson).optString("pipeline_execution_id") == view.executionId
+            }.getOrDefault(false)
+        }
+        localState.value = localState.value.copy(
+            tab = AppTab.Compose,
+            composeMode = ComposeMode.Write,
+            refinementOpen = false,
+            refinementBusy = false,
+            selectedHistory = selected,
+            lineageDetached = selected == null,
+            selectedCanvasAspect = options?.optString("canvas_aspect")?.takeIf { it.isNotBlank() } ?: localState.value.selectedCanvasAspect,
+            selectedCatalogId = if (options?.optString("catalog_mode") == "auto") CatalogSelection.AUTO_ID else options?.optString("catalog_id")?.takeIf { it.isNotBlank() } ?: localState.value.selectedCatalogId,
+            selectedModelId = view.models?.stage1ModelId ?: localState.value.selectedModelId,
+            selectedStage2ModelId = view.models?.stage2ModelId ?: localState.value.selectedStage2ModelId,
+            renderWild = options?.optBoolean("wild") ?: localState.value.renderWild,
+            prompt = view.description ?: localState.value.prompt,
+            ddl = view.visibleDdl ?: localState.value.ddl,
+            pipelineView = view,
+            historyAuthority = view.authority,
+            historyAuthorityLoading = false,
+            descriptionForkRequested = false,
+            ddlEditedAfterGeneration = false,
+            isDrawing = false,
+            cameraCaptureState = CameraCaptureState.Idle,
+            message = if (view.patchProposal != null) {
+                strings().pipelineProposal
+            } else {
+                strings().pipelineCheckDdl
+            },
+        )
+    }
+
+    private fun presentPipelineInteraction(error: Throwable): Boolean {
+        if (error !is PipelineInteractionRequired) return false
+        presentPipelineView(error.view)
+        return true
+    }
+
+    fun approvePipelinePatch() = continuePipeline(approve = true)
+
+    fun resumePipeline() = continuePipeline(approve = false)
+
+    private fun continuePipeline(approve: Boolean) {
+        val view = localState.value.pipelineView ?: return
+        val runId = beginDrawingRun()
+        localState.value = localState.value.copy(isDrawing = true)
+        drawingJob = viewModelScope.launch {
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    if (approve) repository.approvePipelinePatch(view.executionId) else repository.resumePipeline(view.executionId)
+                }
+            }.onSuccess { item ->
+                val next = withContext(Dispatchers.IO) { repository.pipelineViewFor(item) }
+                if (!isCurrentDrawingRun(runId)) return@onSuccess
+                localState.value = localState.value.copy(
+                    prompt = item.originalInput,
+                    ddl = item.normalizedDdl,
+                    selectedHistory = item,
+                    pipelineView = next,
+                    historyAuthority = next?.authority,
+                    descriptionForkRequested = false,
+                    lineageDetached = false,
+                    isDrawing = false,
+                    message = "Rendered ${item.renderHashShort}",
+                )
+            }.onFailure { error ->
+                if (!isCurrentDrawingRun(runId)) return@onFailure
+                if (!presentPipelineInteraction(error)) {
+                    localState.value = localState.value.copy(isDrawing = false, message = messageFor(error, strings(), strings().statusDrawFailed))
+                }
+            }
+        }
+    }
+
+    fun declinePipelinePatch() {
+        val view = localState.value.pipelineView ?: return
+        if (localState.value.isDrawing) return
+        viewModelScope.launch {
+            runCatching { withContext(Dispatchers.IO) { repository.declinePipelinePatch(view.executionId) } }
+                .onSuccess { if (localState.value.pipelineView?.executionId == view.executionId) presentPipelineView(it) }
+                .onFailure { localState.value = localState.value.copy(message = safeErrorMessage(it, "Could not decline changes.")) }
+        }
     }
 
     fun requestCameraCapture() {
@@ -771,10 +877,7 @@ class InkuViewModel @JvmOverloads constructor(
                     if (result.text.isBlank()) throw CameraStageFailure(CameraFailure.EmptyResult)
                     val directDdl = when (request.outputMode) {
                         VisionOutputMode.DESCRIPTION -> null
-                        VisionOutputMode.DDL -> when (val validation = ServerDdlText.validateLocalVisionDdl(result.text)) {
-                            is LocalVisionDdlValidation.Valid -> validation.ddl
-                            LocalVisionDdlValidation.Invalid -> throw CameraStageFailure(CameraFailure.InvalidDdl)
-                        }
+                        VisionOutputMode.DDL -> result.text.trim().ifBlank { throw CameraStageFailure(CameraFailure.EmptyResult) }
                     }
                     CameraNimRunInput(
                         description = directDdl ?: result.text.trim(),
@@ -810,6 +913,8 @@ class InkuViewModel @JvmOverloads constructor(
                 )
             }
             throw error
+        } catch (error: PipelineInteractionRequired) {
+            if (serial == cameraRunSerial) presentPipelineInteraction(error)
         } catch (_: Throwable) {
             failCameraRun(
                 serial,
@@ -859,6 +964,8 @@ class InkuViewModel @JvmOverloads constructor(
                     )
                 }
                 throw error
+            } catch (error: PipelineInteractionRequired) {
+                if (serial == cameraRunSerial) presentPipelineInteraction(error)
             } catch (_: Throwable) {
                 failCameraRun(serial, input.nimFailure(), canRetryNim = true)
             }
@@ -932,6 +1039,7 @@ class InkuViewModel @JvmOverloads constructor(
                 instructionLang = InstructionLanguages.AUTO,
                 uiLang = input.uiLanguageCode,
                 sketch = SketchInput(),
+                inputProvenance = input.inputProvenance,
             )
         }
     }
@@ -957,6 +1065,7 @@ class InkuViewModel @JvmOverloads constructor(
             uiLang = input.uiLanguageCode,
             sketch = SketchInput(),
             inputProvenance = input.inputProvenance,
+            executionId = interpreted?.executionId,
             onProgress = { pipelinePhase ->
                 progress(
                     when (pipelinePhase) {
@@ -1054,6 +1163,12 @@ class InkuViewModel @JvmOverloads constructor(
         localState.value = localState.value.copy(
             prompt = "",
             ddl = "",
+            pipelineView = null,
+            historyAuthority = null,
+            historyAuthorityLoading = false,
+            descriptionForkRequested = false,
+            selectedHistory = null,
+            lineageDetached = true,
             ddlEditedAfterGeneration = false,
             cameraCaptureState = localState.value.cameraCaptureState.clearCameraOrigin(),
             message = null,
@@ -1100,8 +1215,9 @@ class InkuViewModel @JvmOverloads constructor(
     }
 
     fun setCanvasAspect(id: String) {
-        localState.value = localState.value.copy(selectedCanvasAspect = CanvasAspects.normalize(id))
-        persistSetting("canvas_aspect", JSONObject().put("value", CanvasAspects.normalize(id)).toString())
+        val selected = CanvasAspects.newSelectionOrDefault(id)
+        localState.value = localState.value.copy(selectedCanvasAspect = selected)
+        persistSetting("canvas_aspect", JSONObject().put("value", selected).toString())
     }
 
     fun setSelectedModel(modelId: String) {
@@ -1297,9 +1413,9 @@ class InkuViewModel @JvmOverloads constructor(
         )
     }
 
-    fun setCanvasAspectPluginEnabled(enabled: Boolean) {
-        localState.value = localState.value.copy(canvasAspectPluginEnabled = enabled)
-        persistSetting("canvas_aspect_plugin", JSONObject().put("enabled", enabled).toString())
+    fun setDisplaySafeMarginsEnabled(enabled: Boolean) {
+        localState.value = localState.value.copy(displaySafeMarginsEnabled = enabled)
+        persistSetting(SETTING_KEY_DISPLAY_SAFE_MARGINS, JSONObject().put("enabled", enabled).toString())
     }
 
     fun setPngAlphaWhite(enabled: Boolean) {
@@ -1447,10 +1563,15 @@ class InkuViewModel @JvmOverloads constructor(
      *   (`openLineageNodeInCanvas`, :4234) that moves to the canvas.
      */
     private fun applyHistorySelection(item: HistoryItemEntity, tab: AppTab) {
+        if (localState.value.isDrawing) stopDrawing()
         restoredInitialHistory = true
         promptEditedByUser = false
         localState.value = localState.value.copy(
             selectedHistory = item,
+            pipelineView = null,
+            historyAuthority = null,
+            historyAuthorityLoading = true,
+            descriptionForkRequested = false,
             // An explicit pick is what makes a work the parent of the next save
             // (web's `loadIterationItem`, +page.svelte:4600).
             lineageDetached = false,
@@ -1464,6 +1585,17 @@ class InkuViewModel @JvmOverloads constructor(
             tab = tab,
             composeMode = ComposeMode.Write,
         )
+        viewModelScope.launch {
+            val loaded = runCatching {
+                withContext(Dispatchers.IO) { repository.readManagedHistory(AndroidWorkPipeline.OWNER_ID, item.id) }
+            }
+            if (localState.value.selectedHistory?.id != item.id || !localState.value.historyAuthorityLoading) return@launch
+            localState.value = localState.value.copy(
+                historyAuthority = loaded.getOrNull()?.authority,
+                historyAuthorityLoading = false,
+                message = loaded.getOrNull()?.warning ?: loaded.exceptionOrNull()?.let { safeErrorMessage(it, "Could not read drawing context.") },
+            )
+        }
     }
 
     fun selectHistory(item: HistoryListItem) {
@@ -1485,6 +1617,10 @@ class InkuViewModel @JvmOverloads constructor(
     fun detachLineage() {
         localState.value = localState.value.copy(
             selectedHistory = null,
+            pipelineView = null,
+            historyAuthority = null,
+            historyAuthorityLoading = false,
+            descriptionForkRequested = false,
             lineageDetached = true,
             // The two lines contract 1/5 had to leave out, because there was no
             // lineage on this client to clear or to leave: web's `detachLineage`
@@ -1602,6 +1738,7 @@ class InkuViewModel @JvmOverloads constructor(
     private fun beginDrawingRun(): Long {
         drawingRunSerial += 1
         drawingJob?.cancel()
+        localState.value = localState.value.copy(isDrawing = true)
         return drawingRunSerial
     }
 
@@ -1723,6 +1860,7 @@ class InkuViewModel @JvmOverloads constructor(
     }
 
     private fun runSubmit(current: InkuUiState, route: CameraNimDrawRoute? = null) {
+        if (current.descriptionLocked && !current.historyAuthorityLoading) return
         if (current.prompt.isBlank()) {
             localState.value = current.copy(message = "Prompt is empty.")
             return
@@ -1736,15 +1874,39 @@ class InkuViewModel @JvmOverloads constructor(
         val declared = if (route == null) describeLineage(current) else LineageDeclaration()
         // Read here for the same reason: it is decided against the parent, and
         // the coroutine clears the parent before it draws.
-        val sketchRequest = if (route == null) describeSketchInput(current) else SketchInput()
         val stage1ModelId = route?.stage1ModelId ?: current.selectedModelId
         val stage2ModelId = route?.stage2ModelId ?: current.selectedStage2ModelId
-        val stage1CatalogId = route?.catalogId ?:
-            CatalogSelection.resolvedCatalogIdForRun(current.selectedCatalogId)
+        val stage1CatalogId = route?.catalogId ?: current.selectedCatalogId
         val autoRepair = route?.autoRepair ?: current.ddlAutoRepairEnabled
         val litertStage1PromptOptimization = if (route == null) current.litertStage1PromptOptimization else false
         val runId = beginDrawingRun()
         drawingJob = viewModelScope.launch {
+            if (current.historyAuthorityLoading && current.selectedHistory != null) {
+                val read = runCatching {
+                    withContext(Dispatchers.IO) {
+                        repository.readManagedHistory(AndroidWorkPipeline.OWNER_ID, current.selectedHistory.id)
+                    }
+                }
+                if (!isCurrentDrawingRun(runId)) return@launch
+                val managed = read.getOrNull()
+                if (read.isFailure || managed == null || managed.warning != null) {
+                    localState.value = localState.value.copy(
+                        isDrawing = false,
+                        historyAuthorityLoading = false,
+                        message = managed?.warning ?: read.exceptionOrNull()?.let { safeErrorMessage(it, "Could not read drawing context.") } ?: "Drawing context is missing.",
+                    )
+                    return@launch
+                }
+                if (managed.authority == "ddl_authoritative" && !current.descriptionForkRequested) {
+                    localState.value = localState.value.copy(
+                        isDrawing = false,
+                        historyAuthorityLoading = false,
+                        historyAuthority = managed.authority,
+                        message = strings().pipelineDdlAuthority,
+                    )
+                    return@launch
+                }
+            }
             val lineage = withPreviewParent(current, declared)
             localState.value = localState.value.copy(
                 isDrawing = true,
@@ -1752,67 +1914,30 @@ class InkuViewModel @JvmOverloads constructor(
                 ddl = "",
                 ddlEditedAfterGeneration = false,
                 confirmDdlOverwrite = false,
+                pipelineView = null,
+                historyAuthority = null,
                 message = strings().statusStage1,
             )
             runCatching {
-                val interpreted = withContext(Dispatchers.IO) {
-                    repository.interpret(
+                withContext(Dispatchers.IO) {
+                    repository.paint(
                         current.prompt,
                         stage1CatalogId,
                         current.selectedCanvasAspect,
                         stage1ModelId,
                         stage2ModelId,
                         autoRepair,
-                        litertStage1PromptOptimization,
-                        instructionLang = InstructionLanguages.AUTO,
-                        uiLang = current.uiLanguage.code,
-                        sketch = sketchRequest,
-                    )
-                }
-                if (!isCurrentDrawingRun(runId)) return@launch
-                localState.value = localState.value.copy(
-                    ddl = interpreted.ddlForDisplay,
-                    ddlEditedAfterGeneration = false,
-                    message = strings().statusStage2,
-                )
-                val catalogId = route?.catalogId ?: if (sketchRequest.text != null) {
-                    CatalogSelection.resolvedCatalogIdForRun(
-                        if (current.selectedCatalogId == CatalogSelection.AUTO_ID) "default" else current.selectedCatalogId,
-                    )
-                } else {
-                    withContext(Dispatchers.IO) {
-                        repository.selectCatalogId(
-                            current.selectedCatalogId,
-                            interpreted.sketchText ?: current.prompt,
-                            stage1ModelId,
-                        )
-                    }
-                }
-                withContext(Dispatchers.IO) {
-                    repository.composeFromDdl(
-                        current.prompt,
-                        interpreted.ddlForDisplay,
-                        catalogId,
-                        current.selectedCanvasAspect,
-                        stage1ModelId,
-                        stage2ModelId,
-                        autoRepair,
-                        litertStage1PromptOptimization,
+                        litertStage1PromptOptimization = litertStage1PromptOptimization,
                         lineage = lineage,
                         instructionLang = InstructionLanguages.AUTO,
                         uiLang = current.uiLanguage.code,
-                        // 0.5 ran in the step above and is not run again: what it
-                        // produced -- and what it did, including a fallback the
-                        // prose cannot show -- travels to the save from there.
-                        sketch = sketchRequest.copy(
-                            text = interpreted.sketchText,
-                            grain = interpreted.sketchGrain,
-                            claimedState = interpreted.sketchState,
-                        ),
+                        parentHistoryId = current.selectedHistory?.id?.takeUnless { current.lineageDetached },
                         inputProvenance = route?.inputProvenance,
                     )
                 }
             }.onSuccess { item ->
+                if (!isCurrentDrawingRun(runId)) return@onSuccess
+                val view = withContext(Dispatchers.IO) { repository.pipelineViewFor(item) }
                 if (!isCurrentDrawingRun(runId)) return@onSuccess
                 promptEditedByUser = false
                 localState.value = localState.value.copy(
@@ -1821,6 +1946,9 @@ class InkuViewModel @JvmOverloads constructor(
                     ddlEditedAfterGeneration = false,
                     confirmDdlOverwrite = false,
                     selectedHistory = item,
+                    pipelineView = view,
+                    historyAuthority = view?.authority,
+                    descriptionForkRequested = false,
                     // A saved work is what the next one comes from (web lowers
                     // the same flag on every save, +page.svelte:2883, :3304).
                     lineageDetached = false,
@@ -1830,6 +1958,7 @@ class InkuViewModel @JvmOverloads constructor(
                 )
             }.onFailure { error ->
                 if (!isCurrentDrawingRun(runId)) return@onFailure
+                if (presentPipelineInteraction(error)) return@onFailure
                 val message = if (error is CancellationException) strings().statusStopped else messageFor(error, strings(), strings().statusDrawFailed)
                 localState.value = localState.value.copy(isDrawing = false, message = message)
             }
@@ -1843,10 +1972,6 @@ class InkuViewModel @JvmOverloads constructor(
             localState.value = localState.value.copy(message = REFINEMENT_IN_PROGRESS(strings()))
             return
         }
-        validateSelectedModels(current)?.let { message ->
-            localState.value = localState.value.copy(message = message)
-            return
-        }
         val ddl = current.ddl.ifBlank { current.prompt }
         val declared = ddlLineage(current)
         val runId = beginDrawingRun()
@@ -1855,9 +1980,11 @@ class InkuViewModel @JvmOverloads constructor(
             localState.value = localState.value.copy(isDrawing = true, message = strings().statusComposingFromDdl)
             runCatching {
                 withContext(Dispatchers.IO) {
-                    repository.composeFromDdl(current.prompt, ddl, CatalogSelection.resolvedCatalogIdForRun(current.selectedCatalogId), current.selectedCanvasAspect, current.selectedModelId, current.selectedStage2ModelId, current.ddlAutoRepairEnabled, current.litertStage1PromptOptimization, lineage = lineage, instructionLang = InstructionLanguages.AUTO, uiLang = current.uiLanguage.code)
+                    repository.composeFromDdl(current.prompt, ddl, current.selectedCatalogId, current.selectedCanvasAspect, current.selectedModelId, current.selectedStage2ModelId, current.ddlAutoRepairEnabled, current.litertStage1PromptOptimization, lineage = lineage, instructionLang = InstructionLanguages.AUTO, uiLang = current.uiLanguage.code, parentHistoryId = current.selectedHistory?.id?.takeUnless { current.lineageDetached }, executionId = current.pipelineView?.executionId)
                 }
             }.onSuccess { item ->
+                if (!isCurrentDrawingRun(runId)) return@onSuccess
+                val view = withContext(Dispatchers.IO) { repository.pipelineViewFor(item) }
                 if (!isCurrentDrawingRun(runId)) return@onSuccess
                 promptEditedByUser = false
                 localState.value = localState.value.copy(
@@ -1866,6 +1993,9 @@ class InkuViewModel @JvmOverloads constructor(
                     ddlEditedAfterGeneration = false,
                     confirmDdlOverwrite = false,
                     selectedHistory = item,
+                    pipelineView = view,
+                    historyAuthority = view?.authority,
+                    descriptionForkRequested = false,
                     lineageDetached = false,
                     isDrawing = false,
                     message = "Composed ${item.renderHashShort}",
@@ -1873,6 +2003,7 @@ class InkuViewModel @JvmOverloads constructor(
                 if (returnToLineage) refreshLineage()
             }.onFailure { error ->
                 if (!isCurrentDrawingRun(runId)) return@onFailure
+                if (presentPipelineInteraction(error)) return@onFailure
                 val message = if (error is CancellationException) strings().statusStopped else messageFor(error, strings(), strings().statusComposeFailed)
                 localState.value = localState.value.copy(isDrawing = false, message = message)
             }
@@ -1975,6 +2106,7 @@ class InkuViewModel @JvmOverloads constructor(
                 }.onFailure { error ->
                     if (error is CancellationException) throw error
                     if (!isCurrentDrawingRun(runId)) return@onFailure
+                    if (presentPipelineInteraction(error)) return@launch
                     failures = (failures + BatchFailure(lineNumber, prompt, safeErrorMessage(error, "Draw failed."))).take(30)
                     localState.value = localState.value.copy(
                         batchSuccess = success,
@@ -2099,6 +2231,7 @@ class InkuViewModel @JvmOverloads constructor(
                     }.onFailure { error ->
                         if (error is CancellationException) throw error
                         if (!isCurrentDrawingRun(runId)) return@onFailure
+                        if (presentPipelineInteraction(error)) return@launch
                         localState.value = localState.value.copy(
                             demoCurrentElapsedMs = System.currentTimeMillis() - startedAt,
                             message = safeErrorMessage(error, "Demo failed."),
@@ -2131,6 +2264,9 @@ class InkuViewModel @JvmOverloads constructor(
         drawingRunSerial += 1
         drawingJob?.cancel()
         drawingJob = null
+        localState.value.pipelineView?.takeIf { !it.terminal }?.let { view ->
+            viewModelScope.launch { runCatching { repository.cancelPipeline(view.executionId) } }
+        }
         localState.value = localState.value.copy(isDrawing = false, demoWaitingSeconds = null, message = strings().statusStopped)
     }
 
@@ -2467,6 +2603,7 @@ class InkuViewModel @JvmOverloads constructor(
                             renderHash = result.renderHash,
                             renderHashShort = result.renderHashShort,
                             renderMetadataJson = result.renderMetadataJson,
+                            pipelineResult = result,
                             elapsedMs = System.currentTimeMillis() - started,
                             stage1Model = job.plan.stage1Model ?: parent.stage1Model,
                             stage2Model = job.plan.stage2Model ?: parent.stage2Model,
@@ -2479,7 +2616,9 @@ class InkuViewModel @JvmOverloads constructor(
                 }
             }.onFailure { error ->
                 if (error is CancellationException) throw error
-                localState.value = localState.value.copy(refinementStatus = messageFor(error, strings(), strings().refinementFailed))
+                if (!presentPipelineInteraction(error)) {
+                    localState.value = localState.value.copy(refinementStatus = messageFor(error, strings(), strings().refinementFailed))
+                }
             }
             abortTimer.cancel()
             localState.value = localState.value.copy(refinementBusy = false, refinementCanAbort = false)
@@ -2554,7 +2693,7 @@ class InkuViewModel @JvmOverloads constructor(
         parentItem: HistoryItemEntity,
         historyVisibility: String?,
     ): HistoryItemEntity = repository.saveRefinementCandidate(
-        result = PaintResult(
+        result = candidate.pipelineResult ?: PaintResult(
             originalInput = sourceTextOf(parentItem),
             normalizedDdl = candidate.normalizedDdl,
             expandedDdl = candidate.normalizedDdl,
@@ -2837,7 +2976,10 @@ class InkuViewModel @JvmOverloads constructor(
         val current = localState.value
         val catalog = settings["color_catalog"]?.let { JSONObject(it).optString("value", current.selectedCatalogId) } ?: current.selectedCatalogId
         val canvas = settings["canvas_aspect"]?.let { JSONObject(it).optString("value", current.selectedCanvasAspect) } ?: current.selectedCanvasAspect
-        val canvasPlugin = settings["canvas_aspect_plugin"]?.let { JSONObject(it).optBoolean("enabled", current.canvasAspectPluginEnabled) } ?: current.canvasAspectPluginEnabled
+        val legacyPixel9Paper = canvas == CanvasAspects.LEGACY_PIXEL9_LANDSCAPE_SAFE_ID
+        val displaySafeMargins = settings[SETTING_KEY_DISPLAY_SAFE_MARGINS]
+            ?.let { JSONObject(it).optBoolean("enabled", current.displaySafeMarginsEnabled) }
+            ?: if (legacyPixel9Paper) true else current.displaySafeMarginsEnabled
         val pngAlpha = settings["png_alpha_white"]?.let { JSONObject(it).optBoolean("enabled", current.pngAlphaWhite) } ?: current.pngAlphaWhite
         val replay = settings["save_replay_as_new_version"]?.let { JSONObject(it).optBoolean("enabled", current.saveReplayAsNewVersion) } ?: current.saveReplayAsNewVersion
         val histCanvas = settings["history_selection_canvas"]?.let { parseHistorySelection(JSONObject(it).optString("value")) } ?: current.historySelectionCanvas
@@ -2873,8 +3015,8 @@ class InkuViewModel @JvmOverloads constructor(
             ?: current.includeThinking
         localState.value = current.copy(
             selectedCatalogId = CatalogSelection.normalizedSelectionId(catalog),
-            selectedCanvasAspect = CanvasAspects.normalize(canvas),
-            canvasAspectPluginEnabled = canvasPlugin,
+            selectedCanvasAspect = CanvasAspects.newSelectionOrDefault(canvas),
+            displaySafeMarginsEnabled = displaySafeMargins,
             pngAlphaWhite = pngAlpha,
             saveReplayAsNewVersion = replay,
             historySelectionCanvas = histCanvas,
@@ -2894,6 +3036,18 @@ class InkuViewModel @JvmOverloads constructor(
             selectedModelId = restoredUnifiedModel,
             selectedStage2ModelId = restoredUnifiedModel,
         )
+        if (legacyPixel9Paper) {
+            repository.saveSetting(
+                "canvas_aspect",
+                JSONObject().put("value", CanvasAspects.DEFAULT_ID).toString(),
+            )
+            if (SETTING_KEY_DISPLAY_SAFE_MARGINS !in settings) {
+                repository.saveSetting(
+                    SETTING_KEY_DISPLAY_SAFE_MARGINS,
+                    JSONObject().put("enabled", true).toString(),
+                )
+            }
+        }
         warmupLiteRtModels(restoredUnifiedModel)
     }
 

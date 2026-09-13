@@ -4,7 +4,15 @@
 
 This file records changes chronologically. If a historical note conflicts with the current specification, the current specification wins. The more detailed canonical history is maintained in Japanese in [CHANGELOG.ja.md](CHANGELOG.ja.md).
 
-**This file holds the 33 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
+**This file holds the 34 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
+
+### 2026-09-13 — Connect standalone Android authoring to shared Rust
+
+Android's Kotlin host now connects directly to the provider and shared Rust JNI without an inku server. Normal description and direct-DDL input, batch, demo, refinement, and camera output use the same authoring state machine. Shared core requests completion for a known hole without another start operation; the normal drawing screen shows the current DDL and visible patch, and persistence proceeds only after author approval. Camera image preparation and the on-device local LLM remain in the host, while non-image provenance survives completion approval and resumption.
+
+Room migrates from v10 to v11 without deleting existing works. It stores origin, authority, and source through atomic CAS; action acknowledgments; opaque executions; and immutable context for the selected history revision. Replaying a saved Score does not recompile it and retains its DDL, authority revision, and resource limits. A new performance with changed color or touch is saved with its history, lineage, and link in one transaction. Authority for legacy works is not inferred from their text: display and saved replay remain available, while DDL editing and description regeneration fork new variations and preserve the source work.
+
+The shared Rust registry is authoritative for the 11 new-paper formats. The former `pixel9_landscape_safe` option is treated as device display margins, while existing works retain their 9:5 ratio and saved images. Migrating that old preference uses `square` as the default paper for new works and does not alias 9:5 to 16:9. This entry records source integration; device acceptance and the Step 14 completion judgment remain pending. iOS is outside this change and remains pending as the separate Step 15. Versions and deployment state are unchanged.
 
 ### 2026-09-13 — Wait for history identification before drawing
 

@@ -63,7 +63,7 @@ fn closed_arc_pair_gets_one_outer_spread_and_absent_field_adds_nothing() {
     let spread = render_svg(
         r#"{"version":"0.12.0","instructions":[
           {"primitive":"arc","center":[0.5,0.47],"radius":0.0833,
-           "angle_start":-143.13,"angle_end":-36.87,"color":"green"},
+           "angle_start":-143.13,"angle_end":-36.87,"color":"green","ink_spread":"bleed"},
           {"primitive":"arc","center":[0.5,0.53],"radius":0.0833,
            "angle_start":143.13,"angle_end":36.87,"color":"green",
            "filled":true,"ink_spread":"bleed",

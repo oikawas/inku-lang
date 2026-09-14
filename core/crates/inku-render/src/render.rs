@@ -399,7 +399,7 @@ fn render_impl(
         }
     }
     let mut surface_definitions = Vec::new();
-    let mut closed_arc_pair_spread_followers = BTreeSet::new();
+    let mut closed_arc_pair_spread_marks = BTreeSet::new();
     for (
         instruction_index,
         instruction,
@@ -458,7 +458,8 @@ fn render_impl(
                 render_closed_arc_pair_fill(instruction, first_context, follower, follower_context)?
             {
                 if follower.ink_spread.is_some() {
-                    closed_arc_pair_spread_followers.insert(follower_performed_index);
+                    closed_arc_pair_spread_marks.insert(performed_index);
+                    closed_arc_pair_spread_marks.insert(follower_performed_index);
                 }
                 material_definitions.extend(accepted_fills::closed_contour_definitions(
                     follower,
@@ -507,7 +508,7 @@ fn render_impl(
             } else {
                 base_mark
             };
-            let mut mark = if closed_arc_pair_spread_followers.contains(&performed_index) {
+            let mut mark = if closed_arc_pair_spread_marks.contains(&performed_index) {
                 mark
             } else {
                 crate::ink_spread::wrap(mark, single, context)

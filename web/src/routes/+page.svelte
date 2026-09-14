@@ -131,6 +131,7 @@
 	// Injected by vite.config from web/APP_VERSION, the single source shared with
 	// the server (/api/info) and the CLI. Never write the version here again.
 	const APP_VERSION = __APP_VERSION__;
+	const BINDING_PROTOCOL_VERSION = '1.0.0';
 	const REPOSITORY_URL = 'https://github.com/oikawas/inku-lang';
 	// vite.config embeds BUILD_NUMBER's mtime. Treat an unreadable value as null.
 	const buildDateLabel = $derived.by(() => {
@@ -1084,7 +1085,7 @@
 			currentRenderEngineVersion = typeof data.render_engine_version === 'string'
 				? data.render_engine_version
 				: null;
-			// The three layer versions the app info panel shows. They come from the
+			// The three server layer versions the app info panel shows. They come from the
 			// same call the render engine version does, so one answer carries all.
 			currentDdlVersion = typeof data.ddl_version === 'string' ? data.ddl_version : null;
 			currentDdlEngineVersion = typeof data.ddl_engine_version === 'string' ? data.ddl_engine_version : null;
@@ -3059,15 +3060,16 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 					<dt>{t().appInfoBuildDateLabel}</dt>
 					<dd>{buildDateLabel ?? t().historyVersionNotRecorded}</dd>
 				</div>
-				<!-- The three layer versions the server is running, in the same order
-				     and under the same names the provenance drawer uses. -->
+				<!-- Runtime version labels, in the requested display order. -->
 				<div class="app-info-row">
-					<dt>Render engine version</dt>
-					<dd>{currentRenderEngineVersion ?? t().historyVersionNotRecorded}</dd>
-					<dt>DDL version</dt>
+					<dt>DDL Spec. ver.</dt>
 					<dd>{currentDdlVersion ?? t().historyVersionNotRecorded}</dd>
-					<dt>DDL engine version</dt>
+					<dt>DDL engine ver.</dt>
 					<dd>{currentDdlEngineVersion ?? t().historyVersionNotRecorded}</dd>
+					<dt>Render engine ver.</dt>
+					<dd>{currentRenderEngineVersion ?? t().historyVersionNotRecorded}</dd>
+					<dt>Binding protocol ver.</dt>
+					<dd>{BINDING_PROTOCOL_VERSION}</dd>
 				</div>
 				<div>
 					<dt>{t().appInfoRepositoryLabel}</dt>

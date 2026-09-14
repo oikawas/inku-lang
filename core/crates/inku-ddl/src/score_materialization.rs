@@ -328,6 +328,17 @@ pub fn materialize_selected_composition(
         .collect::<Result<Vec<_>, ScoreMaterializationError>>()?;
     let score = Score {
         version: if instructions.iter().any(|instruction| {
+            instruction.relation.as_ref().is_some_and(|relation| {
+                matches!(
+                    relation.target_path_position,
+                    Some(inku_score::TargetPathPosition::Selection(
+                        inku_score::TargetPathSelection::Interior
+                    ))
+                )
+            })
+        }) {
+            "0.13.0"
+        } else if instructions.iter().any(|instruction| {
             instruction.ink_spread.is_some()
                 || instruction
                     .relation
@@ -336,10 +347,12 @@ pub fn materialize_selected_composition(
         }) {
             "0.12.0"
         } else if instructions.iter().any(|instruction| {
-            instruction
-                .relation
-                .as_ref()
-                .is_some_and(|relation| relation.target_path_position.is_some())
+            instruction.relation.as_ref().is_some_and(|relation| {
+                matches!(
+                    relation.target_path_position,
+                    Some(inku_score::TargetPathPosition::Exact(_))
+                )
+            })
         }) {
             "0.11.0"
         } else {

@@ -313,6 +313,49 @@ fn relation_association_failure_keeps_valid_neighbors_under_legacy_stop() {
 }
 
 #[test]
+fn invalid_partway_target_omits_only_the_relation_and_keeps_the_following_instruction() {
+    let source = "赤い円を置く。青い線を引く、前の線の途中につながる。灰の四角を置く。";
+    let result = execute_language(
+        source,
+        ResolvedInstructionLanguage::Ja,
+        &[],
+        ScoreErrorPolicy::OmitAndContinue,
+    );
+    assert_eq!(
+        result.outcome(),
+        ScoreLoweringOutcome::CompleteWithOmissions
+    );
+    let score = result
+        .score()
+        .expect("independent instructions remain drawable");
+    assert_eq!(score.instructions.len(), 3);
+    assert!(score.instructions[1].relation.is_none());
+    assert_eq!(score.instructions[2].primitive, Primitive::Square);
+    assert!(
+        result
+            .compilation()
+            .semantic_document
+            .as_ref()
+            .unwrap()
+            .instruction_association
+            .relation_issues
+            .iter()
+            .any(|issue| issue.kind.as_str() == "relation_target_primitive_mismatch")
+    );
+    assert!(result.upstream_diagnostics().iter().any(|diagnostic| {
+        matches!(
+            diagnostic.disposition,
+            CompilerExecutionDisposition::RelationOmitted {
+                unit: CompilerExecutionOmissionUnit::RelationInstruction {
+                    instruction_index: 1,
+                    ..
+                }
+            }
+        )
+    }));
+}
+
+#[test]
 fn touching_explicit_facts_and_omission_chain_keep_original_dependencies() {
     let source = concat!(
         "place one red horizontal line with length 0.4 at horizontal 0.5, vertical 0.5. ",

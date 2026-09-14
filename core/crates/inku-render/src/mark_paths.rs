@@ -2,8 +2,11 @@
 
 use std::collections::BTreeSet;
 
-use crate::determinism::needs_path_variation;
-use crate::geometry::{line_with_variation, point_to_pixels, size_to_pixels, stroke_sample_count};
+use crate::determinism::{needs_contour_variation, needs_path_variation};
+use crate::geometry::{
+    ArcGeometry, arc_points, arc_points_with_variation, line_with_variation, point_to_pixels,
+    size_to_pixels, stroke_sample_count,
+};
 use crate::marks::{MarkContext, MarkStyle, apply_style, is_closed, mark_width};
 use crate::materials::{OilPaintStyle, oil_paint_stroke, with_texture_filter};
 use crate::planning::instruction_anchor_on_canvas;
@@ -227,6 +230,83 @@ pub(crate) fn connected_line_centerline(
         amplitude(instruction, canvas),
         canvas,
     );
+    if let Some(degrees) = instruction
+        .rotation
+        .filter(|degrees| degrees.abs() >= 1.0e-9)
+    {
+        let pivot = point_to_pixels(
+            instruction_anchor_on_canvas(instruction, Some(canvas)),
+            canvas,
+        );
+        let (sin, cos) = degrees.to_radians().sin_cos();
+        for point in &mut centerline {
+            let dx = point.x - pivot.x;
+            let dy = point.y - pivot.y;
+            *point = Point::new(pivot.x + dx * cos - dy * sin, pivot.y + dx * sin + dy * cos);
+        }
+    }
+    let transform = transform.in_pixels(unit);
+    centerline
+        .into_iter()
+        .map(|point| {
+            let point = transform.apply(point);
+            let point = Point::new(point.x / unit, point.y / unit);
+            (point.x.is_finite() && point.y.is_finite()).then_some(point)
+        })
+        .collect()
+}
+
+/// Fix the visible centerline for an Arc that an interior path connection targets.
+///
+/// The result is in physical short-side units and includes the instruction rotation
+/// and every enclosing affine transform so execution and rendering share one path.
+pub(crate) fn connected_arc_centerline(
+    instruction: &Instruction,
+    seed: crate::types::Seed,
+    canvas: CanvasSize,
+    transform: crate::affine::AffineTransform,
+) -> Option<Vec<Point>> {
+    if instruction.primitive != Primitive::Arc || instruction.arc_form.is_some() {
+        return None;
+    }
+    let unit = canvas.unit();
+    if !unit.is_finite() || unit <= 0.0 {
+        return None;
+    }
+    let center = point_to_pixels(instruction.center?, canvas);
+    let radius = instruction.radius? * unit;
+    let start = instruction.angle_start?;
+    let end = instruction.angle_end?;
+    let length = radius * (end - start).to_radians().abs();
+    let mut centerline = instruction
+        .variation
+        .as_ref()
+        .filter(|variation| needs_contour_variation(variation))
+        .map_or_else(
+            || {
+                arc_points(
+                    center,
+                    radius,
+                    start,
+                    end,
+                    stroke_sample_count(length, canvas),
+                )
+            },
+            |variation| {
+                arc_points_with_variation(
+                    ArcGeometry {
+                        center,
+                        radius,
+                        start_degrees: start,
+                        end_degrees: end,
+                    },
+                    variation,
+                    seed,
+                    amplitude(instruction, canvas),
+                    canvas,
+                )
+            },
+        );
     if let Some(degrees) = instruction
         .rotation
         .filter(|degrees| degrees.abs() >= 1.0e-9)

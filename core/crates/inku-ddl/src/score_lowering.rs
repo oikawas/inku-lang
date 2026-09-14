@@ -37,7 +37,7 @@ use crate::{
 
 /// Stable identity for the non-serializable Score-field candidate boundary.
 pub const SCORE_FIELD_CANDIDATE_SCHEMA_ID: &str = "inku.score-field-candidate.v2";
-pub const EXPLICIT_SCORE_LOWERING_SCHEMA_ID: &str = "inku.explicit-score-lowering.v5";
+pub const EXPLICIT_SCORE_LOWERING_SCHEMA_ID: &str = "inku.explicit-score-lowering.v6";
 
 /// A canonical semantic primitive identity that cannot be represented by Score.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -536,7 +536,7 @@ fn checked_macro_relation(
     input: ScoreLoweringInput<'_>,
     target_instruction_index: Option<usize>,
     prior: Option<(Primitive, Option<inku_score::ArcForm>)>,
-    target_path_position: Option<f64>,
+    target_path_position: Option<inku_score::TargetPathPosition>,
     target_endpoint: Option<inku_score::Endpoint>,
 ) -> Result<Relation, ScoreFieldGap> {
     let target =
@@ -559,13 +559,22 @@ fn checked_macro_relation(
     {
         return Err(ScoreFieldGap::UnsupportedMacroRelation);
     }
-    if target_path_position.is_some_and(|position| {
-        kind != RelationType::Connected
-            || !position.is_finite()
-            || !(0.0..=1.0).contains(&position)
-            || !prior.is_some_and(|(primitive, _)| primitive == Primitive::Line)
-    }) {
-        return Err(ScoreFieldGap::UnsupportedMacroRelation);
+    if let Some(position) = &target_path_position {
+        let valid_target = match position {
+            inku_score::TargetPathPosition::Exact(position) => {
+                position.is_finite()
+                    && (0.0..=1.0).contains(position)
+                    && prior.is_some_and(|(primitive, _)| primitive == Primitive::Line)
+            }
+            inku_score::TargetPathPosition::Selection(
+                inku_score::TargetPathSelection::Interior,
+            ) => prior.is_some_and(|(primitive, _)| {
+                matches!(primitive, Primitive::Line | Primitive::Arc)
+            }),
+        };
+        if kind != RelationType::Connected || !valid_target {
+            return Err(ScoreFieldGap::UnsupportedMacroRelation);
+        }
     }
     let mut relation = checked_object_relation(kind, input, target, prior)
         .ok_or(ScoreFieldGap::UnsupportedMacroRelation)?;
@@ -872,7 +881,7 @@ fn lower_macro_instruction(
                     from.clone(),
                     kind.as_str(),
                     secondary,
-                    *target_path_position,
+                    target_path_position.clone(),
                     *target_endpoint,
                 ),
             )
@@ -1100,7 +1109,7 @@ fn lower_macro_instruction(
                     input,
                     Some(target_object_index),
                     Some((prior.primitive(), prior.arc_form())),
-                    *target_path_position,
+                    target_path_position.clone(),
                     *target_endpoint,
                 );
                 match relation {
@@ -1190,7 +1199,7 @@ fn lower_macro_instruction(
                     input,
                     target_instruction_index,
                     prior.map(|instruction| (instruction.primitive, instruction.arc_form)),
-                    *target_path_position,
+                    target_path_position.clone(),
                     *target_endpoint,
                 ) {
                     Ok(relation) => score_instruction.relation = Some(relation),
@@ -2855,6 +2864,17 @@ fn lower_verified_stage15_shared<'a>(
     };
     let score = (objects.is_none() && outcome != ScoreLoweringOutcome::Stopped).then(|| Score {
         version: if instructions.iter().any(|instruction| {
+            instruction.relation.as_ref().is_some_and(|relation| {
+                matches!(
+                    relation.target_path_position,
+                    Some(inku_score::TargetPathPosition::Selection(
+                        inku_score::TargetPathSelection::Interior
+                    ))
+                )
+            })
+        }) {
+            "0.13.0".to_owned()
+        } else if instructions.iter().any(|instruction| {
             instruction.ink_spread.is_some()
                 || instruction
                     .relation
@@ -3015,8 +3035,9 @@ fn direct_score_relation<'a>(
         prior,
     )
     .ok_or_else(|| unsupported_relation_reason(instruction_index, relation))?;
-    if relation.target_endpoint.is_some()
-        && (kind != RelationType::Connected
+    if (relation.target_endpoint.is_some() || relation.target_path_selection.is_some())
+        && (relation.target_endpoint.is_some() && relation.target_path_selection.is_some()
+            || kind != RelationType::Connected
             || !prior.is_some_and(|(primitive, _)| {
                 matches!(primitive, Primitive::Line | Primitive::Arc)
             }))
@@ -3024,6 +3045,9 @@ fn direct_score_relation<'a>(
         return Err(unsupported_relation_reason(instruction_index, relation));
     }
     checked.target_endpoint = relation.target_endpoint;
+    checked.target_path_position = relation
+        .target_path_selection
+        .map(|selection| inku_score::TargetPathPosition::Selection(selection));
     Ok(checked)
 }
 

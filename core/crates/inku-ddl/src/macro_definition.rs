@@ -315,7 +315,7 @@ pub enum Statement {
         from: String,
         to: String,
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        target_path_position: Option<Expression>,
+        target_path_position: Option<MacroTargetPathPosition>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         target_endpoint: Option<inku_score::Endpoint>,
     },
@@ -336,6 +336,14 @@ pub enum Statement {
         range: Option<NumericRange>,
         body: Vec<Statement>,
     },
+}
+
+/// Backward-compatible Macro input for an exact path fraction or a deferred named selection.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum MacroTargetPathPosition {
+    Exact(Expression),
+    Selection(inku_score::TargetPathSelection),
 }
 
 /// One local component and its local parameter schema.
@@ -750,7 +758,7 @@ fn normalize_statement_semantic_aliases(statements: &mut [Statement]) {
                 target_path_position,
                 ..
             } => {
-                if let Some(position) = target_path_position {
+                if let Some(MacroTargetPathPosition::Exact(position)) = target_path_position {
                     normalize_expression_semantic_aliases(position);
                 }
             }
@@ -1159,10 +1167,12 @@ fn validate_body(
                     if kind != "connected" {
                         push_diagnostic(diagnostics, "path_position_requires_connected", &path);
                     }
-                    if !matches!(
-                        validate_expression(position, &path, parameters, locals, diagnostics),
-                        Some(ValueKind::Number | ValueKind::Integer)
-                    ) {
+                    if let MacroTargetPathPosition::Exact(position) = position
+                        && !matches!(
+                            validate_expression(position, &path, parameters, locals, diagnostics),
+                            Some(ValueKind::Number | ValueKind::Integer)
+                        )
+                    {
                         push_diagnostic(diagnostics, "path_position_requires_number", &path);
                     }
                 }

@@ -5,6 +5,7 @@ use crate::anchor_schedule::{AnchorSchedule, ScheduleNode, group_contains, sched
 use crate::planning::{Bounds, PlanningWarning};
 use crate::typed_performance::TypedExecutionPlan;
 use crate::types::Point;
+use sha2::{Digest, Sha256};
 
 struct Performed {
     instruction: Instruction,
@@ -19,6 +20,7 @@ struct Execution<'a> {
     performed: Vec<Vec<Performed>>,
     transforms: Vec<AffineTransform>,
     path_hosts: Vec<bool>,
+    interior_path_hosts: Vec<bool>,
     anchors: Vec<Option<Point>>,
     omitted: Vec<bool>,
     omitted_groups: Vec<bool>,
@@ -260,7 +262,7 @@ impl Execution<'_> {
         Ok(())
     }
 
-    fn connected_line_centerline(
+    fn connected_path_centerline(
         &self,
         index: usize,
         instruction: &Instruction,
@@ -276,12 +278,39 @@ impl Execution<'_> {
         let seed = seed_override.unwrap_or_else(|| {
             crate::determinism::instruction_seed(instruction, self.request.performance_seed)
         });
-        crate::mark_paths::connected_line_centerline(
-            instruction,
-            seed,
-            canvas,
-            self.transforms[index],
-        )
+        match instruction.primitive {
+            Primitive::Line => crate::mark_paths::connected_line_centerline(
+                instruction,
+                seed,
+                canvas,
+                self.transforms[index],
+            ),
+            Primitive::Arc if self.interior_path_hosts[index] => {
+                crate::mark_paths::connected_arc_centerline(
+                    instruction,
+                    seed,
+                    canvas,
+                    self.transforms[index],
+                )
+            }
+            _ => None,
+        }
+    }
+
+    fn interior_path_position(&self, source: usize) -> f64 {
+        let seed = self
+            .typed
+            .as_ref()
+            .and_then(|typed| typed.instruction_seed_overrides[source])
+            .unwrap_or_else(|| {
+                crate::determinism::instruction_seed(
+                    &self.request.score.instructions[source],
+                    self.request.performance_seed,
+                )
+            });
+        let digest = Sha256::digest(format!("{seed}:connected-interior-path-position").as_bytes());
+        let value = u32::from_le_bytes(digest[..4].try_into().expect("four digest bytes"));
+        (f64::from(value) + 0.5) / 4_294_967_296.0
     }
 
     fn transform_fill_scope_indices(
@@ -416,13 +445,32 @@ impl Execution<'_> {
             })
             .ok_or(ScoreExecutionReason::UnsupportedConnectedPrimitive);
         }
-        if let Some(position) = relation.target_path_position {
-            if prior.instruction.primitive != Primitive::Line {
-                return Err(ScoreExecutionReason::UnsupportedConnectedPrimitive);
-            }
+        if let Some(position) = &relation.target_path_position {
+            let position = match position {
+                inku_score::TargetPathPosition::Exact(position) => {
+                    if prior.instruction.primitive != Primitive::Line {
+                        return Err(ScoreExecutionReason::UnsupportedConnectedPrimitive);
+                    }
+                    *position
+                }
+                inku_score::TargetPathPosition::Selection(
+                    inku_score::TargetPathSelection::Interior,
+                ) => {
+                    if !matches!(
+                        prior.instruction.primitive,
+                        Primitive::Line | Primitive::Arc
+                    ) {
+                        return Err(ScoreExecutionReason::UnsupportedConnectedPrimitive);
+                    }
+                    self.interior_path_position(source)
+                }
+            };
             if let Some(centerline) = prior.line_centerline.as_deref() {
                 return centerline_point(centerline, position)
                     .ok_or(ScoreExecutionReason::UnsupportedConnectedPrimitive);
+            }
+            if prior.instruction.primitive == Primitive::Arc {
+                return Err(ScoreExecutionReason::UnsupportedConnectedPrimitive);
             }
             let (start, end, _, _) = crate::affine_geometry::endpoints(
                 &prior.instruction,
@@ -1620,6 +1668,7 @@ fn resolve_impl(
         .collect();
     let mut omitted_relations = vec![false; request.score.instructions.len()];
     let mut path_hosts = vec![false; request.score.instructions.len()];
+    let mut interior_path_hosts = vec![false; request.score.instructions.len()];
     for instruction in &request.score.instructions {
         let Some(relation) = instruction.relation.as_ref() else {
             continue;
@@ -1627,6 +1676,16 @@ fn resolve_impl(
         if (relation.target_path_position.is_some() || relation.target_endpoint.is_some())
             && let Some(host) = relation.target_instruction_index
             && let Some(targeted) = path_hosts.get_mut(host)
+        {
+            *targeted = true;
+        }
+        if matches!(
+            relation.target_path_position,
+            Some(inku_score::TargetPathPosition::Selection(
+                inku_score::TargetPathSelection::Interior
+            ))
+        ) && let Some(host) = relation.target_instruction_index
+            && let Some(targeted) = interior_path_hosts.get_mut(host)
         {
             *targeted = true;
         }
@@ -1654,6 +1713,7 @@ fn resolve_impl(
             .collect(),
         transforms: vec![AffineTransform::identity(); request.score.instructions.len()],
         path_hosts,
+        interior_path_hosts,
         anchors,
         omitted: vec![false; request.score.instructions.len()],
         omitted_groups: vec![false; request.score.transform_groups.len()],
@@ -1702,7 +1762,7 @@ fn resolve_impl(
                             )
                         });
                     let line_centerline =
-                        execution.connected_line_centerline(index, &instruction, seed_override);
+                        execution.connected_path_centerline(index, &instruction, seed_override);
                     execution.performed[index].push(Performed {
                         instruction,
                         ordinal,

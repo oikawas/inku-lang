@@ -107,7 +107,7 @@ PNGは正本SVGを写す派生出力であり、縮小してもSVGの材質・�
 | **じ** | 紙、和紙、薄墨地、木炭地、カンバス、画用紙、メゾチント |
 | **いろ** | 白、黒、青、赤、緑、灰、黄、橙、紫 |
 | **ゆらぎ** | 細かく、大きく、ゆっくり、速く、揺れる、波打つ、にじみ |
-| **ばしょ** | 上、下、中心、左端、右端、上端、下端、始点、終点、隅 |
+| **ばしょ** | 上、下、中心、左端、右端、上端、下端、始点、終点、途中、隅 |
 | **うごき** | 置く、並べる、引く、散らす、埋める、敷き詰める |
 | **じゅん** | 交互に、順に |
 | **わりあい** | 縦長、横長、全幅、半幅、半円、上弦、下弦、三日月 |
@@ -224,9 +224,11 @@ transformはCount1のactual Scoreとcompactな反復recipeの両方へ配送す�
 
 Anchorは線の接続先に使う非描画の基準点であり、`place`または`position_x` / `position_y`の組で位置を明示する。Anchorの`place:center`は画面中央（0.5, 0.5）で、Emitのfocus依存配置から推測しない。その他のnamed位置は既存の位置領域を使う。Score 0.6.0の`anchors`は描画instructionと別に保持し、`target_anchor_index`でConnectedの接続先になる。元の参照・owner・描画順・seedを保ち、包含Transformの移動・拡縮・回転へ一緒に従う。数値位置の固定と旧Stop入力の互換を維持するが、recoverableなrelation失敗はerrorを記録してrelationだけを外し、描画を止めない。位置のないAnchorを前後の図形や呼出し位置から補完しない。保存済みScore 0.1.0〜0.5.0とversionなしartifactは従来互換を保つ。
 
-MacroのConnectedは、先行するLineを`from`に指定し、任意の数値式`target_path_position`を明示できる。値は有限な0〜1で、0は枝の始点、1は終点、途中は演奏時に生成した中心線のサンプル順序を均等に区切って補間する。接続先Lineは直前に限らず、同じMacro内の元参照を保持する。葉などの接続元は既存の位置authorityに従い、端点をその接点へ合わせる。揺らぎを含む同じ中心線を接続解決と最終描画で共有し、共通の外側変形では線と接続元を一緒に変形する。この指定だけならScore 0.11.0を出力する。`target_endpoint`または`ink_spread`もあれば0.12.0を優先し、いずれもなければ従来のflat 0.9／compact 0.10を保つ。0.11のflat形式は資源snapshotを必須にせず、compact形式は従来のcaller-owned資源契約を保つ。一般Along、位置を省略したConnectedの隣接規則、Touchingの閉形は変更しない。無効・省略済み参照は診断付きで関係だけを外し、他の描画を続ける。
+MacroのConnectedは、先行するLineを`from`に指定し、任意の数値式`target_path_position`を明示できる。値は有限な0〜1で、0は枝の始点、1は終点、途中は演奏時に生成した中心線のサンプル順序を均等に区切って補間する。接続先Lineは直前に限らず、同じMacro内の元参照を保持する。葉などの接続元は既存の位置authorityに従い、端点をその接点へ合わせる。揺らぎを含む同じ中心線を接続解決と最終描画で共有し、共通の外側変形では線と接続元を一緒に変形する。数値指定だけならScore 0.11.0、`target_endpoint`または`ink_spread`もあれば0.12.0、後述の`"interior"`があれば0.13.0を使う。いずれもなければ従来のflat 0.9／compact 0.10を保つ。0.11のflat形式は資源snapshotを必須にせず、compact形式は従来のcaller-owned資源契約を保つ。一般Along、位置を省略したConnectedの隣接規則、Touchingの閉形は変更しない。無効・省略済み参照は診断付きで関係だけを外し、他の描画を続ける。
 
-通常DDLでは`[前の]線/弧の始点/終点につながる`で既存の先行参照の対象側端点を選ぶ。接続元は常にcanonicalな始点であり、Lineの`from`→`to`、Arcの`angle_start`→`angle_end`というidentityを保つ。対象端点を省略した既存の接続は先行図形の終点から現在図形の始点へつながる。`target_endpoint`と`target_path_position`は併用できず拒否する。`ink_spread`または`target_endpoint`を持つScoreだけ0.12であり、両方を持たないScore 0.9／0.10／0.11は従来どおりである。
+通常DDLでは`[前の]線/弧の始点/終点につながる`で既存の先行参照の対象側端点を選ぶ。接続元は常にcanonicalな始点であり、Lineの`from`→`to`、Arcの`angle_start`→`angle_end`というidentityを保つ。対象端点を省略した既存の接続は先行図形の終点から現在図形の始点へつながる。`target_endpoint`と`target_path_position`は併用できず拒否する。`ink_spread`または`target_endpoint`を持つScoreは少なくとも0.12を使い、途中の指定があれば0.13となる。従来のfieldだけを持つScore 0.9／0.10／0.11の意味は保つ。
+
+通常DDLの「前の線の途中につながる」「前の弧の途中につながる」は、先行Line／Arcの両端を除く一点に現在図形の始点をつなぐ。「途中／partway」はばしょの語であり、中心の別名ではない。Scoreは`target_path_position:"interior"`を保持し、既存のinstanceと演奏seedから具体的な開区間位置を選ぶ。同じScoreと演奏seedなら同じ接点となり、揺らぎを含む実際の中心線と外側の回転・鏡映・移動を反映する。接線合わせや寸法補正はしない。Macroも`target_path_position:"interior"`で同じ意味へ接続する。この文字列を持つ作品だけScore 0.13とし、既存の数値式・数値ScoreはLine限定の0〜1と元の補間を保つ。endpointとの同時指定やanchorへの指定は無効な関係として扱う。
 
 揺らぎparameterはasset category `variation`のまま、任意のclosed `dimension`（`amplitude` / `frequency` / `quality` / `spread`）で候補を制限できる。例は`{"type":"semantic_ref","category":"variation","dimension":"amplitude"}`である。SemanticRefの`dimension`はvariation以外では禁止し、省略／Noneは旧category-only matchingとcanonical bytes / digestを保つ。Someはdefinition digestに含む。Flat Emitは`fluctuation_amplitude` / `fluctuation_frequency` / `fluctuation_quality` / `ink_spread`を使い、値は各dimensionに属する既存`SemanticRef { category: variation, id }`である。Field名は語義identityを変更しない。Definition、component `use`、binding、実行境界で同じ現行7語の分類を検査する。
 
@@ -1552,11 +1554,11 @@ LeWitt の Wall Drawing も同様である。語彙は線と少数の色とい�
 | 切る | cutting | 直前要素を横切り、視覚的な断絶を作る（短歌の「切れ」に相当） | `cutting` |
 | 間に | between | 直前の2要素の間の領域に置く | `between` |
 | 触れる | touching | 直前要素に接触する。両端点を一致させて閉形を構成する | `touching` |
-| つながる | connected | current始端を、明示時は先行Line / Arcの始点または終点へ、未指定時は直前要素の終端へ合わせる | `connected` |
+| つながる | connected | current始端を、明示時は先行Line / Arcの始点・終点・途中へ、未指定時は直前要素の終端へ合わせる | `connected` |
 
 **排除する語**: 寄り添う、応える、対話する、呼応する——意図・擬人の語であり、外部から観察できない。
 
-`relation` は正規化DDL中に明示的な previous-object 句がある場合に限る。`connected` は既存の `前の形につながる` に加え、`[前の]線/弧の始点/終点につながる` を受ける。後者は対象側端点だけを選び、currentはcanonical始点のままである。通常DDLの無回転の線・通常弧では左が始点、右が終点であり、回転・鏡映後も同じ端を指す。端点を省略した接続だけがprior終端からcurrent始端へつながる。自然文由来の「周囲」「同じ拍子」「先行/遅れ」「近く/遠く」は relation ではなく、position / path / rotation / spacingで表す。
+`relation` は正規化DDL中に明示的な previous-object 句がある場合に限る。`connected` は既存の `前の形につながる` に加え、`[前の]線/弧の始点/終点につながる` を受ける。後者は対象側端点だけを選び、currentはcanonical始点のままである。通常DDLの無回転の線・通常弧では左が始点、右が終点であり、回転・鏡映後も同じ端を指す。途中を指定した接続はLine / Arcの両端以外へつなぎ、具体位置を演奏で決める。端点も途中も指定しない接続はprior終端からcurrent始端へつながる。自然文由来の「周囲」「同じ拍子」「先行/遅れ」「近く/遠く」は relation ではなく、position / path / rotation / spacingで表す。
 
 **第二段候補（実測後に判断）**: 重なる、離す、同じ向きに、逆向きに、〜より細く。現行語で表現の不足が実測で示されてから追加する。片端接続の`つながる (connected)`は独立した表現価値と有限なLine / Arc / Point endpoint familyを確定してから導入した。
 
@@ -1580,7 +1582,7 @@ instruction に任意フィールド `relation` を追加する。
 | `type` | `along` / `not_touching` / `cutting` / `between` / `touching` / `connected` | 関係の種類 |
 | `gap` | `narrow` / `medium` / `wide` | 距離の目安。具体値は演奏が解決する |
 | `target_instruction_index` | 0以上のScore index | checked `connected` / `touching` / `along` / `cutting`が参照する正確な先行Score instruction。旧relationでは省略 |
-| `target_path_position` | 有限な0〜1 | Score 0.11の明示Connected接点。先行Lineの演奏中心線をサンプル順に補間する位置。指定時のみ非隣接targetを許す |
+| `target_path_position` | 有限な0〜1 / `"interior"` | 数値はScore 0.11のLine中心線位置。文字列はScore 0.13でLine / Arcの両端以外を演奏時に選ぶ。サンプル順の補間を使い、明示した先行targetを保持する |
 | `target_endpoint` | `start` / `end` | Score 0.12の明示Connected対象端点。先行Line / Arcだけを対象にし、`target_path_position`とは併用しない |
 | `position_authority` | `named_movable` / `numeric_fixed` | checked currentの位置authority |
 | `touching_constraints` | `dimensions_fixed` / `direction_fixed`のboolean組 | typed `touching`の明示寸法・向きの固定条件。省略normalとは区別し、旧Scoreでは省略 |

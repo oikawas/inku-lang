@@ -13,7 +13,7 @@ use crate::{
 };
 
 /// Stable identity for the runtime-disconnected expansion overlay.
-pub const MACRO_EXPANSION_SCHEMA_ID: &str = "inku.macro-expansion.v1";
+pub const MACRO_EXPANSION_SCHEMA_ID: &str = "inku.macro-expansion.v2";
 
 /// Stable deterministic choice scheme used by `vary`.
 pub const MACRO_VARY_CHOICE_SCHEME_ID: &str = "inku.macro-vary-choice.v1";
@@ -139,7 +139,7 @@ pub enum ExpandedMacroNode {
         kind: String,
         from: GeneratedTargetId,
         to: GeneratedTargetId,
-        target_path_position: Option<f64>,
+        target_path_position: Option<inku_score::TargetPathPosition>,
         target_endpoint: Option<inku_score::Endpoint>,
         provenance: GeneratedNodeProvenance,
     },
@@ -1191,23 +1191,30 @@ impl<'a> Evaluator<'a> {
                 let to = self.target(targets, to, path)?;
                 let target_path_position = target_path_position
                     .as_ref()
-                    .map(|position| {
-                        let value = match self.evaluate_expression(position, environment, path)? {
-                            ExpandedMacroValue::Number(value) => value,
-                            ExpandedMacroValue::Integer(value) => value as f64,
-                            _ => {
+                    .map(|position| match position {
+                        crate::MacroTargetPathPosition::Selection(selection) => {
+                            Ok(inku_score::TargetPathPosition::Selection(*selection))
+                        }
+                        crate::MacroTargetPathPosition::Exact(position) => {
+                            let value =
+                                match self.evaluate_expression(position, environment, path)? {
+                                    ExpandedMacroValue::Number(value) => value,
+                                    ExpandedMacroValue::Integer(value) => value as f64,
+                                    _ => {
+                                        return Err(EvalError::new(
+                                            MacroExpansionDiagnosticKind::ExpressionMismatch,
+                                        )
+                                        .at(path));
+                                    }
+                                };
+                            if !value.is_finite() || !(0.0..=1.0).contains(&value) {
                                 return Err(EvalError::new(
-                                    MacroExpansionDiagnosticKind::ExpressionMismatch,
+                                    MacroExpansionDiagnosticKind::NumericRange,
                                 )
                                 .at(path));
                             }
-                        };
-                        if !value.is_finite() || !(0.0..=1.0).contains(&value) {
-                            return Err(
-                                EvalError::new(MacroExpansionDiagnosticKind::NumericRange).at(path)
-                            );
+                            Ok(inku_score::TargetPathPosition::Exact(value))
                         }
-                        Ok(value)
                     })
                     .transpose()?;
                 let ordinal = self.bump_node(path)?;

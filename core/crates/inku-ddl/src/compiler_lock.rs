@@ -34,19 +34,19 @@ use crate::{
 const MISSING_CANONICAL_SEMANTIC_IDENTITY: &str = "missing_canonical_semantic_identity";
 
 /// Stable identity for the compilation envelope.
-pub const TYPED_DDL_COMPILATION_SCHEMA_ID: &str = "inku.typed-ddl-compilation.v16";
+pub const TYPED_DDL_COMPILATION_SCHEMA_ID: &str = "inku.typed-ddl-compilation.v17";
 /// Stable identity for source-independent pre-expansion semantic bytes.
 pub const CANONICAL_SEMANTIC_DDL_SCHEMA_ID: &str = crate::SEMANTIC_DOCUMENT_SCHEMA_ID;
 /// Stable identity for compiler locks.
-pub const TYPED_DDL_COMPILER_LOCK_SCHEMA_ID: &str = "inku.typed-ddl-compiler-lock.v17";
+pub const TYPED_DDL_COMPILER_LOCK_SCHEMA_ID: &str = "inku.typed-ddl-compiler-lock.v18";
 /// ASCII domain prefix for the fully framed compiler lock digest.
-pub const COMPILER_LOCK_DIGEST_DOMAIN: &[u8] = b"inku.typed-ddl-compiler-lock.v16";
+pub const COMPILER_LOCK_DIGEST_DOMAIN: &[u8] = b"inku.typed-ddl-compiler-lock.v17";
 /// Stable identity for source-bearing semantic provenance bytes.
-pub const SEMANTIC_SOURCE_PROVENANCE_SCHEMA_ID: &str = "inku.semantic-source-provenance.v5";
+pub const SEMANTIC_SOURCE_PROVENANCE_SCHEMA_ID: &str = "inku.semantic-source-provenance.v6";
 /// Stable identity for generated macro provenance bytes.
 pub const EXPANDED_GENERATED_PROVENANCE_SCHEMA_ID: &str = "inku.expanded-generated-provenance.v1";
 /// Stable identity for source-independent expanded macro meaning bytes.
-pub const EXPANDED_MACRO_MEANING_SCHEMA_ID: &str = "inku.expanded-macro-meaning.v2";
+pub const EXPANDED_MACRO_MEANING_SCHEMA_ID: &str = "inku.expanded-macro-meaning.v3";
 
 /// Closed compiler state. This is not a Score-readiness decision.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
@@ -1782,14 +1782,23 @@ fn project_instruction(instruction: &crate::SemanticInstruction, projection: &mu
             projection,
             relation.provenance.span,
             SemanticDeliveryOwner::Relation,
-            match relation.target_endpoint {
-                None => format!("{}:{}", relation.kind.as_str(), relation.reference.as_str()),
-                Some(endpoint) => format!(
+            match (relation.target_endpoint, relation.target_path_selection) {
+                (None, None) => {
+                    format!("{}:{}", relation.kind.as_str(), relation.reference.as_str())
+                }
+                (Some(endpoint), None) => format!(
                     "{}:{}:{}",
                     relation.kind.as_str(),
                     relation.reference.as_str(),
                     serde_json::to_string(&endpoint).expect("closed endpoint")
                 ),
+                (None, Some(selection)) => format!(
+                    "{}:{}:{}",
+                    relation.kind.as_str(),
+                    relation.reference.as_str(),
+                    serde_json::to_string(&selection).expect("closed target path selection")
+                ),
+                (Some(_), Some(_)) => unreachable!("semantic relation target is exclusive"),
             },
         );
     }
@@ -3430,7 +3439,12 @@ fn node_value(
             if let Some(position) = target_path_position {
                 record.insert(
                     "target_path_position".to_owned(),
-                    optional_f64(Some(*position)),
+                    match position {
+                        inku_score::TargetPathPosition::Exact(value) => finite_number(*value),
+                        inku_score::TargetPathPosition::Selection(selection) => {
+                            serde_json::to_value(selection).expect("closed target path selection")
+                        }
+                    },
                 );
             }
         }

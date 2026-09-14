@@ -123,8 +123,8 @@ pub use macro_definition::{
     ComponentDefinition, ExactDecimalDimension, Expression, LEGACY_PLUGIN_FORMAT_WARNING,
     LegacyImportOutcome, LegacyWarning, MACRO_DEFINITION_DIGEST_DOMAIN, MACRO_DEFINITION_SCHEMA_ID,
     MacroDefinition, MacroDefinitionDiagnostic, MacroDefinitionIdentity, MacroDefinitionParseError,
-    MacroDefinitionValidation, MacroSemanticRefProjection, NumericRange, ParameterSchema,
-    SemanticMap, Statement, TransformExpression, project_macro_semantic_ref,
+    MacroDefinitionValidation, MacroSemanticRefProjection, MacroTargetPathPosition, NumericRange,
+    ParameterSchema, SemanticMap, Statement, TransformExpression, project_macro_semantic_ref,
     validate_macro_definition_semantic_version,
 };
 pub use macro_expansion::{

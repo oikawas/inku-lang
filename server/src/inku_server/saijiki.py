@@ -314,6 +314,7 @@ SAIJIKI: tuple[SaijikiCategory, ...] = (
             _w("下端", "bottom-edge"),
             _w("始点", "start"),
             _w("終点", "end"),
+            _w("途中", "partway"),
             _w("隅", "corner"),
         ),
     ),

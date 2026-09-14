@@ -913,7 +913,20 @@ fn render_affine_instruction(
             ))
         }
         Primitive::Arc => {
-            let centerline = arc_centerline_points(instruction, context, true)?;
+            let centerline = connected_centerline.map_or_else(
+                || arc_centerline_points(instruction, context, true),
+                |points| {
+                    Ok(points
+                        .iter()
+                        .map(|point| {
+                            Point::new(
+                                point.x * context.canvas.unit(),
+                                point.y * context.canvas.unit(),
+                            )
+                        })
+                        .collect())
+                },
+            )?;
             if uses_hand_stroke(instruction.weight) {
                 if centerline
                     .windows(2)
@@ -1153,6 +1166,33 @@ pub(crate) fn render_instruction_with_line_centerline(
         Primitive::Arc => {
             if instruction.arc_form == Some(ArcForm::Crescent) {
                 return render_crescent(instruction, &style, context);
+            }
+            if let Some(centerline) = connected_centerline {
+                let centerline = centerline
+                    .iter()
+                    .map(|point| {
+                        Point::new(
+                            point.x * context.canvas.unit(),
+                            point.y * context.canvas.unit(),
+                        )
+                    })
+                    .collect::<Vec<_>>();
+                return if uses_hand_stroke(instruction.weight) {
+                    Ok(hand_contour(
+                        instruction,
+                        &centerline,
+                        &BTreeSet::new(),
+                        &style,
+                        context,
+                        false,
+                    ))
+                } else {
+                    Ok(apply_style(
+                        Element::new("path").attr("d", open_path(&centerline)),
+                        &style,
+                        false,
+                    ))
+                };
             }
             let center = point_to_pixels(
                 instruction

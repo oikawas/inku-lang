@@ -979,7 +979,10 @@ pub fn finalize_saved_score_with_omitted_instructions(
     operational_budget: OperationalResourceBudget,
     omitted_original_instruction_indices: &[usize],
 ) -> Result<FinalizedScore, SavedScoreResourceError> {
-    if !matches!(score.version.as_str(), "0.10.0" | "0.11.0" | "0.12.0") {
+    if !matches!(
+        score.version.as_str(),
+        "0.10.0" | "0.11.0" | "0.12.0" | "0.13.0"
+    ) {
         return Err(invalid(
             SavedScoreResourceOwner::Score,
             "saved resource finalization requires compact Score 0.10 or later",
@@ -1652,10 +1655,10 @@ mod tests {
     }
 
     #[test]
-    fn compact_0_11_remap_preserves_a_retained_path_position() {
+    fn compact_0_13_remap_preserves_a_retained_path_position() {
         let policy = hard(100);
         let mut score = representative_score(policy.clone());
-        score.version = "0.11.0".into();
+        score.version = "0.13.0".into();
         let mut target = serde_json::to_value(&score.instructions[2]).unwrap();
         let target = target.as_object_mut().unwrap();
         target.insert("primitive".into(), json!("line"));
@@ -1689,7 +1692,10 @@ mod tests {
             .as_ref()
             .expect("retained relation");
         assert_eq!(relation.target_instruction_index, Some(1));
-        assert_eq!(relation.target_path_position, Some(0.625));
+        assert_eq!(
+            relation.target_path_position,
+            Some(crate::TargetPathPosition::Exact(0.625))
+        );
     }
 
     #[test]

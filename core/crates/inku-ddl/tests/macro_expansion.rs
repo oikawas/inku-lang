@@ -834,7 +834,7 @@ fn fixture_schema_and_required_coverage_are_fixed() {
     let fixture = load_fixture();
     assert_eq!(fixture.schema, "inku.macro-expansion-v1-fixture.v1");
     assert_eq!(fixture.version, 1);
-    assert_eq!(MACRO_EXPANSION_SCHEMA_ID, "inku.macro-expansion.v1");
+    assert_eq!(MACRO_EXPANSION_SCHEMA_ID, "inku.macro-expansion.v2");
     assert_eq!(FIXTURE.as_bytes().last(), Some(&b'\n'));
     let valid_ids = fixture
         .valid_cases

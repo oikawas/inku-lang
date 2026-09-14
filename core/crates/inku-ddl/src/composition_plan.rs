@@ -126,7 +126,7 @@ pub struct PlanRelation {
     pub(crate) gap: RelationGap,
     pub(crate) target_object_index: Option<usize>,
     pub(crate) target_anchor_index: Option<usize>,
-    pub(crate) target_path_position: Option<f64>,
+    pub(crate) target_path_position: Option<inku_score::TargetPathPosition>,
     pub(crate) target_endpoint: Option<inku_score::Endpoint>,
     pub(crate) position_authority: Option<ConnectedPositionAuthority>,
     pub(crate) touching_constraints: Option<TouchingConstraints>,
@@ -153,8 +153,8 @@ impl PlanRelation {
         self.target_endpoint
     }
 
-    pub const fn target_path_position(&self) -> Option<f64> {
-        self.target_path_position
+    pub fn target_path_position(&self) -> Option<inku_score::TargetPathPosition> {
+        self.target_path_position.clone()
     }
 
     pub const fn position_authority(&self) -> Option<ConnectedPositionAuthority> {

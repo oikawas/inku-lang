@@ -397,6 +397,7 @@ fn project_remaining_role(term: &inku_ddl::RemainingRoleTerm) -> ExpectedRemaini
             RemainingRoleKind::Place => "place",
             RemainingRoleKind::Motion => "motion",
             RemainingRoleKind::Proportion => "proportion",
+            RemainingRoleKind::Sequence => "sequence",
         }
         .to_owned(),
         asset_id: term.asset_id.clone(),

@@ -54,7 +54,7 @@ export const GENERATED_SAIJIKI: SaijikiCategory[] = [
 		key: 'basho',
 		label: 'ばしょ',
 		en: 'places',
-		words: ['上', '下', '中心', '左端', '右端', '上端', '下端', '始点', '終点', '隅']
+		words: ['上', '下', '中心', '左端', '右端', '上端', '下端', '始点', '終点', '途中', '隅']
 	},
 	{
 		key: 'ugoki',
@@ -135,7 +135,7 @@ export const GENERATED_SAIJIKI_EN: SaijikiCategory[] = [
 		key: 'basho',
 		label: 'ばしょ',
 		en: 'places',
-		words: ['top', 'bottom', 'center', 'left-edge', 'right-edge', 'top-edge', 'bottom-edge', 'start', 'end', 'corner']
+		words: ['top', 'bottom', 'center', 'left-edge', 'right-edge', 'top-edge', 'bottom-edge', 'start', 'end', 'partway', 'corner']
 	},
 	{
 		key: 'ugoki',

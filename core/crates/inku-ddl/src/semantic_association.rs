@@ -21,7 +21,7 @@ use crate::{
 };
 
 /// Stable identity for the runtime-disconnected single-head semantic AST.
-pub const SEMANTIC_ENTITY_ASSOCIATION_SCHEMA_ID: &str = "inku.semantic-entity-association.v16";
+pub const SEMANTIC_ENTITY_ASSOCIATION_SCHEMA_ID: &str = "inku.semantic-entity-association.v17";
 
 /// Source-independent semantic identity projected from one accepted Saijiki row.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -135,6 +135,7 @@ pub struct ExplicitPreviousReferenceOccurrence {
     pub kind: SemanticRelationKind,
     pub target: Option<crate::saijiki::TouchingLiteralTarget>,
     pub target_endpoint: Option<inku_score::Endpoint>,
+    pub target_path_selection: Option<inku_score::TargetPathSelection>,
     pub reference: SemanticPreviousReference,
     pub provenance: SourceOccurrence,
     pub asset_id: String,
@@ -2309,6 +2310,7 @@ fn explicit_previous_reference_occurrence(
         kind,
         target: canonical_identity.target,
         target_endpoint: canonical_identity.target_endpoint,
+        target_path_selection: canonical_identity.target_path_selection,
         reference,
         provenance: source_occurrence(document, span, region_index, clause_index, atom_index),
         asset_id: asset_id.to_owned(),
@@ -3906,6 +3908,9 @@ mod tests {
             None,
             PreHeadPhraseOwnership::default(),
             ClauseTopologyEvidence::default(),
+            Vec::new(),
+            Vec::new(),
+            BTreeSet::new(),
         );
 
         assert!(result.explicit_previous_references.is_empty());

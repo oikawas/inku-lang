@@ -1,5 +1,8 @@
 use inku_ddl::*;
-use inku_score::{Color, Endpoint, InkSpread, Quality, Score, SurfaceTexture};
+use inku_score::{
+    Color, Endpoint, InkSpread, Quality, Score, SurfaceTexture, TargetPathPosition,
+    TargetPathSelection,
+};
 use serde_json::json;
 
 #[test]
@@ -76,30 +79,7 @@ fn compile(
     language: ResolvedInstructionLanguage,
     definitions: &[MacroDefinition],
 ) -> Stage15TransformationResult {
-    let locks = definitions
-        .iter()
-        .map(|definition| {
-            let identity = definition.identity().unwrap();
-            MacroLock::new(
-                identity.qualified_name(),
-                identity.version(),
-                format!("sha256:{}", identity.full_digest_hex()),
-            )
-            .unwrap()
-        })
-        .collect();
-    let compiled = compile_typed_ddl(
-        NormalizedDdlDocument::new(source, language, locks).unwrap(),
-        definitions,
-        Some(19),
-        MacroExpansionLimits {
-            max_invocations: 8,
-            max_depth: 8,
-            max_evaluation_steps: 512,
-            max_nodes_per_invocation: 64,
-            max_total_nodes: 128,
-        },
-    );
+    let compiled = typed_compilation(source, language, definitions);
     let input = stage15_transformation_input(&compiled).unwrap_or_else(|error| {
         panic!(
             "{source}: {error:?}; holes={:?}; conflicts={:?}; blocking={:?}; lexemes={:?}",
@@ -112,6 +92,37 @@ fn compile(
         )
     });
     transform_stage15(input, None).unwrap()
+}
+
+fn typed_compilation(
+    source: &str,
+    language: ResolvedInstructionLanguage,
+    definitions: &[MacroDefinition],
+) -> TypedDdlCompilation {
+    let locks = definitions
+        .iter()
+        .map(|definition| {
+            let identity = definition.identity().unwrap();
+            MacroLock::new(
+                identity.qualified_name(),
+                identity.version(),
+                format!("sha256:{}", identity.full_digest_hex()),
+            )
+            .unwrap()
+        })
+        .collect();
+    compile_typed_ddl(
+        NormalizedDdlDocument::new(source, language, locks).unwrap(),
+        definitions,
+        Some(19),
+        MacroExpansionLimits {
+            max_invocations: 8,
+            max_depth: 8,
+            max_evaluation_steps: 512,
+            max_nodes_per_invocation: 64,
+            max_total_nodes: 128,
+        },
+    )
 }
 
 fn compact(transformed: &Stage15TransformationResult) -> Score {
@@ -197,6 +208,60 @@ fn target_endpoints_preserve_reference_and_endpoint_in_direct_and_compact_scores
             .target_endpoint,
         None
     );
+}
+
+#[test]
+fn partway_connections_preserve_line_and_arc_targets_in_canonical_direct_and_compact_delivery() {
+    for (ja, en) in [
+        (
+            "赤い波打つ線を引く。斜めの小さな青い弧を引く、前の線の途中につながる。",
+            "draw a red undulating line. draw a small diagonal blue arc connected partway along the previous line.",
+        ),
+        (
+            "赤い揺れる弧を引く。小さな青い垂直の線を引く、前の弧の途中につながる。",
+            "draw a red swaying arc. draw a small blue vertical line connected partway along the previous arc.",
+        ),
+    ] {
+        let ja_compiled = typed_compilation(ja, ResolvedInstructionLanguage::Ja, &[]);
+        let en_compiled = typed_compilation(en, ResolvedInstructionLanguage::En, &[]);
+        assert_eq!(
+            ja_compiled.pre_expansion_canonical_bytes(),
+            en_compiled.pre_expansion_canonical_bytes()
+        );
+        assert!(
+            std::str::from_utf8(ja_compiled.pre_expansion_canonical_bytes().unwrap())
+                .unwrap()
+                .contains("\"target_path_position\":\"interior\"")
+        );
+
+        for (source, language) in [
+            (ja, ResolvedInstructionLanguage::Ja),
+            (en, ResolvedInstructionLanguage::En),
+        ] {
+            let transformed = compile(source, language, &[]);
+            let lowered = lower_verified_stage15_score(
+                transformed.verified_effective_view(),
+                ScoreLoweringContext::resolve("square", Color::White).unwrap(),
+            );
+            assert_eq!(
+                lowered.outcome(),
+                ScoreLoweringOutcome::Complete,
+                "{source}: {:?}",
+                lowered.diagnostics()
+            );
+            let compact = compact(&transformed);
+            for score in [lowered.score().unwrap(), &compact] {
+                assert_eq!(score.version, "0.13.0");
+                let relation = score.instructions[1].relation.as_ref().unwrap();
+                assert_eq!(relation.target_instruction_index, Some(0));
+                assert_eq!(relation.target_endpoint, None);
+                assert_eq!(
+                    relation.target_path_position,
+                    Some(TargetPathPosition::Selection(TargetPathSelection::Interior))
+                );
+            }
+        }
+    }
 }
 
 #[test]

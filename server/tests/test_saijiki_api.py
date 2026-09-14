@@ -128,7 +128,7 @@ _EXPECTED_PAIRING: dict[str, tuple[tuple[str, str], ...]] = {
     "basho": (
         ("上", "top"), ("下", "bottom"), ("中心", "center"), ("左端", "left-edge"),
         ("右端", "right-edge"), ("上端", "top-edge"), ("下端", "bottom-edge"),
-        ("始点", "start"), ("終点", "end"), ("隅", "corner"),
+        ("始点", "start"), ("終点", "end"), ("途中", "partway"), ("隅", "corner"),
     ),
     "ugoki": (
         ("置く", "place"), ("並べる", "line-up"), ("引く", "draw"),

@@ -145,7 +145,7 @@ The core vocabulary consists of twelve Saijiki categories plus relations. Its so
 | order | じゅん | alternating, in order |
 | movements | ゆらぎ | fine, large, slowly, quickly, swaying, undulating, bleeding |
 | relations | あいだ | along, not touching, cutting, between, touching, connected — with fixed phrases such as `along the previous line` and `connected to the previous shape` |
-| places | ばしょ | top, bottom, center, left-edge, right-edge, top-edge, bottom-edge, start, end, corner |
+| places | ばしょ | top, bottom, center, left-edge, right-edge, top-edge, bottom-edge, start, end, partway, corner |
 | angles | かたむき | horizontal, vertical, diagonal, rising, falling, rotated |
 | proportions | わりあい | tall, wide, full-width, half-width, semicircle, waxing, waning, crescent |
 | colors | いろ | white, black, blue, red, green, gray, yellow, orange, purple |
@@ -407,9 +407,11 @@ Transform reaches both count-one actual Scores and compact repetition recipes. S
 
 An Anchor is a non-drawing reference point for line connections, with an explicit `place` or paired `position_x` / `position_y`. Anchor `place:center` means the canvas center (0.5, 0.5), without borrowing an Emit's focus-dependent placement. Other named positions use the existing placement regions. Score 0.6.0 stores `anchors` separately from drawing instructions, and `target_anchor_index` names a Connected target. Original references, ownership, drawing order, and seeds remain intact; Anchors follow the translation, scale, and rotation of their enclosing Transform. Numeric-position authority and legacy Stop-input compatibility remain, but a recoverable relation failure records an error, removes only its relation, and does not stop drawing. A missing position is not filled from nearby shapes or the invocation position. Saved Score 0.1.0 through 0.5.0 and versionless artifacts retain their compatibility.
 
-A Macro Connected relation may name a prior Line as `from` and explicitly provide a numeric `target_path_position` expression. Its finite value lies from 0 to 1: zero is the Line start, one its end, and intermediate values interpolate uniformly by sample order along the performed centerline. The Line need not be immediately adjacent; its original reference within the Macro is retained. The connected source follows existing position authority and aligns its endpoint with that point. Connection resolution and final rendering share the same centerline, including variation, and common outer transforms move it together with the attached source. This field alone selects Score 0.11.0. If `target_endpoint` or `ink_spread` is also present, version 0.12.0 takes precedence. With none of these fields, outputs retain flat 0.9 or compact 0.10. Flat 0.11 does not require a resource snapshot, while compact 0.11 retains the existing caller-owned resource contract. General Along, adjacency for Connected without a path position, and Touching closure remain unchanged. Invalid or omitted targets produce a diagnostic and remove only the relation while other drawing continues.
+A Macro Connected relation may name a prior Line as `from` and explicitly provide a numeric `target_path_position` expression. Its finite value lies from 0 to 1: zero is the Line start, one its end, and intermediate values interpolate uniformly by sample order along the performed centerline. The Line need not be immediately adjacent; its original reference within the Macro is retained. The connected source follows existing position authority and aligns its endpoint with that point. Connection resolution and final rendering share the same centerline, including variation, and common outer transforms move it together with the attached source. The numeric field alone selects Score 0.11.0. A `target_endpoint` or `ink_spread` selects 0.12.0; the `"interior"` selector described below selects 0.13.0. With none of these fields, outputs retain flat 0.9 or compact 0.10. Flat 0.11 does not require a resource snapshot, while compact 0.11 retains the existing caller-owned resource contract. General Along, adjacency for Connected without a path position, and Touching closure remain unchanged. Invalid or omitted targets produce a diagnostic and remove only the relation while other drawing continues.
 
-Ordinary DDL accepts `connected/connects to [the] start/end of [the] [previous] line/arc` to select only the target endpoint of an existing previous reference. The current shape always uses its canonical start, preserving Line from→to and Arc angle_start→angle_end identity. The existing endpoint-free connection remains prior end to current start. `target_endpoint` and `target_path_position` cannot coexist. A Score carrying either `target_endpoint` or `ink_spread` is version 0.12; versions 0.9, 0.10, and 0.11 without both fields retain their existing behavior.
+Ordinary DDL accepts `connected/connects to [the] start/end of [the] [previous] line/arc` to select only the target endpoint of an existing previous reference. The current shape always uses its canonical start, preserving Line from→to and Arc angle_start→angle_end identity. The existing endpoint-free connection remains prior end to current start. `target_endpoint` and `target_path_position` cannot coexist. A Score carrying `target_endpoint` or `ink_spread` uses at least 0.12, or 0.13 when it also carries an interior selector. Existing fields in versions 0.9, 0.10, and 0.11 keep their prior meaning.
+
+Ordinary DDL accepts `connected partway along the previous line/arc` to join the current start to a point on the prior Line or Arc, excluding both ends. `partway` belongs to places and is not an alias for center. Score retains `target_path_position:"interior"`; performance chooses a position strictly inside the path using the existing instance identity and performance seed. The same Score and performance seed reproduce the same contact on the actual varied centerline, including outer rotation, reflection, and translation. This does not align tangents or resize the shape. Macros use the same `target_path_position:"interior"` selector. Only works carrying this string require Score 0.13. Existing numeric expressions and numeric Score positions retain their Line-only 0–1 range and interpolation. Combining the selector with an endpoint or targeting an anchor is an invalid relation.
 
 Fluctuation parameters keep asset category `variation` and may constrain candidates with an optional closed `dimension`: `amplitude`, `frequency`, `quality`, or `spread`. For example, `{"type":"semantic_ref","category":"variation","dimension":"amplitude"}`. Other categories cannot specify a dimension. Omitted / None preserves legacy category-only matching and canonical bytes / digest; Some participates in the definition digest. Flat Emit uses `fluctuation_amplitude`, `fluctuation_frequency`, `fluctuation_quality`, and `ink_spread`, each carrying an existing `SemanticRef { category: variation, id }` from its dimension. A field name does not change semantic identity. Definition validation, component `use`, binding, and execution boundaries share the same seven-word current classification.
 
@@ -2388,7 +2390,7 @@ core.
 | 切る | cutting | crosses the preceding element and makes a visual break (the *kire*, the cut, of tanka) | `cutting` |
 | 間に | between | placed in the region between the preceding two elements | `between` |
 | 触れる | touching | contacts the preceding element; coinciding endpoints compose a closed form | `touching` |
-| つながる | connected | joins the current start to a selected start or end of a prior Line or Arc, or to the prior endpoint when omitted | `connected` |
+| つながる | connected | joins the current start to a selected start, end, or interior point of a prior Line or Arc, or to the prior endpoint when omitted | `connected` |
 
 **Words excluded**: nestle up to, answer, converse with, resonate with — words of
 intent and personification, not observable from outside.
@@ -2405,8 +2407,9 @@ explicit; it is never granted spontaneously. `connected` accepts the existing
 `connected/connects to [the] start/end of [the] [previous] line/arc`. The latter
 selects only the target endpoint; the current shape remains at its canonical start.
 For unrotated ordinary Lines and Arcs, left is start and right is end; rotation
-and reflection preserve that same endpoint identity. Only the endpoint-free form
-uses prior end to current start. Notions that arrive from natural
+and reflection preserve that same endpoint identity. The partway form instead
+selects a point excluding both ends during performance. Without either an endpoint
+or partway selector, the connection uses prior end to current start. Notions that arrive from natural
 language — around, on the same beat, leading or lagging, near or far — are not
 relations, and are expressed through position, path, rotation, and spacing.
 
@@ -2436,7 +2439,7 @@ An optional `relation` field is added to an instruction.
 | `type` | `along` / `not_touching` / `cutting` / `between` / `touching` / `connected` | the kind of relation |
 | `gap` | `narrow` / `medium` / `wide` | a guide distance; the concrete value is resolved by the performance |
 | `target_instruction_index` | non-negative Score index | the exact preceding Score instruction for checked `connected` / `touching` / `along` / `cutting`; omitted for older relations |
-| `target_path_position` | finite 0–1 | explicit Score 0.11 Connected position interpolated by sample order on the prior Line's performed centerline; only this field permits a nonadjacent target |
+| `target_path_position` | finite 0–1 / `"interior"` | numbers retain the Score 0.11 Line centerline position; the Score 0.13 string selects an interior Line / Arc position during performance, interpolated by sample order and preserving the explicit prior target |
 | `target_endpoint` | `start` / `end` | explicit Score 0.12 Connected target endpoint on a prior Line or Arc; it cannot coexist with `target_path_position` |
 | `position_authority` | `named_movable` / `numeric_fixed` | position authority of the checked current instruction |
 | `touching_constraints` | boolean `dimensions_fixed` / `direction_fixed` pair | explicit dimension and direction constraints for typed `touching`, distinct from omitted normal; absent in older Scores |

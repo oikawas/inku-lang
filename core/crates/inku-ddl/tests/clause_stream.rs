@@ -378,6 +378,7 @@ fn project_atom(atom: &ClauseAtom, source: &str) -> ExpectedAtom {
                 RemainingRoleKind::Place => "place",
                 RemainingRoleKind::Motion => "motion",
                 RemainingRoleKind::Proportion => "proportion",
+                RemainingRoleKind::Sequence => "sequence",
             }
         ),
         ClauseAtom::UnattachedExactNumber(number) => format!("exact_number:{}", number.value),

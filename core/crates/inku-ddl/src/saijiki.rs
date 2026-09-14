@@ -207,6 +207,7 @@ pub struct CanonicalRelationIdentity {
     pub previous_reference: Option<CanonicalPreviousReference>,
     pub target: Option<TouchingLiteralTarget>,
     pub target_endpoint: Option<inku_score::Endpoint>,
+    pub target_path_selection: Option<inku_score::TargetPathSelection>,
 }
 
 pub(crate) fn canonical_relation_identity(
@@ -239,6 +240,7 @@ pub(crate) fn canonical_relation_identity(
         previous_reference,
         target: None,
         target_endpoint: None,
+        target_path_selection: None,
     })
 }
 
@@ -247,9 +249,17 @@ pub(crate) fn canonical_relation_identity_is_valid(
     identity: CanonicalRelationIdentity,
     surface: &str,
 ) -> bool {
+    if identity.target_endpoint.is_some() && identity.target_path_selection.is_some() {
+        return false;
+    }
     if identity.target_endpoint.is_some() {
         return relation_type == "connected"
             && connected_endpoint_phrase(surface)
+                .is_some_and(|(length, expected)| length == surface.len() && expected == identity);
+    }
+    if identity.target_path_selection.is_some() {
+        return relation_type == "connected"
+            && connected_path_phrase(surface)
                 .is_some_and(|(length, expected)| length == surface.len() && expected == identity);
     }
     let Some(mut expected) = canonical_relation_identity(relation_type, identity.form) else {
@@ -267,6 +277,49 @@ pub(crate) fn canonical_relation_identity_is_valid(
         })
         .copied();
     expected == identity
+}
+
+/// Parse one source-authored connection to an unspecified interior point of a prior path.
+pub(crate) fn connected_path_phrase(source: &str) -> Option<(usize, CanonicalRelationIdentity)> {
+    fn strip_ci<'a>(source: &'a str, prefix: &str) -> Option<&'a str> {
+        source
+            .get(..prefix.len())
+            .filter(|head| head.eq_ignore_ascii_case(prefix))?;
+        Some(&source[prefix.len()..])
+    }
+    let (remaining, target) =
+        if source.starts_with("前の") || source.starts_with('線') || source.starts_with('弧') {
+            let rest = source.strip_prefix("前の").unwrap_or(source);
+            let (rest, target) = if let Some(rest) = rest.strip_prefix('線') {
+                (rest, TouchingLiteralTarget::Line)
+            } else {
+                (rest.strip_prefix('弧')?, TouchingLiteralTarget::Arc)
+            };
+            (rest.strip_prefix("の途中につながる")?, target)
+        } else {
+            let rest = strip_ci(source, "connected partway along ")
+                .or_else(|| strip_ci(source, "connects partway along "))?;
+            let rest = strip_ci(rest, "the ").unwrap_or(rest);
+            let rest = strip_ci(rest, "previous ").unwrap_or(rest);
+            let (rest, target) = if let Some(rest) = strip_ci(rest, "line") {
+                (rest, TouchingLiteralTarget::Line)
+            } else {
+                (strip_ci(rest, "arc")?, TouchingLiteralTarget::Arc)
+            };
+            if rest
+                .chars()
+                .next()
+                .is_some_and(|ch| ch.is_ascii_alphanumeric() || ch == '_')
+            {
+                return None;
+            }
+            (rest, target)
+        };
+    let mut identity =
+        canonical_relation_identity("connected", CanonicalRelationForm::FullLiteral)?;
+    identity.target = Some(target);
+    identity.target_path_selection = Some(inku_score::TargetPathSelection::Interior);
+    Some((source.len() - remaining.len(), identity))
 }
 
 /// Parse a finite target-reference grammar, retaining the whole source phrase as one

@@ -1,4 +1,6 @@
-use inku_score::{Endpoint, InkSpread, Instruction, Score, read_saved_score_json};
+use inku_score::{
+    Endpoint, InkSpread, Instruction, Score, TargetPathPosition, read_saved_score_json,
+};
 
 #[test]
 fn new_optional_fields_are_omitted_and_gated_by_score_0_12() {
@@ -36,7 +38,7 @@ fn new_optional_fields_are_omitted_and_gated_by_score_0_12() {
         .relation
         .as_mut()
         .unwrap()
-        .target_path_position = Some(0.5);
+        .target_path_position = Some(TargetPathPosition::Exact(0.5));
     assert_eq!(
         score.validate_schema_edition(),
         Err("relation target path position and endpoint are exclusive")

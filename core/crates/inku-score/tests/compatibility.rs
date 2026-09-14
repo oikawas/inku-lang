@@ -181,7 +181,7 @@ fn connected_path_position_requires_the_0_11_instruction_target_contract() {
             .as_ref()
             .unwrap()
             .target_path_position,
-        Some(0.375)
+        Some(inku_score::TargetPathPosition::Exact(0.375))
     );
     let canonical = canonical_json_bytes(&score).expect("Score 0.11 path target canonicalizes");
     assert_eq!(

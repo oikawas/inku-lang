@@ -948,6 +948,8 @@ accepted_saijiki_vocabulary の有限語彙と、compilerが読む通常の数�
 
 色の順序が明示された配置は「赤と灰を交互にして、円を五つ並べる。」「赤・灰・青の順に繰り返して、円を八つ並べる。」のように書く。同じ色列を散らす・敷き詰める・埋めるにも使える。交互には2項、順には空でない有限色列を使い、項の順序と重複を保つ。個数は全体の図形数であり列長を掛けない。順序のない複数色から交互や循環を推測しない。
 
+接続先の線や弧の両端以外を指定するには「前の線の途中につながる」「前の弧の途中につながる」と書く。途中の具体位置は演奏で決まるため、中心や数値位置へ置き換えない。始点・終点の明示もそのまま保つ。
+
 canvas format、catalog ID、catalog modeは解決済みhost contextであり、勝手に既定へ置換しない。返答は指定されたJSONだけにする。"#;
 
 const TYPED_STAGE1_SYSTEM_EN: &str = r#"You are inku's typed Stage 1 normalizer. Deep-read the author's description and produce visible, editable normalized DDL that the deterministic compiler can parse again.
@@ -959,6 +961,8 @@ Use the finite accepted_saijiki_vocabulary plus ordinary numeric literals, punct
 Preserve every explicit subject, color, material, thinness, count, size, angle, coordinate, region, relation, repetition, and placement. Fill, scatter, tile, and background are distinct meanings. Fill places the author's specified shape inside the specified region while preserving its explicit count and size; never normalize fill to scatter. Scatter is a distribution with spacing, tile is regular tessellation, and background means only the canvas background color. Do not infer fill merely from “starry sky”, “full”, or “whole area”, and do not turn “fill” into whole-canvas scatter. Never expand an explicit region to the whole canvas.
 
 Write explicitly ordered color placements as "line up five circles, alternating red and gray." or "line up eight circles, repeating red, gray, and blue in order." The same color sequences apply to scatter, tile, and fill. Alternating takes two entries; in order takes a nonempty finite color list. Preserve entry order and duplicates. The count is the total number of shapes; do not multiply it by the list length. Do not infer alternation or cycling from multiple colors without an explicit order.
+
+Write "connected partway along the previous line" or "connected partway along the previous arc" for contact excluding both ends. Its position is decided during performance, so do not replace partway with the center or a numeric position. Preserve an explicitly selected start or end as well.
 
 The canvas format, catalog ID, and catalog mode are already resolved host context. Do not replace them with defaults. Return only the specified JSON."#;
 

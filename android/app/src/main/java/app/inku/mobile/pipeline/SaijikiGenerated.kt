@@ -79,8 +79,8 @@ object SaijikiGenerated {
             key = "basho",
             nameJa = "ばしょ",
             nameEn = "places",
-            wordsJa = listOf("上", "下", "中心", "左端", "右端", "上端", "下端", "始点", "終点", "隅"),
-            wordsEn = listOf("top", "bottom", "center", "left-edge", "right-edge", "top-edge", "bottom-edge", "start", "end", "corner"),
+            wordsJa = listOf("上", "下", "中心", "左端", "右端", "上端", "下端", "始点", "終点", "途中", "隅"),
+            wordsEn = listOf("top", "bottom", "center", "left-edge", "right-edge", "top-edge", "bottom-edge", "start", "end", "partway", "corner"),
         ),
         Category(
             key = "ugoki",

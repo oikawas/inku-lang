@@ -479,6 +479,60 @@ fn path_connected_closed_leaves_follow_one_varied_branch_through_outer_affine() 
 }
 
 #[test]
+fn interior_path_connections_are_reproducible_and_follow_transformed_line_and_arc_centerlines() {
+    let input = score(
+        r#"{"version":"0.13.0","instructions":[
+      {"primitive":"line","from":[0.15,0.4],"to":[0.85,0.4]},
+      {"primitive":"line","from":[0.1,0.2],"to":[0.2,0.2],
+       "relation":{"type":"connected","target_instruction_index":0,
+                   "target_path_position":"interior","position_authority":"named_movable"}},
+      {"primitive":"arc","center":[0.5,0.55],"radius":0.2,
+       "angle_start":15,"angle_end":235,
+       "variation":{"amplitude":"medium","frequency":"slow","quality":"wave",
+                    "dimensions":["position_x","position_y"]}},
+      {"primitive":"line","from":[0.2,0.2],"to":[0.3,0.2],
+       "relation":{"type":"connected","target_instruction_index":2,
+                   "target_path_position":"interior","position_authority":"named_movable"}}
+    ],"transform_groups":[
+      {"start":0,"end":4,"rotation_degrees":21,"scale_x":1.15,"scale_y":0.75,
+       "translate_x":0.04,"translate_y":-0.03}
+    ]}"#,
+    );
+    let performed = resolve_checked_performance(request(&input), ScoreErrorPolicy::Stop).unwrap();
+    let repeated = resolve_checked_performance(request(&input), ScoreErrorPolicy::Stop).unwrap();
+    assert_eq!(performed, repeated);
+
+    let (line_start, line_end) = endpoints(&performed, 0, None);
+    let line_connection = start(&performed, 1);
+    let line = Point::new(line_end.x - line_start.x, line_end.y - line_start.y);
+    let line_offset = Point::new(
+        line_connection.x - line_start.x,
+        line_connection.y - line_start.y,
+    );
+    let line_position =
+        (line.x * line_offset.x + line.y * line_offset.y) / (line.x * line.x + line.y * line.y);
+    assert!((line.x * line_offset.y - line.y * line_offset.x).abs() < 1.0e-9);
+    assert!((0.0..1.0).contains(&line_position));
+
+    let arc_connection = start(&performed, 3);
+    let arc_centerline = performed.line_centerlines[2]
+        .as_deref()
+        .expect("an interior Arc target fixes one rendered centerline");
+    assert!(arc_centerline.windows(2).any(|segment| {
+        let vector = Point::new(segment[1].x - segment[0].x, segment[1].y - segment[0].y);
+        let offset = Point::new(
+            arc_connection.x - segment[0].x,
+            arc_connection.y - segment[0].y,
+        );
+        let length_squared = vector.x * vector.x + vector.y * vector.y;
+        (vector.x * offset.y - vector.y * offset.x).abs() < 1.0e-9
+            && (0.0..=length_squared).contains(&(vector.x * offset.x + vector.y * offset.y))
+    }));
+    assert_ne!(arc_connection, arc_centerline[0]);
+    assert_ne!(arc_connection, *arc_centerline.last().unwrap());
+}
+
+#[test]
 fn selected_line_and_arc_endpoints_keep_identity_through_outer_reflection_and_rotation() {
     let canvas = CanvasSize::new(1200.0, 800.0);
     let input = score(

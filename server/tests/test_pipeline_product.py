@@ -183,3 +183,40 @@ def test_compact_delivery_preserves_authority_in_normal_history(tmp_path, monkey
         assert connection.scalar(select(func.count()).select_from(HistoryRow)) == 1
         assert connection.scalar(select(UserAccountRow.image_generation_count)) == 1
     engine.dispose()
+
+
+def test_partway_score_replay_routes_preserve_the_symbolic_position(monkeypatch):
+    from fastapi import FastAPI, HTTPException
+    from fastapi.testclient import TestClient
+    from types import SimpleNamespace
+    from inku_server.api_core.routers import render as render_routes
+    from inku_server import pipeline_runtime
+
+    app = FastAPI()
+    app.include_router(render_routes.router)
+    app.dependency_overrides[render_routes._current_user] = lambda: {"id": "author"}
+    client = TestClient(app)
+    score = {"version": "0.13.0", "instructions": [
+        {"primitive": "arc"}, {"primitive": "line", "relation": {
+            "type": "connected", "target_instruction_index": 0,
+            "target_path_position": "interior", "position_authority": "named_movable",
+        }},
+    ]}
+    calls = []
+
+    def replay(owner_id, payload, work):
+        calls.append((owner_id, payload, work))
+        # Stop at the shared service boundary without producing SVG on the host.
+        raise HTTPException(status_code=409, detail="shared replay reached")
+
+    monkeypatch.setattr(pipeline_runtime, "get_service", lambda: SimpleNamespace(replay_for=replay))
+    for path in ("/api/render-score", "/api/render-svg"):
+        response = client.post(path, json={"score": score, "render_seed": 77})
+        assert response.status_code == 409
+        assert response.json()["detail"] == "shared replay reached"
+    assert len(calls) == 2
+    for owner_id, payload, work in calls:
+        assert owner_id == "author"
+        assert payload["score"] == score
+        assert payload["render_seed"] == 77
+        assert work is None

@@ -21,7 +21,7 @@ use crate::{
 
 /// Stable identity for the runtime-disconnected explicit instruction association AST.
 pub const SEMANTIC_INSTRUCTION_ASSOCIATION_SCHEMA_ID: &str =
-    "inku.semantic-instruction-association.v21";
+    "inku.semantic-instruction-association.v22";
 
 /// An explicit fill domain. Inline operands retain their original instruction owner
 /// and are consumed as geometry by the fill, rather than drawn independently.
@@ -50,6 +50,7 @@ impl SemanticFillTarget {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SemanticRelation {
     pub target_endpoint: Option<inku_score::Endpoint>,
+    pub target_path_selection: Option<inku_score::TargetPathSelection>,
     pub kind: SemanticRelationKind,
     pub reference: SemanticPreviousReference,
     pub provenance: SourceOccurrence,
@@ -2575,6 +2576,7 @@ fn select_relation(
 
     Some(SemanticRelation {
         target_endpoint: occurrence.target_endpoint,
+        target_path_selection: occurrence.target_path_selection,
         kind: occurrence.kind,
         reference: occurrence.reference,
         provenance: occurrence.provenance,
@@ -2823,6 +2825,12 @@ fn semantic_relation_value(relation: &SemanticRelation) -> Value {
         record.insert(
             "target_endpoint".to_owned(),
             serde_json::to_value(endpoint).expect("closed endpoint"),
+        );
+    }
+    if let Some(selection) = relation.target_path_selection {
+        record.insert(
+            "target_path_position".to_owned(),
+            serde_json::to_value(selection).expect("closed target path selection"),
         );
     }
     record.insert(

@@ -6,6 +6,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 34 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-14 — Resolve partway Line and Arc connections during performance
+
+Saijiki adds partway to places and connects it through ordinary DDL, Macros, shared Score, and Web / Android vocabulary display. The current start joins the interior of a Line or Arc, excluding both ends; the existing instance identity and performance seed choose the position. Contact shares the actual drawn centerline and follows outer transforms. Partway does not become a fixed center, and numeric path positions and endpoint selections retain their meanings. Only the new string selector requires Score 0.13. This uses DDL_VERSION 9, DDL engine 42, and render engine 64, without changing application or build versions or deployment.
+
 ### 2026-09-14 — Place ordinary DDL colors in alternating or explicit order
 
 Saijiki adds the order category with alternating and in order, including Web / Android display and input examples. Ordinary finite color sequences reach shared Score and compact performance while preserving entry order, duplicates, and total count. Eight red/gray/blue shapes produce ABCABCAB; five red/gray shapes produce ABABA. Line-up, scatter, tile, and fill use existing count rules and resource limits; an over-budget placement is omitted while independent drawing continues. General sequences of other attributes, shapes, and groups remain unfinished. DDL_VERSION advances to 8, DDL engine to 41, and render engine to 63. The existing Score format, application and build versions, and deployment state are unchanged.

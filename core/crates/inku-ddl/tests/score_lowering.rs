@@ -3789,7 +3789,7 @@ fn macro_path_connection_preserves_nonadjacent_host_in_score_and_plan() {
         macro_group_emit("spacer", "black"),
         leaf,
         {"op":"relation","kind":"connected","from":"branch","to":"leaf",
-         "target_path_position":{"expr":"number","value":0.375}}
+         "target_path_position":"interior"}
     ]);
     let definition = macro_group_definition(body.clone());
     let transformed = stage15_locked("Draw.Pair", ResolvedInstructionLanguage::En, &[definition]);
@@ -3802,15 +3802,41 @@ fn macro_path_connection_preserves_nonadjacent_host_in_score_and_plan() {
         lowered.diagnostics()
     );
     let score = lowered.score().unwrap();
-    assert_eq!(score.version, "0.11.0");
+    assert_eq!(score.version, "0.13.0");
     assert_eq!(score.instructions.len(), 3);
     let relation = score.instructions[2].relation.as_ref().unwrap();
     assert_eq!(relation.target_instruction_index, Some(0));
-    assert_eq!(relation.target_path_position, Some(0.375));
+    assert_eq!(
+        relation.target_path_position,
+        Some(inku_score::TargetPathPosition::Selection(
+            inku_score::TargetPathSelection::Interior
+        ))
+    );
     let plan = plan_verified_stage15(transformed.verified_effective_view(), context);
     let planned = plan.objects().unwrap()[2].relation().unwrap();
     assert_eq!(planned.target_object_index(), Some(0));
-    assert_eq!(planned.target_path_position(), Some(0.375));
+    assert_eq!(
+        planned.target_path_position(),
+        Some(inku_score::TargetPathPosition::Selection(
+            inku_score::TargetPathSelection::Interior
+        ))
+    );
+
+    body[3]["target_path_position"] = json!({"expr":"number","value":0.375});
+    let exact = macro_group_definition(body.clone());
+    let transformed = stage15_locked("Draw.Pair", ResolvedInstructionLanguage::En, &[exact]);
+    let lowered = lower_verified_stage15_score(transformed.verified_effective_view(), context);
+    assert_eq!(lowered.outcome(), ScoreLoweringOutcome::Complete);
+    let score = lowered.score().unwrap();
+    assert_eq!(score.version, "0.11.0");
+    assert_eq!(
+        score.instructions[2]
+            .relation
+            .as_ref()
+            .unwrap()
+            .target_path_position,
+        Some(inku_score::TargetPathPosition::Exact(0.375))
+    );
 
     body[3]
         .as_object_mut()

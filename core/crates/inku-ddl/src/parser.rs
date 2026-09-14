@@ -12,7 +12,7 @@ use crate::{
 };
 
 /// Stable identity for the runtime-disconnected neutral parser foundation.
-pub const NEUTRAL_LEXEME_PARSER_SCHEMA_ID: &str = "inku.neutral-lexeme-parser.v10";
+pub const NEUTRAL_LEXEME_PARSER_SCHEMA_ID: &str = "inku.neutral-lexeme-parser.v11";
 
 /// A half-open UTF-8 byte span into the source document.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
@@ -819,6 +819,7 @@ fn candidates_at(
 
     if let Some((length, canonical_identity)) =
         crate::saijiki::connected_endpoint_phrase(&source[start_byte..])
+            .or_else(|| crate::saijiki::connected_path_phrase(&source[start_byte..]))
     {
         push_surface_candidate(
             &mut candidates,
@@ -829,8 +830,8 @@ fn candidates_at(
             &source[start_byte..start_byte + length],
             PRIORITY_ASSET,
             format!(
-                "relation:connected:endpoint:{:?}",
-                canonical_identity.target_endpoint
+                "relation:connected:target:{:?}:{:?}",
+                canonical_identity.target_endpoint, canonical_identity.target_path_selection
             ),
             CandidateDelivery::Token(NeutralTokenKind::SaijikiRelation {
                 asset_id: SAIJIKI_ASSET_ID.to_owned(),

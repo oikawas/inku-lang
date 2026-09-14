@@ -286,7 +286,8 @@
 # consolidated vocabulary. Existing stored Scores retain their prior meaning.
 # 41: Ordinary color sequences preserve ordered duplicates and total placement
 # counts through the shared compact Score color cycle.
-DDL_ENGINE_VERSION = "41"
+# 42: Partway connections keep an interior path selector until performance.
+DDL_ENGINE_VERSION = "42"
 # 4 (2026-07-30): yellow, orange, and purple become abstract Score colors, and
 # coerce recognizes the corresponding Japanese and English DDL markers.
 # 3 (2026-07-30): 黄 / 橙 / 紫 joined the saijiki color words, so an author can write
@@ -302,4 +303,5 @@ DDL_ENGINE_VERSION = "41"
 # 7 (2026-09-14): Start/end become place words; center, stipple, swaying,
 # and independent bleeding replace the duplicate public entries.
 # 8 (2026-09-14): Alternating and in order join the new order category.
-DDL_VERSION = "8"
+# 9 (2026-09-14): Partway joins place vocabulary for Line/Arc connections.
+DDL_VERSION = "9"

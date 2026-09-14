@@ -106,12 +106,27 @@ class SingleAttemptProvider:
         key = connection.get("api_key") or ""
         headers = {"Content-Type": "application/json"}
         kind = connection["kind"]
+        response_name = "submit_pipeline_response"
         if kind == "openai_compatible":
             url = base + "/chat/completions"
             headers["Authorization"] = "Bearer " + (key or "none")
             body = {"model": model, "max_tokens": self.options.max_tokens, "stream": False,
+                    "temperature": 0.3 if prompt["action_name"] == "generate_normalized_ddl" else 0.0,
                     "messages": [{"role": "system", "content": prompt["system"]},
                                  {"role": "user", "content": prompt["message"]}]}
+            # Preserve the established provider-specific structured-output
+            # transport, using the schema owned by the shared core verbatim.
+            if connection["id"] == "ollama":
+                body["response_format"] = {
+                    "type": "json_schema",
+                    "json_schema": {"name": response_name, "schema": prompt["response_schema"], "strict": True},
+                }
+            else:
+                body["tools"] = [{"type": "function", "function": {
+                    "name": response_name, "description": "Submit the requested pipeline response.",
+                    "parameters": prompt["response_schema"],
+                }}]
+                body["tool_choice"] = {"type": "function", "function": {"name": response_name}}
             if connection["id"] in {"ollama", "ollama-cloud"}:
                 body["reasoning_effort"] = "none"
         elif kind == "anthropic":
@@ -141,7 +156,14 @@ class SingleAttemptProvider:
                         raw.extend(chunk)
                 data = json.loads(raw)
                 if kind == "openai_compatible":
-                    text = data["choices"][0]["message"]["content"]
+                    message = data["choices"][0]["message"]
+                    calls = message.get("tool_calls") or []
+                    if calls:
+                        if len(calls) != 1 or calls[0]["function"]["name"] != response_name:
+                            raise TypeError("provider returned an unexpected tool call")
+                        text = calls[0]["function"]["arguments"]
+                    else:
+                        text = message.get("content")
                 elif kind == "anthropic":
                     text = "\n".join(block["text"] for block in data["content"] if block["type"] == "text")
                 else:

@@ -54,6 +54,7 @@
 	import { initMascot } from '$lib/mascot.svelte';
 	import { FALLBACK_CATALOG, catalogById, catalogNameplate, type ColorCatalog, type ColorCatalogsResponse } from '$lib/colors';
 	import { createElapsed } from '$lib/elapsed.svelte';
+	import { describeApiErrorDetail } from '$lib/apiError';
 	import { createApiFetch } from '$lib/transport/api-fetch';
 	import { createSessionState, type UserItem, type UserModelSettings } from '$lib/features/session/state.svelte';
 	import { createWorkState } from '$lib/features/work/state.svelte';
@@ -463,36 +464,13 @@
 		registerModelCatalog(availableVisionModelCatalog);
 	});
 
-	type ProviderFailure = {
-		code: 'model_gone' | 'provider_auth' | 'provider_rate_limit' | 'provider_error';
-		stage: string;
-		provider_status: number;
-		message: string;
-	};
-
 	/**
 	 * v1.98: Turn a Server failure detail into one human-readable line.
 	 * Provider failures (retirement, authentication, and rate limiting) lead
 	 * with their category and retain the provider's original message for diagnosis.
 	 */
 	function describeApiError(detail: unknown, status: number): string {
-		if (detail === 'render capacity is full') return t().errorRenderBusy;
-		if (detail === 'description is only labels') return t().errorDescriptionOnlyLabels;
-		if (typeof detail === 'string' && detail) return detail;
-		if (detail && typeof detail === 'object' && 'code' in detail) {
-			const failure = detail as ProviderFailure;
-			const stage = failure.stage === 'interpret' ? t().runStatusStage1 : t().runStatusStage2;
-			const headline =
-				failure.code === 'model_gone'
-					? t().errorModelGone(stage)
-					: failure.code === 'provider_auth'
-						? t().errorProviderAuth(stage)
-						: failure.code === 'provider_rate_limit'
-							? t().errorProviderRateLimit(stage)
-							: t().errorProviderOther(stage, failure.provider_status);
-			return `${headline}\n${failure.message}`;
-		}
-		return `HTTP ${status}`;
+		return describeApiErrorDetail(detail, status, t());
 	}
 
 	const apiFetch = createApiFetch();

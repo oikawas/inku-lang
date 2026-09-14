@@ -518,29 +518,39 @@ pub fn build_stage1_prompt(
 }
 
 fn stage1_normalizer_rules(language: ResolvedInstructionLanguage) -> String {
-    let (role, ddl_intent, response_envelope, output_scope, grammar, context, response_ending) =
-        match language {
-            ResolvedInstructionLanguage::Ja => (
-                TYPED_STAGE1_NORMALIZER_ROLE_JA,
-                STAGE1_DDL_INTENT_JA,
-                STAGE1_NORMALIZER_RESPONSE_ENVELOPE_JA,
-                STAGE1_OUTPUT_SCOPE_JA,
-                STAGE1_GRAMMAR_JA,
-                STAGE1_CONTEXT_JA,
-                STAGE1_NORMALIZER_RESPONSE_ENDING_JA,
-            ),
-            ResolvedInstructionLanguage::En => (
-                TYPED_STAGE1_NORMALIZER_ROLE_EN,
-                STAGE1_DDL_INTENT_EN,
-                STAGE1_NORMALIZER_RESPONSE_ENVELOPE_EN,
-                STAGE1_OUTPUT_SCOPE_EN,
-                STAGE1_GRAMMAR_EN,
-                STAGE1_CONTEXT_EN,
-                STAGE1_NORMALIZER_RESPONSE_ENDING_EN,
-            ),
-        };
+    let (
+        role,
+        ddl_intent,
+        response_envelope,
+        output_scope,
+        interpretation,
+        grammar,
+        context,
+        response_ending,
+    ) = match language {
+        ResolvedInstructionLanguage::Ja => (
+            TYPED_STAGE1_NORMALIZER_ROLE_JA,
+            STAGE1_DDL_INTENT_JA,
+            STAGE1_NORMALIZER_RESPONSE_ENVELOPE_JA,
+            STAGE1_OUTPUT_SCOPE_JA,
+            STAGE1_INTERPRETATION_JA,
+            STAGE1_GRAMMAR_JA,
+            STAGE1_CONTEXT_JA,
+            STAGE1_NORMALIZER_RESPONSE_ENDING_JA,
+        ),
+        ResolvedInstructionLanguage::En => (
+            TYPED_STAGE1_NORMALIZER_ROLE_EN,
+            STAGE1_DDL_INTENT_EN,
+            STAGE1_NORMALIZER_RESPONSE_ENVELOPE_EN,
+            STAGE1_OUTPUT_SCOPE_EN,
+            STAGE1_INTERPRETATION_EN,
+            STAGE1_GRAMMAR_EN,
+            STAGE1_CONTEXT_EN,
+            STAGE1_NORMALIZER_RESPONSE_ENDING_EN,
+        ),
+    };
     format!(
-        "{role}{ddl_intent}\n\n{response_envelope}{output_scope}\n\n{grammar}\n\n{context}{response_ending}"
+        "{role}{ddl_intent}\n\n{response_envelope}{output_scope}\n\n{interpretation}\n\n{grammar}\n\n{context}{response_ending}"
     )
 }
 
@@ -910,8 +920,21 @@ fn hole_response_schema(
 }
 
 fn finish_prompt(mut prompt: LlmPrompt) -> Result<LlmPrompt, PromptError> {
-    let schema_bytes =
-        serde_json::to_vec(&prompt.response_schema).map_err(|_| PromptError::Serialization)?;
+    let schema_text =
+        serde_json::to_string(&prompt.response_schema).map_err(|_| PromptError::Serialization)?;
+    let response_instruction = match prompt.instruction_language {
+        ResolvedInstructionLanguage::Ja => {
+            "次のJSON Schemaに従うJSONオブジェクトを一つだけ返す。各値の型を守り、文字列を配列やオブジェクトに変えない。コードブロックや説明文を付けない。"
+        }
+        ResolvedInstructionLanguage::En => {
+            "Return exactly one JSON object matching the following JSON Schema. Preserve each value's type; do not replace a string with an array or object. Do not add Markdown fences or explanations."
+        }
+    };
+    // Every host sends system/message verbatim. The schema must reach the model,
+    // not merely remain transport metadata used by the response validator.
+    prompt.system.push_str(&format!(
+        "\n\n{response_instruction}\n# response_schema\n{schema_text}"
+    ));
     let mut hasher = Sha256::new();
     hasher.update(PROMPT_DIGEST_DOMAIN);
     for field in [
@@ -922,7 +945,7 @@ fn finish_prompt(mut prompt: LlmPrompt) -> Result<LlmPrompt, PromptError> {
         prompt.instruction_language.as_str().as_bytes(),
         prompt.system.as_bytes(),
         prompt.message.as_bytes(),
-        &schema_bytes,
+        schema_text.as_bytes(),
         prompt.saijiki_asset_id.as_deref().unwrap_or("").as_bytes(),
         prompt
             .saijiki_asset_digest
@@ -1006,6 +1029,17 @@ const STAGE1_DDL_INTENT_JA: &str =
     "決定的 compiler が再読できる、可視で編集可能な normalized DDL を作る。";
 const STAGE1_NORMALIZER_RESPONSE_ENVELOPE_JA: &str = "返すJSONは normalized_ddl だけとし、";
 const STAGE1_OUTPUT_SCOPE_JA: &str = "Score、renderer命令、観測文、思考過程、説明、非表示metadataを出力しない。normalized DDL はそれ単独で意味を完結させ、後段のLLM補完を前提にholeや曖昧な代用語を残さない。";
+const STAGE1_INTERPRETATION_JA: &str = r#"入力は詩・比喩・物語を含む自由記述である。歳時記にない対象は、記述全体の形・質感・構造から、歳時記の図形、色、画材、配置へ解釈する。人・顔・動物を具象的な部品や記号にせず、重心、余白、線の密度、間隔として表す。出来事や感情は静止画の状態へ読み替え、対象名、物語、感情語、「〜を表現する」等の説明句をDDLへ残さない。解釈した画材も可視DDLへ明記する。既に明示された描画属性は保持する。
+
+macroは名前空間付きの名前が明示された場合、またはそのmacroの対象そのものが明示された場合だけ選ぶ。季節・比喩・未知対象から連想した別のmacroで記述全体を置き換えない。macroを使わずコア語彙だけでも記述できる。
+
+normalized_ddlは命令文をつないだ一つの文字列であり、命令の配列ではない。一つの図形の属性・個数・配置を一つの命令文にまとめる。「その」「それ」などの指示語で別の図形を参照しない。図形間の関係を作者が明示した場合だけ、歳時記のあいだに対応する「前の線に沿って」「前の形に触れない」等の定型句を使う。それ以外の位置は歳時記のばしょで記す。
+
+次は変換形式の例であり、例の対象や構図を今回の記述へコピーしない。
+記述: 中心に赤い円をひとつ。
+応答: {"normalized_ddl":"中心に赤い円を1個置く。"}
+記述: 誰もいない場所に足音だけが響く。
+応答: {"normalized_ddl":"中心に赤い鉛筆の細い線をひとつ置く。"}"#;
 const STAGE1_GRAMMAR_JA: &str = r#"accepted_saijiki_vocabulary の有限語彙と、compilerが読む通常の数値・句読点・文法だけを使う。installed_macro_signatures のmacroを使う場合は qualified_name と列挙されたparameterだけを書く。version、digest、MacroDefinition本文、component、展開結果をDDLへ書かない。
 
 作者が明示した対象、色、画材、太さ、個数、寸法、角度、座標、領域、関係、反復、配置を失わない。fill、scatter、tile、background は別の意味である。fillは作者が指定した図形を指定領域の内部へ、指定個数と寸法を保って充填する。scatterへ読み替えない。scatterは疎密を持つ散布、tileは規則的な敷き詰め、backgroundはキャンバス背景色だけに使う。『満天』『星空』『全面』を理由にfillへ変えず、『埋める』を全面scatterへ変えない。明示領域をcanvas全体へ広げない。
@@ -1027,6 +1061,17 @@ const STAGE1_DDL_INTENT_EN: &str =
     "produce visible, editable normalized DDL that the deterministic compiler can parse again.";
 const STAGE1_NORMALIZER_RESPONSE_ENVELOPE_EN: &str = "Return JSON containing only normalized_ddl. ";
 const STAGE1_OUTPUT_SCOPE_EN: &str = "Do not output a Score, renderer instructions, observation text, chain of thought, explanation, or hidden metadata. The normalized DDL must be meaning-complete by itself; do not leave holes or vague placeholders for a later LLM.";
+const STAGE1_INTERPRETATION_EN: &str = r#"The input is free description and may contain poetry, metaphors, or a narrative. Interpret subjects outside the Saijiki through the whole description's shape, texture, and structure as Saijiki shapes, colors, tools, and placements. Express people, faces, and animals through visual weight, empty space, line density, and spacing rather than figurative parts or symbols. Translate events and emotions into a static image; do not retain subject names, narrative, emotional terms, or explanations such as "representing ..." in DDL. State interpreted tools in visible DDL as well. Preserve already explicit drawing attributes.
+
+Choose a macro only when its qualified name or its actual subject is explicit. Do not replace the whole description with another macro inferred from a season, metaphor, or unknown subject. Core vocabulary alone is sufficient without macros.
+
+normalized_ddl is one string of instruction sentences, not an array of instructions. Keep one shape's attributes, count, and placement in one instruction sentence. Do not refer to another shape with pronouns such as "it" or "that". Only when the author explicitly requests an inter-shape relation, use a fixed phrase for a Saijiki relation such as "along the previous line" or "not touching the previous shape". Express other positions with Saijiki place vocabulary.
+
+These examples demonstrate the conversion format; do not copy their subjects or compositions into the current description.
+Description: One red circle in the center.
+Response: {"normalized_ddl":"Place one red circle in the center."}
+Description: Only footsteps echo in an empty place.
+Response: {"normalized_ddl":"place one thin red pencil line at the center."}"#;
 const STAGE1_GRAMMAR_EN: &str = r#"Use the finite accepted_saijiki_vocabulary plus ordinary numeric literals, punctuation, and grammar accepted by the compiler. When invoking an installed macro, write only its qualified_name and listed parameters. Do not write versions, digests, MacroDefinition bodies, components, or expansions into DDL.
 
 Preserve every explicit subject, color, material, thinness, count, size, angle, coordinate, region, relation, repetition, and placement. Fill, scatter, tile, and background are distinct meanings. Fill places the author's specified shape inside the specified region while preserving its explicit count and size; never normalize fill to scatter. Scatter is a distribution with spacing, tile is regular tessellation, and background means only the canvas background color. Do not infer fill merely from “starry sky”, “full”, or “whole area”, and do not turn “fill” into whole-canvas scatter. Never expand an explicit region to the whole canvas.
@@ -1086,6 +1131,14 @@ mod tests {
         )
         .unwrap();
         assert_eq!(stage1.action_name, "generate_normalized_ddl");
+        let delivered_schema: serde_json::Value =
+            serde_json::from_str(stage1.system.split("# response_schema\n").nth(1).unwrap())
+                .unwrap();
+        assert_eq!(delivered_schema, stage1.response_schema);
+        assert_eq!(
+            delivered_schema["properties"]["normalized_ddl"]["type"],
+            "string"
+        );
         assert!(
             stage1
                 .system
@@ -1182,11 +1235,11 @@ mod tests {
     fn stage1_normalizer_rules_preserve_accepted_prompt_bytes() {
         assert_eq!(
             sha256_hex(stage1_normalizer_rules(ResolvedInstructionLanguage::Ja).as_bytes()),
-            "5845e087963c8a7d27791fdec037ec659db72c8a5614dae5da6f88a30748893d",
+            "265b80139d46e3868cc393b1121b7df458dd5d03aca84aacec39114c25808f8a",
         );
         assert_eq!(
             sha256_hex(stage1_normalizer_rules(ResolvedInstructionLanguage::En).as_bytes()),
-            "6974e6a04d99d23d1dbe67623382b5bed77acfb8e657c1b4b67423f0265ce1b7",
+            "853fd69bef3e0ffa116d8e31c1239b3c9b4a2b26a92cae7dcbf99ef30902e1a4",
         );
     }
 
@@ -1209,12 +1262,14 @@ mod tests {
         .unwrap();
         let ja_projection = stage1_system_projection(ResolvedInstructionLanguage::Ja).unwrap();
         let en_projection = stage1_system_projection(ResolvedInstructionLanguage::En).unwrap();
+        assert!(prompt.system.starts_with(&format!(
+            "{}\n\n# installed_macro_signatures\n[]\n\n",
+            stage1_normalizer_system(ResolvedInstructionLanguage::En).unwrap(),
+        )));
+        let (_, schema_text) = prompt.system.split_once("# response_schema\n").unwrap();
         assert_eq!(
-            prompt.system,
-            format!(
-                "{}\n\n# installed_macro_signatures\n[]",
-                stage1_normalizer_system(ResolvedInstructionLanguage::En).unwrap(),
-            ),
+            serde_json::from_str::<Value>(schema_text).unwrap(),
+            prompt.response_schema
         );
         assert!(ja_projection.contains("fill、scatter、tile、background は別の意味"));
         assert!(en_projection.contains("Fill, scatter, tile, and background"));
@@ -1222,6 +1277,8 @@ mod tests {
             assert!(projection.contains("accepted_saijiki_vocabulary"));
             assert!(!projection.contains("normalized_ddl"));
             assert!(!projection.contains("JSON"));
+            assert!(!projection.contains("足音"));
+            assert!(!projection.contains("footsteps"));
         }
     }
 }

@@ -282,10 +282,7 @@ export function createWorkState(deps: WorkStateDeps) {
 		const payload = await response.json().catch(() => ({})) as { detail?: unknown };
 		const current = pipelineViewFromErrorDetail(payload.detail);
 		if (current) pipelineController.adopt(current);
-		const message = payload.detail && typeof payload.detail === 'object' && 'message' in payload.detail
-			? String((payload.detail as { message: unknown }).message)
-			: describeApiError(payload.detail, response.status);
-		return new Error(message);
+		return new Error(describeApiError(payload.detail, response.status));
 	}
 
 	async function finishPipeline(run: () => Promise<PipelineView>): Promise<PipelineView> {
@@ -302,7 +299,8 @@ export function createWorkState(deps: WorkStateDeps) {
 			return view;
 		} catch (cause) {
 			if (cause instanceof PipelineApiError && cause.detail.current_view) {
-				adoptPipelineView(cause.detail.current_view);
+				pipelineController.adopt(cause.detail.current_view);
+				throw new Error(describeApiError(cause.detail, cause.status));
 			}
 			throw cause;
 		} finally {

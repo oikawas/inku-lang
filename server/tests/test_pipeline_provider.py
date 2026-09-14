@@ -22,7 +22,11 @@ def test_single_attempt_preserves_core_prompt_and_reports_rate_limit_and_deadlin
             return httpx.Response(429, json={"error": "fixture rate limit"})
         if len(seen) == 3:
             await asyncio.sleep(0.2)
-        return httpx.Response(200, json={"choices": [{"message": {"content": ' {"normalized_ddl":"keep these bytes"} '}}]})
+        return httpx.Response(200, json={"choices": [{"message": {
+            "content": None, "tool_calls": [{"type": "function", "function": {
+                "name": "submit_pipeline_response", "arguments": ' {"normalized_ddl":"keep these bytes"} ',
+            }}],
+        }}]})
 
     provider = SingleAttemptProvider(
         ProviderOptions({}, "fixture-model", "fixture-model", 256, 8192),
@@ -30,7 +34,12 @@ def test_single_attempt_preserves_core_prompt_and_reports_rate_limit_and_deadlin
     )
     action = {
         "tag": "generate_normalized_ddl", "identity": {"action_id": "a", "attempt": 1, "request_digest": "b"},
-        "timeout_ms": "1000", "payload": {"prompt": {"system": "exact bounded system", "message": "exact visible input"}},
+        "timeout_ms": "1000", "payload": {"prompt": {
+            "system": "exact bounded system", "message": "exact visible input",
+            "action_name": "generate_normalized_ddl",
+            "response_schema": {"type": "object", "required": ["normalized_ddl"],
+                                "properties": {"normalized_ddl": {"type": "string"}}},
+        }},
     }
     result = provider(action)
     assert result["tag"] == "normalized_ddl_generated"
@@ -39,6 +48,10 @@ def test_single_attempt_preserves_core_prompt_and_reports_rate_limit_and_deadlin
     assert json.loads(seen[0].content)["messages"] == [
         {"role": "system", "content": "exact bounded system"}, {"role": "user", "content": "exact visible input"},
     ]
+    request_body = json.loads(seen[0].content)
+    assert request_body["tools"][0]["function"]["parameters"] == action["payload"]["prompt"]["response_schema"]
+    assert request_body["tool_choice"]["function"]["name"] == "submit_pipeline_response"
+    assert request_body["temperature"] == 0.3
     assert provider(action)["failure"] == "rate_limited"
     assert len(seen) == 2  # The host has not retried the rejected attempt.
     assert provider({**action, "timeout_ms": "20"})["failure"] == "transport_timeout"

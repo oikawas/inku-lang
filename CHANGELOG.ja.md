@@ -6,6 +6,10 @@
 
 **本書が持つのは v2.5.0（2026-07-25、render engine 12）以降**の 34 版である。それより前は書庫にある。
 
+### 2026-09-14 — 記述からの描画応答と失敗表示を修正
+
+共有pipelineのJSON応答schemaを実際のモデル要求へ渡し、OpenAI互換接続では既存の提供元別structured outputを使う。Stage 1へ自由記述の抽象化、明示対象だけのMacro選択、有限な命令・参照文法を戻し、命令配列や説明句を生成する失敗を抑える。可視DDLの検証、補完候補の承認、再試行の管理は共有coreに保つ。Webはpipelineの失敗・補完承認を提供元HTTPエラーと混同せず、現在のphaseに対応する理由を表示する。描画・DDLの決定的意味、版、camera語彙projectionは変更しない。
+
 ### 2026-09-14 — カメラの共有語彙と旧層整理
 
 通常Server／Web／Androidの意味決定を共有Rustへ統一し、Pythonの旧解釈・展開・Score生成とKotlinの旧決定層、専用比較testを除いた。保存済みScore／SVG／履歴、保存時予算と旧9:5用紙の再演互換を保持し、保存Scoreの形式互換はDDLを再解釈しない入口へ絞る。カメラDDLも共有Stage 1語彙projectionを使い、通常のJSON応答指定と分離した。旧promptを再構成して送信記録のように表示する処理と、現在は効いていないWeb／Android設定・CLI送信項目を外した。共有bindingは1.1.0、byte protocolは1.0.0、camera DDL promptはv2となる。

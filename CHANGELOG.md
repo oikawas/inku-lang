@@ -6,6 +6,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 34 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-14 — Fix description responses and pipeline failure messages
+
+Send the shared pipeline's JSON response schema to the model, using the established provider-specific structured output for OpenAI-compatible connections. Restore Stage 1 guidance for interpreting free descriptions, selecting Macros only for explicit subjects, and using finite instruction and reference grammar, reducing instruction-array and explanatory-text failures. Shared core retains visible-DDL validation, patch approval, and retry ownership. Web distinguishes pipeline failures and patch approval from provider HTTP errors and shows the reason for the current phase. Deterministic drawing and DDL semantics, versions, and the camera vocabulary projection are unchanged.
+
 ### 2026-09-14 — Share camera vocabulary and retire old layers
 
 Consolidated normal Server, Web, and Android meaning decisions in shared Rust. Removed the old Python interpretation, expansion, and Score generation, the Kotlin decision layer, and their comparison-only tests. Saved Score, SVG, history, stored resource budgets, and old 9:5 paper replay remain supported; saved-Score format compatibility is limited to an entry that cannot reinterpret DDL. Camera DDL uses the shared Stage 1 vocabulary projection, separated from the normalizer's JSON response contract. Removed reconstructed old prompts presented as sent records, inactive Web and Android settings, and obsolete CLI request options. The shared binding advances to 1.1.0, while the byte protocol stays 1.0.0; the camera DDL prompt advances to v2.

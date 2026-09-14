@@ -1,0 +1,42 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+
+import { describeApiErrorDetail } from './apiError.ts';
+import { ja } from './i18n/ja.ts';
+
+test('a failed pipeline action uses its saved phase instead of inventing a provider error', () => {
+	const actual = describeApiErrorDetail({
+		code: 'pipeline_author_action_required',
+		message: 'pipeline author action required',
+		current_view: {
+			phase: { tag: 'failed', reason: 'stage1_failed' },
+			document: null,
+			delivery: null,
+			result: null,
+		},
+	}, 409, ja);
+
+	assert.equal(actual, '処理の結果を確認してください。 理由: 記述の解釈を完了できませんでした');
+	assert.doesNotMatch(actual, /undefined|モデル提供元|pipeline author action required/);
+});
+
+test('a required pipeline patch points to the existing approval view', () => {
+	const actual = describeApiErrorDetail({
+		code: 'pipeline_patch_approval_required',
+		message: 'pipeline patch approval required',
+		current_view: { phase: { tag: 'awaiting_patch_approval' } },
+	}, 409, ja);
+
+	assert.equal(actual, ja.pipelinePatchHint);
+});
+
+test('a real provider failure keeps its localized stage, status, and provider message', () => {
+	const actual = describeApiErrorDetail({
+		code: 'provider_error',
+		stage: 'interpret',
+		provider_status: 502,
+		message: 'upstream disconnected',
+	}, 500, ja);
+
+	assert.equal(actual, '解釈のモデル提供元がエラーを返しました（HTTP 502）。\nupstream disconnected');
+});

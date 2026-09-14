@@ -8,6 +8,7 @@ authority sidecars, effect results or resource policies through this module.
 from __future__ import annotations
 
 import hashlib
+import importlib
 import importlib.util
 import json
 import platform
@@ -29,9 +30,25 @@ def _bytes(value: dict) -> bytes:
 
 
 class PipelineBinding:
-    """Load one explicitly selected, platform-specific generated binding bundle."""
+    """Use the shipped native wheel or an explicit short-lived fixture bundle."""
 
-    def __init__(self, bundle: Path):
+    def __init__(self, bundle: Path | None = None):
+        if bundle is None:
+            try:
+                module = importlib.import_module("inku_render")
+                version_report = module.pipeline_version_report
+                self.step = module.pipeline_step
+                self.canvas_registry = json.loads(module.pipeline_canvas_registry())
+                self.resolve_palette = module.pipeline_resolve_palette
+                self.render_saved = module.pipeline_render_saved
+                self.resolve_macro_catalog = module.pipeline_resolve_macro_catalog
+            except (AttributeError, ImportError) as error:
+                raise CandidateHostError("binding_unavailable") from error
+            self.versions = json.loads(version_report())
+            if self.versions != {"binding_version": "1.0.0", "protocol_version": "1.0.0"}:
+                raise CandidateHostError("binding_protocol_mismatch")
+            return
+
         bundle = bundle.resolve()
         manifest = json.loads((bundle / "manifest.json").read_bytes())
         library = {"Darwin": "libinku_pipeline_uniffi.dylib", "Linux": "libinku_pipeline_uniffi.so"}.get(platform.system())

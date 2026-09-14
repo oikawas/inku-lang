@@ -1,8 +1,6 @@
 """One real-binding host/DB connection; no provider network or native rendering."""
 
 import json
-import os
-from pathlib import Path
 
 import pytest
 from sqlalchemy import create_engine
@@ -47,10 +45,7 @@ def _fixture_config() -> dict:
 
 
 def test_real_binding_commits_source_and_authority_before_automatic_hole_request(tmp_path):
-    bundle = os.environ.get("INKU_PIPELINE_PYTHON_BUNDLE")
-    if not bundle:
-        pytest.skip("explicit generated candidate binding bundle required")
-    binding = PipelineBinding(Path(bundle))
+    binding = PipelineBinding()
     engine = create_engine(f"sqlite:///{tmp_path / 'candidate.db'}")
     store = VariationAuthorityStore(engine)
     store.install_schema()

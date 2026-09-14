@@ -6,6 +6,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 34 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-14 — Ship the shared pipeline in the Server native wheel
+
+The existing Python native wheel now exposes the shared authoring pipeline's byte boundary, and the normal Server uses that installed module directly. An externally generated bundle is no longer a normal runtime dependency. A focused Linux wheel and real-binding/SQLite check verified visible-DDL persistence, authority, and automatic known-hole requests. Semantics, DDL/Score formats, and engine versions are unchanged; legacy removal and deployment follow separately.
+
 ### 2026-09-14 — Reconnect bundled Macros and saved definitions after vocabulary consolidation
 
 Updated young-leaf and dead-leaf definitions to canonical `swaying`, and falling leaves and dry grass from legacy Pink variation to independent `ink_spread:bleeding`. The four definitions and bundled package advance to 1.0.1. Saved definitions carrying legacy `trembling` or `blurring` retain their canonical bytes, digest, and lock and continue to resolve to Perlin or Pink respectively. Legacy `middle` retains its canonical identity shared with `center`. Saved configs are not rebound to the new catalog, and ordinary DDL and the public vocabulary retain the consolidation. DDL engine 45 identifies this change; render 66, DDL_VERSION 11, and Score formats are unchanged.

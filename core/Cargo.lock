@@ -439,6 +439,7 @@ dependencies = [
 name = "inku-render-python"
 version = "0.1.0"
 dependencies = [
+ "inku-pipeline-uniffi",
  "inku-render",
  "inku-score",
  "pyo3",

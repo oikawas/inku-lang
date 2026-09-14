@@ -22,8 +22,7 @@ def get_binding() -> PipelineBinding:
     global _binding
     with _lock:
         if _binding is None:
-            bundle = Path(os.environ.get("INKU_PIPELINE_PYTHON_BUNDLE", str(Path(__file__).parent / "native" / "pipeline")))
-            _binding = PipelineBinding(bundle)
+            _binding = PipelineBinding()
         return _binding
 
 

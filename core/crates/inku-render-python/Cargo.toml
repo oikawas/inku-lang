@@ -13,6 +13,7 @@ crate-type = ["cdylib"]
 path = "src/lib.rs"
 
 [dependencies]
+inku-pipeline-uniffi = { path = "../inku-pipeline-uniffi" }
 inku-score.workspace = true
 inku-render.workspace = true
 pyo3.workspace = true

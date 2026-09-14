@@ -2,6 +2,7 @@
 
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
+use pyo3::types::PyBytes;
 use serde::Deserialize;
 
 #[derive(Deserialize)]
@@ -106,6 +107,59 @@ fn render_with_resources(request_json: &str, resources_json: &str) -> PyResult<(
     Ok((output.svg, metadata))
 }
 
+/// Report the shared pipeline binding and byte-protocol versions.
+#[pyfunction]
+fn pipeline_version_report() -> String {
+    inku_pipeline_uniffi::version_report()
+}
+
+/// Share the canonical canvas registry with the Python host.
+#[pyfunction]
+fn pipeline_canvas_registry() -> String {
+    inku_pipeline_uniffi::canvas_registry()
+}
+
+/// Advance one pipeline execution through the same owned byte boundary as Android.
+#[pyfunction]
+fn pipeline_step<'py>(
+    py: Python<'py>,
+    snapshot_bytes: &Bound<'py, PyBytes>,
+    input_envelope_bytes: &Bound<'py, PyBytes>,
+) -> Bound<'py, PyBytes> {
+    let output = inku_pipeline_uniffi::step(
+        snapshot_bytes.as_bytes().to_vec(),
+        input_envelope_bytes.as_bytes().to_vec(),
+    );
+    PyBytes::new(py, &output)
+}
+
+#[pyfunction]
+fn pipeline_resolve_palette<'py>(
+    py: Python<'py>,
+    input_bytes: &Bound<'py, PyBytes>,
+) -> Bound<'py, PyBytes> {
+    let output = inku_pipeline_uniffi::resolve_palette(input_bytes.as_bytes().to_vec());
+    PyBytes::new(py, &output)
+}
+
+#[pyfunction]
+fn pipeline_resolve_macro_catalog<'py>(
+    py: Python<'py>,
+    input_bytes: &Bound<'py, PyBytes>,
+) -> Bound<'py, PyBytes> {
+    let output = inku_pipeline_uniffi::resolve_macro_catalog(input_bytes.as_bytes().to_vec());
+    PyBytes::new(py, &output)
+}
+
+#[pyfunction]
+fn pipeline_render_saved<'py>(
+    py: Python<'py>,
+    input_bytes: &Bound<'py, PyBytes>,
+) -> Bound<'py, PyBytes> {
+    let output = inku_pipeline_uniffi::render_saved(input_bytes.as_bytes().to_vec());
+    PyBytes::new(py, &output)
+}
+
 #[pymodule]
 fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(core_api_version, module)?)?;
@@ -115,5 +169,11 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(renderer_reference_json, module)?)?;
     module.add_function(wrap_pyfunction!(render, module)?)?;
     module.add_function(wrap_pyfunction!(render_with_resources, module)?)?;
+    module.add_function(wrap_pyfunction!(pipeline_version_report, module)?)?;
+    module.add_function(wrap_pyfunction!(pipeline_canvas_registry, module)?)?;
+    module.add_function(wrap_pyfunction!(pipeline_step, module)?)?;
+    module.add_function(wrap_pyfunction!(pipeline_resolve_palette, module)?)?;
+    module.add_function(wrap_pyfunction!(pipeline_resolve_macro_catalog, module)?)?;
+    module.add_function(wrap_pyfunction!(pipeline_render_saved, module)?)?;
     Ok(())
 }

@@ -223,8 +223,9 @@ pub use semantic_association::{
     SemanticIssueCausalProvenance, SemanticMacroInvocationHead, SemanticMacroInvocationProvenance,
     SemanticMacroParameterBinding, SemanticMacroParameterValue, SemanticPreviousReference,
     SemanticProportion, SemanticQuantity, SemanticRelationKind, SemanticRelativeScale,
-    SemanticSequence, SemanticSequenceIssue, SemanticSequenceIssueKind, SemanticSurface,
-    SemanticTerm, SemanticTermProvenance, SemanticThinness, SemanticUpstreamCausalRelation,
+    SemanticSequence, SemanticSequenceField, SemanticSequenceIssue, SemanticSequenceIssueKind,
+    SemanticSequenceKind, SemanticSequenceUnit, SemanticSurface, SemanticTerm,
+    SemanticTermProvenance, SemanticThinness, SemanticUpstreamCausalRelation,
     SemanticUpstreamDiagnosticCause, SourceOccurrence, associate_semantic_entities,
     associate_semantic_entities_with_macro_binding,
 };

@@ -41,6 +41,7 @@
 | 日本語（正本） | 英語 | 用法 | 退けた訳・注 |
 |---|---|---|---|
 | 演奏する（主動作ボタン） | **Paint** | 動詞・**lint 固定**。API `/api/paint` と一致 | ~~Generate~~、~~Create~~、~~Draw~~（ボタン語として） |
+| 組（図形のまとまり） | **group** / **a group of …** | 複数図形を一つの配置単位として表す名詞句。歳時記チップは追加しない | ~~command block~~（描画命令の入れ子を表す語ではない） |
 | 純粋呼出し（プラグイン語だけの入力） | **pure invocation** | 名詞句。Stage 1 を飛ばして転写する判定の名 | — |
 | 転写・書き下し（プラグイン展開） | **writing-down** / **transcription** | 名詞。宣言的プラグイン文書の決定的展開。転写された instruction は transcribed instruction | ~~expansion~~ 単独（Stage 1.5 の展開と紛れる文脈では避ける） |
 | 解釈フォールバック（Stage 1 が落ちた） | **Interpretation fallback** | 名詞句。**層を名指す**ため作曲側と対で使う | ~~Stage 1 fallback~~（UI で段番号を主語にしない） |

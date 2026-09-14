@@ -946,7 +946,9 @@ accepted_saijiki_vocabulary の有限語彙と、compilerが読む通常の数�
 
 作者が明示した対象、色、画材、太さ、個数、寸法、角度、座標、領域、関係、反復、配置を失わない。fill、scatter、tile、background は別の意味である。fillは作者が指定した図形を指定領域の内部へ、指定個数と寸法を保って充填する。scatterへ読み替えない。scatterは疎密を持つ散布、tileは規則的な敷き詰め、backgroundはキャンバス背景色だけに使う。『満天』『星空』『全面』を理由にfillへ変えず、『埋める』を全面scatterへ変えない。明示領域をcanvas全体へ広げない。
 
-色の順序が明示された配置は「赤と灰を交互にして、円を五つ並べる。」「赤・灰・青の順に繰り返して、円を八つ並べる。」のように書く。同じ色列を散らす・敷き詰める・埋めるにも使える。交互には2項、順には空でない有限色列を使い、項の順序と重複を保つ。個数は全体の図形数であり列長を掛けない。順序のない複数色から交互や循環を推測しない。
+順序が明示された配置は「赤と灰を交互にして、円を五つ並べる。」「鉛筆と太筆を交互にして、線を五本並べる。」「赤い円・青い線・灰の弧の順に繰り返して、八つ並べる。」のように書く。まとまりは括弧内の命令にせず、「赤い円と青い線の組を、灰の弧と交互に5つ並べる。」のように名詞句で書く。組と単独図形を合わせた総数5なので、円と線の組3つ、弧2つになる。交互には2項、順には空でない有限列を使い、項の順序と重複を保つ。同じ有限列を散らす・敷き詰める・埋めるにも使える。総個数へ列長や組の中の図形数を掛けない。順序のない複数の指定から交互や循環を推測しない。
+
+日本語の「つ」は1つから9つまでで、10つ・11つとは書かない。10は助数詞なしの10として書ける。「個」は1個・2個・10個・11個などにも使え、必要なら線の「本」など対象に合う既存助数詞を使う。表記の違いで明示した総数を変えない。
 
 接続先の線や弧の両端以外を指定するには「前の線の途中につながる」「前の弧の途中につながる」と書く。途中の具体位置は演奏で決まるため、中心や数値位置へ置き換えない。始点・終点の明示もそのまま保つ。
 
@@ -960,7 +962,9 @@ Use the finite accepted_saijiki_vocabulary plus ordinary numeric literals, punct
 
 Preserve every explicit subject, color, material, thinness, count, size, angle, coordinate, region, relation, repetition, and placement. Fill, scatter, tile, and background are distinct meanings. Fill places the author's specified shape inside the specified region while preserving its explicit count and size; never normalize fill to scatter. Scatter is a distribution with spacing, tile is regular tessellation, and background means only the canvas background color. Do not infer fill merely from “starry sky”, “full”, or “whole area”, and do not turn “fill” into whole-canvas scatter. Never expand an explicit region to the whole canvas.
 
-Write explicitly ordered color placements as "line up five circles, alternating red and gray." or "line up eight circles, repeating red, gray, and blue in order." The same color sequences apply to scatter, tile, and fill. Alternating takes two entries; in order takes a nonempty finite color list. Preserve entry order and duplicates. The count is the total number of shapes; do not multiply it by the list length. Do not infer alternation or cycling from multiple colors without an explicit order.
+Write explicitly ordered placements as "Line up five circles, alternating red and gray." or "Line up eight, repeating a red circle, a blue line, and a gray arc in order." Describe a group as a noun phrase without parenthesized commands: "Line up five, alternating a group of a red circle and a blue line with a gray arc." Five is the total number of groups and individual shapes, producing three circle-and-line groups and two arcs. Alternating takes two entries; in order takes a nonempty finite list. Preserve entry order and duplicates. The same sequences apply to scatter, tile, and fill. Do not multiply the total count by the list length or the number of shapes inside a group. Do not infer alternation or cycling without an explicit order.
+
+When writing Japanese DDL, use the counter つ only for one through nine, never 10つ or 11つ. Ten can be written without a counter. 個 works for one, two, ten, eleven, and other counts; use an existing shape-specific counter such as 本 for lines when appropriate. Counter spelling must not change the explicit total.
 
 Write "connected partway along the previous line" or "connected partway along the previous arc" for contact excluding both ends. Its position is decided during performance, so do not replace partway with the center or a numeric position. Preserve an explicitly selected start or end as well.
 

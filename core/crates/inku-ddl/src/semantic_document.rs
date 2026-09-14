@@ -26,7 +26,7 @@ use crate::{
 };
 
 /// Stable identity for the runtime-disconnected semantic document root.
-pub const SEMANTIC_DOCUMENT_SCHEMA_ID: &str = "inku.semantic-document.v19";
+pub const SEMANTIC_DOCUMENT_SCHEMA_ID: &str = "inku.semantic-document.v20";
 
 /// A document background declaration, distinct from a drawable surface or Ground.
 #[derive(Clone, Debug, PartialEq)]

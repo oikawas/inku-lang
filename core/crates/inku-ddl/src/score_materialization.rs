@@ -227,7 +227,11 @@ pub fn materialize_selected_composition(
             &anchor_map,
             &transform_map,
             None,
+            planned.cycle_occurrence_count().is_some(),
         )?;
+        group.cycle_members = planned
+            .cycle_occurrence_count()
+            .map(|occurrence_count| inku_score::CycleMembersV1 { occurrence_count });
         group.resolved = Some(ResolvedPlacementGroup {
             owner: PlacementGroupOwner::CoordinatedGroup {
                 group_index: planned.group_index(),
@@ -252,6 +256,7 @@ pub fn materialize_selected_composition(
             &anchor_map,
             &transform_map,
             Some(origin),
+            group.cycle_occurrence_count.is_some(),
         )?;
         let first = members
             .first()
@@ -269,6 +274,9 @@ pub fn materialize_selected_composition(
             boundary: FillBoundary::ClipToTarget,
             ordinal_scheme: ORDINAL_SCHEME,
             members,
+            cycle_members: group
+                .cycle_occurrence_count
+                .map(|occurrence_count| inku_score::CycleMembersV1 { occurrence_count }),
         });
     }
     for &old in admitted.object_indices() {
@@ -290,6 +298,7 @@ pub fn materialize_selected_composition(
                 target: saved_target(region)?,
                 boundary: FillBoundary::ClipToTarget,
                 ordinal_scheme: ORDINAL_SCHEME,
+                cycle_members: None,
                 members: vec![PlacementMember {
                     start,
                     end: start + 1,
@@ -319,6 +328,7 @@ pub fn materialize_selected_composition(
                 &anchor_map,
                 &transform_map,
                 None,
+                false,
             )?;
             Ok(RepetitionGroup {
                 member: members.remove(0),
@@ -327,7 +337,15 @@ pub fn materialize_selected_composition(
         })
         .collect::<Result<Vec<_>, ScoreMaterializationError>>()?;
     let score = Score {
-        version: if instructions.iter().any(|instruction| {
+        version: if placement_groups
+            .iter()
+            .any(|group| group.cycle_members.is_some())
+            || fill_groups
+                .iter()
+                .any(|group| group.cycle_members.is_some())
+        {
+            "0.14.0"
+        } else if instructions.iter().any(|instruction| {
             instruction.relation.as_ref().is_some_and(|relation| {
                 matches!(
                     relation.target_path_position,
@@ -401,6 +419,7 @@ fn saved_members(
     anchors: &IndexMap,
     transforms: &IndexMap,
     fill_origin: Option<&FillCountResolution>,
+    cycle: bool,
 ) -> Result<Vec<PlacementMember>, ScoreMaterializationError> {
     let mut ordinal = 0_u64;
     members
@@ -408,25 +427,40 @@ fn saved_members(
         .enumerate()
         .map(|(member_ordinal, planned)| {
             let original = planned.member();
-            let count = u64::from(planned.logical_count());
+            let count = if cycle {
+                1
+            } else {
+                u64::from(planned.logical_count())
+            };
             let member = PlacementMember {
                 start: objects.boundaries[original.start],
                 end: objects.boundaries[original.end],
                 anchor_indices: anchors.indices(&original.anchor_indices),
                 transform_group_indices: transforms.indices(&original.transform_group_indices),
                 symbolic: Some(SymbolicMember {
-                    owner: ScoreSourceOwner::SourceInstruction {
-                        instruction_index: planned.source_instruction_index(),
+                    owner: if planned.kind() == PlacementMemberKind::OrdinaryGroup {
+                        ScoreSourceOwner::OrdinaryGroup {
+                            source_instruction_indices: planned
+                                .source_instruction_indices()
+                                .to_vec(),
+                        }
+                    } else {
+                        ScoreSourceOwner::SourceInstruction {
+                            instruction_index: planned.source_instruction_index(),
+                        }
                     },
                     kind: match planned.kind() {
                         PlacementMemberKind::Primitive => SymbolicMemberKind::Primitive,
                         PlacementMemberKind::Macro => SymbolicMemberKind::Macro,
+                        PlacementMemberKind::OrdinaryGroup => SymbolicMemberKind::OrdinaryGroup,
                     },
                     member_ordinal: member_ordinal as u64,
                     first_instance_ordinal: ordinal,
                     instance_count: count,
                     count_origin: if !planned.count_was_omitted() {
                         CountOrigin::Explicit
+                    } else if cycle {
+                        CountOrigin::OmittedDefault
                     } else if let Some(origin) = fill_origin {
                         saved_count_origin(origin)?
                     } else {

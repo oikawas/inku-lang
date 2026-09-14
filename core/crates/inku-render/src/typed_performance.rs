@@ -411,12 +411,24 @@ impl<'a> Builder<'a> {
                     0,
                     self.request.canvas,
                 );
-                let (members, fragment, member_fill_scope_indices) =
-                    self.expand_members(parent_context, &group.members, &next_skipped, parent_fill);
+                let (members, fragment, member_fill_scope_indices) = if let Some(cycle) =
+                    &group.cycle_members
+                {
+                    self.expand_cycle_members(
+                        parent_context,
+                        &group.members,
+                        cycle.occurrence_count,
+                        &next_skipped,
+                        parent_fill,
+                    )
+                } else {
+                    self.expand_members(parent_context, &group.members, &next_skipped, parent_fill)
+                };
                 let dense = inku_score::PlacementGroup {
                     start: fragment.start,
                     end: fragment.end,
                     members,
+                    cycle_members: None,
                     ..group
                 };
                 self.placements.push(DensePlacement {
@@ -468,21 +480,43 @@ impl<'a> Builder<'a> {
                 let mut centers = Vec::with_capacity(
                     usize::try_from(group.logical_count).expect("admitted count fits usize"),
                 );
-                for member in &group.members {
-                    let symbolic = member.symbolic.as_ref().expect("validated fill member");
-                    let count = usize::try_from(symbolic.instance_count)
-                        .expect("admitted count fits usize");
-                    for instance in 0..count {
+                if let Some(cycle) = &group.cycle_members {
+                    for occurrence in 0..cycle.occurrence_count {
                         centers.push(region.sample(
                             fill_seed,
                             0,
-                            usize::try_from(symbolic.member_ordinal).unwrap_or(usize::MAX),
-                            instance,
+                            0,
+                            usize::try_from(occurrence).expect("admitted count fits usize"),
                         ));
                     }
+                } else {
+                    for member in &group.members {
+                        let symbolic = member.symbolic.as_ref().expect("validated fill member");
+                        let count = usize::try_from(symbolic.instance_count)
+                            .expect("admitted count fits usize");
+                        for instance in 0..count {
+                            centers.push(region.sample(
+                                fill_seed,
+                                0,
+                                usize::try_from(symbolic.member_ordinal).unwrap_or(usize::MAX),
+                                instance,
+                            ));
+                        }
+                    }
                 }
-                let (members, mut fragment, member_fill_scope_indices) =
-                    self.expand_members(parent_context, &group.members, &next_skipped, Some(scope));
+                let (members, mut fragment, member_fill_scope_indices) = if let Some(cycle) =
+                    &group.cycle_members
+                {
+                    self.expand_cycle_members(
+                        parent_context,
+                        &group.members,
+                        cycle.occurrence_count,
+                        &next_skipped,
+                        Some(scope),
+                    )
+                } else {
+                    self.expand_members(parent_context, &group.members, &next_skipped, Some(scope))
+                };
                 fragment.scopes.push(scope);
                 let dense = inku_score::PlacementGroup {
                     start: fragment.start,
@@ -492,6 +526,7 @@ impl<'a> Builder<'a> {
                         region: [0.0, 0.0, 1.0, 1.0],
                     },
                     members,
+                    cycle_members: None,
                     resolved: None,
                 };
                 self.placements.push(DensePlacement {
@@ -548,28 +583,15 @@ impl<'a> Builder<'a> {
         for member in members {
             let symbolic = member.symbolic.as_ref().expect("validated symbolic member");
             for instance in 0..symbolic.instance_count {
-                let context =
-                    self.new_context(parent_context, symbolic.first_instance_ordinal + instance);
-                let anchors = member
-                    .anchor_indices
-                    .iter()
-                    .map(|&old| self.clone_anchor(context, old))
-                    .collect::<Vec<_>>();
-                let fragment =
-                    self.expand_range(context, member.start, member.end, skipped, innermost_fill);
-                let transforms = self.clone_transforms(
-                    context,
-                    &member.transform_group_indices,
-                    &fragment.scopes,
+                let (member, scopes) = self.expand_member_occurrence(
+                    parent_context,
+                    member,
+                    symbolic.first_instance_ordinal + instance,
+                    skipped,
+                    innermost_fill,
                 );
-                member_fill_scope_indices.push(fragment.scopes.clone());
-                dense_members.push(PlacementMember {
-                    start: fragment.start,
-                    end: fragment.end,
-                    anchor_indices: anchors,
-                    transform_group_indices: transforms,
-                    symbolic: None,
-                });
+                member_fill_scope_indices.push(scopes);
+                dense_members.push(member);
             }
         }
         (
@@ -580,6 +602,74 @@ impl<'a> Builder<'a> {
                 scopes: (scope_start..self.fill_scopes.len()).collect(),
             },
             member_fill_scope_indices,
+        )
+    }
+
+    fn expand_cycle_members(
+        &mut self,
+        parent_context: usize,
+        members: &[PlacementMember],
+        occurrence_count: u64,
+        skipped: &[GroupId],
+        innermost_fill: Option<usize>,
+    ) -> (Vec<PlacementMember>, Fragment, Vec<Vec<usize>>) {
+        let output_start = self.output.instructions.len();
+        let scope_start = self.fill_scopes.len();
+        let mut dense_members = Vec::with_capacity(
+            usize::try_from(occurrence_count).expect("admitted count fits usize"),
+        );
+        let mut member_fill_scope_indices = Vec::with_capacity(dense_members.capacity());
+        for occurrence in 0..occurrence_count {
+            let member = &members[usize::try_from(occurrence % members.len() as u64)
+                .expect("cycle member index fits usize")];
+            let (member, scopes) = self.expand_member_occurrence(
+                parent_context,
+                member,
+                occurrence,
+                skipped,
+                innermost_fill,
+            );
+            member_fill_scope_indices.push(scopes);
+            dense_members.push(member);
+        }
+        (
+            dense_members,
+            Fragment {
+                start: output_start,
+                end: self.output.instructions.len(),
+                scopes: (scope_start..self.fill_scopes.len()).collect(),
+            },
+            member_fill_scope_indices,
+        )
+    }
+
+    fn expand_member_occurrence(
+        &mut self,
+        parent_context: usize,
+        member: &PlacementMember,
+        occurrence: u64,
+        skipped: &[GroupId],
+        innermost_fill: Option<usize>,
+    ) -> (PlacementMember, Vec<usize>) {
+        let context = self.new_context(parent_context, occurrence);
+        let anchors = member
+            .anchor_indices
+            .iter()
+            .map(|&old| self.clone_anchor(context, old))
+            .collect::<Vec<_>>();
+        let fragment =
+            self.expand_range(context, member.start, member.end, skipped, innermost_fill);
+        let transforms =
+            self.clone_transforms(context, &member.transform_group_indices, &fragment.scopes);
+        (
+            PlacementMember {
+                start: fragment.start,
+                end: fragment.end,
+                anchor_indices: anchors,
+                transform_group_indices: transforms,
+                symbolic: None,
+            },
+            fragment.scopes,
         )
     }
 
@@ -1764,6 +1854,246 @@ mod tests {
                 .filter_map(|(instruction, &owner)| { (owner == 2).then_some(instruction.color) })
                 .collect::<Vec<_>>(),
             vec![inku_score::Color::Red, inku_score::Color::Red]
+        );
+    }
+
+    #[test]
+    fn compact_member_cycle_reuses_complete_ordinary_body_at_global_ordinals() {
+        let policy = hard(100);
+        let source = |index| json!({"kind": "source_instruction", "instruction_index": index});
+        let mut circle = instruction(source(0), true);
+        circle.color = inku_score::Color::Red;
+        let mut line = instruction(source(0), true);
+        line.primitive = Primitive::Line;
+        line.center = None;
+        line.radius = None;
+        line.from_ = Some(Point::new(0.45, 0.5));
+        line.to = Some(Point::new(0.55, 0.5));
+        line.color = inku_score::Color::Blue;
+        let mut arc = instruction(source(2), true);
+        arc.primitive = Primitive::Arc;
+        arc.radius = Some(0.05);
+        arc.angle_start = Some(0.0);
+        arc.angle_end = Some(90.0);
+        arc.color = inku_score::Color::Gray;
+        let group = serde_json::from_value(json!({
+            "start": 0,
+            "end": 3,
+            "layout": "horizontal_source_order",
+            "at": {"region": [0.0, 0.0, 1.0, 1.0]},
+            "members": [
+                {
+                    "start": 0,
+                    "end": 2,
+                    "symbolic": {
+                        "owner": {"kind": "ordinary_group", "source_instruction_indices": [0]},
+                        "kind": "ordinary_group",
+                        "member_ordinal": 0,
+                        "first_instance_ordinal": 0,
+                        "instance_count": 1,
+                        "count_origin": {"kind": "explicit"}
+                    }
+                },
+                {
+                    "start": 2,
+                    "end": 3,
+                    "symbolic": {
+                        "owner": {"kind": "source_instruction", "instruction_index": 2},
+                        "kind": "primitive",
+                        "member_ordinal": 1,
+                        "first_instance_ordinal": 1,
+                        "instance_count": 1,
+                        "count_origin": {"kind": "explicit"}
+                    }
+                }
+            ],
+            "cycle_members": {"occurrence_count": 5},
+            "resolved": {
+                "owner": {"kind": "coordinated_group", "group_index": 0},
+                "logical_count": 5,
+                "domain": [1.0, 1.0],
+                "anchor": {"kind": "numeric", "point": [0.5, 0.5]},
+                "recipe": {"kind": "horizontal_line", "cell_width": 0.2},
+                "ordinal_scheme": "source_member_then_instance_v1"
+            }
+        }))
+        .unwrap();
+        let score = Score {
+            version: "0.14.0".into(),
+            canvas: inku_score::Canvas::Id("square".into()),
+            background: inku_score::Color::Black,
+            presence: None,
+            instructions: vec![circle, line, arc],
+            anchors: Vec::new(),
+            transform_groups: Vec::new(),
+            placement_groups: vec![group],
+            repetition_groups: Vec::new(),
+            fill_groups: Vec::new(),
+            resource_policy: Some(ScoreResourcePolicy {
+                accounting_id: inku_score::RESOURCE_ACCOUNTING_ID.into(),
+                hard_policy: policy.clone(),
+                operational_budget: OperationalResourceBudget(budget(100)),
+            }),
+        };
+        assert_eq!(score.validate_schema_edition(), Ok(()));
+        let admitted = inku_score::finalize_saved_score(
+            &score,
+            &policy,
+            OperationalResourceBudget(budget(100)),
+        )
+        .unwrap();
+        assert_eq!(
+            admitted.score.placement_groups[0]
+                .cycle_members
+                .as_ref()
+                .unwrap()
+                .occurrence_count,
+            5
+        );
+        let (dense, _, dense_to_original, _) = Builder::new(PerformanceRequest {
+            score: &admitted.score,
+            performance_seed: Some(7),
+            composition_seed: Some(11),
+            canvas: None,
+        })
+        .finish();
+        assert_eq!(dense_to_original, vec![0, 1, 2, 0, 1, 2, 0, 1]);
+        assert_eq!(dense.instructions.len(), 8);
+        let request = PerformanceRequest {
+            score: &score,
+            performance_seed: Some(7),
+            composition_seed: Some(11),
+            canvas: None,
+        };
+        let first = crate::checked_performance::resolve_checked_performance_with_resources(
+            request,
+            ScoreErrorPolicy::OmitAndContinue,
+            &policy,
+            OperationalResourceBudget(budget(100)),
+        )
+        .unwrap();
+        let second = crate::checked_performance::resolve_checked_performance_with_resources(
+            request,
+            ScoreErrorPolicy::OmitAndContinue,
+            &policy,
+            OperationalResourceBudget(budget(100)),
+        )
+        .unwrap();
+
+        assert_eq!(first, second);
+        assert_eq!(
+            first.original_instruction_indices,
+            vec![0, 1, 2, 0, 1, 2, 0, 1]
+        );
+        assert_eq!(
+            first
+                .score
+                .instructions
+                .iter()
+                .map(|instruction| instruction.primitive)
+                .collect::<Vec<_>>(),
+            vec![
+                Primitive::Circle,
+                Primitive::Line,
+                Primitive::Arc,
+                Primitive::Circle,
+                Primitive::Line,
+                Primitive::Arc,
+                Primitive::Circle,
+                Primitive::Line,
+            ]
+        );
+        let circle_centers = [0, 3, 6].map(|index| {
+            first.instruction_transforms[index]
+                .apply(first.score.instructions[index].center.unwrap())
+        });
+        let line_midpoints = [1, 4, 7].map(|index| {
+            let instruction = &first.score.instructions[index];
+            let from = instruction.from_.unwrap();
+            let to = instruction.to.unwrap();
+            first.instruction_transforms[index]
+                .apply(Point::new((from.x + to.x) / 2.0, (from.y + to.y) / 2.0))
+        });
+        let arc_centers = [2, 5].map(|index| {
+            first.instruction_transforms[index]
+                .apply(first.score.instructions[index].center.unwrap())
+        });
+        for centers in [&circle_centers[..], &line_midpoints[..], &arc_centers[..]] {
+            assert!(centers.windows(2).all(|pair| {
+                (pair[1].x - pair[0].x - 0.4).abs() < 1.0e-12
+                    && (pair[1].y - pair[0].y).abs() < 1.0e-12
+            }));
+        }
+        assert_eq!(first.resource_demand.as_ref().unwrap().logical_objects, 5);
+        assert_eq!(first.resource_demand.as_ref().unwrap().primitive_marks, 8);
+        assert_eq!(
+            first.instruction_seed_overrides,
+            vec![
+                Some(instance_seed(
+                    &inku_score::ScoreSourceOwner::SourceInstruction {
+                        instruction_index: 0
+                    },
+                    &[0],
+                    0,
+                    Some(7)
+                )),
+                Some(instance_seed(
+                    &inku_score::ScoreSourceOwner::SourceInstruction {
+                        instruction_index: 0
+                    },
+                    &[0],
+                    0,
+                    Some(7)
+                )),
+                Some(instance_seed(
+                    &inku_score::ScoreSourceOwner::SourceInstruction {
+                        instruction_index: 2
+                    },
+                    &[1],
+                    0,
+                    Some(7)
+                )),
+                Some(instance_seed(
+                    &inku_score::ScoreSourceOwner::SourceInstruction {
+                        instruction_index: 0
+                    },
+                    &[2],
+                    0,
+                    Some(7)
+                )),
+                Some(instance_seed(
+                    &inku_score::ScoreSourceOwner::SourceInstruction {
+                        instruction_index: 0
+                    },
+                    &[2],
+                    0,
+                    Some(7)
+                )),
+                Some(instance_seed(
+                    &inku_score::ScoreSourceOwner::SourceInstruction {
+                        instruction_index: 2
+                    },
+                    &[3],
+                    0,
+                    Some(7)
+                )),
+                Some(instance_seed(
+                    &inku_score::ScoreSourceOwner::SourceInstruction {
+                        instruction_index: 0
+                    },
+                    &[4],
+                    0,
+                    Some(7)
+                )),
+                Some(instance_seed(
+                    &inku_score::ScoreSourceOwner::SourceInstruction {
+                        instruction_index: 0
+                    },
+                    &[4],
+                    0,
+                    Some(7)
+                )),
+            ]
         );
     }
 }

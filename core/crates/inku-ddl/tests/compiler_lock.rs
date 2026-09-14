@@ -2874,7 +2874,7 @@ fn fixture_schema_and_closed_ids_are_stable() {
     assert_eq!(fixture.version, 12);
     assert_eq!(
         CANONICAL_SEMANTIC_DDL_SCHEMA_ID,
-        "inku.semantic-document.v19"
+        "inku.semantic-document.v20"
     );
     assert_eq!(
         SEMANTIC_SOURCE_PROVENANCE_SCHEMA_ID,

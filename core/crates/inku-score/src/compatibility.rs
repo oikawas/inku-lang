@@ -41,6 +41,7 @@ pub fn read_saved_score_json(bytes: &[u8]) -> serde_json::Result<Score> {
                     | "0.11.0"
                     | "0.12.0"
                     | "0.13.0"
+                    | "0.14.0"
             ) => {}
         _ => return Err(invalid_saved_score("unsupported saved Score version")),
     }

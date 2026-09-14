@@ -733,6 +733,10 @@ pub enum ScoreSourceOwner {
     SourceInstruction {
         instruction_index: usize,
     },
+    /// A complete ordinary DDL group whose members retain their source identities.
+    OrdinaryGroup {
+        source_instruction_indices: Vec<usize>,
+    },
     MacroEmit {
         source_instruction_index: usize,
         invocation_ordinal: u64,
@@ -761,6 +765,14 @@ pub enum CountOrigin {
 #[serde(rename_all = "snake_case")]
 pub enum InstanceOrdinalScheme {
     SourceMemberThenInstanceV1,
+}
+
+/// A finite sequence reuses the ordered symbolic member templates at each
+/// global occurrence. The count belongs to the outer action, never to every
+/// template member.
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct CycleMembersV1 {
+    pub occurrence_count: u64,
 }
 
 /// Resolved placement math retained without materializing performance positions.
@@ -1103,6 +1115,7 @@ pub struct PlacementMember {
 #[serde(rename_all = "snake_case")]
 pub enum SymbolicMemberKind {
     Primitive,
+    OrdinaryGroup,
     Macro,
 }
 
@@ -1150,6 +1163,8 @@ pub struct PlacementGroup {
     pub at: AtRegion,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub members: Vec<PlacementMember>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cycle_members: Option<CycleMembersV1>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub resolved: Option<ResolvedPlacementGroup>,
 }
@@ -1257,6 +1272,8 @@ pub struct FillGroup {
     pub boundary: FillBoundary,
     pub ordinal_scheme: InstanceOrdinalScheme,
     pub members: Vec<PlacementMember>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cycle_members: Option<CycleMembersV1>,
 }
 
 /// Resource authorities captured with a Score for deterministic replay.
@@ -1482,11 +1499,67 @@ impl Score {
     fn source_owner_index(owner: &ScoreSourceOwner) -> usize {
         match owner {
             ScoreSourceOwner::SourceInstruction { instruction_index } => *instruction_index,
+            ScoreSourceOwner::OrdinaryGroup {
+                source_instruction_indices,
+            } => *source_instruction_indices
+                .first()
+                .expect("validated ordinary group owner has a source"),
             ScoreSourceOwner::MacroEmit {
                 source_instruction_index,
                 ..
             } => *source_instruction_index,
         }
+    }
+
+    fn source_owner_contains(owner: &ScoreSourceOwner, source: usize) -> bool {
+        match owner {
+            ScoreSourceOwner::SourceInstruction { instruction_index } => {
+                *instruction_index == source
+            }
+            ScoreSourceOwner::OrdinaryGroup {
+                source_instruction_indices,
+            } => source_instruction_indices.contains(&source),
+            ScoreSourceOwner::MacroEmit {
+                source_instruction_index,
+                ..
+            } => *source_instruction_index == source,
+        }
+    }
+
+    fn validate_cycle_members(
+        cycle: &CycleMembersV1,
+        members: &[PlacementMember],
+        logical_count: u64,
+    ) -> Result<(), &'static str> {
+        if cycle.occurrence_count == 0
+            || cycle.occurrence_count != logical_count
+            || members.is_empty()
+        {
+            return Err("cycle members require a nonzero matching occurrence count");
+        }
+        for member in members {
+            let Some(symbolic) = &member.symbolic else {
+                return Err("cycle members require symbolic templates");
+            };
+            if symbolic.instance_count != 1 {
+                return Err("cycle member templates must store one instance");
+            }
+            match (&symbolic.kind, &symbolic.owner) {
+                (SymbolicMemberKind::Primitive, ScoreSourceOwner::SourceInstruction { .. })
+                | (SymbolicMemberKind::Macro, ScoreSourceOwner::SourceInstruction { .. }) => {}
+                (
+                    SymbolicMemberKind::OrdinaryGroup,
+                    ScoreSourceOwner::OrdinaryGroup {
+                        source_instruction_indices,
+                    },
+                ) if !source_instruction_indices.is_empty()
+                    && source_instruction_indices
+                        .windows(2)
+                        .all(|pair| pair[0] < pair[1]) => {}
+                _ => return Err("cycle member kind and owner are inconsistent"),
+            }
+        }
+        Ok(())
     }
 
     fn synthetic_fill_source(&self, group: &FillGroup) -> Option<usize> {
@@ -1547,7 +1620,7 @@ impl Score {
                 member.start <= child.start
                     && child.end <= member.end
                     && member.symbolic.as_ref().is_some_and(|symbolic| {
-                        Self::source_owner_index(&symbolic.owner) == child_source
+                        Self::source_owner_contains(&symbolic.owner, child_source)
                     })
             })
     }
@@ -1555,13 +1628,14 @@ impl Score {
     fn validate_compact_score_0_10(&self) -> Result<(), &'static str> {
         let is_compact_edition = matches!(
             self.version.as_str(),
-            "0.10.0" | "0.11.0" | "0.12.0" | "0.13.0"
+            "0.10.0" | "0.11.0" | "0.12.0" | "0.13.0" | "0.14.0"
         );
         let has_0_10_fields = !self.fill_groups.is_empty()
             || !self.repetition_groups.is_empty()
             || self.resource_policy.is_some()
             || self.placement_groups.iter().any(|group| {
                 group.resolved.is_some()
+                    || group.cycle_members.is_some()
                     || group.members.iter().any(|member| member.symbolic.is_some())
             })
             || self.instructions.iter().any(|instruction| {
@@ -1594,6 +1668,9 @@ impl Score {
             let Some(resolved) = arrangement.resolved.as_ref() else {
                 return Err("Score 0.10 arrangements require resolved metadata");
             };
+            if matches!(resolved.owner, ScoreSourceOwner::OrdinaryGroup { .. }) {
+                return Err("ordinary group ownership is reserved for cycle members");
+            }
             if arrangement.count == 0 || arrangement.group_size == 0 {
                 return Err("Score 0.10 arrangements require nonzero count and group_size");
             }
@@ -1634,6 +1711,9 @@ impl Score {
             if symbolic.kind != SymbolicMemberKind::Macro {
                 return Err("repetition group must own one complete Macro body");
             }
+            if matches!(symbolic.owner, ScoreSourceOwner::OrdinaryGroup { .. }) {
+                return Err("ordinary group ownership is reserved for cycle members");
+            }
             Self::validate_symbolic_member(member, 0, 0)?;
             repetition_end = member.end;
         }
@@ -1653,6 +1733,15 @@ impl Score {
                 .is_some_and(|&parent_index| group.start >= self.fill_groups[parent_index].end)
             {
                 fill_ancestors.pop();
+            }
+            if group.members.iter().any(|member| {
+                member.symbolic.as_ref().is_some_and(|symbolic| {
+                    matches!(symbolic.owner, ScoreSourceOwner::OrdinaryGroup { .. })
+                        && (group.cycle_members.is_none()
+                            || symbolic.kind != SymbolicMemberKind::OrdinaryGroup)
+                })
+            }) {
+                return Err("ordinary group ownership is reserved for cycle members");
             }
             if let Some(&parent_index) = fill_ancestors.last() {
                 let parent = &self.fill_groups[parent_index];
@@ -1684,7 +1773,15 @@ impl Score {
                 )?;
                 member_end = member.end;
             }
-            if member_end != group.end || first_instance != group.logical_count {
+            if member_end != group.end {
+                return Err("fill members must cover the group and its logical count");
+            }
+            if let Some(cycle) = &group.cycle_members {
+                if self.version != "0.14.0" {
+                    return Err("cycle members require Score version 0.14.0");
+                }
+                Self::validate_cycle_members(cycle, &group.members, group.logical_count)?;
+            } else if first_instance != group.logical_count {
                 return Err("fill members must cover the group and its logical count");
             }
             Self::validate_fill_target(&group.target)?;
@@ -1696,15 +1793,36 @@ impl Score {
 
     pub fn validate_placement_groups(&self) -> Result<(), &'static str> {
         let is_compact = self.version == "0.10.0"
-            || (matches!(self.version.as_str(), "0.11.0" | "0.12.0" | "0.13.0")
-                && self.resource_policy.is_some());
+            || (matches!(
+                self.version.as_str(),
+                "0.11.0" | "0.12.0" | "0.13.0" | "0.14.0"
+            ) && self.resource_policy.is_some());
         let mut previous_end = 0;
         for group in &self.placement_groups {
+            if group.cycle_members.is_some() && self.version != "0.14.0" {
+                return Err("cycle members require Score version 0.14.0");
+            }
+            if group.members.iter().any(|member| {
+                member.symbolic.as_ref().is_some_and(|symbolic| {
+                    matches!(symbolic.owner, ScoreSourceOwner::OrdinaryGroup { .. })
+                        && (group.cycle_members.is_none()
+                            || symbolic.kind != SymbolicMemberKind::OrdinaryGroup)
+                })
+            }) {
+                return Err("ordinary group ownership is reserved for cycle members");
+            }
             match group.layout {
                 GroupLayout::Overlap | GroupLayout::HorizontalSourceOrder
                     if !matches!(
                         self.version.as_str(),
-                        "0.7.0" | "0.8.0" | "0.9.0" | "0.10.0" | "0.11.0" | "0.12.0" | "0.13.0"
+                        "0.7.0"
+                            | "0.8.0"
+                            | "0.9.0"
+                            | "0.10.0"
+                            | "0.11.0"
+                            | "0.12.0"
+                            | "0.13.0"
+                            | "0.14.0"
                     ) =>
                 {
                     return Err("placement_groups requires Score version 0.7.0");
@@ -1712,7 +1830,7 @@ impl Score {
                 GroupLayout::Scatter | GroupLayout::Tile
                     if !matches!(
                         self.version.as_str(),
-                        "0.8.0" | "0.9.0" | "0.10.0" | "0.11.0" | "0.12.0" | "0.13.0"
+                        "0.8.0" | "0.9.0" | "0.10.0" | "0.11.0" | "0.12.0" | "0.13.0" | "0.14.0"
                     ) =>
                 {
                     return Err("scatter and tile placement_groups require Score version 0.8.0");
@@ -1732,7 +1850,7 @@ impl Score {
             if !group.members.is_empty()
                 && !matches!(
                     self.version.as_str(),
-                    "0.9.0" | "0.10.0" | "0.11.0" | "0.12.0" | "0.13.0"
+                    "0.9.0" | "0.10.0" | "0.11.0" | "0.12.0" | "0.13.0" | "0.14.0"
                 )
             {
                 return Err("placement members require Score version 0.9.0");
@@ -1798,10 +1916,12 @@ impl Score {
             if !group.members.is_empty() && member_end != group.end {
                 return Err("placement members must cover the group");
             }
-            if let Some(resolved) = &group.resolved
-                && first_instance != resolved.logical_count
-            {
-                return Err("placement member counts must equal the resolved logical count");
+            if let Some(resolved) = &group.resolved {
+                if let Some(cycle) = &group.cycle_members {
+                    Self::validate_cycle_members(cycle, &group.members, resolved.logical_count)?;
+                } else if first_instance != resolved.logical_count {
+                    return Err("placement member counts must equal the resolved logical count");
+                }
             }
             for prior in &self.placement_groups {
                 if std::ptr::eq(prior, group) {
@@ -1868,7 +1988,15 @@ impl Score {
         if !self.anchors.is_empty()
             && !matches!(
                 self.version.as_str(),
-                "0.6.0" | "0.7.0" | "0.8.0" | "0.9.0" | "0.10.0" | "0.11.0" | "0.12.0" | "0.13.0"
+                "0.6.0"
+                    | "0.7.0"
+                    | "0.8.0"
+                    | "0.9.0"
+                    | "0.10.0"
+                    | "0.11.0"
+                    | "0.12.0"
+                    | "0.13.0"
+                    | "0.14.0"
             )
         {
             return Err("anchors requires Score version 0.6.0");
@@ -1911,7 +2039,10 @@ impl Score {
                     }
                     match position {
                         TargetPathPosition::Exact(position) => {
-                            if !matches!(self.version.as_str(), "0.11.0" | "0.12.0" | "0.13.0") {
+                            if !matches!(
+                                self.version.as_str(),
+                                "0.11.0" | "0.12.0" | "0.13.0" | "0.14.0"
+                            ) {
                                 return Err(
                                     "relation target_path_position requires Score version 0.11.0",
                                 );
@@ -1923,7 +2054,7 @@ impl Score {
                             }
                         }
                         TargetPathPosition::Selection(TargetPathSelection::Interior) => {
-                            if self.version != "0.13.0" {
+                            if !matches!(self.version.as_str(), "0.13.0" | "0.14.0") {
                                 return Err(
                                     "relation interior target_path_position requires Score version 0.13.0",
                                 );
@@ -1946,7 +2077,7 @@ impl Score {
                     return Err("relation target path position and endpoint are exclusive");
                 }
                 if relation.target_endpoint.is_some() {
-                    if !matches!(self.version.as_str(), "0.12.0" | "0.13.0") {
+                    if !matches!(self.version.as_str(), "0.12.0" | "0.13.0" | "0.14.0") {
                         return Err("relation target_endpoint requires Score version 0.12.0");
                     }
                     if relation.kind != RelationType::Connected
@@ -1969,6 +2100,7 @@ impl Score {
                             | "0.11.0"
                             | "0.12.0"
                             | "0.13.0"
+                            | "0.14.0"
                     ) {
                         return Err("relation target_anchor_index requires Score version 0.6.0");
                     }
@@ -1989,6 +2121,7 @@ impl Score {
                     && self.version != "0.11.0"
                     && self.version != "0.12.0"
                     && self.version != "0.13.0"
+                    && self.version != "0.14.0"
                 {
                     return Err("surface_intensity requires Score version 0.3.0");
                 }
@@ -2018,7 +2151,7 @@ impl Score {
                 }
             }
             if instruction.ink_spread.is_some()
-                && !matches!(self.version.as_str(), "0.12.0" | "0.13.0")
+                && !matches!(self.version.as_str(), "0.12.0" | "0.13.0" | "0.14.0")
             {
                 return Err("ink_spread requires Score version 0.12.0");
             }
@@ -2037,6 +2170,7 @@ impl Score {
                 && self.version != "0.11.0"
                 && self.version != "0.12.0"
                 && self.version != "0.13.0"
+                && self.version != "0.14.0"
             {
                 return Err("arc_form requires Score version 0.2.0");
             }
@@ -2086,6 +2220,7 @@ impl Score {
                 | "0.11.0"
                 | "0.12.0"
                 | "0.13.0"
+                | "0.14.0"
         ) {
             return Err("transform_groups requires Score version 0.4.0");
         }
@@ -2117,6 +2252,7 @@ impl Score {
                 && self.version != "0.11.0"
                 && self.version != "0.12.0"
                 && self.version != "0.13.0"
+                && self.version != "0.14.0"
                 && (group.scale_x != 1.0
                     || group.scale_y != 1.0
                     || group.translate_x != 0.0
@@ -2166,6 +2302,7 @@ impl Score {
                         | "0.11.0"
                         | "0.12.0"
                         | "0.13.0"
+                        | "0.14.0"
                 )
             {
                 return Err("transform group anchor_indices requires Score version 0.6.0");

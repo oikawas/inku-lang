@@ -31,7 +31,7 @@ def count_field_description(limits: Limits = DEFAULT_LIMITS) -> str:
 COUNT_FIELD_DESCRIPTION = count_field_description(DEFAULT_LIMITS)
 
 Coord = tuple[float, float]
-ScoreVersion = Literal["0.13.0", "0.12.0", "0.11.0", "0.10.0", "0.9.0", "0.8.0", "0.7.0", "0.6.0", "0.5.0", "0.4.0", "0.3.0", "0.2.0", "0.1.0"]
+ScoreVersion = Literal["0.14.0", "0.13.0", "0.12.0", "0.11.0", "0.10.0", "0.9.0", "0.8.0", "0.7.0", "0.6.0", "0.5.0", "0.4.0", "0.3.0", "0.2.0", "0.1.0"]
 
 Primitive = Literal[
     "line",
@@ -447,7 +447,20 @@ class MacroEmitOwner(BaseModel):
     generated_ordinal: int = Field(ge=0)
 
 
-ScoreSourceOwner = SourceInstructionOwner | MacroEmitOwner
+class OrdinaryGroupOwner(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    kind: Literal["ordinary_group"]
+    source_instruction_indices: list[Annotated[int, Field(ge=0)]] = Field(min_length=1)
+
+    @field_validator("source_instruction_indices")
+    @classmethod
+    def _require_source_order(cls, value: list[int]) -> list[int]:
+        if any(left >= right for left, right in zip(value, value[1:])):
+            raise ValueError("ordinary group sources must be unique and source ordered")
+        return value
+
+
+ScoreSourceOwner = SourceInstructionOwner | MacroEmitOwner | OrdinaryGroupOwner
 
 
 class ExplicitCountOrigin(BaseModel):
@@ -1061,7 +1074,7 @@ class SymbolicMember(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     owner: ScoreSourceOwner
-    kind: Literal["primitive", "macro"]
+    kind: Literal["primitive", "macro", "ordinary_group"]
     member_ordinal: int = Field(ge=0)
     first_instance_ordinal: int = Field(ge=0)
     instance_count: int = Field(gt=0)
@@ -1085,6 +1098,11 @@ class ResolvedPlacementGroup(BaseModel):
     ordinal_scheme: InstanceOrdinalScheme
 
 
+class CycleMembersV1(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    occurrence_count: int = Field(gt=0)
+
+
 class PlacementGroup(BaseModel):
     """One direct coordinated-group placement over a contiguous Score span."""
 
@@ -1100,6 +1118,7 @@ class PlacementGroup(BaseModel):
         description="Score 0.9 Macro body boundaries; absent retains the legacy drawable span",
     )
     resolved: Optional[ResolvedPlacementGroup] = None
+    cycle_members: Optional[CycleMembersV1] = Field(default=None, exclude_if=lambda value: value is None)
 
     @model_validator(mode="after")
     def _require_finite_ordered_region(self) -> "PlacementGroup":
@@ -1302,6 +1321,7 @@ class FillGroup(BaseModel):
     boundary: Literal["clip_to_target"]
     ordinal_scheme: InstanceOrdinalScheme
     members: list[PlacementMember]
+    cycle_members: Optional[CycleMembersV1] = Field(default=None, exclude_if=lambda value: value is None)
 
 
 class ResourceDemand(BaseModel):
@@ -1453,9 +1473,9 @@ class Score(BaseModel):
                         "between needs two prior instructions inside its composite group"
                     )
             covered_until = stop
-        if self.anchors and self.version not in {"0.6.0", "0.7.0", "0.8.0", "0.9.0", "0.10.0", "0.11.0", "0.12.0", "0.13.0"}:
+        if self.anchors and self.version not in {"0.6.0", "0.7.0", "0.8.0", "0.9.0", "0.10.0", "0.11.0", "0.12.0", "0.13.0", "0.14.0"}:
             raise ValueError("anchors requires Score version 0.6.0")
-        if self.transform_groups and self.version not in {"0.4.0", "0.5.0", "0.6.0", "0.7.0", "0.8.0", "0.9.0", "0.10.0", "0.11.0", "0.12.0", "0.13.0"}:
+        if self.transform_groups and self.version not in {"0.4.0", "0.5.0", "0.6.0", "0.7.0", "0.8.0", "0.9.0", "0.10.0", "0.11.0", "0.12.0", "0.13.0", "0.14.0"}:
             raise ValueError("transform_groups requires Score version 0.4.0")
         for group_index, group in enumerate(self.transform_groups):
             if group.start > group.end or (
@@ -1464,14 +1484,14 @@ class Score(BaseModel):
                 raise ValueError("transform group range must be nonempty unless it owns anchors")
             if group.end > len(self.instructions):
                 raise ValueError("transform group range exceeds the instruction list")
-            if self.version not in {"0.5.0", "0.6.0", "0.7.0", "0.8.0", "0.9.0", "0.10.0", "0.11.0", "0.12.0", "0.13.0"} and (
+            if self.version not in {"0.5.0", "0.6.0", "0.7.0", "0.8.0", "0.9.0", "0.10.0", "0.11.0", "0.12.0", "0.13.0", "0.14.0"} and (
                 group.scale_x != 1.0
                 or group.scale_y != 1.0
                 or group.translate_x != 0.0
                 or group.translate_y != 0.0
             ):
                 raise ValueError("scale or translation requires Score version 0.5.0")
-            if any(instruction.arrangement is not None for instruction in self.instructions[group.start:group.end]):
+            if any(instruction.arrangement is not None and instruction.arrangement.resolved is None for instruction in self.instructions[group.start:group.end]):
                 raise ValueError("transform group members cannot carry arrangements")
             fixed_indices = set(group.fixed_position_indices)
             if len(fixed_indices) != len(group.fixed_position_indices):
@@ -1483,7 +1503,7 @@ class Score(BaseModel):
                 raise ValueError("transform group anchor_indices must be unique")
             if any(index >= len(self.anchors) for index in anchor_indices):
                 raise ValueError("transform group anchor_indices exceeds anchors")
-            if group.anchor_indices and self.version not in {"0.6.0", "0.7.0", "0.8.0", "0.9.0", "0.10.0", "0.11.0", "0.12.0", "0.13.0"}:
+            if group.anchor_indices and self.version not in {"0.6.0", "0.7.0", "0.8.0", "0.9.0", "0.10.0", "0.11.0", "0.12.0", "0.13.0", "0.14.0"}:
                 raise ValueError("transform group anchor_indices requires Score version 0.6.0")
             for prior in self.transform_groups[:group_index]:
                 current_contains_prior = (
@@ -1509,15 +1529,36 @@ class Score(BaseModel):
                     raise ValueError("outer transform groups must include descendant fixed_position_indices")
                 if not set(prior.anchor_indices) <= anchor_indices:
                     raise ValueError("outer transform groups must include descendant anchor_indices")
-        if self.placement_groups and self.version not in {"0.7.0", "0.8.0", "0.9.0", "0.10.0", "0.11.0", "0.12.0", "0.13.0"}:
+        if self.placement_groups and self.version not in {"0.7.0", "0.8.0", "0.9.0", "0.10.0", "0.11.0", "0.12.0", "0.13.0", "0.14.0"}:
             raise ValueError("placement_groups requires Score version 0.7.0")
+        for group in [*self.placement_groups, *self.fill_groups]:
+            if group.cycle_members is not None and self.version != "0.14.0":
+                raise ValueError("cycle_members requires Score version 0.14.0")
+            for member in group.members:
+                symbolic = member.symbolic
+                if symbolic is not None and (
+                    symbolic.kind == "ordinary_group" or isinstance(symbolic.owner, OrdinaryGroupOwner)
+                ) and self.version != "0.14.0":
+                    raise ValueError("ordinary group members require Score version 0.14.0")
+                if symbolic is not None and (
+                    symbolic.kind == "ordinary_group" or isinstance(symbolic.owner, OrdinaryGroupOwner)
+                ) and group.cycle_members is None:
+                    raise ValueError("ordinary group members require cycle_members")
+                if group.cycle_members is not None and symbolic is not None:
+                    owner_kind = {
+                        "primitive": SourceInstructionOwner,
+                        "macro": SourceInstructionOwner,
+                        "ordinary_group": OrdinaryGroupOwner,
+                    }[symbolic.kind]
+                    if not isinstance(symbolic.owner, owner_kind):
+                        raise ValueError("cycle member kind and owner are inconsistent")
         placement_end = 0
         placement_anchor_indices: set[int] = set()
         placement_transform_indices: set[int] = set()
         for group in self.placement_groups:
-            if group.layout in {"scatter", "tile"} and self.version not in {"0.8.0", "0.9.0", "0.10.0", "0.11.0", "0.12.0", "0.13.0"}:
+            if group.layout in {"scatter", "tile"} and self.version not in {"0.8.0", "0.9.0", "0.10.0", "0.11.0", "0.12.0", "0.13.0", "0.14.0"}:
                 raise ValueError("scatter and tile placement_groups require Score version 0.8.0")
-            if group.members and self.version not in {"0.9.0", "0.10.0", "0.11.0", "0.12.0", "0.13.0"}:
+            if group.members and self.version not in {"0.9.0", "0.10.0", "0.11.0", "0.12.0", "0.13.0", "0.14.0"}:
                 raise ValueError("placement group members require Score version 0.9.0")
             if not group.members and group.start >= group.end:
                 raise ValueError("placement group range must be nonempty")
@@ -1525,7 +1566,7 @@ class Score(BaseModel):
                 raise ValueError("placement group range exceeds the instruction list")
             if group.start < placement_end:
                 raise ValueError("placement groups must be disjoint and source ordered")
-            if any(instruction.arrangement is not None for instruction in self.instructions[group.start:group.end]):
+            if any(instruction.arrangement is not None and instruction.arrangement.resolved is None for instruction in self.instructions[group.start:group.end]):
                 raise ValueError("placement group members cannot carry arrangements")
             if group.members:
                 member_end = group.start
@@ -1577,17 +1618,21 @@ class Score(BaseModel):
             placement_end = group.end
         for instruction in self.instructions:
             relation = instruction.relation
-            if self.version not in {"0.12.0", "0.13.0"} and (
+            if instruction.arrangement is not None and instruction.arrangement.resolved is not None and isinstance(
+                instruction.arrangement.resolved.owner, OrdinaryGroupOwner
+            ):
+                raise ValueError("instruction templates cannot use an ordinary group owner")
+            if self.version not in {"0.12.0", "0.13.0", "0.14.0"} and (
                 instruction.ink_spread is not None
                 or (relation is not None and relation.target_endpoint is not None)
             ):
                 raise ValueError("ink_spread and target_endpoint require Score version 0.12.0")
-            if relation is not None and relation.target_path_position == "interior" and self.version != "0.13.0":
+            if relation is not None and relation.target_path_position == "interior" and self.version not in {"0.13.0", "0.14.0"}:
                 raise ValueError("interior target_path_position requires Score version 0.13.0")
-            if relation is not None and relation.target_path_position is not None and self.version not in {"0.11.0", "0.12.0", "0.13.0"}:
+            if relation is not None and relation.target_path_position is not None and self.version not in {"0.11.0", "0.12.0", "0.13.0", "0.14.0"}:
                 raise ValueError("target_path_position requires Score version 0.11.0")
             if relation is not None and relation.target_anchor_index is not None:
-                if self.version not in {"0.6.0", "0.7.0", "0.8.0", "0.9.0", "0.10.0", "0.11.0", "0.12.0", "0.13.0"}:
+                if self.version not in {"0.6.0", "0.7.0", "0.8.0", "0.9.0", "0.10.0", "0.11.0", "0.12.0", "0.13.0", "0.14.0"}:
                     raise ValueError("relation target_anchor_index requires Score version 0.6.0")
                 if relation.target_anchor_index >= len(self.anchors):
                     raise ValueError("relation target_anchor_index exceeds anchors")
@@ -1595,7 +1640,7 @@ class Score(BaseModel):
             self.repetition_groups
             or self.fill_groups
             or self.resource_policy is not None
-            or any(group.resolved is not None for group in self.placement_groups)
+            or any(group.resolved is not None or group.cycle_members is not None for group in self.placement_groups)
             or any(member.symbolic is not None for group in self.placement_groups for member in group.members)
             or any(
                 instruction.arrangement is not None
@@ -1603,9 +1648,9 @@ class Score(BaseModel):
                 for instruction in self.instructions
             )
         )
-        if has_compact_fields and self.version not in {"0.10.0", "0.11.0", "0.12.0", "0.13.0"}:
+        if has_compact_fields and self.version not in {"0.10.0", "0.11.0", "0.12.0", "0.13.0", "0.14.0"}:
             raise ValueError("compact symbolic fields require Score version 0.10.0 or newer")
-        if self.version == "0.10.0" or (self.version in {"0.11.0", "0.12.0", "0.13.0"} and has_compact_fields):
+        if self.version == "0.10.0" or (self.version in {"0.11.0", "0.12.0", "0.13.0", "0.14.0"} and has_compact_fields):
             if self.resource_policy is None:
                 raise ValueError("Score 0.10 requires a resource_policy snapshot")
             if not self.resource_policy.hard_policy.identity:
@@ -1624,12 +1669,17 @@ class Score(BaseModel):
                     symbolic = member.symbolic
                     if symbolic is None or symbolic.member_ordinal != ordinal or symbolic.first_instance_ordinal != expected:
                         raise ValueError("placement symbolic member ordinals must form a source-order prefix")
+                    if group.cycle_members is not None and symbolic.instance_count != 1:
+                        raise ValueError("cycle members must each store one template instance")
                     expected += symbolic.instance_count
-                if expected != group.resolved.logical_count:
+                if group.cycle_members is not None:
+                    if group.cycle_members.occurrence_count != group.resolved.logical_count:
+                        raise ValueError("cycle occurrence_count must equal the resolved logical count")
+                elif expected != group.resolved.logical_count:
                     raise ValueError("placement member counts must equal the resolved logical count")
             for group in self.repetition_groups:
                 symbolic = group.member.symbolic
-                if symbolic is None or symbolic.kind != "macro" or symbolic.member_ordinal != 0 or symbolic.first_instance_ordinal != 0:
+                if symbolic is None or symbolic.kind != "macro" or isinstance(symbolic.owner, OrdinaryGroupOwner) or symbolic.member_ordinal != 0 or symbolic.first_instance_ordinal != 0:
                     raise ValueError("repetition group requires one whole Macro symbolic member")
             for group in self.fill_groups:
                 expected = 0
@@ -1637,7 +1687,12 @@ class Score(BaseModel):
                     symbolic = member.symbolic
                     if symbolic is None or symbolic.member_ordinal != ordinal or symbolic.first_instance_ordinal != expected:
                         raise ValueError("fill symbolic member ordinals must form a source-order prefix")
+                    if group.cycle_members is not None and symbolic.instance_count != 1:
+                        raise ValueError("cycle members must each store one template instance")
                     expected += symbolic.instance_count
-                if expected != group.logical_count:
+                if group.cycle_members is not None:
+                    if group.cycle_members.occurrence_count != group.logical_count:
+                        raise ValueError("cycle occurrence_count must equal the logical count")
+                elif expected != group.logical_count:
                     raise ValueError("fill member counts must equal the logical count")
         return self

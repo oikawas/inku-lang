@@ -853,6 +853,33 @@ fn retain_ast(
             })
         })
         .collect::<Vec<_>>();
+    for instruction in &mut instructions {
+        let Some(sequence) = &mut instruction.sequence else {
+            continue;
+        };
+        if !matches!(sequence.kind, crate::SemanticSequenceKind::Units) {
+            continue;
+        }
+        let remapped = sequence
+            .units
+            .iter()
+            .map(|unit| {
+                unit.member_entity_indices
+                    .iter()
+                    .map(|index| index_map[*index])
+                    .collect::<Option<Vec<_>>>()
+                    .map(|member_entity_indices| crate::SemanticSequenceUnit {
+                        member_entity_indices,
+                        source_span: unit.source_span,
+                    })
+            })
+            .collect::<Option<Vec<_>>>();
+        if let Some(units) = remapped {
+            sequence.units = units;
+        } else {
+            instruction.sequence = None;
+        }
+    }
     crate::semantic_document::remap_fill_targets(&mut instructions, &index_map);
     let mut group_map = vec![None; ast.coordinated_head_groups.len()];
     let mut source_group_indices = Vec::new();

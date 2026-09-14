@@ -120,7 +120,7 @@ impl Accounting {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 struct MemberClaim {
     source: usize,
-    repetitions: u32,
+    repetitions: u64,
 }
 
 struct Claims {
@@ -162,6 +162,8 @@ fn claim(
 fn register_member(
     plan: &CompositionPlanResult<'_>,
     member: &PlacementMemberPlan,
+    repetitions_override: Option<u64>,
+    allow_duplicate_sources: bool,
     claims: &mut Claims,
     accounting: &mut Accounting,
 ) -> Result<(), PlanResourceError> {
@@ -177,8 +179,10 @@ fn register_member(
     {
         return Err(invalid(&owner, "invalid member range or count"));
     }
-    if !claims.sources.insert(source) {
-        return Err(invalid(&owner, "duplicate member source"));
+    for &owned_source in member.source_instruction_indices() {
+        if !claims.sources.insert(owned_source) && !allow_duplicate_sources {
+            return Err(invalid(&owner, "duplicate member source"));
+        }
     }
     if member.kind() == PlacementMemberKind::Primitive
         && (body.end - body.start != 1
@@ -192,10 +196,13 @@ fn register_member(
     }
     let value = MemberClaim {
         source,
-        repetitions: member.body_repeat_count(),
+        repetitions: repetitions_override.unwrap_or_else(|| u64::from(member.body_repeat_count())),
     };
     for index in body.start..body.end {
         let object = &plan.objects[index];
+        let object_owned = member
+            .source_instruction_indices()
+            .contains(&object_source(object.origin()));
         let kind_matches = matches!(
             (member.kind(), object.origin()),
             (
@@ -204,9 +211,9 @@ fn register_member(
             ) | (
                 PlacementMemberKind::Macro,
                 ScoreInstructionOrigin::MacroEmit { .. }
-            )
+            ) | (PlacementMemberKind::OrdinaryGroup, _)
         );
-        if object_source(object.origin()) != source
+        if !object_owned
             || !kind_matches
             || (member.kind() == PlacementMemberKind::Primitive
                 && object.count() != member.logical_count())
@@ -219,7 +226,11 @@ fn register_member(
         claim(&mut claims.objects[index], value, &owner)?;
     }
     for &index in &body.anchor_indices {
-        if index >= plan.anchors.len() || anchor_source(&plan.anchor_origins[index]) != source {
+        if index >= plan.anchors.len()
+            || !member
+                .source_instruction_indices()
+                .contains(&anchor_source(&plan.anchor_origins[index]))
+        {
             return Err(invalid(&owner, "invalid member anchor owner"));
         }
         claim(&mut claims.anchors[index], value, &owner)?;
@@ -235,8 +246,12 @@ fn register_member(
     }
     accounting.add(
         ResourceDemand {
-            logical_objects: u64::from(member.logical_count()),
-            maximum_resolved_count: u64::from(member.logical_count()),
+            logical_objects: repetitions_override.map_or_else(
+                || u64::from(member.logical_count()),
+                |repetitions| repetitions * member.source_instruction_indices().len() as u64,
+            ),
+            maximum_resolved_count: repetitions_override
+                .unwrap_or_else(|| u64::from(member.logical_count())),
             ..ResourceDemand::default()
         },
         &owner,
@@ -269,6 +284,7 @@ fn register_group(
     plan: &CompositionPlanResult<'_>,
     members: &[PlacementMemberPlan],
     logical_count: u64,
+    cycle_occurrence_count: Option<u64>,
     owner: &PlanResourceOwner,
     claims: &mut Claims,
     accounting: &mut Accounting,
@@ -278,7 +294,7 @@ fn register_group(
     }
     let mut count = 0u64;
     let mut end = members[0].member().start;
-    for member in members {
+    for (member_index, member) in members.iter().enumerate() {
         if member.member().start != end {
             return Err(invalid(owner, "noncontiguous group members"));
         }
@@ -289,9 +305,29 @@ fn register_group(
                 owner: owner.clone(),
                 reason: PlanResourceFailure::ArithmeticOverflow(ResourceDimension::LogicalObjects),
             })?;
-        register_member(plan, member, claims, accounting)?;
+        let repetitions = cycle_occurrence_count.map(|occurrence_count| {
+            if member_index as u64 >= occurrence_count {
+                0
+            } else {
+                1 + (occurrence_count - 1 - member_index as u64) / members.len() as u64
+            }
+        });
+        register_member(
+            plan,
+            member,
+            repetitions,
+            cycle_occurrence_count.is_some(),
+            claims,
+            accounting,
+        )?;
     }
-    if count != logical_count {
+    if cycle_occurrence_count.is_some() {
+        if cycle_occurrence_count != Some(logical_count)
+            || members.iter().any(|member| member.logical_count() != 1)
+        {
+            return Err(invalid(owner, "cycle group logical count mismatch"));
+        }
+    } else if count != logical_count {
         return Err(invalid(owner, "group logical count mismatch"));
     }
     Ok(())
@@ -386,6 +422,7 @@ fn account_composition_plan(
             plan,
             group.members(),
             group.logical_count(),
+            group.cycle_occurrence_count(),
             &owner,
             &mut claims,
             &mut accounting,
@@ -432,6 +469,7 @@ fn account_composition_plan(
             plan,
             &group.members,
             group.logical_count,
+            group.cycle_occurrence_count,
             &owner,
             &mut claims,
             &mut accounting,
@@ -461,7 +499,7 @@ fn account_composition_plan(
                 "standalone repetition must be Macro",
             ));
         }
-        register_member(plan, member, &mut claims, &mut accounting)?;
+        register_member(plan, member, None, false, &mut claims, &mut accounting)?;
     }
     let mut ungrouped_macros = HashSet::new();
     for (index, object) in plan.objects.iter().enumerate() {
@@ -476,7 +514,7 @@ fn account_composition_plan(
         }
         let repetitions = claims.objects[index].map_or(1, |claim| claim.repetitions);
         let primitive_marks = u64::from(object.count())
-            .checked_mul(u64::from(repetitions))
+            .checked_mul(repetitions)
             .ok_or_else(|| PlanResourceError {
                 owner: owner.clone(),
                 reason: PlanResourceFailure::ArithmeticOverflow(ResourceDimension::PrimitiveMarks),
@@ -495,7 +533,7 @@ fn account_composition_plan(
             object.recipe(),
             PlacementRecipe::FillUniformInRegionAndClip { .. }
         ) {
-            u64::from(repetitions)
+            repetitions
         } else {
             0
         };
@@ -727,7 +765,11 @@ impl UnitMapping {
             let owner = PlanResourceOwner::PlacementGroup {
                 group_index: group.group_index(),
             };
-            let unit = result.group(group.members(), owner)?;
+            let unit = result.group(
+                group.members(),
+                owner,
+                group.cycle_occurrence_count().is_some(),
+            )?;
             if result
                 .placement_units
                 .insert(group.group_index(), unit)
@@ -740,7 +782,11 @@ impl UnitMapping {
             }
         }
         for group in plan.fill_groups() {
-            let unit = result.group(&group.members, PlanResourceOwner::FillGroup(group.owner))?;
+            let unit = result.group(
+                &group.members,
+                PlanResourceOwner::FillGroup(group.owner),
+                group.cycle_occurrence_count.is_some(),
+            )?;
             if result.fill_units.insert(group.owner, unit).is_some() {
                 return Err(invalid(
                     &PlanResourceOwner::Plan,
@@ -755,26 +801,34 @@ impl UnitMapping {
         &mut self,
         members: &[PlacementMemberPlan],
         owner: PlanResourceOwner,
+        allow_duplicate_sources: bool,
     ) -> Result<usize, PlanResourceError> {
         let first = members
             .first()
             .ok_or_else(|| invalid(&owner, "empty resource unit"))?
             .source_instruction_index();
-        let mut previous = None;
+        let mut sources = HashSet::new();
         for member in members {
-            let source = member.source_instruction_index();
-            if source >= self.source_units.len()
-                || previous.is_some_and(|previous| source <= previous)
-                || self.owners[source].is_some()
-                || self.source_units[source] != source
-            {
-                return Err(invalid(
-                    &owner,
-                    "invalid or overlapping resource unit source",
-                ));
+            for &source in member.source_instruction_indices() {
+                if !sources.insert(source) {
+                    if allow_duplicate_sources {
+                        continue;
+                    }
+                    return Err(invalid(&owner, "duplicate resource unit source"));
+                }
+                if source >= self.source_units.len()
+                    || self.owners[source].is_some()
+                    || self.source_units[source] != source
+                {
+                    return Err(invalid(
+                        &owner,
+                        "invalid or overlapping resource unit source",
+                    ));
+                }
             }
+        }
+        for source in sources {
             self.source_units[source] = first;
-            previous = Some(source);
         }
         self.owners[first] = Some(owner);
         Ok(first)

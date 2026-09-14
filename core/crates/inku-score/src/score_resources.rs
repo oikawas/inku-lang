@@ -173,10 +173,41 @@ fn invalid(owner: SavedScoreResourceOwner, reason: &'static str) -> SavedScoreRe
 fn source_index(owner: &ScoreSourceOwner) -> usize {
     match owner {
         ScoreSourceOwner::SourceInstruction { instruction_index } => *instruction_index,
+        ScoreSourceOwner::OrdinaryGroup {
+            source_instruction_indices,
+        } => *source_instruction_indices
+            .first()
+            .expect("validated ordinary group owner has a source"),
         ScoreSourceOwner::MacroEmit {
             source_instruction_index,
             ..
         } => *source_instruction_index,
+    }
+}
+
+fn symbolic_sources(symbolic: &crate::SymbolicMember) -> Vec<usize> {
+    match &symbolic.owner {
+        ScoreSourceOwner::OrdinaryGroup {
+            source_instruction_indices,
+        } => source_instruction_indices.clone(),
+        owner => vec![source_index(owner)],
+    }
+}
+
+fn cycle_repetitions(
+    cycle: Option<&crate::CycleMembersV1>,
+    member_ordinal: u64,
+    member_count: usize,
+    default: u64,
+) -> u64 {
+    let Some(cycle) = cycle else {
+        return default;
+    };
+    let width = u64::try_from(member_count).expect("member count fits u64");
+    if member_ordinal >= cycle.occurrence_count {
+        0
+    } else {
+        1 + (cycle.occurrence_count - 1 - member_ordinal) / width
     }
 }
 
@@ -185,6 +216,7 @@ struct OuterClaim {
     source: usize,
     repetitions: u64,
     kind: SymbolicMemberKind,
+    cycle: bool,
 }
 
 #[derive(Clone)]
@@ -263,7 +295,8 @@ impl Analysis {
             instruction_sources.push(source);
             match &resolved.owner {
                 ScoreSourceOwner::SourceInstruction { .. } => {
-                    if !direct_sources.insert(source) || macro_sources.contains(&source) {
+                    direct_sources.insert(source);
+                    if macro_sources.contains(&source) {
                         return Err(invalid(
                             SavedScoreResourceOwner::Instruction {
                                 instruction_index,
@@ -272,6 +305,15 @@ impl Analysis {
                             "source instruction owns multiple incompatible templates",
                         ));
                     }
+                }
+                ScoreSourceOwner::OrdinaryGroup { .. } => {
+                    return Err(invalid(
+                        SavedScoreResourceOwner::Instruction {
+                            instruction_index,
+                            owner: resolved.owner.clone(),
+                        },
+                        "instruction template cannot own an ordinary group",
+                    ));
                 }
                 ScoreSourceOwner::MacroEmit {
                     invocation_ordinal,
@@ -333,13 +375,24 @@ impl Analysis {
     fn register_group(
         &mut self,
         sources: &[usize],
+        allow_duplicate_sources: bool,
         owner: SavedScoreResourceOwner,
     ) -> Result<usize, SavedScoreResourceError> {
         let Some(&first) = sources.first() else {
             return Err(invalid(owner, "resource group has no members"));
         };
         let mut previous = None;
+        let mut seen = HashSet::new();
         for &source in sources {
+            if !seen.insert(source) {
+                if allow_duplicate_sources {
+                    continue;
+                }
+                return Err(invalid(
+                    owner,
+                    "resource group sources must be unique and in source order",
+                ));
+            }
             if previous.is_some_and(|previous| source <= previous)
                 || !self.grouped_sources.insert(source)
             {
@@ -360,21 +413,30 @@ impl Analysis {
         &mut self,
         score: &Score,
         member: &PlacementMember,
+        repetitions: u64,
+        cycle: bool,
         owner: SavedScoreResourceOwner,
     ) -> Result<usize, SavedScoreResourceError> {
         let symbolic = member
             .symbolic
             .as_ref()
             .ok_or_else(|| invalid(owner.clone(), "outer member has no symbolic metadata"))?;
-        let ScoreSourceOwner::SourceInstruction { instruction_index } = symbolic.owner else {
-            return Err(invalid(
-                owner,
-                "outer member owner must identify its source instruction",
-            ));
+        let source = match &symbolic.owner {
+            ScoreSourceOwner::SourceInstruction { instruction_index } => *instruction_index,
+            ScoreSourceOwner::OrdinaryGroup {
+                source_instruction_indices,
+            } => *source_instruction_indices
+                .first()
+                .ok_or_else(|| invalid(owner.clone(), "ordinary group owner has no sources"))?,
+            ScoreSourceOwner::MacroEmit { .. } => {
+                return Err(invalid(
+                    owner,
+                    "outer member owner must identify its source instruction",
+                ));
+            }
         };
-        let source = instruction_index;
         self.add_source(source);
-        if !self.outer_sources.insert(source) {
+        if !self.outer_sources.insert(source) && !cycle {
             return Err(invalid(
                 owner,
                 "source has multiple outer repetition owners",
@@ -398,9 +460,11 @@ impl Analysis {
         }
         let claim = OuterClaim {
             source,
-            repetitions: symbolic.instance_count,
+            repetitions,
             kind: symbolic.kind,
+            cycle,
         };
+        let mut ordinary_member_sources = BTreeSet::new();
         for instruction_index in member.start..member.end {
             let resolved_owner = &score.instructions[instruction_index]
                 .arrangement
@@ -422,6 +486,25 @@ impl Analysis {
                         ..
                     },
                 ) => *source_instruction_index == source,
+                (
+                    SymbolicMemberKind::OrdinaryGroup,
+                    ScoreSourceOwner::SourceInstruction { instruction_index },
+                )
+                | (
+                    SymbolicMemberKind::OrdinaryGroup,
+                    ScoreSourceOwner::MacroEmit {
+                        source_instruction_index: instruction_index,
+                        ..
+                    },
+                ) => {
+                    ordinary_member_sources.insert(*instruction_index);
+                    matches!(
+                        &symbolic.owner,
+                        ScoreSourceOwner::OrdinaryGroup {
+                            source_instruction_indices,
+                        } if source_instruction_indices.contains(instruction_index)
+                    )
+                }
                 _ => false,
             };
             if !owner_matches
@@ -434,6 +517,20 @@ impl Analysis {
                     "outer member instruction ownership is inconsistent or overlapping",
                 ));
             }
+        }
+        if let ScoreSourceOwner::OrdinaryGroup {
+            source_instruction_indices,
+        } = &symbolic.owner
+            && (ordinary_member_sources.len() != source_instruction_indices.len()
+                || !source_instruction_indices
+                    .iter()
+                    .copied()
+                    .eq(ordinary_member_sources.into_iter()))
+        {
+            return Err(invalid(
+                owner,
+                "ordinary group member sources must exactly match its body",
+            ));
         }
         let mut anchors = HashSet::new();
         for &anchor_index in &member.anchor_indices {
@@ -475,8 +572,8 @@ impl Analysis {
                 source_instruction_index: source,
             },
             demand: ResourceDemand {
-                logical_objects: symbolic.instance_count,
-                maximum_resolved_count: symbolic.instance_count,
+                logical_objects: repetitions,
+                maximum_resolved_count: repetitions,
                 ..ResourceDemand::default()
             },
         });
@@ -497,21 +594,34 @@ impl Analysis {
             if !coordinated_group_ids.insert(source_group_index) {
                 return Err(invalid(owner, "coordinated group identity is duplicated"));
             }
-            let member_sources = group
-                .members
-                .iter()
-                .map(|member| {
-                    member
-                        .symbolic
-                        .as_ref()
-                        .map(|symbolic| source_index(&symbolic.owner))
-                        .ok_or_else(|| invalid(owner.clone(), "placement member is not symbolic"))
-                })
-                .collect::<Result<Vec<_>, _>>()?;
-            let unit = self.register_group(&member_sources, owner.clone())?;
-            self.placement_sources.push(unit);
+            let mut member_sources = Vec::new();
             for member in &group.members {
-                self.register_outer_member(score, member, owner.clone())?;
+                let symbolic = member
+                    .symbolic
+                    .as_ref()
+                    .ok_or_else(|| invalid(owner.clone(), "placement member is not symbolic"))?;
+                member_sources.extend(symbolic_sources(symbolic));
+            }
+            let unit = self.register_group(
+                &member_sources,
+                group.cycle_members.is_some(),
+                owner.clone(),
+            )?;
+            self.placement_sources.push(unit);
+            for (ordinal, member) in group.members.iter().enumerate() {
+                let symbolic = member.symbolic.as_ref().unwrap();
+                self.register_outer_member(
+                    score,
+                    member,
+                    cycle_repetitions(
+                        group.cycle_members.as_ref(),
+                        u64::try_from(ordinal).expect("member ordinal fits u64"),
+                        group.members.len(),
+                        symbolic.instance_count,
+                    ),
+                    group.cycle_members.is_some(),
+                    owner.clone(),
+                )?;
             }
             self.contributions.push(Contribution {
                 source: unit,
@@ -584,17 +694,14 @@ impl Analysis {
                 continue;
             }
 
-            let member_sources = group
-                .members
-                .iter()
-                .map(|member| {
-                    member
-                        .symbolic
-                        .as_ref()
-                        .map(|symbolic| source_index(&symbolic.owner))
-                        .ok_or_else(|| invalid(owner.clone(), "fill member is not symbolic"))
-                })
-                .collect::<Result<Vec<_>, _>>()?;
+            let mut member_sources = Vec::new();
+            for member in &group.members {
+                let symbolic = member
+                    .symbolic
+                    .as_ref()
+                    .ok_or_else(|| invalid(owner.clone(), "fill member is not symbolic"))?;
+                member_sources.extend(symbolic_sources(symbolic));
+            }
             if let FillGroupOwner::Instruction {
                 source_instruction_index,
             } = group.owner
@@ -612,10 +719,26 @@ impl Analysis {
             {
                 return Err(invalid(owner, "coordinated group identity is duplicated"));
             }
-            let unit = self.register_group(&member_sources, owner.clone())?;
+            let unit = self.register_group(
+                &member_sources,
+                group.cycle_members.is_some(),
+                owner.clone(),
+            )?;
             self.fill_sources.push(unit);
-            for member in &group.members {
-                self.register_outer_member(score, member, owner.clone())?;
+            for (ordinal, member) in group.members.iter().enumerate() {
+                let symbolic = member.symbolic.as_ref().unwrap();
+                self.register_outer_member(
+                    score,
+                    member,
+                    cycle_repetitions(
+                        group.cycle_members.as_ref(),
+                        u64::try_from(ordinal).expect("member ordinal fits u64"),
+                        group.members.len(),
+                        symbolic.instance_count,
+                    ),
+                    group.cycle_members.is_some(),
+                    owner.clone(),
+                )?;
             }
             self.contributions.push(Contribution {
                 source: unit,
@@ -637,7 +760,13 @@ impl Analysis {
             };
             self.add_source(source);
             self.set_unit_owner(source, owner.clone())?;
-            self.register_outer_member(score, &group.member, owner)?;
+            self.register_outer_member(
+                score,
+                &group.member,
+                symbolic.instance_count,
+                false,
+                owner,
+            )?;
             self.repetition_sources.push(source);
         }
 
@@ -657,6 +786,7 @@ impl Analysis {
     }
 
     fn validate_ownership(&self, score: &Score) -> Result<(), SavedScoreResourceError> {
+        let mut direct_template_cycles = BTreeMap::<usize, bool>::new();
         for (instruction_index, instruction) in score.instructions.iter().enumerate() {
             let resolved = instruction
                 .arrangement
@@ -677,7 +807,10 @@ impl Analysis {
                     ));
                 }
                 (ScoreSourceOwner::MacroEmit { .. }, Some(claim))
-                    if claim.kind != SymbolicMemberKind::Macro =>
+                    if !matches!(
+                        claim.kind,
+                        SymbolicMemberKind::Macro | SymbolicMemberKind::OrdinaryGroup
+                    ) =>
                 {
                     return Err(invalid(
                         SavedScoreResourceOwner::Instruction {
@@ -688,7 +821,10 @@ impl Analysis {
                     ));
                 }
                 (ScoreSourceOwner::SourceInstruction { .. }, Some(claim))
-                    if claim.kind != SymbolicMemberKind::Primitive =>
+                    if !matches!(
+                        claim.kind,
+                        SymbolicMemberKind::Primitive | SymbolicMemberKind::OrdinaryGroup
+                    ) =>
                 {
                     return Err(invalid(
                         SavedScoreResourceOwner::Instruction {
@@ -701,7 +837,7 @@ impl Analysis {
                 _ => {}
             }
             if let Some(claim) = claim
-                && claim.source != self.instruction_sources[instruction_index]
+                && self.unit(claim.source) != self.unit(self.instruction_sources[instruction_index])
             {
                 return Err(invalid(
                     SavedScoreResourceOwner::Instruction {
@@ -711,8 +847,30 @@ impl Analysis {
                     "instruction source differs from its outer owner",
                 ));
             }
-            if (claim.is_some_and(|claim| claim.kind == SymbolicMemberKind::Primitive)
-                || self.direct_fills[instruction_index].is_some())
+            if let ScoreSourceOwner::SourceInstruction {
+                instruction_index: source_instruction_index,
+            } = resolved.owner
+            {
+                let cycle = claim.is_some_and(|claim| claim.cycle);
+                if direct_template_cycles
+                    .insert(source_instruction_index, cycle)
+                    .is_some_and(|prior_cycle| !prior_cycle || !cycle)
+                {
+                    return Err(invalid(
+                        SavedScoreResourceOwner::Instruction {
+                            instruction_index,
+                            owner: resolved.owner.clone(),
+                        },
+                        "source instruction owns multiple templates outside one cycle group",
+                    ));
+                }
+            }
+            if (claim.is_some_and(|claim| {
+                matches!(
+                    claim.kind,
+                    SymbolicMemberKind::Primitive | SymbolicMemberKind::OrdinaryGroup
+                )
+            }) || self.direct_fills[instruction_index].is_some())
                 && (instruction.arrangement.as_ref().unwrap().count != 1
                     || !matches!(resolved.count_origin, crate::CountOrigin::TemplateSingle))
             {
@@ -732,7 +890,10 @@ impl Analysis {
                     "saved anchor has no source owner",
                 ));
             }
-            if claim.unwrap().kind != SymbolicMemberKind::Macro {
+            if !matches!(
+                claim.unwrap().kind,
+                SymbolicMemberKind::Macro | SymbolicMemberKind::OrdinaryGroup
+            ) {
                 return Err(invalid(
                     SavedScoreResourceOwner::Anchor {
                         anchor_index,
@@ -749,7 +910,10 @@ impl Analysis {
                     "saved transform has no source owner",
                 ));
             }
-            if claim.unwrap().kind != SymbolicMemberKind::Macro {
+            if !matches!(
+                claim.unwrap().kind,
+                SymbolicMemberKind::Macro | SymbolicMemberKind::OrdinaryGroup
+            ) {
                 return Err(invalid(
                     SavedScoreResourceOwner::TransformGroup {
                         transform_group_index,
@@ -981,7 +1145,7 @@ pub fn finalize_saved_score_with_omitted_instructions(
 ) -> Result<FinalizedScore, SavedScoreResourceError> {
     if !matches!(
         score.version.as_str(),
-        "0.10.0" | "0.11.0" | "0.12.0" | "0.13.0"
+        "0.10.0" | "0.11.0" | "0.12.0" | "0.13.0" | "0.14.0"
     ) {
         return Err(invalid(
             SavedScoreResourceOwner::Score,

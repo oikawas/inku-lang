@@ -238,6 +238,7 @@ fn project_source_instruction<'a>(
         color_cycle: instruction
             .sequence
             .as_ref()
+            .filter(|sequence| matches!(sequence.kind, crate::SemanticSequenceKind::Color))
             .map_or(&[], |sequence| sequence.items.as_slice()),
         touch: instruction
             .entity
@@ -2161,7 +2162,9 @@ fn lower_verified_stage15_shared<'a>(
     let mut fill_groups = Vec::new();
     let mut fill_checkpoints = BTreeMap::new();
     let mut lowered_members = BTreeMap::new();
+    let mut field_cycle_members = BTreeMap::new();
     let mut standalone_macro_repetitions = Vec::new();
+    let mut supported_member_cycles = Vec::new();
 
     let ground =
         document.ground.as_ref().and_then(|ground| {
@@ -2351,6 +2354,152 @@ fn lower_verified_stage15_shared<'a>(
         });
     }
 
+    for (owner_projected_index, instruction) in document.instructions.iter().enumerate() {
+        let Some(sequence) = instruction.sequence.as_ref() else {
+            continue;
+        };
+        let (members, member_count) = match sequence.kind {
+            crate::SemanticSequenceKind::Color => continue,
+            crate::SemanticSequenceKind::Field(_) => (
+                SupportedCycleMembers::Field {
+                    owner_projected_index,
+                },
+                sequence.items.len(),
+            ),
+            crate::SemanticSequenceKind::Units => (
+                SupportedCycleMembers::Units(
+                    sequence
+                        .units
+                        .iter()
+                        .map(|unit| unit.member_entity_indices.clone())
+                        .collect(),
+                ),
+                sequence.units.len(),
+            ),
+        };
+        let Some(action_term) = instruction.action.as_ref() else {
+            continue;
+        };
+        let action = match action_term.identity.id.as_str() {
+            "place" => PlacementAction::Place,
+            "line_up" => PlacementAction::LineUp,
+            "scatter" => PlacementAction::Scatter,
+            "tile" => PlacementAction::Tile,
+            "fill" => PlacementAction::Fill,
+            _ => continue,
+        };
+        let first_projected_index = match &members {
+            SupportedCycleMembers::Field { .. } => owner_projected_index,
+            SupportedCycleMembers::Units(units) => units
+                .first()
+                .and_then(|unit| unit.first())
+                .copied()
+                .unwrap_or(owner_projected_index),
+        };
+        let Some(first_source_index) = view.source_instruction_index(first_projected_index) else {
+            continue;
+        };
+        let focus = direct_instruction_focus(view, first_source_index);
+        let fill_region = if action == PlacementAction::Fill {
+            let input = ScoreLoweringInput {
+                fill_target: project_fill_target(view, instruction.fill_target.as_ref()),
+                has_named_position: instruction.position.is_some(),
+                named_position: instruction
+                    .position
+                    .as_ref()
+                    .map(|term| (&term.identity).into()),
+                effective_focus: focus,
+                angle_context: Some(ScoreAngleContext {
+                    composition_seed: view.composition_seed(),
+                    original_pre_expansion_digest: view.original_pre_expansion_digest(),
+                    original_expanded_meaning_digest: view.original_expanded_meaning_digest(),
+                    occurrence: ScoreAngleOccurrence::Direct {
+                        logical_ordinal: first_source_index as u64,
+                    },
+                }),
+                ..ScoreLoweringInput::default()
+            };
+            let Ok(region) = resolve_fill_region(input, context) else {
+                continue;
+            };
+            Some(region)
+        } else {
+            None
+        };
+        let bounds = if action == PlacementAction::Fill {
+            None
+        } else {
+            let Some(bounds) = crate::geometry::resolved_position_rational_bounds(
+                instruction
+                    .position
+                    .as_ref()
+                    .map(|position| position.identity.id.as_str()),
+                focus,
+                ScoreAngleContext {
+                    composition_seed: view.composition_seed(),
+                    original_pre_expansion_digest: view.original_pre_expansion_digest(),
+                    original_expanded_meaning_digest: view.original_expanded_meaning_digest(),
+                    occurrence: ScoreAngleOccurrence::Direct {
+                        logical_ordinal: first_source_index as u64,
+                    },
+                },
+            ) else {
+                continue;
+            };
+            Some(bounds)
+        };
+        let count = sequence
+            .quantity
+            .as_ref()
+            .map(|quantity| quantity.value)
+            .or(match action {
+                PlacementAction::Scatter | PlacementAction::Tile => Some(8),
+                PlacementAction::Place | PlacementAction::LineUp => Some(member_count as u64),
+                PlacementAction::Fill => None,
+            });
+        if count == Some(0) {
+            continue;
+        }
+        let region = bounds.map_or([0.5; 4], |bounds| {
+            bounds.map(|(numerator, denominator)| numerator as f64 / denominator as f64)
+        });
+        match &members {
+            SupportedCycleMembers::Field {
+                owner_projected_index,
+                ..
+            } => {
+                group_members.insert(*owner_projected_index, ([0.5; 4], 1));
+            }
+            SupportedCycleMembers::Units(units) => {
+                for projected_index in units.iter().flatten().copied() {
+                    group_members.insert(projected_index, ([0.5; 4], 1));
+                }
+            }
+        }
+        let (width, height) = context.canvas_format.integer_ratio();
+        let short = width.min(height);
+        let domain = [
+            Rational::from_ratio(width.into(), short.into()).expect("valid canvas ratio"),
+            Rational::from_ratio(height.into(), short.into()).expect("valid canvas ratio"),
+        ];
+        supported_member_cycles.push(SupportedMemberCycle {
+            owner_projected_index,
+            members,
+            count,
+            action,
+            layout: match action {
+                PlacementAction::Place => inku_score::GroupLayout::Overlap,
+                PlacementAction::LineUp => inku_score::GroupLayout::HorizontalSourceOrder,
+                PlacementAction::Scatter => inku_score::GroupLayout::Scatter,
+                PlacementAction::Tile => inku_score::GroupLayout::Tile,
+                PlacementAction::Fill => inku_score::GroupLayout::Overlap,
+            },
+            region,
+            domain,
+            fill_region,
+        });
+    }
+
     // Consume the standalone Macro caller's placement once, outside its intact
     // body. The body keeps its own actions, quantities, anchors and transforms.
     for (projected_index, instruction) in document.instructions.iter().enumerate() {
@@ -2452,6 +2601,195 @@ fn lower_verified_stage15_shared<'a>(
             .find(|(_, sources, _)| sources.first() == Some(&instruction_index))
         {
             fill_checkpoints.insert(*group_index, (body_start, anchor_start, transform_start));
+        }
+        if let Some(sequence) = instruction.sequence.as_ref()
+            && let crate::SemanticSequenceKind::Field(field) = sequence.kind
+            && let Some((region, _)) = group_members.get(&projected_index)
+        {
+            let effective_focus =
+                direct_instruction_focus(candidate.verified_effective_view(), instruction_index);
+            let mut members = Vec::new();
+            let plan_relation = if let Some(objects) = objects.as_deref() {
+                instruction.relation.as_ref().and_then(|relation| {
+                    match direct_score_relation(
+                        instruction_index,
+                        project_source_instruction(
+                            candidate.verified_effective_view(),
+                            instruction_index,
+                            instruction,
+                            effective_focus,
+                        )
+                        .expect("field cycle has a primitive source"),
+                        relation,
+                        objects
+                            .last()
+                            .map(|object| (object.primitive(), object.arc_form())),
+                        objects.iter().map(|object| &object.origin),
+                        objects.len().checked_sub(1),
+                    ) {
+                        Ok(relation) => Some(plan_relation(relation)),
+                        Err(reason) => {
+                            diagnostics.push(ScoreLoweringDiagnostic {
+                                owner: source_owner_for_gap(
+                                    instruction_index,
+                                    instruction,
+                                    &reason,
+                                ),
+                                disposition: relation_diagnostic_disposition(),
+                                reason,
+                            });
+                            None
+                        }
+                    }
+                })
+            } else {
+                None
+            };
+            let score_relation = if objects.is_none() {
+                instruction.relation.as_ref().and_then(|relation| {
+                    match direct_score_relation(
+                        instruction_index,
+                        project_source_instruction(
+                            candidate.verified_effective_view(),
+                            instruction_index,
+                            instruction,
+                            effective_focus,
+                        )
+                        .expect("field cycle has a primitive source"),
+                        relation,
+                        instructions
+                            .last()
+                            .map(|prior: &Instruction| (prior.primitive, prior.arc_form)),
+                        instruction_origins.iter(),
+                        instructions.len().checked_sub(1),
+                    ) {
+                        Ok(relation) => Some(relation),
+                        Err(reason) => {
+                            diagnostics.push(ScoreLoweringDiagnostic {
+                                owner: source_owner_for_gap(
+                                    instruction_index,
+                                    instruction,
+                                    &reason,
+                                ),
+                                disposition: relation_diagnostic_disposition(),
+                                reason,
+                            });
+                            None
+                        }
+                    }
+                })
+            } else {
+                None
+            };
+            let mut complete = true;
+            for item in &sequence.items {
+                let member_start = objects
+                    .as_ref()
+                    .map_or(instructions.len(), |objects| objects.len());
+                let mut member_instruction = instruction.clone();
+                member_instruction.sequence = None;
+                apply_sequence_field(&mut member_instruction, field, item.clone());
+                let mut input = project_source_instruction(
+                    candidate.verified_effective_view(),
+                    instruction_index,
+                    &member_instruction,
+                    effective_focus,
+                )
+                .expect("field cycle has a primitive source");
+                input.action = Some(SemanticInputIdentity {
+                    category: "movement",
+                    id: "place",
+                });
+                input.count = Some(1);
+                input.has_named_position = true;
+                input.group_region = Some(*region);
+                if let Some(objects) = objects.as_deref_mut() {
+                    let attempt = resolve_projected_instruction(
+                        input,
+                        context,
+                        error_policy,
+                        |input, context| {
+                            resolve_object_plan(
+                                input,
+                                context,
+                                ScoreInstructionOrigin::SourceInstruction { instruction_index },
+                            )
+                        },
+                    );
+                    let object_index = append_plan_attempt(
+                        attempt,
+                        |reason| {
+                            source_owner_for_gap(instruction_index, &member_instruction, reason)
+                        },
+                        ScoreOmissionUnit::SourceInstruction { instruction_index },
+                        error_policy,
+                        objects,
+                        &mut diagnostics,
+                    );
+                    let Some(index) = object_index else {
+                        complete = false;
+                        break;
+                    };
+                    objects[index].relation = plan_relation.clone();
+                    objects[index].count_was_omitted = true;
+                } else {
+                    let before = instructions.len();
+                    if let Some(relation) = score_relation.clone() {
+                        lower_source_relation_instruction_with_policy(
+                            instruction_index,
+                            &member_instruction,
+                            input,
+                            relation,
+                            context,
+                            error_policy,
+                            &mut instructions,
+                            &mut instruction_origins,
+                            &mut diagnostics,
+                        );
+                    } else {
+                        lower_source_instruction_with_policy(
+                            instruction_index,
+                            &member_instruction,
+                            input,
+                            context,
+                            error_policy,
+                            &mut instructions,
+                            &mut instruction_origins,
+                            &mut diagnostics,
+                        );
+                    }
+                    if instructions.len() == before {
+                        complete = false;
+                        break;
+                    }
+                }
+                let member_end = objects
+                    .as_ref()
+                    .map_or(instructions.len(), |objects| objects.len());
+                members.push(PlacementMemberPlan {
+                    source_instruction_index: instruction_index,
+                    source_instruction_indices: vec![instruction_index],
+                    member: inku_score::PlacementMember {
+                        start: member_start,
+                        end: member_end,
+                        anchor_indices: Vec::new(),
+                        transform_group_indices: Vec::new(),
+                        symbolic: None,
+                    },
+                    kind: PlacementMemberKind::Primitive,
+                    source_count: 1,
+                    count_was_omitted: true,
+                });
+            }
+            if complete && members.len() == sequence.items.len() {
+                field_cycle_members.insert(instruction_index, members);
+            } else if let Some(objects) = objects.as_deref_mut() {
+                objects.truncate(body_start);
+            } else {
+                instructions.truncate(body_start);
+                instruction_origins.truncate(body_start);
+            }
+            continue;
         }
         match &instruction.entity.head {
             SemanticHead::Primitive(_) => {
@@ -2601,11 +2939,14 @@ fn lower_verified_stage15_shared<'a>(
                     });
                 }
                 let mut body_caller;
-                let body_instruction = if standalone_fill_members.contains(&projected_index) {
+                let body_instruction = if standalone_fill_members.contains(&projected_index)
+                    || group_members.contains_key(&projected_index)
+                {
                     body_caller = instruction.clone();
                     body_caller.action = None;
                     body_caller.position = None;
                     body_caller.fill_target = None;
+                    body_caller.sequence = None;
                     &body_caller
                 } else {
                     instruction
@@ -2642,6 +2983,7 @@ fn lower_verified_stage15_shared<'a>(
                 instruction_index,
                 PlacementMemberPlan {
                     source_instruction_index: instruction_index,
+                    source_instruction_indices: vec![instruction_index],
                     member: inku_score::PlacementMember {
                         start: body_start,
                         end: body_end,
@@ -2667,6 +3009,7 @@ fn lower_verified_stage15_shared<'a>(
             let quantity = instruction.entity.quantity.as_ref();
             standalone_macro_repetitions.push(PlacementMemberPlan {
                 source_instruction_index: instruction_index,
+                source_instruction_indices: vec![instruction_index],
                 member: inku_score::PlacementMember {
                     start: body_start,
                     end: body_end,
@@ -2760,6 +3103,169 @@ fn lower_verified_stage15_shared<'a>(
     }
 
     let mut placement_groups = Vec::new();
+    for cycle in supported_member_cycles {
+        let mut members = Vec::new();
+        let mut complete = true;
+        let cycle_units = match cycle.members {
+            SupportedCycleMembers::Units(units) => units,
+            SupportedCycleMembers::Field {
+                owner_projected_index,
+                ..
+            } => {
+                let Some(source_index) = view.source_instruction_index(owner_projected_index)
+                else {
+                    continue;
+                };
+                let Some(field_members) = field_cycle_members.remove(&source_index) else {
+                    continue;
+                };
+                members.extend(field_members);
+                Vec::new()
+            }
+        };
+        for unit in &cycle_units {
+            let mut parts = Vec::new();
+            for &projected_index in unit {
+                let Some(source_index) = view.source_instruction_index(projected_index) else {
+                    complete = false;
+                    break;
+                };
+                let Some(member) = lowered_members.remove(&source_index) else {
+                    complete = false;
+                    break;
+                };
+                parts.push(member);
+            }
+            if !complete || parts.is_empty() {
+                break;
+            }
+            for part in &parts {
+                if part.kind == PlacementMemberKind::Primitive {
+                    if let Some(objects) = objects.as_deref_mut() {
+                        objects[part.member.start].anchor = ObjectAnchor::Named([0.5; 4]);
+                    } else {
+                        instructions[part.member.start].at = Some(AtRegion { region: [0.5; 4] });
+                    }
+                }
+            }
+            if parts.len() == 1 {
+                members.push(parts.remove(0));
+                continue;
+            }
+            let source_instruction_indices = parts
+                .iter()
+                .flat_map(|member| member.source_instruction_indices.iter().copied())
+                .collect::<Vec<_>>();
+            members.push(PlacementMemberPlan {
+                source_instruction_index: source_instruction_indices[0],
+                source_instruction_indices,
+                member: inku_score::PlacementMember {
+                    start: parts[0].member.start,
+                    end: parts.last().expect("ordinary group has members").member.end,
+                    anchor_indices: parts
+                        .iter()
+                        .flat_map(|member| member.member.anchor_indices.iter().copied())
+                        .collect(),
+                    transform_group_indices: parts
+                        .iter()
+                        .flat_map(|member| member.member.transform_group_indices.iter().copied())
+                        .collect(),
+                    symbolic: None,
+                },
+                kind: PlacementMemberKind::OrdinaryGroup,
+                source_count: 1,
+                count_was_omitted: true,
+            });
+        }
+        if !complete || members.is_empty() {
+            continue;
+        }
+        let start = members[0].member.start;
+        let end = members.last().expect("member cycle is nonempty").member.end;
+        let group_index = document.coordinated_head_groups.len() + cycle.owner_projected_index;
+        if cycle.action == PlacementAction::Fill {
+            let Some(region) = cycle.fill_region else {
+                continue;
+            };
+            let (occurrence_count, count_resolution) = if let Some(count) = cycle.count {
+                (count, FillCountResolution::Explicit)
+            } else {
+                let Some(plan_objects) = objects.as_deref() else {
+                    continue;
+                };
+                let plan_transforms = transform_groups
+                    .as_ref()
+                    .map_or(&[][..], |groups| groups.as_slice());
+                let extents = members
+                    .iter()
+                    .map(|member| match member.kind {
+                        PlacementMemberKind::Primitive => {
+                            reference_extent(plan_objects[member.member.start].dimensions)
+                        }
+                        PlacementMemberKind::Macro | PlacementMemberKind::OrdinaryGroup => {
+                            crate::plan_reference_extent::reference_member_extent(
+                                plan_objects,
+                                plan_transforms,
+                                &anchors,
+                                member,
+                                context.canvas_format,
+                            )
+                        }
+                    })
+                    .collect::<Result<Vec<_>, _>>();
+                let Ok(extents) = extents else {
+                    continue;
+                };
+                let explicit_counts = vec![None; members.len()];
+                let Ok(counts) =
+                    balanced_fill_counts(region.reference_area, &extents, &explicit_counts)
+                else {
+                    continue;
+                };
+                let occurrence_count = counts.iter().map(|count| u64::from(*count)).sum();
+                (
+                    occurrence_count,
+                    FillCountResolution::BalancedGroup {
+                        reference_extents: extents,
+                        explicit_counts,
+                    },
+                )
+            };
+            fill_groups.push(FillGroupPlan {
+                owner: FillPlanOwner::CoordinatedGroup { group_index },
+                logical_count: occurrence_count,
+                members,
+                recipe: PlacementRecipe::FillUniformInRegionAndClip {
+                    region: Box::new(region),
+                    count_resolution,
+                },
+                cycle_occurrence_count: Some(occurrence_count),
+            });
+            continue;
+        }
+        let count = cycle.count.expect("non-fill cycles resolve an outer count");
+        let recipe = placement_recipe(cycle.action, count, cycle.domain, None, false)
+            .expect("bounded member cycle recipe");
+        placement_groups.push(PlacementGroupPlan {
+            group_index,
+            placement: inku_score::PlacementGroup {
+                start,
+                end,
+                layout: cycle.layout,
+                at: AtRegion {
+                    region: cycle.region,
+                },
+                members: members.iter().map(|member| member.member.clone()).collect(),
+                resolved: None,
+                cycle_members: None,
+            },
+            logical_count: count,
+            domain: cycle.domain,
+            recipe,
+            members,
+            cycle_occurrence_count: Some(count),
+        });
+    }
     for (group_index, members, layout, region, bounds) in supported_groups {
         let members = members
             .iter()
@@ -2828,12 +3334,14 @@ fn lower_verified_stage15_shared<'a>(
             domain,
             recipe,
             members,
+            cycle_occurrence_count: None,
             placement: inku_score::PlacementGroup {
                 start,
                 end,
                 layout,
                 at: AtRegion { region },
                 members: score_members,
+                cycle_members: None,
                 resolved: None,
             },
         });
@@ -3888,6 +4396,61 @@ struct PreparedFillGroup {
     counts: Vec<u32>,
 }
 
+struct SupportedMemberCycle {
+    owner_projected_index: usize,
+    members: SupportedCycleMembers,
+    count: Option<u64>,
+    action: PlacementAction,
+    layout: inku_score::GroupLayout,
+    region: [f64; 4],
+    domain: [Rational; 2],
+    fill_region: Option<ResolvedFillRegion>,
+}
+
+enum SupportedCycleMembers {
+    Units(Vec<Vec<usize>>),
+    Field { owner_projected_index: usize },
+}
+
+fn apply_sequence_field(
+    instruction: &mut SemanticInstruction,
+    field: crate::SemanticSequenceField,
+    item: crate::SemanticTerm,
+) {
+    match field {
+        crate::SemanticSequenceField::Touch => instruction.entity.touch = Some(item),
+        crate::SemanticSequenceField::Continuity => instruction.entity.continuity = Some(item),
+        crate::SemanticSequenceField::Angle => instruction.entity.angle = Some(item),
+        crate::SemanticSequenceField::SurfaceQuality => {
+            instruction.entity.surface.quality = Some(item)
+        }
+        crate::SemanticSequenceField::SurfaceIntensity => {
+            instruction.entity.surface.intensity = Some(item)
+        }
+        crate::SemanticSequenceField::FluctuationAmplitude => {
+            instruction.entity.fluctuation.amplitude = Some(item)
+        }
+        crate::SemanticSequenceField::FluctuationFrequency => {
+            instruction.entity.fluctuation.frequency = Some(item)
+        }
+        crate::SemanticSequenceField::FluctuationQuality => {
+            instruction.entity.fluctuation.quality = Some(item)
+        }
+        crate::SemanticSequenceField::FluctuationSpread => {
+            instruction.entity.fluctuation.spread = Some(item)
+        }
+        crate::SemanticSequenceField::ProportionAspect => {
+            instruction.entity.proportion.aspect = Some(item)
+        }
+        crate::SemanticSequenceField::ProportionWidthExtent => {
+            instruction.entity.proportion.width_extent = Some(item)
+        }
+        crate::SemanticSequenceField::ProportionArcForm => {
+            instruction.entity.proportion.arc_form = Some(item)
+        }
+    }
+}
+
 fn project_fill_target<'a>(
     view: VerifiedStage15EffectiveView<'a>,
     target: Option<&'a crate::SemanticFillTarget>,
@@ -4103,6 +4666,11 @@ fn finalize_fill_group(
             PlacementMemberKind::Macro => crate::plan_reference_extent::reference_member_extent(
                 objects, transforms, anchors, member, canvas,
             ),
+            PlacementMemberKind::OrdinaryGroup => {
+                crate::plan_reference_extent::reference_member_extent(
+                    objects, transforms, anchors, member, canvas,
+                )
+            }
         })
         .collect::<Result<Vec<_>, _>>()?;
     let explicit_counts = members
@@ -4133,6 +4701,7 @@ fn finalize_fill_group(
                 explicit_counts,
             },
         },
+        cycle_occurrence_count: None,
     })
 }
 

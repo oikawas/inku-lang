@@ -12,7 +12,7 @@ use crate::{
 };
 
 /// Stable identity for the runtime-disconnected neutral parser foundation.
-pub const NEUTRAL_LEXEME_PARSER_SCHEMA_ID: &str = "inku.neutral-lexeme-parser.v11";
+pub const NEUTRAL_LEXEME_PARSER_SCHEMA_ID: &str = "inku.neutral-lexeme-parser.v12";
 
 /// A half-open UTF-8 byte span into the source document.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
@@ -175,6 +175,7 @@ pub struct NeutralParseResult {
 
 const FUNCTION_WORDS_JA: &[&str] = &[
     "繰り返して",
+    "組",
     "して",
     "を",
     "に",
@@ -191,9 +192,10 @@ const JAPANESE_COLOR_I_ADJECTIVE_STEMS_V1: &[&str] = &["白", "黒", "青", "赤
 const JAPANESE_COUNTERS_V1: &[&str] = &["本", "個", "枚"];
 
 pub(crate) fn is_japanese_counter_surface(surface: &str) -> bool {
-    JAPANESE_COUNTERS_V1.contains(&surface)
+    JAPANESE_COUNTERS_V1.contains(&surface) || surface == "つ"
 }
 const FUNCTION_WORDS_EN: &[&str] = &[
+    "group of",
     "background",
     "a",
     "an",
@@ -925,6 +927,7 @@ fn candidates_at(
         for counter in JAPANESE_COUNTERS_V1 {
             push_japanese_counter_candidate(&mut candidates, source, start_byte, counter);
         }
+        push_japanese_native_tsu_counter_candidate(&mut candidates, source, start_byte);
     }
 
     if language == ResolvedInstructionLanguage::Ja {
@@ -994,6 +997,19 @@ fn candidates_at(
                 delivery,
             });
         }
+    } else if language == ResolvedInstructionLanguage::Ja
+        && let Some((end_byte, value)) = japanese_fullwidth_decimal_at(source, start_byte)
+        && (!require_boundary || has_candidate_boundary(source, start_byte, end_byte, language))
+    {
+        let surface = &source[start_byte..end_byte];
+        candidates.push(Candidate {
+            end_byte,
+            priority: PRIORITY_NUMBER,
+            identity: format!("decimal:{surface}"),
+            delivery: value.map_or(CandidateDelivery::Hole, |value| {
+                CandidateDelivery::Token(NeutralTokenKind::ExactNumber { value })
+            }),
+        });
     }
 
     candidates
@@ -1383,6 +1399,59 @@ fn push_japanese_counter_candidate(
     });
 }
 
+fn push_japanese_native_tsu_counter_candidate(
+    candidates: &mut Vec<Candidate>,
+    source: &str,
+    start_byte: usize,
+) {
+    let end_byte = start_byte + 'つ'.len_utf8();
+    if source.get(start_byte..end_byte) != Some("つ") {
+        return;
+    }
+    let Some(value) = japanese_exact_number_before(source, start_byte) else {
+        return;
+    };
+    if !(1..=9).contains(&value) {
+        return;
+    }
+    candidates.push(Candidate {
+        end_byte,
+        priority: PRIORITY_FUNCTION,
+        identity: "function:counter:つ".to_owned(),
+        delivery: CandidateDelivery::Token(NeutralTokenKind::FunctionWord),
+    });
+}
+
+fn japanese_exact_number_before(source: &str, end_byte: usize) -> Option<u64> {
+    source[..end_byte]
+        .char_indices()
+        .find_map(|(start_byte, _)| {
+            NATIVE_TSU_CARDINALS_JA
+                .iter()
+                .find_map(|(surface, value)| {
+                    (start_byte + surface.len() == end_byte
+                        && source.get(start_byte..end_byte) == Some(*surface))
+                    .then_some(*value)
+                })
+                .or_else(|| {
+                    japanese_kanji_cardinal_at(source, start_byte)
+                        .filter(|(candidate_end, _)| *candidate_end == end_byte)
+                        .map(|(_, value)| value)
+                })
+                .or_else(|| {
+                    let candidate = source.get(start_byte..end_byte)?;
+                    (!candidate.is_empty() && candidate.bytes().all(|byte| byte.is_ascii_digit()))
+                        .then(|| candidate.parse::<u64>().ok())
+                        .flatten()
+                })
+                .or_else(|| {
+                    japanese_fullwidth_decimal_at(source, start_byte)
+                        .filter(|(candidate_end, _)| *candidate_end == end_byte)
+                        .and_then(|(_, value)| value)
+                })
+        })
+}
+
 fn japanese_exact_number_ends_at(source: &str, end_byte: usize) -> bool {
     source[..end_byte].char_indices().any(|(start_byte, _)| {
         NATIVE_TSU_CARDINALS_JA.iter().any(|(surface, _)| {
@@ -1390,12 +1459,30 @@ fn japanese_exact_number_ends_at(source: &str, end_byte: usize) -> bool {
                 && source.get(start_byte..end_byte) == Some(*surface)
         }) || japanese_kanji_cardinal_at(source, start_byte)
             .is_some_and(|(candidate_end, _)| candidate_end == end_byte)
+            || japanese_fullwidth_decimal_at(source, start_byte)
+                .is_some_and(|(candidate_end, value)| candidate_end == end_byte && value.is_some())
             || (source.as_bytes()[start_byte].is_ascii_digit()
                 && source.as_bytes()[start_byte..end_byte]
                     .iter()
                     .all(u8::is_ascii_digit)
                 && source[start_byte..end_byte].parse::<u64>().is_ok())
     })
+}
+
+fn japanese_fullwidth_decimal_at(source: &str, start_byte: usize) -> Option<(usize, Option<u64>)> {
+    let mut end_byte = start_byte;
+    let mut value = Some(0_u64);
+    let mut found = false;
+    for (offset, character) in source[start_byte..].char_indices() {
+        let digit = match character {
+            '０'..='９' => u64::from(character as u32 - '０' as u32),
+            _ => break,
+        };
+        found = true;
+        end_byte = start_byte + offset + character.len_utf8();
+        value = value.and_then(|value| value.checked_mul(10)?.checked_add(digit));
+    }
+    found.then_some((end_byte, value))
 }
 
 fn has_candidate_boundary(

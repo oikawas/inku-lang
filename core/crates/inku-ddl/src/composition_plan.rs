@@ -31,18 +31,21 @@ pub struct PlacementGroupPlan {
     pub(crate) domain: [Rational; 2],
     pub(crate) recipe: PlacementRecipe,
     pub(crate) members: Vec<PlacementMemberPlan>,
+    pub(crate) cycle_occurrence_count: Option<u64>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum PlacementMemberKind {
     Primitive,
     Macro,
+    OrdinaryGroup,
 }
 
 /// Source-head occurrence count is distinct from the body's internal Emit counts.
 #[derive(Clone, Debug, PartialEq)]
 pub struct PlacementMemberPlan {
     pub(crate) source_instruction_index: usize,
+    pub(crate) source_instruction_indices: Vec<usize>,
     pub(crate) member: inku_score::PlacementMember,
     pub(crate) kind: PlacementMemberKind,
     pub(crate) source_count: u32,
@@ -52,6 +55,9 @@ pub struct PlacementMemberPlan {
 impl PlacementMemberPlan {
     pub const fn source_instruction_index(&self) -> usize {
         self.source_instruction_index
+    }
+    pub fn source_instruction_indices(&self) -> &[usize] {
+        &self.source_instruction_indices
     }
     pub const fn member(&self) -> &inku_score::PlacementMember {
         &self.member
@@ -66,7 +72,7 @@ impl PlacementMemberPlan {
     /// supplies one slot per whole-body repetition, retaining every internal count.
     pub const fn body_repeat_count(&self) -> u32 {
         match self.kind {
-            PlacementMemberKind::Primitive => 1,
+            PlacementMemberKind::Primitive | PlacementMemberKind::OrdinaryGroup => 1,
             PlacementMemberKind::Macro => self.source_count,
         }
     }
@@ -87,6 +93,9 @@ impl PlacementGroupPlan {
     }
     pub const fn logical_count(&self) -> u64 {
         self.logical_count
+    }
+    pub const fn cycle_occurrence_count(&self) -> Option<u64> {
+        self.cycle_occurrence_count
     }
     pub const fn domain(&self) -> [Rational; 2] {
         self.domain
@@ -296,6 +305,7 @@ pub struct FillGroupPlan {
     /// second time. External relations preserve the region or only the relation
     /// is omitted. The region and contents share every outer Transform.
     pub recipe: PlacementRecipe,
+    pub cycle_occurrence_count: Option<u64>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize)]

@@ -287,7 +287,8 @@
 # 41: Ordinary color sequences preserve ordered duplicates and total placement
 # counts through the shared compact Score color cycle.
 # 42: Partway connections keep an interior path selector until performance.
-DDL_ENGINE_VERSION = "42"
+# 43: Ordinary noun groups and finite non-color sequences preserve total counts.
+DDL_ENGINE_VERSION = "43"
 # 4 (2026-07-30): yellow, orange, and purple become abstract Score colors, and
 # coerce recognizes the corresponding Japanese and English DDL markers.
 # 3 (2026-07-30): 黄 / 橙 / 紫 joined the saijiki color words, so an author can write
@@ -304,4 +305,5 @@ DDL_ENGINE_VERSION = "42"
 # and independent bleeding replace the duplicate public entries.
 # 8 (2026-09-14): Alternating and in order join the new order category.
 # 9 (2026-09-14): Partway joins place vocabulary for Line/Arc connections.
-DDL_VERSION = "9"
+# 10 (2026-09-14): Noun groups and non-color sequences use ordinary count grammar.
+DDL_VERSION = "10"

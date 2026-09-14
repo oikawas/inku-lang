@@ -6,6 +6,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 34 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-14 — Describe groups and finite shape or attribute sequences without parentheses
+
+Ordinary DDL now describes a group of a red circle and a blue line alternating with a gray arc, with five meaning three groups and two arcs. Shared Score and performance preserve complete bodies, source order, duplicates, and total count; non-color attribute and shape sequences use the same mechanism. Japanese noun groups and English group-of phrases express the same meaning. Numeric Japanese counts accept 1つ through 9つ, reject 10つ and 11つ, and retain existing 個 and ten forms. Web Saijiki explanations, examples, and normalization instructions are updated. Only the new member cycle requires Score 0.14, identified by DDL_VERSION 10, DDL engine 43, and render engine 65. Application and build versions and deployment are unchanged.
+
 ### 2026-09-14 — Resolve partway Line and Arc connections during performance
 
 Saijiki adds partway to places and connects it through ordinary DDL, Macros, shared Score, and Web / Android vocabulary display. The current start joins the interior of a Line or Arc, excluding both ends; the existing instance identity and performance seed choose the position. Contact shares the actual drawn centerline and follows outer transforms. Partway does not become a fixed center, and numeric path positions and endpoint selections retain their meanings. Only the new string selector requires Score 0.13. This uses DDL_VERSION 9, DDL engine 42, and render engine 64, without changing application or build versions or deployment.

@@ -21,7 +21,7 @@ use crate::{
 
 /// Stable identity for the runtime-disconnected explicit instruction association AST.
 pub const SEMANTIC_INSTRUCTION_ASSOCIATION_SCHEMA_ID: &str =
-    "inku.semantic-instruction-association.v22";
+    "inku.semantic-instruction-association.v23";
 
 /// An explicit fill domain. Inline operands retain their original instruction owner
 /// and are consumed as geometry by the fill, rather than drawn independently.
@@ -648,6 +648,17 @@ fn build_semantic_instructions(
             .push(occurrence.clone());
     }
 
+    let mut sequence_predicates = BTreeMap::new();
+    for sequence in &association.ast.sequences {
+        if !matches!(sequence.sequence.kind, crate::SemanticSequenceKind::Units) {
+            continue;
+        }
+        let region_index = sequence.sequence.operator.provenance.source.region_index;
+        let action = take_unique_region_term(&mut actions, region_index);
+        let position = take_unique_region_term(&mut positions, region_index);
+        sequence_predicates.insert(sequence.target_entity_index, (action, position));
+    }
+
     let sequence_marker_spans = association
         .ast
         .sequences
@@ -735,7 +746,7 @@ fn build_semantic_instructions(
     for (entity_index, entity) in association.ast.entities.iter().enumerate() {
         let region_index = entity.head.source().region_index;
         let head_start = entity.head.source().span.start_byte;
-        let action = select_one(
+        let mut action = select_one(
             take_owned_instruction_terms(
                 &mut actions,
                 ownership.action_starts_by_head.get(&head_start),
@@ -745,7 +756,7 @@ fn build_semantic_instructions(
             region_index,
             &mut issues,
         );
-        let position = select_one(
+        let mut position = select_one(
             take_owned_instruction_terms(
                 &mut positions,
                 ownership.position_starts_by_head.get(&head_start),
@@ -755,6 +766,12 @@ fn build_semantic_instructions(
             region_index,
             &mut issues,
         );
+        if let Some((sequence_action, sequence_position)) =
+            sequence_predicates.remove(&entity_index)
+        {
+            action = sequence_action.or(action);
+            position = sequence_position.or(position);
+        }
         let relation = if entity_counts_by_region[&region_index] == 1 {
             select_relation(
                 relations_by_region
@@ -1013,6 +1030,23 @@ fn build_semantic_instructions(
         owned_relation_occurrence_count,
         delivered_relation_occurrence_count,
     }
+}
+
+fn take_unique_region_term(
+    terms: &mut Vec<SemanticTerm>,
+    region_index: usize,
+) -> Option<SemanticTerm> {
+    let indices = terms
+        .iter()
+        .enumerate()
+        .filter_map(|(index, term)| {
+            (term.provenance.source.region_index == region_index).then_some(index)
+        })
+        .collect::<Vec<_>>();
+    if indices.len() != 1 {
+        return None;
+    }
+    Some(terms.remove(indices[0]))
 }
 
 fn take_owned_instruction_terms(

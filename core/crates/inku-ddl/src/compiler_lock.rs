@@ -1649,6 +1649,14 @@ fn project_instruction(instruction: &crate::SemanticInstruction, projection: &mu
         for item in &sequence.items {
             add_term_explicit(projection, SemanticDeliveryOwner::SequenceItem, item);
         }
+        if let Some(quantity) = &sequence.quantity {
+            add_explicit(
+                projection,
+                quantity.provenance.span,
+                SemanticDeliveryOwner::Quantity,
+                quantity.value.to_string(),
+            );
+        }
         for marker in &sequence.markers {
             add_syntax(projection, marker.span, "sequence_grammar");
         }

@@ -1,8 +1,5 @@
 """Actual core compilation to normal history projection, without SVG execution."""
 
-import os
-from pathlib import Path
-
 import pytest
 from sqlalchemy import create_engine, func, select
 from sqlalchemy.orm import sessionmaker
@@ -20,10 +17,7 @@ from inku_server.pipeline_product import ProductPipelineEffects
 
 
 def test_bundled_macro_enters_new_work_with_localized_summary_and_saved_lock(tmp_path, monkeypatch):
-    bundle = os.environ.get("INKU_PIPELINE_PYTHON_BUNDLE")
-    if not bundle:
-        pytest.skip("explicit generated pipeline binding bundle required")
-    binding = PipelineBinding(Path(bundle))
+    binding = PipelineBinding()
     engine = create_engine(f"sqlite:///{tmp_path / 'bundled-macro.db'}")
     Base.metadata.create_all(engine)
     from inku_server import db
@@ -61,14 +55,11 @@ def test_bundled_macro_enters_new_work_with_localized_summary_and_saved_lock(tmp
 
 
 def test_compact_delivery_preserves_authority_in_normal_history(tmp_path, monkeypatch):
-    bundle = os.environ.get("INKU_PIPELINE_PYTHON_BUNDLE")
-    if not bundle:
-        pytest.skip("explicit generated pipeline binding bundle required")
     from inku_server import db
     from inku_server.api_core import rendering, thumbnails
     from inku_server.api_core.models import HistoryItem
 
-    binding = PipelineBinding(Path(bundle))
+    binding = PipelineBinding()
     engine = create_engine(f"sqlite:///{tmp_path / 'normal-history.db'}")
     Base.metadata.create_all(engine)
     monkeypatch.setattr(db, "engine", engine)

@@ -41,13 +41,11 @@ Variation belongs to renderer performance and explicit user operations.
 
 A short description becomes a typed semantic document retaining shared meaning;
 the lock-verified lowerer resolves it once to a Score, and SVG is one
-performance of that same Score. The normal Server and Web are connected to the
-shared authoring pipeline and its resource-aware compact Score 0.10 compilation
+performance of that same Score. The normal Server, Web, and Android paths are connected to the
+shared authoring pipeline and its resource-aware compact Score compilation that selects the minimum required version
 and performance entry points. Viewing old works and replaying their saved SVGs
 remain available; changes from an old work are stored as a new variation while
-the original is preserved. The bridge that replays a saved compact Score on the
-latest engine has also passed a normal-host Linux check, but this integrated
-source has not been deployed. SPEC defines the completed and unfinished boundaries.
+the original is preserved. Saved compact Scores can be replayed by the shared engine. SPEC defines the current contracts.
 
 ## Current Architecture
 
@@ -58,37 +56,38 @@ description or direct DDL
   -> atomically CAS-save visible DDL with authority and revision
   -> typed compiler (known holes automatically request a completion proposal)
   -> CAS-save a completion patch only after author approval
-  -> compact Score 0.10
+  -> typed Stage 1.5 + shared lowerer
+  -> minimum compatible Score (resource-aware compact baseline 0.10; 0.15 only with mirroring)
   -> resource-aware Render Engine: SVG performance
   -> save raw Score, SVG, and the history-authority link
 ```
 
-- `server/`: FastAPI backend for APIs, authentication, DB access, interpretation, composition, coercion, rendering, and lineage.
+- `server/`: FastAPI backend for APIs, authentication, DB access, shared-pipeline host adapters, rendering, lineage, and old-work compatibility paths.
 - `web/`: SvelteKit 2 / Svelte 5 frontend.
 - `cli/`: `inku-cli`, which operates only through the public HTTP API.
-- `android/`: separate Kotlin / Jetpack Compose implementation; `android/ANDROID_SPEC.ja.md` is its detailed canonical specification.
+- `android/`: Kotlin / Jetpack Compose host with shared-Rust pipeline and renderer bindings; `android/ANDROID_SPEC.ja.md` is its detailed canonical specification.
 - `SPEC.ja.md`: canonical Japanese design and behavior specification.
 - `SPEC.md`: maintained public English adaptation.
 - `CHANGELOG.ja.md` / `CHANGELOG.md`: chronological design and implementation history.
 
-### Accepted typed DDL foundation and compact performance core
+### Shared typed DDL foundation and compact performance core
 
 The shared Rust compiler interprets normalized Japanese and English DDL as a typed semantic document, retaining source provenance, canonical meaning, and finite Macro expansion. The compiler lock attests source and provenance; only lock-verified meaning reaches the shared lowerer. The lowerer resolves once to an actual Score or a symbolic plan for repetition. A recoverable failure receives a typed diagnostic and local omission while independent drawing continues. [SPEC.ja.md](SPEC.ja.md) is authoritative for the types, lock, recovery, geometry, relations, and Macro contracts.
 
-The current lowerer shares finite background syntax and source-priority background, line / arc `draw`, omitted position (None in source and selected from the central region at performance time), explicit position, existing surface / Ground, and finite geometry and relations to Score. The normal wire for new works is compact Score 0.10. It stores recipes with source owners, namespace-scoped ordinals, placement / repetition / fill groups, fill targets and boundaries, and separate Macro inner and outer repetition. Performance samples from those recipes without storing instance coordinates. It preserves exact resolved counts and shapes; resource excess omits one complete source or coordinated placement before instance allocation, records diagnostics, and continues with independent later work. Legacy Score 0.9 remains readable for old-work compatibility.
+The current lowerer shares finite background syntax and source-priority background, line / arc `draw`, omitted position (None in source and selected from the central region at performance time), explicit position, existing surface / Ground, and finite geometry and relations to Score. New works select the minimum Score version their representation requires; resource-aware compact output starts at Score 0.10. It stores recipes with source owners, namespace-scoped ordinals, placement / repetition / fill groups, fill targets and boundaries, and separate Macro inner and outer repetition. Performance samples from those recipes without storing instance coordinates. It preserves exact resolved counts and shapes; resource excess omits one complete source or coordinated placement before instance allocation, records diagnostics, and continues with independent later work. Legacy Score 0.9 remains readable for old-work compatibility.
 
 `compile_ddl_to_score_with_resources` and `render_with_resources` form the shared-core boundary. The normal Web and existing interpret, compose, and paint APIs use the same pipeline service. Provider transport is attempted once for each action requested by core; core retains the retry decision. The shared core is the source of truth for all 11 canvas IDs and integer ratios. The six new resource limits are 4,096 logical objects, 128 template nodes, 4,096 anchor instances, 4,096 transform instances, 64 placement instances, and 64 fill instances. The existing four limits, administrator authority, and budgets saved with old works remain intact. An over-budget placement is omitted locally and later work continues.
 
-In a representative normal Linux-host check, an ordinary point fill requested 6,945 logical objects against a fixed fixture budget of 400 logical objects, 512 template nodes, and 400 for the other structural resources. Only that fill was omitted; a three-point circle fill and a later line continued, producing four primitive marks. Saving the SVG, raw Score, history, and authority link passed. This checked the native connection; it did not measure the six new shipping limits. Saved compact Score replay also preserved the raw Score, saved source, and authority; a changed seed changed the SVG; and saved policy rejected a request that tried to alter the hard budget, retaining four primitive marks. Lineage editing selects the history owner's linked fork and preserves the old fork. Active DDL receives source, revision, and options: changed settings create a parent-linked direct-DDL variation under DDL authority; changed source with the same settings saves metadata while retaining CAS, origin, and lock; and changed metadata with unchanged source saves a new edition. History sidecar v2 restores the four core diagnostics, renderer diagnostics, and `resource_execution` for its revision and source. V1 has no diagnostics, and a corrupt sidecar warns only for that work while saved DDL, Score, and SVG remain visible. Step 14 Android integration, Step 16 work acceptance, and Step 17 deployment have not started. Source integration does not mean the change has shipped. See [CHANGELOG.md](CHANGELOG.md) for implementation history and SPEC for each current boundary.
+The normal Web and API paths use the shared-Rust authoring service. Lineage editing inherits the selected history owner and saved context while preserving the original work. Active DDL source edits retain CAS and the authority lock; changed settings create a parent-linked new variation. History restores the diagnostics for its revision and continues displaying saved DDL, Score, and SVG for old formats or a corrupt sidecar. See [CHANGELOG.md](CHANGELOG.md) for implementation history and SPEC for the current contracts.
 
 ## Contracts That Must Remain Intact
 
 - DDL text may be written in the author's language.
 JSON Score keys remain English.
-- Keep Stage 1 interpretation separate from Stage 2 structuring.
-- Stage 1.5 must not overwrite interpreted intent or accumulate fixed finished-work recipes.
-- Coerce should shrink over time.
-It must not inject a house style; invalid optional data should prefer drop-only handling.
+- Description-path Stage 1 produces visible normalized DDL only; it does not decide Score meaning.
+- The shared compiler and lowerer treat visible DDL and verified meaning as authoritative; typed Stage 1.5 does not overwrite intent.
+- Old Stage 2 and coerce remain compatibility paths only and are not semantic authority for new work.
+Local recovery injects no house style and omits the smallest affected field or execution unit with a diagnostic.
 - The same Score and seed reproduce the same work.
 Do not add implicit time seeds or automatic variation counters.
 - A redraw runs under the limits the work was drawn under.
@@ -106,11 +105,8 @@ The conversion comes from the per-mark cost the server measured, with no copy of
 Never infer parentage from similarity, time, or matching hashes.
 - Metrics, similarity, and vision reviews are diagnostic mirrors, not generation gates or automatic best-branch selectors.
 - Language-level macros use one generic `MacroDefinition` format rather than domain-specific code
-  or grammars. The current runtime's legacy plugin expansion remains a compatibility path until
-  cutover, not the new semantic authority.
-- The saijiki table (`server/src/inku_server/saijiki.py`, v1.92) is the source of truth for vocabulary.
-The Stage 1 prompt vocabulary block, plugin closure markers, relation phrases, web Saijiki display,
-and reference §1 are derived from it; vocabulary changes go through the table and its golden tests.
+  or grammars. Saved Macro definitions and old Score/SVG artifacts retain compatibility; the shared compiler determines new-work meaning.
+- The shared Rust asset `core/crates/inku-ddl/assets/saijiki-v1.json` is the vocabulary authority. Shared Stage 1 prompts use its projection; the Server display table, Web/Android Saijiki, and reference follow the same vocabulary.
 - Japanese and English behavior must stay aligned.
 Do not introduce English-only requirements.
 - **The engine does not go backwards** (SPEC "Design Principles", principle 9).
@@ -132,8 +128,8 @@ To learn why something took its current shape, search the changelog by term, ver
 | Subject | Value | Source of truth |
 |---|---|---|
 | Application | the "Target version" line at the top of this file | **the two files `web/APP_VERSION` and `web/BUILD_NUMBER`**. The UI, `/api/info` `version`, and the CLI all read them (the value is not copied here) |
-| Render Engine | 59 | `core/crates/inku-render/src/lib.rs` |
-| DDL | `ddl_version` 3 / `ddl_engine_version` 37 | `server/src/inku_server/layer_versions.py` |
+| Render Engine | 66 | `core/crates/inku-render/src/lib.rs` |
+| DDL | `ddl_version` 11 / `ddl_engine_version` 45 | `server/src/inku_server/layer_versions.py` |
 | Android | `2.1.4-android.78` | `android/VERSION` (a namespace separate from web and server) |
 | Python package | 2.7.2 | `server/pyproject.toml` (moves only on a product release) |
 
@@ -154,70 +150,21 @@ relation phrases, the web Saijiki display, and reference §1 are all derived fro
 Vocabulary changes go through the table and its golden tests.
 The saijiki holds ten categories, and `おもて` / surfaces (eleven words) says how the inside of a
 closed shape is (ddl-engine 15) — the counterpart to continuity, which says how a line is, with
-state nouns rather than actions. A surface attached to an instruction that encloses nothing is moved
-by coerce to the closed shape before it, and dropped where there is none. **The two words 粒 (grain)
+state nouns rather than actions. A surface attached to an instruction that encloses nothing is delivered
+by the shared compiler and lowerer to the corresponding closed shape, or omitted with a diagnostic where there is none. **The two words 粒 (grain)
 and にじみ (bleed) are the exception and stay on the line or arc they landed on** (ddl-engine 20):
 they say how the mark runs rather than how an inside is, which is what a line has instead of an
 inside.
 
 ### Pipeline layers
 
-- **Stage 0.5 (sketch from life)** — an optional layer that rewrites the description as plain prose
-naming things. Its granularity is chosen per draw from two values, `fine` (many short sentences,
-the default) and `coarse` (fewer, longer ones).
-**The prose stands in for the description at three consumers**
-(Stage 1, the plugin expansion's firing decision, and Stage 1.5).
-**Stage 2 and coerce read the DDL alone.** The plugin's seed -- what decides how many -- is the description.
-The description itself is kept for saving and display, and when the layer fails it goes to Stage 1 unchanged.
-**What the layer did is recorded on the work** (`sketch_state`, one of `fine`, `coarse`, `fallback`,
-`off`, `not_applicable`). **A run that fell over, a run the author switched off, and a route that
-never calls the layer are recorded separately.** `NULL` means only one thing: the work was drawn
-before the column existed.
-**A run where interpretation or composition fell back is recorded the same way** (`interpret_fallback`
-and `compose_fallback`). **The composition field holds three states**: a reason, `"none"` (it did not
-fall back), and no record at all.
-**Refining from a marked work as the lineage parent asks once before it runs.**
-- **Stage 1 (interpretation)** — detects the language of the instruction and produces normalized DDL.
-The prompt is assembled from the saijiki table and holds no fixed vocabulary string of its own.
-- **Plugin expansion (compatibility path)** — writes a validated `.inku-plugin.md` down into core DDL deterministically,
-immediately after Stage 1.
-Only a `fires_on` term that is namespace-qualified or named as an explicit subject fires; it never
-widens to metaphor or unknown subjects.
-**What a plugin hands over is one unit, and a count stated in the phrase naming it says how many of
-those units to place** (what one unit becomes is settled by the plugin document's declaration and the
-seed; the body does not reach inside it). The count is read by `counts.py`, shared with coerce.
-**When the stated number times one unit exceeds a budget, the single unit stands and the decline is
-recorded rather than trimmed to fit.**
-- **Stage 1.5 (compatibility runtime)** — deterministic focus reframing and explicit variation.
-It carries variation (three strengths), stored per work. **One axis moves — the focus — and this
-layer adds no sentence the description did not ask for.**
-- **Stage 2** — Score construction as JSON.
-The fill rate of an optional field **depends on its declaration order** in the tool schema; fields
-declared last are filled more often.
-**It is told which paper it composes for** (v2.13.14). What it may fit to the paper is size and
-placement, never the number of marks. **What it declares stays in `Score.canvas` and may disagree
-with the aspect actually performed on.**
-- **coerce** — split into `normalize` and `compose`.
-Invalid values prefer drop-only handling, and no house style is injected.
-**The words this layer judges a description with are declared in one place**, `COERCE_MARKERS` in
-`language_support/{ja,en}.py` (77 systems, 693 distinct words).
-**No matching literal is written into a branch of `coerce/`** — the one exception is a string this
-layer wrote itself and a later branch reads back (a `note`). Tests hold both halves.
-**When the description names exactly one abstract color, the color cycle folds to that one color**
-(background clauses do not count, and a polychrome phrase or a cycle without the named color is left
-alone).
-**An even split is a distribution the description never stated, so it is taken back rather than delivered.**
-**A count stated in plain words reaches the group its clause describes, but only when
-exactly one group answers to that clause** (an ambiguous pairing is left alone). It is a branch of its
-own, separate from the "only" path and carrying its own note wording, so attribution stays countable.
-**The band it covers comes from the limits threshold** — it reaches the counts the configuration calls
-literal (up to 239 by default) and leaves everything at or above the threshold to representation.
-**The boundary is not given a second name.**
-**When the forced count would exceed the per-instruction or whole-work budget, it is not forced rather
-than trimmed** — a trimmed count is neither the number stated nor the represented one.
-- **Shared authoring pipeline (connected to the normal Server and Web)** — a pure state machine applies commands to a versioned snapshot and sends LLM work and visible-DDL persistence to the host as typed actions and results. Its Stage 1 prompt contains bounded projections of the finite Saijiki-derived vocabulary, resolved canvas and catalog, and only validated Macro identities, parameters, and localized summaries. Committed known-hole detection automatically starts the completion request without another user operation. No hole means no Stage 2 LLM call; unknowns, conflicts, and integrity errors are excluded. Typed-hole completion is closed over explicit hole spans and digests. A provider patch is never adopted directly: author approval, CAS save, host acknowledgment, and reparse of the saved bytes occur in that order.
-Variation origin is immutable. Description authority locks monotonically to DDL authority after the first user DDL commit that changes exact bytes; identical bytes do not lock, and undo or regeneration cannot unlock it. An old record of unknown origin is never migrated by inference. Editing old DDL forks a `user_authored_ddl` / `ddl_authoritative` variation, while regenerating from an old description forks a `stage1_generated` / `description_authoritative` variation. Selecting an older shared-pipeline history keeps that revision's performance on screen instead of replacing it with the latest state of the same variation. Lineage editing selects the history owner's linked fork and preserves the old fork. Its fork uses a matching source digest plus saved config, seed, catalog, resource limits, and definition locks; it never infers them from the latest snapshot. Active DDL receives source, revision, and options. With the same settings, changed source saves metadata while retaining CAS, origin, and the DDL-authority lock; changed settings create a parent-linked direct-DDL variation without changing the original source, config, or authority; changed metadata with unchanged source saves a new edition. Core config is immutable within a variation, so regenerating from an existing variation creates a new variation and edition with the current options. History sidecar v2 immutably stores the four core diagnostics, renderer diagnostics, and `resource_execution` for its revision and source for ordinary history display. V1 has no diagnostic record; a corrupt sidecar warns only for that work, keeps saved DDL, Score, and SVG visible, and neither infers latest state nor recompiles. The parent relation is saved and the original history row remains unchanged. A transcript of commands and final effect results replays deterministically, and the thin UniFFI binding accepts snapshot bytes plus input-envelope bytes and returns stable JSON bytes. The normal Server and Web, authority store, history link, saved compact Score replay, and shared 11-format canvas registry are connected. Steps 14, 16, and 17 have not started.
-- **Render Engine 41** — the SVG performance, owned by the shared Rust core and called through the same one-request boundary by the server's thin Python adapter and Android's thin JNI adapter.
+- **Shared authoring state machine** — the normal Server, Web, and Android paths apply commands to the same versioned snapshot in shared Rust. The normal Android UI reaches it through `InkuRepository`, `AndroidWorkPipeline`, and JNI. Core returns the next snapshot, progress events, and at most one typed effect.
+- **Host effects** — Python and Kotlin hosts perform one provider call for Stage 1 or known-hole completion, or one visible-DDL CAS save, as requested by core, and return an identity-preserving result. Core owns retries, authority transitions, and the next effect; hosts own no separate meaning branch.
+- **Visible DDL and authority** — only a description start uses Stage 1 to produce visible normalized DDL. Direct DDL and an author-approved completion patch enter the same CAS-save boundary, and only the exact acknowledged bytes are parsed again. Description authority locks monotonically to DDL authority after the first author commit that changes source bytes.
+- **Typed compiler, Stage 1.5, and lowerer** — the compiler lock verifies source, provenance, and Macro definitions. Bounded Macro expansion and the focus-only typed Stage 1.5 feed one lowering to an actual Score or compact recipe. Only known holes can request a completion proposal; with no hole there is no Stage 2 LLM call. Recoverable failures omit the smallest affected field or execution unit with a diagnostic and preserve independent later drawing.
+- **Score and resources** — the lowerer selects the minimum Score version required by the representation. Resource-aware compact output starts at 0.10; only a work carrying a mirror relation requires 0.15. Replay recomputes demand from saved policy and omits one excessive source or coordinated placement before materializing instances.
+- **Compatibility boundary** — old works display and replay from their saved Score, SVG, and context. Shared Rust determines the meaning of new work. Android camera DDL uses the shared vocabulary, and history display uses saved information without reconstructing an unrecorded prompt from the old implementation.
+- **Render Engine 66** — the SVG performance, owned by the shared Rust core and called through the same one-request boundary by the server's thin Python adapter and Android's thin JNI adapter.
 Android main preview, thumbnails, and PNG export rasterize canonical saved/current SVG through the
 separate `inku-svg-raster` (`resvg`) crate. Pixels are derived presentation; SVG remains canonical storage.
 **A sheet called by name changes how the brush runs**: each of the seven grounds carries its own

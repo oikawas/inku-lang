@@ -11,7 +11,6 @@ from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel, Field
 from ...color_catalogs import RENAMED_COLOR_CATALOG_IDS, color_catalogs
 from ...layer_versions import DDL_ENGINE_VERSION, DDL_VERSION
-from ...languages import stage_prompts_for_lang
 from ...plugins import DOCUMENT_PLUGIN_MANAGER, entries_with_fires_on
 from ...plugins.document_format import preview_path_for_qualified_name
 from ...reference import build_reference, render_markdown
@@ -26,11 +25,6 @@ from ..models import ModelSettingsResponse
 
 router = APIRouter()
 authenticated_router = APIRouter(dependencies=[Depends(_current_user)])
-
-
-class PromptsResponse(BaseModel):
-    stage1_system: str
-    stage2_system: str
 
 
 class AppInfoResponse(BaseModel):
@@ -210,16 +204,6 @@ def api_reference(
 def api_client_config() -> dict[str, object]:
     """Server-owned values every client needs. Editable by admins only."""
     return {"render_fanout_limit": int(_db.get_render_concurrency_settings()["client_limit"])}
-
-
-@authenticated_router.get("/api/prompts", response_model=PromptsResponse)
-def api_prompts(lang: str = Query(default="ja")) -> PromptsResponse:
-    try:
-        requested_lang = _normalize_instruction_lang(lang)
-        s1, s2 = stage_prompts_for_lang("ja" if requested_lang == "auto" else requested_lang)
-    except (HTTPException, ValueError):
-        s1, s2 = stage_prompts_for_lang("ja")
-    return PromptsResponse(stage1_system=s1, stage2_system=s2)
 
 
 def _demo_instruction_system(lang: str) -> str:

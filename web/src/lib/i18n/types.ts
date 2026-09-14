@@ -226,7 +226,6 @@ export interface LangPack {
 	// DDL edit
 	replayFromDdlButton: string;
 	ddlPaintButton: string;
-	ddlAutoRepairLabel: string;
 	ddlEditBtn: string;
 	ddlDoneBtn: string;
 	saijikiPreviewPlaceholder: string;
@@ -272,8 +271,6 @@ export interface LangPack {
 	tooltipVariationGridWithInterpretation: string;
 	tooltipVariationGridSaveSelected: string;
 	tooltipModelCompare: string;
-	tooltipDdlAutoRepair: string;
-	tooltipDdlAutoRepairDetails: string;
 	tooltipAppRailToggle: string;
 	tooltipAppRailLogo: string;
 	tooltipAppRailUser: string;
@@ -410,12 +407,7 @@ export interface LangPack {
 
 	// Prompts tab
 	promptStage1Input: string;
-	promptStage1System: string;
 	promptStage2Input: string;
-	promptStage2System: string;
-	promptLoading: string;
-	promptExpand: string;
-	promptCollapse: string;
 	promptCopy: string;
 	promptCopied: string;
 

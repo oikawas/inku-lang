@@ -52,7 +52,6 @@ import app.inku.mobile.pipeline.PipelineView
 import app.inku.mobile.pipeline.SketchInput
 import app.inku.mobile.pipeline.SketchMode
 import app.inku.mobile.pipeline.Sketches
-import app.inku.mobile.pipeline.ServerDdlText
 import app.inku.mobile.ui.camera.CameraCaptureFileStore
 import app.inku.mobile.ui.camera.CameraCaptureState
 import app.inku.mobile.ui.camera.CameraInputSource
@@ -198,8 +197,6 @@ data class InkuUiState(
     val saveReplayAsNewVersion: Boolean = true,
     val historySelectionCanvas: HistorySelectionBehavior = HistorySelectionBehavior.Current,
     val historySelectionCatalog: HistorySelectionBehavior = HistorySelectionBehavior.Current,
-    val ddlAutoRepairEnabled: Boolean = false,
-    val litertStage1PromptOptimization: Boolean = false,
     val saijikiOpen: Boolean = false,
     // Whether the description is being written. The bottom bar reads it: while
     // the keyboard is up, the four destinations give their place to the one
@@ -1491,18 +1488,6 @@ class InkuViewModel @JvmOverloads constructor(
         localState.value = current.copy(historyStarredOnly = !current.historyStarredOnly)
     }
 
-    fun toggleDdlAutoRepair() {
-        val current = localState.value
-        val enabled = !current.ddlAutoRepairEnabled
-        localState.value = current.copy(ddlAutoRepairEnabled = enabled, message = null)
-        persistSetting("ddl_auto_repair", JSONObject().put("enabled", enabled).toString())
-    }
-
-    fun setLiteRtStage1PromptOptimization(enabled: Boolean) {
-        localState.value = localState.value.copy(litertStage1PromptOptimization = enabled, message = null)
-        persistSetting("litert_stage1_prompt_optimization", JSONObject().put("enabled", enabled).toString())
-    }
-
     fun setUiMode(mode: String) {
         val normalized = if (mode == "simple") "simple" else "full"
         localState.value = localState.value.copy(uiMode = normalized, message = null)
@@ -1934,8 +1919,7 @@ class InkuViewModel @JvmOverloads constructor(
         val stage1ModelId = route?.stage1ModelId ?: current.selectedModelId
         val stage2ModelId = route?.stage2ModelId ?: current.selectedStage2ModelId
         val stage1CatalogId = route?.catalogId ?: current.selectedCatalogId
-        val autoRepair = route?.autoRepair ?: current.ddlAutoRepairEnabled
-        val litertStage1PromptOptimization = if (route == null) current.litertStage1PromptOptimization else false
+        val autoRepair = route?.autoRepair ?: true
         val runId = beginDrawingRun()
         drawingJob = viewModelScope.launch {
             if (current.historyAuthorityLoading && current.selectedHistory != null) {
@@ -1984,7 +1968,6 @@ class InkuViewModel @JvmOverloads constructor(
                         stage1ModelId,
                         stage2ModelId,
                         autoRepair,
-                        litertStage1PromptOptimization = litertStage1PromptOptimization,
                         lineage = lineage,
                         instructionLang = InstructionLanguages.AUTO,
                         uiLang = current.uiLanguage.code,
@@ -2034,7 +2017,7 @@ class InkuViewModel @JvmOverloads constructor(
             localState.value = localState.value.copy(isDrawing = true, message = strings().statusComposingFromDdl)
             runCatching {
                 withContext(Dispatchers.IO) {
-                    repository.composeFromDdl(current.prompt, ddl, current.selectedCatalogId, current.selectedCanvasAspect, current.selectedModelId, current.selectedStage2ModelId, current.ddlAutoRepairEnabled, current.litertStage1PromptOptimization, lineage = lineage, instructionLang = InstructionLanguages.AUTO, uiLang = current.uiLanguage.code, parentHistoryId = current.selectedHistory?.id?.takeUnless { current.lineageDetached }, executionId = matchingPipelineExecutionId(current))
+                    repository.composeFromDdl(current.prompt, ddl, current.selectedCatalogId, current.selectedCanvasAspect, current.selectedModelId, current.selectedStage2ModelId, lineage = lineage, instructionLang = InstructionLanguages.AUTO, uiLang = current.uiLanguage.code, parentHistoryId = current.selectedHistory?.id?.takeUnless { current.lineageDetached }, executionId = matchingPipelineExecutionId(current))
                 }
             }.onSuccess { item ->
                 if (!isCurrentDrawingRun(runId)) return@onSuccess
@@ -2123,9 +2106,7 @@ class InkuViewModel @JvmOverloads constructor(
                             canvasAspect = current.selectedCanvasAspect,
                             stage1ModelId = current.selectedModelId,
                             stage2ModelId = current.selectedStage2ModelId,
-                            autoRepair = current.ddlAutoRepairEnabled,
                             historyInput = "#$lineNumber $prompt",
-                            litertStage1PromptOptimization = current.litertStage1PromptOptimization,
                             instructionLang = InstructionLanguages.AUTO,
                             uiLang = current.uiLanguage.code,
                             // The prose without the line number: the same split
@@ -2254,9 +2235,7 @@ class InkuViewModel @JvmOverloads constructor(
                                 canvasAspect = DemoCanvasAspectId,
                                 stage1ModelId = cycle.selectedModelId,
                                 stage2ModelId = cycle.selectedStage2ModelId,
-                                autoRepair = cycle.ddlAutoRepairEnabled,
                                 historyInput = "$DemoHistoryInputPrefix$prompt",
-                                litertStage1PromptOptimization = cycle.litertStage1PromptOptimization,
                                 instructionLang = InstructionLanguages.AUTO,
                                 uiLang = cycle.uiLanguage.code,
                                 // The prose without the demo marker, for the
@@ -3036,8 +3015,6 @@ class InkuViewModel @JvmOverloads constructor(
         val replay = settings["save_replay_as_new_version"]?.let { JSONObject(it).optBoolean("enabled", current.saveReplayAsNewVersion) } ?: current.saveReplayAsNewVersion
         val histCanvas = settings["history_selection_canvas"]?.let { parseHistorySelection(JSONObject(it).optString("value")) } ?: current.historySelectionCanvas
         val histCatalog = settings["history_selection_catalog"]?.let { parseHistorySelection(JSONObject(it).optString("value")) } ?: current.historySelectionCatalog
-        val ddlAutoRepair = settings["ddl_auto_repair"]?.let { JSONObject(it).optBoolean("enabled", current.ddlAutoRepairEnabled) } ?: current.ddlAutoRepairEnabled
-        val litertPromptOptimization = settings["litert_stage1_prompt_optimization"]?.let { JSONObject(it).optBoolean("enabled", current.litertStage1PromptOptimization) } ?: current.litertStage1PromptOptimization
         val cameraVisionOutputMode = CameraVisionModeSetting.decode(settings[CameraVisionModeSetting.KEY])
         val uiMode = settings["ui_mode"]?.let { JSONObject(it).optString("value", current.uiMode) } ?: current.uiMode
         // A stored code that is not one of the two falls back to Japanese
@@ -3073,8 +3050,6 @@ class InkuViewModel @JvmOverloads constructor(
             saveReplayAsNewVersion = replay,
             historySelectionCanvas = histCanvas,
             historySelectionCatalog = histCatalog,
-            ddlAutoRepairEnabled = ddlAutoRepair,
-            litertStage1PromptOptimization = litertPromptOptimization,
             cameraVisionOutputMode = cameraVisionOutputMode,
             uiMode = uiMode,
             uiLanguage = uiLanguage,

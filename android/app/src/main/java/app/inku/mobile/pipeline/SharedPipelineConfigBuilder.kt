@@ -424,7 +424,7 @@ class SharedPipelineConfigBuilder(
         }
 
     private companion object {
-        const val BINDING_VERSION = "1.0.0"
+        const val BINDING_VERSION = "1.1.0"
         const val PROTOCOL_VERSION = "1.0.0"
         const val MACRO_CATALOG_SCHEMA = "inku.macro-catalog-resolution.v1"
         const val PIXEL9_HOST_ONLY_FORMAT = "pixel9_landscape_safe"

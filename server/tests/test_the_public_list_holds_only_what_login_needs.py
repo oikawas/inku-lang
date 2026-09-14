@@ -1,4 +1,4 @@
-"""T-80 / T-82: the three routes that left the public list are guarded, and say so.
+"""T-80 / T-82: retained private setup routes are guarded, and say so.
 
 I-086. `test_route_authorization.py` walks the dependency tree and says the
 guard is wired; that is a statement about the app object, not about what a
@@ -32,7 +32,6 @@ client = TestClient(app)
 # in and the route still answers what it used to": a route that had quietly
 # become an empty 200 would pass a status-only check.
 MOVED_ROUTES = [
-    ("/api/prompts", ("stage1_system", "stage2_system")),
     ("/api/color-catalogs", ("default_catalog_id",)),
     ("/api/auth/config", ("local_enabled",)),
 ]

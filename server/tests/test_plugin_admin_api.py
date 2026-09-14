@@ -83,19 +83,17 @@ def plugin_dir(tmp_path):
 # --- manager level ---
 
 
-def test_manager_disable_excludes_from_documents_and_vocabulary(tmp_path):
+def test_manager_disable_excludes_from_documents(tmp_path):
     manager = PluginDocumentManager(directory=tmp_path)
     (tmp_path / FIXTURE.name).write_text(_fixture_text(), encoding="utf-8")
 
     items = manager.reload(force=True)
     assert [item.status for item in items] == ["enabled"]
-    assert manager.prompt_vocabulary("ja")
 
     item = manager.set_enabled(FIXTURE.name, False)
     assert item.status == "disabled"
     assert item.enabled is False
     assert manager.documents() == ()
-    assert manager.prompt_vocabulary("ja") == ()
     assert (tmp_path / ".plugin-state.json").is_file()
 
     item = manager.set_enabled(FIXTURE.name, True)

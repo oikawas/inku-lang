@@ -471,16 +471,9 @@ pub fn build_stage1_prompt(
         }
     })?;
     let (macro_catalog_json, macro_catalog_digest) = project_macro_catalog(macros, limits)?;
-    let saijiki =
-        saijiki_derived_projection(language).map_err(|_| PromptError::SaijikiProjection)?;
-
-    let rules = match language {
-        ResolvedInstructionLanguage::Ja => TYPED_STAGE1_SYSTEM_JA,
-        ResolvedInstructionLanguage::En => TYPED_STAGE1_SYSTEM_EN,
-    };
     let system = format!(
-        "{rules}\n\n# accepted_saijiki_vocabulary\n{}\n\n# installed_macro_signatures\n{macro_catalog_json}",
-        saijiki.prompt_block
+        "{}\n\n# installed_macro_signatures\n{macro_catalog_json}",
+        stage1_normalizer_system(language)?,
     );
     let message = serde_json::to_string(&Stage1Message {
         description,
@@ -522,6 +515,75 @@ pub fn build_stage1_prompt(
         base_source_digest: None,
         base_compiler_lock_digest: None,
     })
+}
+
+fn stage1_normalizer_rules(language: ResolvedInstructionLanguage) -> String {
+    let (role, ddl_intent, response_envelope, output_scope, grammar, context, response_ending) =
+        match language {
+            ResolvedInstructionLanguage::Ja => (
+                TYPED_STAGE1_NORMALIZER_ROLE_JA,
+                STAGE1_DDL_INTENT_JA,
+                STAGE1_NORMALIZER_RESPONSE_ENVELOPE_JA,
+                STAGE1_OUTPUT_SCOPE_JA,
+                STAGE1_GRAMMAR_JA,
+                STAGE1_CONTEXT_JA,
+                STAGE1_NORMALIZER_RESPONSE_ENDING_JA,
+            ),
+            ResolvedInstructionLanguage::En => (
+                TYPED_STAGE1_NORMALIZER_ROLE_EN,
+                STAGE1_DDL_INTENT_EN,
+                STAGE1_NORMALIZER_RESPONSE_ENVELOPE_EN,
+                STAGE1_OUTPUT_SCOPE_EN,
+                STAGE1_GRAMMAR_EN,
+                STAGE1_CONTEXT_EN,
+                STAGE1_NORMALIZER_RESPONSE_ENDING_EN,
+            ),
+        };
+    format!(
+        "{role}{ddl_intent}\n\n{response_envelope}{output_scope}\n\n{grammar}\n\n{context}{response_ending}"
+    )
+}
+
+fn stage1_normalizer_system(language: ResolvedInstructionLanguage) -> Result<String, PromptError> {
+    let saijiki =
+        saijiki_derived_projection(language).map_err(|_| PromptError::SaijikiProjection)?;
+    Ok(format!(
+        "{}\n\n# accepted_saijiki_vocabulary\n{}",
+        stage1_normalizer_rules(language),
+        saijiki.prompt_block,
+    ))
+}
+
+/// Project the stable Stage 1 grammar and accepted vocabulary without a response envelope.
+///
+/// This is intentionally not a provider prompt: it has no description, resolved host context,
+/// macro signatures, response schema, digest, or normalizer JSON response contract. Hosts may
+/// use it only where they need the shared grammar before a visible input exists.
+pub fn stage1_system_projection(
+    language: ResolvedInstructionLanguage,
+) -> Result<String, PromptError> {
+    let saijiki =
+        saijiki_derived_projection(language).map_err(|_| PromptError::SaijikiProjection)?;
+    let (camera_subject, ddl_intent, output_scope, grammar, context) = match language {
+        ResolvedInstructionLanguage::Ja => (
+            "",
+            STAGE1_DDL_INTENT_JA,
+            STAGE1_OUTPUT_SCOPE_JA,
+            STAGE1_GRAMMAR_JA,
+            STAGE1_CONTEXT_JA,
+        ),
+        ResolvedInstructionLanguage::En => (
+            "You ",
+            STAGE1_DDL_INTENT_EN,
+            STAGE1_OUTPUT_SCOPE_EN,
+            STAGE1_GRAMMAR_EN,
+            STAGE1_CONTEXT_EN,
+        ),
+    };
+    Ok(format!(
+        "{camera_subject}{ddl_intent}\n\n{output_scope}\n\n{grammar}\n\n{context}\n\n# accepted_saijiki_vocabulary\n{}",
+        saijiki.prompt_block
+    ))
 }
 
 /// Build a request that can propose edits only for the supplied selected holes.
@@ -938,11 +1000,13 @@ fn hex_digest(bytes: impl AsRef<[u8]>) -> String {
         .collect()
 }
 
-const TYPED_STAGE1_SYSTEM_JA: &str = r#"あなたは inku の typed Stage 1 正規化器。作者の記述を深く読み、決定的 compiler が再読できる、可視で編集可能な normalized DDL を作る。
-
-返すJSONは normalized_ddl だけとし、Score、renderer命令、観測文、思考過程、説明、非表示metadataを出力しない。normalized DDL はそれ単独で意味を完結させ、後段のLLM補完を前提にholeや曖昧な代用語を残さない。
-
-accepted_saijiki_vocabulary の有限語彙と、compilerが読む通常の数値・句読点・文法だけを使う。installed_macro_signatures のmacroを使う場合は qualified_name と列挙されたparameterだけを書く。version、digest、MacroDefinition本文、component、展開結果をDDLへ書かない。
+const TYPED_STAGE1_NORMALIZER_ROLE_JA: &str =
+    "あなたは inku の typed Stage 1 正規化器。作者の記述を深く読み、";
+const STAGE1_DDL_INTENT_JA: &str =
+    "決定的 compiler が再読できる、可視で編集可能な normalized DDL を作る。";
+const STAGE1_NORMALIZER_RESPONSE_ENVELOPE_JA: &str = "返すJSONは normalized_ddl だけとし、";
+const STAGE1_OUTPUT_SCOPE_JA: &str = "Score、renderer命令、観測文、思考過程、説明、非表示metadataを出力しない。normalized DDL はそれ単独で意味を完結させ、後段のLLM補完を前提にholeや曖昧な代用語を残さない。";
+const STAGE1_GRAMMAR_JA: &str = r#"accepted_saijiki_vocabulary の有限語彙と、compilerが読む通常の数値・句読点・文法だけを使う。installed_macro_signatures のmacroを使う場合は qualified_name と列挙されたparameterだけを書く。version、digest、MacroDefinition本文、component、展開結果をDDLへ書かない。
 
 作者が明示した対象、色、画材、太さ、個数、寸法、角度、座標、領域、関係、反復、配置を失わない。fill、scatter、tile、background は別の意味である。fillは作者が指定した図形を指定領域の内部へ、指定個数と寸法を保って充填する。scatterへ読み替えない。scatterは疎密を持つ散布、tileは規則的な敷き詰め、backgroundはキャンバス背景色だけに使う。『満天』『星空』『全面』を理由にfillへ変えず、『埋める』を全面scatterへ変えない。明示領域をcanvas全体へ広げない。
 
@@ -952,15 +1016,18 @@ accepted_saijiki_vocabulary の有限語彙と、compilerが読む通常の数�
 
 接続先の線や弧の両端以外を指定するには「前の線の途中につながる」「前の弧の途中につながる」と書く。途中の具体位置は演奏で決まるため、中心や数値位置へ置き換えない。始点・終点の明示もそのまま保つ。
 
-二つの形の位置と向きが鏡像になる関係は「前の形と鏡写し」と書く。葉や組なら全体を指す。明示した位置・寸法・向きと後続の色・画材は保つ。
+二つの形の位置と向きが鏡像になる関係は「前の形と鏡写し」と書く。葉や組なら全体を指す。明示した位置・寸法・向きと後続の色・画材は保つ。"#;
+const STAGE1_CONTEXT_JA: &str =
+    "canvas format、catalog ID、catalog modeは解決済みhost contextであり、勝手に既定へ置換しない。";
+const STAGE1_NORMALIZER_RESPONSE_ENDING_JA: &str = "返答は指定されたJSONだけにする。";
 
-canvas format、catalog ID、catalog modeは解決済みhost contextであり、勝手に既定へ置換しない。返答は指定されたJSONだけにする。"#;
-
-const TYPED_STAGE1_SYSTEM_EN: &str = r#"You are inku's typed Stage 1 normalizer. Deep-read the author's description and produce visible, editable normalized DDL that the deterministic compiler can parse again.
-
-Return JSON containing only normalized_ddl. Do not output a Score, renderer instructions, observation text, chain of thought, explanation, or hidden metadata. The normalized DDL must be meaning-complete by itself; do not leave holes or vague placeholders for a later LLM.
-
-Use the finite accepted_saijiki_vocabulary plus ordinary numeric literals, punctuation, and grammar accepted by the compiler. When invoking an installed macro, write only its qualified_name and listed parameters. Do not write versions, digests, MacroDefinition bodies, components, or expansions into DDL.
+const TYPED_STAGE1_NORMALIZER_ROLE_EN: &str =
+    "You are inku's typed Stage 1 normalizer. Deep-read the author's description and ";
+const STAGE1_DDL_INTENT_EN: &str =
+    "produce visible, editable normalized DDL that the deterministic compiler can parse again.";
+const STAGE1_NORMALIZER_RESPONSE_ENVELOPE_EN: &str = "Return JSON containing only normalized_ddl. ";
+const STAGE1_OUTPUT_SCOPE_EN: &str = "Do not output a Score, renderer instructions, observation text, chain of thought, explanation, or hidden metadata. The normalized DDL must be meaning-complete by itself; do not leave holes or vague placeholders for a later LLM.";
+const STAGE1_GRAMMAR_EN: &str = r#"Use the finite accepted_saijiki_vocabulary plus ordinary numeric literals, punctuation, and grammar accepted by the compiler. When invoking an installed macro, write only its qualified_name and listed parameters. Do not write versions, digests, MacroDefinition bodies, components, or expansions into DDL.
 
 Preserve every explicit subject, color, material, thinness, count, size, angle, coordinate, region, relation, repetition, and placement. Fill, scatter, tile, and background are distinct meanings. Fill places the author's specified shape inside the specified region while preserving its explicit count and size; never normalize fill to scatter. Scatter is a distribution with spacing, tile is regular tessellation, and background means only the canvas background color. Do not infer fill merely from “starry sky”, “full”, or “whole area”, and do not turn “fill” into whole-canvas scatter. Never expand an explicit region to the whole canvas.
 
@@ -970,9 +1037,9 @@ When writing Japanese DDL, use the counter つ only for one through nine, never 
 
 Write "connected partway along the previous line" or "connected partway along the previous arc" for contact excluding both ends. Its position is decided during performance, so do not replace partway with the center or a numeric position. Preserve an explicitly selected start or end as well.
 
-Write "mirrored with the previous shape" for mirrored positions and orientations across the axis between two shapes. A leaf or group is referred to as a whole. Preserve explicit positions, dimensions, and directions and the follower’s color and tool.
-
-The canvas format, catalog ID, and catalog mode are already resolved host context. Do not replace them with defaults. Return only the specified JSON."#;
+Write "mirrored with the previous shape" for mirrored positions and orientations across the axis between two shapes. A leaf or group is referred to as a whole. Preserve explicit positions, dimensions, and directions and the follower’s color and tool."#;
+const STAGE1_CONTEXT_EN: &str = "The canvas format, catalog ID, and catalog mode are already resolved host context. Do not replace them with defaults.";
+const STAGE1_NORMALIZER_RESPONSE_ENDING_EN: &str = " Return only the specified JSON.";
 
 const HOLE_SYSTEM_JA: &str = r#"あなたは inku の可視DDL hole patch提案器。original_source全体を書き直さず、selected_holesに列挙された各holeのallowed_spanだけへ、accepted_saijiki_vocabularyと通常の数値・文法からなる可視DDL replacementを提案する。
 
@@ -1109,5 +1176,52 @@ mod tests {
             "hole-1"
         );
         assert!(!prompt.message.contains("description"));
+    }
+
+    #[test]
+    fn stage1_normalizer_rules_preserve_accepted_prompt_bytes() {
+        assert_eq!(
+            sha256_hex(stage1_normalizer_rules(ResolvedInstructionLanguage::Ja).as_bytes()),
+            "5845e087963c8a7d27791fdec037ec659db72c8a5614dae5da6f88a30748893d",
+        );
+        assert_eq!(
+            sha256_hex(stage1_normalizer_rules(ResolvedInstructionLanguage::En).as_bytes()),
+            "6974e6a04d99d23d1dbe67623382b5bed77acfb8e657c1b4b67423f0265ce1b7",
+        );
+    }
+
+    #[test]
+    fn stage1_system_projection_shares_grammar_without_normalizer_json_contract() {
+        let context = Stage1Context {
+            catalog_id: "default".to_owned(),
+            catalog_mode: ResolvedCatalogMode::Default,
+            canvas_format_id: "square".to_owned(),
+            canvas_format_registry_id: CANVAS_FORMAT_REGISTRY_ID.to_owned(),
+            canvas_format_registry_digest: canvas_format_registry_digest().unwrap(),
+        };
+        let prompt = build_stage1_prompt(
+            "One blue circle.",
+            ResolvedInstructionLanguage::En,
+            &context,
+            &[],
+            LIMITS,
+        )
+        .unwrap();
+        let ja_projection = stage1_system_projection(ResolvedInstructionLanguage::Ja).unwrap();
+        let en_projection = stage1_system_projection(ResolvedInstructionLanguage::En).unwrap();
+        assert_eq!(
+            prompt.system,
+            format!(
+                "{}\n\n# installed_macro_signatures\n[]",
+                stage1_normalizer_system(ResolvedInstructionLanguage::En).unwrap(),
+            ),
+        );
+        assert!(ja_projection.contains("fill、scatter、tile、background は別の意味"));
+        assert!(en_projection.contains("Fill, scatter, tile, and background"));
+        for projection in [&ja_projection, &en_projection] {
+            assert!(projection.contains("accepted_saijiki_vocabulary"));
+            assert!(!projection.contains("normalized_ddl"));
+            assert!(!projection.contains("JSON"));
+        }
     }
 }

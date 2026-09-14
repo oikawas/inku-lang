@@ -103,7 +103,7 @@
 # table, which is the whole claim: the answer cannot drift apart again without
 # both paths drifting together. It fills nothing where two clauses fit (the
 # description does not say which one the mark answers) and overrules nothing the
-# model stated. Both exits run it, the `INKU_COERCE_DISABLE` one included: being
+# model stated. Both former coerce exits ran it: being
 # faithful to a size the description stated is not a matter of style, for the
 # same reason the two grid branches already run there. Four cases are new and
 # they are the whole of `changed_from_previous` -- no branch name was added to
@@ -218,9 +218,8 @@
 # that rebuild, and a stored Score whose `color_hint` still carries an old
 # machine note ("black restored in color_cycle...") then hands the renderer a
 # color the description never named -- measured, 58 of 100 cycled instructions
-# in the [I-173] sample carry such a note. Both exits run the branch, including
-# the `INKU_COERCE_DISABLE` one: that flag turns off style repair, not the ban
-# on inventing.
+# in the [I-173] sample carry such a note. Both former coerce exits ran the
+# branch because it was not treated as style repair.
 # 9 (2026-08-09): coerce becomes a fixed point for a color it delivers. The
 # promotion to a primary stroke ran before the repair that puts a color in a
 # cycle, and it can only promote what a cycle already carries -- so a color the

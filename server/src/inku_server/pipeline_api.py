@@ -6,7 +6,6 @@ import hashlib
 import json
 import threading
 from concurrent.futures import Future, ThreadPoolExecutor
-from contextlib import asynccontextmanager
 from copy import deepcopy
 from dataclasses import asdict
 from typing import Callable, Literal
@@ -21,7 +20,6 @@ from .persistence.variation_authority import (
     ExecutionSnapshotConflict,
     VariationAuthorityAdapterError,
 )
-from .security import ConcurrencyLimitMiddleware, RequestBodyLimitMiddleware
 
 
 _RECORD_OPTIONS = frozenset({
@@ -441,19 +439,3 @@ def register_pipeline_errors(app: FastAPI) -> None:
     @app.exception_handler(ExecutionSnapshotConflict)
     async def snapshot_conflict(request, error):
         return JSONResponse(status_code=409, content={"detail": {"code": "execution_conflict", "message": "The saved authoring state has changed."}})
-
-
-def create_acceptance_app(service: PipelineService, *, actor_dependency: Callable, max_body_bytes: int, max_requests: int) -> FastAPI:
-    """Isolated API fixture; production registers the same router on api.app."""
-    @asynccontextmanager
-    async def lifespan(app):
-        yield
-        service.close()
-
-    app = FastAPI(title="inku pipeline test fixture", lifespan=lifespan)
-    register_pipeline_errors(app)
-
-    app.add_middleware(RequestBodyLimitMiddleware, max_bytes=max_body_bytes)
-    app.add_middleware(ConcurrencyLimitMiddleware, max_requests=max_requests)
-    app.include_router(pipeline_router(service, actor_dependency))
-    return app

@@ -119,7 +119,6 @@ test('T-259: one current-work run owns the paint request and preserves caller ov
 		variation_seed: 23,
 		interpretation_seed: 'seed',
 		seed_text: 'seed text',
-		auto_repair: true,
 		save_history: false,
 		save_artifacts: false,
 		count_generation: false,

@@ -15,6 +15,7 @@ from urllib.parse import quote
 
 import httpx
 
+from .api_core.common import _is_qualified_model_id
 from .model_settings import connection_for, provider_for_model
 from .provider_limits import provider_slot
 
@@ -26,6 +27,24 @@ class ProviderOptions:
     stage2_model: str
     max_tokens: int
     max_response_bytes: int
+
+
+def resolved_stage_model(model: str | None, actor: dict | None, *, stage: str) -> str:
+    """Resolve a request model against the actor's selected stage provider."""
+    settings = (actor or {}).get("model_settings") or {}
+    provider_key = "stage1_provider" if stage == "stage1" else "stage2_provider"
+    model_key = "stage1_model" if stage == "stage1" else "stage2_model"
+    default_model = "google/gemma-4-31b-it"
+    provider = str(settings.get(provider_key, "nvidia") or "nvidia")
+    model_id = str(settings.get(model_key, default_model) or default_model)
+    if model:
+        requested = str(model).strip()
+        if _is_qualified_model_id(requested):
+            return requested
+        if requested == model_id:
+            return f"{provider}:{requested}"
+        return requested
+    return model_id if _is_qualified_model_id(model_id) else f"{provider}:{model_id}"
 
 
 class SingleAttemptProvider:

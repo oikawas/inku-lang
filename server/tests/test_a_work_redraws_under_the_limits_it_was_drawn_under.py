@@ -51,8 +51,8 @@ from inku_server.api_core.rendering import (
     LIMITS_SOURCE_WORK_UNRECORDED,
 )
 from inku_server.api_core.routers import render as render_routes
-from inku_server.coerce import coerce_score
 from inku_server.limits import DEFAULT_LIMITS, LIMIT_FIELD_NAMES, Limits, using_limits
+from inku_server.saved_score_compat import coerce_saved_score
 from inku_server.schema import Score
 
 client = TestClient(app)
@@ -173,14 +173,11 @@ def _render_score(headers, *, score=None, **body) -> dict:
 
 
 def _notes_for(score: dict, limits: Limits, ddl: str | None = None) -> list[str]:
-    """The limit notes coerce writes for one Score under one set of limits.
-
-    Through `coerce_score`, the entry point the routes call, so a note written
-    in a branch the entry point never reaches cannot pass this.
-    """
+    """The limit notes the saved-Score seam writes under recorded limits."""
+    del ddl
     notes: list[str] = []
     with using_limits(limits):
-        coerce_score(Score.model_validate(score), ddl=ddl, limits=limits, limit_notes=notes)
+        coerce_saved_score(score, limits=limits, limit_notes=notes)
     return notes
 
 
@@ -453,14 +450,6 @@ _BINDING_CASES: list[tuple[str, dict, dict, str | None]] = [
         },
         None,
     ),
-    # A number the description states, at the threshold: read as a band rather
-    # than as a tally. The DDL is what carries it, so this case hands one over.
-    (
-        "literal_count_threshold",
-        {"literal_count_threshold": 100},
-        {"instructions": [{"primitive": "ellipse", "center": [0.5, 0.5], "radius": 0.01}]},
-        "黒い点を三百個散らす。",
-    ),
     # The band's floor, reached by making 0.42 of the crowd fall below it. It
     # necessarily names `represented_count_max` as well -- the ceiling is what
     # turned the tally into a band in the first place -- so the case measures
@@ -486,28 +475,6 @@ _BINDING_CASES: list[tuple[str, dict, dict, str | None]] = [
         {"represented_count_max": 60},
         CROWD_SCORE,
         None,
-    ),
-    # A numeral read OUT OF THE DESCRIPTION, above the reading ceiling.
-    (
-        "ddl_count_max",
-        {"ddl_count_max": 50},
-        {"instructions": [{"primitive": "line", "at": {"region": [0.1, 0.1, 0.9, 0.9]}}]},
-        "黒い点を三百個散らす。細い線を一本引く。",
-    ),
-    # The same reader, on the tiling side, where the other ceiling answers.
-    (
-        "ddl_count_max_grid",
-        {"ddl_count_max_grid": 50},
-        {"instructions": [{"primitive": "line", "at": {"region": [0.1, 0.1, 0.9, 0.9]}}]},
-        "小さな四角を三百個、画面全体に敷き詰める。細い線を一本引く。",
-    ),
-    # The only bound on what one arrangement may DECLARE, reached where coerce
-    # writes the arrangement itself from a tiling clause.
-    (
-        "schema_count_max",
-        {"schema_count_max": 40, "ddl_count_max_grid": 2000},
-        {"instructions": [{"primitive": "line", "at": {"region": [0.1, 0.1, 0.9, 0.9]}}]},
-        "小さな四角を三百個、画面全体に敷き詰める。細い線を一本引く。",
     ),
 ]
 

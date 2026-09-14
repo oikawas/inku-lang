@@ -77,7 +77,7 @@ DDLは単にグラフィックを記述する言語ではなく、**視覚的な
 
 決定的な層だけが版を持つ。Stage 1 と Stage 2 の LLM 層は同じ入力でも揺らぐため、版ではなく実際に送信した prompt の digest を来歴として記録する。`render_engine_version` は同じ Score と seed の演奏結果が変わるとき、または演奏できる語彙が増えるときに上げる。語や道具の改名だけでは上げず、参照記録の更新もそれだけでは要求しない。`ddl_engine_version` は決定的変換の出力が変わるときに加え、`Instruction` のフィールド宣言順が変わるときにも上げる。宣言順を変えるときは移すfieldだけでなく席を譲るfieldも測る。`ddl_version` は文法または語彙が追加・変更・廃止されるとき、Score の `version` はschema構造が変わるときに上げる。`ddl_version` と `ddl_engine_version` は1から数える。`MODEL_CONFIG_VERSION` は計測値・推奨度・選択可否が変わるときに上げ、同じidの保存済みcatalogへ組み込みmetadataを反映する。`APP_VERSION` は `web/APP_VERSION` を唯一の正本とし、UI、`/api/info` の `version`、CLIが同じ値を読む。`server/pyproject.toml` の配布版はrelease tag時だけ更新する。`web/BUILD_NUMBER` はUI変更でも進む共有連番で、同一性には含めない。現在の値は実装と保存済み作品が正本である。新しい版の値、理由、結果は[変更履歴](CHANGELOG.ja.md)だけへ記録する。[描画エンジンの版史](docs/spec/render-engine-history.ja.md)は既存の版記録を保存するhistorical recordであり、新しい節を追加しない。
 
-版と同一性 ID は別の名前空間である。作品エディション ID は `rh3` で、`score`、`render_seed`、render engine の ID / 版、`render_color_catalog_id` から決まる。`render_build_number` と Score側の `vary_seed` は同一性に含めない。保存済み `rh2` はlegacyとして保持し、再計算も `rh3` との比較もしない。
+版と同一性 ID は別の名前空間である。作品エディション ID は `rh3` で、`score`、`render_seed`、`render_wild`、render engine の ID / 版、`render_color_catalog_id` から決まる。`render_build_number` と Score側の `vary_seed` は同一性に含めない。保存済み `rh2` はlegacyとして保持し、再計算も `rh3` との比較もしない。
 
 保存済みの参照コーパスは、凍結した版の比較記録として保持する。凍結済み版の出力は更新せず、既存のcase IDも保持する。全体の移行実装が完了した明示的なcheckpointでは、一度だけ全件を更新し、前版との差をmanifestに記録する。途中のengine版上げ、DDL版上げ、または改名だけでは、参照コーパスの全件更新・現行版directoryの作成・generatorや手動比較の実行を義務にしない。変更のリスクに応じて局所的な確認を選ぶ。描画の保存記録はSVG、DDLの保存記録はDDLテキストまたはJSONの形式を維持する。
 
@@ -206,7 +206,7 @@ Nature plugin（雨・葉・水・風）のような具象語彙をコアに入�
 
 Canvasのcanonical ownerはshared coreの`inku.canvas-format-registry.v1`であり、語彙pluginやsystem pluginではない。Canvas selectionはresolved host optionとしてvisible DDL本文とMacroInvocation / MacroDefinitionの外に置く。同じDDLを異なるcanvasへ使え、選択が無いhost boundaryでは`square`をhost defaultにできるが、DDL compilerが`square`をsemantic factとして挿入する意味ではない。Hostが選択をScore / render context / historyへ運び、RendererがSVGの`width` / `height` / `viewBox`を解決する（§19）。
 
-現行runtimeの`plugin_storage["canvas-aspect"]`、`canvas_aspect` request alias、保存済み`Score.canvas` / `render_canvas_aspect*`、system / user plugin directory、plugin status / enable toggleはlegacy互換操作として残る。これらは読み取りだけでなく、legacy plugin documentやenable状態の更新も行える。しかしそのことはsemantic authorityでも、`MacroDefinition`形式の新規authoring / loading APIでもない。これらのretirementとruntime / UI cutoverは後続Stepの責務で、本節は実装済みと偽装しない。Stage 2が現行互換経路でcanvasを受け取る場合もhost-resolved composition contextであり、visible DDL metadataではない。DDL sourceの座標、語、canonical meaningを書き換えない。
+現行runtimeの`plugin_storage["canvas-aspect"]`、`canvas_aspect` request alias、保存済み`Score.canvas` / `render_canvas_aspect*`、system / user plugin directory、plugin status / enable toggleはlegacy互換操作として残る。これらは読み取りだけでなく、legacy plugin documentやenable状態の更新も行える。しかしそのことはsemantic authorityでも、`MacroDefinition`形式の新規authoring / loading APIでもない。保存済み設定とcatalog発見に必要なstorage／API互換を保ち、これらを旧意味決定実装の実行経路にはしない。Stage 2が現行互換経路でcanvasを受け取る場合もhost-resolved composition contextであり、visible DDL metadataではない。DDL sourceの座標、語、canonical meaningを書き換えない。
 
 ### 4.5 MacroDefinitionによる展開モデル
 
@@ -226,7 +226,7 @@ Anchorだけを含むTransformは、解決済みのAnchor全体の外接矩形�
 
 現行consumerの`transform`は回転、`scale_x` / `scale_y`、`translate_x` / `translate_y`を受け入れる。有限値だけを受け、負のscaleは反転、0は退化を表す。子図形のgeometryだけを、回転前の子図形全体の正確な外接矩形中心でscaleし、同じ中心で回転し、最後に平行移動する。translateはnormalized canvas軸の差分である。形状と間隔は変わるがstroke幅とgrain pitchは保つ。内側から外側へgeneral affineを合成し、配置が演奏時に決まる場合はその配置を確定してからbboxを求める。`group`は範囲・参照・ownerを運ぶ透明な構造であり、それ自体の配置・描画命令にはならない。
 
-transformはCount1のactual Scoreとcompactな反復recipeの両方へ配送する。Score 0.5.0の`transform_groups`は範囲、回転、scale、translate、数値固定memberの元instruction indexを保持する。旧Score 0.4.0の回転だけのgroup、保存済み0.1.0／0.2.0／0.3.0、versionなしartifactは従来互換を保つ。空のgroup listはwireへ出ず、`surface_intensity`はScore 0.3.0以後で有効である。明示path接続を持たない既定／legacy lowererはScore 0.9のまま、resource-aware入口はScore 0.10のresolved placement / repetition / fill recipeを出す。Score 0.8.0のdirect `placement_groups`は連続したsource順member範囲を一度だけ配置する。Macroは一つの配置memberとしてbodyの位置・内部count・Transform・Anchorと所有範囲を保ち、外側Macro反復は別の`repetition_groups`に保存するため、内外のcountとordinal namespaceは衝突しない。group単位の反復actionは、以下の個数規則でcompact recipeへ配送する。内部配置省略はbbox中心を揃える`overlap`、明示した「並べて置く」は既存wire値の`horizontal_source_order`、明示した「重ねて置く」は`overlap`、`散らす`と`敷き詰める`は`scatter`と`tile`である。group bbox中心をperformance seedで解決する一つのnamed regionへ移し、各memberのowner、count、seedと形を保つ。line-upの省略countは各member 1である。scatter / tileは明示countを保ち、合計8までの残りを省略したmemberへ均等配分し、余りはsource順で先の省略memberへ割り当てる。省略memberは最低1個とし、明示数と最低数だけで8を超える場合も減らさない。全省略も同じ規則で、9種類なら各1個になる。全明示なら合計8へ補わない。line-up / placeは省略memberだけ1とする。外部Connected、Touching / Along / Cutting、NotTouching / Betweenは、変形後の形・向き・namedまたは数値の配置authorityを保ったgroup全体の平行移動で成立を試みる。NotTouchingは既存gap、Betweenは先行二要素のbbox中心を使う既存recipeを保つ。不成立ならerrorを記録してrelationだけを外し、groupは元の変形後配置で描く。数値固定member、旧Stop入力、owner・元index・seed・失われた参照の規則は保持する。`compile_ddl_to_score_with_resources`と`render_with_resources`が共有coreの新入口であり、製品runtime / UI / API / 保存への切替は未完了である。
+transformはCount1のactual Scoreとcompactな反復recipeの両方へ配送する。Score 0.5.0の`transform_groups`は範囲、回転、scale、translate、数値固定memberの元instruction indexを保持する。旧Score 0.4.0の回転だけのgroup、保存済み0.1.0／0.2.0／0.3.0、versionなしartifactは従来互換を保つ。空のgroup listはwireへ出ず、`surface_intensity`はScore 0.3.0以後で有効である。共有lowererは表現に必要な最小Score版を選ぶ。明示path接続を持たないflat互換はScore 0.9、resource-awareなcompact recipeの基準はScore 0.10であり、追加fieldを持つ作品だけが対応する後続版になる。鏡写しrelationを持つ作品だけがScore 0.15を必要とする。Score 0.8.0のdirect `placement_groups`は連続したsource順member範囲を一度だけ配置する。Macroは一つの配置memberとしてbodyの位置・内部count・Transform・Anchorと所有範囲を保ち、外側Macro反復は別の`repetition_groups`に保存するため、内外のcountとordinal namespaceは衝突しない。group単位の反復actionは、以下の個数規則でcompact recipeへ配送する。内部配置省略はbbox中心を揃える`overlap`、明示した「並べて置く」は既存wire値の`horizontal_source_order`、明示した「重ねて置く」は`overlap`、`散らす`と`敷き詰める`は`scatter`と`tile`である。group bbox中心をperformance seedで解決する一つのnamed regionへ移し、各memberのowner、count、seedと形を保つ。line-upの省略countは各member 1である。scatter / tileは明示countを保ち、合計8までの残りを省略したmemberへ均等配分し、余りはsource順で先の省略memberへ割り当てる。省略memberは最低1個とし、明示数と最低数だけで8を超える場合も減らさない。全省略も同じ規則で、9種類なら各1個になる。全明示なら合計8へ補わない。line-up / placeは省略memberだけ1とする。外部Connected、Touching / Along / Cutting、NotTouching / Betweenは、変形後の形・向き・namedまたは数値の配置authorityを保ったgroup全体の平行移動で成立を試みる。NotTouchingは既存gap、Betweenは先行二要素のbbox中心を使う既存recipeを保つ。不成立ならerrorを記録してrelationだけを外し、groupは元の変形後配置で描く。数値固定member、旧Stop入力、owner・元index・seed・失われた参照の規則は保持する。`compile_ddl_to_score_with_resources`と`render_with_resources`が共有coreの新入口であり、通常Server／Web／Androidはこの共有core入口を使用する。保存済みScoreとhistoryの読取・再演には必要な形式互換を保持する。
 
 Anchorは線の接続先に使う非描画の基準点であり、`place`または`position_x` / `position_y`の組で位置を明示する。Anchorの`place:center`は画面中央（0.5, 0.5）で、Emitのfocus依存配置から推測しない。その他のnamed位置は既存の位置領域を使う。Score 0.6.0の`anchors`は描画instructionと別に保持し、`target_anchor_index`でConnectedの接続先になる。元の参照・owner・描画順・seedを保ち、包含Transformの移動・拡縮・回転へ一緒に従う。数値位置の固定と旧Stop入力の互換を維持するが、recoverableなrelation失敗はerrorを記録してrelationだけを外し、描画を止めない。位置のないAnchorを前後の図形や呼出し位置から補完しない。保存済みScore 0.1.0〜0.5.0とversionなしartifactは従来互換を保つ。
 
@@ -264,7 +264,7 @@ Macroは意味解決後のinvocation順に実行する。照応だけのmention�
 
 旧`.inku-plugin.md`、`fires_on`、localized expansion template、旧Stage 1.5 / Stage 2 expanderは、新規pluginのsemantic canonとして退役した。Compatibility importerはapplication全体をerrorにせず`legacy_plugin_format` warningとper-macro `Imported | Omitted` outcomeを返す。旧作品は保存Score / expanded artifactを優先して表示し、旧expanderを恒久fallbackにしない。Artifact不足の`Omitted`をsilent partial renderや別図形へ変えない。
 
-Shared Rust compiler foundationはparse / validate / identity / lock / binding / deterministic expansionに加え、上記finite Emit（配置を持たないGroup内を含む）を通常lowerer経由でactual Scoreへ届ける。ただしproduction runtime接続、package catalog、preview、legacy cutover、任意user package loaderは未完了である。後続package / catalog / preview実装はPLANの別Stepで扱う。`PLUGIN.md`は本節に従う現行authoring guideであり、未実装loaderやdirectory追加手順をauthorityとしてはならない。
+Shared Rust compiler foundationはparse / validate / identity / lock / binding / deterministic expansionに加え、上記finite Emit（配置を持たないGroup内を含む）を通常lowerer経由でactual Scoreへ届ける。通常Server／Web／Android runtimeとbundled package catalogは接続済みである。任意user package loaderは未実装である。`PLUGIN.md`は本節に従う現行authoring guideであり、未実装loaderやdirectory追加手順をauthorityとしてはならない。
 
 Visible sourceの細さと大小は、同じdimensionの`SemanticRef` categoryを明示宣言したparameterへ、一意で完全なassignmentだけをbindingする。大小は既存のhead前修飾でqualified Macro headも認識する。Core由来の値はSaijiki asset metadataを持たず、元span / clause / atom / parameter / definitionへ結び、通常entity修飾として二重消費しない。Literal、外側parameter、definition-local component parameterの値はいずれも同じEmit fieldと通常lowererへ合流する。Missing / ambiguous bindingは既存上流error policy、未宣言caller factは既存lowering policyに従う。Bound parameterだけを新しいcontinuation predicateへ昇格せず、未宣言属性の自動overlay / fan-outを行わない。Source / owner integrity不良は両modeを停止する。
 
@@ -277,7 +277,7 @@ Render Engine は、`JSON Score + render options + server-owned color metadata` 
 `SVG + render metadata` を返す境界である。現行serverの`renderer.py`はdefault engineへのSVG-only互換facadeであり、
 薄いadapterが検証済みScoreと解決済みoptionを1個のrequestにしてnative `inku_render` bindingを呼ぶ。
 
-決定的な描画coreはRust crate `core/crates/inku-render`である。これはhost間で共有できるportability boundaryとして受け入れられているが、各hostのbindingとruntime cutoverは個別に確立する。現行server integration以外の実行経路を、このportability intentだけで稼働済みとは主張しない。
+決定的な描画coreはRust crate `core/crates/inku-render`である。Serverはnative wheel、AndroidはJNIを通して同じcoreを使う。iOSのhost接続は別途pendingである。
 
 履歴、JSONタブ、CLI、ベンチマークが読む正規メタデータ形式は安定させる。`render_hash` は作品エディションIDで、SVG本文・入力文・正規化DDL・LLM応答本文は hash の主材料に含めない。
 
@@ -546,9 +546,9 @@ DDLの語彙辞書は **Saijiki** と呼ぶ。英語版でもこの名称を維�
 
 **カテゴリ構造**
 
-歳時記は 12 カテゴリ（かたち・かたむき・てざわり・つらなり・**おもて**・**じ**・いろ・ゆらぎ・ばしょ・うごき・わりあい・あいだ）に、ロード済みプラグインの名前空間付き語を加えて表示する。語彙の現行値は §3.1 の表と reference §1 を正とし、web の歳時記表示も同じ saijiki テーブルから配信される（v1.92: `GET /api/saijiki` + バンドル内蔵スナップショットの同期ストア）。
+歳時記は 13 カテゴリ（かたち・かたむき・てざわり・つらなり・**おもて**・**じ**・いろ・ゆらぎ・ばしょ・うごき・じゅん・わりあい・あいだ）に、ロード済みプラグインの名前空間付き語を加えて表示する。語彙の現行値は §3.1 の表と reference §1 を正とし、web の歳時記表示も同じ saijiki テーブルから配信される（v1.92: `GET /api/saijiki` + バンドル内蔵スナップショットの同期ストア）。
 
-カテゴリ名はひらがなを採用する。漢字は硬い。ひらがなは記述の敷居を下げる。英語版カテゴリ名は forms / angles / touches / continuity / **surfaces** / **grounds** / colors / movements / places / motions / proportions / relations とする。
+カテゴリ名はひらがなを採用する。漢字は硬い。ひらがなは記述の敷居を下げる。英語版カテゴリ名は forms / angles / touches / continuity / **surfaces** / **grounds** / colors / movements / places / motions / order / proportions / relations とする。
 
 **配置方針**
 
@@ -801,7 +801,7 @@ CLI の judge metric（`visual_event`、`negative_space_pressure`、`motion_ener
 
 - Stage 1 が入力の文脈を丸ごと保つか
 - Stage 1.5 が明示意味を保ち、焦点以外を発明しないか
-- Stage 2 が DDL 要素をすべて JSON Score へ運ぶか
+- 共有compiler／lowererが明示DDLを保持し、不成立だけを診断付きで局所省略するか
 - 決定的フォールバックが講評に足る量の DDL 内容を保つか
 - renderer が DDL の特徴を可視にするか
 - 出力に十分な余白・揺らぎ・芸術的な焦点があるか
@@ -821,41 +821,28 @@ NVIDIA の無料 API を試すときの所要時間も同じく運用メタデ�
 
 ## 12. 二段階変換アーキテクチャ
 
-現行パイプラインは、任意の Stage 0.5、Stage 1 の有限 typed normalization、決定的な Stage 1.5、Stage 2 の閉じた Score 化、Renderer の演奏から成る。本章は現在の各段の authority と互換境界を記す。
+現行pipelineは共有authoring state machineが管理する。記述起点のStage 1、可視DDLの保存とtyped compile、必要なknown-hole補完、決定的なStage 1.5／lowerer、共有rendererから成る。新作では旧Stage 0.5を使わない。本章は各段のauthorityと保存互換を記す。
 
-### 12.1 二段階変換の採用
+### 12.1 可視DDLを境界とする二段階変換
 
-DDLの変換パイプラインは**二段階変換**を採用する。一段階変換は採用しない。
+記述から可視DDLを作る段階と、可視DDLを検証してScoreへ下ろす段階を分ける。二つのLLMに同じ描画意図を推測させる構成ではない。Direct DDLは最初の段階を通らない。
 
 ```
 ユーザー記述
-    ↓ 第一段階：解釈
-正規化DDL（コア語彙のみで表現された中間表現）
-    ↓ 第二段階：構造化
+    ↓ Stage 1：可視DDLの生成
+可視DDL（コア語彙とlockされたMacro呼出） ← 作者が直接記述・編集できる
+    ↓ 共有compiler：known holeがあれば補完候補と作者承認・CAS保存
+    ↓ 決定的なStage 1.5とlowerer
 JSON Score
-    ↓
+    ↓ 共有renderer
 SVG
 ```
 
-### 12.2 一段階変換を採用しない理由
+### 12.2 可視DDLとScore生成を分ける理由
 
-記述とDDL生成の間に、明確な切断面を作ることで、想定外の記述からの想定外の意味の流入（例：「美しい」のニュアンスが、JSON生成時にengineに影響を与える）を、構造的に抑止する。
+可視DDLを意味の境界にすることで、元の記述にある曖昧なニュアンスが、作者に見えない経路でScoreへ入り込むことを防ぐ。書き手はDDLを読み、意図を確認して編集できる。
 
-また、現在のLLMの性能要件を考慮して、LLMに渡す仕事を1種類とすることで、精度を向上する。
-
-**仕事1: 解釈（意味論的）**
-自由な自然言語の曖昧な表現を、DDLの語彙空間にマッピングする
-
-**仕事2: 構造化（構文論的）**
-primitive、region、weight、variation などのフィールドを持つ、スキーマに合致するJSONを生成する
-
-この二つは求められる能力が根本的に異なる：
-- 解釈は**創造的・連想的**な能力
-- 構造化は**機械的・規則遵守的**な能力
-
-一つのプロンプトで両方を高水準で要求すると、どちらも中途半端になる。特にコーナーケースでは、解釈の難しさが構造化エラーを誘発する（解釈に迷ったLLMがJSON形式も崩す連鎖）。
-
-既存のテストからも、一段階変換ではコーナーケースを実装しきれないことが観察されている。
+LLMは記述からDDL候補を作るか、compilerが明示したholeへのpatch候補を返す。構文の検証、明示属性の保持、個数・資源の扱いとScore構造化は共有Rustが決定する。補完候補も可視DDLの承認・保存を経由し、Scoreを直接上書きしない。
 
 ### 12.3 DDLコンセプトとの整合性
 
@@ -867,7 +854,7 @@ SPEC Section 5 の三層パイプラインに二段階変換を組み込むと�
 記述（母語・自由な言葉）
   ↓ 第一段階：解釈
 正規化DDL（コア語彙のみ）          ← ここが「霧が払われる瞬間」の実体
-  ↓ 第二段階：構造化
+  ↓ 共有compiler／Stage 1.5／lowerer
 楽譜（JSON Score）
   ↓
 演奏（SVG）
@@ -914,28 +901,25 @@ Continuationはreintroduced head、subject marker / determiner、predicateの正
 - 記述者がdirect DDLを書いた場合、または生成DDLを編集した場合は、てざわり等の省略を許容してtyped meaningを`unspecified`のまま保持する。Texture / context、primitive type、語順、現行Score defaultからhidden推測または挿入しない
 - 図形の大小は普通 / 小さい / 大きいと弱・標準・強を組み合わせた有限7classの局所modifierとして記し、明示normalと省略を区別する。数値geometryとqualitative sizeの併記、unknown degree、曖昧なownerはtyped conflict / issueにする
 - ビュランとドライポイントはvisible DDLが明示した場合だけexplicitとなる。Stage 1 few-shotの品質方針とdirect DDL compiler semanticsを混同しない
-- 現行actual Score lowererは、数値位置、またはverified Stage 1.5のdirect instruction ownerへ解決済みの元`place:center`と、place actionを持つcount1 circle / square / ellipse / cloudformだけで、作者裁定済みのnormal geometry・大小倍率・描画属性省略をresolutionとして適用する。Named経路は寸法を保ったままeffective focusを`at.region`へ置く。旧Stop / OmitAndContinue入力にかかわらず、recoverableな対象外意味やpalette context不足は独立fieldまたはtyped実行単位だけを省略して残存Scoreと診断を返す。両modeとも元meaningを変更せず、このRust経路は製品runtimeにはまだ接続しない
+- 現行actual Score lowererは、数値位置、またはverified Stage 1.5のdirect instruction ownerへ解決済みの元`place:center`と、place actionを持つcount1 circle / square / ellipse / cloudformだけで、作者裁定済みのnormal geometry・大小倍率・描画属性省略をresolutionとして適用する。Named経路は寸法を保ったままeffective focusを`at.region`へ置く。旧Stop / OmitAndContinue入力にかかわらず、recoverableな対象外意味やpalette context不足は独立fieldまたはtyped実行単位だけを省略して残存Scoreと診断を返す。両modeとも元meaningを変更せず、この共有Rust経路を通常Server／Web／Androidが使用する
 
 ### 12.5 モデル分割
 
 段階ごとに異なるモデルを使える。**現行実装は Stage 別のモデル選択制**であり、ユーザー・管理者が Stage 1 / Stage 2 / Vision の各用途にモデルを設定できる（§8.4 のモデル設定・モデル比較、`/api/models` の llm/vision カタログ）。
 
-初期設計時の想定（Stage 1 = 高能力モデル、Stage 2 = 軽量モデル）は方針として維持される:
-
-- 解釈（Stage 1）は連想的・創造的でニュアンス理解が必要、構造化（Stage 2）は入力が制限されるため軽量モデルでも安定する
-- 「モデル選択そのものが創造的変数」という原則と、実用的なコスト構造を両立する
+Stage 1は記述から可視DDLを作り、Stage 2はcompilerが報告したknown holeに対する可視patch候補だけを作る。それぞれの制限された入力と必要な結果に合わせてモデルを選ぶ。Scoreの構造化は共有Rustの決定的なlowererが行い、LLMへ委ねない。
 
 ### 12.6 第一段階（解釈）の設計
 
 Stage 1 は自由記述を、書き手が観察・編集できる正規化 DDL へ有限に写す。原文の明示要素・数量・色・素材・関係を保ち、隠れた視覚要素や「美しい」解釈を追加しない。語彙、閉じた schema、制限値、出典をプロンプト lock として渡し、出力はその lock の内側だけを使う。これは I-640 で同期した有限 typed normalization 契約であり、特定のモデル名やモデル階級を正本にしない。
 
-### 12.7 第二段階（構造化）の設計
+### 12.7 第二段階（補完）と決定的な構造化
 
-Stage 2 は effective DDL / typed meaning を閉じた JSON Score schema へ構造化する。色、素材、数量、運動、配置 path、回転、canvas、明示 relation を保ち、届かない明示要素は黙って別の意味へ変えず失敗として扱う。語彙と relation の対応は Saijiki と typed lowering の正本から導出し、履歴上の prompt sketch を現行契約にはしない。
+Stage 2 LLMは、保存済み可視DDLにcompilerが明示したknown holeがある場合だけ、範囲を限定したpatch候補を返す。要求は共通pipelineが自動で作り、採用には作者承認と可視DDLのCAS保存を必要とする。LLMはScoreを出力しない。Lock検証済みtyped meaningからScoreへの構造化は共有lowererが一度だけ行い、色、素材、数量、運動、配置path、回転、canvas、明示relationを保つ。
 
-Lock検証済みtyped経路では、Stage 2 consumerの失敗方針をStop（既定）またはOmitAndContinueとして明示する。Continueは届かない意味をScore fieldへ変換せず、execution projectionからtyped単位を省略し、残った命令と元owner順序を返す。結果は完全成功、省略付き成功、停止を区別する。
+回復可能な不成立は、旧Stop／OmitAndContinue入力にかかわらず、最小のfieldまたは実行単位を診断付きで省略して独立した描画を続ける。届かない意味を別のScore fieldへ補正せず、元ownerと順序を保つ。描画単位の全省略やintegrity失敗は停止し、完全成功、省略付き成功、停止を区別する。
 
-作者が明示したかたむきは、元meaningとtag付き`composition_seed`、logical occurrence、angle identityに束縛した共通resolverで、direct instructionとflat Macro Emitから一度だけ`Score.rotation`へ届く。Stage 2はeffective focus、variation seed、render seed、source spellingをこの選択へ混ぜない。
+作者が明示したかたむきは、元meaningとtag付き`composition_seed`、logical occurrence、angle identityに束縛した共通resolverで、direct instructionとflat Macro Emitから一度だけ`Score.rotation`へ届く。共有lowererはeffective focus、variation seed、render seed、source spellingをこの選択へ混ぜない。
 
 ### 12.7.1 共有authoring state machine
 
@@ -951,9 +935,9 @@ Variationの作成元は`stage1_generated`または`user_authored_ddl`として�
 
 Typed Stage 1 requestは、Saijikiから導出した有限語彙、解決済みcatalog/canvas identity、検証済みMacroのqualified name・version・definition digest・parameter・host提供のlocalized summaryだけをbounded projectionとして持ち、応答schemaはvisible normalized DDLだけを許す。保存済みvisible DDLのparseが補完可能なknown holeを検出したら、共通pipelineが補完要求を自動で作る。別のユーザー補完操作は要求せず、holeがなければStage2 LLMを呼ばない。Unknown／conflict／integrityエラーを補完対象にしない。Hole補完はtyped compilerが明示したholeだけを対象とし、選択したhole id、許可span、range digest、base source digest、compiler-lock digestでpatchを閉じる。Providerのpatchは候補にすぎない。作者の明示承認時にbaseへ再検証し、sourceと次authorityを1個のCAS save actionとしてhostへ渡す。一致するsave acknowledgmentの後だけ、保存されたvisible bytesを再parseして共有compilerへ渡す。
 
-Transcript replayはcommandと最終effect resultの入力envelopeだけから同じsnapshotと出力を再構成し、出力専用の進行eventやhost effectを再入力しない。二つのowned byte bufferからなる入口は、空または直前snapshotのUTF-8 JSON bytesとinput envelope bytesを受け、outputまたはstable errorのJSON bytesを返す。UniFFI候補はこの`Vec<u8>, Vec<u8> -> Vec<u8>`とbinding/protocol version reportだけを公開し、意味分岐を持たない。Panicもplatform例外文ではなくstableな`internal_invariant` error envelopeへ閉じる。
+Transcript replayはcommandと最終effect resultの入力envelopeだけから同じsnapshotと出力を再構成し、出力専用の進行eventやhost effectを再入力しない。二つのowned byte bufferからなる入口は、空または直前snapshotのUTF-8 JSON bytesとinput envelope bytesを受け、outputまたはstable errorのJSON bytesを返す。共有bindingはこの`Vec<u8>, Vec<u8> -> Vec<u8>`、binding／protocol版、およびcanvas・palette・Macro catalog・Stage 1語彙projection・保存Score再演の共有入口を公開する。Python／JNI adapterに意味分岐を複製しない。Panicはplatform例外文ではなくstableな`internal_invariant` error envelopeへ閉じる。
 
-保存・承認・再parse／replay、authorityとprompt境界、代表binding呼出しに加え、通常Server hostでの一つのLinux flowは成功した。このflowは固定fixture予算（logical objects 400、template nodes 512、その他の構造資源400）に対して通常point fillがlogical objects 6945を要求したとき、そのfillだけを省略し、3 pointのcircle fillと後続lineをprimitive mark 4としてSVGへ演奏し、raw Score、history、authority linkを保存した。これはnative接続の確認であり、新しい6資源の出荷値を使った実測ではない。通常Webと`/api/interpret`、`/api/compose`、`/api/paint`、`/api/paint/stream`は同じserviceを使い、11形式のcanvasは共有registryを正本とする。保存済みraw compact Scoreの再演もLinuxで成功し、raw Score、保存source、authorityを変えず、seed変更をSVG差分へ届け、requestによるhard budget改竄を保存済みpolicyで拒否してprimitive mark 4を保った。managed historyの系譜編集、active DDLの現在options、revisionごとの診断復元は上記の契約で通常経路へ接続する。Androidのstandalone共有Rust接続は実装済みであり、作品受入と配備は後続する。Source接続と出荷済みであることを混同しない。
+通常Webと`/api/interpret`、`/api/compose`、`/api/paint`、`/api/paint/stream`は同じ共有pipeline serviceを使い、11形式のcanvasは共有registryを正本とする。Androidの通常UIは`InkuRepository`、`AndroidWorkPipeline`、JNIを通って同じ共有Rustへ到達する。カメラDDL promptも共有Stage 1語彙projectionを使う。履歴に送信promptを保存していない場合は、旧promptを再構成して送信履歴と扱わない。
 
 通常履歴を選んだ後の記述生成・DDL描画は、同じhistoryの判別が完了してから対応するforkへ進む。判別中・失敗・選択の失効を新規作品と扱わず、元記述・保存時設定・親関係の継承を保つ。待機中に取り消した操作や別の作品へ切り替える前の操作を、後から開始しない。
 
@@ -975,37 +959,36 @@ Shared compiler consumerでは、StopとOmitAndContinueはLLM fallbackではな�
 
 ### 12.11 中間フィルタ（Stage 1.5）
 
-Stage 1.5 は LLM を使わない決定的な typed transformation である。入力は lock 検証済みの `CanonicalReady` typed meaning とし、自由 prose は受け取らない。出力は Stage 2 が読む effective DDL / typed meaning である。
+Stage 1.5 は LLM を使わない決定的な typed transformation である。入力は lock 検証済みの `CanonicalReady` typed meaning とし、自由 prose は受け取らない。出力は共有lowererが読むeffective DDL / typed meaningである。
 
 - 原文、正規化 DDL、元の typed meaning、effective meaning、source / generated provenance を別々に保ち、元の意味や明示属性を上書きしない
 - 新しい sentence、entity、relation、technique、color、touch、primitive、content を発明しない
 - `place:center` だけを閉じた六つの焦点候補の一つへ写す。その他の place と明示属性はそのまま通す
 - verified viewをactual Scoreへ下ろすときは、direct `Instruction { instruction_index }`は元のtyped instructionと同じindexのinstructionだけを所有する。direct coordinated groupはその規則を変えず、別の`placement_groups`範囲としてmemberを配送する。`GroupPredicate` / `MacroEmit`を同じindexのownerとせず、数値位置をfocus targetにせず、元centerを仮の`0.5,0.5`へ書き換えない
 - baseline のfocus選択はlockで検証されたpre-expansion meaning digest、expanded meaning digest、attested optional `composition_seed`に束縛する。seedの不在と`Some(0)`の存在は別であり、full compiler-lock digestはsource integrityのattestationであってfocus材料ではない
-- 明示noncenter placeはfocus targetへ加えず、Stage 2が§18の領域へ解決する。隅の四候補選択も構図側の責務で、元meaningとattested optional seedおよび元logical occurrenceを使う。
-- 明示angleは元のtyped meaningのまま通し、center-only target集合や変奏軸へ追加しない。具体角度はStage 2が同じverified pre / expanded meaning、tag付きoptional `composition_seed`、directの元logical ordinal、またはMacroのsemantic ordinal / expansion path / generated ordinalから選ぶ
+- 明示noncenter placeはfocus targetへ加えず、共有lowererが§18の領域へ解決する。隅の四候補選択も構図側の責務で、元meaningとattested optional seedおよび元logical occurrenceを使う。
+- 明示angleは元のtyped meaningのまま通し、center-only target集合や変奏軸へ追加しない。具体角度は共有lowererが同じverified pre / expanded meaning、tag付きoptional `composition_seed`、directの元logical ordinal、またはMacroのsemantic ordinal / expansion path / generated ordinalから選ぶ
 - Stage 1.5の入力を切り離す前に、実際のvisible DDLのUTF-8 bytes、semantic source occurrenceに残る言語証跡、未使用分を含む全macro sidecarの三項、実行macroのresolved / binding / semantic head identityをcompiler lockと照合する。SourceOccurrenceがない入力へ新しい言語条件を課さず、未使用sidecarにresolutionや実行を要求しない。Sourceとprovenanceは入場時のintegrity証拠であり、meaningやfocusの材料ではない
 - 明示変奏は amplitude（`small` / `medium` / `large`）と `variation_seed` がともにある場合だけ完全であり、焦点だけを動かす。不完全な指定は変奏なしとする
 - output の canonical bytes、schema identity、digest、provenance は同じ意味を再現し、別 schema の bytes を同じ identity と偽らない
 
 sealed Rust Stage 1.5 v5 のtyped foundationとR1 / R2 / D1、direct instructionのnormal / explicit geometry、finite flat Macro Emit、および両者へ共通の局所回復error policyはactual Scoreまで実装され、通常Server／Web／Androidの共有pipelineから使用される。`compile_ddl_to_score` facadeは元の`NormalizedDdlDocument`を一度だけcompileし、そのsource / state / lock / issuesを保持する。旧StopとContinueの入力は、同じcompilationのtyped owner / dependencyに従うsealed projectionを使う。回復可能な上流hole / conflictは確立済みの局所単位を省略して独立命令を届け、描画単位の全省略はstoppedとする。Canonical pre-meaningでは成功済みmacro outputを元binding / source ordinal / semantic ordinal / seed / provenanceのexact subsetとして再利用し、再seed・再展開しない。NonCanonical pre-expansion projectionでは省略単位を先に確定した後、一度だけseedを導出して展開し、local failure後のretry drawを行わない。Global budgetおよびsource / lock / owner / definition / provenance整合性不良は両modeを止める。Public Stage 1.5 APIは`CanonicalReady`専用のままで、任意のmutable compilationを回復しない。D1のmeaning / seed / focus、source ordinal欠番、generated provenanceは保ち、寸法規則の追加はgeometry policy digestへ記録し、Score 0.2.0で新しい月形を表す。通常APIは旧URLを保ちながらこの共有経路へ接続し、保存済みcompact Scoreの再演もLinuxで確認済みである。
 
-このshared compiler subsetは、directとflat Macro Emitのangleをcircle / ellipse / cloudform / square / triangle / polygonのactual `Score.rotation`まで共有lowererで配達する。Squareもdirectとflat Macro Emitで同じangle resolverを通り、numeric配置だけは回転した宣言矩形をmust-fitし、named focusはmust-fitを追加しない。この到達はwhole Step 10の完了ではない。
+このshared compiler subsetは、directとflat Macro Emitのangleをcircle / ellipse / cloudform / square / triangle / polygonのactual `Score.rotation`まで共有lowererで配達する。Squareもdirectとflat Macro Emitで同じangle resolverを通り、numeric配置だけは回転した宣言矩形をmust-fitし、named focusはmust-fitを追加しない。
 
 同じshared compiler subsetは有限な二段階のthinnessをdirectとflat Macro Emitからactual
 `Instruction.thinness`へ届け、明示宣言した細さ・大小parameterも§4.6の経路へbindingする。
-この到達だけでwhole Step 10を完了とはしない。
 
 
 全幅・半幅はキャンバスの横幅の100%・50%を回転前の寸法へ適用する。線は長さ、開弧は弦の長さ、閉じた図形は基準輪郭の横幅、雲形は宣言幅を使い、元の形と縦横比を保つ。回転後の横占有幅や筆致の外縁から再計測せず、端への接触や位置移動を追加しない。通常DDLと宣言済みflat Macro Emitの`proportion_width_extent`は共通の寸法解決を通る。
 
 半円は上へ膨らむ半円の開弧、上弦は右、下弦は左へ膨らむ半円の開弧とする。三日月は歳時記の細い月形の閉じた塗り面であり、一本の開弧に置き換えない。Score 0.2.0の`primitive: arc`、`arc_form: crescent`と`center`・`size`がその輪郭を表す。月形の基準は歳時記の三本の三次Bezier曲線で、寸法は曲線の実際の境界に基づく。省略された`arc_form`は従来の開弧の意味とcanonical bytesを保ち、保存済みScore 0.1.0を読み続ける。三日月の位置・回転・境界は共通rendererへ渡す。端点を要求するconnected/touchingへ閉じた三日月を渡すと不適合を診断する。
 
-大きさの指定が重なるときは、原文の全候補を保持し、各候補を独立に物理寸法へ解決して小さい幅を採用する。明示寸法が形を指定する場合はその縦横比を一度だけ拡縮し、相対サイズを二重に掛けない。同じ大きさの重複もエラーとして示す。`ConflictingSizeSpecifications`は候補寸法と採用寸法を持ち、処置`Recovered`はStop/Continueの両方でその図形を描くことを表す。この例外は重複サイズだけであり、形の不整合、未対応属性、source/lockの整合性不良を回復可能にしない。これは共通compilerからScoreと診断までの接続であり、現行のPython生成経路やUIへの置換を意味しない。
+大きさの指定が重なるときは、原文の全候補を保持し、各候補を独立に物理寸法へ解決して小さい幅を採用する。明示寸法が形を指定する場合はその縦横比を一度だけ拡縮し、相対サイズを二重に掛けない。同じ大きさの重複もエラーとして示す。`ConflictingSizeSpecifications`は候補寸法と採用寸法を持ち、処置`Recovered`はStop/Continueの両方でその図形を描くことを表す。この例外は重複サイズだけであり、形の不整合、未対応属性、source/lockの整合性不良を回復可能にしない。これは共通compilerからScoreと診断までの接続であり、通常Server／Web／Androidがこの経路を使用し、Python／Kotlinはhost bindingとして別の意味分岐を持たない。
 
 ### 12.12 添景と互換記録
 
-現行生成に添景レベルはない。Stage 1.5 と coerce は記述にない要素を足さず、明示内容を配達する限定修復だけを行う。明示angleの数値解決も新しい添景や視覚要素を足す処理ではなく、元のtyped identityを既存`rotation`へ配達する処理である。過去作品の `history.tenkei` と API の `tenkei` は読み取り互換のため残るが、新しい作品の生成契約には作用しない。導入・廃止の経緯と件数は [CHANGELOG.ja.md](CHANGELOG.ja.md) と [公開履歴アーカイブ](docs/history/changelog-v1.72-v2.4.ja.md) に置く。
+現行生成に添景レベルはない。共有compilerとlowererは記述にない要素を足さず、明示内容を配達する限定回復だけを行う。明示angleの数値解決も新しい添景や視覚要素を足す処理ではなく、元のtyped identityを既存`rotation`へ配達する処理である。過去作品の `history.tenkei` と API の `tenkei` は読み取り互換のため残るが、新しい作品の生成契約には作用しない。導入・廃止の経緯と件数は [CHANGELOG.ja.md](CHANGELOG.ja.md) と [公開履歴アーカイブ](docs/history/changelog-v1.72-v2.4.ja.md) に置く。
 
 ### 12.13 変奏（Stage 1.5）
 
@@ -1028,7 +1011,7 @@ renderer は JSON Score を SVG へ変換する。視覚的な実体化を持つ
 - SVG フィルターとテクスチャ効果
 - キャンバス比の扱い
 
-現行の標準実装は共有Rust rendererであり、platform-independentなRust crate `core/crates/inku-render`が演奏の正本である。PythonはScore schemaとcoerceの正本、host側canvas/profileの解決、fresh seedの発行、engine registryを所有する。薄い`render_engines/default/adapter.py`は、検証済みScoreと解決済みoptionを1個の正規JSON requestへまとめ、独立した`inku-render-python` CPython wheelを1回だけ呼び、SVGとmetadataを一緒に受け取る。AndroidはKotlin hostでcoerce済みScore、canvas、色map、profile、seedを解決し、薄い`inku-render-android` JNIを同じ粗いrequestで呼ぶ。`renderer.py`はSVGだけを必要とする既存Server callerの互換facadeであり、第二の描画実装ではない。
+現行の標準実装は共有Rust rendererであり、platform-independentなRust crate `core/crates/inku-render`が演奏の正本である。Scoreの構造と意味は共有Rustを正本とし、Pythonは保存形式の読取互換、host側canvas/profileの解決、fresh seedの発行、engine registryを所有する。薄い`render_engines/default/adapter.py`は、検証済みScoreと解決済みoptionを1個の正規JSON requestへまとめ、独立した`inku-render-python` CPython wheelを1回だけ呼び、SVGとmetadataを一緒に受け取る。AndroidはKotlin hostで共有coreのScore、canvas、色map、profile、seedを解決し、薄い`inku-render-android` JNIを同じ粗いrequestで呼ぶ。`renderer.py`はSVGだけを必要とする既存Server callerの互換facadeであり、第二の描画実装ではない。
 
 Rust core内では、host-neutralなrequest/output型と粗い`render`境界から、決定的seed、performance planning、arrangement／placement／relation、純粋な幾何、mark／stroke／surface／support、ground／presence layer／palette、SVG documentへ一方向に依存する。host SDKやPython runtimeへ依存せず、engine identityとrenderer-owned referenceもcoreが持つ。Engine 40のPython実装やruntime fallbackは持たず、過去のEngine 40 corpusは履歴根拠としてのみ保持する。この境界はServerの出力意味論を固定したままAndroidと将来のclientへ同じcoreを渡すportability boundaryである。Android bindingはEngine 42で統合済みであり、Android固有のKotlin rendererへfallbackしない。
 
@@ -1036,7 +1019,7 @@ SVGからpixelへのpresentationはRender Engineと別の`core/crates/inku-svg-r
 
 renderer は制御された揺らぎを生んでよいが、**JSON Score の意図は保たねばならない**。各描画は `render_seed` を持ちうる。同じ seed を与えれば再演は再現し、正本の Score は動かない。演奏の 2 つのスケールと render engine の版史は §13.8 と §13.11 にある。
 
-**人・顔・動物・群れのモチーフは、文字どおりの対象としては描かない。** Stage 2 と coerce 層がそれらを `Score.presence` へ変換する — presence の種別・強度・重心・対称性・視線の圧・群れの挙動・輪郭密度である。renderer は presence を、かすかな弧・縁へ寄った焦点・非対称な間隔・輪郭密度の圧として実体化する。棒人間・頭と胴の対・翼や尾の印・同一の楕円の輪といった**固定のシルエットは避ける**。
+**旧作品の`Score.presence`は保存形式として維持する。** 旧Stage 2／coerceが人・顔・動物・群れから変換したpresenceの種別・強度・重心・対称性・視線の圧・群れの挙動・輪郭密度を再演できる。新作では記述からpresenceを暗黙に追加しない。renderer は presence を、かすかな弧・縁へ寄った焦点・非対称な間隔・輪郭密度の圧として実体化する。棒人間・頭と胴の対・翼や尾の印・同一の楕円の輪といった**固定のシルエットは避ける**。
 
 primitive 語彙は多角形の語のために `polygon` を持つ。五角形や六角形の primitive を個別に足すことはしない — 多角形の意図は `polygon` と `sides=5-8` で表す。運動のエネルギーは、単に個数や密度を増やすのではなく、軌跡・回転・斜めの配置・波の経路・非対称で扱う。
 
@@ -1050,7 +1033,9 @@ SVG の書き出しは 3 つのプロファイルを持つ。
 
 DB が保存するのは `history.svg` の `display` SVG だけである。編集可能 SVG と互換 SVG は、DB の追加ペイロードとして保存するのではなく**ダウンロード時に生成し直す**。
 
-### 12.15 写生層（Stage 0.5、v2.9.38）
+### 12.15 旧写生層の保存互換（Stage 0.5、v2.9.38）
+
+以下は旧作品を読むための歴史的説明である。新作の通常pipelineは写生文への書き換えを行わず、保存済みの写生情報だけを保持する。
 
 記述と Stage 1 のあいだに置く**任意の層**である。短歌のように密度の高い記述は、Stage 1 が
 一度に噛み砕けない。そこで記述を**物の言葉へ写した自然文（写生文）**に変えてから後段へ渡す。
@@ -1127,7 +1112,7 @@ Object sizeの基準はcanvas短辺で、count・cell・密度に依存しない
 
 Line-upだけが方向を配置へ届ける。省略は従来の横一列、明示horizontalは同じ式でも元の明示identityを保持する。t=(i+1/2)/n-1/2としてanchorからのoffsetはhorizontal=(tW,0)、vertical=(0,tH)、rising=(ts,-ts)、falling=(ts,ts)、s=min(W,H)である。Y下向きの物理座標で斜めは45度とし、長方形の対角線へ引き伸ばさない。Bare diagonalはattestされたoptional composition seed（NoneとSome(0)を区別）、元pre / expanded meaning、元logical occurrenceを専用layout-direction roleでframeして二軸から選ぶ。Shape angleの選択scheme・size・countは変えず、focus / variation / render seedやsource spellingを方向選択へ使わない。Pointにも方向は届くがPoint自身のangleは拒否する。Place / Scatter / Tile、group / relationの新方向、rotated等の未対応方向は元instruction / Emit単位で停止・省略し、全省略は両mode停止する。既存Score入口も新fieldを捨てて成功しない。
 
-Planは一instruction / 一Emitにつき一件で、exact count、解決済み寸法・外観・angle・位置・layout式とsource / generated originを持つ。count比例の配列・個体geometry・Score命令複製は作らない。旧Stop / Continue入力にかかわらず、recoverableなblockingは既存のtyped owner / span / 理由 / 実処置を保つ最小fieldまたは実行単位の省略として扱い、残るplanを返す。全省略をReadyにせず、未対応field・relation・coordinationを黙って捨てない。resource-aware materializerはこのPlanをScore 0.10の再演可能なrecipeへ写し、個体配列を作る前にhard policyとcallerが明示許可したoperational budgetの双方で需要を検査する。現行出荷値はprimitive mark合計400、展開後Score templateごとのprimitive mark 240、resolved count 2000、drawable template 64に加え、`logical_objects` 4096、`template_nodes` 128、`anchor_instances` 4096、`transform_instances` 4096、`placement_instances` 64、`fill_instances` 64であり、countをclampしない。既存4上限の管理者設定と作品に保存された旧予算は維持する。超過した一sourceまたはcoordinated placement全体だけを個体化前に省略して診断し、独立した後続を続ける。保存Scoreはauthorityのsnapshotを持つが需要の自己申告は持たず、再演時にrecipeから再計算する。既存Score wire / lowering outcome / compiler executionの成功意味とScore 0.9のdefault / legacy互換は変わらない。同じ`inku.geometry-resolution-policy.v1`がこの解決をattestする。短いDDLから保存Scoreと非矩形fillのDisplay／Compat、clip後の局所省略・後続描画までの限定Linux確認は成功した。通常Server接続と保存compact Scoreの再演確認は完了したが、fresh reviewで§12.7.1に記す3件が残り、Step 13の統合は未完了と判定した。
+Planは一instruction / 一Emitにつき一件で、exact count、解決済み寸法・外観・angle・位置・layout式とsource / generated originを持つ。count比例の配列・個体geometry・Score命令複製は作らない。旧Stop / Continue入力にかかわらず、recoverableなblockingは既存のtyped owner / span / 理由 / 実処置を保つ最小fieldまたは実行単位の省略として扱い、残るplanを返す。全省略をReadyにせず、未対応field・relation・coordinationを黙って捨てない。resource-aware materializerはこのPlanをScore 0.10を基準とする再演可能なrecipeへ写し、必要な追加fieldに応じて最小の後続Score版を選ぶ。個体配列を作る前にhard policyとcallerが明示許可したoperational budgetの双方で需要を検査する。現行出荷値はprimitive mark合計400、展開後Score templateごとのprimitive mark 240、resolved count 2000、drawable template 64に加え、`logical_objects` 4096、`template_nodes` 128、`anchor_instances` 4096、`transform_instances` 4096、`placement_instances` 64、`fill_instances` 64であり、countをclampしない。既存4上限の管理者設定と作品に保存された旧予算は維持する。超過した一sourceまたはcoordinated placement全体だけを個体化前に省略して診断し、独立した後続を続ける。保存Scoreはauthorityのsnapshotを持つが需要の自己申告は持たず、再演時にrecipeから再計算する。既存Score wire / lowering outcome / compiler executionの成功意味とScore 0.9のdefault / legacy互換は変わらない。同じ`inku.geometry-resolution-policy.v1`がこの解決をattestする。通常Server／Web／Androidと保存compact Scoreの再演は、この共有materializerと局所回復の契約を使う。
 
 ## 13. 揺らぎの設計
 
@@ -1489,7 +1474,7 @@ Canonical meaningでは、記述に明示された個数をlosslessなsymbolic i
 鉛筆の破線の横線を縦に三本並べる。線は細かく揺れる。
 ```
 
-**第二段階（構造化）の出力（JSON Score、抜粋）:**
+**同じ描画意図を表す旧形式Scoreの抜粋。新作では共有lowererが反復recipeへ下ろす。**
 
 ```json
 {
@@ -1617,7 +1602,7 @@ id 参照が必要になった場合も、その必要が実測で示されて�
 - `touching` → line / arc だけに適用し、直前の line / arc の演奏実現後の両端点へ当該要素の両端点を一致させる
 - `connected` → Line / Arc / Pointに適用する。`target_endpoint`があればcurrentのcanonical始端（Pointはcenter）を指定したprior Line / Arc端点へ、なければpriorのcanonical終端（Pointはcenter）へ平行移動する。prior、寸法、曲率、rotationは変えない
 
-現行のtyped Along / Cutting描画はCount1のactual Scoreを対象とする。Macroの反復CompositionPlanは共通のrelation intentを保持するが、反復個体の演奏は後続materializationで扱う。Typed Alongではcurrentと直前要素がともに線で、currentの方向が未指定なら、その方向を直前の線と平行に揃える。明示された方向・寸法・数値位置は保持する。Typed Cuttingも、共通resolverが決めた通常寸法または明示寸法を保持し、専用のランダム長に置き換えない。明示方向は交差角の演奏より優先する。通常DDLとMacroは同じ意味を使う。旧metadata-free Scoreの関係処理は互換用に保持し、Typed DDL本番pipeline／UI／saveの全面接続とは区別する。
+現行のtyped Along / Cutting描画はCount1のactual Scoreを対象とする。Macroの反復CompositionPlanは共通のrelation intentを保持するが、反復個体の演奏は後続materializationで扱う。Typed Alongではcurrentと直前要素がともに線で、currentの方向が未指定なら、その方向を直前の線と平行に揃える。明示された方向・寸法・数値位置は保持する。Typed Cuttingも、共通resolverが決めた通常寸法または明示寸法を保持し、専用のランダム長に置き換えない。明示方向は交差角の演奏より優先する。通常DDLとMacroは同じ意味を使う。旧metadata-free Scoreの関係処理は保存形式の互換用に保持する。
 
 `touching` で当該要素が弧なら、直前要素の確定端点を P1, P2、弦長を `c=|P2-P1|`、当該弧の演奏後の符号付き矢高を `b` とし、`r=c²/(8|b|)+|b|/2` で劣弧を再構成する。中心は弦の中点から膨らみと反対側へ `r-|b|` だけ置き、掃引角は必ず180°未満とする。直前要素が弧なら膨らみ側はその反対側を既定とする。劣弧の符号・掃引規約はRendererのSVG弧描画と一つの実装を共有する。variationと筆致は端点を固定し、中間区間だけへ作用する。閉形、端点のない直前要素、退化した弦・矢高ではrelationをdropし、座標推定による修復やgovernorは行わない。
 
@@ -1629,13 +1614,13 @@ region（`at`）と relation を両方持つ instruction（プラグイン membe
 
 typed compilerは、通常direct隣接instructionの正確な日英full literalと、同じflat Macro expansion内の隣接bound Emit間に明示されたrelationから、`connected`を同じScore consumerへ運ぶ。元Score index、dependency slot、owner、focus、seedを保つ。named位置はmovable、numeric位置はfixedであり、named region解決後に接続に必要な平行移動だけを適用して再clampしない。numericは既存physical geometry精度で必要deltaがzeroなら成功し、非zeroなら明示conflictにする。
 
-recoverable なrelation失敗は、旧Stop入力を含むどのmodeでもSVG全体を止めない。失敗したrelationだけをerrorとして記録して外し、current instructionまたはMacro Emit、その所属group、後続dependencyは元の変形後配置と元Score index / owner / seedのまま描く。参照先をnearest survivorへ付け替えず、複数の移動要求が競合するときは一つを恣意的に優先せず元配置を保ち、その配置で成立しないrelationだけを外す。全描画単位の省略、source / lock / owner / exact Score joinのintegrity失敗、または描画対象が残らない場合は両mode停止する。旧5 relationのwarning / wire挙動は維持する。これはdirect shared/native経路であり、typed DDL本番pipeline、UI、設定保存cutoverの完了を主張しない。
+recoverable なrelation失敗は、旧Stop入力を含むどのmodeでもSVG全体を止めない。失敗したrelationだけをerrorとして記録して外し、current instructionまたはMacro Emit、その所属group、後続dependencyは元の変形後配置と元Score index / owner / seedのまま描く。参照先をnearest survivorへ付け替えず、複数の移動要求が競合するときは一つを恣意的に優先せず元配置を保ち、その配置で成立しないrelationだけを外す。全描画単位の省略、source / lock / owner / exact Score joinのintegrity失敗、または描画対象が残らない場合は両mode停止する。旧5 relationのwarning / wire挙動は維持する。通常pipelineはこのshared/native経路を使う。
 
 validator / coerce で判明するinvalid relationは従来どおりwarningを記録してdropし、relationを発明しない。checked performerでのみ判明するrecoverableな不成立はerrorを記録し、そのrelationだけをdropする。instruction、所属group、後続dependencyは元の変形後配置で描画を続ける。grid layoutがrelationを消費する場合などwarning-classの失敗はstructured warningを記録する。一方、prior boundsの不足やcanonical-silentな退化幾何のfallbackは警告なしでrelationをdropする。
 
 Engine 45のtyped `touching`も通常directと同flat Macroの隣接bound Emitから同じchecked performerへ届く。日英の四full literalは、有限宣言に書かれたLine / Arc対象を元のPreviousOneと照合し、型が違えばcanonical成功へ進まない。Macroは実際のtyped Emitを確認し、literalのnoun条件を作らない。Line / Arcだけが成功対象で、先行を変えずに両端を一致させ、Arcは上記と同じ劣弧再構成を使う。明示numeric geometryまたはrelative scale（normalのfactor 1も含む）は寸法を固定し、明示angleはcanonical両端順による弦方向を固定する。省略normalはTouchingに合わせて変わりうる。Numeric位置はanchor固定かつ最終geometryの既存must-fitを保ち、named focusはmovable/clippingのままとする。不一致はtyped conflictとなる。
 
-typed Touchingにも上のrelation recoveryと元dependency / owner / drawing ordinal規則を適用する。不成立ならTouchingだけをerrorとして外し、current、同じgroup、後続dependencyを元の変形後配置で描く。新metadataのない旧Touchingには上記legacyの再構成・warning・dropを保ち、Connectedも変えない。typed本番pipeline / UI / 保存設定cutoverとwhole Step10の完了は含まない。
+typed Touchingにも上のrelation recoveryと元dependency / owner / drawing ordinal規則を適用する。不成立ならTouchingだけをerrorとして外し、current、同じgroup、後続dependencyを元の変形後配置で描く。新metadataのない旧Touchingには上記legacyの再構成・warning・dropを保ち、Connectedも変えない。
 
 ### 14.5 relation の owner
 
@@ -1773,9 +1758,9 @@ ordinal / expansion path / generated ordinalをframeし、SHA-256先頭byteのmo
 隅内のanchorは既存Rendererのrender seedが選ぶ。別の演奏・明示変奏は隅を変えない。
 Tableはpolicyの有理数定義から最後にだけScore f64へ変換する。Policy IDは同じでも内容digestは変わり、
 semantic schemaの新versionを意味しない。未指定位置は補わず、named/numeric conflict、numeric must-fitを保つ。
-Noncenterとrelationの未対応境界は広げず、relationを黙って落とさない。このdeliveryは通常の共有runtime / UI / 保存経路から使用されるが、whole Step10の完了を意味しない。
+Noncenterとrelationの未対応境界は広げず、relationを黙って落とさない。このdeliveryは通常の共有runtime / UI / 保存経路から使用される。
 
-JSON Score は Stage 2 が生む機械可読の楽譜である。**最終的な作品ではない** — renderer が演奏する構造である。
+JSON Score は共有lowererが検証済みmeaningから作る機械可読の楽譜である。**最終的な作品ではない** — renderer が演奏する構造である。
 
 楽譜の主要な概念:
 
@@ -1855,11 +1840,11 @@ Canvas selectionはvisible DDLやmacroの意味ではなく、shared coreの`ink
 
 選択が無いhost boundaryでは`square`をhost defaultにできるが、DDL compilerが`square`をsemantic factとして挿入する意味ではない。Hostがresolved selectionをScore / render context / historyへ運び、RendererがSVGの`width` / `height` / `viewBox`を決める。Stage 2が現行互換経路でcanvasを受け取る場合も、これはhost-resolved composition contextであってvisible DDL metadataではない。
 
-現行runtimeの`plugin_storage["canvas-aspect"]`、`canvas_aspect` request alias、保存済み`Score.canvas` / `render_canvas_aspect*`、system / user plugin directory、plugin status / enable toggleはread compatibilityとして残る。これらは新規plugin authoring modelではない。Retirementとruntime / UI cutoverは後続Stepが所有し、本節は完了済みと主張しない。現行UIで比を変えたときは描画表示を消してplaceholderへ切り替えるが、表示中作品はlineage contextとして保持し、次の保存作品は`canvas_aspect_change`の子として記録できる。
+現行runtimeの`plugin_storage["canvas-aspect"]`、`canvas_aspect` request alias、保存済み`Score.canvas` / `render_canvas_aspect*`、system / user plugin directory、plugin status / enable toggleはread compatibilityとして残る。これらは新規plugin authoring modelではない。保存済み設定とcatalog発見に必要なstorage／API互換を保ち、これらを旧意味決定実装の実行経路にはしない。現行UIで比を変えたときは描画表示を消してplaceholderへ切り替えるが、表示中作品はlineage contextとして保持し、次の保存作品は`canvas_aspect_change`の子として記録できる。
 
 Position座標は`0.0`から`1.0`の正規化のままで、Xはcanvas幅、Yはcanvas高さの割合である。左上は`(0.0,0.0)`、右下は`(1.0,1.0)`、exact centerは`(0.5,0.5)`とする。Named center、qualitative region、exact numeric coordinateは別authorityで、exact coordinateをStage 1.5のfocus targetにせず、silent move / clamp / snapしない。Boundary anchorの妥当性と、shape extentがcanvasからclipする診断は別に扱う。
 
-Direct typed DDLは、JAの`半径N` / `直径N` / `幅N、高さN` / `一辺N`と`画面の横X、縦Yの位置`、対応するENの有限構造、および日英の有限7class size modifierを受け入れる。小数は元のspellingとsource spanをprovenanceに残し、意味では符号付きbase-10係数とscaleへ正規化する。Lock検証済みStage 1.5 v5 viewとhostが明示したcanvas / backgroundを入口とし、color省略時だけ対応するresolved palette contextも要求する。数値位置、またはverified direct instructionの元`place:center`と、place actionが解決済みのcircle、ellipse、cloudform、square、triangle、polygonの独立instruction群は、明示numeric geometryまたは現行normal / qualitative geometryと、省略count=1 / pen / solid / fill / contrast colorをactual `Score`へ変換できる。`none` / `solid` / surface省略の既存fillを保ったまま、`wash` / `grain` / `stipple` / `hatch` / `crosshatch` / `bleed` / `aquatint`は既存Rendererの`SurfaceSpec`へ、検証済みの`paper` / `washi` / `ink_wash` / `charcoal_ground` / `canvas` / `drawing_paper` / `mezzotint`はhost解決済みaspectを持つ`Canvas::Spec`の既存`CanvasGroundSpec`へ届く。数値のtexture / material defaultやseedをcompilerは作らない。solidな閉じた塗りのSurface intensityは道具別のnormal／dense／faintへ届く。非solid・Pointの明示surface等のrecoverableな未対応組合せは、旧Stop / OmitAndContinue入力にかかわらず最小fieldまたは実行単位を診断付きで省略し、残るScoreを返す。Groundだけも描画内容であり、Groundを残す場合も元の省略診断を保つ。整合性不良または全省略はstoppedである。このRust経路はruntimeにはまだ接続しない。
+Direct typed DDLは、JAの`半径N` / `直径N` / `幅N、高さN` / `一辺N`と`画面の横X、縦Yの位置`、対応するENの有限構造、および日英の有限7class size modifierを受け入れる。小数は元のspellingとsource spanをprovenanceに残し、意味では符号付きbase-10係数とscaleへ正規化する。Lock検証済みStage 1.5 v5 viewとhostが明示したcanvas / backgroundを入口とし、color省略時だけ対応するresolved palette contextも要求する。数値位置、またはverified direct instructionの元`place:center`と、place actionが解決済みのcircle、ellipse、cloudform、square、triangle、polygonの独立instruction群は、明示numeric geometryまたは現行normal / qualitative geometryと、省略count=1 / pen / solid / fill / contrast colorをactual `Score`へ変換できる。`none` / `solid` / surface省略の既存fillを保ったまま、`wash` / `grain` / `stipple` / `hatch` / `crosshatch` / `bleed` / `aquatint`は既存Rendererの`SurfaceSpec`へ、検証済みの`paper` / `washi` / `ink_wash` / `charcoal_ground` / `canvas` / `drawing_paper` / `mezzotint`はhost解決済みaspectを持つ`Canvas::Spec`の既存`CanvasGroundSpec`へ届く。数値のtexture / material defaultやseedをcompilerは作らない。solidな閉じた塗りのSurface intensityは道具別のnormal／dense／faintへ届く。非solid・Pointの明示surface等のrecoverableな未対応組合せは、旧Stop / OmitAndContinue入力にかかわらず最小fieldまたは実行単位を診断付きで省略し、残るScoreを返す。Groundだけも描画内容であり、Groundを残す場合も元の省略診断を保つ。整合性不良または全省略はstoppedである。この共有Rust経路を通常Server／Web／Androidが使用する。
 
 痕のisotropic size、円・弧の半径、`radial`の環、`at.region`の広がり、clusterの帯、pathの交差軸のずれは、そのallocationまたはcanvas短辺を基準に画素へ直す。Circleをaspect-correctに保ち、ellipseは記述したaspectを保つ。置き場所・region中心・cluster中心は幅と高さに比例し、pathの進行量（`margin` / `span`）と`arrangement.margin`は各軸の割合を保つ。この決定は§18の単一`inku.geometry-resolution-policy.v1` ownerに従う。
 
@@ -1879,23 +1864,21 @@ Shared typed compilerで揺らぎが不成立なら、旧Stop / Continue入力�
 
 ### 単一描画
 
-記述者は指示を 1 つ書き、パイプライン全体を走らせる。得られた DDL は読み取り専用の解釈ボックスで確認し、DDL 編集ダイアログで直接編集できる。DDL からの再演は Stage 1 を飛ばし、Stage 2 と renderer をもう一度呼ぶ。
+記述者は指示を 1 つ書き、パイプライン全体を走らせる。得られた DDL は読み取り専用の解釈ボックスで確認し、DDL 編集ダイアログで直接編集できる。DDLからの再演は記述生成を飛ばし、保存済み可視DDLを共有compiler／lowererへ戻してrendererを呼ぶ。
 
 正規化 DDL は単一描画の入力の下に**読み取り専用の解釈ボックス**として現れる。
 
 - v1.98 から Canvas のツールバーに置かれた `歳時記` トグルは、サイドドロワーを**閲覧専用の語彙リファレンス**として開く — 語のチップを押すと挿入ではなくプレビューが出る
 - `DDL 編集` ボタンは、行番号・2 列の歳時記語彙パネル・短い DDL 構文ガイドを持つ大きなダイアログを開く。v1.98 から**語の挿入はこのダイアログのインライン歳時記だけで起きる**。ここは読み込まれたプラグインの語彙も並べる
-- `自動補修` は設定から切り替える。既定は有効。無効にすると Stage 2 の出力は広い `coerce_score()` の補修を通さずに描画されるが、**要求された primitive／色の契約に反する命令は、硬い契約ガードが取り除くことがある**
+- 旧`自動補修`設定は廃止する。意味の検証と回復は共有compilerが担い、上限超過の配置や成立しない関係は、それぞれ既定の単位で診断とともに扱う。旧APIの`auto_repair` fieldは受け取るが動作を切り替えない。
 
-同じ `DDL から描画` の操作は解釈ボックスの下にもあり、ダイアログを開かずに素早く再演できる。候補の metadata は、当てはまるところで render、composition、variation、interpretation の seed を示す。DDL 編集ダイアログの `描画` は、編集した DDL を保って Stage 2 と renderer だけを走らせ、自然言語の記述を解釈し直さない。
+同じ `DDL から描画` の操作は解釈ボックスの下にもあり、ダイアログを開かずに素早く再演できる。候補の metadata は、当てはまるところで render、composition、variation、interpretation の seed を示す。DDL編集ダイアログの`描画`は、編集したDDLをauthoring authorityとして保存し、共有compiler／lowererとrendererを走らせ、自然言語の記述を解釈し直さない。
 
-描画タブは明示の再生成操作を 2 つ出す。**別の演奏**は同じ Score を保ち、renderer にだけ新しい演奏 seed を求める。**別の構図**は保存済み正規化 DDL を保って `composition_seed` を進め、Stage 1.5 の閉じた六つの候補から焦点を選び直し、明示angleがあればStage 2で具体角度も、明示cornerがあれば隅も選び直す。構図族、技法、色、タッチ、relation、要素数は変えない。同じlock検証済みmeaningとattested `composition_seed`なら同じeffective meaningと角度・隅を再現する。別の演奏と明示変奏は確定角度と隅を保つ。保存済みScore / expanded artifactを優先し、原文を保存し、silent backfillを行わず、恒久的なold/new runtime switchを作らない。semantic schema / identityは変更bytesを旧identityと偽らない。D1の実装到達は§12.11のtyped v5からresource-awareなScore 0.10演奏coreまで接続したが、製品host runtime / UI / API / 保存への切替は未完了である。
+描画タブは明示の再生成操作を 2 つ出す。**別の演奏**は同じ Score を保ち、renderer にだけ新しい演奏 seed を求める。**別の構図**は保存済み正規化 DDL を保って `composition_seed` を進め、Stage 1.5 の閉じた六つの候補から焦点を選び直し、明示angleがあれば共有lowererで具体角度も、明示cornerがあれば隅も選び直す。構図族、技法、色、タッチ、relation、要素数は変えない。同じlock検証済みmeaningとattested `composition_seed`なら同じeffective meaningと角度・隅を再現する。別の演奏と明示変奏は確定角度と隅を保つ。保存済みScore / expanded artifactを優先し、原文を保存し、silent backfillを行わず、恒久的なold/new runtime switchを作らない。semantic schema / identityは変更bytesを旧identityと偽らない。通常Server／Web／Androidは§12.11のtyped v5からresource-awareなcompact Score演奏coreまで同じ共有経路を使用する。保存済みScoreとhistoryの読取・再演には必要な形式互換を保持する。
 
-v1.98 から単一描画は `POST /api/paint/stream`（NDJSON）を呼ぶ。解釈が終わった時点で `stage1` イベントを出し（正規化 DDL・使ったモデル・トークン数・所要時間・フォールバックの旗）、Stage 2 と描画が続くあいだ UI は解釈を見せられる。最後の `done` イベントは従来と同じ `PaintResponse` を運ぶ。`POST /api/paint` は同じロジックの包みとして応答の形を変えずに残るので、**CLI と Android に変更は要らない**。
+通常UIは共有pipelineの実行状態から可視DDL、補完候補、保存済み結果を表示する。互換用の`POST /api/paint/stream`は、同じ共有pipelineの最終結果を一つの`done` NDJSON recordとして返す。補完patchの承認待ちはstream開始前にHTTP 409で返す。旧`sketch`／`stage1`／`score`の四段階streamを新作の進捗契約にはしない。`POST /api/paint`も同じ共有経路の互換入口として維持する。
 
-v2.13.39 から合図は 4 つになった。写生層が動いた回は `sketch` が `stage1` より前に出て（粒度・フォールバックの旗・トークン数・写生に掛かった時間）、Stage 2 と coerce が終わって Score が確定した時点で `score` が出る（命令数・使ったモデル・トークン数・所要）。**段階表示はこの 4 つの合図で切り替わり、次の層を推測して先に出すことをやめた。**写生文と Score の本体はイベントに載せない（`done` が既に運んでいる）。**`stage1` の `elapsed_ms` は写生を含んだままである** — 内訳は `sketch` の `elapsed_ms` を引けば出る。**⚠ 最初のイベントが `sketch` になったため、写生層が動いた要求では Stage 1 の失敗が HTTP 502 ではなく本文の `{"event":"error","status":502}` で届く**（写生 off の回は 502 のまま）。「最初のイベントより前の失敗は HTTP、後の失敗は本文」という規則そのものは変わっていない。
-
-DDL の再演は所要時間・トークン情報・停止ボタン・進捗マスコットを見せる。再演の停止は実行中の `/api/compose` 要求を中断する。単一描画と DDL 再演のあいだ、単一タブは実行中の効果を出し、バッチ／デモの開始操作は抑止される。
+DDL の再演は所要時間・トークン情報・停止ボタン・進捗マスコットを見せる。再演の停止は実行中の要求を中断する。単一描画と DDL 再演のあいだ、単一タブは実行中の効果を出し、バッチ／デモの開始操作は抑止される。
 
 単一描画・DDL 再演・バッチ・デモの進捗表示には、**設定で選んだマスコットが 1 体**出る。選べるのは `Incu` と `Yuragi` の 2 体で、既定は `Incu`。名前は固有名詞なので翻訳しない。`Incu` は 5×5 の画素で組んだ立方体で、15 秒に 1 回ゆっくり回る。`Yuragi` は蟹で、左の鋏を 11 秒ごと、右の鋏を 8 秒ごとに持ち上げて挨拶する。切り替えは設定ダイアログで行う。**画面ごとに違うマスコットが出ることはない。**
 

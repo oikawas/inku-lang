@@ -27,14 +27,6 @@ through Stage 2/rendering:
 inku-cli paint "白い背景に黒い線を一本引く。" --input-mode ddl --save-history
 ```
 
-Whether a plugin expands is decided by the description, not by the DDL, so a DDL
-that spells a plugin word expands to nothing on its own. `--fires-on` supplies
-the prose, which is how a word's own expansion is drawn with nothing else in it:
-
-```sh
-inku-cli paint "落葉" --input-mode ddl --fires-on "落葉"
-```
-
 ## List history, with or without the drawings
 
 `history` returns each work's whole SVG by default, which is what makes it
@@ -338,7 +330,7 @@ usage: inku-cli paint [-h] [--base-url BASE_URL]
                       [--canvas-aspect {square,golden,a4,b4,pillar,oban,wide,byobu,vertical}]
                       [--render-seed RENDER_SEED]
                       [--composition-seed COMPOSITION_SEED]
-                      [--seed-text SEED_TEXT] [--fires-on FIRES_ON] [--sketch]
+                      [--seed-text SEED_TEXT] [--sketch]
                       [--sketch-grain {fine,coarse}]
                       [--sketch-text SKETCH_TEXT]
                       [--variation-amplitude {small,medium,large}]
@@ -392,9 +384,6 @@ options:
   --seed-text SEED_TEXT
                         explicit text used only to derive the renderer
                         performance seed
-  --fires-on FIRES_ON   in --input-mode ddl, the prose a plugin expansion
-                        fires on; without it a DDL that spells a plugin word
-                        still expands to nothing
   --sketch              run the description through the sketch-from-life layer
                         (Stage 0.5) before Stage 1, so the later stages read
                         the sketch instead of the description; server default
@@ -459,7 +448,7 @@ usage: inku-cli batch [-h] [--base-url BASE_URL]
                       [--canvas-aspect {square,golden,a4,b4,pillar,oban,wide,byobu,vertical}]
                       [--render-seed RENDER_SEED]
                       [--composition-seed COMPOSITION_SEED]
-                      [--seed-text SEED_TEXT] [--fires-on FIRES_ON] [--sketch]
+                      [--seed-text SEED_TEXT] [--sketch]
                       [--sketch-grain {fine,coarse}]
                       [--sketch-text SKETCH_TEXT]
                       [--variation-amplitude {small,medium,large}]
@@ -512,9 +501,6 @@ options:
   --seed-text SEED_TEXT
                         explicit text used only to derive the renderer
                         performance seed
-  --fires-on FIRES_ON   in --input-mode ddl, the prose a plugin expansion
-                        fires on; without it a DDL that spells a plugin word
-                        still expands to nothing
   --sketch              run the description through the sketch-from-life layer
                         (Stage 0.5) before Stage 1, so the later stages read
                         the sketch instead of the description; server default

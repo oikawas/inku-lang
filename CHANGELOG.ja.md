@@ -6,6 +6,12 @@
 
 **本書が持つのは v2.5.0（2026-07-25、render engine 12）以降**の 34 版である。それより前は書庫にある。
 
+### 2026-09-14 — カメラの共有語彙と旧層整理
+
+通常Server／Web／Androidの意味決定を共有Rustへ統一し、Pythonの旧解釈・展開・Score生成とKotlinの旧決定層、専用比較testを除いた。保存済みScore／SVG／履歴、保存時予算と旧9:5用紙の再演互換を保持し、保存Scoreの形式互換はDDLを再解釈しない入口へ絞る。カメラDDLも共有Stage 1語彙projectionを使い、通常のJSON応答指定と分離した。旧promptを再構成して送信記録のように表示する処理と、現在は効いていないWeb／Android設定・CLI送信項目を外した。共有bindingは1.1.0、byte protocolは1.0.0、camera DDL promptはv2となる。
+
+外部Python bundle生成と二重build、製品内の一時acceptance appを除去し、既存host testも通常wheelへ揃えた。DDL参照generatorは採用済み可視DDLを共有Rustでコンパイルする形式へ移し、旧expander／coerceの参照を過去資料として保持する。日英仕様のStage 2をknown-hole補完、Score生成を共有lowererとして揃え、「じゅん」を含む13カテゴリと保存互換を明確にした。DDL_VERSION11、DDL engine45、render66、必要な最小Score版の契約は変えない。
+
 ### 2026-09-14 — Server配備wheelへ共有pipelineを同梱
 
 既存のPython native wheelが共有authoring pipelineのbyte境界も公開し、通常Serverはそのinstalled moduleを直接使う。外部生成bundleを通常runtimeの依存から外した。Linux wheelと実binding・SQLiteの限定経路で、可視DDLの保存・authority・known-hole自動要求を確認した。意味決定、DDL／Scoreの形式、engine版は変えず、旧決定層の除去と一括配備は後続で行う。

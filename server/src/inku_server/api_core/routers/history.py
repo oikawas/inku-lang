@@ -9,9 +9,8 @@ from pydantic import BaseModel, Field
 from ...animation_export import build_animation
 from ...card_export import build_card
 from ...feature_analysis import composition_distance
-from ...coerce import coerce_score
-from ...ddl_expander import FOCUS_IDS
-from ...limits import limits_as_dict, using_limits
+from ...limits import limits_as_dict
+from ...saved_score_compat import SAVED_FOCUS_IDS, coerce_saved_score
 from ...schema import Score
 from ...sketch import SketchDetail, normalize_sketch_grain, sketch_state_of
 from ... import db as _db
@@ -386,18 +385,14 @@ def api_history_post(
         pre_coerce_score = Score.model_validate(body.score)
         coerce_observability = _capture_history_coerce_observability(
             pre_coerce_score,
-            ddl=None,
             lang=body.instruction_lang_resolved,
-            auto_repair=True,
-            include_trace=False,
         )
-        with using_limits(limits):
-            score = coerce_score(
-                pre_coerce_score,
-                limits=limits,
-                lang=body.instruction_lang_resolved,
-                trace=coerce_observability,
-            )
+        score = coerce_saved_score(
+            pre_coerce_score,
+            limits=limits,
+            lang=body.instruction_lang_resolved,
+            trace=coerce_observability,
+        )
         catalog_id = _resolved_catalog_id(body.catalog_id)
         canvas_aspect = _validated_canvas_aspect_override(body.canvas_aspect)
         if canvas_aspect is not None:
@@ -412,7 +407,7 @@ def api_history_post(
             "ui_lang": body.ui_lang,
             "render_seed": render_seed,
             "composition_seed": body.composition_seed,
-            "focus": body.focus if body.focus in FOCUS_IDS else None,
+            "focus": body.focus if body.focus in SAVED_FOCUS_IDS else None,
             "variation_amplitude": _validated_variation_amplitude(body.variation_amplitude),
             "variation_seed": body.variation_seed,
             "seed_text": seed_text,

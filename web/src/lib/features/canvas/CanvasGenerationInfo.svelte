@@ -11,8 +11,6 @@
 	import { normalizeSketchGrain, normalizeSketchState, sketchModeLabel, sketchStateNote } from '$lib/sketch';
 	import type { SvgWeight } from '$lib/svgWeight';
 
-	type PromptsData = { stage1_system: string; stage2_system: string };
-
 	export type GenerationInfoWork = {
 		note?: string | null;
 		description_hash?: string | null;
@@ -77,11 +75,8 @@
 		detailSvgBytes: number | null;
 		statusHashLabel: string;
 		statusHashCopied: boolean;
-		promptsData: PromptsData | null;
 		stage1PromptText: string;
 		ddl: string | null;
-		promptStage1Expanded: boolean;
-		promptStage2Expanded: boolean;
 		copiedPrompt: 'stage1' | 'stage2' | 'score' | null;
 		scoreJsonText: string;
 		scoreJsonLines: string[];
@@ -116,11 +111,8 @@
 		detailSvgBytes,
 		statusHashLabel,
 		statusHashCopied,
-		promptsData,
 		stage1PromptText,
 		ddl,
-		promptStage1Expanded = $bindable(false),
-		promptStage2Expanded = $bindable(false),
 		copiedPrompt,
 		scoreJsonText,
 		scoreJsonLines,
@@ -337,11 +329,8 @@
 			<OutputTabsContent
 				bind:scrollEl={tabsScrollEl}
 				outputTab={tab}
-				{promptsData}
 				{stage1PromptText}
 				{ddl}
-				bind:promptStage1Expanded
-				bind:promptStage2Expanded
 				{copiedPrompt}
 				{scoreJsonText}
 				{scoreJsonLines}

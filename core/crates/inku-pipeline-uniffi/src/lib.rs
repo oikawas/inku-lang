@@ -8,7 +8,7 @@ mod macro_catalog;
 
 pub use macro_catalog::resolve_macro_catalog;
 
-const BINDING_VERSION: &str = "1.0.0";
+const BINDING_VERSION: &str = "1.1.0";
 const PROTOCOL_VERSION: &str = "1.0.0";
 
 uniffi::setup_scaffolding!();
@@ -37,6 +37,18 @@ pub fn canvas_registry() -> String {
     let digest =
         inku_score::canvas_format_registry_digest().expect("static canvas registry has a digest");
     format!(r#"{{"registry":{registry},"digest":"{digest}"}}"#)
+}
+
+/// Project the shared Stage 1 grammar and vocabulary before a host has an authoring input.
+#[uniffi::export]
+pub fn stage1_system_projection(language_code: String) -> String {
+    let language = if language_code == "en" {
+        inku_ddl::ResolvedInstructionLanguage::En
+    } else {
+        inku_ddl::ResolvedInstructionLanguage::Ja
+    };
+    inku_pipeline::prompts::stage1_system_projection(language)
+        .expect("static Stage 1 projection is valid")
 }
 
 #[derive(serde::Deserialize)]

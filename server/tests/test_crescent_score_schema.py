@@ -3,7 +3,8 @@ import json
 import pytest
 from pydantic import ValidationError
 
-from inku_server.coerce.normalize import _coerce_instruction, _has_relation_contour, _shape_extent
+from inku_server.limits import DEFAULT_LIMITS
+from inku_server.saved_score_compat import coerce_saved_score
 from inku_server.schema import Instruction, Score
 
 
@@ -76,7 +77,9 @@ def test_crescent_coercion_preserves_its_physical_box() -> None:
         }
     )
 
-    coerced = _coerce_instruction(crescent)
+    coerced = coerce_saved_score(
+        Score(version="0.2.0", instructions=[crescent]), limits=DEFAULT_LIMITS
+    ).instructions[0]
 
     assert coerced.arc_form == "crescent"
     assert coerced.center == (0.5, 0.5)
@@ -84,5 +87,3 @@ def test_crescent_coercion_preserves_its_physical_box() -> None:
     assert coerced.radius is None
     assert coerced.angle_start is None
     assert coerced.angle_end is None
-    assert _shape_extent(coerced) == pytest.approx(0.2572564393705176)
-    assert _has_relation_contour(coerced)

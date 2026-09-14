@@ -1,183 +1,135 @@
 # DDL処理pipeline
 
+通常Server／WebとAndroidは、同じ共有Rust authoring state machine、typed compiler、lowerer、rendererを使用する。
+
 ## 段階と所有者
 
-| 段階 | 入力 → 出力 | 決定性・fallback | 所有module |
+| 段階 | 入力 → 出力 | 契約 | 所有module |
 |---|---|---|---|
-| 記述 | 作者の文 → 保存用原文とpipeline用本文 | 行頭番号・括弧注記は描画pipelineから切除、原文は保持。切除後が空なら400 | `description_labels.py`; `render.py` |
-| Stage 0.5 | 記述 → 写生文 | 任意、LLM。requestが写生文を持てばそのまま再利用しLLMを呼ばない。失敗（timeout・provider例外・空出力）時は記述へfallbackし`sketch_state`記録 | `sketch.py`; `render.py:_resolved_sketch` |
-| Stage 1 | 記述/写生文 → 正規化DDL | LLM、空/timeout等にfallback。プラグイン語だけの入力（純粋呼出し）はStage 1を飛ばして転写 | `interpreter.py`; `render.py:_call_interpret_detail` |
-| plugin展開 | 正規化DDL → core DDL + optional instructions | 文書検証後、seedつき決定的writing-down。seedは記述のhash | `plugins/document_format.py`; `_call_compose_detail` |
-| Stage 1.5 | core DDL → effective DDL | 決定的。現行は焦点書換えのみ、明示変奏時だけ軸を動かす | `ddl_expander.py` |
-| Stage 2 | effective DDL → JSON Score | LLM tool/schema。空・短すぎる出力は理由つきで1回retryし、timeout・空retry後は決定的fallback（`compose_fallback`へ記録） | `composer.py`; `render.py:_call_compose_detail` |
-| coerce/validation | Score → renderable Score | `auto_repair`時のみ。不正relation等はdrop。要求配達とhard ceilingを行い、記述が抽象色を一つだけ名指す条件ではcolor cycleをその色へ畳む。分岐の発火は`coerce_branch_counts`（trace時） | `coerce/` |
-| Render Engine | Score + seeds + 解決済みhost option → SVG + metadata | 同一Score・seed・条件で再現。runtime fallbackなしの粗いnative 1-call境界 | registry `render_engines/__init__.py`; 薄いadapter `default/adapter.py`; binding `inku-render-python`; portable core `core/crates/inku-render`; 別入口 `renderer.py`（SVG-only互換facade） |
-| 履歴・系譜 | pipeline生成物 → DB row/node/edge | DB transaction。edgeは明示parent+kindのみ | `rendering.py`; `db.py` |
+| Host入力 | 記述またはdirect DDL → typed command | 記述起点だけStage 1を要求する。Direct DDLは自然文へ戻さない | Server pipeline host / Android pipeline host |
+| Authoring state machine | snapshot + command/effect result → next snapshot + event + 最大1 effect | 決定的。provider transportと保存はtyped effectとして外出しし、再試行とauthority遷移はcoreが決める | `core/crates/inku-pipeline` |
+| Stage 1 effect | 記述 → visible normalized DDL候補 | LLMはDDL候補だけを返す。Scoreを書かず、Macro本文やhidden meaningを受け取らない | shared core prompt/action; host provider adapter |
+| CAS保存 | DDL候補 + revision → 保存済みvisible DDL | 一致するatomic save acknowledgment後だけsourceとauthorityを進め、exact saved bytesを再parseする | authority store / pipeline host |
+| Typed compiler | visible DDL + definition locks → verified meaning + diagnostics | source、provenance、Macro definitionをlock検証し、bounded expansionする。曖昧さをfirst/nearest/lastで推測しない | `core/crates/inku-ddl` |
+| Hole補完 | known hole → patch候補 → 作者承認 | known holeだけをspanとdigestに閉じて要求する。HoleなしではStage 2 LLMを呼ばない。承認patchもCAS保存後に再parseする | shared state machine + host provider/store |
+| Typed Stage 1.5 | verified meaning + composition/variation seed → effective meaning | LLMを使わずfocusだけを決定的に変換する。原文の意味や明示属性を上書きしない | `core/crates/inku-ddl` |
+| Lowering/materialization | verified effective meaning → actual Score / compact recipe | 一度だけ下ろし、表現に必要な最小Score版を選ぶ。Compact基準は0.10、鏡写しrelationを持つ作品だけが0.15を必要とする | `core/crates/inku-ddl`; `core/crates/inku-score` |
+| Resource check / Render Engine | Score + saved policy + seeds + resolved host options → SVG + metadata | 個体化前に需要を検査し、超過した一sourceまたはcoordinated placement全体を局所省略する。同じScore、seed、条件は同じ演奏を再現する | `core/crates/inku-render` |
+| 履歴・系譜 | DDL / Score / SVG / authority context → DB row/node/edge | Historyは当該revisionのsource、config、seed、catalog、budget、definition lockを保持し、親子を類似性から推測しない | Server DB / Android Room |
 
-判定単位の詳細（どの条件で・何が起き・何が記録されるか）は `description-to-svg.ja.md` が持つ。
+判定単位の詳細は [SPEC.ja.md](../../SPEC.ja.md) §12.7.1が正本である。
 
-## 受入済みのTyped DDL経路（runtime未接続）
-
-Step 8で、利用者に見える正規化DDLからtyped semantic documentとcompiler lockまでを
-作るshared Rust基盤を`core/crates/inku-ddl`へ受け入れた。
-
-```mermaid
-flowchart LR
-    VDDL["可視の正規化DDL"]
-    DOC["source-preserving document"]
-    STRUCTURE["lexer / clause stream\nmacro resolution / binding"]
-    AST["typed semantic document"]
-    EXPAND["bounded macro expansion"]
-    LOCK["compiler lock"]
-    SCORE["JSON Score / 現行runtime"]
-
-    VDDL --> DOC --> STRUCTURE --> AST --> EXPAND --> LOCK
-    LOCK -.->|"後続Stepで接続"| SCORE
-```
-
-この経路は、Stage 1が生成したDDLと利用者が直接書いたDDLを同じ可視本文から扱う。
-自然文や非表示の背景情報をcompilerへ迂回させず、canvas metadataや未決定の描画既定値を
-DDLの意味として挿入しない。複数の読みが残る場合はfirst / nearest / lastで決めず、
-source spanと候補をtyped issueへ保存してfail closedする。
-
-`compile_typed_ddl`の呼出しは現時点で`inku-ddl` crate内とそのtestだけにあり、server・
-Web・Androidの製品pipelineには未接続である。したがって、以下の通常描画図は現在の
-runtimeを、上図は受入済みの次期compiler境界を表す。
-
-## 通常描画
+## 通常authoring
 
 ```mermaid
 flowchart TD
     DESC["記述"]
-    LABELS["描画対象本文を抽出"]
-    S05["Stage 0.5 写生 任意"]
-    S1["Stage 1 解釈"]
-    DDL["正規化DDL"]
-    PLUGIN["宣言的plugin展開"]
-    S15["Stage 1.5 決定的拡張"]
-    EFFECTIVE["実効DDL"]
-    S2["Stage 2 Score化"]
-    SCORE["JSON Score"]
-    COERCE["coerce / validation"]
-    RENDER["Render Engine\nPython adapter → native wheel → Rust core"]
-    SVG["SVG + 描画metadata"]
-    HISTORY[("履歴DB + 系譜")]
-    FILES[("任意の作品ファイル")]
+    DIRECT["Direct DDL"]
+    HOST["Server / Android host"]
+    CORE["共有Rust authoring state machine"]
+    S1["Stage 1 typed effect"]
+    DDL["保存済みvisible DDL\nauthority + revision"]
+    COMPILER["typed compiler\nlock + bounded Macro expansion"]
+    HOLE{"known hole?"}
+    PROPOSAL["補完patch候補"]
+    APPROVAL{"作者が承認?"}
+    S15["typed Stage 1.5"]
+    LOWER["shared lowerer / materializer"]
+    SCORE["最小互換Score版\ncompact基準0.10"]
+    RENDER["resource-aware Render Engine 66"]
+    SVG["SVG + diagnostics + metadata"]
+    HISTORY[("履歴 / 系譜")]
 
-    DESC -->|"原文は保存側にも保持"| LABELS
-    LABELS -->|"sketch=on"| S05
-    LABELS -->|"sketch=off"| S1
-    S05 -->|"写生文 / 失敗時は記述"| S1
-    S1 -->|"Stage 1出力"| DDL
-    DDL -->|"coreへwriting-down"| PLUGIN
-    PLUGIN -->|"core DDL"| S15
-    S15 -->|"Stage 2入力"| EFFECTIVE
-    EFFECTIVE --> S2
-    S2 --> SCORE
-    SCORE --> COERCE
-    COERCE -->|"Score + seed + color"| RENDER
-    RENDER --> SVG
-    SVG -->|"save_history"| HISTORY
-    HISTORY -.->|"best-effort派生保存"| FILES
+    DESC --> HOST --> CORE
+    CORE -->|"provider effect"| S1 --> HOST
+    HOST -->|"effect result"| CORE
+    DIRECT --> HOST
+    CORE -->|"CAS save effect"| DDL
+    DDL --> COMPILER --> HOLE
+    HOLE -->|"yes"| PROPOSAL --> APPROVAL
+    APPROVAL -->|"yes: CAS save + reparse"| DDL
+    APPROVAL -->|"no"| EDIT["元DDLを保持して作者の編集を待つ"]
+    HOLE -->|"no"| S15 --> LOWER --> SCORE --> RENDER --> SVG --> HISTORY
 ```
 
-## `/api/paint` とstreaming
+Provider patchは候補にすぎず、hostが直接採用しない。Hostは一つのeffectにつきproviderを一度だけ呼び、失敗結果をcoreへ返す。次のeffectまたは有限な終了はcoreが決める。
+
+## APIとplatform境界
 
 ```mermaid
 sequenceDiagram
-    participant C as Web/CLI client
-    participant R as render router
-    participant P as Stage pipeline
+    participant C as Web / CLI / Android UI
+    participant H as Host adapter
+    participant A as Shared authoring core
     participant L as LLM provider
-    participant E as Render Engine
-    participant D as DB
-    participant F as Artifact queue
+    participant P as Persistence
+    participant R as Shared renderer
 
-    C->>R: POST /api/paint または /api/paint/stream
-    R->>P: _paint_events(request)
-    opt Stage 0.5 enabled
-        P->>L: 写生
-        L-->>P: 写生文 / fallback
-        R-->>C: streamのみ sketch NDJSON event
+    C->>H: authoring command
+    H->>A: snapshot bytes + input envelope
+    opt provider effect
+        A-->>H: typed effect action
+        H->>L: one transport attempt
+        L-->>H: candidate or failure
+        H->>A: identity-preserving effect result
     end
-    P->>L: Stage 1
-    L-->>P: 正規化DDL
-    R-->>C: streamのみ stage1 NDJSON event
-    P->>P: plugin展開 + Stage 1.5
-    P->>L: Stage 2 tool/schema
-    L-->>P: Score / retry / fallback
-    P->>P: coerce + validation
-    R-->>C: streamのみ score NDJSON event
-    P->>E: Score + render/composition seed
-    E-->>P: SVG + metadata
-    opt save_history
-        P->>D: history + node + optional edge transaction
-        P->>F: 任意の派生保存job
+    opt save effect
+        A-->>H: CAS-save visible DDL
+        H->>P: atomic save
+        P-->>H: matching acknowledgment
+        H->>A: save result
     end
-    P-->>R: PaintResponse
-    R-->>C: response または done NDJSON event
+    A-->>H: verified Score or typed failure
+    H->>R: Score + saved policy + render context
+    R-->>H: SVG + diagnostics
+    H->>P: history + authority link
+    H-->>C: response / progress events
 ```
 
-## 推敲の再入点
+ServerのPython adapterとAndroidのKotlin/JNI adapterはhost処理を行う薄い境界で、意味を別実装しない。Androidの通常UIは`InkuRepository` → `AndroidWorkPipeline` → JNIで共有coreへ到達する。Webは既存HTTP APIを通してServerの同じpipeline serviceを使う。
 
-推敲は「pipelineをもう一度最初から」ではない。各操作は保存済みの生成物から、決まった層へ再入する。矢印の注記は**保たれるもの**である。
+## 再入点
 
-```mermaid
-flowchart LR
-    SAVED[("保存済み作品\n記述・写生文・DDL・Score・seed群")]
-    S1["Stage 1"]
-    S15["Stage 1.5"]
-    S2["Stage 2"]
-    COERCE["coerce"]
-    RENDER["Render Engine"]
+| 操作 | 保つもの | 再開点 |
+|---|---|---|
+| 読み取りを変える | 元作品と明示parent relation | 保存済みcontextから新しいStage 1 command |
+| DDL編集 | authoring origin、CAS、元history | 作者DDL候補のCAS保存後にcompilerへ再入 |
+| 別の構図 | 保存済みvisible DDL、元meaning、描画属性 | 新しい`composition_seed`でtyped Stage 1.5／lowerer |
+| 明示変奏 | 保存済みvisible DDL、構図族、色、タッチ、個数 | amplitude + `variation_seed`でtyped Stage 1.5／lowerer |
+| 別の演奏 | 保存Scoreとauthoring revision | 新しい`render_seed`でrendererだけ |
+| catalog / canvas変更 | 元variationを変更しない | 現在optionsを持つ親付きnew variation |
 
-    SAVED -->|"読み取りを変える: 写生文は再利用、interpretation_seedだけ新しい"| S1
-    SAVED -->|"配置: 保存DDLへcomposition_seed"| S15
-    SAVED -->|"変奏: 保存DDLへamplitude+variation_seed"| S15
-    SAVED -->|"タッチ（別の演奏）: 保存Scoreへ新しいrender_seed"| RENDER
-    SAVED -->|"言葉でタッチを変える: seed_textからrender_seedを決定的に導出"| RENDER
-    SAVED -->|"色カタログ: 保存Scoreとseedのまま色写像だけ変更"| RENDER
-    S1 --> S15
-    S15 --> S2
-    S2 --> COERCE
-    COERCE --> RENDER
-```
+過去historyを選んだときは、そのrevisionに保存されたcontextを使う。同じvariationの最新snapshotから推測せず、壊れたsidecarも再compileで補わない。
 
-- 再入した層より上流は変わらない。「読み取りを変える」は写生をやり直さず（確定済み写生文を`sketch_text`で渡し、Stage 0.5のLLMは呼ばれない）、「配置」「変奏」は解釈（DDL）を変えず、「タッチ」「色カタログ」はScoreを変えない。
-- 再入した層より下流は再走する。「配置」「変奏」はStage 2のLLMを通り直すので、構図族の選択は決定的でも、Scoreの充填はモデル依存で揺れうる。
-- AI自律推敲は上の5種（`reinterpretation` / `layout_change` / `variation` / `touch_change` / `catalog_change`）から各世代1種を選ぶ反復で、Visionの助言は次世代への入力になるだけである（`autonomous_refine.py:ALLOWED_KINDS`）。
+## 保存互換とplatform境界
 
-## 設計契約の実装位置
+- 保存済みSVGは当時の表示の正本であり、旧Scoreと旧artifactはread compatibilityを保つ。
+- 新しい作品の意味は共有Rustが決定する。旧作品は保存済みScore／SVGと保存時のcontextを優先し、旧DDLを再解釈して置き換えない。
+- AndroidのカメラDDL promptも共有RustのStage 1語彙projectionを使う。履歴は保存された記述・DDL・model情報を表示し、記録されていない送信promptを後から推測しない。
+- Serverは配布用の同じnative wheelにauthoring pipelineとrendererを含める。Androidは同じ共有coreへJNIで接続する。
+- iOS接続はAndroid受入の範囲外で、別途保留する。
 
-| 契約 | 実装での保持 |
+## 生成条件と同一性
+
+`rh3`の直接材料はScore、render seed、wild、engine identity、render color catalog IDである。その他の設定は、Scoreまたは直接材料を変える場合にedition同一性へ効く。
+
+| 条件 | 解決する層 | 保存先 |
+|---|---|---|
+| visible DDL source / authority / revision | authoring state machine + CAS store | snapshot / history link |
+| Macro definition / catalog / canvas identity | compiler inputとしてlock検証、host optionとして解決 | definition lock / config / history |
+| `composition_seed` / variation | typed Stage 1.5 + lowerer | config / render metadata |
+| resource policy / operational budget | materializer + checked performance | Score policy / history |
+| `render_seed` / `wild` / concrete color map | Render Engine | render metadata / history |
+| model choice | Stage 1またはknown-hole effectのhost transport | effect metadata / history |
+
+## 実装位置
+
+| 境界 | 主な実装 |
 |---|---|
-| Stage 1 / Stage 2分離 | `interpret_detail`と`compose`は別関数・別model解決。`/api/compose`はStage 1を通らない |
-| Stage 1.5は意味を上書きしない | 現行`_expand_ja/_expand_en`は焦点のreframeだけで新しい文を追加しない |
-| pluginはStage 1直後 | `_call_compose_detail`: `manager.expand` → `expand_intermediate_for_lang` → `compose` |
-| 後段はplugin namespace非依存 | plugin文書はcore DDL/instructionへ閉じ、未知参照をdrop。provenanceだけmetadataへ残す |
-| drop-only優先 | invalid relationは`_drop_invalid_relations`。ただしcoerceは要求配達repairと、単一の名指し色だけを残す決定的規則も持つため、完全なdrop-onlyではない |
-| 再現性 | 決定的なseed派生はRustが所有し、Engine 41凍結corpusが描画byteを固定する。Python `seeds.py` はhostのfresh entropy発行だけを所有する。`renderer.py`は `render` だけを公開し、採用したfresh seedはmetadata/DBへ保存 |
-| 過去engineを選び直さない | `current_render_engine()`は現行1 engine。履歴のdisplay SVGは保存済みを返す |
-| 歳時記single source | `saijiki.py`からprompt、markers、relation literals、API表示、referenceを導出 |
-
-## 生成パラメータの注入点
-
-生成を変えるパラメータは、それぞれ決まった層に注入される。**rh3列が本表の要点である** — edition同一性 `rh3` の直接材料は「Score・render seed・wild・engine ID/版・色カタログID」だけで、それ以外はScoreを変えることを通じてのみ同一性に効く。直接材料に触れる変更は、同じ作品を別のeditionにする。
-
-| パラメータ | 注入される層 | rh3への効き方 | 記録先 |
-|---|---|---|---|
-| 色カタログ（`catalog_id` / `catalog_mode`） | Renderの色写像 | **直接材料**（`render_color_catalog_id`） | render metadata・履歴列。`auto`はmodeも記録 |
-| `render_seed` | Render Engine | **直接材料** | render metadata |
-| `seed_text`（言葉でタッチを変える） | `render_seed`を決定的に導出してRender Engineへ | render_seedを通じて直接材料 | `seed_text`と導出seedの両方 |
-| `wild`（暴れる） | Render Engine | **直接材料**（`render_wild`） | render metadata |
-| `canvas_aspect` | Stage 2 prompt + Scoreの`canvas` | Score経由 | Score・`render_canvas_aspect_*`列 |
-| `composition_seed` | Stage 1.5の構図族選択 | Score経由（直接材料ではない） | render metadata |
-| `variation_amplitude` / `variation_seed` | Stage 1.5の明示変奏 | Score経由 | render metadata・`variation_moved_axes` |
-| `interpretation_seed` | Stage 1 | DDL→Score経由 | render metadata |
-| 写生設定（on/off・grain） | Stage 0.5 | 写生文→DDL→Score経由 | `sketch_text` / `sketch_grain` / `sketch_state`列 |
-| 制限値（limits） | Stage 1/2 promptに明記＋coerceが適用 | Score経由 | `render_limits`と`render_limits_source`、超過は`render_limit_notes` |
-| model選択（Stage 0.5/1/2） | 各LLM呼出し | Score経由（材料ではない） | `stage1_model` / `stage2_model`列 |
-
-## 図の根拠
-
-`PIPE-SKETCH`、`PIPE-S1`、`PIPE-PLUGIN`、`PIPE-S15`、`PIPE-S2`、`PIPE-COERCE`、`PIPE-RENDER`、`PIPE-HISTORY`、`PIPE-LIMITS`、`DATA-RH3`、`DATA-FALLBACK`。主なcall siteは `server/src/inku_server/api_core/routers/render.py:_paint_events` と `_call_compose_detail`。
+| Shared state machine / byte protocol | `core/crates/inku-pipeline`, `core/crates/inku-pipeline-uniffi` |
+| Typed compiler / Stage 1.5 / lowerer | `core/crates/inku-ddl` |
+| Score schema / compatibility / resource policy | `core/crates/inku-score` |
+| SVG performance | `core/crates/inku-render` |
+| Server host | `server/src/inku_server/pipeline_runtime.py`, `pipeline_product.py`, `pipeline_provider.py` |
+| Android host | `android/.../pipeline/SharedAuthoringPipeline.kt`, `AndroidWorkPipeline.kt`, `NativePipelineBridge.kt` |
+| Product contract | [SPEC.ja.md](../../SPEC.ja.md) §12.7.1、§12.11、§18 |

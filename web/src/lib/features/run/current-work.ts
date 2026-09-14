@@ -63,8 +63,7 @@ export type PaintResult = {
 	elapsed_stage2_ms: number;
 	elapsed_total_ms: number;
 	source_ddl?: string | null;
-	// What the expansion layer removed and why. This reaches the record on
-	// every path, so the author can see which part of the sentence was lost.
+	// Compatibility diagnostics returned for older saved work.
 	plugin_warnings?: string[] | null;
 	// Which render limits took effect and where they came from. The values say
 	// what was used; the source distinguishes a replayed ceiling (ledger I-154).
@@ -132,7 +131,6 @@ export type CurrentWorkDefaults = {
 	includeThinking: boolean;
 	instructionLang: InstructionLang;
 	canvasAspectId: CanvasAspectId;
-	ddlAutoRepairEnabled: boolean;
 	sketchMode: SketchMode;
 	renderPayload: Record<string, unknown>;
 };
@@ -200,7 +198,6 @@ export async function runCurrentWork(
 			variation_seed: options.variationSeed ?? null,
 			interpretation_seed: options.interpretationSeed,
 			seed_text: options.seedText,
-			auto_repair: defaults.ddlAutoRepairEnabled,
 			save_history: options.saveHistory ?? true,
 			save_artifacts: options.saveArtifacts ?? true,
 			count_generation: options.countGeneration ?? true,

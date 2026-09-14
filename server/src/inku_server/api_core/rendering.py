@@ -9,19 +9,16 @@ from datetime import datetime, timezone
 from pathlib import Path
 from fastapi import HTTPException
 from ..color_catalogs import DEFAULT_COLOR_CATALOG_ID, get_color_catalog, render_color_map_for_catalog
-from ..coerce import coerce_score
-from ..ddl_expander import VARIATION_AMPLITUDES
-from ..interpreter import _sanitize_placement_words
 from ..layer_versions import DDL_ENGINE_VERSION, DDL_VERSION
 from ..limits import (
     LIMIT_FIELD_NAMES,
     Limits,
     limits_from_settings,
     normalize_limits,
-    using_limits,
 )
 from ..plugins import canvas_aspect_ids, canvas_aspect_ratio_for_aspect, normalize_canvas_aspect_id
 from ..render_engines import SVG_PROFILES, current_render_engine, new_render_seed
+from ..saved_score_compat import VARIATION_AMPLITUDES, coerce_saved_score
 from ..schema import CanvasSpec, Score
 from .. import db as _db
 from .common import _build_number, _model_metadata
@@ -40,10 +37,8 @@ _SRGB_COLOR_PROFILE = {
 def _effective_limits() -> Limits:
     """Read the stored limits ONCE for this request.
 
-    Every route that coerces a score calls this and passes the result down by
-    name. `coerce_score`'s `limits=` defaults to DEFAULT_LIMITS, so a route that
-    forgets would run at the defaults silently rather than fail -- which is why
-    the count of routes that pass it is a stated number, not an assumption.
+    Every versionless saved-Score route calls this and passes the result to the
+    compatibility seam by name, so it cannot silently use process defaults.
     """
     return limits_from_settings(_db.get_render_limit_settings())
 
@@ -154,7 +149,7 @@ def _render_hash_metadata(
     score_payload = score.model_dump(by_alias=True) if isinstance(score, Score) else score
     item = {
         "input": input_text,
-        "ddl": _sanitize_placement_words(ddl) if ddl else ddl,
+        "ddl": ddl,
         "score": score_payload,
         "svg": svg,
         "catalog_id": catalog_id,
@@ -230,8 +225,7 @@ def _render_score_svg(
     # own row rather than from today's default: a caller that starts handing a
     # DDL over must not silently get the reading rules of the other language.
     lang = (work or {}).get("instruction_lang_resolved")
-    with using_limits(limits):
-        score = coerce_score(Score.model_validate(score_payload), limits=limits, lang=lang)
+    score = coerce_saved_score(score_payload, limits=limits, lang=lang)
     # Three answers to "which paper", in the order they bind: the caller's
     # override, the paper the work was performed on, and the Score's own
     # declaration. The middle one is read off the work's row because the Score
@@ -552,43 +546,15 @@ def _score_with_canvas(score: Score, canvas_aspect: str) -> Score:
     return Score.model_validate(data)
 
 
-# The word a writer uses to say Stage 2 held. A value rather than NULL on
-# purpose: NULL already means "this row predates the column", and one field
-# cannot carry both readings at once.
-COMPOSE_FALLBACK_NONE = "none"
-
-
-def compose_fallback_value(*, fallback_used: bool, reasons: list[str] | None) -> str:
-    """What to record about Stage 2 for a work being saved now.
-
-    Always a string, never None: a writer that knows the answer says so either
-    way, so a reader can tell a work whose compose held from one drawn before
-    anybody wrote this down. The reason is the first the stage gave, which is
-    the same shape Stage 1's column already uses.
-    """
-    if not fallback_used:
-        return COMPOSE_FALLBACK_NONE
-    for reason in reasons or []:
-        if reason:
-            return reason
-    return "stage2_fallback"
-
-
 def _capture_history_coerce_observability(
     score: Score,
     *,
-    ddl: str | None,
     lang: str | None,
-    auto_repair: bool,
-    include_trace: bool,
 ):
-    """Create a private capture independent of the public trace response flag."""
+    """Create a private capture for saved Score normalization."""
     from ..coerce.observability import capture_context
 
-    trace = capture_context(score, ddl=ddl, lang=lang)
-    if not auto_repair:
-        trace.mark_not_executed("auto_repair_off")
-    return trace
+    return capture_context(score, ddl=None, lang=lang)
 
 
 def _add_history_item(
@@ -648,8 +614,8 @@ def _add_history_item(
         "user_id": actor["id"],
         "output_path": str(prefix),
         "input": input_text,
-        "ddl": _sanitize_placement_words(ddl) if ddl else ddl,
-        "expanded_ddl": _sanitize_placement_words(expanded_ddl) if expanded_ddl else expanded_ddl,
+        "ddl": ddl,
+        "expanded_ddl": expanded_ddl,
         "interpret_fallback": interpret_fallback,
         "compose_fallback": compose_fallback,
         "score": score_dict,

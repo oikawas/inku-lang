@@ -31,7 +31,6 @@
 
 	type OutputTab = 'canvas' | 'refine' | 'lineage';
 	type ApiFetch = (path: string, init?: RequestInit) => Promise<Response>;
-	type PromptsData = { stage1_system: string; stage2_system: string };
 	type Props = {
 		outputTab: OutputTab;
 		result: PaintResult | null;
@@ -55,12 +54,9 @@
 		canvasAspectWidth: number;
 		canvasAspectHeight: number;
 		viewport: CanvasViewport;
-		promptsData: PromptsData | null;
 		stage1PromptText: string;
 		instructionText: string;
 		ddl: string | null;
-		promptStage1Expanded: boolean;
-		promptStage2Expanded: boolean;
 		copiedPrompt: 'stage1' | 'stage2' | 'score' | null;
 		scoreJsonText: string;
 		scoreJsonLines: string[];
@@ -193,12 +189,9 @@
 		canvasAspectWidth = 1,
 		canvasAspectHeight = 1,
 		viewport,
-		promptsData,
 		stage1PromptText,
 		instructionText,
 		ddl,
-		promptStage1Expanded = $bindable(false),
-		promptStage2Expanded = $bindable(false),
 		copiedPrompt,
 		scoreJsonText,
 		scoreJsonLines,
@@ -716,11 +709,8 @@
 		detailSvgBytes={detailSvgBytes}
 		{statusHashLabel}
 		{statusHashCopied}
-		{promptsData}
 		{stage1PromptText}
 		{ddl}
-		bind:promptStage1Expanded
-		bind:promptStage2Expanded
 		{copiedPrompt}
 		{scoreJsonText}
 		{scoreJsonLines}

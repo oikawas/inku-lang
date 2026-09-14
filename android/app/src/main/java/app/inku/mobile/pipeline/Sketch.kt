@@ -155,3 +155,14 @@ object Sketches {
     fun modeNote(mode: SketchMode, isJapanese: Boolean): String =
         if (mode != SketchMode.Off) "" else if (isJapanese) "（推奨しない）" else "(not recommended)"
 }
+
+/**
+ * Persisted sketch transport for history and replay. The retired Stage 0.5
+ * producer is deliberately not part of this DTO.
+ */
+data class SketchInput(
+    val requested: Boolean = false,
+    val text: String? = null,
+    val grain: String? = null,
+    val claimedState: String? = null,
+)

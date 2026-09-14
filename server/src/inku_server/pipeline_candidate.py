@@ -1,21 +1,17 @@
 """Serialized host execution for the shared Rust authoring pipeline.
 
-Configuration, bundle location and owner identity come from the trusted server.
+Configuration, native binding and owner identity come from the trusted server.
 Clients cannot submit snapshots,
 authority sidecars, effect results or resource policies through this module.
 """
 
 from __future__ import annotations
 
-import hashlib
 import importlib
-import importlib.util
 import json
-import platform
 import threading
 import time
 import uuid
-from pathlib import Path
 from typing import Callable
 
 from .persistence.variation_authority import VariationAuthoringContext, VariationAuthorityStore
@@ -30,54 +26,22 @@ def _bytes(value: dict) -> bytes:
 
 
 class PipelineBinding:
-    """Use the shipped native wheel or an explicit short-lived fixture bundle."""
+    """Use the shared authoring boundary packaged in the shipped native wheel."""
 
-    def __init__(self, bundle: Path | None = None):
-        if bundle is None:
-            try:
-                module = importlib.import_module("inku_render")
-                version_report = module.pipeline_version_report
-                self.step = module.pipeline_step
-                self.canvas_registry = json.loads(module.pipeline_canvas_registry())
-                self.resolve_palette = module.pipeline_resolve_palette
-                self.render_saved = module.pipeline_render_saved
-                self.resolve_macro_catalog = module.pipeline_resolve_macro_catalog
-            except (AttributeError, ImportError) as error:
-                raise CandidateHostError("binding_unavailable") from error
-            self.versions = json.loads(version_report())
-            if self.versions != {"binding_version": "1.0.0", "protocol_version": "1.0.0"}:
-                raise CandidateHostError("binding_protocol_mismatch")
-            return
-
-        bundle = bundle.resolve()
-        manifest = json.loads((bundle / "manifest.json").read_bytes())
-        library = {"Darwin": "libinku_pipeline_uniffi.dylib", "Linux": "libinku_pipeline_uniffi.so"}.get(platform.system())
-        if (
-            manifest.get("schema") != "inku.pipeline-python-bundle.v1"
-            or manifest.get("platform") != platform.system()
-            or manifest.get("machine") != platform.machine()
-            or set(manifest.get("files", {})) != {library, "inku_pipeline_uniffi.py"}
-        ):
-            raise CandidateHostError("binding_bundle_mismatch")
-        for name, digest in manifest["files"].items():
-            if hashlib.sha256((bundle / name).read_bytes()).hexdigest() != digest:
-                raise CandidateHostError("binding_bundle_mismatch")
-        spec = importlib.util.spec_from_file_location(
-            "inku_pipeline_candidate_" + uuid.uuid4().hex, bundle / "inku_pipeline_uniffi.py"
-        )
-        if spec is None or spec.loader is None:
-            raise CandidateHostError("binding_unavailable")
-        module = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(module)
-        self.versions = json.loads(module.version_report())
-        if self.versions != {"binding_version": "1.0.0", "protocol_version": "1.0.0"}:
+    def __init__(self):
+        try:
+            module = importlib.import_module("inku_render")
+            version_report = module.pipeline_version_report
+            self.step = module.pipeline_step
+            self.canvas_registry = json.loads(module.pipeline_canvas_registry())
+            self.resolve_palette = module.pipeline_resolve_palette
+            self.render_saved = module.pipeline_render_saved
+            self.resolve_macro_catalog = module.pipeline_resolve_macro_catalog
+        except (AttributeError, ImportError) as error:
+            raise CandidateHostError("binding_unavailable") from error
+        self.versions = json.loads(version_report())
+        if self.versions != {"binding_version": "1.1.0", "protocol_version": "1.0.0"}:
             raise CandidateHostError("binding_protocol_mismatch")
-        self.step = module.step
-        # Older Step12 bundles remain useful for their existing byte fixtures.
-        self.canvas_registry = json.loads(module.canvas_registry()) if hasattr(module, "canvas_registry") else None
-        self.resolve_palette = getattr(module, "resolve_palette", None)
-        self.render_saved = getattr(module, "render_saved", None)
-        self.resolve_macro_catalog = getattr(module, "resolve_macro_catalog", None)
 
 
 class CandidateExecution:

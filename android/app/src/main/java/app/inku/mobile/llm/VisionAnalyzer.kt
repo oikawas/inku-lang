@@ -1,6 +1,6 @@
 package app.inku.mobile.llm
 
-import app.inku.mobile.pipeline.WebDdlSpec
+import app.inku.mobile.pipeline.NativePipelineBridge
 import org.json.JSONObject
 
 const val LOCAL_VISION_MODEL_ID = "local-litert-lm:gemma-4-e2b"
@@ -87,7 +87,7 @@ internal object LocalLiteRtLmOutput {
 /** One owner for the equivalent JA / EN local-observation prompts. */
 internal object VisionPrompts {
     const val VERSION = "camera-description-v1"
-    private const val DDL_VERSION = "camera-ddl-v1"
+    private const val DDL_VERSION = "camera-ddl-v2"
 
     fun versionFor(outputMode: VisionOutputMode): String = when (outputMode) {
         VisionOutputMode.DESCRIPTION -> VERSION
@@ -121,7 +121,7 @@ internal object VisionPrompts {
     }
 
     private fun ddlForLanguage(languageCode: String): String {
-        val authority = WebDdlSpec.stage1LiteRtVisionSystemPromptForDisplay()
+        val authority = NativePipelineBridge.stage1SystemProjection(languageCode)
         val cameraBoundary = if (languageCode == "en") {
             """
             # Camera input boundary

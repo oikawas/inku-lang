@@ -15,7 +15,7 @@ import { projectRefinementRedrawResult, runLayoutRedraw, runReadingRedraw, runTo
 type Iteration = HistoryItem;
 type DdlDiffPart = { kind: 'same' | 'removed' | 'added'; text: string; };
 type RefinementWork = Pick<WorkState,
-	'confirmFallbackRefine' | 'currentRefineParent' | 'ddl' | 'ddlAutoRepairEnabled' |
+	'confirmFallbackRefine' | 'currentRefineParent' | 'ddl' |
 	'ddlGeneratedBaseline' | 'displayedHistoryItem' | 'elapsedStage1Ms' | 'elapsedStage2Ms' |
 	'elapsedTotalMs' | 'error' | 'expandedDdl' | 'input' | 'instructionLang' | 'loading' |
 	'paintOne' | 'paintTokensIn' | 'paintTokensOut' | 'reloadError' | 'reloading' | 'result' |
@@ -326,7 +326,6 @@ export function createRefinementCoordinator(deps: RefinementCoordinatorDeps) {
 				instruction_lang: work.instructionLang,
 				ui_lang: getLang(),
 				canvas_aspect: refinementCanvasAspectId(),
-				auto_repair: work.ddlAutoRepairEnabled,
 				composition_seed: compositionSeed,
 				...renderSettingsPayload('compose', refinementRenderOverrides()),
 				...(deps.lineageParentId() ? { lineage_parent_node_id: deps.lineageParentId() } : {}),
@@ -411,7 +410,6 @@ export function createRefinementCoordinator(deps: RefinementCoordinatorDeps) {
 				instruction_lang: work.instructionLang,
 				ui_lang: getLang(),
 				canvas_aspect: refinementCanvasAspectId(),
-				auto_repair: work.ddlAutoRepairEnabled,
 				variation_amplitude: amplitude,
 				variation_seed: seed,
 				...renderSettingsPayload('compose', refinementRenderOverrides()),

@@ -15,7 +15,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from .color_catalogs import color_catalogs, get_color_catalog, render_color_map_for_catalog
 from .macro_catalog import resolve_new_work_macro_catalog
 from .pipeline_candidate import CandidateHostError, PipelineBinding, _bytes
-from .pipeline_provider import ProviderOptions, SingleAttemptProvider
+from .pipeline_provider import ProviderOptions, SingleAttemptProvider, resolved_stage_model
 from .pipeline_settings import PipelineSettings, select_canvas
 from .persistence.variation_authority import VariationAuthorityStore
 
@@ -63,7 +63,6 @@ class ProductPipelineEffects:
     def prepare(self, owner: str, kind: str, text: str, options: dict, work: dict | None) -> tuple[dict, dict]:
         from . import db
         from .api_core.common import _resolve_instruction_lang
-        from .api_core.routers.render import _resolved_stage_model
         from .api_core.rendering import _render_seed_from_text
 
         try:
@@ -141,8 +140,8 @@ class ProductPipelineEffects:
                                "resolved": resolved[entry["id"]]} for entry in catalogs] if mode == "auto" else []
         actor = db.get_user(owner)
         selected.update(
-            stage1_model=_resolved_stage_model(selected.get("stage1_model"), actor, stage="stage1"),
-            stage2_model=_resolved_stage_model(selected.get("stage2_model"), actor, stage="stage2"),
+            stage1_model=resolved_stage_model(selected.get("stage1_model"), actor, stage="stage1"),
+            stage2_model=resolved_stage_model(selected.get("stage2_model"), actor, stage="stage2"),
             render_seed=str(seed), seed_text=seed_text, catalog_mode=mode,
             instruction_lang=selected.get("instruction_lang") or "auto",
             instruction_lang_resolved=language, catalog_id=catalog_id,

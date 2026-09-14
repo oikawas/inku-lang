@@ -182,39 +182,8 @@ def test_compose_payload_for_ddl_input_mode():
         "model": "s2",
         "instruction_lang": "auto",
         "catalog_id": "default",
-        "auto_repair": True,
     }
     assert "description" not in payload
-
-
-def test_compose_payload_carries_the_prose_a_plugin_fires_on():
-    """`--fires-on` is the only way a plugin expands in ddl input mode.
-
-    Whether a plugin fires is decided by the description (`source_text` on the
-    server); the DDL is only hashed for the seed. A DDL that spells a plugin
-    word therefore expands to nothing on its own, which reads as the plugin
-    being broken rather than as the description being absent.
-    """
-    parser = cli.build_parser()
-    args = parser.parse_args(
-        ["paint", "落葉", "--input-mode", "ddl", "--fires-on", "落葉"]
-    )
-
-    payload = cli._compose_payload(args, "落葉", stage2_model="s2", color_catalog="default")
-
-    assert payload["fires_on"] == "落葉"
-    # The DDL is unchanged: the flag adds prose, it does not rewrite the input.
-    assert payload["ddl"] == "落葉"
-
-
-def test_compose_payload_omits_an_empty_fires_on():
-    parser = cli.build_parser()
-    args = parser.parse_args(["paint", "落葉", "--input-mode", "ddl", "--fires-on", "   "])
-
-    payload = cli._compose_payload(args, "落葉", stage2_model="s2", color_catalog="default")
-
-    # Blank is not a description: sending "" would claim the work has one.
-    assert "fires_on" not in payload
 
 
 def test_compose_result_keeps_which_plugin_expanded():

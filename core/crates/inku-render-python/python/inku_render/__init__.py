@@ -7,13 +7,14 @@ from ._native import (
     pipeline_render_saved,
     pipeline_resolve_macro_catalog,
     pipeline_resolve_palette,
+    pipeline_stage1_system_projection,
     pipeline_step,
     pipeline_version_report,
-    renderer_reference_json,
     render,
-    render_with_resources,
     render_engine_id,
     render_engine_version,
+    render_with_resources,
+    renderer_reference_json,
 )
 
 __all__ = (
@@ -23,11 +24,12 @@ __all__ = (
     "pipeline_render_saved",
     "pipeline_resolve_macro_catalog",
     "pipeline_resolve_palette",
+    "pipeline_stage1_system_projection",
     "pipeline_step",
     "pipeline_version_report",
-    "renderer_reference_json",
     "render",
-    "render_with_resources",
     "render_engine_id",
     "render_engine_version",
+    "render_with_resources",
+    "renderer_reference_json",
 )

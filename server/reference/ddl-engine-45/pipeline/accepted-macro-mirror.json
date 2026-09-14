@@ -1,0 +1,1310 @@
+{
+  "delivery": {
+    "compiler_lock": {
+      "blocking_diagnostic_identities": [],
+      "canonical_pre_expansion_digest": "6e0bc9f0857ccd9fd552ff2bb3c36ea42912dea653dc715ed7566a9a2c799ee7",
+      "composition_seed": "17",
+      "conflict_identities": [],
+      "definition_identities": [
+        {
+          "qualified_name": "Nature.下草",
+          "resolved_definition_digest": "88046b24987a2600eeb8b985f36bc15222202a5758a0f4a7638e514dd6af2aea",
+          "sidecar_digest": "sha256:88046b24987a2600eeb8b985f36bc15222202a5758a0f4a7638e514dd6af2aea",
+          "version": "1.0.0"
+        },
+        {
+          "qualified_name": "Nature.枯草",
+          "resolved_definition_digest": "7cbfea0d3d71e47cf32f98c4c28574e9ecc4e536bd8bf8eb700ea9bee263e290",
+          "sidecar_digest": "sha256:7cbfea0d3d71e47cf32f98c4c28574e9ecc4e536bd8bf8eb700ea9bee263e290",
+          "version": "1.0.1"
+        },
+        {
+          "qualified_name": "Nature.枯葉",
+          "resolved_definition_digest": "1ceac898eb3b3f5478f8cf6cb8661eae7c4fc40a0a871e10cfeac64b02fafdf5",
+          "sidecar_digest": "sha256:1ceac898eb3b3f5478f8cf6cb8661eae7c4fc40a0a871e10cfeac64b02fafdf5",
+          "version": "1.0.1"
+        },
+        {
+          "qualified_name": "Nature.紅葉",
+          "resolved_definition_digest": "ccb0feb87149da13d10e1310e64d0299dafdad6056d3e75a5567e1a293442ba4",
+          "sidecar_digest": "sha256:ccb0feb87149da13d10e1310e64d0299dafdad6056d3e75a5567e1a293442ba4",
+          "version": "1.0.0"
+        },
+        {
+          "qualified_name": "Nature.若葉",
+          "resolved_definition_digest": "82ffc5c348a82ba927b315acaaa5ce4bc4c3998e2497deecd91535fb3005c8f4",
+          "sidecar_digest": "sha256:82ffc5c348a82ba927b315acaaa5ce4bc4c3998e2497deecd91535fb3005c8f4",
+          "version": "1.0.1"
+        },
+        {
+          "qualified_name": "Nature.落葉",
+          "resolved_definition_digest": "5bb12d41611739c63c589f98d28feda1d2d5e49fb669c339790bd4a4e3b006f3",
+          "sidecar_digest": "sha256:5bb12d41611739c63c589f98d28feda1d2d5e49fb669c339790bd4a4e3b006f3",
+          "version": "1.0.1"
+        },
+        {
+          "qualified_name": "Nature.青葉",
+          "resolved_definition_digest": "0527f7a1bc0d81bf9b6141d326afce99034ccd0666c3d70260ead027dcb72a8e",
+          "sidecar_digest": "sha256:0527f7a1bc0d81bf9b6141d326afce99034ccd0666c3d70260ead027dcb72a8e",
+          "version": "1.0.0"
+        }
+      ],
+      "expanded_generated_provenance_digest": "714ba153a7d69ebbcaf81ca596ffc799deed254d73ede7bc96152e2b9a73c8c2",
+      "expanded_meaning_digest": "5a62e6a53d56687fa6250b69df6ba1f633abafdce18815e73ed0f23b03ee408d",
+      "full_digest": "6d65727e327e26d4f48d7b7f09afc19ad1e84f353b87637bf4e1522b98a58717",
+      "geometry_policy_digest": "210ddd7bed6b4ae837d17404a91c8a371f1e3f7a9adbf6e41e9fbdae3346d23e",
+      "geometry_policy_id": "inku.geometry-resolution-policy.v1",
+      "hole_identities": [],
+      "macro_seeds": [
+        {
+          "full_digest": "661e11b0320ef3f593dc093f7980b8cba73c74c054fe1beedb6551333a43eb81",
+          "ordinal": "0",
+          "qualified_name": "Nature.若葉",
+          "resolved_seed": "7358338289621726197",
+          "scheme_id": "ddl-v1"
+        }
+      ],
+      "schema_id": "inku.typed-ddl-compiler-lock.v18",
+      "semantic_source_provenance_digest": "e324c3e8220ca154bfbff53fc61338b569e8298280ac3f1f42f412b6e7ccdf06",
+      "state": "canonical_ready",
+      "structured_semantic_occurrence_digest": "c86a475492929f3f3c0b948b99029d519162745acac7c06f0dedcbe9214aa6b1",
+      "visible_source_digest": "22188167a31123965eec3dfac13e62dad6228dfa119cc0757c441ffb0c1aae2e"
+    },
+    "compiler_lock_digest": "6d65727e327e26d4f48d7b7f09afc19ad1e84f353b87637bf4e1522b98a58717",
+    "downstream_diagnostics": [],
+    "outcome": "complete",
+    "relation_omissions": [],
+    "resource_omissions": [],
+    "schema_id": "inku.pipeline-compiled-delivery.v1",
+    "score": {
+      "background": "white",
+      "canvas": "square",
+      "instructions": [
+        {
+          "angle_end": 44.76027010391915,
+          "angle_start": 135.23972989608086,
+          "arrangement": {
+            "center": null,
+            "cluster_count": null,
+            "color_cycle": [],
+            "cols": null,
+            "count": 1,
+            "density": "none",
+            "fade": "none",
+            "group_size": 1,
+            "jitter": 0.0,
+            "layout": "horizontal",
+            "margin": 0.0,
+            "path": "none",
+            "preserve_space": false,
+            "radius": null,
+            "resolved": {
+              "anchor": {
+                "kind": "generated_numeric",
+                "point": [
+                  0.8,
+                  0.44
+                ]
+              },
+              "count_origin": {
+                "kind": "omitted_default"
+              },
+              "domain": [
+                1.0,
+                1.0
+              ],
+              "first_instance_ordinal": 0,
+              "ordinal_scheme": "source_member_then_instance_v1",
+              "owner": {
+                "generated_ordinal": 0,
+                "invocation_ordinal": 0,
+                "kind": "macro_emit",
+                "source_instruction_index": 0
+              },
+              "recipe": {
+                "kind": "place"
+              }
+            },
+            "rhythm_spacing": "none",
+            "rows": null
+          },
+          "at": null,
+          "carve_depth": null,
+          "center": [
+            0.8,
+            0.4995
+          ],
+          "color": "green",
+          "color_hint": null,
+          "filled": true,
+          "from": null,
+          "mode": "additive",
+          "note": null,
+          "position": [
+            0.8,
+            0.44
+          ],
+          "primitive": "arc",
+          "radius": 0.0845,
+          "relation": null,
+          "rotation": 216.0,
+          "sides": null,
+          "size": null,
+          "style": "solid",
+          "surface": null,
+          "thinness": null,
+          "to": null,
+          "variation": {
+            "amplitude": "fine",
+            "dimensions": [
+              "position_x",
+              "position_y"
+            ],
+            "frequency": "medium",
+            "quality": "perlin"
+          },
+          "weight": "pencil"
+        },
+        {
+          "angle_end": 44.76027010391915,
+          "angle_start": 135.23972989608086,
+          "arrangement": {
+            "center": null,
+            "cluster_count": null,
+            "color_cycle": [],
+            "cols": null,
+            "count": 1,
+            "density": "none",
+            "fade": "none",
+            "group_size": 1,
+            "jitter": 0.0,
+            "layout": "horizontal",
+            "margin": 0.0,
+            "path": "none",
+            "preserve_space": false,
+            "radius": null,
+            "resolved": {
+              "anchor": {
+                "kind": "named",
+                "region": [
+                  0.39,
+                  0.39,
+                  0.61,
+                  0.61
+                ]
+              },
+              "count_origin": {
+                "kind": "omitted_default"
+              },
+              "domain": [
+                1.0,
+                1.0
+              ],
+              "first_instance_ordinal": 0,
+              "ordinal_scheme": "source_member_then_instance_v1",
+              "owner": {
+                "generated_ordinal": 1,
+                "invocation_ordinal": 0,
+                "kind": "macro_emit",
+                "source_instruction_index": 0
+              },
+              "recipe": {
+                "kind": "place"
+              }
+            },
+            "rhythm_spacing": "none",
+            "rows": null
+          },
+          "at": {
+            "region": [
+              0.39,
+              0.39,
+              0.61,
+              0.61
+            ]
+          },
+          "carve_depth": null,
+          "center": [
+            0.5,
+            0.5595
+          ],
+          "color": "green",
+          "color_hint": null,
+          "filled": true,
+          "from": null,
+          "mode": "additive",
+          "note": null,
+          "position": [
+            0.5,
+            0.5
+          ],
+          "primitive": "arc",
+          "radius": 0.0845,
+          "relation": {
+            "gap": "medium",
+            "position_authority": "named_movable",
+            "target_instruction_index": 0,
+            "touching_constraints": {
+              "dimensions_fixed": true,
+              "direction_fixed": false
+            },
+            "type": "touching"
+          },
+          "rotation": null,
+          "sides": null,
+          "size": null,
+          "style": "solid",
+          "surface": null,
+          "thinness": null,
+          "to": null,
+          "variation": {
+            "amplitude": "fine",
+            "dimensions": [
+              "position_x",
+              "position_y"
+            ],
+            "frequency": "medium",
+            "quality": "perlin"
+          },
+          "weight": "pencil"
+        },
+        {
+          "angle_end": 44.76027010391915,
+          "angle_start": 135.23972989608086,
+          "arrangement": {
+            "center": null,
+            "cluster_count": null,
+            "color_cycle": [],
+            "cols": null,
+            "count": 1,
+            "density": "none",
+            "fade": "none",
+            "group_size": 1,
+            "jitter": 0.0,
+            "layout": "horizontal",
+            "margin": 0.0,
+            "path": "none",
+            "preserve_space": false,
+            "radius": null,
+            "resolved": {
+              "anchor": {
+                "kind": "generated_numeric",
+                "point": [
+                  0.2,
+                  0.24
+                ]
+              },
+              "count_origin": {
+                "kind": "omitted_default"
+              },
+              "domain": [
+                1.0,
+                1.0
+              ],
+              "first_instance_ordinal": 0,
+              "ordinal_scheme": "source_member_then_instance_v1",
+              "owner": {
+                "generated_ordinal": 3,
+                "invocation_ordinal": 0,
+                "kind": "macro_emit",
+                "source_instruction_index": 0
+              },
+              "recipe": {
+                "kind": "place"
+              }
+            },
+            "rhythm_spacing": "none",
+            "rows": null
+          },
+          "at": null,
+          "carve_depth": null,
+          "center": [
+            0.2,
+            0.2995
+          ],
+          "color": "green",
+          "color_hint": null,
+          "filled": true,
+          "from": null,
+          "mode": "additive",
+          "note": null,
+          "position": [
+            0.2,
+            0.24
+          ],
+          "primitive": "arc",
+          "radius": 0.0845,
+          "relation": null,
+          "rotation": 90.0,
+          "sides": null,
+          "size": null,
+          "style": "solid",
+          "surface": null,
+          "thinness": null,
+          "to": null,
+          "variation": {
+            "amplitude": "fine",
+            "dimensions": [
+              "position_x",
+              "position_y"
+            ],
+            "frequency": "medium",
+            "quality": "perlin"
+          },
+          "weight": "pencil"
+        },
+        {
+          "angle_end": 44.76027010391915,
+          "angle_start": 135.23972989608086,
+          "arrangement": {
+            "center": null,
+            "cluster_count": null,
+            "color_cycle": [],
+            "cols": null,
+            "count": 1,
+            "density": "none",
+            "fade": "none",
+            "group_size": 1,
+            "jitter": 0.0,
+            "layout": "horizontal",
+            "margin": 0.0,
+            "path": "none",
+            "preserve_space": false,
+            "radius": null,
+            "resolved": {
+              "anchor": {
+                "kind": "named",
+                "region": [
+                  0.39,
+                  0.39,
+                  0.61,
+                  0.61
+                ]
+              },
+              "count_origin": {
+                "kind": "omitted_default"
+              },
+              "domain": [
+                1.0,
+                1.0
+              ],
+              "first_instance_ordinal": 0,
+              "ordinal_scheme": "source_member_then_instance_v1",
+              "owner": {
+                "generated_ordinal": 4,
+                "invocation_ordinal": 0,
+                "kind": "macro_emit",
+                "source_instruction_index": 0
+              },
+              "recipe": {
+                "kind": "place"
+              }
+            },
+            "rhythm_spacing": "none",
+            "rows": null
+          },
+          "at": {
+            "region": [
+              0.39,
+              0.39,
+              0.61,
+              0.61
+            ]
+          },
+          "carve_depth": null,
+          "center": [
+            0.5,
+            0.5595
+          ],
+          "color": "green",
+          "color_hint": null,
+          "filled": true,
+          "from": null,
+          "mode": "additive",
+          "note": null,
+          "position": [
+            0.5,
+            0.5
+          ],
+          "primitive": "arc",
+          "radius": 0.0845,
+          "relation": {
+            "gap": "medium",
+            "position_authority": "named_movable",
+            "target_instruction_index": 2,
+            "touching_constraints": {
+              "dimensions_fixed": true,
+              "direction_fixed": false
+            },
+            "type": "touching"
+          },
+          "rotation": null,
+          "sides": null,
+          "size": null,
+          "style": "solid",
+          "surface": null,
+          "thinness": null,
+          "to": null,
+          "variation": {
+            "amplitude": "fine",
+            "dimensions": [
+              "position_x",
+              "position_y"
+            ],
+            "frequency": "medium",
+            "quality": "perlin"
+          },
+          "weight": "pencil"
+        },
+        {
+          "angle_end": 44.76027010391915,
+          "angle_start": 135.23972989608086,
+          "arrangement": {
+            "center": null,
+            "cluster_count": null,
+            "color_cycle": [],
+            "cols": null,
+            "count": 1,
+            "density": "none",
+            "fade": "none",
+            "group_size": 1,
+            "jitter": 0.0,
+            "layout": "horizontal",
+            "margin": 0.0,
+            "path": "none",
+            "preserve_space": false,
+            "radius": null,
+            "resolved": {
+              "anchor": {
+                "kind": "generated_numeric",
+                "point": [
+                  0.2,
+                  0.44
+                ]
+              },
+              "count_origin": {
+                "kind": "omitted_default"
+              },
+              "domain": [
+                1.0,
+                1.0
+              ],
+              "first_instance_ordinal": 0,
+              "ordinal_scheme": "source_member_then_instance_v1",
+              "owner": {
+                "generated_ordinal": 6,
+                "invocation_ordinal": 0,
+                "kind": "macro_emit",
+                "source_instruction_index": 0
+              },
+              "recipe": {
+                "kind": "place"
+              }
+            },
+            "rhythm_spacing": "none",
+            "rows": null
+          },
+          "at": null,
+          "carve_depth": null,
+          "center": [
+            0.2,
+            0.4995
+          ],
+          "color": "green",
+          "color_hint": null,
+          "filled": true,
+          "from": null,
+          "mode": "additive",
+          "note": null,
+          "position": [
+            0.2,
+            0.44
+          ],
+          "primitive": "arc",
+          "radius": 0.0845,
+          "relation": null,
+          "rotation": 90.0,
+          "sides": null,
+          "size": null,
+          "style": "solid",
+          "surface": null,
+          "thinness": null,
+          "to": null,
+          "variation": {
+            "amplitude": "fine",
+            "dimensions": [
+              "position_x",
+              "position_y"
+            ],
+            "frequency": "medium",
+            "quality": "perlin"
+          },
+          "weight": "pencil"
+        },
+        {
+          "angle_end": 44.76027010391915,
+          "angle_start": 135.23972989608086,
+          "arrangement": {
+            "center": null,
+            "cluster_count": null,
+            "color_cycle": [],
+            "cols": null,
+            "count": 1,
+            "density": "none",
+            "fade": "none",
+            "group_size": 1,
+            "jitter": 0.0,
+            "layout": "horizontal",
+            "margin": 0.0,
+            "path": "none",
+            "preserve_space": false,
+            "radius": null,
+            "resolved": {
+              "anchor": {
+                "kind": "named",
+                "region": [
+                  0.39,
+                  0.39,
+                  0.61,
+                  0.61
+                ]
+              },
+              "count_origin": {
+                "kind": "omitted_default"
+              },
+              "domain": [
+                1.0,
+                1.0
+              ],
+              "first_instance_ordinal": 0,
+              "ordinal_scheme": "source_member_then_instance_v1",
+              "owner": {
+                "generated_ordinal": 7,
+                "invocation_ordinal": 0,
+                "kind": "macro_emit",
+                "source_instruction_index": 0
+              },
+              "recipe": {
+                "kind": "place"
+              }
+            },
+            "rhythm_spacing": "none",
+            "rows": null
+          },
+          "at": {
+            "region": [
+              0.39,
+              0.39,
+              0.61,
+              0.61
+            ]
+          },
+          "carve_depth": null,
+          "center": [
+            0.5,
+            0.5595
+          ],
+          "color": "green",
+          "color_hint": null,
+          "filled": true,
+          "from": null,
+          "mode": "additive",
+          "note": null,
+          "position": [
+            0.5,
+            0.5
+          ],
+          "primitive": "arc",
+          "radius": 0.0845,
+          "relation": {
+            "gap": "medium",
+            "position_authority": "named_movable",
+            "target_instruction_index": 4,
+            "touching_constraints": {
+              "dimensions_fixed": true,
+              "direction_fixed": false
+            },
+            "type": "touching"
+          },
+          "rotation": null,
+          "sides": null,
+          "size": null,
+          "style": "solid",
+          "surface": null,
+          "thinness": null,
+          "to": null,
+          "variation": {
+            "amplitude": "fine",
+            "dimensions": [
+              "position_x",
+              "position_y"
+            ],
+            "frequency": "medium",
+            "quality": "perlin"
+          },
+          "weight": "pencil"
+        },
+        {
+          "angle_end": 44.76027010391915,
+          "angle_start": 135.23972989608086,
+          "arrangement": {
+            "center": null,
+            "cluster_count": null,
+            "color_cycle": [],
+            "cols": null,
+            "count": 1,
+            "density": "none",
+            "fade": "none",
+            "group_size": 1,
+            "jitter": 0.0,
+            "layout": "horizontal",
+            "margin": 0.0,
+            "path": "none",
+            "preserve_space": false,
+            "radius": null,
+            "resolved": {
+              "anchor": {
+                "kind": "generated_numeric",
+                "point": [
+                  0.2,
+                  0.14
+                ]
+              },
+              "count_origin": {
+                "kind": "omitted_default"
+              },
+              "domain": [
+                1.0,
+                1.0
+              ],
+              "first_instance_ordinal": 0,
+              "ordinal_scheme": "source_member_then_instance_v1",
+              "owner": {
+                "generated_ordinal": 9,
+                "invocation_ordinal": 0,
+                "kind": "macro_emit",
+                "source_instruction_index": 0
+              },
+              "recipe": {
+                "kind": "place"
+              }
+            },
+            "rhythm_spacing": "none",
+            "rows": null
+          },
+          "at": null,
+          "carve_depth": null,
+          "center": [
+            0.2,
+            0.1995
+          ],
+          "color": "green",
+          "color_hint": null,
+          "filled": true,
+          "from": null,
+          "mode": "additive",
+          "note": null,
+          "position": [
+            0.2,
+            0.14
+          ],
+          "primitive": "arc",
+          "radius": 0.0845,
+          "relation": null,
+          "rotation": 216.0,
+          "sides": null,
+          "size": null,
+          "style": "solid",
+          "surface": null,
+          "thinness": null,
+          "to": null,
+          "variation": {
+            "amplitude": "fine",
+            "dimensions": [
+              "position_x",
+              "position_y"
+            ],
+            "frequency": "medium",
+            "quality": "perlin"
+          },
+          "weight": "pencil"
+        },
+        {
+          "angle_end": 44.76027010391915,
+          "angle_start": 135.23972989608086,
+          "arrangement": {
+            "center": null,
+            "cluster_count": null,
+            "color_cycle": [],
+            "cols": null,
+            "count": 1,
+            "density": "none",
+            "fade": "none",
+            "group_size": 1,
+            "jitter": 0.0,
+            "layout": "horizontal",
+            "margin": 0.0,
+            "path": "none",
+            "preserve_space": false,
+            "radius": null,
+            "resolved": {
+              "anchor": {
+                "kind": "named",
+                "region": [
+                  0.39,
+                  0.39,
+                  0.61,
+                  0.61
+                ]
+              },
+              "count_origin": {
+                "kind": "omitted_default"
+              },
+              "domain": [
+                1.0,
+                1.0
+              ],
+              "first_instance_ordinal": 0,
+              "ordinal_scheme": "source_member_then_instance_v1",
+              "owner": {
+                "generated_ordinal": 10,
+                "invocation_ordinal": 0,
+                "kind": "macro_emit",
+                "source_instruction_index": 0
+              },
+              "recipe": {
+                "kind": "place"
+              }
+            },
+            "rhythm_spacing": "none",
+            "rows": null
+          },
+          "at": {
+            "region": [
+              0.39,
+              0.39,
+              0.61,
+              0.61
+            ]
+          },
+          "carve_depth": null,
+          "center": [
+            0.5,
+            0.5595
+          ],
+          "color": "green",
+          "color_hint": null,
+          "filled": true,
+          "from": null,
+          "mode": "additive",
+          "note": null,
+          "position": [
+            0.5,
+            0.5
+          ],
+          "primitive": "arc",
+          "radius": 0.0845,
+          "relation": {
+            "gap": "medium",
+            "position_authority": "named_movable",
+            "target_instruction_index": 6,
+            "touching_constraints": {
+              "dimensions_fixed": true,
+              "direction_fixed": false
+            },
+            "type": "touching"
+          },
+          "rotation": null,
+          "sides": null,
+          "size": null,
+          "style": "solid",
+          "surface": null,
+          "thinness": null,
+          "to": null,
+          "variation": {
+            "amplitude": "fine",
+            "dimensions": [
+              "position_x",
+              "position_y"
+            ],
+            "frequency": "medium",
+            "quality": "perlin"
+          },
+          "weight": "pencil"
+        },
+        {
+          "angle_end": 44.76027010391915,
+          "angle_start": 135.23972989608086,
+          "arrangement": {
+            "center": null,
+            "cluster_count": null,
+            "color_cycle": [],
+            "cols": null,
+            "count": 1,
+            "density": "none",
+            "fade": "none",
+            "group_size": 1,
+            "jitter": 0.0,
+            "layout": "horizontal",
+            "margin": 0.0,
+            "path": "none",
+            "preserve_space": false,
+            "radius": null,
+            "resolved": {
+              "anchor": {
+                "kind": "generated_numeric",
+                "point": [
+                  0.8,
+                  0.34
+                ]
+              },
+              "count_origin": {
+                "kind": "omitted_default"
+              },
+              "domain": [
+                1.0,
+                1.0
+              ],
+              "first_instance_ordinal": 0,
+              "ordinal_scheme": "source_member_then_instance_v1",
+              "owner": {
+                "generated_ordinal": 12,
+                "invocation_ordinal": 0,
+                "kind": "macro_emit",
+                "source_instruction_index": 0
+              },
+              "recipe": {
+                "kind": "place"
+              }
+            },
+            "rhythm_spacing": "none",
+            "rows": null
+          },
+          "at": null,
+          "carve_depth": null,
+          "center": [
+            0.8,
+            0.3995
+          ],
+          "color": "green",
+          "color_hint": null,
+          "filled": true,
+          "from": null,
+          "mode": "additive",
+          "note": null,
+          "position": [
+            0.8,
+            0.34
+          ],
+          "primitive": "arc",
+          "radius": 0.0845,
+          "relation": null,
+          "rotation": -30.0,
+          "sides": null,
+          "size": null,
+          "style": "solid",
+          "surface": null,
+          "thinness": null,
+          "to": null,
+          "variation": {
+            "amplitude": "fine",
+            "dimensions": [
+              "position_x",
+              "position_y"
+            ],
+            "frequency": "medium",
+            "quality": "perlin"
+          },
+          "weight": "pencil"
+        },
+        {
+          "angle_end": 44.76027010391915,
+          "angle_start": 135.23972989608086,
+          "arrangement": {
+            "center": null,
+            "cluster_count": null,
+            "color_cycle": [],
+            "cols": null,
+            "count": 1,
+            "density": "none",
+            "fade": "none",
+            "group_size": 1,
+            "jitter": 0.0,
+            "layout": "horizontal",
+            "margin": 0.0,
+            "path": "none",
+            "preserve_space": false,
+            "radius": null,
+            "resolved": {
+              "anchor": {
+                "kind": "named",
+                "region": [
+                  0.39,
+                  0.39,
+                  0.61,
+                  0.61
+                ]
+              },
+              "count_origin": {
+                "kind": "omitted_default"
+              },
+              "domain": [
+                1.0,
+                1.0
+              ],
+              "first_instance_ordinal": 0,
+              "ordinal_scheme": "source_member_then_instance_v1",
+              "owner": {
+                "generated_ordinal": 13,
+                "invocation_ordinal": 0,
+                "kind": "macro_emit",
+                "source_instruction_index": 0
+              },
+              "recipe": {
+                "kind": "place"
+              }
+            },
+            "rhythm_spacing": "none",
+            "rows": null
+          },
+          "at": {
+            "region": [
+              0.39,
+              0.39,
+              0.61,
+              0.61
+            ]
+          },
+          "carve_depth": null,
+          "center": [
+            0.5,
+            0.5595
+          ],
+          "color": "green",
+          "color_hint": null,
+          "filled": true,
+          "from": null,
+          "mode": "additive",
+          "note": null,
+          "position": [
+            0.5,
+            0.5
+          ],
+          "primitive": "arc",
+          "radius": 0.0845,
+          "relation": {
+            "gap": "medium",
+            "position_authority": "named_movable",
+            "target_instruction_index": 8,
+            "touching_constraints": {
+              "dimensions_fixed": true,
+              "direction_fixed": false
+            },
+            "type": "touching"
+          },
+          "rotation": null,
+          "sides": null,
+          "size": null,
+          "style": "solid",
+          "surface": null,
+          "thinness": null,
+          "to": null,
+          "variation": {
+            "amplitude": "fine",
+            "dimensions": [
+              "position_x",
+              "position_y"
+            ],
+            "frequency": "medium",
+            "quality": "perlin"
+          },
+          "weight": "pencil"
+        },
+        {
+          "angle_end": 36.86989764584401,
+          "angle_start": 143.13010235415598,
+          "arrangement": {
+            "center": null,
+            "cluster_count": null,
+            "color_cycle": [],
+            "cols": null,
+            "count": 1,
+            "density": "none",
+            "fade": "none",
+            "group_size": 1,
+            "jitter": 0.0,
+            "layout": "horizontal",
+            "margin": 0.0,
+            "path": "none",
+            "preserve_space": false,
+            "radius": null,
+            "resolved": {
+              "anchor": {
+                "kind": "named",
+                "region": [
+                  0.0,
+                  0.0,
+                  1.0,
+                  0.3333333333333333
+                ]
+              },
+              "count_origin": {
+                "kind": "omitted_default"
+              },
+              "domain": [
+                1.0,
+                1.0
+              ],
+              "first_instance_ordinal": 0,
+              "ordinal_scheme": "source_member_then_instance_v1",
+              "owner": {
+                "instruction_index": 1,
+                "kind": "source_instruction"
+              },
+              "recipe": {
+                "kind": "place"
+              }
+            },
+            "rhythm_spacing": "none",
+            "rows": null
+          },
+          "at": {
+            "region": [
+              0.0,
+              0.0,
+              1.0,
+              0.3333333333333333
+            ]
+          },
+          "carve_depth": null,
+          "center": [
+            0.5,
+            0.545
+          ],
+          "color": "red",
+          "color_hint": null,
+          "filled": false,
+          "from": null,
+          "mode": "additive",
+          "note": null,
+          "position": [
+            0.5,
+            0.5
+          ],
+          "primitive": "arc",
+          "radius": 0.075,
+          "relation": null,
+          "rotation": 315.0,
+          "sides": null,
+          "size": null,
+          "style": "solid",
+          "surface": null,
+          "thinness": null,
+          "to": null,
+          "variation": null,
+          "weight": "pen"
+        },
+        {
+          "angle_end": 36.86989764584401,
+          "angle_start": 143.13010235415598,
+          "arrangement": {
+            "center": null,
+            "cluster_count": null,
+            "color_cycle": [],
+            "cols": null,
+            "count": 1,
+            "density": "none",
+            "fade": "none",
+            "group_size": 1,
+            "jitter": 0.0,
+            "layout": "horizontal",
+            "margin": 0.0,
+            "path": "none",
+            "preserve_space": false,
+            "radius": null,
+            "resolved": {
+              "anchor": {
+                "kind": "named",
+                "region": [
+                  0.0,
+                  0.6666666666666666,
+                  1.0,
+                  1.0
+                ]
+              },
+              "count_origin": {
+                "kind": "omitted_default"
+              },
+              "domain": [
+                1.0,
+                1.0
+              ],
+              "first_instance_ordinal": 0,
+              "ordinal_scheme": "source_member_then_instance_v1",
+              "owner": {
+                "instruction_index": 2,
+                "kind": "source_instruction"
+              },
+              "recipe": {
+                "kind": "place"
+              }
+            },
+            "rhythm_spacing": "none",
+            "rows": null
+          },
+          "at": {
+            "region": [
+              0.0,
+              0.6666666666666666,
+              1.0,
+              1.0
+            ]
+          },
+          "carve_depth": null,
+          "center": [
+            0.5,
+            0.59
+          ],
+          "color": "blue",
+          "color_hint": null,
+          "filled": false,
+          "from": null,
+          "mode": "additive",
+          "note": null,
+          "position": [
+            0.5,
+            0.5
+          ],
+          "primitive": "arc",
+          "radius": 0.15,
+          "relation": null,
+          "rotation": null,
+          "sides": null,
+          "size": null,
+          "style": "solid",
+          "surface": null,
+          "thinness": null,
+          "to": null,
+          "variation": null,
+          "weight": "pen"
+        }
+      ],
+      "mirror_relations": [
+        {
+          "follower": {
+            "instruction_index": 11,
+            "kind": "instruction"
+          },
+          "follower_facts": {
+            "dimensions_fixed": false
+          },
+          "target": {
+            "instruction_index": 10,
+            "kind": "instruction"
+          }
+        }
+      ],
+      "presence": null,
+      "repetition_groups": [
+        {
+          "member": {
+            "end": 10,
+            "start": 0,
+            "symbolic": {
+              "count_origin": {
+                "kind": "omitted_default"
+              },
+              "first_instance_ordinal": 0,
+              "instance_count": 1,
+              "kind": "macro",
+              "member_ordinal": 0,
+              "owner": {
+                "instruction_index": 0,
+                "kind": "source_instruction"
+              }
+            }
+          },
+          "ordinal_scheme": "source_member_then_instance_v1"
+        }
+      ],
+      "resource_policy": {
+        "accounting_id": "inku.resource-accounting.v1",
+        "hard_policy": {
+          "budget": {
+            "maximum": {
+              "anchor_instances": 4096,
+              "fill_instances": 64,
+              "logical_objects": 4096,
+              "maximum_per_template_primitive_marks": 240,
+              "maximum_resolved_count": 2000,
+              "object_templates": 64,
+              "placement_instances": 64,
+              "primitive_marks": 400,
+              "template_nodes": 128,
+              "transform_instances": 4096
+            }
+          },
+          "identity": "host-settings:7f1399413dec8fa789348e9a8424af11e9177878ff8c2d780893ed73bc6bc0f4"
+        },
+        "operational_budget": {
+          "maximum": {
+            "anchor_instances": 4096,
+            "fill_instances": 64,
+            "logical_objects": 4096,
+            "maximum_per_template_primitive_marks": 240,
+            "maximum_resolved_count": 2000,
+            "object_templates": 64,
+            "placement_instances": 64,
+            "primitive_marks": 400,
+            "template_nodes": 128,
+            "transform_instances": 4096
+          }
+        }
+      },
+      "version": "0.15.0"
+    },
+    "score_digest": "e4e67e3a3b5256019568f47b60b2528ad73411b787800fa8c7cde81eb50045e7",
+    "upstream_diagnostics": []
+  },
+  "document": {
+    "language": "en",
+    "macro_locks": [
+      {
+        "digest": "sha256:88046b24987a2600eeb8b985f36bc15222202a5758a0f4a7638e514dd6af2aea",
+        "qualified_name": "Nature.下草",
+        "version": "1.0.0"
+      },
+      {
+        "digest": "sha256:7cbfea0d3d71e47cf32f98c4c28574e9ecc4e536bd8bf8eb700ea9bee263e290",
+        "qualified_name": "Nature.枯草",
+        "version": "1.0.1"
+      },
+      {
+        "digest": "sha256:1ceac898eb3b3f5478f8cf6cb8661eae7c4fc40a0a871e10cfeac64b02fafdf5",
+        "qualified_name": "Nature.枯葉",
+        "version": "1.0.1"
+      },
+      {
+        "digest": "sha256:ccb0feb87149da13d10e1310e64d0299dafdad6056d3e75a5567e1a293442ba4",
+        "qualified_name": "Nature.紅葉",
+        "version": "1.0.0"
+      },
+      {
+        "digest": "sha256:82ffc5c348a82ba927b315acaaa5ce4bc4c3998e2497deecd91535fb3005c8f4",
+        "qualified_name": "Nature.若葉",
+        "version": "1.0.1"
+      },
+      {
+        "digest": "sha256:5bb12d41611739c63c589f98d28feda1d2d5e49fb669c339790bd4a4e3b006f3",
+        "qualified_name": "Nature.落葉",
+        "version": "1.0.1"
+      },
+      {
+        "digest": "sha256:0527f7a1bc0d81bf9b6141d326afce99034ccd0666c3d70260ead027dcb72a8e",
+        "qualified_name": "Nature.青葉",
+        "version": "1.0.0"
+      }
+    ],
+    "source": "Nature.若葉. Place a small diagonal red arc at top. Place a blue arc at bottom, mirrored with the previous shape."
+  }
+}

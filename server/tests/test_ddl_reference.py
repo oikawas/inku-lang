@@ -112,7 +112,7 @@ def test_current_manifest_and_outputs_record_the_three_actual_scores() -> None:
         "value"
     ] == {
         "authority": "hard_policy",
-        "dimension": "primitive_marks",
+        "dimension": "logical_objects",
         "maximum": 400,
         "required": 6945,
     }

@@ -113,7 +113,10 @@ def test_t317_save_captures_hidden_trace_non_save_writes_nothing_and_replay_is_i
         db.delete_user(actor["id"])
         db.delete_user_group(group["id"])
 
-def test_t316_history_api_output_stays_public_while_private_trace_is_saved():
+def test_t316_history_api_output_stays_public_while_private_trace_is_saved(monkeypatch):
+    from inku_server.api_core import rendering
+
+    monkeypatch.setattr(rendering, "_submit_thumbnail_build", lambda _item: None)
     actor, group = _actor()
     saved = None
     try:
@@ -139,7 +142,7 @@ def test_t316_history_api_output_stays_public_while_private_trace_is_saved():
         assert len(public["score"]["instructions"]) == 1
         instruction = public["score"]["instructions"][0]
         assert instruction["primitive"] == "circle"
-        assert instruction["center"] == (0.23, 0.67)
+        assert instruction["center"] == [0.23, 0.67]
         assert instruction["radius"] == 0.04
         assert instruction["arrangement"]["count"] == 7
         assert saved.svg.startswith("<svg")

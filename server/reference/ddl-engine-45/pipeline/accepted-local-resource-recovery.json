@@ -1,0 +1,325 @@
+{
+  "delivery": {
+    "compiler_lock": {
+      "blocking_diagnostic_identities": [],
+      "canonical_pre_expansion_digest": "fe61b418581b6db9de20b017d413bbeffc5a1c901621dbf6976775d07d63eb63",
+      "composition_seed": "17",
+      "conflict_identities": [],
+      "definition_identities": [],
+      "expanded_generated_provenance_digest": "3411eae23c028b7ebc3b00d3c03c96f43135980fc1180401db55df2427bec18b",
+      "expanded_meaning_digest": "6a538b04e0b16427741f7bd50c749c85296d46f8f1176ab4ac50064205c99a2c",
+      "full_digest": "d76b3a81c33f2ee942dd26d96faf2ce24328c68902e47a9fd36ad4e9e51bdbd2",
+      "geometry_policy_digest": "210ddd7bed6b4ae837d17404a91c8a371f1e3f7a9adbf6e41e9fbdae3346d23e",
+      "geometry_policy_id": "inku.geometry-resolution-policy.v1",
+      "hole_identities": [],
+      "macro_seeds": [],
+      "schema_id": "inku.typed-ddl-compiler-lock.v18",
+      "semantic_source_provenance_digest": "8de8d848678ff1883954b07cded99b9666522341fa4cb7d1dcf081ff532d8511",
+      "state": "canonical_ready",
+      "structured_semantic_occurrence_digest": "1c2701cc6d1412a49f044a7f30abcfb5c3b2499a3c6dcb9bebd70cecff8c6eee",
+      "visible_source_digest": "aeede9c2e395e837ff25c0240d98ecfb8e80cd3bf629c8a660a45cc0576fef43"
+    },
+    "compiler_lock_digest": "d76b3a81c33f2ee942dd26d96faf2ce24328c68902e47a9fd36ad4e9e51bdbd2",
+    "downstream_diagnostics": [],
+    "outcome": "complete_with_omissions",
+    "relation_omissions": [],
+    "resource_omissions": [
+      {
+        "cause": {
+          "owner": {
+            "kind": "object",
+            "value": {
+              "instruction_index": 0,
+              "kind": "source_instruction"
+            }
+          },
+          "reason": {
+            "kind": "budget_exceeded",
+            "value": {
+              "authority": "hard_policy",
+              "dimension": "logical_objects",
+              "maximum": 400,
+              "required": 6945
+            }
+          }
+        },
+        "owner": {
+          "kind": "source_instruction",
+          "value": {
+            "source_instruction_index": 0
+          }
+        }
+      }
+    ],
+    "schema_id": "inku.pipeline-compiled-delivery.v1",
+    "score": {
+      "background": "white",
+      "canvas": "square",
+      "fill_groups": [
+        {
+          "boundary": "clip_to_target",
+          "end": 1,
+          "logical_count": 3,
+          "members": [
+            {
+              "end": 1,
+              "start": 0,
+              "symbolic": {
+                "count_origin": {
+                  "kind": "explicit"
+                },
+                "first_instance_ordinal": 0,
+                "instance_count": 3,
+                "kind": "primitive",
+                "member_ordinal": 0,
+                "owner": {
+                  "instruction_index": 2,
+                  "kind": "source_instruction"
+                }
+              }
+            }
+          ],
+          "ordinal_scheme": "source_member_then_instance_v1",
+          "owner": {
+            "kind": "instruction",
+            "source_instruction_index": 2
+          },
+          "recipe": "uniform_in_region",
+          "start": 0,
+          "target": {
+            "geometry": {
+              "anchor": {
+                "kind": "numeric",
+                "point": [
+                  0.5,
+                  0.5
+                ]
+              },
+              "dimensions": {
+                "kind": "circle",
+                "radius": 0.25
+              },
+              "kind": "shape",
+              "primitive": "circle"
+            },
+            "owner": {
+              "kind": "inline_shape",
+              "source": {
+                "clause_index": 1,
+                "region_index": 1
+              },
+              "source_instruction_index": 1
+            },
+            "reference_area": 0.196349540849375
+          }
+        }
+      ],
+      "instructions": [
+        {
+          "angle_end": null,
+          "angle_start": null,
+          "arrangement": {
+            "center": null,
+            "cluster_count": null,
+            "color_cycle": [],
+            "cols": null,
+            "count": 1,
+            "density": "none",
+            "fade": "none",
+            "group_size": 1,
+            "jitter": 0.0,
+            "layout": "horizontal",
+            "margin": 0.0,
+            "path": "none",
+            "preserve_space": false,
+            "radius": null,
+            "resolved": {
+              "anchor": {
+                "kind": "enclosing_group"
+              },
+              "count_origin": {
+                "kind": "template_single"
+              },
+              "domain": [
+                1.0,
+                1.0
+              ],
+              "first_instance_ordinal": 0,
+              "ordinal_scheme": "source_member_then_instance_v1",
+              "owner": {
+                "instruction_index": 2,
+                "kind": "source_instruction"
+              },
+              "recipe": {
+                "kind": "place"
+              }
+            },
+            "rhythm_spacing": "none",
+            "rows": null
+          },
+          "at": {
+            "region": [
+              0.5,
+              0.5,
+              0.5,
+              0.5
+            ]
+          },
+          "carve_depth": null,
+          "center": null,
+          "color": "red",
+          "color_hint": null,
+          "filled": true,
+          "from": null,
+          "mode": "additive",
+          "note": null,
+          "position": null,
+          "primitive": "point",
+          "radius": 0.006,
+          "relation": null,
+          "rotation": null,
+          "sides": null,
+          "size": null,
+          "style": "solid",
+          "surface": null,
+          "thinness": null,
+          "to": null,
+          "variation": null,
+          "weight": "pen"
+        },
+        {
+          "angle_end": null,
+          "angle_start": null,
+          "arrangement": {
+            "center": null,
+            "cluster_count": null,
+            "color_cycle": [],
+            "cols": null,
+            "count": 1,
+            "density": "none",
+            "fade": "none",
+            "group_size": 1,
+            "jitter": 0.0,
+            "layout": "horizontal",
+            "margin": 0.0,
+            "path": "none",
+            "preserve_space": false,
+            "radius": null,
+            "resolved": {
+              "anchor": {
+                "kind": "named",
+                "region": [
+                  0.6,
+                  0.6,
+                  0.82,
+                  0.82
+                ]
+              },
+              "count_origin": {
+                "kind": "explicit"
+              },
+              "domain": [
+                1.0,
+                1.0
+              ],
+              "first_instance_ordinal": 0,
+              "ordinal_scheme": "source_member_then_instance_v1",
+              "owner": {
+                "instruction_index": 3,
+                "kind": "source_instruction"
+              },
+              "recipe": {
+                "kind": "place"
+              }
+            },
+            "rhythm_spacing": "none",
+            "rows": null
+          },
+          "at": {
+            "region": [
+              0.6,
+              0.6,
+              0.82,
+              0.82
+            ]
+          },
+          "carve_depth": null,
+          "center": null,
+          "color": "blue",
+          "color_hint": null,
+          "filled": false,
+          "from": [
+            0.38,
+            0.5
+          ],
+          "mode": "additive",
+          "note": null,
+          "position": null,
+          "primitive": "line",
+          "radius": null,
+          "relation": {
+            "gap": "medium",
+            "position_authority": "named_movable",
+            "target_instruction_index": 0,
+            "type": "connected"
+          },
+          "rotation": null,
+          "sides": null,
+          "size": null,
+          "style": "solid",
+          "surface": null,
+          "thinness": null,
+          "to": [
+            0.62,
+            0.5
+          ],
+          "variation": null,
+          "weight": "pen"
+        }
+      ],
+      "presence": null,
+      "resource_policy": {
+        "accounting_id": "inku.resource-accounting.v1",
+        "hard_policy": {
+          "budget": {
+            "maximum": {
+              "anchor_instances": 400,
+              "fill_instances": 400,
+              "logical_objects": 400,
+              "maximum_per_template_primitive_marks": 240,
+              "maximum_resolved_count": 2000,
+              "object_templates": 64,
+              "placement_instances": 400,
+              "primitive_marks": 400,
+              "template_nodes": 512,
+              "transform_instances": 400
+            }
+          },
+          "identity": "host-settings:738dbe7610f89ef35ad1c4b233492e57083ddc2462bd615060cbff2bc8013cbd"
+        },
+        "operational_budget": {
+          "maximum": {
+            "anchor_instances": 400,
+            "fill_instances": 400,
+            "logical_objects": 400,
+            "maximum_per_template_primitive_marks": 240,
+            "maximum_resolved_count": 2000,
+            "object_templates": 64,
+            "placement_instances": 400,
+            "primitive_marks": 400,
+            "template_nodes": 512,
+            "transform_instances": 400
+          }
+        }
+      },
+      "version": "0.10.0"
+    },
+    "score_digest": "69b722066d1d6737a72a0ed6bd195aba2e49ba7491d19d8a38e90da56c233c19",
+    "upstream_diagnostics": []
+  },
+  "document": {
+    "language": "en",
+    "macro_locks": [],
+    "source": "fill red point. fill a circle diameter 0.5 at horizontal 0.5 vertical 0.5 with 3 red points. place one blue line at center connected to the previous shape."
+  }
+}

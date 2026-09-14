@@ -1,0 +1,400 @@
+{
+  "delivery": {
+    "compiler_lock": {
+      "blocking_diagnostic_identities": [],
+      "canonical_pre_expansion_digest": "dd49f5d96dfa9c6476d13f149c6a2a787bbf2dbbed1e3def4d55f381391c900d",
+      "composition_seed": "37",
+      "conflict_identities": [],
+      "definition_identities": [],
+      "expanded_generated_provenance_digest": "3411eae23c028b7ebc3b00d3c03c96f43135980fc1180401db55df2427bec18b",
+      "expanded_meaning_digest": "6a538b04e0b16427741f7bd50c749c85296d46f8f1176ab4ac50064205c99a2c",
+      "full_digest": "166f539a8788cbd44160d1737af0d1b00f9d7f0650d3ef7b284aedf4898ae086",
+      "geometry_policy_digest": "210ddd7bed6b4ae837d17404a91c8a371f1e3f7a9adbf6e41e9fbdae3346d23e",
+      "geometry_policy_id": "inku.geometry-resolution-policy.v1",
+      "hole_identities": [],
+      "macro_seeds": [],
+      "schema_id": "inku.typed-ddl-compiler-lock.v18",
+      "semantic_source_provenance_digest": "9e924b31ccf97b919bd613f2c9119fa2bb798dfc01b63114105f5831241b5729",
+      "state": "canonical_ready",
+      "structured_semantic_occurrence_digest": "e4a6fcf90508980067435615596c1970f3c82cd6007e79f3425eaf9d603361d6",
+      "visible_source_digest": "f3b21d2f0437921ef59f7db2deedab4a2d30af5c6b05e461acf054443fcb0255"
+    },
+    "compiler_lock_digest": "166f539a8788cbd44160d1737af0d1b00f9d7f0650d3ef7b284aedf4898ae086",
+    "downstream_diagnostics": [],
+    "outcome": "complete",
+    "relation_omissions": [],
+    "resource_omissions": [],
+    "schema_id": "inku.pipeline-compiled-delivery.v1",
+    "score": {
+      "background": "white",
+      "canvas": "wide",
+      "instructions": [
+        {
+          "angle_end": null,
+          "angle_start": null,
+          "arrangement": {
+            "center": null,
+            "cluster_count": null,
+            "color_cycle": [],
+            "cols": null,
+            "count": 1,
+            "density": "none",
+            "fade": "none",
+            "group_size": 1,
+            "jitter": 0.0,
+            "layout": "horizontal",
+            "margin": 0.0,
+            "path": "none",
+            "preserve_space": false,
+            "radius": null,
+            "resolved": {
+              "anchor": {
+                "kind": "named",
+                "region": [
+                  0.5,
+                  0.5,
+                  0.5,
+                  0.5
+                ]
+              },
+              "count_origin": {
+                "kind": "omitted_default"
+              },
+              "domain": [
+                2.35,
+                1.0
+              ],
+              "first_instance_ordinal": 0,
+              "ordinal_scheme": "source_member_then_instance_v1",
+              "owner": {
+                "instruction_index": 0,
+                "kind": "source_instruction"
+              },
+              "recipe": {
+                "kind": "place"
+              }
+            },
+            "rhythm_spacing": "none",
+            "rows": null
+          },
+          "at": {
+            "region": [
+              0.5,
+              0.5,
+              0.5,
+              0.5
+            ]
+          },
+          "carve_depth": null,
+          "center": null,
+          "color": "red",
+          "color_hint": null,
+          "filled": true,
+          "from": null,
+          "mode": "additive",
+          "note": null,
+          "position": null,
+          "primitive": "circle",
+          "radius": 0.12,
+          "relation": null,
+          "rotation": null,
+          "sides": null,
+          "size": null,
+          "style": "solid",
+          "surface": null,
+          "thinness": null,
+          "to": null,
+          "variation": null,
+          "weight": "pen"
+        },
+        {
+          "angle_end": null,
+          "angle_start": null,
+          "arrangement": {
+            "center": null,
+            "cluster_count": null,
+            "color_cycle": [],
+            "cols": null,
+            "count": 1,
+            "density": "none",
+            "fade": "none",
+            "group_size": 1,
+            "jitter": 0.0,
+            "layout": "horizontal",
+            "margin": 0.0,
+            "path": "none",
+            "preserve_space": false,
+            "radius": null,
+            "resolved": {
+              "anchor": {
+                "kind": "named",
+                "region": [
+                  0.5,
+                  0.5,
+                  0.5,
+                  0.5
+                ]
+              },
+              "count_origin": {
+                "kind": "omitted_default"
+              },
+              "domain": [
+                2.35,
+                1.0
+              ],
+              "first_instance_ordinal": 0,
+              "ordinal_scheme": "source_member_then_instance_v1",
+              "owner": {
+                "instruction_index": 1,
+                "kind": "source_instruction"
+              },
+              "recipe": {
+                "kind": "place"
+              }
+            },
+            "rhythm_spacing": "none",
+            "rows": null
+          },
+          "at": {
+            "region": [
+              0.5,
+              0.5,
+              0.5,
+              0.5
+            ]
+          },
+          "carve_depth": null,
+          "center": null,
+          "color": "blue",
+          "color_hint": null,
+          "filled": false,
+          "from": [
+            0.44893617021276594,
+            0.5
+          ],
+          "mode": "additive",
+          "note": null,
+          "position": null,
+          "primitive": "line",
+          "radius": null,
+          "relation": null,
+          "rotation": null,
+          "sides": null,
+          "size": null,
+          "style": "solid",
+          "surface": null,
+          "thinness": null,
+          "to": [
+            0.551063829787234,
+            0.5
+          ],
+          "variation": null,
+          "weight": "pen"
+        },
+        {
+          "angle_end": 36.86989764584401,
+          "angle_start": 143.13010235415598,
+          "arrangement": {
+            "center": null,
+            "cluster_count": null,
+            "color_cycle": [],
+            "cols": null,
+            "count": 1,
+            "density": "none",
+            "fade": "none",
+            "group_size": 1,
+            "jitter": 0.0,
+            "layout": "horizontal",
+            "margin": 0.0,
+            "path": "none",
+            "preserve_space": false,
+            "radius": null,
+            "resolved": {
+              "anchor": {
+                "kind": "enclosing_group"
+              },
+              "count_origin": {
+                "kind": "template_single"
+              },
+              "domain": [
+                2.35,
+                1.0
+              ],
+              "first_instance_ordinal": 0,
+              "ordinal_scheme": "source_member_then_instance_v1",
+              "owner": {
+                "instruction_index": 2,
+                "kind": "source_instruction"
+              },
+              "recipe": {
+                "kind": "place"
+              }
+            },
+            "rhythm_spacing": "none",
+            "rows": null
+          },
+          "at": {
+            "region": [
+              0.5,
+              0.5,
+              0.5,
+              0.5
+            ]
+          },
+          "carve_depth": null,
+          "center": [
+            0.5,
+            0.59
+          ],
+          "color": "gray",
+          "color_hint": null,
+          "filled": false,
+          "from": null,
+          "mode": "additive",
+          "note": null,
+          "position": [
+            0.5,
+            0.5
+          ],
+          "primitive": "arc",
+          "radius": 0.15,
+          "relation": null,
+          "rotation": null,
+          "sides": null,
+          "size": null,
+          "style": "solid",
+          "surface": null,
+          "thinness": null,
+          "to": null,
+          "variation": null,
+          "weight": "pen"
+        }
+      ],
+      "placement_groups": [
+        {
+          "at": {
+            "region": [
+              0.39,
+              0.39,
+              0.61,
+              0.61
+            ]
+          },
+          "cycle_members": {
+            "occurrence_count": 5
+          },
+          "end": 3,
+          "layout": "horizontal_source_order",
+          "members": [
+            {
+              "end": 2,
+              "start": 0,
+              "symbolic": {
+                "count_origin": {
+                  "kind": "omitted_default"
+                },
+                "first_instance_ordinal": 0,
+                "instance_count": 1,
+                "kind": "ordinary_group",
+                "member_ordinal": 0,
+                "owner": {
+                  "kind": "ordinary_group",
+                  "source_instruction_indices": [
+                    0,
+                    1
+                  ]
+                }
+              }
+            },
+            {
+              "end": 3,
+              "start": 2,
+              "symbolic": {
+                "count_origin": {
+                  "kind": "omitted_default"
+                },
+                "first_instance_ordinal": 1,
+                "instance_count": 1,
+                "kind": "primitive",
+                "member_ordinal": 1,
+                "owner": {
+                  "instruction_index": 2,
+                  "kind": "source_instruction"
+                }
+              }
+            }
+          ],
+          "resolved": {
+            "anchor": {
+              "kind": "named",
+              "region": [
+                0.39,
+                0.39,
+                0.61,
+                0.61
+              ]
+            },
+            "domain": [
+              2.35,
+              1.0
+            ],
+            "logical_count": 5,
+            "ordinal_scheme": "source_member_then_instance_v1",
+            "owner": {
+              "group_index": 0,
+              "kind": "coordinated_group"
+            },
+            "recipe": {
+              "cell_width": 0.47,
+              "kind": "horizontal_line"
+            }
+          },
+          "start": 0
+        }
+      ],
+      "presence": null,
+      "resource_policy": {
+        "accounting_id": "inku.resource-accounting.v1",
+        "hard_policy": {
+          "budget": {
+            "maximum": {
+              "anchor_instances": 4096,
+              "fill_instances": 64,
+              "logical_objects": 4096,
+              "maximum_per_template_primitive_marks": 240,
+              "maximum_resolved_count": 2000,
+              "object_templates": 64,
+              "placement_instances": 64,
+              "primitive_marks": 400,
+              "template_nodes": 128,
+              "transform_instances": 4096
+            }
+          },
+          "identity": "installation-default.v1"
+        },
+        "operational_budget": {
+          "maximum": {
+            "anchor_instances": 4096,
+            "fill_instances": 64,
+            "logical_objects": 4096,
+            "maximum_per_template_primitive_marks": 240,
+            "maximum_resolved_count": 2000,
+            "object_templates": 64,
+            "placement_instances": 64,
+            "primitive_marks": 400,
+            "template_nodes": 128,
+            "transform_instances": 4096
+          }
+        }
+      },
+      "version": "0.14.0"
+    },
+    "score_digest": "c2ccb6489879478937363aa2f897151a69df6bd3c53b15a31c5b99baf5ed82f4",
+    "upstream_diagnostics": []
+  },
+  "document": {
+    "language": "ja",
+    "macro_locks": [],
+    "source": "赤い円と青い線の組を、灰の弧と交互に5つ並べる。"
+  }
+}

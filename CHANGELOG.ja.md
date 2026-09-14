@@ -12,6 +12,8 @@
 
 外部Python bundle生成と二重build、製品内の一時acceptance appを除去し、既存host testも通常wheelへ揃えた。DDL参照generatorは採用済み可視DDLを共有Rustでコンパイルする形式へ移し、旧expander／coerceの参照を過去資料として保持する。日英仕様のStage 2をknown-hole補完、Score生成を共有lowererとして揃え、「じゅん」を含む13カテゴリと保存互換を明確にした。DDL_VERSION11、DDL engine45、render66、必要な最小Score版の契約は変えない。
 
+移行の最終参照としてDDL45とrender66の出力を保存した。同梱Nature文書の英語表記を共有語彙に揃え、七つの定義が通常catalogへ登録されるよう修正した。採用済みMacro定義と描画の意味は変えない。
+
 ### 2026-09-14 — Server配備wheelへ共有pipelineを同梱
 
 既存のPython native wheelが共有authoring pipelineのbyte境界も公開し、通常Serverはそのinstalled moduleを直接使う。外部生成bundleを通常runtimeの依存から外した。Linux wheelと実binding・SQLiteの限定経路で、可視DDLの保存・authority・known-hole自動要求を確認した。意味決定、DDL／Scoreの形式、engine版は変えず、旧決定層の除去と一括配備は後続で行う。

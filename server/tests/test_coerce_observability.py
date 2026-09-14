@@ -1,8 +1,6 @@
 from __future__ import annotations
 
-import ast
 import json
-import re
 import subprocess
 import sys
 from pathlib import Path
@@ -11,10 +9,11 @@ import uuid
 from sqlalchemy import create_engine, inspect, text
 
 from inku_server import db
-from inku_server.api_core.rendering import _add_history_item, _capture_history_coerce_observability
+from inku_server.api_core.rendering import _add_history_item
 from inku_server.api_core.models import HistoryPostBody
 from inku_server.api_core.routers.history import api_history_post
-from inku_server.coerce import coerce_score
+from inku_server.limits import DEFAULT_LIMITS
+from inku_server.saved_score_compat import coerce_saved_score
 from inku_server.schema import Score
 
 
@@ -84,10 +83,13 @@ def test_t317_save_captures_hidden_trace_non_save_writes_nothing_and_replay_is_i
     actor, group = _actor()
     try:
         score = Score.model_validate({"background": "white", "instructions": []})
-        trace = _capture_history_coerce_observability(
-            score, ddl="night", lang="en", auto_repair=True, include_trace=False,
+        trace = _capture_history_coerce_observability(score, lang="en")
+        post = coerce_saved_score(
+            score,
+            limits=DEFAULT_LIMITS,
+            lang="en",
+            trace=trace,
         )
-        post = coerce_score(score, ddl="night", lang="en", trace=trace)
         stored = _add_history_item(
             actor=actor, input_text="night", ddl="night", expanded_ddl="night", score=post,
             svg="<svg/>", at=1, save_artifacts=False, idempotency_key="i331-replay",
@@ -111,56 +113,39 @@ def test_t317_save_captures_hidden_trace_non_save_writes_nothing_and_replay_is_i
         db.delete_user(actor["id"])
         db.delete_user_group(group["id"])
 
-def test_t317_paint_history_capture_is_gated_only_by_save_history():
-    source = Path(__file__).parents[1] / "src/inku_server/api_core/routers/render.py"
-    module = ast.parse(source.read_text())
-    paint_events = next(
-        node for node in module.body
-        if isinstance(node, ast.FunctionDef) and node.name == "_paint_events"
-    )
-    captures = [
-        node for node in ast.walk(paint_events)
-        if isinstance(node, ast.Assign)
-        and any(isinstance(target, ast.Name) and target.id == "coerce_observability" for target in node.targets)
-    ]
-    assert len(captures) == 1
-    capture = captures[0]
-    assert isinstance(capture.value, ast.IfExp)
-    assert isinstance(capture.value.test, ast.Attribute)
-    assert isinstance(capture.value.test.value, ast.Name)
-    assert capture.value.test.value.id == "req"
-    assert capture.value.test.attr == "save_history"
-    assert not any(
-        isinstance(node, ast.Attribute)
-        and isinstance(node.value, ast.Name)
-        and node.value.id == "req"
-        and node.attr == "include_trace"
-        for node in ast.walk(capture.value.test)
-    )
-    assert isinstance(capture.value.body, ast.Call)
-    assert isinstance(capture.value.body.func, ast.Name)
-    assert capture.value.body.func.id == "_capture_history_coerce_observability"
-    assert isinstance(capture.value.orelse, ast.Constant)
-    assert capture.value.orelse.value is None
+def test_t316_history_api_output_stays_public_while_private_trace_is_saved(monkeypatch):
+    from inku_server.api_core import rendering
 
-
-
-def test_t316_history_api_output_stays_public_while_private_trace_is_saved():
+    monkeypatch.setattr(rendering, "_submit_thumbnail_build", lambda _item: None)
     actor, group = _actor()
     saved = None
     try:
         body = HistoryPostBody(
-            input="plain history",
-            score={"background": "white", "instructions": []},
+            input="three hundred squares",
+            ddl="Place three hundred squares in the upper right.",
+            score={
+                "background": "white",
+                "instructions": [
+                    {
+                        "primitive": "circle",
+                        "center": [0.23, 0.67],
+                        "radius": 0.04,
+                        "arrangement": {"count": 7, "layout": "scatter"},
+                    }
+                ],
+            },
             at=4,
             save_artifacts=False,
         )
-        expected_score = coerce_score(Score.model_validate(body.score)).model_dump(
-            mode="json", by_alias=True
-        )
         saved = api_history_post(body, idempotency_key=None, actor=actor)
         public = saved.model_dump()
-        assert public["score"] == expected_score
+        assert len(public["score"]["instructions"]) == 1
+        instruction = public["score"]["instructions"][0]
+        assert instruction["primitive"] == "circle"
+        assert instruction["center"] == [0.23, 0.67]
+        assert instruction["radius"] == 0.04
+        assert instruction["arrangement"]["count"] == 7
+        assert saved.svg.startswith("<svg")
         assert not set(public) & {
             "score_pre_coerce",
             "coerce_trace_version",
@@ -204,244 +189,3 @@ def test_t317_history_api_persists_private_capture_without_a_public_trace_field(
         db.delete_items(actor["id"], [saved.id] if saved is not None else [])
         db.delete_user(actor["id"])
         db.delete_user_group(group["id"])
-
-
-def test_t318_registry_covers_all_leaf_predicates_and_catalog_preserves_memberships():
-    from inku_server.coerce.observability import catalog_snapshot, verify_decision_site_registry
-
-    assert verify_decision_site_registry() == []
-    markers = catalog_snapshot()["markers"]
-    assert markers
-    assert all({"system", "marker", "language", "decision_site", "match_mode"} <= set(event) for event in markers)
-    assert all("output" not in event for event in markers)
-    duplicate = [event for event in markers if event["marker"] == "right half"]
-    assert len({event["system"] for event in duplicate}) > 1
-
-
-def test_t319_real_coerce_records_actual_marker_and_effect_without_score_byte_change():
-    from inku_server.coerce.observability import capture_context
-
-    score = Score.model_validate({"background": "white", "instructions": [{"primitive": "circle", "color": "white", "center": [0.5, 0.5], "radius": 0.1}]})
-    plain = coerce_score(score, ddl="blue", lang="en")
-    trace = capture_context(score, ddl="blue", lang="en")
-    observed = coerce_score(score, ddl="blue", lang="en", trace=trace)
-    assert plain.model_dump_json(by_alias=True) == observed.model_dump_json(by_alias=True)
-    event = trace.persistable()
-    assert event["complete"] is True
-    assert any(marker["marker"] == "blue" for marker in event["marker_events"])
-    assert any(branch["changed_fields"] for branch in event["branch_events"])
-    assert all(
-        field["path"].startswith("/instructions/")
-        and field["effect"] in {"add", "remove", "replace"}
-        for branch in event["branch_events"]
-        for field in branch["changed_fields"]
-    )
-
-
-def test_t320_actual_disabled_not_executed_and_incomplete_states_are_distinct(monkeypatch):
-    from inku_server.coerce.observability import capture_context
-
-    score = Score.model_validate({"background": "white", "instructions": []})
-    disabled = capture_context(score, ddl="night", lang="en")
-    monkeypatch.setenv("INKU_COERCE_DISABLE", "1")
-    coerce_score(score, ddl="night", lang="en", trace=disabled)
-    assert disabled.persistable()["disabled"] is True
-    not_executed = capture_context(score, ddl="night", lang="en")
-    assert not_executed.persistable()["complete"] is False
-    assert not_executed.persistable()["reason_class"] == "not_executed"
-    auto_repair_off = _capture_history_coerce_observability(
-        score, ddl="night", lang="en", auto_repair=False, include_trace=False
-    )
-    assert auto_repair_off.persistable()["reason_class"] == "auto_repair_off"
-
-
-def test_t318_stage_a_registry_and_catalog_are_actual_and_stable():
-    from inku_server.coerce.observability import catalog_digest, catalog_snapshot
-    from inku_server.coerce.observation_registry import (
-        DIRECT_INPUT_SEMANTIC_LEAVES,
-        DIRECT_SITE_COUNT,
-        LANGUAGE_SITE_COUNT,
-        OUTPUT_EXCLUSIONS,
-        SEMANTIC_LEAF_COUNT,
-        SITE_REGISTRY,
-        SYNTAX_SITE_COUNT,
-    )
-    from inku_server.language_support.registry import INSTRUCTION_LANGUAGE_REGISTRY
-
-    language_sites = [
-        site
-        for site in SITE_REGISTRY
-        if site["source_kind"] == "language_support.COERCE_MARKERS"
-    ]
-    assert (SYNTAX_SITE_COUNT, SEMANTIC_LEAF_COUNT, LANGUAGE_SITE_COUNT) == (81, 93, 70)
-    assert DIRECT_SITE_COUNT == 11
-    assert len(OUTPUT_EXCLUSIONS) == 5
-    decision_sites = [site["decision_site"] for site in language_sites]
-    assert len(decision_sites) == len(set(decision_sites)) == LANGUAGE_SITE_COUNT
-    assert not any(re.search(r"\.\d{3,}\.", site) for site in decision_sites)
-
-    source = Path(__file__).parents[1] / "src/inku_server/coerce/compose.py"
-    tree = ast.parse(source.read_text())
-    observed_sites = {
-        keyword.value.value
-        for call in ast.walk(tree)
-        if isinstance(call, ast.Call)
-        for keyword in call.keywords
-        if keyword.arg == "decision_site" and isinstance(keyword.value, ast.Constant)
-    }
-    direct_sites = [
-        site for site in SITE_REGISTRY if site["source_kind"] == "compose_direct_input"
-    ]
-    direct_decision_sites = {site["decision_site"] for site in direct_sites}
-    assert set(decision_sites) | direct_decision_sites == observed_sites
-    assert len(direct_sites) == DIRECT_SITE_COUNT == 11
-    assert {site["systems"][0] for site in direct_sites} == {
-        "direct.visual_event.dynamic_groups",
-        "direct.visual_event.anticipatory_skip",
-        "direct.presence.human", "direct.presence.creature",
-        "direct.presence.group", "direct.presence.gaze",
-        "direct.presence.symmetry", "direct.atmospheric_clause",
-        "direct.polychrome_clause", "direct.bamboo_green",
-        "direct.only_primitive.dynamic_groups",
-    }
-    direct_leaves = {
-        leaf for site in direct_sites for leaf in site["semantic_leaves"]
-    }
-    assert direct_leaves == set(DIRECT_INPUT_SEMANTIC_LEAVES)
-    assert len(direct_leaves) == 26
-
-    declared_systems = set().union(
-        *(set(support.coerce_markers) for support in INSTRUCTION_LANGUAGE_REGISTRY.values())
-    )
-    catalog_systems = {system for site in language_sites for system in site["systems"]}
-    inert_systems = declared_systems - catalog_systems - {"atmospheric_effect"}
-    assert inert_systems == {
-        "colorful",
-        "edge_light",
-        "hard_edge",
-        "leaf_grain",
-        "playful_motion",
-        "silence_layer",
-        "strong_edge_light",
-        "surface_tension",
-        "vanishing_trace",
-    }
-
-    snapshot = catalog_snapshot()
-    assert catalog_digest(snapshot) == (
-        "cdb57692526fcf9dd5cbb08e49a3244837e6ab2f47ad8bae82d9f5757c524a80"
-    )
-    catalog = snapshot["markers"]
-    direct_catalog = [event for event in catalog if event["system"].startswith("direct.")]
-    assert len({event["system"] for event in catalog}) == 77
-    assert len(catalog) == 1402
-    assert len(direct_catalog) == 271
-    assert len({(event["language"], event["marker"]) for event in catalog}) == 776
-    assert {event["decision_site"] for event in direct_catalog} == direct_decision_sites
-    assert all(event["system"] != "atmospheric_effect" for event in catalog)
-    assert all("output" not in event for event in catalog)
-
-
-def test_t318_stage_a_declaration_inventory_is_separate_from_site_membership():
-    from inku_server.coerce.observability import marker_tokens
-
-    declarations = tuple(
-        token for token in marker_tokens() if not token.system.startswith("direct.")
-    )
-    declaration_memberships = {
-        (token.system, token.language, str(token)) for token in declarations
-    }
-    actual_inputs = {
-        membership
-        for membership in declaration_memberships
-        if membership[0] != "atmospheric_effect"
-    }
-    assert len(declarations) == 975
-    assert len(declaration_memberships) == 974
-    assert len(actual_inputs) == 952
-    assert len({(language, marker) for _, language, marker in actual_inputs}) == 611
-
-
-def test_t319_stage_a_raw_and_marker_helper_observations_preserve_score_bytes():
-    from inku_server.coerce.observability import capture_context
-
-    score = Score.model_validate(
-        {
-            "background": "white",
-            "instructions": [
-                {
-                    "primitive": "circle",
-                    "color": "white",
-                    "center": [0.5, 0.5],
-                    "radius": 0.1,
-                }
-            ],
-        }
-    )
-    for ddl, expected_mode in (
-        ("slow wave", "raw-substring"),
-        ("blue", "marker_helper(word_ascii_else_substring)"),
-    ):
-        plain = coerce_score(score, ddl=ddl, lang="en")
-        trace = capture_context(score, ddl=ddl, lang="en")
-        observed = coerce_score(score, ddl=ddl, lang="en", trace=trace)
-        assert plain.model_dump_json(by_alias=True) == observed.model_dump_json(by_alias=True)
-        assert any(
-            event["match_mode"] == expected_mode
-            for event in trace.persistable()["marker_events"]
-        )
-
-
-def test_t319_stage_b_direct_presence_visual_and_primitive_trace_preserve_score_bytes():
-    from inku_server.coerce import compose
-    from inku_server.coerce.observability import capture_context
-
-    score = Score.model_validate(
-        {
-            "background": "white",
-            "instructions": [
-                {
-                    "primitive": "circle",
-                    "color": "white",
-                    "center": [0.5, 0.5],
-                    "radius": 0.1,
-                }
-            ],
-        }
-    )
-    for ddl, expected_system in (
-        ("figure face", "direct.presence.human"),
-        ("two same newspaper held", "direct.visual_event.dynamic_groups"),
-    ):
-        plain = coerce_score(score, ddl=ddl, lang="en")
-        trace = capture_context(score, ddl=ddl, lang="en")
-        observed = coerce_score(score, ddl=ddl, lang="en", trace=trace)
-        assert plain.model_dump_json(by_alias=True) == observed.model_dump_json(by_alias=True)
-        assert any(
-            event["system"] == expected_system
-            for event in trace.persistable()["marker_events"]
-        )
-
-    trace = capture_context(score, ddl="circle only", lang="en")
-    with trace.activate():
-        assert compose._primitive_only_constraint_from_ddl("circle only") == {"circle"}
-    assert any(
-        event["system"] == "direct.only_primitive.dynamic_groups"
-        for event in trace.persistable()["marker_events"]
-    )
-
-
-def test_t318_stage_b_live_visual_event_mode_is_not_the_map_raw_substring_mode():
-    from inku_server.coerce.observation_registry import SITE_REGISTRY
-
-    direct_modes = {
-        site["systems"][0]: site["match_mode"]
-        for site in SITE_REGISTRY
-        if site["source_kind"] == "compose_direct_input"
-    }
-    assert direct_modes["direct.visual_event.dynamic_groups"] == (
-        "marker_helper(word_ascii_else_substring)"
-    )
-    assert direct_modes["direct.visual_event.anticipatory_skip"] == (
-        "marker_helper(word_ascii_else_substring)"
-    )

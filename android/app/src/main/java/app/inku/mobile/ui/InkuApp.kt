@@ -207,7 +207,6 @@ import app.inku.mobile.ui.camera.CameraFailure
 import app.inku.mobile.ui.camera.CameraInputSource
 import app.inku.mobile.ui.camera.cameraDevelopmentPresentation
 import app.inku.mobile.ui.camera.locksCameraInteraction
-import app.inku.mobile.pipeline.WebDdlSpec
 import app.inku.mobile.render.NativeRenderBridge
 import app.inku.mobile.render.RustArtworkRasterizer
 import java.io.File
@@ -2136,7 +2135,7 @@ private fun CanvasHeroCard(
     if (!presentation && showControls) item?.let {
         renderTabCopyText(
             state.renderTab,
-            promptText = renderPromptText(it, state.litertStage1PromptOptimization),
+            promptText = renderPromptText(it),
             jsonText = renderJsonText(it),
         )?.let { text ->
             CopyableRenderTextView(
@@ -3787,8 +3786,6 @@ private fun ModelSettingsPanel(state: InkuUiState, viewModel: InkuViewModel, mod
                     onAcceptModelLicense = viewModel::acceptModelLicense,
                     onDownloadModel = viewModel::downloadModel,
                     onRedownloadModel = viewModel::redownloadModel,
-                    litertStage1PromptOptimization = state.litertStage1PromptOptimization,
-                    onLiteRtStage1PromptOptimizationChange = viewModel::setLiteRtStage1PromptOptimization,
                     statusMessage = state.message,
                 )
             }
@@ -3809,8 +3806,6 @@ private fun ProviderConnectionCard(
     onAcceptModelLicense: (String) -> Unit,
     onDownloadModel: (String) -> Unit,
     onRedownloadModel: (String) -> Unit,
-    litertStage1PromptOptimization: Boolean,
-    onLiteRtStage1PromptOptimizationChange: (Boolean) -> Unit,
     statusMessage: String?,
 ) {
     val requiresKey = provider.providerId in setOf("openai", "nvidia", "anthropic", "gemini")
@@ -3847,18 +3842,6 @@ private fun ProviderConnectionCard(
                 action = S.edit,
                 onAction = { editBaseUrlOpen = true },
             )
-            if (provider.isDefaultLocal) {
-                SettingCheckRow(
-                    checked = litertStage1PromptOptimization,
-                    text = S.promptOptimization,
-                    onCheckedChange = onLiteRtStage1PromptOptimizationChange,
-                )
-                Text(
-                    S.promptOptimizationNote,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
             Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -5038,7 +5021,7 @@ private fun CanvasPanel(state: InkuUiState, viewModel: InkuViewModel, modifier: 
                     } else {
                         renderTabCopyText(
                             state.renderTab,
-                            promptText = renderPromptText(item, state.litertStage1PromptOptimization),
+                            promptText = renderPromptText(item),
                             jsonText = renderJsonText(item),
                         )?.let { text ->
                             CopyableRenderTextView(text, Modifier.fillMaxSize())
@@ -5420,35 +5403,22 @@ private fun RenderTextView(text: String, modifier: Modifier = Modifier) {
     }
 }
 
-private fun renderPromptText(item: HistoryItemEntity, litertStage1PromptOptimization: Boolean): String {
-    val usesLiteRt = item.stage1Model.isLiteRtModelId() || item.stage2Model.isLiteRtModelId()
-    val stage1System = if (usesLiteRt && litertStage1PromptOptimization) {
-        WebDdlSpec.buildStage1LiteRtSystemPrompt(item.originalInput)
-    } else {
-        WebDdlSpec.stage1SystemPromptForDisplay()
-    }
-    val stage2System = if (usesLiteRt) {
-        WebDdlSpec.stage2LiteRtSystemPromptForDisplay()
-    } else {
-        WebDdlSpec.stage2SystemPromptForDisplay()
-    }
+private fun renderPromptText(item: HistoryItemEntity): String {
+    val source = item.sourceText?.takeIf { it.isNotBlank() } ?: item.originalInput
     return buildString {
-        appendLine("Stage 1 input:")
-        appendLine(item.originalInput)
+        appendLine("Saved source:")
+        appendLine(source)
         appendLine()
-        appendLine("Stage 1 system:")
-        appendLine(stage1System)
-        appendLine()
-        appendLine("Stage 2 input:")
+        appendLine("Saved normalized DDL:")
         appendLine(item.normalizedDdl)
         appendLine()
-        appendLine("Stage 2 system:")
-        appendLine(stage2System)
+        appendLine("Prompt transcript:")
+        appendLine("Unavailable: this history row does not persist a prompt transcript or digest.")
+        appendLine()
+        appendLine("Recorded models:")
+        appendLine("Stage 1: ${item.stage1Model ?: "unrecorded"}")
+        appendLine("Stage 2: ${item.stage2Model ?: "unrecorded"}")
     }
-}
-
-private fun String?.isLiteRtModelId(): Boolean {
-    return this?.startsWith("local-litert-lm:") == true
 }
 
 private fun renderJsonText(item: HistoryItemEntity): String {

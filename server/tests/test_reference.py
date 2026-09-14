@@ -14,7 +14,6 @@ import inku_render
 
 from inku_server import reference, schema
 from inku_server.color_catalogs import COLOR_CATALOGS, COLOR_KEYS, color_catalogs
-from inku_server.composer import _PRIMITIVE_TERMS, _RELATION_LITERAL_MARKERS
 from inku_server.geometry_thresholds import (
     CLOSURE_LIMIT,
     CUSP_LIMIT_DEGREES,
@@ -23,6 +22,7 @@ from inku_server.geometry_thresholds import (
 from inku_server.plugins import CANVAS_ASPECTS, plugin_status_items
 from inku_server.plugins.document_format import _CORE_MARKERS, _REGIONS
 from inku_server.render_engines import SVG_PROFILES
+from inku_server.saijiki import relation_literal_markers, shape_markers
 
 
 def _ref() -> dict:
@@ -100,10 +100,10 @@ def test_saijiki_prose_categories_track_enum_sizes() -> None:
     }
 
 
-def test_relation_literals_match_composer() -> None:
+def test_relation_literals_match_saijiki() -> None:
     literals = _ref()["normalized_ddl_phrases"]["relation_literals"]
     assert literals == {
-        key: list(value) for key, value in _RELATION_LITERAL_MARKERS.items()
+        key: list(value) for key, value in relation_literal_markers().items()
     }
     assert _ref()["normalized_ddl_phrases"]["relation_enums"]["type"] == list(
         get_args(schema.RelationType)
@@ -136,7 +136,7 @@ def test_core_markers_and_regions_match_document_format() -> None:
 def test_marker_classes_use_known_buckets() -> None:
     expansion = _ref()["expansion_layer"]
     primitive_surfaces = {
-        term.lower() for terms in _PRIMITIVE_TERMS.values() for term in terms
+        term.lower() for lang in ("ja", "en") for term in shape_markers(lang)
     }
     allowed = {"structural", "shape", "operation", "material", "color", "variation", "angle", "ratio", "place"}
     for lang in ("ja", "en"):

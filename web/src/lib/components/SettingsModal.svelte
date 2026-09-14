@@ -47,7 +47,6 @@
 		loginStatus: string | null;
 		loginUserName: string;
 		loginPassword: string;
-		autoRepairEnabled: boolean;
 		pngAlphaWhite: boolean;
 		exportTemplates: ExportTemplate[];
 		exportTemplateStatus: string | null;
@@ -96,7 +95,6 @@
 		loginStatus,
 		loginUserName = $bindable(),
 		loginPassword = $bindable(),
-		autoRepairEnabled = $bindable(true),
 		pngAlphaWhite = $bindable(),
 		exportTemplates,
 		exportTemplateStatus,
@@ -340,7 +338,7 @@
 				<AppearanceSettings
 					{uiMode} {uiCustom} {uiModeSaving} {uiModeSaveError}
 					{historyStripFields} {historyStripFieldsSaving} {historyStripFieldsSaveError}
-					bind:autoRepairEnabled {onToggleHistoryStripField} {onSetUiMode} {onSetUiCustomItem}
+					{onToggleHistoryStripField} {onSetUiMode} {onSetUiCustomItem}
 				/>
 			{/if}
 		</div>

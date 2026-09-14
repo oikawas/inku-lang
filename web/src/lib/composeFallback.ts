@@ -42,8 +42,7 @@ export function composeFallbackState(value: unknown): ComposeFallbackState {
 
 /** What a sender writes when it saves a work it has a paint response for.
  *
- *  The same rule the server applies on the paint route
- *  (`api_core/rendering.py:compose_fallback_value`): always a string. Omitting
+ *  The saved-history compatibility shape is always a string. Omitting
  *  the key stores NULL, and NULL already means "drawn before the column", so a
  *  silent sender makes a sound work look unrecorded. */
 export function composeFallbackValue(result: {

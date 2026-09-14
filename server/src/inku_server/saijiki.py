@@ -1,24 +1,24 @@
-"""inku 歳時記 (Saijiki) — 語彙の単一情報源 (v1.92).
+"""inku 歳時記 (Saijiki) — Server 表示・保存互換 projection.
 
-このテーブルが次の消費側の正である:
+生成語彙の正は共有 core の ``assets/saijiki-v1.json`` にある。このテーブルは
+その内容と同期し、Server 側の次の読み取り用途へ投影する:
 
-- Stage 1 プロンプトの語彙ブロックとてざわり列挙 (interpreter.py)
 - プラグイン閉包マーカー (plugins/document_format.py)
-- Stage 2 の relation 固定句テーブル (composer.py)
 - reference §1〜§3 の歳時記・マーカー表 (reference.py)
 - 歳時記表示の配信 (Phase 3: GET /api/saijiki と web スナップショット)
+- 保存済み Score の受理に使う互換語彙
 
 Score schema (schema.py) の enum は従来どおり Score 側の正であり、ここからは
 導出しない。語彙から消えた語 (例: 描く) も保存済み Score の受理・Replay のため
 schema からは削除しない。
 
 フラグの意味:
-- prompt:  Stage 1 語彙ブロック・列挙へ出す
+- prompt: 共有 asset との同期確認用ブロック・列挙へ出す
 - display: 歳時記表示 (web / API) へ出す
 - marker:  プラグイン閉包マーカーにする (None = prompt に従う)
 
-順序の扱い: words は Stage 1 プロンプトの表示順で持つ。閉包マーカーの順序が
-プロンプト順と異なるカテゴリ (かたち・うごき・あいだ) は marker_order_* で明示する。
+順序の扱い: words は共有 asset の表示順で持つ。閉包マーカーの順序が
+表示順と異なるカテゴリ (かたち・うごき・あいだ) は marker_order_* で明示する。
 順序は表示・互換のための指定であり、所属 (membership) は常に語の
 フラグから導出される。
 """
@@ -58,7 +58,7 @@ class SaijikiWord:
     surface_ja: str
     surface_en: str | None
     default: bool = False  # プロンプトで「(既定)」/" (default)" を付ける
-    prompt: bool = True  # Stage 1 語彙ブロック・列挙へ出す
+    prompt: bool = True  # 共有 asset 同期用ブロック・列挙へ出す
     display: bool = True  # 歳時記表示 (web / API) へ出す
     marker: bool | None = None  # 閉包マーカー所属 (None = prompt に従う)
     score_value: str | None = None  # Weight / Color / SurfaceTexture の Score enum 値
@@ -107,7 +107,7 @@ class SaijikiCategory:
 
 @dataclass(frozen=True)
 class RelationWord:
-    relation_type: str  # relation.type (schema / composer と共通)
+    relation_type: str  # relation.type (共有 asset / schema と共通)
     surface_ja: str
     surface_en: str
     literals_ja: tuple[str, ...]  # 正規化DDLの固定 previous-object 句
@@ -366,7 +366,7 @@ SAIJIKI: tuple[SaijikiCategory, ...] = (
 )
 
 # あいだ (関係)。プロンプトの語彙ブロックには出さず、関係節 (散文) が扱う。
-# 表示順は SPEC §14.2、格納順は composer の relation テーブル順とする。
+# 表示順は SPEC §14.2、格納順は共有 asset の relation テーブル順とする。
 RELATIONS: tuple[RelationWord, ...] = (
     RelationWord("along", "沿う", "along", ("前の線に沿って",), ("along the previous line",)),
     RelationWord(
@@ -438,7 +438,7 @@ def _prompt_words(category: SaijikiCategory, lang: str) -> tuple[SaijikiWord, ..
 
 
 def prompt_block(lang: str) -> str:
-    """Stage 1 プロンプトの歳時記カテゴリブロック (10 行)。"""
+    """共有 asset と同期する歳時記カテゴリブロック (10 行)。"""
     lines = []
     joiner = "、" if lang == "ja" else ", "
     for category in SAIJIKI:
@@ -519,7 +519,7 @@ def saijiki_marker_table() -> dict[str, dict[str, tuple[str, ...]]]:
 
 
 def relation_literal_markers() -> dict[str, tuple[str, ...]]:
-    """Stage 2 (composer) の relation 固定句テーブルの正。"""
+    """共有 asset と同期する relation 固定句の Server projection。"""
     return {word.relation_type: word.literals_ja + word.literals_en for word in RELATIONS}
 
 

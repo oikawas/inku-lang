@@ -114,8 +114,6 @@ export function createWorkState(deps: WorkStateDeps) {
 
 	let ddlGeneratedBaseline = $state<string | null>(null);
 
-	let ddlAutoRepairEnabled = $state(true);
-
 	let thinking = $state<string | null>(null);
 
 	let result = $state<PaintResult | null>(null);
@@ -468,7 +466,6 @@ export function createWorkState(deps: WorkStateDeps) {
 				includeThinking: deps.models.includeThinking(),
 				instructionLang,
 				canvasAspectId: effectiveCanvasAspectId(),
-				ddlAutoRepairEnabled,
 				sketchMode,
 				renderPayload: renderSettingsPayload('paint', options.renderOverrides)
 			},
@@ -511,7 +508,6 @@ export function createWorkState(deps: WorkStateDeps) {
 				include_thinking: deps.models.includeThinking(),
 				instruction_lang: langOverride ?? instructionLang,
 				ui_lang: uiLang,
-				expand_intermediate: true,
 			})
 		});
 		if (!r.ok) {
@@ -578,7 +574,6 @@ export function createWorkState(deps: WorkStateDeps) {
 				instruction_lang: langOverride ?? instructionLang,
 				ui_lang: uiLang,
 				canvas_aspect: renderOptions.canvasAspectId ?? effectiveCanvasAspectId(),
-				auto_repair: ddlAutoRepairEnabled,
 				...renderSettingsPayload('compose', renderOptions.renderOverrides),
 				...(renderOptions.lineageParentNodeId ? { lineage_parent_node_id: renderOptions.lineageParentNodeId } : {}),
 			})
@@ -967,8 +962,6 @@ export function createWorkState(deps: WorkStateDeps) {
 		set expandedDdl(value) { expandedDdl = value; },
 		get ddlGeneratedBaseline() { return ddlGeneratedBaseline; },
 		set ddlGeneratedBaseline(value) { ddlGeneratedBaseline = value; },
-		get ddlAutoRepairEnabled() { return ddlAutoRepairEnabled; },
-		set ddlAutoRepairEnabled(value) { ddlAutoRepairEnabled = value; },
 		get thinking() { return thinking; },
 		set thinking(value) { thinking = value; },
 		get result() { return result; },

@@ -30,12 +30,13 @@ REFERENCE_ROOT = pathlib.Path(__file__).resolve().parents[1] / "reference"
 CORPUS_FORMAT_VERSION = "2"
 SCHEMA_VERSION = "0.5.0"
 CRESCENT_SCHEMA_VERSION = "0.2.0"
-FROZEN_AT = "2026-09-11"
+FROZEN_AT = "2026-09-14"
 REASON = (
-    "Engine 51 scales group geometry and spacing while keeping stroke widths "
-    "and material grain in canvas units. Nonuniform and nested affine transforms "
-    "are resolved before material generation. Existing Engine 50 literal inputs "
-    "and artifacts are retained."
+    "Engine 66 is the accepted shared Rust performance for the typed-DDL "
+    "migration. It renders resolved repeated groups, endpoint and partway "
+    "relations, independent ink spread, finite member cycles, and whole-body "
+    "mirroring while preserving saved-Score playback. Existing Engine 51 "
+    "literal inputs and artifacts are retained."
 )
 SVG_PROFILE = "editable"
 DEFAULT_RENDER_SEED = 12345

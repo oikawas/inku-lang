@@ -132,7 +132,7 @@ member 葉形: 弧を置き、前の弧に両端で触れる
 member leaf form: place an arc, then an arc touching the previous arc at both ends
 Scatter 8-12 leaf forms in {region: diagonal band, upper-left to lower-right}.
 In crayon. Red and gray alternating per leaf. Fill each interior with its outline color.
-Rotation varies per leaf. Edges blurring.
+Rotated differently per leaf. Edges blurring.
 note: Denser toward the bottom — a density-gradient construct is a future candidate.
 
 ## 語: 枯草

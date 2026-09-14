@@ -3,19 +3,19 @@
 from __future__ import annotations
 
 import json
-import os
 import runpy
 import time
 from copy import deepcopy
+from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import Header
+from fastapi import FastAPI, Header
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, select
 
 from inku_server.persistence.schema import Base, HistoryRow
 from inku_server.persistence.variation_authority import VariationAuthorityStore
-from inku_server.pipeline_api import PipelineService, create_acceptance_app
+from inku_server.pipeline_api import PipelineService, pipeline_router, register_pipeline_errors
 from inku_server.pipeline_candidate import PipelineBinding
 from inku_server.pipeline_product import RunOptions
 from inku_server.pipeline_settings import select_canvas
@@ -52,7 +52,7 @@ def _wait_for(
 def test_managed_api_persists_approved_patch_reload_and_legacy_fork(
     tmp_path,
 ) -> None:
-    binding = PipelineBinding(Path(os.environ["INKU_PIPELINE_PYTHON_BUNDLE"]))
+    binding = PipelineBinding()
     engine = create_engine(f"sqlite:///{tmp_path / 'pipeline-api.db'}")
     Base.metadata.create_all(engine)
     store = VariationAuthorityStore(engine, now_ms=lambda: 1_777_777_777)
@@ -134,13 +134,18 @@ def test_managed_api_persists_approved_patch_reload_and_legacy_fork(
             prepare_for=prepare,
         )
 
-    def app(candidate_service: PipelineService):
-        return create_acceptance_app(
-            candidate_service,
-            actor_dependency=_actor,
-            max_body_bytes=100_000,
-            max_requests=4,
-        )
+    def app(pipeline_service: PipelineService):
+        @asynccontextmanager
+        async def lifespan(_app):
+            try:
+                yield
+            finally:
+                pipeline_service.close()
+
+        application = FastAPI(lifespan=lifespan)
+        register_pipeline_errors(application)
+        application.include_router(pipeline_router(pipeline_service, _actor))
+        return application
 
     owner = {"X-Owner": "author-1"}
     another_owner = {"X-Owner": "author-2"}

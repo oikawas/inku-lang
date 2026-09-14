@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { t } from '$lib/i18n/index.svelte';
 	import { getMascot, setMascot } from '$lib/mascot.svelte';
-	import Tooltip from '$lib/components/Tooltip.svelte';
 	import NumberStepper from '$lib/components/NumberStepper.svelte';
 	import { batchSettings, BATCH_RETRY_MAX, BATCH_RETRY_MIN } from '$lib/features/batch/settings.svelte';
 	import { captionSettings } from '$lib/features/canvas/caption-settings.svelte';
@@ -17,7 +16,6 @@
 		historyStripFields: HistoryStripField[];
 		historyStripFieldsSaving: boolean;
 		historyStripFieldsSaveError: boolean;
-		autoRepairEnabled: boolean;
 		onToggleHistoryStripField: (field: HistoryStripField) => void;
 		onSetUiMode: (mode: UiMode) => void | Promise<void>;
 		onSetUiCustomItem: (key: UiVisibilityKey, visible: boolean) => void;
@@ -26,7 +24,7 @@
 	let {
 		uiMode, uiCustom, uiModeSaving, uiModeSaveError,
 		historyStripFields, historyStripFieldsSaving, historyStripFieldsSaveError,
-		autoRepairEnabled = $bindable(true), onToggleHistoryStripField,
+		onToggleHistoryStripField,
 		onSetUiMode, onSetUiCustomItem
 	}: Props = $props();
 </script>
@@ -138,16 +136,4 @@
 						<span>{t().settingsMascotYuragi}</span>
 					</label>
 				</div>
-			</div>
-			<div class="popover-group">
-				<div class="popover-group-label generation-label">
-					<span>{t().settingsGenerationLabel}</span>
-					<Tooltip placement="bottom-right" wide text={t().tooltipDdlAutoRepairDetails}>
-						<span class="settings-info-mark" aria-hidden="true">i</span>
-					</Tooltip>
-				</div>
-				<label class="setting-toggle" title={t().tooltipDdlAutoRepair}>
-					<input type="checkbox" bind:checked={autoRepairEnabled} />
-					<span>{t().ddlAutoRepairLabel}</span>
-				</label>
 			</div>

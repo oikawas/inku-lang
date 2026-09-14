@@ -64,9 +64,7 @@ EXCUSED: dict[str, str] = {
     "lineage_parent_node_id": "lineage; `refine perform` sends it on its own path",
     "derivation_kind": "lineage; `refine perform` sends it on its own path",
     "derivation_metadata": "lineage; `refine perform` sends it on its own path",
-    # Both sides default to True, so staying quiet and sending True are the same
-    # request. A flag to turn it off is a separate judgement, not an omission.
-    "auto_repair": "server default True matches what the CLI wants; no flag defined yet",
+    "auto_repair": "deprecated compatibility field; ignored server-side",
 }
 
 

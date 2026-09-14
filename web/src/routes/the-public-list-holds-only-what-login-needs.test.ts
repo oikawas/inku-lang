@@ -1,12 +1,11 @@
 // Run with: npm run test:unit  (node:test, no test dependency)
 //
-// T-87 / T-88: signing in reads the two lists that stopped being public.
+// T-87 / T-88: signing in reads the catalog list that is not public.
 //
-// I-086 moved /api/color-catalogs and /api/prompts behind the authorization
-// guard. The startup fetch runs before anyone has logged in, so both now come
-// back 401 there and the page swallows it; unless `login()` asks again, the
-// catalog stays on FALLBACK_CATALOG and the Prompt tab stays empty until the
-// page is reloaded.
+// I-086 moved /api/color-catalogs behind the authorization guard. The startup
+// fetch runs before anyone has logged in, so it comes back 401 there and the
+// page swallows it; unless `login()` asks again, the catalog stays on
+// FALLBACK_CATALOG until the page is reloaded.
 //
 // The check is cut down to the body of `login()` before it is matched. The page
 // calls both functions in several places -- `loadCurrentUser()` alone has the
@@ -38,11 +37,11 @@ function loginBody(): string {
 	return region(SESSION, 'async login()', 'async logout()');
 }
 
-test('signing in reads the catalog list and the prompts', () => {
+test('signing in reads the catalog list', () => {
 	const login = loginBody();
 	const afterAuthentication = region(PAGE, "async function completeAuthentication(source: 'resume' | 'login')", 'function resetAfterSignedOut()');
 	assert.match(login, /afterAuthenticated\('login'\)/, 'login() should invoke its post-authentication boundary');
-	assert.match(afterAuthentication, /source === 'login' \? \[loadColorCatalogs\(\), fetchPrompts\(\)\] : \[\]/, 'login should read the protected catalog and prompt lists');
+	assert.match(afterAuthentication, /source === 'login' \? \[loadColorCatalogs\(\)\] : \[\]/, 'login should read the protected catalog list');
 });
 
 test('the cut is a cut: login()s region is not the file and not its neighbour', () => {

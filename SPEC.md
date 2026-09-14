@@ -107,7 +107,7 @@ It rests on three pillars of constraint:
 
 Only deterministic layers carry versions. Stage 1 and Stage 2 are LLM layers that can vary for the same input, so they retain the digest of the prompt actually sent as provenance rather than a version. `render_engine_version` rises when the same Score and seed perform differently, or when the performable vocabulary grows. A rename of a word or tool does not raise it and does not by itself require updating a reference record. `ddl_engine_version` rises when a deterministic transform's output changes and when `Instruction` field declaration order changes; changing the order measures both the field that moves and the field that gives up its position. `ddl_version` rises when grammar or vocabulary is added, changed, or retired; Score `version` rises when the schema structure changes. `ddl_version` and `ddl_engine_version` count from 1. `MODEL_CONFIG_VERSION` rises when measurements, recommendation levels, or selectability change and applies builtin metadata to matching ids in a stored catalog. `web/APP_VERSION` is the single authority for `APP_VERSION`, read by the UI, `/api/info` `version`, and the CLI; the distributed version in `server/pyproject.toml` changes only for a release tag. `web/BUILD_NUMBER` is a shared serial that also moves for UI changes and is excluded from identity. Implementations and saved works own the current values. Record a new version's values, reasons, and results only in the [changelog](CHANGELOG.md). The [render engine version history](docs/spec/render-engine-history.md) preserves existing version records as historical material and receives no new sections.
 
-Versions and identity IDs are separate namespaces. The work-edition ID is `rh3`, derived from `score`, `render_seed`, the render engine ID and version, and `render_color_catalog_id`. `render_build_number` and the Score-side `vary_seed` are excluded from identity. Stored `rh2` remains legacy: it is neither recalculated nor compared with `rh3`.
+Versions and identity IDs are separate namespaces. The work-edition ID is `rh3`, derived from `score`, `render_seed`, `render_wild`, the render engine ID and version, and `render_color_catalog_id`. `render_build_number` and the Score-side `vary_seed` are excluded from identity. Stored `rh2` remains legacy: it is neither recalculated nor compared with `rh3`.
 
 Saved reference corpora remain comparison records for the versions they froze. Do not rewrite a frozen version's output, and retain its existing case IDs. At an explicit checkpoint after an overall migration is complete, perform one full update and record the difference from the prior version in its manifest. An intermediate render or DDL engine bump, or a rename alone, does not require a full corpus update, a current-version reference directory, or running a generator or manual comparison. Choose focused validation from the change risk. Render records remain SVGs; DDL records remain DDL text or JSON.
 
@@ -389,7 +389,7 @@ is shorthand, not a new capability.
 
 The canonical owner of Canvas is the shared-core `inku.canvas-format-registry.v1`, not a vocabulary plugin or a system plugin. Canvas selection is a resolved host option outside visible DDL and MacroInvocation / MacroDefinition. The same DDL can be used on different canvases. A host boundary with no selection may choose `square` as its host default, but that does not mean the DDL compiler inserts `square` as a semantic fact. The host carries the selection through Score / render context / history, and the Renderer resolves SVG `width`, `height`, and `viewBox` (§19).
 
-The current runtime's `plugin_storage["canvas-aspect"]`, `canvas_aspect` request alias, stored `Score.canvas` / `render_canvas_aspect*`, system / user plugin directories, and plugin-status / enable controls remain as legacy compatibility operations. They permit reads as well as updates to legacy plugin documents and enabled state. That does not make them semantic authority or a new MacroDefinition authoring / loading API. Their retirement and the runtime / UI cutover belong to a later Step; this section does not pretend that work is complete. If Stage 2 receives canvas through the current compatibility path, it is host-resolved composition context, not visible-DDL metadata. It does not rewrite DDL coordinates, words, or canonical meaning.
+The current runtime's `plugin_storage["canvas-aspect"]`, `canvas_aspect` request alias, stored `Score.canvas` / `render_canvas_aspect*`, system / user plugin directories, and plugin-status / enable controls remain as legacy compatibility operations. They permit reads as well as updates to legacy plugin documents and enabled state. That does not make them semantic authority or a new MacroDefinition authoring / loading API. Storage and API compatibility remain for saved settings and catalog discovery; they do not execute the old semantic decision layer. If Stage 2 receives canvas through the current compatibility path, it is host-resolved composition context, not visible-DDL metadata. It does not rewrite DDL coordinates, words, or canonical meaning.
 
 ### 4.5 Expansion Through MacroDefinition
 
@@ -409,7 +409,7 @@ A Transform containing only Anchors uses the center of their resolved bounding b
 
 The current consumer accepts rotation plus `scale_x` / `scale_y` and `translate_x` / `translate_y`. Only finite values are accepted; negative scale reflects and zero scale degenerates. It transforms child geometry only: scale about the exact combined child bounding-box center before rotation, rotate about that same center, then translate by a normalized-canvas-axis delta. Shape geometry and spacing change while stroke width and grain pitch remain fixed. General affine transforms compose inner to outer. If placement is determined during performance, that placement resolves before the bounding box is computed. A `group` is transparent structure that carries the range, references, and ownership; it creates neither placement nor a drawing instruction.
 
-Transform reaches both count-one actual Scores and compact repetition recipes. Score 0.5.0 `transform_groups` retains the range, rotation, scale, translation, and original instruction indices of numerically fixed members. Rotation-only Score 0.4.0 groups, saved 0.1.0 / 0.2.0 / 0.3.0 Scores, and versionless artifacts retain their existing compatibility. An empty group list stays off the wire; `surface_intensity` is valid from Score 0.3.0 onward. Without an explicit path connection, the default / legacy lowerer remains Score 0.9 and the resource-aware entrance emits Score 0.10 resolved placement, repetition, and fill recipes. Score 0.8.0 direct `placement_groups` place one contiguous source-order member range once. Each Macro is one placement member, retaining its body positions, internal counts, Transforms, Anchors, and ownership ranges. Outer Macro repetition is stored separately in `repetition_groups`, so inner and outer counts and ordinal namespaces do not collide. Group-level repeated actions reach compact recipes under the count rules below. Omitted internal placement uses `overlap`, which aligns bounding-box centers; explicit “place in a row” retains `horizontal_source_order`; explicit “overlap” uses `overlap`; scatter and tile use `scatter` and `tile`. The group bounding-box center moves to one named region resolved from the performance seed, retaining each member's owner, count, seed, and geometry. An omitted line-up count is one for every member. Scatter and tile preserve explicit counts and divide the remainder up to a total of eight evenly among omitted members, assigning any remainder to earlier omitted members in source order. Each omitted member receives at least one, even when explicit counts plus those minima exceed eight. The same rule applies when all counts are omitted: nine listed kinds receive one each. Fully explicit counts are not topped up to eight. Line-up and place assign one only to omitted members. External Connected, Touching / Along / Cutting, and NotTouching / Between attempt one whole-group translation while retaining transformed geometry, direction, and named or numeric placement authority. NotTouching retains the existing gap and Between the existing recipe based on the two prior bounding-box centers. Failure records an error, removes only the relation, and leaves the group at its original transformed placement. Numeric fixed members, legacy Stop input, and owners, original indices, seeds, and lost references retain their rules. `compile_ddl_to_score_with_resources` and `render_with_resources` are the new shared-core entrances; product runtime / UI / API / persistence cutover remains incomplete.
+Transform reaches both count-one actual Scores and compact repetition recipes. Score 0.5.0 `transform_groups` retains the range, rotation, scale, translation, and original instruction indices of numerically fixed members. Rotation-only Score 0.4.0 groups, saved 0.1.0 / 0.2.0 / 0.3.0 Scores, and versionless artifacts retain their existing compatibility. An empty group list stays off the wire; `surface_intensity` is valid from Score 0.3.0 onward. The shared lowerer selects the minimum Score version required by the representation: flat compatibility without an explicit path connection remains Score 0.9, resource-aware compact recipes start at Score 0.10, and only works carrying a mirror relation require Score 0.15. Score 0.8.0 direct `placement_groups` place one contiguous source-order member range once. Each Macro is one placement member, retaining its body positions, internal counts, Transforms, Anchors, and ownership ranges. Outer Macro repetition is stored separately in `repetition_groups`, so inner and outer counts and ordinal namespaces do not collide. Group-level repeated actions reach compact recipes under the count rules below. Omitted internal placement uses `overlap`, which aligns bounding-box centers; explicit “place in a row” retains `horizontal_source_order`; explicit “overlap” uses `overlap`; scatter and tile use `scatter` and `tile`. The group bounding-box center moves to one named region resolved from the performance seed, retaining each member's owner, count, seed, and geometry. An omitted line-up count is one for every member. Scatter and tile preserve explicit counts and divide the remainder up to a total of eight evenly among omitted members, assigning any remainder to earlier omitted members in source order. Each omitted member receives at least one, even when explicit counts plus those minima exceed eight. The same rule applies when all counts are omitted: nine listed kinds receive one each. Fully explicit counts are not topped up to eight. Line-up and place assign one only to omitted members. External Connected, Touching / Along / Cutting, and NotTouching / Between attempt one whole-group translation while retaining transformed geometry, direction, and named or numeric placement authority. NotTouching retains the existing gap and Between the existing recipe based on the two prior bounding-box centers. Failure records an error, removes only the relation, and leaves the group at its original transformed placement. Numeric fixed members, legacy Stop input, and owners, original indices, seeds, and lost references retain their rules. `compile_ddl_to_score_with_resources` and `render_with_resources` are the shared-core entrances used by the normal Server, Web, and Android paths. Saved Score and history retain the format compatibility needed for reading and replay.
 
 An Anchor is a non-drawing reference point for line connections, with an explicit `place` or paired `position_x` / `position_y`. Anchor `place:center` means the canvas center (0.5, 0.5), without borrowing an Emit's focus-dependent placement. Other named positions use the existing placement regions. Score 0.6.0 stores `anchors` separately from drawing instructions, and `target_anchor_index` names a Connected target. Original references, ownership, drawing order, and seeds remain intact; Anchors follow the translation, scale, and rotation of their enclosing Transform. Numeric-position authority and legacy Stop-input compatibility remain, but a recoverable relation failure records an error, removes only its relation, and does not stop drawing. A missing position is not filled from nearby shapes or the invocation position. Saved Score 0.1.0 through 0.5.0 and versionless artifacts retain their compatibility.
 
@@ -447,7 +447,7 @@ Macros execute in invocation order after meaning resolution. A mention used only
 
 The old `.inku-plugin.md`, `fires_on`, localized expansion templates, and old Stage 1.5 / Stage 2 expander are retired as the semantic canon for new plugins. The compatibility importer returns a `legacy_plugin_format` warning and a per-macro `Imported | Omitted` outcome instead of failing the whole application. Old works prefer their stored Score / expanded artifact; the old expander is not a permanent fallback. An `Omitted` macro with no artifact must not silently render partially or turn into a different figure.
 
-The shared Rust compiler foundation exists through parse / validation / identity / lock / binding / deterministic expansion and carries the finite Emit subset above, including placement-free Groups, through the ordinary lowerer to an actual Score. Production runtime integration, a package catalog, preview, legacy cutover, and an arbitrary user-package loader remain incomplete. Later package / catalog / preview work belongs to separate PLAN steps. `PLUGIN.md` is the current authoring guide governed by this section; it must not treat an unimplemented loader or directory-addition procedure as authority.
+The shared Rust compiler foundation exists through parse / validation / identity / lock / binding / deterministic expansion and carries the finite Emit subset above, including placement-free Groups, through the ordinary lowerer to an actual Score. The normal Server, Web, and Android runtimes and bundled package catalog are connected. An arbitrary user-package loader remains unimplemented. `PLUGIN.md` is the current authoring guide governed by this section; it must not treat an unimplemented loader or directory-addition procedure as authority.
 
 Visible source thinness and size bind only a unique complete assignment to parameters explicitly declaring the matching `SemanticRef` category. Size uses the existing modifier-before-head syntax, also recognizing a qualified Macro head. Core values carry no Saijiki asset metadata; their original span, clause, atom, parameter, and definition remain attached, and ordinary entity modifiers do not consume them again. Literals, outer parameters, and definition-local component parameters rejoin the same Emit fields and ordinary lowerer. Missing or ambiguous binding follows the existing upstream error policy; undeclared caller facts follow the existing lowering policy. A bound parameter alone does not become a new continuation predicate, and undeclared attributes do not automatically overlay or fan out. Source or owner integrity failures stop both modes.
 
@@ -464,9 +464,8 @@ the default engine; a thin adapter sends one request containing the validated
 Score and resolved options to the native `inku_render` binding.
 
 The deterministic rendering core is the Rust crate `core/crates/inku-render`.
-It is accepted as a portability boundary that hosts can share, while each host
-binding and runtime cutover is established separately.  The portability intent
-alone does not claim that another execution path is installed or live.
+Server uses the native wheel and Android uses JNI to reach the same core.
+The iOS host connection remains separately pending.
 
 The canonical metadata format read by history, the JSON tab, the CLI, and the
 benchmarks stays stable.  `render_hash` is the work-edition identifier; SVG
@@ -880,8 +879,8 @@ name.
 
 **Category structure**
 
-Saijiki displays 12 categories — forms, angles, touches, continuity, surfaces,
-grounds, colors, movements, places, motions, proportions, relations — together with the qualified
+Saijiki displays 13 categories — forms, angles, touches, continuity, surfaces,
+grounds, colors, movements, places, motions, order, proportions, relations — together with the qualified
 words of any loaded plugin.  The current values of the vocabulary are given by
 the §3.1 table and by reference §1, and the web Saijiki display is served from
 that same saijiki table (v1.92: `GET /api/saijiki` plus a synchronized store over
@@ -890,7 +889,7 @@ the snapshot bundled into the build).
 The Japanese category names are written in hiragana.  Kanji is stiff; hiragana
 lowers the threshold of writing.  The English category names are forms / angles /
 touches / continuity / **surfaces** / **grounds** / colors / movements / places / motions /
-proportions / relations.
+order / proportions / relations.
 
 **Placement policy**
 
@@ -1271,7 +1270,7 @@ Benchmarks focus on:
 
 - whether Stage 1 preserves the whole input context
 - whether Stage 1.5 preserves explicit meaning and invents nothing beyond focus
-- whether Stage 2 preserves all DDL elements in JSON Score
+- whether the shared compiler/lowerer preserves explicit DDL and omits only failures locally with diagnostics
 - whether deterministic fallback keeps enough DDL content to be reviewable
 - whether the renderer makes DDL features visible
 - whether the output has enough negative space, sway, and artistic focus
@@ -1298,52 +1297,28 @@ authority for current check layers and acceptance boundaries.
 
 ## 12. The Two-Stage Architecture
 
-The current pipeline consists of optional Stage 0.5, Stage 1 finite typed
-normalization, deterministic Stage 1.5, Stage 2 conversion into the closed
-Score, and Renderer performance. This chapter states each current authority and
-compatibility boundary.
+The shared authoring state machine manages the current pipeline: Stage 1 for description input, visible-DDL persistence and typed compilation, known-hole completion when needed, deterministic Stage 1.5/lowering, and the shared renderer. New work does not use old Stage 0.5. This chapter states each authority and saved-compatibility boundary.
 
-### 12.1 Two Stages, Not One
+### 12.1 Two Stages Separated by Visible DDL
 
-The DDL conversion pipeline uses **two stages**.  One stage is not used.
+Producing visible DDL from a description is separate from validating DDL and lowering it to Score. These are not two LLMs independently inferring drawing intent. Direct DDL bypasses the first stage.
 
 ```text
 the user's description
-    | stage one: interpretation
-normalized DDL (an intermediate form written only in core vocabulary)
-    | stage two: structuring
+    | Stage 1: produce visible DDL
+visible DDL (core vocabulary and locked Macro calls) <- directly writable and editable
+    | shared compiler: known holes may request a patch, author approval, and CAS save
+    | deterministic Stage 1.5 and lowerer
 JSON Score
-    |
+    | shared renderer
 SVG
 ```
 
-### 12.2 Why One Stage Is Not Used
+### 12.2 Why Visible DDL and Score Production Are Separate
 
-A clear boundary between description and DDL generation structurally prevents
-unexpected meaning in an unexpected description from leaking through — for
-example, the nuance of "beautiful" influencing the engine during JSON generation.
+Visible DDL is the meaning boundary. Ambiguous nuances in the original description cannot enter Score through a hidden route. Authors can read DDL, assess the intent, and edit it.
 
-Given current LLM capabilities, assigning one kind of work to the LLM also
-improves accuracy.
-
-**Job 1: interpretation (semantic).**  Map the loose expressions of free
-natural language onto DDL's vocabulary space.
-
-**Job 2: structuring (syntactic).**  Emit JSON that matches the schema, with
-fields such as primitive, region, weight and variation.
-
-What the two ask for is fundamentally different:
-
-- interpretation is a **creative, associative** ability
-- structuring is a **mechanical, rule-abiding** ability
-
-Demand both at a high level in a single prompt and both come out
-half-finished.  In corner cases especially, the difficulty of the
-interpretation induces structuring errors — an LLM unsure how to interpret
-also breaks the JSON form.
-
-The existing tests likewise show that one stage cannot carry the corner cases
-through to an implementation.
+An LLM produces a DDL candidate from description or proposes a patch for compiler-reported holes. Shared Rust owns syntax validation, preservation of explicit attributes, counts, resources, and Score structuring. A completion candidate also passes through visible-DDL approval and persistence; it never overwrites Score directly.
 
 ### 12.3 How It Fits the DDL Concept
 
@@ -1355,7 +1330,7 @@ Fitted into the three-layer pipeline of §5:
 description (the author's own language, free words)
   | stage one: interpretation
 normalized DDL (core vocabulary only)   <- where "the fog lifts"
-  | stage two: structuring
+  | shared compiler, Stage 1.5, and lowerer
 score (JSON Score)
   |
 performance (SVG)
@@ -1423,14 +1398,7 @@ selects a model per stage**: users and administrators set a model for Stage 1,
 Stage 2 and Vision separately (the model settings and model comparison of
 §8.4, and the llm / vision catalogs of `/api/models`).
 
-The assumption made at design time — Stage 1 a high-capability model, Stage 2
-a light one — is kept as policy:
-
-- interpretation (Stage 1) is associative and creative and needs nuance, while
-  structuring (Stage 2) has a restricted input and stays stable on a light
-  model
-- it satisfies both the principle that *the choice of model is itself a
-  creative variable* and a practical cost structure
+Stage 1 produces visible DDL from a description. Stage 2 produces only visible patch candidates for known holes reported by the compiler. Select each model for its bounded input and required result. The deterministic shared Rust lowerer structures Score; this is not delegated to an LLM.
 
 ### 12.6 The Design of Stage 1 (Interpretation)
 
@@ -1442,16 +1410,11 @@ passed as a prompt lock, and output stays inside that lock. This is the finite
 typed-normalization contract synchronized in I-640; no particular model name or
 model class is canonical.
 
-### 12.7 The Design of Stage 2 (Structuring)
+### 12.7 Stage 2 Completion and Deterministic Structuring
 
-Stage 2 structures effective DDL / typed meaning into the closed JSON Score
-schema. It preserves color, material, quantity, movement, arrangement path,
-rotation, canvas, and explicit relations. An explicit element that cannot be
-delivered fails clearly instead of silently becoming something else.
-Vocabulary and relation mappings come from the Saijiki and typed-lowering
-authorities; historical prompt sketches are not the current contract.
+The Stage 2 LLM returns a span-bounded patch candidate only for known holes explicitly reported by the compiler in saved visible DDL. The shared pipeline creates the request automatically; adoption requires author approval and a visible-DDL CAS save. The LLM does not output Score. The shared lowerer structures lock-verified typed meaning into Score once, preserving color, material, quantity, movement, arrangement path, rotation, canvas, and explicit relations.
 
-On the lock-verified typed path, the Stage 2 consumer selects either Stop, the default, or OmitAndContinue. Continue does not convert undeliverable meaning into a Score field. It removes a typed unit from the execution projection and returns the remaining instructions in original owner order. The result distinguishes complete, complete with omissions, and stopped.
+A recoverable failure omits the smallest affected field or execution unit with a diagnostic and continues independent drawing, for either legacy Stop or OmitAndContinue input. It does not correct undeliverable meaning into a different Score field, and retains original owners and order. An entirely omitted drawing or an integrity failure stops. Results distinguish complete, complete with omissions, and stopped.
 
 An explicitly authored angle reaches `Score.rotation` exactly once through one shared resolver for direct instructions and flat Macro Emits. Its selection is bound to original meaning, tagged `composition_seed`, logical occurrence, and angle identity; effective focus, variation seed, render seed, and source spelling are excluded.
 
@@ -1469,9 +1432,9 @@ Lineage editing identifies the history-row owner and selects its linked fork, wi
 
 A typed Stage 1 request carries bounded projections of the finite vocabulary derived from the Saijiki, resolved catalog and canvas identities, and only each validated Macro's qualified name, version, definition digest, parameters, and host-supplied localized summary. Its response schema permits visible normalized DDL alone. When parsing committed visible DDL identifies completable known holes, the shared pipeline automatically creates the completion request without a separate user operation. With no holes it does not call the Stage 2 LLM; unknowns, conflicts, and integrity errors are not completion targets. Hole completion is limited to holes explicitly reported by the typed compiler and binds each selected hole ID, allowed span, range digest, base-source digest, and compiler-lock digest. A provider patch remains a candidate. Explicit author approval revalidates it against the base and sends source plus next authority to the host as one CAS save action. Only the matching save acknowledgment allows the saved visible bytes to be parsed again and passed to the shared compiler.
 
-Transcript replay reconstructs the same snapshots and outputs from command envelopes and final effect-result envelopes alone; output-only progress events and host effects are never replay inputs. The two-owned-buffer entry point accepts UTF-8 JSON bytes for an empty or previous snapshot and for one input envelope, then returns JSON bytes for either output or a stable error. The UniFFI candidate exports only this `Vec<u8>, Vec<u8> -> Vec<u8>` operation and a binding/protocol version report, with no semantic branch. A panic is contained as a stable `internal_invariant` error envelope rather than platform exception text.
+Transcript replay reconstructs the same snapshots and outputs from command envelopes and final effect-result envelopes alone; output-only progress events and host effects are never replay inputs. The two-owned-buffer entry point accepts UTF-8 JSON bytes for an empty or previous snapshot and for one input envelope, then returns JSON bytes for either output or a stable error. Shared bindings expose this `Vec<u8>, Vec<u8> -> Vec<u8>` operation, binding/protocol versions, and shared operations for the canvas registry, resolved colors, Macro catalog, Stage 1 vocabulary projection, and saved-Score replay. Python and JNI adapters do not duplicate semantic decisions. A panic is contained as a stable `internal_invariant` error envelope rather than platform exception text.
 
-Focused checks of commit/approval/reparse/replay, authority and prompt boundaries, and one representative binding call passed, as did one normal Server host flow on Linux. In that flow an ordinary point fill requested 6,945 logical objects against a fixed fixture budget of 400 logical objects, 512 template nodes, and 400 for the other structural resources; only that fill was omitted, while a three-point circle fill and a later line continued as four primitive marks, produced SVG, and saved the raw Score, history, and authority link. This checked the native connection; it did not measure the six new shipping limits. The normal Web and `/api/interpret`, `/api/compose`, `/api/paint`, and `/api/paint/stream` paths use the same service, and the shared registry is authoritative for all 11 canvas formats. Saved raw compact Score replay also passed on Linux: it left the raw Score, saved source, and authority unchanged, delivered a changed seed as a changed SVG, and rejected a request-side hard-budget alteration using independently saved policy while retaining four primitive marks. Managed-history lineage editing, current options for active DDL, and per-revision diagnostic restoration are connected to the normal path under the contracts above. The standalone Android shared-Rust connection is implemented; work acceptance and deployment follow separately. Source integration does not mean the change has shipped.
+The normal Web and `/api/interpret`, `/api/compose`, `/api/paint`, and `/api/paint/stream` paths use the same shared pipeline service, and the shared registry is authoritative for all 11 canvas formats. The normal Android UI reaches the same shared Rust through `InkuRepository`, `AndroidWorkPipeline`, and JNI. The camera DDL prompt also uses the shared Stage 1 vocabulary projection. When history does not contain the sent prompt, display must not reconstruct an old prompt and present it as a record of what was sent.
 
 After selecting ordinary history, description generation and DDL drawing wait for that same history to be identified before taking its corresponding fork, preserving the original description, saved settings, and parent relation. A pending or failed lookup, or an invalidated selection, never means a new work. An operation cancelled while waiting or belonging to an earlier selection must not start later.
 
@@ -1511,7 +1474,7 @@ are not part of the current contract.
 
 Stage 1.5 is a deterministic typed transformation that uses no LLM. Its input
 is lock-verified `CanonicalReady` typed meaning, never free prose. Its output
-is the effective DDL / typed meaning consumed by Stage 2.
+is the effective DDL / typed meaning consumed by the shared lowerer.
 
 - source text, normalized DDL, original typed meaning, effective meaning, and
   source / generated provenance remain distinct; original meaning and explicit
@@ -1530,9 +1493,9 @@ is the effective DDL / typed meaning consumed by Stage 2.
   expanded-meaning digests plus an attested optional `composition_seed`; absent
   seed and present `Some(0)` differ, and the full compiler-lock digest is a
   source-integrity attestation rather than focus material
-- explicit noncenter place never enters the focus targets; Stage 2 resolves it to the regions in §18. Corner selection belongs to composition, using original meaning, attested optional seed, and original logical occurrence
+- explicit noncenter place never enters the focus targets; the shared lowerer resolves it to the regions in §18. Corner selection belongs to composition, using original meaning, attested optional seed, and original logical occurrence
 - an explicit angle passes through as original typed meaning and does not join
-  the center-only target set or variation axis. Stage 2 selects its concrete
+  the center-only target set or variation axis. The shared lowerer selects its concrete
   angle from the same verified pre- and expanded-meaning digests, tagged
   optional `composition_seed`, and either the direct original logical ordinal
   or the Macro semantic ordinal, expansion path, and generated ordinal
@@ -1575,23 +1538,23 @@ This shared-compiler subset delivers direct and flat-Macro angles for
 circle, ellipse, cloudform, and square through the shared lowerer to actual
 `Score.rotation`. Square uses the same angle resolver for direct and flat Macro
 Emit input. Only numeric placement must fit the rotated declared rectangle;
-named focus adds no must-fit check. This does not complete Step 10 as a whole.
+named focus adds no must-fit check.
 
 The same shared-compiler subset delivers finite two-step thinness from direct and flat
 Macro Emit input to actual `Instruction.thinness`, and binds explicitly declared thinness and size
-parameters through §4.6. This delivery does not complete Step 10 as a whole.
+parameters through §4.6.
 
 
 Full-width and half-width use 100% and 50% of the canvas width before rotation. Their reference dimension is line length, open-arc chord length, the base outline width of a closed shape, or declared cloudform width. Uniform scaling preserves the shape and aspect ratio. Rotation and stroke variation do not trigger another width measurement or force edge contact or repositioning. Ordinary DDL and declared flat Macro Emit `proportion_width_extent` fields use the same size resolver.
 
 Semicircle is an upward open semicircle; waxing bulges right and waning left. Crescent is the thin closed filled moon shown in the saijiki, never a single open arc. Score 0.2.0 represents it with `primitive: arc`, `arc_form: crescent`, `center`, and `size`. Its reference is the saijiki's three cubic Bezier curves, sized by their actual bounds. An absent `arc_form` retains legacy open-arc meaning and canonical bytes, and saved Score 0.1.0 remains readable. Position, rotation, and bounds use the shared renderer. Endpoint-only connected/touching relations reject the closed crescent with a diagnostic.
 
-Overlapping size specifications retain all original candidates. The resolver independently computes their physical reference dimensions and chooses the smaller extent, scaling the original shape once without multiplying relative size into explicit size a second time. Equal duplicates also produce an error. `ConflictingSizeSpecifications` records candidate and effective extents; its `Recovered` disposition draws the shape under both Stop and Continue. This exception applies only to size overlaps, not shape incompatibility, unsupported attributes, or source/lock integrity failures. This connects the shared compiler to Score and diagnostics; it does not replace the current Python generation path or connect its UI.
+Overlapping size specifications retain all original candidates. The resolver independently computes their physical reference dimensions and chooses the smaller extent, scaling the original shape once without multiplying relative size into explicit size a second time. Equal duplicates also produce an error. `ConflictingSizeSpecifications` records candidate and effective extents; its `Recovered` disposition draws the shape under both Stop and Continue. This exception applies only to size overlaps, not shape incompatibility, unsupported attributes, or source/lock integrity failures. The normal Server, Web, and Android paths use this shared compiler-to-Score-and-diagnostics route; Python and Kotlin are host bindings and own no separate meaning branch.
 
 ### 12.12 Staffage and Compatibility Records
 
-Current generation has no staffage level. Stage 1.5 and coerce do not add
-elements absent from the description; coerce is limited to delivering explicit
+Current generation has no staffage level. The shared compiler and lowerer do not add
+elements absent from the description; recovery is limited to delivering explicit
 content. Resolving an explicit angle does not add staffage or visual content;
 it delivers an existing typed identity into `rotation`. Historical
 `history.tenkei` and API `tenkei` remain readable for
@@ -1626,13 +1589,11 @@ generation. The history of reducing seven variation axes to one lives in
 The Renderer performs a validated JSON Score into SVG. It realizes coordinates,
 materials, sway, primitives, texture, and canvas ratio without inventing visual
 content absent from Score. The current authority is the platform-independent
-Rust `inku-render` core (Render Engine 43); Python and Android are hosts that
+Rust `inku-render` core (Render Engine 66); Python and Android are hosts that
 pass resolved options into the same core. Native rasterization belongs to the
 separate `inku-svg-raster` boundary.
 
-Coerce owns Score-schema delivery and safety for explicit content and performs
-only finite actions such as a warned drop of an invalid relation. It must not
-add a visual event, composition anchor, density floor, or accent shape.
+Shared Rust owns Score structure and meaning. Python retains saved-format read compatibility, including finite actions such as a warned drop of an invalid legacy relation. Hosts must not add a visual event, composition anchor, density floor, or accent shape.
 Renderer sway is bound to `render_seed` and does not alter canonical Score.
 
 The SVG profiles are `display`, `editable`, and `compat`. The database stores
@@ -1640,7 +1601,9 @@ the `display` SVG; the other profiles are generated from saved Score on
 request. Sections 13.8 and 13.11 define performance and render identity, while
 history lives in the [render-engine version history](docs/spec/render-engine-history.md).
 
-### 12.15 The Sketch-from-Life Layer (Stage 0.5, v2.9.38)
+### 12.15 Saved Compatibility for the Old Sketch Layer (Stage 0.5, v2.9.38)
+
+The following is historical context for reading old works. The normal pipeline does not rewrite a new description into sketch prose; it retains only previously saved sketch information.
 
 An **optional layer** between the description and Stage 1.  A description as dense as a tanka is
 more than Stage 1 can chew at once, so this layer rewrites it as **plain prose naming things** --
@@ -1736,7 +1699,7 @@ Optional instruction / Emit `layout_direction` owns arrangement direction indepe
 
 Only line-up delivers direction into placement. Omission retains the horizontal row; explicit horizontal uses the same formula while preserving its explicit identity. With t=(i+1/2)/n-1/2, offsets from the anchor are horizontal=(tW,0), vertical=(0,tH), rising=(ts,-ts), and falling=(ts,ts), where s=min(W,H). Diagonals are physical 45-degree axes with downward-positive Y, never stretched to the canvas diagonal. Bare diagonal chooses one of the two axes using the attested optional composition seed (distinguishing None from Some(0)), original pre / expanded meaning, and original logical occurrence framed with a dedicated layout-direction role. Shape-angle selection, size, and count are unchanged. Focus, variation / render seeds, and source spelling do not select direction. Point accepts layout direction while still rejecting its own angle. New direction on Place / Scatter / Tile, groups / relations, and unsupported identities such as rotated stop or omit the original instruction / Emit; an entirely omitted result stops in both modes. The existing Score entrance also cannot discard this field and report success.
 
-One plan per instruction / Emit retains exact count, resolved dimensions, appearance, angle, position, layout recipe, and source / generated origin. There are no count-proportional arrays, instance geometry, or duplicated Score instructions. For either legacy Stop or Continue input, recoverable blocking preserves typed owners, spans, reasons, and actual omissions at the smallest affected field or execution unit, returning the remaining plan. An entirely omitted result is never marked Ready. Unsupported fields, relations, and coordination are not silently discarded. The resource-aware materializer maps this plan to replayable Score 0.10 recipes and checks demand before instance allocation against both hard policy and a caller-authorized operational budget. Current shipping limits are 400 total primitive marks, 240 primitive marks per expanded Score template, resolved count 2000, and 64 drawable templates, plus 4096 `logical_objects`, 128 `template_nodes`, 4096 `anchor_instances`, 4096 `transform_instances`, 64 `placement_instances`, and 64 `fill_instances`; counts are never clamped. Administrator control of the existing four limits and budgets saved by older works remain intact. An excessive source or coordinated placement alone is omitted as one complete atomic unit before materialization, with a diagnostic, while independent later work continues. A saved Score snapshots the authorized policies but stores no self-reported demand; replay recomputes demand from its recipes. Existing Score wire, lowering outcomes, compiler execution success, and Score 0.9 default / legacy compatibility remain. The same `inku.geometry-resolution-policy.v1` attests this resolution. A focused Linux check passed from short DDL through saved Score and nonrectangular Display / Compat fill to local omission after clip failure and continued later drawing. Normal Server integration and saved compact Score replay validation are complete, but fresh review found the three gaps recorded in §12.7.1 and judged Step 13 integration unfinished.
+One plan per instruction / Emit retains exact count, resolved dimensions, appearance, angle, position, layout recipe, and source / generated origin. There are no count-proportional arrays, instance geometry, or duplicated Score instructions. For either legacy Stop or Continue input, recoverable blocking preserves typed owners, spans, reasons, and actual omissions at the smallest affected field or execution unit, returning the remaining plan. An entirely omitted result is never marked Ready. Unsupported fields, relations, and coordination are not silently discarded. The resource-aware materializer maps this plan to replayable recipes with Score 0.10 as the compact baseline, selects the minimum later version required by added fields, and checks demand before instance allocation against both hard policy and a caller-authorized operational budget. Current shipping limits are 400 total primitive marks, 240 primitive marks per expanded Score template, resolved count 2000, and 64 drawable templates, plus 4096 `logical_objects`, 128 `template_nodes`, 4096 `anchor_instances`, 4096 `transform_instances`, 64 `placement_instances`, and 64 `fill_instances`; counts are never clamped. Administrator control of the existing four limits and budgets saved by older works remain intact. An excessive source or coordinated placement alone is omitted as one complete atomic unit before materialization, with a diagnostic, while independent later work continues. A saved Score snapshots the authorized policies but stores no self-reported demand; replay recomputes demand from its recipes. Existing Score wire, lowering outcomes, compiler execution success, and Score 0.9 default / legacy compatibility remain. The same `inku.geometry-resolution-policy.v1` attests this resolution. The normal Server, Web, and Android paths and saved compact Score replay use this shared materializer and local-recovery contract.
 
 ## 13. The Design of Sway
 
@@ -2218,7 +2181,7 @@ The description:
 (line up three horizontal dashed pencil lines vertically. the lines sway finely.)
 ```
 
-**Stage 2 (structuring) produces the JSON Score, in part:**
+**An excerpt of a legacy Score expressing the same drawing intent. New work uses shared lowering into repetition recipes.**
 
 ```json
 {
@@ -2498,8 +2461,7 @@ retains the normal dimensions from the shared resolver or explicit dimensions;
 it does not substitute a relation-specific random length. An explicit direction
 takes precedence over the performed crossing angle. Ordinary DDL and Macro use
 the same meaning. Metadata-free legacy Score relations retain their compatibility
-behavior. This contract is separate from full typed production-pipeline, UI,
-and save integration.
+behavior for saved formats.
 
 Under `touching`, when the element is an arc: let the settled endpoints of the
 preceding element be P1 and P2, the chord length `c=|P2-P1|`, and the signed
@@ -2547,8 +2509,7 @@ several translations conflict, none is chosen arbitrarily: the original placemen
 is retained and only relations that cannot hold there are removed. Omitting every
 drawing unit and any source, lock, owner, or exact-Score join failure stop both
 modes. Older five relations retain their existing warning and wire behavior.
-This is a direct shared/native path; it does not claim the typed DDL production
-pipeline, UI, or saved-setting cutover is complete.
+The normal pipeline uses this shared/native path.
 
 An invalid relation discovered by the validator or coerce retains its existing
 warning and drop behavior; neither layer invents a relation. A recoverable
@@ -2561,7 +2522,7 @@ drop the relation without a warning.
 
 Engine 45 also carries typed `touching` from ordinary direct instructions and adjacent bound Emits in the same flat Macro into the shared checked performer. The four bilingual full literals carry their declared Line / Arc target to the original PreviousOne; a mismatched primitive cannot reach canonical success. Macros check the actual typed Emits without inventing a source noun condition. Only Line / Arc succeed. The prior stays unchanged, both endpoints coincide, and Arc uses the same minor-arc reconstruction described above. Explicit numeric geometry or relative scale (including normal at factor 1) fixes dimensions; an explicit angle fixes the performed chord direction in canonical endpoint order. Omitted normal may adjust to Touching. Numeric positions retain their anchor and the final geometry's existing must-fit requirement; named focus remains movable with clipping. Incompatibility is a typed conflict.
 
-Typed Touching follows the same relation-recovery and original dependency, owner, and drawing-ordinal rules. On failure it records an error and removes only Touching, leaving the current, its group, and dependent instructions at their original transformed placement. Touching without the new metadata retains legacy reconstruction, warning, and drop behavior, and Connected is unchanged. This does not complete the typed production pipeline, UI, saved settings, or whole Step 10.
+Typed Touching follows the same relation-recovery and original dependency, owner, and drawing-ordinal rules. On failure it records an error and removes only Touching, leaving the current, its group, and dependent instructions at their original transformed placement. Touching without the new metadata retains legacy reconstruction, warning, and drop behavior, and Connected is unchanged.
 
 ### 14.5 The Owner of Relations
 
@@ -2777,9 +2738,9 @@ explicit variation preserve the corner. One rational policy table converts to Sc
 The policy ID stays unchanged while its content digest changes; this does not introduce a semantic schema version.
 Unspecified position remains unsupported; named/numeric conflicts and numeric must-fit remain enforced.
 Unsupported noncenter relations remain unsupported and are never silently discarded. The normal shared runtime,
-UI, and persistence path uses this delivery, which does not complete whole Step10.
+UI, and persistence path uses this delivery.
 
-JSON Score is the machine-readable score produced by Stage 2.  It is not the
+JSON Score is the machine-readable score produced by the shared lowerer from verified meaning.  It is not the
 final work; it is the structure that the renderer performs.
 
 Important score concepts:
@@ -2962,7 +2923,7 @@ Canvas selection is not visible-DDL or macro meaning. It is a host option resolv
 
 A host boundary with no selection may choose `square` as its host default, but the DDL compiler does not insert `square` as a semantic fact. The host carries the resolved selection through Score / render context / history, and the Renderer chooses SVG `width`, `height`, and `viewBox`. If Stage 2 receives canvas through the current compatibility path, that value is host-resolved composition context rather than visible-DDL metadata.
 
-The current runtime's `plugin_storage["canvas-aspect"]`, `canvas_aspect` request alias, stored `Score.canvas` / `render_canvas_aspect*`, system / user plugin directories, and plugin-status / enable controls remain as read compatibility. They are not the new plugin-authoring model. Retirement and the runtime / UI cutover belong to a later Step; this section does not claim they are complete. In the current UI, changing the aspect clears the rendered display for a placeholder but retains the displayed work as lineage context, and the next saved work may be recorded as its child with `canvas_aspect_change`.
+The current runtime's `plugin_storage["canvas-aspect"]`, `canvas_aspect` request alias, stored `Score.canvas` / `render_canvas_aspect*`, system / user plugin directories, and plugin-status / enable controls remain as read compatibility. They are not the new plugin-authoring model. Storage and API compatibility remain for saved settings and catalog discovery; they do not execute the old semantic decision layer. In the current UI, changing the aspect clears the rendered display for a placeholder but retains the displayed work as lineage context, and the next saved work may be recorded as its child with `canvas_aspect_change`.
 
 Position coordinates remain normalized from `0.0` to `1.0`: X is a fraction of
 canvas width and Y is a fraction of canvas height. Top-left is `(0.0,0.0)`,
@@ -3041,7 +3002,7 @@ Web use this compiler and persistence path.
 
 The user writes one instruction and runs the full pipeline.  The resulting DDL
 is inspected in a read-only interpretation box and edited directly in the DDL
-editor dialog. Replaying from DDL skips Stage 1 and calls Stage 2 / renderer
+editor dialog. Replaying from DDL skips description generation and sends the saved visible DDL through the shared compiler, lowerer, and renderer
 again.
 
 The normalized DDL appears as a **read-only interpretation box** under the
@@ -3054,57 +3015,42 @@ single drawing input.
   two-column Saijiki vocabulary panel, and a short DDL syntax guide; since
   v1.98 word insertion happens only through this dialog's inline Saijiki,
   which also lists loaded plugin vocabulary
-- `auto repair` is controlled in settings. It is enabled by default. When disabled,
-  Stage 2 output is rendered without the broader `coerce_score()` repair pass,
-  while hard contract guards may still remove instructions that violate the
-  requested primitive/color contract.
+- The old `auto repair` setting is retired. The shared compiler owns semantic
+  validation and recovery, diagnosing excessive placements and unsatisfied relations
+  at their defined recovery units. The legacy API still accepts `auto_repair`,
+  but it no longer selects behavior.
 
 The same `Draw from DDL` action is also available below the interpretation box
 for quick replay without opening the dialog. Candidate metadata shows render,
 composition, variation, and interpretation seeds where applicable. `Draw` in
-the DDL editor dialog preserves the edited DDL, runs Stage 2 / rendering only,
+the DDL editor dialog saves the edited DDL under authoring authority, then runs the shared compiler, lowerer, and renderer,
 and does not reinterpret the natural-language description.
 
 The drawing tab also exposes two explicit regeneration actions. **Another
 performance** keeps the same Score and asks only the renderer for a new
 performance seed. **Another composition** preserves saved normalized DDL,
 advances `composition_seed`, reselects focus from Stage 1.5's closed six
-candidates, and reselects the concrete angle or corner in Stage 2 when that
+candidates, and reselects the concrete angle or corner in the shared lowerer when that
 meaning is explicitly present. It changes no composition family, technique, color, touch,
 relation, or element count. The same lock-verified meaning and attested
 `composition_seed` reproduce the same effective meaning, angle, and corner. Another
 performance and explicit variation preserve the resolved angle and corner. Saved Score / expanded
 artifacts take precedence, source text remains saved, silent backfill does not
 occur, and no permanent old/new runtime switch is introduced. Semantic schema /
-identity never presents changed bytes as an old identity. The D1 implementation
-milestone now connects typed v5 in §12.11 through the resource-aware Score 0.10
-performance core; product-host runtime / UI / API / persistence cutover remains
-incomplete.
+identity never presents changed bytes as an old identity. The normal Server, Web, and Android
+use the same shared route from typed v5 in §12.11 through the resource-aware compact Score
+performance core. Saved Score and history retain the format compatibility needed
+for display and replay.
 
-Since v1.98 single drawing calls `POST /api/paint/stream` (NDJSON): a `stage1`
-event is emitted as soon as interpretation completes (normalized DDL, models
-used, token counts, elapsed time, fallback flag) so the UI can show the
-interpretation while Stage 2 and rendering continue, and the final `done` event
-carries the same `PaintResponse` as before. `POST /api/paint` remains a wrapper
-over the same logic with an unchanged response shape, so the CLI and Android
-need no changes.
-
-Since v2.13.39 there are four signals. On a request where the sketch layer ran,
-`sketch` arrives before `stage1` (grain, fallback flag, token counts, the time
-the sketch took), and `score` arrives once Stage 2 and coerce are done and the
-Score will not change again (instruction count, model, token counts, elapsed).
-**The stage indicator switches on these four signals and no longer guesses the
-next layer ahead of time.** Neither the prose nor the Score body travels in an
-event; `done` already carries both. **`stage1`'s `elapsed_ms` still includes
-the sketch** — the breakdown comes from subtracting the `sketch` event's
-`elapsed_ms`. **⚠ Because the first event is now `sketch`, a Stage 1 failure on
-a sketched request arrives as `{"event":"error","status":502}` in the body
-rather than as HTTP 502** (with the layer off it is still 502). The rule
-itself — a failure before the first event is HTTP, one after it is in the body
-— has not changed.
+The normal UI displays visible DDL, proposed patches, and saved results from
+the shared pipeline execution state. The compatibility `POST /api/paint/stream`
+returns the final shared-pipeline result as one `done` NDJSON record. A pending
+patch approval returns HTTP 409 before streaming starts. The former four-stage
+`sketch` / `stage1` / `score` stream is not the progress contract for new works.
+`POST /api/paint` remains a compatibility entry to the same shared route.
 
 DDL replay shows elapsed time, token information, a stop button, and the
-progress mascot.  Stopping replay aborts the active `/api/compose` request.
+progress mascot.  Stopping replay aborts the active request.
 During single drawing and DDL replay, the single tab shows a running effect and
 the batch/demo start actions are suppressed.
 

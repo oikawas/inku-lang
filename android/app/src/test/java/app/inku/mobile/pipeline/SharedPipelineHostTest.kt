@@ -198,7 +198,7 @@ class SharedPipelineHostTest {
     }
 
     private class ScriptedBinding : SharedPipelineBinding {
-        override fun versionReport() = """{"binding_version":"1.0.0","protocol_version":"1.0.0"}"""
+        override fun versionReport() = """{"binding_version":"1.1.0","protocol_version":"1.0.0"}"""
 
         override fun step(snapshotBytes: ByteArray, inputEnvelopeBytes: ByteArray): ByteArray {
             val input = JSONObject(inputEnvelopeBytes.toString(Charsets.UTF_8))

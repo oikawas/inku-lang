@@ -9,11 +9,14 @@ import app.inku.mobile.data.refinement.PaintSeeds
 import app.inku.mobile.llm.ModelProvider
 import app.inku.mobile.llm.ModelRequest
 import app.inku.mobile.llm.ModelResponse
+import app.inku.mobile.llm.VisionOutputMode
+import app.inku.mobile.llm.VisionPrompts
 import java.io.File
 import kotlinx.coroutines.runBlocking
 import org.json.JSONObject
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
@@ -83,6 +86,33 @@ class AndroidSharedPipelineTest {
                 .put("svg_bytes", work.displaySvg.toByteArray(Charsets.UTF_8).size)
                 .toString(),
         )
+    }
+
+    /**
+     * Device-only seam check for the camera DDL prompt: this calls the packaged JNI library,
+     * then verifies that the Kotlin camera prompt keeps the returned shared prefix and appends
+     * only its camera-specific boundary. It deliberately performs no model, Room, or render work.
+     */
+    @Test
+    fun cameraDdlV2UsesPackagedSharedProjectionAndCameraBoundary() {
+        val version = JSONObject(NativePipelineBridge.versionReport())
+        assertEquals("1.1.0", version.getString("binding_version"))
+        assertEquals("1.0.0", version.getString("protocol_version"))
+        assertEquals("camera-ddl-v2", VisionPrompts.versionFor(VisionOutputMode.DDL))
+
+        val jaProjection = NativePipelineBridge.stage1SystemProjection("ja")
+        val enProjection = NativePipelineBridge.stage1SystemProjection("en")
+        val jaCameraPrompt = VisionPrompts.forLanguage("ja", VisionOutputMode.DDL)
+        val enCameraPrompt = VisionPrompts.forLanguage("en", VisionOutputMode.DDL)
+
+        assertFalse(jaProjection.contains("JSON"))
+        assertFalse(enProjection.contains("JSON"))
+        assertFalse(jaProjection.contains("normalized_ddl"))
+        assertFalse(enProjection.contains("normalized_ddl"))
+        assertTrue(jaCameraPrompt.startsWith(jaProjection))
+        assertTrue(enCameraPrompt.startsWith(enProjection))
+        assertTrue(jaCameraPrompt.contains("# カメラ入力境界"))
+        assertTrue(enCameraPrompt.contains("# Camera input boundary"))
     }
 
     @Test

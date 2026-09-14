@@ -23,7 +23,6 @@ from fastapi.testclient import TestClient
 from inku_server import db
 from inku_server.api import app
 from inku_server.plugins.document_format import (
-    DOCUMENT_PLUGIN_MANAGER,
     MAX_PREVIEW_BYTES,
     entry_preview_path,
     parse_plugin_document,
@@ -239,49 +238,3 @@ def test_the_route_needs_a_session():
     assert client.get(
         "/api/saijiki/plugin-preview", params={"name": "Nature.若葉"}
     ).status_code == 401
-
-
-# ------------------------------------------- the prose that makes one expand
-
-
-def test_a_plugin_expands_on_prose_and_not_on_the_ddl():
-    """The reason `fires_on` exists, measured on the mechanism itself.
-
-    Whether a plugin expands is decided by the prose (`source_text`); the DDL is
-    only hashed for the seed. A DDL that spells a plugin word therefore expands
-    to nothing on its own, which is what made every drawing-from-DDL bake come
-    back empty before the request carried the prose.
-    """
-    without = DOCUMENT_PLUGIN_MANAGER.expand("落葉", source_text=None, lang="ja", seed_text="落葉")
-    with_prose = DOCUMENT_PLUGIN_MANAGER.expand(
-        "落葉", source_text="落葉", lang="ja", seed_text="落葉"
-    )
-
-    assert len(without.provenance) == 0
-    assert [p["plugin_term"] for p in with_prose.provenance] == ["Nature.落葉"]
-    # The expansion is really in the DDL, not only in the provenance.
-    assert with_prose.ddl != "落葉"
-
-
-def test_compose_hands_the_declared_prose_to_the_expansion():
-    """The wiring, in the one region that carries it.
-
-    Read narrowly rather than over the whole module: a match anywhere else in
-    the file would satisfy a check that is meant to be about this call.
-    """
-    source = (
-        Path(__file__).resolve().parents[1]
-        / "src"
-        / "inku_server"
-        / "api_core"
-        / "routers"
-        / "render.py"
-    ).read_text(encoding="utf-8")
-
-    detail = source[source.index("def _call_compose_detail") :]
-    detail = detail[: detail.index("\ndef ", 1)]
-    assert "source_text=plugin_fires_on or original_description," in detail
-
-    compose = source[source.index("def api_compose") :]
-    compose = compose[: compose.index("\ndef ", 1)]
-    assert 'plugin_fires_on=(req.fires_on or "").strip() or None,' in compose

@@ -119,6 +119,12 @@ fn pipeline_canvas_registry() -> String {
     inku_pipeline_uniffi::canvas_registry()
 }
 
+/// Project the shared Stage 1 grammar for host input and prompt displays.
+#[pyfunction]
+fn pipeline_stage1_system_projection(language_code: String) -> String {
+    inku_pipeline_uniffi::stage1_system_projection(language_code)
+}
+
 /// Advance one pipeline execution through the same owned byte boundary as Android.
 #[pyfunction]
 fn pipeline_step<'py>(
@@ -171,6 +177,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(render_with_resources, module)?)?;
     module.add_function(wrap_pyfunction!(pipeline_version_report, module)?)?;
     module.add_function(wrap_pyfunction!(pipeline_canvas_registry, module)?)?;
+    module.add_function(wrap_pyfunction!(pipeline_stage1_system_projection, module)?)?;
     module.add_function(wrap_pyfunction!(pipeline_step, module)?)?;
     module.add_function(wrap_pyfunction!(pipeline_resolve_palette, module)?)?;
     module.add_function(wrap_pyfunction!(pipeline_resolve_macro_catalog, module)?)?;

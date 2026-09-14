@@ -153,7 +153,6 @@ interface InkuStrings {
     val mascotSubtitle: String
     val mascotIncu: String
     val localModelNote: String
-    val promptOptimizationNote: String
     val exportPngTooLarge: String
     val pngAlphaWhite: String
     val stagesShared: String
@@ -206,7 +205,6 @@ interface InkuStrings {
     val uiModeFullLong: String
     val promptLabel: String
     val searchPlaceholderLong: String
-    val promptOptimization: String
     val mascotTitle: String
     val model: String
     val modelListFetch: String

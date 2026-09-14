@@ -28,18 +28,16 @@ from typing import Any, get_args
 
 from . import schema
 from .color_catalogs import COLOR_KEYS, DEFAULT_COLOR_CATALOG_ID, color_catalogs
-from .composer import (
-    _COLOR_TERMS,
-    _MOTION_OR_TEXTURE_TERMS,
-    _PRIMITIVE_TERMS,
-    _RELATION_LITERAL_MARKERS,
-)
 from .geometry_thresholds import (
     CLOSURE_LIMIT,
     CUSP_LIMIT_DEGREES,
     SAGITTA_RELATIVE_LIMIT,
 )
-from .saijiki import reference_categories as saijiki_reference_categories
+from .saijiki import (
+    reference_categories as saijiki_reference_categories,
+    relation_literal_markers,
+    shape_markers,
+)
 from .plugins import (
     CANVAS_ASPECTS,
     DEFAULT_CANVAS_ASPECT_ID,
@@ -134,35 +132,6 @@ def _meta() -> dict[str, Any]:
 # --------------------------------------------------------------------------- #
 # §1 saijiki                                                                   #
 # --------------------------------------------------------------------------- #
-def _parse_saijiki_block(prompt: str, heading: str, separator: str) -> dict[str, list[str]]:
-    """Extract the `category: value, value` block from a Stage 1 prompt string.
-
-    The prompt string itself is the source of truth; nothing is hardcoded here.
-    """
-    lines = prompt.splitlines()
-    start: int | None = None
-    for index, line in enumerate(lines):
-        if line.strip() == heading:
-            start = index + 1
-            break
-    if start is None:
-        return {}
-    block: dict[str, list[str]] = {}
-    for line in lines[start:]:
-        stripped = line.strip()
-        if not stripped:
-            continue
-        if stripped.startswith("# "):
-            break
-        if ":" not in stripped:
-            continue
-        key, _, raw = stripped.partition(":")
-        values = [item.strip() for item in raw.split(separator) if item.strip()]
-        if values:
-            block[key.strip()] = values
-    return block
-
-
 def _plugin_words() -> list[dict[str, Any]]:
     words: list[dict[str, Any]] = []
     for document in DOCUMENT_PLUGIN_MANAGER.documents():
@@ -210,9 +179,6 @@ def _saijiki() -> dict[str, Any]:
             "frequency": list(get_args(schema.Frequency)),
             "quality": list(get_args(schema.Quality)),
         },
-        "primitive_terms": {key: list(value) for key, value in _PRIMITIVE_TERMS.items()},
-        "color_terms": {key: list(value) for key, value in _COLOR_TERMS.items()},
-        "motion_or_texture_terms": list(_MOTION_OR_TEXTURE_TERMS),
         "plugin_words": _plugin_words(),
     }
 
@@ -224,7 +190,7 @@ def _normalized_ddl_phrases() -> dict[str, Any]:
     return {
         "relation_literals": {
             relation_type: list(markers)
-            for relation_type, markers in _RELATION_LITERAL_MARKERS.items()
+            for relation_type, markers in relation_literal_markers().items()
         },
         "relation_enums": {
             "type": list(get_args(schema.RelationType)),
@@ -237,7 +203,7 @@ def _normalized_ddl_phrases() -> dict[str, Any]:
         },
         "background_colors": list(get_args(schema.Color)),
         "notes": [
-            "Stage 2 (composer) transcribes a relation only when a literal from "
+            "The shared compiler transcribes a relation only when a literal from "
             "relation_literals appears; relations are never inferred.",
             "Ground texture comes from a '地: ...' sentence and surface texture "
             "from a '面: ...' sentence; neither is inferred from scenery.",
@@ -255,7 +221,7 @@ def _classify_marker(marker: str) -> str:
     if marker == ANCHOR_PREFIX.strip() or "領域" in marker or "region" in lowered:
         return "structural"
     primitive_surfaces = {
-        term.lower() for terms in _PRIMITIVE_TERMS.values() for term in terms
+        term.lower() for lang in ("ja", "en") for term in shape_markers(lang)
     }
     if lowered in primitive_surfaces or marker in ("雲形", "cloudform"):
         return "shape"

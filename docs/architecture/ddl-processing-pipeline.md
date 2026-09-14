@@ -1,184 +1,135 @@
 # DDL processing pipeline
 
+The normal Server, Web, and Android paths use the same shared-Rust authoring state machine, typed compiler, lowerer, and renderer.
+
 ## Stages and owners
 
-| Stage | Input → output | Determinism and fallback | Owning module |
+| Stage | Input → output | Contract | Owning module |
 |---|---|---|---|
-| Description | Author’s sentence → stored original and pipeline text | Leading numbers and bracketed comments are cut from the performance pipeline; the original remains. A cut that leaves nothing answers 400 | `description_labels.py`; `render.py` |
-| Stage 0.5 | Description → Sketch from life text | Optional LLM; a request that carries a sketch text reuses it verbatim without calling the model. A failure (timeout, provider error, empty output) falls back to the description and records `sketch_state` | `sketch.py`; `render.py:_resolved_sketch` |
-| Stage 1 | Description/Sketch from life → Instructions (normalized DDL) | LLM with empty/timeout fallback. An input made of nothing but qualified plugin terms (a pure invocation) skips Stage 1 and is transcribed | `interpreter.py`; `render.py:_call_interpret_detail` |
-| Plugin expansion | Instructions → core DDL + optional instructions | Validated document, deterministic writing-down; the seed is a hash of the description | `plugins/document_format.py`; `_call_compose_detail` |
-| Stage 1.5 | Core DDL → effective DDL | Deterministic focus rewrite; explicit variation moves one axis | `ddl_expander.py` |
-| Stage 2 | Effective DDL → JSON Score | LLM tool/schema; an empty or too-short answer retries once with a stated reason, and a timeout or empty retry ends in the deterministic fallback (recorded in `compose_fallback`) | `composer.py`; `render.py:_call_compose_detail` |
-| Coerce/validation | Score → performable Score | Only with `auto_repair`. Drops invalid relations, delivers requests, enforces ceilings, and retains one explicitly named abstract color. Branch firings land in `coerce_branch_counts` when tracing | `coerce/` |
-| Render Engine | Score + seeds + resolved host options → SVG + metadata | Same Score, seeds, and conditions reproduce the same work; one coarse native call with no runtime fallback | Registry `render_engines/__init__.py`; thin adapter `default/adapter.py`; binding `inku-render-python`; portable core `core/crates/inku-render`; separate entrypoint `renderer.py` (SVG-only compatibility facade) |
-| History/lineage | Pipeline outputs → DB row/node/edge | One DB transaction; an edge needs an explicit parent and kind | `rendering.py`; `db.py` |
+| Host input | Description or direct DDL → typed command | Only a description start requests Stage 1. Direct DDL is never sent back through prose | Server pipeline host / Android pipeline host |
+| Authoring state machine | Snapshot + command/effect result → next snapshot + event + at most one effect | Deterministic. Provider transport and persistence leave core as typed effects; core decides retry and authority transitions | `core/crates/inku-pipeline` |
+| Stage 1 effect | Description → visible normalized DDL candidate | The model returns DDL only. It does not write Score or receive Macro bodies or hidden meaning | Shared-core prompt/action; host provider adapter |
+| CAS persistence | DDL candidate + revision → saved visible DDL | Source and authority advance only after a matching atomic save acknowledgment; core reparses the exact saved bytes | Authority store / pipeline host |
+| Typed compiler | Visible DDL + definition locks → verified meaning + diagnostics | Verifies source, provenance, and Macro definitions, then performs bounded expansion. Ambiguity is not guessed by first/nearest/last | `core/crates/inku-ddl` |
+| Hole completion | Known hole → patch candidate → author approval | Only a known hole is closed over its span and digests. With no hole there is no Stage 2 LLM call. An approved patch is reparsed only after CAS save | Shared state machine + host provider/store |
+| Typed Stage 1.5 | Verified meaning + composition/variation seed → effective meaning | Deterministic and model-free; changes focus only and does not overwrite source meaning or explicit attributes | `core/crates/inku-ddl` |
+| Lowering/materialization | Verified effective meaning → actual Score / compact recipe | Lowers once and selects the minimum compatible Score version. Compact output starts at 0.10; only a work carrying a mirror relation requires 0.15 | `core/crates/inku-ddl`; `core/crates/inku-score` |
+| Resource check / Render Engine | Score + saved policy + seeds + resolved host options → SVG + metadata | Checks demand before instance materialization and locally omits one excessive source or coordinated placement. The same Score, seeds, and conditions reproduce the same performance | `core/crates/inku-render` |
+| History/lineage | DDL / Score / SVG / authority context → DB row/node/edge | History retains that revision's source, config, seeds, catalog, budget, and definition locks; lineage is never inferred from similarity | Server DB / Android Room |
 
-The decision-level detail — under which condition each judgment fires, what happens, and what is recorded — lives in `description-to-svg.md`.
+The decision-level contract is canonical in [SPEC.md](../../SPEC.md) §12.7.1.
 
-## Accepted typed DDL path (not connected to runtime)
-
-Step 8 accepted the shared-Rust foundation in `core/crates/inku-ddl` that compiles visible
-normalized DDL through a typed semantic document to a compiler lock.
-
-```mermaid
-flowchart LR
-    VDDL["Visible normalized DDL"]
-    DOC["Source-preserving document"]
-    STRUCTURE["Lexer / clause stream\nmacro resolution / binding"]
-    AST["Typed semantic document"]
-    EXPAND["Bounded macro expansion"]
-    LOCK["Compiler lock"]
-    SCORE["JSON Score / current runtime"]
-
-    VDDL --> DOC --> STRUCTURE --> AST --> EXPAND --> LOCK
-    LOCK -.->|"connected in a later step"| SCORE
-```
-
-The path treats DDL generated by Stage 1 and DDL written directly by an author from the same
-visible source. It does not bypass that text with prose or hidden background information, and it
-does not insert canvas metadata or undecided drawing defaults as DDL meaning. When multiple
-readings remain, it records source spans and candidates in a typed issue and fails closed instead
-of selecting the first, nearest, or last.
-
-At present, calls to `compile_typed_ddl` exist only inside the `inku-ddl` crate and its tests; the
-Server, Web, and Android product pipelines do not call it. The Normal Paint diagram below is
-therefore the active runtime, while the diagram above is the accepted next compiler boundary.
-
-## Normal Paint path
+## Normal authoring
 
 ```mermaid
 flowchart TD
     DESC["Description"]
-    LABELS["Extract performance text"]
-    S05["Stage 0.5 Sketch from life / optional"]
-    S1["Stage 1 interpretation"]
-    DDL["Instructions / normalized DDL"]
-    PLUGIN["Declarative plugin expansion"]
-    S15["Stage 1.5 deterministic expansion"]
-    EFFECTIVE["Effective DDL"]
-    S2["Stage 2 score writing"]
-    SCORE["JSON Score"]
-    COERCE["Coerce / validation"]
-    RENDER["Render Engine\nPython adapter → native wheel → Rust core"]
-    SVG["SVG + performance metadata"]
-    HISTORY[("History DB + lineage")]
-    FILES[("Optional work files")]
+    DIRECT["Direct DDL"]
+    HOST["Server / Android host"]
+    CORE["Shared-Rust authoring state machine"]
+    S1["Stage 1 typed effect"]
+    DDL["Saved visible DDL\nauthority + revision"]
+    COMPILER["Typed compiler\nlock + bounded Macro expansion"]
+    HOLE{"Known hole?"}
+    PROPOSAL["Completion patch candidate"]
+    APPROVAL{"Author approves?"}
+    S15["Typed Stage 1.5"]
+    LOWER["Shared lowerer / materializer"]
+    SCORE["Minimum compatible Score\ncompact baseline 0.10"]
+    RENDER["Resource-aware Render Engine 66"]
+    SVG["SVG + diagnostics + metadata"]
+    HISTORY[("History / lineage")]
 
-    DESC -->|"original also reaches persistence"| LABELS
-    LABELS -->|"Sketch from life on"| S05
-    LABELS -->|"off"| S1
-    S05 -->|"observation / description fallback"| S1
-    S1 -->|"Stage 1 output"| DDL
-    DDL -->|"write down into core"| PLUGIN
-    PLUGIN -->|"core DDL"| S15
-    S15 -->|"Stage 2 input"| EFFECTIVE
-    EFFECTIVE --> S2
-    S2 --> SCORE
-    SCORE --> COERCE
-    COERCE -->|"Score + seeds + color"| RENDER
-    RENDER --> SVG
-    SVG -->|"save_history"| HISTORY
-    HISTORY -.->|"best-effort derivative"| FILES
+    DESC --> HOST --> CORE
+    CORE -->|"provider effect"| S1 --> HOST
+    HOST -->|"effect result"| CORE
+    DIRECT --> HOST
+    CORE -->|"CAS-save effect"| DDL
+    DDL --> COMPILER --> HOLE
+    HOLE -->|"yes"| PROPOSAL --> APPROVAL
+    APPROVAL -->|"yes: CAS save + reparse"| DDL
+    APPROVAL -->|"no"| EDIT["Keep original DDL and wait for author editing"]
+    HOLE -->|"no"| S15 --> LOWER --> SCORE --> RENDER --> SVG --> HISTORY
 ```
 
-## `/api/paint` and streaming
+A provider patch remains a candidate; a host never adopts it directly. The host attempts provider transport once for each effect and returns the failure to core. Core decides the next effect or a finite stop.
+
+## API and platform boundary
 
 ```mermaid
 sequenceDiagram
-    participant C as Web/CLI client
-    participant R as Render router
-    participant P as Stage pipeline
+    participant C as Web / CLI / Android UI
+    participant H as Host adapter
+    participant A as Shared authoring core
     participant L as LLM provider
-    participant E as Render Engine
-    participant D as DB
-    participant F as Work-file queue
+    participant P as Persistence
+    participant R as Shared renderer
 
-    C->>R: POST /api/paint or /api/paint/stream
-    R->>P: _paint_events(request)
-    opt Stage 0.5 enabled
-        P->>L: Sketch from life
-        L-->>P: observation / fallback
-        R-->>C: sketch NDJSON event on stream only
+    C->>H: authoring command
+    H->>A: snapshot bytes + input envelope
+    opt provider effect
+        A-->>H: typed effect action
+        H->>L: one transport attempt
+        L-->>H: candidate or failure
+        H->>A: identity-preserving effect result
     end
-    P->>L: Stage 1 interpretation
-    L-->>P: Instructions
-    R-->>C: stage1 NDJSON event on stream only
-    P->>P: plugin expansion + Stage 1.5
-    P->>L: Stage 2 schema tool
-    L-->>P: Score / retry / fallback
-    P->>P: coerce + validation
-    R-->>C: score NDJSON event on stream only
-    P->>E: Score + render/composition seed
-    E-->>P: SVG + metadata
-    opt save_history
-        P->>D: history + node + optional edge transaction
-        P->>F: optional derivative job
+    opt save effect
+        A-->>H: CAS-save visible DDL
+        H->>P: atomic save
+        P-->>H: matching acknowledgment
+        H->>A: save result
     end
-    P-->>R: PaintResponse
-    R-->>C: response or done NDJSON event
+    A-->>H: verified Score or typed failure
+    H->>R: Score + saved policy + render context
+    R-->>H: SVG + diagnostics
+    H->>P: history + authority link
+    H-->>C: response / progress events
 ```
 
-## Refinement re-entry points
+The Server's Python adapter and Android's Kotlin/JNI adapter are thin host boundaries without separate meaning implementations. The normal Android UI reaches core through `InkuRepository` → `AndroidWorkPipeline` → JNI. Web uses the same Server pipeline service through the existing HTTP API.
 
-Refinement is not the pipeline run again from the top. Each operation re-enters a fixed layer from the saved outputs. The edge notes name **what is preserved**.
+## Re-entry points
 
-```mermaid
-flowchart LR
-    SAVED[("Saved work\ndescription / sketch text / DDL / Score / seeds")]
-    S1["Stage 1"]
-    S15["Stage 1.5"]
-    S2["Stage 2"]
-    COERCE["Coerce"]
-    RENDER["Render Engine"]
+| Operation | Preserved | Re-entry |
+|---|---|---|
+| Reinterpretation | Original work and explicit parent relation | A new Stage 1 command from saved context |
+| DDL edit | Authoring origin, CAS, and original history | Compiler after CAS-saving the author DDL candidate |
+| Another composition | Saved visible DDL, source meaning, and drawing attributes | Typed Stage 1.5 / lowerer with a new `composition_seed` |
+| Explicit variation | Saved visible DDL, composition family, color, touch, and count | Typed Stage 1.5 / lowerer with amplitude + `variation_seed` |
+| Another performance | Saved Score and authoring revision | Renderer only with a new `render_seed` |
+| Catalog / canvas change | Original variation remains unchanged | A parent-linked new variation with current options |
 
-    SAVED -->|"Reinterpretation: sketch text reused, only interpretation_seed is new"| S1
-    SAVED -->|"Layout: composition_seed over the saved DDL"| S15
-    SAVED -->|"Variation: amplitude + variation_seed over the saved DDL"| S15
-    SAVED -->|"Touch (another performance): a new render_seed over the saved Score"| RENDER
-    SAVED -->|"Words change the touch: render_seed derived deterministically from seed_text"| RENDER
-    SAVED -->|"Color catalog: saved Score and seed, only the color mapping changes"| RENDER
-    S1 --> S15
-    S15 --> S2
-    S2 --> COERCE
-    COERCE --> RENDER
-```
+Selecting old history uses the context saved for that revision. It never infers from the latest snapshot of the same variation, and a corrupt sidecar is not repaired by recompiling.
 
-- Everything upstream of the re-entry point is preserved. Reinterpretation does not redo the sketch (the settled sketch text travels as `sketch_text`, and the Stage 0.5 model is not called), layout and variation keep the interpretation (DDL), and touch and catalog keep the Score.
-- Everything downstream re-runs. Layout and variation pass through Stage 2's LLM again, so even though the compositional-family choice is deterministic, the Score's filling can move with the model.
-- Autonomous refinement is a bounded loop over the same five kinds (`reinterpretation` / `layout_change` / `variation` / `touch_change` / `catalog_change`), and Vision's advice is only input to the next generation (`autonomous_refine.py:ALLOWED_KINDS`).
+## Saved compatibility and platform boundaries
 
-## Where the contracts are held
+- Saved SVG is canonical for the original display; saved Scores and artifacts retain read compatibility.
+- Shared Rust determines the meaning of new work. Old works use their saved Score, SVG, and context; they are not replaced by reinterpreting old DDL.
+- Android camera DDL uses the shared Rust Stage 1 vocabulary projection. History displays saved description, DDL, and model information without inferring an unrecorded prompt.
+- The Server distribution includes the authoring pipeline and renderer in the same native wheel. Android connects to the same shared core through JNI.
+- iOS integration is outside Android acceptance and remains pending.
 
-| Contract | Implementation |
+## Generation conditions and identity
+
+The direct inputs to `rh3` are Score, render seed, wild, engine identity, and the render color catalog ID. Other settings affect edition identity when they change Score or one of those direct inputs.
+
+| Condition | Resolving layer | Persistence |
+|---|---|---|
+| Visible DDL source / authority / revision | Authoring state machine + CAS store | Snapshot / history link |
+| Macro definitions / catalog / canvas identity | Compiler lock input and resolved host options | Definition lock / config / history |
+| `composition_seed` / variation | Typed Stage 1.5 + lowerer | Config / render metadata |
+| Resource policy / operational budget | Materializer + checked performance | Score policy / history |
+| `render_seed` / `wild` / concrete color map | Render Engine | Render metadata / history |
+| Model choice | Host transport for Stage 1 or a known-hole effect | Effect metadata / history |
+
+## Implementation locations
+
+| Boundary | Main implementation |
 |---|---|
-| Stage 1 / Stage 2 separation | `interpret_detail` and `compose` are separate functions with separate model resolution; `/api/compose` skips Stage 1 |
-| Stage 1.5 does not overwrite meaning | `_expand_ja/_expand_en` reframe focus and add no sentence of their own |
-| Plugin immediately after Stage 1 | `_call_compose_detail`: `manager.expand` → `expand_intermediate_for_lang` → `compose` |
-| Later stages ignore plugin namespaces | Plugin documents close into core DDL/instructions; unknown references drop; metadata retains provenance only |
-| Drop-only preference | `_drop_invalid_relations` drops invalid relations; coerce also has request-delivery repairs and the deterministic single-named-color rule |
-| Reproducibility | Rust owns deterministic seed derivation and Engine 41 frozen corpus pins rendering bytes. Python `seeds.py` only issues fresh host entropy. `renderer.py` exports only `render`; any fresh seed used by a run is stored in metadata/DB |
-| No old-engine selector | `current_render_engine()` exposes one current engine; history display returns the stored SVG |
-| Saijiki source | `saijiki.py` supplies prompts, markers, relation literals, API display, and references |
-
-## Where generation parameters are injected
-
-Every parameter that changes a generation is injected into one fixed layer. **The rh3 column is the point of this table** — the direct materials of the edition identity `rh3` are only the Score, the render seed, Wild, the engine ID/version, and the color catalog ID; everything else reaches the identity only by changing the Score. A change that touches a direct material makes the same work a different edition.
-
-| Parameter | Injected into | How it reaches rh3 | Recorded in |
-|---|---|---|---|
-| Color catalog (`catalog_id` / `catalog_mode`) | The render-time color mapping | **Direct material** (`render_color_catalog_id`) | Render metadata and history columns; `auto` also records the mode |
-| `render_seed` | Render Engine | **Direct material** | Render metadata |
-| `seed_text` (words change the touch) | Deterministically derives `render_seed` for the Render Engine | Direct material through the render seed | Both `seed_text` and the derived seed |
-| `wild` | Render Engine | **Direct material** (`render_wild`) | Render metadata |
-| `canvas_aspect` | Stage 2 prompt + the Score's `canvas` | Through the Score | Score and the `render_canvas_aspect_*` columns |
-| `composition_seed` | Stage 1.5 compositional-family choice | Through the Score (not a direct material) | Render metadata |
-| `variation_amplitude` / `variation_seed` | Stage 1.5 explicit variation | Through the Score | Render metadata and `variation_moved_axes` |
-| `interpretation_seed` | Stage 1 | Through DDL, then the Score | Render metadata |
-| Sketch settings (on/off, grain) | Stage 0.5 | Through the sketch text, DDL, then the Score | The `sketch_text` / `sketch_grain` / `sketch_state` columns |
-| Limits | Stated in the Stage 1/2 prompts and applied by coerce | Through the Score | `render_limits` and `render_limits_source`; overruns in `render_limit_notes` |
-| Model choice (Stage 0.5/1/2) | Each LLM call | Through the Score (not a material) | The `stage1_model` / `stage2_model` columns |
-
-## Diagram evidence
-
-Evidence IDs: `PIPE-SKETCH`, `PIPE-S1`, `PIPE-PLUGIN`, `PIPE-S15`, `PIPE-S2`, `PIPE-COERCE`, `PIPE-RENDER`, `PIPE-HISTORY`, `PIPE-LIMITS`, `DATA-RH3`, `DATA-FALLBACK`. Main call sites: `server/src/inku_server/api_core/routers/render.py:_paint_events` and `_call_compose_detail`.
+| Shared state machine / byte protocol | `core/crates/inku-pipeline`, `core/crates/inku-pipeline-uniffi` |
+| Typed compiler / Stage 1.5 / lowerer | `core/crates/inku-ddl` |
+| Score schema / compatibility / resource policy | `core/crates/inku-score` |
+| SVG performance | `core/crates/inku-render` |
+| Server host | `server/src/inku_server/pipeline_runtime.py`, `pipeline_product.py`, `pipeline_provider.py` |
+| Android host | `android/.../pipeline/SharedAuthoringPipeline.kt`, `AndroidWorkPipeline.kt`, `NativePipelineBridge.kt` |
+| Product contract | [SPEC.md](../../SPEC.md) §12.7.1, §12.11, and §18 |

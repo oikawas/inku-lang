@@ -27,7 +27,7 @@ DDLは一般的な描画命令ではなく、「視覚的な短歌を書く言�
 - 短さと制約によって作者の主張を削ぎ、提示を中心にする。
 - 既定の処理は再現可能にし、揺らぎはRendererの演奏とユーザーの明示操作に限定する。
 
-短い記述はtyped semantic documentとして共有の意味を保ち、lock検証済みlowererが一度だけScoreへ解決する。SVGは同じScoreからの一度の演奏である。通常のServer／Webは、compact Score 0.10のresource-awareなcompile／演奏入口を持つ共有authoring pipelineへ接続済みである。旧作品の閲覧と保存済みSVGの再演は維持し、旧作品からの変更は元を保った新しいvariationとして保存する。保存済みcompact Scoreを最新engineで再演する橋も通常hostのLinux確認を通したが、接続全体はまだ配備していない。詳細な実装範囲と未完了境界はSPECを正とする。
+短い記述はtyped semantic documentとして共有の意味を保ち、lock検証済みlowererが一度だけScoreへ解決する。SVGは同じScoreからの一度の演奏である。通常のServer／Web／Androidは、必要な最小版を選ぶresource-awareなcompact Scoreのcompile／演奏入口を持つ共有authoring pipelineを使う。旧作品の閲覧と保存済みScore／SVGの再演は維持し、旧作品からの変更は元を保った新しいvariationとして保存する。詳細な契約はSPECを正とする。
 
 ## 現行アーキテクチャ
 
@@ -38,39 +38,40 @@ DDLは一般的な描画命令ではなく、「視覚的な短歌を書く言�
   -> visible DDLをauthority・revisionと原子的にCAS保存
   -> typed compiler（known holeは自動検出して補完案を要求）
   -> 作者が補完案を承認した場合だけCAS保存
-  -> compact Score 0.10
+  -> typed Stage 1.5 + shared lowerer
+  -> 必要な最小版のcompact Score（resource-aware基準は0.10、鏡写しを持つ場合だけ0.15）
   -> resource-aware Render Engine: SVG演奏
   -> raw Score・SVG・history authority linkを保存
 ```
 
 - `server/`: FastAPIバックエンド。
-API、認証、DB、解釈、構成、補修、描画、系譜を持つ。
+API、認証、DB、共有pipelineのhost adapter、描画、系譜と旧作品の互換経路を持つ。
 - `web/`: SvelteKit 2 / Svelte 5フロントエンド。
 - `cli/`: 公開HTTP APIだけを使う `inku-cli`。
-- `android/`: Kotlin / Jetpack Composeによる別実装。
+- `android/`: Kotlin / Jetpack Composeのhostと共有Rust pipeline／renderer binding。
 詳細正本は `android/ANDROID_SPEC.ja.md`。
 - `SPEC.ja.md`: 設計思想と現行契約の日本語正本。
 - `SPEC.md`: 英語公開仕様。
 - `CHANGELOG.ja.md` / `CHANGELOG.md`: 実装・設計変更の履歴。
 
-### 受入済みのTyped DDL基盤とcompact演奏core
+### 共有Typed DDL基盤とcompact演奏core
 
 共有Rust compilerは、日英の正規化DDLをtyped semantic documentとして解釈し、source provenance、canonical meaning、Macroの有限展開を保持する。compiler lockはsourceとprovenanceを照合し、lock検証済みmeaningだけが共通lowererへ進む。lowererは一度だけactual Scoreまたは反復のsymbolic Planへ解決し、recoverableな不成立はtyped diagnosticと局所省略で扱い、独立した描画を続ける。詳細な型、lock、recovery、geometry、relation、Macroの契約は[SPEC.ja.md](SPEC.ja.md)を正とする。
 
-現在のlowererは背景の有限構文とsource優先のbackground、line / arcの`引く`、位置省略（sourceではNone、演奏時は中央領域から選ぶ）、明示位置、既存のsurface / Ground、有限のgeometryとrelationを共有してScoreへ届ける。新作品の通常wireはcompact Score 0.10であり、source owner、namespaceごとのordinal、placement／repetition／fill group、fill targetと境界、Macroの内外の反復をrecipeとして保存する。演奏時にrecipeからsamplingし、個体座標を保存しない。解決済みの個数・図形を正確に保ち、資源超過は個体生成前に当該sourceまたはcoordinated placement全体を診断付きで省略して、独立した後続を続ける。旧Score 0.9は旧作品の互換読取用に維持する。
+現在のlowererは背景の有限構文とsource優先のbackground、line / arcの`引く`、位置省略（sourceではNone、演奏時は中央領域から選ぶ）、明示位置、既存のsurface / Ground、有限のgeometryとrelationを共有してScoreへ届ける。新作品は表現に必要な最小Score版を選び、resource-awareなcompact wireは0.10を基準とする。source owner、namespaceごとのordinal、placement／repetition／fill group、fill targetと境界、Macroの内外の反復をrecipeとして保存する。演奏時にrecipeからsamplingし、個体座標を保存しない。解決済みの個数・図形を正確に保ち、資源超過は個体生成前に当該sourceまたはcoordinated placement全体を診断付きで省略して、独立した後続を続ける。旧Score 0.9は旧作品の互換読取用に維持する。
 
 `compile_ddl_to_score_with_resources`と`render_with_resources`が共通coreの入口であり、通常Webと既存のinterpret／compose／paint APIも同じpipeline serviceを使う。Provider transportはcoreが要求したactionごとに一度だけ呼び、再試行判断をcoreに残す。CanvasのIDと整数比は共有coreの11形式を正本とする。新しい6資源上限はlogical objects 4096、template nodes 128、anchor instances 4096、transform instances 4096、placement instances 64、fill instances 64である。既存4上限、管理者のauthority、旧作品に保存済みのbudgetを維持し、超過した配置だけを省略して後続を続ける。
 
-通常Linux hostの代表確認では、固定fixture予算（logical objects 400、template nodes 512、その他の構造資源400）に対して通常point fillがlogical objects 6945を要求したとき、そのfillだけを省略し、3点のcircle fillと後続lineを含むprimitive mark 4個を描画した。SVG、raw Score、historyとauthority linkの保存まで成功した。これはnative接続の確認であり、新しい6資源の出荷値を使った実測ではない。保存済みcompact Scoreの再演でもraw Score、保存source、authorityを変えず、seed変更をSVG差分へ届け、requestによるhard budget改竄を保存済みpolicyで拒否してprimitive mark 4個を保つことをLinuxで確認した。系譜編集はhistory ownerのlinked forkを選び旧forkを保つ。active DDLはsource・revision・optionsを受け、設定変更なら親関係を持つDDL authorityのdirect-DDL variation、同設定のsource変更ならCAS・origin・lockを保つmetadata保存、source不変のmetadata変更ならnew editionを保存する。history sidecar v2は当該revision／sourceのcore 4診断、renderer診断、`resource_execution`を復元し、v1は診断なし、壊れたsidecarはその作品だけwarningとして保存DDL／Score／SVGを継続表示する。Step 14のAndroid接続、Step 16の作品受入、Step 17の配備は開始しておらず、source接続済みという状態は出荷済みを意味しない。実装の時系列は[CHANGELOG.ja.md](CHANGELOG.ja.md)、各機能の詳細と現在の境界はSPECを参照する。
+通常WebとAPIは共有Rustのauthoring serviceを使う。系譜編集は選択したhistoryのownerと保存contextを引き継ぎ、元作品を保持する。Active DDLのsource変更はCASとauthority lockを保ち、設定変更は親関係を持つ新しいvariationへ進む。履歴は当該revisionの診断を復元し、古い形式や壊れたsidecarでも保存DDL／Score／SVGの表示を継続する。実装の時系列は[CHANGELOG.ja.md](CHANGELOG.ja.md)、現在の契約はSPECを参照する。
 
 ## 守るべき設計契約
 
 - DDLテキストは母語で書ける。
 JSON Scoreのキーは英語で統一する。
-- Stage 1の解釈とStage 2の構造化を分離する。
-- Stage 1.5は入力の意味を上書きせず、固定レシピの大量注入を避ける。
-- coerceは長期的に縮小する。
-新しい様式を自動注入せず、不正値は可能な限りdrop-onlyで扱う。
+- 記述起点のStage 1はvisible normalized DDLだけを生成し、Scoreの意味を決めない。
+- 共有compiler／lowererは可視DDLと検証済みmeaningを正とし、typed Stage 1.5は入力の意味を上書きしない。
+- 旧Stage 2／coerceは互換経路としてのみ残し、新作品のsemantic authorityにしない。
+局所回復は新しい様式を注入せず、最小のfieldまたは実行単位を診断付きで省略する。
 - 同一Scoreと同一seedは同じ作品を再現する。
 暗黙の時刻seedや自動varyを導入しない。
 - 描き直しは、その作品が描かれた上限で走る。
@@ -88,10 +89,8 @@ JSON Scoreのキーは英語で統一する。
 - 系譜は明示された派生操作だけを記録し、類似度、時刻、hash一致から親子関係を推測しない。
 - 品質指標、類似度、Vision所見は監査の鏡であり、生成ゲートや「最良枝」の自動選択に接続しない。
 - 言語上のmacroはdomain別codeや個別文法を足さず、一つの汎用`MacroDefinition`形式で
-  記述する。現行runtimeのlegacy plugin展開はcutoverまで互換経路として残るが、
-  新しいsemantic authorityではない。
-- 語彙の正は saijiki テーブル（`server/src/inku_server/saijiki.py`、v1.92）であり、Stage 1プロンプトの語彙ブロック・プラグイン閉包マーカー・relation固定句・web歳時記表示・reference §1はそこから導出する。
-語彙の変更はテーブルとgolden testを経由する。
+  記述する。保存済みMacro定義と旧作品のScore／SVGは互換性を保ち、新作の意味は共有compilerが決定する。
+- 語彙の正本は共有Rustの`core/crates/inku-ddl/assets/saijiki-v1.json`である。共有Stage 1 promptはそのprojectionを使い、Serverの表示表・Web／Android歳時記・referenceも同じ語彙へ揃える。
 - 日本語と英語の挙動を揃え、英語だけの要件を追加しない。
 - **エンジンは後戻りしない**（SPEC.ja §15.8）。
 過去の描画エンジンをシステムとして保持せず、版を選び直す機構も作らない。
@@ -111,8 +110,8 @@ Replay は常に最新で行い、当時のエディションの再現は**保�
 | 対象 | 値 | 正本 |
 |---|---|---|
 | アプリ | 本書冒頭の「対象バージョン」 | **`web/APP_VERSION` と `web/BUILD_NUMBER` の 2 ファイル**。UI・`/api/info` の `version`・CLI はすべてここを読む（値をここに写さない） |
-| Render Engine | 58 | `core/crates/inku-render/src/lib.rs` |
-| DDL | `ddl_version` 3 / `ddl_engine_version` 35 | `server/src/inku_server/layer_versions.py` |
+| Render Engine | 66 | `core/crates/inku-render/src/lib.rs` |
+| DDL | `ddl_version` 11 / `ddl_engine_version` 45 | `server/src/inku_server/layer_versions.py` |
 | Android | `2.1.4-android.78` | `android/VERSION`（web / server とは別の名前空間） |
 | Python パッケージ | 2.7.2 | `server/pyproject.toml`（**製品リリースのときだけ動く**） |
 
@@ -131,53 +130,19 @@ saijiki テーブルは単一の情報源で、Stage 1 プロンプトの語彙�
 語彙の変更はテーブルと golden test を経由する。
 歳時記は 10 カテゴリで、`おもて`（11 語）が閉じた図形の内側の在り方を言う（ddl-engine 15）。
 つらなりが線の在り方を言うのと対になる軸で、語は状態の名詞であって動作ではない。
-面の指定が閉じていない命令に付いたときは、coerce が直前の閉図形へ移し、移せる先が無ければ落とす。
+面の指定が閉じていない命令に付いたときは、共有compiler／lowererが対応する閉図形へ届け、成立する先が無ければ診断付きで省略する。
 **ただし `粒` と `にじみ` の 2 語は例外で、線や弧の上にそのまま残る**（ddl-engine 20）——
 この 2 語は内側の在り方ではなく痕の走り方を言うので、線が内側の代わりに持てるものだからである。
 
 ### パイプラインの各層
 
-- **Stage 0.5（写生）** — 任意の層で、記述を物の言葉へ写した自然文（写生文）に変える。
-区切りの大きさを `fine`（細かく・既定）と `coarse`（大きく）の 2 値から選び、描画のたびに指定できる。
-**写生文は記述の代わりに 3 つの消費者へ届く**（Stage 1・プラグイン展開の発動判断・Stage 1.5）。
-**Stage 2 と coerce は DDL だけを読む。** プラグインの種（何枚・何本を決める材料）は記述である。
-記述そのものは保存と表示に残り、層が落ちたときは記述がそのまま Stage 1 へ流れる。
-**層が何をしたかは作品に残る**（`sketch_state` の 5 値 = `fine` / `coarse` / `fallback` / `off` /
-`not_applicable`）。**落ちた回と、切った回と、呼ばない経路は別々に記録される。**
-`NULL` が意味するのは「この列より前に描かれた作品」だけである。
-**解釈と作曲が落ちた回も同じ形で残る**（`interpret_fallback` と `compose_fallback`）。
-**作曲の欄は 3 状態を持つ** —— 理由・`"none"`（落ちなかった）・記録なし。
-**印の付いた作品を系譜の親にして推敲するときは、実行の前に一度だけ尋ねる。**
-- **Stage 1（解釈）** — 指示文の言語を自動判定し、正規化 DDL を作る。
-プロンプトは歳時記から組み立てられ、固定文字列を持たない。
-- **プラグイン展開（互換経路）** — 検証済みの `.inku-plugin.md` を Stage 1 の直後にコア DDL へ決定的に writing-down する。
-名前空間が明示された語か、指示対象として明示された語の `fires_on` だけが発火し、比喩や未知の対象へは広げない。
-**プラグインが渡すのは 1 単位で、その参照を含む句に述べた数はその単位を何回置くかを指す**（1 単位の内訳は
-プラグイン文書の宣言と seed が決め、本文は中へ手を入れない）。数の読み手は coerce と共有の `counts.py` である。
-**述べた数 × 1 単位が上限を越えるときは、切り詰めずに 1 単位のまま据え置き、断りを記録に残す。**
-- **Stage 1.5（互換runtime）** — 決定的な焦点書換えと明示変奏。
-変奏（強度 3 段）を持ち、作品ごとに保存される。**動く軸は焦点ひとつで、この層は記述に無い文を足さない。**
-- **Stage 2** — JSON Score 化。
-任意フィールドの充填率は tool schema の**宣言順に従属する**（末尾に置いた語ほど埋まる）。
-**どの紙に描くのかを告げられて組む**（v2.13.14）。合わせてよいのは大きさと配置で、個数ではない。
-**宣言した比は `Score.canvas` に残り、実際に演奏した比とは食い違いうる。**
-- **coerce** — `normalize` と `compose` の 2 つに割れている。
-不正値は可能な限り drop-only で扱い、新しい様式を自動注入しない。
-**この層が記述を判ずるために読む語は、`language_support/{ja,en}.py` の `COERCE_MARKERS` が 1 か所で宣言する**
-（77 系統 / 693 異なり語）。**`coerce/` の分岐に照合用のリテラルを書かない**
-（例外は、この層が自分で書いて後の分岐が読み返す `note` の文字列である）。検査がこの 2 つを見ている。
-**記述が抽象色をひとつしか名指していないとき、配色サイクルはその 1 色へ畳まれる**（背景句は数えず、
-「色とりどり」句があるときと名指し色を含まない循環は畳まない）。
-**等分は記述が述べていない配分なので、届けるのではなく取り下げる。**
-**平文で述べた個数は、その節に対応する群がちょうど 1 つに決まるときだけ、その群へ効く**
-（曖昧なら触らない。「だけ」の道とは別の枝で、note の文言も分けてあるので帰属を後から数えられる）。
-**効く帯は制限値の閾値から来る** —— そのまま描くと定めた帯の中（既定では 239 まで）が対象で、
-閾値以上は代表化の領分なので触らない。**帯に別の名前を与えない。**
-**強制した数が命令ごとの上限か作品全体の上限を越えるときは、切り詰めずに強制しない** ——
-切り詰めると、述べた数でも代表数でもない中途半端な数が絵に出るからである。
-- **共有authoring pipeline（通常Server／Web接続済み）** — version付きsnapshotへcommandを与える純粋なstate machineで、LLMとvisible DDL保存はtyped action/resultとしてhostへ外出しする。Stage 1 promptはSaijiki由来の有限語彙、解決済みcanvas/catalog、検証済みMacroのidentity・parameter・localized summaryだけをbounded projectionとして持つ。保存済みDDLのknown hole検出から補完要求へ自動で進み、補完開始の追加操作を要求しない。HoleなしではStage2 LLMを呼ばず、unknown／conflict／integrityは対象にしない。Typed holeの補完は明示holeのspanとdigestに閉じ、provider patchをそのまま採用せず、作者の承認、CAS save、host acknowledgment、保存bytesの再parseの順を守る。
-Variationのoriginは不変で、description authorityはexact bytesの変わる最初のユーザーDDL確定後にDDL authorityへ単調にlockする。同一bytesの確定はlockせず、undoや再生成でunlockしない。由来不明の旧recordは推測移行せず、旧DDLの編集は`user_authored_ddl`／`ddl_authoritative`、旧記述からの再生成は`stage1_generated`／`description_authoritative`の新variationへforkする。共有pipelineの過去historyを選んだ場合もそのrevisionの演奏を表示し続け、同じvariationの最新状態で置換しない。系譜編集はhistory ownerのlinked forkを選び、旧forkを保持する。Forkはhistory linkと一致するsource digest、保存済みconfig、seed、catalog、資源上限、definition lockを使い、latest snapshotから推測しない。Active DDLはsource・revision・optionsを受け、同設定のsource変更でCAS・origin・DDL authority lockを保つmetadataを保存し、設定変更では元のsource・config・authorityを変えずparent付きdirect-DDL variationを作る。source不変のmetadata変更もnew editionとして保存する。Core configはvariation内で不変なので、既存variationからの記述再生成も現在のoptionsを持つ新variation／new editionにする。history sidecar v2は当該revision／sourceのcore 4診断、renderer診断、`resource_execution`を不変保存して通常履歴に表示する。v1には診断記録がなく、壊れたsidecarは当該作品にwarningを示すだけで保存DDL／Score／SVGを表示し、latest推測や再compileをしない。親関係を保存し、元のhistory行は変更しない。Commandと最終effect resultだけのtranscriptは決定的にreplayでき、薄いUniFFI bindingはsnapshot bytesとinput-envelope bytesを受けてstable JSON bytesを返すだけである。通常Server／Web、authority store、history link、保存済みcompact Score replay、共有11 canvas形式まで接続している。Step 14／16／17は開始していない。
-- **Render Engine 41** — 共有Rust coreが所有し、Serverの薄いPython adapterとAndroidの薄いJNI adapterが同じ1 requestで呼ぶSVGの演奏。
+- **共有authoring state machine** — 通常Server／WebとAndroidは、version付きsnapshotへcommandを適用する同じ共有Rust coreを使う。Androidの通常UIは`InkuRepository`、`AndroidWorkPipeline`、JNIを通る。Coreは次snapshot、進行event、最大1件のtyped effectを返す。
+- **Host effect** — Python／Kotlin hostは、coreが要求したStage 1またはknown-hole補完のprovider呼出し、もしくはvisible DDLのCAS保存を一度だけ実行し、identityを保ったresultを返す。再試行、authority遷移、次のeffectはcoreが決め、hostは別の意味分岐を持たない。
+- **Visible DDLとauthority** — 記述起点だけがStage 1を使ってvisible normalized DDLを作る。Direct DDLと作者が承認した補完patchは同じCAS保存境界へ入り、保存acknowledgment後のexact bytesだけを再parseする。Description authorityはsource bytesを変更する最初の作者確定後にDDL authorityへ単調にlockする。
+- **Typed compiler／Stage 1.5／lowerer** — compiler lockでsource、provenance、Macro definitionを検証し、bounded Macro expansionとfocus-onlyのtyped Stage 1.5を経てactual Scoreまたはcompact recipeへ一度だけ下ろす。Known holeだけが補完候補となり、holeなしではStage 2 LLMを呼ばない。Recoverableな不成立は最小のfieldまたは実行単位を診断付きで省略し、独立した後続を保つ。
+- **Scoreと資源** — lowererは表現に必要な最小Score版を選ぶ。Resource-awareなcompact基準は0.10で、鏡写しrelationを持つ作品だけが0.15を必要とする。保存済みpolicyから需要を再計算し、超過した一sourceまたはcoordinated placement全体を個体化前に省略する。
+- **互換境界** — 旧作品は保存済みScore／SVGと保存時contextで表示・再演する。新しい作品の意味は共有Rustが決定する。AndroidのカメラDDLも共有語彙を使い、履歴表示は保存情報に基づく。記録されていないpromptを旧実装から再構成しない。
+- **Render Engine 66** — 共有Rust coreが所有し、Serverの薄いPython adapterとAndroidの薄いJNI adapterが同じ1 requestで呼ぶSVGの演奏。
 Androidのmain preview、thumbnail、PNG exportはcanonicalな保存済み／現行SVGを別crate
 `inku-svg-raster`（`resvg`）でpixel化する。pixelは派生presentationであり、保存の正本はSVGのままである。
 **名前で呼んだ支持体は筆の走り方を変える** —— 地の 7 種はそれぞれ吸い方と歯の強さを持ち、

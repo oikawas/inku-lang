@@ -6,6 +6,14 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 34 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-14 — Share camera vocabulary and retire old layers
+
+Consolidated normal Server, Web, and Android meaning decisions in shared Rust. Removed the old Python interpretation, expansion, and Score generation, the Kotlin decision layer, and their comparison-only tests. Saved Score, SVG, history, stored resource budgets, and old 9:5 paper replay remain supported; saved-Score format compatibility is limited to an entry that cannot reinterpret DDL. Camera DDL uses the shared Stage 1 vocabulary projection, separated from the normalizer's JSON response contract. Removed reconstructed old prompts presented as sent records, inactive Web and Android settings, and obsolete CLI request options. The shared binding advances to 1.1.0, while the byte protocol stays 1.0.0; the camera DDL prompt advances to v2.
+
+Removed external Python bundle generation, its duplicate build, and the temporary acceptance app from the product; existing host tests use the normal wheel. The DDL reference generator now compiles accepted visible DDL with shared Rust, retaining old expander/coerce references as historical records. Bilingual specifications identify Stage 2 as known-hole completion and the shared lowerer as Score producer, and clarify the 13 categories including order and the saved-compatibility boundary. DDL_VERSION 11, DDL engine 45, render 66, and the minimum-required Score-version contract are unchanged.
+
+Saved the DDL 45 and render 66 outputs as the migration's final references. Aligned English wording in the bundled Nature document with the shared vocabulary so all seven definitions enter the normal catalog. Accepted Macro definitions and drawing semantics are unchanged.
+
 ### 2026-09-14 — Ship the shared pipeline in the Server native wheel
 
 The existing Python native wheel now exposes the shared authoring pipeline's byte boundary, and the normal Server uses that installed module directly. An externally generated bundle is no longer a normal runtime dependency. A focused Linux wheel and real-binding/SQLite check verified visible-DDL persistence, authority, and automatic known-hole requests. Semantics, DDL/Score formats, and engine versions are unchanged; legacy removal and deployment follow separately.

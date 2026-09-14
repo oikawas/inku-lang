@@ -198,8 +198,6 @@
 	let instructionCaptionVisible = $state(true);
 	let outputTab    = $state<'canvas' | 'refine' | 'lineage'>('canvas');
 	const canvasViewport = new CanvasViewportState();
-	let promptStage1Expanded = $state(false);
-	let promptStage2Expanded = $state(false);
 	type ModelSelectionSnapshot = {
 		stage1Provider: Provider;
 		stage1Model: string;
@@ -1120,7 +1118,7 @@
 			loadPluginVocabulary(),
 			loadExportTemplates(),
 			loadClientConfig(),
-			...(source === 'login' ? [loadColorCatalogs(), fetchPrompts()] : [])
+			...(source === 'login' ? [loadColorCatalogs()] : [])
 		]);
 		demo.reconcilePromptModel(availableModelCatalog, availableModelsLoaded);
 		await Promise.all([history.fetchOffset(0), history.fetchTrashPage()]);
@@ -1216,8 +1214,6 @@
 	const trashItems = $derived(history.trashItems);
 	const trashTotal = $derived(history.trashTotal);
 	let confirmAction = $state<{ message: string; run: () => void; destructive?: boolean; runLabel?: string; secondaryLabel?: string; secondaryRun?: () => void; hideCancel?: boolean; cancelRun?: () => void } | null>(null);
-
-	let promptsData = $state<{ stage1_system: string; stage2_system: string } | null>(null);
 
 	// ── Batch derived ────────────────────────────────────────
 	const batchRunning = $derived(batch.running);
@@ -2036,11 +2032,6 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		await downloadCard(apiFetch, id, exportSettings.card);
 	}
 
-	// ── Prompts ─────────────────────────────────────────────
-	async function fetchPrompts(): Promise<void> {
-		try { const r = await fetch(`/api/prompts?lang=${getLang()}`); if (r.ok) promptsData = await r.json(); } catch {}
-	}
-
 	async function copyTextToClipboard(value: string): Promise<void> {
 		if (navigator.clipboard?.writeText) {
 			await navigator.clipboard.writeText(value);
@@ -2415,7 +2406,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			loadPersistedSettings();
 		} catch {}
 		void (async () => {
-			await Promise.all([loadColorCatalogs(), loadPublicAppInfo(), session.loadCurrentUser(), fetchPrompts()]);
+			await Promise.all([loadColorCatalogs(), loadPublicAppInfo(), session.loadCurrentUser()]);
 		})();
 
 		return () => {
@@ -2427,7 +2418,6 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		};
 	});
 
-	$effect(() => { const _lang = getLang(); fetchPrompts(); });
 	// persist() reads every field it writes, so this effect tracks them all
 	// without the page having to name them one by one.
 	$effect(() => exportSettings.persist());
@@ -2787,8 +2777,6 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				{formatHistoryDate}
 				{historyPreviewText}
 				bind:outputTab
-				bind:promptStage1Expanded
-				bind:promptStage2Expanded
 				bind:exportMenuOpen
 				bind:exportWrapEl
 				exportCardOnly={!session.uiVisibility.work_tools}
@@ -2808,7 +2796,6 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				canvasAspectWidth={displayCanvasAspect.ratioW}
 				canvasAspectHeight={displayCanvasAspect.ratioH}
 				viewport={canvasViewport}
-				{promptsData}
 				stage1PromptText={work.stage1UserPrompt || (work.inputMode === 'single' ? work.input : work.inputMode === 'batch' ? batch.input : demo.generatedPrompt)}
 				instructionText={work.currentInstructionText}
 				ddl={work.ddl}
@@ -3016,7 +3003,6 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			loginStatus={session.loginStatus}
 			bind:loginUserName={session.loginUserName}
 			bind:loginPassword={session.loginPassword}
-			bind:autoRepairEnabled={work.ddlAutoRepairEnabled}
 			bind:pngAlphaWhite={exportSettings.pngAlphaWhite}
 			bind:animationExportSettings={exportSettings.animation}
 			bind:cardExportSettings={exportSettings.card}

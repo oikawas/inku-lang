@@ -479,6 +479,54 @@ fn path_connected_closed_leaves_follow_one_varied_branch_through_outer_affine() 
 }
 
 #[test]
+fn selected_line_and_arc_endpoints_keep_identity_through_outer_reflection_and_rotation() {
+    let canvas = CanvasSize::new(1200.0, 800.0);
+    let input = score(
+        r#"{"version":"0.12.0","instructions":[
+          {"primitive":"line","from":[0.2,0.3],"to":[0.65,0.3],
+           "variation":{"amplitude":"broad","frequency":"slow","quality":"wave",
+                        "dimensions":["position_x","position_y"]}},
+          {"primitive":"point","center":[0.4,0.4],"radius":0.01,
+           "relation":{"type":"connected","target_instruction_index":0,
+                       "target_endpoint":"start","position_authority":"named_movable"}},
+          {"primitive":"point","center":[0.4,0.4],"radius":0.01,
+           "relation":{"type":"connected","target_instruction_index":0,
+                       "target_endpoint":"end","position_authority":"named_movable"}},
+          {"primitive":"arc","center":[0.5,0.65],"radius":0.15,
+           "angle_start":25,"angle_end":145,"rotation":17},
+          {"primitive":"point","center":[0.4,0.4],"radius":0.01,
+           "relation":{"type":"connected","target_instruction_index":3,
+                       "target_endpoint":"start","position_authority":"named_movable"}},
+          {"primitive":"point","center":[0.4,0.4],"radius":0.01,
+           "relation":{"type":"connected","target_instruction_index":3,
+                       "target_endpoint":"end","position_authority":"named_movable"}}
+        ],"transform_groups":[
+          {"start":0,"end":6,"rotation_degrees":137,"scale_x":-1.2,"scale_y":0.7}
+        ]}"#,
+    );
+    let performed = resolve_checked_performance(
+        PerformanceRequest {
+            canvas: Some(canvas),
+            ..request(&input)
+        },
+        ScoreErrorPolicy::OmitAndContinue,
+    )
+    .unwrap();
+    assert!(performed.execution.is_none(), "{:?}", performed.execution);
+    assert_eq!(performed.original_instruction_indices, [0, 1, 2, 3, 4, 5]);
+    let line = performed.line_centerlines[0].as_deref().unwrap();
+    near_point(endpoints(&performed, 1, Some(canvas)).0, line[0]);
+    near_point(
+        endpoints(&performed, 2, Some(canvas)).0,
+        *line.last().unwrap(),
+    );
+    let arc = endpoints(&performed, 3, Some(canvas));
+    near_point(endpoints(&performed, 4, Some(canvas)).0, arc.0);
+    near_point(endpoints(&performed, 5, Some(canvas)).0, arc.1);
+    assert!((arc.0.x - arc.1.x).hypot(arc.0.y - arc.1.y) > 0.1);
+}
+
+#[test]
 fn closed_arc_pair_fill_requires_solid_and_a_successful_checked_touching() {
     let render_svg = |input: Score, error_policy| {
         render(RenderRequest {

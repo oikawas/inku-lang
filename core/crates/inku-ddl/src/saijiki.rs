@@ -206,6 +206,7 @@ pub struct CanonicalRelationIdentity {
     pub form: CanonicalRelationForm,
     pub previous_reference: Option<CanonicalPreviousReference>,
     pub target: Option<TouchingLiteralTarget>,
+    pub target_endpoint: Option<inku_score::Endpoint>,
 }
 
 pub(crate) fn canonical_relation_identity(
@@ -237,6 +238,7 @@ pub(crate) fn canonical_relation_identity(
         form,
         previous_reference,
         target: None,
+        target_endpoint: None,
     })
 }
 
@@ -245,6 +247,11 @@ pub(crate) fn canonical_relation_identity_is_valid(
     identity: CanonicalRelationIdentity,
     surface: &str,
 ) -> bool {
+    if identity.target_endpoint.is_some() {
+        return relation_type == "connected"
+            && connected_endpoint_phrase(surface)
+                .is_some_and(|(length, expected)| length == surface.len() && expected == identity);
+    }
     let Some(mut expected) = canonical_relation_identity(relation_type, identity.form) else {
         return false;
     };
@@ -260,6 +267,66 @@ pub(crate) fn canonical_relation_identity_is_valid(
         })
         .copied();
     expected == identity
+}
+
+/// Parse a finite target-reference grammar, retaining the whole source phrase as one
+/// relation occurrence. Shape and endpoint are independent grammatical selections;
+/// this does not add per-sentence literals or infer a reference from nearby geometry.
+pub(crate) fn connected_endpoint_phrase(
+    source: &str,
+) -> Option<(usize, CanonicalRelationIdentity)> {
+    use inku_score::Endpoint;
+    fn strip_ci<'a>(source: &'a str, prefix: &str) -> Option<&'a str> {
+        source
+            .get(..prefix.len())
+            .filter(|head| head.eq_ignore_ascii_case(prefix))?;
+        Some(&source[prefix.len()..])
+    }
+    let (remaining, target, endpoint) =
+        if source.starts_with("前の") || source.starts_with('線') || source.starts_with('弧') {
+            let rest = source.strip_prefix("前の").unwrap_or(source);
+            let (rest, target) = if let Some(rest) = rest.strip_prefix('線') {
+                (rest, TouchingLiteralTarget::Line)
+            } else {
+                (rest.strip_prefix('弧')?, TouchingLiteralTarget::Arc)
+            };
+            let rest = rest.strip_prefix('の')?;
+            let (rest, endpoint) = if let Some(rest) = rest.strip_prefix("始点") {
+                (rest, Endpoint::Start)
+            } else {
+                (rest.strip_prefix("終点")?, Endpoint::End)
+            };
+            (rest.strip_prefix("につながる")?, target, endpoint)
+        } else {
+            let rest =
+                strip_ci(source, "connected to ").or_else(|| strip_ci(source, "connects to "))?;
+            let rest = strip_ci(rest, "the ").unwrap_or(rest);
+            let (rest, endpoint) = if let Some(rest) = strip_ci(rest, "start of ") {
+                (rest, Endpoint::Start)
+            } else {
+                (strip_ci(rest, "end of ")?, Endpoint::End)
+            };
+            let rest = strip_ci(rest, "the ").unwrap_or(rest);
+            let rest = strip_ci(rest, "previous ").unwrap_or(rest);
+            let (rest, target) = if let Some(rest) = strip_ci(rest, "line") {
+                (rest, TouchingLiteralTarget::Line)
+            } else {
+                (strip_ci(rest, "arc")?, TouchingLiteralTarget::Arc)
+            };
+            if rest
+                .chars()
+                .next()
+                .is_some_and(|ch| ch.is_ascii_alphanumeric() || ch == '_')
+            {
+                return None;
+            }
+            (rest, target, endpoint)
+        };
+    let mut identity =
+        canonical_relation_identity("connected", CanonicalRelationForm::FullLiteral)?;
+    identity.target = Some(target);
+    identity.target_endpoint = Some(endpoint);
+    Some((source.len() - remaining.len(), identity))
 }
 
 static SAIJIKI_ASSET: OnceLock<SaijikiAsset> = OnceLock::new();

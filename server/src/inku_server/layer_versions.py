@@ -282,7 +282,9 @@
 # path connections reach Score 0.11 without changing ordinary adjacent relations.
 # 39: Preserve an explicit solid fill on an Arc for the closed contour formed
 # by a successfully performed Touching pair.
-DDL_ENGINE_VERSION = "39"
+# 40: Shared endpoint selection and independent ink spread accompany the
+# consolidated vocabulary. Existing stored Scores retain their prior meaning.
+DDL_ENGINE_VERSION = "40"
 # 4 (2026-07-30): yellow, orange, and purple become abstract Score colors, and
 # coerce recognizes the corresponding Japanese and English DDL markers.
 # 3 (2026-07-30): 黄 / 橙 / 紫 joined the saijiki color words, so an author can write
@@ -295,4 +297,6 @@ DDL_ENGINE_VERSION = "39"
 # 5 (2026-09-07): つながる / connected joins the relation vocabulary through
 # only the fixed previous-shape phrases. Existing works retain their language version.
 # 6 (2026-09-11): 油彩 / oil paint joins the touch vocabulary as its own wire key.
-DDL_VERSION = "6"
+# 7 (2026-09-14): Start/end become place words; center, stipple, swaying,
+# and independent bleeding replace the duplicate public entries.
+DDL_VERSION = "7"

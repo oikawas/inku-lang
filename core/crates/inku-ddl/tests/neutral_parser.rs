@@ -289,7 +289,7 @@ fn typed_english_grammar_preserves_source_and_canonical_row_identity() {
 
     for (canonical, derived, expected_surface_ja) in [
         ("undulating", "undulates", "波打つ"),
-        ("trembling", "trembles", "震える"),
+        ("trembling", "trembles", "揺れる"),
     ] {
         let mut identities = Vec::new();
         for source in [canonical, derived] {
@@ -488,7 +488,7 @@ fn japanese_point_homograph_uses_typed_phrase_ownership() {
     assert!(matches!(
         &modified.tokens[0].kind,
         NeutralTokenKind::SaijikiWord { category_key, canonical_surface_ja, .. }
-            if category_key == "omote" && canonical_surface_ja == "点"
+            if category_key == "omote" && canonical_surface_ja == "点描"
     ));
     assert!(matches!(
         &modified.tokens[2].kind,
@@ -500,7 +500,7 @@ fn japanese_point_homograph_uses_typed_phrase_ownership() {
     assert!(matches!(
         &point_modified.tokens[0].kind,
         NeutralTokenKind::SaijikiWord { category_key, canonical_surface_ja, .. }
-            if category_key == "omote" && canonical_surface_ja == "点"
+            if category_key == "omote" && canonical_surface_ja == "点描"
     ));
     assert!(matches!(
         &point_modified.tokens[2].kind,
@@ -512,7 +512,7 @@ fn japanese_point_homograph_uses_typed_phrase_ownership() {
     assert!(surface_clause.tokens.iter().any(|token| matches!(
         &token.kind,
         NeutralTokenKind::SaijikiWord { category_key, canonical_surface_ja, .. }
-            if category_key == "omote" && canonical_surface_ja == "点"
+            if category_key == "omote" && canonical_surface_ja == "点描"
     )));
 }
 
@@ -671,7 +671,7 @@ fn fixture_schema_case_count_ids_and_required_cases_are_guarded() {
     let fixture = load_fixture();
     assert_eq!(
         NEUTRAL_LEXEME_PARSER_SCHEMA_ID,
-        "inku.neutral-lexeme-parser.v8"
+        "inku.neutral-lexeme-parser.v9"
     );
     assert_eq!(fixture.schema, "inku.neutral-lexeme-parser-fixture.v7");
     assert_eq!(fixture.version, 7);

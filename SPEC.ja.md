@@ -103,11 +103,11 @@ PNGは正本SVGを写す派生出力であり、縮小してもSVGの材質・�
 | **かたむき** | 水平、垂直、斜め、右上がり、右下がり、回転 |
 | **てざわり** | 銀筆、鉛筆、ペン、ロットリング、クレヨン、チョーク、細筆、太筆、油彩、ビュラン、ドライポイント、コンピュータ |
 | **つらなり** | 実線、破線、点線、一点鎖線 |
-| **おもて** | 空、塗り、薄墨、粒、点、平行線、交差線、にじみ、アクアチント、濃い、薄い |
+| **おもて** | 空、塗り、薄墨、粒、点描、平行線、交差線、アクアチント、濃い、薄い |
 | **じ** | 紙、和紙、薄墨地、木炭地、カンバス、画用紙、メゾチント |
 | **いろ** | 白、黒、青、赤、緑、灰、黄、橙、紫 |
-| **ゆらぎ** | 細かく、大きく、ゆっくり、速く、揺れる、波打つ、震える、滲む |
-| **ばしょ** | 上、下、中央、左端、右端、上端、下端、中心、隅 |
+| **ゆらぎ** | 細かく、大きく、ゆっくり、速く、揺れる、波打つ、にじみ |
+| **ばしょ** | 上、下、中心、左端、右端、上端、下端、始点、終点、隅 |
 | **うごき** | 置く、並べる、引く、散らす、埋める、敷き詰める |
 | **わりあい** | 縦長、横長、全幅、半幅、半円、上弦、下弦、三日月 |
 | **あいだ** | 沿う、触れない、切る、間に、触れる、つながる |
@@ -124,9 +124,11 @@ PNGは正本SVGを写す派生出力であり、縮小してもSVGの材質・�
 - 物理素材の語彙のみ（感情語ゼロ）
 - 「描く動作」ではなく「配置する動作」を中心とする（盆栽で枝を「置く」感覚）
 - Actionの語彙設計が特に重要：置く・並べる・埋める——これは提示の動詞
-- **ゆらぎカテゴリは運動語彙のみ**：「細かく揺れる」「ゆっくり波打つ」は許容、「美しく揺れる」「激しく揺れる」は排除（詳細は Section 13）
+- **ゆらぎカテゴリは痕の不均一さを言う語彙**：「細かく揺れる」「ゆっくり波打つ」「にじみ」は許容し、「美しく揺れる」「激しく揺れる」は排除する（詳細は Section 13）
 - **あいだカテゴリは観察可能な関係のみ**：「沿う」「触れない」は外部から観察できる位置関係。「寄り添う」「呼応する」のような意図・擬人の語は排除（詳細は Section 14）。語彙（名詞）ではなく述語（統語）の追加であり、プラグイン原則1と矛盾しない
-- **おもてカテゴリは面の在り方を言う状態の名詞のみ**（2026-08-12 作者裁定で新設）：つらなりが線の在り方（実線・破線・点線・一点鎖線）を言うのに対し、**おもては閉じた図形の内側がどう在るかを言う**。**動詞を入れない** —— 動詞の「塗る」ではなく名詞の「塗り」。行為の語は §2 原則 5 と「配置する動作を中心とする」の両方に衝突し、`描く` が剪定されたのと同じ理由で入らない。**質**（空・塗り・薄墨・粒・点・平行線・交差線・にじみ・アクアチント）と**濃さ**（濃い・薄い）の 2 次元を持ち、ゆらぎが振幅・周波数・質の 3 次元を持つのと同じ形。**⚠ 濃い／薄いは相対の語であって絶対の濃さではない** —— 同じ塗りでも道具によって濃さは大きく変わる（実測で原寸 1618px の平均輝度が 17.4〜131.1）。**⚠ 紙目は入らない**（面ではなく地の質で、`地:` が引き取る）。**⚠ 質のうち `粒`・`にじみ`・`薄墨` の 3 語は、線や弧に付いたときも落とさず、その痕の走り方として読む**（`粒` と `にじみ` は 2026-08-16 作者裁定・ddl engine 20 / render engine 37、`薄墨` は 2026-08-16 作者裁定・render engine 38）—— **この 3 語は内側の在り方ではなく痕の走り方を言うので、線が内側の代わりに持てるものだからである。****⚠ ただし 3 語の届く先は同じではない** —— **`粒` と `にじみ` は支持体の 2 量（吸い方・歯）を上げる**が、**`薄墨` は紙について何も言わない**（墨をどう溶いたかであって支持体の話ではない）ので、**太くて淡い帯として描く**（幅 3.0 倍・不透明度 0.35 倍）。**残る 6 語は従来どおり、直前の閉じた図形へ移すか、移せる先が無ければ落とす。****背景を埋める指示は面の話ではない**（`background` フィールドへ行く）
+- **おもてカテゴリは面や痕の在り方を言う状態の名詞**：動作の「塗る」ではなく「塗り」を使う。**質**（空・塗り・薄墨・粒・点描・平行線・交差線・アクアチント）と**濃さ**（濃い・薄い）の2次元を持つ。濃い／薄いは道具ごとの相対指定であり、絶対の濃さではない。紙目は支持体を表す`地:`が引き取る。`粒`と`薄墨`は線・弧にも残し、痕の在り方として読む。粒は支持体の吸い方・歯を上げ、薄墨は紙の性質を変えず、幅3.0倍・不透明度0.35倍の淡い帯を作る。残る6種は直前の閉じた図形へ移し、対象がなければ落とす。現行のにじみは独立したゆらぎであり、おもての質には含めない。背景を埋める指示は面の指定ではなく、documentの`background`へ届く。
+
+現行の `点描` はおもての `stipple`、`にじみ` はゆらぎの `bleeding` である。にじみは `ink_spread:"bleed"` として Wave / Perlin と独立に併用でき、単独では Perlin を加えず、強度語を増やさない通常の広がりを作る。旧入力の `滲む` / `blurring`、`震える` / `trembling`、`中央` / `middle` はそれぞれ新しい正規語へ正規化する。保存済みScoreの`surface.texture="bleed"`と`variation.quality="pink"`は旧描画の意味を保持する。編集または再生成は新しい変奏へ進む。
 - **じカテゴリは支持体の名前のみ**（2026-08-15 新設・render engine 34）：**紙・和紙・薄墨地・木炭地・カンバス・画用紙・メゾチント の 7 語**で、`canvas.ground.material` の値になる。**おもてが閉じた図形の内側を言うのに対し、じはキャンバスそのものを言う** —— だから記述では「面: ...」ではなく「地: ...」の固定句で書く。**7 種は `<pattern>` のタイルとして敷かれ、`<filter>` を 1 つも使わないので、3 つの SVG profile が同じ地を出す。****費用の歯止めは要素数ではなく地の層のバイト数である**（24 KB）。
 - **「ランダム」は記述者の入力としては禁止しない**。禁止されるのは Score / 正規化DDL の内部表現に無秩序を残すことであり、記述者が「ランダムに散らす」と書いた場合は Stage 1 が「画面全体に点々と」「ばらつく」「散らす」などの観察可能な配置へ解釈する。
 - **コアの色語彙は9色**（白・黒・青・赤・緑・灰・黄・橙・紫）であり、記述者が書ける抽象色を表す。色カタログはこの9色の解決先を差し替える server-owned metadata で、語彙の拡張ではない。**黄・橙・紫は v2.9.11 で加わった** — カタログの `palette` には黄が12色あるのに実描画は0.6%で、**出口となる語が存在しなかった**（公称13.6%との差はそこから生まれていた）。3語は他の抽象色と同格であり、`color_hint` は依然として抽象色に収まらないニュアンスの置き場である。 **v2.9.12（render engine 17）から、9色は作品ごとに1回だけカタログの `palette` から決定的に割り当てられる** — 材料は `(render_seed, catalog_id, 抽象色)` の3つだけで、有彩6語は OKLCh の色相帯（CIELAB は青と紫を分離できない）、無彩3役は `map` 値と同じhexを予約してから明度の近い順に取る。背景も同じ割当を通り、`color_hint` は帯を指す語彙表としてだけ働く（ASCII は単語境界で照合する）。 **v2.9.14（render engine 18）から、13のカタログはそれぞれ9キーの `map` を持ち、その9キーはすべてそのカタログ自身の `palette` から選ばれる** — palette は無彩ちょうど3・有彩ちょうど7で6帯すべてを埋めるので、記述が求めた帯は最近傍の色ではなくその帯から答えられる。**1帯だけは意図して空にしてある** — `sea_stone` は紫を持たず、`blue` と同じ `Night Sea` が代役に立つ。**v2.11.11 から、保存済み作品を描き直すときの色の正本は作品自身が持つ記録である** — 描画要求が作品を名指せば（`/api/render-svg` と `/api/render-score` の `work_id`、CLI の `--from-work`）、サーバーはその行の `render_color_map` で描き、カタログの今日の定義を読まない。**したがって改名されたカタログも退役したカタログも描ける**（id の解決を通らないので 422 にならない）。記録を持たない古い作品は現行の定義へ落ち、そこでも 422 を出さない。作品を名指さない要求は従来どおりで、**退役したカタログidは既定へ落ちず何も返さないので、そのidを指定した描画は既定カタログで描かれる**。
@@ -219,9 +221,11 @@ transformはCount1のactual Scoreとcompactな反復recipeの両方へ配送す�
 
 Anchorは線の接続先に使う非描画の基準点であり、`place`または`position_x` / `position_y`の組で位置を明示する。Anchorの`place:center`は画面中央（0.5, 0.5）で、Emitのfocus依存配置から推測しない。その他のnamed位置は既存の位置領域を使う。Score 0.6.0の`anchors`は描画instructionと別に保持し、`target_anchor_index`でConnectedの接続先になる。元の参照・owner・描画順・seedを保ち、包含Transformの移動・拡縮・回転へ一緒に従う。数値位置の固定と旧Stop入力の互換を維持するが、recoverableなrelation失敗はerrorを記録してrelationだけを外し、描画を止めない。位置のないAnchorを前後の図形や呼出し位置から補完しない。保存済みScore 0.1.0〜0.5.0とversionなしartifactは従来互換を保つ。
 
-MacroのConnectedは、先行するLineを`from`に指定し、任意の数値式`target_path_position`を明示できる。値は有限な0〜1で、0は枝の始点、1は終点、途中は演奏時に生成した中心線のサンプル順序を均等に区切って補間する。接続先Lineは直前に限らず、同じMacro内の元参照を保持する。葉などの接続元は既存の位置authorityに従い、端点をその接点へ合わせる。揺らぎを含む同じ中心線を接続解決と最終描画で共有し、共通の外側変形では線と接続元を一緒に変形する。この指定があるScoreだけ0.11.0を出力し、指定なしは従来のflat 0.9／compact 0.10を保つ。0.11のflat形式は資源snapshotを必須にせず、compact形式は従来のcaller-owned資源契約を保つ。一般Along、位置を省略したConnectedの隣接規則、Touchingの閉形は変更しない。無効・省略済み参照は診断付きで関係だけを外し、他の描画を続ける。
+MacroのConnectedは、先行するLineを`from`に指定し、任意の数値式`target_path_position`を明示できる。値は有限な0〜1で、0は枝の始点、1は終点、途中は演奏時に生成した中心線のサンプル順序を均等に区切って補間する。接続先Lineは直前に限らず、同じMacro内の元参照を保持する。葉などの接続元は既存の位置authorityに従い、端点をその接点へ合わせる。揺らぎを含む同じ中心線を接続解決と最終描画で共有し、共通の外側変形では線と接続元を一緒に変形する。この指定だけならScore 0.11.0を出力する。`target_endpoint`または`ink_spread`もあれば0.12.0を優先し、いずれもなければ従来のflat 0.9／compact 0.10を保つ。0.11のflat形式は資源snapshotを必須にせず、compact形式は従来のcaller-owned資源契約を保つ。一般Along、位置を省略したConnectedの隣接規則、Touchingの閉形は変更しない。無効・省略済み参照は診断付きで関係だけを外し、他の描画を続ける。
 
-揺らぎparameterはasset category `variation`のまま、任意のclosed `dimension`（`amplitude` / `frequency` / `quality`）で候補を制限できる。例は`{"type":"semantic_ref","category":"variation","dimension":"amplitude"}`である。SemanticRefの`dimension`はvariation以外では禁止し、省略／Noneは旧category-only matchingとcanonical bytes / digestを保つ。Someはdefinition digestに含む。Flat Emitは`fluctuation_amplitude` / `fluctuation_frequency` / `fluctuation_quality`を使い、値は各dimensionに属する既存`SemanticRef { category: variation, id }`である。Field名は語義identityを変更しない。Definition、component `use`、binding、実行境界で同じ8語分類を検査する。
+通常DDLでは`[前の]線/弧の始点/終点につながる`で既存の先行参照の対象側端点を選ぶ。接続元は常にcanonicalな始点であり、Lineの`from`→`to`、Arcの`angle_start`→`angle_end`というidentityを保つ。対象端点を省略した既存の接続は先行図形の終点から現在図形の始点へつながる。`target_endpoint`と`target_path_position`は併用できず拒否する。`ink_spread`または`target_endpoint`を持つScoreだけ0.12であり、両方を持たないScore 0.9／0.10／0.11は従来どおりである。
+
+揺らぎparameterはasset category `variation`のまま、任意のclosed `dimension`（`amplitude` / `frequency` / `quality` / `spread`）で候補を制限できる。例は`{"type":"semantic_ref","category":"variation","dimension":"amplitude"}`である。SemanticRefの`dimension`はvariation以外では禁止し、省略／Noneは旧category-only matchingとcanonical bytes / digestを保つ。Someはdefinition digestに含む。Flat Emitは`fluctuation_amplitude` / `fluctuation_frequency` / `fluctuation_quality` / `ink_spread`を使い、値は各dimensionに属する既存`SemanticRef { category: variation, id }`である。Field名は語義identityを変更しない。Definition、component `use`、binding、実行境界で同じ現行7語の分類を検査する。
 
 宣言parameterはすべて必須である。三parameterを宣言してcallerが一値だけならMissingCompatibleFact等のbinding errorとなる。一振幅parameterだけを宣言してEmitへ届けた場合は、§13.6の同じresolverが残る二slotを解決する。未宣言callerの推測overlay、generic variation一fieldからの三slot推測、parameter optional化は行わない。
 
@@ -1269,11 +1273,10 @@ Saijiki（歳時記）に「ゆらぎ（movements）」カテゴリを追加す�
 |---|---|
 | 振幅 | 細かく、大きく |
 | 周波数 | 速く、ゆっくり |
-| 質 | 揺れる、波打つ、震える、滲む |
+| 質 | 揺れる、波打つ |
+| 広がり | にじみ |
 
-**⚠ ゆらぎの `滲む` と おもて の `にじみ` は別のものである**（2026-08-12 作者裁定）。
-ゆらぎの `滲む` は**線そのものが震えて滲む**振る舞い、おもての `にじみ` は**塗った面の縁が広がる**状態。
-**動詞と名詞で品詞が分かれる。**
+`にじみ`はゆらぎの一語であり、`ink_spread:"bleed"`を独立に届ける。Wave / Perlinや点描surfaceと併用できるが、単独でPerlinを補わず、強度語を増やさない通常の広がりに留める。`滲む` / `blurring`は現行入力ではこの語へ正規化する。
 
 **英語版「movements」:**
 
@@ -1281,11 +1284,12 @@ Saijiki（歳時記）に「ゆらぎ（movements）」カテゴリを追加す�
 |---|---|
 | amplitude | fine, large |
 | frequency | quickly, slowly |
-| quality | swaying, undulating, trembling, blurring |
+| quality | swaying, undulating |
+| spread | bleeding |
 
 配置のばらつきは ゆらぎ ではなく、うごき（散らす）と arrangement（layout / path / jitter）が担う。
 
-Shared compilerでは、通常DDLと宣言済みflat Macroが一つのresolverを通る。`fine` / `large`はFine / Broad、`slowly` / `quickly`はSlow / High、`swaying` / `trembling`はPerlin、`undulating`はWave、`blurring`はPinkへ写す。三slotが全て無ければ`Instruction.variation=None`、一つ以上あれば不足する振幅／周波数／質だけをMedium / Medium / Perlinで補う。明示値が優先し、三次元は独立である。`trembling`からFineやHighを推測しない。Sourceやtyped meaningへdefaultを注入せず、既存geometry-resolution-policyのauthor-resolved omissionがこの共通定義をattestする。
+Shared compilerでは、通常DDLと宣言済みflat Macroが一つのresolverを通る。`fine` / `large`はFine / Broad、`slowly` / `quickly`はSlow / High、`swaying`はPerlin、`undulating`はWaveへ写す。`bleeding`は独立した`ink_spread:"bleed"`へ届く。旧語の`trembling`と`blurring`は先にそれぞれ`swaying`と`bleeding`へ正規化する。振幅／周波数／質の三slotが全て無ければ`Instruction.variation=None`、一つ以上あれば不足するslotだけをMedium / Medium / Perlinで補う。明示値が優先し、三次元は独立である。`swaying`からFineやHighを推測せず、にじみ単独でvariationを追加しない。Sourceやtyped meaningへdefaultを注入せず、既存geometry-resolution-policyのauthor-resolved omissionがこの共通定義をattestする。
 
 ### 13.7 Nature plugin による現象の揺らぎ
 
@@ -1545,11 +1549,11 @@ LeWitt の Wall Drawing も同様である。語彙は線と少数の色とい�
 | 切る | cutting | 直前要素を横切り、視覚的な断絶を作る（短歌の「切れ」に相当） | `cutting` |
 | 間に | between | 直前の2要素の間の領域に置く | `between` |
 | 触れる | touching | 直前要素に接触する。両端点を一致させて閉形を構成する | `touching` |
-| つながる | connected | current始端を直前要素の終端へ合わせ、両方の形を変えずに接続する | `connected` |
+| つながる | connected | current始端を、明示時は先行Line / Arcの始点または終点へ、未指定時は直前要素の終端へ合わせる | `connected` |
 
 **排除する語**: 寄り添う、応える、対話する、呼応する——意図・擬人の語であり、外部から観察できない。
 
-v1.52 クローズ時点では、JSON Score の `relation` は正規化DDL中に明示的な previous-object 句がある場合に限る。日本語では `前の線に沿って` / `前の形に触れない` / `前の線を切る` / `前の二つの間に`、英語では `along the previous line` / `not touching the previous shape` / `cutting the previous line` / `between the previous two` を固定句とする。`touching` は日本語の `前の線に触れる` / `前の弧に両端で触れる`、英語の `touching the previous line` / `touching the previous arc at both ends` が接触を明示する場合に限り使い、自発付与しない。`connected` は `前の形につながる` / `connected to the previous shape` だけを固定句とし、短表記や未検証のprior primitive typeを断定する別句をaliasにしない。自然文由来の「周囲」「同じ拍子」「先行/遅れ」「近く/遠く」は relation ではなく、position / path / rotation / spacing で表す。
+`relation` は正規化DDL中に明示的な previous-object 句がある場合に限る。`connected` は既存の `前の形につながる` に加え、`[前の]線/弧の始点/終点につながる` を受ける。後者は対象側端点だけを選び、currentはcanonical始点のままである。通常DDLの無回転の線・通常弧では左が始点、右が終点であり、回転・鏡映後も同じ端を指す。端点を省略した接続だけがprior終端からcurrent始端へつながる。自然文由来の「周囲」「同じ拍子」「先行/遅れ」「近く/遠く」は relation ではなく、position / path / rotation / spacingで表す。
 
 **第二段候補（実測後に判断）**: 重なる、離す、同じ向きに、逆向きに、〜より細く。現行語で表現の不足が実測で示されてから追加する。片端接続の`つながる (connected)`は独立した表現価値と有限なLine / Arc / Point endpoint familyを確定してから導入した。
 
@@ -1574,6 +1578,7 @@ instruction に任意フィールド `relation` を追加する。
 | `gap` | `narrow` / `medium` / `wide` | 距離の目安。具体値は演奏が解決する |
 | `target_instruction_index` | 0以上のScore index | checked `connected` / `touching` / `along` / `cutting`が参照する正確な先行Score instruction。旧relationでは省略 |
 | `target_path_position` | 有限な0〜1 | Score 0.11の明示Connected接点。先行Lineの演奏中心線をサンプル順に補間する位置。指定時のみ非隣接targetを許す |
+| `target_endpoint` | `start` / `end` | Score 0.12の明示Connected対象端点。先行Line / Arcだけを対象にし、`target_path_position`とは併用しない |
 | `position_authority` | `named_movable` / `numeric_fixed` | checked currentの位置authority |
 | `touching_constraints` | `dimensions_fixed` / `direction_fixed`のboolean組 | typed `touching`の明示寸法・向きの固定条件。省略normalとは区別し、旧Scoreでは省略 |
 
@@ -1594,7 +1599,7 @@ id 参照が必要になった場合も、その必要が実測で示されて�
 - `cutting` → 直前要素と交差する角度・交点を、レンジ内で演奏ごとに決める
 - `between` → 直前2要素の間の領域内で決める
 - `touching` → line / arc だけに適用し、直前の line / arc の演奏実現後の両端点へ当該要素の両端点を一致させる
-- `connected` → Line / Arc / Pointに適用し、currentのcanonical始端（Pointはcenter）をpriorのcanonical終端（Pointはcenter）へ平行移動する。prior、寸法、曲率、rotationは変えない
+- `connected` → Line / Arc / Pointに適用する。`target_endpoint`があればcurrentのcanonical始端（Pointはcenter）を指定したprior Line / Arc端点へ、なければpriorのcanonical終端（Pointはcenter）へ平行移動する。prior、寸法、曲率、rotationは変えない
 
 現行のtyped Along / Cutting描画はCount1のactual Scoreを対象とする。Macroの反復CompositionPlanは共通のrelation intentを保持するが、反復個体の演奏は後続materializationで扱う。Typed Alongではcurrentと直前要素がともに線で、currentの方向が未指定なら、その方向を直前の線と平行に揃える。明示された方向・寸法・数値位置は保持する。Typed Cuttingも、共通resolverが決めた通常寸法または明示寸法を保持し、専用のランダム長に置き換えない。明示方向は交差角の演奏より優先する。通常DDLとMacroは同じ意味を使う。旧metadata-free Scoreの関係処理は互換用に保持し、Typed DDL本番pipeline／UI／saveの全面接続とは区別する。
 

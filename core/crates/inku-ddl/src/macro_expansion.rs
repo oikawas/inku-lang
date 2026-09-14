@@ -140,6 +140,7 @@ pub enum ExpandedMacroNode {
         from: GeneratedTargetId,
         to: GeneratedTargetId,
         target_path_position: Option<f64>,
+        target_endpoint: Option<inku_score::Endpoint>,
         provenance: GeneratedNodeProvenance,
     },
     Transform {
@@ -1184,6 +1185,7 @@ impl<'a> Evaluator<'a> {
                 from,
                 to,
                 target_path_position,
+                target_endpoint,
             } => {
                 let from = self.target(targets, from, path)?;
                 let to = self.target(targets, to, path)?;
@@ -1215,6 +1217,7 @@ impl<'a> Evaluator<'a> {
                         from,
                         to,
                         target_path_position,
+                        target_endpoint: *target_endpoint,
                         provenance: self.node_provenance(ordinal, path),
                     }])
                 } else {

@@ -184,7 +184,7 @@ fn fluctuation_dimension_preserves_legacy_identity_and_checks_known_constraints(
     for (dimension, valid, invalid) in [
         ("amplitude", "large", "slowly"),
         ("frequency", "quickly", "trembling"),
-        ("quality", "blurring", "fine"),
+        ("quality", "undulating", "fine"),
     ] {
         let field = format!("fluctuation_{dimension}");
         let mut data = legacy.clone();

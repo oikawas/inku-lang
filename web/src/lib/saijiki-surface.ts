@@ -46,13 +46,12 @@ export function localizePreview(
 export const shapeSvg = (shape: string) =>
 	`<svg viewBox="0 0 180 92" aria-hidden="true"><rect width="180" height="92" rx="6" fill="#fffdf8"/>${shape}</svg>`;
 
-/** The one contour all eleven surface drawings share. */
+/** The one contour all ten surface drawings share. */
 export const SURFACE_BOX = 'x="50" y="20" width="80" height="52" rx="2"';
 
 /**
  * One surface drawing: the shared contour, an interior clipped to it, and
- * anything belonging outside the contour -- bleeding is an edge and not a
- * face, so it is the one word that draws there.
+ * anything belonging outside the contour.
  */
 export const surfaceSvg = (interior: string, outside = '') =>
 	shapeSvg(
@@ -157,9 +156,9 @@ export const SURFACE_PREVIEWS: Record<string, PreviewEntry> = {
 		exampleEn: 'A grainy face',
 		svg: surfaceSvg(surfaceDabs(78, 1.3, 0.5, 1.7))
 	},
-	点: {
+	点描: {
 		effect: '点を面に撒いて濃淡を作る。',
-		example: '点で面を埋める',
+		example: '点描の円を置く',
 		effectEn: 'Scatters dots across the face to build tone.',
 		exampleEn: 'Fill the face with stipple',
 		svg: surfaceSvg(surfaceDabs(34, 2.6, 0.62, 5.3))
@@ -177,20 +176,6 @@ export const SURFACE_PREVIEWS: Record<string, PreviewEntry> = {
 		effectEn: 'Lays a second set of lines across the first.',
 		exampleEn: 'Fill a square with crosshatch',
 		svg: surfaceSvg(surfaceHatch([45, 115], 9, 2, 0.5))
-	},
-	にじみ: {
-		effect: '輪郭の外へ墨が染み出す。面の中ではなく縁の話。',
-		example: '縁がにじむ四角を置く',
-		effectEn: 'Ink seeps outward past the contour. It is about the edge, not the interior.',
-		exampleEn: 'Place a square with a bleeding edge',
-		svg: surfaceSvg(
-			'',
-			'<defs><filter id="surface-bleed" x="-25%" y="-45%" width="150%" height="190%"><feGaussianBlur stdDeviation="3"/></filter></defs>' +
-				'<g fill="none" stroke="#2b2b2b" filter="url(#surface-bleed)">' +
-				'<path d="M43 16 C62 9 104 8 135 16 C142 31 141 62 133 76 C108 85 66 87 50 78 C42 61 40 31 43 16 Z" stroke-width="5" opacity="0.13"/>' +
-				'<path d="M47 18 C64 13 102 12 132 19 C138 32 137 60 131 73 C107 80 69 81 52 74 C46 60 44 31 47 18 Z" stroke-width="8" opacity="0.3"/>' +
-				'</g>'
-		)
 	},
 	アクアチント: {
 		effect: '粒の濃さを段に分ける。既定は三段。',

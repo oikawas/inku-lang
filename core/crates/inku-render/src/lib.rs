@@ -22,6 +22,7 @@ pub mod geometry;
 pub mod ground;
 mod ground_patterns;
 pub mod group;
+mod ink_spread;
 pub mod layers;
 mod mark_paths;
 pub mod marks;
@@ -46,7 +47,7 @@ pub const CORE_API_VERSION: &str = "0.1.0";
 
 /// Canonical engine identity owned by the portable core and exposed by every host binding.
 pub const RENDER_ENGINE_ID: &str = "default";
-pub const RENDER_ENGINE_VERSION: &str = "61";
+pub const RENDER_ENGINE_VERSION: &str = "62";
 
 /// Report the host-boundary version for binding and packaging smoke tests.
 #[must_use]

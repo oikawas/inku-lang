@@ -428,6 +428,7 @@ string_enum!(Quality {
     Pink,
     Wave,
 });
+string_enum!(InkSpread { Bleed });
 string_enum!(Dimension {
     PositionX,
     PositionY,
@@ -890,11 +891,16 @@ pub struct Relation {
     /// Zero is the Line start and one is the Line end.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub target_path_position: Option<f64>,
+    /// An explicit endpoint on a connected target Line or Arc.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub target_endpoint: Option<Endpoint>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub position_authority: Option<ConnectedPositionAuthority>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub touching_constraints: Option<TouchingConstraints>,
 }
+
+string_enum!(Endpoint { Start, End });
 
 /// Authoritative explicit facts; omitted normal geometry remains adjustable.
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
@@ -946,6 +952,11 @@ pub struct Instruction {
     pub color_hint: Option<String>,
     #[serde(default)]
     pub variation: Option<Variation>,
+    /// Irregular outward ink spread around the performed mark boundary.
+    ///
+    /// This is independent from contour variation and surface texture.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ink_spread: Option<InkSpread>,
     #[serde(default)]
     pub arrangement: Option<Arrangement>,
     #[serde(default)]
@@ -1532,7 +1543,7 @@ impl Score {
     }
 
     fn validate_compact_score_0_10(&self) -> Result<(), &'static str> {
-        let is_compact_edition = matches!(self.version.as_str(), "0.10.0" | "0.11.0");
+        let is_compact_edition = matches!(self.version.as_str(), "0.10.0" | "0.11.0" | "0.12.0");
         let has_0_10_fields = !self.fill_groups.is_empty()
             || !self.repetition_groups.is_empty()
             || self.resource_policy.is_some()
@@ -1672,14 +1683,15 @@ impl Score {
 
     pub fn validate_placement_groups(&self) -> Result<(), &'static str> {
         let is_compact = self.version == "0.10.0"
-            || (self.version == "0.11.0" && self.resource_policy.is_some());
+            || (matches!(self.version.as_str(), "0.11.0" | "0.12.0")
+                && self.resource_policy.is_some());
         let mut previous_end = 0;
         for group in &self.placement_groups {
             match group.layout {
                 GroupLayout::Overlap | GroupLayout::HorizontalSourceOrder
                     if !matches!(
                         self.version.as_str(),
-                        "0.7.0" | "0.8.0" | "0.9.0" | "0.10.0" | "0.11.0"
+                        "0.7.0" | "0.8.0" | "0.9.0" | "0.10.0" | "0.11.0" | "0.12.0"
                     ) =>
                 {
                     return Err("placement_groups requires Score version 0.7.0");
@@ -1687,7 +1699,7 @@ impl Score {
                 GroupLayout::Scatter | GroupLayout::Tile
                     if !matches!(
                         self.version.as_str(),
-                        "0.8.0" | "0.9.0" | "0.10.0" | "0.11.0"
+                        "0.8.0" | "0.9.0" | "0.10.0" | "0.11.0" | "0.12.0"
                     ) =>
                 {
                     return Err("scatter and tile placement_groups require Score version 0.8.0");
@@ -1705,7 +1717,10 @@ impl Score {
             }
             previous_end = group.end;
             if !group.members.is_empty()
-                && !matches!(self.version.as_str(), "0.9.0" | "0.10.0" | "0.11.0")
+                && !matches!(
+                    self.version.as_str(),
+                    "0.9.0" | "0.10.0" | "0.11.0" | "0.12.0"
+                )
             {
                 return Err("placement members require Score version 0.9.0");
             }
@@ -1840,7 +1855,7 @@ impl Score {
         if !self.anchors.is_empty()
             && !matches!(
                 self.version.as_str(),
-                "0.6.0" | "0.7.0" | "0.8.0" | "0.9.0" | "0.10.0" | "0.11.0"
+                "0.6.0" | "0.7.0" | "0.8.0" | "0.9.0" | "0.10.0" | "0.11.0" | "0.12.0"
             )
         {
             return Err("anchors requires Score version 0.6.0");
@@ -1873,7 +1888,7 @@ impl Score {
                     return Err("relation target instruction and anchor are exclusive");
                 }
                 if let Some(position) = relation.target_path_position {
-                    if self.version != "0.11.0" {
+                    if !matches!(self.version.as_str(), "0.11.0" | "0.12.0") {
                         return Err("relation target_path_position requires Score version 0.11.0");
                     }
                     if relation.kind != RelationType::Connected
@@ -1890,10 +1905,26 @@ impl Score {
                         );
                     }
                 }
+                if relation.target_path_position.is_some() && relation.target_endpoint.is_some() {
+                    return Err("relation target path position and endpoint are exclusive");
+                }
+                if relation.target_endpoint.is_some() {
+                    if self.version != "0.12.0" {
+                        return Err("relation target_endpoint requires Score version 0.12.0");
+                    }
+                    if relation.kind != RelationType::Connected
+                        || relation.target_instruction_index.is_none()
+                        || relation.target_anchor_index.is_some()
+                    {
+                        return Err(
+                            "relation target_endpoint requires a connected instruction target",
+                        );
+                    }
+                }
                 if let Some(anchor_index) = relation.target_anchor_index {
                     if !matches!(
                         self.version.as_str(),
-                        "0.6.0" | "0.7.0" | "0.8.0" | "0.9.0" | "0.10.0" | "0.11.0"
+                        "0.6.0" | "0.7.0" | "0.8.0" | "0.9.0" | "0.10.0" | "0.11.0" | "0.12.0"
                     ) {
                         return Err("relation target_anchor_index requires Score version 0.6.0");
                     }
@@ -1912,6 +1943,7 @@ impl Score {
                     && self.version != "0.9.0"
                     && self.version != "0.10.0"
                     && self.version != "0.11.0"
+                    && self.version != "0.12.0"
                 {
                     return Err("surface_intensity requires Score version 0.3.0");
                 }
@@ -1940,6 +1972,9 @@ impl Score {
                     return Err("surface_intensity requires a closed solid fill");
                 }
             }
+            if instruction.ink_spread.is_some() && self.version != "0.12.0" {
+                return Err("ink_spread requires Score version 0.12.0");
+            }
             if instruction.arc_form != Some(ArcForm::Crescent) {
                 continue;
             }
@@ -1953,6 +1988,7 @@ impl Score {
                 && self.version != "0.9.0"
                 && self.version != "0.10.0"
                 && self.version != "0.11.0"
+                && self.version != "0.12.0"
             {
                 return Err("arc_form requires Score version 0.2.0");
             }
@@ -1992,7 +2028,15 @@ impl Score {
         }
         if !matches!(
             self.version.as_str(),
-            "0.4.0" | "0.5.0" | "0.6.0" | "0.7.0" | "0.8.0" | "0.9.0" | "0.10.0" | "0.11.0"
+            "0.4.0"
+                | "0.5.0"
+                | "0.6.0"
+                | "0.7.0"
+                | "0.8.0"
+                | "0.9.0"
+                | "0.10.0"
+                | "0.11.0"
+                | "0.12.0"
         ) {
             return Err("transform_groups requires Score version 0.4.0");
         }
@@ -2022,6 +2066,7 @@ impl Score {
                 && self.version != "0.9.0"
                 && self.version != "0.10.0"
                 && self.version != "0.11.0"
+                && self.version != "0.12.0"
                 && (group.scale_x != 1.0
                     || group.scale_y != 1.0
                     || group.translate_x != 0.0
@@ -2063,7 +2108,7 @@ impl Score {
             if !group.anchor_indices.is_empty()
                 && !matches!(
                     self.version.as_str(),
-                    "0.6.0" | "0.7.0" | "0.8.0" | "0.9.0" | "0.10.0" | "0.11.0"
+                    "0.6.0" | "0.7.0" | "0.8.0" | "0.9.0" | "0.10.0" | "0.11.0" | "0.12.0"
                 )
             {
                 return Err("transform group anchor_indices requires Score version 0.6.0");

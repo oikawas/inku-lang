@@ -1162,11 +1162,11 @@ fn schema_fixture_and_required_document_boundaries_are_guarded() {
     assert_eq!(SEMANTIC_DOCUMENT_SCHEMA_ID, "inku.semantic-document.v17");
     assert_eq!(
         SEMANTIC_ENTITY_ASSOCIATION_SCHEMA_ID,
-        "inku.semantic-entity-association.v14"
+        "inku.semantic-entity-association.v15"
     );
     assert_eq!(
         SEMANTIC_INSTRUCTION_ASSOCIATION_SCHEMA_ID,
-        "inku.semantic-instruction-association.v19"
+        "inku.semantic-instruction-association.v20"
     );
     assert_eq!(fixture.schema, "inku.semantic-document-fixture.v17");
     assert_eq!(fixture.version, 17);

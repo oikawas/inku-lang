@@ -165,7 +165,7 @@ fn embedded_asset_is_complete_and_orders_are_lossless() {
                 .map(|alias| (word.surface_ja.as_str(), alias))
         })
         .collect::<Vec<_>>();
-    assert_eq!(aliases, [("中心", "center")]);
+    assert!(aliases.is_empty());
 
     let angles = asset
         .categories
@@ -202,10 +202,11 @@ fn invalid_semantic_aliases_fail_closed_with_distinct_stable_kinds() {
             },
         ),
         ("semantic_alias_cycle", |asset: &mut SaijikiAsset| {
-            place_word_mut(asset, "中央").semantic_alias = Some("middle".to_owned());
+            place_word_mut(asset, "中心").semantic_alias = Some("center".to_owned());
         }),
         ("conflicting_semantic_alias", |asset: &mut SaijikiAsset| {
-            place_word_mut(asset, "中央").surface_en = Some("middle".to_owned());
+            place_word_mut(asset, "中心").semantic_alias = Some("center".to_owned());
+            place_word_mut(asset, "上").surface_en = Some("center".to_owned());
         }),
     ];
 
@@ -249,15 +250,6 @@ fn typed_english_grammar_is_row_owned_and_does_not_leak_into_public_projections(
                 "permitted_forms": ["third_person_singular"]
             }),
         ),
-        (
-            "震える",
-            json!({
-                "lemma": "tremble",
-                "lexical_class": "verb",
-                "canonical_form": "present_participle",
-                "permitted_forms": ["third_person_singular"]
-            }),
-        ),
     ] {
         assert_eq!(
             word_value(&asset_value, "yuragi", surface_ja).get("english_grammar"),
@@ -274,7 +266,7 @@ fn typed_english_grammar_is_row_owned_and_does_not_leak_into_public_projections(
             .clone()
             .filter(|word| word.get("english_grammar").is_some())
             .count(),
-        7
+        6
     );
     assert!(
         words
@@ -283,9 +275,15 @@ fn typed_english_grammar_is_row_owned_and_does_not_leak_into_public_projections(
     );
     let asset_source = std::str::from_utf8(SAIJIKI_ASSET_BYTES).unwrap();
     assert!(!asset_source.contains("parser_forms_en"));
-    for derived_surface in ["finely", "sways", "undulates", "trembles"] {
+    assert_eq!(
+        word_value(&asset_value, "yuragi", "揺れる").get("parser_surfaces_en"),
+        Some(&json!(["trembling", "trembles"]))
+    );
+    for derived_surface in ["finely", "sways", "undulates"] {
         assert!(!asset_source.contains(&format!("\"{derived_surface}\"")));
     }
+    assert!(asset_source.contains("\"trembling\""));
+    assert!(asset_source.contains("\"trembles\""));
 
     let projection = saijiki_derived_projection(ResolvedInstructionLanguage::En).unwrap();
     let markers = saijiki_marker_class_table(ResolvedInstructionLanguage::En).unwrap();
@@ -317,7 +315,6 @@ fn typed_english_grammar_is_row_owned_and_does_not_leak_into_public_projections(
         ("細かく", "fine"),
         ("揺れる", "swaying"),
         ("波打つ", "undulating"),
-        ("震える", "trembling"),
     ] {
         assert_eq!(
             project_macro_semantic_ref("yuragi", surface_ja)

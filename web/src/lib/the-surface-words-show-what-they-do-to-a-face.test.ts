@@ -1,14 +1,14 @@
 // Run with: npm run test:unit  (node:test, no test dependency)
 //
 // Acceptance for the surface half of the saijiki panels. おもて was the only
-// one of the eleven built-in categories with no preview of its own: all eleven
+// one of the eleven built-in categories with no preview of its own: all ten
 // of its words fell through to the generic fallback -- one wavy line and the
 // sentence "記述の解釈に影響する語彙です。" -- so the panel said nothing about
 // what any of them does.
 //
 // T-30 (every word of the category has its own preview, and the page reads it),
-// T-31 (the copy is there in both UI languages), T-32 (eleven drawings, not one
-// drawing eleven times), T-33 (they share one contour, so only the face
+// T-31 (the copy is there in both UI languages), T-32 (ten drawings, not one
+// drawing ten times), T-33 (they share one contour, so only the face
 // changes), T-34 (空 is the empty one, and it is the only empty one),
 // T-35 (the drawings carry the engine's own counts: one line set for 平行線,
 // two for 交差線, three tone steps for アクアチント).
@@ -67,7 +67,7 @@ test('T-31  each word says what it does, in both UI languages', () => {
 
 // ------------------------------------------------------------------- T-32
 
-test('T-32  eleven words, eleven different drawings', () => {
+test('T-32  ten words, ten different drawings', () => {
 	const drawings = OMOTE.map((word) => SURFACE_PREVIEWS[word].svg);
 	assert.equal(new Set(drawings).size, OMOTE.length, 'two surface words share a drawing');
 	for (const [index, svg] of drawings.entries()) {
@@ -78,15 +78,14 @@ test('T-32  eleven words, eleven different drawings', () => {
 
 // ------------------------------------------------------------------- T-33
 
-test('T-33  the contour is the same in all eleven; the face is what changes', () => {
+test('T-33  the contour is the same in all ten; the face is what changes', () => {
 	for (const word of OMOTE) {
 		const svg = SURFACE_PREVIEWS[word].svg;
 		assert.ok(
 			svg.includes(`<rect ${SURFACE_BOX} fill="none" stroke="#2b2b2b" stroke-width="4"/>`),
 			`${word}: draws its own contour instead of the shared one`
 		);
-		// Every interior is cut to that contour, so no word spills over the edge
-		// by accident. Bleeding leaves the contour on purpose and says so.
+		// Every interior is cut to that contour, so no word spills over the edge.
 		assert.match(svg, /clip-path="url\(#surface-clip\)"/, `${word}: interior is not clipped`);
 	}
 });

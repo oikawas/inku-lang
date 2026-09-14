@@ -9,6 +9,7 @@ pub enum FluctuationDimension {
     Amplitude,
     Frequency,
     Quality,
+    Spread,
 }
 
 impl FluctuationDimension {
@@ -17,6 +18,7 @@ impl FluctuationDimension {
             "fluctuation_amplitude" => Some(Self::Amplitude),
             "fluctuation_frequency" => Some(Self::Frequency),
             "fluctuation_quality" => Some(Self::Quality),
+            "ink_spread" => Some(Self::Spread),
             _ => None,
         }
     }
@@ -27,17 +29,20 @@ enum ResolvedValue {
     Amplitude(Amplitude),
     Frequency(Frequency),
     Quality(Quality),
+    Spread(inku_score::InkSpread),
 }
 
-const WORDS: [(&str, ResolvedValue); 8] = [
+const WORDS: [(&str, ResolvedValue); 7] = [
     ("fine", ResolvedValue::Amplitude(Amplitude::Fine)),
     ("large", ResolvedValue::Amplitude(Amplitude::Broad)),
     ("slowly", ResolvedValue::Frequency(Frequency::Slow)),
     ("quickly", ResolvedValue::Frequency(Frequency::High)),
     ("swaying", ResolvedValue::Quality(Quality::Perlin)),
-    ("trembling", ResolvedValue::Quality(Quality::Perlin)),
     ("undulating", ResolvedValue::Quality(Quality::Wave)),
-    ("blurring", ResolvedValue::Quality(Quality::Pink)),
+    (
+        "bleeding",
+        ResolvedValue::Spread(inku_score::InkSpread::Bleed),
+    ),
 ];
 
 fn resolved_value(id: &str) -> Option<ResolvedValue> {
@@ -52,6 +57,7 @@ pub fn classify_fluctuation_dimension(id: &str) -> Option<FluctuationDimension> 
         ResolvedValue::Amplitude(_) => FluctuationDimension::Amplitude,
         ResolvedValue::Frequency(_) => FluctuationDimension::Frequency,
         ResolvedValue::Quality(_) => FluctuationDimension::Quality,
+        ResolvedValue::Spread(_) => FluctuationDimension::Spread,
     })
 }
 
@@ -110,6 +116,7 @@ pub(crate) fn policy() -> serde_json::Value {
             ResolvedValue::Amplitude(value) => serde_json::to_value(value),
             ResolvedValue::Frequency(value) => serde_json::to_value(value),
             ResolvedValue::Quality(value) => serde_json::to_value(value),
+            ResolvedValue::Spread(value) => serde_json::to_value(value),
         }.expect("closed Score enum serializes");
         ((*id).to_owned(), serde_json::json!({"dimension": classify_fluctuation_dimension(id), "value": resolved}))
     }).collect();

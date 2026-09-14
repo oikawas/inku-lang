@@ -40,6 +40,41 @@ def test_score11_keeps_explicit_path_contact_and_rejects_older_editions() -> Non
         Score.model_validate(invalid)
 
 
+def test_score12_independent_spread_and_selected_endpoint_preserve_legacy_meaning() -> None:
+    relation = {
+        "type": "connected", "target_instruction_index": 0,
+        "target_endpoint": "start", "position_authority": "named_movable",
+    }
+    data = {
+        "version": "0.12.0", "instructions": [
+            {"primitive": "arc"},
+            {"primitive": "line", "ink_spread": "bleed", "relation": relation,
+             "variation": {"quality": "wave"}, "surface": {"texture": "stipple"}},
+        ],
+    }
+    result = Score.model_validate(data).model_dump()
+    mark = result["instructions"][1]
+    assert mark["ink_spread"] == "bleed"
+    assert mark["variation"]["quality"] == "wave"
+    assert mark["surface"]["texture"] == "stipple"
+    assert mark["relation"]["target_endpoint"] == "start"
+    assert result["resource_policy"] is None
+    with pytest.raises(ValueError, match="require Score version 0.12.0"):
+        Score.model_validate({**data, "version": "0.11.0"})
+    with pytest.raises(ValueError, match="are exclusive"):
+        Score.model_validate({**data, "instructions": [data["instructions"][0], {
+            **data["instructions"][1],
+            "relation": {**relation, "target_path_position": 0.0},
+        }]})
+    legacy = Score.model_validate({
+        "version": "0.9.0", "instructions": [{"primitive": "circle",
+            "variation": {"quality": "pink"}, "surface": {"texture": "bleed"}}],
+    }).model_dump()["instructions"][0]
+    assert "ink_spread" not in legacy
+    assert legacy["variation"]["quality"] == "pink"
+    assert legacy["surface"]["texture"] == "bleed"
+
+
 def _canonical_score_schema_bytes() -> bytes:
     return json.dumps(
         Score.model_json_schema(),
@@ -60,7 +95,7 @@ def test_checked_in_score_schema_matches_the_live_pydantic_model() -> None:
     assert {"version", "canvas", "background", "presence", "instructions", "anchors", "transform_groups", "placement_groups", "repetition_groups", "fill_groups", "resource_policy"} <= properties.keys()
 
     assert properties["version"]["default"] == "0.9.0"
-    assert properties["version"]["enum"] == ["0.11.0", "0.10.0", "0.9.0", "0.8.0", "0.7.0", "0.6.0", "0.5.0", "0.4.0", "0.3.0", "0.2.0", "0.1.0"]
+    assert properties["version"]["enum"] == ["0.12.0", "0.11.0", "0.10.0", "0.9.0", "0.8.0", "0.7.0", "0.6.0", "0.5.0", "0.4.0", "0.3.0", "0.2.0", "0.1.0"]
     transform_group = schema["$defs"]["TransformGroup"]["properties"]
     assert {"start", "end", "rotation_degrees", "scale_x", "scale_y", "translate_x", "translate_y", "fixed_position_indices", "anchor_indices"} <= transform_group.keys()
     placement_group = schema["$defs"]["PlacementGroup"]["properties"]

@@ -853,7 +853,7 @@ mod tests {
         let fluctuation = &payload["author_resolved_omission"]["fluctuation"];
         assert_eq!(fluctuation["words"].as_object().unwrap().len(), 8);
         assert_eq!(fluctuation["words"]["large"]["value"], "broad");
-        assert_eq!(fluctuation["words"]["trembling"]["dimension"], "quality");
+        assert_eq!(fluctuation["words"]["swaying"]["dimension"], "quality");
         assert_eq!(fluctuation["absent"], "none");
         assert_eq!(
             fluctuation["partial"],

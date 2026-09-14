@@ -298,6 +298,12 @@ fn project_source_instruction<'a>(
             .layout_direction
             .as_ref()
             .map(|term| (&term.identity).into()),
+        ink_spread: instruction
+            .entity
+            .fluctuation
+            .spread
+            .as_ref()
+            .map(|term| (&term.identity).into()),
         fluctuation: [
             instruction
                 .entity
@@ -510,6 +516,7 @@ fn checked_object_relation(
         target_instruction_index: Some(target_instruction_index),
         target_anchor_index: None,
         target_path_position: None,
+        target_endpoint: None,
         position_authority: Some(input.position_authority()),
         touching_constraints: touching.then_some(TouchingConstraints {
             dimensions_fixed: input.exact_geometry().is_some()
@@ -526,6 +533,7 @@ fn checked_macro_relation(
     target_instruction_index: Option<usize>,
     prior: Option<(Primitive, Option<inku_score::ArcForm>)>,
     target_path_position: Option<f64>,
+    target_endpoint: Option<inku_score::Endpoint>,
 ) -> Result<Relation, ScoreFieldGap> {
     let target =
         target_instruction_index.ok_or(ScoreFieldGap::UnavailableMacroRelationReference)?;
@@ -538,6 +546,15 @@ fn checked_macro_relation(
         "between" => RelationType::Between,
         _ => return Err(ScoreFieldGap::UnsupportedMacroRelation),
     };
+    if target_endpoint.is_some()
+        && (kind != RelationType::Connected
+            || target_path_position.is_some()
+            || !prior.is_some_and(|(primitive, _)| {
+                matches!(primitive, Primitive::Line | Primitive::Arc)
+            }))
+    {
+        return Err(ScoreFieldGap::UnsupportedMacroRelation);
+    }
     if target_path_position.is_some_and(|position| {
         kind != RelationType::Connected
             || !position.is_finite()
@@ -549,6 +566,7 @@ fn checked_macro_relation(
     let mut relation = checked_object_relation(kind, input, target, prior)
         .ok_or(ScoreFieldGap::UnsupportedMacroRelation)?;
     relation.target_path_position = target_path_position;
+    relation.target_endpoint = target_endpoint;
     Ok(relation)
 }
 
@@ -571,6 +589,7 @@ fn checked_macro_anchor_relation(
         target_instruction_index: None,
         target_anchor_index: Some(target_anchor_index),
         target_path_position: None,
+        target_endpoint: None,
         position_authority: Some(input.position_authority()),
         touching_constraints: None,
     })
@@ -583,6 +602,7 @@ fn plan_relation(relation: Relation) -> PlanRelation {
         target_object_index: relation.target_instruction_index,
         target_anchor_index: relation.target_anchor_index,
         target_path_position: relation.target_path_position,
+        target_endpoint: relation.target_endpoint,
         position_authority: relation.position_authority,
         touching_constraints: relation.touching_constraints,
     }
@@ -787,6 +807,7 @@ fn lower_macro_instruction(
             from,
             to,
             target_path_position,
+            target_endpoint,
             provenance,
         } = node
         else {
@@ -805,6 +826,7 @@ fn lower_macro_instruction(
             if to_position.is_some()
                 && kind == "connected"
                 && target_path_position.is_none()
+                && target_endpoint.is_none()
                 && anchor_relation_by_to
                     .insert(to.clone(), (*anchor_index, kind.as_str()))
                     .is_none()
@@ -847,6 +869,7 @@ fn lower_macro_instruction(
                     kind.as_str(),
                     secondary,
                     *target_path_position,
+                    *target_endpoint,
                 ),
             )
             .is_none()
@@ -925,7 +948,7 @@ fn lower_macro_instruction(
         let anchor_relation_dependency = binding
             .as_ref()
             .and_then(|binding| anchor_relation_by_to.get(binding));
-        if let Some((dependency, _, secondary, _)) = relation_dependency
+        if let Some((dependency, _, secondary, _, _)) = relation_dependency
             && (!successful_bindings.contains_key(dependency)
                 || secondary.is_some_and(|ordinal| !successful_emits.contains_key(&ordinal)))
         {
@@ -1063,7 +1086,9 @@ fn lower_macro_instruction(
             let Some(object_index) = object_index else {
                 continue;
             };
-            if let Some((dependency, kind, _, target_path_position)) = relation_dependency {
+            if let Some((dependency, kind, _, target_path_position, target_endpoint)) =
+                relation_dependency
+            {
                 let target_object_index = successful_bindings[dependency];
                 let prior = &objects[target_object_index];
                 let relation = checked_macro_relation(
@@ -1072,6 +1097,7 @@ fn lower_macro_instruction(
                     Some(target_object_index),
                     Some((prior.primitive(), prior.arc_form())),
                     *target_path_position,
+                    *target_endpoint,
                 );
                 match relation {
                     Ok(relation) => objects[object_index].relation = Some(plan_relation(relation)),
@@ -1150,7 +1176,9 @@ fn lower_macro_instruction(
             });
         }
         if let Some(mut score_instruction) = attempt.instruction {
-            if let Some((dependency, kind, _, target_path_position)) = relation_dependency {
+            if let Some((dependency, kind, _, target_path_position, target_endpoint)) =
+                relation_dependency
+            {
                 let target_instruction_index = successful_bindings.get(dependency).copied();
                 let prior = target_instruction_index.and_then(|index| instructions.get(index));
                 match checked_macro_relation(
@@ -1159,6 +1187,7 @@ fn lower_macro_instruction(
                     target_instruction_index,
                     prior.map(|instruction| (instruction.primitive, instruction.arc_form)),
                     *target_path_position,
+                    *target_endpoint,
                 ) {
                     Ok(relation) => score_instruction.relation = Some(relation),
                     Err(reason) => {
@@ -1377,6 +1406,7 @@ fn append_macro_caller_diagnostics(
         || instruction.entity.fluctuation.amplitude.is_some()
         || instruction.entity.fluctuation.frequency.is_some()
         || instruction.entity.fluctuation.quality.is_some()
+        || instruction.entity.fluctuation.spread.is_some()
         || instruction.entity.shape_constraint.is_some()
         || instruction.entity.proportion.aspect.is_some()
         || instruction.entity.proportion.width_extent.is_some()
@@ -1437,7 +1467,7 @@ fn exact_macro_emit_focus(
     Ok(target.effective_focus)
 }
 
-const MACRO_SCORE_FIELD_KEYS: [&str; 31] = [
+const MACRO_SCORE_FIELD_KEYS: [&str; 32] = [
     "radius",
     "diameter",
     "length",
@@ -1469,6 +1499,7 @@ const MACRO_SCORE_FIELD_KEYS: [&str; 31] = [
     "fluctuation_amplitude",
     "fluctuation_frequency",
     "fluctuation_quality",
+    "ink_spread",
 ];
 
 fn project_macro_emit<'a>(
@@ -1556,6 +1587,7 @@ fn project_macro_emit<'a>(
     let angle = macro_semantic_field(fields, "angle", "angle", false, &mut gaps);
     let layout_direction =
         macro_semantic_field(fields, "layout_direction", "angle", false, &mut gaps);
+    let ink_spread = macro_semantic_field(fields, "ink_spread", "variation", false, &mut gaps);
     let fluctuation = [
         "fluctuation_amplitude",
         "fluctuation_frequency",
@@ -1699,6 +1731,7 @@ fn project_macro_emit<'a>(
         angle_context: None,
         layout_direction,
         fluctuation,
+        ink_spread,
         has_unsupported_meaning: false,
     })
 }
@@ -2817,6 +2850,14 @@ fn lower_verified_stage15_shared<'a>(
     };
     let score = (objects.is_none() && outcome != ScoreLoweringOutcome::Stopped).then(|| Score {
         version: if instructions.iter().any(|instruction| {
+            instruction.ink_spread.is_some()
+                || instruction
+                    .relation
+                    .as_ref()
+                    .is_some_and(|relation| relation.target_endpoint.is_some())
+        }) {
+            "0.12.0".to_owned()
+        } else if instructions.iter().any(|instruction| {
             instruction
                 .relation
                 .as_ref()
@@ -2962,13 +3003,23 @@ fn direct_score_relation<'a>(
         SemanticRelationKind::Along => RelationType::Along,
         SemanticRelationKind::Cutting => RelationType::Cutting,
     };
-    checked_object_relation(
+    let mut checked = checked_object_relation(
         kind,
         input,
         target_instruction_index.expect("verified original dependency has a delivered target"),
         prior,
     )
-    .ok_or_else(|| unsupported_relation_reason(instruction_index, relation))
+    .ok_or_else(|| unsupported_relation_reason(instruction_index, relation))?;
+    if relation.target_endpoint.is_some()
+        && (kind != RelationType::Connected
+            || !prior.is_some_and(|(primitive, _)| {
+                matches!(primitive, Primitive::Line | Primitive::Arc)
+            }))
+    {
+        return Err(unsupported_relation_reason(instruction_index, relation));
+    }
+    checked.target_endpoint = relation.target_endpoint;
+    Ok(checked)
 }
 
 #[derive(Clone, Debug)]
@@ -3542,6 +3593,7 @@ struct ScoreLoweringInput<'a> {
     angle_context: Option<ScoreAngleContext<'a>>,
     layout_direction: Option<SemanticInputIdentity<'a>>,
     fluctuation: [Option<SemanticInputIdentity<'a>>; 3],
+    ink_spread: Option<SemanticInputIdentity<'a>>,
     has_unsupported_meaning: bool,
 }
 
@@ -3679,6 +3731,7 @@ fn instruction_from_resolved_geometry(
         color: appearance.color,
         color_hint: None,
         variation: appearance.fluctuation,
+        ink_spread: appearance.ink_spread,
         arrangement: None,
         at: geometric.at,
         relation: None,
@@ -4838,6 +4891,16 @@ fn resolve_complete_object<'a>(
     if input.has_unsupported_meaning {
         gaps.push(ScoreFieldGap::UnsupportedInstructionMeaning);
     }
+    let ink_spread = match input.ink_spread {
+        None => None,
+        Some(identity) if identity.category == "variation" && identity.id == "bleeding" => {
+            Some(inku_score::InkSpread::Bleed)
+        }
+        Some(_) => {
+            gaps.push(ScoreFieldGap::UnsupportedInstructionMeaning);
+            None
+        }
+    };
     let variation = if input
         .fluctuation
         .iter()
@@ -4907,6 +4970,7 @@ fn resolve_complete_object<'a>(
             touch: weight.expect("checked touch"),
             color: color.expect("checked color"),
             fluctuation: variation,
+            ink_spread,
             thinness,
             surface,
             surface_intensity,

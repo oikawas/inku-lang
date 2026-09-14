@@ -516,11 +516,7 @@ def test_rust_saijiki_asset_matches_python_authority() -> None:
         "marker_class_order": list(saijiki._MARKER_CLASS_ORDER),
     }
     place_rows = next(category for category in expected["categories"] if category["key"] == "basho")["words"]
-    assert [
-        (row["surface_ja"], row["surface_en"], row.get("semantic_alias"))
-        for row in place_rows
-        if row.get("semantic_alias") is not None
-    ] == [("中心", "middle", "center")]
+    assert all(row.get("semantic_alias") is None for row in place_rows)
     assert actual == expected
 
 

@@ -819,7 +819,7 @@ fn fluctuation_use_checks_deferred_broad_values_and_preserves_semantic_identity(
                 fields.get("fluctuation_quality"),
                 Some(&ExpandedMacroValue::SemanticRef {
                     category: "variation".to_owned(),
-                    id: "trembling".to_owned()
+                    id: "swaying".to_owned()
                 })
             );
         } else {

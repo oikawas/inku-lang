@@ -139,12 +139,12 @@ Since v1.92 the vocabulary has a single source of truth: the saijiki table on th
 | forms | かたち | circle, ellipse, triangle, square, line, arc, cloudform |
 | touches | てざわり | silverpoint, pencil, pen, rotring, crayon, chalk, fine-brush, thick-brush, oil paint, burin, drypoint, computer |
 | continuity | つらなり | solid, dashed, dotted, dash-dot |
-| surfaces | おもて | empty, flat, pale ink wash, grain, stipple, hatch, crosshatch, bleeding, aquatint, dense, faint |
+| surfaces | おもて | empty, flat, pale ink wash, grain, stipple, hatch, crosshatch, aquatint, dense, faint |
 | grounds | じ | paper, washi, ink-wash ground, charcoal ground, canvas, drawing paper, mezzotint |
 | motions | うごき | place, line-up, draw, scatter, fill, tile |
-| movements | ゆらぎ | fine, large, slowly, quickly, swaying, undulating, trembling, blurring |
+| movements | ゆらぎ | fine, large, slowly, quickly, swaying, undulating, bleeding |
 | relations | あいだ | along, not touching, cutting, between, touching, connected — with fixed phrases such as `along the previous line` and `connected to the previous shape` |
-| places | ばしょ | top, bottom, center, left-edge, right-edge, top-edge, bottom-edge, middle, corner |
+| places | ばしょ | top, bottom, center, left-edge, right-edge, top-edge, bottom-edge, start, end, corner |
 | angles | かたむき | horizontal, vertical, diagonal, rising, falling, rotated |
 | proportions | わりあい | tall, wide, full-width, half-width, semicircle, waxing, waning, crescent |
 | colors | いろ | white, black, blue, red, green, gray, yellow, orange, purple |
@@ -166,38 +166,25 @@ Canvas format is neither vocabulary nor a plugin. It is a resolved host option o
   sense in which a bonsai branch is "placed"
 - the design of the motion vocabulary matters most: place, line up, fill --
   these are the verbs of presentation
-- **the movements category holds movement words only**: "swaying finely" and
-  "undulating slowly" are allowed, "swaying beautifully" and "swaying
-  violently" are excluded (§13 has the detail)
+- **the movements category describes irregularities in marks**: "swaying finely",
+  "undulating slowly", and "bleeding" are allowed; "swaying beautifully" and
+  "swaying violently" are excluded (§13 has the detail)
 - **the relations category holds observable relations only**: "along" and "not
   touching" are positional relations an outside observer can verify. Words of
   intent or personification, such as "nestling against" or "answering each
   other", are excluded (§14 has the detail). This is the addition of a
   predicate (syntax), not of vocabulary (nouns), so it does not contradict
   plugin principle 1
-- **the surfaces category holds state nouns for how a surface is** (added by the
-  author's ruling of 2026-08-12): where continuity says how a *line* is (solid,
-  dashed, dotted, dash-dot), surfaces says **how the inside of a closed shape
-  is**. **No verbs** -- "flat", not "to paint". A word for the act would collide
-  both with §2 principle 6 and with "placing rather than drawing", and stays out
-  for the same reason 描く was pruned. It carries two dimensions, **quality**
-  (empty, flat, pale ink wash, grain, stipple, hatch, crosshatch, bleeding,
-  aquatint) and **density** (dense, faint), the same shape movements has with its
-  amplitude, frequency, and quality. **`dense` and `faint` are relative, never an
-  absolute darkness**: the same flat fill varies widely with the tool (measured
-  mean luminance 17.4 to 131.1 at the native 1618px). **Paper grain does not
-  belong here** -- it is a quality of the support, and `Ground:` takes it.
-  **Three of the qualities, `grain`, `bleeding` and `wash`, are kept when they
-  land on a line or an arc and are read as how that mark runs** (grain and
-  bleeding by the author's ruling of 2026-08-16, ddl engine 20 / render engine
-  37; wash by the ruling of the same day, render engine 38) -- **they speak
-  about the run of the mark rather than about an inside, which is what a line
-  has instead of an inside. The three do not land in the same place**: grain and
-  bleeding raise the support's two quantities (absorption and tooth), while
-  **a wash says nothing about the sheet** -- it is how the ink was diluted, not
-  what it was laid on -- and is drawn as **a broader, paler band** (three times
-  the width at 0.35 of the opacity). **The other six are moved to the closed
-  shape before them as before, and dropped where there is none.** **An
+- **the surfaces category holds state nouns for surfaces and marks**: use a
+  noun such as "flat", not the act of painting. Its two dimensions are **quality**
+  (empty, flat, pale ink wash, grain, stipple, hatch, crosshatch, aquatint) and
+  **density** (dense, faint). Density is relative to the tool, not an absolute
+  darkness. Paper grain belongs to the support named by `Ground:`. Grain and
+  wash remain applicable to lines and arcs: grain raises support absorption and
+  tooth, while wash changes no sheet properties and produces a pale band at
+  three times the width and 0.35 of the opacity. The other six qualities move
+  to the preceding closed shape and are dropped when there is none. Current
+  bleeding is independent movement vocabulary, not a surface quality. An
   instruction to fill the background is not about a surface** either; it goes to
   the document-owned `background` field. The finite form is `fill [the]
   background with <abstract color>.` `fill` densely fills a surface or region;
@@ -238,6 +225,8 @@ region, including the exact domain used for tiling. Fill's omitted target
 remains the whole canvas under its separate rule. A valid ground alone is
 drawable content in both Score and Plan; omitting another invalid drawing
 instruction preserves that ground and its diagnostics.
+
+  The current vocabulary keeps `stipple` in surfaces as 点描 and moves `bleeding` to movements. It is independent `ink_spread:"bleed"`, so it can combine with Wave, Perlin, and stipple without creating Perlin or an intensity by itself. Legacy `blurring`, `trembling`, and `middle` input normalizes to `bleeding`, `swaying`, and `center`. Saved Scores retain the old rendering meaning of `surface.texture="bleed"` and `variation.quality="pink"`; editing or regenerating creates a new variation.
 
 - **the grounds category holds the names of supports** (added 2026-08-15, render
   engine 34): **paper, washi, ink-wash ground, charcoal ground, canvas, drawing
@@ -415,9 +404,11 @@ Transform reaches both count-one actual Scores and compact repetition recipes. S
 
 An Anchor is a non-drawing reference point for line connections, with an explicit `place` or paired `position_x` / `position_y`. Anchor `place:center` means the canvas center (0.5, 0.5), without borrowing an Emit's focus-dependent placement. Other named positions use the existing placement regions. Score 0.6.0 stores `anchors` separately from drawing instructions, and `target_anchor_index` names a Connected target. Original references, ownership, drawing order, and seeds remain intact; Anchors follow the translation, scale, and rotation of their enclosing Transform. Numeric-position authority and legacy Stop-input compatibility remain, but a recoverable relation failure records an error, removes only its relation, and does not stop drawing. A missing position is not filled from nearby shapes or the invocation position. Saved Score 0.1.0 through 0.5.0 and versionless artifacts retain their compatibility.
 
-A Macro Connected relation may name a prior Line as `from` and explicitly provide a numeric `target_path_position` expression. Its finite value lies from 0 to 1: zero is the Line start, one its end, and intermediate values interpolate uniformly by sample order along the performed centerline. The Line need not be immediately adjacent; its original reference within the Macro is retained. The connected source follows existing position authority and aligns its endpoint with that point. Connection resolution and final rendering share the same centerline, including variation, and common outer transforms move it together with the attached source. Only Scores using this field emit version 0.11.0; other outputs retain flat 0.9 or compact 0.10. Flat 0.11 does not require a resource snapshot, while compact 0.11 retains the existing caller-owned resource contract. General Along, adjacency for Connected without a path position, and Touching closure remain unchanged. Invalid or omitted targets produce a diagnostic and remove only the relation while other drawing continues.
+A Macro Connected relation may name a prior Line as `from` and explicitly provide a numeric `target_path_position` expression. Its finite value lies from 0 to 1: zero is the Line start, one its end, and intermediate values interpolate uniformly by sample order along the performed centerline. The Line need not be immediately adjacent; its original reference within the Macro is retained. The connected source follows existing position authority and aligns its endpoint with that point. Connection resolution and final rendering share the same centerline, including variation, and common outer transforms move it together with the attached source. This field alone selects Score 0.11.0. If `target_endpoint` or `ink_spread` is also present, version 0.12.0 takes precedence. With none of these fields, outputs retain flat 0.9 or compact 0.10. Flat 0.11 does not require a resource snapshot, while compact 0.11 retains the existing caller-owned resource contract. General Along, adjacency for Connected without a path position, and Touching closure remain unchanged. Invalid or omitted targets produce a diagnostic and remove only the relation while other drawing continues.
 
-Fluctuation parameters keep asset category `variation` and may constrain candidates with an optional closed `dimension`: `amplitude`, `frequency`, or `quality`. For example, `{"type":"semantic_ref","category":"variation","dimension":"amplitude"}`. Other categories cannot specify a dimension. Omitted / None preserves legacy category-only matching and canonical bytes / digest; Some participates in the definition digest. Flat Emit uses `fluctuation_amplitude`, `fluctuation_frequency`, and `fluctuation_quality`, each carrying an existing `SemanticRef { category: variation, id }` from its dimension. A field name does not change semantic identity. Definition validation, component `use`, binding, and execution boundaries share the same eight-word classification.
+Ordinary DDL accepts `connected/connects to [the] start/end of [the] [previous] line/arc` to select only the target endpoint of an existing previous reference. The current shape always uses its canonical start, preserving Line from→to and Arc angle_start→angle_end identity. The existing endpoint-free connection remains prior end to current start. `target_endpoint` and `target_path_position` cannot coexist. A Score carrying either `target_endpoint` or `ink_spread` is version 0.12; versions 0.9, 0.10, and 0.11 without both fields retain their existing behavior.
+
+Fluctuation parameters keep asset category `variation` and may constrain candidates with an optional closed `dimension`: `amplitude`, `frequency`, `quality`, or `spread`. For example, `{"type":"semantic_ref","category":"variation","dimension":"amplitude"}`. Other categories cannot specify a dimension. Omitted / None preserves legacy category-only matching and canonical bytes / digest; Some participates in the definition digest. Flat Emit uses `fluctuation_amplitude`, `fluctuation_frequency`, `fluctuation_quality`, and `ink_spread`, each carrying an existing `SemanticRef { category: variation, id }` from its dimension. A field name does not change semantic identity. Definition validation, component `use`, binding, and execution boundaries share the same seven-word current classification.
 
 Every declared parameter remains required. Declaring three parameters and supplying only one value produces a binding error such as MissingCompatibleFact. Declaring only an amplitude parameter and delivering it to Emit lets the same resolver in §13.6 resolve the other two slots. Undeclared caller overlays, guessing three slots from one generic variation field, and optional parameters are not introduced.
 
@@ -1904,7 +1895,8 @@ The Saijiki carries a category called ゆらぎ (movements).
 |---|---|
 | amplitude | 細かく, 大きく |
 | frequency | 速く, ゆっくり |
-| quality | 揺れる, 波打つ, 震える, 滲む |
+| quality | 揺れる, 波打つ |
+| spread | にじみ |
 
 **English, movements:**
 
@@ -1912,17 +1904,17 @@ The Saijiki carries a category called ゆらぎ (movements).
 |---|---|
 | amplitude | fine, large |
 | frequency | quickly, slowly |
-| quality | swaying, undulating, trembling, blurring |
+| quality | swaying, undulating |
+| spread | bleeding |
 
-**The `blurring` of movements and the `bleeding` of surfaces are not the same thing**
-(author's ruling, 2026-08-12). Movements' `blurring` is the line itself trembling and
-smearing; surfaces' `bleeding` is the edge of a filled area spreading. **They part as verb
-and noun.**
+`bleeding` is the single movement word and delivers independent `ink_spread:"bleed"`.
+It combines with Wave, Perlin, and the stipple surface, but does not add Perlin by itself
+or introduce an intensity word. Current `blurring` input normalizes to it.
 
 Scatter in placement is not ゆらぎ. It is carried by うごき (motions, "scatter")
 and by `arrangement` (layout / path / jitter).
 
-In the shared compiler, ordinary DDL and declared flat Macros use one resolver. `fine` / `large` map to Fine / Broad; `slowly` / `quickly` to Slow / High; `swaying` / `trembling` to Perlin; `undulating` to Wave; and `blurring` to Pink. With all three slots absent, `Instruction.variation=None`. With at least one present, only missing amplitude, frequency, and quality receive Medium, Medium, and Perlin respectively. Explicit values win and the dimensions are independent: `trembling` does not imply Fine or High. Defaults do not enter source or typed meaning. The existing geometry-resolution-policy author-resolved omission owner attests this shared definition.
+In the shared compiler, ordinary DDL and declared flat Macros use one resolver. `fine` / `large` map to Fine / Broad; `slowly` / `quickly` to Slow / High; `swaying` (and its accepted legacy `trembling` forms) maps to Perlin; `undulating` maps to Wave; and `bleeding` maps independently to `ink_spread:"bleed"`. With all three variation slots absent, `Instruction.variation=None`. When at least one is present, only the missing amplitude, frequency, and quality slots default to Medium, Medium, and Perlin. Ink spread alone does not create variation. Explicit values win and the dimensions are independent: swaying does not imply Fine or High. Defaults do not enter source or typed meaning. The existing geometry-resolution-policy author-resolved omission owner attests this shared definition.
 
 ### 13.7 Sway from Phenomena: the Nature Plugin
 
@@ -2386,7 +2378,7 @@ core.
 | 切る | cutting | crosses the preceding element and makes a visual break (the *kire*, the cut, of tanka) | `cutting` |
 | 間に | between | placed in the region between the preceding two elements | `between` |
 | 触れる | touching | contacts the preceding element; coinciding endpoints compose a closed form | `touching` |
-| つながる | connected | joins the current start to the preceding element's endpoint without changing either shape | `connected` |
+| つながる | connected | joins the current start to a selected start or end of a prior Line or Arc, or to the prior endpoint when omitted | `connected` |
 
 **Words excluded**: nestle up to, answer, converse with, resonate with — words of
 intent and personification, not observable from outside.
@@ -2398,9 +2390,13 @@ Japanese, and `along the previous line` / `not touching the previous shape` /
 `cutting the previous line` / `between the previous two` in English.  `touching`
 is used only where `前の線に触れる` / `前の弧に両端で触れる` or `touching the
 previous line` / `touching the previous arc at both ends` makes the contact
-explicit; it is never granted spontaneously. `connected` is used only for
-`前の形につながる` / `connected to the previous shape`; shorter forms and
-phrases asserting an unverified previous primitive type are not aliases. Notions that arrive from natural
+explicit; it is never granted spontaneously. `connected` accepts the existing
+`前の形につながる` / `connected to the previous shape` and
+`connected/connects to [the] start/end of [the] [previous] line/arc`. The latter
+selects only the target endpoint; the current shape remains at its canonical start.
+For unrotated ordinary Lines and Arcs, left is start and right is end; rotation
+and reflection preserve that same endpoint identity. Only the endpoint-free form
+uses prior end to current start. Notions that arrive from natural
 language — around, on the same beat, leading or lagging, near or far — are not
 relations, and are expressed through position, path, rotation, and spacing.
 
@@ -2431,6 +2427,7 @@ An optional `relation` field is added to an instruction.
 | `gap` | `narrow` / `medium` / `wide` | a guide distance; the concrete value is resolved by the performance |
 | `target_instruction_index` | non-negative Score index | the exact preceding Score instruction for checked `connected` / `touching` / `along` / `cutting`; omitted for older relations |
 | `target_path_position` | finite 0–1 | explicit Score 0.11 Connected position interpolated by sample order on the prior Line's performed centerline; only this field permits a nonadjacent target |
+| `target_endpoint` | `start` / `end` | explicit Score 0.12 Connected target endpoint on a prior Line or Arc; it cannot coexist with `target_path_position` |
 | `position_authority` | `named_movable` / `numeric_fixed` | position authority of the checked current instruction |
 | `touching_constraints` | boolean `dimensions_fixed` / `direction_fixed` pair | explicit dimension and direction constraints for typed `touching`, distinct from omitted normal; absent in older Scores |
 
@@ -2464,9 +2461,10 @@ sequential resolution.
 - `touching` -> applies to line and arc only; the element's two endpoints are made
   to coincide with the two endpoints of the preceding line or arc as the
   performance realized them
-- `connected` -> applies to Line, Arc, and Point; the current canonical start
-  (Point center) is translated to the prior canonical end (Point center), while
-  the prior, dimensions, curvature, and rotation remain unchanged
+- `connected` -> applies to Line, Arc, and Point; with `target_endpoint`, the
+  current canonical start (Point center) is translated to the selected endpoint
+  of a prior Line or Arc; without it, it is translated to the prior canonical
+  end (Point center). The prior, dimensions, curvature, and rotation remain unchanged
 
 Current typed Along / Cutting rendering covers count-one actual Scores. Macro repeated CompositionPlans retain shared relation intent; repeated-instance performance belongs to later materialization. Typed Along aligns
 the current line parallel to the preceding line when both

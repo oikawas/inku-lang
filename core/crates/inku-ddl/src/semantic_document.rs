@@ -991,7 +991,8 @@ fn apply_continuation_occurrence(
             "quickly" | "slowly" => {
                 set_if_empty(&mut instruction.entity.fluctuation.frequency, term)
             }
-            "swaying" | "undulating" | "trembling" | "blurring" => {
+            "bleeding" => set_if_empty(&mut instruction.entity.fluctuation.spread, term),
+            "swaying" | "undulating" => {
                 set_if_empty(&mut instruction.entity.fluctuation.quality, term)
             }
             _ => false,

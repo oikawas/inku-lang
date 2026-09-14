@@ -115,6 +115,7 @@ pub enum SemanticDeliveryOwner {
     FluctuationAmplitude,
     FluctuationFrequency,
     FluctuationQuality,
+    InkSpread,
     ProportionAspect,
     ShapeConstraint,
     ProportionWidthExtent,
@@ -150,6 +151,7 @@ impl SemanticDeliveryOwner {
             Self::FluctuationAmplitude => "fluctuation_amplitude",
             Self::FluctuationFrequency => "fluctuation_frequency",
             Self::FluctuationQuality => "fluctuation_quality",
+            Self::InkSpread => "ink_spread",
             Self::ProportionAspect => "proportion_aspect",
             Self::ShapeConstraint => "shape_constraint",
             Self::ProportionWidthExtent => "proportion_width_extent",
@@ -1035,6 +1037,7 @@ fn project_deliveries(
             | SemanticAssociationIssueKind::IncompleteNumericPosition
             | SemanticAssociationIssueKind::UnownedExactDecimal
             | SemanticAssociationIssueKind::UnknownSurfaceDimension
+            | SemanticAssociationIssueKind::ConflictingFluctuationSpreads
             | SemanticAssociationIssueKind::UnknownFluctuationDimension
             | SemanticAssociationIssueKind::UnknownProportionDimension
             | SemanticAssociationIssueKind::UpstreamUnknown
@@ -1649,6 +1652,10 @@ fn project_instruction(instruction: &crate::SemanticInstruction, projection: &mu
             instruction.entity.fluctuation.frequency.as_ref(),
         ),
         (
+            SemanticDeliveryOwner::InkSpread,
+            instruction.entity.fluctuation.spread.as_ref(),
+        ),
+        (
             SemanticDeliveryOwner::FluctuationQuality,
             instruction.entity.fluctuation.quality.as_ref(),
         ),
@@ -1740,7 +1747,15 @@ fn project_instruction(instruction: &crate::SemanticInstruction, projection: &mu
             projection,
             relation.provenance.span,
             SemanticDeliveryOwner::Relation,
-            format!("{}:{}", relation.kind.as_str(), relation.reference.as_str()),
+            match relation.target_endpoint {
+                None => format!("{}:{}", relation.kind.as_str(), relation.reference.as_str()),
+                Some(endpoint) => format!(
+                    "{}:{}:{}",
+                    relation.kind.as_str(),
+                    relation.reference.as_str(),
+                    serde_json::to_string(&endpoint).expect("closed endpoint")
+                ),
+            },
         );
     }
 }
@@ -2519,6 +2534,7 @@ pub(crate) fn semantic_source_occurrences(ast: &SemanticDocumentAst) -> Vec<&Sou
             entity.fluctuation.amplitude.as_ref(),
             entity.fluctuation.frequency.as_ref(),
             entity.fluctuation.quality.as_ref(),
+            entity.fluctuation.spread.as_ref(),
             entity.proportion.aspect.as_ref(),
             entity.proportion.width_extent.as_ref(),
             entity.proportion.arc_form.as_ref(),
@@ -2866,6 +2882,7 @@ fn entity_provenance_value(entity: &crate::SemanticEntity) -> Value {
             entity.fluctuation.frequency.as_ref(),
         ),
         ("fluctuation_quality", entity.fluctuation.quality.as_ref()),
+        ("ink_spread", entity.fluctuation.spread.as_ref()),
         ("proportion_aspect", entity.proportion.aspect.as_ref()),
         (
             "proportion_width_extent",
@@ -3362,12 +3379,19 @@ fn node_value(
             from,
             to,
             target_path_position,
+            target_endpoint,
             ..
         } => {
             record.insert("kind".to_owned(), Value::String("relation".to_owned()));
             record.insert("relation".to_owned(), Value::String(kind.clone()));
             record.insert("from".to_owned(), target_value(from, owners, owner)?);
             record.insert("to".to_owned(), target_value(to, owners, owner)?);
+            if let Some(endpoint) = target_endpoint {
+                record.insert(
+                    "target_endpoint".to_owned(),
+                    serde_json::to_value(endpoint).expect("closed endpoint"),
+                );
+            }
             if let Some(position) = target_path_position {
                 record.insert(
                     "target_path_position".to_owned(),

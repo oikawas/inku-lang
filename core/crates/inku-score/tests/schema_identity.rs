@@ -3,7 +3,7 @@ use serde_json::Value;
 use sha2::{Digest, Sha256};
 
 const EXPECTED_SCHEMA_DIGEST: &str =
-    "3102f4caefb6c12e61025b49b38f0551f218aed8af8c0b08b329ce7b596db1bb";
+    "9c536bfe51507f5ce13e3cec4670e9a25a86e5a53e82f0d1ff275f45abf69d72";
 
 #[test]
 fn canonical_score_schema_identity_is_stable() {
@@ -106,6 +106,8 @@ fn canonical_score_schema_identity_is_stable() {
     );
     assert_eq!(instruction["arc_form"]["default"], Value::Null);
     assert_eq!(instruction["arc_form"]["anyOf"][0]["const"], "crescent");
+    assert_eq!(instruction["ink_spread"]["default"], Value::Null);
+    assert_eq!(instruction["ink_spread"]["anyOf"][0]["const"], "bleed");
     let relation = schema["$defs"]["Relation"]["properties"]
         .as_object()
         .expect("Relation properties must be an object");
@@ -118,6 +120,11 @@ fn canonical_score_schema_identity_is_stable() {
     );
     assert!(relation.contains_key("target_instruction_index"));
     assert!(relation.contains_key("position_authority"));
+    assert_eq!(relation["target_endpoint"]["default"], Value::Null);
+    assert_eq!(
+        relation["target_endpoint"]["anyOf"][0]["enum"],
+        serde_json::json!(["start", "end"])
+    );
 
     let transform_group = schema["$defs"]["TransformGroup"]["properties"]
         .as_object()

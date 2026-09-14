@@ -134,12 +134,12 @@ fn fluctuation_matching_is_disjoint_only_when_declared_and_required_stays_requir
                 .unwrap();
         bind_macro_parameters(&document, &[definition]).unwrap()
     };
-    let result = bind(&data, "Sway.Mark fine slowly blurring");
+    let result = bind(&data, "Sway.Mark fine slowly undulating");
     assert!(result.diagnostics.is_empty(), "{:?}", result.diagnostics);
     assert_eq!(result.complete.len(), 1);
     let parameters = &result.complete[0].parameters;
     assert_eq!(parameters.len(), 3);
-    for (name, id) in [("z", "fine"), ("a", "slowly"), ("m", "blurring")] {
+    for (name, id) in [("z", "fine"), ("a", "slowly"), ("m", "undulating")] {
         let parameter = parameters
             .iter()
             .find(|parameter| parameter.parameter_name == name)

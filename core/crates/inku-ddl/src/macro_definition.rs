@@ -315,6 +315,8 @@ pub enum Statement {
         to: String,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         target_path_position: Option<Expression>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        target_endpoint: Option<inku_score::Endpoint>,
     },
     Repeat {
         count: Expression,
@@ -1140,7 +1142,17 @@ fn validate_body(
                 from,
                 to,
                 target_path_position,
+                target_endpoint,
             } => {
+                if target_endpoint.is_some()
+                    && (kind != "connected" || target_path_position.is_some())
+                {
+                    push_diagnostic(
+                        diagnostics,
+                        "invalid_endpoint_target",
+                        format!("{statement_path}.target_endpoint"),
+                    );
+                }
                 if let Some(position) = target_path_position {
                     let path = format!("{statement_path}.target_path_position");
                     if kind != "connected" {

@@ -103,8 +103,8 @@ _EXPECTED_PAIRING: dict[str, tuple[tuple[str, str], ...]] = {
     # Japanese is the noun 塗り, not the verb 塗る, by the same ruling.
     "omote": (
         ("空", "empty"), ("塗り", "flat"), ("薄墨", "pale ink wash"), ("粒", "grain"),
-        ("点", "stipple"), ("平行線", "hatch"), ("交差線", "crosshatch"),
-        ("にじみ", "bleeding"), ("アクアチント", "aquatint"),
+        ("点描", "stipple"), ("平行線", "hatch"), ("交差線", "crosshatch"),
+        ("アクアチント", "aquatint"),
         ("濃い", "dense"), ("薄い", "faint"),
     ),
     # じ (2026-08-14, ddl-engine 19). Seven supports and no `plain`: asking for
@@ -123,12 +123,12 @@ _EXPECTED_PAIRING: dict[str, tuple[tuple[str, str], ...]] = {
     ),
     "yuragi": (
         ("細かく", "fine"), ("大きく", "large"), ("ゆっくり", "slowly"), ("速く", "quickly"),
-        ("揺れる", "swaying"), ("波打つ", "undulating"), ("震える", "trembling"), ("滲む", "blurring"),
+        ("揺れる", "swaying"), ("波打つ", "undulating"), ("にじみ", "bleeding"),
     ),
     "basho": (
-        ("上", "top"), ("下", "bottom"), ("中央", "center"), ("左端", "left-edge"),
+        ("上", "top"), ("下", "bottom"), ("中心", "center"), ("左端", "left-edge"),
         ("右端", "right-edge"), ("上端", "top-edge"), ("下端", "bottom-edge"),
-        ("中心", "middle"), ("隅", "corner"),
+        ("始点", "start"), ("終点", "end"), ("隅", "corner"),
     ),
     "ugoki": (
         ("置く", "place"), ("並べる", "line-up"), ("引く", "draw"),

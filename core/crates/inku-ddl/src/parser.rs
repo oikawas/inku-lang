@@ -12,7 +12,7 @@ use crate::{
 };
 
 /// Stable identity for the runtime-disconnected neutral parser foundation.
-pub const NEUTRAL_LEXEME_PARSER_SCHEMA_ID: &str = "inku.neutral-lexeme-parser.v8";
+pub const NEUTRAL_LEXEME_PARSER_SCHEMA_ID: &str = "inku.neutral-lexeme-parser.v9";
 
 /// A half-open UTF-8 byte span into the source document.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
@@ -391,7 +391,9 @@ fn resolve_declared_point_homograph(
     language: ResolvedInstructionLanguage,
     candidates: Vec<Candidate>,
 ) -> Vec<Candidate> {
-    if language != ResolvedInstructionLanguage::Ja {
+    if language != ResolvedInstructionLanguage::Ja
+        || document.source()[start_byte..].starts_with("点描")
+    {
         return candidates;
     }
     let has_point_head = candidates
@@ -399,7 +401,7 @@ fn resolve_declared_point_homograph(
         .any(|candidate| candidate.identity == "word:katachi:点");
     let has_stipple = candidates
         .iter()
-        .any(|candidate| candidate.identity == "word:omote:点");
+        .any(|candidate| candidate.identity == "word:omote:点描");
     if !has_point_head || !has_stipple {
         return candidates;
     }
@@ -423,14 +425,14 @@ fn resolve_declared_point_homograph(
             })
     });
     let selected = if explicit_surface_predicate || modifier_of_other_shape {
-        "word:omote:点"
+        "word:omote:点描"
     } else {
         "word:katachi:点"
     };
     candidates
         .into_iter()
         .filter(|candidate| {
-            candidate.identity != "word:katachi:点" && candidate.identity != "word:omote:点"
+            candidate.identity != "word:katachi:点" && candidate.identity != "word:omote:点描"
                 || candidate.identity == selected
         })
         .collect()
@@ -801,6 +803,29 @@ fn candidates_at(
                 );
             }
         }
+    }
+
+    if let Some((length, canonical_identity)) =
+        crate::saijiki::connected_endpoint_phrase(&source[start_byte..])
+    {
+        push_surface_candidate(
+            &mut candidates,
+            source,
+            start_byte,
+            language,
+            require_boundary,
+            &source[start_byte..start_byte + length],
+            PRIORITY_ASSET,
+            format!(
+                "relation:connected:endpoint:{:?}",
+                canonical_identity.target_endpoint
+            ),
+            CandidateDelivery::Token(NeutralTokenKind::SaijikiRelation {
+                asset_id: SAIJIKI_ASSET_ID.to_owned(),
+                relation_type: "connected".to_owned(),
+                canonical_identity,
+            }),
+        );
     }
 
     for relation in &asset.relations {

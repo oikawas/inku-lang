@@ -179,6 +179,7 @@ pub fn materialize_selected_composition(
                     position_authority: relation.position_authority(),
                     touching_constraints: relation.touching_constraints(),
                     target_path_position: relation.target_path_position(),
+                    target_endpoint: relation.target_endpoint(),
                 });
             }
         }
@@ -326,6 +327,14 @@ pub fn materialize_selected_composition(
         .collect::<Result<Vec<_>, ScoreMaterializationError>>()?;
     let score = Score {
         version: if instructions.iter().any(|instruction| {
+            instruction.ink_spread.is_some()
+                || instruction
+                    .relation
+                    .as_ref()
+                    .is_some_and(|relation| relation.target_endpoint.is_some())
+        }) {
+            "0.12.0"
+        } else if instructions.iter().any(|instruction| {
             instruction
                 .relation
                 .as_ref()

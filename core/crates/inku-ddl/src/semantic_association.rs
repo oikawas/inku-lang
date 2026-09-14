@@ -21,7 +21,7 @@ use crate::{
 };
 
 /// Stable identity for the runtime-disconnected single-head semantic AST.
-pub const SEMANTIC_ENTITY_ASSOCIATION_SCHEMA_ID: &str = "inku.semantic-entity-association.v14";
+pub const SEMANTIC_ENTITY_ASSOCIATION_SCHEMA_ID: &str = "inku.semantic-entity-association.v15";
 
 /// Source-independent semantic identity projected from one accepted Saijiki row.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -134,6 +134,7 @@ impl SemanticPreviousReference {
 pub struct ExplicitPreviousReferenceOccurrence {
     pub kind: SemanticRelationKind,
     pub target: Option<crate::saijiki::TouchingLiteralTarget>,
+    pub target_endpoint: Option<inku_score::Endpoint>,
     pub reference: SemanticPreviousReference,
     pub provenance: SourceOccurrence,
     pub asset_id: String,
@@ -307,9 +308,10 @@ pub struct SemanticSurface {
     pub intensity: Option<SemanticTerm>,
 }
 
-/// Three independent explicit Fluctuation dimensions. Missing values remain unspecified.
+/// Four independent explicit Fluctuation dimensions. Missing values remain unspecified.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct SemanticFluctuation {
+    pub spread: Option<SemanticTerm>,
     pub amplitude: Option<SemanticTerm>,
     pub frequency: Option<SemanticTerm>,
     pub quality: Option<SemanticTerm>,
@@ -441,6 +443,7 @@ pub enum SemanticAssociationIssueKind {
     ConflictingFluctuationAmplitudes,
     ConflictingFluctuationFrequencies,
     ConflictingFluctuationQualities,
+    ConflictingFluctuationSpreads,
     UnknownFluctuationDimension,
     ConflictingProportionAspects,
     ConflictingProportionWidthExtents,
@@ -479,6 +482,7 @@ impl SemanticAssociationIssueKind {
             Self::ConflictingFluctuationAmplitudes => "conflicting_fluctuation_amplitudes",
             Self::ConflictingFluctuationFrequencies => "conflicting_fluctuation_frequencies",
             Self::ConflictingFluctuationQualities => "conflicting_fluctuation_qualities",
+            Self::ConflictingFluctuationSpreads => "conflicting_fluctuation_spreads",
             Self::UnknownFluctuationDimension => "unknown_fluctuation_dimension",
             Self::ConflictingShapeConstraints => "conflicting_shape_constraints",
             Self::ConflictingProportionAspects => "conflicting_proportion_aspects",
@@ -682,6 +686,7 @@ struct AssociationRegion {
     fluctuation_amplitudes: Vec<SemanticTerm>,
     fluctuation_frequencies: Vec<SemanticTerm>,
     fluctuation_qualities: Vec<SemanticTerm>,
+    fluctuation_spreads: Vec<SemanticTerm>,
     unclassified_fluctuations: Vec<SemanticTerm>,
     proportion_aspects: Vec<SemanticTerm>,
     proportion_width_extents: Vec<SemanticTerm>,
@@ -1263,6 +1268,7 @@ fn build_semantic_entities(
                         Some(FluctuationDimension::Frequency) => {
                             region.fluctuation_frequencies.push(term)
                         }
+                        Some(FluctuationDimension::Spread) => region.fluctuation_spreads.push(term),
                         Some(FluctuationDimension::Quality) => {
                             region.fluctuation_qualities.push(term)
                         }
@@ -1833,6 +1839,7 @@ fn explicit_previous_reference_occurrence(
     Ok(Some(ExplicitPreviousReferenceOccurrence {
         kind,
         target: canonical_identity.target,
+        target_endpoint: canonical_identity.target_endpoint,
         reference,
         provenance: source_occurrence(document, span, region_index, clause_index, atom_index),
         asset_id: asset_id.to_owned(),
@@ -2267,6 +2274,13 @@ fn associate_region(
         region_index,
         issues,
     );
+    let spread = select_term(
+        owned_region.fluctuation_spreads,
+        OwnedSemanticOccurrence::Fluctuation,
+        SemanticAssociationIssueKind::ConflictingFluctuationSpreads,
+        region_index,
+        issues,
+    );
     let fluctuation_quality = select_term(
         owned_region.fluctuation_qualities,
         OwnedSemanticOccurrence::Fluctuation,
@@ -2333,6 +2347,7 @@ fn associate_region(
         angle,
         surface: SemanticSurface { quality, intensity },
         fluctuation: SemanticFluctuation {
+            spread,
             amplitude,
             frequency,
             quality: fluctuation_quality,
@@ -2457,6 +2472,7 @@ fn take_pre_head_region(
             &head,
             ownership,
         ),
+        fluctuation_spreads: take_owned_terms(&mut region.fluctuation_spreads, &head, ownership),
         fluctuation_qualities: take_owned_terms(
             &mut region.fluctuation_qualities,
             &head,
@@ -2548,6 +2564,7 @@ fn take_fluctuation_occurrences(region: &mut AssociationRegion) -> Vec<OwnedSema
         .drain(..)
         .chain(region.fluctuation_frequencies.drain(..))
         .chain(region.fluctuation_qualities.drain(..))
+        .chain(region.fluctuation_spreads.drain(..))
         .chain(region.unclassified_fluctuations.drain(..))
         .map(OwnedSemanticOccurrence::Fluctuation)
         .collect()
@@ -2839,6 +2856,7 @@ fn entity_occurrence_count(entity: &SemanticEntity) -> usize {
         + usize::from(entity.fluctuation.amplitude.is_some())
         + usize::from(entity.fluctuation.frequency.is_some())
         + usize::from(entity.fluctuation.quality.is_some())
+        + usize::from(entity.fluctuation.spread.is_some())
         + usize::from(entity.proportion.aspect.is_some())
         + usize::from(entity.proportion.width_extent.is_some())
         + usize::from(entity.proportion.arc_form.is_some())
@@ -3166,6 +3184,12 @@ fn semantic_surface_value(surface: &SemanticSurface) -> Value {
 
 fn semantic_fluctuation_value(fluctuation: &SemanticFluctuation) -> Value {
     let mut record = BTreeMap::new();
+    if let Some(spread) = &fluctuation.spread {
+        record.insert(
+            "spread".to_owned(),
+            semantic_identity_value(&spread.identity),
+        );
+    }
     record.insert(
         "amplitude".to_owned(),
         fluctuation

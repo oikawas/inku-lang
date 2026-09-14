@@ -21,7 +21,7 @@ use crate::{
 
 /// Stable identity for the runtime-disconnected explicit instruction association AST.
 pub const SEMANTIC_INSTRUCTION_ASSOCIATION_SCHEMA_ID: &str =
-    "inku.semantic-instruction-association.v19";
+    "inku.semantic-instruction-association.v20";
 
 /// An explicit fill domain. Inline operands retain their original instruction owner
 /// and are consumed as geometry by the fill, rather than drawn independently.
@@ -49,6 +49,7 @@ impl SemanticFillTarget {
 /// One explicit relation from the current instruction to prior source-ordered instruction(s).
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SemanticRelation {
+    pub target_endpoint: Option<inku_score::Endpoint>,
     pub kind: SemanticRelationKind,
     pub reference: SemanticPreviousReference,
     pub provenance: SourceOccurrence,
@@ -1386,6 +1387,7 @@ fn semantic_entity_owned_spans(entity: &SemanticEntity) -> BTreeSet<(usize, usiz
         entity.fluctuation.amplitude.as_ref(),
         entity.fluctuation.frequency.as_ref(),
         entity.fluctuation.quality.as_ref(),
+        entity.fluctuation.spread.as_ref(),
         entity.proportion.aspect.as_ref(),
         entity.proportion.width_extent.as_ref(),
         entity.proportion.arc_form.as_ref(),
@@ -2287,7 +2289,11 @@ fn japanese_entity_segment_is_clear(
                         | JapaneseAttachmentMarkerKind::He
                 ))
             ),
-            ClauseAtom::SaijikiRelation { .. } | ClauseAtom::UnresolvedDiagnostic(_) => false,
+            ClauseAtom::SaijikiRelation { span, .. } => association
+                .explicit_previous_references
+                .iter()
+                .any(|reference| reference.provenance.span == *span),
+            ClauseAtom::UnresolvedDiagnostic(_) => false,
         })
 }
 
@@ -2332,9 +2338,9 @@ fn japanese_predicate_segment_is_clear(
                         ))
                     )
             }
-            ClauseAtom::CoreRole(_)
-            | ClauseAtom::SaijikiRelation { .. }
-            | ClauseAtom::UnresolvedDiagnostic(_) => false,
+            ClauseAtom::CoreRole(_) => false,
+            ClauseAtom::SaijikiRelation { span, .. } => association.explicit_previous_references.iter().any(|reference| reference.provenance.span == *span),
+            ClauseAtom::UnresolvedDiagnostic(_) => false,
         })
 }
 
@@ -2524,6 +2530,7 @@ fn select_relation(
     }
 
     Some(SemanticRelation {
+        target_endpoint: occurrence.target_endpoint,
         kind: occurrence.kind,
         reference: occurrence.reference,
         provenance: occurrence.provenance,
@@ -2760,6 +2767,12 @@ pub(crate) fn semantic_fill_target_value(target: &SemanticFillTarget) -> Value {
 
 fn semantic_relation_value(relation: &SemanticRelation) -> Value {
     let mut record = BTreeMap::new();
+    if let Some(endpoint) = relation.target_endpoint {
+        record.insert(
+            "target_endpoint".to_owned(),
+            serde_json::to_value(endpoint).expect("closed endpoint"),
+        );
+    }
     record.insert(
         "kind".to_owned(),
         Value::String(relation.kind.as_str().to_owned()),

@@ -86,10 +86,9 @@
         {"surface_ja": "塗り", "surface_en": "flat", "default": false, "prompt": true, "display": true, "marker": null, "score_value": "solid", "marker_surfaces_ja": null, "marker_surfaces_en": null},
         {"surface_ja": "薄墨", "surface_en": "pale ink wash", "default": false, "prompt": true, "display": true, "marker": null, "score_value": "wash", "marker_surfaces_ja": null, "marker_surfaces_en": null},
         {"surface_ja": "粒", "surface_en": "grain", "default": false, "prompt": true, "display": true, "marker": null, "score_value": "grain", "marker_surfaces_ja": null, "marker_surfaces_en": null},
-        {"surface_ja": "点", "surface_en": "stipple", "default": false, "prompt": true, "display": true, "marker": null, "score_value": "stipple", "marker_surfaces_ja": null, "marker_surfaces_en": null},
+        {"surface_ja": "点描", "surface_en": "stipple", "default": false, "prompt": true, "display": true, "marker": null, "score_value": "stipple", "marker_surfaces_ja": null, "marker_surfaces_en": null, "parser_surfaces_ja": ["点"]},
         {"surface_ja": "平行線", "surface_en": "hatch", "default": false, "prompt": true, "display": true, "marker": null, "score_value": "hatch", "marker_surfaces_ja": null, "marker_surfaces_en": null},
         {"surface_ja": "交差線", "surface_en": "crosshatch", "default": false, "prompt": true, "display": true, "marker": null, "score_value": "crosshatch", "marker_surfaces_ja": null, "marker_surfaces_en": null},
-        {"surface_ja": "にじみ", "surface_en": "bleeding", "default": false, "prompt": true, "display": true, "marker": null, "score_value": "bleed", "marker_surfaces_ja": null, "marker_surfaces_en": null},
         {"surface_ja": "アクアチント", "surface_en": "aquatint", "default": false, "prompt": true, "display": true, "marker": null, "score_value": "aquatint", "marker_surfaces_ja": null, "marker_surfaces_en": null},
         {"surface_ja": "濃い", "surface_en": "dense", "default": false, "prompt": true, "display": true, "marker": null, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": null},
         {"surface_ja": "薄い", "surface_en": "faint", "default": false, "prompt": true, "display": true, "marker": null, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": null}
@@ -143,10 +142,9 @@
         {"surface_ja": "大きく", "surface_en": "large", "default": false, "prompt": true, "display": true, "marker": null, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": null},
         {"surface_ja": "ゆっくり", "surface_en": "slowly", "default": false, "prompt": true, "display": true, "marker": null, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": null},
         {"surface_ja": "速く", "surface_en": "quickly", "default": false, "prompt": true, "display": true, "marker": null, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": null},
-        {"surface_ja": "揺れる", "surface_en": "swaying", "english_grammar": {"lemma": "sway", "lexical_class": "verb", "canonical_form": "present_participle", "permitted_forms": ["third_person_singular"]}, "default": false, "prompt": true, "display": true, "marker": null, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": null},
+        {"surface_ja": "揺れる", "surface_en": "swaying", "english_grammar": {"lemma": "sway", "lexical_class": "verb", "canonical_form": "present_participle", "permitted_forms": ["third_person_singular"]}, "default": false, "prompt": true, "display": true, "marker": null, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": null, "parser_surfaces_ja": ["震える"], "parser_surfaces_en": ["trembling", "trembles"]},
         {"surface_ja": "波打つ", "surface_en": "undulating", "english_grammar": {"lemma": "undulate", "lexical_class": "verb", "canonical_form": "present_participle", "permitted_forms": ["third_person_singular"]}, "default": false, "prompt": true, "display": true, "marker": null, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": null},
-        {"surface_ja": "震える", "surface_en": "trembling", "english_grammar": {"lemma": "tremble", "lexical_class": "verb", "canonical_form": "present_participle", "permitted_forms": ["third_person_singular"]}, "default": false, "prompt": true, "display": true, "marker": null, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": null},
-        {"surface_ja": "滲む", "surface_en": "blurring", "default": false, "prompt": true, "display": true, "marker": null, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": null}
+        {"surface_ja": "にじみ", "surface_en": "bleeding", "default": false, "prompt": true, "display": true, "marker": null, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": null, "parser_surfaces_ja": ["滲む"], "parser_surfaces_en": ["blurring"]}
       ],
       "marker_order_ja": null,
       "marker_order_en": null
@@ -159,12 +157,13 @@
       "words": [
         {"surface_ja": "上", "surface_en": "top", "default": false, "prompt": true, "display": true, "marker": null, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": null},
         {"surface_ja": "下", "surface_en": "bottom", "default": false, "prompt": true, "display": true, "marker": null, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": null},
-        {"surface_ja": "中央", "surface_en": "center", "default": false, "prompt": true, "display": true, "marker": null, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": null},
+        {"surface_ja": "中心", "surface_en": "center", "default": false, "prompt": true, "display": true, "marker": null, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": null, "parser_surfaces_ja": ["中央"], "parser_surfaces_en": ["middle"]},
         {"surface_ja": "左端", "surface_en": "left-edge", "default": false, "prompt": true, "display": true, "marker": null, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": null},
         {"surface_ja": "右端", "surface_en": "right-edge", "default": false, "prompt": true, "display": true, "marker": null, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": null},
         {"surface_ja": "上端", "surface_en": "top-edge", "default": false, "prompt": true, "display": true, "marker": null, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": null},
         {"surface_ja": "下端", "surface_en": "bottom-edge", "default": false, "prompt": true, "display": true, "marker": null, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": null},
-        {"surface_ja": "中心", "surface_en": "middle", "default": false, "prompt": true, "display": true, "marker": null, "score_value": null, "semantic_alias": "center", "marker_surfaces_ja": null, "marker_surfaces_en": null},
+        {"surface_ja": "始点", "surface_en": "start", "default": false, "prompt": true, "display": true, "marker": null, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": null},
+        {"surface_ja": "終点", "surface_en": "end", "default": false, "prompt": true, "display": true, "marker": null, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": null},
         {"surface_ja": "隅", "surface_en": "corner", "default": false, "prompt": true, "display": true, "marker": null, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": null}
       ],
       "marker_order_ja": null,

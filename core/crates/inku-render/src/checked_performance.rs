@@ -563,7 +563,9 @@ fn in_any_transform_group(groups: &[TransformGroup], index: usize) -> bool {
 }
 
 fn uses_compact_resource_contract(score: &inku_score::Score) -> bool {
-    score.version == "0.10.0" || (score.version == "0.11.0" && score.resource_policy.is_some())
+    score.version == "0.10.0"
+        || (matches!(score.version.as_str(), "0.11.0" | "0.12.0")
+            && score.resource_policy.is_some())
 }
 
 /// Resolve checked relations and transform scopes through one dependency executor.

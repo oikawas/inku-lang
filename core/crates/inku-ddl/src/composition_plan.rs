@@ -127,6 +127,7 @@ pub struct PlanRelation {
     pub(crate) target_object_index: Option<usize>,
     pub(crate) target_anchor_index: Option<usize>,
     pub(crate) target_path_position: Option<f64>,
+    pub(crate) target_endpoint: Option<inku_score::Endpoint>,
     pub(crate) position_authority: Option<ConnectedPositionAuthority>,
     pub(crate) touching_constraints: Option<TouchingConstraints>,
 }
@@ -146,6 +147,10 @@ impl PlanRelation {
 
     pub const fn target_anchor_index(&self) -> Option<usize> {
         self.target_anchor_index
+    }
+
+    pub const fn target_endpoint(&self) -> Option<inku_score::Endpoint> {
+        self.target_endpoint
     }
 
     pub const fn target_path_position(&self) -> Option<f64> {
@@ -213,6 +218,7 @@ pub struct ResolvedObjectAppearance {
     pub surface_intensity: SurfaceIntensity,
     pub thinness: Option<Thinness>,
     pub fluctuation: Option<Variation>,
+    pub ink_spread: Option<inku_score::InkSpread>,
 }
 
 #[derive(Clone, Debug, PartialEq)]

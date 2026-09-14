@@ -680,7 +680,11 @@ pub(crate) fn render_closed_arc_pair_fill(
     let mut material = accepted_fills::closed_contour_group(follower, follower_context);
     material.push(fill);
     group.push(material);
-    Ok(Some(group))
+    Ok(Some(crate::ink_spread::wrap(
+        group,
+        follower,
+        follower_context,
+    )))
 }
 
 fn render_affine_instruction(

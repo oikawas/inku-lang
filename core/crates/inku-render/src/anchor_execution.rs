@@ -377,7 +377,7 @@ impl Execution<'_> {
         let target = relation
             .target_instruction_index
             .filter(|&target| {
-                if relation.target_path_position.is_some() {
+                if relation.target_path_position.is_some() || relation.target_endpoint.is_some() {
                     target < self.performed.len()
                 } else {
                     Some(target) == source.checked_sub(1)
@@ -387,6 +387,35 @@ impl Execution<'_> {
         let prior = self.performed[target]
             .last()
             .ok_or(ScoreExecutionReason::ConnectedReferenceOmitted)?;
+        if let Some(endpoint) = relation.target_endpoint {
+            if relation.target_path_position.is_some()
+                || !matches!(
+                    prior.instruction.primitive,
+                    Primitive::Line | Primitive::Arc
+                )
+            {
+                return Err(ScoreExecutionReason::UnsupportedConnectedPrimitive);
+            }
+            if let Some(centerline) = prior.line_centerline.as_deref() {
+                let point = match endpoint {
+                    inku_score::Endpoint::Start => centerline.first(),
+                    inku_score::Endpoint::End => centerline.last(),
+                };
+                return point
+                    .copied()
+                    .ok_or(ScoreExecutionReason::UnsupportedConnectedPrimitive);
+            }
+            return crate::affine_geometry::endpoints(
+                &prior.instruction,
+                self.request.canvas,
+                self.transforms[target],
+            )
+            .map(|(start, end, _, _)| match endpoint {
+                inku_score::Endpoint::Start => start,
+                inku_score::Endpoint::End => end,
+            })
+            .ok_or(ScoreExecutionReason::UnsupportedConnectedPrimitive);
+        }
         if let Some(position) = relation.target_path_position {
             if prior.instruction.primitive != Primitive::Line {
                 return Err(ScoreExecutionReason::UnsupportedConnectedPrimitive);
@@ -438,6 +467,7 @@ impl Execution<'_> {
             }
         } else if relation.target_instruction_index.is_none()
             || (relation.target_path_position.is_none()
+                && relation.target_endpoint.is_none()
                 && relation.target_instruction_index != index.checked_sub(1))
         {
             return Err(ScoreExecutionReason::MissingConnectedReference);
@@ -1594,7 +1624,7 @@ fn resolve_impl(
         let Some(relation) = instruction.relation.as_ref() else {
             continue;
         };
-        if relation.target_path_position.is_some()
+        if (relation.target_path_position.is_some() || relation.target_endpoint.is_some())
             && let Some(host) = relation.target_instruction_index
             && let Some(targeted) = path_hosts.get_mut(host)
         {

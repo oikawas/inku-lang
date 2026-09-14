@@ -6,6 +6,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 34 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-14 — Consolidate Saijiki vocabulary, endpoint connections, and bleeding
+
+`start` / `end` select only the target-side endpoint of a preceding Line or Arc. The connection source remains the existing start, preserving Line from→to and Arc angle_start→angle_end identity. Movement `bleeding` is independent `ink_spread:"bleed"`, combinable with Wave, Perlin, and the stipple surface. Current `blurring` input normalizes to that new meaning, while saved Scores retain their old surfaceBleed / qualityPink behavior. This advances DDL_VERSION to 7, DDL engine to 40, and render engine to 62; only Scores carrying the new fields use Score 0.12. Application and build versions are unchanged.
+
 ### 2026-09-14 — Fill the interior of leaves closed by two arcs
 
 All seven Nature leaf motifs now fill their selected interior. For the six two-Arc leaf motifs, only a successful checked `Touching` to the immediately preceding ordinary Arc with explicit Solid fill intent resolves one closed contour in the resolved shared line color. Its two outlines remain unchanged. The fallen-leaf cloudform also fills its closed-form interior. Initial edition adoption remains pending. This changes DDL engine 39 and render engine 61; the Score wire format is unchanged.

@@ -2525,7 +2525,7 @@ fn supported_input_is_identical_under_both_error_modes() {
 #[test]
 fn ordinary_non_solid_surface_intensity_omits_only_that_field_and_keeps_quality() {
     let result = stage15(
-        "place one red bleeding dense circle at center.",
+        "place one red grain dense circle at center.",
         ResolvedInstructionLanguage::En,
     );
     let context = ScoreLoweringContext::resolve("wide", Color::White).unwrap();
@@ -2549,7 +2549,7 @@ fn ordinary_non_solid_surface_intensity_omits_only_that_field_and_keeps_quality(
             .as_ref()
             .unwrap()
             .texture,
-        SurfaceTexture::Bleed
+        SurfaceTexture::Grain
     );
     assert!(matches!(
         continued.diagnostics(),
@@ -2630,7 +2630,7 @@ fn surface_intensity_reaches_direct_and_macro_scores_with_owned_provenance() {
 #[test]
 fn explicit_surface_and_ground_reach_the_actual_score() {
     let result = stage15(
-        "paper. place one red bleeding circle at center.",
+        "paper. place one red grain circle at center.",
         ResolvedInstructionLanguage::En,
     );
     let lowered = lower_verified_stage15_score(
@@ -2653,7 +2653,7 @@ fn explicit_surface_and_ground_reach_the_actual_score() {
     ));
     assert_eq!(
         score.instructions[0].surface.as_ref().unwrap().texture,
-        SurfaceTexture::Bleed
+        SurfaceTexture::Grain
     );
     assert!(
         score.instructions[0]
@@ -2674,7 +2674,6 @@ fn delivered_surface_ids_use_shared_defaults_and_flat_macro_parity() {
         ("stipple", SurfaceTexture::Stipple),
         ("hatch", SurfaceTexture::Hatch),
         ("crosshatch", SurfaceTexture::Crosshatch),
-        ("bleed", SurfaceTexture::Bleed),
         ("aquatint", SurfaceTexture::Aquatint),
     ] {
         let definition = surface_emit_definition(surface);
@@ -2702,9 +2701,9 @@ fn delivered_surface_ids_use_shared_defaults_and_flat_macro_parity() {
         assert!(spec.seed.is_none(), "{surface}");
     }
 
-    let definition = surface_emit_definition("bleed");
+    let definition = surface_emit_definition("grain");
     let paired = stage15_locked(
-        "place one red bleeding circle at center; Draw.Surface",
+        "place one red grain circle at center; Draw.Surface",
         ResolvedInstructionLanguage::En,
         std::slice::from_ref(&definition),
     );
@@ -4288,7 +4287,7 @@ fn macro_group_delivery_keeps_affine_transform_and_emit_omission_units() {
 
 #[test]
 fn flat_macro_surface_uses_the_same_shared_lowerer() {
-    let definition = surface_emit_definition("bleed");
+    let definition = surface_emit_definition("grain");
     let result = stage15_locked(
         "Draw.Surface",
         ResolvedInstructionLanguage::En,
@@ -4310,7 +4309,7 @@ fn flat_macro_surface_uses_the_same_shared_lowerer() {
             .as_ref()
             .unwrap()
             .texture,
-        SurfaceTexture::Bleed
+        SurfaceTexture::Grain
     );
 }
 
@@ -4453,7 +4452,7 @@ fn resolved_palette(
 #[test]
 fn explicit_fluctuation_reaches_actual_score() {
     let result = stage15(
-        "place one red fine slowly blurring circle at center.",
+        "place one red fine slowly undulating circle at center.",
         ResolvedInstructionLanguage::En,
     );
     let lowered = lower_verified_stage15_score(
@@ -4473,7 +4472,7 @@ fn explicit_fluctuation_reaches_actual_score() {
     assert_eq!(
         serde_json::to_value(variation).unwrap(),
         serde_json::json!({
-            "amplitude": "fine", "frequency": "slow", "quality": "pink",
+            "amplitude": "fine", "frequency": "slow", "quality": "wave",
             "dimensions": ["position_x", "position_y"]
         })
     );
@@ -4506,9 +4505,7 @@ fn fluctuation_closed_words_defaults_and_six_consumers_reach_score() {
         ("frequency", "slowly", "medium", "slow", "perlin"),
         ("frequency", "quickly", "medium", "high", "perlin"),
         ("quality", "swaying", "medium", "medium", "perlin"),
-        ("quality", "trembling", "medium", "medium", "perlin"),
         ("quality", "undulating", "medium", "medium", "wave"),
-        ("quality", "blurring", "medium", "medium", "pink"),
     ] {
         let definition = fluctuation_definition(&[(dimension, id)], false, "circle");
         let result = stage15_locked("Draw.Pair", ResolvedInstructionLanguage::En, &[definition]);
@@ -4558,22 +4555,22 @@ fn fluctuation_ordinary_literal_and_declared_macro_share_effective_score_and_own
     for (language, ordinary, caller, slots) in [
         (
             ResolvedInstructionLanguage::En,
-            "place one red fine slowly blurring circle at left-edge.",
-            "Draw.Pair fine slowly blurring",
+            "place one red fine slowly undulating circle at left-edge.",
+            "Draw.Pair fine slowly undulating",
             vec![
                 ("amplitude", "fine"),
                 ("frequency", "slowly"),
-                ("quality", "blurring"),
+                ("quality", "undulating"),
             ],
         ),
         (
             ResolvedInstructionLanguage::Ja,
-            "左端に、赤い円をひとつ置く。円は細かくゆっくり滲む。",
-            "Draw.Pair 細かくゆっくり滲む",
+            "左端に、赤い円をひとつ置く。円は細かくゆっくり波打つ。",
+            "Draw.Pair 細かくゆっくり波打つ",
             vec![
                 ("amplitude", "fine"),
                 ("frequency", "slowly"),
-                ("quality", "blurring"),
+                ("quality", "undulating"),
             ],
         ),
         (
@@ -4629,7 +4626,7 @@ fn fluctuation_rejections_preserve_instruction_invocation_and_emit_units() {
         "place one blue circle at left-edge. Draw.Pair",
         ResolvedInstructionLanguage::En,
         &[fluctuation_definition(
-            &[("quality", "trembling")],
+            &[("quality", "swaying")],
             false,
             "point",
         )],
@@ -4641,7 +4638,7 @@ fn fluctuation_rejections_preserve_instruction_invocation_and_emit_units() {
     );
     // A broad legacy parameter has no known dimension until its caller value arrives.
     let mut malformed = serde_json::to_value(fluctuation_definition(
-        &[("quality", "trembling")],
+        &[("quality", "swaying")],
         true,
         "circle",
     ))

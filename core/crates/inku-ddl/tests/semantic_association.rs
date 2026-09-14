@@ -580,7 +580,7 @@ fn fixture_schema_and_required_semantic_boundaries_are_guarded() {
     let fixture = load_fixture();
     assert_eq!(
         SEMANTIC_ENTITY_ASSOCIATION_SCHEMA_ID,
-        "inku.semantic-entity-association.v14"
+        "inku.semantic-entity-association.v15"
     );
     assert_eq!(
         fixture.schema,
@@ -665,7 +665,7 @@ fn fixture_schema_and_required_semantic_boundaries_are_guarded() {
         "regional-fluctuation-ownership",
         "fluctuation-soft-line-break",
         "fluctuation-upstream-issue-retained",
-        "blurring-and-surface-bleed-coexist",
+        "wave-and-surface-grain-coexist",
         "unobserved-primitive-fluctuation-combination",
         "ja-proportion-order-one",
         "ja-proportion-order-two",
@@ -1173,7 +1173,7 @@ fn pre_head_phrases_deliver_every_closed_modifier_dimension() {
     );
     assert_eq!(
         second.fluctuation.quality.as_ref().unwrap().identity.id,
-        "trembling"
+        "swaying"
     );
     assert_eq!(
         second.proportion.aspect.as_ref().unwrap().identity.id,
@@ -1342,7 +1342,7 @@ fn every_accepted_surface_row_belongs_to_exactly_one_closed_dimension() {
         .iter()
         .find(|category| category.key == "omote")
         .expect("accepted asset has the Surface category");
-    assert_eq!(category.words.len(), 11);
+    assert_eq!(category.words.len(), 10);
 
     let mut quality_ids = HashSet::new();
     let mut intensity_ids = HashSet::new();
@@ -1390,7 +1390,6 @@ fn every_accepted_surface_row_belongs_to_exactly_one_closed_dimension() {
             "stipple",
             "hatch",
             "crosshatch",
-            "bleed",
             "aquatint",
         ]
         .map(str::to_owned)
@@ -1410,11 +1409,12 @@ fn every_accepted_fluctuation_row_belongs_to_exactly_one_closed_dimension() {
         .iter()
         .find(|category| category.key == "yuragi")
         .expect("accepted asset has the Fluctuation category");
-    assert_eq!(category.words.len(), 8);
+    assert_eq!(category.words.len(), 7);
 
     let mut amplitude_ids = HashSet::new();
     let mut frequency_ids = HashSet::new();
     let mut quality_ids = HashSet::new();
+    let mut spread_ids = HashSet::new();
     for word in &category.words {
         let projection = project_macro_semantic_ref(&category.key, &word.surface_ja)
             .expect("accepted Fluctuation row has canonical identity");
@@ -1430,21 +1430,27 @@ fn every_accepted_fluctuation_row_belongs_to_exactly_one_closed_dimension() {
             &entity.fluctuation.amplitude,
             &entity.fluctuation.frequency,
             &entity.fluctuation.quality,
+            &entity.fluctuation.spread,
         ) {
-            (Some(term), None, None) => {
+            (Some(term), None, None, None) => {
                 assert_eq!(term.identity.category, "variation");
                 assert_eq!(term.identity.id, projection.canonical_id);
                 assert!(amplitude_ids.insert(term.identity.id.clone()));
             }
-            (None, Some(term), None) => {
+            (None, Some(term), None, None) => {
                 assert_eq!(term.identity.category, "variation");
                 assert_eq!(term.identity.id, projection.canonical_id);
                 assert!(frequency_ids.insert(term.identity.id.clone()));
             }
-            (None, None, Some(term)) => {
+            (None, None, Some(term), None) => {
                 assert_eq!(term.identity.category, "variation");
                 assert_eq!(term.identity.id, projection.canonical_id);
                 assert!(quality_ids.insert(term.identity.id.clone()));
+            }
+            (None, None, None, Some(term)) => {
+                assert_eq!(term.identity.category, "variation");
+                assert_eq!(term.identity.id, projection.canonical_id);
+                assert!(spread_ids.insert(term.identity.id.clone()));
             }
             _ => panic!(
                 "{} must belong to exactly one Fluctuation dimension",
@@ -1487,6 +1493,7 @@ fn every_accepted_fluctuation_row_belongs_to_exactly_one_closed_dimension() {
                 entity.fluctuation.amplitude.as_ref(),
                 entity.fluctuation.frequency.as_ref(),
                 entity.fluctuation.quality.as_ref(),
+                entity.fluctuation.spread.as_ref(),
             ]
             .into_iter()
             .flatten()
@@ -1508,8 +1515,12 @@ fn every_accepted_fluctuation_row_belongs_to_exactly_one_closed_dimension() {
             .collect()
     );
     assert_eq!(
+        spread_ids,
+        ["bleeding"].map(str::to_owned).into_iter().collect()
+    );
+    assert_eq!(
         quality_ids,
-        ["swaying", "undulating", "trembling", "blurring"]
+        ["swaying", "undulating"]
             .map(str::to_owned)
             .into_iter()
             .collect()

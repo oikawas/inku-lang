@@ -1,5 +1,6 @@
 //! Coarse portable render boundary, SVG orchestration, and render metadata.
 
+use std::collections::BTreeSet;
 use std::fmt;
 
 use crate::accepted_fills;
@@ -393,6 +394,7 @@ fn render_impl(
         }
     }
     let mut surface_definitions = Vec::new();
+    let mut closed_arc_pair_spread_followers = BTreeSet::new();
     for (
         instruction_index,
         instruction,
@@ -450,6 +452,9 @@ fn render_impl(
             if let Some(fill) =
                 render_closed_arc_pair_fill(instruction, first_context, follower, follower_context)?
             {
+                if follower.ink_spread.is_some() {
+                    closed_arc_pair_spread_followers.insert(follower_performed_index);
+                }
                 material_definitions.extend(accepted_fills::closed_contour_definitions(
                     follower,
                     follower_context,
@@ -488,6 +493,11 @@ fn render_impl(
             material_definitions.extend(accepted_fills::definitions(single, context));
             let base_mark =
                 render_instruction_with_line_centerline(single, context, line_centerline)?;
+            let base_mark = if closed_arc_pair_spread_followers.contains(&performed_index) {
+                base_mark
+            } else {
+                crate::ink_spread::wrap(base_mark, single, context)
+            };
             let mut mark = if let Some(surface) = render_surface(single, context) {
                 let mut combined = Element::new("g");
                 combined.push(base_mark);

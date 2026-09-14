@@ -34,15 +34,15 @@ use crate::{
 const MISSING_CANONICAL_SEMANTIC_IDENTITY: &str = "missing_canonical_semantic_identity";
 
 /// Stable identity for the compilation envelope.
-pub const TYPED_DDL_COMPILATION_SCHEMA_ID: &str = "inku.typed-ddl-compilation.v15";
+pub const TYPED_DDL_COMPILATION_SCHEMA_ID: &str = "inku.typed-ddl-compilation.v16";
 /// Stable identity for source-independent pre-expansion semantic bytes.
 pub const CANONICAL_SEMANTIC_DDL_SCHEMA_ID: &str = crate::SEMANTIC_DOCUMENT_SCHEMA_ID;
 /// Stable identity for compiler locks.
-pub const TYPED_DDL_COMPILER_LOCK_SCHEMA_ID: &str = "inku.typed-ddl-compiler-lock.v16";
+pub const TYPED_DDL_COMPILER_LOCK_SCHEMA_ID: &str = "inku.typed-ddl-compiler-lock.v17";
 /// ASCII domain prefix for the fully framed compiler lock digest.
-pub const COMPILER_LOCK_DIGEST_DOMAIN: &[u8] = b"inku.typed-ddl-compiler-lock.v15";
+pub const COMPILER_LOCK_DIGEST_DOMAIN: &[u8] = b"inku.typed-ddl-compiler-lock.v16";
 /// Stable identity for source-bearing semantic provenance bytes.
-pub const SEMANTIC_SOURCE_PROVENANCE_SCHEMA_ID: &str = "inku.semantic-source-provenance.v4";
+pub const SEMANTIC_SOURCE_PROVENANCE_SCHEMA_ID: &str = "inku.semantic-source-provenance.v5";
 /// Stable identity for generated macro provenance bytes.
 pub const EXPANDED_GENERATED_PROVENANCE_SCHEMA_ID: &str = "inku.expanded-generated-provenance.v1";
 /// Stable identity for source-independent expanded macro meaning bytes.
@@ -101,6 +101,8 @@ pub enum SemanticDeliveryOwner {
     EntityHead,
     MacroParameter,
     Color,
+    SequenceOperator,
+    SequenceItem,
     Quantity,
     Thinness,
     RelativeScale,
@@ -137,6 +139,8 @@ impl SemanticDeliveryOwner {
             Self::EntityHead => "entity_head",
             Self::MacroParameter => "macro_parameter",
             Self::Color => "color",
+            Self::SequenceOperator => "sequence_operator",
+            Self::SequenceItem => "sequence_item",
             Self::Quantity => "quantity",
             Self::Thinness => "thinness",
             Self::RelativeScale => "relative_scale",
@@ -934,6 +938,24 @@ fn project_deliveries(
         .collect::<Vec<_>>();
 
     let association = &semantic_document.instruction_association.association;
+    for issue in &association.sequence_issues {
+        add_blocking_with_members(
+            &mut projection,
+            issue.kind.as_str(),
+            Some(issue.operator.provenance.source.span),
+            issue.items.iter().map(term_key).collect(),
+        );
+        for item in &issue.items {
+            add_syntax(
+                &mut projection,
+                item.provenance.source.span,
+                "invalid_sequence_item",
+            );
+        }
+        for marker in &issue.markers {
+            add_syntax(&mut projection, marker.span, "invalid_sequence_grammar");
+        }
+    }
     for issue in &association.issues {
         if issue.kind == SemanticAssociationIssueKind::MissingEntityHead
             && issue.upstream_diagnostic.is_none()
@@ -1616,6 +1638,19 @@ fn project_instruction(instruction: &crate::SemanticInstruction, projection: &mu
                     ),
                 );
             }
+        }
+    }
+    if let Some(sequence) = &instruction.sequence {
+        add_term_explicit(
+            projection,
+            SemanticDeliveryOwner::SequenceOperator,
+            &sequence.operator,
+        );
+        for item in &sequence.items {
+            add_term_explicit(projection, SemanticDeliveryOwner::SequenceItem, item);
+        }
+        for marker in &sequence.markers {
+            add_syntax(projection, marker.span, "sequence_grammar");
         }
     }
     for (owner, term) in [

@@ -580,7 +580,7 @@ fn fixture_schema_and_required_semantic_boundaries_are_guarded() {
     let fixture = load_fixture();
     assert_eq!(
         SEMANTIC_ENTITY_ASSOCIATION_SCHEMA_ID,
-        "inku.semantic-entity-association.v15"
+        "inku.semantic-entity-association.v16"
     );
     assert_eq!(
         fixture.schema,

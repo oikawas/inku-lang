@@ -95,7 +95,7 @@ PNGは正本SVGを写す派生出力であり、縮小してもSVGの材質・�
 
 語彙辞書は俳句の季語辞典にならって**歳時記**と呼ぶ。inku において歳時記は常時開いておくものではなく、必要なときに参照するものとする。
 
-コア語彙は歳時記の 11 カテゴリと、あいだ（関係）で構成される。**語の正は実装の saijiki テーブル（v1.92 で単一情報源化）であり、機械生成の reference §1（`GET /api/reference` / `inku-cli reference`）が常に現行値を公開する。** 以下は概観で、語の追加・削除は reference を正とする。
+コア語彙は歳時記の 12 カテゴリと、あいだ（関係）で構成される。**語の正は共有Rustの `core/crates/inku-ddl/assets/saijiki-v1.json` であり、ServerのsaijikiテーブルとWeb／Androidの表示も同じ語彙へ揃える。機械生成の reference §1（`GET /api/reference` / `inku-cli reference`）が現行値を公開する。** 以下は概観で、語の追加・削除は reference を正とする。
 
 | カテゴリ | 語彙（概観） |
 |---|---|
@@ -109,6 +109,7 @@ PNGは正本SVGを写す派生出力であり、縮小してもSVGの材質・�
 | **ゆらぎ** | 細かく、大きく、ゆっくり、速く、揺れる、波打つ、にじみ |
 | **ばしょ** | 上、下、中心、左端、右端、上端、下端、始点、終点、隅 |
 | **うごき** | 置く、並べる、引く、散らす、埋める、敷き詰める |
+| **じゅん** | 交互に、順に |
 | **わりあい** | 縦長、横長、全幅、半幅、半円、上弦、下弦、三日月 |
 | **あいだ** | 沿う、触れない、切る、間に、触れる、つながる |
 
@@ -117,6 +118,8 @@ PNGは正本SVGを写す派生出力であり、縮小してもSVGの材質・�
 ペン・実線・空・黒は legacy Score / coerce と比較するための historical baseline であり、typed meaningへ挿入する既定値ではない。Visible DDL に該当 field が無ければ typed meaning は `unspecified` のままで、parser / semantic association は補わない。Lock検証済みviewからactual Scoreへ解決する現行subsetだけは、数値位置、またはverified Stage 1.5でdirect `Instruction { instruction_index }`へ解決済みの元`place:center`と、place actionを持つcount1のcircle / square / ellipse / cloudform / triangle / polygonについて、省略countを1、touchをpen、continuityをsolid、閉じた面を塗りとして解決する。色の省略は実際のwork paletteで解決したbackgroundとblack / whiteのOKLCH L差を比較し、大きい側（同差はblack）を選ぶ。明示値は項目ごとに優先し、この解決やeffective focusをsource meaningへ書き戻さない。旧Stop / OmitAndContinue入力は互換で受けるが、recoverableなfieldまたは実行単位の不成立は共通の局所回復としてtyped診断つきで省略し、残る描画を続ける。この規則は Renderer 内部の物理 fallbackや既存作品のread compatibilityを遡及変更しない。
 
 図形の大小は歳時記語彙ではなく、typed DDL compilerが所有する有限の局所modifierである。現行classは`slightly_small` / `small` / `very_small` / `normal` / `slightly_large` / `large` / `very_large`の7つで、JAの普通・大小表現とENの`normal-sized`、`slightly` / `very`を含む対応表面をsource spanごと保持する。自由なdegree同義語やsource substring後処理へ広げない。
+
+じゅんは配置する色の有限列を指定する。「赤と灰を交互にして、円を五つ並べる。」は赤・灰・赤・灰・赤、「赤・灰・青の順に繰り返して、円を八つ並べる。」は赤・灰・青・赤・灰・青・赤・灰となる。交互には2項、順には空でない色列を使い、同じ色の重複も記述順に保つ。並べる・散らす・敷き詰める・埋めるに適用し、明示個数は列長にかかわらず総図形数とする。個数省略時の既存規則と資源上限は変えない。順序語のない複数色から循環を推測しない。不成立な色列は局所診断とし、独立した他の描画を続ける。通常DDLは共有Scoreの既存 `Arrangement.color_cycle` へ接続し、各配置の先頭から列を始める。現時点で通常DDLの列指定は色を対象とし、他属性・図形・まとまりの一般列まで実装済みとはしない。`繰り返して`はこの構文の接続語であり、歳時記の別語を増やさない。
 
 キャンバス形式は語彙でもpluginでもなく、shared core の `inku.canvas-format-registry.v1` が所有する resolved host option である。11形式は `square` / `golden` / `a4` / `b4` / `pillar` / `oban` / `wide` / `byobu` / `vertical` / `sd_monitor` / `hd_monitor` とし、visible DDL やmacro定義へ書かない（§19）。
 
@@ -280,7 +283,7 @@ Render Engine は、`JSON Score + render options + server-owned color metadata` 
 
 ### 4.9 Reference vocabulary names
 
-`Nature`、`Bamboo`は将来または説明用のreference vocabulary名である。現存するruntime-loaded package、install済みpackage、公式registry entryとは主張しない。将来reference definitionを提供する場合も、同じMacroDefinition v1 schemaと通常のlock / expansion境界に従い、plugin固有の実行経路を持たない。
+`Nature.leaves`は、`Nature.若葉`、`Nature.下草`、`Nature.青葉`、`Nature.紅葉`、`Nature.落葉`、`Nature.枯草`、`Nature.枯葉`を同梱するshared catalogである。ServerとAndroidは同じcatalogからこれらの定義と表示を読む。これは外部runtime loader、任意にinstallするpackage、または`Nature`名前空間全体のregistryを実装したという主張ではない。`Bamboo`、`Nature.雨`、`Nature.風`は将来または説明用のreference vocabulary名として残る。将来reference definitionを提供する場合も、同じMacroDefinition v1 schemaと通常のlock / expansion境界に従い、plugin固有の実行経路を持たない。
 
 ### 4.10 名前空間の規約
 
@@ -1293,9 +1296,9 @@ Shared compilerでは、通常DDLと宣言済みflat Macroが一つのresolver�
 
 ### 13.7 Nature plugin による現象の揺らぎ
 
-`Nature.風` などの名前空間付き語は、`inku.macro-definition.v1` の閉じた typed parameter、bounded repeat、typed transform、deterministic bounded vary から core meaning を emit する概念例である。definition は raw Score field、renderer 命令、noise algorithm を直接書かず、source / generated provenance と compiler lock に従う。
+`Nature.leaves`は、若葉、下草、青葉、紅葉、落葉、枯草、枯葉の七つの同梱MacroDefinition v1をshared catalogから通常のlock / expansion境界へ接続する。definition は閉じたtyped parameter、bounded repeat、typed transform、deterministic bounded varyからcore meaningをemitし、raw Score field、renderer命令、noise algorithmを直接書かない。ServerとAndroidは同じcatalogを表示と解決に使う。
 
-MacroDefinition v1 の schema と展開 primitive は受け入れ済みだが、runtime loader、公式 registry、インストール済み Nature package はまだ接続されていない。v1.70 の hard-coded Nature 展開は legacy compatibility であり、新規 semantic canon や恒久 fallback ではない。保存済み Score / expanded artifact を優先し、欠落を別図形へ黙って変えない。
+この接続は外部runtime loader、任意にinstallするpackage、または`Nature`名前空間全体の公式registryを意味しない。`Nature.雨`と`Nature.風`は引き続き概念例であり、同梱catalogのentryではない。v1.70 のhard-coded Nature展開はlegacy compatibilityであり、新規semantic canonや恒久fallbackではない。保存済みScore / expanded artifactを優先し、欠落を別図形へ黙って変えない。
 
 ### 13.8 Renderer での揺らぎ生成
 

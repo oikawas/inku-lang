@@ -6,6 +6,12 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 34 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-14 — Place ordinary DDL colors in alternating or explicit order
+
+Saijiki adds the order category with alternating and in order, including Web / Android display and input examples. Ordinary finite color sequences reach shared Score and compact performance while preserving entry order, duplicates, and total count. Eight red/gray/blue shapes produce ABCABCAB; five red/gray shapes produce ABABA. Line-up, scatter, tile, and fill use existing count rules and resource limits; an over-budget placement is omitted while independent drawing continues. General sequences of other attributes, shapes, and groups remain unfinished. DDL_VERSION advances to 8, DDL engine to 41, and render engine to 63. The existing Score format, application and build versions, and deployment state are unchanged.
+
+The author accepted the content of the seven Nature leaf motifs reviewed in comparison sheet 14.
+
 ### 2026-09-14 — Consolidate Saijiki vocabulary, endpoint connections, and bleeding
 
 Saijiki display and examples follow shared Web / Android vocabulary: middle becomes center, the Japanese surface 点 becomes 点描, and trembling becomes swaying. `start` / `end` select only the target-side endpoint of a preceding Line or Arc. The connection source remains the existing start, preserving Line from→to and Arc angle_start→angle_end identity. Movement `bleeding` is independent `ink_spread:"bleed"`, combinable with Wave, Perlin, and the stipple surface. Current `blurring` input normalizes to that new meaning, while saved Scores retain their old surfaceBleed / qualityPink behavior. This advances DDL_VERSION to 7, DDL engine to 40, and render engine to 62; only Scores carrying the new fields use Score 0.12. Application and build versions are unchanged.

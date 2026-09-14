@@ -365,6 +365,7 @@ pub struct ObjectPlacementPlan {
     pub(crate) explicit_geometry: Option<SemanticExplicitGeometry>,
     pub(crate) relative_scale: Option<CoreModifierValue>,
     pub(crate) appearance: ResolvedObjectAppearance,
+    pub(crate) color_cycle: Vec<Color>,
     pub(crate) angle: Option<f64>,
     pub(crate) layout_direction: Option<ResolvedLayoutDirection>,
     pub(crate) anchor: ObjectAnchor,
@@ -428,6 +429,9 @@ impl ObjectPlacementPlan {
     }
     pub fn appearance(&self) -> &ResolvedObjectAppearance {
         &self.appearance
+    }
+    pub fn color_cycle(&self) -> &[Color] {
+        &self.color_cycle
     }
     pub fn angle(&self) -> Option<f64> {
         self.angle

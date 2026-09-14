@@ -8,7 +8,8 @@
 //!
 //! Each request accepts `source`, `language`, optional `canvas`, optional
 //! `composition_seed`, optional `error_policy`, optional raw macro `definitions`,
-//! and optional `macro_locks` (`qualified_name`, `version`, `digest`). A single
+//! optional `macro_locks` (`qualified_name`, `version`, `digest`), and optional
+//! `resources` (`hard_policy`, `operational_budget`) for compact Score output. A single
 //! request object is accepted for convenience; the output is always an array.
 
 use std::io::{self, Read};
@@ -17,8 +18,9 @@ use inku_ddl::{
     CompilerExecutionDiagnostic, MacroDefinition, MacroExpansionLimits, MacroLock,
     NormalizedDdlDocument, ResolvedInstructionLanguage, ScoreDiagnosticOwner, ScoreErrorPolicy,
     ScoreLoweringContext, ScoreLoweringDiagnostic, compile_ddl_to_score,
+    compile_ddl_to_score_with_resources,
 };
-use inku_score::Color;
+use inku_score::{Color, HardResourcePolicy, OperationalResourceBudget};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -52,6 +54,15 @@ struct Request {
     definitions: Vec<Value>,
     #[serde(default)]
     macro_locks: Vec<MacroLockRequest>,
+    #[serde(default)]
+    resources: Option<ResourceLimits>,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ResourceLimits {
+    hard_policy: HardResourcePolicy,
+    operational_budget: OperationalResourceBudget,
 }
 
 #[derive(Deserialize)]
@@ -68,6 +79,10 @@ struct Response {
     outcome: String,
     score: Option<Value>,
     diagnostics: Vec<Diagnostic>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    resource_omissions: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    failure: Option<String>,
     definition_identities: Vec<DefinitionIdentity>,
 }
 
@@ -152,35 +167,62 @@ fn compile(request: Request) -> Result<Response, String> {
             .map_err(|error| format!("construct normalized DDL document: {error}"))?;
     let context = ScoreLoweringContext::resolve(&request.canvas, Color::White)
         .map_err(|error| format!("resolve canvas: {error:?}"))?;
-    let execution = compile_ddl_to_score(
-        document,
-        &definitions,
-        Some(request.composition_seed),
-        LIMITS,
-        context,
-        None,
-        request.error_policy,
-    );
-    let mut diagnostics = execution
-        .upstream_diagnostics()
-        .iter()
-        .map(upstream_diagnostic)
-        .collect::<Vec<_>>();
-    diagnostics.extend(
-        execution
-            .downstream_diagnostics()
-            .iter()
-            .map(downstream_diagnostic),
-    );
+    let (outcome, score, upstream, downstream, resource_omissions, failure) =
+        if let Some(resources) = request.resources {
+            let execution = compile_ddl_to_score_with_resources(
+                document,
+                &definitions,
+                Some(request.composition_seed),
+                LIMITS,
+                context,
+                None,
+                request.error_policy,
+                resources.hard_policy,
+                resources.operational_budget,
+            );
+            (
+                execution.outcome(),
+                execution.score().cloned(),
+                execution.upstream_diagnostics().to_vec(),
+                execution.downstream_diagnostics().to_vec(),
+                execution
+                    .resource_omissions()
+                    .iter()
+                    .map(|item| format!("{item:?}"))
+                    .collect(),
+                execution.failure().map(|failure| format!("{failure:?}")),
+            )
+        } else {
+            let execution = compile_ddl_to_score(
+                document,
+                &definitions,
+                Some(request.composition_seed),
+                LIMITS,
+                context,
+                None,
+                request.error_policy,
+            );
+            (
+                execution.outcome(),
+                execution.score().cloned(),
+                execution.upstream_diagnostics().to_vec(),
+                execution.downstream_diagnostics().to_vec(),
+                Vec::new(),
+                None,
+            )
+        };
+    let mut diagnostics = upstream.iter().map(upstream_diagnostic).collect::<Vec<_>>();
+    diagnostics.extend(downstream.iter().map(downstream_diagnostic));
     Ok(Response {
         original_source: request.source,
-        outcome: format!("{:?}", execution.outcome()),
-        score: execution
-            .score()
+        outcome: format!("{outcome:?}"),
+        score: score
             .map(serde_json::to_value)
             .transpose()
             .map_err(|error| format!("serialize score: {error}"))?,
         diagnostics,
+        resource_omissions,
+        failure,
         definition_identities,
     })
 }

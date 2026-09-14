@@ -132,7 +132,7 @@ The vocabulary dictionary is called Saijiki, following the haiku term for a
 seasonal word dictionary.  In inku, Saijiki is consulted rather than kept open
 at all times.
 
-Since v1.92 the vocabulary has a single source of truth: the saijiki table on the server (`saijiki.py`). The Stage 1 prompt vocabulary block, the plugin closure markers, the Stage 2 relation phrases, the web Saijiki display (`GET /api/saijiki`), and reference §1 are all derived from that table. The machine-generated reference dump (`GET /api/reference` / `inku-cli reference`) always shows the current values; the table below is an overview, and reference §1 decides additions and removals.
+The core vocabulary consists of twelve Saijiki categories plus relations. Its source of truth is the shared Rust asset `core/crates/inku-ddl/assets/saijiki-v1.json`; the Server Saijiki table and Web / Android displays follow the same vocabulary. The machine-generated reference dump (`GET /api/reference` / `inku-cli reference`) publishes the current values; the table below is an overview, and reference §1 decides additions and removals.
 
 | English | Japanese | Vocabulary |
 | --- | --- | --- |
@@ -142,6 +142,7 @@ Since v1.92 the vocabulary has a single source of truth: the saijiki table on th
 | surfaces | おもて | empty, flat, pale ink wash, grain, stipple, hatch, crosshatch, aquatint, dense, faint |
 | grounds | じ | paper, washi, ink-wash ground, charcoal ground, canvas, drawing paper, mezzotint |
 | motions | うごき | place, line-up, draw, scatter, fill, tile |
+| order | じゅん | alternating, in order |
 | movements | ゆらぎ | fine, large, slowly, quickly, swaying, undulating, bleeding |
 | relations | あいだ | along, not touching, cutting, between, touching, connected — with fixed phrases such as `along the previous line` and `connected to the previous shape` |
 | places | ばしょ | top, bottom, center, left-edge, right-edge, top-edge, bottom-edge, start, end, corner |
@@ -156,6 +157,8 @@ In v1.92 the words 描く (ja draw) and 髪 / hair were removed from the vocabul
 Pen, solid, empty, and black remain historical baselines for comparison with legacy Score / coerce behavior, rather than values inserted into typed meaning. When visible DDL omits a corresponding field, typed meaning remains `unspecified`; neither the parser nor semantic association fills it. The current subset resolves omissions only while lowering a lock-verified view to an actual Score: for count-one circle, square, ellipse, cloudform, triangle, and polygon instructions with a numeric position or an original `place:center` resolved to a verified direct `Instruction { instruction_index }` target, plus a place action, omitted count becomes one, touch becomes pen, continuity becomes solid, and an omitted closed surface becomes filled. An omitted color compares the actual work color-catalog background against actual black and white by absolute OKLCH L distance, choosing the farther color and black on a tie. Each explicit value wins independently, and neither these resolutions nor effective focus is written back into source meaning. Legacy Stop and OmitAndContinue inputs remain accepted, but a recoverable field or execution-unit failure uses shared local recovery: it records a typed diagnostic, omits only that unit, and continues with the remaining drawing. This rule does not retroactively change physical Renderer fallbacks or read compatibility for existing works.
 
 Shape size is a finite local modifier owned by the typed DDL compiler, not Saijiki vocabulary. The current classes are `slightly_small`, `small`, `very_small`, `normal`, `slightly_large`, `large`, and `very_large`. Their Japanese ordinary/small/large surfaces and the corresponding English `normal-sized`, `slightly`, and `very` forms retain exact source spans. The grammar does not grow free-form degree synonyms or use source-substring post-processing.
+
+Order specifies a finite color sequence for a placement. `line up five circles, alternating red and gray.` produces red, gray, red, gray, red. `line up eight circles, repeating red, gray, and blue in order.` produces red, gray, blue, red, gray, blue, red, gray. Alternating takes two entries; in order takes a nonempty color list and preserves ordered duplicates. It applies to line-up, scatter, tile, and fill. An explicit count is the total shape count, regardless of list length; existing omitted-count rules and resource limits remain unchanged. Multiple colors without an order operator do not imply a cycle. An invalid sequence produces a local diagnostic while independent drawing continues. Ordinary DDL reaches the existing shared Score `Arrangement.color_cycle`, starting at the first entry for each placement. Ordinary sequences currently support colors; this does not claim general sequences of other attributes, shapes, or groups. `repeating` is grammar in this form, not another Saijiki entry.
 
 Canvas format is neither vocabulary nor a plugin. It is a resolved host option owned by the shared-core `inku.canvas-format-registry.v1`. Its eleven formats are `square` / `golden` / `a4` / `b4` / `pillar` / `oban` / `wide` / `byobu` / `vertical` / `sd_monitor` / `hd_monitor`, and it is not written into visible DDL or macro definitions (§19).
 
@@ -474,10 +477,14 @@ dependencies get designed once a second real engine is actually needed.
 
 ### 4.9 Reference Vocabulary Names
 
-`Nature` and `Bamboo` are future or explanatory reference-vocabulary names.
-They are not claimed to be runtime-loaded packages, installed packages, or
-entries in an official registry. Any future reference definition must use the
-same MacroDefinition v1 schema and ordinary lock / expansion boundary, with no
+`Nature.leaves` is a shared bundled catalog containing `Nature.若葉`,
+`Nature.下草`, `Nature.青葉`, `Nature.紅葉`, `Nature.落葉`, `Nature.枯草`,
+and `Nature.枯葉`. Server and Android read these definitions and their display
+data from the same catalog. This does not claim an external runtime loader, an
+arbitrarily installed package, or a registry for the entire `Nature` namespace.
+`Bamboo`, `Nature.雨`, and `Nature.風` remain future or explanatory reference
+vocabulary names. Any future reference definition must use the same
+MacroDefinition v1 schema and ordinary lock / expansion boundary, with no
 plugin-specific execution path.
 
 ### 4.10 Namespace Convention
@@ -1920,19 +1927,20 @@ In the shared compiler, ordinary DDL and declared flat Macros use one resolver. 
 
 ### 13.7 Sway from Phenomena: the Nature Plugin
 
-Qualified terms such as `Nature.wind` are conceptual examples of an
-`inku.macro-definition.v1` definition emitting core meaning from closed typed
-parameters, bounded repeat, typed transforms, and deterministic bounded vary. A
-definition writes neither raw Score fields nor renderer instructions or noise
-algorithms, and remains under source / generated provenance and the compiler
-lock.
+`Nature.leaves` connects seven bundled MacroDefinition v1 motifs — `Nature.若葉`,
+`Nature.下草`, `Nature.青葉`, `Nature.紅葉`, `Nature.落葉`, `Nature.枯草`, and
+`Nature.枯葉` — from the shared catalog through the ordinary lock / expansion
+boundary. Definitions emit core meaning from closed typed parameters, bounded
+repeat, typed transforms, and deterministic bounded vary; they write neither raw
+Score fields nor renderer instructions or noise algorithms. Server and Android
+use the same catalog for resolution and display.
 
-The MacroDefinition v1 schema and expansion primitives are accepted, but the
-runtime loader, official registry, and an installed Nature package are not yet
-connected. The v1.70 hard-coded Nature expansion is legacy compatibility, not
-new semantic canon or a permanent fallback. Saved Score / expanded artifacts
-take precedence, and an absent artifact is not silently rendered as another
-shape.
+This connection does not provide an external runtime loader, an arbitrarily
+installed package, or an official registry for the whole `Nature` namespace.
+`Nature.雨` and `Nature.風` remain conceptual examples, not bundled catalog
+entries. The v1.70 hard-coded Nature expansion is legacy compatibility, not new
+semantic canon or a permanent fallback. Saved Score / expanded artifacts take
+precedence, and an absent artifact is not silently rendered as another shape.
 
 ### 13.8 Sway Is Generated in the Renderer
 

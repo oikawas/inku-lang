@@ -9,7 +9,7 @@ use crate::{
 pub const CORE_ROLE_COMPOSITION_SCHEMA_ID: &str = "inku.core-role-composition.v4";
 
 /// Stable identity for the runtime-disconnected remaining-role composition foundation.
-pub const REMAINING_ROLE_COMPOSITION_SCHEMA_ID: &str = "inku.remaining-role-composition.v4";
+pub const REMAINING_ROLE_COMPOSITION_SCHEMA_ID: &str = "inku.remaining-role-composition.v5";
 
 /// One of the exact core drawing roles typed by this foundation slice.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -58,6 +58,7 @@ pub enum RemainingRoleKind {
     Place,
     Motion,
     Proportion,
+    Sequence,
 }
 
 /// One typed remaining Saijiki row at its exact source location.
@@ -274,6 +275,7 @@ fn remaining_role_for_category(category_key: &str) -> Option<RemainingRoleKind> 
         "basho" => Some(RemainingRoleKind::Place),
         "ugoki" => Some(RemainingRoleKind::Motion),
         "wariai" => Some(RemainingRoleKind::Proportion),
+        "jun" => Some(RemainingRoleKind::Sequence),
         _ => None,
     }
 }

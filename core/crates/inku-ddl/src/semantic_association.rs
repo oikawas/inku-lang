@@ -21,7 +21,7 @@ use crate::{
 };
 
 /// Stable identity for the runtime-disconnected single-head semantic AST.
-pub const SEMANTIC_ENTITY_ASSOCIATION_SCHEMA_ID: &str = "inku.semantic-entity-association.v15";
+pub const SEMANTIC_ENTITY_ASSOCIATION_SCHEMA_ID: &str = "inku.semantic-entity-association.v16";
 
 /// Source-independent semantic identity projected from one accepted Saijiki row.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -155,6 +155,52 @@ pub struct SemanticTermProvenance {
 pub struct SemanticTerm {
     pub identity: SemanticIdentity,
     pub provenance: SemanticTermProvenance,
+}
+
+/// One source-authored finite sequence applied over instances of a drawing instruction.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SemanticSequence {
+    pub operator: SemanticTerm,
+    pub items: Vec<SemanticTerm>,
+    pub markers: Vec<SourceOccurrence>,
+}
+
+/// One sequence and the entity occurrence that owns its eventual instruction predicate.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SemanticEntitySequence {
+    pub target_entity_index: usize,
+    pub sequence: SemanticSequence,
+}
+
+/// A recognized sequence phrase that cannot acquire one complete structural meaning.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum SemanticSequenceIssueKind {
+    AmbiguousTarget,
+    MissingItems,
+    InvalidAlternatingCardinality,
+    InvalidConnectors,
+    MultipleOperators,
+}
+
+impl SemanticSequenceIssueKind {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::AmbiguousTarget => "ambiguous_sequence_target",
+            Self::MissingItems => "missing_sequence_items",
+            Self::InvalidAlternatingCardinality => "invalid_alternating_cardinality",
+            Self::InvalidConnectors => "invalid_sequence_connectors",
+            Self::MultipleOperators => "multiple_sequence_operators",
+        }
+    }
+}
+
+/// Source-owned evidence for one invalid known sequence phrase.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SemanticSequenceIssue {
+    pub kind: SemanticSequenceIssueKind,
+    pub operator: SemanticTerm,
+    pub items: Vec<SemanticTerm>,
+    pub markers: Vec<SourceOccurrence>,
 }
 
 /// One checked, explicit, non-negative numeric quantity and its source provenance.
@@ -352,6 +398,7 @@ pub struct SemanticEntity {
 #[derive(Clone, Debug, PartialEq)]
 pub struct SemanticEntityAssociationAst {
     pub entities: Vec<SemanticEntity>,
+    pub sequences: Vec<SemanticEntitySequence>,
     pub complete: bool,
 }
 
@@ -573,6 +620,7 @@ pub struct SemanticAssociationResult {
     pub clause_stream: ClauseStream,
     pub ast: SemanticEntityAssociationAst,
     pub issues: Vec<SemanticAssociationIssue>,
+    pub sequence_issues: Vec<SemanticSequenceIssue>,
     pub canonical_bytes: Option<Vec<u8>>,
     pub owned_occurrence_count: usize,
     pub delivered_occurrence_count: usize,
@@ -595,6 +643,377 @@ impl SemanticAssociationResult {
                     .any(|parameter| parameter.owns_span(span))
             })
     }
+}
+
+#[derive(Clone, Debug)]
+struct PendingSemanticSequence {
+    target_head_start: usize,
+    sequence: SemanticSequence,
+}
+
+fn collect_semantic_sequences(
+    document: &NormalizedDdlDocument,
+    stream: &ClauseStream,
+) -> (
+    Vec<PendingSemanticSequence>,
+    Vec<SemanticSequenceIssue>,
+    BTreeSet<usize>,
+) {
+    let mut pending = Vec::new();
+    let mut issues = Vec::new();
+    let mut claimed_color_starts = BTreeSet::new();
+
+    for (clause_index, clause) in stream.clauses.iter().enumerate() {
+        let operators = clause
+            .atoms
+            .iter()
+            .enumerate()
+            .filter_map(|(atom_index, atom)| match atom {
+                ClauseAtom::RemainingRole(term) if term.role == RemainingRoleKind::Sequence => {
+                    Some((atom_index, term))
+                }
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+        if operators.len() > 1 {
+            let region_index = sentence_region_index(stream, operators[0].1.span);
+            let mut clause_color_indices = BTreeSet::new();
+            let mut clause_marker_indices = BTreeSet::new();
+            for (operator_index, operator_term) in &operators {
+                let operator = project_remaining_term(
+                    document,
+                    operator_term,
+                    region_index,
+                    clause_index,
+                    *operator_index,
+                );
+                let color_indices = sequence_color_indices(
+                    document.language(),
+                    clause,
+                    *operator_index,
+                    operator.identity.id.as_str(),
+                );
+                clause_marker_indices.extend(sequence_marker_indices(
+                    document.language(),
+                    clause,
+                    *operator_index,
+                    &color_indices,
+                    operator.identity.id.as_str(),
+                ));
+                clause_color_indices.extend(color_indices);
+            }
+            let clause_color_indices = clause_color_indices.into_iter().collect::<Vec<_>>();
+            let clause_marker_indices = clause_marker_indices.into_iter().collect::<Vec<_>>();
+            for &atom_index in &clause_color_indices {
+                if let ClauseAtom::CoreRole(term) = &clause.atoms[atom_index] {
+                    claimed_color_starts.insert(term.span.start_byte);
+                }
+            }
+            for (issue_index, (operator_index, operator_term)) in operators.into_iter().enumerate()
+            {
+                let operator = project_remaining_term(
+                    document,
+                    operator_term,
+                    region_index,
+                    clause_index,
+                    operator_index,
+                );
+                let items = if issue_index == 0 {
+                    clause_color_indices
+                        .iter()
+                        .filter_map(|&atom_index| match &clause.atoms[atom_index] {
+                            ClauseAtom::CoreRole(term) if term.role == CoreRoleKind::Color => {
+                                Some(project_term(
+                                    document,
+                                    term,
+                                    region_index,
+                                    clause_index,
+                                    atom_index,
+                                ))
+                            }
+                            _ => None,
+                        })
+                        .collect()
+                } else {
+                    Vec::new()
+                };
+                let markers = if issue_index == 0 {
+                    clause_marker_indices
+                        .iter()
+                        .map(|&atom_index| {
+                            source_occurrence(
+                                document,
+                                clause.atoms[atom_index].span(),
+                                region_index,
+                                clause_index,
+                                atom_index,
+                            )
+                        })
+                        .collect()
+                } else {
+                    Vec::new()
+                };
+                issues.push(SemanticSequenceIssue {
+                    kind: SemanticSequenceIssueKind::MultipleOperators,
+                    operator,
+                    items,
+                    markers,
+                });
+            }
+            continue;
+        }
+        for (operator_index, operator_term) in operators {
+            let region_index = sentence_region_index(stream, operator_term.span);
+            let operator = project_remaining_term(
+                document,
+                operator_term,
+                region_index,
+                clause_index,
+                operator_index,
+            );
+            let color_indices = sequence_color_indices(
+                document.language(),
+                clause,
+                operator_index,
+                operator.identity.id.as_str(),
+            );
+            let items = color_indices
+                .iter()
+                .filter_map(|&atom_index| match &clause.atoms[atom_index] {
+                    ClauseAtom::CoreRole(term) if term.role == CoreRoleKind::Color => {
+                        claimed_color_starts.insert(term.span.start_byte);
+                        Some(project_term(
+                            document,
+                            term,
+                            region_index,
+                            clause_index,
+                            atom_index,
+                        ))
+                    }
+                    _ => None,
+                })
+                .collect::<Vec<_>>();
+            let marker_indices = sequence_marker_indices(
+                document.language(),
+                clause,
+                operator_index,
+                &color_indices,
+                operator.identity.id.as_str(),
+            );
+            let markers = marker_indices
+                .iter()
+                .map(|&atom_index| {
+                    source_occurrence(
+                        document,
+                        clause.atoms[atom_index].span(),
+                        region_index,
+                        clause_index,
+                        atom_index,
+                    )
+                })
+                .collect::<Vec<_>>();
+            let targets = clause
+                .atoms
+                .iter()
+                .filter_map(|atom| match atom {
+                    ClauseAtom::CoreRole(term) if term.role == CoreRoleKind::Primitive => {
+                        Some(term.span.start_byte)
+                    }
+                    _ => None,
+                })
+                .collect::<Vec<_>>();
+            let issue = if targets.len() != 1 {
+                Some(SemanticSequenceIssueKind::AmbiguousTarget)
+            } else if items.is_empty() {
+                Some(SemanticSequenceIssueKind::MissingItems)
+            } else if operator.identity.id == "alternating" && items.len() != 2 {
+                Some(SemanticSequenceIssueKind::InvalidAlternatingCardinality)
+            } else if !sequence_connectors_are_valid(
+                document,
+                clause,
+                operator_index,
+                &color_indices,
+                operator.identity.id.as_str(),
+            ) {
+                Some(SemanticSequenceIssueKind::InvalidConnectors)
+            } else {
+                None
+            };
+            let sequence = SemanticSequence {
+                operator,
+                items,
+                markers,
+            };
+            if let Some(kind) = issue {
+                issues.push(SemanticSequenceIssue {
+                    kind,
+                    operator: sequence.operator,
+                    items: sequence.items,
+                    markers: sequence.markers,
+                });
+            } else {
+                pending.push(PendingSemanticSequence {
+                    target_head_start: targets[0],
+                    sequence,
+                });
+            }
+        }
+    }
+    (pending, issues, claimed_color_starts)
+}
+
+fn sequence_color_indices(
+    language: ResolvedInstructionLanguage,
+    clause: &crate::ClauseSegment,
+    operator_index: usize,
+    operator_id: &str,
+) -> Vec<usize> {
+    let repeating_index = clause.atoms[..operator_index]
+        .iter()
+        .rposition(|atom| matches!(atom, ClauseAtom::FunctionWord { surface, .. } if surface.eq_ignore_ascii_case("repeating")));
+    clause
+        .atoms
+        .iter()
+        .enumerate()
+        .filter_map(|(index, atom)| {
+            let ClauseAtom::CoreRole(term) = atom else {
+                return None;
+            };
+            if term.role != CoreRoleKind::Color {
+                return None;
+            }
+            let selected = match (language, operator_id) {
+                (ResolvedInstructionLanguage::Ja, _) => index < operator_index,
+                (ResolvedInstructionLanguage::En, "alternating") => index > operator_index,
+                (ResolvedInstructionLanguage::En, "in_order") => repeating_index
+                    .is_some_and(|repeating| repeating < index && index < operator_index),
+                _ => false,
+            };
+            selected.then_some(index)
+        })
+        .collect()
+}
+
+fn sequence_marker_indices(
+    language: ResolvedInstructionLanguage,
+    clause: &crate::ClauseSegment,
+    operator_index: usize,
+    color_indices: &[usize],
+    operator_id: &str,
+) -> Vec<usize> {
+    let first = color_indices
+        .first()
+        .copied()
+        .unwrap_or(operator_index)
+        .min(operator_index);
+    let last = color_indices
+        .last()
+        .copied()
+        .unwrap_or(operator_index)
+        .max(operator_index);
+    clause
+        .atoms
+        .iter()
+        .enumerate()
+        .filter_map(|(index, atom)| {
+            let ClauseAtom::FunctionWord { surface, .. } = atom else {
+                return None;
+            };
+            let sequence_marker = match language {
+                ResolvedInstructionLanguage::Ja => {
+                    first <= index
+                        && (index <= last
+                            || (last < index && matches!(surface.as_str(), "して" | "繰り返して")))
+                }
+                ResolvedInstructionLanguage::En => {
+                    (first <= index && index <= last)
+                        || (operator_id == "in_order" && surface.eq_ignore_ascii_case("repeating"))
+                }
+            };
+            sequence_marker.then_some(index)
+        })
+        .collect()
+}
+
+fn sequence_connectors_are_valid(
+    document: &NormalizedDdlDocument,
+    clause: &crate::ClauseSegment,
+    operator_index: usize,
+    color_indices: &[usize],
+    operator_id: &str,
+) -> bool {
+    let exact_functions = |surfaces: &[&str], start: usize, end: usize| {
+        let atoms = &clause.atoms[start..end];
+        atoms.len() == surfaces.len()
+            && atoms.iter().zip(surfaces).all(|(atom, expected)| {
+                matches!(atom, ClauseAtom::FunctionWord { surface, .. }
+                    if surface.eq_ignore_ascii_case(expected))
+            })
+    };
+    match (document.language(), operator_id) {
+        (ResolvedInstructionLanguage::Ja, "alternating") => {
+            color_indices.len() == 2
+                && exact_functions(&["と"], color_indices[0] + 1, color_indices[1])
+                && exact_functions(&["を"], color_indices[1] + 1, operator_index)
+                && sequence_suffix_is_exact(clause, operator_index, "して")
+        }
+        (ResolvedInstructionLanguage::Ja, "in_order") => {
+            let Some(&last) = color_indices.last() else {
+                return false;
+            };
+            exact_functions(&["の"], last + 1, operator_index)
+                && sequence_suffix_is_exact(clause, operator_index, "繰り返して")
+                && color_indices.windows(2).all(|pair| {
+                    exact_functions(&[], pair[0] + 1, pair[1])
+                        && document.source()[clause.atoms[pair[0]].span().end_byte
+                            ..clause.atoms[pair[1]].span().start_byte]
+                            .chars()
+                            .all(|character| character.is_whitespace() || character == '・')
+                })
+        }
+        (ResolvedInstructionLanguage::En, "alternating") => {
+            color_indices.len() == 2
+                && exact_functions(&[], operator_index + 1, color_indices[0])
+                && exact_functions(&["and"], color_indices[0] + 1, color_indices[1])
+        }
+        (ResolvedInstructionLanguage::En, "in_order") => {
+            let Some(&first) = color_indices.first() else {
+                return false;
+            };
+            let Some(repeating_index) = clause.atoms[..first].iter().rposition(|atom| {
+                matches!(atom, ClauseAtom::FunctionWord { surface, .. }
+                    if surface.eq_ignore_ascii_case("repeating"))
+            }) else {
+                return false;
+            };
+            exact_functions(&[], repeating_index + 1, first)
+                && exact_functions(&[], last_color_index(color_indices) + 1, operator_index)
+                && color_indices.windows(2).enumerate().all(|(index, pair)| {
+                    let expected = if index + 1 == color_indices.len() - 1 {
+                        &["and"][..]
+                    } else {
+                        &[][..]
+                    };
+                    exact_functions(expected, pair[0] + 1, pair[1])
+                })
+        }
+        _ => false,
+    }
+}
+
+fn sequence_suffix_is_exact(
+    clause: &crate::ClauseSegment,
+    operator_index: usize,
+    surface: &str,
+) -> bool {
+    matches!(
+        clause.atoms.get(operator_index + 1),
+        Some(ClauseAtom::FunctionWord { surface: actual, .. }) if actual == surface
+    )
+}
+
+fn last_color_index(color_indices: &[usize]) -> usize {
+    *color_indices.last().expect("nonempty sequence was checked")
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
@@ -1020,6 +1439,8 @@ pub fn associate_semantic_entities(
     document: &NormalizedDdlDocument,
 ) -> Result<SemanticAssociationResult, ClauseStreamError> {
     let attachment_evidence = collect_attachment_evidence(document)?;
+    let (pending_sequences, sequence_issues, claimed_sequence_colors) =
+        collect_semantic_sequences(document, &attachment_evidence.noun_phrase.clause_stream);
     let pre_head_ownership = collect_pre_head_phrase_ownership(&attachment_evidence, None);
     let clause_topology = ClauseTopologyEvidence::from_attachment(&attachment_evidence);
     let clause_stream = attachment_evidence.noun_phrase.clause_stream;
@@ -1029,6 +1450,9 @@ pub fn associate_semantic_entities(
         None,
         pre_head_ownership,
         clause_topology,
+        pending_sequences,
+        sequence_issues,
+        claimed_sequence_colors,
     ))
 }
 
@@ -1051,12 +1475,17 @@ pub fn associate_semantic_entities_with_macro_binding(
         .noun_phrase
         .clause_stream
         .clone();
+    let (pending_sequences, sequence_issues, claimed_sequence_colors) =
+        collect_semantic_sequences(document, &clause_stream);
     build_semantic_entities(
         document,
         clause_stream,
         Some(macro_parameter_binding),
         pre_head_ownership,
         clause_topology,
+        pending_sequences,
+        sequence_issues,
+        claimed_sequence_colors,
     )
 }
 
@@ -1100,6 +1529,9 @@ fn build_semantic_entities(
     macro_parameter_binding: Option<MacroParameterBindingResult>,
     mut pre_head_ownership: PreHeadPhraseOwnership,
     clause_topology: ClauseTopologyEvidence,
+    pending_sequences: Vec<PendingSemanticSequence>,
+    mut sequence_issues: Vec<SemanticSequenceIssue>,
+    claimed_sequence_colors: BTreeSet<usize>,
 ) -> SemanticAssociationResult {
     let mut regions = BTreeMap::<usize, AssociationRegion>::new();
     let mut issues = Vec::new();
@@ -1202,6 +1634,10 @@ fn build_semantic_entities(
                     owned_occurrence_count += 1;
                 }
                 ClauseAtom::CoreRole(term) if term.role == CoreRoleKind::Color => {
+                    if claimed_sequence_colors.contains(&term.span.start_byte) {
+                        owned_occurrence_count += 1;
+                        continue;
+                    }
                     region.colors.push(project_term(
                         document,
                         term,
@@ -1294,6 +1730,9 @@ fn build_semantic_entities(
                         }
                         None => region.unclassified_proportions.push(term),
                     }
+                    owned_occurrence_count += 1;
+                }
+                ClauseAtom::RemainingRole(term) if term.role == RemainingRoleKind::Sequence => {
                     owned_occurrence_count += 1;
                 }
                 ClauseAtom::UnattachedExactNumber(quantity) => {
@@ -1471,11 +1910,39 @@ fn build_semantic_entities(
     }
     attach_association_causal_provenance(&clause_stream, &entities, &mut issues);
 
+    let mut sequences = Vec::new();
+    for pending in pending_sequences {
+        if let Some(target_entity_index) = entities
+            .iter()
+            .position(|entity| entity.head.source().span.start_byte == pending.target_head_start)
+        {
+            sequences.push(SemanticEntitySequence {
+                target_entity_index,
+                sequence: pending.sequence,
+            });
+        } else {
+            sequence_issues.push(SemanticSequenceIssue {
+                kind: SemanticSequenceIssueKind::AmbiguousTarget,
+                operator: pending.sequence.operator,
+                items: pending.sequence.items,
+                markers: pending.sequence.markers,
+            });
+        }
+    }
+
     let delivered_occurrence_count = entities.iter().map(entity_occurrence_count).sum::<usize>()
         + issues
             .iter()
             .flat_map(|issue| &issue.occurrences)
             .map(OwnedSemanticOccurrence::occurrence_count)
+            .sum::<usize>()
+        + sequences
+            .iter()
+            .map(|sequence| 1 + sequence.sequence.items.len())
+            .sum::<usize>()
+        + sequence_issues
+            .iter()
+            .map(|issue| 1 + issue.items.len())
             .sum::<usize>();
     assert_eq!(
         delivered_occurrence_count, owned_occurrence_count,
@@ -1490,7 +1957,8 @@ fn build_semantic_entities(
 
     let ast = SemanticEntityAssociationAst {
         entities,
-        complete: issues.is_empty(),
+        sequences,
+        complete: issues.is_empty() && sequence_issues.is_empty(),
     };
     let canonical_bytes = ast.complete.then(|| canonical_ast_bytes(&ast));
 
@@ -1499,6 +1967,7 @@ fn build_semantic_entities(
         clause_stream,
         ast,
         issues,
+        sequence_issues,
         canonical_bytes,
         owned_occurrence_count,
         delivered_occurrence_count,
@@ -2870,11 +3339,41 @@ fn canonical_ast_bytes(ast: &SemanticEntityAssociationAst) -> Vec<u8> {
         .collect::<Vec<_>>();
     let mut root = BTreeMap::new();
     root.insert("entities".to_owned(), Value::Array(entities));
+    if !ast.sequences.is_empty() {
+        root.insert(
+            "sequences".to_owned(),
+            Value::Array(
+                ast.sequences
+                    .iter()
+                    .map(|sequence| {
+                        semantic_sequence_value(sequence.target_entity_index, &sequence.sequence)
+                    })
+                    .collect(),
+            ),
+        );
+    }
     root.insert(
         "schema".to_owned(),
         Value::String(SEMANTIC_ENTITY_ASSOCIATION_SCHEMA_ID.to_owned()),
     );
     serde_json::to_vec(&root).expect("closed semantic association AST serializes")
+}
+
+pub(crate) fn semantic_sequence_value(
+    target_instruction_index: usize,
+    sequence: &SemanticSequence,
+) -> Value {
+    serde_json::json!({
+        "field": "color",
+        "items": sequence
+            .items
+            .iter()
+            .map(|item| semantic_identity_value(&item.identity))
+            .collect::<Vec<_>>(),
+        "kind": "cycle",
+        "operator": semantic_identity_value(&sequence.operator.identity),
+        "target_instruction_index": target_instruction_index,
+    })
 }
 
 pub(crate) fn semantic_entity_value(entity: &SemanticEntity) -> Value {

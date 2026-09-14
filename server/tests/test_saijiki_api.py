@@ -134,6 +134,7 @@ _EXPECTED_PAIRING: dict[str, tuple[tuple[str, str], ...]] = {
         ("置く", "place"), ("並べる", "line-up"), ("引く", "draw"),
         ("散らす", "scatter"), ("埋める", "fill"), ("敷き詰める", "tile"),
     ),
+    "jun": (("交互に", "alternating"), ("順に", "in order")),
     "wariai": (
         ("縦長", "tall"), ("横長", "wide"), ("全幅", "full-width"), ("半幅", "half-width"),
         ("半円", "semicircle"), ("上弦", "waxing"), ("下弦", "waning"), ("三日月", "crescent"),

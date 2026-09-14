@@ -235,6 +235,10 @@ fn project_source_instruction<'a>(
             .color
             .as_ref()
             .map(|term| (&term.identity).into()),
+        color_cycle: instruction
+            .sequence
+            .as_ref()
+            .map_or(&[], |sequence| sequence.items.as_slice()),
         touch: instruction
             .entity
             .touch
@@ -1709,6 +1713,7 @@ fn project_macro_emit<'a>(
         primitive: primitive.expect("required macro shape field checked"),
         count,
         color,
+        color_cycle: &[],
         touch,
         continuity,
         surface,
@@ -3577,6 +3582,7 @@ struct ScoreLoweringInput<'a> {
     primitive: SemanticInputIdentity<'a>,
     count: Option<u64>,
     color: Option<SemanticInputIdentity<'a>>,
+    color_cycle: &'a [crate::SemanticTerm],
     touch: Option<SemanticInputIdentity<'a>>,
     continuity: Option<SemanticInputIdentity<'a>>,
     surface: Option<SemanticInputIdentity<'a>>,
@@ -3748,6 +3754,7 @@ struct ResolvedObject {
     action: PlacementAction,
     dimensions: ResolvedGeometryDimensions,
     appearance: ResolvedObjectAppearance,
+    color_cycle: Vec<Color>,
     rotation: Option<f64>,
     layout_direction: Option<crate::composition_plan::ResolvedLayoutDirection>,
     placement: ScorePlacement,
@@ -3838,6 +3845,7 @@ fn resolve_object_plan(
             generated_geometries: input.generated_geometries.into_iter().flatten().collect(),
             relative_scale: input.relative_scale,
             appearance: resolved.appearance,
+            color_cycle: resolved.color_cycle,
             angle: resolved.rotation,
             layout_direction,
             anchor,
@@ -4681,9 +4689,19 @@ fn resolve_complete_object<'a>(
         "finite lowering never materializes repeated count"
     );
 
+    let color_cycle = input
+        .color_cycle
+        .iter()
+        .filter_map(|item| {
+            map_score_enum::<Color>(Some((&item.identity).into()), "color", &mut gaps)
+        })
+        .collect::<Vec<_>>();
     let color = match input.color {
         Some(_) => map_score_enum::<Color>(input.color, "color", &mut gaps),
-        None => resolve_omitted_color(context, &mut gaps),
+        None => color_cycle
+            .first()
+            .copied()
+            .or_else(|| resolve_omitted_color(context, &mut gaps)),
     };
     let weight = match input.touch {
         Some(_) => map_score_enum::<Weight>(input.touch, "touch", &mut gaps),
@@ -4835,6 +4853,17 @@ fn resolve_complete_object<'a>(
             PlacementAction::Place
         }
     };
+    if !color_cycle.is_empty()
+        && !matches!(
+            action,
+            PlacementAction::LineUp
+                | PlacementAction::Tile
+                | PlacementAction::Scatter
+                | PlacementAction::Fill
+        )
+    {
+        gaps.push(ScoreFieldGap::UnsupportedInstructionMeaning);
+    }
     let named_focus = if input.has_named_position && input.exact_position().is_some() {
         gaps.push(ScoreFieldGap::NamedAndNumericPositionConflict);
         None
@@ -4975,6 +5004,7 @@ fn resolve_complete_object<'a>(
             surface,
             surface_intensity,
         },
+        color_cycle,
     })
 }
 

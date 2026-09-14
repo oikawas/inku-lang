@@ -164,12 +164,20 @@ impl<'a> Builder<'a> {
         innermost_fill: Option<usize>,
     ) {
         let original = &self.request.score.instructions[old];
-        let resolved = original
+        let arrangement = original
             .arrangement
             .as_ref()
-            .and_then(|arrangement| arrangement.resolved.as_ref())
+            .expect("validated Score 0.10 arrangement");
+        let resolved = arrangement
+            .resolved
+            .as_ref()
             .expect("validated Score 0.10 arrangement");
         let mut instruction = crate::planning::ensure_line_coordinates(original);
+        crate::group::apply_color_cycle_at_ordinal(
+            &mut instruction,
+            &arrangement.color_cycle,
+            instance_ordinal,
+        );
         instruction.arrangement = None;
         if let Some(target) = target {
             instruction = translate_instruction_to(&instruction, target, self.request.canvas);
@@ -1589,5 +1597,140 @@ mod tests {
             .unwrap();
         assert!(empty.score.instructions.is_empty());
         assert!(empty.original_instruction_indices.is_empty());
+    }
+
+    #[test]
+    fn compact_color_cycle_uses_local_ordinal_and_preserves_performance_identity() {
+        let policy = hard(100);
+        let mut repeated = instruction(
+            json!({"kind": "source_instruction", "instruction_index": 0}),
+            false,
+        );
+        let arrangement = repeated.arrangement.as_mut().unwrap();
+        arrangement.count = 5;
+        arrangement.color_cycle = vec![inku_score::Color::Red, inku_score::Color::Blue];
+        repeated.color_hint = Some("red reflection".into());
+        let score = Score {
+            version: "0.10.0".into(),
+            canvas: inku_score::Canvas::Id("square".into()),
+            background: inku_score::Color::Black,
+            presence: None,
+            instructions: vec![repeated],
+            anchors: Vec::new(),
+            transform_groups: Vec::new(),
+            placement_groups: Vec::new(),
+            repetition_groups: Vec::new(),
+            fill_groups: Vec::new(),
+            resource_policy: Some(ScoreResourcePolicy {
+                accounting_id: inku_score::RESOURCE_ACCOUNTING_ID.into(),
+                hard_policy: policy.clone(),
+                operational_budget: OperationalResourceBudget(budget(100)),
+            }),
+        };
+        assert_eq!(score.validate_schema_edition(), Ok(()));
+        let request = PerformanceRequest {
+            score: &score,
+            performance_seed: Some(7),
+            composition_seed: Some(11),
+            canvas: None,
+        };
+        let operational = OperationalResourceBudget(budget(100));
+        let cycled = crate::checked_performance::resolve_checked_performance_with_resources(
+            request,
+            ScoreErrorPolicy::OmitAndContinue,
+            &policy,
+            operational,
+        )
+        .unwrap();
+
+        let mut baseline_score = score.clone();
+        baseline_score.instructions[0]
+            .arrangement
+            .as_mut()
+            .unwrap()
+            .color_cycle
+            .clear();
+        let baseline = crate::checked_performance::resolve_checked_performance_with_resources(
+            PerformanceRequest {
+                score: &baseline_score,
+                ..request
+            },
+            ScoreErrorPolicy::OmitAndContinue,
+            &policy,
+            operational,
+        )
+        .unwrap();
+
+        assert_eq!(
+            cycled
+                .score
+                .instructions
+                .iter()
+                .map(|instruction| instruction.color)
+                .collect::<Vec<_>>(),
+            vec![
+                inku_score::Color::Red,
+                inku_score::Color::Blue,
+                inku_score::Color::Red,
+                inku_score::Color::Blue,
+                inku_score::Color::Red,
+            ]
+        );
+        assert!(
+            cycled
+                .score
+                .instructions
+                .iter()
+                .all(|instruction| instruction.color_hint.as_deref() == Some("reflection"))
+        );
+        assert_eq!(cycled.original_instruction_indices, vec![0; 5]);
+        assert_eq!(
+            cycled.instruction_seed_overrides,
+            baseline.instruction_seed_overrides
+        );
+        assert_eq!(cycled.resource_demand, baseline.resource_demand);
+        assert_eq!(
+            cycled
+                .score
+                .instructions
+                .iter()
+                .map(|instruction| instruction.center)
+                .collect::<Vec<_>>(),
+            baseline
+                .score
+                .instructions
+                .iter()
+                .map(|instruction| instruction.center)
+                .collect::<Vec<_>>()
+        );
+
+        let mut outer_repeated = representative_score(policy.clone());
+        outer_repeated.instructions[2]
+            .arrangement
+            .as_mut()
+            .unwrap()
+            .color_cycle = vec![inku_score::Color::Red, inku_score::Color::Blue];
+        let performance = crate::checked_performance::resolve_checked_performance_with_resources(
+            PerformanceRequest {
+                score: &outer_repeated,
+                performance_seed: Some(7),
+                composition_seed: Some(11),
+                canvas: None,
+            },
+            ScoreErrorPolicy::OmitAndContinue,
+            &policy,
+            operational,
+        )
+        .unwrap();
+        assert_eq!(
+            performance
+                .score
+                .instructions
+                .iter()
+                .zip(&performance.original_instruction_indices)
+                .filter_map(|(instruction, &owner)| { (owner == 2).then_some(instruction.color) })
+                .collect::<Vec<_>>(),
+            vec![inku_score::Color::Red, inku_score::Color::Red]
+        );
     }
 }

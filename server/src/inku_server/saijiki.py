@@ -337,6 +337,16 @@ SAIJIKI: tuple[SaijikiCategory, ...] = (
         marker_order_en=("place", "draw", "arrange", "scatter", "tile", "fill"),
     ),
     SaijikiCategory(
+        key="jun",
+        name_ja="じゅん",
+        name_en="order",
+        marker_class=None,
+        words=(
+            _w("交互に", "alternating"),
+            _w("順に", "in order"),
+        ),
+    ),
+    SaijikiCategory(
         key="wariai",
         name_ja="わりあい",
         name_en="proportions",

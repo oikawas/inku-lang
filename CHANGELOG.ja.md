@@ -6,6 +6,12 @@
 
 **本書が持つのは v2.5.0（2026-07-25、render engine 12）以降**の 34 版である。それより前は書庫にある。
 
+### 2026-09-14 — 通常DDLから色を交互・指定順に配置する
+
+歳時記に「じゅん」を追加し、「交互に」「順に」をWeb／Androidの表示と入力例へ接続した。通常DDLの有限色列が共有Scoreとcompact演奏へ届き、指定順・重複・総個数を保つ。赤・灰・青の8個はABCABCAB、赤・灰の5個はABABAとなる。並べる・散らす・敷き詰める・埋めるで既存の個数規則と資源上限を使い、超過する配置だけを省略して他の描画を続ける。他属性・図形・まとまりの一般列は残件である。DDL_VERSIONは8、DDL engineは41、render engineは63へ進め、既存のScore形式、アプリ・build版、配備状態は変更しない。
+
+比較14で確認したNatureの七つの葉形の内容は作者に採用された。
+
 ### 2026-09-14 — 歳時記の語彙整理と端点接続・にじみの共通実装
 
 歳時記の表示と入力例をWeb／Androidの共通語彙に揃え、中央を中心、面の点を点描、震えるを揺れるへ統合した。`始点` / `終点`は先行する線または弧の対象側端点だけを選ぶ。接続元は既存の始点で、Lineのfrom→toとArcのangle_start→angle_endのidentityを保つ。ゆらぎの`にじみ` / `bleeding`は独立した`ink_spread:"bleed"`となり、Wave・Perlin・点描surfaceと併用できる。旧`滲む` / `blurring`は現行入力で新しい意味へ正規化し、保存済みScoreの旧surfaceBleed / qualityPinkは維持する。DDL_VERSION 7、DDL engine 40、render engine 62へ進み、新fieldを持つScoreだけ0.12とする。アプリ版とbuild番号は変更しない。

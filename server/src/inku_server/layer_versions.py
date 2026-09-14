@@ -284,7 +284,9 @@
 # by a successfully performed Touching pair.
 # 40: Shared endpoint selection and independent ink spread accompany the
 # consolidated vocabulary. Existing stored Scores retain their prior meaning.
-DDL_ENGINE_VERSION = "40"
+# 41: Ordinary color sequences preserve ordered duplicates and total placement
+# counts through the shared compact Score color cycle.
+DDL_ENGINE_VERSION = "41"
 # 4 (2026-07-30): yellow, orange, and purple become abstract Score colors, and
 # coerce recognizes the corresponding Japanese and English DDL markers.
 # 3 (2026-07-30): 黄 / 橙 / 紫 joined the saijiki color words, so an author can write
@@ -299,4 +301,5 @@ DDL_ENGINE_VERSION = "40"
 # 6 (2026-09-11): 油彩 / oil paint joins the touch vocabulary as its own wire key.
 # 7 (2026-09-14): Start/end become place words; center, stipple, swaying,
 # and independent bleeding replace the duplicate public entries.
-DDL_VERSION = "7"
+# 8 (2026-09-14): Alternating and in order join the new order category.
+DDL_VERSION = "8"

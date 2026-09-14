@@ -679,11 +679,19 @@ struct UnitMapping {
 
 impl UnitMapping {
     fn new(plan: &CompositionPlanResult<'_>) -> Result<Self, PlanResourceError> {
-        let count = plan
+        let retained_count = plan
             .verified_effective_view()
             .original_semantic_document()
             .instructions
             .len();
+        let highest_retained_source = plan
+            .objects
+            .iter()
+            .map(|object| object_source(object.origin()))
+            .chain(plan.anchor_origins.iter().map(anchor_source))
+            .max()
+            .map_or(0, |index| index + 1);
+        let count = retained_count.max(highest_retained_source);
         let mut result = Self {
             source_units: (0..count).collect(),
             owners: vec![None; count],

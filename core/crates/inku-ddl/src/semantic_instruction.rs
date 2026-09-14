@@ -21,7 +21,7 @@ use crate::{
 
 /// Stable identity for the runtime-disconnected explicit instruction association AST.
 pub const SEMANTIC_INSTRUCTION_ASSOCIATION_SCHEMA_ID: &str =
-    "inku.semantic-instruction-association.v20";
+    "inku.semantic-instruction-association.v21";
 
 /// An explicit fill domain. Inline operands retain their original instruction owner
 /// and are consumed as geometry by the fill, rather than drawn independently.
@@ -61,6 +61,7 @@ pub struct SemanticRelation {
 #[derive(Clone, Debug, PartialEq)]
 pub struct SemanticInstruction {
     pub entity: SemanticEntity,
+    pub sequence: Option<crate::SemanticSequence>,
     pub action: Option<SemanticTerm>,
     pub position: Option<SemanticTerm>,
     pub layout_direction: Option<SemanticTerm>,
@@ -622,7 +623,8 @@ fn build_semantic_instructions(
                 RemainingRoleKind::Angle
                 | RemainingRoleKind::Continuity
                 | RemainingRoleKind::Fluctuation
-                | RemainingRoleKind::Proportion => continue,
+                | RemainingRoleKind::Proportion
+                | RemainingRoleKind::Sequence => continue,
             };
             let region_index = sentence_region_index(&association.clause_stream, term.span);
             let projected =
@@ -645,10 +647,26 @@ fn build_semantic_instructions(
             .push(occurrence.clone());
     }
 
+    let sequence_marker_spans = association
+        .ast
+        .sequences
+        .iter()
+        .flat_map(|sequence| &sequence.sequence.markers)
+        .chain(
+            association
+                .sequence_issues
+                .iter()
+                .flat_map(|issue| &issue.markers),
+        )
+        .map(|marker| (marker.span.start_byte, marker.span.end_byte))
+        .collect::<BTreeSet<_>>();
     let coordination_evidence =
         collect_coordination_marker_evidence(document, &association.clause_stream)
             .into_iter()
             .filter(|marker| marker.kind == CoordinationMarkerKind::HeadConjunction)
+            .filter(|marker| {
+                !sequence_marker_spans.contains(&(marker.source.start_byte, marker.source.end_byte))
+            })
             .collect::<Vec<_>>();
     let owned_coordination_identities = coordination_evidence
         .iter()
@@ -713,7 +731,7 @@ fn build_semantic_instructions(
             });
         }
     }
-    for entity in &association.ast.entities {
+    for (entity_index, entity) in association.ast.entities.iter().enumerate() {
         let region_index = entity.head.source().region_index;
         let head_start = entity.head.source().span.start_byte;
         let action = select_one(
@@ -750,6 +768,12 @@ fn build_semantic_instructions(
         };
         instructions.push(SemanticInstruction {
             entity: entity.clone(),
+            sequence: association
+                .ast
+                .sequences
+                .iter()
+                .find(|sequence| sequence.target_entity_index == entity_index)
+                .map(|sequence| sequence.sequence.clone()),
             action,
             position,
             layout_direction: None,
@@ -2280,21 +2304,41 @@ fn japanese_entity_segment_is_clear(
                 ..
             } => true,
             ClauseAtom::RemainingRole(term) => term.role != RemainingRoleKind::Motion,
-            ClauseAtom::FunctionWord { span, .. } => matches!(
-                attachment_marker_at(association, clause_index, span.start_byte),
-                Some(AttachmentMarkerKind::Japanese(
-                    JapaneseAttachmentMarkerKind::No
-                        | JapaneseAttachmentMarkerKind::Ni
-                        | JapaneseAttachmentMarkerKind::De
-                        | JapaneseAttachmentMarkerKind::He
-                ))
-            ),
+            ClauseAtom::FunctionWord { span, .. } => {
+                matches!(
+                    attachment_marker_at(association, clause_index, span.start_byte),
+                    Some(AttachmentMarkerKind::Japanese(
+                        JapaneseAttachmentMarkerKind::No
+                            | JapaneseAttachmentMarkerKind::Ni
+                            | JapaneseAttachmentMarkerKind::De
+                            | JapaneseAttachmentMarkerKind::He
+                    ))
+                ) || semantic_sequence_marker_owns_span(association, *span)
+            }
             ClauseAtom::SaijikiRelation { span, .. } => association
                 .explicit_previous_references
                 .iter()
                 .any(|reference| reference.provenance.span == *span),
             ClauseAtom::UnresolvedDiagnostic(_) => false,
         })
+}
+
+fn semantic_sequence_marker_owns_span(
+    association: &SemanticAssociationResult,
+    span: SourceSpan,
+) -> bool {
+    association
+        .ast
+        .sequences
+        .iter()
+        .flat_map(|sequence| &sequence.sequence.markers)
+        .chain(
+            association
+                .sequence_issues
+                .iter()
+                .flat_map(|issue| &issue.markers),
+        )
+        .any(|marker| marker.span == span)
 }
 
 fn japanese_predicate_segment_is_clear(
@@ -2750,6 +2794,14 @@ pub(crate) fn semantic_instruction_value(instruction: &SemanticInstruction) -> V
             .map(semantic_relation_value)
             .unwrap_or(Value::Null),
     );
+    if let Some(sequence) = &instruction.sequence {
+        let mut value = crate::semantic_association::semantic_sequence_value(0, sequence);
+        value
+            .as_object_mut()
+            .expect("semantic sequence canonical value is an object")
+            .remove("target_instruction_index");
+        record.insert("sequence".to_owned(), value);
+    }
     Value::Object(record.into_iter().collect())
 }
 

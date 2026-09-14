@@ -137,6 +137,7 @@ pub fn materialize_selected_composition(
         };
         instruction.arrangement = Some(arrangement(
             count,
+            object.color_cycle(),
             ResolvedArrangement {
                 owner: saved_owner(object.origin()),
                 first_instance_ordinal: 0,
@@ -703,7 +704,11 @@ fn saved_dimensions(
     })
 }
 
-fn arrangement(count: u32, resolved: ResolvedArrangement) -> Arrangement {
+fn arrangement(
+    count: u32,
+    color_cycle: &[inku_score::Color],
+    resolved: ResolvedArrangement,
+) -> Arrangement {
     Arrangement {
         count,
         group_size: 1,
@@ -712,7 +717,7 @@ fn arrangement(count: u32, resolved: ResolvedArrangement) -> Arrangement {
         cols: None,
         jitter: 0.0,
         path: ArrangementPath::None,
-        color_cycle: Vec::new(),
+        color_cycle: color_cycle.to_vec(),
         margin: 0.0,
         center: None,
         radius: None,

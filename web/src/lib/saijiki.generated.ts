@@ -63,6 +63,12 @@ export const GENERATED_SAIJIKI: SaijikiCategory[] = [
 		words: ['置く', '並べる', '引く', '散らす', '埋める', '敷き詰める']
 	},
 	{
+		key: 'jun',
+		label: 'じゅん',
+		en: 'order',
+		words: ['交互に', '順に']
+	},
+	{
 		key: 'wariai',
 		label: 'わりあい',
 		en: 'proportions',
@@ -136,6 +142,12 @@ export const GENERATED_SAIJIKI_EN: SaijikiCategory[] = [
 		label: 'うごき',
 		en: 'motions',
 		words: ['place', 'line-up', 'draw', 'scatter', 'fill', 'tile']
+	},
+	{
+		key: 'jun',
+		label: 'じゅん',
+		en: 'order',
+		words: ['alternating', 'in order']
 	},
 	{
 		key: 'wariai',

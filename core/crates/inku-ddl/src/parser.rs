@@ -12,7 +12,7 @@ use crate::{
 };
 
 /// Stable identity for the runtime-disconnected neutral parser foundation.
-pub const NEUTRAL_LEXEME_PARSER_SCHEMA_ID: &str = "inku.neutral-lexeme-parser.v9";
+pub const NEUTRAL_LEXEME_PARSER_SCHEMA_ID: &str = "inku.neutral-lexeme-parser.v10";
 
 /// A half-open UTF-8 byte span into the source document.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
@@ -173,7 +173,18 @@ pub struct NeutralParseResult {
     pub recognized_delivery_count: usize,
 }
 
-const FUNCTION_WORDS_JA: &[&str] = &["を", "に", "で", "の", "は", "が", "へ", "と"];
+const FUNCTION_WORDS_JA: &[&str] = &[
+    "繰り返して",
+    "して",
+    "を",
+    "に",
+    "で",
+    "の",
+    "は",
+    "が",
+    "へ",
+    "と",
+];
 // V1 closed Japanese morphology classes. These are grammatical classes over accepted
 // canonical rows, not aliases or independent semantic vocabulary.
 const JAPANESE_COLOR_I_ADJECTIVE_STEMS_V1: &[&str] = &["白", "黒", "青", "赤"];
@@ -194,6 +205,7 @@ const FUNCTION_WORDS_EN: &[&str] = &[
     "to",
     "of",
     "and",
+    "repeating",
 ];
 const GROUP_LAYOUT_FUNCTION_WORDS_JA: &[&str] = &["重ねて", "並べて"];
 const GROUP_LAYOUT_FUNCTION_WORDS_EN: &[&str] = &["overlapping", "side by side"];

@@ -214,13 +214,26 @@ fn render_effect_hint(hint: Option<&str>) -> Option<String> {
     (!kept.is_empty()).then(|| kept.join("; "))
 }
 
+pub(crate) fn apply_color_cycle_at_ordinal(item: &mut Instruction, cycle: &[Color], ordinal: u64) {
+    if cycle.is_empty() {
+        return;
+    }
+    let cycle_len = u64::try_from(cycle.len()).expect("color cycle length fits u64");
+    let cycle_index = usize::try_from(ordinal % cycle_len).expect("color cycle index fits usize");
+    item.color = cycle[cycle_index];
+    item.color_hint = render_effect_hint(item.color_hint.as_deref());
+}
+
 fn apply_color_cycle(items: &mut [Instruction], cycle: &[Color]) {
     if cycle.is_empty() {
         return;
     }
     for (index, item) in items.iter_mut().enumerate() {
-        item.color = cycle[index % cycle.len()];
-        item.color_hint = render_effect_hint(item.color_hint.as_deref());
+        apply_color_cycle_at_ordinal(
+            item,
+            cycle,
+            u64::try_from(index).expect("group member index fits u64"),
+        );
     }
 }
 

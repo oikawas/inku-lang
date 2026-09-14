@@ -26,7 +26,7 @@ use crate::{
 };
 
 /// Stable identity for the runtime-disconnected semantic document root.
-pub const SEMANTIC_DOCUMENT_SCHEMA_ID: &str = "inku.semantic-document.v17";
+pub const SEMANTIC_DOCUMENT_SCHEMA_ID: &str = "inku.semantic-document.v18";
 
 /// A document background declaration, distinct from a drawable surface or Ground.
 #[derive(Clone, Debug, PartialEq)]
@@ -1320,6 +1320,7 @@ fn merge_predicate(target: &mut SemanticInstruction, continuation: &SemanticInst
     );
     merge_option(&mut target.action, &continuation.action);
     merge_option(&mut target.layout_direction, &continuation.layout_direction);
+    merge_option(&mut target.sequence, &continuation.sequence);
 }
 
 fn merge_option<T: Clone>(target: &mut Option<T>, continuation: &Option<T>) {

@@ -187,6 +187,18 @@
       "marker_order_en": ["place", "draw", "arrange", "scatter", "tile", "fill"]
     },
     {
+      "key": "jun",
+      "name_ja": "じゅん",
+      "name_en": "order",
+      "marker_class": null,
+      "words": [
+        {"surface_ja": "交互に", "surface_en": "alternating", "default": false, "prompt": true, "display": true, "marker": null, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": null},
+        {"surface_ja": "順に", "surface_en": "in order", "default": false, "prompt": true, "display": true, "marker": null, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": null}
+      ],
+      "marker_order_ja": null,
+      "marker_order_en": null
+    },
+    {
       "key": "wariai",
       "name_ja": "わりあい",
       "name_en": "proportions",

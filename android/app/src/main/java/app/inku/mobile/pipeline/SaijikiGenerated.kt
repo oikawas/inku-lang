@@ -90,6 +90,13 @@ object SaijikiGenerated {
             wordsEn = listOf("place", "line-up", "draw", "scatter", "fill", "tile"),
         ),
         Category(
+            key = "jun",
+            nameJa = "じゅん",
+            nameEn = "order",
+            wordsJa = listOf("交互に", "順に"),
+            wordsEn = listOf("alternating", "in order"),
+        ),
+        Category(
             key = "wariai",
             nameJa = "わりあい",
             nameEn = "proportions",

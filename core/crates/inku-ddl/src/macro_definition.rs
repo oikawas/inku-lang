@@ -66,7 +66,14 @@ pub fn project_macro_semantic_ref(
         .find(|candidate| candidate.key == *asset_key)?
         .words
         .iter()
-        .find(|word| word.surface_ja == canonical_surface_ja)?;
+        .find(|word| {
+            word.surface_ja == canonical_surface_ja
+                || word
+                    .parser_surfaces_ja
+                    .iter()
+                    .flatten()
+                    .any(|surface| surface == canonical_surface_ja)
+        })?;
     let lexical_id = word
         .score_value
         .clone()
@@ -1693,6 +1700,16 @@ fn known_semantic_id(category: &str, id: &str) -> bool {
 }
 
 pub(crate) fn canonical_semantic_ref_id(category: &str, id: &str) -> Option<String> {
+    match (category, id) {
+        // This spelling already shared center's canonical identity before the
+        // display rows were consolidated.
+        ("place", "middle") => return Some("center".to_owned()),
+        // These retired MacroDefinition wire IDs remain byte-distinct so saved
+        // definitions continue to match their existing locks. Visible DDL is
+        // normalized by the Saijiki parser; current definitions use the new IDs.
+        ("variation", "trembling" | "blurring") => return Some(id.to_owned()),
+        _ => {}
+    }
     match semantic_category_authority(category)? {
         SemanticCategoryAuthority::Relation => known_relation(id).then(|| id.to_owned()),
         SemanticCategoryAuthority::CoreModifier => {

@@ -1,14 +1,14 @@
 {
   "schema": "inku.bundled-macro-package.v1",
   "package_id": "Nature.leaves",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "entries": [
     {
       "definition": {
         "schema": "inku.macro-definition.v1",
         "namespace": "Nature",
         "heading": "若葉",
-        "version": "1.0.0",
+        "version": "1.0.1",
         "parameters": {},
         "components": {
           "leaf_form": {
@@ -52,7 +52,7 @@
                   "fluctuation_quality": {
                     "expr": "semantic_ref",
                     "category": "variation",
-                    "id": "trembling"
+                    "id": "swaying"
                   },
                   "movement": {
                     "expr": "semantic_ref",
@@ -109,7 +109,7 @@
                   "fluctuation_quality": {
                     "expr": "semantic_ref",
                     "category": "variation",
-                    "id": "trembling"
+                    "id": "swaying"
                   },
                   "movement": {
                     "expr": "semantic_ref",
@@ -282,8 +282,8 @@
         ]
       },
       "summaries": {
-        "ja": "若葉を4〜6枚、上半分へ散らす。各葉は両端で触れる二つの弧で、鉛筆の緑、細かな震え、上向きの異なる傾きを持つ。各葉の内側を輪郭と同じ色で塗る。",
-        "en": "Scatter 4–6 young leaves across the upper half. Each leaf is two arcs touching at both ends, in trembling fine green pencil with a separately chosen upward lean. Fill each leaf interior with the same color as its outline."
+        "ja": "若葉を4〜6枚、上半分へ散らす。各葉は両端で触れる二つの弧で、鉛筆の緑、細かな揺れ、上向きの異なる傾きを持つ。各葉の内側を輪郭と同じ色で塗る。",
+        "en": "Scatter 4–6 young leaves across the upper half. Each leaf is two arcs touching at both ends, in finely swaying green pencil with a separately chosen upward lean. Fill each leaf interior with the same color as its outline."
       }
     },
     {
@@ -1137,7 +1137,7 @@
         "schema": "inku.macro-definition.v1",
         "namespace": "Nature",
         "heading": "落葉",
-        "version": "1.0.0",
+        "version": "1.0.1",
         "parameters": {},
         "components": {
           "fallen_leaf": {
@@ -1176,10 +1176,10 @@
                     "expr": "parameter",
                     "name": "color"
                   },
-                  "fluctuation_quality": {
+                  "ink_spread": {
                     "expr": "semantic_ref",
                     "category": "variation",
-                    "id": "blurring"
+                    "id": "bleeding"
                   },
                   "movement": {
                     "expr": "semantic_ref",
@@ -1227,10 +1227,10 @@
                     "expr": "parameter",
                     "name": "color"
                   },
-                  "fluctuation_quality": {
+                  "ink_spread": {
                     "expr": "semantic_ref",
                     "category": "variation",
-                    "id": "blurring"
+                    "id": "bleeding"
                   },
                   "movement": {
                     "expr": "semantic_ref",
@@ -1495,8 +1495,8 @@
         ]
       },
       "summaries": {
-        "ja": "落葉8〜12枚を左上から右下へ順に流れる斜めの帯に置く。各葉は両端で触れる二弧で、クレヨンの赤と灰を厳密に交互にし、傾きをばらし、端を滲ませる。各葉の内側を輪郭と同じ色で塗る。",
-        "en": "Place 8–12 fallen leaves in order along a diagonal band from upper left to lower right. Each is a blurred crayon two-arc form touching at both ends, with strictly alternating red and gray and varied rotations. Fill each leaf interior with the same color as its outline."
+        "ja": "落葉8〜12枚を左上から右下へ順に流れる斜めの帯に置く。各葉は両端で触れる二弧で、クレヨンの赤と灰を厳密に交互にし、傾きをばらし、縁ににじみを加える。各葉の内側を輪郭と同じ色で塗る。",
+        "en": "Place 8–12 fallen leaves in order along a diagonal band from upper left to lower right. Each is a bleeding crayon two-arc form touching at both ends, with strictly alternating red and gray and varied rotations. Fill each leaf interior with the same color as its outline."
       }
     },
     {
@@ -1504,7 +1504,7 @@
         "schema": "inku.macro-definition.v1",
         "namespace": "Nature",
         "heading": "枯草",
-        "version": "1.0.0",
+        "version": "1.0.1",
         "parameters": {},
         "components": {
           "rooted_blade": {
@@ -1576,10 +1576,10 @@
                         "category": "variation",
                         "id": "quickly"
                       },
-                      "fluctuation_quality": {
+                      "ink_spread": {
                         "expr": "semantic_ref",
                         "category": "variation",
-                        "id": "blurring"
+                        "id": "bleeding"
                       },
                       "movement": {
                         "expr": "semantic_ref",
@@ -1625,10 +1625,10 @@
                         "category": "variation",
                         "id": "quickly"
                       },
-                      "fluctuation_quality": {
+                      "ink_spread": {
                         "expr": "semantic_ref",
                         "category": "variation",
-                        "id": "blurring"
+                        "id": "bleeding"
                       },
                       "movement": {
                         "expr": "semantic_ref",
@@ -1824,8 +1824,8 @@
         ]
       },
       "summaries": {
-        "ja": "下端の1〜2箇所の同じ根元から、枯れた縦長の葉を3〜5本ずつ上へ並べる。丈と傾きを垂直から右下がりまで大きく変え、チョークの灰で速く滲ませ、地面は描かない。各葉の内側を輪郭と同じ色で塗る。",
-        "en": "From 1–2 shared root spots at the bottom edge, raise 3–5 tall withered blades per root. Heights and leans vary strongly from vertical to falling; gray chalk moves quickly with blurred edges, and no ground is drawn. Fill each leaf interior with the same color as its outline."
+        "ja": "下端の1〜2箇所の同じ根元から、枯れた縦長の葉を3〜5本ずつ上へ並べる。丈と傾きを垂直から右下がりまで大きく変え、チョークの灰で速く揺らし、縁ににじみを加え、地面は描かない。各葉の内側を輪郭と同じ色で塗る。",
+        "en": "From 1–2 shared root spots at the bottom edge, raise 3–5 tall withered blades per root. Heights and leans vary strongly from vertical to falling; gray chalk sways quickly with bleeding edges, and no ground is drawn. Fill each leaf interior with the same color as its outline."
       }
     },
     {
@@ -1833,7 +1833,7 @@
         "schema": "inku.macro-definition.v1",
         "namespace": "Nature",
         "heading": "枯葉",
-        "version": "1.0.0",
+        "version": "1.0.1",
         "parameters": {},
         "components": {},
         "body": [
@@ -1927,7 +1927,7 @@
                               "fluctuation_quality": {
                                 "expr": "semantic_ref",
                                 "category": "variation",
-                                "id": "trembling"
+                                "id": "swaying"
                               },
                               "movement": {
                                 "expr": "semantic_ref",
@@ -1970,8 +1970,8 @@
         ]
       },
       "summaries": {
-        "ja": "雲形2〜4個を下の左右の隅に置く。チョークの灰で輪郭を細かく震わせ、内側も同じ灰で塗る。",
-        "en": "Place 2–4 cloudforms in the lower left or right corners. Their outlines tremble in fine gray chalk, and their interiors are filled with the same gray."
+        "ja": "雲形2〜4個を下の左右の隅に置く。チョークの灰で輪郭を細かく揺らし、内側も同じ灰で塗る。",
+        "en": "Place 2–4 cloudforms in the lower left or right corners. Their outlines sway finely in gray chalk, and their interiors are filled with the same gray."
       }
     }
   ]

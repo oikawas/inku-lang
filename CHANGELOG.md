@@ -6,6 +6,14 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 34 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-14 — Reconnect bundled Macros and saved definitions after vocabulary consolidation
+
+Updated young-leaf and dead-leaf definitions to canonical `swaying`, and falling leaves and dry grass from legacy Pink variation to independent `ink_spread:bleeding`. The four definitions and bundled package advance to 1.0.1. Saved definitions carrying legacy `trembling` or `blurring` retain their canonical bytes, digest, and lock and continue to resolve to Perlin or Pink respectively. Legacy `middle` retains its canonical identity shared with `center`. Saved configs are not rebound to the new catalog, and ordinary DDL and the public vocabulary retain the consolidation. DDL engine 45 identifies this change; render 66, DDL_VERSION 11, and Score formats are unchanged.
+
+### 2026-09-14 — Include Macros and mirroring in the Android shared rendering check
+
+Updated the existing on-device normal-authoring check to include a bundled Nature Macro and ordinary DDL mirroring. It checks shared Score delivery and the absence of resource omissions, relation omissions, and native rendering diagnostics, and records the actual config, DDL, and Score for comparison with the Python binding. Product rendering behavior is unchanged; Android BUILD_NUMBER follows normal automatic build allocation.
+
 ### 2026-09-14 — Mirror complete shapes and groups
 
 Added mirrored to the relations vocabulary and connected ordinary DDL to whole-shape, Macro, and group mirroring across the axis between two bodies. Explicit dimensions and orientation, and the follower’s color and tool, remain authoritative. Incompatible relations alone are omitted with diagnostics. Web and Android vocabulary and bilingual explanations and examples were updated. New mirror relations use Score 0.15, DDL_VERSION 11, DDL engine 44, and render engine 66. App versions, build numbers, and deployment are unchanged.

@@ -6,6 +6,14 @@
 
 **本書が持つのは v2.5.0（2026-07-25、render engine 12）以降**の 34 版である。それより前は書庫にある。
 
+### 2026-09-14 — 歳時記統合後の同梱Macroと保存定義を接続する
+
+若葉・枯葉の旧semantic IDをcanonicalな`swaying`へ揃え、落葉・枯草は旧Pinkの揺らぎから独立した`ink_spread:bleeding`へ更新した。四定義と同梱packageは1.0.1となる。旧`trembling`／`blurring`を持つ保存定義はcanonical bytes／digestとlockを保持し、それぞれ従来のPerlin／Pinkへ届ける。旧`middle`は`center`と同じcanonical identityを保つ。保存configを新しいcatalogへ差し替えず、通常DDLと公開語彙の統合を維持する。DDL engine45で識別し、render66／DDL_VERSION11／Score形式は変更しない。
+
+### 2026-09-14 — Androidの共有描画確認へMacroと鏡写しを含める
+
+既存の通常authoring実機確認を、同梱Nature Macroと通常DDLの鏡写しを含む入力へ更新した。共有Scoreへの配送に加え、資源・関係の省略と実描画の診断がないことを確認し、同入力のPython binding比較用に実config・DDL・Scoreを記録する。製品の描画処理は変更せず、Android BUILD_NUMBERは通常buildの自動採番に従う。
+
 ### 2026-09-14 — 形とまとまりを鏡写しにする
 
 歳時記のあいだへ「鏡写し／mirrored」を追加し、通常DDLから単独図形・Macro・組の全体を二者の間の軸に対する鏡像へ接続した。明示寸法・向きと後続の色・画材を保ち、両立しない関係だけを診断付きで外す。Web／Androidの語彙と日英の説明・例を更新した。新しい鏡写しだけScore0.15、DDL_VERSION11／DDL engine44／render engine66で識別する。アプリ版・build・配備は変更しない。

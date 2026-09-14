@@ -289,7 +289,8 @@
 # 42: Partway connections keep an interior path selector until performance.
 # 43: Ordinary noun groups and finite non-color sequences preserve total counts.
 # 44: Whole-body mirror relations preserve explicit follower facts.
-DDL_ENGINE_VERSION = "44"
+# 45: Bundled Nature uses consolidated semantics; saved Macro IDs keep their locks.
+DDL_ENGINE_VERSION = "45"
 # 4 (2026-07-30): yellow, orange, and purple become abstract Score colors, and
 # coerce recognizes the corresponding Japanese and English DDL markers.
 # 3 (2026-07-30): 黄 / 橙 / 紫 joined the saijiki color words, so an author can write

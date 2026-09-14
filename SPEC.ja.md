@@ -240,6 +240,8 @@ MacroのConnectedは、先行するLineを`from`に指定し、任意の数値�
 
 揺らぎparameterはasset category `variation`のまま、任意のclosed `dimension`（`amplitude` / `frequency` / `quality` / `spread`）で候補を制限できる。例は`{"type":"semantic_ref","category":"variation","dimension":"amplitude"}`である。SemanticRefの`dimension`はvariation以外では禁止し、省略／Noneは旧category-only matchingとcanonical bytes / digestを保つ。Someはdefinition digestに含む。Flat Emitは`fluctuation_amplitude` / `fluctuation_frequency` / `fluctuation_quality` / `ink_spread`を使い、値は各dimensionに属する既存`SemanticRef { category: variation, id }`である。Field名は語義identityを変更しない。Definition、component `use`、binding、実行境界で同じ現行7語の分類を検査する。
 
+保存済みMacroDefinitionの旧`variation:trembling`と`variation:blurring`は、定義のcanonical bytes／digestとlockを変えずに受理し、それぞれ従来のPerlinとPinkへ届ける。旧`place:middle`は従来どおり`center`と同じcanonical identityを保つ。これは共有の保存形式互換であり、特定plugin名への分岐や歳時記への旧語の再追加ではない。新しい定義はcanonicalな`swaying`や独立した`ink_spread:bleeding`を使い、本文変更は新しいdefinition version／digestで識別する。保存済みconfigを現在のcatalog定義へ差し替えない。
+
 宣言parameterはすべて必須である。三parameterを宣言してcallerが一値だけならMissingCompatibleFact等のbinding errorとなる。一振幅parameterだけを宣言してEmitへ届けた場合は、§13.6の同じresolverが残る二slotを解決する。未宣言callerの推測overlay、generic variation一fieldからの三slot推測、parameter optional化は行わない。
 
 `inku.macro-definition.v1`はclosed typed parameterと、definition-local `components`、共通operator `emit` / `use` / `group` / `anchor` / `relation` / bounded `repeat` / typed `transform` / deterministic bounded `vary`だけを持つ。任意code、I/O、無制限loop、recursion / component cycle、filesystem / network / clock / environment、外部macro依存、raw SVG / Score / renderer instructionの生成を許さない。Expansionはeffect-freeで、attested composition seedと明示boundsから決定的なsemantic nodeとsource / generated typed provenanceを返す。

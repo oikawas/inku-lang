@@ -57,19 +57,31 @@ The four effect tags are `select_description_catalog`,
 `generate_normalized_ddl`, `commit_visible_normalized_ddl`, and
 `complete_visible_ddl_holes`. Each result echoes action ID, attempt, and request
 digest. Retries preserve the logical action ID and increase its attempt; a new
-action receives a new identity. The host enforces the supplied delay and timeout
-and reports elapsed time including its provider attempt, but not a delay already
-accounted for by the core.
+action receives a new identity. Corrective Stage 1 normalization is a new action
+because compiler feedback changes its payload and request digest. The host
+enforces the supplied delay and timeout and reports elapsed time including its
+provider attempt, but not a delay already accounted for by the core.
 
 | Result | Core decision |
 | --- | --- |
 | Temporary transport, timeout, rate limit, or response schema failure | Retry within the explicit attempt and total-time budget |
-| Provider rejection or semantic validation failure | No retry |
+| Compiler rejection of an uncommitted core-generated Stage 1 candidate | Request complete DDL again from the same Stage 1 with the original description, rejected DDL, and bounded reason/span diagnostics with corresponding exact source excerpts, using a new logical action within the same Stage 1 `max_attempts` and `total_timeout_ms` budget |
+| Provider rejection or any other semantic validation failure | No retry |
 | Catalog selection exhausted or rejected | Resolve `default`, record `auto_fallback_default`, then construct Stage 1 |
 | Stage 1 exhausted or rejected | Fail without a new semantic artifact |
 | Hole completion exhausted or rejected | Keep committed DDL and require user editing |
 | Host commit failure | Fail and retain the last acknowledged document and authority |
 | Cancellation | Invalidate the outstanding action; later results are stale |
+
+The corrective Stage 1 path uses the same model and response schema and returns
+a complete replacement DDL. The rejected candidate is not committed as the
+visible document or as a work; it remains only in request context retained for
+durable execution replay. This path does not apply to direct or already accepted
+author DDL, or to Macro expansion budget or integrity failures after the source
+already has canonical pre-expansion meaning. Provider-reported generic semantic
+failure and hole-patch validation are also terminal. The host does not repair DDL
+or decide to retry, and the correction does not relax the compiler, reduce counts,
+patch Score, or delegate hidden meaning changes to a later LLM.
 
 `commit_visible_normalized_ddl` carries the exact visible document, its digest,
 and an authority proposal with an expected revision. The host makes these bytes

@@ -165,7 +165,14 @@ impl RetryPolicy {
         if matches!(
             failure,
             ProviderFailure::ProviderRejected | ProviderFailure::SemanticViolation
-        ) || attempt >= self.max_attempts
+        ) {
+            return None;
+        }
+        self.next_budgeted_attempt(attempt, elapsed_ms)
+    }
+
+    pub(crate) fn next_budgeted_attempt(self, attempt: u32, elapsed_ms: u64) -> Option<u32> {
+        if attempt >= self.max_attempts
             || elapsed_ms.checked_add(self.retry_delay_ms.get())? >= self.total_timeout_ms.get()
         {
             return None;

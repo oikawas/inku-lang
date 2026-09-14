@@ -140,6 +140,21 @@ fn run(snapshot: Option<&PipelineSnapshot>, input: &Envelope<PipelineInput>) -> 
     serde_json::from_value(output["payload"]["result"].clone()).unwrap()
 }
 
+fn run_error(
+    snapshot: Option<&PipelineSnapshot>,
+    input: &Envelope<PipelineInput>,
+) -> serde_json::Value {
+    let snapshot_bytes = snapshot
+        .map(|state| serde_json::to_vec(state).unwrap())
+        .unwrap_or_default();
+    let mut wire = serde_json::to_value(input).unwrap();
+    wire["payload"]["version"] = json!(1);
+    let bytes = step_owned(&snapshot_bytes, &serde_json::to_vec(&wire).unwrap());
+    let output: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+    assert_eq!(output["kind"], "error", "{output}");
+    output
+}
+
 fn ack(state: &PipelineSnapshot) -> PipelineInput {
     let action = state.action.as_ref().unwrap();
     PipelineInput::EffectResult {
@@ -244,6 +259,261 @@ fn unresolved_qualified_macro_blocks_without_stage2_completion() {
             .as_array()
             .is_some_and(|identities| !identities.is_empty()),
         "MissingLock must be represented as a blocking diagnostic"
+    );
+}
+
+#[test]
+fn stage1_compiler_feedback_retries_before_the_corrected_ddl_commits() {
+    let description = "One quiet black circle";
+    let rejected_ddl = "Unknown.Macro.";
+    let corrected_ddl = "place one black circle at center.";
+    let mut pipeline_config = config();
+    pipeline_config.stage1_retry.attempt_timeout_ms = DecimalU64::new(3_000);
+    let start = envelope(
+        None,
+        PipelineInput::Start {
+            variation_id: "compiler-feedback".into(),
+            authoring_nonce: "compiler-feedback-1".into(),
+            config: Box::new(pipeline_config),
+            authority: VariationAuthorityState::new_description(),
+            authoring: AuthoringInput::Description {
+                description: description.into(),
+                auto_catalog: false,
+            },
+        },
+    );
+    let mut state = run(None, &start).snapshot;
+    let original_action = state.action.as_ref().unwrap().identity.clone();
+    let rejected = envelope(
+        Some(&state),
+        PipelineInput::EffectResult {
+            result: EffectResult::NormalizedDdlGenerated {
+                identity: original_action.clone(),
+                response: json!({"normalized_ddl": rejected_ddl}).to_string(),
+                elapsed_ms: DecimalU64::new(20),
+            },
+        },
+    );
+    let rejected_output = run(Some(&state), &rejected);
+    state = rejected_output.snapshot;
+    assert!(state.document.is_none() && state.delivery.is_none());
+    assert!(
+        rejected_output
+            .events
+            .iter()
+            .all(|event| event.tag != "visible_ddl_ready")
+    );
+    let feedback_action = state.action.as_ref().unwrap();
+    assert_eq!(feedback_action.tag, "generate_normalized_ddl");
+    assert_ne!(
+        feedback_action.identity.action_id,
+        original_action.action_id
+    );
+    assert_ne!(
+        feedback_action.identity.request_digest,
+        original_action.request_digest
+    );
+    assert_eq!(feedback_action.identity.attempt, 2);
+    assert_eq!(feedback_action.timeout_ms, DecimalU64::new(2_970));
+    let feedback: serde_json::Value = serde_json::from_str(
+        feedback_action.payload["prompt"]["message"]
+            .as_str()
+            .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(feedback["description"], description);
+    assert_eq!(feedback["compiler_feedback"]["rejected_ddl"], rejected_ddl);
+    let diagnostics = feedback["compiler_feedback"]["diagnostics"]
+        .as_array()
+        .expect("compiler feedback must contain diagnostics");
+    assert!(!diagnostics.is_empty());
+    assert!(
+        diagnostics
+            .iter()
+            .all(|diagnostic| { diagnostic["kind"].is_string() && diagnostic["span"].is_object() })
+    );
+
+    let stale = envelope(
+        Some(&state),
+        PipelineInput::EffectResult {
+            result: EffectResult::NormalizedDdlGenerated {
+                identity: original_action,
+                response: json!({"normalized_ddl": corrected_ddl}).to_string(),
+                elapsed_ms: DecimalU64::new(20),
+            },
+        },
+    );
+    assert_eq!(
+        run_error(Some(&state), &stale)["payload"]["code"],
+        "stale_result"
+    );
+
+    let corrected = envelope(
+        Some(&state),
+        PipelineInput::EffectResult {
+            result: EffectResult::NormalizedDdlGenerated {
+                identity: feedback_action.identity.clone(),
+                response: json!({"normalized_ddl": corrected_ddl}).to_string(),
+                elapsed_ms: DecimalU64::new(20),
+            },
+        },
+    );
+    state = run(Some(&state), &corrected).snapshot;
+    assert!(state.document.is_none());
+    assert!(state.delivery.is_none());
+    let commit = state.action.as_ref().unwrap();
+    assert_eq!(commit.tag, "commit_visible_normalized_ddl");
+    assert_eq!(commit.payload["document"]["source"], corrected_ddl);
+    let committed = run(Some(&state), &envelope(Some(&state), ack(&state))).snapshot;
+    assert!(matches!(committed.phase, PipelinePhase::ScoreReady));
+    assert_eq!(committed.document.as_ref().unwrap().source, corrected_ddl);
+    assert!(committed.delivery.as_ref().unwrap().score.is_some());
+}
+
+#[test]
+fn stage1_compiler_feedback_uses_the_shared_attempt_budget() {
+    let mut pipeline_config = config();
+    pipeline_config.stage1_retry.max_attempts = 2;
+    let start = envelope(
+        None,
+        PipelineInput::Start {
+            variation_id: "compiler-feedback-exhaustion".into(),
+            authoring_nonce: "compiler-feedback-exhaustion-1".into(),
+            config: Box::new(pipeline_config),
+            authority: VariationAuthorityState::new_description(),
+            authoring: AuthoringInput::Description {
+                description: "One quiet black circle".into(),
+                auto_catalog: false,
+            },
+        },
+    );
+    let mut state = run(None, &start).snapshot;
+    let original_action = state.action.as_ref().unwrap().identity.clone();
+    let transport_retry = envelope(
+        Some(&state),
+        PipelineInput::EffectResult {
+            result: EffectResult::ProviderFailed {
+                identity: original_action.clone(),
+                failure: ProviderFailure::TransportUnavailable,
+                elapsed_ms: DecimalU64::new(20),
+            },
+        },
+    );
+    state = run(Some(&state), &transport_retry).snapshot;
+    assert_eq!(
+        state.action.as_ref().unwrap().identity.action_id,
+        original_action.action_id
+    );
+    assert_eq!(state.action.as_ref().unwrap().identity.attempt, 2);
+    let rejected = envelope(
+        Some(&state),
+        PipelineInput::EffectResult {
+            result: EffectResult::NormalizedDdlGenerated {
+                identity: state.action.as_ref().unwrap().identity.clone(),
+                response: json!({"normalized_ddl": "Unknown.Macro."}).to_string(),
+                elapsed_ms: DecimalU64::new(20),
+            },
+        },
+    );
+    state = run(Some(&state), &rejected).snapshot;
+    assert!(
+        matches!(state.phase, PipelinePhase::Failed { ref reason } if reason == "stage1_failed")
+    );
+    assert!(state.action.is_none() && state.document.is_none() && state.delivery.is_none());
+}
+
+#[test]
+fn stage1_does_not_correct_canonical_ddl_when_macro_expansion_exceeds_its_budget() {
+    let definition = inku_ddl::MacroDefinition::from_json(
+        &json!({
+            "schema": "inku.macro-definition.v1", "namespace": "Example", "heading": "Circle",
+            "version": "1.0.0", "parameters": {}, "components": {}, "body": [{
+                "op": "emit", "binding": null, "fields": {
+                    "shape": {"expr": "semantic_ref", "category": "shape", "id": "circle"},
+                    "movement": {"expr": "semantic_ref", "category": "movement", "id": "place"},
+                    "color": {"expr": "semantic_ref", "category": "color", "id": "black"},
+                    "position_x": {"expr": "exact_decimal", "value": "0.5"},
+                    "position_y": {"expr": "exact_decimal", "value": "0.5"},
+                    "count": {"expr": "integer", "value": 1}
+                }
+            }]
+        })
+        .to_string(),
+    )
+    .unwrap();
+    let source = "Example.Circle. Example.Circle.";
+    let identity = definition.identity().unwrap();
+    let document = inku_ddl::NormalizedDdlDocument::new(
+        source,
+        inku_ddl::ResolvedInstructionLanguage::En,
+        vec![
+            inku_ddl::MacroLock::new(
+                identity.qualified_name(),
+                identity.version(),
+                format!("sha256:{}", identity.full_digest_hex()),
+            )
+            .unwrap(),
+        ],
+    )
+    .unwrap();
+    let mut pipeline_config = config();
+    pipeline_config
+        .compiler
+        .macro_expansion_limits
+        .max_invocations = DecimalU64::new(1);
+    let compiled = inku_ddl::compile_typed_ddl(
+        document,
+        std::slice::from_ref(&definition),
+        Some(17),
+        pipeline_config.compiler.macro_limits().unwrap(),
+    );
+    assert!(compiled.pre_expansion_canonical_bytes().is_some());
+    assert!(
+        !compiled
+            .compiler_lock
+            .as_ref()
+            .is_some_and(|lock| lock.state == inku_ddl::CompilerLockState::CanonicalReady)
+    );
+    pipeline_config.definitions = vec![definition];
+    pipeline_config.macro_summaries = vec!["A black circle at the center".into()];
+    let start = envelope(
+        None,
+        PipelineInput::Start {
+            variation_id: "expansion-budget".into(),
+            authoring_nonce: "expansion-budget-1".into(),
+            config: Box::new(pipeline_config),
+            authority: VariationAuthorityState::new_description(),
+            authoring: AuthoringInput::Description {
+                description: "Two black circles at the center".into(),
+                auto_catalog: false,
+            },
+        },
+    );
+    let state = run(None, &start).snapshot;
+    let generated = envelope(
+        Some(&state),
+        PipelineInput::EffectResult {
+            result: EffectResult::NormalizedDdlGenerated {
+                identity: state.action.as_ref().unwrap().identity.clone(),
+                response: json!({"normalized_ddl": source}).to_string(),
+                elapsed_ms: DecimalU64::new(20),
+            },
+        },
+    );
+    let output = run(Some(&state), &generated);
+    assert!(
+        matches!(output.snapshot.phase, PipelinePhase::Failed { ref reason } if reason == "stage1_failed")
+    );
+    assert!(
+        output.snapshot.action.is_none()
+            && output.snapshot.document.is_none()
+            && output.snapshot.delivery.is_none()
+    );
+    assert!(
+        output
+            .events
+            .iter()
+            .all(|event| event.tag != "effect_requested")
     );
 }
 

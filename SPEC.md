@@ -1440,11 +1440,36 @@ After selecting ordinary history, description generation and DDL drawing wait fo
 
 ### 12.8 Error Recovery
 
-Each LLM stage retries an empty, too-short, or schema-invalid response once with
-the reason stated. If the retry is still unusable, it does not switch models: it
-either completes finitely through the deterministic fallback or fails
-explicitly. A fallback is a compatibility delivery path for explicit DDL, not a
-way to add new content.
+Each LLM stage makes retry decisions only within its caller-supplied
+`max_attempts` and `total_timeout_ms`. Transport failures and empty, too-short,
+or schema-invalid responses may consume another attempt within that finite
+budget; provider rejection and generic semantic failure remain terminal. On
+exhaustion it does not switch models: it either completes finitely through the
+deterministic fallback or fails explicitly. A fallback is a compatibility
+delivery path for explicit DDL, not a way to add new content.
+
+When the shared compiler rejects a core-generated Stage 1 candidate before its
+visible commit, the core may spend the remaining Stage 1 `max_attempts` and
+`total_timeout_ms` budget on corrective normalization. It sends the original
+description, the unadopted DDL, and a bounded projection of compiler reasons,
+source spans, and their exact source excerpts when present to the same Stage 1
+under the same response schema, and requests a complete replacement DDL. Because
+this feedback changes the payload, the
+correction is a new logical action with a new request digest; transport retries
+and corrective actions consume the same finite Stage 1 budget. A rejected
+candidate is not committed as visible DDL or as a work; it remains only in the
+request context retained for durable execution replay. Only a replacement
+accepted by the compiler enters the ordinary visible-DDL commit.
+
+This correction applies only to compiler rejection of an uncommitted
+core-generated Stage 1 candidate. It never rewrites direct or already accepted
+author DDL, and it ends once the source has canonical pre-expansion meaning;
+later Macro expansion budget or integrity failures are terminal.
+Provider-reported generic semantic failure and hole-patch semantic validation
+also remain terminal, and the host neither repairs meaning nor retries on its
+own. The correction returns DDL through Stage 1 rather than reducing counts,
+relaxing the compiler, patching Score, or asking a later LLM to alter hidden
+meaning.
 
 Responses and saved history retain the fallback reason per stage, the models
 used, and provider-failure classification; the UI identifies the affected

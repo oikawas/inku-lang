@@ -943,7 +943,11 @@ Transcript replayはcommandと最終effect resultの入力envelopeだけから�
 
 ### 12.8 エラー回復戦略
 
-各 LLM 段は、空・短すぎる・schema 不適合の応答に対して理由を明示した再試行を一度だけ行う。再試行後も使えない場合は別モデルへ切り替えず、決定的フォールバックで有限に完了するか、明示的に失敗する。フォールバックは DDL の明示要素を配達するための互換経路であって、新しい内容を補う経路ではない。
+各 LLM 段のretry判断は、callerが明示した`max_attempts`と`total_timeout_ms`の範囲内だけで行う。Transport failureと空・短すぎる・schema不適合の応答は、その有限budget内で次のattemptを消費できるが、provider rejectionとgeneric semantic failureは終端である。Budgetを使い切った後は別モデルへ切り替えず、決定的フォールバックで有限に完了するか、明示的に失敗する。フォールバックは DDL の明示要素を配達するための互換経路であって、新しい内容を補う経路ではない。
+
+共有compilerがcore生成のStage 1候補を可視commit前に拒否した場合、coreはStage 1の`max_attempts`と`total_timeout_ms`の残りを再正規化に使える。同じStage 1とresponse schemaへ、元の記述、未採用DDL、compilerのreason、source span、spanがある場合は対応する原文断片からなる有限projectionを渡し、完全な置換DDLを要求する。このfeedbackはpayloadを変えるため、再正規化は新しいrequest digestを持つnew logical actionである。Transport retryと再正規化actionは同じ有限Stage 1 budgetを消費する。拒否された候補は可視DDLまたは作品としてcommitせず、durable execution replay用に保持するrequest contextにだけ残す。Compilerが受理した置換候補だけを通常のvisible DDL commitへ進める。
+
+この再正規化は、未commitのcore生成Stage 1候補に対するcompiler rejectionだけに適用する。Direct DDLまたは既に受理された作者DDLを書き換えず、sourceの意味がpre-expansionでcanonicalになった後のMacro expansion予算・整合性failureも対象にしない。Providerが報告するgeneric semantic failureとhole patchのsemantic validationも終端のままで、hostは意味を補修せず、独自にretryしない。Compilerを緩和せず、個数を減らさず、Scoreを補修せず、後段LLMに非表示の意味を変更させず、Stage 1からDDLを返す。
 
 応答と保存履歴は Stage ごとのフォールバック理由、使用モデル、provider failure の分類を保持し、UI は発生した層を示す。`interpret_fallback` / `compose_fallback` は理由、`"none"`、欄導入前の未記録を区別する。印のある親から推敲するときは実行前に一度確認し、既存作品へ遡及して値を書かない。
 

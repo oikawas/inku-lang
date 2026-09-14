@@ -8,7 +8,7 @@
 
 ### 2026-09-14 — 記述からの描画応答と失敗表示を修正
 
-共有pipelineのJSON応答schemaを実際のモデル要求へ渡し、OpenAI互換接続では既存の提供元別structured outputを使う。Stage 1へ自由記述の抽象化、明示対象だけのMacro選択、有限な命令・参照文法を戻し、命令配列や説明句を生成する失敗を抑える。可視DDLの検証、補完候補の承認、再試行の管理は共有coreに保つ。Webはpipelineの失敗・補完承認を提供元HTTPエラーと混同せず、現在のphaseに対応する理由を表示する。描画・DDLの決定的意味、版、camera語彙projectionは変更しない。
+共有pipelineのJSON応答schemaを実際のモデル要求へ渡し、OpenAI互換接続では既存の提供元別structured outputを使う。Stage 1へ自由記述の抽象化、明示対象だけのMacro選択、有限な命令・参照文法を戻し、命令配列や説明句を生成する失敗を抑える。可視DDLの検証、補完候補の承認、再試行の管理は共有coreに保つ。Coreのcompilerが未commitのStage 1候補を拒否した場合は、残るStage 1 budget内で元記述・未採用DDL・有限reason/span診断をnew action digestへ載せ、完全DDLをもう一度要求する。拒否候補は可視DDLまたは作品としてcommitせず、受理済み作者DDLは変更しない。Webはpipelineの失敗・補完承認を提供元HTTPエラーと混同せず、現在のphaseに対応する理由を表示する。描画・DDLの決定的意味、版、camera語彙projectionは変更しない。
 
 ### 2026-09-14 — カメラの共有語彙と旧層整理
 

@@ -4,7 +4,8 @@ use std::collections::BTreeMap;
 
 use inku_ddl::{
     CompilerLockState, MacroDefinition, MacroLock, NormalizedDdlDocument,
-    ResolvedInstructionLanguage, compile_typed_ddl, validate_visible_ddl_patch,
+    ResolvedInstructionLanguage, TypedDdlCompilation, compile_typed_ddl,
+    validate_visible_ddl_patch,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -19,7 +20,7 @@ use crate::prompts::{
     DescriptionCatalogEntry, HolePatchResponse, LlmPrompt, LlmStage, MacroPromptEntry,
     PromptLimits, Stage1Context, build_catalog_selection_prompt, build_hole_completion_prompt,
     build_stage1_prompt, parse_catalog_selection_response, parse_hole_patch_response,
-    parse_stage1_response,
+    parse_stage1_response, with_stage1_compiler_feedback,
 };
 use crate::protocol::{
     ActionEcho, DecimalU64, EffectAction, EffectResult, Envelope, PROTOCOL_NAME, PROTOCOL_VERSION,
@@ -417,6 +418,17 @@ impl PipelineSnapshot {
         timeout_ms: u64,
         events: &mut Vec<PipelineEvent>,
     ) -> Result<(), ProtocolError> {
+        self.issue_attempt(tag, payload, timeout_ms, 1, events)
+    }
+
+    fn issue_attempt(
+        &mut self,
+        tag: &str,
+        payload: serde_json::Value,
+        timeout_ms: u64,
+        attempt: u32,
+        events: &mut Vec<PipelineEvent>,
+    ) -> Result<(), ProtocolError> {
         self.action_ordinal = self.action_ordinal.checked_next()?;
         let request_digest = value_digest("inku.pipeline-request.v1", &payload)?;
         let ordinal = self.action_ordinal.get().to_string();
@@ -434,7 +446,7 @@ impl PipelineSnapshot {
             version: 1,
             identity: ActionEcho {
                 action_id,
-                attempt: 1,
+                attempt,
                 request_digest,
             },
             timeout_ms: DecimalU64::new(timeout_ms),
@@ -574,6 +586,11 @@ impl PipelineSnapshot {
             self.authority
                 .propose_stage1_result_commit(self.authority.revision()),
         )?;
+        let prompt = self.stage1_prompt(&description)?;
+        self.begin_llm(prompt, Some(description), Vec::new(), events)
+    }
+
+    fn stage1_prompt(&self, description: &str) -> Result<LlmPrompt, ProtocolError> {
         let macros = self
             .config
             .definitions
@@ -605,15 +622,59 @@ impl PipelineSnapshot {
             )
             .map_err(|_| ProtocolError::SchemaViolation)?,
         };
-        let prompt = build_stage1_prompt(
-            &description,
+        build_stage1_prompt(
+            description,
             self.config.language,
             &context,
             &macros,
             self.config.prompt_limits,
         )
-        .map_err(|_| ProtocolError::SchemaViolation)?;
-        self.begin_llm(prompt, Some(description), Vec::new(), events)
+        .map_err(|_| ProtocolError::SchemaViolation)
+    }
+
+    fn correct_stage1(
+        &mut self,
+        compiled: &TypedDdlCompilation,
+        description: String,
+        elapsed_ms: u64,
+        events: &mut Vec<PipelineEvent>,
+    ) -> Result<bool, ProtocolError> {
+        let policy = self.config.stage1_retry;
+        let attempt = self
+            .action
+            .as_ref()
+            .ok_or(ProtocolError::InvalidState)?
+            .identity
+            .attempt;
+        let Some(next) = policy.next_budgeted_attempt(attempt, elapsed_ms) else {
+            return Ok(false);
+        };
+        let Ok(prompt) = with_stage1_compiler_feedback(
+            self.stage1_prompt(&description)?,
+            compiled,
+            self.config.prompt_limits,
+        ) else {
+            return Ok(false);
+        };
+        let total = elapsed_ms
+            .checked_add(policy.retry_delay_ms.get())
+            .ok_or(ProtocolError::InvalidPolicy)?;
+        self.phase = PipelinePhase::AwaitingLlm {
+            stage: LlmStage::GenerateNormalizedDdl,
+            description: Some(description),
+            hole_ids: Vec::new(),
+            elapsed_ms: DecimalU64::new(total),
+        };
+        // A changed request gets a new action identity but keeps the stage budget.
+        self.issue_attempt(
+            LlmStage::GenerateNormalizedDdl.action_name(),
+            json!({"prompt": prompt, "policy": policy}),
+            policy.remaining_attempt_timeout(total),
+            next,
+            events,
+        )?;
+        self.action.as_mut().unwrap().delay_ms = policy.retry_delay_ms;
+        Ok(true)
     }
 
     fn description(
@@ -886,6 +947,14 @@ impl PipelineSnapshot {
                     .as_ref()
                     .is_some_and(|lock| lock.state == CompilerLockState::CanonicalReady)
                 {
+                    if self.correct_stage1(
+                        &compiled,
+                        description.ok_or(ProtocolError::InternalInvariant)?,
+                        total,
+                        events,
+                    )? {
+                        return Ok(());
+                    }
                     return self.failure(ProviderFailure::SemanticViolation, spent_ms, events);
                 }
                 let next = proposal(

@@ -865,11 +865,21 @@ fn named_anchor(
     owner: usize,
     canvas: Option<crate::types::CanvasSize>,
 ) -> Point {
-    let [x0, y0, x1, y1] = crate::placement::region_in_short_side_units(region, canvas);
+    let [x0, y0, x1, y1] = named_region_in_short_side_units(region, canvas);
     Point::new(
         x0 + (x1 - x0) * crate::determinism::hash01(owner as i64, seed, "typed-anchor-x"),
         y0 + (y1 - y0) * crate::determinism::hash01(owner as i64, seed, "typed-anchor-y"),
     )
+}
+
+fn named_region_in_short_side_units(
+    region: [f64; 4],
+    canvas: Option<crate::types::CanvasSize>,
+) -> [f64; 4] {
+    let [x0, y0, x1, y1] = crate::placement::region_in_short_side_units(region, canvas);
+    let start = crate::geometry::point_to_short_side_units(Point::new(x0, y0), canvas);
+    let end = crate::geometry::point_to_short_side_units(Point::new(x1, y1), canvas);
+    [start.x, start.y, end.x, end.y]
 }
 
 fn resolved_anchor(
@@ -962,7 +972,7 @@ fn recipe_centers(
             ResolvedPlacementAnchor::Named { region },
             _,
         ) => {
-            let [x0, y0, _, _] = crate::placement::region_in_short_side_units(*region, canvas);
+            let [x0, y0, _, _] = named_region_in_short_side_units(*region, canvas);
             for center in &mut centers {
                 center.x += x0;
                 center.y += y0;
@@ -1609,10 +1619,16 @@ mod tests {
         let arrangement = repeated.arrangement.as_mut().unwrap();
         arrangement.count = 5;
         arrangement.color_cycle = vec![inku_score::Color::Red, inku_score::Color::Blue];
+        let resolved = arrangement.resolved.as_mut().unwrap();
+        resolved.domain = Point::new(2.35, 1.0);
+        resolved.anchor = ResolvedPlacementAnchor::Named {
+            region: [0.5, 0.5, 0.5, 0.5],
+        };
+        resolved.recipe = ResolvedPlacementRecipe::HorizontalLine { cell_width: 0.47 };
         repeated.color_hint = Some("red reflection".into());
         let score = Score {
             version: "0.10.0".into(),
-            canvas: inku_score::Canvas::Id("square".into()),
+            canvas: inku_score::Canvas::Id("wide".into()),
             background: inku_score::Color::Black,
             presence: None,
             instructions: vec![repeated],
@@ -1632,7 +1648,7 @@ mod tests {
             score: &score,
             performance_seed: Some(7),
             composition_seed: Some(11),
-            canvas: None,
+            canvas: Some(crate::types::CanvasSize::new(2.35, 1.0)),
         };
         let operational = OperationalResourceBudget(budget(100));
         let cycled = crate::checked_performance::resolve_checked_performance_with_resources(
@@ -1682,6 +1698,23 @@ mod tests {
                 .instructions
                 .iter()
                 .all(|instruction| instruction.color_hint.as_deref() == Some("reflection"))
+        );
+        let centers = cycled
+            .score
+            .instructions
+            .iter()
+            .map(|instruction| instruction.center.unwrap())
+            .collect::<Vec<_>>();
+        assert_eq!(centers.len(), 5);
+        assert!(
+            centers.iter().all(|center| {
+                (0.0..=1.0).contains(&center.x) && (0.0..=1.0).contains(&center.y)
+            })
+        );
+        assert!(
+            centers
+                .windows(2)
+                .all(|pair| (pair[1].x - pair[0].x - 0.2).abs() < 1.0e-12)
         );
         assert_eq!(cycled.original_instruction_indices, vec![0; 5]);
         assert_eq!(

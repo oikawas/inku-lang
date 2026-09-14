@@ -12,7 +12,7 @@ Saijiki adds the order category with alternating and in order, including Web / A
 
 The author accepted the content of the seven Nature leaf motifs reviewed in comparison sheet 14.
 
-The Python drawing binding also adds an entry point for compact Scores with explicit, independent resource limits and clipping policy. It passes these authorities to existing shared-core validation and drawing, without automatically trusting the budget stored in a Score.
+The Python drawing binding also adds an entry point for compact Scores with explicit, independent resource limits and clipping policy. It passes these authorities to existing shared-core validation and drawing, without automatically trusting the budget stored in a Score. Named compact-placement positions now convert normalized coordinates to short-side units correctly, fixing a leftward shift on wide canvases.
 
 ### 2026-09-14 — Consolidate Saijiki vocabulary, endpoint connections, and bleeding
 

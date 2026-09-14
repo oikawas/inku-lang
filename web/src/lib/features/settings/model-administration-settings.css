@@ -256,7 +256,7 @@
 	}
 	.settings-feature-root .model-picker-dialog {
 		width: min(760px, 88vw);
-		max-height: 82vh;
+		max-height: min(82vh, calc(100% - 32px));
 	}
 	.settings-feature-root .add-service-body {
 		padding: 14px;
@@ -288,6 +288,7 @@
 		letter-spacing: 0;
 	}
 	.settings-feature-root .model-picker-body {
+		min-height: 0;
 		padding: 14px;
 		overflow: auto;
 		display: flex;

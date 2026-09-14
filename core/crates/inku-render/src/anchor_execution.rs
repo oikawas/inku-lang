@@ -3,10 +3,11 @@
 use super::*;
 use crate::anchor_schedule::{AnchorSchedule, ScheduleNode, group_contains, schedule};
 use crate::planning::{Bounds, PlanningWarning};
-use crate::typed_performance::TypedExecutionPlan;
+use crate::typed_performance::{TypedExecutionPlan, TypedMirrorBody, TypedMirrorRelation};
 use crate::types::Point;
 use sha2::{Digest, Sha256};
 
+#[derive(Clone)]
 struct Performed {
     instruction: Instruction,
     ordinal: usize,
@@ -32,6 +33,7 @@ struct Execution<'a> {
     group_fill_scope_indices: Vec<Vec<usize>>,
     omitted_fill_scopes: Vec<bool>,
     typed: Option<TypedExecutionPlan>,
+    mirror_done: Vec<bool>,
 }
 
 fn relation_inside_member(
@@ -230,6 +232,198 @@ fn merge_bounds(bounds: &mut Option<Bounds>, next: Bounds) {
     });
 }
 
+fn perpendicular_bisector_reflection(target: Point, follower: Point) -> Option<AffineTransform> {
+    let normal = Point::new(follower.x - target.x, follower.y - target.y);
+    let length = distance(normal);
+    if !length.is_finite() || length <= GEOMETRY_EPSILON {
+        return None;
+    }
+    let nx = normal.x / length;
+    let ny = normal.y / length;
+    let reflection = AffineTransform {
+        a: 1.0 - 2.0 * nx * nx,
+        b: -2.0 * nx * ny,
+        c: -2.0 * nx * ny,
+        d: 1.0 - 2.0 * ny * ny,
+        e: 0.0,
+        f: 0.0,
+    };
+    let midpoint = Point::new((target.x + follower.x) / 2.0, (target.y + follower.y) / 2.0);
+    let moved = reflection.apply(midpoint);
+    let result = AffineTransform {
+        e: midpoint.x - moved.x,
+        f: midpoint.y - moved.y,
+        ..reflection
+    };
+    result.is_finite().then_some(result)
+}
+
+fn reflected_pose_at(
+    follower_center: Point,
+    follower_vector: Point,
+    target_vector: Point,
+    fallback: AffineTransform,
+) -> Option<AffineTransform> {
+    let follower_length = distance(follower_vector);
+    let target_length = distance(target_vector);
+    if follower_length <= GEOMETRY_EPSILON || target_length <= GEOMETRY_EPSILON {
+        let moved = fallback.apply(follower_center);
+        return Some(AffineTransform {
+            e: follower_center.x - moved.x,
+            f: follower_center.y - moved.y,
+            ..fallback
+        });
+    }
+    if !same_number(follower_length, target_length) {
+        return None;
+    }
+    let source_unit = Point::new(
+        follower_vector.x / follower_length,
+        follower_vector.y / follower_length,
+    );
+    let target_unit = Point::new(
+        target_vector.x / target_length,
+        target_vector.y / target_length,
+    );
+    let mut pose = AffineTransform {
+        a: target_unit.x * source_unit.x - target_unit.y * source_unit.y,
+        b: target_unit.y * source_unit.x + target_unit.x * source_unit.y,
+        c: target_unit.x * source_unit.y + target_unit.y * source_unit.x,
+        d: target_unit.y * source_unit.y - target_unit.x * source_unit.x,
+        e: 0.0,
+        f: 0.0,
+    };
+    let mapped = pose.apply(follower_center);
+    pose.e = follower_center.x - mapped.x;
+    pose.f = follower_center.y - mapped.y;
+    pose.is_finite().then_some(pose)
+}
+
+fn same_number(left: f64, right: f64) -> bool {
+    (left - right).abs() <= GEOMETRY_EPSILON
+}
+
+fn same_point(left: Point, right: Point) -> bool {
+    same_number(left.x, right.x) && same_number(left.y, right.y)
+}
+
+struct MirrorIdealFrame {
+    origin: Point,
+    x: Point,
+    y: Point,
+}
+
+// An exact affine frame of the ideal primitive, not its varied stroke bounds.
+fn mirror_ideal_frame(
+    instruction: &Instruction,
+    canvas: Option<crate::types::CanvasSize>,
+    transform: AffineTransform,
+) -> Option<MirrorIdealFrame> {
+    let physical = |point| crate::geometry::point_to_short_side_units(point, canvas);
+    let anchor = physical(crate::planning::instruction_anchor_on_canvas(
+        instruction,
+        canvas,
+    ));
+    let transform = transform.compose(AffineTransform::around(
+        anchor,
+        1.0,
+        1.0,
+        instruction.rotation.unwrap_or(0.0),
+        Point::new(0.0, 0.0),
+    ));
+    let zero = Point::new(0.0, 0.0);
+    let (origin, x, y) = match instruction.primitive {
+        Primitive::Line => {
+            let start = physical(instruction.from_?);
+            let end = physical(instruction.to?);
+            (
+                anchor,
+                Point::new((end.x - start.x) / 2.0, (end.y - start.y) / 2.0),
+                zero,
+            )
+        }
+        Primitive::Arc if instruction.arc_form != Some(crate::types::ArcForm::Crescent) => {
+            let angle = ((instruction.angle_start? + instruction.angle_end?) / 2.0).to_radians();
+            let radius = instruction.radius?;
+            (
+                physical(instruction.center?),
+                Point::new(radius * angle.cos(), -radius * angle.sin()),
+                Point::new(-radius * angle.sin(), -radius * angle.cos()),
+            )
+        }
+        Primitive::Circle | Primitive::Point | Primitive::Polygon => {
+            let radius = instruction.radius?;
+            (
+                physical(instruction.center?),
+                Point::new(radius, 0.0),
+                Point::new(0.0, radius),
+            )
+        }
+        Primitive::Ellipse | Primitive::Cloudform | Primitive::Arc => {
+            let size = instruction.size?;
+            (
+                physical(instruction.center?),
+                Point::new(size.x / 2.0, 0.0),
+                Point::new(0.0, size.y / 2.0),
+            )
+        }
+        Primitive::Square | Primitive::Triangle => {
+            let size = instruction.size?;
+            (
+                anchor,
+                Point::new(size.x / 2.0, 0.0),
+                Point::new(0.0, size.y / 2.0),
+            )
+        }
+    };
+    let frame = MirrorIdealFrame {
+        origin: transform.apply(origin),
+        x: transform.vector(x),
+        y: transform.vector(y),
+    };
+    [frame.origin, frame.x, frame.y]
+        .into_iter()
+        .all(|point| point.x.is_finite() && point.y.is_finite())
+        .then_some(frame)
+}
+
+fn mirror_direction(
+    instruction: &Instruction,
+    canvas: Option<crate::types::CanvasSize>,
+) -> Option<Point> {
+    if matches!(instruction.primitive, Primitive::Line | Primitive::Arc)
+        && instruction.arc_form != Some(crate::types::ArcForm::Crescent)
+    {
+        let (from, to, _, _) = crate::planning::endpoint_geometry(instruction, canvas)?;
+        return Some(Point::new(to.x - from.x, to.y - from.y));
+    }
+    let angle = instruction.rotation.unwrap_or(0.0).to_radians();
+    Some(Point::new(angle.cos(), angle.sin()))
+}
+
+fn copy_mirror_geometry(
+    target: &Instruction,
+    follower: &mut Instruction,
+    canvas: Option<crate::types::CanvasSize>,
+) {
+    let target_anchor = crate::planning::instruction_anchor_on_canvas(target, canvas);
+    let follower_anchor = crate::planning::instruction_anchor_on_canvas(follower, canvas);
+    let moved = |point: Point| {
+        Point::new(
+            point.x + follower_anchor.x - target_anchor.x,
+            point.y + follower_anchor.y - target_anchor.y,
+        )
+    };
+    follower.from_ = target.from_.map(moved);
+    follower.to = target.to.map(moved);
+    follower.center = target.center.map(moved);
+    follower.position = target.position.map(moved);
+    follower.radius = target.radius;
+    follower.size = target.size;
+    follower.angle_start = target.angle_start;
+    follower.angle_end = target.angle_end;
+}
+
 impl Execution<'_> {
     fn apply_instruction_transform(
         &mut self,
@@ -340,6 +534,351 @@ impl Execution<'_> {
     ) -> Result<(), ScoreExecutionReason> {
         let scopes = self.group_fill_scope_indices[group_index].clone();
         self.transform_fill_scope_indices(&scopes, transform)
+    }
+
+    fn mirror_diagnostic(&mut self, relation: &TypedMirrorRelation, reason: ScoreExecutionReason) {
+        let instruction_index = relation
+            .follower_bodies
+            .first()
+            .and_then(|body| body.instruction_indices.first())
+            .or_else(|| {
+                relation
+                    .target_bodies
+                    .first()
+                    .and_then(|body| body.instruction_indices.first())
+            })
+            .copied()
+            .unwrap_or(0);
+        self.diagnostics.push(ScoreExecutionDiagnostic {
+            instruction_index,
+            anchor_index: None,
+            dependency_instruction_index: None,
+            reason,
+            disposition: ScoreExecutionDisposition::RelationOmitted,
+        });
+    }
+
+    // Semantic anchors follow complete body operations, never an arbitrary
+    // leaf's private transform. Placement anchors are already final targets and
+    // become live only when their placement has completed.
+    fn transform_mirror_anchors(
+        &mut self,
+        start: usize,
+        end: usize,
+        transform: AffineTransform,
+        placement_complete: bool,
+    ) {
+        let Some(typed) = self.typed.as_mut() else {
+            return;
+        };
+        for relation in &mut typed.mirror_relations {
+            for body in relation
+                .target_bodies
+                .iter_mut()
+                .chain(&mut relation.follower_bodies)
+            {
+                if body.instruction_indices.is_empty()
+                    || !body
+                        .instruction_indices
+                        .iter()
+                        .all(|&index| start <= index && index < end)
+                {
+                    continue;
+                }
+                if body.placement_pending {
+                    if placement_complete
+                        && body.instruction_indices.first() == Some(&start)
+                        && body.instruction_indices.last() == Some(&(end - 1))
+                    {
+                        body.placement_pending = false;
+                    }
+                } else {
+                    body.semantic_anchor = body.semantic_anchor.map(|point| transform.apply(point));
+                }
+            }
+        }
+    }
+
+    fn mirror_body_anchor(&self, body: &TypedMirrorBody) -> Option<Point> {
+        if body.placement_pending
+            || body
+                .instruction_indices
+                .iter()
+                .any(|&index| self.omitted[index] || self.performed[index].is_empty())
+        {
+            return None;
+        }
+        finite_point(body.semantic_anchor?).ok()
+    }
+
+    fn mirror_occurrence(
+        &mut self,
+        relation: &TypedMirrorRelation,
+        target: &TypedMirrorBody,
+        follower: &TypedMirrorBody,
+    ) -> Result<(), ScoreExecutionReason> {
+        let mismatch = ScoreExecutionReason::MirrorBodyMismatch;
+        let conflict = if relation.follower_facts.dimensions_fixed {
+            ScoreExecutionReason::MirrorExplicitConflict
+        } else {
+            mismatch
+        };
+        if target.primitive_body != follower.primitive_body
+            || target.instruction_indices.len() != follower.instruction_indices.len()
+            || target.anchor_indices.len() != follower.anchor_indices.len()
+            || target.context_path != follower.context_path
+        {
+            return Err(mismatch);
+        }
+        let target_anchor = self
+            .mirror_body_anchor(target)
+            .ok_or(ScoreExecutionReason::MirrorReferenceOmitted)?;
+        let follower_anchor = self
+            .mirror_body_anchor(follower)
+            .ok_or(ScoreExecutionReason::MirrorReferenceOmitted)?;
+        let reflection = perpendicular_bisector_reflection(target_anchor, follower_anchor)
+            .ok_or(ScoreExecutionReason::MirrorCoincidentAnchors)?;
+        let single = follower.primitive_body && follower.instruction_indices.len() == 1;
+        let mut candidates = Vec::new();
+        let mut frames = Vec::new();
+        for (&target_index, &follower_index) in target
+            .instruction_indices
+            .iter()
+            .zip(&follower.instruction_indices)
+        {
+            let target_instruction = &self.performed[target_index][0].instruction;
+            let mut candidate = self.performed[follower_index][0].instruction.clone();
+            if target_instruction.primitive != candidate.primitive
+                || target_instruction.arc_form != candidate.arc_form
+                || target_instruction.sides != candidate.sides
+            {
+                return Err(mismatch);
+            }
+            if single && !relation.follower_facts.dimensions_fixed {
+                copy_mirror_geometry(target_instruction, &mut candidate, self.request.canvas);
+            }
+            if matches!(candidate.primitive, Primitive::Arc)
+                && candidate.arc_form != Some(crate::types::ArcForm::Crescent)
+                && !same_number(
+                    (target_instruction.angle_end.ok_or(mismatch)?
+                        - target_instruction.angle_start.ok_or(mismatch)?)
+                    .abs(),
+                    (candidate.angle_end.ok_or(mismatch)?
+                        - candidate.angle_start.ok_or(mismatch)?)
+                    .abs(),
+                )
+            {
+                return Err(conflict);
+            }
+            let target_frame = mirror_ideal_frame(
+                target_instruction,
+                self.request.canvas,
+                reflection.compose(self.transforms[target_index]),
+            )
+            .ok_or(mismatch)?;
+            let follower_frame = mirror_ideal_frame(
+                &candidate,
+                self.request.canvas,
+                self.transforms[follower_index],
+            )
+            .ok_or(mismatch)?;
+            frames.push((target_frame, follower_frame));
+            candidates.push(candidate);
+        }
+        let (desired, source) = frames.first().ok_or(mismatch)?;
+        let pose =
+            reflected_pose_at(follower_anchor, source.x, desired.x, reflection).ok_or(conflict)?;
+        // One rigid pose must carry every leaf's ideal origin and both axes.
+        // This includes internal scales/rotations and concentric leaves; brush
+        // variation and material do not participate in shape correspondence.
+        if frames.iter().any(|(target, follower)| {
+            !same_point(pose.apply(follower.origin), target.origin)
+                || !same_point(pose.vector(follower.x), target.x)
+                || !same_point(pose.vector(follower.y), target.y)
+        }) {
+            return Err(conflict);
+        }
+        if let Some(direction) = relation.follower_facts.direction_degrees {
+            let angle = direction.to_radians();
+            let expected = Point::new(angle.cos(), angle.sin());
+            let actual = if single {
+                let index = follower.instruction_indices[0];
+                let vector =
+                    mirror_direction(&candidates[0], self.request.canvas).ok_or(mismatch)?;
+                pose.vector(self.transforms[index].vector(vector))
+            } else {
+                pose.vector(expected)
+            };
+            let length = distance(actual);
+            if length <= GEOMETRY_EPSILON
+                || !same_point(Point::new(actual.x / length, actual.y / length), expected)
+            {
+                return Err(ScoreExecutionReason::MirrorExplicitConflict);
+            }
+        }
+        let anchors = target
+            .anchor_indices
+            .iter()
+            .zip(&follower.anchor_indices)
+            .map(|(&target, &follower)| {
+                let expected = reflection.apply(self.anchors[target]?);
+                let actual = pose.apply(self.anchors[follower]?);
+                (same_point(actual, expected)).then_some((follower, actual))
+            })
+            .collect::<Option<Vec<_>>>()
+            .ok_or(mismatch)?;
+        let fills = self
+            .typed
+            .as_ref()
+            .map(|typed| {
+                follower
+                    .fill_scope_indices
+                    .iter()
+                    .copied()
+                    .filter(|&scope| !self.omitted_fill_scopes[scope])
+                    .map(|scope| {
+                        typed.fill_scopes[scope]
+                            .prepared_region
+                            .transformed(pose)
+                            .map(|region| (scope, region))
+                            .map_err(|_| mismatch)
+                    })
+                    .collect::<Result<Vec<_>, _>>()
+            })
+            .transpose()?
+            .unwrap_or_default();
+        let mut staged = Vec::new();
+        for (&index, candidate) in follower.instruction_indices.iter().zip(candidates) {
+            let transform = pose.compose(self.transforms[index]);
+            if !transform.is_finite() {
+                return Err(mismatch);
+            }
+            let mut performed = self.performed[index].clone();
+            for value in &mut performed {
+                if single && !relation.follower_facts.dimensions_fixed {
+                    value.instruction = candidate.clone();
+                    value.line_centerline = self.connected_path_centerline(
+                        index,
+                        &value.instruction,
+                        value.seed_override,
+                    );
+                }
+                value.line_centerline = value
+                    .line_centerline
+                    .as_ref()
+                    .map(|points| {
+                        points
+                            .iter()
+                            .map(|point| finite_point(pose.apply(*point)))
+                            .collect::<Result<Vec<_>, _>>()
+                    })
+                    .transpose()?;
+            }
+            staged.push((index, transform, performed));
+        }
+        // Commit only after every geometry, anchor, fill and path operation
+        // succeeded. A rejected occurrence leaves its follower untouched.
+        for (index, transform, performed) in staged {
+            self.transforms[index] = transform;
+            self.performed[index] = performed;
+        }
+        for (index, point) in anchors {
+            self.anchors[index] = Some(point);
+        }
+        if let Some(typed) = self.typed.as_mut() {
+            for (scope, region) in fills {
+                typed.fill_scopes[scope].prepared_region = region;
+            }
+        }
+        self.transform_mirror_anchors(
+            follower.instruction_indices[0],
+            follower.instruction_indices.last().unwrap() + 1,
+            pose,
+            false,
+        );
+        Ok(())
+    }
+
+    fn mirror_relation(&mut self, relation: &TypedMirrorRelation) {
+        if relation.target_bodies.is_empty() || relation.follower_bodies.is_empty() {
+            self.mirror_diagnostic(relation, ScoreExecutionReason::MirrorReferenceOmitted);
+            return;
+        }
+        if relation.target_bodies.len() != relation.follower_bodies.len() {
+            self.mirror_diagnostic(relation, ScoreExecutionReason::MirrorBodyMismatch);
+            return;
+        }
+        for (target, follower) in relation.target_bodies.iter().zip(&relation.follower_bodies) {
+            if let Err(reason) = self.mirror_occurrence(relation, target, follower) {
+                self.mirror_diagnostic(relation, reason);
+            }
+        }
+    }
+
+    fn mirror_stage(&self, relation: &TypedMirrorRelation) -> Option<usize> {
+        let instructions = relation
+            .target_bodies
+            .iter()
+            .chain(&relation.follower_bodies)
+            .flat_map(|body| body.instruction_indices.iter().copied())
+            .collect::<Vec<_>>();
+        (!instructions.is_empty()).then_some(())?;
+        self.request
+            .score
+            .transform_groups
+            .iter()
+            .enumerate()
+            .find(|(index, group)| {
+                self.placement_indices[*index].is_none()
+                    && instructions
+                        .iter()
+                        .all(|&instruction| group.start <= instruction && instruction < group.end)
+            })
+            .map(|(index, _)| index)
+    }
+
+    fn perform_mirrors_before_group(&mut self, group_index: usize) {
+        let ready = self
+            .typed
+            .as_ref()
+            .map(|typed| {
+                typed
+                    .mirror_relations
+                    .iter()
+                    .enumerate()
+                    .filter_map(|(index, relation)| {
+                        (!self.mirror_done[index]
+                            && self.mirror_stage(relation) == Some(group_index))
+                        .then_some((index, relation.clone()))
+                    })
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default();
+        for (index, relation) in ready {
+            self.mirror_relation(&relation);
+            self.mirror_done[index] = true;
+        }
+    }
+
+    fn perform_remaining_mirrors(&mut self) {
+        let remaining = self
+            .typed
+            .as_ref()
+            .map(|typed| {
+                typed
+                    .mirror_relations
+                    .iter()
+                    .enumerate()
+                    .filter_map(|(index, relation)| {
+                        (!self.mirror_done[index]).then_some((index, relation.clone()))
+                    })
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default();
+        for (index, relation) in remaining {
+            self.mirror_relation(&relation);
+            self.mirror_done[index] = true;
+        }
     }
 
     fn drop_relation(&mut self, index: usize, reason: ScoreExecutionReason) {
@@ -610,6 +1149,12 @@ impl Execution<'_> {
                 constraint.preferred
             };
             self.apply_instruction_transform(index, AffineTransform::translation(delta))?;
+            self.transform_mirror_anchors(
+                index,
+                index + 1,
+                AffineTransform::translation(delta),
+                false,
+            );
             instruction.relation = None;
             return Ok(instruction);
         }
@@ -1103,6 +1648,7 @@ impl Execution<'_> {
                 }
             }
         }
+        self.transform_mirror_anchors(group.start, group.end, translation, false);
         for &anchor in &group.anchor_indices {
             self.anchors[anchor] = self.anchors[anchor]
                 .map(|point| finite_point(translation.apply(point)))
@@ -1173,6 +1719,7 @@ impl Execution<'_> {
         for member in group.start..group.end {
             self.apply_instruction_transform(member, transform)?;
         }
+        self.transform_mirror_anchors(group.start, group.end, transform, false);
         for &anchor in &group.anchor_indices {
             self.anchors[anchor] = self.anchors[anchor]
                 .map(|point| finite_point(transform.apply(point)))
@@ -1327,6 +1874,12 @@ impl Execution<'_> {
             for instruction in member.start..member.end {
                 self.apply_instruction_transform(instruction, AffineTransform::translation(delta))?;
             }
+            self.transform_mirror_anchors(
+                member.start,
+                member.end,
+                AffineTransform::translation(delta),
+                false,
+            );
             for &anchor in &member.anchor_indices {
                 self.anchors[anchor] = self.anchors[anchor]
                     .map(|point| Point::new(point.x + delta.x, point.y + delta.y));
@@ -1365,6 +1918,7 @@ impl Execution<'_> {
         for member in group.start..group.end {
             self.apply_instruction_transform(member, translation)?;
         }
+        self.transform_mirror_anchors(group.start, group.end, translation, false);
         for member in &members {
             for &anchor in &member.anchor_indices {
                 self.anchors[anchor] = self.anchors[anchor].map(|point| translation.apply(point));
@@ -1451,11 +2005,13 @@ impl Execution<'_> {
             for instruction in member.start..member.end {
                 self.apply_instruction_transform(instruction, translation)?;
             }
+            self.transform_mirror_anchors(member.start, member.end, translation, true);
             for &anchor in &member.anchor_indices {
                 self.anchors[anchor] = self.anchors[anchor].map(|point| translation.apply(point));
             }
             self.transform_fill_scope_indices(&fill_scopes, translation)?;
         }
+        self.transform_mirror_anchors(group.start, group.end, AffineTransform::identity(), true);
         for member in group.start..group.end {
             if self.schedule.external_groups[member].is_none()
                 && self
@@ -1724,9 +2280,18 @@ fn resolve_impl(
         placement_indices,
         group_fill_scope_indices,
         omitted_fill_scopes: vec![false; typed.as_ref().map_or(0, |typed| typed.fill_scopes.len())],
+        mirror_done: vec![
+            false;
+            typed
+                .as_ref()
+                .map_or(0, |typed| typed.mirror_relations.len())
+        ],
         typed,
     };
     for node in execution.schedule.order.clone() {
+        if let ScheduleNode::Group(index) = node {
+            execution.perform_mirrors_before_group(index);
+        }
         let failure = match node {
             ScheduleNode::Instruction(index) => {
                 if execution.omitted[index] {
@@ -1791,6 +2356,7 @@ fn resolve_impl(
                 .push(node_failure(request.score, node, reason, policy));
         }
     }
+    execution.perform_remaining_mirrors();
     let mut rendered = Vec::new();
     for (owner, values) in execution.performed.into_iter().enumerate() {
         for value in values {

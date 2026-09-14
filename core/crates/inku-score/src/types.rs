@@ -1276,6 +1276,42 @@ pub struct FillGroup {
     pub cycle_members: Option<CycleMembersV1>,
 }
 
+/// Existing saved execution boundaries accepted by the fixed binary mirror relation.
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum MirrorBodyRef {
+    Instruction {
+        instruction_index: usize,
+    },
+    RepetitionGroup {
+        repetition_group_index: usize,
+    },
+    PlacementMember {
+        placement_group_index: usize,
+        member_index: usize,
+    },
+    PlacementGroup {
+        placement_group_index: usize,
+    },
+}
+
+/// Facts the caller explicitly fixed on the follower. Geometry values remain on
+/// existing Instructions; this payload contains only their authority.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct MirrorFollowerFactsV1 {
+    pub dimensions_fixed: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub direction_degrees: Option<f64>,
+}
+
+/// A fixed binary relation: preserve the target and mirror the follower body.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct MirrorRelationV1 {
+    pub target: MirrorBodyRef,
+    pub follower: MirrorBodyRef,
+    pub follower_facts: MirrorFollowerFactsV1,
+}
+
 /// Resource authorities captured with a Score for deterministic replay.
 /// Demand is deliberately absent and must be recomputed from the Score.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -1306,11 +1342,32 @@ pub struct Score {
     pub repetition_groups: Vec<RepetitionGroup>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub fill_groups: Vec<FillGroup>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub mirror_relations: Vec<MirrorRelationV1>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub resource_policy: Option<ScoreResourcePolicy>,
 }
 
 impl Score {
+    fn validate_mirror_relations(&self) -> Result<(), &'static str> {
+        if self.mirror_relations.is_empty() {
+            return Ok(());
+        }
+        if self.version != "0.15.0" {
+            return Err("mirror relations require Score version 0.15.0");
+        }
+        for relation in &self.mirror_relations {
+            if relation
+                .follower_facts
+                .direction_degrees
+                .is_some_and(|degrees| !degrees.is_finite())
+            {
+                return Err("mirror direction must be finite");
+            }
+        }
+        Ok(())
+    }
+
     fn validate_count_origin(origin: &CountOrigin) -> Result<(), &'static str> {
         match origin {
             CountOrigin::Explicit | CountOrigin::OmittedDefault | CountOrigin::TemplateSingle => {
@@ -1628,7 +1685,7 @@ impl Score {
     fn validate_compact_score_0_10(&self) -> Result<(), &'static str> {
         let is_compact_edition = matches!(
             self.version.as_str(),
-            "0.10.0" | "0.11.0" | "0.12.0" | "0.13.0" | "0.14.0"
+            "0.10.0" | "0.11.0" | "0.12.0" | "0.13.0" | "0.14.0" | "0.15.0"
         );
         let has_0_10_fields = !self.fill_groups.is_empty()
             || !self.repetition_groups.is_empty()
@@ -1795,7 +1852,7 @@ impl Score {
         let is_compact = self.version == "0.10.0"
             || (matches!(
                 self.version.as_str(),
-                "0.11.0" | "0.12.0" | "0.13.0" | "0.14.0"
+                "0.11.0" | "0.12.0" | "0.13.0" | "0.14.0" | "0.15.0"
             ) && self.resource_policy.is_some());
         let mut previous_end = 0;
         for group in &self.placement_groups {
@@ -1823,6 +1880,7 @@ impl Score {
                             | "0.12.0"
                             | "0.13.0"
                             | "0.14.0"
+                            | "0.15.0"
                     ) =>
                 {
                     return Err("placement_groups requires Score version 0.7.0");
@@ -1830,7 +1888,14 @@ impl Score {
                 GroupLayout::Scatter | GroupLayout::Tile
                     if !matches!(
                         self.version.as_str(),
-                        "0.8.0" | "0.9.0" | "0.10.0" | "0.11.0" | "0.12.0" | "0.13.0" | "0.14.0"
+                        "0.8.0"
+                            | "0.9.0"
+                            | "0.10.0"
+                            | "0.11.0"
+                            | "0.12.0"
+                            | "0.13.0"
+                            | "0.14.0"
+                            | "0.15.0"
                     ) =>
                 {
                     return Err("scatter and tile placement_groups require Score version 0.8.0");
@@ -1850,7 +1915,7 @@ impl Score {
             if !group.members.is_empty()
                 && !matches!(
                     self.version.as_str(),
-                    "0.9.0" | "0.10.0" | "0.11.0" | "0.12.0" | "0.13.0" | "0.14.0"
+                    "0.9.0" | "0.10.0" | "0.11.0" | "0.12.0" | "0.13.0" | "0.14.0" | "0.15.0"
                 )
             {
                 return Err("placement members require Score version 0.9.0");
@@ -1985,6 +2050,7 @@ impl Score {
     /// geometry that belongs to an open arc.
     pub fn validate_schema_edition(&self) -> Result<(), &'static str> {
         self.validate_compact_score_0_10()?;
+        self.validate_mirror_relations()?;
         if !self.anchors.is_empty()
             && !matches!(
                 self.version.as_str(),
@@ -1997,6 +2063,7 @@ impl Score {
                     | "0.12.0"
                     | "0.13.0"
                     | "0.14.0"
+                    | "0.15.0"
             )
         {
             return Err("anchors requires Score version 0.6.0");
@@ -2041,7 +2108,7 @@ impl Score {
                         TargetPathPosition::Exact(position) => {
                             if !matches!(
                                 self.version.as_str(),
-                                "0.11.0" | "0.12.0" | "0.13.0" | "0.14.0"
+                                "0.11.0" | "0.12.0" | "0.13.0" | "0.14.0" | "0.15.0"
                             ) {
                                 return Err(
                                     "relation target_path_position requires Score version 0.11.0",
@@ -2054,7 +2121,7 @@ impl Score {
                             }
                         }
                         TargetPathPosition::Selection(TargetPathSelection::Interior) => {
-                            if !matches!(self.version.as_str(), "0.13.0" | "0.14.0") {
+                            if !matches!(self.version.as_str(), "0.13.0" | "0.14.0" | "0.15.0") {
                                 return Err(
                                     "relation interior target_path_position requires Score version 0.13.0",
                                 );
@@ -2077,7 +2144,10 @@ impl Score {
                     return Err("relation target path position and endpoint are exclusive");
                 }
                 if relation.target_endpoint.is_some() {
-                    if !matches!(self.version.as_str(), "0.12.0" | "0.13.0" | "0.14.0") {
+                    if !matches!(
+                        self.version.as_str(),
+                        "0.12.0" | "0.13.0" | "0.14.0" | "0.15.0"
+                    ) {
                         return Err("relation target_endpoint requires Score version 0.12.0");
                     }
                     if relation.kind != RelationType::Connected
@@ -2101,6 +2171,7 @@ impl Score {
                             | "0.12.0"
                             | "0.13.0"
                             | "0.14.0"
+                            | "0.15.0"
                     ) {
                         return Err("relation target_anchor_index requires Score version 0.6.0");
                     }
@@ -2122,6 +2193,7 @@ impl Score {
                     && self.version != "0.12.0"
                     && self.version != "0.13.0"
                     && self.version != "0.14.0"
+                    && self.version != "0.15.0"
                 {
                     return Err("surface_intensity requires Score version 0.3.0");
                 }
@@ -2151,7 +2223,10 @@ impl Score {
                 }
             }
             if instruction.ink_spread.is_some()
-                && !matches!(self.version.as_str(), "0.12.0" | "0.13.0" | "0.14.0")
+                && !matches!(
+                    self.version.as_str(),
+                    "0.12.0" | "0.13.0" | "0.14.0" | "0.15.0"
+                )
             {
                 return Err("ink_spread requires Score version 0.12.0");
             }
@@ -2171,6 +2246,7 @@ impl Score {
                 && self.version != "0.12.0"
                 && self.version != "0.13.0"
                 && self.version != "0.14.0"
+                && self.version != "0.15.0"
             {
                 return Err("arc_form requires Score version 0.2.0");
             }
@@ -2221,6 +2297,7 @@ impl Score {
                 | "0.12.0"
                 | "0.13.0"
                 | "0.14.0"
+                | "0.15.0"
         ) {
             return Err("transform_groups requires Score version 0.4.0");
         }
@@ -2253,6 +2330,7 @@ impl Score {
                 && self.version != "0.12.0"
                 && self.version != "0.13.0"
                 && self.version != "0.14.0"
+                && self.version != "0.15.0"
                 && (group.scale_x != 1.0
                     || group.scale_y != 1.0
                     || group.translate_x != 0.0
@@ -2303,6 +2381,7 @@ impl Score {
                         | "0.12.0"
                         | "0.13.0"
                         | "0.14.0"
+                        | "0.15.0"
                 )
             {
                 return Err("transform group anchor_indices requires Score version 0.6.0");

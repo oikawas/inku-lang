@@ -236,6 +236,8 @@ MacroのConnectedは、先行するLineを`from`に指定し、任意の数値�
 
 通常DDLの「前の線の途中につながる」「前の弧の途中につながる」は、先行Line／Arcの両端を除く一点に現在図形の始点をつなぐ。「途中／partway」はばしょの語であり、中心の別名ではない。Scoreは`target_path_position:"interior"`を保持し、既存のinstanceと演奏seedから具体的な開区間位置を選ぶ。同じScoreと演奏seedなら同じ接点となり、揺らぎを含む実際の中心線と外側の回転・鏡映・移動を反映する。接線合わせや寸法補正はしない。Macroも`target_path_position:"interior"`で同じ意味へ接続する。この文字列を持つ作品だけScore 0.13とし、既存の数値式・数値ScoreはLine限定の0〜1と元の補間を保つ。endpointとの同時指定やanchorへの指定は無効な関係として扱う。
 
+「前の形と鏡写し」は、二つの形の間の軸を挟んで、位置と向きを鏡像にする「あいだ」の語である。単独図形だけでなく、葉のようなMacroや組を全体で扱う。既存の配置で決まった二つの位置の中点を通る垂直二等分線を軸とし、先行形と後続の位置を保って、後続の省略した寸法・全体の向きを鏡像へ解決する。明示した図形・寸法・向き、色・画材・面の指定を上書きしない。対応する形が異なる、明示値が両立しない、位置が一致して軸が定まらない場合は、関係だけを診断付きで外し、他の描画を続ける。まとまりの内側配置・内側変形の後に鏡写しを解決し、共通の外側変形はその後に作用する。外側の非等方拡縮も保持するので、その後の最終像へ鏡映を掛け直さない。画材の揺らぎは各図形のseedで演奏する。新しい`mirror_relations`を持つ作品だけScore 0.15を使い、単独図形・単独Macro・配置内member・配置groupという既存のまとまりを参照する。
+
 揺らぎparameterはasset category `variation`のまま、任意のclosed `dimension`（`amplitude` / `frequency` / `quality` / `spread`）で候補を制限できる。例は`{"type":"semantic_ref","category":"variation","dimension":"amplitude"}`である。SemanticRefの`dimension`はvariation以外では禁止し、省略／Noneは旧category-only matchingとcanonical bytes / digestを保つ。Someはdefinition digestに含む。Flat Emitは`fluctuation_amplitude` / `fluctuation_frequency` / `fluctuation_quality` / `ink_spread`を使い、値は各dimensionに属する既存`SemanticRef { category: variation, id }`である。Field名は語義identityを変更しない。Definition、component `use`、binding、実行境界で同じ現行7語の分類を検査する。
 
 宣言parameterはすべて必須である。三parameterを宣言してcallerが一値だけならMissingCompatibleFact等のbinding errorとなる。一振幅parameterだけを宣言してEmitへ届けた場合は、§13.6の同じresolverが残る二slotを解決する。未宣言callerの推測overlay、generic variation一fieldからの三slot推測、parameter optional化は行わない。
@@ -1551,9 +1553,9 @@ LeWitt の Wall Drawing も同様である。語彙は線と少数の色とい�
 
 §13.3 の感情語彙/運動語彙の区別を、関係に延長する。物理的・外部観察可能な関係のみをコアに許す。
 
-**関係語彙は次の6語に限定する:**
+**関係語彙は次の7語に限定する:**
 
-| 語彙（日） | 語彙（英） | 意味 | relation.type |
+| 語彙（日） | 語彙（英） | 意味 | Scoreの表現 |
 |---|---|---|---|
 | 沿う | along | 直前要素の軌跡・方向に沿って配置する | `along` |
 | 触れない | not touching | 直前要素に接近するが接触しない | `not_touching` |
@@ -1561,6 +1563,7 @@ LeWitt の Wall Drawing も同様である。語彙は線と少数の色とい�
 | 間に | between | 直前の2要素の間の領域に置く | `between` |
 | 触れる | touching | 直前要素に接触する。両端点を一致させて閉形を構成する | `touching` |
 | つながる | connected | current始端を、明示時は先行Line / Arcの始点・終点・途中へ、未指定時は直前要素の終端へ合わせる | `connected` |
+| 鏡写し | mirrored | 二つの形・まとまりの間の軸を挟んで位置と向きを鏡像にする | `mirror_relations` |
 
 **排除する語**: 寄り添う、応える、対話する、呼応する——意図・擬人の語であり、外部から観察できない。
 

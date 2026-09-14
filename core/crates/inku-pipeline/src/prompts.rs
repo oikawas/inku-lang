@@ -952,6 +952,8 @@ accepted_saijiki_vocabulary の有限語彙と、compilerが読む通常の数�
 
 接続先の線や弧の両端以外を指定するには「前の線の途中につながる」「前の弧の途中につながる」と書く。途中の具体位置は演奏で決まるため、中心や数値位置へ置き換えない。始点・終点の明示もそのまま保つ。
 
+二つの形の位置と向きが鏡像になる関係は「前の形と鏡写し」と書く。葉や組なら全体を指す。明示した位置・寸法・向きと後続の色・画材は保つ。
+
 canvas format、catalog ID、catalog modeは解決済みhost contextであり、勝手に既定へ置換しない。返答は指定されたJSONだけにする。"#;
 
 const TYPED_STAGE1_SYSTEM_EN: &str = r#"You are inku's typed Stage 1 normalizer. Deep-read the author's description and produce visible, editable normalized DDL that the deterministic compiler can parse again.
@@ -967,6 +969,8 @@ Write explicitly ordered placements as "Line up five circles, alternating red an
 When writing Japanese DDL, use the counter つ only for one through nine, never 10つ or 11つ. Ten can be written without a counter. 個 works for one, two, ten, eleven, and other counts; use an existing shape-specific counter such as 本 for lines when appropriate. Counter spelling must not change the explicit total.
 
 Write "connected partway along the previous line" or "connected partway along the previous arc" for contact excluding both ends. Its position is decided during performance, so do not replace partway with the center or a numeric position. Preserve an explicitly selected start or end as well.
+
+Write "mirrored with the previous shape" for mirrored positions and orientations across the axis between two shapes. A leaf or group is referred to as a whole. Preserve explicit positions, dimensions, and directions and the follower’s color and tool.
 
 The canvas format, catalog ID, and catalog mode are already resolved host context. Do not replace them with defaults. Return only the specified JSON."#;
 

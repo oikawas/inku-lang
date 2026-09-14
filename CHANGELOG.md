@@ -6,6 +6,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 34 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-14 — Mirror complete shapes and groups
+
+Added mirrored to the relations vocabulary and connected ordinary DDL to whole-shape, Macro, and group mirroring across the axis between two bodies. Explicit dimensions and orientation, and the follower’s color and tool, remain authoritative. Incompatible relations alone are omitted with diagnostics. Web and Android vocabulary and bilingual explanations and examples were updated. New mirror relations use Score 0.15, DDL_VERSION 11, DDL engine 44, and render engine 66. App versions, build numbers, and deployment are unchanged.
+
 ### 2026-09-14 — Describe groups and finite shape or attribute sequences without parentheses
 
 Ordinary DDL now describes a group of a red circle and a blue line alternating with a gray arc, with five meaning three groups and two arcs. Shared Score and performance preserve complete bodies, source order, duplicates, and total count; non-color attribute and shape sequences use the same mechanism. Japanese noun groups and English group-of phrases express the same meaning. Numeric Japanese counts accept 1つ through 9つ, reject 10つ and 11つ, and retain existing 個 and ten forms. Web Saijiki explanations, examples, and normalization instructions are updated. Only the new member cycle requires Score 0.14, identified by DDL_VERSION 10, DDL engine 43, and render engine 65. Application and build versions and deployment are unchanged.

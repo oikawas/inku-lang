@@ -15,11 +15,11 @@ use inku_score::{
 };
 
 use crate::{
-    FillCountResolution, FillPlanOwner, FillRegionGeometry, FillRegionOwner, ObjectAnchor,
-    PlacementMemberKind, PlacementMemberPlan, PlacementRecipe, Rational, ResolvedFillRegion,
-    ResolvedGeometryDimensions, ScoreAnchorOrigin, ScoreFieldGap, ScoreInstructionOrigin,
-    ScoreLoweringDiagnostic, SelectedCompositionPlan, plan_resources::PlanResourceOmission,
-    score_lowering::lower_resolved_object_template,
+    FillCountResolution, FillPlanOwner, FillRegionGeometry, FillRegionOwner, MirrorBodyPlanRef,
+    ObjectAnchor, PlacementMemberKind, PlacementMemberPlan, PlacementRecipe, Rational,
+    ResolvedFillRegion, ResolvedGeometryDimensions, ScoreAnchorOrigin, ScoreFieldGap,
+    ScoreInstructionOrigin, ScoreLoweringDiagnostic, SelectedCompositionPlan,
+    plan_resources::PlanResourceOmission, score_lowering::lower_resolved_object_template,
 };
 
 const ORDINAL_SCHEME: InstanceOrdinalScheme = InstanceOrdinalScheme::SourceMemberThenInstanceV1;
@@ -94,6 +94,14 @@ pub fn materialize_selected_composition(
     let object_map = IndexMap::new(objects.len(), admitted.object_indices());
     let anchor_map = IndexMap::new(plan.anchors().len(), admitted.anchor_indices());
     let transform_map = IndexMap::new(plan.transform_groups().len(), admitted.transform_indices());
+    let placement_group_map = IndexMap::new(
+        plan.placement_groups().len(),
+        admitted.placement_group_indices(),
+    );
+    let repetition_group_map = IndexMap::new(
+        plan.standalone_macro_repetitions().len(),
+        admitted.standalone_macro_indices(),
+    );
     let mut managed_primitives = HashSet::new();
     for members in admitted
         .placement_group_indices()
@@ -336,8 +344,41 @@ pub fn materialize_selected_composition(
             })
         })
         .collect::<Result<Vec<_>, ScoreMaterializationError>>()?;
+    let mut mirror_relations = Vec::new();
+    for planned in plan.mirror_relations() {
+        let target = saved_mirror_body_ref(
+            planned.target(),
+            &object_map,
+            &placement_group_map,
+            &repetition_group_map,
+        );
+        let follower = saved_mirror_body_ref(
+            planned.follower(),
+            &object_map,
+            &placement_group_map,
+            &repetition_group_map,
+        );
+        if let (Some(target), Some(follower)) = (target, follower) {
+            mirror_relations.push(inku_score::MirrorRelationV1 {
+                target,
+                follower,
+                follower_facts: planned.follower_facts().clone(),
+            });
+        } else {
+            relation_omissions.push(MaterializedRelationOmission {
+                owner: planned.owner().clone(),
+                target_object_index: match planned.target() {
+                    MirrorBodyPlanRef::Object { object_index } => Some(*object_index),
+                    _ => None,
+                },
+                target_anchor_index: None,
+            });
+        }
+    }
     let score = Score {
-        version: if placement_groups
+        version: if !mirror_relations.is_empty() {
+            "0.15.0"
+        } else if placement_groups
             .iter()
             .any(|group| group.cycle_members.is_some())
             || fill_groups
@@ -394,6 +435,7 @@ pub fn materialize_selected_composition(
         placement_groups,
         fill_groups,
         repetition_groups,
+        mirror_relations,
         resource_policy: Some(ScoreResourcePolicy {
             accounting_id: inku_score::RESOURCE_ACCOUNTING_ID.to_owned(),
             hard_policy: admitted.hard_policy().clone(),
@@ -411,6 +453,46 @@ pub fn materialize_selected_composition(
         resource_omissions: admitted.omissions().to_vec(),
         relation_omissions,
     })
+}
+
+fn saved_mirror_body_ref(
+    reference: &MirrorBodyPlanRef,
+    objects: &IndexMap,
+    placement_groups: &IndexMap,
+    repetition_groups: &IndexMap,
+) -> Option<inku_score::MirrorBodyRef> {
+    match *reference {
+        MirrorBodyPlanRef::Object { object_index } => objects
+            .get(object_index)
+            .map(|instruction_index| inku_score::MirrorBodyRef::Instruction { instruction_index }),
+        MirrorBodyPlanRef::StandaloneMacro { member_index } => repetition_groups
+            .get(member_index)
+            .map(
+                |repetition_group_index| inku_score::MirrorBodyRef::RepetitionGroup {
+                    repetition_group_index,
+                },
+            ),
+        MirrorBodyPlanRef::PlacementMember {
+            group_index,
+            member_index,
+        } => placement_groups
+            .get(group_index)
+            .map(
+                |placement_group_index| inku_score::MirrorBodyRef::PlacementMember {
+                    placement_group_index,
+                    member_index,
+                },
+            ),
+        MirrorBodyPlanRef::PlacementGroup { group_index } => {
+            placement_groups
+                .get(group_index)
+                .map(
+                    |placement_group_index| inku_score::MirrorBodyRef::PlacementGroup {
+                        placement_group_index,
+                    },
+                )
+        }
+    }
 }
 
 fn saved_members(

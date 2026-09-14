@@ -21,7 +21,7 @@ use crate::{
 };
 
 /// Stable identity for the runtime-disconnected single-head semantic AST.
-pub const SEMANTIC_ENTITY_ASSOCIATION_SCHEMA_ID: &str = "inku.semantic-entity-association.v18";
+pub const SEMANTIC_ENTITY_ASSOCIATION_SCHEMA_ID: &str = "inku.semantic-entity-association.v19";
 
 /// Source-independent semantic identity projected from one accepted Saijiki row.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -90,6 +90,7 @@ pub enum SemanticRelationKind {
     Between,
     Touching,
     Connected,
+    Mirrored,
 }
 
 impl SemanticRelationKind {
@@ -101,6 +102,7 @@ impl SemanticRelationKind {
             Self::Between => "between",
             Self::Touching => "touching",
             Self::Connected => "connected",
+            Self::Mirrored => "mirrored",
         }
     }
 }
@@ -2941,6 +2943,7 @@ fn explicit_previous_reference_occurrence(
         CanonicalRelationKind::Between => SemanticRelationKind::Between,
         CanonicalRelationKind::Touching => SemanticRelationKind::Touching,
         CanonicalRelationKind::Connected => SemanticRelationKind::Connected,
+        CanonicalRelationKind::Mirrored => SemanticRelationKind::Mirrored,
     };
     let reference = match reference {
         CanonicalPreviousReference::PreviousOne => SemanticPreviousReference::PreviousOne,

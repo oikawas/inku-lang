@@ -3,9 +3,9 @@
 use std::collections::{BTreeMap, HashSet};
 
 use inku_score::{
-    FillGroup, FillTargetAnchor, FillTargetGeometry, PlacementMember, ResolvedPlacementAnchor,
-    ResolvedPlacementRecipe, ScoreExecutionDiagnostic, ScoreExecutionDisposition,
-    ScoreExecutionReason, SymbolicMemberKind, TransformGroup,
+    FillGroup, FillTargetAnchor, FillTargetGeometry, MirrorBodyRef, MirrorFollowerFactsV1,
+    PlacementMember, ResolvedPlacementAnchor, ResolvedPlacementRecipe, ScoreExecutionDiagnostic,
+    ScoreExecutionDisposition, ScoreExecutionReason, SymbolicMemberKind, TransformGroup,
 };
 use sha2::{Digest, Sha256};
 
@@ -39,6 +39,27 @@ pub(crate) struct TypedExecutionPlan {
     pub fill_scopes: Vec<PerformedFillScope>,
     /// Recoverable contour omissions discovered before dependency execution.
     pub diagnostics: Vec<ScoreExecutionDiagnostic>,
+    /// Dense bodies selected from fixed Score mirror references.
+    pub mirror_relations: Vec<TypedMirrorRelation>,
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct TypedMirrorBody {
+    pub instruction_indices: Vec<usize>,
+    pub anchor_indices: Vec<usize>,
+    pub fill_scope_indices: Vec<usize>,
+    /// Runtime expansion identity; it never appears in the saved Score wire.
+    pub context_path: Vec<u64>,
+    pub semantic_anchor: Option<Point>,
+    pub placement_pending: bool,
+    pub primitive_body: bool,
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct TypedMirrorRelation {
+    pub target_bodies: Vec<TypedMirrorBody>,
+    pub follower_bodies: Vec<TypedMirrorBody>,
+    pub follower_facts: MirrorFollowerFactsV1,
 }
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
@@ -74,6 +95,8 @@ struct DensePlacement {
     group: inku_score::PlacementGroup,
     execution: TypedPlacementScope,
     fill_scopes: Vec<usize>,
+    source_placement_group_index: Option<usize>,
+    source_member_indices: Vec<usize>,
 }
 
 struct Builder<'a> {
@@ -83,11 +106,14 @@ struct Builder<'a> {
     original_anchor_indices: Vec<usize>,
     instruction_seed_overrides: Vec<Option<Seed>>,
     instruction_fill_scope_indices: Vec<Option<usize>>,
+    instruction_context_paths: Vec<Vec<u64>>,
+    instruction_semantic_anchors: Vec<Option<Point>>,
     contexts: Vec<ContextMap>,
     global_instructions: BTreeMap<usize, Vec<usize>>,
     global_anchors: BTreeMap<usize, Vec<usize>>,
     pending_relations: Vec<PendingRelation>,
     placements: Vec<DensePlacement>,
+    repetition_bodies: Vec<Vec<TypedMirrorBody>>,
     transform_fill_scope_indices: Vec<Vec<usize>>,
     fill_scopes: Vec<PerformedFillScope>,
     scope_sources: Vec<(usize, usize)>,
@@ -104,6 +130,7 @@ impl<'a> Builder<'a> {
         output.placement_groups.clear();
         output.repetition_groups.clear();
         output.fill_groups.clear();
+        output.mirror_relations.clear();
         output.resource_policy = None;
         Self {
             request,
@@ -112,11 +139,14 @@ impl<'a> Builder<'a> {
             original_anchor_indices: Vec::new(),
             instruction_seed_overrides: Vec::new(),
             instruction_fill_scope_indices: Vec::new(),
+            instruction_context_paths: Vec::new(),
+            instruction_semantic_anchors: Vec::new(),
             contexts: vec![ContextMap::default()],
             global_instructions: BTreeMap::new(),
             global_anchors: BTreeMap::new(),
             pending_relations: Vec::new(),
             placements: Vec::new(),
+            repetition_bodies: vec![Vec::new(); request.score.repetition_groups.len()],
             transform_fill_scope_indices: Vec::new(),
             fill_scopes: Vec::new(),
             scope_sources: Vec::new(),
@@ -206,6 +236,15 @@ impl<'a> Builder<'a> {
             self.request.performance_seed,
         )));
         self.instruction_fill_scope_indices.push(innermost_fill);
+        self.instruction_context_paths
+            .push(self.contexts[context].path.clone());
+        self.instruction_semantic_anchors
+            .push(Some(target.unwrap_or_else(|| {
+                crate::geometry::point_to_short_side_units(
+                    crate::planning::instruction_anchor_on_canvas(original, self.request.canvas),
+                    self.request.canvas,
+                )
+            })));
         // Enclosing Macro transforms also own instructions expanded in an
         // inner fill's child context. Retain their full descendant span.
         let mut enclosing = Some(context);
@@ -411,19 +450,23 @@ impl<'a> Builder<'a> {
                     0,
                     self.request.canvas,
                 );
-                let (members, fragment, member_fill_scope_indices) = if let Some(cycle) =
-                    &group.cycle_members
-                {
-                    self.expand_cycle_members(
-                        parent_context,
-                        &group.members,
-                        cycle.occurrence_count,
-                        &next_skipped,
-                        parent_fill,
-                    )
-                } else {
-                    self.expand_members(parent_context, &group.members, &next_skipped, parent_fill)
-                };
+                let (members, fragment, member_fill_scope_indices, source_member_indices) =
+                    if let Some(cycle) = &group.cycle_members {
+                        self.expand_cycle_members(
+                            parent_context,
+                            &group.members,
+                            cycle.occurrence_count,
+                            &next_skipped,
+                            parent_fill,
+                        )
+                    } else {
+                        self.expand_members(
+                            parent_context,
+                            &group.members,
+                            &next_skipped,
+                            parent_fill,
+                        )
+                    };
                 let dense = inku_score::PlacementGroup {
                     start: fragment.start,
                     end: fragment.end,
@@ -438,6 +481,8 @@ impl<'a> Builder<'a> {
                         member_fill_scope_indices,
                     },
                     fill_scopes: fragment.scopes,
+                    source_placement_group_index: Some(index),
+                    source_member_indices,
                 });
                 let scopes = self
                     .placements
@@ -504,7 +549,7 @@ impl<'a> Builder<'a> {
                         }
                     }
                 }
-                let (members, mut fragment, member_fill_scope_indices) = if let Some(cycle) =
+                let (members, mut fragment, member_fill_scope_indices, _) = if let Some(cycle) =
                     &group.cycle_members
                 {
                     self.expand_cycle_members(
@@ -536,6 +581,8 @@ impl<'a> Builder<'a> {
                         member_fill_scope_indices,
                     },
                     fill_scopes: fragment.scopes,
+                    source_placement_group_index: None,
+                    source_member_indices: Vec::new(),
                 });
                 let scopes = self
                     .placements
@@ -547,11 +594,25 @@ impl<'a> Builder<'a> {
             }
             GroupId::Repetition(index) => {
                 let member = self.request.score.repetition_groups[index].member.clone();
-                let (_, fragment, _) = self.expand_members(
+                let (members, fragment, member_fill_scope_indices, _) = self.expand_members(
                     parent_context,
                     std::slice::from_ref(&member),
                     &next_skipped,
                     parent_fill,
+                );
+                self.repetition_bodies[index].extend(
+                    members
+                        .iter()
+                        .zip(member_fill_scope_indices.iter())
+                        .map(|(member, scopes)| TypedMirrorBody {
+                            instruction_indices: (member.start..member.end).collect(),
+                            anchor_indices: member.anchor_indices.clone(),
+                            fill_scope_indices: scopes.clone(),
+                            context_path: self.instruction_context_paths[member.start].clone(),
+                            semantic_anchor: self.instruction_semantic_anchors[member.start],
+                            placement_pending: false,
+                            primitive_body: false,
+                        }),
                 );
                 self.assign_atomic_unit(&fragment.scopes, fragment.start, fragment.end);
             }
@@ -575,12 +636,13 @@ impl<'a> Builder<'a> {
         members: &[PlacementMember],
         skipped: &[GroupId],
         innermost_fill: Option<usize>,
-    ) -> (Vec<PlacementMember>, Fragment, Vec<Vec<usize>>) {
+    ) -> (Vec<PlacementMember>, Fragment, Vec<Vec<usize>>, Vec<usize>) {
         let output_start = self.output.instructions.len();
         let scope_start = self.fill_scopes.len();
         let mut dense_members = Vec::new();
         let mut member_fill_scope_indices = Vec::new();
-        for member in members {
+        let mut source_member_indices = Vec::new();
+        for (source_member_index, member) in members.iter().enumerate() {
             let symbolic = member.symbolic.as_ref().expect("validated symbolic member");
             for instance in 0..symbolic.instance_count {
                 let (member, scopes) = self.expand_member_occurrence(
@@ -592,6 +654,7 @@ impl<'a> Builder<'a> {
                 );
                 member_fill_scope_indices.push(scopes);
                 dense_members.push(member);
+                source_member_indices.push(source_member_index);
             }
         }
         (
@@ -602,6 +665,7 @@ impl<'a> Builder<'a> {
                 scopes: (scope_start..self.fill_scopes.len()).collect(),
             },
             member_fill_scope_indices,
+            source_member_indices,
         )
     }
 
@@ -612,16 +676,18 @@ impl<'a> Builder<'a> {
         occurrence_count: u64,
         skipped: &[GroupId],
         innermost_fill: Option<usize>,
-    ) -> (Vec<PlacementMember>, Fragment, Vec<Vec<usize>>) {
+    ) -> (Vec<PlacementMember>, Fragment, Vec<Vec<usize>>, Vec<usize>) {
         let output_start = self.output.instructions.len();
         let scope_start = self.fill_scopes.len();
         let mut dense_members = Vec::with_capacity(
             usize::try_from(occurrence_count).expect("admitted count fits usize"),
         );
         let mut member_fill_scope_indices = Vec::with_capacity(dense_members.capacity());
+        let mut source_member_indices = Vec::with_capacity(dense_members.capacity());
         for occurrence in 0..occurrence_count {
-            let member = &members[usize::try_from(occurrence % members.len() as u64)
-                .expect("cycle member index fits usize")];
+            let source_member_index = usize::try_from(occurrence % members.len() as u64)
+                .expect("cycle member index fits usize");
+            let member = &members[source_member_index];
             let (member, scopes) = self.expand_member_occurrence(
                 parent_context,
                 member,
@@ -631,6 +697,7 @@ impl<'a> Builder<'a> {
             );
             member_fill_scope_indices.push(scopes);
             dense_members.push(member);
+            source_member_indices.push(source_member_index);
         }
         (
             dense_members,
@@ -640,6 +707,7 @@ impl<'a> Builder<'a> {
                 scopes: (scope_start..self.fill_scopes.len()).collect(),
             },
             member_fill_scope_indices,
+            source_member_indices,
         )
     }
 
@@ -906,6 +974,149 @@ impl<'a> Builder<'a> {
         }
     }
 
+    fn mirror_member_body(
+        &self,
+        member: &PlacementMember,
+        fill_scope_indices: &[usize],
+        semantic_anchor: Option<Point>,
+        primitive_body: bool,
+    ) -> TypedMirrorBody {
+        TypedMirrorBody {
+            instruction_indices: (member.start..member.end).collect(),
+            anchor_indices: member.anchor_indices.clone(),
+            fill_scope_indices: fill_scope_indices.to_vec(),
+            context_path: self.instruction_context_paths[member.start].clone(),
+            semantic_anchor,
+            placement_pending: true,
+            primitive_body,
+        }
+    }
+
+    fn mirror_bodies_for(&self, reference: &MirrorBodyRef) -> Vec<TypedMirrorBody> {
+        match reference {
+            MirrorBodyRef::Instruction { instruction_index } => self
+                .global_instructions
+                .get(instruction_index)
+                .into_iter()
+                .flatten()
+                .map(|&index| TypedMirrorBody {
+                    instruction_indices: vec![index],
+                    anchor_indices: Vec::new(),
+                    fill_scope_indices: self.instruction_fill_scope_indices[index]
+                        .into_iter()
+                        .collect(),
+                    context_path: self.instruction_context_paths[index].clone(),
+                    semantic_anchor: self.instruction_semantic_anchors[index],
+                    placement_pending: false,
+                    primitive_body: true,
+                })
+                .collect(),
+            MirrorBodyRef::RepetitionGroup {
+                repetition_group_index,
+            } => self
+                .repetition_bodies
+                .get(*repetition_group_index)
+                .cloned()
+                .unwrap_or_default(),
+            MirrorBodyRef::PlacementMember {
+                placement_group_index,
+                member_index,
+            } => {
+                let Some(source_member) = self
+                    .request
+                    .score
+                    .placement_groups
+                    .get(*placement_group_index)
+                    .and_then(|group| group.members.get(*member_index))
+                else {
+                    return Vec::new();
+                };
+                let primitive_body = source_member
+                    .symbolic
+                    .as_ref()
+                    .is_some_and(|member| member.kind == SymbolicMemberKind::Primitive);
+                self.placements
+                    .iter()
+                    .filter(|placement| {
+                        placement.source_placement_group_index == Some(*placement_group_index)
+                    })
+                    .flat_map(|placement| {
+                        placement
+                            .group
+                            .members
+                            .iter()
+                            .zip(placement.execution.member_fill_scope_indices.iter())
+                            .zip(placement.source_member_indices.iter())
+                            .enumerate()
+                            .filter_map(|(dense_index, ((member, scopes), source_member))| {
+                                (*source_member == *member_index).then(|| {
+                                    self.mirror_member_body(
+                                        member,
+                                        scopes,
+                                        placement
+                                            .execution
+                                            .member_centers
+                                            .get(dense_index)
+                                            .copied(),
+                                        primitive_body,
+                                    )
+                                })
+                            })
+                    })
+                    .collect()
+            }
+            MirrorBodyRef::PlacementGroup {
+                placement_group_index,
+            } => self
+                .placements
+                .iter()
+                .filter(|placement| {
+                    placement.source_placement_group_index == Some(*placement_group_index)
+                })
+                .map(|placement| {
+                    let mut body = TypedMirrorBody {
+                        instruction_indices: Vec::new(),
+                        anchor_indices: Vec::new(),
+                        fill_scope_indices: Vec::new(),
+                        context_path: Vec::new(),
+                        semantic_anchor: (!placement.execution.member_centers.is_empty())
+                            .then(|| mean(&placement.execution.member_centers)),
+                        placement_pending: true,
+                        primitive_body: false,
+                    };
+                    for (member, scopes) in placement
+                        .group
+                        .members
+                        .iter()
+                        .zip(placement.execution.member_fill_scope_indices.iter())
+                    {
+                        body.instruction_indices.extend(member.start..member.end);
+                        body.anchor_indices.extend(&member.anchor_indices);
+                        body.fill_scope_indices.extend(scopes);
+                        if body.context_path.is_empty() {
+                            body.context_path =
+                                self.instruction_context_paths[member.start].clone();
+                        }
+                    }
+                    body
+                })
+                .collect(),
+        }
+    }
+
+    fn build_mirror_relations(&self) -> Vec<TypedMirrorRelation> {
+        self.request
+            .score
+            .mirror_relations
+            .iter()
+            .map(|relation| TypedMirrorRelation {
+                target_bodies: self.mirror_bodies_for(&relation.target),
+                follower_bodies: self.mirror_bodies_for(&relation.follower),
+                follower_facts: relation.follower_facts.clone(),
+            })
+            .collect()
+    }
+
     fn finish(mut self) -> (Score, TypedExecutionPlan, Vec<usize>, Vec<usize>) {
         self.expand_range(0, 0, self.request.score.instructions.len(), &[], None);
         self.clone_top_level_state();
@@ -916,6 +1127,7 @@ impl<'a> Builder<'a> {
                 placement.group.start,
             )
         });
+        let mirror_relations = self.build_mirror_relations();
         let mut placement_scopes = Vec::with_capacity(self.placements.len());
         let mut placement_fill_scope_indices = Vec::with_capacity(self.placements.len());
         for placement in self.placements {
@@ -935,6 +1147,7 @@ impl<'a> Builder<'a> {
                 instruction_fill_scope_indices: self.instruction_fill_scope_indices,
                 fill_scopes: self.fill_scopes,
                 diagnostics: self.diagnostics,
+                mirror_relations,
             },
             self.original_instruction_indices,
             self.original_anchor_indices,
@@ -1571,6 +1784,7 @@ mod tests {
                 }))
                 .unwrap(),
             ],
+            mirror_relations: Vec::new(),
             resource_policy: Some(ScoreResourcePolicy {
                 accounting_id: inku_score::RESOURCE_ACCOUNTING_ID.into(),
                 hard_policy: policy,
@@ -1727,6 +1941,7 @@ mod tests {
             placement_groups: Vec::new(),
             repetition_groups: Vec::new(),
             fill_groups: Vec::new(),
+            mirror_relations: Vec::new(),
             resource_policy: Some(ScoreResourcePolicy {
                 accounting_id: inku_score::RESOURCE_ACCOUNTING_ID.into(),
                 hard_policy: policy.clone(),
@@ -1857,6 +2072,382 @@ mod tests {
         );
     }
 
+    fn mirrored_line(owner: usize, anchor_x: f64) -> inku_score::Instruction {
+        let mut line = instruction(
+            json!({"kind": "source_instruction", "instruction_index": owner}),
+            false,
+        );
+        line.primitive = Primitive::Line;
+        line.center = None;
+        line.radius = None;
+        line.from_ = Some(Point::new(0.4, 0.4));
+        line.to = Some(Point::new(0.6, 0.6));
+        line.arrangement
+            .as_mut()
+            .unwrap()
+            .resolved
+            .as_mut()
+            .unwrap()
+            .anchor = ResolvedPlacementAnchor::Numeric {
+            point: Point::new(anchor_x, 0.5),
+        };
+        line
+    }
+
+    fn mirror_score(
+        policy: HardResourcePolicy,
+        instructions: Vec<inku_score::Instruction>,
+        dimensions_fixed: bool,
+    ) -> Score {
+        Score {
+            version: "0.15.0".into(),
+            canvas: inku_score::Canvas::Id("square".into()),
+            background: inku_score::Color::Black,
+            presence: None,
+            instructions,
+            anchors: Vec::new(),
+            transform_groups: Vec::new(),
+            placement_groups: Vec::new(),
+            repetition_groups: Vec::new(),
+            fill_groups: Vec::new(),
+            mirror_relations: vec![inku_score::MirrorRelationV1 {
+                target: inku_score::MirrorBodyRef::Instruction {
+                    instruction_index: 0,
+                },
+                follower: inku_score::MirrorBodyRef::Instruction {
+                    instruction_index: 1,
+                },
+                follower_facts: inku_score::MirrorFollowerFactsV1 {
+                    dimensions_fixed,
+                    direction_degrees: None,
+                },
+            }],
+            resource_policy: Some(ScoreResourcePolicy {
+                accounting_id: inku_score::RESOURCE_ACCOUNTING_ID.into(),
+                hard_policy: policy,
+                operational_budget: OperationalResourceBudget(budget(100)),
+            }),
+        }
+    }
+
+    fn performed_point(
+        performance: &crate::performance::PerformancePlan,
+        index: usize,
+        point: Point,
+    ) -> Point {
+        performance.instruction_transforms[index].apply(point)
+    }
+
+    #[test]
+    fn compact_mirror_preserves_seeds_and_precedes_common_outer_transform() {
+        let policy = hard(100);
+        let mut shorter = mirrored_line(1, 0.2);
+        shorter.from_ = Some(Point::new(0.45, 0.45));
+        shorter.to = Some(Point::new(0.55, 0.55));
+        let score = mirror_score(policy.clone(), vec![mirrored_line(0, 0.8), shorter], false);
+        assert_eq!(score.validate_schema_edition(), Ok(()));
+        let request = PerformanceRequest {
+            score: &score,
+            performance_seed: Some(7),
+            composition_seed: Some(11),
+            canvas: None,
+        };
+        let base = resolve(request, ScoreErrorPolicy::OmitAndContinue).unwrap();
+        assert!(
+            base.execution
+                .as_ref()
+                .is_none_or(|execution| execution.diagnostics.is_empty())
+        );
+        let target_from = performed_point(&base, 0, base.score.instructions[0].from_.unwrap());
+        let follower_from = performed_point(&base, 1, base.score.instructions[1].from_.unwrap());
+        assert!((follower_from.x - (1.0 - target_from.x)).abs() < 1.0e-12);
+        assert!((follower_from.y - target_from.y).abs() < 1.0e-12);
+
+        let mut outer_score = score.clone();
+        outer_score.transform_groups.push(TransformGroup {
+            start: 0,
+            end: 2,
+            rotation_degrees: 0.0,
+            scale_x: 1.2,
+            scale_y: 1.0,
+            translate_x: 0.0,
+            translate_y: 0.0,
+            fixed_position_indices: Vec::new(),
+            anchor_indices: Vec::new(),
+        });
+        let outer = resolve(
+            PerformanceRequest {
+                score: &outer_score,
+                ..request
+            },
+            ScoreErrorPolicy::OmitAndContinue,
+        )
+        .unwrap();
+        assert_eq!(
+            outer.instruction_seed_overrides,
+            base.instruction_seed_overrides
+        );
+        let outer_target = performed_point(&outer, 0, outer.score.instructions[0].from_.unwrap());
+        let outer_follower = performed_point(&outer, 1, outer.score.instructions[1].from_.unwrap());
+        let scale_x = |point: Point| Point::new(0.5 + (point.x - 0.5) * 1.2, point.y);
+        for (actual, expected) in [
+            (outer_target, scale_x(target_from)),
+            (outer_follower, scale_x(follower_from)),
+        ] {
+            assert!((actual.x - expected.x).abs() < 1.0e-12);
+            assert!((actual.y - expected.y).abs() < 1.0e-12);
+        }
+    }
+
+    #[test]
+    fn compact_mirror_explicit_conflict_omits_only_relation() {
+        let policy = hard(100);
+        let mut follower = mirrored_line(1, 0.2);
+        follower.to = Some(Point::new(0.55, 0.55));
+        let score = mirror_score(
+            policy.clone(),
+            vec![
+                mirrored_line(0, 0.8),
+                follower,
+                instruction(
+                    json!({"kind": "source_instruction", "instruction_index": 2}),
+                    false,
+                ),
+            ],
+            true,
+        );
+        let performance = resolve(
+            PerformanceRequest {
+                score: &score,
+                performance_seed: Some(7),
+                composition_seed: Some(11),
+                canvas: None,
+            },
+            ScoreErrorPolicy::OmitAndContinue,
+        )
+        .unwrap();
+        assert_eq!(performance.score.instructions.len(), 3);
+        assert_eq!(performance.original_instruction_indices, vec![0, 1, 2]);
+        assert!(
+            performance
+                .execution
+                .as_ref()
+                .unwrap()
+                .diagnostics
+                .iter()
+                .any(|diagnostic| {
+                    diagnostic.reason == ScoreExecutionReason::MirrorExplicitConflict
+                        && diagnostic.disposition == ScoreExecutionDisposition::RelationOmitted
+                })
+        );
+        let mut baseline_score = score.clone();
+        baseline_score.mirror_relations.clear();
+        let baseline = resolve(
+            PerformanceRequest {
+                score: &baseline_score,
+                performance_seed: Some(7),
+                composition_seed: Some(11),
+                canvas: None,
+            },
+            ScoreErrorPolicy::OmitAndContinue,
+        )
+        .unwrap();
+        let unchanged = performed_point(
+            &performance,
+            1,
+            performance.score.instructions[1].from_.unwrap(),
+        );
+        let baseline_point =
+            performed_point(&baseline, 1, baseline.score.instructions[1].from_.unwrap());
+        assert_eq!(unchanged, baseline_point);
+    }
+
+    fn mirrored_arc(
+        owner: usize,
+        anchor_x: f64,
+        width: f64,
+        rotation: f64,
+    ) -> inku_score::Instruction {
+        let mut arc = mirrored_line(owner, anchor_x);
+        let geometry = crate::arc::arc_from_endpoints_and_sagitta(
+            Point::new(0.5 - width / 2.0, 0.5),
+            Point::new(0.5 + width / 2.0, 0.5),
+            width / 5.0,
+        )
+        .unwrap();
+        arc.primitive = Primitive::Arc;
+        arc.from_ = None;
+        arc.to = None;
+        arc.position = Some(Point::new(0.5, 0.5));
+        arc.center = Some(geometry.center);
+        arc.radius = Some(geometry.radius);
+        arc.angle_start = Some(geometry.angle_start);
+        arc.angle_end = Some(geometry.angle_end);
+        arc.rotation = Some(rotation);
+        arc
+    }
+
+    fn mirror_resolve(score: &Score) -> crate::performance::PerformancePlan {
+        resolve(
+            PerformanceRequest {
+                score,
+                performance_seed: Some(7),
+                composition_seed: Some(11),
+                canvas: None,
+            },
+            ScoreErrorPolicy::OmitAndContinue,
+        )
+        .unwrap()
+    }
+
+    fn arc_ideal_point(
+        performance: &crate::performance::PerformancePlan,
+        index: usize,
+        fraction: f64,
+    ) -> Point {
+        let instruction = &performance.score.instructions[index];
+        let angle = instruction.angle_start.unwrap()
+            + (instruction.angle_end.unwrap() - instruction.angle_start.unwrap()) * fraction;
+        let raw = crate::arc::arc_point(
+            instruction.center.unwrap(),
+            instruction.radius.unwrap(),
+            angle,
+        );
+        let rotated = crate::planning::rotate_point(
+            raw,
+            instruction.position.unwrap(),
+            instruction.rotation.unwrap_or(0.0),
+        );
+        performed_point(performance, index, rotated)
+    }
+
+    #[test]
+    fn compact_mirror_arc_uses_ideal_pose_and_preserves_semantic_position() {
+        let mut follower = mirrored_arc(1, 0.2, 0.08, 145.0);
+        follower.color = inku_score::Color::Blue;
+        let mut score = mirror_score(
+            hard(100),
+            vec![mirrored_arc(0, 0.8, 0.2, 35.0), follower],
+            false,
+        );
+        score.mirror_relations[0].follower_facts.direction_degrees = Some(145.0);
+        let mut baseline_score = score.clone();
+        baseline_score.mirror_relations.clear();
+        let baseline = mirror_resolve(&baseline_score);
+        let mirrored = mirror_resolve(&score);
+        assert!(
+            mirrored
+                .execution
+                .as_ref()
+                .is_none_or(|execution| execution.diagnostics.is_empty())
+        );
+        assert_eq!(
+            mirrored.instruction_seed_overrides,
+            baseline.instruction_seed_overrides
+        );
+        assert_eq!(
+            mirrored.score.instructions[1].color,
+            inku_score::Color::Blue
+        );
+        let anchor = performed_point(
+            &mirrored,
+            1,
+            mirrored.score.instructions[1].position.unwrap(),
+        );
+        let original = performed_point(
+            &baseline,
+            1,
+            baseline.score.instructions[1].position.unwrap(),
+        );
+        assert!((anchor.x - original.x).hypot(anchor.y - original.y) < 1.0e-12);
+        for fraction in [0.0, 0.5, 1.0] {
+            let target = arc_ideal_point(&mirrored, 0, fraction);
+            let follower = arc_ideal_point(&mirrored, 1, fraction);
+            assert!((follower.x - (1.0 - target.x)).hypot(follower.y - target.y) < 1.0e-12);
+        }
+        // Candidate size changes must not leak when the explicit pose fails.
+        score.mirror_relations[0].follower_facts.direction_degrees = Some(35.0);
+        let rejected = mirror_resolve(&score);
+        assert!(rejected.execution.as_ref().unwrap().diagnostics.iter()
+            .any(|diagnostic| diagnostic.reason == ScoreExecutionReason::MirrorExplicitConflict));
+        assert_eq!(
+            rejected.score.instructions[1],
+            baseline.score.instructions[1]
+        );
+        assert_eq!(
+            rejected.instruction_transforms[1],
+            baseline.instruction_transforms[1]
+        );
+    }
+
+    #[test]
+    fn compact_mirror_concentric_body_requires_one_pose_for_internal_geometry() {
+        let mut instructions = vec![
+            mirrored_line(0, 0.8),
+            mirrored_line(1, 0.8),
+            mirrored_line(2, 0.2),
+            mirrored_line(3, 0.2),
+        ];
+        instructions[1].rotation = Some(60.0);
+        instructions[3].rotation = Some(60.0);
+        let mut score = mirror_score(hard(100), instructions, true);
+        score.repetition_groups = [0, 2]
+            .into_iter()
+            .map(|start| inku_score::RepetitionGroup {
+                member: symbolic_member(
+                    start,
+                    start + 2,
+                    json!({"kind": "source_instruction", "instruction_index": start}),
+                    "macro",
+                    1,
+                ),
+                ordinal_scheme: inku_score::InstanceOrdinalScheme::SourceMemberThenInstanceV1,
+            })
+            .collect();
+        score.mirror_relations[0].target = inku_score::MirrorBodyRef::RepetitionGroup {
+            repetition_group_index: 0,
+        };
+        score.mirror_relations[0].follower = inku_score::MirrorBodyRef::RepetitionGroup {
+            repetition_group_index: 1,
+        };
+        assert_eq!(score.validate_schema_edition(), Ok(()));
+        let mirrored = mirror_resolve(&score);
+        assert!(
+            mirrored
+                .execution
+                .as_ref()
+                .is_none_or(|execution| execution.diagnostics.is_empty())
+        );
+        for (target_index, follower_index) in [(0, 2), (1, 3)] {
+            let ideal_endpoint = |index| {
+                let instruction = &mirrored.score.instructions[index];
+                let (start, _, _, _) =
+                    crate::planning::endpoint_geometry(instruction, None).unwrap();
+                performed_point(&mirrored, index, start)
+            };
+            let target = ideal_endpoint(target_index);
+            let follower = ideal_endpoint(follower_index);
+            assert!((follower.x - (1.0 - target.x)).hypot(follower.y - target.y) < 1.0e-12);
+        }
+        // Identical leaf centers and raw sizes are insufficient: the second
+        // leaf's internal pose must also correspond under that same reflection.
+        score.instructions[3].rotation = Some(30.0);
+        let mut baseline_score = score.clone();
+        baseline_score.mirror_relations.clear();
+        let baseline = mirror_resolve(&baseline_score);
+        let rejected = mirror_resolve(&score);
+        assert!(rejected.execution.as_ref().unwrap().diagnostics.iter()
+            .any(|diagnostic| diagnostic.reason == ScoreExecutionReason::MirrorExplicitConflict));
+        assert_eq!(
+            rejected.score.instructions[2..],
+            baseline.score.instructions[2..]
+        );
+        assert_eq!(
+            rejected.instruction_transforms[2..],
+            baseline.instruction_transforms[2..]
+        );
+    }
+
     #[test]
     fn compact_member_cycle_reuses_complete_ordinary_body_at_global_ordinals() {
         let policy = hard(100);
@@ -1951,6 +2542,7 @@ mod tests {
             placement_groups: vec![group],
             repetition_groups: Vec::new(),
             fill_groups: Vec::new(),
+            mirror_relations: Vec::new(),
             resource_policy: Some(ScoreResourcePolicy {
                 accounting_id: inku_score::RESOURCE_ACCOUNTING_ID.into(),
                 hard_policy: policy.clone(),

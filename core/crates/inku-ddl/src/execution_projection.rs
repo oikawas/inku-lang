@@ -914,6 +914,7 @@ fn retain_ast(
                     group_index,
                     action: edge.action.clone(),
                     position: edge.position.clone(),
+                    relation: edge.relation.clone(),
                     layout: edge.layout,
                     fill_target,
                 }

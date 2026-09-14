@@ -52,6 +52,47 @@ pub struct PlacementMemberPlan {
     pub(crate) count_was_omitted: bool,
 }
 
+/// Original-plan body boundaries remapped only after resource admission.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum MirrorBodyPlanRef {
+    Object {
+        object_index: usize,
+    },
+    StandaloneMacro {
+        member_index: usize,
+    },
+    PlacementMember {
+        group_index: usize,
+        member_index: usize,
+    },
+    PlacementGroup {
+        group_index: usize,
+    },
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct MirrorRelationPlan {
+    pub(crate) owner: ScoreInstructionOrigin,
+    pub(crate) target: MirrorBodyPlanRef,
+    pub(crate) follower: MirrorBodyPlanRef,
+    pub(crate) follower_facts: inku_score::MirrorFollowerFactsV1,
+}
+
+impl MirrorRelationPlan {
+    pub fn owner(&self) -> &ScoreInstructionOrigin {
+        &self.owner
+    }
+    pub fn target(&self) -> &MirrorBodyPlanRef {
+        &self.target
+    }
+    pub fn follower(&self) -> &MirrorBodyPlanRef {
+        &self.follower
+    }
+    pub fn follower_facts(&self) -> &inku_score::MirrorFollowerFactsV1 {
+        &self.follower_facts
+    }
+}
+
 impl PlacementMemberPlan {
     pub const fn source_instruction_index(&self) -> usize {
         self.source_instruction_index
@@ -491,6 +532,7 @@ pub struct CompositionPlanResult<'a> {
     pub(crate) placement_groups: Vec<PlacementGroupPlan>,
     pub(crate) fill_groups: Vec<FillGroupPlan>,
     pub(crate) standalone_macro_repetitions: Vec<PlacementMemberPlan>,
+    pub(crate) mirror_relations: Vec<MirrorRelationPlan>,
     pub(crate) ground: Option<CanvasGroundSpec>,
     pub(crate) diagnostics: Vec<ScoreLoweringDiagnostic>,
 }
@@ -530,6 +572,9 @@ impl<'a> CompositionPlanResult<'a> {
     /// ranges are outside coordinated placement, and add no layout or anchor.
     pub fn standalone_macro_repetitions(&self) -> &[PlacementMemberPlan] {
         &self.standalone_macro_repetitions
+    }
+    pub fn mirror_relations(&self) -> &[MirrorRelationPlan] {
+        &self.mirror_relations
     }
     pub fn anchors(&self) -> &[AnchorPoint] {
         &self.anchors

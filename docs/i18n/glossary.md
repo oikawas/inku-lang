@@ -122,6 +122,7 @@ composition / color catalog と食い違って見える（→ §8）。
 | 添景 | **staffage** | 名詞。v2.11.0 で軸ごと畳んだ（記録の表示にのみ残る） | ~~decoration~~、~~props~~ |
 | 銀筆 | **silverpoint** | 名詞。Score の `weight` 値と同綴り・小文字 | ~~hair~~（画材として存在しない語だった）、~~metalpoint~~ |
 | 歳時記 | **Saijiki** | 固有名詞・大文字。カテゴリ鍵のローマ字（`katachi` ほか）は正しい英語表記 | ~~almanac~~ 単独 |
+| 鏡写し | **mirrored** | 歳時記のあいだ。二つの形・まとまりの間の軸に対する位置と向きの鏡像 | 色・画材の複製とはしない |
 
 ## 5. 文書・調査の語
 

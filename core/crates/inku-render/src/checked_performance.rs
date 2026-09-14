@@ -566,7 +566,7 @@ fn uses_compact_resource_contract(score: &inku_score::Score) -> bool {
     score.version == "0.10.0"
         || (matches!(
             score.version.as_str(),
-            "0.11.0" | "0.12.0" | "0.13.0" | "0.14.0"
+            "0.11.0" | "0.12.0" | "0.13.0" | "0.14.0" | "0.15.0"
         ) && score.resource_policy.is_some())
 }
 

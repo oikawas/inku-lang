@@ -21,7 +21,7 @@ use crate::{
 
 /// Stable identity for the runtime-disconnected explicit instruction association AST.
 pub const SEMANTIC_INSTRUCTION_ASSOCIATION_SCHEMA_ID: &str =
-    "inku.semantic-instruction-association.v23";
+    "inku.semantic-instruction-association.v24";
 
 /// An explicit fill domain. Inline operands retain their original instruction owner
 /// and are consumed as geometry by the fill, rather than drawn independently.
@@ -83,6 +83,7 @@ pub struct SemanticGroupPredicateEdge {
     pub group_index: usize,
     pub action: Option<SemanticTerm>,
     pub position: Option<SemanticTerm>,
+    pub relation: Option<SemanticRelation>,
     pub layout: GroupLayout,
     pub fill_target: Option<SemanticFillTarget>,
 }
@@ -732,6 +733,13 @@ fn build_semantic_instructions(
             .entry(entity.head.source().region_index)
             .or_default() += 1;
     }
+    claim_group_mirrored_relations(
+        &association,
+        &coordinated_head_groups,
+        &mut group_predicates,
+        &mut relations_by_region,
+        &mut relation_issues,
+    );
     for (&region_index, &entity_count) in &entity_counts_by_region {
         if entity_count > 1
             && let Some(relations) = relations_by_region.remove(&region_index)
@@ -995,6 +1003,10 @@ fn build_semantic_instructions(
         .iter()
         .filter(|instruction| instruction.relation.is_some())
         .count()
+        + group_predicates
+            .iter()
+            .filter(|predicate| predicate.relation.is_some())
+            .count()
         + relation_issues
             .iter()
             .map(|issue| issue.occurrences.len())
@@ -1397,6 +1409,7 @@ fn coordination_gap_is_clear(
     let left_source = left.head.source();
     let right_source = right.head.source();
     let right_owned = semantic_entity_owned_spans(right);
+    let right_heads = BTreeSet::from([(right_source.span.start_byte, right_source.span.end_byte)]);
     association.clause_stream.clauses[left_source.clause_index]
         .atoms
         .iter()
@@ -1407,16 +1420,44 @@ fn coordination_gap_is_clear(
         .all(|atom| {
             atom.span() == marker_span
                 || right_owned.contains(&(atom.span().start_byte, atom.span().end_byte))
-                // The accepted right quantity keeps its genitive bridge, e.g.
-                // `circle と four の blue point`; it is part of that noun phrase,
-                // not a boundary between coordinated heads.
-                || right.quantity.as_ref().is_some_and(|quantity|
-                    association.clause_topology.attachment_markers.iter().any(|marker|
-                        marker.span == atom.span()
-                            && marker.marker == AttachmentMarkerKind::Japanese(JapaneseAttachmentMarkerKind::No)
-                            && marker.left_atom_spans.last() == Some(&quantity.provenance.span)))
+                // An accepted right modifier keeps its genitive bridge to that
+                // entity head, e.g. `circle と vertical の line`; it is part of
+                // the right noun phrase, not a coordination boundary.
+                || japanese_owned_genitive_bridge(
+                    association,
+                    left_source.clause_index,
+                    atom.span(),
+                    &right_owned,
+                    &right_heads,
+                )
                 || matches!(atom, ClauseAtom::FunctionWord { span, .. }
                     if association.clause_topology.determiner_starts.contains(&span.start_byte))
+        })
+}
+
+fn japanese_owned_genitive_bridge(
+    association: &SemanticAssociationResult,
+    clause_index: usize,
+    span: SourceSpan,
+    owned_spans: &BTreeSet<(usize, usize)>,
+    head_spans: &BTreeSet<(usize, usize)>,
+) -> bool {
+    association
+        .clause_topology
+        .attachment_markers
+        .iter()
+        .filter(|marker| marker.clause_index == clause_index)
+        .any(|marker| {
+            marker.span == span
+                && marker.marker == AttachmentMarkerKind::Japanese(JapaneseAttachmentMarkerKind::No)
+                && marker
+                    .left_atom_spans
+                    .last()
+                    .is_some_and(|left| owned_spans.contains(&(left.start_byte, left.end_byte)))
+                && marker
+                    .right_atom_spans
+                    .first()
+                    .is_some_and(|right| head_spans.contains(&(right.start_byte, right.end_byte)))
         })
 }
 
@@ -1561,6 +1602,7 @@ fn extract_group_predicates(
             edges.push(SemanticGroupPredicateEdge {
                 group_index,
                 fill_target: None,
+                relation: None,
                 layout: group_layout(
                     group_index,
                     groups,
@@ -1574,6 +1616,105 @@ fn extract_group_predicates(
         }
     }
     (edges, issues)
+}
+
+fn claim_group_mirrored_relations(
+    association: &SemanticAssociationResult,
+    groups: &[SemanticCoordinatedHeadGroup],
+    edges: &mut Vec<SemanticGroupPredicateEdge>,
+    relations_by_region: &mut BTreeMap<usize, Vec<ExplicitPreviousReferenceOccurrence>>,
+    issues: &mut Vec<SemanticRelationIssue>,
+) {
+    for (group_index, group) in groups.iter().enumerate() {
+        let Some(&first_member) = group.member_instruction_indices.first() else {
+            continue;
+        };
+        let Some(region_index) = group
+            .member_instruction_indices
+            .iter()
+            .map(|&index| association.ast.entities[index].head.source().region_index)
+            .reduce(|left, right| (left == right).then_some(left).unwrap_or(usize::MAX))
+            .filter(|region| *region != usize::MAX)
+        else {
+            continue;
+        };
+        let region_members = association
+            .ast
+            .entities
+            .iter()
+            .enumerate()
+            .filter(|(_, entity)| entity.head.source().region_index == region_index)
+            .map(|(index, _)| index)
+            .collect::<Vec<_>>();
+        if region_members != group.member_instruction_indices {
+            continue;
+        }
+        let Some(occurrences) = relations_by_region.get(&region_index) else {
+            continue;
+        };
+        if occurrences.is_empty()
+            || !occurrences
+                .iter()
+                .all(|occurrence| occurrence.kind == SemanticRelationKind::Mirrored)
+        {
+            continue;
+        }
+        let last_head_end = group
+            .member_instruction_indices
+            .iter()
+            .map(|&index| association.ast.entities[index].head.source().span.end_byte)
+            .max()
+            .unwrap_or(0);
+        if occurrences
+            .iter()
+            .any(|occurrence| occurrence.provenance.span.start_byte < last_head_end)
+        {
+            continue;
+        }
+        let mut occurrences = relations_by_region
+            .remove(&region_index)
+            .expect("checked group relation occurrences");
+        if occurrences.len() > 1 {
+            issues.push(SemanticRelationIssue {
+                kind: SemanticRelationIssueKind::ConflictingRelations,
+                region_index,
+                occurrences,
+            });
+            continue;
+        }
+        let occurrence = occurrences.pop().expect("nonempty group relation");
+        if first_member == 0 {
+            issues.push(SemanticRelationIssue {
+                kind: SemanticRelationIssueKind::MissingPreviousOne,
+                region_index,
+                occurrences: vec![occurrence],
+            });
+            continue;
+        }
+        let relation = SemanticRelation {
+            target_endpoint: occurrence.target_endpoint,
+            target_path_selection: occurrence.target_path_selection,
+            kind: occurrence.kind,
+            reference: occurrence.reference,
+            provenance: occurrence.provenance,
+        };
+        if let Some(edge) = edges
+            .iter_mut()
+            .find(|edge| edge.group_index == group_index)
+        {
+            edge.relation = Some(relation);
+        } else {
+            edges.push(SemanticGroupPredicateEdge {
+                group_index,
+                action: None,
+                position: None,
+                relation: Some(relation),
+                layout: group_layout(group_index, groups, association, None, None),
+                fill_target: None,
+            });
+        }
+    }
+    edges.sort_by_key(|edge| edge.group_index);
 }
 
 fn group_layout(
@@ -2304,6 +2445,12 @@ fn japanese_group_segment_is_clear(
         .iter()
         .map(|marker| (marker.span.start_byte, marker.span.end_byte))
         .collect::<BTreeSet<_>>();
+    let head_spans = group
+        .member_instruction_indices
+        .iter()
+        .map(|index| association.ast.entities[*index].head.source().span)
+        .map(|span| (span.start_byte, span.end_byte))
+        .collect::<BTreeSet<_>>();
     association.clause_stream.clauses[clause_index]
         .atoms
         .iter()
@@ -2312,6 +2459,22 @@ fn japanese_group_segment_is_clear(
             let key = (atom.span().start_byte, atom.span().end_byte);
             owned_spans.contains(&key)
                 || marker_spans.contains(&key)
+                || japanese_owned_genitive_bridge(
+                    association,
+                    clause_index,
+                    atom.span(),
+                    &owned_spans,
+                    &head_spans,
+                )
+                || matches!(atom, ClauseAtom::FunctionWord { surface, .. } if surface == "組")
+                || matches!(atom, ClauseAtom::FunctionWord { surface, span, .. }
+                if surface == "の"
+                    && association.clause_stream.clauses[clause_index].atoms.iter().any(
+                        |candidate| matches!(candidate,
+                            ClauseAtom::FunctionWord { surface, span: group_span, .. }
+                                if surface == "組" && span.end_byte == group_span.start_byte
+                        )
+                    ))
                 || matches!(atom, ClauseAtom::FunctionWord { span, .. }
                     if association.clause_topology.determiner_starts.contains(&span.start_byte))
         })
@@ -2454,11 +2617,12 @@ fn english_entity_prefix_is_clear(
                     | RemainingRoleKind::Fluctuation
                     | RemainingRoleKind::Proportion
             ),
-            ClauseAtom::FunctionWord { span, .. } => {
-                association
-                    .clause_topology
-                    .determiner_starts
-                    .contains(&span.start_byte)
+            ClauseAtom::FunctionWord { surface, span, .. } => {
+                surface.eq_ignore_ascii_case("group of")
+                    || association
+                        .clause_topology
+                        .determiner_starts
+                        .contains(&span.start_byte)
                     || attachment_marker_at(association, clause_index, span.start_byte)
                         == Some(AttachmentMarkerKind::English(
                             EnglishAttachmentMarkerKind::Of,
@@ -2788,6 +2952,9 @@ pub(crate) fn semantic_group_predicate_value(edge: &SemanticGroupPredicateEdge) 
             .map(|term| semantic_identity_value(&term.identity))
             .unwrap_or(Value::Null),
     );
+    if let Some(relation) = &edge.relation {
+        record.insert("relation".to_owned(), semantic_relation_value(relation));
+    }
     Value::Object(record.into_iter().collect())
 }
 

@@ -50,7 +50,7 @@ fn embedded_asset_is_complete_and_orders_are_lossless() {
     assert!(angles.words[0].marker_surfaces_ja.is_none());
 
     assert_eq!(asset.languages, ["ja", "en"]);
-    assert_eq!(asset.categories.len(), 11);
+    assert_eq!(asset.categories.len(), 12);
     let shape = asset
         .categories
         .iter()
@@ -73,9 +73,9 @@ fn embedded_asset_is_complete_and_orders_are_lossless() {
             .iter()
             .map(|category| category.words.len())
             .sum::<usize>(),
-        93
+        94
     );
-    assert_eq!(asset.relations.len(), 6);
+    assert_eq!(asset.relations.len(), 7);
     assert_eq!(
         asset
             .categories
@@ -93,6 +93,7 @@ fn embedded_asset_is_complete_and_orders_are_lossless() {
             "yuragi",
             "basho",
             "ugoki",
+            "jun",
             "wariai",
         ]
     );
@@ -108,7 +109,8 @@ fn embedded_asset_is_complete_and_orders_are_lossless() {
             "touching",
             "cutting",
             "between",
-            "connected"
+            "connected",
+            "mirrored"
         ]
     );
     assert_eq!(

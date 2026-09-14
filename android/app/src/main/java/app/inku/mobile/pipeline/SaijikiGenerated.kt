@@ -107,8 +107,8 @@ object SaijikiGenerated {
             key = "aida",
             nameJa = "あいだ",
             nameEn = "relations",
-            wordsJa = listOf("沿う", "触れない", "切る", "間に", "触れる", "つながる"),
-            wordsEn = listOf("along", "not touching", "cutting", "between", "touching", "connected"),
+            wordsJa = listOf("沿う", "触れない", "切る", "間に", "触れる", "つながる", "鏡写し"),
+            wordsEn = listOf("along", "not touching", "cutting", "between", "touching", "connected", "mirrored"),
         ),
     )
 }

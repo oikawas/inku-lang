@@ -48,11 +48,11 @@ pub mod score_lowering;
 pub mod score_materialization;
 pub use composition_plan::{
     CompositionPlanOutcome, CompositionPlanResult, FillCountResolution, FillGroupPlan,
-    FillPlanOwner, FillRegionGeometry, FillRegionOwner, ObjectAnchor, ObjectPlacementPlan,
-    PlacementAction, PlacementGroupPlan, PlacementMemberKind, PlacementMemberPlan, PlacementRecipe,
-    PlanRelation, Rational, ResolvedFillRegion, ResolvedGeometryDimensions,
-    ResolvedLayoutDirection, ResolvedObjectAppearance, TransformGroupPlan, plan_verified_stage15,
-    plan_verified_stage15_with_policy,
+    FillPlanOwner, FillRegionGeometry, FillRegionOwner, MirrorBodyPlanRef, MirrorRelationPlan,
+    ObjectAnchor, ObjectPlacementPlan, PlacementAction, PlacementGroupPlan, PlacementMemberKind,
+    PlacementMemberPlan, PlacementRecipe, PlanRelation, Rational, ResolvedFillRegion,
+    ResolvedGeometryDimensions, ResolvedLayoutDirection, ResolvedObjectAppearance,
+    TransformGroupPlan, plan_verified_stage15, plan_verified_stage15_with_policy,
 };
 pub use score_materialization::{
     MaterializedComposition, MaterializedRelationOmission, ScoreMaterializationError,

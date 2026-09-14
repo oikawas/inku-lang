@@ -394,11 +394,18 @@ RELATIONS: tuple[RelationWord, ...] = (
         ("前の形につながる",),
         ("connected to the previous shape",),
     ),
+    RelationWord(
+        "mirrored",
+        "鏡写し",
+        "mirrored",
+        ("前の形と鏡写し",),
+        ("mirrored with the previous shape",),
+    ),
 )
 
 _RELATION_MARKER_ORDER = {
-    "ja": ("触れる", "つながる", "沿う", "切る", "触れない", "間に"),
-    "en": ("touching", "connected", "along", "cutting", "not touching", "between"),
+    "ja": ("触れる", "つながる", "沿う", "切る", "触れない", "間に", "鏡写し"),
+    "en": ("touching", "connected", "along", "cutting", "not touching", "between", "mirrored"),
 }
 
 _RELATION_DISPLAY_ORDER = (
@@ -408,6 +415,7 @@ _RELATION_DISPLAY_ORDER = (
     "between",
     "touching",
     "connected",
+    "mirrored",
 )
 
 

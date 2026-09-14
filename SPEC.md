@@ -419,6 +419,8 @@ Ordinary DDL accepts `connected/connects to [the] start/end of [the] [previous] 
 
 Ordinary DDL accepts `connected partway along the previous line/arc` to join the current start to a point on the prior Line or Arc, excluding both ends. `partway` belongs to places and is not an alias for center. Score retains `target_path_position:"interior"`; performance chooses a position strictly inside the path using the existing instance identity and performance seed. The same Score and performance seed reproduce the same contact on the actual varied centerline, including outer rotation, reflection, and translation. This does not align tangents or resize the shape. Macros use the same `target_path_position:"interior"` selector. Only works carrying this string require Score 0.13. Existing numeric expressions and numeric Score positions retain their Line-only 0–1 range and interpolation. Combining the selector with an endpoint or targeting an anchor is an invalid relation.
 
+`Mirrored with the previous shape` belongs to relations: the two shapes have mirrored positions and orientations across the axis between them. It applies to a complete Macro, such as a leaf, or an ordinary group as well as a single shape. The axis is the perpendicular bisector of the two positions resolved by existing placement. The target and follower positions stay fixed while omitted follower dimensions and overall orientation are resolved from the reflected target. Explicit shape, dimensions, direction, color, tool, and surface remain authoritative. Incompatible corresponding shapes or explicit facts, or coincident positions with no defined axis, produce a diagnostic and remove only the relation; other drawing continues. Inner layouts and transforms precede mirroring, followed by shared outer transforms. Explicit outer nonuniform scaling remains in force without another reflection of the final image. Each shape retains its own performance seed for material variation. Only works carrying the new `mirror_relations` require Score 0.15. The relation refers to existing standalone instruction, standalone Macro repetition, placement member, or placement group boundaries.
+
 Fluctuation parameters keep asset category `variation` and may constrain candidates with an optional closed `dimension`: `amplitude`, `frequency`, `quality`, or `spread`. For example, `{"type":"semantic_ref","category":"variation","dimension":"amplitude"}`. Other categories cannot specify a dimension. Omitted / None preserves legacy category-only matching and canonical bytes / digest; Some participates in the definition digest. Flat Emit uses `fluctuation_amplitude`, `fluctuation_frequency`, `fluctuation_quality`, and `ink_spread`, each carrying an existing `SemanticRef { category: variation, id }` from its dimension. A field name does not change semantic identity. Definition validation, component `use`, binding, and execution boundaries share the same seven-word current classification.
 
 Every declared parameter remains required. Declaring three parameters and supplying only one value produces a binding error such as MissingCompatibleFact. Declaring only an amplitude parameter and delivering it to Emit lets the same resolver in §13.6 resolve the other two slots. Undeclared caller overlays, guessing three slots from one generic variation field, and optional parameters are not introduced.
@@ -2387,9 +2389,9 @@ The distinction §13.3 draws between emotion words and motion words extends to
 relation.  Only physical, externally observable relations are allowed into the
 core.
 
-**The set is limited to these six words:**
+**The set is limited to these seven words:**
 
-| Word (ja) | Word (en) | Meaning | `relation.type` |
+| Word (ja) | Word (en) | Meaning | Score representation |
 |---|---|---|---|
 | 沿う | along | placed along the path or direction of the preceding element | `along` |
 | 触れない | not touching | approaches the preceding element without contact | `not_touching` |
@@ -2397,6 +2399,7 @@ core.
 | 間に | between | placed in the region between the preceding two elements | `between` |
 | 触れる | touching | contacts the preceding element; coinciding endpoints compose a closed form | `touching` |
 | つながる | connected | joins the current start to a selected start, end, or interior point of a prior Line or Arc, or to the prior endpoint when omitted | `connected` |
+| 鏡写し | mirrored | mirrors the positions and orientations of two complete shapes or groups across the axis between them | `mirror_relations` |
 
 **Words excluded**: nestle up to, answer, converse with, resonate with — words of
 intent and personification, not observable from outside.

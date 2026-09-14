@@ -55,6 +55,10 @@ pub enum ScoreExecutionReason {
     NoDrawableInstructions,
     FillClipUnsupported,
     FillClipLimitExceeded,
+    MirrorReferenceOmitted,
+    MirrorBodyMismatch,
+    MirrorCoincidentAnchors,
+    MirrorExplicitConflict,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]

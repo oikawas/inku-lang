@@ -26,7 +26,7 @@ use crate::{
 };
 
 /// Stable identity for the runtime-disconnected semantic document root.
-pub const SEMANTIC_DOCUMENT_SCHEMA_ID: &str = "inku.semantic-document.v20";
+pub const SEMANTIC_DOCUMENT_SCHEMA_ID: &str = "inku.semantic-document.v21";
 
 /// A document background declaration, distinct from a drawable surface or Ground.
 #[derive(Clone, Debug, PartialEq)]
@@ -625,7 +625,7 @@ fn arbitrate_coordination_continuation_claims(
     association
         .ast
         .group_predicates
-        .retain(|edge| edge.action.is_some() || edge.position.is_some());
+        .retain(|edge| edge.action.is_some() || edge.position.is_some() || edge.relation.is_some());
     if !conflicts.is_empty() {
         association.ast.complete = false;
         association.canonical_bytes = None;

@@ -288,7 +288,8 @@
 # counts through the shared compact Score color cycle.
 # 42: Partway connections keep an interior path selector until performance.
 # 43: Ordinary noun groups and finite non-color sequences preserve total counts.
-DDL_ENGINE_VERSION = "43"
+# 44: Whole-body mirror relations preserve explicit follower facts.
+DDL_ENGINE_VERSION = "44"
 # 4 (2026-07-30): yellow, orange, and purple become abstract Score colors, and
 # coerce recognizes the corresponding Japanese and English DDL markers.
 # 3 (2026-07-30): 黄 / 橙 / 紫 joined the saijiki color words, so an author can write
@@ -306,4 +307,5 @@ DDL_ENGINE_VERSION = "43"
 # 8 (2026-09-14): Alternating and in order join the new order category.
 # 9 (2026-09-14): Partway joins place vocabulary for Line/Arc connections.
 # 10 (2026-09-14): Noun groups and non-color sequences use ordinary count grammar.
-DDL_VERSION = "10"
+# 11 (2026-09-14): Mirrored joins the relation vocabulary.
+DDL_VERSION = "11"

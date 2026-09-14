@@ -1116,6 +1116,89 @@ fn remap_member(
     })
 }
 
+fn remap_mirror_body_ref(
+    score: &Score,
+    body: &crate::MirrorBodyRef,
+    instructions: &IndexMap,
+    placements: &IndexMap,
+    repetitions: &IndexMap,
+) -> Option<crate::MirrorBodyRef> {
+    match body {
+        crate::MirrorBodyRef::Instruction { instruction_index } => instructions
+            .values
+            .get(*instruction_index)?
+            .map(|instruction_index| crate::MirrorBodyRef::Instruction { instruction_index }),
+        crate::MirrorBodyRef::RepetitionGroup {
+            repetition_group_index,
+        } => repetitions
+            .values
+            .get(*repetition_group_index)?
+            .map(
+                |repetition_group_index| crate::MirrorBodyRef::RepetitionGroup {
+                    repetition_group_index,
+                },
+            ),
+        crate::MirrorBodyRef::PlacementMember {
+            placement_group_index,
+            member_index,
+        } => {
+            score
+                .placement_groups
+                .get(*placement_group_index)?
+                .members
+                .get(*member_index)?;
+            placements
+                .values
+                .get(*placement_group_index)?
+                .map(
+                    |placement_group_index| crate::MirrorBodyRef::PlacementMember {
+                        placement_group_index,
+                        member_index: *member_index,
+                    },
+                )
+        }
+        crate::MirrorBodyRef::PlacementGroup {
+            placement_group_index,
+        } => placements
+            .values
+            .get(*placement_group_index)?
+            .map(
+                |placement_group_index| crate::MirrorBodyRef::PlacementGroup {
+                    placement_group_index,
+                },
+            ),
+    }
+}
+
+// Original instruction provenance for the existing relation-only diagnostic.
+// This is not a replacement target: missing references are never rebound.
+fn mirror_body_instruction_index(score: &Score, body: &crate::MirrorBodyRef) -> Option<usize> {
+    match body {
+        crate::MirrorBodyRef::Instruction { instruction_index } => Some(*instruction_index),
+        crate::MirrorBodyRef::RepetitionGroup {
+            repetition_group_index,
+        } => score
+            .repetition_groups
+            .get(*repetition_group_index)
+            .map(|group| group.member.start),
+        crate::MirrorBodyRef::PlacementMember {
+            placement_group_index,
+            member_index,
+        } => score
+            .placement_groups
+            .get(*placement_group_index)?
+            .members
+            .get(*member_index)
+            .map(|member| member.start),
+        crate::MirrorBodyRef::PlacementGroup {
+            placement_group_index,
+        } => score
+            .placement_groups
+            .get(*placement_group_index)
+            .map(|group| group.start),
+    }
+}
+
 /// Recompute demand from an untrusted compact Score, omit only offending atomic
 /// source units, and return a schema-valid Score with every retained index remapped.
 pub fn finalize_saved_score(
@@ -1141,7 +1224,7 @@ pub fn finalize_saved_score_with_omitted_instructions(
 ) -> Result<FinalizedScore, SavedScoreResourceError> {
     if !matches!(
         score.version.as_str(),
-        "0.10.0" | "0.11.0" | "0.12.0" | "0.13.0" | "0.14.0"
+        "0.10.0" | "0.11.0" | "0.12.0" | "0.13.0" | "0.14.0" | "0.15.0"
     ) {
         return Err(invalid(
             SavedScoreResourceOwner::Score,
@@ -1502,6 +1585,53 @@ pub fn finalize_saved_score_with_omitted_instructions(
     finalized.placement_groups = placement_groups;
     finalized.fill_groups = fill_groups;
     finalized.repetition_groups = repetition_groups;
+    finalized.mirror_relations = score
+        .mirror_relations
+        .iter()
+        .filter_map(|relation| {
+            let target = remap_mirror_body_ref(
+                score,
+                &relation.target,
+                &instruction_map,
+                &placement_map,
+                &repetition_map,
+            );
+            let follower = remap_mirror_body_ref(
+                score,
+                &relation.follower,
+                &instruction_map,
+                &placement_map,
+                &repetition_map,
+            );
+            let (Some(target), Some(follower)) = (target, follower) else {
+                let target_instruction_index =
+                    mirror_body_instruction_index(score, &relation.target);
+                let instruction_index = mirror_body_instruction_index(score, &relation.follower)
+                    .or(target_instruction_index)
+                    .unwrap_or(0);
+                let owner = score
+                    .instructions
+                    .get(instruction_index)
+                    .and_then(|instruction| instruction.arrangement.as_ref())
+                    .and_then(|arrangement| arrangement.resolved.as_ref())
+                    .map(|resolved| resolved.owner.clone())
+                    .unwrap_or(ScoreSourceOwner::SourceInstruction { instruction_index });
+                relation_diagnostics.push(SavedScoreRelationDiagnostic {
+                    instruction_index,
+                    owner,
+                    target_instruction_index,
+                    target_anchor_index: None,
+                    disposition: SavedScoreRelationDisposition::Omitted,
+                });
+                return None;
+            };
+            Some(crate::MirrorRelationV1 {
+                target,
+                follower,
+                follower_facts: relation.follower_facts.clone(),
+            })
+        })
+        .collect();
     finalized
         .resource_policy
         .as_mut()
@@ -1652,6 +1782,7 @@ mod tests {
         .unwrap();
         Score {
             version: "0.10.0".into(),
+            mirror_relations: Vec::new(),
             canvas: crate::Canvas::Id("square".into()),
             background: Color::Black,
             presence: None,
@@ -1812,6 +1943,71 @@ mod tests {
             ),
             (vec![Some(0), None, None, Some(1)], 0, 1)
         );
+    }
+
+    #[test]
+    fn compact_mirror_missing_references_diagnose_only_relation_and_preserve_later_pair() {
+        let policy = hard(100);
+        let mut score = representative_score(policy.clone());
+        score.version = "0.15.0".into();
+        score.instructions[3].relation = None;
+        let instruction_ref =
+            |instruction_index| crate::MirrorBodyRef::Instruction { instruction_index };
+        let relation = |target, follower| crate::MirrorRelationV1 {
+            target,
+            follower,
+            follower_facts: crate::MirrorFollowerFactsV1 {
+                dimensions_fixed: true,
+                direction_degrees: None,
+            },
+        };
+        score.mirror_relations = vec![
+            relation(instruction_ref(0), instruction_ref(3)),
+            relation(
+                crate::MirrorBodyRef::PlacementMember {
+                    placement_group_index: 0,
+                    member_index: usize::MAX,
+                },
+                instruction_ref(3),
+            ),
+            relation(instruction_ref(1), instruction_ref(2)),
+        ];
+        // Missing relation references are recoverable, not schema failures.
+        assert_eq!(score.validate_schema_edition(), Ok(()));
+        let finalized = finalize_saved_score_with_omitted_instructions(
+            &score,
+            &policy,
+            OperationalResourceBudget(budget(100)),
+            &[0],
+        )
+        .unwrap();
+        assert_eq!(finalized.score.instructions, score.instructions[1..]);
+        assert_eq!(
+            finalized.index_maps.instructions,
+            vec![None, Some(0), Some(1), Some(2)]
+        );
+        assert_eq!(finalized.relation_diagnostics.len(), 2);
+        assert!(finalized.relation_diagnostics.iter().all(|diagnostic| {
+            diagnostic.instruction_index == 3
+                && diagnostic.owner
+                    == ScoreSourceOwner::SourceInstruction {
+                        instruction_index: 3,
+                    }
+                && diagnostic.disposition == SavedScoreRelationDisposition::Omitted
+        }));
+        assert_eq!(
+            finalized.relation_diagnostics[0].target_instruction_index,
+            Some(0)
+        );
+        assert_eq!(
+            finalized.relation_diagnostics[1].target_instruction_index,
+            None
+        );
+        assert_eq!(
+            finalized.score.mirror_relations,
+            vec![relation(instruction_ref(0), instruction_ref(1))]
+        );
+        assert!(finalized.resource_diagnostics.is_empty());
     }
 
     #[test]

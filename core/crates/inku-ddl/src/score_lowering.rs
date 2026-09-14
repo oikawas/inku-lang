@@ -2,9 +2,10 @@
 
 use crate::composition_plan::{
     CompositionPlanOutcome, CompositionPlanResult, FillCountResolution, FillGroupPlan,
-    FillPlanOwner, FillRegionGeometry, FillRegionOwner, ObjectAnchor, ObjectPlacementPlan,
-    PlacementAction, PlacementGroupPlan, PlacementMemberKind, PlacementMemberPlan, PlacementRecipe,
-    PlanRelation, ResolvedFillRegion, ResolvedObjectAppearance, TransformGroupPlan,
+    FillPlanOwner, FillRegionGeometry, FillRegionOwner, MirrorBodyPlanRef, MirrorRelationPlan,
+    ObjectAnchor, ObjectPlacementPlan, PlacementAction, PlacementGroupPlan, PlacementMemberKind,
+    PlacementMemberPlan, PlacementRecipe, PlanRelation, ResolvedFillRegion,
+    ResolvedObjectAppearance, TransformGroupPlan,
 };
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -37,7 +38,7 @@ use crate::{
 
 /// Stable identity for the non-serializable Score-field candidate boundary.
 pub const SCORE_FIELD_CANDIDATE_SCHEMA_ID: &str = "inku.score-field-candidate.v2";
-pub const EXPLICIT_SCORE_LOWERING_SCHEMA_ID: &str = "inku.explicit-score-lowering.v6";
+pub const EXPLICIT_SCORE_LOWERING_SCHEMA_ID: &str = "inku.explicit-score-lowering.v7";
 
 /// A canonical semantic primitive identity that cannot be represented by Score.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -1893,6 +1894,7 @@ pub struct ExplicitScoreLoweringResult<'a> {
     placement_groups: Vec<PlacementGroupPlan>,
     fill_groups: Vec<FillGroupPlan>,
     standalone_macro_repetitions: Vec<PlacementMemberPlan>,
+    mirror_relations: Vec<MirrorRelationPlan>,
 }
 
 impl<'a> ExplicitScoreLoweringResult<'a> {
@@ -2113,6 +2115,7 @@ pub(crate) fn resolve_composition_plan<'a>(
         placement_groups: result.placement_groups,
         fill_groups: result.fill_groups,
         standalone_macro_repetitions: result.standalone_macro_repetitions,
+        mirror_relations: result.mirror_relations,
         ground: result.resolved_ground,
         diagnostics: result.diagnostics,
     }
@@ -2165,6 +2168,7 @@ fn lower_verified_stage15_shared<'a>(
     let mut field_cycle_members = BTreeMap::new();
     let mut standalone_macro_repetitions = Vec::new();
     let mut supported_member_cycles = Vec::new();
+    let mut mirror_relations = Vec::new();
 
     let ground =
         document.ground.as_ref().and_then(|ground| {
@@ -2610,74 +2614,82 @@ fn lower_verified_stage15_shared<'a>(
                 direct_instruction_focus(candidate.verified_effective_view(), instruction_index);
             let mut members = Vec::new();
             let plan_relation = if let Some(objects) = objects.as_deref() {
-                instruction.relation.as_ref().and_then(|relation| {
-                    match direct_score_relation(
-                        instruction_index,
-                        project_source_instruction(
-                            candidate.verified_effective_view(),
+                instruction
+                    .relation
+                    .as_ref()
+                    .filter(|relation| relation.kind != SemanticRelationKind::Mirrored)
+                    .and_then(|relation| {
+                        match direct_score_relation(
                             instruction_index,
-                            instruction,
-                            effective_focus,
-                        )
-                        .expect("field cycle has a primitive source"),
-                        relation,
-                        objects
-                            .last()
-                            .map(|object| (object.primitive(), object.arc_form())),
-                        objects.iter().map(|object| &object.origin),
-                        objects.len().checked_sub(1),
-                    ) {
-                        Ok(relation) => Some(plan_relation(relation)),
-                        Err(reason) => {
-                            diagnostics.push(ScoreLoweringDiagnostic {
-                                owner: source_owner_for_gap(
-                                    instruction_index,
-                                    instruction,
-                                    &reason,
-                                ),
-                                disposition: relation_diagnostic_disposition(),
-                                reason,
-                            });
-                            None
+                            project_source_instruction(
+                                candidate.verified_effective_view(),
+                                instruction_index,
+                                instruction,
+                                effective_focus,
+                            )
+                            .expect("field cycle has a primitive source"),
+                            relation,
+                            objects
+                                .last()
+                                .map(|object| (object.primitive(), object.arc_form())),
+                            objects.iter().map(|object| &object.origin),
+                            objects.len().checked_sub(1),
+                        ) {
+                            Ok(relation) => Some(plan_relation(relation)),
+                            Err(reason) => {
+                                diagnostics.push(ScoreLoweringDiagnostic {
+                                    owner: source_owner_for_gap(
+                                        instruction_index,
+                                        instruction,
+                                        &reason,
+                                    ),
+                                    disposition: relation_diagnostic_disposition(),
+                                    reason,
+                                });
+                                None
+                            }
                         }
-                    }
-                })
+                    })
             } else {
                 None
             };
             let score_relation = if objects.is_none() {
-                instruction.relation.as_ref().and_then(|relation| {
-                    match direct_score_relation(
-                        instruction_index,
-                        project_source_instruction(
-                            candidate.verified_effective_view(),
+                instruction
+                    .relation
+                    .as_ref()
+                    .filter(|relation| relation.kind != SemanticRelationKind::Mirrored)
+                    .and_then(|relation| {
+                        match direct_score_relation(
                             instruction_index,
-                            instruction,
-                            effective_focus,
-                        )
-                        .expect("field cycle has a primitive source"),
-                        relation,
-                        instructions
-                            .last()
-                            .map(|prior: &Instruction| (prior.primitive, prior.arc_form)),
-                        instruction_origins.iter(),
-                        instructions.len().checked_sub(1),
-                    ) {
-                        Ok(relation) => Some(relation),
-                        Err(reason) => {
-                            diagnostics.push(ScoreLoweringDiagnostic {
-                                owner: source_owner_for_gap(
-                                    instruction_index,
-                                    instruction,
-                                    &reason,
-                                ),
-                                disposition: relation_diagnostic_disposition(),
-                                reason,
-                            });
-                            None
+                            project_source_instruction(
+                                candidate.verified_effective_view(),
+                                instruction_index,
+                                instruction,
+                                effective_focus,
+                            )
+                            .expect("field cycle has a primitive source"),
+                            relation,
+                            instructions
+                                .last()
+                                .map(|prior: &Instruction| (prior.primitive, prior.arc_form)),
+                            instruction_origins.iter(),
+                            instructions.len().checked_sub(1),
+                        ) {
+                            Ok(relation) => Some(relation),
+                            Err(reason) => {
+                                diagnostics.push(ScoreLoweringDiagnostic {
+                                    owner: source_owner_for_gap(
+                                        instruction_index,
+                                        instruction,
+                                        &reason,
+                                    ),
+                                    disposition: relation_diagnostic_disposition(),
+                                    reason,
+                                });
+                                None
+                            }
                         }
-                    }
-                })
+                    })
             } else {
                 None
             };
@@ -2816,33 +2828,37 @@ fn lower_verified_stage15_shared<'a>(
                     input.group_region = Some(*region);
                 }
                 if let Some(objects) = objects.as_deref_mut() {
-                    let relation = instruction.relation.as_ref().and_then(|relation| {
-                        let resolved = direct_score_relation(
-                            instruction_index,
-                            input,
-                            relation,
-                            objects
-                                .last()
-                                .map(|object| (object.primitive(), object.arc_form())),
-                            objects.iter().map(|object| &object.origin),
-                            objects.len().checked_sub(1),
-                        );
-                        match resolved {
-                            Ok(relation) => Some(plan_relation(relation)),
-                            Err(reason) => {
-                                diagnostics.push(ScoreLoweringDiagnostic {
-                                    owner: source_owner_for_gap(
-                                        instruction_index,
-                                        instruction,
-                                        &reason,
-                                    ),
-                                    disposition: relation_diagnostic_disposition(),
-                                    reason,
-                                });
-                                None
+                    let relation = instruction
+                        .relation
+                        .as_ref()
+                        .filter(|relation| relation.kind != SemanticRelationKind::Mirrored)
+                        .and_then(|relation| {
+                            let resolved = direct_score_relation(
+                                instruction_index,
+                                input,
+                                relation,
+                                objects
+                                    .last()
+                                    .map(|object| (object.primitive(), object.arc_form())),
+                                objects.iter().map(|object| &object.origin),
+                                objects.len().checked_sub(1),
+                            );
+                            match resolved {
+                                Ok(relation) => Some(plan_relation(relation)),
+                                Err(reason) => {
+                                    diagnostics.push(ScoreLoweringDiagnostic {
+                                        owner: source_owner_for_gap(
+                                            instruction_index,
+                                            instruction,
+                                            &reason,
+                                        ),
+                                        disposition: relation_diagnostic_disposition(),
+                                        reason,
+                                    });
+                                    None
+                                }
                             }
-                        }
-                    });
+                        });
                     let attempt = resolve_projected_instruction(
                         input,
                         context,
@@ -2867,7 +2883,11 @@ fn lower_verified_stage15_shared<'a>(
                         objects[index].relation = relation;
                         objects[index].count_was_omitted = instruction.entity.quantity.is_none();
                     }
-                } else if let Some(relation) = &instruction.relation {
+                } else if let Some(relation) = instruction
+                    .relation
+                    .as_ref()
+                    .filter(|relation| relation.kind != SemanticRelationKind::Mirrored)
+                {
                     match direct_score_relation(
                         instruction_index,
                         input,
@@ -2925,7 +2945,11 @@ fn lower_verified_stage15_shared<'a>(
                 }
             }
             SemanticHead::MacroInvocation(head) => {
-                if let Some(relation) = &instruction.relation {
+                if let Some(relation) = instruction
+                    .relation
+                    .as_ref()
+                    .filter(|relation| relation.kind != SemanticRelationKind::Mirrored)
+                {
                     let reason = unsupported_relation_reason(instruction_index, relation);
                     diagnostics.push(ScoreLoweringDiagnostic {
                         owner: ScoreDiagnosticOwner::MacroInvocation {
@@ -3346,6 +3370,18 @@ fn lower_verified_stage15_shared<'a>(
             },
         });
     }
+    if let Some(plan_objects) = objects.as_deref() {
+        mirror_relations = collect_mirror_relation_plans(
+            view,
+            document,
+            plan_objects,
+            &placement_groups,
+            &standalone_macro_repetitions,
+            &mut diagnostics,
+        );
+    } else {
+        append_unmaterialized_mirror_diagnostics(view, document, &mut diagnostics);
+    }
     let stopped = diagnostics
         .iter()
         .any(|diagnostic| matches!(diagnostic.disposition, ScoreDiagnosticDisposition::Stopped));
@@ -3420,6 +3456,7 @@ fn lower_verified_stage15_shared<'a>(
             .collect(),
         repetition_groups: Vec::new(),
         fill_groups: Vec::new(),
+        mirror_relations: Vec::new(),
         resource_policy: None,
     });
     if score.is_none() {
@@ -3445,6 +3482,328 @@ fn lower_verified_stage15_shared<'a>(
         placement_groups,
         fill_groups,
         standalone_macro_repetitions,
+        mirror_relations,
+    }
+}
+
+#[derive(Clone)]
+struct PlannedMirrorBody {
+    source_instruction_indices: Vec<usize>,
+    object_indices: Vec<usize>,
+    reference: MirrorBodyPlanRef,
+}
+
+impl PlannedMirrorBody {
+    fn first_source_index(&self) -> usize {
+        self.source_instruction_indices[0]
+    }
+}
+
+struct PendingMirrorRelation<'a> {
+    follower_source_index: usize,
+    expected_target_source_index: usize,
+    follower_group_index: Option<usize>,
+    relation: &'a SemanticRelation,
+}
+
+fn collect_mirror_relation_plans(
+    view: VerifiedStage15EffectiveView<'_>,
+    document: &crate::SemanticDocumentAst,
+    objects: &[ObjectPlacementPlan],
+    placement_groups: &[PlacementGroupPlan],
+    standalone_macros: &[PlacementMemberPlan],
+    diagnostics: &mut Vec<ScoreLoweringDiagnostic>,
+) -> Vec<MirrorRelationPlan> {
+    let bodies = planned_mirror_bodies(objects, placement_groups, standalone_macros);
+    let mut pending = Vec::new();
+    for (projected_index, instruction) in document.instructions.iter().enumerate() {
+        let Some(relation) = instruction
+            .relation
+            .as_ref()
+            .filter(|relation| relation.kind == SemanticRelationKind::Mirrored)
+        else {
+            continue;
+        };
+        let Some(target_projected_index) = projected_index.checked_sub(1) else {
+            continue;
+        };
+        let Some(follower_source_index) = view.source_instruction_index(projected_index) else {
+            continue;
+        };
+        let Some(expected_target_source_index) =
+            view.source_instruction_index(target_projected_index)
+        else {
+            continue;
+        };
+        pending.push(PendingMirrorRelation {
+            follower_source_index,
+            expected_target_source_index,
+            follower_group_index: None,
+            relation,
+        });
+    }
+    for predicate in &document.group_predicates {
+        let Some(relation) = predicate
+            .relation
+            .as_ref()
+            .filter(|relation| relation.kind == SemanticRelationKind::Mirrored)
+        else {
+            continue;
+        };
+        let group = &document.coordinated_head_groups[predicate.group_index];
+        let Some(&first_projected_index) = group.member_instruction_indices.first() else {
+            continue;
+        };
+        let Some(target_projected_index) = first_projected_index.checked_sub(1) else {
+            continue;
+        };
+        let Some(follower_source_index) = group
+            .member_instruction_indices
+            .last()
+            .and_then(|index| view.source_instruction_index(*index))
+        else {
+            continue;
+        };
+        let Some(expected_target_source_index) =
+            view.source_instruction_index(target_projected_index)
+        else {
+            continue;
+        };
+        let Some(follower_group_index) = view.source_group_index(predicate.group_index) else {
+            continue;
+        };
+        pending.push(PendingMirrorRelation {
+            follower_source_index,
+            expected_target_source_index,
+            follower_group_index: Some(follower_group_index),
+            relation,
+        });
+    }
+
+    let mut plans = Vec::new();
+    for pending in pending {
+        let follower = if let Some(group_index) = pending.follower_group_index {
+            bodies.iter().find(|body| {
+                matches!(
+                    body.reference,
+                    MirrorBodyPlanRef::PlacementGroup { group_index: candidate }
+                        if placement_groups[candidate].group_index() == group_index
+                )
+            })
+        } else {
+            bodies.iter().find(|body| {
+                body.source_instruction_indices
+                    .contains(&pending.follower_source_index)
+            })
+        };
+        let target = bodies.iter().find(|body| {
+            body.source_instruction_indices
+                .contains(&pending.expected_target_source_index)
+        });
+        let (Some(target), Some(follower)) = (target, follower) else {
+            diagnostics.push(mirror_relation_diagnostic(
+                pending.follower_source_index,
+                pending.expected_target_source_index,
+                pending.relation,
+            ));
+            continue;
+        };
+        let target_primitives = target
+            .object_indices
+            .iter()
+            .map(|&index| objects[index].primitive())
+            .collect::<Vec<_>>();
+        let follower_primitives = follower
+            .object_indices
+            .iter()
+            .map(|&index| objects[index].primitive())
+            .collect::<Vec<_>>();
+        if target_primitives != follower_primitives || target_primitives.is_empty() {
+            diagnostics.push(mirror_relation_diagnostic(
+                pending.follower_source_index,
+                pending.expected_target_source_index,
+                pending.relation,
+            ));
+            continue;
+        }
+        let whole_body_fixed = !matches!(follower.reference, MirrorBodyPlanRef::Object { .. });
+        let dimensions_fixed = follower
+            .object_indices
+            .iter()
+            .any(|&index| mirror_dimensions_fixed(&objects[index], whole_body_fixed));
+        let direction_degrees =
+            if matches!(follower.reference, MirrorBodyPlanRef::PlacementGroup { .. }) {
+                None
+            } else {
+                resolved_mirror_follower_direction(
+                    view,
+                    document,
+                    pending.follower_source_index,
+                    follower,
+                    objects,
+                )
+            };
+        plans.push(MirrorRelationPlan {
+            owner: ScoreInstructionOrigin::SourceInstruction {
+                instruction_index: pending.follower_source_index,
+            },
+            target: target.reference.clone(),
+            follower: follower.reference.clone(),
+            follower_facts: inku_score::MirrorFollowerFactsV1 {
+                dimensions_fixed,
+                direction_degrees,
+            },
+        });
+    }
+    plans
+}
+
+fn planned_mirror_bodies(
+    objects: &[ObjectPlacementPlan],
+    placement_groups: &[PlacementGroupPlan],
+    standalone_macros: &[PlacementMemberPlan],
+) -> Vec<PlannedMirrorBody> {
+    let mut covered_objects = BTreeSet::new();
+    let mut bodies = Vec::new();
+    for (group_index, group) in placement_groups.iter().enumerate() {
+        let mut sources = group
+            .members()
+            .iter()
+            .flat_map(|member| member.source_instruction_indices().iter().copied())
+            .collect::<Vec<_>>();
+        sources.sort_unstable();
+        sources.dedup();
+        let object_indices = (group.placement().start..group.placement().end).collect::<Vec<_>>();
+        covered_objects.extend(object_indices.iter().copied());
+        if !sources.is_empty() && !object_indices.is_empty() {
+            bodies.push(PlannedMirrorBody {
+                source_instruction_indices: sources,
+                object_indices,
+                reference: MirrorBodyPlanRef::PlacementGroup { group_index },
+            });
+        }
+    }
+    for (member_index, member) in standalone_macros.iter().enumerate() {
+        let object_indices = (member.member().start..member.member().end).collect::<Vec<_>>();
+        covered_objects.extend(object_indices.iter().copied());
+        if !object_indices.is_empty() {
+            bodies.push(PlannedMirrorBody {
+                source_instruction_indices: member.source_instruction_indices().to_vec(),
+                object_indices,
+                reference: MirrorBodyPlanRef::StandaloneMacro { member_index },
+            });
+        }
+    }
+    for (object_index, object) in objects.iter().enumerate() {
+        if covered_objects.contains(&object_index) {
+            continue;
+        }
+        let source_instruction_index = match object.origin() {
+            ScoreInstructionOrigin::SourceInstruction { instruction_index } => *instruction_index,
+            ScoreInstructionOrigin::MacroEmit {
+                source_instruction_index,
+                ..
+            } => *source_instruction_index,
+        };
+        bodies.push(PlannedMirrorBody {
+            source_instruction_indices: vec![source_instruction_index],
+            object_indices: vec![object_index],
+            reference: MirrorBodyPlanRef::Object { object_index },
+        });
+    }
+    bodies.sort_by_key(PlannedMirrorBody::first_source_index);
+    bodies
+}
+
+fn mirror_dimensions_fixed(object: &ObjectPlacementPlan, whole_body_fixed: bool) -> bool {
+    whole_body_fixed
+        || matches!(object.origin(), ScoreInstructionOrigin::MacroEmit { .. })
+        || !object.generated_geometries().is_empty()
+        || object.explicit_geometry().is_some()
+        || object.relative_scale().is_some()
+        || object.proportion_width_extent().is_some()
+        || !object.additional_relative_scales().is_empty()
+        || !object.additional_explicit_geometries().is_empty()
+        || !object.additional_width_extents().is_empty()
+        || object.shape_constraint().is_some()
+        || object.proportion_aspect().is_some()
+}
+
+fn resolved_mirror_follower_direction(
+    view: VerifiedStage15EffectiveView<'_>,
+    document: &crate::SemanticDocumentAst,
+    source_instruction_index: usize,
+    follower: &PlannedMirrorBody,
+    objects: &[ObjectPlacementPlan],
+) -> Option<f64> {
+    if let MirrorBodyPlanRef::Object { object_index } = follower.reference {
+        return objects[object_index].angle();
+    }
+    let (_, instruction) =
+        document
+            .instructions
+            .iter()
+            .enumerate()
+            .find(|(projected_index, _)| {
+                view.source_instruction_index(*projected_index) == Some(source_instruction_index)
+            })?;
+    let angle = instruction.entity.angle.as_ref()?;
+    resolve_score_angle(
+        &angle.identity.id,
+        ScoreAngleContext {
+            composition_seed: view.composition_seed(),
+            original_pre_expansion_digest: view.original_pre_expansion_digest(),
+            original_expanded_meaning_digest: view.original_expanded_meaning_digest(),
+            occurrence: ScoreAngleOccurrence::Direct {
+                logical_ordinal: source_instruction_index as u64,
+            },
+        },
+    )
+    .filter(|value| value.is_finite())
+}
+
+fn mirror_relation_diagnostic(
+    follower_source_index: usize,
+    target_source_index: usize,
+    relation: &SemanticRelation,
+) -> ScoreLoweringDiagnostic {
+    let reason = ScoreFieldGap::UnsupportedRelation {
+        kind: relation.kind,
+        reference: relation.reference,
+        dependency_instruction_indices: vec![target_source_index],
+    };
+    ScoreLoweringDiagnostic {
+        owner: ScoreDiagnosticOwner::SourceInstruction {
+            instruction_index: follower_source_index,
+            field: None,
+            spans: vec![relation.provenance.span],
+        },
+        disposition: relation_diagnostic_disposition(),
+        reason,
+    }
+}
+
+fn append_unmaterialized_mirror_diagnostics(
+    view: VerifiedStage15EffectiveView<'_>,
+    document: &crate::SemanticDocumentAst,
+    diagnostics: &mut Vec<ScoreLoweringDiagnostic>,
+) {
+    for (projected_index, instruction) in document.instructions.iter().enumerate() {
+        let Some(relation) = instruction
+            .relation
+            .as_ref()
+            .filter(|relation| relation.kind == SemanticRelationKind::Mirrored)
+        else {
+            continue;
+        };
+        let Some(follower) = view.source_instruction_index(projected_index) else {
+            continue;
+        };
+        let target = projected_index
+            .checked_sub(1)
+            .and_then(|index| view.source_instruction_index(index))
+            .unwrap_or(follower);
+        diagnostics.push(mirror_relation_diagnostic(follower, target, relation));
     }
 }
 
@@ -3535,6 +3894,9 @@ fn direct_score_relation<'a>(
         SemanticRelationKind::Touching => RelationType::Touching,
         SemanticRelationKind::Along => RelationType::Along,
         SemanticRelationKind::Cutting => RelationType::Cutting,
+        SemanticRelationKind::Mirrored => {
+            return Err(unsupported_relation_reason(instruction_index, relation));
+        }
     };
     let mut checked = checked_object_relation(
         kind,

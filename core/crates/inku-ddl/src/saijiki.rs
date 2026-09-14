@@ -152,6 +152,7 @@ pub enum CanonicalRelationKind {
     Cutting,
     Between,
     Connected,
+    Mirrored,
 }
 
 impl CanonicalRelationKind {
@@ -163,6 +164,7 @@ impl CanonicalRelationKind {
             Self::Cutting => "cutting",
             Self::Between => "between",
             Self::Connected => "connected",
+            Self::Mirrored => "mirrored",
         }
     }
 }
@@ -221,6 +223,7 @@ pub(crate) fn canonical_relation_identity(
         "cutting" => CanonicalRelationKind::Cutting,
         "between" => CanonicalRelationKind::Between,
         "connected" => CanonicalRelationKind::Connected,
+        "mirrored" => CanonicalRelationKind::Mirrored,
         _ => return None,
     };
     let previous_reference = match form {
@@ -231,7 +234,8 @@ pub(crate) fn canonical_relation_identity(
             | CanonicalRelationKind::NotTouching
             | CanonicalRelationKind::Touching
             | CanonicalRelationKind::Cutting
-            | CanonicalRelationKind::Connected => CanonicalPreviousReference::PreviousOne,
+            | CanonicalRelationKind::Connected
+            | CanonicalRelationKind::Mirrored => CanonicalPreviousReference::PreviousOne,
         }),
     };
     Some(CanonicalRelationIdentity {

@@ -224,12 +224,13 @@
     {"relation_type": "touching", "surface_ja": "触れる", "surface_en": "touching", "literals_ja": ["前の線に触れる", "前の弧に両端で触れる"], "literals_en": ["touching the previous line", "touching the previous arc at both ends"], "literal_targets": {"前の線に触れる": "line", "前の弧に両端で触れる": "arc", "touching the previous line": "line", "touching the previous arc at both ends": "arc"}},
     {"relation_type": "cutting", "surface_ja": "切る", "surface_en": "cutting", "literals_ja": ["前の線を切る"], "literals_en": ["cutting the previous line"]},
     {"relation_type": "between", "surface_ja": "間に", "surface_en": "between", "literals_ja": ["前の二つの間に"], "literals_en": ["between the previous two"]},
-    {"relation_type": "connected", "surface_ja": "つながる", "surface_en": "connected", "literals_ja": ["前の形につながる"], "literals_en": ["connected to the previous shape"]}
+    {"relation_type": "connected", "surface_ja": "つながる", "surface_en": "connected", "literals_ja": ["前の形につながる"], "literals_en": ["connected to the previous shape"]},
+    {"relation_type": "mirrored", "surface_ja": "鏡写し", "surface_en": "mirrored", "literals_ja": ["前の形と鏡写し"], "literals_en": ["mirrored with the previous shape"]}
   ],
   "relation_marker_order": {
-    "ja": ["触れる", "つながる", "沿う", "切る", "触れない", "間に"],
-    "en": ["touching", "connected", "along", "cutting", "not touching", "between"]
+    "ja": ["触れる", "つながる", "沿う", "切る", "触れない", "間に", "鏡写し"],
+    "en": ["touching", "connected", "along", "cutting", "not touching", "between", "mirrored"]
   },
-  "relation_display_order": ["along", "not_touching", "cutting", "between", "touching", "connected"],
+  "relation_display_order": ["along", "not_touching", "cutting", "between", "touching", "connected", "mirrored"],
   "marker_class_order": ["material", "color", "variation", "angle", "ratio", "place"]
 }

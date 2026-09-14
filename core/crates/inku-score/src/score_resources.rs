@@ -865,12 +865,8 @@ impl Analysis {
                     ));
                 }
             }
-            if (claim.is_some_and(|claim| {
-                matches!(
-                    claim.kind,
-                    SymbolicMemberKind::Primitive | SymbolicMemberKind::OrdinaryGroup
-                )
-            }) || self.direct_fills[instruction_index].is_some())
+            if (claim.is_some_and(|claim| claim.kind == SymbolicMemberKind::Primitive)
+                || self.direct_fills[instruction_index].is_some())
                 && (instruction.arrangement.as_ref().unwrap().count != 1
                     || !matches!(resolved.count_origin, crate::CountOrigin::TemplateSingle))
             {

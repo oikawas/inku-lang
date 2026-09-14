@@ -1862,8 +1862,30 @@ mod tests {
         let policy = hard(100);
         let source = |index| json!({"kind": "source_instruction", "instruction_index": index});
         let mut circle = instruction(source(0), true);
+        let circle_resolved = circle
+            .arrangement
+            .as_mut()
+            .unwrap()
+            .resolved
+            .as_mut()
+            .unwrap();
+        circle_resolved.count_origin = inku_score::CountOrigin::OmittedDefault;
+        circle_resolved.anchor = ResolvedPlacementAnchor::Named {
+            region: [0.5, 0.5, 0.5, 0.5],
+        };
         circle.color = inku_score::Color::Red;
-        let mut line = instruction(source(0), true);
+        let mut line = instruction(source(1), true);
+        let line_resolved = line
+            .arrangement
+            .as_mut()
+            .unwrap()
+            .resolved
+            .as_mut()
+            .unwrap();
+        line_resolved.count_origin = inku_score::CountOrigin::OmittedDefault;
+        line_resolved.anchor = ResolvedPlacementAnchor::Named {
+            region: [0.5, 0.5, 0.5, 0.5],
+        };
         line.primitive = Primitive::Line;
         line.center = None;
         line.radius = None;
@@ -1886,7 +1908,7 @@ mod tests {
                     "start": 0,
                     "end": 2,
                     "symbolic": {
-                        "owner": {"kind": "ordinary_group", "source_instruction_indices": [0]},
+                        "owner": {"kind": "ordinary_group", "source_instruction_indices": [0, 1]},
                         "kind": "ordinary_group",
                         "member_ordinal": 0,
                         "first_instance_ordinal": 0,
@@ -2028,72 +2050,27 @@ mod tests {
         assert_eq!(first.resource_demand.as_ref().unwrap().primitive_marks, 8);
         assert_eq!(
             first.instruction_seed_overrides,
-            vec![
-                Some(instance_seed(
-                    &inku_score::ScoreSourceOwner::SourceInstruction {
-                        instruction_index: 0
-                    },
-                    &[0],
-                    0,
-                    Some(7)
-                )),
-                Some(instance_seed(
-                    &inku_score::ScoreSourceOwner::SourceInstruction {
-                        instruction_index: 0
-                    },
-                    &[0],
-                    0,
-                    Some(7)
-                )),
-                Some(instance_seed(
-                    &inku_score::ScoreSourceOwner::SourceInstruction {
-                        instruction_index: 2
-                    },
-                    &[1],
-                    0,
-                    Some(7)
-                )),
-                Some(instance_seed(
-                    &inku_score::ScoreSourceOwner::SourceInstruction {
-                        instruction_index: 0
-                    },
-                    &[2],
-                    0,
-                    Some(7)
-                )),
-                Some(instance_seed(
-                    &inku_score::ScoreSourceOwner::SourceInstruction {
-                        instruction_index: 0
-                    },
-                    &[2],
-                    0,
-                    Some(7)
-                )),
-                Some(instance_seed(
-                    &inku_score::ScoreSourceOwner::SourceInstruction {
-                        instruction_index: 2
-                    },
-                    &[3],
-                    0,
-                    Some(7)
-                )),
-                Some(instance_seed(
-                    &inku_score::ScoreSourceOwner::SourceInstruction {
-                        instruction_index: 0
-                    },
-                    &[4],
-                    0,
-                    Some(7)
-                )),
-                Some(instance_seed(
-                    &inku_score::ScoreSourceOwner::SourceInstruction {
-                        instruction_index: 0
-                    },
-                    &[4],
-                    0,
-                    Some(7)
-                )),
+            [
+                (0, 0),
+                (1, 0),
+                (2, 1),
+                (0, 2),
+                (1, 2),
+                (2, 3),
+                (0, 4),
+                (1, 4)
             ]
+            .map(|(owner, occurrence)| {
+                Some(instance_seed(
+                    &inku_score::ScoreSourceOwner::SourceInstruction {
+                        instruction_index: owner,
+                    },
+                    &[occurrence],
+                    0,
+                    Some(7),
+                ))
+            })
+            .to_vec(),
         );
     }
 }

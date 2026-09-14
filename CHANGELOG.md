@@ -8,7 +8,7 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ### 2026-09-14 — Consolidate Saijiki vocabulary, endpoint connections, and bleeding
 
-`start` / `end` select only the target-side endpoint of a preceding Line or Arc. The connection source remains the existing start, preserving Line from→to and Arc angle_start→angle_end identity. Movement `bleeding` is independent `ink_spread:"bleed"`, combinable with Wave, Perlin, and the stipple surface. Current `blurring` input normalizes to that new meaning, while saved Scores retain their old surfaceBleed / qualityPink behavior. This advances DDL_VERSION to 7, DDL engine to 40, and render engine to 62; only Scores carrying the new fields use Score 0.12. Application and build versions are unchanged.
+Saijiki display and examples follow shared Web / Android vocabulary: middle becomes center, the Japanese surface 点 becomes 点描, and trembling becomes swaying. `start` / `end` select only the target-side endpoint of a preceding Line or Arc. The connection source remains the existing start, preserving Line from→to and Arc angle_start→angle_end identity. Movement `bleeding` is independent `ink_spread:"bleed"`, combinable with Wave, Perlin, and the stipple surface. Current `blurring` input normalizes to that new meaning, while saved Scores retain their old surfaceBleed / qualityPink behavior. This advances DDL_VERSION to 7, DDL engine to 40, and render engine to 62; only Scores carrying the new fields use Score 0.12. Application and build versions are unchanged.
 
 ### 2026-09-14 — Fill the interior of leaves closed by two arcs
 

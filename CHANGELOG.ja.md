@@ -8,7 +8,7 @@
 
 ### 2026-09-14 — 歳時記の語彙整理と端点接続・にじみの共通実装
 
-`始点` / `終点`は先行する線または弧の対象側端点だけを選ぶ。接続元は既存の始点で、Lineのfrom→toとArcのangle_start→angle_endのidentityを保つ。ゆらぎの`にじみ` / `bleeding`は独立した`ink_spread:"bleed"`となり、Wave・Perlin・点描surfaceと併用できる。旧`滲む` / `blurring`は現行入力で新しい意味へ正規化し、保存済みScoreの旧surfaceBleed / qualityPinkは維持する。DDL_VERSION 7、DDL engine 40、render engine 62へ進み、新fieldを持つScoreだけ0.12とする。アプリ版とbuild番号は変更しない。
+歳時記の表示と入力例をWeb／Androidの共通語彙に揃え、中央を中心、面の点を点描、震えるを揺れるへ統合した。`始点` / `終点`は先行する線または弧の対象側端点だけを選ぶ。接続元は既存の始点で、Lineのfrom→toとArcのangle_start→angle_endのidentityを保つ。ゆらぎの`にじみ` / `bleeding`は独立した`ink_spread:"bleed"`となり、Wave・Perlin・点描surfaceと併用できる。旧`滲む` / `blurring`は現行入力で新しい意味へ正規化し、保存済みScoreの旧surfaceBleed / qualityPinkは維持する。DDL_VERSION 7、DDL engine 40、render engine 62へ進み、新fieldを持つScoreだけ0.12とする。アプリ版とbuild番号は変更しない。
 
 ### 2026-09-14 — 二つの弧で閉じる葉の内面を塗る
 

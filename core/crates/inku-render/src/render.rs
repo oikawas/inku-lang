@@ -115,7 +115,12 @@ pub fn build_render_metadata(score: &Score, profile: SvgProfile) -> RenderMetada
         render_engine_version: RENDER_ENGINE_VERSION.to_owned(),
         render_texture_version: "1".to_owned(),
         render_texture_profile: profile,
-        texture_degraded: profile == SvgProfile::Compat && !render_surface_textures.is_empty(),
+        texture_degraded: profile == SvgProfile::Compat
+            && (!render_surface_textures.is_empty()
+                || score
+                    .instructions
+                    .iter()
+                    .any(|instruction| instruction.ink_spread.is_some())),
         render_canvas_ground: canvas_ground(score),
         render_surface_textures,
         execution: None,
@@ -493,12 +498,7 @@ fn render_impl(
             material_definitions.extend(accepted_fills::definitions(single, context));
             let base_mark =
                 render_instruction_with_line_centerline(single, context, line_centerline)?;
-            let base_mark = if closed_arc_pair_spread_followers.contains(&performed_index) {
-                base_mark
-            } else {
-                crate::ink_spread::wrap(base_mark, single, context)
-            };
-            let mut mark = if let Some(surface) = render_surface(single, context) {
+            let mark = if let Some(surface) = render_surface(single, context) {
                 let mut combined = Element::new("g");
                 combined.push(base_mark);
                 combined.push(surface.group);
@@ -506,6 +506,11 @@ fn render_impl(
                 combined
             } else {
                 base_mark
+            };
+            let mut mark = if closed_arc_pair_spread_followers.contains(&performed_index) {
+                mark
+            } else {
+                crate::ink_spread::wrap(mark, single, context)
             };
             if structured || has_fill_scopes {
                 if structured {

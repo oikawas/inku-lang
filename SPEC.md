@@ -1908,6 +1908,8 @@ The Saijiki carries a category called ゆらぎ (movements).
 | spread | bleeding |
 
 `bleeding` is the single movement word and delivers independent `ink_spread:"bleed"`.
+Display and Editable apply it after combining the contour and surface marks.
+Compat preserves the marks, omits ink spread, and reports `texture_degraded`.
 It combines with Wave, Perlin, and the stipple surface, but does not add Perlin by itself
 or introduce an intensity word. Current `blurring` input normalizes to it.
 

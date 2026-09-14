@@ -1276,7 +1276,7 @@ Saijiki（歳時記）に「ゆらぎ（movements）」カテゴリを追加す�
 | 質 | 揺れる、波打つ |
 | 広がり | にじみ |
 
-`にじみ`はゆらぎの一語であり、`ink_spread:"bleed"`を独立に届ける。Wave / Perlinや点描surfaceと併用できるが、単独でPerlinを補わず、強度語を増やさない通常の広がりに留める。`滲む` / `blurring`は現行入力ではこの語へ正規化する。
+`にじみ`はゆらぎの一語であり、`ink_spread:"bleed"`を独立に届ける。DisplayとEditableでは輪郭と面の痕を合わせてから適用する。Compatでは痕を残してにじみを省き、`texture_degraded`に記録する。Wave / Perlinや点描surfaceと併用できるが、単独でPerlinを補わず、強度語を増やさない通常の広がりに留める。`滲む` / `blurring`は現行入力ではこの語へ正規化する。
 
 **英語版「movements」:**
 

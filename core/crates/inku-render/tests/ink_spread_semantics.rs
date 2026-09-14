@@ -5,6 +5,10 @@ use inku_render::types::{
 };
 
 fn render_svg(json: &str) -> String {
+    render_svg_with_profile(json, SvgProfile::Display)
+}
+
+fn render_svg_with_profile(json: &str, profile: SvgProfile) -> String {
     let score: Score = serde_json::from_str(json).unwrap();
     render(RenderRequest {
         score,
@@ -13,7 +17,7 @@ fn render_svg(json: &str) -> String {
             catalog_id: None,
             canvas: CanvasSize::new(1000.0, 1000.0),
             canvas_aspect_id: "square".to_owned(),
-            svg_profile: SvgProfile::Display,
+            svg_profile: profile,
             render_seed: Some(2718),
             composition_seed: Some(2718),
             wild: false,
@@ -78,4 +82,19 @@ fn closed_arc_pair_gets_one_outer_spread_and_absent_field_adds_nothing() {
     );
     assert!(!legacy.contains("ink-spread"));
     assert!(!legacy.contains("inkSpread"));
+}
+
+#[test]
+fn compat_keeps_the_mark_and_reports_omitted_ink_spread() {
+    let json = r#"{"version":"0.12.0","instructions":[
+        {"primitive":"line","from":[0.1,0.5],"to":[0.9,0.5],"ink_spread":"bleed"}
+    ]}"#;
+    let score: Score = serde_json::from_str(json).unwrap();
+    assert!(
+        inku_render::render::build_render_metadata(&score, SvgProfile::Compat).texture_degraded
+    );
+    let svg = render_svg_with_profile(json, SvgProfile::Compat);
+    assert!(svg.contains("<path"));
+    assert!(!svg.contains("<filter"));
+    assert!(!svg.contains("ink-spread"));
 }

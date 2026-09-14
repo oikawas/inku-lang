@@ -4,7 +4,7 @@ use sha2::{Digest, Sha256};
 
 use crate::marks::{MarkContext, mark_style};
 use crate::svg::{Element, format_number};
-use crate::types::{InkSpread, Instruction};
+use crate::types::{InkSpread, Instruction, SvgProfile};
 
 fn identity(instruction: &Instruction, context: MarkContext<'_>) -> (String, u32) {
     let material = format!(
@@ -104,7 +104,7 @@ fn filter(
 
 /// Adds a deterministic halo without changing performed geometry or mark count.
 pub(crate) fn wrap(mark: Element, instruction: &Instruction, context: MarkContext<'_>) -> Element {
-    if instruction.ink_spread != Some(InkSpread::Bleed) {
+    if instruction.ink_spread != Some(InkSpread::Bleed) || context.profile == SvgProfile::Compat {
         return mark;
     }
     let (identifier, seed) = identity(instruction, context);

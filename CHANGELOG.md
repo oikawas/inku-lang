@@ -12,6 +12,8 @@ Saijiki adds the order category with alternating and in order, including Web / A
 
 The author accepted the content of the seven Nature leaf motifs reviewed in comparison sheet 14.
 
+The Python drawing binding also adds an entry point for compact Scores with explicit, independent resource limits and clipping policy. It passes these authorities to existing shared-core validation and drawing, without automatically trusting the budget stored in a Score.
+
 ### 2026-09-14 — Consolidate Saijiki vocabulary, endpoint connections, and bleeding
 
 Saijiki display and examples follow shared Web / Android vocabulary: middle becomes center, the Japanese surface 点 becomes 点描, and trembling becomes swaying. `start` / `end` select only the target-side endpoint of a preceding Line or Arc. The connection source remains the existing start, preserving Line from→to and Arc angle_start→angle_end identity. Movement `bleeding` is independent `ink_spread:"bleed"`, combinable with Wave, Perlin, and the stipple surface. Current `blurring` input normalizes to that new meaning, while saved Scores retain their old surfaceBleed / qualityPink behavior. This advances DDL_VERSION to 7, DDL engine to 40, and render engine to 62; only Scores carrying the new fields use Score 0.12. Application and build versions are unchanged.

@@ -72,6 +72,6 @@ mod tests {
 
     #[test]
     fn engine_identity_is_owned_by_the_core() {
-        assert_eq!(render_engine_identity(), ("default", "61"));
+        assert_eq!(render_engine_identity(), ("default", "63"));
     }
 }

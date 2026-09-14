@@ -5,6 +5,7 @@ from ._native import (
     default_color_map_json,
     renderer_reference_json,
     render,
+    render_with_resources,
     render_engine_id,
     render_engine_version,
 )
@@ -14,6 +15,7 @@ __all__ = (
     "default_color_map_json",
     "renderer_reference_json",
     "render",
+    "render_with_resources",
     "render_engine_id",
     "render_engine_version",
 )

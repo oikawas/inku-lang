@@ -440,7 +440,9 @@ name = "inku-render-python"
 version = "0.1.0"
 dependencies = [
  "inku-render",
+ "inku-score",
  "pyo3",
+ "serde",
  "serde_json",
 ]
 

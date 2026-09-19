@@ -27,6 +27,33 @@ use crate::protocol::{
     PipelineEvent, ProtocolError, ProviderFailure, RetryPolicy, digest, value_digest,
 };
 
+fn stage1_compiler_failure_detail(compiled: &TypedDdlCompilation) -> &str {
+    let kind = compiled
+        .holes
+        .first()
+        .map(|item| item.kind.as_str())
+        .or_else(|| compiled.conflicts.first().map(|item| item.kind.as_str()))
+        .or_else(|| {
+            compiled
+                .blocking_diagnostics
+                .first()
+                .map(|item| item.kind.as_str())
+        });
+    match kind {
+        Some(kind)
+            if kind.len() <= 64
+                && !kind.is_empty()
+                && kind.bytes().all(|byte| {
+                    byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'_'
+                }) =>
+        {
+            kind
+        }
+        Some(_) => "compiler_diagnostic_unclassified",
+        None => "compiler_lock_unavailable",
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct LockedDefinition {
@@ -674,6 +701,15 @@ impl PipelineSnapshot {
             events,
         )?;
         self.action.as_mut().unwrap().delay_ms = policy.retry_delay_ms;
+        self.event(
+            events,
+            "retry_scheduled",
+            json!({
+                "identity": self.action.as_ref().unwrap().identity,
+                "failure": ProviderFailure::SemanticViolation,
+                "detail": stage1_compiler_failure_detail(compiled),
+            }),
+        )?;
         Ok(true)
     }
 
@@ -801,6 +837,16 @@ impl PipelineSnapshot {
         spent_ms: u64,
         events: &mut Vec<PipelineEvent>,
     ) -> Result<(), ProtocolError> {
+        self.failure_with_detail(failure, spent_ms, None, events)
+    }
+
+    fn failure_with_detail(
+        &mut self,
+        failure: ProviderFailure,
+        spent_ms: u64,
+        detail: Option<&str>,
+        events: &mut Vec<PipelineEvent>,
+    ) -> Result<(), ProtocolError> {
         let PipelinePhase::AwaitingLlm {
             stage,
             description,
@@ -835,11 +881,14 @@ impl PipelineSnapshot {
                 hole_ids,
                 elapsed_ms: DecimalU64::new(total),
             };
-            return self.event(
-                events,
-                "retry_scheduled",
-                json!({"identity": self.action.as_ref().unwrap().identity, "failure": failure}),
-            );
+            let mut payload = json!({
+                "identity": self.action.as_ref().unwrap().identity,
+                "failure": failure,
+            });
+            if let Some(detail) = detail {
+                payload["detail"] = json!(detail);
+            }
+            return self.event(events, "retry_scheduled", payload);
         }
         self.action = None;
         match stage {
@@ -852,7 +901,11 @@ impl PipelineSnapshot {
                 self.phase = PipelinePhase::Failed {
                     reason: "stage1_failed".into(),
                 };
-                self.event(events, "failed", json!({"stage": stage, "reason": failure}))
+                let mut payload = json!({"stage": stage, "reason": failure});
+                if let Some(detail) = detail {
+                    payload["detail"] = json!(detail);
+                }
+                self.event(events, "failed", payload)
             }
             LlmStage::CompleteVisibleDdlHoles => {
                 self.phase = PipelinePhase::NeedsUserEdit {
@@ -955,7 +1008,12 @@ impl PipelineSnapshot {
                     )? {
                         return Ok(());
                     }
-                    return self.failure(ProviderFailure::SemanticViolation, spent_ms, events);
+                    return self.failure_with_detail(
+                        ProviderFailure::SemanticViolation,
+                        spent_ms,
+                        Some(stage1_compiler_failure_detail(&compiled)),
+                        events,
+                    );
                 }
                 let next = proposal(
                     self.authority

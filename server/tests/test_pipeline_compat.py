@@ -85,7 +85,7 @@ def test_compose_projects_opaque_score_and_never_approves_a_hole(monkeypatch) ->
     assert commands == [{"tag": "perform"}]
 
 
-def test_paint_409_exposes_persisted_provider_failure(
+def test_paint_409_exposes_persisted_compiler_failure_detail(
     tmp_path, monkeypatch
 ) -> None:
     from inku_server import db, pipeline_product
@@ -110,9 +110,9 @@ def test_paint_409_exposes_persisted_provider_failure(
 
         def __call__(self, action):
             return {
-                "tag": "provider_failed",
+                "tag": "normalized_ddl_generated",
                 "identity": action["identity"],
-                "failure": "provider_rejected",
+                "response": json.dumps({"normalized_ddl": "Unknown.Macro."}),
                 "elapsed_ms": "7",
             }
 
@@ -150,10 +150,11 @@ def test_paint_409_exposes_persisted_provider_failure(
             )
         detail = raised.value.detail
         diagnostic = {
-            "failure": "provider_rejected",
+            "failure": "semantic_violation",
             "stage": "stage1",
             "attempt": 1,
             "elapsed_ms": 7,
+            "detail": "macro_resolution_missing_lock",
         }
         assert raised.value.status_code == 409
         assert detail["current_view"]["provider_failure"] == diagnostic

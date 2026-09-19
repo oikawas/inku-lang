@@ -303,6 +303,11 @@ fn stage1_compiler_feedback_retries_before_the_corrected_ddl_commits() {
             .iter()
             .all(|event| event.tag != "visible_ddl_ready")
     );
+    assert!(rejected_output.events.iter().any(|event| {
+        event.tag == "retry_scheduled"
+            && event.payload["failure"] == "semantic_violation"
+            && event.payload["detail"] == "macro_resolution_missing_lock"
+    }));
     let feedback_action = state.action.as_ref().unwrap();
     assert_eq!(feedback_action.tag, "generate_normalized_ddl");
     assert_ne!(
@@ -415,11 +420,17 @@ fn stage1_compiler_feedback_uses_the_shared_attempt_budget() {
             },
         },
     );
-    state = run(Some(&state), &rejected).snapshot;
+    let rejected_output = run(Some(&state), &rejected);
+    state = rejected_output.snapshot;
     assert!(
         matches!(state.phase, PipelinePhase::Failed { ref reason } if reason == "stage1_failed")
     );
     assert!(state.action.is_none() && state.document.is_none() && state.delivery.is_none());
+    assert!(rejected_output.events.iter().any(|event| {
+        event.tag == "failed"
+            && event.payload["reason"] == "semantic_violation"
+            && event.payload["detail"] == "macro_resolution_missing_lock"
+    }));
 }
 
 #[test]

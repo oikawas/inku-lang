@@ -7,7 +7,12 @@ import pytest
 from sqlalchemy import create_engine
 
 from inku_server.persistence.variation_authority import VariationAuthorityStore
-from inku_server.pipeline_candidate import CandidateExecution, CandidateHostError, PipelineBinding
+from inku_server.pipeline_candidate import (
+    CandidateExecution,
+    CandidateHostError,
+    PipelineBinding,
+    _pipeline_failures,
+)
 
 
 def _fixture_config() -> dict:
@@ -43,6 +48,44 @@ def _fixture_config() -> dict:
         "prompt_limits": {"max_catalog_entries": 16, "max_summary_bytes": 1024, "max_catalog_serialized_bytes": 32768, "max_source_bytes": 8192, "max_response_bytes": 16384},
         "catalog_retry": retry, "stage1_retry": retry, "hole_retry": retry,
     }
+
+
+def test_core_compiler_failure_detail_is_allowlisted():
+    state = {
+        "action": {
+            "tag": "generate_normalized_ddl",
+            "identity": {"attempt": 4},
+        }
+    }
+    envelope = {
+        "payload": {
+            "tag": "effect_result",
+            "result": {"elapsed_ms": "855"},
+        }
+    }
+    result = {
+        "events": [{
+            "tag": "failed",
+            "payload": {
+                "reason": "semantic_violation",
+                "detail": "upstream_unknown",
+            },
+        }]
+    }
+
+    assert _pipeline_failures(state, envelope, result) == [(
+        "failed",
+        {
+            "failure": "semantic_violation",
+            "stage": "stage1",
+            "detail": "upstream_unknown",
+            "attempt": 4,
+            "elapsed_ms": 855,
+        },
+    )]
+
+    result["events"][0]["payload"]["detail"] = "raw response marker"
+    assert "detail" not in _pipeline_failures(state, envelope, result)[0][1]
 
 
 def test_real_binding_commits_source_and_authority_before_automatic_hole_request(tmp_path):

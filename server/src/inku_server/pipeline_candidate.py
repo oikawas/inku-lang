@@ -52,6 +52,12 @@ def _nonnegative_int(value: object) -> int | None:
     return parsed if parsed >= 0 else None
 
 
+def _safe_compiler_failure_detail(value: object) -> str | None:
+    if not isinstance(value, str) or not 1 <= len(value) <= 64:
+        return None
+    return value if all(character.isascii() and (character.islower() or character.isdigit() or character == "_") for character in value) else None
+
+
 def _pipeline_failures(state: dict | None, envelope: dict, result: dict) -> list[tuple[str, dict]]:
     """Project only stable failure values from a fresh core transition."""
     if state is None or envelope["payload"].get("tag") != "effect_result":
@@ -72,6 +78,9 @@ def _pipeline_failures(state: dict | None, envelope: dict, result: dict) -> list
         if failure not in _PIPELINE_FAILURES or stage is None:
             continue
         diagnostic: dict[str, object] = {"failure": failure, "stage": stage}
+        detail = _safe_compiler_failure_detail(payload.get("detail"))
+        if failure == "semantic_violation" and detail is not None:
+            diagnostic["detail"] = detail
         if attempt is not None:
             diagnostic["attempt"] = attempt
         if elapsed_ms is not None:
@@ -279,8 +288,7 @@ class CandidateExecution:
             existing = self.context.get("provider_failure")
             if (
                 diagnostic.get("failure") == "provider_rejected"
-                and
-                isinstance(existing, dict)
+                and isinstance(existing, dict)
                 and all(existing.get(key) == diagnostic.get(key) for key in ("failure", "stage", "attempt"))
                 and existing.get("detail") in _PIPELINE_FAILURE_DETAILS
             ):

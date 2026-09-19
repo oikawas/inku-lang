@@ -28,6 +28,7 @@ _PIPELINE_FAILURES = {
     "schema_violation",
     "semantic_violation",
 }
+_PIPELINE_FAILURE_DETAILS = {"credentials_unavailable"}
 _ACTION_STAGES = {
     "select_description_catalog": "catalog",
     "generate_normalized_ddl": "stage1",
@@ -275,6 +276,15 @@ class CandidateExecution:
         if rendered is None and state and next_snapshot["document"] == state["document"] and next_snapshot["delivery"] is not None:
             rendered = self._rendered
         for transition, diagnostic in _pipeline_failures(state, envelope, result):
+            existing = self.context.get("provider_failure")
+            if (
+                diagnostic.get("failure") == "provider_rejected"
+                and
+                isinstance(existing, dict)
+                and all(existing.get(key) == diagnostic.get(key) for key in ("failure", "stage", "attempt"))
+                and existing.get("detail") in _PIPELINE_FAILURE_DETAILS
+            ):
+                diagnostic["detail"] = existing["detail"]
             self.context["provider_failure"] = diagnostic
             _logger.warning(
                 "pipeline_failure %s",

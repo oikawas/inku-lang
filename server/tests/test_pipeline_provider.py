@@ -8,6 +8,26 @@ import httpx
 from inku_server.pipeline_provider import ProviderOptions, SingleAttemptProvider
 
 
+def _action() -> dict:
+    return {
+        "tag": "generate_normalized_ddl",
+        "identity": {"action_id": "a", "attempt": 1, "request_digest": "b"},
+        "timeout_ms": "1000",
+        "payload": {
+            "prompt": {
+                "system": "exact bounded system",
+                "message": "exact visible input",
+                "action_name": "generate_normalized_ddl",
+                "response_schema": {
+                    "type": "object",
+                    "required": ["normalized_ddl"],
+                    "properties": {"normalized_ddl": {"type": "string"}},
+                },
+            }
+        },
+    }
+
+
 def test_single_attempt_preserves_core_prompt_and_reports_rate_limit_and_deadline(monkeypatch):
     monkeypatch.setattr("inku_server.pipeline_provider.provider_for_model", lambda *args, **kwargs: ("fixture", "fixture-model"))
     monkeypatch.setattr("inku_server.pipeline_provider.connection_for", lambda *args: {
@@ -32,15 +52,7 @@ def test_single_attempt_preserves_core_prompt_and_reports_rate_limit_and_deadlin
         ProviderOptions({}, "fixture-model", "fixture-model", 256, 8192),
         transport=httpx.MockTransport(request),
     )
-    action = {
-        "tag": "generate_normalized_ddl", "identity": {"action_id": "a", "attempt": 1, "request_digest": "b"},
-        "timeout_ms": "1000", "payload": {"prompt": {
-            "system": "exact bounded system", "message": "exact visible input",
-            "action_name": "generate_normalized_ddl",
-            "response_schema": {"type": "object", "required": ["normalized_ddl"],
-                                "properties": {"normalized_ddl": {"type": "string"}}},
-        }},
-    }
+    action = _action()
     result = provider(action)
     assert result["tag"] == "normalized_ddl_generated"
     assert result["identity"] == action["identity"]
@@ -56,3 +68,31 @@ def test_single_attempt_preserves_core_prompt_and_reports_rate_limit_and_deadlin
     assert len(seen) == 2  # The host has not retried the rejected attempt.
     assert provider({**action, "timeout_ms": "20"})["failure"] == "transport_timeout"
     assert len(seen) == 3
+
+
+def test_missing_credentials_keep_only_safe_failure_detail(monkeypatch):
+    monkeypatch.setattr(
+        "inku_server.pipeline_provider.provider_for_model",
+        lambda *args, **kwargs: ("ollama-cloud", "gemma4:31b"),
+    )
+    monkeypatch.setattr(
+        "inku_server.pipeline_provider.connection_for",
+        lambda *args: {
+            "id": "ollama-cloud",
+            "kind": "openai_compatible",
+            "base_url": "https://ollama.invalid/v1",
+            "api_key": "",
+            "requires_api_key": True,
+        },
+    )
+    provider = SingleAttemptProvider(
+        ProviderOptions({}, "ollama-cloud:gemma4:31b", "fixture", 256, 8192)
+    )
+    action = _action()
+    action["payload"]["prompt"]["message"] = "raw secret marker"
+
+    result = provider(action)
+
+    assert result["failure"] == "provider_rejected"
+    assert provider.failure_detail == "credentials_unavailable"
+    assert "raw secret marker" not in repr(result)

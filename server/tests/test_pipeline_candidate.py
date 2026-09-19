@@ -172,6 +172,15 @@ def test_core_failures_are_persisted_and_logged_once_per_transition(caplog):
         owner_id="acceptance",
         config=_fixture_config(),
         provider=provider,
+        context={
+            "provider_failure": {
+                "failure": "schema_violation",
+                "stage": "stage1",
+                "attempt": 1,
+                "elapsed_ms": 7,
+                "detail": "credentials_unavailable",
+            }
+        },
         save_snapshot=save,
     )
     with caplog.at_level(logging.WARNING, logger="inku_server.pipeline_candidate"):
@@ -192,6 +201,7 @@ def test_core_failures_are_persisted_and_logged_once_per_transition(caplog):
         "elapsed_ms": 7,
     }
     assert run.view()["provider_failure"] == diagnostic
+    assert "detail" not in run.view()["provider_failure"]
     assert persisted[-1]["provider_failure"] == diagnostic
     records = [
         record.getMessage()
@@ -208,3 +218,107 @@ def test_core_failures_are_persisted_and_logged_once_per_transition(caplog):
     assert all(payload["execution_id"] == run.view()["execution_id"] for payload in payloads)
     assert all(payload["variation_id"] == run.view()["variation_id"] for payload in payloads)
     assert "raw response marker" not in caplog.text
+
+
+def test_matching_safe_provider_detail_is_persisted_and_logged(caplog):
+    class FixtureBinding:
+        def step(self, snapshot_bytes, _input_bytes):
+            if not snapshot_bytes:
+                snapshot = {
+                    "execution_id": "execution-credentials",
+                    "variation_id": "variation-credentials",
+                    "sequence": "0",
+                    "authority": {"revision": "0"},
+                    "document": None,
+                    "phase": {"tag": "awaiting_llm"},
+                    "delivery": None,
+                    "action": {
+                        "tag": "generate_normalized_ddl",
+                        "identity": {"attempt": 1},
+                        "delay_ms": "0",
+                    },
+                }
+                events = []
+            else:
+                snapshot = json.loads(snapshot_bytes)
+                snapshot["sequence"] = "1"
+                snapshot["action"] = None
+                snapshot["phase"] = {"tag": "failed", "reason": "stage1_failed"}
+                events = [{
+                    "tag": "failed",
+                    "payload": {
+                        "stage": "generate_normalized_ddl",
+                        "reason": "provider_rejected",
+                    },
+                }]
+            return json.dumps({
+                "kind": "output",
+                "payload": {
+                    "result": {
+                        "snapshot": snapshot,
+                        "events": events,
+                        "rendered": None,
+                    }
+                },
+            }).encode()
+
+    persisted = []
+    holder = {}
+
+    def provider(action):
+        holder["run"].context["provider_failure"] = {
+            "failure": "provider_rejected",
+            "stage": "stage1",
+            "attempt": 1,
+            "elapsed_ms": 3,
+            "detail": "credentials_unavailable",
+        }
+        return {
+            "tag": "provider_failed",
+            "identity": action["identity"],
+            "failure": "provider_rejected",
+            "elapsed_ms": "3",
+        }
+
+    def save(_previous, _snapshot, context, _rendered):
+        persisted.append(json.loads(json.dumps(context)))
+
+    run = CandidateExecution(
+        FixtureBinding(),
+        object(),
+        owner_id="acceptance",
+        config=_fixture_config(),
+        provider=provider,
+        save_snapshot=save,
+    )
+    holder["run"] = run
+    with caplog.at_level(logging.WARNING, logger="inku_server.pipeline_candidate"):
+        run.start_new({
+            "tag": "description",
+            "description": "One quiet black circle",
+            "auto_catalog": False,
+        })
+        run.run_effect()
+
+    diagnostic = {
+        "failure": "provider_rejected",
+        "stage": "stage1",
+        "attempt": 1,
+        "elapsed_ms": 3,
+        "detail": "credentials_unavailable",
+    }
+    assert run.view()["provider_failure"] == diagnostic
+    assert persisted[-1]["provider_failure"] == diagnostic
+    records = [
+        record.getMessage()
+        for record in caplog.records
+        if record.getMessage().startswith("pipeline_failure ")
+    ]
+    assert len(records) == 1
+    payload = json.loads(records[0].removeprefix("pipeline_failure "))
+    assert payload == {
+        "execution_id": "execution-credentials",
+        "variation_id": "variation-credentials",
+        "transition": "failed",
+        **diagnostic,
+    }

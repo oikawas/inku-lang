@@ -53,8 +53,10 @@ class SingleAttemptProvider:
             raise ValueError("positive provider limits required")
         self.options = options
         self.transport = transport
+        self.failure_detail: str | None = None
 
     def __call__(self, action: dict) -> dict:
+        self.failure_detail = None
         tags = {
             "select_description_catalog": "description_catalog_selected",
             "generate_normalized_ddl": "normalized_ddl_generated",
@@ -75,6 +77,7 @@ class SingleAttemptProvider:
             provider_id, model = provider_for_model(model_ref, stage=stage, settings=self.options.settings)
             connection = connection_for(provider_id, self.options.settings)
             if connection["requires_api_key"] and not connection.get("api_key"):
+                self.failure_detail = "credentials_unavailable"
                 raise ValueError("provider credentials unavailable")
             with provider_slot(provider_id, timeout=timeout):
                 remaining = timeout - (time.monotonic() - started)

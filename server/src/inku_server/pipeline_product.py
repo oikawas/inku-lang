@@ -171,6 +171,9 @@ class ProductPipelineEffects:
                     "attempt": int(action["identity"]["attempt"]),
                     "elapsed_ms": int(result["elapsed_ms"]),
                 }
+                detail = getattr(transport, "failure_detail", None)
+                if result["failure"] == "provider_rejected" and detail == "credentials_unavailable":
+                    context["provider_failure"]["detail"] = detail
             else:
                 context.pop("provider_failure", None)
             return result

@@ -109,7 +109,7 @@ def test_provider_failure_diagnostic_is_cleared_by_success(monkeypatch):
     results = [
         {
             "tag": "provider_failed",
-            "failure": "transport_timeout",
+            "failure": "provider_rejected",
             "elapsed_ms": "300000",
         },
         {
@@ -121,10 +121,13 @@ def test_provider_failure_diagnostic_is_cleared_by_success(monkeypatch):
 
     class FixtureProvider:
         def __init__(self, _options):
-            pass
+            self.failure_detail = None
 
         def __call__(self, action):
-            return {**results.pop(0), "identity": action["identity"]}
+            result = results.pop(0)
+            if result["tag"] == "provider_failed":
+                self.failure_detail = "credentials_unavailable"
+            return {**result, "identity": action["identity"]}
 
     monkeypatch.setattr(db, "get_model_settings", lambda: {})
     monkeypatch.setattr(pipeline_product, "SingleAttemptProvider", FixtureProvider)
@@ -140,10 +143,11 @@ def test_provider_failure_diagnostic_is_cleared_by_success(monkeypatch):
 
     perform(action)
     assert context["provider_failure"] == {
-        "failure": "transport_timeout",
+        "failure": "provider_rejected",
         "stage": "stage1",
         "attempt": 1,
         "elapsed_ms": 300000,
+        "detail": "credentials_unavailable",
     }
     perform(
         {

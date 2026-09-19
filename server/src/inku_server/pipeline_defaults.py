@@ -37,12 +37,40 @@ def default_manifest(binding: PipelineBinding) -> dict:
         "maximum_resolved_count": DEFAULT_LIMITS.schema_count_max,
         "object_templates": DEFAULT_LIMITS.max_instructions,
     }}
-    # The existing outer stage deadline remains the total bound. Core alone
-    # decides which transient failures merit another attempt inside that bound.
+    # Catalog selection and hole completion retain the existing request bound.
+    # Stage 1 has a separate finite budget because its verified models can need
+    # longer than one legacy request deadline. Core still owns every retry.
     timeout_ms = max(1, int(float(os.getenv("INKU_LLM_REQUEST_TIMEOUT_SECONDS", "120")) * 1000))
-    retry = {"max_attempts": max(1, int(os.getenv("INKU_LLM_RETRY_ATTEMPTS", "4"))),
-             "attempt_timeout_ms": str(timeout_ms), "total_timeout_ms": str(timeout_ms),
-             "retry_delay_ms": str(max(0, int(float(os.getenv("INKU_LLM_RETRY_BASE_DELAY", "2")) * 1000)))}
+    max_attempts = max(1, int(os.getenv("INKU_LLM_RETRY_ATTEMPTS", "4")))
+    retry_delay_ms = max(
+        0, int(float(os.getenv("INKU_LLM_RETRY_BASE_DELAY", "2")) * 1000)
+    )
+    retry = {
+        "max_attempts": max_attempts,
+        "attempt_timeout_ms": str(timeout_ms),
+        "total_timeout_ms": str(timeout_ms),
+        "retry_delay_ms": str(retry_delay_ms),
+    }
+    stage1_attempt_timeout_ms = max(
+        1,
+        int(
+            float(os.getenv("INKU_LLM_STAGE1_ATTEMPT_TIMEOUT_SECONDS", "300"))
+            * 1000
+        ),
+    )
+    stage1_total_timeout_ms = max(
+        stage1_attempt_timeout_ms,
+        int(
+            float(os.getenv("INKU_LLM_STAGE1_TOTAL_TIMEOUT_SECONDS", "540"))
+            * 1000
+        ),
+    )
+    stage1_retry = {
+        "max_attempts": max_attempts,
+        "attempt_timeout_ms": str(stage1_attempt_timeout_ms),
+        "total_timeout_ms": str(stage1_total_timeout_ms),
+        "retry_delay_ms": str(retry_delay_ms),
+    }
     return {
         "schema": "inku.pipeline-host.v1",
         "pipeline": {
@@ -66,7 +94,7 @@ def default_manifest(binding: PipelineBinding) -> dict:
             "prompt_limits": {"max_catalog_entries": 64, "max_summary_bytes": 8192,
                               "max_catalog_serialized_bytes": 1024 * 1024,
                               "max_source_bytes": 400_000, "max_response_bytes": 1024 * 1024},
-            "catalog_retry": deepcopy(retry), "stage1_retry": deepcopy(retry), "hole_retry": deepcopy(retry),
+            "catalog_retry": deepcopy(retry), "stage1_retry": stage1_retry, "hole_retry": deepcopy(retry),
         },
         "render": {
             "options": {"canvas": {"width": CANVAS_BASE_PX, "height": CANVAS_BASE_PX}, "svg_profile": "display"},

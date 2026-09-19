@@ -164,6 +164,15 @@ class ProductPipelineEffects:
             result = transport(action)
             metrics = context.setdefault("metrics", {})
             metrics[stage] = metrics.get(stage, 0) + int(result["elapsed_ms"])
+            if result["tag"] == "provider_failed":
+                context["provider_failure"] = {
+                    "failure": result["failure"],
+                    "stage": stage,
+                    "attempt": int(action["identity"]["attempt"]),
+                    "elapsed_ms": int(result["elapsed_ms"]),
+                }
+            else:
+                context.pop("provider_failure", None)
             return result
         return perform
 

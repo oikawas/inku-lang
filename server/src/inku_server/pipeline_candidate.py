@@ -183,6 +183,8 @@ class CandidateExecution:
                            "catalog_diagnostics": self.context.get("macro_catalog", {}).get("diagnostics", []),
                            "rendered": self._rendered,
                            "result": self.context.get("result")})
+            if self.context.get("provider_failure") is not None:
+                result["provider_failure"] = self.context["provider_failure"]
             return json.loads(_bytes(result))
 
     def snapshot(self) -> dict:

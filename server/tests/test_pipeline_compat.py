@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from copy import deepcopy
 
 import httpx
 import pytest
@@ -82,6 +83,88 @@ def test_compose_projects_opaque_score_and_never_approves_a_hole(monkeypatch) ->
     )
     assert raised.value.detail["pipeline_execution_id"] == "execution-1"
     assert commands == [{"tag": "perform"}]
+
+
+def test_paint_409_exposes_persisted_provider_failure(
+    tmp_path, monkeypatch
+) -> None:
+    from inku_server import db, pipeline_product
+    from inku_server.persistence.variation_authority import VariationAuthorityStore
+    from inku_server.pipeline_api import PipelineService
+    from inku_server.pipeline_candidate import PipelineBinding
+    from inku_server.pipeline_defaults import default_manifest
+    from inku_server.pipeline_product import ProductPipelineEffects
+
+    binding = PipelineBinding()
+    manifest = default_manifest(binding)
+    config = deepcopy(manifest["pipeline"])
+    config["stage1_retry"]["max_attempts"] = 1
+    engine = create_engine(f"sqlite:///{tmp_path / 'provider-failure.db'}")
+    Base.metadata.create_all(engine)
+    store = VariationAuthorityStore(engine)
+    effects = ProductPipelineEffects(binding, manifest)
+
+    class RejectedProvider:
+        def __init__(self, _options):
+            pass
+
+        def __call__(self, action):
+            return {
+                "tag": "provider_failed",
+                "identity": action["identity"],
+                "failure": "provider_rejected",
+                "elapsed_ms": "7",
+            }
+
+    def prepare(_owner, _kind, _text, _options, _source):
+        return deepcopy(config), {
+            "host_options": {
+                "stage1_model": "fixture:stage1",
+                "stage2_model": "fixture:stage2",
+            },
+            "metrics": {},
+        }
+
+    monkeypatch.setattr(db, "get_model_settings", lambda: {})
+    monkeypatch.setattr(pipeline_product, "SingleAttemptProvider", RejectedProvider)
+    service = PipelineService(
+        binding,
+        store,
+        config_for=lambda _owner, _source: deepcopy(config),
+        provider_for=lambda _owner: pytest.fail("context-free provider used"),
+        render_for=None,
+        prepare_for=prepare,
+        provider_with_context=effects.provider_for,
+        max_workers=1,
+        max_effect_steps=4,
+        max_retained_runs=1,
+    )
+    monkeypatch.setattr(pipeline_compat, "_service", lambda: service)
+
+    try:
+        with pytest.raises(HTTPException) as raised:
+            pipeline_compat.paint(
+                "author",
+                {"description": "One quiet black circle", "save_history": False},
+                None,
+            )
+        detail = raised.value.detail
+        diagnostic = {
+            "failure": "provider_rejected",
+            "stage": "stage1",
+            "attempt": 1,
+            "elapsed_ms": 7,
+        }
+        assert raised.value.status_code == 409
+        assert detail["current_view"]["provider_failure"] == diagnostic
+        record = store.read_execution(
+            "author", execution_id=detail["pipeline_execution_id"]
+        )
+        persisted = json.loads(record.state_bytes)
+        assert persisted["context"]["provider_failure"] == diagnostic
+    finally:
+        service.close()
+        engine.dispose()
 
 
 def test_description_pipeline_forces_typed_stage1_transport_and_renders_svg(

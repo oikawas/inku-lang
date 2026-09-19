@@ -273,6 +273,11 @@ uv run inku-cli --base-url http://127.0.0.1:8100 paint "A blue circle in the upp
 | `INKU_SERVER_PORT` | `inku-server` listen port |
 | `INKU_BASE_URL` | Default API URL for `inku-cli` |
 | `INKU_STAGE_WORKERS` | Concurrent Stage 1 / Stage 2 LLM calls |
+| `INKU_LLM_REQUEST_TIMEOUT_SECONDS` | Deadline in seconds for shared-pipeline catalog selection and hole completion, and for legacy LLM requests. Defaults to 120. Normalized-DDL Stage 1 uses the dedicated limits below |
+| `INKU_LLM_RETRY_ATTEMPTS` | Maximum attempts within one LLM stage. Defaults to 4; the total time budget still stops further attempts |
+| `INKU_LLM_RETRY_BASE_DELAY` | Delay in seconds before a retry authorized by core. Defaults to 2 |
+| `INKU_LLM_STAGE1_ATTEMPT_TIMEOUT_SECONDS` | Per-attempt deadline for normalized-DDL Stage 1. Defaults to 300 seconds |
+| `INKU_LLM_STAGE1_TOTAL_TIMEOUT_SECONDS` | Finite total Stage 1 budget including retry delays. Defaults to 540 seconds; a value below the per-attempt deadline is raised to that deadline |
 | `INKU_OUTPUT_DIR` | Automatic output-save directory |
 | `INKU_OUTPUT_PNG_SIZE` | Automatic output-save PNG Y-axis size |
 | `OPENAI_API_KEY` | OpenAI API key |

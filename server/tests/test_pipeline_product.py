@@ -1,5 +1,7 @@
 """Actual core compilation to normal history projection, without SVG execution."""
 
+import json
+
 import pytest
 from sqlalchemy import create_engine, func, select
 from sqlalchemy.orm import sessionmaker
@@ -14,6 +16,147 @@ from inku_server.persistence.variation_authority import VariationAuthorityStore
 from inku_server.pipeline_candidate import CandidateExecution, PipelineBinding
 from inku_server.pipeline_defaults import ADDITIONAL_RESOURCE_LIMITS, default_manifest
 from inku_server.pipeline_product import ProductPipelineEffects
+
+
+def test_stage1_default_budget_is_separate_from_legacy_request_timeout(
+    monkeypatch,
+):
+    monkeypatch.setenv("INKU_LLM_REQUEST_TIMEOUT_SECONDS", "17")
+    monkeypatch.delenv("INKU_LLM_STAGE1_ATTEMPT_TIMEOUT_SECONDS", raising=False)
+    monkeypatch.delenv("INKU_LLM_STAGE1_TOTAL_TIMEOUT_SECONDS", raising=False)
+    manifest = default_manifest(PipelineBinding())
+
+    assert manifest["pipeline"]["catalog_retry"] == {
+        "max_attempts": 4,
+        "attempt_timeout_ms": "17000",
+        "total_timeout_ms": "17000",
+        "retry_delay_ms": "2000",
+    }
+    assert manifest["pipeline"]["hole_retry"] == manifest["pipeline"][
+        "catalog_retry"
+    ]
+    assert manifest["pipeline"]["stage1_retry"] == {
+        "max_attempts": 4,
+        "attempt_timeout_ms": "300000",
+        "total_timeout_ms": "540000",
+        "retry_delay_ms": "2000",
+    }
+
+
+def test_stage1_timeout_retries_inside_total_budget_then_stops(
+    tmp_path, monkeypatch
+):
+    binding = PipelineBinding()
+    config = default_manifest(binding)["pipeline"]
+    engine = create_engine(f"sqlite:///{tmp_path / 'stage1-budget.db'}")
+    store = VariationAuthorityStore(engine)
+    calls: list[tuple[int, int]] = []
+
+    def provider(action):
+        calls.append(
+            (
+                int(action["identity"]["attempt"]),
+                int(action["timeout_ms"]),
+            )
+        )
+        return {
+            "tag": "provider_failed",
+            "identity": action["identity"],
+            "failure": "transport_timeout",
+            "elapsed_ms": action["timeout_ms"],
+        }
+
+    monkeypatch.setattr("inku_server.pipeline_candidate.time.sleep", lambda _delay: None)
+    run = CandidateExecution(
+        binding,
+        store,
+        owner_id="author",
+        config=config,
+        provider=provider,
+    )
+    run.start_new(
+        {
+            "tag": "description",
+            "description": "One quiet black circle",
+            "auto_catalog": False,
+        }
+    )
+
+    run.run_effect()
+    retry = run.snapshot()["action"]
+    assert retry["identity"]["attempt"] == 2
+    assert retry["timeout_ms"] == "238000"
+    run.run_effect()
+
+    assert calls == [(1, 300000), (2, 238000)]
+    assert run.view()["phase"] == {"tag": "failed", "reason": "stage1_failed"}
+    assert run.view()["busy"] is False
+    engine.dispose()
+
+
+def test_provider_failure_diagnostic_is_cleared_by_success(monkeypatch):
+    from inku_server import db, pipeline_product
+
+    binding = PipelineBinding()
+    effects = ProductPipelineEffects(binding, default_manifest(binding))
+    context = {
+        "host_options": {
+            "stage1_model": "fixture:stage1",
+            "stage2_model": "fixture:stage2",
+        },
+        "metrics": {},
+    }
+    results = [
+        {
+            "tag": "provider_failed",
+            "failure": "transport_timeout",
+            "elapsed_ms": "300000",
+        },
+        {
+            "tag": "normalized_ddl_generated",
+            "response": json.dumps({"normalized_ddl": "one black circle"}),
+            "elapsed_ms": "11",
+        },
+    ]
+
+    class FixtureProvider:
+        def __init__(self, _options):
+            pass
+
+        def __call__(self, action):
+            return {**results.pop(0), "identity": action["identity"]}
+
+    monkeypatch.setattr(db, "get_model_settings", lambda: {})
+    monkeypatch.setattr(pipeline_product, "SingleAttemptProvider", FixtureProvider)
+    perform = effects.provider_for("author", context)
+    action = {
+        "tag": "generate_normalized_ddl",
+        "identity": {
+            "action_id": "action-1",
+            "attempt": 1,
+            "request_digest": "request-1",
+        },
+    }
+
+    perform(action)
+    assert context["provider_failure"] == {
+        "failure": "transport_timeout",
+        "stage": "stage1",
+        "attempt": 1,
+        "elapsed_ms": 300000,
+    }
+    perform(
+        {
+            **action,
+            "identity": {
+                **action["identity"],
+                "action_id": "action-2",
+                "attempt": 2,
+            },
+        }
+    )
+    assert "provider_failure" not in context
+    assert context["metrics"] == {"stage1": 300011}
 
 
 def test_bundled_macro_enters_new_work_with_localized_summary_and_saved_lock(tmp_path, monkeypatch):

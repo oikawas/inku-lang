@@ -4,7 +4,13 @@
 
 This file records changes chronologically. If a historical note conflicts with the current specification, the current specification wins. The more detailed canonical history is maintained in Japanese in [CHANGELOG.ja.md](CHANGELOG.ja.md).
 
-**This file holds the 34 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
+**This file holds the 35 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
+
+### 2026-09-19 — Separate the measured Stage 1 time budget and failure diagnostic
+
+Normalized-DDL Stage 1 now has finite defaults of 300 seconds per attempt and 540 seconds total, separate from the 120-second bound retained by catalog selection, hole completion, and legacy requests. Four maximum attempts and the two-second delay apply only while the total budget remains, leaving compilation and rendering time inside `inku-cli`'s 600-second default. Dedicated environment variables adjust both Stage 1 limits, and Compose passes the same settings to Server.
+
+A provider failure persists only its failure class, stage, attempt, and elapsed milliseconds in host context and `current_view`. It includes no credentials, prompt, or raw response, and a later provider success clears the stale failure. An HTTP 409 that previously exposed only `stage1_failed` can therefore identify a timeout or other direct provider cause. DDL, Score, drawing semantics, and versions are unchanged.
 
 ### 2026-09-14 — Fix description responses and pipeline failure messages
 

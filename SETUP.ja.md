@@ -272,6 +272,11 @@ uv run inku-cli --base-url http://127.0.0.1:8100 paint "青い円を右上に置
 | `INKU_SERVER_PORT` | `inku-server` のlisten port |
 | `INKU_BASE_URL` | `inku-cli` の既定API URL |
 | `INKU_STAGE_WORKERS` | Stage 1 / Stage 2 LLM呼び出しの同時実行数 |
+| `INKU_LLM_REQUEST_TIMEOUT_SECONDS` | 共有pipelineのcatalog選択・hole補完と従来のLLM要求の上限秒。既定は120。通常DDLを作るStage 1は下記の専用上限を使う |
+| `INKU_LLM_RETRY_ATTEMPTS` | 一つのLLM段で許す最大試行数。既定は4。総時間上限を越えて試行を増やさない |
+| `INKU_LLM_RETRY_BASE_DELAY` | Coreが許可した再試行までの待機秒。既定は2 |
+| `INKU_LLM_STAGE1_ATTEMPT_TIMEOUT_SECONDS` | 通常DDLを作るStage 1の一回あたり上限秒。既定は300 |
+| `INKU_LLM_STAGE1_TOTAL_TIMEOUT_SECONDS` | 再試行待機を含むStage 1全体の有限上限秒。既定は540。試行上限より小さい値は試行上限まで持ち上げる |
 | `INKU_OUTPUT_DIR` | 自動保存出力先 |
 | `INKU_OUTPUT_PNG_SIZE` | 自動保存PNGのY軸サイズ |
 | `OPENAI_API_KEY` | OpenAI API key |

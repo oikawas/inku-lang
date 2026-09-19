@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import importlib
 import json
+import logging
 import threading
 import time
 import uuid
@@ -17,12 +18,65 @@ from typing import Callable
 from .persistence.variation_authority import VariationAuthoringContext, VariationAuthorityStore
 
 
+_logger = logging.getLogger(__name__)
+_PIPELINE_FAILURES = {
+    "transport_unavailable",
+    "transport_timeout",
+    "rate_limited",
+    "provider_rejected",
+    "malformed_payload",
+    "schema_violation",
+    "semantic_violation",
+}
+_ACTION_STAGES = {
+    "select_description_catalog": "catalog",
+    "generate_normalized_ddl": "stage1",
+    "complete_visible_ddl_holes": "stage2",
+}
+
+
 class CandidateHostError(ValueError):
     """A stable host error; provider exception text is not part of the protocol."""
 
 
 def _bytes(value: dict) -> bytes:
     return json.dumps(value, ensure_ascii=False, allow_nan=False, separators=(",", ":")).encode()
+
+
+def _nonnegative_int(value: object) -> int | None:
+    try:
+        parsed = int(value)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return None
+    return parsed if parsed >= 0 else None
+
+
+def _pipeline_failures(state: dict | None, envelope: dict, result: dict) -> list[tuple[str, dict]]:
+    """Project only stable failure values from a fresh core transition."""
+    if state is None or envelope["payload"].get("tag") != "effect_result":
+        return []
+    action = state.get("action") or {}
+    action_identity = action.get("identity") or {}
+    effect_result = envelope["payload"].get("result") or {}
+    elapsed_ms = _nonnegative_int(effect_result.get("elapsed_ms"))
+    attempt = _nonnegative_int(action_identity.get("attempt"))
+    stage = _ACTION_STAGES.get(str(action.get("tag") or ""))
+    projected: list[tuple[str, dict]] = []
+    for event in result.get("events") or []:
+        transition = event.get("tag")
+        if transition not in {"retry_scheduled", "failed"}:
+            continue
+        payload = event.get("payload") or {}
+        failure = payload.get("failure") if transition == "retry_scheduled" else payload.get("reason")
+        if failure not in _PIPELINE_FAILURES or stage is None:
+            continue
+        diagnostic: dict[str, object] = {"failure": failure, "stage": stage}
+        if attempt is not None:
+            diagnostic["attempt"] = attempt
+        if elapsed_ms is not None:
+            diagnostic["elapsed_ms"] = elapsed_ms
+        projected.append((transition, diagnostic))
+    return projected
 
 
 class PipelineBinding:
@@ -220,6 +274,21 @@ class CandidateExecution:
         # when the same acknowledged source and Score remain active.
         if rendered is None and state and next_snapshot["document"] == state["document"] and next_snapshot["delivery"] is not None:
             rendered = self._rendered
+        for transition, diagnostic in _pipeline_failures(state, envelope, result):
+            self.context["provider_failure"] = diagnostic
+            _logger.warning(
+                "pipeline_failure %s",
+                json.dumps(
+                    {
+                        "execution_id": next_snapshot["execution_id"],
+                        "variation_id": next_snapshot["variation_id"],
+                        "transition": transition,
+                        **diagnostic,
+                    },
+                    sort_keys=True,
+                    separators=(",", ":"),
+                ),
+            )
         if self.save_snapshot is not None:
             self.save_snapshot(state, next_snapshot, self.context, rendered)
         self._snapshot = next_snapshot

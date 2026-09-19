@@ -1,6 +1,7 @@
 """One real-binding host/DB connection; no provider network or native rendering."""
 
 import json
+import logging
 
 import pytest
 from sqlalchemy import create_engine
@@ -94,3 +95,116 @@ def test_real_binding_commits_source_and_authority_before_automatic_hole_request
         run.command({"tag": "generate_from_description", "expected_revision": "2", "description": "overwrite", "auto_catalog": False})
     assert store.read("acceptance", view["variation_id"])["document"]["source"] == edited
     engine.dispose()
+
+
+def test_core_failures_are_persisted_and_logged_once_per_transition(caplog):
+    class FixtureBinding:
+        def step(self, snapshot_bytes, _input_bytes):
+            if not snapshot_bytes:
+                snapshot = {
+                    "execution_id": "execution-1",
+                    "variation_id": "variation-1",
+                    "sequence": "0",
+                    "authority": {"revision": "0"},
+                    "document": None,
+                    "phase": {"tag": "awaiting_llm"},
+                    "delivery": None,
+                    "action": {
+                        "tag": "generate_normalized_ddl",
+                        "identity": {"attempt": 1},
+                        "delay_ms": "0",
+                    },
+                }
+                events = []
+            else:
+                snapshot = json.loads(snapshot_bytes)
+                attempt = snapshot["action"]["identity"]["attempt"]
+                snapshot["sequence"] = str(int(snapshot["sequence"]) + 1)
+                if attempt == 1:
+                    snapshot["action"]["identity"]["attempt"] = 2
+                    events = [
+                        {
+                            "tag": "retry_scheduled",
+                            "payload": {"failure": "schema_violation"},
+                        }
+                    ]
+                else:
+                    snapshot["action"] = None
+                    snapshot["phase"] = {"tag": "failed", "reason": "stage1_failed"}
+                    events = [
+                        {
+                            "tag": "failed",
+                            "payload": {
+                                "stage": "generate_normalized_ddl",
+                                "reason": "schema_violation",
+                            },
+                        }
+                    ]
+            return json.dumps(
+                {
+                    "kind": "output",
+                    "payload": {
+                        "result": {
+                            "snapshot": snapshot,
+                            "events": events,
+                            "rendered": None,
+                        }
+                    },
+                }
+            ).encode()
+
+    persisted = []
+
+    def provider(action):
+        return {
+            "tag": "normalized_ddl_generated",
+            "identity": action["identity"],
+            "response": "raw response marker that must not be logged",
+            "elapsed_ms": "7",
+        }
+
+    def save(_previous, _snapshot, context, _rendered):
+        persisted.append(json.loads(json.dumps(context)))
+
+    run = CandidateExecution(
+        FixtureBinding(),
+        object(),
+        owner_id="acceptance",
+        config=_fixture_config(),
+        provider=provider,
+        save_snapshot=save,
+    )
+    with caplog.at_level(logging.WARNING, logger="inku_server.pipeline_candidate"):
+        run.start_new(
+            {
+                "tag": "description",
+                "description": "One quiet black circle",
+                "auto_catalog": False,
+            }
+        )
+        run.run_effect()
+        run.run_effect()
+
+    diagnostic = {
+        "failure": "schema_violation",
+        "stage": "stage1",
+        "attempt": 2,
+        "elapsed_ms": 7,
+    }
+    assert run.view()["provider_failure"] == diagnostic
+    assert persisted[-1]["provider_failure"] == diagnostic
+    records = [
+        record.getMessage()
+        for record in caplog.records
+        if record.getMessage().startswith("pipeline_failure ")
+    ]
+    assert len(records) == 2
+    payloads = [json.loads(message.removeprefix("pipeline_failure ")) for message in records]
+    assert [payload["transition"] for payload in payloads] == ["retry_scheduled", "failed"]
+    assert [payload["attempt"] for payload in payloads] == [1, 2]
+    assert all(payload["failure"] == "schema_violation" for payload in payloads)
+    assert all(payload["stage"] == "stage1" for payload in payloads)
+    assert all(payload["elapsed_ms"] == 7 for payload in payloads)
+    assert all(payload["execution_id"] == run.view()["execution_id"] for payload in payloads)
+    assert all(payload["variation_id"] == run.view()["variation_id"] for payload in payloads)
+    assert "raw response marker" not in caplog.text

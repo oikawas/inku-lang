@@ -523,6 +523,23 @@ pub(crate) fn with_stage1_compiler_feedback(
     compiled: &TypedDdlCompilation,
     limits: PromptLimits,
 ) -> Result<LlmPrompt, PromptError> {
+    let needs_explicit_action_owner = compiled
+        .holes
+        .iter()
+        .map(|item| item.kind.as_str())
+        .chain(compiled.conflicts.iter().map(|item| item.kind.as_str()))
+        .chain(
+            compiled
+                .blocking_diagnostics
+                .iter()
+                .map(|item| item.kind.as_str()),
+        )
+        .any(|kind| {
+            matches!(
+                kind,
+                "ambiguous_entity_ownership" | "ambiguous_action_ownership"
+            )
+        });
     let diagnostic = |kind: &str, span: Option<SourceSpan>| {
         let text = span.and_then(|span| {
             compiled
@@ -579,6 +596,19 @@ pub(crate) fn with_stage1_compiler_feedback(
         }
     };
     prompt.system.push_str(&format!("\n\n{instruction}"));
+    if needs_explicit_action_owner {
+        let action_owner_instruction = match prompt.instruction_language {
+            ResolvedInstructionLanguage::Ja => {
+                "各描画動作について、その対象図形を同じ命令文内に明記して一意に対応させる。対象や動作を省略せず、「その」「それ」等の代名参照を使わない。"
+            }
+            ResolvedInstructionLanguage::En => {
+                "For every drawing action, name its target shape in the same instruction so the pairing is unambiguous. Do not omit the action or target, and do not use pronouns to refer to them."
+            }
+        };
+        prompt
+            .system
+            .push_str(&format!("\n\n{action_owner_instruction}"));
+    }
     let schema_text =
         serde_json::to_string(&prompt.response_schema).map_err(|_| PromptError::Serialization)?;
     Ok(hash_prompt(prompt, &schema_text))

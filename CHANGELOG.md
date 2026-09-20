@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ### 2026-09-21 — Avoid rejecting independent paraphrases with unrelated failed proposals
 
+Hole-completion attachment guidance is organized into concise Japanese and English grammar skeletons, separating shape orientation, layout direction, position, and references. Unspecified counts remain unspecified, and the existing accepted thinness terms are explicit. Repeated default-layout guidance is consolidated without adding case-specific answers, grammar, or weaker validator protections.
+
 Pre-head modifier guidance in the completion prompt now explicitly includes existing continuity, orientation, surface, fluctuation, proportion, and related attribute families. It explains only the attachment structure needed for word-order repair, without adding individual source examples or accepted forms.
 
 Independent checking of a clause with one established head and action now also permits an unspecified count when no recognized numeric occurrence is present. The proposal must retain that unspecified state, while preserving every owner's source-ordered head, count, action, and the outgoing-dependency check. Unbound quantities or multiple heads are not presumed independent, and no default quantity is added.

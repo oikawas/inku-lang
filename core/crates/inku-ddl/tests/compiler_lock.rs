@@ -92,6 +92,34 @@ fn unresolved_clause_owns_its_invalid_sequence_diagnostic() {
 }
 
 #[test]
+fn recoverable_fragments_do_not_block_an_anchored_clause_hole() {
+    let source = "地: 薄墨。\n赤い細筆の横の実線を右端に一本引く。\n赤い細筆の極細の横線を前の線に沿って右から左へ波打つ軌跡に引く。";
+    let result = compile(
+        source,
+        ResolvedInstructionLanguage::Ja,
+        &[],
+        Some(23),
+        LIMITS,
+    );
+
+    assert_eq!(
+        result.compiler_lock.as_ref().unwrap().state,
+        CompilerLockState::IncompleteKnownHole,
+        "holes={:?}; conflicts={:?}; blocking={:?}",
+        result.holes,
+        result.conflicts,
+        result.blocking_diagnostics
+    );
+    assert!(result.conflicts.is_empty(), "{:?}", result.conflicts);
+    assert!(
+        result.blocking_diagnostics.is_empty(),
+        "{:?}",
+        result.blocking_diagnostics
+    );
+    assert_eq!(result.holes.len(), 1, "{:?}", result.holes);
+}
+
+#[test]
 fn layout_direction_is_attested_separately_and_absence_adds_no_null_key() {
     let result = compile(
         "arrange three horizontal lines vertically at center.",

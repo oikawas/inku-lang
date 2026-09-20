@@ -757,7 +757,9 @@ fn project_deliveries(
     semantic_document: &SemanticDocumentResult,
 ) -> Projection {
     let mut projection = Projection::default();
-    let patchable_clause_spans = patchable_unresolved_clause_spans(semantic_document);
+    let unresolved_clause_spans = unresolved_clause_spans(semantic_document);
+    let patchable_clause_spans =
+        patchable_unresolved_clause_spans(semantic_document, &unresolved_clause_spans);
     let exclusive_continuation_claims =
         exclusive_continuation_claim_groups(&semantic_document.continuation_issues);
 
@@ -959,7 +961,7 @@ fn project_deliveries(
             )
             .chain(issue.markers.iter().map(|marker| marker.span))
             .collect::<Vec<_>>();
-        if spans_share_patchable_clause(&issue_spans, &patchable_clause_spans) {
+        if spans_share_clause(&issue_spans, &unresolved_clause_spans) {
             continue;
         }
         add_blocking_with_members(
@@ -1017,7 +1019,7 @@ fn project_deliveries(
                 .iter()
                 .map(|diagnostic| diagnostic.span),
         );
-        if spans_share_patchable_clause(&issue_spans, &patchable_clause_spans) {
+        if spans_share_clause(&issue_spans, &unresolved_clause_spans) {
             continue;
         }
         match issue.kind {
@@ -1055,9 +1057,9 @@ fn project_deliveries(
                 for occurrence in issue.occurrences.iter().filter(|occurrence| {
                     !consumed_continuation_spans.contains(&occurrence.source().span)
                         && !background_spans.contains(&occurrence.source().span)
-                        && !span_is_in_patchable_clause(
+                        && !span_is_in_clause(
                             occurrence.source().span,
-                            &patchable_clause_spans,
+                            &unresolved_clause_spans,
                         )
                 }) {
                     add_conflict(
@@ -1134,7 +1136,16 @@ fn project_deliveries(
             .iter()
             .map(|occurrence| occurrence.term.provenance.source.span)
             .collect::<Vec<_>>();
-        if spans_share_patchable_clause(&issue_spans, &patchable_clause_spans) {
+        if spans_share_clause(&issue_spans, &unresolved_clause_spans) {
+            continue;
+        }
+        if matches!(
+            issue.kind,
+            SemanticInstructionIssueKind::MissingActionEntity
+                | SemanticInstructionIssueKind::MissingLayoutDirectionEntity
+                | SemanticInstructionIssueKind::MissingPositionEntity
+        ) && !issue.occurrences.is_empty()
+        {
             continue;
         }
         match issue.kind {
@@ -1143,6 +1154,11 @@ fn project_deliveries(
             | SemanticInstructionIssueKind::AmbiguousPositionOwnership => {
                 for occurrence in issue.occurrences.iter().filter(|occurrence| {
                     !consumed_continuation_spans.contains(&occurrence.term.provenance.source.span)
+                        && !background_spans.contains(&occurrence.term.provenance.source.span)
+                        && !span_is_in_clause(
+                            occurrence.term.provenance.source.span,
+                            &unresolved_clause_spans,
+                        )
                 }) {
                     add_conflict(
                         &mut projection,
@@ -1189,7 +1205,7 @@ fn project_deliveries(
                     .map(|predicate| predicate.term.provenance.source.span),
             )
             .collect::<Vec<_>>();
-        if spans_share_patchable_clause(&issue_spans, &patchable_clause_spans) {
+        if spans_share_clause(&issue_spans, &unresolved_clause_spans) {
             continue;
         }
         let mut members = issue
@@ -1389,7 +1405,40 @@ fn project_deliveries(
 
 fn patchable_unresolved_clause_spans(
     semantic_document: &SemanticDocumentResult,
+    unresolved_clause_spans: &[SourceSpan],
 ) -> Vec<SourceSpan> {
+    semantic_document
+        .instruction_association
+        .association
+        .clause_stream
+        .clauses
+        .iter()
+        .filter(|clause| unresolved_clause_spans.contains(&clause.span))
+        .filter(|clause| {
+            let has_primitive_or_ground = clause.atoms.iter().any(|atom| {
+                matches!(
+                    atom,
+                    ClauseAtom::CoreRole(term)
+                        if matches!(term.role, CoreRoleKind::Primitive | CoreRoleKind::Ground)
+                )
+            });
+            let has_color = clause.atoms.iter().any(|atom| {
+                matches!(atom, ClauseAtom::CoreRole(term) if term.role == CoreRoleKind::Color)
+            });
+            let has_background = clause.atoms.iter().any(|atom| {
+                matches!(
+                    atom,
+                    ClauseAtom::FunctionWord { surface, .. }
+                        if matches!(surface.as_str(), "背景" | "background")
+                )
+            });
+            has_primitive_or_ground || has_color && has_background
+        })
+        .map(|clause| clause.span)
+        .collect()
+}
+
+fn unresolved_clause_spans(semantic_document: &SemanticDocumentResult) -> Vec<SourceSpan> {
     let unresolved_spans = semantic_document
         .instruction_association
         .association
@@ -1409,33 +1458,15 @@ fn patchable_unresolved_clause_spans(
         .clauses
         .iter()
         .filter(|clause| {
-            let has_unknown = unresolved_spans.iter().any(|span| {
+            unresolved_spans.iter().any(|span| {
                 clause.span.start_byte <= span.start_byte && span.end_byte <= clause.span.end_byte
-            });
-            let has_primitive_or_ground = clause.atoms.iter().any(|atom| {
-                matches!(
-                    atom,
-                    ClauseAtom::CoreRole(term)
-                        if matches!(term.role, CoreRoleKind::Primitive | CoreRoleKind::Ground)
-                )
-            });
-            let has_color = clause.atoms.iter().any(|atom| {
-                matches!(atom, ClauseAtom::CoreRole(term) if term.role == CoreRoleKind::Color)
-            });
-            let has_background = clause.atoms.iter().any(|atom| {
-                matches!(
-                    atom,
-                    ClauseAtom::FunctionWord { surface, .. }
-                        if matches!(surface.as_str(), "背景" | "background")
-                )
-            });
-            has_unknown && (has_primitive_or_ground || has_color && has_background)
+            })
         })
         .map(|clause| clause.span)
         .collect()
 }
 
-fn spans_share_patchable_clause(spans: &[SourceSpan], clauses: &[SourceSpan]) -> bool {
+fn spans_share_clause(spans: &[SourceSpan], clauses: &[SourceSpan]) -> bool {
     !spans.is_empty()
         && clauses.iter().any(|clause| {
             spans.iter().all(|span| {
@@ -1444,7 +1475,7 @@ fn spans_share_patchable_clause(spans: &[SourceSpan], clauses: &[SourceSpan]) ->
         })
 }
 
-fn span_is_in_patchable_clause(span: SourceSpan, clauses: &[SourceSpan]) -> bool {
+fn span_is_in_clause(span: SourceSpan, clauses: &[SourceSpan]) -> bool {
     clauses
         .iter()
         .any(|clause| clause.start_byte <= span.start_byte && span.end_byte <= clause.end_byte)

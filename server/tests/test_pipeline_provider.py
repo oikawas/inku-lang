@@ -125,10 +125,20 @@ def test_gemini_forces_one_schema_bound_function_call_with_minimal_thinking(monk
                         "name": "submit_pipeline_response",
                         "args": {
                             "schema_id": "inku.visible-ddl-patch.v1",
-                            "edits": [{
-                                "hole_id": "hole-1",
-                                "replacement": "青い円を描く。",
-                            }],
+                            "edits": [
+                                {
+                                    "hole_id": "hole-1",
+                                    "allowed_span": {"start_byte": 0, "end_byte": 10},
+                                    "expected_range_digest": "digest-1",
+                                    "replacement": "青い円を描く。",
+                                },
+                                {
+                                    "hole_id": "hole-2",
+                                    "allowed_span": {"start_byte": 11, "end_byte": 20},
+                                    "expected_range_digest": "digest-2",
+                                    "replacement": "赤い線を引く。",
+                                },
+                            ],
                         },
                     }}]}
                 }]
@@ -150,21 +160,63 @@ def test_gemini_forces_one_schema_bound_function_call_with_minimal_thinking(monk
             "schema_id": {"const": "inku.visible-ddl-patch.v1"},
             "edits": {
                 "type": "array",
-                "minItems": 1,
-                "maxItems": 1,
+                "minItems": 2,
+                "maxItems": 2,
                 "items": {
-                    "oneOf": [{
-                        "type": "object",
-                        "required": ["hole_id", "replacement"],
-                        "properties": {
-                            "hole_id": {"const": "hole-1"},
-                            "replacement": {
-                                "type": "string",
-                                "minLength": 1,
-                                "maxLength": 4096,
+                    "oneOf": [
+                        {
+                            "type": "object",
+                            "required": [
+                                "hole_id",
+                                "allowed_span",
+                                "expected_range_digest",
+                                "replacement",
+                            ],
+                            "properties": {
+                                "hole_id": {"const": "hole-1"},
+                                "allowed_span": {
+                                    "type": "object",
+                                    "required": ["start_byte", "end_byte"],
+                                    "properties": {
+                                        "start_byte": {"const": 0},
+                                        "end_byte": {"const": 10},
+                                    },
+                                },
+                                "expected_range_digest": {"const": "digest-1"},
+                                "replacement": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 4096,
+                                },
                             },
                         },
-                    }]
+                        {
+                            "type": "object",
+                            "required": [
+                                "hole_id",
+                                "allowed_span",
+                                "expected_range_digest",
+                                "replacement",
+                            ],
+                            "properties": {
+                                "hole_id": {"const": "hole-2"},
+                                "allowed_span": {
+                                    "type": "object",
+                                    "required": ["start_byte", "end_byte"],
+                                    "properties": {
+                                        "start_byte": {"const": 11},
+                                        "end_byte": {"const": 20},
+                                    },
+                                },
+                                "expected_range_digest": {"const": "digest-2"},
+                                "replacement": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 4096,
+                                },
+                            },
+                        },
+                    ]
                 },
             },
         },
@@ -175,7 +227,20 @@ def test_gemini_forces_one_schema_bound_function_call_with_minimal_thinking(monk
     assert result["tag"] == "visible_ddl_hole_patch_generated"
     assert json.loads(result["response"]) == {
         "schema_id": "inku.visible-ddl-patch.v1",
-        "edits": [{"hole_id": "hole-1", "replacement": "青い円を描く。"}],
+        "edits": [
+            {
+                "hole_id": "hole-1",
+                "allowed_span": {"start_byte": 0, "end_byte": 10},
+                "expected_range_digest": "digest-1",
+                "replacement": "青い円を描く。",
+            },
+            {
+                "hole_id": "hole-2",
+                "allowed_span": {"start_byte": 11, "end_byte": 20},
+                "expected_range_digest": "digest-2",
+                "replacement": "赤い線を引く。",
+            },
+        ],
     }
     assert len(seen) == 1
     request_body = json.loads(seen[0].content)
@@ -185,9 +250,19 @@ def test_gemini_forces_one_schema_bound_function_call_with_minimal_thinking(monk
     assert projected["properties"]["schema_id"] == {
         "enum": ["inku.visible-ddl-patch.v1"]
     }
-    assert projected["properties"]["edits"]["items"]["oneOf"][0]["properties"][
-        "replacement"
-    ] == {
+    projected_items = projected["properties"]["edits"]["items"]
+    assert "oneOf" not in projected_items
+    assert projected_items["properties"]["hole_id"] == {
+        "enum": ["hole-1", "hole-2"]
+    }
+    assert projected_items["properties"]["allowed_span"]["properties"] == {
+        "start_byte": {"enum": [0, 11]},
+        "end_byte": {"enum": [10, 20]},
+    }
+    assert projected_items["properties"]["expected_range_digest"] == {
+        "enum": ["digest-1", "digest-2"]
+    }
+    assert projected_items["properties"]["replacement"] == {
         "type": "string",
     }
     assert request_body["toolConfig"] == {

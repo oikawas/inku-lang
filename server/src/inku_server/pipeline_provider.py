@@ -45,7 +45,46 @@ _GEMINI_JSON_SCHEMA_KEYS = {
 }
 
 
-def _gemini_json_schema(schema: dict[str, Any]) -> dict[str, Any]:
+def _merge_gemini_variant_values(values: list[Any]) -> Any | None:
+    first = values[0]
+    if all(value == first for value in values[1:]):
+        return first
+    if not all(isinstance(value, dict) for value in values):
+        return None
+    keys = list(first)
+    if not all(list(value) == keys for value in values[1:]):
+        return None
+    if keys == ["enum"] and all(
+        isinstance(value["enum"], list) and len(value["enum"]) == 1
+        for value in values
+    ):
+        return {"enum": [value["enum"][0] for value in values]}
+    merged = {}
+    for key in keys:
+        value = _merge_gemini_variant_values([item[key] for item in values])
+        if value is None:
+            return None
+        merged[key] = value
+    return merged
+
+
+def _compact_gemini_hole_edit_variants(schema: dict[str, Any]) -> None:
+    edits = (schema.get("properties") or {}).get("edits") or {}
+    items = edits.get("items") or {}
+    variants = items.get("oneOf")
+    if not isinstance(variants, list) or not variants:
+        return
+    merged = _merge_gemini_variant_values(variants)
+    if isinstance(merged, dict) and merged.get("type") == "object":
+        # Gemini receives a bounded, flat enum schema. The shared core still
+        # validates each returned hole/range/digest tuple against the full
+        # response schema and compiler lock before accepting a patch.
+        edits["items"] = merged
+
+
+def _gemini_json_schema(
+    schema: dict[str, Any], *, compact_hole_edits: bool = False
+) -> dict[str, Any]:
     """Project core JSON Schema into Gemini's supported transport subset."""
 
     def project(value: Any, *, named_schemas: bool = False) -> Any:
@@ -66,6 +105,8 @@ def _gemini_json_schema(schema: dict[str, Any]) -> dict[str, Any]:
     result = project(schema)
     if not isinstance(result, dict) or result.get("type") != "object":
         raise ValueError("Gemini function schema must describe an object")
+    if compact_hole_edits:
+        _compact_gemini_hole_edit_variants(result)
     return result
 
 
@@ -199,7 +240,12 @@ class SingleAttemptProvider:
                     "tools": [{"functionDeclarations": [{
                         "name": response_name,
                         "description": "Submit the requested pipeline response.",
-                        "parametersJsonSchema": _gemini_json_schema(prompt["response_schema"]),
+                        "parametersJsonSchema": _gemini_json_schema(
+                            prompt["response_schema"],
+                            compact_hole_edits=(
+                                prompt["action_name"] == "complete_visible_ddl_holes"
+                            ),
+                        ),
                     }]}],
                     "toolConfig": {"functionCallingConfig": {
                         "mode": "ANY", "allowedFunctionNames": [response_name],

@@ -68,9 +68,10 @@ def _merge_gemini_variant_values(values: list[Any]) -> Any | None:
     return merged
 
 
-def _compact_gemini_hole_edit_variants(schema: dict[str, Any]) -> None:
-    edits = (schema.get("properties") or {}).get("edits") or {}
-    items = edits.get("items") or {}
+def _compact_gemini_hole_variants(schema: dict[str, Any]) -> None:
+    properties = schema.get("properties") or {}
+    collection = properties.get("results") or properties.get("edits") or {}
+    items = collection.get("items") or {}
     variants = items.get("oneOf")
     if not isinstance(variants, list) or not variants:
         return
@@ -79,7 +80,34 @@ def _compact_gemini_hole_edit_variants(schema: dict[str, Any]) -> None:
         # Gemini receives a bounded, flat enum schema. The shared core still
         # validates each returned hole/range/digest tuple against the full
         # response schema and compiler lock before accepting a patch.
-        edits["items"] = merged
+        collection["items"] = merged
+        return
+
+    # The v3 result variants require either `replacement` or `reason`. Gemini's
+    # function schema cannot express that disjunction compactly, so the
+    # transport permits both optional fields while Rust retains the exact
+    # one-of validation after the response returns.
+    if not all(isinstance(variant, dict) for variant in variants):
+        return
+    variant_properties = [variant.get("properties") for variant in variants]
+    if not all(isinstance(value, dict) for value in variant_properties):
+        return
+    shared_required = set(variants[0].get("required") or [])
+    for variant in variants[1:]:
+        shared_required.intersection_update(variant.get("required") or [])
+    merged_properties = {}
+    for name in sorted(set().union(*(value.keys() for value in variant_properties))):
+        candidates = [value[name] for value in variant_properties if name in value]
+        merged_value = _merge_gemini_variant_values(candidates)
+        if merged_value is None:
+            return
+        merged_properties[name] = merged_value
+    collection["items"] = {
+        "type": "object",
+        "additionalProperties": False,
+        "required": sorted(shared_required),
+        "properties": merged_properties,
+    }
 
 
 def _gemini_json_schema(
@@ -106,7 +134,7 @@ def _gemini_json_schema(
     if not isinstance(result, dict) or result.get("type") != "object":
         raise ValueError("Gemini function schema must describe an object")
     if compact_hole_edits:
-        _compact_gemini_hole_edit_variants(result)
+        _compact_gemini_hole_variants(result)
     return result
 
 
@@ -227,7 +255,13 @@ class SingleAttemptProvider:
             headers.update({"x-api-key": key, "anthropic-version": "2023-06-01"})
             body = {"model": model, "max_tokens": self.options.max_tokens,
                     "system": prompt["system"],
-                    "messages": [{"role": "user", "content": prompt["message"]}]}
+                    "messages": [{"role": "user", "content": prompt["message"]}],
+                    "tools": [{
+                        "name": response_name,
+                        "description": "Submit the requested pipeline response.",
+                        "input_schema": prompt["response_schema"],
+                    }],
+                    "tool_choice": {"type": "tool", "name": response_name}}
         elif kind == "gemini":
             url = base + "/v1beta/models/" + quote(model, safe="") + ":generateContent"
             headers["x-goog-api-key"] = key
@@ -274,7 +308,15 @@ class SingleAttemptProvider:
                     else:
                         text = message.get("content")
                 elif kind == "anthropic":
-                    text = "\n".join(block["text"] for block in data["content"] if block["type"] == "text")
+                    calls = [
+                        block for block in data["content"] if block.get("type") == "tool_use"
+                    ]
+                    if len(calls) != 1 or calls[0].get("name") != response_name:
+                        raise TypeError("provider returned an unexpected tool call")
+                    arguments = calls[0].get("input")
+                    if not isinstance(arguments, dict):
+                        raise TypeError("provider returned invalid tool input")
+                    text = json.dumps(arguments, ensure_ascii=False, separators=(",", ":"))
                 elif kind == "gemini":
                     calls = [part["functionCall"] for part in data["candidates"][0]["content"]["parts"]
                              if "functionCall" in part]

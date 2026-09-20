@@ -11,7 +11,9 @@ from inku_server.pipeline_candidate import (
     CandidateExecution,
     CandidateHostError,
     PipelineBinding,
+    _hole_completion_checks,
     _pipeline_failures,
+    _sync_hole_completion_check,
 )
 
 
@@ -86,6 +88,45 @@ def test_core_compiler_failure_detail_is_allowlisted():
 
     result["events"][0]["payload"]["detail"] = "raw response marker"
     assert "detail" not in _pipeline_failures(state, envelope, result)[0][1]
+
+
+def test_hole_completion_event_projects_only_safe_per_hole_diagnostics():
+    result = {
+        "events": [
+            {
+                "tag": "hole_completion_checked",
+                "payload": {
+                    "results": [
+                        {"hole_id": "hole-1", "status": "rejected", "reason": "owner_changed"},
+                        {"hole_id": "hole-2", "status": "unresolved", "reason": "ambiguous"},
+                    ],
+                    "raw_response": "must not be retained",
+                    "base_source_digest": "trusted-but-not-user-diagnostic",
+                },
+            }
+        ]
+    }
+
+    expected = {
+        "results": [
+            {"hole_id": "hole-1", "status": "rejected", "reason": "owner_changed"},
+            {"hole_id": "hole-2", "status": "unresolved", "reason": "ambiguous"},
+        ]
+    }
+    assert _hole_completion_checks(result) == [expected]
+    context = {"hole_completion_check": {"results": [{"hole_id": "stale"}]}}
+    assert _sync_hole_completion_check(
+        context,
+        {
+            "hole_completion_check": {
+                **expected,
+                "base_source_digest": "not-visible",
+            }
+        },
+    ) == expected
+    assert context["hole_completion_check"] == expected
+    assert _sync_hole_completion_check(context, {"hole_completion_check": None}) is None
+    assert "hole_completion_check" not in context
 
 
 def test_real_binding_commits_source_and_authority_before_automatic_hole_request(tmp_path):

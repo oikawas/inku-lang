@@ -5,6 +5,7 @@
 pub mod authority;
 pub mod byte_envelope;
 pub mod core_boundary;
+mod hole_completion;
 pub mod machine;
 pub mod prompts;
 pub mod protocol;

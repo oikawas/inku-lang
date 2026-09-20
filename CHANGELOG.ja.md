@@ -6,6 +6,14 @@
 
 **本書が持つのは v2.5.0（2026-07-25、render engine 12）以降**の 36 版である。それより前は書庫にある。
 
+### 2026-09-20 — 穴補完を原文に根拠を持つ局所提案へ限定
+
+Stage 2の新しい要求は、原文、確定済みfact、compilerが確定した最小の読取り専用文脈と受理構文を渡す。同じ対象に複数の色や道具があるだけで交互配置を要求していた規則を撤去し、明示されていない順序・数量分配を追加しない。意味を保って表現できない場合は、無理に別の意味へ変換せず未解決理由を返す。
+
+応答は短い要求内IDごとの候補または未解決結果へ縮小した。共有Rustが全IDの対応を検査し、元のhole、span、digest、compiler lockを保存済み要求から復元する。新要求は構造化応答schemaをsystem本文へ重複掲載せず、ServerとAndroidのproviderへ正式なschemaとして渡す。旧版の保存済みpending要求は、その版の応答形式だけで引き続き処理する。
+
+Patch検証は確定済みfactと描画対象の対応を検査し、holeごとの検証結果を安全な理由コードで残す。独立性をcompiler情報から証明できる単位だけ部分候補にでき、依存関係または独立性が不明な単位を推測で分割しない。候補全体の再compile、作者承認、CAS保存を維持し、部分承認後の残りholeを自動再送しない。失敗しても現在の安全なScore／SVGを保持する。未知表現の意味同等性を全面的に機械証明するものではなく、可視DDLでの作者確認を省略しない。DDL／Score形式、engine版、モデル既定値は変更しない。
+
 ### 2026-09-20 — Relation局所回復とcompiler診断を通常応答へ接続
 
 共有compilerはrelation issueのcurrent ownerをinstructionまたはcoordinated groupとしてexactに保持し、参照先を失ったrelation edgeだけを診断付きで外す。描画可能なcurrentとgroup、元index、seed、provenanceを残し、別のsurvivorへ参照を付け替えない。relationのownerが確定しない場合も近傍から推測せず、exactなrelation spanとclauseの診断だけを描画本体から分離する。非relationの未配送field／grammar occurrenceもexactなsource spanとして分離し、同じclauseの受理済み描画命令を所有者とはみなさない。旧Stop／Continueのどちらもrecoverableな不成立へ同じ局所回復を使い、source・lock・owner join等のintegrity不良と全省略だけを停止する。resource選別後に描画命令が一つも残らない場合も空Scoreを省略付き成功にせず停止し、独立した描画命令が残る場合だけ省略付き成功を返す。

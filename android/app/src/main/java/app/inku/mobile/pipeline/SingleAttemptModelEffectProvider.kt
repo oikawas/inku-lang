@@ -3,6 +3,7 @@ package app.inku.mobile.pipeline
 import app.inku.mobile.llm.ModelProvider
 import app.inku.mobile.llm.ModelProviderHttpException
 import app.inku.mobile.llm.ModelRequest
+import app.inku.mobile.llm.ModelTool
 import java.io.IOException
 import java.net.SocketTimeoutException
 import kotlinx.coroutines.CancellationException
@@ -45,6 +46,11 @@ class SingleAttemptModelEffectProvider(
                         temperature = 0.0,
                         maxTokens = maxTokens,
                         systemInstruction = prompt.requiredString("system"),
+                        tool = ModelTool(
+                            name = "submit_pipeline_response",
+                            description = "Submit the requested pipeline response.",
+                            parametersJson = prompt.requiredObject("response_schema").toString(),
+                        ),
                         timeoutMs = timeoutMs,
                     ),
                 ).text

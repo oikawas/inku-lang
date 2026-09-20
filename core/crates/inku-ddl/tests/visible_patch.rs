@@ -113,7 +113,7 @@ fn unresolved_clause_patch_keeps_typed_facts_and_resolves_the_clause() {
     assert_error_with_seed(
         &base,
         patch(&base, vec![edit(holes[0], "背景を黒で埋める")]),
-        VisiblePatchDiagnostic::TargetUnresolved,
+        VisiblePatchDiagnostic::EstablishedFactChanged,
         Some(23),
     );
 }

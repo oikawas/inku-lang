@@ -6,6 +6,14 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 36 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-20 — Keep hole completion local and grounded in the original text
+
+The new Stage 2 request supplies the original text, established facts, the smallest compiler-confirmed read-only context, and accepted grammar. It removes the rule that required alternation merely because one target had multiple colors or tools, and forbids adding unspecified order or quantity splits. When the meaning cannot be represented faithfully, the provider returns an unresolved reason rather than forcing a different meaning.
+
+Responses now contain a proposal or unresolved result for each short request-local ID. Shared Rust checks the complete ID set and restores the original hole, span, digests, and compiler lock from the saved request. New requests deliver the structured response schema through the Server and Android providers without repeating it in the system text. Persisted pending requests from the previous edition still use only that edition's response format.
+
+Patch validation checks established facts against their drawing targets and records per-hole results with safe reason codes. Partial proposals are limited to units whose independence can be proven from compiler information; dependent or uncertain units are not split by inference. Full-candidate recompilation, author approval, and compare-and-set saving remain required, and remaining holes are not automatically resubmitted after partial approval. Failures retain the current safe Score and SVG. This does not prove every unknown expression semantically equivalent or replace visible-DDL author review. DDL and Score formats, engine versions, and model defaults are unchanged.
+
 ### 2026-09-20 — Connect local relation recovery and compiler diagnostics to normal responses
 
 The shared compiler now keeps the exact current owner of a relation issue as an instruction or coordinated group and removes only a relation edge whose target was lost. It retains the drawable current body or group, original indices, seeds, and provenance without retargeting another survivor. If the relation owner is unresolved, it does not infer one from nearby content and instead separates only the exact relation span and clause diagnostic from the drawing body. It also separates an undelivered non-relation field or grammar occurrence as an exact source span without treating accepted drawing instructions in the same clause as its owner. Recoverable failures use the same local recovery for legacy Stop and Continue input; only source, lock, owner-join, or other integrity failure, or complete omission, stops execution. Resource selection also stops instead of reporting an omitted success when no drawing instruction remains, while an independent surviving instruction still produces a success with omissions.

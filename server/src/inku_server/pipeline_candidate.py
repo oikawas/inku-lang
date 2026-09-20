@@ -29,6 +29,7 @@ _PIPELINE_FAILURES = {
     "semantic_violation",
 }
 _PIPELINE_FAILURE_DETAILS = {"credentials_unavailable"}
+_HOLE_COMPLETION_STATUSES = {"validated", "rejected", "unresolved"}
 _ACTION_STAGES = {
     "select_description_catalog": "catalog",
     "generate_normalized_ddl": "stage1",
@@ -56,6 +57,53 @@ def _safe_compiler_failure_detail(value: object) -> str | None:
     if not isinstance(value, str) or not 1 <= len(value) <= 64:
         return None
     return value if all(character.isascii() and (character.islower() or character.isdigit() or character == "_") for character in value) else None
+
+
+def _safe_hole_id(value: object) -> str | None:
+    if not isinstance(value, str) or not 1 <= len(value) <= 128:
+        return None
+    return value if all(
+        character.isascii()
+        and (character.islower() or character.isdigit() or character in {"_", "-"})
+        for character in value
+    ) else None
+
+
+def _safe_hole_completion_check(value: object) -> dict | None:
+    if not isinstance(value, dict) or not isinstance(value.get("results"), list):
+        return None
+    results = []
+    for row in value["results"]:
+        if not isinstance(row, dict):
+            continue
+        hole_id = _safe_hole_id(row.get("hole_id"))
+        status = row.get("status")
+        reason = _safe_compiler_failure_detail(row.get("reason"))
+        if hole_id is None or status not in _HOLE_COMPLETION_STATUSES:
+            continue
+        results.append({"hole_id": hole_id, "status": status, "reason": reason})
+    return {"results": results} if results else None
+
+
+def _hole_completion_checks(result: dict) -> list[dict]:
+    """Project the core's safe per-hole event without retaining provider text."""
+    projected = []
+    for event in result.get("events") or []:
+        if not isinstance(event, dict) or event.get("tag") != "hole_completion_checked":
+            continue
+        check = _safe_hole_completion_check(event.get("payload"))
+        if check is not None:
+            projected.append(check)
+    return projected
+
+
+def _sync_hole_completion_check(context: dict, snapshot: dict) -> dict | None:
+    check = _safe_hole_completion_check(snapshot.get("hole_completion_check"))
+    if check is None:
+        context.pop("hole_completion_check", None)
+        return None
+    context["hole_completion_check"] = check
+    return check
 
 
 def _pipeline_failures(state: dict | None, envelope: dict, result: dict) -> list[tuple[str, dict]]:
@@ -249,6 +297,8 @@ class CandidateExecution:
                            "result": self.context.get("result")})
             if self.context.get("provider_failure") is not None:
                 result["provider_failure"] = self.context["provider_failure"]
+            if self.context.get("hole_completion_check") is not None:
+                result["hole_completion_check"] = self.context["hole_completion_check"]
             return json.loads(_bytes(result))
 
     def snapshot(self) -> dict:
@@ -302,6 +352,22 @@ class CandidateExecution:
                         "variation_id": next_snapshot["variation_id"],
                         "transition": transition,
                         **diagnostic,
+                    },
+                    sort_keys=True,
+                    separators=(",", ":"),
+                ),
+            )
+        check = _sync_hole_completion_check(self.context, next_snapshot)
+        if _hole_completion_checks(result):
+            if check is None:
+                raise CandidateHostError("pipeline_schema_violation")
+            _logger.info(
+                "hole_completion_checked %s",
+                json.dumps(
+                    {
+                        "execution_id": next_snapshot["execution_id"],
+                        "variation_id": next_snapshot["variation_id"],
+                        **check,
                     },
                     sort_keys=True,
                     separators=(",", ":"),

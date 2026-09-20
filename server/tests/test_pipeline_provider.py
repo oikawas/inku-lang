@@ -98,6 +98,62 @@ def test_missing_credentials_keep_only_safe_failure_detail(monkeypatch):
     assert "raw secret marker" not in repr(result)
 
 
+def test_anthropic_forces_the_core_schema_tool_and_extracts_its_input(monkeypatch):
+    monkeypatch.setattr(
+        "inku_server.pipeline_provider.provider_for_model",
+        lambda *args, **kwargs: ("anthropic", "claude-fixture"),
+    )
+    monkeypatch.setattr(
+        "inku_server.pipeline_provider.connection_for",
+        lambda *args: {
+            "id": "anthropic",
+            "kind": "anthropic",
+            "base_url": "https://api.anthropic.invalid",
+            "api_key": "test-only",
+            "requires_api_key": True,
+        },
+    )
+    seen = []
+
+    async def request(value):
+        seen.append(value)
+        return httpx.Response(
+            200,
+            json={
+                "content": [
+                    {
+                        "type": "tool_use",
+                        "name": "submit_pipeline_response",
+                        "input": {"normalized_ddl": "keep these bytes"},
+                    }
+                ]
+            },
+        )
+
+    provider = SingleAttemptProvider(
+        ProviderOptions({}, "fixture", "anthropic:claude-fixture", 256, 8192),
+        transport=httpx.MockTransport(request),
+    )
+    action = _action()
+
+    result = provider(action)
+
+    assert result["tag"] == "normalized_ddl_generated"
+    assert json.loads(result["response"]) == {"normalized_ddl": "keep these bytes"}
+    request_body = json.loads(seen[0].content)
+    assert request_body["tools"] == [
+        {
+            "name": "submit_pipeline_response",
+            "description": "Submit the requested pipeline response.",
+            "input_schema": action["payload"]["prompt"]["response_schema"],
+        }
+    ]
+    assert request_body["tool_choice"] == {
+        "type": "tool",
+        "name": "submit_pipeline_response",
+    }
+
+
 def test_gemini_forces_one_schema_bound_function_call_with_minimal_thinking(monkeypatch):
     monkeypatch.setattr(
         "inku_server.pipeline_provider.provider_for_model",
@@ -124,19 +180,16 @@ def test_gemini_forces_one_schema_bound_function_call_with_minimal_thinking(monk
                     "content": {"parts": [{"functionCall": {
                         "name": "submit_pipeline_response",
                         "args": {
-                            "schema_id": "inku.visible-ddl-patch.v1",
-                            "edits": [
+                            "results": [
                                 {
-                                    "hole_id": "hole-1",
-                                    "allowed_span": {"start_byte": 0, "end_byte": 10},
-                                    "expected_range_digest": "digest-1",
+                                    "id": "h1",
+                                    "status": "proposed",
                                     "replacement": "青い円を描く。",
                                 },
                                 {
-                                    "hole_id": "hole-2",
-                                    "allowed_span": {"start_byte": 11, "end_byte": 20},
-                                    "expected_range_digest": "digest-2",
-                                    "replacement": "赤い線を引く。",
+                                    "id": "h2",
+                                    "status": "unresolved",
+                                    "reason": "ambiguous",
                                 },
                             ],
                         },
@@ -155,10 +208,9 @@ def test_gemini_forces_one_schema_bound_function_call_with_minimal_thinking(monk
     action["payload"]["prompt"]["response_schema"] = {
         "type": "object",
         "additionalProperties": False,
-        "required": ["schema_id", "edits"],
+        "required": ["results"],
         "properties": {
-            "schema_id": {"const": "inku.visible-ddl-patch.v1"},
-            "edits": {
+            "results": {
                 "type": "array",
                 "minItems": 2,
                 "maxItems": 2,
@@ -166,23 +218,10 @@ def test_gemini_forces_one_schema_bound_function_call_with_minimal_thinking(monk
                     "oneOf": [
                         {
                             "type": "object",
-                            "required": [
-                                "hole_id",
-                                "allowed_span",
-                                "expected_range_digest",
-                                "replacement",
-                            ],
+                            "required": ["id", "status", "replacement"],
                             "properties": {
-                                "hole_id": {"const": "hole-1"},
-                                "allowed_span": {
-                                    "type": "object",
-                                    "required": ["start_byte", "end_byte"],
-                                    "properties": {
-                                        "start_byte": {"const": 0},
-                                        "end_byte": {"const": 10},
-                                    },
-                                },
-                                "expected_range_digest": {"const": "digest-1"},
+                                "id": {"const": "h1"},
+                                "status": {"const": "proposed"},
                                 "replacement": {
                                     "type": "string",
                                     "minLength": 1,
@@ -192,28 +231,11 @@ def test_gemini_forces_one_schema_bound_function_call_with_minimal_thinking(monk
                         },
                         {
                             "type": "object",
-                            "required": [
-                                "hole_id",
-                                "allowed_span",
-                                "expected_range_digest",
-                                "replacement",
-                            ],
+                            "required": ["id", "status", "reason"],
                             "properties": {
-                                "hole_id": {"const": "hole-2"},
-                                "allowed_span": {
-                                    "type": "object",
-                                    "required": ["start_byte", "end_byte"],
-                                    "properties": {
-                                        "start_byte": {"const": 11},
-                                        "end_byte": {"const": 20},
-                                    },
-                                },
-                                "expected_range_digest": {"const": "digest-2"},
-                                "replacement": {
-                                    "type": "string",
-                                    "minLength": 1,
-                                    "maxLength": 4096,
-                                },
+                                "id": {"const": "h2"},
+                                "status": {"const": "unresolved"},
+                                "reason": {"const": "ambiguous"},
                             },
                         },
                     ]
@@ -226,19 +248,16 @@ def test_gemini_forces_one_schema_bound_function_call_with_minimal_thinking(monk
 
     assert result["tag"] == "visible_ddl_hole_patch_generated"
     assert json.loads(result["response"]) == {
-        "schema_id": "inku.visible-ddl-patch.v1",
-        "edits": [
+        "results": [
             {
-                "hole_id": "hole-1",
-                "allowed_span": {"start_byte": 0, "end_byte": 10},
-                "expected_range_digest": "digest-1",
+                "id": "h1",
+                "status": "proposed",
                 "replacement": "青い円を描く。",
             },
             {
-                "hole_id": "hole-2",
-                "allowed_span": {"start_byte": 11, "end_byte": 20},
-                "expected_range_digest": "digest-2",
-                "replacement": "赤い線を引く。",
+                "id": "h2",
+                "status": "unresolved",
+                "reason": "ambiguous",
             },
         ],
     }
@@ -247,23 +266,19 @@ def test_gemini_forces_one_schema_bound_function_call_with_minimal_thinking(monk
     declaration = request_body["tools"][0]["functionDeclarations"][0]
     assert declaration["name"] == "submit_pipeline_response"
     projected = declaration["parametersJsonSchema"]
-    assert projected["properties"]["schema_id"] == {
-        "enum": ["inku.visible-ddl-patch.v1"]
-    }
-    projected_items = projected["properties"]["edits"]["items"]
+    projected_items = projected["properties"]["results"]["items"]
     assert "oneOf" not in projected_items
-    assert projected_items["properties"]["hole_id"] == {
-        "enum": ["hole-1", "hole-2"]
+    assert projected_items["properties"]["id"] == {
+        "enum": ["h1", "h2"]
     }
-    assert projected_items["properties"]["allowed_span"]["properties"] == {
-        "start_byte": {"enum": [0, 11]},
-        "end_byte": {"enum": [10, 20]},
-    }
-    assert projected_items["properties"]["expected_range_digest"] == {
-        "enum": ["digest-1", "digest-2"]
+    assert projected_items["properties"]["status"] == {
+        "enum": ["proposed", "unresolved"]
     }
     assert projected_items["properties"]["replacement"] == {
-        "type": "string",
+        "type": "string"
+    }
+    assert projected_items["properties"]["reason"] == {
+        "enum": ["ambiguous"],
     }
     assert request_body["toolConfig"] == {
         "functionCallingConfig": {

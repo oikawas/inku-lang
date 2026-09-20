@@ -255,5 +255,6 @@ pub use stage15_transform::{
 };
 pub use visible_patch::{
     VISIBLE_DDL_PATCH_SCHEMA_ID, ValidatedVisibleDdlCandidate, VisibleDdlPatch,
-    VisibleDdlPatchEdit, VisiblePatchDiagnostic, validate_visible_ddl_patch,
+    VisibleDdlPatchEdit, VisiblePatchDiagnostic, VisiblePatchFailure, validate_visible_ddl_patch,
+    validate_visible_ddl_patch_detailed,
 };

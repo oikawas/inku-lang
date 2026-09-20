@@ -28,7 +28,9 @@ pub const CATALOG_SELECTION_PROMPT_ID: &str = "inku.description-catalog-selectio
 /// Distinct typed Stage 1 prompt edition. This is not the legacy runtime template.
 pub const TYPED_STAGE1_PROMPT_ID: &str = "inku.typed-stage1-normalized-ddl-prompt.v1";
 /// Distinct visible-hole completion prompt edition.
-pub const HOLE_COMPLETION_PROMPT_ID: &str = "inku.visible-ddl-hole-completion-prompt.v2";
+pub const HOLE_COMPLETION_PROMPT_ID: &str = "inku.visible-ddl-hole-completion-prompt.v3";
+pub(crate) const LEGACY_HOLE_COMPLETION_PROMPT_ID: &str =
+    "inku.visible-ddl-hole-completion-prompt.v2";
 
 const PROMPT_DIGEST_DOMAIN: &[u8] = b"inku.llm-prompt.v1";
 const CATALOG_DIGEST_DOMAIN: &[u8] = b"inku.prompt-catalog-projection.v1";
@@ -192,6 +194,42 @@ pub struct HolePatchResponse {
     pub base_source_digest: String,
     pub base_compiler_lock_digest: String,
     pub edits: Vec<HolePatchEditResponse>,
+}
+
+/// Provider-owned text only; source ranges and lock identities never cross this boundary.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(tag = "status", rename_all = "snake_case", deny_unknown_fields)]
+pub enum HoleCompletionResult {
+    Proposed {
+        id: String,
+        replacement: String,
+    },
+    Unresolved {
+        id: String,
+        reason: HoleUnresolvedReason,
+    },
+}
+
+impl HoleCompletionResult {
+    pub fn id(&self) -> &str {
+        match self {
+            Self::Proposed { id, .. } | Self::Unresolved { id, .. } => id,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum HoleUnresolvedReason {
+    Ambiguous,
+    Unsupported,
+    ContextLimit,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct HoleCompletionResponse {
+    pub results: Vec<HoleCompletionResult>,
 }
 
 impl HolePatchResponse {
@@ -374,10 +412,9 @@ struct Stage1Message<'a> {
 
 #[derive(Serialize)]
 struct HoleDescriptor<'a> {
-    hole_id: &'a str,
+    id: String,
     kind: &'a str,
-    allowed_span: HolePatchRange,
-    expected_range_digest: &'a str,
+    source: &'a str,
     expected_owner: &'a str,
 }
 
@@ -390,16 +427,14 @@ struct HoleTypedFact<'a> {
 
 #[derive(Serialize)]
 struct HoleSourceRegion<'a> {
-    span: HolePatchRange,
+    read_only: bool,
     source: &'a str,
     typed_facts: Vec<HoleTypedFact<'a>>,
+    confirmed_bindings: Vec<Value>,
 }
 
 #[derive(Serialize)]
 struct HoleMessage<'a> {
-    base_source_digest: &'a str,
-    base_compiler_lock_schema_id: &'a str,
-    base_compiler_lock_digest: &'a str,
     source_regions: Vec<HoleSourceRegion<'a>>,
     selected_holes: Vec<HoleDescriptor<'a>>,
 }
@@ -763,10 +798,6 @@ pub fn build_hole_completion_prompt(
         ResolvedInstructionLanguage::Ja => HOLE_SYSTEM_JA,
         ResolvedInstructionLanguage::En => HOLE_SYSTEM_EN,
     };
-    let system = format!(
-        "{rules}\n\n# accepted_saijiki_vocabulary\n{}",
-        saijiki.prompt_block
-    );
     let evidence_span_for = |hole: &TypedHole| {
         compilation
             .semantic_document
@@ -788,11 +819,11 @@ pub fn build_hole_completion_prompt(
     };
     let descriptors = selected
         .iter()
-        .map(|hole| HoleDescriptor {
-            hole_id: &hole.id,
+        .enumerate()
+        .map(|(index, hole)| HoleDescriptor {
+            id: format!("h{}", index + 1),
             kind: &hole.kind,
-            allowed_span: hole.allowed_span.into(),
-            expected_range_digest: &hole.expected_range_digest,
+            source: &source[hole.allowed_span.start_byte..hole.allowed_span.end_byte],
             expected_owner: hole.expected_owner.as_str(),
         })
         .collect::<Vec<_>>();
@@ -801,28 +832,57 @@ pub fn build_hole_completion_prompt(
         let span = evidence_span_for(hole);
         evidence_spans.insert((span.start_byte, span.end_byte), span);
     }
+    let selected_spans = evidence_spans.keys().copied().collect::<BTreeSet<_>>();
+    for span in crate::hole_completion::confirmed_context_spans(compilation, &selected) {
+        evidence_spans.insert((span.start_byte, span.end_byte), span);
+    }
     let source_regions = evidence_spans
         .into_values()
         .map(|span| HoleSourceRegion {
-            span: span.into(),
+            read_only: !selected_spans.contains(&(span.start_byte, span.end_byte)),
             source: &source[span.start_byte..span.end_byte],
             typed_facts: hole_typed_facts(compilation, span),
+            confirmed_bindings: crate::hole_completion::confirmed_bindings(compilation, span),
         })
-        .collect();
+        .collect::<Vec<_>>();
+    let has_fact = |owner| {
+        source_regions
+            .iter()
+            .any(|region| region.typed_facts.iter().any(|fact| fact.owner == owner))
+    };
+    let shared_grammar = match language {
+        ResolvedInstructionLanguage::Ja => STAGE1_GRAMMAR_JA,
+        ResolvedInstructionLanguage::En => STAGE1_GRAMMAR_EN,
+    };
+    // Reuse the existing grammar paragraphs verbatim; do not maintain another
+    // language or vocabulary registry for hole completion.
+    let grammar = shared_grammar
+        .split("\n\n")
+        .enumerate()
+        .filter(|(index, _)| match index {
+            0 | 1 => true,
+            2 => has_fact("sequence"),
+            3 => has_fact("quantity"),
+            _ => has_fact("relation"),
+        })
+        .map(|(_, paragraph)| paragraph)
+        .collect::<Vec<_>>()
+        .join("\n\n");
+    let system = format!(
+        "{rules}\n\n{grammar}\n\n# accepted_saijiki_vocabulary\n{}",
+        saijiki.prompt_block
+    );
     let message = serde_json::to_string(&HoleMessage {
-        base_source_digest: &base_source_digest,
-        base_compiler_lock_schema_id: base_compiler_lock.schema_id,
-        base_compiler_lock_digest: &base_compiler_lock.full_digest,
         source_regions,
         selected_holes: descriptors,
     })
     .map_err(|_| PromptError::Serialization)?;
-    let response_schema = hole_response_schema(
-        &selected,
-        &base_source_digest,
-        &base_compiler_lock.full_digest,
-        limits.max_source_bytes,
-    );
+    require_within(
+        "hole_message",
+        message.len(),
+        limits.max_catalog_serialized_bytes,
+    )?;
+    let response_schema = hole_response_schema(selected.len(), limits.max_source_bytes);
     finish_prompt(LlmPrompt {
         schema_id: LLM_PROMPT_SCHEMA_ID.to_owned(),
         prompt_id: HOLE_COMPLETION_PROMPT_ID.to_owned(),
@@ -946,6 +1006,36 @@ pub fn parse_hole_patch_response(
     limits: PromptLimits,
 ) -> Result<HolePatchResponse, PromptError> {
     parse_bounded(response_text, limits)
+}
+
+/// Verify the exact request-local ID set, independently of provider schema enforcement.
+pub fn parse_hole_completion_response(
+    response_text: &str,
+    expected_count: usize,
+    limits: PromptLimits,
+) -> Result<HoleCompletionResponse, PromptError> {
+    let response: HoleCompletionResponse = parse_bounded(response_text, limits)?;
+    let expected = (1..=expected_count)
+        .map(|index| format!("h{index}"))
+        .collect::<BTreeSet<_>>();
+    let mut seen = BTreeSet::new();
+    for result in &response.results {
+        if !expected.contains(result.id()) || !seen.insert(result.id().to_owned()) {
+            return Err(PromptError::ResponseIdentityMismatch {
+                field: "results.id",
+            });
+        }
+        if let HoleCompletionResult::Proposed { replacement, .. } = result {
+            require_nonblank("replacement", replacement)?;
+            require_within("replacement", replacement.len(), limits.max_source_bytes)?;
+        }
+    }
+    if seen != expected {
+        return Err(PromptError::ResponseIdentityMismatch {
+            field: "results.id",
+        });
+    }
+    Ok(response)
 }
 
 fn parse_bounded<T: DeserializeOwned>(
@@ -1091,53 +1181,31 @@ fn validate_hole(source: &str, hole: &TypedHole) -> Result<(), PromptError> {
     Ok(())
 }
 
-fn hole_response_schema(
-    holes: &[&TypedHole],
-    base_source_digest: &str,
-    base_compiler_lock_digest: &str,
-    max_replacement_bytes: usize,
-) -> Value {
-    let variants = holes
-        .iter()
-        .map(|hole| {
-            json!({
-                "type": "object",
-                "additionalProperties": false,
-                "required": ["hole_id", "allowed_span", "expected_range_digest", "replacement"],
-                "properties": {
-                    "hole_id": { "const": hole.id },
-                    "allowed_span": {
-                        "type": "object",
-                        "additionalProperties": false,
-                        "required": ["start_byte", "end_byte"],
-                        "properties": {
-                            "start_byte": { "const": hole.allowed_span.start_byte },
-                            "end_byte": { "const": hole.allowed_span.end_byte }
-                        }
-                    },
-                    "expected_range_digest": { "const": hole.expected_range_digest },
-                    "replacement": {
-                        "type": "string",
-                        "minLength": 1,
-                        "maxLength": max_replacement_bytes
-                    }
-                }
-            })
-        })
+fn hole_response_schema(count: usize, max_replacement_bytes: usize) -> Value {
+    let ids = (1..=count)
+        .map(|index| format!("h{index}"))
         .collect::<Vec<_>>();
     json!({
         "type": "object",
         "additionalProperties": false,
-        "required": ["schema_id", "base_source_digest", "base_compiler_lock_digest", "edits"],
+        "required": ["results"],
         "properties": {
-            "schema_id": { "const": VISIBLE_DDL_PATCH_SCHEMA_ID },
-            "base_source_digest": { "const": base_source_digest },
-            "base_compiler_lock_digest": { "const": base_compiler_lock_digest },
-            "edits": {
+            "results": {
                 "type": "array",
-                "minItems": holes.len(),
-                "maxItems": holes.len(),
-                "items": { "oneOf": variants }
+                "minItems": count,
+                "maxItems": count,
+                "items": { "oneOf": [
+                    {"type":"object", "additionalProperties":false,
+                     "required":["id","status","replacement"],
+                     "properties":{"id":{"type":"string","enum":ids},
+                        "status":{"type":"string","enum":["proposed"]},
+                        "replacement":{"type":"string","minLength":1,"maxLength":max_replacement_bytes}}},
+                    {"type":"object", "additionalProperties":false,
+                     "required":["id","status","reason"],
+                     "properties":{"id":{"type":"string","enum":ids},
+                        "status":{"type":"string","enum":["unresolved"]},
+                        "reason":{"type":"string","enum":["ambiguous","unsupported","context_limit"]}}}
+                ] }
             }
         }
     })
@@ -1154,11 +1222,13 @@ fn finish_prompt(mut prompt: LlmPrompt) -> Result<LlmPrompt, PromptError> {
             "Return exactly one JSON object matching the following JSON Schema. Preserve each value's type; do not replace a string with an array or object. Do not add Markdown fences or explanations."
         }
     };
-    // Every host sends system/message verbatim. The schema must reach the model,
-    // not merely remain transport metadata used by the response validator.
-    prompt.system.push_str(&format!(
-        "\n\n{response_instruction}\n# response_schema\n{schema_text}"
-    ));
+    // v3 transports supply response_schema through their structured-output contract.
+    // Preserve old stage prompt bytes and persisted request editions.
+    if prompt.prompt_id != HOLE_COMPLETION_PROMPT_ID {
+        prompt.system.push_str(&format!(
+            "\n\n{response_instruction}\n# response_schema\n{schema_text}"
+        ));
+    }
     Ok(hash_prompt(prompt, &schema_text))
 }
 
@@ -1314,21 +1384,13 @@ Write "mirrored with the previous shape" for mirrored positions and orientations
 const STAGE1_CONTEXT_EN: &str = "The canvas format, catalog ID, and catalog mode are already resolved host context. Do not replace them with defaults.";
 const STAGE1_NORMALIZER_RESPONSE_ENDING_EN: &str = " Return only the specified JSON.";
 
-const HOLE_SYSTEM_JA: &str = r#"あなたは inku の可視DDL hole patch提案器。source_regionsの短い根拠と確定済みtyped_factsを使い、selected_holesに列挙された各holeのallowed_spanだけへ、accepted_saijiki_vocabularyと通常の数値・文法からなる可視DDL replacementを提案する。
+const HOLE_SYSTEM_JA: &str = r#"あなたは inku の可視DDLの局所翻訳提案器。selected_holesのsourceだけを書換え可能とし、source_regionsとtyped_factsは根拠として読む。read_onlyの文脈を変更しない。原文の未認識語句も検討し、明示された対象、属性と所有者、数量と総数、action、範囲、関係、順序を保持する。typed_factsのownerは語の種類であり、描画対象IDではない。
+未指定値・描画対象・順序を追加しない。複数の色や道具の併記だけから交互配置、分配、重ね塗りを推測しない。「中央付近」を「中央」へ狭めず、存在しない参照先や線を作らない。既存の省略は省略のまま残せる。意味が複数に分かれる場合はunresolved/ambiguous、現文法で表せない場合はunresolved/unsupported、必要な文脈が不足する場合はunresolved/context_limitを返す。受理させるため明示内容を削除しない。
+明示意味を保持できる場合だけ、accepted_saijiki_vocabularyと共有文法によるreplacementを提案する。unresolved_clauseは原文の描画headとactionを同じ命令へ保持し、背景だけで済ませない。背景の基本形は「背景を<色>で埋める。」、面は「面: <おもて名詞>。」。短いidごとに必ず一結果を返す。Score、思考過程、説明、管理情報は返さず、指定されたJSONだけを返す。"#;
 
-source_regionsはcommit済みDDLだが、有限文法外の語句や活用を含みうる。未受理の語句をそのまま写さず、region全体の対象・属性・関係から主旨を読み、明示事実を失わずに最も近いaccepted語彙とcompiler文法へ正規化する。個別単語の字面だけで置換しない。基本形は「背景を<色>で埋める。」「面: <おもて名詞>。」「<属性><図形>を<位置・配置><置く・並べる・引く・散らす・埋める・敷き詰める>。」とする。
-
-Replacementは対応するtyped_factsのsource occurrenceと個数を保持した、compilerが受理できる完結した節にする。unresolved_clauseはbackgroundまたはgroundを成立させるか、一つの描画headとactionをともに成立させる。typed_factsに描画headまたはactionがある場合はbackground／groundだけで済ませず、headとactionを同じ実行可能な描画命令へ結び付けた独立節を必ず残す。同じownerの修飾語が複数あり一つの明示総数を共有する場合は、修飾語だけを「AとB」で結ばず、各修飾語をheadまで含む完全なmemberにして「<member A>と<member B>を交互に<総数>並べる」の有限文法で一つの総数へ結ぶ。それ以外はselected_holesのexpected_ownerを成立させる。
-
-hole ID、range、range digest、source digest、compiler lock digestをそのまま返す。allowed_spanがsource全体でも、その範囲の全文をedit.replacementだけへ返し、別のwhole document fieldは返さない。選択されていない範囲、明示済みの意味、MacroDefinition、Score、typed-only fieldを変更・生成しない。記述入力を推測せず、思考過程、説明を返さない。指定されたpatch JSONだけを返す。"#;
-
-const HOLE_SYSTEM_EN: &str = r#"You propose visible inku DDL hole patches. Use only the short evidence in source_regions and the confirmed typed_facts. Propose visible DDL replacement text, using accepted_saijiki_vocabulary and ordinary numeric/compiler grammar, only inside each allowed_span listed in selected_holes.
-
-source_regions contain committed DDL, but may include phrases or inflections outside the finite grammar. Do not copy an unaccepted phrase unchanged. Read the region's subjects, attributes, and relations together, preserve its explicit facts, and normalize its intent to the nearest accepted vocabulary and compiler grammar instead of substituting words in isolation. Use the basic forms "fill the background with <color>.", "Surface: <surface noun>.", and "<action> <attributes><shape> <position or arrangement>."
-
-Make each replacement a complete compiler-accepted clause that preserves the source occurrences and counts in its typed_facts. An unresolved_clause must establish background or ground, or both one drawing head and an action. If typed_facts contain a drawing head or action, background or ground alone is insufficient: retain a separate executable drawing clause that binds the head and action to the same instruction. When multiple modifiers with the same owner share one explicit total, do not coordinate bare modifiers as "A and B"; make each a complete member through its head and bind the single total with the finite form "Line up <total>, alternating <member A> and <member B>." Other holes must establish the expected_owner in selected_holes.
-
-Return each hole ID, range, range digest, source digest, and compiler lock digest unchanged. If an allowed_span covers the whole source, return all text for that selected range only as edit.replacement; do not return a separate whole-document field. Do not change an unselected range or explicit meaning, and do not generate MacroDefinition data, a Score, typed-only fields, a description, chain of thought, or explanation. Return only the specified patch JSON."#;
+const HOLE_SYSTEM_EN: &str = r#"Propose local translations of visible inku DDL. Only source in selected_holes may be replaced; source_regions and typed_facts are evidence. Never edit read_only context. Consider unrecognized original phrases too. Preserve explicit subjects, attributes and their owners, quantities and totals, actions, regions, relations, and order. A typed_facts owner names a fact category, not a drawing object ID.
+Do not add unspecified values, drawing objects, or order. Listing colors or tools does not specify alternation, distribution, or layering. Do not narrow near the center to the center or invent a reference target or line. Existing omissions may remain omitted. Return unresolved/ambiguous for competing meanings, unresolved/unsupported when the accepted grammar cannot express the meaning, and unresolved/context_limit when required context is unavailable. Never delete explicit content to obtain accepted syntax.
+Propose replacement in accepted_saijiki_vocabulary and the shared grammar only when it preserves the explicit meaning. An unresolved_clause must retain its drawing head and action in the same instruction, not replace them with background alone. Basic support forms are "fill the background with <color>." and "Surface: <surface noun>." Return exactly one result for every short id. Return only the specified JSON, without Score, chain of thought, explanation, or management metadata."#;
 
 #[cfg(test)]
 mod tests {
@@ -1437,23 +1499,21 @@ mod tests {
         let prompt = build_hole_completion_prompt(&compilation, &selected, LIMITS).unwrap();
         assert_eq!(prompt.action_name, "complete_visible_ddl_holes");
         assert_eq!(
-            prompt.response_schema["properties"]["edits"]["minItems"],
+            prompt.response_schema["properties"]["results"]["minItems"],
             holes.len()
         );
         assert_eq!(
-            prompt.response_schema["properties"]["edits"]["maxItems"],
+            prompt.response_schema["properties"]["results"]["maxItems"],
             holes.len()
         );
         assert_eq!(
-            prompt.response_schema["properties"]["edits"]["items"]["oneOf"][0]["properties"]["allowed_span"]
-                ["properties"]["start_byte"]["const"],
-            holes[0].allowed_span.start_byte
+            prompt.response_schema["properties"]["results"]["items"]["oneOf"][0]["properties"]["id"]
+                ["enum"],
+            json!(["h1", "h2"])
         );
-        assert_eq!(
-            prompt.response_schema["properties"]["edits"]["items"]["oneOf"][0]["properties"]["hole_id"]
-                ["const"],
-            holes[0].id
-        );
+        assert!(!prompt.system.contains("# response_schema"));
+        assert!(!prompt.message.contains(&lock.full_digest));
+        assert!(!prompt.message.contains("allowed_span"));
         assert!(!prompt.message.contains("description"));
         assert!(!prompt.message.contains("original_source"));
         assert!(!prompt.message.contains("中心に赤い円"));
@@ -1487,13 +1547,31 @@ mod tests {
         assert!(
             prompt
                 .system
-                .contains("typed_factsのsource occurrenceと個数を保持")
+                .contains("未指定値・描画対象・順序を追加しない")
         );
-        assert!(prompt.system.contains("一つの描画headとactionをともに成立"));
-        assert!(prompt.system.contains("background／groundだけで済ませず"));
-        assert!(prompt.system.contains("個別単語の字面だけで置換しない"));
-        assert!(prompt.system.contains("各修飾語をheadまで含む完全なmember"));
-        assert!(prompt.system.contains("allowed_spanがsource全体でも"));
+        assert!(prompt.system.contains("unresolved/ambiguous"));
+        assert!(!prompt.system.contains("各修飾語をheadまで含む完全なmember"));
+        let proposed = json!({"id":"h1","status":"proposed","replacement":"背景を青で埋める。"});
+        let unresolved = json!({"id":"h2","status":"unresolved","reason":"ambiguous"});
+        assert!(
+            parse_hole_completion_response(
+                &json!({"results":[proposed,unresolved]}).to_string(),
+                2,
+                LIMITS
+            )
+            .is_ok()
+        );
+        // Missing, duplicate, and unknown IDs must fail even without provider schema checks.
+        for results in [
+            json!([proposed]),
+            json!([proposed, proposed]),
+            json!([proposed,{"id":"h3","status":"unresolved","reason":"ambiguous"}]),
+        ] {
+            assert!(
+                parse_hole_completion_response(&json!({"results":results}).to_string(), 2, LIMITS)
+                    .is_err()
+            );
+        }
     }
 
     #[test]

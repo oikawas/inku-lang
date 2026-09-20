@@ -2,12 +2,18 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
+use serde_json::Value;
 use sha2::{Digest, Sha256};
 
 use crate::{
     ClauseAtom, CompilerLockState, CoreRoleKind, MacroDefinition, MacroExpansionLimits,
     NormalizedDdlDocument, RemainingRoleKind, SemanticDeliveryIdentity, SemanticDeliveryKind,
-    SemanticDeliveryOwner, SourceSpan, TypedDdlCompilation, compile_typed_ddl,
+    SemanticDeliveryOwner, SemanticFillTarget, SemanticInstruction, SemanticRelation, SourceSpan,
+    TypedDdlCompilation, compile_typed_ddl,
+    semantic_association::{
+        semantic_entity_value, semantic_explicit_geometry_value, semantic_identity_value,
+        semantic_numeric_position_value, semantic_sequence_value,
+    },
 };
 
 /// Stable identity for constrained visible DDL patch requests.
@@ -69,6 +75,8 @@ pub enum VisiblePatchDiagnostic {
     SidecarLockChanged,
     OutsideBytesChanged,
     OutsideExplicitChanged,
+    EstablishedFactChanged,
+    OwnerAssociationChanged,
     TargetUnresolved,
     NewDiagnostic,
     CandidateIntegrityFailure,
@@ -97,6 +105,8 @@ impl VisiblePatchDiagnostic {
             Self::SidecarLockChanged => "sidecar_lock_changed",
             Self::OutsideBytesChanged => "outside_bytes_changed",
             Self::OutsideExplicitChanged => "outside_explicit_changed",
+            Self::EstablishedFactChanged => "established_fact_changed",
+            Self::OwnerAssociationChanged => "owner_association_changed",
             Self::TargetUnresolved => "target_unresolved",
             Self::NewDiagnostic => "new_diagnostic",
             Self::CandidateIntegrityFailure => "candidate_integrity_failure",
@@ -110,6 +120,29 @@ pub struct ValidatedVisibleDdlCandidate {
     pub document: NormalizedDdlDocument,
     pub compilation: TypedDdlCompilation,
     pub resolved_hole_ids: Vec<String>,
+}
+
+/// One fail-closed patch outcome with the exact target hole when attribution is certain.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct VisiblePatchFailure {
+    pub diagnostic: VisiblePatchDiagnostic,
+    pub hole_id: Option<String>,
+}
+
+impl VisiblePatchFailure {
+    fn global(diagnostic: VisiblePatchDiagnostic) -> Self {
+        Self {
+            diagnostic,
+            hole_id: None,
+        }
+    }
+
+    fn for_hole(diagnostic: VisiblePatchDiagnostic, hole_id: &str) -> Self {
+        Self {
+            diagnostic,
+            hole_id: Some(hole_id.to_owned()),
+        }
+    }
 }
 
 /// Whether the compilation has known holes and no global failure that forbids a bounded patch.
@@ -142,55 +175,95 @@ pub fn validate_visible_ddl_patch(
     composition_seed: Option<u64>,
     limits: MacroExpansionLimits,
 ) -> Result<ValidatedVisibleDdlCandidate, VisiblePatchDiagnostic> {
+    validate_visible_ddl_patch_detailed(base, patch, definitions, composition_seed, limits)
+        .map_err(|failure| failure.diagnostic)
+}
+
+/// Validate one constrained patch and retain exact hole attribution for local failures.
+pub fn validate_visible_ddl_patch_detailed(
+    base: &TypedDdlCompilation,
+    patch: &VisibleDdlPatch,
+    definitions: &[MacroDefinition],
+    composition_seed: Option<u64>,
+    limits: MacroExpansionLimits,
+) -> Result<ValidatedVisibleDdlCandidate, VisiblePatchFailure> {
     if patch.schema_id != VISIBLE_DDL_PATCH_SCHEMA_ID {
-        return Err(VisiblePatchDiagnostic::InvalidSchema);
+        return Err(VisiblePatchFailure::global(
+            VisiblePatchDiagnostic::InvalidSchema,
+        ));
     }
     if patch.edits.is_empty() {
-        return Err(VisiblePatchDiagnostic::EmptyPatch);
+        return Err(VisiblePatchFailure::global(
+            VisiblePatchDiagnostic::EmptyPatch,
+        ));
     }
     let Some(base_lock) = &base.compiler_lock else {
-        return Err(VisiblePatchDiagnostic::BaseIntegrityFailure);
+        return Err(VisiblePatchFailure::global(
+            VisiblePatchDiagnostic::BaseIntegrityFailure,
+        ));
     };
     let source = base.document.source();
     if patch.base_source_digest != sha256_hex(source.as_bytes()) {
-        return Err(VisiblePatchDiagnostic::StaleSource);
+        return Err(VisiblePatchFailure::global(
+            VisiblePatchDiagnostic::StaleSource,
+        ));
     }
     if patch.base_compiler_lock_digest != base_lock.full_digest {
-        return Err(VisiblePatchDiagnostic::StaleCompilerLock);
+        return Err(VisiblePatchFailure::global(
+            VisiblePatchDiagnostic::StaleCompilerLock,
+        ));
     }
     if !visible_ddl_patch_available(base) {
-        if patch.edits.iter().any(|edit| {
+        if let Some(edit) = patch.edits.iter().find(|edit| {
             base.conflicts
                 .iter()
                 .any(|conflict| conflict.id == edit.hole_id)
         }) {
-            return Err(VisiblePatchDiagnostic::ConflictTarget);
+            return Err(VisiblePatchFailure::for_hole(
+                VisiblePatchDiagnostic::ConflictTarget,
+                &edit.hole_id,
+            ));
         }
-        if patch.edits.iter().any(|edit| {
+        if let Some(edit) = patch.edits.iter().find(|edit| {
             base.blocking_diagnostics
                 .iter()
                 .any(|diagnostic| diagnostic.id == edit.hole_id)
         }) {
-            return Err(VisiblePatchDiagnostic::BlockingDiagnosticTarget);
+            return Err(VisiblePatchFailure::for_hole(
+                VisiblePatchDiagnostic::BlockingDiagnosticTarget,
+                &edit.hole_id,
+            ));
         }
-        return Err(VisiblePatchDiagnostic::PatchTargetUnavailable);
+        return Err(VisiblePatchFailure::global(
+            VisiblePatchDiagnostic::PatchTargetUnavailable,
+        ));
     }
 
     let mut previous: Option<&VisibleDdlPatchEdit> = None;
     let mut hole_ids = Vec::new();
     for edit in &patch.edits {
         if edit.replacement.is_empty() {
-            return Err(VisiblePatchDiagnostic::EmptyReplacement);
+            return Err(VisiblePatchFailure::for_hole(
+                VisiblePatchDiagnostic::EmptyReplacement,
+                &edit.hole_id,
+            ));
         }
         if !hole_ids.insert_sorted(edit.hole_id.clone()) {
-            return Err(VisiblePatchDiagnostic::DuplicateHole);
+            return Err(VisiblePatchFailure::for_hole(
+                VisiblePatchDiagnostic::DuplicateHole,
+                &edit.hole_id,
+            ));
         }
         if let Some(previous) = previous {
             if edit.allowed_span.start_byte < previous.allowed_span.start_byte {
-                return Err(VisiblePatchDiagnostic::UnorderedEdits);
+                return Err(VisiblePatchFailure::global(
+                    VisiblePatchDiagnostic::UnorderedEdits,
+                ));
             }
             if edit.allowed_span.start_byte < previous.allowed_span.end_byte {
-                return Err(VisiblePatchDiagnostic::OverlappingEdits);
+                return Err(VisiblePatchFailure::global(
+                    VisiblePatchDiagnostic::OverlappingEdits,
+                ));
             }
         }
         previous = Some(edit);
@@ -201,52 +274,77 @@ pub fn validate_visible_ddl_patch(
             || !source.is_char_boundary(span.start_byte)
             || !source.is_char_boundary(span.end_byte)
         {
-            return Err(VisiblePatchDiagnostic::InvalidRange);
+            return Err(VisiblePatchFailure::for_hole(
+                VisiblePatchDiagnostic::InvalidRange,
+                &edit.hole_id,
+            ));
         }
 
         let Some(hole) = base.holes.iter().find(|hole| hole.id == edit.hole_id) else {
             if base.conflicts.iter().any(|item| item.id == edit.hole_id) {
-                return Err(VisiblePatchDiagnostic::ConflictTarget);
+                return Err(VisiblePatchFailure::for_hole(
+                    VisiblePatchDiagnostic::ConflictTarget,
+                    &edit.hole_id,
+                ));
             }
             if base
                 .blocking_diagnostics
                 .iter()
                 .any(|item| item.id == edit.hole_id)
             {
-                return Err(VisiblePatchDiagnostic::BlockingDiagnosticTarget);
+                return Err(VisiblePatchFailure::for_hole(
+                    VisiblePatchDiagnostic::BlockingDiagnosticTarget,
+                    &edit.hole_id,
+                ));
             }
             if base
                 .deliveries
                 .iter()
                 .any(|item| item.id == edit.hole_id && item.kind == SemanticDeliveryKind::Explicit)
             {
-                return Err(VisiblePatchDiagnostic::ExplicitTarget);
+                return Err(VisiblePatchFailure::for_hole(
+                    VisiblePatchDiagnostic::ExplicitTarget,
+                    &edit.hole_id,
+                ));
             }
-            return Err(VisiblePatchDiagnostic::UnknownTarget);
+            return Err(VisiblePatchFailure::for_hole(
+                VisiblePatchDiagnostic::UnknownTarget,
+                &edit.hole_id,
+            ));
         };
         if hole.allowed_span != edit.allowed_span {
-            return Err(VisiblePatchDiagnostic::SpanMismatch);
+            return Err(VisiblePatchFailure::for_hole(
+                VisiblePatchDiagnostic::SpanMismatch,
+                &edit.hole_id,
+            ));
         }
         let actual_range_digest = sha256_hex(source[span.start_byte..span.end_byte].as_bytes());
         if edit.expected_range_digest != hole.expected_range_digest
             || edit.expected_range_digest != actual_range_digest
         {
-            return Err(VisiblePatchDiagnostic::RangeDigestMismatch);
+            return Err(VisiblePatchFailure::for_hole(
+                VisiblePatchDiagnostic::RangeDigestMismatch,
+                &edit.hole_id,
+            ));
         }
     }
 
     let (candidate_source, candidate_ranges) = merge(source, &patch.edits);
     if !outside_bytes_preserved(source, &candidate_source, &patch.edits, &candidate_ranges) {
-        return Err(VisiblePatchDiagnostic::OutsideBytesChanged);
+        return Err(VisiblePatchFailure::global(
+            VisiblePatchDiagnostic::OutsideBytesChanged,
+        ));
     }
     let candidate_document = NormalizedDdlDocument::new(
         candidate_source,
         base.document.language(),
         base.document.macro_locks().to_vec(),
     )
-    .map_err(|_| VisiblePatchDiagnostic::SidecarLockChanged)?;
+    .map_err(|_| VisiblePatchFailure::global(VisiblePatchDiagnostic::SidecarLockChanged))?;
     if candidate_document.macro_locks() != base.document.macro_locks() {
-        return Err(VisiblePatchDiagnostic::SidecarLockChanged);
+        return Err(VisiblePatchFailure::global(
+            VisiblePatchDiagnostic::SidecarLockChanged,
+        ));
     }
 
     let candidate = compile_typed_ddl(
@@ -256,7 +354,9 @@ pub fn validate_visible_ddl_patch(
         limits,
     );
     if candidate.compiler_lock.is_none() {
-        return Err(VisiblePatchDiagnostic::CandidateIntegrityFailure);
+        return Err(VisiblePatchFailure::global(
+            VisiblePatchDiagnostic::CandidateIntegrityFailure,
+        ));
     }
 
     for (edit, range) in patch.edits.iter().zip(&candidate_ranges) {
@@ -273,15 +373,18 @@ pub fn validate_visible_ddl_patch(
                 .iter()
                 .any(|item| item.span.is_some_and(|span| overlaps(span, *range)))
         {
-            return Err(VisiblePatchDiagnostic::TargetUnresolved);
+            return Err(VisiblePatchFailure::for_hole(
+                VisiblePatchDiagnostic::TargetUnresolved,
+                &edit.hole_id,
+            ));
         }
         let hole = base
             .holes
             .iter()
             .find(|hole| hole.id == edit.hole_id)
             .expect("validated edit retains its exact typed hole");
-        if !target_resolved(hole, base, &candidate, *range) {
-            return Err(VisiblePatchDiagnostic::TargetUnresolved);
+        if let Some(diagnostic) = target_resolution_failure(hole, base, &candidate, *range) {
+            return Err(VisiblePatchFailure::for_hole(diagnostic, &edit.hole_id));
         }
     }
 
@@ -295,7 +398,9 @@ pub fn validate_visible_ddl_patch(
     );
     let candidate_outside = outside_explicit(&candidate, &candidate_ranges);
     if base_outside != candidate_outside {
-        return Err(VisiblePatchDiagnostic::OutsideExplicitChanged);
+        return Err(VisiblePatchFailure::global(
+            VisiblePatchDiagnostic::OutsideExplicitChanged,
+        ));
     }
     let base_holes = outside_holes(
         base,
@@ -328,7 +433,9 @@ pub fn validate_visible_ddl_patch(
         || base_conflicts != candidate_conflicts
         || base_blocking != candidate_blocking
     {
-        return Err(VisiblePatchDiagnostic::NewDiagnostic);
+        return Err(VisiblePatchFailure::global(
+            VisiblePatchDiagnostic::NewDiagnostic,
+        ));
     }
 
     Ok(ValidatedVisibleDdlCandidate {
@@ -342,12 +449,12 @@ pub fn validate_visible_ddl_patch(
     })
 }
 
-fn target_resolved(
+fn target_resolution_failure(
     hole: &crate::TypedHole,
     base: &TypedDdlCompilation,
     candidate: &TypedDdlCompilation,
     range: SourceSpan,
-) -> bool {
+) -> Option<VisiblePatchDiagnostic> {
     if hole.kind == "unresolved_clause" {
         let required = typed_fact_counts(base, hole.span);
         let delivered = typed_fact_counts(candidate, range);
@@ -355,7 +462,18 @@ fn target_resolved(
             .iter()
             .any(|(fact, count)| delivered.get(fact).copied().unwrap_or_default() < *count)
         {
-            return false;
+            return Some(VisiblePatchDiagnostic::EstablishedFactChanged);
+        }
+        let required_associations = resolved_association_counts(base, hole.span);
+        let delivered_associations = resolved_association_counts(candidate, range);
+        if required_associations.iter().any(|(association, count)| {
+            delivered_associations
+                .get(association)
+                .copied()
+                .unwrap_or_default()
+                < *count
+        }) {
+            return Some(VisiblePatchDiagnostic::OwnerAssociationChanged);
         }
         let owners = candidate
             .deliveries
@@ -365,17 +483,20 @@ fn target_resolved(
             .map(|item| item.identity.owner)
             .collect::<BTreeSet<_>>();
         if source_has_drawing_fact(base, hole.span) {
-            return candidate_has_drawable_instruction(candidate, range);
+            return (!candidate_has_drawable_instruction(candidate, range))
+                .then_some(VisiblePatchDiagnostic::TargetUnresolved);
         }
-        return owners.contains(&SemanticDeliveryOwner::Background)
+        return (!(owners.contains(&SemanticDeliveryOwner::Background)
             || owners.contains(&SemanticDeliveryOwner::Ground)
-            || candidate_has_drawable_instruction(candidate, range);
+            || candidate_has_drawable_instruction(candidate, range)))
+        .then_some(VisiblePatchDiagnostic::TargetUnresolved);
     }
-    candidate.deliveries.iter().any(|item| {
+    (!candidate.deliveries.iter().any(|item| {
         item.kind == SemanticDeliveryKind::Explicit
             && item.identity.owner == hole.expected_owner
             && item.span.is_some_and(|span| overlaps(span, range))
-    })
+    }))
+    .then_some(VisiblePatchDiagnostic::TargetUnresolved)
 }
 
 fn source_has_drawing_fact(compilation: &TypedDdlCompilation, range: SourceSpan) -> bool {
@@ -444,6 +565,435 @@ fn candidate_has_drawable_instruction(
                         })
             })
         })
+}
+
+fn resolved_association_counts(
+    compilation: &TypedDdlCompilation,
+    range: SourceSpan,
+) -> BTreeMap<String, usize> {
+    let mut associations = BTreeMap::new();
+    let Some(semantic) = &compilation.semantic_document else {
+        return associations;
+    };
+    let instructions = &semantic.ast.instructions;
+    for (instruction_index, instruction) in instructions.iter().enumerate() {
+        if !span_within(instruction.entity.head.source().span, range) {
+            continue;
+        }
+        let target = semantic_target_value(instruction_index, instructions);
+        record_entity_associations(&mut associations, &target, instruction, range);
+
+        if let Some(sequence) = &instruction.sequence
+            && span_within(sequence.operator.provenance.source.span, range)
+        {
+            record_association(
+                &mut associations,
+                &target,
+                "sequence",
+                semantic_sequence_value(0, sequence),
+            );
+        }
+        if let Some(action) = &instruction.action
+            && span_within(action.provenance.source.span, range)
+        {
+            record_association(
+                &mut associations,
+                &target,
+                "action",
+                semantic_identity_value(&action.identity),
+            );
+        }
+        if let Some(position) = &instruction.position
+            && span_within(position.provenance.source.span, range)
+        {
+            record_association(
+                &mut associations,
+                &target,
+                "position",
+                semantic_identity_value(&position.identity),
+            );
+        }
+        if let Some(direction) = &instruction.layout_direction
+            && span_within(direction.provenance.source.span, range)
+        {
+            record_association(
+                &mut associations,
+                &target,
+                "layout_direction",
+                semantic_identity_value(&direction.identity),
+            );
+        }
+        if let Some(relation) = &instruction.relation
+            && span_within(relation.provenance.span, range)
+        {
+            record_association(
+                &mut associations,
+                &target,
+                "relation",
+                relation_value(relation, instruction_index, instructions),
+            );
+        }
+        if let Some(fill_target) = &instruction.fill_target
+            && fill_target
+                .sources()
+                .iter()
+                .any(|source| span_within(source.span, range))
+        {
+            record_association(
+                &mut associations,
+                &target,
+                "fill_target",
+                fill_target_value(fill_target, instructions),
+            );
+        }
+    }
+
+    for predicate in &semantic.ast.group_predicates {
+        let Some(group) = semantic
+            .ast
+            .coordinated_head_groups
+            .get(predicate.group_index)
+        else {
+            continue;
+        };
+        let member_targets = group
+            .member_instruction_indices
+            .iter()
+            .filter(|index| {
+                instructions.get(**index).is_some_and(|instruction| {
+                    span_within(instruction.entity.head.source().span, range)
+                })
+            })
+            .map(|index| semantic_target_value(*index, instructions))
+            .collect::<Vec<_>>();
+        if member_targets.len() != group.member_instruction_indices.len() {
+            continue;
+        }
+        let target = Value::Array(member_targets);
+        if let Some(action) = &predicate.action
+            && span_within(action.provenance.source.span, range)
+        {
+            record_association(
+                &mut associations,
+                &target,
+                "group_action",
+                semantic_identity_value(&action.identity),
+            );
+        }
+        if let Some(position) = &predicate.position
+            && span_within(position.provenance.source.span, range)
+        {
+            record_association(
+                &mut associations,
+                &target,
+                "group_position",
+                semantic_identity_value(&position.identity),
+            );
+        }
+        if let Some(relation) = &predicate.relation
+            && span_within(relation.provenance.span, range)
+        {
+            let owner_index = group
+                .member_instruction_indices
+                .iter()
+                .copied()
+                .min()
+                .unwrap_or_default();
+            record_association(
+                &mut associations,
+                &target,
+                "group_relation",
+                relation_value(relation, owner_index, instructions),
+            );
+        }
+        if let Some(fill_target) = &predicate.fill_target
+            && fill_target
+                .sources()
+                .iter()
+                .any(|source| span_within(source.span, range))
+        {
+            record_association(
+                &mut associations,
+                &target,
+                "group_fill_target",
+                fill_target_value(fill_target, instructions),
+            );
+        }
+    }
+
+    if let Some(background) = &semantic.ast.background {
+        let target = Value::String("background".to_owned());
+        if span_within(background.color.provenance.source.span, range) {
+            record_association(
+                &mut associations,
+                &target,
+                "color",
+                semantic_identity_value(&background.color.identity),
+            );
+        }
+        if span_within(background.action.provenance.source.span, range) {
+            record_association(
+                &mut associations,
+                &target,
+                "action",
+                semantic_identity_value(&background.action.identity),
+            );
+        }
+    }
+    associations
+}
+
+fn record_entity_associations(
+    associations: &mut BTreeMap<String, usize>,
+    target: &Value,
+    instruction: &SemanticInstruction,
+    range: SourceSpan,
+) {
+    let entity = &instruction.entity;
+    let canonical = semantic_entity_value(entity);
+    let field = |name: &str| {
+        canonical
+            .get(name)
+            .cloned()
+            .expect("closed semantic entity value contains every requested field")
+    };
+    let nested_field = |owner: &str, name: &str| {
+        canonical
+            .get(owner)
+            .and_then(|value| value.get(name))
+            .cloned()
+            .unwrap_or(Value::Null)
+    };
+
+    if let Some(constraint) = &entity.shape_constraint
+        && std::iter::once(&constraint.provenance)
+            .chain(&constraint.additional_provenance)
+            .any(|source| span_within(source.span, range))
+    {
+        record_association(
+            associations,
+            target,
+            "shape_constraint",
+            field("shape_constraint"),
+        );
+    }
+    if let Some(color) = &entity.color
+        && span_within(color.provenance.source.span, range)
+    {
+        record_association(associations, target, "color", field("color"));
+    }
+    if let Some(quantity) = &entity.quantity
+        && span_within(quantity.provenance.span, range)
+    {
+        record_association(associations, target, "quantity", field("quantity"));
+    }
+    if let Some(thinness) = &entity.thinness
+        && span_within(thinness.provenance.span, range)
+    {
+        record_association(associations, target, "thinness", field("thinness"));
+    }
+    if let Some(scale) = &entity.relative_scale
+        && span_within(scale.provenance.span, range)
+    {
+        record_association(
+            associations,
+            target,
+            "relative_scale",
+            field("relative_scale"),
+        );
+    }
+    if let Some(geometry) = &entity.explicit_geometry
+        && span_within(geometry.source().span, range)
+    {
+        record_association(
+            associations,
+            target,
+            "explicit_geometry",
+            semantic_explicit_geometry_value(geometry),
+        );
+    }
+    for scale in &entity.additional_relative_scales {
+        if span_within(scale.provenance.span, range) {
+            record_association(
+                associations,
+                target,
+                "additional_relative_scale",
+                Value::String(scale.value.as_str().to_owned()),
+            );
+        }
+    }
+    for geometry in &entity.additional_explicit_geometries {
+        if span_within(geometry.source().span, range) {
+            record_association(
+                associations,
+                target,
+                "additional_explicit_geometry",
+                semantic_explicit_geometry_value(geometry),
+            );
+        }
+    }
+    for width_extent in &entity.additional_width_extents {
+        if span_within(width_extent.provenance.source.span, range) {
+            record_association(
+                associations,
+                target,
+                "additional_width_extent",
+                semantic_identity_value(&width_extent.identity),
+            );
+        }
+    }
+    if let Some(position) = &entity.numeric_position
+        && span_within(position.source().span, range)
+    {
+        record_association(
+            associations,
+            target,
+            "numeric_position",
+            semantic_numeric_position_value(position),
+        );
+    }
+    for (owner, term, value) in [
+        ("touch", entity.touch.as_ref(), field("touch")),
+        (
+            "continuity",
+            entity.continuity.as_ref(),
+            field("continuity"),
+        ),
+        ("angle", entity.angle.as_ref(), field("angle")),
+        (
+            "surface_quality",
+            entity.surface.quality.as_ref(),
+            nested_field("surface", "quality"),
+        ),
+        (
+            "surface_intensity",
+            entity.surface.intensity.as_ref(),
+            nested_field("surface", "intensity"),
+        ),
+        (
+            "fluctuation_spread",
+            entity.fluctuation.spread.as_ref(),
+            nested_field("fluctuation", "spread"),
+        ),
+        (
+            "fluctuation_amplitude",
+            entity.fluctuation.amplitude.as_ref(),
+            nested_field("fluctuation", "amplitude"),
+        ),
+        (
+            "fluctuation_frequency",
+            entity.fluctuation.frequency.as_ref(),
+            nested_field("fluctuation", "frequency"),
+        ),
+        (
+            "fluctuation_quality",
+            entity.fluctuation.quality.as_ref(),
+            nested_field("fluctuation", "quality"),
+        ),
+        (
+            "proportion_aspect",
+            entity.proportion.aspect.as_ref(),
+            nested_field("proportion", "aspect"),
+        ),
+        (
+            "proportion_width_extent",
+            entity.proportion.width_extent.as_ref(),
+            nested_field("proportion", "width_extent"),
+        ),
+        (
+            "proportion_arc_form",
+            entity.proportion.arc_form.as_ref(),
+            nested_field("proportion", "arc_form"),
+        ),
+    ] {
+        if term.is_some_and(|term| span_within(term.provenance.source.span, range)) {
+            record_association(associations, target, owner, value);
+        }
+    }
+}
+
+fn semantic_head_value(instruction: &SemanticInstruction) -> Value {
+    semantic_entity_value(&instruction.entity)
+        .get("head")
+        .cloned()
+        .expect("closed semantic entity value contains its head")
+}
+
+fn semantic_target_value(instruction_index: usize, instructions: &[SemanticInstruction]) -> Value {
+    let head = semantic_head_value(&instructions[instruction_index]);
+    let occurrence = instructions[..instruction_index]
+        .iter()
+        .filter(|instruction| semantic_head_value(instruction) == head)
+        .count();
+    serde_json::json!({
+        "head": head,
+        "source_order_occurrence": occurrence,
+    })
+}
+
+fn relation_value(
+    relation: &SemanticRelation,
+    owner_index: usize,
+    instructions: &[SemanticInstruction],
+) -> Value {
+    let target_count = match relation.reference {
+        crate::SemanticPreviousReference::PreviousOne => 1,
+        crate::SemanticPreviousReference::PreviousTwo => 2,
+    };
+    let referenced_targets = instructions[..owner_index.min(instructions.len())]
+        .iter()
+        .enumerate()
+        .rev()
+        .take(target_count)
+        .collect::<Vec<_>>()
+        .into_iter()
+        .rev()
+        .map(|(index, _)| semantic_target_value(index, instructions))
+        .collect::<Vec<_>>();
+    serde_json::json!({
+        "kind": relation.kind.as_str(),
+        "reference": relation.reference.as_str(),
+        "referenced_targets": referenced_targets,
+        "target_endpoint": relation.target_endpoint,
+        "target_path_selection": relation.target_path_selection,
+    })
+}
+
+fn fill_target_value(
+    fill_target: &SemanticFillTarget,
+    instructions: &[SemanticInstruction],
+) -> Value {
+    match fill_target {
+        SemanticFillTarget::Canvas { .. } => serde_json::json!({"kind": "canvas"}),
+        SemanticFillTarget::InlineShape {
+            target_instruction_index,
+            ..
+        } => serde_json::json!({
+            "kind": "inline_shape",
+            "target": instructions
+                .get(*target_instruction_index)
+                .map(|_| semantic_target_value(*target_instruction_index, instructions)),
+        }),
+    }
+}
+
+fn record_association(
+    associations: &mut BTreeMap<String, usize>,
+    target: &Value,
+    owner: &str,
+    value: Value,
+) {
+    let key = serde_json::to_string(&Value::Array(vec![
+        target.clone(),
+        Value::String(owner.to_owned()),
+        value,
+    ]))
+    .expect("closed semantic association key serializes");
+    *associations.entry(key).or_default() += 1;
+}
+
+const fn span_within(span: SourceSpan, range: SourceSpan) -> bool {
+    range.start_byte <= span.start_byte && span.end_byte <= range.end_byte
 }
 
 fn typed_fact_counts(
@@ -690,7 +1240,7 @@ mod tests {
             candidate.compiler_lock.as_ref().unwrap().state,
             CompilerLockState::BlockedDiagnostic
         );
-        assert!(target_resolved(hole, &base, &candidate, range));
+        assert!(target_resolution_failure(hole, &base, &candidate, range).is_none());
 
         candidate
             .semantic_document
@@ -711,6 +1261,35 @@ mod tests {
                 .iter()
                 .any(|delivery| { delivery.identity.owner == SemanticDeliveryOwner::EntityHead })
         );
-        assert!(!target_resolved(hole, &base, &candidate, range));
+        assert_eq!(
+            target_resolution_failure(hole, &base, &candidate, range),
+            Some(VisiblePatchDiagnostic::TargetUnresolved)
+        );
+    }
+
+    #[test]
+    fn detailed_validation_attributes_owner_reassignment_to_the_exact_hole() {
+        let base = compile("出力: 赤い円と青い円を中央に置く。面: 粗く塗りつぶす。");
+        let hole = base.holes.first().expect("whole unresolved clause");
+        assert_eq!(hole.kind, "unresolved_clause");
+        let patch = VisibleDdlPatch::new(
+            sha256_hex(base.document.source().as_bytes()),
+            base.compiler_lock.as_ref().unwrap().full_digest.clone(),
+            vec![VisibleDdlPatchEdit {
+                hole_id: hole.id.clone(),
+                allowed_span: hole.allowed_span,
+                expected_range_digest: hole.expected_range_digest.clone(),
+                replacement: "青い円と赤い円を中央に置く。".to_owned(),
+            }],
+        );
+
+        let failure =
+            validate_visible_ddl_patch_detailed(&base, &patch, &[], None, LIMITS).unwrap_err();
+        assert_eq!(
+            failure.diagnostic,
+            VisiblePatchDiagnostic::OwnerAssociationChanged
+        );
+        assert_eq!(failure.diagnostic.kind(), "owner_association_changed");
+        assert_eq!(failure.hole_id.as_deref(), Some(hole.id.as_str()));
     }
 }

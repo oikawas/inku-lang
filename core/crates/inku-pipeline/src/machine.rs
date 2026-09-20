@@ -1,11 +1,11 @@
 //! Pure effect orchestration around the shared compiler and durable visible DDL.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use inku_ddl::{
     CompilerLockState, MacroDefinition, MacroLock, NormalizedDdlDocument,
     ResolvedInstructionLanguage, TypedDdlCompilation, compile_typed_ddl,
-    validate_visible_ddl_patch, visible_ddl_patch_available,
+    validate_visible_ddl_patch, validate_visible_ddl_patch_detailed, visible_ddl_patch_available,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -17,10 +17,12 @@ use crate::authority::{
 use crate::core_boundary::CatalogMode;
 use crate::core_boundary::{CompiledDelivery, CompilerOptions, ResolvedHostOptions};
 use crate::prompts::{
-    DescriptionCatalogEntry, HolePatchResponse, LlmPrompt, LlmStage, MacroPromptEntry,
-    PromptLimits, Stage1Context, build_catalog_selection_prompt, build_hole_completion_prompt,
-    build_stage1_prompt, parse_catalog_selection_response, parse_hole_patch_response,
-    parse_stage1_response, with_stage1_compiler_feedback,
+    DescriptionCatalogEntry, HOLE_COMPLETION_PROMPT_ID, HoleCompletionResult,
+    HolePatchEditResponse, HolePatchResponse, LEGACY_HOLE_COMPLETION_PROMPT_ID, LlmPrompt,
+    LlmStage, MacroPromptEntry, PromptLimits, Stage1Context, build_catalog_selection_prompt,
+    build_hole_completion_prompt, build_stage1_prompt, parse_catalog_selection_response,
+    parse_hole_completion_response, parse_hole_patch_response, parse_stage1_response,
+    with_stage1_compiler_feedback,
 };
 use crate::protocol::{
     ActionEcho, DecimalU64, EffectAction, EffectResult, Envelope, PROTOCOL_NAME, PROTOCOL_VERSION,
@@ -272,6 +274,8 @@ pub struct PipelineSnapshot {
     pub phase: PipelinePhase,
     pub action: Option<EffectAction>,
     pub delivery: Option<CompiledDelivery>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub hole_completion_check: Option<serde_json::Value>,
     pub snapshot_digest: String,
 }
 
@@ -500,6 +504,9 @@ impl PipelineSnapshot {
         reason: &str,
         events: &mut Vec<PipelineEvent>,
     ) -> Result<(), ProtocolError> {
+        if reason != "user_approved_patch" {
+            self.hole_completion_check = None;
+        }
         let payload = json!({
             "variation_id": self.variation_id,
             "document": document,
@@ -826,8 +833,34 @@ impl PipelineSnapshot {
             );
         }
         selected.sort_by_key(|hole| hole.allowed_span.start_byte);
-        let prompt = build_hole_completion_prompt(&base, &selected, self.config.prompt_limits)
-            .map_err(|_| ProtocolError::SchemaViolation)?;
+        self.hole_completion_check = None;
+        let prompt = match build_hole_completion_prompt(&base, &selected, self.config.prompt_limits)
+        {
+            Ok(prompt) => prompt,
+            Err(crate::prompts::PromptError::LimitExceeded { .. }) => {
+                let lock = base
+                    .compiler_lock
+                    .as_ref()
+                    .ok_or(ProtocolError::InternalInvariant)?;
+                let report = json!({
+                    "results":selected.iter().map(|hole| json!({"hole_id":hole.id,"status":"unresolved","reason":"context_limit"})).collect::<Vec<_>>(),
+                    "base_source_digest":lock.visible_source_digest,
+                    "base_compiler_lock_digest":lock.full_digest,
+                });
+                self.hole_completion_check = Some(report.clone());
+                self.event(events, "hole_completion_checked", report)?;
+                self.action = None;
+                self.phase = PipelinePhase::NeedsUserEdit {
+                    reason: "hole_completion_context_limit".into(),
+                };
+                return self.event(
+                    events,
+                    "needs_user_edit",
+                    json!({"reason":"hole_completion_context_limit"}),
+                );
+            }
+            Err(_) => return Err(ProtocolError::SchemaViolation),
+        };
         self.begin_llm(prompt, None, hole_ids, events)
     }
 
@@ -918,6 +951,266 @@ impl PipelineSnapshot {
                 self.event(events, "needs_user_edit", payload)
             }
         }
+    }
+
+    fn hole_response(
+        &mut self,
+        response: &str,
+        hole_ids: &[String],
+        spent_ms: u64,
+        events: &mut Vec<PipelineEvent>,
+    ) -> Result<(), ProtocolError> {
+        let base = self.compilation()?;
+        let lock = base
+            .compiler_lock
+            .as_ref()
+            .ok_or(ProtocolError::InternalInvariant)?;
+        let prompt: LlmPrompt = serde_json::from_value(
+            self.action
+                .as_ref()
+                .ok_or(ProtocolError::InvalidState)?
+                .payload["prompt"]
+                .clone(),
+        )
+        .map_err(|_| ProtocolError::InvalidState)?;
+        if prompt.base_source_digest.as_deref() != Some(&lock.visible_source_digest)
+            || prompt.base_compiler_lock_digest.as_deref() != Some(&lock.full_digest)
+        {
+            return Err(ProtocolError::StaleResult);
+        }
+        let mut holes = hole_ids
+            .iter()
+            .map(|id| {
+                base.holes
+                    .iter()
+                    .find(|hole| &hole.id == id)
+                    .ok_or(ProtocolError::StaleResult)
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        holes.sort_by_key(|hole| (hole.allowed_span.start_byte, hole.allowed_span.end_byte));
+        let mut results = holes
+            .iter()
+            .map(|hole| json!({"hole_id":hole.id,"status":"rejected","reason":"schema_violation"}))
+            .collect::<Vec<_>>();
+        let mut patch = HolePatchResponse {
+            schema_id: inku_ddl::VISIBLE_DDL_PATCH_SCHEMA_ID.into(),
+            base_source_digest: lock.visible_source_digest.clone(),
+            base_compiler_lock_digest: lock.full_digest.clone(),
+            edits: vec![],
+        };
+        let parsed = if prompt.prompt_id == HOLE_COMPLETION_PROMPT_ID {
+            parse_hole_completion_response(response, holes.len(), self.config.prompt_limits).map(|response| {
+                for result in response.results {
+                    let index = result.id()[1..].parse::<usize>().expect("verified local ID") - 1;
+                    let hole = holes[index];
+                    match result {
+                        HoleCompletionResult::Proposed { replacement, .. } => {
+                            patch.edits.push(HolePatchEditResponse { hole_id:hole.id.clone(), allowed_span:hole.allowed_span.into(), expected_range_digest:hole.expected_range_digest.clone(), replacement });
+                            results[index] = json!({"hole_id":hole.id,"status":"validated","reason":null});
+                        }
+                        HoleCompletionResult::Unresolved { reason, .. } => {
+                            results[index] = json!({"hole_id":hole.id,"status":"unresolved","reason":reason});
+                        }
+                    }
+                }
+            })
+        } else if prompt.prompt_id == LEGACY_HOLE_COMPLETION_PROMPT_ID {
+            // An already persisted v2 request keeps its exact wire contract. Never
+            // try this decoder after a v3 parse or semantic failure.
+            parse_hole_patch_response(response, self.config.prompt_limits).and_then(|legacy| {
+                let expected = hole_ids.iter().collect::<BTreeSet<_>>();
+                let actual = legacy
+                    .edits
+                    .iter()
+                    .map(|edit| &edit.hole_id)
+                    .collect::<BTreeSet<_>>();
+                if legacy.schema_id != inku_ddl::VISIBLE_DDL_PATCH_SCHEMA_ID
+                    || actual != expected
+                    || actual.len() != legacy.edits.len()
+                {
+                    return Err(crate::prompts::PromptError::ResponseIdentityMismatch {
+                        field: "edits.hole_id",
+                    });
+                }
+                patch = legacy;
+                for result in &mut results {
+                    result["status"] = json!("validated");
+                    result["reason"] = serde_json::Value::Null;
+                }
+                Ok(())
+            })
+        } else {
+            return Err(ProtocolError::SchemaViolation);
+        };
+        if parsed.is_err() {
+            let report = json!({"results":results,"base_source_digest":lock.visible_source_digest,"base_compiler_lock_digest":lock.full_digest});
+            self.hole_completion_check = Some(report.clone());
+            self.event(events, "hole_completion_checked", report)?;
+            return self.failure(ProviderFailure::SchemaViolation, spent_ms, events);
+        }
+        patch.edits.sort_by_key(|edit| edit.allowed_span.start_byte);
+        let units = if prompt.prompt_id == HOLE_COMPLETION_PROMPT_ID {
+            crate::hole_completion::independent_units(&base, &holes)
+        } else {
+            vec![hole_ids.to_vec()]
+        };
+        let seed = self
+            .config
+            .compiler
+            .composition_seed()
+            .map_err(|_| ProtocolError::InvalidPolicy)?;
+        let limits = self
+            .config
+            .compiler
+            .macro_limits()
+            .map_err(|_| ProtocolError::InvalidPolicy)?;
+        let source_limit = self.config.prompt_limits.max_source_bytes;
+        let mut accepted = Vec::new();
+        let mut accepted_units = 0;
+        let mut candidate = None;
+        for unit in units {
+            let edits = patch
+                .edits
+                .iter()
+                .filter(|edit| unit.contains(&edit.hole_id))
+                .cloned()
+                .collect::<Vec<_>>();
+            if edits.len() != unit.len() {
+                for result in &mut results {
+                    if unit.iter().any(|id| result["hole_id"] == *id)
+                        && result["status"] == "validated"
+                    {
+                        result["status"] = json!("rejected");
+                        result["reason"] = json!("dependency_unresolved");
+                    }
+                }
+                continue;
+            }
+            let mut unit_patch = patch.clone();
+            unit_patch.edits = edits;
+            let size = unit_patch
+                .edits
+                .iter()
+                .fold(base.document.source().len(), |size, edit| {
+                    size.saturating_sub(
+                        edit.allowed_span
+                            .end_byte
+                            .saturating_sub(edit.allowed_span.start_byte),
+                    )
+                    .saturating_add(edit.replacement.len())
+                });
+            let checked = if size > source_limit {
+                Err(("source_limit", None))
+            } else {
+                let visible = unit_patch
+                    .clone()
+                    .into_visible_ddl_patch()
+                    .map_err(|_| ProtocolError::SchemaViolation)?;
+                validate_visible_ddl_patch_detailed(
+                    &base,
+                    &visible,
+                    &self.config.definitions,
+                    seed,
+                    limits,
+                )
+                .map_err(|failure| (failure.diagnostic.kind(), failure.hole_id))
+            };
+            match checked {
+                Ok(validated) => {
+                    accepted_units += 1;
+                    accepted.extend(unit_patch.edits);
+                    candidate = Some(validated);
+                }
+                Err((reason, failed_id)) => {
+                    for result in &mut results {
+                        if unit.iter().any(|id| result["hole_id"] == *id) {
+                            result["status"] = json!("rejected");
+                            result["reason"] = json!(if failed_id
+                                .as_ref()
+                                .is_some_and(|id| result["hole_id"] != *id)
+                            {
+                                "dependency_rejected"
+                            } else {
+                                reason
+                            });
+                        }
+                    }
+                }
+            }
+        }
+        accepted.sort_by_key(|edit| edit.allowed_span.start_byte);
+        patch.edits = accepted;
+        // Recompile the union once. Never search for alternate passing subsets.
+        if accepted_units > 1 {
+            let visible = patch
+                .clone()
+                .into_visible_ddl_patch()
+                .map_err(|_| ProtocolError::SchemaViolation)?;
+            let size = patch
+                .edits
+                .iter()
+                .fold(base.document.source().len(), |size, edit| {
+                    size.saturating_sub(
+                        edit.allowed_span
+                            .end_byte
+                            .saturating_sub(edit.allowed_span.start_byte),
+                    )
+                    .saturating_add(edit.replacement.len())
+                });
+            let checked = if size > source_limit {
+                Err("source_limit")
+            } else {
+                validate_visible_ddl_patch_detailed(
+                    &base,
+                    &visible,
+                    &self.config.definitions,
+                    seed,
+                    limits,
+                )
+                .map_err(|failure| failure.diagnostic.kind())
+            };
+            match checked {
+                Ok(validated) => candidate = Some(validated),
+                Err(reason) => {
+                    candidate = None;
+                    for result in &mut results {
+                        if result["status"] == "validated" {
+                            result["status"] = json!("rejected");
+                            result["reason"] = json!(reason);
+                        }
+                    }
+                }
+            }
+        }
+        let report = json!({"results":results,"base_source_digest":lock.visible_source_digest,"base_compiler_lock_digest":lock.full_digest});
+        self.hole_completion_check = Some(report.clone());
+        self.event(events, "hole_completion_checked", report)?;
+        let Some(candidate) = candidate.filter(|_| !patch.edits.is_empty()) else {
+            let detail = results
+                .iter()
+                .find_map(|result| result["reason"].as_str())
+                .unwrap_or("holes_unresolved");
+            return self.failure_with_detail(
+                ProviderFailure::SemanticViolation,
+                spent_ms,
+                Some(detail),
+                events,
+            );
+        };
+        let candidate = VisibleDocument::from_document(&candidate.document);
+        let proposal_digest = value_digest(
+            "inku.pipeline-visible-patch-proposal.v1",
+            &json!({"patch":patch,"candidate":candidate,"revision":DecimalU64::new(self.authority.revision())}),
+        )?;
+        self.event(events, "visible_patch_proposed", json!({"base":self.document,"candidate":candidate,"patch":patch,"proposal_digest":proposal_digest}))?;
+        self.action = None;
+        self.phase = PipelinePhase::AwaitingPatchApproval {
+            patch,
+            candidate,
+            proposal_digest,
+            base_revision: DecimalU64::new(self.authority.revision()),
+        };
+        Ok(())
     }
 
     fn llm_response(
@@ -1023,67 +1316,7 @@ impl PipelineSnapshot {
                 self.commit_document(candidate, next, "stage1_generated", events)
             }
             LlmStage::CompleteVisibleDdlHoles => {
-                let patch = match parse_hole_patch_response(&response, self.config.prompt_limits) {
-                    Ok(value) => value,
-                    Err(_) => {
-                        return self.failure(ProviderFailure::SchemaViolation, spent_ms, events);
-                    }
-                };
-                let visible_patch = match patch.clone().into_visible_ddl_patch() {
-                    Ok(patch) => patch,
-                    Err(_) => {
-                        return self.failure(ProviderFailure::SchemaViolation, spent_ms, events);
-                    }
-                };
-                if visible_patch
-                    .edits
-                    .iter()
-                    .any(|edit| !hole_ids.contains(&edit.hole_id))
-                {
-                    return self.failure(ProviderFailure::SemanticViolation, spent_ms, events);
-                }
-                let base = self.compilation()?;
-                let candidate = match validate_visible_ddl_patch(
-                    &base,
-                    &visible_patch,
-                    &self.config.definitions,
-                    self.config
-                        .compiler
-                        .composition_seed()
-                        .map_err(|_| ProtocolError::InvalidPolicy)?,
-                    self.config
-                        .compiler
-                        .macro_limits()
-                        .map_err(|_| ProtocolError::InvalidPolicy)?,
-                ) {
-                    Ok(candidate) => candidate,
-                    Err(error) => {
-                        return self.failure_with_detail(
-                            ProviderFailure::SemanticViolation,
-                            spent_ms,
-                            Some(error.kind()),
-                            events,
-                        );
-                    }
-                };
-                let candidate = VisibleDocument::from_document(&candidate.document);
-                let proposal_digest = value_digest(
-                    "inku.pipeline-visible-patch-proposal.v1",
-                    &json!({
-                        "patch": patch, "candidate": candidate, "revision": DecimalU64::new(self.authority.revision()),
-                    }),
-                )?;
-                self.event(events, "visible_patch_proposed", json!({
-                    "base": self.document, "candidate": candidate, "patch": patch, "proposal_digest": proposal_digest,
-                }))?;
-                self.action = None;
-                self.phase = PipelinePhase::AwaitingPatchApproval {
-                    patch,
-                    candidate,
-                    proposal_digest,
-                    base_revision: DecimalU64::new(self.authority.revision()),
-                };
-                Ok(())
+                self.hole_response(&response, &hole_ids, spent_ms, events)
             }
         }
     }
@@ -1313,6 +1546,7 @@ pub fn advance(
             phase: PipelinePhase::AuthoringStarted,
             action: None,
             delivery: None,
+            hole_completion_check: None,
             snapshot_digest: String::new(),
         };
         state.event(
@@ -1423,7 +1657,7 @@ impl PipelineSnapshot {
                 let PipelinePhase::AwaitingVisibleDdlCommit {
                     document,
                     authority,
-                    ..
+                    reason,
                 } = self.phase.clone()
                 else {
                     return Err(ProtocolError::StaleResult);
@@ -1465,7 +1699,11 @@ impl PipelineSnapshot {
                     "typed_ddl_parsed",
                     json!({"source_digest": document.source_digest(), "revision": revision}),
                 )?;
-                if let Some(lock) = delivery.compiler_lock.as_ref().filter(|lock| {
+                if reason == "user_approved_patch" {
+                    if let Some(report) = self.hole_completion_check.clone() {
+                        self.event(events, "hole_completion_checked", report)?;
+                    }
+                } else if let Some(lock) = delivery.compiler_lock.as_ref().filter(|lock| {
                     lock.get("hole_identities")
                         .and_then(serde_json::Value::as_array)
                         .is_some_and(|identities| !identities.is_empty())

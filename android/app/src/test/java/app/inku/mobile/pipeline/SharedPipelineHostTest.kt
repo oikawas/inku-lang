@@ -104,6 +104,10 @@ class SharedPipelineHostTest {
         assertEquals(1, requests.size)
         assertEquals("system", requests.single().systemInstruction)
         assertEquals("message", requests.single().prompt)
+        assertEquals(
+            JSONObject().put("type", "object").put("properties", JSONObject()).toString(),
+            requests.single().tool?.parametersJson,
+        )
         assertEquals(1_000L, requests.single().timeoutMs)
     }
 
@@ -367,7 +371,10 @@ class SharedPipelineHostTest {
                 "payload",
                 JSONObject().put(
                     "prompt",
-                    JSONObject().put("system", "system").put("message", "message"),
+                    JSONObject()
+                        .put("system", "system")
+                        .put("message", "message")
+                        .put("response_schema", JSONObject().put("type", "object").put("properties", JSONObject())),
                 ),
             )
 

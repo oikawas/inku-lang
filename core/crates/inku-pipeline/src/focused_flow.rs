@@ -15,7 +15,7 @@ use crate::core_boundary::{
 use crate::machine::{
     AuthoringInput, PipelineConfig, PipelineInput, PipelinePhase, PipelineSnapshot, StepOutput,
 };
-use crate::prompts::{HolePatchEditResponse, HolePatchResponse, PromptLimits};
+use crate::prompts::PromptLimits;
 use crate::protocol::{
     DecimalU64, EffectResult, Envelope, PROTOCOL_NAME, PROTOCOL_VERSION, ProviderFailure,
     RetryPolicy,
@@ -751,18 +751,13 @@ fn committed_ddl_and_approved_hole_patch_share_one_replayable_path() {
         validation_failed.delivery.as_ref(),
         Some(&current_safe_delivery)
     );
+    assert_eq!(
+        validation_failed.hole_completion_check.as_ref().unwrap()["results"][0]["reason"],
+        "schema_violation"
+    );
     let hole = base.holes.first().expect("known quantity hole").clone();
-    let unresolved_patch = HolePatchResponse {
-        schema_id: inku_ddl::VISIBLE_DDL_PATCH_SCHEMA_ID.into(),
-        base_source_digest: lock.visible_source_digest.clone(),
-        base_compiler_lock_digest: lock.full_digest.clone(),
-        edits: vec![HolePatchEditResponse {
-            hole_id: hole.id.clone(),
-            allowed_span: hole.allowed_span.into(),
-            expected_range_digest: hole.expected_range_digest.clone(),
-            replacement: "many square.".into(),
-        }],
-    };
+    let unresolved_patch =
+        json!({"results":[{"id":"h1","status":"proposed","replacement":"many square."}]});
     let unresolved = run(
         Some(&state),
         &envelope(
@@ -789,17 +784,15 @@ fn committed_ddl_and_approved_hole_patch_share_one_replayable_path() {
         unresolved.snapshot.delivery.as_ref(),
         Some(&current_safe_delivery)
     );
-    let patch = HolePatchResponse {
-        schema_id: inku_ddl::VISIBLE_DDL_PATCH_SCHEMA_ID.into(),
-        base_source_digest: lock.visible_source_digest.clone(),
-        base_compiler_lock_digest: lock.full_digest.clone(),
-        edits: vec![HolePatchEditResponse {
-            hole_id: hole.id,
-            allowed_span: hole.allowed_span.into(),
-            expected_range_digest: hole.expected_range_digest,
-            replacement: "8".into(),
-        }],
-    };
+    assert!(
+        unresolved
+            .events
+            .iter()
+            .any(|event| event.tag == "hole_completion_checked"
+                && event.payload["results"][0]["hole_id"] == hole.id
+                && event.payload["results"][0]["reason"] == "target_unresolved")
+    );
+    let patch = json!({"results":[{"id":"h1","status":"proposed","replacement":"8"}]});
     let proposed = envelope(
         Some(&state),
         PipelineInput::EffectResult {
@@ -936,6 +929,149 @@ fn committed_hole_with_local_diagnostics_still_requests_bounded_completion() {
         Some(2)
     );
     assert_eq!(lock["hole_identities"].as_array().map(Vec::len), Some(1));
+}
+
+#[test]
+fn independent_hole_results_keep_valid_subset_without_retry_after_ack() {
+    // One failure: an invalid second quantity used to discard the valid first
+    // edit. The same boundary must stay atomic for coordinated owners.
+    for (source, independent) in [
+        (
+            "ink wash ground. place one red circle at center. many square. many circle.",
+            true,
+        ),
+        (
+            "ink wash ground. place one red circle at center. many circles and many squares.",
+            false,
+        ),
+    ] {
+        let start = envelope(
+            None,
+            PipelineInput::Start {
+                variation_id: "partial-holes".into(),
+                authoring_nonce: "partial-holes-1".into(),
+                config: Box::new(config()),
+                authority: VariationAuthorityState::new_direct_ddl(),
+                authoring: AuthoringInput::DirectDdl {
+                    source: source.into(),
+                },
+            },
+        );
+        let pending = run(None, &start).snapshot;
+        let state = run(Some(&pending), &envelope(Some(&pending), ack(&pending))).snapshot;
+        let base = inku_ddl::compile_typed_ddl(
+            state.document.as_ref().unwrap().document().unwrap(),
+            &[],
+            Some(17),
+            config().compiler.macro_limits().unwrap(),
+        );
+        assert_eq!(base.holes.len(), 2, "{:?}", base.holes);
+        assert_eq!(
+            crate::hole_completion::independent_units(
+                &base,
+                &base.holes.iter().collect::<Vec<_>>()
+            )
+            .len(),
+            if independent { 2 } else { 1 }
+        );
+        let retained = state.delivery.clone();
+        let response = json!({"results":[
+            {"id":"h1","status":"proposed","replacement":"8"},
+            {"id":"h2","status":"proposed","replacement":"many"}
+        ]});
+        let checked = run(
+            Some(&state),
+            &envelope(
+                Some(&state),
+                PipelineInput::EffectResult {
+                    result: EffectResult::VisibleDdlHolePatchGenerated {
+                        identity: state.action.as_ref().unwrap().identity.clone(),
+                        response: response.to_string(),
+                        elapsed_ms: DecimalU64::new(20),
+                    },
+                },
+            ),
+        );
+        assert_eq!(checked.snapshot.delivery, retained);
+        let report = checked
+            .events
+            .iter()
+            .find(|event| event.tag == "hole_completion_checked")
+            .unwrap();
+        assert_eq!(report.payload["results"][1]["status"], "rejected");
+        if independent {
+            assert_eq!(
+                report.payload["results"][0]["status"], "validated",
+                "{:?}",
+                report.payload
+            );
+            let PipelinePhase::AwaitingPatchApproval {
+                patch,
+                proposal_digest,
+                ..
+            } = &checked.snapshot.phase
+            else {
+                panic!("{:?}; {:?}", checked.snapshot.phase, report.payload)
+            };
+            assert_eq!(patch.edits.len(), 1);
+            let approved = run(
+                Some(&checked.snapshot),
+                &envelope(
+                    Some(&checked.snapshot),
+                    PipelineInput::ApprovePatch {
+                        expected_revision: DecimalU64::new(checked.snapshot.authority.revision()),
+                        proposal_digest: proposal_digest.clone(),
+                    },
+                ),
+            )
+            .snapshot;
+            let committed = run(Some(&approved), &envelope(Some(&approved), ack(&approved)));
+            assert!(
+                committed.snapshot.action.is_none(),
+                "remaining holes must not auto-retry after partial ACK"
+            );
+            assert!(
+                committed
+                    .snapshot
+                    .delivery
+                    .as_ref()
+                    .unwrap()
+                    .score
+                    .is_some()
+            );
+            assert!(
+                committed
+                    .snapshot
+                    .document
+                    .as_ref()
+                    .unwrap()
+                    .source
+                    .contains("8 square")
+            );
+            assert!(
+                committed
+                    .snapshot
+                    .document
+                    .as_ref()
+                    .unwrap()
+                    .source
+                    .contains("many circle")
+            );
+            assert!(
+                committed
+                    .events
+                    .iter()
+                    .any(|event| event.tag == "hole_completion_checked")
+            );
+        } else {
+            assert_eq!(report.payload["results"][0]["status"], "rejected");
+            assert!(matches!(
+                checked.snapshot.phase,
+                PipelinePhase::NeedsUserEdit { .. }
+            ));
+            assert!(checked.snapshot.action.is_none());
+        }
+    }
 }
 
 #[test]

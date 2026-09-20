@@ -1135,7 +1135,7 @@ fn hole_response_schema(
             "base_compiler_lock_digest": { "const": base_compiler_lock_digest },
             "edits": {
                 "type": "array",
-                "minItems": 1,
+                "minItems": holes.len(),
                 "maxItems": holes.len(),
                 "items": { "oneOf": variants }
             }
@@ -1318,7 +1318,7 @@ const HOLE_SYSTEM_JA: &str = r#"あなたは inku の可視DDL hole patch提案�
 
 source_regionsはcommit済みDDLだが、有限文法外の語句や活用を含みうる。未受理の語句をそのまま写さず、region全体の対象・属性・関係から主旨を読み、明示事実を失わずに最も近いaccepted語彙とcompiler文法へ正規化する。個別単語の字面だけで置換しない。基本形は「背景を<色>で埋める。」「面: <おもて名詞>。」「<属性><図形>を<位置・配置><置く・並べる・引く・散らす・埋める・敷き詰める>。」とする。
 
-Replacementは対応するtyped_factsのsource occurrenceと個数を保持した、compilerが受理できる完結した節にする。unresolved_clauseはbackgroundまたはgroundを成立させるか、一つの描画headとactionをともに成立させる。typed_factsに描画headまたはactionがある場合はbackground／groundだけで済ませず、headとactionを同じ実行可能な描画命令へ結び付けた独立節を必ず残す。それ以外はselected_holesのexpected_ownerを成立させる。
+Replacementは対応するtyped_factsのsource occurrenceと個数を保持した、compilerが受理できる完結した節にする。unresolved_clauseはbackgroundまたはgroundを成立させるか、一つの描画headとactionをともに成立させる。typed_factsに描画headまたはactionがある場合はbackground／groundだけで済ませず、headとactionを同じ実行可能な描画命令へ結び付けた独立節を必ず残す。同じownerの修飾語が複数あり一つの明示総数を共有する場合は、修飾語だけを「AとB」で結ばず、各修飾語をheadまで含む完全なmemberにして「<member A>と<member B>を交互に<総数>並べる」の有限文法で一つの総数へ結ぶ。それ以外はselected_holesのexpected_ownerを成立させる。
 
 hole ID、range、range digest、source digest、compiler lock digestをそのまま返す。allowed_spanがsource全体でも、その範囲の全文をedit.replacementだけへ返し、別のwhole document fieldは返さない。選択されていない範囲、明示済みの意味、MacroDefinition、Score、typed-only fieldを変更・生成しない。記述入力を推測せず、思考過程、説明を返さない。指定されたpatch JSONだけを返す。"#;
 
@@ -1326,7 +1326,7 @@ const HOLE_SYSTEM_EN: &str = r#"You propose visible inku DDL hole patches. Use o
 
 source_regions contain committed DDL, but may include phrases or inflections outside the finite grammar. Do not copy an unaccepted phrase unchanged. Read the region's subjects, attributes, and relations together, preserve its explicit facts, and normalize its intent to the nearest accepted vocabulary and compiler grammar instead of substituting words in isolation. Use the basic forms "fill the background with <color>.", "Surface: <surface noun>.", and "<action> <attributes><shape> <position or arrangement>."
 
-Make each replacement a complete compiler-accepted clause that preserves the source occurrences and counts in its typed_facts. An unresolved_clause must establish background or ground, or both one drawing head and an action. If typed_facts contain a drawing head or action, background or ground alone is insufficient: retain a separate executable drawing clause that binds the head and action to the same instruction. Other holes must establish the expected_owner in selected_holes.
+Make each replacement a complete compiler-accepted clause that preserves the source occurrences and counts in its typed_facts. An unresolved_clause must establish background or ground, or both one drawing head and an action. If typed_facts contain a drawing head or action, background or ground alone is insufficient: retain a separate executable drawing clause that binds the head and action to the same instruction. When multiple modifiers with the same owner share one explicit total, do not coordinate bare modifiers as "A and B"; make each a complete member through its head and bind the single total with the finite form "Line up <total>, alternating <member A> and <member B>." Other holes must establish the expected_owner in selected_holes.
 
 Return each hole ID, range, range digest, source digest, and compiler lock digest unchanged. If an allowed_span covers the whole source, return all text for that selected range only as edit.replacement; do not return a separate whole-document field. Do not change an unselected range or explicit meaning, and do not generate MacroDefinition data, a Score, typed-only fields, a description, chain of thought, or explanation. Return only the specified patch JSON."#;
 
@@ -1437,6 +1437,14 @@ mod tests {
         let prompt = build_hole_completion_prompt(&compilation, &selected, LIMITS).unwrap();
         assert_eq!(prompt.action_name, "complete_visible_ddl_holes");
         assert_eq!(
+            prompt.response_schema["properties"]["edits"]["minItems"],
+            holes.len()
+        );
+        assert_eq!(
+            prompt.response_schema["properties"]["edits"]["maxItems"],
+            holes.len()
+        );
+        assert_eq!(
             prompt.response_schema["properties"]["edits"]["items"]["oneOf"][0]["properties"]["allowed_span"]
                 ["properties"]["start_byte"]["const"],
             holes[0].allowed_span.start_byte
@@ -1484,6 +1492,7 @@ mod tests {
         assert!(prompt.system.contains("一つの描画headとactionをともに成立"));
         assert!(prompt.system.contains("background／groundだけで済ませず"));
         assert!(prompt.system.contains("個別単語の字面だけで置換しない"));
+        assert!(prompt.system.contains("各修飾語をheadまで含む完全なmember"));
         assert!(prompt.system.contains("allowed_spanがsource全体でも"));
     }
 

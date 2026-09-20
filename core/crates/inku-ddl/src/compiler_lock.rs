@@ -760,6 +760,8 @@ fn project_deliveries(
     let unresolved_clause_spans = unresolved_clause_spans(semantic_document);
     let patchable_clause_spans =
         patchable_unresolved_clause_spans(semantic_document, &unresolved_clause_spans);
+    let deferred_continuation_clause_spans =
+        deferred_continuation_clause_spans(semantic_document, &patchable_clause_spans);
     let exclusive_continuation_claims =
         exclusive_continuation_claim_groups(&semantic_document.continuation_issues);
 
@@ -1061,6 +1063,10 @@ fn project_deliveries(
                             occurrence.source().span,
                             &unresolved_clause_spans,
                         )
+                        && !span_is_in_clause(
+                            occurrence.source().span,
+                            &deferred_continuation_clause_spans,
+                        )
                 }) {
                     add_conflict(
                         &mut projection,
@@ -1158,6 +1164,10 @@ fn project_deliveries(
                         && !span_is_in_clause(
                             occurrence.term.provenance.source.span,
                             &unresolved_clause_spans,
+                        )
+                        && !span_is_in_clause(
+                            occurrence.term.provenance.source.span,
+                            &deferred_continuation_clause_spans,
                         )
                 }) {
                     add_conflict(
@@ -1376,7 +1386,11 @@ fn project_deliveries(
             ),
         }
     }
-    project_continuation_issues(&semantic_document.continuation_issues, &mut projection);
+    project_continuation_issues(
+        &semantic_document.continuation_issues,
+        &deferred_continuation_clause_spans,
+        &mut projection,
+    );
 
     let covered_spans = projection
         .deliveries
@@ -1481,6 +1495,39 @@ fn span_is_in_clause(span: SourceSpan, clauses: &[SourceSpan]) -> bool {
         .any(|clause| clause.start_byte <= span.start_byte && span.end_byte <= clause.end_byte)
 }
 
+fn deferred_continuation_clause_spans(
+    semantic_document: &SemanticDocumentResult,
+    patchable_clause_spans: &[SourceSpan],
+) -> Vec<SourceSpan> {
+    semantic_document
+        .continuation_issues
+        .iter()
+        .filter(|issue| {
+            matches!(
+                &issue.causal_provenance,
+                SemanticIssueCausalProvenance::UpstreamDiagnostics(causes)
+                    if !causes.is_empty()
+                        && causes.iter().all(|cause| {
+                            span_is_in_clause(cause.span, patchable_clause_spans)
+                        })
+            )
+        })
+        .filter_map(|issue| {
+            semantic_document
+                .instruction_association
+                .association
+                .clause_stream
+                .clauses
+                .iter()
+                .find(|clause| {
+                    clause.span.start_byte <= issue.marker.span.start_byte
+                        && issue.predicate_span.end_byte <= clause.span.end_byte
+                })
+                .map(|clause| clause.span)
+        })
+        .collect()
+}
+
 const fn neutral_diagnostic_kind_key(kind: NeutralDiagnosticKind) -> &'static str {
     match kind {
         NeutralDiagnosticKind::Hole => "hole",
@@ -1489,7 +1536,11 @@ const fn neutral_diagnostic_kind_key(kind: NeutralDiagnosticKind) -> &'static st
     }
 }
 
-fn project_continuation_issues(issues: &[SemanticContinuationIssue], projection: &mut Projection) {
+fn project_continuation_issues(
+    issues: &[SemanticContinuationIssue],
+    deferred_clause_spans: &[SourceSpan],
+    projection: &mut Projection,
+) {
     let exclusive_claims = exclusive_continuation_claim_groups(issues);
     let exclusive_issue_indices = exclusive_claims
         .values()
@@ -1498,7 +1549,9 @@ fn project_continuation_issues(issues: &[SemanticContinuationIssue], projection:
         .collect::<Vec<_>>();
     let mut groups = BTreeMap::<(usize, usize), ContinuationIssueProjection>::new();
     for (issue_index, issue) in issues.iter().enumerate() {
-        if exclusive_issue_indices.contains(&issue_index) {
+        if exclusive_issue_indices.contains(&issue_index)
+            || span_is_in_clause(issue.marker.span, deferred_clause_spans)
+        {
             continue;
         }
         let group = groups

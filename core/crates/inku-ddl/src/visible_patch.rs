@@ -486,10 +486,12 @@ fn target_resolution_failure(
         }
         let required = typed_fact_counts(base, hole.span);
         let delivered = typed_fact_counts(candidate, range);
-        if required
-            .iter()
-            .any(|(fact, count)| delivered.get(fact).copied().unwrap_or_default() < *count)
-        {
+        let reference_facts = reclassified_reference_facts(base, hole.span, candidate, range);
+        if required.iter().any(|(fact, count)| {
+            delivered.get(fact).copied().unwrap_or_default()
+                + reference_facts.get(fact).copied().unwrap_or_default()
+                < *count
+        }) {
             return Some(VisiblePatchDiagnostic::EstablishedFactChanged);
         }
         let required_associations = resolved_association_counts(base, hole.span);
@@ -552,6 +554,108 @@ fn source_has_drawing_fact(compilation: &TypedDdlCompilation, range: SourceSpan)
                         }
                 })
         })
+}
+
+/// A bare lexical head in an ambiguous clause may name a reference target,
+/// rather than another drawable. Retain its primitive as a compiler-resolved
+/// previous target, without relaxing any established owner association.
+fn reclassified_reference_facts(
+    base: &TypedDdlCompilation,
+    base_range: SourceSpan,
+    candidate: &TypedDdlCompilation,
+    candidate_range: SourceSpan,
+) -> BTreeMap<String, usize> {
+    let mut facts = BTreeMap::new();
+    let (Some(before), Some(after)) = (&base.semantic_document, &candidate.semantic_document)
+    else {
+        return facts;
+    };
+    if [before, after].iter().any(|semantic| {
+        !semantic.ast.coordinated_head_groups.is_empty()
+            || !semantic.ast.group_predicates.is_empty()
+            || !semantic.ast.continuations.is_empty()
+            || !semantic.continuation_issues.is_empty()
+            || !semantic
+                .instruction_association
+                .coordination_issues
+                .is_empty()
+            || !semantic.instruction_association.relation_issues.is_empty()
+            || !semantic
+                .instruction_association
+                .association
+                .ast
+                .sequences
+                .is_empty()
+    }) || before.ast.instructions.iter().any(|instruction| {
+        instruction.relation.is_some()
+            || instruction.fill_target.is_some()
+            || instruction.sequence.is_some()
+    }) || after.ast.instructions.iter().any(|instruction| {
+        instruction.fill_target.is_some()
+            || instruction.sequence.is_some()
+            || instruction
+                .relation
+                .as_ref()
+                .is_some_and(|relation| !span_within(relation.provenance.span, candidate_range))
+    }) {
+        return facts;
+    }
+    let mut reference_targets = after
+        .ast
+        .instructions
+        .iter()
+        .enumerate()
+        .filter_map(|(index, instruction)| {
+            let relation = instruction.relation.as_ref()?;
+            if !span_within(relation.provenance.span, candidate_range)
+                || relation.reference != crate::SemanticPreviousReference::PreviousOne
+            {
+                return None;
+            }
+            let target = after.ast.instructions.get(index.checked_sub(1)?)?;
+            (target.entity.head.source().span.end_byte <= candidate_range.start_byte)
+                .then(|| semantic_head_value(target))
+        })
+        .collect::<Vec<_>>();
+    for instruction in &before.ast.instructions {
+        let source = instruction.entity.head.source();
+        if !span_within(source.span, base_range)
+            || !matches!(instruction.entity.head, crate::SemanticHead::Primitive(_))
+            || instruction.action.is_some()
+            || instruction.position.is_some()
+            || instruction.layout_direction.is_some()
+            || instruction.relation.is_some()
+            || instruction.fill_target.is_some()
+            || instruction.sequence.is_some()
+            || !before.instruction_association.issues.iter().any(|issue| {
+                issue.region_index == source.region_index
+                    && issue.kind == crate::SemanticInstructionIssueKind::AmbiguousActionOwnership
+            })
+        {
+            continue;
+        }
+        let mut associations = BTreeMap::new();
+        record_entity_associations(
+            &mut associations,
+            &Value::Null,
+            instruction,
+            SourceSpan {
+                start_byte: 0,
+                end_byte: base.document.source().len(),
+            },
+        );
+        if !associations.is_empty() {
+            continue;
+        }
+        let head = semantic_head_value(instruction);
+        if let Some(index) = reference_targets.iter().position(|target| *target == head) {
+            reference_targets.remove(index);
+            for (fact, count) in typed_fact_counts(base, source.span) {
+                *facts.entry(fact).or_default() += count;
+            }
+        }
+    }
+    facts
 }
 
 fn candidate_has_drawable_instruction(

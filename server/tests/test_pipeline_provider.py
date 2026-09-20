@@ -96,3 +96,106 @@ def test_missing_credentials_keep_only_safe_failure_detail(monkeypatch):
     assert result["failure"] == "provider_rejected"
     assert provider.failure_detail == "credentials_unavailable"
     assert "raw secret marker" not in repr(result)
+
+
+def test_gemini_forces_one_schema_bound_function_call_with_minimal_thinking(monkeypatch):
+    monkeypatch.setattr(
+        "inku_server.pipeline_provider.provider_for_model",
+        lambda *args, **kwargs: ("gemini", "gemma-4-31b-it"),
+    )
+    monkeypatch.setattr(
+        "inku_server.pipeline_provider.connection_for",
+        lambda *args: {
+            "id": "gemini",
+            "kind": "gemini",
+            "base_url": "https://generativelanguage.invalid",
+            "api_key": "test-only",
+            "requires_api_key": True,
+        },
+    )
+    seen = []
+
+    async def request(value):
+        seen.append(value)
+        return httpx.Response(
+            200,
+            json={
+                "candidates": [{
+                    "content": {"parts": [{"functionCall": {
+                        "name": "submit_pipeline_response",
+                        "args": {
+                            "schema_id": "inku.visible-ddl-patch.v1",
+                            "edits": [{
+                                "hole_id": "hole-1",
+                                "replacement": "青い円を描く。",
+                            }],
+                        },
+                    }}]}
+                }]
+            },
+        )
+
+    provider = SingleAttemptProvider(
+        ProviderOptions({}, "gemini:gemma-4-31b-it", "fixture", 256, 8192),
+        transport=httpx.MockTransport(request),
+    )
+    action = _action()
+    action["tag"] = "complete_visible_ddl_holes"
+    action["payload"]["prompt"]["action_name"] = "complete_visible_ddl_holes"
+    action["payload"]["prompt"]["response_schema"] = {
+        "type": "object",
+        "additionalProperties": False,
+        "required": ["schema_id", "edits"],
+        "properties": {
+            "schema_id": {"const": "inku.visible-ddl-patch.v1"},
+            "edits": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 1,
+                "items": {
+                    "oneOf": [{
+                        "type": "object",
+                        "required": ["hole_id", "replacement"],
+                        "properties": {
+                            "hole_id": {"const": "hole-1"},
+                            "replacement": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 4096,
+                            },
+                        },
+                    }]
+                },
+            },
+        },
+    }
+
+    result = provider(action)
+
+    assert result["tag"] == "visible_ddl_hole_patch_generated"
+    assert json.loads(result["response"]) == {
+        "schema_id": "inku.visible-ddl-patch.v1",
+        "edits": [{"hole_id": "hole-1", "replacement": "青い円を描く。"}],
+    }
+    assert len(seen) == 1
+    request_body = json.loads(seen[0].content)
+    declaration = request_body["tools"][0]["functionDeclarations"][0]
+    assert declaration["name"] == "submit_pipeline_response"
+    projected = declaration["parametersJsonSchema"]
+    assert projected["properties"]["schema_id"] == {
+        "enum": ["inku.visible-ddl-patch.v1"]
+    }
+    assert projected["properties"]["edits"]["items"]["oneOf"][0]["properties"][
+        "replacement"
+    ] == {
+        "type": "string",
+    }
+    assert request_body["toolConfig"] == {
+        "functionCallingConfig": {
+            "mode": "ANY",
+            "allowedFunctionNames": ["submit_pipeline_response"],
+        }
+    }
+    assert request_body["generationConfig"]["thinkingConfig"] == {
+        "thinkingLevel": "minimal"
+    }

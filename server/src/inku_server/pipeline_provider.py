@@ -20,6 +20,55 @@ from .model_settings import connection_for, provider_for_model
 from .provider_limits import provider_slot
 
 
+_GEMINI_JSON_SCHEMA_KEYS = {
+    "$anchor",
+    "$defs",
+    "$id",
+    "$ref",
+    "additionalProperties",
+    "anyOf",
+    "description",
+    "enum",
+    "format",
+    "items",
+    "maxItems",
+    "maximum",
+    "minItems",
+    "minimum",
+    "oneOf",
+    "prefixItems",
+    "properties",
+    "propertyOrdering",
+    "required",
+    "title",
+    "type",
+}
+
+
+def _gemini_json_schema(schema: dict[str, Any]) -> dict[str, Any]:
+    """Project core JSON Schema into Gemini's supported transport subset."""
+
+    def project(value: Any, *, named_schemas: bool = False) -> Any:
+        if isinstance(value, list):
+            return [project(item) for item in value]
+        if not isinstance(value, dict):
+            return value
+        if named_schemas:
+            return {name: project(item) for name, item in value.items()}
+        projected = {}
+        for key, item in value.items():
+            if key == "const":
+                projected["enum"] = [item]
+            elif key in _GEMINI_JSON_SCHEMA_KEYS:
+                projected[key] = project(item, named_schemas=key in {"$defs", "properties"})
+        return projected
+
+    result = project(schema)
+    if not isinstance(result, dict) or result.get("type") != "object":
+        raise ValueError("Gemini function schema must describe an object")
+    return result
+
+
 @dataclass(frozen=True)
 class ProviderOptions:
     settings: dict[str, Any]
@@ -143,7 +192,18 @@ class SingleAttemptProvider:
             headers["x-goog-api-key"] = key
             body = {"systemInstruction": {"parts": [{"text": prompt["system"]}]},
                     "contents": [{"role": "user", "parts": [{"text": prompt["message"]}]}],
-                    "generationConfig": {"maxOutputTokens": self.options.max_tokens}}
+                    "generationConfig": {
+                        "maxOutputTokens": self.options.max_tokens,
+                        "thinkingConfig": {"thinkingLevel": "minimal"},
+                    },
+                    "tools": [{"functionDeclarations": [{
+                        "name": response_name,
+                        "description": "Submit the requested pipeline response.",
+                        "parametersJsonSchema": _gemini_json_schema(prompt["response_schema"]),
+                    }]}],
+                    "toolConfig": {"functionCallingConfig": {
+                        "mode": "ANY", "allowedFunctionNames": [response_name],
+                    }}}
         else:
             raise ValueError("unsupported provider kind")
         # asyncio's deadline covers connect, body streaming and decoding as one
@@ -169,6 +229,15 @@ class SingleAttemptProvider:
                         text = message.get("content")
                 elif kind == "anthropic":
                     text = "\n".join(block["text"] for block in data["content"] if block["type"] == "text")
+                elif kind == "gemini":
+                    calls = [part["functionCall"] for part in data["candidates"][0]["content"]["parts"]
+                             if "functionCall" in part]
+                    if len(calls) != 1 or calls[0]["name"] != response_name:
+                        raise TypeError("provider returned an unexpected function call")
+                    arguments = calls[0].get("args")
+                    if not isinstance(arguments, dict):
+                        raise TypeError("provider returned invalid function arguments")
+                    text = json.dumps(arguments, ensure_ascii=False, separators=(",", ":"))
                 else:
                     text = "\n".join(part["text"] for part in data["candidates"][0]["content"]["parts"] if "text" in part)
                 if not isinstance(text, str) or not text:

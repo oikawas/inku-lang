@@ -16,6 +16,8 @@
 
 有限文法外の語を含んでもexactな描画head、ground、またはbackground anchorを持つclauseは、clause全体をbounded known-holeとして既存Stage 2へ渡せるようにした。要求は文書全体ではなく各holeの最小clause、確定済みtyped fact、有限Saijiki語彙、lock／range identityだけを持つ。Patch可能な上流holeだけに遮られた後続continuationは、診断を再compileまで保留して後続clauseを要求や書換え範囲へ加えない。Provider候補は再compileし、確定factの同一性と個数を保って描画ownerが成立した場合だけ可視patch候補とする。個別の未知語alias、追加LLM段、Score生成、選択外sourceの書換えは加えていない。
 
+Gemini API経路は共有coreの応答schemaを一つの強制function callとして送り、Gemma 4のthinkingを最小にする。Geminiが受理するJSON Schema subsetへtransport表現だけを射影し、`const`は同値な単一`enum`へ置き換える。返された引数は従来どおり共有coreが完全なschemaとcompiler lockで検証する。Hostは自動再試行せず、自由テキストや別functionを補完結果として採用しない。
+
 共有JSON境界では浮動小数のexact round tripも有効にする。Python hostがsnapshotを再serializeしてもScore内の数値とdigestをRustが同一に復元し、正常なrender stepをstaleとして拒否しない。
 
 ### 2026-09-19 — Stage 1の実測時間予算と失敗診断を分離

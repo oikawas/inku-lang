@@ -16,6 +16,8 @@ Successful Compose and Paint responses now expose the Rust delivery's `compiler_
 
 A clause containing words outside the finite grammar can now enter the existing Stage 2 as one bounded known hole when it has an exact drawing head, ground, or background anchor. Its request carries the smallest clause for each hole, established typed facts, finite Saijiki vocabulary, and lock/range identities instead of the whole document. A following continuation blocked only by a patchable upstream hole defers that diagnostic until recompilation without adding the following clause to the request or rewrite range. The provider candidate is recompiled and becomes a visible patch candidate only when it retains the identity and count of established facts and produces a drawable owner. This adds no per-word alias, extra LLM stage, Score generation, or rewrite of unselected source.
 
+The Gemini API path sends the shared core's response schema as one forced function call and sets Gemma 4 thinking to minimal. Only the transport representation is projected to Gemini's accepted JSON Schema subset; `const` becomes an equivalent single-value `enum`. The returned arguments still pass the full shared-core schema and compiler-lock validation. The host does not retry automatically and does not accept free text or another function as a completion result.
+
 The shared JSON boundary also enables exact floating-point round trips. A snapshot serialized by a Python host therefore retains the same Score numbers and digest when Rust reads it again, instead of rejecting a valid render step as stale.
 
 ### 2026-09-19 — Separate the measured Stage 1 time budget and failure diagnostic

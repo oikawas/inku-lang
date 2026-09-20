@@ -900,6 +900,45 @@ fn committed_ddl_and_approved_hole_patch_share_one_replayable_path() {
 }
 
 #[test]
+fn committed_hole_with_local_diagnostics_still_requests_bounded_completion() {
+    let mut pipeline_config = config();
+    pipeline_config.language = inku_ddl::ResolvedInstructionLanguage::Ja;
+    let start = envelope(
+        None,
+        PipelineInput::Start {
+            variation_id: "mixed-hole-diagnostic".into(),
+            authoring_nonce: "mixed-hole-diagnostic-1".into(),
+            config: Box::new(pipeline_config),
+            authority: VariationAuthorityState::new_direct_ddl(),
+            authoring: AuthoringInput::DirectDdl {
+                source: "出力: 黒い背景に、粗筆の黒い四角を中央に置く。面: 粗く塗りつぶす。".into(),
+            },
+        },
+    );
+    let pending = run(None, &start).snapshot;
+    let committed = envelope(Some(&pending), ack(&pending));
+    let state = run(Some(&pending), &committed).snapshot;
+
+    assert_eq!(
+        state.action.as_ref().map(|action| action.tag.as_str()),
+        Some("complete_visible_ddl_holes")
+    );
+    let lock = state
+        .delivery
+        .as_ref()
+        .and_then(|delivery| delivery.compiler_lock.as_ref())
+        .expect("mixed compilation retains its compiler lock");
+    assert_eq!(lock["state"], "blocked_diagnostic");
+    assert_eq!(
+        lock["blocking_diagnostic_identities"]
+            .as_array()
+            .map(Vec::len),
+        Some(2)
+    );
+    assert_eq!(lock["hole_identities"].as_array().map(Vec::len), Some(1));
+}
+
+#[test]
 fn host_json_float_roundtrip_preserves_snapshot_number() {
     let parsed: f64 = serde_json::from_str("108.58661719879423").unwrap();
     assert_eq!(parsed.to_bits(), 108.58661719879423_f64.to_bits());

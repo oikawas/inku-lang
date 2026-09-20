@@ -60,7 +60,7 @@ pub(crate) fn project_compilation_for_execution(
         || compilation
             .blocking_diagnostics
             .iter()
-            .any(|diagnostic| stops_all_execution(&diagnostic.kind, diagnostic.span))
+            .any(|diagnostic| diagnostic.stops_all_execution())
     {
         return ExecutionProjectionResult::Stopped(stopped_diagnostics(compilation));
     }
@@ -699,28 +699,6 @@ pub(crate) fn stopped_diagnostics(
         });
     }
     diagnostics
-}
-
-fn stops_all_execution(kind: &str, span: Option<crate::SourceSpan>) -> bool {
-    span.is_none()
-        || matches!(
-            kind,
-            "invalid_expansion_limits"
-                | "clause_stream_integrity"
-                | "missing_canonical_semantic_identity"
-                | "coordination_marker_delivery_integrity"
-                | "continuation_claim_owner_integrity"
-                | "missing_continuation_original_instruction"
-                | "expansion_invocation_budget"
-                | "expansion_total_node_budget"
-                | "missing_derived_seed"
-                | "duplicate_derived_seed"
-                | "mismatched_derived_seed"
-                | "expansion_definition_ownership"
-                | "expansion_binding_ownership"
-                | "expansion_target_ownership"
-                | "expansion_provenance_ownership"
-        )
 }
 
 fn macro_or_instruction_unit(

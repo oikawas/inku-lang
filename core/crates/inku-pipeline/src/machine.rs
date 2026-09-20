@@ -5,7 +5,7 @@ use std::collections::BTreeMap;
 use inku_ddl::{
     CompilerLockState, MacroDefinition, MacroLock, NormalizedDdlDocument,
     ResolvedInstructionLanguage, TypedDdlCompilation, compile_typed_ddl,
-    validate_visible_ddl_patch,
+    validate_visible_ddl_patch, visible_ddl_patch_available,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -808,11 +808,7 @@ impl PipelineSnapshot {
             return Err(ProtocolError::CompatibilityRequired);
         }
         let base = self.compilation()?;
-        let lock = base
-            .compiler_lock
-            .as_ref()
-            .ok_or(ProtocolError::SemanticViolation)?;
-        if lock.state != CompilerLockState::IncompleteKnownHole || hole_ids.is_empty() {
+        if !visible_ddl_patch_available(&base) || hole_ids.is_empty() {
             return Err(ProtocolError::SemanticViolation);
         }
         let mut ids = std::collections::BTreeSet::new();
@@ -1470,8 +1466,9 @@ impl PipelineSnapshot {
                     json!({"source_digest": document.source_digest(), "revision": revision}),
                 )?;
                 if let Some(lock) = delivery.compiler_lock.as_ref().filter(|lock| {
-                    lock.get("state").and_then(serde_json::Value::as_str)
-                        == Some("incomplete_known_hole")
+                    lock.get("hole_identities")
+                        .and_then(serde_json::Value::as_array)
+                        .is_some_and(|identities| !identities.is_empty())
                 }) {
                     let hole_ids = lock
                         .get("hole_identities")

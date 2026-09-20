@@ -15,6 +15,7 @@ use inku_ddl::{
     ResolvedInstructionLanguage, SAIJIKI_ASSET_ID, SourceSpan, TYPED_DDL_COMPILER_LOCK_SCHEMA_ID,
     TypedDdlCompilation, TypedHole, VISIBLE_DDL_PATCH_SCHEMA_ID, VisibleDdlPatch,
     VisibleDdlPatchEdit, saijiki_asset_sha256_hex, saijiki_derived_projection,
+    visible_ddl_patch_available,
 };
 use inku_score::{CANVAS_FORMAT_REGISTRY_ID, canvas_format_registry_digest, lookup_canvas_format};
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
@@ -725,7 +726,7 @@ pub fn build_hole_completion_prompt(
     require_nonempty("source", source)?;
     require_within("source", source.len(), limits.max_source_bytes)?;
     if base_compiler_lock.schema_id != TYPED_DDL_COMPILER_LOCK_SCHEMA_ID
-        || base_compiler_lock.state != CompilerLockState::IncompleteKnownHole
+        || !visible_ddl_patch_available(compilation)
     {
         return Err(PromptError::CompilerLockUnavailable);
     }

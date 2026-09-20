@@ -247,6 +247,31 @@ pub struct CompilerBlockingDiagnostic {
     pub span: Option<SourceSpan>,
 }
 
+impl CompilerBlockingDiagnostic {
+    /// Whether this diagnostic prevents every execution and any bounded hole patch.
+    pub fn stops_all_execution(&self) -> bool {
+        self.span.is_none()
+            || matches!(
+                self.kind.as_str(),
+                "invalid_expansion_limits"
+                    | "clause_stream_integrity"
+                    | "missing_canonical_semantic_identity"
+                    | "coordination_marker_delivery_integrity"
+                    | "continuation_claim_owner_integrity"
+                    | "missing_continuation_original_instruction"
+                    | "expansion_invocation_budget"
+                    | "expansion_total_node_budget"
+                    | "missing_derived_seed"
+                    | "duplicate_derived_seed"
+                    | "mismatched_derived_seed"
+                    | "expansion_definition_ownership"
+                    | "expansion_binding_ownership"
+                    | "expansion_target_ownership"
+                    | "expansion_provenance_ownership"
+            )
+    }
+}
+
 /// Sidecar and resolved definition identity retained separately from semantic meaning.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 pub struct CompilerDefinitionIdentity {

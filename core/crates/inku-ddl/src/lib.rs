@@ -63,6 +63,7 @@ pub mod semantic_document;
 pub mod semantic_instruction;
 pub mod stage15_transform;
 pub mod visible_patch;
+pub use visible_patch::visible_ddl_patch_available;
 
 pub use attachment::{
     ATTACHMENT_EVIDENCE_SCHEMA_ID, AttachmentEvidenceDiagnostic, AttachmentEvidenceDiagnosticKind,

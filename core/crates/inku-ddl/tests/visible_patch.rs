@@ -119,6 +119,59 @@ fn unresolved_clause_patch_keeps_typed_facts_and_resolves_the_clause() {
 }
 
 #[test]
+fn patch_preserves_unchanged_local_diagnostics_outside_the_hole() {
+    let source = "出力: 黒い背景に、粗筆の黒い四角を中央に置く。面: 粗く塗りつぶす。";
+    let base = compile_typed_ddl(
+        NormalizedDdlDocument::new(source, ResolvedInstructionLanguage::Ja, Vec::new()).unwrap(),
+        &[],
+        Some(23),
+        LIMITS,
+    );
+    assert_eq!(
+        base.compiler_lock.as_ref().unwrap().state,
+        CompilerLockState::BlockedDiagnostic
+    );
+    assert_eq!(base.holes.len(), 1, "{:?}", base.holes);
+    assert_eq!(
+        base.blocking_diagnostics
+            .iter()
+            .map(|diagnostic| diagnostic.kind.as_str())
+            .collect::<Vec<_>>(),
+        vec!["upstream_unknown", "upstream_unknown"]
+    );
+
+    let accepted = validate_visible_ddl_patch(
+        &base,
+        &patch(
+            &base,
+            vec![edit(
+                &base.holes[0],
+                "背景を黒で埋める。太筆の黒い四角を中央に置く。",
+            )],
+        ),
+        &[],
+        Some(23),
+        LIMITS,
+    )
+    .unwrap();
+
+    assert!(accepted.compilation.holes.is_empty());
+    assert_eq!(
+        accepted.compilation.compiler_lock.as_ref().unwrap().state,
+        CompilerLockState::BlockedDiagnostic
+    );
+    assert_eq!(
+        accepted
+            .compilation
+            .blocking_diagnostics
+            .iter()
+            .map(|diagnostic| diagnostic.kind.as_str())
+            .collect::<Vec<_>>(),
+        vec!["upstream_unknown", "upstream_unknown"]
+    );
+}
+
+#[test]
 fn valid_single_multiple_and_subset_patches_preserve_base_and_return_only_candidates() {
     let base = base("white triangle. many circle. many square");
     let base_snapshot = base.clone();

@@ -112,6 +112,28 @@ pub struct ValidatedVisibleDdlCandidate {
     pub resolved_hole_ids: Vec<String>,
 }
 
+/// Whether the compilation has known holes and no global failure that forbids a bounded patch.
+pub fn visible_ddl_patch_available(compilation: &TypedDdlCompilation) -> bool {
+    let Some(lock) = compilation.compiler_lock.as_ref() else {
+        return false;
+    };
+    !compilation.holes.is_empty()
+        && matches!(
+            lock.state,
+            CompilerLockState::IncompleteKnownHole
+                | CompilerLockState::BlockedConflict
+                | CompilerLockState::BlockedDiagnostic
+        )
+        && compilation
+            .conflicts
+            .iter()
+            .all(|conflict| conflict.span.is_some())
+        && compilation
+            .blocking_diagnostics
+            .iter()
+            .all(|diagnostic| !diagnostic.stops_all_execution())
+}
+
 /// Validate, merge, fully reparse, and fully recompile one constrained visible-source patch.
 pub fn validate_visible_ddl_patch(
     base: &TypedDdlCompilation,
@@ -136,7 +158,7 @@ pub fn validate_visible_ddl_patch(
     if patch.base_compiler_lock_digest != base_lock.full_digest {
         return Err(VisiblePatchDiagnostic::StaleCompilerLock);
     }
-    if base_lock.state != CompilerLockState::IncompleteKnownHole {
+    if !visible_ddl_patch_available(base) {
         if patch.edits.iter().any(|edit| {
             base.conflicts
                 .iter()
@@ -284,15 +306,27 @@ pub fn validate_visible_ddl_patch(
             .collect::<Vec<_>>(),
     );
     let candidate_holes = outside_holes(&candidate, &candidate_ranges);
+    let base_conflicts = outside_conflicts(
+        base,
+        &patch
+            .edits
+            .iter()
+            .map(|item| item.allowed_span)
+            .collect::<Vec<_>>(),
+    );
+    let candidate_conflicts = outside_conflicts(&candidate, &candidate_ranges);
+    let base_blocking = outside_blocking_diagnostics(
+        base,
+        &patch
+            .edits
+            .iter()
+            .map(|item| item.allowed_span)
+            .collect::<Vec<_>>(),
+    );
+    let candidate_blocking = outside_blocking_diagnostics(&candidate, &candidate_ranges);
     if base_holes != candidate_holes
-        || candidate.conflicts.iter().any(|item| {
-            item.span
-                .is_none_or(|span| !candidate_ranges.iter().any(|range| overlaps(span, *range)))
-        })
-        || candidate.blocking_diagnostics.iter().any(|item| {
-            item.span
-                .is_none_or(|span| !candidate_ranges.iter().any(|range| overlaps(span, *range)))
-        })
+        || base_conflicts != candidate_conflicts
+        || base_blocking != candidate_blocking
     {
         return Err(VisiblePatchDiagnostic::NewDiagnostic);
     }
@@ -549,6 +583,57 @@ fn outside_holes(
         .iter()
         .filter(|item| !ranges.iter().any(|range| overlaps(item.span, *range)))
         .map(|item| (item.kind.clone(), item.expected_owner))
+        .collect::<Vec<_>>();
+    values.sort();
+    values
+}
+
+fn outside_conflicts(
+    compilation: &TypedDdlCompilation,
+    ranges: &[SourceSpan],
+) -> Vec<(String, Vec<String>, Option<String>)> {
+    let source = compilation.document.source();
+    let mut values = compilation
+        .conflicts
+        .iter()
+        .filter(|item| {
+            item.span
+                .is_none_or(|span| !ranges.iter().any(|range| overlaps(span, *range)))
+        })
+        .map(|item| {
+            let mut candidates = item.candidate_identities.clone();
+            candidates.sort();
+            (
+                item.kind.clone(),
+                candidates,
+                item.span
+                    .map(|span| sha256_hex(source[span.start_byte..span.end_byte].as_bytes())),
+            )
+        })
+        .collect::<Vec<_>>();
+    values.sort();
+    values
+}
+
+fn outside_blocking_diagnostics(
+    compilation: &TypedDdlCompilation,
+    ranges: &[SourceSpan],
+) -> Vec<(String, Option<String>)> {
+    let source = compilation.document.source();
+    let mut values = compilation
+        .blocking_diagnostics
+        .iter()
+        .filter(|item| {
+            item.span
+                .is_none_or(|span| !ranges.iter().any(|range| overlaps(span, *range)))
+        })
+        .map(|item| {
+            (
+                item.kind.clone(),
+                item.span
+                    .map(|span| sha256_hex(source[span.start_byte..span.end_byte].as_bytes())),
+            )
+        })
         .collect::<Vec<_>>();
     values.sort();
     values

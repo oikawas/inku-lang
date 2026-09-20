@@ -1244,6 +1244,74 @@ fn ja_unresolved_predicate_fragment_preserves_typed_drawing_in_both_resource_mod
 }
 
 #[test]
+fn ja_unresolved_entity_fragment_preserves_typed_drawing() {
+    let source = "中央付近に黒いクレヨンの楕円を一つ置く。";
+    let result = execute_language(
+        source,
+        ResolvedInstructionLanguage::Ja,
+        &[],
+        ScoreErrorPolicy::OmitAndContinue,
+    );
+
+    assert_eq!(
+        result.outcome(),
+        ScoreLoweringOutcome::CompleteWithOmissions,
+        "{result:#?}"
+    );
+    assert_eq!(result.upstream_diagnostics().len(), 1);
+    let diagnostic = &result.upstream_diagnostics()[0];
+    assert_eq!(diagnostic.reason, "upstream_unknown");
+    let span = diagnostic.span.unwrap();
+    assert_eq!(&source[span.start_byte..span.end_byte], "中央付近に");
+    assert_eq!(result.score().unwrap().instructions.len(), 1);
+}
+
+#[test]
+fn ja_unresolved_layout_modifier_keeps_the_typed_line_up() {
+    let source = "背景を黒で埋める。白いロットリングの横線を全幅に三十本並べる。等間隔に配置する。";
+    let budget = inku_score::ResourceBudget {
+        maximum: inku_score::ResourceDemand {
+            logical_objects: 64,
+            primitive_marks: 64,
+            object_templates: 8,
+            maximum_per_template_primitive_marks: 64,
+            maximum_resolved_count: 64,
+            template_nodes: 8,
+            anchor_instances: 64,
+            transform_instances: 64,
+            placement_instances: 8,
+            fill_instances: 8,
+        },
+    };
+    let result = inku_ddl::compile_ddl_to_score_with_resources(
+        NormalizedDdlDocument::new(source, ResolvedInstructionLanguage::Ja, Vec::new()).unwrap(),
+        &[],
+        Some(23),
+        LIMITS,
+        ScoreLoweringContext::resolve("square", Color::White).unwrap(),
+        None,
+        ScoreErrorPolicy::OmitAndContinue,
+        inku_score::HardResourcePolicy {
+            identity: "ja-unresolved-layout-recovery-test.v1".to_owned(),
+            budget,
+        },
+        inku_score::OperationalResourceBudget(budget),
+    );
+
+    assert_eq!(
+        result.outcome(),
+        ScoreLoweringOutcome::CompleteWithOmissions,
+        "{result:#?}"
+    );
+    let score = result.score().expect("the typed line-up survives");
+    assert_eq!(score.instructions.len(), 1, "{result:#?}");
+    assert_eq!(
+        score.instructions[0].arrangement.as_ref().unwrap().count,
+        30
+    );
+}
+
+#[test]
 fn unknown_clause_and_conflicting_ground_candidates_are_locally_omitted() {
     for source in [
         "mystery. place one red square at center.",

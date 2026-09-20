@@ -19,6 +19,46 @@ use sha2::{Digest, Sha256};
 const FIXTURE: &str = include_str!("fixtures/compiler-lock-visible-patch-v12.json");
 
 #[test]
+fn unresolved_drawing_clauses_are_bounded_known_holes() {
+    let source = "青で背景を塗りつぶす\n様々な色の四角30個をクレヨンとコンピュータで塗りつぶす。";
+    let result = compile(
+        source,
+        ResolvedInstructionLanguage::Ja,
+        &[],
+        Some(23),
+        LIMITS,
+    );
+
+    assert_eq!(
+        result.compiler_lock.as_ref().unwrap().state,
+        CompilerLockState::IncompleteKnownHole,
+        "holes={:?}; conflicts={:?}; blocking={:?}",
+        result.holes,
+        result.conflicts,
+        result.blocking_diagnostics
+    );
+    assert!(result.conflicts.is_empty(), "{:?}", result.conflicts);
+    assert!(
+        result.blocking_diagnostics.is_empty(),
+        "{:?}",
+        result.blocking_diagnostics
+    );
+    assert_eq!(result.holes.len(), 2, "{:?}", result.holes);
+    let mut holes = result.holes.iter().collect::<Vec<_>>();
+    holes.sort_by_key(|hole| hole.allowed_span.start_byte);
+    assert_eq!(
+        holes
+            .iter()
+            .map(|hole| &source[hole.allowed_span.start_byte..hole.allowed_span.end_byte])
+            .collect::<Vec<_>>(),
+        [
+            "青で背景を塗りつぶす",
+            "様々な色の四角30個をクレヨンとコンピュータで塗りつぶす"
+        ]
+    );
+}
+
+#[test]
 fn layout_direction_is_attested_separately_and_absence_adds_no_null_key() {
     let result = compile(
         "arrange three horizontal lines vertically at center.",

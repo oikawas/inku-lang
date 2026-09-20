@@ -2529,7 +2529,10 @@ fn japanese_entity_segment_is_clear(
                 .explicit_previous_references
                 .iter()
                 .any(|reference| reference.provenance.span == *span),
-            ClauseAtom::UnresolvedDiagnostic(_) => false,
+            // The exact Japanese object marker and a single typed head still
+            // delimit the entity phrase. Keep an unresolved modifier as its own
+            // diagnostic without taking the typed head away from the predicate.
+            ClauseAtom::UnresolvedDiagnostic(_) => true,
         })
 }
 
@@ -2575,18 +2578,17 @@ fn japanese_predicate_segment_is_clear(
                 exact_decimal: Some(_),
                 ..
             } => true,
-            ClauseAtom::RemainingRole(term) => {
-                matches!(
-                    term.role,
-                    RemainingRoleKind::Motion | RemainingRoleKind::Place | RemainingRoleKind::Angle
-                )
-            }
+            // A typed but unowned modifier is delivered by its own semantic
+            // issue. It does not erase the exact single head/action ownership
+            // established by the object marker.
+            ClauseAtom::RemainingRole(_) => true,
             ClauseAtom::FunctionWord { surface, span, .. } => {
                 crate::parser::is_group_layout_function_word(surface)
                     || matches!(
                         attachment_marker_at(association, clause_index, span.start_byte),
                         Some(AttachmentMarkerKind::Japanese(
-                            JapaneseAttachmentMarkerKind::Ni
+                            JapaneseAttachmentMarkerKind::No
+                                | JapaneseAttachmentMarkerKind::Ni
                                 | JapaneseAttachmentMarkerKind::De
                                 | JapaneseAttachmentMarkerKind::He
                         ))

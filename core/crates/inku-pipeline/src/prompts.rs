@@ -5,13 +5,16 @@
 //! persistence, compare-and-set, and compiler validation belong to the pipeline
 //! state machine and host adapters.
 
-use std::{collections::BTreeSet, fmt};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    fmt,
+};
 
 use inku_ddl::{
-    CompilerLockState, MacroDefinition, ResolvedInstructionLanguage, SAIJIKI_ASSET_ID, SourceSpan,
-    TYPED_DDL_COMPILER_LOCK_SCHEMA_ID, TypedDdlCompilation, TypedDdlCompilerLock, TypedHole,
-    VISIBLE_DDL_PATCH_SCHEMA_ID, VisibleDdlPatch, VisibleDdlPatchEdit, saijiki_asset_sha256_hex,
-    saijiki_derived_projection,
+    ClauseAtom, CompilerLockState, CoreRoleKind, MacroDefinition, RemainingRoleKind,
+    ResolvedInstructionLanguage, SAIJIKI_ASSET_ID, SourceSpan, TYPED_DDL_COMPILER_LOCK_SCHEMA_ID,
+    TypedDdlCompilation, TypedHole, VISIBLE_DDL_PATCH_SCHEMA_ID, VisibleDdlPatch,
+    VisibleDdlPatchEdit, saijiki_asset_sha256_hex, saijiki_derived_projection,
 };
 use inku_score::{CANVAS_FORMAT_REGISTRY_ID, canvas_format_registry_digest, lookup_canvas_format};
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
@@ -25,7 +28,7 @@ pub const CATALOG_SELECTION_PROMPT_ID: &str = "inku.description-catalog-selectio
 /// Distinct typed Stage 1 prompt edition. This is not the legacy runtime template.
 pub const TYPED_STAGE1_PROMPT_ID: &str = "inku.typed-stage1-normalized-ddl-prompt.v1";
 /// Distinct visible-hole completion prompt edition.
-pub const HOLE_COMPLETION_PROMPT_ID: &str = "inku.visible-ddl-hole-completion-prompt.v1";
+pub const HOLE_COMPLETION_PROMPT_ID: &str = "inku.visible-ddl-hole-completion-prompt.v2";
 
 const PROMPT_DIGEST_DOMAIN: &[u8] = b"inku.llm-prompt.v1";
 const CATALOG_DIGEST_DOMAIN: &[u8] = b"inku.prompt-catalog-projection.v1";
@@ -379,11 +382,25 @@ struct HoleDescriptor<'a> {
 }
 
 #[derive(Serialize)]
+struct HoleTypedFact<'a> {
+    owner: &'static str,
+    canonical_key: String,
+    source: &'a str,
+}
+
+#[derive(Serialize)]
+struct HoleSourceRegion<'a> {
+    span: HolePatchRange,
+    source: &'a str,
+    typed_facts: Vec<HoleTypedFact<'a>>,
+}
+
+#[derive(Serialize)]
 struct HoleMessage<'a> {
-    original_source: &'a str,
     base_source_digest: &'a str,
     base_compiler_lock_schema_id: &'a str,
     base_compiler_lock_digest: &'a str,
+    source_regions: Vec<HoleSourceRegion<'a>>,
     selected_holes: Vec<HoleDescriptor<'a>>,
 }
 
@@ -695,12 +712,16 @@ pub fn stage1_system_projection(
 
 /// Build a request that can propose edits only for the supplied selected holes.
 pub fn build_hole_completion_prompt(
-    source: &str,
-    language: ResolvedInstructionLanguage,
-    base_compiler_lock: &TypedDdlCompilerLock,
+    compilation: &TypedDdlCompilation,
     selected_holes: &[TypedHole],
     limits: PromptLimits,
 ) -> Result<LlmPrompt, PromptError> {
+    let source = compilation.document.source();
+    let language = compilation.document.language();
+    let base_compiler_lock = compilation
+        .compiler_lock
+        .as_ref()
+        .ok_or(PromptError::CompilerLockUnavailable)?;
     require_nonempty("source", source)?;
     require_within("source", source.len(), limits.max_source_bytes)?;
     if base_compiler_lock.schema_id != TYPED_DDL_COMPILER_LOCK_SCHEMA_ID
@@ -746,6 +767,25 @@ pub fn build_hole_completion_prompt(
         "{rules}\n\n# accepted_saijiki_vocabulary\n{}",
         saijiki.prompt_block
     );
+    let evidence_span_for = |hole: &TypedHole| {
+        compilation
+            .semantic_document
+            .as_ref()
+            .and_then(|semantic| {
+                semantic
+                    .instruction_association
+                    .association
+                    .clause_stream
+                    .clauses
+                    .iter()
+                    .find(|clause| {
+                        clause.span.start_byte <= hole.allowed_span.start_byte
+                            && hole.allowed_span.end_byte <= clause.span.end_byte
+                    })
+                    .map(|clause| clause.span)
+            })
+            .unwrap_or(hole.allowed_span)
+    };
     let descriptors = selected
         .iter()
         .map(|hole| HoleDescriptor {
@@ -756,11 +796,24 @@ pub fn build_hole_completion_prompt(
             expected_owner: hole.expected_owner.as_str(),
         })
         .collect::<Vec<_>>();
+    let mut evidence_spans = BTreeMap::new();
+    for hole in &selected {
+        let span = evidence_span_for(hole);
+        evidence_spans.insert((span.start_byte, span.end_byte), span);
+    }
+    let source_regions = evidence_spans
+        .into_values()
+        .map(|span| HoleSourceRegion {
+            span: span.into(),
+            source: &source[span.start_byte..span.end_byte],
+            typed_facts: hole_typed_facts(compilation, span),
+        })
+        .collect();
     let message = serde_json::to_string(&HoleMessage {
-        original_source: source,
         base_source_digest: &base_source_digest,
         base_compiler_lock_schema_id: base_compiler_lock.schema_id,
         base_compiler_lock_digest: &base_compiler_lock.full_digest,
+        source_regions,
         selected_holes: descriptors,
     })
     .map_err(|_| PromptError::Serialization)?;
@@ -786,6 +839,80 @@ pub fn build_hole_completion_prompt(
         base_source_digest: Some(base_source_digest),
         base_compiler_lock_digest: Some(base_compiler_lock.full_digest.clone()),
     })
+}
+
+fn hole_typed_facts(
+    compilation: &TypedDdlCompilation,
+    evidence_span: SourceSpan,
+) -> Vec<HoleTypedFact<'_>> {
+    let source = compilation.document.source();
+    compilation
+        .semantic_document
+        .iter()
+        .flat_map(|semantic| {
+            semantic
+                .instruction_association
+                .association
+                .clause_stream
+                .clauses
+                .iter()
+        })
+        .flat_map(|clause| &clause.atoms)
+        .filter(|atom| {
+            let span = atom.span();
+            evidence_span.start_byte <= span.start_byte && span.end_byte <= evidence_span.end_byte
+        })
+        .filter_map(|atom| {
+            let span = atom.span();
+            let surface = &source[span.start_byte..span.end_byte];
+            match atom {
+                ClauseAtom::CoreRole(term) => Some(HoleTypedFact {
+                    owner: match term.role {
+                        CoreRoleKind::Primitive => "entity_head",
+                        CoreRoleKind::Touch => "touch",
+                        CoreRoleKind::Color => "color",
+                        CoreRoleKind::Surface => "surface_quality",
+                        CoreRoleKind::Ground => "ground",
+                    },
+                    canonical_key: format!("{}:{}", term.category_key, term.canonical_surface_ja),
+                    source: surface,
+                }),
+                ClauseAtom::CoreModifier(term) => Some(HoleTypedFact {
+                    owner: term.identity.dimension.as_str(),
+                    canonical_key: term.identity.value.as_str().to_owned(),
+                    source: surface,
+                }),
+                ClauseAtom::RemainingRole(term) => Some(HoleTypedFact {
+                    owner: match term.role {
+                        RemainingRoleKind::Angle => "angle",
+                        RemainingRoleKind::Continuity => "continuity",
+                        RemainingRoleKind::Fluctuation => "fluctuation",
+                        RemainingRoleKind::Place => "position",
+                        RemainingRoleKind::Motion => "action",
+                        RemainingRoleKind::Proportion => "proportion",
+                        RemainingRoleKind::Sequence => "sequence",
+                    },
+                    canonical_key: format!("{}:{}", term.category_key, term.canonical_surface_ja),
+                    source: surface,
+                }),
+                ClauseAtom::UnattachedExactNumber(number) => Some(HoleTypedFact {
+                    owner: "quantity",
+                    canonical_key: number.value.to_string(),
+                    source: surface,
+                }),
+                ClauseAtom::SaijikiRelation {
+                    asset_id,
+                    relation_type,
+                    ..
+                } => Some(HoleTypedFact {
+                    owner: "relation",
+                    canonical_key: format!("{asset_id}:{relation_type}"),
+                    source: surface,
+                }),
+                ClauseAtom::FunctionWord { .. } | ClauseAtom::UnresolvedDiagnostic(_) => None,
+            }
+        })
+        .collect()
 }
 
 /// Parse and validate an exact finite-candidate catalog selection.
@@ -1187,11 +1314,11 @@ Write "mirrored with the previous shape" for mirrored positions and orientations
 const STAGE1_CONTEXT_EN: &str = "The canvas format, catalog ID, and catalog mode are already resolved host context. Do not replace them with defaults.";
 const STAGE1_NORMALIZER_RESPONSE_ENDING_EN: &str = " Return only the specified JSON.";
 
-const HOLE_SYSTEM_JA: &str = r#"あなたは inku の可視DDL hole patch提案器。original_source全体を書き直さず、selected_holesに列挙された各holeのallowed_spanだけへ、accepted_saijiki_vocabularyと通常の数値・文法からなる可視DDL replacementを提案する。
+const HOLE_SYSTEM_JA: &str = r#"あなたは inku の可視DDL hole patch提案器。source_regionsの短い根拠と確定済みtyped_factsを使い、selected_holesに列挙された各holeのallowed_spanだけへ、accepted_saijiki_vocabularyと通常の数値・文法からなる可視DDL replacementを提案する。
 
 hole ID、range、range digest、source digest、compiler lock digestをそのまま返す。選択されていない範囲、明示済みの意味、MacroDefinition、Score、typed-only fieldを変更・生成しない。記述入力を推測せず、思考過程、説明、whole documentを返さない。指定されたpatch JSONだけを返す。"#;
 
-const HOLE_SYSTEM_EN: &str = r#"You propose visible inku DDL hole patches. Do not rewrite original_source. Propose visible DDL replacement text, using accepted_saijiki_vocabulary and ordinary numeric/compiler grammar, only inside each allowed_span listed in selected_holes.
+const HOLE_SYSTEM_EN: &str = r#"You propose visible inku DDL hole patches. Use only the short evidence in source_regions and the confirmed typed_facts. Propose visible DDL replacement text, using accepted_saijiki_vocabulary and ordinary numeric/compiler grammar, only inside each allowed_span listed in selected_holes.
 
 Return each hole ID, range, range digest, source digest, and compiler lock digest unchanged. Do not change an unselected range or explicit meaning, and do not generate MacroDefinition data, a Score, typed-only fields, a description, chain of thought, explanation, or a whole document. Return only the specified patch JSON."#;
 
@@ -1275,61 +1402,72 @@ mod tests {
             .is_err()
         );
 
-        let source = "many";
-        let hole = TypedHole {
-            id: "hole-1".to_owned(),
-            kind: "quantity".to_owned(),
-            span: SourceSpan {
-                start_byte: 0,
-                end_byte: 4,
+        let source = "青で背景を塗りつぶす\n様々な色の四角30個をクレヨンとコンピュータで塗りつぶす。\n中心に赤い円を1個置く。";
+        let compilation = inku_ddl::compile_typed_ddl(
+            inku_ddl::NormalizedDdlDocument::new(
+                source,
+                ResolvedInstructionLanguage::Ja,
+                Vec::new(),
+            )
+            .unwrap(),
+            &[],
+            Some(17),
+            inku_ddl::MacroExpansionLimits {
+                max_invocations: 16,
+                max_depth: 16,
+                max_evaluation_steps: 1_000,
+                max_nodes_per_invocation: 100,
+                max_total_nodes: 500,
             },
-            allowed_span: SourceSpan {
-                start_byte: 0,
-                end_byte: 4,
-            },
-            expected_range_digest: sha256_hex(source.as_bytes()),
-            expected_owner: inku_ddl::SemanticDeliveryOwner::Quantity,
-            upstream_diagnostic_identity: "diagnostic-1".to_owned(),
-        };
-        let lock = TypedDdlCompilerLock {
-            schema_id: TYPED_DDL_COMPILER_LOCK_SCHEMA_ID,
-            state: CompilerLockState::IncompleteKnownHole,
-            visible_source_digest: sha256_hex(source.as_bytes()),
-            structured_semantic_occurrence_digest: "semantic".to_owned(),
-            canonical_pre_expansion_digest: None,
-            semantic_source_provenance_digest: None,
-            geometry_policy_id: "geometry-policy",
-            geometry_policy_digest: "geometry-digest".to_owned(),
-            composition_seed: None,
-            definition_identities: Vec::new(),
-            macro_seeds: Vec::new(),
-            expanded_meaning_digest: None,
-            expanded_generated_provenance_digest: None,
-            hole_identities: vec![hole.id.clone()],
-            conflict_identities: Vec::new(),
-            blocking_diagnostic_identities: Vec::new(),
-            full_digest: "compiler-lock-digest".to_owned(),
-        };
-        let prompt = build_hole_completion_prompt(
-            source,
-            ResolvedInstructionLanguage::En,
-            &lock,
-            std::slice::from_ref(&hole),
-            LIMITS,
-        )
-        .unwrap();
+        );
+        let lock = compilation.compiler_lock.as_ref().unwrap();
+        assert_eq!(lock.state, CompilerLockState::IncompleteKnownHole);
+        let mut holes = compilation.holes.iter().collect::<Vec<_>>();
+        holes.sort_by_key(|hole| hole.allowed_span.start_byte);
+        assert_eq!(holes.len(), 2, "{:?}", compilation.holes);
+        let selected = holes.iter().map(|hole| (*hole).clone()).collect::<Vec<_>>();
+        let prompt = build_hole_completion_prompt(&compilation, &selected, LIMITS).unwrap();
         assert_eq!(prompt.action_name, "complete_visible_ddl_holes");
         assert_eq!(
             prompt.response_schema["properties"]["edits"]["items"]["oneOf"][0]["properties"]["allowed_span"]
                 ["properties"]["start_byte"]["const"],
-            0
+            holes[0].allowed_span.start_byte
         );
         assert_eq!(
             prompt.response_schema["properties"]["edits"]["items"]["oneOf"][0]["properties"]["hole_id"]
                 ["const"],
-            "hole-1"
+            holes[0].id
         );
         assert!(!prompt.message.contains("description"));
+        assert!(!prompt.message.contains("original_source"));
+        assert!(!prompt.message.contains("中心に赤い円"));
+        let message: Value = serde_json::from_str(&prompt.message).unwrap();
+        assert_eq!(message["source_regions"].as_array().unwrap().len(), 2);
+        assert_eq!(
+            message["source_regions"][0]["source"],
+            "青で背景を塗りつぶす"
+        );
+        assert_eq!(
+            message["source_regions"][1]["source"],
+            "様々な色の四角30個をクレヨンとコンピュータで塗りつぶす"
+        );
+        let facts = message["source_regions"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .flat_map(|region| region["typed_facts"].as_array().unwrap())
+            .map(|fact| {
+                (
+                    fact["owner"].as_str().unwrap(),
+                    fact["canonical_key"].as_str().unwrap(),
+                )
+            })
+            .collect::<BTreeSet<_>>();
+        assert!(facts.contains(&("color", "iro:青")));
+        assert!(facts.contains(&("entity_head", "katachi:四角")));
+        assert!(facts.contains(&("quantity", "30")));
+        assert!(facts.contains(&("touch", "tezawari:クレヨン")));
+        assert!(facts.contains(&("touch", "tezawari:コンピュータ")));
     }
 
     #[test]

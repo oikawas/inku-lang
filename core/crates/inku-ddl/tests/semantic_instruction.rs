@@ -111,6 +111,66 @@ fn ja_unresolved_predicate_fragment_does_not_steal_exact_object_predicate_owners
     );
 }
 
+#[test]
+fn ja_unresolved_entity_fragment_does_not_steal_exact_object_predicate_owners() {
+    let source = "中央付近に黒いクレヨンの楕円を一つ置く。";
+    let document =
+        NormalizedDdlDocument::new(source, ResolvedInstructionLanguage::Ja, Vec::new()).unwrap();
+    let result = associate_semantic_instructions(&document).unwrap();
+
+    assert_eq!(
+        result
+            .association
+            .issues
+            .iter()
+            .map(|issue| issue.kind.as_str())
+            .collect::<Vec<_>>(),
+        ["upstream_unknown"]
+    );
+    assert!(result.issues.is_empty(), "{:?}", result.issues);
+    assert_eq!(result.ast.instructions.len(), 1);
+    let instruction = &result.ast.instructions[0];
+    assert_eq!(instruction.entity.quantity.as_ref().unwrap().value, 1);
+    assert_eq!(instruction.action.as_ref().unwrap().identity.id, "place");
+}
+
+#[test]
+fn ja_unowned_typed_modifier_does_not_steal_exact_object_predicate_owners() {
+    let source = "白いロットリングの横線を全幅に三十本並べる。";
+    let document =
+        NormalizedDdlDocument::new(source, ResolvedInstructionLanguage::Ja, Vec::new()).unwrap();
+    let result = associate_semantic_instructions(&document).unwrap();
+
+    assert!(
+        result
+            .association
+            .issues
+            .iter()
+            .any(|issue| { issue.kind.as_str() == "ambiguous_entity_ownership" }),
+        "{:?}",
+        result.association.issues
+    );
+    assert!(result.issues.is_empty(), "{:?}", result.issues);
+    assert_eq!(result.ast.instructions.len(), 1);
+    let instruction = &result.ast.instructions[0];
+    assert_eq!(instruction.entity.quantity.as_ref().unwrap().value, 30);
+    assert_eq!(instruction.action.as_ref().unwrap().identity.id, "line_up");
+}
+
+#[test]
+fn ja_compound_position_keeps_the_exact_object_predicate_owner() {
+    let source = "赤い線を右下がりの中央に一本引く。";
+    let document =
+        NormalizedDdlDocument::new(source, ResolvedInstructionLanguage::Ja, Vec::new()).unwrap();
+    let result = associate_semantic_instructions(&document).unwrap();
+
+    assert!(result.issues.is_empty(), "{:?}", result.issues);
+    assert_eq!(result.ast.instructions.len(), 1);
+    let instruction = &result.ast.instructions[0];
+    assert_eq!(instruction.entity.quantity.as_ref().unwrap().value, 1);
+    assert_eq!(instruction.action.as_ref().unwrap().identity.id, "draw");
+}
+
 const FIXTURE: &str = include_str!("fixtures/semantic-instruction-v16.json");
 
 #[test]

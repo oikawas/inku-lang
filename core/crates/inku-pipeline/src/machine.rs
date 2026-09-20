@@ -830,14 +830,8 @@ impl PipelineSnapshot {
             );
         }
         selected.sort_by_key(|hole| hole.allowed_span.start_byte);
-        let prompt = build_hole_completion_prompt(
-            base.document.source(),
-            base.document.language(),
-            lock,
-            &selected,
-            self.config.prompt_limits,
-        )
-        .map_err(|_| ProtocolError::SchemaViolation)?;
+        let prompt = build_hole_completion_prompt(&base, &selected, self.config.prompt_limits)
+            .map_err(|_| ProtocolError::SchemaViolation)?;
         self.begin_llm(prompt, None, hole_ids, events)
     }
 

@@ -7,7 +7,7 @@ use serde_json::{Number, Value};
 use sha2::{Digest, Sha256};
 
 use crate::{
-    ClauseAtom, ExpandedMacroInvocation, ExpandedMacroNode, ExpandedMacroValue,
+    ClauseAtom, CoreRoleKind, ExpandedMacroInvocation, ExpandedMacroNode, ExpandedMacroValue,
     ExpansionPathSegment, GEOMETRY_RESOLUTION_POLICY_ID, GeneratedNodeProvenance, MacroDefinition,
     MacroExpansionDiagnosticKind, MacroExpansionLimits, MacroExpansionResult, MacroInvocation,
     MacroInvocationResolutionDiagnosticKind, MacroParameterBindingDiagnosticKind,
@@ -757,6 +757,7 @@ fn project_deliveries(
     semantic_document: &SemanticDocumentResult,
 ) -> Projection {
     let mut projection = Projection::default();
+    let patchable_clause_spans = patchable_unresolved_clause_spans(semantic_document);
     let exclusive_continuation_claims =
         exclusive_continuation_claim_groups(&semantic_document.continuation_issues);
 
@@ -812,6 +813,16 @@ fn project_deliveries(
         if let Some(position) = &edge.position {
             add_term_explicit(&mut projection, SemanticDeliveryOwner::Position, position);
         }
+    }
+    for span in &patchable_clause_spans {
+        add_hole(
+            document,
+            &mut projection,
+            "unresolved_clause",
+            *span,
+            SemanticDeliveryOwner::TypedIssue,
+            "semantic_clause:unresolved".to_owned(),
+        );
     }
     let mut group_marker_spans = semantic_document
         .ast
@@ -957,8 +968,7 @@ fn project_deliveries(
         }
     }
     for issue in &association.issues {
-        if issue.kind == SemanticAssociationIssueKind::MissingEntityHead
-            && issue.upstream_diagnostic.is_none()
+        if issue.upstream_diagnostic.is_none()
             && !issue.occurrences.is_empty()
             && issue
                 .occurrences
@@ -978,6 +988,20 @@ fn project_deliveries(
                     .map(|occurrence| occurrence.source().span)
             });
         let kind = issue.kind.as_str();
+        let mut issue_spans = issue
+            .occurrences
+            .iter()
+            .map(|occurrence| occurrence.source().span)
+            .collect::<Vec<_>>();
+        issue_spans.extend(
+            issue
+                .upstream_diagnostic
+                .iter()
+                .map(|diagnostic| diagnostic.span),
+        );
+        if spans_share_patchable_clause(&issue_spans, &patchable_clause_spans) {
+            continue;
+        }
         match issue.kind {
             SemanticAssociationIssueKind::UpstreamHole => {
                 if let Some(span) = span {
@@ -1012,6 +1036,11 @@ fn project_deliveries(
             SemanticAssociationIssueKind::AmbiguousEntityOwnership => {
                 for occurrence in issue.occurrences.iter().filter(|occurrence| {
                     !consumed_continuation_spans.contains(&occurrence.source().span)
+                        && !background_spans.contains(&occurrence.source().span)
+                        && !span_is_in_patchable_clause(
+                            occurrence.source().span,
+                            &patchable_clause_spans,
+                        )
                 }) {
                     add_conflict(
                         &mut projection,
@@ -1071,8 +1100,7 @@ fn project_deliveries(
     }
 
     for issue in &semantic_document.instruction_association.issues {
-        if issue.kind == SemanticInstructionIssueKind::MissingActionEntity
-            && !issue.occurrences.is_empty()
+        if !issue.occurrences.is_empty()
             && issue.occurrences.iter().all(|occurrence| {
                 background_spans.contains(&occurrence.term.provenance.source.span)
             })
@@ -1083,6 +1111,14 @@ fn project_deliveries(
             .occurrences
             .first()
             .map(|occurrence| occurrence.term.provenance.source.span);
+        let issue_spans = issue
+            .occurrences
+            .iter()
+            .map(|occurrence| occurrence.term.provenance.source.span)
+            .collect::<Vec<_>>();
+        if spans_share_patchable_clause(&issue_spans, &patchable_clause_spans) {
+            continue;
+        }
         match issue.kind {
             SemanticInstructionIssueKind::AmbiguousActionOwnership
             | SemanticInstructionIssueKind::AmbiguousLayoutDirectionOwnership
@@ -1122,6 +1158,22 @@ fn project_deliveries(
         .instruction_association
         .coordination_issues
     {
+        let issue_spans = issue
+            .markers
+            .iter()
+            .chain(&issue.continuation_markers)
+            .map(|marker| marker.span)
+            .chain(issue.claim_spans.iter().copied())
+            .chain(
+                issue
+                    .predicates
+                    .iter()
+                    .map(|predicate| predicate.term.provenance.source.span),
+            )
+            .collect::<Vec<_>>();
+        if spans_share_patchable_clause(&issue_spans, &patchable_clause_spans) {
+            continue;
+        }
         let mut members = issue
             .member_instruction_indices
             .iter()
@@ -1315,6 +1367,62 @@ fn project_deliveries(
     }
 
     projection
+}
+
+fn patchable_unresolved_clause_spans(
+    semantic_document: &SemanticDocumentResult,
+) -> Vec<SourceSpan> {
+    semantic_document
+        .instruction_association
+        .association
+        .clause_stream
+        .clauses
+        .iter()
+        .filter(|clause| {
+            let has_unknown = clause.atoms.iter().any(|atom| {
+                matches!(
+                    atom,
+                    ClauseAtom::UnresolvedDiagnostic(diagnostic)
+                        if diagnostic.kind == NeutralDiagnosticKind::Unknown
+                            && !diagnostic.recognized
+                )
+            });
+            let has_primitive_or_ground = clause.atoms.iter().any(|atom| {
+                matches!(
+                    atom,
+                    ClauseAtom::CoreRole(term)
+                        if matches!(term.role, CoreRoleKind::Primitive | CoreRoleKind::Ground)
+                )
+            });
+            let has_color = clause.atoms.iter().any(|atom| {
+                matches!(atom, ClauseAtom::CoreRole(term) if term.role == CoreRoleKind::Color)
+            });
+            let has_background = clause.atoms.iter().any(|atom| {
+                matches!(
+                    atom,
+                    ClauseAtom::FunctionWord { surface, .. }
+                        if matches!(surface.as_str(), "背景" | "background")
+                )
+            });
+            has_unknown && (has_primitive_or_ground || has_color && has_background)
+        })
+        .map(|clause| clause.span)
+        .collect()
+}
+
+fn spans_share_patchable_clause(spans: &[SourceSpan], clauses: &[SourceSpan]) -> bool {
+    !spans.is_empty()
+        && clauses.iter().any(|clause| {
+            spans.iter().all(|span| {
+                clause.start_byte <= span.start_byte && span.end_byte <= clause.end_byte
+            })
+        })
+}
+
+fn span_is_in_patchable_clause(span: SourceSpan, clauses: &[SourceSpan]) -> bool {
+    clauses
+        .iter()
+        .any(|clause| clause.start_byte <= span.start_byte && span.end_byte <= clause.end_byte)
 }
 
 const fn neutral_diagnostic_kind_key(kind: NeutralDiagnosticKind) -> &'static str {

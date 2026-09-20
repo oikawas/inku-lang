@@ -1,11 +1,13 @@
 //! Base-lock constrained visible-source patching and full candidate recompilation.
 
+use std::collections::{BTreeMap, BTreeSet};
+
 use sha2::{Digest, Sha256};
 
 use crate::{
-    CompilerLockState, MacroDefinition, MacroExpansionLimits, NormalizedDdlDocument,
-    SemanticDeliveryIdentity, SemanticDeliveryKind, SourceSpan, TypedDdlCompilation,
-    compile_typed_ddl,
+    ClauseAtom, CompilerLockState, MacroDefinition, MacroExpansionLimits, NormalizedDdlDocument,
+    SemanticDeliveryIdentity, SemanticDeliveryKind, SemanticDeliveryOwner, SourceSpan,
+    TypedDdlCompilation, compile_typed_ddl,
 };
 
 /// Stable identity for constrained visible DDL patch requests.
@@ -256,7 +258,7 @@ pub fn validate_visible_ddl_patch(
             .iter()
             .find(|hole| hole.id == edit.hole_id)
             .expect("validated edit retains its exact typed hole");
-        if !target_resolved(hole, &candidate, *range) {
+        if !target_resolved(hole, base, &candidate, *range) {
             return Err(VisiblePatchDiagnostic::TargetUnresolved);
         }
     }
@@ -308,14 +310,84 @@ pub fn validate_visible_ddl_patch(
 
 fn target_resolved(
     hole: &crate::TypedHole,
+    base: &TypedDdlCompilation,
     candidate: &TypedDdlCompilation,
     range: SourceSpan,
 ) -> bool {
+    if hole.kind == "unresolved_clause" {
+        let required = typed_fact_counts(base, hole.span);
+        let delivered = typed_fact_counts(candidate, range);
+        if required
+            .iter()
+            .any(|(fact, count)| delivered.get(fact).copied().unwrap_or_default() < *count)
+        {
+            return false;
+        }
+        let owners = candidate
+            .deliveries
+            .iter()
+            .filter(|item| item.kind == SemanticDeliveryKind::Explicit)
+            .filter(|item| item.span.is_some_and(|span| overlaps(span, range)))
+            .map(|item| item.identity.owner)
+            .collect::<BTreeSet<_>>();
+        return owners.contains(&SemanticDeliveryOwner::Background)
+            || owners.contains(&SemanticDeliveryOwner::Ground)
+            || owners.contains(&SemanticDeliveryOwner::EntityHead)
+                && owners.contains(&SemanticDeliveryOwner::Action);
+    }
     candidate.deliveries.iter().any(|item| {
         item.kind == SemanticDeliveryKind::Explicit
             && item.identity.owner == hole.expected_owner
             && item.span.is_some_and(|span| overlaps(span, range))
     })
+}
+
+fn typed_fact_counts(
+    compilation: &TypedDdlCompilation,
+    range: SourceSpan,
+) -> BTreeMap<String, usize> {
+    let mut facts = BTreeMap::new();
+    let Some(semantic) = &compilation.semantic_document else {
+        return facts;
+    };
+    for atom in semantic
+        .instruction_association
+        .association
+        .clause_stream
+        .clauses
+        .iter()
+        .flat_map(|clause| &clause.atoms)
+    {
+        let span = atom.span();
+        if range.start_byte > span.start_byte || span.end_byte > range.end_byte {
+            continue;
+        }
+        let fact = match atom {
+            ClauseAtom::CoreRole(term) => Some(format!(
+                "core:{:?}:{}:{}:{}",
+                term.role, term.asset_id, term.category_key, term.canonical_surface_ja
+            )),
+            ClauseAtom::CoreModifier(term) => Some(format!(
+                "modifier:{:?}:{:?}",
+                term.identity.dimension, term.identity.value
+            )),
+            ClauseAtom::RemainingRole(term) => Some(format!(
+                "remaining:{:?}:{}:{}:{}",
+                term.role, term.asset_id, term.category_key, term.canonical_surface_ja
+            )),
+            ClauseAtom::UnattachedExactNumber(number) => Some(format!("number:{}", number.value)),
+            ClauseAtom::SaijikiRelation {
+                asset_id,
+                relation_type,
+                ..
+            } => Some(format!("relation:{relation_type}:{asset_id}")),
+            ClauseAtom::FunctionWord { .. } | ClauseAtom::UnresolvedDiagnostic(_) => None,
+        };
+        if let Some(fact) = fact {
+            *facts.entry(fact).or_default() += 1;
+        }
+    }
+    facts
 }
 
 trait SortedInsert {

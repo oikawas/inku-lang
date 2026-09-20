@@ -14,6 +14,8 @@ When an explicit count on a standalone primitive exceeds a resource limit, the s
 
 Successful Compose and Paint responses now expose the Rust delivery's `compiler_outcome` and existing six-channel `pipeline_diagnostics`. For a known hole in committed DDL, the current safe Score and actual drawing from the acknowledged source are saved before provider completion and remain available after provider failure, patch rejection, validation failure, or a failed compare-and-set. Saved work continues to use the existing history sidecar. A safe structured log records only execution identity, source digest, outcome, diagnostic class, and actual disposition, excluding raw DDL, provider responses, and credentials. DDL, Score, render formats, engine versions, and the database schema are unchanged.
 
+A clause containing words outside the finite grammar can now enter the existing Stage 2 as one bounded known hole when it has an exact drawing head, ground, or background anchor. Its request carries the smallest clause for each hole, established typed facts, finite Saijiki vocabulary, and lock/range identities instead of the whole document. The provider candidate is recompiled and becomes a visible patch candidate only when it retains the identity and count of established facts and produces a drawable owner. This adds no per-word alias, extra LLM stage, Score generation, or rewrite of unselected source.
+
 The shared JSON boundary also enables exact floating-point round trips. A snapshot serialized by a Python host therefore retains the same Score numbers and digest when Rust reads it again, instead of rejecting a valid render step as stale.
 
 ### 2026-09-19 — Separate the measured Stage 1 time budget and failure diagnostic

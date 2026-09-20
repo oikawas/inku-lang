@@ -385,17 +385,19 @@ fn relation_association_failure_keeps_valid_neighbors_under_legacy_stop() {
 }
 
 #[test]
-fn relation_without_an_exact_current_owner_stops_without_guessing() {
-    for (source, policy, expected_kind) in [
+fn relation_without_an_exact_current_owner_preserves_independent_drawables() {
+    for (source, policy, expected_kind, expected_indices) in [
         (
             "place one red line at center. touching the previous line. place one blue square at center.",
             ScoreErrorPolicy::Stop,
             "missing_current_instruction",
+            [0, 1],
         ),
         (
             "place one red line at center. circle line touching the previous line. place one blue square at center.",
             ScoreErrorPolicy::OmitAndContinue,
             "ambiguous_current_relation_ownership",
+            [0, 3],
         ),
     ] {
         let result = execute(source, &[], LIMITS, policy);
@@ -406,19 +408,46 @@ fn relation_without_an_exact_current_owner_stops_without_guessing() {
             .unwrap()
             .instruction_association
             .relation_issues;
-        assert!(
-            issues
-                .iter()
-                .any(|issue| issue.kind.as_str() == expected_kind && issue.current_owner.is_none()),
-            "{issues:?}"
+        let issue = issues
+            .iter()
+            .find(|issue| issue.kind.as_str() == expected_kind)
+            .unwrap_or_else(|| panic!("{issues:?}"));
+        assert_eq!(issue.current_owner, None);
+        assert_eq!(result.compilation().document.source(), source);
+        assert_eq!(
+            result.outcome(),
+            ScoreLoweringOutcome::CompleteWithOmissions
         );
-        assert_eq!(result.outcome(), ScoreLoweringOutcome::Stopped);
-        assert!(result.score().is_none());
+        let score = result.score().unwrap();
+        assert_eq!(score.instructions.len(), 2);
+        assert_eq!(score.instructions[0].primitive, Primitive::Line);
+        assert_eq!(score.instructions[1].primitive, Primitive::Square);
         assert!(
-            result
-                .upstream_diagnostics()
+            score
+                .instructions
                 .iter()
-                .all(|diagnostic| diagnostic.disposition == CompilerExecutionDisposition::Stopped)
+                .all(|instruction| instruction.relation.is_none())
+        );
+        assert_eq!(
+            result.instruction_origins(),
+            expected_indices.map(|instruction_index| {
+                ScoreInstructionOrigin::SourceInstruction { instruction_index }
+            })
+        );
+        let occurrence = &issue.occurrences[0];
+        let diagnostic = result
+            .upstream_diagnostics()
+            .iter()
+            .find(|diagnostic| diagnostic.reason == expected_kind)
+            .unwrap();
+        assert_eq!(diagnostic.span, Some(occurrence.provenance.span));
+        assert_eq!(
+            diagnostic.disposition,
+            CompilerExecutionDisposition::RelationOmitted {
+                unit: CompilerExecutionOmissionUnit::Clause {
+                    clause_index: occurrence.provenance.clause_index,
+                },
+            }
         );
     }
 }

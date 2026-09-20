@@ -72,7 +72,7 @@ pub(crate) fn project_compilation_for_execution(
         .relation_issues
         .iter()
         .any(|issue| match issue.current_owner {
-            None => true,
+            None => false,
             Some(crate::SemanticRelationIssueOwner::Instruction { instruction_index }) => {
                 instruction_index >= semantic.ast.instructions.len()
             }
@@ -98,7 +98,26 @@ pub(crate) fn project_compilation_for_execution(
     let mut omitted_group_relations = BTreeSet::new();
     let mut diagnostics = Vec::new();
     for (issue_kind, issue_id, reason, span) in compiler_issues(compilation) {
-        if let Some(unit) = relation_omission_unit(semantic, span) {
+        if let Some((issue, occurrence)) = semantic
+            .instruction_association
+            .relation_issues
+            .iter()
+            .filter(|issue| issue.kind.as_str() == reason)
+            .find_map(|issue| {
+                issue
+                    .occurrences
+                    .iter()
+                    .find(|occurrence| Some(occurrence.provenance.span) == span)
+                    .map(|occurrence| (issue, occurrence))
+            })
+        {
+            // An unowned relation is already separate from every drawable. Its
+            // exact source clause identifies the omitted relation, not an owner.
+            let unit = relation_omission_unit(semantic, issue).unwrap_or(
+                CompilerExecutionOmissionUnit::Clause {
+                    clause_index: occurrence.provenance.clause_index,
+                },
+            );
             if let CompilerExecutionOmissionUnit::RelationInstruction {
                 instruction_index, ..
             } = &unit
@@ -436,19 +455,8 @@ pub(crate) fn project_compilation_for_execution(
 
 fn relation_omission_unit(
     semantic: &crate::SemanticDocumentResult,
-    span: Option<crate::SourceSpan>,
+    issue: &crate::SemanticRelationIssue,
 ) -> Option<CompilerExecutionOmissionUnit> {
-    let span = span?;
-    let issue = semantic
-        .instruction_association
-        .relation_issues
-        .iter()
-        .find(|issue| {
-            issue
-                .occurrences
-                .iter()
-                .any(|occurrence| occurrence.provenance.span == span)
-        })?;
     Some(match issue.current_owner? {
         crate::SemanticRelationIssueOwner::Instruction { instruction_index } => {
             CompilerExecutionOmissionUnit::RelationInstruction {

@@ -8,7 +8,7 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ### 2026-09-20 — Connect local relation recovery and compiler diagnostics to normal responses
 
-The shared compiler now keeps the exact current owner of a relation issue as an instruction or coordinated group and removes only a relation edge whose target was lost. It retains the drawable current body or group, original indices, seeds, and provenance without retargeting another survivor. Recoverable failures use the same local recovery for legacy Stop and Continue input; only a missing owner, integrity failure, or complete omission stops execution.
+The shared compiler now keeps the exact current owner of a relation issue as an instruction or coordinated group and removes only a relation edge whose target was lost. It retains the drawable current body or group, original indices, seeds, and provenance without retargeting another survivor. If the relation owner is unresolved, it does not infer one from nearby content and instead separates only the exact relation span and clause diagnostic from the drawing body. Recoverable failures use the same local recovery for legacy Stop and Continue input; only source, lock, owner-join, or other integrity failure, or complete omission, stops execution.
 
 Successful Compose and Paint responses now expose the Rust delivery's `compiler_outcome` and existing six-channel `pipeline_diagnostics`. Saved work continues to use the existing history sidecar. A safe structured log records only execution identity, source digest, outcome, diagnostic class, and actual disposition, excluding raw DDL, provider responses, and credentials. DDL, Score, render formats, engine versions, and the database schema are unchanged.
 

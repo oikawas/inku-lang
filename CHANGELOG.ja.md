@@ -8,7 +8,7 @@
 
 ### 2026-09-20 — Relation局所回復とcompiler診断を通常応答へ接続
 
-共有compilerはrelation issueのcurrent ownerをinstructionまたはcoordinated groupとしてexactに保持し、参照先を失ったrelation edgeだけを診断付きで外す。描画可能なcurrentとgroup、元index、seed、provenanceを残し、別のsurvivorへ参照を付け替えない。旧Stop／Continueのどちらもrecoverableな不成立へ同じ局所回復を使い、owner不明・integrity不良・全省略だけを停止する。
+共有compilerはrelation issueのcurrent ownerをinstructionまたはcoordinated groupとしてexactに保持し、参照先を失ったrelation edgeだけを診断付きで外す。描画可能なcurrentとgroup、元index、seed、provenanceを残し、別のsurvivorへ参照を付け替えない。relationのownerが確定しない場合も近傍から推測せず、exactなrelation spanとclauseの診断だけを描画本体から分離する。旧Stop／Continueのどちらもrecoverableな不成立へ同じ局所回復を使い、source・lock・owner join等のintegrity不良と全省略だけを停止する。
 
 通常のCompose／Paint成功応答はRust deliveryの`compiler_outcome`と既存六channelの`pipeline_diagnostics`を返す。保存時は既存history sidecarを使い、安全なstructured logにはexecution identity、source digest、結果、診断種別と実処置だけを記録する。raw DDL、provider応答、credentialは記録しない。DDL／Score／render形式、engine版、DB schemaは変更しない。
 

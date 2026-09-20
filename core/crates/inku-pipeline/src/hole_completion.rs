@@ -176,10 +176,126 @@ pub(crate) fn independent_units(
         }
     }
     let mut units = supports.into_values().collect::<Vec<_>>();
-    if !drawing_holes.is_empty() {
-        units.extend(independent_drawing_units(compilation, &drawing_holes));
+    let mut coupled = Vec::new();
+    for hole in drawing_holes {
+        if standalone_instruction_index(compilation, hole).is_some() {
+            // Provisional until the candidate's reference namespace is checked.
+            units.push(vec![hole.id.clone()]);
+        } else {
+            coupled.push(hole);
+        }
+    }
+    if !coupled.is_empty() {
+        units.extend(independent_drawing_units(compilation, &coupled));
     }
     units
+}
+
+fn simple_reference_namespace(compilation: &TypedDdlCompilation) -> bool {
+    compilation
+        .semantic_document
+        .as_ref()
+        .is_some_and(|semantic| {
+            semantic.continuation_issues.is_empty()
+                && semantic.ast.continuations.is_empty()
+                && semantic.ast.coordinated_head_groups.is_empty()
+                && semantic.ast.group_predicates.is_empty()
+                && semantic
+                    .instruction_association
+                    .coordination_issues
+                    .is_empty()
+                && semantic
+                    .instruction_association
+                    .association
+                    .ast
+                    .sequences
+                    .is_empty()
+                && semantic.ast.instructions.iter().all(|instruction| {
+                    matches!(instruction.entity.head, SemanticHead::Primitive(_))
+                        && instruction.sequence.is_none()
+                        && instruction.fill_target.is_none()
+                })
+        })
+}
+
+/// One existing, explicitly counted drawable owner. Unresolved wording is not
+/// itself a dependency edge; the candidate still needs the post-compile proof.
+fn standalone_instruction_index(
+    compilation: &TypedDdlCompilation,
+    hole: &TypedHole,
+) -> Option<usize> {
+    if hole.kind != "unresolved_clause" || !simple_reference_namespace(compilation) {
+        return None;
+    }
+    let ast = &compilation.semantic_document.as_ref()?.ast;
+    let mut owners = ast
+        .instructions
+        .iter()
+        .enumerate()
+        .filter(|(_, instruction)| {
+            contains(hole.allowed_span, instruction.entity.head.source().span)
+        });
+    let (index, instruction) = owners.next()?;
+    if owners.next().is_some()
+        || instruction.relation.is_some()
+        || !instruction
+            .action
+            .as_ref()
+            .is_some_and(|action| contains(hole.allowed_span, action.provenance.source.span))
+        || !instruction
+            .entity
+            .quantity
+            .as_ref()
+            .is_some_and(|quantity| contains(hole.allowed_span, quantity.provenance.span))
+    {
+        return None;
+    }
+    Some(index)
+}
+
+/// A later incoming reference does not require rolling back a repaired earlier
+/// owner. Its source-ordered identity is unchanged, and the repaired owner must
+/// not acquire an outgoing dependency on another unresolved clause.
+pub(crate) fn standalone_repair_preserves_namespace(
+    base: &TypedDdlCompilation,
+    candidate: &TypedDdlCompilation,
+    hole: &TypedHole,
+) -> bool {
+    let Some(index) = standalone_instruction_index(base, hole) else {
+        return true;
+    };
+    if !simple_reference_namespace(candidate) {
+        return false;
+    }
+    let before = &base.semantic_document.as_ref().unwrap().ast.instructions;
+    let after = &candidate
+        .semantic_document
+        .as_ref()
+        .unwrap()
+        .ast
+        .instructions;
+    before.len() == after.len()
+        && before.iter().zip(after).all(|(before, after)| {
+            let (SemanticHead::Primitive(left), SemanticHead::Primitive(right)) =
+                (&before.entity.head, &after.entity.head)
+            else {
+                return false;
+            };
+            left.identity == right.identity
+                && before
+                    .entity
+                    .quantity
+                    .as_ref()
+                    .map(|quantity| quantity.value)
+                    == after
+                        .entity
+                        .quantity
+                        .as_ref()
+                        .map(|quantity| quantity.value)
+                && before.action.as_ref().map(|action| &action.identity)
+                    == after.action.as_ref().map(|action| &action.identity)
+        })
+        && after[index].relation.is_none()
 }
 
 fn independent_drawing_units(

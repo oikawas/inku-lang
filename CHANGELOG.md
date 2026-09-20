@@ -6,6 +6,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 36 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-21 — Avoid rejecting independent paraphrases with unrelated failed proposals
+
+A clause with an established primitive, explicit count, and action can be rechecked individually when its candidate preserves a simple reference namespace. Every instruction retains its source-ordered head, count, and action, and the repaired owner has no outgoing dependency. An unresolved later reference or another failed proposal does not alone reject it. Existing fact/owner validation and whole-candidate recompilation remain required. The completion prompt also asks models to consolidate redundant unaccepted wording into existing syntax or defaults that already carry the meaning. No grammar, rendering feature, or Score type is added.
+
 ### 2026-09-20 — Keep hole completion local and grounded in the original text
 
 Completion is clarified as normalization of word order, term position, combinations, and natural paraphrases into existing grammar. The prompt no longer blocks near-center to named-center paraphrases or recommends unaccepted support headings. A standalone ground/background clause may be checked separately from unresolved drawing clauses, while retaining the same support owner, outside meaning and diagnostics, and forbidding a new drawable head. Unsupported parts remain diagnostic while drawable content is retained; no path grammar, Score type, rendering feature, or engine version is added.

@@ -1114,6 +1114,23 @@ impl PipelineSnapshot {
                     limits,
                 )
                 .map_err(|failure| (failure.diagnostic.kind(), failure.hole_id))
+                .and_then(|validated| {
+                    if prompt.prompt_id != HOLE_COMPLETION_PROMPT_ID || unit.len() != 1 {
+                        return Ok(validated);
+                    }
+                    if let Some(hole) = holes.iter().find(|hole| {
+                        unit.contains(&hole.id)
+                            && !crate::hole_completion::standalone_repair_preserves_namespace(
+                                &base,
+                                &validated.compilation,
+                                hole,
+                            )
+                    }) {
+                        Err(("owner_association_changed", Some(hole.id.clone())))
+                    } else {
+                        Ok(validated)
+                    }
+                })
             };
             match checked {
                 Ok(validated) => {

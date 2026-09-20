@@ -49,6 +49,134 @@ def _wait_for(
     raise AssertionError(f"pipeline did not reach {phase}: {last}")
 
 
+def test_hole_provider_runs_after_current_safe_render_is_persisted() -> None:
+    order: list[str] = []
+
+    class Binding:
+        canvas_registry = {"registry": {"formats": []}}
+
+        @staticmethod
+        def step(snapshot_bytes: bytes, input_bytes: bytes) -> bytes:
+            request = json.loads(input_bytes)
+            payload = request["payload"]
+            rendered = None
+            if not snapshot_bytes:
+                snapshot = {
+                    "execution_id": "execution-1",
+                    "variation_id": "variation-1",
+                    "sequence": request["sequence"],
+                    "authority": {"revision": "1"},
+                    "document": {"source": "known hole"},
+                    "phase": {
+                        "tag": "awaiting_llm",
+                        "stage": "complete_visible_ddl_holes",
+                    },
+                    "delivery": {
+                        "score": {"instructions": [{"shape": "circle"}]}
+                    },
+                    "action": {
+                        "tag": "complete_visible_ddl_holes",
+                        "identity": {
+                            "action_id": "action-1",
+                            "attempt": 1,
+                            "request_digest": "request-1",
+                        },
+                        "delay_ms": "0",
+                    },
+                }
+            else:
+                snapshot = json.loads(snapshot_bytes)
+                snapshot["sequence"] = request["sequence"]
+                if payload["tag"] == "render":
+                    order.append("render")
+                    rendered = {"svg": "<svg><circle/></svg>"}
+                else:
+                    assert payload["tag"] == "effect_result"
+                    assert payload["result"]["tag"] == "provider_failed"
+                    snapshot["action"] = None
+                    snapshot["phase"] = {
+                        "tag": "needs_user_edit",
+                        "reason": "hole_completion_failed",
+                    }
+            return json.dumps(
+                {
+                    "kind": "output",
+                    "payload": {
+                        "result": {
+                            "snapshot": snapshot,
+                            "events": [],
+                            "rendered": rendered,
+                        }
+                    },
+                }
+            ).encode()
+
+    class Store:
+        def __init__(self):
+            self.saved: list[dict] = []
+
+        def create_execution(
+            self, _owner, _execution_id, _variation_id, _sequence, state_bytes
+        ) -> None:
+            self.saved.append(json.loads(state_bytes))
+
+        def compare_and_set_execution(
+            self,
+            _owner,
+            _execution_id,
+            *,
+            expected_sequence,
+            next_sequence,
+            state_bytes,
+        ) -> None:
+            assert int(next_sequence) == int(expected_sequence) + 1
+            self.saved.append(json.loads(state_bytes))
+
+    store = Store()
+
+    def provider(action: dict) -> dict:
+        saved = store.saved[-1]
+        assert saved["rendered"]["svg"] == "<svg><circle/></svg>"
+        assert saved["context"]["result"]["svg"] == "<svg><circle/></svg>"
+        order.append("provider")
+        return {
+            "tag": "provider_failed",
+            "identity": action["identity"],
+            "failure": "provider_rejected",
+            "elapsed_ms": "1",
+        }
+
+    def project(_owner, _snapshot, _context, rendered):
+        order.append("project")
+        return {"svg": rendered["svg"]}
+
+    service = PipelineService(
+        Binding(),
+        store,
+        config_for=lambda _owner, _source: _fixture_config(),
+        provider_for=lambda _owner: provider,
+        render_for=lambda _snapshot: {"options": {}, "clip": {}},
+        project_result=project,
+        max_workers=1,
+        max_effect_steps=2,
+        max_retained_runs=1,
+    )
+    try:
+        run = service._host("author", _fixture_config(), {})
+        run.start_new(
+            {"tag": "direct_ddl", "source": "place one circle. many square."}
+        )
+        service._drain(run)
+        view = run.view()
+        assert order == ["render", "project", "provider"]
+        assert view["phase"]["tag"] == "needs_user_edit"
+        assert view["delivery"]["score"]["instructions"]
+        assert view["rendered"]["svg"] == "<svg><circle/></svg>"
+        assert view["result"]["svg"] == "<svg><circle/></svg>"
+    finally:
+        service.close()
+
+
 def test_managed_api_persists_approved_patch_reload_and_legacy_fork(
     tmp_path,
 ) -> None:

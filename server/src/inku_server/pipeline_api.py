@@ -244,11 +244,39 @@ class PipelineService:
         if run.view()["busy"]:
             self._jobs[key] = self._pool.submit(self._drain, run)
 
+    def _render_payload(
+        self, run: CandidateExecution, command: dict
+    ) -> dict | None:
+        if self.render_with_context is not None:
+            return {
+                "tag": "render",
+                **self.render_with_context(
+                    run.snapshot(), run.context, command
+                ),
+            }
+        if self.render_for is not None and set(command) == {"tag"}:
+            return {"tag": "render", **self.render_for(run.snapshot())}
+        return None
+
     def _drain(self, run: CandidateExecution) -> None:
         # This is a host work cap, never a replacement retry policy.
         for _ in range(self.max_effect_steps):
-            if not run.view()["busy"]:
+            view = run.view()
+            if not view["busy"]:
                 return
+            snapshot = run.snapshot()
+            action = snapshot.get("action") or {}
+            delivery = snapshot.get("delivery") or {}
+            if (
+                action.get("tag") == "complete_visible_ddl_holes"
+                and delivery.get("score") is not None
+                and view["rendered"] is None
+            ):
+                payload = self._render_payload(run, {"tag": "perform"})
+                if payload is not None:
+                    # Persist the acknowledged source's safe performance before
+                    # bounded provider I/O can fail or produce a declined patch.
+                    run.command(payload)
             run.run_effect()
         if run.view()["busy"]:
             raise CandidateHostError("pipeline_effect_limit")
@@ -283,11 +311,8 @@ class PipelineService:
     def command(self, owner: str, execution_id: str, payload: dict) -> dict:
         run = self.execution(owner, execution_id)
         if payload.get("tag") == "perform":
-            if self.render_with_context is not None:
-                payload = {"tag": "render", **self.render_with_context(run.snapshot(), run.context, payload)}
-            elif self.render_for is not None and set(payload) == {"tag"}:
-                payload = {"tag": "render", **self.render_for(run.snapshot())}
-            else:
+            payload = self._render_payload(run, payload)
+            if payload is None:
                 raise HTTPException(422, "performance_unavailable")
         elif payload.get("tag") == "render":
             # A client cannot choose policy, canvas, catalog or palette through

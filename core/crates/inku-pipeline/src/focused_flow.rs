@@ -624,6 +624,7 @@ fn committed_ddl_and_approved_hole_patch_share_one_replayable_path() {
         state.authority.authority(),
         AuthoringAuthority::DescriptionAuthoritative
     );
+    let acknowledged_delivery = state.delivery.clone().unwrap();
 
     let edit = envelope(
         Some(&state),
@@ -635,6 +636,7 @@ fn committed_ddl_and_approved_hole_patch_share_one_replayable_path() {
     outputs.push(run(Some(&state), &edit));
     transcript.push(edit);
     state = outputs.last().unwrap().snapshot.clone();
+    assert_eq!(state.delivery.as_ref(), Some(&acknowledged_delivery));
     let edit_ack = envelope(Some(&state), ack(&state));
     outputs.push(run(Some(&state), &edit_ack));
     transcript.push(edit_ack);
@@ -648,9 +650,15 @@ fn committed_ddl_and_approved_hole_patch_share_one_replayable_path() {
         "complete_visible_ddl_holes",
         "committed known holes request completion without another user operation"
     );
+    let current_safe_delivery = state.delivery.clone().unwrap();
     assert!(
-        state.delivery.is_none(),
-        "an unapproved patch is not a Score"
+        !current_safe_delivery
+            .score
+            .as_ref()
+            .unwrap()
+            .instructions
+            .is_empty(),
+        "the acknowledged drawable survives while its known hole is completed"
     );
     let base = inku_ddl::compile_typed_ddl(
         state.document.as_ref().unwrap().document().unwrap(),
@@ -666,6 +674,82 @@ fn committed_ddl_and_approved_hole_patch_share_one_replayable_path() {
         base.holes,
         base.conflicts,
         base.blocking_diagnostics
+    );
+    let provider_retry = run(
+        Some(&state),
+        &envelope(
+            Some(&state),
+            PipelineInput::EffectResult {
+                result: EffectResult::ProviderFailed {
+                    identity: state.action.as_ref().unwrap().identity.clone(),
+                    failure: ProviderFailure::TransportUnavailable,
+                    elapsed_ms: DecimalU64::new(20),
+                },
+            },
+        ),
+    )
+    .snapshot;
+    assert_eq!(
+        provider_retry.delivery.as_ref(),
+        Some(&current_safe_delivery)
+    );
+    let provider_failed = run(
+        Some(&provider_retry),
+        &envelope(
+            Some(&provider_retry),
+            PipelineInput::EffectResult {
+                result: EffectResult::ProviderFailed {
+                    identity: provider_retry.action.as_ref().unwrap().identity.clone(),
+                    failure: ProviderFailure::TransportUnavailable,
+                    elapsed_ms: DecimalU64::new(20),
+                },
+            },
+        ),
+    )
+    .snapshot;
+    assert!(matches!(
+        provider_failed.phase,
+        PipelinePhase::NeedsUserEdit { .. }
+    ));
+    assert_eq!(
+        provider_failed.delivery.as_ref(),
+        Some(&current_safe_delivery)
+    );
+    let validation_retry = run(
+        Some(&state),
+        &envelope(
+            Some(&state),
+            PipelineInput::EffectResult {
+                result: EffectResult::VisibleDdlHolePatchGenerated {
+                    identity: state.action.as_ref().unwrap().identity.clone(),
+                    response: "{}".into(),
+                    elapsed_ms: DecimalU64::new(20),
+                },
+            },
+        ),
+    )
+    .snapshot;
+    let validation_failed = run(
+        Some(&validation_retry),
+        &envelope(
+            Some(&validation_retry),
+            PipelineInput::EffectResult {
+                result: EffectResult::VisibleDdlHolePatchGenerated {
+                    identity: validation_retry.action.as_ref().unwrap().identity.clone(),
+                    response: "{}".into(),
+                    elapsed_ms: DecimalU64::new(20),
+                },
+            },
+        ),
+    )
+    .snapshot;
+    assert!(matches!(
+        validation_failed.phase,
+        PipelinePhase::NeedsUserEdit { .. }
+    ));
+    assert_eq!(
+        validation_failed.delivery.as_ref(),
+        Some(&current_safe_delivery)
     );
     let hole = base.holes.first().expect("known quantity hole").clone();
     let patch = HolePatchResponse {
@@ -699,7 +783,23 @@ fn committed_ddl_and_approved_hole_patch_share_one_replayable_path() {
         panic!("{:?}", state.phase);
     };
     assert!(state.document.as_ref().unwrap().source.contains("many"));
-    assert!(state.action.is_none() && state.delivery.is_none());
+    assert!(state.action.is_none());
+    assert_eq!(state.delivery.as_ref(), Some(&current_safe_delivery));
+    let declined = run(
+        Some(&state),
+        &envelope(
+            Some(&state),
+            PipelineInput::DeclinePatch {
+                proposal_digest: proposal_digest.clone(),
+            },
+        ),
+    )
+    .snapshot;
+    assert!(matches!(
+        declined.phase,
+        PipelinePhase::NeedsUserEdit { .. }
+    ));
+    assert_eq!(declined.delivery.as_ref(), Some(&current_safe_delivery));
     let approve = envelope(
         Some(&state),
         PipelineInput::ApprovePatch {
@@ -711,6 +811,25 @@ fn committed_ddl_and_approved_hole_patch_share_one_replayable_path() {
     transcript.push(approve);
     state = outputs.last().unwrap().snapshot.clone();
     assert!(state.document.as_ref().unwrap().source.contains("many"));
+    assert_eq!(state.delivery.as_ref(), Some(&current_safe_delivery));
+    let commit_failed = run(
+        Some(&state),
+        &envelope(
+            Some(&state),
+            PipelineInput::EffectResult {
+                result: EffectResult::HostCommitFailed {
+                    identity: state.action.as_ref().unwrap().identity.clone(),
+                    actual_revision: Some(DecimalU64::new(state.authority.revision())),
+                },
+            },
+        ),
+    )
+    .snapshot;
+    assert!(matches!(commit_failed.phase, PipelinePhase::Failed { .. }));
+    assert_eq!(
+        commit_failed.delivery.as_ref(),
+        Some(&current_safe_delivery)
+    );
     let patch_ack = envelope(Some(&state), ack(&state));
     outputs.push(run(Some(&state), &patch_ack));
     transcript.push(patch_ack);

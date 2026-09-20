@@ -313,9 +313,15 @@ impl PipelineSnapshot {
                     != Some(delivery.source_digest.as_str())
                 || !matches!(
                     self.phase,
-                    PipelinePhase::ScoreReady
+                    PipelinePhase::AwaitingLlm {
+                        stage: LlmStage::CompleteVisibleDdlHoles,
+                        ..
+                    } | PipelinePhase::AwaitingVisibleDdlCommit { .. }
+                        | PipelinePhase::AwaitingPatchApproval { .. }
+                        | PipelinePhase::ScoreReady
                         | PipelinePhase::Completed
                         | PipelinePhase::NeedsUserEdit { .. }
+                        | PipelinePhase::Failed { .. }
                 )
             {
                 return Err(ProtocolError::StaleResult);
@@ -507,7 +513,9 @@ impl PipelineSnapshot {
             authority,
             reason: reason.into(),
         };
-        self.delivery = None;
+        // The proposed bytes are not authoritative until the host ACK. Keep
+        // the last acknowledged delivery available if that compare-and-set
+        // fails; the ACK branch replaces it from the newly committed source.
         self.event(events, "visible_ddl_ready", payload.clone())?;
         self.issue("commit_visible_normalized_ddl", payload, 0, events)
     }
@@ -535,7 +543,9 @@ impl PipelineSnapshot {
             hole_ids,
             elapsed_ms: DecimalU64::new(0),
         };
-        self.delivery = None;
+        if stage != LlmStage::CompleteVisibleDdlHoles {
+            self.delivery = None;
+        }
         self.issue(
             stage.action_name(),
             json!({"prompt": prompt, "policy": policy}),
@@ -1231,10 +1241,20 @@ pub fn advance(
             }
             PipelineInput::EffectResult { result } => state.accept_result(result, &mut events)?,
             PipelineInput::Render { options, clip } => {
-                if !matches!(
+                let final_render = matches!(
                     state.phase,
                     PipelinePhase::ScoreReady | PipelinePhase::Completed
-                ) {
+                );
+                let current_safe_render = matches!(
+                    state.phase,
+                    PipelinePhase::AwaitingLlm {
+                        stage: LlmStage::CompleteVisibleDdlHoles,
+                        ..
+                    } | PipelinePhase::AwaitingPatchApproval { .. }
+                        | PipelinePhase::NeedsUserEdit { .. }
+                        | PipelinePhase::Failed { .. }
+                );
+                if !final_render && !current_safe_render {
                     return Err(ProtocolError::InvalidState);
                 }
                 let delivery = state.delivery.as_ref().ok_or(ProtocolError::InvalidState)?;
@@ -1247,12 +1267,14 @@ pub fn advance(
                     )
                     .map_err(|_| ProtocolError::SemanticViolation)?,
                 );
-                state.phase = PipelinePhase::Completed;
-                state.event(
-                    &mut events,
-                    "completed",
-                    json!({"render_engine": inku_render::RENDER_ENGINE_VERSION}),
-                )?;
+                if final_render {
+                    state.phase = PipelinePhase::Completed;
+                    state.event(
+                        &mut events,
+                        "completed",
+                        json!({"render_engine": inku_render::RENDER_ENGINE_VERSION}),
+                    )?;
+                }
             }
         }
         state
@@ -1460,7 +1482,7 @@ impl PipelineSnapshot {
                     // Known holes enter the shared completion policy without a
                     // separate user command. Declines and failures do not re-enter
                     // this commit-only branch; any retry is bounded by its action.
-                    self.delivery = None;
+                    self.delivery = Some(delivery);
                     if let Err(error) = self.complete_holes(hole_ids, events) {
                         // This revision is already committed. Preserve it even if
                         // a completion prompt cannot be constructed within policy.

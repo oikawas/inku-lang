@@ -456,6 +456,34 @@ fn target_resolution_failure(
     range: SourceSpan,
 ) -> Option<VisiblePatchDiagnostic> {
     if hole.kind == "unresolved_clause" {
+        // A support-only proposal cannot introduce drawable owners or alter the
+        // source-ordered reference namespace. This also permits independent
+        // support repair while an unrelated drawable clause remains unresolved.
+        if let Some(owner) = base.semantic_document.as_ref().and_then(|semantic| {
+            semantic
+                .instruction_association
+                .association
+                .clause_stream
+                .clauses
+                .iter()
+                .find(|clause| clause.span == hole.span)
+                .and_then(crate::compiler_lock::isolated_support_clause_owner)
+        }) {
+            let explicit = candidate
+                .deliveries
+                .iter()
+                .filter(|item| {
+                    item.kind == SemanticDeliveryKind::Explicit
+                        && item.span.is_some_and(|span| overlaps(span, range))
+                })
+                .collect::<Vec<_>>();
+            if !explicit.iter().any(|item| item.identity.owner == owner)
+                || explicit.iter().any(|item| item.identity.owner != owner)
+                || candidate_has_drawable_instruction(candidate, range)
+            {
+                return Some(VisiblePatchDiagnostic::OwnerAssociationChanged);
+            }
+        }
         let required = typed_fact_counts(base, hole.span);
         let delivered = typed_fact_counts(candidate, range);
         if required

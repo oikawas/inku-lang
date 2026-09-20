@@ -1434,6 +1434,33 @@ fn project_deliveries(
     projection
 }
 
+/// A support-only hole has no drawable, quantity, relation, or modifier owner.
+/// This recognizes existing compiler evidence, not additional source grammar.
+pub fn isolated_support_clause_owner(
+    clause: &crate::ClauseSegment,
+) -> Option<SemanticDeliveryOwner> {
+    let mut grounds = 0;
+    let mut colors = 0;
+    let mut background = false;
+    for atom in &clause.atoms {
+        match atom {
+            ClauseAtom::CoreRole(term) if term.role == CoreRoleKind::Ground => grounds += 1,
+            ClauseAtom::CoreRole(term) if term.role == CoreRoleKind::Color => colors += 1,
+            ClauseAtom::FunctionWord { surface, .. } => {
+                background |= matches!(surface.as_str(), "背景" | "background");
+            }
+            ClauseAtom::UnresolvedDiagnostic(diagnostic)
+                if diagnostic.kind == NeutralDiagnosticKind::Unknown && !diagnostic.recognized => {}
+            _ => return None,
+        }
+    }
+    match (grounds, colors, background) {
+        (1, 0, false) => Some(SemanticDeliveryOwner::Ground),
+        (0, 1, true) => Some(SemanticDeliveryOwner::Background),
+        _ => None,
+    }
+}
+
 fn patchable_unresolved_clause_spans(
     semantic_document: &SemanticDocumentResult,
     unresolved_clause_spans: &[SourceSpan],

@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ### 2026-09-20 — Keep hole completion local and grounded in the original text
 
+Completion is clarified as normalization of word order, term position, combinations, and natural paraphrases into existing grammar. The prompt no longer blocks near-center to named-center paraphrases or recommends unaccepted support headings. A standalone ground/background clause may be checked separately from unresolved drawing clauses, while retaining the same support owner, outside meaning and diagnostics, and forbidding a new drawable head. Unsupported parts remain diagnostic while drawable content is retained; no path grammar, Score type, rendering feature, or engine version is added.
+
 The new Stage 2 request supplies the original text, established facts, the smallest compiler-confirmed read-only context, and accepted grammar. It removes the rule that required alternation merely because one target had multiple colors or tools, and forbids adding unspecified order or quantity splits. When the meaning cannot be represented faithfully, the provider returns an unresolved reason rather than forcing a different meaning.
 
 Responses now contain a proposal or unresolved result for each short request-local ID. Shared Rust checks the complete ID set and restores the original hole, span, digests, and compiler lock from the saved request. New requests deliver the structured response schema through the Server and Android providers without repeating it in the system text. Persisted pending requests from the previous edition still use only that edition's response format.

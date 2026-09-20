@@ -153,6 +153,39 @@ pub(crate) fn independent_units(
     compilation: &TypedDdlCompilation,
     holes: &[&TypedHole],
 ) -> Vec<Vec<String>> {
+    // Support repair cannot change drawable ordinals: the validator requires the
+    // same support owner and rejects added drawable/other explicit owners. Keep
+    // declarations of the same support kind together and revalidate the union.
+    let mut supports = BTreeMap::<Owner, Vec<String>>::new();
+    let mut drawing_holes = Vec::new();
+    for hole in holes {
+        let support = compilation.semantic_document.as_ref().and_then(|semantic| {
+            semantic
+                .instruction_association
+                .association
+                .clause_stream
+                .clauses
+                .iter()
+                .find(|clause| clause.span == hole.allowed_span)
+                .and_then(inku_ddl::compiler_lock::isolated_support_clause_owner)
+        });
+        if let Some(owner) = support {
+            supports.entry(owner).or_default().push(hole.id.clone());
+        } else {
+            drawing_holes.push(*hole);
+        }
+    }
+    let mut units = supports.into_values().collect::<Vec<_>>();
+    if !drawing_holes.is_empty() {
+        units.extend(independent_drawing_units(compilation, &drawing_holes));
+    }
+    units
+}
+
+fn independent_drawing_units(
+    compilation: &TypedDdlCompilation,
+    holes: &[&TypedHole],
+) -> Vec<Vec<String>> {
     let atomic = || vec![holes.iter().map(|hole| hole.id.clone()).collect()];
     let Some(semantic) = &compilation.semantic_document else {
         return atomic();

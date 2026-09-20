@@ -444,7 +444,7 @@ fn execute_compilation_with_resources(
         }
     };
     let upstream_omitted = !prepared.upstream_diagnostics.is_empty();
-    let plan_has_drawable_content = !plan.objects().unwrap().is_empty()
+    let score_has_drawable_content = !materialized.score.instructions.is_empty()
         || transformed
             .verified_effective_view()
             .original_semantic_document()
@@ -455,7 +455,7 @@ fn execute_compilation_with_resources(
         || plan.outcome() == CompositionPlanOutcome::ReadyWithOmissions
         || !materialized.resource_omissions.is_empty()
         || !materialized.relation_omissions.is_empty();
-    let outcome = if upstream_omitted && !plan_has_drawable_content {
+    let outcome = if has_omissions && !score_has_drawable_content {
         ScoreLoweringOutcome::Stopped
     } else if has_omissions {
         ScoreLoweringOutcome::CompleteWithOmissions

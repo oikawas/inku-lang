@@ -989,6 +989,85 @@ fn all_omitted_stops_under_legacy_stop() {
 }
 
 #[test]
+fn resource_omissions_cannot_complete_an_empty_score() {
+    let budget = inku_score::ResourceBudget {
+        maximum: inku_score::ResourceDemand {
+            logical_objects: 4096,
+            primitive_marks: 400,
+            object_templates: 64,
+            maximum_per_template_primitive_marks: 240,
+            maximum_resolved_count: 2000,
+            template_nodes: 128,
+            anchor_instances: 4096,
+            transform_instances: 4096,
+            placement_instances: 64,
+            fill_instances: 64,
+        },
+    };
+    for (count, later, expected_outcome, expected_origin) in [
+        (300, "", ScoreLoweringOutcome::Stopped, None),
+        (240, "", ScoreLoweringOutcome::Complete, Some(0)),
+        (
+            300,
+            " place one blue circle at center.",
+            ScoreLoweringOutcome::CompleteWithOmissions,
+            Some(1),
+        ),
+    ] {
+        let source = format!("scatter {count} red square at center.{later}");
+        let result = inku_ddl::compile_ddl_to_score_with_resources(
+            document(&source, &[]),
+            &[],
+            Some(23),
+            LIMITS,
+            ScoreLoweringContext::resolve("square", Color::White).unwrap(),
+            None,
+            ScoreErrorPolicy::Stop,
+            inku_score::HardResourcePolicy {
+                identity: "all-resource-omitted-test.v1".to_owned(),
+                budget,
+            },
+            inku_score::OperationalResourceBudget(budget),
+        );
+        assert_eq!(
+            result.outcome(),
+            expected_outcome,
+            "count={count}, later={later}"
+        );
+        assert_eq!(result.compilation().document.source(), source);
+        let semantic = result.compilation().semantic_document.as_ref().unwrap();
+        assert_eq!(
+            semantic.ast.instructions[0].entity.quantity.as_ref().unwrap().value,
+            count
+        );
+        assert_eq!(result.resource_omissions().len(), usize::from(count > 240));
+        if count > 240 {
+            let omission = &result.resource_omissions()[0];
+            assert_eq!(
+                omission.owner,
+                inku_ddl::PlanResourceOwner::SourceInstruction {
+                    source_instruction_index: 0,
+                }
+            );
+            assert!(matches!(
+                omission.cause.reason,
+                inku_ddl::PlanResourceFailure::BudgetExceeded(_)
+            ));
+        }
+        if let Some(instruction_index) = expected_origin {
+            assert_eq!(result.score().unwrap().instructions.len(), 1);
+            assert_eq!(
+                result.instruction_origins(),
+                [ScoreInstructionOrigin::SourceInstruction { instruction_index }]
+            );
+        } else {
+            assert!(result.score().is_none());
+            assert!(result.instruction_origins().is_empty());
+        }
+    }
+}
+
+#[test]
 fn undelivered_occurrences_preserve_accepted_drawables_in_the_same_clause() {
     let source = concat!(
         "place red circle at horizontal 0.5, vertical 0.5 many mystery. ",

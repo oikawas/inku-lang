@@ -59,6 +59,39 @@ fn unresolved_drawing_clauses_are_bounded_known_holes() {
 }
 
 #[test]
+fn unresolved_clause_owns_its_invalid_sequence_diagnostic() {
+    let source = "背景を灰で埋める。赤いクレヨンの折れ線を右上がりから右下がりへ交互に組み合わせて、上端から下端へ一本引く。細かく震える。";
+    let result = compile(
+        source,
+        ResolvedInstructionLanguage::Ja,
+        &[],
+        Some(23),
+        LIMITS,
+    );
+
+    assert_eq!(
+        result.compiler_lock.as_ref().unwrap().state,
+        CompilerLockState::IncompleteKnownHole,
+        "holes={:?}; conflicts={:?}; blocking={:?}",
+        result.holes,
+        result.conflicts,
+        result.blocking_diagnostics
+    );
+    assert!(result.conflicts.is_empty(), "{:?}", result.conflicts);
+    assert!(
+        result.blocking_diagnostics.is_empty(),
+        "{:?}",
+        result.blocking_diagnostics
+    );
+    assert_eq!(result.holes.len(), 1, "{:?}", result.holes);
+    let hole = &result.holes[0];
+    assert_eq!(
+        &source[hole.allowed_span.start_byte..hole.allowed_span.end_byte],
+        "赤いクレヨンの折れ線を右上がりから右下がりへ交互に組み合わせて、上端から下端へ一本引く"
+    );
+}
+
+#[test]
 fn layout_direction_is_attested_separately_and_absence_adds_no_null_key() {
     let result = compile(
         "arrange three horizontal lines vertically at center.",

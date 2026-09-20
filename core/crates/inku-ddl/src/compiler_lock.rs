@@ -950,6 +950,18 @@ fn project_deliveries(
 
     let association = &semantic_document.instruction_association.association;
     for issue in &association.sequence_issues {
+        let issue_spans = std::iter::once(issue.operator.provenance.source.span)
+            .chain(
+                issue
+                    .items
+                    .iter()
+                    .map(|item| item.provenance.source.span),
+            )
+            .chain(issue.markers.iter().map(|marker| marker.span))
+            .collect::<Vec<_>>();
+        if spans_share_patchable_clause(&issue_spans, &patchable_clause_spans) {
+            continue;
+        }
         add_blocking_with_members(
             &mut projection,
             issue.kind.as_str(),
@@ -974,6 +986,12 @@ fn project_deliveries(
                 .occurrences
                 .iter()
                 .all(|occurrence| background_spans.contains(&occurrence.source().span))
+        {
+            continue;
+        }
+        if issue.kind == SemanticAssociationIssueKind::MissingEntityHead
+            && issue.upstream_diagnostic.is_none()
+            && !issue.occurrences.is_empty()
         {
             continue;
         }
@@ -1372,6 +1390,18 @@ fn project_deliveries(
 fn patchable_unresolved_clause_spans(
     semantic_document: &SemanticDocumentResult,
 ) -> Vec<SourceSpan> {
+    let unresolved_spans = semantic_document
+        .instruction_association
+        .association
+        .issues
+        .iter()
+        .filter(|issue| issue.kind == SemanticAssociationIssueKind::UpstreamUnknown)
+        .filter_map(|issue| issue.upstream_diagnostic.as_ref())
+        .filter(|diagnostic| {
+            diagnostic.kind == NeutralDiagnosticKind::Unknown && !diagnostic.recognized
+        })
+        .map(|diagnostic| diagnostic.span)
+        .collect::<Vec<_>>();
     semantic_document
         .instruction_association
         .association
@@ -1379,13 +1409,8 @@ fn patchable_unresolved_clause_spans(
         .clauses
         .iter()
         .filter(|clause| {
-            let has_unknown = clause.atoms.iter().any(|atom| {
-                matches!(
-                    atom,
-                    ClauseAtom::UnresolvedDiagnostic(diagnostic)
-                        if diagnostic.kind == NeutralDiagnosticKind::Unknown
-                            && !diagnostic.recognized
-                )
+            let has_unknown = unresolved_spans.iter().any(|span| {
+                clause.span.start_byte <= span.start_byte && span.end_byte <= clause.span.end_byte
             });
             let has_primitive_or_ground = clause.atoms.iter().any(|atom| {
                 matches!(

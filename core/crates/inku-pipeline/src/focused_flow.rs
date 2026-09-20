@@ -752,6 +752,43 @@ fn committed_ddl_and_approved_hole_patch_share_one_replayable_path() {
         Some(&current_safe_delivery)
     );
     let hole = base.holes.first().expect("known quantity hole").clone();
+    let unresolved_patch = HolePatchResponse {
+        schema_id: inku_ddl::VISIBLE_DDL_PATCH_SCHEMA_ID.into(),
+        base_source_digest: lock.visible_source_digest.clone(),
+        base_compiler_lock_digest: lock.full_digest.clone(),
+        edits: vec![HolePatchEditResponse {
+            hole_id: hole.id.clone(),
+            allowed_span: hole.allowed_span.into(),
+            expected_range_digest: hole.expected_range_digest.clone(),
+            replacement: "many square.".into(),
+        }],
+    };
+    let unresolved = run(
+        Some(&state),
+        &envelope(
+            Some(&state),
+            PipelineInput::EffectResult {
+                result: EffectResult::VisibleDdlHolePatchGenerated {
+                    identity: state.action.as_ref().unwrap().identity.clone(),
+                    response: serde_json::to_string(&unresolved_patch).unwrap(),
+                    elapsed_ms: DecimalU64::new(20),
+                },
+            },
+        ),
+    );
+    assert!(matches!(
+        unresolved.snapshot.phase,
+        PipelinePhase::NeedsUserEdit { .. }
+    ));
+    assert!(unresolved.events.iter().any(|event| {
+        event.tag == "needs_user_edit"
+            && event.payload["reason"] == "semantic_violation"
+            && event.payload["detail"] == "target_unresolved"
+    }));
+    assert_eq!(
+        unresolved.snapshot.delivery.as_ref(),
+        Some(&current_safe_delivery)
+    );
     let patch = HolePatchResponse {
         schema_id: inku_ddl::VISIBLE_DDL_PATCH_SCHEMA_ID.into(),
         base_source_digest: lock.visible_source_digest.clone(),

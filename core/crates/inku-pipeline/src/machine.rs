@@ -915,11 +915,11 @@ impl PipelineSnapshot {
                 self.phase = PipelinePhase::NeedsUserEdit {
                     reason: "hole_completion_failed".into(),
                 };
-                self.event(
-                    events,
-                    "needs_user_edit",
-                    json!({"stage": stage, "reason": failure}),
-                )
+                let mut payload = json!({"stage": stage, "reason": failure});
+                if let Some(detail) = detail {
+                    payload["detail"] = json!(detail);
+                }
+                self.event(events, "needs_user_edit", payload)
             }
         }
     }
@@ -1061,8 +1061,13 @@ impl PipelineSnapshot {
                         .map_err(|_| ProtocolError::InvalidPolicy)?,
                 ) {
                     Ok(candidate) => candidate,
-                    Err(_) => {
-                        return self.failure(ProviderFailure::SemanticViolation, spent_ms, events);
+                    Err(error) => {
+                        return self.failure_with_detail(
+                            ProviderFailure::SemanticViolation,
+                            spent_ms,
+                            Some(error.kind()),
+                            events,
+                        );
                     }
                 };
                 let candidate = VisibleDocument::from_document(&candidate.document);

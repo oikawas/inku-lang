@@ -1316,9 +1316,13 @@ const STAGE1_NORMALIZER_RESPONSE_ENDING_EN: &str = " Return only the specified J
 
 const HOLE_SYSTEM_JA: &str = r#"あなたは inku の可視DDL hole patch提案器。source_regionsの短い根拠と確定済みtyped_factsを使い、selected_holesに列挙された各holeのallowed_spanだけへ、accepted_saijiki_vocabularyと通常の数値・文法からなる可視DDL replacementを提案する。
 
+Replacementは対応するtyped_factsのsource occurrenceと個数を保持した、compilerが受理できる完結した節にする。unresolved_clauseはbackgroundまたはgroundを成立させるか、一つの描画headとactionをともに成立させる。それ以外はselected_holesのexpected_ownerを成立させる。
+
 hole ID、range、range digest、source digest、compiler lock digestをそのまま返す。選択されていない範囲、明示済みの意味、MacroDefinition、Score、typed-only fieldを変更・生成しない。記述入力を推測せず、思考過程、説明、whole documentを返さない。指定されたpatch JSONだけを返す。"#;
 
 const HOLE_SYSTEM_EN: &str = r#"You propose visible inku DDL hole patches. Use only the short evidence in source_regions and the confirmed typed_facts. Propose visible DDL replacement text, using accepted_saijiki_vocabulary and ordinary numeric/compiler grammar, only inside each allowed_span listed in selected_holes.
+
+Make each replacement a complete compiler-accepted clause that preserves the source occurrences and counts in its typed_facts. An unresolved_clause must establish background or ground, or both one drawing head and an action. Other holes must establish the expected_owner in selected_holes.
 
 Return each hole ID, range, range digest, source digest, and compiler lock digest unchanged. Do not change an unselected range or explicit meaning, and do not generate MacroDefinition data, a Score, typed-only fields, a description, chain of thought, explanation, or a whole document. Return only the specified patch JSON."#;
 
@@ -1468,6 +1472,12 @@ mod tests {
         assert!(facts.contains(&("quantity", "30")));
         assert!(facts.contains(&("touch", "tezawari:クレヨン")));
         assert!(facts.contains(&("touch", "tezawari:コンピュータ")));
+        assert!(
+            prompt
+                .system
+                .contains("typed_factsのsource occurrenceと個数を保持")
+        );
+        assert!(prompt.system.contains("一つの描画headとactionをともに成立"));
     }
 
     #[test]

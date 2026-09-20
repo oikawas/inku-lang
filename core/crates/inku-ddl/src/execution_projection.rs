@@ -93,7 +93,7 @@ pub(crate) fn project_compilation_for_execution(
     }
 
     let mut keep = vec![true; semantic.ast.instructions.len()];
-    let mut omitted_clauses = BTreeSet::new();
+    let mut omitted_spans = Vec::new();
     let mut omitted_relation_indices = BTreeSet::new();
     let mut omitted_group_relations = BTreeSet::new();
     let mut diagnostics = Vec::new();
@@ -143,46 +143,26 @@ pub(crate) fn project_compilation_for_execution(
             } else if reason == "conflicting_backgrounds" {
                 CompilerExecutionOmissionUnit::BackgroundCandidates
             } else if let Some(span) = span {
-                let exact_macro = semantic.ast.instructions.iter().enumerate().find_map(
-                    |(index, instruction)| match &instruction.entity.head {
-                        SemanticHead::MacroInvocation(head)
-                            if head.provenance.source.span == span =>
-                        {
-                            Some((index, head.provenance.ordinal))
-                        }
-                        SemanticHead::Primitive(_) | SemanticHead::MacroInvocation(_) => None,
-                    },
-                );
-                if let Some((index, invocation_ordinal)) = exact_macro {
-                    keep[index] = false;
-                    CompilerExecutionOmissionUnit::MacroInvocation {
-                        source_instruction_index: index,
-                        invocation_ordinal,
-                    }
+                omitted_spans.push(span);
+                let indices = semantic
+                    .ast
+                    .instructions
+                    .iter()
+                    .enumerate()
+                    .filter_map(|(index, instruction)| {
+                        (instruction.entity.head.source().span == span).then_some(index)
+                    })
+                    .collect::<Vec<_>>();
+                if indices.is_empty() {
+                    // Association has already kept unresolved fields and grammar
+                    // occurrences out of the accepted AST. Sharing their clause
+                    // does not make an otherwise accepted head their owner.
+                    CompilerExecutionOmissionUnit::SourceOccurrence { span }
                 } else {
-                    let clauses = clauses_for_span(compilation, span);
-                    omitted_clauses.extend(clauses.iter().copied());
-                    let indices = semantic
-                        .ast
-                        .instructions
-                        .iter()
-                        .enumerate()
-                        .filter_map(|(index, instruction)| {
-                            clauses
-                                .contains(&instruction.entity.head.source().clause_index)
-                                .then_some(index)
-                        })
-                        .collect::<Vec<_>>();
-                    if indices.is_empty() {
-                        CompilerExecutionOmissionUnit::Clause {
-                            clause_index: clauses.first().copied().unwrap_or(0),
-                        }
-                    } else {
-                        for index in &indices {
-                            keep[*index] = false;
-                        }
-                        macro_or_instruction_unit(&semantic.ast, &indices)
+                    for index in &indices {
+                        keep[*index] = false;
                     }
+                    macro_or_instruction_unit(&semantic.ast, &indices)
                 }
             } else {
                 return ExecutionProjectionResult::Stopped(stopped_diagnostics(compilation));
@@ -198,7 +178,7 @@ pub(crate) fn project_compilation_for_execution(
 
     omit_typed_dependencies(
         semantic,
-        &omitted_clauses,
+        &omitted_spans,
         &mut keep,
         &mut omitted_relation_indices,
         &mut diagnostics,
@@ -744,35 +724,6 @@ fn stops_all_execution(kind: &str, span: Option<crate::SourceSpan>) -> bool {
         )
 }
 
-fn clauses_for_span(compilation: &TypedDdlCompilation, span: crate::SourceSpan) -> Vec<usize> {
-    compilation
-        .accepted_parameter_binding()
-        .map(|binding| {
-            binding
-                .macro_resolution
-                .relation_reference_evidence
-                .attachment_evidence
-                .noun_phrase
-                .clause_stream
-                .clauses
-                .iter()
-                .enumerate()
-                .filter_map(|(index, clause)| {
-                    clause
-                        .atoms
-                        .iter()
-                        .any(|atom| spans_overlap(atom.span(), span))
-                        .then_some(index)
-                })
-                .collect()
-        })
-        .unwrap_or_default()
-}
-
-fn spans_overlap(left: crate::SourceSpan, right: crate::SourceSpan) -> bool {
-    left.start_byte < right.end_byte && right.start_byte < left.end_byte
-}
-
 fn macro_or_instruction_unit(
     ast: &SemanticDocumentAst,
     indices: &[usize],
@@ -792,7 +743,7 @@ fn macro_or_instruction_unit(
 
 fn omit_typed_dependencies(
     semantic: &crate::SemanticDocumentResult,
-    omitted_clauses: &BTreeSet<usize>,
+    omitted_spans: &[crate::SourceSpan],
     keep: &mut [bool],
     omitted_relation_indices: &mut BTreeSet<usize>,
     diagnostics: &mut Vec<CompilerExecutionDiagnostic>,
@@ -844,13 +795,12 @@ fn omit_typed_dependencies(
         }
     }
     for edge in &semantic.ast.continuations {
-        if omitted_clauses.contains(&edge.reintroduced_head.source().clause_index)
-            || omitted_clauses.contains(&edge.marker.clause_index)
-            || omitted_clauses.iter().any(|clause| {
-                edge.consumed_upstream_spans
-                    .iter()
-                    .any(|span| clauses_for_semantic(semantic, *span).contains(clause))
-            })
+        if omitted_spans.contains(&edge.reintroduced_head.source().span)
+            || omitted_spans.contains(&edge.marker.span)
+            || edge
+                .consumed_upstream_spans
+                .iter()
+                .any(|span| omitted_spans.contains(span))
         {
             keep[edge.target_instruction_index] = false;
             diagnostics.push(CompilerExecutionDiagnostic {
@@ -976,27 +926,6 @@ fn omit_retained_relations(
             ast.instructions[projected_index].relation = None;
         }
     }
-}
-
-fn clauses_for_semantic(
-    semantic: &crate::SemanticDocumentResult,
-    span: crate::SourceSpan,
-) -> Vec<usize> {
-    semantic
-        .instruction_association
-        .association
-        .clause_stream
-        .clauses
-        .iter()
-        .enumerate()
-        .filter_map(|(index, clause)| {
-            clause
-                .atoms
-                .iter()
-                .any(|atom| spans_overlap(atom.span(), span))
-                .then_some(index)
-        })
-        .collect()
 }
 
 fn retain_ast(
@@ -1172,7 +1101,7 @@ mod tests {
         let mut diagnostics = Vec::new();
         omit_typed_dependencies(
             &semantic,
-            &BTreeSet::new(),
+            &[],
             &mut keep,
             &mut BTreeSet::from([1]),
             &mut diagnostics,

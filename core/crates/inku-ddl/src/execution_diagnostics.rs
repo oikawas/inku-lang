@@ -18,6 +18,10 @@ pub enum CompilerExecutionIssueKind {
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum CompilerExecutionOmissionUnit {
+    /// An undelivered field or grammar occurrence, separate from accepted drawables.
+    SourceOccurrence {
+        span: SourceSpan,
+    },
     SourceInstructions {
         instruction_indices: Vec<usize>,
     },

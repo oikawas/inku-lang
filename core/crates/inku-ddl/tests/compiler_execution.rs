@@ -989,45 +989,102 @@ fn all_omitted_stops_under_legacy_stop() {
 }
 
 #[test]
-fn continue_omits_a_typed_count_failure_and_keeps_an_independent_instruction() {
-    let source =
-        "place many red circle at horizontal 0.5, vertical 0.5. place one red square at center.";
-    let result = execute(source, &[], LIMITS, ScoreErrorPolicy::OmitAndContinue);
-
-    assert_eq!(result.compilation().document.source(), source);
-    assert_eq!(
-        result.compilation().compiler_lock.as_ref().unwrap().state,
-        CompilerLockState::BlockedConflict
+fn undelivered_occurrences_preserve_accepted_drawables_in_the_same_clause() {
+    let source = concat!(
+        "place red circle at horizontal 0.5, vertical 0.5 many mystery. ",
+        "place one red square at center."
     );
-    assert!(!result.compilation().holes.is_empty());
-    assert_eq!(
-        result.outcome(),
-        ScoreLoweringOutcome::CompleteWithOmissions,
-        "{:?}",
-        result
-    );
-    let score = result
-        .score()
-        .expect("independent instruction remains executable");
-    assert_eq!(score.instructions.len(), 1);
-    assert_eq!(score.instructions[0].primitive, Primitive::Square);
-    assert_eq!(
-        result.instruction_origins(),
-        [ScoreInstructionOrigin::SourceInstruction {
-            instruction_index: 1
-        }]
-    );
-    assert!(
-        result
-            .upstream_diagnostics()
-            .iter()
-            .any(|diagnostic| matches!(
+    let continued = execute(source, &[], LIMITS, ScoreErrorPolicy::OmitAndContinue);
+    let stopped_policy = execute(source, &[], LIMITS, ScoreErrorPolicy::Stop);
+    for result in [&continued, &stopped_policy] {
+        assert_eq!(result.compilation().document.source(), source);
+        assert_eq!(
+            result.outcome(),
+            ScoreLoweringOutcome::CompleteWithOmissions,
+            "{:?} {:?}",
+            result.upstream_diagnostics(),
+            result.downstream_diagnostics()
+        );
+        let score = result.score().unwrap();
+        assert_eq!(
+            score.instructions.len(),
+            2,
+            "{:?}",
+            result.downstream_diagnostics()
+        );
+        assert_eq!(score.instructions[0].primitive, Primitive::Circle);
+        assert_eq!(score.instructions[1].primitive, Primitive::Square);
+        assert_eq!(
+            result.instruction_origins(),
+            [0, 1].map(|instruction_index| {
+                ScoreInstructionOrigin::SourceInstruction { instruction_index }
+            })
+        );
+        let semantic = result.compilation().semantic_document.as_ref().unwrap();
+        assert_eq!(semantic.ast.instructions[0].entity.quantity, None);
+        for (kind, text) in [("upstream_hole", "many"), ("upstream_unknown", "mystery")] {
+            let diagnostic = result
+                .upstream_diagnostics()
+                .iter()
+                .find(|diagnostic| diagnostic.reason == kind)
+                .unwrap();
+            let span = diagnostic.span.unwrap();
+            assert_eq!(&source[span.start_byte..span.end_byte], text);
+            assert_eq!(
                 diagnostic.disposition,
-                CompilerExecutionDisposition::Omitted { .. }
-            ))
+                CompilerExecutionDisposition::Omitted {
+                    unit: CompilerExecutionOmissionUnit::SourceOccurrence { span }
+                }
+            );
+        }
+    }
+    assert_eq!(continued.score(), stopped_policy.score());
+    assert_eq!(
+        continued.upstream_diagnostics(),
+        stopped_policy.upstream_diagnostics()
     );
-    assert!(result.execution_pre_expansion_digest().is_some());
-    assert!(result.effective_stage15_digest().is_some());
+    let budget = inku_score::ResourceBudget {
+        maximum: inku_score::ResourceDemand {
+            logical_objects: 8,
+            primitive_marks: 8,
+            object_templates: 8,
+            maximum_per_template_primitive_marks: 8,
+            maximum_resolved_count: 8,
+            template_nodes: 8,
+            anchor_instances: 8,
+            transform_instances: 8,
+            placement_instances: 8,
+            fill_instances: 8,
+        },
+    };
+    let resource_result = inku_ddl::compile_ddl_to_score_with_resources(
+        document(source, &[]),
+        &[],
+        Some(23),
+        LIMITS,
+        ScoreLoweringContext::resolve("square", Color::White).unwrap(),
+        None,
+        ScoreErrorPolicy::Stop,
+        inku_score::HardResourcePolicy {
+            identity: "occurrence-recovery-test.v1".to_owned(),
+            budget,
+        },
+        inku_score::OperationalResourceBudget(budget),
+    );
+    assert_eq!(resource_result.outcome(), continued.outcome());
+    assert_eq!(resource_result.score().unwrap().instructions.len(), 2);
+    assert_eq!(
+        resource_result.instruction_origins(),
+        continued.instruction_origins()
+    );
+    assert_eq!(
+        resource_result.upstream_diagnostics(),
+        continued.upstream_diagnostics()
+    );
+    assert_eq!(
+        resource_result.effective_stage15_digest(),
+        continued.effective_stage15_digest()
+    );
 }
 
 #[test]
@@ -1120,17 +1177,19 @@ fn group_and_relation_dependencies_follow_an_omitted_source_owner() {
         grouped
     );
     assert_eq!(grouped.score().unwrap().instructions.len(), 1);
-    assert!(
-        grouped
-            .upstream_diagnostics()
-            .iter()
-            .any(|diagnostic| matches!(
-                diagnostic.disposition,
-                CompilerExecutionDisposition::Omitted {
-                    unit: CompilerExecutionOmissionUnit::CoordinatedGroup { .. }
-                }
-            ))
-    );
+    assert!(grouped.downstream_diagnostics().iter().any(|diagnostic| {
+        diagnostic.reason == ScoreFieldGap::UnsupportedCoordinatedGroup
+            && matches!(
+                &diagnostic.disposition,
+                ScoreDiagnosticDisposition::Omitted {
+                    unit: ScoreOmissionUnit::CoordinatedGroup {
+                        group_index: 0,
+                        member_instruction_indices,
+                    },
+                    ..
+                } if member_instruction_indices == &[0, 1]
+            )
+    }));
 
     let relation = saijiki_asset()
         .relations
@@ -1138,7 +1197,7 @@ fn group_and_relation_dependencies_follow_an_omitted_source_owner() {
         .find_map(|entry| entry.literals_en.first())
         .expect("the accepted asset has an English relation literal");
     let source = format!(
-        "place one yellow square at center. place many red circle at center. place one blue circle at center {relation}. place one green square at center."
+        "place one yellow square at center. place 0 red circle at center. place one blue circle at center {relation}. place one green square at center."
     );
     let related = execute(&source, &[], LIMITS, ScoreErrorPolicy::OmitAndContinue);
     assert_eq!(
@@ -1166,33 +1225,30 @@ fn group_and_relation_dependencies_follow_an_omitted_source_owner() {
         ]
     );
     let diagnostic = related
-        .upstream_diagnostics()
+        .downstream_diagnostics()
         .iter()
-        .find(|diagnostic| diagnostic.reason == "relation_dependency")
+        .find(|diagnostic| matches!(
+            &diagnostic.reason,
+            ScoreFieldGap::UnavailableRelationReference { dependency_instruction_indices, .. }
+                if dependency_instruction_indices == &[1]
+        ))
         .expect("missing target keeps an explicit relation omission diagnostic");
     assert_eq!(
         diagnostic.disposition,
-        CompilerExecutionDisposition::RelationOmitted {
-            unit: CompilerExecutionOmissionUnit::RelationInstruction {
-                instruction_index: 2,
-                dependency_instruction_indices: vec![1],
-            }
-        }
+        ScoreDiagnosticDisposition::RelationOmitted
     );
+    assert!(matches!(
+        &diagnostic.owner,
+        inku_ddl::ScoreDiagnosticOwner::SourceInstruction { instruction_index: 2, spans, .. }
+            if !spans.is_empty()
+    ));
     let value = serde_json::to_value(diagnostic).unwrap();
-    assert_eq!(value["reason"], "relation_dependency");
     assert_eq!(value["disposition"]["kind"], "relation_omitted");
-    assert_eq!(value["disposition"]["unit"]["kind"], "relation_instruction");
-    assert_eq!(value["disposition"]["unit"]["instruction_index"], 2);
-    assert_eq!(
-        value["disposition"]["unit"]["dependency_instruction_indices"],
-        serde_json::json!([1])
-    );
-    assert!(value["span"]["end_byte"].as_u64().unwrap() > 0);
+    assert_eq!(value["owner"]["instruction_index"], 2);
 
     let blocked_current = execute(
         &format!(
-            "place one red circle at center. place many blue circle at center {relation}. place one green square at center."
+            "place one red circle at center. place 0 blue circle at center {relation}. place one green square at center."
         ),
         &[],
         LIMITS,
@@ -1301,16 +1357,17 @@ fn group_relation_does_not_retarget_an_earlier_surviving_group() {
     );
     assert!(
         result
-            .upstream_diagnostics()
+            .downstream_diagnostics()
             .iter()
             .any(|diagnostic| matches!(
-                &diagnostic.disposition,
-                CompilerExecutionDisposition::RelationOmitted {
-                    unit: CompilerExecutionOmissionUnit::CoordinatedGroup {
-                        group_index: 2,
-                        member_instruction_indices,
-                    }
-                } if member_instruction_indices == &[4, 5]
+                (&diagnostic.owner, &diagnostic.disposition),
+                (
+                    inku_ddl::ScoreDiagnosticOwner::SourceInstruction {
+                        instruction_index: 4,
+                        ..
+                    },
+                    ScoreDiagnosticDisposition::RelationOmitted
+                )
             ))
     );
 }
@@ -1379,7 +1436,16 @@ fn projected_lowering_keeps_original_direct_referents_after_an_older_omission() 
         ScoreLoweringOutcome::CompleteWithOmissions
     );
     assert!(!result.upstream_diagnostics().is_empty());
-    assert!(result.downstream_diagnostics().is_empty());
+    assert!(result.downstream_diagnostics().iter().any(|diagnostic| {
+        diagnostic.reason == ScoreFieldGap::MissingPlaceAction
+            && matches!(
+                diagnostic.disposition,
+                ScoreDiagnosticDisposition::Omitted {
+                    unit: ScoreOmissionUnit::SourceInstruction { instruction_index: 0 },
+                    ..
+                }
+            )
+    }));
     assert_eq!(
         result.instruction_origins(),
         &[

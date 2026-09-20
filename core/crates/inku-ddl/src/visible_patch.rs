@@ -5,9 +5,9 @@ use std::collections::{BTreeMap, BTreeSet};
 use sha2::{Digest, Sha256};
 
 use crate::{
-    ClauseAtom, CompilerLockState, MacroDefinition, MacroExpansionLimits, NormalizedDdlDocument,
-    SemanticDeliveryIdentity, SemanticDeliveryKind, SemanticDeliveryOwner, SourceSpan,
-    TypedDdlCompilation, compile_typed_ddl,
+    ClauseAtom, CompilerLockState, CoreRoleKind, MacroDefinition, MacroExpansionLimits,
+    NormalizedDdlDocument, RemainingRoleKind, SemanticDeliveryIdentity, SemanticDeliveryKind,
+    SemanticDeliveryOwner, SourceSpan, TypedDdlCompilation, compile_typed_ddl,
 };
 
 /// Stable identity for constrained visible DDL patch requests.
@@ -330,16 +330,86 @@ fn target_resolved(
             .filter(|item| item.span.is_some_and(|span| overlaps(span, range)))
             .map(|item| item.identity.owner)
             .collect::<BTreeSet<_>>();
+        if source_has_drawing_fact(base, hole.span) {
+            return candidate_has_drawable_instruction(candidate, range);
+        }
         return owners.contains(&SemanticDeliveryOwner::Background)
             || owners.contains(&SemanticDeliveryOwner::Ground)
-            || owners.contains(&SemanticDeliveryOwner::EntityHead)
-                && owners.contains(&SemanticDeliveryOwner::Action);
+            || candidate_has_drawable_instruction(candidate, range);
     }
     candidate.deliveries.iter().any(|item| {
         item.kind == SemanticDeliveryKind::Explicit
             && item.identity.owner == hole.expected_owner
             && item.span.is_some_and(|span| overlaps(span, range))
     })
+}
+
+fn source_has_drawing_fact(compilation: &TypedDdlCompilation, range: SourceSpan) -> bool {
+    compilation
+        .semantic_document
+        .as_ref()
+        .is_some_and(|semantic| {
+            semantic
+                .instruction_association
+                .association
+                .clause_stream
+                .clauses
+                .iter()
+                .flat_map(|clause| &clause.atoms)
+                .any(|atom| {
+                    let span = atom.span();
+                    range.start_byte <= span.start_byte
+                        && span.end_byte <= range.end_byte
+                        && match atom {
+                            ClauseAtom::CoreRole(term) => term.role == CoreRoleKind::Primitive,
+                            ClauseAtom::RemainingRole(term) => {
+                                term.role == RemainingRoleKind::Motion
+                            }
+                            _ => false,
+                        }
+                })
+        })
+}
+
+fn candidate_has_drawable_instruction(
+    compilation: &TypedDdlCompilation,
+    range: SourceSpan,
+) -> bool {
+    let Some(semantic) = &compilation.semantic_document else {
+        return false;
+    };
+    semantic
+        .ast
+        .instructions
+        .iter()
+        .enumerate()
+        .any(|(instruction_index, instruction)| {
+            if !overlaps(instruction.entity.head.source().span, range) {
+                return false;
+            }
+            if instruction
+                .action
+                .as_ref()
+                .is_some_and(|action| overlaps(action.provenance.source.span, range))
+            {
+                return true;
+            }
+            semantic.ast.group_predicates.iter().any(|predicate| {
+                predicate
+                    .action
+                    .as_ref()
+                    .is_some_and(|action| overlaps(action.provenance.source.span, range))
+                    && semantic
+                        .ast
+                        .coordinated_head_groups
+                        .get(predicate.group_index)
+                        .is_some_and(|group| {
+                            group
+                                .member_instruction_indices
+                                .contains(&instruction_index)
+                        })
+            })
+        })
 }
 
 fn typed_fact_counts(
@@ -493,4 +563,69 @@ fn sha256_hex(bytes: &[u8]) -> String {
         .iter()
         .map(|byte| format!("{byte:02x}"))
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::ResolvedInstructionLanguage;
+
+    const LIMITS: MacroExpansionLimits = MacroExpansionLimits {
+        max_invocations: 16,
+        max_depth: 16,
+        max_evaluation_steps: 1_000,
+        max_nodes_per_invocation: 100,
+        max_total_nodes: 500,
+    };
+
+    fn compile(source: &str) -> TypedDdlCompilation {
+        compile_typed_ddl(
+            NormalizedDdlDocument::new(source, ResolvedInstructionLanguage::Ja, Vec::new())
+                .unwrap(),
+            &[],
+            None,
+            LIMITS,
+        )
+    }
+
+    #[test]
+    fn unresolved_clause_with_drawing_facts_requires_an_associated_instruction() {
+        let base = compile("出力: 黒い背景に、粗筆の黒い四角を中央に置く。面: 粗く塗りつぶす。");
+        let hole = base.holes.first().expect("whole unresolved clause");
+        assert_eq!(hole.allowed_span.start_byte, 0);
+        assert_eq!(hole.allowed_span.end_byte, 65);
+
+        let mut candidate =
+            compile("背景を黒で埋める。太筆の黒い四角を中央に置く。面: 粗く塗りつぶす。");
+        let range = SourceSpan {
+            start_byte: 0,
+            end_byte: "背景を黒で埋める。太筆の黒い四角を中央に置く。".len(),
+        };
+        assert_eq!(
+            candidate.compiler_lock.as_ref().unwrap().state,
+            CompilerLockState::BlockedDiagnostic
+        );
+        assert!(target_resolved(hole, &base, &candidate, range));
+
+        candidate
+            .semantic_document
+            .as_mut()
+            .unwrap()
+            .ast
+            .instructions
+            .clear();
+        assert!(
+            candidate
+                .deliveries
+                .iter()
+                .any(|delivery| { delivery.identity.owner == SemanticDeliveryOwner::Background })
+        );
+        assert!(
+            candidate
+                .deliveries
+                .iter()
+                .any(|delivery| { delivery.identity.owner == SemanticDeliveryOwner::EntityHead })
+        );
+        assert!(!target_resolved(hole, &base, &candidate, range));
+    }
 }

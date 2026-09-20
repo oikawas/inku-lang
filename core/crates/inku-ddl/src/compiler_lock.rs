@@ -955,15 +955,10 @@ fn project_deliveries(
     let association = &semantic_document.instruction_association.association;
     for issue in &association.sequence_issues {
         let issue_spans = std::iter::once(issue.operator.provenance.source.span)
-            .chain(
-                issue
-                    .items
-                    .iter()
-                    .map(|item| item.provenance.source.span),
-            )
+            .chain(issue.items.iter().map(|item| item.provenance.source.span))
             .chain(issue.markers.iter().map(|marker| marker.span))
             .collect::<Vec<_>>();
-        if spans_share_clause(&issue_spans, &unresolved_clause_spans) {
+        if spans_share_clause(&issue_spans, &patchable_clause_spans) {
             continue;
         }
         add_blocking_with_members(
@@ -1021,7 +1016,7 @@ fn project_deliveries(
                 .iter()
                 .map(|diagnostic| diagnostic.span),
         );
-        if spans_share_clause(&issue_spans, &unresolved_clause_spans) {
+        if spans_share_clause(&issue_spans, &patchable_clause_spans) {
             continue;
         }
         match issue.kind {
@@ -1059,10 +1054,7 @@ fn project_deliveries(
                 for occurrence in issue.occurrences.iter().filter(|occurrence| {
                     !consumed_continuation_spans.contains(&occurrence.source().span)
                         && !background_spans.contains(&occurrence.source().span)
-                        && !span_is_in_clause(
-                            occurrence.source().span,
-                            &unresolved_clause_spans,
-                        )
+                        && !span_is_in_clause(occurrence.source().span, &patchable_clause_spans)
                         && !span_is_in_clause(
                             occurrence.source().span,
                             &deferred_continuation_clause_spans,
@@ -1142,7 +1134,7 @@ fn project_deliveries(
             .iter()
             .map(|occurrence| occurrence.term.provenance.source.span)
             .collect::<Vec<_>>();
-        if spans_share_clause(&issue_spans, &unresolved_clause_spans) {
+        if spans_share_clause(&issue_spans, &patchable_clause_spans) {
             continue;
         }
         if matches!(
@@ -1163,7 +1155,7 @@ fn project_deliveries(
                         && !background_spans.contains(&occurrence.term.provenance.source.span)
                         && !span_is_in_clause(
                             occurrence.term.provenance.source.span,
-                            &unresolved_clause_spans,
+                            &patchable_clause_spans,
                         )
                         && !span_is_in_clause(
                             occurrence.term.provenance.source.span,
@@ -1215,7 +1207,7 @@ fn project_deliveries(
                     .map(|predicate| predicate.term.provenance.source.span),
             )
             .collect::<Vec<_>>();
-        if spans_share_clause(&issue_spans, &unresolved_clause_spans) {
+        if spans_share_clause(&issue_spans, &patchable_clause_spans) {
             continue;
         }
         let mut members = issue

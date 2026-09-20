@@ -137,36 +137,35 @@ pub(crate) fn project_compilation_for_execution(
             });
             continue;
         }
-        let unit =
-            if reason == "conflicting_grounds" {
-                CompilerExecutionOmissionUnit::GroundCandidates
-            } else if reason == "conflicting_backgrounds" {
-                CompilerExecutionOmissionUnit::BackgroundCandidates
-            } else if let Some(span) = span {
-                omitted_spans.push(span);
-                let indices = semantic
-                    .ast
-                    .instructions
-                    .iter()
-                    .enumerate()
-                    .filter_map(|(index, instruction)| {
-                        (instruction.entity.head.source().span == span).then_some(index)
-                    })
-                    .collect::<Vec<_>>();
-                if indices.is_empty() {
-                    // Association has already kept unresolved fields and grammar
-                    // occurrences out of the accepted AST. Sharing their clause
-                    // does not make an otherwise accepted head their owner.
-                    CompilerExecutionOmissionUnit::SourceOccurrence { span }
-                } else {
-                    for index in &indices {
-                        keep[*index] = false;
-                    }
-                    macro_or_instruction_unit(&semantic.ast, &indices)
-                }
+        let unit = if reason == "conflicting_grounds" {
+            CompilerExecutionOmissionUnit::GroundCandidates
+        } else if reason == "conflicting_backgrounds" {
+            CompilerExecutionOmissionUnit::BackgroundCandidates
+        } else if let Some(span) = span {
+            omitted_spans.push(span);
+            let indices = semantic
+                .ast
+                .instructions
+                .iter()
+                .enumerate()
+                .filter_map(|(index, instruction)| {
+                    (instruction.entity.head.source().span == span).then_some(index)
+                })
+                .collect::<Vec<_>>();
+            if indices.is_empty() {
+                // Association has already kept unresolved fields and grammar
+                // occurrences out of the accepted AST. Sharing their clause
+                // does not make an otherwise accepted head their owner.
+                CompilerExecutionOmissionUnit::SourceOccurrence { span }
             } else {
-                return ExecutionProjectionResult::Stopped(stopped_diagnostics(compilation));
-            };
+                for index in &indices {
+                    keep[*index] = false;
+                }
+                macro_or_instruction_unit(&semantic.ast, &indices)
+            }
+        } else {
+            return ExecutionProjectionResult::Stopped(stopped_diagnostics(compilation));
+        };
         diagnostics.push(CompilerExecutionDiagnostic {
             issue_kind,
             issue_id,

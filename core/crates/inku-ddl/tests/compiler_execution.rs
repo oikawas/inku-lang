@@ -1451,11 +1451,13 @@ fn group_and_relation_dependencies_follow_an_omitted_source_owner() {
     let diagnostic = related
         .downstream_diagnostics()
         .iter()
-        .find(|diagnostic| matches!(
-            &diagnostic.reason,
-            ScoreFieldGap::UnavailableRelationReference { dependency_instruction_indices, .. }
-                if dependency_instruction_indices == &[1]
-        ))
+        .find(|diagnostic| {
+            matches!(
+                &diagnostic.reason,
+                ScoreFieldGap::UnavailableRelationReference { dependency_instruction_indices, .. }
+                    if dependency_instruction_indices == &[1]
+            )
+        })
         .expect("missing target keeps an explicit relation omission diagnostic");
     assert_eq!(
         diagnostic.disposition,
@@ -1665,7 +1667,9 @@ fn projected_lowering_keeps_original_direct_referents_after_an_older_omission() 
             && matches!(
                 diagnostic.disposition,
                 ScoreDiagnosticDisposition::Omitted {
-                    unit: ScoreOmissionUnit::SourceInstruction { instruction_index: 0 },
+                    unit: ScoreOmissionUnit::SourceInstruction {
+                        instruction_index: 0
+                    },
                     ..
                 }
             )
@@ -2208,6 +2212,57 @@ fn declared_macro_width_and_relative_scale_conflict_recovers_like_ordinary_ddl()
         assert!((ordinary_radius - declared_radius).abs() < 1e-12);
         assert!((declared_radius - 0.06).abs() < 1e-12);
     }
+}
+
+#[test]
+fn unsupported_surface_clause_preserves_the_independent_completed_drawing() {
+    let source = "背景を黒で埋める。太筆の黒い四角を中央に置く。面: 粗く塗りつぶす。";
+    let continued = execute_language(
+        source,
+        ResolvedInstructionLanguage::Ja,
+        &[],
+        ScoreErrorPolicy::OmitAndContinue,
+    );
+    let stopped_policy = execute_language(
+        source,
+        ResolvedInstructionLanguage::Ja,
+        &[],
+        ScoreErrorPolicy::Stop,
+    );
+    for result in [&continued, &stopped_policy] {
+        assert_eq!(
+            result.compilation().compiler_lock.as_ref().unwrap().state,
+            CompilerLockState::BlockedDiagnostic
+        );
+        assert_eq!(
+            result.outcome(),
+            ScoreLoweringOutcome::CompleteWithOmissions
+        );
+        assert!(
+            result
+                .upstream_diagnostics()
+                .iter()
+                .any(|diagnostic| diagnostic.reason == "upstream_unknown"),
+            "the unsupported surface clause remains visible as a diagnostic: {:?}",
+            result.upstream_diagnostics()
+        );
+        assert_eq!(
+            result
+                .score()
+                .map(|score| score.instructions.len())
+                .unwrap_or_default(),
+            1,
+            "outcome={:?}; upstream={:?}; downstream={:?}",
+            result.outcome(),
+            result.upstream_diagnostics(),
+            result.downstream_diagnostics()
+        );
+    }
+    assert_eq!(continued.score(), stopped_policy.score());
+    assert_eq!(
+        continued.upstream_diagnostics(),
+        stopped_policy.upstream_diagnostics()
+    );
 }
 
 fn execute(

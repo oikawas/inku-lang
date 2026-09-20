@@ -218,8 +218,10 @@ fn simple_reference_namespace(compilation: &TypedDdlCompilation) -> bool {
         })
 }
 
-/// One existing, explicitly counted drawable owner. Unresolved wording is not
-/// itself a dependency edge; the candidate still needs the post-compile proof.
+/// One existing drawable owner with a bound count or no numeric occurrence
+/// or recognized unresolved diagnostic (which may denote a qualitative count).
+/// Unresolved wording is not itself a dependency edge; the candidate still
+/// needs the post-compile proof, including preservation of an omitted count.
 fn standalone_instruction_index(
     compilation: &TypedDdlCompilation,
     hole: &TypedHole,
@@ -227,7 +229,8 @@ fn standalone_instruction_index(
     if hole.kind != "unresolved_clause" || !simple_reference_namespace(compilation) {
         return None;
     }
-    let ast = &compilation.semantic_document.as_ref()?.ast;
+    let semantic = compilation.semantic_document.as_ref()?;
+    let ast = &semantic.ast;
     let mut owners = ast
         .instructions
         .iter()
@@ -242,11 +245,31 @@ fn standalone_instruction_index(
             .action
             .as_ref()
             .is_some_and(|action| contains(hole.allowed_span, action.provenance.source.span))
-        || !instruction
-            .entity
-            .quantity
-            .as_ref()
-            .is_some_and(|quantity| contains(hole.allowed_span, quantity.provenance.span))
+        || match instruction.entity.quantity.as_ref() {
+            Some(quantity) => !contains(hole.allowed_span, quantity.provenance.span),
+            None => semantic
+                .instruction_association
+                .association
+                .clause_stream
+                .clauses
+                .iter()
+                .flat_map(|clause| &clause.atoms)
+                .any(|atom| {
+                    contains(hole.allowed_span, atom.span())
+                        && (matches!(
+                            atom,
+                            inku_ddl::ClauseAtom::UnattachedExactNumber(_)
+                                | inku_ddl::ClauseAtom::FunctionWord {
+                                    exact_decimal: Some(_),
+                                    ..
+                                }
+                        ) || matches!(
+                            atom,
+                            inku_ddl::ClauseAtom::UnresolvedDiagnostic(diagnostic)
+                                if diagnostic.recognized
+                        ))
+                }),
+        }
     {
         return None;
     }

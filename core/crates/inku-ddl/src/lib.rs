@@ -243,8 +243,7 @@ pub use semantic_instruction::{
     SemanticInstructionAssociationResult, SemanticInstructionIssue, SemanticInstructionIssueKind,
     SemanticInstructionOccurrence, SemanticInstructionOccurrenceRole, SemanticRelation,
     SemanticRelationIssue, SemanticRelationIssueKind, SemanticRelationIssueOwner,
-    associate_semantic_instructions,
-    associate_semantic_instructions_with_macro_binding,
+    associate_semantic_instructions, associate_semantic_instructions_with_macro_binding,
 };
 pub use stage15_transform::{
     FocusRegion, STAGE15_FOCUS_SELECTION_DOMAIN, STAGE15_TRANSFORMATION_SCHEMA_ID,

@@ -82,7 +82,8 @@ pub(crate) fn project_compilation_for_execution(
                 .get(group_index)
                 .is_none_or(|group| {
                     group.member_instruction_indices.is_empty()
-                        || group.member_instruction_indices
+                        || group
+                            .member_instruction_indices
                             .iter()
                             .any(|index| *index >= semantic.ast.instructions.len())
                 }),
@@ -103,7 +104,8 @@ pub(crate) fn project_compilation_for_execution(
             } = &unit
             {
                 omitted_relation_indices.insert(*instruction_index);
-            } else if let CompilerExecutionOmissionUnit::CoordinatedGroup { group_index, .. } = &unit
+            } else if let CompilerExecutionOmissionUnit::CoordinatedGroup { group_index, .. } =
+                &unit
             {
                 omitted_group_relations.insert(*group_index);
             }
@@ -561,10 +563,7 @@ fn omit_projected_dependencies(
     );
 }
 
-fn missing_group_relation_indices(
-    ast: &SemanticDocumentAst,
-    keep: &[bool],
-) -> BTreeSet<usize> {
+fn missing_group_relation_indices(ast: &SemanticDocumentAst, keep: &[bool]) -> BTreeSet<usize> {
     ast.group_predicates
         .iter()
         .filter_map(|edge| {
@@ -583,8 +582,7 @@ fn missing_group_relation_indices(
                 SemanticPreviousReference::PreviousTwo => 2,
             };
             (first_member < required
-                || (first_member.saturating_sub(required)..first_member)
-                    .any(|index| !keep[index]))
+                || (first_member.saturating_sub(required)..first_member).any(|index| !keep[index]))
             .then_some(edge.group_index)
         })
         .collect()

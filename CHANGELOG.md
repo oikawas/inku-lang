@@ -12,6 +12,8 @@ The shared compiler now keeps the exact current owner of a relation issue as an 
 
 Successful Compose and Paint responses now expose the Rust delivery's `compiler_outcome` and existing six-channel `pipeline_diagnostics`. Saved work continues to use the existing history sidecar. A safe structured log records only execution identity, source digest, outcome, diagnostic class, and actual disposition, excluding raw DDL, provider responses, and credentials. DDL, Score, render formats, engine versions, and the database schema are unchanged.
 
+The shared JSON boundary also enables exact floating-point round trips. A snapshot serialized by a Python host therefore retains the same Score numbers and digest when Rust reads it again, instead of rejecting a valid render step as stale.
+
 ### 2026-09-19 — Separate the measured Stage 1 time budget and failure diagnostic
 
 Normalized-DDL Stage 1 now has finite defaults of 300 seconds per attempt and 540 seconds total, separate from the 120-second bound retained by catalog selection, hole completion, and legacy requests. Four maximum attempts and the two-second delay apply only while the total budget remains, leaving compilation and rendering time inside `inku-cli`'s 600-second default. Dedicated environment variables adjust both Stage 1 limits, and Compose passes the same settings to Server.

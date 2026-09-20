@@ -407,15 +407,18 @@ fn relation_without_an_exact_current_owner_stops_without_guessing() {
             .instruction_association
             .relation_issues;
         assert!(
-            issues.iter().any(|issue| issue.kind.as_str() == expected_kind
-                && issue.current_owner.is_none()),
+            issues
+                .iter()
+                .any(|issue| issue.kind.as_str() == expected_kind && issue.current_owner.is_none()),
             "{issues:?}"
         );
         assert_eq!(result.outcome(), ScoreLoweringOutcome::Stopped);
         assert!(result.score().is_none());
         assert!(
-            result.upstream_diagnostics().iter().all(|diagnostic|
-                diagnostic.disposition == CompilerExecutionDisposition::Stopped)
+            result
+                .upstream_diagnostics()
+                .iter()
+                .all(|diagnostic| diagnostic.disposition == CompilerExecutionDisposition::Stopped)
         );
     }
 }
@@ -443,15 +446,20 @@ fn relation_owner_is_remapped_after_a_continuation_is_consumed() {
     );
     assert_eq!(result.score().unwrap().instructions.len(), 3);
     assert!(result.score().unwrap().instructions[1].relation.is_none());
-    assert!(result.upstream_diagnostics().iter().any(|diagnostic| matches!(
-        diagnostic.disposition,
-        CompilerExecutionDisposition::RelationOmitted {
-            unit: CompilerExecutionOmissionUnit::RelationInstruction {
-                instruction_index: 1,
-                ..
-            }
-        }
-    )));
+    assert!(
+        result
+            .upstream_diagnostics()
+            .iter()
+            .any(|diagnostic| matches!(
+                diagnostic.disposition,
+                CompilerExecutionDisposition::RelationOmitted {
+                    unit: CompilerExecutionOmissionUnit::RelationInstruction {
+                        instruction_index: 1,
+                        ..
+                    }
+                }
+            ))
+    );
 }
 
 #[test]
@@ -940,10 +948,15 @@ fn all_omitted_stops_under_legacy_stop() {
     assert!(result.score().is_none());
     assert!(result.instruction_origins().is_empty());
     assert!(!result.upstream_diagnostics().is_empty());
-    assert!(result.upstream_diagnostics().iter().any(|diagnostic| matches!(
-        diagnostic.disposition,
-        CompilerExecutionDisposition::Omitted { .. }
-    )));
+    assert!(
+        result
+            .upstream_diagnostics()
+            .iter()
+            .any(|diagnostic| matches!(
+                diagnostic.disposition,
+                CompilerExecutionDisposition::Omitted { .. }
+            ))
+    );
 }
 
 #[test]
@@ -1199,19 +1212,24 @@ fn group_relation_without_a_previous_target_keeps_its_exact_group_owner() {
     assert!(score.mirror_relations.is_empty());
     assert_eq!(
         result.instruction_origins(),
-        [0, 1, 2].map(|instruction_index| ScoreInstructionOrigin::SourceInstruction {
-            instruction_index
-        })
+        [0, 1, 2].map(
+            |instruction_index| ScoreInstructionOrigin::SourceInstruction { instruction_index }
+        )
     );
-    assert!(result.upstream_diagnostics().iter().any(|diagnostic| matches!(
-        &diagnostic.disposition,
-        CompilerExecutionDisposition::RelationOmitted {
-            unit: CompilerExecutionOmissionUnit::CoordinatedGroup {
-                group_index: 0,
-                member_instruction_indices,
-            }
-        } if member_instruction_indices == &[0, 1]
-    )));
+    assert!(
+        result
+            .upstream_diagnostics()
+            .iter()
+            .any(|diagnostic| matches!(
+                &diagnostic.disposition,
+                CompilerExecutionDisposition::RelationOmitted {
+                    unit: CompilerExecutionOmissionUnit::CoordinatedGroup {
+                        group_index: 0,
+                        member_instruction_indices,
+                    }
+                } if member_instruction_indices == &[0, 1]
+            ))
+    );
 }
 
 #[test]
@@ -1248,19 +1266,24 @@ fn group_relation_does_not_retarget_an_earlier_surviving_group() {
     assert!(score.mirror_relations.is_empty());
     assert_eq!(
         result.instruction_origins(),
-        [0, 1, 4, 5, 6].map(|instruction_index| ScoreInstructionOrigin::SourceInstruction {
-            instruction_index
-        })
+        [0, 1, 4, 5, 6].map(
+            |instruction_index| ScoreInstructionOrigin::SourceInstruction { instruction_index }
+        )
     );
-    assert!(result.upstream_diagnostics().iter().any(|diagnostic| matches!(
-        &diagnostic.disposition,
-        CompilerExecutionDisposition::RelationOmitted {
-            unit: CompilerExecutionOmissionUnit::CoordinatedGroup {
-                group_index: 2,
-                member_instruction_indices,
-            }
-        } if member_instruction_indices == &[4, 5]
-    )));
+    assert!(
+        result
+            .upstream_diagnostics()
+            .iter()
+            .any(|diagnostic| matches!(
+                &diagnostic.disposition,
+                CompilerExecutionDisposition::RelationOmitted {
+                    unit: CompilerExecutionOmissionUnit::CoordinatedGroup {
+                        group_index: 2,
+                        member_instruction_indices,
+                    }
+                } if member_instruction_indices == &[4, 5]
+            ))
+    );
 }
 
 #[test]

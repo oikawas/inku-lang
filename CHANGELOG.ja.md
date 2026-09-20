@@ -12,6 +12,8 @@
 
 通常のCompose／Paint成功応答はRust deliveryの`compiler_outcome`と既存六channelの`pipeline_diagnostics`を返す。保存時は既存history sidecarを使い、安全なstructured logにはexecution identity、source digest、結果、診断種別と実処置だけを記録する。raw DDL、provider応答、credentialは記録しない。DDL／Score／render形式、engine版、DB schemaは変更しない。
 
+共有JSON境界では浮動小数のexact round tripも有効にする。Python hostがsnapshotを再serializeしてもScore内の数値とdigestをRustが同一に復元し、正常なrender stepをstaleとして拒否しない。
+
 ### 2026-09-19 — Stage 1の実測時間予算と失敗診断を分離
 
 通常DDLを作るStage 1に一回300秒・全体540秒の有限な既定予算を設け、catalog選択・hole補完・従来要求の120秒上限から分離した。最大試行数4回と2秒の待機は全体予算内でだけ働き、`inku-cli`の既定600秒内にcompile・描画の余地を残す。各上限は専用の環境変数で変更でき、Composeも同じ値をServerへ渡す。

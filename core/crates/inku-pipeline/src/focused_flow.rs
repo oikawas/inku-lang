@@ -742,3 +742,9 @@ fn committed_ddl_and_approved_hole_patch_share_one_replayable_path() {
         serde_json::to_value(&replay).unwrap()
     );
 }
+
+#[test]
+fn host_json_float_roundtrip_preserves_snapshot_number() {
+    let parsed: f64 = serde_json::from_str("108.58661719879423").unwrap();
+    assert_eq!(parsed.to_bits(), 108.58661719879423_f64.to_bits());
+}

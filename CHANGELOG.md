@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ### 2026-09-21 — Avoid rejecting independent paraphrases with unrelated failed proposals
 
+Pre-head modifier guidance in the completion prompt now explicitly includes existing continuity, orientation, surface, fluctuation, proportion, and related attribute families. It explains only the attachment structure needed for word-order repair, without adding individual source examples or accepted forms.
+
 Independent checking of a clause with one established head and action now also permits an unspecified count when no recognized numeric occurrence is present. The proposal must retain that unspecified state, while preserving every owner's source-ordered head, count, action, and the outgoing-dependency check. Unbound quantities or multiple heads are not presumed independent, and no default quantity is added.
 
 The preservation comparison no longer always freezes an unbound, attribute-free primitive word in an unresolved clause as an additional drawable. Only with ambiguous action ownership and no existing references or related structures may its vocabulary be retained by a resolved reference to a preceding object of the same primitive. Established head attributes, count, action, owner, outside diagnostics, and approval/CAS remain protected; no grammar or rendering feature is added.

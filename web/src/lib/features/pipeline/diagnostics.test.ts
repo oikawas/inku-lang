@@ -25,6 +25,28 @@ test('resource omission names its owner, limit, omitted part, and continued draw
 	);
 });
 
+test('partial resource execution names requested and drawn counts without saying the instruction was omitted', () => {
+	const actual = formatPipelineDiagnostic({
+		channel: 'resource',
+		value: {
+			cause: {
+				owner: { kind: 'object', value: { instruction_index: 0, kind: 'source_instruction' } },
+				reason: {
+					kind: 'budget_exceeded',
+					value: { authority: 'hard_policy', dimension: 'maximum_per_template_primitive_marks', maximum: 240, required: 300 },
+				},
+			},
+			owner: { kind: 'source_instruction', value: { source_instruction_index: 0 } },
+			partial_execution: { requested_count: 300, executed_count: 240 },
+		},
+	}, ja);
+
+	assert.equal(
+		actual,
+		'原文の指示 1 の箇所。 一つの描画指示が描く印の数は 300 必要でしたが、上限は 240 でした。 300個の要求のうち、実行可能な240個を描画しました。 ほかの部分の描画は続けました。',
+	);
+});
+
 test('saved render clip omission names its instruction, reason, omission, and continuation', () => {
 	const actual = formatPipelineDiagnostic({
 		channel: 'render',

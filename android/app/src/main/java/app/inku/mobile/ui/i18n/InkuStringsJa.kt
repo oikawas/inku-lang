@@ -36,6 +36,9 @@ object InkuStringsJa : InkuStrings {
     override val pipelineCheckDdl = "DDLと描画の診断を確認してください。"
     override val pipelineDiagnostics = "描画の診断"
     override val pipelineOmissions: (Int) -> String = { count -> "省略した配置・関係: $count 件。ほかの部分は描画を続けます。" }
+    override val pipelinePartialExecution: (Int, Int) -> String = { requested, executed ->
+        "${requested}個の要求のうち、実行可能な${executed}個を描画しました。"
+    }
 
     override val batchTooManyItems: (Int, Int) -> String = { max, actual ->
         "バッチは最大 $max 件までです。現在: $actual 件"

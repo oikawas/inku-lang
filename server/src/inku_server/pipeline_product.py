@@ -49,6 +49,24 @@ def _compiler_diagnostic_log_projection(channel: str, diagnostic: object) -> dic
     }
 
 
+def _resource_omission_log_projection(diagnostic: object) -> dict:
+    if not isinstance(diagnostic, dict):
+        return {"channel": "resource_omissions", "kind": None, "issue_id": None, "actual_action": None}
+    cause = diagnostic.get("cause")
+    reason = cause.get("reason") if isinstance(cause, dict) else None
+    kind = reason.get("kind") if isinstance(reason, dict) else None
+    return {
+        "channel": "resource_omissions",
+        "kind": _safe_compiler_log_atom(kind),
+        "issue_id": None,
+        "actual_action": (
+            "partially_executed"
+            if isinstance(diagnostic.get("partial_execution"), dict)
+            else "omitted"
+        ),
+    }
+
+
 class RunOptions(BaseModel):
     model_config = ConfigDict(extra="forbid")
     stage1_model: str | None = None
@@ -302,6 +320,9 @@ class ProductPipelineEffects:
                         _compiler_diagnostic_log_projection(channel, diagnostic)
                         for channel in compiler_channels
                         for diagnostic in pipeline_diagnostics[channel]
+                    ] + [
+                        _resource_omission_log_projection(diagnostic)
+                        for diagnostic in pipeline_diagnostics["resource_omissions"]
                     ],
                 },
                 sort_keys=True,

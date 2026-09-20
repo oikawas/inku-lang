@@ -2594,7 +2594,11 @@ fn japanese_predicate_segment_is_clear(
             }
             ClauseAtom::CoreRole(_) => false,
             ClauseAtom::SaijikiRelation { span, .. } => association.explicit_previous_references.iter().any(|reference| reference.provenance.span == *span),
-            ClauseAtom::UnresolvedDiagnostic(_) => false,
+            // The exact Japanese object marker and the single typed head/action on
+            // its two sides own the accepted predicate terms. An unresolved atom
+            // remains a separately delivered diagnostic; it does not take those
+            // already typed terms away from their exact owner.
+            ClauseAtom::UnresolvedDiagnostic(_) => true,
         })
 }
 

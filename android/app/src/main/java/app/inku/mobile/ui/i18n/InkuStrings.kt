@@ -60,6 +60,7 @@ interface InkuStrings {
     val pipelineCheckDdl: String
     val pipelineDiagnostics: String
     val pipelineOmissions: (Int) -> String
+    val pipelinePartialExecution: (Int, Int) -> String
 
     // --- Batch --------------------------------------------------------------
     val batchTooManyItems: (Int, Int) -> String

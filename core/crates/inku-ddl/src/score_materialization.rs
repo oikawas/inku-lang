@@ -16,10 +16,11 @@ use inku_score::{
 
 use crate::{
     FillCountResolution, FillPlanOwner, FillRegionGeometry, FillRegionOwner, MirrorBodyPlanRef,
-    ObjectAnchor, PlacementMemberKind, PlacementMemberPlan, PlacementRecipe, Rational,
-    ResolvedFillRegion, ResolvedGeometryDimensions, ScoreAnchorOrigin, ScoreFieldGap,
+    ObjectAnchor, PlacementAction, PlacementMemberKind, PlacementMemberPlan, PlacementRecipe,
+    Rational, ResolvedFillRegion, ResolvedGeometryDimensions, ScoreAnchorOrigin, ScoreFieldGap,
     ScoreInstructionOrigin, ScoreLoweringDiagnostic, SelectedCompositionPlan,
-    plan_resources::PlanResourceOmission, score_lowering::lower_resolved_object_template,
+    plan_resources::PlanResourceOmission,
+    score_lowering::{lower_resolved_object_template, placement_recipe},
 };
 
 const ORDINAL_SCHEME: InstanceOrdinalScheme = InstanceOrdinalScheme::SourceMemberThenInstanceV1;
@@ -137,9 +138,49 @@ pub fn materialize_selected_composition(
                 object.recipe(),
                 PlacementRecipe::FillUniformInRegionAndClip { .. }
             );
-        let count = if owned_elsewhere { 1 } else { object.count() };
+        let count = if owned_elsewhere {
+            1
+        } else {
+            admitted
+                .object_count_override(old)
+                .unwrap_or_else(|| object.count())
+        };
         let recipe = if owned_elsewhere {
             ResolvedPlacementRecipe::Place
+        } else if admitted.object_count_override(old).is_some() {
+            let action = match object.recipe() {
+                PlacementRecipe::Place => PlacementAction::Place,
+                PlacementRecipe::HorizontalLine { .. }
+                | PlacementRecipe::VerticalLine { .. }
+                | PlacementRecipe::DiagonalLine { .. } => PlacementAction::LineUp,
+                PlacementRecipe::Grid { .. } => PlacementAction::Tile,
+                PlacementRecipe::ScatterUniformWithCentroidTranslation => PlacementAction::Scatter,
+                PlacementRecipe::FillUniformInRegionAndClip { .. } => {
+                    return Err(ScoreMaterializationError::InvalidContract(
+                        "fill count cannot be partially executed",
+                    ));
+                }
+            };
+            let translate_to_numeric_anchor = matches!(
+                object.recipe(),
+                PlacementRecipe::Grid {
+                    translate_to_numeric_anchor: true,
+                    ..
+                }
+            );
+            let adjusted = placement_recipe(
+                action,
+                u64::from(count),
+                object.domain(),
+                object.layout_direction(),
+                translate_to_numeric_anchor,
+            )
+            .map_err(|_| {
+                ScoreMaterializationError::InvalidContract(
+                    "partial count recipe cannot be represented",
+                )
+            })?;
+            saved_recipe(&adjusted)?
         } else {
             saved_recipe(object.recipe())?
         };

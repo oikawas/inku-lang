@@ -207,7 +207,7 @@ fn known_invalid_sequence_is_local_and_plain_multiple_colors_do_not_imply_a_cycl
 }
 
 #[test]
-fn over_budget_sequence_omits_the_complete_placement_and_keeps_the_later_drawing() {
+fn over_budget_sequence_draws_the_safe_prefix_and_keeps_the_later_drawing() {
     let budget = ResourceBudget {
         maximum: ResourceDemand {
             logical_objects: 400,
@@ -254,11 +254,24 @@ fn over_budget_sequence_omits_the_complete_placement_and_keeps_the_later_drawing
         ResourceDimension::MaximumPerTemplatePrimitiveMarks
     );
     assert_eq!((exceeded.required, exceeded.maximum), (241, 240));
-    let score = result.score().expect("later independent drawing survives");
-    assert_eq!(score.instructions.len(), 1);
-    assert_eq!(score.instructions[0].primitive, Primitive::Square);
-    assert_eq!(score.instructions[0].sides, None);
-    assert_eq!(score.instructions[0].color, Color::Blue);
+    assert_eq!(
+        result.resource_omissions()[0].partial_execution,
+        Some(inku_ddl::PlanResourcePartialExecution {
+            requested_count: 241,
+            executed_count: 240,
+        })
+    );
+    let score = result
+        .score()
+        .expect("safe repeated prefix and later drawing survive");
+    assert_eq!(score.instructions.len(), 2);
+    assert_eq!(
+        score.instructions[0].arrangement.as_ref().unwrap().count,
+        240
+    );
+    assert_eq!(score.instructions[1].primitive, Primitive::Square);
+    assert_eq!(score.instructions[1].sides, None);
+    assert_eq!(score.instructions[1].color, Color::Blue);
 }
 
 fn execute(source: &str, language: ResolvedInstructionLanguage) -> CompilerResourceExecutionResult {

@@ -989,7 +989,7 @@ fn all_omitted_stops_under_legacy_stop() {
 }
 
 #[test]
-fn resource_omissions_cannot_complete_an_empty_score() {
+fn resource_overage_draws_the_safe_prefix_and_reports_the_unexecuted_suffix() {
     let budget = inku_score::ResourceBudget {
         maximum: inku_score::ResourceDemand {
             logical_objects: 4096,
@@ -1004,14 +1004,19 @@ fn resource_omissions_cannot_complete_an_empty_score() {
             fill_instances: 64,
         },
     };
-    for (count, later, expected_outcome, expected_origin) in [
-        (300, "", ScoreLoweringOutcome::Stopped, None),
-        (240, "", ScoreLoweringOutcome::Complete, Some(0)),
+    for (count, later, expected_outcome, expected_origins) in [
+        (
+            300,
+            "",
+            ScoreLoweringOutcome::CompleteWithOmissions,
+            &[0][..],
+        ),
+        (240, "", ScoreLoweringOutcome::Complete, &[0][..]),
         (
             300,
             " place one blue circle at center.",
             ScoreLoweringOutcome::CompleteWithOmissions,
-            Some(1),
+            &[0, 1][..],
         ),
     ] {
         let source = format!("scatter {count} red square at center.{later}");
@@ -1037,7 +1042,12 @@ fn resource_omissions_cannot_complete_an_empty_score() {
         assert_eq!(result.compilation().document.source(), source);
         let semantic = result.compilation().semantic_document.as_ref().unwrap();
         assert_eq!(
-            semantic.ast.instructions[0].entity.quantity.as_ref().unwrap().value,
+            semantic.ast.instructions[0]
+                .entity
+                .quantity
+                .as_ref()
+                .unwrap()
+                .value,
             count
         );
         assert_eq!(result.resource_omissions().len(), usize::from(count > 240));
@@ -1053,17 +1063,30 @@ fn resource_omissions_cannot_complete_an_empty_score() {
                 omission.cause.reason,
                 inku_ddl::PlanResourceFailure::BudgetExceeded(_)
             ));
-        }
-        if let Some(instruction_index) = expected_origin {
-            assert_eq!(result.score().unwrap().instructions.len(), 1);
             assert_eq!(
-                result.instruction_origins(),
-                [ScoreInstructionOrigin::SourceInstruction { instruction_index }]
+                omission.partial_execution,
+                Some(inku_ddl::PlanResourcePartialExecution {
+                    requested_count: 300,
+                    executed_count: 240,
+                })
             );
-        } else {
-            assert!(result.score().is_none());
-            assert!(result.instruction_origins().is_empty());
         }
+        let score = result.score().expect("the safe drawable prefix survives");
+        assert_eq!(
+            score.instructions[0].arrangement.as_ref().unwrap().count,
+            u32::try_from(count.min(240)).unwrap()
+        );
+        assert_eq!(
+            result.instruction_origins(),
+            expected_origins
+                .iter()
+                .map(
+                    |&instruction_index| ScoreInstructionOrigin::SourceInstruction {
+                        instruction_index,
+                    }
+                )
+                .collect::<Vec<_>>()
+        );
     }
 }
 
@@ -1164,6 +1187,60 @@ fn undelivered_occurrences_preserve_accepted_drawables_in_the_same_clause() {
         resource_result.effective_stage15_digest(),
         continued.effective_stage15_digest()
     );
+}
+
+#[test]
+fn ja_unresolved_predicate_fragment_preserves_typed_drawing_in_both_resource_modes() {
+    let source = "黒いロットリングの小さな四角を左から右へ横に二十四個並べる。";
+    let budget = inku_score::ResourceBudget {
+        maximum: inku_score::ResourceDemand {
+            logical_objects: 64,
+            primitive_marks: 64,
+            object_templates: 8,
+            maximum_per_template_primitive_marks: 64,
+            maximum_resolved_count: 64,
+            template_nodes: 8,
+            anchor_instances: 64,
+            transform_instances: 64,
+            placement_instances: 8,
+            fill_instances: 8,
+        },
+    };
+
+    let mut scores = Vec::new();
+    for policy in [ScoreErrorPolicy::Stop, ScoreErrorPolicy::OmitAndContinue] {
+        let result = inku_ddl::compile_ddl_to_score_with_resources(
+            NormalizedDdlDocument::new(source, ResolvedInstructionLanguage::Ja, Vec::new())
+                .unwrap(),
+            &[],
+            Some(23),
+            LIMITS,
+            ScoreLoweringContext::resolve("square", Color::White).unwrap(),
+            None,
+            policy,
+            inku_score::HardResourcePolicy {
+                identity: "ja-predicate-recovery-test.v1".to_owned(),
+                budget,
+            },
+            inku_score::OperationalResourceBudget(budget),
+        );
+        assert_eq!(
+            result.outcome(),
+            ScoreLoweringOutcome::CompleteWithOmissions
+        );
+        assert_eq!(result.upstream_diagnostics().len(), 1);
+        let diagnostic = &result.upstream_diagnostics()[0];
+        assert_eq!(diagnostic.reason, "upstream_unknown");
+        let span = diagnostic.span.unwrap();
+        assert_eq!(&source[span.start_byte..span.end_byte], "左から右へ");
+        let score = result.score().expect("the typed drawing survives");
+        assert_eq!(score.instructions.len(), 1);
+        let arrangement = score.instructions[0].arrangement.as_ref().unwrap();
+        assert_eq!(arrangement.count, 24);
+        assert_eq!(arrangement.layout, inku_score::Layout::Horizontal);
+        scores.push(score.clone());
+    }
+    assert_eq!(scores[0], scores[1]);
 }
 
 #[test]

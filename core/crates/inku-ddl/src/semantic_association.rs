@@ -1896,7 +1896,6 @@ fn collect_japanese_post_head_quantity_ownership(
             .filter(|atom| marker.span.end_byte <= atom.span().start_byte)
             .filter(|atom| {
                 matches!(atom, ClauseAtom::CoreRole(term) if term.role == CoreRoleKind::Primitive)
-                    || matches!(atom, ClauseAtom::UnresolvedDiagnostic(_))
             })
             .map(|atom| atom.span().start_byte)
             .chain(

@@ -27,6 +27,7 @@ export interface LangPack {
 	pipelineDiagnosticOwner: (kind: string, index: number) => string;
 	pipelineDiagnosticReason: (reason: string) => string;
 	pipelineDiagnosticBudgetExceeded: (dimension: string, required: number, maximum: number) => string;
+	pipelineDiagnosticPartialExecution: (requested: number, executed: number) => string;
 	pipelineDiagnosticOmitted: (kind: string, index: number | null) => string;
 	pipelineDiagnosticContinued: string;
 	pipelineDiagnosticDetails: string;

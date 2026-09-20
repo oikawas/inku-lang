@@ -35,8 +35,8 @@ mod plan_reference_extent;
 pub mod plan_resources;
 pub use plan_resources::{
     AdmittedCompositionPlan, CompositionPlanSelection, PlanResourceError, PlanResourceFailure,
-    PlanResourceOmission, PlanResourceOwner, SelectedCompositionPlan, preflight_composition_plan,
-    select_composition_plan_resources,
+    PlanResourceOmission, PlanResourceOwner, PlanResourcePartialExecution, SelectedCompositionPlan,
+    preflight_composition_plan, select_composition_plan_resources,
 };
 pub mod prompt;
 pub mod relation_reference;

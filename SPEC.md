@@ -1724,7 +1724,7 @@ Optional instruction / Emit `layout_direction` owns arrangement direction indepe
 
 Only line-up delivers direction into placement. Omission retains the horizontal row; explicit horizontal uses the same formula while preserving its explicit identity. With t=(i+1/2)/n-1/2, offsets from the anchor are horizontal=(tW,0), vertical=(0,tH), rising=(ts,-ts), and falling=(ts,ts), where s=min(W,H). Diagonals are physical 45-degree axes with downward-positive Y, never stretched to the canvas diagonal. Bare diagonal chooses one of the two axes using the attested optional composition seed (distinguishing None from Some(0)), original pre / expanded meaning, and original logical occurrence framed with a dedicated layout-direction role. Shape-angle selection, size, and count are unchanged. Focus, variation / render seeds, and source spelling do not select direction. Point accepts layout direction while still rejecting its own angle. New direction on Place / Scatter / Tile, groups / relations, and unsupported identities such as rotated stop or omit the original instruction / Emit; an entirely omitted result stops in both modes. The existing Score entrance also cannot discard this field and report success.
 
-One plan per instruction / Emit retains exact count, resolved dimensions, appearance, angle, position, layout recipe, and source / generated origin. There are no count-proportional arrays, instance geometry, or duplicated Score instructions. For either legacy Stop or Continue input, recoverable blocking preserves typed owners, spans, reasons, and actual omissions at the smallest affected field or execution unit, returning the remaining plan. An entirely omitted result is never marked Ready. Unsupported fields, relations, and coordination are not silently discarded. The resource-aware materializer maps this plan to replayable recipes with Score 0.10 as the compact baseline, selects the minimum later version required by added fields, and checks demand before instance allocation against both hard policy and a caller-authorized operational budget. Current shipping limits are 400 total primitive marks, 240 primitive marks per expanded Score template, resolved count 2000, and 64 drawable templates, plus 4096 `logical_objects`, 128 `template_nodes`, 4096 `anchor_instances`, 4096 `transform_instances`, 64 `placement_instances`, and 64 `fill_instances`; counts are never clamped. Administrator control of the existing four limits and budgets saved by older works remain intact. An excessive source or coordinated placement alone is omitted as one complete atomic unit before materialization, with a diagnostic, while independent later work continues. A saved Score snapshots the authorized policies but stores no self-reported demand; replay recomputes demand from its recipes. Existing Score wire, lowering outcomes, compiler execution success, and Score 0.9 default / legacy compatibility remain. The same `inku.geometry-resolution-policy.v1` attests this resolution. The normal Server, Web, and Android paths and saved compact Score replay use this shared materializer and local-recovery contract.
+One plan per instruction / Emit retains exact count, resolved dimensions, appearance, angle, position, layout recipe, and source / generated origin. There are no count-proportional arrays, instance geometry, or duplicated Score instructions. For either legacy Stop or Continue input, recoverable blocking preserves typed owners, spans, reasons, and actual omissions at the smallest affected field or execution unit, returning the remaining plan. An entirely omitted result is never marked Ready. Unsupported fields, relations, and coordination are not silently discarded. The resource-aware materializer maps this plan to replayable recipes with Score 0.10 as the compact baseline, selects the minimum later version required by added fields, and checks demand before instance allocation against both hard policy and a caller-authorized operational budget. Current shipping limits are 400 total primitive marks, 240 primitive marks per expanded Score template, resolved count 2000, and 64 drawable templates, plus 4096 `logical_objects`, 128 `template_nodes`, 4096 `anchor_instances`, 4096 `transform_instances`, 64 `placement_instances`, and 64 `fill_instances`. Administrator control of the existing four limits and budgets saved by older works remain intact. When an explicit count on a standalone primitive exceeds the budget, the original Plan and source retain the requested value, while the Score receives the largest safe source-ordered prefix and resource diagnostics carry the requested count, executed count, and reason to display, persistence, and structured logging. Only a unit for which no instance can run safely, or a coordinated placement / Macro whose structure cannot be partially executed, is omitted at its typed boundary; independent later work continues. A saved Score snapshots the authorized policies but stores no self-reported demand; replay recomputes demand from its recipes. Existing Score wire, lowering outcomes, compiler execution success, and Score 0.9 default / legacy compatibility remain. The same `inku.geometry-resolution-policy.v1` attests this resolution. The normal Server, Web, and Android paths and saved compact Score replay use this shared materializer and local-recovery contract.
 
 ## 13. The Design of Sway
 
@@ -2095,8 +2095,10 @@ expanded marks never consulted a declared coordinate**.
 In canonical meaning, a stated count remains lossless symbolic intent. The Step
 11 pure ceiling preflight runs before expansion, allocation, or any other
 O(count) materialization. Even a value such as `u32::MAX` is not clamped or
-silently rewritten to a representative count; rejection performs zero
-allocation and zero materialization.
+silently rewritten to a representative count. A standalone primitive
+materializes only the safe source-ordered prefix and diagnoses the remainder;
+only a structurally indivisible rejected unit performs zero allocation and zero
+materialization.
 
 The following records compatibility behavior in the existing Score / coerce
 path. It does not redefine the symbolic intent above, and the runtime state
@@ -2786,10 +2788,11 @@ A count the description states outright outranks any later reading of it.
 Canonical meaning keeps the value as lossless symbolic intent. The Step 11 pure
 ceiling preflight runs before expansion, allocation, or any other O(count)
 materialization. A value such as `u32::MAX` is neither clamped nor silently
-rewritten to a representative count; rejection performs zero allocation and
-zero materialization. Threshold and representation behavior remaining in the
-current runtime is compatibility behavior, not semantic authority to change the
-canonical count into another value.
+rewritten to a representative count; a standalone primitive draws its safe
+source-ordered prefix and diagnoses the requested and executed counts. Threshold
+and representation behavior remaining in the current runtime is compatibility
+behavior, not semantic authority to change the canonical count into another
+value.
 
 **Size has three authorities.** Unspecified, explicit qualitative, and explicit
 numeric geometry remain distinct. In the current subset, an unallocated

@@ -247,7 +247,19 @@ def test_unsaved_success_exposes_compiler_delivery_and_logs_safe_projection(
                 "owner": {"credential": "secret-value"},
                 "disposition": {"kind": "recovered"},
             }],
-            "resource_omissions": [],
+            "resource_omissions": [{
+                "owner": {"kind": "source_instruction", "value": {"source_instruction_index": 0}},
+                "cause": {
+                    "owner": {"kind": "object", "value": {"kind": "source_instruction", "instruction_index": 0}},
+                    "reason": {"kind": "budget_exceeded", "value": {
+                        "authority": "hard_policy",
+                        "dimension": "maximum_per_template_primitive_marks",
+                        "required": 300,
+                        "maximum": 240,
+                    }},
+                },
+                "partial_execution": {"requested_count": 300, "executed_count": 240},
+            }],
             "relation_omissions": [],
         },
     }
@@ -288,7 +300,7 @@ def test_unsaved_success_exposes_compiler_delivery_and_logs_safe_projection(
     assert result["pipeline_diagnostics"] == {
         "upstream_diagnostics": snapshot["delivery"]["upstream_diagnostics"],
         "downstream_diagnostics": snapshot["delivery"]["downstream_diagnostics"],
-        "resource_omissions": [],
+        "resource_omissions": snapshot["delivery"]["resource_omissions"],
         "relation_omissions": [],
         "render_diagnostics": render_diagnostics,
         "resource_execution": resource_execution,
@@ -309,7 +321,7 @@ def test_unsaved_success_exposes_compiler_delivery_and_logs_safe_projection(
         "diagnostic_counts": {
             "upstream_diagnostics": 1,
             "downstream_diagnostics": 1,
-            "resource_omissions": 0,
+            "resource_omissions": 1,
             "relation_omissions": 0,
         },
         "diagnostics": [
@@ -324,6 +336,12 @@ def test_unsaved_success_exposes_compiler_delivery_and_logs_safe_projection(
                 "kind": "missing_field",
                 "issue_id": None,
                 "actual_action": "recovered",
+            },
+            {
+                "channel": "resource_omissions",
+                "kind": "budget_exceeded",
+                "issue_id": None,
+                "actual_action": "partially_executed",
             },
         ],
     }

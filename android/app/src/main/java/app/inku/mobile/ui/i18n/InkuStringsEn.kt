@@ -42,6 +42,9 @@ object InkuStringsEn : InkuStrings {
     override val pipelineCheckDdl = "Check the DDL and drawing diagnostics."
     override val pipelineDiagnostics = "Drawing diagnostics"
     override val pipelineOmissions: (Int) -> String = { count -> "Omitted placements or relations: $count. The other parts continue drawing." }
+    override val pipelinePartialExecution: (Int, Int) -> String = { requested, executed ->
+        "Drew $executed of the $requested requested."
+    }
 
     override val batchTooManyItems: (Int, Int) -> String = { max, actual ->
         "A batch holds at most $max lines. There are $actual."

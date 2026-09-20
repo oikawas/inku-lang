@@ -37,6 +37,7 @@ export const ja: LangPack = {
 		fill_group: '塗りの配置', transform_group: '変形', relation_instruction: '関係の指定',
 		coordinated_group: '組み合わせ', ground: '下地', object: '描画対象', part: '該当部分',
 		logical_objects: '描画対象の数', primitive_marks: '描画する印の数', object_templates: '描画指示の数',
+		maximum_per_template_primitive_marks: '一つの描画指示が描く印の数', maximum_resolved_count: '一つの配置が描く数',
 	}[kind] ?? kind),
 	pipelineDiagnosticOwner: (kind, index) => `${kind} ${index} の箇所。`,
 	pipelineDiagnosticReason: (reason) => ({
@@ -53,6 +54,7 @@ export const ja: LangPack = {
 		mirror_explicit_conflict: '明示した寸法や向きと両立しないため、鏡写しの関係を外しました。',
 	}[reason] ?? `理由: ${reason}。`),
 	pipelineDiagnosticBudgetExceeded: (dimension, required, maximum) => `${dimension}は ${required} 必要でしたが、上限は ${maximum} でした。`,
+	pipelineDiagnosticPartialExecution: (requested, executed) => `${requested}個の要求のうち、実行可能な${executed}個を描画しました。`,
 	pipelineDiagnosticOmitted: (kind, index) => `${kind}${index === null ? '' : ` ${index}`} を省略しました。`,
 	pipelineDiagnosticContinued: 'ほかの部分の描画は続けました。',
 	pipelineDiagnosticDetails: '診断の詳細',

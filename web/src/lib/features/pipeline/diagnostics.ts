@@ -130,8 +130,13 @@ export function formatPipelineDiagnostic(
 		parts.push(strings.pipelineDiagnosticOwner(strings.pipelineDiagnosticPart(owner.kind), owner.index + 1));
 	}
 	parts.push(budgetReason(value, strings) ?? strings.pipelineDiagnosticReason(reasonOf(value)));
-	const omitted = omittedUnit(value, diagnostic.channel);
-	if (omitted) {
+	const partial = object(value.partial_execution);
+	if (typeof partial?.requested_count === 'number' && typeof partial.executed_count === 'number') {
+		parts.push(strings.pipelineDiagnosticPartialExecution(partial.requested_count, partial.executed_count));
+		parts.push(strings.pipelineDiagnosticContinued);
+	} else {
+		const omitted = omittedUnit(value, diagnostic.channel);
+		if (!omitted) return parts.join(' ');
 		parts.push(strings.pipelineDiagnosticOmitted(strings.pipelineDiagnosticPart(omitted.kind), omitted.index === undefined ? null : omitted.index + 1));
 		parts.push(strings.pipelineDiagnosticContinued);
 	}

@@ -37,6 +37,7 @@ export const en: LangPack = {
 		fill_group: 'fill placement', transform_group: 'transform', relation_instruction: 'relation',
 		coordinated_group: 'coordinated group', ground: 'ground', object: 'drawing object', part: 'part',
 		logical_objects: 'drawing objects', primitive_marks: 'drawn marks', object_templates: 'drawing instructions',
+		maximum_per_template_primitive_marks: 'marks drawn by one instruction', maximum_resolved_count: 'marks in one placement',
 	}[kind] ?? kind),
 	pipelineDiagnosticOwner: (kind, index) => `At ${kind} ${index}.`,
 	pipelineDiagnosticReason: (reason) => ({
@@ -53,6 +54,7 @@ export const en: LangPack = {
 		mirror_explicit_conflict: 'The mirror relation was omitted because it conflicts with explicit dimensions or orientation.',
 	}[reason] ?? `Reason: ${reason}.`),
 	pipelineDiagnosticBudgetExceeded: (dimension, required, maximum) => `${dimension} required ${required}; the limit was ${maximum}.`,
+	pipelineDiagnosticPartialExecution: (requested, executed) => `Drew ${executed} of the ${requested} requested.`,
 	pipelineDiagnosticOmitted: (kind, index) => `Omitted ${kind}${index === null ? '' : ` ${index}`}.`,
 	pipelineDiagnosticContinued: 'The rest of the drawing continued.',
 	pipelineDiagnosticDetails: 'Diagnostic details',

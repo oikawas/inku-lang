@@ -60,6 +60,57 @@ fn shape_angle_and_action_direction_have_distinct_exact_owners() {
     }
 }
 
+#[test]
+fn ja_post_head_layout_direction_keeps_exact_action_owner() {
+    let source = "黒いロットリングの小さな四角を横に二十四個並べる。";
+    let document =
+        NormalizedDdlDocument::new(source, ResolvedInstructionLanguage::Ja, Vec::new()).unwrap();
+    let result = associate_semantic_instructions(&document).unwrap();
+
+    assert!(result.ast.complete, "{:?}", result.issues);
+    assert!(
+        result.association.issues.is_empty(),
+        "{:?}",
+        result.association.issues
+    );
+    assert!(result.issues.is_empty(), "{:?}", result.issues);
+    assert_eq!(result.ast.instructions.len(), 1);
+    let instruction = &result.ast.instructions[0];
+    assert_eq!(instruction.entity.quantity.as_ref().unwrap().value, 24);
+    assert_eq!(instruction.action.as_ref().unwrap().identity.id, "line_up");
+    assert_eq!(
+        instruction.layout_direction.as_ref().unwrap().identity.id,
+        "horizontal"
+    );
+}
+
+#[test]
+fn ja_unresolved_predicate_fragment_does_not_steal_exact_object_predicate_owners() {
+    let source = "黒いロットリングの小さな四角を左から右へ横に二十四個並べる。";
+    let document =
+        NormalizedDdlDocument::new(source, ResolvedInstructionLanguage::Ja, Vec::new()).unwrap();
+    let result = associate_semantic_instructions(&document).unwrap();
+
+    assert_eq!(
+        result
+            .association
+            .issues
+            .iter()
+            .map(|issue| issue.kind.as_str())
+            .collect::<Vec<_>>(),
+        ["upstream_unknown"]
+    );
+    assert!(result.issues.is_empty(), "{:?}", result.issues);
+    assert_eq!(result.ast.instructions.len(), 1);
+    let instruction = &result.ast.instructions[0];
+    assert_eq!(instruction.entity.quantity.as_ref().unwrap().value, 24);
+    assert_eq!(instruction.action.as_ref().unwrap().identity.id, "line_up");
+    assert_eq!(
+        instruction.layout_direction.as_ref().unwrap().identity.id,
+        "horizontal"
+    );
+}
+
 const FIXTURE: &str = include_str!("fixtures/semantic-instruction-v16.json");
 
 #[test]

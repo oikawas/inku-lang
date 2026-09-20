@@ -5741,12 +5741,25 @@ private fun PipelineStatusPanel(state: InkuUiState, viewModel: InkuViewModel) {
         }
         if (issues.isNotEmpty()) {
             Text(S.pipelineDiagnostics, style = MaterialTheme.typography.labelMedium)
-            val omissions = (diagnostics.optJSONArray("resource_omissions")?.length() ?: 0) +
-                (diagnostics.optJSONArray("relation_omissions")?.length() ?: 0)
+            val resources = diagnostics.optJSONArray("resource_omissions")
+            val omissions = (0 until (resources?.length() ?: 0)).count { index ->
+                resources?.optJSONObject(index)?.optJSONObject("partial_execution") == null
+            } + (diagnostics.optJSONArray("relation_omissions")?.length() ?: 0)
             if (omissions > 0) Text(S.pipelineOmissions(omissions), style = MaterialTheme.typography.bodySmall)
             issues.forEach { issue ->
-                val reason = issue.optString("reason").ifBlank { issue.optString("issue_id") }
-                if (reason.isNotBlank()) Text(reason, style = MaterialTheme.typography.bodySmall)
+                val partial = issue.optJSONObject("partial_execution")
+                if (partial != null) {
+                    Text(
+                        S.pipelinePartialExecution(
+                            partial.optInt("requested_count"),
+                            partial.optInt("executed_count"),
+                        ),
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                } else {
+                    val reason = issue.optString("reason").ifBlank { issue.optString("issue_id") }
+                    if (reason.isNotBlank()) Text(reason, style = MaterialTheme.typography.bodySmall)
+                }
             }
         }
     }

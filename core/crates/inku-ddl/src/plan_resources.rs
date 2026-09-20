@@ -642,14 +642,26 @@ pub struct CompositionPlanSelection {
     pub placement_group_indices: Vec<usize>,
     pub fill_group_indices: Vec<usize>,
     pub standalone_macro_repetition_indices: Vec<usize>,
+    /// Executed count for a standalone primitive whose requested suffix could
+    /// not fit the resource budget. The immutable plan retains the request.
+    pub object_count_overrides: HashMap<usize, u32>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+pub struct PlanResourcePartialExecution {
+    pub requested_count: u32,
+    pub executed_count: u32,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 pub struct PlanResourceOmission {
-    /// Atomic placement or complete source head omitted, without reducing count.
+    /// Atomic placement/source owner whose whole unit or unexecuted suffix was omitted.
     pub owner: PlanResourceOwner,
     /// Exact source/generated owner that caused arithmetic or budget refusal.
     pub cause: PlanResourceError,
+    /// Present only when a safe standalone primitive prefix was executed.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub partial_execution: Option<PlanResourcePartialExecution>,
 }
 
 /// Admission applies only to `selection`, not to every object in `plan`.
@@ -689,6 +701,12 @@ impl<'plan, 'source> SelectedCompositionPlan<'plan, 'source> {
     }
     pub fn standalone_macro_indices(&self) -> &[usize] {
         &self.selection.standalone_macro_repetition_indices
+    }
+    pub fn object_count_override(&self, object_index: usize) -> Option<u32> {
+        self.selection
+            .object_count_overrides
+            .get(&object_index)
+            .copied()
     }
     pub const fn demand(&self) -> ResourceDemand {
         self.demand
@@ -881,9 +899,89 @@ impl UnitMapping {
     }
 }
 
-/// Admit atomic source/placement units in source order. Resource refusal omits
-/// only that complete unit; later units are tried against the remaining budget.
-/// Malformed plan contracts remain errors. No repetition is partially admitted.
+fn partial_standalone_object_admission(
+    plan: &CompositionPlanResult<'_>,
+    mapping: &UnitMapping,
+    unit: usize,
+    current: ResourceDemand,
+    unit_demand: ResourceDemand,
+    hard_policy: &HardResourcePolicy,
+    operational_budget: OperationalResourceBudget,
+) -> Option<(usize, u32, ResourceDemand)> {
+    if mapping.owners[unit].is_some() {
+        return None;
+    }
+    let mut matching = plan.objects.iter().enumerate().filter(|(_, object)| {
+        matches!(
+            object.origin(),
+            ScoreInstructionOrigin::SourceInstruction { instruction_index }
+                if *instruction_index == unit
+        )
+    });
+    let (object_index, object) = matching.next()?;
+    if matching.next().is_some() || object.count() <= 1 {
+        return None;
+    }
+    let requested = u64::from(object.count());
+    let exact_direct_demand = ResourceDemand {
+        logical_objects: requested,
+        primitive_marks: requested,
+        object_templates: 1,
+        maximum_per_template_primitive_marks: requested,
+        maximum_resolved_count: requested,
+        template_nodes: 1,
+        ..ResourceDemand::default()
+    };
+    if unit_demand != exact_direct_demand {
+        return None;
+    }
+    let hard = hard_policy.budget.maximum;
+    let operational = operational_budget.0.maximum;
+    let remaining = |maximum: u64, used: u64| maximum.saturating_sub(used);
+    let executed = requested
+        .saturating_sub(1)
+        .min(remaining(hard.logical_objects, current.logical_objects))
+        .min(remaining(
+            operational.logical_objects,
+            current.logical_objects,
+        ))
+        .min(remaining(hard.primitive_marks, current.primitive_marks))
+        .min(remaining(
+            operational.primitive_marks,
+            current.primitive_marks,
+        ))
+        .min(hard.maximum_per_template_primitive_marks)
+        .min(operational.maximum_per_template_primitive_marks)
+        .min(hard.maximum_resolved_count)
+        .min(operational.maximum_resolved_count);
+    if executed == 0 {
+        return None;
+    }
+    let adjusted = ResourceDemand {
+        logical_objects: executed,
+        primitive_marks: executed,
+        object_templates: 1,
+        maximum_per_template_primitive_marks: executed,
+        maximum_resolved_count: executed,
+        template_nodes: 1,
+        ..ResourceDemand::default()
+    };
+    let candidate = current.checked_add(adjusted).ok()?;
+    hard_policy
+        .budget
+        .check(candidate, ResourceAuthority::HardPolicy)
+        .ok()?;
+    operational_budget
+        .0
+        .check(candidate, ResourceAuthority::OperationalBudget)
+        .ok()?;
+    Some((object_index, u32::try_from(executed).ok()?, candidate))
+}
+
+/// Admit source/placement units in source order. A standalone primitive may
+/// retain the largest safe source-ordered prefix; structurally coupled units
+/// remain atomic. Later units are tried against the remaining budget.
+/// Malformed plan contracts remain errors.
 pub fn select_composition_plan_resources<'plan, 'source>(
     plan: &'plan CompositionPlanResult<'source>,
     hard_policy: HardResourcePolicy,
@@ -926,6 +1024,7 @@ pub fn select_composition_plan_resources<'plan, 'source>(
     let mut demand = ResourceDemand::default();
     let mut admitted = vec![false; count];
     let mut omissions = Vec::new();
+    let mut object_count_overrides = HashMap::new();
     for unit in 0..count {
         if !present[unit] {
             continue;
@@ -963,7 +1062,38 @@ pub fn select_composition_plan_resources<'plan, 'source>(
                 }),
         });
         if let Some(cause) = failure {
-            omissions.push(PlanResourceOmission { owner, cause });
+            let partial = if matches!(cause.reason, PlanResourceFailure::BudgetExceeded(_)) {
+                partial_standalone_object_admission(
+                    plan,
+                    &mapping,
+                    unit,
+                    demand,
+                    demands[unit],
+                    &hard_policy,
+                    operational_budget,
+                )
+            } else {
+                None
+            };
+            if let Some((object_index, executed_count, adjusted_demand)) = partial {
+                omissions.push(PlanResourceOmission {
+                    owner,
+                    cause,
+                    partial_execution: Some(PlanResourcePartialExecution {
+                        requested_count: plan.objects[object_index].count(),
+                        executed_count,
+                    }),
+                });
+                object_count_overrides.insert(object_index, executed_count);
+                demand = adjusted_demand;
+                admitted[unit] = true;
+            } else {
+                omissions.push(PlanResourceOmission {
+                    owner,
+                    cause,
+                    partial_execution: None,
+                });
+            }
         } else {
             demand = candidate.unwrap();
             admitted[unit] = true;
@@ -1010,6 +1140,7 @@ pub fn select_composition_plan_resources<'plan, 'source>(
             selection.standalone_macro_repetition_indices.push(index);
         }
     }
+    selection.object_count_overrides = object_count_overrides;
     Ok(SelectedCompositionPlan {
         plan,
         selection,
@@ -1466,7 +1597,7 @@ mod tests {
     }
 
     #[test]
-    fn selection_tests_later_units_against_remaining_budget() {
+    fn selection_executes_the_safe_prefix_before_testing_later_units() {
         let stage = stage(
             "scatter 240 red circles. scatter 200 blue squares. scatter 100 green triangles.",
             &[],
@@ -1478,11 +1609,12 @@ mod tests {
             OperationalResourceBudget(budget(400)),
         )
         .unwrap();
-        assert_eq!(selected.object_indices(), [0, 2]);
-        assert_eq!(selected.demand().primitive_marks, 340);
+        assert_eq!(selected.object_indices(), [0, 1]);
+        assert_eq!(selected.object_count_override(1), Some(160));
+        assert_eq!(selected.demand().primitive_marks, 400);
         assert_eq!(selected.demand().maximum_per_template_primitive_marks, 240);
         assert_eq!(selected.demand().object_templates, 2);
-        assert_eq!(selected.omissions().len(), 1);
+        assert_eq!(selected.omissions().len(), 2);
         assert_eq!(
             selected.omissions()[0].owner,
             PlanResourceOwner::SourceInstruction {
@@ -1497,6 +1629,20 @@ mod tests {
                 ..
             })
         ));
+        assert_eq!(
+            selected.omissions()[0].partial_execution,
+            Some(PlanResourcePartialExecution {
+                requested_count: 200,
+                executed_count: 160,
+            })
+        );
+        assert_eq!(
+            selected.omissions()[1].owner,
+            PlanResourceOwner::SourceInstruction {
+                source_instruction_index: 2
+            }
+        );
+        assert_eq!(selected.omissions()[1].partial_execution, None);
     }
 
     #[test]

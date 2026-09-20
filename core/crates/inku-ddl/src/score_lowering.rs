@@ -5413,7 +5413,7 @@ fn fill_shape_reference_area(
     Ok(reduced_ratio(area))
 }
 
-fn placement_recipe(
+pub(crate) fn placement_recipe(
     action: PlacementAction,
     n: u64,
     domain: [Rational; 2],

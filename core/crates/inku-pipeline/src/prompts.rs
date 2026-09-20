@@ -11,11 +11,10 @@ use std::{
 };
 
 use inku_ddl::{
-    ClauseAtom, CompilerLockState, CoreRoleKind, MacroDefinition, RemainingRoleKind,
-    ResolvedInstructionLanguage, SAIJIKI_ASSET_ID, SourceSpan, TYPED_DDL_COMPILER_LOCK_SCHEMA_ID,
-    TypedDdlCompilation, TypedHole, VISIBLE_DDL_PATCH_SCHEMA_ID, VisibleDdlPatch,
-    VisibleDdlPatchEdit, saijiki_asset_sha256_hex, saijiki_derived_projection,
-    visible_ddl_patch_available,
+    ClauseAtom, CoreRoleKind, MacroDefinition, RemainingRoleKind, ResolvedInstructionLanguage,
+    SAIJIKI_ASSET_ID, SourceSpan, TYPED_DDL_COMPILER_LOCK_SCHEMA_ID, TypedDdlCompilation,
+    TypedHole, VISIBLE_DDL_PATCH_SCHEMA_ID, VisibleDdlPatch, VisibleDdlPatchEdit,
+    saijiki_asset_sha256_hex, saijiki_derived_projection, visible_ddl_patch_available,
 };
 use inku_score::{CANVAS_FORMAT_REGISTRY_ID, canvas_format_registry_digest, lookup_canvas_format};
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
@@ -1430,7 +1429,7 @@ mod tests {
             },
         );
         let lock = compilation.compiler_lock.as_ref().unwrap();
-        assert_eq!(lock.state, CompilerLockState::IncompleteKnownHole);
+        assert_eq!(lock.state, inku_ddl::CompilerLockState::IncompleteKnownHole);
         let mut holes = compilation.holes.iter().collect::<Vec<_>>();
         holes.sort_by_key(|hole| hole.allowed_span.start_byte);
         assert_eq!(holes.len(), 2, "{:?}", compilation.holes);

@@ -91,14 +91,17 @@ def test_core_compiler_failure_detail_is_allowlisted():
 
 
 def test_hole_completion_event_projects_only_safe_per_hole_diagnostics():
+    first_hole = "hole:" + "a" * 64
+    second_hole = "hole:" + "b" * 64
     result = {
         "events": [
             {
                 "tag": "hole_completion_checked",
                 "payload": {
                     "results": [
-                        {"hole_id": "hole-1", "status": "rejected", "reason": "owner_changed"},
-                        {"hole_id": "hole-2", "status": "unresolved", "reason": "ambiguous"},
+                        {"hole_id": first_hole, "status": "rejected", "reason": "owner_changed"},
+                        {"hole_id": second_hole, "status": "unresolved", "reason": "ambiguous"},
+                        {"hole_id": "hole:not-hex", "status": "rejected", "reason": "owner_changed"},
                     ],
                     "raw_response": "must not be retained",
                     "base_source_digest": "trusted-but-not-user-diagnostic",
@@ -109,8 +112,8 @@ def test_hole_completion_event_projects_only_safe_per_hole_diagnostics():
 
     expected = {
         "results": [
-            {"hole_id": "hole-1", "status": "rejected", "reason": "owner_changed"},
-            {"hole_id": "hole-2", "status": "unresolved", "reason": "ambiguous"},
+            {"hole_id": first_hole, "status": "rejected", "reason": "owner_changed"},
+            {"hole_id": second_hole, "status": "unresolved", "reason": "ambiguous"},
         ]
     }
     assert _hole_completion_checks(result) == [expected]

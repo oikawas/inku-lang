@@ -60,13 +60,14 @@ def _safe_compiler_failure_detail(value: object) -> str | None:
 
 
 def _safe_hole_id(value: object) -> str | None:
-    if not isinstance(value, str) or not 1 <= len(value) <= 128:
+    if (
+        not isinstance(value, str)
+        or len(value) != 69
+        or not value.startswith("hole:")
+    ):
         return None
-    return value if all(
-        character.isascii()
-        and (character.islower() or character.isdigit() or character in {"_", "-"})
-        for character in value
-    ) else None
+    suffix = value.removeprefix("hole:")
+    return value if all(character in "0123456789abcdef" for character in suffix) else None
 
 
 def _safe_hole_completion_check(value: object) -> dict | None:

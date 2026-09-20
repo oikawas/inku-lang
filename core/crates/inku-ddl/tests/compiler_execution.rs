@@ -285,6 +285,19 @@ fn relation_association_failure_keeps_valid_neighbors_under_legacy_stop() {
         assert_eq!(score.instructions.len(), 3);
         assert!(score.instructions[1].relation.is_none());
         assert_eq!(
+            result
+                .compilation()
+                .semantic_document
+                .as_ref()
+                .unwrap()
+                .instruction_association
+                .relation_issues[0]
+                .current_owner,
+            Some(inku_ddl::SemanticRelationIssueOwner::Instruction {
+                instruction_index: 1
+            })
+        );
+        assert_eq!(
             result.instruction_origins(),
             [
                 ScoreInstructionOrigin::SourceInstruction {
@@ -310,6 +323,135 @@ fn relation_association_failure_keeps_valid_neighbors_under_legacy_stop() {
             )
         }));
     }
+
+    let budget = inku_score::ResourceBudget {
+        maximum: inku_score::ResourceDemand {
+            logical_objects: 8,
+            primitive_marks: 8,
+            object_templates: 8,
+            maximum_per_template_primitive_marks: 8,
+            maximum_resolved_count: 8,
+            template_nodes: 8,
+            anchor_instances: 8,
+            transform_instances: 8,
+            placement_instances: 8,
+            fill_instances: 8,
+        },
+    };
+    let resource_result = inku_ddl::compile_ddl_to_score_with_resources(
+        document(source, &[]),
+        &[],
+        Some(23),
+        LIMITS,
+        ScoreLoweringContext::resolve("square", Color::White).unwrap(),
+        None,
+        ScoreErrorPolicy::Stop,
+        inku_score::HardResourcePolicy {
+            identity: "relation-recovery-test.v1".to_owned(),
+            budget,
+        },
+        inku_score::OperationalResourceBudget(budget),
+    );
+    let ordinary = execute(source, &[], LIMITS, ScoreErrorPolicy::Stop);
+    assert_eq!(resource_result.outcome(), ordinary.outcome());
+    assert_eq!(
+        resource_result.instruction_origins(),
+        ordinary.instruction_origins()
+    );
+    assert_eq!(
+        resource_result.upstream_diagnostics(),
+        ordinary.upstream_diagnostics()
+    );
+    assert_eq!(
+        resource_result.effective_stage15_digest(),
+        ordinary.effective_stage15_digest()
+    );
+    let resource_score = resource_result.score().unwrap();
+    let ordinary_score = ordinary.score().unwrap();
+    assert_eq!(
+        resource_score.instructions.len(),
+        ordinary_score.instructions.len()
+    );
+    for (compact, flat) in resource_score
+        .instructions
+        .iter()
+        .zip(&ordinary_score.instructions)
+    {
+        assert_eq!(compact.primitive, flat.primitive);
+        assert_eq!(compact.color, flat.color);
+        assert_eq!(compact.relation, flat.relation);
+        assert_eq!(compact.at, flat.at);
+    }
+}
+
+#[test]
+fn relation_without_an_exact_current_owner_stops_without_guessing() {
+    for (source, policy, expected_kind) in [
+        (
+            "place one red line at center. touching the previous line. place one blue square at center.",
+            ScoreErrorPolicy::Stop,
+            "missing_current_instruction",
+        ),
+        (
+            "place one red line at center. circle line touching the previous line. place one blue square at center.",
+            ScoreErrorPolicy::OmitAndContinue,
+            "ambiguous_current_relation_ownership",
+        ),
+    ] {
+        let result = execute(source, &[], LIMITS, policy);
+        let issues = &result
+            .compilation()
+            .semantic_document
+            .as_ref()
+            .unwrap()
+            .instruction_association
+            .relation_issues;
+        assert!(
+            issues.iter().any(|issue| issue.kind.as_str() == expected_kind
+                && issue.current_owner.is_none()),
+            "{issues:?}"
+        );
+        assert_eq!(result.outcome(), ScoreLoweringOutcome::Stopped);
+        assert!(result.score().is_none());
+        assert!(
+            result.upstream_diagnostics().iter().all(|diagnostic|
+                diagnostic.disposition == CompilerExecutionDisposition::Stopped)
+        );
+    }
+}
+
+#[test]
+fn relation_owner_is_remapped_after_a_continuation_is_consumed() {
+    let result = execute_language(
+        "円を置く。円は赤い。青い線を引く、前の線の途中につながる。灰の四角を置く。",
+        ResolvedInstructionLanguage::Ja,
+        &[],
+        ScoreErrorPolicy::OmitAndContinue,
+    );
+    let semantic = result.compilation().semantic_document.as_ref().unwrap();
+    assert_eq!(semantic.continuation_issues.len(), 0);
+    assert_eq!(semantic.ast.continuations.len(), 1);
+    assert_eq!(
+        semantic.instruction_association.relation_issues[0].current_owner,
+        Some(inku_ddl::SemanticRelationIssueOwner::Instruction {
+            instruction_index: 1
+        })
+    );
+    assert_eq!(
+        result.outcome(),
+        ScoreLoweringOutcome::CompleteWithOmissions
+    );
+    assert_eq!(result.score().unwrap().instructions.len(), 3);
+    assert!(result.score().unwrap().instructions[1].relation.is_none());
+    assert!(result.upstream_diagnostics().iter().any(|diagnostic| matches!(
+        diagnostic.disposition,
+        CompilerExecutionDisposition::RelationOmitted {
+            unit: CompilerExecutionOmissionUnit::RelationInstruction {
+                instruction_index: 1,
+                ..
+            }
+        }
+    )));
 }
 
 #[test]
@@ -786,9 +928,9 @@ fn ground_is_drawable_content_for_both_facade_modes_and_continue_omissions() {
 }
 
 #[test]
-fn stop_retains_the_original_failure_and_returns_no_score() {
+fn all_omitted_stops_under_legacy_stop() {
     let result = execute(
-        "place many red circle at horizontal 0.5, vertical 0.5. place one red square at center.",
+        "place many red circle at horizontal 0.5, vertical 0.5.",
         &[],
         LIMITS,
         ScoreErrorPolicy::Stop,
@@ -798,12 +940,10 @@ fn stop_retains_the_original_failure_and_returns_no_score() {
     assert!(result.score().is_none());
     assert!(result.instruction_origins().is_empty());
     assert!(!result.upstream_diagnostics().is_empty());
-    assert!(
-        result
-            .upstream_diagnostics()
-            .iter()
-            .all(|diagnostic| { diagnostic.disposition == CompilerExecutionDisposition::Stopped })
-    );
+    assert!(result.upstream_diagnostics().iter().any(|diagnostic| matches!(
+        diagnostic.disposition,
+        CompilerExecutionDisposition::Omitted { .. }
+    )));
 }
 
 #[test]
@@ -956,7 +1096,7 @@ fn group_and_relation_dependencies_follow_an_omitted_source_owner() {
         .find_map(|entry| entry.literals_en.first())
         .expect("the accepted asset has an English relation literal");
     let source = format!(
-        "place many red circle at center. place one blue circle at center {relation}. place one green square at center."
+        "place one yellow square at center. place many red circle at center. place one blue circle at center {relation}. place one green square at center."
     );
     let related = execute(&source, &[], LIMITS, ScoreErrorPolicy::OmitAndContinue);
     assert_eq!(
@@ -965,18 +1105,162 @@ fn group_and_relation_dependencies_follow_an_omitted_source_owner() {
         "{:?}",
         related
     );
-    assert_eq!(related.score().unwrap().instructions.len(), 1);
-    assert!(
-        related
-            .upstream_diagnostics()
-            .iter()
-            .any(|diagnostic| matches!(
-                diagnostic.disposition,
-                CompilerExecutionDisposition::Omitted {
-                    unit: CompilerExecutionOmissionUnit::RelationInstruction { .. }
-                }
-            ))
+    let score = related.score().unwrap();
+    assert_eq!(related.compilation().document.source(), source);
+    assert_eq!(score.instructions.len(), 3);
+    assert!(score.instructions[1].relation.is_none());
+    assert_eq!(
+        related.instruction_origins(),
+        &[
+            ScoreInstructionOrigin::SourceInstruction {
+                instruction_index: 0
+            },
+            ScoreInstructionOrigin::SourceInstruction {
+                instruction_index: 2
+            },
+            ScoreInstructionOrigin::SourceInstruction {
+                instruction_index: 3
+            },
+        ]
     );
+    let diagnostic = related
+        .upstream_diagnostics()
+        .iter()
+        .find(|diagnostic| diagnostic.reason == "relation_dependency")
+        .expect("missing target keeps an explicit relation omission diagnostic");
+    assert_eq!(
+        diagnostic.disposition,
+        CompilerExecutionDisposition::RelationOmitted {
+            unit: CompilerExecutionOmissionUnit::RelationInstruction {
+                instruction_index: 2,
+                dependency_instruction_indices: vec![1],
+            }
+        }
+    );
+    let value = serde_json::to_value(diagnostic).unwrap();
+    assert_eq!(value["reason"], "relation_dependency");
+    assert_eq!(value["disposition"]["kind"], "relation_omitted");
+    assert_eq!(value["disposition"]["unit"]["kind"], "relation_instruction");
+    assert_eq!(value["disposition"]["unit"]["instruction_index"], 2);
+    assert_eq!(
+        value["disposition"]["unit"]["dependency_instruction_indices"],
+        serde_json::json!([1])
+    );
+    assert!(value["span"]["end_byte"].as_u64().unwrap() > 0);
+
+    let blocked_current = execute(
+        &format!(
+            "place one red circle at center. place many blue circle at center {relation}. place one green square at center."
+        ),
+        &[],
+        LIMITS,
+        ScoreErrorPolicy::OmitAndContinue,
+    );
+    assert_eq!(
+        blocked_current.outcome(),
+        ScoreLoweringOutcome::CompleteWithOmissions
+    );
+    assert_eq!(
+        blocked_current.instruction_origins(),
+        &[
+            ScoreInstructionOrigin::SourceInstruction {
+                instruction_index: 0
+            },
+            ScoreInstructionOrigin::SourceInstruction {
+                instruction_index: 2
+            },
+        ]
+    );
+}
+
+#[test]
+fn group_relation_without_a_previous_target_keeps_its_exact_group_owner() {
+    let source = concat!(
+        "place one gray circle and black square at bottom mirrored with the previous shape. ",
+        "place one yellow ellipse at center."
+    );
+    let result = execute(source, &[], LIMITS, ScoreErrorPolicy::Stop);
+    let semantic = result.compilation().semantic_document.as_ref().unwrap();
+    assert_eq!(result.compilation().document.source(), source);
+    assert_eq!(semantic.instruction_association.relation_issues.len(), 1);
+    let issue = &semantic.instruction_association.relation_issues[0];
+    assert_eq!(issue.kind.as_str(), "missing_previous_one");
+    assert_eq!(
+        issue.current_owner,
+        Some(inku_ddl::SemanticRelationIssueOwner::CoordinatedGroup { group_index: 0 })
+    );
+    assert_eq!(
+        result.outcome(),
+        ScoreLoweringOutcome::CompleteWithOmissions
+    );
+    let score = result.score().unwrap();
+    assert_eq!(score.instructions.len(), 3);
+    assert_eq!(score.placement_groups.len(), 1);
+    assert!(score.mirror_relations.is_empty());
+    assert_eq!(
+        result.instruction_origins(),
+        [0, 1, 2].map(|instruction_index| ScoreInstructionOrigin::SourceInstruction {
+            instruction_index
+        })
+    );
+    assert!(result.upstream_diagnostics().iter().any(|diagnostic| matches!(
+        &diagnostic.disposition,
+        CompilerExecutionDisposition::RelationOmitted {
+            unit: CompilerExecutionOmissionUnit::CoordinatedGroup {
+                group_index: 0,
+                member_instruction_indices,
+            }
+        } if member_instruction_indices == &[0, 1]
+    )));
+}
+
+#[test]
+fn group_relation_does_not_retarget_an_earlier_surviving_group() {
+    let result = execute(
+        concat!(
+            "place one blue circle and green square at top. ",
+            "place many red circle and white square at center. ",
+            "place one gray circle and black square at bottom mirrored with the previous shape. ",
+            "place one yellow ellipse at center."
+        ),
+        &[],
+        LIMITS,
+        ScoreErrorPolicy::OmitAndContinue,
+    );
+    assert!(
+        result
+            .compilation()
+            .semantic_document
+            .as_ref()
+            .unwrap()
+            .ast
+            .group_predicates
+            .iter()
+            .any(|edge| edge.group_index == 2 && edge.relation.is_some())
+    );
+    assert_eq!(
+        result.outcome(),
+        ScoreLoweringOutcome::CompleteWithOmissions
+    );
+    let score = result.score().unwrap();
+    assert_eq!(score.instructions.len(), 5);
+    assert_eq!(score.placement_groups.len(), 2);
+    assert!(score.mirror_relations.is_empty());
+    assert_eq!(
+        result.instruction_origins(),
+        [0, 1, 4, 5, 6].map(|instruction_index| ScoreInstructionOrigin::SourceInstruction {
+            instruction_index
+        })
+    );
+    assert!(result.upstream_diagnostics().iter().any(|diagnostic| matches!(
+        &diagnostic.disposition,
+        CompilerExecutionDisposition::RelationOmitted {
+            unit: CompilerExecutionOmissionUnit::CoordinatedGroup {
+                group_index: 2,
+                member_instruction_indices,
+            }
+        } if member_instruction_indices == &[4, 5]
+    )));
 }
 
 #[test]

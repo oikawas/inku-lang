@@ -244,11 +244,19 @@ impl SemanticRelationIssueKind {
     }
 }
 
+/// Exact current owner established by relation association.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum SemanticRelationIssueOwner {
+    Instruction { instruction_index: usize },
+    CoordinatedGroup { group_index: usize },
+}
+
 /// One typed relation issue owning every undelivered full-literal occurrence.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SemanticRelationIssue {
     pub kind: SemanticRelationIssueKind,
     pub region_index: usize,
+    pub current_owner: Option<SemanticRelationIssueOwner>,
     pub occurrences: Vec<ExplicitPreviousReferenceOccurrence>,
 }
 
@@ -747,6 +755,7 @@ fn build_semantic_instructions(
             relation_issues.push(SemanticRelationIssue {
                 kind: SemanticRelationIssueKind::AmbiguousCurrentInstructionOwnership,
                 region_index,
+                current_owner: None,
                 occurrences: relations,
             });
         }
@@ -937,6 +946,7 @@ fn build_semantic_instructions(
         relation_issues.push(SemanticRelationIssue {
             kind: SemanticRelationIssueKind::MissingCurrentInstruction,
             region_index,
+            current_owner: None,
             occurrences: relations,
         });
     }
@@ -1678,6 +1688,7 @@ fn claim_group_mirrored_relations(
             issues.push(SemanticRelationIssue {
                 kind: SemanticRelationIssueKind::ConflictingRelations,
                 region_index,
+                current_owner: Some(SemanticRelationIssueOwner::CoordinatedGroup { group_index }),
                 occurrences,
             });
             continue;
@@ -1687,6 +1698,7 @@ fn claim_group_mirrored_relations(
             issues.push(SemanticRelationIssue {
                 kind: SemanticRelationIssueKind::MissingPreviousOne,
                 region_index,
+                current_owner: Some(SemanticRelationIssueOwner::CoordinatedGroup { group_index }),
                 occurrences: vec![occurrence],
             });
             continue;
@@ -2736,6 +2748,9 @@ fn select_relation(
         issues.push(SemanticRelationIssue {
             kind: SemanticRelationIssueKind::ConflictingRelations,
             region_index,
+            current_owner: Some(SemanticRelationIssueOwner::Instruction {
+                instruction_index: previous_instructions.len(),
+            }),
             occurrences,
         });
         return None;
@@ -2750,6 +2765,9 @@ fn select_relation(
         issues.push(SemanticRelationIssue {
             kind,
             region_index,
+            current_owner: Some(SemanticRelationIssueOwner::Instruction {
+                instruction_index: previous_instructions.len(),
+            }),
             occurrences: vec![occurrence],
         });
         return None;
@@ -2767,6 +2785,9 @@ fn select_relation(
         issues.push(SemanticRelationIssue {
             kind: SemanticRelationIssueKind::TargetPrimitiveMismatch,
             region_index,
+            current_owner: Some(SemanticRelationIssueOwner::Instruction {
+                instruction_index: previous_instructions.len(),
+            }),
             occurrences: vec![occurrence],
         });
         return None;

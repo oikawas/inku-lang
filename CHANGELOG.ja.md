@@ -4,7 +4,13 @@
 
 この文書は時系列の実装・設計記録である。仕様との不一致がある場合は、現行契約を記す `SPEC.ja.md` を優先する。
 
-**本書が持つのは v2.5.0（2026-07-25、render engine 12）以降**の 35 版である。それより前は書庫にある。
+**本書が持つのは v2.5.0（2026-07-25、render engine 12）以降**の 36 版である。それより前は書庫にある。
+
+### 2026-09-20 — Relation局所回復とcompiler診断を通常応答へ接続
+
+共有compilerはrelation issueのcurrent ownerをinstructionまたはcoordinated groupとしてexactに保持し、参照先を失ったrelation edgeだけを診断付きで外す。描画可能なcurrentとgroup、元index、seed、provenanceを残し、別のsurvivorへ参照を付け替えない。旧Stop／Continueのどちらもrecoverableな不成立へ同じ局所回復を使い、owner不明・integrity不良・全省略だけを停止する。
+
+通常のCompose／Paint成功応答はRust deliveryの`compiler_outcome`と既存六channelの`pipeline_diagnostics`を返す。保存時は既存history sidecarを使い、安全なstructured logにはexecution identity、source digest、結果、診断種別と実処置だけを記録する。raw DDL、provider応答、credentialは記録しない。DDL／Score／render形式、engine版、DB schemaは変更しない。
 
 ### 2026-09-19 — Stage 1の実測時間予算と失敗診断を分離
 

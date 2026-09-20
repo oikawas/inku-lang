@@ -67,12 +67,46 @@ pub(crate) fn project_compilation_for_execution(
     let Some(semantic) = compilation.semantic_document.as_ref() else {
         return ExecutionProjectionResult::Stopped(stopped_diagnostics(compilation));
     };
+    if semantic
+        .instruction_association
+        .relation_issues
+        .iter()
+        .any(|issue| match issue.current_owner {
+            None => true,
+            Some(crate::SemanticRelationIssueOwner::Instruction { instruction_index }) => {
+                instruction_index >= semantic.ast.instructions.len()
+            }
+            Some(crate::SemanticRelationIssueOwner::CoordinatedGroup { group_index }) => semantic
+                .ast
+                .coordinated_head_groups
+                .get(group_index)
+                .is_none_or(|group| {
+                    group.member_instruction_indices.is_empty()
+                        || group.member_instruction_indices
+                            .iter()
+                            .any(|index| *index >= semantic.ast.instructions.len())
+                }),
+        })
+    {
+        return ExecutionProjectionResult::Stopped(stopped_diagnostics(compilation));
+    }
 
     let mut keep = vec![true; semantic.ast.instructions.len()];
     let mut omitted_clauses = BTreeSet::new();
+    let mut omitted_relation_indices = BTreeSet::new();
+    let mut omitted_group_relations = BTreeSet::new();
     let mut diagnostics = Vec::new();
     for (issue_kind, issue_id, reason, span) in compiler_issues(compilation) {
         if let Some(unit) = relation_omission_unit(semantic, span) {
+            if let CompilerExecutionOmissionUnit::RelationInstruction {
+                instruction_index, ..
+            } = &unit
+            {
+                omitted_relation_indices.insert(*instruction_index);
+            } else if let CompilerExecutionOmissionUnit::CoordinatedGroup { group_index, .. } = &unit
+            {
+                omitted_group_relations.insert(*group_index);
+            }
             diagnostics.push(CompilerExecutionDiagnostic {
                 issue_kind,
                 issue_id,
@@ -141,9 +175,28 @@ pub(crate) fn project_compilation_for_execution(
         });
     }
 
-    omit_typed_dependencies(semantic, &omitted_clauses, &mut keep, &mut diagnostics);
+    omit_typed_dependencies(
+        semantic,
+        &omitted_clauses,
+        &mut keep,
+        &mut omitted_relation_indices,
+        &mut diagnostics,
+    );
+    omitted_group_relations.extend(missing_group_relation_indices(&semantic.ast, &keep));
     let (mut projected_ast, mut source_instruction_indices, mut source_group_indices) =
         retain_ast(&semantic.ast, &keep);
+    omit_retained_relations(
+        &mut projected_ast,
+        &source_instruction_indices,
+        &omitted_relation_indices,
+    );
+    omit_group_relations(
+        &mut projected_ast,
+        &source_instruction_indices,
+        &source_group_indices,
+        &omitted_group_relations,
+        &mut diagnostics,
+    );
     projected_ast.ground = if !semantic
         .issues
         .iter()
@@ -288,7 +341,7 @@ pub(crate) fn project_compilation_for_execution(
                 })
                 .collect::<Vec<_>>();
             omit_projected_dependencies(
-                &projected_ast,
+                &mut projected_ast,
                 &mut second_keep,
                 &source_instruction_indices,
                 &source_group_indices,
@@ -394,17 +447,26 @@ fn relation_omission_unit(
                 .iter()
                 .any(|occurrence| occurrence.provenance.span == span)
         })?;
-    let instruction_index = semantic.ast.instructions.iter().position(|instruction| {
-        instruction.entity.head.source().region_index == issue.region_index
-    })?;
-    Some(CompilerExecutionOmissionUnit::RelationInstruction {
-        instruction_index,
-        dependency_instruction_indices: Vec::new(),
+    Some(match issue.current_owner? {
+        crate::SemanticRelationIssueOwner::Instruction { instruction_index } => {
+            CompilerExecutionOmissionUnit::RelationInstruction {
+                instruction_index,
+                dependency_instruction_indices: Vec::new(),
+            }
+        }
+        crate::SemanticRelationIssueOwner::CoordinatedGroup { group_index } => {
+            CompilerExecutionOmissionUnit::CoordinatedGroup {
+                group_index,
+                member_instruction_indices: semantic.ast.coordinated_head_groups[group_index]
+                    .member_instruction_indices
+                    .clone(),
+            }
+        }
     })
 }
 
 fn omit_projected_dependencies(
-    ast: &SemanticDocumentAst,
+    ast: &mut SemanticDocumentAst,
     keep: &mut [bool],
     source_instruction_indices: &[usize],
     source_group_indices: &[usize],
@@ -445,26 +507,32 @@ fn omit_projected_dependencies(
                 }
             }
         }
-        for (index, instruction) in ast.instructions.iter().enumerate() {
+        for index in 0..ast.instructions.len() {
             if !keep[index] {
                 continue;
             }
-            let Some(relation) = &instruction.relation else {
+            let Some((required, span)) =
+                ast.instructions[index].relation.as_ref().map(|relation| {
+                    (
+                        match relation.reference {
+                            SemanticPreviousReference::PreviousOne => 1,
+                            SemanticPreviousReference::PreviousTwo => 2,
+                        },
+                        relation.provenance.span,
+                    )
+                })
+            else {
                 continue;
-            };
-            let required = match relation.reference {
-                SemanticPreviousReference::PreviousOne => 1,
-                SemanticPreviousReference::PreviousTwo => 2,
             };
             let dependencies = (index.saturating_sub(required)..index).collect::<Vec<_>>();
             if index < required || dependencies.iter().any(|dependency| !keep[*dependency]) {
-                keep[index] = false;
+                ast.instructions[index].relation = None;
                 diagnostics.push(CompilerExecutionDiagnostic {
                     issue_kind: CompilerExecutionIssueKind::Dependency,
                     issue_id: format!("relation-dependency:{}", source_instruction_indices[index]),
                     reason: "relation_dependency".to_owned(),
-                    span: Some(relation.provenance.span),
-                    disposition: CompilerExecutionDisposition::Omitted {
+                    span: Some(span),
+                    disposition: CompilerExecutionDisposition::RelationOmitted {
                         unit: CompilerExecutionOmissionUnit::RelationInstruction {
                             instruction_index: source_instruction_indices[index],
                             dependency_instruction_indices: dependencies
@@ -479,6 +547,80 @@ fn omit_projected_dependencies(
         if before == keep {
             break;
         }
+    }
+    let omitted_group_relations = missing_group_relation_indices(ast, keep)
+        .into_iter()
+        .map(|group_index| source_group_indices[group_index])
+        .collect();
+    omit_group_relations(
+        ast,
+        source_instruction_indices,
+        source_group_indices,
+        &omitted_group_relations,
+        diagnostics,
+    );
+}
+
+fn missing_group_relation_indices(
+    ast: &SemanticDocumentAst,
+    keep: &[bool],
+) -> BTreeSet<usize> {
+    ast.group_predicates
+        .iter()
+        .filter_map(|edge| {
+            let relation = edge.relation.as_ref()?;
+            let group = &ast.coordinated_head_groups[edge.group_index];
+            let &first_member = group.member_instruction_indices.first()?;
+            if group
+                .member_instruction_indices
+                .iter()
+                .any(|index| !keep[*index])
+            {
+                return None;
+            }
+            let required = match relation.reference {
+                SemanticPreviousReference::PreviousOne => 1,
+                SemanticPreviousReference::PreviousTwo => 2,
+            };
+            (first_member < required
+                || (first_member.saturating_sub(required)..first_member)
+                    .any(|index| !keep[index]))
+            .then_some(edge.group_index)
+        })
+        .collect()
+}
+
+fn omit_group_relations(
+    ast: &mut SemanticDocumentAst,
+    source_instruction_indices: &[usize],
+    source_group_indices: &[usize],
+    omitted_group_relations: &BTreeSet<usize>,
+    diagnostics: &mut Vec<CompilerExecutionDiagnostic>,
+) {
+    for edge in &mut ast.group_predicates {
+        let group_index = source_group_indices[edge.group_index];
+        if !omitted_group_relations.contains(&group_index) {
+            continue;
+        }
+        let Some(relation) = edge.relation.take() else {
+            continue;
+        };
+        diagnostics.push(CompilerExecutionDiagnostic {
+            issue_kind: CompilerExecutionIssueKind::Dependency,
+            issue_id: format!("group-relation-dependency:{group_index}"),
+            reason: "relation_dependency".to_owned(),
+            span: Some(relation.provenance.span),
+            disposition: CompilerExecutionDisposition::RelationOmitted {
+                unit: CompilerExecutionOmissionUnit::CoordinatedGroup {
+                    group_index,
+                    member_instruction_indices: ast.coordinated_head_groups[edge.group_index]
+                        .member_instruction_indices
+                        .iter()
+                        .map(|index| source_instruction_indices[*index])
+                        .collect(),
+                },
+            },
+        });
     }
 }
 
@@ -646,6 +788,7 @@ fn omit_typed_dependencies(
     semantic: &crate::SemanticDocumentResult,
     omitted_clauses: &BTreeSet<usize>,
     keep: &mut [bool],
+    omitted_relation_indices: &mut BTreeSet<usize>,
     diagnostics: &mut Vec<CompilerExecutionDiagnostic>,
 ) {
     for issue in &semantic.instruction_association.coordination_issues {
@@ -784,6 +927,9 @@ fn omit_typed_dependencies(
                 });
                 continue;
             }
+            if omitted_relation_indices.contains(&index) {
+                continue;
+            }
             let Some(relation) = &instruction.relation else {
                 continue;
             };
@@ -793,13 +939,13 @@ fn omit_typed_dependencies(
             };
             let dependencies = (index.saturating_sub(required)..index).collect::<Vec<_>>();
             if index < required || dependencies.iter().any(|dependency| !keep[*dependency]) {
-                keep[index] = false;
+                omitted_relation_indices.insert(index);
                 diagnostics.push(CompilerExecutionDiagnostic {
                     issue_kind: CompilerExecutionIssueKind::Dependency,
                     issue_id: format!("relation-dependency:{index}"),
                     reason: "relation_dependency".to_owned(),
                     span: Some(relation.provenance.span),
-                    disposition: CompilerExecutionDisposition::Omitted {
+                    disposition: CompilerExecutionDisposition::RelationOmitted {
                         unit: CompilerExecutionOmissionUnit::RelationInstruction {
                             instruction_index: index,
                             dependency_instruction_indices: dependencies,
@@ -810,6 +956,18 @@ fn omit_typed_dependencies(
         }
         if before == keep {
             break;
+        }
+    }
+}
+
+fn omit_retained_relations(
+    ast: &mut SemanticDocumentAst,
+    source_instruction_indices: &[usize],
+    omitted_relation_indices: &BTreeSet<usize>,
+) {
+    for (projected_index, source_index) in source_instruction_indices.iter().enumerate() {
+        if omitted_relation_indices.contains(source_index) {
+            ast.instructions[projected_index].relation = None;
         }
     }
 }
@@ -982,4 +1140,46 @@ fn sha256_hex(bytes: &[u8]) -> String {
         .iter()
         .map(|byte| format!("{byte:02x}"))
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn omitted_relation_does_not_skip_an_inline_fill_dependency() {
+        let document = crate::NormalizedDdlDocument::new(
+            "fill a circle with one red point. place one blue square at center.",
+            crate::ResolvedInstructionLanguage::En,
+            Vec::new(),
+        )
+        .unwrap();
+        let semantic = crate::associate_semantic_document(&document).unwrap();
+        assert!(matches!(
+            semantic.ast.instructions[1].fill_target,
+            Some(crate::SemanticFillTarget::InlineShape {
+                target_instruction_index: 0,
+                ..
+            })
+        ));
+        let mut keep = vec![false, true, true];
+        let mut diagnostics = Vec::new();
+        omit_typed_dependencies(
+            &semantic,
+            &BTreeSet::new(),
+            &mut keep,
+            &mut BTreeSet::from([1]),
+            &mut diagnostics,
+        );
+        assert_eq!(keep, [false, false, true]);
+        assert!(diagnostics.iter().any(|diagnostic| {
+            diagnostic.reason == "fill_target_dependency"
+                && matches!(&diagnostic.disposition,
+                    CompilerExecutionDisposition::Omitted {
+                        unit: CompilerExecutionOmissionUnit::SourceInstructions {
+                            instruction_indices
+                        }
+                    } if instruction_indices == &[1])
+        }));
+    }
 }

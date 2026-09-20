@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import secrets
 import time
 import uuid
@@ -18,6 +19,34 @@ from .pipeline_candidate import CandidateHostError, PipelineBinding, _bytes
 from .pipeline_provider import ProviderOptions, SingleAttemptProvider, resolved_stage_model
 from .pipeline_settings import PipelineSettings, select_canvas
 from .persistence.variation_authority import VariationAuthorityStore
+
+
+_logger = logging.getLogger(__name__)
+
+
+def _safe_compiler_log_atom(value: object) -> str | None:
+    if not isinstance(value, str) or not 1 <= len(value) <= 128:
+        return None
+    allowed = "_-:."
+    return value if all(character.isascii() and (character.isalnum() or character in allowed) for character in value) else None
+
+
+def _compiler_diagnostic_log_projection(channel: str, diagnostic: object) -> dict:
+    if not isinstance(diagnostic, dict):
+        return {"channel": channel, "kind": None, "issue_id": None, "actual_action": None}
+    reason = diagnostic.get("reason")
+    disposition = diagnostic.get("disposition")
+    kind = diagnostic.get("issue_kind")
+    if kind is None and isinstance(reason, dict):
+        kind = reason.get("kind")
+    return {
+        "channel": channel,
+        "kind": _safe_compiler_log_atom(kind),
+        "issue_id": _safe_compiler_log_atom(diagnostic.get("issue_id")),
+        "actual_action": _safe_compiler_log_atom(
+            disposition.get("kind") if isinstance(disposition, dict) else None
+        ),
+    }
 
 
 class RunOptions(BaseModel):
@@ -248,6 +277,37 @@ class ProductPipelineEffects:
             "render_diagnostics": result["render_diagnostics"],
             "resource_execution": result["resource_execution"],
         }
+        result["compiler_outcome"] = snapshot["delivery"]["outcome"]
+        result["pipeline_diagnostics"] = pipeline_diagnostics
+        compiler_channels = ("upstream_diagnostics", "downstream_diagnostics")
+        _logger.info(
+            "pipeline_compiler_outcome %s",
+            json.dumps(
+                {
+                    "execution_id": snapshot["execution_id"],
+                    "variation_id": snapshot["variation_id"],
+                    "revision": snapshot["authority"]["revision"],
+                    "source_digest": snapshot["delivery"]["source_digest"],
+                    "compiler_outcome": result["compiler_outcome"],
+                    "diagnostic_counts": {
+                        key: len(pipeline_diagnostics[key])
+                        for key in (
+                            "upstream_diagnostics",
+                            "downstream_diagnostics",
+                            "resource_omissions",
+                            "relation_omissions",
+                        )
+                    },
+                    "diagnostics": [
+                        _compiler_diagnostic_log_projection(channel, diagnostic)
+                        for channel in compiler_channels
+                        for diagnostic in pipeline_diagnostics[channel]
+                    ],
+                },
+                sort_keys=True,
+                separators=(",", ":"),
+            ),
+        )
         if settings.get("save_history") is False:
             if settings.get("count_generation") is not False:
                 result["user_generation_count"] = db.increment_user_generation_count(owner)

@@ -154,6 +154,8 @@ class ComposeResponse(BaseModel):
     pipeline_variation_id: str | None = None
     pipeline_execution_id: str | None = None
     pipeline_revision: str | None = None
+    compiler_outcome: str | None = None
+    pipeline_diagnostics: dict[str, object] | None = None
 
 
 class InterpretRequest(BaseModel):
@@ -318,6 +320,8 @@ class PaintResponse(BaseModel):
     pipeline_variation_id: str | None = None
     pipeline_execution_id: str | None = None
     pipeline_revision: str | None = None
+    compiler_outcome: str | None = None
+    pipeline_diagnostics: dict[str, object] | None = None
 
 
 class RenderSvgRequest(BaseModel):

@@ -57,6 +57,15 @@ def test_compose_projects_opaque_score_and_never_approves_a_hole(monkeypatch) ->
                     "future_field": {"kept": True},
                 },
                 "svg": "<svg/>",
+                "compiler_outcome": "complete_with_omissions",
+                "pipeline_diagnostics": {
+                    "upstream_diagnostics": [{"issue_id": "issue-1"}],
+                    "downstream_diagnostics": [],
+                    "resource_omissions": [],
+                    "relation_omissions": [],
+                    "render_diagnostics": {"diagnostics": []},
+                    "resource_execution": {"omitted_units": []},
+                },
             }
             return self.view
 
@@ -69,6 +78,10 @@ def test_compose_projects_opaque_score_and_never_approves_a_hole(monkeypatch) ->
     )
     projected = ComposeResponse.model_validate(result).model_dump()
     assert projected["score"]["future_field"] == {"kept": True}
+    assert projected["compiler_outcome"] == "complete_with_omissions"
+    assert projected["pipeline_diagnostics"] == service.view["result"][
+        "pipeline_diagnostics"
+    ]
     assert projected["pipeline_variation_id"] == "variation-1"
     assert commands == [{"tag": "perform"}]
 

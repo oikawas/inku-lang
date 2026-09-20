@@ -270,6 +270,16 @@ fn build_semantic_document(
         mut owned_continuation_occurrence_count,
         instruction_index_map,
     ) = associate_continuations(document, &instruction_association);
+    for issue in &mut instruction_association.relation_issues {
+        if let Some(crate::SemanticRelationIssueOwner::Instruction { instruction_index }) =
+            issue.current_owner
+        {
+            issue.current_owner =
+                instruction_index_map[instruction_index].map(|instruction_index| {
+                    crate::SemanticRelationIssueOwner::Instruction { instruction_index }
+                });
+        }
+    }
     remap_fill_targets(&mut instructions, &instruction_index_map);
     owned_continuation_occurrence_count += coordination_continuation_occurrence_count;
     let coordinated_head_groups = instruction_association

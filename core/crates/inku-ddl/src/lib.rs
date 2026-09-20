@@ -242,7 +242,8 @@ pub use semantic_instruction::{
     SemanticGroupPredicateEdge, SemanticInstruction, SemanticInstructionAssociationAst,
     SemanticInstructionAssociationResult, SemanticInstructionIssue, SemanticInstructionIssueKind,
     SemanticInstructionOccurrence, SemanticInstructionOccurrenceRole, SemanticRelation,
-    SemanticRelationIssue, SemanticRelationIssueKind, associate_semantic_instructions,
+    SemanticRelationIssue, SemanticRelationIssueKind, SemanticRelationIssueOwner,
+    associate_semantic_instructions,
     associate_semantic_instructions_with_macro_binding,
 };
 pub use stage15_transform::{

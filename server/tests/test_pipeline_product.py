@@ -1,6 +1,7 @@
 """Actual core compilation to normal history projection, without SVG execution."""
 
 import json
+from types import SimpleNamespace
 
 import pytest
 from sqlalchemy import create_engine, func, select
@@ -201,6 +202,136 @@ def test_bundled_macro_enters_new_work_with_localized_summary_and_saved_lock(tmp
     engine.dispose()
 
 
+def test_unsaved_success_exposes_compiler_delivery_and_logs_safe_projection(
+    monkeypatch, caplog
+):
+    from inku_server import db
+
+    effects = object.__new__(ProductPipelineEffects)
+    effects.binding = SimpleNamespace(canvas_registry={
+        "registry": {"formats": [{"id": "square", "width_units": 1, "height_units": 1}]}
+    })
+    monkeypatch.setattr(db, "render_hash_for_item", lambda _item: "a" * 64)
+    monkeypatch.setattr(db, "render_hash_short", lambda digest: digest[:12])
+    source = "raw DDL must not enter the log"
+    snapshot = {
+        "execution_id": "execution-1",
+        "variation_id": "variation-1",
+        "authority": {"revision": "1"},
+        "document": {"source": source},
+        "delivery": {
+            "score": {"version": "0.10.0", "instructions": []},
+            "source_digest": "b" * 64,
+            "outcome": "complete_with_omissions",
+            "compiler_options": {
+                "host": {"resolved_catalog_id": "default"},
+                "composition_seed": None,
+                "operational_resource_budget": {"maximum": {
+                    "primitive_marks": 1,
+                    "maximum_per_template_primitive_marks": 1,
+                    "maximum_resolved_count": 1,
+                    "object_templates": 1,
+                }},
+            },
+            "upstream_diagnostics": [{
+                "issue_kind": "blocking_diagnostic",
+                "issue_id": "compiler-issue:0",
+                "reason": "provider raw response",
+                "span": {"start": 0, "end": 7},
+                "owner": {"credential": "secret-value"},
+                "target": "provider raw response",
+                "disposition": {"kind": "omitted"},
+            }],
+            "downstream_diagnostics": [{
+                "reason": {"kind": "missing_field", "value": "provider raw response"},
+                "owner": {"credential": "secret-value"},
+                "disposition": {"kind": "recovered"},
+            }],
+            "resource_omissions": [],
+            "relation_omissions": [],
+        },
+    }
+    context = {
+        "committed_description": "private description",
+        "host_options": {
+            "stage1_model": "fixture:stage1",
+            "stage2_model": "fixture:stage2",
+            "render_seed": "71",
+            "instruction_lang": "auto",
+            "instruction_lang_resolved": "en",
+            "catalog_mode": "fixed",
+            "save_history": False,
+            "count_generation": False,
+        },
+        "performance_options": {
+            "canvas_aspect_id": "square",
+            "resolved_color_map": {},
+            "wild": False,
+        },
+    }
+    render_diagnostics = {"diagnostics": []}
+    resource_execution = {"omitted_units": []}
+    rendered = {
+        "svg": "<svg/>",
+        "metadata": {
+            "render_engine_id": "default",
+            "render_engine_version": "1",
+            "execution": render_diagnostics,
+            "resource_execution": resource_execution,
+        },
+    }
+
+    with caplog.at_level("INFO", logger="inku_server.pipeline_product"):
+        result = effects.save_result("author", snapshot, context, rendered)
+
+    assert result["compiler_outcome"] == "complete_with_omissions"
+    assert result["pipeline_diagnostics"] == {
+        "upstream_diagnostics": snapshot["delivery"]["upstream_diagnostics"],
+        "downstream_diagnostics": snapshot["delivery"]["downstream_diagnostics"],
+        "resource_omissions": [],
+        "relation_omissions": [],
+        "render_diagnostics": render_diagnostics,
+        "resource_execution": resource_execution,
+    }
+    assert "history_id" not in result
+    records = [
+        record.getMessage()
+        for record in caplog.records
+        if record.getMessage().startswith("pipeline_compiler_outcome ")
+    ]
+    assert len(records) == 1
+    assert json.loads(records[0].removeprefix("pipeline_compiler_outcome ")) == {
+        "execution_id": "execution-1",
+        "variation_id": "variation-1",
+        "revision": "1",
+        "source_digest": "b" * 64,
+        "compiler_outcome": "complete_with_omissions",
+        "diagnostic_counts": {
+            "upstream_diagnostics": 1,
+            "downstream_diagnostics": 1,
+            "resource_omissions": 0,
+            "relation_omissions": 0,
+        },
+        "diagnostics": [
+            {
+                "channel": "upstream_diagnostics",
+                "kind": "blocking_diagnostic",
+                "issue_id": "compiler-issue:0",
+                "actual_action": "omitted",
+            },
+            {
+                "channel": "downstream_diagnostics",
+                "kind": "missing_field",
+                "issue_id": None,
+                "actual_action": "recovered",
+            },
+        ],
+    }
+    assert source not in records[0]
+    assert "provider raw response" not in records[0]
+    assert "secret-value" not in records[0]
+
+
 def test_compact_delivery_preserves_authority_in_normal_history(tmp_path, monkeypatch):
     from inku_server import db
     from inku_server.api_core import rendering, thumbnails
@@ -283,9 +414,19 @@ def test_compact_delivery_preserves_authority_in_normal_history(tmp_path, monkey
                 "metadata": {"render_engine_id": "default", "render_engine_version": "59",
                              "execution": render_diagnostics,
                              "resource_execution": resource_execution}}
+    expected_diagnostics = {
+        "upstream_diagnostics": snapshot["delivery"]["upstream_diagnostics"],
+        "downstream_diagnostics": snapshot["delivery"]["downstream_diagnostics"],
+        "resource_omissions": snapshot["delivery"]["resource_omissions"],
+        "relation_omissions": snapshot["delivery"]["relation_omissions"],
+        "render_diagnostics": render_diagnostics,
+        "resource_execution": resource_execution,
+    }
     result = effects.save_result("author", snapshot, run.context, rendered)
     replay = effects.save_result("author", snapshot, run.context, rendered)
     assert result["history_id"] == replay["history_id"]
+    assert result["compiler_outcome"] == snapshot["delivery"]["outcome"]
+    assert result["pipeline_diagnostics"] == expected_diagnostics
     item = db.get_items("author", [result["history_id"]])[0]
     response = HistoryItem.model_validate(item).model_dump()
     assert response["score"] == snapshot["delivery"]["score"]
@@ -295,14 +436,7 @@ def test_compact_delivery_preserves_authority_in_normal_history(tmp_path, monkey
     assert response["pipeline_revision"] == "1"
     assert response["render_canvas_aspect_id"] == "hd_monitor"
     assert response["render_seed"] == 71
-    assert response["pipeline_diagnostics"] == {
-        "upstream_diagnostics": snapshot["delivery"]["upstream_diagnostics"],
-        "downstream_diagnostics": snapshot["delivery"]["downstream_diagnostics"],
-        "resource_omissions": snapshot["delivery"]["resource_omissions"],
-        "relation_omissions": snapshot["delivery"]["relation_omissions"],
-        "render_diagnostics": render_diagnostics,
-        "resource_execution": resource_execution,
-    }
+    assert response["pipeline_diagnostics"] == expected_diagnostics
     with engine.begin() as connection:
         connection.execute(
             PipelineHistoryLinkRow.__table__.update()

@@ -868,8 +868,31 @@ pub fn build_hole_completion_prompt(
         .map(|(_, paragraph)| paragraph)
         .collect::<Vec<_>>()
         .join("\n\n");
+    // Unknown reference wording has no relation fact yet. Recognition cannot be
+    // the prerequisite for exposing the existing accepted full literals.
+    let attachment_grammar = if has_fact("entity_head") || has_fact("relation") {
+        let rules = match language {
+            ResolvedInstructionLanguage::Ja => HOLE_ATTACHMENT_GRAMMAR_JA,
+            ResolvedInstructionLanguage::En => HOLE_ATTACHMENT_GRAMMAR_EN,
+        };
+        let relations = inku_ddl::saijiki_asset()
+            .relations
+            .iter()
+            .map(|relation| {
+                let literals = match language {
+                    ResolvedInstructionLanguage::Ja => &relation.literals_ja,
+                    ResolvedInstructionLanguage::En => &relation.literals_en,
+                };
+                format!("{}: {}", relation.relation_type, literals.join(" / "))
+            })
+            .collect::<Vec<_>>()
+            .join("\n");
+        format!("{rules}\n# accepted_relation_literals\n{relations}")
+    } else {
+        String::new()
+    };
     let system = format!(
-        "{rules}\n\n{grammar}\n\n# accepted_saijiki_vocabulary\n{}",
+        "{rules}\n\n{grammar}\n\n{attachment_grammar}\n\n# accepted_saijiki_vocabulary\n{}",
         saijiki.prompt_block
     );
     let message = serde_json::to_string(&HoleMessage {
@@ -1383,6 +1406,16 @@ Write "connected partway along the previous line" or "connected partway along th
 Write "mirrored with the previous shape" for mirrored positions and orientations across the axis between two shapes. A leaf or group is referred to as a whole. Preserve explicit positions, dimensions, and directions and the follower’s color and tool."#;
 const STAGE1_CONTEXT_EN: &str = "The canvas format, catalog ID, and catalog mode are already resolved host context. Do not replace them with defaults.";
 const STAGE1_NORMALIZER_RESPONSE_ENDING_EN: &str = " Return only the specified JSON.";
+
+// Existing ownership grammar: semantic_association's pre-head/quantity collectors
+// and semantic_instruction's language-specific instruction-ownership collectors.
+// This explains accepted syntax without registering additional source forms.
+const HOLE_ATTACHMENT_GRAMMAR_JA: &str = r#"単独図形では、色・道具・太さ等をhead前の名詞句へまとめ、名詞修飾を「の」でつなぐ。対象と動作は「<head>を…<動作>」、個数・助数詞はその「を」と動作の間へ置ける。位置は受理済みの位置語に直接「に」を付けて動作の前へ置く。未指定の属性は追加しない。
+typed_factsは認識された語の種類、confirmed_bindingsは確定した所有先と役割である。angleはheadの向き、layout_directionは動作の配置方向であり、語順変更で両者を入れ替えない。日本語の配置方向は受理方向語に「に」を付ける形で表す。
+明示された前の対象への参照だけを、下記の完全な固定句で同じ命令内に記す。参照を新たな描画対象へ変えない。参照先を確定できないときはcontext_limit、意味を保持できる受理形がないときはunsupportedとする。解釈の中間説明は出力せず、局所修正文または未解決理由だけを返す。"#;
+const HOLE_ATTACHMENT_GRAMMAR_EN: &str = r#"For a standalone shape, put the action before the count and shape noun phrase. Keep color, tool, thinness, and other shape modifiers together before the head. Attach a named position after the head with at/in/on/to followed by an accepted place term. Do not add unspecified attributes.
+typed_facts lists recognized lexical categories; confirmed_bindings gives established owners and roles. angle modifies the shape head, while layout_direction modifies placement. Do not interchange these roles by reordering words or add a second shape angle to express layout direction.
+Only for an explicitly requested previous-object reference, use a complete fixed literal below in the same instruction. Do not turn the reference into a new drawable subject. If its target cannot be established, return context_limit; if no accepted form preserves the meaning, return unsupported. Output no intermediate interpretation: return only a local replacement or unresolved reason."#;
 
 const HOLE_SYSTEM_JA: &str = r#"あなたは inku の可視DDLの局所翻訳提案器。selected_holesのsourceだけを書換え可能とし、source_regionsとtyped_factsは根拠として読む。read_onlyの文脈を変更しない。原文の未認識語句も検討し、明示された対象、属性と所有者、数量と総数、action、範囲、関係、順序を保持する。typed_factsのownerは語の種類であり、描画対象IDではない。
 語順、用語の位置や組合せ、自然な言い換えの揺らぎを、既存の受理文法へ直す。原文の語や位置を逐語的に維持する必要はない。「中央付近」は「中央」「中心」に相当する既存の位置語へ言い換えられる。数値座標は追加しない。原文の主旨と確定した対象・個数・色・道具・所有関係を保つ欠落補完も提案できる。複数の色や道具だけから交互配置や数量分配を新たに指定せず、多様な色を単色へ削らない。既存の省略は演奏時補完へ残せる。語句の揺らぎを直しても既存機能で描画できない意味はunresolved/unsupported、意図を一つに定められない場合はunresolved/ambiguous、必要な参照文脈が不足する場合はunresolved/context_limitとする。他のholeについて可能な提案は返す。

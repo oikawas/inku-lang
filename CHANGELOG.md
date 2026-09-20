@@ -8,6 +8,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ### 2026-09-21 — Avoid rejecting independent paraphrases with unrelated failed proposals
 
+The hole-completion prompt now includes concise existing attachment syntax and projects fixed reference literals from the existing Saijiki asset. It explains modifier, action, and position binding beyond the vocabulary list, without withholding reference literals until a reference has already been recognized. Normal Stage 1, compiler grammar, and validator preservation requirements are unchanged.
+
 A clause with an established primitive, explicit count, and action can be rechecked individually when its candidate preserves a simple reference namespace. Every instruction retains its source-ordered head, count, and action, and the repaired owner has no outgoing dependency. An unresolved later reference or another failed proposal does not alone reject it. Existing fact/owner validation and whole-candidate recompilation remain required. The completion prompt also asks models to consolidate redundant unaccepted wording into existing syntax or defaults that already carry the meaning. No grammar, rendering feature, or Score type is added.
 
 ### 2026-09-20 — Keep hole completion local and grounded in the original text

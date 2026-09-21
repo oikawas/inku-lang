@@ -6,6 +6,10 @@
 
 **本書が持つのは v2.5.0（2026-07-25、render engine 12）以降**の 36 版である。それより前は書庫にある。
 
+### 2026-09-21 — Developer provider I/O observation
+
+Developer modeだけで、request単位にcore LLM retryを全段で1回へ限定し、独立してprovider I/O captureを有効にできるようにした。captureは送信前のdurable private recordを必須にし、実送信JSON、provider/model/action、HTTP status、raw response、timeout、usage、elapsedとoutcomeを同じowner/executionだけへ保存する。切断・上限切詰め・record失敗はcompleteと扱わず、rawは通常history、public view、logへ出さない。通常request、prompt、描画意味は変更しない。
+
 ### 2026-09-21 — 英語文法語の大小文字判定を統一し、既存markerを一元化
 
 字句解析では認識される英語文法語が、後段の小文字完全一致によって背景やfillの意味へ届かない不統一を修正した。背景の`the / background / with`、fillの`with`と関連する背景の補完対象判定をASCII大小文字非区別へ揃える。作者のsource bytes、spanとprovenanceは保持し、Macro名や意味語彙の別identityへ一括適用しない。背景とinline fillの大文字表記について、意味の成立と小文字版とのcanonical同値を限定検査で確認した。

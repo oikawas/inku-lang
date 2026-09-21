@@ -11,7 +11,7 @@ import uuid
 from copy import deepcopy
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, StrictBool, ValidationError
 
 from .color_catalogs import color_catalogs, get_color_catalog, render_color_map_for_catalog
 from .macro_catalog import resolve_new_work_macro_catalog
@@ -19,9 +19,21 @@ from .pipeline_candidate import CandidateHostError, PipelineBinding, _bytes
 from .pipeline_provider import ProviderOptions, SingleAttemptProvider, resolved_stage_model
 from .pipeline_settings import PipelineSettings, select_canvas
 from .persistence.variation_authority import VariationAuthorityStore
+from .provider_observation import ProviderObservationStore
 
 
 _logger = logging.getLogger(__name__)
+
+
+def _apply_developer_options(config: dict, options: dict, *, developer_mode: bool) -> None:
+    requested = any(options.get(name) is True for name in (
+        "developer_disable_llm_retries", "developer_capture_provider_io",
+    ))
+    if requested and not developer_mode:
+        raise CandidateHostError("developer_mode_required")
+    if options.get("developer_disable_llm_retries") is True:
+        for name in ("catalog_retry", "stage1_retry", "hole_retry"):
+            config[name]["max_attempts"] = 1
 
 
 def _safe_compiler_log_atom(value: object) -> str | None:
@@ -97,6 +109,8 @@ class RunOptions(BaseModel):
     history_source_text: str | None = None
     history_at: int | None = None
     request_idempotency_key: str | None = Field(default=None, max_length=200)
+    developer_disable_llm_retries: StrictBool | None = None
+    developer_capture_provider_io: StrictBool | None = None
 
 
 class ProductPipelineEffects:
@@ -109,7 +123,7 @@ class ProductPipelineEffects:
 
     def prepare(self, owner: str, kind: str, text: str, options: dict, work: dict | None) -> tuple[dict, dict]:
         from . import db
-        from .api_core.common import _resolve_instruction_lang
+        from .api_core.common import _env_flag, _resolve_instruction_lang
         from .api_core.rendering import _render_seed_from_text
 
         try:
@@ -132,6 +146,7 @@ class ProductPipelineEffects:
         if "lineage_parent_node_id" not in options and (work or {}).get("result", {}).get("lineage_node_id"):
             selected["lineage_parent_node_id"] = work["result"]["lineage_node_id"]
         config = self.settings.config_for(owner, work)
+        _apply_developer_options(config, options, developer_mode=_env_flag("INKU_DEVELOPER_MODE"))
         language = _resolve_instruction_lang(text, selected.get("instruction_lang") or "auto", ui_lang=selected.get("ui_lang"))
         config["language"] = language
         if work and "saved_config" in work:
@@ -193,6 +208,8 @@ class ProductPipelineEffects:
             instruction_lang=selected.get("instruction_lang") or "auto",
             instruction_lang_resolved=language, catalog_id=catalog_id,
         )
+        selected["developer_disable_llm_retries"] = options.get("developer_disable_llm_retries") is True
+        selected["developer_capture_provider_io"] = options.get("developer_capture_provider_io") is True
         return config, {"host_options": selected, "color_maps": color_maps, "macro_catalog": catalog_context,
                         "auto_catalog": kind == "description" and mode == "auto", "metrics": {}}
 
@@ -207,7 +224,14 @@ class ProductPipelineEffects:
                 stage2_model=options.get("stage2_model", configured["stage2_model"]),
                 max_tokens=configured.get("stage1_max_tokens", configured["max_tokens"]) if stage == "stage1" else configured["max_tokens"],
                 max_response_bytes=self.manifest["pipeline"]["prompt_limits"]["max_response_bytes"],
-            ))
+            ), observation=(
+                ProviderObservationStore(
+                    db.engine,
+                    limit=max(16 * 1024 * 1024, self.manifest["pipeline"]["prompt_limits"]["max_response_bytes"]),
+                ),
+                owner,
+                context["execution_id"],
+            ) if options.get("developer_capture_provider_io") is True else None)
             result = transport(action)
             metrics = context.setdefault("metrics", {})
             metrics[stage] = metrics.get(stage, 0) + int(result["elapsed_ms"])
@@ -219,12 +243,16 @@ class ProductPipelineEffects:
                     "elapsed_ms": int(result["elapsed_ms"]),
                 }
                 detail = getattr(transport, "failure_detail", None)
-                if result["failure"] == "provider_rejected" and detail == "credentials_unavailable":
+                if result["failure"] == "provider_rejected" and detail in {"credentials_unavailable", "observation_incomplete"}:
                     context["provider_failure"]["detail"] = detail
             else:
                 context.pop("provider_failure", None)
             return result
         return perform
+
+    def provider_observations(self, owner: str, execution_id: str) -> list[dict]:
+        from . import db
+        return ProviderObservationStore(db.engine, limit=16 * 1024 * 1024).read_execution(owner, execution_id)
 
     def render_options(self, snapshot: dict, context: dict, command: dict) -> dict:
         if set(command) != {"tag"}:

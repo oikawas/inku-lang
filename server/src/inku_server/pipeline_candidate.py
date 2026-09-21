@@ -300,6 +300,8 @@ class CandidateExecution:
                 result["provider_failure"] = self.context["provider_failure"]
             if self.context.get("hole_completion_check") is not None:
                 result["hole_completion_check"] = self.context["hole_completion_check"]
+            if self.context.get("host_options", {}).get("developer_capture_provider_io") is True:
+                result["provider_capture_requested"] = True
             return json.loads(_bytes(result))
 
     def snapshot(self) -> dict:
@@ -374,6 +376,10 @@ class CandidateExecution:
                     separators=(",", ":"),
                 ),
             )
+        # The host may need this server-generated identity before its first
+        # provider effect. Put it into the same context snapshot that is about
+        # to be durably saved, rather than only the caller's pre-copy dict.
+        self.context["execution_id"] = next_snapshot["execution_id"]
         if self.save_snapshot is not None:
             self.save_snapshot(state, next_snapshot, self.context, rendered)
         self._snapshot = next_snapshot

@@ -30,15 +30,14 @@ class MigrationExecutionError(MigrationStateError):
         self.snapshot = snapshot
 
 
-_PREVIOUS_MIGRATION_VERSION = 1
-_PREVIOUS_MIGRATION_NAME = "legacy_baseline"
+_PREVIOUS_MIGRATION_VERSION = 2
+_PREVIOUS_MIGRATION_NAME = "candidate_authoring_sidecars"
 _PREVIOUS_MIGRATION_MANIFEST = (
-    "create-current-metadata-v1",
-    "history-column-and-index-transforms-v1",
-    "permission-and-owner-transforms-v1",
-    "history-identity-and-lineage-transform-v1",
-    "history-fts5-trigram-v1",
-    "pk-and-canonical-history-invariants-v1",
+    "create-current-metadata-v1", "history-column-and-index-transforms-v1",
+    "permission-and-owner-transforms-v1", "history-identity-and-lineage-transform-v1",
+    "history-fts5-trigram-v1", "pk-and-canonical-history-invariants-v1",
+    "variation-authority-and-action-sidecars-v1", "pipeline-candidate-execution-snapshots-v1",
+    "pipeline-performance-history-links-v2",
 )
 _PREVIOUS_MIGRATION_CHECKSUM = hashlib.sha256(
     json.dumps(
@@ -46,13 +45,22 @@ _PREVIOUS_MIGRATION_CHECKSUM = hashlib.sha256(
     ).encode("utf-8")
 ).hexdigest()
 
-MIGRATION_VERSION = 2
-MIGRATION_NAME = "candidate_authoring_sidecars"
+_V1_MIGRATION_VERSION = 1
+_V1_MIGRATION_NAME = "legacy_baseline"
+_V1_MIGRATION_MANIFEST = (
+    "create-current-metadata-v1", "history-column-and-index-transforms-v1",
+    "permission-and-owner-transforms-v1", "history-identity-and-lineage-transform-v1",
+    "history-fts5-trigram-v1", "pk-and-canonical-history-invariants-v1",
+)
+_V1_MIGRATION_CHECKSUM = hashlib.sha256(
+    json.dumps(_V1_MIGRATION_MANIFEST, separators=(",", ":")).encode("utf-8")
+).hexdigest()
+
+MIGRATION_VERSION = 3
+MIGRATION_NAME = "developer_provider_observations"
 _MIGRATION_MANIFEST = (
     *_PREVIOUS_MIGRATION_MANIFEST,
-    "variation-authority-and-action-sidecars-v1",
-    "pipeline-candidate-execution-snapshots-v1",
-    "pipeline-performance-history-links-v2",
+    "developer-provider-observations-v1",
 )
 MIGRATION_CHECKSUM = hashlib.sha256(
     json.dumps(_MIGRATION_MANIFEST, separators=(",", ":")).encode("utf-8")
@@ -332,10 +340,13 @@ def _verify_registry(connection: Connection) -> str:
             _PREVIOUS_MIGRATION_CHECKSUM,
         )
     ]
+    v1 = [(_V1_MIGRATION_VERSION, _V1_MIGRATION_NAME, _V1_MIGRATION_CHECKSUM)]
     if rows == current:
         return "current"
     if rows == previous:
         return "previous"
+    if rows == v1:
+        return "v1"
     raise MigrationStateError(
         "schema_migrations does not match a reviewed baseline"
     )
@@ -359,7 +370,8 @@ def _upgrade_registered_schema(
     with engine.connect() as connection:
         _begin_immediate(connection)
         try:
-            if _verify_registry(connection) != "previous":
+            previous_state = _verify_registry(connection)
+            if previous_state not in {"previous", "v1"}:
                 raise MigrationStateError(
                     "registered schema changed before writer lock"
                 )
@@ -379,7 +391,7 @@ def _upgrade_registered_schema(
                     "name": MIGRATION_NAME,
                     "checksum": MIGRATION_CHECKSUM,
                     "applied_at": int(time.time() * 1000),
-                    "previous_version": _PREVIOUS_MIGRATION_VERSION,
+                    "previous_version": _PREVIOUS_MIGRATION_VERSION if previous_state == "previous" else _V1_MIGRATION_VERSION,
                 },
             )
             connection.commit()

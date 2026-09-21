@@ -47,7 +47,7 @@ def get_service():
             provider_for=lambda owner: effects.provider_for(owner, {}), render_for=None,
             prepare_for=effects.prepare, provider_with_context=effects.provider_for,
             render_with_context=effects.render_options, project_result=effects.save_result,
-            replay_for=effects.replay,
+            replay_for=effects.replay, provider_observations=effects.provider_observations,
             max_workers=limits["max_workers"], max_effect_steps=limits["max_effect_steps"],
             max_retained_runs=limits["max_retained_runs"],
         )

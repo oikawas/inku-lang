@@ -80,6 +80,7 @@ class PipelineService:
         render_with_context: Callable[[dict, dict, dict], dict] | None = None,
         project_result: Callable[[str, dict, dict, dict], dict] | None = None,
         replay_for: Callable[[str, dict, dict | None], dict] | None = None,
+        provider_observations: Callable[[str, str], list[dict]] | None = None,
     ):
         if max_workers <= 0 or max_effect_steps <= 0 or max_retained_runs < max_workers:
             raise ValueError("explicit positive pipeline host limits required")
@@ -91,6 +92,7 @@ class PipelineService:
         self.prepare_for, self.provider_with_context = prepare_for, provider_with_context
         self.render_with_context, self.project_result = render_with_context, project_result
         self.replay_for = replay_for
+        self.provider_observations = provider_observations
         self._runs: dict[tuple[str, str], CandidateExecution] = {}
         self._jobs: dict[tuple[str, str], Future] = {}
         self._lock = threading.RLock()
@@ -171,6 +173,7 @@ class PipelineService:
             run = self._host(owner, config, context)
             authoring = {"tag": "description", "description": text, "auto_catalog": context.get("auto_catalog", self.auto_catalog)} if kind == "description" else {"tag": "direct_ddl", "source": text}
             run.start_new(authoring)
+            run.context["execution_id"] = run.view()["execution_id"]
             key = (owner, run.view()["execution_id"])
             self._runs[key] = run
             self._schedule(key, run)
@@ -293,9 +296,20 @@ class PipelineService:
                 saved = json.loads(record.state_bytes)
                 run = self._host(owner, saved["snapshot"]["config"], saved["context"])
                 run.restore(saved["snapshot"], rendered=saved["rendered"])
+                run.context["execution_id"] = execution_id
                 self._runs[key] = run
                 self._schedule(key, run)
             return run
+
+    def provider_capture_status(self, owner: str, execution_id: str) -> dict:
+        """Read saved state only; transcript inspection must not resume work."""
+        record = self.store.read_execution(owner, execution_id)
+        if record is None:
+            raise HTTPException(404, "variation_not_found")
+        saved = json.loads(record.state_bytes)
+        requested = bool(saved.get("context", {}).get("host_options", {}).get("developer_capture_provider_io"))
+        observations = self.provider_observations(owner, execution_id) if requested and self.provider_observations else []
+        return {"capture_enabled": requested, "observations": observations}
 
     def get(self, owner: str, variation_id: str) -> dict:
         record = self.store.read_latest_execution_for_variation(owner, variation_id)
@@ -438,6 +452,15 @@ def pipeline_router(service: PipelineService | Callable[[], PipelineService], ac
                 detail["current_view"] = current_service().execution(actor["id"], execution_id).view()
                 detail["current_revision"] = detail["current_view"]["authority"]["revision"]
             raise HTTPException(_host_error_status(code), detail) from None
+
+    @router.get("/executions/{execution_id}/provider-observations")
+    def provider_observations(execution_id: str, actor: dict = Depends(actor_dependency)):
+        from .api_core.common import _env_flag
+        if not _env_flag("INKU_DEVELOPER_MODE") or current_service().provider_observations is None:
+            raise HTTPException(404, "developer_provider_observations_not_available")
+        # Read through the service so the owner is always the authenticated
+        # actor; the client never supplies a filesystem or artifact path.
+        return current_service().provider_capture_status(actor["id"], execution_id)
 
     @router.get("/legacy/{history_id}")
     def legacy(history_id: str, actor: dict = Depends(actor_dependency)):

@@ -19,6 +19,7 @@ SCHEMA_MODEL_NAMES = (
     "VariationAuthorityRow",
     "VariationAuthorityActionRow",
     "PipelineCandidateExecutionRow",
+    "ProviderObservationRow",
     "CoerceTraceCatalogRow",
     "LineageNodeRow",
     "LineageEdgeRow",
@@ -42,6 +43,7 @@ DB_COMPAT_MODEL_NAMES = tuple(
         "VariationAuthorityRow",
         "VariationAuthorityActionRow",
         "PipelineCandidateExecutionRow",
+        "ProviderObservationRow",
         "PipelineHistoryLinkRow",
     }
 )
@@ -49,6 +51,7 @@ AUTHORING_TABLE_NAMES = {
     "variation_authority",
     "variation_authority_actions",
     "pipeline_candidate_executions",
+    "provider_observations",
     "pipeline_history_links",
 }
 EXPECTED_TABLE_NAMES = {

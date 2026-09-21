@@ -4,6 +4,7 @@ import json
 from types import SimpleNamespace
 
 import pytest
+from pydantic import ValidationError
 from sqlalchemy import create_engine, func, select
 from sqlalchemy.orm import sessionmaker
 
@@ -14,9 +15,9 @@ from inku_server.persistence.schema import (
     UserAccountRow,
 )
 from inku_server.persistence.variation_authority import VariationAuthorityStore
-from inku_server.pipeline_candidate import CandidateExecution, PipelineBinding
+from inku_server.pipeline_candidate import CandidateExecution, CandidateHostError, PipelineBinding
 from inku_server.pipeline_defaults import ADDITIONAL_RESOURCE_LIMITS, default_manifest
-from inku_server.pipeline_product import ProductPipelineEffects
+from inku_server.pipeline_product import ProductPipelineEffects, RunOptions, _apply_developer_options
 
 
 def test_stage1_default_budget_is_separate_from_legacy_request_timeout(
@@ -42,6 +43,27 @@ def test_stage1_default_budget_is_separate_from_legacy_request_timeout(
         "total_timeout_ms": "540000",
         "retry_delay_ms": "2000",
     }
+
+
+def test_developer_retry_opt_in_does_not_change_the_normal_default():
+    config = {
+        name: {"max_attempts": 4}
+        for name in ("catalog_retry", "stage1_retry", "hole_retry")
+    }
+    _apply_developer_options(config, {"developer_disable_llm_retries": True}, developer_mode=True)
+    assert [config[name]["max_attempts"] for name in (
+        "catalog_retry", "stage1_retry", "hole_retry",
+    )] == [1, 1, 1]
+    normal = {
+        name: {"max_attempts": 4}
+        for name in ("catalog_retry", "stage1_retry", "hole_retry")
+    }
+    _apply_developer_options(normal, {}, developer_mode=False)
+    assert [normal[name]["max_attempts"] for name in normal] == [4, 4, 4]
+    with pytest.raises(CandidateHostError, match="developer_mode_required"):
+        _apply_developer_options(normal, {"developer_capture_provider_io": True}, developer_mode=False)
+    with pytest.raises(ValidationError):
+        RunOptions.model_validate({"developer_disable_llm_retries": "true"})
 
 
 def test_stage1_timeout_retries_inside_total_budget_then_stops(

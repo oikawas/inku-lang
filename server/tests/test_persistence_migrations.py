@@ -131,7 +131,7 @@ def test_fresh_database_records_baseline_and_second_start_skips_legacy(
     engine.dispose()
 
 
-def test_registered_v1_adds_candidate_tables_without_touching_history(
+def test_registered_v2_adds_provider_observations_without_touching_history(
     tmp_path: Path,
 ) -> None:
     path = tmp_path / "registered-v1.db"
@@ -141,6 +141,7 @@ def test_registered_v1_adds_candidate_tables_without_touching_history(
         "variation_authority_actions",
         "pipeline_candidate_executions",
         "pipeline_history_links",
+        "provider_observations",
     }
     legacy_tables = [
         table

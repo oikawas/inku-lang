@@ -18,6 +18,7 @@ import httpx
 from .api_core.common import _is_qualified_model_id
 from .model_settings import connection_for, provider_for_model
 from .provider_limits import provider_slot
+from .provider_observation import ProviderObservationError, ProviderObservationStore
 
 
 _GEMINI_JSON_SCHEMA_KEYS = {
@@ -166,15 +167,19 @@ def resolved_stage_model(model: str | None, actor: dict | None, *, stage: str) -
 
 
 class SingleAttemptProvider:
-    def __init__(self, options: ProviderOptions, *, transport: httpx.AsyncBaseTransport | None = None):
+    def __init__(self, options: ProviderOptions, *, transport: httpx.AsyncBaseTransport | None = None,
+                 observation: tuple[ProviderObservationStore, str, str] | None = None):
         if options.max_tokens <= 0 or options.max_response_bytes <= 0:
             raise ValueError("positive provider limits required")
         self.options = options
         self.transport = transport
+        self.observation = observation
         self.failure_detail: str | None = None
+        self._observation_truncated = False
 
     def __call__(self, action: dict) -> dict:
         self.failure_detail = None
+        self._observation_truncated = False
         tags = {
             "select_description_catalog": "description_catalog_selected",
             "generate_normalized_ddl": "normalized_ddl_generated",
@@ -202,7 +207,7 @@ class SingleAttemptProvider:
                 if remaining <= 0:
                     raise TimeoutError
                 response = asyncio.run(self._request(
-                    connection, model, action["payload"]["prompt"], remaining
+                    connection, model, action, action["payload"]["prompt"], remaining
                 ))
         except (TimeoutError, httpx.TimeoutException):
             failure = "transport_timeout"
@@ -215,14 +220,27 @@ class SingleAttemptProvider:
             failure = "transport_unavailable"
         except (json.JSONDecodeError, KeyError, IndexError, TypeError):
             failure = "malformed_payload"
+        except ProviderObservationError:
+            self.failure_detail = "observation_incomplete"
+            self._observation_truncated = True
+            failure = "provider_rejected"
         except ValueError:
             failure = "provider_rejected"
-        elapsed = str(max(0, int((time.monotonic() - started) * 1000)))
+        elapsed_int = max(0, int((time.monotonic() - started) * 1000))
+        if self.observation is not None:
+            store, owner_id, execution_id = self.observation
+            try:
+                store.outcome(owner_id, execution_id, action, failure=failure, elapsed_ms=elapsed_int,
+                              capture_complete=not self._observation_truncated)
+            except ProviderObservationError:
+                self.failure_detail = "observation_incomplete"
+                failure = "provider_rejected"
+        elapsed = str(elapsed_int)
         if failure is not None:
             return {"tag": "provider_failed", "identity": identity, "failure": failure, "elapsed_ms": elapsed}
         return {"tag": tags[action["tag"]], "identity": identity, "response": response, "elapsed_ms": elapsed}
 
-    async def _request(self, connection: dict, model: str, prompt: dict, timeout: float) -> str:
+    async def _request(self, connection: dict, model: str, action: dict, prompt: dict, timeout: float) -> str:
         base = connection["base_url"].rstrip("/")
         key = connection.get("api_key") or ""
         headers = {"Content-Type": "application/json"}
@@ -286,48 +304,79 @@ class SingleAttemptProvider:
                     }}}
         else:
             raise ValueError("unsupported provider kind")
+        body_bytes = json.dumps(body, ensure_ascii=False, separators=(",", ":"), allow_nan=False).encode("utf-8")
+        if self.observation is not None:
+            store, owner_id, execution_id = self.observation
+            # The durable request record is the send authorization: a failed
+            # insert must leave this method before it reaches HTTPX.
+            request_truncated = store.request(
+                owner_id, execution_id, action,
+                "stage2" if action["tag"] == "complete_visible_ddl_holes" else "stage1",
+                str(connection["id"]), model, body_bytes,
+            )
+            self._observation_truncated = request_truncated
+            if request_truncated:
+                raise ProviderObservationError("request_capture_truncated")
         # asyncio's deadline covers connect, body streaming and decoding as one
         # attempt. HTTPX performs no retries; redirects are not followed.
-        async with asyncio.timeout(timeout):
-            async with httpx.AsyncClient(timeout=timeout, transport=self.transport, follow_redirects=False) as client:
-                async with client.stream("POST", url, headers=headers, json=body) as result:
-                    result.raise_for_status()
-                    raw = bytearray()
-                    async for chunk in result.aiter_bytes():
-                        if len(raw) + len(chunk) > self.options.max_response_bytes:
-                            raise ValueError("provider response limit exceeded")
-                        raw.extend(chunk)
-                data = json.loads(raw)
-                if kind == "openai_compatible":
-                    message = data["choices"][0]["message"]
-                    calls = message.get("tool_calls") or []
-                    if calls:
-                        if len(calls) != 1 or calls[0]["function"]["name"] != response_name:
-                            raise TypeError("provider returned an unexpected tool call")
-                        text = calls[0]["function"]["arguments"]
-                    else:
-                        text = message.get("content")
-                elif kind == "anthropic":
-                    calls = [
-                        block for block in data["content"] if block.get("type") == "tool_use"
-                    ]
-                    if len(calls) != 1 or calls[0].get("name") != response_name:
-                        raise TypeError("provider returned an unexpected tool call")
-                    arguments = calls[0].get("input")
-                    if not isinstance(arguments, dict):
-                        raise TypeError("provider returned invalid tool input")
-                    text = json.dumps(arguments, ensure_ascii=False, separators=(",", ":"))
-                elif kind == "gemini":
-                    calls = [part["functionCall"] for part in data["candidates"][0]["content"]["parts"]
-                             if "functionCall" in part]
-                    if len(calls) != 1 or calls[0]["name"] != response_name:
-                        raise TypeError("provider returned an unexpected function call")
-                    arguments = calls[0].get("args")
-                    if not isinstance(arguments, dict):
-                        raise TypeError("provider returned invalid function arguments")
-                    text = json.dumps(arguments, ensure_ascii=False, separators=(",", ":"))
-                else:
-                    text = "\n".join(part["text"] for part in data["candidates"][0]["content"]["parts"] if "text" in part)
-                if not isinstance(text, str) or not text:
-                    raise TypeError("provider returned no text")
-                return text
+        raw = bytearray()
+        response_status: int | None = None
+        try:
+            async with asyncio.timeout(timeout):
+                async with httpx.AsyncClient(timeout=timeout, transport=self.transport, follow_redirects=False) as client:
+                    async with client.stream("POST", url, headers=headers, content=body_bytes) as result:
+                        response_status = result.status_code
+                    # Preserve legacy behavior when capture is disabled: a
+                    # status error is classified before reading its body.
+                        if self.observation is None:
+                            result.raise_for_status()
+                        async for chunk in result.aiter_bytes():
+                            if len(raw) + len(chunk) > self.options.max_response_bytes:
+                                raw.extend(chunk[:max(0, self.options.max_response_bytes - len(raw))])
+                                if self.observation is not None:
+                                    store, owner_id, execution_id = self.observation
+                                    store.response(owner_id, execution_id, action, status=result.status_code, raw=bytes(raw), truncated=True)
+                                self._observation_truncated = True
+                                raise ValueError("provider response limit exceeded")
+                            raw.extend(chunk)
+                        if self.observation is not None:
+                            store, owner_id, execution_id = self.observation
+                            store.response(owner_id, execution_id, action, status=result.status_code, raw=bytes(raw))
+                            result.raise_for_status()
+            data = json.loads(raw)
+        except (TimeoutError, httpx.TimeoutException, httpx.TransportError):
+            if self.observation is not None and response_status is not None:
+                store, owner_id, execution_id = self.observation
+                store.response(owner_id, execution_id, action, status=response_status, raw=bytes(raw), truncated=True)
+                self._observation_truncated = True
+            raise
+        if kind == "openai_compatible":
+            message = data["choices"][0]["message"]
+            calls = message.get("tool_calls") or []
+            if calls:
+                if len(calls) != 1 or calls[0]["function"]["name"] != response_name:
+                    raise TypeError("provider returned an unexpected tool call")
+                text = calls[0]["function"]["arguments"]
+            else:
+                text = message.get("content")
+        elif kind == "anthropic":
+            calls = [block for block in data["content"] if block.get("type") == "tool_use"]
+            if len(calls) != 1 or calls[0].get("name") != response_name:
+                raise TypeError("provider returned an unexpected tool call")
+            arguments = calls[0].get("input")
+            if not isinstance(arguments, dict):
+                raise TypeError("provider returned invalid tool input")
+            text = json.dumps(arguments, ensure_ascii=False, separators=(",", ":"))
+        elif kind == "gemini":
+            calls = [part["functionCall"] for part in data["candidates"][0]["content"]["parts"] if "functionCall" in part]
+            if len(calls) != 1 or calls[0]["name"] != response_name:
+                raise TypeError("provider returned an unexpected function call")
+            arguments = calls[0].get("args")
+            if not isinstance(arguments, dict):
+                raise TypeError("provider returned invalid function arguments")
+            text = json.dumps(arguments, ensure_ascii=False, separators=(",", ":"))
+        else:
+            text = "\n".join(part["text"] for part in data["candidates"][0]["content"]["parts"] if "text" in part)
+        if not isinstance(text, str) or not text:
+            raise TypeError("provider returned no text")
+        return text

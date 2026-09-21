@@ -213,6 +213,35 @@ class PipelineCandidateExecutionRow(Base):
     updated_at = Column(BigInteger, nullable=False, index=True)
 
 
+class ProviderObservationRow(Base):
+    """Developer-only, owner-scoped provider I/O captured outside history."""
+
+    __tablename__ = "provider_observations"
+
+    owner_id = Column(String, primary_key=True)
+    execution_id = Column(String, primary_key=True)
+    action_id = Column(String, primary_key=True)
+    request_digest = Column(String, nullable=False)
+    action_tag = Column(String, nullable=False)
+    stage = Column(String, nullable=False)
+    provider_id = Column(String, nullable=False)
+    model = Column(String, nullable=False)
+    attempt = Column(Integer, nullable=False)
+    timeout_ms = Column(Integer, nullable=False)
+    request_body = Column(Text, nullable=False)
+    request_truncated = Column(Boolean, nullable=False, default=False)
+    response_body = Column(Text, nullable=True)
+    response_truncated = Column(Boolean, nullable=False, default=False)
+    http_status = Column(Integer, nullable=True)
+    usage_json = Column(Text, nullable=True)
+    outcome = Column(String, nullable=False, default="request_saved")
+    capture_complete = Column(Boolean, nullable=False, default=False)
+    failure = Column(String, nullable=True)
+    elapsed_ms = Column(Integer, nullable=True)
+    created_at = Column(BigInteger, nullable=False)
+    updated_at = Column(BigInteger, nullable=False)
+
+
 class PipelineHistoryLinkRow(Base):
     """Server-owned link from an immutable performance to its authoring revision."""
 

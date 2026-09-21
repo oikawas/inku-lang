@@ -589,7 +589,8 @@ fn clause_facts(
                 }
                 FactKind::CoreModifier(modifier.identity.value)
             }
-            ClauseAtom::FunctionWord { .. }
+            ClauseAtom::GrammarMarker { .. }
+            | ClauseAtom::FunctionWord { .. }
             | ClauseAtom::SaijikiRelation { .. }
             | ClauseAtom::UnresolvedDiagnostic(_) => continue,
         };

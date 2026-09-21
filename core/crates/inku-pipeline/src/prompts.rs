@@ -11,7 +11,8 @@ use std::{
 };
 
 use inku_ddl::{
-    ClauseAtom, CoreRoleKind, MacroDefinition, RemainingRoleKind, ResolvedInstructionLanguage,
+    ClauseAtom, CoreRoleKind, MacroDefinition, MarkerId, RemainingRoleKind,
+    ResolvedInstructionLanguage,
     SAIJIKI_ASSET_ID, SourceSpan, TYPED_DDL_COMPILER_LOCK_SCHEMA_ID, TypedDdlCompilation,
     TypedHole, VISIBLE_DDL_PATCH_SCHEMA_ID, VisibleDdlPatch, VisibleDdlPatchEdit,
     saijiki_asset_sha256_hex, saijiki_derived_projection, visible_ddl_patch_available,
@@ -683,7 +684,7 @@ fn stage1_normalizer_rules(language: ResolvedInstructionLanguage) -> String {
             STAGE1_NORMALIZER_RESPONSE_ENVELOPE_JA,
             STAGE1_OUTPUT_SCOPE_JA,
             STAGE1_INTERPRETATION_JA,
-            STAGE1_GRAMMAR_JA,
+            stage1_grammar(ResolvedInstructionLanguage::Ja),
             STAGE1_CONTEXT_JA,
             STAGE1_NORMALIZER_RESPONSE_ENDING_JA,
         ),
@@ -693,7 +694,7 @@ fn stage1_normalizer_rules(language: ResolvedInstructionLanguage) -> String {
             STAGE1_NORMALIZER_RESPONSE_ENVELOPE_EN,
             STAGE1_OUTPUT_SCOPE_EN,
             STAGE1_INTERPRETATION_EN,
-            STAGE1_GRAMMAR_EN,
+            stage1_grammar(ResolvedInstructionLanguage::En),
             STAGE1_CONTEXT_EN,
             STAGE1_NORMALIZER_RESPONSE_ENDING_EN,
         ),
@@ -728,14 +729,14 @@ pub fn stage1_system_projection(
             "",
             STAGE1_DDL_INTENT_JA,
             STAGE1_OUTPUT_SCOPE_JA,
-            STAGE1_GRAMMAR_JA,
+            stage1_grammar(ResolvedInstructionLanguage::Ja),
             STAGE1_CONTEXT_JA,
         ),
         ResolvedInstructionLanguage::En => (
             "You ",
             STAGE1_DDL_INTENT_EN,
             STAGE1_OUTPUT_SCOPE_EN,
-            STAGE1_GRAMMAR_EN,
+            stage1_grammar(ResolvedInstructionLanguage::En),
             STAGE1_CONTEXT_EN,
         ),
     };
@@ -794,10 +795,7 @@ pub fn build_hole_completion_prompt(
 
     let saijiki =
         saijiki_derived_projection(language).map_err(|_| PromptError::SaijikiProjection)?;
-    let rules = match language {
-        ResolvedInstructionLanguage::Ja => HOLE_SYSTEM_JA,
-        ResolvedInstructionLanguage::En => HOLE_SYSTEM_EN,
-    };
+    let rules = hole_system_grammar(language);
     let evidence_span_for = |hole: &TypedHole| {
         compilation
             .semantic_document
@@ -851,8 +849,8 @@ pub fn build_hole_completion_prompt(
             .any(|region| region.typed_facts.iter().any(|fact| fact.owner == owner))
     };
     let shared_grammar = match language {
-        ResolvedInstructionLanguage::Ja => STAGE1_GRAMMAR_JA,
-        ResolvedInstructionLanguage::En => STAGE1_GRAMMAR_EN,
+        ResolvedInstructionLanguage::Ja => stage1_grammar(ResolvedInstructionLanguage::Ja),
+        ResolvedInstructionLanguage::En => stage1_grammar(ResolvedInstructionLanguage::En),
     };
     // Reuse the existing grammar paragraphs verbatim; do not maintain another
     // language or vocabulary registry for hole completion.
@@ -871,10 +869,7 @@ pub fn build_hole_completion_prompt(
     // Unknown reference wording has no relation fact yet. Recognition cannot be
     // the prerequisite for exposing the existing accepted full literals.
     let attachment_grammar = if has_fact("entity_head") || has_fact("relation") {
-        let rules = match language {
-            ResolvedInstructionLanguage::Ja => HOLE_ATTACHMENT_GRAMMAR_JA,
-            ResolvedInstructionLanguage::En => HOLE_ATTACHMENT_GRAMMAR_EN,
-        };
+        let rules = hole_attachment_grammar(language);
         let relations = inku_ddl::saijiki_asset()
             .relations
             .iter()
@@ -992,7 +987,9 @@ fn hole_typed_facts(
                     canonical_key: format!("{asset_id}:{relation_type}"),
                     source: surface,
                 }),
-                ClauseAtom::FunctionWord { .. } | ClauseAtom::UnresolvedDiagnostic(_) => None,
+                ClauseAtom::FunctionWord { .. }
+                | ClauseAtom::GrammarMarker { .. }
+                | ClauseAtom::UnresolvedDiagnostic(_) => None,
             }
         })
         .collect()
@@ -1344,6 +1341,45 @@ fn hex_digest(bytes: impl AsRef<[u8]>) -> String {
         .collect()
 }
 
+fn stage1_grammar(language: ResolvedInstructionLanguage) -> String {
+    let (prefix, ordered_placement, suffix) = match language {
+        ResolvedInstructionLanguage::Ja => (
+            STAGE1_GRAMMAR_JA_PREFIX,
+            stage1_ordered_placement_grammar_ja(),
+            STAGE1_GRAMMAR_JA_SUFFIX,
+        ),
+        ResolvedInstructionLanguage::En => (
+            STAGE1_GRAMMAR_EN_PREFIX,
+            stage1_ordered_placement_grammar_en(),
+            STAGE1_GRAMMAR_EN_SUFFIX,
+        ),
+    };
+    format!("{prefix}\n\n{ordered_placement}\n\n{suffix}")
+}
+
+fn stage1_ordered_placement_grammar_ja() -> String {
+    let to = MarkerId::JaTo.surface();
+    let wo = MarkerId::JaWo.surface();
+    let sequence_te = MarkerId::JaSequenceTe.surface();
+    let no = MarkerId::JaNo.surface();
+    let repeating = MarkerId::JaRepeat.surface();
+    let group = MarkerId::JaGroup.surface();
+    format!(
+        "順序が明示された配置は「赤{to}灰{wo}交互に{sequence_te}、円{wo}五つ並べる。」「鉛筆{to}太筆{wo}交互に{sequence_te}、線{wo}五本並べる。」「赤い円・青い線・灰{no}弧{no}順に{repeating}、八つ並べる。」のように書く。まとまりは括弧内の命令にせず、「赤い円{to}青い線{no}{group}{wo}、灰{no}弧{to}交互に5つ並べる。」のように名詞句で書く。組と単独図形を合わせた総数5なので、円と線の組3つ、弧2つになる。交互には2項、順には空でない有限列を使い、項の順序と重複を保つ。同じ有限列を散らす・敷き詰める・埋めるにも使える。総個数へ列長や組の中の図形数を掛けない。順序のない複数の指定から交互や循環を推測しない。"
+    )
+}
+
+fn stage1_ordered_placement_grammar_en() -> String {
+    let and = MarkerId::EnAnd.surface();
+    let repeating = MarkerId::EnRepeating.surface();
+    let article = MarkerId::EnA.surface();
+    let group = MarkerId::EnGroupOf.surface();
+    let with = MarkerId::EnWith.surface();
+    format!(
+        "Write explicitly ordered placements as \"Line up five circles, alternating red {and} gray.\" or \"Line up eight, {repeating} {article} red circle, {article} blue line, {and} {article} gray arc in order.\" Describe a group as a noun phrase without parenthesized commands: \"Line up five, alternating {article} {group} {article} red circle {and} {article} blue line {with} {article} gray arc.\" Five is the total number of groups and individual shapes, producing three circle-and-line groups and two arcs. Alternating takes two entries; in order takes a nonempty finite list. Preserve entry order and duplicates. The same sequences apply to scatter, tile, and fill. Do not multiply the total count by the list length or the number of shapes inside a group. Do not infer alternation or cycling without an explicit order."
+    )
+}
+
 const TYPED_STAGE1_NORMALIZER_ROLE_JA: &str =
     "あなたは inku の typed Stage 1 正規化器。作者の記述を深く読み、";
 const STAGE1_DDL_INTENT_JA: &str =
@@ -1361,13 +1397,11 @@ normalized_ddlは命令文をつないだ一つの文字列であり、命令の
 応答: {"normalized_ddl":"中心に赤い円を1個置く。"}
 記述: 誰もいない場所に足音だけが響く。
 応答: {"normalized_ddl":"中心に赤い鉛筆の細い線をひとつ置く。"}"#;
-const STAGE1_GRAMMAR_JA: &str = r#"accepted_saijiki_vocabulary の有限語彙と、compilerが読む通常の数値・句読点・文法だけを使う。installed_macro_signatures のmacroを使う場合は qualified_name と列挙されたparameterだけを書く。version、digest、MacroDefinition本文、component、展開結果をDDLへ書かない。
+const STAGE1_GRAMMAR_JA_PREFIX: &str = r#"accepted_saijiki_vocabulary の有限語彙と、compilerが読む通常の数値・句読点・文法だけを使う。installed_macro_signatures のmacroを使う場合は qualified_name と列挙されたparameterだけを書く。version、digest、MacroDefinition本文、component、展開結果をDDLへ書かない。
 
-作者が明示した対象、色、画材、太さ、個数、寸法、角度、座標、領域、関係、反復、配置を失わない。fill、scatter、tile、background は別の意味である。fillは作者が指定した図形を指定領域の内部へ、指定個数と寸法を保って充填する。scatterへ読み替えない。scatterは疎密を持つ散布、tileは規則的な敷き詰め、backgroundはキャンバス背景色だけに使う。『満天』『星空』『全面』を理由にfillへ変えず、『埋める』を全面scatterへ変えない。明示領域をcanvas全体へ広げない。
+作者が明示した対象、色、画材、太さ、個数、寸法、角度、座標、領域、関係、反復、配置を失わない。fill、scatter、tile、background は別の意味である。fillは作者が指定した図形を指定領域の内部へ、指定個数と寸法を保って充填する。scatterへ読み替えない。scatterは疎密を持つ散布、tileは規則的な敷き詰め、backgroundはキャンバス背景色だけに使う。『満天』『星空』『全面』を理由にfillへ変えず、『埋める』を全面scatterへ変えない。明示領域をcanvas全体へ広げない。"#;
 
-順序が明示された配置は「赤と灰を交互にして、円を五つ並べる。」「鉛筆と太筆を交互にして、線を五本並べる。」「赤い円・青い線・灰の弧の順に繰り返して、八つ並べる。」のように書く。まとまりは括弧内の命令にせず、「赤い円と青い線の組を、灰の弧と交互に5つ並べる。」のように名詞句で書く。組と単独図形を合わせた総数5なので、円と線の組3つ、弧2つになる。交互には2項、順には空でない有限列を使い、項の順序と重複を保つ。同じ有限列を散らす・敷き詰める・埋めるにも使える。総個数へ列長や組の中の図形数を掛けない。順序のない複数の指定から交互や循環を推測しない。
-
-日本語の「つ」は1つから9つまでで、10つ・11つとは書かない。10は助数詞なしの10として書ける。「個」は1個・2個・10個・11個などにも使え、必要なら線の「本」など対象に合う既存助数詞を使う。表記の違いで明示した総数を変えない。
+const STAGE1_GRAMMAR_JA_SUFFIX: &str = r#"日本語の「つ」は1つから9つまでで、10つ・11つとは書かない。10は助数詞なしの10として書ける。「個」は1個・2個・10個・11個などにも使え、必要なら線の「本」など対象に合う既存助数詞を使う。表記の違いで明示した総数を変えない。
 
 接続先の線や弧の両端以外を指定するには「前の線の途中につながる」「前の弧の途中につながる」と書く。途中の具体位置は演奏で決まるため、中心や数値位置へ置き換えない。始点・終点の明示もそのまま保つ。
 
@@ -1393,13 +1427,11 @@ Description: One red circle in the center.
 Response: {"normalized_ddl":"Place one red circle in the center."}
 Description: Only footsteps echo in an empty place.
 Response: {"normalized_ddl":"place one thin red pencil line at the center."}"#;
-const STAGE1_GRAMMAR_EN: &str = r#"Use the finite accepted_saijiki_vocabulary plus ordinary numeric literals, punctuation, and grammar accepted by the compiler. When invoking an installed macro, write only its qualified_name and listed parameters. Do not write versions, digests, MacroDefinition bodies, components, or expansions into DDL.
+const STAGE1_GRAMMAR_EN_PREFIX: &str = r#"Use the finite accepted_saijiki_vocabulary plus ordinary numeric literals, punctuation, and grammar accepted by the compiler. When invoking an installed macro, write only its qualified_name and listed parameters. Do not write versions, digests, MacroDefinition bodies, components, or expansions into DDL.
 
-Preserve every explicit subject, color, material, thinness, count, size, angle, coordinate, region, relation, repetition, and placement. Fill, scatter, tile, and background are distinct meanings. Fill places the author's specified shape inside the specified region while preserving its explicit count and size; never normalize fill to scatter. Scatter is a distribution with spacing, tile is regular tessellation, and background means only the canvas background color. Do not infer fill merely from “starry sky”, “full”, or “whole area”, and do not turn “fill” into whole-canvas scatter. Never expand an explicit region to the whole canvas.
+Preserve every explicit subject, color, material, thinness, count, size, angle, coordinate, region, relation, repetition, and placement. Fill, scatter, tile, and background are distinct meanings. Fill places the author's specified shape inside the specified region while preserving its explicit count and size; never normalize fill to scatter. Scatter is a distribution with spacing, tile is regular tessellation, and background means only the canvas background color. Do not infer fill merely from “starry sky”, “full”, or “whole area”, and do not turn “fill” into whole-canvas scatter. Never expand an explicit region to the whole canvas."#;
 
-Write explicitly ordered placements as "Line up five circles, alternating red and gray." or "Line up eight, repeating a red circle, a blue line, and a gray arc in order." Describe a group as a noun phrase without parenthesized commands: "Line up five, alternating a group of a red circle and a blue line with a gray arc." Five is the total number of groups and individual shapes, producing three circle-and-line groups and two arcs. Alternating takes two entries; in order takes a nonempty finite list. Preserve entry order and duplicates. The same sequences apply to scatter, tile, and fill. Do not multiply the total count by the list length or the number of shapes inside a group. Do not infer alternation or cycling without an explicit order.
-
-When writing Japanese DDL, use the counter つ only for one through nine, never 10つ or 11つ. Ten can be written without a counter. 個 works for one, two, ten, eleven, and other counts; use an existing shape-specific counter such as 本 for lines when appropriate. Counter spelling must not change the explicit total.
+const STAGE1_GRAMMAR_EN_SUFFIX: &str = r#"When writing Japanese DDL, use the counter つ only for one through nine, never 10つ or 11つ. Ten can be written without a counter. 個 works for one, two, ten, eleven, and other counts; use an existing shape-specific counter such as 本 for lines when appropriate. Counter spelling must not change the explicit total.
 
 Write "connected partway along the previous line" or "connected partway along the previous arc" for contact excluding both ends. Its position is decided during performance, so do not replace partway with the center or a numeric position. Preserve an explicitly selected start or end as well.
 
@@ -1410,22 +1442,51 @@ const STAGE1_NORMALIZER_RESPONSE_ENDING_EN: &str = " Return only the specified J
 // Existing ownership grammar: semantic_association's pre-head/quantity collectors
 // and semantic_instruction's language-specific instruction-ownership collectors.
 // This explains accepted syntax without registering additional source forms.
-const HOLE_ATTACHMENT_GRAMMAR_JA: &str = r#"単独図形は「[<受理位置>に] [<head前修飾句>]<head>を [<並べる配置方向>に] [<個数・助数詞>] <動作>」を骨格にする。色・道具・線の連続性・図形の向き・面・揺らぎ・比率・相対寸法・太さ・形・辺数はすべてhead前修飾句へまとめ、必要な名詞修飾を「の」でつなぐ。既存の太さ語は「細い」「ごく細い」である。図形の向きはhead前、並べる配置方向は受理方向語に「に」を付けてhead後へ置き、両者を入れ替えず自由な方向句を残さない。配置方向を省略した「並べる」は既定で横の左から右なので、その既定だけを言い直す語句は省く。未指定の属性は追加しない。
+fn hole_attachment_grammar(language: ResolvedInstructionLanguage) -> String {
+    match language {
+        ResolvedInstructionLanguage::Ja => hole_attachment_grammar_ja(),
+        ResolvedInstructionLanguage::En => HOLE_ATTACHMENT_GRAMMAR_EN.to_owned(),
+    }
+}
+
+fn hole_attachment_grammar_ja() -> String {
+    let ni = MarkerId::JaNi.surface();
+    let wo = MarkerId::JaWo.surface();
+    let no = MarkerId::JaNo.surface();
+    format!(r#"単独図形は「[<受理位置>{ni}] [<head前修飾句>]<head>{wo} [<並べる配置方向>{ni}] [<個数・助数詞>] <動作>」を骨格にする。色・道具・線の連続性・図形の向き・面・揺らぎ・比率・相対寸法・太さ・形・辺数はすべてhead前修飾句へまとめ、必要な名詞修飾を「{no}」でつなぐ。既存の太さ語は「細い」「ごく細い」である。図形の向きはhead前、並べる配置方向は受理方向語に「{ni}」を付けてhead後へ置き、両者を入れ替えず自由な方向句を残さない。配置方向を省略した「並べる」は既定で横の左から右なので、その既定だけを言い直す語句は省く。未指定の属性は追加しない。
 typed_factsは認識された語の種類、confirmed_bindingsは確定した所有先と役割である。未結合lexical factの役割は原文の文脈で解釈し、confirmed_bindingsにないことだけを所有先の確定、明示意味の削除、推測の理由にしない。位置指定のないscatterはcanvas寸法の分布領域を既定で使う。語句がそのextentの既定だけを言い直す場合は省けるが、明示された領域や位置をこの既定と同一視しない。
-明示された前の対象への参照だけを、下記の完全な固定句で同じ命令内に記す。参照を新たな描画対象へ変えない。参照先を確定できないときはcontext_limit、意味を保持できる受理形がないときはunsupportedとする。解釈の中間説明は出力せず、局所修正文または未解決理由だけを返す。"#;
+明示された前の対象への参照だけを、下記の完全な固定句で同じ命令内に記す。参照を新たな描画対象へ変えない。参照先を確定できないときはcontext_limit、意味を保持できる受理形がないときはunsupportedとする。解釈の中間説明は出力せず、局所修正文または未解決理由だけを返す。"#)
+}
 const HOLE_ATTACHMENT_GRAMMAR_EN: &str = r#"For one standalone shape, use this grammar: <action> [<count>] [<pre-head modifiers>] <head> [<accepted line-up direction adverb>] [<position preposition> <accepted place>] [<complete accepted relation literal>]. Put every entity modifier in the pre-head slot: color, tool, continuity, shape angle, surface, fluctuation, proportion, relative size, thinness, shape form, and sides. The core thinness forms are thin and extra-fine. Shape angles are pre-head adjectives; accepted line-up directions are post-head adverbs. Do not interchange them or duplicate an angle as a direction. Leave no other free directional wording after the head. Line-up defaults to horizontal left-to-right when direction is omitted; omit wording that only restates this default. Do not add unspecified attributes.
 typed_facts lists recognized lexical categories; confirmed_bindings gives established owners and roles. Interpret the role of an unbound lexical fact from the original context; absence from confirmed_bindings alone neither establishes its owner nor permits removing or guessing explicit meaning. An unpositioned scatter already uses the canvas-sized distribution domain. Wording that only restates that extent default may be omitted, but never equate an explicitly specified region or position with this default.
 Only for an explicitly requested previous-object reference, use a complete fixed literal below in the same instruction. Do not turn the reference into a new drawable subject. If its target cannot be established, return context_limit; if no accepted form preserves the meaning, return unsupported. Output no intermediate interpretation: return only a local replacement or unresolved reason."#;
 
-const HOLE_SYSTEM_JA: &str = r#"あなたは inku の可視DDLの局所翻訳提案器。selected_holesのsourceだけを書換え可能とし、source_regionsとtyped_factsは根拠として読む。read_onlyの文脈を変更しない。原文の未認識語句も検討し、明示された対象、属性と所有者、数量と総数、action、範囲、関係、順序を保持する。typed_factsのownerは語の種類であり、描画対象IDではない。
+fn hole_system_grammar(language: ResolvedInstructionLanguage) -> String {
+    match language {
+        ResolvedInstructionLanguage::Ja => hole_system_grammar_ja(),
+        ResolvedInstructionLanguage::En => hole_system_grammar_en(),
+    }
+}
+
+fn hole_system_grammar_ja() -> String {
+    let background = MarkerId::JaBackground.surface();
+    let wo = MarkerId::JaWo.surface();
+    let de = MarkerId::JaDe.surface();
+    format!(r#"あなたは inku の可視DDLの局所翻訳提案器。selected_holesのsourceだけを書換え可能とし、source_regionsとtyped_factsは根拠として読む。read_onlyの文脈を変更しない。原文の未認識語句も検討し、明示された対象、属性と所有者、数量と総数、action、範囲、関係、順序を保持する。typed_factsのownerは語の種類であり、描画対象IDではない。
 語順、用語の位置や組合せ、自然な言い換えの揺らぎを、既存の受理文法へ直す。原文の語や位置を逐語的に維持する必要はない。「中央付近」は「中央」「中心」に相当する既存の位置語へ言い換えられる。数値座標は追加しない。原文の主旨と確定した対象・個数・色・道具・所有関係を保つ欠落補完も提案できる。複数の色や道具だけから交互配置や数量分配を新たに指定せず、多様な色を単色へ削らない。既存の省略は演奏時補完へ残せる。語句の揺らぎを直しても既存機能で描画できない意味はunresolved/unsupported、意図を一つに定められない場合はunresolved/ambiguous、必要な参照文脈が不足する場合はunresolved/context_limitとする。他のholeについて可能な提案は返す。
 既存の受理構文やその既定が原文の意味を既に担う場合、余分な未受理表現はその受理形へまとめる。未解釈の語句をそのまま返して解決済みとしない。
-accepted_saijiki_vocabularyと共有文法を用いる。unresolved_clauseは原文の描画headとactionを同じ命令へ保持し、背景だけで済ませない。地は受理済みの地の名詞だけで指定でき、Ground:やSurface:という見出しを付けない。地の支持体を面の質感へ変えない。背景の受理形は「背景を<色>で埋める。」。短いidごとに必ず一結果を返す。Score、思考過程、説明、管理情報は返さず、指定されたJSONだけを返す。"#;
+accepted_saijiki_vocabularyと共有文法を用いる。unresolved_clauseは原文の描画headとactionを同じ命令へ保持し、背景だけで済ませない。地は受理済みの地の名詞だけで指定でき、Ground:やSurface:という見出しを付けない。地の支持体を面の質感へ変えない。背景の受理形は「{background}{wo}<色>{de}埋める。」。短いidごとに必ず一結果を返す。Score、思考過程、説明、管理情報は返さず、指定されたJSONだけを返す。"#)
+}
 
-const HOLE_SYSTEM_EN: &str = r#"Propose local translations of visible inku DDL. Only source in selected_holes may be replaced; source_regions and typed_facts are evidence. Never edit read_only context. Consider unrecognized original phrases too. Preserve explicit subjects, attributes and their owners, quantities and totals, actions, regions, relations, and order. A typed_facts owner names a fact category, not a drawing object ID.
+fn hole_system_grammar_en() -> String {
+    let article = MarkerId::EnThe.surface();
+    let background = MarkerId::EnBackground.surface();
+    let with = MarkerId::EnWith.surface();
+    format!(r#"Propose local translations of visible inku DDL. Only source in selected_holes may be replaced; source_regions and typed_facts are evidence. Never edit read_only context. Consider unrecognized original phrases too. Preserve explicit subjects, attributes and their owners, quantities and totals, actions, regions, relations, and order. A typed_facts owner names a fact category, not a drawing object ID.
 Normalize variations in word order, term position, combinations, and natural paraphrases to the existing accepted grammar. You need not copy the original words or their positions. Near the center may be rephrased as the existing named center position; do not add numeric coordinates. You may fill missing detail consistently with the original intent and established subjects, counts, colors, tools, and ownership. Listing colors or tools alone does not specify alternation or count allocation; do not reduce diverse colors to one color. Existing omissions may remain for performance-time completion. Return unresolved/unsupported only for meaning that remains undrawable with existing features after natural rephrasing, unresolved/ambiguous when the intent cannot be determined, and unresolved/context_limit when needed reference context is unavailable. Still return possible proposals for other holes.
 When an accepted construction or its existing default already carries the original meaning, express that meaning through the accepted form instead of retaining redundant unaccepted wording. Do not return uninterpreted phrases unchanged as if they were resolved.
-Use accepted_saijiki_vocabulary and the shared grammar. An unresolved_clause must retain its drawing head and action in the same instruction, not replace them with background alone. A ground can be written as its accepted ground noun alone, without a Ground: or Surface: heading. Never change ground material into surface quality. The accepted background form is "fill the background with <color>." Return exactly one result for every short id. Return only the specified JSON, without Score, chain of thought, explanation, or management metadata."#;
+Use accepted_saijiki_vocabulary and the shared grammar. An unresolved_clause must retain its drawing head and action in the same instruction, not replace them with background alone. A ground can be written as its accepted ground noun alone, without a Ground: or Surface: heading. Never change ground material into surface quality. The accepted background form is "fill {article} {background} {with} <color>." Return exactly one result for every short id. Return only the specified JSON, without Score, chain of thought, explanation, or management metadata."#)
+}
 
 #[cfg(test)]
 mod tests {

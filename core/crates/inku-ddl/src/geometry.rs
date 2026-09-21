@@ -794,12 +794,10 @@ fn japanese_position_context_closes(atoms: &[ClauseAtom], axis_x_index: usize) -
     keyword_at(atoms, axis_x_index + 4, GeometryKeyword::Position)
         || (matches!(
             atoms.get(axis_x_index + 4),
-            Some(ClauseAtom::FunctionWord {
-                surface,
-                geometry_keyword: None,
-                exact_decimal: None,
+            Some(ClauseAtom::GrammarMarker {
+                marker_id: crate::MarkerId::JaNo,
                 ..
-            }) if surface == "の"
+            })
         ) && keyword_at(atoms, axis_x_index + 5, GeometryKeyword::Position))
 }
 

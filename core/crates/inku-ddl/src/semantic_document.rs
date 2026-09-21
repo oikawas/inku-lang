@@ -6,7 +6,7 @@ use serde_json::Value;
 
 use crate::{
     AttachmentMarkerKind, ClauseAtom, ClauseStreamError, CoreRoleKind, EnglishDeterminerKind,
-    JapaneseAttachmentMarkerKind, MacroParameterBindingResult, NormalizedDdlDocument,
+    JapaneseAttachmentMarkerKind, MacroParameterBindingResult, MarkerId, NormalizedDdlDocument,
     OwnedSemanticOccurrence, ResolvedInstructionLanguage, SemanticAssociationIssueKind,
     SemanticCoordinationIssue, SemanticCoordinationIssueKind, SemanticHead, SemanticIdentity,
     SemanticInstruction, SemanticInstructionAssociationResult, SemanticInstructionIssueKind,
@@ -435,6 +435,14 @@ fn associate_backgrounds(
     document: &NormalizedDdlDocument,
     association: &SemanticInstructionAssociationResult,
 ) -> Vec<SemanticBackground> {
+    #[derive(Clone, Copy, Eq, PartialEq)]
+    enum BackgroundGrammarPart {
+        Head,
+        Color,
+        Fill,
+        Marker(MarkerId),
+    }
+
     let stream = &association.association.clause_stream;
     stream
         .clauses
@@ -479,7 +487,7 @@ fn associate_backgrounds(
                             clause_index,
                             atom_index,
                         ));
-                        tokens.push("color");
+                        tokens.push(BackgroundGrammarPart::Color);
                     }
                     ClauseAtom::RemainingRole(term)
                         if term.role == crate::RemainingRoleKind::Motion && action.is_none() =>
@@ -498,15 +506,17 @@ fn associate_backgrounds(
                             return None;
                         }
                         action = Some(term);
-                        tokens.push("fill");
+                        tokens.push(BackgroundGrammarPart::Fill);
                     }
-                    ClauseAtom::FunctionWord { surface, .. } => {
-                        if matches!(surface.as_str(), "背景" | "background") && head.is_none() {
+                    ClauseAtom::GrammarMarker { marker_id, .. } => {
+                        if matches!(marker_id, MarkerId::JaBackground | MarkerId::EnBackground)
+                            && head.is_none()
+                        {
                             head = Some(source());
-                            tokens.push("background");
+                            tokens.push(BackgroundGrammarPart::Head);
                         } else {
                             markers.push(source());
-                            tokens.push(surface.as_str());
+                            tokens.push(BackgroundGrammarPart::Marker(*marker_id));
                         }
                     }
                     _ => return None,
@@ -514,11 +524,31 @@ fn associate_backgrounds(
             }
             let accepted = match document.language() {
                 ResolvedInstructionLanguage::Ja => {
-                    tokens == ["background", "を", "color", "で", "fill"]
+                    tokens
+                        == [
+                            BackgroundGrammarPart::Head,
+                            BackgroundGrammarPart::Marker(MarkerId::JaWo),
+                            BackgroundGrammarPart::Color,
+                            BackgroundGrammarPart::Marker(MarkerId::JaDe),
+                            BackgroundGrammarPart::Fill,
+                        ]
                 }
                 ResolvedInstructionLanguage::En => {
-                    tokens == ["fill", "the", "background", "with", "color"]
-                        || tokens == ["fill", "background", "with", "color"]
+                    tokens
+                        == [
+                            BackgroundGrammarPart::Fill,
+                            BackgroundGrammarPart::Marker(MarkerId::EnThe),
+                            BackgroundGrammarPart::Head,
+                            BackgroundGrammarPart::Marker(MarkerId::EnWith),
+                            BackgroundGrammarPart::Color,
+                        ]
+                        || tokens
+                            == [
+                                BackgroundGrammarPart::Fill,
+                                BackgroundGrammarPart::Head,
+                                BackgroundGrammarPart::Marker(MarkerId::EnWith),
+                                BackgroundGrammarPart::Color,
+                            ]
                 }
             };
             accepted.then(|| SemanticBackground {

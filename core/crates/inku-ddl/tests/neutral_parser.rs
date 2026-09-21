@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 
 use inku_ddl::{
-    CanonicalPreviousReference, CanonicalRelationForm, NEUTRAL_LEXEME_PARSER_SCHEMA_ID,
+    CanonicalPreviousReference, CanonicalRelationForm, MarkerId, NEUTRAL_LEXEME_PARSER_SCHEMA_ID,
     NeutralDiagnosticKind, NeutralToken, NeutralTokenKind, NormalizedDdlDocument,
     ResolvedInstructionLanguage, parse_neutral_lexemes, project_macro_semantic_ref, saijiki_asset,
 };
@@ -1202,7 +1202,7 @@ fn japanese_counters_are_syntax_only_after_exact_numbers() {
 }
 
 #[test]
-fn japanese_particles_require_a_typed_left_boundary_but_preserve_unknown_right_side() {
+fn grammar_markers_preserve_typed_boundaries_multiword_case_and_unknowns() {
     let document = NormalizedDdlDocument::new(
         "円を未知".to_owned(),
         ResolvedInstructionLanguage::Ja,
@@ -1219,6 +1219,10 @@ fn japanese_particles_require_a_typed_left_boundary_but_preserve_unknown_right_s
         ["円", "を"]
     );
     assert_eq!(result.diagnostics[0].surface, "未知");
+    assert!(matches!(
+        result.tokens[1].kind,
+        NeutralTokenKind::GrammarMarker(MarkerId::JaWo)
+    ));
 
     let spaced = NormalizedDdlDocument::new(
         "円 を 未知".to_owned(),
@@ -1249,7 +1253,10 @@ fn japanese_particles_require_a_typed_left_boundary_but_preserve_unknown_right_s
             result
                 .tokens
                 .iter()
-                .all(|token| !matches!(token.kind, NeutralTokenKind::FunctionWord))
+                .all(|token| !matches!(
+                    token.kind,
+                    NeutralTokenKind::GrammarMarker(_) | NeutralTokenKind::FunctionWord
+                ))
         );
         assert_eq!(result.diagnostics.len(), 1, "{source}");
         assert_eq!(result.diagnostics[0].surface, source, "{source}");
@@ -1267,7 +1274,10 @@ fn japanese_particles_require_a_typed_left_boundary_but_preserve_unknown_right_s
             result
                 .tokens
                 .iter()
-                .all(|token| !matches!(token.kind, NeutralTokenKind::FunctionWord))
+                .all(|token| !matches!(
+                    token.kind,
+                    NeutralTokenKind::GrammarMarker(_) | NeutralTokenKind::FunctionWord
+                ))
         );
         assert!(
             result
@@ -1276,6 +1286,36 @@ fn japanese_particles_require_a_typed_left_boundary_but_preserve_unknown_right_s
                 .any(|diagnostic| diagnostic.surface == "を")
         );
     }
+
+    let source = "GROUP OF-circle qzx";
+    let document = NormalizedDdlDocument::new(
+        source.to_owned(),
+        ResolvedInstructionLanguage::En,
+        Vec::new(),
+    )
+    .unwrap();
+    let result = parse_neutral_lexemes(&document);
+    let marker = result
+        .tokens
+        .iter()
+        .find(|token| matches!(token.kind, NeutralTokenKind::GrammarMarker(MarkerId::EnGroupOf)))
+        .expect("the existing fixed-space multiword marker remains case-insensitive");
+    assert_eq!(marker.surface, "GROUP OF");
+    assert_eq!(&source[marker.span.start_byte..marker.span.end_byte], "GROUP OF");
+    assert!(result
+        .diagnostics
+        .iter()
+        .any(|diagnostic| diagnostic.surface == "qzx"));
+
+    let embedded = NormalizedDdlDocument::new(
+        "xgroup ofy".to_owned(),
+        ResolvedInstructionLanguage::En,
+        Vec::new(),
+    )
+    .unwrap();
+    assert!(parse_neutral_lexemes(&embedded).tokens.iter().all(|token| {
+        !matches!(token.kind, NeutralTokenKind::GrammarMarker(MarkerId::EnGroupOf))
+    }));
 }
 
 fn load_fixture() -> Fixture {
@@ -1348,7 +1388,9 @@ fn project_token(token: &inku_ddl::NeutralToken) -> ExpectedToken {
                 .previous_reference
                 .map(|reference| reference.as_str().to_owned());
         }
-        NeutralTokenKind::FunctionWord => projected.kind = "function_word".to_owned(),
+        NeutralTokenKind::GrammarMarker(_) | NeutralTokenKind::FunctionWord => {
+            projected.kind = "function_word".to_owned();
+        }
         NeutralTokenKind::GeometryKeyword { keyword } => {
             projected.kind = "geometry_keyword".to_owned();
             projected.geometry_keyword = Some(keyword.as_str().to_owned());

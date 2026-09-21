@@ -3,8 +3,8 @@ use std::collections::HashSet;
 use inku_ddl::{
     ATTACHMENT_EVIDENCE_SCHEMA_ID, AttachmentEvidenceDiagnosticKind, AttachmentMarkerKind,
     ClauseAtom, CoordinationMarkerKind, EnglishAttachmentMarkerKind, JapaneseAttachmentMarkerKind,
-    NormalizedDdlDocument, ResolvedInstructionLanguage, SourceSpan, collect_attachment_evidence,
-    collect_english_noun_phrase_evidence,
+    MarkerCapability, NormalizedDdlDocument, ResolvedInstructionLanguage, SourceSpan,
+    collect_attachment_evidence, collect_english_noun_phrase_evidence,
 };
 use serde::Deserialize;
 
@@ -456,20 +456,13 @@ fn parse_language(value: &str, case_id: &str) -> ResolvedInstructionLanguage {
 fn accepted_marker(
     language: ResolvedInstructionLanguage,
     atom: &ClauseAtom,
-    source: &str,
+    _source: &str,
 ) -> Option<SourceSpan> {
-    let ClauseAtom::FunctionWord { span, .. } = atom else {
+    let ClauseAtom::GrammarMarker { marker_id, span } = atom else {
         return None;
     };
-    let surface = &source[span.start_byte..span.end_byte];
-    let recognized = match language {
-        ResolvedInstructionLanguage::Ja => {
-            ["を", "に", "で", "の", "は", "が", "へ", "と"].contains(&surface)
-        }
-        ResolvedInstructionLanguage::En => ["with", "in", "at", "on", "to", "of"]
-            .iter()
-            .any(|candidate| surface.eq_ignore_ascii_case(candidate)),
-    };
+    let recognized = marker_id.language() == language
+        && marker_id.has_capability(MarkerCapability::Attachment);
     recognized.then_some(*span)
 }
 

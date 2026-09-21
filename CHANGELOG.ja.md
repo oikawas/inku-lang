@@ -6,6 +6,12 @@
 
 **本書が持つのは v2.5.0（2026-07-25、render engine 12）以降**の 36 版である。それより前は書庫にある。
 
+### 2026-09-21 — 英語文法語の大小文字判定を統一し、既存markerを一元化
+
+字句解析では認識される英語文法語が、後段の小文字完全一致によって背景やfillの意味へ届かない不統一を修正した。背景の`the / background / with`、fillの`with`と関連する背景の補完対象判定をASCII大小文字非区別へ揃える。作者のsource bytes、spanとprovenanceは保持し、Macro名や意味語彙の別identityへ一括適用しない。背景とinline fillの大文字表記について、意味の成立と小文字版とのcanonical同値を限定検査で確認した。
+
+既存の日英文法marker 25表現を同梱Rustのtyped定数表へ集約し、字句解析から句解析、attachment・determiner・coordination等へidentityとsource spanを渡す。複数の文法的役割を一つの語へ持たせ、下流のsurface再分類を除く。配置意味を持つ`重ねて / 並べて / overlapping / side by side`、助数詞、数値、geometryとSaijiki意味語はこの表へ移さない。既存prompt helperは必要なmarkerだけを参照し、prompt本文と有限構文を維持する。大小文字の是正以外の受理拡張や意味変更、新しい辞書loader、保存用registry版は追加せず、既存の診断識別子、compiler-lock、Score／binding形式、保存作品を維持する。
+
 ### 2026-09-21 — 独立した言い換え候補の巻き添え棄却を抑制
 
 穴補完の結合説明を日英それぞれの短い文法骨格へ整理し、図形を修飾する向きと配置方向、位置、参照の置き場所を区別した。数量未指定は未指定のまま保ち、既存の細さの受理語も明示する。既定配置の重複説明をまとめ、個別の正解例、文法追加、validatorの保護緩和は行わない。

@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 
 use inku_ddl::{
-    ClauseAtom, EnglishDeterminerKind, EnglishNounPhraseCandidateEvidence,
+    ClauseAtom, EnglishDeterminerKind, EnglishNounPhraseCandidateEvidence, MarkerCapability,
     NOUN_PHRASE_EVIDENCE_SCHEMA_ID, NormalizedDdlDocument, NounPhraseEvidenceDiagnosticKind,
     ResolvedInstructionLanguage, SourceSpan, collect_english_noun_phrase_evidence,
     parse_clause_stream,
@@ -329,16 +329,11 @@ fn parse_language(value: &str, case_id: &str) -> ResolvedInstructionLanguage {
 }
 
 fn accepted_english_determiner(atom: &ClauseAtom, document: &NormalizedDdlDocument) -> bool {
-    let ClauseAtom::FunctionWord { span, .. } = atom else {
+    let ClauseAtom::GrammarMarker { marker_id, .. } = atom else {
         return false;
     };
-    if document.language() != ResolvedInstructionLanguage::En {
-        return false;
-    }
-    let surface = &document.source()[span.start_byte..span.end_byte];
-    ["a", "an", "the"]
-        .iter()
-        .any(|candidate| surface.eq_ignore_ascii_case(candidate))
+    document.language() == ResolvedInstructionLanguage::En
+        && marker_id.has_capability(MarkerCapability::Determiner)
 }
 
 fn project_evidence(

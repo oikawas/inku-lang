@@ -1366,6 +1366,12 @@ The continuation retains exact source spans and clause provenance for the reintr
 
 For example, `赤い円を中心に置く。` and `円を中心に置く。円は赤い。` have the same source-independent canonical meaning when they resolve uniquely to the same subject and explicit instructions. The first form's inline record and the second form's continuation source spans, rhythm, continuation edge / target, bindings, and provenance remain distinct, so their full compiler-lock attestations need not match.
 
+English grammar words are ASCII case-insensitive in both lexical recognition and downstream grammar matching. For example, background markers `the / background / with` and the fill connector `with` have the same grammatical meaning when written with uppercase letters. This does not lowercase the source: the author's bytes, spans, and provenance are preserved. Matching rules for separate identities, such as Macro names, are unchanged.
+
+Existing grammar markers are recognized by a bundled constant table in shared Rust, which passes typed identities and occurrence-specific source spans downstream. Its scope is Japanese `を / に / で / の / は / が / へ / と / 背景 / 組 / して / 繰り返して` and English `with / in / at / on / to / of / a / an / the / and / background / group of / repeating`. Multiple grammatical roles of one marker use capabilities and existing phrase structure rather than reclassifying surface strings downstream. Saijiki owns semantic vocabulary; existing compiler rules own attachment and owner selection. The layout-bearing forms `重ねて / 並べて / overlapping / side by side` stay outside this table in their existing layout grammar. The table does not introduce new words, aliases, or drawing meanings, load external dictionaries, or add a registry version to saved formats.
+
+Stage 1, camera projection, and hole completion use the existing shared grammar helper, referring by identity only to markers required by those finite forms. They do not enumerate the whole table in prompts. Centralizing marker recognition does not change recommended forms, Score, the renderer, or the meaning of saved works.
+
 **Options that were rejected:**
 
 | Form | Why it was rejected |

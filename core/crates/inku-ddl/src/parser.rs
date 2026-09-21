@@ -6,7 +6,8 @@ use serde::Serialize;
 
 use crate::{
     CanonicalRelationForm, CanonicalRelationIdentity, ExactDecimal, GeometryKeyword,
-    NormalizedDdlDocument, ResolvedInstructionLanguage, SAIJIKI_ASSET_ID,
+    MarkerId, NormalizedDdlDocument, ResolvedInstructionLanguage, SAIJIKI_ASSET_ID,
+    grammar_markers::{MarkerMatchKind, grammar_marker_definitions},
     saijiki::{canonical_relation_identity, parser_candidate_surfaces},
     saijiki_asset,
 };
@@ -135,6 +136,7 @@ pub enum NeutralTokenKind {
         relation_type: String,
         canonical_identity: CanonicalRelationIdentity,
     },
+    GrammarMarker(MarkerId),
     FunctionWord,
     GeometryKeyword {
         keyword: GeometryKeyword,
@@ -173,19 +175,6 @@ pub struct NeutralParseResult {
     pub recognized_delivery_count: usize,
 }
 
-const FUNCTION_WORDS_JA: &[&str] = &[
-    "繰り返して",
-    "組",
-    "して",
-    "を",
-    "に",
-    "で",
-    "の",
-    "は",
-    "が",
-    "へ",
-    "と",
-];
 // V1 closed Japanese morphology classes. These are grammatical classes over accepted
 // canonical rows, not aliases or independent semantic vocabulary.
 const JAPANESE_COLOR_I_ADJECTIVE_STEMS_V1: &[&str] = &["白", "黒", "青", "赤"];
@@ -194,21 +183,6 @@ const JAPANESE_COUNTERS_V1: &[&str] = &["本", "個", "枚"];
 pub(crate) fn is_japanese_counter_surface(surface: &str) -> bool {
     JAPANESE_COUNTERS_V1.contains(&surface) || surface == "つ"
 }
-const FUNCTION_WORDS_EN: &[&str] = &[
-    "group of",
-    "background",
-    "a",
-    "an",
-    "the",
-    "with",
-    "in",
-    "at",
-    "on",
-    "to",
-    "of",
-    "and",
-    "repeating",
-];
 const GROUP_LAYOUT_FUNCTION_WORDS_JA: &[&str] = &["重ねて", "並べて"];
 const GROUP_LAYOUT_FUNCTION_WORDS_EN: &[&str] = &["overlapping", "side by side"];
 const NATIVE_TSU_CARDINALS_JA: &[(&str, u64)] = &[
@@ -268,7 +242,10 @@ pub(crate) fn is_reserved_english_non_asset_surface(surface: &str) -> bool {
         .iter()
         .map(|(surface, _)| *surface)
         .chain(["slightly", "very", "normal-sized", "small"])
-        .chain(FUNCTION_WORDS_EN.iter().copied())
+        .chain(
+            grammar_marker_definitions(ResolvedInstructionLanguage::En)
+                .map(|definition| definition.id.surface()),
+        )
         .chain(QUALITATIVE_QUANTITIES_EN.iter().copied())
         .any(|reserved| reserved.eq_ignore_ascii_case(surface))
         || (!surface.is_empty() && surface.bytes().all(|byte| byte.is_ascii_digit()))
@@ -881,46 +858,32 @@ fn candidates_at(
         }
     }
 
-    if language == ResolvedInstructionLanguage::Ja {
-        // A document head is eligible at a clause start, unlike a particle.
-        push_surface_candidate(
-            &mut candidates,
-            source,
-            start_byte,
-            language,
-            require_boundary,
-            "背景",
-            PRIORITY_FUNCTION,
-            "document:background".to_owned(),
-            CandidateDelivery::Token(NeutralTokenKind::FunctionWord),
-        );
-    }
-    let function_words = match language {
-        ResolvedInstructionLanguage::Ja => FUNCTION_WORDS_JA,
-        ResolvedInstructionLanguage::En => FUNCTION_WORDS_EN,
-    };
-    for surface in function_words {
-        if language == ResolvedInstructionLanguage::Ja {
-            push_japanese_function_candidate(
+    for definition in grammar_marker_definitions(language) {
+        let candidate_identity = if definition.id == MarkerId::JaBackground {
+            "document:background".to_owned()
+        } else {
+            format!("function:{}", definition.id.surface())
+        };
+        match definition.match_kind {
+            MarkerMatchKind::JapaneseAttached => push_japanese_grammar_marker_candidate(
                 &mut candidates,
                 source,
                 start_byte,
                 require_boundary,
-                surface,
-                format!("function:{surface}"),
-            );
-        } else {
-            push_surface_candidate(
+                definition.id,
+                candidate_identity,
+            ),
+            MarkerMatchKind::JapaneseDocumentHead | MarkerMatchKind::EnglishWord => push_surface_candidate(
                 &mut candidates,
                 source,
                 start_byte,
                 language,
                 require_boundary,
-                surface,
-                PRIORITY_FUNCTION,
-                format!("function:{surface}"),
-                CandidateDelivery::Token(NeutralTokenKind::FunctionWord),
-            );
+                definition.id.surface(),
+                definition.priority,
+                candidate_identity,
+                CandidateDelivery::Token(NeutralTokenKind::GrammarMarker(definition.id)),
+            ),
         }
     }
     if language == ResolvedInstructionLanguage::Ja {
@@ -1274,7 +1237,8 @@ fn has_relative_scale_head_context(
         let next = candidates_at(source, cursor, language, false)
             .into_iter()
             .filter(|candidate| match &candidate.delivery {
-                CandidateDelivery::Token(NeutralTokenKind::FunctionWord) => true,
+                CandidateDelivery::Token(NeutralTokenKind::GrammarMarker(_)
+                    | NeutralTokenKind::FunctionWord) => true,
                 CandidateDelivery::Token(NeutralTokenKind::CoreModifier(_)) => true,
                 CandidateDelivery::Token(NeutralTokenKind::SaijikiWord {
                     category_key, ..
@@ -1376,6 +1340,31 @@ fn push_japanese_function_candidate(
         priority: PRIORITY_FUNCTION,
         identity,
         delivery: CandidateDelivery::Token(NeutralTokenKind::FunctionWord),
+    });
+}
+
+fn push_japanese_grammar_marker_candidate(
+    candidates: &mut Vec<Candidate>,
+    source: &str,
+    start_byte: usize,
+    require_boundary: bool,
+    marker_id: MarkerId,
+    identity: String,
+) {
+    let surface = marker_id.surface();
+    let end_byte = start_byte + surface.len();
+    if source.get(start_byte..end_byte) != Some(surface)
+        || (require_boundary
+            && !has_japanese_recognized_left_candidate(source, start_byte)
+            && !has_japanese_recognized_left_candidate_across_separators(source, start_byte))
+    {
+        return;
+    }
+    candidates.push(Candidate {
+        end_byte,
+        priority: crate::grammar_markers::GRAMMAR_MARKER_PRIORITY,
+        identity,
+        delivery: CandidateDelivery::Token(NeutralTokenKind::GrammarMarker(marker_id)),
     });
 }
 

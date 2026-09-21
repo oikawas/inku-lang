@@ -461,7 +461,9 @@ fn project_deferred(token: &inku_ddl::NeutralToken) -> ExpectedDeferred {
             projected.asset_id = Some(asset_id.clone());
             projected.relation_type = Some(relation_type.clone());
         }
-        NeutralTokenKind::FunctionWord => projected.kind = "function_word".to_owned(),
+        NeutralTokenKind::GrammarMarker(_) | NeutralTokenKind::FunctionWord => {
+            projected.kind = "function_word".to_owned();
+        }
         NeutralTokenKind::GeometryKeyword { .. } => {
             projected.kind = "geometry_keyword".to_owned();
         }

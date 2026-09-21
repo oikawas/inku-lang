@@ -2,8 +2,8 @@
 
 use crate::{
     AttachmentEvidenceResult, AttachmentMarkerKind, CanonicalRelationIdentity, ClauseAtom,
-    ClauseSegment, ClauseStreamError, EnglishAttachmentMarkerKind, JapaneseAttachmentMarkerKind,
-    NeutralDiagnosticKind, NormalizedDdlDocument, SourceSpan, collect_attachment_evidence,
+    ClauseSegment, ClauseStreamError, NeutralDiagnosticKind, NormalizedDdlDocument, SourceSpan,
+    attachment::marker_from_id, collect_attachment_evidence,
     saijiki::canonical_relation_identity_is_valid,
 };
 
@@ -401,40 +401,9 @@ fn occurrence_matches_atom(
         }
         (
             RelationReferenceOccurrenceKind::AttachmentMarker { marker, .. },
-            ClauseAtom::FunctionWord { surface, .. },
-        ) => occurrence.surface == *surface && marker_matches_surface(*marker, surface),
+            ClauseAtom::GrammarMarker { marker_id, .. },
+        ) => marker_from_id(*marker_id) == Some(*marker),
         _ => false,
-    }
-}
-
-fn marker_matches_surface(marker: AttachmentMarkerKind, surface: &str) -> bool {
-    match marker {
-        AttachmentMarkerKind::Japanese(JapaneseAttachmentMarkerKind::Wo) => surface == "を",
-        AttachmentMarkerKind::Japanese(JapaneseAttachmentMarkerKind::Ni) => surface == "に",
-        AttachmentMarkerKind::Japanese(JapaneseAttachmentMarkerKind::De) => surface == "で",
-        AttachmentMarkerKind::Japanese(JapaneseAttachmentMarkerKind::No) => surface == "の",
-        AttachmentMarkerKind::Japanese(JapaneseAttachmentMarkerKind::Wa) => surface == "は",
-        AttachmentMarkerKind::Japanese(JapaneseAttachmentMarkerKind::Ga) => surface == "が",
-        AttachmentMarkerKind::Japanese(JapaneseAttachmentMarkerKind::He) => surface == "へ",
-        AttachmentMarkerKind::Japanese(JapaneseAttachmentMarkerKind::To) => surface == "と",
-        AttachmentMarkerKind::English(EnglishAttachmentMarkerKind::With) => {
-            surface.eq_ignore_ascii_case("with")
-        }
-        AttachmentMarkerKind::English(EnglishAttachmentMarkerKind::In) => {
-            surface.eq_ignore_ascii_case("in")
-        }
-        AttachmentMarkerKind::English(EnglishAttachmentMarkerKind::At) => {
-            surface.eq_ignore_ascii_case("at")
-        }
-        AttachmentMarkerKind::English(EnglishAttachmentMarkerKind::On) => {
-            surface.eq_ignore_ascii_case("on")
-        }
-        AttachmentMarkerKind::English(EnglishAttachmentMarkerKind::To) => {
-            surface.eq_ignore_ascii_case("to")
-        }
-        AttachmentMarkerKind::English(EnglishAttachmentMarkerKind::Of) => {
-            surface.eq_ignore_ascii_case("of")
-        }
     }
 }
 

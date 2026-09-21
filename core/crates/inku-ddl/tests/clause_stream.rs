@@ -386,6 +386,7 @@ fn project_atom(atom: &ClauseAtom, source: &str) -> ExpectedAtom {
             assert_eq!(surface, &source[span.start_byte..span.end_byte]);
             "function_word".to_owned()
         }
+        ClauseAtom::GrammarMarker { .. } => "function_word".to_owned(),
         ClauseAtom::SaijikiRelation {
             asset_id,
             canonical_identity,

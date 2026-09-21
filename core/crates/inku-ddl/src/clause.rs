@@ -33,6 +33,10 @@ pub enum ClauseAtom {
     CoreModifier(CoreModifierTerm),
     RemainingRole(RemainingRoleTerm),
     UnattachedExactNumber(UnattachedExactNumber),
+    GrammarMarker {
+        marker_id: crate::MarkerId,
+        span: SourceSpan,
+    },
     FunctionWord {
         surface: String,
         span: SourceSpan,
@@ -57,7 +61,9 @@ impl ClauseAtom {
             Self::CoreModifier(term) => term.span,
             Self::RemainingRole(term) => term.span,
             Self::UnattachedExactNumber(number) => number.span,
-            Self::FunctionWord { span, .. } | Self::SaijikiRelation { span, .. } => *span,
+            Self::GrammarMarker { span, .. }
+            | Self::FunctionWord { span, .. }
+            | Self::SaijikiRelation { span, .. } => *span,
             Self::UnresolvedDiagnostic(diagnostic) => diagnostic.span,
         }
     }
@@ -308,6 +314,9 @@ fn atom_from_deferred_token(token: NeutralToken) -> Result<ClauseAtom, ClauseStr
         kind,
     } = token;
     match kind {
+        NeutralTokenKind::GrammarMarker(marker_id) => {
+            Ok(ClauseAtom::GrammarMarker { marker_id, span })
+        }
         NeutralTokenKind::FunctionWord => Ok(ClauseAtom::FunctionWord {
             surface,
             span,

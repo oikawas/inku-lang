@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 
 use inku_ddl::{
-    ClauseAtom, EnglishOpaqueHeadCandidateEvidenceResult, NOUN_PHRASE_EVIDENCE_SCHEMA_ID,
+    ClauseAtom, EnglishOpaqueHeadCandidateEvidenceResult, MarkerId, NOUN_PHRASE_EVIDENCE_SCHEMA_ID,
     NeutralDiagnosticKind, NormalizedDdlDocument, OPAQUE_HEAD_CANDIDATE_EVIDENCE_SCHEMA_ID,
     OpaqueHeadCandidateEvidence, OpaqueHeadCandidateEvidenceDiagnosticKind,
     ResolvedInstructionLanguage, SourceSpan, collect_english_noun_phrase_evidence,
@@ -158,7 +158,7 @@ fn typed_deliveries_holes_numbers_and_function_words_are_not_candidates() {
     );
     assert!(atoms.iter().any(|atom| matches!(
         atom,
-        ClauseAtom::FunctionWord { surface, .. } if surface == "with"
+        ClauseAtom::GrammarMarker { marker_id: MarkerId::EnWith, .. }
     )));
     assert!(atoms.iter().any(|atom| matches!(
         atom,

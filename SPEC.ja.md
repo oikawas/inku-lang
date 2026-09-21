@@ -882,6 +882,12 @@ Continuationはreintroduced head、subject marker / determiner、predicateの正
 
 たとえば`赤い円を中心に置く。`と`円を中心に置く。円は赤い。`は、同じ対象と明示指示へ一意に解決されるなら同じsource-independent canonical meaningを持つ。前者のinlineと後者のcontinuationのsource span、rhythm、continuation edge / target、binding、provenanceはそれぞれ保存され、full compiler-lock attestationは一致しなくてよい。
 
+英語の文法語は字句解析と後段の文法判定を通じてASCIIの大小文字を区別しない。例えば背景の`the / background / with`やfillの`with`は、大文字を含む表記でも小文字と同じ文法的意味を持つ。入力全体を小文字化せず、作者のsource bytes、spanとprovenanceを保持する。Macro名など別のidentityの照合規則は、この規則で変更しない。
+
+既存の文法markerは共有Rustの同梱定数表で認識し、typed identityと入力ごとのsource spanを下流へ渡す。対象はJAの`を / に / で / の / は / が / へ / と / 背景 / 組 / して / 繰り返して`と、ENの`with / in / at / on / to / of / a / an / the / and / background / group of / repeating`である。同じ語の複数の文法的役割はcapabilityと既存の句構造で区別し、下流でsurfaceを再分類しない。意味語彙はSaijiki、句の結合とowner決定は既存compilerが所有する。配置の意味を選ぶ`重ねて / 並べて / overlapping / side by side`はこの表へ含めず、既存の配置構文として扱う。表の追加による新語・別名・描画意味の導入、外部辞書の読込み、保存形式へのregistry版追加は行わない。
+
+Stage 1、camera projection、hole補完は既存の共有grammar helperを使い、その有限構文で必要なmarkerだけをidentityから参照する。表全体をpromptへ列挙せず、文法表の一元化を理由に推奨構文、Score、renderer、保存済み作品の意味を変えない。
+
 **却下した選択肢:**
 
 | 形式 | 却下理由 |

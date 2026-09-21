@@ -8,7 +8,7 @@ use crate::{
     AttachmentMarkerKind, ClauseAtom, ClauseStreamError, CoordinationMarkerEvidence,
     CoordinationMarkerKind, CoreRoleKind, EnglishAttachmentMarkerKind,
     ExplicitPreviousReferenceOccurrence, JapaneseAttachmentMarkerKind, MacroParameterBindingResult,
-    NormalizedDdlDocument, RemainingRoleKind, SemanticAssociationResult, SemanticEntity,
+    MarkerId, NormalizedDdlDocument, RemainingRoleKind, SemanticAssociationResult, SemanticEntity,
     SemanticIssueCausalProvenance, SemanticPreviousReference, SemanticRelationKind, SemanticTerm,
     SemanticUpstreamCausalRelation, SourceOccurrence, SourceSpan, associate_semantic_entities,
     associate_semantic_entities_with_macro_binding,
@@ -345,21 +345,22 @@ pub(crate) fn fill_phrase_ranges(
     clause: &crate::ClauseSegment,
     action_span: SourceSpan,
 ) -> Option<(SourceSpan, SourceSpan, Vec<usize>)> {
-    let marker = |word: &str| {
+    let marker = |expected: MarkerId| {
         clause
             .atoms
             .iter()
             .enumerate()
             .filter_map(|(index, atom)| {
-                matches!(atom, ClauseAtom::FunctionWord { surface, .. } if surface == word)
+                matches!(atom, ClauseAtom::GrammarMarker { marker_id, .. }
+                    if *marker_id == expected)
                     .then_some(index)
             })
             .collect::<Vec<_>>()
     };
     let ranges = match language {
         crate::ResolvedInstructionLanguage::Ja => {
-            let object = marker("を");
-            let material = marker("で");
+            let object = marker(MarkerId::JaWo);
+            let material = marker(MarkerId::JaDe);
             let [material] = material.as_slice() else {
                 return None;
             };
@@ -394,7 +395,7 @@ pub(crate) fn fill_phrase_ranges(
             )
         }
         crate::ResolvedInstructionLanguage::En => {
-            let with = marker("with");
+            let with = marker(MarkerId::EnWith);
             let [with] = with.as_slice() else {
                 return None;
             };
@@ -508,7 +509,8 @@ fn associate_fill_targets(
         } else if target_heads.is_empty() {
             let background = clause.atoms.iter().enumerate().filter_map(|(index, atom)| {
                 (target_range.start_byte <= atom.span().start_byte && atom.span().end_byte <= target_range.end_byte
-                    && matches!(atom, ClauseAtom::FunctionWord {surface, ..} if matches!(surface.as_str(), "背景" | "background"))).then_some(index)
+                    && matches!(atom, ClauseAtom::GrammarMarker {marker_id, ..}
+                        if matches!(marker_id, MarkerId::JaBackground | MarkerId::EnBackground))).then_some(index)
             }).collect::<Vec<_>>();
             let named = positions
                 .iter()
@@ -1440,7 +1442,7 @@ fn coordination_gap_is_clear(
                     &right_owned,
                     &right_heads,
                 )
-                || matches!(atom, ClauseAtom::FunctionWord { span, .. }
+                || matches!(atom, ClauseAtom::GrammarMarker { span, .. }
                     if association.clause_topology.determiner_starts.contains(&span.start_byte))
         })
 }
@@ -2478,16 +2480,15 @@ fn japanese_group_segment_is_clear(
                     &owned_spans,
                     &head_spans,
                 )
-                || matches!(atom, ClauseAtom::FunctionWord { surface, .. } if surface == "組")
-                || matches!(atom, ClauseAtom::FunctionWord { surface, span, .. }
-                if surface == "の"
-                    && association.clause_stream.clauses[clause_index].atoms.iter().any(
+                || matches!(atom, ClauseAtom::GrammarMarker { marker_id: MarkerId::JaGroup, .. })
+                || matches!(atom, ClauseAtom::GrammarMarker { marker_id: MarkerId::JaNo, span }
+                    if association.clause_stream.clauses[clause_index].atoms.iter().any(
                         |candidate| matches!(candidate,
-                            ClauseAtom::FunctionWord { surface, span: group_span, .. }
-                                if surface == "組" && span.end_byte == group_span.start_byte
+                            ClauseAtom::GrammarMarker { marker_id: MarkerId::JaGroup, span: group_span }
+                                if span.end_byte == group_span.start_byte
                         )
                     ))
-                || matches!(atom, ClauseAtom::FunctionWord { span, .. }
+                || matches!(atom, ClauseAtom::GrammarMarker { span, .. }
                     if association.clause_topology.determiner_starts.contains(&span.start_byte))
         })
 }
@@ -2514,7 +2515,7 @@ fn japanese_entity_segment_is_clear(
                 ..
             } => true,
             ClauseAtom::RemainingRole(term) => term.role != RemainingRoleKind::Motion,
-            ClauseAtom::FunctionWord { span, .. } => {
+            ClauseAtom::GrammarMarker { span, .. } => {
                 matches!(
                     attachment_marker_at(association, clause_index, span.start_byte),
                     Some(AttachmentMarkerKind::Japanese(
@@ -2524,6 +2525,9 @@ fn japanese_entity_segment_is_clear(
                             | JapaneseAttachmentMarkerKind::He
                     ))
                 ) || semantic_sequence_marker_owns_span(association, *span)
+            }
+            ClauseAtom::FunctionWord { span, .. } => {
+                semantic_sequence_marker_owns_span(association, *span)
             }
             ClauseAtom::SaijikiRelation { span, .. } => association
                 .explicit_previous_references
@@ -2582,18 +2586,18 @@ fn japanese_predicate_segment_is_clear(
             // issue. It does not erase the exact single head/action ownership
             // established by the object marker.
             ClauseAtom::RemainingRole(_) => true,
-            ClauseAtom::FunctionWord { surface, span, .. } => {
+            ClauseAtom::FunctionWord { surface, .. } => {
                 crate::parser::is_group_layout_function_word(surface)
-                    || matches!(
-                        attachment_marker_at(association, clause_index, span.start_byte),
-                        Some(AttachmentMarkerKind::Japanese(
-                            JapaneseAttachmentMarkerKind::No
-                                | JapaneseAttachmentMarkerKind::Ni
-                                | JapaneseAttachmentMarkerKind::De
-                                | JapaneseAttachmentMarkerKind::He
-                        ))
-                    )
             }
+            ClauseAtom::GrammarMarker { span, .. } => matches!(
+                attachment_marker_at(association, clause_index, span.start_byte),
+                Some(AttachmentMarkerKind::Japanese(
+                    JapaneseAttachmentMarkerKind::No
+                        | JapaneseAttachmentMarkerKind::Ni
+                        | JapaneseAttachmentMarkerKind::De
+                        | JapaneseAttachmentMarkerKind::He
+                ))
+            ),
             ClauseAtom::CoreRole(_) => false,
             ClauseAtom::SaijikiRelation { span, .. } => association.explicit_previous_references.iter().any(|reference| reference.provenance.span == *span),
             // The exact Japanese object marker and the single typed head/action on
@@ -2635,8 +2639,8 @@ fn english_entity_prefix_is_clear(
                     | RemainingRoleKind::Fluctuation
                     | RemainingRoleKind::Proportion
             ),
-            ClauseAtom::FunctionWord { surface, span, .. } => {
-                surface.eq_ignore_ascii_case("group of")
+            ClauseAtom::GrammarMarker { marker_id, span } => {
+                *marker_id == MarkerId::EnGroupOf
                     || association
                         .clause_topology
                         .determiner_starts
@@ -2646,6 +2650,7 @@ fn english_entity_prefix_is_clear(
                             EnglishAttachmentMarkerKind::Of,
                         ))
             }
+            ClauseAtom::FunctionWord { .. } => false,
             ClauseAtom::SaijikiRelation { .. } | ClauseAtom::UnresolvedDiagnostic(_) => false,
         })
 }
@@ -2673,9 +2678,11 @@ fn english_entity_to_marker_gap_is_clear(
                 exact_decimal: Some(_),
                 ..
             } => true,
-            ClauseAtom::FunctionWord { surface, span, .. } => {
+            ClauseAtom::FunctionWord { surface, .. } => {
                 crate::parser::is_group_layout_function_word(surface)
-                    || association
+            }
+            ClauseAtom::GrammarMarker { span, .. } => {
+                association
                         .clause_topology
                         .determiner_starts
                         .contains(&span.start_byte)
@@ -2720,7 +2727,7 @@ fn english_position_gap_is_clear(
         .iter()
         .filter(|atom| start_byte <= atom.span().start_byte && atom.span().end_byte <= end_byte)
         .all(|atom| match atom {
-            ClauseAtom::FunctionWord { span, .. } => association
+            ClauseAtom::GrammarMarker { span, .. } => association
                 .clause_topology
                 .determiner_starts
                 .contains(&span.start_byte),

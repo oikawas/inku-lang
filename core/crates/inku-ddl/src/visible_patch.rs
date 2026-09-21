@@ -1167,7 +1167,9 @@ fn typed_fact_counts(
                 relation_type,
                 ..
             } => Some(format!("relation:{relation_type}:{asset_id}")),
-            ClauseAtom::FunctionWord { .. } | ClauseAtom::UnresolvedDiagnostic(_) => None,
+            ClauseAtom::GrammarMarker { .. }
+            | ClauseAtom::FunctionWord { .. }
+            | ClauseAtom::UnresolvedDiagnostic(_) => None,
         };
         if let Some(fact) = fact {
             *facts.entry(fact).or_default() += 1;

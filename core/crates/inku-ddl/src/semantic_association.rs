@@ -12,8 +12,9 @@ use crate::{
     CoreModifierValue, CoreRoleKind, EnglishAttachmentMarkerKind, EnglishDeterminerKind,
     JapaneseAttachmentMarkerKind, MacroInvocationResolutionDiagnosticKind,
     MacroLockResolutionIdentity, MacroParameterBinding, MacroParameterBindingDiagnosticKind,
-    MacroParameterBindingResult, NeutralDiagnostic, NeutralDiagnosticKind, NormalizedDdlDocument,
-    ParameterSchema, RemainingRoleKind, ResolvedInstructionLanguage, SAIJIKI_ASSET_ID,
+    MacroParameterBindingResult, MarkerId, NeutralDiagnostic, NeutralDiagnosticKind,
+    NormalizedDdlDocument, ParameterSchema, RemainingRoleKind, ResolvedInstructionLanguage,
+    SAIJIKI_ASSET_ID,
     SemanticExplicitGeometry, SemanticNumericPosition, SourceSpan, collect_attachment_evidence,
     geometry::{GeometrySyntaxIssueKind, analyze_clause_geometry},
     project_macro_semantic_ref,
@@ -1253,8 +1254,7 @@ fn sequence_field_indices(
     operator_id: &str,
 ) -> Vec<usize> {
     let repeating_index = clause.atoms[..operator_index].iter().rposition(|atom| {
-        matches!(atom, ClauseAtom::FunctionWord { surface, .. }
-            if surface.eq_ignore_ascii_case("repeating"))
+        matches!(atom, ClauseAtom::GrammarMarker { marker_id: MarkerId::EnRepeating, .. })
     });
     clause
         .atoms
@@ -1320,8 +1320,10 @@ fn sequence_unit_head_indices(
         })
         .collect::<Vec<_>>();
     let group_index = clause.atoms.iter().enumerate().find_map(|(index, atom)| {
-        matches!(atom, ClauseAtom::FunctionWord { surface, .. }
-            if surface == "組" || surface.eq_ignore_ascii_case("group of"))
+        matches!(atom, ClauseAtom::GrammarMarker {
+            marker_id: MarkerId::JaGroup | MarkerId::EnGroupOf,
+            ..
+        })
         .then_some(index)
     });
     let Some(group_index) = group_index else {
@@ -1347,8 +1349,10 @@ fn sequence_unit_head_indices(
         ResolvedInstructionLanguage::En => {
             let with_index = clause.atoms.iter().enumerate().find_map(|(index, atom)| {
                 (index > group_index
-                    && matches!(atom, ClauseAtom::FunctionWord { surface, .. }
-                        if surface.eq_ignore_ascii_case("with")))
+                    && matches!(atom, ClauseAtom::GrammarMarker {
+                        marker_id: MarkerId::EnWith,
+                        ..
+                    }))
                 .then_some(index)
             });
             let Some(with_index) = with_index else {
@@ -1392,22 +1396,26 @@ fn member_sequence_markers(
         .iter()
         .enumerate()
         .filter_map(|(index, atom)| {
-            (start <= index
+            let in_range = start <= index
                 && (index <= end
                     || (matches!(document.language(), ResolvedInstructionLanguage::Ja)
-                        && matches!(atom, ClauseAtom::FunctionWord { surface, .. }
-                            if matches!(surface.as_str(), "して" | "繰り返して")))))
-            .then(|| match atom {
-                ClauseAtom::FunctionWord { span, .. } => Some(source_occurrence(
-                    document,
-                    *span,
-                    region_index,
-                    clause_index,
-                    index,
-                )),
+                        && matches!(atom, ClauseAtom::GrammarMarker {
+                            marker_id: MarkerId::JaSequenceTe | MarkerId::JaRepeat,
+                            ..
+                        })));
+            in_range
+                .then(|| match atom {
+                    ClauseAtom::GrammarMarker { span, .. }
+                    | ClauseAtom::FunctionWord { span, .. } => Some(source_occurrence(
+                        document,
+                        *span,
+                        region_index,
+                        clause_index,
+                        index,
+                    )),
                 _ => None,
-            })
-            .flatten()
+                })
+                .flatten()
         })
         .collect()
 }
@@ -1420,7 +1428,7 @@ fn sequence_color_indices(
 ) -> Vec<usize> {
     let repeating_index = clause.atoms[..operator_index]
         .iter()
-        .rposition(|atom| matches!(atom, ClauseAtom::FunctionWord { surface, .. } if surface.eq_ignore_ascii_case("repeating")));
+        .rposition(|atom| matches!(atom, ClauseAtom::GrammarMarker { marker_id: MarkerId::EnRepeating, .. }));
     clause
         .atoms
         .iter()
@@ -1466,21 +1474,28 @@ fn sequence_marker_indices(
         .iter()
         .enumerate()
         .filter_map(|(index, atom)| {
-            let ClauseAtom::FunctionWord { surface, .. } = atom else {
-                return None;
-            };
             let sequence_marker = match language {
                 ResolvedInstructionLanguage::Ja => {
                     first <= index
                         && (index <= last
-                            || (last < index && matches!(surface.as_str(), "して" | "繰り返して")))
+                            || (last < index
+                                && matches!(atom, ClauseAtom::GrammarMarker {
+                                    marker_id: MarkerId::JaSequenceTe | MarkerId::JaRepeat,
+                                    ..
+                                })))
                 }
                 ResolvedInstructionLanguage::En => {
                     (first <= index && index <= last)
-                        || (operator_id == "in_order" && surface.eq_ignore_ascii_case("repeating"))
+                        || (operator_id == "in_order"
+                            && matches!(atom, ClauseAtom::GrammarMarker {
+                                marker_id: MarkerId::EnRepeating,
+                                ..
+                            }))
                 }
             };
-            sequence_marker.then_some(index)
+            (sequence_marker
+                && matches!(atom, ClauseAtom::GrammarMarker { .. } | ClauseAtom::FunctionWord { .. }))
+            .then_some(index)
         })
         .collect()
 }
@@ -1492,29 +1507,29 @@ fn sequence_connectors_are_valid(
     color_indices: &[usize],
     operator_id: &str,
 ) -> bool {
-    let exact_functions = |surfaces: &[&str], start: usize, end: usize| {
+    let exact_markers = |marker_ids: &[MarkerId], start: usize, end: usize| {
         let atoms = &clause.atoms[start..end];
-        atoms.len() == surfaces.len()
-            && atoms.iter().zip(surfaces).all(|(atom, expected)| {
-                matches!(atom, ClauseAtom::FunctionWord { surface, .. }
-                    if surface.eq_ignore_ascii_case(expected))
+        atoms.len() == marker_ids.len()
+            && atoms.iter().zip(marker_ids).all(|(atom, expected)| {
+                matches!(atom, ClauseAtom::GrammarMarker { marker_id, .. }
+                    if marker_id == expected)
             })
     };
     match (document.language(), operator_id) {
         (ResolvedInstructionLanguage::Ja, "alternating") => {
             color_indices.len() == 2
-                && exact_functions(&["と"], color_indices[0] + 1, color_indices[1])
-                && exact_functions(&["を"], color_indices[1] + 1, operator_index)
-                && sequence_suffix_is_exact(clause, operator_index, "して")
+                && exact_markers(&[MarkerId::JaTo], color_indices[0] + 1, color_indices[1])
+                && exact_markers(&[MarkerId::JaWo], color_indices[1] + 1, operator_index)
+                && sequence_suffix_is_exact(clause, operator_index, MarkerId::JaSequenceTe)
         }
         (ResolvedInstructionLanguage::Ja, "in_order") => {
             let Some(&last) = color_indices.last() else {
                 return false;
             };
-            exact_functions(&["の"], last + 1, operator_index)
-                && sequence_suffix_is_exact(clause, operator_index, "繰り返して")
+            exact_markers(&[MarkerId::JaNo], last + 1, operator_index)
+                && sequence_suffix_is_exact(clause, operator_index, MarkerId::JaRepeat)
                 && color_indices.windows(2).all(|pair| {
-                    exact_functions(&[], pair[0] + 1, pair[1])
+                    exact_markers(&[], pair[0] + 1, pair[1])
                         && document.source()[clause.atoms[pair[0]].span().end_byte
                             ..clause.atoms[pair[1]].span().start_byte]
                             .chars()
@@ -1523,28 +1538,27 @@ fn sequence_connectors_are_valid(
         }
         (ResolvedInstructionLanguage::En, "alternating") => {
             color_indices.len() == 2
-                && exact_functions(&[], operator_index + 1, color_indices[0])
-                && exact_functions(&["and"], color_indices[0] + 1, color_indices[1])
+                && exact_markers(&[], operator_index + 1, color_indices[0])
+                && exact_markers(&[MarkerId::EnAnd], color_indices[0] + 1, color_indices[1])
         }
         (ResolvedInstructionLanguage::En, "in_order") => {
             let Some(&first) = color_indices.first() else {
                 return false;
             };
             let Some(repeating_index) = clause.atoms[..first].iter().rposition(|atom| {
-                matches!(atom, ClauseAtom::FunctionWord { surface, .. }
-                    if surface.eq_ignore_ascii_case("repeating"))
+                matches!(atom, ClauseAtom::GrammarMarker { marker_id: MarkerId::EnRepeating, .. })
             }) else {
                 return false;
             };
-            exact_functions(&[], repeating_index + 1, first)
-                && exact_functions(&[], last_color_index(color_indices) + 1, operator_index)
+            exact_markers(&[], repeating_index + 1, first)
+                && exact_markers(&[], last_color_index(color_indices) + 1, operator_index)
                 && color_indices.windows(2).enumerate().all(|(index, pair)| {
-                    let expected = if index + 1 == color_indices.len() - 1 {
-                        &["and"][..]
+                    let expected: &[MarkerId] = if index + 1 == color_indices.len() - 1 {
+                        &[MarkerId::EnAnd]
                     } else {
-                        &[][..]
+                        &[]
                     };
-                    exact_functions(expected, pair[0] + 1, pair[1])
+                    exact_markers(expected, pair[0] + 1, pair[1])
                 })
         }
         _ => false,
@@ -1554,11 +1568,11 @@ fn sequence_connectors_are_valid(
 fn sequence_suffix_is_exact(
     clause: &crate::ClauseSegment,
     operator_index: usize,
-    surface: &str,
+    expected: MarkerId,
 ) -> bool {
     matches!(
         clause.atoms.get(operator_index + 1),
-        Some(ClauseAtom::FunctionWord { surface: actual, .. }) if actual == surface
+        Some(ClauseAtom::GrammarMarker { marker_id, .. }) if *marker_id == expected
     )
 }
 
@@ -1818,11 +1832,12 @@ fn collect_pre_head_phrase_ownership(
             }
             match atom {
                 ClauseAtom::UnresolvedDiagnostic(_) => break,
-                ClauseAtom::FunctionWord { .. } => {
+                ClauseAtom::GrammarMarker { .. } => {
                     if !genitive_marker_starts.contains(&span.start_byte) {
                         break;
                     }
                 }
+                ClauseAtom::FunctionWord { .. } => break,
                 _ if is_pre_head_modifier_atom(atom) => ownership.insert(head_span, span),
                 _ => {}
             }
@@ -2436,6 +2451,7 @@ fn build_semantic_entities(
                 }
                 ClauseAtom::CoreRole(_)
                 | ClauseAtom::RemainingRole(_)
+                | ClauseAtom::GrammarMarker { .. }
                 | ClauseAtom::FunctionWord { .. } => {}
             }
         }
@@ -3820,7 +3836,9 @@ fn adjacent_diagnostic_causes(
                 .all(|between| {
                     matches!(
                         between,
-                        ClauseAtom::FunctionWord { .. } | ClauseAtom::UnresolvedDiagnostic(_)
+                        ClauseAtom::GrammarMarker { .. }
+                            | ClauseAtom::FunctionWord { .. }
+                            | ClauseAtom::UnresolvedDiagnostic(_)
                     )
                 })
                 .then(|| {

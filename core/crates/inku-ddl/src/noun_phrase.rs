@@ -2,7 +2,8 @@
 
 use crate::{
     ClauseAtom, ClauseSegment, ClauseStream, ClauseStreamError, CoreRoleKind,
-    NormalizedDdlDocument, ResolvedInstructionLanguage, SourceSpan, parse_clause_stream,
+    MarkerCapability, MarkerId, NormalizedDdlDocument, ResolvedInstructionLanguage, SourceSpan,
+    parse_clause_stream,
 };
 
 /// Stable identity for the runtime-disconnected English noun-phrase evidence foundation.
@@ -17,15 +18,12 @@ pub enum EnglishDeterminerKind {
 }
 
 impl EnglishDeterminerKind {
-    fn from_ascii_case_insensitive_surface(surface: &str) -> Option<Self> {
-        if surface.eq_ignore_ascii_case("a") {
-            Some(Self::A)
-        } else if surface.eq_ignore_ascii_case("an") {
-            Some(Self::An)
-        } else if surface.eq_ignore_ascii_case("the") {
-            Some(Self::The)
-        } else {
-            None
+    const fn from_marker_id(marker_id: MarkerId) -> Option<Self> {
+        match marker_id {
+            MarkerId::EnA => Some(Self::A),
+            MarkerId::EnAn => Some(Self::An),
+            MarkerId::EnThe => Some(Self::The),
+            _ => None,
         }
     }
 }
@@ -180,12 +178,15 @@ fn collect_clause_evidence(
 }
 
 fn determiner_from_atom(atom: &ClauseAtom, source: &str) -> Option<EnglishDeterminerEvidence> {
-    let ClauseAtom::FunctionWord { span, .. } = atom else {
+    let ClauseAtom::GrammarMarker { marker_id, span } = atom else {
         return None;
     };
+    if !marker_id.has_capability(MarkerCapability::Determiner) {
+        return None;
+    }
     let surface = &source[span.start_byte..span.end_byte];
     Some(EnglishDeterminerEvidence {
-        kind: EnglishDeterminerKind::from_ascii_case_insensitive_surface(surface)?,
+        kind: EnglishDeterminerKind::from_marker_id(*marker_id)?,
         surface: surface.to_owned(),
         span: *span,
     })
@@ -226,14 +227,12 @@ mod tests {
                 end_byte: 7,
             },
             atoms: vec![
-                ClauseAtom::FunctionWord {
-                    surface: "a".to_owned(),
+                ClauseAtom::GrammarMarker {
+                    marker_id: MarkerId::EnA,
                     span: SourceSpan {
                         start_byte: 0,
                         end_byte: 1,
                     },
-                    geometry_keyword: None,
-                    exact_decimal: None,
                 },
                 ClauseAtom::CoreRole(CoreRoleTerm {
                     role: CoreRoleKind::Primitive,

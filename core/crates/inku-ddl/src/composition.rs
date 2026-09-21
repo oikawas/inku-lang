@@ -130,6 +130,7 @@ pub fn compose_core_roles(neutral: NeutralParseResult) -> CoreRoleComposition {
             | NeutralTokenKind::CoreModifier(_)
             | NeutralTokenKind::GeometryKeyword { .. }
             | NeutralTokenKind::SaijikiRelation { .. }
+            | NeutralTokenKind::GrammarMarker(_)
             | NeutralTokenKind::FunctionWord
             | NeutralTokenKind::ExactNumber { .. }
             | NeutralTokenKind::ExactDecimal { .. } => None,
@@ -196,6 +197,7 @@ pub fn compose_remaining_roles(core: CoreRoleComposition) -> RemainingRoleCompos
             | NeutralTokenKind::CoreModifier(_)
             | NeutralTokenKind::GeometryKeyword { .. }
             | NeutralTokenKind::SaijikiRelation { .. }
+            | NeutralTokenKind::GrammarMarker(_)
             | NeutralTokenKind::FunctionWord
             | NeutralTokenKind::ExactNumber { .. }
             | NeutralTokenKind::ExactDecimal { .. } => None,

@@ -183,6 +183,61 @@ fn fill_target_roles_keep_bilingual_canonical_meaning_and_original_operand_indic
     );
 }
 
+#[test]
+fn english_grammar_function_words_are_ascii_case_insensitive_after_parsing() {
+    let compile = |source| {
+        compile_typed_ddl(document(source, Language::En, &[]), &[], Some(23), LIMITS)
+    };
+
+    let background = compile("fill the background with black.");
+    let uppercase_background = compile("fill THE BACKGROUND WITH black.");
+    assert_eq!(
+        uppercase_background.pre_expansion_canonical_bytes(),
+        background.pre_expansion_canonical_bytes(),
+        "uppercase grammar markers must preserve background meaning"
+    );
+    assert_eq!(
+        uppercase_background.document.source(),
+        "fill THE BACKGROUND WITH black."
+    );
+    assert!(
+        uppercase_background
+            .semantic_document
+            .as_ref()
+            .unwrap()
+            .ast
+            .background
+            .is_some(),
+        "uppercase grammar markers must produce one semantic background"
+    );
+
+    let inline = compile("fill a circle with red points.");
+    let uppercase_with = compile("fill a circle WITH red points.");
+    assert_eq!(
+        uppercase_with.pre_expansion_canonical_bytes(),
+        inline.pre_expansion_canonical_bytes(),
+        "uppercase WITH must preserve inline fill meaning"
+    );
+    assert_eq!(
+        uppercase_with.document.source(),
+        "fill a circle WITH red points."
+    );
+    assert!(
+        uppercase_with
+            .semantic_document
+            .as_ref()
+            .unwrap()
+            .ast
+            .instructions
+            .iter()
+            .any(|instruction| matches!(
+                instruction.fill_target,
+                Some(inku_ddl::SemanticFillTarget::InlineShape { .. })
+            )),
+        "uppercase WITH must produce one inline fill target"
+    );
+}
+
 fn context() -> ScoreLoweringContext {
     let palette = work_palette_context(&BTreeMap::new(), Some(23), None, Color::White).unwrap();
     ScoreLoweringContext::resolve_with_palette("square", Color::White, palette).unwrap()

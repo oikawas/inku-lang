@@ -6,6 +6,12 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 36 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-21 — Consistent English grammar case handling and shared marker identities
+
+English grammar words recognized by the lexer no longer lose their background or fill meaning because a downstream check requires lowercase spelling. Background markers `the / background / with`, the fill connector `with`, and related background completion-target checks now use ASCII case-insensitive matching. The author's source bytes, spans, and provenance remain intact; matching rules for separate identities such as Macro names or semantic vocabulary are not changed globally. A focused check confirms that uppercase background and inline-fill markers establish the intended meaning and match their lowercase forms' canonical meaning.
+
+A bundled typed Rust table now centralizes 25 existing Japanese and English grammar markers. Identities and source spans flow from lexical and clause analysis to attachment, determiners, coordination, and other existing consumers without reclassifying surface strings downstream. One marker can retain multiple grammatical roles. Layout-bearing `重ねて / 並べて / overlapping / side by side`, counters, numbers, geometry, and Saijiki semantic vocabulary stay outside the table. Existing prompt helpers refer only to the markers their finite forms need, preserving prompt text and grammar. Apart from the case-handling correction, this does not expand accepted forms or change meaning, introduce dictionary loaders or saved registry versions, or change existing diagnostic identities, compiler-lock, Score and binding formats, or saved works.
+
 ### 2026-09-21 — Avoid rejecting independent paraphrases with unrelated failed proposals
 
 Hole-completion attachment guidance is organized into concise Japanese and English grammar skeletons, separating shape orientation, layout direction, position, and references. Unspecified counts remain unspecified, and the existing accepted thinness terms are explicit. Repeated default-layout guidance is consolidated without adding case-specific answers, grammar, or weaker validator protections.

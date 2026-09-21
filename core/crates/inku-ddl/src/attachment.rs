@@ -2,7 +2,8 @@
 
 use crate::{
     ClauseAtom, ClauseStreamError, EnglishNounPhraseEvidenceResult, NormalizedDdlDocument,
-    ResolvedInstructionLanguage, SourceSpan, collect_english_noun_phrase_evidence,
+    MarkerCapability, MarkerId, ResolvedInstructionLanguage, SourceSpan,
+    collect_english_noun_phrase_evidence,
 };
 
 /// Stable identity for the runtime-disconnected attachment evidence foundation.
@@ -47,16 +48,16 @@ pub enum JapaneseAttachmentMarkerKind {
 }
 
 impl JapaneseAttachmentMarkerKind {
-    fn from_surface(surface: &str) -> Option<Self> {
-        match surface {
-            "を" => Some(Self::Wo),
-            "に" => Some(Self::Ni),
-            "で" => Some(Self::De),
-            "の" => Some(Self::No),
-            "は" => Some(Self::Wa),
-            "が" => Some(Self::Ga),
-            "へ" => Some(Self::He),
-            "と" => Some(Self::To),
+    const fn from_marker_id(marker_id: MarkerId) -> Option<Self> {
+        match marker_id {
+            MarkerId::JaWo => Some(Self::Wo),
+            MarkerId::JaNi => Some(Self::Ni),
+            MarkerId::JaDe => Some(Self::De),
+            MarkerId::JaNo => Some(Self::No),
+            MarkerId::JaWa => Some(Self::Wa),
+            MarkerId::JaGa => Some(Self::Ga),
+            MarkerId::JaHe => Some(Self::He),
+            MarkerId::JaTo => Some(Self::To),
             _ => None,
         }
     }
@@ -74,21 +75,15 @@ pub enum EnglishAttachmentMarkerKind {
 }
 
 impl EnglishAttachmentMarkerKind {
-    fn from_ascii_case_insensitive_surface(surface: &str) -> Option<Self> {
-        if surface.eq_ignore_ascii_case("with") {
-            Some(Self::With)
-        } else if surface.eq_ignore_ascii_case("in") {
-            Some(Self::In)
-        } else if surface.eq_ignore_ascii_case("at") {
-            Some(Self::At)
-        } else if surface.eq_ignore_ascii_case("on") {
-            Some(Self::On)
-        } else if surface.eq_ignore_ascii_case("to") {
-            Some(Self::To)
-        } else if surface.eq_ignore_ascii_case("of") {
-            Some(Self::Of)
-        } else {
-            None
+    const fn from_marker_id(marker_id: MarkerId) -> Option<Self> {
+        match marker_id {
+            MarkerId::EnWith => Some(Self::With),
+            MarkerId::EnIn => Some(Self::In),
+            MarkerId::EnAt => Some(Self::At),
+            MarkerId::EnOn => Some(Self::On),
+            MarkerId::EnTo => Some(Self::To),
+            MarkerId::EnOf => Some(Self::Of),
+            _ => None,
         }
     }
 }
@@ -160,11 +155,14 @@ pub fn collect_attachment_evidence(
 
     for (clause_index, clause) in noun_phrase.clause_stream.clauses.iter().enumerate() {
         for atom in &clause.atoms {
-            let ClauseAtom::FunctionWord { span, .. } = atom else {
+            let ClauseAtom::GrammarMarker { marker_id, span } = atom else {
                 continue;
             };
+            if !marker_id.has_capability(MarkerCapability::Attachment) {
+                continue;
+            }
             let surface = &source[span.start_byte..span.end_byte];
-            let Some(marker) = marker_from_surface(language, surface) else {
+            let Some(marker) = marker_from_id(*marker_id) else {
                 continue;
             };
 
@@ -250,21 +248,16 @@ pub fn collect_attachment_evidence(
 }
 
 pub(crate) fn collect_coordination_marker_evidence(
-    document: &NormalizedDdlDocument,
+    _document: &NormalizedDdlDocument,
     clause_stream: &crate::ClauseStream,
 ) -> Vec<CoordinationMarkerEvidence> {
     let mut evidence = Vec::new();
     for (clause_index, clause) in clause_stream.clauses.iter().enumerate() {
         for atom in &clause.atoms {
-            let ClauseAtom::FunctionWord { span, .. } = atom else {
+            let ClauseAtom::GrammarMarker { marker_id, span } = atom else {
                 continue;
             };
-            let surface = &document.source()[span.start_byte..span.end_byte];
-            let recognized = match document.language() {
-                ResolvedInstructionLanguage::Ja => surface == "と",
-                ResolvedInstructionLanguage::En => surface.eq_ignore_ascii_case("and"),
-            };
-            if !recognized {
+            if !marker_id.has_capability(MarkerCapability::Coordination) {
                 continue;
             }
             evidence.push(CoordinationMarkerEvidence {
@@ -290,18 +283,16 @@ pub(crate) fn collect_coordination_marker_evidence(
     evidence
 }
 
-fn marker_from_surface(
-    language: ResolvedInstructionLanguage,
-    surface: &str,
-) -> Option<AttachmentMarkerKind> {
-    match language {
-        ResolvedInstructionLanguage::Ja => {
-            JapaneseAttachmentMarkerKind::from_surface(surface).map(AttachmentMarkerKind::Japanese)
-        }
-        ResolvedInstructionLanguage::En => {
-            EnglishAttachmentMarkerKind::from_ascii_case_insensitive_surface(surface)
-                .map(AttachmentMarkerKind::English)
-        }
+pub(crate) const fn marker_from_id(marker_id: MarkerId) -> Option<AttachmentMarkerKind> {
+    match marker_id.language() {
+        ResolvedInstructionLanguage::Ja => match JapaneseAttachmentMarkerKind::from_marker_id(marker_id) {
+            Some(marker) => Some(AttachmentMarkerKind::Japanese(marker)),
+            None => None,
+        },
+        ResolvedInstructionLanguage::En => match EnglishAttachmentMarkerKind::from_marker_id(marker_id) {
+            Some(marker) => Some(AttachmentMarkerKind::English(marker)),
+            None => None,
+        },
     }
 }
 

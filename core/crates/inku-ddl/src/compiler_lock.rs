@@ -682,6 +682,7 @@ fn projection_integrity_failure_kind(stream: &crate::ClauseStream) -> Option<&'s
                 ),
                 ClauseAtom::CoreModifier(_)
                 | ClauseAtom::UnattachedExactNumber(_)
+                | ClauseAtom::GrammarMarker { .. }
                 | ClauseAtom::FunctionWord { .. }
                 | ClauseAtom::SaijikiRelation { .. }
                 | ClauseAtom::UnresolvedDiagnostic(_) => return None,
@@ -1422,6 +1423,7 @@ fn project_deliveries(
                     ClauseAtom::CoreModifier(_) => "core_modifier_transport",
                     ClauseAtom::RemainingRole(_) => "remaining_role_transport",
                     ClauseAtom::UnattachedExactNumber(_) => "exact_number_transport",
+                    ClauseAtom::GrammarMarker { .. } => "function_word",
                     ClauseAtom::FunctionWord { .. } => "function_word",
                     ClauseAtom::SaijikiRelation { .. } => "relation_transport",
                     ClauseAtom::UnresolvedDiagnostic(_) => "diagnostic_transport",
@@ -1446,9 +1448,13 @@ pub fn isolated_support_clause_owner(
         match atom {
             ClauseAtom::CoreRole(term) if term.role == CoreRoleKind::Ground => grounds += 1,
             ClauseAtom::CoreRole(term) if term.role == CoreRoleKind::Color => colors += 1,
-            ClauseAtom::FunctionWord { surface, .. } => {
-                background |= matches!(surface.as_str(), "背景" | "background");
+            ClauseAtom::GrammarMarker { marker_id, .. } => {
+                background |= matches!(
+                    marker_id,
+                    crate::MarkerId::JaBackground | crate::MarkerId::EnBackground
+                );
             }
+            ClauseAtom::FunctionWord { .. } => {}
             ClauseAtom::UnresolvedDiagnostic(diagnostic)
                 if diagnostic.kind == NeutralDiagnosticKind::Unknown && !diagnostic.recognized => {}
             _ => return None,
@@ -1486,8 +1492,10 @@ fn patchable_unresolved_clause_spans(
             let has_background = clause.atoms.iter().any(|atom| {
                 matches!(
                     atom,
-                    ClauseAtom::FunctionWord { surface, .. }
-                        if matches!(surface.as_str(), "背景" | "background")
+                    ClauseAtom::GrammarMarker {
+                        marker_id: crate::MarkerId::JaBackground | crate::MarkerId::EnBackground,
+                        ..
+                    }
                 )
             });
             has_primitive_or_ground || has_color && has_background

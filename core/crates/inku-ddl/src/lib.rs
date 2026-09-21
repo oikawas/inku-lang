@@ -15,6 +15,8 @@ pub mod execution_diagnostics;
 mod execution_projection;
 pub mod fluctuation;
 pub mod geometry;
+mod grammar_markers;
+pub use grammar_markers::{MarkerCapability, MarkerId};
 mod group_quantity;
 mod shape_constraint;
 pub use shape_constraint::{SemanticShapeConstraint, ShapeConstraint};

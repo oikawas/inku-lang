@@ -1372,6 +1372,8 @@ Existing grammar markers are recognized by a bundled constant table in shared Ru
 
 Stage 1, camera projection, and hole completion use the existing shared grammar helper, referring by identity only to markers required by those finite forms. They do not enumerate the whole table in prompts. Centralizing marker recognition does not change recommended forms, Score, the renderer, or the meaning of saved works.
 
+Initial generation and camera projection also share the existing standalone-shape grammar for pre-head modifiers, quantity, action, and line-up direction. Patch-only constraints on adding unspecified attributes, confirmed bindings, and local patch responses remain in hole completion and do not constrain the initial visual interpretation of poetry. Existing group and ordered-placement rules, Saijiki vocabulary, macro signatures, response schemas, and compiler acceptance conditions are preserved.
+
 **Options that were rejected:**
 
 | Form | Why it was rejected |

@@ -6,6 +6,10 @@
 
 **本書が持つのは v2.5.0（2026-07-25、render engine 12）以降**の 36 版である。それより前は書庫にある。
 
+### 2026-09-22 — 初回DDL生成へ既存の単独図形構文を共有
+
+補完promptだけにあった単独図形のhead前修飾・数量・動作・配置方向の説明を共有helperへ分け、初回生成とcamera projectionへ追加した。補完固有の属性追加禁止と局所patch契約は補完側に保持する。既存の解釈・組・順序配置・語彙・応答契約とcompilerの意味決定は変更しない。
+
 ### 2026-09-21 — Developer provider I/O observation
 
 Developer modeだけで、request単位にcore LLM retryを全段で1回へ限定し、独立してprovider I/O captureを有効にできるようにした。captureは送信前のdurable private recordを必須にし、実送信JSON、provider/model/action、HTTP status、raw response、timeout、usage、elapsedとoutcomeを同じowner/executionだけへ保存する。切断・上限切詰め・record失敗はcompleteと扱わず、rawは通常history、public view、logへ出さない。通常request、prompt、描画意味は変更しない。

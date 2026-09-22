@@ -888,6 +888,8 @@ Continuationはreintroduced head、subject marker / determiner、predicateの正
 
 Stage 1、camera projection、hole補完は既存の共有grammar helperを使い、その有限構文で必要なmarkerだけをidentityから参照する。表全体をpromptへ列挙せず、文法表の一元化を理由に推奨構文、Score、renderer、保存済み作品の意味を変えない。
 
+単独図形のhead前修飾・数量・動作・配置方向を結ぶ既存の構文説明は、初回生成とcamera projectionにも共有する。補完専用の未指定属性追加禁止、確定binding、局所patchの返却条件は補完側に残し、初回の詩からの視覚解釈へ混ぜない。既存の組・順序配置、歳時記語彙、macro署名、応答schemaとcompilerの受理条件を保持する。
+
 **却下した選択肢:**
 
 | 形式 | 却下理由 |

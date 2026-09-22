@@ -6,6 +6,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 36 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-22 — Share existing standalone-shape grammar with initial DDL generation
+
+The standalone-shape guidance for pre-head modifiers, quantity, action, and line-up direction now uses a shared helper in initial generation, camera projection, and hole completion. Patch-only attribute restrictions and local-response rules remain in hole completion. Existing interpretation, group, ordered-placement, vocabulary, response, and compiler meaning contracts are unchanged.
+
 ### 2026-09-21 — Developer provider I/O observation
 
 Developer mode can independently limit all core LLM retries to one attempt per request and enable provider I/O capture. Capture requires a durable private record before send and retains the actual JSON body, provider/model/action, HTTP status, raw response, timeout, usage, elapsed time, and outcome only for the same owner and execution. Cuts, size limits, and write failures remain explicitly incomplete; raw data never enters normal history, public views, or logs. Normal requests, prompts, and drawing semantics are unchanged.

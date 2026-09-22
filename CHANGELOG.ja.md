@@ -6,6 +6,12 @@
 
 **本書が持つのは v2.5.0（2026-07-25、render engine 12）以降**の 36 版である。それより前は書庫にある。
 
+### 2026-09-22 — 不成立な背景句の局所診断を実行投影へ保持
+
+背景markerを持つ句で色のheadまたは背景actionが成立しないとき、既存のsource局所診断が実行投影から落ち、canonical identity欠落のintegrity診断だけで全文が停止する不備を修正した。不成立な背景句のspanと理由を省略診断として保持し、resource-aware compilerが独立して成立した描画を続けられるようにする。未知語を色へ補正せず、語彙・文法・planning、既存の`missing_canonical_semantic_identity` guardは変更しない。
+
+保存済み1件のresource-aware限定確認では、不成立な背景を省略し、線3本と点3個の色・画材・波打つ・scatterを保持した。非resource入口が明示countとscatterを拒否する既存挙動は通常pipelineの結果として扱わない。既存の合法な日英背景のcanonical成功は維持する。
+
 ### 2026-09-22 — 初回・共有文法で既存の弧形のわりあいを弧へ結ぶ
 
 Stage 1と共有の単独図形grammarは、歳時記のわりあい行にある弧形語を独立した描画headにせず、対応する弧headの直前へ名詞修飾として結ぶことを説明する。既存の`arc_form`の適用関係をpromptへ投影するだけで、語彙一覧の複製、新しいalias・認識条件、compiler／lowering、描画機能は追加しない。

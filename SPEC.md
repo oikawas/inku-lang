@@ -196,7 +196,12 @@ Canvas format is neither vocabulary nor a plugin. It is a resolved host option o
   bleeding is independent movement vocabulary, not a surface quality. An
   instruction to fill the background is not about a surface** either; it goes to
   the document-owned `background` field. The finite form is `fill [the]
-  background with <abstract color>.` `fill` densely fills a surface or region;
+  background with <abstract color>.` When a clause has a background marker but
+  its color head or background action does not resolve, its exact source span
+  and reason remain a local diagnostic instead of being replaced by a missing
+  canonical identity. No word is coerced to another color or background form;
+  resource-aware execution may omit only that clause and continue independent
+  drawing. `fill` densely fills a surface or region;
   `scatter` distributes elements irregularly; and `tile` covers a region by
   arranging shapes regularly and repeatedly. These movement meanings are
   distinct and are never substituted for one another. A typed fill plan targets

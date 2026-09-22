@@ -6,6 +6,24 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 36 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-22 — Preserve local diagnostics for invalid background clauses in execution projection
+
+When a clause has a background marker but its color head or background action
+does not resolve, its existing source-local diagnostic no longer disappears
+from execution projection and leaves only a missing-canonical-identity
+integrity stop. The invalid background clause retains its span and omission
+reason so the resource-aware compiler can continue independently valid
+drawing. This does not coerce unknown words into colors, add vocabulary,
+grammar, or planning behavior, or weaken the existing
+`missing_canonical_semantic_identity` guard.
+
+One focused resource-aware check of the saved input omitted the invalid
+background while retaining three lines and three points with their colors,
+tools, undulation, and resolved scatter recipe. The legacy non-resource entry
+point's rejection of explicit repetition and scatter is not treated as a
+normal-pipeline result. Existing canonical Japanese and English backgrounds
+remain valid.
+
 ### 2026-09-22 — Attach existing arc-form proportions to arcs in initial and shared grammar
 
 The Stage 1 and shared standalone-shape grammar now explains that an arc-form term in the saijiki proportions row is a noun modifier immediately before its corresponding arc head, not an independent drawing head. This only projects the existing `arc_form` applicability into the prompt: it copies no vocabulary list and adds no alias, recognition condition, compiler or lowering behavior, or rendering feature.

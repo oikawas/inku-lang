@@ -811,6 +811,25 @@ fn project_deliveries(
         .flat_map(crate::SemanticBackground::sources)
         .map(|source| source.span)
         .collect::<Vec<_>>();
+    let background_clause_spans = semantic_document
+        .instruction_association
+        .association
+        .clause_stream
+        .clauses
+        .iter()
+        .filter(|clause| {
+            clause.atoms.iter().any(|atom| {
+                matches!(
+                    atom,
+                    ClauseAtom::GrammarMarker {
+                        marker_id: crate::MarkerId::JaBackground | crate::MarkerId::EnBackground,
+                        ..
+                    }
+                )
+            })
+        })
+        .map(|clause| clause.span)
+        .collect::<Vec<_>>();
     for background in &semantic_document.background_candidates {
         add_explicit(
             &mut projection,
@@ -1025,9 +1044,15 @@ fn project_deliveries(
         {
             continue;
         }
+        let issue_spans = issue
+            .occurrences
+            .iter()
+            .map(|occurrence| occurrence.source().span)
+            .collect::<Vec<_>>();
         if issue.kind == SemanticAssociationIssueKind::MissingEntityHead
             && issue.upstream_diagnostic.is_none()
             && !issue.occurrences.is_empty()
+            && !spans_share_clause(&issue_spans, &background_clause_spans)
         {
             continue;
         }
@@ -1042,11 +1067,7 @@ fn project_deliveries(
                     .map(|occurrence| occurrence.source().span)
             });
         let kind = issue.kind.as_str();
-        let mut issue_spans = issue
-            .occurrences
-            .iter()
-            .map(|occurrence| occurrence.source().span)
-            .collect::<Vec<_>>();
+        let mut issue_spans = issue_spans;
         issue_spans.extend(
             issue
                 .upstream_diagnostic
@@ -1174,12 +1195,15 @@ fn project_deliveries(
         if spans_share_clause(&issue_spans, &patchable_clause_spans) {
             continue;
         }
-        if matches!(
-            issue.kind,
-            SemanticInstructionIssueKind::MissingActionEntity
-                | SemanticInstructionIssueKind::MissingLayoutDirectionEntity
-                | SemanticInstructionIssueKind::MissingPositionEntity
-        ) && !issue.occurrences.is_empty()
+        if (issue.kind != SemanticInstructionIssueKind::MissingActionEntity
+            || !spans_share_clause(&issue_spans, &background_clause_spans))
+            && matches!(
+                issue.kind,
+                SemanticInstructionIssueKind::MissingActionEntity
+                    | SemanticInstructionIssueKind::MissingLayoutDirectionEntity
+                    | SemanticInstructionIssueKind::MissingPositionEntity
+            )
+            && !issue.occurrences.is_empty()
         {
             continue;
         }

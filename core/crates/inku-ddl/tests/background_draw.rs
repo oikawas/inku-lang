@@ -4,11 +4,15 @@ use inku_ddl::{
     CompilerExecutionDisposition, CompilerExecutionOmissionUnit, CompilerLockState,
     MacroDefinition, MacroExpansionLimits, MacroLock, NormalizedDdlDocument, PlacementMemberKind,
     ResolvedInstructionLanguage as Language, ScoreErrorPolicy, ScoreFieldGap, ScoreLoweringContext,
-    ScoreLoweringOutcome, SemanticDeliveryOwner, compile_ddl_to_score, compile_typed_ddl,
-    plan_verified_stage15, stage15_transformation_input, transform_stage15,
+    ScoreLoweringOutcome, SemanticDeliveryOwner, compile_ddl_to_score,
+    compile_ddl_to_score_with_resources, compile_typed_ddl, plan_verified_stage15,
+    stage15_transformation_input, transform_stage15,
 };
 use inku_render::palette::work_palette_context;
-use inku_score::{Color, Primitive, ResolvedPaletteContext};
+use inku_score::{
+    Color, HardResourcePolicy, OperationalResourceBudget, Primitive, Quality,
+    ResolvedPaletteContext, ResolvedPlacementRecipe, ResourceBudget, ResourceDemand, Weight,
+};
 use serde_json::json;
 
 const LIMITS: MacroExpansionLimits = MacroExpansionLimits {
@@ -414,6 +418,117 @@ fn stage1_background_and_draw_keep_bilingual_meaning_and_source_ownership() {
             .unwrap()
             .canonical_bytes
     );
+}
+
+#[test]
+fn stage1_background_with_surface_in_color_slot_keeps_local_diagnostics_and_drawable_residual() {
+    let source = "背景を薄墨で埋める。下端に薄い灰の太筆の波打つ線を3本引く。中心に小さな黒いペンの点を3個散らす。";
+    let budget = ResourceBudget {
+        maximum: ResourceDemand {
+            logical_objects: 400,
+            primitive_marks: 400,
+            object_templates: 64,
+            maximum_per_template_primitive_marks: 240,
+            maximum_resolved_count: 2000,
+            template_nodes: 512,
+            anchor_instances: 400,
+            transform_instances: 400,
+            placement_instances: 400,
+            fill_instances: 400,
+        },
+    };
+    let result = compile_ddl_to_score_with_resources(
+        document(source, Language::Ja, &[]),
+        &[],
+        Some(23),
+        LIMITS,
+        context(),
+        None,
+        ScoreErrorPolicy::OmitAndContinue,
+        HardResourcePolicy {
+            identity: "background-diagnostic-test.v1".into(),
+            budget,
+        },
+        OperationalResourceBudget(budget),
+    );
+    let compilation = result.compilation();
+    let semantic = compilation.semantic_document.as_ref().unwrap();
+
+    assert_eq!(
+        compilation.compiler_lock.as_ref().unwrap().state,
+        CompilerLockState::BlockedDiagnostic
+    );
+    assert!(!semantic.ast.complete);
+    assert!(semantic.canonical_bytes.is_none());
+    assert!(semantic.ast.background.is_none());
+    assert_eq!(semantic.ast.instructions.len(), 2);
+    assert!(
+        compilation
+            .blocking_diagnostics
+            .iter()
+            .all(|diagnostic| diagnostic.kind != "missing_canonical_semantic_identity")
+    );
+    let mut local_diagnostics = compilation
+        .blocking_diagnostics
+        .iter()
+        .map(|diagnostic| {
+            let span = diagnostic.span.unwrap();
+            (
+                diagnostic.kind.as_str(),
+                &source[span.start_byte..span.end_byte],
+            )
+        })
+        .collect::<Vec<_>>();
+    local_diagnostics.sort_unstable();
+    assert_eq!(
+        local_diagnostics,
+        [
+            ("missing_action_entity", "埋める"),
+            ("missing_entity_head", "薄墨"),
+        ]
+    );
+
+    assert_eq!(
+        result.outcome(),
+        ScoreLoweringOutcome::CompleteWithOmissions,
+        "upstream={:?}; downstream={:?}",
+        result.upstream_diagnostics(),
+        result.downstream_diagnostics()
+    );
+    assert_eq!(result.upstream_diagnostics().len(), 2);
+    let score = result
+        .score()
+        .expect("independent line and point remain drawable");
+    assert_eq!(score.instructions.len(), 2);
+    assert_eq!(score.instructions[0].primitive, Primitive::Line);
+    assert_eq!(score.instructions[0].color, Color::Gray);
+    assert_eq!(score.instructions[0].weight, Weight::BrushThick);
+    assert_eq!(
+        score.instructions[0].variation.as_ref().unwrap().quality,
+        Quality::Wave
+    );
+    assert_eq!(score.instructions[0].arrangement.as_ref().unwrap().count, 3);
+    assert_eq!(score.instructions[1].primitive, Primitive::Point);
+    assert_eq!(score.instructions[1].color, Color::Black);
+    assert_eq!(score.instructions[1].weight, Weight::Pen);
+    assert_eq!(score.instructions[1].arrangement.as_ref().unwrap().count, 3);
+    assert_eq!(
+        score.instructions[1]
+            .arrangement
+            .as_ref()
+            .unwrap()
+            .resolved
+            .as_ref()
+            .unwrap()
+            .recipe,
+        ResolvedPlacementRecipe::ScatterUniformWithCentroidTranslation
+    );
+    assert!(result.downstream_diagnostics().iter().any(|diagnostic| {
+        matches!(
+            diagnostic.reason,
+            ScoreFieldGap::UnsupportedSurfaceIntensity { .. }
+        )
+    }));
 }
 
 #[test]

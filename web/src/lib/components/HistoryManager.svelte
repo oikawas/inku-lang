@@ -387,8 +387,15 @@
 	async function downloadSelectedAnimation(
 		ids: string[], settings: AnimationExportSettings, directory?: FileSystemDirectoryHandle
 	): Promise<void> {
+		const uniqueIds = [...new Set(ids)];
+		// Layer animation is made on the server from one saved work. Unlike a
+		// multi-work transition, it never needs the full SVG in the browser.
+		if (uniqueIds.length === 1) {
+			await downloadAnimation(apiFetch, uniqueIds, settings, directory);
+			return;
+		}
 		const items: HistoryItem[] = [];
-		for (const id of ids) {
+		for (const id of uniqueIds) {
 			const item = await resolveWorkWithSvg(id);
 			if (!item?.id) throw new Error(t().animationExportWorkUnavailable);
 			items.push(item);
@@ -718,7 +725,7 @@
 					class="ghost-btn"
 					type="button"
 					onclick={() => { animationExportIds = [...selectedHistoryIds]; }}
-					disabled={selectedHistoryIds.length < 2}
+					disabled={selectedHistoryIds.length === 0}
 				>
 					{t().historyAnimationExport}
 					{#if selectedHistoryIds.length > 0}<span class="tool-count">{selectedHistoryIds.length}</span>{/if}

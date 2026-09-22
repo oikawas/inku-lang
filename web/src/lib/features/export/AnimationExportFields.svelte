@@ -1,13 +1,15 @@
 <script lang="ts">
 	import { t } from '$lib/i18n/index.svelte';
 	import type { AnimationExportSettings } from '$lib/animationExport';
+	type Mode = 'layer' | 'transition' | 'settings';
 
 	type Props = {
 		settings: AnimationExportSettings;
+		mode?: Mode;
 		disabled?: boolean;
 	};
 
-	let { settings = $bindable(), disabled = false }: Props = $props();
+	let { settings = $bindable(), mode = 'settings', disabled = false }: Props = $props();
 </script>
 
 <div class="animation-settings-grid">
@@ -18,20 +20,42 @@
 			<option value="gif">{t().animationFormatGif}</option>
 		</select>
 	</label>
-	<label>
-		<span>{t().settingsAnimationPattern}</span>
-		<select value={settings.pattern} {disabled} onchange={(event) => (settings = { ...settings, pattern: event.currentTarget.value as AnimationExportSettings["pattern"] })}>
-			<option value="cut">{t().animationPatternCut}</option>
-			<option value="crossfade">{t().animationPatternCrossfade}</option>
-			<option value="fade_white">{t().animationPatternFadeWhite}</option>
-			<option value="slide">{t().animationPatternSlide}</option>
-		</select>
-	</label>
-	<label>
-		<span>{t().settingsAnimationHold}</span>
-		<input type="number" min="0.1" max="30" step="0.1" value={settings.holdSeconds} {disabled} onchange={(event) => (settings = { ...settings, holdSeconds: Math.max(0.1, Math.min(30, Number(event.currentTarget.value) || 1)) })} />
-		<small>{t().settingsAnimationHoldHint}</small>
-	</label>
+	{#if mode !== 'layer'}
+		<label>
+			<span>{t().settingsAnimationPattern}</span>
+			<select value={settings.pattern} {disabled} onchange={(event) => (settings = { ...settings, pattern: event.currentTarget.value as AnimationExportSettings["pattern"] })}>
+				<option value="cut">{t().animationPatternCut}</option>
+				<option value="crossfade">{t().animationPatternCrossfade}</option>
+				<option value="fade_white">{t().animationPatternFadeWhite}</option>
+				<option value="slide">{t().animationPatternSlide}</option>
+			</select>
+		</label>
+		<label>
+			<span>{t().settingsAnimationHold}</span>
+			<input type="number" min="0.1" max="30" step="0.1" value={settings.holdSeconds} {disabled} onchange={(event) => (settings = { ...settings, holdSeconds: Math.max(0.1, Math.min(30, Number(event.currentTarget.value) || 1)) })} />
+			<small>{t().settingsAnimationHoldHint}</small>
+		</label>
+	{/if}
+	{#if mode !== 'transition'}
+		<label>
+			<span>{t().settingsAnimationLayerFrames}</span>
+			<input type="number" min="2" max="120" step="1" value={settings.layerFrameCount} {disabled} onchange={(event) => (settings = { ...settings, layerFrameCount: Math.max(2, Math.min(120, Math.round(Number(event.currentTarget.value) || 12))) })} />
+			<small>{t().settingsAnimationLayerFramesHint}</small>
+		</label>
+		<label>
+			<span>{t().settingsAnimationLayerInterval}</span>
+			<input type="number" min="0.1" max="30" step="0.1" value={settings.layerIntervalSeconds} {disabled} onchange={(event) => (settings = { ...settings, layerIntervalSeconds: Math.max(0.1, Math.min(30, Number(event.currentTarget.value) || 0.3)) })} />
+			<small>{t().settingsAnimationLayerIntervalHint}</small>
+		</label>
+		<label>
+			<span>{t().settingsAnimationLayerReplay}</span>
+			<select value={settings.layerReplay} {disabled} onchange={(event) => (settings = { ...settings, layerReplay: event.currentTarget.value as AnimationExportSettings["layerReplay"] })}>
+				<option value="restart">{t().animationLayerReplayRestart}</option>
+				<option value="reverse">{t().animationLayerReplayReverse}</option>
+				<option value="once">{t().animationLayerReplayOnce}</option>
+			</select>
+		</label>
+	{/if}
 	<label>
 		<span>{t().settingsAnimationResolution}</span>
 		<select value={settings.resolution} {disabled} onchange={(event) => (settings = { ...settings, resolution: event.currentTarget.value as AnimationExportSettings["resolution"] })}>

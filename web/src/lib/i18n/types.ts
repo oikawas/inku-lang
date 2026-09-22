@@ -702,6 +702,14 @@ export interface LangPack {
 	animationPatternSlide: string;
 	settingsAnimationHold: string;
 	settingsAnimationHoldHint: string;
+	settingsAnimationLayerFrames: string;
+	settingsAnimationLayerFramesHint: string;
+	settingsAnimationLayerInterval: string;
+	settingsAnimationLayerIntervalHint: string;
+	settingsAnimationLayerReplay: string;
+	animationLayerReplayRestart: string;
+	animationLayerReplayReverse: string;
+	animationLayerReplayOnce: string;
 	settingsAnimationResolution: string;
 	animationResolution150: string;
 	animationResolution300: string;

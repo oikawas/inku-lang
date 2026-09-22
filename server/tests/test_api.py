@@ -2177,6 +2177,64 @@ def test_history_animation_export_preserves_requested_order(auth_context, monkey
         db.delete_items(user["id"], item_ids)
 
 
+def test_history_animation_export_uses_saved_svg_for_one_work(auth_context, monkeypatch):
+    headers, user, _group = auth_context
+    response = client.post(
+        "/api/history",
+        json={
+            "input": "layer animation",
+            "ddl": "中心に円",
+            "score": {"instructions": []},
+            "svg": '<svg xmlns="http://www.w3.org/2000/svg"><circle r="10"/></svg>',
+            "at": 1_700_000_200_000,
+        },
+        headers=headers,
+    )
+    assert response.status_code == 200
+    item_id = response.json()["id"]
+    try:
+        expected_svg = db.get_items(user["id"], [item_id])[0]["svg"]
+        captured: dict = {}
+
+        def fake_build(svg, **options):
+            captured["svg"] = svg
+            captured["options"] = options
+            return b"GIF89a"
+
+        monkeypatch.setattr(history_routes, "build_layer_animation", fake_build)
+        response = client.post(
+            "/api/history/export-animation",
+            json={
+                "ids": [item_id],
+                "format": "gif",
+                "layer_frame_count": 8,
+                "replay": "reverse",
+                "hold_seconds": 0.4,
+                "resolution": "1k",
+                "height_px": 300,
+            },
+            headers=headers,
+        )
+
+        assert response.status_code == 200
+        assert response.headers["content-type"] == "image/gif"
+        assert response.headers["content-disposition"].endswith('.gif"')
+        assert response.content == b"GIF89a"
+        assert captured == {
+            "svg": expected_svg,
+            "options": {
+                "output_format": "gif",
+                "frame_count": 8,
+                "replay": "reverse",
+                "hold_seconds": 0.4,
+                "resolution": "1k",
+                "height_px": 300,
+            },
+        }
+    finally:
+        db.delete_items(user["id"], [item_id])
+
+
 def test_output_save_settings_are_admin_only(tmp_path):
     suffix = uuid.uuid4().hex[:8]
     group = db.add_user_group(f"output-save-{suffix}")

@@ -5,6 +5,20 @@ from PIL import Image
 from inku_server import animation_export
 
 
+LAYERED_SVG = """<svg xmlns="http://www.w3.org/2000/svg" width="80" height="64">
+<defs>
+<clipPath id="clip"><rect width="80" height="64"/></clipPath>
+<filter id="ink"><feColorMatrix values="1 0 0 0 0 0 1 0 0 0 0 0 1 0 0 0 0 0 1 0"/></filter>
+<mask id="mask"><rect width="80" height="64" fill="white"/></mask>
+</defs>
+<rect id="background" width="80" height="64" fill="white"/>
+<g id="art" clip-path="url(#clip)" filter="url(#ink)" transform="translate(1 2)">
+<g id="stroke-1"><rect width="20" height="60" fill="red"/></g>
+<g id="stroke-2" mask="url(#mask)"><rect x="20" width="20" height="60" fill="green"/></g>
+<g id="stroke-3"><rect x="40" width="20" height="60" fill="blue"/></g>
+</g></svg>"""
+
+
 def _png(color: str, width: int = 40, height: int = 24) -> bytes:
     output = BytesIO()
     Image.new("RGBA", (width, height), color).save(output, format="PNG")
@@ -237,3 +251,95 @@ def test_requires_two_works():
         assert str(error) == "at least two works are required"
     else:
         raise AssertionError("single-work export should fail")
+
+
+def test_progressive_svg_states_keep_compositing_structure_and_exact_final_svg():
+    states = list(animation_export._progressive_svg_states(LAYERED_SVG, 4))
+
+    assert [repeats for _svg, repeats in states] == [1, 1, 1, 1]
+    assert "clipPath" in states[0][0]
+    assert 'clip-path="url(#clip)"' in states[0][0]
+    assert 'filter="url(#ink)"' in states[0][0]
+    assert 'transform="translate(1 2)"' in states[0][0]
+    assert "stroke-1" not in states[0][0]
+    assert "stroke-1" in states[1][0]
+    assert "stroke-2" not in states[1][0]
+    assert "stroke-2" in states[2][0]
+    assert "stroke-3" not in states[2][0]
+    assert states[-1][0] == LAYERED_SVG
+
+    root_rects = '<svg xmlns="http://www.w3.org/2000/svg"><rect id="background" fill="white"/><rect id="art-1" fill="red"/><rect id="art-2" fill="blue"/></svg>'
+    rect_states = list(animation_export._progressive_svg_states(root_rects, 3))
+    assert 'fill="white"' in rect_states[0][0]
+    assert 'id="art-1"' not in rect_states[0][0]
+    assert 'id="art-2"' not in rect_states[0][0]
+    assert rect_states[-1][0] == root_rects
+
+
+def test_layer_animation_encodes_reverse_and_once_replay_boundaries():
+    reverse = Image.open(BytesIO(animation_export.build_layer_animation(
+        LAYERED_SVG,
+        output_format="gif",
+        frame_count=8,
+        hold_seconds=0.3,
+        replay="reverse",
+        resolution="1k",
+        height_px=64,
+    )))
+    assert reverse.info["loop"] == 0
+    assert reverse.n_frames == 6
+    reverse_frames = []
+    reverse_durations = []
+    for index in range(reverse.n_frames):
+        reverse.seek(index)
+        reverse_frames.append(reverse.convert("RGB").tobytes())
+        reverse_durations.append(reverse.info["duration"])
+    assert len(set(reverse_frames[:4])) == 4
+    assert reverse_frames == [
+        reverse_frames[0], reverse_frames[1], reverse_frames[2],
+        reverse_frames[3], reverse_frames[2], reverse_frames[1],
+    ]
+    assert reverse_durations == [900, 600, 600, 900, 600, 600]
+    assert sum(reverse_durations) == (2 * 8 - 2) * 300
+
+    once = Image.open(BytesIO(animation_export.build_layer_animation(
+        LAYERED_SVG,
+        output_format="apng",
+        frame_count=8,
+        hold_seconds=0.3,
+        replay="once",
+        resolution="1k",
+        height_px=64,
+    )))
+    assert once.info["loop"] == 1
+    assert once.n_frames == 4
+    once_durations = []
+    for index in range(once.n_frames):
+        once.seek(index)
+        once_durations.append(once.info["duration"])
+    assert once_durations == [600.0, 600.0, 600.0, 600.0]
+    assert sum(once_durations) == 8 * 300
+    once.seek(once.n_frames - 1)
+    saved = Image.open(BytesIO(animation_export.svg_to_png(LAYERED_SVG, height=64)))
+    assert once.convert("RGBA").tobytes() == saved.convert("RGBA").tobytes()
+
+
+def test_layer_animation_rejects_a_gif_frame_duration_above_the_format_limit(monkeypatch):
+    monkeypatch.setattr(
+        animation_export,
+        "svg_to_png",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("must reject before rasterizing")),
+    )
+    try:
+        animation_export.build_layer_animation(
+            LAYERED_SVG,
+            output_format="gif",
+            frame_count=120,
+            hold_seconds=30,
+            replay="once",
+            resolution="1k",
+        )
+    except ValueError as error:
+        assert str(error) == "GIF cannot preserve this frame count and animation interval"
+    else:
+        raise AssertionError("a GIF frame duration above 655.35 seconds should fail")

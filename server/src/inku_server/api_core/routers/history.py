@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from typing import Literal
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, Response
 from pydantic import BaseModel, Field
-from ...animation_export import build_animation
+from ...animation_export import build_animation, build_layer_animation
 from ...card_export import build_card
 from ...feature_analysis import composition_distance
 from ...limits import limits_as_dict
@@ -29,12 +29,14 @@ class HistoryIdsBody(BaseModel):
 
 
 class AnimationExportBody(BaseModel):
-    ids: list[str] = Field(..., min_length=2, max_length=100)
+    ids: list[str] = Field(..., min_length=1, max_length=100)
     format: Literal["apng", "gif"] = "apng"
     pattern: Literal["cut", "crossfade", "fade_white", "slide"] = "cut"
     hold_seconds: float = Field(default=1.0, ge=0.1, le=30.0)
     resolution: Literal["1k", "4k", "8k"] = "1k"
     height_px: int | None = Field(default=None, ge=64, le=12000)
+    layer_frame_count: int = Field(default=12, ge=2, le=120)
+    replay: Literal["restart", "reverse", "once"] = "restart"
 
 
 class HistoryStateResponse(BaseModel):
@@ -179,8 +181,6 @@ def api_history_export_animation(
     actor: dict = Depends(_current_user),
 ) -> Response:
     ids = list(dict.fromkeys(body.ids))
-    if len(ids) < 2:
-        raise HTTPException(status_code=400, detail="at least two distinct works are required")
     items = _db.get_items(actor["id"], ids)
     if len(items) != len(ids):
         raise HTTPException(status_code=404, detail="one or more history items were not found")
@@ -188,14 +188,25 @@ def api_history_export_animation(
     if any(not svg for svg in svgs):
         raise HTTPException(status_code=409, detail="one or more works have no saved SVG")
     try:
-        payload = build_animation(
-            svgs,
-            output_format=body.format,
-            pattern=body.pattern,
-            hold_seconds=body.hold_seconds,
-            resolution=body.resolution,
-            height_px=body.height_px,
-        )
+        if len(ids) == 1:
+            payload = build_layer_animation(
+                svgs[0],
+                output_format=body.format,
+                frame_count=body.layer_frame_count,
+                replay=body.replay,
+                hold_seconds=body.hold_seconds,
+                resolution=body.resolution,
+                height_px=body.height_px,
+            )
+        else:
+            payload = build_animation(
+                svgs,
+                output_format=body.format,
+                pattern=body.pattern,
+                hold_seconds=body.hold_seconds,
+                resolution=body.resolution,
+                height_px=body.height_px,
+            )
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")

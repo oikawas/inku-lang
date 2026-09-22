@@ -157,22 +157,13 @@ export class HistoryManagerState {
 	private requestId = 0;
 	private pendingRequests = 0;
 	private preloadKey = "";
+	private stripSeedKey = "";
+	private pageSizeMeasured = false;
+	private awaitingInitialPageSize = false;
 	// Requests that have been sent and not yet come back. One page of history is
 	// tens of megabytes here, so asking again for something already on its way is
 	// not a harmless duplicate.
 	private inFlight: Request[] = [];
-	/**
-	 * The offset the works in hand were fetched at. -1 before anything lands.
-	 *
-	 * What the works are is not enough to know whether they are the right ones:
-	 * counting them says how many arrived, not where they came from. The modal
-	 * measures its grid after it is on screen and reports a smaller page size,
-	 * which moves `offset` without changing how many works are held -- so a
-	 * check on the count alone keeps a full page that is now labelled with
-	 * somebody else's numbers.
-	 */
-	private fetchedOffset = -1;
-
 	// One page shows what fits and no more. The works in hand can outnumber it:
 	// the page guesses the manager's page size before the modal exists and fetches
 	// with the guess, then the modal measures its own grid and says a smaller
@@ -229,7 +220,9 @@ export class HistoryManagerState {
 		this.requestId += 1;
 		this.pendingRequests = 0;
 		this.preloadKey = "";
-		this.fetchedOffset = -1;
+		this.stripSeedKey = "";
+		this.pageSizeMeasured = false;
+		this.awaitingInitialPageSize = false;
 	}
 
 	openWith(activeItems: HistoryItem[], activeTotal: number, trashTotal: number) {
@@ -239,17 +232,36 @@ export class HistoryManagerState {
 		this.page = 0;
 		this.search = '';
 		this.selectedIds = [];
-		const preloaded = this.preloadMatches('active', 0, this.pageSize, '', false, false, false, activeTotal);
-		if (!preloaded) {
+		const stripSeedKey = this.cacheKey('active', 0, '', false, false, false, activeTotal);
+		const hasFreshUnfilteredSeed =
+			this.stripSeedKey === stripSeedKey &&
+			this.preloadKey === stripSeedKey &&
+			!this.starredOnly &&
+			!this.forRevisionOnly &&
+			!this.forShareOnly;
+		const preloaded = this.preloadMatches(
+			'active',
+			0,
+			this.pageSize,
+			'',
+			this.starredOnly,
+			this.forRevisionOnly,
+			this.forShareOnly,
+			activeTotal
+		);
+		if (!preloaded && !hasFreshUnfilteredSeed) {
 			this.activeItems = activeItems;
 		}
 		this.activeTotal = activeTotal;
 		this.trashItems = [];
 		this.trashTotal = trashTotal;
-		// The first load carries the strip's works only, so a full page has to be
-		// fetched by whoever opens the manager. Seeded items stay on screen while
-		// it arrives. When a page is already in hand, opening costs nothing.
-		if (!preloaded) void this.fetch({ view: 'active', page: 0, pageSize: this.pageSize });
+		// A fresh strip has already answered the first page's question. Let the
+		// mounted grid report its actual capacity before deciding whether it needs
+		// more; this replaces a guessed page request with one measured request.
+		this.awaitingInitialPageSize = !preloaded && hasFreshUnfilteredSeed;
+		if (!preloaded && !hasFreshUnfilteredSeed) {
+			void this.fetch({ view: 'active', page: 0, pageSize: this.pageSize });
+		}
 	}
 
 	fetch = async (options: FetchOptions = {}): Promise<void> => {
@@ -307,9 +319,9 @@ export class HistoryManagerState {
 				this.activeItems = data.items;
 				this.activeTotal = data.total;
 			}
-			// Written where the works are taken in, so the two can never disagree.
-			this.fetchedOffset = offset;
-			this.preloadKey = this.cacheKey(view, page, pageSize, search, starredOnly, forRevisionOnly, forShareOnly, data.total);
+			// Written where the works are taken in, so the list identity and its
+			// starting offset always move together.
+			this.preloadKey = this.cacheKey(view, offset, search, starredOnly, forRevisionOnly, forShareOnly, data.total);
 			if (data.items.length === 0 && data.total > 0 && page > 0) {
 				const fallbackPage = page - 1;
 				this.page = fallbackPage;
@@ -336,19 +348,27 @@ export class HistoryManagerState {
 	 *
 	 * Two different quantities meet here and must not be confused. `pageSize` is
 	 * how many works one page of the manager holds; `stripItems` is what the
-	 * strip happens to have in hand, which is fewer -- the strip asks only for
-	 * what it shows. The items are kept so the modal does not open blank, but
-	 * they are not a page, so no preload key is written and openWith() will go
-	 * and fetch one. Items already in hand are not replaced by a shorter list.
+	 * strip has just received for its visible first page. The mounted grid owns
+	 * the decision whether that is enough, so its first measurement is the only
+	 * point that starts a modal fetch.
 	 */
 	seedFromStrip(stripItems: HistoryItem[], activeTotal: number, trashTotal: number, pageSize: number) {
-		this.pageSize = Math.max(1, Math.min(100, Math.floor(pageSize)));
+		if (!this.pageSizeMeasured) {
+			this.pageSize = Math.max(1, Math.min(100, Math.floor(pageSize)));
+		}
 		this.activeTotal = activeTotal;
 		this.trashTotal = trashTotal;
-		if (stripItems.length > this.activeItems.length) this.activeItems = stripItems;
+		const seedKey = this.cacheKey('active', 0, '', false, false, false, activeTotal);
+		const keepsWarmPage =
+			this.preloadKey === seedKey &&
+			stripItems.every((item, index) => item.id === this.activeItems[index]?.id);
+		if (!keepsWarmPage) this.activeItems = stripItems;
+		this.preloadKey = seedKey;
+		this.stripSeedKey = seedKey;
 	}
 
 	setView = (view: HistoryManagerView) => {
+		this.awaitingInitialPageSize = false;
 		this.view = view;
 		this.page = 0;
 		this.selectedIds = [];
@@ -356,6 +376,7 @@ export class HistoryManagerState {
 	};
 
 	setStarredOnly = (value: boolean) => {
+		this.awaitingInitialPageSize = false;
 		this.starredOnly = value;
 		this.page = 0;
 		this.selectedIds = [];
@@ -363,6 +384,7 @@ export class HistoryManagerState {
 	};
 
 	setForRevisionOnly = (value: boolean) => {
+		this.awaitingInitialPageSize = false;
 		this.forRevisionOnly = value;
 		this.page = 0;
 		this.selectedIds = [];
@@ -370,6 +392,7 @@ export class HistoryManagerState {
 	};
 
 	setForShareOnly = (value: boolean) => {
+		this.awaitingInitialPageSize = false;
 		this.forShareOnly = value;
 		this.page = 0;
 		this.selectedIds = [];
@@ -379,28 +402,37 @@ export class HistoryManagerState {
 	setPage = (page: number) => {
 		const nextPage = Math.max(0, Math.min(page, this.totalPages - 1));
 		if (nextPage === this.page) return;
+		this.awaitingInitialPageSize = false;
 		this.page = nextPage;
 		void this.fetch({ page: nextPage });
 	};
 
 	setPageSize = (pageSize: number) => {
-		const nextPageSize = Math.max(1, Math.min(200, Math.floor(pageSize)));
+		this.awaitingInitialPageSize = false;
+		// `/api/history` accepts at most 100 rows. Keep the UI request valid even
+		// when a very large grid has room for more cards than one server page.
+		const nextPageSize = Math.max(1, Math.min(100, Math.floor(pageSize)));
 		this.pageSize = nextPageSize;
+		this.pageSizeMeasured = true;
 		// Both quantities are computed here rather than read off the derived
 		// fields: those are recomputed after this method returns, so reading them
 		// now would clamp the page against the size that is being replaced.
 		const nextTotalPages = Math.max(1, Math.ceil(this.total / nextPageSize));
 		this.page = Math.max(0, Math.min(this.page, nextTotalPages - 1));
-		const nextOffset = this.page * nextPageSize;
-		// Asked by where the works came from, not by how many there are. A page
-		// size that shrinks moves `offset` while leaving the works untouched, so
-		// counting them finds nothing wrong and the modal goes on showing works
-		// from one place under the numbers of another.
-		//
-		// The modal also measures itself while the page opened with is still on
-		// its way. Nothing extra is asked for then: fetch() sees a request out for
-		// this same offset holding at least this many works and drops the question.
-		if (nextOffset !== this.fetchedOffset) void this.fetch({ page: this.page });
+		// The grid's first measurement can be smaller than the page predicted
+		// from the viewport. Its fresh strip page already answers that smaller
+		// question, so only ask when the measured page needs items not in hand.
+		// While a larger request is in flight, fetch() keeps the same protection.
+		if (!this.preloadMatches(
+			this.view,
+			this.page,
+			nextPageSize,
+			this.search.trim(),
+			this.starredOnly,
+			this.forRevisionOnly,
+			this.forShareOnly,
+			this.total
+		)) void this.fetch({ page: this.page });
 	};
 
 	searchChanged = (search: string) => {
@@ -409,6 +441,11 @@ export class HistoryManagerState {
 		// not a search, and answering it would cost a whole page of history for
 		// works already in hand -- which is what reopening the manager used to do.
 		const next = search.trim();
+		// +page reports the empty bound value while the dynamically imported
+		// manager is still mounting. It is not a user search, and must not turn
+		// the fresh strip into a guessed-page request before the grid measures.
+		if (!next && this.awaitingInitialPageSize) return;
+		this.awaitingInitialPageSize = false;
 		if (this.preloadMatches(this.view, 0, this.pageSize, next, this.starredOnly, this.forRevisionOnly, this.forShareOnly, this.total)) return;
 		this.page = 0;
 		this.selectedIds = [];
@@ -484,8 +521,8 @@ export class HistoryManagerState {
 		);
 	}
 
-	private cacheKey(view: HistoryManagerView, page: number, pageSize: number, search: string, starredOnly: boolean, forRevisionOnly: boolean, forShareOnly: boolean, total: number): string {
-		return [view, page, pageSize, search, starredOnly ? 1 : 0, forRevisionOnly ? 1 : 0, forShareOnly ? 1 : 0, total].join('|');
+	private cacheKey(view: HistoryManagerView, offset: number, search: string, starredOnly: boolean, forRevisionOnly: boolean, forShareOnly: boolean, total: number): string {
+		return [view, offset, search, starredOnly ? 1 : 0, forRevisionOnly ? 1 : 0, forShareOnly ? 1 : 0, total].join('|');
 	}
 
 	/**
@@ -495,10 +532,12 @@ export class HistoryManagerState {
 	 * fetch, which is a fact about this class rather than an internal detail.
 	 */
 	preloadMatches(view: HistoryManagerView, page: number, pageSize: number, search: string, starredOnly: boolean, forRevisionOnly: boolean, forShareOnly: boolean, total: number): boolean {
-		const expectedItems = Math.min(pageSize, total);
+		const held = view === 'trash' ? this.trashItems : this.activeItems;
+		const offset = page * pageSize;
+		const expectedItems = Math.max(0, Math.min(pageSize, total - offset));
 		return (
-			this.preloadKey === this.cacheKey(view, page, pageSize, search, starredOnly, forRevisionOnly, forShareOnly, total) &&
-			this.items.length >= expectedItems
+			this.preloadKey === this.cacheKey(view, offset, search, starredOnly, forRevisionOnly, forShareOnly, total) &&
+			held.length >= expectedItems
 		);
 	}
 }

@@ -157,13 +157,29 @@ def test_t162_the_listing_sends_each_works_weight_even_when_it_withholds_the_pic
     })
     expected = len(svg.encode("utf-8"))
 
-    withheld = client.get(
-        "/api/history",
-        headers=account["headers"],
-        params={"limit": 5, "include_svg": "false"},
-    ).json()["items"][0]
+    from sqlalchemy import event
+
+    statements: list[str] = []
+
+    def capture(_conn, _cursor, statement, _parameters, _context, _executemany):
+        statements.append(statement)
+
+    event.listen(db.engine, "before_cursor_execute", capture)
+    try:
+        withheld = client.get(
+            "/api/history",
+            headers=account["headers"],
+            params={"limit": 5, "include_svg": "false"},
+        ).json()["items"][0]
+    finally:
+        event.remove(db.engine, "before_cursor_execute", capture)
     assert withheld["svg"] == "", "this test is not exercising the withholding path"
     assert withheld["svg_bytes"] == expected
+    history_selects = [statement for statement in statements if "FROM history" in statement]
+    assert history_selects
+    selected = history_selects[-1].split("FROM history", 1)[0]
+    assert "CAST(history.svg AS BLOB)" in selected
+    assert "history.svg AS history_svg" not in selected
 
     carried = client.get(
         "/api/history",

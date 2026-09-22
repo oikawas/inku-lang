@@ -6,7 +6,8 @@ import re
 from collections.abc import Callable
 from dataclasses import dataclass
 
-from sqlalchemy import func, or_, text
+from sqlalchemy import LargeBinary, func, or_, text
+from sqlalchemy.orm import defer
 
 from .schema import HistoryRow
 
@@ -73,6 +74,26 @@ class HistorySearchService:
     readable_sql: Callable
     rows_to_dicts_with_lineage: Callable
 
+    def _project_rows(self, session, query, actor: dict, *, include_svg: bool) -> list[dict]:
+        """Project a list page without fetching artwork the caller declined."""
+        if include_svg:
+            return self.rows_to_dicts_with_lineage(session, query.all(), actor)
+        projected = query.options(defer(HistoryRow.svg)).add_columns(
+            func.length(func.cast(HistoryRow.svg, LargeBinary)).label("svg_bytes")
+        ).all()
+        rows = [row for row, _svg_bytes in projected]
+        svg_bytes_by_id = {
+            row.id: int(svg_bytes or 0)
+            for row, svg_bytes in projected
+        }
+        return self.rows_to_dicts_with_lineage(
+            session,
+            rows,
+            actor,
+            include_svg=False,
+            svg_bytes_by_id=svg_bytes_by_id,
+        )
+
     def use_history_fts(self, search: str) -> bool:
         return _use_history_fts(
             search,
@@ -91,6 +112,7 @@ class HistorySearchService:
         starred: bool,
         for_revision: bool = False,
         for_share: bool = False,
+        include_svg: bool = True,
     ) -> tuple[list[dict], int]:
         visible, visible_params = self.readable_sql(actor, "h.user_id", "h.id")
         params = {
@@ -149,8 +171,8 @@ class HistorySearchService:
         if not ids:
             return [], int(total)
         order = {item_id: index for index, item_id in enumerate(ids)}
-        rows = session.query(HistoryRow).filter(HistoryRow.id.in_(ids)).all()
-        items = self.rows_to_dicts_with_lineage(session, rows, actor)
+        rows = session.query(HistoryRow).filter(HistoryRow.id.in_(ids))
+        items = self._project_rows(session, rows, actor, include_svg=include_svg)
         return sorted(items, key=lambda item: order[item["id"]]), int(total)
 
     def list_items(
@@ -163,6 +185,7 @@ class HistorySearchService:
         starred: bool = False,
         for_revision: bool = False,
         for_share: bool = False,
+        include_svg: bool = True,
     ) -> tuple[list[dict], int]:
         actor = self.actor_of(user_id)
         with self.session_factory() as session:
@@ -179,7 +202,7 @@ class HistorySearchService:
                 query = query.filter(HistoryRow.for_share == 1)
             search = query_text.strip()
             if search and self.use_history_fts(search):
-                return self.list_items_with_fts(
+                arguments = (
                     session,
                     actor,
                     offset,
@@ -190,6 +213,9 @@ class HistorySearchService:
                     for_revision,
                     for_share,
                 )
+                if include_svg:
+                    return self.list_items_with_fts(*arguments)
+                return self.list_items_with_fts(*arguments, include_svg=False)
             if search:
                 query = query.filter(_history_search_clause(search))
             total: int = query.with_entities(func.count(HistoryRow.id)).scalar() or 0
@@ -197,6 +223,5 @@ class HistorySearchService:
                 query.order_by(HistoryRow.at.desc(), HistoryRow.id.asc())
                 .offset(offset)
                 .limit(limit)
-                .all()
             )
-            return self.rows_to_dicts_with_lineage(session, rows, actor), total
+            return self._project_rows(session, rows, actor, include_svg=include_svg), total

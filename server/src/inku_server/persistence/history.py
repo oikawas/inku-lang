@@ -424,6 +424,26 @@ class HistoryItemReader:
             items = self.rows_to_dicts_with_lineage_fn(session, rows, actor)
             return sorted(items, key=lambda item: order.get(item["id"], len(order)))
 
+    def can_read_item(self, user_id: str, item_id: str) -> bool:
+        """Check one active work's visibility without materializing its artwork.
+
+        A thumbnail request needs the same permission decision as ``get_items()``,
+        but not its SVG, Score, or lineage projection.  Those fields can be
+        megabytes each, and the browser asks this question once per thumbnail.
+        """
+        actor = self.actor_of_fn(user_id)
+        with self.session_factory() as session:
+            return (
+                session.query(HistoryRow.id)
+                .filter(
+                    access._readable_by(actor, HistoryRow.user_id, HistoryRow.id),
+                    HistoryRow.id == item_id,
+                    HistoryRow.trashed == 0,
+                )
+                .first()
+                is not None
+            )
+
 
 @dataclass(frozen=True)
 class HistoryMarkWriter:
@@ -824,6 +844,9 @@ class HistoryListProjector:
         session,
         rows: list[HistoryRow],
         actor: dict | None = None,
+        *,
+        include_svg: bool = True,
+        svg_bytes_by_id: dict[str, int] | None = None,
     ) -> list[dict]:
         """Attach edge provenance while keeping lineage_edges as the source of truth.
 
@@ -836,7 +859,18 @@ class HistoryListProjector:
         Set only when true, so `response_model_exclude_none` keeps it off the wire
         for the ordinary case of a person looking at their own works.
         """
-        items = [self.row_to_dict_fn(row) for row in rows]
+        if include_svg:
+            items = [self.row_to_dict_fn(row) for row in rows]
+        else:
+            svg_bytes_by_id = svg_bytes_by_id or {}
+            items = [
+                self.row_to_dict_fn(
+                    row,
+                    include_svg=False,
+                    svg_bytes=svg_bytes_by_id.get(row.id, 0),
+                )
+                for row in rows
+            ]
         if rows:
             links = session.query(PipelineHistoryLinkRow).filter(
                 PipelineHistoryLinkRow.history_id.in_([row.id for row in rows]),
@@ -1111,6 +1145,8 @@ def row_to_dict(
     render_hash_short_fn: Callable[[str | None], str | None],
     normalize_canvas_aspect_id_fn: Callable[[str], str],
     canvas_aspect_ratio_for_aspect_fn: Callable[[str], float],
+    include_svg: bool = True,
+    svg_bytes: int | None = None,
 ) -> dict:
     data_warnings: list[str] = []
     try:
@@ -1131,7 +1167,7 @@ def row_to_dict(
         "ddl":          row.ddl,
         "expanded_ddl": row.expanded_ddl,
         "score":        score,
-        "svg":          row.svg,
+        "svg":          row.svg if include_svg else "",
         "output_path":  row.output_path,
         "elapsed_ms":   row.elapsed_ms,
         "stage1_model": row.stage1_model,
@@ -1160,6 +1196,10 @@ def row_to_dict(
     "history_visibility": row.history_visibility or "normal",
     "lineage_node_id": row.lineage_node_id,
 }
+    if not include_svg:
+        # SQLite counts characters for TEXT. Casting to BLOB in the list query
+        # counts UTF-8 bytes, which is the exported SVG's actual size.
+        item["svg_bytes"] = svg_bytes or 0
     if data_warnings:
         item["data_warnings"] = data_warnings
     if row.stage1_prompt_digest is not None:

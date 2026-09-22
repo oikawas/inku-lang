@@ -296,6 +296,56 @@ def test_a_strangers_work_is_not_reachable(owner, stranger):
     assert response.status_code == 404
 
 
+def test_thumbnail_access_check_does_not_materialize_the_work(owner, monkeypatch):
+    """One thumbnail reads only the permission column, never SVG or Score."""
+    from sqlalchemy import event
+
+    user, headers = owner
+    item = save_work(user)
+    # A response needs stored bytes, not a rasterizer. Keeping this check off
+    # the image path lets it run in the local focused API lane.
+    thumbs_db.put_thumb(item["id"], 1, b"png", item.get("render_hash"))
+
+    def materialize_work(*_args, **_kwargs):
+        raise AssertionError("thumbnail access read the complete history work")
+
+    monkeypatch.setattr(db, "get_items", materialize_work)
+
+    statements: list[str] = []
+
+    def capture(_conn, _cursor, statement, _parameters, _context, _executemany):
+        statements.append(statement)
+
+    event.listen(db.engine, "before_cursor_execute", capture)
+    try:
+        response = client.get(f"/api/history/{item['id']}/thumb", headers=headers)
+    finally:
+        event.remove(db.engine, "before_cursor_execute", capture)
+
+    assert response.status_code == 200
+    history_selects = [statement for statement in statements if "FROM history" in statement]
+    assert len(history_selects) == 1
+    selected = history_selects[0].split("FROM history", 1)[0]
+    assert "history.svg" not in selected
+    assert "history.score" not in selected
+
+
+def test_thumbnail_visibility_keeps_shared_and_trashed_rules(owner, stranger):
+    """The lightweight check must keep the same ACL and trash boundary."""
+    user, owner_headers = owner
+    stranger_user, stranger_headers = stranger
+    item = save_work(user)
+    thumbs_db.put_thumb(item["id"], 1, b"png", item.get("render_hash"))
+
+    assert client.get(f"/api/history/{item['id']}/thumb", headers=stranger_headers).status_code == 404
+    db.grant_history_acl(user["id"], item["id"], "user", stranger_user["id"], "read")
+    assert client.get(f"/api/history/{item['id']}/thumb", headers=stranger_headers).status_code == 200
+
+    db.trash_items(user["id"], [item["id"]])
+    assert client.get(f"/api/history/{item['id']}/thumb", headers=owner_headers).status_code == 404
+    assert client.get(f"/api/history/{item['id']}/thumb", headers=stranger_headers).status_code == 404
+
+
 def test_the_thumbnail_needs_a_session_at_all(owner):
     user, _ = owner
     item = save_work(user)

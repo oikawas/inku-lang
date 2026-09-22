@@ -6,6 +6,12 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 36 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-22 — Reduce history and thumbnail display latency
+
+The history manager immediately shows works already held by the strip, then measures its actual viewport before requesting the page it needs. An initial count such as 19 comes from the strip width, not a fixed manager limit. Opening no longer requests both an estimated and a measured page, and reopening the same first page reuses its loaded data. Page sizes share the history API's maximum of 100 works.
+
+Thumbnail authorization reads only the work ID instead of loading the saved SVG, Score, and lineage for every image. History lists that omit SVG also avoid loading its text while retaining the stored UTF-8 byte count. Access rules and saved artwork are preserved. A newer strip request cancels its predecessor, navigation resumes as soon as the current page arrives, and automatic refresh does not compete with a pending page request.
+
 ### 2026-09-21 — Developer provider I/O observation
 
 Developer mode can independently limit all core LLM retries to one attempt per request and enable provider I/O capture. Capture requires a durable private record before send and retains the actual JSON body, provider/model/action, HTTP status, raw response, timeout, usage, elapsed time, and outcome only for the same owner and execution. Cuts, size limits, and write failures remain explicitly incomplete; raw data never enters normal history, public views, or logs. Normal requests, prompts, and drawing semantics are unchanged.

@@ -6,6 +6,12 @@
 
 **本書が持つのは v2.5.0（2026-07-25、render engine 12）以降**の 36 版である。それより前は書庫にある。
 
+### 2026-09-22 — 履歴一覧とサムネイル表示の待ち時間を削減
+
+履歴管理モーダルは、履歴帯から引き継いだ作品を即座に表示し、実際の表示領域を測定してから必要な1ページを取得する。画面幅によって初めに19件などが見えるのは帯の先行表示であり、固定上限ではない。推定件数と実測件数による重複取得を避け、同じ先頭ページの再表示には取得済みデータを使う。ページ件数の上限は履歴APIと同じ100件に揃える。
+
+サムネイル取得の権限確認は作品IDだけを読み、画像ごとに保存SVG・Score・系譜を読み出す処理を除いた。SVGを要求しない履歴一覧もSVG本文を読み出さず、保存されたUTF-8バイト数を返す。閲覧権限と保存作品の内容は維持する。履歴帯では新しいページ取得が古い要求を中止し、最新ページが届いた時点で操作を再開する。自動更新もページ取得中は競合しない。
+
 ### 2026-09-21 — Developer provider I/O observation
 
 Developer modeだけで、request単位にcore LLM retryを全段で1回へ限定し、独立してprovider I/O captureを有効にできるようにした。captureは送信前のdurable private recordを必須にし、実送信JSON、provider/model/action、HTTP status、raw response、timeout、usage、elapsedとoutcomeを同じowner/executionだけへ保存する。切断・上限切詰め・record失敗はcompleteと扱わず、rawは通常history、public view、logへ出さない。通常request、prompt、描画意味は変更しない。

@@ -899,22 +899,42 @@ def _assign_unowned_history_to_admin(session: Session | None = None) -> None:
     ).assign(session)
 
 
-def _row_to_dict(row: HistoryRow) -> dict:
+def _row_to_dict(
+    row: HistoryRow,
+    *,
+    include_svg: bool = True,
+    svg_bytes: int | None = None,
+) -> dict:
     return _history.row_to_dict(
         row,
         logger=_logger,
         render_hash_short_fn=render_hash_short,
         normalize_canvas_aspect_id_fn=normalize_canvas_aspect_id,
         canvas_aspect_ratio_for_aspect_fn=canvas_aspect_ratio_for_aspect,
+        include_svg=include_svg,
+        svg_bytes=svg_bytes,
     )
 
 
-def _rows_to_dicts_with_lineage(session, rows: list[HistoryRow], actor: dict | None = None) -> list[dict]:
+def _rows_to_dicts_with_lineage(
+    session,
+    rows: list[HistoryRow],
+    actor: dict | None = None,
+    *,
+    include_svg: bool = True,
+    svg_bytes_by_id: dict[str, int] | None = None,
+) -> list[dict]:
     """Compatibility façade for the lineage-aware history list projection."""
     return _history.HistoryListProjector(
         row_to_dict_fn=_row_to_dict,
         lineage_edge_to_dict_fn=_lineage_edge_to_dict,
-    ).rows_to_dicts_with_lineage(session, rows, actor=actor)
+    ).rows_to_dicts_with_lineage(
+        session,
+        rows,
+        actor=actor,
+        include_svg=include_svg,
+        svg_bytes_by_id=svg_bytes_by_id,
+    )
 
 
 def _group_to_dict(row: UserGroupRow) -> dict:
@@ -1364,8 +1384,9 @@ def list_items(
     starred: bool = False,
     for_revision: bool = False,
     for_share: bool = False,
+    include_svg: bool = True,
 ) -> tuple[list[dict], int]:
-    return _history_search_service().list_items(
+    arguments = (
         user_id,
         offset,
         limit,
@@ -1375,6 +1396,9 @@ def list_items(
         for_revision,
         for_share,
     )
+    if include_svg:
+        return _history_search_service().list_items(*arguments)
+    return _history_search_service().list_items(*arguments, include_svg=False)
 
 
 def list_state(user_id: str, trashed: bool = False) -> tuple[int, int | None, str | None]:
@@ -1485,6 +1509,15 @@ def get_items(user_id: str, ids: list[str]) -> list[dict]:
         _actor_of,
         _rows_to_dicts_with_lineage,
     ).get_items(user_id, ids)
+
+
+def can_read_history_item(user_id: str, item_id: str) -> bool:
+    """Decide access to one active history work without loading its payload."""
+    return _history.HistoryItemReader(
+        SessionLocal,
+        _actor_of,
+        _rows_to_dicts_with_lineage,
+    ).can_read_item(user_id, item_id)
 
 
 def _neighbor_score(raw: str | None) -> dict:

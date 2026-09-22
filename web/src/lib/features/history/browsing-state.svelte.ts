@@ -85,6 +85,7 @@ export class HistoryBrowsingState {
 
 	private readonly deps: HistoryBrowsingDependencies;
 	private fetchRequest = 0;
+	private fetchController: AbortController | null = null;
 	private selectionRequest = 0;
 	private trashRequest = 0;
 	private externalRefreshInFlight = false;
@@ -137,6 +138,8 @@ export class HistoryBrowsingState {
 
 	clear(): void {
 		this.fetchRequest += 1;
+		this.fetchController?.abort();
+		this.fetchController = null;
 		this.selectionRequest += 1;
 		this.trashRequest += 1;
 		this.items = [];
@@ -170,6 +173,10 @@ export class HistoryBrowsingState {
 
 	async fetchOffset(offset: number, options: FetchHistoryOptions = {}): Promise<boolean> {
 		if (!this.deps.signedIn()) {
+			this.fetchRequest += 1;
+			this.fetchController?.abort();
+			this.fetchController = null;
+			this.fetchInFlight = 0;
 			this.items = [];
 			this.total = 0;
 			this.offset = 0;
@@ -180,7 +187,12 @@ export class HistoryBrowsingState {
 		// Resize and external-refresh callers intentionally do not always await,
 		// so a slower old page must never overwrite the latest question.
 		const requestId = ++this.fetchRequest;
-		this.fetchInFlight += 1;
+		this.fetchController?.abort();
+		const controller = new AbortController();
+		this.fetchController = controller;
+		// Only the current page can block navigation; superseded requests may
+		// still be settling even after their network transfer has been aborted.
+		this.fetchInFlight = 1;
 		const selectedHistoryId = options.anchorId ?? (options.preserveSelection
 			? this.items[this.cursor]?.id ?? this.deps.currentHistoryId()
 			: null);
@@ -202,7 +214,9 @@ export class HistoryBrowsingState {
 			if (this.forRevisionOnly) params.set('for_revision', 'true');
 			if (this.forShareOnly) params.set('for_share', 'true');
 			if (options.anchorId) params.set('anchor_id', options.anchorId);
-			const response = await this.deps.apiFetch(`/api/history?${params.toString()}`);
+			const response = await this.deps.apiFetch(`/api/history?${params.toString()}`, {
+				signal: controller.signal
+			});
 			if (requestId !== this.fetchRequest || !response.ok) return false;
 			const data = await response.json() as {
 				items: HistoryItem[];
@@ -247,7 +261,10 @@ export class HistoryBrowsingState {
 		} catch {
 			return false;
 		} finally {
-			this.fetchInFlight = Math.max(0, this.fetchInFlight - 1);
+			if (requestId === this.fetchRequest) {
+				this.fetchInFlight = 0;
+				this.fetchController = null;
+			}
 		}
 	}
 
@@ -418,7 +435,7 @@ export class HistoryBrowsingState {
 			offset: this.offset,
 			loading: this.deps.drawing(),
 			visible: this.deps.visible(),
-			inFlight: this.externalRefreshInFlight,
+			inFlight: this.externalRefreshInFlight || this.fetchInFlight > 0,
 			now,
 			lastRefreshAt: this.lastExternalRefreshAt,
 			minGapMs: HISTORY_EXTERNAL_REFRESH_MIN_GAP_MS

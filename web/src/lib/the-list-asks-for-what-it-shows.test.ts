@@ -91,7 +91,7 @@ test("the manager's page does not shrink to the strip's handful", () => {
 });
 
 // ── T-4 ─────────────────────────────────────────────────────────────────────
-test('holding the strip is not claimed to be holding a page', async () => {
+test('a short fresh strip replaces a stale page but is not claimed to be a full page', async () => {
 	const { manager } = makeManager([], TOTAL);
 	manager.seedFromStrip(works(STRIP_SIZE), TOTAL, 6, MANAGER_PAGE_SIZE);
 	refreshDerived(manager);
@@ -100,33 +100,51 @@ test('holding the strip is not claimed to be holding a page', async () => {
 		false
 	);
 
-	// The case above is also refused by the count of works in hand (21 < 65), so
-	// on its own it cannot see the claim being made. This one can: a page has
-	// been fetched, then one new work is drawn and the strip seeds a shorter but
-	// fresher list. The works in hand are still a page's worth, so whether the
-	// manager believes it is holding the current page rests on the claim alone --
-	// and believing it here would open the manager without the new work in it.
+	// A page may have been fetched before a new work arrives. The fresh strip is
+	// shorter, but it must replace the stale first page and still cannot satisfy
+	// the larger manager estimate.
 	const stale = makeManager(works(MANAGER_PAGE_SIZE, 'page'), TOTAL);
 	stale.manager.pageSize = MANAGER_PAGE_SIZE;
 	await stale.manager.fetch({ view: 'active', page: 0, pageSize: MANAGER_PAGE_SIZE });
 	refreshDerived(stale.manager);
 	stale.manager.seedFromStrip(works(STRIP_SIZE, 'fresh'), TOTAL + 1, 6, MANAGER_PAGE_SIZE);
 	refreshDerived(stale.manager);
-	assert.equal(stale.manager.items.length, MANAGER_PAGE_SIZE);
+	assert.equal(stale.manager.items.length, STRIP_SIZE);
 	assert.equal(
 		stale.manager.preloadMatches('active', 0, MANAGER_PAGE_SIZE, '', false, false, false, TOTAL + 1),
 		false
 	);
 });
 
+test('opening with a complete fresh strip page makes no request', () => {
+	const { manager, calls } = makeManager([], TOTAL);
+	manager.seedFromStrip(works(STRIP_SIZE), TOTAL, 6, STRIP_SIZE);
+	refreshDerived(manager);
+
+	assert.equal(
+		manager.preloadMatches('active', 0, STRIP_SIZE, '', false, false, false, TOTAL),
+		true
+	);
+	manager.openWith(works(STRIP_SIZE), TOTAL, 6);
+	manager.setPageSize(STRIP_SIZE - 1);
+
+	assert.equal(calls.length, 0);
+});
+
 // ── T-5 ─────────────────────────────────────────────────────────────────────
-test('opening the manager without a page in hand fetches one', async () => {
+test('the grid measurement fetches once when the fresh strip is short', async () => {
 	const { manager, calls } = makeManager(works(MANAGER_PAGE_SIZE), TOTAL);
 	manager.seedFromStrip(works(STRIP_SIZE), TOTAL, 6, MANAGER_PAGE_SIZE);
 	refreshDerived(manager);
 	assert.equal(calls.length, 0);
 
 	manager.openWith(works(STRIP_SIZE), TOTAL, 6);
+	assert.equal(calls.length, 0);
+	// The route's bound empty search fires before the dynamically imported
+	// modal can measure. It must not replace the measured request with a guess.
+	manager.searchChanged('');
+	assert.equal(calls.length, 0);
+	manager.setPageSize(MANAGER_PAGE_SIZE);
 
 	assert.equal(calls.length, 1);
 	const asked = new URL(calls[0], 'http://localhost');
@@ -147,6 +165,8 @@ test('opening the manager without a page in hand fetches one', async () => {
 	assert.equal(stale.calls.length, 1);
 
 	stale.manager.openWith(works(STRIP_SIZE, 'fresh'), TOTAL + 1, 6);
+	assert.equal(stale.calls.length, 1);
+	stale.manager.setPageSize(MANAGER_PAGE_SIZE);
 
 	assert.equal(stale.calls.length, 2);
 });
@@ -173,23 +193,21 @@ test('two callers wanting the same page at once cost one request', async () => {
 	assert.equal(calls.length, 2);
 });
 
-// The sequence one press actually produces, measured in the browser: the page
-// opens the manager with a guessed page size, then the modal appears, measures
-// its own grid and reports a smaller one. Asking again for the smaller page
-// cost a second 46 MB for works that were already on their way.
-test('the modal measuring itself smaller does not cost a second page', () => {
+// The strip opens immediately, then the actual grid capacity decides the one
+// request the modal may need. There is no guessed page request to replace.
+test('the first grid measurement makes one request at its measured size', () => {
 	const { manager, calls } = makeManager(works(MANAGER_PAGE_SIZE), TOTAL);
 	manager.seedFromStrip(works(STRIP_SIZE), TOTAL, 6, MANAGER_PAGE_SIZE);
 	refreshDerived(manager);
 
 	manager.openWith(works(STRIP_SIZE), TOTAL, 6);
 	refreshDerived(manager);
-	assert.equal(calls.length, 1);
-	assert.equal(new URL(calls[0], 'http://x').searchParams.get('limit'), String(MANAGER_PAGE_SIZE));
+	assert.equal(calls.length, 0);
 
 	manager.setPageSize(MEASURED_PAGE_SIZE);
 
 	assert.equal(calls.length, 1);
+	assert.equal(new URL(calls[0], 'http://x').searchParams.get('limit'), String(MEASURED_PAGE_SIZE));
 	assert.equal(manager.pageSize, MEASURED_PAGE_SIZE);
 });
 
@@ -213,31 +231,59 @@ test('the works that arrive are the works that are shown', async () => {
 	assert.equal(manager.activeItems[0].id, 'page-0');
 });
 
-test('measuring itself larger than what is on its way does ask again', () => {
+test('the first larger measurement asks only for that page', () => {
 	const { manager, calls } = makeManager(works(MANAGER_PAGE_SIZE), TOTAL);
 	manager.seedFromStrip(works(STRIP_SIZE), TOTAL, 6, MANAGER_PAGE_SIZE);
 	refreshDerived(manager);
 	manager.openWith(works(STRIP_SIZE), TOTAL, 6);
 	refreshDerived(manager);
-	assert.equal(calls.length, 1);
+	assert.equal(calls.length, 0);
 
 	manager.setPageSize(MANAGER_PAGE_SIZE + 20);
 
-	assert.equal(calls.length, 2);
-	assert.equal(new URL(calls[1], 'http://x').searchParams.get('limit'), String(MANAGER_PAGE_SIZE + 20));
+	assert.equal(calls.length, 1);
+	assert.equal(new URL(calls[0], 'http://x').searchParams.get('limit'), String(MANAGER_PAGE_SIZE + 20));
+});
+
+test('a measurement above the history API limit asks for its valid maximum', () => {
+	const { manager, calls } = makeManager([], TOTAL);
+	manager.seedFromStrip(works(STRIP_SIZE), TOTAL, 6, STRIP_SIZE);
+	manager.openWith(works(STRIP_SIZE), TOTAL, 6);
+	manager.setPageSize(101);
+
+	assert.equal(manager.pageSize, 100);
+	assert.equal(calls.length, 1);
+	assert.equal(new URL(calls[0], 'http://x').searchParams.get('limit'), '100');
+});
+
+test('a short final page does not refetch when its measurement repeats', async () => {
+	const { manager, calls } = makeManager(works(4, 'final'), 25);
+	manager.pageSize = STRIP_SIZE;
+	manager.page = 1;
+	await manager.fetch({ view: 'active', page: 1, pageSize: STRIP_SIZE });
+	refreshDerived(manager);
+
+	manager.setPageSize(STRIP_SIZE);
+
+	assert.equal(calls.length, 1);
 });
 
 // The page re-runs its search effect every time the manager opens, dispatching
 // the query the manager already has. On a reopen there is nothing in flight to
 // ride on, so without this the second press cost a whole page of history for
 // works already on screen.
-test('reopening does not re-search for the page already in hand', async () => {
+test('a matching fresh strip keeps the measured warm page on reopen', async () => {
 	const { manager, calls } = makeManager(works(MANAGER_PAGE_SIZE), TOTAL);
 	manager.pageSize = MANAGER_PAGE_SIZE;
 	await manager.fetch({ view: 'active', page: 0, pageSize: MANAGER_PAGE_SIZE });
 	refreshDerived(manager);
 	assert.equal(calls.length, 1);
 
+	manager.setPageSize(MEASURED_PAGE_SIZE);
+	manager.seedFromStrip(works(STRIP_SIZE), TOTAL, 6, MANAGER_PAGE_SIZE);
+	refreshDerived(manager);
+	assert.equal(manager.pageSize, MEASURED_PAGE_SIZE);
+	assert.equal(manager.activeItems.length, MANAGER_PAGE_SIZE);
 	manager.openWith(works(STRIP_SIZE), TOTAL, 6);
 	manager.searchChanged('');
 
@@ -254,6 +300,16 @@ test('a real search still asks, even with a page in hand', async () => {
 
 	assert.equal(calls.length, 2);
 	assert.equal(new URL(calls[1], 'http://x').searchParams.get('q'), 'mountain');
+});
+
+test('reopening after search does not mistake its results for the strip seed', async () => {
+	const { manager } = makeManager(works(MANAGER_PAGE_SIZE, 'search'), TOTAL);
+	const strip = works(STRIP_SIZE, 'strip');
+	manager.seedFromStrip(strip, TOTAL, 0, MANAGER_PAGE_SIZE);
+	await manager.fetch({ search: 'mountain' });
+	refreshDerived(manager);
+	manager.openWith(strip, TOTAL, 0);
+	assert.equal(manager.activeItems[0]?.id, 'strip-0');
 });
 
 test('a different page is not swallowed as a duplicate', async () => {

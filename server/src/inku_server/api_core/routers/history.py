@@ -137,14 +137,15 @@ def api_history_get(
         starred=starred,
         for_revision=for_revision,
         for_share=for_share,
+        include_svg=include_svg,
     )
-    # How heavy each work is, counted here because this is the last place the
-    # picture is in hand: below, `include_svg=false` empties the key, and a
-    # client that measured what it received would be measuring the emptying.
-    # UTF-8 bytes, the same quantity measureSvgWeight().bytes counts on the page
-    # and measure() counts in no-git-sync/scripts/svg_weight.py.
-    items = [{**item, "svg_bytes": len((item.get("svg") or "").encode("utf-8")) } for item in items]
-    if not include_svg:
+    # When the picture is present, count it here. When it is withheld,
+    # persistence already measured its UTF-8 byte length in SQLite without
+    # materializing the SVG; a client must not mistake the empty transport key
+    # for the saved work's size.
+    if include_svg:
+        items = [{**item, "svg_bytes": len((item.get("svg") or "").encode("utf-8")) } for item in items]
+    else:
         # Emptied, not removed. A client that has never heard of this flag still
         # finds the key where it has always been, holding a string; taking the
         # key away would make "no picture asked for" and "old server" the same
@@ -293,10 +294,11 @@ def api_history_thumb(
     holding since it was saved; if none were, the answer is 404 and the client
     draws the SVG itself.
     """
-    # The listing's own rule, not a second one: get_items() applies the same
-    # visibility and sharing checks, and answers with nothing -- so, 404 -- for
-    # a work this caller may not see.
-    if not _db.get_items(actor["id"], [item_id]):
+    # This uses the listing's visibility rule without materializing the work.
+    # A thumbnail page asks once per image; loading every SVG and lineage just
+    # to answer the permission question made those requests compete with their
+    # own PNG transfer.
+    if not _db.can_read_history_item(actor["id"], item_id):
         raise HTTPException(status_code=404, detail="history item not found")
     row = _thumbs_db.get_thumb(item_id, scale)
     if row is None:

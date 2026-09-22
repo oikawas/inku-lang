@@ -79,12 +79,18 @@ test('T-275: only the latest strip request settles items, offset, and busy state
 
 	const first = state.fetchOffset(0);
 	const second = state.fetchOffset(3);
-	assert.equal(state.fetchInFlight, 2);
+	assert.equal(state.fetchInFlight, 1);
+	assert.equal(requests[0]?.init?.signal?.aborted, true);
+	assert.equal(requests[1]?.init?.signal?.aborted, false);
 	assert.match(requests[0]?.path ?? '', /^\/api\/history\?offset=0&limit=3&include_svg=false$/);
 	assert.match(requests[1]?.path ?? '', /^\/api\/history\?offset=3&limit=3&include_svg=false$/);
+	controls.now = 20_000;
+	await state.refreshExternal();
+	assert.equal(requests.length, 2, 'background refresh does not compete with the pending page');
 
 	requests[1]?.resolve(jsonResponse({ items: [work('newer')], total: 8, offset: 3 }));
 	await second;
+	assert.equal(state.fetchInFlight, 0, 'navigation resumes without waiting for the obsolete page');
 	requests[0]?.resolve(jsonResponse({ items: [work('stale')], total: 8, offset: 0 }));
 	await first;
 
@@ -101,6 +107,7 @@ test('T-275: only the latest strip request settles items, offset, and busy state
 	controls.signedIn = true;
 	const invalidated = state.fetchOffset(0);
 	state.clear();
+	assert.equal(requests[2]?.init?.signal?.aborted, true);
 	requests[2]?.resolve(jsonResponse({ items: [work('after-reset')], total: 1, offset: 0 }));
 	await invalidated;
 	assert.deepEqual(state.items, []);

@@ -63,9 +63,9 @@
 		onSetVisionModel: (model: string) => void;
 		onLogin: () => void | Promise<void>;
 		onLogout: () => void | Promise<void>;
-		onAddExportTemplate: () => void | Promise<void>;
-		onUpdateExportTemplate: (id: string, patch: Partial<ExportTemplate>) => void | Promise<void>;
-		onRemoveExportTemplate: (id: string) => void | Promise<void>;
+		onAddExportTemplate: () => boolean | Promise<boolean>;
+		onUpdateExportTemplate: (id: string, patch: Partial<ExportTemplate>) => boolean | Promise<boolean>;
+		onRemoveExportTemplate: (id: string) => boolean | Promise<boolean>;
 		onConfirmModelSelection: () => void;
 	};
 

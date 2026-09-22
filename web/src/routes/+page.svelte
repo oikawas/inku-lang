@@ -786,12 +786,16 @@
 		}
 	}
 
-	async function saveExportTemplates(nextTemplates: ExportTemplate[]) {
-		const previous = exportTemplates;
+	let exportTemplatesSaving = false;
+	async function saveExportTemplates(nextTemplates: ExportTemplate[]): Promise<boolean> {
+		if (exportTemplatesSaving) return false;
 		const next = normalizeExportTemplates(nextTemplates);
-		exportTemplates = next;
 		exportTemplateStatus = null;
-		if (!session.currentUser) return;
+		if (!session.currentUser) {
+			exportTemplates = next;
+			return true;
+		}
+		exportTemplatesSaving = true;
 		try {
 			const r = await apiFetch('/api/auth/me/export-templates', {
 				method: 'PUT',
@@ -804,29 +808,32 @@
 			}
 			const data = await r.json() as { templates?: unknown };
 			exportTemplates = normalizeExportTemplates(data.templates);
+			return true;
 		} catch (e) {
-			exportTemplates = previous;
 			exportTemplateStatus = t().settingsExportTemplateSaveFailed;
 			console.warn('failed to save export templates', e);
+			return false;
+		} finally {
+			exportTemplatesSaving = false;
 		}
 	}
 
-	function addExportTemplate() {
+	function addExportTemplate(): Promise<boolean> {
 		const id = `png-${Date.now().toString(36)}`;
-		void saveExportTemplates([
+		return saveExportTemplates([
 			...exportTemplates,
 			{ id, name: 'PNG 3000px', description: 'PNG / Y軸 3000px', y_px: 3000 }
 		]);
 	}
 
-	function updateExportTemplate(id: string, patch: Partial<ExportTemplate>) {
-		void saveExportTemplates(exportTemplates.map((template) => (
+	function updateExportTemplate(id: string, patch: Partial<ExportTemplate>): Promise<boolean> {
+		return saveExportTemplates(exportTemplates.map((template) => (
 			template.id === id ? { ...template, ...patch } : template
 		)));
 	}
 
-	function removeExportTemplate(id: string) {
-		void saveExportTemplates(exportTemplates.filter((template) => template.id !== id));
+	function removeExportTemplate(id: string): Promise<boolean> {
+		return saveExportTemplates(exportTemplates.filter((template) => template.id !== id));
 	}
 
 	function openModelSelection(allowVision = true) {

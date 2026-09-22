@@ -6,6 +6,14 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 36 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-22 — Refine limits, export, and user administration
+
+Limits now show saved values, defaults, and units alongside draft inputs. Users can review the change count and save or discard edits together. Restoring defaults also stays a draft, and successful saves identify fields normalized by the server.
+
+Export settings separate Save location, PNG, Animation, and Share card and explain persistence scope. PNG templates validate input and provide explicit save and reset actions, preventing overlapping saves from overwriting changes.
+
+User administration adds search and filtering, readable long names, emails, and groups, and separate selected-account editing and new-account creation. Permission and membership explanations accompany the fields. Refresh and reselection preserve unsaved edits; failed saves retain the inputs and error.
+
 ### 2026-09-22 — Improve settings layout and model administration
 
 The centered settings modal now gives each tab consistent headings, explanations, fields, and supporting information. Navigation and forms adapt to narrow screens; export, user, and backup tables scroll horizontally within their own regions when needed.

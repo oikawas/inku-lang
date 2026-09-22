@@ -172,8 +172,9 @@ export function createUserAdministration<TActor extends SettingsActor>(
 			await loadUserAdministration();
 			return true;
 		} catch (error) {
-			userAdministrationStatus = error instanceof Error ? error.message : String(error);
+			const message = error instanceof Error ? error.message : String(error);
 			await loadUserAdministration();
+			userAdministrationStatus = message;
 			return false;
 		}
 	}

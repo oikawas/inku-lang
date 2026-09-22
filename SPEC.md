@@ -996,6 +996,12 @@ The input side identifies the conditions for the next drawing, while the work si
 
 The settings modal is centered, with each tab's heading and explanation outside the scrolling body. Navigation and fields adapt to narrow screens, while wide tables scroll within their own regions. Model administration edits one selected service at a time, showing published models before expandable connection details. Model rows expose names, IDs, publication, and purposes; evaluation fields open explicitly for editing. Search and publication/purpose filters preserve drafts, and bulk selection or clearing affects only models currently visible. Publication counts, unsaved status, and save actions stay outside the scrolling list. List refresh is disabled while edits are unsaved, and failed saves retain inputs and the dialog. Tab cycles within child dialogs; Escape closes only the child dialog and returns focus to its opener.
 
+The Limits tab groups fields by capability, legibility, and safety, with saved values, defaults, and units. Edits and restoring defaults remain drafts until an explicit batch save; users can review the number of changes or discard them. Successful saves adopt the server response and identify normalized fields. Refresh is disabled with unsaved changes, editing is disabled during saving, and failures preserve inputs.
+
+Export settings separate Save location, PNG, Animation, and Share card. PNG templates use explicit per-row saves, requiring a name and an integer height from 64 to 12000 px. Add, update, and delete requests run one at a time, and failed saves retain drafts. The UI distinguishes account-level PNG templates from browser-local export defaults and explains browser-default downloads when folder selection is unavailable. Animation settings switch between one work's layers and transitions between multiple works, sharing the same format and resolution defaults.
+
+User administration provides search and a single permission/no-group filter, with wrapping names, emails, and groups. Only the selected account is edited, and the add-user form opens explicitly. Unsaved edits prevent list refresh and reselection; failed saves retain the inputs and error. Permission and membership explanations accompany the fields, and group management is expandable. Existing authorization rules are unchanged.
+
 Major UI areas:
 
 - App rail: compact navigation with an explicit expand/collapse toggle, user

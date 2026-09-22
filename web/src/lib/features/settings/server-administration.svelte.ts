@@ -122,7 +122,7 @@ export type ServerAdministration = {
 	updateOutputSaveSettings: (enabled: boolean, outputDir: string, pngSize: number) => Promise<void>;
 	updateRenderConcurrencySettings: (serverLimit: number, clientLimit: number) => Promise<void>;
 	updateLogRetentionSettings: (enabled: boolean, retentionDays: number, rotate: string, compress: boolean) => Promise<void>;
-	updateRenderLimits: (patch: Record<string, number> | null) => Promise<void>;
+	updateRenderLimits: (patch: Record<string, number> | null) => Promise<SettingsStatus['render_limits'] | null>;
 };
 
 export function createServerAdministration<TActor extends SettingsActor>(
@@ -359,7 +359,9 @@ export function createServerAdministration<TActor extends SettingsActor>(
 	}
 
 	// A null patch restores defaults. The response is authoritative after server normalization.
-	async function updateRenderLimits(patch: Record<string, number> | null): Promise<void> {
+	async function updateRenderLimits(
+		patch: Record<string, number> | null
+	): Promise<SettingsStatus['render_limits'] | null> {
 		renderLimitsStatus = null;
 		try {
 			const response = await deps.apiFetch('/api/settings/limits', {
@@ -374,9 +376,11 @@ export function createServerAdministration<TActor extends SettingsActor>(
 			const next = await response.json() as SettingsStatus['render_limits'];
 			if (settingsStatus) settingsStatus = { ...settingsStatus, render_limits: next };
 			renderLimitsStatus = t().settingsRenderLimitsSaved;
+			return next;
 		} catch (error) {
 			renderLimitsStatus = error instanceof Error ? error.message : String(error);
 			console.warn('failed to update render limits', error);
+			return null;
 		}
 	}
 

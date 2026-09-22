@@ -710,7 +710,7 @@ fn stage1_normalizer_system(language: ResolvedInstructionLanguage) -> Result<Str
     Ok(format!(
         "{}\n\n{}\n\n# accepted_saijiki_vocabulary\n{}",
         stage1_normalizer_rules(language),
-        stage1_vocabulary_roles(language, &saijiki.shape_markers),
+        stage1_vocabulary_roles(language),
         saijiki.prompt_block,
     ))
 }
@@ -743,7 +743,7 @@ pub fn stage1_system_projection(
     };
     Ok(format!(
         "{camera_subject}{ddl_intent}\n\n{output_scope}\n\n{grammar}\n\n{context}\n\n{}\n\n# accepted_saijiki_vocabulary\n{}",
-        stage1_vocabulary_roles(language, &saijiki.shape_markers),
+        stage1_vocabulary_roles(language),
         saijiki.prompt_block
     ))
 }
@@ -1446,17 +1446,14 @@ Write "mirrored with the previous shape" for mirrored positions and orientations
 const STAGE1_CONTEXT_EN: &str = "The canvas format, catalog ID, and catalog mode are already resolved host context. Do not replace them with defaults.";
 const STAGE1_NORMALIZER_RESPONSE_ENDING_EN: &str = " Return only the specified JSON.";
 
-fn stage1_vocabulary_roles(language: ResolvedInstructionLanguage, heads: &[String]) -> String {
-    let heads = heads.join(", ");
+fn stage1_vocabulary_roles(language: ResolvedInstructionLanguage) -> String {
     match language {
-        ResolvedInstructionLanguage::Ja => format!(r#"語彙一覧はそのまま使える語形であり、自由な同義語や複合語を生成する材料ではない。抽象化した視覚内容を、一覧の語形と上記の構文へ符号化する。カテゴリ名は説明用の見出しで、命令に付けない。
-単独図形のheadは {heads}。てざわりは道具、つらなりは線の連続性、おもては面の属性であり、それだけをheadや動作にしない。属性は対応するheadの前に置く。図形の形容と描画headを区別する。
-受理済みの修飾句の接続例は「赤いペンの実線の空の円」「青いクレヨンの塗りの四角」。道具・連続性・面の各名詞を「の」で結び、最後に図形headを残す。面の名詞を動詞の連体節へ展開しない。これらは接続だけを示す断片であり、単独では命令にならない。例の属性・対象・構図は転写せず、今回選んだ語形で同じ接続を使い、上記骨格の位置・数量・動作と結ぶ。
-図形命令と支持体・背景・macroは別の構文である。地を指定するなら、じの語を単独の文にする。背景色は「背景を<色>で埋める。」。いずれも任意で、必要な描画対象の代用ではない。macroはqualified_nameと宣言されたparameterの呼出しだけを一文にし、外側に動作・数量・位置・属性を足さない。明示指定がある場合は宣言されたparameterで結合し、結合不能な指定を削って呼出しを成立させない。"#),
-        ResolvedInstructionLanguage::En => format!(r#"The vocabulary lists usable surface forms, not material for inventing synonyms or compound terms. Encode the interpreted visual content with those forms and the grammar above. Category names are explanatory headings, not command prefixes.
-Standalone drawing heads are {heads}. Touches specify tools, continuity specifies line continuity, and surfaces specify surface attributes; none is a head or action on its own. Put attributes before their corresponding head. Distinguish shape modifiers from drawing heads.
-Accepted modifier-attachment fragments include "red pen solid empty circle" and "blue crayon flat square". Keep the tool, continuity, and surface terms as pre-head modifiers and retain the final drawing head. Do not expand a surface term into a verbal relative clause. These fragments demonstrate attachment only and are not complete commands. Do not copy their attributes, subjects, or composition; use the selected vocabulary with the same attachment and the position, count, and action slots above.
-Drawing commands, ground, background, and macros have separate syntax. To specify ground, write a ground vocabulary noun as its own sentence. Background color uses "fill the background with <color>." Both are optional and do not replace required drawing subjects. A macro sentence contains only its qualified_name call with declared parameters; do not append an outer action, count, position, or attribute. Bind explicit specifications through declared parameters and never delete an unbindable specification to make a call succeed."#),
+        ResolvedInstructionLanguage::Ja => r#"語彙一覧はそのまま使える語形であり、自由な同義語や複合語を生成する材料ではない。抽象化した視覚内容を、一覧の語形と上記の構文へ符号化する。カテゴリ名は説明用の見出しで、命令に付けない。
+単独図形のheadは下記かたち一覧から選ぶ。てざわりは道具、つらなりは線の連続性、おもては面の属性であり、それだけをheadや動作にしない。属性は対応するheadの前に置く。図形の形容と描画headを区別する。
+図形命令と支持体・背景・macroは別の構文である。地を指定するなら、じの語を単独の文にする。背景色は「背景を<色>で埋める。」。いずれも任意で、必要な描画対象の代用ではない。macroはqualified_nameと宣言されたparameterの呼出しだけを一文にし、外側に動作・数量・位置・属性を足さない。明示指定がある場合は宣言されたparameterで結合し、結合不能な指定を削って呼出しを成立させない。"#.to_owned(),
+        ResolvedInstructionLanguage::En => r#"The vocabulary lists usable surface forms, not material for inventing synonyms or compound terms. Encode the interpreted visual content with those forms and the grammar above. Category names are explanatory headings, not command prefixes.
+Choose standalone drawing heads from the forms vocabulary below. Touches specify tools, continuity specifies line continuity, and surfaces specify surface attributes; none is a head or action on its own. Put attributes before their corresponding head. Distinguish shape modifiers from drawing heads.
+Drawing commands, ground, background, and macros have separate syntax. To specify ground, write a ground vocabulary noun as its own sentence. Background color uses "fill the background with <color>." Both are optional and do not replace required drawing subjects. A macro sentence contains only its qualified_name call with declared parameters; do not append an outer action, count, position, or attribute. Bind explicit specifications through declared parameters and never delete an unbindable specification to make a call succeed."#.to_owned(),
     }
 }
 
@@ -1474,10 +1471,14 @@ fn standalone_shape_grammar_ja() -> String {
     let ni = MarkerId::JaNi.surface();
     let wo = MarkerId::JaWo.surface();
     let no = MarkerId::JaNo.surface();
-    format!(r#"単独図形は「[<受理位置>{ni}] [<head前修飾句>]<head>{wo} [<並べる配置方向>{ni}] [<個数・助数詞>] <動作>」を骨格にする。色・道具・線の連続性・図形の向き・面・揺らぎ・比率・相対寸法・太さ・形・辺数はすべてhead前修飾句へまとめ、必要な名詞修飾を「{no}」でつなぐ。既存の太さ語は「細い」「ごく細い」である。図形の向きはhead前、並べる配置方向は受理方向語に「{ni}」を付けてhead後へ置き、両者を入れ替えず自由な方向句を残さない。配置方向を省略した「並べる」は既定で横の左から右なので、その既定だけを言い直す語句は省く。"#)
+    format!(r#"各単独図形命令を「[<位置句>] [<head前修飾句>]<head>{wo} [<並べる配置方向句>] [<数量句>] <動作>。」として組み立てる。位置句は受理位置に「{ni}」を一つ付けた句、headは描画対象一つ、数量句は数と対象に合う助数詞一つを結合した句である。数量句が既に助数詞を含むなら、命令への接続時に助数詞を加えない。動作はうごきの語形で文末を閉じる。
+色・道具・線の連続性・図形の向き・面・揺らぎ・比率・相対寸法・太さ・形・辺数はhead前修飾句へまとめる。名詞修飾は「{no}」、形容修飾は受理された形容形でheadへ結ぶ。修飾句はhead直前の接続までを含み、head自体は含まない。接続例は「赤いペンの実線の空の」＋「円」、「青いクレヨンの塗りの」＋「四角」。境界に接続語を再挿入せず、面の名詞を動詞の連体節へ展開しない。例は接続だけを示し、属性・対象・構図を今回の記述へ転写しない。既存の太さ語は「細い」「ごく細い」である。
+図形の向きはhead前、並べる配置方向句は受理方向語に「{ni}」を一つ付けてhead後へ置く。揺らぎもhead前の属性として結び、動作の前後へ説明句として移さない。配置方向を省略した「並べる」は既定で横の左から右なので、その既定だけを言い直す語句は省く。出力前に全ての単独図形命令で、修飾句とhead、headと「{wo}」、数量句、文末動作がこの構造で結ばれることを照合する。組・順序配置・関係はそれぞれの既存構文を使い、この単独図形骨格へ縮約しない。照合内容は出力しない。"#)
 }
 
-const STANDALONE_SHAPE_GRAMMAR_EN: &str = r#"For one standalone shape, use this grammar: <action> [<count>] [<pre-head modifiers>] <head> [<accepted line-up direction adverb>] [<position preposition> <accepted place>] [<complete accepted relation literal>]. Put every entity modifier in the pre-head slot: color, tool, continuity, shape angle, surface, fluctuation, proportion, relative size, thinness, shape form, and sides. The core thinness forms are thin and extra-fine. Shape angles are pre-head adjectives; accepted line-up directions are post-head adverbs. Do not interchange them or duplicate an angle as a direction. Leave no other free directional wording after the head. Line-up defaults to horizontal left-to-right when direction is omitted; omit wording that only restates this default."#;
+const STANDALONE_SHAPE_GRAMMAR_EN: &str = r#"Assemble every standalone drawing command as <action> [<quantity>] [<pre-head modifier phrase>] <head> [<accepted line-up direction adverb>] [<position phrase>] [<complete accepted relation literal>]. A quantity is one complete count expression, the head names one drawing subject, and a position phrase contains one position preposition and the accepted place. Do not repeat a connector or count component when joining complete slots. Use an accepted movement word as the command's action.
+Keep color, tool, continuity, shape angle, surface, fluctuation, proportion, relative size, thinness, shape form, and sides in the pre-head modifier phrase. That phrase excludes the final head: "red pen solid empty" + "circle", or "blue crayon flat" + "square". Do not insert another connector at this boundary or expand a surface noun into a verbal relative clause. These examples show attachment only; do not copy their attributes, subjects, or composition. The core thinness forms are thin and extra-fine.
+Shape angles are pre-head adjectives; accepted line-up directions are post-head adverbs. Fluctuation also modifies the head rather than becoming extra wording around the action. Line-up defaults to horizontal left-to-right when direction is omitted; omit wording that only restates this default. Before output, check every standalone command's modifier/head boundary, quantity, action, and position against this structure. Groups, ordered placements, and relations retain their own existing grammar and must not be reduced to this standalone form. Do not output the checks."#;
 
 fn hole_attachment_grammar(language: ResolvedInstructionLanguage) -> String {
     let attachment = standalone_shape_grammar(language);

@@ -24,6 +24,20 @@ point's rejection of explicit repetition and scatter is not treated as a
 normal-pipeline result. Existing canonical Japanese and English backgrounds
 remain valid.
 
+### 2026-09-22 — Make work editing, Lineage, and Library easier to read
+
+The work header now offers Refine through the same six editing actions and eligibility rules as Lineage cards. It targets the displayed saved work; opening the menu neither draws nor saves. Closing without saving returns to the originating work or Lineage view, while saved children appear in Lineage with the newest child and its ancestors in focus. Revision marks now use a consistent flag icon to distinguish marking from editing.
+
+History lists place the description beside its thumbnail and remove the 20-character cutoff. A three-line preview expands to the full description by mouse or keyboard, including in the thumbnail view. The two model stages share one name only when their complete provider-qualified IDs match; differing models and unrecorded stages remain distinct. Details expose the provider and full model name.
+
+History management now opens as a Library without rebuilding the making view. Returning to it retains the query, filters, display form, page, selection, scroll position, and read-only preview. Selecting that read-only preview does not change the next-drawing conditions; its actions to open the work, Lineage, or Refine remain separate. Display form and grouping are separate controls, and only a changed search or filter resets the page and bulk selection.
+
+Within one Lineage tree, expanded branches, normal and overview positions, direction, overview openness, and scale remain available. Selecting a node in the overview does not close it. A new root or an unauthorized response does not reuse retained browsing state or old work content; deleted or private nodes follow the fresh Lineage response. The Lineage header now groups view controls, the displayed work, the root-to-displayed path, checked works, and lineage actions.
+
+Export uses one scoped menu with a fixed target. The current work or one selection offers SVG, PNG, a share card, and layer animation; multiple checked works offer chronological work animation and contact sheets; a lineage path uses root-to-displayed order. Checked works and the path are never mixed, and trashed, unavailable, or failed-validation works are rejected.
+
+The input side names the conditions for the next drawing and the work side names the displayed work's conditions; merely reading a Library preview does not change the next drawing. Settings are grouped as Display and operation, Making, Export, Connections and administration, and Extensions and details without changing existing permission visibility. Body text and descriptions use 14px, while supporting information and small buttons use 12px; checked and displayed labels plus keyboard focus distinguish selection and actions.
+
 ### 2026-09-22 — Attach existing arc-form proportions to arcs in initial and shared grammar
 
 The Stage 1 and shared standalone-shape grammar now explains that an arc-form term in the saijiki proportions row is a noun modifier immediately before its corresponding arc head, not an independent drawing head. This only projects the existing `arc_form` applicability into the prompt: it copies no vocabulary list and adds no alias, recognition condition, compiler or lowering behavior, or rendering feature.

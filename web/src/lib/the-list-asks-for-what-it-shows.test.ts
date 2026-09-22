@@ -312,6 +312,47 @@ test('reopening after search does not mistake its results for the strip seed', a
 	assert.equal(manager.activeItems[0]?.id, 'strip-0');
 });
 
+test('a retained library query survives a late strip seed, and a cached search still clears its selection', async () => {
+	const { manager, calls } = makeManager(works(MANAGER_PAGE_SIZE, 'filtered'), TOTAL);
+	const initialStrip = works(STRIP_SIZE, 'strip');
+	manager.seedFromStrip(initialStrip, TOTAL, 0, MANAGER_PAGE_SIZE);
+	manager.openWith(initialStrip, TOTAL, 0);
+	manager.open = false;
+	manager.starredOnly = true;
+	manager.page = 2;
+	manager.search = 'mountain';
+	manager.selectedIds = ['filtered-0'];
+	manager.activeItems = works(MANAGER_PAGE_SIZE, 'retained');
+
+	manager.seedFromStrip(works(STRIP_SIZE, 'late-strip'), TOTAL + 1, 4, STRIP_SIZE);
+	assert.equal(manager.activeItems[0]?.id, 'retained-0');
+	assert.equal(manager.page, 2);
+	assert.equal(manager.search, 'mountain');
+	assert.equal(manager.starredOnly, true);
+	assert.deepEqual(manager.selectedIds, ['filtered-0']);
+
+	manager.openWith(works(STRIP_SIZE, 'reopen-strip'), TOTAL + 1, 4);
+	assert.equal(manager.open, true);
+	assert.equal(manager.page, 2);
+	assert.equal(manager.search, 'mountain');
+	assert.equal(manager.starredOnly, true);
+	assert.deepEqual(manager.selectedIds, ['filtered-0']);
+
+	// Stage a cached filtered search, then change to it from the retained query.
+	// The cache avoids a fetch, but it is still a real query change and therefore
+	// must return to page one and clear the checked works.
+	await manager.fetch({ page: 0, search: 'coast', starredOnly: true });
+	refreshDerived(manager);
+	manager.page = 2;
+	manager.search = 'coast';
+	manager.selectedIds = ['filtered-0'];
+	const callsBeforeCachedSearch = calls.length;
+	manager.searchChanged('coast');
+	assert.equal(manager.page, 0);
+	assert.deepEqual(manager.selectedIds, []);
+	assert.equal(calls.length, callsBeforeCachedSearch);
+});
+
 test('a different page is not swallowed as a duplicate', async () => {
 	const { manager, calls } = makeManager(works(MANAGER_PAGE_SIZE), TOTAL);
 	manager.pageSize = MANAGER_PAGE_SIZE;

@@ -140,11 +140,15 @@ type FetchOptions = {
 
 export class HistoryManagerState {
 	open = $state(false);
+	/** A library visit is an in-app round trip, not a fresh history session. */
+	libraryInitialized = $state(false);
+	selectionResetReason = $state<'query' | 'filter' | 'trash' | null>(null);
 	view = $state<HistoryManagerView>('active');
 	tab = $state<HistoryManagerTab>('thumbs');
 	page = $state(0);
 	pageSize = $state(HISTORY_MANAGER_DEFAULT_PAGE_SIZE);
 	loading = $state(false);
+	loadFailed = $state(false);
 	starredOnly = $state(false);
 	forRevisionOnly = $state(false);
 	forShareOnly = $state(false);
@@ -160,6 +164,8 @@ export class HistoryManagerState {
 	private stripSeedKey = "";
 	private pageSizeMeasured = false;
 	private awaitingInitialPageSize = false;
+	private selectionResetTimer: number | null = null;
+	private appliedSearch = '';
 	// Requests that have been sent and not yet come back. One page of history is
 	// tens of megabytes here, so asking again for something already on its way is
 	// not a harmless duplicate.
@@ -208,6 +214,7 @@ export class HistoryManagerState {
 		this.page = 0;
 		this.pageSize = HISTORY_MANAGER_DEFAULT_PAGE_SIZE;
 		this.loading = false;
+		this.loadFailed = false;
 		this.starredOnly = false;
 		this.forRevisionOnly = false;
 		this.forShareOnly = false;
@@ -223,15 +230,35 @@ export class HistoryManagerState {
 		this.stripSeedKey = "";
 		this.pageSizeMeasured = false;
 		this.awaitingInitialPageSize = false;
+		this.libraryInitialized = false;
+		this.appliedSearch = '';
+		this.clearSelectionResetNotice();
 	}
 
 	openWith(activeItems: HistoryItem[], activeTotal: number, trashTotal: number) {
+		if (this.libraryInitialized) {
+			this.open = true;
+			// Reopening is a new permission-sensitive view of the same retained
+			// query. Keep its query, page, checked ids, and scroll owner intact, but
+			// replace the rows rather than presenting a stale cached result.
+			void this.fetch({
+				view: this.view,
+				page: this.page,
+				search: this.search.trim(),
+				starredOnly: this.starredOnly,
+				forRevisionOnly: this.forRevisionOnly,
+				forShareOnly: this.forShareOnly,
+			});
+			return;
+		}
 		this.open = true;
+		this.libraryInitialized = true;
 		this.view = 'active';
 		this.tab = 'thumbs';
 		this.page = 0;
 		this.search = '';
 		this.selectedIds = [];
+		this.appliedSearch = '';
 		const stripSeedKey = this.cacheKey('active', 0, '', false, false, false, activeTotal);
 		const hasFreshUnfilteredSeed =
 			this.stripSeedKey === stripSeedKey &&
@@ -290,6 +317,7 @@ export class HistoryManagerState {
 		this.inFlight.push(request);
 		this.pendingRequests += 1;
 		if (!silent) this.loading = true;
+		this.loadFailed = false;
 		try {
 			const trashed = view === 'trash';
 			const params = new URLSearchParams({
@@ -308,7 +336,10 @@ export class HistoryManagerState {
 			if (forShareOnly) params.set('for_share', 'true');
 			const r = await this.apiFetch(`/api/history?${params.toString()}`);
 			if (requestId !== this.requestId) return;
-			if (!r.ok) return;
+			if (!r.ok) {
+				this.markLoadFailed(view);
+				return;
+			}
 			const data = await r.json() as { items: HistoryItem[]; total: number };
 			if (requestId !== this.requestId) return;
 			if (trashed) {
@@ -335,13 +366,40 @@ export class HistoryManagerState {
 					await this.fetch({ view, page: fallbackPage, search, starredOnly, forRevisionOnly, forShareOnly });
 				}
 			}
-		} catch { /* ignore */ }
+		} catch {
+			if (requestId === this.requestId) this.markLoadFailed(view);
+		}
 		finally {
 			this.inFlight = this.inFlight.filter((sent) => sent !== request);
 			this.pendingRequests = Math.max(0, this.pendingRequests - 1);
 			if (!silent && (requestId === this.requestId || this.pendingRequests === 0)) this.loading = false;
 		}
 	};
+
+	retry = () => {
+		void this.fetch({
+			view: this.view,
+			page: this.page,
+			search: this.search.trim(),
+			starredOnly: this.starredOnly,
+			forRevisionOnly: this.forRevisionOnly,
+			forShareOnly: this.forShareOnly,
+		});
+	};
+
+	private markLoadFailed(view: HistoryManagerView): void {
+		this.loadFailed = true;
+		this.preloadKey = "";
+		this.selectedIds = [];
+		this.clearSelectionResetNotice();
+		if (view === 'trash') {
+			this.trashItems = [];
+			this.trashTotal = 0;
+		} else {
+			this.activeItems = [];
+			this.activeTotal = 0;
+		}
+	}
 
 	/**
 	 * Hand the manager what the history strip is holding.
@@ -353,6 +411,9 @@ export class HistoryManagerState {
 	 * point that starts a modal fetch.
 	 */
 	seedFromStrip(stripItems: HistoryItem[], activeTotal: number, trashTotal: number, pageSize: number) {
+		// The strip is a first-open warm seed. Once the library has a retained
+		// query, it must not replace that query's page while the modal is closed.
+		if (this.libraryInitialized) return;
 		if (!this.pageSizeMeasured) {
 			this.pageSize = Math.max(1, Math.min(100, Math.floor(pageSize)));
 		}
@@ -371,7 +432,7 @@ export class HistoryManagerState {
 		this.awaitingInitialPageSize = false;
 		this.view = view;
 		this.page = 0;
-		this.selectedIds = [];
+		this.resetSelection('trash');
 		void this.fetch({ view, page: 0 });
 	};
 
@@ -379,7 +440,7 @@ export class HistoryManagerState {
 		this.awaitingInitialPageSize = false;
 		this.starredOnly = value;
 		this.page = 0;
-		this.selectedIds = [];
+		this.resetSelection('filter');
 		void this.fetch({ page: 0, starredOnly: value });
 	};
 
@@ -387,7 +448,7 @@ export class HistoryManagerState {
 		this.awaitingInitialPageSize = false;
 		this.forRevisionOnly = value;
 		this.page = 0;
-		this.selectedIds = [];
+		this.resetSelection('filter');
 		void this.fetch({ page: 0, forRevisionOnly: value });
 	};
 
@@ -395,7 +456,7 @@ export class HistoryManagerState {
 		this.awaitingInitialPageSize = false;
 		this.forShareOnly = value;
 		this.page = 0;
-		this.selectedIds = [];
+		this.resetSelection('filter');
 		void this.fetch({ page: 0, forShareOnly: value });
 	};
 
@@ -446,11 +507,35 @@ export class HistoryManagerState {
 		// the fresh strip into a guessed-page request before the grid measures.
 		if (!next && this.awaitingInitialPageSize) return;
 		this.awaitingInitialPageSize = false;
-		if (this.preloadMatches(this.view, 0, this.pageSize, next, this.starredOnly, this.forRevisionOnly, this.forShareOnly, this.total)) return;
+		if (next === this.appliedSearch) return;
+		this.appliedSearch = next;
 		this.page = 0;
-		this.selectedIds = [];
+		this.resetSelection('query');
+		if (this.preloadMatches(this.view, 0, this.pageSize, next, this.starredOnly, this.forRevisionOnly, this.forShareOnly, this.total)) return;
 		void this.fetch({ page: 0, search });
 	};
+
+	clearSelection = () => {
+		this.selectedIds = [];
+		this.clearSelectionResetNotice();
+	};
+
+	private resetSelection(reason: 'query' | 'filter' | 'trash'): void {
+		if (this.selectedIds.length === 0) return;
+		this.selectedIds = [];
+		this.selectionResetReason = reason;
+		if (this.selectionResetTimer !== null) globalThis.clearTimeout(this.selectionResetTimer);
+		this.selectionResetTimer = globalThis.setTimeout(() => {
+			this.selectionResetReason = null;
+			this.selectionResetTimer = null;
+		}, 2400);
+	}
+
+	private clearSelectionResetNotice(): void {
+		if (this.selectionResetTimer !== null) globalThis.clearTimeout(this.selectionResetTimer);
+		this.selectionResetTimer = null;
+		this.selectionResetReason = null;
+	}
 
 	toggleSelection(id: string) {
 		this.selectedIds = this.selectedIds.includes(id)

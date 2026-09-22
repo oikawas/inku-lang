@@ -9,6 +9,7 @@
 	import type { CanvasStatusHistoryItem } from './view-types';
 	import Tooltip from '$lib/components/Tooltip.svelte';
 	import CaptionText from '$lib/components/CaptionText.svelte';
+	import SavedWorkExportMenu, { type SavedWorkExportMenuProps } from '$lib/components/SavedWorkExportMenu.svelte';
 	import type { CaptionPosition, CaptionWritingMode } from '$lib/captionWritingMode';
 
 	type Props = {
@@ -41,6 +42,7 @@
 		exportMenuOpen: boolean;
 		exportWrapEl: HTMLDivElement | null;
 		exportCardOnly: boolean;
+		savedWorkExport?: SavedWorkExportMenuProps | null;
 		cardExportBusy: boolean;
 		svgHelpOpen: boolean;
 		currentHistoryId: string | null;
@@ -91,6 +93,7 @@
 		exportMenuOpen = $bindable(false),
 		exportWrapEl = $bindable(null),
 		exportCardOnly,
+		savedWorkExport = null,
 		cardExportBusy,
 		svgHelpOpen = $bindable(false),
 		currentHistoryId,
@@ -256,7 +259,7 @@
 								event.stopPropagation();
 								onToggleForRevision(statusHistoryItem, event);
 							}}
-						>✎</button>
+						>⚑</button>
 					</Tooltip>
 					{#if shareTarget.supported && onToggleForShare}
 						<Tooltip placement="top-right" text={shareTarget.marked ? t().shareTargetOn : t().shareTargetOff}>
@@ -347,6 +350,9 @@
 					     share card. They were three buttons side by side, which said
 					     three things where the reader wanted one. -->
 					<div class="canvas-export" bind:this={exportWrapEl}>
+						{#if savedWorkExport}
+							<SavedWorkExportMenu {...savedWorkExport} variant="canvas" />
+						{:else}
 						<Tooltip placement="top-left" text={exportCardOnly ? t().historyCardExport : t().exportLabel}>
 							<button
 								type="button"
@@ -429,6 +435,7 @@
 									</button>
 								</div>
 							</div>
+						{/if}
 						{/if}
 					</div>
 					<Tooltip placement="top-left" text={t().tooltipCanvasPresentation}>
@@ -565,7 +572,7 @@
 		stroke-linejoin: round;
 	}
 	/* Three of these are glyphs rather than drawn paths: the star and the
-	   pencil are the marks the history manager already uses for the same two
+	   flag are the marks the history manager already uses for the same two
 	   flags, and the hash is the character the value itself starts with. */
 	.canvas-star-btn, .canvas-revision-btn, .canvas-hash-btn {
 		font-family: inherit;

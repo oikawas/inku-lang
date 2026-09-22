@@ -1,24 +1,24 @@
 <script lang="ts">
-	import SketchSelect from './SketchSelect.svelte';
-	import { DEFAULT_SKETCH_GRAIN, normalizeSketchGrain, sketchModeLabel, type SketchGrain, type SketchMode } from '$lib/sketch';
 	import { hashDigest, hashSchemeLabel, shortHashDigest } from '$lib/hashIdentity';
-	import { onMount, tick } from 'svelte';
+	import { onMount, tick, untrack } from 'svelte';
 	import type { HistoryItem } from '$lib/historyManagerState.svelte';
 	import HistoryThumbnail from './HistoryThumbnail.svelte';
-	import AnimationExportModal from './AnimationExportModal.svelte';
-	import RunStatus from './RunStatus.svelte';
-	import WildToggle from './WildToggle.svelte';
+	import SavedWorkExportMenu from './SavedWorkExportMenu.svelte';
+	import WorkEditDialog from './WorkEditDialog.svelte';
+	import type { SketchGrain } from '$lib/sketch';
 	import { derivationKindLabel } from '$lib/derivation';
 	import { t } from '$lib/i18n/index.svelte';
 	import { modelDisplayName, modelShortName, qualifiedModelId, type Provider, type ProviderGroup } from '$lib/models';
 	import ModelCardPicker from './ModelCardPicker.svelte';
-	import { downloadAnimation, type AnimationExportSettings } from '$lib/animationExport';
-	import { runContactSheet } from '$lib/features/contact-sheet/run';
-	import { saveBlob } from '$lib/features/export/save-target';
+	import type { AnimationExportSettings } from '$lib/animationExport';
 	import { svgImage } from '$lib/svgImage';
-	import { downloadFolderSettings } from '$lib/features/export/download-folder.svelte';
+	import type { ExportTemplate } from '$lib/exportTemplates';
 	import type { SheetVariant } from '$lib/contactSheet';
+	import type { SvgProfile } from '$lib/features/export/download';
+	import type { SavedWorkExportScope, SavedWorkExportSnapshot } from '$lib/features/export/saved-work';
 	import type { LineageGraph, LineageNode, NearbyWork } from '$lib/features/history/types';
+	import type { LineageBrowsingState, LineageOrientation } from '$lib/features/history/lineage-state.svelte';
+	import WorkActionMenu, { type WorkAction } from './WorkActionMenu.svelte';
 	export type OkugakiItem = { id?: string; target_node_id: string; branch_snapshot: string[]; model: string; at: number; language: 'ja' | 'en'; body: string; warnings: string[] };
 
 	type Props = {
@@ -39,7 +39,6 @@
 		onToggleForRevision: (node: LineageNode, event?: Event) => void | Promise<void>;
 		onOpenRefinement: (node: LineageNode, view: 'adjust' | 'compare') => void | Promise<void>;
 		onDrawDescription: (node: LineageNode, text: string, signal?: AbortSignal, wild?: boolean | null) => void | Promise<void>;
-		onDrawDdl: (node: LineageNode, ddl: string) => void | Promise<void>;
 		onOpenDdlEditor: (node: LineageNode) => void;
 		stageLabel: string;
 		stage1ModelLabel: string;
@@ -62,10 +61,14 @@
 		okugakiModel: string;
 		visionProviderGroups: ProviderGroup[];
 		animationExportSettings: AnimationExportSettings;
-		apiFetch: (path: string, init?: RequestInit) => Promise<Response>;
-		catalogName: (id: string | null | undefined) => string;
-		formatHistoryDate: (at: number) => string;
-		historyPreviewText: (text: string) => string;
+		pngTemplates?: ExportTemplate[];
+		onDownloadSavedWorkSVG?: (profile: SvgProfile, snapshot: SavedWorkExportSnapshot) => void | Promise<void>;
+		onDownloadSavedWorkPNG?: (height: number, snapshot: SavedWorkExportSnapshot) => void | Promise<void>;
+		onDownloadSavedWorkCard?: (historyId: string, snapshot: SavedWorkExportSnapshot) => void | Promise<void>;
+		onDownloadSavedWorkAnimation: (snapshot: SavedWorkExportSnapshot, settings: AnimationExportSettings, directory?: FileSystemDirectoryHandle) => void | Promise<void>;
+		onDownloadSavedWorkContactSheet: (snapshot: SavedWorkExportSnapshot, variant: SheetVariant) => void | Promise<void>;
+		onValidateSavedWorkExport: (snapshot: SavedWorkExportSnapshot) => boolean | Promise<boolean>;
+		browsingState: LineageBrowsingState;
 	};
 	function withheldLabel(node: LineageNode): string | null {
 		if (node.redacted === 'not_permitted') return isJapanese ? '非公開' : 'Private';
@@ -79,65 +82,27 @@
 	}
 
 	type ArrowPath = { id: string; path: string; tombstone: boolean };
-	type LineageOrientation = 'vertical' | 'horizontal';
-	const LINEAGE_ORIENTATION_KEY = 'inku-lineage-orientation';
+	let { graph, loading, error, isJapanese, nearbyHistory = [], onOpenNearbyHistory, onOpenNode, onOpenNodeInCanvas, onToggleStar, onToggleForRevision, onOpenRefinement, onDrawDescription, onOpenDdlEditor, onDrawSketchGrain, stageLabel, stage1ModelLabel, stage2ModelLabel, runTokensIn, runTokensOut, onSaveOkugakiModel, onPromoteNode, onSaveNote, onAskTrash, onDetach, onLoadOverview, onLoadBranch, onPaintOne, onVisionAdvice, onSaveVisionModel, visionModel, okugakiModel, visionProviderGroups, animationExportSettings, pngTemplates = [], onDownloadSavedWorkSVG, onDownloadSavedWorkPNG, onDownloadSavedWorkCard, onDownloadSavedWorkAnimation, onDownloadSavedWorkContactSheet, onValidateSavedWorkExport, browsingState }: Props = $props();
 
-	let { graph, loading, error, isJapanese, nearbyHistory = [], onOpenNearbyHistory, onOpenNode, onOpenNodeInCanvas, onToggleStar, onToggleForRevision, onOpenRefinement, onDrawDescription, onDrawDdl, onOpenDdlEditor, onDrawSketchGrain, stageLabel, stage1ModelLabel, stage2ModelLabel, runTokensIn, runTokensOut, onSaveOkugakiModel, onPromoteNode, onSaveNote, onAskTrash, onDetach, onLoadOverview, onLoadBranch, onPaintOne, onVisionAdvice, onSaveVisionModel, visionModel, okugakiModel, visionProviderGroups, animationExportSettings, apiFetch, catalogName, formatHistoryDate, historyPreviewText }: Props = $props();
-
-	// Standalone DDL-authored artworks carry the display_label marker 'DDL' and have
-	// no natural-language instruction, so instruction-only refine paths are hidden.
-	function isDdlOrigin(node: LineageNode): boolean {
-		return node.history?.display_label === 'DDL';
-	}
 	let lineageColumnsEl = $state<HTMLDivElement | null>(null);
 	let lineageScrollEl = $state<HTMLDivElement | null>(null);
 	let resizeObserver: ResizeObserver | null = null;
 	let arrowFrame: number | null = null;
 	let arrowPaths = $state<ArrowPath[]>([]);
 	let checkedHistoryIds = $state<string[]>([]);
-	let checkedAnimationExportIds = $state<string[] | null>(null);
-	let animationExportBusy = $state(false);
-	let contactSheetBusy = $state<SheetVariant | null>(null);
-	let contactSheetError = $state<string | null>(null);
-	let animationExportError = $state<string | null>(null);
 	let noteDrafts = $state<Record<string, string>>({});
 	let savingNoteIds = $state<string[]>([]);
-	let expandedNodeIds = $state<string[]>([]);
-	let lastFocusNodeId = $state<string | null>(null);
-	let overviewOpen = $state(false);
 	let overviewLoading = $state(false);
-	let overviewScale = $state(1);
-	let lineageOrientation = $state<LineageOrientation>('vertical');
 	let lineagePanning = $state(false);
 	let panSession: { pointerId: number; x: number; y: number; scrollLeft: number; scrollTop: number } | null = null;
 	let activeMenuNodeId = $state<string | null>(null);
+	let headerWorkMenuOpen = $state(false);
 	let activeAIRefineNode = $state<LineageNode | null>(null);
 	let activeEditNode = $state<LineageNode | null>(null);
-	let editMode = $state<'description' | 'ddl' | null>(null);
-	let editDraft = $state('');
 	// Sketch from life (Stage 0.5): the grain lives on the edit shelf beside
 	// description and the instructions -- not on the refinement radio, because
 	// changing it re-runs 0.5 and Stage 1 and is not deterministic.
 	let activeSketchNode = $state<LineageNode | null>(null);
-	let sketchGrainChoice = $state<SketchGrain>(DEFAULT_SKETCH_GRAIN);
-	let sketchDrawing = $state(false);
-	let sketchError = $state<string | null>(null);
-	let sketchDrawController: AbortController | null = null;
-	let editDrawing = $state(false);
-	let editError = $state<string | null>(null);
-	let editElapsedMs = $state(0);
-	let editDrawController: AbortController | null = null;
-	// null = inherit the parent work's setting (field omitted).
-	let editWildOverride = $state<boolean | null>(null);
-
-	// While the edit dialog is drawing, tick an elapsed timer for the status element.
-	$effect(() => {
-		if (!editDrawing) return;
-		editElapsedMs = 0;
-		const startedAt = Date.now();
-		const handle = setInterval(() => { editElapsedMs = Date.now() - startedAt; }, 100);
-		return () => clearInterval(handle);
-	});
 	let okugakiOpen = $state(false);
 	let selectedOkugakiModel = $state('');
 	let okugakiItems = $state<OkugakiItem[]>([]);
@@ -162,15 +127,27 @@
 		}
 		return ids;
 	});
-	const checkedAnimationHistoryIds = $derived.by(() => (graph?.nodes ?? [])
-		.flatMap((node) => {
+	const focusExportScope = $derived.by((): SavedWorkExportScope | null => {
+		const history = focusNode?.history;
+		if (!history?.id) return null;
+		return { kind: 'current', works: [{ id: history.id, at: history.at, preview: history.svg ?? null, description: history.source_text ?? history.input ?? null, trashed: history.trashed }] };
+	});
+	const pathExportScope = $derived.by((): SavedWorkExportScope | null => {
+		const works = focusAnimationHistoryIds.flatMap((id) => {
+			const history = graph?.nodes.find((node) => node.history?.id === id)?.history;
+			return history?.id ? [{ id: history.id, at: history.at, preview: history.svg ?? null, description: history.source_text ?? history.input ?? null, trashed: history.trashed }] : [];
+		});
+		return works.length > 0 ? { kind: 'lineage-path', works } : null;
+	});
+	const selectionExportScope = $derived.by((): SavedWorkExportScope | null => {
+		const works = (graph?.nodes ?? []).flatMap((node) => {
 			const history = node.history;
-			return history?.id && !history.trashed && checkedHistoryIds.includes(history.id)
-				? [{ id: history.id, at: history.at }]
+			return history?.id && checkedHistoryIds.includes(history.id)
+				? [{ id: history.id, at: history.at, preview: history.svg ?? null, description: history.source_text ?? history.input ?? null, trashed: history.trashed }]
 				: [];
-		})
-		.sort((left, right) => left.at - right.at || left.id.localeCompare(right.id))
-		.map((history) => history.id));
+		});
+		return works.length > 0 ? { kind: 'selection', works } : null;
+	});
 	const childrenByParent = $derived.by(() => {
 		const children = new Map<string, LineageNode[]>();
 		for (const edge of graph?.edges ?? []) {
@@ -221,10 +198,10 @@
 		return ids;
 	});
 	const visibleNodeIds = $derived.by(() => {
-		if (overviewOpen) return new Set((graph?.nodes ?? []).map((node) => node.id));
+		if (browsingState.overviewOpen) return new Set((graph?.nodes ?? []).map((node) => node.id));
 		const visible = new Set(ancestorIds);
 		const queue = [...ancestorIds];
-		const expanded = new Set(expandedNodeIds);
+		const expanded = new Set(browsingState.expandedNodeIds);
 		while (queue.length) {
 			const parentId = queue.shift() as string;
 			if (!expanded.has(parentId)) continue;
@@ -316,57 +293,6 @@ function askTrashChecked(): void {
 	if (checkedHistoryIds.length > 0) onAskTrash([...checkedHistoryIds]);
 }
 
-function openCheckedAnimationExport(): void {
-	if (checkedAnimationHistoryIds.length === 0) return;
-	checkedAnimationExportIds = [...checkedAnimationHistoryIds];
-}
-
-// The same implementation the history manager uses -- see
-// features/contact-sheet/run. Only the selection and the lookup differ: the
-// works are already in the graph here, so no fetch is needed.
-async function downloadCheckedContactSheet(variant: SheetVariant): Promise<void> {
-	if (contactSheetBusy || checkedHistoryIds.length === 0) return;
-	contactSheetBusy = variant;
-	contactSheetError = null;
-	try {
-		await runContactSheet(variant, {
-			ids: () => checkedHistoryIds,
-			resolveWork: (id) => graph?.nodes.find((node) => node.history?.id === id)?.history ?? null,
-			catalogName,
-			formatDate: formatHistoryDate,
-			previewText: historyPreviewText,
-			save: async (blob, filename) => {
-				const outcome = await saveBlob(blob, filename, { enabled: downloadFolderSettings.enabled });
-				if (outcome.kind === 'browser' && outcome.reason === 'denied') {
-					contactSheetError = t().downloadFolderFellBack;
-				}
-			},
-			labels: {
-				title: t().historyContactSheetTitle,
-				subtitle: (total, date, page, pages) => t().historyContactSheetSubtitle(total, date, page, pages),
-			},
-		});
-	} catch {
-		contactSheetError = t().historyContactSheetFailed;
-	} finally {
-		contactSheetBusy = null;
-	}
-}
-
-async function downloadFocusAnimation(): Promise<void> {
-	if (animationExportBusy || focusAnimationHistoryIds.length < 2) return;
-	animationExportBusy = true;
-	animationExportError = null;
-	try {
-		await downloadAnimation(apiFetch, focusAnimationHistoryIds, animationExportSettings);
-	} catch (cause) {
-		const reason = cause instanceof Error ? cause.message : String(cause);
-		animationExportError = t().animationExportFailed(reason);
-	} finally {
-		animationExportBusy = false;
-	}
-}
-
 function noteValue(node: LineageNode): string {
 	return noteDrafts[node.id] ?? node.history?.note ?? '';
 }
@@ -389,9 +315,8 @@ async function saveNodeNote(node: LineageNode): Promise<void> {
 }
 
 	async function openNode(node: LineageNode): Promise<void> {
-		if (overviewOpen) closeOverview();
 		// Do not reload the selected work; a double-click must not fetch twice.
-		else if (node.id === graph?.focus_node_id) return;
+		if (node.id === graph?.focus_node_id) return;
 		await onOpenNode(node);
 	}
 
@@ -456,84 +381,29 @@ async function saveNodeNote(node: LineageNode): Promise<void> {
 		else okugakiError = (await response.text()) || `HTTP ${response.status}`;
 	}
 
-	function openEditDialog(node: LineageNode, mode: 'description' | 'ddl'): void {
+	function openEditDialog(node: LineageNode): void {
 		if (!node.history) return;
-		editWildOverride = null;
 		activeEditNode = node;
-		editMode = mode;
-		editDraft = mode === 'description'
-			? (node.history.source_text ?? node.history.input ?? '')
-			: (node.history.ddl ?? '');
-		editError = null;
 		activeMenuNodeId = null;
 	}
 
 	function openSketchDialog(node: LineageNode): void {
 		if (!node.history) return;
 		activeSketchNode = node;
-		// Start from what the parent used, so the dialog opens on "no change".
-		sketchGrainChoice = normalizeSketchGrain(node.history.sketch_grain) ?? DEFAULT_SKETCH_GRAIN;
-		sketchError = null;
 		activeMenuNodeId = null;
 	}
 
-	function closeSketchDialog(): void {
-		if (sketchDrawing) return;
-		activeSketchNode = null;
-		sketchError = null;
-	}
-
-	async function drawSketchGrain(): Promise<void> {
-		if (!activeSketchNode || sketchDrawing) return;
-		sketchDrawing = true;
-		sketchError = null;
-		sketchDrawController = new AbortController();
-		try {
-			await onDrawSketchGrain(activeSketchNode, sketchGrainChoice, sketchDrawController.signal);
-			activeSketchNode = null;
-		} catch (cause) {
-			if (!(cause instanceof Error && cause.name === 'AbortError')) {
-				sketchError = cause instanceof Error ? cause.message : String(cause);
-			}
-		} finally {
-			sketchDrawController = null;
-			sketchDrawing = false;
+	async function runWorkAction(action: WorkAction, node: LineageNode): Promise<void> {
+		switch (action) {
+			case 'adjust': await onOpenRefinement(node, 'adjust'); break;
+			case 'description': openEditDialog(node); break;
+			case 'instructions': onOpenDdlEditor(node); break;
+			case 'sketch-grain': openSketchDialog(node); break;
+			case 'models': await onOpenRefinement(node, 'compare'); break;
+			case 'autonomous': activeAIRefineNode = node; break;
 		}
 	}
 
-	function closeEditDialog(): void {
-		if (editDrawing) return;
-		activeEditNode = null;
-		editMode = null;
-		editDraft = '';
-		editError = null;
-	}
-
-	async function drawEditedArtwork(): Promise<void> {
-		if (!activeEditNode || !editMode || !editDraft.trim() || editDrawing) return;
-		editDrawing = true;
-		editError = null;
-		editDrawController = new AbortController();
-		try {
-			if (editMode === 'description') await onDrawDescription(activeEditNode, editDraft, editDrawController.signal, editWildOverride);
-			else await onDrawDdl(activeEditNode, editDraft);
-			activeEditNode = null;
-			editMode = null;
-			editDraft = '';
-		} catch (cause) {
-			// Aborted by the stop button: keep the dialog open, no error.
-			if (!(cause instanceof Error && cause.name === 'AbortError')) {
-				editError = cause instanceof Error ? cause.message : String(cause);
-			}
-		} finally {
-			editDrawController = null;
-			editDrawing = false;
-		}
-	}
-
-	function stopEditDraw(): void {
-		editDrawController?.abort();
-	}
 
 	async function selectOkugakiModel(provider: Provider, model: string): Promise<void> {
 		const nextModel = qualifiedModelId(provider, model);
@@ -548,51 +418,59 @@ async function saveNodeNote(node: LineageNode): Promise<void> {
 		}
 	}
 
-	function handleDialogKeydown(event: KeyboardEvent): void {
-		if (event.key !== 'Escape') return;
-		if (activeEditNode && !editDrawing) closeEditDialog();
-		else if (okugakiOpen && !okugakiGenerating) okugakiOpen = false;
-	}
 
 	async function toggleBranch(node: LineageNode): Promise<void> {
-		if (expandedNodeIds.includes(node.id)) {
-			expandedNodeIds = expandedNodeIds.filter((id) => id !== node.id);
+		if (browsingState.expandedNodeIds.includes(node.id)) {
+			browsingState.expandedNodeIds = browsingState.expandedNodeIds.filter((id) => id !== node.id);
 			return;
 		}
 		const loadedCount = childrenByParent.get(node.id)?.length ?? 0;
 		const needsLoad = (node.child_count ?? loadedCount) > loadedCount;
 		// Loading children flips `loading`, which unmounts the scroll area and would
 		// reset scrollTop to 0. Preserve and restore the scroll position across it.
-		const savedScrollTop = lineageScrollEl?.scrollTop ?? 0;
+		rememberScroll();
 		if (needsLoad) await onLoadBranch(node.id);
-		expandedNodeIds = [...expandedNodeIds, node.id];
+		browsingState.expandedNodeIds = [...browsingState.expandedNodeIds, node.id];
 		if (needsLoad) {
 			await tick();
-			if (lineageScrollEl) lineageScrollEl.scrollTop = savedScrollTop;
+			restoreScroll();
 		}
 	}
 	function setLineageOrientation(next: LineageOrientation): void {
-		if (next === lineageOrientation) return;
-		lineageOrientation = next;
-		try { localStorage.setItem(LINEAGE_ORIENTATION_KEY, next); } catch {}
+		if (next === browsingState.orientation) return;
+		browsingState.orientation = next;
 		void tick().then(() => {
 			scheduleArrowUpdate();
-			const focusId = graph?.focus_node_id;
-			if (focusId) cardElements.get(focusId)?.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
+			restoreScroll();
 		});
 	}
 
 	async function openOverview(): Promise<void> {
-		overviewOpen = true;
+		rememberScroll();
+		browsingState.overviewOpen = true;
 		overviewLoading = true;
 		try { await onLoadOverview(); }
-		finally { overviewLoading = false; await tick(); scheduleArrowUpdate(); }
+		finally { overviewLoading = false; await tick(); restoreScroll(); scheduleArrowUpdate(); }
 	}
 	function closeOverview(): void {
-		overviewOpen = false;
-		overviewScale = 1;
-		void tick().then(scheduleArrowUpdate);
+		rememberScroll();
+		browsingState.overviewOpen = false;
+		void tick().then(() => { restoreScroll(); scheduleArrowUpdate(); });
 	}
+	function rememberScroll(): void {
+		if (!lineageScrollEl) return;
+		browsingState.setScroll(browsingState.overviewOpen, {
+			left: lineageScrollEl.scrollLeft,
+			top: lineageScrollEl.scrollTop,
+		});
+	}
+	function restoreScroll(): void {
+		if (!lineageScrollEl) return;
+		const position = browsingState.scrollFor(browsingState.overviewOpen);
+		lineageScrollEl.scrollLeft = position.left;
+		lineageScrollEl.scrollTop = position.top;
+	}
+	function handleLineageScroll(): void { rememberScroll(); }
 	function startLineagePan(event: PointerEvent): void {
 		if (event.pointerType !== 'mouse' || event.button !== 0 || !event.isPrimary) return;
 		const target = event.target;
@@ -653,7 +531,7 @@ async function saveNodeNote(node: LineageNode): Promise<void> {
 			const parentRect = getRelativeCoords(parent, container);
 			const childRect = getRelativeCoords(child, container);
 			let path: string;
-			if (lineageOrientation === 'horizontal') {
+			if (browsingState.orientation === 'horizontal') {
 				const x1 = parentRect.left + parentRect.width + 1;
 				const y1 = parentRect.top + parentRect.height / 2;
 				const x2 = childRect.left - 7;
@@ -711,10 +589,6 @@ async function saveNodeNote(node: LineageNode): Promise<void> {
 	}
 
 	onMount(() => {
-		try {
-			const savedOrientation = localStorage.getItem(LINEAGE_ORIENTATION_KEY);
-			if (savedOrientation === 'vertical' || savedOrientation === 'horizontal') lineageOrientation = savedOrientation;
-		} catch {}
 		resizeObserver = new ResizeObserver(scheduleArrowUpdate);
 		if (lineageColumnsEl) resizeObserver.observe(lineageColumnsEl);
 		for (const element of cardElements.values()) resizeObserver.observe(element);
@@ -722,8 +596,6 @@ async function saveNodeNote(node: LineageNode): Promise<void> {
 		window.addEventListener('click', handleGlobalClick);
 		scheduleArrowUpdate();
 		return () => {
-			sketchDrawController?.abort();
-			editDrawController?.abort();
 			if (copiedHashTimer !== null) clearTimeout(copiedHashTimer);
 			resizeObserver?.disconnect();
 			resizeObserver = null;
@@ -734,17 +606,13 @@ async function saveNodeNote(node: LineageNode): Promise<void> {
 	});
 
 	$effect(() => {
-		const focusId = graph?.focus_node_id ?? null;
-		const focusChanged = !!focusId && focusId !== lastFocusNodeId;
-		if (focusChanged) { lastFocusNodeId = focusId; expandedNodeIds = [focusId]; }
-		columns;
-		overviewScale;
-		lineageOrientation;
+		const nextGraph = graph;
+		const focusId = nextGraph?.focus_node_id ?? null;
+		const treeChanged = untrack(() => browsingState.reconcileGraph(nextGraph));
 		void tick().then(() => {
 			scheduleArrowUpdate();
-			if (focusChanged && focusId && !overviewOpen) {
-				cardElements.get(focusId)?.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
-			}
+			untrack(restoreScroll);
+			if (treeChanged && focusId && !browsingState.overviewOpen) cardElements.get(focusId)?.scrollIntoView({ block: 'center', inline: 'center' });
 		});
 	});
 $effect(() => {
@@ -761,46 +629,89 @@ $effect(() => {
 
 </script>
 
-<svelte:window onkeydown={handleDialogKeydown} />
-
-<section class="lineage-panel" class:overview={overviewOpen}>
+<section class="lineage-panel" class:overview={browsingState.overviewOpen}>
 	<header>
 		<div>
 			<h2 id="lineage-title">{isJapanese ? '作品の系譜' : 'Lineage of the work'}</h2>
-			{#if overviewOpen}<p>{lineageOrientation === 'horizontal' ? (isJapanese ? '全体を左から右へ見渡せます。' : 'Review the complete tree from left to right.') : (isJapanese ? '全体を上から下へ見渡せます。' : 'Review the complete tree from top to bottom.')}</p>{/if}
+			{#if browsingState.overviewOpen}<p>{browsingState.orientation === 'horizontal' ? (isJapanese ? '全体を左から右へ見渡せます。' : 'Review the complete tree from left to right.') : (isJapanese ? '全体を上から下へ見渡せます。' : 'Review the complete tree from top to bottom.')}</p>{/if}
 		</div>
-<div class="lineage-actions">
-	<div class="orientation-toggle" role="group" aria-label={isJapanese ? '系譜の方向' : 'Lineage direction'}>
-		<button type="button" class:active={lineageOrientation === 'vertical'} aria-pressed={lineageOrientation === 'vertical'} onclick={() => setLineageOrientation('vertical')}>{isJapanese ? '縦' : 'Vertical'}</button>
-		<button type="button" class:active={lineageOrientation === 'horizontal'} aria-pressed={lineageOrientation === 'horizontal'} onclick={() => setLineageOrientation('horizontal')}>{isJapanese ? '横' : 'Horizontal'}</button>
-	</div>
-	<button type="button" disabled={!graph?.focus_node_id} title={t().okugakiTooltip} onclick={() => { selectedOkugakiModel = okugakiModel || visionModel; okugakiOpen = true; void loadOkugaki(true); }}>{t().okugakiRead}</button>
-	{#if overviewOpen}
-		<div class="overview-zoom"><button type="button" onclick={() => (overviewScale = Math.max(.4, overviewScale - .1))}>−</button><span>{Math.round(overviewScale * 100)}%</span><button type="button" onclick={() => (overviewScale = Math.min(1.4, overviewScale + .1))}>＋</button></div>
-		<button type="button" onclick={closeOverview}>{isJapanese ? '閉じる' : 'Close'}</button>
-	{:else}
-		<button type="button" onclick={openOverview}>{isJapanese ? '全体図' : 'Map'}</button>
-	{/if}
-	<button type="button" disabled={focusAnimationHistoryIds.length < 2 || animationExportBusy} title={t().lineageAnimationExportHint} onclick={downloadFocusAnimation}>
-		{animationExportBusy ? t().animationExportBusy : t().lineageAnimationExport}
-		{#if !animationExportBusy && focusAnimationHistoryIds.length > 1}<span>({focusAnimationHistoryIds.length})</span>{/if}
-	</button>
-	<button type="button" disabled={checkedAnimationHistoryIds.length === 0} title={t().lineageCheckedAnimationExportHint} onclick={openCheckedAnimationExport}>
-		{t().lineageCheckedAnimationExport}
-		{#if checkedAnimationHistoryIds.length > 0}<span>({checkedAnimationHistoryIds.length})</span>{/if}
-	</button>
-	<!-- The AI contact sheet over the checked works, same builder as the history
-	     manager (features/contact-sheet/run) and the same save path. -->
-	<button type="button" title={t().historyContactSheetAiHint} disabled={checkedHistoryIds.length === 0 || contactSheetBusy !== null} onclick={() => downloadCheckedContactSheet('ai')}>
-		{contactSheetBusy === 'ai' ? t().historyContactSheetBusy : t().historyContactSheetAi}
-		{#if contactSheetBusy === null && checkedHistoryIds.length > 0}<span>({checkedHistoryIds.length})</span>{/if}
-	</button>
-	<button class="bulk-trash" type="button" disabled={checkedHistoryIds.length === 0} title={isJapanese ? 'チェックした作品をゴミ箱へ移動' : 'Move checked works to trash'} aria-label={isJapanese ? 'チェックした作品をゴミ箱へ移動' : 'Move checked works to trash'} onclick={askTrashChecked}>
-		<svg viewBox="2 2 20 20" aria-hidden="true"><path d="M3 6h18"></path><path d="M8 6V4h8v2"></path><path d="M6 6l1 15h10l1-15"></path><path d="M10 10v7"></path><path d="M14 10v7"></path></svg>
-		{#if checkedHistoryIds.length > 0}<span>{checkedHistoryIds.length}</span>{/if}
-	</button>
-	<button type="button" class="detach-btn" onclick={onDetach}>{isJapanese ? '新しい起点にする' : 'Start a new root'}</button>
-</div>
+		<div class="lineage-actions">
+			<div class="toolbar-group" aria-label={t().lineageViewTools}>
+				<span class="toolbar-label">{t().lineageViewTools}</span>
+				<div class="orientation-toggle" role="group" aria-label={isJapanese ? '系譜の方向' : 'Lineage direction'}>
+					<button type="button" class:active={browsingState.orientation === 'vertical'} aria-pressed={browsingState.orientation === 'vertical'} onclick={() => setLineageOrientation('vertical')}>{isJapanese ? '縦' : 'Vertical'}</button>
+					<button type="button" class:active={browsingState.orientation === 'horizontal'} aria-pressed={browsingState.orientation === 'horizontal'} onclick={() => setLineageOrientation('horizontal')}>{isJapanese ? '横' : 'Horizontal'}</button>
+				</div>
+				{#if browsingState.overviewOpen}
+					<div class="overview-zoom"><button type="button" onclick={() => (browsingState.overviewScale = Math.max(.4, browsingState.overviewScale - .1))}>−</button><span>{Math.round(browsingState.overviewScale * 100)}%</span><button type="button" onclick={() => (browsingState.overviewScale = Math.min(1.4, browsingState.overviewScale + .1))}>＋</button></div>
+					<button type="button" onclick={closeOverview}>{isJapanese ? '全体図を閉じる' : 'Close map'}</button>
+				{:else}
+					<button type="button" onclick={openOverview}>{isJapanese ? '全体図' : 'Map'}</button>
+				{/if}
+			</div>
+
+			<div class="toolbar-group" aria-label={t().lineageFocusedWork}>
+				<span class="toolbar-label">{t().lineageFocusedWork}</span>
+				<WorkActionMenu
+					node={focusNode}
+					{isJapanese}
+					variant="header"
+					open={headerWorkMenuOpen}
+					onOpenChange={(open) => (headerWorkMenuOpen = open)}
+					onAction={runWorkAction}
+				/>
+				<button type="button" disabled={!focusNode?.history} onclick={() => focusNode && void onOpenNodeInCanvas(focusNode)}>{t().lineageOpenLarge}</button>
+				<SavedWorkExportMenu
+					scope={focusExportScope}
+					animationSettings={animationExportSettings}
+					{pngTemplates}
+					onDownloadSVG={onDownloadSavedWorkSVG}
+					onDownloadPNG={onDownloadSavedWorkPNG}
+					onDownloadCard={onDownloadSavedWorkCard}
+					onDownloadAnimation={onDownloadSavedWorkAnimation}
+					onDownloadContactSheet={onDownloadSavedWorkContactSheet}
+					onValidateSnapshot={onValidateSavedWorkExport}
+				/>
+			</div>
+
+			<div class="toolbar-group" aria-label={t().lineagePathScope(focusAnimationHistoryIds.length)}>
+				<span class="toolbar-label">{t().lineagePathScope(focusAnimationHistoryIds.length)}</span>
+				<SavedWorkExportMenu
+					scope={pathExportScope}
+					animationSettings={animationExportSettings}
+					{pngTemplates}
+					onDownloadSVG={onDownloadSavedWorkSVG}
+					onDownloadPNG={onDownloadSavedWorkPNG}
+					onDownloadCard={onDownloadSavedWorkCard}
+					onDownloadAnimation={onDownloadSavedWorkAnimation}
+					onDownloadContactSheet={onDownloadSavedWorkContactSheet}
+					onValidateSnapshot={onValidateSavedWorkExport}
+				/>
+			</div>
+
+			<div class="toolbar-group" aria-label={t().lineageSelectionActions}>
+				<span class="toolbar-label">{t().lineageSelectionScope(checkedHistoryIds.length)}</span>
+				<SavedWorkExportMenu
+					scope={selectionExportScope}
+					animationSettings={animationExportSettings}
+					{pngTemplates}
+					onDownloadSVG={onDownloadSavedWorkSVG}
+					onDownloadPNG={onDownloadSavedWorkPNG}
+					onDownloadCard={onDownloadSavedWorkCard}
+					onDownloadAnimation={onDownloadSavedWorkAnimation}
+					onDownloadContactSheet={onDownloadSavedWorkContactSheet}
+					onValidateSnapshot={onValidateSavedWorkExport}
+				/>
+				<button class="bulk-trash" type="button" disabled={checkedHistoryIds.length === 0} title={isJapanese ? 'チェックした作品をゴミ箱へ移動' : 'Move checked works to trash'} aria-label={isJapanese ? 'チェックした作品をゴミ箱へ移動' : 'Move checked works to trash'} onclick={askTrashChecked}>
+					<svg viewBox="2 2 20 20" aria-hidden="true"><path d="M3 6h18"></path><path d="M8 6V4h8v2"></path><path d="M6 6l1 15h10l1-15"></path><path d="M10 10v7"></path><path d="M14 10v7"></path></svg>
+				</button>
+			</div>
+
+			<div class="toolbar-group lineage-history-tools">
+				<button type="button" disabled={!graph?.focus_node_id} title={t().okugakiTooltip} onclick={() => { selectedOkugakiModel = okugakiModel || visionModel; okugakiOpen = true; void loadOkugaki(true); }}>{t().okugakiRead}</button>
+				<button type="button" class="detach-btn" onclick={onDetach}>{isJapanese ? '新しい起点にする' : 'Start a new root'}</button>
+			</div>
+		</div>
 	</header>
 	{#if nearbyHistory.length > 0 && onOpenNearbyHistory}
 		<div class="nearby-mirror">
@@ -817,8 +728,6 @@ $effect(() => {
 			{/each}
 		</div>
 	{/if}
-	{#if animationExportError}<div class="lineage-message error">{animationExportError}</div>{/if}
-	{#if contactSheetError}<div class="lineage-message error">{contactSheetError}</div>{/if}
 	{#if loading || overviewLoading}
 		<div class="lineage-message">{isJapanese ? '系譜を読み込み中…' : 'Loading lineage…'}</div>
 	{:else if error}
@@ -830,17 +739,18 @@ $effect(() => {
 			class="lineage-scroll"
 			role="region"
 			aria-labelledby="lineage-title"
-			class:overview-scroll={overviewOpen}
-			class:horizontal={lineageOrientation === 'horizontal'}
+			class:overview-scroll={browsingState.overviewOpen}
+			class:horizontal={browsingState.orientation === 'horizontal'}
 			class:panning={lineagePanning}
 			bind:this={lineageScrollEl}
+			onscroll={handleLineageScroll}
 			onpointerdown={startLineagePan}
 			onpointermove={moveLineagePan}
 			onpointerup={endLineagePan}
 			onpointercancel={endLineagePan}
 			onlostpointercapture={endLineagePan}
 		>
-			<div class="lineage-columns" class:horizontal={lineageOrientation === 'horizontal'} bind:this={lineageColumnsEl} style={overviewOpen ? (lineageOrientation === 'horizontal' ? `transform: scale(${overviewScale}); transform-origin: top left;` : `transform: scale(${overviewScale}); transform-origin: top left; width: ${100 / overviewScale}%; height: ${100 / overviewScale}%;`) : undefined}>
+			<div class="lineage-columns" class:horizontal={browsingState.orientation === 'horizontal'} bind:this={lineageColumnsEl} style={browsingState.overviewOpen ? (browsingState.orientation === 'horizontal' ? `transform: scale(${browsingState.overviewScale}); transform-origin: top left;` : `transform: scale(${browsingState.overviewScale}); transform-origin: top left; width: ${100 / browsingState.overviewScale}%; height: ${100 / browsingState.overviewScale}%;`) : undefined}>
 				<svg class="lineage-arrows" aria-hidden="true">
 					<defs>
 						<marker id="lineage-arrowhead" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto" markerUnits="strokeWidth">
@@ -888,7 +798,7 @@ $effect(() => {
 			aria-pressed={!!node.history.for_revision}
 			onpointerdown={(event) => event.stopPropagation()}
 			onclick={(event) => { event.stopPropagation(); void onToggleForRevision(node, event); }}
-		>✎</button>
+		>⚑</button>
 	{/if}
 	<span class="identity-marks">
 		{#if node.id === graph.focus_node_id}<span class="active-mark">{isJapanese ? '表示中' : 'Displayed'}</span>{/if}
@@ -897,42 +807,14 @@ $effect(() => {
 		{#if node.id !== graph.focus_node_id && node.render_hash && node.render_hash === focusNode?.render_hash}<span class="identity-mark">{isJapanese ? '同じ版' : 'Same edition'}</span>{/if}
 	</span>
 {#if node.history?.id && !node.history.trashed}
-	<button type="button" class="card-menu-trigger" onclick={(event) => { event.stopPropagation(); activeMenuNodeId = activeMenuNodeId === node.id ? null : node.id; }} aria-label={isJapanese ? 'メニューを開く' : 'Open menu'}>
-		<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"></circle><circle cx="19" cy="12" r="1"></circle><circle cx="5" cy="12" r="1"></circle></svg>
-	</button>
-	{#if activeMenuNodeId === node.id}
-		{@const ddlOrigin = isDdlOrigin(node)}
-		<div class="card-dropdown-menu" role="menu">
-			<div class="card-dropdown-title">
-				{isJapanese ? '作品編集' : 'Edit the work'}
-				{#if ddlOrigin}<span class="card-dropdown-origin">{isJapanese ? '（DDL直接生成作品）' : '(DDL-authored)'}</span>{/if}
-			</div>
-			<button type="button" role="menuitem" onclick={(event) => { event.stopPropagation(); void onOpenRefinement(node, 'adjust'); activeMenuNodeId = null; }}>
-				{isJapanese ? '描画パラメータの編集' : 'Edit drawing parameters'}
-			</button>
-			{#if !ddlOrigin}
-				<button type="button" role="menuitem" onclick={(event) => { event.stopPropagation(); openEditDialog(node, 'description'); }}>
-					{isJapanese ? '記述を編集' : 'Edit the description'}
-				</button>
-			{/if}
-			<button type="button" role="menuitem" onclick={(event) => { event.stopPropagation(); onOpenDdlEditor(node); activeMenuNodeId = null; }}>
-				{isJapanese ? '指示書を編集' : 'Edit instructions'}
-			</button>
-			{#if !ddlOrigin}
-				<button type="button" role="menuitem" onclick={(event) => { event.stopPropagation(); openSketchDialog(node); }}>
-					{isJapanese ? '写生の区切りを変える' : 'Change the sketch-from-life grain'}
-				</button>
-			{/if}
-			{#if !ddlOrigin}
-				<button type="button" role="menuitem" onclick={(event) => { event.stopPropagation(); void onOpenRefinement(node, 'compare'); activeMenuNodeId = null; }}>
-					{isJapanese ? '使用モデル変更' : 'Change models'}
-				</button>
-			{/if}
-			<button type="button" role="menuitem" onclick={(event) => { event.stopPropagation(); activeAIRefineNode = node; activeMenuNodeId = null; }}>
-				{isJapanese ? 'AI自動推敲プロセス' : 'Autonomous refinement process'}
-			</button>
-		</div>
-	{/if}
+	<WorkActionMenu
+		{node}
+		{isJapanese}
+		variant="card"
+		open={activeMenuNodeId === node.id}
+		onOpenChange={(open) => (activeMenuNodeId = open ? node.id : null)}
+		onAction={runWorkAction}
+	/>
 {/if}
 </div>
 
@@ -955,10 +837,10 @@ $effect(() => {
 									{#if node.history?.trashed}<div class="trash-state">{isJapanese ? 'ゴミ箱（復元可能）' : 'In trash (restorable)'}</div>{/if}
 									<div class="meta" title={node.history?.source_text ?? node.history?.input ?? node.description_hash ?? ''}>{node.history?.source_text || node.history?.input || withheldWorkLabel(node)}</div>
 								</button>
-								{#if childCount > 0 && !overviewOpen}
-									<button class="branch-toggle" type="button" aria-expanded={expandedNodeIds.includes(node.id)} onclick={() => toggleBranch(node)}>{expandedNodeIds.includes(node.id) ? '▾' : '▸'} {isJapanese ? `子作品 ${childCount}件` : `${childCount} children`}</button>
+								{#if childCount > 0 && !browsingState.overviewOpen}
+									<button class="branch-toggle" type="button" aria-expanded={browsingState.expandedNodeIds.includes(node.id)} onclick={() => toggleBranch(node)}>{browsingState.expandedNodeIds.includes(node.id) ? '▾' : '▸'} {isJapanese ? `子作品 ${childCount}件` : `${childCount} children`}</button>
 								{/if}
-								{#if node.history && !overviewOpen}
+								{#if node.history && !browsingState.overviewOpen}
 									<details class="node-details">
 										<summary>{isJapanese ? '詳細' : 'Details'}</summary>
 										<dl>
@@ -1007,86 +889,12 @@ $effect(() => {
 	{/if}
 </section>
 
-{#if activeEditNode && editMode}
-	<button type="button" class="lineage-edit-backdrop" aria-label={isJapanese ? '編集ダイアログを閉じる' : 'Close edit dialog'} disabled={editDrawing} onclick={closeEditDialog}></button>
-	<div class="lineage-edit-dialog" role="dialog" aria-modal="true" aria-labelledby="lineage-edit-title" tabindex="-1">
-			<header>
-				<div>
-					<h2 id="lineage-edit-title">{editMode === 'description' ? (isJapanese ? '記述を編集' : 'Edit description') : (isJapanese ? '指示書を編集' : 'Edit instructions')}</h2>
-					<p>{isJapanese ? '描画すると、選択した作品の子として系譜へ保存します。' : 'Drawing saves a new child of the chosen work.'}</p>
-				</div>
-				<button type="button" disabled={editDrawing} aria-label={isJapanese ? '閉じる' : 'Close'} onclick={closeEditDialog}>×</button>
-			</header>
-			<div class="lineage-edit-body">
-				<label for="lineage-edit-text">{editMode === 'description' ? (isJapanese ? '記述' : 'Description') : 'DDL'}</label>
-				<textarea id="lineage-edit-text" class:ddl-editor={editMode === 'ddl'} rows={editMode === 'ddl' ? 18 : 9} bind:value={editDraft} spellcheck={editMode === 'description'} disabled={editDrawing}></textarea>
-				{#if editError}<div class="lineage-message error">{editError}</div>{/if}
-			</div>
-			<footer>
-				{#if editDrawing}
-					<RunStatus
-						variant="inline"
-						label={stageLabel || (isJapanese ? '生成中…' : 'Painting…')}
-						stage1Model={stage1ModelLabel}
-						stage2Model={stage2ModelLabel}
-						elapsedMs={editElapsedMs}
-						tokensIn={runTokensIn}
-						tokensOut={runTokensOut}
-						onStop={stopEditDraw}
-					/>
-				{:else}
-					<WildToggle value={editWildOverride ?? (activeEditNode?.history?.render_wild === true)} {isJapanese} inherited={editWildOverride === null} onSelect={(next) => (editWildOverride = next)} />
-					<button type="button" onclick={closeEditDialog}>{isJapanese ? 'キャンセル' : 'Cancel'}</button>
-					<button type="button" class="edit-draw" disabled={!editDraft.trim()} onclick={drawEditedArtwork}>{isJapanese ? '描画' : 'Draw'}</button>
-				{/if}
-			</footer>
-	</div>
+{#if activeEditNode}
+	<WorkEditDialog node={activeEditNode} mode="description" {isJapanese} {stageLabel} {stage1ModelLabel} {stage2ModelLabel} tokensIn={runTokensIn} tokensOut={runTokensOut} onClose={() => (activeEditNode = null)} onDrawDescription={onDrawDescription} {onDrawSketchGrain} />
 {/if}
 
 {#if activeSketchNode}
-	<button type="button" class="lineage-edit-backdrop" aria-label={isJapanese ? '写生ダイアログを閉じる' : 'Close the dialog'} disabled={sketchDrawing} onclick={closeSketchDialog}></button>
-	<div class="lineage-edit-dialog" role="dialog" aria-modal="true" aria-labelledby="lineage-sketch-title" tabindex="-1">
-		<header>
-			<div>
-				<h2 id="lineage-sketch-title">{isJapanese ? '写生の区切りを変える' : 'Change the sketch-from-life grain'}</h2>
-				<p>{isJapanese ? '写生をやり直して描画し、選択した作品の子として系譜へ保存します。' : 'The layer writes the prose again at the chosen grain, and the result is saved as a child of the chosen work.'}</p>
-			</div>
-			<button type="button" disabled={sketchDrawing} aria-label={isJapanese ? '閉じる' : 'Close'} onclick={closeSketchDialog}>×</button>
-		</header>
-		<div class="lineage-edit-body">
-			<SketchSelect
-				compact
-				value={sketchGrainChoice as SketchMode}
-				{isJapanese}
-				disabled={sketchDrawing}
-				onSelect={(mode: SketchMode) => { if (mode !== 'off') sketchGrainChoice = mode; }}
-			/>
-			{#if activeSketchNode.history?.sketch_text}
-				<p class="sketch-parent-prose">{activeSketchNode.history.sketch_text}</p>
-			{:else}
-				<p class="sketch-parent-prose empty">{isJapanese ? 'この作品は写生を通していません。' : 'This work was painted without the layer.'}</p>
-			{/if}
-			{#if sketchError}<div class="lineage-message error">{sketchError}</div>{/if}
-		</div>
-		<footer>
-			{#if sketchDrawing}
-				<RunStatus
-					variant="inline"
-					label={stageLabel || (isJapanese ? '生成中…' : 'Painting…')}
-					stage1Model={stage1ModelLabel}
-					stage2Model={stage2ModelLabel}
-					elapsedMs={editElapsedMs}
-					tokensIn={runTokensIn}
-					tokensOut={runTokensOut}
-					onStop={() => sketchDrawController?.abort()}
-				/>
-			{:else}
-				<span class="sketch-dialog-current">{isJapanese ? '親の区切り' : "Parent's grain"}: {activeSketchNode.history?.sketch_grain ? sketchModeLabel(normalizeSketchGrain(activeSketchNode.history.sketch_grain) as SketchMode, isJapanese) : (isJapanese ? '切' : 'Off')}</span>
-				<button type="button" onclick={closeSketchDialog}>{isJapanese ? 'キャンセル' : 'Cancel'}</button>
-				<button type="button" class="edit-draw" onclick={drawSketchGrain}>{isJapanese ? '描画' : 'Draw'}</button>
-			{/if}
-		</footer>
-	</div>
+	<WorkEditDialog node={activeSketchNode} mode="sketch-grain" {isJapanese} {stageLabel} {stage1ModelLabel} {stage2ModelLabel} tokensIn={runTokensIn} tokensOut={runTokensOut} onClose={() => (activeSketchNode = null)} onDrawDescription={onDrawDescription} {onDrawSketchGrain} />
 {/if}
 
 {#if okugakiOpen}
@@ -1128,38 +936,28 @@ $effect(() => {
 	{/await}
 {/if}
 
-{#if checkedAnimationExportIds}
-	<AnimationExportModal
-		initialSettings={animationExportSettings}
-		count={checkedAnimationExportIds.length}
-		onSave={(settings, directory) => downloadAnimation(apiFetch, checkedAnimationExportIds ?? [], settings, directory)}
-		onClose={() => { checkedAnimationExportIds = null; }}
-	/>
-{/if}
-
-
 <style>
 	/* Moved from the canvas, where it floated over the drawing. Here it is a
 	   row in the flow, so it needs no absolute placement. */
-	.nearby-mirror { display: flex; align-items: center; gap: 5px; margin: 0 0 8px; padding: 4px 6px; border-radius: 7px; background: color-mix(in srgb, var(--bg) 88%, transparent); color: var(--fg3); font-size: 0.68rem; }
+	.nearby-mirror { display: flex; align-items: center; gap: 5px; margin: 0 0 8px; padding: 4px 6px; border-radius: 7px; background: color-mix(in srgb, var(--bg) 88%, transparent); color: var(--fg2); font-size: 12px; }
 	.nearby-thumb { width: 32px; height: 32px; padding: 0; overflow: hidden; background: var(--canvas-paper); border: 1px solid var(--border); cursor: pointer; }
 	.nearby-thumb:hover:not(:disabled), .nearby-thumb:focus-visible { border-color: var(--fg2); transform: translateY(-1px); }
 	.nearby-thumb:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 	.nearby-thumb:disabled { cursor: default; opacity: 0.65; }
 	.nearby-thumb img { display: block; width: 100%; height: 100%; object-fit: contain; }
-	.sketch-parent-prose { margin: 0; font-size: 12px; line-height: 1.7; color: var(--fg2); white-space: pre-wrap; }
-	.sketch-parent-prose.empty { color: var(--fg3); }
-	.sketch-dialog-current { font-size: 11px; color: var(--fg3); margin-right: auto; }
 	.lineage-panel { box-sizing: border-box; width: 100%; height: 100%; min-width: 0; padding: 22px; overflow: hidden; display: flex; flex-direction: column; color: var(--fg); background: var(--bg); }
 	.lineage-panel.overview { position: fixed; inset: 14px; z-index: 1300; width: auto; height: auto; border: 1px solid var(--border2); border-radius: 12px; box-shadow: 0 18px 70px #000a; }
 	header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 16px; }
 	h2 { margin: 0 0 4px; font-size: 1.05rem; }
-	p { margin: 0; color: var(--fg3); font-size: .82rem; }
-	.lineage-actions, .overview-zoom, .orientation-toggle { display: flex; align-items: center; gap: 8px; }
+	p { margin: 0; color: var(--fg2); font-size: 12px; }
+	.lineage-actions, .toolbar-group, .overview-zoom, .orientation-toggle { display: flex; align-items: center; gap: 8px; }
 	.lineage-actions { flex-wrap: wrap; justify-content: flex-end; }
+	.toolbar-group { flex-wrap: wrap; padding-left: 8px; border-left: 1px solid var(--border); }
+	.toolbar-label { color: var(--fg2); font-size: 12px; white-space: nowrap; }
+	.lineage-history-tools { margin-left: auto; }
 	.overview-zoom, .orientation-toggle { padding-right: 8px; border-right: 1px solid var(--border); }
 	.orientation-toggle button.active { border-color: var(--accent); background: var(--accent); color: var(--accent-fg); }
-	.overview-zoom span { min-width: 42px; color: var(--fg3); font-size: .72rem; text-align: center; }
+	.overview-zoom span { min-width: 42px; color: var(--fg2); font-size: 12px; text-align: center; }
 	header button, .promote, .branch-toggle { border: 1px solid var(--border2); background: var(--panel); color: var(--fg); border-radius: var(--btn-sm-radius); padding: var(--btn-sm-padding); font-family: inherit; font-size: var(--btn-sm-font-size); cursor: pointer; }
 	/* Dimensions follow the header button tokens; only color is overridden here. */
 	.detach-btn { background: var(--ddl-btn-bg); border-color: var(--ddl-btn-border); color: var(--ddl-btn-fg); font-weight: 600; box-shadow: var(--ddl-btn-shadow); white-space: nowrap; }
@@ -1167,7 +965,7 @@ $effect(() => {
 	.bulk-trash { min-width: 38px; display: inline-flex; align-items: center; justify-content: center; gap: 4px; }
 	.bulk-trash svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
 	.bulk-trash:disabled { opacity: .4; cursor: default; }
-	.lineage-message { margin: auto; color: var(--fg3); }
+	.lineage-message { margin: auto; color: var(--fg2); }
 	.lineage-message.error { color: var(--danger, #9b3d32); white-space: pre-line; }
 	.lineage-scroll { min-height: 0; overflow-x: hidden; overflow-y: auto; padding: 8px 18px 24px 8px; cursor: grab; }
 	.lineage-scroll.horizontal { overflow: auto; }
@@ -1184,7 +982,7 @@ $effect(() => {
 	.lineage-column { position: relative; z-index: 1; width: 100%; min-width: 0; display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: center; gap: 14px 18px; }
 	.lineage-columns.horizontal .lineage-column { flex: 0 0 210px; width: 210px; min-width: 210px; flex-direction: column; flex-wrap: nowrap; justify-content: flex-start; gap: 14px; }
 	.lineage-column.menu-layer { z-index: 20; }
-	.generation { flex: 0 0 100%; color: var(--fg3); font-size: .72rem; text-align: center; }
+	.generation { flex: 0 0 100%; color: var(--fg2); font-size: 12px; text-align: center; }
 	.lineage-columns.horizontal .generation { flex: 0 0 auto; width: 100%; }
 	.lineage-card { position: relative; box-sizing: border-box; width: 210px; min-width: 0; max-width: 210px; overflow: hidden; border: 1px solid var(--border); border-radius: 10px; padding: 8px; background: var(--panel); box-shadow: 0 2px 8px color-mix(in srgb, var(--fg) 8%, transparent); cursor: default; }
 	.lineage-card.menu-open { z-index: 10; overflow: visible; }
@@ -1194,85 +992,62 @@ $effect(() => {
 	.card-toolbar { position: relative; z-index: 3; min-height: 22px; margin-bottom: 6px; padding-right: 26px; display: flex; align-items: flex-start; gap: 5px; }
 	.card-check { flex: 0 0 auto; display: grid; place-items: center; padding: 2px; border-radius: 4px; background: color-mix(in srgb, var(--panel) 88%, transparent); cursor: pointer; }
 	/* Work star: pressing it does not select the work; the card owns selection. */
-	.card-star { flex: 0 0 auto; width: 18px; height: 18px; display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--border2); border-radius: 50%; padding: 0; background: var(--panel); color: var(--fg3); font-size: 10px; line-height: 1; font-family: inherit; cursor: pointer; }
+	.card-star { flex: 0 0 auto; width: 26px; height: 26px; display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--border2); border-radius: 50%; padding: 0; background: var(--panel); color: var(--fg2); font-size: 12px; line-height: 1; font-family: inherit; cursor: pointer; }
 	.card-star.starred { color: var(--star-fg); background: var(--star-bg); border-color: var(--star-border); }
 	/* The revision mark rides beside the star in the same shell: the two are
 	   separate columns and a work can carry either, both or neither. */
-	.card-mark { flex: 0 0 auto; width: 18px; height: 18px; display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--border2); border-radius: 50%; padding: 0; background: var(--panel); color: var(--fg3); font-size: 10px; line-height: 1; font-family: inherit; cursor: pointer; }
+	.card-mark { flex: 0 0 auto; width: 26px; height: 26px; display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--border2); border-radius: 50%; padding: 0; background: var(--panel); color: var(--fg2); font-size: 12px; line-height: 1; font-family: inherit; cursor: pointer; }
 	.card-mark.marked { color: var(--accent); background: var(--accent-light); border-color: var(--accent); }
 	.card-check input { width: 15px; height: 15px; margin: 0; accent-color: var(--accent); margin: 0; }
-	.lineage-edit-backdrop { position: fixed; inset: 0; z-index: 1460; width: 100%; height: 100%; border: 0; padding: 0; background: #0009; cursor: default; }
-	.lineage-edit-dialog { position: fixed; z-index: 1461; top: 50%; left: 50%; transform: translate(-50%, -50%); box-sizing: border-box; width: min(780px, 96vw); max-height: 92vh; overflow: hidden; display: flex; flex-direction: column; border: 1px solid var(--border2); border-radius: 12px; background: var(--panel); box-shadow: 0 24px 80px #000a; }
-	.lineage-edit-dialog > header { padding: 18px 20px 14px; margin: 0; border-bottom: 1px solid var(--border); }
-	.lineage-edit-dialog > header button { border: 0; background: transparent; color: var(--fg2); font-size: 1.35rem; cursor: pointer; }
-	.lineage-edit-body { min-height: 0; overflow-y: auto; display: grid; gap: 8px; padding: 18px 20px; }
-	.lineage-edit-body label { color: var(--fg2); font-size: .78rem; font-weight: 700; }
-	.lineage-edit-body textarea { box-sizing: border-box; width: 100%; min-height: 180px; resize: vertical; border: 1px solid var(--border2); border-radius: 8px; padding: 12px 14px; background: var(--bg); color: var(--fg); font: inherit; line-height: 1.65; }
-	.lineage-edit-body textarea.ddl-editor { min-height: 390px; tab-size: 2; white-space: pre; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .82rem; line-height: 1.55; }
-	.lineage-edit-dialog > footer :global(.wild-inline) { margin-right: auto; }
-	.lineage-edit-dialog > footer { display: flex; justify-content: flex-end; gap: 8px; padding: 12px 20px 16px; border-top: 1px solid var(--border); }
-	.lineage-edit-dialog > footer button { border: 1px solid var(--border2); border-radius: 7px; padding: 9px 15px; background: var(--panel); color: var(--fg); cursor: pointer; }
-	/* Same shell as the main paint button (no ▶ mark: footer buttons carry none). */
-	.lineage-edit-dialog > footer .edit-draw { border-color: var(--action-bg); background: var(--action-bg); color: var(--action-fg); font-weight: 700; }
-	.lineage-edit-dialog > footer .edit-draw:hover:not(:disabled) { border-color: var(--action-hover); background: var(--action-hover); }
-	.lineage-edit-dialog button:disabled, .lineage-edit-dialog textarea:disabled { opacity: .55; cursor: default; }
 	.okugaki-backdrop { position: fixed; inset: 0; z-index: 1450; display: grid; place-items: center; padding: 24px; background: #0009; }
 	.okugaki-dialog { box-sizing: border-box; width: min(760px, 96vw); max-height: 90vh; overflow: hidden; display: flex; flex-direction: column; border: 1px solid var(--border2); border-radius: 12px; background: var(--panel); box-shadow: 0 24px 80px #000a; }
 	.okugaki-dialog > header { padding: 18px 20px 14px; margin: 0; border-bottom: 1px solid var(--border); }
-	.okugaki-dialog > header button, .okugaki-record-head button { border: 0; background: transparent; color: var(--fg3); font-size: 1.2rem; cursor: pointer; }
+	.okugaki-dialog > header button, .okugaki-record-head button { border: 0; background: transparent; color: var(--fg2); font-size: 1.2rem; cursor: pointer; }
 	.okugaki-controls { display: grid; gap: 10px; padding: 14px 20px; border-bottom: 1px solid var(--border); }
 	.okugaki-generate { justify-self: start; border: 1px solid var(--accent); border-radius: 7px; padding: 9px 14px; background: var(--accent); color: var(--accent-fg); cursor: pointer; }
-	.okugaki-progress { display: flex; align-items: center; gap: 8px; color: var(--fg2); font-size: .8rem; }
+	.okugaki-progress { display: flex; align-items: center; gap: 8px; color: var(--fg2); font-size: 12px; }
 	.okugaki-progress span { width: 13px; height: 13px; border: 2px solid var(--border2); border-top-color: var(--accent); border-radius: 50%; animation: okugaki-spin .8s linear infinite; }
 	.okugaki-list { min-height: 160px; overflow-y: auto; padding: 18px 20px 24px; display: grid; gap: 16px; }
 	.okugaki-record { border: 1px solid var(--border); border-radius: 9px; padding: 14px 16px; background: var(--bg); }
-	.okugaki-record-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; color: var(--fg3); font-size: .72rem; }
+	.okugaki-record-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; color: var(--fg2); font-size: 12px; }
 	.okugaki-body { white-space: pre-wrap; line-height: 1.85; font-family: serif; font-size: .92rem; }
-	.okugaki-warning { margin-top: 10px; color: #b98232; font-size: .72rem; }
+	.okugaki-warning { margin-top: 10px; color: #b98232; font-size: 12px; }
 	@keyframes okugaki-spin { to { transform: rotate(360deg); } }
-	.card-menu-trigger { position: absolute; z-index: 3; top: 0; right: 0; display: grid; place-items: center; width: 22px; height: 22px; border: 0; padding: 0; border-radius: 4px; background: color-mix(in srgb, var(--panel) 88%, transparent); color: var(--fg3); cursor: pointer; }
-	.card-menu-trigger:hover { background: var(--bg2); color: var(--fg); }
-	.card-dropdown-menu { position: absolute; z-index: 10; top: 27px; right: 0; min-width: 210px; border: 1px solid var(--border2); border-radius: 6px; padding: 0 0 4px; overflow: hidden; background: var(--panel); box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35); display: flex; flex-direction: column; }
-	.card-dropdown-menu button { border: 0; background: transparent; color: var(--fg); padding: 6px 13px; font-size: 0.82rem; line-height: 1.35; text-align: left; cursor: pointer; font-family: inherit; width: 100%; box-sizing: border-box; }
-	.card-dropdown-menu button:hover { background: var(--bg2); }
-	/* A band separates the menu heading clearly from its actions. */
-	.card-dropdown-title { margin-bottom: 4px; padding: 7px 13px; border-bottom: 1px solid var(--accent); background: color-mix(in srgb, var(--accent) 14%, var(--panel)); color: var(--fg); font-size: 0.78rem; font-weight: 700; letter-spacing: 0.08em; }
-	.card-dropdown-origin { display: block; margin-top: 2px; color: var(--fg2); font-size: 0.68rem; font-weight: 500; letter-spacing: 0.02em; }
 	.card-main { user-select: none; display: block; width: 100%; min-width: 0; border: 0; padding: 0; background: transparent; color: inherit; cursor: pointer; text-align: left; font: inherit; }
 	.card-main:disabled { cursor: default; }
 	.card-main:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 6px; }
 	/* One line, never wrapping: the card has a fixed width and the operation
 	   label sets the row height. The model name gives up its width first and
 	   ends in an ellipsis rather than pushing the label onto a second line. */
-	.operation { min-height: 18px; margin-bottom: 6px; color: var(--fg2); font-size: .7rem; display: flex; align-items: baseline; gap: 5px; white-space: nowrap; }
+	.operation { min-height: 18px; margin-bottom: 6px; color: var(--fg2); font-size: 12px; display: flex; align-items: baseline; gap: 5px; white-space: nowrap; }
 	.operation > span:first-child { flex: 0 0 auto; }
-	.operation-model { min-width: 0; overflow: hidden; text-overflow: ellipsis; color: var(--fg3); font-size: .62rem; }
+	.operation-model { min-width: 0; overflow: hidden; text-overflow: ellipsis; color: var(--fg2); font-size: 12px; }
 	.identity-marks { min-width: 0; display: flex; flex-wrap: wrap; justify-content: flex-start; gap: 3px; }
-	.identity-mark, .active-mark { border-radius: 999px; padding: 1px 5px; font-size: .62rem; }
-	.identity-mark { color: var(--fg3); background: var(--bg2); }
+	.identity-mark, .active-mark { border-radius: 999px; padding: 1px 5px; font-size: 12px; }
+	.identity-mark { color: var(--fg2); background: var(--bg2); }
 	.active-mark { color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, var(--panel)); font-weight: 700; }
 	.preview { width: 100%; height: 118px; border-radius: 6px; overflow: hidden; background: var(--bg2); }
 	.preview :global(.history-thumbnail) { width: 100%; height: 100%; aspect-ratio: auto; }
 	.preview :global(svg) { width: 100%; height: 100%; display: block; }
-	.preview span { height: 100%; display: grid; place-items: center; color: var(--fg3); }
-	.trash-state { margin-top: 6px; color: var(--fg3); font-size: .64rem; }
-	.display-label { margin-top: 7px; color: var(--fg3); font-size: .65rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-	.meta { margin-top: 4px; min-width: 0; height: 2.7em; overflow: hidden; font-size: .72rem; line-height: 1.35; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; }
-	.branch-toggle { width: 100%; margin-top: 7px; padding: 5px; font-size: .68rem; }
-	.node-details { margin-top: 7px; font-size: .66rem; }
-	.node-details summary { cursor: pointer; color: var(--fg3); }
+	.preview span { height: 100%; display: grid; place-items: center; color: var(--fg2); }
+	.trash-state { margin-top: 6px; color: var(--fg2); font-size: 12px; }
+	.display-label { margin-top: 7px; color: var(--fg2); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+	.meta { margin-top: 4px; min-width: 0; height: 2.7em; overflow: hidden; font-size: 14px; line-height: 1.35; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; }
+	.branch-toggle { width: 100%; margin-top: 7px; padding: 5px; font-size: 12px; }
+	.node-details { margin-top: 7px; font-size: 12px; }
+	.node-details summary { cursor: pointer; color: var(--fg2); }
 	.node-details dl { display: grid; grid-template-columns: auto 1fr; gap: 2px 6px; margin: 6px 0 0; }
-	.node-details dt { color: var(--fg3); }
+	.node-details dt { color: var(--fg2); }
 	.node-details dd { min-width: 0; margin: 0; overflow-wrap: anywhere; }
 	.node-details dd.hash-cell { display: flex; align-items: center; gap: 6px; }
-	.hash-copy { flex: 0 0 auto; border: 1px solid var(--border2); border-radius: var(--btn-sm-radius); padding: 1px 6px; background: var(--panel); color: var(--fg3); font-family: inherit; font-size: inherit; line-height: 1.5; cursor: pointer; }
+	.hash-copy { flex: 0 0 auto; border: 1px solid var(--border2); border-radius: var(--btn-sm-radius); padding: 1px 6px; background: var(--panel); color: var(--fg2); font-family: inherit; font-size: inherit; line-height: 1.5; cursor: pointer; }
 	.hash-copy:hover { border-color: var(--accent); color: var(--fg); }
 	.full-source { max-height: 7em; overflow: auto; white-space: pre-wrap; }
 	.note-editor { display: grid; gap: 5px; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border); }
-	.note-editor label { color: var(--fg3); }
+	.note-editor label { color: var(--fg2); }
 	.note-editor textarea { box-sizing: border-box; width: 100%; min-height: 4.5em; resize: vertical; border: 1px solid var(--border2); border-radius: 5px; padding: 5px 6px; background: var(--bg); color: var(--fg); font: inherit; line-height: 1.35; }
 	.note-editor button { justify-self: end; border: 1px solid var(--border2); border-radius: 5px; padding: 4px 9px; background: var(--panel); color: var(--fg); cursor: pointer; }
 	.note-editor button:disabled { opacity: .45; cursor: default; }
-	.promote { width: 100%; margin-top: 7px; font-size: .68rem; }
+	.promote { width: 100%; margin-top: 7px; font-size: 12px; }
 	.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 </style>

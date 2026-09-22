@@ -5,7 +5,7 @@
 </script>
 
 <script lang="ts">
-	import { onMount, untrack } from 'svelte';
+	import { onMount, tick, untrack } from 'svelte';
 	import { pipelineDescription } from '$lib/description-labels';
 	import { highlightDDL } from '$lib/highlight';
 	import { pluginWarningsToShow } from '$lib/plugin-names';
@@ -19,7 +19,8 @@
 	import { CanvasViewportState } from '$lib/features/canvas/viewport-state.svelte';
 	import { createRefinementCoordinator } from '$lib/features/canvas/refinement-coordinator.svelte';
 	import { RefinementSessionState } from '$lib/features/canvas/refinement-session.svelte';
-	import { LineageQueryState } from '$lib/features/history/lineage-state.svelte';
+	import { LineageQueryState, LineageBrowsingState } from '$lib/features/history/lineage-state.svelte';
+	import { makeSavedWorkExportActions } from '$lib/features/export/saved-work-actions';
 	import type { LineageNode } from '$lib/features/history/types';
 	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
 	import { DEFAULT_SKETCH_MODE, normalizeSketchGrain, normalizeSketchState, sketchGrainOf, sketchModeLabel, sketchModeOf, sketchStateNote, type SketchMode, type SketchState } from '$lib/sketch';
@@ -500,7 +501,8 @@
 		uiLang: getLang,
 		describeApiError,
 	});
-	const lineageState = new LineageQueryState(apiFetch);
+	const lineageBrowsingState = new LineageBrowsingState();
+	const lineageState = new LineageQueryState(apiFetch, lineageBrowsingState);
 	const work = createWorkState({
 		apiFetch,
 		describeApiError,
@@ -1112,6 +1114,9 @@
 		canvasAspectId = DEFAULT_CANVAS_ASPECT_ID;
 		settings.resetForLoggedOut();
 		history.clear();
+		libraryMounted = false;
+		lineageState.reset();
+		lineageBrowsingState.reset();
 	}
 
 	// ── Export filenames ────────────────────────────────────
@@ -1152,6 +1157,11 @@
 		onOtherFilterCleared: showHistoryForRevisionFilterClearedNotice
 	});
 	const historyManager = history.manager;
+	let libraryMounted = $state(false);
+	let canvasPanelHandle = $state<{ openDirectActionMenu: () => Promise<void> } | null>(null);
+	$effect(() => {
+		if (historyManager.open) libraryMounted = true;
+	});
 	const historyMutations = new HistoryMutations({
 		apiFetch,
 		signedIn: () => !!session.authToken,
@@ -1468,9 +1478,10 @@ async function showNewLineageChild(historyId: string | null | undefined, nodeId:
 		clearFilters: () => history.clearFilters(),
 		items: () => historyItems,
 		displayCurrentItem: (item) => {
-			// Description / DDL edits produce one artwork, not a candidate set.
-			outputTab = 'canvas';
-			loadIterationItem(item);
+			// The saved child becomes the lineage focus without replacing an
+			// unfinished description or next-drawing conditions in the left pane.
+			outputTab = 'lineage';
+			loadIterationItem(item, { preserveAuthoring: true });
 		},
 		loadLineage: (id) => lineageState.load(id, true),
 		missingIdentityError: () => new Error(getLang() === 'ja' ? '描画結果を系譜へ保存できませんでした。' : 'The finished work could not be saved to the lineage.'),
@@ -1592,6 +1603,34 @@ function openLineageDdlEditor(node: LineageNode): void {
 	ddlDialogOpen = true;
 }
 
+// Resolves the displayed saved work for the canvas work menu. Loading this
+// read-only lineage projection must not select the work again, because that
+// would replace an unfinished description in the authoring pane.
+async function resolveCurrentLineageNode(): Promise<LineageNode | null> {
+	const nodeId = currentLineageNodeId;
+	if (!nodeId) return null;
+	if (!lineageState.graph?.nodes.some((entry) => entry.id === nodeId)) await lineageState.load(nodeId, true);
+	const node = lineageState.graph?.nodes.find((entry) => entry.id === nodeId) ?? null;
+	if (!node || node.state === 'tombstone' || node.redacted || !node.history?.id || node.history.trashed) return null;
+	return node;
+}
+
+// A direct refinement returns to the newest saved child after an actual save.
+// Loading the child keeps the unfinished authoring pane unchanged.
+async function focusLatestRefinementChild(parentNodeId: string, knownChildNodeIds: Set<string>): Promise<boolean> {
+	await lineageState.load(parentNodeId, true);
+	const graph = lineageState.graph;
+	const childNodeIds = new Set(graph?.edges.filter((edge) => edge.parent_node_id === parentNodeId).map((edge) => edge.child_node_id));
+	const latestChild = graph?.nodes
+		.filter((node) => childNodeIds.has(node.id) && !knownChildNodeIds.has(node.id) && node.state !== 'tombstone' && !node.redacted && !!node.history?.id && !node.history.trashed)
+		.sort((left, right) => right.at - left.at)[0];
+	if (!latestChild?.history) return false;
+	loadIterationItem(latestChild.history, { preserveAuthoring: true });
+	outputTab = 'lineage';
+	await lineageState.load(latestChild.id, true);
+	return true;
+}
+
 function closeDdlDialog(): void {
 	if (ddlDialogDrawing) return;
 	ddlDialogOpen = false;
@@ -1674,7 +1713,7 @@ $effect(() => {
 	if (outputTab === 'lineage' && currentLineageNodeId) void lineageState.load(currentLineageNodeId);
 });
 
-	function resetTargetScopedState(options: { preserveVariationCandidates?: boolean } = {}): void {
+	function resetTargetScopedState(options: { preserveVariationCandidates?: boolean; preserveLineageBrowsing?: boolean } = {}): void {
 		refinement.resetTarget(options);
 
 		modelInspection.reset();
@@ -1689,26 +1728,30 @@ $effect(() => {
 		lineageIntermediateNotice = null;
 
 		lineageState.reset();
+		if (!options.preserveLineageBrowsing) lineageBrowsingState.reset();
 	}
 
-	function loadIterationItem(it: Iteration) {
+	function loadIterationItem(it: Iteration, options: { preserveAuthoring?: boolean } = {}) {
 		if (demoRunning) return;
 		const preserveLineageTab = outputTab === 'lineage';
 		const projection = projectHistoryCurrentWork(it);
-		resetTargetScopedState();
+		const sameTree = !!lineageBrowsingState.treeId && it.lineage_root_node_id === lineageBrowsingState.treeId;
+		resetTargetScopedState({ preserveLineageBrowsing: sameTree });
 		work.pendingCanvasAspectDerivation = null;
-		work.inputMode = 'single';
 		work.displayedHistoryItem = it;
 		if (it.id) void work.selectHistoryAuthority(it.id, it.pipeline_variation_id);
 		void history.syncToItem(it);
 		work.lineageDetached = false;
-		work.expandedDdl = projection.expandedDdl;
-		work.input = projection.sourceText;
-		work.ddl = projection.ddl;
-		work.ddlGeneratedBaseline = projection.ddl;
-		work.thinking = projection.thinking;
-		work.stage1UserPrompt = projection.sourceText;
-		work.adoptSketch(projection.sketchText, projection.sketchGrain, projection.sourceText, projection.sketchState);
+		if (!options.preserveAuthoring) {
+			work.inputMode = 'single';
+			work.expandedDdl = projection.expandedDdl;
+			work.input = projection.sourceText;
+			work.ddl = projection.ddl;
+			work.ddlGeneratedBaseline = projection.ddl;
+			work.thinking = projection.thinking;
+			work.stage1UserPrompt = projection.sourceText;
+			work.adoptSketch(projection.sketchText, projection.sketchGrain, projection.sourceText, projection.sketchState);
+		}
 		work.result = projection.result;
 		work.error = null;
 		outputTab = preserveLineageTab ? 'lineage' : 'canvas';
@@ -1799,6 +1842,7 @@ $effect(() => {
 	const navPos       = $derived(historyOffset + historyCursor + 1);
 	// ── Saijiki ─────────────────────────────────────────────
 	function handleKeydown(e: KeyboardEvent) {
+		if (e.target instanceof Element && e.target.closest('dialog[open], [role="menu"]')) return;
 		if (e.key === 'Escape') {
 			saijikiOpen = false;
 			userMenuOpen = false;
@@ -1987,6 +2031,9 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 	}
 
 	// ── Download ────────────────────────────────────────────
+	const savedWorkExportActions = makeSavedWorkExportActions({
+		apiFetch, catalogName, formatDate: formatHistoryDate, previewText: historyPreviewText
+	});
 	// Exporting owns the profile round trip, the canvas rasterisation and the
 	// capture-date stamp; the page only lends it the artwork and the fetch wrapper.
 	const { downloadSVG, downloadPNG } = createExportActions({
@@ -2198,12 +2245,6 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		return new Date(at).toLocaleString(getLang() === 'ja' ? 'ja-JP' : 'en-US');
 	}
 
-	function historyModelSummary(it: Iteration): string {
-		const s1 = it.stage1_model ? shortModel(it.stage1_model) : '-';
-		const s2 = it.stage2_model ? shortModel(it.stage2_model) : '-';
-		return `${s1} → ${s2}`;
-	}
-
 	function historyModelStage1Short(it: Iteration): string {
 		return it.stage1_model ? shortModel(it.stage1_model) : '-';
 	}
@@ -2227,6 +2268,17 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 	function openHistoryManager() {
 		if (demoRunning) return;
 		history.openManager();
+	}
+
+	async function openLibraryWork(item: Iteration, destination: 'canvas' | 'lineage' | 'refine'): Promise<void> {
+		if (demoRunning || item.trashed) return;
+		loadIterationItem(item, { preserveAuthoring: destination === 'refine' });
+		outputTab = destination === 'lineage' ? 'lineage' : 'canvas';
+		historyManager.open = false;
+		if (destination === 'refine') {
+			await tick();
+			await canvasPanelHandle?.openDirectActionMenu();
+		}
 	}
 
 	function setHistoryStarredOnly(value: boolean) {
@@ -2469,7 +2521,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 	/>
 
 	<!-- ══ BODY ══ -->
-	<div class="main-shell">
+	<div class="main-shell" class:library-away={historyManager.open} inert={historyManager.open} aria-hidden={historyManager.open}>
 		<div class="body">
 			<!-- ── LEFT PANEL ── -->
 			{#if !leftPanelCollapsed}
@@ -2751,6 +2803,8 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			>{leftPanelCollapsed ? '›' : '‹'}</button>
 
 			<CanvasPanel
+				bind:this={canvasPanelHandle}
+				{savedWorkExportActions}
 				{catalogName}
 				{formatHistoryDate}
 				{historyPreviewText}
@@ -2769,6 +2823,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				navNewerDisabled={historyNavButtonsDisabled.newer}
 				navOlderDisabled={historyNavButtonsDisabled.older}
 				interactionLocked={demoRunning}
+				generationLocked={work.loading || work.reloading || refinementSession.gridBusy}
 				{historyTotal}
 				{navPos}
 				canvasAspectWidth={displayCanvasAspect.ratioW}
@@ -2830,6 +2885,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				onShowVariationCandidate={refinement.showVariationCandidate}
 				{activeComparisonItem}
 				lineageGraph={lineageState.graph}
+				{lineageBrowsingState}
 				lineageLoading={lineageState.loading}
 				lineageError={lineageState.error}
 				isJapanese={getLang() === 'ja'}
@@ -2838,8 +2894,9 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				onToggleLineageStar={toggleLineageStar}
 				onToggleLineageForRevision={toggleLineageForRevision}
 				onDrawLineageDescription={drawLineageDescriptionEdit}
-				onDrawLineageDdl={drawLineageDdlEdit}
 				onOpenLineageDdlEditor={openLineageDdlEditor}
+				onResolveCurrentLineageNode={resolveCurrentLineageNode}
+				onFocusLatestRefinementChild={focusLatestRefinementChild}
 				onDrawLineageSketchGrain={drawLineageSketchGrain}
 				onToggleSaijiki={() => (saijikiOpen = !saijikiOpen)}
 				onCloseRefinement={refreshLineageAfterRefine}
@@ -3105,9 +3162,21 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 {/if}
 
 <!-- ══ HISTORY MANAGER MODAL ══ -->
-{#if historyManager.open}
+{#if libraryMounted && session.currentUser}
+	{#key session.currentUser.id}
 	{#await import('$lib/components/HistoryManager.svelte') then { default: HistoryManager }}
 		<HistoryManager
+			active={historyManager.open}
+			historyManagerLoadFailed={historyManager.loadFailed}
+			onRetryLoad={historyManager.retry}
+			selectionResetReason={historyManager.selectionResetReason}
+			pngTemplates={exportTemplates}
+			onDownloadSavedWorkSVG={savedWorkExportActions.onDownloadSVG}
+			onDownloadSavedWorkPNG={savedWorkExportActions.onDownloadPNG}
+			onDownloadSavedWorkCard={savedWorkExportActions.onDownloadCard}
+			onDownloadSavedWorkAnimation={savedWorkExportActions.onDownloadAnimation}
+			onDownloadSavedWorkContactSheet={savedWorkExportActions.onDownloadContactSheet}
+			onValidateSavedWorkExport={savedWorkExportActions.onValidateSnapshot}
 			bind:historyManagerTab={historyManager.tab}
 			bind:historySearch={historyManager.search}
 			historyManagerView={historyManager.view}
@@ -3121,7 +3190,6 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			{trashTotal}
 			selectedHistoryIds={historyManager.selectedIds}
 			animationExportSettings={exportSettings.animation}
-			cardExportSettings={exportSettings.card}
 			historyManagerStarredOnly={historyManager.starredOnly}
 			historyManagerForRevisionOnly={historyManager.forRevisionOnly}
 			historyManagerForShareOnly={historyManager.forShareOnly}
@@ -3140,9 +3208,11 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			onAskRestore={askRestore}
 			onAskPermanentDelete={askPermanentDelete}
 			onToggleSelection={toggleHistorySelection}
-			onLoadItem={loadIterationItem}
+			onOpenArtwork={(item) => void openLibraryWork(item, 'canvas')}
+			onOpenLineage={(item) => void openLibraryWork(item, 'lineage')}
+			onRefine={(item) => void openLibraryWork(item, 'refine')}
 			onToggleStar={toggleHistoryStar}
-			{historyModelSummary}
+			historyModelFull={statusModelName}
 			{formatHistoryDate}
 			{catalogName}
 			{historyPreviewText}
@@ -3154,6 +3224,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			onShareItem={singleUserMode ? null : (item) => (shareTarget = item)}
 		/>
 	{/await}
+	{/key}
 {/if}
 
 {#if shareTarget?.id}
@@ -3205,7 +3276,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		--r: 4px;
 		--r-lg: 8px;
 		/* Small control dimensions are theme-independent. */
-		--btn-sm-font-size: 11px;
+		--btn-sm-font-size: 12px;
 		--btn-sm-padding: 4px 10px;
 		--btn-sm-radius: var(--r);
 		/* Amber DDL controls intentionally keep one palette in both themes. */
@@ -3419,6 +3490,10 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 	:global(html[data-theme='dark'] .ddl-token-emotion) { color: #d8b8a6; }
 
 	:global(*, *::before, *::after) { box-sizing: border-box; margin: 0; padding: 0; }
+	:global(button:focus-visible), :global(summary:focus-visible), :global(a:focus-visible), :global([tabindex="0"]:focus-visible) {
+		outline: 2px solid var(--accent);
+		outline-offset: 3px;
+	}
 
 	:global(html), :global(body) {
 		height: 100%;
@@ -3450,6 +3525,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		flex-direction: column;
 		overflow: hidden;
 	}
+	.main-shell.library-away { visibility: hidden; }
 
 	.body {
 		display: flex;

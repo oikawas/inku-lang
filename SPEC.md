@@ -976,7 +976,17 @@ Adjustment candidates are temporary state owned by their source work: explicitly
 
 The web UI keeps direct operational labels while the specification retains the musical metaphor: performance is shown as touch, composition as layout, and interpretation as reading. Model comparison lives beside `Adjust` as a subview inside the Canvas-side `Refine` tab and shows no judge values. It provides three modes: `Shared Stage 1/2`, `Fixed Stage 1 + compare Stage 2`, and `Compare Stage 1 + fixed Stage 2`. Shared mode uses each selected model for both stages. Fixed modes select one model for the fixed stage and up to four for the compared stage. Only the exact Stage 1/2 combination used by the target work is prohibited; a model used by the target remains selectable when the fixed-stage pairing makes the combination different. A floating tooltip explains prohibited choices. Models are always selected explicitly, and no unselected fallback model is run. Changing the target clears stale comparison results and aborts any comparison still in flight. Saved comparison results record the actual Stage 1 and Stage 2 models and may be adopted or starred into history.
 
-Each Lineage-card work menu offers, under the heading "Edit the work" and in this order: Edit drawing parameters, Edit the description, Edit instructions, Change the sketch-from-life grain, Change models, and Autonomous refinement process. DDL-authored works omit Edit the description, Change the sketch-from-life grain, and Change models. Edit drawing parameters and Change models target the selected card and open the corresponding existing Refine subview without duplicating comparison logic. Description and instruction editing open dialogs initialized from the selected work. Drawing saves a `description_edit` or `ddl_edit` child, returns to Lineage, and focuses the newest child together with its ancestors. Closing the dialog returns to the originating Lineage view, while the regular top-level Refine tab retains its panel layout. The former Manual Refine modal has no menu entry.
+The work header's Refine control and Lineage cards share the same work-editing menu: Edit drawing parameters, Edit the description, Edit instructions, Change the sketch-from-life grain, Change models, and Autonomous refinement process, in that order. Opening the menu does not draw or save. The header entry targets the displayed saved work and asks the user to save an unsaved preview first. DDL-authored works omit Edit the description, Change the sketch-from-life grain, and Change models. Drawing parameters and model changes open the target's existing Refine subview without duplicating comparison logic. Description and instruction dialogs initialize from that work and save a `description_edit` or `ddl_edit` child. Closing without saving returns to the originating work or Lineage view without replacing the description being written. After saving children, Lineage focuses the newest child and its ancestors while retaining the other saved branches; newest does not mean best. The regular top-level Refine tab retains its panel layout, and the former Manual Refine modal has no menu entry. A flag icon and an explicit revision-mark label distinguish the mark from editing; the stored `for_revision` meaning is unchanged.
+
+History lists place the description in a wide column beside the thumbnail without a character cutoff. A preview of up to three lines expands or collapses by mouse or keyboard without selecting or drawing a work; the thumbnail view also offers the full text. Model names are combined only when both stages record the same complete provider-qualified ID. Missing values remain unrecorded for their respective stages, and details retain the provider and full model name. Presentation changes do not alter the saved description or conditions.
+
+History management opens as an in-app **Library** and does not rebuild the making view, its input, or temporary refinement state. Returning after viewing a work or Lineage retains the query, filters, display form, page, selection, scroll position, and read-only preview. Selecting a row or image in that read-only preview is reading only and does not change the conditions for the next drawing. Opening the work, Lineage, and Refine are separate actions. Display form (thumbnails/list) and grouping (chronological/Lineage) are separate control groups; only a changed search, filter, or trash view updates the page and bulk selection. Cross-page selection and clearing it are explicit, and active-history and trash selections do not mix.
+
+Lineage browsing state is separate from the selected work. Within one rooted tree it retains expanded branches, normal and overview scroll positions, orientation, overview openness, and scale. Selecting a node in the overview does not close it. A new root or unauthorized response discards that state and does not substitute old work images or text; deleted or private nodes follow the fresh Lineage response. The Lineage header groups view controls, the displayed work, the root-to-displayed path, checked works, and colophon or root actions. The displayed work and the checked set are distinct targets.
+
+Saved-work export uses a shared menu with a fixed scope. The displayed work or one selected work offers SVG, PNG, a share card, and layer animation. Multiple checked works offer chronological work animation and review or AI contact sheets. A Lineage path uses root-to-displayed order. The checked set and the path never mix. The menu snapshots its target when opened and validates each work immediately before export; trashed, unavailable, or failed-validation works are not exported.
+
+The input side identifies the conditions for the next drawing, while the work side identifies the displayed work's conditions. Reading a Library preview alone does not change the next-drawing conditions, and differing values are not an error. Settings are grouped as Display and operation, Making, Export, Connections and administration, and Extensions and details without changing existing permission visibility or persistence. Body text and descriptions use 14px; supporting information and small buttons use 12px. Selection is shown with checks or a displayed label as well as borders. Small actions have keyboard focus, and closing the edited-work, export, or settings modal restores focus to its entry point.
 
 Major UI areas:
 
@@ -1016,13 +1026,13 @@ The canvas panel header also shows the selected work's color catalog, canvas,
 and creation time.  The color catalog button in the input panel displays the
 currently selected catalog name and truncates long names with an ellipsis.
 
-The settings modal's "other" tab includes history-selection behavior controls.
+The settings modal's Display and operation category includes history-selection behavior controls.
 Users can choose independently whether selecting a history item updates the UI's
 current canvas aspect and color catalog to the history item's values, or keeps
 the current UI selections.  This setting affects only the UI selection state;
 the saved history SVG is displayed as stored and is not re-rendered.
 
-The same tab carries the choice of **which facts the history strip prints**.  Up
+The same Display and operation category carries the choice of **which facts the history strip prints**.  Up
 to **two** of generation, model, engine version and file size are chosen, and they
 are printed in the declared order rather than the order they were picked.
 **Choosing none is a stored answer, not a return to the default**, so **an account
@@ -1045,7 +1055,7 @@ Horizontal/Vertical controls in both views. Vertical text reads top to bottom
 and right to left, preserving line breaks and emphasis. Long vertical headnotes
 scroll within their frame. The defaults are horizontal and left; text without
 Japanese stays horizontal without changing the saved preference. Headnote
-position in Settings > Other selects left or right for vertical placement and
+position in Settings > Display and operation selects left or right for vertical placement and
 horizontal text alignment. Captions display the original
 user-facing instruction text, not the internally augmented Stage 1 prompt; this
 keeps emotion-hint or system prompt material out of presentation captions.

@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { t } from '$lib/i18n/index.svelte';
+	import { onMount, tick } from 'svelte';
 	import UnreadWordsPanel from '$lib/components/UnreadWordsPanel.svelte';
 	import DatabaseAdministrationSettings from '$lib/features/settings/DatabaseAdministrationSettings.svelte';
 	import RenderLimitsSettings from '$lib/features/settings/RenderLimitsSettings.svelte';
@@ -137,15 +138,60 @@
 	const onUpdateRenderConcurrencySettings = (serverLimit: number, clientLimit: number) => settings.updateRenderConcurrencySettings(serverLimit, clientLimit);
 	const onUpdateLogRetentionSettings = (enabled: boolean, retentionDays: number, rotate: string, compress: boolean) => settings.updateLogRetentionSettings(enabled, retentionDays, rotate, compress);
 	const onUpdateRenderLimits = (patch: Record<string, number> | null) => settings.updateRenderLimits(patch);
-	// The tab bar asks the same question as the navigation guard from the same module.
+	// The category navigation asks the same question as the navigation guard from the same module.
 	const showsTab = (tab: string) => settingsTabShownAtDetail(tab, settingsDetail);
 	const detailed = $derived(settingsDetail === 'detailed');
 	const isAdmin = $derived(currentUser?.permission_groups?.includes('admins') === true);
+	let appearanceSection = $state<'display' | 'making'>('display');
+	let modalElement = $state<HTMLDivElement | null>(null);
+	let restoreFocusTo: HTMLElement | null = null;
+
+	function visibleEnabledControls(): HTMLElement[] {
+		if (!modalElement) return [];
+		return [...modalElement.querySelectorAll<HTMLElement>('button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])')]
+			.filter((element) => !element.closest('[inert]') && element.getClientRects().length > 0);
+	}
+
+	function trapTab(event: KeyboardEvent): void {
+		if (event.key !== 'Tab') return;
+		const controls = visibleEnabledControls();
+		if (controls.length === 0) {
+			event.preventDefault();
+			modalElement?.focus();
+			return;
+		}
+		const first = controls[0];
+		const last = controls[controls.length - 1];
+		if (!controls.includes(document.activeElement as HTMLElement)) {
+			event.preventDefault();
+			(event.shiftKey ? last : first).focus();
+		} else if (event.shiftKey && document.activeElement === first) {
+			event.preventDefault();
+			last.focus();
+		} else if (!event.shiftKey && document.activeElement === last) {
+			event.preventDefault();
+			first.focus();
+		}
+	}
+
+	onMount(() => {
+		const activeElement = document.activeElement;
+		restoreFocusTo = activeElement instanceof HTMLElement && activeElement !== document.body ? activeElement : null;
+		void tick().then(() => (visibleEnabledControls()[0] ?? modalElement)?.focus());
+		return () => {
+			if (restoreFocusTo?.isConnected) restoreFocusTo.focus();
+		};
+	});
+
+	function selectAppearanceSection(section: 'display' | 'making') {
+		appearanceSection = section;
+		onSelectSettingsTab('misc');
+	}
 </script>
 
 <div class="settings-feature-root">
 <div class="modal-backdrop" onclick={onClose} aria-hidden="true"></div>
-<div class="settings-modal" class:model-modal={settingsMode === 'model'} role="dialog" aria-modal="true" tabindex="-1" onclick={(e) => e.stopPropagation()} onkeydown={(e) => e.stopPropagation()}>
+<div bind:this={modalElement} class="settings-modal" class:model-modal={settingsMode === 'model'} role="dialog" aria-modal="true" tabindex="-1" onclick={(e) => e.stopPropagation()} onkeydown={trapTab}>
 	<div class="modal-head">
 		<div class="catalog-modal-title">{settingsMode === 'model' ? t().modelSelectButton : t().settingsTitle}</div>
 		<div class="modal-head-tools">
@@ -180,32 +226,49 @@
 			{onSetVisionProvider} {onSetVisionModel} onCancel={settings.close} onConfirm={onConfirmModelSelection}
 		/>
 	{:else}
-		<div class="settings-tabs">
-			{#if isAdmin}
-				<button class:active={settingsTab === 'models'} onclick={() => onSelectSettingsTab('models')}>{t().settingsTabModels}</button>
-			{/if}
-			{#if showsTab('plugins')}
-				<button class:active={settingsTab === 'plugins'} onclick={() => onSelectSettingsTab('plugins')}>{t().settingsTabPlugins}</button>
-			{/if}
-			{#if isAdmin}
-				<button class:active={settingsTab === 'users'} onclick={() => onSelectSettingsTab('users')}>{t().settingsTabUsers}</button>
-				<button class:active={settingsTab === 'db'} onclick={() => onSelectSettingsTab('db')}>{t().settingsTabDb}</button>
-				{#if showsTab('server_misc')}
-					<button class:active={settingsTab === 'server_misc'} onclick={() => onSelectSettingsTab('server_misc')}>{t().settingsTabServerMisc}</button>
+		<div class="settings-workspace">
+			<nav class="settings-category-nav" aria-label={t().settingsTitle}>
+				<section class="settings-category">
+					<div class="settings-category-label">{t().settingsCategoryDisplayOperation}</div>
+					<button class:active={settingsTab === 'misc' && appearanceSection === 'display'} onclick={() => selectAppearanceSection('display')}>{t().settingsCategoryDisplayOperation}</button>
+				</section>
+				<section class="settings-category">
+					<div class="settings-category-label">{t().settingsCategoryMaking}</div>
+					<button class:active={settingsTab === 'misc' && appearanceSection === 'making'} onclick={() => selectAppearanceSection('making')}>{t().settingsBatchRetryLabel}</button>
+				</section>
+				<section class="settings-category">
+					<div class="settings-category-label">{t().settingsTabExport}</div>
+					<button class:active={settingsTab === 'export'} onclick={() => onSelectSettingsTab('export')}>{t().settingsTabExport}</button>
+				</section>
+				{#if isAdmin}
+					<section class="settings-category">
+						<div class="settings-category-label">{t().settingsCategoryAdministration}</div>
+						<button class:active={settingsTab === 'models'} onclick={() => onSelectSettingsTab('models')}>{t().settingsTabModels}</button>
+						<button class:active={settingsTab === 'users'} onclick={() => onSelectSettingsTab('users')}>{t().settingsTabUsers}</button>
+						<button class:active={settingsTab === 'db'} onclick={() => onSelectSettingsTab('db')}>{t().settingsTabDb}</button>
+						{#if showsTab('server_misc')}
+							<button class:active={settingsTab === 'server_misc'} onclick={() => onSelectSettingsTab('server_misc')}>{t().settingsTabServerMisc}</button>
+						{/if}
+						<button class:active={settingsTab === 'logs'} onclick={() => onSelectSettingsTab('logs')}>{t().settingsTabLogs}</button>
+						{#if showsTab('limits')}
+							<button class:active={settingsTab === 'limits'} onclick={() => onSelectSettingsTab('limits')}>{t().settingsTabLimits}</button>
+						{/if}
+					</section>
 				{/if}
-				<button class:active={settingsTab === 'logs'} onclick={() => onSelectSettingsTab('logs')}>{t().settingsTabLogs}</button>
-				{#if showsTab('limits')}
-					<button class:active={settingsTab === 'limits'} onclick={() => onSelectSettingsTab('limits')}>{t().settingsTabLimits}</button>
+				{#if showsTab('plugins') || showsTab('unread')}
+					<section class="settings-category">
+						<div class="settings-category-label">{t().settingsCategoryExtensions}</div>
+						{#if showsTab('plugins')}
+							<button class:active={settingsTab === 'plugins'} onclick={() => onSelectSettingsTab('plugins')}>{t().settingsTabPlugins}</button>
+						{/if}
+						{#if showsTab('unread')}
+							<button class:active={settingsTab === 'unread'} onclick={() => onSelectSettingsTab('unread')}>{t().settingsTabUnreadWords}</button>
+						{/if}
+					</section>
 				{/if}
-			{/if}
-			{#if showsTab('unread')}
-				<button class:active={settingsTab === 'unread'} onclick={() => onSelectSettingsTab('unread')}>{t().settingsTabUnreadWords}</button>
-			{/if}
-			<button class:active={settingsTab === 'export'} onclick={() => onSelectSettingsTab('export')}>{t().settingsTabExport}</button>
-			<button class:active={settingsTab === 'misc'} onclick={() => onSelectSettingsTab('misc')}>{t().settingsTabMisc}</button>
-		</div>
+			</nav>
 
-		<div class="settings-body">
+			<div class="settings-body">
 			{#if settingsTab === 'models'}
 				<ModelAdministrationSettings administration={settings.modelAdministration} {providerGroups} />
 		{:else if settingsTab === 'db'}
@@ -336,11 +399,13 @@
 				/>
 			{:else}
 				<AppearanceSettings
+					section={appearanceSection}
 					{uiMode} {uiCustom} {uiModeSaving} {uiModeSaveError}
 					{historyStripFields} {historyStripFieldsSaving} {historyStripFieldsSaveError}
 					{onToggleHistoryStripField} {onSetUiMode} {onSetUiCustomItem}
 				/>
 			{/if}
+			</div>
 		</div>
 	{/if}
 </div>

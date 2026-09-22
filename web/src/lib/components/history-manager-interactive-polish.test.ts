@@ -12,9 +12,10 @@ const JA = read('../i18n/ja.ts');
 const EN = read('../i18n/en.ts');
 const TYPES = read('../i18n/types.ts');
 
-test('the timeline description is the first twenty Unicode characters', () => {
-	assert.equal(historyListDescription('#12  一二三四五六七八九十一二三四五六七八九十一'), '一二三四五六七八九十一二三四五六七八九十');
-	assert.equal(Array.from(historyListDescription('abcdefghijklmnopqrstu')).length, 20);
+test('the timeline description keeps its complete Unicode text while removing only a batch prefix', () => {
+	const description = '一二三四五六七八九十一二三四五六七八九十一';
+	assert.equal(historyListDescription(`#12  ${description}`), description);
+	assert.equal(historyListDescription('abcdefghijklmnopqrstu'), 'abcdefghijklmnopqrstu');
 });
 
 test('the timeline creation date stops at minutes', () => {

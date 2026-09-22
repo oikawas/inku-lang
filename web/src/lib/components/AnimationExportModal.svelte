@@ -13,11 +13,13 @@
 	type Props = {
 		initialSettings: AnimationExportSettings;
 		count: number;
+		mode?: 'layer' | 'transition';
+		scopeDescription?: string | null;
 		onSave: (settings: AnimationExportSettings, directory?: FileSystemDirectoryHandle) => Promise<void>;
 		onClose: () => void;
 	};
 
-	let { initialSettings, count, onSave, onClose }: Props = $props();
+	let { initialSettings, count, mode: requestedMode, scopeDescription = null, onSave, onClose }: Props = $props();
 	let dialog: HTMLDialogElement;
 	let settings = $state<AnimationExportSettings>({ ...DEFAULT_ANIMATION_EXPORT_SETTINGS });
 	let directory = $state<FileSystemDirectoryHandle | null>(null);
@@ -26,7 +28,9 @@
 	let saving = $state(false);
 	let error = $state<string | null>(null);
 	const busy = $derived(picking || saving);
-	const mode = $derived(count === 1 ? 'layer' : 'transition');
+	const mode = $derived(requestedMode ?? (count === 1 ? 'layer' : 'transition'));
+	const title = $derived(mode === 'layer' ? t().animationExportLayerTitle : t().animationExportTransitionTitle);
+	const description = $derived(scopeDescription ?? t().animationExportSelection(count));
 
 	onMount(() => {
 		settings = normalizeAnimationExportSettings(initialSettings);
@@ -82,10 +86,10 @@
 >
 	<form onsubmit={save} aria-busy={busy}>
 		<header>
-			<h2 id="animation-export-title">{t().animationExportTitle}</h2>
+			<h2 id="animation-export-title">{title}</h2>
 			<button type="button" onclick={close} disabled={busy}>{t().closeLabel}</button>
 		</header>
-		<p id="animation-export-description">{t().animationExportSelection(count)}</p>
+		<p id="animation-export-description">{description}</p>
 		<AnimationExportFields bind:settings {mode} disabled={busy} />
 		<section class="destination" aria-labelledby="animation-export-destination">
 			<h3 id="animation-export-destination">{t().settingsDownloadFolderLabel}</h3>
@@ -120,6 +124,8 @@
 
 <style>
 	dialog {
+		inset: 0;
+		margin: auto;
 		width: min(560px, calc(100vw - 32px));
 		max-height: calc(100dvh - 32px);
 		box-sizing: border-box;

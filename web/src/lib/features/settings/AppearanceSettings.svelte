@@ -9,6 +9,7 @@
 	import './appearance-settings.css';
 
 	type Props = {
+		section?: 'display' | 'making';
 		uiMode: UiMode;
 		uiCustom: UiCustomVisibility;
 		uiModeSaving: boolean;
@@ -22,6 +23,7 @@
 	};
 
 	let {
+		section = 'display',
 		uiMode, uiCustom, uiModeSaving, uiModeSaveError,
 		historyStripFields, historyStripFieldsSaving, historyStripFieldsSaveError,
 		onToggleHistoryStripField,
@@ -29,6 +31,7 @@
 	}: Props = $props();
 </script>
 
+			{#if section === 'making'}
 			<div class="popover-group">
 				<div class="popover-group-label">{t().settingsBatchRetryLabel}</div>
 				<div class="db-test-result">{t().settingsBatchRetryDescription}</div>
@@ -43,6 +46,7 @@
 					/>
 				</div>
 			</div>
+			{:else}
 			<div class="popover-group">
 				<div class="popover-group-label">{t().settingsCaptionPosition}</div>
 				<div class="db-test-result">{t().settingsCaptionPositionDescription}</div>
@@ -137,3 +141,4 @@
 					</label>
 				</div>
 			</div>
+			{/if}

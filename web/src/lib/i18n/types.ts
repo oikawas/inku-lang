@@ -405,6 +405,14 @@ export interface LangPack {
 	shareTargetOn: string;
 	shareTargetOff: string;
 	historyLineageForRevisionCount: (count: number) => string;
+	historyDescriptionExpand: string;
+	historyDescriptionCollapse: string;
+	historyDescriptionExpandTitle: string;
+	historyDescriptionCollapseTitle: string;
+	historyModelInterpretation: string;
+	historyModelDrawing: string;
+	historyModelUnrecorded: string;
+	historyModelDetails: string;
 
 	// Prompts tab
 	promptStage1Input: string;
@@ -438,6 +446,34 @@ export interface LangPack {
 	pngSquare: string;
 	pngSquareHighRes: string;
 	pngYAxisDescription: (px: number) => string;
+	savedWorkExportCurrentScope: string;
+	savedWorkExportSelectionScope: (count: number) => string;
+	savedWorkExportLineagePathScope: (count: number) => string;
+	savedWorkExportOldestFirst: string;
+	savedWorkExportLayerAnimation: string;
+	savedWorkExportTransitionAnimation: string;
+	savedWorkExportContactSheet: string;
+	savedWorkExportAiContactSheet: string;
+	savedWorkExportUnavailable: string;
+	workActionRefine: string;
+	workActionOpenMenu: string;
+	workActionMenuTitle: string;
+	workActionDdlOrigin: string;
+	workActionAdjust: string;
+	workActionDescription: string;
+	workActionInstructions: string;
+	workActionSketchGrain: string;
+	workActionModels: string;
+	workActionAutonomous: string;
+	workActionSaveFirst: string;
+	workActionGenerationLocked: string;
+	workEditCloseBackdrop: string;
+	workEditDescriptionTitle: string;
+	workEditSketchTitle: string;
+	workEditDescriptionHelp: string;
+	workEditSketchHelp: string;
+	workEditNoSketch: string;
+	workEditParentGrain: string;
 
 	// Elapsed / tokens
 	elapsedDetailed: (s1: number, s2: number, total: number) => string;
@@ -722,6 +758,8 @@ export interface LangPack {
 	historyAnimationExport: string;
 	historyAnimationExportHint: string;
 	animationExportTitle: string;
+	animationExportLayerTitle: string;
+	animationExportTransitionTitle: string;
 	animationExportSelection: (count: number) => string;
 	animationExportChoosePath: string;
 	animationExportSave: string;
@@ -732,6 +770,13 @@ export interface LangPack {
 	lineageAnimationExportHint: string;
 	lineageCheckedAnimationExport: string;
 	lineageCheckedAnimationExportHint: string;
+	lineageViewTools: string;
+	lineageFocusedWork: string;
+	lineageOpenLarge: string;
+	lineagePathScope: (count: number) => string;
+	lineageSelectionScope: (count: number) => string;
+	lineageWorkActions: string;
+	lineageSelectionActions: string;
 	animationExportBusy: string;
 	animationExportFailed: (reason: string) => string;
 	historyCardExport: string;
@@ -740,6 +785,10 @@ export interface LangPack {
 	cardExportFailed: (reason: string) => string;
 	settingsCardExportTitle: string;
 	settingsCardExportDescription: string;
+	settingsCategoryDisplayOperation: string;
+	settingsCategoryMaking: string;
+	settingsCategoryAdministration: string;
+	settingsCategoryExtensions: string;
 	settingsCardLayout: string;
 	cardLayoutSquare: string;
 	cardLayoutPortrait: string;
@@ -804,6 +853,22 @@ export interface LangPack {
 	historyTooltipTokens: string;
 	historyCurrentBadge: string;
 	historyManagerTitle: string;
+	historyLibraryTitle: string;
+	historyLibraryReturn: string;
+	historyLibraryLoadFailed: string;
+	historyLibraryRetry: string;
+	historyDisplayFormat: string;
+	historyGrouping: string;
+	historySelectionCount: (n: number) => string;
+	historySelectionCleared: (reason: 'query' | 'filter' | 'trash') => string;
+	historyPreviewTitle: string;
+	historyPreviewLoading: string;
+	historyPreviewUnavailable: string;
+	historyPreviewOpenArtwork: string;
+	historyPreviewOpenLineage: string;
+	historyPreviewRefine: string;
+	nextWorkConditions: string;
+	displayedWorkConditions: string;
 	historyTrashButton: (n: number) => string;
 	historyThumbsTab: string;
 	historyListTab: string;

@@ -259,6 +259,7 @@
 	     mode, but the description tab puts them below the input box: the description is
 	     written first, the settings are confirmed just before painting. -->
 	{#snippet inputSettings()}
+	<h3 class="conditions-heading">{t().nextWorkConditions}</h3>
 	<div class="section-head">
 		<div class="section-actions">
 			<!-- Model / catalog / sketch / canvas apply to every input mode, so the
@@ -300,7 +301,7 @@
 		</div>
 	</div>
 
-	<div class="current-selection" aria-label={isJapanese ? '現在選択中の設定' : 'Current selection'}>
+	<div class="current-selection" aria-label={t().nextWorkConditions}>
 		<span class="cs-group">
 			<span class="cs-label">{isJapanese ? 'モデル' : 'Model'}</span>
 			{#if nextStage1Model === nextStage2Model}
@@ -518,6 +519,7 @@
 		animation: inkupulse 1s ease-in-out infinite;
 	}
 	.panel-section { display: flex; flex-direction: column; gap: 6px; }
+	.conditions-heading { margin: 8px 0 2px; font-size: 12px; font-weight: 500; color: var(--fg2); }
 	.section-head {
 		display: flex;
 		justify-content: space-between;
@@ -603,7 +605,7 @@
 		background: transparent; color: var(--fg);
 		position: relative;
 		z-index: 1;
-		font-family: inherit; font-size: 13px; line-height: 1.65;
+		font-family: inherit; font-size: 14px; line-height: 1.65;
 		resize: vertical; outline: none;
 	}
 	.input-ta:focus { border-color: var(--accent); }

@@ -77,6 +77,7 @@
 	let lineNumberEl = $state<HTMLDivElement | null>(null);
 	let activeSaijikiPreview = $state<SaijikiPreview | null>(null);
 	let lastOpen = false;
+	let returnFocusTo: HTMLElement | null = null;
 	let elapsedMs = $state(0);
 	let drawController: AbortController | null = null;
 	onDestroy(() => drawController?.abort());
@@ -109,6 +110,8 @@
 
 	$effect(() => {
 		if (open && !lastOpen) {
+			const active = document.activeElement;
+			returnFocusTo = active instanceof HTMLElement && active !== document.body ? active : null;
 			value = initialDdl;
 			selection = { start: initialDdl.length, end: initialDdl.length };
 			activeSaijikiPreview = null;
@@ -116,6 +119,10 @@
 				textareaEl?.focus();
 				rememberSelection();
 				syncScroll();
+			});
+		} else if (!open && lastOpen) {
+			void tick().then(() => {
+				if (returnFocusTo?.isConnected && returnFocusTo.getClientRects().length > 0) returnFocusTo.focus();
 			});
 		}
 		lastOpen = open;

@@ -1,6 +1,5 @@
-export function historyListDescription(text: string, limit = 20): string {
-	const description = text.replace(/^\s*#\d+\s*/, '').trim();
-	return Array.from(description).slice(0, limit).join('');
+export function historyListDescription(text: string): string {
+	return text.replace(/^\s*#\d+\s*/, '').trim();
 }
 
 export function formatHistoryMinute(at: number, locale: string, timeZone?: string): string {

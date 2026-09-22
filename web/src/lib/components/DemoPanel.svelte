@@ -243,11 +243,11 @@
 </div>
 
 <style>
-	.demo-panel { display: flex; flex-direction: column; gap: 10px; }
+	.demo-panel { display: flex; flex-direction: column; gap: 16px; font-size: 14px; }
 	/* The seed phrase leads the panel, so its label carries the section heading
 	   and matches the label over the description box in InputPanel. */
 	.seed-label {
-		font-size: 12px;
+		font-size: 14px;
 		line-height: 1.5;
 		color: var(--fg2);
 	}
@@ -256,19 +256,19 @@
 
 		display: grid;
 		grid-template-columns: 1fr 1fr;
-		gap: 8px;
+		gap: 14px;
 	}
 	label {
 		display: flex;
 		flex-direction: column;
-		gap: 4px;
+		gap: 6px;
 		color: var(--fg2);
-		font-size: 11px;
+		font-size: 14px;
 	}
 	.check-row {
 		flex-direction: row;
 		align-items: center;
-		min-height: 30px;
+		min-height: 34px;
 	}
 	.wide { grid-column: 1 / -1; }
 	/* The parent lays these two out with a 6px column gap; the grid gap is 8px. */
@@ -280,15 +280,15 @@
 		background: var(--panel);
 		color: var(--fg);
 		font: inherit;
-		font-size: 12px;
-		padding: 6px 8px;
+		font-size: 14px;
+		padding: 8px 10px;
 	}
 	textarea { resize: vertical; line-height: 1.5; }
 	.interval-control {
 		display: inline-grid;
 		grid-template-columns: 26px 4.5em 26px;
 		align-items: stretch;
-		gap: 4px;
+		gap: 6px;
 		width: max-content;
 	}
 	.interval-input {
@@ -302,7 +302,7 @@
 		background: var(--panel);
 		color: var(--fg2);
 		font: inherit;
-		font-size: var(--btn-sm-font-size);
+		font-size: 14px;
 		line-height: 1;
 		cursor: pointer;
 	}
@@ -311,23 +311,23 @@
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
-		gap: 8px;
+		gap: 12px;
 	}
 	.demo-stats {
 		display: grid;
-		gap: 4px;
-		padding: 7px 8px;
+		gap: 6px;
+		padding: 10px 12px;
 		border: 1px solid var(--border);
 		border-radius: var(--r);
 		background: var(--bg2);
 		color: var(--fg2);
-		font-size: 11px;
+		font-size: 13px;
 		font-variant-numeric: tabular-nums;
 	}
 	.stats-row {
 		display: flex;
 		align-items: center;
-		gap: 8px;
+		gap: 12px;
 		min-width: 0;
 	}
 	.stats-label {
@@ -343,20 +343,20 @@
 		align-items: center;
 		gap: 8px;
 		color: var(--fg3);
-		font-size: 11px;
-		min-height: 26px;
+		font-size: 13px;
+		min-height: 32px;
 	}
 	.status-text {
 		margin: 0;
 		color: var(--fg2);
-		font-size: 12px;
+		font-size: 14px;
 	}
 	.error-text {
 		margin: 0;
 		color: var(--danger);
-		font-size: 12px;
+		font-size: 14px;
 	}
-	.demo-observe { display: flex; flex-direction: column; gap: 8px; }
+	.demo-observe { display: flex; flex-direction: column; gap: 12px; }
 	.observe-block {
 		border: 1px solid var(--border);
 		border-radius: var(--r);
@@ -364,20 +364,20 @@
 		overflow: hidden;
 	}
 	.observe-title {
-		padding: 6px 8px;
+		padding: 8px 10px;
 		border-bottom: 1px solid var(--border);
 		color: var(--fg3);
-		font-size: 10px;
+		font-size: 12px;
 		text-transform: uppercase;
 		letter-spacing: 0.08em;
 	}
 	.observe-body {
-		min-height: 42px;
-		max-height: 130px;
+		min-height: 72px;
+		max-height: 200px;
 		overflow: auto;
-		padding: 8px;
+		padding: 10px;
 		color: var(--fg);
-		font-size: 12px;
+		font-size: 14px;
 		line-height: 1.55;
 		white-space: pre-wrap;
 	}

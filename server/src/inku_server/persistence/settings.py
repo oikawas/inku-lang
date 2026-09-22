@@ -20,6 +20,7 @@ SETTINGS_TABS = {
     "plugins",
     "users",
     "export",
+    "demo",
     "misc",
     "server_misc",
     "logs",

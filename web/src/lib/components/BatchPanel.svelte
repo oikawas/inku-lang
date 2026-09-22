@@ -44,6 +44,14 @@
 		batchPromptHistory: string[];
 		/** Set when the last run stopped before the end of its prompt. */
 		canResumeBatch: boolean;
+		/** The stopped batch's remaining work, found without changing the editor. */
+		batchResumeInfo?: { nextLine: number | null; pending: number | null; total: number } | null;
+		/** A resume scan is in progress; its result has not yet replaced the editor. */
+		batchResuming?: boolean;
+		/** The last batch was explicitly stopped before it reached its end. */
+		batchInterrupted?: boolean;
+		/** Completed works from the most recent batch, including a stopped one. */
+		batchSuccess?: number;
 		onResumeBatch: () => void;
 		stage1ModelLabel: string;
 		stage2ModelLabel: string;
@@ -82,6 +90,10 @@
 		error,
 		batchPromptHistory,
 		canResumeBatch,
+		batchResumeInfo = null,
+		batchResuming = false,
+		batchInterrupted = false,
+		batchSuccess = 0,
 		onResumeBatch,
 		stage1ModelLabel,
 		stage2ModelLabel,
@@ -110,7 +122,7 @@
 
 	function restoreHistoryPrompt(prompt: string) {
 		historyMenuOpen = false;
-		if (!prompt || batchRunning) return;
+		if (!prompt || batchRunning || batchResuming) return;
 		selectedHistoryPrompt = prompt;
 		batchInput = prompt;
 	}
@@ -128,7 +140,7 @@
 
 	function submitAndRemember() {
 		rememberCurrentPrompt();
-		void onSubmit();
+		if (!batchResuming) void onSubmit();
 	}
 
 	function tokenPair(input: number | null, output: number | null): string {
@@ -142,7 +154,10 @@
 />
 
 <div class="batch-label">
-	<span class="batch-label-text"><strong>{t().batchSectionLabel}</strong>{t().batchSectionHint}</span>
+	<span class="batch-label-text"><strong>{t().batchSectionLabel}</strong><span class="batch-label-hint">{t().batchSectionHint}</span></span>
+	{#if batchInterrupted && !batchRunning}
+		<span class="batch-interrupted-mark">{t().batchInterruptedLabel}</span>
+	{/if}
 </div>
 {#if batchRunning}
 	<!-- The box is read-only for the length of the run, so the whole list is not
@@ -166,6 +181,7 @@
 				class="batch-ta"
 				bind:this={batchTextareaEl}
 				bind:value={batchInput}
+				disabled={batchResuming}
 				rows="5"
 				spellcheck="false"
 				wrap="off"
@@ -195,6 +211,7 @@
 			aria-expanded={historyMenuOpen}
 			aria-label={t().batchHistoryLabel}
 			onclick={() => (historyMenuOpen = !historyMenuOpen)}
+			disabled={batchResuming}
 		>
 			<span class="batch-history-current">
 				{selectedHistoryPrompt ? historyPromptLabel(selectedHistoryPrompt) : t().batchHistoryPlaceholder}
@@ -209,6 +226,7 @@
 						role="option"
 						aria-selected={prompt === selectedHistoryPrompt}
 						class:selected={prompt === selectedHistoryPrompt}
+						disabled={batchResuming}
 						onclick={() => restoreHistoryPrompt(prompt)}
 					>{historyPromptLabel(prompt)}</button>
 				{/each}
@@ -217,7 +235,37 @@
 	</div>
 {/if}
 
-{@render settings?.()}
+{#if !batchRunning && canResumeBatch}
+	<section class="batch-resume-card" aria-label={t().batchResumeTitle}>
+		<div class="batch-resume-copy">
+			<strong>{t().batchResumeTitle}</strong>
+			<p>
+				{#if batchResumeInfo?.nextLine !== null && batchResumeInfo?.nextLine !== undefined && batchResumeInfo?.pending !== null && batchResumeInfo?.pending !== undefined}
+					{t().batchResumeKnown(batchResumeInfo.nextLine, batchResumeInfo.pending, batchResumeInfo.total)}
+				{:else}
+					{t().batchResumeUnknown(batchResumeInfo?.total ?? 0)}
+				{/if}
+			</p>
+			{#if batchResumeInfo?.pending !== null && batchResumeInfo?.pending !== undefined}
+				<span>{t().batchResumeCompleted(batchResumeInfo.total - batchResumeInfo.pending)}</span>
+			{/if}
+			<span>{t().batchResumeRestores}</span>
+		</div>
+		<button type="button" class="ghost-btn batch-resume-btn" onclick={onResumeBatch} disabled={actionDisabled || batchResuming}>
+			{batchResuming ? t().batchResumeScanning : t().batchResumeBtn}
+		</button>
+	</section>
+{/if}
+
+<section class="batch-next-conditions" aria-label={t().batchNextConditionsLabel} aria-busy={batchResuming}>
+	<div class="batch-next-conditions-head">
+		<span>{t().batchNextConditionsLabel}</span>
+		{#if batchResuming}<span>{t().batchResumeScanning}</span>{/if}
+	</div>
+	<div class:batch-controls-busy={batchResuming} inert={batchResuming}>
+		{@render settings?.()}
+	</div>
+</section>
 
 
 {#if batchRunning && batchTotal > 0}
@@ -235,15 +283,9 @@
 		/>
 	</div>
 {:else}
-	<!-- Left of the paint button, and only while there is something to finish:
-	     the last run stopped part-way through the batch it was given. -->
-	<div class="batch-actions">
-		{#if canResumeBatch}
-			<button type="button" class="ghost-btn batch-resume-btn" onclick={onResumeBatch} disabled={actionDisabled}>
-				{t().batchResumeBtn}
-			</button>
-		{/if}
-		<PaintButton onclick={submitAndRemember} disabled={!canSubmit || actionDisabled}>{t().submitBtn}</PaintButton>
+	<div class="batch-actions" class:batch-actions-busy={batchResuming}>
+		<span class="batch-action-label">{t().batchNewRunLabel}</span>
+		<PaintButton onclick={submitAndRemember} disabled={!canSubmit || actionDisabled || batchResuming}>{t().batchNewRunBtn}</PaintButton>
 	</div>
 {/if}
 
@@ -296,13 +338,24 @@
 <style>
 	/* Same shape as the label over the description box in InputPanel. */
 	.batch-label {
-		font-size: 12px;
+		display: flex;
+		align-items: baseline;
+		justify-content: space-between;
+		gap: 8px;
+		font-size: 14px;
 		line-height: 1.5;
 		color: var(--fg2);
 		font-weight: 400;
 	}
-	.batch-label-text { min-width: 0; }
+	.batch-label-text { display: flex; min-width: 0; gap: 2px; }
 	.batch-label strong { font-weight: 600; color: var(--fg); }
+	.batch-label-hint { color: var(--fg2); }
+	.batch-interrupted-mark {
+		flex: 0 0 auto;
+		color: var(--danger);
+		font-size: 12px;
+		font-weight: 500;
+	}
 	.batch-wrap {
 		display: flex;
 		border: 1px solid var(--border2);
@@ -312,14 +365,14 @@
 		   whose content is as tall as the line count, so leaving the height to the
 		   children let a long batch stretch the box past the bottom of the panel.
 		   Resizing moves the gutter and the text together. */
-		height: clamp(200px, 42vh, 640px);
+		height: clamp(140px, 22vh, 220px);
 		resize: vertical;
 		min-height: 120px;
 	}
 	.line-nums {
 		flex: 0 0 auto;
 		background: var(--bg2); border-right: 1px solid var(--border);
-		padding: 9px 6px; font-size: 13px; line-height: 1.65;
+		padding: 9px 6px; font-size: 14px; line-height: 1.65;
 		text-align: right; color: var(--fg3); user-select: none;
 		font-family: inherit;
 		white-space: pre; min-width: 2rem; font-variant-numeric: tabular-nums;
@@ -331,7 +384,7 @@
 		border: none;
 		border-radius: 0;
 		background: transparent; color: var(--fg);
-		font-family: inherit; font-size: 13px; line-height: 1.65;
+		font-family: inherit; font-size: 14px; line-height: 1.65;
 		resize: none; outline: none;
 		white-space: pre;
 		overflow-wrap: normal;
@@ -353,7 +406,7 @@
 		border-radius: 4px;
 		background: var(--bg2);
 		padding: 8px 10px;
-		font-size: 13px;
+		font-size: 14px;
 		line-height: 1.65;
 	}
 	.batch-current-num {
@@ -377,7 +430,7 @@
 		background: var(--panel);
 		overflow: hidden;
 	}
-	.batch-info { font-size: 11px; color: var(--fg3); }
+	.batch-info { margin: 5px 0 0; font-size: 12px; color: var(--fg3); }
 	.batch-history {
 		position: relative;
 		display: flex;
@@ -402,6 +455,7 @@
 		cursor: pointer;
 	}
 	.batch-history-trigger:hover { background: var(--bg2); }
+	.batch-history-trigger:disabled { cursor: wait; opacity: 0.65; }
 	.batch-history-current {
 		flex: 1;
 		min-width: 0;
@@ -447,15 +501,54 @@
 		background: var(--bg2);
 		box-shadow: inset 3px 0 0 var(--fg2);
 	}
+	.batch-next-conditions {
+		margin-top: 12px;
+		padding-top: 10px;
+		border-top: 1px solid var(--border);
+	}
+	.batch-next-conditions-head {
+		display: flex;
+		justify-content: space-between;
+		gap: 8px;
+		margin-bottom: 6px;
+		color: var(--fg2);
+		font-size: 12px;
+		font-weight: 600;
+	}
+	.batch-next-conditions-head span:last-child { color: var(--fg3); font-weight: 400; }
+	.batch-controls-busy { cursor: wait; opacity: 0.62; }
+	.batch-resume-card {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 12px;
+		margin-top: 12px;
+		padding: 10px;
+		border: 1px solid var(--border2);
+		border-radius: var(--r);
+		background: var(--bg2);
+	}
+	.batch-resume-copy { min-width: 0; color: var(--fg2); font-size: 12px; line-height: 1.5; }
+	.batch-resume-copy strong { display: block; color: var(--fg); font-size: 14px; }
+	.batch-resume-copy p { margin: 2px 0; }
+	.batch-resume-copy span { display: block; color: var(--fg3); }
+	.batch-resume-btn { flex: 0 0 auto; }
 	.batch-actions {
 		display: flex;
 		align-items: stretch;
 		gap: 6px;
+		margin-top: 12px;
 	}
-	/* The paint button carries the row's top margin; the one beside it matches. */
-	.batch-actions .batch-resume-btn {
-		flex: 0 0 auto;
-		margin-top: 8px;
+	.batch-action-label {
+		display: flex;
+		align-items: center;
+		color: var(--fg2);
+		font-size: 12px;
+		white-space: nowrap;
+	}
+	.batch-actions-busy {
+		cursor: wait;
+		opacity: 0.62;
 	}
 	.batch-actions :global(.paint-btn.block) {
 		flex: 1;
@@ -580,5 +673,17 @@
 		font-size: 12px;
 		line-height: 1.55;
 		white-space: pre-wrap;
+	}
+	@media (max-width: 600px) {
+		.batch-label { align-items: flex-start; }
+		.batch-wrap { height: clamp(140px, 26vh, 220px); }
+		.batch-resume-card { align-items: stretch; flex-direction: column; gap: 8px; }
+		.batch-resume-btn { width: 100%; }
+		.batch-actions { align-items: stretch; flex-direction: column; }
+		.batch-action-label { min-height: 0; }
+		.batch-actions :global(.paint-btn.block) { width: 100%; }
+		.batch-observe-head { grid-template-columns: 1fr; gap: 3px; }
+		.batch-observe-meta { justify-self: start; }
+		.batch-failure-list li { grid-template-columns: 44px minmax(0, 1fr); }
 	}
 </style>

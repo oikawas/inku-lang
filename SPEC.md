@@ -820,7 +820,7 @@ the view returns to the single description input or to the canvas.**
 
 **The mode can also be switched from an icon on the rail, and the icon says which mode is on by how many of its bars are dark (one for simple, two for custom, three for full). The menu is listed in that order** (v2.13.18): an icon that draws the same picture for all three modes cannot say which one is chosen.
 
-**The settings dialog carries two modes on the same reasoning (v2.13.18).** `Standard` shows only the settings in daily use; `Detailed` adds the `Plugins`, `Limits`, `Unread Word Ledger` and `Other (server)` tabs. **One module holds the tab names, and both the tab bar and the guard on the body read that same table**: if the bar hides a tab the guard admits, there is a panel nothing can reach, and the other way round leaves a button that does nothing. The choice stays in the browser and changes nothing stored on the server.
+**The settings dialog carries two modes on the same reasoning (v2.13.18).** `Standard` shows only the settings in daily use; `Detailed` adds the `Plugins`, `Limits`, `Unread Word Ledger` and `Other (server)` tabs. **One module holds the tab names, and both the tab bar and the guard on the body read that same table**: if the bar hides a tab the guard admits, there is a panel nothing can reach, and the other way round leaves a button that does nothing. The detail-level choice stays in the browser and changes nothing stored on the server. The `Demo` tab under `Making` is visible to regular users in Standard mode, and the opened settings tab is stored per user.
 
 ### 7.3 LLM Model Inspection
 
@@ -994,7 +994,7 @@ Saved-work export uses a shared menu with a fixed scope. The displayed work or o
 
 The input side identifies the conditions for the next drawing, while the work side identifies the displayed work's conditions. Reading a Library preview alone does not change the next-drawing conditions, and differing values are not an error. Settings are grouped as Display and operation, Making, Export, Connections and administration, and Extensions and details without changing existing permission visibility or persistence. Body text and descriptions use 14px; supporting information and small buttons use 12px. Selection is shown with checks or a displayed label as well as borders. Small actions have keyboard focus, and closing the edited-work, export, or settings modal restores focus to its entry point.
 
-The Description tab places the input, next-work conditions, and drawing action in that order. Each model or catalog row groups its label, change control, and current value, allowing long names to wrap. Different interpretation and performance models are shown separately. Sketch and canvas buttons include the current value, and Wild states On or Off. New instructions stay with the new-work controls; the displayed work's sketch and instructions follow a divider and heading. Instruction editing sits beside the text heading, and drawing from instructions sits directly below the text. Existing input locking, progress, stopping, errors, notices requiring a decision, saved disclosure states, and saving an instruction edit as a child remain intact.
+The Description tab places the input, next-work conditions, and drawing action in that order. The input tabs are `Description` and `Batch` only. Each model or catalog row groups its label, change control, and current value, allowing long names to wrap. Different interpretation and performance models are shown separately. Sketch and canvas buttons include the current value, and Wild states On or Off. New instructions stay with the new-work controls; the displayed work's sketch and instructions follow a divider and heading. Instruction editing sits beside the text heading, and drawing from instructions sits directly below the text. Existing input locking, progress, stopping, errors, notices requiring a decision, saved disclosure states, and saving an instruction edit as a child remain intact.
 
 New and edited instructions share a dialog and editor. The default layout supports composing short instructions from the Saijiki: a few lines of text sit above a wide vocabulary overview. Category headings and words form a multicolumn list, with examples and explanations in a separate region that does not move the word buttons. Vocabulary starts visible on narrow screens too, with fewer columns and an adapted preview position. Vocabulary and the quick guide can be toggled; hiding vocabulary expands the text editor. The text retains line numbers that follow wrapping, syntax colors, and line and character counts. Words follow the language of the current text and replace the selection or insert at the cursor. The performance model and edit-only Wild control sit outside the text; drawing, cancellation, progress, stopping, and errors stay below it. Tab stays inside model selection, and Escape closes only that picker. Closing the instruction dialog returns focus to its entry point. New instructions start empty and draw an independent work; editing starts from the target work and draws a child. Failure or stopping retains the draft. Drawing disables text editing, vocabulary insertion, condition changes, and closing.
 
@@ -1010,7 +1010,7 @@ Major UI areas:
 
 - App rail: compact navigation with an explicit expand/collapse toggle, user
   menu, profile, settings, language and theme controls
-- Input panel: drawing, batch, and demo modes
+- Input panel: description and batch modes
 - DDL display and editing: read-only normalized DDL in the drawing flow, with
   word highlighting, expanded DDL display, and `Draw from DDL`; editing happens
   in a DDL editor dialog with line numbers, inline Saijiki, and a short syntax guide
@@ -1027,7 +1027,7 @@ there looking exactly like their own. **Recipients can be picked by name among t
 your own organisation group**; a member who cannot fetch candidates types an id directly (the
 full roster is not opened)
 - Settings modal: models, color catalogs, DB status, plugin status, export
-  templates, users, theme
+  templates, users, theme, Demo
 
 The status bar displays the current render context:
 
@@ -3189,27 +3189,30 @@ shows a mascot of its own.**
 
 ### Batch Drawing
 
-The batch panel accepts multiple instruction lines.  During execution, the
-active line is highlighted and the current DDL interpretation is displayed
-read-only.  Batch execution keeps failure reports until the next batch run, and
-stores batch prompt history per user.  **The history keeps fifty entries
+The batch panel groups the input, next-work conditions, progress, and resume for
+multiple instruction lines. During execution, the active line is highlighted
+and the current DDL interpretation is displayed read-only. Batch execution
+keeps failure reports until the next batch run, and stores batch prompt history
+per user. **The history keeps fifty entries
 (v2.13.21; twenty before that).  The limit belongs to the server, which cuts on
 both the read and the write.**  The list is capped at half the window height and
 scrolls when it does not fit.
 
-**A batch that stopped part-way can be carried on from where it stopped
-(v2.13.21).**  A resume paints **only the lines that have no work yet**, keeping
-**the line numbers of the original description**.  It is not "everything after
-the last line painted": a line that failed mid-run would make that repaint the
-finished ones behind it.  Whether a resume is offered is decided by **whether
-the newest batch work is the last line of the newest saved description**, and
-the match is made on **both the line number and the description** (the number
-alone reads an unrelated run as unfinished once the description has been
-shortened).  The conditions for the resume — models, color catalog, sketch,
-wild, canvas — are read from **the last work actually painted**, and **a
-condition with no record is not invented**: a missing record means "older than
-that record", not "that setting was off", so inventing a default would resume
-under different conditions.
+**A batch that stopped part-way can be carried on from where it stopped.** In
+one session it retains the original prompt, a stable run ID, the Stage 1/2
+models, color catalog, sketch, Wild, and canvas selected at start, plus the
+pending lines. A stop before the first success, and another stop after resume,
+both resume **only lines not yet saved**, with **the original line numbers** and
+the captured conditions. Editing settings during the run affects only the next
+new batch. A line whose server save succeeded remains successful even when the
+following history refresh fails, so it is not painted again.
+
+After a page reload the in-session interrupted snapshot is gone. The existing
+saved-history discovery alone looks for a resume candidate, matching both line
+number and description. **A batch with no saved success is not promised to
+resume after reload.** When reload recovery can restore conditions, it reads the
+last saved work; a condition without a record is not invented, because absence
+means "older than the record," not "off."
 
 Letting the server choose a color catalog by reading each line is **not a batch
 option but the catalog selection itself** (below). **Until v2.9.39 the batch tab
@@ -3244,9 +3247,12 @@ when the dialog was opened.
 ### Demo Drawing
 
 Demo mode repeatedly generates an instruction from a seed phrase, renders it,
-waits for the configured interval, and repeats.  Demo settings are stored per
-user.  Demo results are not saved by default; the user can explicitly save a
-current render to history.
+waits for the configured interval, and repeats. Demo settings are stored per
+user. Demo results are not saved by default; the user can explicitly save a
+current render to history. Demo is in the settings modal's `Making` category,
+not an input tab. Its running status and Stop action stay available outside
+settings, where it can also be reopened, and starting it does not replace the
+Description or Batch text.
 
 Demo draws with the same selection.  The status bar reflects the catalog reported
 by the render result, not only the current catalog selection.  **Until v2.9.39 the

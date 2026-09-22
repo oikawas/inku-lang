@@ -30,6 +30,10 @@
 	import DdlViewer from '$lib/components/DdlViewer.svelte';
 	import HistoryStrip from '$lib/components/HistoryStrip.svelte';
 	import InputPanel from '$lib/components/InputPanel.svelte';
+	import DemoPanel from '$lib/components/DemoPanel.svelte';
+	import ModelCardPicker from '$lib/components/ModelCardPicker.svelte';
+	import CanvasAspectPlugin from '$lib/components/CanvasAspectPlugin.svelte';
+	import SketchSelect from '$lib/components/SketchSelect.svelte';
 	import PipelineStatus from '$lib/components/PipelineStatus.svelte';
 	import RunStatus from '$lib/components/RunStatus.svelte';
 	import Tooltip from '$lib/components/Tooltip.svelte';
@@ -163,7 +167,7 @@
 	type CopyKind = 'stage1' | 'stage2' | 'score';
 	let copiedPrompt = $state<CopyKind | null>(null);
 	let statusHashCopied = $state(false);
-	let previousInputMode = $state<'single' | 'batch' | 'demo'>('single');
+	let previousInputMode = $state<'single' | 'batch'>('single');
 	type DdlDiffPart = { kind: "same" | "removed" | "added"; text: string };
 	type TextDiffPart = { kind: "same" | "removed" | "added"; text: string };
 	const refinementSession = new RefinementSessionState();
@@ -685,7 +689,7 @@
 	async function resumeInterruptedBatch() {
 		try {
 			await batch.resumeInterrupted({
-				blocked: () => work.loading || refinementSession.gridBusy,
+				blocked: () => work.loading || work.reloading || refinementSession.gridBusy,
 				applyConditions: applyBatchRunConditions,
 				run: (lines) => work.submit({ resumeLines: lines }),
 			});
@@ -1843,7 +1847,7 @@ $effect(() => {
 	const navPos       = $derived(historyOffset + historyCursor + 1);
 	// ── Saijiki ─────────────────────────────────────────────
 	function handleKeydown(e: KeyboardEvent) {
-		if (e.key === 'Escape' && ((e.target instanceof Element && e.target.closest('[data-settings-nested-dialog]')) || document.querySelector('[data-settings-nested-dialog]'))) return;
+		if (e.key === 'Escape' && ((e.target instanceof Element && e.target.closest('[data-settings-nested-dialog]')) || document.querySelector('[data-settings-nested-dialog], .settings-modal [role="dialog"][aria-modal="true"]'))) return;
 		if (e.target instanceof Element && e.target.closest('dialog[open], [role="menu"]')) return;
 		if (e.key === 'Escape') {
 			saijikiOpen = false;
@@ -2229,7 +2233,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				note: projected?.note ?? null,
 			};
 		}
-		if (work.inputMode === 'demo' || work.activeRunMode === 'demo') return null;
+		if (work.showingDemo) return null;
 		return historyCursor >= 0 && historyItems[historyCursor] ? historyItems[historyCursor] : null;
 	});
 	const replayableStatusHistoryItem = $derived(
@@ -2462,7 +2466,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		const wasMode = previousInputMode;
 		if (mode === wasMode) return;
 		previousInputMode = mode;
-		if (mode === 'batch' && (work.activeRunMode === 'batch' || batch.latestResult)) {
+		if (mode === 'batch' && !demoRunning && (work.activeRunMode === 'batch' || batch.latestResult)) {
 			untrack(resumeBatchLatestFollow);
 		} else if (wasMode === 'batch') {
 			batch.stopFollowingLatest();
@@ -2529,6 +2533,18 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			{#if !leftPanelCollapsed}
 			<div class="left-panel">
 				<div class="panel-scroll" class:description-scroll={work.inputMode === 'single'}>
+					{#if demoRunning}
+						<div class="demo-running-banner">
+							<button class="ghost-btn" onclick={() => settings.openSettings('demo')}>{t().demoOpenSettings}</button>
+							<RunStatus
+								label={demo.waitingSeconds !== null ? t().demoWaiting(demo.waitingSeconds) : work.stageLabel || t().modeDemo}
+								elapsedMs={work.liveMs}
+								tokensIn={work.activeRunTokensIn}
+								tokensOut={work.activeRunTokensOut}
+								onStop={work.stopDemo}
+							/>
+						</div>
+					{/if}
 					<InputPanel
 						sketchMode={work.sketchMode}
 						onSelectSketchMode={(mode) => (work.sketchMode = mode)}
@@ -2559,29 +2575,13 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 						batchFailureReport={batchFailureReportStore.report}
 						batchPromptHistory={batch.promptHistory}
 						canResumeBatch={batch.canResume}
+						batchResumeInfo={batch.resumeInfo}
+						batchResuming={batch.resuming}
+						batchInterrupted={batch.interrupted}
+						batchSuccess={batch.success}
 						onResumeBatch={() => void resumeInterruptedBatch()}
-						bind:demoSettings={demo.settings}
-						demoModelProviderGroups={availableModelCatalog}
-						{demoRunning}
-						demoTimedOut={demo.timedOut}
-						demoWaitingSeconds={demo.waitingSeconds}
-						demoCurrentLiveMs={demo.currentLiveMs}
-						demoCurrentElapsedMs={demo.currentElapsedMs}
-						demoCurrentTokensIn={demo.currentTokensIn}
-						demoCurrentTokensOut={demo.currentTokensOut}
-						demoTotalElapsedMs={demo.totalElapsedMs}
-						demoTotalTokensIn={demo.totalTokensIn}
-						demoTotalTokensOut={demo.totalTokensOut}
-						demoRenderCount={demo.renderCount}
-						demoGeneratedPrompt={demo.generatedPrompt}
-						{demoGeneratedDdlHighlighted}
-						demoCanSaveCurrent={demo.canSaveCurrent}
-						demoSavingCurrent={demo.savingCurrent}
-						demoSaveStatus={demo.saveStatus}
-						demoError={demo.error}
-						lockNonDemo={demoRunning}
 						canSubmit={work.canSubmit}
-						generationDisabled={refinementSession.gridBusy || work.reloading}
+						generationDisabled={refinementSession.gridBusy || work.reloading || demoRunning || batch.resuming}
 						error={work.error}
 						stageLabel={work.stageLabel}
 						{canvasAspectId}
@@ -2594,17 +2594,12 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 						{nextStage1Model}
 						{nextStage2Model}
 						{nextCatalogName}
-						{nextCanvasName}
 						onToggleCanvasAspectMenu={() => (canvasAspectMenuOpen = !canvasAspectMenuOpen)}
 						onSelectCanvasAspect={selectCanvasAspect}
 						onOpenModelSelection={() => openModelSelection(false)}
 						onOpenCatalogModal={openCatalogModal}
 						onClearInput={work.clearInput}
 						onRememberBatchPrompt={(prompt) => batch.rememberPrompt(prompt)}
-						onDemoSettingsChange={(next) => demo.saveSettings(next)}
-						onSaveCurrentDemo={saveCurrentDemoToHistory}
-						onStartDemo={work.startDemo}
-						onStopDemo={work.stopDemo}
 						onSubmit={work.requestSubmit}
 						onForkDescription={work.forkPipelineDescription}
 						onStop={work.stopBatch}
@@ -2818,7 +2813,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				result={work.result}
 				{unsavedRefinementPreview}
 				{lineageIntermediateNotice}
-				allowEmptyOutputTabs={work.inputMode === 'demo' || work.activeRunMode === 'demo'}
+				allowEmptyOutputTabs={work.showingDemo}
 				{currentRenderedAt}
 				navLatestDisabled={historyNavButtonsDisabled.latest}
 				navNewerDisabled={historyNavButtonsDisabled.newer}
@@ -2830,7 +2825,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				canvasAspectWidth={displayCanvasAspect.ratioW}
 				canvasAspectHeight={displayCanvasAspect.ratioH}
 				viewport={canvasViewport}
-				stage1PromptText={work.stage1UserPrompt || (work.inputMode === 'single' ? work.input : work.inputMode === 'batch' ? batch.input : demo.generatedPrompt)}
+				stage1PromptText={work.stage1UserPrompt || (work.showingDemo ? demo.generatedPrompt : work.inputMode === 'single' ? work.input : batch.input)}
 				instructionText={work.currentInstructionText}
 				ddl={work.ddl}
 				{copiedPrompt}
@@ -3008,9 +3003,66 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 {/if}
 
 <!-- ══ SETTINGS MODAL ══ -->
+{#snippet demoContent()}
+	<DemoPanel
+		bind:settings={demo.settings}
+		providerGroups={availableModelCatalog}
+		running={demoRunning}
+		timedOut={demo.timedOut}
+		liveMs={work.liveMs}
+		runTokensIn={work.activeRunTokensIn}
+		runTokensOut={work.activeRunTokensOut}
+		waitingSeconds={demo.waitingSeconds}
+		currentLiveMs={demo.currentLiveMs}
+		currentElapsedMs={demo.currentElapsedMs}
+		currentTokensIn={demo.currentTokensIn}
+		currentTokensOut={demo.currentTokensOut}
+		totalElapsedMs={demo.totalElapsedMs}
+		totalTokensIn={demo.totalTokensIn}
+		totalTokensOut={demo.totalTokensOut}
+		demoRenderCount={demo.renderCount}
+		generatedPrompt={demo.generatedPrompt}
+		generatedDdlHighlighted={demoGeneratedDdlHighlighted}
+		canSaveCurrent={demo.canSaveCurrent}
+		savingCurrent={demo.savingCurrent}
+		actionDisabled={work.loading || work.reloading || refinementSession.gridBusy || batch.resuming}
+		drawingStage1ModelLabel={work.stage1ModelLabel}
+		drawingStage2ModelLabel={work.stage2ModelLabel}
+		saveStatus={demo.saveStatus}
+		error={demo.error}
+		onSettingsChange={(next) => demo.saveSettings(next)}
+		onSaveCurrent={saveCurrentDemoToHistory}
+		onStart={() => { void work.startDemo(); if (demo.running) settings.close(); }}
+		onStop={work.stopDemo}
+	>
+		{#snippet inputSettings()}
+			<div class="demo-drawing-conditions" inert={demoRunning}>
+				<h3>{t().nextWorkConditions}</h3>
+				<div class="demo-model-pair">
+				<ModelCardPicker label={t().stage1Label} selectedModel={qualifiedModelId(stage1Provider, stage1Model)} providerGroups={availableModelCatalog}
+					onSelect={(provider, model) => { setStage1Provider(provider); setStage1Model(model); }} />
+				<ModelCardPicker label={t().stage2Label} selectedModel={qualifiedModelId(stage2Provider, stage2Model)} providerGroups={availableModelCatalog}
+					onSelect={(provider, model) => { setStage2Provider(provider); setStage2Model(model); }} />
+				</div>
+				<label class="demo-catalog-field"><span>{t().colorCatalogButton}</span>
+					<select bind:value={colorCatalogSettings.selected}>
+						<option value={AUTO_CATALOG_ID}>{t().colorCatalogAuto}</option>
+						{#each colorCatalogs as catalog (catalog.id)}<option value={catalog.id}>{catalog.name}</option>{/each}
+					</select>
+				</label>
+				<div class="demo-compact-conditions">
+					<SketchSelect value={work.sketchMode} isJapanese={getLang() === 'ja'} showValue onSelect={(mode) => (work.sketchMode = mode)} />
+					<CanvasAspectPlugin selected={canvasAspectId} options={canvasAspectOptions} open={canvasAspectMenuOpen} showValue
+						onToggle={() => (canvasAspectMenuOpen = !canvasAspectMenuOpen)} onSelect={selectCanvasAspect} />
+				</div>
+			</div>
+		{/snippet}
+	</DemoPanel>
+{/snippet}
 {#if settings.opened}
 	{#await import('$lib/components/SettingsModal.svelte') then { default: SettingsModal }}
 		<SettingsModal
+			{demoContent}
 			settings={settings}
 			{singleUserMode}
 			{stage1Provider}
@@ -3263,6 +3315,17 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 {/if}
 
 <style>
+	.demo-running-banner { display: grid; gap: 8px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+	.demo-running-banner > button { justify-self: start; }
+	.demo-drawing-conditions { display: grid; gap: 12px; min-width: 0; }
+	.demo-drawing-conditions h3 { margin: 0; font-size: 14px; font-weight: 600; }
+	.demo-model-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+	@media (max-width: 600px) { .demo-model-pair { grid-template-columns: minmax(0, 1fr); } }
+	.demo-catalog-field { display: grid; gap: 6px; font-size: 12px; color: var(--fg2); }
+	.demo-catalog-field select { width: 100%; min-width: 0; min-height: 38px; padding: 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); color: var(--fg); font: inherit; font-size: 14px; }
+	.demo-compact-conditions { position: relative; display: flex; flex-wrap: wrap; gap: 8px; }
+	.demo-compact-conditions :global(.sketch-plugin), .demo-compact-conditions :global(.canvas-aspect-plugin) { position: static; }
+	.demo-compact-conditions :global(.sketch-menu), .demo-compact-conditions :global(.aspect-menu) { width: min(310px, 100%); }
 	/* ── Application color contract ────────────────────────────
 	   Theme-dependent tokens have the same names in both explicit theme
 	   blocks. Shared cross-component surfaces consume semantic tokens here;

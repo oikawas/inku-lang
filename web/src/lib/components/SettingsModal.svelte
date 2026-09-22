@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { t } from '$lib/i18n/index.svelte';
 	import { onMount, tick } from 'svelte';
+	import type { Snippet } from 'svelte';
 	import UnreadWordsPanel from '$lib/components/UnreadWordsPanel.svelte';
 	import DatabaseAdministrationSettings from '$lib/features/settings/DatabaseAdministrationSettings.svelte';
 	import RenderLimitsSettings from '$lib/features/settings/RenderLimitsSettings.svelte';
@@ -23,6 +24,7 @@
 
 	type Props = {
 		settings: SettingsController;
+		demoContent?: Snippet;
 		singleUserMode: boolean;
 		stage1Provider: Provider;
 		stage1Model: string;
@@ -71,6 +73,7 @@
 
 	let {
 		settings,
+		demoContent,
 		singleUserMode,
 		stage1Provider,
 		stage1Model,
@@ -155,6 +158,7 @@
 			case 'plugins': return { title: strings.settingsTabPlugins, hint: strings.settingsPluginsHint };
 			case 'unread': return { title: strings.settingsTabUnreadWords, hint: strings.settingsUnreadHint };
 			case 'export': return { title: strings.settingsTabExport, hint: strings.settingsExportHint };
+			case 'demo': return { title: strings.modeDemo, hint: strings.tooltipInputTabDemo };
 			default: return appearanceSection === 'making'
 				? { title: strings.settingsCategoryMaking, hint: strings.settingsMakingHint }
 				: { title: strings.settingsCategoryDisplayOperation, hint: strings.settingsDisplayHint };
@@ -171,7 +175,7 @@
 
 	function trapTab(event: KeyboardEvent): void {
 		if (event.key !== 'Tab') return;
-		if (event.target instanceof Element && event.target.closest('[data-settings-nested-dialog]')) return;
+		if (event.target instanceof Element && event.target.closest('[data-settings-nested-dialog], [role="dialog"][aria-modal="true"]:not(.settings-modal)')) return;
 		const controls = visibleEnabledControls();
 		if (controls.length === 0) {
 			event.preventDefault();
@@ -253,6 +257,7 @@
 				<section class="settings-category">
 					<div class="settings-category-label">{t().settingsCategoryMaking}</div>
 					<button aria-current={settingsTab === 'misc' && appearanceSection === 'making' ? 'page' : undefined} class:active={settingsTab === 'misc' && appearanceSection === 'making'} onclick={() => selectAppearanceSection('making')}>{t().settingsBatchRetryLabel}</button>
+					<button aria-current={settingsTab === 'demo' ? 'page' : undefined} class:active={settingsTab === 'demo'} onclick={() => onSelectSettingsTab('demo')}>{t().modeDemo}</button>
 				</section>
 				<section class="settings-category">
 					<div class="settings-category-label">{t().settingsTabExport}</div>
@@ -420,6 +425,8 @@
 					{exportTemplates} {exportTemplateStatus} {onChooseDownloadFolder} {onClearDownloadFolder}
 					{onAddExportTemplate} {onUpdateExportTemplate} {onRemoveExportTemplate}
 				/>
+			{:else if settingsTab === 'demo'}
+				{@render demoContent?.()}
 			{:else}
 				<AppearanceSettings
 					section={appearanceSection}

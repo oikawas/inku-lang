@@ -7,12 +7,13 @@ import { composeFallbackReason, composeFallbackState, composeFallbackValue } fro
 import { needsFallbackRefineConfirm, rememberFallbackRefineConfirm, type FallbackRefineParent } from '$lib/fallbackRefineGate';
 import { submitDerivationKind as submitDerivationKindOf, type DerivationKind } from '$lib/derivation';
 import { modelDisplayName, qualifiedModelId, type Provider, type ProviderGroup } from '$lib/models';
-import { colorCatalogOverride } from '$lib/features/color-catalog/render';
+import { AUTO_CATALOG_ID, colorCatalogOverride } from '$lib/features/color-catalog/render';
 import { colorCatalogSettings } from '$lib/features/color-catalog/settings.svelte';
 import { renderSettingsPayload, type RenderOverrides } from '$lib/features/render-payload';
 import { runCurrentWork, type InstructionLang, type PaintOptions, type PaintResult } from '$lib/features/run/current-work';
 import { batchSettings } from '$lib/features/batch/settings.svelte';
 import { wildOverride } from '$lib/features/wild/render';
+import { wildSettings } from '$lib/features/wild/settings.svelte';
 import type { NumberedLine } from '$lib/features/batch/resume';
 import type { CanvasAspectId } from '$lib/plugins/system/canvas-aspect';
 import type { HistoryItem, Score } from '$lib/historyManagerState.svelte';
@@ -68,7 +69,7 @@ export function createWorkState(deps: WorkStateDeps) {
 	// ── Input ───────────────────────────────────────────────
 	const DEFAULT_INPUT = '山の向こうに月が昇る';
 
-	let inputMode = $state<'single' | 'batch' | 'demo'>('single');
+	let inputMode = $state<'single' | 'batch'>('single');
 
 	let input = $state(DEFAULT_INPUT);
 
@@ -603,8 +604,9 @@ export function createWorkState(deps: WorkStateDeps) {
 	}
 
 	async function startDemo() {
-		if (loading || refinementSession.gridBusy) return;
-		clearInput();
+		if (loading || reloading || batch.resuming || refinementSession.gridBusy) return;
+		resetWorkOutput();
+		demo.clearInput();
 		error = null;
 		displayedHistoryItem = null;
 		activeRunMode = 'demo';
@@ -677,7 +679,7 @@ export function createWorkState(deps: WorkStateDeps) {
 	 * it. Everything else about the run is unchanged.
 	 */
 	async function submit(options: { resumeLines?: NumberedLine[]; } = {}) {
-		if (!canSubmit || loading || refinementSession.gridBusy) return;
+		if (!canSubmit || loading || refinementSession.gridBusy || (batch.resuming && !options.resumeLines)) return;
 		// Ask before resetTargetScopedState and before any intermediate save.
 		if (submitWouldRefine() && !(await confirmFallbackRefine(currentRefineParent()))) return;
 		resetTargetScopedState();
@@ -688,6 +690,8 @@ export function createWorkState(deps: WorkStateDeps) {
 			return;
 		}
 
+		// The lineage lookup may yield to a different drawing action.
+		if (loading || reloading || refinementSession.gridBusy || (batch.resuming && !options.resumeLines)) return;
 		if (inputMode === 'batch') {
 			await submitBatch(options);
 			return;
@@ -752,6 +756,10 @@ export function createWorkState(deps: WorkStateDeps) {
 	async function submitBatch(options: { resumeLines?: NumberedLine[]; }): Promise<void> {
 		const batchCanvasAspectId = effectiveCanvasAspectId();
 		const batchCatalogId = colorCatalogSettings.selected;
+		const batchStage1Model = qualifiedModelId(deps.models.stage1Provider(), deps.models.stage1Model());
+		const batchStage2Model = qualifiedModelId(deps.models.stage2Provider(), deps.models.stage2Model());
+		const batchSketchMode = sketchMode;
+		const batchWild = wildSettings.enabled;
 		loading = true; error = null;
 		activeRunMode = 'batch';
 		ddl = null; expandedDdl = null; ddlGeneratedBaseline = null; thinking = null;
@@ -765,10 +773,22 @@ export function createWorkState(deps: WorkStateDeps) {
 		try {
 			await batch.run({
 				resumeLines: options.resumeLines,
+				runConditions: {
+					stage1Model: batchStage1Model,
+					stage2Model: batchStage2Model,
+					catalogId: batchCatalogId,
+					catalogMode: batchCatalogId === AUTO_CATALOG_ID ? 'auto' : 'fixed',
+					sketchGrain: sketchGrainOf(batchSketchMode),
+					wild: batchWild,
+					canvasAspectId: batchCanvasAspectId,
+				},
 				canvasAspectId: batchCanvasAspectId,
-				renderOverrides: colorCatalogOverride(batchCatalogId),
+				renderOverrides: { ...colorCatalogOverride(batchCatalogId), ...wildOverride(batchWild) },
 				maxRetries: batchSettings.maxRetries,
-				paintLine: (text, paintOptions) => paintOne(text, paintOptions),
+				paintLine: (text, paintOptions) => paintOne(text, {
+					...paintOptions, stage1Model: batchStage1Model, stage2Model: batchStage2Model,
+					sketchMode: batchSketchMode,
+				}),
 				onLatestResult: (painted) => {
 					thinking = painted.thinking;
 					if (inputMode === 'batch' && batch.autoFollowLatest) displayLatestBatchRender();
@@ -869,12 +889,15 @@ export function createWorkState(deps: WorkStateDeps) {
 	}
 
 	function clearInput() {
+		if (inputMode === 'single') input = '';
+		if (inputMode === 'batch') batch.clearInput();
+		resetWorkOutput();
+	}
+
+	function resetWorkOutput() {
 		resetTargetScopedState();
 		pipelineController.clear();
 		pendingCanvasAspectDerivation = null;
-		if (inputMode === 'single') input = '';
-		if (inputMode === 'batch') batch.clearInput();
-		if (inputMode === 'demo') demo.clearInput();
 		ddl = inputMode === 'single' ? '' : null;
 		expandedDdl = null;
 		ddlGeneratedBaseline = inputMode === 'single' ? '' : null;
@@ -895,7 +918,9 @@ export function createWorkState(deps: WorkStateDeps) {
 		deps.history().clearSelection();
 		canvasViewport.fit();
 	}
+	const showingDemo = $derived(activeRunMode === 'demo' || (result !== null && result === demo.latestResult && displayedHistoryItem === null));
 	return {
+		get showingDemo() { return showingDemo; },
 		get instructionLang() { return instructionLang; },
 		get pluginWarningsShown() { return pluginWarningsToShow(result); },
 		get limitNotesShown() { return limitNotesToShow(result); },
@@ -913,7 +938,7 @@ export function createWorkState(deps: WorkStateDeps) {
 		get canSubmit() { return canSubmit; },
 		get currentInstructionText() {
 			if (displayedHistoryItem?.input) return displayedHistoryItem.input;
-			if (inputMode === 'demo' || activeRunMode === 'demo') return demo.generatedPrompt;
+			if (showingDemo) return demo.generatedPrompt;
 			if (inputMode === 'batch' || activeRunMode === 'batch') return batch.latestPrompt;
 			return input;
 		},

@@ -41,7 +41,21 @@ export type BatchResumeCandidate<TWork extends BatchWork = BatchWork> = {
 	prompt: string;
 	lines: NumberedLine[];
 	runId: string | null;
-	work: TWork;
+	/** In-session pauses have their conditions before history has caught up. */
+	work: TWork | null;
+	conditions: BatchRunConditions;
+	pending: NumberedLine[] | null;
+	source: 'history' | 'session';
+};
+
+type InterruptedBatchSnapshot<TWork extends BatchWork> = {
+	prompt: string;
+	lines: NumberedLine[];
+	pending: NumberedLine[];
+	completed: NumberedLine[];
+	runId: string;
+	conditions: BatchRunConditions;
+	lastWork: TWork | null;
 };
 
 export type BatchStateDependencies = {
@@ -56,6 +70,8 @@ export type BatchStateDependencies = {
 
 export type BatchRunOptions<TResult extends BatchLineResult> = {
 	resumeLines?: NumberedLine[];
+	/** Captured when a fresh run starts, then reapplied by every in-session resume. */
+	runConditions?: BatchRunConditions;
 	canvasAspectId: PaintOptions['canvasAspectId'];
 	renderOverrides?: PaintOptions['renderOverrides'];
 	maxRetries: number;
@@ -116,8 +132,11 @@ export class BatchState<TResult extends BatchLineResult = BatchLineResult, TWork
 
 	private readonly deps: BatchStateDependencies;
 	private runIdentity = 0;
+	private resumeDiscovery = 0;
 	private stopRequested = false;
 	private abortController: AbortController | null = null;
+	private interruptedSnapshot: InterruptedBatchSnapshot<TWork> | null = null;
+	resuming = $state(false);
 
 	constructor(deps: BatchStateDependencies) {
 		this.deps = deps;
@@ -143,6 +162,17 @@ export class BatchState<TResult extends BatchLineResult = BatchLineResult, TWork
 		return this.resume !== null;
 	}
 
+	/** Enough progress for the button to explain an in-session continuation. */
+	get resumeInfo(): { nextLine: number | null; pending: number | null; total: number } {
+		const candidate = this.resume;
+		if (!candidate) return { nextLine: null, pending: null, total: 0 };
+		return {
+			nextLine: candidate.pending?.[0]?.line ?? null,
+			pending: candidate.pending?.length ?? null,
+			total: candidate.lines.length,
+		};
+	}
+
 	startFollowingLatest(): void {
 		this.autoFollowLatest = true;
 	}
@@ -152,8 +182,10 @@ export class BatchState<TResult extends BatchLineResult = BatchLineResult, TWork
 	}
 
 	clearPromptHistory(): void {
+		this.resumeDiscovery += 1;
 		this.promptHistory = [];
 		this.resume = null;
+		this.interruptedSnapshot = null;
 	}
 
 	clearInput(): void {
@@ -214,56 +246,121 @@ export class BatchState<TResult extends BatchLineResult = BatchLineResult, TWork
 
 	/** Ask the shallow listing only whether the newest batch stopped early. */
 	async refreshResume(): Promise<void> {
+		const discovery = ++this.resumeDiscovery;
+		if (this.resuming) return;
+		if (this.interruptedSnapshot) {
+			this.resume = this.sessionResumeCandidate(this.interruptedSnapshot);
+			return;
+		}
 		const prompt = this.promptHistory[0] ?? '';
 		if (!this.deps.signedIn() || !prompt) {
-			this.resume = null;
+			if (this.resumeDiscovery === discovery) this.resume = null;
 			return;
 		}
 		const lines = numberedBatchLines(prompt, this.deps.paintable);
 		if (lines.length === 0) {
-			this.resume = null;
+			if (this.resumeDiscovery === discovery) this.resume = null;
 			return;
 		}
 		try {
 			const work = latestBatchWork(await this.fetchWorksPage(0, BATCH_RESUME_PROBE_LIMIT)) as TWork | null;
+			if (this.resumeDiscovery !== discovery || this.resuming || this.interruptedSnapshot) return;
 			this.resume = work && batchStoppedPartWay(lines, work)
-				? { prompt, lines, runId: work.batch_run_id ?? null, work }
+				? {
+					prompt,
+					lines,
+					runId: work.batch_run_id ?? null,
+					work,
+					conditions: conditionsOfWork(work),
+					pending: null,
+					source: 'history',
+				}
 				: null;
 		} catch (cause) {
-			this.resume = null;
+			if (this.resumeDiscovery === discovery && !this.interruptedSnapshot) this.resume = null;
 			this.warn('failed to check whether the last batch reached its end', cause);
 		}
 	}
 
 	async resumeInterrupted(options: ResumeInterruptedOptions): Promise<void> {
 		const candidate = this.resume;
-		if (!candidate || options.blocked()) return;
-		const works = await this.collectRunWorks(candidate.runId, candidate.lines.length);
-		const remaining = linesToResume(candidate.lines, works, candidate.runId);
-		if (remaining.length === 0) {
+		if (!candidate || options.blocked() || this.resuming || this.running) return;
+		this.resuming = true;
+		const selection = ++this.resumeDiscovery;
+		try {
+			let snapshot = this.interruptedSnapshot;
+			if (!snapshot || candidate.source !== 'session') {
+				// A reload has no client snapshot. Discover its already-saved lines
+				// before starting anything; a failed lookup must never turn into a
+				// full rerun.
+				const works = await this.collectRunWorks(candidate.runId, candidate.lines.length);
+				// Sign-out, a prompt reset, or another resume discovery can happen
+				// while this paged lookup is waiting. None may apply this stale
+				// candidate's settings or restart its work.
+				if (this.resumeDiscovery !== selection || options.blocked() || this.resume !== candidate) return;
+				const remaining = linesToResume(candidate.lines, works, candidate.runId);
+				if (remaining.length === 0) {
+					this.resume = null;
+					return;
+				}
+				snapshot = {
+					prompt: candidate.prompt,
+					lines: candidate.lines,
+					pending: remaining,
+					completed: candidate.lines.filter((line) => !remaining.some((item) => item.line === line.line)),
+					runId: candidate.runId ?? (this.deps.createRunId ?? defaultRunId)(),
+					conditions: candidate.conditions,
+					lastWork: candidate.work,
+				};
+				this.interruptedSnapshot = snapshot;
+			}
+			if (snapshot.pending.length === 0) {
+				this.resume = null;
+				return;
+			}
+			options.applyConditions(snapshot.conditions);
+			// Refill the whole prompt: the pending plan keeps the original numbers.
+			this.input = snapshot.prompt;
 			this.resume = null;
-			return;
+			const run = options.run(snapshot.pending);
+			await run;
+		} finally {
+			this.resuming = false;
+			if (this.interruptedSnapshot) this.resume = this.sessionResumeCandidate(this.interruptedSnapshot);
 		}
-		options.applyConditions(conditionsOfWork(candidate.work));
-		// Refill the whole prompt: the remaining plan keeps the original numbers.
-		this.input = candidate.prompt;
-		this.resume = null;
-		await options.run(remaining);
 	}
 
 	async run(options: BatchRunOptions<TResult>): Promise<void> {
 		if (this.running) return;
+		const resumingSnapshot = options.resumeLines ? this.interruptedSnapshot : null;
+		if (!resumingSnapshot) {
+			this.resumeDiscovery += 1;
+			this.resume = null;
+		}
 		const identity = ++this.runIdentity;
 		const abortController = new AbortController();
 		this.abortController = abortController;
 		this.stopRequested = false;
 		this.running = true;
+		// A caller may need asynchronous lineage work before it invokes this
+		// owner. Keep the selection guarded until this run has claimed `running`.
+		if (resumingSnapshot) this.resuming = false;
 		this.resetForRun();
 
 		const lines = numberedBatchLines(this.input, this.deps.paintable);
 		const paintLines = options.resumeLines ?? lines;
 		const lineTotal = paintLines.length;
-		const batchRunId = (this.deps.createRunId ?? defaultRunId)();
+		const snapshot = resumingSnapshot ?? {
+			prompt: this.input,
+			lines,
+			pending: [...paintLines],
+			completed: [],
+			runId: (this.deps.createRunId ?? defaultRunId)(),
+			conditions: options.runConditions ?? this.emptyConditions(),
+			lastWork: null,
+		};
+		this.interruptedSnapshot = snapshot;
+		const batchRunId = snapshot.runId;
 		this.total = lineTotal;
 		let interrupted = false;
 
@@ -278,6 +375,7 @@ export class BatchState<TResult extends BatchLineResult = BatchLineResult, TWork
 		const paintBatchLine = async (item: NumberedLine): Promise<true | string | null> => {
 			if (!isCurrent()) return null;
 			this.activeLine = item.line;
+			let saved = false;
 			try {
 				const painted = await options.paintLine(item.input, {
 					historyInput: `#${item.line} ${item.input}`,
@@ -290,6 +388,9 @@ export class BatchState<TResult extends BatchLineResult = BatchLineResult, TWork
 					signal: abortController.signal,
 				});
 				if (!isCurrent()) return null;
+				saved = true;
+				this.markSnapshotCompleted(snapshot, item);
+				this.success += 1;
 
 				// These observer quantities settle together and always describe one work.
 				this.observedLine = item.line;
@@ -307,9 +408,14 @@ export class BatchState<TResult extends BatchLineResult = BatchLineResult, TWork
 				options.onLatestResult(painted, this.latestPrompt);
 				await options.refreshAfterServerSave();
 				if (!isCurrent()) return null;
-				this.success += 1;
 				return true;
 			} catch (cause) {
+				// Saving the work and refreshing its history are separate operations.
+				// Do not repaint a work merely because the ancillary refresh failed.
+				if (saved) {
+					this.warn('failed to refresh history after saved batch work', cause);
+					return true;
+				}
 				if (!isCurrent()) return null;
 				return cause instanceof Error ? cause.message : String(cause);
 			}
@@ -373,8 +479,15 @@ export class BatchState<TResult extends BatchLineResult = BatchLineResult, TWork
 			this.retryRound = 0;
 			this.total = lineTotal;
 			options.onPaintComplete?.();
-			await options.refreshAfterRun();
+			try {
+				await options.refreshAfterRun();
+			} catch (cause) {
+				// The completed work and the local interruption snapshot are already
+				// authoritative here. A history refresh must not hide Resume.
+				this.warn('failed to refresh history after batch run', cause);
+			}
 			publishFailureReport();
+			if (!interrupted && isCurrent()) this.interruptedSnapshot = null;
 			await this.refreshResume();
 		} finally {
 			if (this.abortController === abortController) {
@@ -421,6 +534,38 @@ export class BatchState<TResult extends BatchLineResult = BatchLineResult, TWork
 		this.latestPrompt = '';
 		this.autoFollowLatest = true;
 		this.deps.setFailureReport(null);
+	}
+
+	private emptyConditions(): BatchRunConditions {
+		return {
+			stage1Model: null,
+			stage2Model: null,
+			catalogId: null,
+			catalogMode: null,
+			sketchGrain: null,
+			wild: null,
+			canvasAspectId: null,
+		};
+	}
+
+	private markSnapshotCompleted(snapshot: InterruptedBatchSnapshot<TWork>, item: NumberedLine): void {
+		if (!snapshot.completed.some((line) => line.line === item.line)) {
+			snapshot.completed = [...snapshot.completed, item];
+		}
+		snapshot.pending = snapshot.pending.filter((line) => line.line !== item.line);
+	}
+
+	private sessionResumeCandidate(snapshot: InterruptedBatchSnapshot<TWork>): BatchResumeCandidate<TWork> | null {
+		if (snapshot.pending.length === 0) return null;
+		return {
+			prompt: snapshot.prompt,
+			lines: snapshot.lines,
+			runId: snapshot.runId,
+			work: snapshot.lastWork,
+			conditions: snapshot.conditions,
+			pending: snapshot.pending,
+			source: 'session',
+		};
 	}
 
 	private normalizePromptHistory(items: string[]): string[] {

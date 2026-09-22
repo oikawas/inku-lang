@@ -22,6 +22,7 @@ export type SettingsTab =
 	| 'users'
 	| 'unread'
 	| 'export'
+	| 'demo'
 	| 'misc'
 	| 'server_misc'
 	| 'logs'
@@ -58,7 +59,7 @@ export type SettingsNavigation = {
 };
 
 function isSettingsContentTab(tab: string | null | undefined): tab is Exclude<SettingsTab, 'connection'> {
-	return tab === 'models' || tab === 'db' || tab === 'plugins' || tab === 'users' || tab === 'unread' || tab === 'export' || tab === 'misc' || tab === 'server_misc' || tab === 'logs' || tab === 'limits';
+	return tab === 'models' || tab === 'db' || tab === 'plugins' || tab === 'users' || tab === 'unread' || tab === 'export' || tab === 'demo' || tab === 'misc' || tab === 'server_misc' || tab === 'logs' || tab === 'limits';
 }
 
 export function createSettingsNavigation<TActor extends SettingsActor>(

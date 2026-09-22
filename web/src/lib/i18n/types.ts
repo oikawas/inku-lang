@@ -107,6 +107,17 @@ export interface LangPack {
 	batchHistoryPlaceholder: string;
 	batchHistoryApply: string;
 	batchResumeBtn: string;
+	batchInterruptedLabel: string;
+	batchNextConditionsLabel: string;
+	batchResumeScanning: string;
+	batchResumeTitle: string;
+	batchResumeKnown: (nextLine: number, pending: number, total: number) => string;
+	batchResumeUnknown: (total: number) => string;
+	batchResumeCompleted: (success: number) => string;
+	batchResumeRestores: string;
+	batchNewRunLabel: string;
+	batchNewRunBtn: string;
+	demoOpenSettings: string;
 	colorCatalogAuto: string;
 	colorCatalogAutoSub: string;
 	colorCatalogRetired: string;

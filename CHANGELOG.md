@@ -6,6 +6,12 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 36 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-22 — Move Demo to settings and retain batch-run conditions
+
+The input tabs are now Description and Batch. Demo moved to the settings modal's `Making` category, available to regular users in Standard mode. Its running state and Stop action remain outside settings, which can be reopened, and starting Demo does not replace Description or Batch text.
+
+Batch now groups input, conditions, progress, and resume. During a run it retains the original prompt, run ID, start-time models, color catalog, sketch, Wild, canvas, and pending lines, so a stop before the first save or another stop after resume continues only the unsaved original lines under those conditions. A saved line is not repainted when the following history refresh fails. After reload, existing saved-history discovery remains the only resume source; a run with no saved success is not promised to resume.
+
 ### 2026-09-22 — Widen the Saijiki overview in the instruction editor
 
 The editor now supports composing short instructions from the Saijiki with a few lines of text above a wide category-based vocabulary list. Examples and explanations occupy a separate region, keeping word buttons stationary as previews change. Vocabulary starts visible on narrow screens too; hiding it expands the text editor. Language-aware words, selection replacement, and drawing paths are retained.

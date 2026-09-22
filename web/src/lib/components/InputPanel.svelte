@@ -5,14 +5,11 @@
 	import Tooltip from './Tooltip.svelte';
 	import BatchPanel from './BatchPanel.svelte';
 	import CanvasAspectPlugin from './CanvasAspectPlugin.svelte';
-	import DemoPanel from './DemoPanel.svelte';
 	import SketchSelect from './SketchSelect.svelte';
-	import { sketchModeLabel, type SketchMode } from '$lib/sketch';
+	import { type SketchMode } from '$lib/sketch';
 	import { wildSettings } from '$lib/features/wild/settings.svelte';
 	import PaintButton from './PaintButton.svelte';
 	import RunStatus from './RunStatus.svelte';
-	import type { DemoSettings } from '$lib/demo';
-	import type { ProviderGroup } from '$lib/models';
 	import type { CanvasAspectId, CanvasAspectOption } from '$lib/plugins/system/canvas-aspect';
 
 	type BatchFailure = {
@@ -26,7 +23,7 @@
 		failures: BatchFailure[];
 	};
 	type Props = {
-		inputMode: 'single' | 'batch' | 'demo';
+		inputMode: 'single' | 'batch';
 		input: string;
 		batchInput: string;
 		lineNumbersText: string;
@@ -59,27 +56,11 @@
 		error: string | null;
 		batchPromptHistory: string[];
 		canResumeBatch: boolean;
+		batchResumeInfo: { nextLine: number | null; pending: number | null; total: number } | null;
+		batchResuming: boolean;
+		batchInterrupted: boolean;
+		batchSuccess: number;
 		onResumeBatch: () => void;
-		demoSettings: DemoSettings;
-		demoModelProviderGroups: ProviderGroup[];
-		demoRunning: boolean;
-		demoTimedOut: boolean;
-		demoWaitingSeconds: number | null;
-		demoCurrentLiveMs: number | null;
-		demoCurrentElapsedMs: number | null;
-		demoCurrentTokensIn: number | null;
-		demoCurrentTokensOut: number | null;
-		demoTotalElapsedMs: number;
-		demoTotalTokensIn: number;
-		demoTotalTokensOut: number;
-		demoRenderCount: number;
-		demoGeneratedPrompt: string;
-		demoGeneratedDdlHighlighted: string;
-		demoCanSaveCurrent: boolean;
-		demoSavingCurrent: boolean;
-		demoSaveStatus: string | null;
-		demoError: string | null;
-		lockNonDemo: boolean;
 		stageLabel: string;
 		canvasAspectId: CanvasAspectId;
 		canvasAspectOptions: CanvasAspectOption[];
@@ -92,17 +73,12 @@
 		nextStage1Model: string;
 		nextStage2Model: string;
 		nextCatalogName: string;
-		nextCanvasName: string;
 		onToggleCanvasAspectMenu: () => void;
 		onSelectCanvasAspect: (id: CanvasAspectId) => void | Promise<void>;
 		onOpenModelSelection: () => void;
 		onOpenCatalogModal: () => void;
 		onClearInput: () => void;
 		onRememberBatchPrompt: (prompt: string) => void | Promise<void>;
-		onDemoSettingsChange: (settings: DemoSettings) => void | Promise<void>;
-		onSaveCurrentDemo: () => void | Promise<void>;
-		onStartDemo: () => void | Promise<void>;
-		onStopDemo: () => void;
 		onSubmit: () => void | Promise<void>;
 		onForkDescription: () => void | Promise<void>;
 		onStop: () => void;
@@ -141,27 +117,11 @@
 		error,
 		batchPromptHistory,
 		canResumeBatch,
+		batchResumeInfo,
+		batchResuming,
+		batchInterrupted,
+		batchSuccess,
 		onResumeBatch,
-		demoSettings = $bindable(),
-		demoModelProviderGroups,
-		demoRunning,
-		demoTimedOut,
-		demoWaitingSeconds,
-		demoCurrentLiveMs,
-		demoCurrentElapsedMs,
-		demoCurrentTokensIn,
-		demoCurrentTokensOut,
-		demoTotalElapsedMs,
-		demoTotalTokensIn,
-		demoTotalTokensOut,
-		demoRenderCount,
-		demoGeneratedPrompt,
-		demoGeneratedDdlHighlighted,
-		demoCanSaveCurrent,
-		demoSavingCurrent,
-		demoSaveStatus,
-		demoError,
-		lockNonDemo,
 		stageLabel,
 		canvasAspectId,
 		canvasAspectOptions,
@@ -173,17 +133,12 @@
 		nextStage1Model,
 		nextStage2Model,
 		nextCatalogName,
-		nextCanvasName,
 		onToggleCanvasAspectMenu,
 		onSelectCanvasAspect,
 		onOpenModelSelection,
 		onOpenCatalogModal,
 		onClearInput,
 		onRememberBatchPrompt,
-		onDemoSettingsChange,
-		onSaveCurrentDemo,
-		onStartDemo,
-		onStopDemo,
 		onSubmit,
 		onForkDescription,
 		onStop,
@@ -211,7 +166,6 @@
 	const tabItems = $derived([
 		{ mode: 'single' as const, label: t().modeSingle, running: singleRunning, progress: '' },
 		{ mode: 'batch' as const, label: t().modeBatch, running: batchRunning, progress: batchProgress },
-		{ mode: 'demo' as const, label: t().modeDemo, running: demoRunning, progress: '' },
 	]);
 
 	const singleInputStats = $derived.by(() => {
@@ -232,19 +186,15 @@
 <div class="panel-tabs">
 	{#each tabItems as item (item.mode)}
 		<Tooltip
-			placement={item.mode === 'single' ? 'bottom-right' : item.mode === 'demo' ? 'bottom-left' : 'bottom'}
-			text={item.mode === 'single' ? t().tooltipInputTabSingle : item.mode === 'batch' ? t().tooltipInputTabBatch : t().tooltipInputTabDemo}
+			placement={item.mode === 'single' ? 'bottom-right' : 'bottom-left'}
+			text={item.mode === 'single' ? t().tooltipInputTabSingle : t().tooltipInputTabBatch}
 		>
 			<button
 				class="panel-tab"
 				class:active={inputMode === item.mode}
 				class:running={item.running}
 				aria-busy={item.running}
-				disabled={lockNonDemo && item.mode !== 'demo'}
-				onclick={() => {
-					if (lockNonDemo && item.mode !== 'demo') return;
-					inputMode = item.mode;
-				}}
+				onclick={() => (inputMode = item.mode)}
 			>
 				<span class="tab-label">{item.label}</span>
 				{#if item.progress}<span class="tab-progress" style="min-width: {batchProgressWidth}ch">{item.progress}</span>{/if}
@@ -256,9 +206,7 @@
 
 <section class="panel-section">
 	<!-- The description is written before its conditions, immediately before painting. -->
-	{#snippet inputSettings()}
-	<h3 class="conditions-heading">{t().nextWorkConditions}</h3>
-	{#if inputMode === 'single'}
+	{#snippet inputConditionRows()}
 		<div class="condition-rows" aria-label={t().nextWorkConditions}>
 			<div class="condition-row">
 				<div class="condition-row-head">
@@ -310,88 +258,22 @@
 							showValue
 							onToggle={onToggleCanvasAspectMenu}
 							onSelect={onSelectCanvasAspect}
-						/>
+					/>
 					</Tooltip>
 				</div>
-			</div>
-		</div>
-	{:else}
-		<div class="section-head">
-			<div class="section-actions">
-				<!-- Batch and demo retain their shared settings toolbar. -->
-				<Tooltip text={t().tooltipInputModel}>
-					<button class="ghost-btn" onclick={onOpenModelSelection}>{t().modelButton}</button>
-				</Tooltip>
-				<Tooltip text={t().tooltipInputCatalog}>
-					<button class="ghost-btn catalog-btn" onclick={onOpenCatalogModal}>{t().colorCatalogButton}</button>
-				</Tooltip>
-				<Tooltip text={t().tooltipInputSketch}>
-					<SketchSelect value={sketchMode} {isJapanese} onSelect={onSelectSketchMode} />
-				</Tooltip>
-				<Tooltip text={t().tooltipInputWild}>
-					<button
-						type="button"
-						class="ghost-btn wild-btn"
-						class:active={wildSettings.enabled}
-						aria-pressed={wildSettings.enabled}
-						onclick={() => wildSettings.set(!wildSettings.enabled)}
-					>{t().wildButton}</button>
-				</Tooltip>
-				<Tooltip text={t().tooltipInputCanvas}>
-					<CanvasAspectPlugin
-						selected={canvasAspectId}
-						options={canvasAspectOptions}
-						open={canvasAspectMenuOpen}
-						onToggle={onToggleCanvasAspectMenu}
-						onSelect={onSelectCanvasAspect}
-					/>
-				</Tooltip>
 				{#if inputMode === 'batch'}
-					<Tooltip placement="left" text={t().tooltipInputClear}>
-						<button class="ghost-btn create-btn" onclick={onClearInput}>{t().clearInputBtn}</button>
-					</Tooltip>
+					<div class="condition-compact-row">
+						<Tooltip text={t().tooltipInputClear}>
+							<button class="ghost-btn" onclick={onClearInput}>{t().clearInputBtn}</button>
+						</Tooltip>
+					</div>
 				{/if}
 			</div>
 		</div>
-
-		<div class="current-selection" aria-label={t().nextWorkConditions}>
-			<span class="cs-group">
-				<span class="cs-label">{isJapanese ? 'モデル' : 'Model'}</span>
-				{#if nextStage1Model === nextStage2Model}
-					<span class="cs-value" title={nextStage1Model}>{nextStage1Model}</span>
-				{:else}
-					<span class="cs-sub">{isJapanese ? '解釈' : 'Interpretation'}</span>
-					<span class="cs-value" title={nextStage1Model}>{nextStage1Model}</span>
-					<span class="cs-sub">{isJapanese ? '描画' : 'Performance'}</span>
-					<span class="cs-value" title={nextStage2Model}>{nextStage2Model}</span>
-				{/if}
-			</span>
-			{#if inputMode === 'demo'}
-				<span class="cs-divider"></span>
-				<span class="cs-group">
-					<span class="cs-label">{isJapanese ? '指示生成' : 'Instruction'}</span>
-					<span class="cs-value" title={demoSettings.prompt_model}>{demoSettings.prompt_model}</span>
-				</span>
-			{/if}
-			<span class="cs-divider"></span>
-			<span class="cs-group">
-				<span class="cs-label">{isJapanese ? '色カタログ' : 'Catalog'}</span>
-				<!-- Reads "from the description" when that is what is selected: the page
-				     names the choice, so this shows one value either way. -->
-				<span class="cs-value" title={nextCatalogName}>{nextCatalogName}</span>
-			</span>
-			<span class="cs-divider"></span>
-			<span class="cs-group">
-				<span class="cs-label">{isJapanese ? '写生' : 'Sketch from life'}</span>
-				<span class="cs-value">{sketchModeLabel(sketchMode, isJapanese)}</span>
-			</span>
-			<span class="cs-divider"></span>
-			<span class="cs-group">
-				<span class="cs-label">{isJapanese ? 'キャンバス' : 'Canvas'}</span>
-				<span class="cs-value" title={nextCanvasName}>{nextCanvasName}</span>
-			</span>
-		</div>
-	{/if}
+	{/snippet}
+	{#snippet inputSettings()}
+		<h3 class="conditions-heading">{t().nextWorkConditions}</h3>
+		{@render inputConditionRows()}
 	{/snippet}
 
 	{#if inputMode === 'single'}
@@ -451,7 +333,7 @@
 		{#if error}<p class="error-text">{error}</p>{/if}
 	{:else if inputMode === 'batch'}
 		<BatchPanel
-			settings={inputSettings}
+			settings={inputConditionRows}
 			{runTokensIn}
 			{runTokensOut}
 			bind:batchInput
@@ -478,45 +360,16 @@
 			{error}
 			{batchPromptHistory}
 			{canResumeBatch}
+			{batchResumeInfo}
+			{batchResuming}
+			{batchInterrupted}
+			{batchSuccess}
 			{onResumeBatch}
 			{stage1ModelLabel}
 			{stage2ModelLabel}
 			{onRememberBatchPrompt}
 			onSubmit={onSubmit}
 			onStop={onStop}
-		/>
-	{:else}
-		<DemoPanel
-			{runTokensIn}
-			{runTokensOut}
-			{inputSettings}
-			bind:settings={demoSettings}
-			providerGroups={demoModelProviderGroups}
-			running={demoRunning}
-			timedOut={demoTimedOut}
-			{liveMs}
-			waitingSeconds={demoWaitingSeconds}
-			currentLiveMs={demoCurrentLiveMs}
-			currentElapsedMs={demoCurrentElapsedMs}
-			currentTokensIn={demoCurrentTokensIn}
-			currentTokensOut={demoCurrentTokensOut}
-			totalElapsedMs={demoTotalElapsedMs}
-			totalTokensIn={demoTotalTokensIn}
-			totalTokensOut={demoTotalTokensOut}
-			{demoRenderCount}
-			generatedPrompt={demoGeneratedPrompt}
-			generatedDdlHighlighted={demoGeneratedDdlHighlighted}
-			canSaveCurrent={demoCanSaveCurrent}
-			savingCurrent={demoSavingCurrent}
-			actionDisabled={singleRunning || generationDisabled}
-			drawingStage1ModelLabel={stage1ModelLabel}
-			drawingStage2ModelLabel={stage2ModelLabel}
-			saveStatus={demoSaveStatus}
-			error={demoError}
-			onSettingsChange={onDemoSettingsChange}
-			onSaveCurrent={onSaveCurrentDemo}
-			onStart={onStartDemo}
-			onStop={onStopDemo}
 		/>
 	{/if}
 </section>
@@ -550,13 +403,7 @@
 		animation: tabrun 1.1s linear infinite;
 	}
 	.panel-tab.active.running::before { background: var(--accent); animation: none; }
-	.panel-tab:disabled { opacity: 0.38; cursor: not-allowed; }
-	/* Neither half of a running tab may break across lines. The tab is a third
-	   of the row and the counter reserves its widest form beside the word, which
-	   left the word too little room: 「バッチ」 broke between its characters and
-	   the tab grew a line. Measured at a 1235px window -- (12/12 ↻2) made the
-	   tab 46px instead of 38, and (120/120 ↻2) made it 58 with the word on
-	   three lines. Neither string can break here, so neither does. */
+	/* Neither half of a running tab may break across lines. */
 	.tab-label { line-height: 1; white-space: nowrap; }
 	.tab-progress {
 		line-height: 1;
@@ -577,12 +424,6 @@
 	}
 	.panel-section { display: flex; flex-direction: column; gap: 6px; }
 	.conditions-heading { margin: 8px 0 2px; font-size: 12px; font-weight: 500; color: var(--fg2); }
-	.section-head {
-		display: flex;
-		justify-content: space-between;
-		align-items: center;
-	}
-	.section-actions { display: flex; gap: 5px; min-width: 0; flex: 1; }
 	.condition-rows {
 		display: grid;
 		gap: 6px;
@@ -659,59 +500,6 @@
 	.input-description { margin-top: 1px; color: var(--fg2); font-size: 12px; line-height: 1.45; }
 	.wild-btn.active { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
 	.wild-btn.active:hover { background: var(--accent); }
-	.catalog-btn {
-		display: inline-block;
-		max-width: 128px;
-		overflow: hidden;
-		text-overflow: ellipsis;
-		vertical-align: bottom;
-	}
-	.create-btn {
-		background: var(--ddl-btn-bg);
-		border-color: var(--ddl-btn-border);
-		color: var(--ddl-btn-fg);
-		font-weight: 600;
-		box-shadow: var(--ddl-btn-shadow);
-	}
-	.create-btn:hover {
-		background: var(--ddl-btn-bg-hover);
-		border-color: var(--ddl-btn-border-hover);
-		color: var(--ddl-btn-fg-hover);
-	}
-	.current-selection {
-		display: flex;
-		align-items: center;
-		flex-wrap: wrap;
-		gap: 6px 10px;
-		padding: 6px 9px;
-		border: 1px solid var(--border);
-		border-radius: var(--r);
-		background: var(--bg2);
-		font-size: 11px;
-		line-height: 1;
-		min-width: 0;
-	}
-	.cs-group {
-		display: inline-flex;
-		align-items: center;
-		gap: 5px;
-		min-width: 0;
-	}
-	.cs-label { color: var(--fg3); flex-shrink: 0; }
-	.cs-sub { color: var(--fg3); flex-shrink: 0; font-size: 10px; }
-	.cs-value {
-		min-width: 0;
-		overflow-wrap: anywhere;
-		color: #4d5f86;
-		font-weight: 500;
-	}
-	:global(html[data-theme='dark']) .cs-value { color: #a9c0ee; }
-	.cs-divider {
-		width: 1px;
-		height: 12px;
-		background: var(--border2);
-		flex-shrink: 0;
-	}
 	.input-ta-wrap {
 		position: relative;
 		display: flex;

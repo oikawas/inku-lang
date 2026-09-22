@@ -189,7 +189,7 @@ def test_user_settings_preserves_json_merge_transaction_and_exceptions(
         tooltips_enabled=False,
         download_folder_enabled=True,
         download_folder_name=" ",
-        settings_tab="models",
+        settings_tab="demo",
         model_settings={"stage1_model": "example:model"},
         history_strip_fields=["bytes", "generation"],
     )
@@ -198,7 +198,7 @@ def test_user_settings_preserves_json_merge_transaction_and_exceptions(
         "light", "custom", False, True
     )
     assert row.download_folder_name is None
-    assert row.settings_tab == "models"
+    assert row.settings_tab == "demo"
     assert json.loads(row.ui_custom) == {"history": False}
     assert json.loads(row.history_strip_fields) == ["generation", "bytes"]
     assert json.loads(row.model_settings) == {

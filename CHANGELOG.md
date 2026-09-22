@@ -6,6 +6,12 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 36 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-22 — Merge general visual-composition guidance into the current Stage 1 contract
+
+Japanese and English initial-generation prompts now retain the whole description's roles, contrasts, repetition, density, empty space, and texture within short instructions. Repetition without an explicit quantity receives a context-derived count in visible DDL; explicit counts remain unchanged. The prompts use no fixed count bands, subject-specific tables or steering examples, uniform count increases, or automatic paper grounds. The footsteps-to-central-red-line example is removed while the directly specified format example remains.
+
+Finite vocabulary, grammar, response schema, camera projection, hole completion, the compiler, renderer, and saved works are unchanged. The sent prompt digest distinguishes this change; engine and application versions are unchanged. Merging the prompt is not acceptance evidence for generated output or drawing quality.
+
 ### 2026-09-22 — Prevent clipping in the Library's grouped thumbnails
 
 In the Library's thumbnails grouped by Lineage, multiple groups could shrink until their thumbnails were hidden. Each group now retains its required height while the list scrolls vertically. Works within a Lineage remain arranged horizontally from the root in generation order, with horizontal scrolling for longer lineages.

@@ -1467,6 +1467,24 @@ passed as a prompt lock, and output stays inside that lock. This is the finite
 typed-normalization contract synchronized in I-640; no particular model name or
 model class is canonical.
 
+Initial interpretation condenses the whole description's roles, contrasts,
+repetition, density, empty space, and texture into a short visual composition.
+Brevity does not mean collapsing necessary roles into one central element or
+assigning one shape to every noun. Explicit quantities take priority. For
+repetition without an explicit quantity, choose a count from the context and
+state it in visible DDL. Do not use word-to-count bands, fixed minimums, or
+uniform increases, and do not treat more marks or sentences as a quality goal.
+
+Placements, tools, and other choices interpreted from the description are
+written into visible DDL while explicit specifications are preserved. Do not
+impose a central or edge placement, a fixed tool, or ground or background on
+every work. Do not change explicit colors for visibility or substitute ground
+or background for necessary drawing subjects. There are no subject-to-shape,
+material, or composition tables or subject-specific steering examples. This
+initial-generation policy is shared by Japanese and English; it changes
+neither the existing finite vocabulary, grammar, and response schema nor
+camera projection, hole completion, the compiler, or saved works' meaning.
+
 ### 12.7 Stage 2 Completion and Deterministic Structuring
 
 The Stage 2 LLM returns a span-bounded patch candidate only for known holes explicitly reported by the compiler in saved visible DDL. The shared pipeline creates the request automatically; adoption requires author approval and a visible-DDL CAS save. The LLM does not output Score. The shared lowerer structures lock-verified typed meaning into Score once, preserving color, material, quantity, movement, arrangement path, rotation, canvas, and explicit relations.

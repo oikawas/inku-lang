@@ -1,6 +1,6 @@
 # Application Installation
 
-This guide describes a standard new installation or upgrade of the unreleased inku v2.13.42 (Web Build 929) on Linux. It provides both the existing systemd development setup and a Compose setup using the production SvelteKit adapter. Put a TLS reverse proxy in front of any public internet deployment.
+This guide describes a standard new installation or upgrade on Linux. It provides both the existing systemd development setup and a Compose setup using the production SvelteKit adapter. Put a TLS reverse proxy in front of any public internet deployment. The Web UI instructions in §§10 and 12 match v2.15.15 (Web Build 1091).
 
 ## 1. Components
 
@@ -168,9 +168,9 @@ systemctl status inku-server.service --no-pager
 
 1. Open `http://<server>:5173/`.
 2. Sign in as the bootstrap admin.
-3. Check provider connections, API keys, and published models in Settings.
-4. Create users and groups.
-5. Choose Stage 1 and Stage 2 under `model selection`.
+3. Open `Models` under `Connections and administration` in Settings and check provider connections, API keys, and models visible to members.
+4. Create users and groups in `User management`.
+5. Choose Stage 1 and Stage 2 in the separate `Model selection` screen.
 6. Paint short Japanese and English descriptions and verify automatic language detection, history saving, and SVG/PNG export.
 
 Normal generation has no manual instruction-language selector. It detects the input language and falls back to the UI language only when the text has no language signal.
@@ -197,11 +197,13 @@ Check in the Web UI:
 - Painting from Japanese and English descriptions
 - Painting with Sketch from life set to `Fine`, and the sketch appearing on the left
 - Color catalog, model, canvas, and Wild selection
-- All five refinement elements (Another composition, Another reading, Another catalog, Variation, Another performance) and model comparison
+- Refinement and model comparison
 - Provenance Details, Prompts, and JSON
 - Timeline and By lineage history modes, and search by the last four hash characters or a whole render hash
-- SVG and PNG export, contact sheets, and animation
-- Administrators see the `Limits` settings tab and can save it
+- Choose a save location in `Export`, then export SVG, PNG, contact sheets, and animation. The location remains only in the browser that chose it; without one, exports use the browser default download location.
+- As an administrator, switch Settings between `Standard` and `Detailed`, then open and save `Limits` and `Other (server)` in Detailed mode
+- Review backup status in `DB settings` and retention settings in `Log retention`
+- Change text size in `Display and operation` and confirm that it takes effect immediately
 
 ## 13. Upgrade Procedure
 

@@ -1,6 +1,6 @@
 # Creating Images
 
-This guide covers work creation with the Web UI and CLI in inku v2.13.42 (Web Build 929). A description passes through sketching from life, interpretation, deterministic expansion, structuring, and performance.
+The Web instructions in this guide apply to inku v2.15.15 (Build 1091). A description passes through sketching from life, interpretation, deterministic expansion, structuring, and performance.
 
 ```text
 description -> Sketch from life (Stage 0.5) -> interpretation (Stage 1) -> instructions (normalized DDL)
@@ -30,7 +30,7 @@ The left app rail provides settings, profile, theme, UI display language, the to
 
 The UI language and the description language are separate. Ordinary painting detects the description language from the entered text, including English text in the Japanese UI and Japanese text in the English UI. Only text with no usable language signal falls back to the UI language. You may also state it with `Description language`: `Auto`, `Japanese`, or `English`.
 
-`UI mode`, under `Other` in the settings, chooses how much of the screen is shown.
+`UI mode`, under `Display and operation` in Settings, chooses how much of the screen is shown.
 
 | UI mode | Contents |
 |---|---|
@@ -40,7 +40,7 @@ The UI language and the description language are separate. Ordinary painting det
 
 The UI mode can also be switched from the icon on the left of the rail. **The number of dark bars is the mode that is on**: one for simple, two for custom, three for full. The menu is listed in the same order (simple, custom, full).
 
-The user menu, settings, single description and painting, the canvas and the history are always visible. **The history is always there so that a work can be looked at again and taken out as one sheet with `Share card`** (the card has two doors, one inside `Export` at the top right of the canvas and one in the history panel, and both belong to the history side; in the simple UI the first becomes a card-only button -- v2.13.29). Custom UI can add seven groups: batch and demo; model, color, sketch, and canvas settings; view and edit instructions; timing, tokens, and provenance; refinement, comparison, export, and work actions; history and work navigation; theme, language, and work information.
+The user menu, settings, one description and Paint action, and the canvas are always visible. Open history and the library when needed. Custom UI can add seven groups: batch and demo; model, color, sketch, and canvas settings; view and edit instructions; timing, tokens, and provenance; refinement, comparison, export, and work actions; history and work navigation; theme, language, and work information.
 
 This manual assumes Full UI. Under Simple UI some of the operations described here are not on screen.
 
@@ -58,7 +58,7 @@ The new password must be at least eight characters. **It does not change unless 
 
 1. Open the `Describe` tab.
 2. Write a short sentence in the description area.
-3. If needed, set `Model`, `Color catalog`, `Sketch from life`, `Wild`, and `Canvas`.
+3. Under `Conditions for the next work`, set `Model`, `Color catalog`, `Sketch from life`, `Wild`, and `Canvas` if needed.
 4. Press `Paint`.
 5. Confirm that the performance appears in the `Work` tab and is saved to history.
 
@@ -140,17 +140,17 @@ If the layer does not answer, the description goes to interpretation unchanged a
 
 ## 5. Consult the Saijiki
 
-The `Saijiki` is inku's vocabulary dictionary.
+The `Saijiki` is inku's vocabulary dictionary. Open `New instructions` or `Edit instructions` to find the shared instruction editor, with a broad Saijiki list beneath it. Close the vocabulary to make more room for the text.
 
-1. After the first painting, press `Saijiki` on the `Instructions (normalized DDL)` row.
-2. Point at or click a word to see how it acts on the performance, with examples.
-3. Choose a word to insert it at the cursor position in the instructions.
+1. `New instructions` starts with an empty text; `Edit instructions` starts with the displayed work's text.
+2. Review the categories and words. Hover over or click a word to read its effect and example in the separate preview.
+3. Pick a word to insert it into the selected text or at the cursor.
 
 The eleven words under `Surface` each carry a small drawing of how the face is, and a note on what it does to the performance. Every drawing shares the same outline; only what is inside it changes.
 
-The Saijiki is not autocompletion. Consult it when needed; it does not narrow a description to the existing vocabulary on its own. It is for reading, and pressing it does not start a painting.
+The Saijiki is not autocompletion. Consult it when needed; it does not narrow a description to the existing vocabulary on its own. Picking a word does not start painting.
 
-Plugin words appear in the same row and wear the same face as built-in ones. The explanation is not under the word but in the preview above it, which carries four parts: name, effect, example, and picture. The picture appears only when the plugin document ships one; a word without one gets the same fallback picture a built-in word gets.
+Plugin words appear in the same row and wear the same face as built-in ones. The explanation is not under the word but in a preview panel separate from the list, which carries four parts: name, effect, example, and picture. The picture appears only when the plugin document ships one; a word without one gets the same fallback picture a built-in word gets.
 
 ## 6. Read and Edit the Instructions
 
@@ -165,12 +165,12 @@ After painting, `Instructions (normalized DDL)` on the left shows how Stage 1 re
 
 `Auto-repair` enables or disables the deterministic repairs for invisible colors, overcrowding, contract violations, and the like. The repairs are: making colors that merge with the background visible; damping overcrowded lines, grains, and fills; filling in missing shape parameters; tidying duplicate instructions; removing invalid contact and positional relations; supplying colors and shapes the DDL left short; and supplying the composition's fulcrum, motion, and rhythm.
 
-There are two entrances to the instructions.
+There are two entrances to the instructions. Both use the same dialog and editor. The text shows line numbers, syntax color, line and character counts; choose the painting model and `Wild` outside the text. While painting, the text, Saijiki, condition changes and close control are unavailable. A failed or stopped painting keeps the text.
 
 | Action | Contents |
 |---|---|
-| New instructions | Write instructions directly, without a description, and paint them as an independent work |
-| Edit instructions | Edit the instructions of the displayed work and repaint it as that work's child |
+| New instructions | Open it from the Describe side. Write instructions directly, without a description, and paint them as an independent work |
+| Edit instructions | Open it beside the displayed work's instructions heading or from the work editing menu. Edit the text and repaint it as that work's child |
 
 `Draw from instructions` sends the displayed instructions to Stage 2 unchanged. Stage 1 does not run, so the interpretation does not change.
 
@@ -186,7 +186,7 @@ A `namespace.word` such as `Nature.青葉` is marked in the plugin color only wh
 
 ## 7. Choose Model, Color Catalog, Sketch, Wild, and Canvas
 
-The button row on the describe tab applies to the next painting. It is identical across the three input tabs: describe, batch, and demo.
+`Conditions for the next work` on the Describe tab apply to the next painting. The input tabs are `Describe` and `Batch`. Batch shows the same kind of choices as its own `Drawing conditions for the next batch`.
 
 | Control | Contents |
 |---|---|
@@ -222,7 +222,7 @@ Coordinates stay normalized to 0.0–1.0 whatever the canvas. **A mark's size is
 
 **From v2.13.14 the canvas you choose also reaches the stage that builds the composition (Stage 2).** The composition is told which paper it is for, so the same description is laid out differently on a pillar than on a folding screen. **Only size and placement move with the paper** -- a number the description states is drawn as stated, and a size the description states is not changed to suit the paper.
 
-The settings of the displayed work and the settings for the next painting are separate. Distinguish the `Displayed` strip at the top of the work tab from the button row on the describe tab.
+The conditions of the displayed work and the conditions for the next work are separate. `Conditions of the displayed work` records how the selected saved work was painted; `Conditions for the next work` controls what comes next. Reading a work preview in the library does not change the next conditions. Different values on the two sides are not an error.
 
 ## 8. Refine
 
@@ -329,9 +329,13 @@ The `Lineage` tab shows which explicit action a work was derived from. Performan
 
 ## 14. Manage History
 
-The history strip at the bottom is for moving quickly back and forth in time. `History management` switches between `Timeline` and `By lineage`.
+The history strip at the bottom is for moving quickly back and forth in time. Opening history leads to the separate `Library`, which keeps the making screen's input and unsaved refinement state. `Return to making` also keeps the library's query, filters, display, page, selection, scroll position and reading preview.
 
-**What is printed under each thumbnail is chosen under `Other` in `Settings`** (`Facts under the history thumbnails`). Choose **up to two** of generation, model, engine version and file size; **choose none and the strip shows only the pictures**. A third choice is refused rather than allowed to evict an existing one, and the limit is shown. **File size is the size the server reports for the stored work.**
+In the library, choose `Display` (`Thumbnails` or `List`) separately from `Group by` (`Timeline` or `By lineage`). Selecting a row or picture only opens its reading preview; it does not change the conditions for the next work. Use `Open work`, `Open lineage`, or `Refine` for those actions.
+
+Combine `Thumbnails` with `By lineage` to arrange works horizontally within each lineage, from the origin in generation order. Scroll vertically between lineage groups and horizontally through a long row of related works.
+
+**What is printed under each thumbnail is chosen under `Display and operation` in `Settings`** (`Facts under the history thumbnails`). Choose **up to two** of generation, model, engine version and file size; **choose none and the strip shows only the pictures**. A third choice is refused rather than allowed to evict an existing one, and the limit is shown. **File size is the size the server reports for the stored work.**
 
 - Search by description, by the last four characters of the hash, or by **a whole render hash**
 - Filters for starred only, for revision only, and shared only. Used together, only works matching every one of them remain
@@ -340,23 +344,23 @@ The history strip at the bottom is for moving quickly back and forth in time. `H
 - Move to trash, restore, and permanent delete, singly or by multiple selection
 - Expanding and selecting a whole lineage at once
 - Syncing to the displayed work and jumping to the oldest or latest page
-- **The words for moving agree everywhere.** On the canvas, the strip and history management alike, left is newer and right is older, and `prev`, `next` and `first` are not used (`← newer` / `older →` / `Latest` / `Oldest`)
+- **The words for moving agree everywhere.** On the canvas, the strip and Library alike, left is newer and right is older, and `prev`, `next` and `first` are not used (`← newer` / `older →` / `Latest` / `Oldest`)
 
 `By lineage` groups only on stored lineage nodes and edges. `lineage_only` intermediate works and tombstones are not counted in ordinary history.
 
 The revision mark is a second mark, independent of the star. Use it for works you mean to return to.
 
-The share mark is a third one. Raise it with `Mark for sharing` at the top right of the canvas on the work tab. **Once it is up, the members of your own organisation group can read that work.** Press it again to lower it. An administrator may aim it at another organisation group instead.
+The share mark is a third one. Raise it with `Mark for sharing` at the bottom of the canvas on the Work tab. **Once it is up, the members of your own organisation group can read that work.** Press it again to lower it. An administrator may aim it at another organisation group instead.
 
 **Lowering the mark keeps the destination.** Marking the same work again returns it to the same recipients. **What this mark widens is reading only, never writing** — a work shared to you cannot be starred or moved to trash by you. Lineage nodes follow the mark, but **the colophon does not**.
 
-Both the history strip and `History management` carry a `Shared only` filter, so the marked works can be listed on their own.
+Both the history strip and `Library` carry a `Shared only` filter, so the marked works can be listed on their own.
 
 `Replay` re-renders from the stored score and seed. If the engine version that painted the work differs from the current one, that fact and a comparison of the two are shown. Old history entries without a render seed cannot be replayed.
 
 ## 15. Export Images
 
-Save from `SVG` or `PNG` at the bottom of the work tab.
+Open `Export` at the bottom of the Work tab, check that the target is `Displayed work`, then choose an SVG format or PNG size. When exporting from the Library or Lineage, check the selected count or path from the origin shown in the menu.
 
 | Format | Use | Characteristics |
 |---|---|---|
@@ -367,11 +371,11 @@ Save from `SVG` or `PNG` at the bottom of the work tab.
 
 `Editable` and `Compat` are drawn again from the Score, and **a redraw uses the performance that was saved** (both the render seed and the composition seed the saved work carries). **The only difference from the stored SVG is how far the drawing engine has moved on** -- inku keeps no past version, so a redraw after the engine advances is never byte-identical.
 
-The download folder can be set in the settings. Without one, files land in the browser's default folder. The folder itself lives only inside that browser, so another browser or another device needs its own choice. If writing is not permitted, the file lands in the browser's default folder and says so.
+Set the download folder under `Settings` → `Export` → `Save location`. Without one, files land in the browser's default folder. The folder itself lives only inside that browser, so another browser or another device needs its own choice. If writing is not permitted, the file lands in the browser's default folder and says so.
 
 ### 15.1 Contact Sheets
 
-Works selected in history management are laid out on a single PNG.
+Works selected in Library are laid out on a single PNG.
 
 | Kind | Contents |
 |---|---|
@@ -386,12 +390,12 @@ There are two doors.
 
 | Door | What it cards | What one press does |
 |---|---|---|
-| `Share card` inside `Export`, at the top right of the canvas | the work on the canvas | exports one sheet immediately (v2.13.29) |
-| `Share card` in history management | the one checked work | enabled only when exactly one work is checked |
+| `Share card` inside `Export`, at the bottom of the Work tab | the displayed work | exports one sheet immediately |
+| `Share card` inside `Export` in the Library or Lineage | the one work shown in the menu | available when the selection or preview targets one work |
 
 Both follow the same layout and seal settings. A work that has not been saved yet has no card, so the button on the canvas cannot be pressed.
 
-**In the simple UI — and in any custom UI without `refinement, comparison, export, and work actions` — `Export` becomes a card-only button** (v2.13.29). One press exports the card with no menu in between. SVG and PNG belong to that group and are not offered, but the card stays: it is how a work goes to someone else.
+**In the simple UI — and in any custom UI without `refinement, comparison, export, and work actions` — the work's export control becomes a card-only button.** One press exports the card with no menu in between. SVG and PNG belong to that group and are not offered, but the card stays: it is how a work goes to someone else.
 
 | Setting | Choices |
 |---|---|
@@ -404,7 +408,7 @@ The same card comes out of the CLI with `inku-cli export-card`.
 
 ### 15.3 Animation
 
-Works checked in history management, or the works from a selected work back to its origin in the lineage, are exported as one moving image.
+One saved work and several selected works export differently. For the displayed work or one checked work in the Library, choose `Layer animation` from `Export`. For several checked works, choose `Transition animation` to move between works from oldest to newest. In Lineage, choose either the path from the origin to the displayed work or only the checked works.
 
 | Setting | Choices |
 |---|---|
@@ -413,7 +417,17 @@ Works checked in history management, or the works from a selected work back to i
 | Hold | Seconds each work is shown |
 | Resolution (Y axis) | 150 px, 300 px, 500 px, 1K (1080 px), 4K (2160 px), 8K (4320 px), custom |
 
-From history management the order is oldest to newest; from the lineage it runs from the origin to the selected work.
+For one work, `Layer frames` sets the number of forward frames from ground to finish. Layers accumulate from frame to frame until the work is complete. `Layer interval` sets the seconds each frame remains on screen. This is a simulated making process based on the saved SVG's stacking order.
+
+| Replay | Motion |
+|---|---|
+| Restart from ground | Return to the ground after completion and build up again |
+| Play back and forth | Reverse from the finished work to the ground, then repeat forwards |
+| Play once and hold | Build up once and stop at the finished work |
+
+For several works, choose the transition pattern and display hold for each work. Format, resolution, and destination are common to both types. Settings and destination changed in the export dialog apply only to that export. In supported browsers, `Choose save path` chooses a folder; other browsers use their download settings.
+
+From Library the order is oldest to newest; from the lineage it runs from the origin to the selected work.
 
 ## 16. Batch
 
@@ -425,34 +439,37 @@ While it runs, the current line, progress, elapsed time, token counts, and the i
 
 Descriptions used before can be restored from `Batch description history`. The last fifty are kept (v2.13.21; twenty before that). The list reaches half the window height at most and scrolls when it does not fit. Clicking outside it or pressing `Esc` closes it.
 
-A batch that stopped part-way can be carried on with `Resume where it stopped`, which appears to the left of `Paint` (v2.13.21). Pressing it paints only the lines that have no work yet, keeping the line numbers of the original description. The button appears only when the last batch work painted is not the last line of the newest description in `Batch description history`. The models, color catalog, sketch, wild and canvas used for the resume follow the record of the last work painted. A setting with no record is left as it is now.
+A batch stopped with `Stop` can continue through `Resume the interrupted batch` and `Resume where it stopped`. It checks the unfinished lines of the original batch, skips completed works, and restores the original text and drawing conditions. After a browser reload, the same signed-in account can also resume when its newest saved batch text and saved batch works establish that the batch stopped part-way. If the unfinished lines cannot be established from the saved history and text, no resume card appears.
 
 Set `Batch retry` in the settings to one or more and the failed lines alone are painted again after the first pass. Zero means no retry. A run that was stopped is not retried.
 
 ## 17. Demo
 
-The `Demo` tab writes short descriptions from a seed phrase and paints them repeatedly. You can set saving to the DB, saving to files, the description model, the display interval in seconds, and a timeout in minutes.
+Open `Settings` → `Making` → `Demo`. It writes short descriptions from a seed phrase, then paints them repeatedly. Choose saving to DB, saving files, the description model, display interval in seconds, and timeout in minutes.
+
+Starting Demo closes Settings so you can watch the canvas. While it runs, the making screen shows a stop control and `Demo settings and progress`, which reopens its settings. Description and Batch text are retained.
 
 Even with automatic saving disabled, the current work can be saved to history explicitly. The demo stops on its own when the configured time is reached. History actions are locked while a demo runs.
 
 ## 18. Settings
 
-Open the settings from the application rail. Which tabs are visible depends on the role.
+Open it from `Settings` in the app rail. Settings are grouped as `Display and operation`, `Making`, `Export`, `Connections and administration`, and `Extensions and details`. The pages and controls visible depend on your role.
 
-| Tab | Contents |
+| Category | Pages and contents |
 |---|---|
-| Models | Default models, AI service connections, published model selection |
-| DB settings | The current server DB; DB backup interval, generations, time, and manual run |
-| Plugins | The state of the system plugin, canvas ratio, and of user plugins |
-| User management | Adding, changing, and deleting users and groups |
-| Export | PNG export templates, animation across several works, the shareable card's layout and seal |
-| Limits | The ceilings, such as how many marks one work may hold |
-| Log retention | Log retention and rotation policy |
-| Unread-word ledger | Words interpretation could not map directly |
-| Other | UI mode, theme, mascot, download folder, batch retry, facts under the history thumbnails |
-| Other (server) | Automatic saving of output files, painting concurrency |
+| Display and operation | `Display and operation`. Text size, caption position, UI mode, facts under history thumbnails, mascot, and related controls |
+| Making | `Batch retry` and `Demo` |
+| Export | `Export`. Save location, PNG export templates, animation, and the share card's page shape and seal |
+| Connections and administration (administrators) | `Models`, `User management`, `DB settings`, and `Log retention`. `Detailed` also shows `Other (server)` and `Limits` |
+| Extensions and details | `Detailed` shows `Plugins` and `Unread-word ledger` |
 
-The settings dialog opens either `Standard` or `Detailed`, switched from the toggle at its top right. **The `Plugins`, `Limits`, `Unread Word Ledger` and `Other (server)` tabs appear only in `Detailed`.** The choice stays in that browser.
+To choose the models for drawing, open `Model selection` from the making screen's conditions and select Stage 1, Stage 2, and Vision when needed. The administrator's `Models` page manages connections and which models are published to members.
+
+The settings dialog has `Standard` and `Detailed` modes, switched through `Display mode` at upper right. `Standard` shows everyday settings; **`Plugins`, `Limits`, `Unread-word ledger`, and `Other (server)` appear only in `Detailed`.** The choice remains in this browser.
+
+`Text size` in `Display and operation` has five values: 90%, 100%, 110%, 120%, and 130%. Moving it changes the screen immediately; confirming the control saves it on the account. `Return to standard` restores 100%. If saving fails, the current size remains visible and `Retry` saves it again. It does not change the work SVG, PNG output, or export dimensions.
+
+`User management` provides search, permission and no-group filters, then selection and editing of users. `Add user` opens the add form explicitly. Edit only the selected member, set permissions and groups, then use `Save changes`. While edits are unsaved, it does not refresh the list or select another user; a failed save keeps both input and error. It is available to administrators in the Web UI.
 
 `Limits` is not a speed control: it changes the number of lines actually drawn. The values chosen there are written into the Stage 1 and Stage 2 prompts and recorded on every work painted. See `Server Configuration` for the details.
 

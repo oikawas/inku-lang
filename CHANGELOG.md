@@ -6,6 +6,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 36 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-22 — Update the Japanese and English manuals for the current Web UI
+
+Aligned the user manuals with the current screen layout, instruction editing, Library and Lineage, animation, batch resume, Demo, and settings. Added text-size adjustment and saving instructions, and updated settings paths in the administration and installation guides. Product code and versions are unchanged.
+
 ### 2026-09-22 — Shared text sizing with a stepped control
 
 Display and operation now offers five text-size steps from 90% to 130% and a reset to the default. Changes appear immediately, are saved to the account, and can be retried if saving fails. Fixed UI font sizes now use shared CSS definitions so settings, editors, history, Lineage, and supporting text follow one scale. Work pictures and export dimensions are unchanged.

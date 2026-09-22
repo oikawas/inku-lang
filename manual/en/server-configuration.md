@@ -1,6 +1,6 @@
 # Server Configuration
 
-This guide defines the administration baseline for the unreleased inku v2.13.42 (Web Build 929). It covers the environment template, current DB schema, Web administration UI, and reference systemd templates.
+This guide defines the administration baseline. It covers the environment template, current DB schema, Web administration UI, and reference systemd templates. Its Web UI instructions match v2.15.15 (Web Build 1091).
 
 ## 1. Configuration Boundaries
 
@@ -8,7 +8,7 @@ Settings belong to three boundaries.
 
 1. OS and service: `/etc/inku/inku-api.env`, systemd, reverse proxy, and filesystem permissions
 2. Administrator: provider connections, published models, limits, DB backups, artifacts, log policy, and users
-3. User: Stage 1/2 models, UI language, UI mode, theme, canvas, color catalog, sketch, Wild, download folder, and history-selection behavior
+3. User: Stage 1/2 models, UI language, UI mode, theme, text size, canvas, color catalog, sketch, Wild, download folder, and history-selection behavior
 
 Provider API key environment variables are initial values. A provider key saved from the admin UI is stored encrypted in the DB. Never put host-specific details or secrets in Git-tracked documentation.
 
@@ -83,7 +83,7 @@ An administrator who forgets the password is not shut out for good. `inku-admin 
 
 When the artifact queue is full, DB history remains the priority and only artifact saving is skipped. Distinguish provider queue latency from insufficient server workers.
 
-`INKU_RENDER_CONCURRENCY` and `INKU_CLIENT_FANOUT_LIMIT` **seed the first value only**. After that the DB settings are canonical; change them from `Other (server)` in the admin UI or with `inku-cli config update`. Requests beyond the server limit are refused with 503 rather than queued, and the client retries at a short interval.
+`INKU_RENDER_CONCURRENCY` and `INKU_CLIENT_FANOUT_LIMIT` **seed the first value only**. After that the DB settings are canonical; change them from `Other (server)`, which appears after switching Settings to `Detailed`, or with `inku-cli config update`. Requests beyond the server limit are refused with 503 rather than queued, and the client retries at a short interval.
 
 ### 2.4 LLM Retry and Timeout
 
@@ -191,7 +191,7 @@ Lineage connects only explicit creation operations. It is never inferred from si
 | `leaders` | User administration within assigned scope |
 | `users` | Generation and management of own history and settings |
 
-An administrator can change another person's password: choose the account under `User management` in the settings, fill in `New password` in `Edit user`, and save (**the current password is not asked for**). A `leaders` member can do the same within their own scope. A person changing their own password does it from `Profile`, where both the current and the new one are required. **None of this is open to a lone administrator who has forgotten theirs** -- the way back is `inku-admin reset-password` in 2.2.
+An administrator uses `User management` in Settings to create users and change membership, permission groups, and another person's password. Choose the account, fill in `New password` in `Edit user`, and save (**the current password is not asked for**). The current Web UI shows `User management` only to `admins`. A `leaders` member manages ordinary users in their own organisation group through the CLI or API. A person changing their own password does it from `Profile`, where both the current and the new one are required. **None of this is open to a lone administrator who has forgotten theirs** -- the way back is `inku-admin reset-password` in 2.2.
 
 One member may hold several permission groups; where they overlap the stronger one decides (a member holding `admins` and `leaders` passes as `admins`). A user group — the organisational unit — is a separate thing: one per member, and independent of permission.
 
@@ -208,6 +208,25 @@ One member may hold several permission groups; where they overlap the stronger o
 Generation, history, lineage, and settings APIs enforce authentication and the visibility scope. **⚠ Since v2.12.2 a lineage crosses owners** — any readable work of another member can be a parent, and the group's root is inherited, so **the number of visible nodes in one group differs per viewer**. A node that cannot be read comes back with its content withheld, telling `deleted` apart from `not_permitted` in words. Acceptance testing must cover both directions: **a work that was not shared never reaches another member**, and **a work that was shared does reach them**. **Settings carry no sharing**: personal settings stay with their owner, and global settings stay with `admins`.
 
 ## 5. Models and Languages
+
+### 5.0 Web UI Settings Routes
+
+Open `Settings` from the application rail. The top `Standard` / `Detailed` switch and the categories on the left control this dialog. The switch is a per-browser choice for the amount shown in Settings; it is separate from the drawing screen's `UI mode`. `Standard` shows everyday items. `Detailed` also shows `Plugins`, `Other (server)`, `Limits`, and `Unread-word ledger`. A person without the needed permission neither sees nor operates administration items.
+
+| Category | Main items | Scope |
+|---|---|---|
+| `Display and operation` | Text size, caption position, UI mode, and fields below history thumbnails | Text size, UI mode, and related choices belong to the member. Text size takes effect immediately. |
+| `Making` | Batch retry count and `Demo` | The batch retry count belongs to the member. `Demo` is in the Making category. |
+| `Export` | Save location, PNG templates, animation, and cards | The save location belongs only to the browser that chose it. PNG templates apply to that member's PNG menu. |
+| `Connections and administration` | `Models`, `User management`, `DB settings`, `Log retention`, and, in Detailed mode, `Other (server)` and `Limits` | The current Web UI administration items are available only to `admins`. |
+
+`Model selection` is a separate drawing-time screen for choosing the Stage 1 / Stage 2 models (and Vision when available). In contrast, the administrator's `Models` screen manages connection services, Base URLs, API keys encrypted for storage, models visible to members, and LLM / Vision purpose. Adding or changing a connection does not by itself make its models visible to members.
+
+To change the published models as an administrator:
+
+1. Choose a connection service in `Models`, then open `Select models` in its published-model section.
+2. Find models with search and filters, and check those to publish. The bulk selection action applies only to the currently filtered results.
+3. Use `Save` to apply the selection, or `Cancel` to close without saving it. Fetching the model list is unavailable while there are unsaved changes; save or discard them first.
 
 | Stage | Role |
 |---|---|
@@ -227,7 +246,7 @@ Resolved values are recorded as `instruction_lang_requested`, `instruction_lang_
 
 ### 5.1 Limits
 
-Nine numbers decide how many marks one work may hold. They are not a speed control: the number of lines actually drawn changes. Set them from the `Limits` tab in the admin UI or with `inku-cli config update`. **They are written into the Stage 1 and Stage 2 prompts and recorded on every work painted.**
+Nine numbers decide how many marks one work may hold. They are not a speed control: the number of lines actually drawn changes. Switch Settings to `Detailed` and open `Limits`, or use `inku-cli config update`. **They are written into the Stage 1 and Stage 2 prompts and recorded on every work painted.**
 
 | Group | Value | Default | Contents |
 |---|---|---|---|
@@ -273,7 +292,7 @@ This setting has nothing to do with thumbnails: listings keep baking them even w
 <output_dir>/<user_id>/YYYY-MM-DD/YYYYMMDD_HHMMSS_<history_id>...
 ```
 
-Administrators can change artifact targets and queue settings from server settings. Verify write permission for the service user after changing the output path.
+In `Detailed` Settings, administrators change artifact targets and queue settings in `Other (server)`. Verify write permission for the service user after changing the output path. This is where the server automatically saves history byproducts. The member's download location for SVG, PNG, and related exports is separate: choose it under `Export` / `Save location`; it remains only in the browser that chose it. Without a choice, or if the browser loses write permission, the export goes to the browser default download location.
 
 ## 8. Backup and Recovery
 
@@ -287,7 +306,7 @@ Back up at least:
 | systemd and reverse proxy | Service recovery |
 | Artifacts | Rebuildable, but potentially required operationally |
 
-Change the SQLite backup directory with `INKU_DB_BACKUP_DIR`. The Web admin UI supports manual and scheduled backups with generation retention. Use external backups as well, keeping the DB and encryption key at the same recovery point.
+Change the SQLite backup directory with `INKU_DB_BACKUP_DIR`. In `DB settings`, the Web admin UI shows DB status and manages manual backups plus the interval, time, and generation count for scheduled backups. Use external backups as well, keeping the DB and encryption key at the same recovery point.
 
 Recovery tests should verify sign-in, provider-key decryption, history display, lineage edges, and SVG replay.
 
@@ -309,7 +328,7 @@ journalctl -u inku-api.service -n 100 --no-pager
 journalctl -u inku-server.service -n 100 --no-pager
 ```
 
-The log policy in the admin UI (enabled / retention days / interval / compression) is **executed by the application itself**. Files are written under `INKU_LOG_DIR` (`~/.local/share/inku/logs` by default, `/data/logs` in the container distribution), and the application rotates, compresses and prunes them. No logrotate configuration is needed. **The same lines keep going to stdout**, so `journalctl` and `docker logs` are unchanged. In the container distribution, `logging` in `compose.yaml` caps what the daemon collects from stdout.
+The `Log retention` policy in the admin UI (enabled / retention days / interval / compression) is **executed by the application itself**. Files are written under `INKU_LOG_DIR` (`~/.local/share/inku/logs` by default, `/data/logs` in the container distribution), and the application rotates, compresses and prunes them. No logrotate configuration is needed. **The same lines keep going to stdout**, so `journalctl` and `docker logs` are unchanged. In the container distribution, `logging` in `compose.yaml` caps what the daemon collects from stdout.
 
 ## 10. systemd
 

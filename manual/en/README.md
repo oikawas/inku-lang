@@ -1,6 +1,6 @@
 # inku User and Operations Manual
 
-This manual explains how to use and operate the unreleased inku v2.13.42 baseline (Web Build 929). It is intended for first-time creators and system administrators who deploy and maintain the application. The canonical product specification is `SPEC.ja.md` at the repository root.
+This manual explains how to use and operate inku. It is intended for first-time creators and system administrators who deploy and maintain the application. Web UI instructions reflect v2.15.15 (Web Build 1091). The canonical product specification is `SPEC.ja.md` at the repository root.
 
 ## Audience
 
@@ -15,6 +15,8 @@ This manual explains how to use and operate the unreleased inku v2.13.42 baselin
 3. [Application Installation](./application-install.md)
 4. [Server Configuration](./server-configuration.md)
 5. [Revision History](./revision-history.md)
+
+For everyday creative work, start with Creating Images. It covers drawing from descriptions and instructions, Lineage and the Library, resuming batches, layer animation, and text-size settings. For provider connections and user permissions, see Server Configuration.
 
 ## Templates
 

@@ -2,6 +2,17 @@
 
 This file records revisions to user and operations documents under `manual/`. See `SPEC.ja.md` for the detailed product change history.
 
+## 2026-09-22 — Align Web UI instructions with v2.15.15 (Web Build 1091)
+
+Updated Creating Images in both languages and the Web UI procedures in the administration and installation guides to match the current interface. This documentation update changes no product behavior or version.
+
+- Distinguished the next drawing's conditions from those of the displayed work, and clarified writing and editing instructions, the Saijiki, Refine, and Lineage.
+- Documented the Library entry point, display formats and grouping, thumbnails grouped by Lineage, and export actions.
+- Added layer animation for one work, batch interruption and resume with its limitations after reload, and Demo's new location in settings.
+- Updated settings categories, Standard and Detailed views, model settings, rendering limits, export, and user administration. Display and operation now documents the five text-size steps—90, 100, 110, 120, and 130%—with immediate preview, account saving, reset, and retry after a save failure.
+
+This revision covers Web UI instructions. Earlier revision entries retain their historical wording.
+
 ## 2026-08-18 — v2.13.42 unreleased baseline (Web Build 929)
 
 The thirteen places that name a version were updated to v2.13.42 / Build 929. **A fault that stopped the

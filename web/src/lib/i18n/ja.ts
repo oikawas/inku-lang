@@ -570,7 +570,7 @@ export const ja: LangPack = {
 	userGroupMembershipHint: '所属グループは、リーダーの管理範囲と利用者のまとまりを決めます。',
 	userAddOpen: 'ユーザーを追加',
 	userNoSearchResults: '条件に合うユーザーはいません。',
-	settingsRenderLimitsCurrent: '現在の保存値',
+	settingsRenderLimitsCurrent: '保存値',
 	settingsRenderLimitsDefault: '既定値',
 	settingsRenderLimitsUnit: (unit) => `単位: ${unit}`,
 	settingsRenderLimitUnits: {
@@ -652,9 +652,9 @@ export const ja: LangPack = {
 	settingsRenderLimitsReset: '既定値へ戻す',
 	settingsRenderLimitsSaved: '制限値を保存しました',
 	settingsRenderLimitGroups: {
-		capability: 'この機械が描ける量',
-		legibility: '目で数えられる限界',
-		safety: '誤入力の番人'
+		capability: '描画量',
+		legibility: '数の表現',
+		safety: '安全上限'
 	},
 	settingsRenderLimitGroupTooltips: {
 		capability:
@@ -676,9 +676,9 @@ export const ja: LangPack = {
 		schema_count_max: 'Stage 2 の出力を検証する天井'
 	},
 	settingsRenderLimitHints: {
-		max_expanded_primitives: 'これを超えると作品全体を縮めて収めます。実測では 400 本で SVG 5〜6.5 MB（筆致による）',
+		max_expanded_primitives: 'これを超えると作品全体を縮めて収めます。',
 		max_expanded_per_instruction: '一つの指示がこれより多くを求めたら間引きます。一枚の総量より大きい値は総量まで下げます',
-		max_instructions: 'これを超えた指示は切り捨てます。本番の最大は 27（中央値 4）なので、既定の 64 は実在の作品に当たりません',
+		max_instructions: 'これを超えた指示は切り捨てます。',
 		literal_count_threshold: 'これ未満なら述べた数をそのまま描きます。これ以上は数えられないので群れとして見せます',
 		represented_count_min: '群れとして見せるときの下の端',
 		represented_count_max: 'その上の端。そのまま描く上限を超えていれば、そこまで下げます。ここを動かすと一つの群れに入る墨の量も動きます',

@@ -70,6 +70,17 @@
 		scrollbar-gutter: stable;
 	}
 	.settings-feature-root .settings-body > * { flex-shrink: 0; }
+	.settings-feature-root .settings-body.limits-body {
+		flex: 1;
+		min-height: 0;
+		padding: 0;
+		overflow: hidden;
+		gap: 0;
+	}
+	.settings-feature-root .settings-body.limits-body > * {
+		flex: 1 1 auto;
+		min-height: 0;
+	}
 	.settings-feature-root button:focus-visible,
 	.settings-feature-root summary:focus-visible,
 	.settings-feature-root input:focus-visible,

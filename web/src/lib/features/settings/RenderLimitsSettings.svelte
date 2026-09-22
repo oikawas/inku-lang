@@ -110,112 +110,101 @@
 	}
 </script>
 
-<div class="popover-group">
-	<div class="popover-group-label">{t().settingsRenderLimitsTitle}</div>
+<div class="limits-panel">
 	{#if loading}
-		<div class="inline-message">{t().settingsLoading}</div>
+		<div class="limits-content"><div class="inline-message">{t().settingsLoading}</div></div>
 	{:else if status}
-		<div class="db-test-result">{t().settingsRenderLimitsIntro}</div>
-		{#each Object.entries(status.groups) as [groupName, fields]}
-			<div class="limits-group">
-				<div class="limits-group-label">
-					<span>{renderLimitGroupLabel(groupName)}</span>
-					{#if renderLimitGroupTooltip(groupName)}
-						<Tooltip placement="bottom-right" wide text={renderLimitGroupTooltip(groupName)}>
-							<span class="settings-info-mark" aria-hidden="true">i</span>
-						</Tooltip>
-					{/if}
-				</div>
-				{#if renderLimitGroupSummary(groupName)}
-					<p class="limits-group-summary">{renderLimitGroupSummary(groupName)}</p>
-				{/if}
-				<div class="limits-grid">
-					{#each fields as field}
-						<!-- A div, not a label: the stepper's first labelable child is a
-						     button, so a wrapping label would target that instead of the
-						     field. The stepper carries its own aria-label. -->
-						<div class="limits-field">
-							<span>{renderLimitLabel(field)}</span>
-							<div class="limits-field-facts">
-								<span>{t().settingsRenderLimitsCurrent}: {formatGroupedNumber(saved[field] ?? status.limits[field], 1)}</span>
-								<span>{t().settingsRenderLimitsDefault}: {formatGroupedNumber(status.defaults[field], 1)}</span>
-								<span>{renderLimitUnit(field)}</span>
-							</div>
-							<NumberStepper
-								label={renderLimitLabel(field)}
-								min={1}
-								max={status.absolute_max}
-								value={draft[field] ?? status.limits[field]}
-								disabled={!isAdmin || saving}
-								onChange={(value) => {
-									draft = { ...draft, [field]: value };
-									normalizedFields = [];
-								}}
-							/>
-							<small>{renderLimitHint(field)}</small>
-							<!-- The Svelte const directive may only be the immediate child of a block,
-							     so the costs guard hosts it rather than the field div. Both conditions
-							     carry weight: an older server sends no costs at all, and eight of the
-							     nine fields govern no megabytes even when it does. -->
-							{#if status.bytes_per_mark}
-								{@const weight = markWeight(
-									field,
-									draft[field] ?? status.limits[field],
-									status.bytes_per_mark
-								)}
-								{#if weight}
-									<small class="limits-weight"
-										>{t().settingsRenderLimitsWeight(weight.low, weight.high)}</small
-									>
-								{/if}
+		<div class="limits-content">
+			<div class="limits-intro">{t().settingsRenderLimitsIntro}</div>
+			{#each Object.entries(status.groups) as [groupName, fields]}
+				<section class="limits-group" aria-label={renderLimitGroupLabel(groupName)}>
+					<div class="limits-group-heading">
+						<div class="limits-group-label">
+							<span>{renderLimitGroupLabel(groupName)}</span>
+							{#if renderLimitGroupTooltip(groupName)}
+								<Tooltip placement="bottom-right" wide text={renderLimitGroupTooltip(groupName)}>
+									<span class="settings-info-mark" aria-hidden="true">i</span>
+								</Tooltip>
 							{/if}
 						</div>
-					{/each}
+						{#if renderLimitGroupSummary(groupName)}
+							<p class="limits-group-summary">{renderLimitGroupSummary(groupName)}</p>
+						{/if}
+					</div>
+					<div class="limits-list">
+						{#each fields as field}
+							<!-- The stepper owns the labelable control, so the row keeps its text separate. -->
+							<div class:limits-field-changed={draft[field] !== saved[field]} class="limits-field">
+								<div class="limits-field-copy">
+									<span class="limits-field-label">{renderLimitLabel(field)}</span>
+									<small>{renderLimitHint(field)}</small>
+									{#if status.bytes_per_mark}
+										{@const weight = markWeight(
+											field,
+											draft[field] ?? status.limits[field],
+											status.bytes_per_mark
+										)}
+										{#if weight}
+											<small class="limits-weight"
+												>{t().settingsRenderLimitsWeight(weight.low, weight.high)}</small
+											>
+										{/if}
+									{/if}
+								</div>
+								<div class="limits-field-control">
+									<NumberStepper
+										label={renderLimitLabel(field)}
+										min={1}
+										max={status.absolute_max}
+										value={draft[field] ?? status.limits[field]}
+										disabled={!isAdmin || saving}
+										onChange={(value) => {
+											draft = { ...draft, [field]: value };
+											normalizedFields = [];
+										}}
+									/>
+									<div class="limits-field-facts">
+										<span>{t().settingsRenderLimitsCurrent}: {formatGroupedNumber(saved[field] ?? status.limits[field], 1)}</span>
+										<span>{t().settingsRenderLimitsDefault}: {formatGroupedNumber(status.defaults[field], 1)}</span>
+										<span>{renderLimitUnit(field)}</span>
+									</div>
+								</div>
+							</div>
+						{/each}
+					</div>
+				</section>
+			{/each}
+			<div class="limits-rounding">{t().settingsRenderLimitsRounding}</div>
+		</div>
+		<footer class="limits-footer">
+			{#if normalizedFields.length}
+				<div class="inline-message limits-normalized">
+					{t().settingsRenderLimitsNormalized(normalizedFields.map(renderLimitLabel).join(', '))}
 				</div>
-			</div>
-		{/each}
-		<div class="db-test-result">{t().settingsRenderLimitsRounding}</div>
-		<div class="limits-footer">
-		{#if normalizedFields.length}
-			<div class="inline-message limits-normalized">
-				{t().settingsRenderLimitsNormalized(normalizedFields.map(renderLimitLabel).join(', '))}
-			</div>
-		{/if}
-		{#if saveStatus && !(hasChanges && saveStatus === t().settingsRenderLimitsSaved)}
-			<div class="inline-message">{saveStatus}</div>
-		{/if}
-		<div class="settings-inline-actions">
-			<button class="ghost-btn" onclick={onReload} disabled={loading || saving || hasChanges || !isAdmin}>{t().settingsReloadSettings}</button>
-			<button class="ghost-btn" onclick={restoreDefaults} disabled={saving || !isAdmin}>{t().settingsRenderLimitsReset}</button>
-			{#if hasChanges}
-				<span class="limits-change-count">{t().settingsRenderLimitsChanges(changedFields.length)}</span>
-				<button class="ghost-btn" onclick={discardChanges} disabled={saving}>{t().settingsRenderLimitsCancel}</button>
-				<button class="limits-save" onclick={saveChanges} disabled={saving || !isAdmin}>
-					{saving ? t().settingsRenderLimitsSaving : t().settingsRenderLimitsSave}
-				</button>
 			{/if}
-		</div>
-		</div>
+			{#if saveStatus && !(hasChanges && saveStatus === t().settingsRenderLimitsSaved)}
+				<div class="inline-message">{saveStatus}</div>
+			{/if}
+			<div class="settings-inline-actions">
+				<button class="ghost-btn" onclick={onReload} disabled={loading || saving || hasChanges || !isAdmin}>{t().settingsReloadSettings}</button>
+				<button class="ghost-btn" onclick={restoreDefaults} disabled={saving || !isAdmin}>{t().settingsRenderLimitsReset}</button>
+				{#if hasChanges}
+					<span class="limits-change-count">{t().settingsRenderLimitsChanges(changedFields.length)}</span>
+					<button class="ghost-btn" onclick={discardChanges} disabled={saving}>{t().settingsRenderLimitsCancel}</button>
+					<button class="limits-save" onclick={saveChanges} disabled={saving || !isAdmin}>
+						{saving ? t().settingsRenderLimitsSaving : t().settingsRenderLimitsSave}
+					</button>
+				{/if}
+			</div>
+		</footer>
 	{:else}
-		<div class="inline-message">{statusError ?? t().settingsLoadFailed}</div>
+		<div class="limits-content"><div class="inline-message">{statusError ?? t().settingsLoadFailed}</div></div>
 	{/if}
 </div>
 
 <style>
-	.popover-group {
-		border: 1px solid var(--border);
-		border-radius: var(--r);
-		padding: 12px;
-		background: var(--panel);
-	}
-	.popover-group-label {
-		font-size: 10px;
-		color: var(--fg3);
-		text-transform: uppercase;
-		letter-spacing: 0.08em;
-		font-weight: 500;
-		margin-bottom: 7px;
-	}
+	.limits-panel { display: flex; flex: 1 1 auto; flex-direction: column; min-height: 0; }
+	.limits-content { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 20px 24px 24px; }
 	.settings-info-mark {
 		display: inline-flex;
 		align-items: center;
@@ -230,7 +219,9 @@
 		text-transform: none;
 		letter-spacing: 0;
 	}
-	.db-test-result { color: var(--fg2); font-size: 12px; }
+	.limits-intro, .limits-rounding { color: var(--fg2); font-size: 12px; line-height: 1.5; }
+	.limits-intro { margin-bottom: 20px; }
+	.limits-rounding { margin-top: 18px; }
 	.inline-message {
 		padding: 7px 9px;
 		border: 1px solid var(--border);
@@ -240,11 +231,8 @@
 		font-size: 12px;
 	}
 	.limits-footer {
-		position: sticky;
-		bottom: 0;
-		z-index: 1;
-		margin-top: 12px;
-		padding: 10px 0;
+		flex: none;
+		padding: 12px 24px 16px;
 		border-top: 1px solid var(--border);
 		background: var(--panel);
 	}
@@ -255,7 +243,8 @@
 		gap: 10px;
 		margin-top: 8px;
 	}
-	.limits-group { margin: 16px 0; padding: 14px; border: 1px solid var(--border); border-radius: var(--r); }
+	.limits-group + .limits-group { margin-top: 22px; }
+	.limits-group-heading { margin-bottom: 8px; }
 	.limits-group-label {
 		font-size: var(--btn-sm-font-size);
 		color: var(--fg2);
@@ -271,35 +260,33 @@
 		font-size: 12px;
 		line-height: 1.4;
 	}
-	.limits-grid {
-		display: grid;
-		/* The hint sets the card width, not the control: the stepper is fixed
-		   below and every hint is a sentence. */
-		grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
-		gap: 14px 16px;
-	}
+	.limits-list { border-top: 1px solid var(--border); }
 	.limits-field {
-		display: flex;
-		flex-direction: column;
-		gap: 4px;
+		display: grid;
+		grid-template-columns: minmax(0, 1fr) 160px;
+		gap: 12px 24px;
+		align-items: start;
+		padding: 12px 10px;
 		min-width: 0;
 		font-size: 12px;
+		border-bottom: 1px solid var(--border);
+		border-left: 3px solid transparent;
 	}
-	.limits-field > span { color: var(--fg); font-weight: 500; }
-	.limits-field > small { color: var(--fg3); font-size: 12px; line-height: 1.5; }
+	.limits-field-changed { border-left-color: var(--accent); background: var(--accent-light); }
+	.limits-field-copy { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+	.limits-field-label { color: var(--fg); font-weight: 600; }
+	.limits-field-copy > small { color: var(--fg3); font-size: 12px; line-height: 1.45; }
+	.limits-field-control { display: flex; flex-direction: column; align-items: flex-start; gap: 5px; }
 	.limits-field-facts {
 		display: flex;
 		flex-wrap: wrap;
 		gap: 3px 8px;
 		color: var(--fg3);
-		font-size: 12px;
+		font-size: 11px;
 		font-variant-numeric: tabular-nums;
 	}
 	.limits-field-facts > span { color: inherit; font-weight: 400; }
-	/* The conversion answers a different question from the hint above it -- what
-	   this number costs, rather than what it governs -- so it is set apart
-	   rather than reading as a second sentence of the same line. */
-	.limits-field > small.limits-weight { color: var(--fg2); }
+	.limits-field-copy > small.limits-weight { color: var(--fg2); }
 	.limits-normalized { margin-top: 8px; }
 	.limits-change-count { color: var(--fg2); font-size: 12px; }
 	.limits-save {
@@ -314,4 +301,10 @@
 	}
 	.limits-save:hover:not(:disabled) { background: var(--action-hover); }
 	.limits-save:disabled { opacity: 0.5; cursor: default; }
+	@media (max-width: 680px) {
+		.limits-content { padding: 16px; }
+		.limits-footer { padding: 12px 16px 16px; }
+		.limits-field { grid-template-columns: minmax(0, 1fr); gap: 9px; }
+		.limits-field-control { align-items: flex-start; }
+	}
 </style>

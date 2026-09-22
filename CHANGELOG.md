@@ -6,6 +6,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 36 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-22 — Organize the Limits tab
+
+Removed the duplicate heading and outer frame, and aligned all three groups into consistent rows for explanations, inputs, saved values, and defaults. Changed rows are marked, and narrow screens stack the content. Save feedback and actions now sit outside the scrolling fields so they do not cover the final rows. Field meanings, values, and saving behavior are unchanged.
+
 ### 2026-09-22 — Refine limits, export, and user administration
 
 Limits now show saved values, defaults, and units alongside draft inputs. Users can review the change count and save or discard edits together. Restoring defaults also stays a draft, and successful saves identify fields normalized by the server.

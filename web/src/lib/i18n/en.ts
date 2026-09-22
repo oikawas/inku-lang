@@ -570,7 +570,7 @@ export const en: LangPack = {
 	userGroupMembershipHint: 'A group defines a leader’s management scope and a user’s membership.',
 	userAddOpen: 'Add user',
 	userNoSearchResults: 'No users match the current filters.',
-	settingsRenderLimitsCurrent: 'Saved value',
+	settingsRenderLimitsCurrent: 'Saved',
 	settingsRenderLimitsDefault: 'Default',
 	settingsRenderLimitsUnit: (unit) => `Unit: ${unit}`,
 	settingsRenderLimitUnits: {
@@ -652,9 +652,9 @@ export const en: LangPack = {
 	settingsRenderLimitsReset: 'Restore defaults',
 	settingsRenderLimitsSaved: 'Limits saved',
 	settingsRenderLimitGroups: {
-		capability: 'What this machine can draw',
-		legibility: 'Where counting by eye stops',
-		safety: 'Guards against a typing mistake'
+		capability: 'Drawing volume',
+		legibility: 'Count representation',
+		safety: 'Safety limits'
 	},
 	settingsRenderLimitGroupTooltips: {
 		capability:
@@ -676,9 +676,9 @@ export const en: LangPack = {
 		schema_count_max: "Ceiling checked on Stage 2's output"
 	},
 	settingsRenderLimitHints: {
-		max_expanded_primitives: 'Past this the whole work is scaled down to fit. Measured: 400 marks come to 5-6.5 MB of SVG, depending on the brush',
+		max_expanded_primitives: 'Past this the whole work is scaled down to fit.',
 		max_expanded_per_instruction: 'An instruction asking for more than this is thinned. A value above the per-work total is lowered to it',
-		max_instructions: 'Instructions past this are dropped. Production has never exceeded 27 (median 4), so the default of 64 has never bound a real work',
+		max_instructions: 'Instructions past this are dropped.',
 		literal_count_threshold: 'Below this the stated number is drawn as stated; at or above it the group is shown as a band, because it cannot be counted by eye',
 		represented_count_min: 'Low end of the band a too-large group is drawn as',
 		represented_count_max: 'High end of that band. Lowered to the literal threshold if it sits above it. Moving it also moves how much ink lands in one cluster',

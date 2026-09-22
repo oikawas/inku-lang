@@ -291,7 +291,7 @@
 					<h2 id="settings-page-title">{settingsPage.title}</h2>
 					<p>{settingsPage.hint}</p>
 				</header>
-			<div class="settings-body">
+			<div class:limits-body={settingsTab === 'limits'} class="settings-body">
 			{#if settingsTab === 'models'}
 				<ModelAdministrationSettings administration={settings.modelAdministration} {providerGroups} />
 		{:else if settingsTab === 'db'}

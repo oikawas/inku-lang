@@ -72,6 +72,7 @@ def _encode_frames(
     output_format: AnimationFormat,
     *,
     play_once: bool = False,
+    apng_disposal: Literal[0, 2] = 2,
 ) -> bytes:
     output = BytesIO()
     if output_format == "apng":
@@ -82,7 +83,7 @@ def _encode_frames(
             append_images=frames[1:],
             duration=durations,
             loop=1 if play_once else 0,
-            disposal=2,
+            disposal=apng_disposal,
             blend=0,
             compress_level=6,
         )
@@ -363,6 +364,8 @@ def build_layer_animation(
             durations,
             output_format,
             play_once=replay == "once",
+            # Keep the canvas behind cropped APNG updates, including the final hold.
+            apng_disposal=0,
         )
     finally:
         for frame in reverse_frames:

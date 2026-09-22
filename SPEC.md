@@ -450,6 +450,8 @@ The current finite consumer that reaches an actual Score projects each complete 
 
 The macro head is joined exactly across its source instruction slot, source invocation ordinal, locked definition, and expanded invocation. Only `place:center` uses the effective focus at `MacroEmit { invocation_ordinal, expansion_path, generated_ordinal, field: place }`. Multiple complete Emits replace the head in their existing order as ordinary instructions; an origin through `use`, bounded `repeat`, or `vary` is not itself a rejection. Output instructions correspond in order to either a direct source slot or generated provenance. Adjacent bound Emits in the same Macro and original generated order deliver `connected` / `touching` through the same checked relation rules as ordinary DDL, preserving original reference order, ownership, and numeric-fixed or named-movable position authority. Touching joins both Line / Arc endpoints with the existing Arc reconstruction and fixes explicit relative scale (including normal), dimensions, and chord direction. `not_touching` and `between` also reach the shared checked performer from adjacent bound Emits in the same Macro. NotTouching retains the existing Medium gap, while Between retains the existing recipe using the bounding-box centers of the current Emit's immediately preceding Emit and the Emit before it. Named and noncenter placement is movable; numeric placement is fixed and is never overwritten. Between's `from` is the immediately preceding Emit, with the one before it retained as its second reference and with both owners preserved. `along` / `cutting` also reach the same checked performer from adjacent bound Line Emits, using named-movable or numeric-fixed position authority and the direction/dimension rules in §14.4. Adjacency includes unbound Emits in the original order, and an omitted from or either Between reference never retargets to a survivor. Regardless of legacy Stop or OmitAndContinue input, an incomplete Emit, unknown key, category or type mismatch, unbound caller fact, or expanded unsupported Transform axes / an unpositioned `anchor` / unsupported `relation` omits its established minimum field, Emit, subtree, or invocation with a diagnostic and continues the remaining Score. Unrelated siblings, including those inside Groups, remain in source and generated-provenance order. A missing reference omits only the relation while retaining its original dependency and any independently drawable Emit; it never retargets to a survivor. No child Emit is extracted from an unsupported structural subtree, and adjacency is not created across an unsupported subtree. An unused parameter or unreferenced Emit binding ID alone is not rejected.
 
+An unbound caller action does not omit the entire Macro invocation. Only the outer action is omitted as `macro_caller_field { field: action }`, retaining its original owner, spans, and reason while preserving the definition's Emits, transforms, counts, order, seed, and provenance. The outer action is neither distributed into the body nor interpreted as a different action. This does not grant unconditional recovery for other unbound caller fields; exact-join integrity failures and the absence of drawable residual content still stop execution.
+
 Repeated Direct and Macro plans retain checked Connected, Touching, Along, and Cutting intents symbolically, including the verified original target and position authority. This does not materialize instances.
 
 Macros execute in invocation order after meaning resolution. A mention used only for anaphora does not execute twice or shift the semantic ordinal of a later macro. Source occurrence ordinal remains separately for ownership and provenance. The original sentences and rhythm, source spans, continuation edge / target, all bindings, and source / generated provenance are retained and verified. A full compiler-lock digest that includes them is an attestation of source integrity; equivalent expressions need not have the same digest. Source-record differences do not enter meaning selection, while source alteration is rejected.
@@ -1469,6 +1471,47 @@ passed as a prompt lock, and output stays inside that lock. This is the finite
 typed-normalization contract synchronized in I-640; no particular model name or
 model class is canonical.
 
+Initial interpretation condenses the whole description's roles, contrasts,
+repetition, density, empty space, and texture into a short visual composition.
+Brevity does not mean collapsing necessary roles into one central element or
+assigning one shape to every noun. Explicit quantities take priority. For
+repetition without an explicit quantity, choose a count from the context and
+state it in visible DDL. Do not use word-to-count bands, fixed minimums, or
+uniform increases, and do not treat more marks or sentences as a quality goal.
+
+Placements, tools, and other choices interpreted from the description are
+written into visible DDL while explicit specifications are preserved. Do not
+impose a central or edge placement, a fixed tool, or ground or background on
+every work. Do not change explicit colors for visibility or substitute ground
+or background for necessary drawing subjects. There are no subject-to-shape,
+material, or composition tables or subject-specific steering examples. This
+initial-generation policy is shared by Japanese and English; it changes
+neither the existing finite vocabulary, grammar, and response schema nor
+camera projection, hole completion, the compiler, or saved works' meaning.
+
+The initial prompt uses a short order: preserve explicit specifications, choose
+unspecified parts from the whole description, write accepted grammar, then check
+preservation and ownership. It does not require every attribute to be filled or
+invite the LLM to silently delete unsupported explicit meaning. "Random" is read
+as an observable static state in context, not mapped to a fixed placement. The
+example distinguishes a directly specified shape angle from arrangement
+direction; it supplies no subject mapping or default center, color, or support.
+
+Tools in the shared Saijiki asset carry short bilingual `physical_description`
+notes grounded in §13.5. Only initial generation reads these notes for existing
+`prompt=true` tools in Saijiki order. There is no subject- or emotion-dependent
+selection or recommendation, fixed quantity, numeric default, or new synonym.
+Notes remain separate from accepted vocabulary and are not DDL words, parser
+aliases, or Score values. Editing notes changes the asset's byte-provenance
+digest without changing accepted words or drawing semantics.
+
+Initial usage guidance distinguishes tool from thinness and continuity, count
+from size and placement, shape angle from line-up direction, and surface from
+ground and background, with the current typed DDL applicability limits. A listed
+word does not authorize every head combination. Explicit independent points,
+lines, and marks must not be absorbed into surface attributes. Neither this guide
+nor the tool notes are added to camera or hole-completion system text.
+
 ### 12.7 Stage 2 Completion and Deterministic Structuring
 
 The Stage 2 LLM returns a span-bounded patch candidate only for known holes explicitly reported by the compiler in saved visible DDL. The shared pipeline creates the request automatically; adoption requires author approval and a visible-DDL CAS save. The LLM does not output Score. The shared lowerer structures lock-verified typed meaning into Score once, preserving color, material, quantity, movement, arrangement path, rotation, canvas, and explicit relations.
@@ -1574,7 +1617,7 @@ layer. `interpret_fallback` and `compose_fallback` distinguish a reason,
 `"none"`, and absence from records created before the field. Refining from a
 marked parent asks once before execution, and existing works are not backfilled.
 
-In the shared compiler consumer, Stop and OmitAndContinue are deterministic execution policies over the same verified input rather than LLM fallbacks. Continue omits an appearance field only when the existing default can resolve it; otherwise it omits the invalid instruction, Emit, invocation, or structural subtree, or the unsupported Ground, group, or relation as its typed unit. Integrity failures stop both modes, and omitting every unit is not reported as a successful empty work.
+In the shared compiler consumer, Stop and OmitAndContinue are deterministic execution policies over the same verified input rather than LLM fallbacks. Continue omits an appearance field when the existing default can resolve it, and omits an unbound Macro caller action or unsupported instruction layout direction as a field while retaining its body. Other invalid instructions, Emits, invocations, or structural subtrees, and unsupported Ground, groups, or relations are omitted as their typed units. Integrity failures stop both modes, and omitting every unit is not reported as a successful empty work.
 
 ### 12.9 Where Implementation History Lives
 
@@ -1821,7 +1864,7 @@ Non-Grid domains use the physical canvas axes and place the group centroid at th
 
 Optional instruction / Emit `layout_direction` owns arrangement direction independently of entity `angle`. Japanese examples such as “中央に、横線を縦に三本並べる。” and “中央に、斜めの線を横に三本並べる。” share the typed entrance with “arrange three horizontal lines vertically at center.” and “line up three diagonal lines horizontally at center.” Japanese particle evidence and English angle-row adverb forms separate the roles. Compiler-only parser aliases leave prompt, display, and legacy markers unchanged. Single-head continuation merges direction into the original entity; conflicting directions stop. Absent-field canonical and provenance bytes remain unchanged; a present field includes its meaning and complete source evidence.
 
-Only line-up delivers direction into placement. Omission retains the horizontal row; explicit horizontal uses the same formula while preserving its explicit identity. With t=(i+1/2)/n-1/2, offsets from the anchor are horizontal=(tW,0), vertical=(0,tH), rising=(ts,-ts), and falling=(ts,ts), where s=min(W,H). Diagonals are physical 45-degree axes with downward-positive Y, never stretched to the canvas diagonal. Bare diagonal chooses one of the two axes using the attested optional composition seed (distinguishing None from Some(0)), original pre / expanded meaning, and original logical occurrence framed with a dedicated layout-direction role. Shape-angle selection, size, and count are unchanged. Focus, variation / render seeds, and source spelling do not select direction. Point accepts layout direction while still rejecting its own angle. New direction on Place / Scatter / Tile, groups / relations, and unsupported identities such as rotated stop or omit the original instruction / Emit; an entirely omitted result stops in both modes. The existing Score entrance also cannot discard this field and report success.
+Only line-up delivers direction into placement. Omission retains the horizontal row; explicit horizontal uses the same formula while preserving its explicit identity. With t=(i+1/2)/n-1/2, offsets from the anchor are horizontal=(tW,0), vertical=(0,tH), rising=(ts,-ts), and falling=(ts,ts), where s=min(W,H). Diagonals are physical 45-degree axes with downward-positive Y, never stretched to the canvas diagonal. Bare diagonal chooses one of the two axes using the attested optional composition seed (distinguishing None from Some(0)), original pre / expanded meaning, and original logical occurrence framed with a dedicated layout-direction role. Shape-angle selection, size, and count are unchanged. Focus, variation / render seeds, and source spelling do not select direction. Point accepts layout direction while still rejecting its own angle. Unsupported layout direction on Place / Scatter / Tile, or an unsupported identity such as rotated, is omitted as a field with its original owner, spans, and reason, retaining an instruction or Emit whose body, explicit count, action, and position remain valid without it. Direction is not repurposed as entity angle. Unsupported group / relation structures and other failures retain their existing omission units; an entirely omitted result stops in both modes. The existing Score entrance likewise never silently discards an unsupported field and reports complete success.
 
 One plan per instruction / Emit retains exact count, resolved dimensions, appearance, angle, position, layout recipe, and source / generated origin. There are no count-proportional arrays, instance geometry, or duplicated Score instructions. For either legacy Stop or Continue input, recoverable blocking preserves typed owners, spans, reasons, and actual omissions at the smallest affected field or execution unit, returning the remaining plan. An entirely omitted result is never marked Ready. Unsupported fields, relations, and coordination are not silently discarded. The resource-aware materializer maps this plan to replayable recipes with Score 0.10 as the compact baseline, selects the minimum later version required by added fields, and checks demand before instance allocation against both hard policy and a caller-authorized operational budget. Current shipping limits are 400 total primitive marks, 240 primitive marks per expanded Score template, resolved count 2000, and 64 drawable templates, plus 4096 `logical_objects`, 128 `template_nodes`, 4096 `anchor_instances`, 4096 `transform_instances`, 64 `placement_instances`, and 64 `fill_instances`. Administrator control of the existing four limits and budgets saved by older works remain intact. When an explicit count on a standalone primitive exceeds the budget, the original Plan and source retain the requested value, while the Score receives the largest safe source-ordered prefix and resource diagnostics carry the requested count, executed count, and reason to display, persistence, and structured logging. Only a unit for which no instance can run safely, or a coordinated placement / Macro whose structure cannot be partially executed, is omitted at its typed boundary; independent later work continues. A saved Score snapshots the authorized policies but stores no self-reported demand; replay recomputes demand from its recipes. Existing Score wire, lowering outcomes, compiler execution success, and Score 0.9 default / legacy compatibility remain. The same `inku.geometry-resolution-policy.v1` attests this resolution. The normal Server, Web, and Android paths and saved compact Score replay use this shared materializer and local-recovery contract.
 

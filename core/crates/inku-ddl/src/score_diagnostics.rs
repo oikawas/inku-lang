@@ -178,6 +178,20 @@ pub enum ScoreAppearanceField {
     SurfaceIntensity,
 }
 
+/// One non-appearance instruction field that can be omitted without removing geometry.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ScoreInstructionField {
+    LayoutDirection,
+}
+
+/// One outer macro-invocation field whose meaning is not bound into the exact body.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ScoreMacroCallerField {
+    Action,
+}
+
 /// Actual default or retained value used after one appearance omission.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -229,6 +243,14 @@ pub enum ScoreDiagnosticOwner {
 pub enum ScoreOmissionUnit {
     AppearanceField {
         field: ScoreAppearanceField,
+    },
+    InstructionField {
+        field: ScoreInstructionField,
+    },
+    MacroCallerField {
+        source_instruction_index: usize,
+        invocation_ordinal: u64,
+        field: ScoreMacroCallerField,
     },
     SourceInstruction {
         instruction_index: usize,

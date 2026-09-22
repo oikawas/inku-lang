@@ -2,10 +2,10 @@ use inku_ddl::{
     CompilerExecutionDisposition, CompilerExecutionOmissionUnit, CompilerLockState,
     CompilerRenderExecutionError, CompilerRenderOwner, MacroDefinition, MacroExpansionLimits,
     MacroLock, NormalizedDdlDocument, ResolvedInstructionLanguage, ScoreDiagnosticDisposition,
-    ScoreErrorPolicy, ScoreFieldGap, ScoreInstructionOrigin, ScoreLoweringContext,
-    ScoreLoweringOutcome, ScoreOmissionUnit, SemanticPreviousReference, SemanticRelationKind,
-    compile_ddl_to_score, compile_typed_ddl, map_compiler_render_execution, saijiki_asset,
-    stage15_transformation_input,
+    ScoreErrorPolicy, ScoreFieldGap, ScoreInstructionField, ScoreInstructionOrigin,
+    ScoreLoweringContext, ScoreLoweringOutcome, ScoreOmissionUnit, SemanticPreviousReference,
+    SemanticRelationKind, compile_ddl_to_score, compile_typed_ddl,
+    map_compiler_render_execution, saijiki_asset, stage15_transformation_input,
 };
 use inku_render::checked_performance::resolve_checked_performance;
 use inku_render::performance::PerformanceRequest;
@@ -1435,6 +1435,80 @@ fn ja_unresolved_layout_modifier_keeps_the_typed_line_up() {
         score.instructions[0].arrangement.as_ref().unwrap().count,
         30
     );
+}
+
+#[test]
+fn ja_unknown_fragment_and_unsupported_layout_keep_line_and_count() {
+    let source = "黒いペンの実線の細い線を10本、右下がりにとばらして置く。";
+    let budget = inku_score::ResourceBudget {
+        maximum: inku_score::ResourceDemand {
+            logical_objects: 64,
+            primitive_marks: 64,
+            object_templates: 8,
+            maximum_per_template_primitive_marks: 64,
+            maximum_resolved_count: 64,
+            template_nodes: 8,
+            anchor_instances: 64,
+            transform_instances: 64,
+            placement_instances: 8,
+            fill_instances: 8,
+        },
+    };
+    let result = inku_ddl::compile_ddl_to_score_with_resources(
+        NormalizedDdlDocument::new(source, ResolvedInstructionLanguage::Ja, Vec::new()).unwrap(),
+        &[],
+        Some(23),
+        LIMITS,
+        ScoreLoweringContext::resolve("square", Color::White).unwrap(),
+        None,
+        ScoreErrorPolicy::OmitAndContinue,
+        inku_score::HardResourcePolicy {
+            identity: "ja-local-field-recovery-test.v1".to_owned(),
+            budget,
+        },
+        inku_score::OperationalResourceBudget(budget),
+    );
+
+    assert_eq!(
+        result.outcome(),
+        ScoreLoweringOutcome::CompleteWithOmissions,
+        "{result:#?}"
+    );
+    let unknown = result
+        .upstream_diagnostics()
+        .iter()
+        .find(|diagnostic| diagnostic.reason == "unresolved_clause")
+        .expect("the unsupported fragment keeps one clause diagnostic");
+    assert!(unknown.span.is_some());
+    assert!(
+        result
+            .upstream_diagnostics()
+            .iter()
+            .all(|diagnostic| diagnostic.reason != "missing_right_coordination_head")
+    );
+    let layout = result
+        .downstream_diagnostics()
+        .iter()
+        .find(|diagnostic| {
+            matches!(
+                diagnostic.reason,
+                ScoreFieldGap::UnsupportedLayoutDirection { .. }
+            )
+        })
+        .expect("the unsupported layout field keeps one diagnostic");
+    assert_eq!(
+        layout.disposition,
+        ScoreDiagnosticDisposition::Omitted {
+            unit: ScoreOmissionUnit::InstructionField {
+                field: ScoreInstructionField::LayoutDirection,
+            },
+            appearance_resolution: None,
+        }
+    );
+    let score = result.score().expect("the line body survives local omissions");
+    assert_eq!(score.instructions.len(), 1);
+    assert_eq!(score.instructions[0].primitive, Primitive::Line);
+    assert_eq!(score.instructions[0].arrangement.as_ref().unwrap().count, 10);
 }
 
 #[test]

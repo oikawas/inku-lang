@@ -258,6 +258,8 @@ Actual Scoreへ届く現行finite consumerは、完成`emit`を一命令ずつ�
 
 Macro headはsource instruction slot、source invocation ordinal、locked definition、expanded invocationをexact joinし、`place:center`だけは`MacroEmit { invocation_ordinal, expansion_path, generated_ordinal, field: place }`のeffective focusだけを使う。複数の完成Emitはその場の順序で通常命令列へ置換され、`use` / bounded `repeat` / `vary`由来という理由では拒否しない。出力命令はdirect source slotまたはgenerated provenanceへ順序どおり対応する。同じMacroの元の生成順で隣接するbound Emit間の`connected` / `touching`を、通常DDLと同じchecked relation規則で共有performerへ届け、元参照順とowner、numeric-fixed／named-movableの位置authorityを保つ。TouchingはLine / Arcの両端一致と既存Arc再構成を使い、明示relative scale（normal含む）・寸法・弦方向を固定する。`not_touching`と`between`も同じMacroの隣接bound Emitから通常DDLと同じchecked performerへ届く。NotTouchingは既存Medium gapを、Betweenはcurrentの直前Emitとさらに一つ前のEmitのbbox中心を使う既存recipeを保つ。named／noncenter位置はmovable、数値位置はfixedであり、位置authorityを上書きしない。Betweenの`from`は直前Emit、その一つ前を第二参照として両方のownerを保持する。`along` / `cutting`は両者がLineの隣接bound Emitから同じchecked performerへ届き、named位置はmovable、数値位置はfixedとして§14.4の方向・寸法規則を使う。隣接性はunbound Emitも含む元順序で判定し、省略されたfromまたはBetweenの二参照をsurvivorへ付け替えない。旧Stop / OmitAndContinue入力にかかわらず、不完全Emit、unknown key、category / type不一致、未結合caller fact、展開後の未対応Transform軸 / 位置のない`anchor` / 未対応`relation`は、確立済みの最小field・Emit・subtree・invocationを診断付きで省略して残るScoreを続ける。Group内も含め無関係なsiblingをsource / generated provenance順に残す。参照消失は元の依存先を保って関係だけを省略し、独立して描画可能なEmitを残す。参照を残存Emitへ付け替えない。未対応structural subtreeから子Emitだけを抜き出さず、未対応subtreeを跨いで隣接関係を作らない。未使用parameterと未参照Emit binding IDだけを理由に拒否しない。
 
+Macro本体へ結合されないcallerのactionは、呼出し全体を省略する理由にしない。外側のactionだけを`macro_caller_field { field: action }`として元owner・span・理由付きで省略し、定義内のEmit、変換、個数、順序、seedとprovenanceを保持する。外側の動作を内部へ配ったり、別の動作へ読み替えたりはしない。他の未結合caller指定を無条件に回復する規則ではなく、exact joinの整合性不良と描画可能な残部なしは引き続き停止する。
+
 DirectとMacroの反復planはConnected、Touching、Along、Cuttingのchecked relation intentを、検証済みの元targetと位置authorityのままsymbolicに保持する。これは個体materializationを意味しない。
 
 Macroは意味解決後のinvocation順に実行する。照応だけのmentionは二度実行せず、後続macroの意味上の番号をずらさない。source occurrence ordinalはownershipとprovenanceのために別に保存する。原文の文章とリズム、source span、continuation edge / target、全binding、source / generated provenanceは保存・検証する。これらを含むfull compiler-lock digestはsource integrityのattestationであり、同じ意味の別表現どうしで一致する必要はない。source記録の差を意味選択へ混ぜず、source改変は拒否する。
@@ -953,6 +955,16 @@ Stage 1は記述から可視DDLを作り、Stage 2はcompilerが報告したknow
 
 Stage 1 は自由記述を、書き手が観察・編集できる正規化 DDL へ有限に写す。原文の明示要素・数量・色・素材・関係を保ち、隠れた視覚要素や「美しい」解釈を追加しない。語彙、閉じた schema、制限値、出典をプロンプト lock として渡し、出力はその lock の内側だけを使う。これは I-640 で同期した有限 typed normalization 契約であり、特定のモデル名やモデル階級を正本にしない。
 
+初回の解釈では、記述全体の役割、対比、反復、疎密、余白、質感を短い視覚的構成へまとめる。短さを、必要な複数の役割を中央の一要素へ縮めることや、各名詞を一図形へ対応させることと混同しない。明示数量を最優先し、数量が明示されていない反復は文脈から数量を選んで可視DDLへ記す。単語と数量帯の対応表、決め打ちの最低数、一律の増量は使わず、数や文の多さ自体を品質目標にしない。
+
+原文から解釈して選んだ配置・画材等は可視DDLに記し、明示指定を保持する。中央または端への一律配置、固定画材、紙地や背景の一律追加は行わない。明示された色は可視性を理由に変更せず、支持体や背景を必要な描画対象の代用にしない。対象語から図形・素材・構図を引く表や対象別の誘導例は持たない。この初回生成方針は日英で共有し、現行の有限語彙・構文・応答schema、camera projection、hole補完、compiler、保存済み作品の意味を変更しない。
+
+初回promptは「明示指定の固定 → 未指定部分を全体から選択 → 受理済み構文へ記述 → 保持と所属の確認」の短い順序で案内する。全属性の補完を義務化せず、未対応の明示指定をLLMが黙って消す誘導にしない。「ランダム」も、固定配置への置換ではなく文脈に沿った観察可能な静止画の状態へ解釈する。例は直接指定された図形の向きと配列方向を区別する構文例とし、題材別の変換例や中心・色・支持体の既定を与えない。
+
+歳時記の道具には、§13.5に基づく短い日英の物理的な痕跡説明を共有assetの`physical_description`として保持する。初回生成だけが、`prompt=true`の既存道具を歳時記順に説明付きで参照する。題材・感情に応じた選別や推奨、固定数量、数値default、新たな同義語は含めない。説明文はDDL語彙・parser alias・Score値ではなく、既存の語彙一覧から分離する。説明の変更もasset bytesの来歴digestへ反映するが、compilerの受理語・描画意味は変えない。
+
+初回用の使い分け案内は、画材と太さ・連続性、個数と大きさ・配置、図形の向きとline-upの配列方向、面と地・背景を区別し、現行typed DDLの適用範囲を示す。語の存在を全headとの組合せ許可と扱わず、独立した対象として明示された点・線・痕を質感指定へ吸収しない。この案内と道具の説明はcameraやhole補完のsystem本文には加えない。
+
 ### 12.7 第二段階（補完）と決定的な構造化
 
 Stage 2 LLMは、保存済み可視DDLにcompilerが明示したknown holeがある場合だけ、範囲を限定したpatch候補を返す。要求は共通pipelineが自動で作り、採用には作者承認と可視DDLのCAS保存を必要とする。LLMはScoreを出力しない。Lock検証済みtyped meaningからScoreへの構造化は共有lowererが一度だけ行い、色、素材、数量、運動、配置path、回転、canvas、明示relationを保つ。
@@ -1013,7 +1025,7 @@ Transcript replayはcommandと最終effect resultの入力envelopeだけから�
 
 応答と保存履歴は Stage ごとのフォールバック理由、使用モデル、provider failure の分類を保持し、UI は発生した層を示す。`interpret_fallback` / `compose_fallback` は理由、`"none"`、欄導入前の未記録を区別する。印のある親から推敲するときは実行前に一度確認し、既存作品へ遡及して値を書かない。
 
-Shared compiler consumerでは、StopとOmitAndContinueはLLM fallbackではなく同じverified inputへ適用する決定的な実行方針である。Continueはappearance fieldを既存defaultへ戻せる場合だけfield単位で省略し、成立しないinstruction / Emit / call / structural subtree、Ground、group、relationをそれぞれのtyped単位で省略する。整合性不良は両modeで停止し、全省略を空の新作成功として扱わない。
+Shared compiler consumerでは、StopとOmitAndContinueはLLM fallbackではなく同じverified inputへ適用する決定的な実行方針である。Continueはappearance fieldを既存defaultへ戻せる場合にfield単位で省略し、Macroの未結合caller actionと命令の未対応layout directionも本体を保持してfield単位で省略する。それ以外の成立しないinstruction / Emit / call / structural subtree、Ground、group、relationはそれぞれのtyped単位で省略する。整合性不良は両modeで停止し、全省略を空の新作成功として扱わない。
 
 ### 12.9 実装史の所在
 
@@ -1178,7 +1190,7 @@ Object sizeの基準はcanvas短辺で、count・cell・密度に依存しない
 
 配置方向はoptionalなinstruction / Emitの`layout_direction`が所有し、entityの`angle`と独立する。「中央に、横線を縦に三本並べる。」「中央に、斜めの線を横に三本並べる。」と英語のaction-prefix / shape adjective / direction adverbを同じtyped入口で扱う。日本語の「に」のphrase証拠、英語の既存angle rowのadverb形で役割を分ける。Compiler専用parser aliasはprompt・display・legacy markerを変えない。Single-head continuationの方向も元entityへmergeし、競合は停止する。Field不在のcanonical / provenance bytesは保ち、存在時だけ意味と完全な出典を含める。
 
-Line-upだけが方向を配置へ届ける。省略は従来の横一列、明示horizontalは同じ式でも元の明示identityを保持する。t=(i+1/2)/n-1/2としてanchorからのoffsetはhorizontal=(tW,0)、vertical=(0,tH)、rising=(ts,-ts)、falling=(ts,ts)、s=min(W,H)である。Y下向きの物理座標で斜めは45度とし、長方形の対角線へ引き伸ばさない。Bare diagonalはattestされたoptional composition seed（NoneとSome(0)を区別）、元pre / expanded meaning、元logical occurrenceを専用layout-direction roleでframeして二軸から選ぶ。Shape angleの選択scheme・size・countは変えず、focus / variation / render seedやsource spellingを方向選択へ使わない。Pointにも方向は届くがPoint自身のangleは拒否する。Place / Scatter / Tile、group / relationの新方向、rotated等の未対応方向は元instruction / Emit単位で停止・省略し、全省略は両mode停止する。既存Score入口も新fieldを捨てて成功しない。
+Line-upだけが方向を配置へ届ける。省略は従来の横一列、明示horizontalは同じ式でも元の明示identityを保持する。t=(i+1/2)/n-1/2としてanchorからのoffsetはhorizontal=(tW,0)、vertical=(0,tH)、rising=(ts,-ts)、falling=(ts,ts)、s=min(W,H)である。Y下向きの物理座標で斜めは45度とし、長方形の対角線へ引き伸ばさない。Bare diagonalはattestされたoptional composition seed（NoneとSome(0)を区別）、元pre / expanded meaning、元logical occurrenceを専用layout-direction roleでframeして二軸から選ぶ。Shape angleの選択scheme・size・countは変えず、focus / variation / render seedやsource spellingを方向選択へ使わない。Pointにも方向は届くがPoint自身のangleは拒否する。Place / Scatter / Tileやrotated等の未対応layout directionは、そのfieldだけを元owner・span・理由付きで省略し、方向を外して成立するinstruction / Emitの本体・明示個数・動作・位置を保持する。方向をentity angleへ転用しない。group / relationの未対応構造や他の不成立理由は既存単位で省略し、全省略は両mode停止する。既存Score入口も未対応fieldを黙って捨てて完全成功とは扱わない。
 
 Planは一instruction / 一Emitにつき一件で、exact count、解決済み寸法・外観・angle・位置・layout式とsource / generated originを持つ。count比例の配列・個体geometry・Score命令複製は作らない。旧Stop / Continue入力にかかわらず、recoverableなblockingは既存のtyped owner / span / 理由 / 実処置を保つ最小fieldまたは実行単位の省略として扱い、残るplanを返す。全省略をReadyにせず、未対応field・relation・coordinationを黙って捨てない。resource-aware materializerはこのPlanをScore 0.10を基準とする再演可能なrecipeへ写し、必要な追加fieldに応じて最小の後続Score版を選ぶ。個体配列を作る前にhard policyとcallerが明示許可したoperational budgetの双方で需要を検査する。現行出荷値はprimitive mark合計400、展開後Score templateごとのprimitive mark 240、resolved count 2000、drawable template 64に加え、`logical_objects` 4096、`template_nodes` 128、`anchor_instances` 4096、`transform_instances` 4096、`placement_instances` 64、`fill_instances` 64である。既存4上限の管理者設定と作品に保存された旧予算は維持する。単独primitiveの明示countが予算を超える場合は、元Planとsourceの要求値を変えず、source順の先頭から安全に実行できる最大数をScoreへ届け、要求数・実行数・超過理由をresource診断として表示・保存・ログへ渡す。安全に一つも実行できない場合と、部分実行が構造を壊すcoordinated placement／Macro等だけは既定のtyped単位を省略し、独立した後続を続ける。保存Scoreはauthorityのsnapshotを持つが需要の自己申告は持たず、再演時にrecipeから再計算する。既存Score wire / lowering outcome / compiler executionの成功意味とScore 0.9のdefault / legacy互換は変わらない。同じ`inku.geometry-resolution-policy.v1`がこの解決をattestする。通常Server／Web／Androidと保存compact Scoreの再演は、この共有materializerと局所回復の契約を使う。
 

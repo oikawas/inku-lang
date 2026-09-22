@@ -28,12 +28,12 @@ use crate::{
     CoreModifierValue, ExactDecimal, ExactDecimalError, ExpandedMacroInvocation, ExpandedMacroNode,
     ExpandedMacroValue, FocusRegion, GEOMETRY_RESOLUTION_POLICY_ID, GeneratedNodeProvenance,
     GeneratedTargetId, ScoreAppearanceField, ScoreAppearanceResolution, ScoreDiagnosticDisposition,
-    ScoreDiagnosticOwner, ScoreErrorPolicy, ScoreFieldGap, ScoreLoweringDiagnostic,
-    ScoreLoweringOutcome, ScoreOmissionUnit, SemanticExplicitGeometry, SemanticHead,
-    SemanticIdentity, SemanticInstruction, SemanticMacroInvocationHead, SemanticNumericPosition,
-    SemanticPreviousReference, SemanticRelation, SemanticRelationKind, SourceSpan,
-    Stage15TargetPath, Stage15TargetProvenance, VerifiedStage15EffectiveView,
-    geometry_resolution_policy_digest,
+    ScoreDiagnosticOwner, ScoreErrorPolicy, ScoreFieldGap, ScoreInstructionField,
+    ScoreLoweringDiagnostic, ScoreLoweringOutcome, ScoreMacroCallerField, ScoreOmissionUnit,
+    SemanticExplicitGeometry, SemanticHead, SemanticIdentity, SemanticInstruction,
+    SemanticMacroInvocationHead, SemanticNumericPosition, SemanticPreviousReference,
+    SemanticRelation, SemanticRelationKind, SourceSpan, Stage15TargetPath, Stage15TargetProvenance,
+    VerifiedStage15EffectiveView, geometry_resolution_policy_digest,
 };
 
 /// Stable identity for the non-serializable Score-field candidate boundary.
@@ -1174,6 +1174,24 @@ fn lower_macro_instruction(
                 reason: omission.reason,
             });
         }
+        for omission in attempt.instruction_field_omissions {
+            diagnostics.push(ScoreLoweringDiagnostic {
+                owner: generated_owner(
+                    source_instruction_index,
+                    provenance,
+                    macro_key_for_gap(&omission.reason),
+                ),
+                disposition: diagnostic_disposition(
+                    error_policy,
+                    &omission.reason,
+                    ScoreOmissionUnit::InstructionField {
+                        field: omission.field,
+                    },
+                    None,
+                ),
+                reason: omission.reason,
+            });
+        }
         for reason in attempt.remaining_gaps {
             diagnostics.push(ScoreLoweringDiagnostic {
                 owner: generated_owner(
@@ -1413,6 +1431,28 @@ fn append_macro_caller_diagnostics(
             reason,
         });
     }
+    if instruction.action.is_some() {
+        let reason = ScoreFieldGap::UnboundMacroCallerMeaning;
+        diagnostics.push(ScoreLoweringDiagnostic {
+            owner: macro_caller_field_owner(
+                source_instruction_index,
+                instruction,
+                head,
+                ScoreMacroCallerField::Action,
+            ),
+            disposition: diagnostic_disposition(
+                error_policy,
+                &reason,
+                macro_caller_field_unit(
+                    source_instruction_index,
+                    head,
+                    ScoreMacroCallerField::Action,
+                ),
+                None,
+            ),
+            reason,
+        });
+    }
     if instruction.entity.thinness.is_some()
         || instruction.entity.relative_scale.is_some()
         || instruction.entity.explicit_geometry.is_some()
@@ -1426,7 +1466,6 @@ fn append_macro_caller_diagnostics(
         || instruction.entity.proportion.aspect.is_some()
         || instruction.entity.proportion.width_extent.is_some()
         || instruction.entity.proportion.arc_form.is_some()
-        || instruction.action.is_some()
         || instruction.layout_direction.is_some()
         || instruction.position.is_some()
     {
@@ -3929,9 +3968,16 @@ struct AppearanceOmission {
 }
 
 #[derive(Clone, Debug)]
+struct InstructionFieldOmission {
+    reason: ScoreFieldGap,
+    field: ScoreInstructionField,
+}
+
+#[derive(Clone, Debug)]
 struct InstructionLoweringAttempt<T = Instruction> {
     instruction: Option<T>,
     appearance_omissions: Vec<AppearanceOmission>,
+    instruction_field_omissions: Vec<InstructionFieldOmission>,
     remaining_gaps: Vec<ScoreFieldGap>,
 }
 
@@ -3957,6 +4003,7 @@ fn resolve_projected_instruction<'a, T>(
             return InstructionLoweringAttempt {
                 instruction: Some(instruction),
                 appearance_omissions: Vec::new(),
+                instruction_field_omissions: Vec::new(),
                 remaining_gaps: size_recovery_diagnostic(input, context)
                     .into_iter()
                     .collect(),
@@ -3972,6 +4019,7 @@ fn resolve_projected_instruction<'a, T>(
         && !appearance_fields.contains(&ScoreAppearanceField::SurfaceQuality);
     let mut projected = input;
     let mut appearance_omissions = Vec::new();
+    let mut instruction_field_omissions = Vec::new();
     let mut remaining_gaps = Vec::new();
     for reason in first_gaps {
         if let Some(field) = appearance_field_for_gap(&reason) {
@@ -3981,6 +4029,9 @@ fn resolve_projected_instruction<'a, T>(
                 field,
                 resolution: default_resolution(field, surface_quality_survives),
             });
+        } else if let Some(field) = instruction_field_for_gap(&reason) {
+            omit_instruction_field(&mut projected, field);
+            instruction_field_omissions.push(InstructionFieldOmission { reason, field });
         } else {
             remaining_gaps.push(reason);
         }
@@ -3989,6 +4040,7 @@ fn resolve_projected_instruction<'a, T>(
         return InstructionLoweringAttempt {
             instruction: None,
             appearance_omissions,
+            instruction_field_omissions,
             remaining_gaps,
         };
     }
@@ -3996,6 +4048,7 @@ fn resolve_projected_instruction<'a, T>(
         Ok(instruction) => InstructionLoweringAttempt {
             instruction: Some(instruction),
             appearance_omissions,
+            instruction_field_omissions,
             remaining_gaps: size_recovery_diagnostic(projected, context)
                 .into_iter()
                 .collect(),
@@ -4003,6 +4056,7 @@ fn resolve_projected_instruction<'a, T>(
         Err(gaps) => InstructionLoweringAttempt {
             instruction: None,
             appearance_omissions,
+            instruction_field_omissions,
             remaining_gaps: gaps,
         },
     }
@@ -4030,6 +4084,20 @@ fn lower_source_instruction_with_policy(
                     field: omission.field,
                 },
                 Some(omission.resolution),
+            ),
+            reason: omission.reason,
+        });
+    }
+    for omission in attempt.instruction_field_omissions {
+        diagnostics.push(ScoreLoweringDiagnostic {
+            owner: source_owner_for_gap(instruction_index, instruction, &omission.reason),
+            disposition: diagnostic_disposition(
+                error_policy,
+                &omission.reason,
+                ScoreOmissionUnit::InstructionField {
+                    field: omission.field,
+                },
+                None,
             ),
             reason: omission.reason,
         });
@@ -4075,6 +4143,20 @@ fn lower_source_relation_instruction_with_policy(
                     field: omission.field,
                 },
                 Some(omission.resolution),
+            ),
+            reason: omission.reason,
+        });
+    }
+    for omission in attempt.instruction_field_omissions {
+        diagnostics.push(ScoreLoweringDiagnostic {
+            owner: source_owner_for_gap(instruction_index, instruction, &omission.reason),
+            disposition: diagnostic_disposition(
+                error_policy,
+                &omission.reason,
+                ScoreOmissionUnit::InstructionField {
+                    field: omission.field,
+                },
+                None,
             ),
             reason: omission.reason,
         });
@@ -4138,6 +4220,15 @@ fn appearance_field_for_gap(gap: &ScoreFieldGap) -> Option<ScoreAppearanceField>
     }
 }
 
+fn instruction_field_for_gap(gap: &ScoreFieldGap) -> Option<ScoreInstructionField> {
+    match gap {
+        ScoreFieldGap::UnsupportedLayoutDirection { .. } => {
+            Some(ScoreInstructionField::LayoutDirection)
+        }
+        _ => None,
+    }
+}
+
 fn omit_appearance_field(input: &mut ScoreLoweringInput<'_>, field: ScoreAppearanceField) {
     match field {
         ScoreAppearanceField::Color => input.color = None,
@@ -4145,6 +4236,12 @@ fn omit_appearance_field(input: &mut ScoreLoweringInput<'_>, field: ScoreAppeara
         ScoreAppearanceField::Continuity => input.continuity = None,
         ScoreAppearanceField::SurfaceQuality => input.surface = None,
         ScoreAppearanceField::SurfaceIntensity => input.surface_intensity = None,
+    }
+}
+
+fn omit_instruction_field(input: &mut ScoreLoweringInput<'_>, field: ScoreInstructionField) {
+    match field {
+        ScoreInstructionField::LayoutDirection => input.layout_direction = None,
     }
 }
 
@@ -4310,6 +4407,27 @@ fn macro_caller_owner(
     }
 }
 
+fn macro_caller_field_owner(
+    source_instruction_index: usize,
+    instruction: &SemanticInstruction,
+    head: &SemanticMacroInvocationHead,
+    field: ScoreMacroCallerField,
+) -> ScoreDiagnosticOwner {
+    let span = match field {
+        ScoreMacroCallerField::Action => instruction
+            .action
+            .as_ref()
+            .map(|term| term.provenance.source.span),
+    }
+    .unwrap_or(head.provenance.source.span);
+    ScoreDiagnosticOwner::MacroInvocation {
+        source_instruction_index,
+        invocation_ordinal: head.provenance.ordinal,
+        field: None,
+        spans: vec![span],
+    }
+}
+
 fn macro_invocation_unit(
     source_instruction_index: usize,
     head: &SemanticMacroInvocationHead,
@@ -4317,6 +4435,18 @@ fn macro_invocation_unit(
     ScoreOmissionUnit::MacroInvocation {
         source_instruction_index,
         invocation_ordinal: head.provenance.ordinal,
+    }
+}
+
+fn macro_caller_field_unit(
+    source_instruction_index: usize,
+    head: &SemanticMacroInvocationHead,
+    field: ScoreMacroCallerField,
+) -> ScoreOmissionUnit {
+    ScoreOmissionUnit::MacroCallerField {
+        source_instruction_index,
+        invocation_ordinal: head.provenance.ordinal,
+        field,
     }
 }
 
@@ -5521,6 +5651,20 @@ fn append_plan_attempt(
                     field: omission.field,
                 },
                 Some(omission.resolution),
+            ),
+            reason: omission.reason,
+        });
+    }
+    for omission in attempt.instruction_field_omissions {
+        diagnostics.push(ScoreLoweringDiagnostic {
+            owner: owner(&omission.reason),
+            disposition: diagnostic_disposition(
+                error_policy,
+                &omission.reason,
+                ScoreOmissionUnit::InstructionField {
+                    field: omission.field,
+                },
+                None,
             ),
             reason: omission.reason,
         });

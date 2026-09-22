@@ -4,13 +4,14 @@ use inku_ddl::{
     MacroExpansionLimits, MacroLock, NormalizedDdlDocument, ResolvedInstructionLanguage,
     SCORE_FIELD_CANDIDATE_SCHEMA_ID, ScoreAppearanceField, ScoreAppearanceResolution,
     ScoreDiagnosticDisposition, ScoreDiagnosticOwner, ScoreErrorPolicy, ScoreFieldGap,
-    ScoreInstructionOrigin, ScoreLoweringCandidate, ScoreLoweringContext, ScoreLoweringOutcome,
-    ScoreOmissionUnit, SemanticHead, SemanticIdentity, SemanticPreviousReference,
-    SemanticRelationKind, Stage15TransformationResult, Stage15Variation, Stage15VariationAmplitude,
-    VerifiedStage15EffectiveView, compile_typed_ddl, geometry_resolution_policy_digest,
-    lower_verified_stage15_score, lower_verified_stage15_score_with_policy,
-    lower_verified_stage15_view, plan_verified_stage15, plan_verified_stage15_with_policy,
-    score_primitive_from_semantic_identity, stage15_transformation_input, transform_stage15,
+    ScoreInstructionField, ScoreInstructionOrigin, ScoreLoweringCandidate, ScoreLoweringContext,
+    ScoreLoweringOutcome, ScoreMacroCallerField, ScoreOmissionUnit, SemanticHead, SemanticIdentity,
+    SemanticPreviousReference, SemanticRelationKind, Stage15TransformationResult, Stage15Variation,
+    Stage15VariationAmplitude, VerifiedStage15EffectiveView, compile_typed_ddl,
+    geometry_resolution_policy_digest, lower_verified_stage15_score,
+    lower_verified_stage15_score_with_policy, lower_verified_stage15_view, plan_verified_stage15,
+    plan_verified_stage15_with_policy, score_primitive_from_semantic_identity,
+    stage15_transformation_input, transform_stage15,
 };
 use inku_render::palette::{default_color_map, work_palette_context};
 use inku_render::placement::region_in_short_side_units;
@@ -18,7 +19,7 @@ use inku_render::planning::{instruction_anchor, resolve_at_region};
 use inku_render::types::CanvasSize;
 
 #[test]
-fn actual_score_never_drops_layout_direction_on_place() {
+fn unsupported_layout_direction_is_locally_omitted_from_place() {
     let transformed = stage15(
         "place one red point vertically at center.",
         ResolvedInstructionLanguage::En,
@@ -29,11 +30,30 @@ fn actual_score_never_drops_layout_direction_on_place() {
             ScoreLoweringContext::resolve("square", Color::White).unwrap(),
             policy,
         );
-        assert!(result.score().is_none());
-        assert!(result.diagnostics().iter().any(|diagnostic| matches!(
-            diagnostic.reason,
-            ScoreFieldGap::UnsupportedLayoutDirection { .. }
-        )));
+        assert_eq!(
+            result.outcome(),
+            ScoreLoweringOutcome::CompleteWithOmissions
+        );
+        assert_eq!(result.score().unwrap().instructions.len(), 1);
+        let diagnostic = result
+            .diagnostics()
+            .iter()
+            .find(|diagnostic| {
+                matches!(
+                    diagnostic.reason,
+                    ScoreFieldGap::UnsupportedLayoutDirection { .. }
+                )
+            })
+            .expect("unsupported layout field keeps one diagnostic");
+        assert_eq!(
+            diagnostic.disposition,
+            ScoreDiagnosticDisposition::Omitted {
+                unit: ScoreOmissionUnit::InstructionField {
+                    field: ScoreInstructionField::LayoutDirection,
+                },
+                appearance_resolution: None,
+            }
+        );
     }
 }
 use inku_score::{
@@ -3224,6 +3244,87 @@ fn complete_flat_macro_sequence_reaches_actual_score() {
     assert_eq!(empty_lowered.outcome(), ScoreLoweringOutcome::Complete);
     assert!(empty_lowered.score().unwrap().instructions.is_empty());
     assert!(empty_lowered.instruction_origins().is_empty());
+}
+
+#[test]
+fn macro_caller_action_omits_only_action_and_preserves_the_macro_body() {
+    let definition = complete_flat_emit_definition();
+    let baseline = stage15_locked(
+        "Draw.Pair",
+        ResolvedInstructionLanguage::En,
+        std::slice::from_ref(&definition),
+    );
+    let action = stage15_locked(
+        "scatter Draw.Pair",
+        ResolvedInstructionLanguage::En,
+        std::slice::from_ref(&definition),
+    );
+    let action_expansion = &action.original_expanded_invocations()[0];
+    assert_eq!(action_expansion.nodes.len(), 2);
+    assert_eq!(action.targets().len(), 2);
+    let action_provenance = action_expansion.provenance.clone();
+    let context = ScoreLoweringContext::resolve("wide", Color::White).unwrap();
+
+    let baseline = lower_verified_stage15_score(baseline.verified_effective_view(), context);
+    let recovered = lower_verified_stage15_score(action.verified_effective_view(), context);
+    assert_eq!(
+        recovered.outcome(),
+        ScoreLoweringOutcome::CompleteWithOmissions
+    );
+    assert_eq!(recovered.score(), baseline.score());
+    for (generated_ordinal, origin) in recovered.instruction_origins().iter().enumerate() {
+        assert!(matches!(
+            origin,
+            ScoreInstructionOrigin::MacroEmit { provenance, .. }
+                if provenance.invocation == action_provenance
+                    && provenance.generated_ordinal == generated_ordinal as u64
+        ));
+    }
+    assert!(recovered.diagnostics().iter().any(|diagnostic| matches!(
+        (
+            &diagnostic.owner,
+            &diagnostic.disposition,
+            &diagnostic.reason,
+        ),
+        (
+            ScoreDiagnosticOwner::MacroInvocation {
+                source_instruction_index: 0,
+                invocation_ordinal: 0,
+                field: None,
+                spans,
+            },
+            ScoreDiagnosticDisposition::Omitted {
+                unit: ScoreOmissionUnit::MacroCallerField {
+                    source_instruction_index: 0,
+                    invocation_ordinal: 0,
+                    field: ScoreMacroCallerField::Action,
+                },
+                appearance_resolution: None,
+            },
+            ScoreFieldGap::UnboundMacroCallerMeaning,
+        ) if !spans.is_empty()
+    )));
+
+    let still_unbound = stage15_locked(
+        "extra-fine Draw.Pair",
+        ResolvedInstructionLanguage::En,
+        std::slice::from_ref(&definition),
+    );
+    let stopped = lower_verified_stage15_score_with_policy(
+        still_unbound.verified_effective_view(),
+        context,
+        ScoreErrorPolicy::OmitAndContinue,
+    );
+    assert_eq!(stopped.outcome(), ScoreLoweringOutcome::Stopped);
+    assert!(stopped.score().is_none());
+    assert!(stopped.instruction_origins().is_empty());
+    assert!(stopped.diagnostics().iter().any(|diagnostic| matches!(
+        diagnostic.disposition,
+        ScoreDiagnosticDisposition::Omitted {
+            unit: ScoreOmissionUnit::MacroInvocation { .. },
+            ..
+        }
+    )));
 }
 
 #[test]

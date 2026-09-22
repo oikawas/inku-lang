@@ -16,7 +16,7 @@ use inku_ddl::{
     SAIJIKI_ASSET_ID, SourceSpan, TYPED_DDL_COMPILER_LOCK_SCHEMA_ID, TypedDdlCompilation,
     TypedHole, VISIBLE_DDL_PATCH_SCHEMA_ID, VisibleDdlPatch, VisibleDdlPatchEdit,
     core_modifier_surface_forms, saijiki_asset_sha256_hex, saijiki_derived_projection,
-    visible_ddl_patch_available,
+    saijiki_tool_guidance, visible_ddl_patch_available,
 };
 use inku_score::{CANVAS_FORMAT_REGISTRY_ID, canvas_format_registry_digest, lookup_canvas_format};
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
@@ -708,11 +708,15 @@ fn stage1_normalizer_rules(language: ResolvedInstructionLanguage) -> String {
 fn stage1_normalizer_system(language: ResolvedInstructionLanguage) -> Result<String, PromptError> {
     let saijiki =
         saijiki_derived_projection(language).map_err(|_| PromptError::SaijikiProjection)?;
+    let tool_guidance =
+        saijiki_tool_guidance(language).map_err(|_| PromptError::SaijikiProjection)?;
     Ok(format!(
-        "{}\n\n{}\n\n# accepted_saijiki_vocabulary\n{}",
+        "{}\n\n{}\n\n# accepted_saijiki_vocabulary\n{}\n\n# saijiki_usage_guide\n{}\n\n# tool_marks\n{}",
         stage1_normalizer_rules(language),
         stage1_vocabulary_roles(language),
         saijiki.prompt_block,
+        stage1_usage_guidance(language),
+        tool_guidance,
     ))
 }
 
@@ -1394,17 +1398,26 @@ const STAGE1_DDL_INTENT_JA: &str =
     "決定的 compiler が再読できる、可視で編集可能な normalized DDL を作る。";
 const STAGE1_NORMALIZER_RESPONSE_ENVELOPE_JA: &str = "返すJSONは normalized_ddl だけとし、";
 const STAGE1_OUTPUT_SCOPE_JA: &str = "Score、renderer命令、観測文、思考過程、説明、非表示metadataを出力しない。normalized DDL はそれ単独で意味を完結させ、後段のLLM補完を前提にholeや曖昧な代用語を残さない。";
-const STAGE1_INTERPRETATION_JA: &str = r#"入力は詩・比喩・物語を含む自由記述である。歳時記にない対象は、記述全体の形・質感・構造から、歳時記の図形、色、画材、配置へ解釈する。人・顔・動物を具象的な部品や記号にせず、重心、余白、線の密度、間隔として表す。出来事や感情は静止画の状態へ読み替え、対象名、物語、感情語、「〜を表現する」等の説明句をDDLへ残さない。解釈した画材も可視DDLへ明記する。既に明示された描画属性は保持する。
+const STAGE1_INTERPRETATION_JA: &str = r#"入力は詩・比喩・物語を含む自由記述である。短い視覚的な短歌として、次の順で解釈し、最後に可視DDLだけを返す。
 
-macroは名前空間付きの名前が明示された場合、またはそのmacroの対象そのものが明示された場合だけ選ぶ。季節・比喩・未知対象から連想した別のmacroで記述全体を置き換えない。macroを使わずコア語彙だけでも記述できる。
+1. 明示指定を固定する。
+作者が明示した図形、数、色、画材、位置、関係、その他の属性を保持する。可視性の理由でも明示色を変えない。未対応の明示指定を黙って削って形式だけを成立させない。
 
-normalized_ddlは命令文をつないだ一つの文字列であり、命令の配列ではない。一つの図形の属性・個数・配置を一つの命令文にまとめる。「その」「それ」などの指示語で別の図形を参照しない。図形間の関係を作者が明示した場合だけ、歳時記のあいだに対応する「前の線に沿って」「前の形に触れない」等の定型句を使う。それ以外の位置は歳時記のばしょで記す。
+2. 未指定の部分を全体から選ぶ。
+原文全体の役割、対比、反復、疎密、余白、質感を簡潔な構成へまとめる。歳時記にない対象は、全体の形・質感・構造から図形、色、画材、配置へ解釈する。複数の役割を中心の一要素へ潰さず、各名詞を一図形へ部品化しない。数量未指定の反復は全体の疎密と反復から数を選ぶ。固定の数量帯、決め打ちの下限、倍増、原文の語数を使わず、単一の対象を機械的に複数化しない。
+構図と画材は選べるが、中心や端を一律に強制せず、図形の種類だけで画材を固定しない。原文にない支持体や背景を一律に追加せず、支持体や背景を主題の代用にしない。単語から数・図形・素材・配置への対応表を作らない。
+人・顔・動物は具象的な部品や記号にせず、重心、余白、線の密度、間隔として読む。出来事・感情・「ランダム」は、文脈に沿った観察可能な静止画の状態へ読む。特定の語から同じ配置へ一律変換しない。
 
-次は変換形式の例であり、例の対象や構図を今回の記述へコピーしない。
-記述: 中心に赤い円をひとつ。
-応答: {"normalized_ddl":"中心に赤い円を1個置く。"}
-記述: 誰もいない場所に足音だけが響く。
-応答: {"normalized_ddl":"中心に赤い鉛筆の細い線をひとつ置く。"}"#;
+3. 選んだ意味を受理済みの構文へ書く。
+選んだ数量・配置・画材等を可視DDLへ明記する。全ての属性を埋める必要はない。説明、図形数、文数を増やすこと自体を目的にしない。語彙説明は語の物理的性質と適用範囲であり、題材との対応表ではない。説明文をDDLの語形として使わない。
+一つの図形の属性・個数・配置を一つの命令文にまとめ、命令文をつないだ一つの文字列をnormalized_ddlへ入れる。配列や指示語「その」「それ」は使わない。関係が原文に明示された場合だけ「あいだ」の定型句を使い、それ以外の位置は「ばしょ」で記す。macroは名前空間付きの名前またはそのmacroの対象そのものが明示された場合だけ選ぶ。季節・比喩・未知対象から連想した別macroで全体を置き換えない。コア語彙だけでも記述できる。
+
+4. 明示指定の保持と属性の所属を確認する。
+数・色・画材・位置・関係が消えたり、別の図形へ移ったりしていないか確認する。対象名、物語、感情語、「〜を表現する」等の説明句や確認過程は出力しない。
+
+次は直接指定の構文例であり、例の数や構図を今回の記述へコピーしない。
+記述: 横線を縦に3本並べる。
+応答: {"normalized_ddl":"横線を縦に3本並べる。"}"#;
 const STAGE1_GRAMMAR_JA_PREFIX: &str = r#"accepted_saijiki_vocabulary の有限語彙と、compilerが読む通常の数値・句読点・文法だけを使う。installed_macro_signatures のmacroを使う場合は qualified_name と列挙されたparameterだけを書く。version、digest、MacroDefinition本文、component、展開結果をDDLへ書かない。
 
 作者が明示した対象、色、画材、太さ、個数、寸法、角度、座標、領域、関係、反復、配置を失わない。fill、scatter、tile、background は別の意味である。fillは作者が指定した図形を指定領域の内部へ、指定個数と寸法を保って充填する。scatterへ読み替えない。scatterは疎密を持つ散布、tileは規則的な敷き詰め、backgroundはキャンバス背景色だけに使う。『満天』『星空』『全面』を理由にfillへ変えず、『埋める』を全面scatterへ変えない。明示領域をcanvas全体へ広げない。"#;
@@ -1424,17 +1437,26 @@ const STAGE1_DDL_INTENT_EN: &str =
     "produce visible, editable normalized DDL that the deterministic compiler can parse again.";
 const STAGE1_NORMALIZER_RESPONSE_ENVELOPE_EN: &str = "Return JSON containing only normalized_ddl. ";
 const STAGE1_OUTPUT_SCOPE_EN: &str = "Do not output a Score, renderer instructions, observation text, chain of thought, explanation, or hidden metadata. The normalized DDL must be meaning-complete by itself; do not leave holes or vague placeholders for a later LLM.";
-const STAGE1_INTERPRETATION_EN: &str = r#"The input is free description and may contain poetry, metaphors, or a narrative. Interpret subjects outside the Saijiki through the whole description's shape, texture, and structure as Saijiki shapes, colors, tools, and placements. Express people, faces, and animals through visual weight, empty space, line density, and spacing rather than figurative parts or symbols. Translate events and emotions into a static image; do not retain subject names, narrative, emotional terms, or explanations such as "representing ..." in DDL. State interpreted tools in visible DDL as well. Preserve already explicit drawing attributes.
+const STAGE1_INTERPRETATION_EN: &str = r#"The input is free description and may contain poetry, metaphors, or a narrative. Treat it as a short visual tanka. Follow this order and return only visible DDL at the end.
 
-Choose a macro only when its qualified name or its actual subject is explicit. Do not replace the whole description with another macro inferred from a season, metaphor, or unknown subject. Core vocabulary alone is sufficient without macros.
+1. Keep explicit specifications.
+Preserve the author's explicit shapes, counts, colors, tools, positions, relations, and other attributes. Never alter an explicit color even for visibility. Do not silently delete an unsupported explicit specification merely to pass a form.
 
-normalized_ddl is one string of instruction sentences, not an array of instructions. Keep one shape's attributes, count, and placement in one instruction sentence. Do not refer to another shape with pronouns such as "it" or "that". Only when the author explicitly requests an inter-shape relation, use a fixed phrase for a Saijiki relation such as "along the previous line" or "not touching the previous shape". Express other positions with Saijiki place vocabulary.
+2. Choose unspecified parts from the whole.
+Make a concise composition of the whole description's roles, contrasts, repetition, density, empty space, and texture. Interpret subjects outside the Saijiki through the whole description's shape, texture, and structure as shapes, colors, tools, and placements. Do not collapse multiple roles into one central element or turn each noun into a separate shape. For repetition without a stated count, choose a count from the whole description's density and repetition. Do not use fixed quantity bands, a predetermined minimum, doubling, or source word count, or mechanically turn a singular subject into multiples.
+Choose composition and tools without uniformly forcing a center or edge; do not fix a tool from shape type alone. Do not automatically add a support or background absent from the source or use either as a substitute for the subject. Do not use word-to-count/shape/material/placement tables.
+Read people, faces, and animals as visual weight, empty space, line density, and spacing, not figurative parts or symbols. Read events, emotions, and "random" as observable states of a static image in context, never by mapping one word uniformly to one placement.
 
-These examples demonstrate the conversion format; do not copy their subjects or compositions into the current description.
-Description: One red circle in the center.
-Response: {"normalized_ddl":"Place one red circle in the center."}
-Description: Only footsteps echo in an empty place.
-Response: {"normalized_ddl":"place one thin red pencil line at the center."}"#;
+3. Write chosen meaning in accepted grammar.
+State chosen counts, placements, tools, and other choices in visible DDL. Not every attribute needs a value. More explanations, shapes, or sentences are not a goal. Vocabulary notes describe physical properties and applicability, not subject mappings. Do not use their explanatory wording as DDL vocabulary.
+Keep one shape's attributes, count, and placement in one instruction sentence; join sentences into one normalized_ddl string, not an array. Do not refer to another shape with pronouns such as "it" or "that". Use fixed Saijiki relation phrases only for relations explicit in the source; otherwise use place vocabulary. Choose a macro only when its qualified name or its actual subject is explicit. Do not replace the whole description with a different macro inferred from a season, metaphor, or unknown subject. Core vocabulary alone is sufficient.
+
+4. Check preservation and ownership.
+Check that counts, colors, tools, positions, and relations have neither disappeared nor moved to another shape. Do not output subject names, narrative, emotional terms, explanations such as "representing ...", or the checks.
+
+This example demonstrates directly specified grammar, not a count or composition to copy.
+Description: Line up three horizontal lines vertically.
+Response: {"normalized_ddl":"Line up three horizontal lines vertically."}"#;
 const STAGE1_GRAMMAR_EN_PREFIX: &str = r#"Use the finite accepted_saijiki_vocabulary plus ordinary numeric literals, punctuation, and grammar accepted by the compiler. When invoking an installed macro, write only its qualified_name and listed parameters. Do not write versions, digests, MacroDefinition bodies, components, or expansions into DDL.
 
 Preserve every explicit subject, color, material, thinness, count, size, angle, coordinate, region, relation, repetition, and placement. Fill, scatter, tile, and background are distinct meanings. Fill places the author's specified shape inside the specified region while preserving its explicit count and size; never normalize fill to scatter. Scatter is a distribution with spacing, tile is regular tessellation, and background means only the canvas background color. Do not infer fill merely from “starry sky”, “full”, or “whole area”, and do not turn “fill” into whole-canvas scatter. Never expand an explicit region to the whole canvas."#;
@@ -1446,6 +1468,24 @@ Write "connected partway along the previous line" or "connected partway along th
 Write "mirrored with the previous shape" for mirrored positions and orientations across the axis between two shapes. A leaf or group is referred to as a whole. Preserve explicit positions, dimensions, and directions and the follower’s color and tool."#;
 const STAGE1_CONTEXT_EN: &str = "The canvas format, catalog ID, and catalog mode are already resolved host context. Do not replace them with defaults.";
 const STAGE1_NORMALIZER_RESPONSE_ENDING_EN: &str = " Return only the specified JSON.";
+
+// Initial interpretation only: these notes neither extend grammar nor supply patch defaults.
+fn stage1_usage_guidance(language: ResolvedInstructionLanguage) -> &'static str {
+    match language {
+        ResolvedInstructionLanguage::Ja => r#"以下は選択肢の違いであり、毎回追加する項目ではない。
+- 画材は筆跡・塗りの痕跡、太さは線幅、つらなりは実線・破線等の連続性を指定する。これらは別の属性である。tool_marksは画材の痕跡だけを説明し、題材や感情への適性を定めない。
+- 個数・大きさ・配置は別の指定である。個数を増やしても図形は自動で小さくならず、重ならず見える保証もない。
+- 図形の向きと配列の方向は別である。配列の方向が使える動作は「並べる」。構文例の「横線を縦に3本並べる」は、線が横向き、配列が縦向きである。「置く」「散らす」「敷き詰める」の方向指定へ転用しない。
+- おもては対象図形の面、じは支持体、背景はcanvasの色である。対象の質感を面で指定することと、独立した点や線を描くことを区別する。原文で独立した対象として明示された点・線・痕は残す。
+- 面の「濃い・薄い」は、現在は「塗り」のある閉じた図形へ適用できる。それ以外の面や塗りのない線・弧に濃淡を付けること、および点に面を指定することは未対応である。使える語の一覧は全ての組合せを許可するものではなく、未対応を理由に作者の明示指定を黙って削ってよいという意味でもない。"#,
+        ResolvedInstructionLanguage::En => r#"These are differences between choices, not fields to add every time.
+- Tools specify mark and fill character, thinness specifies line width, and continuity specifies solid, dashed, and related line patterns. They are separate attributes. tool_marks describes physical marks, not suitability for subjects or emotions.
+- Count, size, and placement are separate. Increasing count neither shrinks shapes automatically nor guarantees visibly separated marks.
+- A shape's angle differs from the direction of its arrangement. Arrangement direction applies to line-up. In the syntax example, "Line up three horizontal lines vertically", the lines are horizontal and the arrangement is vertical. Do not transfer that direction slot to place, scatter, or tile.
+- Surface belongs to the shape, ground to the support, and background to the canvas color. Distinguish a shape's surface texture from independently drawn points or lines. Preserve points, lines, and marks explicitly stated as independent subjects.
+- Surface intensity (dense or faint) currently applies to closed shapes with a flat fill. Intensity on other surfaces or unfilled lines or arcs, and any explicit surface on a point, are unsupported. The vocabulary list does not authorize every combination, nor does lack of support authorize silently deleting the author's explicit specification."#,
+    }
+}
 
 fn stage1_vocabulary_roles(language: ResolvedInstructionLanguage) -> String {
     match language {
@@ -1735,18 +1775,25 @@ mod tests {
     }
 
     #[test]
-    fn stage1_normalizer_rules_add_attachment_without_patch_constraints() {
-        for (language, previous_sha) in [
-            (
-                ResolvedInstructionLanguage::Ja,
-                "265b80139d46e3868cc393b1121b7df458dd5d03aca84aacec39114c25808f8a",
-            ),
-            (
-                ResolvedInstructionLanguage::En,
-                "853fd69bef3e0ffa116d8e31c1239b3c9b4a2b26a92cae7dcbf99ef30902e1a4",
-            ),
+    fn stage1_initial_guidance_preserves_grammar_and_stage_boundaries() {
+        for language in [
+            ResolvedInstructionLanguage::Ja,
+            ResolvedInstructionLanguage::En,
         ] {
             let rules = stage1_normalizer_rules(language);
+            let system = stage1_normalizer_system(language).unwrap();
+            let guide = saijiki_tool_guidance(language).unwrap();
+            assert!(!guide.is_empty());
+            assert_eq!(system.matches(&guide).count(), 1);
+            assert_eq!(system.matches(stage1_usage_guidance(language)).count(), 1);
+            for other_stage in [
+                stage1_system_projection(language).unwrap(),
+                hole_system_grammar(language),
+            ] {
+                assert!(!other_stage.contains("# tool_marks"));
+                assert!(!other_stage.contains(&guide));
+                assert!(!other_stage.contains(stage1_usage_guidance(language)));
+            }
             let forms = core_modifier_surface_forms(language);
             let normal_size = forms
                 .relative_scale
@@ -1760,19 +1807,55 @@ mod tests {
                 ResolvedInstructionLanguage::Ja => {
                     assert!(rules.contains("accepted_saijiki_vocabularyのわりあい行"));
                     assert!(rules.contains("非弧headへ転用しない"));
+                    assert!(rules.contains("短い視覚的な短歌"));
+                    assert!(rules.contains("固定の数量帯"));
+                    assert!(rules.contains("単一の対象を機械的に複数化しない"));
+                    assert!(rules.contains("図形の種類だけで画材を固定しない"));
+                    assert!(rules.contains("原文にない支持体や背景を一律に追加せず"));
+                    assert!(rules.contains("横線を縦に3本並べる"));
+                    assert!(!rules.contains("中心に赤い円をひとつ"));
+                    assert!(rules.contains("未対応の明示指定を黙って削って"));
+                    assert!(rules.contains("全ての属性を埋める必要はない"));
+                    let steps = [
+                        "1. 明示指定",
+                        "2. 未指定の部分",
+                        "3. 選んだ意味",
+                        "4. 明示指定",
+                    ];
+                    assert!(steps.windows(2).all(|pair| {
+                        rules.find(pair[0]).unwrap() < rules.find(pair[1]).unwrap()
+                    }));
+                    assert!(!rules.contains("足音だけが響く"));
                 }
                 ResolvedInstructionLanguage::En => {
                     assert!(rules.contains("proportions row of accepted_saijiki_vocabulary"));
                     assert!(rules.contains("Do not attach it to a non-arc head"));
+                    assert!(rules.contains("short visual tanka"));
+                    assert!(rules.contains("fixed quantity bands"));
+                    assert!(rules.contains("singular subject into multiples"));
+                    assert!(rules.contains("fix a tool from shape type alone"));
+                    assert!(rules.contains("support or background absent from the source"));
+                    assert!(rules.contains("Line up three horizontal lines vertically."));
+                    assert!(!rules.contains("One red circle in the center."));
+                    assert!(
+                        rules.contains("silently delete an unsupported explicit specification")
+                    );
+                    assert!(rules.contains("Not every attribute needs a value"));
+                    let steps = [
+                        "1. Keep explicit",
+                        "2. Choose unspecified",
+                        "3. Write chosen",
+                        "4. Check preservation",
+                    ];
+                    assert!(steps.windows(2).all(|pair| {
+                        rules.find(pair[0]).unwrap() < rules.find(pair[1]).unwrap()
+                    }));
+                    assert!(!rules.contains("footsteps echo"));
                 }
             }
             let attachment = format!("{}\n\n", standalone_shape_grammar(language));
             assert_eq!(rules.matches(&attachment).count(), 1);
-            // Existing interpretation, group, order, and response rules remain intact.
-            assert_eq!(
-                sha256_hex(rules.replace(&attachment, "").as_bytes()),
-                previous_sha
-            );
+            // Initial guidance must not turn into a patch-only constraint or a camera instruction.
             for patch_constraint in [
                 "typed_facts",
                 "confirmed_bindings",

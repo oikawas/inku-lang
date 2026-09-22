@@ -1369,6 +1369,8 @@ fn push_japanese_grammar_marker_candidate(
     let surface = marker_id.surface();
     let end_byte = start_byte + surface.len();
     if source.get(start_byte..end_byte) != Some(surface)
+        || (marker_id == MarkerId::JaTo
+            && !has_japanese_coordination_right_boundary(source, end_byte))
         || (require_boundary
             && !has_japanese_recognized_left_candidate(source, start_byte)
             && !has_japanese_recognized_left_candidate_across_separators(source, start_byte))
@@ -1381,6 +1383,22 @@ fn push_japanese_grammar_marker_candidate(
         identity,
         delivery: CandidateDelivery::Token(NeutralTokenKind::GrammarMarker(marker_id)),
     });
+}
+
+fn has_japanese_coordination_right_boundary(source: &str, start_byte: usize) -> bool {
+    if start_byte == source.len() {
+        return true;
+    }
+    let Some(character) = source[start_byte..].chars().next() else {
+        return true;
+    };
+    if is_separator(character)
+        || character == 'と'
+        || qualified_macro_end(source, start_byte).is_some()
+    {
+        return true;
+    }
+    !candidates_at(source, start_byte, ResolvedInstructionLanguage::Ja, false).is_empty()
 }
 
 fn push_japanese_counter_candidate(
@@ -1965,5 +1983,51 @@ mod tests {
             select_candidate(candidates),
             Some(Selection::Conflict { end_byte: 6 })
         );
+    }
+
+    #[test]
+    fn ja_to_requires_a_recognized_right_operand() {
+        let embedded_source = "黒い線にとばらして置く。";
+        let embedded = parse_neutral_lexemes(
+            &NormalizedDdlDocument::new(
+                embedded_source,
+                ResolvedInstructionLanguage::Ja,
+                Vec::new(),
+            )
+            .unwrap(),
+        );
+        assert!(!embedded.tokens.iter().any(|token| {
+            matches!(token.kind, NeutralTokenKind::GrammarMarker(MarkerId::JaTo))
+        }));
+        let unknown = embedded
+            .diagnostics
+            .iter()
+            .find(|diagnostic| diagnostic.surface.starts_with("とばら"))
+            .expect("the unsupported fragment remains one source diagnostic");
+        assert!(
+            embedded_source[unknown.span.start_byte..unknown.span.end_byte].starts_with("とばら")
+        );
+
+        for coordinated_source in ["黒い線と赤い円を置く。", "黒い線と 赤い円を置く。"] {
+            let coordinated = parse_neutral_lexemes(
+                &NormalizedDdlDocument::new(
+                    coordinated_source,
+                    ResolvedInstructionLanguage::Ja,
+                    Vec::new(),
+                )
+                .unwrap(),
+            );
+            assert_eq!(
+                coordinated
+                    .tokens
+                    .iter()
+                    .filter(|token| {
+                        matches!(token.kind, NeutralTokenKind::GrammarMarker(MarkerId::JaTo))
+                    })
+                    .count(),
+                1,
+                "{coordinated_source}"
+            );
+        }
     }
 }

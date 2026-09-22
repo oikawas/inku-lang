@@ -50,7 +50,7 @@ def _compiler_diagnostic_log_projection(channel: str, diagnostic: object) -> dic
     disposition = diagnostic.get("disposition")
     kind = diagnostic.get("issue_kind")
     if kind is None and isinstance(reason, dict):
-        kind = reason.get("kind")
+        kind = reason.get("type", reason.get("kind"))
     return {
         "channel": channel,
         "kind": _safe_compiler_log_atom(kind),

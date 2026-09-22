@@ -49,6 +49,8 @@ pub struct SaijikiWordAsset {
     pub surface_ja: String,
     pub surface_en: Option<String>,
     #[serde(default)]
+    pub physical_description: Option<SaijikiPhysicalDescriptionAsset>,
+    #[serde(default)]
     english_grammar: Option<EnglishGrammarAsset>,
     pub parser_surfaces_ja: Option<Vec<String>>,
     pub parser_surfaces_en: Option<Vec<String>>,
@@ -60,6 +62,13 @@ pub struct SaijikiWordAsset {
     pub semantic_alias: Option<String>,
     pub marker_surfaces_ja: Option<Vec<String>>,
     pub marker_surfaces_en: Option<Vec<String>>,
+}
+
+/// Bilingual physical trace description attached to one Saijiki word.
+#[derive(Debug, Deserialize, Eq, PartialEq)]
+pub struct SaijikiPhysicalDescriptionAsset {
+    pub ja: String,
+    pub en: String,
 }
 
 #[derive(Debug, Deserialize, Eq, PartialEq)]
@@ -1117,6 +1126,35 @@ pub fn saijiki_derived_projection(
     saijiki_derived_projection_from_asset(saijiki_asset(), language)
 }
 
+/// Return neutral physical descriptions for prompt-visible tools in asset order.
+pub fn saijiki_tool_guidance(
+    language: ResolvedInstructionLanguage,
+) -> Result<String, SaijikiProjectionError> {
+    saijiki_tool_guidance_from_asset(saijiki_asset(), language)
+}
+
+fn saijiki_tool_guidance_from_asset(
+    asset: &SaijikiAsset,
+    language: ResolvedInstructionLanguage,
+) -> Result<String, SaijikiProjectionError> {
+    let category = required_category(asset, "tezawari")?;
+    Ok(category
+        .words
+        .iter()
+        .filter(|word| word.prompt)
+        .filter_map(|word| {
+            let surface = language_surface(word, language)?;
+            let description = word.physical_description.as_ref()?;
+            let description = match language {
+                ResolvedInstructionLanguage::Ja => &description.ja,
+                ResolvedInstructionLanguage::En => &description.en,
+            };
+            Some(format!("{surface}: {description}"))
+        })
+        .collect::<Vec<_>>()
+        .join("\n"))
+}
+
 /// Derive every language-specific projection from a typed Saijiki asset.
 ///
 /// This is public so callers that validate a separately supplied typed asset can receive the
@@ -1547,4 +1585,73 @@ fn surface_score_pairs(
         }
     }
     Ok(pairs)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn tool_guidance_is_bilingual_ordered_and_prompt_only() {
+        let ja = saijiki_tool_guidance(ResolvedInstructionLanguage::Ja).unwrap();
+        let en = saijiki_tool_guidance(ResolvedInstructionLanguage::En).unwrap();
+        let expected_ja = [
+            "銀筆", "鉛筆", "ペン", "ロットリング", "クレヨン", "チョーク", "細筆",
+            "太筆", "油彩", "ビュラン", "ドライポイント", "コンピュータ",
+        ];
+        let expected_en = [
+            "silverpoint",
+            "pencil",
+            "pen",
+            "rotring",
+            "crayon",
+            "chalk",
+            "fine-brush",
+            "thick-brush",
+            "oil paint",
+            "burin",
+            "drypoint",
+            "computer",
+        ];
+        let ja_lines = ja.lines().collect::<Vec<_>>();
+        let en_lines = en.lines().collect::<Vec<_>>();
+
+        assert_eq!(ja_lines.len(), expected_ja.len());
+        assert_eq!(en_lines.len(), expected_en.len());
+        for ((ja_line, en_line), (ja_surface, en_surface)) in ja_lines
+            .iter()
+            .zip(&en_lines)
+            .zip(expected_ja.iter().zip(expected_en))
+        {
+            assert!(ja_line.starts_with(&format!("{ja_surface}: ")));
+            assert!(en_line.starts_with(&format!("{en_surface}: ")));
+        }
+        assert!(!ja.contains("既定"));
+        assert!(!en.contains("default"));
+        assert!(!ja.contains("brush_thin"));
+        assert!(!en.contains("brush_thin"));
+
+        let mut asset: SaijikiAsset = serde_json::from_slice(SAIJIKI_ASSET_BYTES).unwrap();
+        let tools = asset
+            .categories
+            .iter_mut()
+            .find(|category| category.key == "tezawari")
+            .unwrap();
+        tools
+            .words
+            .iter_mut()
+            .find(|word| word.surface_ja == "コンピュータ")
+            .unwrap()
+            .prompt = false;
+
+        let filtered_ja =
+            saijiki_tool_guidance_from_asset(&asset, ResolvedInstructionLanguage::Ja).unwrap();
+        let filtered_en =
+            saijiki_tool_guidance_from_asset(&asset, ResolvedInstructionLanguage::En).unwrap();
+
+        assert_eq!(filtered_ja.lines().count(), expected_ja.len() - 1);
+        assert_eq!(filtered_en.lines().count(), expected_en.len() - 1);
+        assert!(!filtered_ja.contains("コンピュータ"));
+        assert!(!filtered_en.contains("computer"));
+    }
 }

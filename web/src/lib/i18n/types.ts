@@ -194,6 +194,11 @@ export interface LangPack {
 	ddlNewDialogSubtitle: string;
 	ddlEditDialogSubtitle: string;
 	ddlSyntaxGuide: string;
+	ddlEditorInstructions: string;
+	ddlEditorVocabulary: string;
+	ddlEditorSyntaxGuideToggle: string;
+	ddlEditorStatus: (lines: number, chars: number) => string;
+	modelSelectionFailed: string;
 	ddlDialogDrawingModel: string;
 	// A namespaced name the server does not hold. Not an error: plugins can be
 	// installed later, so the wording says "not on this server", not "wrong".

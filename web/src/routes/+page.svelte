@@ -183,6 +183,7 @@
 	let ddlDialogMode = $state<'new' | 'edit'>('new');
 	let ddlDialogNode = $state<LineageNode | null>(null);
 	let ddlDialogInitial = $state('');
+	let ddlDialogReturnFocus = $state<HTMLElement | null>(null);
 	let ddlDialogDrawing = $state(false);
 	let ddlDialogError = $state<string | null>(null);
 	let ddlDialogWildOverride = $state<boolean | null>(null);
@@ -1575,6 +1576,7 @@ async function drawNewDdl(rawDdl: string, signal?: AbortSignal): Promise<void> {
 }
 
 function openNewDdlDialog(): void {
+	ddlDialogReturnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
 	ddlDialogWildOverride = null;
 	ddlDialogMode = 'new';
 	ddlDialogNode = null;
@@ -1587,16 +1589,18 @@ function openNewDdlDialog(): void {
 // resolve the displayed artwork's node from the loaded graph, fetching the
 // lineage first when that tab has not been opened in this session.
 async function openCurrentDdlEditor(): Promise<void> {
+	const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
 	const nodeId = currentLineageNodeId;
 	if (!nodeId) return;
 	const item = work.displayedHistoryItem ?? historyItems.find((entry) => entry.id === work.result?.history_id) ?? null;
 	if (!lineageState.graph?.nodes.some((entry) => entry.id === nodeId)) await lineageState.load(nodeId, true);
 	const node = lineageState.graph?.nodes.find((entry) => entry.id === nodeId) ?? null;
 	if (!node) return;
-	openLineageDdlEditor(node.history ? node : { ...node, history: item });
+	openLineageDdlEditor(node.history ? node : { ...node, history: item }, opener);
 }
 
-function openLineageDdlEditor(node: LineageNode): void {
+function openLineageDdlEditor(node: LineageNode, opener = document.activeElement instanceof HTMLElement ? document.activeElement : null): void {
+	ddlDialogReturnFocus = opener;
 	ddlDialogWildOverride = null;
 	ddlDialogMode = 'edit';
 	ddlDialogNode = node;
@@ -2519,7 +2523,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 	/>
 
 	<!-- ══ BODY ══ -->
-	<div class="main-shell" class:library-away={historyManager.open} inert={historyManager.open} aria-hidden={historyManager.open}>
+	<div class="main-shell" class:library-away={historyManager.open} inert={historyManager.open || ddlDialogOpen} aria-hidden={historyManager.open || ddlDialogOpen}>
 		<div class="body">
 			<!-- ── LEFT PANEL ── -->
 			{#if !leftPanelCollapsed}
@@ -2980,11 +2984,10 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		<DdlEditorDialog
 			open={ddlDialogOpen}
 			isJapanese={getLang() === 'ja'}
-			title={ddlDialogMode === 'new' ? t().ddlNewDialogTitle : t().ddlEditButton}
-			subtitle={ddlDialogMode === 'new' ? t().ddlNewDialogSubtitle : t().ddlEditDialogSubtitle}
+			mode={ddlDialogMode}
 			initialDdl={ddlDialogInitial}
+			returnFocusTo={ddlDialogReturnFocus}
 			drawing={ddlDialogDrawing}
-			stage1ModelLabel={work.stage1ModelLabel}
 			stage2ModelLabel={work.stage2ModelLabel}
 			drawingModelId={qualifiedModelId(stage2Provider, stage2Model)}
 			drawingModelGroups={availableModelCatalog}
@@ -2993,9 +2996,8 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			runTokensOut={work.activeRunTokensOut}
 			error={ddlDialogError}
 			previewForWord={saijikiPreview}
-		previewForPlugin={pluginPreview}
+			previewForPlugin={pluginPreview}
 			{pluginEntries}
-			showSettings={ddlDialogMode === 'edit'}
 			wildValue={ddlDialogWildOverride ?? (ddlDialogNode?.history?.render_wild === true)}
 			wildInherited={ddlDialogWildOverride === null}
 			onSelectWild={(next) => (ddlDialogWildOverride = next)}

@@ -117,12 +117,12 @@ test('T-22: a plugin preview is built from the document, not invented', () => {
 test('T-22: both panels are given the builder, or one of them shows nothing', () => {
 	const page = read('../../routes/+page.svelte');
 	const wired = page.match(/previewForPlugin=\{pluginPreview\}/g) ?? [];
-	// The drawer takes it directly; the editor dialog passes it to the inline
-	// panel. Two call sites, and a missing one is a silent dead panel.
+	// The drawer takes it directly; the dialog passes it through the shared
+	// editor to the inline panel. A missing handoff is a silent dead panel.
 	assert.equal(wired.length, 2);
 	const dialog = read('./DdlEditorDialog.svelte');
-	assert.match(dialog, /previewForPlugin: \(entry: PluginEntry, wordLang: ResolvedInstructionLang\) => SaijikiPreview;/);
 	assert.match(dialog, /\{previewForPlugin\}/);
+	assert.match(read('./DdlEditor.svelte'), /\{previewForPlugin\}/);
 });
 
 // --------------------------------------------------------- T-23 (the artwork)

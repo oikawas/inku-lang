@@ -2,29 +2,7 @@
 	import { t } from '$lib/i18n/index.svelte';
 	import { SAIJIKI, saijikiWordsFor } from '$lib/saijiki';
 	import type { ResolvedInstructionLang } from '$lib/instructionLang';
-
-	type SaijikiPreview = {
-		categoryKey: string;
-		word: string;
-		canonicalWord: string;
-		effect: string;
-		example: string;
-		svg: string;
-		/** Raster artwork, served by its own route. Set for plugin words;
-		    built-in words carry their drawing in `svg` instead. */
-		image?: string;
-		image2x?: string;
-	};
-
-	type PluginEntry = {
-		qualified_name: string;
-		note_ja: string;
-		note_en: string;
-		fires_on_ja?: string[];
-		fires_on_en?: string[];
-		preview_url?: string;
-		preview_url_2x?: string;
-	};
+	import type { PluginEntry, PreviewForPlugin, PreviewForWord, SaijikiPreview } from '$lib/features/ddl-editor/types';
 
 	type Props = {
 		activePreview: SaijikiPreview | null;
@@ -38,9 +16,10 @@
 		/** Namespaced plugin vocabulary, same list the saijiki drawer shows. */
 		pluginEntries?: PluginEntry[];
 		onInsertWord: (word: string) => void;
-		previewForWord: (categoryKey: string, canonicalWord: string, word: string, wordLang: ResolvedInstructionLang) => SaijikiPreview;
+		previewForWord: PreviewForWord;
 		/** The same preview a built-in word gets, built from the plugin document. */
-		previewForPlugin: (entry: PluginEntry, wordLang: ResolvedInstructionLang) => SaijikiPreview;
+		previewForPlugin: PreviewForPlugin;
+		disabled?: boolean;
 	};
 
 	let {
@@ -50,6 +29,7 @@
 		onInsertWord,
 		previewForWord,
 		previewForPlugin,
+		disabled = false,
 	}: Props = $props();
 </script>
 
@@ -98,6 +78,7 @@
 						<button
 							class="saijiki-chip"
 							class:plugin-chip={cat.key.startsWith("plugin-")}
+							{disabled}
 							onpointerdown={(e) => e.preventDefault()}
 							onclick={() => onInsertWord(word)}
 							onpointerenter={() => (activePreview = previewForWord(cat.key, canonicalWord, word, wordLang))}
@@ -121,6 +102,7 @@
 					{#each pluginEntries as entry (entry.qualified_name)}
 						<button
 							class="saijiki-chip plugin-chip"
+							{disabled}
 							onpointerdown={(e) => e.preventDefault()}
 							onclick={() => onInsertWord(entry.qualified_name)}
 							onpointerenter={() => (activePreview = previewForPlugin(entry, wordLang))}
@@ -157,18 +139,20 @@
 	}
 	.saijiki-hint {
 		margin-top: 3px;
-		font-size: 10px;
+		font-size: 12px;
 		line-height: 1.45;
 		color: var(--fg3);
 	}
 	.saijiki-preview {
+		box-sizing: border-box;
+		height: 190px;
 		margin: 10px;
 		padding: 9px;
 		border: 1px solid var(--border);
 		border-radius: var(--r);
 		background: var(--panel);
 		flex-shrink: 0;
-		overflow: hidden;
+		overflow: auto;
 	}
 	.saijiki-preview.empty {
 		background: var(--bg2);
@@ -206,13 +190,13 @@
 		color: var(--fg);
 	}
 	.saijiki-preview-effect {
-		font-size: 10px;
+		font-size: 12px;
 		line-height: 1.45;
 		color: var(--fg2);
 	}
 	.saijiki-preview-example,
 	.saijiki-preview-placeholder {
-		font-size: 10px;
+		font-size: 12px;
 		line-height: 1.45;
 		color: var(--fg3);
 	}
@@ -280,18 +264,32 @@
 		border-color: var(--fg3);
 		outline: none;
 	}
-	@media (max-width: 900px) {
+	.saijiki-chip:disabled {
+		cursor: not-allowed;
+		opacity: 0.58;
+	}
+	@media (max-width: 760px) {
 		.saijiki-inline {
-			max-height: none;
+			display: grid;
+			grid-template-columns: minmax(130px, 38%) minmax(0, 1fr);
+			grid-template-rows: auto minmax(100px, 1fr);
 		}
 		.saijiki-head {
-			border-bottom: 1px solid var(--border);
+			grid-column: 1 / -1;
+			grid-row: 1;
 		}
 		.saijiki-preview {
-			width: auto;
+			grid-column: 1;
+			grid-row: 2;
+			height: auto;
+			min-height: 0;
+			margin: 8px;
 		}
 		.saijiki-list {
-			padding: 0 0 10px;
+			grid-column: 2;
+			grid-row: 2;
+			min-height: 100px;
+			padding: 0 0 8px;
 		}
 	}
 </style>

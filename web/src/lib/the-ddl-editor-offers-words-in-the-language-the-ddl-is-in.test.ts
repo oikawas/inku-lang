@@ -26,7 +26,7 @@ const here = path.dirname(new URL(import.meta.url).pathname);
 const read = (relative: string) => fs.readFileSync(path.join(here, relative), 'utf8');
 
 const INLINE = './components/SaijikiInline.svelte';
-const DIALOG = './components/DdlEditorDialog.svelte';
+const DIALOG = './components/DdlEditor.svelte';
 const DRAWER = './components/SaijikiDrawer.svelte';
 const PAGE = '../routes/+page.svelte';
 

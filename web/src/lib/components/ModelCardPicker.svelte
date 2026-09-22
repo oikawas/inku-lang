@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { tick } from 'svelte';
 	import { t } from '$lib/i18n/index.svelte';
 	import { qualifiedModelId, type ModelOption, type Provider, type ProviderGroup } from '$lib/models';
 	import { modelPurposes, modelRecommendation, modelSpeed, modelComment, modelStatusLabel, isModelUnselectable, sortModels, type ModelPurpose } from '$lib/modelMeta';
@@ -14,6 +15,10 @@
 
 	let { label, selectedModel, providerGroups, purpose = 'llm', disabled = false, onSelect }: Props = $props();
 	let open = $state(false);
+	let selectionError = $state('');
+	let launchButton = $state<HTMLButtonElement>();
+	let pickerDialog = $state<HTMLDivElement>();
+	let closeButton = $state<HTMLButtonElement>();
 
 	const configuredGroups = $derived(providerGroups.filter((group) => group.models.length > 0));
 	const selected = $derived.by(() => {
@@ -27,8 +32,47 @@
 	const isJapanese = $derived(t().closeLabel !== 'Close');
 
 	async function choose(provider: Provider, model: string) {
-		await onSelect(provider, model);
+		selectionError = '';
+		try {
+			await onSelect(provider, model);
+		} catch (error) {
+			selectionError = error instanceof Error && error.message ? error.message : t().modelSelectionFailed;
+			return;
+		}
+		closePicker();
+	}
+
+	function openPicker() {
+		selectionError = '';
+		open = true;
+		void tick().then(() => closeButton?.focus());
+	}
+
+	function closePicker() {
 		open = false;
+		void tick().then(() => launchButton?.focus());
+	}
+
+	function trapKeyboard(event: KeyboardEvent) {
+		if (event.isComposing) return;
+		if (event.key === 'Escape') {
+			event.preventDefault();
+			event.stopPropagation();
+			closePicker();
+			return;
+		}
+		if (event.key !== 'Tab' || !pickerDialog) return;
+		const focusable = [...pickerDialog.querySelectorAll<HTMLElement>('button:not(:disabled), [href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])')];
+		const first = focusable[0];
+		const last = focusable.at(-1);
+		if (!first || !last) return;
+		if (event.shiftKey && document.activeElement === first) {
+			event.preventDefault();
+			last.focus();
+		} else if (!event.shiftKey && document.activeElement === last) {
+			event.preventDefault();
+			first.focus();
+		}
 	}
 
 	function positionMeta(event: Event) {
@@ -52,16 +96,17 @@
 
 <div class="context-model-picker">
 	<span class="field-label">{label}</span>
-	<button class="picker-launch" type="button" {disabled} onclick={() => (open = true)}>
+	<button class="picker-launch" type="button" {disabled} bind:this={launchButton} onclick={openPicker}>
 		<span><strong>{selected?.model.label ?? selectedModel}</strong>{#if selected}<small>{selected.group.label}</small>{/if}</span>
 		<span class="change-label">{t().modelSelectButton}</span>
 	</button>
 </div>
 
 {#if open}
-	<div class="picker-backdrop" role="presentation" onclick={() => (open = false)}></div>
-	<div class="picker-dialog" role="dialog" aria-modal="true" aria-label={label} tabindex="-1">
-		<header><h2>{label}</h2><button type="button" onclick={() => (open = false)}>×</button></header>
+	<div class="picker-backdrop" role="presentation" onclick={closePicker}></div>
+	<div class="picker-dialog" role="dialog" aria-modal="true" aria-label={label} tabindex="-1" bind:this={pickerDialog} onkeydown={trapKeyboard}>
+		<header><h2>{label}</h2><button type="button" bind:this={closeButton} aria-label={t().closeLabel} onclick={closePicker}>×</button></header>
+		{#if selectionError}<p class="selection-error" role="alert">{selectionError}</p>{/if}
 		<div class="picker-groups">
 			{#each configuredGroups as group (group.id)}
 				<section><h3>{group.label}</h3><div class="model-grid">
@@ -101,6 +146,7 @@
 	.picker-dialog header { display: flex; align-items: center; justify-content: space-between; padding: 13px 16px; border-bottom: 1px solid var(--border); }
 	.picker-dialog h2 { margin: 0; font-size: 15px; font-weight: 400; }
 	.picker-dialog header button { border: 0; background: none; color: var(--fg3); font-size: 20px; cursor: pointer; }
+	.selection-error { margin: 12px 15px 0; color: var(--danger); font-size: 12px; }
 	.picker-groups { display: grid; gap: 14px; padding: 15px; overflow: auto; }
 	.picker-groups h3 { margin: 0 0 6px; color: var(--fg3); font-size: 10px; font-weight: 500; letter-spacing: .06em; }
 	.model-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 7px; }

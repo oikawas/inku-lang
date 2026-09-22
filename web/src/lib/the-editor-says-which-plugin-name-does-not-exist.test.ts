@@ -161,7 +161,7 @@ test('T-7: the four callers pass no index, and the editor passes one', () => {
 	const page = read('../routes/+page.svelte');
 	assert.match(page, /highlightDDL\(batch\.activeDdl\)/);
 	assert.match(page, /highlightDDL\(demo\.generatedDdl\)/);
-	const dialog = read('components/DdlEditorDialog.svelte');
+	const dialog = read('components/DdlEditor.svelte');
 	assert.match(dialog, /highlightDDL\(value, [^)]*, pluginNameIndex\)/);
 });
 
@@ -221,7 +221,7 @@ test('T-10: the new colour is a theme token, not a literal in the rule', () => {
 	assert.ok(!/#fff\b|#ffffff\b|\bwhite\b/i.test(body), body);
 	assert.ok(!/:\s*\d+px/.test(body.replace(/text-underline-offset:[^;]+;/, '')), body);
 
-	const dialog = read('components/DdlEditorDialog.svelte');
+	const dialog = read('components/DdlEditor.svelte');
 	const strip = dialog.slice(dialog.indexOf('.ddl-unknown-names {'), dialog.indexOf('.ddl-unknown-hint'));
 	assert.ok(!/#fff\b|#ffffff\b|\bwhite\b/i.test(strip), strip);
 	for (const token of TOKENS) assert.match(strip + dialog, new RegExp(`var\\(${token}\\)`));

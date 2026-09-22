@@ -6,6 +6,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 36 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-22 — Share and refine the instruction editor
+
+Extracted text editing and vocabulary assistance into a shared component for new and edited instructions. The text gets more space, line numbers follow wrapped lines, and vocabulary and the quick guide can be toggled. Narrow screens prioritize editing; conditions and actions stay outside the text area. Model selection contains keyboard focus and closes independently, closing the editor restores focus, and drawing prevents editing. Independent-work and derived-work save paths are unchanged.
+
 ### 2026-09-22 — Organize description and instruction controls
 
 The Description tab now follows writing, checking the next work's conditions, and drawing. Model and catalog values are grouped with their change controls, with long model names wrapping across the available width. Sketch, canvas, and Wild buttons show their current choices.

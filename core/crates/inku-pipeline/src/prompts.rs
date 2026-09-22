@@ -1451,9 +1451,11 @@ fn stage1_vocabulary_roles(language: ResolvedInstructionLanguage, heads: &[Strin
     match language {
         ResolvedInstructionLanguage::Ja => format!(r#"語彙一覧はそのまま使える語形であり、自由な同義語や複合語を生成する材料ではない。抽象化した視覚内容を、一覧の語形と上記の構文へ符号化する。カテゴリ名は説明用の見出しで、命令に付けない。
 単独図形のheadは {heads}。てざわりは道具、つらなりは線の連続性、おもては面の属性であり、それだけをheadや動作にしない。属性は対応するheadの前に置く。図形の形容と描画headを区別する。
+受理済みの修飾句の接続例は「赤いペンの実線の空の円」「青いクレヨンの塗りの四角」。道具・連続性・面の各名詞を「の」で結び、最後に図形headを残す。面の名詞を動詞の連体節へ展開しない。これらは接続だけを示す断片であり、単独では命令にならない。例の属性・対象・構図は転写せず、今回選んだ語形で同じ接続を使い、上記骨格の位置・数量・動作と結ぶ。
 図形命令と支持体・背景・macroは別の構文である。地を指定するなら、じの語を単独の文にする。背景色は「背景を<色>で埋める。」。いずれも任意で、必要な描画対象の代用ではない。macroはqualified_nameと宣言されたparameterの呼出しだけを一文にし、外側に動作・数量・位置・属性を足さない。明示指定がある場合は宣言されたparameterで結合し、結合不能な指定を削って呼出しを成立させない。"#),
         ResolvedInstructionLanguage::En => format!(r#"The vocabulary lists usable surface forms, not material for inventing synonyms or compound terms. Encode the interpreted visual content with those forms and the grammar above. Category names are explanatory headings, not command prefixes.
 Standalone drawing heads are {heads}. Touches specify tools, continuity specifies line continuity, and surfaces specify surface attributes; none is a head or action on its own. Put attributes before their corresponding head. Distinguish shape modifiers from drawing heads.
+Accepted modifier-attachment fragments include "red pen solid empty circle" and "blue crayon flat square". Keep the tool, continuity, and surface terms as pre-head modifiers and retain the final drawing head. Do not expand a surface term into a verbal relative clause. These fragments demonstrate attachment only and are not complete commands. Do not copy their attributes, subjects, or composition; use the selected vocabulary with the same attachment and the position, count, and action slots above.
 Drawing commands, ground, background, and macros have separate syntax. To specify ground, write a ground vocabulary noun as its own sentence. Background color uses "fill the background with <color>." Both are optional and do not replace required drawing subjects. A macro sentence contains only its qualified_name call with declared parameters; do not append an outer action, count, position, or attribute. Bind explicit specifications through declared parameters and never delete an unbindable specification to make a call succeed."#),
     }
 }

@@ -9,13 +9,15 @@
 		selected: CanvasAspectId;
 		options: CanvasAspectOption[];
 		open: boolean;
+		showValue?: boolean;
 		onToggle: () => void;
 		onSelect: (id: CanvasAspectId) => void | Promise<void>;
 	};
 
-	let { selected, options, open = false, onToggle, onSelect }: Props = $props();
+	let { selected, options, open = false, showValue = false, onToggle, onSelect }: Props = $props();
 
 	const isJa = $derived(getLang() === 'ja');
+	const selectedLabel = $derived(options.find((option) => option.id === selected)?.label ?? '');
 </script>
 
 <div class="canvas-aspect-plugin">
@@ -29,7 +31,7 @@
 		aria-haspopup="menu"
 		aria-expanded={open}
 	>
-		<span>{t().canvasAspectButton}</span>
+		<span>{t().canvasAspectButton}{#if showValue}<span class="aspect-trigger-value">{isJa ? '：' : ': '}{selectedLabel}</span>{/if}</span>
 	</button>
 	{#if open}
 		<div class="aspect-menu" role="menu">
@@ -60,6 +62,7 @@
 		display: inline-flex;
 	}
 	.aspect-trigger { display: inline-flex; align-items: center; }
+	.aspect-trigger-value { color: var(--fg2); font-weight: 400; }
 	.aspect-menu {
 		position: absolute;
 		top: calc(100% + 6px);

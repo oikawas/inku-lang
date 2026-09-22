@@ -255,96 +255,153 @@
 </div>
 
 <section class="panel-section">
-	<!-- The button row and the settings readout are the same for every input
-	     mode, but the description tab puts them below the input box: the description is
-	     written first, the settings are confirmed just before painting. -->
+	<!-- The description is written before its conditions, immediately before painting. -->
 	{#snippet inputSettings()}
 	<h3 class="conditions-heading">{t().nextWorkConditions}</h3>
-	<div class="section-head">
-		<div class="section-actions">
-			<!-- Model / catalog / sketch / canvas apply to every input mode, so the
-			     button row is identical across the three tabs. -->
-			<Tooltip text={t().tooltipInputModel}>
-				<button class="ghost-btn" onclick={onOpenModelSelection}>{t().modelButton}</button>
-			</Tooltip>
-			<Tooltip text={t().tooltipInputCatalog}>
-				<button class="ghost-btn catalog-btn" onclick={onOpenCatalogModal}>{t().colorCatalogButton}</button>
-			</Tooltip>
-			<Tooltip text={t().tooltipInputSketch}>
-				<SketchSelect value={sketchMode} {isJapanese} onSelect={onSelectSketchMode} />
-			</Tooltip>
-			<Tooltip text={t().tooltipInputWild}>
-				<button
-					type="button"
-					class="ghost-btn wild-btn"
-					class:active={wildSettings.enabled}
-					aria-pressed={wildSettings.enabled}
-					onclick={() => wildSettings.set(!wildSettings.enabled)}
-				>{t().wildButton}</button>
-			</Tooltip>
-			<Tooltip text={t().tooltipInputCanvas}>
-				<CanvasAspectPlugin
-					selected={canvasAspectId}
-					options={canvasAspectOptions}
-					open={canvasAspectMenuOpen}
-					onToggle={onToggleCanvasAspectMenu}
-					onSelect={onSelectCanvasAspect}
-				/>
-			</Tooltip>
-			<!-- On the description tab this button lives at the right end of the label row
-			     instead, next to the text it clears. -->
-			{#if inputMode === 'batch'}
-				<Tooltip placement="left" text={t().tooltipInputClear}>
-					<button class="ghost-btn create-btn" onclick={onClearInput}>{t().clearInputBtn}</button>
-				</Tooltip>
-			{/if}
+	{#if inputMode === 'single'}
+		<div class="condition-rows" aria-label={t().nextWorkConditions}>
+			<div class="condition-row">
+				<div class="condition-row-head">
+					<span class="condition-label">{t().modelButton}</span>
+					<Tooltip text={t().tooltipInputModel}>
+						<button class="ghost-btn condition-change" aria-label={t().tooltipInputModel} onclick={onOpenModelSelection}>{t().editButton}</button>
+					</Tooltip>
+				</div>
+				<div class="condition-value condition-model-value">
+					{#if nextStage1Model === nextStage2Model}
+						<span title={nextStage1Model}>{nextStage1Model}</span>
+					{:else}
+						<span><small>{isJapanese ? '解釈' : 'Interpretation'}</small><span title={nextStage1Model}>{nextStage1Model}</span></span>
+						<span><small>{isJapanese ? '描画' : 'Performance'}</small><span title={nextStage2Model}>{nextStage2Model}</span></span>
+					{/if}
+				</div>
+			</div>
+			<div class="condition-row">
+				<div class="condition-row-head">
+					<span class="condition-label">{t().colorCatalogButton}</span>
+					<Tooltip text={t().tooltipInputCatalog}>
+						<button class="ghost-btn condition-change" aria-label={t().tooltipInputCatalog} onclick={onOpenCatalogModal}>{t().editButton}</button>
+					</Tooltip>
+				</div>
+				<!-- This still names the description-selected catalog when applicable. -->
+				<span class="condition-value" title={nextCatalogName}>{nextCatalogName}</span>
+			</div>
+			<div class="condition-compact-rows">
+				<div class="condition-compact-row">
+					<Tooltip text={t().tooltipInputSketch}><SketchSelect value={sketchMode} {isJapanese} showValue onSelect={onSelectSketchMode} /></Tooltip>
+				</div>
+				<div class="condition-compact-row">
+					<Tooltip text={t().tooltipInputWild}>
+						<button
+							type="button"
+							class="ghost-btn wild-btn"
+							class:active={wildSettings.enabled}
+							aria-pressed={wildSettings.enabled}
+							onclick={() => wildSettings.set(!wildSettings.enabled)}
+						>{t().wildButton} {wildSettings.enabled ? t().wildEnabled : t().wildDisabled}</button>
+					</Tooltip>
+				</div>
+				<div class="condition-compact-row">
+					<Tooltip text={t().tooltipInputCanvas}>
+						<CanvasAspectPlugin
+							selected={canvasAspectId}
+							options={canvasAspectOptions}
+							open={canvasAspectMenuOpen}
+							showValue
+							onToggle={onToggleCanvasAspectMenu}
+							onSelect={onSelectCanvasAspect}
+						/>
+					</Tooltip>
+				</div>
+			</div>
 		</div>
-	</div>
+	{:else}
+		<div class="section-head">
+			<div class="section-actions">
+				<!-- Batch and demo retain their shared settings toolbar. -->
+				<Tooltip text={t().tooltipInputModel}>
+					<button class="ghost-btn" onclick={onOpenModelSelection}>{t().modelButton}</button>
+				</Tooltip>
+				<Tooltip text={t().tooltipInputCatalog}>
+					<button class="ghost-btn catalog-btn" onclick={onOpenCatalogModal}>{t().colorCatalogButton}</button>
+				</Tooltip>
+				<Tooltip text={t().tooltipInputSketch}>
+					<SketchSelect value={sketchMode} {isJapanese} onSelect={onSelectSketchMode} />
+				</Tooltip>
+				<Tooltip text={t().tooltipInputWild}>
+					<button
+						type="button"
+						class="ghost-btn wild-btn"
+						class:active={wildSettings.enabled}
+						aria-pressed={wildSettings.enabled}
+						onclick={() => wildSettings.set(!wildSettings.enabled)}
+					>{t().wildButton}</button>
+				</Tooltip>
+				<Tooltip text={t().tooltipInputCanvas}>
+					<CanvasAspectPlugin
+						selected={canvasAspectId}
+						options={canvasAspectOptions}
+						open={canvasAspectMenuOpen}
+						onToggle={onToggleCanvasAspectMenu}
+						onSelect={onSelectCanvasAspect}
+					/>
+				</Tooltip>
+				{#if inputMode === 'batch'}
+					<Tooltip placement="left" text={t().tooltipInputClear}>
+						<button class="ghost-btn create-btn" onclick={onClearInput}>{t().clearInputBtn}</button>
+					</Tooltip>
+				{/if}
+			</div>
+		</div>
 
-	<div class="current-selection" aria-label={t().nextWorkConditions}>
-		<span class="cs-group">
-			<span class="cs-label">{isJapanese ? 'モデル' : 'Model'}</span>
-			{#if nextStage1Model === nextStage2Model}
-				<span class="cs-value" title={nextStage1Model}>{nextStage1Model}</span>
-			{:else}
-				<span class="cs-sub">{isJapanese ? '解釈' : 'Interpretation'}</span>
-				<span class="cs-value" title={nextStage1Model}>{nextStage1Model}</span>
-				<span class="cs-sub">{isJapanese ? '描画' : 'Performance'}</span>
-				<span class="cs-value" title={nextStage2Model}>{nextStage2Model}</span>
+		<div class="current-selection" aria-label={t().nextWorkConditions}>
+			<span class="cs-group">
+				<span class="cs-label">{isJapanese ? 'モデル' : 'Model'}</span>
+				{#if nextStage1Model === nextStage2Model}
+					<span class="cs-value" title={nextStage1Model}>{nextStage1Model}</span>
+				{:else}
+					<span class="cs-sub">{isJapanese ? '解釈' : 'Interpretation'}</span>
+					<span class="cs-value" title={nextStage1Model}>{nextStage1Model}</span>
+					<span class="cs-sub">{isJapanese ? '描画' : 'Performance'}</span>
+					<span class="cs-value" title={nextStage2Model}>{nextStage2Model}</span>
+				{/if}
+			</span>
+			{#if inputMode === 'demo'}
+				<span class="cs-divider"></span>
+				<span class="cs-group">
+					<span class="cs-label">{isJapanese ? '指示生成' : 'Instruction'}</span>
+					<span class="cs-value" title={demoSettings.prompt_model}>{demoSettings.prompt_model}</span>
+				</span>
 			{/if}
-		</span>
-		{#if inputMode === 'demo'}
 			<span class="cs-divider"></span>
 			<span class="cs-group">
-				<span class="cs-label">{isJapanese ? '指示生成' : 'Instruction'}</span>
-				<span class="cs-value" title={demoSettings.prompt_model}>{demoSettings.prompt_model}</span>
+				<span class="cs-label">{isJapanese ? '色カタログ' : 'Catalog'}</span>
+				<!-- Reads "from the description" when that is what is selected: the page
+				     names the choice, so this shows one value either way. -->
+				<span class="cs-value" title={nextCatalogName}>{nextCatalogName}</span>
 			</span>
-		{/if}
-		<span class="cs-divider"></span>
-		<span class="cs-group">
-			<span class="cs-label">{isJapanese ? '色カタログ' : 'Catalog'}</span>
-			<!-- Reads "from the description" when that is what is selected: the page
-			     names the choice, so this shows one value either way. -->
-			<span class="cs-value" title={nextCatalogName}>{nextCatalogName}</span>
-		</span>
-		<span class="cs-divider"></span>
-		<span class="cs-group">
-			<span class="cs-label">{isJapanese ? '写生' : 'Sketch from life'}</span>
-			<span class="cs-value">{sketchModeLabel(sketchMode, isJapanese)}</span>
-		</span>
-		<span class="cs-divider"></span>
-		<span class="cs-group">
-			<span class="cs-label">{isJapanese ? 'キャンバス' : 'Canvas'}</span>
-			<span class="cs-value" title={nextCanvasName}>{nextCanvasName}</span>
-		</span>
-	</div>
+			<span class="cs-divider"></span>
+			<span class="cs-group">
+				<span class="cs-label">{isJapanese ? '写生' : 'Sketch from life'}</span>
+				<span class="cs-value">{sketchModeLabel(sketchMode, isJapanese)}</span>
+			</span>
+			<span class="cs-divider"></span>
+			<span class="cs-group">
+				<span class="cs-label">{isJapanese ? 'キャンバス' : 'Canvas'}</span>
+				<span class="cs-value" title={nextCanvasName}>{nextCanvasName}</span>
+			</span>
+		</div>
+	{/if}
 	{/snippet}
 
 	{#if inputMode === 'single'}
 		<div class="input-label">
-			<span class="input-label-text"><strong>{t().inputSectionLabel}</strong>{t().inputSectionHint}</span>
+			<div class="input-label-text">
+				<div class="input-heading">{t().inputSectionLabel}</div>
+				<div class="input-description">{t().inputSectionHint}</div>
+			</div>
 			<Tooltip placement="left" text={t().tooltipInputClear}>
-				<button class="ghost-btn create-btn" onclick={onClearInput}>{t().clearInputBtn}</button>
+				<button class="ghost-btn" onclick={onClearInput}>{t().clearInputBtn}</button>
 			</Tooltip>
 		</div>
 		<!-- The grey ranges are painted behind the textarea, which cannot colour
@@ -526,17 +583,80 @@
 		align-items: center;
 	}
 	.section-actions { display: flex; gap: 5px; min-width: 0; flex: 1; }
-	.input-label {
+	.condition-rows {
+		display: grid;
+		gap: 6px;
+		min-width: 0;
+	}
+	.condition-row {
+		display: grid;
+		gap: 5px;
+		min-width: 0;
+		padding: 7px 0;
+	}
+	.condition-row + .condition-row { border-top: 1px solid var(--border); }
+	.condition-row-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+	.condition-label {
+		color: var(--fg2);
+		font-size: 12px;
+		line-height: 1.35;
+		font-weight: 500;
+	}
+	.condition-value {
+		min-width: 0;
+		color: var(--fg);
+		font-size: 14px;
+		line-height: 1.35;
+		overflow-wrap: anywhere;
+	}
+	.condition-model-value {
+		display: grid;
+		gap: 3px;
+	}
+	.condition-model-value > span {
+		display: flex;
+		gap: 6px;
+		min-width: 0;
+	}
+	.condition-model-value > span > span { min-width: 0; overflow-wrap: anywhere; }
+	.condition-model-value small {
+		flex: none;
+		color: var(--fg3);
+		font-size: 12px;
+		font-weight: 400;
+	}
+	.condition-change { white-space: nowrap; }
+	.condition-compact-rows {
+		position: relative;
+		display: flex;
+		flex-wrap: wrap;
+		gap: 6px;
+		padding-top: 6px;
+		border-top: 1px solid var(--border);
+	}
+	.condition-compact-row {
 		display: flex;
 		align-items: center;
+		min-width: 0;
+	}
+	.condition-compact-row :global(.tooltip-wrap) { flex: none; max-width: 100%; position: static; }
+	/* Anchor menus to the whole conditions row so a wrapped trigger never
+	   pushes its menu outside the narrow input panel. */
+	.condition-compact-row :global(.sketch-plugin),
+	.condition-compact-row :global(.canvas-aspect-plugin) { position: static; max-width: 100%; }
+	.condition-compact-row :global(.sketch-menu),
+	.condition-compact-row :global(.aspect-menu) { width: min(310px, 100%); }
+	.condition-compact-row :global(.ghost-btn) { white-space: normal; text-align: left; }
+	.input-label {
+		display: flex;
+		align-items: flex-start;
 		justify-content: space-between;
 		gap: 8px;
-		font-size: 12px; line-height: 1.5; color: var(--fg2);
-		font-weight: 400;
 	}
 	.input-label-text { min-width: 0; }
 	.input-label :global(.tooltip-wrap) { flex: none; }
-	.input-label strong { font-weight: 600; color: var(--fg); }
+	.input-heading { color: var(--fg); font-size: 14px; line-height: 1.35; font-weight: 600; }
+	.input-description { margin-top: 1px; color: var(--fg2); font-size: 12px; line-height: 1.45; }
 	.wild-btn.active { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
 	.wild-btn.active:hover { background: var(--accent); }
 	.catalog-btn {
@@ -610,32 +730,35 @@
 	}
 	.input-ta:focus { border-color: var(--accent); }
 	.input-ta[readonly] { background: var(--bg2); color: var(--fg2); }
-	.description-lock { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 11px; color: var(--fg2); }
+	.description-lock { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; font-size: 12px; color: var(--fg2); }
 	.input-meta-row {
 		display: flex;
+		flex-wrap: wrap;
 		align-items: flex-start;
 		justify-content: space-between;
-		gap: 12px;
+		gap: 2px 12px;
 		margin-top: -3px;
 	}
 	.input-comment-hint {
-		min-height: 16px;
-		font-size: 10px;
-		line-height: 16px;
-		color: color-mix(in srgb, var(--fg3) 68%, transparent);
+		font-size: 12px;
+		line-height: 1.5;
+		color: var(--fg3);
 	}
 	.input-meter {
 		min-width: 54px;
-		min-height: 16px;
-		font-size: 10px;
-		line-height: 16px;
+		margin-left: auto;
+		font-size: 12px;
+		line-height: 1.5;
 		font-variant-numeric: tabular-nums;
 		text-align: right;
-		color: color-mix(in srgb, var(--fg3) 68%, transparent);
+		color: var(--fg3);
 	}
 	.input-meter.soft-over { color: color-mix(in srgb, var(--fg) 78%, transparent); }
-	.gen-status-wrap { margin-top: 8px; }
+	.gen-status-wrap { margin-top: 4px; }
 	.error-text { color: var(--danger); font-size: 12px; white-space: pre-line; }
+	@media (max-width: 430px) {
+		.condition-compact-row { max-width: 100%; }
+	}
 	@keyframes inkupulse {
 		0%, 100% { opacity: 1; transform: scale(1); }
 		50% { opacity: 0.4; transform: scale(0.7); }

@@ -2524,7 +2524,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			<!-- ── LEFT PANEL ── -->
 			{#if !leftPanelCollapsed}
 			<div class="left-panel">
-				<div class="panel-scroll">
+				<div class="panel-scroll" class:description-scroll={work.inputMode === 'single'}>
 					<InputPanel
 						sketchMode={work.sketchMode}
 						onSelectSketchMode={(mode) => (work.sketchMode = mode)}
@@ -2605,6 +2605,13 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 						onForkDescription={work.forkPipelineDescription}
 						onStop={work.stopBatch}
 					/>
+					{#if work.inputMode === 'single'}
+						<div class="ddl-new-action">
+							<Tooltip placement="left" text={t().tooltipDdlNew}>
+								<button class="ghost-btn" type="button" onclick={openNewDdlDialog}>{t().ddlNewButton}</button>
+							</Tooltip>
+						</div>
+					{/if}
 
 					<!-- thinking -->
 					{#if work.thinking}
@@ -2627,16 +2634,8 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 						onDecline={work.declinePipelinePatch}
 					/>
 
-					<!-- DDL tools -->
-					{#if work.inputMode === 'single'}
-						<section class="panel-section ddl-tools-section">
-							<Tooltip placement="left" text={t().tooltipDdlEdit}>
-								<button class="ddl-new-btn" type="button" disabled={!canEditCurrentDdl} onclick={openCurrentDdlEditor}>{t().ddlEditButton}</button>
-							</Tooltip>
-							<Tooltip placement="left" text={t().tooltipDdlNew}>
-								<button class="ddl-new-btn" type="button" onclick={openNewDdlDialog}>{t().ddlNewButton}</button>
-							</Tooltip>
-						</section>
+					{#if work.inputMode === 'single' && (work.result !== null || work.ddl !== null || work.sketchText !== null)}
+						<h3 class="displayed-work-heading">{t().displayedWorkProcess}</h3>
 					{/if}
 
 					<!-- DDL-run status belongs below the action buttons, not inside the input field. -->
@@ -2658,7 +2657,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 						<section class="panel-section sketch-section">
 							<div class="sketch-head">
 								<Tooltip placement="right" text={t().tooltipSketchToggle}>
-									<button class="sketch-toggle" type="button" onclick={describePanelSettings.toggleSketch}>
+									<button class="sketch-toggle" type="button" aria-expanded={describePanelSettings.sketchOpen} onclick={describePanelSettings.toggleSketch}>
 										<span class="sketch-arrow" class:open={describePanelSettings.sketchOpen}>▶</span>
 										<span class="sketch-title">{t().sketchLabel}</span>
 									</button>
@@ -2699,6 +2698,8 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 								expandedDdl={work.expandedDdl}
 								label={t().ddlLabel}
 								expandedLabel={t().ddlExpandedLabel}
+								onEdit={openCurrentDdlEditor}
+								editDisabled={!canEditCurrentDdl}
 								onPaint={() => { void work.replay(); }}
 								paintDisabled={work.loading || work.reloading || refinementSession.gridBusy}
 								runStatus={work.reloading ? ddlRunStatus : null}
@@ -2740,7 +2741,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 					{#if work.result && work.elapsedTotalMs > 0}
 						<section class="panel-section stats-section">
 							<Tooltip placement="right" text={t().tooltipStatsToggle}>
-								<button class="stats-toggle" onclick={resultLogSettings.toggle}>
+								<button class="stats-toggle" aria-expanded={resultLogSettings.open} onclick={resultLogSettings.toggle}>
 									<span class="stats-arrow" class:open={resultLogSettings.open}>▶</span>
 									<span>{t().resultLogLabel}</span>
 								</button>
@@ -3409,8 +3410,10 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 	.ui-hide-input-modes :global(.panel-tabs),
 	.ui-hide-drawing-settings :global(.section-head),
 	.ui-hide-drawing-settings :global(.current-selection),
+	.ui-hide-drawing-settings :global(.conditions-heading),
+	.ui-hide-drawing-settings :global(.condition-rows),
 	.ui-hide-drawing-settings :global(.input-label .tooltip-wrap),
-	.ui-hide-ddl-tools .ddl-tools-section,
+	.ui-hide-ddl-tools .ddl-new-action,
 	.ui-hide-ddl-tools :global(.ddl-viewer),
 	.ui-hide-ddl-tools .interpretation-diff,
 	.ui-hide-detail-status .thinking-details,
@@ -3572,24 +3575,18 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		flex-direction: column;
 		gap: 14px;
 	}
+	.description-scroll { overflow-x: hidden; }
 
 	.panel-section { display: flex; flex-direction: column; gap: 6px; }
-	.ddl-tools-section { flex-direction: row; justify-content: flex-end; gap: 6px; }
-	.ddl-new-btn {
-		padding: var(--btn-sm-padding);
-		border: 1px solid var(--ddl-btn-border);
-		border-radius: var(--btn-sm-radius);
-		background: var(--ddl-btn-bg);
-		color: var(--ddl-btn-fg);
-		font-family: inherit;
-		font-size: var(--btn-sm-font-size);
+	.ddl-new-action { display: flex; justify-content: flex-end; margin-top: -6px; }
+	.displayed-work-heading {
+		margin: 4px 0 0;
+		padding-top: 16px;
+		border-top: 1px solid var(--border);
+		color: var(--fg);
+		font-size: 12px;
 		font-weight: 600;
-		box-shadow: var(--ddl-btn-shadow);
-		white-space: nowrap;
-		cursor: pointer;
 	}
-	.ddl-new-btn:hover:not(:disabled) { background: var(--ddl-btn-bg-hover); border-color: var(--ddl-btn-border-hover); color: var(--ddl-btn-fg-hover); }
-	.ddl-new-btn:disabled { opacity: 0.45; cursor: not-allowed; }
 
 	/* thinking */
 	.thinking-details {
@@ -3606,9 +3603,9 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 	/* Stats */
 	.stats-toggle {
 		display: flex; align-items: center; gap: 5px;
-		width: 100%; padding: 4px 2px;
+		width: 100%; padding: 6px 0;
 		border: none; background: none;
-		color: var(--fg3); font-size: 11px; cursor: pointer;
+		color: var(--fg2); font-size: 12px; cursor: pointer;
 		text-align: left; font-family: inherit;
 	}
 	.stats-arrow {
@@ -3618,7 +3615,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 	.stats-arrow.open { transform: rotate(90deg); }
 	.stats-detail {
 		background: var(--bg2); border-radius: var(--r); border-left: 2px solid var(--border2);
-		padding: 8px 10px; font-size: 11px; color: var(--fg2); line-height: 1.5;
+		padding: 8px 10px; font-size: 12px; color: var(--fg2); line-height: 1.5;
 		overflow: hidden;
 	}
 	.stats-grid {
@@ -3820,15 +3817,15 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 	/* Sketching (Stage 0.5). Reads as prose, not as code: the instructions below it
 	   are monospace because they are a score, this is the author's own language. */
 	.sketch-section { display: grid; gap: 6px; }
-	.sketch-head { display: flex; align-items: center; gap: 8px; }
-	.sketch-title { font-size: 11px; color: var(--fg3); }
+	.sketch-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+	.sketch-title { font-size: 12px; color: var(--fg2); }
 	/* Matches the expanded-DDL toggle: the two folds in this panel are one
 	   control repeated, so they read and behave the same. */
 	.sketch-toggle {
 		display: flex;
 		align-items: center;
 		gap: 5px;
-		padding: 2px 0;
+		padding: 6px 0;
 		border: 0;
 		background: none;
 		color: var(--fg3);
@@ -3842,7 +3839,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		transition: transform 0.15s ease;
 	}
 	.sketch-arrow.open { transform: rotate(90deg); }
-	.sketch-grain { font-size: 11px; color: var(--fg3); margin-left: auto; }
+	.sketch-grain { font-size: 12px; color: var(--fg3); margin-left: auto; }
 	.sketch-edit-btn {
 		padding: var(--btn-sm-padding);
 		border: 1px solid var(--border2);
@@ -3858,14 +3855,14 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		padding: 8px 10px;
 		border: 1px solid var(--border);
 		background: color-mix(in srgb, var(--bg2) 68%, transparent);
-		font-size: 12px;
+		font-size: 14px;
 		line-height: 1.7;
 		color: var(--fg2);
 		white-space: pre-wrap;
 		margin: 0;
 	}
 	.sketch-editor { font-family: inherit; width: 100%; resize: vertical; }
-	.sketch-note { margin: 0; font-size: 11px; color: var(--fg3); }
+	.sketch-note { margin: 0; font-size: 12px; line-height: 1.6; color: var(--fg3); }
 
 	/* The same amber as the editor's mark: one meaning, one colour. */
 	.plugin-warnings {

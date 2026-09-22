@@ -180,6 +180,7 @@ export interface LangPack {
 	vocabInInputLabel: string;
 	thinkingLabel: string;
 	ddlLabel: string;
+	displayedWorkProcess: string;
 	sketchLabel: string;
 	sketchGrainLabel: string;
 	sketchOffNote: string;
@@ -284,6 +285,8 @@ export interface LangPack {
 	tooltipInputClear: string;
 	tooltipInputSketch: string;
 	wildButton: string;
+	wildEnabled: string;
+	wildDisabled: string;
 	tooltipInputWild: string;
 	tooltipInputCanvas: string;
 	tooltipDdlNew: string;

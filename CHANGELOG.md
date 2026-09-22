@@ -6,6 +6,12 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 36 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-22 — Organize description and instruction controls
+
+The Description tab now follows writing, checking the next work's conditions, and drawing. Model and catalog values are grouped with their change controls, with long model names wrapping across the available width. Sketch, canvas, and Wild buttons show their current choices.
+
+New instructions stay with the new-work controls. A separate heading identifies the displayed work's sketch and instructions, with instruction editing beside the heading and drawing from instructions below the text. Text sizes, spacing, and disclosure controls are aligned while retaining input locking, progress and stopping, saved disclosure states, and derivation relationships.
+
 ### 2026-09-22 — Organize the Limits tab
 
 Removed the duplicate heading and outer frame, and aligned all three groups into consistent rows for explanations, inputs, saved values, and defaults. Changed rows are marked, and narrow screens stack the content. Save feedback and actions now sit outside the scrolling fields so they do not cover the final rows. Field meanings, values, and saving behavior are unchanged.

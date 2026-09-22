@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { highlightDDL } from '$lib/highlight';
 	import Tooltip from './Tooltip.svelte';
-	import PaintButton from './PaintButton.svelte';
 	import { t } from '$lib/i18n/index.svelte';
 	import { describePanelSettings } from '$lib/features/describe-panel/settings.svelte';
 
@@ -12,6 +11,8 @@
 		expandedDdl?: string | null;
 		label: string;
 		expandedLabel: string;
+		onEdit?: (() => void) | null;
+		editDisabled?: boolean;
 		/** Perform the shown DDL again through Stage 2. Omitted = no button. */
 		onPaint?: (() => void) | null;
 		/** Set by the caller while a run is in flight; empty DDL disables on its own. */
@@ -20,7 +21,7 @@
 		runStatus?: import('svelte').Snippet | null;
 	};
 
-	let { ddl, expandedDdl = null, label, expandedLabel, onPaint = null, paintDisabled = false, runStatus = null }: Props = $props();
+	let { ddl, expandedDdl = null, label, expandedLabel, onEdit = null, editDisabled = false, onPaint = null, paintDisabled = false, runStatus = null }: Props = $props();
 
 	// Artworks saved before v1.98 have no input-side DDL: their single stored text
 	// is the expanded one. Show it in the main slot and rename the label so the
@@ -44,12 +45,17 @@
 <div class="ddl-viewer">
 	<div class="ddl-viewer-head">
 		<span class="ddl-viewer-label">{primaryLabel}</span>
+		{#if onEdit}
+			<Tooltip placement="left" text={t().tooltipDdlEdit}>
+				<button class="ghost-btn" type="button" disabled={editDisabled} onclick={() => onEdit?.()}>{t().ddlEditButton}</button>
+			</Tooltip>
+		{/if}
 	</div>
 	<div class="ddl-viewer-body ddl-highlight">{@html highlighted}</div>
 	{#if onPaint}
 		<div class="ddl-viewer-actions">
 			<Tooltip placement="left" text={t().tooltipDdlPaint}>
-				<PaintButton icon={false} block={false} disabled={paintBlocked} onclick={() => onPaint?.()}>{t().replayFromDdlButton}</PaintButton>
+				<button class="ghost-btn" type="button" disabled={paintBlocked} onclick={() => onPaint?.()}>{t().replayFromDdlButton}</button>
 			</Tooltip>
 		</div>
 	{/if}
@@ -57,7 +63,7 @@
 	{#if showExpanded}
 		<div class="ddl-expanded">
 			<Tooltip placement="right" text={t().tooltipDdlExpandedToggle}>
-				<button class="ddl-expanded-toggle" type="button" onclick={describePanelSettings.toggleDdlExpanded}>
+				<button class="ddl-expanded-toggle" type="button" aria-expanded={expandedOpen} onclick={describePanelSettings.toggleDdlExpanded}>
 					<span class="ddl-expanded-arrow" class:open={expandedOpen}>▶</span>
 					<span>{expandedLabel}</span>
 				</button>
@@ -78,6 +84,7 @@
 	}
 	.ddl-viewer-head {
 		display: flex;
+		flex-wrap: wrap;
 		align-items: center;
 		gap: 8px;
 	}
@@ -85,7 +92,6 @@
 		margin-right: auto;
 		font-size: 12px;
 		font-weight: 600;
-		letter-spacing: 0.04em;
 		color: var(--fg2);
 	}
 	.ddl-viewer-body {
@@ -94,7 +100,7 @@
 		background: transparent;
 		color: var(--fg);
 		font-family: inherit;
-		font-size: 13px;
+		font-size: 14px;
 		line-height: 1.78;
 		white-space: pre-wrap;
 		word-break: break-word;
@@ -104,7 +110,6 @@
 	.ddl-viewer-actions {
 		display: flex;
 		justify-content: flex-end;
-		margin-top: -2px;
 	}
 	.ddl-expanded {
 		display: flex;
@@ -115,12 +120,12 @@
 		display: flex;
 		align-items: center;
 		gap: 5px;
-		padding: 2px 0;
+		padding: 6px 0;
 		border: 0;
 		background: none;
-		color: var(--fg3);
+		color: var(--fg2);
 		font-family: inherit;
-		font-size: 11px;
+		font-size: 12px;
 		cursor: pointer;
 		text-align: left;
 	}

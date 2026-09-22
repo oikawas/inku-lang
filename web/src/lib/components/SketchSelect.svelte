@@ -13,12 +13,13 @@
 		value: SketchMode;
 		isJapanese: boolean;
 		compact?: boolean;
+		showValue?: boolean;
 		inherited?: boolean;
 		disabled?: boolean;
 		onSelect: (mode: SketchMode) => void;
 	};
 
-	let { value, isJapanese, compact = false, inherited = false, disabled = false, onSelect }: Props = $props();
+	let { value, isJapanese, compact = false, showValue = false, inherited = false, disabled = false, onSelect }: Props = $props();
 
 	let open = $state(false);
 	const title = $derived(isJapanese ? '写生' : 'Sketch from life');
@@ -59,7 +60,7 @@
 			aria-expanded={open}
 			onclick={(event) => { event.stopPropagation(); open = !open; }}
 		>
-			<span>{title}</span>
+			<span>{title}{#if showValue}<span class="sketch-trigger-value">{isJapanese ? '：' : ': '}{sketchModeLabel(value, isJapanese)}</span>{/if}</span>
 		</button>
 		{#if open}
 			<div class="sketch-menu" role="menu">
@@ -94,6 +95,7 @@
 	/* dropdown variant (describe tab) */
 	.sketch-plugin { position: relative; display: inline-flex; }
 	.sketch-trigger { display: inline-flex; align-items: center; }
+	.sketch-trigger-value { color: var(--fg2); font-weight: 400; }
 	.sketch-menu {
 		position: absolute;
 		top: calc(100% + 6px);

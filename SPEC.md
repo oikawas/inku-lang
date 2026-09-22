@@ -794,7 +794,9 @@ revision** — is a premise of the design.
 ### 7.2 Screen Composition (in concept)
 
 The current reference UI places description input and interpretation results,
-the drawing canvas, history, and refinement on one making surface. Stage 1's
+the drawing canvas, the history strip, and refinement on the making screen.
+Saved works are managed in a separate Library screen. Moving between the two
+retains the input, refinement state, and Library browsing state. Stage 1's
 normalized DDL may appear before drawing finishes, and a saved work exposes its
 DDL, Score, provenance, and lineage. Refinement shows its relation to the source
 work through derivation metadata and presentation; a programmer's diff is not
@@ -844,8 +846,9 @@ which to look inward.
 
 **What is adopted**
 
-1. **A blank writing area**: nothing is offered while writing.  Close to the
-   purity of a tanka manuscript sheet
+1. **A blank writing area**: the description box does not automatically offer
+   completions while the writer uses their own words. Close to the purity of a
+   tanka manuscript sheet
 2. **The vocabulary dictionary placed elsewhere, as Saijiki**: the writer goes to
    consult it actively
 3. **Interpretation feedback after writing**: inspect the normalized DDL and
@@ -867,13 +870,15 @@ which to look inward.
 | Design | Why it is rejected |
 |---|---|
 | IntelliSense-style autocompletion | it takes away the still time of making; too procedural |
-| a permanently displayed list of choices | it forces the order "look outward, then draw from within," which is the reverse of the order of making |
+| a permanently displayed candidate list in the description box | it requires choosing existing vocabulary before writing in one's own words |
 
 **The grounds for the design**
 
-Nobody writes a tanka while keeping a list of seasonal words in view.  You write
-the word that rose from inside you, and check the seasonal word afterwards.
-**From the inside out, then confirmed on the outside** — that is the right order.
+The description box does not push candidates at the writer, allowing them to
+start in their own words. Direct instruction authoring and editing instead
+show the Saijiki from the start, so the writer can survey vocabulary and compose
+short instructions. These activities have different purposes; the user decides
+whether to consult the Saijiki or close it while writing.
 
 ### 7.5 Saijiki
 
@@ -904,9 +909,10 @@ order / proportions / relations.
 
 **Placement policy**
 
-- it is not shown in the writing area
-- it is opened actively, from a `Saijiki` button in the UI
-- it stays closed while writing and opens only when the writer is unsure
+- vocabulary candidates do not appear automatically in the description box
+- the browsing drawer opens explicitly from the button below the canvas
+- the instruction editor initially shows the Saijiki below the text and lets
+  the user close it as needed (§7.8)
 
 The Saijiki drawer is read-only (v1.98).  Clicking a vocabulary chip shows a
 preview rather than inserting the word; insertion happens only in the inline
@@ -959,10 +965,9 @@ identity still matches.
 Short English tabs, buttons, and labels follow the correspondence table in
 `docs/i18n/glossary.md` and the style rules in `web/src/lib/i18n/GLOSSARY.md`
 (the correspondence table was consolidated into the former on 2026-08-17); the
-latter's rules are enforced by `npm run lint:i18n` (v2.7.1).  At iPad-class widths the
-Canvas tabs and the displayed Models / Color / Canvas / creation metadata wrap
-into two rows, and the left panel scales with the viewport rather than clipping
-the work metadata.
+latter's rules are enforced by `npm run lint:i18n` (v2.7.1). On narrow screens or
+with enlarged text, Canvas tabs and work conditions wrap while keeping each
+label with its value. The left panel also scales with the viewport.
 
 The web app is the current reference interface. v1.72 makes refinement and model comparison first-class authoring surfaces. The `Refine` tab offers touch, layout, reading, color-catalog, and variation (§12.13) changes as a radio-style choice: exactly one intervention may be selected per refinement step, so each lineage edge remains attributable to one cause.
 
@@ -987,6 +992,8 @@ The work header's Refine control and Lineage cards share the same work-editing m
 History lists place the description in a wide column beside the thumbnail without a character cutoff. A preview of up to three lines expands or collapses by mouse or keyboard without selecting or drawing a work; the thumbnail view also offers the full text. Model names are combined only when both stages record the same complete provider-qualified ID. Missing values remain unrecorded for their respective stages, and details retain the provider and full model name. Presentation changes do not alter the saved description or conditions.
 
 History management opens as an in-app **Library** and does not rebuild the making view, its input, or temporary refinement state. Returning after viewing a work or Lineage retains the query, filters, display form, page, selection, scroll position, and read-only preview. Selecting a row or image in that read-only preview is reading only and does not change the conditions for the next drawing. Opening the work, Lineage, and Refine are separate actions. Display form (thumbnails/list) and grouping (chronological/Lineage) are separate control groups; only a changed search, filter, or trash view updates the page and bulk selection. Cross-page selection and clearing it are explicit, and active-history and trash selections do not mix.
+
+With Library thumbnails grouped by Lineage, works in each Lineage run horizontally from the root in generation order. Each group retains the height its thumbnails need; Lineages scroll vertically, and long Lineage rows scroll horizontally.
 
 Lineage browsing state is separate from the selected work. Within one rooted tree it retains expanded branches, normal and overview scroll positions, orientation, overview openness, and scale. Selecting a node in the overview does not close it. A new root or unauthorized response discards that state and does not substitute old work images or text; deleted or private nodes follow the fresh Lineage response. The Lineage header groups view controls, the displayed work, the root-to-displayed path, checked works, and colophon or root actions. The displayed work and the checked set are distinct targets.
 
@@ -1018,7 +1025,8 @@ Major UI areas:
 - DDL display and editing: read-only normalized DDL in the drawing flow, with
   word highlighting, expanded DDL display, and `Draw from DDL`; editing happens
   in a DDL editor dialog with line numbers, inline Saijiki, and a short syntax guide
-- Canvas panel: SVG display, zoom, pan, output tabs, status bar, export buttons
+- Canvas panel: SVG display, zoom, pan, output tabs, work-conditions header,
+  and work actions and export at the bottom
 - History strip: recent works, hover metadata, star markers, pagination. **The reader chooses
   which information is printed under each thumbnail** — up to two of generation, model, engine version
   and file size, and **zero may also be selected** (choose nothing and only the pictures are shown)
@@ -1030,23 +1038,20 @@ is the screen where people select and delete, and without the mark another membe
 there looking exactly like their own. **Recipients can be picked by name among the members of
 your own organisation group**; a member who cannot fetch candidates types an id directly (the
 full roster is not opened)
-- Settings modal: models, color catalogs, DB status, plugin status, export
-  templates, users, theme, Demo
+- Settings modal: Display and operation, Making, Export, Connections and
+  administration, Extensions and details; contents follow permissions and the
+  Standard/Detailed selection
 
-The status bar displays the current render context:
-
-- Stage 1 model
-- Stage 2 model
-- color catalog
-- canvas aspect
-- star state for the current history item
-- SVG / PNG export controls
+The work-conditions header shows the displayed work's models, color catalog,
+and canvas. Work actions, including star and sharing marks and export, appear
+below the canvas.
 
 For history display, model, catalog, and canvas values come from the history
-item when available.  For active editing, they come from the current selections.
-The canvas panel header also shows the selected work's color catalog, canvas,
-and creation time.  The color catalog button in the input panel displays the
-currently selected catalog name and truncates long names with an ellipsis.
+item when available. Conditions for the next drawing come from the current
+selections. The canvas header compactly groups labels and values for the
+displayed work's generation, models, color catalog, canvas, SVG size, and
+creation time. In the input panel, the current color catalog and its change
+control share a row, with long names wrapping so they remain readable.
 
 The settings modal's Display and operation category includes history-selection behavior controls.
 Users can choose independently whether selecting a history item updates the UI's
@@ -1096,12 +1101,13 @@ PNG export options are managed as per-user templates in the settings modal's
 export tab.  Each template has a name, description, and y-axis height in pixels.
 The default templates are `PNG 1080px`, `PNG 2160px`, and `PNG 4320px` (the
 older stored defaults `1024px` / `2048px` are replaced automatically, while
-templates the user edited are kept).  The status bar PNG menu is generated from
-these templates, and export width is computed from the current canvas aspect
-ratio.
+templates the user edited are kept). The PNG choices in the shared Export menu
+are generated from these templates, and export width is computed from
+the target work's canvas aspect ratio.
 
-In history management, Animation opens an export modal when at least one work
-is selected. For one work, it creates a simulated making process by revealing
+The shared Export menu on a work, Library, or Lineage opens the same export
+modal as Layer animation for one work and Transition animation for multiple
+works. For one work, it creates a simulated making process by revealing
 layers of the saved SVG in drawing order, from the background to the finished
 work. Choose the number of frames including background and completion (2–120,
 default 12), the interval (0.1–30 seconds, default 0.3), and replay behavior.
@@ -1111,8 +1117,8 @@ groups, stacking order, background, clipping, and filters are preserved, and
 the completed frame uses the original saved SVG. When there are fewer layers
 than requested frames, repeated states combine their display durations.
 
-For two or more works, the existing animation switches between selected works
-from oldest to newest. The settings export tab holds defaults for the shared
+For two or more works, checked works switch from oldest to newest, while a
+Lineage path switches from its root to the displayed work. The settings export tab holds defaults for the shared
 format (APNG/GIF), resolution, and custom height, the single-work frame count,
 interval, and replay behavior, and the multiple-work transition and hold time.
 The export modal shows the controls for the selected number of works. Size and
@@ -1123,10 +1129,10 @@ the existing save settings apply; browsers without folder selection use their
 own download settings. Failure to write to a folder chosen for this export stays
 visible in the modal and does not redirect the file to another destination.
 
-The lineage tab's Export animation button opens the same modal when at least
-one work is checked, using layer animation for one work and chronological
-transitions for multiple works. It snapshots the checked works when pressed.
-Unchecked ancestors and the currently displayed work are not added automatically.
+Lineage provides separate Export menus for the displayed work, the path from
+the root to the displayed work, and checked works. Each menu snapshots its
+target when opened; exporting checked works does not add unchecked ancestors or
+the displayed work automatically.
 
 ---
 
@@ -3299,8 +3305,9 @@ not an input tab. Its running status and Stop action stay available outside
 settings, where it can also be reopened, and starting it does not replace the
 Description or Batch text.
 
-Demo draws with the same selection.  The status bar reflects the catalog reported
-by the render result, not only the current catalog selection.  **Until v2.9.39 the
+Demo draws with the same selection. The work-conditions header reflects the
+catalog reported by the render result, not only the current catalog selection.
+**Until v2.9.39 the
 per-user demo settings held a `catalog_mode` of their own, and until v2.9.22 that
 option drew a catalog at random.**
 

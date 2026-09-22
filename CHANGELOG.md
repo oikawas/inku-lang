@@ -6,6 +6,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 36 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-23 — Synchronize the specification with the current Web UI
+
+Aligned the Japanese and English specification with the current making and Library state retention, description and instruction editing with the Saijiki, responsive work-condition display, Lineage-grouped Library thumbnails, the shared Export menu and Lineage scopes, and Demo's work-conditions header. The batch-resume wording now also uses the current saved-success meaning. Product code and versions are unchanged.
+
 ### 2026-09-23 — Guide initial interpretation with ordered decisions and neutral Saijiki notes
 
 Japanese and English Stage 1 now follow a short order: preserve explicit specifications, interpret unspecified parts from the whole, write accepted grammar, and check preservation and ownership. The central red-circle format example is replaced by directly specified line-angle and arrangement-direction syntax, with no subject-to-shape example. "Random" becomes an observable state in context, never a fixed placement substitution.

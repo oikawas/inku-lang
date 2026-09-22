@@ -26,7 +26,7 @@ export type SaveRefinementCandidatesCapabilities = {
 	now?: () => number;
 };
 
-export type SaveRefinementCandidatesOutcome = 'complete' | 'stale';
+export type SaveRefinementCandidatesOutcome = 'complete' | 'stale' | 'failed';
 
 /** Map one generated candidate to the route's current-work projection. */
 export function projectRefinementCandidate(
@@ -74,10 +74,13 @@ export async function saveRefinementCandidates(
 		// The save may finish after the author has switched targets. Check before
 		// changing selection or starting the next write.
 		if (!capabilities.isCurrentContext()) return 'stale';
+		// saveHistory deliberately returns null for a failed or unavailable save.
+		// Keep this candidate selected so the author can see the failure and retry.
+		if (!saved?.id) return 'failed';
 		capabilities.markSaved(candidate.id);
 		// A saved id belongs on the Canvas only when it is still showing this exact
 		// result object; another candidate must not inherit the persisted identity.
-		if (saved?.id && capabilities.isCurrentResult(result)) {
+		if (capabilities.isCurrentResult(result)) {
 			capabilities.adoptSavedIdentity(result, saved);
 		}
 	}

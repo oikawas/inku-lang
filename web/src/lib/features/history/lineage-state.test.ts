@@ -8,7 +8,7 @@ const stateShim = identity as (<T>(value: T) => T) & { raw: <T>(value: T) => T }
 stateShim.raw = identity;
 (globalThis as unknown as Record<string, unknown>).$state = stateShim;
 
-const { LineageQueryState } = await import('./lineage-state.svelte.ts');
+const { LineageBrowsingState, LineageQueryState } = await import('./lineage-state.svelte.ts');
 
 type PendingRequest = {
 	path: string;
@@ -69,9 +69,76 @@ test('T-267/T-268: the latest base lineage request alone may settle state', asyn
 	const failed = state.load('node-c');
 	requests[3]?.resolve(jsonResponse({}, 503));
 	await failed;
-	assert.equal(state.graph?.focus_node_id, 'node-b');
+	assert.equal(state.graph, null);
 	assert.equal(state.error, 'HTTP 503');
 	assert.equal(state.loading, false);
+});
+
+test('T-273: a same-tree refresh retains browsing state but fresh roots and rejected access discard it', async () => {
+	const { apiFetch, requests } = deferredTransport();
+	const browsing = new LineageBrowsingState();
+	const state = new LineageQueryState(apiFetch, browsing);
+	const initial: LineageGraph = {
+		focus_node_id: 'shown',
+		nodes: [
+			{ id: 'root', state: 'active', at: 1, history: null },
+			{ id: 'shown', state: 'active', at: 2, history: { id: 'old-history', input: 'remembered work', ddl: null, score: { instructions: [] }, svg: '<svg/>', at: 2, starred: false, for_revision: false, for_share: false } }
+		],
+		edges: [{ id: 'root-shown', parent_node_id: 'root', child_node_id: 'shown', derivation_kind: 'replay' }]
+	};
+	state.graph = initial;
+	browsing.reconcileGraph(initial);
+	browsing.expandedNodeIds = ['root', 'shown'];
+	browsing.overviewOpen = true;
+	browsing.overviewScale = 0.7;
+	browsing.setScroll(false, { left: 13, top: 21 });
+	browsing.setScroll(true, { left: 34, top: 55 });
+
+	const refresh = state.load('shown', true);
+	assert.equal(requests[0]?.path, '/api/lineage/root?descendant_depth=200&node_limit=200');
+	requests[0]?.resolve(jsonResponse({
+		focus_node_id: 'root',
+		nodes: [
+			{ id: 'root', state: 'active', at: 1, history: null },
+			{ id: 'shown', state: 'lineage_only', at: 2, redacted: 'not_permitted', history: null }
+		],
+		edges: [{ id: 'root-shown', parent_node_id: 'root', child_node_id: 'shown', derivation_kind: 'replay' }]
+	}));
+	await refresh;
+	browsing.reconcileGraph(state.graph);
+
+	assert.equal(state.graph?.focus_node_id, 'shown');
+	assert.equal(state.graph?.nodes.find((node) => node.id === 'shown')?.redacted, 'not_permitted');
+	assert.equal(state.graph?.nodes.find((node) => node.id === 'shown')?.history, null, 'fresh redaction must replace retained history');
+	assert.deepEqual(browsing.expandedNodeIds, ['root', 'shown']);
+	assert.equal(browsing.overviewOpen, true);
+	assert.equal(browsing.overviewScale, 0.7);
+	assert.deepEqual(browsing.scrollFor(false), { left: 13, top: 21 });
+	assert.deepEqual(browsing.scrollFor(true), { left: 34, top: 55 });
+
+	const newRoot = state.load('new-shown', true);
+	assert.equal(requests[1]?.path, '/api/lineage/root?descendant_depth=200&node_limit=200');
+	requests[1]?.resolve(jsonResponse(graph('new-shown', ['new-root', 'new-shown'], [
+		{ id: 'new-root-shown', parent_node_id: 'new-root', child_node_id: 'new-shown', derivation_kind: 'replay' }
+	])));
+	await newRoot;
+	browsing.reconcileGraph(state.graph);
+	assert.equal(browsing.treeId, 'new-root');
+	assert.deepEqual(browsing.expandedNodeIds, ['new-shown']);
+	assert.equal(browsing.overviewOpen, false);
+	assert.equal(browsing.overviewScale, 1);
+	assert.deepEqual(browsing.scrollFor(false), { left: 0, top: 0 });
+	assert.deepEqual(browsing.scrollFor(true), { left: 0, top: 0 });
+
+	browsing.overviewOpen = true;
+	const rejected = state.load('denied', true);
+	assert.equal(requests[2]?.path, '/api/lineage/new-root?descendant_depth=200&node_limit=200');
+	requests[2]?.resolve(jsonResponse({}, 403));
+	await rejected;
+	assert.equal(state.graph, null);
+	assert.equal(browsing.treeId, null);
+	assert.deepEqual(browsing.expandedNodeIds, []);
+	assert.equal(browsing.overviewOpen, false);
 });
 
 test('T-268: reset invalidates a response already in flight', async () => {

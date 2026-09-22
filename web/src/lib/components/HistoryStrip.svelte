@@ -418,8 +418,8 @@
 		top: 3px;
 		right: 3px;
 		z-index: 20;
-		width: 18px;
-		height: 18px;
+		width: 26px;
+		height: 26px;
 		border: 1px solid var(--thumb-plate-border);
 		border-radius: 50%;
 		background: var(--thumb-plate-bg);
@@ -481,8 +481,8 @@
 	/* The first line reads as the heading of the tile and the second as its
 	   footnote, whichever two facts are in them -- the weight belongs to the
 	   position, not to the fact that used to sit there. */
-	.thumb-meta-first { font-size: 10px; font-weight: 650; color: var(--fg2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-	.thumb-meta-second { font-size: 9px; color: var(--fg3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+	.thumb-meta-first { font-size: 12px; font-weight: 650; color: var(--fg2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+	.thumb-meta-second { font-size: 12px; color: var(--fg2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 	.thumb-current-badge {
 		position: absolute;
 		bottom: 22px;

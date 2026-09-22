@@ -1,6 +1,65 @@
 import type { ApiFetch } from '../../transport/api-fetch.ts';
 import type { LineageGraph, NearbyWork } from './types.ts';
 
+export type LineageOrientation = 'vertical' | 'horizontal';
+
+export type LineageScrollPosition = { left: number; top: number };
+
+function lineageRootId(graph: LineageGraph): string | null {
+	const childIds = new Set(graph.edges.map((edge) => edge.child_node_id));
+	return graph.nodes.find((node) => !childIds.has(node.id))?.id ?? graph.focus_node_id ?? null;
+}
+
+/**
+ * Route-lifetime browsing state for one authorized lineage tree.
+ *
+ * The graph remains owned by LineageQueryState. A response for another root,
+ * including a reset after an account or permission change, discards this state
+ * rather than attempting to show a remembered branch against unknown data.
+ */
+export class LineageBrowsingState {
+	treeId = $state<string | null>(null);
+	expandedNodeIds = $state<string[]>([]);
+	overviewOpen = $state(false);
+	overviewScale = $state(1);
+	orientation = $state<LineageOrientation>('vertical');
+	normalScroll = $state<LineageScrollPosition>({ left: 0, top: 0 });
+	overviewScroll = $state<LineageScrollPosition>({ left: 0, top: 0 });
+
+	reset(): void {
+		this.treeId = null;
+		this.expandedNodeIds = [];
+		this.overviewOpen = false;
+		this.overviewScale = 1;
+		this.normalScroll = { left: 0, top: 0 };
+		this.overviewScroll = { left: 0, top: 0 };
+	}
+
+	reconcileGraph(graph: LineageGraph | null): boolean {
+		if (!graph) return false;
+		const nextTreeId = lineageRootId(graph);
+		if (!nextTreeId || nextTreeId !== this.treeId) {
+			this.reset();
+			this.treeId = nextTreeId;
+			this.expandedNodeIds = graph.focus_node_id ? [graph.focus_node_id] : [];
+			return true;
+		}
+		const available = new Set(graph.nodes.map((node) => node.id));
+		const retained = this.expandedNodeIds.filter((id) => available.has(id));
+		if (retained.length !== this.expandedNodeIds.length) this.expandedNodeIds = retained;
+		return false;
+	}
+
+	setScroll(overview: boolean, position: LineageScrollPosition): void {
+		if (overview) this.overviewScroll = position;
+		else this.normalScroll = position;
+	}
+
+	scrollFor(overview: boolean): LineageScrollPosition {
+		return overview ? this.overviewScroll : this.normalScroll;
+	}
+}
+
 export type HistoryStarProjection = {
 	id?: string;
 	starred?: boolean;
@@ -36,9 +95,11 @@ export class LineageQueryState {
 	private nearbyRequestId = 0;
 	private nearbyLoadedId: string | null = null;
 	private readonly apiFetch: ApiFetch;
+	private readonly browsingState?: LineageBrowsingState;
 
-	constructor(apiFetch: ApiFetch) {
+	constructor(apiFetch: ApiFetch, browsingState?: LineageBrowsingState) {
 		this.apiFetch = apiFetch;
+		this.browsingState = browsingState;
 	}
 
 	/**
@@ -61,16 +122,33 @@ export class LineageQueryState {
 		this.loading = true;
 		this.error = null;
 		try {
-			const url = `/api/lineage/${encodeURIComponent(nodeId)}?descendant_depth=${descendantDepth}&node_limit=200`;
-			const response = await this.apiFetch(url, { cache: 'no-store' });
-			if (!response.ok) throw new Error(`HTTP ${response.status}`);
-			const graph = await response.json() as LineageGraph;
+			const readGraph = async (id: string, depth: number): Promise<LineageGraph> => {
+				const response = await this.apiFetch(`/api/lineage/${encodeURIComponent(id)}?descendant_depth=${depth}&node_limit=200`, { cache: 'no-store' });
+				if (!response.ok) throw new Error(`HTTP ${response.status}`);
+				return await response.json() as LineageGraph;
+			};
+			const rootId = this.browsingState?.treeId;
+			let graph = await readGraph(rootId ?? nodeId, rootId ? 200 : descendantDepth);
+			if (rootId && !graph.nodes.some((node) => node.id === nodeId)) {
+				// A bounded overview may omit the focus. Both sets must come from
+				// fresh authorized responses; never merge remembered artwork here.
+				const focus = await readGraph(nodeId, descendantDepth);
+				if (lineageRootId(focus) === lineageRootId(graph)) {
+					graph = { ...focus,
+						nodes: [...new Map([...graph.nodes, ...focus.nodes].map((node) => [node.id, node])).values()],
+						edges: [...new Map([...graph.edges, ...focus.edges].map((edge) => [edge.id, edge])).values()]
+					};
+				} else graph = focus;
+			}
 			if (requestId !== this.requestId) return;
-			this.graph = graph;
+			this.graph = { ...graph, focus_node_id: nodeId };
 			this.loadedFocus = nodeId;
 		} catch (cause) {
 			if (requestId === this.requestId) {
 				this.error = cause instanceof Error ? cause.message : String(cause);
+				this.graph = null;
+				this.loadedFocus = null;
+				this.browsingState?.reset();
 			}
 		} finally {
 			if (requestId === this.requestId) this.loading = false;

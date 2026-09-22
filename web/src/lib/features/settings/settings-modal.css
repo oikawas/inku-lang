@@ -43,17 +43,34 @@
 		width: min(820px, calc(100vw - 32px));
 		height: min(760px, 88vh);
 	}
-	.settings-feature-root .settings-tabs {
-		display: flex; flex: 0 0 auto; gap: 0; overflow-x: auto; border-bottom: 1px solid var(--border); background: var(--bg);
+	.settings-feature-root .settings-workspace {
+		display: grid; grid-template-columns: minmax(172px, 220px) minmax(0, 1fr); min-height: 0; flex: 1;
 	}
-	.settings-feature-root .settings-tabs button {
-		flex: 0 0 auto; white-space: nowrap; padding: 9px 16px; border: none; border-bottom: 2px solid transparent;
-		background: none; color: var(--fg2); font-size: 13px; cursor: pointer; font-family: inherit;
+	.settings-feature-root .settings-category-nav {
+		overflow-y: auto; padding: 12px; border-right: 1px solid var(--border); background: var(--bg);
 	}
-	.settings-feature-root .settings-tabs button.active { color: var(--fg); border-bottom-color: var(--fg); font-weight: 500; }
+	.settings-feature-root .settings-category { display: grid; gap: 3px; }
+	.settings-feature-root .settings-category + .settings-category { margin-top: 14px; }
+	.settings-feature-root .settings-category-label {
+		padding: 0 7px 4px; color: var(--fg3); font-size: 10px; font-weight: 500;
+		letter-spacing: 0.08em; text-transform: uppercase;
+	}
+	.settings-feature-root .settings-category button {
+		width: 100%; padding: 7px 8px; border: 1px solid transparent; border-radius: var(--r); background: transparent;
+		color: var(--fg2); cursor: pointer; font-family: inherit; font-size: 13px; line-height: 1.35; text-align: left;
+	}
+	.settings-feature-root .settings-category button:hover { background: var(--panel); color: var(--fg); }
+	.settings-feature-root .settings-category button.active { border-color: var(--border2); background: var(--panel); color: var(--fg); font-weight: 500; }
 	.settings-feature-root .settings-body {
-		padding: 14px 16px; overflow-y: auto;
+		min-width: 0; padding: 14px 16px; overflow-y: auto;
 		display: flex; flex-direction: column; gap: 10px;
+	}
+	@media (max-width: 680px) {
+		.settings-feature-root .settings-modal { top: 3vh; width: min(100vw - 20px, 1120px); height: min(88vh, 760px); }
+		.settings-feature-root .settings-workspace { grid-template-columns: 1fr; }
+		.settings-feature-root .settings-category-nav { display: flex; gap: 12px; overflow-x: auto; overflow-y: hidden; padding: 8px 10px; border-right: 0; border-bottom: 1px solid var(--border); }
+		.settings-feature-root .settings-category { min-width: max-content; }
+		.settings-feature-root .settings-category + .settings-category { margin-top: 0; }
 	}
 	.settings-feature-root .popover-group {
 		border: 1px solid var(--border);

@@ -9,6 +9,7 @@
 	import CanvasPresentationOverlay from '$lib/features/canvas/CanvasPresentationOverlay.svelte';
 	import CanvasRefinementWorkspace from '$lib/features/canvas/CanvasRefinementWorkspace.svelte';
 	import type { LineageGraph, LineageNode, NearbyWork } from '$lib/features/history/types';
+	import type { LineageBrowsingState } from '$lib/features/history/lineage-state.svelte';
 	import { measureSvgWeight } from '$lib/svgWeight';
 	import { formatCanvasCapacity } from '$lib/formatNumber';
 	import { normalizeCaptionWritingMode, supportsVerticalCaption, type CaptionPosition, type CaptionWritingMode } from '$lib/captionWritingMode';
@@ -17,10 +18,13 @@
 
 	type ModelInspection = ReturnType<typeof createModelInspection>;
 	import Tooltip from './Tooltip.svelte';
+	import WorkActionMenu, { type WorkAction } from './WorkActionMenu.svelte';
+	import WorkEditDialog from './WorkEditDialog.svelte';
 	import { composeFallbackReason, composeFallbackState, composeFallbackValue } from '$lib/composeFallback';
 	import type { CanvasViewport } from '$lib/features/canvas/viewport-state.svelte';
 	import type { PaintResult } from '$lib/features/run/current-work';
 	import type { SvgProfile } from '$lib/features/export/download';
+	import type { makeSavedWorkExportActions } from '$lib/features/export/saved-work-actions';
 	import type { CanvasStatusHistoryItem as HistoryItem } from '$lib/features/canvas/view-types';
 	import type {
 		RefinementSession,
@@ -49,6 +53,7 @@
 		// below as well: the flags above already carry it, and this is the guard
 		// that stays if a caller ever forgets to pass it through them.
 		interactionLocked: boolean;
+		generationLocked: boolean;
 		historyTotal: number;
 		navPos: number;
 		canvasAspectWidth: number;
@@ -113,6 +118,7 @@
 		// The card is built from a saved work, so the toolbar needs its id, not
 		// just the drawing on screen.
 		currentHistoryId: string | null;
+		savedWorkExportActions: ReturnType<typeof makeSavedWorkExportActions>;
 		onDownloadCard: () => void | Promise<void>;
 		onVaryPerformance: () => void | Promise<void>;
 		onVaryComposition: () => void | Promise<void>;
@@ -133,15 +139,17 @@
 		onShowVariationCandidate: (candidate: VariationCandidate) => void;
 		activeComparisonItem: { svg: string } | null;
 		lineageGraph: LineageGraph | null;
+		lineageBrowsingState: LineageBrowsingState;
 		lineageLoading: boolean;
 		lineageError: string | null;
 		isJapanese: boolean;
 		onOpenLineageNode: (node: LineageNode) => void | Promise<void>;
 		onOpenLineageNodeInCanvas: (node: LineageNode) => void | Promise<void>;
+		onResolveCurrentLineageNode: () => Promise<LineageNode | null>;
+		onFocusLatestRefinementChild: (parentNodeId: string, knownChildNodeIds: Set<string>) => boolean | Promise<boolean>;
 		onToggleLineageStar: (node: LineageNode, event?: Event) => void | Promise<void>;
 		onToggleLineageForRevision: (node: LineageNode, event?: Event) => void | Promise<void>;
-		onDrawLineageDescription: (node: LineageNode, text: string, signal?: AbortSignal) => void | Promise<void>;
-		onDrawLineageDdl: (node: LineageNode, ddl: string) => void | Promise<void>;
+		onDrawLineageDescription: (node: LineageNode, text: string, signal?: AbortSignal, wild?: boolean | null) => void | Promise<void>;
 		onOpenLineageDdlEditor: (node: LineageNode) => void;
 		onDrawLineageSketchGrain: (node: LineageNode, grain: 'fine' | 'coarse', signal?: AbortSignal) => Promise<void>;
 		onToggleSaijiki: () => void;
@@ -184,6 +192,7 @@
 		navNewerDisabled,
 		navOlderDisabled,
 		interactionLocked,
+		generationLocked,
 		historyTotal,
 		navPos,
 		canvasAspectWidth = 1,
@@ -233,6 +242,7 @@
 		onDownloadSVG,
 		onDownloadPNG,
 		currentHistoryId,
+		savedWorkExportActions,
 		onDownloadCard,
 		onVaryPerformance,
 		onVaryComposition,
@@ -252,15 +262,17 @@
 		onShowVariationCandidate,
 		activeComparisonItem,
 		lineageGraph = null,
+		lineageBrowsingState,
 		lineageLoading = false,
 		lineageError = null,
 		isJapanese = true,
 		onOpenLineageNode,
 		onOpenLineageNodeInCanvas,
+		onResolveCurrentLineageNode,
+		onFocusLatestRefinementChild,
 		onToggleLineageStar,
 		onToggleLineageForRevision,
 		onDrawLineageDescription,
-		onDrawLineageDdl,
 		onOpenLineageDdlEditor,
 		onDrawLineageSketchGrain,
 		onToggleSaijiki,
@@ -369,6 +381,19 @@
 	let generationInfoToggleEl = $state<HTMLButtonElement | null>(null);
 	let refineView = $state<'adjust' | 'compare'>('adjust');
 	let refineModalOpen = $state(false);
+	let refineReturnTab = $state<OutputTab>('lineage');
+	let directRefinementActive = $state(false);
+	let directRefinementSaveObserved = $state(false);
+	let directRefinementParentNodeId = $state<string | null>(null);
+	let directRefinementKnownChildNodeIds = $state<Set<string>>(new Set());
+	let directRefinementSavedCandidateIds = $state<Set<string>>(new Set());
+	let directRefinementSavedModelHistoryIds = $state<Set<string>>(new Set());
+	let directActionNode = $state<LineageNode | null>(null);
+	let directActionMenuOpen = $state(false);
+	let directEditNode = $state<LineageNode | null>(null);
+	let directEditMode = $state<'description' | 'sketch-grain' | null>(null);
+	let directAIRefineNode = $state<LineageNode | null>(null);
+	let directAIRefineSaved = $state(false);
 	// Refinement dimensions retain the previous selection.
 	const REFINE_KIND_KEY = 'inku-refine-kind';
 	const REFINE_KINDS: RefineKind[] = ['touch', 'layout', 'reading', 'color', 'variation'];
@@ -396,16 +421,97 @@
 	async function openLineageRefinement(node: LineageNode, view: 'adjust' | 'compare'): Promise<void> {
 		await onOpenLineageNode(node);
 		refineView = view;
+		refineReturnTab = 'lineage';
+		directRefinementActive = false;
+		directRefinementParentNodeId = null;
 		refineModalOpen = true;
 		outputTab = 'refine';
 	}
 
-	function closeRefineModal(): void {
-		refineModalOpen = false;
-		outputTab = 'lineage';
-		// Reflect any adopted comparison/variation results into the lineage tree.
-		onCloseRefinement();
+	export async function openDirectActionMenu(): Promise<void> {
+		if (interactionLocked || generationLocked) return;
+		const historyId = currentHistoryId;
+		if (!historyId) return;
+		const node = await onResolveCurrentLineageNode();
+		if (currentHistoryId !== historyId) return;
+		directActionNode = node;
+		directActionMenuOpen = !!node;
 	}
+
+	function startDirectRefinement(node: LineageNode, view: 'adjust' | 'compare'): void {
+		refineView = view;
+		refineReturnTab = 'canvas';
+		directRefinementActive = true;
+		directRefinementSaveObserved = false;
+		directRefinementParentNodeId = node.id;
+		directRefinementKnownChildNodeIds = new Set(
+			lineageGraph?.edges.filter((edge) => edge.parent_node_id === node.id).map((edge) => edge.child_node_id)
+		);
+		directRefinementSavedCandidateIds = new Set(
+			refinementSession.candidates.filter((candidate) => candidate.saved).map((candidate) => candidate.id)
+		);
+		directRefinementSavedModelHistoryIds = new Set(
+			modelInspection.results.flatMap((item) => item.savedHistoryId ? [item.savedHistoryId] : [])
+		);
+		refineModalOpen = true;
+		outputTab = 'refine';
+	}
+
+	function openDirectEdit(node: LineageNode, mode: 'description' | 'sketch-grain'): void {
+		directEditNode = node;
+		directEditMode = mode;
+	}
+
+	function closeDirectEdit(): void {
+		directEditNode = null;
+		directEditMode = null;
+	}
+
+	async function runDirectWorkAction(action: WorkAction, node: LineageNode): Promise<void> {
+		switch (action) {
+			case 'adjust':
+				startDirectRefinement(node, 'adjust');
+				break;
+			case 'description': openDirectEdit(node, 'description'); break;
+			case 'instructions': onOpenLineageDdlEditor(node); break;
+			case 'sketch-grain': openDirectEdit(node, 'sketch-grain'); break;
+			case 'models':
+				startDirectRefinement(node, 'compare');
+				break;
+			case 'autonomous':
+				directAIRefineNode = node;
+				directAIRefineSaved = false;
+				break;
+		}
+	}
+
+	async function closeRefineModal(): Promise<void> {
+		refineModalOpen = false;
+		const savedParentNodeId = directRefinementActive && directRefinementSaveObserved ? directRefinementParentNodeId : null;
+		const knownChildNodeIds = directRefinementKnownChildNodeIds;
+		directRefinementActive = false;
+		directRefinementParentNodeId = null;
+		// Reflect any adopted comparison/variation results into the lineage tree.
+		if (savedParentNodeId && await onFocusLatestRefinementChild(savedParentNodeId, knownChildNodeIds)) {
+			outputTab = 'lineage';
+		} else {
+			outputTab = refineReturnTab;
+			onCloseRefinement();
+		}
+	}
+
+	$effect(() => {
+		if (!directRefinementActive) return;
+		const savedCandidate = refinementSession.candidates.some((candidate) => candidate.saved && !directRefinementSavedCandidateIds.has(candidate.id));
+		const savedModel = modelInspection.results.some((item) => !!item.savedHistoryId && !directRefinementSavedModelHistoryIds.has(item.savedHistoryId));
+		if (savedCandidate || savedModel) directRefinementSaveObserved = true;
+	});
+
+	$effect(() => {
+		currentHistoryId;
+		directActionNode = null;
+		directActionMenuOpen = false;
+	});
 
 	const canvasMaxRatio = $derived(Math.max(canvasAspectWidth, canvasAspectHeight, 1));
 	const canvasBaseWidth = $derived(400 * canvasAspectWidth / canvasMaxRatio);
@@ -526,7 +632,8 @@
 		</Tooltip>
 		<div class="rtab-spacer"></div>
 		{#if result}
-			<div class="render-meta-strip" aria-label={isJapanese ? '\u8868\u793a\u4e2d\u306e\u4f5c\u54c1\u60c5\u5831' : 'Information about the displayed work'}>
+			<div class="render-meta-strip" aria-label={t().displayedWorkConditions}>
+				<span class="render-meta-heading">{t().displayedWorkConditions}</span>
 				<span class="render-meta-item render-meta-generation">
 					{#if statusGeneration}<span class="render-meta-label">{isJapanese ? '系譜' : 'Lineage'}</span>{/if}
 					<strong>{statusGenerationValue}</strong>
@@ -561,6 +668,21 @@
 				</span>
 			</div>
 		{/if}
+		{#if currentHistoryId}
+			<WorkActionMenu
+				node={directActionNode}
+				{isJapanese}
+				variant="header"
+				open={directActionMenuOpen}
+				available={!interactionLocked && !generationLocked}
+				unavailableReason={t().workActionGenerationLocked}
+				onRequestOpen={openDirectActionMenu}
+				onOpenChange={(open) => (directActionMenuOpen = open)}
+				onAction={runDirectWorkAction}
+			/>
+		{:else if result}
+			<span class="work-action-save-first" role="status">{t().workActionSaveFirst}</span>
+		{/if}
 	</div>
 
 	<div class="canvas-area">
@@ -575,6 +697,17 @@
 
 		{#if outputTab === 'canvas'}
 			<CanvasArtworkWorkspace
+				savedWorkExport={currentHistoryId && !statusHistoryItem?.trashed ? {
+					scope: { kind: 'current', works: [{
+						id: currentHistoryId,
+						at: statusHistoryItem?.at ?? result?.history_at ?? 0,
+						preview: result?.svg,
+						description: instructionText
+					}] },
+					animationSettings: animationExportSettings,
+					pngTemplates,
+					...savedWorkExportActions
+				} : null}
 				{result}
 				{artworkUrl}
 				bind:canvasContentEl
@@ -667,7 +800,23 @@
 				/>
 			{:else if outputTab === 'lineage'}
 				{#await import('./LineagePanel.svelte') then { default: LineagePanel }}
-					<LineagePanel graph={lineageGraph} loading={lineageLoading} error={lineageError} {isJapanese} {nearbyHistory} {onOpenNearbyHistory} onOpenNode={onOpenLineageNode} onOpenNodeInCanvas={onOpenLineageNodeInCanvas} onToggleStar={onToggleLineageStar} onToggleForRevision={onToggleLineageForRevision} onOpenRefinement={openLineageRefinement} onDrawDescription={onDrawLineageDescription} onDrawDdl={onDrawLineageDdl} onOpenDdlEditor={onOpenLineageDdlEditor} onDrawSketchGrain={onDrawLineageSketchGrain} {stageLabel} stage1ModelLabel={statusStage1Model} stage2ModelLabel={statusStage2Model} {runTokensIn} {runTokensOut} onSaveOkugakiModel={onSaveOkugakiModel} {onSaveVisionModel} onPromoteNode={onPromoteLineageNode} onSaveNote={onSaveLineageNote} onAskTrash={onAskTrashLineage} onDetach={onDetachLineage} onLoadOverview={onLoadLineageOverview} onLoadBranch={onLoadLineageBranch} {onPaintOne} {onVisionAdvice} {visionModel} {okugakiModel} {visionProviderGroups} {animationExportSettings} {apiFetch} {catalogName} {formatHistoryDate} {historyPreviewText} />
+					<LineagePanel browsingState={lineageBrowsingState} graph={lineageGraph} loading={lineageLoading} error={lineageError}
+						{isJapanese} {nearbyHistory} {onOpenNearbyHistory} onOpenNode={onOpenLineageNode}
+						onOpenNodeInCanvas={onOpenLineageNodeInCanvas} onToggleStar={onToggleLineageStar}
+						onToggleForRevision={onToggleLineageForRevision} onOpenRefinement={openLineageRefinement}
+						onDrawDescription={onDrawLineageDescription} onOpenDdlEditor={onOpenLineageDdlEditor}
+						onDrawSketchGrain={onDrawLineageSketchGrain} {stageLabel} stage1ModelLabel={statusStage1Model}
+						stage2ModelLabel={statusStage2Model} {runTokensIn} {runTokensOut} onSaveOkugakiModel={onSaveOkugakiModel}
+						{onSaveVisionModel} onPromoteNode={onPromoteLineageNode} onSaveNote={onSaveLineageNote}
+						onAskTrash={onAskTrashLineage} onDetach={onDetachLineage} onLoadOverview={onLoadLineageOverview}
+						onLoadBranch={onLoadLineageBranch} {onPaintOne} {onVisionAdvice} {visionModel} {okugakiModel}
+						{visionProviderGroups} {animationExportSettings} {pngTemplates}
+						onDownloadSavedWorkSVG={savedWorkExportActions.onDownloadSVG}
+						onDownloadSavedWorkPNG={savedWorkExportActions.onDownloadPNG}
+						onDownloadSavedWorkCard={savedWorkExportActions.onDownloadCard}
+						onDownloadSavedWorkAnimation={savedWorkExportActions.onDownloadAnimation}
+						onDownloadSavedWorkContactSheet={savedWorkExportActions.onDownloadContactSheet}
+						onValidateSavedWorkExport={savedWorkExportActions.onValidateSnapshot} />
 				{/await}
 			{/if}
 		</div>
@@ -723,6 +872,39 @@
 
 
 </div>
+
+{#if directEditNode && directEditMode}
+	<WorkEditDialog
+		node={directEditNode}
+		mode={directEditMode}
+		{isJapanese}
+		{stageLabel}
+		stage1ModelLabel={statusStage1Model}
+		stage2ModelLabel={statusStage2Model}
+		tokensIn={runTokensIn}
+		tokensOut={runTokensOut}
+		onClose={closeDirectEdit}
+		onDrawDescription={onDrawLineageDescription}
+		onDrawSketchGrain={onDrawLineageSketchGrain}
+	/>
+{/if}
+
+{#if directAIRefineNode}
+	{#await import('./AIRefineModal.svelte') then { default: AIRefineModal }}
+		<AIRefineModal
+			node={directAIRefineNode}
+			onClose={() => { directAIRefineNode = null; if (directAIRefineSaved) outputTab = 'lineage'; }}
+			{onPaintOne}
+			{onVisionAdvice}
+			{onSaveVisionModel}
+			{visionModel}
+			{visionProviderGroups}
+			stage1ModelLabel={statusStage1Model}
+			stage2ModelLabel={statusStage2Model}
+			onLoadBranch={async (nodeId) => { directAIRefineSaved = true; await onLoadLineageBranch(nodeId); }}
+		/>
+	{/await}
+{/if}
 
 {#if presentationMode && result}
 	<CanvasPresentationOverlay
@@ -785,6 +967,7 @@
 	.rtab-spacer { flex: 0 0 12px; }
 	.render-meta-strip {
 		display: flex;
+		flex-wrap: wrap;
 		align-items: center;
 		justify-content: flex-end;
 		gap: 10px;
@@ -796,6 +979,7 @@
 		color: var(--fg3);
 	}
 	.render-meta-generation { flex: 0 0 auto; }
+	.render-meta-heading { flex: 1 0 100%; color: var(--fg2); font-weight: 500; font-size: 12px; }
 	.render-meta-generation strong { max-width: none; }
 	.render-meta-item {
 		display: inline-flex;
@@ -813,7 +997,7 @@
 		color: var(--fg2);
 		font-weight: 400;
 	}
-	.render-meta-model strong { max-width: 220px; }
+	.render-meta-model strong { max-width: 280px; white-space: normal; overflow-wrap: anywhere; }
 	.render-meta-catalog strong { max-width: 130px; }
 	.render-meta-canvas strong { max-width: 100px; }
 	/* The two numeric items: never ellipsised, and set on the digit grid so a
@@ -823,6 +1007,7 @@
 		max-width: none;
 		font-variant-numeric: tabular-nums;
 	}
+	.work-action-save-first { color: var(--fg3); font-size: 0.78rem; }
 	@media (max-width: 1180px) {
 		.right-tabs { flex-wrap: wrap; padding-inline: 10px; }
 		.rtab { padding-inline: 12px; }

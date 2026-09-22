@@ -140,3 +140,24 @@ test('T-317: stale context stops before mark, adoption, or the next save', async
 	assert.equal(outcome, 'stale');
 	assert.deepEqual(events, ['save:first expanded']);
 });
+
+test('a null history save stays selected and reports failure without a saved marker', async () => {
+	const events: string[] = [];
+	const outcome = await saveRefinementCandidates({
+		candidates: [candidate('unsaved')],
+		sourceText: () => 'source',
+		fallbackCatalogId: () => 'catalog'
+	}, {
+		saveHistory: async (item) => {
+			events.push(`save:${item.ddl}`);
+			return null;
+		},
+		isCurrentContext: () => true,
+		markSaved: (id) => { events.push(`mark:${id}`); },
+		isCurrentResult: () => true,
+		adoptSavedIdentity: () => { events.push('adopt'); }
+	});
+
+	assert.equal(outcome, 'failed');
+	assert.deepEqual(events, ['save:unsaved expanded']);
+});

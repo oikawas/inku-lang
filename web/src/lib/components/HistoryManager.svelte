@@ -1,18 +1,17 @@
 <script lang="ts">
 	import Tooltip from './Tooltip.svelte';
-	import { onMount } from 'svelte';
+	import { onMount, untrack } from 'svelte';
 	import { t } from '$lib/i18n/index.svelte';
-	import { downloadFolderSettings } from '$lib/features/export/download-folder.svelte';
-	import { saveBlob } from '$lib/features/export/save-target';
 	import HistoryThumbnail from '$lib/components/HistoryThumbnail.svelte';
-	import AnimationExportModal from '$lib/components/AnimationExportModal.svelte';
-	import { type SheetVariant } from '$lib/contactSheet';
-	import { runContactSheet } from '$lib/features/contact-sheet/run';
-	import { buildContactSheetNotes, type ContactSheetNoteEntry } from '$lib/contactSheetNotes';
-	import { downloadAnimation, type AnimationExportSettings } from '$lib/animationExport';
-	import { downloadCard, type CardExportSettings } from '$lib/cardExport';
+	import SavedWorkExportMenu from '$lib/components/SavedWorkExportMenu.svelte';
+	import type { ExportTemplate } from '$lib/exportTemplates';
+	import type { AnimationExportSettings } from '$lib/animationExport';
+	import type { SheetVariant } from '$lib/contactSheet';
+	import type { SvgProfile } from '$lib/features/export/download';
+	import type { SavedWorkExportItem, SavedWorkExportScope, SavedWorkExportSnapshot } from '$lib/features/export/saved-work';
 	import { formatByteSize } from '$lib/formatNumber';
 	import { formatHistoryMinute, historyListDescription } from '$lib/historyManagerPresentation';
+	import HistoryDescription from '$lib/components/HistoryDescription.svelte';
 
 	type HistoryItem = {
 		// Set only when the work is somebody else's, reached through a group
@@ -65,10 +64,13 @@
 	type ApiFetch = (path: string, init?: RequestInit) => Promise<Response>;
 
 	type Props = {
+		/** Kept mounted between library visits so its list, scroll, and preview survive. */
+		active: boolean;
 		historyManagerView: 'active' | 'trash';
 		historyManagerTab: 'thumbs' | 'list';
 		historyManagerPage: number;
 		historyManagerLoading: boolean;
+		historyManagerLoadFailed: boolean;
 		historyManagerTotalPages: number;
 		historyManagerOffset: number;
 		historyManagerShownTo: number;
@@ -79,17 +81,25 @@
 		trashTotal: number;
 		selectedHistoryIds: string[];
 		animationExportSettings: AnimationExportSettings;
-		cardExportSettings: CardExportSettings;
+		pngTemplates?: ExportTemplate[];
+		onDownloadSavedWorkSVG?: (profile: SvgProfile, snapshot: SavedWorkExportSnapshot) => void | Promise<void>;
+		onDownloadSavedWorkPNG?: (height: number, snapshot: SavedWorkExportSnapshot) => void | Promise<void>;
+		onDownloadSavedWorkCard?: (historyId: string, snapshot: SavedWorkExportSnapshot) => void | Promise<void>;
+		onDownloadSavedWorkAnimation: (snapshot: SavedWorkExportSnapshot, settings: AnimationExportSettings, directory?: FileSystemDirectoryHandle) => void | Promise<void>;
+		onDownloadSavedWorkContactSheet: (snapshot: SavedWorkExportSnapshot, variant: SheetVariant) => void | Promise<void>;
+		onValidateSavedWorkExport: (snapshot: SavedWorkExportSnapshot) => boolean | Promise<boolean>;
 		historySearch: string;
 		historyManagerStarredOnly: boolean;
 		historyManagerForRevisionOnly: boolean;
 		historyManagerForShareOnly: boolean;
+		selectionResetReason?: 'query' | 'filter' | 'trash' | null;
 		onClose: () => void;
 		onSetView: (view: 'active' | 'trash') => void;
 		onSetPage: (page: number) => void;
 		onSetLatestPage: () => void | Promise<void>;
 		onSetFirstPage: () => void | Promise<void>;
 		onSetPageSize: (pageSize: number) => void;
+		onRetryLoad: () => void;
 		onSetStarredOnly: (value: boolean) => void;
 		onSetForRevisionOnly: (value: boolean) => void;
 		onSetForShareOnly: (value: boolean) => void;
@@ -99,12 +109,14 @@
 		onAskRestore: (ids: string[]) => void;
 		onAskPermanentDelete: (ids: string[]) => void;
 		onToggleSelection: (id: string) => void;
-		onLoadItem: (item: HistoryItem) => void;
+		onOpenArtwork: (item: HistoryItem) => void;
+		onOpenLineage: (item: HistoryItem) => void;
+		onRefine: (item: HistoryItem) => void;
 		onToggleStar: (item: HistoryItem, event?: Event) => void | Promise<void>;
 		// Absent in single-user mode, where there is nobody to share with.
 		onShareItem?: ((item: HistoryItem) => void) | null;
 		isJapanese?: boolean;
-		historyModelSummary: (item: HistoryItem) => string;
+		historyModelFull: (model: string) => string;
 		formatHistoryDate: (at: number) => string;
 		catalogName: (id: string | null | undefined) => string;
 		historyPreviewText: (text: string) => string;
@@ -115,10 +127,12 @@
 	};
 
 	let {
+		active,
 		historyManagerView,
 		historyManagerTab = $bindable('thumbs'),
 		historyManagerPage,
 		historyManagerLoading,
+		historyManagerLoadFailed,
 		historyManagerTotalPages,
 		historyManagerOffset,
 		historyManagerShownTo,
@@ -127,17 +141,25 @@
 		trashTotal,
 		selectedHistoryIds,
 		animationExportSettings,
-		cardExportSettings,
+		pngTemplates = [],
+		onDownloadSavedWorkSVG,
+		onDownloadSavedWorkPNG,
+		onDownloadSavedWorkCard,
+		onDownloadSavedWorkAnimation,
+		onDownloadSavedWorkContactSheet,
+		onValidateSavedWorkExport,
 		historySearch = $bindable(''),
 		historyManagerStarredOnly,
 		historyManagerForRevisionOnly,
 		historyManagerForShareOnly,
+		selectionResetReason = null,
 		onClose,
 		onSetView,
 		onSetPage,
 		onSetLatestPage,
 		onSetFirstPage,
 		onSetPageSize,
+		onRetryLoad,
 		onSetStarredOnly,
 		onSetForRevisionOnly,
 		onSetForShareOnly,
@@ -147,11 +169,13 @@
 		onAskRestore,
 		onAskPermanentDelete,
 		onToggleSelection,
-		onLoadItem,
+		onOpenArtwork,
+		onOpenLineage,
+		onRefine,
 		onToggleStar,
 		onShareItem = null,
 		isJapanese = false,
-		historyModelSummary,
+		historyModelFull,
 		formatHistoryDate,
 		catalogName,
 		historyPreviewText,
@@ -167,6 +191,7 @@
 	let lineageGroupTotal = $state(0);
 	let lineageGroupPage = $state(0);
 	let lineageGroupLoading = $state(false);
+	let lineageLoadFailed = $state(false);
 	let expandedRootIds = $state<string[]>([]);
 	let lineageGroupItems = $state<Record<string, HistoryItem[]>>({});
 	let lineageMemberLoadingIds = $state<string[]>([]);
@@ -174,6 +199,77 @@
 	let lineageGroupController: AbortController | null = null;
 	const lineageMemberControllers = new Map<string, AbortController>();
 	let copiedHistoryHash = $state<string | null>(null);
+	let previewItem = $state<HistoryItem | null>(null);
+	let previewLoading = $state(false);
+	let previewError = $state(false);
+	let previewRequestId = 0;
+	let previewController: AbortController | null = null;
+	let previewReturnElement: HTMLElement | null = null;
+	let selectedExportItems = $state<Record<string, SavedWorkExportItem>>({});
+	const checkedExportScope = $derived.by((): SavedWorkExportScope | null => {
+		if (historyManagerView !== 'active' || selectedHistoryIds.length === 0) return null;
+		const works = selectedHistoryIds.map((id) => selectedExportItems[id]);
+		// A selection can outlive its visible page. It must be complete before the
+		// menu takes a snapshot: exporting the page-local subset would be wrong.
+		if (works.some((work) => !work)) return null;
+		return { kind: 'selection', works: works as SavedWorkExportItem[] };
+	});
+	const previewReady = $derived(active && historyManagerView === 'active' && !!previewItem && !previewLoading && !previewError);
+	const previewExportScope = $derived.by((): SavedWorkExportScope | null => {
+		if (!previewReady || !previewItem?.id) return null;
+		return {
+			kind: 'current',
+			works: [{ id: previewItem.id, at: previewItem.at, trashed: previewItem.trashed }],
+		};
+	});
+
+	function exportItem(item: HistoryItem): SavedWorkExportItem | null {
+		return item.id ? {
+			id: item.id,
+			at: item.at,
+			trashed: item.trashed,
+			description: item.source_text ?? item.input,
+			preview: item.svg || null,
+		} : null;
+	}
+
+	function rememberExportItem(item: HistoryItem): void {
+		const work = exportItem(item);
+		if (work) selectedExportItems = { ...selectedExportItems, [work.id]: work };
+	}
+
+	function toggleSelection(item: HistoryItem): void {
+		if (!item.id) return;
+		if (!selectedHistoryIds.includes(item.id)) rememberExportItem(item);
+		onToggleSelection(item.id);
+	}
+
+	function selectAllVisible(): void {
+		for (const item of managedHistoryItems) rememberExportItem(item);
+		for (const item of Object.values(lineageGroupItems).flat()) rememberExportItem(item);
+		onSelectAll();
+	}
+
+	function sameExportItems(left: Record<string, SavedWorkExportItem>, right: Record<string, SavedWorkExportItem>): boolean {
+		const leftIds = Object.keys(left);
+		return leftIds.length === Object.keys(right).length
+			&& leftIds.every((id) => left[id].at === right[id]?.at && left[id].trashed === right[id]?.trashed);
+	}
+
+	$effect(() => {
+		const selected = new Set(selectedHistoryIds);
+		const visible = [
+			...managedHistoryItems,
+			...Object.values(lineageGroupItems).flat(),
+		];
+		const next: Record<string, SavedWorkExportItem> = {};
+		for (const id of selected) {
+			const item = visible.find((candidate) => candidate.id === id);
+			const work = item ? exportItem(item) : selectedExportItems[id];
+			if (work) next[id] = work;
+		}
+		if (!sameExportItems(selectedExportItems, next)) selectedExportItems = next;
+	});
 	let copiedHistoryHashTimer: number | null = null;
 	const lineageGroupPageSize = 8;
 	const lineageGroupTotalPages = $derived(Math.max(1, Math.ceil(lineageGroupTotal / lineageGroupPageSize)));
@@ -183,6 +279,7 @@
 			if (localStorage.getItem('inku-history-display-mode') === 'lineage') historyDisplayMode = 'lineage';
 		} catch {}
 		return () => {
+			previewController?.abort();
 			lineageGroupController?.abort();
 			for (const controller of lineageMemberControllers.values()) controller.abort();
 			if (copiedHistoryHashTimer !== null) window.clearTimeout(copiedHistoryHashTimer);
@@ -206,6 +303,22 @@
 			lineageGroupPage = 0;
 			expandedRootIds = [];
 		}
+	}
+
+	function recordedModel(model: string | null | undefined): string | null {
+		return model && model.trim() ? model : null;
+	}
+
+	function modelLines(item: HistoryItem): { label: string | null; compact: string; full: string }[] {
+		const interpretation = recordedModel(item.stage1_model);
+		const drawing = recordedModel(item.stage2_model);
+		if (interpretation && drawing && interpretation === drawing) {
+			return [{ label: null, compact: shortModel(interpretation), full: historyModelFull(interpretation) }];
+		}
+		return [
+			{ label: t().historyModelInterpretation, compact: interpretation ? shortModel(interpretation) : t().historyModelUnrecorded, full: interpretation ? historyModelFull(interpretation) : t().historyModelUnrecorded },
+			{ label: t().historyModelDrawing, compact: drawing ? shortModel(drawing) : t().historyModelUnrecorded, full: drawing ? historyModelFull(drawing) : t().historyModelUnrecorded }
+		];
 	}
 
 	const lineageThumbsMode = $derived(
@@ -233,11 +346,13 @@
 	}
 
 	async function fetchLineageGroups(): Promise<void> {
+		if (!active) return;
 		const requestId = ++lineageRequestId;
 		lineageGroupController?.abort();
 		const controller = new AbortController();
 		lineageGroupController = controller;
 		lineageGroupLoading = true;
+		lineageLoadFailed = false;
 		const params = new URLSearchParams({ offset: String(lineageGroupPage * lineageGroupPageSize), limit: String(lineageGroupPageSize), q: historySearch.trim() });
 		if (historyManagerView === 'trash') params.set('trashed', 'true');
 		if (historyManagerStarredOnly) params.set('starred', 'true');
@@ -251,7 +366,7 @@
 			const response = await apiFetch('/api/history/lineage-groups?' + params.toString(), { cache: 'no-store', signal: controller.signal });
 			if (!response.ok) throw new Error('HTTP ' + response.status);
 			const data = await response.json() as { groups: LineageHistoryGroup[]; total: number };
-			if (requestId !== lineageRequestId) return;
+			if (!active || requestId !== lineageRequestId) return;
 			lineageGroups = data.groups;
 			lineageGroupTotal = data.total;
 			lineageGroupItems = {};
@@ -263,7 +378,14 @@
 				await Promise.all(data.groups.map((group) => loadLineageMembers(group.root_node_id)));
 			}
 		} catch (error) {
-			if (!(error instanceof DOMException && error.name === 'AbortError')) throw error;
+			if (!(error instanceof DOMException && error.name === 'AbortError') && requestId === lineageRequestId) {
+				lineageLoadFailed = true;
+				lineageGroups = [];
+				lineageGroupTotal = 0;
+				lineageGroupItems = {};
+				expandedRootIds = [];
+				clearPreview();
+			}
 		} finally {
 			if (requestId === lineageRequestId) lineageGroupLoading = false;
 			if (lineageGroupController === controller) lineageGroupController = null;
@@ -281,6 +403,7 @@
 	}
 
 	async function loadLineageMembers(rootNodeId: string): Promise<void> {
+		if (!active) return;
 		if (lineageGroupItems[rootNodeId]) return;
 		lineageMemberLoadingIds = [...lineageMemberLoadingIds, rootNodeId];
 		lineageMemberControllers.get(rootNodeId)?.abort();
@@ -295,9 +418,16 @@
 			const response = await apiFetch('/api/history/lineage-groups/' + encodeURIComponent(rootNodeId) + '/items?' + params.toString(), { cache: 'no-store', signal: controller.signal });
 			if (!response.ok) throw new Error('HTTP ' + response.status);
 			const data = await response.json() as { items: HistoryItem[] };
-			lineageGroupItems = { ...lineageGroupItems, [rootNodeId]: data.items };
+			if (active) lineageGroupItems = { ...lineageGroupItems, [rootNodeId]: data.items };
 		} catch (error) {
-			if (!(error instanceof DOMException && error.name === 'AbortError')) throw error;
+			if (!(error instanceof DOMException && error.name === 'AbortError')) {
+				lineageLoadFailed = true;
+				lineageGroups = [];
+				lineageGroupTotal = 0;
+				lineageGroupItems = {};
+				expandedRootIds = [];
+				clearPreview();
+			}
 		} finally {
 			lineageMemberLoadingIds = lineageMemberLoadingIds.filter((id) => id !== rootNodeId);
 			if (lineageMemberControllers.get(rootNodeId) === controller) lineageMemberControllers.delete(rootNodeId);
@@ -335,135 +465,69 @@
 	}
 
 	function selectLineageGroup(rootNodeId: string): void {
-		const ids = (lineageGroupItems[rootNodeId] ?? []).flatMap((item) => item.id ? [item.id] : []);
-		for (const id of ids) if (!selectedHistoryIds.includes(id)) onToggleSelection(id);
-	}
-
-	let contactSheetBusy = $state<SheetVariant | null>(null);
-	let contactSheetError = $state<string | null>(null);
-	let animationExportIds = $state<string[] | null>(null);
-	let cardExportBusy = $state(false);
-	let cardExportError = $state<string | null>(null);
-
-	// Selection can span pages. The current page and expanded lineage members are
-	// checked first; off-page items are fetched on demand by export actions.
-	/**
-	 * The work, with its drawing.
-	 *
-	 * The listing asks for thumbnails rather than pictures, so the copy on the
-	 * page carries an empty `svg`. Contact sheets and exports need the drawing
-	 * itself, and an item without one is skipped in silence -- an empty sheet
-	 * with no error. Falling through to the single-work fetch keeps that from
-	 * being how it fails.
-	 */
-	async function resolveWorkWithSvg(id: string): Promise<HistoryItem | null> {
-		const onPage = findSelectedItem(id);
-		if (onPage?.svg) return onPage;
-		return (await fetchHistoryItem(id)) ?? onPage;
-	}
-
-	function findSelectedItem(id: string): HistoryItem | null {
-		const onPage = managedHistoryItems.find((it) => it.id === id);
-		if (onPage) return onPage;
-		for (const members of Object.values(lineageGroupItems)) {
-			const member = members.find((it) => it.id === id);
-			if (member) return member;
+		for (const item of lineageGroupItems[rootNodeId] ?? []) {
+			if (item.id && !selectedHistoryIds.includes(item.id)) toggleSelection(item);
 		}
-		const representative = lineageGroups.find((group) => group.representative.id === id)?.representative;
-		return representative ?? null;
 	}
 
-	async function fetchHistoryItem(id: string): Promise<HistoryItem | null> {
+	async function openPreview(item: HistoryItem): Promise<void> {
+		if (!active || historyManagerView !== 'active' || !item.id) return;
+		previewReturnElement = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+		const requestId = ++previewRequestId;
+		previewController?.abort();
+		const controller = new AbortController();
+		previewController = controller;
+		previewItem = item;
+		previewLoading = true;
+		previewError = false;
 		try {
-			const response = await apiFetch('/api/history/' + encodeURIComponent(id) + '/neighbors', { cache: 'no-store' });
-			if (!response.ok) return null;
-			const items = await response.json() as HistoryItem[];
-			return items.find((it) => it.id === id) ?? null;
-		} catch {
-			return null;
-		}
-	}
-
-	async function downloadSelectedAnimation(
-		ids: string[], settings: AnimationExportSettings, directory?: FileSystemDirectoryHandle
-	): Promise<void> {
-		const uniqueIds = [...new Set(ids)];
-		// Layer animation is made on the server from one saved work. Unlike a
-		// multi-work transition, it never needs the full SVG in the browser.
-		if (uniqueIds.length === 1) {
-			await downloadAnimation(apiFetch, uniqueIds, settings, directory);
-			return;
-		}
-		const items: HistoryItem[] = [];
-		for (const id of uniqueIds) {
-			const item = await resolveWorkWithSvg(id);
-			if (!item?.id) throw new Error(t().animationExportWorkUnavailable);
-			items.push(item);
-		}
-		if (items.length < 2) throw new Error(t().animationExportWorkUnavailable);
-		items.sort((left, right) => left.at - right.at || String(left.id).localeCompare(String(right.id)));
-		await downloadAnimation(apiFetch, items.map((item) => item.id as string), settings, directory);
-	}
-
-	async function downloadSelectedCard(): Promise<void> {
-		if (cardExportBusy || selectedHistoryIds.length !== 1) return;
-		cardExportBusy = true;
-		cardExportError = null;
-		try {
-			await downloadCard(apiFetch, selectedHistoryIds[0], cardExportSettings);
-		} catch (cause) {
-			const reason = cause instanceof Error ? cause.message : String(cause);
-			cardExportError = t().cardExportFailed(reason);
-		} finally {
-			cardExportBusy = false;
-		}
-	}
-
-	// The AI sheet carries index badges only, so the notes file has to restate
-	// everything a caption would have said, plus the machinery behind the
-	// performance. Labels stay English; the description keeps its own language.
-	// Same single path as every other download -- see features/export/save-target.
-	async function triggerDownload(blob: Blob, filename: string): Promise<void> {
-		const outcome = await saveBlob(blob, filename, { enabled: downloadFolderSettings.enabled });
-		if (outcome.kind === 'browser' && outcome.reason === 'denied') {
-			contactSheetError = t().downloadFolderFellBack;
-		}
-	}
-
-	async function downloadContactSheet(variant: SheetVariant): Promise<void> {
-		if (contactSheetBusy || selectedHistoryIds.length === 0) return;
-		contactSheetBusy = variant;
-		contactSheetError = null;
-		try {
-			await runContactSheet(variant, {
-				ids: () => selectedHistoryIds,
-				resolveWork: (id) => resolveWorkWithSvg(id),
-				catalogName,
-				formatDate: formatHistoryDate,
-				previewText: historyPreviewText,
-				save: triggerDownload,
-				labels: {
-					title: t().historyContactSheetTitle,
-					subtitle: (total, date, page, pages) => t().historyContactSheetSubtitle(total, date, page, pages),
-				},
+			// The listing intentionally omits SVG text. Read it only for this one,
+			// explicitly selected preview; a list page never causes a full-SVG read.
+			const response = await apiFetch(`/api/history/${encodeURIComponent(item.id)}/svg`, {
+				cache: 'no-store', signal: controller.signal
 			});
-		} catch {
-			contactSheetError = t().historyContactSheetFailed;
+			if (!response.ok) throw new Error(`HTTP ${response.status}`);
+			const svg = await response.text();
+			if (!active || requestId !== previewRequestId) return;
+			previewItem = { ...item, svg };
+		} catch (error) {
+			if (requestId === previewRequestId && !(error instanceof DOMException && error.name === 'AbortError')) previewError = true;
 		} finally {
-			contactSheetBusy = null;
+			if (requestId === previewRequestId) previewLoading = false;
+			if (previewController === controller) previewController = null;
 		}
 	}
 
-	function loadItemAndClose(item: HistoryItem) {
-		if (historyManagerView !== 'active') return;
-		onLoadItem(item);
-		onClose();
+	function clearPreview(restoreFocus = false): void {
+		previewRequestId += 1;
+		previewController?.abort();
+		previewController = null;
+		previewItem = null;
+		previewLoading = false;
+		previewError = false;
+		if (restoreFocus) {
+			const returnElement = previewReturnElement;
+			requestAnimationFrame(() => returnElement?.isConnected && returnElement.focus());
+		}
+		previewReturnElement = null;
+	}
+
+	function previewArtwork(): void {
+		if (previewReady && previewItem) onOpenArtwork(previewItem);
+	}
+
+	function previewLineage(): void {
+		if (previewReady && previewItem) onOpenLineage(previewItem);
+	}
+
+	function previewRefine(): void {
+		if (previewReady && previewItem) onRefine(previewItem);
 	}
 
 	function handleThumbKeydown(event: KeyboardEvent, item: HistoryItem) {
 		if (event.key !== 'Enter' && event.key !== ' ') return;
 		event.preventDefault();
-		loadItemAndClose(item);
+		void openPreview(item);
 	}
 
 	async function copyHash(item: HistoryItem, event: MouseEvent): Promise<void> {
@@ -541,7 +605,7 @@
 	}
 
 	$effect(() => {
-		if (historyDisplayMode !== 'lineage') return;
+		if (!active || historyDisplayMode !== 'lineage') return;
 		// historyManagerTab is a dependency because the thumbnail tab asks the
 		// server for a different set (min_items=2) than the list tab does.
 		historyManagerView; historySearch; historyManagerStarredOnly; historyManagerForRevisionOnly; historyManagerForShareOnly; lineageGroupPage; managedHistoryTotal; trashTotal; historyManagerTab;
@@ -550,7 +614,7 @@
 
 	$effect(() => {
 		const element = thumbGridWrapEl;
-		if (!element || historyManagerTab !== 'thumbs' || historyDisplayMode !== 'chronological') return;
+		if (!active || !element || historyManagerTab !== 'thumbs' || historyDisplayMode !== 'chronological') return;
 		let frame = 0;
 		let debounceTimeout = 0;
 		const update = () => {
@@ -571,28 +635,54 @@
 			observer.disconnect();
 		};
 	});
+
+	$effect(() => {
+		if (!historyManagerLoadFailed) return;
+		clearPreview();
+	});
+
+	$effect(() => {
+		const remembered = untrack(() => previewItem);
+		if (active) {
+			if (remembered?.id) void untrack(() => openPreview(remembered));
+			return;
+		}
+		previewController?.abort();
+		previewController = null;
+		untrack(() => { previewRequestId += 1; });
+		previewLoading = false;
+		// Remember the target across visits, but read its authorized SVG again.
+		if (remembered) previewItem = { ...remembered, svg: '' };
+		lineageGroupController?.abort();
+		for (const controller of lineageMemberControllers.values()) controller.abort();
+	});
 </script>
 
-<div class="modal-backdrop" onclick={onClose} aria-hidden="true"></div>
-<div class="history-modal" role="dialog" aria-modal="true" tabindex="-1">
+<section class="history-library" class:library-hidden={!active} aria-label={t().historyLibraryTitle} aria-hidden={!active} inert={!active} tabindex="-1">
 	<div class="modal-head">
 		<div class="history-head-left">
-			<div class="catalog-modal-title">{t().historyManagerTitle}</div>
-			<div class="settings-tabs history-mode-tabs">
+			<div class="catalog-modal-title">{t().historyLibraryTitle}</div>
+			<div class="history-control-group">
+				<span>{t().historyDisplayFormat}</span>
+				<div class="settings-tabs history-mode-tabs">
 				<Tooltip placement="bottom-right" text={t().tooltipHistoryThumbsTab}>
 					<button class:active={historyManagerTab === 'thumbs'} onclick={() => selectHistoryManagerTab('thumbs')}>{t().historyThumbsTab}</button>
 				</Tooltip>
 				<Tooltip placement="bottom-right" text={t().tooltipHistoryListTab}>
 					<button class:active={historyManagerTab === 'list'} onclick={() => selectHistoryManagerTab('list')}>{t().historyListTab}</button>
 				</Tooltip>
+				</div>
 			</div>
-			<div class="settings-tabs history-group-tabs">
+			<div class="history-control-group">
+				<span>{t().historyGrouping}</span>
+				<div class="settings-tabs history-group-tabs">
 				<Tooltip placement="bottom-right" text={t().tooltipHistoryChronological}>
 					<button class:active={historyDisplayMode === 'chronological'} onclick={() => setHistoryDisplayMode('chronological')}>{t().historyChronologicalMode}</button>
 				</Tooltip>
 				<Tooltip placement="bottom-right" text={t().tooltipHistoryLineageGrouped}>
 					<button class:active={historyDisplayMode === 'lineage'} onclick={() => setHistoryDisplayMode('lineage')}>{t().historyLineageMode}</button>
 				</Tooltip>
+				</div>
 			</div>
 			<span class="history-manager-count">
 				{#if historyDisplayMode === 'lineage'}
@@ -636,15 +726,15 @@
 					</Tooltip>
 				{/if}
 			</div>
-			<Tooltip placement="bottom-left" text={t().tooltipHistoryClose}>
-				<button class="catalog-close" onclick={onClose} aria-label={t().tooltipHistoryClose}>×</button>
+			<Tooltip placement="bottom-left" text={t().historyLibraryReturn}>
+				<button class="ghost-btn history-return" type="button" onclick={onClose}>{t().historyLibraryReturn}</button>
 			</Tooltip>
 		</div>
 	</div>
 	<div class="history-tools">
 		<div class="history-tool-group">
 			<Tooltip placement="bottom-right" text={t().tooltipHistorySelectAll}>
-				<button class="ghost-btn" onclick={onSelectAll}>{t().historySelectAll}</button>
+				<button class="ghost-btn" onclick={selectAllVisible}>{t().historySelectAll}</button>
 			</Tooltip>
 			<Tooltip placement="bottom-right" text={t().tooltipHistoryStarredOnly}>
 				<button
@@ -695,62 +785,72 @@
 					<button class="danger-btn" onclick={() => onAskPermanentDelete(selectedHistoryIds)} disabled={selectedHistoryIds.length === 0}>{t().historyPermanentDelete}</button>
 				</Tooltip>
 			{/if}
-			<!-- The trash view restores or deletes; it does not produce work from a
-			     work. The server refuses a trashed id on these routes (I-094), so
-			     leaving the buttons here would only offer a 404. -->
 			{#if historyManagerView === 'active'}
-			<Tooltip placement="bottom-left" wide text={t().historyContactSheetHint}>
-				<button
-					class="ghost-btn"
-					type="button"
-					onclick={() => downloadContactSheet('review')}
-					disabled={selectedHistoryIds.length === 0 || contactSheetBusy !== null}
-				>
-					{contactSheetBusy === 'review' ? t().historyContactSheetBusy : t().historyContactSheet}
-					{#if contactSheetBusy === null && selectedHistoryIds.length > 0}<span class="tool-count">{selectedHistoryIds.length}</span>{/if}
-				</button>
-			</Tooltip>
-			<Tooltip placement="bottom-left" wide text={t().historyContactSheetAiHint}>
-				<button
-					class="ghost-btn"
-					type="button"
-					onclick={() => downloadContactSheet('ai')}
-					disabled={selectedHistoryIds.length === 0 || contactSheetBusy !== null}
-				>
-					{contactSheetBusy === 'ai' ? t().historyContactSheetBusy : t().historyContactSheetAi}
-				</button>
-			</Tooltip>
-			<Tooltip placement="bottom-left" wide text={t().historyAnimationExportHint}>
-				<button
-					class="ghost-btn"
-					type="button"
-					onclick={() => { animationExportIds = [...selectedHistoryIds]; }}
-					disabled={selectedHistoryIds.length === 0}
-				>
-					{t().historyAnimationExport}
-					{#if selectedHistoryIds.length > 0}<span class="tool-count">{selectedHistoryIds.length}</span>{/if}
-				</button>
-			</Tooltip>
-			<Tooltip placement="bottom-left" wide text={t().historyCardExportHint}>
-				<button
-					class="ghost-btn"
-					type="button"
-					onclick={downloadSelectedCard}
-					disabled={selectedHistoryIds.length !== 1 || cardExportBusy}
-				>
-					{cardExportBusy ? t().cardExportBusy : t().historyCardExport}
-				</button>
-			</Tooltip>
-			{#if cardExportError}<span class="tool-error">{cardExportError}</span>{/if}
-			{#if contactSheetError}<span class="tool-error">{contactSheetError}</span>{/if}
+				<SavedWorkExportMenu
+					scope={checkedExportScope}
+					animationSettings={animationExportSettings}
+					{pngTemplates}
+					onDownloadSVG={onDownloadSavedWorkSVG}
+					onDownloadPNG={onDownloadSavedWorkPNG}
+					onDownloadCard={onDownloadSavedWorkCard}
+					onDownloadAnimation={onDownloadSavedWorkAnimation}
+					onDownloadContactSheet={onDownloadSavedWorkContactSheet}
+					onValidateSnapshot={onValidateSavedWorkExport}
+				/>
 			{/if}
 		</div>
 		<label class="history-search">{t().historySearchLabel} <input bind:value={historySearch} /></label>
 	</div>
-	{#if historyDisplayMode === 'lineage'}
+	{#if selectedHistoryIds.length > 0}
+		<div class="history-selection-status">{t().historySelectionCount(selectedHistoryIds.length)}</div>
+	{/if}
+	{#if selectionResetReason}
+		<div class="history-selection-reset" role="status">{t().historySelectionCleared(selectionResetReason)}</div>
+	{/if}
+	<div class="history-content" class:has-preview={!!previewItem || previewLoading}>
+	{#if previewItem || previewLoading}
+		<aside class="history-preview" aria-label={t().historyPreviewTitle}>
+			<div class="history-preview-head"><strong>{t().historyPreviewTitle}</strong><button class="ghost-btn" type="button" onclick={() => clearPreview(true)}>{t().closeLabel}</button></div>
+			{#if previewLoading}<p>{t().historyPreviewLoading}</p>{/if}
+			{#if previewError}<p>{t().historyPreviewUnavailable}</p>{/if}
+			{#if previewItem && !previewLoading && !previewError}
+				<div class="history-preview-art"><HistoryThumbnail item={previewItem} scope={'library-preview-' + previewItem.id} size="manager" /></div>
+				<p class="history-preview-description">{previewItem.source_text ?? previewItem.input}</p>
+				<div class="history-preview-actions">
+					{#if previewReady}
+						<button class="ghost-btn" type="button" onclick={previewArtwork}>{t().historyPreviewOpenArtwork}</button>
+						<button class="ghost-btn" type="button" onclick={previewLineage}>{t().historyPreviewOpenLineage}</button>
+						<button class="ghost-btn" type="button" onclick={previewRefine}>{t().historyPreviewRefine}</button>
+						<SavedWorkExportMenu
+							scope={previewExportScope}
+							animationSettings={animationExportSettings}
+							{pngTemplates}
+							onDownloadSVG={onDownloadSavedWorkSVG}
+							onDownloadPNG={onDownloadSavedWorkPNG}
+							onDownloadCard={onDownloadSavedWorkCard}
+							onDownloadAnimation={onDownloadSavedWorkAnimation}
+							onDownloadContactSheet={onDownloadSavedWorkContactSheet}
+							onValidateSnapshot={onValidateSavedWorkExport}
+						/>
+					{/if}
+				</div>
+			{/if}
+		</aside>
+	{/if}
+	{#if historyManagerLoadFailed}
+		<div class="history-load-failure" role="alert">
+			<p>{t().historyLibraryLoadFailed}</p>
+			<button class="ghost-btn" type="button" onclick={onRetryLoad}>{t().historyLibraryRetry}</button>
+		</div>
+	{:else if historyDisplayMode === 'lineage'}
 		<div class="lineage-history-list" class:list-mode={historyManagerTab === 'list'} class:thumbs-mode={lineageThumbsMode}>
 			{#if lineageGroupLoading}
 				<div class="lineage-history-message">{t().historyLoading}</div>
+			{:else if lineageLoadFailed}
+				<div class="history-load-failure" role="alert">
+					<p>{t().historyLibraryLoadFailed}</p>
+					<button class="ghost-btn" type="button" onclick={() => void fetchLineageGroups()}>{t().historyLibraryRetry}</button>
+				</div>
 			{:else if lineageGroups.length === 0}
 				<div class="lineage-history-message">{t().historyLineageEmpty}</div>
 			{:else}
@@ -758,7 +858,7 @@
 					<article class="lineage-history-group" class:current-lineage={currentLineageRootId === group.root_node_id}>
 						<div class="lineage-group-head">
 							{#if !lineageThumbsMode}
-								<button class="lineage-representative" type="button" title={t().historyOpenItemTitle} onclick={() => loadItemAndClose(group.representative)}>
+								<button class="lineage-representative" type="button" title={t().historyPreviewTitle} onclick={() => void openPreview(group.representative)}>
 									<HistoryThumbnail item={group.representative} scope={'lineage-group-' + group.root_node_id} size="mini" />
 								</button>
 							{/if}
@@ -781,15 +881,15 @@
 								<div class="lineage-member-grid">
 									{#each lineageThumbsMode ? lineageLaneItems(group) : membersInGenerationOrder(lineageGroupItems[group.root_node_id]) as it (it.id ?? it.at)}
 										<div class="lineage-member" class:current-work={currentHistoryId === it.id} class:selected={!!it.id && selectedHistoryIds.includes(it.id)}>
-											<button type="button" class="selection-checkbox" class:checked={!!it.id && selectedHistoryIds.includes(it.id)} title={t().historySelectItem(!!it.id && selectedHistoryIds.includes(it.id))} aria-label={t().historySelectItem(!!it.id && selectedHistoryIds.includes(it.id))} onclick={() => it.id && onToggleSelection(it.id)}><span aria-hidden="true">{it.id && selectedHistoryIds.includes(it.id) ? '✓' : ''}</span></button>
+											<button type="button" class="selection-checkbox" class:checked={!!it.id && selectedHistoryIds.includes(it.id)} title={t().historySelectItem(!!it.id && selectedHistoryIds.includes(it.id))} aria-label={t().historySelectItem(!!it.id && selectedHistoryIds.includes(it.id))} onclick={() => toggleSelection(it)}><span aria-hidden="true">{it.id && selectedHistoryIds.includes(it.id) ? '✓' : ''}</span></button>
 											{#if lineageThumbsMode && it.lineage_generation != null}<span class="lineage-generation-badge" title={t().historyGenerationTitle}>{it.lineage_generation}</span>{/if}
-											<button class="lineage-member-main" type="button" title={t().historyOpenItemTitle} onclick={() => loadItemAndClose(it)}>
+											<button class="lineage-member-main" type="button" title={t().historyPreviewTitle} onclick={() => void openPreview(it)}>
 												<HistoryThumbnail item={it} scope={'lineage-member-' + it.id} size={historyManagerTab === 'list' ? 'mini' : 'manager'} />
 												<span>{thumbnailPromptText(it.source_text ?? it.input)}</span>
 											</button>
 											<div class="lineage-member-actions">
 												<button class="hash-row-star" class:starred={!!it.starred} title={it.starred ? t().starOn : t().starOff} aria-label={it.starred ? t().starOn : t().starOff} onclick={(event) => toggleLineageMemberStar(it, event)}>★</button>
-												<button class="hash-row-mark" class:marked={!!it.for_revision} title={it.for_revision ? t().forRevisionOn : t().forRevisionOff} aria-label={it.for_revision ? t().forRevisionOn : t().forRevisionOff} onclick={(event) => toggleLineageMemberForRevision(it, event)}>✎</button>
+												<button class="hash-row-mark" class:marked={!!it.for_revision} title={it.for_revision ? t().forRevisionOn : t().forRevisionOff} aria-label={it.for_revision ? t().forRevisionOn : t().forRevisionOff} onclick={(event) => toggleLineageMemberForRevision(it, event)}>⚑</button>
 												{#if historyManagerView === 'active'}
 													<button class="ghost-btn icon-trash-btn" title={t().historyTrashItemTitle} onclick={() => it.id && onAskTrash([it.id])} aria-label={t().deleteButton}>⌫</button>
 												{:else}
@@ -819,15 +919,15 @@
 	role="checkbox"
 	aria-checked={!!it.id && selectedHistoryIds.includes(it.id)}
 	aria-label={t().historySelectItem(!!it.id && selectedHistoryIds.includes(it.id))}
-	onclick={(event) => { event.stopPropagation(); if (it.id) onToggleSelection(it.id); }}
+	onclick={(event) => { event.stopPropagation(); toggleSelection(it); }}
 ><span aria-hidden="true">{it.id && selectedHistoryIds.includes(it.id) ? '✓' : ''}</span></button>
 						{#if it.lineage_generation}
 							<span class="manager-generation" title={t().historyGenerationTitle}>{it.lineage_generation}</span>
 						{/if}
 						<div
 							class="thumb manager-thumb"
-							title={t().historyOpenItemTitle}
-							onclick={() => loadItemAndClose(it)}
+							title={t().historyPreviewTitle}
+							onclick={() => void openPreview(it)}
 							onkeydown={(event) => handleThumbKeydown(event, it)}
 							role="button"
 							tabindex={historyManagerView === 'active' ? 0 : -1}
@@ -835,7 +935,8 @@
 							<HistoryThumbnail item={it} scope="manager" size="manager" />
 						</div>
 						<div class="manager-thumb-actions">
-							<div class="thumb-catalog" title={it.source_text ?? it.input}>{#if it.display_label}<span class="history-display-label">{it.display_label}</span>{/if}<span>{thumbnailPromptText(it.source_text ?? it.input)}</span></div>
+							{#if it.display_label}<span class="history-display-label">{it.display_label}</span>{/if}
+							<HistoryDescription text={historyListDescription(it.source_text ?? it.input)} className="thumb-description" />
 							{#if it.note}<div class="thumb-note"><span>{t().selectionNoteLabel}</span>{it.note}</div>{/if}
 							<div class="thumb-action-row">
 								<button
@@ -851,13 +952,20 @@
 									onclick={(event) => onToggleForRevision(it, event)}
 									title={it.for_revision ? t().forRevisionOn : t().forRevisionOff}
 									aria-label={it.for_revision ? t().forRevisionOn : t().forRevisionOff}
-								>✎</button>
+								>⚑</button>
 								{#if it.render_hash}
 									<Tooltip placement="top" text={copiedHistoryHash === it.render_hash ? t().historyHashCopied : t().historyHashCopyTitle}>
 										<button type="button" class="hash-chip hash-icon" class:marked={copiedHistoryHash === it.render_hash} onclick={(event) => copyHash(it, event)} aria-label={t().historyHashCopyTitle}>#</button>
 									</Tooltip>
 								{/if}
-								<span class="thumb-model" title={historyModelSummary(it)}>{historyModelSummary(it)}</span>
+								<div class="thumb-model">
+									{#each modelLines(it) as model}
+										<details class="history-model-detail">
+											<summary>{#if model.label}<span class="model-role">{model.label}:</span>{/if}{model.compact}</summary>
+											<span>{model.full}</span>
+										</details>
+									{/each}
+								</div>
 							</div>
 						</div>
 					</div>
@@ -867,20 +975,23 @@
 	{:else}
 		<div class="history-table-wrap">
 			<table class="history-table">
+				<colgroup>
+					<col class="history-table-select" /><col class="history-table-image" /><col class="history-table-description" /><col class="history-table-created" /><col class="history-table-model" /><col class="history-table-catalog" /><col class="history-table-size" /><col class="history-table-hash" /><col class="history-table-actions" />
+				</colgroup>
 				<thead>
-					<tr><th></th><th>{t().historyImageHeader}</th><th>{t().historyHashHeader}</th><th>{t().historyCreatedAtHeader}</th><th>{t().historyDescriptionHeader}</th><th>{t().historyModelHeader}</th><th>{t().historySvgSizeHeader}</th><th>{t().historyCatalogHeader}</th><th>{t().historyActionHeader}</th></tr>
+					<tr><th></th><th>{t().historyImageHeader}</th><th>{t().historyDescriptionHeader}</th><th>{t().historyCreatedAtHeader}</th><th>{t().historyModelHeader}</th><th>{t().historyCatalogHeader}</th><th>{t().historySvgSizeHeader}</th><th>{t().historyHashHeader}</th><th>{t().historyActionHeader}</th></tr>
 				</thead>
 				<tbody>
 					{#each managedHistoryItems as it (it.id ?? it.at)}
 						<tr>
-							<td><button type="button" class="selection-checkbox table-check" class:checked={!!it.id && selectedHistoryIds.includes(it.id)} title={t().historySelectItem(!!it.id && selectedHistoryIds.includes(it.id))} role="checkbox" aria-checked={!!it.id && selectedHistoryIds.includes(it.id)} aria-label={t().historySelectItem(!!it.id && selectedHistoryIds.includes(it.id))} onclick={(event) => { event.stopPropagation(); if (it.id) onToggleSelection(it.id); }}><span aria-hidden="true">{it.id && selectedHistoryIds.includes(it.id) ? '✓' : ''}</span></button></td>
+							<td><button type="button" class="selection-checkbox table-check" class:checked={!!it.id && selectedHistoryIds.includes(it.id)} title={t().historySelectItem(!!it.id && selectedHistoryIds.includes(it.id))} role="checkbox" aria-checked={!!it.id && selectedHistoryIds.includes(it.id)} aria-label={t().historySelectItem(!!it.id && selectedHistoryIds.includes(it.id))} onclick={(event) => { event.stopPropagation(); toggleSelection(it); }}><span aria-hidden="true">{it.id && selectedHistoryIds.includes(it.id) ? '✓' : ''}</span></button></td>
 							<td class="table-thumb-cell">
 								<button
 									class="table-thumb-select"
-									onclick={() => loadItemAndClose(it)}
+								onclick={() => void openPreview(it)}
 									disabled={historyManagerView !== 'active'}
-									title={t().historyOpenItemTitle}
-									aria-label={t().historyOpenItemTitle}
+									title={t().historyPreviewTitle}
+									aria-label={t().historyPreviewTitle}
 								>
 									<HistoryThumbnail item={it} scope="table" size="mini" />
 								</button>
@@ -892,6 +1003,18 @@
 									aria-label={it.starred ? t().starOn : t().starOff}
 								>★</button>
 							</td>
+							<td class="table-description"><HistoryDescription text={historyListDescription(it.source_text ?? it.input)} /></td>
+							<td>{formatHistoryMinute(it.at, isJapanese ? 'ja-JP' : 'en-US')}</td>
+							<td class="table-model">
+								{#each modelLines(it) as model}
+									<details class="history-model-detail">
+										<summary>{#if model.label}<span class="model-role">{model.label}:</span>{/if}{model.compact}</summary>
+										<span>{model.full}</span>
+									</details>
+								{/each}
+							</td>
+							<td>{catalogName(it.catalog_id)}</td>
+							<td class="table-svg-size">{formatByteSize(it.svg_bytes)}</td>
 							<td>
 								{#if it.shared}<span class="shared-mark" title={isJapanese ? '他の利用者から共有された作品' : 'Shared with you by another member'}>{isJapanese ? '共有' : 'Shared'}</span>{/if}
 								{#if it.render_hash}
@@ -900,11 +1023,6 @@
 									</Tooltip>
 								{/if}
 							</td>
-							<td>{formatHistoryMinute(it.at, isJapanese ? 'ja-JP' : 'en-US')}</td>
-							<td class="table-description" title={it.source_text ?? it.input}>{historyListDescription(it.source_text ?? it.input)}</td>
-							<td>{historyModelSummary(it)}</td>
-							<td class="table-svg-size">{formatByteSize(it.svg_bytes)}</td>
-							<td>{catalogName(it.catalog_id)}</td>
 							<td class="table-actions">
 								<button
 									class="hash-row-mark"
@@ -912,7 +1030,7 @@
 									onclick={(event) => onToggleForRevision(it, event)}
 									title={it.for_revision ? t().forRevisionOn : t().forRevisionOff}
 									aria-label={it.for_revision ? t().forRevisionOn : t().forRevisionOff}
-								>✎</button>
+								>⚑</button>
 								{#if historyManagerView === 'active' && onShareItem && !it.shared}
 									<button class="ghost-btn" onclick={() => onShareItem?.(it)} title={isJapanese ? 'この作品を共有する' : 'Share this work'}>{isJapanese ? '共有' : 'Share'}</button>
 								{/if}
@@ -937,16 +1055,8 @@
 			</table>
 		</div>
 	{/if}
-</div>
-
-{#if animationExportIds}
-	<AnimationExportModal
-		initialSettings={animationExportSettings}
-		count={animationExportIds.length}
-		onSave={(settings, directory) => downloadSelectedAnimation(animationExportIds ?? [], settings, directory)}
-		onClose={() => { animationExportIds = null; }}
-	/>
-{/if}
+	</div>
+</section>
 
 <style>
 	/* Not a decoration: this listing is what people select and delete from, so a
@@ -962,8 +1072,13 @@
 		vertical-align: middle;
 	}
 
-	.lineage-history-list { flex: 1; min-height: 0; overflow: auto; padding: 10px 12px 16px; display: flex; flex-direction: column; gap: 10px; }
+	.lineage-history-list { min-height: 0; overflow: auto; padding: 10px 12px 16px; display: flex; flex-direction: column; gap: 10px; }
 	.lineage-history-message { margin: auto; padding: 30px; color: var(--fg3); text-align: center; }
+	.history-load-failure { margin: auto; display: grid; justify-items: center; gap: 10px; padding: 30px; color: var(--fg2); text-align: center; }
+	.history-load-failure p { margin: 0; }
+	.history-content { min-height: 0; flex: 1; display: grid; grid-template-columns: minmax(0, 1fr); }
+	.history-content.has-preview { grid-template-columns: minmax(0, 1fr) minmax(280px, 360px); }
+	.lineage-history-list, .history-thumb-grid-wrap, .history-table-wrap, .history-load-failure { order: 1; min-width: 0; }
 	.lineage-history-group { border: 1px solid var(--border); border-radius: var(--r-lg); background: var(--panel); overflow: hidden; }
 	.lineage-history-group.current-lineage { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-light); }
 	.lineage-group-head { display: flex; align-items: center; gap: 10px; padding: 9px 10px; background: var(--panel); }
@@ -1015,26 +1130,15 @@
 		.lineage-history-list.thumbs-mode .lineage-group-head { flex-wrap: wrap; }
 	}
 	.history-group-tabs { flex-shrink: 0; }
-	.modal-backdrop {
+	.history-library.library-hidden { display: none; }
+	.history-library {
 		position: fixed;
 		inset: 0;
-		z-index: 400;
-		background: rgba(0,0,0,0.25);
-		backdrop-filter: blur(2px);
-	}
-	.history-modal {
-		position: fixed;
-		top: 10vh;
-		left: 10vw;
 		z-index: 401;
 		background: var(--panel2);
-		border-radius: var(--r-lg);
-		box-shadow: 0 12px 48px rgba(0,0,0,0.18);
 		display: flex;
 		flex-direction: column;
 		overflow: hidden;
-		width: 80vw;
-		height: 80vh;
 	}
 	.modal-head {
 		display: flex;
@@ -1055,22 +1159,14 @@
 	}
 	.history-head-left { flex: 1 1 auto; }
 	.history-head-actions { flex: 0 0 auto; }
+	.history-control-group { display: flex; align-items: center; gap: 5px; color: var(--fg2); font-size: 12px; }
 	.catalog-modal-title {
 		flex: 0 0 auto;
 		font-size: 15px;
 		font-weight: 300;
 		letter-spacing: 0.05em;
 	}
-	.catalog-close {
-		width: 24px;
-		height: 24px;
-		border: none;
-		background: none;
-		color: var(--fg3);
-		font-size: 18px;
-		cursor: pointer;
-		line-height: 1;
-	}
+	.history-return { white-space: nowrap; }
 	/* No overflow clipping here: the tabs carry Tooltip bubbles that must escape the box.
 	   The rounded corners live on the end buttons instead. */
 	.settings-tabs {
@@ -1110,8 +1206,8 @@
 	}
 	.history-mode-tabs { flex-shrink: 0; }
 	.history-manager-count {
-		font-size: 11px;
-		color: var(--fg3);
+		font-size: 12px;
+		color: var(--fg2);
 		font-variant-numeric: tabular-nums;
 		margin-right: 2px;
 	}
@@ -1135,25 +1231,48 @@
 		font-size: 12px;
 		font-family: inherit;
 	}
+	.history-selection-status,
+	.history-selection-reset {
+		padding: 5px 12px;
+		font-size: 12px;
+		border-bottom: 1px solid var(--border);
+	}
+	.history-selection-status { color: var(--accent); }
+	.history-selection-reset { color: var(--fg2); background: var(--bg); }
+	.history-preview {
+		order: 2;
+		min-width: 0;
+		overflow: auto;
+		padding: 12px;
+		border-left: 1px solid var(--border2);
+		background: var(--panel2);
+	}
+	.history-preview-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+	.history-preview-art :global(svg) { display: block; width: 100%; max-height: 240px; }
+	.history-preview-description { white-space: pre-wrap; font-size: 14px; line-height: 1.55; }
+	.history-preview-actions { display: flex; flex-wrap: wrap; gap: 6px; }
 	.history-manager-pager {
 		display: flex;
 		align-items: center;
 		justify-content: center;
 		gap: 6px;
-		color: var(--fg3);
-		font-size: 11px;
+		color: var(--fg2);
+		font-size: 12px;
 		font-variant-numeric: tabular-nums;
 	}
 	.history-nav-btn { min-width: 74px; }
 	.history-latest-btn { min-width: 54px; }
 	.history-thumb-grid-wrap,
 	.history-table-wrap {
-		flex: 1;
 		padding: 8px 10px 6px;
 		min-height: 0;
 	}
-	.history-thumb-grid-wrap { overflow: hidden; }
+	.history-thumb-grid-wrap { overflow: auto; }
 	.history-table-wrap { overflow: auto; }
+	@media (max-width: 760px) {
+		.history-content.has-preview { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) minmax(220px, 38%); }
+		.history-preview { border-left: 0; border-top: 1px solid var(--border2); }
+	}
 	.history-thumb-grid {
 		display: grid;
 		grid-template-columns: repeat(auto-fill, minmax(142px, 1fr));
@@ -1183,7 +1302,7 @@
    same plate treatment the star badge uses to stay readable on any image. */
 .manager-generation {
 	position: absolute;
-	top: 26px;
+	top: 32px;
 	left: 6px;
 	z-index: 30;
 	box-sizing: border-box;
@@ -1200,8 +1319,8 @@
 }
 .selection-checkbox {
 	box-sizing: border-box;
-	width: 16px;
-	height: 16px;
+	width: 26px;
+	height: 26px;
 	display: inline-grid;
 	place-items: center;
 	margin: 0;
@@ -1211,7 +1330,7 @@
 	background: color-mix(in srgb, var(--panel) 92%, transparent);
 	color: var(--accent-fg);
 	cursor: pointer;
-	font: 700 11px/1 system-ui, sans-serif;
+	font: 700 12px/1 system-ui, sans-serif;
 	box-shadow: 0 1px 3px rgba(0,0,0,.16);
 }
 .selection-checkbox:hover { border-color: var(--accent); }
@@ -1223,8 +1342,8 @@
 		top: 5px;
 		right: 5px;
 		z-index: 31;
-		width: 22px;
-		height: 22px;
+		width: 26px;
+		height: 26px;
 		border: 1px solid var(--thumb-plate-border);
 		border-radius: 50%;
 		background: var(--thumb-plate-bg);
@@ -1254,9 +1373,9 @@
 	.table-thumb-cell .mini-star {
 		top: 2px;
 		right: 2px;
-		width: 18px;
-		height: 18px;
-		font-size: 11px;
+		width: 26px;
+		height: 26px;
+		font-size: 13px;
 	}
 	.thumb {
 		flex-shrink: 0;
@@ -1271,19 +1390,11 @@
 		position: relative;
 		transition: border-color 0.1s;
 	}
-	.thumb-catalog {
-		min-width: 0;
-		overflow: hidden;
-		text-overflow: ellipsis;
-		white-space: nowrap;
-		color: var(--fg2);
-		font-size: 11px;
-		line-height: 1.25;
-	}
 	.thumb-note { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--fg3); font-size: 10px; line-height: 1.25; }
 	.thumb-note span { margin-right: 4px; font-weight: 600; }
 	.thumb-action-row {
 		display: flex;
+		flex-wrap: wrap;
 		align-items: flex-end;
 		gap: 4px;
 		justify-content: flex-start;
@@ -1296,8 +1407,8 @@
 		flex: 0 0 auto;
 		position: relative;
 		z-index: 41;
-		width: 18px;
-		height: 18px;
+		width: 26px;
+		height: 26px;
 		border: 1px solid var(--border2);
 		border-radius: 50%;
 		background: var(--panel);
@@ -1371,20 +1482,20 @@
 	.table-hash {
 		font-size: 11px;
 		white-space: nowrap;
+		word-break: normal;
+		overflow-wrap: normal;
 	}
-	/* Takes whatever the star and the hash chip leave; the native title carries
-	   the whole string once the card is too narrow for it. */
+	/* Model roles use the card width; marking controls do not squeeze them. */
 	.thumb-model {
-		flex: 1 1 auto;
-		align-self: flex-end;
+		flex: 1 0 100%;
+		order: -1;
 		min-width: 0;
-		overflow: hidden;
-		text-overflow: ellipsis;
-		white-space: nowrap;
-		color: var(--fg3);
-		font-size: 10px;
-		line-height: 1.6;
+		color: var(--fg2);
+		font-size: 12px;
+		line-height: 1.5;
 	}
+	.thumb-model .history-model-detail summary { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+	.thumb-model .history-model-detail > span { font-size: 12px; }
 	.manager-thumb {
 		width: 100%;
 	}
@@ -1402,6 +1513,7 @@
 	}
 	.history-table {
 		width: 100%;
+		table-layout: fixed;
 		border-collapse: collapse;
 		background: var(--panel);
 		font-size: 12px;
@@ -1414,12 +1526,22 @@
 		vertical-align: middle;
 	}
 	.history-table th { color: var(--fg3); font-weight: 500; background: var(--bg); }
-	.table-description {
-		max-width: 20ch;
-		overflow: hidden;
-		text-overflow: ellipsis;
-		white-space: nowrap;
-	}
+	.history-table-select { width: 32px; }
+	.history-table-image { width: 66px; }
+	.history-table-description { width: 34%; }
+	.history-table-created { width: 116px; }
+	.history-table-model { width: 17%; }
+	.history-table-catalog { width: 10%; }
+	.history-table-size { width: 74px; }
+	.history-table-hash { width: 72px; min-width: 72px; }
+	.history-table-actions { width: 112px; }
+	.table-description { vertical-align: top !important; }
+	.table-model { vertical-align: top !important; overflow-wrap: anywhere; }
+	.history-model-detail + .history-model-detail { margin-top: 3px; }
+	.history-model-detail summary { cursor: pointer; overflow-wrap: anywhere; }
+	.history-model-detail > span { display: block; margin-top: 2px; color: var(--fg3); font-size: 12px; overflow-wrap: anywhere; }
+	.model-role { margin-right: 3px; color: var(--fg2); white-space: nowrap; }
+	:global(.history-description) { color: var(--fg2); font-size: 14px; line-height: 1.4; }
 	.table-svg-size { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
 	.table-actions { white-space: nowrap; }
 	/* --action-* is the theme-aware primary pair; var(--fg) with a hardcoded
@@ -1427,8 +1549,6 @@
 	.bulk-trash { min-width: 38px; display: inline-flex; align-items: center; justify-content: center; gap: 4px; }
 	.bulk-trash svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
 	.bulk-trash:disabled { opacity: .4; cursor: default; }
-	.tool-count { margin-left: 4px; color: var(--fg3); }
-	.tool-error { align-self: center; color: #b3452c; font-size: 11px; }
 	.icon-trash-btn {
 		width: 24px;
 		height: 22px;

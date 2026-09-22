@@ -548,7 +548,7 @@ export function createRefinementCoordinator(deps: RefinementCoordinatorDeps) {
 		}
 		refinementSession.beginSave();
 		try {
-			await saveRefinementCandidates({
+			const outcome = await saveRefinementCandidates({
 				candidates: selected,
 				sourceText: () => work.input.trim(),
 				fallbackCatalogId: () => deps.catalog.effectiveId()
@@ -563,6 +563,9 @@ export function createRefinementCoordinator(deps: RefinementCoordinatorDeps) {
 					void deps.history.syncToItem(saved);
 				}
 			});
+			if (outcome === 'failed' && contextVersion === targetIdentityVersion) {
+				refinementSession.setStatus(t().pipelineAttentionReason('host_commit_failed'));
+			}
 		} finally {
 			if (contextVersion === targetIdentityVersion) refinementSession.finishSave();
 		}

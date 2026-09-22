@@ -265,9 +265,12 @@ def test_unsaved_success_exposes_compiler_delivery_and_logs_safe_projection(
                 "disposition": {"kind": "omitted"},
             }],
             "downstream_diagnostics": [{
-                "reason": {"kind": "missing_field", "value": "provider raw response"},
+                "reason": {"type": "unbound_macro_caller_meaning", "value": "provider raw response"},
                 "owner": {"credential": "secret-value"},
-                "disposition": {"kind": "recovered"},
+                "disposition": {"kind": "omitted", "unit": {
+                    "kind": "macro_caller_field", "field": "action",
+                    "source_instruction_index": 0, "invocation_ordinal": "0",
+                }},
             }],
             "resource_omissions": [{
                 "owner": {"kind": "source_instruction", "value": {"source_instruction_index": 0}},
@@ -355,9 +358,9 @@ def test_unsaved_success_exposes_compiler_delivery_and_logs_safe_projection(
             },
             {
                 "channel": "downstream_diagnostics",
-                "kind": "missing_field",
+                "kind": "unbound_macro_caller_meaning",
                 "issue_id": None,
-                "actual_action": "recovered",
+                "actual_action": "omitted",
             },
             {
                 "channel": "resource_omissions",

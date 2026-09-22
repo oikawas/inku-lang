@@ -6,6 +6,14 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 36 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-22 — Retain drawable bodies when only an outer modifier is unsupported
+
+An unbound Macro caller action no longer drops the whole invocation: its action-omission diagnostic remains while the established body survives. An unsupported instruction layout direction is likewise omitted as a field, retaining the established shape, count, action, and position. Layout direction is not reinterpreted as shape angle, and a Macro caller action is not distributed into its body.
+
+The Japanese parser no longer mistakes a `と` embedded in an unknown form for a shape-coordination marker and invalidates an otherwise established head. Unknown text remains unknown and diagnostic. Original descriptions, visible DDL, save acknowledgments, integrity validation, resource limits, and total-omission stops remain intact. No dictionaries, synonyms, subject-specific exceptions, or additional LLM retries are introduced.
+
+Server omission logs now read the downstream diagnostic wire's `reason.type`, fixing blank reason fields. Compatibility with the earlier `kind` form and the safe projection that excludes source text and secrets are retained.
+
 ### 2026-09-22 — Merge general visual-composition guidance into the current Stage 1 contract
 
 Japanese and English initial-generation prompts now retain the whole description's roles, contrasts, repetition, density, empty space, and texture within short instructions. Repetition without an explicit quantity receives a context-derived count in visible DDL; explicit counts remain unchanged. The prompts use no fixed count bands, subject-specific tables or steering examples, uniform count increases, or automatic paper grounds. The footsteps-to-central-red-line example is removed while the directly specified format example remains.

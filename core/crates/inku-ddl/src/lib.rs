@@ -208,7 +208,8 @@ pub use saijiki::{
 };
 pub use score_diagnostics::{
     ScoreAppearanceField, ScoreAppearanceResolution, ScoreDiagnosticDisposition,
-    ScoreDiagnosticOwner, ScoreFieldGap, ScoreLoweringDiagnostic, ScoreOmissionUnit,
+    ScoreDiagnosticOwner, ScoreFieldGap, ScoreInstructionField, ScoreLoweringDiagnostic,
+    ScoreMacroCallerField, ScoreOmissionUnit,
 };
 pub use score_lowering::{
     EXPLICIT_SCORE_LOWERING_SCHEMA_ID, ExactCountFieldCandidate, ExplicitScoreLoweringResult,

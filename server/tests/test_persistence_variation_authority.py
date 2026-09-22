@@ -18,6 +18,7 @@ from inku_server.persistence.variation_authority import (
     VariationAuthorityStore,
 )
 from inku_server.persistence.schema import Base, HistoryRow, PipelineHistoryLinkRow
+from inku_server.pipeline_candidate import CandidateExecution
 
 
 def _core_digest(
@@ -231,6 +232,7 @@ def test_inventory_keeps_history_explicitly_legacy_unknown_without_reading_text(
 
 def test_legacy_description_fork_and_execution_resume_keep_provenance(
     tmp_path,
+    monkeypatch,
 ) -> None:
     engine = create_engine(f"sqlite:///{tmp_path / 'fork.db'}", future=True)
     store = VariationAuthorityStore(engine, now_ms=lambda: 1_777_777_777)
@@ -294,19 +296,27 @@ def test_legacy_description_fork_and_execution_resume_keep_provenance(
         derivation_kind="legacy_description_fork",
         parent_legacy_history_id=legacy.history_id,
     )
-    store.commit_effect(
-        "author-1",
-        _action(
-            action_digit="5",
-            source="青い円を中央に描く。",
-            expected_revision="1",
-            next_revision="2",
-            reason="stage1_generated",
-        ),
-        authoring_context=edited_context,
+    residual_action = _action(
+        action_digit="5",
+        source="青い円を中央に描く。",
+        expected_revision="1",
+        next_revision="2",
+        reason="stage1_residual_execution",
     )
+    host = CandidateExecution(
+        None, store, owner_id="author-1", config={},
+        provider=lambda _action: pytest.fail("a commit must not call a provider"),
+        context={**asdict(edited_context), "committed_description": legacy.description},
+    )
+    host.restore({"authority": {"revision": "1"}, "action": residual_action})
+    # Exercise host context selection and the real SQL CAS, not the Rust compiler.
+    monkeypatch.setattr(host, "_advance", lambda payload: payload)
+    acknowledgment = host.run_effect()
+    assert acknowledgment["result"]["tag"] == "visible_normalized_ddl_committed"
+    assert host.context["committed_description"] == edited_context.description
     saved = store.read("author-1", "variation-1")
     assert saved is not None
+    assert saved["authority"]["origin"] == "stage1_generated"
     assert saved["context"] == {
         "description": "青い円の記述",
         "derivation_kind": "legacy_description_fork",

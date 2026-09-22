@@ -11,6 +11,23 @@ This file records changes chronologically. If a historical note conflicts with t
 The history manager immediately shows works already held by the strip, then measures its actual viewport before requesting the page it needs. An initial count such as 19 comes from the strip width, not a fixed manager limit. Opening no longer requests both an estimated and a measured page, and reopening the same first page reuses its loaded data. Page sizes share the history API's maximum of 100 works.
 
 Thumbnail authorization reads only the work ID instead of loading the saved SVG, Score, and lineage for every image. History lists that omit SVG also avoid loading its text while retaining the stored UTF-8 byte count. Access rules and saved artwork are preserved. A newer strip request cancels its predecessor, navigation resumes as soon as the current page arrives, and automatic refresh does not compete with a pending page request.
+### 2026-09-22 — Conditionally deliver a diagnosed remainder from initial generation
+
+After Stage 1's finite corrective-normalization budget is exhausted, a candidate may save its entire visible source through the ordinary CAS only when the existing compiler's integrity, execution-projection, lowering, and resource checks establish drawable content. The full source and original omission diagnostics are retained, and only recompilation after the matching save acknowledgment delivers the remainder. This does not claim full acceptance or a canonical identity and does not open another LLM completion request. Total omission, no drawable content, and integrity failure still stop execution. Existing full acceptance, visible-patch approval, and saved-work compatibility remain intact; grammar, rendering features, and model settings are unchanged.
+
+The Server and Android persistence adapters also recognize residual adoption as a description-generated commit, retaining the current description when regenerating under description authority. They neither revert to an older description nor reject that valid update; parent and authority constraints remain intact.
+
+### 2026-09-22 — Share existing standalone-shape grammar with initial DDL generation
+
+The standalone-shape guidance for pre-head modifiers, quantity, action, and line-up direction now uses a shared helper in initial generation, camera projection, and hole completion. Patch-only attribute restrictions and local-response rules remain in hole completion. Existing interpretation, group, ordered-placement, vocabulary, response, and compiler meaning contracts are unchanged.
+
+Generation vocabulary now derives raw surface forms from the existing asset, separately from reference-display default annotations. Initial generation and camera share projected drawing heads, attribute roles, and the syntax boundaries for ground, background, and macros. Defaults, reference displays, accepted vocabulary, and compiler guards remain unchanged.
+
+Standalone modifier, head, quantity, and action assembly guidance is unified. Non-Saijiki core modifier forms are also shared from the existing definitions used by the parser, closing the gap where relative-size and regularity slots lacked usable forms. No aliases, vocabulary tables, or recognition conditions are added.
+
+### 2026-09-22 — Do not mark an incomplete semantic document CanonicalReady
+
+When an incomplete semantic document cannot produce canonical bytes and has no known hole, conflict, or blocking diagnostic, its compiler lock now stops with the existing `missing_canonical_semantic_identity` blocking diagnostic instead of being marked `CanonicalReady`. This fixes the inconsistent state that reached the Stage 1.5 integrity check and was then replaced by the detail-free `execution_projection_integrity` fallback. Integrity guards and input meaning remain intact. This change makes the stop reason explicit; it does not make the stopped DDL draw or add a new accepted expression.
 
 ### 2026-09-21 — Developer provider I/O observation
 

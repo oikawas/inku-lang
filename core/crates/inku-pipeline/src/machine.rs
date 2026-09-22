@@ -730,6 +730,18 @@ impl PipelineSnapshot {
         Ok(true)
     }
 
+    fn residual_execution_preflight(&self, candidate: &VisibleDocument) -> bool {
+        let Ok(document) = candidate.document() else {
+            return false;
+        };
+        crate::core_boundary::compile_committed(
+            document,
+            &self.config.definitions,
+            &self.config.compiler,
+        )
+        .is_ok_and(|delivery| delivery.residual_execution_is_deliverable())
+    }
+
     fn description(
         &mut self,
         description: String,
@@ -1310,6 +1322,18 @@ impl PipelineSnapshot {
                     .as_ref()
                     .is_some_and(|lock| lock.state == CompilerLockState::CanonicalReady)
                 {
+                    let retry_exhausted = self
+                        .config
+                        .stage1_retry
+                        .next_budgeted_attempt(
+                            self.action
+                                .as_ref()
+                                .ok_or(ProtocolError::InvalidState)?
+                                .identity
+                                .attempt,
+                            total,
+                        )
+                        .is_none();
                     if self.correct_stage1(
                         &compiled,
                         description.ok_or(ProtocolError::InternalInvariant)?,
@@ -1317,6 +1341,19 @@ impl PipelineSnapshot {
                         events,
                     )? {
                         return Ok(());
+                    }
+                    if retry_exhausted && self.residual_execution_preflight(&candidate) {
+                        let next = proposal(
+                            self.authority
+                                .propose_stage1_result_commit(self.authority.revision()),
+                        )?
+                        .ok_or(ProtocolError::InternalInvariant)?;
+                        return self.commit_document(
+                            candidate,
+                            next,
+                            "stage1_residual_execution",
+                            events,
+                        );
                     }
                     return self.failure_with_detail(
                         ProviderFailure::SemanticViolation,
@@ -1720,37 +1757,39 @@ impl PipelineSnapshot {
                     if let Some(report) = self.hole_completion_check.clone() {
                         self.event(events, "hole_completion_checked", report)?;
                     }
-                } else if let Some(lock) = delivery.compiler_lock.as_ref().filter(|lock| {
-                    lock.get("hole_identities")
-                        .and_then(serde_json::Value::as_array)
-                        .is_some_and(|identities| !identities.is_empty())
-                }) {
-                    let hole_ids = lock
-                        .get("hole_identities")
-                        .cloned()
-                        .and_then(|ids| serde_json::from_value::<Vec<String>>(ids).ok())
-                        .unwrap_or_default();
-                    // Known holes enter the shared completion policy without a
-                    // separate user command. Declines and failures do not re-enter
-                    // this commit-only branch; any retry is bounded by its action.
-                    self.delivery = Some(delivery);
-                    if let Err(error) = self.complete_holes(hole_ids, events) {
-                        // This revision is already committed. Preserve it even if
-                        // a completion prompt cannot be constructed within policy.
-                        self.action = None;
-                        self.phase = PipelinePhase::NeedsUserEdit {
-                            reason: "hole_request_unavailable".into(),
-                        };
-                        return self.event(
-                            events,
-                            "needs_user_edit",
-                            json!({
-                                "reason": "hole_request_unavailable", "error": error,
-                                "revision": revision,
-                            }),
-                        );
+                } else if reason != "stage1_residual_execution" {
+                    if let Some(lock) = delivery.compiler_lock.as_ref().filter(|lock| {
+                        lock.get("hole_identities")
+                            .and_then(serde_json::Value::as_array)
+                            .is_some_and(|identities| !identities.is_empty())
+                    }) {
+                        let hole_ids = lock
+                            .get("hole_identities")
+                            .cloned()
+                            .and_then(|ids| serde_json::from_value::<Vec<String>>(ids).ok())
+                            .unwrap_or_default();
+                        // Known holes enter the shared completion policy without a
+                        // separate user command. Declines and failures do not re-enter
+                        // this commit-only branch; any retry is bounded by its action.
+                        self.delivery = Some(delivery);
+                        if let Err(error) = self.complete_holes(hole_ids, events) {
+                            // This revision is already committed. Preserve it even if
+                            // a completion prompt cannot be constructed within policy.
+                            self.action = None;
+                            self.phase = PipelinePhase::NeedsUserEdit {
+                                reason: "hole_request_unavailable".into(),
+                            };
+                            return self.event(
+                                events,
+                                "needs_user_edit",
+                                json!({
+                                    "reason": "hole_request_unavailable", "error": error,
+                                    "revision": revision,
+                                }),
+                            );
+                        }
+                        return Ok(());
                     }
-                    return Ok(());
                 }
                 let has_score = delivery.score.is_some();
                 self.phase = if has_score {

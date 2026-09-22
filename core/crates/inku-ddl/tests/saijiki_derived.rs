@@ -5,6 +5,21 @@ use inku_ddl::{
 };
 
 #[test]
+fn generation_vocabulary_separates_default_annotations_from_surface_forms() {
+    for (language, annotation, surface) in [
+        (ResolvedInstructionLanguage::Ja, "(既定)", "ペン"),
+        (ResolvedInstructionLanguage::En, " (default)", "pen"),
+    ] {
+        let projection = saijiki_derived_projection(language).unwrap();
+        assert!(!projection.prompt_block.contains(annotation));
+        assert!(projection.prompt_block.contains(surface));
+        assert!(projection.reference_categories.iter().any(|category| {
+            category.words.contains(&format!("{surface}{annotation}"))
+        }));
+    }
+}
+
+#[test]
 fn full_language_projections_preserve_python_prompt_and_marker_behavior() {
     let ja = saijiki_derived_projection(ResolvedInstructionLanguage::Ja).unwrap();
     let en = saijiki_derived_projection(ResolvedInstructionLanguage::En).unwrap();

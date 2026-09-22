@@ -361,7 +361,7 @@ class RoomSharedPipelineStore(
         ) { "variation derivation and parent are immutable" }
         if (proposed.description == stored.description) return stored
         require(
-            commit.reason == "stage1_generated" &&
+            commit.reason in setOf("stage1_generated", "stage1_residual_execution") &&
                 current.authority == "description_authoritative" &&
                 commit.authority == "description_authoritative",
         ) { "description can change only during an authoritative Stage 1 commit" }

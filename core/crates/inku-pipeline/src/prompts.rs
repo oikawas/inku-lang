@@ -15,7 +15,8 @@ use inku_ddl::{
     ResolvedInstructionLanguage,
     SAIJIKI_ASSET_ID, SourceSpan, TYPED_DDL_COMPILER_LOCK_SCHEMA_ID, TypedDdlCompilation,
     TypedHole, VISIBLE_DDL_PATCH_SCHEMA_ID, VisibleDdlPatch, VisibleDdlPatchEdit,
-    saijiki_asset_sha256_hex, saijiki_derived_projection, visible_ddl_patch_available,
+    core_modifier_surface_forms, saijiki_asset_sha256_hex, saijiki_derived_projection,
+    visible_ddl_patch_available,
 };
 use inku_score::{CANVAS_FORMAT_REGISTRY_ID, canvas_format_registry_digest, lookup_canvas_format};
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
@@ -708,8 +709,9 @@ fn stage1_normalizer_system(language: ResolvedInstructionLanguage) -> Result<Str
     let saijiki =
         saijiki_derived_projection(language).map_err(|_| PromptError::SaijikiProjection)?;
     Ok(format!(
-        "{}\n\n# accepted_saijiki_vocabulary\n{}",
+        "{}\n\n{}\n\n# accepted_saijiki_vocabulary\n{}",
         stage1_normalizer_rules(language),
+        stage1_vocabulary_roles(language),
         saijiki.prompt_block,
     ))
 }
@@ -741,7 +743,8 @@ pub fn stage1_system_projection(
         ),
     };
     Ok(format!(
-        "{camera_subject}{ddl_intent}\n\n{output_scope}\n\n{grammar}\n\n{context}\n\n# accepted_saijiki_vocabulary\n{}",
+        "{camera_subject}{ddl_intent}\n\n{output_scope}\n\n{grammar}\n\n{context}\n\n{}\n\n# accepted_saijiki_vocabulary\n{}",
+        stage1_vocabulary_roles(language),
         saijiki.prompt_block
     ))
 }
@@ -848,10 +851,7 @@ pub fn build_hole_completion_prompt(
             .iter()
             .any(|region| region.typed_facts.iter().any(|fact| fact.owner == owner))
     };
-    let shared_grammar = match language {
-        ResolvedInstructionLanguage::Ja => stage1_grammar(ResolvedInstructionLanguage::Ja),
-        ResolvedInstructionLanguage::En => stage1_grammar(ResolvedInstructionLanguage::En),
-    };
+    let shared_grammar = common_grammar(language);
     // Reuse the existing grammar paragraphs verbatim; do not maintain another
     // language or vocabulary registry for hole completion.
     let grammar = shared_grammar
@@ -1342,6 +1342,14 @@ fn hex_digest(bytes: impl AsRef<[u8]>) -> String {
 }
 
 fn stage1_grammar(language: ResolvedInstructionLanguage) -> String {
+    format!(
+        "{}\n\n{}",
+        common_grammar(language),
+        standalone_shape_grammar(language)
+    )
+}
+
+fn common_grammar(language: ResolvedInstructionLanguage) -> String {
     let (prefix, ordered_placement, suffix) = match language {
         ResolvedInstructionLanguage::Ja => (
             STAGE1_GRAMMAR_JA_PREFIX,
@@ -1439,26 +1447,80 @@ Write "mirrored with the previous shape" for mirrored positions and orientations
 const STAGE1_CONTEXT_EN: &str = "The canvas format, catalog ID, and catalog mode are already resolved host context. Do not replace them with defaults.";
 const STAGE1_NORMALIZER_RESPONSE_ENDING_EN: &str = " Return only the specified JSON.";
 
-// Existing ownership grammar: semantic_association's pre-head/quantity collectors
-// and semantic_instruction's language-specific instruction-ownership collectors.
-// This explains accepted syntax without registering additional source forms.
-fn hole_attachment_grammar(language: ResolvedInstructionLanguage) -> String {
+fn stage1_vocabulary_roles(language: ResolvedInstructionLanguage) -> String {
     match language {
-        ResolvedInstructionLanguage::Ja => hole_attachment_grammar_ja(),
-        ResolvedInstructionLanguage::En => HOLE_ATTACHMENT_GRAMMAR_EN.to_owned(),
+        ResolvedInstructionLanguage::Ja => r#"語彙一覧はそのまま使える語形であり、自由な同義語や複合語を生成する材料ではない。抽象化した視覚内容を、一覧の語形と上記の構文へ符号化する。カテゴリ名は説明用の見出しで、命令に付けない。
+単独図形のheadは下記かたち一覧から選ぶ。てざわりは道具、つらなりは線の連続性、おもては面の属性であり、それだけをheadや動作にしない。属性は対応するheadの前に置く。図形の形容と描画headを区別する。
+図形命令と支持体・背景・macroは別の構文である。地を指定するなら、じの語を単独の文にする。背景色は「背景を<色>で埋める。」。いずれも任意で、必要な描画対象の代用ではない。macroはqualified_nameと宣言されたparameterの呼出しだけを一文にし、外側に動作・数量・位置・属性を足さない。明示指定がある場合は宣言されたparameterで結合し、結合不能な指定を削って呼出しを成立させない。"#.to_owned(),
+        ResolvedInstructionLanguage::En => r#"The vocabulary lists usable surface forms, not material for inventing synonyms or compound terms. Encode the interpreted visual content with those forms and the grammar above. Category names are explanatory headings, not command prefixes.
+Choose standalone drawing heads from the forms vocabulary below. Touches specify tools, continuity specifies line continuity, and surfaces specify surface attributes; none is a head or action on its own. Put attributes before their corresponding head. Distinguish shape modifiers from drawing heads.
+Drawing commands, ground, background, and macros have separate syntax. To specify ground, write a ground vocabulary noun as its own sentence. Background color uses "fill the background with <color>." Both are optional and do not replace required drawing subjects. A macro sentence contains only its qualified_name call with declared parameters; do not append an outer action, count, position, or attribute. Bind explicit specifications through declared parameters and never delete an unbindable specification to make a call succeed."#.to_owned(),
     }
 }
 
-fn hole_attachment_grammar_ja() -> String {
+// Existing ownership grammar: semantic_association's pre-head/quantity collectors
+// and semantic_instruction's language-specific instruction-ownership collectors.
+// This explains accepted syntax without registering additional source forms.
+fn standalone_shape_grammar(language: ResolvedInstructionLanguage) -> String {
+    let assembly = match language {
+        ResolvedInstructionLanguage::Ja => standalone_shape_grammar_ja(),
+        ResolvedInstructionLanguage::En => STANDALONE_SHAPE_GRAMMAR_EN.to_owned(),
+    };
+    let forms = core_modifier_surface_forms(language);
+    let separator = match language {
+        ResolvedInstructionLanguage::Ja => "、",
+        ResolvedInstructionLanguage::En => ", ",
+    };
+    let thinness = forms
+        .thinness
+        .iter()
+        .map(|(surface, _)| *surface)
+        .collect::<Vec<_>>()
+        .join(separator);
+    let scale = forms
+        .relative_scale
+        .iter()
+        .map(|(surface, _)| *surface)
+        .collect::<Vec<_>>()
+        .join(separator);
+    let regular = forms.regular;
+    let sides = forms.sides_prefix;
+    let modifiers = match language {
+        ResolvedInstructionLanguage::Ja => format!("歳時記外のcore修飾語も有限の受理形を使う。太さは「{thinness}」、相対寸法は「{scale}」。形修飾は「{regular}」という正則な形の制約であり、自然物名を自由に形容するslotではない。辺数は「{sides}<整数>」。これらも対象headへ結び、名詞形と形容形の接続を区別する。語形の列挙は全headとの任意の組合せを許可するものではない。詩の対象は受理済みの図形・配置・属性へ解釈し、その対象名から新しい形修飾語を作らない。"),
+        ResolvedInstructionLanguage::En => format!("Non-Saijiki core modifiers also have finite accepted forms. Thinness: {thinness}. Relative size: {scale}. The shape-form modifier is {regular}, a regularity constraint, not an open slot for describing natural subjects. Sides use {sides}<integer>. Attach these to their target head with the appropriate noun or adjective construction. Listing a form does not authorize arbitrary combinations with every head. Interpret poetic subjects through accepted shapes, placement, and attributes rather than inventing shape modifiers from subject names."),
+    };
+    format!("{assembly}\n{modifiers}")
+}
+
+fn standalone_shape_grammar_ja() -> String {
     let ni = MarkerId::JaNi.surface();
     let wo = MarkerId::JaWo.surface();
     let no = MarkerId::JaNo.surface();
-    format!(r#"単独図形は「[<受理位置>{ni}] [<head前修飾句>]<head>{wo} [<並べる配置方向>{ni}] [<個数・助数詞>] <動作>」を骨格にする。色・道具・線の連続性・図形の向き・面・揺らぎ・比率・相対寸法・太さ・形・辺数はすべてhead前修飾句へまとめ、必要な名詞修飾を「{no}」でつなぐ。既存の太さ語は「細い」「ごく細い」である。図形の向きはhead前、並べる配置方向は受理方向語に「{ni}」を付けてhead後へ置き、両者を入れ替えず自由な方向句を残さない。配置方向を省略した「並べる」は既定で横の左から右なので、その既定だけを言い直す語句は省く。未指定の属性は追加しない。
-typed_factsは認識された語の種類、confirmed_bindingsは確定した所有先と役割である。未結合lexical factの役割は原文の文脈で解釈し、confirmed_bindingsにないことだけを所有先の確定、明示意味の削除、推測の理由にしない。位置指定のないscatterはcanvas寸法の分布領域を既定で使う。語句がそのextentの既定だけを言い直す場合は省けるが、明示された領域や位置をこの既定と同一視しない。
-明示された前の対象への参照だけを、下記の完全な固定句で同じ命令内に記す。参照を新たな描画対象へ変えない。参照先を確定できないときはcontext_limit、意味を保持できる受理形がないときはunsupportedとする。解釈の中間説明は出力せず、局所修正文または未解決理由だけを返す。"#)
+    format!(r#"各単独図形命令を「[<位置句>] [<head前修飾句>]<head>{wo} [<並べる配置方向句>] [<数量句>] <動作>。」として組み立てる。位置句は受理位置に「{ni}」を一つ付けた句、headは描画対象一つ、数量句は数と対象に合う助数詞一つを結合した句である。数量句が既に助数詞を含むなら、命令への接続時に助数詞を加えない。動作はうごきの語形で文末を閉じる。
+色・道具・線の連続性・図形の向き・面・揺らぎ・比率・相対寸法・太さ・形・辺数はhead前修飾句へまとめる。名詞修飾は「{no}」、形容修飾は受理された形容形でheadへ結ぶ。修飾句はhead直前の接続までを含み、head自体は含まない。接続例は「赤いペンの実線の空の」＋「円」、「青いクレヨンの塗りの」＋「四角」。境界に接続語を再挿入せず、面の名詞を動詞の連体節へ展開しない。例は接続だけを示し、属性・対象・構図を今回の記述へ転写しない。
+図形の向きはhead前、並べる配置方向句は受理方向語に「{ni}」を一つ付けてhead後へ置く。揺らぎもhead前の属性として結び、動作の前後へ説明句として移さない。配置方向を省略した「並べる」は既定で横の左から右なので、その既定だけを言い直す語句は省く。出力前に全ての単独図形命令で、修飾句とhead、headと「{wo}」、数量句、文末動作がこの構造で結ばれることを照合する。組・順序配置・関係はそれぞれの既存構文を使い、この単独図形骨格へ縮約しない。照合内容は出力しない。"#)
 }
-const HOLE_ATTACHMENT_GRAMMAR_EN: &str = r#"For one standalone shape, use this grammar: <action> [<count>] [<pre-head modifiers>] <head> [<accepted line-up direction adverb>] [<position preposition> <accepted place>] [<complete accepted relation literal>]. Put every entity modifier in the pre-head slot: color, tool, continuity, shape angle, surface, fluctuation, proportion, relative size, thinness, shape form, and sides. The core thinness forms are thin and extra-fine. Shape angles are pre-head adjectives; accepted line-up directions are post-head adverbs. Do not interchange them or duplicate an angle as a direction. Leave no other free directional wording after the head. Line-up defaults to horizontal left-to-right when direction is omitted; omit wording that only restates this default. Do not add unspecified attributes.
-typed_facts lists recognized lexical categories; confirmed_bindings gives established owners and roles. Interpret the role of an unbound lexical fact from the original context; absence from confirmed_bindings alone neither establishes its owner nor permits removing or guessing explicit meaning. An unpositioned scatter already uses the canvas-sized distribution domain. Wording that only restates that extent default may be omitted, but never equate an explicitly specified region or position with this default.
+
+const STANDALONE_SHAPE_GRAMMAR_EN: &str = r#"Assemble every standalone drawing command as <action> [<quantity>] [<pre-head modifier phrase>] <head> [<accepted line-up direction adverb>] [<position phrase>] [<complete accepted relation literal>]. A quantity is one complete count expression, the head names one drawing subject, and a position phrase contains one position preposition and the accepted place. Do not repeat a connector or count component when joining complete slots. Use an accepted movement word as the command's action.
+Keep color, tool, continuity, shape angle, surface, fluctuation, proportion, relative size, thinness, shape form, and sides in the pre-head modifier phrase. That phrase excludes the final head: "red pen solid empty" + "circle", or "blue crayon flat" + "square". Do not insert another connector at this boundary or expand a surface noun into a verbal relative clause. These examples show attachment only; do not copy their attributes, subjects, or composition.
+Shape angles are pre-head adjectives; accepted line-up directions are post-head adverbs. Fluctuation also modifies the head rather than becoming extra wording around the action. Line-up defaults to horizontal left-to-right when direction is omitted; omit wording that only restates this default. Before output, check every standalone command's modifier/head boundary, quantity, action, and position against this structure. Groups, ordered placements, and relations retain their own existing grammar and must not be reduced to this standalone form. Do not output the checks."#;
+
+fn hole_attachment_grammar(language: ResolvedInstructionLanguage) -> String {
+    let attachment = standalone_shape_grammar(language);
+    // Patch-only constraints do not constrain the initial visual interpretation.
+    match language {
+        ResolvedInstructionLanguage::Ja => {
+            format!("{attachment}未指定の属性は追加しない。\n{HOLE_ATTACHMENT_CONTEXT_JA}")
+        }
+        ResolvedInstructionLanguage::En => {
+            format!("{attachment} Do not add unspecified attributes.\n{HOLE_ATTACHMENT_CONTEXT_EN}")
+        }
+    }
+}
+
+const HOLE_ATTACHMENT_CONTEXT_JA: &str = r#"typed_factsは認識された語の種類、confirmed_bindingsは確定した所有先と役割である。未結合lexical factの役割は原文の文脈で解釈し、confirmed_bindingsにないことだけを所有先の確定、明示意味の削除、推測の理由にしない。位置指定のないscatterはcanvas寸法の分布領域を既定で使う。語句がそのextentの既定だけを言い直す場合は省けるが、明示された領域や位置をこの既定と同一視しない。
+明示された前の対象への参照だけを、下記の完全な固定句で同じ命令内に記す。参照を新たな描画対象へ変えない。参照先を確定できないときはcontext_limit、意味を保持できる受理形がないときはunsupportedとする。解釈の中間説明は出力せず、局所修正文または未解決理由だけを返す。"#;
+const HOLE_ATTACHMENT_CONTEXT_EN: &str = r#"typed_facts lists recognized lexical categories; confirmed_bindings gives established owners and roles. Interpret the role of an unbound lexical fact from the original context; absence from confirmed_bindings alone neither establishes its owner nor permits removing or guessing explicit meaning. An unpositioned scatter already uses the canvas-sized distribution domain. Wording that only restates that extent default may be omitted, but never equate an explicitly specified region or position with this default.
 Only for an explicitly requested previous-object reference, use a complete fixed literal below in the same instruction. Do not turn the reference into a new drawable subject. If its target cannot be established, return context_limit; if no accepted form preserves the meaning, return unsupported. Output no intermediate interpretation: return only a local replacement or unresolved reason."#;
 
 fn hole_system_grammar(language: ResolvedInstructionLanguage) -> String {
@@ -1671,15 +1733,47 @@ mod tests {
     }
 
     #[test]
-    fn stage1_normalizer_rules_preserve_accepted_prompt_bytes() {
-        assert_eq!(
-            sha256_hex(stage1_normalizer_rules(ResolvedInstructionLanguage::Ja).as_bytes()),
-            "265b80139d46e3868cc393b1121b7df458dd5d03aca84aacec39114c25808f8a",
-        );
-        assert_eq!(
-            sha256_hex(stage1_normalizer_rules(ResolvedInstructionLanguage::En).as_bytes()),
-            "853fd69bef3e0ffa116d8e31c1239b3c9b4a2b26a92cae7dcbf99ef30902e1a4",
-        );
+    fn stage1_normalizer_rules_add_attachment_without_patch_constraints() {
+        for (language, previous_sha) in [
+            (
+                ResolvedInstructionLanguage::Ja,
+                "265b80139d46e3868cc393b1121b7df458dd5d03aca84aacec39114c25808f8a",
+            ),
+            (
+                ResolvedInstructionLanguage::En,
+                "853fd69bef3e0ffa116d8e31c1239b3c9b4a2b26a92cae7dcbf99ef30902e1a4",
+            ),
+        ] {
+            let rules = stage1_normalizer_rules(language);
+            let forms = core_modifier_surface_forms(language);
+            let normal_size = forms
+                .relative_scale
+                .iter()
+                .find(|(_, value)| *value == inku_ddl::CoreModifierValue::Normal)
+                .unwrap()
+                .0;
+            assert!(rules.contains(normal_size));
+            assert!(rules.contains(forms.regular));
+            let attachment = format!("{}\n\n", standalone_shape_grammar(language));
+            assert_eq!(rules.matches(&attachment).count(), 1);
+            // Existing interpretation, group, order, and response rules remain intact.
+            assert_eq!(
+                sha256_hex(rules.replace(&attachment, "").as_bytes()),
+                previous_sha
+            );
+            for patch_constraint in [
+                "typed_facts",
+                "confirmed_bindings",
+                "context_limit",
+                "未指定の属性は追加しない",
+                "Do not add unspecified attributes",
+            ] {
+                assert!(!rules.contains(patch_constraint));
+            }
+            for patch_context in ["typed_facts", "confirmed_bindings", "context_limit"] {
+                assert!(hole_attachment_grammar(language).contains(patch_context));
+            }
+        }
     }
 
     #[test]

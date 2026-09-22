@@ -163,9 +163,9 @@ pub use opaque_head::{
     OpaqueHeadCandidateEvidenceDiagnosticKind, collect_english_opaque_head_candidate_evidence,
 };
 pub use parser::{
-    CoreModifierDimension, CoreModifierIdentity, CoreModifierValue,
+    CoreModifierDimension, CoreModifierIdentity, CoreModifierSurfaceForms, CoreModifierValue,
     NEUTRAL_LEXEME_PARSER_SCHEMA_ID, NeutralDiagnostic, NeutralDiagnosticKind, NeutralParseResult,
-    NeutralToken, NeutralTokenKind, SourceSpan, parse_neutral_lexemes,
+    NeutralToken, NeutralTokenKind, SourceSpan, core_modifier_surface_forms, parse_neutral_lexemes,
 };
 pub use phrase::{
     DETERMINER_PHRASE_EVIDENCE_SCHEMA_ID, DeterminerPhraseEvidenceAvailability,

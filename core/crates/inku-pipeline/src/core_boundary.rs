@@ -15,7 +15,7 @@ use inku_render::{
     types::{RenderOptions, RenderOutput, RenderRequest},
 };
 use inku_score::{
-    CANVAS_FORMAT_REGISTRY_ID, Color, HardResourcePolicy, OperationalResourceBudget,
+    CANVAS_FORMAT_REGISTRY_ID, Canvas, Color, HardResourcePolicy, OperationalResourceBudget,
     ResolvedPaletteColor, ResolvedPaletteContext, ResourceDemand, Score, ScoreErrorPolicy,
     canonical_score_digest, canvas_format_registry_digest, lookup_canvas_format,
     validate_canvas_format_id,
@@ -368,6 +368,25 @@ pub struct CompiledDelivery {
 }
 
 impl CompiledDelivery {
+    /// Whether a sealed noncanonical execution may be proposed for visible ACK.
+    ///
+    /// This is intentionally narrower than normal delivery: residual adoption never promotes a
+    /// background color alone, but preserves an accepted ground as drawable
+    /// content. The Score's compact groups describe ranges of `instructions`,
+    /// so an instruction remains the common positive evidence for those forms.
+    pub fn residual_execution_is_deliverable(&self) -> bool {
+        self.semantic_digest.is_none()
+            && self.outcome == ScoreLoweringOutcome::CompleteWithOmissions
+            && self.resource_failure.is_none()
+            && self.execution_pre_expansion_digest.is_some()
+            && self.effective_stage15_digest.is_some()
+            && !self.upstream_diagnostics.is_empty()
+            && self.score.as_ref().is_some_and(|score| {
+                !score.instructions.is_empty()
+                    || matches!(&score.canvas, Canvas::Spec(spec) if spec.ground.is_some())
+            })
+    }
+
     pub fn validate(&self) -> Result<(), BoundaryError> {
         if self.schema_id != COMPILED_DELIVERY_SCHEMA_ID
             || self.compiler_execution_schema_id != RESOURCE_COMPILER_EXECUTION_SCHEMA_ID

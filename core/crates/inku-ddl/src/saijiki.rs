@@ -1130,8 +1130,15 @@ pub fn saijiki_derived_projection_from_asset(
     let prompt_rows = prompt_rows(asset, language)?;
     let prompt_block = prompt_rows
         .iter()
-        .map(|row| format!("{}: {}", row.name, row.words.join(word_joiner(language))))
-        .collect::<Vec<_>>()
+        .zip(&asset.categories)
+        .map(|(row, category)| {
+            Ok(format!(
+                "{}: {}",
+                row.name,
+                prompt_surfaces(category, language)?.join(word_joiner(language))
+            ))
+        })
+        .collect::<Result<Vec<_>, SaijikiProjectionError>>()?
         .join("\n");
 
     let texture_words = prompt_surfaces(required_category(asset, "tezawari")?, language)?;

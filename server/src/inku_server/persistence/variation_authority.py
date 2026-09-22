@@ -464,7 +464,7 @@ def _resolved_context(
     if proposed.description == stored.description:
         return stored
     if (
-        commit.reason == "stage1_generated"
+        commit.reason in {"stage1_generated", "stage1_residual_execution"}
         and current["authority"] == "description_authoritative"
         and commit.authority == "description_authoritative"
     ):

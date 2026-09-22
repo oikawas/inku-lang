@@ -231,6 +231,34 @@ const RELATIVE_SCALE_SURFACES_EN: &[(&str, CoreModifierValue)] = &[
     ("large", CoreModifierValue::Large),
 ];
 
+/// A read-only projection of the existing non-Saijiki modifier forms.
+/// Recognition still requires the parser's original boundary and head context.
+pub struct CoreModifierSurfaceForms {
+    pub regular: &'static str,
+    pub sides_prefix: &'static str,
+    pub thinness: &'static [(&'static str, CoreModifierValue)],
+    pub relative_scale: &'static [(&'static str, CoreModifierValue)],
+}
+
+pub fn core_modifier_surface_forms(
+    language: ResolvedInstructionLanguage,
+) -> CoreModifierSurfaceForms {
+    match language {
+        ResolvedInstructionLanguage::Ja => CoreModifierSurfaceForms {
+            regular: "正形",
+            sides_prefix: "辺数",
+            thinness: THINNESS_SURFACES_JA,
+            relative_scale: RELATIVE_SCALE_SURFACES_JA,
+        },
+        ResolvedInstructionLanguage::En => CoreModifierSurfaceForms {
+            regular: "regular",
+            sides_prefix: "sides ",
+            thinness: THINNESS_SURFACES_EN,
+            relative_scale: RELATIVE_SCALE_SURFACES_EN,
+        },
+    }
+}
+
 const PRIORITY_FUNCTION: u8 = 1;
 const PRIORITY_NUMBER: u8 = 2;
 const PRIORITY_ASSET: u8 = 3;
@@ -588,10 +616,8 @@ fn candidates_at(
         ResolvedInstructionLanguage::Ja => crate::shape_constraint::SHAPE_HEADS_JA,
         ResolvedInstructionLanguage::En => crate::shape_constraint::SHAPE_HEADS_EN,
     };
-    for surface in match language {
-        ResolvedInstructionLanguage::Ja => &["正形"][..],
-        ResolvedInstructionLanguage::En => &["regular"][..],
-    } {
+    let modifier_forms = core_modifier_surface_forms(language);
+    for surface in [modifier_forms.regular] {
         push_surface_candidate(
             &mut candidates,
             source,
@@ -607,10 +633,7 @@ fn candidates_at(
             })),
         );
     }
-    let sides_prefix = match language {
-        ResolvedInstructionLanguage::Ja => "辺数",
-        ResolvedInstructionLanguage::En => "sides ",
-    };
+    let sides_prefix = modifier_forms.sides_prefix;
     if let Some(rest) = source[start_byte..].strip_prefix(sides_prefix) {
         let number = rest.trim_start();
         let digits = number.bytes().take_while(u8::is_ascii_digit).count();
@@ -652,11 +675,7 @@ fn candidates_at(
         );
     }
 
-    let thinness_surfaces = match language {
-        ResolvedInstructionLanguage::Ja => THINNESS_SURFACES_JA,
-        ResolvedInstructionLanguage::En => THINNESS_SURFACES_EN,
-    };
-    for (surface, value) in thinness_surfaces {
+    for (surface, value) in modifier_forms.thinness {
         if language == ResolvedInstructionLanguage::Ja
             && require_boundary
             && !has_japanese_recognized_left_boundary(source, start_byte)
@@ -679,11 +698,7 @@ fn candidates_at(
         );
     }
 
-    let relative_scale_surfaces = match language {
-        ResolvedInstructionLanguage::Ja => RELATIVE_SCALE_SURFACES_JA,
-        ResolvedInstructionLanguage::En => RELATIVE_SCALE_SURFACES_EN,
-    };
-    for (relative_scale_surface, value) in relative_scale_surfaces {
+    for (relative_scale_surface, value) in modifier_forms.relative_scale {
         let relative_scale_end = start_byte + relative_scale_surface.len();
         let surface_matches = source
             .get(start_byte..relative_scale_end)

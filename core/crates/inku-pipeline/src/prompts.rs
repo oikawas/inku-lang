@@ -708,8 +708,9 @@ fn stage1_normalizer_system(language: ResolvedInstructionLanguage) -> Result<Str
     let saijiki =
         saijiki_derived_projection(language).map_err(|_| PromptError::SaijikiProjection)?;
     Ok(format!(
-        "{}\n\n# accepted_saijiki_vocabulary\n{}",
+        "{}\n\n{}\n\n# accepted_saijiki_vocabulary\n{}",
         stage1_normalizer_rules(language),
+        stage1_vocabulary_roles(language, &saijiki.shape_markers),
         saijiki.prompt_block,
     ))
 }
@@ -741,7 +742,8 @@ pub fn stage1_system_projection(
         ),
     };
     Ok(format!(
-        "{camera_subject}{ddl_intent}\n\n{output_scope}\n\n{grammar}\n\n{context}\n\n# accepted_saijiki_vocabulary\n{}",
+        "{camera_subject}{ddl_intent}\n\n{output_scope}\n\n{grammar}\n\n{context}\n\n{}\n\n# accepted_saijiki_vocabulary\n{}",
+        stage1_vocabulary_roles(language, &saijiki.shape_markers),
         saijiki.prompt_block
     ))
 }
@@ -1443,6 +1445,18 @@ Write "connected partway along the previous line" or "connected partway along th
 Write "mirrored with the previous shape" for mirrored positions and orientations across the axis between two shapes. A leaf or group is referred to as a whole. Preserve explicit positions, dimensions, and directions and the follower’s color and tool."#;
 const STAGE1_CONTEXT_EN: &str = "The canvas format, catalog ID, and catalog mode are already resolved host context. Do not replace them with defaults.";
 const STAGE1_NORMALIZER_RESPONSE_ENDING_EN: &str = " Return only the specified JSON.";
+
+fn stage1_vocabulary_roles(language: ResolvedInstructionLanguage, heads: &[String]) -> String {
+    let heads = heads.join(", ");
+    match language {
+        ResolvedInstructionLanguage::Ja => format!(r#"語彙一覧はそのまま使える語形であり、自由な同義語や複合語を生成する材料ではない。抽象化した視覚内容を、一覧の語形と上記の構文へ符号化する。カテゴリ名は説明用の見出しで、命令に付けない。
+単独図形のheadは {heads}。てざわりは道具、つらなりは線の連続性、おもては面の属性であり、それだけをheadや動作にしない。属性は対応するheadの前に置く。図形の形容と描画headを区別する。
+図形命令と支持体・背景・macroは別の構文である。地を指定するなら、じの語を単独の文にする。背景色は「背景を<色>で埋める。」。いずれも任意で、必要な描画対象の代用ではない。macroはqualified_nameと宣言されたparameterの呼出しだけを一文にし、外側に動作・数量・位置・属性を足さない。明示指定がある場合は宣言されたparameterで結合し、結合不能な指定を削って呼出しを成立させない。"#),
+        ResolvedInstructionLanguage::En => format!(r#"The vocabulary lists usable surface forms, not material for inventing synonyms or compound terms. Encode the interpreted visual content with those forms and the grammar above. Category names are explanatory headings, not command prefixes.
+Standalone drawing heads are {heads}. Touches specify tools, continuity specifies line continuity, and surfaces specify surface attributes; none is a head or action on its own. Put attributes before their corresponding head. Distinguish shape modifiers from drawing heads.
+Drawing commands, ground, background, and macros have separate syntax. To specify ground, write a ground vocabulary noun as its own sentence. Background color uses "fill the background with <color>." Both are optional and do not replace required drawing subjects. A macro sentence contains only its qualified_name call with declared parameters; do not append an outer action, count, position, or attribute. Bind explicit specifications through declared parameters and never delete an unbindable specification to make a call succeed."#),
+    }
+}
 
 // Existing ownership grammar: semantic_association's pre-head/quantity collectors
 // and semantic_instruction's language-specific instruction-ownership collectors.

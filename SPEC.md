@@ -1374,6 +1374,8 @@ Stage 1, camera projection, and hole completion use the existing shared grammar 
 
 Initial generation and camera projection also share the existing standalone-shape grammar for pre-head modifiers, quantity, action, and line-up direction. Patch-only constraints on adding unspecified attributes, confirmed bindings, and local patch responses remain in hole completion and do not constrain the initial visual interpretation of poetry. Existing group and ordered-placement rules, Saijiki vocabulary, macro signatures, response schemas, and compiler acceptance conditions are preserved.
 
+The generation vocabulary projection lists only existing asset surface forms, without appending display/reference default annotations to them. Reference annotations and default values remain intact. Initial generation and camera derive drawing heads from the same projection and distinguish them from tool, continuity, and surface attributes. Ground, background, and macro calls with only declared parameters are distinguished from drawing commands. Required subjects or unbindable explicit specifications must not be deleted merely to obtain formal acceptance.
+
 **Options that were rejected:**
 
 | Form | Why it was rejected |

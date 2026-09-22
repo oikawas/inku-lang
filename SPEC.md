@@ -1063,21 +1063,33 @@ templates the user edited are kept).  The status bar PNG menu is generated from
 these templates, and export width is computed from the current canvas aspect
 ratio.
 
-In history management, Animation opens an export modal when at least two works
-are selected. It starts with the settings export tab's Animation of multiple
-works values and allows the format (APNG/GIF), transition pattern, hold time,
-resolution, and custom height to be changed for this export. Supported browsers
-offer a save-location button to choose a folder; Save exports the selected works
-from oldest to newest. Changes in the modal do not update the default settings
-or folder. Without a destination override, the existing save settings apply;
-browsers without folder selection use their own download settings. Failure to
-write to a folder chosen for this export stays visible in the modal and does
-not redirect the file to another destination.
+In history management, Animation opens an export modal when at least one work
+is selected. For one work, it creates a simulated making process by revealing
+layers of the saved SVG in drawing order, from the background to the finished
+work. Choose the number of frames including background and completion (2–120,
+default 12), the interval (0.1–30 seconds, default 0.3), and replay behavior.
+Restart repeats from the beginning; Reverse plays back toward the beginning
+after completion and repeats; Play once stops on the completed work. Drawing
+groups, stacking order, background, clipping, and filters are preserved, and
+the completed frame uses the original saved SVG. When there are fewer layers
+than requested frames, repeated states combine their display durations.
+
+For two or more works, the existing animation switches between selected works
+from oldest to newest. The settings export tab holds defaults for the shared
+format (APNG/GIF), resolution, and custom height, the single-work frame count,
+interval, and replay behavior, and the multiple-work transition and hold time.
+The export modal shows the controls for the selected number of works. Size and
+save location are shared by both modes. Supported browsers offer a save-location
+button to choose a folder. Changes in the modal apply only to this export and
+do not update the default settings or folder. Without a destination override,
+the existing save settings apply; browsers without folder selection use their
+own download settings. Failure to write to a folder chosen for this export stays
+visible in the modal and does not redirect the file to another destination.
 
 The lineage tab's Export animation button opens the same modal when at least
-two works are checked. It snapshots the checked works when pressed and exports
-them from oldest to newest. Unchecked ancestors and the currently displayed
-work are not added automatically.
+one work is checked, using layer animation for one work and chronological
+transitions for multiple works. It snapshots the checked works when pressed.
+Unchecked ancestors and the currently displayed work are not added automatically.
 
 ---
 

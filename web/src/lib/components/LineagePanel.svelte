@@ -317,7 +317,7 @@ function askTrashChecked(): void {
 }
 
 function openCheckedAnimationExport(): void {
-	if (checkedAnimationHistoryIds.length < 2) return;
+	if (checkedAnimationHistoryIds.length === 0) return;
 	checkedAnimationExportIds = [...checkedAnimationHistoryIds];
 }
 
@@ -785,7 +785,7 @@ $effect(() => {
 		{animationExportBusy ? t().animationExportBusy : t().lineageAnimationExport}
 		{#if !animationExportBusy && focusAnimationHistoryIds.length > 1}<span>({focusAnimationHistoryIds.length})</span>{/if}
 	</button>
-	<button type="button" disabled={checkedAnimationHistoryIds.length < 2} title={t().lineageCheckedAnimationExportHint} onclick={openCheckedAnimationExport}>
+	<button type="button" disabled={checkedAnimationHistoryIds.length === 0} title={t().lineageCheckedAnimationExportHint} onclick={openCheckedAnimationExport}>
 		{t().lineageCheckedAnimationExport}
 		{#if checkedAnimationHistoryIds.length > 0}<span>({checkedAnimationHistoryIds.length})</span>{/if}
 	</button>

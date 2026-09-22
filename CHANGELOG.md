@@ -6,6 +6,19 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 36 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-22 — Export a single work as a layer animation
+
+Select one work in history management or lineage and choose Animation to save
+an APNG or GIF that gradually reveals its saved SVG layers, from the background
+to the finished work. Frame count, interval, and replay behavior (restart,
+reverse, or play once) are configurable. Size and save location use the same
+controls as animations of multiple works. Defaults can be saved in the settings
+export tab; changes in the export modal apply only to that export.
+
+Drawing groups, background, clipping, filters, and stacking order are preserved,
+and the completed frame uses the original saved SVG. Selecting two or more
+works continues to use the existing transition animation.
+
 ### 2026-09-22 — Reduce history and thumbnail display latency
 
 The history manager immediately shows works already held by the strip, then measures its actual viewport before requesting the page it needs. An initial count such as 19 comes from the strip width, not a fixed manager limit. Opening no longer requests both an estimated and a measured page, and reopening the same first page reuses its loaded data. Page sizes share the history API's maximum of 100 works.

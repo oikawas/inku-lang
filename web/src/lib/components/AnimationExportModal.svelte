@@ -26,6 +26,7 @@
 	let saving = $state(false);
 	let error = $state<string | null>(null);
 	const busy = $derived(picking || saving);
+	const mode = $derived(count === 1 ? 'layer' : 'transition');
 
 	onMount(() => {
 		settings = normalizeAnimationExportSettings(initialSettings);
@@ -85,7 +86,7 @@
 			<button type="button" onclick={close} disabled={busy}>{t().closeLabel}</button>
 		</header>
 		<p id="animation-export-description">{t().animationExportSelection(count)}</p>
-		<AnimationExportFields bind:settings disabled={busy} />
+		<AnimationExportFields bind:settings {mode} disabled={busy} />
 		<section class="destination" aria-labelledby="animation-export-destination">
 			<h3 id="animation-export-destination">{t().settingsDownloadFolderLabel}</h3>
 			<div class="destination-row">

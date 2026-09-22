@@ -544,11 +544,22 @@ pub fn compile_typed_ddl(
     let mut semantic_document =
         associate_semantic_document_with_macro_binding(&document, parameter_binding);
     let mut projection = project_deliveries(&document, &semantic_document);
+    let canonical_ready = semantic_document.canonical_bytes.is_some();
+    if !canonical_ready
+        && projection.holes.is_empty()
+        && projection.conflicts.is_empty()
+        && projection.blocking.is_empty()
+    {
+        add_blocking(
+            &mut projection,
+            MISSING_CANONICAL_SEMANTIC_IDENTITY,
+            None,
+        );
+    }
     sort_projection(&mut projection);
     let structured_semantic_occurrence_digest = sha256_hex(&structured_semantic_occurrence_bytes(
         &projection.deliveries,
     ));
-    let canonical_ready = semantic_document.canonical_bytes.is_some();
     let mut seeds = Vec::new();
     let mut expansion = None;
     let mut expanded_meaning_bytes = None;

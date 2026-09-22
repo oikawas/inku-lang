@@ -20,6 +20,10 @@ ServerとAndroidの保存adapterも残部採用を記述からの生成commitと
 
 単独図形の修飾句・head・数量句・動作の組立て案内を統合し、非歳時記のcore修飾語もparserが使う既存定義から共有する。相対寸法・正形などのslotだけを示して語形を欠く状態を解消し、新しいalias、語彙表、認識条件は追加しない。
 
+### 2026-09-22 — 未完semantic documentをCanonicalReadyにしない
+
+canonical bytesを作れない未完semantic documentに既知のhole、conflict、blocking diagnosticがない場合、compiler lockを`CanonicalReady`とせず、既存の`missing_canonical_semantic_identity` blocking diagnosticで停止する。Stage 1.5の内部整合性検査まで誤ったready状態を運び、詳細のない`execution_projection_integrity`へ置き換えていた不整合を修正した。integrity guardと入力の意味は維持する。この変更は停止理由を確定できる形へ直すもので、停止したDDLの描画成立や新しい語形解釈を追加しない。
+
 ### 2026-09-21 — Developer provider I/O observation
 
 Developer modeだけで、request単位にcore LLM retryを全段で1回へ限定し、独立してprovider I/O captureを有効にできるようにした。captureは送信前のdurable private recordを必須にし、実送信JSON、provider/model/action、HTTP status、raw response、timeout、usage、elapsedとoutcomeを同じowner/executionだけへ保存する。切断・上限切詰め・record失敗はcompleteと扱わず、rawは通常history、public view、logへ出さない。通常request、prompt、描画意味は変更しない。

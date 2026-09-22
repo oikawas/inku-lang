@@ -20,6 +20,10 @@ Generation vocabulary now derives raw surface forms from the existing asset, sep
 
 Standalone modifier, head, quantity, and action assembly guidance is unified. Non-Saijiki core modifier forms are also shared from the existing definitions used by the parser, closing the gap where relative-size and regularity slots lacked usable forms. No aliases, vocabulary tables, or recognition conditions are added.
 
+### 2026-09-22 — Do not mark an incomplete semantic document CanonicalReady
+
+When an incomplete semantic document cannot produce canonical bytes and has no known hole, conflict, or blocking diagnostic, its compiler lock now stops with the existing `missing_canonical_semantic_identity` blocking diagnostic instead of being marked `CanonicalReady`. This fixes the inconsistent state that reached the Stage 1.5 integrity check and was then replaced by the detail-free `execution_projection_integrity` fallback. Integrity guards and input meaning remain intact. This change makes the stop reason explicit; it does not make the stopped DDL draw or add a new accepted expression.
+
 ### 2026-09-21 — Developer provider I/O observation
 
 Developer mode can independently limit all core LLM retries to one attempt per request and enable provider I/O capture. Capture requires a durable private record before send and retains the actual JSON body, provider/model/action, HTTP status, raw response, timeout, usage, elapsed time, and outcome only for the same owner and execution. Cuts, size limits, and write failures remain explicitly incomplete; raw data never enters normal history, public views, or logs. Normal requests, prompts, and drawing semantics are unchanged.

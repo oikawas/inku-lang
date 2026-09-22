@@ -1487,6 +1487,29 @@ initial-generation policy is shared by Japanese and English; it changes
 neither the existing finite vocabulary, grammar, and response schema nor
 camera projection, hole completion, the compiler, or saved works' meaning.
 
+The initial prompt uses a short order: preserve explicit specifications, choose
+unspecified parts from the whole description, write accepted grammar, then check
+preservation and ownership. It does not require every attribute to be filled or
+invite the LLM to silently delete unsupported explicit meaning. "Random" is read
+as an observable static state in context, not mapped to a fixed placement. The
+example distinguishes a directly specified shape angle from arrangement
+direction; it supplies no subject mapping or default center, color, or support.
+
+Tools in the shared Saijiki asset carry short bilingual `physical_description`
+notes grounded in §13.5. Only initial generation reads these notes for existing
+`prompt=true` tools in Saijiki order. There is no subject- or emotion-dependent
+selection or recommendation, fixed quantity, numeric default, or new synonym.
+Notes remain separate from accepted vocabulary and are not DDL words, parser
+aliases, or Score values. Editing notes changes the asset's byte-provenance
+digest without changing accepted words or drawing semantics.
+
+Initial usage guidance distinguishes tool from thinness and continuity, count
+from size and placement, shape angle from line-up direction, and surface from
+ground and background, with the current typed DDL applicability limits. A listed
+word does not authorize every head combination. Explicit independent points,
+lines, and marks must not be absorbed into surface attributes. Neither this guide
+nor the tool notes are added to camera or hole-completion system text.
+
 ### 12.7 Stage 2 Completion and Deterministic Structuring
 
 The Stage 2 LLM returns a span-bounded patch candidate only for known holes explicitly reported by the compiler in saved visible DDL. The shared pipeline creates the request automatically; adoption requires author approval and a visible-DDL CAS save. The LLM does not output Score. The shared lowerer structures lock-verified typed meaning into Score once, preserving color, material, quantity, movement, arrangement path, rotation, canvas, and explicit relations.

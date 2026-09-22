@@ -6,6 +6,14 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 36 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-23 — Guide initial interpretation with ordered decisions and neutral Saijiki notes
+
+Japanese and English Stage 1 now follow a short order: preserve explicit specifications, interpret unspecified parts from the whole, write accepted grammar, and check preservation and ownership. The central red-circle format example is replaced by directly specified line-angle and arrangement-direction syntax, with no subject-to-shape example. "Random" becomes an observable state in context, never a fixed placement substitution.
+
+All existing tools receive brief physical mark descriptions in the shared Saijiki asset. Only initial generation receives these notes, separately from accepted vocabulary. There is no input-subject selection, emotion mapping, fixed count band, explicit recoloring, forced edge or paper ground, or mandatory completion of every attribute. Usage notes explain attribute ownership and current applicability without inviting silent deletion of unsupported explicit specifications.
+
+Descriptions do not enter parser vocabulary, aliases, or Score values; camera and hole-completion system text is unchanged. Asset byte and initial-prompt provenance digests change, but accepted words, compiler/renderer meaning, output limits, and versions do not. Generation, image quality, and normal history saving remain separate acceptance work.
+
 ### 2026-09-22 — Retain drawable bodies when only an outer modifier is unsupported
 
 An unbound Macro caller action no longer drops the whole invocation: its action-omission diagnostic remains while the established body survives. An unsupported instruction layout direction is likewise omitted as a field, retaining the established shape, count, action, and position. Layout direction is not reinterpreted as shape angle, and a Macro caller action is not distributed into its body.

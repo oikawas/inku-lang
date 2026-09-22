@@ -6,6 +6,12 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 36 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-22 — Conditionally deliver a diagnosed remainder from initial generation
+
+After Stage 1's finite corrective-normalization budget is exhausted, a candidate may save its entire visible source through the ordinary CAS only when the existing compiler's integrity, execution-projection, lowering, and resource checks establish drawable content. The full source and original omission diagnostics are retained, and only recompilation after the matching save acknowledgment delivers the remainder. This does not claim full acceptance or a canonical identity and does not open another LLM completion request. Total omission, no drawable content, and integrity failure still stop execution. Existing full acceptance, visible-patch approval, and saved-work compatibility remain intact; grammar, rendering features, and model settings are unchanged.
+
+The Server and Android persistence adapters also recognize residual adoption as a description-generated commit, retaining the current description when regenerating under description authority. They neither revert to an older description nor reject that valid update; parent and authority constraints remain intact.
+
 ### 2026-09-22 — Share existing standalone-shape grammar with initial DDL generation
 
 The standalone-shape guidance for pre-head modifiers, quantity, action, and line-up direction now uses a shared helper in initial generation, camera projection, and hole completion. Patch-only attribute restrictions and local-response rules remain in hole completion. Existing interpretation, group, ordered-placement, vocabulary, response, and compiler meaning contracts are unchanged.

@@ -432,11 +432,75 @@ fn stage1_compiler_feedback_uses_the_shared_attempt_budget() {
         matches!(state.phase, PipelinePhase::Failed { ref reason } if reason == "stage1_failed")
     );
     assert!(state.action.is_none() && state.document.is_none() && state.delivery.is_none());
-    assert!(rejected_output.events.iter().any(|event| {
-        event.tag == "failed"
-            && event.payload["reason"] == "semantic_violation"
-            && event.payload["detail"] == "macro_resolution_missing_lock"
-    }));
+    assert!(
+        rejected_output.events.iter().any(|event| {
+            event.tag == "failed"
+                && event.payload["reason"] == "semantic_violation"
+                && event.payload["detail"] == "macro_resolution_missing_lock"
+        })
+    );
+    assert!(
+        rejected_output
+            .events
+            .iter()
+            .all(|event| event.tag != "visible_ddl_ready"),
+        "an all-omitted candidate must not enter the CAS path"
+    );
+}
+
+#[test]
+fn exhausted_stage1_proposes_sealed_residual_only_after_visible_ack() {
+    let source = "mystery. place one red square at center.";
+    let mut pipeline_config = config();
+    pipeline_config.stage1_retry.max_attempts = 1;
+    let start = envelope(
+        None,
+        PipelineInput::Start {
+            variation_id: "sealed-residual".into(),
+            authoring_nonce: "sealed-residual-1".into(),
+            config: Box::new(pipeline_config),
+            authority: VariationAuthorityState::new_description(),
+            authoring: AuthoringInput::Description {
+                description: "One red square with an unresolved clause".into(),
+                auto_catalog: false,
+            },
+        },
+    );
+    let state = run(None, &start).snapshot;
+    let generated = envelope(
+        Some(&state),
+        PipelineInput::EffectResult {
+            result: EffectResult::NormalizedDdlGenerated {
+                identity: state.action.as_ref().unwrap().identity.clone(),
+                response: json!({"normalized_ddl": source}).to_string(),
+                elapsed_ms: DecimalU64::new(20),
+            },
+        },
+    );
+    let proposed = run(Some(&state), &generated).snapshot;
+    assert!(proposed.document.is_none() && proposed.delivery.is_none());
+    let commit = proposed.action.as_ref().expect("residual CAS proposal");
+    assert_eq!(commit.tag, "commit_visible_normalized_ddl");
+    assert_eq!(commit.payload["document"]["source"], source);
+    assert_eq!(commit.payload["reason"], "stage1_residual_execution");
+
+    let committed = run(Some(&proposed), &envelope(Some(&proposed), ack(&proposed))).snapshot;
+    assert!(matches!(committed.phase, PipelinePhase::ScoreReady));
+    assert_eq!(committed.document.as_ref().unwrap().source, source);
+    assert!(
+        committed.action.is_none(),
+        "residual adoption must not open known-hole completion"
+    );
+    let delivery = committed.delivery.as_ref().expect("ACKed delivery");
+    assert!(delivery.semantic_digest.is_none());
+    assert!(delivery.execution_pre_expansion_digest.is_some());
+    assert!(delivery.effective_stage15_digest.is_some());
+    assert_eq!(delivery.score.as_ref().unwrap().instructions.len(), 1);
+    assert!(
+        delivery.upstream_diagnostics.iter().any(|diagnostic| {
+            diagnostic["reason"].is_string() && diagnostic["span"].is_object()
+        })
+    );
 }
 
 #[test]

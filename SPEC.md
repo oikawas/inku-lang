@@ -1444,7 +1444,7 @@ A variation preserves its origin as either `stage1_generated` or `user_authored_
 
 Lineage editing identifies the history-row owner and selects its linked fork, without updating or replacing the old fork. Active `/executions/{id}/author-ddl` receives source, revision, and options. With unchanged settings and changed source it saves record metadata while preserving CAS, origin, and the DDL-authority lock. A changed canvas, wild setting, or other option creates a parent-linked direct-DDL variation under DDL authority without changing the original source, config, or authority. An unchanged source with changed record metadata also saves a new edition instead of discarding the existing result. History sidecar v2 immutably records the four core diagnostics, renderer diagnostics, and `resource_execution` for the matching revision and source, and normal history display restores them. V1 has no diagnostic record. A corrupt sidecar warns only for that work while saved DDL, Score, and SVG remain visible; it neither infers latest state nor recompiles.
 
-A typed Stage 1 request carries bounded projections of the finite vocabulary derived from the Saijiki, resolved catalog and canvas identities, and only each validated Macro's qualified name, version, definition digest, parameters, and host-supplied localized summary. Its response schema permits visible normalized DDL alone. When parsing committed visible DDL identifies completable known holes, the shared pipeline automatically creates the completion request without a separate user operation. With no holes it does not call the Stage 2 LLM. A clause containing words outside the finite grammar may become a known hole only when the compiler can establish its exact clause boundary and an exact drawing head, ground, or background anchor; unknowns without that exact boundary, conflicts, and integrity errors are not completion targets. When a following continuation clause is unresolved only because of a patchable upstream hole, its continuation diagnostic is deferred until recompilation after the patch; the following clause does not become an additional rewrite target.
+A typed Stage 1 request carries bounded projections of the finite vocabulary derived from the Saijiki, resolved catalog and canvas identities, and only each validated Macro's qualified name, version, definition digest, parameters, and host-supplied localized summary. Its response schema permits visible normalized DDL alone. When parsing committed visible DDL identifies completable known holes, the shared pipeline automatically creates the completion request without a separate user operation. With no holes it does not call the Stage 2 LLM. The Stage 1 residual-adoption path in §12.8 is an exception: after its save acknowledgment it delivers the deterministic remainder without another LLM request. A clause containing words outside the finite grammar may become a known hole only when the compiler can establish its exact clause boundary and an exact drawing head, ground, or background anchor; unknowns without that exact boundary, conflicts, and integrity errors are not completion targets. When a following continuation clause is unresolved only because of a patchable upstream hole, its continuation diagnostic is deferred until recompilation after the patch; the following clause does not become an additional rewrite target.
 
 A hole-completion request carries the original target text, established typed facts, finite Saijiki vocabulary, and accepted grammar. Unrecognized expressions remain in that original text. A reference target or other compiler-confirmed dependency may supply the smallest necessary read-only context. Reading scope and editing scope are distinct; the request excludes descriptions, unrelated clauses, Score, renderer instructions, and chain of thought. Multiple colors or tools alone do not justify inventing alternation, order, or a quantity split, and an unrepresentable meaning is not changed to a nearby different meaning.
 
@@ -1478,7 +1478,7 @@ exhaustion it does not switch models: it either completes finitely through the
 deterministic fallback or fails explicitly. A fallback is a compatibility
 delivery path for explicit DDL, not a way to add new content.
 
-When the shared compiler rejects a core-generated Stage 1 candidate before its
+When the shared compiler cannot fully accept a core-generated Stage 1 candidate before its
 visible commit, the core may spend the remaining Stage 1 `max_attempts` and
 `total_timeout_ms` budget on corrective normalization. It sends the original
 description, the unadopted DDL, and a bounded projection of compiler reasons,
@@ -1486,10 +1486,30 @@ source spans, and their exact source excerpts when present to the same Stage 1
 under the same response schema, and requests a complete replacement DDL. Because
 this feedback changes the payload, the
 correction is a new logical action with a new request digest; transport retries
-and corrective actions consume the same finite Stage 1 budget. A rejected
-candidate is not committed as visible DDL or as a work; it remains only in the
-request context retained for durable execution replay. Only a replacement
-accepted by the compiler enters the ordinary visible-DDL commit.
+and corrective actions consume the same finite Stage 1 budget. Candidates under
+correction remain in the request context retained for durable execution replay.
+Only ordinary full acceptance or the conditional residual adoption below may
+enter a visible-DDL commit.
+
+After corrective-normalization budget is exhausted, a candidate may propose its
+entire unchanged DDL through the ordinary authority-revision and source-digest
+CAS save only if the existing compiler's sealed execution projection, lowering,
+and resource checks establish drawable content. This is not full semantic
+acceptance and does not change the original lock to `CanonicalReady`. A missing
+canonical semantic identity stays None; the remainder's execution identity and
+the original omission owners, spans, and reasons remain separate. Omitting an
+unknown span can retain an established head in the same clause: this is neither
+sentence slicing nor proof of equivalence for unknown meaning.
+
+Pre-save evaluation determines eligibility only. Only Score recompiled from
+the entire source after the host's matching save acknowledgment is delivered.
+Residual adoption does not open another known-hole LLM request, and ordinary
+delivery and persistence retain `complete_with_omissions` and the original
+diagnostics. Integrity failure, no drawable content, total omission, or failure
+after acknowledgment stops execution; an empty work containing only background
+is not success. The existing rule that valid ground is drawable content remains.
+This never rewrites the original description or candidate, adds unspecified
+meaning, disables guards, or admits Stage 1 candidates unconditionally.
 
 This correction applies only to compiler rejection of an uncommitted
 core-generated Stage 1 candidate. It never rewrites direct or already accepted

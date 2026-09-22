@@ -246,7 +246,9 @@ class CandidateExecution:
             if action["tag"] == "commit_visible_normalized_ddl":
                 context = None
                 if self.context:
-                    generated = action["payload"]["reason"] == "stage1_generated"
+                    generated = action["payload"]["reason"] in {
+                        "stage1_generated", "stage1_residual_execution",
+                    }
                     description = self.context.get("description", "") if generated else self.context.get("committed_description", self.context.get("description", ""))
                     context = VariationAuthoringContext(
                         description=description,

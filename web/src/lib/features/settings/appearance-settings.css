@@ -1,8 +1,9 @@
-	.settings-feature-root .ui-mode-options { display: grid; gap: 8px; }
-	.settings-feature-root .ui-mode-options .setting-toggle { align-items: flex-start; }
+	.settings-feature-root .settings-radio-set.ui-mode-options { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr)); gap: 10px; margin-top: 12px; }
+	.settings-feature-root .ui-mode-options .setting-toggle { align-items: flex-start; padding: 12px; border: 1px solid var(--border); border-radius: var(--r); }
+	.settings-feature-root .ui-mode-options .setting-toggle:has(input:checked) { border-color: var(--accent); background: var(--accent-light); }
 	.settings-feature-root .ui-mode-options .setting-toggle span { display: grid; gap: 2px; }
-	.settings-feature-root .ui-mode-options small { color: var(--fg3); font-size: 11px; font-weight: 400; }
-	.settings-feature-root .ui-custom-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 16px; margin-top: 8px; }
+	.settings-feature-root .ui-mode-options small { color: var(--fg2); font-size: 12px; font-weight: 400; }
+	.settings-feature-root .ui-custom-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 8px 20px; margin-top: 10px; }
 	@media (max-width: 720px) { .settings-feature-root .ui-custom-grid { grid-template-columns: 1fr; } }
 	/* A box that cannot be ticked because two already are. Dimmed rather than
 	   hidden: the fourth choice stays legible, and what is missing is the room
@@ -11,12 +12,14 @@
 
 	.settings-feature-root .settings-radio-set {
 		display: flex;
-		flex-direction: column;
-		gap: 6px;
-		margin-bottom: 10px;
+		flex-wrap: wrap;
+		gap: 10px 24px;
+		margin: 8px 0 4px;
 	}
 	.settings-feature-root .settings-radio-title {
-		font-size: 12px;
+		font-size: 13px;
 		font-weight: 600;
 		color: var(--fg);
+		margin-top: 4px;
 	}
+	.settings-feature-root .ui-mode-settings .settings-inline-actions { margin-top: 2px; }

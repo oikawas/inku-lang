@@ -6,6 +6,12 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 36 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-22 — Improve settings layout and model administration
+
+The centered settings modal now gives each tab consistent headings, explanations, fields, and supporting information. Navigation and forms adapt to narrow screens; export, user, and backup tables scroll horizontally within their own regions when needed.
+
+Model administration edits one selected service at a time, showing published models before expandable connection details. Readable model rows separate names and IDs, publication, LLM/Vision purposes, and expandable evaluation fields. Search and publication/purpose filters retain draft edits, and bulk actions affect only currently visible models. A fixed footer shows publication counts, unsaved changes, and save feedback. Failed saves retain the dialog and its inputs; list refresh is disabled while edits are unsaved. Child dialogs also contain keyboard focus and close independently with Escape.
+
 ### 2026-09-22 — Remove Nearby works from the web UI
 
 Removed the Nearby works row from Lineage and its automatic loading when switching works or completing generation. The top three works ranked by Score similarity did not describe parent-child relationships in the creative process; Lineage follows recorded derivations. The extra similarity search and fetch are also removed.

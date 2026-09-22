@@ -143,17 +143,35 @@
 	const detailed = $derived(settingsDetail === 'detailed');
 	const isAdmin = $derived(currentUser?.permission_groups?.includes('admins') === true);
 	let appearanceSection = $state<'display' | 'making'>('display');
+	const settingsPage = $derived.by(() => {
+		const strings = t();
+		switch (settingsTab) {
+			case 'models': return { title: strings.settingsTabModels, hint: strings.settingsModelsHint };
+			case 'users': return { title: strings.settingsTabUsers, hint: strings.settingsUsersHint };
+			case 'db': return { title: strings.settingsTabDb, hint: strings.settingsDatabaseHint };
+			case 'server_misc': return { title: strings.settingsTabServerMisc, hint: strings.settingsServerHint };
+			case 'logs': return { title: strings.settingsTabLogs, hint: strings.settingsLogsHint };
+			case 'limits': return { title: strings.settingsTabLimits, hint: strings.settingsLimitsHint };
+			case 'plugins': return { title: strings.settingsTabPlugins, hint: strings.settingsPluginsHint };
+			case 'unread': return { title: strings.settingsTabUnreadWords, hint: strings.settingsUnreadHint };
+			case 'export': return { title: strings.settingsTabExport, hint: strings.settingsExportHint };
+			default: return appearanceSection === 'making'
+				? { title: strings.settingsCategoryMaking, hint: strings.settingsMakingHint }
+				: { title: strings.settingsCategoryDisplayOperation, hint: strings.settingsDisplayHint };
+		}
+	});
 	let modalElement = $state<HTMLDivElement | null>(null);
 	let restoreFocusTo: HTMLElement | null = null;
 
 	function visibleEnabledControls(): HTMLElement[] {
 		if (!modalElement) return [];
-		return [...modalElement.querySelectorAll<HTMLElement>('button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])')]
+		return [...modalElement.querySelectorAll<HTMLElement>('button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), summary, textarea:not([disabled]), [tabindex]:not([tabindex="-1"])')]
 			.filter((element) => !element.closest('[inert]') && element.getClientRects().length > 0);
 	}
 
 	function trapTab(event: KeyboardEvent): void {
 		if (event.key !== 'Tab') return;
+		if (event.target instanceof Element && event.target.closest('[data-settings-nested-dialog]')) return;
 		const controls = visibleEnabledControls();
 		if (controls.length === 0) {
 			event.preventDefault();
@@ -191,9 +209,9 @@
 
 <div class="settings-feature-root">
 <div class="modal-backdrop" onclick={onClose} aria-hidden="true"></div>
-<div bind:this={modalElement} class="settings-modal" class:model-modal={settingsMode === 'model'} role="dialog" aria-modal="true" tabindex="-1" onclick={(e) => e.stopPropagation()} onkeydown={trapTab}>
+<div bind:this={modalElement} class="settings-modal" class:model-modal={settingsMode === 'model'} role="dialog" aria-modal="true" aria-labelledby="settings-dialog-title" tabindex="-1" onclick={(e) => e.stopPropagation()} onkeydown={trapTab}>
 	<div class="modal-head">
-		<div class="catalog-modal-title">{settingsMode === 'model' ? t().modelSelectButton : t().settingsTitle}</div>
+		<h1 id="settings-dialog-title" class="catalog-modal-title">{settingsMode === 'model' ? t().modelSelectButton : t().settingsTitle}</h1>
 		<div class="modal-head-tools">
 			<!-- Model mode has its own four tabs and none of them is detail-gated,
 			     so the switch would govern nothing there. -->
@@ -230,28 +248,28 @@
 			<nav class="settings-category-nav" aria-label={t().settingsTitle}>
 				<section class="settings-category">
 					<div class="settings-category-label">{t().settingsCategoryDisplayOperation}</div>
-					<button class:active={settingsTab === 'misc' && appearanceSection === 'display'} onclick={() => selectAppearanceSection('display')}>{t().settingsCategoryDisplayOperation}</button>
+					<button aria-current={settingsTab === 'misc' && appearanceSection === 'display' ? 'page' : undefined} class:active={settingsTab === 'misc' && appearanceSection === 'display'} onclick={() => selectAppearanceSection('display')}>{t().settingsCategoryDisplayOperation}</button>
 				</section>
 				<section class="settings-category">
 					<div class="settings-category-label">{t().settingsCategoryMaking}</div>
-					<button class:active={settingsTab === 'misc' && appearanceSection === 'making'} onclick={() => selectAppearanceSection('making')}>{t().settingsBatchRetryLabel}</button>
+					<button aria-current={settingsTab === 'misc' && appearanceSection === 'making' ? 'page' : undefined} class:active={settingsTab === 'misc' && appearanceSection === 'making'} onclick={() => selectAppearanceSection('making')}>{t().settingsBatchRetryLabel}</button>
 				</section>
 				<section class="settings-category">
 					<div class="settings-category-label">{t().settingsTabExport}</div>
-					<button class:active={settingsTab === 'export'} onclick={() => onSelectSettingsTab('export')}>{t().settingsTabExport}</button>
+					<button aria-current={settingsTab === 'export' ? 'page' : undefined} class:active={settingsTab === 'export'} onclick={() => onSelectSettingsTab('export')}>{t().settingsTabExport}</button>
 				</section>
 				{#if isAdmin}
 					<section class="settings-category">
 						<div class="settings-category-label">{t().settingsCategoryAdministration}</div>
-						<button class:active={settingsTab === 'models'} onclick={() => onSelectSettingsTab('models')}>{t().settingsTabModels}</button>
-						<button class:active={settingsTab === 'users'} onclick={() => onSelectSettingsTab('users')}>{t().settingsTabUsers}</button>
-						<button class:active={settingsTab === 'db'} onclick={() => onSelectSettingsTab('db')}>{t().settingsTabDb}</button>
+						<button aria-current={settingsTab === 'models' ? 'page' : undefined} class:active={settingsTab === 'models'} onclick={() => onSelectSettingsTab('models')}>{t().settingsTabModels}</button>
+						<button aria-current={settingsTab === 'users' ? 'page' : undefined} class:active={settingsTab === 'users'} onclick={() => onSelectSettingsTab('users')}>{t().settingsTabUsers}</button>
+						<button aria-current={settingsTab === 'db' ? 'page' : undefined} class:active={settingsTab === 'db'} onclick={() => onSelectSettingsTab('db')}>{t().settingsTabDb}</button>
 						{#if showsTab('server_misc')}
-							<button class:active={settingsTab === 'server_misc'} onclick={() => onSelectSettingsTab('server_misc')}>{t().settingsTabServerMisc}</button>
+							<button aria-current={settingsTab === 'server_misc' ? 'page' : undefined} class:active={settingsTab === 'server_misc'} onclick={() => onSelectSettingsTab('server_misc')}>{t().settingsTabServerMisc}</button>
 						{/if}
-						<button class:active={settingsTab === 'logs'} onclick={() => onSelectSettingsTab('logs')}>{t().settingsTabLogs}</button>
+						<button aria-current={settingsTab === 'logs' ? 'page' : undefined} class:active={settingsTab === 'logs'} onclick={() => onSelectSettingsTab('logs')}>{t().settingsTabLogs}</button>
 						{#if showsTab('limits')}
-							<button class:active={settingsTab === 'limits'} onclick={() => onSelectSettingsTab('limits')}>{t().settingsTabLimits}</button>
+							<button aria-current={settingsTab === 'limits' ? 'page' : undefined} class:active={settingsTab === 'limits'} onclick={() => onSelectSettingsTab('limits')}>{t().settingsTabLimits}</button>
 						{/if}
 					</section>
 				{/if}
@@ -259,15 +277,20 @@
 					<section class="settings-category">
 						<div class="settings-category-label">{t().settingsCategoryExtensions}</div>
 						{#if showsTab('plugins')}
-							<button class:active={settingsTab === 'plugins'} onclick={() => onSelectSettingsTab('plugins')}>{t().settingsTabPlugins}</button>
+							<button aria-current={settingsTab === 'plugins' ? 'page' : undefined} class:active={settingsTab === 'plugins'} onclick={() => onSelectSettingsTab('plugins')}>{t().settingsTabPlugins}</button>
 						{/if}
 						{#if showsTab('unread')}
-							<button class:active={settingsTab === 'unread'} onclick={() => onSelectSettingsTab('unread')}>{t().settingsTabUnreadWords}</button>
+							<button aria-current={settingsTab === 'unread' ? 'page' : undefined} class:active={settingsTab === 'unread'} onclick={() => onSelectSettingsTab('unread')}>{t().settingsTabUnreadWords}</button>
 						{/if}
 					</section>
 				{/if}
 			</nav>
 
+			<section class="settings-content" aria-labelledby="settings-page-title">
+				<header class="settings-page-heading">
+					<h2 id="settings-page-title">{settingsPage.title}</h2>
+					<p>{settingsPage.hint}</p>
+				</header>
 			<div class="settings-body">
 			{#if settingsTab === 'models'}
 				<ModelAdministrationSettings administration={settings.modelAdministration} {providerGroups} />
@@ -406,6 +429,7 @@
 				/>
 			{/if}
 			</div>
+			</section>
 		</div>
 	{/if}
 </div>

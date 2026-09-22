@@ -243,7 +243,7 @@
 	.db-backup-grid {
 		display: grid;
 		/* The time takes two number fields, so it claims two of these tracks. */
-		grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+		grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
 		gap: 10px;
 		margin-top: 10px;
 	}
@@ -252,9 +252,8 @@
 		flex-direction: column;
 		gap: 4px;
 		color: var(--fg3);
-		font-size: 10px;
-		text-transform: uppercase;
-		letter-spacing: 0.06em;
+		font-size: 12px;
+		font-weight: 500;
 	}
 	.db-backup-time { grid-column: span 2; }
 	.db-backup-time-fields {
@@ -286,9 +285,11 @@
 		overflow: auto;
 		border: 1px solid var(--border);
 		border-radius: var(--r);
+		background: var(--bg);
 	}
 	.db-backup-list {
 		width: 100%;
+		min-width: 460px;
 		border-collapse: collapse;
 		font-size: 11px;
 		font-variant-numeric: tabular-nums;
@@ -319,5 +320,11 @@
 		border-color: var(--accent);
 		background: var(--accent-light);
 		color: var(--accent);
+	}
+	@media (max-width: 560px) {
+		.db-backup-time { grid-column: auto; }
+		.db-backup-time-fields { flex-wrap: wrap; }
+		.settings-readonly-grid { grid-template-columns: 1fr; gap: 3px; }
+		.settings-readonly-grid strong, .settings-readonly-grid code { margin-bottom: 7px; }
 	}
 </style>

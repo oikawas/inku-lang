@@ -54,9 +54,9 @@ export type ModelAdministration = {
 	askDeleteModelProvider: (provider: Provider) => void;
 	fetchProviderModels: (provider: Provider) => Promise<void>;
 	askClearModelApiKey: (provider: Provider) => void;
-	saveModelProviderName: (provider: Provider, label: string) => Promise<void>;
-	saveModelProviderMemo: (provider: Provider, memo: string) => Promise<void>;
-	saveModelProvider: (provider: Provider, patch?: Partial<ModelProviderSetting>) => Promise<void>;
+	saveModelProviderName: (provider: Provider, label: string) => Promise<boolean>;
+	saveModelProviderMemo: (provider: Provider, memo: string) => Promise<boolean>;
+	saveModelProvider: (provider: Provider, patch?: Partial<ModelProviderSetting>) => Promise<boolean>;
 	saveModelSettings: () => Promise<void>;
 	loadModelSettings: () => Promise<void>;
 };
@@ -252,44 +252,50 @@ export function createModelAdministration<TActor extends SettingsActor>(
 		await deps.loadAvailableModels();
 	}
 
-	async function saveModelProviderName(provider: Provider, label: string): Promise<void> {
-		if (!modelSettings || !isAdministrator()) return;
+	async function saveModelProviderName(provider: Provider, label: string): Promise<boolean> {
+		if (!modelSettings || !isAdministrator()) return false;
 		const providerSettings = modelSettings.providers[provider];
 		const nextLabel = label.trim();
-		if (!providerSettings || !nextLabel) return;
+		if (!providerSettings || !nextLabel) return false;
 		modelSettingsLoading = true;
 		try {
 			await saveProviderPayload(provider, modelProviderPayload(provider, providerSettings, nextLabel));
+			return true;
 		} catch (error) {
 			modelSettingsStatus = error instanceof Error ? error.message : String(error);
+			return false;
 		} finally {
 			modelSettingsLoading = false;
 		}
 	}
 
-	async function saveModelProviderMemo(provider: Provider, memo: string): Promise<void> {
-		if (!modelSettings || !isAdministrator()) return;
+	async function saveModelProviderMemo(provider: Provider, memo: string): Promise<boolean> {
+		if (!modelSettings || !isAdministrator()) return false;
 		const providerSettings = modelSettings.providers[provider];
-		if (!providerSettings) return;
+		if (!providerSettings) return false;
 		modelSettingsLoading = true;
 		try {
 			await saveProviderPayload(provider, modelProviderPayload(provider, providerSettings, undefined, memo));
+			return true;
 		} catch (error) {
 			modelSettingsStatus = error instanceof Error ? error.message : String(error);
+			return false;
 		} finally {
 			modelSettingsLoading = false;
 		}
 	}
 
-	async function saveModelProvider(provider: Provider, patch: Partial<ModelProviderSetting> = {}): Promise<void> {
-		if (!modelSettings || !isAdministrator()) return;
+	async function saveModelProvider(provider: Provider, patch: Partial<ModelProviderSetting> = {}): Promise<boolean> {
+		if (!modelSettings || !isAdministrator()) return false;
 		const current = modelSettings.providers[provider];
-		if (!current) return;
+		if (!current) return false;
 		modelSettingsLoading = true;
 		try {
 			await saveProviderPayload(provider, modelProviderPayload(provider, { ...current, ...patch }));
+			return true;
 		} catch (error) {
 			modelSettingsStatus = error instanceof Error ? error.message : String(error);
+			return false;
 		} finally {
 			modelSettingsLoading = false;
 		}

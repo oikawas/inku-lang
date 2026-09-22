@@ -520,6 +520,17 @@ export interface LangPack {
 	lineageIntermediateSaveFailed: string;
 
 	settingsTitle: string;
+	settingsDisplayHint: string;
+	settingsMakingHint: string;
+	settingsExportHint: string;
+	settingsModelsHint: string;
+	settingsUsersHint: string;
+	settingsDatabaseHint: string;
+	settingsServerHint: string;
+	settingsLogsHint: string;
+	settingsLimitsHint: string;
+	settingsPluginsHint: string;
+	settingsUnreadHint: string;
 	settingsTabModels: string;
 	settingsTabDb: string;
 	settingsTabPlugins: string;
@@ -684,6 +695,20 @@ export interface LangPack {
 	settingsModelApiKeyOptionalHint: string;
 	settingsModelSecurityNote: string;
 	settingsModelPublishedModels: string;
+	settingsModelPublishedCount: (count: number) => string;
+	settingsModelPickerCount: (visible: number, total: number) => string;
+	settingsModelDraftChanges: string;
+	settingsModelFetchDisabledWhileDirty: string;
+	settingsModelMetadataDetails: string;
+	settingsModelConnectionDetails: string;
+	settingsModelSelectVisible: string;
+	settingsModelClearVisible: string;
+	settingsModelFilterLabel: string;
+	settingsModelFilterAll: string;
+	settingsModelFilterPublished: string;
+	settingsModelFilterUnpublished: string;
+	settingsModelFilterLlm: string;
+	settingsModelFilterVision: string;
 	settingsModelSelectModels: string;
 	settingsModelSelectModelsTitle: (provider: string) => string;
 	settingsModelSearchPlaceholder: string;

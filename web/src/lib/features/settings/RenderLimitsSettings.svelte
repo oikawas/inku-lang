@@ -172,17 +172,17 @@
 		display: grid;
 		/* The hint sets the card width, not the control: the stepper is fixed
 		   below and every hint is a sentence. */
-		grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-		gap: 10px;
+		grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+		gap: 14px 16px;
 	}
 	.limits-field {
 		display: flex;
 		flex-direction: column;
 		gap: 4px;
 		min-width: 0;
-		font-size: var(--btn-sm-font-size);
+		font-size: 12px;
 	}
-	.limits-field > span { color: var(--fg2); }
+	.limits-field > span { color: var(--fg); font-weight: 500; }
 	.limits-field > small { color: var(--fg3); line-height: 1.4; }
 	/* The conversion answers a different question from the hint above it -- what
 	   this number costs, rather than what it governs -- so it is set apart

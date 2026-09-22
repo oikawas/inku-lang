@@ -13,6 +13,10 @@
 		text-transform: uppercase;
 		letter-spacing: 0.06em;
 	}
+	.settings-feature-root .export-template-table {
+		overflow-x: auto;
+		padding-bottom: 2px;
+	}
 	.settings-feature-root .export-template-list {
 		display: flex;
 		flex-direction: column;
@@ -20,6 +24,7 @@
 		margin: 6px 0 10px;
 	}
 	.settings-feature-root .export-template-row {
+		min-width: 540px;
 		padding: 7px;
 		border: 1px solid var(--border);
 		border-radius: var(--r);
@@ -58,3 +63,6 @@
 	}
 	.settings-feature-root .animation-settings-grid small { color: var(--fg3); font-size: 10px; }
 	@media (max-width: 720px) { .settings-feature-root .animation-settings-grid { grid-template-columns: 1fr; } }
+	@media (max-width: 640px) {
+		.settings-feature-root .export-template-head { min-width: 540px; }
+	}

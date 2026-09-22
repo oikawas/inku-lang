@@ -367,7 +367,7 @@
 		color: var(--fg2);
 		font-size: 12px;
 	}
-	.plugin-add { display: flex; gap: 8px; align-items: center; }
+	.plugin-add { display: flex; gap: 8px; align-items: center; max-width: 520px; }
 	.plugin-add input, .login-grid input, .group-edit-input {
 		flex: 1; min-width: 0; padding: 5px 7px;
 		border: 1px solid var(--border2); border-radius: var(--r);
@@ -445,9 +445,8 @@
 		gap: 4px;
 		min-width: 0;
 		color: var(--fg3);
-		font-size: 10px;
-		text-transform: uppercase;
-		letter-spacing: 0.06em;
+		font-size: 12px;
+		font-weight: 500;
 	}
 	.user-form-field select {
 		width: 100%;
@@ -557,5 +556,19 @@
 	}
 	.group-edit-input {
 		flex: 1;
+	}
+	@media (max-width: 820px) {
+		.user-management-layout { grid-template-columns: 1fr; }
+		.user-management-layout .user-editor-panel { grid-column: auto; }
+		.user-list-panel { overflow-x: auto; padding-bottom: 2px; }
+		.user-list-head, .user-row { min-width: 640px; }
+	}
+	@media (max-width: 560px) {
+		.login-grid, .user-form-grid { grid-template-columns: 1fr; }
+		.user-session-row, .user-management-head, .group-row { align-items: flex-start; flex-direction: column; }
+		.user-management-head .ghost-btn, .group-row-actions { width: 100%; }
+		.group-row-actions { justify-content: flex-start; }
+		.plugin-add { align-items: stretch; flex-direction: column; }
+		.plugin-add .ghost-btn { width: 100%; justify-content: center; }
 	}
 </style>

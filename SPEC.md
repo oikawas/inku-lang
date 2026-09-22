@@ -994,6 +994,8 @@ Saved-work export uses a shared menu with a fixed scope. The displayed work or o
 
 The input side identifies the conditions for the next drawing, while the work side identifies the displayed work's conditions. Reading a Library preview alone does not change the next-drawing conditions, and differing values are not an error. Settings are grouped as Display and operation, Making, Export, Connections and administration, and Extensions and details without changing existing permission visibility or persistence. Body text and descriptions use 14px; supporting information and small buttons use 12px. Selection is shown with checks or a displayed label as well as borders. Small actions have keyboard focus, and closing the edited-work, export, or settings modal restores focus to its entry point.
 
+The settings modal is centered, with each tab's heading and explanation outside the scrolling body. Navigation and fields adapt to narrow screens, while wide tables scroll within their own regions. Model administration edits one selected service at a time, showing published models before expandable connection details. Model rows expose names, IDs, publication, and purposes; evaluation fields open explicitly for editing. Search and publication/purpose filters preserve drafts, and bulk selection or clearing affects only models currently visible. Publication counts, unsaved status, and save actions stay outside the scrolling list. List refresh is disabled while edits are unsaved, and failed saves retain inputs and the dialog. Tab cycles within child dialogs; Escape closes only the child dialog and returns focus to its opener.
+
 Major UI areas:
 
 - App rail: compact navigation with an explicit expand/collapse toggle, user

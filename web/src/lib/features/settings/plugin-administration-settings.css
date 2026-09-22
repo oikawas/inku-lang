@@ -105,6 +105,14 @@
 	}
 	.settings-feature-root .user-plugin-btn { padding: 5px 10px; font-size: 12px; }
 	.settings-feature-root .user-plugin-btn.danger { color: var(--danger, #9b3d32); border-color: var(--danger, #9b3d32); }
+	.settings-feature-root .user-plugin-row + .user-plugin-row { margin-top: 2px; }
+	.settings-feature-root .user-plugin-info .system-plugin-desc { overflow-wrap: anywhere; }
+	@media (max-width: 640px) {
+		.settings-feature-root .user-plugin-head { align-items: flex-start; flex-wrap: wrap; }
+		.settings-feature-root .user-plugin-head span { flex-basis: 100%; }
+		.settings-feature-root .user-plugin-row { flex-direction: column; }
+		.settings-feature-root .user-plugin-controls { width: 100%; justify-content: flex-start; }
+	}
 	.settings-feature-root .plugin-editor-dialog {
 		position: fixed;
 		left: 50%;

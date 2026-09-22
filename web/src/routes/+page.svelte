@@ -1832,6 +1832,7 @@ $effect(() => {
 	const navPos       = $derived(historyOffset + historyCursor + 1);
 	// ── Saijiki ─────────────────────────────────────────────
 	function handleKeydown(e: KeyboardEvent) {
+		if (e.key === 'Escape' && ((e.target instanceof Element && e.target.closest('[data-settings-nested-dialog]')) || document.querySelector('[data-settings-nested-dialog]'))) return;
 		if (e.target instanceof Element && e.target.closest('dialog[open], [role="menu"]')) return;
 		if (e.key === 'Escape') {
 			saijikiOpen = false;

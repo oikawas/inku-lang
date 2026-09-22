@@ -159,11 +159,10 @@
 		gap: 5px;
 		margin-top: 10px;
 		color: var(--fg3);
-		font-size: 10px;
-		text-transform: uppercase;
-		letter-spacing: 0.06em;
+		font-size: 12px;
+		font-weight: 500;
 	}
-	.server-path-input-row { display: flex; gap: 8px; }
+	.server-path-input-row { display: flex; gap: 8px; align-items: stretch; }
 	.server-path-input-row input {
 		flex: 1;
 		min-width: 0;
@@ -175,7 +174,7 @@
 		font-size: 12px;
 		font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 	}
-	.server-path-row.compact-control { width: max-content; }
+	.server-path-row.compact-control { width: min(100%, 280px); }
 	.server-path-row select {
 		min-width: 110px;
 		padding: 5px 7px;
@@ -251,5 +250,11 @@
 		border-color: var(--accent);
 		background: var(--accent-light);
 		color: var(--accent);
+	}
+	@media (max-width: 560px) {
+		.server-path-input-row { flex-direction: column; }
+		.server-path-input-row .ghost-btn { width: 100%; justify-content: center; }
+		.settings-readonly-grid { grid-template-columns: 1fr; gap: 3px; }
+		.settings-readonly-grid strong { margin-bottom: 7px; }
 	}
 </style>

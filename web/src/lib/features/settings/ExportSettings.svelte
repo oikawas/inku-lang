@@ -60,37 +60,39 @@
 				{#if exportTemplateStatus}
 					<div class="inline-message">{exportTemplateStatus}</div>
 				{/if}
-				<div class="export-template-head">
-					<span>{t().settingsExportTemplateName}</span>
-					<span>{t().settingsExportTemplateDescription}</span>
-					<span>{t().settingsExportTemplateHeight}</span>
-					<span></span>
-				</div>
-				<div class="export-template-list">
-					{#each exportTemplates as template (template.id)}
-						<div class="export-template-row">
-							<input
-								value={template.name}
-								aria-label={t().settingsExportTemplateName}
-								onchange={(e) => onUpdateExportTemplate(template.id, { name: (e.currentTarget as HTMLInputElement).value })}
-							/>
-							<input
-								value={template.description}
-								aria-label={t().settingsExportTemplateDescription}
-								onchange={(e) => onUpdateExportTemplate(template.id, { description: (e.currentTarget as HTMLInputElement).value })}
-							/>
-							<input
-								value={template.y_px}
-								type="number"
-								min="64"
-								max="12000"
-								step="1"
-								aria-label={t().settingsExportTemplateHeight}
-								onchange={(e) => onUpdateExportTemplate(template.id, { y_px: Number((e.currentTarget as HTMLInputElement).value) })}
-							/>
-							<button class="ghost-btn" onclick={() => onRemoveExportTemplate(template.id)}>{t().settingsExportTemplateDelete}</button>
-						</div>
-					{/each}
+				<div class="export-template-table">
+					<div class="export-template-head">
+						<span>{t().settingsExportTemplateName}</span>
+						<span>{t().settingsExportTemplateDescription}</span>
+						<span>{t().settingsExportTemplateHeight}</span>
+						<span></span>
+					</div>
+					<div class="export-template-list">
+						{#each exportTemplates as template (template.id)}
+							<div class="export-template-row">
+								<input
+									value={template.name}
+									aria-label={t().settingsExportTemplateName}
+									onchange={(e) => onUpdateExportTemplate(template.id, { name: (e.currentTarget as HTMLInputElement).value })}
+								/>
+								<input
+									value={template.description}
+									aria-label={t().settingsExportTemplateDescription}
+									onchange={(e) => onUpdateExportTemplate(template.id, { description: (e.currentTarget as HTMLInputElement).value })}
+								/>
+								<input
+									value={template.y_px}
+									type="number"
+									min="64"
+									max="12000"
+									step="1"
+									aria-label={t().settingsExportTemplateHeight}
+									onchange={(e) => onUpdateExportTemplate(template.id, { y_px: Number((e.currentTarget as HTMLInputElement).value) })}
+								/>
+								<button class="ghost-btn" onclick={() => onRemoveExportTemplate(template.id)}>{t().settingsExportTemplateDelete}</button>
+							</div>
+						{/each}
+					</div>
 				</div>
 				<div class="settings-inline-actions">
 					<button class="ghost-btn primary-inline" onclick={onAddExportTemplate}>{t().settingsExportTemplateAdd}</button>

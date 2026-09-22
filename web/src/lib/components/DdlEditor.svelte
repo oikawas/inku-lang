@@ -46,9 +46,6 @@
 	const wordLang = $derived(resolveInstructionLang(value, isJapanese ? 'ja' : 'en'));
 
 	onMount(() => {
-		// On narrow screens the editor gets the available height first. The writer
-		// can open the independently scrollable vocabulary when it is useful.
-		if (window.innerWidth <= 760) showVocabulary = false;
 		const observer = new ResizeObserver(updateTextMetrics);
 		if (textareaEl) observer.observe(textareaEl);
 		updateTextMetrics();
@@ -153,7 +150,7 @@
 		<div class="ddl-editor-status">{t().ddlEditorStatus(lineNumbers.length, value.length)}</div>
 	</div>
 
-	<div class="ddl-editor-workspace" class:with-vocabulary={showVocabulary}>
+	<div class="ddl-editor-workspace" class:with-vocabulary={showVocabulary} class:with-support={showGuide || unknownNames.length > 0}>
 		<div class="ddl-editor-main">
 			<div class="ddl-editor-frame">
 				<div class="ddl-line-numbers" bind:this={lineNumberEl} aria-hidden="true">
@@ -177,7 +174,7 @@
 						class="ddl-edit-ta"
 						bind:this={textareaEl}
 						bind:value
-						rows="18"
+						rows="5"
 						spellcheck="false"
 						placeholder={t().ddlEditPlaceholder}
 						aria-label={t().ddlEditorInstructions}
@@ -298,8 +295,11 @@
 		min-width: 0;
 	}
 	.ddl-editor-workspace.with-vocabulary {
-		grid-template-columns: minmax(0, 1fr) minmax(280px, 310px);
+		grid-template-rows: minmax(100px, 22%) minmax(0, 1fr);
 		gap: 10px;
+	}
+	.ddl-editor-workspace.with-vocabulary.with-support {
+		grid-template-rows: minmax(160px, 36%) minmax(0, 1fr);
 	}
 	.ddl-editor-main,
 	.ddl-editor-vocabulary {
@@ -456,16 +456,5 @@
 	@media (max-width: 760px) {
 		.ddl-editor-toolbar { flex-wrap: wrap; }
 		.ddl-editor-status { margin-left: 0; }
-		.ddl-editor-workspace.with-vocabulary {
-			display: flex;
-			flex-direction: column;
-			gap: 10px;
-		}
-		.ddl-editor-main { flex: 1; }
-		.ddl-editor-vocabulary {
-			flex: 0 1 240px;
-			min-height: 150px;
-			max-height: 240px;
-		}
 	}
 </style>

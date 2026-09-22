@@ -138,27 +138,29 @@
 		<div class="ddled-body">
 			<DdlEditor bind:this={editor} bind:value {isJapanese} disabled={drawing} {pluginEntries} {previewForWord} {previewForPlugin} />
 		</div>
-		<div class="ddled-conditions">
-			<div class="ddled-model">
-				<ModelCardPicker label={t().ddlDialogDrawingModel} selectedModel={drawingModelId} providerGroups={drawingModelGroups} disabled={drawing} onSelect={onSelectDrawingModel} />
+		<div class="ddled-bottom">
+			<div class="ddled-conditions">
+				<div class="ddled-model">
+					<ModelCardPicker label={t().ddlDialogDrawingModel} selectedModel={drawingModelId} providerGroups={drawingModelGroups} disabled={drawing} onSelect={onSelectDrawingModel} />
+				</div>
+				{#if mode === 'edit' && onSelectWild}
+					<div class="ddled-settings" inert={drawing}>
+						<WildToggle value={wildValue} {isJapanese} inherited={wildInherited} onSelect={onSelectWild} />
+					</div>
+				{/if}
 			</div>
-			{#if mode === 'edit' && onSelectWild}
-				<div class="ddled-settings" inert={drawing}>
-					<WildToggle value={wildValue} {isJapanese} inherited={wildInherited} onSelect={onSelectWild} />
-				</div>
-			{/if}
+			<footer class="ddled-foot">
+				{#if error}<div class="ddled-error" role="alert">{error}</div>{/if}
+				{#if drawing}
+					<RunStatus variant="inline" label={t().stageImageGenerating} stage2Model={stage2ModelLabel} {elapsedMs} tokensIn={runTokensIn} tokensOut={runTokensOut} onStop={stopDraw} />
+				{:else}
+					<div class="ddled-actions">
+						<button type="button" class="ddled-cancel" onclick={requestClose}>{t().pipelineCancel}</button>
+						<button type="button" class="ddled-draw" disabled={!value.trim()} onclick={requestDraw}>{t().submitBtn}</button>
+					</div>
+				{/if}
+			</footer>
 		</div>
-		<footer class="ddled-foot">
-			{#if error}<div class="ddled-error" role="alert">{error}</div>{/if}
-			{#if drawing}
-				<RunStatus variant="inline" label={t().stageImageGenerating} stage2Model={stage2ModelLabel} {elapsedMs} tokensIn={runTokensIn} tokensOut={runTokensOut} onStop={stopDraw} />
-			{:else}
-				<div class="ddled-actions">
-					<button type="button" class="ddled-cancel" onclick={requestClose}>{t().pipelineCancel}</button>
-					<button type="button" class="ddled-draw" disabled={!value.trim()} onclick={requestDraw}>{t().submitBtn}</button>
-				</div>
-			{/if}
-		</footer>
 	</div>
 {/if}
 
@@ -166,7 +168,7 @@
 	.ddled-backdrop { position: fixed; inset: 0; z-index: 1450; background: rgba(0, 0, 0, .28); backdrop-filter: blur(2px); }
 	.ddled-dialog {
 		position: fixed; inset: 0; margin: auto; z-index: 1451;
-		box-sizing: border-box; width: min(1200px, calc(100vw - 40px)); height: min(900px, calc(100dvh - 40px));
+		box-sizing: border-box; width: min(1360px, calc(100vw - 40px)); height: min(940px, calc(100dvh - 40px));
 		display: flex; flex-direction: column; border: 1px solid var(--border2); border-radius: 12px;
 		background: var(--panel2); box-shadow: 0 18px 56px rgba(0, 0, 0, .22); overflow: hidden;
 	}
@@ -176,11 +178,12 @@
 	.ddled-close { flex-shrink: 0; width: 30px; height: 30px; padding: 0; border: 1px solid var(--border2); border-radius: var(--r); background: var(--panel); color: var(--fg2); font-size: 20px; cursor: pointer; }
 	.ddled-close:hover:not(:disabled) { background: var(--bg2); }
 	.ddled-body { display: flex; min-height: 0; flex: 1; padding: 14px 18px; }
-	.ddled-conditions { display: flex; align-items: center; gap: 18px; padding: 10px 18px; border-top: 1px solid var(--border); flex-shrink: 0; }
+	.ddled-bottom { display: flex; align-items: flex-end; gap: 16px; padding: 10px 18px 14px; border-top: 1px solid var(--border); flex-shrink: 0; }
+	.ddled-conditions { display: flex; align-items: center; gap: 18px; min-width: 0; flex: 1; }
 	.ddled-model { flex: 1; min-width: 0; max-width: 520px; }
 	.ddled-settings { min-width: 0; }
 	.ddled-settings[inert] { opacity: .5; }
-	.ddled-foot { display: flex; flex-direction: column; gap: 8px; padding: 10px 18px 14px; flex-shrink: 0; }
+	.ddled-foot { display: flex; flex-direction: column; gap: 8px; min-width: 0; max-width: 44%; }
 	.ddled-error { max-height: 80px; overflow: auto; color: var(--danger); font-size: 12px; overflow-wrap: anywhere; }
 	.ddled-actions { display: flex; justify-content: flex-end; gap: 8px; }
 	.ddled-actions button { border: 1px solid var(--border2); border-radius: var(--btn-sm-radius); padding: 8px 18px; background: var(--panel); color: var(--fg2); font: inherit; font-size: var(--btn-sm-font-size); cursor: pointer; }
@@ -192,8 +195,9 @@
 		.ddled-dialog { width: calc(100vw - 16px); height: calc(100dvh - 16px); }
 		.ddled-head { padding: 12px; gap: 8px; }
 		.ddled-body { padding: 10px 12px; }
-		.ddled-conditions { padding: 8px 12px; gap: 8px; flex-wrap: wrap; max-height: 26dvh; overflow: auto; }
+		.ddled-bottom { flex-direction: column; align-items: stretch; gap: 10px; padding: 8px 12px 12px; }
+		.ddled-conditions { gap: 8px; flex-wrap: wrap; max-height: 26dvh; overflow: auto; }
 		.ddled-model { flex-basis: 100%; max-width: none; }
-		.ddled-foot { padding: 8px 12px 12px; }
+		.ddled-foot { max-width: none; }
 	}
 </style>

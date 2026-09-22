@@ -6,6 +6,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 36 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-22 — Widen the Saijiki overview in the instruction editor
+
+The editor now supports composing short instructions from the Saijiki with a few lines of text above a wide category-based vocabulary list. Examples and explanations occupy a separate region, keeping word buttons stationary as previews change. Vocabulary starts visible on narrow screens too; hiding it expands the text editor. Language-aware words, selection replacement, and drawing paths are retained.
+
 ### 2026-09-22 — Share and refine the instruction editor
 
 Extracted text editing and vocabulary assistance into a shared component for new and edited instructions. The text gets more space, line numbers follow wrapped lines, and vocabulary and the quick guide can be toggled. Narrow screens prioritize editing; conditions and actions stay outside the text area. Model selection contains keyboard focus and closes independently, closing the editor restores focus, and drawing prevents editing. Independent-work and derived-work save paths are unchanged.

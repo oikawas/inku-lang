@@ -1079,7 +1079,7 @@
 	.history-content { min-height: 0; flex: 1; display: grid; grid-template-columns: minmax(0, 1fr); }
 	.history-content.has-preview { grid-template-columns: minmax(0, 1fr) minmax(280px, 360px); }
 	.lineage-history-list, .history-thumb-grid-wrap, .history-table-wrap, .history-load-failure { order: 1; min-width: 0; }
-	.lineage-history-group { border: 1px solid var(--border); border-radius: var(--r-lg); background: var(--panel); overflow: hidden; }
+	.lineage-history-group { flex: 0 0 auto; border: 1px solid var(--border); border-radius: var(--r-lg); background: var(--panel); overflow: hidden; }
 	.lineage-history-group.current-lineage { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-light); }
 	.lineage-group-head { display: flex; align-items: center; gap: 10px; padding: 9px 10px; background: var(--panel); }
 	.lineage-representative { flex: 0 0 56px; width: 56px; height: 56px; padding: 0; border: 0; border-radius: var(--r); overflow: hidden; background: var(--bg); cursor: pointer; }

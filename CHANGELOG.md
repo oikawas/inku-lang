@@ -6,6 +6,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 36 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-22 — Prevent clipping in the Library's grouped thumbnails
+
+In the Library's thumbnails grouped by Lineage, multiple groups could shrink until their thumbnails were hidden. Each group now retains its required height while the list scrolls vertically. Works within a Lineage remain arranged horizontally from the root in generation order, with horizontal scrolling for longer lineages.
+
 ### 2026-09-22 — Refine the canvas work-conditions header
 
 The displayed work's conditions now use compact, aligned labels and values. Subtle separators and clearer text hierarchy distinguish generation, models, color catalog, canvas, capacity, and creation time, with each group kept together for long names and narrow widths. The displayed information, data sources, Canvas and Lineage tabs, and Refine actions are retained.

@@ -965,6 +965,132 @@ fn ground_is_drawable_content_for_both_facade_modes_and_continue_omissions() {
 }
 
 #[test]
+fn background_does_not_admit_an_omitted_macro_without_drawable_residual() {
+    use serde_json::json;
+
+    let definition = definition_from(
+        &json!({
+            "schema": "inku.macro-definition.v1",
+            "namespace": "Guard",
+            "heading": "Grass",
+            "version": "1.0.0",
+            "parameters": {},
+            "components": {},
+            "body": [{
+                "op": "emit",
+                "binding": null,
+                "fields": {
+                    "shape": {"expr": "semantic_ref", "category": "shape", "id": "line"},
+                    "movement": {"expr": "semantic_ref", "category": "movement", "id": "place"},
+                    "place": {"expr": "semantic_ref", "category": "place", "id": "center"},
+                    "color": {"expr": "semantic_ref", "category": "color", "id": "green"}
+                }
+            }]
+        })
+        .to_string(),
+    );
+    let definitions = [definition];
+    let locks = definitions.iter().map(lock_for).collect::<Vec<_>>();
+    let budget = inku_score::ResourceBudget {
+        maximum: inku_score::ResourceDemand {
+            logical_objects: 8,
+            primitive_marks: 8,
+            object_templates: 8,
+            maximum_per_template_primitive_marks: 8,
+            maximum_resolved_count: 8,
+            template_nodes: 8,
+            anchor_instances: 8,
+            transform_instances: 8,
+            placement_instances: 8,
+            fill_instances: 8,
+        },
+    };
+    let resource = |source: &str| {
+        inku_ddl::compile_ddl_to_score_with_resources(
+            document(source, &locks),
+            &definitions,
+            Some(23),
+            LIMITS,
+            ScoreLoweringContext::resolve("square", Color::White).unwrap(),
+            None,
+            ScoreErrorPolicy::OmitAndContinue,
+            inku_score::HardResourcePolicy {
+                identity: "empty-residual-test.v1".to_owned(),
+                budget: budget.clone(),
+            },
+            inku_score::OperationalResourceBudget(budget.clone()),
+        )
+    };
+
+    let omitted = "place Guard.Grass at bottom. fill background with white.";
+    let ordinary = execute_locked(
+        omitted,
+        &definitions,
+        LIMITS,
+        ScoreErrorPolicy::OmitAndContinue,
+    );
+    let compact = resource(omitted);
+    for (outcome, score, diagnostics) in [
+        (
+            ordinary.outcome(),
+            ordinary.score(),
+            ordinary.downstream_diagnostics(),
+        ),
+        (
+            compact.outcome(),
+            compact.score(),
+            compact.downstream_diagnostics(),
+        ),
+    ] {
+        assert!(
+            diagnostics
+                .iter()
+                .any(|diagnostic| diagnostic.reason == ScoreFieldGap::UnboundMacroCallerMeaning),
+            "{diagnostics:?}"
+        );
+        assert!(
+            score.is_none_or(|score| score.instructions.is_empty()),
+            "{score:?}"
+        );
+        assert_eq!(outcome, ScoreLoweringOutcome::Stopped);
+        assert!(score.is_none());
+    }
+
+    let with_ground = "paper. place Guard.Grass at bottom. fill background with white.";
+    let ordinary = execute_locked(
+        with_ground,
+        &definitions,
+        LIMITS,
+        ScoreErrorPolicy::OmitAndContinue,
+    );
+    let compact = resource(with_ground);
+    for (outcome, score) in [
+        (ordinary.outcome(), ordinary.score()),
+        (compact.outcome(), compact.score()),
+    ] {
+        assert_eq!(outcome, ScoreLoweringOutcome::CompleteWithOmissions);
+        assert!(matches!(&score.unwrap().canvas, Canvas::Spec(spec) if spec.ground.is_some()));
+    }
+
+    let with_instruction =
+        "place one red circle at center. place Guard.Grass at bottom. fill background with white.";
+    let ordinary = execute_locked(
+        with_instruction,
+        &definitions,
+        LIMITS,
+        ScoreErrorPolicy::OmitAndContinue,
+    );
+    let compact = resource(with_instruction);
+    for (outcome, score) in [
+        (ordinary.outcome(), ordinary.score()),
+        (compact.outcome(), compact.score()),
+    ] {
+        assert_eq!(outcome, ScoreLoweringOutcome::CompleteWithOmissions);
+        assert_eq!(score.unwrap().instructions.len(), 1);
+    }
+}
+
+#[test]
 fn all_omitted_stops_under_legacy_stop() {
     let result = execute(
         "place many red circle at horizontal 0.5, vertical 0.5.",

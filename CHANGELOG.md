@@ -6,6 +6,20 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 36 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-22 — Do not admit omitted execution with only a background
+
+Both the resource-aware and non-resource entries of the shared compiler now
+stop when local recovery, plan, resource, or relation omissions leave neither
+an instruction nor valid ground. A background remains document and Score
+context, but is not drawable residual content on its own. An input whose only
+drawing unit, such as a Macro, is omitted therefore is not ordinarily saved or
+delivered as an empty Score with `complete_with_omissions`.
+
+A work with valid ground alone, and local recovery that retains valid ground or
+an independent instruction, remain drawable content. Diagnostics, ownership,
+CAS, the Score format, engine versions, renderer, prompt, and host settings are
+unchanged.
+
 ### 2026-09-22 — Preserve local diagnostics for invalid background clauses in execution projection
 
 When a clause has a background marker but its color head or background action

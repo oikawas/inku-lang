@@ -302,18 +302,15 @@ fn execute_compilation(
     let upstream_omitted = !prepared.upstream_diagnostics.is_empty();
     let score_has_drawable_content = lowered.score().is_some_and(|score| {
         !score.instructions.is_empty()
-            || transformed
-                .verified_effective_view()
-                .original_semantic_document()
-                .background
-                .is_some()
             || matches!(&score.canvas, Canvas::Spec(spec) if spec.ground.is_some())
     });
+    let has_omissions =
+        upstream_omitted || lowered.outcome() == ScoreLoweringOutcome::CompleteWithOmissions;
     let outcome = if lowered.outcome() == ScoreLoweringOutcome::Stopped
-        || (upstream_omitted && !score_has_drawable_content)
+        || (has_omissions && !score_has_drawable_content)
     {
         ScoreLoweringOutcome::Stopped
-    } else if upstream_omitted || lowered.outcome() == ScoreLoweringOutcome::CompleteWithOmissions {
+    } else if has_omissions {
         ScoreLoweringOutcome::CompleteWithOmissions
     } else {
         ScoreLoweringOutcome::Complete
@@ -445,11 +442,6 @@ fn execute_compilation_with_resources(
     };
     let upstream_omitted = !prepared.upstream_diagnostics.is_empty();
     let score_has_drawable_content = !materialized.score.instructions.is_empty()
-        || transformed
-            .verified_effective_view()
-            .original_semantic_document()
-            .background
-            .is_some()
         || matches!(&materialized.score.canvas, Canvas::Spec(spec) if spec.ground.is_some());
     let has_omissions = upstream_omitted
         || plan.outcome() == CompositionPlanOutcome::ReadyWithOmissions

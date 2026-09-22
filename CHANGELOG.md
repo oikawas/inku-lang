@@ -6,6 +6,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 36 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-22 — Refine the canvas work-conditions header
+
+The displayed work's conditions now use compact, aligned labels and values. Subtle separators and clearer text hierarchy distinguish generation, models, color catalog, canvas, capacity, and creation time, with each group kept together for long names and narrow widths. The displayed information, data sources, Canvas and Lineage tabs, and Refine actions are retained.
+
 ### 2026-09-22 — Move Demo to settings and retain batch-run conditions
 
 The input tabs are now Description and Batch. Demo moved to the settings modal's `Making` category, available to regular users in Standard mode. Its running state and Stop action remain outside settings, which can be reopened, and starting Demo does not replace Description or Batch text.

@@ -619,7 +619,7 @@
 />
 
 <div class="right-panel">
-	<div class="right-tabs">
+	<div class="right-tabs" class:english-meta={!isJapanese}>
 		<Tooltip placement="bottom-right" text={t().tooltipCanvasTabCanvas}>
 			<button class="rtab" class:active={outputTab === 'canvas'} onclick={() => (outputTab = 'canvas')}>{t().tabCanvas}</button>
 		</Tooltip>
@@ -628,40 +628,53 @@
 		</Tooltip>
 		<div class="rtab-spacer"></div>
 		{#if result}
-			<div class="render-meta-strip" aria-label={t().displayedWorkConditions}>
-				<span class="render-meta-heading">{t().displayedWorkConditions}</span>
-				<span class="render-meta-item render-meta-generation">
-					{#if statusGeneration}<span class="render-meta-label">{isJapanese ? '系譜' : 'Lineage'}</span>{/if}
-					<strong>{statusGenerationValue}</strong>
-				</span>
-				<span class="render-meta-item render-meta-model">
-					<span class="render-meta-label">{isJapanese ? '\u30e2\u30c7\u30eb' : 'Models'}</span>
-					<strong title={statusStage1Model + ' / ' + statusStage2Model}>
-						{#if statusStage1Model === statusStage2Model}
-							{isJapanese ? '\u89e3\u91c8\uff0f\u63cf\u753b' : 'Interpretation / performance'} {statusStage1ModelOnly}
-						{:else}
-							{isJapanese ? '\u89e3\u91c8' : 'Interpretation'} {statusStage1ModelOnly} / {isJapanese ? '\u63cf\u753b' : 'Performance'} {statusStage2ModelOnly}
-						{/if}
-					</strong>
-				</span>
-				<span class="render-meta-item render-meta-catalog">
-					<span class="render-meta-label">{isJapanese ? '\u8272\u30ab\u30bf\u30ed\u30b0' : 'Color catalog'}</span>
-					<strong title={statusCatalogName}>{statusCatalogName}</strong>
-				</span>
-				<span class="render-meta-item render-meta-canvas">
-					<span class="render-meta-label">{isJapanese ? '\u30ad\u30e3\u30f3\u30d0\u30b9' : 'Canvas'}</span>
-					<strong title={statusCanvasName}>{statusCanvasName}</strong>
-				</span>
-				<!-- The same byte measurement the drawer shows, rounded to a compact
-				     whole-kilobyte capacity in this narrow strip. -->
-				<span class="render-meta-item render-meta-svg-size">
-					<span class="render-meta-label">{isJapanese ? '\u30b5\u30a4\u30ba' : 'Size'}</span>
-					<strong>{formatCanvasCapacity(detailSvgBytes)}</strong>
-				</span>
-				<span class="render-meta-item render-meta-created">
-					<span class="render-meta-label">{isJapanese ? '\u4f5c\u6210' : 'Created'}</span>
-					<strong>{currentRenderedAt ?? '-'}</strong>
-				</span>
+			<div class="render-meta-strip" class:english={!isJapanese} aria-label={t().displayedWorkConditions}>
+				<div class="render-meta-context">
+					<span class="render-meta-heading">{t().displayedWorkConditions}</span>
+					<span class="render-meta-generation">
+						{#if statusGeneration}<span class="render-meta-label">{isJapanese ? '系譜' : 'Lineage'}</span>{/if}
+						<strong>{statusGenerationValue}</strong>
+					</span>
+				</div>
+				<div class="render-meta-fields">
+					<span class="render-meta-item render-meta-model">
+						<span class="render-meta-label">{isJapanese ? '\u30e2\u30c7\u30eb' : 'Models'}</span>
+						<strong title={statusStage1Model + ' / ' + statusStage2Model}>
+							{#if statusStage1Model === statusStage2Model}
+								<span class="render-meta-model-line">
+									<span class="render-meta-model-name">{statusStage1ModelOnly}</span>
+								</span>
+							{:else}
+								<span class="render-meta-model-line">
+									<span class="render-meta-model-stage">{isJapanese ? '\u89e3\u91c8' : 'Interpretation'}</span>
+									<span class="render-meta-model-name">{statusStage1ModelOnly}</span>
+								</span>
+								<span class="render-meta-model-line">
+									<span class="render-meta-model-stage">{isJapanese ? '\u63cf\u753b' : 'Performance'}</span>
+									<span class="render-meta-model-name">{statusStage2ModelOnly}</span>
+								</span>
+							{/if}
+						</strong>
+					</span>
+					<span class="render-meta-item render-meta-catalog">
+						<span class="render-meta-label">{isJapanese ? '\u8272\u30ab\u30bf\u30ed\u30b0' : 'Color catalog'}</span>
+						<strong title={statusCatalogName}>{statusCatalogName}</strong>
+					</span>
+					<span class="render-meta-item render-meta-canvas">
+						<span class="render-meta-label">{isJapanese ? '\u30ad\u30e3\u30f3\u30d0\u30b9' : 'Canvas'}</span>
+						<strong title={statusCanvasName}>{statusCanvasName}</strong>
+					</span>
+					<!-- The same byte measurement the drawer shows, rounded to a compact
+					     whole-kilobyte capacity in this narrow strip. -->
+					<span class="render-meta-item render-meta-svg-size">
+						<span class="render-meta-label">{isJapanese ? '\u30b5\u30a4\u30ba' : 'Size'}</span>
+						<strong>{formatCanvasCapacity(detailSvgBytes)}</strong>
+					</span>
+					<span class="render-meta-item render-meta-created">
+						<span class="render-meta-label">{isJapanese ? '\u4f5c\u6210' : 'Created'}</span>
+						<strong>{currentRenderedAt ?? '-'}</strong>
+					</span>
+				</div>
 			</div>
 		{/if}
 		{#if currentHistoryId}
@@ -936,6 +949,7 @@
 		min-width: 0;
 		display: flex;
 		flex-direction: column;
+		container: canvas-panel / inline-size;
 		overflow: hidden;
 	}
 	.right-tabs {
@@ -962,38 +976,93 @@
 	.rtab:disabled { opacity: 0.35; cursor: not-allowed; }
 	.rtab-spacer { flex: 0 0 12px; }
 	.render-meta-strip {
-		display: flex;
-		flex-wrap: wrap;
-		align-items: center;
-		justify-content: flex-end;
-		gap: 10px;
+		display: grid;
+		grid-template-columns: max-content minmax(0, 1fr);
+		align-items: stretch;
 		min-width: 0;
+		min-height: 52px;
 		flex: 1 1 auto;
-		max-width: none;
 		overflow: hidden;
-		font-size: 11px;
 		color: var(--fg3);
 	}
-	.render-meta-generation { flex: 0 0 auto; }
-	.render-meta-heading { flex: 1 0 100%; color: var(--fg2); font-weight: 500; font-size: 12px; }
-	.render-meta-generation strong { max-width: none; }
-	.render-meta-item {
-		display: inline-flex;
-		align-items: baseline;
-		gap: 4px;
-		min-width: 0;
+	.render-meta-context {
+		display: grid;
+		grid-template-rows: auto auto;
+		align-content: center;
+		gap: 3px;
+		padding: 7px 12px 7px 0;
+	}
+	.render-meta-heading {
+		color: var(--fg2);
+		font-size: 12px;
+		font-weight: 500;
 		white-space: nowrap;
 	}
-	.render-meta-label { color: var(--fg3); }
+	.render-meta-generation {
+		display: flex;
+		align-items: baseline;
+		gap: 4px;
+		white-space: nowrap;
+	}
+	.render-meta-generation strong { color: var(--fg2); font-size: 13px; font-weight: 450; line-height: 1.2; }
+	.render-meta-fields {
+		display: grid;
+		grid-template-columns: minmax(0, 1.8fr) minmax(84px, 1fr) minmax(84px, 0.8fr) max-content max-content;
+		min-width: 0;
+		padding-block: 7px;
+	}
+	.render-meta-item {
+		display: grid;
+		grid-template-rows: auto auto;
+		align-content: center;
+		gap: 2px;
+		min-width: 0;
+		padding: 0 12px;
+		position: relative;
+	}
+	.render-meta-item::before {
+		position: absolute;
+		top: 8px;
+		bottom: 8px;
+		left: 0;
+		width: 1px;
+		background: var(--border);
+		content: '';
+	}
+	.render-meta-label {
+		color: var(--fg3);
+		font-size: 12px;
+		line-height: 1.1;
+		white-space: nowrap;
+	}
 	.render-meta-item strong {
 		min-width: 0;
 		max-width: 160px;
 		overflow: hidden;
 		text-overflow: ellipsis;
 		color: var(--fg2);
-		font-weight: 400;
+		font-size: 13px;
+		font-weight: 450;
+		line-height: 1.2;
+		white-space: nowrap;
 	}
-	.render-meta-model strong { max-width: 280px; white-space: normal; overflow-wrap: anywhere; }
+	.render-meta-model strong {
+		display: grid;
+		gap: 1px;
+		max-width: 280px;
+	}
+	.render-meta-model-line {
+		display: flex;
+		gap: 4px;
+		min-width: 0;
+		white-space: nowrap;
+	}
+	.render-meta-model-stage { flex: 0 0 auto; color: var(--fg3); }
+	.render-meta-model-name {
+		min-width: 0;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
 	.render-meta-catalog strong { max-width: 130px; }
 	.render-meta-canvas strong { max-width: 100px; }
 	/* The two numeric items: never ellipsised, and set on the digit grid so a
@@ -1004,21 +1073,62 @@
 		font-variant-numeric: tabular-nums;
 	}
 	.work-action-save-first { color: var(--fg3); font-size: 0.78rem; }
-	@media (max-width: 1180px) {
+	@container canvas-panel (max-width: 880px) {
 		.right-tabs { flex-wrap: wrap; padding-inline: 10px; }
 		.rtab { padding-inline: 12px; }
 		.rtab-spacer { display: none; }
 		.render-meta-strip {
 			order: 2;
 			flex: 1 0 100%;
-			justify-content: flex-start;
-			gap: 12px;
-			padding: 4px 0 6px;
-			flex-wrap: wrap;
+			min-height: 44px;
+			padding: 0;
 			overflow: visible;
 		}
-		.render-meta-item { flex: 0 1 auto; }
-		.render-meta-item strong { max-width: 180px; }
+		.render-meta-context { padding-right: 10px; }
+		.render-meta-fields { grid-template-columns: minmax(0, 1.8fr) minmax(84px, 1fr) minmax(84px, 0.8fr) max-content max-content; }
+		.render-meta-item { padding: 0 10px; }
+		.render-meta-strip.english { grid-template-columns: 1fr; }
+		.render-meta-strip.english .render-meta-context {
+			display: flex;
+			align-items: baseline;
+			gap: 8px;
+			padding: 7px 0;
+			flex-wrap: wrap;
+		}
+	}
+	@container canvas-panel (max-width: 1040px) {
+		.right-tabs.english-meta { flex-wrap: wrap; padding-inline: 10px; }
+		.right-tabs.english-meta .rtab { padding-inline: 12px; }
+		.right-tabs.english-meta .rtab-spacer { display: none; }
+		.render-meta-strip.english {
+			order: 2;
+			flex: 1 0 100%;
+			min-height: 44px;
+			overflow: visible;
+		}
+		.render-meta-strip.english .render-meta-fields {
+			grid-template-columns: minmax(150px, 1.8fr) minmax(112px, 1fr) minmax(92px, 0.8fr) max-content max-content;
+		}
+	}
+	@container canvas-panel (max-width: 650px) {
+		.render-meta-strip { grid-template-columns: max-content minmax(0, 1fr); }
+		.render-meta-fields,
+		.render-meta-strip.english .render-meta-fields { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+		.render-meta-item { padding: 4px 8px; }
+		.render-meta-created { grid-column: span 2; }
+	}
+	@container canvas-panel (max-width: 460px) {
+		.render-meta-strip { grid-template-columns: 1fr; }
+		.render-meta-context {
+			display: flex;
+			align-items: baseline;
+			gap: 8px;
+			padding: 7px 0;
+			flex-wrap: wrap;
+		}
+		.render-meta-fields,
+		.render-meta-strip.english .render-meta-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+		.render-meta-strip.english .render-meta-model { grid-column: span 2; }
 	}
 	.canvas-area {
 		flex: 1;

@@ -93,7 +93,6 @@ test('T-259: one current-work run owns the paint request and preserves caller ov
 			setStage1UserPrompt: () => undefined,
 			setStageLabel: (label) => labels.push(label),
 			setActiveRunTokens: () => undefined,
-			loadNearbyHistory: async () => undefined,
 			attachSavedLineage: () => { attachments += 1; },
 			updateGenerationCount: () => undefined
 		}
@@ -142,7 +141,6 @@ test('T-259: one current-work run owns the paint request and preserves caller ov
 test('T-260/T-261: stream progress and saved-work effects cross named capabilities', async () => {
 	const labels: string[] = [];
 	const tokenPairs: Array<[number | null, number | null]> = [];
-	const nearby: Array<string | null | undefined> = [];
 	const prompts: string[] = [];
 	const stage1Events: unknown[] = [];
 	let attached = 0;
@@ -183,7 +181,6 @@ test('T-260/T-261: stream progress and saved-work effects cross named capabiliti
 			setStage1UserPrompt: (prompt) => prompts.push(prompt),
 			setStageLabel: (label) => labels.push(label),
 			setActiveRunTokens: (tokensIn, tokensOut) => tokenPairs.push([tokensIn, tokensOut]),
-			loadNearbyHistory: async (historyId) => { nearby.push(historyId); },
 			attachSavedLineage: () => { attached += 1; },
 			updateGenerationCount: (count) => { generationCount = count; }
 		}
@@ -193,7 +190,6 @@ test('T-260/T-261: stream progress and saved-work effects cross named capabiliti
 	assert.deepEqual(labels, ['sketching', 'structuring', 'performing']);
 	assert.deepEqual(tokenPairs, [[null, null], [7, 8], [null, null]]);
 	assert.equal(stage1Events.length, 1);
-	assert.deepEqual(nearby, ['history-1']);
 	assert.equal(attached, 1);
 	assert.equal(generationCount, 31);
 });
@@ -221,7 +217,6 @@ test('T-260: an HTTP failure uses the page-provided error wording', async () => 
 				setStage1UserPrompt: () => undefined,
 				setStageLabel: () => undefined,
 				setActiveRunTokens: () => undefined,
-				loadNearbyHistory: async () => undefined,
 				attachSavedLineage: () => undefined,
 				updateGenerationCount: () => undefined
 			}
@@ -242,7 +237,6 @@ test('T-263/T-264: the operation stays stateless and Work keeps outer-run owners
 	assert.match(work, /return runCurrentWork\(/);
 	assert.match(owner, /type CurrentWorkCapabilities = \{/);
 	assert.match(owner, /setActiveRunTokens:/);
-	assert.match(owner, /loadNearbyHistory:/);
 	assert.match(owner, /attachSavedLineage:/);
 	assert.match(owner, /updateGenerationCount:/);
 });

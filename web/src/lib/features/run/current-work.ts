@@ -141,7 +141,6 @@ export type CurrentWorkCapabilities = {
 	setStage1UserPrompt: (prompt: string) => void;
 	setStageLabel: (label: string) => void;
 	setActiveRunTokens: (tokensIn: number | null, tokensOut: number | null) => void;
-	loadNearbyHistory: (historyId: string | null | undefined) => Promise<void>;
 	attachSavedLineage: () => void;
 	updateGenerationCount: (count: number) => void;
 	adoptPipelineView?: (view: PipelineView) => void;
@@ -232,7 +231,6 @@ export async function runCurrentWork(
 	});
 
 	capabilities.setActiveRunTokens(null, null);
-	await capabilities.loadNearbyHistory(result.history_id);
 
 	const unreadWords = interpretationFeedback(text, result.ddl)
 		.filter((part) => part.tone === 'weak')

@@ -108,7 +108,7 @@ flowchart TB
 | route-instance Batch owner | prompt履歴、resume/retry plan、line進行、停止、failure、latest-result follow | routeごとに1個の`BatchState`。private run identityがlate resultを遮断し、Workから1作品Paintとfocused history callbackだけを借りる |
 | route-instance Demo owner | demo設定、prompt生成、反復、timeout/stop、token/elapsed、current result保存 | routeごとに1個の`DemoState`。private run identityが停止済みrunの遅延結果を遮断し、Workから1作品Paintとfocused projectionだけを借りる |
 | stateless run feature | 1回のPaint request、stream進行、保存直後projection | `runCurrentWork`はWorkから解決済みdefaultと名前付きcapabilityを受ける。route/component stateと外側run ownershipはoperationへ入らない |
-| route-instance lineage query owner | lineage graph/loading/error、stale-response identity、branch/overview merge、nearby作品 | routeごとに1個の`LineageQueryState`。query stateをhistory action moduleやpageへ複製しない |
+| route-instance lineage query owner | lineage graph/loading/error、stale-response identity、branch/overview merge | routeごとに1個の`LineageQueryState`。query stateをhistory action moduleやpageへ複製しない |
 | route-instance history browsing owner | stripのitems/count/offset/選択、filter、paging/resize、stale-response identity、trash summary、external refresh、mark projection、manager連携 | routeごとに1個の`HistoryBrowsingState`が既存`HistoryManagerState`を必ず1個だけ生成する。managerのrequest/cache/page-size意味論は複製しない |
 | route-instance history mutation coordinator | star/revision/shareのoptimistic mutation、trash/restore/permanent-deleteのbulk coordination | routeごとに1個の`HistoryMutations`。stateを複製せず、browsing/lineage ownerとcurrent-work capabilityへ名前付きprojectionだけを渡す |
 | stateless history work operations | 保存用history payload、saved-work replay、history→current-work projection、saved-child/promote/note調停 | `save.ts`、`replay.ts`、`current-work.ts`、`lineage-actions.ts`がtyped inputと名前付きcapabilityだけを受ける。route UIと該当するWorkまたはRefinement ownerがstateと適用判断を保持する |
@@ -135,6 +135,8 @@ flowchart TB
 以下のStage 5〜7の段落は、各cut直後の境界を記録した履歴である。現在の収束後の境界は、上の責務表とStage 10の段落を正とする。
 
 Stage 5Aではlineageとnearby作品のquery stateをroute-instanceの`LineageQueryState`へ置く。request identity、loading/error、graph置換、branch/overview merge、reset invalidation、同一historyのneighbor deduplicationをここが所有する。`runCurrentWork`には`loadNearby` methodを直接渡す。
+
+2026-09-22にWebの「近い作品」を廃止し、nearby state、`loadNearby`、作品切替・生成完了時の呼び出し、専用neighbors APIと候補readerを削除した。現在の`LineageQueryState`は系譜だけを所有し、Workと`runCurrentWork`はnearby取得のcapabilityを受け取らない。上記Stage 5Aのnearby部分は当時の記録である。
 
 Stage 5Bではhistory browsingをroute-instanceの`HistoryBrowsingState`へ置く。strip/trash query、paging、選択同期、filter、resize時のoffset整列、stale-response identity、外部保存refresh、保存・run後の一覧refresh、mark projectionをここが所有する。既存`HistoryManagerState`を必ず1個だけ生成し、そのrequest suppression・cache・実測page-size規則を複製せずにseed/refreshする。pageはcurrent workとbrowser lifecycleのcapabilityを渡す。
 

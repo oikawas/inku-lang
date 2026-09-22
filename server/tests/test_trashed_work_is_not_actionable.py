@@ -75,7 +75,6 @@ def test_a_trashed_work_is_not_served_or_rebuilt(auth_context):  # noqa: F811
         assert trashed.json()["count"] == 1
 
         assert client.get(f"/api/history/{item_id}/svg", headers=headers).status_code == 404
-        assert client.get(f"/api/history/{item_id}/neighbors", headers=headers).status_code == 404
         assert client.get(f"/api/history/{item_id}/lineage", headers=headers).status_code == 404
 
         rebuilt = client.post("/api/history/rebuild-output-files", json={"ids": [item_id]}, headers=headers)

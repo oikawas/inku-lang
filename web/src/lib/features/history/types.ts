@@ -28,6 +28,3 @@ export type LineageGraph = {
 	nodes: LineageNode[];
 	edges: LineageEdge[];
 };
-
-/** A complete history work the Server found close to the work on screen. */
-export type NearbyWork = HistoryItem;

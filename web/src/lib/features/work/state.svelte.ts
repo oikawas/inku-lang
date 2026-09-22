@@ -22,7 +22,6 @@ import { BatchState } from '$lib/features/batch/state.svelte';
 import { DemoState } from '$lib/features/demo/state.svelte';
 import { RefinementSessionState } from '$lib/features/canvas/refinement-session.svelte';
 import { HistoryBrowsingState } from '$lib/features/history/browsing-state.svelte';
-import { LineageQueryState } from '$lib/features/history/lineage-state.svelte';
 import { CanvasViewportState } from '$lib/features/canvas/viewport-state.svelte';
 import type { SaveHistoryOptions } from '$lib/features/history/save';
 import { PipelineApi, PipelineApiError, pipelineDiagnostics, pipelinePatch, pipelineViewFromErrorDetail, type PipelineOptions, type PipelineView } from '$lib/features/pipeline/api';
@@ -39,7 +38,6 @@ export type WorkStateDeps = {
 	demo: DemoState<BatchPaintResult>;
 	refinementSession: RefinementSessionState;
 	history: () => HistoryBrowsingState;
-	lineageState: LineageQueryState;
 	canvasViewport: CanvasViewportState;
 	models: {
 		stage1Provider: () => Provider;
@@ -59,7 +57,7 @@ export type WorkStateDeps = {
 };
 
 export function createWorkState(deps: WorkStateDeps) {
-	const { apiFetch, batch, demo, refinementSession, lineageState, canvasViewport } = deps;
+	const { apiFetch, batch, demo, refinementSession, canvasViewport } = deps;
 	const { describeApiError, session } = deps;
 	const effectiveCanvasAspectId = deps.canvasAspectId;
 	const resetTargetScopedState = deps.resetTargetScopedState;
@@ -294,7 +292,6 @@ export function createWorkState(deps: WorkStateDeps) {
 			if (view.result?.history_id) {
 				await deps.history().fetchOffset(0, { anchorId: view.result.history_id });
 				displayedHistoryItem = deps.history().items.find((item) => item.id === view.result?.history_id) ?? null;
-				await lineageState.loadNearby(view.result.history_id);
 			}
 			return view;
 		} catch (cause) {
@@ -476,7 +473,6 @@ export function createWorkState(deps: WorkStateDeps) {
 					activeRunTokensIn = tokensIn;
 					activeRunTokensOut = tokensOut;
 				},
-				loadNearbyHistory: lineageState.loadNearby,
 				attachSavedLineage: () => { lineageDetached = false; },
 				updateGenerationCount: (count) => session.updateGenerationCount(count),
 				adoptPipelineView: (view) => pipelineController.adopt(view)

@@ -11,12 +11,11 @@
 	import { modelDisplayName, modelShortName, qualifiedModelId, type Provider, type ProviderGroup } from '$lib/models';
 	import ModelCardPicker from './ModelCardPicker.svelte';
 	import type { AnimationExportSettings } from '$lib/animationExport';
-	import { svgImage } from '$lib/svgImage';
 	import type { ExportTemplate } from '$lib/exportTemplates';
 	import type { SheetVariant } from '$lib/contactSheet';
 	import type { SvgProfile } from '$lib/features/export/download';
 	import type { SavedWorkExportScope, SavedWorkExportSnapshot } from '$lib/features/export/saved-work';
-	import type { LineageGraph, LineageNode, NearbyWork } from '$lib/features/history/types';
+	import type { LineageGraph, LineageNode } from '$lib/features/history/types';
 	import type { LineageBrowsingState, LineageOrientation } from '$lib/features/history/lineage-state.svelte';
 	import WorkActionMenu, { type WorkAction } from './WorkActionMenu.svelte';
 	export type OkugakiItem = { id?: string; target_node_id: string; branch_snapshot: string[]; model: string; at: number; language: 'ja' | 'en'; body: string; warnings: string[] };
@@ -26,13 +25,6 @@
 		loading: boolean;
 		error: string | null;
 		isJapanese: boolean;
-		/**
-		 * Works near the one on screen. They used to float over the canvas,
-		 * where they covered the drawing they were offered beside; this panel is
-		 * where a reader already goes to ask how one work relates to another.
-		 */
-		nearbyHistory?: NearbyWork[];
-		onOpenNearbyHistory?: (id: string) => void;
 		onOpenNode: (node: LineageNode) => void | Promise<void>;
 		onOpenNodeInCanvas: (node: LineageNode) => void | Promise<void>;
 		onToggleStar: (node: LineageNode, event?: Event) => void | Promise<void>;
@@ -82,7 +74,7 @@
 	}
 
 	type ArrowPath = { id: string; path: string; tombstone: boolean };
-	let { graph, loading, error, isJapanese, nearbyHistory = [], onOpenNearbyHistory, onOpenNode, onOpenNodeInCanvas, onToggleStar, onToggleForRevision, onOpenRefinement, onDrawDescription, onOpenDdlEditor, onDrawSketchGrain, stageLabel, stage1ModelLabel, stage2ModelLabel, runTokensIn, runTokensOut, onSaveOkugakiModel, onPromoteNode, onSaveNote, onAskTrash, onDetach, onLoadOverview, onLoadBranch, onPaintOne, onVisionAdvice, onSaveVisionModel, visionModel, okugakiModel, visionProviderGroups, animationExportSettings, pngTemplates = [], onDownloadSavedWorkSVG, onDownloadSavedWorkPNG, onDownloadSavedWorkCard, onDownloadSavedWorkAnimation, onDownloadSavedWorkContactSheet, onValidateSavedWorkExport, browsingState }: Props = $props();
+	let { graph, loading, error, isJapanese, onOpenNode, onOpenNodeInCanvas, onToggleStar, onToggleForRevision, onOpenRefinement, onDrawDescription, onOpenDdlEditor, onDrawSketchGrain, stageLabel, stage1ModelLabel, stage2ModelLabel, runTokensIn, runTokensOut, onSaveOkugakiModel, onPromoteNode, onSaveNote, onAskTrash, onDetach, onLoadOverview, onLoadBranch, onPaintOne, onVisionAdvice, onSaveVisionModel, visionModel, okugakiModel, visionProviderGroups, animationExportSettings, pngTemplates = [], onDownloadSavedWorkSVG, onDownloadSavedWorkPNG, onDownloadSavedWorkCard, onDownloadSavedWorkAnimation, onDownloadSavedWorkContactSheet, onValidateSavedWorkExport, browsingState }: Props = $props();
 
 	let lineageColumnsEl = $state<HTMLDivElement | null>(null);
 	let lineageScrollEl = $state<HTMLDivElement | null>(null);
@@ -713,21 +705,6 @@ $effect(() => {
 			</div>
 		</div>
 	</header>
-	{#if nearbyHistory.length > 0 && onOpenNearbyHistory}
-		<div class="nearby-mirror">
-			<span>{isJapanese ? '近い作品' : 'Nearby works'}</span>
-			{#each nearbyHistory as item (item.id)}
-				<button
-					type="button"
-					class="nearby-thumb"
-					title={item.input}
-					aria-label={`${isJapanese ? '近い作品を開く' : 'Open nearby work'}: ${item.input}`}
-					disabled={!item.id}
-					onclick={() => { if (item.id) onOpenNearbyHistory?.(item.id); }}
-				><img use:svgImage={item.svg} alt="" /></button>
-			{/each}
-		</div>
-	{/if}
 	{#if loading || overviewLoading}
 		<div class="lineage-message">{isJapanese ? '系譜を読み込み中…' : 'Loading lineage…'}</div>
 	{:else if error}
@@ -937,14 +914,6 @@ $effect(() => {
 {/if}
 
 <style>
-	/* Moved from the canvas, where it floated over the drawing. Here it is a
-	   row in the flow, so it needs no absolute placement. */
-	.nearby-mirror { display: flex; align-items: center; gap: 5px; margin: 0 0 8px; padding: 4px 6px; border-radius: 7px; background: color-mix(in srgb, var(--bg) 88%, transparent); color: var(--fg2); font-size: 12px; }
-	.nearby-thumb { width: 32px; height: 32px; padding: 0; overflow: hidden; background: var(--canvas-paper); border: 1px solid var(--border); cursor: pointer; }
-	.nearby-thumb:hover:not(:disabled), .nearby-thumb:focus-visible { border-color: var(--fg2); transform: translateY(-1px); }
-	.nearby-thumb:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-	.nearby-thumb:disabled { cursor: default; opacity: 0.65; }
-	.nearby-thumb img { display: block; width: 100%; height: 100%; object-fit: contain; }
 	.lineage-panel { box-sizing: border-box; width: 100%; height: 100%; min-width: 0; padding: 22px; overflow: hidden; display: flex; flex-direction: column; color: var(--fg); background: var(--bg); }
 	.lineage-panel.overview { position: fixed; inset: 14px; z-index: 1300; width: auto; height: auto; border: 1px solid var(--border2); border-radius: 12px; box-shadow: 0 18px 70px #000a; }
 	header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 16px; }

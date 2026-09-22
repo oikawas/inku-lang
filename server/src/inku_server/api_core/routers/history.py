@@ -8,7 +8,6 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, R
 from pydantic import BaseModel, Field
 from ...animation_export import build_animation, build_layer_animation
 from ...card_export import build_card
-from ...feature_analysis import composition_distance
 from ...limits import limits_as_dict
 from ...saved_score_compat import SAVED_FOCUS_IDS, coerce_saved_score
 from ...schema import Score
@@ -259,19 +258,6 @@ def api_history_export_card(
             "Cache-Control": "no-store",
         },
     )
-
-
-@router.get("/api/history/{item_id}/neighbors", response_model=list[HistoryItem], response_model_exclude_none=True)
-def api_history_neighbors(item_id: str, actor: dict = Depends(_current_user)) -> list[HistoryItem]:
-    focus = _db.get_items(actor["id"], [item_id])
-    if not focus:
-        raise HTTPException(status_code=404, detail="history item not found")
-    candidates = _db.list_neighbor_candidates(actor["id"], item_id)
-    ranked = sorted(
-        candidates,
-        key=lambda item: (composition_distance(focus[0].get("score") or {}, item.get("score") or {}), -int(item.get("at") or 0)),
-    )[:3]
-    return [HistoryItem(**item) for item in _db.get_items(actor["id"], [item["id"] for item in ranked])]
 
 
 # A year, and immutable: a saved work's SVG never changes, so neither does the

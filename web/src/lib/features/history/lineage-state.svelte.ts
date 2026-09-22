@@ -1,5 +1,5 @@
 import type { ApiFetch } from '../../transport/api-fetch.ts';
-import type { LineageGraph, NearbyWork } from './types.ts';
+import type { LineageGraph } from './types.ts';
 
 export type LineageOrientation = 'vertical' | 'horizontal';
 
@@ -78,7 +78,7 @@ export type HistoryForShareProjection = {
 };
 
 /**
- * Route-instance owner for lineage queries and nearby-work projection.
+ * Route-instance owner for lineage queries.
  *
  * One request counter covers base, branch, and overview loads because all three
  * write one graph. A newer question or reset invalidates every older answer.
@@ -88,12 +88,9 @@ export class LineageQueryState {
 	graph = $state<LineageGraph | null>(null);
 	loading = $state(false);
 	error = $state<string | null>(null);
-	nearby = $state<NearbyWork[]>([]);
 
 	private loadedFocus: string | null = null;
 	private requestId = 0;
-	private nearbyRequestId = 0;
-	private nearbyLoadedId: string | null = null;
 	private readonly apiFetch: ApiFetch;
 	private readonly browsingState?: LineageBrowsingState;
 
@@ -104,9 +101,6 @@ export class LineageQueryState {
 
 	/**
 	 * Clear the graph and invalidate any graph answer already in flight.
-	 *
-	 * Nearby works have their own identity and are driven by the displayed
-	 * history id, so a target reset does not clear them ahead of that effect.
 	 */
 	reset(): void {
 		this.requestId += 1;
@@ -205,28 +199,6 @@ export class LineageQueryState {
 			}
 		} finally {
 			if (requestId === this.requestId) this.loading = false;
-		}
-	};
-
-	loadNearby = async (historyId: string | null | undefined): Promise<void> => {
-		const normalizedHistoryId = historyId ?? null;
-		if (normalizedHistoryId === this.nearbyLoadedId) return;
-		this.nearbyLoadedId = normalizedHistoryId;
-		const requestId = ++this.nearbyRequestId;
-		this.nearby = [];
-		if (!historyId) return;
-		try {
-			const response = await this.apiFetch(
-				`/api/history/${historyId}/neighbors`,
-				{ cache: 'no-store' }
-			);
-			if (!response.ok) throw new Error(`HTTP ${response.status}`);
-			const items = await response.json();
-			if (requestId === this.nearbyRequestId) {
-				this.nearby = Array.isArray(items) ? items : [];
-			}
-		} catch {
-			if (requestId === this.nearbyRequestId) this.nearby = [];
 		}
 	};
 

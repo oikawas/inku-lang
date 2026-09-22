@@ -206,35 +206,6 @@ test('T-270: overview starts at the loaded root and keeps the selected focus', a
 	assert.deepEqual(state.graph?.nodes.map((node) => node.id), ['replacement']);
 });
 
-test('T-271: nearby work deduplicates ids, clears first, and drops late answers', async () => {
-	const { apiFetch, requests } = deferredTransport();
-	const state = new LineageQueryState(apiFetch);
-
-	const first = state.loadNearby('history-a');
-	assert.deepEqual(state.nearby, []);
-	const second = state.loadNearby('history-b');
-	assert.equal(requests[0]?.path, '/api/history/history-a/neighbors');
-	assert.equal(requests[0]?.init?.cache, 'no-store');
-	assert.equal(requests[1]?.path, '/api/history/history-b/neighbors');
-
-	requests[1]?.resolve(jsonResponse([{ id: 'near-b', input: 'b', svg: '<svg/>' }]));
-	await second;
-	requests[0]?.resolve(jsonResponse([{ id: 'near-a', input: 'a', svg: '<svg/>' }]));
-	await first;
-	assert.deepEqual(state.nearby.map((item) => item.id), ['near-b']);
-
-	await state.loadNearby('history-b');
-	assert.equal(requests.length, 2);
-	await state.loadNearby(null);
-	assert.deepEqual(state.nearby, []);
-	assert.equal(requests.length, 2);
-
-	const failed = state.loadNearby('history-c');
-	requests[2]?.resolve(jsonResponse({}, 503));
-	await failed;
-	assert.deepEqual(state.nearby, []);
-});
-
 test('T-272: named history projections update only the matching lineage node', () => {
 	const state = new LineageQueryState(async () => jsonResponse({}));
 	state.graph = {

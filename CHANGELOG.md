@@ -6,6 +6,12 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 36 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-22 — Remove Nearby works from the web UI
+
+Removed the Nearby works row from Lineage and its automatic loading when switching works or completing generation. The top three works ranked by Score similarity did not describe parent-child relationships in the creative process; Lineage follows recorded derivations. The extra similarity search and fetch are also removed.
+
+Removed the dedicated `GET /api/history/{item_id}/neighbors` endpoint and candidate reader. Saved works, Lineage data, and shared analysis used elsewhere are retained.
+
 ### 2026-09-22 — Do not admit omitted execution with only a background
 
 Both the resource-aware and non-resource entries of the shared compiler now

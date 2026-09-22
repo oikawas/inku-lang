@@ -23,9 +23,8 @@ than assumed:
   is. Changing them to 403 would be an API-surface change, which belongs to
   Stage D, and 404 is the safer of the two anyway: 403 confirms the work exists
   to someone who may not see it.
-* There is no `GET /api/history/{item_id}`. The routes that resolve a single
-  named work are `/svg` and `/neighbors`, so those carry the "a single work
-  answers 200" checks.
+* There is no `GET /api/history/{item_id}`. `/svg` resolves a single named
+  work, so it carries the "a single work answers 200" checks.
 
 The suite shares one database across the whole run, so a listing assertion here
 tests for the presence or absence of a specific id, never a total.
@@ -135,11 +134,6 @@ def test_t2_an_admin_can_load_another_members_svg(world) -> None:
     assert response.status_code == 200, response.text
 
 
-def test_t2_an_admin_can_resolve_another_members_work_by_id(world) -> None:
-    response = client.get(f"/api/history/{world.alice_work['id']}/neighbors", headers=world.admin_h)
-    assert response.status_code == 200, response.text
-
-
 # --- T-3: leaders read their own organisation -------------------------------
 
 
@@ -174,11 +168,6 @@ def test_t5_a_user_does_not_see_a_fellow_members_work_in_the_listing(world) -> N
 
 def test_t5_a_user_cannot_load_a_fellow_members_svg(world) -> None:
     response = client.get(f"/api/history/{world.alice_work['id']}/svg", headers=world.carol_h)
-    assert response.status_code == 404, response.text
-
-
-def test_t5_a_user_cannot_resolve_a_fellow_members_work_by_id(world) -> None:
-    response = client.get(f"/api/history/{world.alice_work['id']}/neighbors", headers=world.carol_h)
     assert response.status_code == 404, response.text
 
 

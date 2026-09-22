@@ -8,7 +8,7 @@
 	import CanvasGenerationInfo from '$lib/features/canvas/CanvasGenerationInfo.svelte';
 	import CanvasPresentationOverlay from '$lib/features/canvas/CanvasPresentationOverlay.svelte';
 	import CanvasRefinementWorkspace from '$lib/features/canvas/CanvasRefinementWorkspace.svelte';
-	import type { LineageGraph, LineageNode, NearbyWork } from '$lib/features/history/types';
+	import type { LineageGraph, LineageNode } from '$lib/features/history/types';
 	import type { LineageBrowsingState } from '$lib/features/history/lineage-state.svelte';
 	import { measureSvgWeight } from '$lib/svgWeight';
 	import { formatCanvasCapacity } from '$lib/formatNumber';
@@ -38,8 +38,6 @@
 	type Props = {
 		outputTab: OutputTab;
 		result: PaintResult | null;
-		nearbyHistory: NearbyWork[];
-		onOpenNearbyHistory: (id: string) => void;
 		unsavedRefinementPreview: boolean;
 		lineageIntermediateNotice: string | null;
 		allowEmptyOutputTabs: boolean;
@@ -182,8 +180,6 @@
 	let {
 		outputTab = $bindable('canvas'),
 		result,
-		nearbyHistory = [],
-		onOpenNearbyHistory,
 		unsavedRefinementPreview = false,
 		lineageIntermediateNotice = null,
 		allowEmptyOutputTabs,
@@ -801,7 +797,7 @@
 			{:else if outputTab === 'lineage'}
 				{#await import('./LineagePanel.svelte') then { default: LineagePanel }}
 					<LineagePanel browsingState={lineageBrowsingState} graph={lineageGraph} loading={lineageLoading} error={lineageError}
-						{isJapanese} {nearbyHistory} {onOpenNearbyHistory} onOpenNode={onOpenLineageNode}
+						{isJapanese} onOpenNode={onOpenLineageNode}
 						onOpenNodeInCanvas={onOpenLineageNodeInCanvas} onToggleStar={onToggleLineageStar}
 						onToggleForRevision={onToggleLineageForRevision} onOpenRefinement={openLineageRefinement}
 						onDrawDescription={onDrawLineageDescription} onOpenDdlEditor={onOpenLineageDdlEditor}

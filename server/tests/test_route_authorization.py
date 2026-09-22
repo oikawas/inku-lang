@@ -51,7 +51,8 @@ PUBLIC = {  # every entry needs a reason
 #   +1 for PATCH /api/history/{item_id}/for-share, which opens one work to an
 #   organisation group. The listing filter that reads the bit is an argument on
 #   a route that already exists, so it adds none.
-EXPECTED_ROUTE_COUNT = 96
+#   -1 for retiring GET /api/history/{item_id}/neighbors with Nearby works.
+EXPECTED_ROUTE_COUNT = 95
 
 
 def _guard_names(dependant, seen=None) -> set[str]:

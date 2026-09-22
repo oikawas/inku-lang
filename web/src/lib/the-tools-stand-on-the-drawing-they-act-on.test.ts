@@ -17,7 +17,6 @@
 // T-100: the bar is gone and its controls stand in the two corner rows.
 // T-101: the marks are the flags the history manager already toggles.
 // T-102: each moved control answers to its own visibility group, not its row's.
-// T-103: nearby works moved to the lineage tab, off the drawing they covered.
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -29,7 +28,6 @@ const read = (relative: string) => fs.readFileSync(path.join(here, relative), 'u
 const PANEL = read('./components/CanvasPanel.svelte');
 const ARTWORK = read('./features/canvas/CanvasArtworkWorkspace.svelte');
 const HISTORY_STATE = read('./historyManagerState.svelte.ts');
-const LINEAGE = read('./components/LineagePanel.svelte');
 const PAGE = read('../routes/+page.svelte');
 
 /**
@@ -214,30 +212,6 @@ test('T-102: the visibility rules name buttons, never a whole corner row', () =>
 	// onto instead, which is T-107's business. Named here so that the count
 	// above still covers every control on the rows -- this one by its absence.
 	assert.doesNotMatch(block, /:global\(\.canvas-export\)/);
-});
-
-// --------------------------------------- T-103 (nearby works left the canvas)
-
-test('T-103: nearby works are shown by the lineage tab', () => {
-	assert.match(LINEAGE, /class="nearby-mirror"/);
-	assert.match(LINEAGE, /onOpenNearbyHistory\?\.\(item\.id\)/);
-	// The canvas hands them on rather than drawing them.
-	assert.doesNotMatch(PANEL, /class="nearby-mirror"/);
-	assert.doesNotMatch(PANEL, /class="nearby-thumb"/);
-	assert.match(PANEL, /<LineagePanel [^>]*\{nearbyHistory\} \{onOpenNearbyHistory\}/);
-});
-
-test('T-103: the strip is in the flow there, not floating over a drawing', () => {
-	// On the canvas it was positioned over the picture it was offered beside.
-	// The lineage tab has room, so it is a row like any other -- and the one
-	// literal colour it carried is a token now, the way the paper is elsewhere.
-	const rule = LINEAGE.match(/\.nearby-mirror \{[^}]*\}/);
-	assert.ok(rule, 'the strip lost its rule');
-	assert.doesNotMatch(rule[0], /position: absolute/);
-	assert.doesNotMatch(LINEAGE, /\.nearby-thumb \{[^}]*background: white/);
-	assert.match(LINEAGE, /\.nearby-thumb \{[^}]*var\(--canvas-paper\)/);
-	// The history group still hides it, as it did on the canvas.
-	assert.match(PAGE, /\.ui-hide-history :global\(\.nearby-mirror\)/);
 });
 
 // ------------------------- T-107 (the simple UI keeps a door, and it is the card)

@@ -2008,69 +2008,6 @@ def test_history_is_scoped_to_authenticated_user():
     db.delete_user_group(group["id"])
 
 
-def test_history_neighbors_returns_ranked_items():
-    suffix = uuid.uuid4().hex[:8]
-    group = db.add_user_group(f"neighbors-{suffix}")
-    user = db.add_user(
-        username=f"neighbors-{suffix}",
-        email=f"neighbors-{suffix}@example.test",
-        password="password-123",
-        permission_groups=["users"],
-        group_id=group["id"],
-    )
-    headers, token = _auth_headers(user)
-    item_ids: list[str] = []
-    try:
-        base_at = 1_700_000_000_000
-        for index in range(5):
-            score = {
-                "instructions": [
-                    {
-                        "primitive": "circle",
-                        "center": [0.1 * index + 0.1, 0.5],
-                        "radius": 0.1,
-                    }
-                ]
-            }
-            r = client.post(
-                "/api/history",
-                json={
-                    "input": f"neighbors item {index}",
-                    "ddl": "中心に円",
-                    "score": score,
-                    "svg": "<svg></svg>",
-                    "at": base_at + index,
-                },
-                headers=headers,
-            )
-            assert r.status_code == 200
-            item_ids.append(r.json()["id"])
-
-        r = client.get(f"/api/history/{item_ids[0]}/neighbors", headers=headers)
-        assert r.status_code == 200
-        neighbors = r.json()
-        assert len(neighbors) == 3
-        assert item_ids[0] not in [item["id"] for item in neighbors]
-
-        with db.SessionLocal() as session:
-            session.query(db.HistoryRow).filter(db.HistoryRow.id == item_ids[1]).update(
-                {db.HistoryRow.score: "{not json"}, synchronize_session=False
-            )
-            session.query(db.HistoryRow).filter(db.HistoryRow.id == item_ids[2]).update(
-                {db.HistoryRow.score: ""}, synchronize_session=False
-            )
-            session.commit()
-
-        r = client.get(f"/api/history/{item_ids[0]}/neighbors", headers=headers)
-        assert r.status_code == 200
-        assert len(r.json()) == 3
-    finally:
-        db.delete_items(user["id"], item_ids)
-        db.delete_session(token)
-        db.delete_user(user["id"])
-        db.delete_user_group(group["id"])
-
-
 def test_history_animation_export_returns_404_for_a_missing_work(auth_context):
     headers, _user, _group = auth_context
     response = client.post(

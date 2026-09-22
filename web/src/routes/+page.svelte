@@ -511,7 +511,6 @@
 		demo,
 		refinementSession,
 		history: () => history,
-		lineageState,
 		canvasViewport,
 		models: {
 			stage1Provider: () => stage1Provider,
@@ -1139,10 +1138,6 @@
 	let okugakiModel    = $state<string>(qualifiedModelId(DEFAULT_PROVIDER, DEFAULT_VISION_MODEL));
 	let includeThinking = $state(false);
 	let currentResultStarState = $state<HistoryStarProjection | null>(null);
-	$effect(() => {
-		const historyId = work.displayedHistoryItem?.id ?? work.result?.history_id ?? null;
-		void lineageState.loadNearby(historyId);
-	});
 	const visibleThumbCount = $derived(Math.max(1, Math.floor((windowWidth - 40) / 89)));
 	const history = new HistoryBrowsingState({
 		apiFetch,
@@ -1770,11 +1765,6 @@ $effect(() => {
 		if (!svg || work.displayedHistoryItem?.id !== target || !work.result) return;
 		work.result = { ...work.result, svg };
 		canvasViewport.fit();
-	}
-
-	function openNearbyHistory(id: string): void {
-		const item = lineageState.nearby.find((candidate) => candidate.id === id);
-		if (item) loadIterationItem(item);
 	}
 
 	const currentRenderedAt = $derived.by(() => {
@@ -2813,8 +2803,6 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				bind:exportWrapEl
 				exportCardOnly={!session.uiVisibility.work_tools}
 				result={work.result}
-				nearbyHistory={lineageState.nearby}
-				onOpenNearbyHistory={openNearbyHistory}
 				{unsavedRefinementPreview}
 				{lineageIntermediateNotice}
 				allowEmptyOutputTabs={work.inputMode === 'demo' || work.activeRunMode === 'demo'}
@@ -3442,8 +3430,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 	   and calls the card directly instead; CanvasPanel decides that from
 	   exportCardOnly, so the rule here and the behaviour there must agree. */
 	.ui-hide-history :global(.nav-left),
-	.ui-hide-history :global(.nav-right),
-	.ui-hide-history :global(.nearby-mirror) {
+	.ui-hide-history :global(.nav-right) {
 		display: none;
 	}
 	.tooltips-disabled :global(.tooltip-bubble) {

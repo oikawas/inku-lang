@@ -1520,18 +1520,6 @@ def can_read_history_item(user_id: str, item_id: str) -> bool:
     ).can_read_item(user_id, item_id)
 
 
-def _neighbor_score(raw: str | None) -> dict:
-    return _history._neighbor_score(raw)
-
-
-def list_neighbor_candidates(user_id: str, item_id: str, *, limit: int = 10_000) -> list[dict]:
-    return _history.HistoryNeighborCandidateReader(
-        SessionLocal,
-        _actor_of,
-        _history._neighbor_score,
-    ).list_neighbor_candidates(user_id, item_id, limit=limit)
-
-
 def delete_all(user_id: str) -> None:
     return _history.HistoryOwnedDataPurgeWriter(
         SessionLocal,

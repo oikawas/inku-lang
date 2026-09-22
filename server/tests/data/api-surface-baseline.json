@@ -1,6 +1,6 @@
 {
-  "endpoint_count": 96,
-  "operation_count": 96,
+  "endpoint_count": 95,
+  "operation_count": 95,
   "schema_count": 95,
   "operations": [
     {
@@ -623,21 +623,6 @@
       "requestBody": "null",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"additionalProperties\":true,\"title\":\"Response Api History Lineage Api History  Item Id  Lineage Get\",\"type\":\"object\"}}},\"description\":\"Successful Response\"}",
-        "422": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/HTTPValidationError\"}}},\"description\":\"Validation Error\"}"
-      }
-    },
-    {
-      "path": "/api/history/{item_id}/neighbors",
-      "method": "GET",
-      "operationId": "api_history_neighbors_api_history__item_id__neighbors_get",
-      "params": [
-        "cookie:inku_session:opt",
-        "header:authorization:opt",
-        "path:item_id:req"
-      ],
-      "requestBody": "null",
-      "responses": {
-        "200": "{\"content\":{\"application/json\":{\"schema\":{\"items\":{\"$ref\":\"#/components/schemas/HistoryItem\"},\"title\":\"Response Api History Neighbors Api History  Item Id  Neighbors Get\",\"type\":\"array\"}}},\"description\":\"Successful Response\"}",
         "422": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/HTTPValidationError\"}}},\"description\":\"Validation Error\"}"
       }
     },
@@ -1503,5 +1488,5 @@
     "VisionRefineAdviceBody": "{\"properties\":{\"direction\":{\"default\":\"\",\"maxLength\":2000,\"title\":\"Direction\",\"type\":\"string\"},\"enabled_kinds\":{\"items\":{\"type\":\"string\"},\"maxItems\":5,\"minItems\":1,\"title\":\"Enabled Kinds\",\"type\":\"array\"},\"history_id\":{\"maxLength\":200,\"minLength\":1,\"title\":\"History Id\",\"type\":\"string\"},\"instruction\":{\"maxLength\":100000,\"minLength\":1,\"title\":\"Instruction\",\"type\":\"string\"},\"language\":{\"default\":\"ja\",\"pattern\":\"^(ja|en)$\",\"title\":\"Language\",\"type\":\"string\"},\"model\":{\"anyOf\":[{\"maxLength\":200,\"minLength\":1,\"type\":\"string\"},{\"type\":\"null\"}],\"title\":\"Model\"}},\"required\":[\"history_id\",\"instruction\",\"enabled_kinds\"],\"title\":\"VisionRefineAdviceBody\",\"type\":\"object\"}",
     "VisionRefineAdviceResponse": "{\"properties\":{\"model\":{\"title\":\"Model\",\"type\":\"string\"},\"next_direction\":{\"title\":\"Next Direction\",\"type\":\"string\"},\"observation\":{\"title\":\"Observation\",\"type\":\"string\"},\"suggested_kind\":{\"title\":\"Suggested Kind\",\"type\":\"string\"}},\"required\":[\"observation\",\"next_direction\",\"suggested_kind\",\"model\"],\"title\":\"VisionRefineAdviceResponse\",\"type\":\"object\"}"
   },
-  "digest": "9e3188fed6fe5ff6941613de82e880d040f3927e2e95b0bd6e731e88250034ca"
+  "digest": "62d05fc756f1ac0cf6e5b469bbb4d146ffa0355d5ba0747b2b2755db41ed6d1b"
 }

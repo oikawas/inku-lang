@@ -27,6 +27,7 @@ export type UserModelSettings = {
 	okugaki_provider?: Provider;
 	okugaki_model?: string;
 	instruction_caption_visible?: boolean;
+	ui_text_size?: number;
 	color_catalog_id?: string;
 	sketch_open?: boolean;
 	ddl_expanded_open?: boolean;

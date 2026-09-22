@@ -121,10 +121,10 @@
 		display: flex; align-items: center; justify-content: space-between;
 		padding: 14px 18px 10px; border-bottom: 1px solid var(--border); flex-shrink: 0;
 	}
-	.catalog-modal-title { font-size: 15px; font-weight: 300; letter-spacing: 0.05em; }
+	.catalog-modal-title { font-size: var(--ui-font-size-15); font-weight: 300; letter-spacing: 0.05em; }
 	.catalog-close {
 		width: 24px; height: 24px; border: none; background: none;
-		color: var(--fg3); font-size: 18px; cursor: pointer; line-height: 1;
+		color: var(--fg3); font-size: var(--ui-font-size-18); cursor: pointer; line-height: 1;
 	}
 	.catalog-body { flex: 1; min-height: 0; }
 	.catalog-scroll { height: 100%; overflow-y: auto; padding: 10px; display: flex; flex-direction: column; gap: 8px; }
@@ -139,10 +139,10 @@
 	.catalog-item:hover:not(.active) { background: var(--bg); }
 	.catalog-info { min-width: 0; padding: 2px 2px 0; }
 	.catalog-name-row { display: flex; align-items: baseline; gap: 5px; }
-	.catalog-name { font-size: 12px; font-weight: 600; color: var(--fg); line-height: 1.15; }
-	.catalog-id { margin-top: 1px; color: var(--fg3); font: 9px/1.15 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
-	.catalog-sub { margin-top: 5px; font-size: 9px; line-height: 1.25; color: var(--fg3); }
-	.catalog-check { color: var(--accent); font-size: 12px; flex-shrink: 0; }
+	.catalog-name { font-size: var(--ui-font-size-12); font-weight: 600; color: var(--fg); line-height: 1.15; }
+	.catalog-id { margin-top: 1px; color: var(--fg3); font: var(--ui-font-size-9)/1.15 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+	.catalog-sub { margin-top: 5px; font-size: var(--ui-font-size-9); line-height: 1.25; color: var(--fg3); }
+	.catalog-check { color: var(--accent); font-size: var(--ui-font-size-12); flex-shrink: 0; }
 	.catalog-palette {
 		display: grid;
 		grid-template-columns: repeat(10, minmax(56px, 1fr));
@@ -155,10 +155,10 @@
 	.catalog-color-name, .catalog-color-localized {
 		display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 	}
-	.catalog-color-name { margin-top: 1px; color: var(--fg2); font-size: 8px; line-height: 1.15; }
-	.catalog-color-localized { color: var(--fg3); font-size: 7px; line-height: 1.15; }
+	.catalog-color-name { margin-top: 1px; color: var(--fg2); font-size: var(--ui-font-size-8); line-height: 1.15; }
+	.catalog-color-localized { color: var(--fg3); font-size: var(--ui-font-size-7); line-height: 1.15; }
 	.catalog-color-code {
-		display: block; margin-top: 2px; font-size: 7px; line-height: 1.1; color: var(--fg3);
+		display: block; margin-top: 2px; font-size: var(--ui-font-size-7); line-height: 1.1; color: var(--fg3);
 		font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 	}
 	.catalog-modal-foot {

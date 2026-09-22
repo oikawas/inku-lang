@@ -248,7 +248,7 @@
 		background: var(--panel);
 		color: var(--fg2);
 		font-family: inherit;
-		font-size: 18px;
+		font-size: var(--ui-font-size-18);
 		line-height: 1;
 		cursor: pointer;
 	}
@@ -266,7 +266,7 @@
 		border-radius: var(--r);
 		padding: 0;
 		background: var(--panel);
-		font-size: 15px;
+		font-size: var(--ui-font-size-15);
 		font-weight: 300;
 		letter-spacing: 0;
 		line-height: 1;
@@ -300,7 +300,7 @@
 	.rail-sub {
 		margin-top: 4px;
 		color: var(--fg3);
-		font-size: 10px;
+		font-size: var(--ui-font-size-10);
 		line-height: 1.3;
 		white-space: nowrap;
 		opacity: 0;
@@ -330,7 +330,7 @@
 		background: transparent;
 		color: var(--fg2);
 		font-family: inherit;
-		font-size: 11px;
+		font-size: var(--ui-font-size-11);
 		cursor: pointer;
 		text-align: left;
 	}
@@ -435,7 +435,7 @@
 		box-shadow: 4px -3px 0 0 var(--panel);
 	}
 	.tooltip-icon {
-		font-size: 13px;
+		font-size: var(--ui-font-size-13);
 		font-weight: 600;
 	}
 	.tooltip-icon::after {
@@ -491,7 +491,7 @@
 		border-radius: 4px;
 		background: transparent;
 		color: var(--fg2);
-		font-size: 11px;
+		font-size: var(--ui-font-size-11);
 		text-align: left;
 		cursor: pointer;
 		font-family: inherit;
@@ -516,7 +516,7 @@
 		border-radius: var(--r);
 		background: var(--panel);
 		color: var(--fg2);
-		font-size: 10px;
+		font-size: var(--ui-font-size-10);
 		cursor: pointer;
 		font-family: inherit;
 	}
@@ -531,7 +531,7 @@
 	.rail-build {
 		padding: 4px 2px;
 		color: var(--fg3);
-		font-size: 10px;
+		font-size: var(--ui-font-size-10);
 		font-variant-numeric: tabular-nums;
 		text-align: center;
 		white-space: nowrap;

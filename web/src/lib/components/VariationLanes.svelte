@@ -115,7 +115,7 @@
 	}
 	.lane-mark {
 		color: var(--accent);
-		font-size: 18px;
+		font-size: var(--ui-font-size-18);
 		line-height: 1;
 	}
 	.lane-idle {
@@ -130,7 +130,7 @@
 		text-overflow: ellipsis;
 		white-space: nowrap;
 		color: var(--fg3);
-		font-size: 11px;
+		font-size: var(--ui-font-size-11);
 	}
 	.lane.done .lane-label {
 		color: var(--fg2);

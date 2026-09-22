@@ -171,19 +171,19 @@
 		gap: 18px;
 	}
 	.login-logo {
-		font-size: 22px;
+		font-size: var(--ui-font-size-22);
 		font-weight: 300;
 		letter-spacing: 0.02em;
 	}
 	.login-sub {
 		margin-top: 2px;
 		color: var(--fg3);
-		font-size: 11px;
+		font-size: var(--ui-font-size-11);
 	}
 	.login-meta {
 		padding: 0 24px 18px;
 		color: var(--fg3);
-		font-size: 11px;
+		font-size: var(--ui-font-size-11);
 		letter-spacing: 0.02em;
 	}
 	.login-lang-switcher {
@@ -202,7 +202,7 @@
 		background: var(--login-lang-bg);
 		color: var(--fg2);
 		font-family: inherit;
-		font-size: 11px;
+		font-size: var(--ui-font-size-11);
 		font-weight: 500;
 		cursor: pointer;
 	}
@@ -213,7 +213,7 @@
 	.login-lang-btn.active { background: var(--action-bg); color: var(--action-fg); }
 	.login-title {
 		padding: 18px 24px 0;
-		font-size: 16px;
+		font-size: var(--ui-font-size-16);
 		font-weight: 500;
 	}
 	.login-panel-body {
@@ -230,7 +230,7 @@
 	.login-grid input {
 		min-height: 38px;
 		padding: 8px 10px;
-		font-size: 13px;
+		font-size: var(--ui-font-size-13);
 		border: 1px solid var(--border2);
 		border-radius: var(--r);
 		background: var(--panel);
@@ -239,7 +239,7 @@
 	}
 	.login-submit {
 		min-height: 38px;
-		font-size: 13px;
+		font-size: var(--ui-font-size-13);
 		font-weight: 500;
 	}
 	.password-field {
@@ -278,7 +278,7 @@
 		background: var(--panel2);
 		border-radius: var(--r);
 		padding: 8px 10px;
-		font-size: 12px;
+		font-size: var(--ui-font-size-12);
 		color: var(--fg2);
 	}
 </style>

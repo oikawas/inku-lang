@@ -1,17 +1,17 @@
 	.settings-feature-root .settings-tabs.model-selection-tabs { display: flex; flex-shrink: 0; gap: 6px; padding: 12px 24px; border-bottom: 1px solid var(--border); background: var(--bg); }
-	.settings-feature-root .settings-tabs.model-selection-tabs button { flex: 1 1 0; min-height: 38px; padding: 8px 12px; border: 1px solid transparent; border-radius: var(--r); background: transparent; color: var(--fg2); font: inherit; font-size: 14px; text-align: center; cursor: pointer; }
+	.settings-feature-root .settings-tabs.model-selection-tabs button { flex: 1 1 0; min-height: 38px; padding: 8px 12px; border: 1px solid transparent; border-radius: var(--r); background: transparent; color: var(--fg2); font: inherit; font-size: var(--ui-font-size-14); text-align: center; cursor: pointer; }
 	.settings-feature-root .settings-tabs.model-selection-tabs button:hover { background: var(--panel); }
 	.settings-feature-root .settings-tabs.model-selection-tabs button.active { border-color: var(--border2); background: var(--accent-light); color: var(--fg); font-weight: 600; box-shadow: inset 0 -2px var(--accent); }
 	.settings-feature-root .model-selection-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 8px; }
 	.settings-feature-root .model-selection-summary span {
 		display: flex; flex-direction: column; gap: 3px; min-width: 0; padding: 8px 10px;
 		border: 1px solid var(--border); border-radius: var(--r); background: var(--panel);
-		color: var(--fg2); font-size: 12px; overflow-wrap: anywhere;
+		color: var(--fg2); font-size: var(--ui-font-size-12); overflow-wrap: anywhere;
 	}
-	.settings-feature-root .model-selection-summary strong { color: var(--fg3); font-size: 10px; letter-spacing: .08em; text-transform: uppercase; }
-	.settings-feature-root .model-selection-hint { margin: 0; color: var(--fg3); font-size: 12px; line-height: 1.5; }
+	.settings-feature-root .model-selection-summary strong { color: var(--fg3); font-size: var(--ui-font-size-10); letter-spacing: .08em; text-transform: uppercase; }
+	.settings-feature-root .model-selection-hint { margin: 0; color: var(--fg3); font-size: var(--ui-font-size-12); line-height: 1.5; }
 	.settings-feature-root .generation-model-groups { display: flex; flex-direction: column; gap: 12px; }
-	.settings-feature-root .generation-model-provider h3 { margin: 0 0 7px; color: var(--fg2); font-size: 13px; font-weight: 600; }
+	.settings-feature-root .generation-model-provider h3 { margin: 0 0 7px; color: var(--fg2); font-size: var(--ui-font-size-13); font-weight: 600; }
 	.settings-feature-root .generation-model-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 7px; }
 	.settings-feature-root .generation-model-grid button {
 		display: flex; flex-direction: column; align-items: flex-start; gap: 3px; min-width: 0;
@@ -24,8 +24,8 @@
 	.settings-feature-root .generation-model-grid button.eol strong { text-decoration: line-through; }
 	.settings-feature-root .eol-mark { color: var(--danger); font-weight: 600; }
 	.settings-feature-root .generation-model-grid button.selected { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); background: var(--accent-light); color: var(--fg); }
-	.settings-feature-root .generation-model-grid strong { font-size: 13px; font-weight: 500; overflow-wrap: anywhere; }
-	.settings-feature-root .generation-model-grid span { color: var(--fg3); font-size: 11px; }
+	.settings-feature-root .generation-model-grid strong { font-size: var(--ui-font-size-13); font-weight: 500; overflow-wrap: anywhere; }
+	.settings-feature-root .generation-model-grid span { color: var(--fg3); font-size: var(--ui-font-size-11); }
 	.settings-feature-root .model-thinking-row { padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--r); background: var(--panel); }
 	.settings-feature-root .model-metadata-hover { position: relative; }
 	.settings-feature-root .model-metadata-hover:hover .model-hover-card,

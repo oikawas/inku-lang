@@ -2,7 +2,7 @@
 	.settings-feature-root .ui-mode-options .setting-toggle { align-items: flex-start; padding: 12px; border: 1px solid var(--border); border-radius: var(--r); }
 	.settings-feature-root .ui-mode-options .setting-toggle:has(input:checked) { border-color: var(--accent); background: var(--accent-light); }
 	.settings-feature-root .ui-mode-options .setting-toggle span { display: grid; gap: 2px; }
-	.settings-feature-root .ui-mode-options small { color: var(--fg2); font-size: 12px; font-weight: 400; }
+	.settings-feature-root .ui-mode-options small { color: var(--fg2); font-size: var(--ui-font-size-12); font-weight: 400; }
 	.settings-feature-root .ui-custom-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 8px 20px; margin-top: 10px; }
 	@media (max-width: 720px) { .settings-feature-root .ui-custom-grid { grid-template-columns: 1fr; } }
 	/* A box that cannot be ticked because two already are. Dimmed rather than
@@ -17,9 +17,14 @@
 		margin: 8px 0 4px;
 	}
 	.settings-feature-root .settings-radio-title {
-		font-size: 13px;
+		font-size: var(--ui-font-size-13);
 		font-weight: 600;
 		color: var(--fg);
 		margin-top: 4px;
 	}
 	.settings-feature-root .ui-mode-settings .settings-inline-actions { margin-top: 2px; }
+	.settings-feature-root .text-size-control { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 10px; margin-top: 10px; color: var(--fg2); font-size: var(--ui-font-size-13); }
+	.settings-feature-root .text-size-control input { width: 100%; accent-color: var(--accent); }
+	.settings-feature-root .text-size-value { display: block; margin-top: 8px; color: var(--fg); font-size: var(--ui-font-size-13); font-weight: 600; }
+	.settings-feature-root .text-size-settings .settings-inline-actions { margin-top: 8px; }
+	.settings-feature-root .inline-action { margin-left: 4px; padding: 0; border: 0; background: transparent; color: inherit; font: inherit; text-decoration: underline; cursor: pointer; }

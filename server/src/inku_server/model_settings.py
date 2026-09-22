@@ -286,6 +286,7 @@ def default_user_model_settings() -> dict[str, Any]:
         # The colour catalogue the user draws with. "auto" is not a catalogue:
         # it asks the server to read each description (see color_selector).
         "color_catalog_id": "default",
+        "ui_text_size": 1,
         # Whether each foldable section of the describe panel is open. The
         # sketch prose was always visible before it could be folded, so an
         # account that has never folded it keeps seeing it; the expanded DDL
@@ -443,6 +444,7 @@ _USER_PROVIDER_KEYS = ("stage1_provider", "stage2_provider", "vision_provider", 
 _USER_MODEL_KEYS = ("stage1_model", "stage2_model", "vision_model", "okugaki_model")
 _INSTRUCTION_CAPTION_WRITING_MODES = {"horizontal", "vertical"}
 _INSTRUCTION_CAPTION_POSITIONS = {"left", "right"}
+_UI_TEXT_SIZE_STEPS = range(5)
 
 
 def _normalize_instruction_caption_writing_mode(value: Any) -> str:
@@ -455,6 +457,10 @@ def _normalize_instruction_caption_position(value: Any) -> str:
     if isinstance(value, str) and value in _INSTRUCTION_CAPTION_POSITIONS:
         return value
     return "left"
+
+
+def _normalize_ui_text_size(value: Any) -> int:
+    return value if isinstance(value, int) and not isinstance(value, bool) and value in _UI_TEXT_SIZE_STEPS else 1
 
 
 def normalize_user_model_settings(settings: dict[str, Any] | None) -> dict[str, Any]:
@@ -488,6 +494,7 @@ def normalize_user_model_settings(settings: dict[str, Any] | None) -> dict[str, 
         settings.get("instruction_caption_position")
     )
     clean["color_catalog_id"] = _normalize_catalog_choice(settings.get("color_catalog_id"))
+    clean["ui_text_size"] = _normalize_ui_text_size(settings.get("ui_text_size"))
     # Each fold keeps its own default, so the test is written against the
     # default rather than as one shared shape: absent means "never folded".
     clean["sketch_open"] = settings.get("sketch_open") is not False
@@ -517,6 +524,8 @@ def update_user_model_settings(current: dict[str, Any] | None, patch: dict[str, 
         clean["model_inspection_selected_models"] = _normalize_selected_model_ids(patch.get("model_inspection_selected_models"))
     if "color_catalog_id" in patch:
         clean["color_catalog_id"] = _normalize_catalog_choice(patch.get("color_catalog_id"))
+    if "ui_text_size" in patch:
+        clean["ui_text_size"] = _normalize_ui_text_size(patch.get("ui_text_size"))
     for key in ("sketch_open", "ddl_expanded_open"):
         if key in patch:
             clean[key] = bool(patch[key])

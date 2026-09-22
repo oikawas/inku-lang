@@ -95,3 +95,21 @@ test('registering the same id again replaces it, so a reload cannot double up', 
 	assert.equal(collectUserSettings().a, 'second');
 	assert.equal(userSettingsContributorIds().filter((id) => id === 'test-a').length, 1);
 });
+
+test('a model refresh preserves an independently saved text-size preview', () => {
+	let textSize = 4;
+	let model = 'old';
+	registerUserSettingsContributor({
+		id: 'test-a', collect: () => ({ ui_text_size: textSize }),
+		apply: (settings) => { textSize = Number(settings.ui_text_size); }
+	});
+	registerUserSettingsContributor({
+		id: 'test-b', collect: () => ({ model }),
+		apply: (settings) => { model = String(settings.model); }
+	});
+	const options = { excludeIds: ['test-a'] };
+	assert.deepEqual(collectUserSettings(options), { model: 'old' });
+	applyUserSettings({ ui_text_size: 1, model: 'new' }, options);
+	assert.equal(textSize, 4);
+	assert.equal(model, 'new');
+});

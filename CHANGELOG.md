@@ -6,6 +6,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 36 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-22 — Shared text sizing with a stepped control
+
+Display and operation now offers five text-size steps from 90% to 130% and a reset to the default. Changes appear immediately, are saved to the account, and can be retried if saving fails. Fixed UI font sizes now use shared CSS definitions so settings, editors, history, Lineage, and supporting text follow one scale. Work pictures and export dimensions are unchanged.
+
 ### 2026-09-22 — Prevent clipping in the Library's grouped thumbnails
 
 In the Library's thumbnails grouped by Lineage, multiple groups could shrink until their thumbnails were hidden. Each group now retains its required height while the list scrolls vertically. Works within a Lineage remain arranged horizontally from the root in generation order, with horizontal scrolling for longer lineages.

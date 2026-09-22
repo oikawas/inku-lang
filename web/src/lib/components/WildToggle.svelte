@@ -41,7 +41,7 @@
 
 <style>
 	.wild-inline { display: inline-flex; align-items: center; gap: 4px; }
-	.wild-inline-label { font-size: 11px; color: var(--fg3); white-space: nowrap; }
+	.wild-inline-label { font-size: var(--ui-font-size-11); color: var(--fg3); white-space: nowrap; }
 	.wild-inherit { margin-left: 2px; color: var(--fg3); }
 	/* Svelte scopes styles per component, so `ghost-btn` alone would style nothing
 	   here and the button would fall back to the browser's own. The definition is

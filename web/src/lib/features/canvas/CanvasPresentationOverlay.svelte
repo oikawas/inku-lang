@@ -207,17 +207,17 @@
 		align-items: center;
 		justify-content: center;
 	}
-	.presentation-icon-btn { width: 34px; border-radius: 50%; font-size: 19px; padding: 0; }
-	.presentation-text-btn { border-radius: 999px; font-size: 12px; padding: 0 12px; white-space: nowrap; }
+	.presentation-icon-btn { width: 34px; border-radius: 50%; font-size: var(--ui-font-size-19); padding: 0; }
+	.presentation-text-btn { border-radius: 999px; font-size: var(--ui-font-size-12); padding: 0 12px; white-space: nowrap; }
 	.presentation-icon-btn:hover:not(:disabled),
 	.presentation-text-btn:hover:not(:disabled),
 	.presentation-icon-btn.active { background: rgba(255,255,255,0.16); }
-	.presentation-star-btn { color: rgba(255,253,248,0.62); font-size: 17px; }
+	.presentation-star-btn { color: rgba(255,253,248,0.62); font-size: var(--ui-font-size-17); }
 	.presentation-star-btn.starred { color: #ffd45c; border-color: rgba(255,212,92,0.62); background: rgba(255,212,92,0.14); }
 	.presentation-icon-btn:disabled,
 	.presentation-text-btn:disabled { opacity: 0.35; cursor: not-allowed; }
 	.presentation-icon-btn svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-	.presentation-counter { min-width: 44px; padding: 0 6px; color: rgba(255,253,248,0.72); font-size: 12px; font-variant-numeric: tabular-nums; text-align: center; white-space: nowrap; }
+	.presentation-counter { min-width: 44px; padding: 0 6px; color: rgba(255,253,248,0.72); font-size: var(--ui-font-size-12); font-variant-numeric: tabular-nums; text-align: center; white-space: nowrap; }
 	.caption-writing-mode { display: inline-flex; align-items: center; gap: 4px; color: rgba(255,253,248,0.72); font-size: var(--btn-sm-font-size); white-space: nowrap; }
 	.caption-writing-mode select { max-width: 88px; border: 1px solid var(--action-bg); border-radius: var(--btn-sm-radius); padding: var(--btn-sm-padding); background: var(--action-bg); color: var(--action-fg); font: inherit; }
 

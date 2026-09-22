@@ -58,7 +58,7 @@
 		pointer-events: none;
 		white-space: normal;
 	}
-	.model-hover-card > span { display: grid; gap: 2px; color: var(--tooltip-fg); font-size: 11px; line-height: 1.45; }
+	.model-hover-card > span { display: grid; gap: 2px; color: var(--tooltip-fg); font-size: var(--ui-font-size-11); line-height: 1.45; }
 	.model-hover-card > span + span { margin-top: 6px; }
-	.model-hover-card strong { color: var(--tooltip-muted); font-size: 9px; font-weight: 500; letter-spacing: .05em; text-transform: uppercase; }
+	.model-hover-card strong { color: var(--tooltip-muted); font-size: var(--ui-font-size-9); font-weight: 500; letter-spacing: .05em; text-transform: uppercase; }
 </style>

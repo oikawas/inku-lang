@@ -204,7 +204,7 @@
 		background: var(--panel);
 	}
 	.popover-group-label {
-		font-size: 10px; color: var(--fg3); text-transform: uppercase; letter-spacing: 0.08em;
+		font-size: var(--ui-font-size-10); color: var(--fg3); text-transform: uppercase; letter-spacing: 0.08em;
 		font-weight: 500; margin-bottom: 7px;
 	}
 	.inline-message {
@@ -213,16 +213,16 @@
 		border-radius: var(--r);
 		background: var(--panel);
 		color: var(--fg2);
-		font-size: 12px;
+		font-size: var(--ui-font-size-12);
 	}
-	.db-test-result { color: var(--fg2); font-size: 12px; }
+	.db-test-result { color: var(--fg2); font-size: var(--ui-font-size-12); }
 	.settings-readonly-grid {
 		display: grid;
 		grid-template-columns: max-content minmax(0, 1fr);
 		gap: 7px 12px;
 		align-items: baseline;
 		margin-bottom: 9px;
-		font-size: 12px;
+		font-size: var(--ui-font-size-12);
 	}
 	.settings-readonly-grid span { color: var(--fg3); }
 	.settings-readonly-grid strong { color: var(--fg); font-weight: 500; min-width: 0; word-break: break-word; }
@@ -233,7 +233,7 @@
 		background: var(--bg);
 		color: var(--fg2);
 		font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-		font-size: 11px;
+		font-size: var(--ui-font-size-11);
 		word-break: break-all;
 	}
 	.settings-readonly-grid.compact {
@@ -252,7 +252,7 @@
 		flex-direction: column;
 		gap: 4px;
 		color: var(--fg3);
-		font-size: 12px;
+		font-size: var(--ui-font-size-12);
 		font-weight: 500;
 	}
 	.db-backup-time { grid-column: span 2; }
@@ -266,14 +266,14 @@
 	.db-backup-time-unit {
 		flex: 0 0 auto;
 		color: var(--fg2);
-		font-size: 11px;
+		font-size: var(--ui-font-size-11);
 		letter-spacing: 0;
 		text-transform: none;
 	}
 	.db-backup-hint {
 		margin-top: 6px;
 		color: var(--fg3);
-		font-size: 10px;
+		font-size: var(--ui-font-size-10);
 		line-height: 1.5;
 	}
 	.db-backup-list-label {
@@ -291,7 +291,7 @@
 		width: 100%;
 		min-width: 460px;
 		border-collapse: collapse;
-		font-size: 11px;
+		font-size: var(--ui-font-size-11);
 		font-variant-numeric: tabular-nums;
 	}
 	.db-backup-list th {

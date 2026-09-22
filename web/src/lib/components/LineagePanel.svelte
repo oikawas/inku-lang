@@ -918,15 +918,15 @@ $effect(() => {
 	.lineage-panel.overview { position: fixed; inset: 14px; z-index: 1300; width: auto; height: auto; border: 1px solid var(--border2); border-radius: 12px; box-shadow: 0 18px 70px #000a; }
 	header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 16px; }
 	h2 { margin: 0 0 4px; font-size: 1.05rem; }
-	p { margin: 0; color: var(--fg2); font-size: 12px; }
+	p { margin: 0; color: var(--fg2); font-size: var(--ui-font-size-12); }
 	.lineage-actions, .toolbar-group, .overview-zoom, .orientation-toggle { display: flex; align-items: center; gap: 8px; }
 	.lineage-actions { flex-wrap: wrap; justify-content: flex-end; }
 	.toolbar-group { flex-wrap: wrap; padding-left: 8px; border-left: 1px solid var(--border); }
-	.toolbar-label { color: var(--fg2); font-size: 12px; white-space: nowrap; }
+	.toolbar-label { color: var(--fg2); font-size: var(--ui-font-size-12); white-space: nowrap; }
 	.lineage-history-tools { margin-left: auto; }
 	.overview-zoom, .orientation-toggle { padding-right: 8px; border-right: 1px solid var(--border); }
 	.orientation-toggle button.active { border-color: var(--accent); background: var(--accent); color: var(--accent-fg); }
-	.overview-zoom span { min-width: 42px; color: var(--fg2); font-size: 12px; text-align: center; }
+	.overview-zoom span { min-width: 42px; color: var(--fg2); font-size: var(--ui-font-size-12); text-align: center; }
 	header button, .promote, .branch-toggle { border: 1px solid var(--border2); background: var(--panel); color: var(--fg); border-radius: var(--btn-sm-radius); padding: var(--btn-sm-padding); font-family: inherit; font-size: var(--btn-sm-font-size); cursor: pointer; }
 	/* Dimensions follow the header button tokens; only color is overridden here. */
 	.detach-btn { background: var(--ddl-btn-bg); border-color: var(--ddl-btn-border); color: var(--ddl-btn-fg); font-weight: 600; box-shadow: var(--ddl-btn-shadow); white-space: nowrap; }
@@ -951,7 +951,7 @@ $effect(() => {
 	.lineage-column { position: relative; z-index: 1; width: 100%; min-width: 0; display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: center; gap: 14px 18px; }
 	.lineage-columns.horizontal .lineage-column { flex: 0 0 210px; width: 210px; min-width: 210px; flex-direction: column; flex-wrap: nowrap; justify-content: flex-start; gap: 14px; }
 	.lineage-column.menu-layer { z-index: 20; }
-	.generation { flex: 0 0 100%; color: var(--fg2); font-size: 12px; text-align: center; }
+	.generation { flex: 0 0 100%; color: var(--fg2); font-size: var(--ui-font-size-12); text-align: center; }
 	.lineage-columns.horizontal .generation { flex: 0 0 auto; width: 100%; }
 	.lineage-card { position: relative; box-sizing: border-box; width: 210px; min-width: 0; max-width: 210px; overflow: hidden; border: 1px solid var(--border); border-radius: 10px; padding: 8px; background: var(--panel); box-shadow: 0 2px 8px color-mix(in srgb, var(--fg) 8%, transparent); cursor: default; }
 	.lineage-card.menu-open { z-index: 10; overflow: visible; }
@@ -961,11 +961,11 @@ $effect(() => {
 	.card-toolbar { position: relative; z-index: 3; min-height: 22px; margin-bottom: 6px; padding-right: 26px; display: flex; align-items: flex-start; gap: 5px; }
 	.card-check { flex: 0 0 auto; display: grid; place-items: center; padding: 2px; border-radius: 4px; background: color-mix(in srgb, var(--panel) 88%, transparent); cursor: pointer; }
 	/* Work star: pressing it does not select the work; the card owns selection. */
-	.card-star { flex: 0 0 auto; width: 26px; height: 26px; display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--border2); border-radius: 50%; padding: 0; background: var(--panel); color: var(--fg2); font-size: 12px; line-height: 1; font-family: inherit; cursor: pointer; }
+	.card-star { flex: 0 0 auto; width: 26px; height: 26px; display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--border2); border-radius: 50%; padding: 0; background: var(--panel); color: var(--fg2); font-size: var(--ui-font-size-12); line-height: 1; font-family: inherit; cursor: pointer; }
 	.card-star.starred { color: var(--star-fg); background: var(--star-bg); border-color: var(--star-border); }
 	/* The revision mark rides beside the star in the same shell: the two are
 	   separate columns and a work can carry either, both or neither. */
-	.card-mark { flex: 0 0 auto; width: 26px; height: 26px; display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--border2); border-radius: 50%; padding: 0; background: var(--panel); color: var(--fg2); font-size: 12px; line-height: 1; font-family: inherit; cursor: pointer; }
+	.card-mark { flex: 0 0 auto; width: 26px; height: 26px; display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--border2); border-radius: 50%; padding: 0; background: var(--panel); color: var(--fg2); font-size: var(--ui-font-size-12); line-height: 1; font-family: inherit; cursor: pointer; }
 	.card-mark.marked { color: var(--accent); background: var(--accent-light); border-color: var(--accent); }
 	.card-check input { width: 15px; height: 15px; margin: 0; accent-color: var(--accent); margin: 0; }
 	.okugaki-backdrop { position: fixed; inset: 0; z-index: 1450; display: grid; place-items: center; padding: 24px; background: #0009; }
@@ -974,13 +974,13 @@ $effect(() => {
 	.okugaki-dialog > header button, .okugaki-record-head button { border: 0; background: transparent; color: var(--fg2); font-size: 1.2rem; cursor: pointer; }
 	.okugaki-controls { display: grid; gap: 10px; padding: 14px 20px; border-bottom: 1px solid var(--border); }
 	.okugaki-generate { justify-self: start; border: 1px solid var(--accent); border-radius: 7px; padding: 9px 14px; background: var(--accent); color: var(--accent-fg); cursor: pointer; }
-	.okugaki-progress { display: flex; align-items: center; gap: 8px; color: var(--fg2); font-size: 12px; }
+	.okugaki-progress { display: flex; align-items: center; gap: 8px; color: var(--fg2); font-size: var(--ui-font-size-12); }
 	.okugaki-progress span { width: 13px; height: 13px; border: 2px solid var(--border2); border-top-color: var(--accent); border-radius: 50%; animation: okugaki-spin .8s linear infinite; }
 	.okugaki-list { min-height: 160px; overflow-y: auto; padding: 18px 20px 24px; display: grid; gap: 16px; }
 	.okugaki-record { border: 1px solid var(--border); border-radius: 9px; padding: 14px 16px; background: var(--bg); }
-	.okugaki-record-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; color: var(--fg2); font-size: 12px; }
+	.okugaki-record-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; color: var(--fg2); font-size: var(--ui-font-size-12); }
 	.okugaki-body { white-space: pre-wrap; line-height: 1.85; font-family: serif; font-size: .92rem; }
-	.okugaki-warning { margin-top: 10px; color: #b98232; font-size: 12px; }
+	.okugaki-warning { margin-top: 10px; color: #b98232; font-size: var(--ui-font-size-12); }
 	@keyframes okugaki-spin { to { transform: rotate(360deg); } }
 	.card-main { user-select: none; display: block; width: 100%; min-width: 0; border: 0; padding: 0; background: transparent; color: inherit; cursor: pointer; text-align: left; font: inherit; }
 	.card-main:disabled { cursor: default; }
@@ -988,22 +988,22 @@ $effect(() => {
 	/* One line, never wrapping: the card has a fixed width and the operation
 	   label sets the row height. The model name gives up its width first and
 	   ends in an ellipsis rather than pushing the label onto a second line. */
-	.operation { min-height: 18px; margin-bottom: 6px; color: var(--fg2); font-size: 12px; display: flex; align-items: baseline; gap: 5px; white-space: nowrap; }
+	.operation { min-height: 18px; margin-bottom: 6px; color: var(--fg2); font-size: var(--ui-font-size-12); display: flex; align-items: baseline; gap: 5px; white-space: nowrap; }
 	.operation > span:first-child { flex: 0 0 auto; }
-	.operation-model { min-width: 0; overflow: hidden; text-overflow: ellipsis; color: var(--fg2); font-size: 12px; }
+	.operation-model { min-width: 0; overflow: hidden; text-overflow: ellipsis; color: var(--fg2); font-size: var(--ui-font-size-12); }
 	.identity-marks { min-width: 0; display: flex; flex-wrap: wrap; justify-content: flex-start; gap: 3px; }
-	.identity-mark, .active-mark { border-radius: 999px; padding: 1px 5px; font-size: 12px; }
+	.identity-mark, .active-mark { border-radius: 999px; padding: 1px 5px; font-size: var(--ui-font-size-12); }
 	.identity-mark { color: var(--fg2); background: var(--bg2); }
 	.active-mark { color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, var(--panel)); font-weight: 700; }
 	.preview { width: 100%; height: 118px; border-radius: 6px; overflow: hidden; background: var(--bg2); }
 	.preview :global(.history-thumbnail) { width: 100%; height: 100%; aspect-ratio: auto; }
 	.preview :global(svg) { width: 100%; height: 100%; display: block; }
 	.preview span { height: 100%; display: grid; place-items: center; color: var(--fg2); }
-	.trash-state { margin-top: 6px; color: var(--fg2); font-size: 12px; }
-	.display-label { margin-top: 7px; color: var(--fg2); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-	.meta { margin-top: 4px; min-width: 0; height: 2.7em; overflow: hidden; font-size: 14px; line-height: 1.35; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; }
-	.branch-toggle { width: 100%; margin-top: 7px; padding: 5px; font-size: 12px; }
-	.node-details { margin-top: 7px; font-size: 12px; }
+	.trash-state { margin-top: 6px; color: var(--fg2); font-size: var(--ui-font-size-12); }
+	.display-label { margin-top: 7px; color: var(--fg2); font-size: var(--ui-font-size-12); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+	.meta { margin-top: 4px; min-width: 0; height: 2.7em; overflow: hidden; font-size: var(--ui-font-size-14); line-height: 1.35; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; }
+	.branch-toggle { width: 100%; margin-top: 7px; padding: 5px; font-size: var(--ui-font-size-12); }
+	.node-details { margin-top: 7px; font-size: var(--ui-font-size-12); }
 	.node-details summary { cursor: pointer; color: var(--fg2); }
 	.node-details dl { display: grid; grid-template-columns: auto 1fr; gap: 2px 6px; margin: 6px 0 0; }
 	.node-details dt { color: var(--fg2); }
@@ -1017,6 +1017,6 @@ $effect(() => {
 	.note-editor textarea { box-sizing: border-box; width: 100%; min-height: 4.5em; resize: vertical; border: 1px solid var(--border2); border-radius: 5px; padding: 5px 6px; background: var(--bg); color: var(--fg); font: inherit; line-height: 1.35; }
 	.note-editor button { justify-self: end; border: 1px solid var(--border2); border-radius: 5px; padding: 4px 9px; background: var(--panel); color: var(--fg); cursor: pointer; }
 	.note-editor button:disabled { opacity: .45; cursor: default; }
-	.promote { width: 100%; margin-top: 7px; font-size: 12px; }
+	.promote { width: 100%; margin-top: 7px; font-size: var(--ui-font-size-12); }
 	.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 </style>

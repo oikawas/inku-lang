@@ -129,10 +129,10 @@
 	.work-edit-dialog { position: fixed; z-index: 1461; top: 50%; left: 50%; transform: translate(-50%, -50%); box-sizing: border-box; width: min(780px, 96vw); max-height: 92vh; overflow: hidden; display: flex; flex-direction: column; border: 1px solid var(--border2); border-radius: 12px; background: var(--panel); box-shadow: 0 24px 80px #000a; }
 	.work-edit-dialog > header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; padding: 18px 20px 14px; margin: 0; border-bottom: 1px solid var(--border); }
 	.work-edit-dialog > header h2 { margin: 0 0 4px; font-size: 1.05rem; }
-	.work-edit-dialog > header p { margin: 0; color: var(--fg2); font-size: 12px; }
+	.work-edit-dialog > header p { margin: 0; color: var(--fg2); font-size: var(--ui-font-size-12); }
 	.work-edit-dialog > header button { border: 0; background: transparent; color: var(--fg2); font-size: 1.35rem; cursor: pointer; }
 	.work-edit-body { min-height: 0; overflow-y: auto; display: grid; gap: 8px; padding: 18px 20px; }
-	.work-edit-body label { color: var(--fg2); font-size: 12px; font-weight: 700; }
+	.work-edit-body label { color: var(--fg2); font-size: var(--ui-font-size-12); font-weight: 700; }
 	.work-edit-body textarea { box-sizing: border-box; width: 100%; min-height: 180px; resize: vertical; border: 1px solid var(--border2); border-radius: 8px; padding: 12px 14px; background: var(--bg); color: var(--fg); font: inherit; line-height: 1.65; }
 	.work-edit-dialog > footer { display: flex; justify-content: flex-end; gap: 8px; padding: 12px 20px 16px; border-top: 1px solid var(--border); }
 	.work-edit-dialog > footer :global(.wild-inline), .sketch-current { margin-right: auto; }
@@ -140,8 +140,8 @@
 	.work-edit-dialog > footer .work-edit-draw { border-color: var(--action-bg); background: var(--action-bg); color: var(--action-fg); font-weight: 700; }
 	.work-edit-dialog > footer .work-edit-draw:hover:not(:disabled) { border-color: var(--action-hover); background: var(--action-hover); }
 	.work-edit-dialog button:disabled, .work-edit-dialog textarea:disabled { opacity: .55; cursor: default; }
-	.sketch-parent-prose { margin: 0; font-size: 12px; line-height: 1.7; color: var(--fg2); white-space: pre-wrap; }
+	.sketch-parent-prose { margin: 0; font-size: var(--ui-font-size-12); line-height: 1.7; color: var(--fg2); white-space: pre-wrap; }
 	.sketch-parent-prose.empty, .sketch-current { color: var(--fg2); }
-	.sketch-current { font-size: 12px; }
+	.sketch-current { font-size: var(--ui-font-size-12); }
 	.work-edit-error { color: var(--danger, #9b3d32); white-space: pre-line; }
 </style>

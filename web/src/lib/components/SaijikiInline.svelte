@@ -135,14 +135,14 @@
 		flex-shrink: 0;
 	}
 	.saijiki-title {
-		font-size: 14px;
+		font-size: var(--ui-font-size-14);
 		font-weight: 500;
 		letter-spacing: 0.06em;
 		color: var(--fg);
 	}
 	.saijiki-hint {
 		min-width: 0;
-		font-size: 12px;
+		font-size: var(--ui-font-size-12);
 		line-height: 1.45;
 		color: var(--fg3);
 	}
@@ -195,18 +195,18 @@
 		margin-top: 7px;
 	}
 	.saijiki-preview-title {
-		font-size: 12px;
+		font-size: var(--ui-font-size-12);
 		font-weight: 600;
 		color: var(--fg);
 	}
 	.saijiki-preview-effect {
-		font-size: 12px;
+		font-size: var(--ui-font-size-12);
 		line-height: 1.45;
 		color: var(--fg2);
 	}
 	.saijiki-preview-example,
 	.saijiki-preview-placeholder {
-		font-size: 12px;
+		font-size: var(--ui-font-size-12);
 		line-height: 1.45;
 		color: var(--fg3);
 	}
@@ -230,7 +230,7 @@
 	}
 	.saijiki-cat-head {
 		margin-bottom: 6px;
-		font-size: 12px;
+		font-size: var(--ui-font-size-12);
 		font-weight: 500;
 		color: var(--fg);
 		letter-spacing: 0.08em;

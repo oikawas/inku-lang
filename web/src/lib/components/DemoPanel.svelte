@@ -243,11 +243,11 @@
 </div>
 
 <style>
-	.demo-panel { display: flex; flex-direction: column; gap: 16px; font-size: 14px; }
+	.demo-panel { display: flex; flex-direction: column; gap: 16px; font-size: var(--ui-font-size-14); }
 	/* The seed phrase leads the panel, so its label carries the section heading
 	   and matches the label over the description box in InputPanel. */
 	.seed-label {
-		font-size: 14px;
+		font-size: var(--ui-font-size-14);
 		line-height: 1.5;
 		color: var(--fg2);
 	}
@@ -263,7 +263,7 @@
 		flex-direction: column;
 		gap: 6px;
 		color: var(--fg2);
-		font-size: 14px;
+		font-size: var(--ui-font-size-14);
 	}
 	.check-row {
 		flex-direction: row;
@@ -280,7 +280,7 @@
 		background: var(--panel);
 		color: var(--fg);
 		font: inherit;
-		font-size: 14px;
+		font-size: var(--ui-font-size-14);
 		padding: 8px 10px;
 	}
 	textarea { resize: vertical; line-height: 1.5; }
@@ -302,7 +302,7 @@
 		background: var(--panel);
 		color: var(--fg2);
 		font: inherit;
-		font-size: 14px;
+		font-size: var(--ui-font-size-14);
 		line-height: 1;
 		cursor: pointer;
 	}
@@ -321,7 +321,7 @@
 		border-radius: var(--r);
 		background: var(--bg2);
 		color: var(--fg2);
-		font-size: 13px;
+		font-size: var(--ui-font-size-13);
 		font-variant-numeric: tabular-nums;
 	}
 	.stats-row {
@@ -343,18 +343,18 @@
 		align-items: center;
 		gap: 8px;
 		color: var(--fg3);
-		font-size: 13px;
+		font-size: var(--ui-font-size-13);
 		min-height: 32px;
 	}
 	.status-text {
 		margin: 0;
 		color: var(--fg2);
-		font-size: 14px;
+		font-size: var(--ui-font-size-14);
 	}
 	.error-text {
 		margin: 0;
 		color: var(--danger);
-		font-size: 14px;
+		font-size: var(--ui-font-size-14);
 	}
 	.demo-observe { display: flex; flex-direction: column; gap: 12px; }
 	.observe-block {
@@ -367,7 +367,7 @@
 		padding: 8px 10px;
 		border-bottom: 1px solid var(--border);
 		color: var(--fg3);
-		font-size: 12px;
+		font-size: var(--ui-font-size-12);
 		text-transform: uppercase;
 		letter-spacing: 0.08em;
 	}
@@ -377,7 +377,7 @@
 		overflow: auto;
 		padding: 10px;
 		color: var(--fg);
-		font-size: 14px;
+		font-size: var(--ui-font-size-14);
 		line-height: 1.55;
 		white-space: pre-wrap;
 	}

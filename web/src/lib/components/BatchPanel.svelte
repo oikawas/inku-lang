@@ -342,7 +342,7 @@
 		align-items: baseline;
 		justify-content: space-between;
 		gap: 8px;
-		font-size: 14px;
+		font-size: var(--ui-font-size-14);
 		line-height: 1.5;
 		color: var(--fg2);
 		font-weight: 400;
@@ -353,7 +353,7 @@
 	.batch-interrupted-mark {
 		flex: 0 0 auto;
 		color: var(--danger);
-		font-size: 12px;
+		font-size: var(--ui-font-size-12);
 		font-weight: 500;
 	}
 	.batch-wrap {
@@ -372,7 +372,7 @@
 	.line-nums {
 		flex: 0 0 auto;
 		background: var(--bg2); border-right: 1px solid var(--border);
-		padding: 9px 6px; font-size: 14px; line-height: 1.65;
+		padding: 9px 6px; font-size: var(--ui-font-size-14); line-height: 1.65;
 		text-align: right; color: var(--fg3); user-select: none;
 		font-family: inherit;
 		white-space: pre; min-width: 2rem; font-variant-numeric: tabular-nums;
@@ -384,7 +384,7 @@
 		border: none;
 		border-radius: 0;
 		background: transparent; color: var(--fg);
-		font-family: inherit; font-size: 14px; line-height: 1.65;
+		font-family: inherit; font-size: var(--ui-font-size-14); line-height: 1.65;
 		resize: none; outline: none;
 		white-space: pre;
 		overflow-wrap: normal;
@@ -406,7 +406,7 @@
 		border-radius: 4px;
 		background: var(--bg2);
 		padding: 8px 10px;
-		font-size: 14px;
+		font-size: var(--ui-font-size-14);
 		line-height: 1.65;
 	}
 	.batch-current-num {
@@ -430,7 +430,7 @@
 		background: var(--panel);
 		overflow: hidden;
 	}
-	.batch-info { margin: 5px 0 0; font-size: 12px; color: var(--fg3); }
+	.batch-info { margin: 5px 0 0; font-size: var(--ui-font-size-12); color: var(--fg3); }
 	.batch-history {
 		position: relative;
 		display: flex;
@@ -512,7 +512,7 @@
 		gap: 8px;
 		margin-bottom: 6px;
 		color: var(--fg2);
-		font-size: 12px;
+		font-size: var(--ui-font-size-12);
 		font-weight: 600;
 	}
 	.batch-next-conditions-head span:last-child { color: var(--fg3); font-weight: 400; }
@@ -528,8 +528,8 @@
 		border-radius: var(--r);
 		background: var(--bg2);
 	}
-	.batch-resume-copy { min-width: 0; color: var(--fg2); font-size: 12px; line-height: 1.5; }
-	.batch-resume-copy strong { display: block; color: var(--fg); font-size: 14px; }
+	.batch-resume-copy { min-width: 0; color: var(--fg2); font-size: var(--ui-font-size-12); line-height: 1.5; }
+	.batch-resume-copy strong { display: block; color: var(--fg); font-size: var(--ui-font-size-14); }
 	.batch-resume-copy p { margin: 2px 0; }
 	.batch-resume-copy span { display: block; color: var(--fg3); }
 	.batch-resume-btn { flex: 0 0 auto; }
@@ -543,7 +543,7 @@
 		display: flex;
 		align-items: center;
 		color: var(--fg2);
-		font-size: 12px;
+		font-size: var(--ui-font-size-12);
 		white-space: nowrap;
 	}
 	.batch-actions-busy {
@@ -566,7 +566,7 @@
 		color: var(--fg3);
 		font-variant-numeric: normal;
 	}
-	.error-text { color: var(--danger); font-size: 12px; white-space: pre-line; }
+	.error-text { color: var(--danger); font-size: var(--ui-font-size-12); white-space: pre-line; }
 	.batch-summary {
 		margin-top: 8px;
 		padding: 8px 10px;
@@ -574,7 +574,7 @@
 		border-radius: var(--r);
 		background: #f5f8f1;
 		color: #40552b;
-		font-size: 12px;
+		font-size: var(--ui-font-size-12);
 	}
 	.batch-summary.has-failures {
 		border-color: #d9b4ae;
@@ -582,7 +582,7 @@
 		color: #7c332b;
 	}
 	.batch-summary-line { font-weight: 500; }
-	.batch-failure-title { margin-top: 6px; color: var(--fg2); font-size: 11px; }
+	.batch-failure-title { margin-top: 6px; color: var(--fg2); font-size: var(--ui-font-size-11); }
 	.batch-failure-list {
 		margin: 4px 0 0;
 		padding: 0;
@@ -606,7 +606,7 @@
 	.batch-failure-message {
 		grid-column: 2;
 		color: var(--danger);
-		font-size: 11px;
+		font-size: var(--ui-font-size-11);
 		word-break: break-word;
 	}
 	.batch-observe {
@@ -623,7 +623,7 @@
 		padding: 6px 9px;
 		border-bottom: 1px solid #d9dfd1;
 		color: #4a5b38;
-		font-size: 11px;
+		font-size: var(--ui-font-size-11);
 		font-weight: 600;
 	}
 	.batch-observe-meta {
@@ -670,7 +670,7 @@
 		overflow: auto;
 		color: var(--fg2);
 		font-family: inherit;
-		font-size: 12px;
+		font-size: var(--ui-font-size-12);
 		line-height: 1.55;
 		white-space: pre-wrap;
 	}

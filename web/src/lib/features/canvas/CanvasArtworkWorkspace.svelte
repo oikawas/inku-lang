@@ -474,13 +474,13 @@
 			</div>
 
 <style>
-	.unsaved-refinement-badge { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); z-index: 5; padding: 5px 9px; border: 1px solid var(--border2); border-radius: 999px; background: color-mix(in srgb, var(--panel) 94%, transparent); color: var(--fg2); box-shadow: 0 2px 10px #0002; font-size: 11px; white-space: nowrap; }
+	.unsaved-refinement-badge { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); z-index: 5; padding: 5px 9px; border: 1px solid var(--border2); border-radius: 999px; background: color-mix(in srgb, var(--panel) 94%, transparent); color: var(--fg2); box-shadow: 0 2px 10px #0002; font-size: var(--ui-font-size-11); white-space: nowrap; }
 	/* The stack owns the corner; each badge only paints itself, so a second one
 	   sits under the first instead of on top of it. */
 	.fallback-badges { position: absolute; top: 12px; right: 12px; z-index: 5; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
-	.interpret-fallback-badge, .compose-fallback-badge { padding: 5px 9px; border: 1px solid #c08a3e; border-radius: 999px; background: color-mix(in srgb, #f6e2bd 88%, transparent); color: #6b4410; box-shadow: 0 2px 10px #0002; font-size: 11px; white-space: nowrap; }
+	.interpret-fallback-badge, .compose-fallback-badge { padding: 5px 9px; border: 1px solid #c08a3e; border-radius: 999px; background: color-mix(in srgb, #f6e2bd 88%, transparent); color: #6b4410; box-shadow: 0 2px 10px #0002; font-size: var(--ui-font-size-11); white-space: nowrap; }
 	:global(html[data-theme='dark']) .interpret-fallback-badge, :global(html[data-theme='dark']) .compose-fallback-badge { border-color: #d8a75c; background: color-mix(in srgb, #5a4318 88%, transparent); color: #f4dcb0; }
-	.lineage-intermediate-notice { position: absolute; top: 48px; left: 50%; transform: translateX(-50%); z-index: 6; max-width: min(520px, calc(100% - 48px)); padding: 7px 10px; border-radius: var(--r); background: var(--tooltip-bg); color: var(--tooltip-fg); box-shadow: 0 4px 18px #0004; font-size: 11px; line-height: 1.45; text-align: center; }
+	.lineage-intermediate-notice { position: absolute; top: 48px; left: 50%; transform: translateX(-50%); z-index: 6; max-width: min(520px, calc(100% - 48px)); padding: 7px 10px; border-radius: var(--r); background: var(--tooltip-bg); color: var(--tooltip-fg); box-shadow: 0 4px 18px #0004; font-size: var(--ui-font-size-11); line-height: 1.45; text-align: center; }
 	.canvas-content {
 		position: relative;
 		width: 100%;
@@ -518,7 +518,7 @@
 		align-items: center;
 		justify-content: center;
 		color: var(--fg3);
-		font-size: 13px;
+		font-size: var(--ui-font-size-13);
 		background: var(--canvas-paper);
 	}
 	.canvas-placeholder-art svg {
@@ -576,7 +576,7 @@
 	   flags, and the hash is the character the value itself starts with. */
 	.canvas-star-btn, .canvas-revision-btn, .canvas-hash-btn {
 		font-family: inherit;
-		font-size: 15px;
+		font-size: var(--ui-font-size-15);
 		line-height: 1;
 	}
 	.canvas-hash-btn { font-weight: 600; }
@@ -605,7 +605,7 @@
 		border-radius: 8px;
 		background: rgba(17,17,17,0.78);
 		color: #fffdf8;
-		font-size: 14px;
+		font-size: var(--ui-font-size-14);
 		line-height: 1.55;
 		text-align: left;
 		box-shadow: 0 4px 18px rgba(0,0,0,0.22);
@@ -650,7 +650,7 @@
 		height: 28px;
 		border: none;
 		background: none;
-		font-size: 16px;
+		font-size: var(--ui-font-size-16);
 		color: var(--floating-control-fg);
 		cursor: pointer;
 		display: flex;
@@ -660,7 +660,7 @@
 	}
 	.zoom-controls button:hover { background: var(--floating-control-hover); }
 	.zoom-pct {
-		font-size: 11px;
+		font-size: var(--ui-font-size-11);
 		color: var(--floating-control-fg);
 		font-weight: 500;
 		font-variant-numeric: tabular-nums;
@@ -668,7 +668,7 @@
 		text-align: center;
 		user-select: none;
 	}
-	.zoom-reset { border-left: 1px solid var(--border) !important; font-size: 11px !important; color: var(--floating-control-muted) !important; }
+	.zoom-reset { border-left: 1px solid var(--border) !important; font-size: var(--ui-font-size-11) !important; color: var(--floating-control-muted) !important; }
 	.download-icon {
 		width: 14px;
 		height: 14px;
@@ -709,7 +709,7 @@
 		color: var(--fg);
 		cursor: pointer;
 		font-family: inherit;
-		font-size: 13px;
+		font-size: var(--ui-font-size-13);
 		white-space: nowrap;
 	}
 	.export-menu-group:last-child > button:last-child { border-bottom: none; }
@@ -722,12 +722,12 @@
 	.export-menu-head {
 		padding: 7px 14px 3px;
 		color: var(--fg3);
-		font-size: 10px;
+		font-size: var(--ui-font-size-10);
 		font-weight: 600;
 		letter-spacing: .08em;
 	}
 	.png-size { font-weight: 500; }
-	.png-sub { color: var(--fg3); font-size: 11px; white-space: nowrap; }
+	.png-sub { color: var(--fg3); font-size: var(--ui-font-size-11); white-space: nowrap; }
 	.svg-menu-head {
 		display: flex;
 		align-items: center;
@@ -736,7 +736,7 @@
 		padding: 8px 12px;
 		border-bottom: 1px solid var(--border);
 		color: var(--fg2);
-		font-size: 12px;
+		font-size: var(--ui-font-size-12);
 		font-weight: 600;
 	}
 	.svg-help-btn {
@@ -747,7 +747,7 @@
 		background: var(--bg);
 		color: var(--fg2);
 		font: inherit;
-		font-size: 11px;
+		font-size: var(--ui-font-size-11);
 		line-height: 1;
 		cursor: pointer;
 		display: inline-flex;
@@ -766,7 +766,7 @@
 	.svg-help-popover table {
 		width: 100%;
 		border-collapse: collapse;
-		font-size: 11px;
+		font-size: var(--ui-font-size-11);
 		line-height: 1.45;
 	}
 	.svg-help-popover th,
@@ -791,7 +791,7 @@
 			left: 10%;
 			right: 10%;
 			bottom: 58px;
-			font-size: 13px;
+			font-size: var(--ui-font-size-13);
 		}
 		.instruction-caption.vertical { top: 50px; right: auto; bottom: 56px; left: 8px; max-width: min(46%, 12em); }
 		.instruction-caption.vertical.caption-right { right: 8px; left: auto; }

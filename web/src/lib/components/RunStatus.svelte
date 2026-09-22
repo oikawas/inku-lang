@@ -135,7 +135,7 @@
 		text-align: right;
 	}
 	.run-label {
-		font-size: 12px;
+		font-size: var(--ui-font-size-12);
 		font-weight: 500;
 		color: var(--fg);
 		white-space: nowrap;
@@ -143,7 +143,7 @@
 		text-overflow: ellipsis;
 	}
 	.run-model {
-		font-size: 11px;
+		font-size: var(--ui-font-size-11);
 		color: var(--fg3);
 		line-height: 1.35;
 		overflow-wrap: anywhere;
@@ -151,7 +151,7 @@
 	.run-meta {
 		display: flex;
 		gap: 8px;
-		font-size: 11px;
+		font-size: var(--ui-font-size-11);
 		color: var(--fg3);
 		font-variant-numeric: tabular-nums;
 		white-space: nowrap;
@@ -173,7 +173,7 @@
 		width: auto;
 		min-width: 0;
 		padding: 7px 14px;
-		font-size: 13px;
+		font-size: var(--ui-font-size-13);
 		letter-spacing: 0.06em;
 	}
 </style>

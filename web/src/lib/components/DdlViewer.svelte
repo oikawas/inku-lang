@@ -90,7 +90,7 @@
 	}
 	.ddl-viewer-label {
 		margin-right: auto;
-		font-size: 12px;
+		font-size: var(--ui-font-size-12);
 		font-weight: 600;
 		color: var(--fg2);
 	}
@@ -100,7 +100,7 @@
 		background: transparent;
 		color: var(--fg);
 		font-family: inherit;
-		font-size: 14px;
+		font-size: var(--ui-font-size-14);
 		line-height: 1.78;
 		white-space: pre-wrap;
 		word-break: break-word;
@@ -125,13 +125,13 @@
 		background: none;
 		color: var(--fg2);
 		font-family: inherit;
-		font-size: 12px;
+		font-size: var(--ui-font-size-12);
 		cursor: pointer;
 		text-align: left;
 	}
 	.ddl-expanded-arrow {
 		display: inline-block;
-		font-size: 8px;
+		font-size: var(--ui-font-size-8);
 		transition: transform 0.15s ease;
 	}
 	.ddl-expanded-arrow.open {

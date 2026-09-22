@@ -110,7 +110,7 @@
 	}
 	.sketch-menu-head {
 		padding: 6px 8px 8px;
-		font-size: 11px;
+		font-size: var(--ui-font-size-11);
 		color: var(--fg3);
 		border-bottom: 1px solid var(--border);
 		margin-bottom: 4px;
@@ -131,14 +131,14 @@
 	.sketch-menu button:hover { background: var(--bg2); }
 	.sketch-menu button.selected { background: var(--bg2); box-shadow: inset 3px 0 0 var(--fg2); }
 	.option-head { display: inline-flex; align-items: baseline; gap: 4px; }
-	.option-label { font-size: 13px; font-weight: 500; }
+	.option-label { font-size: var(--ui-font-size-13); font-weight: 500; }
 	/* Weaker than the label: a note about the option, not part of its name. */
-	.option-note { font-size: 11px; color: var(--fg3); font-weight: 400; }
-	.option-intent { font-size: 11px; line-height: 1.35; color: var(--fg3); }
+	.option-note { font-size: var(--ui-font-size-11); color: var(--fg3); font-weight: 400; }
+	.option-intent { font-size: var(--ui-font-size-11); line-height: 1.35; color: var(--fg3); }
 
 	/* compact variant (dialogs) */
 	.sketch-inline { display: inline-flex; align-items: center; gap: 8px; min-width: 0; }
-	.sketch-inline-label { font-size: 11px; color: var(--fg3); white-space: nowrap; }
+	.sketch-inline-label { font-size: var(--ui-font-size-11); color: var(--fg3); white-space: nowrap; }
 	.sketch-inherit { margin-left: 2px; color: var(--fg3); }
 	.sketch-seg { display: inline-flex; border: 1px solid var(--border2); border-radius: var(--r); overflow: hidden; }
 	.sketch-seg button {
@@ -148,7 +148,7 @@
 		background: var(--panel);
 		color: var(--fg2);
 		font: inherit;
-		font-size: 11px;
+		font-size: var(--ui-font-size-11);
 		cursor: pointer;
 		white-space: nowrap;
 	}

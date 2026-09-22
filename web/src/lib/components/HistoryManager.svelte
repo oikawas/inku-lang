@@ -1085,8 +1085,8 @@
 	.lineage-representative { flex: 0 0 56px; width: 56px; height: 56px; padding: 0; border: 0; border-radius: var(--r); overflow: hidden; background: var(--bg); cursor: pointer; }
 	.lineage-representative :global(svg) { width: 100%; height: 100%; }
 	.lineage-group-summary { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
-	.lineage-group-summary strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; font-weight: 600; }
-	.lineage-group-summary > span { color: var(--fg3); font-size: 10px; }
+	.lineage-group-summary strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--ui-font-size-12); font-weight: 600; }
+	.lineage-group-summary > span { color: var(--fg3); font-size: var(--ui-font-size-10); }
 	.current-lineage-badge { align-self: flex-start; padding: 2px 6px; border-radius: 999px; background: var(--accent-light); color: var(--accent) !important; }
 	.lineage-group-tools { display: flex; justify-content: flex-end; padding: 6px 10px; border-top: 1px solid var(--border); background: var(--bg); }
 	.lineage-member-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); gap: 8px; padding: 8px 10px 12px; border-top: 1px solid var(--border); background: var(--bg); }
@@ -1095,7 +1095,7 @@
 	.lineage-member > .selection-checkbox { position: absolute; top: 8px; left: 8px; z-index: 5; }
 	.lineage-member-main { width: 100%; min-width: 0; padding: 0; border: 0; background: transparent; color: var(--fg2); cursor: pointer; text-align: left; }
 	.lineage-member-main :global(svg) { width: 100%; max-height: 110px; }
-	.lineage-member-main span { display: block; overflow: hidden; margin-top: 4px; text-overflow: ellipsis; white-space: nowrap; font-size: 10px; }
+	.lineage-member-main span { display: block; overflow: hidden; margin-top: 4px; text-overflow: ellipsis; white-space: nowrap; font-size: var(--ui-font-size-10); }
 	.lineage-member-actions { display: flex; align-items: center; gap: 4px; margin-top: 5px; }
 	.lineage-member-actions .ghost-btn, .lineage-member-actions .danger-btn { margin-left: 0; }
 	.lineage-history-list.list-mode .lineage-member-grid { display: flex; flex-direction: column; }
@@ -1123,7 +1123,7 @@
 		min-width: 16px; padding: 1px 5px;
 		border-radius: 999px;
 		background: var(--accent-light); color: var(--accent);
-		font-size: 9px; line-height: 1.5; text-align: center;
+		font-size: var(--ui-font-size-9); line-height: 1.5; text-align: center;
 		font-variant-numeric: tabular-nums;
 	}
 	@media (max-width: 640px) {
@@ -1159,10 +1159,10 @@
 	}
 	.history-head-left { flex: 1 1 auto; }
 	.history-head-actions { flex: 0 0 auto; }
-	.history-control-group { display: flex; align-items: center; gap: 5px; color: var(--fg2); font-size: 12px; }
+	.history-control-group { display: flex; align-items: center; gap: 5px; color: var(--fg2); font-size: var(--ui-font-size-12); }
 	.catalog-modal-title {
 		flex: 0 0 auto;
-		font-size: 15px;
+		font-size: var(--ui-font-size-15);
 		font-weight: 300;
 		letter-spacing: 0.05em;
 	}
@@ -1206,7 +1206,7 @@
 	}
 	.history-mode-tabs { flex-shrink: 0; }
 	.history-manager-count {
-		font-size: 12px;
+		font-size: var(--ui-font-size-12);
 		color: var(--fg2);
 		font-variant-numeric: tabular-nums;
 		margin-right: 2px;
@@ -1217,7 +1217,7 @@
 		align-items: center;
 		gap: 6px;
 		color: var(--fg2);
-		font-size: 12px;
+		font-size: var(--ui-font-size-12);
 	}
 	.history-search input {
 		width: min(240px, 30vw);
@@ -1228,13 +1228,13 @@
 		border-radius: var(--r);
 		background: var(--panel);
 		color: var(--fg);
-		font-size: 12px;
+		font-size: var(--ui-font-size-12);
 		font-family: inherit;
 	}
 	.history-selection-status,
 	.history-selection-reset {
 		padding: 5px 12px;
-		font-size: 12px;
+		font-size: var(--ui-font-size-12);
 		border-bottom: 1px solid var(--border);
 	}
 	.history-selection-status { color: var(--accent); }
@@ -1249,7 +1249,7 @@
 	}
 	.history-preview-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
 	.history-preview-art :global(svg) { display: block; width: 100%; max-height: 240px; }
-	.history-preview-description { white-space: pre-wrap; font-size: 14px; line-height: 1.55; }
+	.history-preview-description { white-space: pre-wrap; font-size: var(--ui-font-size-14); line-height: 1.55; }
 	.history-preview-actions { display: flex; flex-wrap: wrap; gap: 6px; }
 	.history-manager-pager {
 		display: flex;
@@ -1257,7 +1257,7 @@
 		justify-content: center;
 		gap: 6px;
 		color: var(--fg2);
-		font-size: 12px;
+		font-size: var(--ui-font-size-12);
 		font-variant-numeric: tabular-nums;
 	}
 	.history-nav-btn { min-width: 74px; }
@@ -1315,7 +1315,7 @@
 	border-radius: 3px;
 	background: var(--thumb-plate-bg);
 	color: var(--thumb-plate-fg-read);
-	font: 600 10px/1 system-ui, sans-serif;
+	font: 600 var(--ui-font-size-10)/1 system-ui, sans-serif;
 }
 .selection-checkbox {
 	box-sizing: border-box;
@@ -1330,7 +1330,7 @@
 	background: color-mix(in srgb, var(--panel) 92%, transparent);
 	color: var(--accent-fg);
 	cursor: pointer;
-	font: 700 12px/1 system-ui, sans-serif;
+	font: 700 var(--ui-font-size-12)/1 system-ui, sans-serif;
 	box-shadow: 0 1px 3px rgba(0,0,0,.16);
 }
 .selection-checkbox:hover { border-color: var(--accent); }
@@ -1348,7 +1348,7 @@
 		border-radius: 50%;
 		background: var(--thumb-plate-bg);
 		color: var(--thumb-plate-fg);
-		font-size: 14px;
+		font-size: var(--ui-font-size-14);
 		line-height: 1;
 		cursor: pointer;
 		display: flex;
@@ -1375,7 +1375,7 @@
 		right: 2px;
 		width: 26px;
 		height: 26px;
-		font-size: 13px;
+		font-size: var(--ui-font-size-13);
 	}
 	.thumb {
 		flex-shrink: 0;
@@ -1390,7 +1390,7 @@
 		position: relative;
 		transition: border-color 0.1s;
 	}
-	.thumb-note { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--fg3); font-size: 10px; line-height: 1.25; }
+	.thumb-note { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--fg3); font-size: var(--ui-font-size-10); line-height: 1.25; }
 	.thumb-note span { margin-right: 4px; font-weight: 600; }
 	.thumb-action-row {
 		display: flex;
@@ -1456,7 +1456,7 @@
 		background: var(--panel);
 		color: var(--fg2);
 		font-family: inherit;
-		font-size: 10px;
+		font-size: var(--ui-font-size-10);
 		line-height: 1;
 		padding: 3px 7px;
 		cursor: copy;
@@ -1476,11 +1476,11 @@
 		padding: 0;
 		align-items: center;
 		justify-content: center;
-		font-size: 13px;
+		font-size: var(--ui-font-size-13);
 		font-weight: 600;
 	}
 	.table-hash {
-		font-size: 11px;
+		font-size: var(--ui-font-size-11);
 		white-space: nowrap;
 		word-break: normal;
 		overflow-wrap: normal;
@@ -1491,11 +1491,11 @@
 		order: -1;
 		min-width: 0;
 		color: var(--fg2);
-		font-size: 12px;
+		font-size: var(--ui-font-size-12);
 		line-height: 1.5;
 	}
 	.thumb-model .history-model-detail summary { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-	.thumb-model .history-model-detail > span { font-size: 12px; }
+	.thumb-model .history-model-detail > span { font-size: var(--ui-font-size-12); }
 	.manager-thumb {
 		width: 100%;
 	}
@@ -1516,7 +1516,7 @@
 		table-layout: fixed;
 		border-collapse: collapse;
 		background: var(--panel);
-		font-size: 12px;
+		font-size: var(--ui-font-size-12);
 	}
 	.history-table th,
 	.history-table td {
@@ -1539,9 +1539,9 @@
 	.table-model { vertical-align: top !important; overflow-wrap: anywhere; }
 	.history-model-detail + .history-model-detail { margin-top: 3px; }
 	.history-model-detail summary { cursor: pointer; overflow-wrap: anywhere; }
-	.history-model-detail > span { display: block; margin-top: 2px; color: var(--fg3); font-size: 12px; overflow-wrap: anywhere; }
+	.history-model-detail > span { display: block; margin-top: 2px; color: var(--fg3); font-size: var(--ui-font-size-12); overflow-wrap: anywhere; }
 	.model-role { margin-right: 3px; color: var(--fg2); white-space: nowrap; }
-	:global(.history-description) { color: var(--fg2); font-size: 14px; line-height: 1.4; }
+	:global(.history-description) { color: var(--fg2); font-size: var(--ui-font-size-14); line-height: 1.4; }
 	.table-svg-size { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
 	.table-actions { white-space: nowrap; }
 	/* --action-* is the theme-aware primary pair; var(--fg) with a hardcoded

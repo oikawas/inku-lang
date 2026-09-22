@@ -90,13 +90,13 @@
 		box-shadow: 0 16px 48px rgba(0, 0, 0, 0.28);
 	}
 	.replay-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
-	.replay-header h2 { margin: 0; color: var(--fg); font-size: 16px; font-weight: 600; }
-	.version-message { margin-top: 14px; padding: 9px 12px; border: 1px solid var(--border2); border-radius: var(--r); background: var(--bg2); color: var(--fg); font-size: 12px; line-height: 1.5; text-align: center; }
+	.replay-header h2 { margin: 0; color: var(--fg); font-size: var(--ui-font-size-16); font-weight: 600; }
+	.version-message { margin-top: 14px; padding: 9px 12px; border: 1px solid var(--border2); border-radius: var(--r); background: var(--bg2); color: var(--fg); font-size: var(--ui-font-size-12); line-height: 1.5; text-align: center; }
 	.comparison-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; margin-top: 14px; }
 	.artwork-card { min-width: 0; overflow: hidden; border: 1px solid var(--border2); border-radius: var(--r); background: var(--panel2); }
 	.artwork-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 9px 11px; border-bottom: 1px solid var(--border2); color: var(--fg); }
-	.artwork-heading strong { font-size: 13px; }
-	.artwork-heading span { color: var(--fg2); font-size: 12px; font-variant-numeric: tabular-nums; }
+	.artwork-heading strong { font-size: var(--ui-font-size-13); }
+	.artwork-heading span { color: var(--fg2); font-size: var(--ui-font-size-12); font-variant-numeric: tabular-nums; }
 	.artwork-frame { display: grid; min-height: 360px; place-items: center; padding: 12px; overflow: auto; background: var(--canvas-paper); }
 	.artwork-frame img { display: block; width: auto; max-width: 100%; height: auto; max-height: min(62vh, 620px); }
 	@media (max-width: 760px) {

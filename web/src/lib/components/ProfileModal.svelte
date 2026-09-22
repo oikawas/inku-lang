@@ -106,13 +106,13 @@
 		border-bottom: 1px solid var(--border);
 	}
 	.profile-title {
-		font-size: 14px;
+		font-size: var(--ui-font-size-14);
 		font-weight: 500;
 	}
 	.profile-sub {
 		margin-top: 3px;
 		color: var(--fg3);
-		font-size: 11px;
+		font-size: var(--ui-font-size-11);
 	}
 	.profile-body {
 		display: flex;
@@ -132,13 +132,13 @@
 	}
 	.profile-stat span {
 		color: var(--fg3);
-		font-size: 10px;
+		font-size: var(--ui-font-size-10);
 		text-transform: uppercase;
 		letter-spacing: 0.06em;
 	}
 	.profile-stat strong {
 		color: var(--fg);
-		font-size: 14px;
+		font-size: var(--ui-font-size-14);
 		font-weight: 500;
 		font-variant-numeric: tabular-nums;
 	}
@@ -147,7 +147,7 @@
 		flex-direction: column;
 		gap: 5px;
 		color: var(--fg3);
-		font-size: 10px;
+		font-size: var(--ui-font-size-10);
 		text-transform: uppercase;
 		letter-spacing: 0.06em;
 	}
@@ -159,7 +159,7 @@
 		border-radius: var(--r);
 		background: var(--panel);
 		color: var(--fg);
-		font-size: 12px;
+		font-size: var(--ui-font-size-12);
 		font-family: inherit;
 		text-transform: none;
 		letter-spacing: 0;
@@ -174,7 +174,7 @@
 	}
 	.profile-help {
 		color: var(--fg2);
-		font-size: 11px;
+		font-size: var(--ui-font-size-11);
 		line-height: 1.45;
 	}
 	.profile-status {
@@ -183,7 +183,7 @@
 		border-radius: var(--r);
 		background: var(--panel);
 		color: var(--fg2);
-		font-size: 12px;
+		font-size: var(--ui-font-size-12);
 	}
 	.profile-actions {
 		display: flex;

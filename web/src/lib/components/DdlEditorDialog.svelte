@@ -173,9 +173,9 @@
 		background: var(--panel2); box-shadow: 0 18px 56px rgba(0, 0, 0, .22); overflow: hidden;
 	}
 	.ddled-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; padding: 14px 18px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
-	.ddled-head h2 { margin: 0; color: var(--fg); font-size: 16px; font-weight: 500; }
-	.ddled-head p { margin: 4px 0 0; color: var(--fg3); font-size: 12px; line-height: 1.5; }
-	.ddled-close { flex-shrink: 0; width: 30px; height: 30px; padding: 0; border: 1px solid var(--border2); border-radius: var(--r); background: var(--panel); color: var(--fg2); font-size: 20px; cursor: pointer; }
+	.ddled-head h2 { margin: 0; color: var(--fg); font-size: var(--ui-font-size-16); font-weight: 500; }
+	.ddled-head p { margin: 4px 0 0; color: var(--fg3); font-size: var(--ui-font-size-12); line-height: 1.5; }
+	.ddled-close { flex-shrink: 0; width: 30px; height: 30px; padding: 0; border: 1px solid var(--border2); border-radius: var(--r); background: var(--panel); color: var(--fg2); font-size: var(--ui-font-size-20); cursor: pointer; }
 	.ddled-close:hover:not(:disabled) { background: var(--bg2); }
 	.ddled-body { display: flex; min-height: 0; flex: 1; padding: 14px 18px; }
 	.ddled-bottom { display: flex; align-items: flex-end; gap: 16px; padding: 10px 18px 14px; border-top: 1px solid var(--border); flex-shrink: 0; }
@@ -184,7 +184,7 @@
 	.ddled-settings { min-width: 0; }
 	.ddled-settings[inert] { opacity: .5; }
 	.ddled-foot { display: flex; flex-direction: column; gap: 8px; min-width: 0; max-width: 44%; }
-	.ddled-error { max-height: 80px; overflow: auto; color: var(--danger); font-size: 12px; overflow-wrap: anywhere; }
+	.ddled-error { max-height: 80px; overflow: auto; color: var(--danger); font-size: var(--ui-font-size-12); overflow-wrap: anywhere; }
 	.ddled-actions { display: flex; justify-content: flex-end; gap: 8px; }
 	.ddled-actions button { border: 1px solid var(--border2); border-radius: var(--btn-sm-radius); padding: 8px 18px; background: var(--panel); color: var(--fg2); font: inherit; font-size: var(--btn-sm-font-size); cursor: pointer; }
 	.ddled-actions .ddled-draw { border-color: var(--action-bg); background: var(--action-bg); color: var(--action-fg); min-width: 96px; }

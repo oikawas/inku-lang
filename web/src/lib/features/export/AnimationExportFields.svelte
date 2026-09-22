@@ -90,7 +90,7 @@
 		gap: 10px;
 		margin-top: 10px;
 	}
-	.animation-settings-grid label { display: flex; min-width: 0; flex-direction: column; gap: 5px; color: var(--fg2); font-size: 11px; }
+	.animation-settings-grid label { display: flex; min-width: 0; flex-direction: column; gap: 5px; color: var(--fg2); font-size: var(--ui-font-size-11); }
 	.animation-settings-grid select,
 	.animation-settings-grid input {
 		min-width: 0;
@@ -101,6 +101,6 @@
 		color: var(--fg);
 		font: inherit;
 	}
-	.animation-settings-grid small { color: var(--fg3); font-size: 10px; }
+	.animation-settings-grid small { color: var(--fg3); font-size: var(--ui-font-size-10); }
 	@media (max-width: 720px) { .animation-settings-grid { grid-template-columns: 1fr; } }
 </style>

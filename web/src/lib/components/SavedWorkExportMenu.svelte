@@ -221,16 +221,16 @@
 	.saved-work-export-menu { position: absolute; right: 0; z-index: 110; width: min(280px, calc(100vw - 32px)); max-height: min(520px, calc(100dvh - 160px)); overflow-y: auto; border: 1px solid var(--border2); border-radius: var(--r-lg); background: var(--panel); box-shadow: 0 4px 18px rgba(0, 0, 0, .18); }
 	.saved-work-export.canvas .saved-work-export-menu { right: 0; bottom: calc(100% + 6px); }
 	.saved-work-export:not(.canvas) .saved-work-export-menu { top: calc(100% + 6px); }
-	.saved-work-export-scope { display: grid; gap: 2px; padding: 8px 12px; border-bottom: 1px solid var(--border); color: var(--fg2); font-size: 12px; }
-	.saved-work-export-scope strong { color: var(--fg); font-size: 12px; }
-	.saved-work-export-target { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-bottom: 1px solid var(--border); color: var(--fg2); font-size: 12px; line-height: 1.5; }
+	.saved-work-export-scope { display: grid; gap: 2px; padding: 8px 12px; border-bottom: 1px solid var(--border); color: var(--fg2); font-size: var(--ui-font-size-12); }
+	.saved-work-export-scope strong { color: var(--fg); font-size: var(--ui-font-size-12); }
+	.saved-work-export-target { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-bottom: 1px solid var(--border); color: var(--fg2); font-size: var(--ui-font-size-12); line-height: 1.5; }
 	.saved-work-export-target span { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-clamp: 3; overflow: hidden; overflow-wrap: anywhere; }
-	.saved-work-export-target code { flex: 0 0 auto; font-size: 12px; }
+	.saved-work-export-target code { flex: 0 0 auto; font-size: var(--ui-font-size-12); }
 	.saved-work-export-target img { width: 34px; height: 34px; flex: 0 0 auto; object-fit: contain; border: 1px solid var(--border); background: var(--canvas-paper); }
 	.saved-work-export-group + .saved-work-export-group { border-top: 1px solid var(--border); }
-	.saved-work-export-heading { padding: 7px 12px 2px; color: var(--fg2); font-size: 12px; font-weight: 700; letter-spacing: .08em; }
-	.saved-work-export-group button { display: block; width: 100%; border: 0; padding: 7px 12px; background: transparent; color: var(--fg); cursor: pointer; font: inherit; font-size: 12px; text-align: left; }
+	.saved-work-export-heading { padding: 7px 12px 2px; color: var(--fg2); font-size: var(--ui-font-size-12); font-weight: 700; letter-spacing: .08em; }
+	.saved-work-export-group button { display: block; width: 100%; border: 0; padding: 7px 12px; background: transparent; color: var(--fg); cursor: pointer; font: inherit; font-size: var(--ui-font-size-12); text-align: left; }
 	.saved-work-export-group button:hover:not(:disabled) { background: var(--bg); }
 	.saved-work-export-group button:disabled { opacity: .55; cursor: default; }
-	.saved-work-export-error { margin: 0; padding: 8px 12px; border-top: 1px solid var(--border); color: var(--danger); font-size: 12px; }
+	.saved-work-export-error { margin: 0; padding: 8px 12px; border-top: 1px solid var(--border); color: var(--danger); font-size: var(--ui-font-size-12); }
 </style>

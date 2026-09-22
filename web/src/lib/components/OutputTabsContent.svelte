@@ -125,7 +125,7 @@
 		margin-top: 8px;
 	}
 	.prompt-head .prompt-label { margin: 0; }
-	.prompt-label { margin: 8px 0 3px; font-size: 11px; font-weight: 600; color: var(--fg2); }
+	.prompt-label { margin: 8px 0 3px; font-size: var(--ui-font-size-11); font-weight: 600; color: var(--fg2); }
 	.prompt-copy-btn {
 		width: 24px;
 		height: 24px;
@@ -170,7 +170,7 @@
 		overflow: auto;
 		white-space: pre-wrap;
 		word-break: break-word;
-		font-size: 11px;
+		font-size: var(--ui-font-size-11);
 		line-height: 1.5;
 		margin: 0;
 		font-family: inherit;
@@ -221,7 +221,7 @@
 		background: var(--panel);
 		overflow: auto;
 		font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
-		font-size: 12px;
+		font-size: var(--ui-font-size-12);
 		line-height: 1.5;
 	}
 	.score-line-nums {

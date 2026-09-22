@@ -138,7 +138,7 @@
 		background: var(--panel);
 	}
 	.popover-group-label {
-		font-size: 10px;
+		font-size: var(--ui-font-size-10);
 		color: var(--fg3);
 		text-transform: uppercase;
 		letter-spacing: 0.08em;
@@ -149,7 +149,7 @@
 		display: flex;
 		align-items: center;
 		gap: 8px;
-		font-size: 12px;
+		font-size: var(--ui-font-size-12);
 		color: var(--fg2);
 		cursor: pointer;
 	}
@@ -159,7 +159,7 @@
 		gap: 5px;
 		margin-top: 10px;
 		color: var(--fg3);
-		font-size: 12px;
+		font-size: var(--ui-font-size-12);
 		font-weight: 500;
 	}
 	.server-path-input-row { display: flex; gap: 8px; align-items: stretch; }
@@ -171,7 +171,7 @@
 		border-radius: var(--r);
 		background: var(--panel);
 		color: var(--fg);
-		font-size: 12px;
+		font-size: var(--ui-font-size-12);
 		font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 	}
 	.server-path-row.compact-control { width: min(100%, 280px); }
@@ -182,7 +182,7 @@
 		border-radius: var(--r);
 		background: var(--panel);
 		color: var(--fg);
-		font-size: 12px;
+		font-size: var(--ui-font-size-12);
 		font-family: inherit;
 	}
 	.info-dot {
@@ -196,7 +196,7 @@
 		border: 1px solid var(--border2);
 		border-radius: 50%;
 		color: var(--fg3);
-		font-size: 10px;
+		font-size: var(--ui-font-size-10);
 		line-height: 1;
 		text-transform: none;
 		letter-spacing: 0;
@@ -213,7 +213,7 @@
 		border-radius: var(--r);
 		background: var(--tooltip-bg);
 		color: var(--tooltip-fg);
-		font-size: 11px;
+		font-size: var(--ui-font-size-11);
 		line-height: 1.5;
 		text-align: left;
 		white-space: normal;
@@ -230,21 +230,21 @@
 		gap: 7px 12px;
 		align-items: baseline;
 		margin-bottom: 9px;
-		font-size: 12px;
+		font-size: var(--ui-font-size-12);
 	}
 	.settings-readonly-grid span { color: var(--fg3); }
 	.settings-readonly-grid .nowrap-label { white-space: nowrap; }
 	.settings-readonly-grid strong { color: var(--fg); font-weight: 500; min-width: 0; word-break: break-word; }
 	.settings-readonly-grid.compact { margin-top: 10px; margin-bottom: 0; }
 	.settings-inline-actions { display: flex; align-items: center; gap: 10px; }
-	.db-test-result { color: var(--fg2); font-size: 12px; }
+	.db-test-result { color: var(--fg2); font-size: var(--ui-font-size-12); }
 	.inline-message {
 		padding: 7px 9px;
 		border: 1px solid var(--border);
 		border-radius: var(--r);
 		background: var(--panel);
 		color: var(--fg2);
-		font-size: 12px;
+		font-size: var(--ui-font-size-12);
 	}
 	.primary-inline {
 		border-color: var(--accent);

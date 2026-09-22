@@ -79,7 +79,7 @@
 	}
 	.aspect-menu-head {
 		padding: 6px 8px 8px;
-		font-size: 11px;
+		font-size: var(--ui-font-size-11);
 		color: var(--fg3);
 		border-bottom: 1px solid var(--border);
 		margin-bottom: 4px;
@@ -112,18 +112,18 @@
 		gap: 8px;
 	}
 	.option-label {
-		font-size: 13px;
+		font-size: var(--ui-font-size-13);
 		font-weight: 500;
 	}
 	.option-ratio,
 	.option-meta {
-		font-size: 11px;
+		font-size: var(--ui-font-size-11);
 		color: var(--fg3);
 		white-space: nowrap;
 	}
 	.option-intent {
 		grid-column: 1 / -1;
-		font-size: 11px;
+		font-size: var(--ui-font-size-11);
 		line-height: 1.35;
 		color: var(--fg2);
 	}

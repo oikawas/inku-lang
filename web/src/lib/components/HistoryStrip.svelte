@@ -307,7 +307,7 @@
 		border-radius: 16px;
 		background: var(--panel);
 		color: var(--fg2);
-		font-size: 12px;
+		font-size: var(--ui-font-size-12);
 		font-weight: 500;
 		cursor: pointer;
 		font-family: inherit;
@@ -339,12 +339,12 @@
 	}
 	.lock-icon {
 		color: var(--fg3);
-		font-size: 10px;
+		font-size: var(--ui-font-size-10);
 	}
 	.history-head-actions { display: flex; align-items: center; gap: 8px; }
 	.history-page-nav { display: flex; align-items: center; gap: 6px; }
 	.history-page-indicator {
-		font-size: 11px;
+		font-size: var(--ui-font-size-11);
 		color: var(--fg3);
 		font-variant-numeric: tabular-nums;
 		min-width: 30px;
@@ -374,7 +374,7 @@
 		min-width: 28px;
 		height: 24px;
 		padding: 0;
-		font-size: 14px;
+		font-size: var(--ui-font-size-14);
 		line-height: 1;
 	}
 	.thumb-strip {
@@ -424,7 +424,7 @@
 		border-radius: 50%;
 		background: var(--thumb-plate-bg);
 		color: var(--thumb-plate-fg);
-		font-size: 10px;
+		font-size: var(--ui-font-size-10);
 		line-height: 1;
 		cursor: pointer;
 		display: flex;
@@ -441,7 +441,7 @@
 		pointer-events: none;
 		background: var(--tooltip-bg);
 		color: var(--tooltip-fg);
-		font-size: 11px;
+		font-size: var(--ui-font-size-11);
 		border-radius: var(--r);
 		padding: 8px 10px;
 		white-space: nowrap;
@@ -481,15 +481,15 @@
 	/* The first line reads as the heading of the tile and the second as its
 	   footnote, whichever two facts are in them -- the weight belongs to the
 	   position, not to the fact that used to sit there. */
-	.thumb-meta-first { font-size: 12px; font-weight: 650; color: var(--fg2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-	.thumb-meta-second { font-size: 12px; color: var(--fg2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+	.thumb-meta-first { font-size: var(--ui-font-size-12); font-weight: 650; color: var(--fg2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+	.thumb-meta-second { font-size: var(--ui-font-size-12); color: var(--fg2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 	.thumb-current-badge {
 		position: absolute;
 		bottom: 22px;
 		right: 3px;
 		background: var(--accent);
 		color: var(--accent-fg);
-		font-size: 9px;
+		font-size: var(--ui-font-size-9);
 		padding: 1px 4px;
 		border-radius: 2px;
 	}

@@ -52,7 +52,7 @@
 		border-radius: var(--r);
 		background: var(--tooltip-bg);
 		color: var(--tooltip-fg);
-		font-size: 11px;
+		font-size: var(--ui-font-size-11);
 		line-height: 1.45;
 		font-weight: 400;
 		letter-spacing: 0;

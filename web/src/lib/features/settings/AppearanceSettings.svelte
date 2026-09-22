@@ -4,6 +4,7 @@
 	import NumberStepper from '$lib/components/NumberStepper.svelte';
 	import { batchSettings, BATCH_RETRY_MAX, BATCH_RETRY_MIN } from '$lib/features/batch/settings.svelte';
 	import { captionSettings } from '$lib/features/canvas/caption-settings.svelte';
+	import { textSizeSettings } from '$lib/features/appearance/text-size.svelte';
 	import { UI_VISIBILITY_KEYS, type UiCustomVisibility, type UiMode, type UiVisibilityKey } from '$lib/uiMode';
 	import { canAddHistoryStripField, HISTORY_STRIP_FIELDS, type HistoryStripField } from '$lib/historyStripFields';
 	import './appearance-settings.css';
@@ -29,6 +30,17 @@
 		onToggleHistoryStripField,
 		onSetUiMode, onSetUiCustomItem
 	}: Props = $props();
+
+	function textSizeLevel(): string {
+		const labels = [
+			t().settingsTextSizeVerySmall,
+			t().settingsTextSizeStandard,
+			t().settingsTextSizeLarge,
+			t().settingsTextSizeVeryLarge,
+			t().settingsTextSizeLargest
+		];
+		return labels[textSizeSettings.step] ?? t().settingsTextSizeStandard;
+	}
 </script>
 
 			{#if section === 'making'}
@@ -47,6 +59,35 @@
 				</div>
 			</div>
 			{:else}
+			<div class="popover-group text-size-settings">
+				<div class="popover-group-label">{t().settingsTextSizeLabel}</div>
+				<div id="text-size-description" class="db-test-result">{t().settingsTextSizeDescription}</div>
+				<div class="text-size-control">
+					<span>{t().settingsTextSizeSmallEnd}</span>
+					<input
+						id="text-size"
+						type="range"
+						min="0"
+						max="4"
+						step="1"
+						aria-label={t().settingsTextSizeLabel}
+						aria-describedby="text-size-description"
+						aria-valuetext={t().settingsTextSizeValue(Math.round(textSizeSettings.scale * 100), textSizeLevel())}
+						value={textSizeSettings.step}
+						oninput={(event) => textSizeSettings.preview(Number(event.currentTarget.value))}
+						onchange={() => textSizeSettings.save()}
+					/>
+					<span>{t().settingsTextSizeLargeEnd}</span>
+				</div>
+				<output for="text-size" class="text-size-value">
+					{t().settingsTextSizeValue(Math.round(textSizeSettings.scale * 100), textSizeLevel())}
+				</output>
+				<div class="settings-inline-actions">
+					<button class="ghost-btn" onclick={() => textSizeSettings.reset()}>{t().settingsTextSizeReset}</button>
+				</div>
+				{#if textSizeSettings.saving}<div class="inline-message">{t().settingsTextSizeSaving}</div>{/if}
+				{#if textSizeSettings.saveError}<div class="inline-message error-text">{t().settingsTextSizeSaveFailed} <button class="inline-action" onclick={() => textSizeSettings.save()}>{t().settingsTextSizeRetry}</button></div>{/if}
+			</div>
 			<div class="popover-group">
 				<div class="popover-group-label">{t().settingsCaptionPosition}</div>
 				<div class="db-test-result">{t().settingsCaptionPositionDescription}</div>

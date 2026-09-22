@@ -29,7 +29,7 @@
 		background: var(--stop-bg);
 		color: var(--stop-fg);
 		font-family: inherit;
-		font-size: 14px;
+		font-size: var(--ui-font-size-14);
 		font-weight: 500;
 		letter-spacing: 0.08em;
 		line-height: 1;

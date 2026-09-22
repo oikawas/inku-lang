@@ -140,12 +140,12 @@
 	form { display: grid; gap: 16px; }
 	header, .destination-row { display: flex; align-items: center; gap: 12px; }
 	header { justify-content: space-between; }
-	h2 { margin: 0; font-size: 16px; }
-	h3 { margin: 0; font-size: 13px; font-weight: 500; }
-	p { margin: 0; color: var(--fg2); font-size: 12px; }
+	h2 { margin: 0; font-size: var(--ui-font-size-16); }
+	h3 { margin: 0; font-size: var(--ui-font-size-13); font-weight: 500; }
+	p { margin: 0; color: var(--fg2); font-size: var(--ui-font-size-12); }
 	.destination { display: grid; gap: 8px; border-top: 1px solid var(--border); padding-top: 16px; }
 	.destination-row { flex-wrap: wrap; }
-	.destination-name { flex: 1; min-width: 120px; overflow-wrap: anywhere; font-size: 12px; }
+	.destination-name { flex: 1; min-width: 120px; overflow-wrap: anywhere; font-size: var(--ui-font-size-12); }
 	.hint { color: var(--fg3); }
 	.error { color: var(--danger); overflow-wrap: anywhere; }
 	footer { display: flex; justify-content: flex-end; }

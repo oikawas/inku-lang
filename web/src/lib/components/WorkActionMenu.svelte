@@ -140,8 +140,8 @@
 	.work-action-dropdown { position: absolute; z-index: 100; min-width: 210px; border: 1px solid var(--border2); border-radius: 6px; padding: 0 0 4px; overflow: hidden; background: var(--panel); box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35); display: flex; flex-direction: column; }
 	.work-action-menu.card .work-action-dropdown { top: 27px; right: 0; }
 	.work-action-menu.header .work-action-dropdown { top: calc(100% + 6px); right: 0; }
-	.work-action-dropdown button { border: 0; background: transparent; color: var(--fg); padding: 6px 13px; font: inherit; font-size: 12px; line-height: 1.35; text-align: left; cursor: pointer; width: 100%; box-sizing: border-box; }
+	.work-action-dropdown button { border: 0; background: transparent; color: var(--fg); padding: 6px 13px; font: inherit; font-size: var(--ui-font-size-12); line-height: 1.35; text-align: left; cursor: pointer; width: 100%; box-sizing: border-box; }
 	.work-action-dropdown button:hover { background: var(--bg2); }
-	.work-action-title { margin-bottom: 4px; padding: 7px 13px; border-bottom: 1px solid var(--accent); background: color-mix(in srgb, var(--accent) 14%, var(--panel)); color: var(--fg); font-size: 12px; font-weight: 700; letter-spacing: 0.08em; }
-	.work-action-origin { display: block; margin-top: 2px; color: var(--fg2); font-size: 12px; font-weight: 500; letter-spacing: 0.02em; }
+	.work-action-title { margin-bottom: 4px; padding: 7px 13px; border-bottom: 1px solid var(--accent); background: color-mix(in srgb, var(--accent) 14%, var(--panel)); color: var(--fg); font-size: var(--ui-font-size-12); font-weight: 700; letter-spacing: 0.08em; }
+	.work-action-origin { display: block; margin-top: 2px; color: var(--fg2); font-size: var(--ui-font-size-12); font-weight: 500; letter-spacing: 0.02em; }
 </style>

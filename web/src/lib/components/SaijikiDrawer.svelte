@@ -177,12 +177,12 @@
 		flex-shrink: 0;
 	}
 	.saijiki-title {
-		font-size: 17px; font-weight: 300; letter-spacing: 0.06em; color: var(--fg);
+		font-size: var(--ui-font-size-17); font-weight: 300; letter-spacing: 0.06em; color: var(--fg);
 	}
-	.saijiki-hint { font-size: 10px; color: var(--fg3); margin-top: 3px; line-height: 1.5; }
+	.saijiki-hint { font-size: var(--ui-font-size-10); color: var(--fg3); margin-top: 3px; line-height: 1.5; }
 	.saijiki-close {
 		width: 24px; height: 24px; border: none; background: none;
-		color: var(--fg3); font-size: 16px; cursor: pointer; flex-shrink: 0; margin-top: 2px;
+		color: var(--fg3); font-size: var(--ui-font-size-16); cursor: pointer; flex-shrink: 0; margin-top: 2px;
 	}
 	.saijiki-body { flex: 1; overflow-y: auto; padding: 8px 0; }
 
@@ -230,34 +230,34 @@
 		margin-top: 8px;
 	}
 	.saijiki-preview-title {
-		font-size: 13px;
+		font-size: var(--ui-font-size-13);
 		font-weight: 600;
 		color: var(--paper-surface-fg);
 	}
 	.saijiki-preview-effect {
-		font-size: 11px;
+		font-size: var(--ui-font-size-11);
 		line-height: 1.45;
 		color: var(--paper-surface-muted);
 	}
 	.saijiki-preview-example {
-		font-size: 10px;
+		font-size: var(--ui-font-size-10);
 		line-height: 1.4;
 		color: var(--paper-surface-subtle);
 	}
 	.saijiki-preview-placeholder {
-		font-size: 11px;
+		font-size: var(--ui-font-size-11);
 		line-height: 1.5;
 		color: var(--paper-surface-subtle);
 	}
 	.saijiki-cat { padding: 10px 18px; }
 	.saijiki-cat-head { display: flex; align-items: baseline; gap: 7px; margin-bottom: 8px; }
-	.saijiki-cat-ja { font-size: 13px; font-weight: 400; color: var(--fg); letter-spacing: 0.05em; }
-	.saijiki-cat-en { font-size: 9px; color: var(--fg3); letter-spacing: 0.1em; text-transform: uppercase; font-weight: 500; }
+	.saijiki-cat-ja { font-size: var(--ui-font-size-13); font-weight: 400; color: var(--fg); letter-spacing: 0.05em; }
+	.saijiki-cat-en { font-size: var(--ui-font-size-9); color: var(--fg3); letter-spacing: 0.1em; text-transform: uppercase; font-weight: 500; }
 
 	.saijiki-chips { display: flex; flex-wrap: wrap; gap: 5px; }
 	.saijiki-chip {
 		padding: 4px 9px; border: 1px solid var(--border2); border-radius: 3px;
-		background: var(--panel); color: var(--fg); font-size: 12px; cursor: pointer;
+		background: var(--panel); color: var(--fg); font-size: var(--ui-font-size-12); cursor: pointer;
 		font-family: inherit; line-height: 1.3; transition: background 0.1s, border-color 0.1s;
 	}
 	/* The plugin accent is the app's blue, from the tokens, so it follows the

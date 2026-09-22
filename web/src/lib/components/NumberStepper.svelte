@@ -99,7 +99,7 @@
 		background: var(--panel);
 		color: var(--fg);
 		font-family: inherit;
-		font-size: 12px;
+		font-size: var(--ui-font-size-12);
 		font-variant-numeric: tabular-nums;
 		text-align: center;
 	}

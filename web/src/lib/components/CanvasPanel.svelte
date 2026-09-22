@@ -966,7 +966,7 @@
 		border-bottom: 2px solid transparent;
 		background: none;
 		color: var(--fg2);
-		font-size: 13px;
+		font-size: var(--ui-font-size-13);
 		cursor: pointer;
 		font-family: inherit;
 		white-space: nowrap;
@@ -994,7 +994,7 @@
 	}
 	.render-meta-heading {
 		color: var(--fg2);
-		font-size: 12px;
+		font-size: var(--ui-font-size-12);
 		font-weight: 500;
 		white-space: nowrap;
 	}
@@ -1004,10 +1004,10 @@
 		gap: 4px;
 		white-space: nowrap;
 	}
-	.render-meta-generation strong { color: var(--fg2); font-size: 13px; font-weight: 450; line-height: 1.2; }
+	.render-meta-generation strong { color: var(--fg2); font-size: var(--ui-font-size-13); font-weight: 450; line-height: 1.2; }
 	.render-meta-fields {
 		display: grid;
-		grid-template-columns: minmax(0, 1.8fr) minmax(84px, 1fr) minmax(84px, 0.8fr) max-content max-content;
+		grid-template-columns: minmax(0, 1.8fr) minmax(calc(84px * var(--ui-text-scale)), 1fr) minmax(calc(84px * var(--ui-text-scale)), 0.8fr) max-content max-content;
 		min-width: 0;
 		padding-block: 7px;
 	}
@@ -1031,7 +1031,7 @@
 	}
 	.render-meta-label {
 		color: var(--fg3);
-		font-size: 12px;
+		font-size: var(--ui-font-size-12);
 		line-height: 1.1;
 		white-space: nowrap;
 	}
@@ -1041,7 +1041,7 @@
 		overflow: hidden;
 		text-overflow: ellipsis;
 		color: var(--fg2);
-		font-size: 13px;
+		font-size: var(--ui-font-size-13);
 		font-weight: 450;
 		line-height: 1.2;
 		white-space: nowrap;
@@ -1073,7 +1073,8 @@
 		font-variant-numeric: tabular-nums;
 	}
 	.work-action-save-first { color: var(--fg3); font-size: 0.78rem; }
-	@container canvas-panel (max-width: 880px) {
+	/* Follow the UI text scale so enlarged labels wrap before columns shrink. */
+	@container canvas-panel (max-width: 67.6923em) {
 		.right-tabs { flex-wrap: wrap; padding-inline: 10px; }
 		.rtab { padding-inline: 12px; }
 		.rtab-spacer { display: none; }
@@ -1085,7 +1086,7 @@
 			overflow: visible;
 		}
 		.render-meta-context { padding-right: 10px; }
-		.render-meta-fields { grid-template-columns: minmax(0, 1.8fr) minmax(84px, 1fr) minmax(84px, 0.8fr) max-content max-content; }
+		.render-meta-fields { grid-template-columns: minmax(0, 1.8fr) minmax(calc(84px * var(--ui-text-scale)), 1fr) minmax(calc(84px * var(--ui-text-scale)), 0.8fr) max-content max-content; }
 		.render-meta-item { padding: 0 10px; }
 		.render-meta-strip.english { grid-template-columns: 1fr; }
 		.render-meta-strip.english .render-meta-context {
@@ -1096,7 +1097,7 @@
 			flex-wrap: wrap;
 		}
 	}
-	@container canvas-panel (max-width: 1040px) {
+	@container canvas-panel (max-width: 80em) {
 		.right-tabs.english-meta { flex-wrap: wrap; padding-inline: 10px; }
 		.right-tabs.english-meta .rtab { padding-inline: 12px; }
 		.right-tabs.english-meta .rtab-spacer { display: none; }
@@ -1110,14 +1111,14 @@
 			grid-template-columns: minmax(150px, 1.8fr) minmax(112px, 1fr) minmax(92px, 0.8fr) max-content max-content;
 		}
 	}
-	@container canvas-panel (max-width: 650px) {
+	@container canvas-panel (max-width: 50em) {
 		.render-meta-strip { grid-template-columns: max-content minmax(0, 1fr); }
 		.render-meta-fields,
 		.render-meta-strip.english .render-meta-fields { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 		.render-meta-item { padding: 4px 8px; }
 		.render-meta-created { grid-column: span 2; }
 	}
-	@container canvas-panel (max-width: 460px) {
+	@container canvas-panel (max-width: 35.3846em) {
 		.render-meta-strip { grid-template-columns: 1fr; }
 		.render-meta-context {
 			display: flex;
@@ -1157,7 +1158,7 @@
 		border-radius: 50%;
 		background: var(--floating-control-bg);
 		border: 1px solid var(--border2);
-		font-size: 20px;
+		font-size: var(--ui-font-size-20);
 		box-shadow: 0 1px 6px rgba(0,0,0,0.1);
 		display: flex;
 		align-items: center;
@@ -1177,7 +1178,7 @@
 		box-shadow: 0 1px 6px rgba(0,0,0,0.1);
 		color: var(--floating-control-fg);
 		cursor: pointer;
-		font-size: 11px;
+		font-size: var(--ui-font-size-11);
 		font-family: inherit;
 		line-height: 1;
 		padding: 0 8px;
@@ -1195,7 +1196,7 @@
 		opacity: 1;
 		cursor: not-allowed;
 	}
-	.nav-counter { font-size: 11px; color: var(--fg3); font-variant-numeric: tabular-nums; white-space: nowrap; }
+	.nav-counter { font-size: var(--ui-font-size-11); color: var(--fg3); font-variant-numeric: tabular-nums; white-space: nowrap; }
 	.canvas-content {
 		position: relative;
 		width: 100%;

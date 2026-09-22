@@ -43,7 +43,7 @@
 	.label-mirror-inner {
 		padding: 9px 10px;
 		font-family: inherit;
-		font-size: 13px;
+		font-size: var(--ui-font-size-13);
 		line-height: 1.65;
 		color: transparent;
 		white-space: pre-wrap;

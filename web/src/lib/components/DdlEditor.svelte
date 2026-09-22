@@ -46,9 +46,14 @@
 	const wordLang = $derived(resolveInstructionLang(value, isJapanese ? 'ja' : 'en'));
 
 	onMount(() => {
-		const observer = new ResizeObserver(updateTextMetrics);
+		const observer = new ResizeObserver(() => {
+			updateTextMetrics();
+			measureLineHeights();
+		});
 		if (textareaEl) observer.observe(textareaEl);
+		if (lineMirrorEl) observer.observe(lineMirrorEl);
 		updateTextMetrics();
+		measureLineHeights();
 		return () => observer.disconnect();
 	});
 
@@ -324,7 +329,7 @@
 		background: var(--bg2);
 		color: var(--fg3);
 		font-family: inherit;
-		font-size: 14px;
+		font-size: var(--ui-font-size-14);
 		line-height: 1.7;
 		text-align: right;
 		user-select: none;
@@ -355,7 +360,7 @@
 		margin: 0;
 		padding: 10px 11px;
 		font-family: inherit;
-		font-size: 14px;
+		font-size: var(--ui-font-size-14);
 		font-weight: 400;
 		font-style: normal;
 		letter-spacing: 0;
@@ -384,7 +389,7 @@
 		visibility: hidden;
 		pointer-events: none;
 		font-family: inherit;
-		font-size: 14px;
+		font-size: var(--ui-font-size-14);
 		font-weight: 400;
 		font-style: normal;
 		letter-spacing: 0;
@@ -429,7 +434,7 @@
 		border: 1px solid var(--ddl-token-unknown-border);
 		border-radius: var(--r);
 		background: var(--ddl-token-unknown-bg);
-		font-size: 11px;
+		font-size: var(--ui-font-size-11);
 		line-height: 1.5;
 	}
 	.ddl-unknown-title,
@@ -443,7 +448,7 @@
 		border-radius: var(--r);
 		background: var(--panel);
 		color: var(--fg3);
-		font-size: 11px;
+		font-size: var(--ui-font-size-11);
 		line-height: 1.55;
 	}
 	.ddl-editor-guide summary {

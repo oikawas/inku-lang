@@ -381,7 +381,7 @@
 	.panel-tab {
 		position: relative;
 		flex: 1; padding: 10px; background: none; border: none;
-		color: var(--fg3); font-size: 12px; cursor: pointer;
+		color: var(--fg3); font-size: var(--ui-font-size-12); cursor: pointer;
 		font-family: inherit; border-bottom: 2px solid transparent;
 		display: flex; align-items: center; justify-content: center; gap: 6px;
 		min-height: 38px;
@@ -407,7 +407,7 @@
 	.tab-label { line-height: 1; white-space: nowrap; }
 	.tab-progress {
 		line-height: 1;
-		font-size: 11px;
+		font-size: var(--ui-font-size-11);
 		color: var(--fg3);
 		font-variant-numeric: tabular-nums;
 		text-align: center;
@@ -423,7 +423,7 @@
 		animation: inkupulse 1s ease-in-out infinite;
 	}
 	.panel-section { display: flex; flex-direction: column; gap: 6px; }
-	.conditions-heading { margin: 8px 0 2px; font-size: 12px; font-weight: 500; color: var(--fg2); }
+	.conditions-heading { margin: 8px 0 2px; font-size: var(--ui-font-size-12); font-weight: 500; color: var(--fg2); }
 	.condition-rows {
 		display: grid;
 		gap: 6px;
@@ -439,14 +439,14 @@
 	.condition-row-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 	.condition-label {
 		color: var(--fg2);
-		font-size: 12px;
+		font-size: var(--ui-font-size-12);
 		line-height: 1.35;
 		font-weight: 500;
 	}
 	.condition-value {
 		min-width: 0;
 		color: var(--fg);
-		font-size: 14px;
+		font-size: var(--ui-font-size-14);
 		line-height: 1.35;
 		overflow-wrap: anywhere;
 	}
@@ -463,7 +463,7 @@
 	.condition-model-value small {
 		flex: none;
 		color: var(--fg3);
-		font-size: 12px;
+		font-size: var(--ui-font-size-12);
 		font-weight: 400;
 	}
 	.condition-change { white-space: nowrap; }
@@ -496,8 +496,8 @@
 	}
 	.input-label-text { min-width: 0; }
 	.input-label :global(.tooltip-wrap) { flex: none; }
-	.input-heading { color: var(--fg); font-size: 14px; line-height: 1.35; font-weight: 600; }
-	.input-description { margin-top: 1px; color: var(--fg2); font-size: 12px; line-height: 1.45; }
+	.input-heading { color: var(--fg); font-size: var(--ui-font-size-14); line-height: 1.35; font-weight: 600; }
+	.input-description { margin-top: 1px; color: var(--fg2); font-size: var(--ui-font-size-12); line-height: 1.45; }
 	.wild-btn.active { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
 	.wild-btn.active:hover { background: var(--accent); }
 	.input-ta-wrap {
@@ -513,12 +513,12 @@
 		background: transparent; color: var(--fg);
 		position: relative;
 		z-index: 1;
-		font-family: inherit; font-size: 14px; line-height: 1.65;
+		font-family: inherit; font-size: var(--ui-font-size-14); line-height: 1.65;
 		resize: vertical; outline: none;
 	}
 	.input-ta:focus { border-color: var(--accent); }
 	.input-ta[readonly] { background: var(--bg2); color: var(--fg2); }
-	.description-lock { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; font-size: 12px; color: var(--fg2); }
+	.description-lock { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; font-size: var(--ui-font-size-12); color: var(--fg2); }
 	.input-meta-row {
 		display: flex;
 		flex-wrap: wrap;
@@ -528,14 +528,14 @@
 		margin-top: -3px;
 	}
 	.input-comment-hint {
-		font-size: 12px;
+		font-size: var(--ui-font-size-12);
 		line-height: 1.5;
 		color: var(--fg3);
 	}
 	.input-meter {
 		min-width: 54px;
 		margin-left: auto;
-		font-size: 12px;
+		font-size: var(--ui-font-size-12);
 		line-height: 1.5;
 		font-variant-numeric: tabular-nums;
 		text-align: right;
@@ -543,7 +543,7 @@
 	}
 	.input-meter.soft-over { color: color-mix(in srgb, var(--fg) 78%, transparent); }
 	.gen-status-wrap { margin-top: 4px; }
-	.error-text { color: var(--danger); font-size: 12px; white-space: pre-line; }
+	.error-text { color: var(--danger); font-size: var(--ui-font-size-12); white-space: pre-line; }
 	@media (max-width: 430px) {
 		.condition-compact-row { max-width: 100%; }
 	}

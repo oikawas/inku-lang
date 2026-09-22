@@ -20,6 +20,10 @@ export type UserSettingsContributor = {
 	apply: (settings: UserSettingsSlice) => void;
 };
 
+export type ApplyUserSettingsOptions = {
+	excludeIds?: readonly string[];
+};
+
 const contributors: UserSettingsContributor[] = [];
 
 export function registerUserSettingsContributor(contributor: UserSettingsContributor): void {
@@ -36,9 +40,11 @@ export function userSettingsContributorIds(): string[] {
 }
 
 /** Every feature's fields, to be merged into what the page saves. */
-export function collectUserSettings(): UserSettingsSlice {
+export function collectUserSettings(options: ApplyUserSettingsOptions = {}): UserSettingsSlice {
 	const collected: UserSettingsSlice = {};
-	for (const contributor of contributors) Object.assign(collected, contributor.collect());
+	for (const contributor of contributors) {
+		if (!options.excludeIds?.includes(contributor.id)) Object.assign(collected, contributor.collect());
+	}
 	return collected;
 }
 
@@ -47,6 +53,8 @@ export function collectUserSettings(): UserSettingsSlice {
  * fields, including resetting to its default when the user has none -- so a
  * user without the setting still clears whatever the previous user left.
  */
-export function applyUserSettings(settings: UserSettingsSlice | null | undefined): void {
-	for (const contributor of contributors) contributor.apply(settings ?? {});
+export function applyUserSettings(settings: UserSettingsSlice | null | undefined, options: ApplyUserSettingsOptions = {}): void {
+	for (const contributor of contributors) {
+		if (!options.excludeIds?.includes(contributor.id)) contributor.apply(settings ?? {});
+	}
 }

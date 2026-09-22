@@ -214,12 +214,12 @@
 		border: 1px solid var(--border2);
 		border-radius: 50%;
 		color: var(--fg3);
-		font-size: 9px;
+		font-size: var(--ui-font-size-9);
 		font-weight: 600;
 		text-transform: none;
 		letter-spacing: 0;
 	}
-	.limits-intro, .limits-rounding { color: var(--fg2); font-size: 12px; line-height: 1.5; }
+	.limits-intro, .limits-rounding { color: var(--fg2); font-size: var(--ui-font-size-12); line-height: 1.5; }
 	.limits-intro { margin-bottom: 20px; }
 	.limits-rounding { margin-top: 18px; }
 	.inline-message {
@@ -228,7 +228,7 @@
 		border-radius: var(--r);
 		background: var(--panel);
 		color: var(--fg2);
-		font-size: 12px;
+		font-size: var(--ui-font-size-12);
 	}
 	.limits-footer {
 		flex: none;
@@ -257,7 +257,7 @@
 	.limits-group-summary {
 		margin: 0 0 8px;
 		color: var(--fg2);
-		font-size: 12px;
+		font-size: var(--ui-font-size-12);
 		line-height: 1.4;
 	}
 	.limits-list { border-top: 1px solid var(--border); }
@@ -268,27 +268,27 @@
 		align-items: start;
 		padding: 12px 10px;
 		min-width: 0;
-		font-size: 12px;
+		font-size: var(--ui-font-size-12);
 		border-bottom: 1px solid var(--border);
 		border-left: 3px solid transparent;
 	}
 	.limits-field-changed { border-left-color: var(--accent); background: var(--accent-light); }
 	.limits-field-copy { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
 	.limits-field-label { color: var(--fg); font-weight: 600; }
-	.limits-field-copy > small { color: var(--fg3); font-size: 12px; line-height: 1.45; }
+	.limits-field-copy > small { color: var(--fg3); font-size: var(--ui-font-size-12); line-height: 1.45; }
 	.limits-field-control { display: flex; flex-direction: column; align-items: flex-start; gap: 5px; }
 	.limits-field-facts {
 		display: flex;
 		flex-wrap: wrap;
 		gap: 3px 8px;
 		color: var(--fg3);
-		font-size: 11px;
+		font-size: var(--ui-font-size-11);
 		font-variant-numeric: tabular-nums;
 	}
 	.limits-field-facts > span { color: inherit; font-weight: 400; }
 	.limits-field-copy > small.limits-weight { color: var(--fg2); }
 	.limits-normalized { margin-top: 8px; }
-	.limits-change-count { color: var(--fg2); font-size: 12px; }
+	.limits-change-count { color: var(--fg2); font-size: var(--ui-font-size-12); }
 	.limits-save {
 		padding: var(--btn-sm-padding);
 		border: 1px solid var(--action-bg);

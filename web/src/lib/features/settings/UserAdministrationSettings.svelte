@@ -407,23 +407,23 @@
 		background: var(--panel);
 	}
 	.popover-group-label {
-		font-size: 10px; color: var(--fg3); text-transform: uppercase; letter-spacing: 0.08em;
+		font-size: var(--ui-font-size-10); color: var(--fg3); text-transform: uppercase; letter-spacing: 0.08em;
 		font-weight: 500; margin-bottom: 7px;
 	}
-	.db-test-result { color: var(--fg2); font-size: 12px; }
+	.db-test-result { color: var(--fg2); font-size: var(--ui-font-size-12); }
 	.inline-message {
 		padding: 7px 9px;
 		border: 1px solid var(--border);
 		border-radius: var(--r);
 		background: var(--panel);
 		color: var(--fg2);
-		font-size: 12px;
+		font-size: var(--ui-font-size-12);
 	}
 	.plugin-add { display: flex; gap: 8px; align-items: center; max-width: 520px; }
 	.plugin-add input, .login-grid input, .group-edit-input {
 		flex: 1; min-width: 0; padding: 5px 7px;
 		border: 1px solid var(--border2); border-radius: var(--r);
-		background: var(--panel); color: var(--fg); font-size: 12px; font-family: inherit;
+		background: var(--panel); color: var(--fg); font-size: var(--ui-font-size-12); font-family: inherit;
 	}
 	.login-grid {
 		display: grid;
@@ -445,7 +445,7 @@
 		border-radius: var(--r);
 		background: var(--panel);
 		color: var(--fg2);
-		font-size: 12px;
+		font-size: var(--ui-font-size-12);
 	}
 	.user-management-head {
 		display: flex;
@@ -457,7 +457,7 @@
 	.user-management-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
 	.user-management-count {
 		color: var(--fg3);
-		font-size: 11px;
+		font-size: var(--ui-font-size-11);
 		line-height: 1.4;
 	}
 	.user-management-layout {
@@ -470,8 +470,8 @@
 		min-width: 0;
 	}
 	.user-list-toolbar { display: grid; grid-template-columns: minmax(0, 1fr) minmax(100px, .6fr); gap: 8px; }
-	.user-list-toolbar input, .user-list-toolbar select { min-width: 0; min-height: 34px; box-sizing: border-box; padding: 7px 9px; border: 1px solid var(--border2); border-radius: var(--r); background: var(--panel); color: var(--fg); font: inherit; font-size: 13px; }
-	.user-list-toolbar label { display: grid; gap: 3px; color: var(--fg3); font-size: 12px; }
+	.user-list-toolbar input, .user-list-toolbar select { min-width: 0; min-height: 34px; box-sizing: border-box; padding: 7px 9px; border: 1px solid var(--border2); border-radius: var(--r); background: var(--panel); color: var(--fg); font: inherit; font-size: var(--ui-font-size-13); }
+	.user-list-toolbar label { display: grid; gap: 3px; color: var(--fg3); font-size: var(--ui-font-size-12); }
 	.user-editor-column { display: grid; align-content: start; gap: 10px; min-width: 0; }
 	.user-editor-panel {
 		border: 1px solid var(--border);
@@ -481,7 +481,7 @@
 		min-width: 0;
 	}
 	.user-editor-title {
-		font-size: 12px;
+		font-size: var(--ui-font-size-12);
 		font-weight: 500;
 		color: var(--fg2);
 		margin-bottom: 8px;
@@ -498,7 +498,7 @@
 	.user-form-grid input, .user-form-grid select {
 		min-width: 0; padding: 5px 7px;
 		border: 1px solid var(--border2); border-radius: var(--r);
-		background: var(--panel); color: var(--fg); font-size: 12px; font-family: inherit;
+		background: var(--panel); color: var(--fg); font-size: var(--ui-font-size-12); font-family: inherit;
 	}
 	.user-form-field {
 		display: flex;
@@ -506,7 +506,7 @@
 		gap: 4px;
 		min-width: 0;
 		color: var(--fg3);
-		font-size: 12px;
+		font-size: var(--ui-font-size-12);
 		font-weight: 500;
 	}
 	.user-form-field select {
@@ -571,17 +571,17 @@
 		cursor: pointer;
 	}
 	.user-row > .ghost-btn { align-self: start; min-height: 34px; justify-content: center; }
-	.user-cell { display: grid; gap: 2px; min-width: 0; overflow-wrap: anywhere; color: var(--fg2); font-size: 13px; line-height: 1.35; }
-	.user-cell small { color: var(--fg3); font-size: 11px; }
+	.user-cell { display: grid; gap: 2px; min-width: 0; overflow-wrap: anywhere; color: var(--fg2); font-size: var(--ui-font-size-13); line-height: 1.35; }
+	.user-cell small { color: var(--fg3); font-size: var(--ui-font-size-11); }
 	.user-name { grid-column: 1 / -1; color: var(--fg); font-weight: 500; }
 	.user-count-cell { font-variant-numeric: tabular-nums; }
 	.selected-user-summary { display: grid; gap: 3px; margin-bottom: 10px; padding: 9px; border: 1px solid var(--border); border-radius: var(--r); background: var(--bg); }
-	.selected-user-summary strong { overflow-wrap: anywhere; font-size: 14px; }
-	.selected-user-summary span { overflow-wrap: anywhere; color: var(--fg2); font-size: 13px; }
-	.selected-user-summary em { color: var(--accent); font-size: 12px; font-style: normal; font-weight: 600; }
-	.user-form-field small { color: var(--fg3); font-size: 11px; font-weight: 400; line-height: 1.4; }
+	.selected-user-summary strong { overflow-wrap: anywhere; font-size: var(--ui-font-size-14); }
+	.selected-user-summary span { overflow-wrap: anywhere; color: var(--fg2); font-size: var(--ui-font-size-13); }
+	.selected-user-summary em { color: var(--accent); font-size: var(--ui-font-size-12); font-style: normal; font-weight: 600; }
+	.user-form-field small { color: var(--fg3); font-size: var(--ui-font-size-11); font-weight: 400; line-height: 1.4; }
 	.group-administration { margin-top: 12px; border-top: 1px solid var(--border); padding-top: 10px; }
-	.group-administration summary { color: var(--fg2); font-size: 13px; font-weight: 600; cursor: pointer; }
+	.group-administration summary { color: var(--fg2); font-size: var(--ui-font-size-13); font-weight: 600; cursor: pointer; }
 	.group-administration .plugin-add { margin-top: 10px; }
 	.group-row {
 		display: flex;
@@ -592,7 +592,7 @@
 		border: 1px solid var(--border);
 		border-radius: var(--r);
 		padding: 7px 9px;
-		font-size: 12px;
+		font-size: var(--ui-font-size-12);
 		color: var(--fg2);
 	}
 	.group-row > span { min-width: 0; overflow-wrap: anywhere; }

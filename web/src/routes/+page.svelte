@@ -70,6 +70,7 @@
 	import { bindColorCatalogPersist, colorCatalogSettings } from '$lib/features/color-catalog/settings.svelte';
 	import { bindDescribePanelPersist, describePanelSettings } from '$lib/features/describe-panel/settings.svelte';
 	import { bindCaptionSettingsPersist, captionSettings } from '$lib/features/canvas/caption-settings.svelte';
+	import { bindTextSizePersist, textSizeSettings } from '$lib/features/appearance/text-size.svelte';
 	import { bindColorCatalogFallback } from '$lib/features/color-catalog/render';
 	import { AUTO_CATALOG_ID, colorCatalogOverride } from '$lib/features/color-catalog/render';
 	import { renderSettingsPayload } from '$lib/features/render-payload';
@@ -590,8 +591,9 @@
 		return availableVisionModelCatalog.find((group) => group.id === provider)?.models ?? [];
 	}
 
-	function applyUserModelSettings(user: UserItem | null) {
+	function applyUserModelSettings(user: UserItem | null, options: { excludeUserSettingIds?: readonly string[] } = {}) {
 		const settings = user?.model_settings;
+		applyUserSettings(settings, { excludeIds: options.excludeUserSettingIds });
 		if (!settings) return;
 		stage1Provider = settings.stage1_provider;
 		stage1Model = settings.stage1_model;
@@ -603,7 +605,6 @@
 			? qualifiedModelId(settings.okugaki_provider ?? settings.vision_provider, settings.okugaki_model)
 			: qualifiedModelId(settings.vision_provider, settings.vision_model);
 		instructionCaptionVisible = settings.instruction_caption_visible !== false;
-		applyUserSettings(settings);
 	}
 
 	async function persistInstructionCaptionVisible(visible: boolean) {
@@ -850,6 +851,7 @@
 	async function persistModelSelection() {
 		if (!session.currentUser) return;
 		const previousUser = session.currentUser;
+		const userId = previousUser.id;
 		// What the page owns; the features add their own fields to the save.
 		const pageModelSettings: UserModelSettings = {
 			stage1_provider: stage1Provider,
@@ -862,7 +864,7 @@
 			okugaki_model: splitModelRef(okugakiModel).model,
 			instruction_caption_visible: instructionCaptionVisible,
 		};
-		const model_settings = { ...pageModelSettings, ...collectUserSettings() };
+		const model_settings = { ...pageModelSettings, ...collectUserSettings({ excludeIds: ['text-size'] }) };
 		try {
 			const r = await apiFetch('/api/auth/me/settings', {
 				method: 'PATCH',
@@ -874,10 +876,24 @@
 				throw new Error(describeApiError(d.detail, r.status));
 			}
 			const actor = await r.json() as UserItem;
-			session.setCurrentUser(actor);
-			applyUserModelSettings(actor);
+			if (session.currentUser?.id !== userId) return;
+			const actorWithTextSizePreview = {
+				...actor,
+				model_settings: actor.model_settings
+					? { ...actor.model_settings, ui_text_size: textSizeSettings.step }
+					: actor.model_settings
+			};
+			session.setCurrentUser(actorWithTextSizePreview);
+			applyUserModelSettings(actorWithTextSizePreview, { excludeUserSettingIds: ['text-size'] });
 		} catch (e) {
-			session.setCurrentUser(previousUser);
+			if (session.currentUser?.id === userId) {
+				session.setCurrentUser({
+					...previousUser,
+					model_settings: previousUser.model_settings
+						? { ...previousUser.model_settings, ui_text_size: textSizeSettings.step }
+						: previousUser.model_settings
+				});
+			}
 			console.warn('failed to update model selection', e);
 		}
 	}
@@ -954,6 +970,27 @@
 			} catch (cause) { console.warn('failed to save headnote direction', cause); }
 		});
 	});
+	bindTextSizePersist(async (step) => {
+		const userId = session.currentUser?.id;
+		if (!userId) throw new Error('No signed-in user');
+		const response = await apiFetch('/api/auth/me/settings', {
+			method: 'PATCH',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ model_settings: { ui_text_size: step } })
+		});
+		if (!response.ok) throw new Error(`HTTP ${response.status}`);
+		const actor = await response.json() as UserItem;
+		const currentUser = session.currentUser;
+		if (!currentUser || currentUser.id !== userId) throw new Error('User changed during save');
+		if (actor.model_settings?.ui_text_size !== step) throw new Error('Text size was not persisted');
+		// Only merge this preference; another settings request may have completed
+		// while the slider save was in flight.
+		session.setCurrentUser({
+			...currentUser,
+			model_settings: { ...actor.model_settings, ...currentUser.model_settings, ui_text_size: step }
+		});
+		return step;
+	});
 	// Where `auto` lands when the server cannot read a description.
 	bindColorCatalogFallback(() => defaultCatalogId);
 
@@ -988,7 +1025,8 @@
 	}
 
 	async function loadAvailableModels() {
-		if (!session.currentUser) {
+		const userId = session.currentUser?.id;
+		if (!userId) {
 			availableModelsLoaded = false;
 			return;
 		}
@@ -996,11 +1034,15 @@
 			const r = await apiFetch('/api/models', { cache: 'no-store' });
 			if (!r.ok) throw new Error(`HTTP ${r.status}`);
 			const data = await r.json() as { catalog: ProviderGroup[]; llm_catalog?: ProviderGroup[]; vision_catalog?: ProviderGroup[]; settings: { model_settings?: UserModelSettings } };
+			if (session.currentUser?.id !== userId) return;
 			availableModelCatalog = data.llm_catalog ?? data.catalog;
 			availableVisionModelCatalog = data.vision_catalog ?? data.catalog.filter((group) => group.models.some((model) => model.purposes?.includes('vision')));
 			availableModelsLoaded = true;
 			if (data.settings.model_settings) {
-				applyUserModelSettings({ ...session.currentUser, model_settings: data.settings.model_settings });
+				applyUserModelSettings(
+					{ ...session.currentUser, model_settings: data.settings.model_settings },
+					{ excludeUserSettingIds: ['text-size'] }
+				);
 			}
 			if (!modelsFor(stage1Provider).some((model) => model.id === stage1Model)) {
 				const fallbackGroup = availableModelCatalog.find((group) => group.models.length > 0);
@@ -3318,11 +3360,11 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 	.demo-running-banner { display: grid; gap: 8px; padding: 10px 0; border-bottom: 1px solid var(--border); }
 	.demo-running-banner > button { justify-self: start; }
 	.demo-drawing-conditions { display: grid; gap: 12px; min-width: 0; }
-	.demo-drawing-conditions h3 { margin: 0; font-size: 14px; font-weight: 600; }
+	.demo-drawing-conditions h3 { margin: 0; font-size: var(--ui-font-size-14); font-weight: 600; }
 	.demo-model-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 	@media (max-width: 600px) { .demo-model-pair { grid-template-columns: minmax(0, 1fr); } }
-	.demo-catalog-field { display: grid; gap: 6px; font-size: 12px; color: var(--fg2); }
-	.demo-catalog-field select { width: 100%; min-width: 0; min-height: 38px; padding: 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); color: var(--fg); font: inherit; font-size: 14px; }
+	.demo-catalog-field { display: grid; gap: 6px; font-size: var(--ui-font-size-12); color: var(--fg2); }
+	.demo-catalog-field select { width: 100%; min-width: 0; min-height: 38px; padding: 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); color: var(--fg); font: inherit; font-size: var(--ui-font-size-14); }
 	.demo-compact-conditions { position: relative; display: flex; flex-wrap: wrap; gap: 8px; }
 	.demo-compact-conditions :global(.sketch-plugin), .demo-compact-conditions :global(.canvas-aspect-plugin) { position: static; }
 	.demo-compact-conditions :global(.sketch-menu), .demo-compact-conditions :global(.aspect-menu) { width: min(310px, 100%); }
@@ -3338,7 +3380,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		--r: 4px;
 		--r-lg: 8px;
 		/* Small control dimensions are theme-independent. */
-		--btn-sm-font-size: 12px;
+		--btn-sm-font-size: var(--ui-font-size-12);
 		--btn-sm-padding: 4px 10px;
 		--btn-sm-radius: var(--r);
 		/* Amber DDL controls intentionally keep one palette in both themes. */
@@ -3561,7 +3603,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 	:global(html), :global(body) {
 		height: 100%;
 		font-family: -apple-system, 'Hiragino Kaku Gothic ProN', 'Yu Gothic', 'Meiryo', sans-serif;
-		font-size: 13px;
+		font-size: var(--ui-font-size-13);
 		background: var(--bg);
 		color: var(--fg);
 	}
@@ -3618,7 +3660,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		background: var(--bg2);
 		color: var(--fg3);
 		font-family: inherit;
-		font-size: 13px;
+		font-size: var(--ui-font-size-13);
 		line-height: 1;
 		cursor: pointer;
 		display: flex;
@@ -3649,20 +3691,20 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		padding-top: 16px;
 		border-top: 1px solid var(--border);
 		color: var(--fg);
-		font-size: 12px;
+		font-size: var(--ui-font-size-12);
 		font-weight: 600;
 	}
 
 	/* thinking */
 	.thinking-details {
-		font-size: 12px; background: #f3efe6;
+		font-size: var(--ui-font-size-12); background: #f3efe6;
 		border-left: 3px solid #c9a08a; border-radius: 0 3px 3px 0; padding: 6px 10px;
 	}
 	.thinking-details summary { cursor: pointer; color: #8a6f5a; font-style: italic; }
 	.thinking-details pre {
 		white-space: pre-wrap; word-break: break-word; color: #6b5340;
 		font-family: inherit; line-height: 1.6; margin-top: 6px;
-		max-height: 180px; overflow-y: auto; font-size: 12px;
+		max-height: 180px; overflow-y: auto; font-size: var(--ui-font-size-12);
 	}
 
 	/* Stats */
@@ -3670,17 +3712,17 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		display: flex; align-items: center; gap: 5px;
 		width: 100%; padding: 6px 0;
 		border: none; background: none;
-		color: var(--fg2); font-size: 12px; cursor: pointer;
+		color: var(--fg2); font-size: var(--ui-font-size-12); cursor: pointer;
 		text-align: left; font-family: inherit;
 	}
 	.stats-arrow {
-		display: inline-block; font-size: 9px;
+		display: inline-block; font-size: var(--ui-font-size-9);
 		transition: transform 0.15s;
 	}
 	.stats-arrow.open { transform: rotate(90deg); }
 	.stats-detail {
 		background: var(--bg2); border-radius: var(--r); border-left: 2px solid var(--border2);
-		padding: 8px 10px; font-size: 12px; color: var(--fg2); line-height: 1.5;
+		padding: 8px 10px; font-size: var(--ui-font-size-12); color: var(--fg2); line-height: 1.5;
 		overflow: hidden;
 	}
 	.stats-grid {
@@ -3764,7 +3806,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		flex: 0 0 auto;
 	}
 	.app-info-title {
-		font-size: 24px;
+		font-size: var(--ui-font-size-24);
 		font-weight: 300;
 		letter-spacing: 0;
 	}
@@ -3774,7 +3816,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		border: 0;
 		background: transparent;
 		color: var(--fg3);
-		font-size: 18px;
+		font-size: var(--ui-font-size-18);
 		line-height: 1;
 		cursor: pointer;
 		font-family: inherit;
@@ -3786,13 +3828,13 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		overflow-y: auto;
 		padding: 18px 18px 20px;
 		color: var(--fg2);
-		font-size: 13px;
+		font-size: var(--ui-font-size-13);
 		line-height: 1.8;
 	}
 	.app-info-body h2 {
 		margin: 0 0 6px;
 		color: var(--fg);
-		font-size: 12px;
+		font-size: var(--ui-font-size-12);
 		font-weight: 500;
 		letter-spacing: 0.04em;
 	}
@@ -3803,7 +3845,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 	.app-info-creator {
 		margin-bottom: 4px;
 		color: var(--fg);
-		font-size: 14px;
+		font-size: var(--ui-font-size-14);
 		font-weight: 500;
 	}
 	.app-info-meta {
@@ -3812,7 +3854,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		gap: 6px 14px;
 		margin: 0;
 		padding-top: 2px;
-		font-size: 12px;
+		font-size: var(--ui-font-size-12);
 		line-height: 1.6;
 	}
 	.app-info-meta div {
@@ -3849,7 +3891,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 	.app-info-vocab {
 		width: 100%;
 		border-collapse: collapse;
-		font-size: 12px;
+		font-size: var(--ui-font-size-12);
 		line-height: 1.6;
 	}
 	.app-info-vocab th,
@@ -3883,7 +3925,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 	   are monospace because they are a score, this is the author's own language. */
 	.sketch-section { display: grid; gap: 6px; }
 	.sketch-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-	.sketch-title { font-size: 12px; color: var(--fg2); }
+	.sketch-title { font-size: var(--ui-font-size-12); color: var(--fg2); }
 	/* Matches the expanded-DDL toggle: the two folds in this panel are one
 	   control repeated, so they read and behave the same. */
 	.sketch-toggle {
@@ -3900,11 +3942,11 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 	}
 	.sketch-arrow {
 		display: inline-block;
-		font-size: 8px;
+		font-size: var(--ui-font-size-8);
 		transition: transform 0.15s ease;
 	}
 	.sketch-arrow.open { transform: rotate(90deg); }
-	.sketch-grain { font-size: 12px; color: var(--fg3); margin-left: auto; }
+	.sketch-grain { font-size: var(--ui-font-size-12); color: var(--fg3); margin-left: auto; }
 	.sketch-edit-btn {
 		padding: var(--btn-sm-padding);
 		border: 1px solid var(--border2);
@@ -3920,14 +3962,14 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		padding: 8px 10px;
 		border: 1px solid var(--border);
 		background: color-mix(in srgb, var(--bg2) 68%, transparent);
-		font-size: 14px;
+		font-size: var(--ui-font-size-14);
 		line-height: 1.7;
 		color: var(--fg2);
 		white-space: pre-wrap;
 		margin: 0;
 	}
 	.sketch-editor { font-family: inherit; width: 100%; resize: vertical; }
-	.sketch-note { margin: 0; font-size: 12px; line-height: 1.6; color: var(--fg3); }
+	.sketch-note { margin: 0; font-size: var(--ui-font-size-12); line-height: 1.6; color: var(--fg3); }
 
 	/* The same amber as the editor's mark: one meaning, one colour. */
 	.plugin-warnings {
@@ -3936,13 +3978,13 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 	}
 	.plugin-warnings-title {
 		color: var(--ddl-token-unknown-fg);
-		font-size: 11px;
+		font-size: var(--ui-font-size-11);
 		font-weight: 500;
 		margin-bottom: 4px;
 	}
 	.plugin-warning-line {
 		color: var(--fg2);
-		font-size: 11px;
+		font-size: var(--ui-font-size-11);
 		line-height: 1.5;
 		word-break: break-word;
 	}
@@ -3954,13 +3996,13 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 	}
 	.limit-notes-title {
 		color: var(--fg2);
-		font-size: 11px;
+		font-size: var(--ui-font-size-11);
 		font-weight: 500;
 		margin-bottom: 4px;
 	}
 	.limit-note-line {
 		color: var(--fg2);
-		font-size: 11px;
+		font-size: var(--ui-font-size-11);
 		line-height: 1.5;
 		word-break: break-word;
 	}
@@ -3970,7 +4012,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		border: 1px solid var(--border);
 		background: color-mix(in srgb, var(--bg2) 68%, transparent);
 		font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-		font-size: 11px;
+		font-size: var(--ui-font-size-11);
 		line-height: 1.55;
 	}
 	.interpretation-diff div {

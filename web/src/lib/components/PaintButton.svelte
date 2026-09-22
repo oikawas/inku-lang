@@ -20,7 +20,7 @@
 <style>
 	.paint-btn {
 		padding: 9px;
-		font-size: 14px;
+		font-size: var(--ui-font-size-14);
 		font-weight: 500;
 		background: var(--action-bg);
 		color: var(--action-fg);
@@ -46,7 +46,7 @@
 		cursor: not-allowed;
 	}
 	.paint-icon {
-		font-size: 12px;
+		font-size: var(--ui-font-size-12);
 		line-height: 1;
 	}
 </style>

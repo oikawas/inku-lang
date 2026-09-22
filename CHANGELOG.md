@@ -6,6 +6,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 36 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-22 — Attach existing arc-form proportions to arcs in initial and shared grammar
+
+The Stage 1 and shared standalone-shape grammar now explains that an arc-form term in the saijiki proportions row is a noun modifier immediately before its corresponding arc head, not an independent drawing head. This only projects the existing `arc_form` applicability into the prompt: it copies no vocabulary list and adds no alias, recognition condition, compiler or lowering behavior, or rendering feature.
+
 ### 2026-09-22 — Export a single work as a layer animation
 
 Select one work in history management or lineage and choose Animation to save

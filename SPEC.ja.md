@@ -1024,6 +1024,8 @@ sealed Rust Stage 1.5 v5 のtyped foundationとR1 / R2 / D1、direct instruction
 
 半円は上へ膨らむ半円の開弧、上弦は右、下弦は左へ膨らむ半円の開弧とする。三日月は歳時記の細い月形の閉じた塗り面であり、一本の開弧に置き換えない。Score 0.2.0の`primitive: arc`、`arc_form: crescent`と`center`・`size`がその輪郭を表す。月形の基準は歳時記の三本の三次Bezier曲線で、寸法は曲線の実際の境界に基づく。省略された`arc_form`は従来の開弧の意味とcanonical bytesを保ち、保存済みScore 0.1.0を読み続ける。三日月の位置・回転・境界は共通rendererへ渡す。端点を要求するconnected/touchingへ閉じた三日月を渡すと不適合を診断する。
 
+Stage 1の共有grammar projectionは、歳時記のわりあいにある弧形語を独立headにせず、対応する弧headの直前へ受理済みの名詞修飾として結ぶ。このprojectionは既存のわりあい語形と`arc_form`の適用関係を説明するだけであり、語彙、認識、lowering、描画機能を変更しない。
+
 大きさの指定が重なるときは、原文の全候補を保持し、各候補を独立に物理寸法へ解決して小さい幅を採用する。明示寸法が形を指定する場合はその縦横比を一度だけ拡縮し、相対サイズを二重に掛けない。同じ大きさの重複もエラーとして示す。`ConflictingSizeSpecifications`は候補寸法と採用寸法を持ち、処置`Recovered`はStop/Continueの両方でその図形を描くことを表す。この例外は重複サイズだけであり、形の不整合、未対応属性、source/lockの整合性不良を回復可能にしない。これは共通compilerからScoreと診断までの接続であり、通常Server／Web／Androidがこの経路を使用し、Python／Kotlinはhost bindingとして別の意味分岐を持たない。
 
 ### 12.12 添景と互換記録

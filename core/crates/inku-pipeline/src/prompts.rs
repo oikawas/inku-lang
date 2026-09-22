@@ -1498,11 +1498,13 @@ fn standalone_shape_grammar_ja() -> String {
     let no = MarkerId::JaNo.surface();
     format!(r#"各単独図形命令を「[<位置句>] [<head前修飾句>]<head>{wo} [<並べる配置方向句>] [<数量句>] <動作>。」として組み立てる。位置句は受理位置に「{ni}」を一つ付けた句、headは描画対象一つ、数量句は数と対象に合う助数詞一つを結合した句である。数量句が既に助数詞を含むなら、命令への接続時に助数詞を加えない。動作はうごきの語形で文末を閉じる。
 色・道具・線の連続性・図形の向き・面・揺らぎ・比率・相対寸法・太さ・形・辺数はhead前修飾句へまとめる。名詞修飾は「{no}」、形容修飾は受理された形容形でheadへ結ぶ。修飾句はhead直前の接続までを含み、head自体は含まない。接続例は「赤いペンの実線の空の」＋「円」、「青いクレヨンの塗りの」＋「四角」。境界に接続語を再挿入せず、面の名詞を動詞の連体節へ展開しない。例は接続だけを示し、属性・対象・構図を今回の記述へ転写しない。
+accepted_saijiki_vocabularyのわりあい行で弧形を表す語は独立headにせず、対応する弧headの直前へ名詞修飾として一つ結ぶ。「<受理済みの弧形語>{no}弧」の形を使い、その弧の既存arc_formを決める。非弧headへ転用しない。
 図形の向きはhead前、並べる配置方向句は受理方向語に「{ni}」を一つ付けてhead後へ置く。揺らぎもhead前の属性として結び、動作の前後へ説明句として移さない。配置方向を省略した「並べる」は既定で横の左から右なので、その既定だけを言い直す語句は省く。出力前に全ての単独図形命令で、修飾句とhead、headと「{wo}」、数量句、文末動作がこの構造で結ばれることを照合する。組・順序配置・関係はそれぞれの既存構文を使い、この単独図形骨格へ縮約しない。照合内容は出力しない。"#)
 }
 
 const STANDALONE_SHAPE_GRAMMAR_EN: &str = r#"Assemble every standalone drawing command as <action> [<quantity>] [<pre-head modifier phrase>] <head> [<accepted line-up direction adverb>] [<position phrase>] [<complete accepted relation literal>]. A quantity is one complete count expression, the head names one drawing subject, and a position phrase contains one position preposition and the accepted place. Do not repeat a connector or count component when joining complete slots. Use an accepted movement word as the command's action.
 Keep color, tool, continuity, shape angle, surface, fluctuation, proportion, relative size, thinness, shape form, and sides in the pre-head modifier phrase. That phrase excludes the final head: "red pen solid empty" + "circle", or "blue crayon flat" + "square". Do not insert another connector at this boundary or expand a surface noun into a verbal relative clause. These examples show attachment only; do not copy their attributes, subjects, or composition.
+An arc-form term in the proportions row of accepted_saijiki_vocabulary is never an independent head. Attach one immediately before its corresponding arc head as an accepted noun modifier, in the form "<accepted arc-form term> arc"; it selects that arc's existing arc_form. Do not attach it to a non-arc head.
 Shape angles are pre-head adjectives; accepted line-up directions are post-head adverbs. Fluctuation also modifies the head rather than becoming extra wording around the action. Line-up defaults to horizontal left-to-right when direction is omitted; omit wording that only restates this default. Before output, check every standalone command's modifier/head boundary, quantity, action, and position against this structure. Groups, ordered placements, and relations retain their own existing grammar and must not be reduced to this standalone form. Do not output the checks."#;
 
 fn hole_attachment_grammar(language: ResolvedInstructionLanguage) -> String {
@@ -1754,6 +1756,16 @@ mod tests {
                 .0;
             assert!(rules.contains(normal_size));
             assert!(rules.contains(forms.regular));
+            match language {
+                ResolvedInstructionLanguage::Ja => {
+                    assert!(rules.contains("accepted_saijiki_vocabularyのわりあい行"));
+                    assert!(rules.contains("非弧headへ転用しない"));
+                }
+                ResolvedInstructionLanguage::En => {
+                    assert!(rules.contains("proportions row of accepted_saijiki_vocabulary"));
+                    assert!(rules.contains("Do not attach it to a non-arc head"));
+                }
+            }
             let attachment = format!("{}\n\n", standalone_shape_grammar(language));
             assert_eq!(rules.matches(&attachment).count(), 1);
             // Existing interpretation, group, order, and response rules remain intact.

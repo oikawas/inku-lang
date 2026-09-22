@@ -6,6 +6,12 @@
 
 **本書が持つのは v2.5.0（2026-07-25、render engine 12）以降**の 36 版である。それより前は書庫にある。
 
+### 2026-09-22 — 背景だけでは省略付き実行を成立させない
+
+共有compilerのresource-aware／非resource両入口で、局所回復・plan・resource・relationの省略後にinstructionも有効な地も残らなければ停止するようにした。背景はdocumentとScoreの文脈として保持しても、単独では描画可能な残部ではない。したがってMacroなど唯一の描画単位が省略された背景付き入力を、空Scoreと`complete_with_omissions`で通常保存・配送しない。
+
+有効な地だけの作品と、有効な地または独立instructionを残す局所回復は従来どおり描画内容であり、diagnostic、owner、CAS、Score形式、engine版、renderer、prompt、host設定は変更しない。
+
 ### 2026-09-22 — 不成立な背景句の局所診断を実行投影へ保持
 
 背景markerを持つ句で色のheadまたは背景actionが成立しないとき、既存のsource局所診断が実行投影から落ち、canonical identity欠落のintegrity診断だけで全文が停止する不備を修正した。不成立な背景句のspanと理由を省略診断として保持し、resource-aware compilerが独立して成立した描画を続けられるようにする。未知語を色へ補正せず、語彙・文法・planning、既存の`missing_canonical_semantic_identity` guardは変更しない。

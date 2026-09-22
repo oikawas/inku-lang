@@ -240,6 +240,10 @@ remains the whole canvas under its separate rule. A valid ground alone is
 drawable content in both Score and Plan; omitting another invalid drawing
 instruction preserves that ground and its diagnostics.
 
+A background color alone is not drawable residual content. When an omission
+leaves neither an instruction nor valid ground, execution stops instead of
+saving or delivering an empty Score with its background as an omitted success.
+
   The current vocabulary keeps `stipple` in surfaces as 点描 and moves `bleeding` to movements. It is independent `ink_spread:"bleed"`, so it can combine with Wave, Perlin, and stipple without creating Perlin or an intensity by itself. Legacy `blurring`, `trembling`, and `middle` input normalizes to `bleeding`, `swaying`, and `center`. Saved Scores retain the old rendering meaning of `surface.texture="bleed"` and `variation.quality="pink"`; editing or regenerating creates a new variation.
 
 - **the grounds category holds the names of supports** (added 2026-08-15, render

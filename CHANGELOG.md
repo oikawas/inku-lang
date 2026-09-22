@@ -12,6 +12,8 @@ The standalone-shape guidance for pre-head modifiers, quantity, action, and line
 
 Generation vocabulary now derives raw surface forms from the existing asset, separately from reference-display default annotations. Initial generation and camera share projected drawing heads, attribute roles, and the syntax boundaries for ground, background, and macros. Defaults, reference displays, accepted vocabulary, and compiler guards remain unchanged.
 
+Standalone modifier, head, quantity, and action assembly guidance is unified. Non-Saijiki core modifier forms are also shared from the existing definitions used by the parser, closing the gap where relative-size and regularity slots lacked usable forms. No aliases, vocabulary tables, or recognition conditions are added.
+
 ### 2026-09-21 — Developer provider I/O observation
 
 Developer mode can independently limit all core LLM retries to one attempt per request and enable provider I/O capture. Capture requires a durable private record before send and retains the actual JSON body, provider/model/action, HTTP status, raw response, timeout, usage, elapsed time, and outcome only for the same owner and execution. Cuts, size limits, and write failures remain explicitly incomplete; raw data never enters normal history, public views, or logs. Normal requests, prompts, and drawing semantics are unchanged.

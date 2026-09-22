@@ -15,7 +15,8 @@ use inku_ddl::{
     ResolvedInstructionLanguage,
     SAIJIKI_ASSET_ID, SourceSpan, TYPED_DDL_COMPILER_LOCK_SCHEMA_ID, TypedDdlCompilation,
     TypedHole, VISIBLE_DDL_PATCH_SCHEMA_ID, VisibleDdlPatch, VisibleDdlPatchEdit,
-    saijiki_asset_sha256_hex, saijiki_derived_projection, visible_ddl_patch_available,
+    core_modifier_surface_forms, saijiki_asset_sha256_hex, saijiki_derived_projection,
+    visible_ddl_patch_available,
 };
 use inku_score::{CANVAS_FORMAT_REGISTRY_ID, canvas_format_registry_digest, lookup_canvas_format};
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
@@ -1461,10 +1462,34 @@ Drawing commands, ground, background, and macros have separate syntax. To specif
 // and semantic_instruction's language-specific instruction-ownership collectors.
 // This explains accepted syntax without registering additional source forms.
 fn standalone_shape_grammar(language: ResolvedInstructionLanguage) -> String {
-    match language {
+    let assembly = match language {
         ResolvedInstructionLanguage::Ja => standalone_shape_grammar_ja(),
         ResolvedInstructionLanguage::En => STANDALONE_SHAPE_GRAMMAR_EN.to_owned(),
-    }
+    };
+    let forms = core_modifier_surface_forms(language);
+    let separator = match language {
+        ResolvedInstructionLanguage::Ja => "、",
+        ResolvedInstructionLanguage::En => ", ",
+    };
+    let thinness = forms
+        .thinness
+        .iter()
+        .map(|(surface, _)| *surface)
+        .collect::<Vec<_>>()
+        .join(separator);
+    let scale = forms
+        .relative_scale
+        .iter()
+        .map(|(surface, _)| *surface)
+        .collect::<Vec<_>>()
+        .join(separator);
+    let regular = forms.regular;
+    let sides = forms.sides_prefix;
+    let modifiers = match language {
+        ResolvedInstructionLanguage::Ja => format!("歳時記外のcore修飾語も有限の受理形を使う。太さは「{thinness}」、相対寸法は「{scale}」。形修飾は「{regular}」という正則な形の制約であり、自然物名を自由に形容するslotではない。辺数は「{sides}<整数>」。これらも対象headへ結び、名詞形と形容形の接続を区別する。語形の列挙は全headとの任意の組合せを許可するものではない。詩の対象は受理済みの図形・配置・属性へ解釈し、その対象名から新しい形修飾語を作らない。"),
+        ResolvedInstructionLanguage::En => format!("Non-Saijiki core modifiers also have finite accepted forms. Thinness: {thinness}. Relative size: {scale}. The shape-form modifier is {regular}, a regularity constraint, not an open slot for describing natural subjects. Sides use {sides}<integer>. Attach these to their target head with the appropriate noun or adjective construction. Listing a form does not authorize arbitrary combinations with every head. Interpret poetic subjects through accepted shapes, placement, and attributes rather than inventing shape modifiers from subject names."),
+    };
+    format!("{assembly}\n{modifiers}")
 }
 
 fn standalone_shape_grammar_ja() -> String {
@@ -1472,12 +1497,12 @@ fn standalone_shape_grammar_ja() -> String {
     let wo = MarkerId::JaWo.surface();
     let no = MarkerId::JaNo.surface();
     format!(r#"各単独図形命令を「[<位置句>] [<head前修飾句>]<head>{wo} [<並べる配置方向句>] [<数量句>] <動作>。」として組み立てる。位置句は受理位置に「{ni}」を一つ付けた句、headは描画対象一つ、数量句は数と対象に合う助数詞一つを結合した句である。数量句が既に助数詞を含むなら、命令への接続時に助数詞を加えない。動作はうごきの語形で文末を閉じる。
-色・道具・線の連続性・図形の向き・面・揺らぎ・比率・相対寸法・太さ・形・辺数はhead前修飾句へまとめる。名詞修飾は「{no}」、形容修飾は受理された形容形でheadへ結ぶ。修飾句はhead直前の接続までを含み、head自体は含まない。接続例は「赤いペンの実線の空の」＋「円」、「青いクレヨンの塗りの」＋「四角」。境界に接続語を再挿入せず、面の名詞を動詞の連体節へ展開しない。例は接続だけを示し、属性・対象・構図を今回の記述へ転写しない。既存の太さ語は「細い」「ごく細い」である。
+色・道具・線の連続性・図形の向き・面・揺らぎ・比率・相対寸法・太さ・形・辺数はhead前修飾句へまとめる。名詞修飾は「{no}」、形容修飾は受理された形容形でheadへ結ぶ。修飾句はhead直前の接続までを含み、head自体は含まない。接続例は「赤いペンの実線の空の」＋「円」、「青いクレヨンの塗りの」＋「四角」。境界に接続語を再挿入せず、面の名詞を動詞の連体節へ展開しない。例は接続だけを示し、属性・対象・構図を今回の記述へ転写しない。
 図形の向きはhead前、並べる配置方向句は受理方向語に「{ni}」を一つ付けてhead後へ置く。揺らぎもhead前の属性として結び、動作の前後へ説明句として移さない。配置方向を省略した「並べる」は既定で横の左から右なので、その既定だけを言い直す語句は省く。出力前に全ての単独図形命令で、修飾句とhead、headと「{wo}」、数量句、文末動作がこの構造で結ばれることを照合する。組・順序配置・関係はそれぞれの既存構文を使い、この単独図形骨格へ縮約しない。照合内容は出力しない。"#)
 }
 
 const STANDALONE_SHAPE_GRAMMAR_EN: &str = r#"Assemble every standalone drawing command as <action> [<quantity>] [<pre-head modifier phrase>] <head> [<accepted line-up direction adverb>] [<position phrase>] [<complete accepted relation literal>]. A quantity is one complete count expression, the head names one drawing subject, and a position phrase contains one position preposition and the accepted place. Do not repeat a connector or count component when joining complete slots. Use an accepted movement word as the command's action.
-Keep color, tool, continuity, shape angle, surface, fluctuation, proportion, relative size, thinness, shape form, and sides in the pre-head modifier phrase. That phrase excludes the final head: "red pen solid empty" + "circle", or "blue crayon flat" + "square". Do not insert another connector at this boundary or expand a surface noun into a verbal relative clause. These examples show attachment only; do not copy their attributes, subjects, or composition. The core thinness forms are thin and extra-fine.
+Keep color, tool, continuity, shape angle, surface, fluctuation, proportion, relative size, thinness, shape form, and sides in the pre-head modifier phrase. That phrase excludes the final head: "red pen solid empty" + "circle", or "blue crayon flat" + "square". Do not insert another connector at this boundary or expand a surface noun into a verbal relative clause. These examples show attachment only; do not copy their attributes, subjects, or composition.
 Shape angles are pre-head adjectives; accepted line-up directions are post-head adverbs. Fluctuation also modifies the head rather than becoming extra wording around the action. Line-up defaults to horizontal left-to-right when direction is omitted; omit wording that only restates this default. Before output, check every standalone command's modifier/head boundary, quantity, action, and position against this structure. Groups, ordered placements, and relations retain their own existing grammar and must not be reduced to this standalone form. Do not output the checks."#;
 
 fn hole_attachment_grammar(language: ResolvedInstructionLanguage) -> String {
@@ -1720,6 +1745,15 @@ mod tests {
             ),
         ] {
             let rules = stage1_normalizer_rules(language);
+            let forms = core_modifier_surface_forms(language);
+            let normal_size = forms
+                .relative_scale
+                .iter()
+                .find(|(_, value)| *value == inku_ddl::CoreModifierValue::Normal)
+                .unwrap()
+                .0;
+            assert!(rules.contains(normal_size));
+            assert!(rules.contains(forms.regular));
             let attachment = format!("{}\n\n", standalone_shape_grammar(language));
             assert_eq!(rules.matches(&attachment).count(), 1);
             // Existing interpretation, group, order, and response rules remain intact.

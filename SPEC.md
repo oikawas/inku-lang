@@ -1376,6 +1376,8 @@ Initial generation and camera projection also share the existing standalone-shap
 
 The generation vocabulary projection lists only existing asset surface forms, without appending display/reference default annotations to them. Reference annotations and default values remain intact. Initial generation and camera derive drawing heads from the same projection and distinguish them from tool, continuity, and surface attributes. Ground, background, and macro calls with only declared parameters are distinguished from drawing commands. Required subjects or unbindable explicit specifications must not be deleted merely to obtain formal acceptance.
 
+Shared standalone grammar makes modifier phrases own their connectors but exclude the head, and treats a quantity as one complete count expression. Non-Saijiki thinness, relative size, regularity, and side-count forms use a read-only projection of the existing parser definitions also used for recognition, not a separate prompt vocabulary table. Shape-form modification is a finite regularity constraint, not an open slot for adjectives derived from natural subjects. Existing boundaries, following-head conditions, and accepted combinations remain unchanged.
+
 **Options that were rejected:**
 
 | Form | Why it was rejected |

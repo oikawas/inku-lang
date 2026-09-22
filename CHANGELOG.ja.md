@@ -12,6 +12,8 @@
 
 生成語彙は既存assetの生の語形から導出し、参照表示用の既定注記を分離した。初回生成とcameraには、同じprojectionから導く描画headと属性の役割、および地・背景・macroの構文境界を共有する。既定値・参照表示・受理語彙・compiler guardは変更しない。
 
+単独図形の修飾句・head・数量句・動作の組立て案内を統合し、非歳時記のcore修飾語もparserが使う既存定義から共有する。相対寸法・正形などのslotだけを示して語形を欠く状態を解消し、新しいalias、語彙表、認識条件は追加しない。
+
 ### 2026-09-21 — Developer provider I/O observation
 
 Developer modeだけで、request単位にcore LLM retryを全段で1回へ限定し、独立してprovider I/O captureを有効にできるようにした。captureは送信前のdurable private recordを必須にし、実送信JSON、provider/model/action、HTTP status、raw response、timeout、usage、elapsedとoutcomeを同じowner/executionだけへ保存する。切断・上限切詰め・record失敗はcompleteと扱わず、rawは通常history、public view、logへ出さない。通常request、prompt、描画意味は変更しない。

@@ -1298,7 +1298,11 @@ impl PipelineSnapshot {
                 self.stage1(description.ok_or(ProtocolError::InternalInvariant)?, events)
             }
             LlmStage::GenerateNormalizedDdl => {
-                let generated = match parse_stage1_response(&response, self.config.prompt_limits) {
+                let generated = match parse_stage1_response(
+                    &response,
+                    self.config.prompt_limits,
+                    self.config.language,
+                ) {
                     Ok(value) => value,
                     Err(_) => {
                         return self.failure(ProviderFailure::SchemaViolation, spent_ms, events);

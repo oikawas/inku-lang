@@ -102,6 +102,6 @@ def default_manifest(binding: PipelineBinding) -> dict:
                      "max_flattened_points": "200000", "max_work": "10000000", "max_output_vertices": "200000"},
         },
         "provider": {"stage1_model": "nvidia:google/gemma-4-31b-it", "stage2_model": "nvidia:google/gemma-4-31b-it",
-                     "max_tokens": 2048, "stage1_max_tokens": 1024},
+                     "max_tokens": 2048, "stage1_max_tokens": 2048},
         "host_limits": {"max_workers": 4, "max_effect_steps": 32, "max_retained_runs": 8},
     }

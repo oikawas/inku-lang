@@ -957,6 +957,8 @@ Stage 1は記述から可視DDLを作り、Stage 2はcompilerが報告したknow
 
 Stage 1 は自由記述を、書き手が観察・編集できる正規化 DDL へ有限に写す。原文の明示要素・数量・色・素材・関係を保ち、隠れた視覚要素や「美しい」解釈を追加しない。語彙、閉じた schema、制限値、出典をプロンプト lock として渡し、出力はその lock の内側だけを使う。これは I-640 で同期した有限 typed normalization 契約であり、特定のモデル名やモデル階級を正本にしない。
 
+**作品計画（Stage 1 prompt `inku.typed-stage1-work-plan-prompt.v1`）**：初回生成のLLMは可視DDLの文字列を書かず、閉じた型の作品計画JSONを返す。作品計画は単独図形命令の層（最大8）と地・背景からなり、各値は歳時記asset、parserの有限修飾語形、揺らぎの分類、Scoreの濃淡値から投影したenumである。形（と比率語）ごとに使える値は、compilerへ一文ずつ問い合わせて生成した受理行列`inku.work-plan-capabilities.v1`が定め、共有Rustの検証が正本になる（providerのdecoding強制には依存しない）。範囲外の値はfield単位で未指定、形の無い層はその層だけを除き、描画を止めない。正規化した計画は要求言語の可視DDLへ決定的に印字され、その文字列だけが既存compilerへ渡る。受理行列と日英の性質試験により印字DDLは全層が診断なしでcompileされるので、初回生成の句が捨てられることはない。応答schemaはobject・array・string enum・有界integerだけを使い、既存の全provider輸送がそのまま運ぶ。保存済み実行の再生のため、`normalized_ddl`を持つ旧応答はそのまま読む。作品計画は一時物で、正本は可視DDLとScoreである。作者の直接DDLと編集DDLは従来どおり全文法で解析し、計画型の部分集合に制限しない。本版の作品計画はMacro呼出しを含まない（コア語彙が主で、Macroは付加機能）。
+
 初回の解釈では、記述全体の役割、対比、反復、疎密、余白、質感を短い視覚的構成へまとめる。短さを、必要な複数の役割を中央の一要素へ縮めることや、各名詞を一図形へ対応させることと混同しない。明示数量を最優先し、数量が明示されていない反復は文脈から数量を選んで可視DDLへ記す。単語と数量帯の対応表、決め打ちの最低数、一律の増量は使わず、数や文の多さ自体を品質目標にしない。
 
 原文から解釈して選んだ配置・画材等は可視DDLに記し、明示指定を保持する。中央または端への一律配置、固定画材、紙地や背景の一律追加は行わない。明示された色は可視性を理由に変更せず、支持体や背景を必要な描画対象の代用にしない。対象語から図形・素材・構図を引く表や対象別の誘導例は持たない。この初回生成方針は日英で共有し、現行の有限語彙・構文・応答schema、camera projection、hole補完、compiler、保存済み作品の意味を変更しない。
@@ -989,7 +991,7 @@ Variationの作成元は`stage1_generated`または`user_authored_ddl`として�
 
 系譜からの編集はhistory rowのownerを判別して対応するlinked forkを選び、旧forkを更新も置換もせず保持する。Activeな`/executions/{id}/author-ddl`はsource、revision、optionsを受ける。同じ設定でsourceが変わる場合はrecord metadataを保存し、既存のCAS、origin、DDL authority lockを保つ。canvas／wildなど設定が変わる場合は、元のsource・config・authorityを変えず親関係を持つDDL authorityのdirect-DDL variationを新設する。sourceが不変でrecord metadataだけが変わる場合も既存resultを捨てずnew editionとして保存する。history sidecar v2はcoreの4診断、renderer診断、`resource_execution`を当該revision／sourceに不変保存し、通常の履歴表示へ戻す。v1には診断記録がない。sidecarが壊れていてもその作品だけにwarningを示し、保存DDL、Score、SVGの表示を続け、latestの推測や再compileをしない。
 
-Typed Stage 1 requestは、Saijikiから導出した有限語彙、解決済みcatalog/canvas identity、検証済みMacroのqualified name・version・definition digest・parameter・host提供のlocalized summaryだけをbounded projectionとして持ち、応答schemaはvisible normalized DDLだけを許す。保存済みvisible DDLのparseが補完可能なknown holeを検出したら、共通pipelineが補完要求を自動で作る。別のユーザー補完操作は要求せず、holeがなければStage2 LLMを呼ばない。ただし§12.8のStage 1残部採用では追加LLM要求を始めず、保存ACK後に決定的な残部配送へ進む。有限文法外の語を含むclauseでも、compilerがexactな描画head、ground、またはbackground anchorとclause境界を確定できる場合は、そのclauseだけをknown holeにできる。Exactな境界を持たないUnknown、conflict、integrityエラーは補完対象にしない。後続の継続clauseがpatch可能な上流holeだけを原因として未確定なら、その継続診断はpatch後の再compileまで保留し、後続clause自体を書換え対象へ広げない。
+Typed Stage 1 requestは、Saijikiから導出した有限語彙、解決済みcatalog/canvas identity、検証済みMacroのqualified name・version・definition digest・parameter・host提供のlocalized summaryだけをbounded projectionとして持ち、応答schemaは§12.6の作品計画だけを許し、LLMが可視DDLの文字列を直接書くことはない。保存済みvisible DDLのparseが補完可能なknown holeを検出したら、共通pipelineが補完要求を自動で作る。別のユーザー補完操作は要求せず、holeがなければStage2 LLMを呼ばない。ただし§12.8のStage 1残部採用では追加LLM要求を始めず、保存ACK後に決定的な残部配送へ進む。有限文法外の語を含むclauseでも、compilerがexactな描画head、ground、またはbackground anchorとclause境界を確定できる場合は、そのclauseだけをknown holeにできる。Exactな境界を持たないUnknown、conflict、integrityエラーは補完対象にしない。後続の継続clauseがpatch可能な上流holeだけを原因として未確定なら、その継続診断はpatch後の再compileまで保留し、後続clause自体を書換え対象へ広げない。
 
 Hole補完の要求には、対象の原文、確定済みtyped fact、有限Saijiki語彙と受理構文を渡す。未認識語句も原文へ残し、compilerが依存を確定した参照先等は必要な範囲だけ読取り専用の文脈として渡せる。読む範囲と編集可能範囲を分け、description、無関係なclause、Score、renderer指示、思考過程は渡さない。複数の色や道具だけから交互配置・順序・数量分配を発明せず、表現できない意味を最も近い別の意味へ変更しない。
 

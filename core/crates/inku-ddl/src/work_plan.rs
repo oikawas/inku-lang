@@ -376,8 +376,6 @@ pub fn work_plan_response_schema() -> Value {
             "ground": enum_schema(ids(WorkPlanSlot::Ground)),
             "layers": {
                 "type": "array",
-                "minItems": 1,
-                "maxItems": MAX_WORK_PLAN_LAYERS,
                 "items": {
                     "type": "object",
                     "properties": layer,

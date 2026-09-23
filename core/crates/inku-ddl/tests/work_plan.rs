@@ -1,7 +1,7 @@
 use inku_ddl::ResolvedInstructionLanguage;
 use inku_ddl::work_plan::{
-    MAX_WORK_PLAN_LAYERS, WorkPlan, WorkPlanLayer, WorkPlanSlot, derive_work_plan_capabilities,
-    normalize_work_plan, print_work_plan, work_plan_capabilities, work_plan_response_schema,
+    WorkPlan, WorkPlanLayer, WorkPlanSlot, derive_work_plan_capabilities, normalize_work_plan,
+    print_work_plan, work_plan_capabilities, work_plan_response_schema,
     work_plan_source_compiles_cleanly, work_plan_vocabulary,
 };
 use serde_json::json;
@@ -196,13 +196,11 @@ fn normalization_turns_unusable_values_into_diagnostics_without_stopping() {
 fn response_schema_uses_the_portable_subset_and_the_projected_vocabulary() {
     let schema = work_plan_response_schema();
     let text = schema.to_string();
-    for forbidden in ["oneOf", "anyOf", "\"null\""] {
+    // Gemini rejects array item-count bounds in function schemas (HTTP 400);
+    // normalization enforces the layer limit instead.
+    for forbidden in ["oneOf", "anyOf", "\"null\"", "minItems", "maxItems"] {
         assert!(!text.contains(forbidden), "{forbidden}");
     }
-    assert_eq!(
-        schema["properties"]["layers"]["maxItems"],
-        MAX_WORK_PLAN_LAYERS
-    );
     let colors = schema["properties"]["layers"]["items"]["properties"]["color"]["enum"]
         .as_array()
         .unwrap();

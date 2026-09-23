@@ -92,6 +92,14 @@ fn random_layer(rng: &mut SplitMix) -> WorkPlanLayer {
             .attributes
             .insert(WorkPlanSlot::SurfaceIntensity, value.clone());
     }
+    if layer.action == "line_up"
+        && rng.chance(50)
+        && let Some(value) = rng.pick(&slots[&WorkPlanSlot::LineUpDirection])
+    {
+        layer
+            .attributes
+            .insert(WorkPlanSlot::LineUpDirection, value.clone());
+    }
     layer
 }
 

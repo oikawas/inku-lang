@@ -83,6 +83,11 @@
         "falling",
         "rotated"
       ],
+      "line_up_direction": [
+        "horizontal",
+        "vertical",
+        "diagonal"
+      ],
       "motion_quality": [
         "swaying",
         "undulating"
@@ -177,6 +182,11 @@
         "falling",
         "rotated"
       ],
+      "line_up_direction": [
+        "horizontal",
+        "vertical",
+        "diagonal"
+      ],
       "motion_quality": [
         "swaying",
         "undulating"
@@ -267,6 +277,11 @@
         "falling",
         "rotated"
       ],
+      "line_up_direction": [
+        "horizontal",
+        "vertical",
+        "diagonal"
+      ],
       "motion_quality": [
         "swaying",
         "undulating"
@@ -356,6 +371,11 @@
         "rising",
         "falling",
         "rotated"
+      ],
+      "line_up_direction": [
+        "horizontal",
+        "vertical",
+        "diagonal"
       ],
       "motion_quality": [
         "swaying",
@@ -455,6 +475,11 @@
         "falling",
         "rotated"
       ],
+      "line_up_direction": [
+        "horizontal",
+        "vertical",
+        "diagonal"
+      ],
       "motion_quality": [
         "swaying",
         "undulating"
@@ -553,6 +578,11 @@
         "falling",
         "rotated"
       ],
+      "line_up_direction": [
+        "horizontal",
+        "vertical",
+        "diagonal"
+      ],
       "motion_quality": [
         "swaying",
         "undulating"
@@ -650,6 +680,11 @@
         "rising",
         "falling",
         "rotated"
+      ],
+      "line_up_direction": [
+        "horizontal",
+        "vertical",
+        "diagonal"
       ],
       "motion_quality": [
         "swaying",
@@ -751,6 +786,11 @@
         "falling",
         "rotated"
       ],
+      "line_up_direction": [
+        "horizontal",
+        "vertical",
+        "diagonal"
+      ],
       "motion_quality": [
         "swaying",
         "undulating"
@@ -843,6 +883,11 @@
         "falling",
         "rotated"
       ],
+      "line_up_direction": [
+        "horizontal",
+        "vertical",
+        "diagonal"
+      ],
       "motion_quality": [
         "swaying",
         "undulating"
@@ -934,6 +979,11 @@
         "rising",
         "falling",
         "rotated"
+      ],
+      "line_up_direction": [
+        "horizontal",
+        "vertical",
+        "diagonal"
       ],
       "motion_quality": [
         "swaying",
@@ -1035,6 +1085,11 @@
         "falling",
         "rotated"
       ],
+      "line_up_direction": [
+        "horizontal",
+        "vertical",
+        "diagonal"
+      ],
       "motion_quality": [
         "swaying",
         "undulating"
@@ -1127,6 +1182,11 @@
         "falling",
         "rotated"
       ],
+      "line_up_direction": [
+        "horizontal",
+        "vertical",
+        "diagonal"
+      ],
       "motion_quality": [
         "swaying",
         "undulating"
@@ -1218,6 +1278,11 @@
         "rising",
         "falling",
         "rotated"
+      ],
+      "line_up_direction": [
+        "horizontal",
+        "vertical",
+        "diagonal"
       ],
       "motion_quality": [
         "swaying",
@@ -1319,6 +1384,11 @@
         "falling",
         "rotated"
       ],
+      "line_up_direction": [
+        "horizontal",
+        "vertical",
+        "diagonal"
+      ],
       "motion_quality": [
         "swaying",
         "undulating"
@@ -1418,6 +1488,11 @@
         "rising",
         "falling",
         "rotated"
+      ],
+      "line_up_direction": [
+        "horizontal",
+        "vertical",
+        "diagonal"
       ],
       "motion_quality": [
         "swaying",
@@ -1519,6 +1594,11 @@
         "falling",
         "rotated"
       ],
+      "line_up_direction": [
+        "horizontal",
+        "vertical",
+        "diagonal"
+      ],
       "motion_quality": [
         "swaying",
         "undulating"
@@ -1611,6 +1691,11 @@
         "falling",
         "rotated"
       ],
+      "line_up_direction": [
+        "horizontal",
+        "vertical",
+        "diagonal"
+      ],
       "motion_quality": [
         "swaying",
         "undulating"
@@ -1702,6 +1787,11 @@
         "rising",
         "falling",
         "rotated"
+      ],
+      "line_up_direction": [
+        "horizontal",
+        "vertical",
+        "diagonal"
       ],
       "motion_quality": [
         "swaying",
@@ -1803,6 +1893,11 @@
         "falling",
         "rotated"
       ],
+      "line_up_direction": [
+        "horizontal",
+        "vertical",
+        "diagonal"
+      ],
       "motion_quality": [
         "swaying",
         "undulating"
@@ -1903,6 +1998,11 @@
         "falling",
         "rotated"
       ],
+      "line_up_direction": [
+        "horizontal",
+        "vertical",
+        "diagonal"
+      ],
       "motion_quality": [
         "swaying",
         "undulating"
@@ -2001,6 +2101,11 @@
         "falling",
         "rotated"
       ],
+      "line_up_direction": [
+        "horizontal",
+        "vertical",
+        "diagonal"
+      ],
       "motion_quality": [
         "swaying",
         "undulating"
@@ -2090,6 +2195,11 @@
         "rising",
         "falling",
         "rotated"
+      ],
+      "line_up_direction": [
+        "horizontal",
+        "vertical",
+        "diagonal"
       ],
       "motion_quality": [
         "swaying",
@@ -2181,6 +2291,11 @@
         "falling",
         "rotated"
       ],
+      "line_up_direction": [
+        "horizontal",
+        "vertical",
+        "diagonal"
+      ],
       "motion_quality": [
         "swaying",
         "undulating"
@@ -2262,6 +2377,11 @@
       "surface": [],
       "surface_intensity": [],
       "angle": [],
+      "line_up_direction": [
+        "horizontal",
+        "vertical",
+        "diagonal"
+      ],
       "motion_quality": [],
       "motion_amplitude": [],
       "motion_speed": [],
@@ -2326,6 +2446,11 @@
       "surface": [],
       "surface_intensity": [],
       "angle": [],
+      "line_up_direction": [
+        "horizontal",
+        "vertical",
+        "diagonal"
+      ],
       "motion_quality": [],
       "motion_amplitude": [],
       "motion_speed": [],
@@ -2390,6 +2515,11 @@
       "surface": [],
       "surface_intensity": [],
       "angle": [],
+      "line_up_direction": [
+        "horizontal",
+        "vertical",
+        "diagonal"
+      ],
       "motion_quality": [],
       "motion_amplitude": [],
       "motion_speed": [],
@@ -2480,6 +2610,11 @@
         "rising",
         "falling",
         "rotated"
+      ],
+      "line_up_direction": [
+        "horizontal",
+        "vertical",
+        "diagonal"
       ],
       "motion_quality": [
         "swaying",
@@ -2573,6 +2708,11 @@
         "falling",
         "rotated"
       ],
+      "line_up_direction": [
+        "horizontal",
+        "vertical",
+        "diagonal"
+      ],
       "motion_quality": [
         "swaying",
         "undulating"
@@ -2664,6 +2804,11 @@
         "rising",
         "falling",
         "rotated"
+      ],
+      "line_up_direction": [
+        "horizontal",
+        "vertical",
+        "diagonal"
       ],
       "motion_quality": [
         "swaying",
@@ -2765,6 +2910,11 @@
         "falling",
         "rotated"
       ],
+      "line_up_direction": [
+        "horizontal",
+        "vertical",
+        "diagonal"
+      ],
       "motion_quality": [
         "swaying",
         "undulating"
@@ -2864,6 +3014,11 @@
         "rising",
         "falling",
         "rotated"
+      ],
+      "line_up_direction": [
+        "horizontal",
+        "vertical",
+        "diagonal"
       ],
       "motion_quality": [
         "swaying",
@@ -2965,6 +3120,11 @@
         "falling",
         "rotated"
       ],
+      "line_up_direction": [
+        "horizontal",
+        "vertical",
+        "diagonal"
+      ],
       "motion_quality": [
         "swaying",
         "undulating"
@@ -3057,6 +3217,11 @@
         "falling",
         "rotated"
       ],
+      "line_up_direction": [
+        "horizontal",
+        "vertical",
+        "diagonal"
+      ],
       "motion_quality": [
         "swaying",
         "undulating"
@@ -3148,6 +3313,11 @@
         "rising",
         "falling",
         "rotated"
+      ],
+      "line_up_direction": [
+        "horizontal",
+        "vertical",
+        "diagonal"
       ],
       "motion_quality": [
         "swaying",
@@ -3249,6 +3419,11 @@
         "falling",
         "rotated"
       ],
+      "line_up_direction": [
+        "horizontal",
+        "vertical",
+        "diagonal"
+      ],
       "motion_quality": [
         "swaying",
         "undulating"
@@ -3348,6 +3523,11 @@
         "rising",
         "falling",
         "rotated"
+      ],
+      "line_up_direction": [
+        "horizontal",
+        "vertical",
+        "diagonal"
       ],
       "motion_quality": [
         "swaying",

@@ -46,6 +46,7 @@ pub enum WorkPlanSlot {
     Surface,
     SurfaceIntensity,
     Angle,
+    LineUpDirection,
     MotionQuality,
     MotionAmplitude,
     MotionSpeed,
@@ -54,7 +55,7 @@ pub enum WorkPlanSlot {
 }
 
 impl WorkPlanSlot {
-    pub const LAYER_ATTRIBUTES: [Self; 14] = [
+    pub const LAYER_ATTRIBUTES: [Self; 15] = [
         Self::Place,
         Self::Size,
         Self::Color,
@@ -64,6 +65,7 @@ impl WorkPlanSlot {
         Self::Surface,
         Self::SurfaceIntensity,
         Self::Angle,
+        Self::LineUpDirection,
         Self::MotionQuality,
         Self::MotionAmplitude,
         Self::MotionSpeed,
@@ -86,6 +88,7 @@ impl WorkPlanSlot {
             Self::Surface => "surface",
             Self::SurfaceIntensity => "surface_intensity",
             Self::Angle => "angle",
+            Self::LineUpDirection => "line_up_direction",
             Self::MotionQuality => "motion_quality",
             Self::MotionAmplitude => "motion_amplitude",
             Self::MotionSpeed => "motion_speed",
@@ -205,6 +208,7 @@ pub fn work_plan_vocabulary() -> &'static WorkPlanVocabulary {
             (WorkPlanSlot::Tool, "tezawari"),
             (WorkPlanSlot::Continuity, "tsuranari"),
             (WorkPlanSlot::Angle, "katamuki"),
+            (WorkPlanSlot::LineUpDirection, "katamuki"),
             (WorkPlanSlot::Ground, "ji"),
         ] {
             for term in saijiki_terms(key) {
@@ -542,6 +546,11 @@ pub fn normalize_work_plan(raw: &Value) -> (WorkPlan, Vec<WorkPlanDiagnostic>) {
                 "requires_flat_surface",
             );
         }
+        if out.action != "line_up"
+            && let Some(value) = out.attributes.remove(&WorkPlanSlot::LineUpDirection)
+        {
+            note(Some(index), "line_up_direction", value, "requires_line_up");
+        }
         if out.attribute(WorkPlanSlot::MotionQuality).is_none() {
             for slot in [WorkPlanSlot::MotionAmplitude, WorkPlanSlot::MotionSpeed] {
                 if let Some(value) = out.attributes.remove(&slot) {
@@ -615,6 +624,10 @@ fn print_layer_ja(layer: &WorkPlanLayer) -> String {
     }
     out.push_str(&surface(WorkPlanSlot::Shape, &layer.shape, ja));
     out.push_str(MarkerId::JaWo.surface());
+    if let Some(direction) = layer.attribute(WorkPlanSlot::LineUpDirection) {
+        out.push_str(&surface(WorkPlanSlot::LineUpDirection, direction, ja));
+        out.push_str(MarkerId::JaNi.surface());
+    }
     out.push_str(&format!("{}個", layer.count));
     out.push_str(&surface(WorkPlanSlot::Action, &layer.action, ja));
     out.push('。');
@@ -677,6 +690,13 @@ fn print_layer_en(layer: &WorkPlanLayer) -> String {
         "one".to_owned()
     };
     let mut out = format!("{action} {count} {}", words.join(" "));
+    if let Some(direction) = layer.attribute(WorkPlanSlot::LineUpDirection) {
+        // Line-up direction is the direction word's adverb form.
+        out.push_str(&format!(
+            " {}ly",
+            surface(WorkPlanSlot::LineUpDirection, direction, en)
+        ));
+    }
     if let Some(place) = layer.attribute(WorkPlanSlot::Place) {
         out.push_str(&format!(
             " at the {}",
@@ -841,6 +861,22 @@ pub fn derive_work_plan_capabilities() -> WorkPlanCapabilities {
                     if slot == WorkPlanSlot::Action {
                         layer.action = term.id.clone();
                         layer.count = 5;
+                    } else if slot == WorkPlanSlot::LineUpDirection {
+                        // Direction exists only on line-up and must print in both languages.
+                        layer.action = "line_up".to_owned();
+                        layer.count = 5;
+                        layer.attributes.insert(slot, term.id.clone());
+                        let plan = WorkPlan {
+                            layers: vec![layer.clone()],
+                            ..WorkPlan::default()
+                        };
+                        let en = ResolvedInstructionLanguage::En;
+                        if accepted(&layer)
+                            && work_plan_source_compiles_cleanly(&print_work_plan(&plan, en), en)
+                        {
+                            values.push(term.id.clone());
+                        }
+                        continue;
                     } else {
                         if slot == WorkPlanSlot::SurfaceIntensity {
                             layer

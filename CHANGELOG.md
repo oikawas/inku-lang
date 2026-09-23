@@ -6,6 +6,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 36 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-24 — Closed-shape surface textures are no longer hidden by a flat fill (DDL engine 46)
+
+An explicit wash, grain, stipple, hatch, crosshatch, or aquatint on a closed shape was lowered together with a flat fill (`filled: true`), so the fill covered the texture and all six rendered as the same solid shape. Such a surface now lowers to `filled: false` with its texture, making the texture itself the area's performance. An explicit flat surface and the omitted-surface default of a closed shape keep their flat fill. Stored Scores are not reinterpreted.
+
 ### 2026-09-23 — Synchronize the specification with the current Web UI
 
 Aligned the Japanese and English specification with the current making and Library state retention, description and instruction editing with the Saijiki, responsive work-condition display, Lineage-grouped Library thumbnails, the shared Export menu and Lineage scopes, and Demo's work-conditions header. The batch-resume wording now also uses the current saved-success meaning. Product code and versions are unchanged.

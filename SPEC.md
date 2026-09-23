@@ -192,7 +192,11 @@ Canvas format is neither vocabulary nor a plugin. It is a resolved host option o
   wash remain applicable to lines and arcs: grain raises support absorption and
   tooth, while wash changes no sheet properties and produces a pale band at
   three times the width and 0.35 of the opacity. The other six qualities move
-  to the preceding closed shape and are dropped when there is none. Current
+  to the preceding closed shape and are dropped when there is none. On a closed
+  shape, an explicit wash, grain, stipple, hatch, crosshatch, or aquatint is
+  itself the area's performance and adds no flat base fill beneath it (DDL
+  engine 46). A flat fill comes only from an explicit flat surface or the
+  omitted-surface default of a closed shape. Current
   bleeding is independent movement vocabulary, not a surface quality. An
   instruction to fill the background is not about a surface** either; it goes to
   the document-owned `background` field. The finite form is `fill [the]

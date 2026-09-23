@@ -2543,6 +2543,34 @@ fn supported_input_is_identical_under_both_error_modes() {
 }
 
 #[test]
+fn named_surface_texture_is_the_area_performance_without_a_hidden_flat_base() {
+    let context = ScoreLoweringContext::resolve("square", Color::White).unwrap();
+    for (surface, filled, texture) in [
+        ("pale ink wash", false, Some(SurfaceTexture::Wash)),
+        ("grain", false, Some(SurfaceTexture::Grain)),
+        ("stipple", false, Some(SurfaceTexture::Stipple)),
+        ("hatch", false, Some(SurfaceTexture::Hatch)),
+        ("crosshatch", false, Some(SurfaceTexture::Crosshatch)),
+        ("aquatint", false, Some(SurfaceTexture::Aquatint)),
+        ("flat", true, None),
+        ("empty", false, None),
+    ] {
+        let result = stage15(
+            &format!("place one red {surface} circle at center."),
+            ResolvedInstructionLanguage::En,
+        );
+        let lowered = lower_verified_stage15_score(result.verified_effective_view(), context);
+        let instruction = &lowered.score().unwrap().instructions[0];
+        assert_eq!(instruction.filled, filled, "{surface}");
+        assert_eq!(
+            instruction.surface.as_ref().map(|spec| spec.texture),
+            texture,
+            "{surface}"
+        );
+    }
+}
+
+#[test]
 fn ordinary_non_solid_surface_intensity_omits_only_that_field_and_keeps_quality() {
     let result = stage15(
         "place one red grain dense circle at center.",
@@ -2562,7 +2590,7 @@ fn ordinary_non_solid_surface_intensity_omits_only_that_field_and_keeps_quality(
         continued.outcome(),
         ScoreLoweringOutcome::CompleteWithOmissions
     );
-    assert!(continued.score().unwrap().instructions[0].filled);
+    assert!(!continued.score().unwrap().instructions[0].filled);
     assert_eq!(
         continued.score().unwrap().instructions[0]
             .surface

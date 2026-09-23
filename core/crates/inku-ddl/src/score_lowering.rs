@@ -5871,8 +5871,10 @@ fn resolve_complete_object<'a>(
                 // two checked Touching arcs. Keep that intent for performance.
                 (closes_area || primitive == Primitive::Arc, None)
             }
+            // A named surface texture is itself the area's performance. A flat
+            // base fill under it would hide the texture entirely.
             Some(identity) => match surface_spec_from_identity(identity) {
-                Ok(spec) => (closes_area, Some(spec)),
+                Ok(spec) => (false, Some(spec)),
                 Err(gap) => {
                     gaps.push(gap);
                     (false, None)

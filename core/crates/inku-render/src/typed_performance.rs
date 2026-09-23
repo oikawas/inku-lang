@@ -293,6 +293,13 @@ impl<'a> Builder<'a> {
             0,
             self.request.canvas,
         );
+        let centers = crate::arrangement_performance::shape_centers(
+            arrangement,
+            &resolved.recipe,
+            centers,
+            resolved.domain,
+            placement_seed,
+        );
         let start = self.output.instructions.len();
         for instance in 0..count {
             let target = (!matches!(resolved.anchor, ResolvedPlacementAnchor::EnclosingGroup))
@@ -305,9 +312,21 @@ impl<'a> Builder<'a> {
                 innermost_fill,
             );
         }
+        let end = self.output.instructions.len();
+        let arrangement = self.request.score.instructions[old]
+            .arrangement
+            .as_ref()
+            .expect("validated Score 0.10 arrangement");
+        crate::arrangement_performance::finish_members(
+            &mut self.output.instructions[start..end],
+            arrangement,
+            &arrangement.resolved.as_ref().expect("validated").recipe,
+            placement_seed,
+            self.request.canvas,
+        );
         Fragment {
             start,
-            end: self.output.instructions.len(),
+            end,
             ..Fragment::default()
         }
     }
@@ -1922,6 +1941,7 @@ mod tests {
         );
         let arrangement = repeated.arrangement.as_mut().unwrap();
         arrangement.count = 5;
+        arrangement.jitter = 0.0;
         arrangement.color_cycle = vec![inku_score::Color::Red, inku_score::Color::Blue];
         let resolved = arrangement.resolved.as_mut().unwrap();
         resolved.domain = Point::new(2.35, 1.0);

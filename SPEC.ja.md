@@ -1494,6 +1494,12 @@ Shared compilerの明示揺らぎは常に`dimensions=["position_x","position_y"
 engine 19 まではどの layout も置き場所を seed から決めており、
 **展開後の印の 77.8% が宣言座標を参照していなかった**。
 
+#### typed配置の中での演奏（render engine 67）
+
+Score 0.10の`arrangement.resolved`（recipe・anchor・domain）は群れの置き場所と広がりを決める。rendererはその内側で、同じ`arrangement`の`density`・`cluster_count`・`rhythm_spacing`・`jitter`・`fade`を演奏する。散らすは`cluster_count`（省略時は密度に応じた数）の群れへ密度に応じて寄り、並べるは`rhythm_spacing`の間で並び、どのrecipeも`jitter`だけ位置がずれ、`fade`は群の中で濃さを減衰させる。置く・引くで一か所に複数を置いた`place` recipeは、同じ点へ重ねず、その場所の周りの有界な束として置く。複製した個体には、道具が持つ既存の個体差（大きさ・回転の手の揺れ）を付ける。敷き詰めの格子はこれらで崩さない。
+
+すべて`render_seed`と元ownerに束縛し、Score fieldだけを読む。語・題材・原文による分岐は持たない。`density: none`・`jitter: 0`・`rhythm_spacing: none`・`fade: none`はrecipeの中心点を変えない。compilerは演奏語彙が無ければこれらを明示の既定値で書くので、保存済みScoreの意味は変わらず、再演の見え方だけが本版の演奏に従う。
+
 #### 明示された個数の扱い（v2.7.6）
 
 Canonical meaningでは、記述に明示された個数をlosslessなsymbolic intentとして保持する。Step 11のpure ceiling preflightを、展開、配列確保、またはその他のO(count) materializationより前に適用する。`u32::MAX`等の巨大な要求値もclampや代表数へsilent rewriteしない。単独primitiveは予算内のsource順prefixだけをmaterializeして残りを診断し、構造上部分実行できない単位の拒否時だけallocation / materializationを0にする。

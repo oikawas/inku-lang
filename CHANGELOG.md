@@ -6,6 +6,12 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 36 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-24 — Typed placement performs density, rhythm, jitter, and fade (render engine 67)
+
+For Score 0.10 typed placement the renderer chose member positions from the recipe, anchor, count, and seed alone and never read the arrangement's `density`, `cluster_count`, `rhythm_spacing`, `jitter`, or `fade`; changing them produced an identical SVG. Inside the place and extent fixed by the recipe, the renderer now performs scatter clusters and density, line-up rhythm, positional jitter, and fade across the group. Several marks placed or drawn at one spot form a bounded bundle instead of an exact overlay. Performed members receive the tool's existing member hand for size and rotation. Tiled grids are unchanged.
+
+Every choice is bound to `render_seed` and the original owner and reads only Score fields, with no branch on words or subjects. Default field values leave recipe centers unchanged. Stored Score meaning is unchanged; replay follows this engine.
+
 ### 2026-09-24 — Closed-shape surface textures are no longer hidden by a flat fill (DDL engine 46)
 
 An explicit wash, grain, stipple, hatch, crosshatch, or aquatint on a closed shape was lowered together with a flat fill (`filled: true`), so the fill covered the texture and all six rendered as the same solid shape. Such a surface now lowers to `filled: false` with its texture, making the texture itself the area's performance. An explicit flat surface and the omitted-surface default of a closed shape keep their flat fill. Stored Scores are not reinterpreted.

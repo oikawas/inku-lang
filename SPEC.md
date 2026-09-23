@@ -2242,6 +2242,12 @@ description stated, so it stays there instead of moving onto the anchor.
 Up to engine 19 every layout decided placement from the seed, and **77.8% of the
 expanded marks never consulted a declared coordinate**.
 
+#### Performance inside a typed placement (render engine 67)
+
+A Score 0.10 `arrangement.resolved` recipe, anchor, and domain fix where a group lives and how far it extends. Inside that extent the renderer performs the same arrangement's `density`, `cluster_count`, `rhythm_spacing`, `jitter`, and `fade`. Scatter members gather toward `cluster_count` clusters (a density-dependent number when omitted) by an amount set by density; line-up members follow the `rhythm_spacing`; every recipe offsets positions by `jitter`; and `fade` attenuates intensity across the group. Several marks placed or drawn at one spot through the `place` recipe form a bounded bundle around it instead of an exact overlay. Performed members also receive the tool's existing member hand for size and rotation. Tiled grids are not disturbed by these fields.
+
+Every choice is bound to `render_seed` and the original owner and reads only Score fields; nothing branches on words, subjects, or source text. `density: none`, `jitter: 0`, `rhythm_spacing: none`, and `fade: none` leave recipe centers unchanged. The compiler writes these explicit defaults when no performance vocabulary is present, so stored Score meaning is unchanged and only its replayed appearance follows this engine.
+
 #### How a stated count is treated (v2.7.6)
 
 In canonical meaning, a stated count remains lossless symbolic intent. The Step

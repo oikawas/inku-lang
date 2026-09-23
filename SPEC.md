@@ -177,7 +177,10 @@ Canvas format is neither vocabulary nor a plugin. It is a resolved host option o
   these are the verbs of presentation
 - **the movements category describes irregularities in marks**: "swaying finely",
   "undulating slowly", and "bleeding" are allowed; "swaying beautifully" and
-  "swaying violently" are excluded (§13 has the detail)
+  "swaying violently" are excluded (§13 has the detail). English amplitude words may be written as
+  adjectives (`fine`, `large`) or adverbs (`finely`, `largely`). Because
+  amplitude `large` is spelled like the relative size `large`, use `largely`
+  when a size also appears in the same phrase (DDL 12)
 - **the relations category holds observable relations only**: "along" and "not
   touching" are positional relations an outside observer can verify. Words of
   intent or personification, such as "nestling against" or "answering each

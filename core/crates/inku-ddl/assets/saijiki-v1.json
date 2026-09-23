@@ -139,7 +139,7 @@
       "marker_class": "variation",
       "words": [
         {"surface_ja": "細かく", "surface_en": "fine", "english_grammar": {"lemma": "fine", "lexical_class": "adjective", "canonical_form": "base", "permitted_forms": ["adverb"]}, "default": false, "prompt": true, "display": true, "marker": null, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": null},
-        {"surface_ja": "大きく", "surface_en": "large", "default": false, "prompt": true, "display": true, "marker": null, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": null},
+        {"surface_ja": "大きく", "surface_en": "large", "english_grammar": {"lemma": "large", "lexical_class": "adjective", "canonical_form": "base", "permitted_forms": ["adverb"]}, "default": false, "prompt": true, "display": true, "marker": null, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": null},
         {"surface_ja": "ゆっくり", "surface_en": "slowly", "default": false, "prompt": true, "display": true, "marker": null, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": null},
         {"surface_ja": "速く", "surface_en": "quickly", "default": false, "prompt": true, "display": true, "marker": null, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": null},
         {"surface_ja": "揺れる", "surface_en": "swaying", "english_grammar": {"lemma": "sway", "lexical_class": "verb", "canonical_form": "present_participle", "permitted_forms": ["third_person_singular"]}, "default": false, "prompt": true, "display": true, "marker": null, "score_value": null, "marker_surfaces_ja": null, "marker_surfaces_en": null, "parser_surfaces_ja": ["震える"], "parser_surfaces_en": ["trembling", "trembles"]},

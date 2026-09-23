@@ -6,6 +6,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 36 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-24 — English amplitude accepts the adverb largely (DDL 12)
+
+The English amplitude word for 大きく was written only as `large`, spelled like relative size `large`. A phrase such as “large swaying small line” read both as sizes and produced a size conflict. Using the existing English grammar record already used for `fine` → `finely`, amplitude `large` now also accepts the adverb `largely`, so amplitude and size can share one phrase. Existing acceptance of `large` is unchanged; Japanese already distinguishes 大きく from 大きな.
+
 ### 2026-09-24 — Typed placement performs density, rhythm, jitter, and fade (render engine 67)
 
 For Score 0.10 typed placement the renderer chose member positions from the recipe, anchor, count, and seed alone and never read the arrangement's `density`, `cluster_count`, `rhythm_spacing`, `jitter`, or `fade`; changing them produced an identical SVG. Inside the place and extent fixed by the recipe, the renderer now performs scatter clusters and density, line-up rhythm, positional jitter, and fade across the group. Several marks placed or drawn at one spot form a bounded bundle instead of an exact overlay. Performed members receive the tool's existing member hand for size and rotation. Tiled grids are unchanged.

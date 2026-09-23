@@ -2543,6 +2543,24 @@ fn supported_input_is_identical_under_both_error_modes() {
 }
 
 #[test]
+fn english_largely_is_fluctuation_amplitude_not_a_second_size() {
+    let result = stage15(
+        "draw one largely swaying small red line at center.",
+        ResolvedInstructionLanguage::En,
+    );
+    let lowered = lower_verified_stage15_score(
+        result.verified_effective_view(),
+        ScoreLoweringContext::resolve("square", Color::White).unwrap(),
+    );
+    assert!(lowered.diagnostics().is_empty());
+    let instruction = &lowered.score().unwrap().instructions[0];
+    assert_eq!(
+        instruction.variation.as_ref().unwrap().amplitude,
+        inku_score::Amplitude::Broad
+    );
+}
+
+#[test]
 fn named_surface_texture_is_the_area_performance_without_a_hidden_flat_base() {
     let context = ScoreLoweringContext::resolve("square", Color::White).unwrap();
     for (surface, filled, texture) in [

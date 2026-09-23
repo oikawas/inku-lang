@@ -310,4 +310,6 @@ DDL_ENGINE_VERSION = "46"
 # 9 (2026-09-14): Partway joins place vocabulary for Line/Arc connections.
 # 10 (2026-09-14): Noun groups and non-color sequences use ordinary count grammar.
 # 11 (2026-09-14): Mirrored joins the relation vocabulary.
-DDL_VERSION = "11"
+# 12 (2026-09-24): English amplitude large also accepts the adverb largely, so
+# it no longer collides with relative size large in one phrase.
+DDL_VERSION = "12"

@@ -661,10 +661,10 @@ const STAGE1_WORK_PLAN_JA: &str = r#"あなたは inku の作品計画者であ�
 1. 記述が明示した形・数・色・画材・位置・関係は保つ。明示された色を見やすさの理由で変えない。
 2. 記述全体を幾つかの視覚的な役割に分ける（場の広がり、主となるもの、動きや伝播、散らばるもの、余白）。役割ごとに層を分け、役割どうしの対比（大と小、疎と密、重と軽、直と曲、静と動）が画面で見分けられるようにする。
 3. 一つの対象を一つの図形へ写すのではなく、広がり・質感・動き・数の多さを、痕の反復・大きさの幅・揺らぎで表す。広がるもの・群れるもの・流れるもの・面として在るものは小さな痕の多数の反復で、焦点となるものは少数で他と大きさや重さで区別する。数の明示がなければ記述全体の疎密から個数を選び、全層を同じ個数・大きさにしない。
-4. 閉じた形（円・楕円・三角・四角・雲形）は面を必ず選ぶ。輪郭で描く形は空、塗りつぶした塊を意図するときだけ塗り、ざらつきや陰影の層が要るときは質感（粒・点描・平行線・交差線・アクアチント・薄墨）を選ぶ。塗りや濃い面の面積は画面の重さを強く支配するので、広い塗りは記述が重い塊や暗い広がりを示す場合に限る。線・弧・点の面は空にする。
+4. 閉じた形（円・楕円・三角・四角・雲形）は面を必ず選ぶ。輪郭で描く形は空、塗りつぶした塊を意図するときだけ塗り、ざらつきや陰影の層が要るときは質感（粒・点描・平行線・交差線・アクアチント・薄墨）を選ぶ。塗りや濃い面の面積は画面の重さを強く支配するので、広い塗りは記述が重い塊や暗い広がりを示す場合に限る。線・弧には粒（紙の歯に擦れた痕）や薄墨（淡い帯）を痕の質として付けられる。点の面は空にする。
 5. 画材と太さは痕の性格を決める。軽く繊細な痕には細い画材や細さ、重く強い痕には太い画材を選ぶ。一作品の中で画材を使い分けてよい。
 6. 複数の痕は、並べる・散らす・敷き詰める・埋めるで配置する。置く・引くは一か所に置く動作で、複数にすると一か所の束になる。埋めるは小さな痕で使う。
-7. 揺らぎは痕の生きた不均一さである。層ごとに揺らぎなし（still）・揺れる・波打つを選び、揺らぐなら振幅と速さも選ぶ。
+7. 揺らぎは痕の生きた不均一さである。層ごとに揺らぎなし（still）・揺れる・波打つを選び、揺らぐなら振幅と速さも選ぶ。反復する痕は、揺らぎ・大きさの幅・画材の擦れや質感で一本ごとに違いを持たせ、機械的な同一の繰り返しにしない。
 8. 余白も構図の一部である。全層を中心に集めず、位置・大きさ・個数で重心と空いた部分を作る。
 9. 背景は画面の地色、groundは紙などの支持体である。どちらも任意で、描く対象の代わりにしない。背景を暗くするなら、痕の色がそれと見分けられるようにする。
 10. 感情・物語・題材名・説明は出力しない。
@@ -677,10 +677,10 @@ const STAGE1_WORK_PLAN_EN: &str = r#"You are inku's work planner. Read the autho
 1. Keep every shape, count, color, tool, position, and relation the description states. Never change a stated color for visibility.
 2. Divide the whole description into a few visual roles (the extent of the scene, the main presence, movement or propagation, scattered things, empty space). Give each role its own layer so contrasts between roles (large and small, sparse and dense, heavy and light, straight and curved, still and moving) are visible.
 3. Do not map one subject to one shape. Express extent, texture, movement, and multiplicity through repeated marks, a range of sizes, and fluctuation. Things that spread, gather, flow, or exist as a surface become many small repeated marks; a focal presence stays few and differs by size or weight. Without a stated count, choose counts from the density of the whole description, and do not give every layer the same count and size.
-4. Always choose a surface for closed shapes (circle, ellipse, triangle, square, cloudform): empty for an outline, flat only when a solid mass is intended, and a texture (grain, stipple, hatch, crosshatch, aquatint, pale ink wash) when the area needs a layer of roughness or shading. Flat or dense areas dominate the picture's weight, so use broad flat areas only when the description indicates a heavy mass or a dark expanse. Use empty for lines, arcs, and points.
+4. Always choose a surface for closed shapes (circle, ellipse, triangle, square, cloudform): empty for an outline, flat only when a solid mass is intended, and a texture (grain, stipple, hatch, crosshatch, aquatint, pale ink wash) when the area needs a layer of roughness or shading. Flat or dense areas dominate the picture's weight, so use broad flat areas only when the description indicates a heavy mass or a dark expanse. Lines and arcs may carry grain (marks scraped by the paper's tooth) or pale ink wash (a pale band) as the quality of the mark. Use empty for points.
 5. Tool and thinness set the character of a mark: fine tools or thinness for light, delicate marks and thick tools for heavy, strong ones. Tools may differ within one work.
 6. Arrange multiple marks with line up, scatter, tile, or fill. Place and draw put marks at one spot, where several form a bundle. Use fill with small marks.
-7. Fluctuation is the living irregularity of a mark. For each layer choose still, swaying, or undulating, and when it moves also choose amplitude and speed.
+7. Fluctuation is the living irregularity of a mark. For each layer choose still, swaying, or undulating, and when it moves also choose amplitude and speed. Give repeated marks individual differences through fluctuation, a range of sizes, and the scrape or texture of the tool, rather than a mechanical identical repetition.
 8. Empty space is part of the composition. Do not gather every layer at the center; use position, size, and count to create a center of weight and open areas.
 9. Background is the canvas color and ground is the support such as paper. Both are optional and never replace a drawn subject. With a dark background, keep mark colors distinguishable from it.
 10. Output no emotions, narrative, subject names, or explanations.

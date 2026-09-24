@@ -152,6 +152,7 @@ object InkuStringsJa : InkuStrings {
 
     override val modelCatalogRefreshed = "ローカルモデルカタログを更新しました。"
     override val modelListFetchFailed = "モデルリスト取得に失敗しました。"
+    override val modelListAccessDenied: (Int) -> String = { code -> "モデルリストを取得できませんでした（HTTP $code）。APIキーと利用権限を確認してください。" }
     override val modelListFetching: (String) -> String = { id -> "$id のモデルリストを取得しています..." }
     override val modelListFetched: (Int, String) -> String = { count, suffix ->
         "${count}件のモデルを取得しました。$suffix"
@@ -279,6 +280,7 @@ object InkuStringsJa : InkuStrings {
     override val mascotTitle = "マスコット選択"
     override val model = "モデル"
     override val modelListFetch = "モデルリスト取得"
+    override val modelListFetchSaveFirst = "取得する前に、モデル選択の変更を保存またはキャンセルしてください。"
     override val modelSearch = "モデル検索"
     override val modelSettings = "モデル設定"
     override val modelSelection = "モデル選択"

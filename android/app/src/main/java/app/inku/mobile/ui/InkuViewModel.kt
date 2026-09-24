@@ -38,6 +38,7 @@ import app.inku.mobile.data.refinement.RefinementPlan
 import app.inku.mobile.data.refinement.RefinementPlanner
 import app.inku.mobile.data.refinement.VariationAmplitude
 import app.inku.mobile.llm.LOCAL_VISION_MODEL_ID
+import app.inku.mobile.llm.ModelProviderHttpException
 import app.inku.mobile.llm.CameraVisionModeSetting
 import app.inku.mobile.llm.VisionAnalysisRequest
 import app.inku.mobile.llm.VisionImagePreparer
@@ -143,6 +144,12 @@ val InkuUiState.descriptionLocked: Boolean
     get() = historyAuthorityLoading || (!descriptionForkRequested &&
         (pipelineView?.authority == "ddl_authoritative" || historyAuthority == "ddl_authoritative"))
 
+data class ProviderModelFetchState(
+    val message: String,
+    val loading: Boolean = false,
+    val failed: Boolean = false,
+)
+
 data class InkuUiState(
     val prompt: String = "青い鉛筆の線を12本、波打つ軌跡に沿って散らす",
     val ddl: String = "",
@@ -177,6 +184,7 @@ data class InkuUiState(
     val modelAssets: List<ModelAssetEntity> = emptyList(),
     val providerSettings: List<ProviderSettingEntity> = emptyList(),
     val providerModelCandidates: Map<String, List<String>> = emptyMap(),
+    val providerModelFetchStates: Map<String, ProviderModelFetchState> = emptyMap(),
     val exportTemplates: List<ExportTemplateEntity> = emptyList(),
     val activeModelDownloadId: String? = null,
     val selectedModelId: String = CompatibilityConstants.defaultStage1Model,
@@ -2839,16 +2847,28 @@ class InkuViewModel @JvmOverloads constructor(
     }
 
     fun fetchProviderModels(providerId: String) {
+        if (localState.value.providerModelFetchStates[providerId]?.loading == true) return
+        fun setFetchState(next: ProviderModelFetchState) {
+            val current = localState.value
+            localState.value = current.copy(
+                providerModelFetchStates = current.providerModelFetchStates + (providerId to next),
+            )
+        }
+        setFetchState(ProviderModelFetchState(strings().modelListFetching(providerId), loading = true))
         viewModelScope.launch {
-            localState.value = localState.value.copy(message = strings().modelListFetching(providerId))
             runCatching {
                 repository.fetchProviderModels(providerId)
             }.onSuccess { models ->
                 val gemma31b = models.firstOrNull { it.equals("google/gemma-4-31b-it", ignoreCase = true) }
                 val suffix = if (providerId == "nvidia" && gemma31b != null) strings().modelListNvidiaSuffix else ""
-                localState.value = localState.value.copy(message = strings().modelListFetched(models.size, suffix))
+                setFetchState(ProviderModelFetchState(strings().modelListFetched(models.size, suffix)))
             }.onFailure { error ->
-                localState.value = localState.value.copy(message = messageFor(error, strings(), strings().modelListFetchFailed))
+                val message = if (error is ModelProviderHttpException && error.statusCode in setOf(401, 403)) {
+                    strings().modelListAccessDenied(error.statusCode)
+                } else {
+                    messageFor(error, strings(), strings().modelListFetchFailed)
+                }
+                setFetchState(ProviderModelFetchState(message, failed = true))
             }
         }
     }

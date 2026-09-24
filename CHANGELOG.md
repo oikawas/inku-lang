@@ -6,6 +6,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 36 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-24 — Support model-list fetching for Android connection types
+
+The Model Selection dialog now fetches model IDs from OpenAI-compatible, Anthropic, and Gemini connections using the same endpoints and credentials as the server. Fetches have a 20-second limit, and fetched candidates remain separate from published models. Only previously published IDs still in the fetched list remain selected; new IDs are not selected automatically. The dialog reports loading, success, and failure per connection and no longer mixes fixed initial suggestions into a fetched list. Drawing and model-generation transports are unchanged.
+
 ### 2026-09-24 — Refine Android creation and text display
 
 The Pixel 9 Android UI now has three destinations: Studio, Works, and Series. New work starts with its description, while saved work opens with the artwork and original description for review. Camera, batch, demo, and settings are grouped into clear entry points. The Works grid adapts to the available width. Series uses full-width cards and explains how to select a work when no lineage is in view. A restrained charcoal-and-paper palette and line icons keep attention on the artwork. Display settings add persistent 100–150% app text scaling on top of the device text scale. The drawing engine, DDL, work semantics, and persistence schema are unchanged.

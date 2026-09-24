@@ -3803,7 +3803,7 @@ private fun ModelSettingsPanel(state: InkuUiState, viewModel: InkuViewModel, mod
             state.providerSettings.forEach { provider ->
                 ProviderConnectionCard(
                     provider = provider,
-                    candidateModelIds = state.providerModelCandidates[provider.providerId].orEmpty(),
+                    candidateModelIds = state.providerModelCandidates[provider.providerId],
                     modelAssets = state.modelAssets,
                     onSave = viewModel::saveProviderSetting,
                     onClearApiKey = { viewModel.clearProviderApiKey(provider.providerId) },
@@ -3813,6 +3813,7 @@ private fun ModelSettingsPanel(state: InkuUiState, viewModel: InkuViewModel, mod
                     onDownloadModel = viewModel::downloadModel,
                     onRedownloadModel = viewModel::redownloadModel,
                     statusMessage = state.message,
+                    fetchState = state.providerModelFetchStates[provider.providerId],
                 )
             }
             AddProviderCard(onAdd = viewModel::saveProviderSetting)
@@ -3823,7 +3824,7 @@ private fun ModelSettingsPanel(state: InkuUiState, viewModel: InkuViewModel, mod
 @Composable
 private fun ProviderConnectionCard(
     provider: app.inku.mobile.data.db.ProviderSettingEntity,
-    candidateModelIds: List<String>,
+    candidateModelIds: List<String>?,
     modelAssets: List<app.inku.mobile.data.db.ModelAssetEntity>,
     onSave: (String, String, String, String, String, String) -> Unit,
     onClearApiKey: () -> Unit,
@@ -3833,6 +3834,7 @@ private fun ProviderConnectionCard(
     onDownloadModel: (String) -> Unit,
     onRedownloadModel: (String) -> Unit,
     statusMessage: String?,
+    fetchState: ProviderModelFetchState?,
 ) {
     val requiresKey = provider.providerId in setOf("openai", "nvidia", "anthropic", "gemini")
     val keySet = !provider.encryptedApiKey.isNullOrBlank()
@@ -3986,7 +3988,7 @@ private fun ProviderConnectionCard(
                 selectedModels = publishedModelIds,
                 onDismiss = { modelPickerOpen = false },
                 onFetchModels = onFetchModels,
-                statusMessage = statusMessage,
+                fetchState = fetchState,
                 onSave = { selected ->
                     modelPickerOpen = false
                     onSave(provider.providerId, displayName, kind, baseUrl, "", selected.joinToString("\n"))
@@ -4090,19 +4092,21 @@ private fun TextEditDialog(
 @Composable
 private fun ProviderModelPickerDialog(
     provider: app.inku.mobile.data.db.ProviderSettingEntity,
-    candidateModelIds: List<String>,
+    candidateModelIds: List<String>?,
     selectedModels: List<String>,
     onDismiss: () -> Unit,
     onFetchModels: () -> Unit,
-    statusMessage: String?,
+    fetchState: ProviderModelFetchState?,
     onSave: (List<String>) -> Unit,
 ) {
     var search by remember(provider.providerId) { mutableStateOf("") }
-    var selected by remember(provider.providerId) { mutableStateOf(selectedModels.toSet()) }
+    var selected by remember(provider.providerId, provider.publishedModelsJson) { mutableStateOf(selectedModels.toSet()) }
     val candidateModels = remember(provider.providerId, provider.publishedModelsJson, candidateModelIds) {
         providerModelCandidates(provider, candidateModelIds)
     }
     val candidateIds = candidateModels.map { it.id }.toSet()
+    val selectionChanged = selected != selectedModels.toSet()
+    val fetching = fetchState?.loading == true
     val filtered = candidateModels.filter { model ->
         val query = search.trim().lowercase()
         query.isBlank() || model.id.lowercase().contains(query) || model.label.lowercase().contains(query) || (model.notes?.lowercase()?.contains(query) == true)
@@ -4116,9 +4120,14 @@ private fun ProviderModelPickerDialog(
                 verticalArrangement = Arrangement.spacedBy(Dimens.spaceM),
             ) {
                 Row(horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM), modifier = Modifier.fillMaxWidth()) {
-                    ModelPickerActionButton(text = S.modelListFetch, onClick = onFetchModels, modifier = Modifier.weight(1.5f))
-                    ModelPickerActionButton(text = S.selectAll, onClick = { selected = filtered.map { it.id }.toSet() }, modifier = Modifier.weight(1f))
-                    ModelPickerActionButton(text = S.selectNone, onClick = { selected = emptySet() }, modifier = Modifier.weight(1f))
+                    ModelPickerActionButton(
+                        text = S.modelListFetch,
+                        onClick = onFetchModels,
+                        enabled = !fetching && !selectionChanged,
+                        modifier = Modifier.weight(1.5f),
+                    )
+                    ModelPickerActionButton(text = S.selectAll, onClick = { selected = filtered.map { it.id }.toSet() }, modifier = Modifier.weight(1f), enabled = !fetching)
+                    ModelPickerActionButton(text = S.selectNone, onClick = { selected = emptySet() }, modifier = Modifier.weight(1f), enabled = !fetching)
                 }
                 ImeAwareOutlinedTextField(
                     value = search,
@@ -4135,13 +4144,13 @@ private fun ProviderModelPickerDialog(
                     filtered.forEach { model ->
                         val checked = selected.contains(model.id)
                         Row(
-                            modifier = Modifier.fillMaxWidth().clickable {
+                            modifier = Modifier.fillMaxWidth().clickable(enabled = !fetching) {
                                 selected = if (checked) selected - model.id else selected + model.id
                             }.padding(vertical = Dimens.spaceXs),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM),
                         ) {
-                            Checkbox(checked = checked, onCheckedChange = { enabled ->
+                            Checkbox(checked = checked, enabled = !fetching, onCheckedChange = { enabled ->
                                 selected = if (enabled) selected + model.id else selected - model.id
                             })
                             Column(modifier = Modifier.weight(1f)) {
@@ -4151,13 +4160,20 @@ private fun ProviderModelPickerDialog(
                         }
                     }
                 }
-                statusMessage?.takeIf { it.contains(S.model) || it.contains(provider.providerId) }?.let {
-                    Text(it, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                fetchState?.let {
+                    Text(
+                        it.message,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = if (it.failed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                if (selectionChanged) {
+                    Text(S.modelListFetchSaveFirst, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         },
         confirmButton = {
-            TextButton(onClick = { onSave(selected.filter { it in candidateIds }) }) { Text(S.save) }
+            TextButton(onClick = { onSave(selected.filter { it in candidateIds }) }, enabled = !fetching) { Text(S.save) }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) { Text(S.cancel) }
@@ -4328,9 +4344,10 @@ private fun LocalModelAssetRow(
 }
 
 @Composable
-private fun ModelPickerActionButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
+private fun ModelPickerActionButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true) {
     OutlinedButton(
         onClick = onClick,
+        enabled = enabled,
         modifier = modifier.height(Dimens.buttonHeightSmall),
         shape = RoundedCornerShape(Dimens.radiusCard),
         contentPadding = PaddingValues(horizontal = Dimens.spaceXs, vertical = 0.dp),
@@ -4552,7 +4569,7 @@ private fun connectionKindLabel(value: String): String {
     }
 }
 
-private fun providerModelCandidates(provider: app.inku.mobile.data.db.ProviderSettingEntity, fetchedModelIds: List<String>): List<ProviderModelCandidate> {
+private fun providerModelCandidates(provider: app.inku.mobile.data.db.ProviderSettingEntity, fetchedModelIds: List<String>?): List<ProviderModelCandidate> {
     val defaults = when (provider.providerId) {
         "local-litert-lm" -> listOf(
             ProviderModelCandidate("local-litert-lm:gemma-4-e2b", "Gemma 4 E2B", "LiteRT-LM"),
@@ -4592,13 +4609,13 @@ private fun providerModelCandidates(provider: app.inku.mobile.data.db.ProviderSe
         )
         else -> emptyList()
     }
-    val fetched = fetchedModelIds.map { id ->
+    val fetched = fetchedModelIds.orEmpty().map { id ->
         ProviderModelCandidate(id, modelDisplayName(id), id)
     }
     val stored = parsePublishedModelIds(provider.publishedModelsJson).map { id ->
         ProviderModelCandidate(id, modelDisplayName(id), id)
     }
-    return (defaults + fetched + stored).distinctBy { it.id }
+    return ((if (fetchedModelIds == null) defaults else fetched) + stored).distinctBy { it.id }
 }
 
 private fun modelChoicesFor(state: InkuUiState): List<ModelChoice> {

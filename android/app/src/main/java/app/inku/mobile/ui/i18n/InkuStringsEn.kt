@@ -170,6 +170,7 @@ object InkuStringsEn : InkuStrings {
 
     override val modelCatalogRefreshed = "The local model catalog is up to date."
     override val modelListFetchFailed = "The model list could not be fetched."
+    override val modelListAccessDenied: (Int) -> String = { code -> "Could not fetch models (HTTP $code). Check the API key and access permissions." }
     override val modelListFetching: (String) -> String = { id -> "Fetching the model list for $id…" }
     override val modelListFetched: (Int, String) -> String = { count, suffix ->
         "Fetched $count model${if (count == 1) "" else "s"}.$suffix"
@@ -307,6 +308,7 @@ object InkuStringsEn : InkuStrings {
     override val mascotTitle = "Mascot"
     override val model = "Model"
     override val modelListFetch = "Fetch the model list"
+    override val modelListFetchSaveFirst = "Save or cancel model selection changes before fetching."
     override val modelSearch = "Search models"
     override val modelSettings = "Model settings"
     override val modelSelection = "Model selection"

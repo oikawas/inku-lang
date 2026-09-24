@@ -117,6 +117,7 @@ interface InkuStrings {
     // --- Models and providers ----------------------------------------------
     val modelCatalogRefreshed: String
     val modelListFetchFailed: String
+    val modelListAccessDenied: (Int) -> String
     val modelListFetching: (String) -> String
     val modelListFetched: (Int, String) -> String
     val modelListNvidiaSuffix: String
@@ -223,6 +224,7 @@ interface InkuStrings {
     val mascotTitle: String
     val model: String
     val modelListFetch: String
+    val modelListFetchSaveFirst: String
     val modelSearch: String
     val modelSettings: String
     val modelSelection: String

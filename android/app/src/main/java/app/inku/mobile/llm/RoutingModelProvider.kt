@@ -26,10 +26,15 @@ class RoutingModelProvider(
 
     suspend fun fetchModels(providerId: String): List<String> {
         val provider = database.providerSettingDao().get(providerId) ?: inkuError { it.errorServiceNotFound(providerId) }
-        if (provider.kind != "openai-compatible" && provider.kind != "openai_compatible") {
+        if (provider.kind !in setOf("openai-compatible", "openai_compatible", "anthropic", "gemini")) {
             inkuError { it.errorProviderModelsUnsupported(provider.displayName) }
         }
-        return remoteProvider(provider).fetchModels()
+        val baseUrl = provider.baseUrl?.trim()?.ifBlank { null } ?: inkuError { it.errorProviderBaseUrlMissing(provider.displayName) }
+        val apiKey = provider.encryptedApiKey?.let(AndroidSecretBox::decryptOrPlain)
+        if (provider.providerId in setOf("openai", "nvidia") && apiKey.isNullOrBlank()) {
+            inkuError { it.errorProviderApiKeyMissing(provider.displayName) }
+        }
+        return ProviderModelListFetcher.fetchModels(provider.kind, baseUrl, apiKey)
     }
 
     private suspend fun resolveProvider(modelId: String): ProviderSettingEntity {

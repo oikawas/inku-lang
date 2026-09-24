@@ -1219,17 +1219,18 @@
 		border-left: 1px solid var(--border);
 	}
 	.history-filter-label {
-		color: var(--fg2);
+		color: var(--fg3);
 		font-size: var(--ui-font-size-12);
-		font-weight: 600;
+		font-weight: 400;
 	}
 	.history-filter-btn {
 		display: inline-flex;
 		align-items: center;
 		gap: 2px;
 		padding: 4px 3px;
-		border-color: var(--border2);
-		color: var(--fg2);
+		background: color-mix(in srgb, var(--panel) 88%, var(--fg2));
+		border-color: color-mix(in srgb, var(--border2) 70%, var(--fg2));
+		color: var(--fg);
 		font-weight: 400;
 	}
 	.history-filter-btn.ghost-active {

@@ -12,6 +12,8 @@ The Library's Starred, Revision marks, and Shared filters are now grouped under 
 
 The filter check mark no longer changes a button's width, and the filter controls now carry the same restrained weight as nearby actions. Work-selection boxes use one smaller fixed square before and after selection, while Star, Revision mark, and Trash controls share one size and gap. Their actions and selected state are unchanged.
 
+The label now reads as supporting static text. Inactive filter buttons use a slightly raised existing-theme surface and stronger border so they read as actions, while their height, reserved check-mark width, and active fill stay unchanged.
+
 ### 2026-09-24 — Refine Android Works and in-person presentation
 
 Following Pixel 9 review and user feedback, the Works list, work presentation, and shared screen composition have been revised. The mostly achromatic palette is replaced with teal and coral accents that distinguish interaction priority. The shared header, bottom navigation, search and filters, and Works grid use screen space more efficiently. Selecting a work opens a dedicated viewer instead of the editing screen, preserving the current filter and order while presenting works in person. Viewer controls are simplified, with an explicit Revise action. App text scaling remains available. The drawing engine is unchanged.

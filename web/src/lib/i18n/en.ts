@@ -444,6 +444,7 @@ export const en: LangPack = {
 	canvasPresentationControls: 'Presentation controls',
 	selectionNotePrompt: 'Why this one? (optional)',
 	selectionNoteLabel: 'Choice',
+	historyFilterLabel: 'Filters',
 	starOn: 'Remove star',
 	starOff: 'Add star',
 	historyStarredOnly: 'Starred only',

@@ -444,6 +444,7 @@ export const ja: LangPack = {
 	canvasPresentationControls: 'プレゼンテーション操作',
 	selectionNotePrompt: '選んだ理由（任意）',
 	selectionNoteLabel: '選',
+	historyFilterLabel: '絞り込み',
 	starOn: 'スターを外す',
 	starOff: 'スターを付ける',
 	historyStarredOnly: 'スターのみ',

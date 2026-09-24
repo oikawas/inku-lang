@@ -736,27 +736,33 @@
 			<Tooltip placement="bottom-right" text={t().tooltipHistorySelectAll}>
 				<button class="ghost-btn" onclick={selectAllVisible}>{t().historySelectAll}</button>
 			</Tooltip>
-			<Tooltip placement="bottom-right" text={t().tooltipHistoryStarredOnly}>
-				<button
-					class="ghost-btn"
-					class:ghost-active={historyManagerStarredOnly}
-					onclick={() => onSetStarredOnly(!historyManagerStarredOnly)}
-				>{t().historyStarredOnly}</button>
-			</Tooltip>
-			<Tooltip placement="bottom-right" text={t().tooltipHistoryForRevisionOnly}>
-				<button
-					class="ghost-btn"
-					class:ghost-active={historyManagerForRevisionOnly}
-					onclick={() => onSetForRevisionOnly(!historyManagerForRevisionOnly)}
-				>{t().historyForRevisionOnly}</button>
-			</Tooltip>
-			<Tooltip placement="bottom-right" text={t().tooltipHistoryForShareOnly}>
-				<button
-					class="ghost-btn"
-					class:ghost-active={historyManagerForShareOnly}
-					onclick={() => onSetForShareOnly(!historyManagerForShareOnly)}
-				>{t().historyForShareOnly}</button>
-			</Tooltip>
+			<div class="history-filter-group" role="group" aria-label={t().historyFilterLabel}>
+				<span class="history-filter-label">{t().historyFilterLabel}</span>
+				<Tooltip placement="bottom-right" text={t().tooltipHistoryStarredOnly}>
+					<button
+						class="ghost-btn history-filter-btn"
+						class:ghost-active={historyManagerStarredOnly}
+						aria-pressed={historyManagerStarredOnly}
+						onclick={() => onSetStarredOnly(!historyManagerStarredOnly)}
+					>{#if historyManagerStarredOnly}<span class="history-filter-check" aria-hidden="true">✓</span>{/if}{t().historyStarredOnly}</button>
+				</Tooltip>
+				<Tooltip placement="bottom-right" text={t().tooltipHistoryForRevisionOnly}>
+					<button
+						class="ghost-btn history-filter-btn"
+						class:ghost-active={historyManagerForRevisionOnly}
+						aria-pressed={historyManagerForRevisionOnly}
+						onclick={() => onSetForRevisionOnly(!historyManagerForRevisionOnly)}
+					>{#if historyManagerForRevisionOnly}<span class="history-filter-check" aria-hidden="true">✓</span>{/if}{t().historyForRevisionOnly}</button>
+				</Tooltip>
+				<Tooltip placement="bottom-right" text={t().tooltipHistoryForShareOnly}>
+					<button
+						class="ghost-btn history-filter-btn"
+						class:ghost-active={historyManagerForShareOnly}
+						aria-pressed={historyManagerForShareOnly}
+						onclick={() => onSetForShareOnly(!historyManagerForShareOnly)}
+					>{#if historyManagerForShareOnly}<span class="history-filter-check" aria-hidden="true">✓</span>{/if}{t().historyForShareOnly}</button>
+				</Tooltip>
+			</div>
 			<Tooltip placement="bottom-right" text={t().tooltipHistoryTrashView}>
 				<button
 					class="ghost-btn"
@@ -1204,6 +1210,37 @@
 		border-bottom: 1px solid var(--border);
 		flex-wrap: wrap;
 	}
+	.history-filter-group {
+		display: flex;
+		align-items: center;
+		gap: 4px;
+		flex-wrap: wrap;
+		padding-left: 10px;
+		border-left: 1px solid var(--border);
+	}
+	.history-filter-label {
+		color: var(--fg2);
+		font-size: var(--ui-font-size-12);
+		font-weight: 600;
+	}
+	.history-filter-btn {
+		display: inline-flex;
+		align-items: center;
+		gap: 4px;
+		border-color: var(--accent);
+		color: var(--accent);
+		font-weight: 600;
+	}
+	.history-filter-btn.ghost-active {
+		background: var(--action-bg);
+		color: var(--action-fg);
+		border-color: var(--action-bg);
+	}
+	.history-filter-btn:focus-visible {
+		outline: 2px solid var(--accent);
+		outline-offset: 2px;
+	}
+	.history-filter-check { font-weight: 700; }
 	.history-mode-tabs { flex-shrink: 0; }
 	.history-manager-count {
 		font-size: var(--ui-font-size-12);

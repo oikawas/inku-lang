@@ -6,6 +6,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 36 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-24 — Make Library filter state easier to identify
+
+The Library's Starred, Revision marks, and Shared filters are now grouped under a label. Inactive buttons have outlines that identify them as controls, while active buttons use a fill and a check mark. Keyboard focus and assistive technology also receive the selected state. Filter combinations, search, and retained state when moving between screens are unchanged.
+
 ### 2026-09-23 — Synchronize the specification with the current Web UI
 
 Aligned the Japanese and English specification with the current making and Library state retention, description and instruction editing with the Saijiki, responsive work-condition display, Lineage-grouped Library thumbnails, the shared Export menu and Lineage scopes, and Demo's work-conditions header. The batch-resume wording now also uses the current saved-success meaning. Product code and versions are unchanged.

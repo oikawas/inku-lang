@@ -1678,11 +1678,10 @@ mod tests {
         assert!(facts.contains(&("quantity", "30")));
         assert!(facts.contains(&("touch", "tezawari:クレヨン")));
         assert!(facts.contains(&("touch", "tezawari:コンピュータ")));
-        assert!(
-            prompt
-                .system
-                .contains("未指定値・描画対象・順序を追加しない")
-        );
+        // Completion normalizes wording without inventing coordinates,
+        // alternation, or count splits.
+        assert!(prompt.system.contains("数値座標は追加しない"));
+        assert!(prompt.system.contains("交互配置や数量分配を新たに指定せず"));
         assert!(prompt.system.contains("unresolved/ambiguous"));
         assert!(!prompt.system.contains("各修飾語をheadまで含む完全なmember"));
         let proposed = json!({"id":"h1","status":"proposed","replacement":"背景を青で埋める。"});

@@ -97,7 +97,10 @@ fn texture_metadata_matches_the_visible_surface_policy() {
         ]}"#,
     );
     let metadata = build_render_metadata(&input, SvgProfile::Compat);
-    assert_eq!(metadata.render_engine_version, "46");
+    assert_eq!(
+        metadata.render_engine_version,
+        inku_render::RENDER_ENGINE_VERSION
+    );
     assert!(metadata.texture_degraded);
     assert!(metadata.render_canvas_ground.is_some());
     assert_eq!(metadata.render_surface_textures.len(), 1);
@@ -149,7 +152,10 @@ fn engine_renders_every_primitive_through_one_request() {
     let first = render(request.clone()).unwrap();
     let second = render(request).unwrap();
     assert_eq!(first, second);
-    assert_eq!(first.metadata.render_engine_version, "46");
+    assert_eq!(
+        first.metadata.render_engine_version,
+        inku_render::RENDER_ENGINE_VERSION
+    );
     assert!(first.svg.starts_with("<svg"));
     assert!(first.svg.ends_with("</svg>"));
     assert!(first.svg.contains("stroke-engine-v1"));
@@ -551,8 +557,8 @@ fn hand_fills_are_tool_fields_while_machine_fills_remain_regions() {
         },
     };
     let output = render(request).unwrap();
-    assert!(output.svg.contains("class=\"fill-v2\""));
-    assert!(output.svg.contains("fill-stroke-v1 strokes-"));
+    // Hand tools fill with their tool field; the machine tool keeps a region.
+    assert!(output.svg.contains("class=\"tool-fill-compat-v1\""));
     assert!(output.svg.contains("class=\"solid-fill-v1\""));
     assert!(output.svg.contains("<polygon"));
     assert!(!output.svg.contains("<clipPath"));
@@ -631,10 +637,9 @@ fn solid_fill_profile_boundary_keeps_base_and_scopes_mottle() {
     };
     for profile in [SvgProfile::Display, SvgProfile::Editable] {
         let output = render(make_request(profile)).unwrap();
+        // The tool-specific solid fill replaced the shared mottle overlay.
         assert!(output.svg.contains("class=\"solid-base-fill-v1\""));
-        assert!(output.svg.contains("class=\"solid-mottle-overlay-v1\""));
-        assert!(output.svg.contains("baseFrequency=\"0.035000\""));
-        assert!(output.svg.contains("tableValues=\"0.310000 1\""));
+        assert!(!output.svg.contains("solid-mottle-overlay-v1"));
     }
     let compat = render(make_request(SvgProfile::Compat)).unwrap();
     assert!(compat.svg.contains("class=\"solid-base-fill-v1\""));
@@ -661,7 +666,7 @@ fn computer_solid_remains_a_periodic_fill_field() {
         },
     };
     let output = render(request).unwrap();
-    assert!(output.svg.contains("fill-stroke-v1 strokes-"));
+    assert!(output.svg.contains("class=\"computer-crt-fill-v1\""));
     assert!(!output.svg.contains("solid-mottle-overlay-v1"));
 }
 
@@ -684,7 +689,8 @@ fn tiny_hand_fill_is_one_dab_instead_of_scanlines() {
         },
     };
     let output = render(request).unwrap();
-    assert!(output.svg.contains("class=\"fill-dab-v1\""));
+    // A tiny hand fill is one closed region, never a run of scanlines.
+    assert!(output.svg.contains("class=\"solid-base-fill-v1\""));
     assert!(!output.svg.contains("fill-stroke-v1 strokes-"));
 }
 

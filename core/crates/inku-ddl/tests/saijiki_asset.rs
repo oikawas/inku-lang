@@ -115,7 +115,15 @@ fn embedded_asset_is_complete_and_orders_are_lossless() {
     );
     assert_eq!(
         asset.relation_marker_order.ja,
-        ["触れる", "つながる", "沿う", "切る", "触れない", "間に", "鏡写し"]
+        [
+            "触れる",
+            "つながる",
+            "沿う",
+            "切る",
+            "触れない",
+            "間に",
+            "鏡写し"
+        ]
     );
     assert_eq!(
         asset.relation_marker_order.en,

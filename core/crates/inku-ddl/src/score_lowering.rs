@@ -3854,7 +3854,8 @@ fn append_unmaterialized_mirror_diagnostics(
         else {
             continue;
         };
-        let members = &document.coordinated_head_groups[predicate.group_index].member_instruction_indices;
+        let members =
+            &document.coordinated_head_groups[predicate.group_index].member_instruction_indices;
         let Some(follower) = members
             .last()
             .and_then(|index| view.source_instruction_index(*index))

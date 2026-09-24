@@ -345,7 +345,8 @@ mod tests {
                 .iter()
                 .filter(|d| d.reason == "catalog_entry_limit")
                 .count(),
-            5
+            // Seven bundled Nature entries, one admitted by the limit of one.
+            6
         );
     }
 

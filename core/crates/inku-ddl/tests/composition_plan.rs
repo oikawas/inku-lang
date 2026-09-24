@@ -1023,7 +1023,8 @@ fn gaps_keep_owners_and_stop_continue_never_ready_all_omitted() {
         &[],
     );
     let view = transformed.verified_effective_view();
-    let stopped = plan_verified_stage15_with_policy(view, context("square"), ScoreErrorPolicy::Stop);
+    let stopped =
+        plan_verified_stage15_with_policy(view, context("square"), ScoreErrorPolicy::Stop);
     let continued = plan_verified_stage15_with_policy(
         view,
         context("square"),
@@ -1031,7 +1032,10 @@ fn gaps_keep_owners_and_stop_continue_never_ready_all_omitted() {
     );
     // Legacy Stop input keeps the same drawable remainder.
     assert_eq!(stopped.outcome(), continued.outcome());
-    assert_eq!(stopped.objects().map(<[_]>::len), continued.objects().map(<[_]>::len));
+    assert_eq!(
+        stopped.objects().map(<[_]>::len),
+        continued.objects().map(<[_]>::len)
+    );
     assert_eq!(
         continued.outcome(),
         CompositionPlanOutcome::ReadyWithOmissions

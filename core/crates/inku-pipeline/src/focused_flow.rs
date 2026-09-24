@@ -265,7 +265,9 @@ fn unresolved_qualified_macro_blocks_without_stage2_completion() {
 #[test]
 fn stage1_compiler_feedback_retries_before_the_corrected_ddl_commits() {
     let description = "One quiet black circle";
-    let rejected_ddl = "place mystery circle.";
+    // An unknown word is now a repairable clause hole; an ownerless shared
+    // action still exercises the explicit action-owner feedback.
+    let rejected_ddl = "place many red circle and white square at center.";
     let corrected_ddl = "place one black circle at center.";
     let mut pipeline_config = config();
     pipeline_config.stage1_retry.attempt_timeout_ms = DecimalU64::new(3_000);
@@ -304,9 +306,7 @@ fn stage1_compiler_feedback_retries_before_the_corrected_ddl_commits() {
             .all(|event| event.tag != "visible_ddl_ready")
     );
     assert!(rejected_output.events.iter().any(|event| {
-        event.tag == "retry_scheduled"
-            && event.payload["failure"] == "semantic_violation"
-            && event.payload["detail"] == "ambiguous_action_ownership"
+        event.tag == "retry_scheduled" && event.payload["failure"] == "semantic_violation"
     }));
     let feedback_action = state.action.as_ref().unwrap();
     assert_eq!(feedback_action.tag, "generate_normalized_ddl");

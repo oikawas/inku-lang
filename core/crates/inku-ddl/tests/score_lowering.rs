@@ -2481,7 +2481,10 @@ fn unsupported_instruction_among_independent_instructions_keeps_the_drawable_res
         ScoreLoweringContext::resolve("square", Color::White).unwrap(),
     );
     // The independent circle is drawn; only the unsupported instruction is omitted.
-    assert_eq!(lowered.outcome(), ScoreLoweringOutcome::CompleteWithOmissions);
+    assert_eq!(
+        lowered.outcome(),
+        ScoreLoweringOutcome::CompleteWithOmissions
+    );
     let score = lowered.score().unwrap();
     assert_eq!(score.instructions.len(), 1);
     assert_eq!(score.instructions[0].primitive, Primitive::Circle);
@@ -3482,7 +3485,10 @@ fn macro_continuation_executes_once_and_keeps_source_ordinal_at_no_score_boundar
     );
     // Legacy Stop input keeps the same drawable invocations.
     assert_eq!(lowered.score(), continued.score());
-    assert_eq!(lowered.instruction_origins(), continued.instruction_origins());
+    assert_eq!(
+        lowered.instruction_origins(),
+        continued.instruction_origins()
+    );
     assert_eq!(
         continued.outcome(),
         ScoreLoweringOutcome::CompleteWithOmissions
@@ -3901,7 +3907,11 @@ fn macro_group_delivery_keeps_unsupported_emit_and_caller_stop_policy() {
         // The independent circle survives; the unusable Macro part is omitted
         // with its typed gap.
         let score = lowered.score().expect(macro_source);
-        assert_eq!(score.instructions[0].primitive, Primitive::Circle, "{macro_source}");
+        assert_eq!(
+            score.instructions[0].primitive,
+            Primitive::Circle,
+            "{macro_source}"
+        );
         assert_eq!(score.instructions[0].color, Color::Green, "{macro_source}");
         assert!(matches!(
             lowered.instruction_origins().first(),
@@ -4580,7 +4590,11 @@ fn continue_uses_root_group_and_full_typed_relation_omission_units() {
     // of an unsupported group is covered by compiler_execution's
     // `group_and_relation_dependencies_follow_an_omitted_source_owner`.
     assert_eq!(grouped.score().unwrap().instructions.len(), 3);
-    assert!(grouped.diagnostics().is_empty(), "{:?}", grouped.diagnostics());
+    assert!(
+        grouped.diagnostics().is_empty(),
+        "{:?}",
+        grouped.diagnostics()
+    );
 
     let related = stage15(
         concat!(

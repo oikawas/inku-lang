@@ -6,6 +6,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 36 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-24 — Refine Android Works and in-person presentation
+
+Following Pixel 9 review and user feedback, the Works list, work presentation, and shared screen composition have been revised. The mostly achromatic palette is replaced with teal and coral accents that distinguish interaction priority. The shared header, bottom navigation, search and filters, and Works grid use screen space more efficiently. Selecting a work opens a dedicated viewer instead of the editing screen, preserving the current filter and order while presenting works in person. Viewer controls are simplified, with an explicit Revise action. App text scaling remains available. The drawing engine is unchanged.
+
 ### 2026-09-24 — Support model-list fetching for Android connection types
 
 The Model Selection dialog now fetches model IDs from OpenAI-compatible, Anthropic, and Gemini connections using the same endpoints and credentials as the server. Fetches have a 20-second limit, and fetched candidates remain separate from published models. Only previously published IDs still in the fetched list remain selected; new IDs are not selected automatically. The dialog reports loading, success, and failure per connection and no longer mixes fixed initial suggestions into a fetched list. Drawing and model-generation transports are unchanged.

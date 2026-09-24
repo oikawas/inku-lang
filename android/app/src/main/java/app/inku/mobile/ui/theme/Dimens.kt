@@ -106,8 +106,8 @@ object Dimens {
     /** 76dp. The 全選択 / 全解除 pair in the model picker. */
     val modelActionWidth: Dp = 76.dp
 
-    /** 80dp. The bottom navigation bar. */
-    val bottomNavHeight: Dp = 80.dp
+    /** 64dp. The bottom navigation bar. */
+    val bottomNavHeight: Dp = 64.dp
 
     /** 104dp. A lineage node card, and the stop button beside it. */
     val chipWidth: Dp = 104.dp
@@ -129,9 +129,6 @@ object Dimens {
 
     /** 92dp. Keeps the presentation caption clear of the control bar. */
     val presentationCaptionBottomInset: Dp = 92.dp
-
-    /** 96dp. Tail space so the compose screen scrolls clear of the nav bar. */
-    val scrollTailSpace: Dp = 96.dp
 
     // --- Panels -------------------------------------------------------------
 

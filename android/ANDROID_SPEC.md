@@ -2818,6 +2818,12 @@ Valid direct DDL makes one local-Vision call, zero NIM Stage 1 calls, one fixed 
 
 The saved work records `route=local_ddl_to_nim_stage2`, `vision_output_mode=ddl`, and `camera-ddl-v1` in backward-compatible camera provenance. Its `stage1_model` is the actual DDL producer, `local-litert-lm:gemma-4-e2b`; its `stage2_model` is fixed NIM. `original_input` and `normalized_ddl` both carry the validated DDL. Photo bytes, URI, EXIF, location, and digest are not saved. This mode adds no Room schema or migration, new column, photo persistence, Photo Picker, E4B, non-NIM fallback, or default-mode change.
 
+## 2026-09-24 Android work list and presentation viewer
+
+Android retains Studio, Works, and Series destinations while fitting the shared header, navigation, and list controls within the Pixel 9 display area. Teal and coral distinguish interaction priority and state, with readable contrast for body and supporting text. App text scaling continues to build on the device text scale.
+
+Selecting a work in Works opens a dedicated viewer. It centers the work and offers its description on demand while preserving the active search, filters, and order from the list. Viewer controls focus on moving between works and closing the viewer; entering production is an explicit Revise action. Opening the viewer preserves any in-progress editing state. The viewer does not automatically render or save a work; starring remains an explicit action.
+
 ## 2026-08-27 On-device image input from Photo Picker ([I-456])
 
 M6-1 of Abstract Instant Print makes the bottom Camera action open a source chooser with Take a photo, Choose a photo, and Cancel. Capture retains the existing `ActivityResultContracts.TakePicture`; an existing photo uses image-only `ActivityResultContracts.PickVisualMedia` and accepts one item. The app adds no storage permission, persistable URI permission, custom file browser, or multi-selection. Both inputs use the existing replacement confirmation and local-E2B/fixed-NIM preflight, then snapshot the source, Vision output mode, canvas, and UI language for the run.

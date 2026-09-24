@@ -2280,3 +2280,9 @@ Abstract Instant PrintのM6-1では、下部「カメラ」を押すと「撮影
 選択されたcontent URIは読取可能な間だけapp-owned cacheへ一時copyし、copyは64 MiBでfail closedする。撮影／選択のどちらも`ImageDecoder`へ渡す直前に同じ64 MiB source上限を再検査し、その後、撮影画像と同じorientation反映、long edge 1280以下、JPEG quality 85のnormalizationから既存one-touch coordinatorへ渡す。description modeはlocal Vision →固定NIM Stage 1／2、DDL direct modeは検証済みlocal DDL →固定NIM Stage 2を維持する。NIMが受けるのはtextだけであり、画像bytes、URI、path、display name、EXIF、location、digestをremote request、history、metadataへ入れない。Photo Picker自身が利用者選択によりcloud-backed mediaを取得しても、remote modelへの画像送信を許可したことにはならない。
 
 Photo Pickerの取消またはnull resultはerrorにせず開始前Compose状態へ戻り、local Vision、NIM、render、saveを起動しない。読取不能、空、unsupported、decode不能は画像準備failureとしてremote callと保存を行わない。app-owned一時copyは成功、失敗、Cancel、system Back、stale run、ViewModel終了で削除し、元写真は変更／削除しない。保存作品の既存`input_provenance.origin`は撮影で`camera`、Photo Pickerで`photo_picker`とし、Generation Infoは後者を「既存の写真」と表示する。Room schema／migration／backfill／新列、段別resume、background復帰、独自reduce-motion、E4B、CameraXは追加しない。
+
+## 2026-09-24 Android作品一覧と紹介用ビューア
+
+Androidの共通画面は制作・作品・連作の移動先を保ちながら、ヘッダー、ナビゲーション、一覧操作をPixel 9の表示領域に収める。色は操作の優先度と状態を区別するために青緑と珊瑚色を用い、本文・補助情報とのコントラストを確保する。文字倍率設定は引き続き端末の文字倍率に重ねて適用する。
+
+作品タブの作品選択は専用ビューアを開く。ビューアは閲覧対象の作品画像と紹介情報を中心にし、作品一覧で適用中の検索・絞り込みと順序を保つ。閲覧中の操作は作品間の移動と画面を閉じる操作を中心に整理し、制作へ戻る場合は「推敲する」を明示的に選ぶ。ビューアを開いても制作中の編集状態を失わない。ビューアから描画処理、保存、作品内容の変更を自動実行しない。

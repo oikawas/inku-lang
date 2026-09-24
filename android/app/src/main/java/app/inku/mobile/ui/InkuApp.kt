@@ -75,6 +75,8 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.LazyGridState
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.grid.items as gridItems
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -441,6 +443,7 @@ internal fun saijikiGroupColorAt(index: Int): Color = saijikiGroupColors[index %
 fun InkuApp() {
     val viewModel: InkuViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
     val state by viewModel.state.collectAsState()
+    val historyGridState = rememberLazyGridState()
     val cameraCaptureLauncher = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { success ->
         viewModel.onCameraCaptureResult(success)
     }
@@ -532,7 +535,7 @@ fun InkuApp() {
                         AppTab.Compose -> ComposeScreen(state, viewModel)
                         AppTab.History -> {
                             val history by viewModel.historyItems.collectAsState()
-                            HistoryScreen(state, history, viewModel)
+                            HistoryScreen(state, history, viewModel, historyGridState)
                         }
                         AppTab.Lineage -> LineageScreen(state, viewModel)
                         AppTab.Settings -> SettingsPanel(state, viewModel, modifier = Modifier.fillMaxSize().padding(Dimens.spaceL))
@@ -1287,7 +1290,7 @@ private fun BottomNavigationBar(
             modifier = Modifier
                 .fillMaxWidth()
                 .heightIn(min = Dimens.bottomNavHeight)
-                .padding(horizontal = Dimens.spaceM, vertical = Dimens.spaceM),
+                .padding(horizontal = Dimens.spaceM),
             horizontalArrangement = Arrangement.spacedBy(Dimens.spaceXs),
         ) {
             BottomNavigationDestination.entries.forEach { destination ->
@@ -1328,9 +1331,13 @@ private enum class BottomNavigationDestination {
 @Composable
 private fun StudioHeader(title: String, viewModel: InkuViewModel, showTools: Boolean = false) {
     var toolsOpen by remember { mutableStateOf(false) }
-    Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
-        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Text("inku", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
+    Row(
+        modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM),
+    ) {
+            Box(Modifier.size(8.dp).background(MaterialTheme.colorScheme.primary, RoundedCornerShape(100)))
+            Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
             if (showTools) {
                 Box {
                     TextButton(onClick = { toolsOpen = true }) { Text(S.productionTools) }
@@ -1360,9 +1367,6 @@ private fun StudioHeader(title: String, viewModel: InkuViewModel, showTools: Boo
                 viewModel.setTab(AppTab.Settings)
                 viewModel.setSettingsPane(SettingsPane.Home)
             }) { Text(S.settings) }
-        }
-        HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
-        Text(title, style = MaterialTheme.typography.headlineMedium, modifier = Modifier.padding(top = Dimens.spaceM))
     }
 }
 
@@ -1427,8 +1431,8 @@ private fun ComposeScreen(state: InkuUiState, viewModel: InkuViewModel) {
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScroll(scrollState)
-                .padding(horizontal = Dimens.spaceXl, vertical = Dimens.spaceM),
-            verticalArrangement = Arrangement.spacedBy(Dimens.spaceL),
+                .padding(horizontal = Dimens.spaceL, vertical = Dimens.spaceM),
+            verticalArrangement = Arrangement.spacedBy(Dimens.spaceM),
         ) {
             StudioHeader(S.studioTitle, viewModel, showTools = true)
             RunStatusRow(state, viewModel)
@@ -1464,7 +1468,6 @@ private fun ComposeScreen(state: InkuUiState, viewModel: InkuViewModel) {
                     )
                 }
             }
-            Spacer(Modifier.height(Dimens.scrollTailSpace))
         }
         if (state.descriptionFocused && state.composeMode == ComposeMode.Write) {
             ImeActionBar(state, viewModel, modifier = Modifier.align(Alignment.BottomCenter))
@@ -1816,7 +1819,7 @@ private fun CanvasHeroCard(
     canvasAspectOverride: String? = null,
     deviceRotation: DeviceRotation = DeviceRotation.Portrait,
 ) {
-    val item = state.selectedHistory
+    val item = if (state.canvasPresentationMode) state.presentationHistory ?: state.selectedHistory else state.selectedHistory
     val canvasAspectId = canvasAspectOverride
         ?: if (state.canvasPresentationMode) item?.canvasAspect ?: state.selectedCanvasAspect else state.selectedCanvasAspect
     val context = LocalContext.current
@@ -1829,9 +1832,10 @@ private fun CanvasHeroCard(
     var exportSheetOpen by remember { mutableStateOf(false) }
     var generationInfoOpen by remember { mutableStateOf(false) }
     var pngExporting by remember { mutableStateOf(false) }
-    var instructionCaptionVisible by remember {
-        mutableStateOf(presentationPreferences.getBoolean(PRESENTATION_CAPTION_VISIBLE_KEY, true))
+    var instructionCaptionVisible by remember(state.canvasPresentationMode, state.presentationHistory != null) {
+        mutableStateOf(if (state.presentationHistory != null) false else presentationPreferences.getBoolean(PRESENTATION_CAPTION_VISIBLE_KEY, true))
     }
+    var presentationChromeVisible by remember(state.canvasPresentationMode) { mutableStateOf(true) }
     val presentation = state.canvasPresentationMode
     val historyItems by viewModel.historyItems.collectAsState()
     val canvasBoundsModifier = if (presentation && state.displaySafeMarginsEnabled) {
@@ -1874,11 +1878,14 @@ private fun CanvasHeroCard(
         }
         val instructionCaptionText = item?.originalInput?.trim().orEmpty()
         val canShowInstructionCaption = instructionCaptionText.isNotBlank()
-        val historyIndex = item?.let { selected -> historyItems.indexOfFirst { it.id == selected.id } } ?: -1
-        val historyTotal = historyItems.size
+        val presentationIds = state.presentationSequence.takeIf { state.presentationHistory != null && it.isNotEmpty() }
+        val historyIndex = item?.let { selected ->
+            presentationIds?.indexOf(selected.id) ?: historyItems.indexOfFirst { it.id == selected.id }
+        } ?: -1
+        val historyTotal = presentationIds?.size ?: historyItems.size
         val canGoLatest = historyIndex > 0
         val canGoNewer = historyIndex > 0
-        val canGoOlder = historyIndex >= 0 && historyIndex < historyItems.lastIndex
+        val canGoOlder = historyIndex >= 0 && historyIndex < historyTotal - 1
         val historyCounter = if (historyIndex >= 0 && historyTotal > 0) "${historyIndex + 1} / $historyTotal" else ""
         Column(modifier = if (presentation) Modifier.fillMaxSize() else Modifier, verticalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
             // The strip above the canvas says what the work on screen *is*: its
@@ -1932,6 +1939,7 @@ private fun CanvasHeroCard(
                         )
                         .pointerInput(item?.id, state.canvasPresentationMode, oneToOneZoom) {
                             detectTapGestures(
+                                onTap = { if (presentation) presentationChromeVisible = !presentationChromeVisible },
                                 onDoubleTap = {
                                     if (state.canvasPresentationMode) {
                                         viewModel.toggleCanvasZoom(oneToOneZoom)
@@ -2020,14 +2028,14 @@ private fun CanvasHeroCard(
                             )
                         }
                     }
-                    if (presentation && instructionCaptionVisible && canShowInstructionCaption) {
+                    if (presentation && presentationChromeVisible && instructionCaptionVisible && canShowInstructionCaption) {
                         PresentationCaption(
                             text = instructionCaptionText,
                             rotation = deviceRotation,
                             modifier = presentationCaptionPlacement(screenWidth),
                         )
                     }
-                    if (presentation) {
+                    if (presentation && presentationChromeVisible) {
                         PresentationControls(
                             modifier = Modifier
                                 .align(Alignment.BottomCenter)
@@ -2046,6 +2054,8 @@ private fun CanvasHeroCard(
                             onGoLatest = viewModel::selectLatestHistory,
                             onGoNewer = viewModel::selectPreviousHistory,
                             onToggleStar = { item?.let(viewModel::toggleStar) },
+                            onEdit = viewModel::editPresentedHistory,
+                            canEdit = state.presentationHistory != null,
                             onToggleCaption = {
                                 if (canShowInstructionCaption) {
                                     val nextVisible = !instructionCaptionVisible
@@ -2327,7 +2337,7 @@ private fun DrawPanel(
                 .fillMaxWidth()
                 .testTag(DESCRIPTION_INPUT_TAG)
                 .onGloballyPositioned { onDescriptionPositioned(it.positionInWindow().y) },
-            minLines = 5,
+            minLines = 3,
             maxLines = 8,
             enabled = !state.descriptionLocked && !state.isDrawing,
             onFocusChanged = onDescriptionFocusChanged,
@@ -2849,6 +2859,7 @@ private fun HistoryScreen(
     state: InkuUiState,
     history: List<HistoryListItem>,
     viewModel: InkuViewModel,
+    gridState: LazyGridState,
 ) {
     val filteredHistory = remember(history, state.historySearchQuery, state.historyStarredOnly) {
         filterHistoryItems(history, state)
@@ -2863,17 +2874,18 @@ private fun HistoryScreen(
     }
     LazyVerticalGrid(
         columns = GridCells.Adaptive(152.dp),
+        state = gridState,
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(horizontal = Dimens.spaceXl, vertical = Dimens.spaceM),
-        horizontalArrangement = Arrangement.spacedBy(Dimens.spaceL),
-        verticalArrangement = Arrangement.spacedBy(Dimens.spaceXl),
+        contentPadding = PaddingValues(horizontal = Dimens.spaceL, vertical = Dimens.spaceM),
+        horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         item(key = "header", span = { GridItemSpan(maxLineSpan) }) { header() }
         gridItems(filteredHistory, key = { it.id }) { item ->
             HistoryGridTile(
                 item = item,
                 selected = state.selectedHistory?.id == item.id,
-                onSelect = { viewModel.selectHistory(item) },
+                onSelect = { viewModel.openHistoryPresentation(item, filteredHistory.map { it.id }) },
                 onToggleStar = { viewModel.toggleStar(item) },
             )
         }
@@ -2887,18 +2899,26 @@ private fun HistoryHeader(
     filteredCount: Int,
     viewModel: InkuViewModel,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceM), modifier = Modifier.fillMaxWidth()) {
+    var searchOpen by remember { mutableStateOf(state.historySearchQuery.isNotBlank()) }
+    val searchLabel = S.searchPlaceholderLong
+    Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceXs), modifier = Modifier.fillMaxWidth()) {
         StudioHeader(S.worksTitle, viewModel)
-        ImeAwareOutlinedTextField(
-            value = state.historySearchQuery,
-            onValueChange = viewModel::setHistorySearchQuery,
-            label = S.searchPlaceholderLong,
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true,
-        )
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Dimens.spaceL), modifier = Modifier.fillMaxWidth()) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM), modifier = Modifier.fillMaxWidth()) {
+            Text(S.filteredOfTotal(filteredCount, sourceCount), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+            TextButton(
+                onClick = { searchOpen = !searchOpen },
+                modifier = Modifier.size(48.dp).semantics { contentDescription = searchLabel },
+            ) { Text("⌕", style = MaterialTheme.typography.titleLarge) }
             ChipButton(S.starredOnly, selected = state.historyStarredOnly, onClick = viewModel::toggleHistoryStarredFilter)
-            Text(S.filteredOfTotal(filteredCount, sourceCount), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        if (searchOpen || state.historySearchQuery.isNotBlank()) {
+            ImeAwareOutlinedTextField(
+                value = state.historySearchQuery,
+                onValueChange = viewModel::setHistorySearchQuery,
+                label = S.searchPlaceholderLong,
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+            )
         }
     }
 }
@@ -3799,7 +3819,7 @@ private fun ModelSettingsPanel(state: InkuUiState, viewModel: InkuViewModel, mod
     ) {
         SettingsHeader(state.settingsPane, viewModel)
 
-        Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
+        Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceXs)) {
             state.providerSettings.forEach { provider ->
                 ProviderConnectionCard(
                     provider = provider,
@@ -5669,11 +5689,11 @@ private fun HistoryGridTile(
                     text = historyGridStarSymbol(item.starred),
                     selected = item.starred,
                     onClick = onToggleStar,
-                    modifier = Modifier.align(Alignment.TopEnd).padding(Dimens.spaceM),
+                    modifier = Modifier.align(Alignment.TopEnd).padding(Dimens.spaceXs),
                 )
             }
             Row(modifier = Modifier.padding(horizontal = Dimens.spaceM, vertical = Dimens.spaceM), verticalAlignment = Alignment.CenterVertically) {
-                Text(historyTitle(item), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface, minLines = 2, maxLines = 3, overflow = TextOverflow.Ellipsis, modifier = Modifier.fillMaxWidth())
+                Text(historyTitle(item), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface, minLines = 2, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.fillMaxWidth())
             }
         }
     }
@@ -5683,6 +5703,7 @@ private fun HistoryGridTile(
 private fun HistoryBadge(text: String, selected: Boolean = false, onClick: (() -> Unit)? = null, modifier: Modifier = Modifier) {
     val base = modifier
         .size(Dimens.badgeSize)
+        .minimumInteractiveComponentSize()
         .background(
             if (selected) MaterialTheme.colorScheme.secondary else HistoryBadgeSurface,
             RoundedCornerShape(100),
@@ -6180,12 +6201,10 @@ private fun PresentationCaption(text: String, rotation: DeviceRotation, modifier
     ) {
         Text(
             text,
-            modifier = Modifier.padding(horizontal = Dimens.spaceL, vertical = Dimens.spaceL),
+            modifier = Modifier.heightIn(max = 180.dp).verticalScroll(rememberScrollState()).padding(horizontal = Dimens.spaceL, vertical = Dimens.spaceM),
             color = PresentationCaptionInk,
             style = MaterialTheme.typography.bodyMedium,
             textAlign = TextAlign.Center,
-            maxLines = 3,
-            overflow = TextOverflow.Ellipsis,
         )
     }
 }
@@ -6209,12 +6228,15 @@ private fun PresentationControls(
     onGoLatest: () -> Unit,
     onGoNewer: () -> Unit,
     onToggleStar: () -> Unit,
+    canEdit: Boolean,
+    onEdit: () -> Unit,
     onToggleCaption: () -> Unit,
     onClose: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    var menuOpen by remember { mutableStateOf(false) }
     Surface(
-        modifier = modifier,
+        modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(100),
         color = PresentationControlsSurface,
         border = BorderStroke(Dimens.hairline, PresentationControlOutline),
@@ -6223,29 +6245,30 @@ private fun PresentationControls(
     ) {
         Row(
             modifier = Modifier.padding(Dimens.spaceM),
-            horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM),
+            horizontalArrangement = Arrangement.spacedBy(Dimens.spaceXs),
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            PresentationControlButton("×", onClick = onClose)
             PresentationControlButton("‹", enabled = canGoOlder, onClick = onGoOlder)
-            PresentationControlButton(S.latest, enabled = canGoLatest, wide = true, onClick = onGoLatest)
-            PresentationControlButton("›", enabled = canGoNewer, onClick = onGoNewer)
             Text(
                 counter,
-                modifier = Modifier.widthIn(min = Dimens.presentationControlMinWidth).padding(horizontal = Dimens.spaceXs),
+                modifier = Modifier.weight(1f).padding(horizontal = Dimens.spaceXs),
                 color = PresentationControlLabelMuted,
                 style = MaterialTheme.typography.labelSmall,
                 textAlign = TextAlign.Center,
                 maxLines = 1,
             )
-            PresentationControlButton(
-                "${zoomPercent}%",
-                wide = true,
-                enabled = zoomPercent != (CANVAS_FIT_ZOOM * 100).toInt(),
-                onClick = onResetZoom,
-            )
-            PresentationControlButton("★", selected = starred, enabled = canToggleStar, onClick = onToggleStar)
-            PresentationControlButton("▭", selected = captionVisible, enabled = captionEnabled, onClick = onToggleCaption)
-            PresentationControlButton("×", onClick = onClose)
+            PresentationControlButton("›", enabled = canGoNewer, onClick = onGoNewer)
+            PresentationControlButton(S.description, selected = captionVisible, enabled = captionEnabled, wide = true, onClick = onToggleCaption)
+            Box {
+                PresentationControlButton("⋯", onClick = { menuOpen = true })
+                DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                    if (canEdit) DropdownMenuItem(text = { Text(S.reviseWork) }, onClick = { menuOpen = false; onEdit() })
+                    DropdownMenuItem(text = { Text(if (starred) "★" else "☆") }, enabled = canToggleStar, onClick = { menuOpen = false; onToggleStar() })
+                    DropdownMenuItem(text = { Text(S.latest) }, enabled = canGoLatest, onClick = { menuOpen = false; onGoLatest() })
+                    DropdownMenuItem(text = { Text("${zoomPercent}%") }, enabled = zoomPercent != (CANVAS_FIT_ZOOM * 100).toInt(), onClick = { menuOpen = false; onResetZoom() })
+                }
+            }
         }
     }
 }
@@ -6323,7 +6346,7 @@ private fun NavButton(destination: BottomNavigationDestination, label: String, s
         color = Color.Transparent,
     ) {
         Column(
-            modifier = Modifier.fillMaxWidth().padding(vertical = Dimens.spaceM),
+            modifier = Modifier.fillMaxWidth().padding(vertical = Dimens.spaceXs),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
         ) {
@@ -6425,7 +6448,12 @@ private fun DrawingActionButton(
     } else if (tonal) {
         SecondaryActionButton(text = idleText, onClick = onClick, modifier = modifier)
     } else {
-        PrimaryActionButton(text = idleText, onClick = onClick, modifier = modifier)
+        Button(
+            onClick = onClick,
+            modifier = modifier.fillMaxWidth().heightIn(min = Dimens.buttonHeightLarge),
+            shape = RoundedCornerShape(Dimens.radiusCard),
+            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary, contentColor = InkOnSecondary),
+        ) { Text(idleText, maxLines = 1) }
     }
 }
 

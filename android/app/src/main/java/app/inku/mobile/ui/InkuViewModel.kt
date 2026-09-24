@@ -196,6 +196,10 @@ data class InkuUiState(
     val selectedCatalogId: String = "default",
     val selectedCanvasAspect: String = "square",
     val selectedHistory: HistoryItemEntity? = null,
+    /** Work being shown to someone from the Works gallery, separate from the editing selection. */
+    val presentationHistory: HistoryItemEntity? = null,
+    /** Gallery order at the moment presentation began (including search and favorite filters). */
+    val presentationSequence: List<String> = emptyList(),
     // web's `lineageDetached` (+page.svelte:515). While it is up, the work on
     // screen is shown but not inherited from: the next save becomes a root.
     val lineageDetached: Boolean = false,
@@ -447,6 +451,7 @@ class InkuViewModel @JvmOverloads constructor(
     private var modelSelectionSnapshot: Pair<String, String>? = null
     private var catalogSelectionSnapshot: String? = null
     private var lastHistorySwipeAt = 0L
+    private var presentationNavigationSerial = 0L
 
     private val providerConfig = combine(providerSettings, providerModelCandidates) { providers, candidates ->
         providers to candidates
@@ -1267,6 +1272,7 @@ class InkuViewModel @JvmOverloads constructor(
 
     fun setTab(tab: AppTab) {
         val current = localState.value
+        if (current.tab == AppTab.History && tab != AppTab.History) presentationNavigationSerial++
         val restoredModelSelection = if (tab != AppTab.Settings && current.settingsPane == SettingsPane.ModelSelection) modelSelectionSnapshot else null
         if (restoredModelSelection != null) modelSelectionSnapshot = null
         localState.value = current.copy(
@@ -1402,12 +1408,34 @@ class InkuViewModel @JvmOverloads constructor(
     }
 
     fun enterCanvasPresentationMode() {
+        presentationNavigationSerial++
         localState.value = localState.value.copy(
             canvasZoom = CANVAS_FIT_ZOOM,
             canvasPanX = 0f,
             canvasPanY = 0f,
             canvasPresentationMode = true,
+            presentationHistory = null,
+            presentationSequence = emptyList(),
         )
+    }
+
+    /** Present a gallery work without changing the work or description selected for editing. */
+    fun openHistoryPresentation(item: HistoryListItem, filteredIds: List<String>) {
+        val request = ++presentationNavigationSerial
+        val sequence = filteredIds.distinct().takeIf { item.id in it } ?: listOf(item.id)
+        viewModelScope.launch {
+            val work = repository.getHistoryById(item.id) ?: return@launch
+            if (request != presentationNavigationSerial) return@launch
+            localState.value = localState.value.copy(
+                tab = AppTab.History,
+                canvasZoom = CANVAS_FIT_ZOOM,
+                canvasPanX = 0f,
+                canvasPanY = 0f,
+                canvasPresentationMode = true,
+                presentationHistory = work,
+                presentationSequence = sequence,
+            )
+        }
     }
 
     /**
@@ -1417,12 +1445,32 @@ class InkuViewModel @JvmOverloads constructor(
      * zoom reset were the same call and neither could be done without the other.
      */
     fun exitCanvasPresentationMode() {
-        localState.value = localState.value.copy(
+        presentationNavigationSerial++
+        val current = localState.value
+        localState.value = current.copy(
             canvasZoom = CANVAS_FIT_ZOOM,
             canvasPanX = 0f,
             canvasPanY = 0f,
             canvasPresentationMode = false,
+            presentationHistory = null,
+            presentationSequence = emptyList(),
+            tab = if (current.presentationHistory != null) AppTab.History else current.tab,
         )
+    }
+
+    /** Leave the gallery viewer and explicitly load this work into the editor. */
+    fun editPresentedHistory() {
+        val work = localState.value.presentationHistory ?: return
+        presentationNavigationSerial++
+        localState.value = localState.value.copy(
+            canvasPresentationMode = false,
+            presentationHistory = null,
+            presentationSequence = emptyList(),
+            canvasZoom = CANVAS_FIT_ZOOM,
+            canvasPanX = 0f,
+            canvasPanY = 0f,
+        )
+        selectHistory(work)
     }
 
     fun panCanvas(dx: Float, dy: Float) {
@@ -1742,6 +1790,11 @@ class InkuViewModel @JvmOverloads constructor(
     }
 
     fun selectLatestHistory() {
+        val viewer = localState.value
+        if (viewer.canvasPresentationMode && viewer.presentationHistory != null) {
+            viewer.presentationSequence.firstOrNull()?.let(::showPresentationHistory)
+            return
+        }
         viewModelScope.launch {
             val latest = historyItems.value.firstOrNull() ?: history.first().firstOrNull() ?: return@launch
             selectHistory(latest)
@@ -1751,6 +1804,16 @@ class InkuViewModel @JvmOverloads constructor(
     private fun selectAdjacentHistory(offset: Int) {
         val now = SystemClock.elapsedRealtime()
         if (now - lastHistorySwipeAt < 450L) return
+        val viewer = localState.value
+        if (viewer.canvasPresentationMode && viewer.presentationHistory != null) {
+            val index = viewer.presentationSequence.indexOf(viewer.presentationHistory.id)
+            if (index < 0) return
+            val next = (index + offset).coerceIn(0, viewer.presentationSequence.lastIndex)
+            if (next == index) return
+            lastHistorySwipeAt = now
+            showPresentationHistory(viewer.presentationSequence[next])
+            return
+        }
         viewModelScope.launch {
             val items = historyItems.value.ifEmpty { history.first() }
             if (items.isEmpty()) return@launch
@@ -1763,6 +1826,21 @@ class InkuViewModel @JvmOverloads constructor(
             if (nextIndex == currentIndex) return@launch
             lastHistorySwipeAt = now
             selectHistory(items[nextIndex])
+        }
+    }
+
+    private fun showPresentationHistory(id: String) {
+        val request = ++presentationNavigationSerial
+        viewModelScope.launch {
+            val work = repository.getHistoryById(id) ?: return@launch
+            val current = localState.value
+            if (request != presentationNavigationSerial || !current.canvasPresentationMode || id !in current.presentationSequence) return@launch
+            localState.value = current.copy(
+                presentationHistory = work,
+                canvasZoom = CANVAS_FIT_ZOOM,
+                canvasPanX = 0f,
+                canvasPanY = 0f,
+            )
         }
     }
 
@@ -2980,6 +3058,9 @@ class InkuViewModel @JvmOverloads constructor(
             repository.setStarred(item.id, nextStarred)
             if (localState.value.selectedHistory?.id == item.id) {
                 localState.value = localState.value.copy(selectedHistory = item.copy(starred = nextStarred))
+            }
+            if (localState.value.presentationHistory?.id == item.id) {
+                localState.value = localState.value.copy(presentationHistory = item.copy(starred = nextStarred))
             }
             if (localState.value.tab == AppTab.Lineage) refreshLineage()
         }

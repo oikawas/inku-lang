@@ -103,9 +103,13 @@
 	let okugakiGenerating = $state(false);
 	let okugakiError = $state<string | null>(null);
 	let okugakiLoadedTarget = $state<string | null>(null);
+	let detailsNodeId = $state<string | null>(null);
+	let detailsDialogEl: HTMLDialogElement | null = $state(null);
+	let detailsReturnButton: HTMLButtonElement | null = null;
 	const cardElements = new Map<string, HTMLElement>();
 
 	const nodeById = $derived(new Map((graph?.nodes ?? []).map((node) => [node.id, node])));
+	const detailsNode = $derived(detailsNodeId ? nodeById.get(detailsNodeId) ?? null : null);
 	const focusNode = $derived(graph?.nodes.find((node) => node.id === graph.focus_node_id) ?? null);
 	const edgeByChild = $derived(new Map((graph?.edges ?? []).map((edge) => [edge.child_node_id, edge])));
 	const focusAnimationHistoryIds = $derived.by(() => {
@@ -224,6 +228,24 @@
 	function hashSuffix(value: string | null | undefined): string {
 		const digest = hashDigest(value);
 		return digest ? `…${digest.slice(-4)}` : '—';
+	}
+
+	function openNodeDetails(node: LineageNode, event: MouseEvent): void {
+		detailsReturnButton = event.currentTarget as HTMLButtonElement;
+		detailsNodeId = node.id;
+		void tick().then(() => {
+			if (detailsDialogEl && !detailsDialogEl.open) detailsDialogEl.showModal();
+		});
+	}
+
+	function closeNodeDetails(): void {
+		detailsDialogEl?.close();
+	}
+
+	function handleNodeDetailsClose(): void {
+		detailsNodeId = null;
+		detailsReturnButton?.focus();
+		detailsReturnButton = null;
 	}
 
 	function copyNodeHash(node: LineageNode, kind: 'description' | 'render', event: MouseEvent): void {
@@ -824,45 +846,7 @@ $effect(() => {
 									<button class="branch-toggle" type="button" aria-expanded={browsingState.expandedNodeIds.includes(node.id)} onclick={() => toggleBranch(node)}>{browsingState.expandedNodeIds.includes(node.id) ? '▾' : '▸'} {isJapanese ? `子作品 ${groupDigits(childCount)}件` : `${groupDigits(childCount)} children`}</button>
 								{/if}
 								{#if node.history && !browsingState.overviewOpen}
-									<details class="node-details">
-										<summary>{isJapanese ? '詳細' : 'Details'}</summary>
-										<dl>
-											<dt class="full-source-label">{isJapanese ? '記述' : 'Text'}</dt><dd class="full-source">{node.history.source_text ?? node.history.input}</dd>
-											<!-- The scheme each value names, read off the value: a row
-											     labelled with a constant went on saying rh2 while the
-											     works below it were being saved as rh3. -->
-											<dt>{hashSchemeLabel(node.description_hash, 'dh')}</dt>
-											<dd class="hash-cell">
-												<span>{hashSuffix(node.description_hash)}</span>
-												{#if node.description_hash}
-													<button type="button" class="hash-copy" title={t().historyHashCopyTitle} aria-label={`${hashSchemeLabel(node.description_hash, 'dh')}: ${t().historyHashCopyTitle}`} onclick={(event) => copyNodeHash(node, 'description', event)}>
-														{copiedHashKey === `${node.id}:description` ? t().promptCopied : t().promptCopy}
-													</button>
-												{/if}
-											</dd>
-											<dt>{hashSchemeLabel(node.render_hash, 'rh')}</dt>
-											<dd class="hash-cell">
-												<span>{hashSuffix(node.render_hash)}</span>
-												{#if node.render_hash}
-													<button type="button" class="hash-copy" title={t().historyHashCopyTitle} aria-label={`${hashSchemeLabel(node.render_hash, 'rh')}: ${t().historyHashCopyTitle}`} onclick={(event) => copyNodeHash(node, 'render', event)}>
-														{copiedHashKey === `${node.id}:render` ? t().promptCopied : t().promptCopy}
-													</button>
-												{/if}
-											</dd>
-											<dt>Render</dt><dd>{node.history.render_engine_version || '—'}</dd>
-											<dt>DDL</dt><dd>{node.history.ddl_engine_version || '—'}</dd>
-											<dt>Build</dt><dd>{node.history.render_build_number || '—'}</dd>
-											<dt>Stage 1</dt><dd>{node.history.stage1_model ? modelDisplayName(node.history.stage1_model) : '—'}</dd>
-											<dt>Stage 2</dt><dd>{node.history.stage2_model ? modelDisplayName(node.history.stage2_model) : '—'}</dd>
-											<dt>seed</dt><dd>{node.history.render_seed ?? '—'} / {node.history.composition_seed ?? '—'} / {node.history.interpretation_seed ?? '—'}</dd>
-											<dt>{isJapanese ? '派生' : 'Derived by'}</dt><dd>{operationLabel(edge?.derivation_kind)}</dd>
-										</dl>
-										<div class="note-editor">
-										<label for={`lineage-note-${node.id}`}>{isJapanese ? '作品へのコメント' : 'Comment on the work'}</label>
-											<textarea id={`lineage-note-${node.id}`} maxlength="240" rows="3" value={noteValue(node)} disabled={savingNoteIds.includes(node.id)} oninput={(event) => updateNoteDraft(node.id, event.currentTarget.value)}></textarea>
-											<button type="button" disabled={savingNoteIds.includes(node.id) || noteValue(node).trim() === (node.history?.note ?? '').trim()} onclick={() => saveNodeNote(node)}>{savingNoteIds.includes(node.id) ? (isJapanese ? '保存中…' : 'Saving…') : (isJapanese ? '保存' : 'Save')}</button>
-										</div>
-									</details>
+									<button class="node-details-trigger" type="button" onclick={(event) => openNodeDetails(node, event)}>{isJapanese ? '詳細' : 'Details'}</button>
 								{/if}
 								{#if node.state === 'lineage_only'}<button class="promote" type="button" onclick={() => onPromoteNode(node)}>{isJapanese ? '通常履歴に保存' : 'Save to regular history'}</button>{/if}
 							</article>
@@ -879,6 +863,54 @@ $effect(() => {
 		</ol>
 	{/if}
 </section>
+
+{#if detailsNode && detailsNode.history}
+	{@const detailEdge = edgeByChild.get(detailsNode.id)}
+	<dialog bind:this={detailsDialogEl} class="lineage-details-dialog" aria-labelledby="lineage-details-title" onclose={handleNodeDetailsClose}>
+		<header>
+			<div>
+				<h2 id="lineage-details-title">{isJapanese ? '作品の詳細' : 'Work details'}</h2>
+				<p>{operationLabel(detailEdge?.derivation_kind)}</p>
+			</div>
+			<button type="button" class="lineage-details-close" aria-label={isJapanese ? '閉じる' : 'Close'} onclick={closeNodeDetails}>×</button>
+		</header>
+		<div class="lineage-details-body">
+			<dl class="lineage-details-grid">
+				<dt class="full-source-label">{isJapanese ? '記述' : 'Text'}</dt><dd class="full-source">{detailsNode.history.source_text ?? detailsNode.history.input}</dd>
+				<dt>{hashSchemeLabel(detailsNode.description_hash, 'dh')}</dt>
+				<dd class="hash-cell">
+					<span>{hashSuffix(detailsNode.description_hash)}</span>
+					{#if detailsNode.description_hash}
+						<button type="button" class="hash-copy" title={t().historyHashCopyTitle} aria-label={`${hashSchemeLabel(detailsNode.description_hash, 'dh')}: ${t().historyHashCopyTitle}`} onclick={(event) => copyNodeHash(detailsNode, 'description', event)}>
+							{copiedHashKey === `${detailsNode.id}:description` ? t().promptCopied : t().promptCopy}
+						</button>
+					{/if}
+				</dd>
+				<dt>{hashSchemeLabel(detailsNode.render_hash, 'rh')}</dt>
+				<dd class="hash-cell">
+					<span>{hashSuffix(detailsNode.render_hash)}</span>
+					{#if detailsNode.render_hash}
+						<button type="button" class="hash-copy" title={t().historyHashCopyTitle} aria-label={`${hashSchemeLabel(detailsNode.render_hash, 'rh')}: ${t().historyHashCopyTitle}`} onclick={(event) => copyNodeHash(detailsNode, 'render', event)}>
+							{copiedHashKey === `${detailsNode.id}:render` ? t().promptCopied : t().promptCopy}
+						</button>
+					{/if}
+				</dd>
+				<dt>Render engine version</dt><dd>{detailsNode.history.render_engine_version || '—'}</dd>
+				<dt>{t().provenanceLabelTransformLayer}</dt><dd>{detailsNode.history.ddl_engine_version || '—'}</dd>
+				<dt>Build</dt><dd>{detailsNode.history.render_build_number || '—'}</dd>
+				<dt>Stage 1</dt><dd>{detailsNode.history.stage1_model ? modelDisplayName(detailsNode.history.stage1_model) : '—'}</dd>
+				<dt>Stage 2</dt><dd>{detailsNode.history.stage2_model ? modelDisplayName(detailsNode.history.stage2_model) : '—'}</dd>
+				<dt>seed</dt><dd>{detailsNode.history.render_seed ?? '—'} / {detailsNode.history.composition_seed ?? '—'} / {detailsNode.history.interpretation_seed ?? '—'}</dd>
+				<dt>{isJapanese ? '派生' : 'Derived by'}</dt><dd>{operationLabel(detailEdge?.derivation_kind)}</dd>
+			</dl>
+			<div class="note-editor">
+				<label for={`lineage-note-${detailsNode.id}`}>{isJapanese ? '作品へのコメント' : 'Comment on the work'}</label>
+				<textarea id={`lineage-note-${detailsNode.id}`} maxlength="240" rows="3" value={noteValue(detailsNode)} disabled={savingNoteIds.includes(detailsNode.id)} oninput={(event) => updateNoteDraft(detailsNode.id, event.currentTarget.value)}></textarea>
+				<button type="button" disabled={savingNoteIds.includes(detailsNode.id) || noteValue(detailsNode).trim() === (detailsNode.history?.note ?? '').trim()} onclick={() => saveNodeNote(detailsNode)}>{savingNoteIds.includes(detailsNode.id) ? (isJapanese ? '保存中…' : 'Saving…') : (isJapanese ? '保存' : 'Save')}</button>
+			</div>
+		</div>
+	</dialog>
+{/if}
 
 {#if activeEditNode}
 	<WorkEditDialog node={activeEditNode} mode="description" {isJapanese} {stageLabel} {stage1ModelLabel} {stage2ModelLabel} tokensIn={runTokensIn} tokensOut={runTokensOut} onClose={() => (activeEditNode = null)} onDrawDescription={onDrawDescription} {onDrawSketchGrain} />
@@ -1017,16 +1049,29 @@ $effect(() => {
 	.display-label { margin-top: 7px; color: var(--fg2); font-size: var(--ui-font-size-12); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 	.meta { margin-top: 4px; min-width: 0; height: 2.7em; overflow: hidden; font-size: var(--ui-font-size-14); line-height: 1.35; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; }
 	.branch-toggle { width: 100%; margin-top: 7px; padding: 5px; font-size: var(--ui-font-size-12); }
-	.node-details { margin-top: 7px; font-size: var(--ui-font-size-12); }
-	.node-details summary { cursor: pointer; color: var(--fg2); }
-	.node-details dl { display: grid; grid-template-columns: 68px minmax(0, 1fr); gap: 4px 6px; margin: 6px 0 0; }
-	.node-details dt { color: var(--fg2); }
-	.node-details dd { min-width: 0; margin: 0; overflow-wrap: anywhere; line-height: 1.4; }
-	.node-details dd.hash-cell { display: flex; align-items: center; gap: 6px; }
+	.node-details-trigger { width: 100%; margin-top: 7px; border: 1px solid var(--border2); border-radius: var(--btn-sm-radius); padding: 5px 8px; background: var(--bg2); color: var(--fg2); font: inherit; font-size: var(--btn-sm-font-size); text-align: left; cursor: pointer; }
+	.node-details-trigger:hover { color: var(--fg); border-color: var(--accent); }
+	.node-details-trigger:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+	.lineage-details-dialog { box-sizing: border-box; width: min(640px, calc(100vw - 32px)); max-height: calc(100vh - 32px); margin: auto; border: 1px solid var(--border2); border-radius: 12px; padding: 0; background: var(--panel); color: var(--fg); box-shadow: 0 24px 80px #000a; }
+	.lineage-details-dialog[open] { display: flex; flex-direction: column; }
+	.lineage-details-dialog::backdrop { background: #0009; }
+	.lineage-details-dialog > header { flex: 0 0 auto; display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin: 0; border-bottom: 1px solid var(--border); padding: 18px 20px 14px; }
+	.lineage-details-dialog > header h2 { margin: 0 0 4px; font-size: var(--ui-font-size-16); }
+	.lineage-details-dialog > header p { margin: 0; color: var(--fg2); font-size: var(--ui-font-size-12); }
+	.lineage-details-close { flex: 0 0 auto; border: 0; background: transparent; color: var(--fg2); font-size: var(--ui-font-size-20); cursor: pointer; }
+	.lineage-details-body { min-height: 0; overflow-y: auto; padding: 16px 20px 20px; }
+	.lineage-details-grid { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 8px 16px; margin: 0; font-size: var(--ui-font-size-13); }
+	.lineage-details-grid dt { color: var(--fg2); }
+	.lineage-details-grid dd { min-width: 0; margin: 0; overflow-wrap: anywhere; line-height: 1.5; }
+	.lineage-details-grid dd.hash-cell { display: flex; align-items: center; gap: 10px; }
 	.hash-copy { flex: 0 0 auto; border: 1px solid var(--border2); border-radius: var(--btn-sm-radius); padding: 1px 6px; background: var(--panel); color: var(--fg2); font-family: inherit; font-size: inherit; line-height: 1.5; cursor: pointer; }
 	.hash-copy:hover { border-color: var(--accent); color: var(--fg); }
 	.full-source-label, .full-source { grid-column: 1 / -1; }
-	.full-source { max-height: 7em; overflow: auto; white-space: pre-wrap; }
+	.full-source { max-height: 9em; overflow: auto; white-space: pre-wrap; }
+	@media (max-width: 480px) {
+		.lineage-details-grid { grid-template-columns: minmax(0, 1fr); gap: 3px; }
+		.lineage-details-grid dt:not(:first-child) { margin-top: 8px; }
+	}
 	.note-editor { display: grid; gap: 5px; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border); }
 	.note-editor label { color: var(--fg2); }
 	.note-editor textarea { box-sizing: border-box; width: 100%; min-height: 4.5em; resize: vertical; border: 1px solid var(--border2); border-radius: 5px; padding: 5px 6px; background: var(--bg); color: var(--fg); font: inherit; line-height: 1.35; }

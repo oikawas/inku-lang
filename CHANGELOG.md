@@ -8,7 +8,7 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ### 2026-09-24 — Make work details readable in Lineage cards
 
-The Details grid no longer lets long labels squeeze values into a column only one character wide. The description uses the card's full width; the remaining labels have a fixed width beside their values. Description and render hashes show only their last four digits, with a separate button beside each to copy the complete digest.
+Work details now open in a separate dialog instead of stretching a narrow Lineage card down the screen. The description uses the dialog's full width, and the values no longer collapse into one-character columns. Description and render hashes show only their last four digits, with a separate button beside each to copy the complete digest. The work comment remains editable in the dialog.
 
 ### 2026-09-24 — Adjust star sizes on the canvas and History strip
 

@@ -12,6 +12,8 @@ The Library's Starred, Revision marks, and Shared filters are now grouped under 
 
 The filter check mark no longer changes a button's width, and the filter controls now carry the same restrained weight as nearby actions. Work-selection boxes use one smaller fixed square before and after selection, while Star, Revision mark, and Trash controls share one size and gap. Their actions and selected state are unchanged.
 
+The label now reads as supporting static text. Inactive filter buttons use a slightly raised existing-theme surface and stronger border so they read as actions, while their height, reserved check-mark width, and active fill stay unchanged.
+
 ### 2026-09-23 — Synchronize the specification with the current Web UI
 
 Aligned the Japanese and English specification with the current making and Library state retention, description and instruction editing with the Saijiki, responsive work-condition display, Lineage-grouped Library thumbnails, the shared Export menu and Lineage scopes, and Demo's work-conditions header. The batch-resume wording now also uses the current saved-success meaning. Product code and versions are unchanged.

@@ -115,7 +115,7 @@ fn embedded_asset_is_complete_and_orders_are_lossless() {
     );
     assert_eq!(
         asset.relation_marker_order.ja,
-        ["触れる", "つながる", "沿う", "切る", "触れない", "間に"]
+        ["触れる", "つながる", "沿う", "切る", "触れない", "間に", "鏡写し"]
     );
     assert_eq!(
         asset.relation_marker_order.en,
@@ -125,7 +125,8 @@ fn embedded_asset_is_complete_and_orders_are_lossless() {
             "along",
             "cutting",
             "not touching",
-            "between"
+            "between",
+            "mirrored"
         ]
     );
     assert_eq!(
@@ -136,7 +137,8 @@ fn embedded_asset_is_complete_and_orders_are_lossless() {
             "cutting",
             "between",
             "touching",
-            "connected"
+            "connected",
+            "mirrored"
         ]
     );
     assert_eq!(
@@ -154,8 +156,8 @@ fn embedded_asset_is_complete_and_orders_are_lossless() {
         .iter()
         .map(|relation| relation.relation_type.as_str())
         .collect::<HashSet<_>>();
-    assert_eq!(category_keys.len(), 11);
-    assert_eq!(relation_types.len(), 6);
+    assert_eq!(category_keys.len(), 12);
+    assert_eq!(relation_types.len(), 7);
 
     let aliases = asset
         .categories

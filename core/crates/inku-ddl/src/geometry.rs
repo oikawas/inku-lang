@@ -849,8 +849,9 @@ mod tests {
             serde_json::from_slice(geometry_resolution_policy_canonical_bytes()).unwrap();
         assert_eq!(payload["policy"], GEOMETRY_RESOLUTION_POLICY_ID);
         let fluctuation = &payload["author_resolved_omission"]["fluctuation"];
-        assert_eq!(fluctuation["words"].as_object().unwrap().len(), 8);
+        assert_eq!(fluctuation["words"].as_object().unwrap().len(), 9);
         assert_eq!(fluctuation["words"]["large"]["value"], "broad");
+        assert_eq!(fluctuation["words"]["bleeding"]["dimension"], "spread");
         assert_eq!(fluctuation["words"]["swaying"]["dimension"], "quality");
         assert_eq!(fluctuation["absent"], "none");
         assert_eq!(
@@ -991,7 +992,7 @@ mod tests {
         );
         assert_eq!(
             geometry_resolution_policy_digest(),
-            "5ce5ec570f913090bec92a9fc2802dfc7c322e866ed965a8486f52f17cb09a56"
+            "210ddd7bed6b4ae837d17404a91c8a371f1e3f7a9adbf6e41e9fbdae3346d23e"
         );
         assert_eq!(
             payload["object_placement"]["layout_direction"]["vertical"],

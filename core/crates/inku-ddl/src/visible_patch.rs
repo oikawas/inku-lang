@@ -1395,9 +1395,11 @@ mod tests {
                 .iter()
                 .any(|delivery| { delivery.identity.owner == SemanticDeliveryOwner::EntityHead })
         );
+        // Without an instruction the entity head loses the association the base
+        // clause established, which is checked before the owner namespace.
         assert_eq!(
             target_resolution_failure(hole, &base, &candidate, range),
-            Some(VisiblePatchDiagnostic::TargetUnresolved)
+            Some(VisiblePatchDiagnostic::OwnerAssociationChanged)
         );
     }
 

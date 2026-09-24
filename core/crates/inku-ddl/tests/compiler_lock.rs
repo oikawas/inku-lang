@@ -203,14 +203,14 @@ const V14_FULL_LOCK_KNOWN_ANSWER: &str =
     "ef2a9699a61bf10e2468428f8715f2d62d2b669749d85c133e327b73c619894e";
 const V15_FULL_LOCK_KNOWN_ANSWER: &str =
     "6b69018c90f334b9044a5855a0158e03b19a8c01c14f77377ef700f351ecf162";
-const V19_CANONICAL_SHA256_KNOWN_ANSWER: &str =
-    "de089c08ab4e41ff01e9d6c8af46190ba2efc9c00c1d456ce0ec9ee4d9dd44ed";
-const V19_SEED_DIGEST_KNOWN_ANSWER: &str =
-    "732c762ebd03d1345c4732e269a075093f3e077f82bf36d415b3a5bceb9d370d";
-const V19_EXPANDED_MEANING_SHA256_KNOWN_ANSWER: &str =
+const V21_CANONICAL_SHA256_KNOWN_ANSWER: &str =
+    "9e7590ebf0adbea689eecb2920388d1ef33700a5ea71b6fb57ec532999d0594e";
+const V21_SEED_DIGEST_KNOWN_ANSWER: &str =
+    "24504af4416e8e47c24ea75d7ae5d68cf978a08f17108b964208417453bd3f99";
+const V21_EXPANDED_MEANING_SHA256_KNOWN_ANSWER: &str =
     "251884860862eff7347cd6cf9c016c1b562d5a2682ce6739f267556a9b370a1c";
-const V19_FULL_LOCK_KNOWN_ANSWER: &str =
-    "c5cf450d3f8e41151a3af9edb65e12ead3474666960beddea4cd534143109edd";
+const V21_FULL_LOCK_KNOWN_ANSWER: &str =
+    "97efbc7f7bb7455c4c6c7dfdbbb16b88dc19caa2447ddaa83673af36c6da1444";
 const LIMITS: MacroExpansionLimits = MacroExpansionLimits {
     max_invocations: 16,
     max_depth: 16,
@@ -1877,20 +1877,20 @@ fn historical_fixture_is_preserved_and_current_known_answers_bind_exactly() {
         actual.canonical_bytes,
         fixture.known_answers.canonical_bytes
     );
-    assert!(actual.canonical_bytes.contains("semantic-document.v19"));
+    assert!(actual.canonical_bytes.contains("semantic-document.v21"));
     assert!(actual.canonical_bytes.contains("explicit_geometry"));
     assert!(actual.canonical_bytes.contains("numeric_position"));
-    assert_eq!(actual.canonical_sha256, V19_CANONICAL_SHA256_KNOWN_ANSWER);
-    assert_eq!(actual.seed_digest, V19_SEED_DIGEST_KNOWN_ANSWER);
+    assert_eq!(actual.canonical_sha256, V21_CANONICAL_SHA256_KNOWN_ANSWER);
+    assert_eq!(actual.seed_digest, V21_SEED_DIGEST_KNOWN_ANSWER);
     assert_eq!(
         actual.expanded_meaning_sha256,
-        V19_EXPANDED_MEANING_SHA256_KNOWN_ANSWER
+        V21_EXPANDED_MEANING_SHA256_KNOWN_ANSWER
     );
     assert_ne!(actual.full_lock_digest, V12_FULL_LOCK_KNOWN_ANSWER);
     assert_ne!(actual.full_lock_digest, V13_FULL_LOCK_KNOWN_ANSWER);
     assert_ne!(actual.full_lock_digest, V14_FULL_LOCK_KNOWN_ANSWER);
     assert_ne!(actual.full_lock_digest, V15_FULL_LOCK_KNOWN_ANSWER);
-    assert_eq!(actual.full_lock_digest, V19_FULL_LOCK_KNOWN_ANSWER);
+    assert_eq!(actual.full_lock_digest, V21_FULL_LOCK_KNOWN_ANSWER);
     assert_eq!(
         lock.canonical_pre_expansion_digest,
         Some(actual.canonical_sha256)

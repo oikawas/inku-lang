@@ -363,9 +363,11 @@ fn typed_english_grammar_preserves_source_and_canonical_row_identity() {
 #[test]
 fn central_place_aliases_preserve_each_lexical_row_and_source_occurrence() {
     for (language, source, canonical_surface_ja) in [
-        (ResolvedInstructionLanguage::Ja, "中央", "中央"),
+        // The consolidated vocabulary keeps one center row; 中央 remains an
+        // accepted spelling of it.
+        (ResolvedInstructionLanguage::Ja, "中央", "中心"),
         (ResolvedInstructionLanguage::Ja, "中心", "中心"),
-        (ResolvedInstructionLanguage::En, "center", "中央"),
+        (ResolvedInstructionLanguage::En, "center", "中心"),
         (ResolvedInstructionLanguage::En, "middle", "中心"),
     ] {
         let document = NormalizedDdlDocument::new(source, language, Vec::new()).unwrap();
@@ -461,7 +463,7 @@ fn asset_flags_drive_candidate_eligibility_without_losing_semantic_identity() {
         }
     }
 
-    assert_eq!((active, marker_only, disabled), (90, 3, 1));
+    assert_eq!((active, marker_only, disabled), (93, 3, 1));
 }
 
 #[test]

@@ -329,7 +329,7 @@ fn fixture_schema_ids_and_required_boundaries_are_guarded() {
     let fixture = load_fixture();
     assert_eq!(
         REMAINING_ROLE_COMPOSITION_SCHEMA_ID,
-        "inku.remaining-role-composition.v4"
+        "inku.remaining-role-composition.v5"
     );
     assert_eq!(fixture.schema, "inku.remaining-role-composition-fixture.v4");
     assert_eq!(fixture.version, 4);

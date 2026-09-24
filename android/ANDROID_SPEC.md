@@ -40,6 +40,14 @@ When updating Android specifications:
 3. Do not introduce English-only Android requirements that are absent from
    `ANDROID_SPEC.ja.md`.
 
+## 2026-09-24 Current bottom actions, photo entry, and Works scrolling
+
+The translucent bottom action area contains Studio, Camera, Works, and Series. Camera is a capture action rather than a destination: tapping it opens the device camera directly, without a source chooser or an overwrite confirmation. Cancelling capture restores the previous screen and Studio content. The existing source chooser in Studio remains available for Photo Picker input.
+
+A visible scrollbar on the right of the Works grid shows position and accepts taps and drags. The grid retains two columns at Pixel 9 width. The Production Tools control shows a disclosure arrow and exposes its expanded state to assistive technology.
+
+Cancelling photo analysis stops the active run and model warmup, then releases the on-device Vision model. A later capture initializes it again when needed. The app does not control audio playback in other apps.
+
 ## 2026-09-24 Current photo input, processing display, and original-photo retention
 
 This section is the current contract for new captures and Photo Picker selections. It replaces the no-photo-storage and no-photo-persistence restrictions in the historical 2026-08-26 and 2026-08-27 implementation entries with the app-private retention described below. Those implementation and acceptance records remain as history.

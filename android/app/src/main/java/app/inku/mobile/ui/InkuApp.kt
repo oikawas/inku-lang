@@ -123,6 +123,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -174,6 +175,10 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.semantics.ProgressBarRangeInfo
+import androidx.compose.ui.semantics.progressBarRangeInfo
+import androidx.compose.ui.semantics.setProgress
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
@@ -225,6 +230,7 @@ import java.io.File
 import java.io.FileOutputStream
 import java.security.MessageDigest
 import kotlin.math.abs
+import kotlin.math.roundToInt
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -1289,8 +1295,7 @@ private fun BottomNavigationBar(
         modifier = Modifier
             .navigationBarsPadding()
             .border(Dimens.hairline, BottomNavDivider),
-        color = MaterialTheme.colorScheme.surface,
-        tonalElevation = Dimens.spaceXs,
+        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.62f),
     ) {
         Row(
             modifier = Modifier
@@ -1304,6 +1309,7 @@ private fun BottomNavigationBar(
                     BottomNavigationDestination.Write -> S.studioTitle
                     BottomNavigationDestination.History -> S.worksTitle
                     BottomNavigationDestination.Lineage -> S.seriesTitle
+                    BottomNavigationDestination.Camera -> S.camera
                 }
                 NavButton(
                     destination = destination,
@@ -1319,6 +1325,7 @@ private fun BottomNavigationBar(
                             }
                             BottomNavigationDestination.History -> viewModel.setTab(AppTab.History)
                             BottomNavigationDestination.Lineage -> viewModel.setTab(AppTab.Lineage)
+                            BottomNavigationDestination.Camera -> viewModel.requestCameraCaptureDirect()
                         }
                     },
                     modifier = Modifier.weight(1f),
@@ -1330,6 +1337,7 @@ private fun BottomNavigationBar(
 
 private enum class BottomNavigationDestination {
     Write,
+    Camera,
     History,
     Lineage,
 }
@@ -1337,6 +1345,7 @@ private enum class BottomNavigationDestination {
 @Composable
 private fun StudioHeader(title: String, viewModel: InkuViewModel, showTools: Boolean = false) {
     var toolsOpen by remember { mutableStateOf(false) }
+    val isEnglish = LocalUiLanguage.current.isEnglish
     Row(
         modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -1346,7 +1355,20 @@ private fun StudioHeader(title: String, viewModel: InkuViewModel, showTools: Boo
             Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
             if (showTools) {
                 Box {
-                    TextButton(onClick = { toolsOpen = true }) { Text(S.productionTools) }
+                    TextButton(
+                        onClick = { toolsOpen = !toolsOpen },
+                        modifier = Modifier.semantics {
+                            stateDescription = if (toolsOpen) {
+                                if (isEnglish) "Expanded" else "展開中"
+                            } else {
+                                if (isEnglish) "Collapsed" else "折りたたみ中"
+                            }
+                        },
+                    ) {
+                        Text(S.productionTools, maxLines = 1)
+                        Spacer(Modifier.width(Dimens.spaceXs))
+                        Text(if (toolsOpen) "⌃" else "⌄", style = MaterialTheme.typography.titleSmall)
+                    }
                     DropdownMenu(expanded = toolsOpen, onDismissRequest = { toolsOpen = false }) {
                         DropdownMenuItem(text = { Text(S.description) }, onClick = {
                             toolsOpen = false
@@ -3200,21 +3222,122 @@ private fun HistoryScreen(
             viewModel = viewModel,
         )
     }
-    LazyVerticalGrid(
-        columns = GridCells.Adaptive(152.dp),
-        state = gridState,
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(horizontal = Dimens.spaceL, vertical = Dimens.spaceM),
-        horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+    Box(Modifier.fillMaxSize()) {
+        LazyVerticalGrid(
+            columns = GridCells.Adaptive(152.dp),
+            state = gridState,
+            modifier = Modifier.fillMaxSize(),
+            // Keep the two columns clear of the 48dp scroll handle on narrow phones.
+            contentPadding = PaddingValues(start = Dimens.spaceL, end = 52.dp, top = Dimens.spaceM, bottom = Dimens.spaceM),
+            horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            item(key = "header", span = { GridItemSpan(maxLineSpan) }) { header() }
+            gridItems(filteredHistory, key = { it.id }) { item ->
+                HistoryGridTile(
+                    item = item,
+                    selected = state.selectedHistory?.id == item.id,
+                    onSelect = { viewModel.openHistoryPresentation(item, filteredHistory.map { it.id }) },
+                    onToggleStar = { viewModel.toggleStar(item) },
+                )
+            }
+        }
+        HistoryGridScrollbar(gridState, Modifier.align(Alignment.CenterEnd))
+    }
+}
+
+@Composable
+private fun HistoryGridScrollbar(gridState: LazyGridState, modifier: Modifier = Modifier) {
+    val layout = gridState.layoutInfo
+    val total = layout.totalItemsCount
+    val visible = layout.visibleItemsInfo.size
+    if (visible == 0 || total <= visible) return
+
+    val first = layout.visibleItemsInfo.firstOrNull()
+    val itemFraction = if (first == null || first.size.height == 0) 0f else {
+        gridState.firstVisibleItemScrollOffset.toFloat() / first.size.height
+    }
+    val maxFirst = (total - visible).coerceAtLeast(1)
+    val progress = if (!gridState.canScrollForward) 1f else {
+        ((gridState.firstVisibleItemIndex + itemFraction) / maxFirst).coerceIn(0f, 1f)
+    }
+    val currentProgress by rememberUpdatedState(progress)
+    val density = LocalDensity.current
+    val minimumThumbPx = with(density) { 48.dp.toPx() }
+    val isEnglish = LocalUiLanguage.current.isEnglish
+    val railColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.42f)
+    val thumbColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.95f)
+    val scope = rememberCoroutineScope()
+    var trackHeightPx by remember { mutableStateOf(0) }
+    val thumbHeightPx = (trackHeightPx * visible.toFloat() / total).coerceAtLeast(minimumThumbPx)
+        .coerceAtMost(trackHeightPx.toFloat())
+    val thumbTravelPx = (trackHeightPx - thumbHeightPx).coerceAtLeast(0f)
+    val scrollToFraction: (Float) -> Unit = { fraction ->
+        val target = if (fraction >= 0.99f) total - 1 else (fraction.coerceIn(0f, 1f) * maxFirst).roundToInt()
+        scope.launch { gridState.scrollToItem(target) }
+    }
+    val currentScrollToFraction by rememberUpdatedState(scrollToFraction)
+    val currentThumbHeightPx by rememberUpdatedState(thumbHeightPx)
+    val currentThumbTravelPx by rememberUpdatedState(thumbTravelPx)
+    Box(
+        modifier = modifier
+            .fillMaxHeight()
+            .width(48.dp)
+            .padding(vertical = Dimens.spaceM)
+            .onSizeChanged { trackHeightPx = it.height }
+            .semantics {
+                contentDescription = if (isEnglish) "Works scrollbar" else "作品のスクロールバー"
+                progressBarRangeInfo = ProgressBarRangeInfo(progress, 0f..1f)
+                setProgress { value -> scrollToFraction(value); true }
+            }
+            .pointerInput(total) {
+                val touchSlop = viewConfiguration.touchSlop
+                awaitPointerEventScope {
+                    while (true) {
+                        val down = awaitPointerEvent(PointerEventPass.Initial).changes
+                            .firstOrNull { it.pressed && !it.previousPressed } ?: continue
+                        val start = down.position
+                        val thumbTop = currentProgress * currentThumbTravelPx
+                        val grabOffset = if (start.y in thumbTop..(thumbTop + currentThumbHeightPx)) {
+                            start.y - thumbTop
+                        } else {
+                            currentThumbHeightPx / 2f
+                        }
+                        var dragging = false
+                        while (true) {
+                            val change = awaitPointerEvent(PointerEventPass.Initial).changes
+                                .firstOrNull { it.id == down.id } ?: break
+                            if (!change.pressed) {
+                                if (!dragging && currentThumbTravelPx > 0f) {
+                                    currentScrollToFraction((change.position.y - currentThumbHeightPx / 2f) / currentThumbTravelPx)
+                                }
+                                break
+                            }
+                            if (dragging || abs(change.position.y - start.y) > touchSlop) {
+                                dragging = true
+                                if (currentThumbTravelPx > 0f) {
+                                    currentScrollToFraction((change.position.y - grabOffset) / currentThumbTravelPx)
+                                }
+                                change.consume()
+                            }
+                        }
+                    }
+                }
+            },
     ) {
-        item(key = "header", span = { GridItemSpan(maxLineSpan) }) { header() }
-        gridItems(filteredHistory, key = { it.id }) { item ->
-            HistoryGridTile(
-                item = item,
-                selected = state.selectedHistory?.id == item.id,
-                onSelect = { viewModel.openHistoryPresentation(item, filteredHistory.map { it.id }) },
-                onToggleStar = { viewModel.toggleStar(item) },
+        Canvas(Modifier.fillMaxSize()) {
+            val railX = size.width - 14.dp.toPx()
+            drawRoundRect(
+                color = railColor,
+                topLeft = Offset(railX - 2.dp.toPx(), 0f),
+                size = Size(4.dp.toPx(), size.height),
+                cornerRadius = CornerRadius(2.dp.toPx()),
+            )
+            drawRoundRect(
+                color = thumbColor,
+                topLeft = Offset(railX - 5.dp.toPx(), progress * thumbTravelPx),
+                size = Size(10.dp.toPx(), thumbHeightPx),
+                cornerRadius = CornerRadius(5.dp.toPx()),
             )
         }
     }
@@ -6669,7 +6792,14 @@ private fun ChipButton(text: String, selected: Boolean = false, modifier: Modifi
 private fun NavButton(destination: BottomNavigationDestination, label: String, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
     Surface(
         modifier = modifier
-            .semantics { this.selected = selected; role = Role.Tab }
+            .semantics {
+                if (destination == BottomNavigationDestination.Camera) {
+                    role = Role.Button
+                } else {
+                    this.selected = selected
+                    role = Role.Tab
+                }
+            }
             .clickable(onClick = onClick),
         color = Color.Transparent,
     ) {
@@ -6722,6 +6852,19 @@ private fun NavigationMark(destination: BottomNavigationDestination, color: Colo
                     drawCircle(InkBackground, radius = w * .12f, center = it)
                     drawCircle(color, radius = w * .12f, center = it, style = stroke)
                 }
+            }
+            BottomNavigationDestination.Camera -> {
+                drawRoundRect(
+                    color = color,
+                    topLeft = Offset(w * .12f, h * .3f),
+                    size = Size(w * .76f, h * .52f),
+                    cornerRadius = CornerRadius(w * .08f),
+                    style = stroke,
+                )
+                drawLine(color, Offset(w * .31f, h * .3f), Offset(w * .38f, h * .2f), strokeWidth = stroke.width)
+                drawLine(color, Offset(w * .38f, h * .2f), Offset(w * .62f, h * .2f), strokeWidth = stroke.width)
+                drawLine(color, Offset(w * .62f, h * .2f), Offset(w * .69f, h * .3f), strokeWidth = stroke.width)
+                drawCircle(color, radius = w * .14f, center = Offset(w * .5f, h * .56f), style = stroke)
             }
         }
     }

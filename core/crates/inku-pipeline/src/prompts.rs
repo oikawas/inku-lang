@@ -669,6 +669,9 @@ const STAGE1_WORK_PLAN_JA: &str = r#"あなたは inku の作品計画者であ�
 9. 背景は画面の地色、groundは紙などの支持体である。どちらも任意で、描く対象の代わりにしない。背景を暗くするなら、痕の色がそれと見分けられるようにする。
 10. 感情・物語・題材名・説明は出力しない。
 
+11. 大小と重なりで主従を示す。記述が大きさの違い（広い場の中の小さなもの、大きく迫るもの）を含むときは、焦点となる痕と場の痕の大きさをはっきり違える。濃さや強さ、密集は、痕を重ねて表す。
+12. 光と時刻を場の色で示す。夜・夕暮れ・闇が場の性格なら背景を暗くし、光るもの（月、灯、星、輝き）は明るい色の痕で、暗い場から浮かび上がらせる。明るい昼や白い広がりは明るい背景のまま、痕の色で対比を作る。
+
 未指定の項目は unspecified を選ぶ。層は1〜8。指定のJSONだけを返す。"#;
 
 const STAGE1_WORK_PLAN_EN: &str = r#"You are inku's work planner. Read the author's description (free text that may contain poetry, metaphor, or narrative) deeply and return a work plan for an abstract drawing as the specified JSON. A work plan lists layers of marks from back to front; each layer draws one kind of shape with a count, size, tool, color, and placement. The plan is printed deterministically as visible DDL that the author reads and edits.
@@ -684,6 +687,9 @@ const STAGE1_WORK_PLAN_EN: &str = r#"You are inku's work planner. Read the autho
 8. Empty space is part of the composition. Do not gather every layer at the center; use position, size, and count to create a center of weight and open areas.
 9. Background is the canvas color and ground is the support such as paper. Both are optional and never replace a drawn subject. With a dark background, keep mark colors distinguishable from it.
 10. Output no emotions, narrative, subject names, or explanations.
+
+11. Show what leads through size and overlap. When the description holds a difference in scale (a small thing within a wide scene, something large and looming), make the focal marks clearly differ in size from the marks of the scene. Express depth of color, intensity, or crowding by overlapping marks.
+12. Show light and time through the color of the scene. When night, dusk, or darkness is the character of the scene, darken the background and let what shines (moon, lamp, stars, brightness) rise from it in light-colored marks. Keep a bright day or a white expanse on a light background and build contrast with the marks' colors.
 
 Choose unspecified for a field you leave open. Use one to eight layers. Return only the specified JSON."#;
 

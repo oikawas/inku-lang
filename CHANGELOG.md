@@ -6,6 +6,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 36 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-24 — The work plan leads through size and overlap, and shows light and time through the scene's color
+
+The work plan prompt gains two principles. When a description holds a difference in scale, focal marks clearly differ in size from the marks of the scene, and depth or crowding comes from overlapping marks. When night, dusk, or darkness is the scene's character, the background darkens and what shines rises in light marks; a bright day or white expanse keeps a light background and builds contrast with mark colors. Neither is a subject-to-shape table. In blind comparisons with engine 41 works it won 53 to 38 on 110 trial samples and 58 to 35 on 110 unused check samples, and three independent reviewer sets preferred it to the previous prompt 54 to 37. DDL, Score, and render versions are unchanged.
+
 ### 2026-09-24 — Many large oil-paint fills no longer produce an oversized SVG
 
 Forty full-width oil-paint squares produced a 50.7 MB SVG, above the 12 MiB production limit and the 8 MiB shared rasterizer limit: every oil interior fill laid down up to about 65 loaded passes, each with a body and eight ridge paths, and the resource budget bounds only the number of marks. One oil interior fill now lays down at most 24 passes, and all oil interior fills of a work share 120 passes (at least 3 each), widening passes instead. The same work now renders at 6.3 MB. Render engine 67 (this edition).

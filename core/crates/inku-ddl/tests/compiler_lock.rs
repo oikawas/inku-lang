@@ -370,14 +370,22 @@ fn coordinated_group_predicates_have_one_compiler_delivery_owner() {
     assert!(blocked_document.canonical_bytes.is_none());
     assert!(blocked.derived_seeds.is_empty());
     assert!(blocked.macro_expansion.is_none());
+    // The unknown word no longer blocks the coordination: the clause becomes
+    // one repairable hole.
     assert_eq!(
         blocked
             .blocking_diagnostics
             .iter()
             .filter(|diagnostic| diagnostic.kind == "blocked_coordination_boundary")
             .count(),
-        2
+        0
     );
+    assert_eq!(
+        blocked.compiler_lock.as_ref().unwrap().state,
+        CompilerLockState::IncompleteKnownHole
+    );
+    assert_eq!(blocked.holes.len(), 1);
+    assert_eq!(blocked.holes[0].kind, "unresolved_clause");
     assert_eq!(
         blocked
             .deliveries
@@ -488,14 +496,14 @@ fn coordination_marker_and_continuation_claims_have_one_compiler_owner() {
         None,
         LIMITS,
     );
-    assert!(blocked.deliveries.iter().any(|delivery| {
+    // The unknown word inside a coordination is a clause hole, not a blocked
+    // coordination boundary.
+    assert!(!blocked.deliveries.iter().any(|delivery| {
         delivery
             .descriptor
             .contains("blocked_coordination_boundary|")
-            && delivery
-                .descriptor
-                .contains("cause=instruction_ownership_path:unknown:")
     }));
+    assert_eq!(blocked.holes.len(), 1);
 
     let overlap = compile(
         "line. place the line and a circle.",
@@ -2203,6 +2211,8 @@ fn exhaustive_delivery_mapping_has_no_default_or_ignored_bucket() {
             CompilerLockState::BlockedDiagnostic,
         ),
         (
+            // A Macro invoked without its lock is an integrity failure that
+            // blocks; it is no longer offered as a hole.
             "macro-missing-hole",
             compile(
                 "Canon.Empty",
@@ -2211,7 +2221,7 @@ fn exhaustive_delivery_mapping_has_no_default_or_ignored_bucket() {
                 None,
                 LIMITS,
             ),
-            CompilerLockState::IncompleteKnownHole,
+            CompilerLockState::BlockedDiagnostic,
         ),
         (
             "macro-ambiguous-conflict",
@@ -2222,7 +2232,8 @@ fn exhaustive_delivery_mapping_has_no_default_or_ignored_bucket() {
                 None,
                 LIMITS,
             ),
-            CompilerLockState::BlockedDiagnostic,
+            // An ambiguous complete parameter assignment is recorded as a conflict.
+            CompilerLockState::BlockedConflict,
         ),
         (
             "expansion-diagnostic-hole",

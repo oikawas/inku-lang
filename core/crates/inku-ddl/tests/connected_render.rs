@@ -48,22 +48,23 @@ fn actual_compiler_touching_reaches_render_and_stop_continue() {
                 error_policy: policy,
             },
         };
-        if conflict {
-            let stopped = render(request(ScoreErrorPolicy::Stop)).unwrap_err();
-            assert!(format!("{stopped:?}").contains("TouchingDirectionConflict"));
-        } else {
-            let output = render(request(ScoreErrorPolicy::Stop)).unwrap();
-            assert!(output.svg.contains("instruction_001_line_blue"));
-            assert!(output.metadata.execution.is_none());
-        }
+        // An unsatisfiable touch removes only its relation edge under either
+        // policy; every line and the circle are still drawn.
+        let stopped = render(request(ScoreErrorPolicy::Stop)).unwrap();
+        assert_eq!(
+            format!("{:?}", stopped.metadata.execution).contains("TouchingDirectionConflict"),
+            conflict
+        );
         let output = render(request(ScoreErrorPolicy::OmitAndContinue)).unwrap();
+        assert_eq!(stopped.svg, output.svg);
         assert!(output.svg.contains("instruction_000_line_red"));
+        assert!(output.svg.contains("instruction_001_line_blue"));
         assert!(output.svg.contains("instruction_002_circle_green"));
-        assert_eq!(output.svg.contains("instruction_001_line_blue"), !conflict);
+        assert_eq!(output.metadata.execution.is_some(), conflict);
         let joined =
             map_compiler_render_execution(&execution, score, output.metadata.execution.as_ref())
                 .unwrap();
-        assert_eq!(joined.rendered_origins.len(), if conflict { 2 } else { 3 });
+        assert_eq!(joined.rendered_origins.len(), 3);
     }
 }
 

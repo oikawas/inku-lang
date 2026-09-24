@@ -180,10 +180,38 @@ fn fill_target_roles_keep_bilingual_canonical_meaning_and_original_operand_indic
         "{:?}",
         recovered.upstream_diagnostics()
     );
+    // The accepted head of the unresolved clause stays in the projection
+    // (and is omitted downstream for its missing action), so the projected
+    // digest differs from the clean source. The fill still reaches lowering
+    // as the same instruction with the same reason, owned by its original
+    // index.
+    let fill_owner = |result: &inku_ddl::CompilerExecutionResult| {
+        result
+            .downstream_diagnostics()
+            .iter()
+            .find(|diagnostic| {
+                diagnostic.reason == inku_ddl::ScoreFieldGap::FillRequiresRegionMaterialization
+            })
+            .map(|diagnostic| diagnostic.disposition.clone())
+    };
     assert_eq!(
-        recovered.execution_pre_expansion_digest(),
-        clean.execution_pre_expansion_digest(),
-        "projection must preserve the original Circle operand after removing an earlier source instruction"
+        fill_owner(&clean),
+        Some(inku_ddl::ScoreDiagnosticDisposition::Omitted {
+            unit: inku_ddl::ScoreOmissionUnit::SourceInstruction {
+                instruction_index: 1
+            },
+            appearance_resolution: None,
+        })
+    );
+    assert_eq!(
+        fill_owner(&recovered),
+        Some(inku_ddl::ScoreDiagnosticDisposition::Omitted {
+            unit: inku_ddl::ScoreOmissionUnit::SourceInstruction {
+                instruction_index: 2
+            },
+            appearance_resolution: None,
+        }),
+        "the fill keeps its original operand after an earlier unresolved clause"
     );
 }
 

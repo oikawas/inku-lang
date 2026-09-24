@@ -476,19 +476,12 @@ fn conflict_unknown_and_unresolved_replacements_never_return_a_candidate() {
         None,
         LIMITS,
     );
-    let missing_lock_hole = &missing_lock.holes[0];
-    let result = validate_visible_ddl_patch(
-        &missing_lock,
-        &patch(&missing_lock, vec![edit(missing_lock_hole, "circle")]),
-        &[definition],
-        None,
-        LIMITS,
-    );
-    let candidate = result.expect("typed macro-head hole accepts a Primitive head replacement");
-    assert_eq!(candidate.document.source(), "circle");
+    // A Macro invoked without its lock is an integrity failure: it blocks
+    // and offers no hole to patch.
+    assert!(missing_lock.holes.is_empty());
     assert_eq!(
-        candidate.compilation.compiler_lock.as_ref().unwrap().state,
-        CompilerLockState::CanonicalReady
+        missing_lock.compiler_lock.as_ref().unwrap().state,
+        CompilerLockState::BlockedDiagnostic
     );
 }
 

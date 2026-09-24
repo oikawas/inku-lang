@@ -1,8 +1,7 @@
 // Run with: npm run test:unit  (node:test, no test dependency)
 //
 // Sketch-from-life acceptance, web side. The sketch supplements place and
-// light beside the description: auto (only when cues are missing), off, or
-// always. T-9 verifies the choice is wired from every place that starts a draw;
+// light beside the description, off by default and on when the author asks. T-9 verifies the choice is wired from every place that starts a draw;
 // T-10 verifies the genealogy edge.
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -26,28 +25,28 @@ const read = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf
 
 // ---------------------------------------------------------------- T-9 (mode)
 
-test('T-9: a draw with no choice made supplements only when needed', () => {
-	assert.equal(DEFAULT_SKETCH_MODE, 'auto');
+test('T-9: a draw with no choice made has no sketch', () => {
+	assert.equal(DEFAULT_SKETCH_MODE, 'off');
 });
 
-test('T-9: the control offers auto, off and always', () => {
-	assert.deepEqual(SKETCH_MODES, ['auto', 'off', 'always']);
+test('T-9: the control offers off and on', () => {
+	assert.deepEqual(SKETCH_MODES, ['off', 'on']);
 });
 
-test('T-9: a saved choice reads back; a grain saved before the supplement sketch reads as auto', () => {
+test('T-9: a saved choice reads back; a grain saved before the supplement sketch reads as on', () => {
 	assert.equal(normalizeSketchGrain(undefined), null);
 	assert.equal(normalizeSketchGrain('segmented'), null);
 	assert.equal(sketchModeOf(undefined), 'off');
-	assert.equal(sketchModeOf('always'), 'always');
-	assert.equal(sketchModeOf('coarse'), 'auto');
-	assert.equal(sketchModeOf('fine'), 'auto');
+	assert.equal(sketchModeOf('on'), 'on');
+	assert.equal(sketchModeOf('coarse'), 'on');
+	assert.equal(sketchModeOf('fine'), 'on');
 });
 
-test('T-9: the work menu redraws with the sketch off or always on', () => {
+test('T-9: the work menu redraws with the sketch off or on', () => {
 	const panel = read('./components/LineagePanel.svelte');
 	assert.match(panel, /onDrawSketchGrain: \(node: LineageNode, mode: SketchMode/);
 	const dialog = read('./components/WorkEditDialog.svelte');
-	assert.match(dialog, /modes=\{\['off', 'always'\]\}/);
+	assert.match(dialog, /modes=\{\['off', 'on'\]\}/);
 
 	const page = read('../routes/+page.svelte');
 	// The menu path asks for a specific mode and must NOT hand over the stored
@@ -66,7 +65,6 @@ test('T-9: both draw paths send the chosen mode', () => {
 	const work = read('./features/work/state.svelte.ts');
 	const currentWork = read('./features/run/current-work.ts');
 	assert.match(currentWork, /sketch:\s*sketchOn/);
-	assert.match(currentWork, /sketch_mode: resolvedSketchMode/);
 	assert.match(work, /sketch: options\.sketchMode \?\? sketchMode/);
 });
 
@@ -208,9 +206,8 @@ test('T-10: no choice is discouraged any more', () => {
 
 test('T-10: the labels name the choice, and a retired grain keeps its own label', () => {
 	const labels: [SketchMode, string, string][] = [
-		['auto', '自動', 'Auto'],
 		['off', 'なし', 'Off'],
-		['always', 'あり', 'Always']
+		['on', 'あり', 'On']
 	];
 	for (const [mode, ja, en] of labels) {
 		assert.equal(sketchModeLabel(mode, true), ja);

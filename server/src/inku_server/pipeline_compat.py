@@ -113,10 +113,8 @@ def _options(data: dict[str, Any], *, save_history: bool) -> dict:
     }
     if data.get("sketch_text"):
         options["sketch_text"] = data["sketch_text"]
-    elif data.get("sketch_mode") in {"auto", "off", "always"}:
-        options["sketch"] = data["sketch_mode"]
     elif data.get("sketch") is True:
-        options["sketch"] = "auto"
+        options["sketch"] = "on"
     options["save_history"] = save_history
     return options
 

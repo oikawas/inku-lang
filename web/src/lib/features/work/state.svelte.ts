@@ -156,9 +156,9 @@ export function createWorkState(deps: WorkStateDeps) {
 		return prose ? { sketch_text: prose } : {};
 	}
 
-	/** Show the sketch a run or a saved work was painted with. A work drawn
-	 *  with the sketch off turns the control off so a redraw starts from the
-	 *  same place; any other work leaves it on its automatic setting.
+	/** Show the sketch a run or a saved work was painted with, and turn the
+	 *  control on for a work that has one so a redraw starts from the same
+	 *  place; any other work leaves the control off.
 	 *
 	 *  What the author is going to draw next is a separate question from what
 	 *  the work on screen was drawn through. The state is what keeps the two
@@ -177,7 +177,7 @@ export function createWorkState(deps: WorkStateDeps) {
 		sketchEditing = false;
 		void grain;
 		sketchState = normalizeSketchState(state);
-		sketchMode = sketchState === 'off' && !text ? 'off' : DEFAULT_SKETCH_MODE;
+		sketchMode = text ? 'on' : DEFAULT_SKETCH_MODE;
 	}
 
 	let pendingCanvasAspectDerivation = $state<{ parentNodeId: string; fromAspectId: CanvasAspectId; toAspectId: CanvasAspectId; } | null>(null);

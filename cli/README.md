@@ -331,7 +331,6 @@ usage: inku-cli paint [-h] [--base-url BASE_URL]
                       [--render-seed RENDER_SEED]
                       [--composition-seed COMPOSITION_SEED]
                       [--seed-text SEED_TEXT] [--sketch]
-                      [--sketch-mode {auto,off,always}]
                       [--sketch-grain {fine,coarse}]
                       [--sketch-text SKETCH_TEXT]
                       [--variation-amplitude {small,medium,large}]
@@ -385,14 +384,10 @@ options:
   --seed-text SEED_TEXT
                         explicit text used only to derive the renderer
                         performance seed
-  --sketch              run the sketch before Stage 1 in auto mode: it
-                        supplements place and light beside the description
-                        only when the description lacks cues; server default
-                        is off, the web UI default is auto
-  --sketch-mode {auto,off,always}
-                        when to sketch: auto (only when the description lacks
-                        cues), off, or always (supplement even stated cues);
-                        overrides --sketch
+  --sketch              run the sketch before Stage 1: it supplements the
+                        extent of place and the seasonal or time-of-day light
+                        beside the description; server default is off, and so
+                        is the web UI default
   --sketch-grain {fine,coarse}
                         the retired Stage 0.5 grain; kept for replaying saved
                         works and unused by the current sketch
@@ -454,7 +449,6 @@ usage: inku-cli batch [-h] [--base-url BASE_URL]
                       [--render-seed RENDER_SEED]
                       [--composition-seed COMPOSITION_SEED]
                       [--seed-text SEED_TEXT] [--sketch]
-                      [--sketch-mode {auto,off,always}]
                       [--sketch-grain {fine,coarse}]
                       [--sketch-text SKETCH_TEXT]
                       [--variation-amplitude {small,medium,large}]
@@ -507,14 +501,10 @@ options:
   --seed-text SEED_TEXT
                         explicit text used only to derive the renderer
                         performance seed
-  --sketch              run the sketch before Stage 1 in auto mode: it
-                        supplements place and light beside the description
-                        only when the description lacks cues; server default
-                        is off, the web UI default is auto
-  --sketch-mode {auto,off,always}
-                        when to sketch: auto (only when the description lacks
-                        cues), off, or always (supplement even stated cues);
-                        overrides --sketch
+  --sketch              run the sketch before Stage 1: it supplements the
+                        extent of place and the seasonal or time-of-day light
+                        beside the description; server default is off, and so
+                        is the web UI default
   --sketch-grain {fine,coarse}
                         the retired Stage 0.5 grain; kept for replaying saved
                         works and unused by the current sketch

@@ -308,7 +308,7 @@ export const ja: LangPack = {
 	tooltipInputCatalog: '色カタログの選択',
 	tooltipInputLang: '入力テキストの判定言語 (自動/日/英)',
 	tooltipInputModel: 'LLMモデルの選択 (解釈・構造化)',
-	tooltipInputSketch: '記述に描く手掛かりが足りないとき、場所の広がりや季節・時刻の光を補ってから解釈します。自動／なし／ありの三択で、確認のために止まりません',
+	tooltipInputSketch: '「あり」にすると、場所の広がりや季節・時刻の光を記述の横に補ってから解釈します。既定は「なし」で、確認のために止まりません',
 	wildButton: '暴れる',
 	wildEnabled: '入',
 	wildDisabled: '切',
@@ -519,7 +519,7 @@ export const ja: LangPack = {
 	workEditDescriptionTitle: '記述を編集',
 	workEditSketchTitle: '写生なし／ありで描き直す',
 	workEditDescriptionHelp: '変更した記述から、選択した作品の子を描画します。',
-	workEditSketchHelp: '写生を外すか、記述に手掛かりがあっても補うかを選んで描き直し、選択した作品の子として系譜へ保存します。',
+	workEditSketchHelp: '写生を外すか付けるかを選んで描き直し、選択した作品の子として系譜へ保存します。',
 	workEditNoSketch: 'この作品は写生を通していません。',
 	workEditParentGrain: '親の写生',
 

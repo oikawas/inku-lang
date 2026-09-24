@@ -25,7 +25,7 @@
 	let { node, mode, isJapanese, stageLabel, stage1ModelLabel, stage2ModelLabel, tokensIn, tokensOut, onClose, onDrawDescription, onDrawSketchGrain }: Props = $props();
 	let draft = $state('');
 	let wildOverride = $state<boolean | null>(null);
-	let sketchMode = $state<SketchMode>('always');
+	let sketchMode = $state<SketchMode>('on');
 	let drawing = $state(false);
 	let error = $state<string | null>(null);
 	let elapsedMs = $state(0);
@@ -48,7 +48,7 @@
 		draft = mode === 'description' ? (node.history?.source_text ?? node.history?.input ?? '') : '';
 		wildOverride = null;
 		// Offer the other side of what the work was drawn with.
-		sketchMode = node.history?.sketch_text ? 'off' : 'always';
+		sketchMode = node.history?.sketch_text ? 'off' : 'on';
 		error = null;
 	});
 
@@ -103,7 +103,7 @@
 			<label for="work-edit-text">{t().workActionDescription}</label>
 			<textarea id="work-edit-text" rows="9" bind:value={draft} spellcheck disabled={drawing}></textarea>
 		{:else}
-			<SketchSelect compact value={sketchMode} modes={['off', 'always']} {isJapanese} disabled={drawing} onSelect={(next: SketchMode) => (sketchMode = next)} />
+			<SketchSelect compact value={sketchMode} modes={['off', 'on']} {isJapanese} disabled={drawing} onSelect={(next: SketchMode) => (sketchMode = next)} />
 			{#if node.history?.sketch_text}<p class="sketch-parent-prose">{node.history.sketch_text}</p>
 			{:else}<p class="sketch-parent-prose empty">{t().workEditNoSketch}</p>{/if}
 		{/if}

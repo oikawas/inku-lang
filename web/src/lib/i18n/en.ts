@@ -308,7 +308,7 @@ export const en: LangPack = {
 	tooltipInputCatalog: 'Select color catalog',
 	tooltipInputLang: 'Text input language detection',
 	tooltipInputModel: 'Select the LLM models for Stage 1 and Stage 2',
-	tooltipInputSketch: 'When the description lacks cues to draw from, supplements the extent of place or the seasonal or time-of-day light before it is interpreted. Auto, off, or always; it never stops to ask.',
+	tooltipInputSketch: 'When on, supplements the extent of place and the seasonal or time-of-day light beside the description before it is interpreted. Off by default; it never stops to ask.',
 	wildButton: 'Wild',
 	wildEnabled: 'On',
 	wildDisabled: 'Off',
@@ -519,7 +519,7 @@ export const en: LangPack = {
 	workEditDescriptionTitle: 'Edit description',
 	workEditSketchTitle: 'Redraw with or without sketch from life',
 	workEditDescriptionHelp: 'The edited description is drawn as a child of the selected work.',
-	workEditSketchHelp: 'Drop the sketch, or supplement even when the description states its cues, and save the result as a child of the selected work.',
+	workEditSketchHelp: 'Draw again with the sketch off or on, and save the result as a child of the selected work.',
 	workEditNoSketch: 'This work was painted without the layer.',
 	workEditParentGrain: "Parent's sketch",
 

@@ -19,7 +19,7 @@ use crate::core_boundary::{CompiledDelivery, CompilerOptions, ResolvedHostOption
 use crate::prompts::{
     DescriptionCatalogEntry, HOLE_COMPLETION_PROMPT_ID, HoleCompletionResult,
     HolePatchEditResponse, HolePatchResponse, LEGACY_HOLE_COMPLETION_PROMPT_ID, LlmPrompt,
-    LlmStage, MacroPromptEntry, PromptLimits, SketchResponse, Stage1Context,
+    LlmStage, MacroPromptEntry, PromptLimits, Stage1Context,
     build_catalog_selection_prompt, build_hole_completion_prompt, build_sketch_prompt,
     build_stage1_prompt_with_sketch, parse_catalog_selection_response,
     parse_hole_completion_response, parse_hole_patch_response, parse_sketch_response,
@@ -139,18 +139,17 @@ pub struct PipelineConfig {
     pub sketch_retry: Option<RetryPolicy>,
 }
 
-/// How a description run treats the sketch before Stage 1. The sketch only
-/// supplements place and light; it never waits for approval and never stops a run.
+/// Whether a description run sketches before Stage 1. The sketch only
+/// supplements place and light beside the description; it runs only when the
+/// author asks for it, never waits for approval, and never stops a run.
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "mode", rename_all = "snake_case", deny_unknown_fields)]
 pub enum SketchRequest {
-    /// No sketch request.
+    /// No sketch (the default).
     #[default]
     Off,
-    /// Ask the sketcher, which supplements only when the description lacks cues.
-    Auto,
-    /// The author asked to draw with a sketch: supplement even when cues are stated.
-    Always,
+    /// The author asked to draw with a sketch.
+    On,
     /// A sketch the author edited, or a saved one being replayed. No request is made.
     Supplied { text: String },
 }
@@ -169,7 +168,7 @@ pub enum SketchState {
     Pending,
     /// The sketcher supplemented place or light.
     Supplemented,
-    /// The sketcher judged the description's cues sufficient.
+    /// The sketcher found nothing to supplement.
     NotNeeded,
     /// The sketch request failed; Stage 1 read the description alone.
     Fallback,
@@ -181,7 +180,6 @@ pub enum SketchState {
 #[serde(deny_unknown_fields)]
 pub struct SketchRecord {
     pub state: SketchState,
-    pub always: bool,
     pub text: Option<String>,
 }
 
@@ -189,11 +187,10 @@ impl SketchRecord {
     fn from_request(request: SketchRequest) -> Option<Self> {
         match request {
             SketchRequest::Off => None,
-            SketchRequest::Auto => Some(Self { state: SketchState::Pending, always: false, text: None }),
-            SketchRequest::Always => Some(Self { state: SketchState::Pending, always: true, text: None }),
+            SketchRequest::On => Some(Self { state: SketchState::Pending, text: None }),
             SketchRequest::Supplied { text } => {
                 let text = text.trim().to_owned();
-                (!text.is_empty()).then_some(Self { state: SketchState::Supplied, always: false, text: Some(text) })
+                (!text.is_empty()).then_some(Self { state: SketchState::Supplied, text: Some(text) })
             }
         }
     }
@@ -205,13 +202,6 @@ impl SketchRecord {
             _ => None,
         }
     }
-}
-
-/// A sketch counts only when it carries text. On its own judgment the sketcher
-/// supplements only when the description leaves place or light unstated.
-fn sketch_supplement(response: &SketchResponse, always: bool) -> Option<String> {
-    let text = response.supplement()?;
-    (always || !(response.place && response.light)).then(|| text.to_owned())
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -719,11 +709,10 @@ impl PipelineSnapshot {
             self.authority
                 .propose_stage1_result_commit(self.authority.revision()),
         )?;
-        if let Some(record) = self.sketch.as_ref().filter(|record| record.state == SketchState::Pending) {
+        if self.sketch.as_ref().is_some_and(|record| record.state == SketchState::Pending) {
             let prompt = build_sketch_prompt(
                 &description,
                 self.config.language,
-                record.always,
                 self.config.prompt_limits,
             )
             .map_err(|_| ProtocolError::SchemaViolation)?;
@@ -745,7 +734,7 @@ impl PipelineSnapshot {
         let record = self.sketch.as_mut().ok_or(ProtocolError::InternalInvariant)?;
         record.state = state;
         record.text = text;
-        let mut payload = json!({"state": state, "always": record.always, "text": record.text});
+        let mut payload = json!({"state": state, "text": record.text});
         if !detail.is_null() {
             payload["detail"] = detail;
         }
@@ -1415,8 +1404,7 @@ impl PipelineSnapshot {
                 let Ok(parsed) = parse_sketch_response(&response, self.config.prompt_limits) else {
                     return self.failure(ProviderFailure::SchemaViolation, spent_ms, events);
                 };
-                let always = self.sketch.as_ref().is_some_and(|record| record.always);
-                let text = sketch_supplement(&parsed, always);
+                let text = parsed.supplement().map(str::to_owned);
                 let state = if text.is_some() {
                     SketchState::Supplemented
                 } else {
@@ -1427,7 +1415,7 @@ impl PipelineSnapshot {
                     state,
                     text,
                     description.ok_or(ProtocolError::InternalInvariant)?,
-                    json!({"place": parsed.place, "light": parsed.light, "subjects": parsed.subjects}),
+                    serde_json::Value::Null,
                     events,
                 )
             }

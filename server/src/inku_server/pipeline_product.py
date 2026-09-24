@@ -91,10 +91,10 @@ class RunOptions(BaseModel):
     render_seed: int | str | None = None
     composition_seed: int | str | None = None
     wild: bool | None = None
-    # The sketch before Stage 1: off, auto (supplement only when cues are
-    # missing) or always (the author's "draw again with a sketch"). A sketch
-    # text the author edited is used as it stands, without a request.
-    sketch: Literal["off", "auto", "always"] | None = None
+    # The sketch before Stage 1: off (the default) or on, when the author asks
+    # to draw with a sketch. A sketch text the author edited is used as it
+    # stands, without a request.
+    sketch: Literal["off", "on"] | None = None
     sketch_text: str | None = Field(default=None, max_length=100_000)
     variation_amplitude: Literal["small", "medium", "large"] | None = None
     variation_seed: int | str | None = None

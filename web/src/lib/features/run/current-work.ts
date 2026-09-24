@@ -182,7 +182,6 @@ export async function runCurrentWork(
 		body: JSON.stringify({
 			description: text,
 			sketch: sketchOn,
-			sketch_mode: resolvedSketchMode,
 			...(options.sketchText ? { sketch_text: options.sketchText } : {}),
 			stage1_model: resolvedStage1Model,
 			stage2_model: resolvedStage2Model,

@@ -225,8 +225,7 @@ class PaintRequest(BaseModel):
     include_trace: bool = Field(default=False, description="各層の RAW 中間生成物を trace として返すか (観測のみ)")
     # The sketch. Carried per request, the way render_seed is: it is an
     # option of one drawing, not a setting of the user.
-    sketch: bool = Field(default=False, description="写生を通すか。sketch_mode が無ければ auto（手掛かりが足りないときだけ補う）")
-    sketch_mode: Literal["auto", "off", "always"] | None = Field(default=None, description="写生の効かせ方: auto（必要なときだけ）/ off / always（手掛かりがあっても補う）")
+    sketch: bool = Field(default=False, description="写生を通すか（場所の広がりと季節・時刻の光を記述の横に補う）。既定は通さない")
     sketch_text: str | None = Field(default=None, max_length=100_000, description="既にある写生文 (作者が直した / 保存済み作品の再演)。与えられたら写生を呼び直さない")
     sketch_grain: str | None = Field(default=None, pattern="^(fine|coarse)$", description="旧写生層の区切り（保存互換のみ。新しい写生では使わない）")
     limits: dict[str, int] | None = Field(default=None, description=_LIMITS_FIELD_DESCRIPTION)

@@ -67,12 +67,11 @@ def test_a_sketch_request_belongs_to_one_description_operation() -> None:
     from inku_server.pipeline_product import sketch_request_for
 
     assert sketch_request_for("description", {}) == {"mode": "off"}
-    assert sketch_request_for("description", {"sketch": "auto"}) == {"mode": "auto"}
-    assert sketch_request_for("description", {"sketch": "always"}) == {"mode": "always"}
+    assert sketch_request_for("description", {"sketch": "on"}) == {"mode": "on"}
     assert sketch_request_for(
-        "description", {"sketch": "auto", "sketch_text": " 広い湿原。 "}
+        "description", {"sketch": "on", "sketch_text": " 広い湿原。 "}
     ) == {"mode": "supplied", "text": "広い湿原。"}
-    assert sketch_request_for("direct_ddl", {"sketch": "auto"}) == {"mode": "off"}
+    assert sketch_request_for("direct_ddl", {"sketch": "on"}) == {"mode": "off"}
 
 
 def test_saved_columns_say_what_the_sketch_did() -> None:

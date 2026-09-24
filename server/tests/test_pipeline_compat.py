@@ -314,8 +314,8 @@ def test_a_supplementing_sketch_reaches_stage1_and_is_saved(tmp_path, monkeypatc
         requests.append(body)
         parameters = body["tools"][0]["function"]["parameters"]
         answer = (
-            {"place": False, "light": False, "subjects": ["鶴"], "decision": "supplement", "sketch": supplement}
-            if "decision" in parameters["properties"]
+            {"sketch": supplement}
+            if list(parameters["properties"]) == ["sketch"]
             else {"normalized_ddl": normalized_ddl}
         )
         arguments = json.dumps(answer, ensure_ascii=False, separators=(",", ":"))

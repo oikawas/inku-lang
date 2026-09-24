@@ -1190,12 +1190,8 @@ fn stage1_message(state: &PipelineSnapshot) -> serde_json::Value {
 
 #[test]
 fn a_supplementing_sketch_reaches_stage1_beside_the_description() {
-    let pending = sketch_start(SketchRequest::Auto);
-    let output = sketch_answer(
-        &pending,
-        json!({"place": false, "light": true, "subjects": ["crane"], "decision": "supplement",
-               "sketch": "A wide marsh under a pale winter sky."}),
-    );
+    let pending = sketch_start(SketchRequest::On);
+    let output = sketch_answer(&pending, json!({"sketch": "A wide marsh under a pale winter sky."}));
     let state = output.snapshot;
     let record = state.sketch.as_ref().unwrap();
     assert_eq!(record.state, SketchState::Supplemented);
@@ -1206,42 +1202,16 @@ fn a_supplementing_sketch_reaches_stage1_beside_the_description() {
 }
 
 #[test]
-fn a_description_with_its_cues_is_drawn_without_a_sketch() {
-    // The sketcher may ask to supplement, but a description stating both
-    // place and light is drawn from the description alone.
-    let pending = sketch_start(SketchRequest::Auto);
-    let state = sketch_answer(
-        &pending,
-        json!({"place": true, "light": true, "subjects": ["crane"], "decision": "supplement",
-               "sketch": "A marsh."}),
-    )
-    .snapshot;
+fn an_empty_sketch_draws_from_the_description_alone() {
+    let pending = sketch_start(SketchRequest::On);
+    let state = sketch_answer(&pending, json!({"sketch": "  "})).snapshot;
     assert_eq!(state.sketch.as_ref().unwrap().state, SketchState::NotNeeded);
     assert!(stage1_message(&state).get("sketch").is_none());
 }
 
 #[test]
-fn drawing_again_with_a_sketch_supplements_even_stated_cues() {
-    let pending = sketch_start(SketchRequest::Always);
-    assert!(
-        pending.action.as_ref().unwrap().payload["prompt"]["system"]
-            .as_str()
-            .unwrap()
-            .contains("The author chose to draw with a sketch")
-    );
-    let state = sketch_answer(
-        &pending,
-        json!({"place": true, "light": true, "subjects": ["crane"], "decision": "supplement",
-               "sketch": "A marsh at dusk."}),
-    )
-    .snapshot;
-    assert_eq!(state.sketch.as_ref().unwrap().state, SketchState::Supplemented);
-    assert_eq!(stage1_message(&state)["sketch"], "A marsh at dusk.");
-}
-
-#[test]
 fn a_failed_sketch_falls_back_to_the_description_without_stopping() {
-    let mut state = sketch_start(SketchRequest::Auto);
+    let mut state = sketch_start(SketchRequest::On);
     for _ in 0..2 {
         let action = state.action.as_ref().unwrap();
         assert_eq!(action.tag, "generate_sketch");

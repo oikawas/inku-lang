@@ -150,33 +150,18 @@ pub struct CatalogSelectionResponse {
     pub catalog_id: String,
 }
 
-/// Whether the sketcher judged the description short of cues.
-#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
-#[serde(rename_all = "snake_case")]
-pub enum SketchDecision {
-    None,
-    Supplement,
-}
-
-/// Exact sketch response shape. `place` and `light` record which cues the
-/// description already states; `sketch` is empty unless it supplements.
+/// Exact sketch response shape: the supplement, or an empty string.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct SketchResponse {
-    pub place: bool,
-    pub light: bool,
-    pub subjects: Vec<String>,
-    pub decision: SketchDecision,
     pub sketch: String,
 }
 
-const SKETCH_MAX_SUBJECTS: usize = 12;
-
 impl SketchResponse {
-    /// The supplement text, when the response asks for one and carries it.
+    /// The supplement text, when the response carries one.
     pub fn supplement(&self) -> Option<&str> {
         let text = self.sketch.trim();
-        (self.decision == SketchDecision::Supplement && !text.is_empty()).then_some(text)
+        (!text.is_empty()).then_some(text)
     }
 }
 
@@ -537,28 +522,20 @@ pub fn build_catalog_selection_prompt(
     })
 }
 
-/// Build the optional `generate_sketch` request. `always` asks for a
-/// supplement even when the description already states its cues (the
-/// author's explicit "draw again with a sketch").
+/// Build the optional `generate_sketch` request. It runs only when the
+/// author asks to draw with a sketch.
 pub fn build_sketch_prompt(
     description: &str,
     language: ResolvedInstructionLanguage,
-    always: bool,
     limits: PromptLimits,
 ) -> Result<LlmPrompt, PromptError> {
     require_nonempty("description", description)?;
     require_within("description", description.len(), limits.max_source_bytes)?;
-    let mut system = match language {
+    let system = match language {
         ResolvedInstructionLanguage::Ja => SKETCH_JA,
         ResolvedInstructionLanguage::En => SKETCH_EN,
     }
     .to_owned();
-    if always {
-        system.push_str(match language {
-            ResolvedInstructionLanguage::Ja => "\n\n作者は写生ありで描くことを選んだ。記述がすでに示す手掛かりがあっても decision は supplement にし、記述が含意する場所の広がりか季節・時刻の光を補う。",
-            ResolvedInstructionLanguage::En => "\n\nThe author chose to draw with a sketch. Set decision to supplement even when the description already states its cues, and supplement the extent of place or the seasonal or time-of-day light it implies.",
-        });
-    }
     let message = serde_json::to_string(&json!({ "description": description }))
         .map_err(|_| PromptError::Serialization)?;
     finish_prompt(LlmPrompt {
@@ -572,18 +549,8 @@ pub fn build_sketch_prompt(
         response_schema: json!({
             "type": "object",
             "additionalProperties": false,
-            "required": ["place", "light", "subjects", "decision", "sketch"],
-            "properties": {
-                "place": { "type": "boolean" },
-                "light": { "type": "boolean" },
-                "subjects": {
-                    "type": "array",
-                    "items": { "type": "string" },
-                    "maxItems": SKETCH_MAX_SUBJECTS
-                },
-                "decision": { "type": "string", "enum": ["none", "supplement"] },
-                "sketch": { "type": "string" }
-            }
+            "required": ["sketch"],
+            "properties": { "sketch": { "type": "string" } }
         }),
         prompt_digest: String::new(),
         saijiki_asset_id: None,
@@ -810,41 +777,21 @@ const STAGE1_WORK_PLAN_EN: &str = r#"You are inku's work planner. Read the autho
 
 Choose unspecified for a field you leave open. Use one to eight layers. Return only the specified JSON."#;
 
-const SKETCH_JA: &str = r#"あなたは inku の写生者である。作者の記述を抽象的な素描にする前に、記述に描くための手掛かりが足りているかを確かめ、足りない場合だけ背景と環境を補う。
+const SKETCH_JA: &str = r#"あなたは inku の写生者である。作者の記述を抽象的な素描にする前に、記述が言外に含む場面の背景と環境を、物の言葉で補う。
 
-# 確かめること
-- place: 場所の広がり（空、野、海、庭、部屋、町、遠近など）が記述の言葉で示されているか。
-- light: 季節・時刻・天気・光（春、夕暮れ、夜、雨、月明かり、日差しなど）が記述の言葉で示されているか。
-- subjects: 記述が描くべき物として名指しているものを、記述の言葉のまま短く並べる。
-
-# 補うかどうか
-- place と light がどちらも示されていれば、decision は none にする。
-- 記述が具体的な物を三つ以上名指し、その配置や数も書いているなら、decision は none にする。
-- それ以外で、記述が含意するのに書いていない場所の広がり、または季節・時刻の光があるときだけ、decision を supplement にする。含意が読み取れなければ none にする。
-
-# 補うときの書き方
-- sketch には、欠けている側（place か light、または両方）だけを、物の言葉で1〜3文に書く。書いてよいのは、場所の広がり、季節や時刻の光と色、周囲にある物とその数の多さや少なさである。
+# 書き方
+- 1〜3文に書く。書いてよいのは、場所の広がり、季節や時刻の光と色、周囲にある物とその数の多さや少なさである。
 - 記述の主題、その動き・向き・数・位置は書き直さない。新しい主題を加えない。
 - 感情語、評価語、比喩、物語の筋は書かない。
-- none のとき sketch は空文字にする。"#;
+- 補うものが読み取れなければ、sketch は空文字にする。"#;
 
-const SKETCH_EN: &str = r#"You are inku's sketcher. Before the author's description becomes an abstract drawing, check whether it gives enough cues to draw from, and supplement the background and environment only when it does not.
+const SKETCH_EN: &str = r#"You are inku's sketcher. Before the author's description becomes an abstract drawing, supplement the background and environment of the scene it implies, in plain words for things.
 
-# What to check
-- place: whether the description's words show the extent of a place (sky, field, sea, garden, room, town, near and far).
-- light: whether the description's words show a season, time of day, weather, or light (spring, dusk, night, rain, moonlight, sunshine).
-- subjects: list briefly, in the description's own words, the things it names to be drawn.
-
-# Whether to supplement
-- If both place and light are shown, set decision to none.
-- If the description names three or more concrete things and also states their placement or count, set decision to none.
-- Otherwise set decision to supplement only when the description implies an extent of place or a seasonal or time-of-day light that it does not state. If no such implication can be read, set none.
-
-# How to supplement
-- In sketch, write only the missing side (place, light, or both) in one to three sentences of plain words for things. You may write the extent of the place, the light and color of the season or time, and the surrounding things with how many or few they are.
+# How to write
+- Write one to three sentences. You may write the extent of the place, the light and color of the season or time, and the surrounding things with how many or few they are.
 - Never rewrite the description's subjects, their movement, direction, count, or position. Add no new subject.
 - Write no emotion words, evaluations, metaphors, or plot.
-- When decision is none, sketch is an empty string."#;
+- When nothing can be read to supplement, sketch is an empty string."#;
 
 const STAGE1_SKETCH_NOTE_JA: &str = r#"
 
@@ -1161,7 +1108,6 @@ pub fn parse_sketch_response(
     limits: PromptLimits,
 ) -> Result<SketchResponse, PromptError> {
     let response: SketchResponse = parse_bounded(response_text, limits)?;
-    require_within("subjects", response.subjects.len(), SKETCH_MAX_SUBJECTS)?;
     require_within("sketch", response.sketch.len(), limits.max_source_bytes)?;
     Ok(response)
 }

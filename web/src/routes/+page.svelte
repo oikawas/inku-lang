@@ -1559,7 +1559,7 @@ async function drawLineageDescriptionEdit(node: LineageNode, text: string, signa
 	await showNewLineageChild(view.result?.history_id, view.result?.lineage_node_id);
 }
 
-/** Redraw a saved work with the sketch off or always on, as its child. The
+/** Redraw a saved work with the sketch off or on, as its child. The
  *  sketch is asked again (or dropped) -- replaying the stored one would leave
  *  the choice dead. */
 async function drawLineageSketchGrain(node: LineageNode, mode: SketchMode, signal?: AbortSignal): Promise<void> {

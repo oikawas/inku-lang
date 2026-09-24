@@ -45,7 +45,7 @@
 		onLoadOverview: () => void | Promise<void>;
 		onLoadBranch: (nodeId: string) => void | Promise<void>;
 		onPaintOne: (text: string, options: any) => Promise<any>;
-		/** Redraw a work with the sketch off or always on, as its child. */
+		/** Redraw a work with the sketch off or on, as its child. */
 		onDrawSketchGrain: (node: LineageNode, mode: SketchMode, signal?: AbortSignal) => Promise<void>;
 		onVisionAdvice: (historyId: string, model: string, instruction: string, direction: string, enabledKinds: string[], signal: AbortSignal) => Promise<any>;
 		onSaveVisionModel: (provider: Provider, model: string) => void | Promise<void>;

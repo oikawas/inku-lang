@@ -1,7 +1,5 @@
 <!--
-	写生 selector. Three states in one control: auto (supplement only when the
-	description lacks cues), off, and always. `modes` narrows the choice (the
-	work menu offers only off and always). Same two shapes as WildToggle, for the same reason -- it sits in
+	写生 selector: off (the default) or on. `modes` narrows the choice. Same two shapes as WildToggle, for the same reason -- it sits in
 	the same rows.
 	- compact=false: dropdown trigger + menu, for the describe tab's control row.
 	- compact=true: inline segmented control for the dialogs, where `inherited`
@@ -66,7 +64,7 @@
 		</button>
 		{#if open}
 			<div class="sketch-menu" role="menu">
-				<div class="sketch-menu-head">{isJapanese ? '写生の効かせ方' : 'When to sketch'}</div>
+				<div class="sketch-menu-head">{isJapanese ? '写生' : 'Sketch from life'}</div>
 				{#each modes as mode (mode)}
 					<button
 						type="button"

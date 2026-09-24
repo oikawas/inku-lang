@@ -1987,7 +1987,6 @@ def _paint_payload(
         # sent explicitly on every run and change the request shape of every
         # existing bench. `include_trace` above already uses this idiom.
         "sketch": bool(getattr(args, "sketch", False)) or None,
-        "sketch_mode": getattr(args, "sketch_mode", None),
         "sketch_grain": getattr(args, "sketch_grain", None),
         "sketch_text": getattr(args, "sketch_text", None),
         "variation_amplitude": getattr(args, "variation_amplitude", None),
@@ -3904,12 +3903,7 @@ def _add_paint_args(parser: argparse.ArgumentParser, *, batch: bool = False) -> 
     parser.add_argument(
         "--sketch",
         action="store_true",
-        help="run the sketch before Stage 1 in auto mode: it supplements place and light beside the description only when the description lacks cues; server default is off, the web UI default is auto",
-    )
-    parser.add_argument(
-        "--sketch-mode",
-        choices=["auto", "off", "always"],
-        help="when to sketch: auto (only when the description lacks cues), off, or always (supplement even stated cues); overrides --sketch",
+        help="run the sketch before Stage 1: it supplements the extent of place and the seasonal or time-of-day light beside the description; server default is off, and so is the web UI default",
     )
     parser.add_argument(
         "--sketch-grain",

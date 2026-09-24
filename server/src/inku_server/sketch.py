@@ -1,9 +1,9 @@
 """Saved sketch metadata.
 
 The retired Python Stage 0.5 producer rewrote the description. The shared
-pipeline's sketch only supplements place and light beside the description and
-records `supplemented`, `not_needed` (the description stated its cues),
-`fallback` or `off`. These small types remain because existing history rows and
+pipeline's sketch runs only when the author asks for it, supplements place and
+light beside the description, and records `supplemented`, `not_needed`
+(nothing to supplement), `fallback` or `off`. These small types remain because existing history rows and
 request models still carry the state that older work recorded.
 """
 

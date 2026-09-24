@@ -143,7 +143,7 @@ def test_provider_failure_diagnostic_is_cleared_by_success(monkeypatch):
     ]
 
     class FixtureProvider:
-        def __init__(self, _options):
+        def __init__(self, _options, **_kwargs):
             self.failure_detail = None
 
         def __call__(self, action):

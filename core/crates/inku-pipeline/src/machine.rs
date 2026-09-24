@@ -19,10 +19,11 @@ use crate::core_boundary::{CompiledDelivery, CompilerOptions, ResolvedHostOption
 use crate::prompts::{
     DescriptionCatalogEntry, HOLE_COMPLETION_PROMPT_ID, HoleCompletionResult,
     HolePatchEditResponse, HolePatchResponse, LEGACY_HOLE_COMPLETION_PROMPT_ID, LlmPrompt,
-    LlmStage, MacroPromptEntry, PromptLimits, Stage1Context, build_catalog_selection_prompt,
-    build_hole_completion_prompt, build_stage1_prompt, parse_catalog_selection_response,
-    parse_hole_completion_response, parse_hole_patch_response, parse_stage1_response,
-    with_stage1_compiler_feedback,
+    LlmStage, MacroPromptEntry, PromptLimits, Stage1Context,
+    build_catalog_selection_prompt, build_hole_completion_prompt, build_sketch_prompt,
+    build_stage1_prompt_with_sketch, parse_catalog_selection_response,
+    parse_hole_completion_response, parse_hole_patch_response, parse_sketch_response,
+    parse_stage1_response, with_stage1_compiler_feedback,
 };
 use crate::protocol::{
     ActionEcho, DecimalU64, EffectAction, EffectResult, Envelope, PROTOCOL_NAME, PROTOCOL_VERSION,
@@ -133,6 +134,74 @@ pub struct PipelineConfig {
     pub catalog_retry: RetryPolicy,
     pub stage1_retry: RetryPolicy,
     pub hole_retry: RetryPolicy,
+    /// Budget for the optional sketch; the catalog budget when absent.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sketch_retry: Option<RetryPolicy>,
+}
+
+/// Whether a description run sketches before Stage 1. The sketch only
+/// supplements place and light beside the description; it runs only when the
+/// author asks for it, never waits for approval, and never stops a run.
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "mode", rename_all = "snake_case", deny_unknown_fields)]
+pub enum SketchRequest {
+    /// No sketch (the default).
+    #[default]
+    Off,
+    /// The author asked to draw with a sketch.
+    On,
+    /// A sketch the author edited, or a saved one being replayed. No request is made.
+    Supplied { text: String },
+}
+
+impl SketchRequest {
+    fn is_off(&self) -> bool {
+        matches!(self, Self::Off)
+    }
+}
+
+/// What the sketch did for this run.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SketchState {
+    /// The request is waiting to be made before Stage 1.
+    Pending,
+    /// The sketcher supplemented place or light.
+    Supplemented,
+    /// The sketcher found nothing to supplement.
+    NotNeeded,
+    /// The sketch request failed; Stage 1 read the description alone.
+    Fallback,
+    /// The author's or a saved sketch was used without a request.
+    Supplied,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SketchRecord {
+    pub state: SketchState,
+    pub text: Option<String>,
+}
+
+impl SketchRecord {
+    fn from_request(request: SketchRequest) -> Option<Self> {
+        match request {
+            SketchRequest::Off => None,
+            SketchRequest::On => Some(Self { state: SketchState::Pending, text: None }),
+            SketchRequest::Supplied { text } => {
+                let text = text.trim().to_owned();
+                (!text.is_empty()).then_some(Self { state: SketchState::Supplied, text: Some(text) })
+            }
+        }
+    }
+
+    /// The text Stage 1 reads beside the description.
+    fn stage1_text(&self) -> Option<&str> {
+        match self.state {
+            SketchState::Supplemented | SketchState::Supplied => self.text.as_deref(),
+            _ => None,
+        }
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -144,6 +213,8 @@ pub enum AuthoringInput {
     Description {
         description: String,
         auto_catalog: bool,
+        #[serde(default, skip_serializing_if = "SketchRequest::is_off")]
+        sketch: SketchRequest,
     },
 }
 
@@ -207,6 +278,8 @@ pub enum PipelineInput {
         expected_revision: DecimalU64,
         description: String,
         auto_catalog: bool,
+        #[serde(default, skip_serializing_if = "SketchRequest::is_off")]
+        sketch: SketchRequest,
     },
     CompleteHoles {
         expected_revision: DecimalU64,
@@ -276,6 +349,8 @@ pub struct PipelineSnapshot {
     pub delivery: Option<CompiledDelivery>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub hole_completion_check: Option<serde_json::Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sketch: Option<SketchRecord>,
     pub snapshot_digest: String,
 }
 
@@ -529,6 +604,7 @@ impl PipelineSnapshot {
 
     fn retry_policy(&self, stage: LlmStage) -> RetryPolicy {
         match stage {
+            LlmStage::GenerateSketch => self.config.sketch_retry.unwrap_or(self.config.catalog_retry),
             LlmStage::SelectDescriptionCatalog => self.config.catalog_retry,
             LlmStage::GenerateNormalizedDdl => self.config.stage1_retry,
             LlmStage::CompleteVisibleDdlHoles => self.config.hole_retry,
@@ -586,6 +662,9 @@ impl PipelineConfig {
             .validate()
             .map_err(|_| ProtocolError::InvalidPolicy)?;
         self.catalog_retry.validate()?;
+        if let Some(policy) = self.sketch_retry {
+            policy.validate()?;
+        }
         self.stage1_retry.validate()?;
         self.hole_retry.validate()?;
         if self.definitions.len() != self.macro_summaries.len()
@@ -630,8 +709,37 @@ impl PipelineSnapshot {
             self.authority
                 .propose_stage1_result_commit(self.authority.revision()),
         )?;
+        if self.sketch.as_ref().is_some_and(|record| record.state == SketchState::Pending) {
+            let prompt = build_sketch_prompt(
+                &description,
+                self.config.language,
+                self.config.prompt_limits,
+            )
+            .map_err(|_| ProtocolError::SchemaViolation)?;
+            return self.begin_llm(prompt, Some(description), Vec::new(), events);
+        }
         let prompt = self.stage1_prompt(&description)?;
         self.begin_llm(prompt, Some(description), Vec::new(), events)
+    }
+
+    /// Record what the sketch did and continue to Stage 1. A sketch never stops a run.
+    fn finish_sketch(
+        &mut self,
+        state: SketchState,
+        text: Option<String>,
+        description: String,
+        detail: serde_json::Value,
+        events: &mut Vec<PipelineEvent>,
+    ) -> Result<(), ProtocolError> {
+        let record = self.sketch.as_mut().ok_or(ProtocolError::InternalInvariant)?;
+        record.state = state;
+        record.text = text;
+        let mut payload = json!({"state": state, "text": record.text});
+        if !detail.is_null() {
+            payload["detail"] = detail;
+        }
+        self.event(events, "sketch_ready", payload)?;
+        self.stage1(description, events)
     }
 
     fn stage1_prompt(&self, description: &str) -> Result<LlmPrompt, ProtocolError> {
@@ -666,8 +774,9 @@ impl PipelineSnapshot {
             )
             .map_err(|_| ProtocolError::SchemaViolation)?,
         };
-        build_stage1_prompt(
+        build_stage1_prompt_with_sketch(
             description,
+            self.sketch.as_ref().and_then(SketchRecord::stage1_text),
             self.config.language,
             &context,
             &macros,
@@ -746,12 +855,19 @@ impl PipelineSnapshot {
         &mut self,
         description: String,
         auto_catalog: bool,
+        sketch: SketchRequest,
         events: &mut Vec<PipelineEvent>,
     ) -> Result<(), ProtocolError> {
         let _ = proposal(
             self.authority
                 .propose_stage1_result_commit(self.authority.revision()),
         )?;
+        if let SketchRequest::Supplied { text } = &sketch {
+            if text.len() > self.config.prompt_limits.max_source_bytes {
+                return Err(ProtocolError::SchemaViolation);
+            }
+        }
+        self.sketch = SketchRecord::from_request(sketch);
         if auto_catalog {
             if !self
                 .config
@@ -937,6 +1053,13 @@ impl PipelineSnapshot {
         }
         self.action = None;
         match stage {
+            LlmStage::GenerateSketch => self.finish_sketch(
+                SketchState::Fallback,
+                None,
+                description.ok_or(ProtocolError::InternalInvariant)?,
+                json!({"failure": failure}),
+                events,
+            ),
             LlmStage::SelectDescriptionCatalog => {
                 self.select_catalog("default", CatalogMode::AutoFallbackDefault)?;
                 self.event(events, "catalog_fallback", json!({"catalog_id": "default", "catalog_mode": "auto_fallback_default", "failure": failure}))?;
@@ -1277,6 +1400,25 @@ impl PipelineSnapshot {
             return self.failure(ProviderFailure::TransportTimeout, spent_ms, events);
         }
         match stage {
+            LlmStage::GenerateSketch => {
+                let Ok(parsed) = parse_sketch_response(&response, self.config.prompt_limits) else {
+                    return self.failure(ProviderFailure::SchemaViolation, spent_ms, events);
+                };
+                let text = parsed.supplement().map(str::to_owned);
+                let state = if text.is_some() {
+                    SketchState::Supplemented
+                } else {
+                    SketchState::NotNeeded
+                };
+                self.action = None;
+                self.finish_sketch(
+                    state,
+                    text,
+                    description.ok_or(ProtocolError::InternalInvariant)?,
+                    serde_json::Value::Null,
+                    events,
+                )
+            }
             LlmStage::SelectDescriptionCatalog => {
                 let selected =
                     match parse_catalog_selection_response(&response, self.config.prompt_limits) {
@@ -1298,7 +1440,11 @@ impl PipelineSnapshot {
                 self.stage1(description.ok_or(ProtocolError::InternalInvariant)?, events)
             }
             LlmStage::GenerateNormalizedDdl => {
-                let generated = match parse_stage1_response(&response, self.config.prompt_limits) {
+                let generated = match parse_stage1_response(
+                    &response,
+                    self.config.prompt_limits,
+                    self.config.language,
+                ) {
                     Ok(value) => value,
                     Err(_) => {
                         return self.failure(ProviderFailure::SchemaViolation, spent_ms, events);
@@ -1438,10 +1584,11 @@ pub fn advance(
                 expected_revision,
                 description,
                 auto_catalog,
+                sketch,
             } => {
                 state.editable()?;
                 state.revision(expected_revision)?;
-                state.description(description, auto_catalog, &mut events)?;
+                state.description(description, auto_catalog, sketch, &mut events)?;
             }
             PipelineInput::CompleteHoles {
                 expected_revision,
@@ -1601,6 +1748,7 @@ pub fn advance(
             action: None,
             delivery: None,
             hole_completion_check: None,
+            sketch: None,
             snapshot_digest: String::new(),
         };
         state.event(
@@ -1628,7 +1776,8 @@ pub fn advance(
             AuthoringInput::Description {
                 description,
                 auto_catalog,
-            } => state.description(description, auto_catalog, &mut events)?,
+                sketch,
+            } => state.description(description, auto_catalog, sketch, &mut events)?,
         }
         state
     };
@@ -1651,6 +1800,16 @@ impl PipelineSnapshot {
             return Err(ProtocolError::StaleResult);
         }
         match result {
+            EffectResult::SketchGenerated {
+                response,
+                elapsed_ms,
+                ..
+            } => self.llm_response(
+                LlmStage::GenerateSketch,
+                response,
+                elapsed_ms.get(),
+                events,
+            ),
             EffectResult::DescriptionCatalogSelected {
                 response,
                 elapsed_ms,

@@ -11,6 +11,7 @@ mod affine_geometry;
 mod anchor_schedule;
 pub mod arc;
 pub mod arrangement;
+pub(crate) mod arrangement_performance;
 pub mod checked_performance;
 pub mod cloudform;
 pub mod compat_clip;
@@ -47,7 +48,7 @@ pub const CORE_API_VERSION: &str = "0.1.0";
 
 /// Canonical engine identity owned by the portable core and exposed by every host binding.
 pub const RENDER_ENGINE_ID: &str = "default";
-pub const RENDER_ENGINE_VERSION: &str = "66";
+pub const RENDER_ENGINE_VERSION: &str = "67";
 
 /// Report the host-boundary version for binding and packaging smoke tests.
 #[must_use]
@@ -72,6 +73,6 @@ mod tests {
 
     #[test]
     fn engine_identity_is_owned_by_the_core() {
-        assert_eq!(render_engine_identity(), ("default", "64"));
+        assert_eq!(render_engine_identity(), ("default", "67"));
     }
 }

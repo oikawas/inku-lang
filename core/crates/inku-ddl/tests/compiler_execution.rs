@@ -590,22 +590,31 @@ fn touching_explicit_facts_and_omission_chain_keep_original_dependencies() {
             execution.downstream_diagnostics()
         );
         let score = execution.score().unwrap();
-        let error = perform(score, ScoreErrorPolicy::Stop).unwrap_err();
-        assert_eq!(error.diagnostics[0].reason, reason);
-        let plan = perform(score, ScoreErrorPolicy::OmitAndContinue).unwrap();
-        assert_eq!(plan.original_instruction_indices, [0, 3]);
-        assert_eq!(plan.instruction_indices, [0, 3]);
-        let summary = plan.execution.as_ref().unwrap();
+        // Legacy Stop input recovers like OmitAndContinue and reports the reason.
+        let stopped = perform(score, ScoreErrorPolicy::Stop).unwrap();
         assert_eq!(
-            summary.diagnostics[1].reason,
-            ScoreExecutionReason::TouchingReferenceOmitted
+            stopped.execution.as_ref().unwrap().diagnostics[0].reason,
+            reason
         );
-        assert_eq!(summary.diagnostics[1].dependency_instruction_index, Some(1));
+        let plan = perform(score, ScoreErrorPolicy::OmitAndContinue).unwrap();
+        assert_eq!(stopped.original_instruction_indices, plan.original_instruction_indices);
+        // An unsatisfiable touch removes only that relation edge; the shapes
+        // and the later chain are still drawn.
+        assert_eq!(plan.original_instruction_indices, [0, 1, 2, 3]);
+        assert_eq!(plan.instruction_indices, [0, 1, 2, 3]);
+        let summary = plan.execution.as_ref().unwrap();
+        assert_eq!(summary.diagnostics.len(), 1);
+        assert_eq!(summary.diagnostics[0].instruction_index, 1);
+        assert_eq!(summary.diagnostics[0].dependency_instruction_index, Some(0));
+        assert_eq!(
+            summary.diagnostics[0].disposition,
+            inku_score::ScoreExecutionDisposition::RelationOmitted
+        );
         let joined = map_compiler_render_execution(&execution, score, Some(summary)).unwrap();
         assert_eq!(
             joined.rendered_origins[1],
             ScoreInstructionOrigin::SourceInstruction {
-                instruction_index: 3
+                instruction_index: 1
             }
         );
     }
@@ -714,16 +723,21 @@ fn touching_flat_macro_color_binding_has_same_effective_score_and_performance() 
         performance_seed: Some(23),
         canvas: None,
     };
+    let stopped = resolve_checked_performance(request(), ScoreErrorPolicy::Stop).unwrap();
     assert_eq!(
-        resolve_checked_performance(request(), ScoreErrorPolicy::Stop)
-            .unwrap_err()
-            .diagnostics[0]
-            .reason,
+        stopped.execution.as_ref().unwrap().diagnostics[0].reason,
         ScoreExecutionReason::TouchingDirectionConflict
     );
     let omitted =
         resolve_checked_performance(request(), ScoreErrorPolicy::OmitAndContinue).unwrap();
-    assert_eq!(omitted.original_instruction_indices, [0]);
+    assert_eq!(stopped.original_instruction_indices, omitted.original_instruction_indices);
+    // The conflicting touch removes only its relation edge; all four Macro
+    // emits are still drawn.
+    assert_eq!(omitted.original_instruction_indices, [0, 1, 2, 3]);
+    assert_eq!(
+        omitted.execution.as_ref().unwrap().diagnostics[0].disposition,
+        inku_score::ScoreExecutionDisposition::RelationOmitted
+    );
     let joined =
         map_compiler_render_execution(&conflict, score, omitted.execution.as_ref()).unwrap();
     assert!(matches!(
@@ -806,14 +820,15 @@ fn declared_normal_scale_is_fixed_for_touching_and_preserves_omission_owner() {
             assert!(resolve_checked_performance(request(), ScoreErrorPolicy::Stop).is_ok());
         } else {
             let stopped =
-                resolve_checked_performance(request(), ScoreErrorPolicy::Stop).unwrap_err();
+                resolve_checked_performance(request(), ScoreErrorPolicy::Stop).unwrap();
             assert_eq!(
-                stopped.diagnostics[0].reason,
+                stopped.execution.as_ref().unwrap().diagnostics[0].reason,
                 ScoreExecutionReason::TouchingGeometryConflict
             );
             let continued =
                 resolve_checked_performance(request(), ScoreErrorPolicy::OmitAndContinue).unwrap();
-            assert_eq!(continued.original_instruction_indices, [0]);
+            // Only the touch is removed; both emits are still drawn.
+            assert_eq!(continued.original_instruction_indices, [0, 1]);
             let joined =
                 map_compiler_render_execution(&execution, score, continued.execution.as_ref())
                     .unwrap();
@@ -849,14 +864,15 @@ fn declared_core_binding_failure_and_unbound_caller_keep_their_policy_owners() {
             LIMITS,
             ScoreErrorPolicy::Stop,
         );
-        assert!(stop.score().is_none());
-        assert_eq!(stop.outcome(), ScoreLoweringOutcome::Stopped);
         let continued = execute_locked(
             source,
             std::slice::from_ref(&definition),
             LIMITS,
             ScoreErrorPolicy::OmitAndContinue,
         );
+        // Legacy Stop input keeps the independent circle like OmitAndContinue.
+        assert_eq!(stop.outcome(), continued.outcome());
+        assert_eq!(stop.score(), continued.score());
         assert_eq!(
             continued.outcome(),
             ScoreLoweringOutcome::CompleteWithOmissions,
@@ -878,13 +894,13 @@ fn declared_core_binding_failure_and_unbound_caller_keep_their_policy_owners() {
         LIMITS,
         ScoreErrorPolicy::Stop,
     );
-    assert!(stop.score().is_none());
     let continued = execute_locked(
         source,
         &[definition],
         LIMITS,
         ScoreErrorPolicy::OmitAndContinue,
     );
+    assert_eq!(stop.score(), continued.score());
     assert_eq!(continued.score().unwrap().instructions.len(), 1);
     assert!(continued.upstream_diagnostics().is_empty());
     assert!(
@@ -951,8 +967,9 @@ fn ground_is_drawable_content_for_both_facade_modes_and_continue_omissions() {
         LIMITS,
         ScoreErrorPolicy::Stop,
     );
-    assert_eq!(stopped.outcome(), ScoreLoweringOutcome::Stopped);
-    assert!(stopped.score().is_none());
+    // The ground is drawable content, so legacy Stop input keeps it too.
+    assert_eq!(stopped.outcome(), continued.outcome());
+    assert_eq!(stopped.score(), continued.score());
 
     let all_omitted = execute(
         "paper washi. place many red circle at center.",
@@ -1250,21 +1267,23 @@ fn undelivered_occurrences_preserve_accepted_drawables_in_the_same_clause() {
         );
         let semantic = result.compilation().semantic_document.as_ref().unwrap();
         assert_eq!(semantic.ast.instructions[0].entity.quantity, None);
-        for (kind, text) in [("upstream_hole", "many"), ("upstream_unknown", "mystery")] {
-            let diagnostic = result
-                .upstream_diagnostics()
-                .iter()
-                .find(|diagnostic| diagnostic.reason == kind)
-                .unwrap();
-            let span = diagnostic.span.unwrap();
-            assert_eq!(&source[span.start_byte..span.end_byte], text);
-            assert_eq!(
-                diagnostic.disposition,
-                CompilerExecutionDisposition::Omitted {
-                    unit: CompilerExecutionOmissionUnit::SourceOccurrence { span }
-                }
-            );
-        }
+        // The undelivered words are reported once as the clause hole they sit
+        // in; the accepted circle in that clause is still drawn.
+        let [diagnostic] = result.upstream_diagnostics() else {
+            panic!("{:?}", result.upstream_diagnostics());
+        };
+        assert_eq!(diagnostic.reason, "unresolved_clause");
+        let span = diagnostic.span.unwrap();
+        assert_eq!(
+            &source[span.start_byte..span.end_byte],
+            "place red circle at horizontal 0.5, vertical 0.5 many mystery"
+        );
+        assert_eq!(
+            diagnostic.disposition,
+            CompilerExecutionDisposition::Omitted {
+                unit: CompilerExecutionOmissionUnit::SourceOccurrence { span }
+            }
+        );
     }
     assert_eq!(continued.score(), stopped_policy.score());
     assert_eq!(
@@ -1356,9 +1375,12 @@ fn ja_unresolved_predicate_fragment_preserves_typed_drawing_in_both_resource_mod
         );
         assert_eq!(result.upstream_diagnostics().len(), 1);
         let diagnostic = &result.upstream_diagnostics()[0];
-        assert_eq!(diagnostic.reason, "upstream_unknown");
+        assert_eq!(diagnostic.reason, "unresolved_clause");
         let span = diagnostic.span.unwrap();
-        assert_eq!(&source[span.start_byte..span.end_byte], "左から右へ");
+        assert_eq!(
+            &source[span.start_byte..span.end_byte],
+            "黒いロットリングの小さな四角を左から右へ横に二十四個並べる"
+        );
         let score = result.score().expect("the typed drawing survives");
         assert_eq!(score.instructions.len(), 1);
         let arrangement = score.instructions[0].arrangement.as_ref().unwrap();
@@ -1386,9 +1408,13 @@ fn ja_unresolved_entity_fragment_preserves_typed_drawing() {
     );
     assert_eq!(result.upstream_diagnostics().len(), 1);
     let diagnostic = &result.upstream_diagnostics()[0];
-    assert_eq!(diagnostic.reason, "upstream_unknown");
+    assert_eq!(diagnostic.reason, "unresolved_clause");
     let span = diagnostic.span.unwrap();
-    assert_eq!(&source[span.start_byte..span.end_byte], "中央付近に");
+    // The unresolved part is reported as the whole clause hole it belongs to.
+    assert_eq!(
+        &source[span.start_byte..span.end_byte],
+        "中央付近に黒いクレヨンの楕円を一つ置く"
+    );
     assert_eq!(result.score().unwrap().instructions.len(), 1);
 }
 
@@ -1788,8 +1814,10 @@ fn group_relation_does_not_retarget_an_earlier_surviving_group() {
             .any(|diagnostic| matches!(
                 (&diagnostic.owner, &diagnostic.disposition),
                 (
+                    // The group's follower is its last member, as on the
+                    // materialized path; the omitted group is its target.
                     inku_ddl::ScoreDiagnosticOwner::SourceInstruction {
-                        instruction_index: 4,
+                        instruction_index: 5,
                         ..
                     },
                     ScoreDiagnosticDisposition::RelationOmitted
@@ -1819,7 +1847,9 @@ fn canonical_ready_lowering_omits_a_relation_whose_direct_referent_is_a_macro_sl
         result.outcome(),
         ScoreLoweringOutcome::CompleteWithOmissions
     );
-    assert_eq!(result.score().unwrap().instructions.len(), 1);
+    // The Macro circle and the square are both drawn; only the square's
+    // relation to the Macro slot is removed.
+    assert_eq!(result.score().unwrap().instructions.len(), 2);
     assert!(
         result
             .downstream_diagnostics()
@@ -1832,12 +1862,7 @@ fn canonical_ready_lowering_omits_a_relation_whose_direct_referent_is_a_macro_sl
                         reference: SemanticPreviousReference::PreviousOne,
                         dependency_instruction_indices,
                     },
-                    ScoreDiagnosticDisposition::Omitted {
-                        unit: ScoreOmissionUnit::RelationInstruction {
-                            instruction_index: 1
-                        },
-                        ..
-                    }
+                    ScoreDiagnosticDisposition::RelationOmitted
                 ) if dependency_instruction_indices == &[0]
             ))
     );

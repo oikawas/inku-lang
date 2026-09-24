@@ -6,6 +6,51 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 36 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-25 — The sketch runs only when the author chooses it
+
+An optional sketch can now run before the work plan. It never rewrites the description: it supplements the extent of place and the seasonal or time-of-day light in plain words beside it, and Stage 1 reads both. It is off by default and is used through "on" in the describe tab or the work menu's "redraw with or without the sketch". It never waits for a confirmation, and a failed sketch request still draws from the description. The sketch can be read and edited after drawing. There is no automatic mode that decides per description: in a blind comparison on 70 development descriptions the sketch was even (32 with, 30 without), and the rule checked on 110 unused descriptions in Japanese and English came out 43 to 50, so no general criterion that improves the picture was found. Saved states gain `supplemented` and `not_needed`; the retired layer's fine and coarse grains remain only for displaying saved works. The CLI's `--sketch` runs the new sketch. Android follows separately. DDL, Score, and render versions are unchanged.
+
+### 2026-09-24 — The work plan leads through size and overlap, and shows light and time through the scene's color
+
+The work plan prompt gains two principles. When a description holds a difference in scale, focal marks clearly differ in size from the marks of the scene, and depth or crowding comes from overlapping marks. When night, dusk, or darkness is the scene's character, the background darkens and what shines rises in light marks; a bright day or white expanse keeps a light background and builds contrast with mark colors. Neither is a subject-to-shape table. In blind comparisons with engine 41 works it won 53 to 38 on 110 trial samples and 58 to 35 on 110 unused check samples, and three independent reviewer sets preferred it to the previous prompt 54 to 37. DDL, Score, and render versions are unchanged.
+
+### 2026-09-24 — Many large oil-paint fills no longer produce an oversized SVG
+
+Forty full-width oil-paint squares produced a 50.7 MB SVG, above the 12 MiB production limit and the 8 MiB shared rasterizer limit: every oil interior fill laid down up to about 65 loaded passes, each with a body and eight ridge paths, and the resource budget bounds only the number of marks. One oil interior fill now lays down at most 24 passes, and all oil interior fills of a work share 120 passes (at least 3 each), widening passes instead. The same work now renders at 6.3 MB. Render engine 67 (this edition).
+
+### 2026-09-24 — Grounds and surfaces are written without headings
+
+The specification described headed forms, 「地: ...」 for the support and 「面: ...」 for a shape's surface, but the typed compiler never read the headings: 「地: 和紙。」 became an unresolved clause and 「地: 薄墨。」 or 「面: 塗り。」 stopped the whole work. The specification now matches the compiler: a ground is a sentence of its own such as 「和紙。」 or 「薄墨地。」, and a surface quality is a modifier of its shape such as 「薄墨の円」. Headed forms are not accepted. The Stage 1 work plan already prints these forms. The legacy prompt templates and their golden fixtures keep their recorded wording for replay. Compiler behavior, DDL, Score, and render versions are unchanged.
+
+### 2026-09-24 — A coordinated group's mirror is never dropped without a diagnostic
+
+When lowering could not materialize the plan, a mirror stated on a coordinated group, such as “place one gray circle and black square at bottom mirrored with the previous shape”, disappeared without any diagnostic, because only instruction-level mirrors were reported on that path. The group mirror is now reported as a relation omission with the same follower (the group's last member) and target as the materialized path. Drawing is unchanged.
+
+### 2026-09-24 — A count on the right member of a Japanese coordination no longer stops the drawing
+
+A Japanese coordination whose right member carried its own count, such as 「三つの赤い円と四つの青い点を置く」 or 「…で埋める」, was read as two members separated by a coordination boundary, and the whole clause stopped with `blocked_coordination_boundary`. The genitive の inside the right noun phrase was accepted only when the word after it was the head, so 「四つ の 青い 点」 broke at 青い. The bridge is now accepted when the word after の is the head or another accepted modifier of the same noun phrase. The coordinated placement and the coordinated fill are drawn again. DDL, Score, and render versions are unchanged beyond this edition's DDL engine 46.
+
+### 2026-09-24 — Initial generation returns a structured work plan
+
+The initial Stage 1 LLM now returns a closed, typed work plan as JSON instead of free visible DDL text. Its values are enums projected from the Saijiki asset, the parser's finite modifier forms, the fluctuation classifier, and the Score intensity values, and the values each form accepts come from the capability matrix `inku.work-plan-capabilities.v1`, generated by querying the compiler. Shared Rust validates and normalizes the plan and prints it deterministically as visible DDL in the request language before the existing compiler reads it. An out-of-range value becomes unspecified for its field and a layer without a shape is removed alone; neither stops the drawing.
+
+In the saved normal-150 run, 193 of 458 generated free-DDL sentences (42%) were dropped whole as `unresolved_clause`, and nine works stopped, because of out-of-vocabulary forms and out-of-grammar references that prompt guidance did not eliminate. Property tests that compile random plans inside the capability matrix in Japanese and English confirm zero diagnostics for printed plan DDL.
+
+The response schema uses only object, array, string enums, and bounded integers, which every existing provider transport carries unchanged. Saved responses carrying `normalized_ddl` are read unchanged for replay. Direct and edited author DDL, hole completion, and camera projection are unchanged. This edition's work plan contains no Macro invocation. The default Stage 1 output limit rises from 1024 to 2048 tokens.
+
+### 2026-09-24 — English amplitude accepts the adverb largely (DDL 12)
+
+The English amplitude word for 大きく was written only as `large`, spelled like relative size `large`. A phrase such as “large swaying small line” read both as sizes and produced a size conflict. Using the existing English grammar record already used for `fine` → `finely`, amplitude `large` now also accepts the adverb `largely`, so amplitude and size can share one phrase. Existing acceptance of `large` is unchanged; Japanese already distinguishes 大きく from 大きな.
+
+### 2026-09-24 — Typed placement performs density, rhythm, jitter, and fade (render engine 67)
+
+For Score 0.10 typed placement the renderer chose member positions from the recipe, anchor, count, and seed alone and never read the arrangement's `density`, `cluster_count`, `rhythm_spacing`, `jitter`, or `fade`; changing them produced an identical SVG. Inside the place and extent fixed by the recipe, the renderer now performs scatter clusters and density, line-up rhythm, positional jitter, and fade across the group. Several marks placed or drawn at one spot form a bounded bundle instead of an exact overlay. Performed members receive the tool's existing member hand for size and rotation. Tiled grids are unchanged.
+
+Every choice is bound to `render_seed` and the original owner and reads only Score fields, with no branch on words or subjects. Default field values leave recipe centers unchanged. Stored Score meaning is unchanged; replay follows this engine.
+
+### 2026-09-24 — Closed-shape surface textures are no longer hidden by a flat fill (DDL engine 46)
+
+An explicit wash, grain, stipple, hatch, crosshatch, or aquatint on a closed shape was lowered together with a flat fill (`filled: true`), so the fill covered the texture and all six rendered as the same solid shape. Such a surface now lowers to `filled: false` with its texture, making the texture itself the area's performance. An explicit flat surface and the omitted-surface default of a closed shape keep their flat fill. Stored Scores are not reinterpreted.
 ### 2026-09-24 — Make work details readable in Lineage cards
 
 Work details now open in a separate dialog instead of stretching a narrow Lineage card down the screen. The description uses the dialog's full width, and the values no longer collapse into one-character columns. Description and render hashes show only their last four digits, with a separate button beside each to copy the complete digest. The work comment remains editable in the dialog.

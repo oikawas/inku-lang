@@ -3844,6 +3844,31 @@ fn append_unmaterialized_mirror_diagnostics(
             .unwrap_or(follower);
         diagnostics.push(mirror_relation_diagnostic(follower, target, relation));
     }
+    // A coordinated group owns its mirror through a group predicate; it is
+    // diagnosed with the same follower and target as the materialized path.
+    for predicate in &document.group_predicates {
+        let Some(relation) = predicate
+            .relation
+            .as_ref()
+            .filter(|relation| relation.kind == SemanticRelationKind::Mirrored)
+        else {
+            continue;
+        };
+        let members =
+            &document.coordinated_head_groups[predicate.group_index].member_instruction_indices;
+        let Some(follower) = members
+            .last()
+            .and_then(|index| view.source_instruction_index(*index))
+        else {
+            continue;
+        };
+        let target = members
+            .first()
+            .and_then(|index| index.checked_sub(1))
+            .and_then(|index| view.source_instruction_index(index))
+            .unwrap_or(follower);
+        diagnostics.push(mirror_relation_diagnostic(follower, target, relation));
+    }
 }
 
 fn relation_dependency_instruction_indices(
@@ -5871,8 +5896,10 @@ fn resolve_complete_object<'a>(
                 // two checked Touching arcs. Keep that intent for performance.
                 (closes_area || primitive == Primitive::Arc, None)
             }
+            // A named surface texture is itself the area's performance. A flat
+            // base fill under it would hide the texture entirely.
             Some(identity) => match surface_spec_from_identity(identity) {
-                Ok(spec) => (closes_area, Some(spec)),
+                Ok(spec) => (false, Some(spec)),
                 Err(gap) => {
                     gaps.push(gap);
                     (false, None)

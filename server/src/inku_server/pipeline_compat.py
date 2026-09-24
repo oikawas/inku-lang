@@ -111,6 +111,10 @@ def _options(data: dict[str, Any], *, save_history: bool) -> dict:
         for source, target in aliases.items()
         if data.get(source) is not None
     }
+    if data.get("sketch_text"):
+        options["sketch_text"] = data["sketch_text"]
+    elif data.get("sketch") is True:
+        options["sketch"] = "on"
     options["save_history"] = save_history
     return options
 

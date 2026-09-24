@@ -255,6 +255,22 @@ fn apply_fade_levels(
     }
 }
 
+/// Typed-path member finishing: fade, then the tool's size and rotation hand.
+/// Color cycles are already applied per logical ordinal on that path.
+pub(crate) fn finish_members_in_place(
+    mut items: Vec<Instruction>,
+    arrangement: &Arrangement,
+    member_seed: Seed,
+    canvas: Option<CanvasSize>,
+) -> Vec<Instruction> {
+    apply_fade_levels(&mut items, arrangement, None);
+    member_rotations(
+        member_sizes(items, arrangement, Some(member_seed), canvas),
+        arrangement,
+        Some(member_seed),
+    )
+}
+
 /// Apply group color, fade, size, and rotation in their canonical order.
 #[must_use]
 pub fn finish_group(

@@ -180,10 +180,38 @@ fn fill_target_roles_keep_bilingual_canonical_meaning_and_original_operand_indic
         "{:?}",
         recovered.upstream_diagnostics()
     );
+    // The accepted head of the unresolved clause stays in the projection
+    // (and is omitted downstream for its missing action), so the projected
+    // digest differs from the clean source. The fill still reaches lowering
+    // as the same instruction with the same reason, owned by its original
+    // index.
+    let fill_owner = |result: &inku_ddl::CompilerExecutionResult| {
+        result
+            .downstream_diagnostics()
+            .iter()
+            .find(|diagnostic| {
+                diagnostic.reason == inku_ddl::ScoreFieldGap::FillRequiresRegionMaterialization
+            })
+            .map(|diagnostic| diagnostic.disposition.clone())
+    };
     assert_eq!(
-        recovered.execution_pre_expansion_digest(),
-        clean.execution_pre_expansion_digest(),
-        "projection must preserve the original Circle operand after removing an earlier source instruction"
+        fill_owner(&clean),
+        Some(inku_ddl::ScoreDiagnosticDisposition::Omitted {
+            unit: inku_ddl::ScoreOmissionUnit::SourceInstruction {
+                instruction_index: 1
+            },
+            appearance_resolution: None,
+        })
+    );
+    assert_eq!(
+        fill_owner(&recovered),
+        Some(inku_ddl::ScoreDiagnosticDisposition::Omitted {
+            unit: inku_ddl::ScoreOmissionUnit::SourceInstruction {
+                instruction_index: 2
+            },
+            appearance_resolution: None,
+        }),
+        "the fill keeps its original operand after an earlier unresolved clause"
     );
 }
 
@@ -649,13 +677,11 @@ fn conflicting_backgrounds_recover_without_losing_source_candidates() {
             .background
             .is_none()
     );
+    // A background is Score context, not drawable residual content on its own
+    // (SPEC §12, 2026-09-22): omissions that leave only a background stop.
     let background_only = execute("背景を黒で埋める。未知語。", Language::Ja, &[], context());
-    assert_eq!(
-        background_only.outcome(),
-        ScoreLoweringOutcome::CompleteWithOmissions
-    );
-    assert_eq!(background_only.score().unwrap().background, Color::Black);
-    assert!(background_only.score().unwrap().instructions.is_empty());
+    assert_eq!(background_only.outcome(), ScoreLoweringOutcome::Stopped);
+    assert!(background_only.score().is_none());
 }
 
 #[test]

@@ -210,6 +210,11 @@ pub struct EffectAction {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "tag", rename_all = "snake_case", deny_unknown_fields)]
 pub enum EffectResult {
+    SketchGenerated {
+        identity: ActionEcho,
+        response: String,
+        elapsed_ms: DecimalU64,
+    },
     DescriptionCatalogSelected {
         identity: ActionEcho,
         response: String,
@@ -245,7 +250,8 @@ pub enum EffectResult {
 impl EffectResult {
     pub fn identity(&self) -> &ActionEcho {
         match self {
-            Self::DescriptionCatalogSelected { identity, .. }
+            Self::SketchGenerated { identity, .. }
+            | Self::DescriptionCatalogSelected { identity, .. }
             | Self::NormalizedDdlGenerated { identity, .. }
             | Self::VisibleDdlHolePatchGenerated { identity, .. }
             | Self::ProviderFailed { identity, .. }

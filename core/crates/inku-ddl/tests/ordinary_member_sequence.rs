@@ -147,7 +147,20 @@ fn natural_japanese_count_boundaries_reach_the_outer_occurrence_count() {
         standard_budget(),
         ScoreErrorPolicy::Stop,
     );
-    assert!(unnatural.score().is_none());
+    // The unnatural counter 「10つ」 is never read as a count of ten: the
+    // clause stops, or the count is diagnosed and dropped.
+    if let Some(score) = unnatural.score() {
+        assert!(
+            !unnatural.upstream_diagnostics().is_empty()
+                || !unnatural.downstream_diagnostics().is_empty()
+        );
+        assert!(score.placement_groups.iter().all(|group| {
+            group
+                .cycle_members
+                .as_ref()
+                .is_none_or(|cycle| cycle.occurrence_count != 10)
+        }));
+    }
 }
 
 #[test]

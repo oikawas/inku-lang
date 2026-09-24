@@ -1,8 +1,8 @@
 // Run with: npm run test:unit  (node:test, no test dependency)
 //
-// Sketch-from-life (Stage 0.5) acceptance, web side. T-9 verifies that the
-// grain is a real option wired from both places that can start a draw; T-10
-// verifies the genealogy edge.
+// Sketch-from-life acceptance, web side. The sketch supplements place and
+// light beside the description, off by default and on when the author asks. T-9 verifies the choice is wired from every place that starts a draw;
+// T-10 verifies the genealogy edge.
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
@@ -12,7 +12,7 @@ import {
 	DEFAULT_SKETCH_MODE,
 	normalizeSketchGrain,
 	normalizeSketchState,
-	sketchGrainOf,
+	sketchGrainLabel,
 	sketchModeLabel,
 	sketchModeNote,
 	sketchModeOf,
@@ -23,56 +23,49 @@ import {
 
 const read = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf8');
 
-// ---------------------------------------------------------------- T-9 (grain)
+// ---------------------------------------------------------------- T-9 (mode)
 
-test('T-9: a draw with no grain chosen uses fine', () => {
-	assert.equal(DEFAULT_SKETCH_MODE, 'fine');
-	assert.equal(sketchGrainOf(DEFAULT_SKETCH_MODE), 'fine');
+test('T-9: a draw with no choice made has no sketch', () => {
+	assert.equal(DEFAULT_SKETCH_MODE, 'off');
 });
 
-test('T-9: the control offers off as well as both grains', () => {
-	assert.deepEqual(SKETCH_MODES, ['off', 'fine', 'coarse']);
-	// Off must send no grain at all: a grain with the layer off would record a
-	// setting the work never used.
-	assert.equal(sketchGrainOf('off'), null);
+test('T-9: the control offers off and on', () => {
+	assert.deepEqual(SKETCH_MODES, ['off', 'on']);
 });
 
-test('T-9: a work saved before the layer existed reads as off, not as fine', () => {
+test('T-9: a saved choice reads back; a grain saved before the supplement sketch reads as on', () => {
 	assert.equal(normalizeSketchGrain(undefined), null);
-	assert.equal(normalizeSketchGrain(null), null);
 	assert.equal(normalizeSketchGrain('segmented'), null);
 	assert.equal(sketchModeOf(undefined), 'off');
-	assert.equal(sketchModeOf('coarse'), 'coarse');
+	assert.equal(sketchModeOf('on'), 'on');
+	assert.equal(sketchModeOf('coarse'), 'on');
+	assert.equal(sketchModeOf('fine'), 'on');
 });
 
-test('T-9: the grain is selectable from the work menu, not only from a first draw', () => {
-	// The work menu is the second place a draw can start. Wiring only the
-	// describe tab passes every other gate here while the menu silently paints
-	// at the default -- one call site passing while the other defaults is
-	// exactly the shape that hides behind a single site.
-	const panel = readFileSync(new URL('./components/LineagePanel.svelte', import.meta.url), 'utf8');
-	assert.match(panel, /写生の区切りを変える/);
-	assert.match(panel, /onDrawSketchGrain\(activeSketchNode, sketchGrainChoice/);
+test('T-9: the work menu redraws with the sketch off or on', () => {
+	const panel = read('./components/LineagePanel.svelte');
+	assert.match(panel, /onDrawSketchGrain: \(node: LineageNode, mode: SketchMode/);
+	const dialog = read('./components/WorkEditDialog.svelte');
+	assert.match(dialog, /modes=\{\['off', 'on'\]\}/);
 
-	const page = readFileSync(new URL('../routes/+page.svelte', import.meta.url), 'utf8');
-	// The menu path must ask for a specific grain and must NOT hand over stored
-	// prose: the grain is what changed, so the prose has to be written again.
+	const page = read('../routes/+page.svelte');
+	// The menu path asks for a specific mode and must NOT hand over the stored
+	// sketch: the choice is what changed, so the sketch is asked again or dropped.
 	const handler = page.slice(
 		page.indexOf('async function drawLineageSketchGrain'),
 		page.indexOf('async function drawLineageDdlEdit')
 	);
 	assert.ok(handler.length > 0, 'the work-menu handler is missing');
-	assert.match(handler, /sketchMode: grain/);
+	assert.match(handler, /sketchMode: mode/);
 	assert.match(handler, /derivationKind: 'sketch_grain_change'/);
 	assert.doesNotMatch(handler, /sketchText/);
 });
 
-test('T-9: the describe tab sends the chosen grain, and replays stored prose only when nothing moved', () => {
+test('T-9: both draw paths send the chosen mode', () => {
 	const work = read('./features/work/state.svelte.ts');
 	const currentWork = read('./features/run/current-work.ts');
 	assert.match(currentWork, /sketch:\s*sketchOn/);
-	assert.match(currentWork, /sketch_grain: resolvedSketchGrain/);
-	assert.match(work, /!submitTextChanged && !submitGrainChanged \? sketchText : null/);
+	assert.match(work, /sketch: options\.sketchMode \?\? sketchMode/);
 });
 
 // ----------------------------------------------------------------- T-10 (edge)
@@ -92,8 +85,6 @@ test('T-10: the same grain stays a replay', () => {
 });
 
 test('T-10: a changed description is a description edit even when the grain moved too', () => {
-	// One edge, one cause. The description is the larger cause, so it names the
-	// edge; the grain does not get to claim it as well.
 	assert.equal(
 		submitDerivationKind({ hasParent: true, canvasAspectChanged: false, textChanged: true, grainChanged: true }),
 		'description_edit'
@@ -107,12 +98,11 @@ test('T-10: a first draw has no parent and so no edge', () => {
 	);
 });
 
-test('T-10: the new kind does not ride on an existing one', () => {
-	const derivation = readFileSync(new URL('./derivation.ts', import.meta.url), 'utf8');
-	assert.match(derivation, /sketch_grain_change: '写生の区切り'/);
-	assert.match(derivation, /sketch_grain_change: 'Sketch grain'/);
+test('T-10: the edge is named for the sketch, not the retired grain', () => {
+	const derivation = read('./derivation.ts');
+	assert.match(derivation, /sketch_grain_change: '写生の有無'/);
+	assert.match(derivation, /sketch_grain_change: 'Sketch from life'/);
 });
-
 // ------------------------------------------- every sender, not just the first
 
 test('T-2/T-9: every request body that starts at Stage 2 carries the prose', () => {
@@ -125,7 +115,7 @@ test('T-2/T-9: every request body that starts at Stage 2 carries the prose', () 
 	const work = read('./features/work/state.svelte.ts');
 	const refinement = read('./features/canvas/refinement-coordinator.svelte.ts');
 	const bodies = [page, work, refinement].flatMap((source) => source.split(/apiFetch\(\s*['"]\/api\/compose['"]/).slice(1));
-	assert.ok(bodies.length >= 4, `expected the known /api/compose senders, found ${bodies.length}`);
+	assert.ok(bodies.length >= 3, `expected the known /api/compose senders, found ${bodies.length}`);
 	for (const [i, body] of bodies.entries()) {
 		const head = body.slice(0, 900);
 		assert.match(head, /sketchPayloadFor\(/, `/api/compose sender ${i + 1} does not carry the prose`);
@@ -155,12 +145,13 @@ test('T-6: a work with no record does not read as a work drawn with the layer of
 });
 
 test('T-6: a failed layer and a route that never runs it read apart from both', () => {
-	const notes = (['fallback', 'off', 'not_applicable'] as const).map((s) => sketchStateNote(s, true));
+	const notes = (['fallback', 'off', 'not_applicable', 'not_needed'] as const).map((s) => sketchStateNote(s, true));
 	notes.push(sketchStateNote(null, true));
-	assert.equal(new Set(notes).size, 4, 'two of the four silences say the same thing');
-	// A work whose prose is on screen needs no note: the prose is the answer.
+	assert.equal(new Set(notes).size, 5, 'two of the five silences say the same thing');
+	// A work whose sketch is on screen needs no note: the sketch is the answer.
 	assert.equal(sketchStateNote('fine', true), '');
 	assert.equal(sketchStateNote('coarse', false), '');
+	assert.ok(sketchStateNote('supplemented', true).length > 0);
 });
 
 test('T-6: an absent or unknown state is not rounded to a real one', () => {
@@ -170,6 +161,8 @@ test('T-6: an absent or unknown state is not rounded to a real one', () => {
 	assert.equal(normalizeSketchState('sketched'), null);
 	assert.equal(normalizeSketchState('off'), 'off');
 	assert.equal(normalizeSketchState('not_applicable'), 'not_applicable');
+	assert.equal(normalizeSketchState('not_needed'), 'not_needed');
+	assert.equal(normalizeSketchState('supplemented'), 'supplemented');
 });
 
 test('T-6: both places that put a work on screen carry its state, and the panel shows it', () => {
@@ -181,7 +174,7 @@ test('T-6: both places that put a work on screen carry its state, and the panel 
 	// A fresh run and a saved work reopened. Wiring one and not the other leaves
 	// half the works reading as though they predate the column. Saved-work field
 	// mapping now belongs to the canonical current-work projection.
-	assert.match(work, /adoptSketch\(r\.sketch_text \?\? null, r\.sketch_grain, input, r\.sketch_state\)/);
+	assert.match(work, /adoptSketch\(painted\.sketch_text \?\? null, painted\.sketch_grain, view\.description, painted\.sketch_state\)/);
 	assert.match(currentWork, /sketchState: item\.sketch_state/);
 	assert.match(page, /work\.adoptSketch\(projection\.sketchText, projection\.sketchGrain, projection\.sourceText, projection\.sketchState\)/);
 	assert.match(page, /sketchStateNote\(work\.sketchState, getLang\(\) === 'ja'\)/);
@@ -197,56 +190,42 @@ test('T-6/T-2: every sender that saves a drawing carries the state too', () => {
 	for (const [i, body] of bodies.entries()) {
 		assert.match(body.slice(0, 4000), /sketch_state/, `/api/history sender ${i + 1} drops the state`);
 	}
-	// And the two works saved from a compose response take the state from it
-	// rather than leaving the server to guess.
-	assert.equal((page.match(/sketch_state: composed\.sketch_state \?\? null/g) ?? []).length, 2);
 });
 
 // ------------------------------------------------------------------- T-10
 
-test('T-10: the menu marks off as not recommended, in both languages', () => {
-	assert.equal(sketchModeNote('off', true), '（推奨しない）');
-	assert.equal(sketchModeNote('off', false), '(not recommended)');
-	assert.equal(sketchModeNote('fine', true), '');
-	assert.equal(sketchModeNote('coarse', false), '');
-
+test('T-10: no choice is discouraged any more', () => {
+	for (const mode of SKETCH_MODES) {
+		assert.equal(sketchModeNote(mode, true), '');
+		assert.equal(sketchModeNote(mode, false), '');
+	}
 	const select = read('./components/SketchSelect.svelte');
 	const menu = select.slice(select.indexOf('{:else}'), select.indexOf('<style>'));
 	assert.match(menu, /sketchModeNote\(mode, isJapanese\)/);
 });
 
-test('T-10: and the three places that are not the menu do not say it', () => {
-	// Those three render sketchModeLabel. Folding the note into the label is the
-	// implementation that passes "it appears" while the note follows the label
-	// everywhere -- including the lineage panel, where it would attach itself to
-	// a work already drawn and read as a judgement of it.
+test('T-10: the labels name the choice, and a retired grain keeps its own label', () => {
 	const labels: [SketchMode, string, string][] = [
-		['off', '切', 'Off'],
-		['fine', '細かく', 'Fine'],
-		['coarse', '大きく', 'Coarse']
+		['off', 'なし', 'Off'],
+		['on', 'あり', 'On']
 	];
 	for (const [mode, ja, en] of labels) {
 		assert.equal(sketchModeLabel(mode, true), ja);
 		assert.equal(sketchModeLabel(mode, false), en);
 	}
+	assert.equal(sketchGrainLabel('fine', true), '細かく');
+	assert.equal(sketchGrainLabel('coarse', false), 'Coarse');
 
-	// The compact toggle inside the same component is the fourth caller, and it
-	// is above the {:else} that starts the menu.
 	const select = read('./components/SketchSelect.svelte');
 	const compact = select.slice(select.indexOf('{#if compact}'), select.indexOf('{:else}'));
 	assert.ok(compact.length > 0);
 	assert.doesNotMatch(compact, /sketchModeNote/);
-
 	assert.doesNotMatch(read('./components/InputPanel.svelte'), /sketchModeNote/);
 	assert.doesNotMatch(read('./components/LineagePanel.svelte'), /sketchModeNote/);
-	// A fifth caller the contract's table did not list: the run summary in the
-	// describe panel, which reports the grain of the work on screen.
 	assert.doesNotMatch(read('../routes/+page.svelte'), /sketchModeNote/);
 });
 
 test('T-10: the note is its own element, not text joined onto the label', () => {
-	// Joined, it would be indistinguishable from the label's return value, and
-	// the gate above could no longer tell the two apart either.
 	const select = read('./components/SketchSelect.svelte');
 	assert.match(select, /<span class="option-label">\{sketchModeLabel\(mode, isJapanese\)\}<\/span/);
 	assert.match(select, /<span class="option-note"\s*>\{sketchModeNote\(mode, isJapanese\)\}<\/span/);

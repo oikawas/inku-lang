@@ -65,6 +65,7 @@ pub mod semantic_document;
 pub mod semantic_instruction;
 pub mod stage15_transform;
 pub mod visible_patch;
+pub mod work_plan;
 pub use visible_patch::visible_ddl_patch_available;
 
 pub use attachment::{

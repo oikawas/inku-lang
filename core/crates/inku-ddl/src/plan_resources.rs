@@ -1721,13 +1721,46 @@ mod tests {
         let selected = select_composition_plan_resources(
             &plan,
             hard(100),
-            OperationalResourceBudget(budget(9)),
+            OperationalResourceBudget(budget(0)),
         )
         .unwrap();
         assert!(selected.object_indices().is_empty());
         assert_eq!(selected.demand(), ResourceDemand::default());
+        assert!(selected.omissions()[0].partial_execution.is_none());
         assert!(matches!(
             selected.omissions()[0].cause.reason,
+            PlanResourceFailure::BudgetExceeded(ResourceBudgetExceeded {
+                authority: ResourceAuthority::OperationalBudget,
+                ..
+            })
+        ));
+    }
+
+    /// A standalone primitive over budget keeps its request and draws the safe
+    /// source-ordered prefix instead of disappearing.
+    #[test]
+    fn standalone_primitive_over_budget_executes_its_safe_prefix() {
+        let stage = stage("scatter ten red circles.", &[]);
+        let plan = plan(&stage);
+        let selected = select_composition_plan_resources(
+            &plan,
+            hard(100),
+            OperationalResourceBudget(budget(9)),
+        )
+        .unwrap();
+        assert_eq!(selected.object_indices(), [0]);
+        assert_eq!(selected.object_count_override(0), Some(9));
+        assert_eq!(selected.demand().primitive_marks, 9);
+        let omission = &selected.omissions()[0];
+        assert_eq!(
+            omission.partial_execution,
+            Some(PlanResourcePartialExecution {
+                requested_count: 10,
+                executed_count: 9,
+            })
+        );
+        assert!(matches!(
+            omission.cause.reason,
             PlanResourceFailure::BudgetExceeded(ResourceBudgetExceeded {
                 authority: ResourceAuthority::OperationalBudget,
                 ..

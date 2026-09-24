@@ -223,11 +223,11 @@ class PaintRequest(BaseModel):
     interpretation_seed: str | None = Field(default=None, description="Opaque identifier for an explicit Stage 1 re-interpretation")
     seed_text: str | None = Field(default=None, description="Explicit text used only to derive the Renderer performance seed")
     include_trace: bool = Field(default=False, description="各層の RAW 中間生成物を trace として返すか (観測のみ)")
-    # Stage 0.5 (v2.10). Carried per request, the way render_seed is: it is an
+    # The sketch. Carried per request, the way render_seed is: it is an
     # option of one drawing, not a setting of the user.
-    sketch: bool = Field(default=False, description="写生層 (Stage 0.5) を通すか")
-    sketch_text: str | None = Field(default=None, max_length=100_000, description="既にある写生文 (作者が直した / 保存済み作品の再演)。与えられたら 0.5 を呼び直さない")
-    sketch_grain: str | None = Field(default=None, pattern="^(fine|coarse)$", description="写生の区切り fine (既定・細かく区切る) / coarse (大きく区切る)")
+    sketch: bool = Field(default=False, description="写生を通すか（場所の広がりと季節・時刻の光を記述の横に補う）。既定は通さない")
+    sketch_text: str | None = Field(default=None, max_length=100_000, description="既にある写生文 (作者が直した / 保存済み作品の再演)。与えられたら写生を呼び直さない")
+    sketch_grain: str | None = Field(default=None, pattern="^(fine|coarse)$", description="旧写生層の区切り（保存互換のみ。新しい写生では使わない）")
     limits: dict[str, int] | None = Field(default=None, description=_LIMITS_FIELD_DESCRIPTION)
 
 

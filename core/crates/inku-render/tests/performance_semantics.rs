@@ -103,15 +103,13 @@ fn affine_groups_connect_whole_geometry_and_keep_fixed_omission_indices() {
     relation.kind = inku_render::types::RelationType::NotTouching;
     relation.target_instruction_index = None;
     relation.position_authority = None;
-    assert_eq!(
-        resolve_checked_performance(request(&legacy), ScoreErrorPolicy::Stop)
-            .unwrap()
-            .execution
-            .unwrap()
-            .diagnostics[0]
-            .reason,
-        ScoreExecutionReason::UnsupportedTransformGroupRelation
-    );
+    // A legacy not-touching relation against a transformed group member is
+    // resolved against that member's transformed bounds, without omission.
+    let legacy_plan =
+        resolve_checked_performance(request(&legacy), ScoreErrorPolicy::Stop).unwrap();
+    assert!(legacy_plan.execution.is_none());
+    assert_eq!(legacy_plan.original_instruction_indices, vec![0, 1, 2, 3]);
+    assert!(legacy_plan.score.instructions[3].relation.is_none());
     let mut fixed = input.clone();
     fixed.transform_groups[0].fixed_position_indices = vec![2];
     let continued =

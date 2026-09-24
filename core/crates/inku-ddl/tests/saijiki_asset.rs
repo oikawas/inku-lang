@@ -115,7 +115,15 @@ fn embedded_asset_is_complete_and_orders_are_lossless() {
     );
     assert_eq!(
         asset.relation_marker_order.ja,
-        ["触れる", "つながる", "沿う", "切る", "触れない", "間に"]
+        [
+            "触れる",
+            "つながる",
+            "沿う",
+            "切る",
+            "触れない",
+            "間に",
+            "鏡写し"
+        ]
     );
     assert_eq!(
         asset.relation_marker_order.en,
@@ -125,7 +133,8 @@ fn embedded_asset_is_complete_and_orders_are_lossless() {
             "along",
             "cutting",
             "not touching",
-            "between"
+            "between",
+            "mirrored"
         ]
     );
     assert_eq!(
@@ -136,7 +145,8 @@ fn embedded_asset_is_complete_and_orders_are_lossless() {
             "cutting",
             "between",
             "touching",
-            "connected"
+            "connected",
+            "mirrored"
         ]
     );
     assert_eq!(
@@ -154,8 +164,8 @@ fn embedded_asset_is_complete_and_orders_are_lossless() {
         .iter()
         .map(|relation| relation.relation_type.as_str())
         .collect::<HashSet<_>>();
-    assert_eq!(category_keys.len(), 11);
-    assert_eq!(relation_types.len(), 6);
+    assert_eq!(category_keys.len(), 12);
+    assert_eq!(relation_types.len(), 7);
 
     let aliases = asset
         .categories
@@ -235,6 +245,15 @@ fn typed_english_grammar_is_row_owned_and_does_not_leak_into_public_projections(
             }),
         ),
         (
+            "大きく",
+            json!({
+                "lemma": "large",
+                "lexical_class": "adjective",
+                "canonical_form": "base",
+                "permitted_forms": ["adverb"]
+            }),
+        ),
+        (
             "揺れる",
             json!({
                 "lemma": "sway",
@@ -268,7 +287,7 @@ fn typed_english_grammar_is_row_owned_and_does_not_leak_into_public_projections(
             .clone()
             .filter(|word| word.get("english_grammar").is_some())
             .count(),
-        6
+        7
     );
     assert!(
         words
@@ -281,7 +300,7 @@ fn typed_english_grammar_is_row_owned_and_does_not_leak_into_public_projections(
         word_value(&asset_value, "yuragi", "揺れる").get("parser_surfaces_en"),
         Some(&json!(["trembling", "trembles"]))
     );
-    for derived_surface in ["finely", "sways", "undulates"] {
+    for derived_surface in ["finely", "largely", "sways", "undulates"] {
         assert!(!asset_source.contains(&format!("\"{derived_surface}\"")));
     }
     assert!(asset_source.contains("\"trembling\""));
@@ -290,7 +309,7 @@ fn typed_english_grammar_is_row_owned_and_does_not_leak_into_public_projections(
     let projection = saijiki_derived_projection(ResolvedInstructionLanguage::En).unwrap();
     let markers = saijiki_marker_class_table(ResolvedInstructionLanguage::En).unwrap();
     let score_maps = saijiki_score_wire_maps().unwrap();
-    for derived_surface in ["finely", "sways", "undulates", "trembles"] {
+    for derived_surface in ["finely", "largely", "sways", "undulates", "trembles"] {
         assert!(!projection.prompt_block.contains(derived_surface));
         assert!(projection.display_categories.iter().all(|category| {
             category
@@ -353,7 +372,9 @@ fn invalid_typed_english_grammar_fails_closed_with_stable_kinds() {
             });
         }),
         ("parser_surface_collision", |asset| {
-            word_value_mut(asset, "yuragi", "大きく")["surface_en"] = json!("FINE");
+            let word = word_value_mut(asset, "yuragi", "大きく");
+            word["surface_en"] = json!("FINE");
+            word.as_object_mut().unwrap().remove("english_grammar");
         }),
         ("ineligible_english_grammar", |asset| {
             word_value_mut(asset, "ugoki", "描く")["english_grammar"] = json!({

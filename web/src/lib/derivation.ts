@@ -28,7 +28,7 @@ const JA: Record<string, string> = {
 	replay: '再描画',
 	canvas_aspect_change: 'キャンバス変更',
 	variation: '変奏',
-	sketch_grain_change: '写生の区切り'
+	sketch_grain_change: '写生の有無'
 };
 
 const EN: Record<string, string> = {
@@ -43,7 +43,7 @@ const EN: Record<string, string> = {
 	replay: 'Replay',
 	canvas_aspect_change: 'Canvas change',
 	variation: 'Variation',
-	sketch_grain_change: 'Sketch grain'
+	sketch_grain_change: 'Sketch from life'
 };
 
 export function derivationKindLabel(kind: string | null | undefined, isJapanese: boolean): string {

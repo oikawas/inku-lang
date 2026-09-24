@@ -355,7 +355,13 @@ fn crescent_numeric_bounds_and_non_size_errors_keep_their_authority() {
             transformed.verified_effective_view(),
             ScoreLoweringContext::resolve("square", Color::White).unwrap(),
         );
-        assert!(lowered.score().is_none(), "{source}");
+        // The modifier the crescent cannot take is diagnosed: either only that
+        // field is omitted and the crescent is drawn, or the lone instruction
+        // is omitted entirely and nothing is drawn.
+        assert!(!lowered.diagnostics().is_empty(), "{source}");
+        if let Some(score) = lowered.score() {
+            assert!(score.instructions[0].arc_form.is_some(), "{source}");
+        }
         assert!(
             lowered
                 .diagnostics()
@@ -598,8 +604,13 @@ fn shared_shape_macro_parameters_and_locals_use_the_same_consumer() {
                     None,
                     policy,
                 );
+                // An undeclared or missing caller value is never accepted
+                // silently: it stops, or its omission is diagnosed while the
+                // Macro body still draws.
                 assert!(
-                    execution.score().is_none(),
+                    execution.score().is_none()
+                        || !execution.upstream_diagnostics().is_empty()
+                        || !execution.downstream_diagnostics().is_empty(),
                     "missing/undeclared {field}/{route}: {invalid_source}"
                 );
             }
@@ -863,7 +874,7 @@ fn assert_corner_region(region: [f64; 4]) {
 }
 
 #[test]
-fn noncenter_macro_relation_stays_unsupported_in_both_modes() {
+fn noncenter_macro_relation_is_delivered_in_both_modes() {
     let context = ScoreLoweringContext::resolve("square", Color::White).unwrap();
     for kind in ["connected", "touching"] {
         for noncenter_index in [0, 1] {
@@ -885,39 +896,39 @@ fn noncenter_macro_relation_stays_unsupported_in_both_modes() {
                     context,
                     policy,
                 );
+                // A named non-center place is a movable anchor that the relation
+                // may reposition; the relation reaches the Score and the Plan.
                 assert!(
-                    lowered
+                    !lowered
                         .gaps()
-                        .contains(&ScoreFieldGap::UnsupportedMacroRelation)
+                        .contains(&ScoreFieldGap::UnsupportedMacroRelation),
+                    "{kind} {noncenter_index} {policy:?}"
                 );
                 let score = lowered.score().unwrap();
                 assert_eq!(score.instructions.len(), 2);
-                assert!(
+                assert_eq!(
                     score
                         .instructions
                         .iter()
-                        .all(|instruction| instruction.relation.is_none())
+                        .filter(|instruction| instruction.relation.is_some())
+                        .count(),
+                    1,
+                    "{kind} {noncenter_index} {policy:?}"
                 );
-                assert!(lowered.diagnostics().iter().any(|diagnostic| matches!(
-                    diagnostic.disposition,
-                    ScoreDiagnosticDisposition::RelationOmitted
-                )));
                 let plan = plan_verified_stage15_with_policy(
                     result.verified_effective_view(),
                     context,
                     policy,
                 );
                 assert_eq!(plan.objects().unwrap().len(), 2);
-                assert!(
+                assert_eq!(
                     plan.objects()
                         .unwrap()
                         .iter()
-                        .all(|object| object.relation().is_none())
+                        .filter(|object| object.relation().is_some())
+                        .count(),
+                    1
                 );
-                assert!(plan.diagnostics().iter().any(|diagnostic| matches!(
-                    diagnostic.disposition,
-                    ScoreDiagnosticDisposition::RelationOmitted
-                )));
             }
             let default_score =
                 lower_verified_stage15_score(result.verified_effective_view(), context);
@@ -2174,9 +2185,14 @@ fn rotated_numeric_bounds_use_the_physical_declared_envelope() {
         ),
         ResolvedInstructionLanguage::En,
     );
-    let stop = lower_verified_stage15_score(cloud.verified_effective_view(), context);
-    assert_eq!(stop.outcome(), ScoreLoweringOutcome::Stopped);
-    assert!(stop.score().is_none());
+    // Both policies omit only the out-of-bounds cloud and keep the circle.
+    let stop = lower_verified_stage15_score_with_policy(
+        cloud.verified_effective_view(),
+        context,
+        ScoreErrorPolicy::Stop,
+    );
+    assert_eq!(stop.outcome(), ScoreLoweringOutcome::CompleteWithOmissions);
+    assert_eq!(stop.score().unwrap().instructions.len(), 1);
     let continued = lower_verified_stage15_score_with_policy(
         cloud.verified_effective_view(),
         context,
@@ -2237,8 +2253,12 @@ fn square_angle_is_delivered_in_both_modes_and_numeric_rotation_must_fit() {
         ),
         ResolvedInstructionLanguage::En,
     );
-    let stopped = lower_verified_stage15_score(out_of_bounds.verified_effective_view(), context);
-    assert!(stopped.score().is_none());
+    let stopped = lower_verified_stage15_score_with_policy(
+        out_of_bounds.verified_effective_view(),
+        context,
+        ScoreErrorPolicy::Stop,
+    );
+    assert_eq!(stopped.score().unwrap().instructions.len(), 1);
     assert!(
         stopped
             .gaps()
@@ -2448,7 +2468,7 @@ fn omission_color_uses_actual_palette_contrast_with_black_tie_and_explicit_value
 }
 
 #[test]
-fn unsupported_instruction_among_independent_instructions_never_yields_partial_score() {
+fn unsupported_instruction_among_independent_instructions_keeps_the_drawable_rest() {
     let result = stage15(
         concat!(
             "place red circle at center. ",
@@ -2460,7 +2480,14 @@ fn unsupported_instruction_among_independent_instructions_never_yields_partial_s
         result.verified_effective_view(),
         ScoreLoweringContext::resolve("square", Color::White).unwrap(),
     );
-    assert!(lowered.score().is_none());
+    // The independent circle is drawn; only the unsupported instruction is omitted.
+    assert_eq!(
+        lowered.outcome(),
+        ScoreLoweringOutcome::CompleteWithOmissions
+    );
+    let score = lowered.score().unwrap();
+    assert_eq!(score.instructions.len(), 1);
+    assert_eq!(score.instructions[0].primitive, Primitive::Circle);
     assert!(
         lowered
             .gaps()
@@ -2525,7 +2552,11 @@ fn supported_input_is_identical_under_both_error_modes() {
         ResolvedInstructionLanguage::En,
     );
     let context = ScoreLoweringContext::resolve("wide", Color::White).unwrap();
-    let stop = lower_verified_stage15_score(result.verified_effective_view(), context);
+    let stop = lower_verified_stage15_score_with_policy(
+        result.verified_effective_view(),
+        context,
+        ScoreErrorPolicy::Stop,
+    );
     let continued = lower_verified_stage15_score_with_policy(
         result.verified_effective_view(),
         context,
@@ -2543,26 +2574,78 @@ fn supported_input_is_identical_under_both_error_modes() {
 }
 
 #[test]
+fn english_largely_is_fluctuation_amplitude_not_a_second_size() {
+    let result = stage15(
+        "draw one largely swaying small red line at center.",
+        ResolvedInstructionLanguage::En,
+    );
+    let lowered = lower_verified_stage15_score(
+        result.verified_effective_view(),
+        ScoreLoweringContext::resolve("square", Color::White).unwrap(),
+    );
+    assert!(lowered.diagnostics().is_empty());
+    let instruction = &lowered.score().unwrap().instructions[0];
+    assert_eq!(
+        instruction.variation.as_ref().unwrap().amplitude,
+        inku_score::Amplitude::Broad
+    );
+}
+
+#[test]
+fn named_surface_texture_is_the_area_performance_without_a_hidden_flat_base() {
+    let context = ScoreLoweringContext::resolve("square", Color::White).unwrap();
+    for (surface, filled, texture) in [
+        ("pale ink wash", false, Some(SurfaceTexture::Wash)),
+        ("grain", false, Some(SurfaceTexture::Grain)),
+        ("stipple", false, Some(SurfaceTexture::Stipple)),
+        ("hatch", false, Some(SurfaceTexture::Hatch)),
+        ("crosshatch", false, Some(SurfaceTexture::Crosshatch)),
+        ("aquatint", false, Some(SurfaceTexture::Aquatint)),
+        ("flat", true, None),
+        ("empty", false, None),
+    ] {
+        let result = stage15(
+            &format!("place one red {surface} circle at center."),
+            ResolvedInstructionLanguage::En,
+        );
+        let lowered = lower_verified_stage15_score(result.verified_effective_view(), context);
+        let instruction = &lowered.score().unwrap().instructions[0];
+        assert_eq!(instruction.filled, filled, "{surface}");
+        assert_eq!(
+            instruction.surface.as_ref().map(|spec| spec.texture),
+            texture,
+            "{surface}"
+        );
+    }
+}
+
+#[test]
 fn ordinary_non_solid_surface_intensity_omits_only_that_field_and_keeps_quality() {
     let result = stage15(
         "place one red grain dense circle at center.",
         ResolvedInstructionLanguage::En,
     );
     let context = ScoreLoweringContext::resolve("wide", Color::White).unwrap();
-    let stop = lower_verified_stage15_score(result.verified_effective_view(), context);
+    let stop = lower_verified_stage15_score_with_policy(
+        result.verified_effective_view(),
+        context,
+        ScoreErrorPolicy::Stop,
+    );
     let continued = lower_verified_stage15_score_with_policy(
         result.verified_effective_view(),
         context,
         ScoreErrorPolicy::OmitAndContinue,
     );
 
-    assert_eq!(stop.outcome(), ScoreLoweringOutcome::Stopped);
-    assert!(stop.score().is_none());
+    // Legacy Stop input uses the same local recovery as OmitAndContinue.
+    assert_eq!(stop.error_policy(), ScoreErrorPolicy::Stop);
+    assert_eq!(stop.outcome(), continued.outcome());
+    assert_eq!(stop.score(), continued.score());
     assert_eq!(
         continued.outcome(),
         ScoreLoweringOutcome::CompleteWithOmissions
     );
-    assert!(continued.score().unwrap().instructions[0].filled);
+    assert!(!continued.score().unwrap().instructions[0].filled);
     assert_eq!(
         continued.score().unwrap().instructions[0]
             .surface
@@ -2775,13 +2858,19 @@ fn flat_macro_thinness_uses_literal_and_component_parameter_through_the_shared_l
         ResolvedInstructionLanguage::En,
         std::slice::from_ref(&definition),
     );
-    let stop = lower_verified_stage15_score(caller.verified_effective_view(), context);
+    let stop = lower_verified_stage15_score_with_policy(
+        caller.verified_effective_view(),
+        context,
+        ScoreErrorPolicy::Stop,
+    );
     let continued = lower_verified_stage15_score_with_policy(
         caller.verified_effective_view(),
         context,
         ScoreErrorPolicy::OmitAndContinue,
     );
-    assert_eq!(stop.outcome(), ScoreLoweringOutcome::Stopped);
+    assert_eq!(stop.error_policy(), ScoreErrorPolicy::Stop);
+    assert_eq!(stop.outcome(), continued.outcome());
+    assert_eq!(stop.score(), continued.score());
     assert!(
         stop.gaps()
             .contains(&ScoreFieldGap::UnboundMacroCallerMeaning)
@@ -3382,18 +3471,23 @@ fn macro_continuation_executes_once_and_keeps_source_ordinal_at_no_score_boundar
         ]
     );
 
-    let lowered = lower_verified_stage15_score(
+    let lowered = lower_verified_stage15_score_with_policy(
         result.verified_effective_view(),
         ScoreLoweringContext::resolve("wide", Color::White).unwrap(),
+        ScoreErrorPolicy::Stop,
     );
     assert_eq!(lowered.gaps(), [ScoreFieldGap::UnboundMacroCallerMeaning]);
-    assert!(lowered.score().is_none());
-    assert!(lowered.instruction_origins().is_empty());
 
     let continued = lower_verified_stage15_score_with_policy(
         result.verified_effective_view(),
         ScoreLoweringContext::resolve("wide", Color::White).unwrap(),
         ScoreErrorPolicy::OmitAndContinue,
+    );
+    // Legacy Stop input keeps the same drawable invocations.
+    assert_eq!(lowered.score(), continued.score());
+    assert_eq!(
+        lowered.instruction_origins(),
+        continued.instruction_origins()
     );
     assert_eq!(
         continued.outcome(),
@@ -3786,9 +3880,11 @@ fn macro_group_delivery_keeps_unsupported_emit_and_caller_stop_policy() {
             },
         ),
         (
+            // Transform bodies are delivered; the colorless emit still needs the
+            // resolved palette context the caller did not provide.
             structural_definition(),
             "Bad.Structure",
-            ScoreFieldGap::UnsupportedMacroStructure,
+            ScoreFieldGap::MissingResolvedPaletteContext,
         ),
         (
             complete_flat_emit_definition(),
@@ -3808,8 +3904,19 @@ fn macro_group_delivery_keeps_unsupported_emit_and_caller_stop_policy() {
             result.verified_effective_view(),
             ScoreLoweringContext::resolve("wide", Color::White).unwrap(),
         );
-        assert!(lowered.score().is_none(), "{macro_source}");
-        assert!(lowered.instruction_origins().is_empty(), "{macro_source}");
+        // The independent circle survives; the unusable Macro part is omitted
+        // with its typed gap.
+        let score = lowered.score().expect(macro_source);
+        assert_eq!(
+            score.instructions[0].primitive,
+            Primitive::Circle,
+            "{macro_source}"
+        );
+        assert_eq!(score.instructions[0].color, Color::Green, "{macro_source}");
+        assert!(matches!(
+            lowered.instruction_origins().first(),
+            Some(ScoreInstructionOrigin::SourceInstruction { .. })
+        ));
         assert!(
             lowered.gaps().contains(&expected_gap),
             "{macro_source}: {:?}",
@@ -4365,15 +4472,21 @@ fn macro_group_delivery_keeps_affine_transform_and_emit_omission_units() {
         std::slice::from_ref(&definition),
     );
     let context = ScoreLoweringContext::resolve("wide", Color::White).unwrap();
-    let stop = lower_verified_stage15_score(result.verified_effective_view(), context);
+    let stop = lower_verified_stage15_score_with_policy(
+        result.verified_effective_view(),
+        context,
+        ScoreErrorPolicy::Stop,
+    );
     let continued = lower_verified_stage15_score_with_policy(
         result.verified_effective_view(),
         context,
         ScoreErrorPolicy::OmitAndContinue,
     );
 
-    assert_eq!(stop.outcome(), ScoreLoweringOutcome::Stopped);
-    assert!(stop.score().is_none());
+    // Legacy Stop input uses the same local recovery as OmitAndContinue.
+    assert_eq!(stop.error_policy(), ScoreErrorPolicy::Stop);
+    assert_eq!(stop.outcome(), continued.outcome());
+    assert_eq!(stop.score(), continued.score());
     assert_eq!(
         continued.outcome(),
         ScoreLoweringOutcome::CompleteWithOmissions
@@ -4473,21 +4586,15 @@ fn continue_uses_root_group_and_full_typed_relation_omission_units() {
         context,
         ScoreErrorPolicy::OmitAndContinue,
     );
-    assert_eq!(grouped.score().unwrap().instructions.len(), 1);
-    assert!(grouped.diagnostics().iter().any(|diagnostic| matches!(
-        (&diagnostic.owner, &diagnostic.disposition),
-        (
-            ScoreDiagnosticOwner::CoordinatedGroup {
-                group_index: 0,
-                member_instruction_indices,
-                spans,
-            },
-            ScoreDiagnosticDisposition::Omitted {
-                unit: ScoreOmissionUnit::CoordinatedGroup { .. },
-                ..
-            }
-        ) if member_instruction_indices == &[1, 2] && !spans.is_empty()
-    )));
+    // A coordinated pair at one center is drawn as a group. The omission unit
+    // of an unsupported group is covered by compiler_execution's
+    // `group_and_relation_dependencies_follow_an_omitted_source_owner`.
+    assert_eq!(grouped.score().unwrap().instructions.len(), 3);
+    assert!(
+        grouped.diagnostics().is_empty(),
+        "{:?}",
+        grouped.diagnostics()
+    );
 
     let related = stage15(
         concat!(
@@ -4507,21 +4614,23 @@ fn continue_uses_root_group_and_full_typed_relation_omission_units() {
         ScoreErrorPolicy::OmitAndContinue,
     );
     assert_eq!(related.score().unwrap().instructions.len(), 1);
+    // Losing the referenced line removes only the relation edge; the relation
+    // owner keeps its own typed diagnostics.
     assert!(related.diagnostics().iter().any(|diagnostic| matches!(
-        (&diagnostic.owner, &diagnostic.disposition),
+        (&diagnostic.reason, &diagnostic.owner, &diagnostic.disposition),
         (
+            ScoreFieldGap::UnavailableRelationReference {
+                kind: inku_ddl::SemanticRelationKind::Along,
+                dependency_instruction_indices,
+                ..
+            },
             ScoreDiagnosticOwner::SourceInstruction {
                 instruction_index: 2,
                 spans,
                 ..
             },
-            ScoreDiagnosticDisposition::Omitted {
-                unit: ScoreOmissionUnit::RelationInstruction {
-                    instruction_index: 2
-                },
-                ..
-            }
-        ) if spans.len() == 1
+            ScoreDiagnosticDisposition::RelationOmitted
+        ) if spans.len() == 1 && dependency_instruction_indices == &[1]
     )));
 }
 
@@ -4786,14 +4895,18 @@ fn fluctuation_rejections_preserve_instruction_invocation_and_emit_units() {
         (&unbound, "invocation", 1),
         (&malformed, "emit", 1),
     ] {
-        let stopped = lower_verified_stage15_score(result.verified_effective_view(), context);
-        assert_eq!(stopped.outcome(), ScoreLoweringOutcome::Stopped);
-        assert!(stopped.score().is_none());
+        let stopped = lower_verified_stage15_score_with_policy(
+            result.verified_effective_view(),
+            context,
+            ScoreErrorPolicy::Stop,
+        );
         let continued = lower_verified_stage15_score_with_policy(
             result.verified_effective_view(),
             context,
             ScoreErrorPolicy::OmitAndContinue,
         );
+        assert_eq!(stopped.outcome(), continued.outcome());
+        assert_eq!(stopped.score(), continued.score());
         assert_eq!(
             continued.outcome(),
             ScoreLoweringOutcome::CompleteWithOmissions

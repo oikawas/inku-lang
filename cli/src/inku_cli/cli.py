@@ -3903,16 +3903,16 @@ def _add_paint_args(parser: argparse.ArgumentParser, *, batch: bool = False) -> 
     parser.add_argument(
         "--sketch",
         action="store_true",
-        help="run the description through the sketch-from-life layer (Stage 0.5) before Stage 1, so the later stages read the sketch instead of the description; server default is off, the web UI default is fine",
+        help="run the sketch before Stage 1: it supplements the extent of place and the seasonal or time-of-day light beside the description; server default is off, and so is the web UI default",
     )
     parser.add_argument(
         "--sketch-grain",
         choices=["fine", "coarse"],
-        help="how finely Stage 0.5 breaks the description apart: fine (server default) or coarse",
+        help="the retired Stage 0.5 grain; kept for replaying saved works and unused by the current sketch",
     )
     parser.add_argument(
         "--sketch-text",
-        help="use this sketch text instead of calling Stage 0.5 (replay of a saved or hand-edited sketch)",
+        help="use this sketch text as it stands instead of asking for one (replay of a saved or hand-edited sketch)",
     )
     parser.add_argument(
         "--variation-amplitude",

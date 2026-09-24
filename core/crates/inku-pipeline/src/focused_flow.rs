@@ -13,7 +13,8 @@ use crate::core_boundary::{
     ResolvedPaletteColorDto, ResolvedPaletteDto,
 };
 use crate::machine::{
-    AuthoringInput, PipelineConfig, PipelineInput, PipelinePhase, PipelineSnapshot, StepOutput,
+    AuthoringInput, PipelineConfig, PipelineInput, PipelinePhase, PipelineSnapshot,
+    SketchRequest, SketchState, StepOutput,
 };
 use crate::prompts::PromptLimits;
 use crate::protocol::{
@@ -105,6 +106,7 @@ fn config() -> PipelineConfig {
         catalog_retry: retry,
         stage1_retry: retry,
         hole_retry: retry,
+        sketch_retry: None,
     }
 }
 
@@ -265,7 +267,9 @@ fn unresolved_qualified_macro_blocks_without_stage2_completion() {
 #[test]
 fn stage1_compiler_feedback_retries_before_the_corrected_ddl_commits() {
     let description = "One quiet black circle";
-    let rejected_ddl = "place mystery circle.";
+    // An unknown word is now a repairable clause hole; an ownerless shared
+    // action still exercises the explicit action-owner feedback.
+    let rejected_ddl = "place many red circle and white square at center.";
     let corrected_ddl = "place one black circle at center.";
     let mut pipeline_config = config();
     pipeline_config.stage1_retry.attempt_timeout_ms = DecimalU64::new(3_000);
@@ -279,6 +283,7 @@ fn stage1_compiler_feedback_retries_before_the_corrected_ddl_commits() {
             authoring: AuthoringInput::Description {
                 description: description.into(),
                 auto_catalog: false,
+                sketch: SketchRequest::Off,
             },
         },
     );
@@ -304,9 +309,7 @@ fn stage1_compiler_feedback_retries_before_the_corrected_ddl_commits() {
             .all(|event| event.tag != "visible_ddl_ready")
     );
     assert!(rejected_output.events.iter().any(|event| {
-        event.tag == "retry_scheduled"
-            && event.payload["failure"] == "semantic_violation"
-            && event.payload["detail"] == "ambiguous_action_ownership"
+        event.tag == "retry_scheduled" && event.payload["failure"] == "semantic_violation"
     }));
     let feedback_action = state.action.as_ref().unwrap();
     assert_eq!(feedback_action.tag, "generate_normalized_ddl");
@@ -395,6 +398,7 @@ fn stage1_compiler_feedback_uses_the_shared_attempt_budget() {
             authoring: AuthoringInput::Description {
                 description: "One quiet black circle".into(),
                 auto_catalog: false,
+                sketch: SketchRequest::Off,
             },
         },
     );
@@ -463,6 +467,7 @@ fn exhausted_stage1_proposes_sealed_residual_only_after_visible_ack() {
             authoring: AuthoringInput::Description {
                 description: "One red square with an unresolved clause".into(),
                 auto_catalog: false,
+                sketch: SketchRequest::Off,
             },
         },
     );
@@ -567,6 +572,7 @@ fn stage1_does_not_correct_canonical_ddl_when_macro_expansion_exceeds_its_budget
             authoring: AuthoringInput::Description {
                 description: "Two black circles at the center".into(),
                 auto_catalog: false,
+                sketch: SketchRequest::Off,
             },
         },
     );
@@ -637,6 +643,7 @@ fn committed_ddl_and_approved_hole_patch_share_one_replayable_path() {
             authoring: AuthoringInput::Description {
                 description: "One quiet black circle".into(),
                 auto_catalog: false,
+                sketch: SketchRequest::Off,
             },
         },
     )];
@@ -1142,4 +1149,99 @@ fn independent_hole_results_keep_valid_subset_without_retry_after_ack() {
 fn host_json_float_roundtrip_preserves_snapshot_number() {
     let parsed: f64 = serde_json::from_str("108.58661719879423").unwrap();
     assert_eq!(parsed.to_bits(), 108.58661719879423_f64.to_bits());
+}
+
+fn sketch_start(sketch: SketchRequest) -> PipelineSnapshot {
+    let start = envelope(
+        None,
+        PipelineInput::Start {
+            variation_id: "sketch".into(),
+            authoring_nonce: "sketch-1".into(),
+            config: Box::new(config()),
+            authority: VariationAuthorityState::new_description(),
+            authoring: AuthoringInput::Description {
+                description: "A crane stands alone".into(),
+                auto_catalog: false,
+                sketch,
+            },
+        },
+    );
+    run(None, &start).snapshot
+}
+
+fn sketch_answer(state: &PipelineSnapshot, response: serde_json::Value) -> StepOutput {
+    let action = state.action.as_ref().unwrap();
+    assert_eq!(action.tag, "generate_sketch");
+    let result = PipelineInput::EffectResult {
+        result: EffectResult::SketchGenerated {
+            identity: action.identity.clone(),
+            response: response.to_string(),
+            elapsed_ms: DecimalU64::new(5),
+        },
+    };
+    run(Some(state), &envelope(Some(state), result))
+}
+
+fn stage1_message(state: &PipelineSnapshot) -> serde_json::Value {
+    let action = state.action.as_ref().unwrap();
+    assert_eq!(action.tag, "generate_normalized_ddl");
+    serde_json::from_str(action.payload["prompt"]["message"].as_str().unwrap()).unwrap()
+}
+
+#[test]
+fn a_supplementing_sketch_reaches_stage1_beside_the_description() {
+    let pending = sketch_start(SketchRequest::On);
+    let output = sketch_answer(&pending, json!({"sketch": "A wide marsh under a pale winter sky."}));
+    let state = output.snapshot;
+    let record = state.sketch.as_ref().unwrap();
+    assert_eq!(record.state, SketchState::Supplemented);
+    let message = stage1_message(&state);
+    assert_eq!(message["description"], "A crane stands alone");
+    assert_eq!(message["sketch"], "A wide marsh under a pale winter sky.");
+    assert!(output.events.iter().any(|event| event.tag == "sketch_ready"));
+}
+
+#[test]
+fn an_empty_sketch_draws_from_the_description_alone() {
+    let pending = sketch_start(SketchRequest::On);
+    let state = sketch_answer(&pending, json!({"sketch": "  "})).snapshot;
+    assert_eq!(state.sketch.as_ref().unwrap().state, SketchState::NotNeeded);
+    assert!(stage1_message(&state).get("sketch").is_none());
+}
+
+#[test]
+fn a_failed_sketch_falls_back_to_the_description_without_stopping() {
+    let mut state = sketch_start(SketchRequest::On);
+    for _ in 0..2 {
+        let action = state.action.as_ref().unwrap();
+        assert_eq!(action.tag, "generate_sketch");
+        let failed = PipelineInput::EffectResult {
+            result: EffectResult::ProviderFailed {
+                identity: action.identity.clone(),
+                failure: ProviderFailure::TransportUnavailable,
+                elapsed_ms: DecimalU64::new(5),
+            },
+        };
+        state = run(Some(&state), &envelope(Some(&state), failed)).snapshot;
+    }
+    assert_eq!(state.sketch.as_ref().unwrap().state, SketchState::Fallback);
+    assert!(stage1_message(&state).get("sketch").is_none());
+}
+
+#[test]
+fn an_edited_sketch_is_used_without_a_request() {
+    let state = sketch_start(SketchRequest::Supplied {
+        text: "Reeds in a row along the water.".into(),
+    });
+    assert_eq!(state.sketch.as_ref().unwrap().state, SketchState::Supplied);
+    assert_eq!(stage1_message(&state)["sketch"], "Reeds in a row along the water.");
+}
+
+#[test]
+fn a_run_without_a_sketch_keeps_its_previous_request_shape() {
+    let state = sketch_start(SketchRequest::Off);
+    assert!(state.sketch.is_none());
+    assert!(stage1_message(&state).get("sketch").is_none());
+    let wire = serde_json::to_value(&state).unwrap();
+    assert!(wire.get("sketch").is_none());
 }

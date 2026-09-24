@@ -118,7 +118,7 @@ def test_paint_409_exposes_persisted_compiler_failure_detail(
     effects = ProductPipelineEffects(binding, manifest)
 
     class RejectedProvider:
-        def __init__(self, _options):
+        def __init__(self, _options, **_kwargs):
             pass
 
         def __call__(self, action):
@@ -243,9 +243,10 @@ def test_description_pipeline_forces_typed_stage1_transport_and_renders_svg(
     monkeypatch.setattr(
         pipeline_product,
         "SingleAttemptProvider",
-        lambda options: provider_class(
+        lambda options, **kwargs: provider_class(
             options,
             transport=httpx.MockTransport(respond),
+            **kwargs,
         ),
     )
 
@@ -284,7 +285,8 @@ def test_description_pipeline_forces_typed_stage1_transport_and_renders_svg(
     assert body["temperature"] == 0.3
     function = body["tools"][0]["function"]
     assert function["name"] == "submit_pipeline_response"
-    assert function["parameters"]["properties"]["normalized_ddl"]["type"] == "string"
+    # Stage 1 asks for a typed work plan; the plan is printed as the visible DDL.
+    assert function["parameters"]["required"] == ["background", "ground", "layers"]
     assert body["tool_choice"] == {
         "type": "function",
         "function": {"name": "submit_pipeline_response"},
@@ -297,3 +299,61 @@ def test_description_pipeline_forces_typed_stage1_transport_and_renders_svg(
     assert view["phase"]["tag"] == "completed"
     assert view["busy"] is False
     assert view["result"]["svg"] == result["svg"]
+
+
+def test_a_supplementing_sketch_reaches_stage1_and_is_saved(tmp_path, monkeypatch) -> None:
+    from inku_server import db, pipeline_product, pipeline_provider, pipeline_runtime
+
+    description = "鶴が一羽立つ"
+    supplement = "広い湿原。冬の淡い空。"
+    normalized_ddl = "中心に赤い鉛筆の細い線をひとつ置く。"
+    requests: list[dict] = []
+
+    async def respond(request: httpx.Request) -> httpx.Response:
+        body = json.loads(request.content)
+        requests.append(body)
+        parameters = body["tools"][0]["function"]["parameters"]
+        answer = (
+            {"sketch": supplement}
+            if list(parameters["properties"]) == ["sketch"]
+            else {"normalized_ddl": normalized_ddl}
+        )
+        arguments = json.dumps(answer, ensure_ascii=False, separators=(",", ":"))
+        return httpx.Response(200, json={"choices": [{"message": {"content": None, "tool_calls": [
+            {"type": "function", "function": {"name": "submit_pipeline_response", "arguments": arguments}}
+        ]}}]})
+
+    engine = create_engine(f"sqlite:///{tmp_path / 'sketch-pipeline.db'}")
+    Base.metadata.create_all(engine)
+    monkeypatch.setattr(db, "engine", engine)
+    monkeypatch.setattr(db, "SessionLocal", sessionmaker(bind=engine))
+    monkeypatch.setattr(pipeline_provider, "provider_for_model", lambda *args, **kwargs: ("fixture", "fixture-model"))
+    monkeypatch.setattr(pipeline_provider, "connection_for", lambda *args: {
+        "id": "fixture", "kind": "openai_compatible", "base_url": "https://provider.invalid/v1",
+        "api_key": "test-only", "requires_api_key": True,
+    })
+    provider_class = pipeline_provider.SingleAttemptProvider
+    monkeypatch.setattr(pipeline_product, "SingleAttemptProvider",
+                        lambda options, **kwargs: provider_class(options, transport=httpx.MockTransport(respond)))
+
+    pipeline_runtime.shutdown()
+    try:
+        result = pipeline_compat.paint("author-1", {
+            "description": description, "sketch": True,
+            "stage1_model": "fixture-model", "stage2_model": "fixture-model",
+            "instruction_lang": "ja", "ui_lang": "ja", "catalog_id": "default", "catalog_mode": "fixed",
+            "canvas_aspect": "square", "render_seed": 77, "composition_seed": 17,
+            "save_history": False, "count_generation": False,
+        }, None)
+    finally:
+        pipeline_runtime.shutdown()
+        engine.dispose()
+
+    assert len(requests) == 2
+    assert json.loads(requests[0]["messages"][1]["content"]) == {"description": description}
+    stage1 = json.loads(requests[1]["messages"][1]["content"])
+    assert stage1["description"] == description
+    assert stage1["sketch"] == supplement
+    assert result["description"] == description
+    assert result["sketch_text"] == supplement
+    assert result["sketch_state"] == "supplemented"

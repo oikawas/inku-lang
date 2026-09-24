@@ -1,6 +1,5 @@
 <!--
-	写生 (Stage 0.5) selector. Three states in one control: off, cut fine, cut
-	coarse. Same two shapes as WildToggle, for the same reason -- it sits in
+	写生 selector: off (the default) or on. `modes` narrows the choice. Same two shapes as WildToggle, for the same reason -- it sits in
 	the same rows.
 	- compact=false: dropdown trigger + menu, for the describe tab's control row.
 	- compact=true: inline segmented control for the dialogs, where `inherited`
@@ -16,10 +15,11 @@
 		showValue?: boolean;
 		inherited?: boolean;
 		disabled?: boolean;
+		modes?: SketchMode[];
 		onSelect: (mode: SketchMode) => void;
 	};
 
-	let { value, isJapanese, compact = false, showValue = false, inherited = false, disabled = false, onSelect }: Props = $props();
+	let { value, isJapanese, compact = false, showValue = false, inherited = false, disabled = false, modes = SKETCH_MODES, onSelect }: Props = $props();
 
 	let open = $state(false);
 	const title = $derived(isJapanese ? '写生' : 'Sketch from life');
@@ -38,7 +38,7 @@
 				>{/if}{isJapanese ? '：' : ':'}</span
 		>
 		<div class="sketch-seg">
-			{#each SKETCH_MODES as mode (mode)}
+			{#each modes as mode (mode)}
 				<button
 					type="button"
 					class:active={mode === value}
@@ -64,8 +64,8 @@
 		</button>
 		{#if open}
 			<div class="sketch-menu" role="menu">
-				<div class="sketch-menu-head">{isJapanese ? '区切りの大きさ' : 'Grain'}</div>
-				{#each SKETCH_MODES as mode (mode)}
+				<div class="sketch-menu-head">{isJapanese ? '写生' : 'Sketch from life'}</div>
+				{#each modes as mode (mode)}
 					<button
 						type="button"
 						class:selected={mode === value}

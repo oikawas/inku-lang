@@ -289,7 +289,9 @@
 # 43: Ordinary noun groups and finite non-color sequences preserve total counts.
 # 44: Whole-body mirror relations preserve explicit follower facts.
 # 45: Bundled Nature uses consolidated semantics; saved Macro IDs keep their locks.
-DDL_ENGINE_VERSION = "45"
+# 46: An explicit named surface texture on a closed shape is the area's own
+# performance and no longer carries a hidden flat base fill.
+DDL_ENGINE_VERSION = "46"
 # 4 (2026-07-30): yellow, orange, and purple become abstract Score colors, and
 # coerce recognizes the corresponding Japanese and English DDL markers.
 # 3 (2026-07-30): 黄 / 橙 / 紫 joined the saijiki color words, so an author can write
@@ -308,4 +310,6 @@ DDL_ENGINE_VERSION = "45"
 # 9 (2026-09-14): Partway joins place vocabulary for Line/Arc connections.
 # 10 (2026-09-14): Noun groups and non-color sequences use ordinary count grammar.
 # 11 (2026-09-14): Mirrored joins the relation vocabulary.
-DDL_VERSION = "11"
+# 12 (2026-09-24): English amplitude large also accepts the adverb largely, so
+# it no longer collides with relative size large in one phrase.
+DDL_VERSION = "12"

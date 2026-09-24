@@ -21,7 +21,7 @@ fn explicit_score_round_trips_without_renderer() {
 fn default_bearing_score_keeps_its_declared_defaults() {
     let parsed = score(r#"{"instructions":[{"primitive":"line"}]}"#);
 
-    assert_eq!(parsed.version, "0.7.0");
+    assert_eq!(parsed.version, "0.9.0");
     assert_eq!(parsed.canvas, Canvas::Id("square".to_owned()));
     assert_eq!(parsed.background, Color::White);
     assert_eq!(parsed.instructions[0].weight, Weight::Pen);
@@ -30,7 +30,7 @@ fn default_bearing_score_keeps_its_declared_defaults() {
     assert_eq!(
         serde_json::to_value(parsed).unwrap(),
         json!({
-            "version": "0.7.0",
+            "version": "0.9.0",
             "canvas": "square",
             "background": "white",
             "presence": null,

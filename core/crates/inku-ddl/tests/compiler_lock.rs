@@ -93,7 +93,8 @@ fn unresolved_clause_owns_its_invalid_sequence_diagnostic() {
 
 #[test]
 fn recoverable_fragments_do_not_block_an_anchored_clause_hole() {
-    let source = "地: 薄墨。\n赤い細筆の横の実線を右端に一本引く。\n赤い細筆の極細の横線を前の線に沿って右から左へ波打つ軌跡に引く。";
+    // A ground is its own sentence; the headed 「地: ...」 form is not accepted.
+    let source = "薄墨地。\n赤い細筆の横の実線を右端に一本引く。\n赤い細筆の極細の横線を前の線に沿って右から左へ波打つ軌跡に引く。";
     let result = compile(
         source,
         ResolvedInstructionLanguage::Ja,
@@ -203,14 +204,14 @@ const V14_FULL_LOCK_KNOWN_ANSWER: &str =
     "ef2a9699a61bf10e2468428f8715f2d62d2b669749d85c133e327b73c619894e";
 const V15_FULL_LOCK_KNOWN_ANSWER: &str =
     "6b69018c90f334b9044a5855a0158e03b19a8c01c14f77377ef700f351ecf162";
-const V19_CANONICAL_SHA256_KNOWN_ANSWER: &str =
-    "de089c08ab4e41ff01e9d6c8af46190ba2efc9c00c1d456ce0ec9ee4d9dd44ed";
-const V19_SEED_DIGEST_KNOWN_ANSWER: &str =
-    "732c762ebd03d1345c4732e269a075093f3e077f82bf36d415b3a5bceb9d370d";
-const V19_EXPANDED_MEANING_SHA256_KNOWN_ANSWER: &str =
+const V21_CANONICAL_SHA256_KNOWN_ANSWER: &str =
+    "9e7590ebf0adbea689eecb2920388d1ef33700a5ea71b6fb57ec532999d0594e";
+const V21_SEED_DIGEST_KNOWN_ANSWER: &str =
+    "24504af4416e8e47c24ea75d7ae5d68cf978a08f17108b964208417453bd3f99";
+const V21_EXPANDED_MEANING_SHA256_KNOWN_ANSWER: &str =
     "251884860862eff7347cd6cf9c016c1b562d5a2682ce6739f267556a9b370a1c";
-const V19_FULL_LOCK_KNOWN_ANSWER: &str =
-    "c5cf450d3f8e41151a3af9edb65e12ead3474666960beddea4cd534143109edd";
+const V21_FULL_LOCK_KNOWN_ANSWER: &str =
+    "97efbc7f7bb7455c4c6c7dfdbbb16b88dc19caa2447ddaa83673af36c6da1444";
 const LIMITS: MacroExpansionLimits = MacroExpansionLimits {
     max_invocations: 16,
     max_depth: 16,
@@ -370,14 +371,22 @@ fn coordinated_group_predicates_have_one_compiler_delivery_owner() {
     assert!(blocked_document.canonical_bytes.is_none());
     assert!(blocked.derived_seeds.is_empty());
     assert!(blocked.macro_expansion.is_none());
+    // The unknown word no longer blocks the coordination: the clause becomes
+    // one repairable hole.
     assert_eq!(
         blocked
             .blocking_diagnostics
             .iter()
             .filter(|diagnostic| diagnostic.kind == "blocked_coordination_boundary")
             .count(),
-        2
+        0
     );
+    assert_eq!(
+        blocked.compiler_lock.as_ref().unwrap().state,
+        CompilerLockState::IncompleteKnownHole
+    );
+    assert_eq!(blocked.holes.len(), 1);
+    assert_eq!(blocked.holes[0].kind, "unresolved_clause");
     assert_eq!(
         blocked
             .deliveries
@@ -488,14 +497,14 @@ fn coordination_marker_and_continuation_claims_have_one_compiler_owner() {
         None,
         LIMITS,
     );
-    assert!(blocked.deliveries.iter().any(|delivery| {
+    // The unknown word inside a coordination is a clause hole, not a blocked
+    // coordination boundary.
+    assert!(!blocked.deliveries.iter().any(|delivery| {
         delivery
             .descriptor
             .contains("blocked_coordination_boundary|")
-            && delivery
-                .descriptor
-                .contains("cause=instruction_ownership_path:unknown:")
     }));
+    assert_eq!(blocked.holes.len(), 1);
 
     let overlap = compile(
         "line. place the line and a circle.",
@@ -1877,20 +1886,20 @@ fn historical_fixture_is_preserved_and_current_known_answers_bind_exactly() {
         actual.canonical_bytes,
         fixture.known_answers.canonical_bytes
     );
-    assert!(actual.canonical_bytes.contains("semantic-document.v19"));
+    assert!(actual.canonical_bytes.contains("semantic-document.v21"));
     assert!(actual.canonical_bytes.contains("explicit_geometry"));
     assert!(actual.canonical_bytes.contains("numeric_position"));
-    assert_eq!(actual.canonical_sha256, V19_CANONICAL_SHA256_KNOWN_ANSWER);
-    assert_eq!(actual.seed_digest, V19_SEED_DIGEST_KNOWN_ANSWER);
+    assert_eq!(actual.canonical_sha256, V21_CANONICAL_SHA256_KNOWN_ANSWER);
+    assert_eq!(actual.seed_digest, V21_SEED_DIGEST_KNOWN_ANSWER);
     assert_eq!(
         actual.expanded_meaning_sha256,
-        V19_EXPANDED_MEANING_SHA256_KNOWN_ANSWER
+        V21_EXPANDED_MEANING_SHA256_KNOWN_ANSWER
     );
     assert_ne!(actual.full_lock_digest, V12_FULL_LOCK_KNOWN_ANSWER);
     assert_ne!(actual.full_lock_digest, V13_FULL_LOCK_KNOWN_ANSWER);
     assert_ne!(actual.full_lock_digest, V14_FULL_LOCK_KNOWN_ANSWER);
     assert_ne!(actual.full_lock_digest, V15_FULL_LOCK_KNOWN_ANSWER);
-    assert_eq!(actual.full_lock_digest, V19_FULL_LOCK_KNOWN_ANSWER);
+    assert_eq!(actual.full_lock_digest, V21_FULL_LOCK_KNOWN_ANSWER);
     assert_eq!(
         lock.canonical_pre_expansion_digest,
         Some(actual.canonical_sha256)
@@ -2203,6 +2212,8 @@ fn exhaustive_delivery_mapping_has_no_default_or_ignored_bucket() {
             CompilerLockState::BlockedDiagnostic,
         ),
         (
+            // A Macro invoked without its lock is an integrity failure that
+            // blocks; it is no longer offered as a hole.
             "macro-missing-hole",
             compile(
                 "Canon.Empty",
@@ -2211,7 +2222,7 @@ fn exhaustive_delivery_mapping_has_no_default_or_ignored_bucket() {
                 None,
                 LIMITS,
             ),
-            CompilerLockState::IncompleteKnownHole,
+            CompilerLockState::BlockedDiagnostic,
         ),
         (
             "macro-ambiguous-conflict",
@@ -2222,7 +2233,8 @@ fn exhaustive_delivery_mapping_has_no_default_or_ignored_bucket() {
                 None,
                 LIMITS,
             ),
-            CompilerLockState::BlockedDiagnostic,
+            // An ambiguous complete parameter assignment is recorded as a conflict.
+            CompilerLockState::BlockedConflict,
         ),
         (
             "expansion-diagnostic-hole",

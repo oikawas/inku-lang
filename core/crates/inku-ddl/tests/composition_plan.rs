@@ -281,13 +281,15 @@ fn between_keeps_both_original_emit_owners_when_either_reference_is_omitted() {
                 == ScoreFieldGap::UnavailableMacroRelationReference
                 && diagnostic.disposition == ScoreDiagnosticDisposition::RelationOmitted));
         }
+        // A size conflict still omits the whole reference; a shape without a
+        // position is now drawn at its default place.
         let first = if omitted == 0 {
-            "place one red circle."
+            "place one red wide equilateral triangle at center."
         } else {
             "place one red circle at center."
         };
         let second = if omitted == 1 {
-            "place one blue circle."
+            "place one blue wide equilateral triangle at center."
         } else {
             "place one blue circle at center."
         };
@@ -479,7 +481,9 @@ fn macro_direction_uses_definition_binding_and_keeps_caller_roles() {
         let result =
             plan_verified_stage15(transformed.verified_effective_view(), context("square"));
         if id == "rotated" {
-            assert_eq!(result.outcome(), CompositionPlanOutcome::Stopped);
+            // Rotated is not a layout direction; only that field is omitted.
+            assert_eq!(result.outcome(), CompositionPlanOutcome::ReadyWithOmissions);
+            assert!(result.objects().unwrap()[0].layout_direction().is_none());
         } else {
             assert!(result.objects().unwrap()[0].layout_direction().is_some());
         }
@@ -543,10 +547,18 @@ fn unsupported_direction_and_conflicts_preserve_execution_boundaries() {
                 context("square"),
                 policy,
             );
-            assert_eq!(result.outcome(), CompositionPlanOutcome::Stopped);
+            // Only the unsupported direction field is omitted; the body stays.
+            assert_eq!(result.outcome(), CompositionPlanOutcome::ReadyWithOmissions);
+            assert_eq!(result.objects().unwrap().len(), 1);
             assert!(result.diagnostics().iter().any(|diagnostic| matches!(
                 diagnostic.reason,
                 ScoreFieldGap::UnsupportedLayoutDirection { .. }
+            ) && matches!(
+                diagnostic.disposition,
+                ScoreDiagnosticDisposition::Omitted {
+                    unit: ScoreOmissionUnit::InstructionField { .. },
+                    ..
+                }
             )));
         }
     }
@@ -564,8 +576,10 @@ fn unsupported_direction_and_conflicts_preserve_execution_boundaries() {
         continued.outcome(),
         CompositionPlanOutcome::ReadyWithOmissions
     );
+    // The point keeps its body without the unsupported direction.
+    assert_eq!(continued.objects().unwrap().len(), 2);
     assert_eq!(
-        continued.objects().unwrap()[0].origin(),
+        continued.objects().unwrap()[1].origin(),
         &ScoreInstructionOrigin::SourceInstruction {
             instruction_index: 1
         }
@@ -1009,13 +1023,18 @@ fn gaps_keep_owners_and_stop_continue_never_ready_all_omitted() {
         &[],
     );
     let view = transformed.verified_effective_view();
-    let stopped = plan_verified_stage15(view, context("square"));
-    assert_eq!(stopped.outcome(), CompositionPlanOutcome::Stopped);
-    assert!(stopped.objects().is_none());
+    let stopped =
+        plan_verified_stage15_with_policy(view, context("square"), ScoreErrorPolicy::Stop);
     let continued = plan_verified_stage15_with_policy(
         view,
         context("square"),
         ScoreErrorPolicy::OmitAndContinue,
+    );
+    // Legacy Stop input keeps the same drawable remainder.
+    assert_eq!(stopped.outcome(), continued.outcome());
+    assert_eq!(
+        stopped.objects().map(<[_]>::len),
+        continued.objects().map(<[_]>::len)
     );
     assert_eq!(
         continued.outcome(),

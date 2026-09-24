@@ -1,8 +1,10 @@
-"""Saved Stage 0.5 metadata compatibility.
+"""Saved sketch metadata.
 
-The shared pipeline does not run the retired Python sketch producer.  These
-small types remain because existing history rows and request models still carry
-the state that older work recorded.
+The retired Python Stage 0.5 producer rewrote the description. The shared
+pipeline's sketch runs only when the author asks for it, supplements place and
+light beside the description, and records `supplemented`, `not_needed`
+(nothing to supplement), `fallback` or `off`. These small types remain because existing history rows and
+request models still carry the state that older work recorded.
 """
 
 from __future__ import annotations
@@ -12,7 +14,7 @@ from dataclasses import dataclass, field
 
 SKETCH_GRAINS = ("fine", "coarse")
 DEFAULT_SKETCH_GRAIN = "fine"
-SKETCH_STATES = ("fine", "coarse", "fallback", "off", "not_applicable")
+SKETCH_STATES = ("fine", "coarse", "fallback", "off", "not_applicable", "not_needed", "supplemented")
 
 
 def normalize_sketch_grain(value: str | None) -> str:

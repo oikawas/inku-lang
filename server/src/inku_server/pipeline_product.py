@@ -91,6 +91,11 @@ class RunOptions(BaseModel):
     render_seed: int | str | None = None
     composition_seed: int | str | None = None
     wild: bool | None = None
+    # The sketch before Stage 1: off (the default) or on, when the author asks
+    # to draw with a sketch. A sketch text the author edited is used as it
+    # stands, without a request.
+    sketch: Literal["off", "on"] | None = None
+    sketch_text: str | None = Field(default=None, max_length=100_000)
     variation_amplitude: Literal["small", "medium", "large"] | None = None
     variation_seed: int | str | None = None
     interpretation_seed: str | None = None
@@ -111,6 +116,28 @@ class RunOptions(BaseModel):
     request_idempotency_key: str | None = Field(default=None, max_length=200)
     developer_disable_llm_retries: StrictBool | None = None
     developer_capture_provider_io: StrictBool | None = None
+
+
+def sketch_request_for(kind: str, options: dict) -> dict:
+    """The sketch request of one operation. It is never inherited from a parent."""
+    if kind != "description":
+        return {"mode": "off"}
+    text = (options.get("sketch_text") or "").strip()
+    if text:
+        return {"mode": "supplied", "text": text}
+    return {"mode": options.get("sketch") or "off"}
+
+
+def sketch_result(record: dict | None) -> dict:
+    """Saved sketch columns from what the sketch did in this run."""
+    if record is None:
+        return {"sketch_text": None, "sketch_grain": None, "sketch_state": "off"}
+    state = record.get("state")
+    if state in {"supplemented", "supplied"} and record.get("text"):
+        return {"sketch_text": record["text"], "sketch_grain": None, "sketch_state": "supplemented"}
+    if state == "not_needed":
+        return {"sketch_text": None, "sketch_grain": None, "sketch_state": "not_needed"}
+    return {"sketch_text": None, "sketch_grain": None, "sketch_state": "fallback"}
 
 
 class ProductPipelineEffects:
@@ -211,7 +238,8 @@ class ProductPipelineEffects:
         selected["developer_disable_llm_retries"] = options.get("developer_disable_llm_retries") is True
         selected["developer_capture_provider_io"] = options.get("developer_capture_provider_io") is True
         return config, {"host_options": selected, "color_maps": color_maps, "macro_catalog": catalog_context,
-                        "auto_catalog": kind == "description" and mode == "auto", "metrics": {}}
+                        "auto_catalog": kind == "description" and mode == "auto",
+                        "sketch_request": sketch_request_for(kind, options), "metrics": {}}
 
     def provider_for(self, owner: str, context: dict):
         from . import db
@@ -296,7 +324,7 @@ class ProductPipelineEffects:
             "elapsed_stage1_ms": metrics.get("stage1", 0), "elapsed_stage2_ms": metrics.get("stage2", 0),
             "elapsed_total_ms": sum(metrics.values()), "tokens_in_stage1": None, "tokens_out_stage1": None,
             "tokens_in_stage2": None, "tokens_out_stage2": None, "thinking": None,
-            "sketch_text": None, "sketch_grain": None, "sketch_state": "off",
+            **sketch_result(snapshot.get("sketch")),
             "ddl_version": DDL_VERSION, "ddl_engine_version": DDL_ENGINE_VERSION,
             "render_build_number": _build_number(), "render_engine_id": render_metadata["render_engine_id"],
             "render_engine_version": render_metadata["render_engine_version"], "catalog_id": catalog_id,

@@ -327,6 +327,7 @@ fn render_impl(
     let support = ground.as_ref().map_or(DEFAULT_SUPPORT, |ground| {
         support_for_ground(ground.material)
     });
+    let oil_fill_pass_limit = crate::fills::oil_fill_pass_limit(&performance.score.instructions);
     let mut ordered = performance
         .instruction_indices
         .iter()
@@ -445,6 +446,7 @@ fn render_impl(
                 profile,
                 support,
                 geometry_transform: instruction_transform.in_pixels(request.options.canvas.unit()),
+                oil_fill_pass_limit,
             };
             let follower_context = MarkContext {
                 instruction_seed_override: performance.instruction_seed_overrides
@@ -486,6 +488,7 @@ fn render_impl(
                 profile,
                 support,
                 geometry_transform: instruction_transform.in_pixels(request.options.canvas.unit()),
+                oil_fill_pass_limit,
             };
             if profile != SvgProfile::Compat
                 && owns_surface(single.primitive)

@@ -108,12 +108,12 @@ uv run inku-cli review evaluate ./test_output/refine-layout-xxxx.png --model nvi
 
 | Flag | Server default | Web UI default |
 |---|---|---|
-| `--sketch` / `--sketch-grain` | off | fine |
+| `--sketch` | off | off |
 | `--wild` | off | user setting, off by default |
 | `--catalog-mode` | `fixed` | user setting |
 
 ```sh
-uv run inku-cli paint "TEXT" --sketch --sketch-grain fine --catalog-mode auto -o ./out --png
+uv run inku-cli paint "TEXT" --sketch --catalog-mode auto -o ./out --png
 ```
 
 Variation takes effect **only when both** `--variation-amplitude` and `--variation-seed` are given. Passing one alone moves no axis of the expansion layer, and the response comes back under the defaults, so having passed a flag is not evidence it took effect. **Read the work's `variation` and `variation_seed` to confirm.**

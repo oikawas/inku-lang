@@ -8,7 +8,7 @@ import {
 	type PaintStage1Event
 } from '../../paintStream.ts';
 import type { CanvasAspectId } from '../../plugins/system/canvas-aspect/index.ts';
-import { sketchGrainOf, type SketchMode } from '../../sketch.ts';
+import { type SketchMode } from '../../sketch.ts';
 import type { ApiFetch } from '../../transport/api-fetch.ts';
 import type { RenderOverrides } from '../render-payload.ts';
 import { pipelineViewFromErrorDetail, type PipelineView } from '../pipeline/api.ts';
@@ -168,7 +168,6 @@ export async function runCurrentWork(
 	const resolvedStage1Model = options.stage1Model ?? defaults.stage1Model;
 	const resolvedStage2Model = options.stage2Model ?? defaults.stage2Model;
 	const resolvedSketchMode = options.sketchMode ?? defaults.sketchMode;
-	const resolvedSketchGrain = sketchGrainOf(resolvedSketchMode);
 	const sketchOn = resolvedSketchMode !== 'off';
 
 	capabilities.setStage1UserPrompt(text);
@@ -183,7 +182,6 @@ export async function runCurrentWork(
 		body: JSON.stringify({
 			description: text,
 			sketch: sketchOn,
-			...(resolvedSketchGrain ? { sketch_grain: resolvedSketchGrain } : {}),
 			...(options.sketchText ? { sketch_text: options.sketchText } : {}),
 			stage1_model: resolvedStage1Model,
 			stage2_model: resolvedStage2Model,

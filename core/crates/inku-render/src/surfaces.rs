@@ -678,6 +678,7 @@ mod tests {
             profile: crate::types::SvgProfile::Editable,
             support: DEFAULT_SUPPORT,
             geometry_transform: crate::affine::AffineTransform::identity(),
+            oil_fill_pass_limit: crate::fills::MAX_OIL_FILL_PASSES,
         }
     }
 

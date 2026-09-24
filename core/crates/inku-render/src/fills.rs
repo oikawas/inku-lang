@@ -139,6 +139,31 @@ fn stroke_path(
 }
 
 #[must_use]
+/// Loaded passes one oil fill lays down at most, and the document-wide total
+/// that many oil fills share. Each pass writes a body and eight ridge paths.
+pub(crate) const MAX_OIL_FILL_PASSES: usize = 24;
+const OIL_FILL_PASS_BUDGET: usize = 120;
+const MIN_OIL_FILL_PASSES: usize = 3;
+
+/// Passes each oil interior fill may use so all of a document's oil fills
+/// together stay within the budget. Counts every performed member.
+pub(crate) fn oil_fill_pass_limit(instructions: &[Instruction]) -> usize {
+    let fills: usize = instructions
+        .iter()
+        .filter(|instruction| {
+            instruction.weight == Weight::OilPaint
+                && (instruction.filled || is_noncomputer_solid_fill(instruction))
+        })
+        .map(|instruction| {
+            instruction
+                .arrangement
+                .as_ref()
+                .map_or(1, |arrangement| arrangement.count.max(1) as usize)
+        })
+        .sum();
+    (OIL_FILL_PASS_BUDGET / fills.max(1)).clamp(MIN_OIL_FILL_PASSES, MAX_OIL_FILL_PASSES)
+}
+
 pub(crate) fn is_noncomputer_solid_fill(instruction: &Instruction) -> bool {
     instruction
         .surface
@@ -297,7 +322,7 @@ fn oil_paint_fill(
     let span = high - low;
     let width = (style.width * 2.0)
         .min(span / 3.0)
-        .max(span / 64.0)
+        .max(span / context.oil_fill_pass_limit.max(1) as f64)
         .max(context.canvas.unit() * 0.0001);
     let spacing = width * 0.82;
     let mut group = Element::new("g")

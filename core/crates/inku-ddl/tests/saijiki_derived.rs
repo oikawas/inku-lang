@@ -82,6 +82,7 @@ fn full_language_projections_preserve_python_prompt_and_marker_behavior() {
             "cutting",
             "not touching",
             "between",
+            "mirrored",
         ]
     );
     assert!(
@@ -131,7 +132,8 @@ fn ordered_marker_relation_reference_and_display_projections_match_asset_semanti
             "touching",
             "cutting",
             "between",
-            "connected"
+            "connected",
+            "mirrored"
         ]
     );
     assert_eq!(relations[2].literals[0], "前の線に触れる");
@@ -176,7 +178,8 @@ fn ordered_marker_relation_reference_and_display_projections_match_asset_semanti
             "cutting",
             "between",
             "touching",
-            "connected"
+            "connected",
+            "mirrored"
         ]
     );
 }

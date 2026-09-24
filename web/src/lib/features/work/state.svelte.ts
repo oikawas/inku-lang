@@ -2,7 +2,7 @@ import { pipelineDescription } from '$lib/description-labels';
 import { pluginWarningsToShow } from '$lib/plugin-names';
 import { limitNotesToShow } from '$lib/limitNotes';
 import { t, getLang } from '$lib/i18n/index.svelte';
-import { DEFAULT_SKETCH_MODE, normalizeSketchGrain, normalizeSketchState, sketchGrainOf, sketchModeOf, type SketchMode, type SketchState } from '$lib/sketch';
+import { DEFAULT_SKETCH_MODE, normalizeSketchState, type SketchMode, type SketchState } from '$lib/sketch';
 import { composeFallbackReason, composeFallbackState, composeFallbackValue } from '$lib/composeFallback';
 import { needsFallbackRefineConfirm, rememberFallbackRefineConfirm, type FallbackRefineParent } from '$lib/fallbackRefineGate';
 import { submitDerivationKind as submitDerivationKindOf, type DerivationKind } from '$lib/derivation';
@@ -149,26 +149,22 @@ export function createWorkState(deps: WorkStateDeps) {
 			: null;
 	}
 
-	/** What every request that begins at Stage 2 sends. Those paths never run
-	 *  0.5 -- they carry the prose the work already has, so the four consumers
-	 *  below Stage 1 read what a paint would have given them. */
+	/** What every request that begins at Stage 2 sends. Those paths never ask
+	 *  for a sketch -- they carry the one the work already has. */
 	function sketchPayloadFor(text: string): Record<string, string> {
 		const prose = sketchTextFor(text);
-		if (!prose) return {};
-		const grain = sketchGrainOf(sketchMode);
-		return { sketch_text: prose, ...(grain ? { sketch_grain: grain } : {}) };
+		return prose ? { sketch_text: prose } : {};
 	}
 
-	/** Show the prose a run or a saved work was painted from, and select the
-	 *  grain it used so a redraw starts from the same place. A work with no
-	 *  prose (painted with the layer off, or made before it existed) turns the
-	 *  control off rather than silently painting it at the default grain.
+	/** Show the sketch a run or a saved work was painted with, and turn the
+	 *  control on for a work that has one so a redraw starts from the same
+	 *  place; any other work leaves the control off.
 	 *
-	 *  The control still lands on 'off' for every work with no prose -- what the
-	 *  author is going to draw next is a separate question from what the work on
-	 *  screen was drawn through. The state is what keeps the two apart: it is
-	 *  carried whole, so the note can say "drawn without the layer" and "drawn
-	 *  before the layer was recorded" as the different things they are. */
+	 *  What the author is going to draw next is a separate question from what
+	 *  the work on screen was drawn through. The state is what keeps the two
+	 *  apart: it is carried whole, so the note can say "drawn without the layer",
+	 *  "the description needed no sketch" and "drawn before the layer was
+	 *  recorded" as the different things they are. */
 	function adoptSketch(
 		text: string | null,
 		grain: unknown,
@@ -179,8 +175,9 @@ export function createWorkState(deps: WorkStateDeps) {
 		sketchSource = source;
 		sketchDraft = text ?? '';
 		sketchEditing = false;
-		sketchMode = text ? sketchModeOf(normalizeSketchGrain(grain) ?? 'fine') : 'off';
+		void grain;
 		sketchState = normalizeSketchState(state);
+		sketchMode = text ? 'on' : DEFAULT_SKETCH_MODE;
 	}
 
 	let pendingCanvasAspectDerivation = $state<{ parentNodeId: string; fromAspectId: CanvasAspectId; toAspectId: CanvasAspectId; } | null>(null);
@@ -221,6 +218,8 @@ export function createWorkState(deps: WorkStateDeps) {
 	function pipelineOptions(options: PaintOptions = {}): PipelineOptions {
 		const render = renderSettingsPayload('paint', options.renderOverrides);
 		return {
+			sketch: options.sketchMode ?? sketchMode,
+			...(options.sketchText ? { sketch_text: options.sketchText } : {}),
 			stage1_model: options.stage1Model ?? qualifiedModelId(deps.models.stage1Provider(), deps.models.stage1Model()),
 			stage2_model: options.stage2Model ?? qualifiedModelId(deps.models.stage2Provider(), deps.models.stage2Model()),
 			instruction_lang: instructionLang,
@@ -258,6 +257,7 @@ export function createWorkState(deps: WorkStateDeps) {
 		if (!view.result) return;
 		const painted = view.result;
 		result = painted;
+		adoptSketch(painted.sketch_text ?? null, painted.sketch_grain, view.description, painted.sketch_state);
 		expandedDdl = painted.ddl ?? view.document?.source ?? null;
 		thinking = painted.thinking ?? null;
 		elapsedStage1Ms = painted.elapsed_stage1_ms;
@@ -320,7 +320,10 @@ export function createWorkState(deps: WorkStateDeps) {
 	}
 
 	async function authorDescription(text: string, options: PaintOptions = {}, signal?: AbortSignal): Promise<PipelineView> {
-		return finishPipeline(() => pipelineController.fromDescription(text, pipelineOptions(options), signal));
+		// An edited sketch for this very description is drawn as it stands.
+		const mode = options.sketchMode ?? sketchMode;
+		const edited = options.sketchText ?? (mode === 'off' ? null : sketchTextFor(text));
+		return finishPipeline(() => pipelineController.fromDescription(text, pipelineOptions({ ...options, ...(edited ? { sketchText: edited } : {}) }), signal));
 	}
 
 	async function authorDdl(source: string, options: PaintOptions = {}, signal?: AbortSignal): Promise<PipelineView> {
@@ -778,7 +781,7 @@ export function createWorkState(deps: WorkStateDeps) {
 					stage2Model: batchStage2Model,
 					catalogId: batchCatalogId,
 					catalogMode: batchCatalogId === AUTO_CATALOG_ID ? 'auto' : 'fixed',
-					sketchGrain: sketchGrainOf(batchSketchMode),
+					sketchGrain: batchSketchMode === 'off' ? null : batchSketchMode,
 					wild: batchWild,
 					canvasAspectId: batchCanvasAspectId,
 				},

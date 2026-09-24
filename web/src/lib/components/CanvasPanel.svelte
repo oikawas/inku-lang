@@ -9,6 +9,7 @@
 	import CanvasPresentationOverlay from '$lib/features/canvas/CanvasPresentationOverlay.svelte';
 	import CanvasRefinementWorkspace from '$lib/features/canvas/CanvasRefinementWorkspace.svelte';
 	import type { LineageGraph, LineageNode } from '$lib/features/history/types';
+	import type { SketchMode } from '$lib/sketch';
 	import type { LineageBrowsingState } from '$lib/features/history/lineage-state.svelte';
 	import { measureSvgWeight } from '$lib/svgWeight';
 	import { formatCanvasCapacity, groupDigits } from '$lib/formatNumber';
@@ -151,7 +152,7 @@
 		onToggleLineageForRevision: (node: LineageNode, event?: Event) => void | Promise<void>;
 		onDrawLineageDescription: (node: LineageNode, text: string, signal?: AbortSignal, wild?: boolean | null) => void | Promise<void>;
 		onOpenLineageDdlEditor: (node: LineageNode) => void;
-		onDrawLineageSketchGrain: (node: LineageNode, grain: 'fine' | 'coarse', signal?: AbortSignal) => Promise<void>;
+		onDrawLineageSketchGrain: (node: LineageNode, mode: SketchMode, signal?: AbortSignal) => Promise<void>;
 		onToggleSaijiki: () => void;
 		onCloseRefinement: () => void;
 		statusDdlOrigin: boolean;

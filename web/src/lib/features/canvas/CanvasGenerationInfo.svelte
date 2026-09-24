@@ -8,7 +8,7 @@
 	import { formatByteSize, groupDigits } from '$lib/formatNumber';
 	import { hashDigest, hashRowLabel } from '$lib/hashIdentity';
 	import { t } from '$lib/i18n/index.svelte';
-	import { normalizeSketchGrain, normalizeSketchState, sketchModeLabel, sketchStateNote } from '$lib/sketch';
+	import { normalizeSketchGrain, normalizeSketchState, sketchGrainLabel, sketchStateNote } from '$lib/sketch';
 	import type { SvgWeight } from '$lib/svgWeight';
 
 	export type GenerationInfoWork = {
@@ -220,7 +220,7 @@
 						<h4>{t().sketchLabel}</h4>
 						<dl>
 							{#if detailSketchGrain}
-								{@render term(t().sketchGrainLabel, t().provenanceHintSketchGrain)}<dd>{sketchModeLabel(detailSketchGrain, isJapanese)}</dd>
+								{@render term(t().sketchGrainLabel, t().provenanceHintSketchGrain)}<dd>{sketchGrainLabel(detailSketchGrain, isJapanese)}</dd>
 							{/if}
 							{#if detailSketchNote}
 								{@render term(t().provenanceLabelSketchRecord, t().provenanceHintSketchRecord)}<dd>{detailSketchNote}</dd>

@@ -177,7 +177,10 @@ Canvas format is neither vocabulary nor a plugin. It is a resolved host option o
   these are the verbs of presentation
 - **the movements category describes irregularities in marks**: "swaying finely",
   "undulating slowly", and "bleeding" are allowed; "swaying beautifully" and
-  "swaying violently" are excluded (§13 has the detail)
+  "swaying violently" are excluded (§13 has the detail). English amplitude words may be written as
+  adjectives (`fine`, `large`) or adverbs (`finely`, `largely`). Because
+  amplitude `large` is spelled like the relative size `large`, use `largely`
+  when a size also appears in the same phrase (DDL 12)
 - **the relations category holds observable relations only**: "along" and "not
   touching" are positional relations an outside observer can verify. Words of
   intent or personification, such as "nestling against" or "answering each
@@ -188,11 +191,15 @@ Canvas format is neither vocabulary nor a plugin. It is a resolved host option o
   noun such as "flat", not the act of painting. Its two dimensions are **quality**
   (empty, flat, pale ink wash, grain, stipple, hatch, crosshatch, aquatint) and
   **density** (dense, faint). Density is relative to the tool, not an absolute
-  darkness. Paper grain belongs to the support named by `Ground:`. Grain and
+  darkness. Paper grain belongs to the support (the grounds category). Grain and
   wash remain applicable to lines and arcs: grain raises support absorption and
   tooth, while wash changes no sheet properties and produces a pale band at
   three times the width and 0.35 of the opacity. The other six qualities move
-  to the preceding closed shape and are dropped when there is none. Current
+  to the preceding closed shape and are dropped when there is none. On a closed
+  shape, an explicit wash, grain, stipple, hatch, crosshatch, or aquatint is
+  itself the area's performance and adds no flat base fill beneath it (DDL
+  engine 46). A flat fill comes only from an explicit flat surface or the
+  omitted-surface default of a closed shape. Current
   bleeding is independent movement vocabulary, not a surface quality. An
   instruction to fill the background is not about a surface** either; it goes to
   the document-owned `background` field. The finite form is `fill [the]
@@ -250,8 +257,10 @@ saving or delivering an empty Score with its background as an omitted success.
   engine 34): **paper, washi, ink-wash ground, charcoal ground, canvas, drawing
   paper, mezzotint** -- the seven values of `canvas.ground.material`. **Where
   surfaces says how the inside of a closed shape is, grounds says what the
-  canvas itself is**, which is why a description writes it as `Ground: ...` and
-  not `Surface: ...`. **All seven are tiled as a `<pattern>` and use no
+  canvas itself is**, and a description names it as a sentence of its own, such as “washi.” or
+  “ink-wash ground.” Headed forms such as `Ground: ...` and `Surface: ...` are
+  not accepted (2026-09-24); a surface quality is written as a modifier of its
+  shape, as in “a pale ink wash circle”. **All seven are tiled as a `<pattern>` and use no
   `<filter>`, so the three SVG profiles emit the same ground.** **The cost limit
   is the byte size of the ground layer (24 KB), not a count of elements.**
 
@@ -1440,14 +1449,14 @@ Shared standalone grammar makes modifier phrases own their connectors but exclud
 | fully natural sentences ("place a thin line, with a slight sway, near the center") | leaves room for a second *interpretation* in stage two |
 | a structured list (YAML-like) | looks like code; it takes the pleasure out of describing, and similar graphical description languages already exist |
 | function-call style (`place(subject=line, position=center)`) | too close to code |
-| a separate modifier line (an early draft that wrote "sway: small" on a line of its own) | never adopted in the implementation. Motion words are written inline as sentences, as in "the line sways finely" (the fixture corpus is canonical). The exception is surface and ground texture, where only the fixed phrases 「面: ...」 and 「地: ...」 are separated onto their own line |
+| a separate modifier line (an early draft that wrote "sway: small" on a line of its own) | never adopted in the implementation. Motion words are written inline as sentences, as in "the line sways finely" (the fixture corpus is canonical). Surface and ground follow the same rule: headed forms such as 「面: ...」 and 「地: ...」 are not adopted (removed from this specification on 2026-09-24). A ground is a sentence of its own such as “washi.”, and a surface is a modifier of its shape |
 
 **What the adopted form does:**
 
 - keeps the rhythm of natural sentences (the readability of tanka)
 - limits the vocabulary to the core (place, thin, center, and the like)
-- writes motion words inline, separating only surface and ground texture with
-  the fixed 「面: / 地:」 phrases
+- writes motion words inline; a surface quality is a modifier of its shape and
+  a ground is a sentence of its own such as “washi.”
 - keeps the structure of the format common between the Japanese and the
   English version
 - **is designed on the assumption that the author will see it** (it is shown
@@ -1476,6 +1485,29 @@ interpretation. Vocabulary, the closed schema, limits, and source facts are
 passed as a prompt lock, and output stays inside that lock. This is the finite
 typed-normalization contract synchronized in I-640; no particular model name or
 model class is canonical.
+
+**Work plan (Stage 1 prompt `inku.typed-stage1-work-plan-prompt.v1`).** The
+initial-generation LLM does not write visible DDL text; it returns a closed,
+typed work plan as JSON. A work plan holds up to eight standalone-shape layers
+plus optional ground and background, and every value is an enum projected from
+the Saijiki asset, the parser's finite modifier forms, the fluctuation
+classifier, and the Score intensity values. The values each form (with its
+proportion word) accepts come from the capability matrix
+`inku.work-plan-capabilities.v1`, generated by compiling one sentence per value,
+and shared-Rust validation is authoritative rather than provider-side decoding.
+An out-of-range value becomes unspecified for that field, a layer without a
+shape is removed alone, and nothing stops the drawing. The normalized plan is
+printed deterministically as visible DDL in the request language, and only that
+text reaches the existing compiler. The capability matrix and bilingual
+property tests guarantee that every printed layer compiles without a
+diagnostic, so initial generation no longer drops clauses. The response schema
+uses only object, array, string enums, and bounded integers, which every
+existing provider transport carries unchanged. A saved response that already
+carries `normalized_ddl` is read unchanged so recorded executions replay. The
+work plan is transient; visible DDL and the Score remain authoritative. Direct
+and edited author DDL is still parsed with the full grammar and is never limited
+to the plan subset. This edition's work plan contains no Macro invocation: core
+vocabulary is primary and Macros are an optional extension.
 
 Initial interpretation condenses the whole description's roles, contrasts,
 repetition, density, empty space, and texture into a short visual composition.
@@ -1518,6 +1550,18 @@ word does not authorize every head combination. Explicit independent points,
 lines, and marks must not be absorbed into surface attributes. Neither this guide
 nor the tool notes are added to camera or hole-completion system text.
 
+### 12.6.1 Sketch from Life (Supplementing Place and Light, draw-system03)
+
+Only when the author chooses it, a **sketch** runs once before the work plan. It never rewrites the description: it supplements the **extent of place** and the **seasonal or time-of-day light** the description implies, in one to three sentences of plain words for things. Stage 1 receives both the description and the sketch; from the sketch it only adds scene or back layers and the background color, while subjects, movement, direction, counts, and placement follow the description. The sketch never takes the description's place, and the description remains the work's provenance in storage and display (§12.16).
+
+The sketch is chosen per drawing and is **off by default**; choosing on runs it. The per-work "redraw with or without the sketch" saves the result as a child of the chosen work (derivation kind `sketch_grain_change`, metadata `from_sketch_state` and `to_sketch_mode`). A sketch the author edited, or a saved one, is used as it stands without a request.
+
+There is no automatic mode that decides per description whether to sketch. In a blind comparison on 70 development descriptions the sketch was even (32 with, 30 without); no general criterion such as the amount of cues picked the works it helped, and the rule checked on 110 unused descriptions in Japanese and English made the pictures no better (43 with, 50 without) (2026-09-25, author decision).
+
+The sketch **never waits for a confirmation**: nothing asks the author between pressing draw and seeing the picture. A failed sketch request goes on to the work plan with the description alone, and the drawing completes (`fallback`). A response with nothing to supplement is recorded as `not_needed` and the description alone is drawn. The sketch can be read and edited after drawing; editing it draws again.
+
+In the shared pipeline the sketch is the optional effect `generate_sketch` before Stage 1 (result `sketch_generated`, prompt `inku.sketch-supplement-prompt.v1`, whose response is only the `sketch` string). The start input and a regeneration from the description may carry `sketch` (`off`, `on`, or `supplied`). The snapshot's `sketch` record (`pending`, `supplemented`, `not_needed`, `fallback`, `supplied`) states what the sketch did, and the saved `sketch_state` becomes `supplemented` (with the sketch text and an empty `sketch_grain`), `not_needed`, `fallback`, or `off`. The retry budget is `sketch_retry`, or the catalog-selection budget when absent. The retired layer's `fine` and `coarse` grains (§12.15) remain only for displaying saved works and are not used by the new sketch.
+
 ### 12.7 Stage 2 Completion and Deterministic Structuring
 
 The Stage 2 LLM returns a span-bounded patch candidate only for known holes explicitly reported by the compiler in saved visible DDL. The shared pipeline creates the request automatically; adoption requires author approval and a visible-DDL CAS save. The LLM does not output Score. The shared lowerer structures lock-verified typed meaning into Score once, preserving color, material, quantity, movement, arrangement path, rotation, canvas, and explicit relations.
@@ -1540,7 +1584,7 @@ A variation preserves its origin as either `stage1_generated` or `user_authored_
 
 Lineage editing identifies the history-row owner and selects its linked fork, without updating or replacing the old fork. Active `/executions/{id}/author-ddl` receives source, revision, and options. With unchanged settings and changed source it saves record metadata while preserving CAS, origin, and the DDL-authority lock. A changed canvas, wild setting, or other option creates a parent-linked direct-DDL variation under DDL authority without changing the original source, config, or authority. An unchanged source with changed record metadata also saves a new edition instead of discarding the existing result. History sidecar v2 immutably records the four core diagnostics, renderer diagnostics, and `resource_execution` for the matching revision and source, and normal history display restores them. V1 has no diagnostic record. A corrupt sidecar warns only for that work while saved DDL, Score, and SVG remain visible; it neither infers latest state nor recompiles.
 
-A typed Stage 1 request carries bounded projections of the finite vocabulary derived from the Saijiki, resolved catalog and canvas identities, and only each validated Macro's qualified name, version, definition digest, parameters, and host-supplied localized summary. Its response schema permits visible normalized DDL alone. When parsing committed visible DDL identifies completable known holes, the shared pipeline automatically creates the completion request without a separate user operation. With no holes it does not call the Stage 2 LLM. The Stage 1 residual-adoption path in §12.8 is an exception: after its save acknowledgment it delivers the deterministic remainder without another LLM request. A clause containing words outside the finite grammar may become a known hole only when the compiler can establish its exact clause boundary and an exact drawing head, ground, or background anchor; unknowns without that exact boundary, conflicts, and integrity errors are not completion targets. When a following continuation clause is unresolved only because of a patchable upstream hole, its continuation diagnostic is deferred until recompilation after the patch; the following clause does not become an additional rewrite target.
+A typed Stage 1 request carries bounded projections of the finite vocabulary derived from the Saijiki, resolved catalog and canvas identities, and only each validated Macro's qualified name, version, definition digest, parameters, and host-supplied localized summary. Its response schema permits only the work plan of §12.6; the LLM never writes visible DDL text directly. When parsing committed visible DDL identifies completable known holes, the shared pipeline automatically creates the completion request without a separate user operation. With no holes it does not call the Stage 2 LLM. The Stage 1 residual-adoption path in §12.8 is an exception: after its save acknowledgment it delivers the deterministic remainder without another LLM request. A clause containing words outside the finite grammar may become a known hole only when the compiler can establish its exact clause boundary and an exact drawing head, ground, or background anchor; unknowns without that exact boundary, conflicts, and integrity errors are not completion targets. When a following continuation clause is unresolved only because of a patchable upstream hole, its continuation diagnostic is deferred until recompilation after the patch; the following clause does not become an additional rewrite target.
 
 A hole-completion request carries the original target text, established typed facts, finite Saijiki vocabulary, and accepted grammar. Unrecognized expressions remain in that original text. A reference target or other compiler-confirmed dependency may supply the smallest necessary read-only context. Reading scope and editing scope are distinct; the request excludes descriptions, unrelated clauses, Score, renderer instructions, and chain of thought. Multiple colors or tools alone do not justify inventing alternation, order, or a quantity split, and an unrepresentable meaning is not changed to a nearby different meaning.
 
@@ -2027,7 +2071,7 @@ Closed fills carry the selected tool's texture. From Score 0.3.0 onward, `surfac
 | Oil paint | Broad paint tracks and pigment-derived bristle relief. Dense strengthens and simplifies the ridges; faint makes deposited paint translucent |
 | Computer | Vertical RGB bands, black interlaced scanlines, and a soft glow evoke a CRT. Dense lowers brightness; faint raises it |
 
-Compact shared patterns, masks, and filters carry grain and line textures; oil paint uses filter-free paths. Oil fill width and spacing are three times the baseline. Interior ridge contrast is 0.6 / 1.05 / 0.6 for normal / dense / faint. Dense simplifies paired ridge banks within 0.25 per 1000 short-edge units before widening; faint applies opacity 0.54 to each paint stroke. The base and outline are not widened. Compat preserves its filter-free, clip-free approximation: Computer retains the contour-path base field, grille, and black scanlines, while Oil retains shape and intensity through its existing paint passes without clipped width expansion. Compat does not promise pixel equality with Display.
+Compact shared patterns, masks, and filters carry grain and line textures; oil paint uses filter-free paths. Oil fill width and spacing are three times the baseline. One oil interior fill lays down at most 24 loaded passes, and all oil interior fills of a work share a budget of 120 passes (at least 3 each), widening the passes of a work with many large oil fills so its SVG stays bounded (render engine 67). Interior ridge contrast is 0.6 / 1.05 / 0.6 for normal / dense / faint. Dense simplifies paired ridge banks within 0.25 per 1000 short-edge units before widening; faint applies opacity 0.54 to each paint stroke. The base and outline are not widened. Compat preserves its filter-free, clip-free approximation: Computer retains the contour-path base field, grille, and black scanlines, while Oil retains shape and intensity through its existing paint passes without clipped width expansion. Compat does not promise pixel equality with Display.
 
 Typed DDL intensity delivery covers solid closed fills. Non-solid textures, unfilled lines and arcs, and explicit Point surfaces retain the existing unsupported diagnostics. Score rendering capability and the delivered typed-DDL subset are distinct. Full typed runtime / UI / save integration remains a later task.
 
@@ -2237,6 +2281,12 @@ around the anchor**, not around the middle of the canvas.
 description stated, so it stays there instead of moving onto the anchor.
 Up to engine 19 every layout decided placement from the seed, and **77.8% of the
 expanded marks never consulted a declared coordinate**.
+
+#### Performance inside a typed placement (render engine 67)
+
+A Score 0.10 `arrangement.resolved` recipe, anchor, and domain fix where a group lives and how far it extends. Inside that extent the renderer performs the same arrangement's `density`, `cluster_count`, `rhythm_spacing`, `jitter`, and `fade`. Scatter members gather toward `cluster_count` clusters (a density-dependent number when omitted) by an amount set by density; line-up members follow the `rhythm_spacing`; every recipe offsets positions by `jitter`; and `fade` attenuates intensity across the group. Several marks placed or drawn at one spot through the `place` recipe form a bounded bundle around it instead of an exact overlay. Performed members also receive the tool's existing member hand for size and rotation. Tiled grids are not disturbed by these fields.
+
+Every choice is bound to `render_seed` and the original owner and reads only Score fields; nothing branches on words, subjects, or source text. `density: none`, `jitter: 0`, `rhythm_spacing: none`, and `fade: none` leave recipe centers unchanged. The compiler writes these explicit defaults when no performance vocabulary is present, so stored Score meaning is unchanged and only its replayed appearance follows this engine.
 
 #### How a stated count is treated (v2.7.6)
 

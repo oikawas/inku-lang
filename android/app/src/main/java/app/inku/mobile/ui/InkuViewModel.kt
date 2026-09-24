@@ -101,6 +101,12 @@ internal fun sourceTextOf(item: HistoryItemEntity): String =
 
 const val SETTING_KEY_MASCOT_KIND = "mascot_kind"
 const val SETTING_KEY_UI_LANGUAGE = "ui_lang"
+const val SETTING_KEY_UI_TEXT_SCALE = "ui_text_scale"
+val UI_TEXT_SCALE_CHOICES: List<Float> = listOf(1f, 1.15f, 1.3f, 1.5f)
+
+private fun normalizeUiTextScale(scale: Float): Float =
+    if (scale.isFinite()) UI_TEXT_SCALE_CHOICES.minBy { abs(it - scale) } else 1f
+
 /** 「推敲要素の選択は前回値をブラウザに記憶する」-- here, the device remembers it. */
 const val SETTING_KEY_REFINEMENT_ELEMENT = "refinement_element"
 /** 写生 (Stage 0.5): which of the three states the control was left in. */
@@ -213,6 +219,7 @@ data class InkuUiState(
     val renderTab: RenderTab = RenderTab.Artwork,
     val uiMode: String = "full",
     val uiLanguage: UiLanguage = UiLanguage.DEFAULT,
+    val uiTextScale: Float = 1f,
     val mascotKind: String = "incu",
     val canvasZoom: Float = 1.0f,
     val canvasPanX: Float = 0f,
@@ -1512,6 +1519,12 @@ class InkuViewModel @JvmOverloads constructor(
     fun setUiLanguage(language: UiLanguage) {
         localState.value = localState.value.copy(uiLanguage = language, message = null)
         persistSetting(SETTING_KEY_UI_LANGUAGE, JSONObject().put("value", language.code).toString())
+    }
+
+    fun setUiTextScale(scale: Float) {
+        val normalized = normalizeUiTextScale(scale)
+        localState.value = localState.value.copy(uiTextScale = normalized)
+        persistSetting(SETTING_KEY_UI_TEXT_SCALE, JSONObject().put("value", normalized).toString())
     }
 
     fun setMascotKind(kind: String) {
@@ -3023,6 +3036,9 @@ class InkuViewModel @JvmOverloads constructor(
         val uiLanguage = settings[SETTING_KEY_UI_LANGUAGE]
             ?.let { UiLanguage.fromCode(JSONObject(it).optString("value")) }
             ?: current.uiLanguage
+        val uiTextScale = settings[SETTING_KEY_UI_TEXT_SCALE]
+            ?.let { normalizeUiTextScale(JSONObject(it).optDouble("value", 1.0).toFloat()) }
+            ?: current.uiTextScale
         val mascotKind = settings[SETTING_KEY_MASCOT_KIND]?.let { JSONObject(it).optString("value", current.mascotKind) } ?: current.mascotKind
         val demoSeed = settings["demo_seed_phrase"]?.let { JSONObject(it).optString("value", current.demoSeed) } ?: current.demoSeed
         val demoInterval = settings["demo_interval_seconds"]?.let { JSONObject(it).optInt("value", current.demoIntervalSeconds) } ?: current.demoIntervalSeconds
@@ -3053,6 +3069,7 @@ class InkuViewModel @JvmOverloads constructor(
             cameraVisionOutputMode = cameraVisionOutputMode,
             uiMode = uiMode,
             uiLanguage = uiLanguage,
+            uiTextScale = uiTextScale,
             mascotKind = mascotKind,
             demoSeed = demoSeed,
             demoIntervalSeconds = demoInterval.coerceIn(1, 999),

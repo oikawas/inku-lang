@@ -12,9 +12,8 @@ import androidx.compose.ui.graphics.Color
  * roles, not values -- `CardHairline`, not `Ink34302B` -- the same rule the web
  * side follows with `--action-bg` / `--accent`.
  *
- * The values are exactly the ones the screens already used. Nothing was merged,
- * rounded, or "tidied": two roles that happen to share an ARGB keep two names,
- * because they are two decisions that only currently agree.
+ * A warm charcoal ground and paper-toned controls leave colour to the work.
+ * Separate roles remain separate even where their current values agree.
  *
  * The app is dark-only. There is no `lightColorScheme` and adding one has not
  * been ruled on.
@@ -25,28 +24,28 @@ import androidx.compose.ui.graphics.Color
 // indirectly, so a change here moves the whole app.
 
 /** The page behind everything. */
-val InkBackground = Color(0xFF11100F)
+val InkBackground = Color(0xFF141412)
 
 /** Cards, dialogs, and rows that sit one step above the page. */
-val InkSurface = Color(0xFF181715)
+val InkSurface = Color(0xFF1B1B18)
 
 /** Inset wells and pressed states, one step above `InkSurface`. */
-val InkSurfaceVariant = Color(0xFF24211E)
+val InkSurfaceVariant = Color(0xFF262620)
 
-/** The blue the app uses for selection and primary actions. */
-val InkPrimary = Color(0xFF7FA6D8)
+/** Paper tone for primary actions and active navigation. */
+val InkPrimary = Color(0xFFE9E2D3)
 
 /** The sand tone the app uses for the drawing action and active hints. */
-val InkSecondary = Color(0xFFEAD7A3)
+val InkSecondary = Color(0xFFC9C8AD)
 
 /** Dividers and field outlines. */
-val InkOutline = Color(0xFF514A43)
+val InkOutline = Color(0xFF48483F)
 
 /** Body text on the page and on surfaces. */
 val InkOnSurface = Color(0xFFEDE7DE)
 
 /** Secondary text: captions, units, and disabled labels. */
-val InkOnSurfaceMuted = Color(0xFFCFC6BA)
+val InkOnSurfaceMuted = Color(0xFFB6B5A9)
 
 val InkuColors = darkColorScheme(
     background = InkBackground,
@@ -54,6 +53,8 @@ val InkuColors = darkColorScheme(
     surfaceVariant = InkSurfaceVariant,
     primary = InkPrimary,
     secondary = InkSecondary,
+    onPrimary = Color(0xFF1B1B18),
+    onSecondary = Color(0xFF1B1B18),
     outline = InkOutline,
     onBackground = InkOnSurface,
     onSurface = InkOnSurface,
@@ -177,10 +178,10 @@ val FailureSummaryWash = Color(0x22E08A7A)
 // --- Surfaces and containers ------------------------------------------------
 
 /** The well behind a dense text input. */
-val InputWellSurface = Color(0xFF191816)
+val InputWellSurface = Color(0xFF1B1B18)
 
 /** A settings card's container. */
-val SettingsCardSurface = Color(0xFF1B1A18)
+val SettingsCardSurface = Color(0xFF1B1B18)
 
 /** The card that frames the canvas. */
 val CanvasPanelSurface = Color(0xFF1B1B1A)
@@ -201,18 +202,18 @@ val RenderTextInk = Color(0xFF22201D)
 val HistoryBadgeSurface = Color(0xCC24211E)
 
 /** A mini pill that is not selected. */
-val MiniPillSurface = Color(0xDD24211E)
+val MiniPillSurface = Color(0xDD262620)
 
 /** The drawing action button when it is not tonal. */
-val DrawingActionSurface = Color(0xFF233144)
+val DrawingActionSurface = Color(0xFF33352B)
 
 // --- Borders and hairlines --------------------------------------------------
 
 /** The hairline around a card, a settings card, and the model asset rows. */
-val CardHairline = Color(0xFF34302B)
+val CardHairline = Color(0xFF36362F)
 
 /** The divider above the bottom navigation bar. */
-val BottomNavDivider = Color(0xFF26221E)
+val BottomNavDivider = Color(0xFF36362F)
 
 /** The hairline around the canvas panel. */
 val CanvasPanelHairline = Color(0xFF2C2925)
@@ -224,7 +225,7 @@ val HeroCardHairline = Color(0x1A000000)
 val SwatchHairline = Color(0x66000000)
 
 /** The ring that marks a selected history tile or nav button. */
-val SelectionRing = Color(0x337FA6D8)
+val SelectionRing = Color(0x33E9E2D3)
 
 // --- Overlays and tints -----------------------------------------------------
 
@@ -241,7 +242,7 @@ val HeroOverlayInk = Color(0xFFEDE7DE)
 val ActiveRowTint = Color(0x1AEAD7A3)
 
 /** The wash behind an active settings row. */
-val ActiveSettingsRowTint = Color(0x1A7FA6D8)
+val ActiveSettingsRowTint = Color(0x1AE9E2D3)
 
 /** The unfilled part of a progress bar. */
 val ProgressTrack = Color(0x3324211E)

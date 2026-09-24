@@ -6,6 +6,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 36 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-24 — Refine Android creation and text display
+
+The Pixel 9 Android UI now has three destinations: Studio, Works, and Series. New work starts with its description, while saved work opens with the artwork and original description for review. Camera, batch, demo, and settings are grouped into clear entry points. The Works grid adapts to the available width. Series uses full-width cards and explains how to select a work when no lineage is in view. A restrained charcoal-and-paper palette and line icons keep attention on the artwork. Display settings add persistent 100–150% app text scaling on top of the device text scale. The drawing engine, DDL, work semantics, and persistence schema are unchanged.
+
 ### 2026-09-23 — Synchronize the specification with the current Web UI
 
 Aligned the Japanese and English specification with the current making and Library state retention, description and instruction editing with the Saijiki, responsive work-condition display, Lineage-grouped Library thumbnails, the shared Export menu and Lineage scopes, and Demo's work-conditions header. The batch-resume wording now also uses the current saved-success meaning. Product code and versions are unchanged.

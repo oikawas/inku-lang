@@ -3,9 +3,9 @@
 このディレクトリは、ネイティブ単体 Android アプリのワークスペースであり、Git 管理対象とする。
 ローカル専用成果物、端末ID、ダウンロード済みモデル、ログ、秘密情報は追跡対象に含めない。
 
-最終更新: 2026-08-31。
+最終更新: 2026-09-24。
 
-**追随状況**: Android は `2.1.4-android.77` / **render engine `default / 41`** /
+**追随状況**: Android は `2.1.4-android.79` / **render engine `default / 41`** /
 **DDL engine version `20`** の世代にある。描画版は固定Kotlin定数ではなく、同梱する
 `core/crates/inku-render/` からJNI経由で取得し、DDL参照版は`ReferenceCorpus.kt`が名乗る。
 master の web/server も **render engine `41`** で、serverの **`ddl_engine_version` は21** であり、
@@ -135,23 +135,16 @@ Rust authoring pipelineとraster presentationを導入済みである。以下�
   通常の記述、直接DDL、batch／demo、推敲、カメラ経路からは到達しない。
 - Kotlinはprovider／camera、Room／history、承認と表示のhost副作用を所有し、
   描画geometry／material／surface／stroke／SVG serializerは共有Rustだけが所有する。
-- Dark Compose UI は、Web-style workbench から Claude Design prototype ベースの Pixel 9 mobile-first layout へ移行中:
-  - top application header
-  - bottom navigation: 記述、カメラ、履歴、系譜。記述は Write へ戻り、カメラは撮影またはPhoto Pickerの1枚を選び、端末内Gemmaで既定の記述または明示選択した上級DDLへ変換し、固定NIM／`vivid_material`描画・保存までone-touchで進める
-  - canvas control strip は全画面を中央に置き、右端menuから既存のバッチと設定へ進む。描画設定panelに記述／バッチのsegmented modeは置かない
-  - selected canvas aspect を尊重しつつ、Pixel 9 で prompt と DDL path が届く bounded first-screen canvas card
-  - canvas 下の prompt と DDL interpretation
-  - local LLM work 中の layout jump を避ける fixed-height drawing CTA と in-place generating state / progress indicator
-  - render sub-tabs: Artwork, Prompt, JSON
-  - model、color catalog、canvas selection の explicit button rows
-  - search/filter placeholders と two-column thumbnail cards を持つ dedicated History screen
-  - overlay text badge ではなく accent border と corner marker による History selected-card affordance
-- 選択中履歴 item の操作:
-  - star / unstar
-  - soft trash
-  - Android `FileProvider` 経由の JSON share export
-- Compose画面のキャンバス直下に履歴thumbnail stripを持つ。選択、Stage 1 / 2モデル、
-  保存日時、色カタログID、作品hash、canvasを、保存済み履歴値だけから表示する。
+- Dark Compose UI は、Pixel 9 で記述から制作へ進み、保存作品を結果から見直せる構成とする:
+  - 下部 navigation は「制作」「作品」「連作」の3つの実画面とし、記号文字ではなく線画アイコンを使う。共通headerから設定へ進める
+  - 新規制作は記述欄を最初に表示し、空の作品canvasを先行表示しない。記述欄のカメラ操作から撮影またはPhoto Pickerへ進む。モデル、色カタログ、canvasは要約行から展開し、解釈とDDLも折りたたんで表示する
+  - 「制作ツール」menuから記述、バッチ、デモへ進む。保存済み作品の「新規制作」は独立した操作とする
+  - 保存済み作品は作品画像と元の記述を先に表示する。「この作品を推敲」から既存編集欄を開き、「新規制作」から記述をリセットする。解釈／DDLは独立して展開でき、閲覧だけではrevisionを作らない
+  - 作品一覧は画面幅に応じた2列以上のthumbnail gridとし、Pixel 9では2列で作品名を複数行表示する
+  - チャコールと紙色を基調とし、角丸と線画iconを抑制して作品画像の視認性を保つ
+  - 設定の表示項目で文字サイズを100%、115%、130%、150%から選ぶ。選択はRoomへ保存し、端末の文字倍率に加えてCompose文字を拡大する
+- saved-work result はcanvas全画面表示、JSON / Prompt表示、作品情報sheet、系譜への移動を保持する。従来のcanvas下thumbnail stripは表示しない。
+- 作品画面の選択 item に対する Star／解除、soft trash、Android `FileProvider` 経由のJSON共有。
 - 保存済み作品の生成情報sheetは、写生、モデルと言語、seedと変奏、色カタログと色map、
   canvas、render hash / engine、作成日時、処理時間を読み取り専用で表示する。
 - 系譜cardは保存済みDDLの編集とStar／解除を持ち、focus外cardの操作でも現在focusを変えない。

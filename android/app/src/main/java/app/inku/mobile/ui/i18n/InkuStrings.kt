@@ -38,6 +38,20 @@ interface InkuStrings {
     // --- Settings: language -------------------------------------------------
     val settingsLanguageTitle: String
     val settingsLanguageSubtitle: String
+    val settingsDisplayTitle: String
+    val settingsTextSizeTitle: String
+    val settingsTextSizeSubtitle: String
+    val settingsTextSizeSample: String
+    val textSizeStandard: String
+    val textSizeLarge: String
+    val textSizeLargest: String
+    val studioTitle: String
+    val worksTitle: String
+    val seriesTitle: String
+    val studioSubtitle: String
+    val productionTools: String
+    val reviseWork: String
+    val interpretationToggle: String
 
     // --- Drawing status -----------------------------------------------------
     val statusStage1: String

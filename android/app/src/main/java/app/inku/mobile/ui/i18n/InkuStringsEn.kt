@@ -19,6 +19,20 @@ object InkuStringsEn : InkuStrings {
 
     override val settingsLanguageTitle = "Language"
     override val settingsLanguageSubtitle = "Interface wording, Saijiki, and the language of a work"
+    override val settingsDisplayTitle = "Display"
+    override val settingsTextSizeTitle = "Text size"
+    override val settingsTextSizeSubtitle = "Adjusts text in addition to your device setting"
+    override val settingsTextSizeSample = "From words to a work."
+    override val textSizeStandard = "Standard"
+    override val textSizeLarge = "Larger"
+    override val textSizeLargest = "Largest"
+    override val studioTitle = "Studio"
+    override val worksTitle = "Works"
+    override val seriesTitle = "Series"
+    override val studioSubtitle = "Write, then draw"
+    override val productionTools = "Studio tools"
+    override val reviseWork = "Refine this work"
+    override val interpretationToggle = "View interpretation"
 
     // 生成 is not "generating": Stage 1 interprets and Stage 2 performs, which is
     // what those stages are called throughout (GLOSSARY §2).
@@ -308,7 +322,7 @@ object InkuStringsEn : InkuStrings {
     override val provenanceHash = "The work's provenance hash"
     override val workLineage = "The work's lineage"
     override val save = "Save"
-    override val lineageEmpty = "Once a work is saved, its lineage appears here."
+    override val lineageEmpty = "Select a work to see its lineage here."
     override val saving = "Saving…"
     override val saved = "Saved"
     override val makeCandidates = "Make options"

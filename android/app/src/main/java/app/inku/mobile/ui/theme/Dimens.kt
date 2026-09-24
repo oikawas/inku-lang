@@ -58,8 +58,8 @@ object Dimens {
     // --- Corner radii -------------------------------------------------------
     // Two. Anything not listed here is a pill: `RoundedCornerShape(100)`.
 
-    /** 16dp. Cards, dialogs, settings rows, and the text fields. */
-    val radiusCard: Dp = 16.dp
+    /** 8dp. Quiet corners for cards, controls, and text fields. */
+    val radiusCard: Dp = 8.dp
 
     /** 28dp. Half of [buttonHeightLarge]: the full-width action button. */
     val radiusPill: Dp = 28.dp

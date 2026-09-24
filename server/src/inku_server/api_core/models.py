@@ -60,7 +60,7 @@ class HistoryPostBody(BaseModel):
     # value is a 422 rather than a quiet not_applicable, and an absent one is
     # derived server-side. Only a row older than the column may end up NULL.
     sketch_state: str | None = Field(
-        default=None, pattern="^(fine|coarse|fallback|off|not_applicable)$"
+        default=None, pattern="^(fine|coarse|fallback|off|not_applicable|not_needed|supplemented)$"
     )
     source_text: str | None = None
     display_label: str | None = None

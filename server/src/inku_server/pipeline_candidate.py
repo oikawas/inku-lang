@@ -31,6 +31,7 @@ _PIPELINE_FAILURES = {
 _PIPELINE_FAILURE_DETAILS = {"credentials_unavailable"}
 _HOLE_COMPLETION_STATUSES = {"validated", "rejected", "unresolved"}
 _ACTION_STAGES = {
+    "generate_sketch": "sketch",
     "select_description_catalog": "catalog",
     "generate_normalized_ddl": "stage1",
     "complete_visible_ddl_holes": "stage2",
@@ -295,6 +296,7 @@ class CandidateExecution:
             result.update({"description": self.context.get("description", ""),
                            "parent": self.context.get("parent"),
                            "busy": state["action"] is not None,
+                           "sketch": state.get("sketch"),
                            "catalog_diagnostics": self.context.get("macro_catalog", {}).get("diagnostics", []),
                            "rendered": self._rendered,
                            "result": self.context.get("result")})

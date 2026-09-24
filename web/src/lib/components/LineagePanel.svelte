@@ -5,7 +5,7 @@
 	import HistoryThumbnail from './HistoryThumbnail.svelte';
 	import SavedWorkExportMenu from './SavedWorkExportMenu.svelte';
 	import WorkEditDialog from './WorkEditDialog.svelte';
-	import type { SketchGrain } from '$lib/sketch';
+	import type { SketchMode } from '$lib/sketch';
 	import { derivationKindLabel } from '$lib/derivation';
 	import { t } from '$lib/i18n/index.svelte';
 	import { modelDisplayName, modelShortName, qualifiedModelId, type Provider, type ProviderGroup } from '$lib/models';
@@ -45,8 +45,8 @@
 		onLoadOverview: () => void | Promise<void>;
 		onLoadBranch: (nodeId: string) => void | Promise<void>;
 		onPaintOne: (text: string, options: any) => Promise<any>;
-		/** Redraw a work with a different sketch-from-life grain as its child. */
-		onDrawSketchGrain: (node: LineageNode, grain: SketchGrain, signal?: AbortSignal) => Promise<void>;
+		/** Redraw a work with the sketch off or always on, as its child. */
+		onDrawSketchGrain: (node: LineageNode, mode: SketchMode, signal?: AbortSignal) => Promise<void>;
 		onVisionAdvice: (historyId: string, model: string, instruction: string, direction: string, enabledKinds: string[], signal: AbortSignal) => Promise<any>;
 		onSaveVisionModel: (provider: Provider, model: string) => void | Promise<void>;
 		visionModel: string;

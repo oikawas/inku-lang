@@ -19,7 +19,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 
-import { SKETCH_STATES, sketchModeLabel, sketchStateNote, type SketchState } from './sketch.ts';
+import { SKETCH_STATES, sketchGrainLabel, sketchStateNote, type SketchState } from './sketch.ts';
 
 const read = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf8');
 const PANEL = read('./components/CanvasPanel.svelte');
@@ -55,7 +55,7 @@ test('T-37  every state the record can be in reaches a row', () => {
 		for (const isJapanese of [true, false]) {
 			const grain = state === 'fine' || state === 'coarse' ? state : null;
 			const shown = grain
-				? sketchModeLabel(grain, isJapanese)
+				? sketchGrainLabel(grain, isJapanese)
 				: sketchStateNote(state, isJapanese);
 			assert.ok(shown.trim().length > 0, `${state} says nothing (ja=${isJapanese})`);
 		}

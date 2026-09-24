@@ -172,6 +172,9 @@ class PipelineService:
                 config = select_canvas(config, self.binding.canvas_registry, selected)
             run = self._host(owner, config, context)
             authoring = {"tag": "description", "description": text, "auto_catalog": context.get("auto_catalog", self.auto_catalog)} if kind == "description" else {"tag": "direct_ddl", "source": text}
+            sketch = context.get("sketch_request") or {"mode": "off"}
+            if kind == "description" and sketch["mode"] != "off":
+                authoring["sketch"] = sketch
             run.start_new(authoring)
             run.context["execution_id"] = run.view()["execution_id"]
             key = (owner, run.view()["execution_id"])
@@ -334,6 +337,9 @@ class PipelineService:
             raise HTTPException(422, "unsupported_author_action")
         elif payload.get("tag") == "generate_from_description":
             payload = {**payload, "auto_catalog": run.context.get("auto_catalog", self.auto_catalog)}
+            sketch = run.context.get("sketch_request") or {"mode": "off"}
+            if sketch["mode"] != "off":
+                payload["sketch"] = sketch
         run.command(payload)
         with self._lock:
             self._schedule((owner, execution_id), run)

@@ -4,7 +4,7 @@
 	import SketchSelect from './SketchSelect.svelte';
 	import RunStatus from './RunStatus.svelte';
 	import WildToggle from './WildToggle.svelte';
-	import { DEFAULT_SKETCH_GRAIN, normalizeSketchGrain, sketchModeLabel, type SketchGrain, type SketchMode } from '$lib/sketch';
+	import { normalizeSketchState, sketchStateNote, type SketchMode } from '$lib/sketch';
 	import type { LineageNode } from '$lib/features/history/types';
 	import { restoreWorkActionFocus } from './WorkActionMenu.svelte';
 
@@ -19,13 +19,13 @@
 		tokensOut: number | null;
 		onClose: () => void;
 		onDrawDescription: (node: LineageNode, text: string, signal?: AbortSignal, wild?: boolean | null) => void | Promise<void>;
-		onDrawSketchGrain: (node: LineageNode, grain: SketchGrain, signal?: AbortSignal) => void | Promise<void>;
+		onDrawSketchGrain: (node: LineageNode, mode: SketchMode, signal?: AbortSignal) => void | Promise<void>;
 	};
 
 	let { node, mode, isJapanese, stageLabel, stage1ModelLabel, stage2ModelLabel, tokensIn, tokensOut, onClose, onDrawDescription, onDrawSketchGrain }: Props = $props();
 	let draft = $state('');
 	let wildOverride = $state<boolean | null>(null);
-	let grain = $state<SketchGrain>(DEFAULT_SKETCH_GRAIN);
+	let sketchMode = $state<SketchMode>('always');
 	let drawing = $state(false);
 	let error = $state<string | null>(null);
 	let elapsedMs = $state(0);
@@ -47,7 +47,8 @@
 		initializedKey = nextKey;
 		draft = mode === 'description' ? (node.history?.source_text ?? node.history?.input ?? '') : '';
 		wildOverride = null;
-		grain = normalizeSketchGrain(node.history?.sketch_grain) ?? DEFAULT_SKETCH_GRAIN;
+		// Offer the other side of what the work was drawn with.
+		sketchMode = node.history?.sketch_text ? 'off' : 'always';
 		error = null;
 	});
 
@@ -75,7 +76,7 @@
 		let saved = false;
 		try {
 			if (mode === 'description') await onDrawDescription(node, draft, controller.signal, wildOverride);
-			else await onDrawSketchGrain(node, grain, controller.signal);
+			else await onDrawSketchGrain(node, sketchMode, controller.signal);
 			saved = true;
 		} catch (cause) {
 			if (!(cause instanceof Error && cause.name === 'AbortError')) error = cause instanceof Error ? cause.message : String(cause);
@@ -102,7 +103,7 @@
 			<label for="work-edit-text">{t().workActionDescription}</label>
 			<textarea id="work-edit-text" rows="9" bind:value={draft} spellcheck disabled={drawing}></textarea>
 		{:else}
-			<SketchSelect compact value={grain as SketchMode} {isJapanese} disabled={drawing} onSelect={(next: SketchMode) => { if (next !== 'off') grain = next; }} />
+			<SketchSelect compact value={sketchMode} modes={['off', 'always']} {isJapanese} disabled={drawing} onSelect={(next: SketchMode) => (sketchMode = next)} />
 			{#if node.history?.sketch_text}<p class="sketch-parent-prose">{node.history.sketch_text}</p>
 			{:else}<p class="sketch-parent-prose empty">{t().workEditNoSketch}</p>{/if}
 		{/if}
@@ -115,7 +116,7 @@
 			{#if mode === 'description'}
 				<WildToggle value={wildOverride ?? (node.history?.render_wild === true)} {isJapanese} inherited={wildOverride === null} onSelect={(next) => (wildOverride = next)} />
 			{:else}
-				<span class="sketch-current">{t().workEditParentGrain}: {sketchModeLabel((normalizeSketchGrain(node.history?.sketch_grain) ?? 'off') as SketchMode, isJapanese)}</span>
+				<span class="sketch-current">{t().workEditParentGrain}: {node.history?.sketch_text ? (isJapanese ? 'あり' : 'With sketch') : (sketchStateNote(normalizeSketchState(node.history?.sketch_state), isJapanese) || (isJapanese ? 'なし' : 'None'))}</span>
 			{/if}
 			<button type="button" onclick={close}>{t().pipelineCancel}</button>
 			<button type="button" class="work-edit-draw" disabled={mode === 'description' && !draft.trim()} onclick={draw}>{t().pipelinePerform}</button>

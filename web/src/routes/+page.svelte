@@ -23,7 +23,7 @@
 	import { makeSavedWorkExportActions } from '$lib/features/export/saved-work-actions';
 	import type { LineageNode } from '$lib/features/history/types';
 	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
-	import { DEFAULT_SKETCH_MODE, normalizeSketchGrain, normalizeSketchState, sketchGrainOf, sketchModeLabel, sketchModeOf, sketchStateNote, type SketchMode, type SketchState } from '$lib/sketch';
+	import { DEFAULT_SKETCH_MODE, normalizeSketchGrain, normalizeSketchState, sketchGrainLabel, sketchModeLabel, sketchModeOf, sketchStateNote, type SketchMode, type SketchState } from '$lib/sketch';
 	import { composeFallbackReason, composeFallbackState, composeFallbackValue } from '$lib/composeFallback';
 	import { needsFallbackRefineConfirm, rememberFallbackRefineConfirm, type FallbackRefineParent } from '$lib/fallbackRefineGate';
 	import { submitDerivationKind as submitDerivationKindOf, type DerivationKind } from '$lib/derivation';
@@ -1559,10 +1559,10 @@ async function drawLineageDescriptionEdit(node: LineageNode, text: string, signa
 	await showNewLineageChild(view.result?.history_id, view.result?.lineage_node_id);
 }
 
-/** Sketching (Stage 0.5): redraw a saved work at a different grain, as its child.
- *  The prose is written again -- the grain is what changed, so replaying the
- *  stored prose would leave the parameter dead. */
-async function drawLineageSketchGrain(node: LineageNode, grain: 'fine' | 'coarse', signal?: AbortSignal): Promise<void> {
+/** Redraw a saved work with the sketch off or always on, as its child. The
+ *  sketch is asked again (or dropped) -- replaying the stored one would leave
+ *  the choice dead. */
+async function drawLineageSketchGrain(node: LineageNode, mode: SketchMode, signal?: AbortSignal): Promise<void> {
 	if (!node.history) return;
 	// Ask before the words are carried into a child (contract § stage 4).
 	if (!(await work.confirmFallbackRefine(node.history))) return;
@@ -1573,12 +1573,12 @@ async function drawLineageSketchGrain(node: LineageNode, grain: 'fine' | 'coarse
 		historyInput: sourceText,
 		canvasAspectId: lineageCanvasAspectId(node),
 		lineageParentNodeId: node.id,
-		sketchMode: grain,
+		sketchMode: mode,
 		derivationKind: 'sketch_grain_change',
 		derivationMetadata: {
 			edited_from_history_id: node.history.id ?? null,
-			from_sketch_grain: node.history.sketch_grain ?? null,
-			to_sketch_grain: grain
+			from_sketch_state: node.history.sketch_state ?? null,
+			to_sketch_mode: mode
 		},
 		signal,
 		renderOverrides: {
@@ -2704,7 +2704,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 									</button>
 								</Tooltip>
 								{#if work.sketchText !== null}
-									<span class="sketch-grain">{t().sketchGrainLabel}: {sketchModeLabel(sketchModeOf(work.result?.sketch_grain ?? sketchGrainOf(work.sketchMode)), getLang() === 'ja')}</span>
+									<span class="sketch-grain">{#if normalizeSketchGrain(work.result?.sketch_grain)}{t().sketchGrainLabel}: {sketchGrainLabel(normalizeSketchGrain(work.result?.sketch_grain) ?? 'fine', getLang() === 'ja')}{:else}{sketchModeLabel(work.sketchMode, getLang() === 'ja')}{/if}</span>
 									<!-- Editing needs the prose on screen, so the button unfolds the
 									     section rather than acting on what the author cannot see. -->
 									<button type="button" class="sketch-edit-btn" onclick={() => { work.sketchEditing = !work.sketchEditing; if (work.sketchEditing) describePanelSettings.revealSketch(); }}>

@@ -66,7 +66,7 @@ test('T-259: one current-work run owns the paint request and preserves caller ov
 			lineageParentNodeId: 'parent-1',
 			derivationKind: 'variation',
 			derivationMetadata: { source: 'test' },
-			sketchMode: 'coarse',
+			sketchMode: 'always',
 			sketchText: 'observed prose',
 			stage1Model: 'provider/one',
 			stage2Model: 'provider/two',
@@ -81,7 +81,7 @@ test('T-259: one current-work run owns the paint request and preserves caller ov
 			instructionLang: 'auto',
 			canvasAspectId: 'square',
 			ddlAutoRepairEnabled: true,
-			sketchMode: 'fine',
+			sketchMode: 'auto',
 			renderPayload: { render_wild: true }
 		},
 		{
@@ -104,7 +104,7 @@ test('T-259: one current-work run owns the paint request and preserves caller ov
 	assert.deepEqual(body, {
 		description: 'a red circle',
 		sketch: true,
-		sketch_grain: 'coarse',
+		sketch_mode: 'always',
 		sketch_text: 'observed prose',
 		stage1_model: 'provider/one',
 		stage2_model: 'provider/two',
@@ -158,7 +158,7 @@ test('T-260/T-261: stream progress and saved-work effects cross named capabiliti
 			instructionLang: 'ja',
 			canvasAspectId: 'square',
 			ddlAutoRepairEnabled: false,
-			sketchMode: 'fine',
+			sketchMode: 'auto',
 			renderPayload: {}
 		},
 		{

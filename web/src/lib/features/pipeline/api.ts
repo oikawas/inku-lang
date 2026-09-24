@@ -45,6 +45,8 @@ export type PipelineView = {
 };
 
 export type PipelineOptions = {
+	sketch?: 'auto' | 'off' | 'always';
+	sketch_text?: string;
 	stage1_model?: string;
 	stage2_model?: string;
 	instruction_lang?: string;

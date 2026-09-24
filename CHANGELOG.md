@@ -6,6 +6,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 36 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-24 — A coordinated group's mirror is never dropped without a diagnostic
+
+When lowering could not materialize the plan, a mirror stated on a coordinated group, such as “place one gray circle and black square at bottom mirrored with the previous shape”, disappeared without any diagnostic, because only instruction-level mirrors were reported on that path. The group mirror is now reported as a relation omission with the same follower (the group's last member) and target as the materialized path. Drawing is unchanged.
+
 ### 2026-09-24 — A count on the right member of a Japanese coordination no longer stops the drawing
 
 A Japanese coordination whose right member carried its own count, such as 「三つの赤い円と四つの青い点を置く」 or 「…で埋める」, was read as two members separated by a coordination boundary, and the whole clause stopped with `blocked_coordination_boundary`. The genitive の inside the right noun phrase was accepted only when the word after it was the head, so 「四つ の 青い 点」 broke at 青い. The bridge is now accepted when the word after の is the head or another accepted modifier of the same noun phrase. The coordinated placement and the coordinated fill are drawn again. DDL, Score, and render versions are unchanged beyond this edition's DDL engine 46.

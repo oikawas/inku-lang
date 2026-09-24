@@ -649,13 +649,11 @@ fn conflicting_backgrounds_recover_without_losing_source_candidates() {
             .background
             .is_none()
     );
+    // A background is Score context, not drawable residual content on its own
+    // (SPEC §12, 2026-09-22): omissions that leave only a background stop.
     let background_only = execute("背景を黒で埋める。未知語。", Language::Ja, &[], context());
-    assert_eq!(
-        background_only.outcome(),
-        ScoreLoweringOutcome::CompleteWithOmissions
-    );
-    assert_eq!(background_only.score().unwrap().background, Color::Black);
-    assert!(background_only.score().unwrap().instructions.is_empty());
+    assert_eq!(background_only.outcome(), ScoreLoweringOutcome::Stopped);
+    assert!(background_only.score().is_none());
 }
 
 #[test]

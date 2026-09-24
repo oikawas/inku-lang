@@ -1238,6 +1238,11 @@
 		color: var(--action-fg);
 		border-color: var(--action-bg);
 	}
+	.history-filter-btn.ghost-active:hover:not(:disabled) {
+		background: var(--action-hover);
+		color: var(--action-fg);
+		border-color: var(--action-hover);
+	}
 	.history-filter-btn:focus-visible {
 		outline: 2px solid var(--accent);
 		outline-offset: 2px;

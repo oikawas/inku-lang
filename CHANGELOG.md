@@ -20,6 +20,8 @@ New captures and selected photos retain their received original bytes in app-pri
 
 The History strip's Starred, Revision mark, and Shared filters now use the Library's supporting label, inactive surface and border, and active fill with a fixed-width check mark. Assistive technology receives the pressed state, and the filter group moves to its own row on narrow widths so it does not overlap page controls. Filter conditions, actions, and the existing locked behavior are unchanged.
 
+Hovering an active button retains the action color and text pairing so it remains readable.
+
 ### 2026-09-24 — Make Library filter state easier to identify
 
 The Library's Starred, Revision marks, and Shared filters are now grouped under a label. Inactive buttons have outlines that identify them as controls, while active buttons use a fill and a check mark. Keyboard focus and assistive technology also receive the selected state. Filter combinations, search, and retained state when moving between screens are unchanged.
@@ -27,6 +29,8 @@ The Library's Starred, Revision marks, and Shared filters are now grouped under 
 The filter check mark no longer changes a button's width, and the filter controls now carry the same restrained weight as nearby actions. Work-selection boxes use one smaller fixed square before and after selection, while Star, Revision mark, and Trash controls share one size and gap. Their actions and selected state are unchanged.
 
 The label now reads as supporting static text. Inactive filter buttons use a slightly raised existing-theme surface and stronger border so they read as actions, while their height, reserved check-mark width, and active fill stay unchanged.
+
+Hovering an active button retains the action color and text pairing so it remains readable.
 
 ### 2026-09-24 — Refine Android Works and in-person presentation
 

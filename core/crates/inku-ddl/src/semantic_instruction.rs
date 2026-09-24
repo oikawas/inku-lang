@@ -1466,10 +1466,13 @@ fn japanese_owned_genitive_bridge(
                     .left_atom_spans
                     .last()
                     .is_some_and(|left| owned_spans.contains(&(left.start_byte, left.end_byte)))
-                && marker
-                    .right_atom_spans
-                    .first()
-                    .is_some_and(|right| head_spans.contains(&(right.start_byte, right.end_byte)))
+                // The bridge stays inside one noun phrase when its right side is
+                // that phrase's head or another of its accepted modifiers, e.g.
+                // `四つ の 青い 点`.
+                && marker.right_atom_spans.first().is_some_and(|right| {
+                    let key = (right.start_byte, right.end_byte);
+                    head_spans.contains(&key) || owned_spans.contains(&key)
+                })
         })
 }
 

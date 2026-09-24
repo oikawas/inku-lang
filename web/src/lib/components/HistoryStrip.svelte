@@ -2,6 +2,7 @@
 	import { t } from '$lib/i18n/index.svelte';
 	import HistoryThumbnail from '$lib/components/HistoryThumbnail.svelte';
 	import { formatHistoryStripEngineVersion, type HistoryStripField } from '$lib/historyStripFields';
+	import { groupDigits } from '$lib/formatNumber';
 
 	type HistoryItem = {
 		id?: string;
@@ -170,7 +171,7 @@
 		<div class="history-head">
 			<div class="history-head-left">
 				<button class="history-title-btn" onclick={onOpenManager} disabled={interactionLocked}>
-					{t().historyTitle} <span class="history-count">({historyTotal})</span> ▸
+					{t().historyTitle} <span class="history-count">({groupDigits(historyTotal)})</span> ▸
 				</button>
 				{#if !historyCollapsed}
 					<div class="history-filter-group" role="group" aria-label={t().historyFilterLabel}>
@@ -218,7 +219,7 @@
 					aria-label={historyCollapsed ? t().historyExpand : t().historyCollapse}
 					title={historyCollapsed ? t().historyExpand : t().historyCollapse}
 				>
-					{historyCollapsed ? '⌃' : '⌄'}
+					{historyCollapsed ? '⌄' : '⌃'}
 				</button>
 			</div>
 		</div>
@@ -456,13 +457,13 @@
 		top: 3px;
 		right: 3px;
 		z-index: 20;
-		width: 26px;
-		height: 26px;
+		width: 22px;
+		height: 22px;
 		border: 1px solid var(--thumb-plate-border);
 		border-radius: 50%;
 		background: var(--thumb-plate-bg);
 		color: var(--thumb-plate-fg);
-		font-size: var(--ui-font-size-10);
+		font-size: var(--ui-font-size-19);
 		line-height: 1;
 		cursor: pointer;
 		display: flex;

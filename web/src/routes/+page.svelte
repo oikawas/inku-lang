@@ -1861,6 +1861,11 @@ $effect(() => {
 		if (item) loadIterationItem(item);
 	}
 
+	async function gotoOldest() {
+		const item = await history.movePage('oldest');
+		if (item) loadIterationItem(item);
+	}
+
 	async function gotoHistoryNewerPage(): Promise<void> {
 		const item = await history.movePage('newer');
 		if (item) loadIterationItem(item);
@@ -2860,6 +2865,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				navLatestDisabled={historyNavButtonsDisabled.latest}
 				navNewerDisabled={historyNavButtonsDisabled.newer}
 				navOlderDisabled={historyNavButtonsDisabled.older}
+				navOldestDisabled={historyPageNavDisabled.oldest}
 				interactionLocked={demoRunning}
 				generationLocked={work.loading || work.reloading || refinementSession.gridBusy}
 				{historyTotal}
@@ -2892,6 +2898,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				onGotoNext={gotoNext}
 				onGotoPrev={gotoPrev}
 				onGotoLatest={gotoLatest}
+				onGotoOldest={gotoOldest}
 				onCopyPromptText={copyPromptText}
 				onCopyStatusHash={copyStatusHash}
 				onToggleStar={toggleHistoryStar}

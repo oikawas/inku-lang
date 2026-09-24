@@ -343,6 +343,7 @@ export interface LangPack {
 	tooltipCanvasNavNewer: string;
 	tooltipCanvasNavOlder: string;
 	tooltipCanvasNavLatest: string;
+	tooltipCanvasNavOldest: string;
 	tooltipCanvasDownloadSvg: string;
 	tooltipCanvasDownloadPng: string;
 	tooltipCanvasDownloadCard: string;

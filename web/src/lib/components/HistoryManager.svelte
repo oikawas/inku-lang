@@ -9,8 +9,9 @@
 	import type { SheetVariant } from '$lib/contactSheet';
 	import type { SvgProfile } from '$lib/features/export/download';
 	import type { SavedWorkExportItem, SavedWorkExportScope, SavedWorkExportSnapshot } from '$lib/features/export/saved-work';
-	import { formatByteSize } from '$lib/formatNumber';
+	import { formatByteSize, groupDigits } from '$lib/formatNumber';
 	import { formatHistoryMinute, historyListDescription } from '$lib/historyManagerPresentation';
+	import { historyGridPageSize } from '$lib/historyManagerSizing';
 	import HistoryDescription from '$lib/components/HistoryDescription.svelte';
 
 	type HistoryItem = {
@@ -579,7 +580,8 @@
 	// one page of the manager holds. The page's estimatedHistoryManagerPageSize()
 	// is only a prediction for the first fetch made before the manager opens.
 	// minCardWidth mirrors the minmax() in the .history-thumb-grid rule below and
-	// must move whenever the CSS does.
+	// must move whenever the CSS does. Card metadata is variable-height, so the
+	// painted cards, rather than a fixed chrome estimate, own the row height.
 	function calculatePageSize(element: HTMLElement): number {
 		const grid = element.querySelector('.history-thumb-grid');
 		const elementStyle = getComputedStyle(element);
@@ -592,16 +594,12 @@
 		const computed = grid ? getComputedStyle(grid) : null;
 		const gap = computed ? Number.parseFloat(computed.rowGap || computed.gap || '8') || 8 : 8;
 		const minCardWidth = 142;
-		const columns = Math.max(1, Math.floor((width + gap) / (minCardWidth + gap)));
-		// Derive the card height from the fixed CSS contract instead of measuring
-		// rendered cards. Measuring content-visibility placeholders caused the
-		// page size to alternate while thumbnails were being painted.
-		const cardWidth = Math.max(minCardWidth, (width - gap * (columns - 1)) / columns);
-		const cardChromeHeight = 75; // borders + padding + margin + 58px action area
-		const imageWidth = Math.max(1, cardWidth - 12); // 5px padding and 1px border on both sides
-		const cardHeight = imageWidth * 58 / 82 + cardChromeHeight;
-		const rows = Math.max(1, Math.floor((height + gap) / (cardHeight + gap)));
-		return Math.max(1, columns * rows);
+		const cardHeights = grid instanceof HTMLElement
+			? [...grid.querySelectorAll('.manager-thumb-wrap')]
+				.filter((card): card is HTMLElement => card instanceof HTMLElement)
+				.map((card) => card.getBoundingClientRect().height)
+			: [];
+		return historyGridPageSize({ width, height, gap, minCardWidth, cardHeights });
 	}
 
 	$effect(() => {
@@ -617,18 +615,41 @@
 		if (!active || !element || historyManagerTab !== 'thumbs' || historyDisplayMode !== 'chronological') return;
 		let frame = 0;
 		let debounceTimeout = 0;
+		let pageSizeCeiling = 100;
+		let viewportWidth = -1;
+		let viewportHeight = -1;
+		let lastReportedPageSize = 0;
+		const reportPageSize = () => {
+			const viewport = element.getBoundingClientRect();
+			const nextViewportWidth = Math.round(viewport.width * 2) / 2;
+			const nextViewportHeight = Math.round(viewport.height * 2) / 2;
+			if (nextViewportWidth !== viewportWidth || nextViewportHeight !== viewportHeight) {
+				viewportWidth = nextViewportWidth;
+				viewportHeight = nextViewportHeight;
+				pageSizeCeiling = 100;
+			}
+			// Changing the page changes which cards can be measured. Within one
+			// viewport, only shrink the capacity so different card content cannot
+			// make the manager alternate between two page sizes.
+			pageSizeCeiling = Math.min(pageSizeCeiling, calculatePageSize(element));
+			if (pageSizeCeiling === lastReportedPageSize) return;
+			lastReportedPageSize = pageSizeCeiling;
+			onSetPageSize(pageSizeCeiling);
+		};
 		const update = () => {
 			cancelAnimationFrame(frame);
 			clearTimeout(debounceTimeout);
 			debounceTimeout = window.setTimeout(() => {
-				frame = requestAnimationFrame(() => onSetPageSize(calculatePageSize(element)));
+				frame = requestAnimationFrame(reportPageSize);
 			}, 200);
 		};
 		// Initial calculation runs synchronously to avoid empty display flash
-		onSetPageSize(calculatePageSize(element));
+		reportPageSize();
 
 		const observer = new ResizeObserver(update);
 		observer.observe(element);
+		const grid = element.querySelector('.history-thumb-grid');
+		if (grid) observer.observe(grid);
 		return () => {
 			cancelAnimationFrame(frame);
 			clearTimeout(debounceTimeout);
@@ -686,11 +707,11 @@
 			</div>
 			<span class="history-manager-count">
 				{#if historyDisplayMode === 'lineage'}
-					{lineageGroupTotal} {t().historyLineageGroups}
+					{groupDigits(lineageGroupTotal)} {t().historyLineageGroups}
 				{:else if managedHistoryTotal === 0}
 					0 / 0
 				{:else}
-					{historyManagerOffset + 1}-{historyManagerShownTo} / {managedHistoryTotal}
+					{groupDigits(historyManagerOffset + 1)}-{groupDigits(historyManagerShownTo)} / {groupDigits(managedHistoryTotal)}
 				{/if}
 			</span>
 		</div>
@@ -1394,13 +1415,13 @@
 		top: 5px;
 		right: 5px;
 		z-index: 31;
-		width: 26px;
-		height: 26px;
+		width: 22px;
+		height: 22px;
 		border: 1px solid var(--thumb-plate-border);
 		border-radius: 50%;
 		background: var(--thumb-plate-bg);
 		color: var(--thumb-plate-fg);
-		font-size: var(--ui-font-size-14);
+		font-size: var(--ui-font-size-19);
 		line-height: 1;
 		cursor: pointer;
 		display: flex;
@@ -1425,9 +1446,9 @@
 	.table-thumb-cell .mini-star {
 		top: 2px;
 		right: 2px;
-		width: 26px;
-		height: 26px;
-		font-size: var(--ui-font-size-13);
+		width: 22px;
+		height: 22px;
+		font-size: var(--ui-font-size-19);
 	}
 	.thumb {
 		flex-shrink: 0;
@@ -1475,8 +1496,7 @@
 		justify-content: center;
 		padding: 0;
 	}
-	/* The revision mark sits beside the star and must not read as a second star:
-	   a pencil, and the accent colour rather than the star colour. */
+	/* Keep the revision flag aligned with the other work actions. */
 	.hash-row-mark {
 		box-sizing: border-box;
 		width: 24px;
@@ -1486,7 +1506,7 @@
 		border-radius: var(--btn-sm-radius);
 		background: var(--panel);
 		color: var(--fg3);
-		font-size: var(--btn-sm-font-size);
+		font-size: var(--ui-font-size-18);
 		line-height: 1;
 		cursor: pointer;
 		display: inline-flex;
@@ -1494,9 +1514,9 @@
 		justify-content: center;
 	}
 	.hash-row-mark.marked {
-		border-color: var(--accent);
-		background: var(--accent-light);
-		color: var(--accent);
+		border-color: color-mix(in srgb, var(--danger) 48%, var(--border2));
+		background: color-mix(in srgb, var(--danger) 12%, var(--panel));
+		color: var(--danger);
 	}
 	.hash-row-star.starred {
 		color: var(--star-fg);

@@ -579,6 +579,8 @@
 		font-size: var(--ui-font-size-15);
 		line-height: 1;
 	}
+	.canvas-star-btn { width: 28px; height: 28px; font-size: var(--ui-font-size-24); }
+	.canvas-revision-btn { font-size: var(--ui-font-size-18); }
 	.canvas-hash-btn { font-weight: 600; }
 	/* `marked` is a flag standing on the work, not a pressed button: it has to
 	   read as on while the pointer is somewhere else entirely. */
@@ -587,7 +589,11 @@
 		border-color: var(--star-border);
 		background: var(--star-bg);
 	}
-	.canvas-revision-btn.marked,
+	.canvas-revision-btn.marked {
+		color: var(--danger);
+		border-color: color-mix(in srgb, var(--danger) 48%, var(--border2));
+		background: color-mix(in srgb, var(--danger) 12%, var(--floating-control-bg));
+	}
 	.canvas-hash-btn.marked {
 		color: var(--accent);
 		border-color: var(--accent);

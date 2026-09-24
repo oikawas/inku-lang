@@ -2,6 +2,7 @@
 	import Tooltip from '$lib/components/Tooltip.svelte';
 	import CaptionText from '$lib/components/CaptionText.svelte';
 	import { t } from '$lib/i18n/index.svelte';
+	import { groupDigits } from '$lib/formatNumber';
 	import type { CaptionPosition, CaptionWritingMode } from '$lib/captionWritingMode';
 
 	export type PresentationWorkMark = {
@@ -86,7 +87,7 @@
 				›
 			</button>
 		</Tooltip>
-		<span class="presentation-counter">{historyTotal > 0 ? `${navPos} / ${historyTotal}` : ''}</span>
+		<span class="presentation-counter">{historyTotal > 0 ? `${groupDigits(navPos)} / ${groupDigits(historyTotal)}` : ''}</span>
 		<Tooltip text={workMark?.starred ? t().starOn : t().starOff}>
 			<button
 				type="button"
@@ -212,7 +213,7 @@
 	.presentation-icon-btn:hover:not(:disabled),
 	.presentation-text-btn:hover:not(:disabled),
 	.presentation-icon-btn.active { background: rgba(255,255,255,0.16); }
-	.presentation-star-btn { color: rgba(255,253,248,0.62); font-size: var(--ui-font-size-17); }
+	.presentation-star-btn { width: 28px; height: 28px; color: rgba(255,253,248,0.62); font-size: var(--ui-font-size-24); }
 	.presentation-star-btn.starred { color: #ffd45c; border-color: rgba(255,212,92,0.62); background: rgba(255,212,92,0.14); }
 	.presentation-icon-btn:disabled,
 	.presentation-text-btn:disabled { opacity: 0.35; cursor: not-allowed; }

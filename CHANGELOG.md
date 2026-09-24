@@ -6,6 +6,12 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 36 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-24 — Refine work controls and History display on the Web
+
+The circles over work thumbnails are smaller, with stars filling them more closely. Revision flags are larger and turn red when marked. The History strip's collapse arrow now points in the direction of its action.
+
+The making view adds Oldest opposite Latest at the right of the canvas and groups the work details at the upper right. Chronological Library thumbnails now use the rendered card height and available viewport to choose a page size that fits without vertical scrolling. Work counts in History, Library, Lineage, and export displays use comma thousands separators.
+
 ### 2026-09-24 — Clarify Android photo processing and retain original photos
 
 The photo-to-work display now follows the actual phases: preparing and examining the photo, planning the composition, building colors and forms, finishing, and saving. Visual effects use the input photo without presenting invented intermediate works, percentages, or remaining-time estimates. Text and static displays retain the phase information when system animations are disabled.

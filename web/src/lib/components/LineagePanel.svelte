@@ -8,6 +8,7 @@
 	import type { SketchGrain } from '$lib/sketch';
 	import { derivationKindLabel } from '$lib/derivation';
 	import { t } from '$lib/i18n/index.svelte';
+	import { groupDigits } from '$lib/formatNumber';
 	import { modelDisplayName, modelShortName, qualifiedModelId, type Provider, type ProviderGroup } from '$lib/models';
 	import ModelCardPicker from './ModelCardPicker.svelte';
 	import type { AnimationExportSettings } from '$lib/animationExport';
@@ -815,7 +816,7 @@ $effect(() => {
 									<div class="meta" title={node.history?.source_text ?? node.history?.input ?? node.description_hash ?? ''}>{node.history?.source_text || node.history?.input || withheldWorkLabel(node)}</div>
 								</button>
 								{#if childCount > 0 && !browsingState.overviewOpen}
-									<button class="branch-toggle" type="button" aria-expanded={browsingState.expandedNodeIds.includes(node.id)} onclick={() => toggleBranch(node)}>{browsingState.expandedNodeIds.includes(node.id) ? '▾' : '▸'} {isJapanese ? `子作品 ${childCount}件` : `${childCount} children`}</button>
+									<button class="branch-toggle" type="button" aria-expanded={browsingState.expandedNodeIds.includes(node.id)} onclick={() => toggleBranch(node)}>{browsingState.expandedNodeIds.includes(node.id) ? '▾' : '▸'} {isJapanese ? `子作品 ${groupDigits(childCount)}件` : `${groupDigits(childCount)} children`}</button>
 								{/if}
 								{#if node.history && !browsingState.overviewOpen}
 									<details class="node-details">
@@ -879,7 +880,7 @@ $effect(() => {
 		<div class="okugaki-dialog" role="dialog" aria-modal="true" aria-labelledby="okugaki-title" tabindex="-1">
 			<header><div><h2 id="okugaki-title">{t().okugakiTitle}</h2><p>{t().okugakiDescription}</p></div><button type="button" disabled={okugakiGenerating} onclick={() => (okugakiOpen = false)}>×</button></header>
 			<div class="okugaki-controls">
-				<p>{t().okugakiBranchConfirm.replace('{count}', String(ancestorIds.size))}</p>
+				<p>{t().okugakiBranchConfirm.replace('{count}', groupDigits(ancestorIds.size))}</p>
 				<ModelCardPicker label={t().okugakiModel} selectedModel={selectedOkugakiModel} providerGroups={visionProviderGroups} purpose="vision" disabled={okugakiGenerating} onSelect={(provider: Provider, model: string) => void selectOkugakiModel(provider, model)} />
 				<button class="okugaki-generate" type="button" disabled={okugakiGenerating || !selectedOkugakiModel.trim()} onclick={generateOkugaki}>{okugakiGenerating ? t().okugakiReading : t().okugakiAppend}</button>
 				{#if okugakiGenerating}<div class="okugaki-progress" aria-live="polite"><span></span>{t().okugakiProgress}</div>{/if}
@@ -961,12 +962,12 @@ $effect(() => {
 	.card-toolbar { position: relative; z-index: 3; min-height: 22px; margin-bottom: 6px; padding-right: 26px; display: flex; align-items: flex-start; gap: 5px; }
 	.card-check { flex: 0 0 auto; display: grid; place-items: center; padding: 2px; border-radius: 4px; background: color-mix(in srgb, var(--panel) 88%, transparent); cursor: pointer; }
 	/* Work star: pressing it does not select the work; the card owns selection. */
-	.card-star { flex: 0 0 auto; width: 26px; height: 26px; display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--border2); border-radius: 50%; padding: 0; background: var(--panel); color: var(--fg2); font-size: var(--ui-font-size-12); line-height: 1; font-family: inherit; cursor: pointer; }
+	.card-star { flex: 0 0 auto; width: 22px; height: 22px; display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--border2); border-radius: 50%; padding: 0; background: var(--panel); color: var(--fg2); font-size: var(--ui-font-size-19); line-height: 1; font-family: inherit; cursor: pointer; }
 	.card-star.starred { color: var(--star-fg); background: var(--star-bg); border-color: var(--star-border); }
 	/* The revision mark rides beside the star in the same shell: the two are
 	   separate columns and a work can carry either, both or neither. */
-	.card-mark { flex: 0 0 auto; width: 26px; height: 26px; display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--border2); border-radius: 50%; padding: 0; background: var(--panel); color: var(--fg2); font-size: var(--ui-font-size-12); line-height: 1; font-family: inherit; cursor: pointer; }
-	.card-mark.marked { color: var(--accent); background: var(--accent-light); border-color: var(--accent); }
+	.card-mark { flex: 0 0 auto; width: 26px; height: 26px; display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--border2); border-radius: 50%; padding: 0; background: var(--panel); color: var(--fg2); font-size: var(--ui-font-size-16); line-height: 1; font-family: inherit; cursor: pointer; }
+	.card-mark.marked { color: var(--danger); background: color-mix(in srgb, var(--danger) 12%, var(--panel)); border-color: color-mix(in srgb, var(--danger) 48%, var(--border2)); }
 	.card-check input { width: 15px; height: 15px; margin: 0; accent-color: var(--accent); margin: 0; }
 	.okugaki-backdrop { position: fixed; inset: 0; z-index: 1450; display: grid; place-items: center; padding: 24px; background: #0009; }
 	.okugaki-dialog { box-sizing: border-box; width: min(760px, 96vw); max-height: 90vh; overflow: hidden; display: flex; flex-direction: column; border: 1px solid var(--border2); border-radius: 12px; background: var(--panel); box-shadow: 0 24px 80px #000a; }

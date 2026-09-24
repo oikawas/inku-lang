@@ -11,7 +11,7 @@
 	import type { LineageGraph, LineageNode } from '$lib/features/history/types';
 	import type { LineageBrowsingState } from '$lib/features/history/lineage-state.svelte';
 	import { measureSvgWeight } from '$lib/svgWeight';
-	import { formatCanvasCapacity } from '$lib/formatNumber';
+	import { formatCanvasCapacity, groupDigits } from '$lib/formatNumber';
 	import { normalizeCaptionWritingMode, supportsVerticalCaption, type CaptionPosition, type CaptionWritingMode } from '$lib/captionWritingMode';
 	import { drawerScrollToRestore, emptyDrawerScrollMemory, rememberDrawerScroll, type DrawerTab } from '$lib/drawerScroll';
 	import type { createModelInspection } from '$lib/features/model-inspection/state.svelte';
@@ -47,6 +47,7 @@
 		navLatestDisabled: boolean;
 		navNewerDisabled: boolean;
 		navOlderDisabled: boolean;
+		navOldestDisabled: boolean;
 		// A demo is running, so nothing may move. ORed into every nav button
 		// below as well: the flags above already carry it, and this is the guard
 		// that stays if a caller ever forgets to pass it through them.
@@ -97,6 +98,7 @@
 		onGotoNext: () => void | Promise<void>;
 		onGotoPrev: () => void | Promise<void>;
 		onGotoLatest: () => void | Promise<void>;
+		onGotoOldest: () => void | Promise<void>;
 		onCopyPromptText: (kind: 'stage1' | 'stage2' | 'score', text: string | null | undefined) => void | Promise<void>;
 		onCopyStatusHash: () => void | Promise<void>;
 		onToggleStar: (item: HistoryItem | null | undefined, event?: Event) => void | Promise<void>;
@@ -187,6 +189,7 @@
 		navLatestDisabled,
 		navNewerDisabled,
 		navOlderDisabled,
+		navOldestDisabled,
 		interactionLocked,
 		generationLocked,
 		historyTotal,
@@ -228,6 +231,7 @@
 		onGotoNext,
 		onGotoPrev,
 		onGotoLatest,
+		onGotoOldest,
 		onCopyPromptText,
 		onCopyStatusHash,
 		onToggleStar,
@@ -598,6 +602,7 @@
 	// HistoryItem carries no SVG, so this reads the current result directly.
 	const detailSvgWeight = $derived(result?.svg ? measureSvgWeight(result.svg) : null);
 	const detailSvgBytes = $derived(detailSvgWeight?.bytes ?? null);
+	const canvasNavOldestTooltip = $derived(t().tooltipCanvasNavOldest);
 </script>
 
 <svelte:window
@@ -834,11 +839,14 @@
 
 
 		<div class="nav-right">
+			<Tooltip placement="left" text={canvasNavOldestTooltip}>
+				<button class="nav-latest" onclick={() => onGotoOldest()} disabled={interactionLocked || navOldestDisabled}>{t().historyOldest}</button>
+			</Tooltip>
 			<Tooltip placement="left" text={t().tooltipCanvasNavOlder}>
 				<button class="nav-circle" onclick={onGotoPrev} disabled={interactionLocked || navOlderDisabled}>›</button>
 			</Tooltip>
 			{#if historyTotal > 0}
-				<span class="nav-counter">{navPos} / {historyTotal}</span>
+				<span class="nav-counter">{groupDigits(navPos)} / {groupDigits(historyTotal)}</span>
 			{/if}
 		</div>
 	</div>
@@ -981,7 +989,10 @@
 		align-items: stretch;
 		min-width: 0;
 		min-height: 52px;
-		flex: 1 1 auto;
+		/* Keep the displayed work's details together at the right edge. At the
+		   compact breakpoints below it resumes the full-width metadata row. */
+		flex: 0 1 auto;
+		margin-left: auto;
 		overflow: hidden;
 		color: var(--fg3);
 	}

@@ -6,6 +6,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 36 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-24 — Adjust star sizes on the canvas and History strip
+
+The canvas and large-view star controls return to their earlier circle and glyph sizes. The star over each History strip thumbnail now has a smaller circle and glyph.
+
 ### 2026-09-24 — Refine work controls and History display on the Web
 
 The circles over work thumbnails are smaller, with stars filling them more closely. Revision flags are larger and turn red when marked. The History strip's collapse arrow now points in the direction of its action.

@@ -457,13 +457,13 @@
 		top: 3px;
 		right: 3px;
 		z-index: 20;
-		width: 22px;
-		height: 22px;
+		width: 18px;
+		height: 18px;
 		border: 1px solid var(--thumb-plate-border);
 		border-radius: 50%;
 		background: var(--thumb-plate-bg);
 		color: var(--thumb-plate-fg);
-		font-size: var(--ui-font-size-19);
+		font-size: var(--ui-font-size-15);
 		line-height: 1;
 		cursor: pointer;
 		display: flex;

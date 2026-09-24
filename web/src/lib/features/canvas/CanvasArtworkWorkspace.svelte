@@ -579,7 +579,6 @@
 		font-size: var(--ui-font-size-15);
 		line-height: 1;
 	}
-	.canvas-star-btn { width: 28px; height: 28px; font-size: var(--ui-font-size-24); }
 	.canvas-revision-btn { font-size: var(--ui-font-size-18); }
 	.canvas-hash-btn { font-weight: 600; }
 	/* `marked` is a flag standing on the work, not a pressed button: it has to

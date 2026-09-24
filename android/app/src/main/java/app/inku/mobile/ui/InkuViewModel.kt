@@ -74,7 +74,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.NonCancellable
-import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -652,19 +651,28 @@ class InkuViewModel @JvmOverloads constructor(
     }
 
     fun requestCameraCapture() {
+        if (!canRequestCameraInput()) return
         val captureState = localState.value.cameraCaptureState
-        if (
-            captureState.locksCameraInteraction ||
-            captureState == CameraCaptureState.ChoosingSource ||
-            captureState == CameraCaptureState.AwaitingOverwriteConfirmation ||
-            captureState == CameraCaptureState.Capturing ||
-            captureState == CameraCaptureState.PickingPhoto
-        ) return
         cameraStateBeforeSourceChooser = captureState
         localState.value = localState.value.copy(
             cameraCaptureState = CameraCaptureState.ChoosingSource,
             message = null,
         )
+    }
+
+    fun requestCameraCaptureDirect() {
+        if (!canRequestCameraInput()) return
+        beginCameraInput(CameraInputSource.Camera, confirmOverwrite = false)
+    }
+
+    private fun canRequestCameraInput(): Boolean {
+        val current = localState.value
+        val captureState = current.cameraCaptureState
+        return !current.isRunning &&
+            captureState != CameraCaptureState.ChoosingSource &&
+            captureState != CameraCaptureState.AwaitingOverwriteConfirmation &&
+            captureState != CameraCaptureState.Capturing &&
+            captureState != CameraCaptureState.PickingPhoto
     }
 
     fun cancelCameraInputSource() {
@@ -678,6 +686,10 @@ class InkuViewModel @JvmOverloads constructor(
 
     fun chooseCameraInputSource(source: CameraInputSource) {
         if (localState.value.cameraCaptureState != CameraCaptureState.ChoosingSource) return
+        beginCameraInput(source, confirmOverwrite = true)
+    }
+
+    private fun beginCameraInput(source: CameraInputSource, confirmOverwrite: Boolean) {
         cameraRunSerial += 1
         cameraJob?.cancel()
         cameraFiles.delete(pendingCameraFile)
@@ -698,7 +710,7 @@ class InkuViewModel @JvmOverloads constructor(
             current.ddl.isNotBlank() ||
             current.selectedHistory != null ||
             current.refinementCandidates.isNotEmpty()
-        if (overwriteRisk) {
+        if (confirmOverwrite && overwriteRisk) {
             localState.value = current.copy(
                 cameraCaptureState = CameraCaptureState.AwaitingOverwriteConfirmation,
                 message = null,
@@ -1025,18 +1037,28 @@ class InkuViewModel @JvmOverloads constructor(
 
     fun cancelCameraDevelopment() {
         val current = localState.value.cameraCaptureState
+        if (current == CameraCaptureState.Cancelling) return
         if (!current.locksCameraInteraction && current !is CameraCaptureState.Failed) return
         cameraRunSerial += 1
         val cancelSerial = cameraRunSerial
         val job = cameraJob
         cameraJob = null
+        val warmupJob = litertWarmupJob
+        litertWarmupJob = null
+        job?.cancel()
+        warmupJob?.cancel()
         localState.value = localState.value.copy(
             cameraCaptureState = CameraCaptureState.Cancelling,
             isDrawing = false,
             message = null,
         )
         viewModelScope.launch {
-            job?.cancelAndJoin()
+            // Native inference and warmup must finish before their engine is closed.
+            withContext(NonCancellable) {
+                job?.join()
+                warmupJob?.join()
+                repository.releaseLocalVisionModel()
+            }
             cameraFiles.delete(pendingCameraFile)
             pendingCameraFile = null
             if (cancelSerial == cameraRunSerial) restoreCameraComposeSnapshot()
@@ -3245,6 +3267,7 @@ class InkuViewModel @JvmOverloads constructor(
     }
 
     private fun warmupLiteRtModels(vararg modelIds: String) {
+        if (localState.value.cameraCaptureState == CameraCaptureState.Cancelling) return
         val targets = modelIds.distinct().filter { it.startsWith("local-litert-lm:") }
         if (targets.isEmpty()) return
         litertWarmupJob?.cancel()

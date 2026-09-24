@@ -485,6 +485,8 @@ class InkuRepository(
     suspend fun analyzeLocalVision(request: VisionAnalysisRequest): VisionAnalysisResult =
         localLiteRtProvider.analyze(request)
 
+    suspend fun releaseLocalVisionModel() = localLiteRtProvider.releaseVisionModel()
+
     suspend fun markModelDownloadQueued(modelId: String) {
         val asset = database.modelAssetDao().getByModelId(modelId) ?: return
         database.modelAssetDao().updateDownload(

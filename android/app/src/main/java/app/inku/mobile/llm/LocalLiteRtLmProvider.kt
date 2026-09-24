@@ -234,12 +234,25 @@ class LocalLiteRtLmProvider(
 
     suspend fun close() {
         inferenceMutex.withLock {
-            engine?.close()
-            engine = null
-            loadedModelId = null
-            loadedModelPath = null
-            loadedMaxNumTokens = null
+            closeEngine()
         }
+    }
+
+    suspend fun releaseVisionModel(): Unit = withContext(Dispatchers.IO) {
+        inferenceMutex.withLock {
+            if (loadedModelId == LOCAL_VISION_MODEL_ID) {
+                closeEngine()
+                Log.i(PERF_TAG, "litert_vision_engine_released")
+            }
+        }
+    }
+
+    private fun closeEngine() {
+        engine?.close()
+        engine = null
+        loadedModelId = null
+        loadedModelPath = null
+        loadedMaxNumTokens = null
     }
 
     private companion object {

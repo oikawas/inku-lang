@@ -10,6 +10,12 @@ This file records changes chronologically. If a historical note conflicts with t
 
 Work details now open in a separate dialog instead of stretching a narrow Lineage card down the screen. The description uses the dialog's full width, and the values no longer collapse into one-character columns. Description and render hashes show only their last four digits, with a separate button beside each to copy the complete digest. The work comment remains editable in the dialog.
 
+### 2026-09-24 — Improve Android bottom actions, capture, and Works scrolling
+
+The translucent bottom action area now contains Studio, Camera, Works, and Series. Camera opens capture without a confirmation and restores the previous screen and Studio content when cancelled; the existing Studio source chooser still offers Photo Picker. A visible, draggable scrollbar sits at the right of the Works grid while preserving two columns on Pixel 9. Production Tools now has a disclosure arrow.
+
+Cancelling photo analysis releases the on-device Vision model, which is initialized again for a later capture. The app does not directly control playback in other apps.
+
 ### 2026-09-24 — Adjust star sizes on the canvas and History strip
 
 The canvas and large-view star controls return to their earlier circle and glyph sizes. The star over each History strip thumbnail now has a smaller circle and glyph.

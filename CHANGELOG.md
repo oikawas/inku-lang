@@ -10,6 +10,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 The photo-to-work display now follows the actual phases: preparing and examining the photo, planning the composition, building colors and forms, finishing, and saving. Visual effects use the input photo without presenting invented intermediate works, percentages, or remaining-time estimates. Text and static displays retain the phase information when system animations are disabled.
 
+The examining phase now adds scan lines, a moving light band, and intermittent signal noise; finishing progressively assembles geometric forms. The source photo and phase text remain legible without rapid full-screen flashes.
+
 New captures and selected photos retain their received original bytes in app-private storage, without recompression, and are associated with successfully saved works. A small preview in the description screen remains available when the work is selected again. The retained original is separate from the reduced photo sent to on-device Vision; NIM still receives text alone. Existing works receive no photo backfill, and the Room schema is unchanged.
 
 ### 2026-09-24 — Make Library filter state easier to identify

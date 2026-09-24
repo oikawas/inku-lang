@@ -118,6 +118,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
@@ -145,6 +146,7 @@ import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInWindow
@@ -1542,9 +1544,12 @@ private fun CameraDevelopmentSurface(state: InkuUiState, viewModel: InkuViewMode
         animationsEnabled = animationsEnabled,
     ) ?: return
     val sourcePhoto = rememberCameraOriginalPhoto(state.cameraSourcePhotoPath, maxEdge = 960)
-    val pulse = if (presentation.animationsEnabled) {
+    val effectsAnimate = presentation.animationsEnabled &&
+        state.cameraCaptureState !is CameraCaptureState.Failed &&
+        state.cameraCaptureState != CameraCaptureState.Cancelling
+    val (pulse, cycle) = if (effectsAnimate) key(presentation.effect) {
         val transition = rememberInfiniteTransition(label = "camera-development")
-        val value by transition.animateFloat(
+        val pulseValue by transition.animateFloat(
             initialValue = 0.35f,
             targetValue = 1f,
             animationSpec = infiniteRepeatable(
@@ -1553,9 +1558,18 @@ private fun CameraDevelopmentSurface(state: InkuUiState, viewModel: InkuViewMode
             ),
             label = "camera-development-pulse",
         )
-        value
+        val cycleValue by transition.animateFloat(
+            initialValue = 0f,
+            targetValue = 1f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(durationMillis = 2400, easing = LinearEasing),
+                repeatMode = androidx.compose.animation.core.RepeatMode.Restart,
+            ),
+            label = "camera-development-effect-cycle",
+        )
+        pulseValue to cycleValue
     } else {
-        1f
+        1f to 0.5f
     }
     Surface(
         modifier = Modifier
@@ -1584,6 +1598,8 @@ private fun CameraDevelopmentSurface(state: InkuUiState, viewModel: InkuViewMode
                     CameraDevelopmentEffectCanvas(
                         effect = presentation.effect,
                         pulse = pulse,
+                        cycle = cycle,
+                        animationsEnabled = effectsAnimate,
                         photo = sourcePhoto,
                         photoLabel = cameraOriginalPhotoWords(!state.uiLanguage.isEnglish).label,
                         modifier = Modifier.fillMaxWidth().weight(1f),
@@ -1639,6 +1655,8 @@ private fun CameraDevelopmentSurface(state: InkuUiState, viewModel: InkuViewMode
 private fun CameraDevelopmentEffectCanvas(
     effect: CameraDevelopmentEffect,
     pulse: Float,
+    cycle: Float,
+    animationsEnabled: Boolean,
     photo: ImageBitmap?,
     photoLabel: String,
     modifier: Modifier = Modifier,
@@ -1672,9 +1690,7 @@ private fun CameraDevelopmentEffectCanvas(
                 }
             }
             CameraDevelopmentEffect.PhotoReading -> {
-                val y = size.height * (0.1f + pulse * 0.8f)
-                drawRect(CameraDevelopmentExposureGlow.copy(alpha = 0.08f), topLeft = Offset(0f, y - size.height * 0.06f), size = Size(size.width, size.height * 0.12f))
-                drawLine(CameraDevelopmentExposureGlow.copy(alpha = 0.56f), Offset(0f, y), Offset(size.width, y), strokeWidth = 2.dp.toPx())
+                drawCameraPhotoScan(cycle, animationsEnabled)
             }
             CameraDevelopmentEffect.GrainAndForms -> {
                 repeat(8) { index ->
@@ -1695,21 +1711,7 @@ private fun CameraDevelopmentEffectCanvas(
                 }
             }
             CameraDevelopmentEffect.OutlineSettling -> {
-                vivid.forEachIndexed { index, color ->
-                    val column = index % 3
-                    val row = index / 3
-                    drawCircle(
-                        color.copy(alpha = 0.62f),
-                        radius = size.minDimension * (0.1f + (index % 2) * 0.03f),
-                        center = Offset(size.width * (0.2f + column * 0.3f), size.height * (0.27f + row * 0.46f)),
-                    )
-                    drawCircle(
-                        CameraDevelopmentOutline.copy(alpha = 0.45f + pulse * 0.35f),
-                        radius = size.minDimension * (0.1f + (index % 2) * 0.03f),
-                        center = Offset(size.width * (0.2f + column * 0.3f), size.height * (0.27f + row * 0.46f)),
-                        style = Stroke(width = 2f + pulse * 2f),
-                    )
-                }
+                drawCameraMechanicalComposition(cycle, animationsEnabled, vivid)
             }
             CameraDevelopmentEffect.Saving -> {
                 drawRect(
@@ -1730,6 +1732,96 @@ private fun CameraDevelopmentEffectCanvas(
                 style = MaterialTheme.typography.labelSmall,
                 color = CameraDevelopmentPaper,
             )
+        }
+    }
+}
+
+/** A restrained video-signal layer over the actual input photo. All positions are deterministic. */
+private fun DrawScope.drawCameraPhotoScan(cycle: Float, animationsEnabled: Boolean) {
+    val hairline = 1.dp.toPx()
+    drawRect(Color(0xFF062C38).copy(alpha = 0.16f))
+    repeat(44) { index ->
+        val y = size.height * (index + 0.5f) / 44f
+        drawLine(
+            CameraDevelopmentVividSky.copy(alpha = if (index % 2 == 0) 0.16f else 0.08f),
+            Offset(0f, y),
+            Offset(size.width, y),
+            strokeWidth = hairline,
+        )
+    }
+
+    val scanY = size.height * (0.06f + cycle * 0.88f)
+    drawRect(
+        CameraDevelopmentVividSky.copy(alpha = 0.18f),
+        topLeft = Offset(0f, scanY - size.height * 0.055f),
+        size = Size(size.width, size.height * 0.11f),
+    )
+    drawLine(
+        CameraDevelopmentVividSky.copy(alpha = 0.82f),
+        Offset(0f, scanY),
+        Offset(size.width, scanY),
+        strokeWidth = 2.dp.toPx(),
+    )
+
+    val noiseFrame = if (animationsEnabled) (cycle * 18f).toInt() else 7
+    repeat(28) { index ->
+        if ((index * 7 + noiseFrame) % 4 != 0) return@repeat
+        val x = size.width * ((index * 41 + noiseFrame * 17) % 97) / 97f
+        val y = size.height * ((index * 29 + noiseFrame * 11) % 89) / 89f
+        val width = minOf(size.width * (0.035f + (index % 4) * 0.017f), size.width - x)
+        drawRect(
+            (if (index % 3 == 0) CameraDevelopmentVividPink else CameraDevelopmentVividSky)
+                .copy(alpha = 0.48f),
+            topLeft = Offset(x, y),
+            size = Size(width, if (index % 5 == 0) 3.dp.toPx() else hairline),
+        )
+    }
+}
+
+/** Geometric ink builds in a fixed grid, so each cycle reads as drawing rather than a spinner. */
+private fun DrawScope.drawCameraMechanicalComposition(
+    cycle: Float,
+    animationsEnabled: Boolean,
+    colors: List<Color>,
+) {
+    drawRect(Color(0xFF201E22).copy(alpha = 0.1f))
+    val stroke = 1.5.dp.toPx()
+    val radius = size.minDimension * 0.042f
+    val visible = if (animationsEnabled) 4 + (cycle * 28f).toInt() else 32
+    repeat(32) { index ->
+        if (index >= visible) return@repeat
+        val column = index % 5
+        val row = index / 5
+        val center = Offset(
+            size.width * (0.12f + column * 0.19f),
+            size.height * (0.1f + row * 0.13f),
+        )
+        val extent = radius * (0.82f + (index % 3) * 0.18f)
+        val color = colors[index % colors.size]
+        when (index % 4) {
+            0 -> {
+                drawCircle(color.copy(alpha = 0.28f), radius = extent, center = center)
+                drawCircle(color.copy(alpha = 0.86f), radius = extent, center = center, style = Stroke(width = stroke))
+            }
+            1 -> {
+                val topLeft = Offset(center.x - extent, center.y - extent)
+                val square = Size(extent * 2f, extent * 2f)
+                drawRect(color.copy(alpha = 0.25f), topLeft = topLeft, size = square)
+                drawRect(color.copy(alpha = 0.86f), topLeft = topLeft, size = square, style = Stroke(width = stroke))
+            }
+            2 -> {
+                val top = Offset(center.x, center.y - extent)
+                val left = Offset(center.x - extent, center.y + extent)
+                val right = Offset(center.x + extent, center.y + extent)
+                drawLine(color.copy(alpha = 0.88f), top, left, strokeWidth = stroke)
+                drawLine(color.copy(alpha = 0.88f), left, right, strokeWidth = stroke)
+                drawLine(color.copy(alpha = 0.88f), right, top, strokeWidth = stroke)
+            }
+            else -> {
+                drawLine(color.copy(alpha = 0.86f), Offset(center.x - extent, center.y), Offset(center.x + extent, center.y), strokeWidth = stroke)
+                drawLine(color.copy(alpha = 0.86f), Offset(center.x, center.y - extent), Offset(center.x, center.y + extent), strokeWidth = stroke)
+                drawCircle(color.copy(alpha = 0.45f), radius = extent * 0.3f, center = center)
+            }
         }
     }
 }

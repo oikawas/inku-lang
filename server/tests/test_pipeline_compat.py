@@ -285,7 +285,8 @@ def test_description_pipeline_forces_typed_stage1_transport_and_renders_svg(
     assert body["temperature"] == 0.3
     function = body["tools"][0]["function"]
     assert function["name"] == "submit_pipeline_response"
-    assert function["parameters"]["properties"]["normalized_ddl"]["type"] == "string"
+    # Stage 1 asks for a typed work plan; the plan is printed as the visible DDL.
+    assert function["parameters"]["required"] == ["background", "ground", "layers"]
     assert body["tool_choice"] == {
         "type": "function",
         "function": {"name": "submit_pipeline_response"},

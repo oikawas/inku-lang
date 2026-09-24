@@ -1550,6 +1550,21 @@ word does not authorize every head combination. Explicit independent points,
 lines, and marks must not be absorbed into surface attributes. Neither this guide
 nor the tool notes are added to camera or hole-completion system text.
 
+### 12.6.1 Sketch from Life (Supplementing Place and Light, draw-system03)
+
+An optional **sketch** can run once before the work plan. It never rewrites the description: it supplements only the **extent of place** and the **seasonal or time-of-day light** that the description implies without stating, in one to three sentences of plain words for things. Stage 1 receives both the description and the sketch; from the sketch it only adds scene or back layers and the background color, while subjects, movement, direction, counts, and placement follow the description. The sketch never takes the description's place, and the description remains the work's provenance in storage and display (§12.16).
+
+When to sketch is chosen per drawing, and the default is **auto**.
+
+- **Auto** (`auto`): the sketcher first judges whether the description gives enough cues to draw from. If it does, nothing is added and the description alone is drawn (`not_needed`). The criterion is the amount of cues, a general one, not the form of the text (waka or prose). <!-- the rule is settled by the development evaluation -->
+- **Off** (`off`): no sketch.
+- **Always** (`always`): supplement even when the description states its cues. This is what the author's per-work "redraw with a sketch" uses.
+- A sketch the author edited, or a saved one, is used as it stands without a request (`supplied`).
+
+The sketch **never waits for a confirmation**: nothing asks the author between pressing draw and seeing the picture. A failed sketch request goes on to the work plan with the description alone, and the drawing completes (`fallback`). The sketch can be read and edited after drawing; editing it draws again. The per-work switch "redraw with or without the sketch" saves the result as a child of the chosen work (derivation kind `sketch_grain_change`, metadata `from_sketch_state` and `to_sketch_mode`).
+
+In the shared pipeline the sketch is the optional effect `generate_sketch` before Stage 1 (result `sketch_generated`, prompt `inku.sketch-supplement-prompt.v1`). The start input and a regeneration from the description may carry `sketch` (`off`, `auto`, `always`, or `supplied`). The snapshot's `sketch` record (`pending`, `supplemented`, `not_needed`, `fallback`, `supplied`) states what the sketch did, and the saved `sketch_state` becomes `supplemented` (with the sketch text and an empty `sketch_grain`), `not_needed`, `fallback`, or `off`. The retry budget is `sketch_retry`, or the catalog-selection budget when absent. The retired layer's `fine` and `coarse` grains (§12.15) remain only for displaying saved works and are not used by the new sketch.
+
 ### 12.7 Stage 2 Completion and Deterministic Structuring
 
 The Stage 2 LLM returns a span-bounded patch candidate only for known holes explicitly reported by the compiler in saved visible DDL. The shared pipeline creates the request automatically; adoption requires author approval and a visible-DDL CAS save. The LLM does not output Score. The shared lowerer structures lock-verified typed meaning into Score once, preserving color, material, quantity, movement, arrangement path, rotation, canvas, and explicit relations.

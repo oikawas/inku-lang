@@ -141,9 +141,9 @@ export class HistoryMutations {
 	toggleForShare = async (
 		item: HistoryForShareProjection | null | undefined,
 		event?: Event
-	): Promise<void> => {
+	): Promise<HistoryItem | null> => {
 		event?.stopPropagation();
-		if (!item?.id) return;
+		if (!item?.id) return null;
 		const nextForShare = !item.for_share;
 		// The server alone resolves a bare share bit to a destination. Optimism
 		// changes only the bit and keeps the last known destination until reply.
@@ -166,9 +166,11 @@ export class HistoryMutations {
 				refreshes.push(this.deps.browsing.manager.fetch());
 			}
 			if (refreshes.length > 0) await Promise.all(refreshes);
+			return updated;
 		} catch (error) {
 			this.projectForShare(item);
 			this.warn('failed to update the share mark', error);
+			return null;
 		}
 	};
 

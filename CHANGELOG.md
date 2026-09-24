@@ -6,6 +6,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 36 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-25 — Make per-work sharing controls and status visible
+
+The Library now opens individual sharing settings from work cards, Lineage members, the chronological table, and previews. Sharing settings separately manage group read access and individual read/write grants. The settings dialog now appears above the Library. History listings report whether an owned work has ACL grants and distinguish individual sharing, group sharing, and works owned by others with separate badges. The “Shared only” filter is labeled “Group shared only” to match its actual scope.
+
 ### 2026-09-24 — Make work details readable in Lineage cards
 
 Work details now open in a separate dialog instead of stretching a narrow Lineage card down the screen. The description uses the dialog's full width, and the values no longer collapse into one-character columns. Description and render hashes show only their last four digits, with a separate button beside each to copy the complete digest. The work comment remains editable in the dialog.

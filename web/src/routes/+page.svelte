@@ -229,6 +229,8 @@
 	// there is somebody to share with: a single-user server is one person's own,
 	// so the button is withheld there rather than opening onto an empty list.
 	let shareTarget = $state<HistoryItem | null>(null);
+	let aclShareStatus = $state<Record<string, boolean>>({});
+	let groupShareStatus = $state<Record<string, boolean>>({});
 	let currentRenderEngineVersion = $state<string | null>(null);
 	let currentDdlVersion = $state<string | null>(null);
 	let currentDdlEngineVersion = $state<string | null>(null);
@@ -2903,7 +2905,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				onCopyStatusHash={copyStatusHash}
 				onToggleStar={toggleHistoryStar}
 				onToggleForRevision={toggleHistoryForRevision}
-				onToggleForShare={toggleHistoryForShare}
+				onToggleForShare={async (item, event) => { await toggleHistoryForShare(item, event); }}
 				onReplayCurrent={() => {
 					if (replayableStatusHistoryItem) return replayHistoryItem(replayableStatusHistoryItem, outputTab);
 				}}
@@ -3322,6 +3324,8 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			currentLineageRootId={work.displayedHistoryItem?.lineage_root_node_id ?? null}
 			isJapanese={getLang() === 'ja'}
 			onShareItem={singleUserMode ? null : (item) => (shareTarget = item)}
+			{aclShareStatus}
+			{groupShareStatus}
 		/>
 	{/await}
 	{/key}
@@ -3335,7 +3339,20 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			users={settings.userAdministration.users.map((u) => ({ id: u.id, name: u.username }))}
 			groups={settings.userAdministration.groups.map((g) => ({ id: g.id, name: g.name }))}
 			isJapanese={getLang() === 'ja'}
+			groupShared={shareTarget.for_share === true}
+			shareGroupId={shareTarget.share_group_id}
+			onToggleGroupShare={async () => {
+				if (!shareTarget) return null;
+				const updated = await toggleHistoryForShare(shareTarget);
+				if (!updated) return null;
+				shareTarget = updated;
+				if (updated.id) groupShareStatus = { ...groupShareStatus, [updated.id]: updated.for_share === true };
+				return updated.for_share === true;
+			}}
 			onClose={() => (shareTarget = null)}
+			onChanged={(hasShares) => {
+				if (shareTarget?.id) aclShareStatus = { ...aclShareStatus, [shareTarget.id]: hasShares };
+			}}
 		/>
 	{/await}
 {/if}

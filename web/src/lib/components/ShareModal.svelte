@@ -21,14 +21,19 @@
 		users: Candidate[];
 		groups: Candidate[];
 		isJapanese: boolean;
+		groupShared: boolean;
+		shareGroupId?: string | null;
+		onToggleGroupShare: () => Promise<boolean | null>;
 		onClose: () => void;
+		onChanged?: (hasShares: boolean) => void;
 	};
 
-	let { itemId, itemLabel, users, groups, isJapanese, onClose }: Props = $props();
+	let { itemId, itemLabel, users, groups, isJapanese, groupShared, shareGroupId = null, onToggleGroupShare, onClose, onChanged }: Props = $props();
 
 	let entries = $state<AclEntry[]>([]);
 	let loading = $state(true);
 	let saving = $state(false);
+	let savingGroup = $state(false);
 	let error = $state<string | null>(null);
 
 	// Names the caller may offer. `users` arrives full only for a member
@@ -76,6 +81,7 @@
 			});
 			if (!response.ok) throw new Error(String(response.status));
 			entries = (await response.json()) as AclEntry[];
+			onChanged?.(entries.length > 0);
 		} catch {
 			error = isJapanese ? '共有の設定を読み込めませんでした。' : 'Could not load the guest list.';
 		} finally {
@@ -101,6 +107,7 @@
 			});
 			if (!response.ok) throw new Error(String(response.status));
 			entries = (await response.json()) as AclEntry[];
+			onChanged?.(entries.length > 0);
 		} catch {
 			error = isJapanese ? '共有の設定を保存できませんでした。' : 'Could not save the guest list.';
 		} finally {
@@ -123,6 +130,20 @@
 				(e) => !(e.subject_type === entry.subject_type && e.subject_id === entry.subject_id),
 			),
 		);
+	}
+
+	async function toggleGroupShare() {
+		savingGroup = true;
+		error = null;
+		try {
+			if (await onToggleGroupShare() === null) {
+				error = isJapanese ? 'グループ共有を変更できませんでした。' : 'Could not change group sharing.';
+			}
+		} catch {
+			error = isJapanese ? 'グループ共有を変更できませんでした。' : 'Could not change group sharing.';
+		} finally {
+			savingGroup = false;
+		}
 	}
 
 	$effect(() => {
@@ -153,6 +174,16 @@
 		</div>
 
 		<div class="share-body">
+			<section class="share-section">
+				<h3>{isJapanese ? 'グループ共有' : 'Group sharing'}</h3>
+				<p class="share-help">{isJapanese ? '作品の共有先グループに閲覧を許可します。編集権限は渡しません。' : 'Allow the destination group to view this work without edit access.'}</p>
+				<div class="share-group-control">
+					<span>{groupShared ? (isJapanese ? '共有中' : 'Shared') : (isJapanese ? '共有していない' : 'Not shared')}{#if groupShared && shareGroupId} · {groups.find((group) => group.id === shareGroupId)?.name ?? shareGroupId}{/if}</span>
+					<button class="action-btn" type="button" disabled={savingGroup} onclick={toggleGroupShare}>{groupShared ? (isJapanese ? 'グループ共有を解除' : 'Stop group sharing') : (isJapanese ? 'グループ共有する' : 'Share with group')}</button>
+				</div>
+			</section>
+			<section class="share-section">
+				<h3>{isJapanese ? '個別共有' : 'Individual sharing'}</h3>
 			{#if loading}
 				<div class="share-note">{isJapanese ? '読み込み中…' : 'Loading…'}</div>
 			{:else}
@@ -231,7 +262,8 @@
 				</p>
 			{/if}
 
-			{#if error}<div class="share-error">{error}</div>{/if}
+			</section>
+			{#if error}<div class="share-error" role="alert">{error}</div>{/if}
 		</div>
 	</div>
 </div>
@@ -244,7 +276,8 @@
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		z-index: 60;
+		/* The library occupies z-index 401; its share dialog must cover it. */
+		z-index: 500;
 	}
 	.share-modal {
 		background: var(--panel-bg);
@@ -269,6 +302,9 @@
 		overflow-wrap: anywhere;
 	}
 	.share-body { margin-top: 0.9rem; display: grid; gap: 0.8rem; }
+	.share-section + .share-section { border-top: 1px solid var(--border); padding-top: 0.8rem; }
+	.share-section h3 { margin: 0 0 0.5rem; font-size: var(--ui-font-size-14); }
+	.share-group-control { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.7rem; }
 	.share-note, .share-help { font-size: 0.85em; opacity: 0.8; margin: 0; }
 	.share-error { font-size: 0.85em; color: var(--danger, #c0392b); }
 	.share-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.4rem; }

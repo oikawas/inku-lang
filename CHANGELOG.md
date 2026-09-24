@@ -12,6 +12,18 @@ The Library's Starred, Revision marks, and Shared filters are now grouped under 
 
 The filter check mark no longer changes a button's width, and the filter controls now carry the same restrained weight as nearby actions. Work-selection boxes use one smaller fixed square before and after selection, while Star, Revision mark, and Trash controls share one size and gap. Their actions and selected state are unchanged.
 
+### 2026-09-24 — Refine Android Works and in-person presentation
+
+Following Pixel 9 review and user feedback, the Works list, work presentation, and shared screen composition have been revised. The mostly achromatic palette is replaced with teal and coral accents that distinguish interaction priority. The shared header, bottom navigation, search and filters, and Works grid use screen space more efficiently. Selecting a work opens a dedicated viewer instead of the editing screen, preserving the current filter and order while presenting works in person. Viewer controls are simplified, with an explicit Revise action. App text scaling remains available. The drawing engine is unchanged.
+
+### 2026-09-24 — Support model-list fetching for Android connection types
+
+The Model Selection dialog now fetches model IDs from OpenAI-compatible, Anthropic, and Gemini connections using the same endpoints and credentials as the server. Fetches have a 20-second limit, and fetched candidates remain separate from published models. Only previously published IDs still in the fetched list remain selected; new IDs are not selected automatically. The dialog reports loading, success, and failure per connection and no longer mixes fixed initial suggestions into a fetched list. Drawing and model-generation transports are unchanged.
+
+### 2026-09-24 — Refine Android creation and text display
+
+The Pixel 9 Android UI now has three destinations: Studio, Works, and Series. New work starts with its description, while saved work opens with the artwork and original description for review. Camera, batch, demo, and settings are grouped into clear entry points. The Works grid adapts to the available width. Series uses full-width cards and explains how to select a work when no lineage is in view. A restrained charcoal-and-paper palette and line icons keep attention on the artwork. Display settings add persistent 100–150% app text scaling on top of the device text scale. The drawing engine, DDL, work semantics, and persistence schema are unchanged.
+
 ### 2026-09-23 — Synchronize the specification with the current Web UI
 
 Aligned the Japanese and English specification with the current making and Library state retention, description and instruction editing with the Saijiki, responsive work-condition display, Lineage-grouped Library thumbnails, the shared Export menu and Lineage scopes, and Demo's work-conditions header. The batch-resume wording now also uses the current saved-success meaning. Product code and versions are unchanged.

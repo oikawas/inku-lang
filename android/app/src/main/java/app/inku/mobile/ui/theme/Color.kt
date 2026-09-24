@@ -12,9 +12,9 @@ import androidx.compose.ui.graphics.Color
  * roles, not values -- `CardHairline`, not `Ink34302B` -- the same rule the web
  * side follows with `--action-bg` / `--accent`.
  *
- * The values are exactly the ones the screens already used. Nothing was merged,
- * rounded, or "tidied": two roles that happen to share an ARGB keep two names,
- * because they are two decisions that only currently agree.
+ * Cool charcoal surfaces give artwork a quiet frame. Clear teal actions and
+ * restrained coral drawing actions distinguish navigation from creation.
+ * Separate roles remain separate even where their current values agree.
  *
  * The app is dark-only. There is no `lightColorScheme` and adding one has not
  * been ruled on.
@@ -25,28 +25,28 @@ import androidx.compose.ui.graphics.Color
 // indirectly, so a change here moves the whole app.
 
 /** The page behind everything. */
-val InkBackground = Color(0xFF11100F)
+val InkBackground = Color(0xFF12191B)
 
 /** Cards, dialogs, and rows that sit one step above the page. */
-val InkSurface = Color(0xFF181715)
+val InkSurface = Color(0xFF1B2528)
 
 /** Inset wells and pressed states, one step above `InkSurface`. */
-val InkSurfaceVariant = Color(0xFF24211E)
+val InkSurfaceVariant = Color(0xFF253338)
 
-/** The blue the app uses for selection and primary actions. */
-val InkPrimary = Color(0xFF7FA6D8)
+/** Teal for primary actions and active navigation. */
+val InkPrimary = Color(0xFF64DACA)
 
-/** The sand tone the app uses for the drawing action and active hints. */
-val InkSecondary = Color(0xFFEAD7A3)
+/** Warm coral for drawing actions and active hints. */
+val InkSecondary = Color(0xFFF5AD8B)
 
 /** Dividers and field outlines. */
-val InkOutline = Color(0xFF514A43)
+val InkOutline = Color(0xFF52656A)
 
 /** Body text on the page and on surfaces. */
-val InkOnSurface = Color(0xFFEDE7DE)
+val InkOnSurface = Color(0xFFEEF4F1)
 
 /** Secondary text: captions, units, and disabled labels. */
-val InkOnSurfaceMuted = Color(0xFFCFC6BA)
+val InkOnSurfaceMuted = Color(0xFFB5C7C6)
 
 val InkuColors = darkColorScheme(
     background = InkBackground,
@@ -54,6 +54,8 @@ val InkuColors = darkColorScheme(
     surfaceVariant = InkSurfaceVariant,
     primary = InkPrimary,
     secondary = InkSecondary,
+    onPrimary = Color(0xFF082C2B),
+    onSecondary = Color(0xFF39251F),
     outline = InkOutline,
     onBackground = InkOnSurface,
     onSurface = InkOnSurface,
@@ -63,10 +65,10 @@ val InkuColors = darkColorScheme(
 // --- Text that sits on a filled action --------------------------------------
 
 /** Text on a `primary`-filled button. */
-val InkOnPrimary = Color(0xFF101010)
+val InkOnPrimary = Color(0xFF082C2B)
 
 /** Text on a `secondary`-filled button. */
-val InkOnSecondary = Color(0xFF19150F)
+val InkOnSecondary = Color(0xFF39251F)
 
 /** Text on a light vocabulary pill (chosen when the pill's fill is light). */
 val PillInkOnLight = Color(0xFF12110F)
@@ -177,16 +179,16 @@ val FailureSummaryWash = Color(0x22E08A7A)
 // --- Surfaces and containers ------------------------------------------------
 
 /** The well behind a dense text input. */
-val InputWellSurface = Color(0xFF191816)
+val InputWellSurface = Color(0xFF182225)
 
 /** A settings card's container. */
-val SettingsCardSurface = Color(0xFF1B1A18)
+val SettingsCardSurface = Color(0xFF1B2528)
 
 /** The card that frames the canvas. */
 val CanvasPanelSurface = Color(0xFF1B1B1A)
 
 /** A chip that names a published model, and the inset well inside the canvas panel. */
-val ChipSurface = Color(0xFF20201E)
+val ChipSurface = Color(0xFF243136)
 
 /** The square that stands in for a lineage node's artwork before it loads. */
 val LineagePlaceholderSurface = Color(0xFF2A2622)
@@ -201,18 +203,18 @@ val RenderTextInk = Color(0xFF22201D)
 val HistoryBadgeSurface = Color(0xCC24211E)
 
 /** A mini pill that is not selected. */
-val MiniPillSurface = Color(0xDD24211E)
+val MiniPillSurface = Color(0xDD253338)
 
 /** The drawing action button when it is not tonal. */
-val DrawingActionSurface = Color(0xFF233144)
+val DrawingActionSurface = Color(0xFF694336)
 
 // --- Borders and hairlines --------------------------------------------------
 
 /** The hairline around a card, a settings card, and the model asset rows. */
-val CardHairline = Color(0xFF34302B)
+val CardHairline = Color(0xFF34474C)
 
 /** The divider above the bottom navigation bar. */
-val BottomNavDivider = Color(0xFF26221E)
+val BottomNavDivider = Color(0xFF34474C)
 
 /** The hairline around the canvas panel. */
 val CanvasPanelHairline = Color(0xFF2C2925)
@@ -224,7 +226,7 @@ val HeroCardHairline = Color(0x1A000000)
 val SwatchHairline = Color(0x66000000)
 
 /** The ring that marks a selected history tile or nav button. */
-val SelectionRing = Color(0x337FA6D8)
+val SelectionRing = Color(0x5264DACA)
 
 // --- Overlays and tints -----------------------------------------------------
 
@@ -238,10 +240,10 @@ val HeroOverlayHairline = Color(0x55EDE7DE)
 val HeroOverlayInk = Color(0xFFEDE7DE)
 
 /** The wash behind an active row in a selection dialog. */
-val ActiveRowTint = Color(0x1AEAD7A3)
+val ActiveRowTint = Color(0x3364DACA)
 
 /** The wash behind an active settings row. */
-val ActiveSettingsRowTint = Color(0x1A7FA6D8)
+val ActiveSettingsRowTint = Color(0x3364DACA)
 
 /** The unfilled part of a progress bar. */
 val ProgressTrack = Color(0x3324211E)

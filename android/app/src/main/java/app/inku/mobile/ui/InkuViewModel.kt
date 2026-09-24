@@ -38,6 +38,7 @@ import app.inku.mobile.data.refinement.RefinementPlan
 import app.inku.mobile.data.refinement.RefinementPlanner
 import app.inku.mobile.data.refinement.VariationAmplitude
 import app.inku.mobile.llm.LOCAL_VISION_MODEL_ID
+import app.inku.mobile.llm.ModelProviderHttpException
 import app.inku.mobile.llm.CameraVisionModeSetting
 import app.inku.mobile.llm.VisionAnalysisRequest
 import app.inku.mobile.llm.VisionImagePreparer
@@ -101,6 +102,12 @@ internal fun sourceTextOf(item: HistoryItemEntity): String =
 
 const val SETTING_KEY_MASCOT_KIND = "mascot_kind"
 const val SETTING_KEY_UI_LANGUAGE = "ui_lang"
+const val SETTING_KEY_UI_TEXT_SCALE = "ui_text_scale"
+val UI_TEXT_SCALE_CHOICES: List<Float> = listOf(1f, 1.15f, 1.3f, 1.5f)
+
+private fun normalizeUiTextScale(scale: Float): Float =
+    if (scale.isFinite()) UI_TEXT_SCALE_CHOICES.minBy { abs(it - scale) } else 1f
+
 /** 「推敲要素の選択は前回値をブラウザに記憶する」-- here, the device remembers it. */
 const val SETTING_KEY_REFINEMENT_ELEMENT = "refinement_element"
 /** 写生 (Stage 0.5): which of the three states the control was left in. */
@@ -137,6 +144,12 @@ val InkuUiState.descriptionLocked: Boolean
     get() = historyAuthorityLoading || (!descriptionForkRequested &&
         (pipelineView?.authority == "ddl_authoritative" || historyAuthority == "ddl_authoritative"))
 
+data class ProviderModelFetchState(
+    val message: String,
+    val loading: Boolean = false,
+    val failed: Boolean = false,
+)
+
 data class InkuUiState(
     val prompt: String = "青い鉛筆の線を12本、波打つ軌跡に沿って散らす",
     val ddl: String = "",
@@ -171,6 +184,7 @@ data class InkuUiState(
     val modelAssets: List<ModelAssetEntity> = emptyList(),
     val providerSettings: List<ProviderSettingEntity> = emptyList(),
     val providerModelCandidates: Map<String, List<String>> = emptyMap(),
+    val providerModelFetchStates: Map<String, ProviderModelFetchState> = emptyMap(),
     val exportTemplates: List<ExportTemplateEntity> = emptyList(),
     val activeModelDownloadId: String? = null,
     val selectedModelId: String = CompatibilityConstants.defaultStage1Model,
@@ -182,6 +196,10 @@ data class InkuUiState(
     val selectedCatalogId: String = "default",
     val selectedCanvasAspect: String = "square",
     val selectedHistory: HistoryItemEntity? = null,
+    /** Work being shown to someone from the Works gallery, separate from the editing selection. */
+    val presentationHistory: HistoryItemEntity? = null,
+    /** Gallery order at the moment presentation began (including search and favorite filters). */
+    val presentationSequence: List<String> = emptyList(),
     // web's `lineageDetached` (+page.svelte:515). While it is up, the work on
     // screen is shown but not inherited from: the next save becomes a root.
     val lineageDetached: Boolean = false,
@@ -213,6 +231,7 @@ data class InkuUiState(
     val renderTab: RenderTab = RenderTab.Artwork,
     val uiMode: String = "full",
     val uiLanguage: UiLanguage = UiLanguage.DEFAULT,
+    val uiTextScale: Float = 1f,
     val mascotKind: String = "incu",
     val canvasZoom: Float = 1.0f,
     val canvasPanX: Float = 0f,
@@ -432,6 +451,7 @@ class InkuViewModel @JvmOverloads constructor(
     private var modelSelectionSnapshot: Pair<String, String>? = null
     private var catalogSelectionSnapshot: String? = null
     private var lastHistorySwipeAt = 0L
+    private var presentationNavigationSerial = 0L
 
     private val providerConfig = combine(providerSettings, providerModelCandidates) { providers, candidates ->
         providers to candidates
@@ -1252,6 +1272,7 @@ class InkuViewModel @JvmOverloads constructor(
 
     fun setTab(tab: AppTab) {
         val current = localState.value
+        if (current.tab == AppTab.History && tab != AppTab.History) presentationNavigationSerial++
         val restoredModelSelection = if (tab != AppTab.Settings && current.settingsPane == SettingsPane.ModelSelection) modelSelectionSnapshot else null
         if (restoredModelSelection != null) modelSelectionSnapshot = null
         localState.value = current.copy(
@@ -1387,12 +1408,34 @@ class InkuViewModel @JvmOverloads constructor(
     }
 
     fun enterCanvasPresentationMode() {
+        presentationNavigationSerial++
         localState.value = localState.value.copy(
             canvasZoom = CANVAS_FIT_ZOOM,
             canvasPanX = 0f,
             canvasPanY = 0f,
             canvasPresentationMode = true,
+            presentationHistory = null,
+            presentationSequence = emptyList(),
         )
+    }
+
+    /** Present a gallery work without changing the work or description selected for editing. */
+    fun openHistoryPresentation(item: HistoryListItem, filteredIds: List<String>) {
+        val request = ++presentationNavigationSerial
+        val sequence = filteredIds.distinct().takeIf { item.id in it } ?: listOf(item.id)
+        viewModelScope.launch {
+            val work = repository.getHistoryById(item.id) ?: return@launch
+            if (request != presentationNavigationSerial) return@launch
+            localState.value = localState.value.copy(
+                tab = AppTab.History,
+                canvasZoom = CANVAS_FIT_ZOOM,
+                canvasPanX = 0f,
+                canvasPanY = 0f,
+                canvasPresentationMode = true,
+                presentationHistory = work,
+                presentationSequence = sequence,
+            )
+        }
     }
 
     /**
@@ -1402,12 +1445,32 @@ class InkuViewModel @JvmOverloads constructor(
      * zoom reset were the same call and neither could be done without the other.
      */
     fun exitCanvasPresentationMode() {
-        localState.value = localState.value.copy(
+        presentationNavigationSerial++
+        val current = localState.value
+        localState.value = current.copy(
             canvasZoom = CANVAS_FIT_ZOOM,
             canvasPanX = 0f,
             canvasPanY = 0f,
             canvasPresentationMode = false,
+            presentationHistory = null,
+            presentationSequence = emptyList(),
+            tab = if (current.presentationHistory != null) AppTab.History else current.tab,
         )
+    }
+
+    /** Leave the gallery viewer and explicitly load this work into the editor. */
+    fun editPresentedHistory() {
+        val work = localState.value.presentationHistory ?: return
+        presentationNavigationSerial++
+        localState.value = localState.value.copy(
+            canvasPresentationMode = false,
+            presentationHistory = null,
+            presentationSequence = emptyList(),
+            canvasZoom = CANVAS_FIT_ZOOM,
+            canvasPanX = 0f,
+            canvasPanY = 0f,
+        )
+        selectHistory(work)
     }
 
     fun panCanvas(dx: Float, dy: Float) {
@@ -1512,6 +1575,12 @@ class InkuViewModel @JvmOverloads constructor(
     fun setUiLanguage(language: UiLanguage) {
         localState.value = localState.value.copy(uiLanguage = language, message = null)
         persistSetting(SETTING_KEY_UI_LANGUAGE, JSONObject().put("value", language.code).toString())
+    }
+
+    fun setUiTextScale(scale: Float) {
+        val normalized = normalizeUiTextScale(scale)
+        localState.value = localState.value.copy(uiTextScale = normalized)
+        persistSetting(SETTING_KEY_UI_TEXT_SCALE, JSONObject().put("value", normalized).toString())
     }
 
     fun setMascotKind(kind: String) {
@@ -1721,6 +1790,11 @@ class InkuViewModel @JvmOverloads constructor(
     }
 
     fun selectLatestHistory() {
+        val viewer = localState.value
+        if (viewer.canvasPresentationMode && viewer.presentationHistory != null) {
+            viewer.presentationSequence.firstOrNull()?.let(::showPresentationHistory)
+            return
+        }
         viewModelScope.launch {
             val latest = historyItems.value.firstOrNull() ?: history.first().firstOrNull() ?: return@launch
             selectHistory(latest)
@@ -1730,6 +1804,16 @@ class InkuViewModel @JvmOverloads constructor(
     private fun selectAdjacentHistory(offset: Int) {
         val now = SystemClock.elapsedRealtime()
         if (now - lastHistorySwipeAt < 450L) return
+        val viewer = localState.value
+        if (viewer.canvasPresentationMode && viewer.presentationHistory != null) {
+            val index = viewer.presentationSequence.indexOf(viewer.presentationHistory.id)
+            if (index < 0) return
+            val next = (index + offset).coerceIn(0, viewer.presentationSequence.lastIndex)
+            if (next == index) return
+            lastHistorySwipeAt = now
+            showPresentationHistory(viewer.presentationSequence[next])
+            return
+        }
         viewModelScope.launch {
             val items = historyItems.value.ifEmpty { history.first() }
             if (items.isEmpty()) return@launch
@@ -1742,6 +1826,21 @@ class InkuViewModel @JvmOverloads constructor(
             if (nextIndex == currentIndex) return@launch
             lastHistorySwipeAt = now
             selectHistory(items[nextIndex])
+        }
+    }
+
+    private fun showPresentationHistory(id: String) {
+        val request = ++presentationNavigationSerial
+        viewModelScope.launch {
+            val work = repository.getHistoryById(id) ?: return@launch
+            val current = localState.value
+            if (request != presentationNavigationSerial || !current.canvasPresentationMode || id !in current.presentationSequence) return@launch
+            localState.value = current.copy(
+                presentationHistory = work,
+                canvasZoom = CANVAS_FIT_ZOOM,
+                canvasPanX = 0f,
+                canvasPanY = 0f,
+            )
         }
     }
 
@@ -2826,16 +2925,28 @@ class InkuViewModel @JvmOverloads constructor(
     }
 
     fun fetchProviderModels(providerId: String) {
+        if (localState.value.providerModelFetchStates[providerId]?.loading == true) return
+        fun setFetchState(next: ProviderModelFetchState) {
+            val current = localState.value
+            localState.value = current.copy(
+                providerModelFetchStates = current.providerModelFetchStates + (providerId to next),
+            )
+        }
+        setFetchState(ProviderModelFetchState(strings().modelListFetching(providerId), loading = true))
         viewModelScope.launch {
-            localState.value = localState.value.copy(message = strings().modelListFetching(providerId))
             runCatching {
                 repository.fetchProviderModels(providerId)
             }.onSuccess { models ->
                 val gemma31b = models.firstOrNull { it.equals("google/gemma-4-31b-it", ignoreCase = true) }
                 val suffix = if (providerId == "nvidia" && gemma31b != null) strings().modelListNvidiaSuffix else ""
-                localState.value = localState.value.copy(message = strings().modelListFetched(models.size, suffix))
+                setFetchState(ProviderModelFetchState(strings().modelListFetched(models.size, suffix)))
             }.onFailure { error ->
-                localState.value = localState.value.copy(message = messageFor(error, strings(), strings().modelListFetchFailed))
+                val message = if (error is ModelProviderHttpException && error.statusCode in setOf(401, 403)) {
+                    strings().modelListAccessDenied(error.statusCode)
+                } else {
+                    messageFor(error, strings(), strings().modelListFetchFailed)
+                }
+                setFetchState(ProviderModelFetchState(message, failed = true))
             }
         }
     }
@@ -2948,6 +3059,9 @@ class InkuViewModel @JvmOverloads constructor(
             if (localState.value.selectedHistory?.id == item.id) {
                 localState.value = localState.value.copy(selectedHistory = item.copy(starred = nextStarred))
             }
+            if (localState.value.presentationHistory?.id == item.id) {
+                localState.value = localState.value.copy(presentationHistory = item.copy(starred = nextStarred))
+            }
             if (localState.value.tab == AppTab.Lineage) refreshLineage()
         }
     }
@@ -3023,6 +3137,9 @@ class InkuViewModel @JvmOverloads constructor(
         val uiLanguage = settings[SETTING_KEY_UI_LANGUAGE]
             ?.let { UiLanguage.fromCode(JSONObject(it).optString("value")) }
             ?: current.uiLanguage
+        val uiTextScale = settings[SETTING_KEY_UI_TEXT_SCALE]
+            ?.let { normalizeUiTextScale(JSONObject(it).optDouble("value", 1.0).toFloat()) }
+            ?: current.uiTextScale
         val mascotKind = settings[SETTING_KEY_MASCOT_KIND]?.let { JSONObject(it).optString("value", current.mascotKind) } ?: current.mascotKind
         val demoSeed = settings["demo_seed_phrase"]?.let { JSONObject(it).optString("value", current.demoSeed) } ?: current.demoSeed
         val demoInterval = settings["demo_interval_seconds"]?.let { JSONObject(it).optInt("value", current.demoIntervalSeconds) } ?: current.demoIntervalSeconds
@@ -3053,6 +3170,7 @@ class InkuViewModel @JvmOverloads constructor(
             cameraVisionOutputMode = cameraVisionOutputMode,
             uiMode = uiMode,
             uiLanguage = uiLanguage,
+            uiTextScale = uiTextScale,
             mascotKind = mascotKind,
             demoSeed = demoSeed,
             demoIntervalSeconds = demoInterval.coerceIn(1, 999),

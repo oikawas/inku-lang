@@ -12,6 +12,20 @@ object InkuStringsJa : InkuStrings {
 
     override val settingsLanguageTitle = "言語"
     override val settingsLanguageSubtitle = "画面の文言・歳時記・作品の言葉"
+    override val settingsDisplayTitle = "表示"
+    override val settingsTextSizeTitle = "文字の大きさ"
+    override val settingsTextSizeSubtitle = "端末の文字設定に加えて調整します"
+    override val settingsTextSizeSample = "言葉から、ひとつの作品へ。"
+    override val textSizeStandard = "標準"
+    override val textSizeLarge = "大きめ"
+    override val textSizeLargest = "最大"
+    override val studioTitle = "制作"
+    override val worksTitle = "作品"
+    override val seriesTitle = "連作"
+    override val studioSubtitle = "言葉を記して、描く"
+    override val productionTools = "制作ツール"
+    override val reviseWork = "この作品を推敲"
+    override val interpretationToggle = "解釈を見る"
 
     override val statusStage1 = "Stage 1: DDL生成中..."
     override val statusStage2 = "Stage 2: 画像生成中..."
@@ -138,6 +152,7 @@ object InkuStringsJa : InkuStrings {
 
     override val modelCatalogRefreshed = "ローカルモデルカタログを更新しました。"
     override val modelListFetchFailed = "モデルリスト取得に失敗しました。"
+    override val modelListAccessDenied: (Int) -> String = { code -> "モデルリストを取得できませんでした（HTTP $code）。APIキーと利用権限を確認してください。" }
     override val modelListFetching: (String) -> String = { id -> "$id のモデルリストを取得しています..." }
     override val modelListFetched: (Int, String) -> String = { count, suffix ->
         "${count}件のモデルを取得しました。$suffix"
@@ -265,6 +280,7 @@ object InkuStringsJa : InkuStrings {
     override val mascotTitle = "マスコット選択"
     override val model = "モデル"
     override val modelListFetch = "モデルリスト取得"
+    override val modelListFetchSaveFirst = "取得する前に、モデル選択の変更を保存またはキャンセルしてください。"
     override val modelSearch = "モデル検索"
     override val modelSettings = "モデル設定"
     override val modelSelection = "モデル選択"
@@ -280,7 +296,7 @@ object InkuStringsJa : InkuStrings {
     override val provenanceHash = "作品の来歴ハッシュ"
     override val workLineage = "作品の系譜"
     override val save = "保存"
-    override val lineageEmpty = "保存すると、ここに系譜が表示されます。"
+    override val lineageEmpty = "作品を選ぶと、ここに系譜が表示されます。"
     override val saving = "保存中…"
     override val saved = "保存済み"
     override val makeCandidates = "候補を作る"

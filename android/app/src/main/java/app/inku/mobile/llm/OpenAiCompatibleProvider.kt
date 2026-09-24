@@ -79,19 +79,6 @@ class OpenAiCompatibleProvider(
         return null
     }
 
-    suspend fun fetchModels(): List<String> = withContext(Dispatchers.IO) {
-        val payload = getJson(endpoint("/models"))
-        val rawModels = payload.optJSONArray("data") ?: payload.optJSONArray("models")
-            ?: error("Model list response did not contain models.")
-        (0 until rawModels.length()).mapNotNull { index ->
-            val item = rawModels.optJSONObject(index) ?: return@mapNotNull null
-            val id = (item.optString("id").ifBlank { item.optString("name") })
-                .removePrefix("models/")
-                .trim()
-            id.takeIf { it.isNotBlank() }
-        }.distinct()
-    }
-
     private fun postJson(url: String, payload: JSONObject, timeoutMs: Long?): JSONObject {
         val connection = open(url, "POST", timeoutMs)
         try {
@@ -100,15 +87,6 @@ class OpenAiCompatibleProvider(
             OutputStreamWriter(connection.outputStream, Charsets.UTF_8).use { writer ->
                 writer.write(payload.toString())
             }
-            return readJson(connection)
-        } finally {
-            connection.disconnect()
-        }
-    }
-
-    private fun getJson(url: String): JSONObject {
-        val connection = open(url, "GET", null)
-        try {
             return readJson(connection)
         } finally {
             connection.disconnect()

@@ -4,9 +4,9 @@ This directory is the Android workspace for the native standalone app and is
 tracked by Git. Local-only artifacts, device IDs, downloaded models, logs, and
 secrets must remain outside tracked files.
 
-Last updated: 2026-08-31.
+Last updated: 2026-09-24.
 
-**Catch-up status**: Android sits at generation `2.1.4-android.77` with **render engine
+**Catch-up status**: Android sits at generation `2.1.4-android.79` with **render engine
 `default / 41`** and **DDL engine version `20`**. Render identity comes from the packaged
 `core/crates/inku-render/` library through JNI rather than a Kotlin compatibility literal;
 `ReferenceCorpus.kt` declares the DDL reference version. The server also uses render engine `41`
@@ -165,29 +165,32 @@ Implemented:
   batch, demo, refinement, and camera paths.
 - Kotlin owns provider and camera operations, Room and history, approval, and presentation host
   side effects. Shared Rust alone owns drawing geometry, materials, surfaces, strokes, and SVG serialization.
-- Dark Compose UI in transition from the web-style workbench to a Pixel 9
-  mobile-first layout based on the Claude Design prototype:
-  - top application header
-  - bottom navigation: Description, Camera, History, Lineage. Description returns to Write; Camera accepts either a new capture or one Photo Picker image, turns it into the default on-device Gemma description or an explicitly selected advanced DDL, and proceeds one-touch through fixed NIM, `vivid_material` rendering, and saving
-  - the canvas control strip centers Full screen and puts a right-end menu for the existing Batch and Settings routes; the drawing-settings panel has no Write/Batch segmented mode
-  - bounded first-screen canvas card that respects the selected canvas aspect
-    while keeping the prompt and DDL path reachable on Pixel 9
-  - prompt and DDL interpretation below the canvas
-  - fixed-height drawing CTAs with an in-place generating state and progress
-    indicator, avoiding layout jumps during local LLM work
-  - render sub-tabs: `Artwork`, `Prompt`, `Json`
-  - explicit button rows for model, color catalog, and canvas selection
-  - dedicated History screen with search/filter placeholders and two-column
-    thumbnail cards
-  - stronger History selected-card affordance using an accent border and
-    corner marker instead of an overlaid text badge
-- History operations for the selected item:
-  - star / unstar
-  - soft trash
-  - JSON share export through Android `FileProvider`
-- The normal Compose screen has a history thumbnail strip below the canvas. It reads only saved
-  history values for selection, Stage 1/2 models, saved time, color-catalog ID,
-  work hash, and canvas tooltips.
+- Dark Compose UI is organized for writing and making on Pixel 9, then reviewing
+  saved work from its result:
+  - bottom navigation has three real destinations: Studio, Works, and Series,
+    with line icons. A shared header opens Settings.
+  - new work opens with the description editor and no empty canvas.
+    Camera and Photo Picker are actions beside the description. Model, color
+    catalog, and canvas settings expand from a summary row; interpretation and
+    DDL can also be collapsed.
+  - the Studio tools menu provides Description, Batch, and Demo. New Work is a
+    separate action from a saved work.
+  - saved work opens result-first with the picture and original description.
+    “Refine this work” opens the existing editor; “New Work” resets the
+    description. Interpretation and DDL expand independently, and viewing them
+    does not create a revision.
+  - the Works grid adapts to available width and shows at least two columns;
+    Pixel 9 uses two columns with multi-line titles.
+  - charcoal and paper colors, restrained rounding, and line icons keep the
+    work visually prominent.
+  - Display settings offer text scales of 100%, 115%, 130%, and 150%. The choice
+    persists in Room and magnifies Compose text in addition to the device text
+    scale.
+- Works retains Star / unstar, soft trash, and JSON sharing through Android
+  `FileProvider` for the selected item.
+- Saved-work results retain a full-screen picture, Prompt / JSON views, the
+  generation-information sheet, and navigation to Series. The old thumbnail
+  strip below the canvas is removed.
 - A read-only generation-information sheet shows saved sketch, models and languages, seeds and
   variation, color catalog and color map, canvas, render hash and engine, creation time, and elapsed time.
 - Lineage cards support editing saved DDL and Star toggling without changing the current focus when
@@ -2814,6 +2817,12 @@ Image-bearing local inference references `WebDdlSpec`'s existing compact Stage 1
 Valid direct DDL makes one local-Vision call, zero NIM Stage 1 calls, one fixed `nvidia:google/gemma-4-31b-it` Stage 2 call, and uses `vivid_material`, Sketch from Life off, catalog auto-selection off, and `autoRepair=false` through the existing `composeFromDdl` and root-save transaction. After local analysis, development skips Bringing out the forms and goes directly to Fixing color and placement. A Stage 2 or render retry reuses retained DDL and repeats only Stage 2, not local Vision or Stage 1. Cancel, system Back, late-result rejection, and the pre-save fence retain M4's single job owner.
 
 The saved work records `route=local_ddl_to_nim_stage2`, `vision_output_mode=ddl`, and `camera-ddl-v1` in backward-compatible camera provenance. Its `stage1_model` is the actual DDL producer, `local-litert-lm:gemma-4-e2b`; its `stage2_model` is fixed NIM. `original_input` and `normalized_ddl` both carry the validated DDL. Photo bytes, URI, EXIF, location, and digest are not saved. This mode adds no Room schema or migration, new column, photo persistence, Photo Picker, E4B, non-NIM fallback, or default-mode change.
+
+## 2026-09-24 Android work list and presentation viewer
+
+Android retains Studio, Works, and Series destinations while fitting the shared header, navigation, and list controls within the Pixel 9 display area. Teal and coral distinguish interaction priority and state, with readable contrast for body and supporting text. App text scaling continues to build on the device text scale.
+
+Selecting a work in Works opens a dedicated viewer. It centers the work and offers its description on demand while preserving the active search, filters, and order from the list. Viewer controls focus on moving between works and closing the viewer; entering production is an explicit Revise action. Opening the viewer preserves any in-progress editing state. The viewer does not automatically render or save a work; starring remains an explicit action.
 
 ## 2026-08-27 On-device image input from Photo Picker ([I-456])
 

@@ -75,6 +75,8 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.LazyGridState
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.grid.items as gridItems
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -92,6 +94,7 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.material3.ModalBottomSheet
@@ -164,6 +167,9 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
@@ -437,6 +443,7 @@ internal fun saijikiGroupColorAt(index: Int): Color = saijikiGroupColors[index %
 fun InkuApp() {
     val viewModel: InkuViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
     val state by viewModel.state.collectAsState()
+    val historyGridState = rememberLazyGridState()
     val cameraCaptureLauncher = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { success ->
         viewModel.onCameraCaptureResult(success)
     }
@@ -493,16 +500,17 @@ fun InkuApp() {
     CompositionLocalProvider(
         LocalUiLanguage provides state.uiLanguage,
         LocalStrings provides stringsFor(state.uiLanguage),
+        LocalUiTextScale provides state.uiTextScale,
     ) {
-    MaterialTheme(colorScheme = InkuColors) {
+    MaterialTheme(colorScheme = InkuColors, typography = inkuTypography(state.uiTextScale)) {
         Scaffold(
             bottomBar = {
-                // While the description is being written the four destinations
+                // While the description is being written the destinations
                 // step aside: keeping them would hold a bar's worth of height
                 // between the keyboard and 「描画する」, and going somewhere else
                 // is not what one is about to do mid-sentence.
                 if (!state.canvasPresentationMode && !state.descriptionFocused && !state.cameraCaptureState.locksCameraInteraction) {
-                    BottomNavigationBar(state.tab, state.composeMode, viewModel, viewModel::requestCameraCapture)
+                    BottomNavigationBar(state.tab, viewModel)
                 }
             },
             containerColor = MaterialTheme.colorScheme.background,
@@ -527,7 +535,7 @@ fun InkuApp() {
                         AppTab.Compose -> ComposeScreen(state, viewModel)
                         AppTab.History -> {
                             val history by viewModel.historyItems.collectAsState()
-                            HistoryScreen(state, history, viewModel)
+                            HistoryScreen(state, history, viewModel, historyGridState)
                         }
                         AppTab.Lineage -> LineageScreen(state, viewModel)
                         AppTab.Settings -> SettingsPanel(state, viewModel, modifier = Modifier.fillMaxSize().padding(Dimens.spaceL))
@@ -1269,9 +1277,7 @@ private fun rememberDeviceRotation(enabled: Boolean): DeviceRotation {
 @Composable
 private fun BottomNavigationBar(
     selected: AppTab,
-    composeMode: ComposeMode,
     viewModel: InkuViewModel,
-    onCameraClick: () -> Unit,
 ) {
     Surface(
         modifier = Modifier
@@ -1283,27 +1289,20 @@ private fun BottomNavigationBar(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(Dimens.bottomNavHeight)
-                .padding(horizontal = Dimens.spaceM, vertical = Dimens.spaceM),
+                .heightIn(min = Dimens.bottomNavHeight)
+                .padding(horizontal = Dimens.spaceM),
             horizontalArrangement = Arrangement.spacedBy(Dimens.spaceXs),
         ) {
             BottomNavigationDestination.entries.forEach { destination ->
                 val label = when (destination) {
-                    BottomNavigationDestination.Write -> S.description
-                    BottomNavigationDestination.Camera -> S.camera
-                    BottomNavigationDestination.History -> S.history
-                    BottomNavigationDestination.Lineage -> S.lineage
-                }
-                val mark = when (destination) {
-                    BottomNavigationDestination.Write -> "✎"
-                    BottomNavigationDestination.Camera -> "◉"
-                    BottomNavigationDestination.History -> "◫"
-                    BottomNavigationDestination.Lineage -> "⌥"
+                    BottomNavigationDestination.Write -> S.studioTitle
+                    BottomNavigationDestination.History -> S.worksTitle
+                    BottomNavigationDestination.Lineage -> S.seriesTitle
                 }
                 NavButton(
-                    mark = mark,
+                    destination = destination,
                     label = label,
-                    selected = destination == BottomNavigationDestination.Write && selected == AppTab.Compose && composeMode == ComposeMode.Write ||
+                    selected = destination == BottomNavigationDestination.Write && selected == AppTab.Compose ||
                         destination == BottomNavigationDestination.History && selected == AppTab.History ||
                         destination == BottomNavigationDestination.Lineage && selected == AppTab.Lineage,
                     onClick = {
@@ -1312,7 +1311,6 @@ private fun BottomNavigationBar(
                                 viewModel.setComposeMode(ComposeMode.Write)
                                 viewModel.setTab(AppTab.Compose)
                             }
-                            BottomNavigationDestination.Camera -> onCameraClick()
                             BottomNavigationDestination.History -> viewModel.setTab(AppTab.History)
                             BottomNavigationDestination.Lineage -> viewModel.setTab(AppTab.Lineage)
                         }
@@ -1326,9 +1324,50 @@ private fun BottomNavigationBar(
 
 private enum class BottomNavigationDestination {
     Write,
-    Camera,
     History,
     Lineage,
+}
+
+@Composable
+private fun StudioHeader(title: String, viewModel: InkuViewModel, showTools: Boolean = false) {
+    var toolsOpen by remember { mutableStateOf(false) }
+    Row(
+        modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM),
+    ) {
+            Box(Modifier.size(8.dp).background(MaterialTheme.colorScheme.primary, RoundedCornerShape(100)))
+            Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+            if (showTools) {
+                Box {
+                    TextButton(onClick = { toolsOpen = true }) { Text(S.productionTools) }
+                    DropdownMenu(expanded = toolsOpen, onDismissRequest = { toolsOpen = false }) {
+                        DropdownMenuItem(text = { Text(S.description) }, onClick = {
+                            toolsOpen = false
+                            viewModel.setComposeMode(ComposeMode.Write)
+                        })
+                        DropdownMenuItem(text = { Text(S.batch) }, onClick = {
+                            toolsOpen = false
+                            viewModel.setComposeMode(ComposeMode.Batch)
+                        })
+                        DropdownMenuItem(text = { Text(S.newWork) }, onClick = {
+                            toolsOpen = false
+                            viewModel.clearPrompt()
+                            viewModel.setComposeMode(ComposeMode.Write)
+                        })
+                        DropdownMenuItem(text = { Text(S.demo) }, onClick = {
+                            toolsOpen = false
+                            viewModel.setTab(AppTab.Settings)
+                            viewModel.setSettingsPane(SettingsPane.Demo)
+                        })
+                    }
+                }
+            }
+            TextButton(onClick = {
+                viewModel.setTab(AppTab.Settings)
+                viewModel.setSettingsPane(SettingsPane.Home)
+            }) { Text(S.settings) }
+    }
 }
 
 private fun canvasLabel(state: InkuUiState): String {
@@ -1348,15 +1387,7 @@ private fun shortCanvasLabel(state: InkuUiState): String {
     }
 }
 
-/**
- * The compose screen, ordered by what it is about.
- *
- * The work comes first. Under it sits everything that decides the *next*
- * drawing, and nothing else: before this, the canvas was the fourth block down,
- * behind a mascot that ran whether or not anything was running, and the row
- * above the canvas mixed the work's own star and hash with a zoom and a canvas
- * aspect -- three families and two tenses on one line.
- */
+/** New work starts with writing; saved work starts with the result. */
 @Composable
 private fun ComposeScreen(state: InkuUiState, viewModel: InkuViewModel) {
     if (state.canvasPresentationMode) {
@@ -1366,6 +1397,10 @@ private fun ComposeScreen(state: InkuUiState, viewModel: InkuViewModel) {
     val scrollState = rememberScrollState()
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
+    var editingWork by remember(state.selectedHistory?.id) { mutableStateOf(false) }
+    var resultInterpretationOpen by remember(state.selectedHistory?.id) { mutableStateOf(false) }
+    val hasWork = state.selectedHistory != null
+    val showEditor = !hasWork || editingWork || state.composeMode == ComposeMode.Batch
     // Where the top of the scrolling area is on screen, and where the
     // description is. Both are measured in window coordinates: the field's
     // position inside its own parent says nothing about how far down the scroll
@@ -1396,23 +1431,43 @@ private fun ComposeScreen(state: InkuUiState, viewModel: InkuViewModel) {
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScroll(scrollState)
-                .padding(horizontal = Dimens.spaceL, vertical = Dimens.spaceXs),
+                .padding(horizontal = Dimens.spaceL, vertical = Dimens.spaceM),
             verticalArrangement = Arrangement.spacedBy(Dimens.spaceM),
         ) {
+            StudioHeader(S.studioTitle, viewModel, showTools = true)
             RunStatusRow(state, viewModel)
-            CameraRevealCanvasHeroCard(state, viewModel)
-            DrawSettingsPanel(state, viewModel)
-            if (state.composeMode == ComposeMode.Batch) {
-                BatchPanel(state, viewModel)
-            } else {
-                DrawPanel(
-                    state,
-                    viewModel,
-                    onDescriptionFocusChanged = viewModel::setDescriptionFocused,
-                    onDescriptionPositioned = { descriptionTop = it },
-                )
+            if (hasWork) {
+                CameraRevealCanvasHeroCard(state, viewModel)
+                if (!showEditor) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM), modifier = Modifier.fillMaxWidth()) {
+                        PrimarySmallButton(S.reviseWork, onClick = { editingWork = true }, modifier = Modifier.weight(1f))
+                        SecondarySmallButton(S.newWork, onClick = viewModel::clearPrompt)
+                    }
+                }
+                state.selectedHistory?.originalInput?.takeIf { it.isNotBlank() }?.let {
+                    Text(it, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface)
+                }
+                if (!showEditor) {
+                    TextButton(onClick = { resultInterpretationOpen = !resultInterpretationOpen }) { Text(S.interpretationToggle) }
+                    if (resultInterpretationOpen) {
+                        DdlPreviewBox(value = state.ddl, onClick = viewModel::openDdlEditor, modifier = Modifier.fillMaxWidth())
+                    }
+                }
             }
-            Spacer(Modifier.height(Dimens.scrollTailSpace))
+            if (showEditor) {
+                if (!hasWork) Text(S.studioSubtitle, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                if (state.composeMode == ComposeMode.Batch) {
+                    DrawSettingsPanel(state, viewModel)
+                    BatchPanel(state, viewModel)
+                } else {
+                    DrawPanel(
+                        state,
+                        viewModel,
+                        onDescriptionFocusChanged = viewModel::setDescriptionFocused,
+                        onDescriptionPositioned = { descriptionTop = it },
+                    )
+                }
+            }
         }
         if (state.descriptionFocused && state.composeMode == ComposeMode.Write) {
             ImeActionBar(state, viewModel, modifier = Modifier.align(Alignment.BottomCenter))
@@ -1733,35 +1788,23 @@ private fun RunStatusRow(state: InkuUiState, viewModel: InkuViewModel) {
  */
 @Composable
 private fun DrawSettingsPanel(state: InkuUiState, viewModel: InkuViewModel) {
+    var expanded by remember { mutableStateOf(false) }
     Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM),
-        ) {
-            CompactLabel(S.drawingSettings)
-            Spacer(Modifier.weight(1f))
-            MiniPill(
-                S.newWork,
-                onClick = if (state.composeMode == ComposeMode.Batch) viewModel::clearBatchText else viewModel::clearPrompt,
+        HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
+        Column(modifier = Modifier.fillMaxWidth().clickable { expanded = !expanded }.padding(vertical = Dimens.spaceM)) {
+            Text(S.drawingSettings, style = MaterialTheme.typography.labelLarge)
+            Text(
+                "${shortModelLabel(state)} · ${shortCatalogLabel(state)} · ${shortCanvasLabel(state)}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        WrapRow {
-            MiniPill(
-                text = "◇ ${shortModelLabel(state)}",
-                onClick = viewModel::openModelSelection,
-                modifier = Modifier.widthIn(max = Dimens.panelWideMaxWidth),
-            )
-            MiniPill(
-                text = "◐ ${shortCatalogLabel(state)}",
-                onClick = viewModel::openCatalogSelection,
-                modifier = Modifier.widthIn(max = Dimens.panelMinHeight),
-            )
-            MiniPill(
-                text = "⬚ ${shortCanvasLabel(state)}",
-                onClick = viewModel::openCanvasSelection,
-                modifier = Modifier.widthIn(max = Dimens.panelMinHeight),
-            )
+        if (expanded) {
+            WrapRow {
+                SecondarySmallButton(text = shortModelLabel(state), onClick = viewModel::openModelSelection)
+                SecondarySmallButton(text = shortCatalogLabel(state), onClick = viewModel::openCatalogSelection)
+                SecondarySmallButton(text = shortCanvasLabel(state), onClick = viewModel::openCanvasSelection)
+            }
         }
     }
 }
@@ -1776,7 +1819,7 @@ private fun CanvasHeroCard(
     canvasAspectOverride: String? = null,
     deviceRotation: DeviceRotation = DeviceRotation.Portrait,
 ) {
-    val item = state.selectedHistory
+    val item = if (state.canvasPresentationMode) state.presentationHistory ?: state.selectedHistory else state.selectedHistory
     val canvasAspectId = canvasAspectOverride
         ?: if (state.canvasPresentationMode) item?.canvasAspect ?: state.selectedCanvasAspect else state.selectedCanvasAspect
     val context = LocalContext.current
@@ -1789,11 +1832,10 @@ private fun CanvasHeroCard(
     var exportSheetOpen by remember { mutableStateOf(false) }
     var generationInfoOpen by remember { mutableStateOf(false) }
     var pngExporting by remember { mutableStateOf(false) }
-    var canvasMenuOpen by remember { mutableStateOf(false) }
-    val canvasMenuContentDescription = S.menu
-    var instructionCaptionVisible by remember {
-        mutableStateOf(presentationPreferences.getBoolean(PRESENTATION_CAPTION_VISIBLE_KEY, true))
+    var instructionCaptionVisible by remember(state.canvasPresentationMode, state.presentationHistory != null) {
+        mutableStateOf(if (state.presentationHistory != null) false else presentationPreferences.getBoolean(PRESENTATION_CAPTION_VISIBLE_KEY, true))
     }
+    var presentationChromeVisible by remember(state.canvasPresentationMode) { mutableStateOf(true) }
     val presentation = state.canvasPresentationMode
     val historyItems by viewModel.historyItems.collectAsState()
     val canvasBoundsModifier = if (presentation && state.displaySafeMarginsEnabled) {
@@ -1836,21 +1878,24 @@ private fun CanvasHeroCard(
         }
         val instructionCaptionText = item?.originalInput?.trim().orEmpty()
         val canShowInstructionCaption = instructionCaptionText.isNotBlank()
-        val historyIndex = item?.let { selected -> historyItems.indexOfFirst { it.id == selected.id } } ?: -1
-        val historyTotal = historyItems.size
+        val presentationIds = state.presentationSequence.takeIf { state.presentationHistory != null && it.isNotEmpty() }
+        val historyIndex = item?.let { selected ->
+            presentationIds?.indexOf(selected.id) ?: historyItems.indexOfFirst { it.id == selected.id }
+        } ?: -1
+        val historyTotal = presentationIds?.size ?: historyItems.size
         val canGoLatest = historyIndex > 0
         val canGoNewer = historyIndex > 0
-        val canGoOlder = historyIndex >= 0 && historyIndex < historyItems.lastIndex
+        val canGoOlder = historyIndex >= 0 && historyIndex < historyTotal - 1
         val historyCounter = if (historyIndex >= 0 && historyTotal > 0) "${historyIndex + 1} / $historyTotal" else ""
         Column(modifier = if (presentation) Modifier.fillMaxSize() else Modifier, verticalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
             // The strip above the canvas says what the work on screen *is*: its
             // star, its hash, where it sits in the lineage, and the way into the
             // full screen. The zoom and the canvas aspect used to be here too --
             // one is a property of the view, the other of the next drawing.
-            if (!presentation && showControls) {
-                Box(modifier = Modifier.fillMaxWidth()) {
+            if (!presentation && showControls && item != null) {
+                Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(Dimens.spaceXs)) {
                     Row(
-                        modifier = Modifier.align(Alignment.CenterStart),
+                        modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
@@ -1864,38 +1909,8 @@ private fun CanvasHeroCard(
                                     canvasMessage = "Hash copied."
                                 },
                             )
-                            MiniPill(text = S.lineage, onClick = { viewModel.setTab(AppTab.Lineage) })
-                        }
-                    }
-                    // A double tap enters the full screen too, but a gesture that
-                    // nothing on screen mentions is a gesture nobody finds.
-                    MiniPill(
-                        text = S.fullScreen,
-                        onClick = viewModel::enterCanvasPresentationMode,
-                        modifier = Modifier.align(Alignment.Center),
-                    )
-                    Box(modifier = Modifier.align(Alignment.CenterEnd)) {
-                        MiniPill(
-                            text = "☰",
-                            onClick = { canvasMenuOpen = true },
-                            modifier = Modifier.semantics { contentDescription = canvasMenuContentDescription },
-                        )
-                        DropdownMenu(expanded = canvasMenuOpen, onDismissRequest = { canvasMenuOpen = false }) {
-                            DropdownMenuItem(
-                                text = { Text(S.batch) },
-                                onClick = {
-                                    canvasMenuOpen = false
-                                    viewModel.setTab(AppTab.Compose)
-                                    viewModel.setComposeMode(ComposeMode.Batch)
-                                },
-                            )
-                            DropdownMenuItem(
-                                text = { Text(S.settings) },
-                                onClick = {
-                                    canvasMenuOpen = false
-                                    viewModel.setTab(AppTab.Settings)
-                                },
-                            )
+                            Spacer(Modifier.weight(1f))
+                            TextButton(onClick = viewModel::enterCanvasPresentationMode) { Text(S.fullScreen) }
                         }
                     }
                 }
@@ -1924,6 +1939,7 @@ private fun CanvasHeroCard(
                         )
                         .pointerInput(item?.id, state.canvasPresentationMode, oneToOneZoom) {
                             detectTapGestures(
+                                onTap = { if (presentation) presentationChromeVisible = !presentationChromeVisible },
                                 onDoubleTap = {
                                     if (state.canvasPresentationMode) {
                                         viewModel.toggleCanvasZoom(oneToOneZoom)
@@ -2012,14 +2028,14 @@ private fun CanvasHeroCard(
                             )
                         }
                     }
-                    if (presentation && instructionCaptionVisible && canShowInstructionCaption) {
+                    if (presentation && presentationChromeVisible && instructionCaptionVisible && canShowInstructionCaption) {
                         PresentationCaption(
                             text = instructionCaptionText,
                             rotation = deviceRotation,
                             modifier = presentationCaptionPlacement(screenWidth),
                         )
                     }
-                    if (presentation) {
+                    if (presentation && presentationChromeVisible) {
                         PresentationControls(
                             modifier = Modifier
                                 .align(Alignment.BottomCenter)
@@ -2038,6 +2054,8 @@ private fun CanvasHeroCard(
                             onGoLatest = viewModel::selectLatestHistory,
                             onGoNewer = viewModel::selectPreviousHistory,
                             onToggleStar = { item?.let(viewModel::toggleStar) },
+                            onEdit = viewModel::editPresentedHistory,
+                            canEdit = state.presentationHistory != null,
                             onToggleCaption = {
                                 if (canShowInstructionCaption) {
                                     val nextVisible = !instructionCaptionVisible
@@ -2052,22 +2070,12 @@ private fun CanvasHeroCard(
                     }
                 }
             }
-            if (!presentation && showControls && historyItems.isNotEmpty()) {
-                HistoryThumbnailStrip(
-                    history = historyItems,
-                    selectedId = item?.id,
-                    enabled = !state.isRunning,
-                    onSelect = viewModel::selectHistory,
-                )
-            }
             // Under the canvas: on the left the ways of looking at the same work,
             // on the right the one way out of the app. Getting a file used to be
             // two dropdown menus in this row and a third place in the settings.
             if (!presentation && showControls) item?.let {
-                Row(
+                WrapRow(
                     modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM),
                 ) {
                     RenderTab.entries.forEach { tab ->
                         MiniPill(
@@ -2080,7 +2088,7 @@ private fun CanvasHeroCard(
                             onClick = { viewModel.setRenderTab(tab) },
                         )
                     }
-                    Spacer(Modifier.weight(1f))
+                    MiniPill(text = S.seriesTitle, onClick = { viewModel.setTab(AppTab.Lineage) })
                     MiniPill(text = S.generationInfoTitle, onClick = { generationInfoOpen = true })
                     MiniPill(text = S.exportButton, onClick = { exportSheetOpen = true })
                 }
@@ -2310,8 +2318,12 @@ private fun DrawPanel(
     onDescriptionFocusChanged: (Boolean) -> Unit = {},
     onDescriptionPositioned: (Float) -> Unit = {},
 ) {
+    var interpretationOpen by remember { mutableStateOf(false) }
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
-        CompactLabel(S.description)
+        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text(S.description, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+            TextButton(onClick = viewModel::requestCameraCapture, enabled = !state.isRunning) { Text(S.camera) }
+        }
         if (state.descriptionLocked && !state.historyAuthorityLoading) {
             Text(S.pipelineDdlAuthority, style = MaterialTheme.typography.bodySmall)
             TextButton(onClick = viewModel::startDescriptionVariation, enabled = !state.historyAuthorityLoading && !state.isDrawing) {
@@ -2325,7 +2337,7 @@ private fun DrawPanel(
                 .fillMaxWidth()
                 .testTag(DESCRIPTION_INPUT_TAG)
                 .onGloballyPositioned { onDescriptionPositioned(it.positionInWindow().y) },
-            minLines = 5,
+            minLines = 3,
             maxLines = 8,
             enabled = !state.descriptionLocked && !state.isDrawing,
             onFocusChanged = onDescriptionFocusChanged,
@@ -2338,11 +2350,12 @@ private fun DrawPanel(
                 style = MaterialTheme.typography.labelSmall,
             )
         }
+        DrawSettingsPanel(state, viewModel)
         // While the keyboard is up the same button is pinned above it, and two
         // 「描画する」 on one screen is a question about which one draws.
         if (!state.descriptionFocused) {
             DrawingActionButton(
-                idleText = "▶  ${drawActionLabel(S)}",
+                idleText = drawActionLabel(S),
                 runningText = S.drawingButton,
                 state = state,
                 onClick = viewModel::draw,
@@ -2362,6 +2375,8 @@ private fun DrawPanel(
             simpleContent = {},
             fullContent = {
                 Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
+                    TextButton(onClick = { interpretationOpen = !interpretationOpen }) { Text(S.interpretationToggle) }
+                    if (interpretationOpen) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
@@ -2387,6 +2402,7 @@ private fun DrawPanel(
                         onStop = viewModel::stopDrawing,
                         tonal = true,
                     )
+                    }
                 }
             },
         )
@@ -2466,7 +2482,7 @@ private fun NumberedBatchTextField(
     val scope = rememberCoroutineScope()
     val textStyle = MaterialTheme.typography.bodySmall.copy(
         color = MaterialTheme.colorScheme.onSurface,
-        lineHeight = TypeScale.denseLineHeight,
+        lineHeight = TypeScale.denseLineHeight * LocalUiTextScale.current,
     )
 
     Surface(
@@ -2624,7 +2640,7 @@ private fun DemoPanel(state: InkuUiState, viewModel: InkuViewModel, modifier: Mo
                 state.demoGeneratedPrompt.ifBlank { "—" },
                 modifier = Modifier.padding(horizontal = Dimens.spaceL, vertical = Dimens.spaceL),
                 style = MaterialTheme.typography.bodyMedium,
-                lineHeight = TypeScale.proseLineHeight,
+                lineHeight = TypeScale.proseLineHeight * LocalUiTextScale.current,
                 color = if (state.demoGeneratedPrompt.isBlank()) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
             )
         }
@@ -2843,6 +2859,7 @@ private fun HistoryScreen(
     state: InkuUiState,
     history: List<HistoryListItem>,
     viewModel: InkuViewModel,
+    gridState: LazyGridState,
 ) {
     val filteredHistory = remember(history, state.historySearchQuery, state.historyStarredOnly) {
         filterHistoryItems(history, state)
@@ -2856,18 +2873,19 @@ private fun HistoryScreen(
         )
     }
     LazyVerticalGrid(
-        columns = GridCells.Fixed(3),
+        columns = GridCells.Adaptive(152.dp),
+        state = gridState,
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(horizontal = Dimens.spaceL, vertical = Dimens.spaceM),
         horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM),
-        verticalArrangement = Arrangement.spacedBy(Dimens.spaceM),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         item(key = "header", span = { GridItemSpan(maxLineSpan) }) { header() }
         gridItems(filteredHistory, key = { it.id }) { item ->
             HistoryGridTile(
                 item = item,
                 selected = state.selectedHistory?.id == item.id,
-                onSelect = { viewModel.selectHistory(item) },
+                onSelect = { viewModel.openHistoryPresentation(item, filteredHistory.map { it.id }) },
                 onToggleStar = { viewModel.toggleStar(item) },
             )
         }
@@ -2881,17 +2899,26 @@ private fun HistoryHeader(
     filteredCount: Int,
     viewModel: InkuViewModel,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceM), modifier = Modifier.fillMaxWidth()) {
-        ImeAwareOutlinedTextField(
-            value = state.historySearchQuery,
-            onValueChange = viewModel::setHistorySearchQuery,
-            label = S.searchPlaceholderLong,
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true,
-        )
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Dimens.spaceL), modifier = Modifier.fillMaxWidth()) {
+    var searchOpen by remember { mutableStateOf(state.historySearchQuery.isNotBlank()) }
+    val searchLabel = S.searchPlaceholderLong
+    Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceXs), modifier = Modifier.fillMaxWidth()) {
+        StudioHeader(S.worksTitle, viewModel)
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM), modifier = Modifier.fillMaxWidth()) {
+            Text(S.filteredOfTotal(filteredCount, sourceCount), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+            TextButton(
+                onClick = { searchOpen = !searchOpen },
+                modifier = Modifier.size(48.dp).semantics { contentDescription = searchLabel },
+            ) { Text("⌕", style = MaterialTheme.typography.titleLarge) }
             ChipButton(S.starredOnly, selected = state.historyStarredOnly, onClick = viewModel::toggleHistoryStarredFilter)
-            Text(S.filteredOfTotal(filteredCount, sourceCount), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        if (searchOpen || state.historySearchQuery.isNotBlank()) {
+            ImeAwareOutlinedTextField(
+                value = state.historySearchQuery,
+                onValueChange = viewModel::setHistorySearchQuery,
+                label = S.searchPlaceholderLong,
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+            )
         }
     }
 }
@@ -2932,9 +2959,10 @@ internal fun languageComboTag(comboId: String): String = "language_combo_$comboI
 internal fun LineageScreen(state: InkuUiState, viewModel: InkuViewModel) {
     val graph = state.lineageGraph
     Column(
-        modifier = Modifier.fillMaxSize().padding(horizontal = Dimens.spaceL, vertical = Dimens.spaceM),
+        modifier = Modifier.fillMaxSize().padding(horizontal = Dimens.spaceXl, vertical = Dimens.spaceM),
         verticalArrangement = Arrangement.spacedBy(Dimens.spaceM),
     ) {
+        StudioHeader(S.seriesTitle, viewModel)
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
@@ -3381,7 +3409,7 @@ private fun LineageColumns(graph: LineageGraphResult, viewModel: InkuViewModel) 
         // where a tombstone -- which the server gives no generation -- can say
         // so for itself rather than sit under a heading that answers for it.
         graph.nodes.groupBy { depthOf[it.id] ?: 0 }.toSortedMap().forEach { (_, nodes) ->
-            WrapRow(horizontal = Dimens.spaceM, vertical = Dimens.spaceM) {
+            Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
                 nodes.forEach { node ->
                     LineageNodeCard(
                         node = node,
@@ -3412,16 +3440,20 @@ private fun LineageNodeCard(
     val history = work?.history
     Card(
         modifier = Modifier
-            .width(Dimens.chipWidth)
+            .fillMaxWidth()
             .testTag(LINEAGE_NODE_TAG)
             .clickable(enabled = history != null, onClick = onSelect)
-            .border(Dimens.spaceXs, if (focused) MaterialTheme.colorScheme.primary else Color.Transparent, RoundedCornerShape(0.dp)),
-        shape = RoundedCornerShape(0.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+            .border(Dimens.hairline, if (focused) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline, RoundedCornerShape(Dimens.radiusCard)),
+        shape = RoundedCornerShape(Dimens.radiusCard),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
     ) {
-        Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceXs)) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(Dimens.spaceM),
+            horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM),
+            verticalAlignment = Alignment.Top,
+        ) {
             if (history != null) {
-                Box(modifier = Modifier.fillMaxWidth().aspectRatio(1f)) {
+                Box(modifier = Modifier.size(112.dp)) {
                     ArtworkThumbnail(
                         id = history.item.id,
                         renderHash = history.item.renderHash,
@@ -3436,9 +3468,9 @@ private fun LineageNodeCard(
                     )
                 }
             } else {
-                Box(modifier = Modifier.fillMaxWidth().aspectRatio(1f).background(LineagePlaceholderSurface))
+                Box(modifier = Modifier.size(112.dp).background(LineagePlaceholderSurface))
             }
-            Column(modifier = Modifier.padding(horizontal = Dimens.spaceM).padding(bottom = Dimens.spaceM), verticalArrangement = Arrangement.spacedBy(Dimens.spaceXs)) {
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Dimens.spaceXs)) {
                 // The label of the edge that produced this work. A node no edge
                 // points at has no kind, and the answer for that is the origin;
                 // the wording is the pack's, never this screen's.
@@ -3470,10 +3502,12 @@ private fun LineageNodeCard(
                 // of their own (SPEC :688). A tombstone has no work to edit,
                 // which is why this hangs off `history`.
                 if (history != null) {
-                    ChipButton(S.refinementElements, modifier = Modifier.testTag(REFINE_ENTRY_TAG), onClick = { onRefine(history.item, RefinementSubview.Adjust) })
-                    ChipButton(S.ddlEdit, modifier = Modifier.testTag(DDL_ENTRY_TAG), onClick = { onEditDdl(history.item) })
-                    ChipButton(S.model, modifier = Modifier.testTag(MODEL_ENTRY_TAG), onClick = { onRefine(history.item, RefinementSubview.Model) })
-                    ChipButton(S.language, modifier = Modifier.testTag(LANGUAGE_ENTRY_TAG), onClick = { onRefine(history.item, RefinementSubview.Language) })
+                    WrapRow(horizontal = Dimens.spaceXs, vertical = Dimens.spaceXs) {
+                        ChipButton(S.refinementElements, modifier = Modifier.testTag(REFINE_ENTRY_TAG), onClick = { onRefine(history.item, RefinementSubview.Adjust) })
+                        ChipButton(S.ddlEdit, modifier = Modifier.testTag(DDL_ENTRY_TAG), onClick = { onEditDdl(history.item) })
+                        ChipButton(S.model, modifier = Modifier.testTag(MODEL_ENTRY_TAG), onClick = { onRefine(history.item, RefinementSubview.Model) })
+                        ChipButton(S.language, modifier = Modifier.testTag(LANGUAGE_ENTRY_TAG), onClick = { onRefine(history.item, RefinementSubview.Language) })
+                    }
                 }
             }
         }
@@ -3648,6 +3682,18 @@ private fun MiscSettingsPanel(state: InkuUiState, viewModel: InkuViewModel, modi
         verticalArrangement = Arrangement.spacedBy(Dimens.spaceL),
     ) {
         SettingsHeader(state.settingsPane, viewModel)
+        SettingsCard(S.settingsTextSizeTitle, S.settingsTextSizeSubtitle, "${(state.uiTextScale * 100).toInt()}%") {
+            WrapRow {
+                UI_TEXT_SCALE_CHOICES.forEach { scale ->
+                    ChipButton(
+                        "${(scale * 100).toInt()}%",
+                        selected = state.uiTextScale == scale,
+                        onClick = { viewModel.setUiTextScale(scale) },
+                    )
+                }
+            }
+            Text(S.settingsTextSizeSample, style = MaterialTheme.typography.bodyLarge)
+        }
         SettingsCard(
             LocalStrings.current.settingsLanguageTitle,
             LocalStrings.current.settingsLanguageSubtitle,
@@ -3773,11 +3819,11 @@ private fun ModelSettingsPanel(state: InkuUiState, viewModel: InkuViewModel, mod
     ) {
         SettingsHeader(state.settingsPane, viewModel)
 
-        Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
+        Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceXs)) {
             state.providerSettings.forEach { provider ->
                 ProviderConnectionCard(
                     provider = provider,
-                    candidateModelIds = state.providerModelCandidates[provider.providerId].orEmpty(),
+                    candidateModelIds = state.providerModelCandidates[provider.providerId],
                     modelAssets = state.modelAssets,
                     onSave = viewModel::saveProviderSetting,
                     onClearApiKey = { viewModel.clearProviderApiKey(provider.providerId) },
@@ -3787,6 +3833,7 @@ private fun ModelSettingsPanel(state: InkuUiState, viewModel: InkuViewModel, mod
                     onDownloadModel = viewModel::downloadModel,
                     onRedownloadModel = viewModel::redownloadModel,
                     statusMessage = state.message,
+                    fetchState = state.providerModelFetchStates[provider.providerId],
                 )
             }
             AddProviderCard(onAdd = viewModel::saveProviderSetting)
@@ -3797,7 +3844,7 @@ private fun ModelSettingsPanel(state: InkuUiState, viewModel: InkuViewModel, mod
 @Composable
 private fun ProviderConnectionCard(
     provider: app.inku.mobile.data.db.ProviderSettingEntity,
-    candidateModelIds: List<String>,
+    candidateModelIds: List<String>?,
     modelAssets: List<app.inku.mobile.data.db.ModelAssetEntity>,
     onSave: (String, String, String, String, String, String) -> Unit,
     onClearApiKey: () -> Unit,
@@ -3807,6 +3854,7 @@ private fun ProviderConnectionCard(
     onDownloadModel: (String) -> Unit,
     onRedownloadModel: (String) -> Unit,
     statusMessage: String?,
+    fetchState: ProviderModelFetchState?,
 ) {
     val requiresKey = provider.providerId in setOf("openai", "nvidia", "anthropic", "gemini")
     val keySet = !provider.encryptedApiKey.isNullOrBlank()
@@ -3960,7 +4008,7 @@ private fun ProviderConnectionCard(
                 selectedModels = publishedModelIds,
                 onDismiss = { modelPickerOpen = false },
                 onFetchModels = onFetchModels,
-                statusMessage = statusMessage,
+                fetchState = fetchState,
                 onSave = { selected ->
                     modelPickerOpen = false
                     onSave(provider.providerId, displayName, kind, baseUrl, "", selected.joinToString("\n"))
@@ -4064,19 +4112,21 @@ private fun TextEditDialog(
 @Composable
 private fun ProviderModelPickerDialog(
     provider: app.inku.mobile.data.db.ProviderSettingEntity,
-    candidateModelIds: List<String>,
+    candidateModelIds: List<String>?,
     selectedModels: List<String>,
     onDismiss: () -> Unit,
     onFetchModels: () -> Unit,
-    statusMessage: String?,
+    fetchState: ProviderModelFetchState?,
     onSave: (List<String>) -> Unit,
 ) {
     var search by remember(provider.providerId) { mutableStateOf("") }
-    var selected by remember(provider.providerId) { mutableStateOf(selectedModels.toSet()) }
+    var selected by remember(provider.providerId, provider.publishedModelsJson) { mutableStateOf(selectedModels.toSet()) }
     val candidateModels = remember(provider.providerId, provider.publishedModelsJson, candidateModelIds) {
         providerModelCandidates(provider, candidateModelIds)
     }
     val candidateIds = candidateModels.map { it.id }.toSet()
+    val selectionChanged = selected != selectedModels.toSet()
+    val fetching = fetchState?.loading == true
     val filtered = candidateModels.filter { model ->
         val query = search.trim().lowercase()
         query.isBlank() || model.id.lowercase().contains(query) || model.label.lowercase().contains(query) || (model.notes?.lowercase()?.contains(query) == true)
@@ -4090,9 +4140,14 @@ private fun ProviderModelPickerDialog(
                 verticalArrangement = Arrangement.spacedBy(Dimens.spaceM),
             ) {
                 Row(horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM), modifier = Modifier.fillMaxWidth()) {
-                    ModelPickerActionButton(text = S.modelListFetch, onClick = onFetchModels, modifier = Modifier.weight(1.5f))
-                    ModelPickerActionButton(text = S.selectAll, onClick = { selected = filtered.map { it.id }.toSet() }, modifier = Modifier.weight(1f))
-                    ModelPickerActionButton(text = S.selectNone, onClick = { selected = emptySet() }, modifier = Modifier.weight(1f))
+                    ModelPickerActionButton(
+                        text = S.modelListFetch,
+                        onClick = onFetchModels,
+                        enabled = !fetching && !selectionChanged,
+                        modifier = Modifier.weight(1.5f),
+                    )
+                    ModelPickerActionButton(text = S.selectAll, onClick = { selected = filtered.map { it.id }.toSet() }, modifier = Modifier.weight(1f), enabled = !fetching)
+                    ModelPickerActionButton(text = S.selectNone, onClick = { selected = emptySet() }, modifier = Modifier.weight(1f), enabled = !fetching)
                 }
                 ImeAwareOutlinedTextField(
                     value = search,
@@ -4109,13 +4164,13 @@ private fun ProviderModelPickerDialog(
                     filtered.forEach { model ->
                         val checked = selected.contains(model.id)
                         Row(
-                            modifier = Modifier.fillMaxWidth().clickable {
+                            modifier = Modifier.fillMaxWidth().clickable(enabled = !fetching) {
                                 selected = if (checked) selected - model.id else selected + model.id
                             }.padding(vertical = Dimens.spaceXs),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM),
                         ) {
-                            Checkbox(checked = checked, onCheckedChange = { enabled ->
+                            Checkbox(checked = checked, enabled = !fetching, onCheckedChange = { enabled ->
                                 selected = if (enabled) selected + model.id else selected - model.id
                             })
                             Column(modifier = Modifier.weight(1f)) {
@@ -4125,13 +4180,20 @@ private fun ProviderModelPickerDialog(
                         }
                     }
                 }
-                statusMessage?.takeIf { it.contains(S.model) || it.contains(provider.providerId) }?.let {
-                    Text(it, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                fetchState?.let {
+                    Text(
+                        it.message,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = if (it.failed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                if (selectionChanged) {
+                    Text(S.modelListFetchSaveFirst, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         },
         confirmButton = {
-            TextButton(onClick = { onSave(selected.filter { it in candidateIds }) }) { Text(S.save) }
+            TextButton(onClick = { onSave(selected.filter { it in candidateIds }) }, enabled = !fetching) { Text(S.save) }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) { Text(S.cancel) }
@@ -4302,14 +4364,15 @@ private fun LocalModelAssetRow(
 }
 
 @Composable
-private fun ModelPickerActionButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
+private fun ModelPickerActionButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true) {
     OutlinedButton(
         onClick = onClick,
+        enabled = enabled,
         modifier = modifier.height(Dimens.buttonHeightSmall),
         shape = RoundedCornerShape(Dimens.radiusCard),
         contentPadding = PaddingValues(horizontal = Dimens.spaceXs, vertical = 0.dp),
     ) {
-        Text(text, maxLines = 1, overflow = TextOverflow.Clip, fontSize = TypeScale.labelTiny)
+        Text(text, maxLines = 1, overflow = TextOverflow.Clip, fontSize = TypeScale.labelTiny * LocalUiTextScale.current)
     }
 }
 
@@ -4373,12 +4436,6 @@ private fun SettingsListItem(mark: String, title: String, sub: String, onClick: 
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(Dimens.spaceL),
         ) {
-            Box(
-                modifier = Modifier.size(Dimens.iconTileSize).background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(Dimens.radiusCard)),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(mark, style = MaterialTheme.typography.titleMedium)
-            }
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Dimens.spaceXs)) {
                 Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Medium)
                 Text(sub, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -4532,7 +4589,7 @@ private fun connectionKindLabel(value: String): String {
     }
 }
 
-private fun providerModelCandidates(provider: app.inku.mobile.data.db.ProviderSettingEntity, fetchedModelIds: List<String>): List<ProviderModelCandidate> {
+private fun providerModelCandidates(provider: app.inku.mobile.data.db.ProviderSettingEntity, fetchedModelIds: List<String>?): List<ProviderModelCandidate> {
     val defaults = when (provider.providerId) {
         "local-litert-lm" -> listOf(
             ProviderModelCandidate("local-litert-lm:gemma-4-e2b", "Gemma 4 E2B", "LiteRT-LM"),
@@ -4572,13 +4629,13 @@ private fun providerModelCandidates(provider: app.inku.mobile.data.db.ProviderSe
         )
         else -> emptyList()
     }
-    val fetched = fetchedModelIds.map { id ->
+    val fetched = fetchedModelIds.orEmpty().map { id ->
         ProviderModelCandidate(id, modelDisplayName(id), id)
     }
     val stored = parsePublishedModelIds(provider.publishedModelsJson).map { id ->
         ProviderModelCandidate(id, modelDisplayName(id), id)
     }
-    return (defaults + fetched + stored).distinctBy { it.id }
+    return ((if (fetchedModelIds == null) defaults else fetched) + stored).distinctBy { it.id }
 }
 
 private fun modelChoicesFor(state: InkuUiState): List<ModelChoice> {
@@ -5613,10 +5670,9 @@ private fun HistoryGridTile(
                 onClick = onSelect,
                 onLongClick = onToggleStar,
             )
-            .border(Dimens.spaceXs, if (selected) MaterialTheme.colorScheme.primary else Color.Transparent, RoundedCornerShape(0.dp))
-            .border(Dimens.selectionRingWidth, if (selected) SelectionRing else Color.Transparent, RoundedCornerShape(0.dp)),
+            .border(Dimens.hairline, if (selected) MaterialTheme.colorScheme.primary else CardHairline, RoundedCornerShape(0.dp)),
         shape = RoundedCornerShape(0.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
             Box {
@@ -5633,11 +5689,11 @@ private fun HistoryGridTile(
                     text = historyGridStarSymbol(item.starred),
                     selected = item.starred,
                     onClick = onToggleStar,
-                    modifier = Modifier.align(Alignment.TopEnd).padding(Dimens.spaceM),
+                    modifier = Modifier.align(Alignment.TopEnd).padding(Dimens.spaceXs),
                 )
             }
             Row(modifier = Modifier.padding(horizontal = Dimens.spaceM, vertical = Dimens.spaceM), verticalAlignment = Alignment.CenterVertically) {
-                Text(historyTitle(item), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.fillMaxWidth())
+                Text(historyTitle(item), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface, minLines = 2, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.fillMaxWidth())
             }
         }
     }
@@ -5647,6 +5703,7 @@ private fun HistoryGridTile(
 private fun HistoryBadge(text: String, selected: Boolean = false, onClick: (() -> Unit)? = null, modifier: Modifier = Modifier) {
     val base = modifier
         .size(Dimens.badgeSize)
+        .minimumInteractiveComponentSize()
         .background(
             if (selected) MaterialTheme.colorScheme.secondary else HistoryBadgeSurface,
             RoundedCornerShape(100),
@@ -5795,7 +5852,7 @@ private fun DdlPreviewBox(value: String, onClick: () -> Unit, modifier: Modifier
                 },
             textStyle = MaterialTheme.typography.bodySmall.copy(
                 color = MaterialTheme.colorScheme.onSurface,
-                lineHeight = TypeScale.denseLineHeight,
+                lineHeight = TypeScale.denseLineHeight * LocalUiTextScale.current,
             ),
             cursorBrush = SolidColor(Color.Transparent),
             visualTransformation = visualTransformation,
@@ -5806,7 +5863,7 @@ private fun DdlPreviewBox(value: String, onClick: () -> Unit, modifier: Modifier
                 if (value.isBlank()) {
                     Text(
                         S.awaitingInterpretation,
-                        style = MaterialTheme.typography.bodySmall.copy(lineHeight = TypeScale.denseLineHeight),
+                        style = MaterialTheme.typography.bodySmall.copy(lineHeight = TypeScale.denseLineHeight * LocalUiTextScale.current),
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 } else {
@@ -5847,9 +5904,9 @@ private fun DenseMultilineInput(
             .background(InputWellSurface, RoundedCornerShape(Dimens.radiusCard))
             .border(Dimens.hairline, MaterialTheme.colorScheme.outline, RoundedCornerShape(Dimens.radiusCard))
             .padding(horizontal = Dimens.spaceM, vertical = Dimens.spaceM),
-        textStyle = MaterialTheme.typography.bodySmall.copy(
+        textStyle = MaterialTheme.typography.bodyLarge.copy(
             color = MaterialTheme.colorScheme.onSurface,
-            lineHeight = TypeScale.denseLineHeight,
+            lineHeight = TypeScale.editorLineHeight * LocalUiTextScale.current,
         ),
         cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
         minLines = minLines,
@@ -5911,8 +5968,8 @@ private fun DenseTextFieldValueInput(
                 },
             textStyle = MaterialTheme.typography.bodySmall.copy(
                 color = MaterialTheme.colorScheme.onSurface,
-                fontSize = TypeScale.editorBody,
-                lineHeight = TypeScale.editorLineHeight,
+                fontSize = TypeScale.editorBody * LocalUiTextScale.current,
+                lineHeight = TypeScale.editorLineHeight * LocalUiTextScale.current,
             ),
             cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
             visualTransformation = visualTransformation,
@@ -6144,12 +6201,10 @@ private fun PresentationCaption(text: String, rotation: DeviceRotation, modifier
     ) {
         Text(
             text,
-            modifier = Modifier.padding(horizontal = Dimens.spaceL, vertical = Dimens.spaceL),
+            modifier = Modifier.heightIn(max = 180.dp).verticalScroll(rememberScrollState()).padding(horizontal = Dimens.spaceL, vertical = Dimens.spaceM),
             color = PresentationCaptionInk,
             style = MaterialTheme.typography.bodyMedium,
             textAlign = TextAlign.Center,
-            maxLines = 3,
-            overflow = TextOverflow.Ellipsis,
         )
     }
 }
@@ -6173,12 +6228,15 @@ private fun PresentationControls(
     onGoLatest: () -> Unit,
     onGoNewer: () -> Unit,
     onToggleStar: () -> Unit,
+    canEdit: Boolean,
+    onEdit: () -> Unit,
     onToggleCaption: () -> Unit,
     onClose: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    var menuOpen by remember { mutableStateOf(false) }
     Surface(
-        modifier = modifier,
+        modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(100),
         color = PresentationControlsSurface,
         border = BorderStroke(Dimens.hairline, PresentationControlOutline),
@@ -6187,29 +6245,30 @@ private fun PresentationControls(
     ) {
         Row(
             modifier = Modifier.padding(Dimens.spaceM),
-            horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM),
+            horizontalArrangement = Arrangement.spacedBy(Dimens.spaceXs),
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            PresentationControlButton("×", onClick = onClose)
             PresentationControlButton("‹", enabled = canGoOlder, onClick = onGoOlder)
-            PresentationControlButton(S.latest, enabled = canGoLatest, wide = true, onClick = onGoLatest)
-            PresentationControlButton("›", enabled = canGoNewer, onClick = onGoNewer)
             Text(
                 counter,
-                modifier = Modifier.widthIn(min = Dimens.presentationControlMinWidth).padding(horizontal = Dimens.spaceXs),
+                modifier = Modifier.weight(1f).padding(horizontal = Dimens.spaceXs),
                 color = PresentationControlLabelMuted,
                 style = MaterialTheme.typography.labelSmall,
                 textAlign = TextAlign.Center,
                 maxLines = 1,
             )
-            PresentationControlButton(
-                "${zoomPercent}%",
-                wide = true,
-                enabled = zoomPercent != (CANVAS_FIT_ZOOM * 100).toInt(),
-                onClick = onResetZoom,
-            )
-            PresentationControlButton("★", selected = starred, enabled = canToggleStar, onClick = onToggleStar)
-            PresentationControlButton("▭", selected = captionVisible, enabled = captionEnabled, onClick = onToggleCaption)
-            PresentationControlButton("×", onClick = onClose)
+            PresentationControlButton("›", enabled = canGoNewer, onClick = onGoNewer)
+            PresentationControlButton(S.description, selected = captionVisible, enabled = captionEnabled, wide = true, onClick = onToggleCaption)
+            Box {
+                PresentationControlButton("⋯", onClick = { menuOpen = true })
+                DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                    if (canEdit) DropdownMenuItem(text = { Text(S.reviseWork) }, onClick = { menuOpen = false; onEdit() })
+                    DropdownMenuItem(text = { Text(if (starred) "★" else "☆") }, enabled = canToggleStar, onClick = { menuOpen = false; onToggleStar() })
+                    DropdownMenuItem(text = { Text(S.latest) }, enabled = canGoLatest, onClick = { menuOpen = false; onGoLatest() })
+                    DropdownMenuItem(text = { Text("${zoomPercent}%") }, enabled = zoomPercent != (CANVAS_FIT_ZOOM * 100).toInt(), onClick = { menuOpen = false; onResetZoom() })
+                }
+            }
         }
     }
 }
@@ -6279,42 +6338,63 @@ private fun ChipButton(text: String, selected: Boolean = false, modifier: Modifi
 }
 
 @Composable
-private fun NavButton(mark: String, label: String, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+private fun NavButton(destination: BottomNavigationDestination, label: String, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
     Surface(
         modifier = modifier
-            .fillMaxHeight()
+            .semantics { this.selected = selected; role = Role.Tab }
             .clickable(onClick = onClick),
         color = Color.Transparent,
     ) {
         Column(
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier.fillMaxWidth().padding(vertical = Dimens.spaceXs),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
         ) {
             Box(
                 modifier = Modifier
                     .width(Dimens.navButtonWidth)
-                    .height(Dimens.controlSizeSmall)
-                    .background(
-                        if (selected) SelectionRing else Color.Transparent,
-                        RoundedCornerShape(Dimens.radiusCard),
-                    ),
+                    .height(Dimens.controlSizeSmall),
                 contentAlignment = Alignment.Center,
             ) {
-                Text(
-                    mark,
-                    style = MaterialTheme.typography.titleMedium,
-                    color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                )
+                NavigationMark(destination, if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
             }
             Text(
                 label,
-                style = MaterialTheme.typography.labelSmall,
+                style = MaterialTheme.typography.labelMedium,
                 fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
                 color = if (selected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
             )
+        }
+    }
+}
+
+/** A small shared stroke language keeps navigation independent of font glyphs. */
+@Composable
+private fun NavigationMark(destination: BottomNavigationDestination, color: Color) {
+    Canvas(Modifier.size(Dimens.badgeSize)) {
+        val stroke = Stroke(width = 1.5.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round)
+        val w = size.width
+        val h = size.height
+        when (destination) {
+            BottomNavigationDestination.Write -> {
+                drawLine(color, Offset(w * .25f, h * .73f), Offset(w * .76f, h * .22f), strokeWidth = stroke.width, cap = StrokeCap.Round)
+                drawLine(color, Offset(w * .2f, h * .8f), Offset(w * .4f, h * .75f), strokeWidth = stroke.width, cap = StrokeCap.Round)
+                drawLine(color, Offset(w * .2f, h * .9f), Offset(w * .8f, h * .9f), strokeWidth = stroke.width, cap = StrokeCap.Round)
+            }
+            BottomNavigationDestination.History -> {
+                drawRect(color, topLeft = Offset(w * .16f, h * .16f), size = Size(w * .68f, h * .68f), style = stroke)
+                drawLine(color, Offset(w * .16f, h * .65f), Offset(w * .43f, h * .4f), strokeWidth = stroke.width)
+                drawLine(color, Offset(w * .43f, h * .4f), Offset(w * .84f, h * .75f), strokeWidth = stroke.width)
+            }
+            BottomNavigationDestination.Lineage -> {
+                drawLine(color, Offset(w * .5f, h * .3f), Offset(w * .25f, h * .72f), strokeWidth = stroke.width)
+                drawLine(color, Offset(w * .5f, h * .3f), Offset(w * .75f, h * .72f), strokeWidth = stroke.width)
+                listOf(Offset(w * .5f, h * .2f), Offset(w * .2f, h * .8f), Offset(w * .8f, h * .8f)).forEach {
+                    drawCircle(InkBackground, radius = w * .12f, center = it)
+                    drawCircle(color, radius = w * .12f, center = it, style = stroke)
+                }
+            }
         }
     }
 }
@@ -6368,7 +6448,12 @@ private fun DrawingActionButton(
     } else if (tonal) {
         SecondaryActionButton(text = idleText, onClick = onClick, modifier = modifier)
     } else {
-        PrimaryActionButton(text = idleText, onClick = onClick, modifier = modifier)
+        Button(
+            onClick = onClick,
+            modifier = modifier.fillMaxWidth().heightIn(min = Dimens.buttonHeightLarge),
+            shape = RoundedCornerShape(Dimens.radiusCard),
+            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary, contentColor = InkOnSecondary),
+        ) { Text(idleText, maxLines = 1) }
     }
 }
 
@@ -6377,8 +6462,8 @@ private fun PrimaryActionButton(text: String, onClick: () -> Unit, enabled: Bool
     Button(
         onClick = onClick,
         enabled = enabled,
-        modifier = modifier.fillMaxWidth().height(Dimens.buttonHeightLarge),
-        shape = RoundedCornerShape(Dimens.radiusPill),
+        modifier = modifier.fillMaxWidth().heightIn(min = Dimens.buttonHeightLarge),
+        shape = RoundedCornerShape(Dimens.radiusCard),
         colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = InkOnPrimary),
     ) { Text(text, maxLines = 1) }
 }
@@ -6388,8 +6473,8 @@ private fun SecondaryActionButton(text: String, onClick: () -> Unit, enabled: Bo
     OutlinedButton(
         onClick = onClick,
         enabled = enabled,
-        modifier = modifier.fillMaxWidth().height(Dimens.buttonHeightLarge),
-        shape = RoundedCornerShape(Dimens.radiusPill),
+        modifier = modifier.fillMaxWidth().heightIn(min = Dimens.buttonHeightLarge),
+        shape = RoundedCornerShape(Dimens.radiusCard),
     ) { Text(text, maxLines = 1) }
 }
 
@@ -6398,7 +6483,7 @@ private fun PrimarySmallButton(text: String, onClick: () -> Unit, enabled: Boole
     Button(
         onClick = onClick,
         enabled = enabled,
-        modifier = modifier.height(Dimens.buttonHeightSmall),
+        modifier = modifier.heightIn(min = Dimens.buttonHeightSmall),
         shape = RoundedCornerShape(Dimens.radiusCard),
         colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = InkOnPrimary),
     ) { Text(text, maxLines = 1) }
@@ -6409,7 +6494,7 @@ private fun SecondarySmallButton(text: String, onClick: () -> Unit, enabled: Boo
     OutlinedButton(
         onClick = onClick,
         enabled = enabled,
-        modifier = modifier.height(Dimens.buttonHeightSmall),
+        modifier = modifier.heightIn(min = Dimens.buttonHeightSmall),
         shape = RoundedCornerShape(Dimens.radiusCard),
     ) { Text(text, maxLines = 1) }
 }

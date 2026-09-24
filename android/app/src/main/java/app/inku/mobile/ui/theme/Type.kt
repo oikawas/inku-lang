@@ -1,15 +1,47 @@
 package app.inku.mobile.ui.theme
 
+import androidx.compose.material3.Typography
+import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.sp
+
+val LocalUiTextScale = compositionLocalOf { 1f }
+
+/** App text magnification. sp continues to honor the device font scale. */
+fun inkuTypography(scale: Float): Typography {
+    val factor = if (scale.isFinite()) scale.coerceIn(1f, 1.5f) else 1f
+    val base = Typography()
+    fun TextStyle.magnified(): TextStyle = copy(
+        fontSize = fontSize * factor,
+        lineHeight = lineHeight * factor,
+        letterSpacing = letterSpacing * factor,
+    )
+    return Typography(
+        displayLarge = base.displayLarge.magnified(),
+        displayMedium = base.displayMedium.magnified(),
+        displaySmall = base.displaySmall.magnified(),
+        headlineLarge = base.headlineLarge.magnified(),
+        headlineMedium = base.headlineMedium.magnified(),
+        headlineSmall = base.headlineSmall.magnified(),
+        titleLarge = base.titleLarge.magnified(),
+        titleMedium = base.titleMedium.magnified(),
+        titleSmall = base.titleSmall.magnified(),
+        bodyLarge = base.bodyLarge.magnified(),
+        bodyMedium = base.bodyMedium.magnified(),
+        bodySmall = base.bodySmall.magnified(),
+        labelLarge = base.labelLarge.magnified(),
+        labelMedium = base.labelMedium.magnified(),
+        labelSmall = base.labelSmall.magnified(),
+    )
+}
 
 /**
  * Type sizes the app sets by hand, and a record of which Material scale steps it
  * actually uses.
  *
- * The app defines no `Typography` of its own: all 140 text styles come from
- * `MaterialTheme.typography`, which is M3's default scale. That is deliberate
- * and stays. What did not have a home were the eight places that override a
+ * The app uses Material 3's default text scale through [inkuTypography].
+ * What did not have a home were the eight places that override a
  * size or a line height on top of a scale step -- five distinct values, written
  * as literals. They live here now.
  *

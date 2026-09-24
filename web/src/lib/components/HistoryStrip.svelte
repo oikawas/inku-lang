@@ -173,22 +173,26 @@
 					{t().historyTitle} <span class="history-count">({historyTotal})</span> ▸
 				</button>
 				{#if !historyCollapsed}
-					<div class="history-filter-group">
+					<div class="history-filter-group" role="group" aria-label={t().historyFilterLabel}>
+						<span class="history-filter-label">{t().historyFilterLabel}</span>
 						<button
 							class="ghost-btn history-filter-btn"
 							class:ghost-active={historyStarredOnly}
+							aria-pressed={historyStarredOnly}
 							onclick={() => onSetStarredOnly(!historyStarredOnly)}
-						>{t().historyStarredOnly}</button>
+						><span class="history-filter-check" class:visible={historyStarredOnly} aria-hidden="true">✓</span>{t().historyStarredOnly}</button>
 						<button
 							class="ghost-btn history-filter-btn"
 							class:ghost-active={historyForRevisionOnly}
+							aria-pressed={historyForRevisionOnly}
 							onclick={() => onSetForRevisionOnly(!historyForRevisionOnly)}
-						>{t().historyForRevisionOnly}</button>
+						><span class="history-filter-check" class:visible={historyForRevisionOnly} aria-hidden="true">✓</span>{t().historyForRevisionOnly}</button>
 						<button
 							class="ghost-btn history-filter-btn"
 							class:ghost-active={historyForShareOnly}
+							aria-pressed={historyForShareOnly}
 							onclick={() => onSetForShareOnly(!historyForShareOnly)}
-						>{t().historyForShareOnly}</button>
+						><span class="history-filter-check" class:visible={historyForShareOnly} aria-hidden="true">✓</span>{t().historyForShareOnly}</button>
 					</div>
 				{/if}
 				{#if interactionLocked}
@@ -323,8 +327,13 @@
 		box-shadow: 0 2px 8px rgba(42,74,114,0.16);
 	}
 	.history-count { color: var(--fg3); font-weight: 400; }
-	.history-head-left { display: flex; align-items: center; min-width: 0; }
-	.history-filter-group { display: flex; align-items: center; gap: 6px; margin-left: 1em; }
+	.history-head-left { display: flex; align-items: center; gap: 6px; min-width: 0; }
+	.history-filter-group { display: flex; align-items: center; gap: 4px; min-width: 0; margin-left: 1em; }
+	.history-filter-label {
+		color: var(--fg3);
+		font-size: var(--ui-font-size-12);
+		font-weight: 400;
+	}
 	.history-lock-badge {
 		display: inline-flex;
 		align-items: center;
@@ -363,12 +372,36 @@
 	/* Both ends of the listing, sized alike so the row does not shuffle. */
 	.history-latest-btn,
 	.history-oldest-btn { min-width: 54px; }
-	.history-filter-btn { min-width: 76px; }
-	/* The same treatment the history manager gives its filter buttons, and the
-	   one the project's colour rule names for a filled button: --action-bg with
-	   --action-fg. The strip used --fg over --panel, which is the paper inverted
-	   rather than an action colour, so a pressed filter here did not read as the
-	   same thing as a pressed filter in the manager. */
+	.history-filter-btn {
+		display: inline-flex;
+		align-items: center;
+		gap: 2px;
+		min-width: 76px;
+		height: 28px;
+		padding: 4px 3px;
+		background: color-mix(in srgb, var(--panel) 88%, var(--fg2));
+		border-color: color-mix(in srgb, var(--border2) 70%, var(--fg2));
+		color: var(--fg);
+		font-weight: 400;
+	}
+	.history-filter-btn.ghost-active {
+		background: var(--action-bg);
+		color: var(--action-fg);
+		border-color: var(--action-bg);
+	}
+	.history-filter-btn:focus-visible {
+		outline: 2px solid var(--accent);
+		outline-offset: 2px;
+	}
+	.history-filter-check {
+		display: inline-grid;
+		inline-size: 1em;
+		place-items: center;
+		line-height: 1;
+		font-weight: 700;
+		visibility: hidden;
+	}
+	.history-filter-check.visible { visibility: visible; }
 	.history-collapse-btn {
 		width: 28px;
 		min-width: 28px;
@@ -492,5 +525,11 @@
 		font-size: var(--ui-font-size-9);
 		padding: 1px 4px;
 		border-radius: 2px;
+	}
+	@media (max-width: 920px) {
+		.history-head { align-items: flex-start; flex-wrap: wrap; }
+		.history-head-left { flex: 1 1 100%; flex-wrap: wrap; }
+		.history-filter-group { flex: 1 1 100%; flex-wrap: wrap; margin-left: 0; }
+		.history-head-actions { margin-left: auto; }
 	}
 </style>

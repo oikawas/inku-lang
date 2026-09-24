@@ -6,6 +6,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 36 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-24 — Grounds and surfaces are written without headings
+
+The specification described headed forms, 「地: ...」 for the support and 「面: ...」 for a shape's surface, but the typed compiler never read the headings: 「地: 和紙。」 became an unresolved clause and 「地: 薄墨。」 or 「面: 塗り。」 stopped the whole work. The specification now matches the compiler: a ground is a sentence of its own such as 「和紙。」 or 「薄墨地。」, and a surface quality is a modifier of its shape such as 「薄墨の円」. Headed forms are not accepted. The Stage 1 work plan already prints these forms. The legacy prompt templates and their golden fixtures keep their recorded wording for replay. Compiler behavior, DDL, Score, and render versions are unchanged.
+
 ### 2026-09-24 — A coordinated group's mirror is never dropped without a diagnostic
 
 When lowering could not materialize the plan, a mirror stated on a coordinated group, such as “place one gray circle and black square at bottom mirrored with the previous shape”, disappeared without any diagnostic, because only instruction-level mirrors were reported on that path. The group mirror is now reported as a relation omission with the same follower (the group's last member) and target as the materialized path. Drawing is unchanged.

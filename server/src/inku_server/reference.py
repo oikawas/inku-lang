@@ -205,8 +205,9 @@ def _normalized_ddl_phrases() -> dict[str, Any]:
         "notes": [
             "The shared compiler transcribes a relation only when a literal from "
             "relation_literals appears; relations are never inferred.",
-            "Ground texture comes from a '地: ...' sentence and surface texture "
-            "from a '面: ...' sentence; neither is inferred from scenery.",
+            "Ground texture comes from a ground sentence such as '和紙。' and "
+            "surface texture from a modifier of its shape; headed '地: ...' / "
+            "'面: ...' forms are not accepted, and neither is inferred from scenery.",
             "background accepts every one of the nine abstract colors, "
             "background='gray' included.",
         ],

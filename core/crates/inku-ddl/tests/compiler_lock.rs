@@ -93,7 +93,8 @@ fn unresolved_clause_owns_its_invalid_sequence_diagnostic() {
 
 #[test]
 fn recoverable_fragments_do_not_block_an_anchored_clause_hole() {
-    let source = "地: 薄墨。\n赤い細筆の横の実線を右端に一本引く。\n赤い細筆の極細の横線を前の線に沿って右から左へ波打つ軌跡に引く。";
+    // A ground is its own sentence; the headed 「地: ...」 form is not accepted.
+    let source = "薄墨地。\n赤い細筆の横の実線を右端に一本引く。\n赤い細筆の極細の横線を前の線に沿って右から左へ波打つ軌跡に引く。";
     let result = compile(
         source,
         ResolvedInstructionLanguage::Ja,

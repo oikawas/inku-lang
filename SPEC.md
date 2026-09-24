@@ -191,7 +191,7 @@ Canvas format is neither vocabulary nor a plugin. It is a resolved host option o
   noun such as "flat", not the act of painting. Its two dimensions are **quality**
   (empty, flat, pale ink wash, grain, stipple, hatch, crosshatch, aquatint) and
   **density** (dense, faint). Density is relative to the tool, not an absolute
-  darkness. Paper grain belongs to the support named by `Ground:`. Grain and
+  darkness. Paper grain belongs to the support (the grounds category). Grain and
   wash remain applicable to lines and arcs: grain raises support absorption and
   tooth, while wash changes no sheet properties and produces a pale band at
   three times the width and 0.35 of the opacity. The other six qualities move
@@ -257,8 +257,10 @@ saving or delivering an empty Score with its background as an omitted success.
   engine 34): **paper, washi, ink-wash ground, charcoal ground, canvas, drawing
   paper, mezzotint** -- the seven values of `canvas.ground.material`. **Where
   surfaces says how the inside of a closed shape is, grounds says what the
-  canvas itself is**, which is why a description writes it as `Ground: ...` and
-  not `Surface: ...`. **All seven are tiled as a `<pattern>` and use no
+  canvas itself is**, and a description names it as a sentence of its own, such as “washi.” or
+  “ink-wash ground.” Headed forms such as `Ground: ...` and `Surface: ...` are
+  not accepted (2026-09-24); a surface quality is written as a modifier of its
+  shape, as in “a pale ink wash circle”. **All seven are tiled as a `<pattern>` and use no
   `<filter>`, so the three SVG profiles emit the same ground.** **The cost limit
   is the byte size of the ground layer (24 KB), not a count of elements.**
 
@@ -1447,14 +1449,14 @@ Shared standalone grammar makes modifier phrases own their connectors but exclud
 | fully natural sentences ("place a thin line, with a slight sway, near the center") | leaves room for a second *interpretation* in stage two |
 | a structured list (YAML-like) | looks like code; it takes the pleasure out of describing, and similar graphical description languages already exist |
 | function-call style (`place(subject=line, position=center)`) | too close to code |
-| a separate modifier line (an early draft that wrote "sway: small" on a line of its own) | never adopted in the implementation. Motion words are written inline as sentences, as in "the line sways finely" (the fixture corpus is canonical). The exception is surface and ground texture, where only the fixed phrases 「面: ...」 and 「地: ...」 are separated onto their own line |
+| a separate modifier line (an early draft that wrote "sway: small" on a line of its own) | never adopted in the implementation. Motion words are written inline as sentences, as in "the line sways finely" (the fixture corpus is canonical). Surface and ground follow the same rule: headed forms such as 「面: ...」 and 「地: ...」 are not adopted (removed from this specification on 2026-09-24). A ground is a sentence of its own such as “washi.”, and a surface is a modifier of its shape |
 
 **What the adopted form does:**
 
 - keeps the rhythm of natural sentences (the readability of tanka)
 - limits the vocabulary to the core (place, thin, center, and the like)
-- writes motion words inline, separating only surface and ground texture with
-  the fixed 「面: / 地:」 phrases
+- writes motion words inline; a surface quality is a modifier of its shape and
+  a ground is a sentence of its own such as “washi.”
 - keeps the structure of the format common between the Japanese and the
   English version
 - **is designed on the assumption that the author will see it** (it is shown

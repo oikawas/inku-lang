@@ -156,6 +156,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.sp
@@ -1671,10 +1672,22 @@ private fun CameraDevelopmentEffectCanvas(
     )
     Box(modifier = modifier.clipToBounds()) {
         if (photo != null) {
+            val signalFrame = if (effect == CameraDevelopmentEffect.PhotoReading && animationsEnabled) {
+                (cycle * 18f).toInt()
+            } else {
+                0
+            }
             Image(
                 bitmap = photo,
                 contentDescription = null,
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier.fillMaxSize().graphicsLayer {
+                    if (effect == CameraDevelopmentEffect.PhotoReading && animationsEnabled) {
+                        translationX = ((signalFrame * 17) % 7 - 3) * 6f
+                        translationY = ((signalFrame * 11) % 5 - 2) * 4f
+                        scaleX = 1.16f
+                        scaleY = 1.08f
+                    }
+                },
                 contentScale = ContentScale.Crop,
             )
         }
@@ -1690,6 +1703,7 @@ private fun CameraDevelopmentEffectCanvas(
                 }
             }
             CameraDevelopmentEffect.PhotoReading -> {
+                if (photo != null && animationsEnabled) drawCameraPhotoTears(photo, cycle)
                 drawCameraPhotoScan(cycle, animationsEnabled)
             }
             CameraDevelopmentEffect.GrainAndForms -> {
@@ -1711,7 +1725,7 @@ private fun CameraDevelopmentEffectCanvas(
                 }
             }
             CameraDevelopmentEffect.OutlineSettling -> {
-                drawCameraMechanicalComposition(cycle, animationsEnabled, vivid)
+                drawCameraMechanicalComposition(cycle, animationsEnabled, cameraMechanicalPalette)
             }
             CameraDevelopmentEffect.Saving -> {
                 drawRect(
@@ -1736,14 +1750,57 @@ private fun CameraDevelopmentEffectCanvas(
     }
 }
 
-/** A restrained video-signal layer over the actual input photo. All positions are deterministic. */
+/** Offset crops of the preview create horizontal signal tears without changing the source file. */
+private fun DrawScope.drawCameraPhotoTears(photo: ImageBitmap, cycle: Float) {
+    if (size.width <= 0f || size.height <= 0f) return
+    val frame = (cycle * 18f).toInt()
+    val photoAspect = photo.width.toFloat() / photo.height
+    val displayAspect = size.width / size.height
+    val sourceWidth = if (photoAspect > displayAspect) {
+        (photo.height * displayAspect).toInt().coerceIn(1, photo.width)
+    } else {
+        photo.width
+    }
+    val sourceHeight = if (photoAspect > displayAspect) {
+        photo.height
+    } else {
+        (photo.width / displayAspect).toInt().coerceIn(1, photo.height)
+    }
+    val sourceLeft = (photo.width - sourceWidth) / 2
+    val sourceTop = (photo.height - sourceHeight) / 2
+    repeat(4) { index ->
+        val yFraction = ((index * 23 + frame * 17) % 80) / 100f
+        val heightFraction = 0.06f + (index % 3) * 0.025f
+        val sourceY = sourceTop + (sourceHeight * yFraction).toInt()
+        val bandSourceHeight = (sourceHeight * heightFraction).toInt()
+            .coerceAtLeast(1)
+            .coerceAtMost(photo.height - sourceY)
+        val shift = (((frame * 13 + index * 7) % 9) - 4) * size.width * 0.026f
+        drawImage(
+            image = photo,
+            srcOffset = IntOffset(sourceLeft, sourceY),
+            srcSize = IntSize(sourceWidth, bandSourceHeight),
+            dstOffset = IntOffset(shift.toInt(), (size.height * yFraction).toInt()),
+            dstSize = IntSize(size.width.toInt().coerceAtLeast(1), (size.height * heightFraction).toInt().coerceAtLeast(1)),
+            alpha = 0.94f,
+        )
+        drawRect(
+            (if (index % 2 == 0) CameraDevelopmentVividSky else CameraDevelopmentVividPink)
+                .copy(alpha = 0.42f),
+            topLeft = Offset(0f, size.height * yFraction),
+            size = Size(size.width, 2.dp.toPx()),
+        )
+    }
+}
+
+/** Video-signal scanlines and bounded interference over the input photo. */
 private fun DrawScope.drawCameraPhotoScan(cycle: Float, animationsEnabled: Boolean) {
     val hairline = 1.dp.toPx()
-    drawRect(Color(0xFF062C38).copy(alpha = 0.16f))
-    repeat(44) { index ->
-        val y = size.height * (index + 0.5f) / 44f
+    drawRect(Color(0xFF062C38).copy(alpha = 0.2f))
+    repeat(52) { index ->
+        val y = size.height * (index + 0.5f) / 52f
         drawLine(
-            CameraDevelopmentVividSky.copy(alpha = if (index % 2 == 0) 0.16f else 0.08f),
+            CameraDevelopmentVividSky.copy(alpha = if (index % 2 == 0) 0.2f else 0.1f),
             Offset(0f, y),
             Offset(size.width, y),
             strokeWidth = hairline,
@@ -1752,75 +1809,116 @@ private fun DrawScope.drawCameraPhotoScan(cycle: Float, animationsEnabled: Boole
 
     val scanY = size.height * (0.06f + cycle * 0.88f)
     drawRect(
-        CameraDevelopmentVividSky.copy(alpha = 0.18f),
+        CameraDevelopmentVividSky.copy(alpha = 0.22f),
         topLeft = Offset(0f, scanY - size.height * 0.055f),
         size = Size(size.width, size.height * 0.11f),
     )
     drawLine(
-        CameraDevelopmentVividSky.copy(alpha = 0.82f),
+        CameraDevelopmentVividSky.copy(alpha = 0.94f),
         Offset(0f, scanY),
         Offset(size.width, scanY),
         strokeWidth = 2.dp.toPx(),
     )
 
     val noiseFrame = if (animationsEnabled) (cycle * 18f).toInt() else 7
-    repeat(28) { index ->
-        if ((index * 7 + noiseFrame) % 4 != 0) return@repeat
+    val interferenceY = size.height * ((noiseFrame * 13 + 9) % 73) / 100f
+    drawRect(
+        CameraDevelopmentVividPink.copy(alpha = 0.16f),
+        topLeft = Offset(0f, interferenceY),
+        size = Size(size.width, size.height * 0.075f),
+    )
+    repeat(42) { index ->
+        if ((index * 7 + noiseFrame) % 3 != 0) return@repeat
         val x = size.width * ((index * 41 + noiseFrame * 17) % 97) / 97f
         val y = size.height * ((index * 29 + noiseFrame * 11) % 89) / 89f
-        val width = minOf(size.width * (0.035f + (index % 4) * 0.017f), size.width - x)
+        val width = minOf(size.width * (0.07f + (index % 6) * 0.048f), size.width - x)
         drawRect(
             (if (index % 3 == 0) CameraDevelopmentVividPink else CameraDevelopmentVividSky)
-                .copy(alpha = 0.48f),
+                .copy(alpha = 0.56f),
             topLeft = Offset(x, y),
-            size = Size(width, if (index % 5 == 0) 3.dp.toPx() else hairline),
+            size = Size(width, if (index % 5 == 0) 6.dp.toPx() else 2.dp.toPx()),
         )
     }
 }
 
-/** Geometric ink builds in a fixed grid, so each cycle reads as drawing rather than a spinner. */
+private val cameraMechanicalPalette = listOf(
+    CameraDevelopmentVividPink,
+    CameraDevelopmentVividGreen,
+    CameraDevelopmentVividSky,
+    CameraDevelopmentVividOrange,
+    CameraDevelopmentVividPurple,
+    CameraDevelopmentVividYellow,
+    CameraDevelopmentVividCyan,
+    CameraDevelopmentVividRed,
+    CameraDevelopmentVividBlue,
+    CameraDevelopmentVividLime,
+)
+
+/** A rapid plotter-like stack of large overlapping forms over the preview. */
 private fun DrawScope.drawCameraMechanicalComposition(
     cycle: Float,
     animationsEnabled: Boolean,
     colors: List<Color>,
 ) {
-    drawRect(Color(0xFF201E22).copy(alpha = 0.1f))
-    val stroke = 1.5.dp.toPx()
-    val radius = size.minDimension * 0.042f
-    val visible = if (animationsEnabled) 4 + (cycle * 28f).toInt() else 32
+    drawRect(Color(0xFF201E22).copy(alpha = 0.14f))
+    val stroke = 2.5.dp.toPx()
+    val radius = size.minDimension * 0.105f
+    val drawingPosition = if (animationsEnabled) 3f + cycle * 29f else 32f
+    val visible = (drawingPosition.toInt() + 1).coerceAtMost(32)
     repeat(32) { index ->
         if (index >= visible) return@repeat
-        val column = index % 5
-        val row = index / 5
+        val column = (index * 3) % 5
+        val row = (index * 5) % 7
         val center = Offset(
-            size.width * (0.12f + column * 0.19f),
-            size.height * (0.1f + row * 0.13f),
+            size.width * (0.16f + column * 0.17f + (index % 3) * 0.022f),
+            size.height * (0.13f + row * 0.115f),
         )
-        val extent = radius * (0.82f + (index % 3) * 0.18f)
+        val arrival = if (animationsEnabled) (drawingPosition - index).coerceIn(0f, 1f) else 1f
+        val extent = radius * (0.82f + (index % 4) * 0.2f) * (0.35f + arrival * 0.65f)
         val color = colors[index % colors.size]
+        drawLine(
+            CameraDevelopmentPaper.copy(alpha = 0.24f),
+            Offset(center.x - extent * 1.35f, center.y - extent * 1.35f),
+            Offset(center.x + extent * 0.3f, center.y - extent * 1.35f),
+            strokeWidth = 1.dp.toPx(),
+        )
         when (index % 4) {
             0 -> {
-                drawCircle(color.copy(alpha = 0.28f), radius = extent, center = center)
-                drawCircle(color.copy(alpha = 0.86f), radius = extent, center = center, style = Stroke(width = stroke))
+                drawCircle(color.copy(alpha = 0.56f), radius = extent, center = center)
+                drawCircle(color.copy(alpha = 0.98f), radius = extent, center = center, style = Stroke(width = stroke))
             }
             1 -> {
                 val topLeft = Offset(center.x - extent, center.y - extent)
                 val square = Size(extent * 2f, extent * 2f)
-                drawRect(color.copy(alpha = 0.25f), topLeft = topLeft, size = square)
-                drawRect(color.copy(alpha = 0.86f), topLeft = topLeft, size = square, style = Stroke(width = stroke))
+                drawRect(color.copy(alpha = 0.54f), topLeft = topLeft, size = square)
+                drawRect(color.copy(alpha = 0.98f), topLeft = topLeft, size = square, style = Stroke(width = stroke))
             }
             2 -> {
                 val top = Offset(center.x, center.y - extent)
                 val left = Offset(center.x - extent, center.y + extent)
                 val right = Offset(center.x + extent, center.y + extent)
-                drawLine(color.copy(alpha = 0.88f), top, left, strokeWidth = stroke)
-                drawLine(color.copy(alpha = 0.88f), left, right, strokeWidth = stroke)
-                drawLine(color.copy(alpha = 0.88f), right, top, strokeWidth = stroke)
+                val triangle = Path().apply {
+                    moveTo(top.x, top.y)
+                    lineTo(left.x, left.y)
+                    lineTo(right.x, right.y)
+                    close()
+                }
+                drawPath(triangle, color.copy(alpha = 0.52f))
+                drawPath(triangle, color.copy(alpha = 0.98f), style = Stroke(width = stroke))
             }
             else -> {
-                drawLine(color.copy(alpha = 0.86f), Offset(center.x - extent, center.y), Offset(center.x + extent, center.y), strokeWidth = stroke)
-                drawLine(color.copy(alpha = 0.86f), Offset(center.x, center.y - extent), Offset(center.x, center.y + extent), strokeWidth = stroke)
-                drawCircle(color.copy(alpha = 0.45f), radius = extent * 0.3f, center = center)
+                drawRect(
+                    color.copy(alpha = 0.5f),
+                    topLeft = Offset(center.x - extent, center.y - extent * 0.22f),
+                    size = Size(extent * 2f, extent * 0.44f),
+                )
+                drawRect(
+                    color.copy(alpha = 0.5f),
+                    topLeft = Offset(center.x - extent * 0.22f, center.y - extent),
+                    size = Size(extent * 0.44f, extent * 2f),
+                )
+                drawLine(color.copy(alpha = 0.98f), Offset(center.x - extent, center.y), Offset(center.x + extent, center.y), strokeWidth = stroke)
+                drawLine(color.copy(alpha = 0.98f), Offset(center.x, center.y - extent), Offset(center.x, center.y + extent), strokeWidth = stroke)
             }
         }
     }

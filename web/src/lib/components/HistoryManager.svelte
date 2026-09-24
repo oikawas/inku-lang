@@ -744,7 +744,7 @@
 						class:ghost-active={historyManagerStarredOnly}
 						aria-pressed={historyManagerStarredOnly}
 						onclick={() => onSetStarredOnly(!historyManagerStarredOnly)}
-					>{#if historyManagerStarredOnly}<span class="history-filter-check" aria-hidden="true">✓</span>{/if}{t().historyStarredOnly}</button>
+					><span class="history-filter-check" class:visible={historyManagerStarredOnly} aria-hidden="true">✓</span>{t().historyStarredOnly}</button>
 				</Tooltip>
 				<Tooltip placement="bottom-right" text={t().tooltipHistoryForRevisionOnly}>
 					<button
@@ -752,7 +752,7 @@
 						class:ghost-active={historyManagerForRevisionOnly}
 						aria-pressed={historyManagerForRevisionOnly}
 						onclick={() => onSetForRevisionOnly(!historyManagerForRevisionOnly)}
-					>{#if historyManagerForRevisionOnly}<span class="history-filter-check" aria-hidden="true">✓</span>{/if}{t().historyForRevisionOnly}</button>
+					><span class="history-filter-check" class:visible={historyManagerForRevisionOnly} aria-hidden="true">✓</span>{t().historyForRevisionOnly}</button>
 				</Tooltip>
 				<Tooltip placement="bottom-right" text={t().tooltipHistoryForShareOnly}>
 					<button
@@ -760,7 +760,7 @@
 						class:ghost-active={historyManagerForShareOnly}
 						aria-pressed={historyManagerForShareOnly}
 						onclick={() => onSetForShareOnly(!historyManagerForShareOnly)}
-					>{#if historyManagerForShareOnly}<span class="history-filter-check" aria-hidden="true">✓</span>{/if}{t().historyForShareOnly}</button>
+					><span class="history-filter-check" class:visible={historyManagerForShareOnly} aria-hidden="true">✓</span>{t().historyForShareOnly}</button>
 				</Tooltip>
 			</div>
 			<Tooltip placement="bottom-right" text={t().tooltipHistoryTrashView}>
@@ -1105,7 +1105,7 @@
 	.lineage-member-actions { display: flex; align-items: center; gap: 4px; margin-top: 5px; }
 	.lineage-member-actions .ghost-btn, .lineage-member-actions .danger-btn { margin-left: 0; }
 	.lineage-history-list.list-mode .lineage-member-grid { display: flex; flex-direction: column; }
-	.lineage-history-list.list-mode .lineage-member { display: grid; grid-template-columns: 18px minmax(0, 1fr) auto; align-items: center; gap: 8px; }
+	.lineage-history-list.list-mode .lineage-member { display: grid; grid-template-columns: 20px minmax(0, 1fr) auto; align-items: center; gap: 8px; }
 	.lineage-history-list.list-mode .lineage-member > .selection-checkbox { position: static; }
 	.lineage-history-list.list-mode .lineage-member-main { display: grid; grid-template-columns: 48px minmax(0, 1fr); align-items: center; gap: 8px; }
 	.lineage-history-list.list-mode .lineage-member-main :global(svg) { width: 48px; height: 48px; }
@@ -1226,10 +1226,11 @@
 	.history-filter-btn {
 		display: inline-flex;
 		align-items: center;
-		gap: 4px;
-		border-color: var(--accent);
-		color: var(--accent);
-		font-weight: 600;
+		gap: 2px;
+		padding: 4px 3px;
+		border-color: var(--border2);
+		color: var(--fg2);
+		font-weight: 400;
 	}
 	.history-filter-btn.ghost-active {
 		background: var(--action-bg);
@@ -1240,7 +1241,15 @@
 		outline: 2px solid var(--accent);
 		outline-offset: 2px;
 	}
-	.history-filter-check { font-weight: 700; }
+	.history-filter-check {
+		display: inline-grid;
+		inline-size: 1em;
+		place-items: center;
+		line-height: 1;
+		font-weight: 700;
+		visibility: hidden;
+	}
+	.history-filter-check.visible { visibility: visible; }
 	.history-mode-tabs { flex-shrink: 0; }
 	.history-manager-count {
 		font-size: var(--ui-font-size-12);
@@ -1339,7 +1348,7 @@
    same plate treatment the star badge uses to stay readable on any image. */
 .manager-generation {
 	position: absolute;
-	top: 32px;
+	top: 30px;
 	left: 6px;
 	z-index: 30;
 	box-sizing: border-box;
@@ -1356,8 +1365,8 @@
 }
 .selection-checkbox {
 	box-sizing: border-box;
-	width: 26px;
-	height: 26px;
+	width: 20px;
+	height: 20px;
 	display: inline-grid;
 	place-items: center;
 	margin: 0;
@@ -1372,7 +1381,7 @@
 }
 .selection-checkbox:hover { border-color: var(--accent); }
 .selection-checkbox:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.selection-checkbox.checked { border-color: var(--accent); background: var(--accent); }
+.selection-checkbox.checked { border-color: var(--accent); color: var(--accent); }
 .table-check { position: static; box-shadow: none; }
 	.thumb-star {
 		position: absolute;
@@ -1444,8 +1453,9 @@
 		flex: 0 0 auto;
 		position: relative;
 		z-index: 41;
-		width: 26px;
-		height: 26px;
+		box-sizing: border-box;
+		width: 24px;
+		height: 24px;
 		border: 1px solid var(--border2);
 		border-radius: 50%;
 		background: var(--panel);
@@ -1462,7 +1472,10 @@
 	/* The revision mark sits beside the star and must not read as a second star:
 	   a pencil, and the accent colour rather than the star colour. */
 	.hash-row-mark {
-		padding: var(--btn-sm-padding);
+		box-sizing: border-box;
+		width: 24px;
+		height: 24px;
+		padding: 0;
 		border: 1px solid var(--border);
 		border-radius: var(--btn-sm-radius);
 		background: var(--panel);
@@ -1470,6 +1483,9 @@
 		font-size: var(--btn-sm-font-size);
 		line-height: 1;
 		cursor: pointer;
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
 	}
 	.hash-row-mark.marked {
 		border-color: var(--accent);
@@ -1587,8 +1603,9 @@
 	.bulk-trash svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
 	.bulk-trash:disabled { opacity: .4; cursor: default; }
 	.icon-trash-btn {
+		box-sizing: border-box;
 		width: 24px;
-		height: 22px;
+		height: 24px;
 		padding: 0;
 		display: inline-flex;
 		align-items: center;
@@ -1596,8 +1613,8 @@
 		color: var(--fg2);
 	}
 	.icon-trash-btn svg {
-		width: 22px;
-		height: 20px;
+		width: 16px;
+		height: 16px;
 		fill: none;
 		stroke: currentColor;
 		stroke-width: 1.7;

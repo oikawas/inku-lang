@@ -10,6 +10,8 @@ This file records changes chronologically. If a historical note conflicts with t
 
 The Library's Starred, Revision marks, and Shared filters are now grouped under a label. Inactive buttons have outlines that identify them as controls, while active buttons use a fill and a check mark. Keyboard focus and assistive technology also receive the selected state. Filter combinations, search, and retained state when moving between screens are unchanged.
 
+The filter check mark no longer changes a button's width, and the filter controls now carry the same restrained weight as nearby actions. Work-selection boxes use one smaller fixed square before and after selection, while Star, Revision mark, and Trash controls share one size and gap. Their actions and selected state are unchanged.
+
 ### 2026-09-23 — Synchronize the specification with the current Web UI
 
 Aligned the Japanese and English specification with the current making and Library state retention, description and instruction editing with the Saijiki, responsive work-condition display, Lineage-grouped Library thumbnails, the shared Export menu and Lineage scopes, and Demo's work-conditions header. The batch-resume wording now also uses the current saved-success meaning. Product code and versions are unchanged.

@@ -30,6 +30,8 @@ pub const LLM_PROMPT_SCHEMA_ID: &str = "inku.llm-prompt.v1";
 pub const CATALOG_SELECTION_PROMPT_ID: &str = "inku.description-catalog-selection-prompt.v1";
 /// Distinct typed Stage 1 prompt edition. This is not the legacy runtime template.
 pub const TYPED_STAGE1_PROMPT_ID: &str = "inku.typed-stage1-work-plan-prompt.v1";
+/// Distinct cue-judging sketch prompt edition.
+pub const SKETCH_PROMPT_ID: &str = "inku.sketch-supplement-prompt.v1";
 /// Distinct visible-hole completion prompt edition.
 pub const HOLE_COMPLETION_PROMPT_ID: &str = "inku.visible-ddl-hole-completion-prompt.v3";
 pub(crate) const LEGACY_HOLE_COMPLETION_PROMPT_ID: &str =
@@ -38,10 +40,11 @@ pub(crate) const LEGACY_HOLE_COMPLETION_PROMPT_ID: &str =
 const PROMPT_DIGEST_DOMAIN: &[u8] = b"inku.llm-prompt.v1";
 const CATALOG_DIGEST_DOMAIN: &[u8] = b"inku.prompt-catalog-projection.v1";
 
-/// The three LLM effects accepted by I-523.
+/// The LLM effects accepted by I-523, plus the optional sketch before Stage 1.
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum LlmStage {
+    GenerateSketch,
     SelectDescriptionCatalog,
     GenerateNormalizedDdl,
     CompleteVisibleDdlHoles,
@@ -51,6 +54,7 @@ impl LlmStage {
     /// Exact I-523 effect tag.
     pub const fn action_name(self) -> &'static str {
         match self {
+            Self::GenerateSketch => "generate_sketch",
             Self::SelectDescriptionCatalog => "select_description_catalog",
             Self::GenerateNormalizedDdl => "generate_normalized_ddl",
             Self::CompleteVisibleDdlHoles => "complete_visible_ddl_holes",
@@ -144,6 +148,36 @@ pub struct LlmPrompt {
 #[serde(deny_unknown_fields)]
 pub struct CatalogSelectionResponse {
     pub catalog_id: String,
+}
+
+/// Whether the sketcher judged the description short of cues.
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SketchDecision {
+    None,
+    Supplement,
+}
+
+/// Exact sketch response shape. `place` and `light` record which cues the
+/// description already states; `sketch` is empty unless it supplements.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct SketchResponse {
+    pub place: bool,
+    pub light: bool,
+    pub subjects: Vec<String>,
+    pub decision: SketchDecision,
+    pub sketch: String,
+}
+
+const SKETCH_MAX_SUBJECTS: usize = 12;
+
+impl SketchResponse {
+    /// The supplement text, when the response asks for one and carries it.
+    pub fn supplement(&self) -> Option<&str> {
+        let text = self.sketch.trim();
+        (self.decision == SketchDecision::Supplement && !text.is_empty()).then_some(text)
+    }
 }
 
 /// Exact typed Stage 1 response shape. Only visible DDL can cross this boundary.
@@ -408,6 +442,8 @@ struct CanvasPromptContext<'a> {
 #[derive(Serialize)]
 struct Stage1Message<'a> {
     description: &'a str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    sketch: Option<&'a str>,
     catalog_id: &'a str,
     catalog_mode: &'a str,
     canvas: CanvasPromptContext<'a>,
@@ -501,6 +537,63 @@ pub fn build_catalog_selection_prompt(
     })
 }
 
+/// Build the optional `generate_sketch` request. `always` asks for a
+/// supplement even when the description already states its cues (the
+/// author's explicit "draw again with a sketch").
+pub fn build_sketch_prompt(
+    description: &str,
+    language: ResolvedInstructionLanguage,
+    always: bool,
+    limits: PromptLimits,
+) -> Result<LlmPrompt, PromptError> {
+    require_nonempty("description", description)?;
+    require_within("description", description.len(), limits.max_source_bytes)?;
+    let mut system = match language {
+        ResolvedInstructionLanguage::Ja => SKETCH_JA,
+        ResolvedInstructionLanguage::En => SKETCH_EN,
+    }
+    .to_owned();
+    if always {
+        system.push_str(match language {
+            ResolvedInstructionLanguage::Ja => "\n\n作者は写生ありで描くことを選んだ。記述がすでに示す手掛かりがあっても decision は supplement にし、記述が含意する場所の広がりか季節・時刻の光を補う。",
+            ResolvedInstructionLanguage::En => "\n\nThe author chose to draw with a sketch. Set decision to supplement even when the description already states its cues, and supplement the extent of place or the seasonal or time-of-day light it implies.",
+        });
+    }
+    let message = serde_json::to_string(&json!({ "description": description }))
+        .map_err(|_| PromptError::Serialization)?;
+    finish_prompt(LlmPrompt {
+        schema_id: LLM_PROMPT_SCHEMA_ID.to_owned(),
+        prompt_id: SKETCH_PROMPT_ID.to_owned(),
+        stage: LlmStage::GenerateSketch,
+        action_name: LlmStage::GenerateSketch.action_name().to_owned(),
+        instruction_language: language,
+        system,
+        message,
+        response_schema: json!({
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["place", "light", "subjects", "decision", "sketch"],
+            "properties": {
+                "place": { "type": "boolean" },
+                "light": { "type": "boolean" },
+                "subjects": {
+                    "type": "array",
+                    "items": { "type": "string" },
+                    "maxItems": SKETCH_MAX_SUBJECTS
+                },
+                "decision": { "type": "string", "enum": ["none", "supplement"] },
+                "sketch": { "type": "string" }
+            }
+        }),
+        prompt_digest: String::new(),
+        saijiki_asset_id: None,
+        saijiki_asset_digest: None,
+        macro_catalog_digest: None,
+        base_source_digest: None,
+        base_compiler_lock_digest: None,
+    })
+}
+
 /// Build the typed `generate_normalized_ddl` request.
 pub fn build_stage1_prompt(
     description: &str,
@@ -509,7 +602,24 @@ pub fn build_stage1_prompt(
     macros: &[MacroPromptEntry<'_>],
     limits: PromptLimits,
 ) -> Result<LlmPrompt, PromptError> {
+    build_stage1_prompt_with_sketch(description, None, language, context, macros, limits)
+}
+
+/// Build the typed `generate_normalized_ddl` request with an optional sketch
+/// that supplements place and light. The sketch never replaces the description.
+pub fn build_stage1_prompt_with_sketch(
+    description: &str,
+    sketch: Option<&str>,
+    language: ResolvedInstructionLanguage,
+    context: &Stage1Context,
+    macros: &[MacroPromptEntry<'_>],
+    limits: PromptLimits,
+) -> Result<LlmPrompt, PromptError> {
     require_nonempty("description", description)?;
+    if let Some(sketch) = sketch {
+        require_nonblank("sketch", sketch)?;
+        require_within("sketch", sketch.len(), limits.max_source_bytes)?;
+    }
     require_within("description", description.len(), limits.max_source_bytes)?;
     require_nonblank("catalog_id", &context.catalog_id)?;
     if matches!(
@@ -526,9 +636,16 @@ pub fn build_stage1_prompt(
         }
     })?;
     let (_, macro_catalog_digest) = project_macro_catalog(macros, limits)?;
-    let system = stage1_work_plan_system(language)?;
+    let mut system = stage1_work_plan_system(language)?;
+    if sketch.is_some() {
+        system.push_str(match language {
+            ResolvedInstructionLanguage::Ja => STAGE1_SKETCH_NOTE_JA,
+            ResolvedInstructionLanguage::En => STAGE1_SKETCH_NOTE_EN,
+        });
+    }
     let message = serde_json::to_string(&Stage1Message {
         description,
+        sketch,
         catalog_id: &context.catalog_id,
         catalog_mode: context.catalog_mode.as_str(),
         canvas: CanvasPromptContext {
@@ -692,6 +809,52 @@ const STAGE1_WORK_PLAN_EN: &str = r#"You are inku's work planner. Read the autho
 12. Show light and time through the color of the scene. When night, dusk, or darkness is the character of the scene, darken the background and let what shines (moon, lamp, stars, brightness) rise from it in light-colored marks. Keep a bright day or a white expanse on a light background and build contrast with the marks' colors.
 
 Choose unspecified for a field you leave open. Use one to eight layers. Return only the specified JSON."#;
+
+const SKETCH_JA: &str = r#"あなたは inku の写生者である。作者の記述を抽象的な素描にする前に、記述に描くための手掛かりが足りているかを確かめ、足りない場合だけ背景と環境を補う。
+
+# 確かめること
+- place: 場所の広がり（空、野、海、庭、部屋、町、遠近など）が記述の言葉で示されているか。
+- light: 季節・時刻・天気・光（春、夕暮れ、夜、雨、月明かり、日差しなど）が記述の言葉で示されているか。
+- subjects: 記述が描くべき物として名指しているものを、記述の言葉のまま短く並べる。
+
+# 補うかどうか
+- place と light がどちらも示されていれば、decision は none にする。
+- 記述が具体的な物を三つ以上名指し、その配置や数も書いているなら、decision は none にする。
+- それ以外で、記述が含意するのに書いていない場所の広がり、または季節・時刻の光があるときだけ、decision を supplement にする。含意が読み取れなければ none にする。
+
+# 補うときの書き方
+- sketch には、欠けている側（place か light、または両方）だけを、物の言葉で1〜3文に書く。書いてよいのは、場所の広がり、季節や時刻の光と色、周囲にある物とその数の多さや少なさである。
+- 記述の主題、その動き・向き・数・位置は書き直さない。新しい主題を加えない。
+- 感情語、評価語、比喩、物語の筋は書かない。
+- none のとき sketch は空文字にする。"#;
+
+const SKETCH_EN: &str = r#"You are inku's sketcher. Before the author's description becomes an abstract drawing, check whether it gives enough cues to draw from, and supplement the background and environment only when it does not.
+
+# What to check
+- place: whether the description's words show the extent of a place (sky, field, sea, garden, room, town, near and far).
+- light: whether the description's words show a season, time of day, weather, or light (spring, dusk, night, rain, moonlight, sunshine).
+- subjects: list briefly, in the description's own words, the things it names to be drawn.
+
+# Whether to supplement
+- If both place and light are shown, set decision to none.
+- If the description names three or more concrete things and also states their placement or count, set decision to none.
+- Otherwise set decision to supplement only when the description implies an extent of place or a seasonal or time-of-day light that it does not state. If no such implication can be read, set none.
+
+# How to supplement
+- In sketch, write only the missing side (place, light, or both) in one to three sentences of plain words for things. You may write the extent of the place, the light and color of the season or time, and the surrounding things with how many or few they are.
+- Never rewrite the description's subjects, their movement, direction, count, or position. Add no new subject.
+- Write no emotion words, evaluations, metaphors, or plot.
+- When decision is none, sketch is an empty string."#;
+
+const STAGE1_SKETCH_NOTE_JA: &str = r#"
+
+# 写生文（補足）
+入力の sketch は、記述が書いていない場所の広がりや季節・時刻の光を補う文である。主題、動き、向き、個数、配置は記述に従い、sketch で置き換えない。sketch からは場や奥の層、背景の色を加えるだけにし、記述の役割の層を弱めたり減らしたりしない。"#;
+
+const STAGE1_SKETCH_NOTE_EN: &str = r#"
+
+# Sketch (supplement)
+The input sketch supplements the extent of place or the seasonal or time-of-day light that the description does not state. Subjects, movement, direction, counts, and placement follow the description; the sketch never replaces them. From the sketch, only add scene or back layers and the background color; never weaken or remove the layers for the description's roles."#;
 
 fn stage1_work_plan_system(language: ResolvedInstructionLanguage) -> Result<String, PromptError> {
     let tool_guidance =
@@ -989,6 +1152,17 @@ pub fn parse_catalog_selection_response(
 ) -> Result<CatalogSelectionResponse, PromptError> {
     let response: CatalogSelectionResponse = parse_bounded(response_text, limits)?;
     require_nonblank("catalog_id", &response.catalog_id)?;
+    Ok(response)
+}
+
+/// Parse a sketch response. The supplement is bounded like visible source.
+pub fn parse_sketch_response(
+    response_text: &str,
+    limits: PromptLimits,
+) -> Result<SketchResponse, PromptError> {
+    let response: SketchResponse = parse_bounded(response_text, limits)?;
+    require_within("subjects", response.subjects.len(), SKETCH_MAX_SUBJECTS)?;
+    require_within("sketch", response.sketch.len(), limits.max_source_bytes)?;
     Ok(response)
 }
 

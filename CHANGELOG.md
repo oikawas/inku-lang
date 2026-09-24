@@ -6,6 +6,12 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 36 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-24 — Clarify Android photo processing and retain original photos
+
+The photo-to-work display now follows the actual phases: preparing and examining the photo, planning the composition, building colors and forms, finishing, and saving. Visual effects use the input photo without presenting invented intermediate works, percentages, or remaining-time estimates. Text and static displays retain the phase information when system animations are disabled.
+
+New captures and selected photos retain their received original bytes in app-private storage, without recompression, and are associated with successfully saved works. A small preview in the description screen remains available when the work is selected again. The retained original is separate from the reduced photo sent to on-device Vision; NIM still receives text alone. Existing works receive no photo backfill, and the Room schema is unchanged.
+
 ### 2026-09-24 — Make Library filter state easier to identify
 
 The Library's Starred, Revision marks, and Shared filters are now grouped under a label. Inactive buttons have outlines that identify them as controls, while active buttons use a fill and a check mark. Keyboard focus and assistive technology also receive the selected state. Filter combinations, search, and retained state when moving between screens are unchanged.

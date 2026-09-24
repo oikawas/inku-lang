@@ -40,6 +40,18 @@ When updating Android specifications:
 3. Do not introduce English-only Android requirements that are absent from
    `ANDROID_SPEC.ja.md`.
 
+## 2026-09-24 Current photo input, processing display, and original-photo retention
+
+This section is the current contract for new captures and Photo Picker selections. It replaces the no-photo-storage and no-photo-persistence restrictions in the historical 2026-08-26 and 2026-08-27 implementation entries with the app-private retention described below. Those implementation and acceptance records remain as history.
+
+The display follows real processing states. It distinguishes photo preparation, on-device model loading, examining the photo, planning the composition, building colors and forms, finishing the performance, and saving the work. Each phase has a short explanation of the current activity. Photo effects operate on a display preview and never alter the input or retained original. Form, color, and outline effects represent processing phases, not partial drawing results. There are no invented intermediate SVGs, percentages, remaining-time estimates, or delays added for presentation. Direct DDL omits the Stage 1 display it does not execute. With system animations disabled, the same phases have static displays, and the actual work appears after saving completes.
+
+The exact photo bytes received from capture or Photo Picker are retained under app-private `filesDir/original-photos/`. Retention does not resize, recompress, or strip metadata, so any original EXIF remains in that local copy. On-device Vision continues to receive the separately normalized photo with orientation correction, a 1280 px long-edge limit, and JPEG quality 85. NIM still receives text alone; photos, URIs, local paths, and EXIF are not sent to a remote model.
+
+An original photo is associated with a successfully saved work from the camera route through an opaque filename derived from its history ID. No Room column, schema version, or migration is added, and photo bytes or local paths are not inserted into existing history metadata. The description screen shows a small preview of the associated original, including after selecting the work again. Display resizing and orientation correction apply only to the preview. Existing works are not backfilled; works without an original photo have no photo preview.
+
+Capture and input files under `cacheDir/camera/` are managed separately from the app-private pending copy. Cancellation, failure, and retry boundaries retain or reclaim the input as needed, and a failed history save leaves no finalized photo unattached to a work. Permanently deleting a saved work also deletes its associated photo. The external source selected through Photo Picker is never modified or deleted.
+
 ## Fixed Decisions
 
 - Native Android implementation in Kotlin and Jetpack Compose.

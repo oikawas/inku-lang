@@ -9,13 +9,13 @@ class CameraDevelopmentPresentationTest {
     @Test
     fun realPhasesMapToTheExactJapaneseAndEnglishDevelopmentWords() {
         val cases = listOf(
-            CameraCaptureState.PreparingImage to Triple("光を読み取っています", "Reading the light", CameraDevelopmentEffect.PaperExposure),
-            CameraCaptureState.LoadingLocalModel to Triple("光を読み取っています", "Reading the light", CameraDevelopmentEffect.PaperExposure),
-            CameraCaptureState.AnalyzingLocally to Triple("光を読み取っています", "Reading the light", CameraDevelopmentEffect.PaperExposure),
-            CameraCaptureState.InterpretingWithNim to Triple("かたちを起こしています", "Bringing out the forms", CameraDevelopmentEffect.GrainAndForms),
-            CameraCaptureState.ComposingWithNim to Triple("色と配置を定着させています", "Fixing color and placement", CameraDevelopmentEffect.VividColorFields),
-            CameraCaptureState.Rendering to Triple("現像しています", "Developing", CameraDevelopmentEffect.OutlineSettling),
-            CameraCaptureState.Saving to Triple("現像しています", "Developing", CameraDevelopmentEffect.OutlineSettling),
+            CameraCaptureState.PreparingImage to Triple("写真を準備しています", "Preparing your photo", CameraDevelopmentEffect.PhotoPreparing),
+            CameraCaptureState.LoadingLocalModel to Triple("写真を見る準備をしています", "Getting ready to examine your photo", CameraDevelopmentEffect.PhotoPreparing),
+            CameraCaptureState.AnalyzingLocally to Triple("写真の内容を調べています", "Examining your photo", CameraDevelopmentEffect.PhotoReading),
+            CameraCaptureState.InterpretingWithNim to Triple("絵の構図を考えています", "Planning the composition", CameraDevelopmentEffect.GrainAndForms),
+            CameraCaptureState.ComposingWithNim to Triple("色と形を組み立てています", "Building the colors and forms", CameraDevelopmentEffect.VividColorFields),
+            CameraCaptureState.Rendering to Triple("絵を仕上げています", "Finishing the work", CameraDevelopmentEffect.OutlineSettling),
+            CameraCaptureState.Saving to Triple("作品を保存しています", "Saving your work", CameraDevelopmentEffect.Saving),
             CameraCaptureState.Completed("history-id") to Triple("現像できました", "Developed", CameraDevelopmentEffect.FinalArtwork),
         )
 
@@ -31,6 +31,14 @@ class CameraDevelopmentPresentationTest {
             assertFalse(ja.message.contains('%'))
             assertFalse(en.message.contains("ETA", ignoreCase = true))
         }
+    }
+
+    @Test
+    fun originalPhotoControlsUseOneSetOfWordsPerLanguage() {
+        assertEquals("元の写真", cameraOriginalPhotoWords(isJapanese = true).label)
+        assertEquals("元の写真を拡大", cameraOriginalPhotoWords(isJapanese = true).enlarge)
+        assertEquals("Original photo", cameraOriginalPhotoWords(isJapanese = false).label)
+        assertEquals("Close", cameraOriginalPhotoWords(isJapanese = false).close)
     }
 
     @Test

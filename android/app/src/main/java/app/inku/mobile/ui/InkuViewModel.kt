@@ -54,6 +54,7 @@ import app.inku.mobile.pipeline.SketchInput
 import app.inku.mobile.pipeline.SketchMode
 import app.inku.mobile.pipeline.Sketches
 import app.inku.mobile.ui.camera.CameraCaptureFileStore
+import app.inku.mobile.ui.camera.CameraOriginalPhotoStore
 import app.inku.mobile.ui.camera.CameraCaptureState
 import app.inku.mobile.ui.camera.CameraInputSource
 import app.inku.mobile.ui.camera.CameraFailure
@@ -222,6 +223,7 @@ data class InkuUiState(
     val descriptionFocused: Boolean = false,
     val ddlEditorOpen: Boolean = false,
     val cameraCaptureState: CameraCaptureState = CameraCaptureState.Idle,
+    val cameraSourcePhotoPath: String? = null,
     val cameraVisionOutputMode: VisionOutputMode = VisionOutputMode.DESCRIPTION,
     val isDrawing: Boolean = false,
     val message: String? = null,
@@ -285,6 +287,7 @@ private data class CameraNimRunInput(
     val inputProvenance: CameraInputProvenance,
     val canvasAspect: String,
     val uiLanguageCode: String,
+    val originalPhoto: java.io.File,
 ) {
     val instantPrintRoute: CameraInstantPrintRoute
         get() = if (directDdl == null) CameraInstantPrintRoute.Description else CameraInstantPrintRoute.DirectDdl
@@ -435,6 +438,8 @@ class InkuViewModel @JvmOverloads constructor(
     private var cameraJob: Job? = null
     private val cameraFiles = CameraCaptureFileStore(application.applicationContext)
     private val selectedImageFiles = SelectedImageFileStore(application.cacheDir)
+    private val originalPhotos = CameraOriginalPhotoStore(application.filesDir).also { it.cleanupStagedOnce() }
+    private var stagedCameraPhoto: java.io.File? = null
     private var pendingCameraFile: java.io.File? = null
     private var pendingCameraInputSource: CameraInputSource? = null
     private var cameraStateBeforeSourceChooser: CameraCaptureState? = null
@@ -528,6 +533,7 @@ class InkuViewModel @JvmOverloads constructor(
         cameraRunSerial += 1
         cameraJob?.cancel()
         cameraFiles.delete(pendingCameraFile)
+        discardStagedCameraPhoto()
         selectedImageFiles.cleanupStaleImages()
         pendingCameraFile = null
         pendingCameraInputSource = null
@@ -604,15 +610,18 @@ class InkuViewModel @JvmOverloads constructor(
 
     private fun continuePipeline(approve: Boolean) {
         val view = localState.value.pipelineView ?: return
+        val originalPhoto = cameraRetryInput?.originalPhoto
         val runId = beginDrawingRun()
         localState.value = localState.value.copy(isDrawing = true)
         drawingJob = viewModelScope.launch {
             runCatching {
                 withContext(Dispatchers.IO) {
-                    if (approve) repository.approvePipelinePatch(view.executionId) else repository.resumePipeline(view.executionId)
+                    if (approve) repository.approvePipelinePatch(view.executionId, originalPhoto) else repository.resumePipeline(view.executionId, originalPhoto)
                 }
             }.onSuccess { item ->
                 if (!isCurrentDrawingRun(runId)) return@onSuccess
+                discardStagedCameraPhoto()
+                cameraRetryInput = null
                 adoptSavedHistory(item, activeExecution = true, isCurrent = { isCurrentDrawingRun(runId) }) { current ->
                     current.copy(
                         prompt = item.originalInput,
@@ -672,6 +681,7 @@ class InkuViewModel @JvmOverloads constructor(
         cameraRunSerial += 1
         cameraJob?.cancel()
         cameraFiles.delete(pendingCameraFile)
+        discardStagedCameraPhoto()
         pendingCameraFile = null
         pendingCameraInputSource = source
         val current = localState.value.copy(
@@ -719,6 +729,7 @@ class InkuViewModel @JvmOverloads constructor(
         pendingCameraFile = null
         localState.value = localState.value.copy(
             pipelineView = null,
+            cameraSourcePhotoPath = null,
             historyAuthority = null,
             historyAuthorityLoading = false,
         )
@@ -868,6 +879,7 @@ class InkuViewModel @JvmOverloads constructor(
         cleanup: (java.io.File?) -> Unit,
     ) {
         val coordinator = cameraCoordinator(serial)
+        var stagedPhoto: java.io.File? = null
         try {
             val outcome = coordinator.run(
                 route = cameraComposeSnapshot
@@ -876,7 +888,15 @@ class InkuViewModel @JvmOverloads constructor(
                     ?: CameraInstantPrintRoute.Description,
                 prepare = {
                     try {
-                        withContext(Dispatchers.IO) { VisionImagePreparer.prepare(file) }
+                        val prepared = withContext(Dispatchers.IO) {
+                            VisionImagePreparer.prepare(file).also {
+                                stagedPhoto = originalPhotos.stage(file)
+                            }
+                        }
+                        if (serial != cameraRunSerial) throw CancellationException("Camera input was replaced.")
+                        stagedCameraPhoto = stagedPhoto
+                        localState.value = localState.value.copy(cameraSourcePhotoPath = stagedPhoto?.absolutePath)
+                        prepared
                     } catch (error: CancellationException) {
                         throw error
                     } catch (_: Throwable) {
@@ -906,6 +926,7 @@ class InkuViewModel @JvmOverloads constructor(
                         inputProvenance = CameraInputProvenance.fromAnalysis(request, result, origin),
                         canvasAspect = cameraComposeSnapshot?.selectedCanvasAspect ?: current.selectedCanvasAspect,
                         uiLanguageCode = uiLanguageCode,
+                        originalPhoto = requireNotNull(stagedPhoto),
                     )
                 },
                 onLocalReady = { input ->
@@ -944,6 +965,15 @@ class InkuViewModel @JvmOverloads constructor(
             )
         } finally {
             cleanup(file)
+            if (serial != cameraRunSerial || cameraRetryInput?.originalPhoto != stagedPhoto) {
+                originalPhotos.deleteStaged(stagedPhoto)
+                if (stagedCameraPhoto == stagedPhoto) {
+                    stagedCameraPhoto = null
+                    if (localState.value.cameraSourcePhotoPath == stagedPhoto?.absolutePath) {
+                        localState.value = localState.value.copy(cameraSourcePhotoPath = null)
+                    }
+                }
+            }
         }
     }
 
@@ -1090,6 +1120,7 @@ class InkuViewModel @JvmOverloads constructor(
             sketch = SketchInput(),
             inputProvenance = input.inputProvenance,
             executionId = interpreted?.executionId,
+            originalPhoto = input.originalPhoto,
             onProgress = { pipelinePhase ->
                 progress(
                     when (pipelinePhase) {
@@ -1108,6 +1139,7 @@ class InkuViewModel @JvmOverloads constructor(
         if (serial != cameraRunSerial) return
         promptEditedByUser = false
         cameraRetryInput = null
+        discardStagedCameraPhoto()
         cameraComposeSnapshot = null
         adoptSavedHistory(item, activeExecution = true, isCurrent = { serial == cameraRunSerial }) { current ->
             current.copy(
@@ -1136,10 +1168,20 @@ class InkuViewModel @JvmOverloads constructor(
         )
     }
 
+    private fun discardStagedCameraPhoto() {
+        val discardedPath = stagedCameraPhoto?.absolutePath
+        originalPhotos.deleteStaged(stagedCameraPhoto)
+        stagedCameraPhoto = null
+        if (discardedPath != null && localState.value.cameraSourcePhotoPath == discardedPath) {
+            localState.value = localState.value.copy(cameraSourcePhotoPath = null)
+        }
+    }
+
     private fun restoreCameraComposeSnapshot() {
         val snapshot = cameraComposeSnapshot
         cameraComposeSnapshot = null
         cameraRetryInput = null
+        discardStagedCameraPhoto()
         pendingCameraInputSource = null
         localState.value = (snapshot ?: localState.value).copy(
             cameraCaptureState = CameraCaptureState.Idle,
@@ -1184,6 +1226,8 @@ class InkuViewModel @JvmOverloads constructor(
 
     fun clearPrompt() {
         if (state.value.isDrawing) return
+        discardStagedCameraPhoto()
+        cameraRetryInput = null
         promptEditedByUser = true
         localState.value = localState.value.copy(
             prompt = "",
@@ -1193,6 +1237,7 @@ class InkuViewModel @JvmOverloads constructor(
             historyAuthorityLoading = false,
             descriptionForkRequested = false,
             selectedHistory = null,
+            cameraSourcePhotoPath = null,
             lineageDetached = true,
             ddlEditedAfterGeneration = false,
             cameraCaptureState = localState.value.cameraCaptureState.clearCameraOrigin(),
@@ -1627,6 +1672,8 @@ class InkuViewModel @JvmOverloads constructor(
      */
     private fun applyHistorySelection(item: HistoryItemEntity, tab: AppTab) {
         if (localState.value.isDrawing) stopDrawing()
+        discardStagedCameraPhoto()
+        cameraRetryInput = null
         restoredInitialHistory = true
         promptEditedByUser = false
         adoptSavedHistory(item) { current ->
@@ -1656,6 +1703,7 @@ class InkuViewModel @JvmOverloads constructor(
     ) {
         localState.value = update(localState.value).copy(
             selectedHistory = item,
+            cameraSourcePhotoPath = originalPhotos.savedPhoto(item.id)?.absolutePath,
             pipelineView = null,
             historyAuthority = null,
             historyAuthorityLoading = true,

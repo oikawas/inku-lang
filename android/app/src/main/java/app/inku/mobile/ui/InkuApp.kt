@@ -19,6 +19,7 @@ import android.content.Intent
 import android.content.ClipData
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.ImageDecoder
 import android.graphics.Matrix
 import android.net.Uri
 import android.provider.Settings
@@ -211,6 +212,8 @@ import app.inku.mobile.ui.camera.CameraCaptureState
 import app.inku.mobile.ui.camera.CameraDevelopmentEffect
 import app.inku.mobile.ui.camera.CameraFailure
 import app.inku.mobile.ui.camera.CameraInputSource
+import app.inku.mobile.ui.camera.CameraOriginalPhotoStore
+import app.inku.mobile.ui.camera.cameraOriginalPhotoWords
 import app.inku.mobile.ui.camera.cameraDevelopmentPresentation
 import app.inku.mobile.ui.camera.locksCameraInteraction
 import app.inku.mobile.render.NativeRenderBridge
@@ -1444,8 +1447,22 @@ private fun ComposeScreen(state: InkuUiState, viewModel: InkuViewModel) {
                         SecondarySmallButton(S.newWork, onClick = viewModel::clearPrompt)
                     }
                 }
-                state.selectedHistory?.originalInput?.takeIf { it.isNotBlank() }?.let {
-                    Text(it, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface)
+                state.selectedHistory?.originalInput?.takeIf { it.isNotBlank() }?.let { originalInput ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM),
+                        verticalAlignment = Alignment.Top,
+                    ) {
+                        Text(
+                            originalInput,
+                            modifier = Modifier.weight(1f),
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
+                        if (!showEditor) {
+                            CameraOriginalPhotoThumbnail(state.cameraSourcePhotoPath, state.uiLanguage.isEnglish)
+                        }
+                    }
                 }
                 if (!showEditor) {
                     TextButton(onClick = { resultInterpretationOpen = !resultInterpretationOpen }) { Text(S.interpretationToggle) }
@@ -1524,6 +1541,7 @@ private fun CameraDevelopmentSurface(state: InkuUiState, viewModel: InkuViewMode
         isJapanese = !state.uiLanguage.isEnglish,
         animationsEnabled = animationsEnabled,
     ) ?: return
+    val sourcePhoto = rememberCameraOriginalPhoto(state.cameraSourcePhotoPath, maxEdge = 960)
     val pulse = if (presentation.animationsEnabled) {
         val transition = rememberInfiniteTransition(label = "camera-development")
         val value by transition.animateFloat(
@@ -1548,10 +1566,6 @@ private fun CameraDevelopmentSurface(state: InkuUiState, viewModel: InkuViewMode
                         awaitPointerEvent(PointerEventPass.Final).changes.forEach { it.consume() }
                     }
                 }
-            }
-            .semantics {
-                contentDescription = presentation.message
-                if (presentation.politeLiveRegion) liveRegion = LiveRegionMode.Polite
             },
         color = CameraDevelopmentBackdrop,
     ) {
@@ -1570,24 +1584,32 @@ private fun CameraDevelopmentSurface(state: InkuUiState, viewModel: InkuViewMode
                     CameraDevelopmentEffectCanvas(
                         effect = presentation.effect,
                         pulse = pulse,
+                        photo = sourcePhoto,
+                        photoLabel = cameraOriginalPhotoWords(!state.uiLanguage.isEnglish).label,
                         modifier = Modifier.fillMaxWidth().weight(1f),
                     )
                     Text(
                         presentation.message,
+                        modifier = Modifier.semantics {
+                            if (presentation.politeLiveRegion) liveRegion = LiveRegionMode.Polite
+                        },
                         style = MaterialTheme.typography.titleMedium,
                         color = CameraDevelopmentInk,
                         textAlign = TextAlign.Center,
                     )
-                    cameraStatusText(state.cameraCaptureState)
-                        ?.takeIf { it != presentation.message }
-                        ?.let { detail ->
-                            Text(
-                                state.message?.takeIf(String::isNotBlank) ?: detail,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = CameraDevelopmentMutedInk,
-                                textAlign = TextAlign.Center,
-                            )
-                        }
+                    val detail = if (state.cameraCaptureState is CameraCaptureState.Failed) {
+                        state.message?.takeIf { it.isNotBlank() && it != presentation.message }
+                    } else {
+                        null
+                    }
+                    detail?.let {
+                        Text(
+                            it,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = CameraDevelopmentMutedInk,
+                            textAlign = TextAlign.Center,
+                        )
+                    }
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM, Alignment.CenterHorizontally),
@@ -1617,6 +1639,8 @@ private fun CameraDevelopmentSurface(state: InkuUiState, viewModel: InkuViewMode
 private fun CameraDevelopmentEffectCanvas(
     effect: CameraDevelopmentEffect,
     pulse: Float,
+    photo: ImageBitmap?,
+    photoLabel: String,
     modifier: Modifier = Modifier,
 ) {
     val vivid = listOf(
@@ -1627,16 +1651,30 @@ private fun CameraDevelopmentEffectCanvas(
         CameraDevelopmentVividPurple,
         CameraDevelopmentVividYellow,
     )
-    Canvas(modifier = modifier.clipToBounds()) {
-        drawRect(CameraDevelopmentCanvasPaper)
-        when (effect) {
-            CameraDevelopmentEffect.PaperExposure -> {
-                drawCircle(CameraDevelopmentExposureGlow.copy(alpha = 0.16f + pulse * 0.18f), radius = size.minDimension * 0.38f, center = center)
+    Box(modifier = modifier.clipToBounds()) {
+        if (photo != null) {
+            Image(
+                bitmap = photo,
+                contentDescription = null,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop,
+            )
+        }
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            if (photo == null) drawRect(CameraDevelopmentCanvasPaper)
+            when (effect) {
+            CameraDevelopmentEffect.PhotoPreparing -> {
+                drawCircle(CameraDevelopmentExposureGlow.copy(alpha = 0.08f + pulse * 0.12f), radius = size.minDimension * 0.38f, center = center)
                 repeat(18) { index ->
                     val x = size.width * ((index * 37 % 101) / 100f)
                     val y = size.height * ((index * 61 % 97) / 96f)
                     drawCircle(CameraDevelopmentGrain.copy(alpha = 0.08f + pulse * 0.06f), 1.5f + index % 3, Offset(x, y))
                 }
+            }
+            CameraDevelopmentEffect.PhotoReading -> {
+                val y = size.height * (0.1f + pulse * 0.8f)
+                drawRect(CameraDevelopmentExposureGlow.copy(alpha = 0.08f), topLeft = Offset(0f, y - size.height * 0.06f), size = Size(size.width, size.height * 0.12f))
+                drawLine(CameraDevelopmentExposureGlow.copy(alpha = 0.56f), Offset(0f, y), Offset(size.width, y), strokeWidth = 2.dp.toPx())
             }
             CameraDevelopmentEffect.GrainAndForms -> {
                 repeat(8) { index ->
@@ -1673,7 +1711,100 @@ private fun CameraDevelopmentEffectCanvas(
                     )
                 }
             }
+            CameraDevelopmentEffect.Saving -> {
+                drawRect(
+                    CameraDevelopmentOutline.copy(alpha = 0.45f + pulse * 0.25f),
+                    style = Stroke(width = 3.dp.toPx()),
+                )
+            }
             CameraDevelopmentEffect.FinalArtwork -> Unit
+            }
+        }
+        if (photo != null) {
+            Text(
+                photoLabel,
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .background(CameraDevelopmentBackdrop.copy(alpha = 0.8f))
+                    .padding(horizontal = Dimens.spaceM, vertical = Dimens.spaceXs),
+                style = MaterialTheme.typography.labelSmall,
+                color = CameraDevelopmentPaper,
+            )
+        }
+    }
+}
+
+@Composable
+private fun rememberCameraOriginalPhoto(path: String?, maxEdge: Int): ImageBitmap? {
+    val context = LocalContext.current
+    val image by produceState<ImageBitmap?>(initialValue = null, path, maxEdge) {
+        value = withContext(Dispatchers.IO) {
+            runCatching {
+                val file = path?.let(::File) ?: return@runCatching null
+                if (!CameraOriginalPhotoStore(context.filesDir).isOwnedPhoto(file)) return@runCatching null
+                ImageDecoder.decodeBitmap(ImageDecoder.createSource(file)) { decoder, info, _ ->
+                    val width = info.size.width
+                    val height = info.size.height
+                    val longEdge = maxOf(width, height)
+                    if (longEdge > maxEdge) {
+                        decoder.setTargetSize(
+                            maxOf(1, (width.toLong() * maxEdge / longEdge).toInt()),
+                            maxOf(1, (height.toLong() * maxEdge / longEdge).toInt()),
+                        )
+                    }
+                    decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
+                }.asImageBitmap()
+            }.getOrNull()
+        }
+    }
+    return image
+}
+
+@Composable
+private fun CameraOriginalPhotoThumbnail(path: String?, isEnglish: Boolean) {
+    if (path.isNullOrBlank()) return
+    val photo = rememberCameraOriginalPhoto(path, maxEdge = 256) ?: return
+    val words = cameraOriginalPhotoWords(!isEnglish)
+    var expanded by remember(path) { mutableStateOf(false) }
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(words.label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Surface(
+            modifier = Modifier
+                .size(72.dp)
+                .semantics { contentDescription = words.enlarge; role = Role.Button }
+                .clickable { expanded = true },
+            shape = RoundedCornerShape(Dimens.radiusCard),
+            color = MaterialTheme.colorScheme.surface,
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        ) {
+            Image(
+                bitmap = photo,
+                contentDescription = null,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Fit,
+            )
+        }
+    }
+    if (expanded) {
+        val largePhoto = rememberCameraOriginalPhoto(path, maxEdge = 1400)
+        Dialog(onDismissRequest = { expanded = false }) {
+            Surface(shape = RoundedCornerShape(Dimens.radiusCard), color = MaterialTheme.colorScheme.surface) {
+                Column(
+                    modifier = Modifier.fillMaxWidth().padding(Dimens.spaceL),
+                    verticalArrangement = Arrangement.spacedBy(Dimens.spaceM),
+                ) {
+                    Text(words.label, style = MaterialTheme.typography.titleMedium)
+                    Image(
+                        bitmap = largePhoto ?: photo,
+                        contentDescription = words.label,
+                        modifier = Modifier.fillMaxWidth().height(360.dp),
+                        contentScale = ContentScale.Fit,
+                    )
+                    TextButton(onClick = { expanded = false }, modifier = Modifier.align(Alignment.End)) {
+                        Text(words.close)
+                    }
+                }
+            }
         }
     }
 }
@@ -2330,18 +2461,25 @@ private fun DrawPanel(
                 Text(S.pipelineNewDescription)
             }
         }
-        DenseMultilineInput(
-            value = state.prompt,
-            onValueChange = viewModel::setPrompt,
-            modifier = Modifier
-                .fillMaxWidth()
-                .testTag(DESCRIPTION_INPUT_TAG)
-                .onGloballyPositioned { onDescriptionPositioned(it.positionInWindow().y) },
-            minLines = 3,
-            maxLines = 8,
-            enabled = !state.descriptionLocked && !state.isDrawing,
-            onFocusChanged = onDescriptionFocusChanged,
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM),
+            verticalAlignment = Alignment.Top,
+        ) {
+            DenseMultilineInput(
+                value = state.prompt,
+                onValueChange = viewModel::setPrompt,
+                modifier = Modifier
+                    .weight(1f)
+                    .testTag(DESCRIPTION_INPUT_TAG)
+                    .onGloballyPositioned { onDescriptionPositioned(it.positionInWindow().y) },
+                minLines = 3,
+                maxLines = 8,
+                enabled = !state.descriptionLocked && !state.isDrawing,
+                onFocusChanged = onDescriptionFocusChanged,
+            )
+            CameraOriginalPhotoThumbnail(state.cameraSourcePhotoPath, state.uiLanguage.isEnglish)
+        }
         cameraStatusText(state.cameraCaptureState)?.let { cameraStatus ->
             Text(
                 cameraStatus,

@@ -1,10 +1,12 @@
 package app.inku.mobile.ui.camera
 
 internal enum class CameraDevelopmentEffect {
-    PaperExposure,
+    PhotoPreparing,
+    PhotoReading,
     GrainAndForms,
     VividColorFields,
     OutlineSettling,
+    Saving,
     FinalArtwork,
 }
 
@@ -23,23 +25,31 @@ internal fun cameraDevelopmentPresentation(
     animationsEnabled: Boolean,
 ): CameraDevelopmentPresentation? {
     val words = when (state) {
-        CameraCaptureState.PreparingImage,
-        CameraCaptureState.LoadingLocalModel,
-        CameraCaptureState.AnalyzingLocally,
-        -> Triple("光を読み取っています", "Reading the light", CameraDevelopmentEffect.PaperExposure)
+        CameraCaptureState.PreparingImage -> Triple(
+            "写真を準備しています", "Preparing your photo", CameraDevelopmentEffect.PhotoPreparing,
+        )
+        CameraCaptureState.LoadingLocalModel -> Triple(
+            "写真を見る準備をしています", "Getting ready to examine your photo", CameraDevelopmentEffect.PhotoPreparing,
+        )
+        CameraCaptureState.AnalyzingLocally -> Triple(
+            "写真の内容を調べています", "Examining your photo", CameraDevelopmentEffect.PhotoReading,
+        )
         CameraCaptureState.InterpretingWithNim -> Triple(
-            "かたちを起こしています",
-            "Bringing out the forms",
+            "絵の構図を考えています",
+            "Planning the composition",
             CameraDevelopmentEffect.GrainAndForms,
         )
         CameraCaptureState.ComposingWithNim -> Triple(
-            "色と配置を定着させています",
-            "Fixing color and placement",
+            "色と形を組み立てています",
+            "Building the colors and forms",
             CameraDevelopmentEffect.VividColorFields,
         )
-        CameraCaptureState.Rendering,
-        CameraCaptureState.Saving,
-        -> Triple("現像しています", "Developing", CameraDevelopmentEffect.OutlineSettling)
+        CameraCaptureState.Rendering -> Triple(
+            "絵を仕上げています", "Finishing the work", CameraDevelopmentEffect.OutlineSettling,
+        )
+        CameraCaptureState.Saving -> Triple(
+            "作品を保存しています", "Saving your work", CameraDevelopmentEffect.Saving,
+        )
         is CameraCaptureState.Completed -> Triple(
             "現像できました",
             "Developed",
@@ -48,12 +58,12 @@ internal fun cameraDevelopmentPresentation(
         CameraCaptureState.Cancelling -> Triple(
             "取り消しています",
             "Cancelling",
-            CameraDevelopmentEffect.PaperExposure,
+            CameraDevelopmentEffect.PhotoPreparing,
         )
         is CameraCaptureState.Failed -> Triple(
             if (state.reason.isNimFailure) "現像に失敗しました" else "画像処理に失敗しました",
             if (state.reason.isNimFailure) "Development failed" else "Image processing failed",
-            if (state.reason.isNimFailure) CameraDevelopmentEffect.OutlineSettling else CameraDevelopmentEffect.PaperExposure,
+            if (state.reason.isNimFailure) CameraDevelopmentEffect.OutlineSettling else CameraDevelopmentEffect.PhotoPreparing,
         )
         else -> return null
     }
@@ -68,3 +78,16 @@ internal fun cameraDevelopmentPresentation(
 
 private val CameraFailure.isNimFailure: Boolean
     get() = this == CameraFailure.NimFailed || this == CameraFailure.NimFailedDirectDdl
+
+internal data class CameraOriginalPhotoWords(
+    val label: String,
+    val enlarge: String,
+    val close: String,
+)
+
+internal fun cameraOriginalPhotoWords(isJapanese: Boolean): CameraOriginalPhotoWords =
+    if (isJapanese) {
+        CameraOriginalPhotoWords("元の写真", "元の写真を拡大", "閉じる")
+    } else {
+        CameraOriginalPhotoWords("Original photo", "Enlarge original photo", "Close")
+    }

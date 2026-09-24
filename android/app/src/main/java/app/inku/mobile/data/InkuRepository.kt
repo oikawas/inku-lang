@@ -105,6 +105,7 @@ class InkuRepository(
     }
     private val modelDownloader = LocalModelDownloader(context.applicationContext, database.modelAssetDao())
     private val thumbnailScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val originalPhotos = app.inku.mobile.ui.camera.CameraOriginalPhotoStore(context.filesDir)
 
     fun history(): Flow<List<HistoryListItem>> = database.historyDao().listActiveSummaries(100, 0)
 
@@ -172,13 +173,13 @@ class InkuRepository(
 
     suspend fun cancelPipeline(executionId: String): PipelineView = pipeline.cancel(executionId)
 
-    suspend fun approvePipelinePatch(executionId: String): HistoryItemEntity =
-        saveResumedPerformance(pipeline.approvePatch(executionId))
+    suspend fun approvePipelinePatch(executionId: String, originalPhoto: File? = null): HistoryItemEntity =
+        saveResumedPerformance(pipeline.approvePatch(executionId), originalPhoto)
 
-    suspend fun resumePipeline(executionId: String): HistoryItemEntity =
-        saveResumedPerformance(pipeline.resume(executionId))
+    suspend fun resumePipeline(executionId: String, originalPhoto: File? = null): HistoryItemEntity =
+        saveResumedPerformance(pipeline.resume(executionId), originalPhoto)
 
-    private suspend fun saveResumedPerformance(result: PaintResult): HistoryItemEntity {
+    private suspend fun saveResumedPerformance(result: PaintResult, originalPhoto: File? = null): HistoryItemEntity {
         val metadata = JSONObject(result.renderMetadataJson)
         val parent = metadata.optString("parent_history_id").takeIf { it.isNotBlank() }
             ?.let { database.historyDao().getById(it) }
@@ -197,6 +198,7 @@ class InkuRepository(
             metadata.optString("stage2_model"),
             elapsedMs = 0,
             lineage = lineage,
+            originalPhoto = originalPhoto,
         )
     }
 
@@ -568,7 +570,7 @@ class InkuRepository(
         )
     }
 
-    suspend fun composeFromDdl(description: String, ddl: String, catalogId: String, canvasAspect: String, stage1ModelId: String, stage2ModelId: String, autoRepair: Boolean = true, litertStage1PromptOptimization: Boolean = false, lineage: LineageDeclaration = LineageDeclaration(), historyVisibility: String? = null, seeds: PaintSeeds = PaintSeeds(), instructionLang: String? = null, uiLang: String? = null, sourceText: String? = null, sketch: SketchInput = SketchInput(), inputProvenance: CameraInputProvenance? = null, onProgress: suspend (ComposeFromDdlProgress) -> Unit = {}, beforeSave: suspend () -> Unit = {}, parentHistoryId: String? = null, executionId: String? = null): HistoryItemEntity {
+    suspend fun composeFromDdl(description: String, ddl: String, catalogId: String, canvasAspect: String, stage1ModelId: String, stage2ModelId: String, autoRepair: Boolean = true, litertStage1PromptOptimization: Boolean = false, lineage: LineageDeclaration = LineageDeclaration(), historyVisibility: String? = null, seeds: PaintSeeds = PaintSeeds(), instructionLang: String? = null, uiLang: String? = null, sourceText: String? = null, sketch: SketchInput = SketchInput(), inputProvenance: CameraInputProvenance? = null, onProgress: suspend (ComposeFromDdlProgress) -> Unit = {}, beforeSave: suspend () -> Unit = {}, parentHistoryId: String? = null, executionId: String? = null, originalPhoto: File? = null): HistoryItemEntity {
         val started = System.currentTimeMillis()
         val result = pipeline.composeFromDdl(
             ddl,
@@ -601,7 +603,7 @@ class InkuRepository(
         currentCoroutineContext().ensureActive()
         beforeSave()
         currentCoroutineContext().ensureActive()
-        return saveResult(result, catalogId, canvasAspect, stage1ModelId, stage2ModelId, System.currentTimeMillis() - started, lineage = lineage, historyVisibility = historyVisibility, sourceText = sourceText, inputProvenance = inputProvenance)
+        return saveResult(result, catalogId, canvasAspect, stage1ModelId, stage2ModelId, System.currentTimeMillis() - started, lineage = lineage, historyVisibility = historyVisibility, sourceText = sourceText, inputProvenance = inputProvenance, originalPhoto = originalPhoto)
     }
 
     suspend fun generateDemoPrompt(seedPhrase: String, modelId: String): String {
@@ -745,7 +747,7 @@ class InkuRepository(
         historyVisibility = historyVisibility,
     )
 
-    private suspend fun saveResult(result: PaintResult, catalogId: String, canvasAspect: String, stage1ModelId: String, stage2ModelId: String, elapsedMs: Long, historyInput: String? = null, lineage: LineageDeclaration = LineageDeclaration(), historyVisibility: String? = null, sourceText: String? = null, inputProvenance: CameraInputProvenance? = null): HistoryItemEntity {
+    private suspend fun saveResult(result: PaintResult, catalogId: String, canvasAspect: String, stage1ModelId: String, stage2ModelId: String, elapsedMs: Long, historyInput: String? = null, lineage: LineageDeclaration = LineageDeclaration(), historyVisibility: String? = null, sourceText: String? = null, inputProvenance: CameraInputProvenance? = null, originalPhoto: File? = null): HistoryItemEntity {
         val now = System.currentTimeMillis()
         // The server writes every one of these as a string
         // (`db.py:2090-2097`), including the numeric ones.
@@ -764,6 +766,7 @@ class InkuRepository(
             check(saved.normalizedDdl == result.normalizedDdl && saved.renderHash == result.renderHash) {
                 "pipeline_history_identity_conflict"
             }
+            originalPhoto?.let { originalPhotos.persist(historyId, it) }
             return saved
         }
         val originalInput = historyInput ?: result.originalInput
@@ -832,20 +835,26 @@ class InkuRepository(
         // One transaction, and the edge after the node: the edge points at a
         // child that has to exist first. A failing edge takes the node and the
         // history row down with it, the way the server's rollback does.
-        result.managedHistoryLink?.let { link ->
-            sharedPipelineStore.saveManagedHistory(item, write, link)
-            scheduleThumbnailGeneration(item.id, result.displaySvg, result.renderHash)
-            return item
-        }
-        result.managedHistoryReplay?.let { replay ->
-            sharedPipelineStore.saveManagedReplayHistory(item, write, replay)
-            scheduleThumbnailGeneration(item.id, result.displaySvg, result.renderHash)
-            return item
-        }
-        database.withTransaction {
-            database.historyDao().insert(item)
-            database.lineageDao().insertNode(write.node)
-            write.edge?.let { database.lineageDao().insertEdge(it) }
+        val photoExisted = originalPhotos.savedPhoto(historyId) != null
+        val attachedPhoto = originalPhoto?.let { originalPhotos.persist(historyId, it) }
+        try {
+            when {
+                result.managedHistoryLink != null -> sharedPipelineStore.saveManagedHistory(item, write, result.managedHistoryLink)
+                result.managedHistoryReplay != null -> sharedPipelineStore.saveManagedReplayHistory(item, write, result.managedHistoryReplay)
+                else -> database.withTransaction {
+                    database.historyDao().insert(item)
+                    database.lineageDao().insertNode(write.node)
+                    write.edge?.let { database.lineageDao().insertEdge(it) }
+                }
+            }
+        } catch (error: Throwable) {
+            // Cancellation can race a committed transaction; keep any committed row's photo.
+            if (attachedPhoto != null && !photoExisted) {
+                kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) {
+                    if (database.historyDao().getById(historyId) == null) originalPhotos.deleteSaved(historyId)
+                }
+            }
+            throw error
         }
         scheduleThumbnailGeneration(item.id, result.displaySvg, result.renderHash)
         return item
@@ -891,6 +900,7 @@ class InkuRepository(
 
     suspend fun deleteHistoryPermanently(id: String) {
         database.historyDao().deletePermanently(id)
+        originalPhotos.deleteSaved(id)
     }
 
     private fun modelSpec(modelId: String): ModelDownloadSpec {

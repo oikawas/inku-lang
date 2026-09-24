@@ -6,6 +6,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 36 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-24 — Many large oil-paint fills no longer produce an oversized SVG
+
+Forty full-width oil-paint squares produced a 50.7 MB SVG, above the 12 MiB production limit and the 8 MiB shared rasterizer limit: every oil interior fill laid down up to about 65 loaded passes, each with a body and eight ridge paths, and the resource budget bounds only the number of marks. One oil interior fill now lays down at most 24 passes, and all oil interior fills of a work share 120 passes (at least 3 each), widening passes instead. The same work now renders at 6.3 MB. Render engine 67 (this edition).
+
 ### 2026-09-24 — Grounds and surfaces are written without headings
 
 The specification described headed forms, 「地: ...」 for the support and 「面: ...」 for a shape's surface, but the typed compiler never read the headings: 「地: 和紙。」 became an unresolved clause and 「地: 薄墨。」 or 「面: 塗り。」 stopped the whole work. The specification now matches the compiler: a ground is a sentence of its own such as 「和紙。」 or 「薄墨地。」, and a surface quality is a modifier of its shape such as 「薄墨の円」. Headed forms are not accepted. The Stage 1 work plan already prints these forms. The legacy prompt templates and their golden fixtures keep their recorded wording for replay. Compiler behavior, DDL, Score, and render versions are unchanged.

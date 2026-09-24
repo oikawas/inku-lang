@@ -79,6 +79,9 @@ pub struct MarkContext<'a> {
     pub profile: SvgProfile,
     pub support: Support,
     pub geometry_transform: crate::affine::AffineTransform,
+    /// Most loaded passes one oil-paint interior fill may lay down, shared out
+    /// of a document-wide budget so many large oil fills stay bounded.
+    pub oil_fill_pass_limit: usize,
 }
 
 impl MarkContext<'_> {

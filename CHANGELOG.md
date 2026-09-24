@@ -6,6 +6,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 36 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-24 — Match History strip filters to the Library
+
+The History strip's Starred, Revision mark, and Shared filters now use the Library's supporting label, inactive surface and border, and active fill with a fixed-width check mark. Assistive technology receives the pressed state, and the filter group moves to its own row on narrow widths so it does not overlap page controls. Filter conditions, actions, and the existing locked behavior are unchanged.
+
 ### 2026-09-24 — Make Library filter state easier to identify
 
 The Library's Starred, Revision marks, and Shared filters are now grouped under a label. Inactive buttons have outlines that identify them as controls, while active buttons use a fill and a check mark. Keyboard focus and assistive technology also receive the selected state. Filter combinations, search, and retained state when moving between screens are unchanged.

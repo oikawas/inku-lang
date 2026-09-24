@@ -694,7 +694,7 @@
 				onOpenChange={(open) => (directActionMenuOpen = open)}
 				onAction={runDirectWorkAction}
 			/>
-		{:else if result}
+		{:else if result && !generationLocked}
 			<span class="work-action-save-first" role="status">{t().workActionSaveFirst}</span>
 		{/if}
 	</div>

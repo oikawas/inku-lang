@@ -331,6 +331,7 @@ usage: inku-cli paint [-h] [--base-url BASE_URL]
                       [--render-seed RENDER_SEED]
                       [--composition-seed COMPOSITION_SEED]
                       [--seed-text SEED_TEXT] [--sketch]
+                      [--sketch-mode {auto,off,always}]
                       [--sketch-grain {fine,coarse}]
                       [--sketch-text SKETCH_TEXT]
                       [--variation-amplitude {small,medium,large}]
@@ -384,16 +385,20 @@ options:
   --seed-text SEED_TEXT
                         explicit text used only to derive the renderer
                         performance seed
-  --sketch              run the description through the sketch-from-life layer
-                        (Stage 0.5) before Stage 1, so the later stages read
-                        the sketch instead of the description; server default
-                        is off, the web UI default is fine
+  --sketch              run the sketch before Stage 1 in auto mode: it
+                        supplements place and light beside the description
+                        only when the description lacks cues; server default
+                        is off, the web UI default is auto
+  --sketch-mode {auto,off,always}
+                        when to sketch: auto (only when the description lacks
+                        cues), off, or always (supplement even stated cues);
+                        overrides --sketch
   --sketch-grain {fine,coarse}
-                        how finely Stage 0.5 breaks the description apart:
-                        fine (server default) or coarse
+                        the retired Stage 0.5 grain; kept for replaying saved
+                        works and unused by the current sketch
   --sketch-text SKETCH_TEXT
-                        use this sketch text instead of calling Stage 0.5
-                        (replay of a saved or hand-edited sketch)
+                        use this sketch text as it stands instead of asking
+                        for one (replay of a saved or hand-edited sketch)
   --variation-amplitude {small,medium,large}
                         how far the variation layer moves the expansion axes;
                         takes effect only together with --variation-seed
@@ -449,6 +454,7 @@ usage: inku-cli batch [-h] [--base-url BASE_URL]
                       [--render-seed RENDER_SEED]
                       [--composition-seed COMPOSITION_SEED]
                       [--seed-text SEED_TEXT] [--sketch]
+                      [--sketch-mode {auto,off,always}]
                       [--sketch-grain {fine,coarse}]
                       [--sketch-text SKETCH_TEXT]
                       [--variation-amplitude {small,medium,large}]
@@ -501,16 +507,20 @@ options:
   --seed-text SEED_TEXT
                         explicit text used only to derive the renderer
                         performance seed
-  --sketch              run the description through the sketch-from-life layer
-                        (Stage 0.5) before Stage 1, so the later stages read
-                        the sketch instead of the description; server default
-                        is off, the web UI default is fine
+  --sketch              run the sketch before Stage 1 in auto mode: it
+                        supplements place and light beside the description
+                        only when the description lacks cues; server default
+                        is off, the web UI default is auto
+  --sketch-mode {auto,off,always}
+                        when to sketch: auto (only when the description lacks
+                        cues), off, or always (supplement even stated cues);
+                        overrides --sketch
   --sketch-grain {fine,coarse}
-                        how finely Stage 0.5 breaks the description apart:
-                        fine (server default) or coarse
+                        the retired Stage 0.5 grain; kept for replaying saved
+                        works and unused by the current sketch
   --sketch-text SKETCH_TEXT
-                        use this sketch text instead of calling Stage 0.5
-                        (replay of a saved or hand-edited sketch)
+                        use this sketch text as it stands instead of asking
+                        for one (replay of a saved or hand-edited sketch)
   --variation-amplitude {small,medium,large}
                         how far the variation layer moves the expansion axes;
                         takes effect only together with --variation-seed

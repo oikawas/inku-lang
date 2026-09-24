@@ -118,7 +118,7 @@ def test_paint_409_exposes_persisted_compiler_failure_detail(
     effects = ProductPipelineEffects(binding, manifest)
 
     class RejectedProvider:
-        def __init__(self, _options):
+        def __init__(self, _options, **_kwargs):
             pass
 
         def __call__(self, action):
@@ -243,9 +243,10 @@ def test_description_pipeline_forces_typed_stage1_transport_and_renders_svg(
     monkeypatch.setattr(
         pipeline_product,
         "SingleAttemptProvider",
-        lambda options: provider_class(
+        lambda options, **kwargs: provider_class(
             options,
             transport=httpx.MockTransport(respond),
+            **kwargs,
         ),
     )
 
@@ -332,7 +333,7 @@ def test_a_supplementing_sketch_reaches_stage1_and_is_saved(tmp_path, monkeypatc
     })
     provider_class = pipeline_provider.SingleAttemptProvider
     monkeypatch.setattr(pipeline_product, "SingleAttemptProvider",
-                        lambda options: provider_class(options, transport=httpx.MockTransport(respond)))
+                        lambda options, **kwargs: provider_class(options, transport=httpx.MockTransport(respond)))
 
     pipeline_runtime.shutdown()
     try:

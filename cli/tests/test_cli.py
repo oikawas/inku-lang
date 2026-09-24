@@ -1927,7 +1927,7 @@ def test_the_sketch_help_says_whose_default_it_is():
     )
     help_text = (action.help or "").lower()
     assert "server default is off" in help_text
-    assert "web" in help_text and "fine" in help_text
+    assert "web" in help_text and "auto" in help_text
 
 
 def test_sketch_fields_reach_the_artifact_summary():

@@ -108,12 +108,12 @@ uv run inku-cli review evaluate ./test_output/refine-layout-xxxx.png --model nvi
 
 | 旗 | サーバー既定 | Web UI既定 |
 |---|---|---|
-| `--sketch` / `--sketch-grain` | 切 | 細かく（`fine`） |
+| `--sketch` / `--sketch-mode` | 切 | 自動（`auto`） |
 | `--wild` | 切 | ユーザー設定（既定は切） |
 | `--catalog-mode` | `fixed` | ユーザー設定 |
 
 ```sh
-uv run inku-cli paint "TEXT" --sketch --sketch-grain fine --catalog-mode auto -o ./out --png
+uv run inku-cli paint "TEXT" --sketch-mode auto --catalog-mode auto -o ./out --png
 ```
 
 変奏は `--variation-amplitude` と `--variation-seed` の**両方が揃ったときだけ**効きます。片方だけ渡しても展開層の軸は動かず、応答は既定のまま返るので、旗を渡したこと自体は成功の証拠になりません。**動いたかどうかは作品の`variation`と`variation_seed`を読んで確かめてください。**

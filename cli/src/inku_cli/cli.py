@@ -1987,6 +1987,7 @@ def _paint_payload(
         # sent explicitly on every run and change the request shape of every
         # existing bench. `include_trace` above already uses this idiom.
         "sketch": bool(getattr(args, "sketch", False)) or None,
+        "sketch_mode": getattr(args, "sketch_mode", None),
         "sketch_grain": getattr(args, "sketch_grain", None),
         "sketch_text": getattr(args, "sketch_text", None),
         "variation_amplitude": getattr(args, "variation_amplitude", None),
@@ -3903,16 +3904,21 @@ def _add_paint_args(parser: argparse.ArgumentParser, *, batch: bool = False) -> 
     parser.add_argument(
         "--sketch",
         action="store_true",
-        help="run the description through the sketch-from-life layer (Stage 0.5) before Stage 1, so the later stages read the sketch instead of the description; server default is off, the web UI default is fine",
+        help="run the sketch before Stage 1 in auto mode: it supplements place and light beside the description only when the description lacks cues; server default is off, the web UI default is auto",
+    )
+    parser.add_argument(
+        "--sketch-mode",
+        choices=["auto", "off", "always"],
+        help="when to sketch: auto (only when the description lacks cues), off, or always (supplement even stated cues); overrides --sketch",
     )
     parser.add_argument(
         "--sketch-grain",
         choices=["fine", "coarse"],
-        help="how finely Stage 0.5 breaks the description apart: fine (server default) or coarse",
+        help="the retired Stage 0.5 grain; kept for replaying saved works and unused by the current sketch",
     )
     parser.add_argument(
         "--sketch-text",
-        help="use this sketch text instead of calling Stage 0.5 (replay of a saved or hand-edited sketch)",
+        help="use this sketch text as it stands instead of asking for one (replay of a saved or hand-edited sketch)",
     )
     parser.add_argument(
         "--variation-amplitude",

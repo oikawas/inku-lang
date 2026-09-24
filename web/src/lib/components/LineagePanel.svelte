@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { hashDigest, hashSchemeLabel, shortHashDigest } from '$lib/hashIdentity';
+	import { hashDigest, hashSchemeLabel } from '$lib/hashIdentity';
 	import { onMount, tick, untrack } from 'svelte';
 	import type { HistoryItem } from '$lib/historyManagerState.svelte';
 	import HistoryThumbnail from './HistoryThumbnail.svelte';
@@ -217,24 +217,29 @@
 	});
 
 
-	// The details row shows the hash abbreviated, so the button copies the whole
-	// value the way the history manager does -- a truncated hash identifies nothing.
-	let copiedHashNodeId = $state<string | null>(null);
+	// The details show only a suffix; each button copies its complete digest.
+	let copiedHashKey = $state<string | null>(null);
 	let copiedHashTimer: ReturnType<typeof setTimeout> | null = null;
 
-	function copyRenderHash(node: LineageNode, event: MouseEvent): void {
+	function hashSuffix(value: string | null | undefined): string {
+		const digest = hashDigest(value);
+		return digest ? `…${digest.slice(-4)}` : '—';
+	}
+
+	function copyNodeHash(node: LineageNode, kind: 'description' | 'render', event: MouseEvent): void {
 		event.stopPropagation();
 		event.preventDefault();
-		if (!node.render_hash) return;
-		const hash = hashDigest(node.render_hash);
+		const value = kind === 'description' ? node.description_hash : node.render_hash;
+		if (!value) return;
+		const hash = hashDigest(value);
 		if (navigator.clipboard?.writeText) {
 			void navigator.clipboard.writeText(hash).catch(() => fallbackCopy(hash));
 		} else {
 			fallbackCopy(hash);
 		}
-		copiedHashNodeId = node.id;
+		copiedHashKey = `${node.id}:${kind}`;
 		if (copiedHashTimer) clearTimeout(copiedHashTimer);
-		copiedHashTimer = setTimeout(() => (copiedHashNodeId = null), 1400);
+		copiedHashTimer = setTimeout(() => (copiedHashKey = null), 1400);
 	}
 
 	function fallbackCopy(text: string): void {
@@ -822,22 +827,30 @@ $effect(() => {
 									<details class="node-details">
 										<summary>{isJapanese ? '詳細' : 'Details'}</summary>
 										<dl>
-											<dt>{isJapanese ? '記述' : 'Text'}</dt><dd class="full-source">{node.history.source_text ?? node.history.input}</dd>
+											<dt class="full-source-label">{isJapanese ? '記述' : 'Text'}</dt><dd class="full-source">{node.history.source_text ?? node.history.input}</dd>
 											<!-- The scheme each value names, read off the value: a row
 											     labelled with a constant went on saying rh2 while the
 											     works below it were being saved as rh3. -->
-											<dt>{hashSchemeLabel(node.description_hash, 'dh')}</dt><dd>{shortHashDigest(node.description_hash)}</dd>
-											<dt>{hashSchemeLabel(node.render_hash, 'rh')}</dt>
+											<dt>{hashSchemeLabel(node.description_hash, 'dh')}</dt>
 											<dd class="hash-cell">
-												<span>{shortHashDigest(node.render_hash)}</span>
-												{#if node.render_hash}
-													<button type="button" class="hash-copy" title={t().historyHashCopyTitle} aria-label={t().historyHashCopyTitle} onclick={(event) => copyRenderHash(node, event)}>
-														{copiedHashNodeId === node.id ? t().promptCopied : t().promptCopy}
+												<span>{hashSuffix(node.description_hash)}</span>
+												{#if node.description_hash}
+													<button type="button" class="hash-copy" title={t().historyHashCopyTitle} aria-label={`${hashSchemeLabel(node.description_hash, 'dh')}: ${t().historyHashCopyTitle}`} onclick={(event) => copyNodeHash(node, 'description', event)}>
+														{copiedHashKey === `${node.id}:description` ? t().promptCopied : t().promptCopy}
 													</button>
 												{/if}
 											</dd>
-											<dt>Render engine version</dt><dd>{node.history.render_engine_version || '—'}</dd>
-											<dt>{t().provenanceLabelTransformLayer}</dt><dd>{node.history.ddl_engine_version || '—'}</dd>
+											<dt>{hashSchemeLabel(node.render_hash, 'rh')}</dt>
+											<dd class="hash-cell">
+												<span>{hashSuffix(node.render_hash)}</span>
+												{#if node.render_hash}
+													<button type="button" class="hash-copy" title={t().historyHashCopyTitle} aria-label={`${hashSchemeLabel(node.render_hash, 'rh')}: ${t().historyHashCopyTitle}`} onclick={(event) => copyNodeHash(node, 'render', event)}>
+														{copiedHashKey === `${node.id}:render` ? t().promptCopied : t().promptCopy}
+													</button>
+												{/if}
+											</dd>
+											<dt>Render</dt><dd>{node.history.render_engine_version || '—'}</dd>
+											<dt>DDL</dt><dd>{node.history.ddl_engine_version || '—'}</dd>
 											<dt>Build</dt><dd>{node.history.render_build_number || '—'}</dd>
 											<dt>Stage 1</dt><dd>{node.history.stage1_model ? modelDisplayName(node.history.stage1_model) : '—'}</dd>
 											<dt>Stage 2</dt><dd>{node.history.stage2_model ? modelDisplayName(node.history.stage2_model) : '—'}</dd>
@@ -1006,12 +1019,13 @@ $effect(() => {
 	.branch-toggle { width: 100%; margin-top: 7px; padding: 5px; font-size: var(--ui-font-size-12); }
 	.node-details { margin-top: 7px; font-size: var(--ui-font-size-12); }
 	.node-details summary { cursor: pointer; color: var(--fg2); }
-	.node-details dl { display: grid; grid-template-columns: auto 1fr; gap: 2px 6px; margin: 6px 0 0; }
+	.node-details dl { display: grid; grid-template-columns: 68px minmax(0, 1fr); gap: 4px 6px; margin: 6px 0 0; }
 	.node-details dt { color: var(--fg2); }
-	.node-details dd { min-width: 0; margin: 0; overflow-wrap: anywhere; }
+	.node-details dd { min-width: 0; margin: 0; overflow-wrap: anywhere; line-height: 1.4; }
 	.node-details dd.hash-cell { display: flex; align-items: center; gap: 6px; }
 	.hash-copy { flex: 0 0 auto; border: 1px solid var(--border2); border-radius: var(--btn-sm-radius); padding: 1px 6px; background: var(--panel); color: var(--fg2); font-family: inherit; font-size: inherit; line-height: 1.5; cursor: pointer; }
 	.hash-copy:hover { border-color: var(--accent); color: var(--fg); }
+	.full-source-label, .full-source { grid-column: 1 / -1; }
 	.full-source { max-height: 7em; overflow: auto; white-space: pre-wrap; }
 	.note-editor { display: grid; gap: 5px; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border); }
 	.note-editor label { color: var(--fg2); }

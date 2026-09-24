@@ -6,6 +6,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 36 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-24 — Make work details readable in Lineage cards
+
+The Details grid no longer lets long labels squeeze values into a column only one character wide. The description uses the card's full width; the remaining labels have a fixed width beside their values. Description and render hashes show only their last four digits, with a separate button beside each to copy the complete digest.
+
 ### 2026-09-24 — Adjust star sizes on the canvas and History strip
 
 The canvas and large-view star controls return to their earlier circle and glyph sizes. The star over each History strip thumbnail now has a smaller circle and glyph.

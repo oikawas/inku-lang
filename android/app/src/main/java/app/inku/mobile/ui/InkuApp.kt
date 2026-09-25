@@ -4473,7 +4473,9 @@ private fun ModelSettingsPanel(state: InkuUiState, viewModel: InkuViewModel, mod
         SettingsHeader(state.settingsPane, viewModel)
 
         Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceXs)) {
-            state.providerSettings.forEach { provider ->
+            // A deleted built-in service stays in the table switched off (see
+            // `InkuRepository.deleteProvider`); it is not listed.
+            state.providerSettings.filter { it.isEnabled || it.isDefaultLocal }.forEach { provider ->
                 ProviderConnectionCard(
                     provider = provider,
                     candidateModelIds = state.providerModelCandidates[provider.providerId],

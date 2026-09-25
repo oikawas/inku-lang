@@ -513,8 +513,23 @@ class InkuRepository(
         return models
     }
 
+    /**
+     * Removes a connection. A built-in one cannot leave the catalog -- the next
+     * start would put it back with its defaults -- so, as the server does
+     * (`model_settings.py` `update_model_settings`), it is switched off and
+     * hidden instead, and its key is forgotten. Adding a service with the same
+     * id brings it back.
+     */
     suspend fun deleteProvider(providerId: String) {
-        database.providerSettingDao().deleteCustom(providerId)
+        val builtIn = defaultProviderSettings().any { it.providerId == providerId && !it.isDefaultLocal }
+        if (!builtIn) {
+            database.providerSettingDao().deleteCustom(providerId)
+            return
+        }
+        val existing = database.providerSettingDao().get(providerId) ?: return
+        database.providerSettingDao().upsert(
+            existing.copy(isEnabled = false, encryptedApiKey = null, updatedAt = System.currentTimeMillis()),
+        )
     }
 
     suspend fun acceptModelLicense(modelId: String) {
@@ -1218,10 +1233,10 @@ class InkuRepository(
  * (`model_settings.py` `normalize_model_settings`). This used to write the
  * catalog's name and URL back over them on every start and before every model
  * list fetch, so an edited Ollama URL was gone before the fetch it was made
- * for. The kind and the switch still come from the catalog: neither is an
- * author setting any more, and a switch left off by an older version would
- * have no control to turn it back on. The local provider's URL is only a
- * marker and stays the catalog's.
+ * for. The kind still comes from the catalog. The switch is kept, because
+ * off is how a deleted built-in stays deleted; adding a service with the same
+ * id turns it back on. The local provider's URL is only a marker and stays
+ * the catalog's, and the local provider cannot be switched off.
  */
 internal fun builtInProviderSetting(
     catalog: ProviderSettingEntity,
@@ -1231,6 +1246,8 @@ internal fun builtInProviderSetting(
     return catalog.copy(
         displayName = existing.displayName.takeIf { it.isNotBlank() } ?: catalog.displayName,
         baseUrl = if (catalog.isDefaultLocal) catalog.baseUrl else existing.baseUrl?.takeIf { it.isNotBlank() } ?: catalog.baseUrl,
+        // Off means deleted (`deleteProvider`); the local model cannot be.
+        isEnabled = catalog.isDefaultLocal || existing.isEnabled,
     )
 }
 

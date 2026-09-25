@@ -34,6 +34,7 @@ To run from source:
 
 - Python 3.12 or newer (both `server` and `cli` declare `requires-python = ">=3.12"`)
 - `uv`
+- Rust (the version `core/rust-toolchain.toml` pins), used to build the native wheel of the shared core the server loads
 - Node.js 20 or newer is recommended
 - npm
 - `resvg-py` when PNG export is needed (installed by `uv sync`)
@@ -108,6 +109,14 @@ cd server
 uv sync
 ```
 
+The server loads the shared Rust core, which makes the drawing decisions, as a native wheel (`inku-render-python`). The wheel is not among the server's dependencies and the server cannot start without it, so build and install it after `uv sync`. Rebuild it the same way whenever `core/` changes. The container image builds and installs this wheel at image build time.
+
+```sh
+uvx maturin==1.13.3 build --manifest-path ../core/crates/inku-render-python/Cargo.toml \
+  --release --locked -i .venv/bin/python --out /tmp/inku-native
+uv pip install --python .venv/bin/python --no-deps /tmp/inku-native/*.whl
+```
+
 Set an 8-character-or-longer password before the first startup, so that an initial admin user is created on the new DB.
 
 ```sh
@@ -175,11 +184,11 @@ npm run build
 
 ## Using a local Ollama provider
 
-inku can connect to [Ollama](https://ollama.com) through its local OpenAI-compatible endpoint. This is a separately managed setup: the operator installs and runs Ollama, pulls the models, configures the endpoint, and assigns each stage. **It is not a claim that the whole of inku can be used without API keys or authentication settings.** Only the Stage 1 / Stage 2 pair below has been measured. Vision can use the same compatibility path when Ollama serves a model that accepts image input, but the current verified local catalog contains no Vision model and the standard setup does not guarantee one.
+inku can connect to [Ollama](https://ollama.com) through its local OpenAI-compatible endpoint. This is a separately managed setup: the operator installs and runs Ollama, pulls the models, configures the endpoint, and assigns each stage. **It is not a claim that the whole of inku can be used without API keys or authentication settings.** Only the Stage 1 / Stage 2 pair below has been measured. **It was measured on 2026-07-29 (Build 764), on the former pipeline,** when Stage 1 wrote the instructions directly and Stage 2 built them into a score. Today Stage 1 returns an underdrawing and Stage 2 only proposes completions for phrases that cannot be read through. The pair has not been measured again on the current setup. Vision can use the same compatibility path when Ollama serves a model that accepts image input, but the current verified local catalog contains no Vision model and the standard setup does not guarantee one.
 
 ### 1. Widen the context length
 
-Install Ollama, then set its context length. **A Stage 2 prompt runs 12,000 to 14,600 tokens, which does not fit in a short context. What overflows is dropped silently, so a reply comes back having read only a fraction of the instructions.**
+Install Ollama, then set its context length. **A Stage 2 prompt ran 12,000 to 14,600 tokens at the time of measurement, which does not fit in a short context. What overflows is dropped silently, so a reply comes back having read only a fraction of the instructions.**
 
 ```sh
 export OLLAMA_CONTEXT_LENGTH=16384
@@ -223,11 +232,17 @@ Sign in as an administrator and set these in the model settings:
 | Stage 1 | Ollama | `qwen3.5:4b-q4_K_M` |
 | Stage 2 | Ollama | `ministral-3:8b-instruct-2512-q4_K_M` |
 
+The Stage 1 model is also used for Sketch from life and automatic color catalog selection.
+
 ### Why this pair
+
+The reasons below are for the stages as they were when measured.
 
 **Stage 1** reads a description into instructions, so what matters is whether it writes sentences that stay inside the vocabulary. `qwen3.5:4b-q4_K_M` was the only model that held up in both Japanese and English, and it is also the smallest of the candidates. **Larger does not order better here.**
 
 **Stage 2** builds those instructions into a JSON Score, so what matters is how many of the written sentences reach a shape instruction. `ministral-3:8b-instruct-2512-q4_K_M` carries the most.
+
+Today's Stage 1 fills the fixed fields of an underdrawing with Saijiki words, so it cannot write a sentence outside the vocabulary at all, and Stage 2 is called only when a completion is needed. Which models suit the current setup has not been checked yet.
 
 The model list carries a note on each of the ten models measured, describing what these two readings found. Consult it when choosing something else you already have.
 
@@ -285,7 +300,7 @@ uv run inku-cli --base-url http://127.0.0.1:8100 paint "A blue circle in the upp
 | `GEMINI_API_KEY` | Gemini API key |
 | `NVIDIA_API_KEY` | NVIDIA API key |
 | `OLLAMA_BASE_URL` | Local Ollama endpoint. Defaults to `http://localhost:11434/v1` |
-| `OLLAMA_CONTEXT_LENGTH` | Context length, set on the Ollama side; inku does not read it. **It must be long enough to hold a Stage 2 prompt** |
+| `OLLAMA_CONTEXT_LENGTH` | Context length, set on the Ollama side; inku does not read it. **It must be long enough to hold the prompts sent to the LLM** (see "Widen the context length") |
 
 Used only when running in containers:
 

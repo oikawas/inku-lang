@@ -28,7 +28,7 @@
 A blue line slowly loosens across the night water.
 ```
 
-An inku work begins by writing a short poem or passage of prose like the one above. An LLM breaks the words into visual elements and converts them into DDL, the language of drawing. A Typed Compiler then compiles the DDL into JSON data that can be rendered as SVG.
+An inku work begins by writing a short poem or passage of prose like the one above. An LLM first gathers the words into an **underdrawing** — a design of what to draw, in which material, placed where and how — and DDL, the language of drawing, is written out from it. A Typed Compiler then compiles the DDL into JSON data that can be rendered as SVG.
 This JSON data is a “score”: even as the application moves from one generation to another, it can continue to “perform” the work consistently as SVG. The computer generates the SVG image by having a dedicated Renderer interpret that JSON. The inku application brings this entire sequence together.
 
 Together, the LLM, Typed Compiler, and Renderer provide a “controllable environment for AI vector-graphic generation.”
@@ -128,7 +128,7 @@ These works were written in Japanese; the original text is given with an English
 
 </details>
 
-All three were generated on Build 667 with render engine 10, using `nvidia:google/gemma-4-31b-it` for both Stage 1 and Stage 2. Only the third has a different ground, because a different **color catalog** was selected: the same "white" or "black" in the instructions is translated into the gamut of the chosen catalog.
+All three were generated on Build 667 with render engine 10, using `nvidia:google/gemma-4-31b-it` for both Stage 1 and Stage 2 (at the time, Stage 2 was the layer that structured the instructions into a score; the Typed Compiler does that now). Only the third has a different ground, because a different **color catalog** was selected: the same "white" or "black" in the instructions is translated into the gamut of the chosen catalog.
 
 **Three more works are in the [gallery](docs/guide/gallery.md).**
 
@@ -151,12 +151,19 @@ See [`deploy/README.md`](deploy/README.md) for the first account, data persisten
 
 ### 1. Running from source
 
+The API server loads inku's shared Rust core, which makes the drawing decisions, as a native wheel. It cannot start without the wheel, so build and install it first. You need Python 3.12 or later, `uv`, and Rust (the version pinned in `core/rust-toolchain.toml`).
+
 ```sh
-cd server && UV_CACHE_DIR=/tmp/inku-uv-cache uv run inku-server   # API (SQLite by default)
-cd web && npm install && npm run dev                              # → http://localhost:5173
+cd server && uv sync
+uvx maturin==1.13.3 build --manifest-path ../core/crates/inku-render-python/Cargo.toml \
+  --release --locked -i .venv/bin/python --out /tmp/inku-native
+uv pip install --python .venv/bin/python --no-deps /tmp/inku-native/*.whl
+uv run inku-server                        # API (SQLite by default)
+
+cd web && npm install && npm run dev      # → http://localhost:5173
 ```
 
-At least one LLM provider is needed for Stage 1 and Stage 2 (`INKU_LLM_BACKEND` plus that provider's authentication and connection settings, or the model settings page in the web UI). A local [Ollama](https://ollama.com) can also be selected as a separately installed and operated provider after its models, connection, and stage assignments are configured. [SETUP.md](SETUP.md) gives the procedure and the measured Stage 1 / Stage 2 pair. Vision is available when a compatible model is configured separately and is not part of the standard local-model setup. There is no self-signup, so on a new DB nobody can sign in until you create the bootstrap admin with `INKU_BOOTSTRAP_ADMIN_PASSWORD` (8+ characters).
+Painting from a description needs an LLM provider. Pass an API key through an environment variable (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`, or `NVIDIA_API_KEY`), or register one as an administrator on the model settings page in the web UI, and choose a model for each stage. A local [Ollama](https://ollama.com) can also be selected as a separately installed and operated provider after its models, connection, and stage assignments are configured. [SETUP.md](SETUP.md) gives the procedure and the measured model pair. Vision is available when a compatible model is configured separately and is not part of the standard local-model setup. There is no self-signup, so on a new DB nobody can sign in until you create the bootstrap admin with `INKU_BOOTSTRAP_ADMIN_PASSWORD` (8+ characters).
 
 Once you are logged in, write a short description. After generating, consult the Saijiki, see how it was converted into DDL, and refine the description if you like.
 
@@ -168,10 +175,11 @@ The full environment variable list, per-provider configuration, and the CLI (`in
 
 ```
 Your sentence (written in your native language)
-     │  interpretation — the words are read into core vocabulary (Stage 1, LLM)
+     │  interpretation — the words are read into an underdrawing (Stage 1, LLM)
      ▼
-Instructions (Normalized DDL — a human-readable executable specification)
-     │  structuring — written down as a score (Stage 2, LLM)
+Instructions (Normalized DDL — a human-readable executable specification, written out deterministically from the underdrawing)
+     │  structuring — the Typed Compiler writes it down as a score (deterministic)
+     │    if a phrase cannot be read through, Stage 2 (LLM) proposes a completion and you approve it
      ▼
 JSON Score (the score — saved deterministically)
      │  performance — drawn, with sway (Renderer, seed-driven)
@@ -183,9 +191,19 @@ SVG (the performance — one-time; for a wall, a page, a screen)
 
 The words land in fields of the score. In the second work above, "shoal" landed in `count` and `cluster_count: 7`; "along an undulating path" landed in `path: wave`; "silver" landed in `color_cycle` and `surface.texture: wash`; and the "opposite bank" became the single vertical line at the right edge. **Neither the sniper nor the fisherman nor the war survives — only shape, material, and motion.**
 
-Interpretation and structuring are separated because they demand different abilities: interpretation is associative and creative; structuring is mechanical and rule-abiding. Each stage can be tuned independently, and the LLM used can be selected per stage. In practice the model makes a large difference to the work that comes out. **The choice of model is itself a creative variable.**
+Interpretation and structuring are separated because they demand different abilities. Interpretation is associative and creative, so it is left to an LLM. Structuring is mechanical and rule-abiding, so the Typed Compiler does it, not an LLM. It never fills in meaning by guessing: a phrase that cannot be read through is sent, on its own, to an LLM for a completion, which then waits for your approval. The model used for interpretation can be selected, and in practice it makes a large difference to the work that comes out. **The choice of model is itself a creative variable.**
 
-Only two layers are nondeterministic: Stage 1 and Stage 2, where LLMs are involved. The conversion from DDL to JSON and the Renderer's performance are always deterministic, so a work can be reproduced from the information saved in its JSON. The inku specification itself, however, keeps moving, so a new inku always draws a different work from an old one.
+**The underdrawing — the LLM does not write sentences.** The LLM in Stage 1 does not write the text of the instructions. What it returns is an underdrawing: a blueprint for the picture that fills fixed fields — which shape, in which material and color, placed where and how — using only Saijiki words (it is made of a layer for each shape, plus the ground and the background). Just as an ukiyo-e carver cut the block from the painter's underdrawing, the text of the instructions is written out from this underdrawing deterministically.
+
+The LLM used to write the text of the instructions directly. In 150 saved runs, 193 of the 458 sentences it generated (42%) could not be read by the compiler and were dropped whole, because they used word forms outside the vocabulary (such as 中くらい, "medium-sized") or phrasings outside the grammar. Nine runs stopped altogether. Teaching the word forms in the prompt did not cure it.
+
+The underdrawing solves this through structure rather than through instruction on how to write. Only Saijiki words can go into the underdrawing's fields, and which values a shape can combine is decided by a table built by asking the compiler one sentence at a time. A value outside that range returns only its own field to unspecified, and the underdrawing is always written out as instructions that can be read. As tests over random underdrawings in Japanese and English confirm, the instructions written out from an underdrawing all compile with no diagnostics, so no phrase from the first interpretation is ever dropped. The LLM's creativity goes into choosing what to draw and how; the mechanism guarantees the grammar.
+
+The underdrawing is transient: what remains are the instructions and the score. Instructions you write or edit by hand are not bound by the underdrawing's shape; they are read with the whole grammar of DDL.
+
+Only the places where an LLM is involved are nondeterministic: the interpretation in Stage 1, the optional Sketch from life (which adds notes on place and light to the description) and automatic color catalog selection, and the proposed completions of the instructions (Stage 2). From the saved instructions onward, the conversion into a score and the Renderer's performance are always deterministic: the same score, the same seed, and the same drawing conditions reproduce the same work. The inku specification itself, however, keeps moving, so a new inku always draws a different work from an old one.
+
+These deterministic parts — the flow of the processing, the Typed Compiler, the score, and the Renderer — are gathered in a single shared core written in Rust. The server and the Android app call the same core, so the same instructions go through the same decisions wherever they are drawn.
 
 **The score itself, the vocabulary of each layer, and how surface and ground texture are handled are in [how it works](docs/guide/how-it-works.md).**
 
@@ -217,15 +235,15 @@ None of them breaks default reproducibility; each acts only on your explicit req
 |---|---|---|---|
 | **Another performance** | Line tremor, placement phase | Interpretation and composition | Very fast, no LLM call |
 | **Another catalog** | The color assignment | Interpretation, composition, performance | Very fast, no LLM call |
-| **Another composition** | Composition family, focus, technique | Interpretation (how the words were read) | Medium, Stage 2 |
-| **Variation** (let the app change Stage 1.5) | Axes of the expansion layer; the range depends on the strength | Your sentence, its reading, and the axes the strength leaves alone | Moderate, Stage 2 |
-| **Another interpretation** | The reading of the words themselves | Your sentence | Slower, from Stage 1 |
+| **Another composition** | The focus (from six fixed candidates), the concrete angle of a slant, the position in a corner | The instructions; technique, color, touch, and element count | Fast, no LLM call |
+| **Variation** (let the app move Stage 1.5) | Moves the focus to a different candidate; each strength moves it somewhere else | The instructions; the frame of the composition, technique, color, touch, and element count | Fast, no LLM call |
+| **Another reading** | The reading of the words themselves | Your sentence | Slower, from Stage 1 |
 
-With *another interpretation*, the old and new instructions are shown side by side as a diff. The moment your words are read differently — that gap itself becomes material for the next sentence. You can also hand the act of accumulating generations to the AI; everything born while it runs is still recorded in the lineage.
+With *another reading*, the old and new instructions are shown side by side as a diff. The moment your words are read differently — that gap itself becomes material for the next sentence. You can also hand the act of accumulating generations to the AI; everything born while it runs is still recorded in the lineage.
 
 **A piece is finished not when a generation happens to land, but when you decide to stop here.**
 
-**Variation strengths, AI-driven refinement, and the details of lineage and editions are in [revision](docs/guide/revision.md).**
+**AI-driven refinement and the details of lineage and editions are in [revision](docs/guide/revision.md).**
 
 ---
 
@@ -235,18 +253,23 @@ The reference dictionary is called **Saijiki**（歳時記）— a word borrowed
 
 | Category (EN) | Category (JA) | Vocabulary |
 |---|---|---|
-| forms | かたち | circle, ellipse, triangle, square, line, arc, cloudform |
-| touches | てざわり | silverpoint, pencil, pen, rotring, crayon, chalk, fine-brush, thick-brush, burin, drypoint, computer |
-| motions | うごき | place, line-up, draw, scatter, fill, tile |
-| places | ばしょ | top, bottom, center, left-edge, right-edge, top-edge, bottom-edge, middle, corner |
-| continuity | つらなり | solid, dashed, dotted, dash-dot |
-| movements | ゆらぎ | fine, large, slowly, quickly, swaying, undulating, trembling, blurring |
-| colors | いろ | white, black, blue, red, green, gray, yellow, orange, purple |
+| forms | かたち | circle, ellipse, triangle, square, line, arc, point, cloudform |
 | angles | かたむき | horizontal, vertical, diagonal, rising, falling, rotated |
+| touches | てざわり | silverpoint, pencil, pen, rotring, crayon, chalk, fine-brush, thick-brush, oil paint, burin, drypoint, computer |
+| continuity | つらなり | solid, dashed, dotted, dash-dot |
+| surfaces | おもて | empty, flat, pale ink wash, grain, stipple, hatch, crosshatch, aquatint, dense, faint |
+| grounds | じ | paper, washi, ink wash ground, charcoal ground, canvas, drawing paper, mezzotint |
+| colors | いろ | white, black, blue, red, green, gray, yellow, orange, purple |
+| movements | ゆらぎ | fine, large, slowly, quickly, swaying, undulating, bleeding |
+| places | ばしょ | top, bottom, center, left-edge, right-edge, top-edge, bottom-edge, start, end, partway, corner |
+| motions | うごき | place, line-up, draw, scatter, fill, tile |
+| order | じゅん | alternating, in order |
 | proportions | わりあい | tall, wide, full-width, half-width, semicircle, waxing, waning, crescent |
-| relations | あいだ | along, not touching, cutting, between, touching (used as "along the previous line") |
+| relations | あいだ | along, not touching, cutting, between, touching, connected, mirrored (used as "along the previous line" or "mirrored with the previous shape") |
 
-The saijiki table in the implementation is the source of truth for the current vocabulary; `inku-cli reference --md` produces a machine-generated listing at any time.
+Surfaces name the inside of a closed shape or the way a mark sits; grounds name the canvas itself, the support. A ground is written as a sentence of its own, such as "Washi." Words from registered plugins (for the bundled `Nature.leaves`, words such as "YoungLeaves" and "FallenLeaves") appear in the Saijiki in the same way as the core words.
+
+The source of truth for the vocabulary is the Saijiki definition held by the shared core (`core/crates/inku-ddl/assets/saijiki-v1.json`). The table above lists the words the app's Saijiki displays; `inku-cli reference --md` produces a machine-generated listing at any time.
 
 Only physical, observable words belong to the core. Emotional evaluation — "beautifully," "delicately," "boldly" — is excluded, because evaluation belongs to the viewer, not the writer. Read the gallery descriptions again and you will find not one evaluative word among them.
 
@@ -281,11 +304,12 @@ During development, we always move forward while comparing with saved reference 
 
 ## Capabilities
 
-- **Multi-stage pipeline** — Stage 1 / 1.5 / 2 / Renderer, with per-stage model selection; non-deterministic AI layers and deterministic algorithmic layers alternate
-- **Primitives and arrangement** — line, circle, ellipse, arc, square, triangle, cloudform; horizontal, vertical, radial, scatter, and literal tiling grid layouts with paths such as waves and diagonal bands
-- **Regions and relations** — scores can state relations between elements ("along the previous line," "not touching the previous shape") that the performance resolves
-- **Material rendering** — pencil, rotring, crayon, chalk, brushes, burin, and drypoint, differentiated through the shared stroke engine's width, tracking, and sparse events plus tool-specific edges
-- **Plugins** — namespaced vocabulary macros such as `Nature.wind`; they may expand only into core vocabulary and cannot modify the core
+- **Multi-stage pipeline** — Sketch from life and automatic color catalog selection, both optional; Stage 1 (underdrawing); the Typed Compiler; Stage 1.5 (focus and variation); and the Renderer. Non-deterministic AI layers and deterministic algorithmic layers alternate
+- **Shared core** — the flow of the processing, the Typed Compiler, the score, and the Renderer are gathered in a shared Rust core that the server (Python) and Android (Kotlin) both call
+- **Primitives and arrangement** — point, line, circle, ellipse, arc, square, triangle, cloudform; placing, lining up, drawing, scattering, filling, and tiling, with paths such as waves and diagonal bands, and "alternating" or "in order" sequences
+- **Regions and relations** — scores can state seven kinds of relation between elements ("along the previous line," "not touching the previous shape," "mirrored with the previous shape") that the performance resolves
+- **Material rendering** — silverpoint, pencil, pen, rotring, crayon, chalk, brushes, oil paint, burin, and drypoint, differentiated through the shared stroke engine's width, tracking, and sparse events plus tool-specific edges. Surface qualities (flat, pale ink wash, stipple, hatch, crosshatch, aquatint, and more) and grounds (washi, charcoal ground, canvas, mezzotint, and more) can be chosen too
+- **Plugins** — namespaced vocabulary macros such as `Nature.YoungLeaves` (alias `Nature.若葉`); they may expand only into core vocabulary and cannot modify the core. When a description names one of their words, the underdrawing can choose it. Instructions that use an unregistered plugin draw everything else and give the reason on that sentence alone. Instructions can be exported together with their plugin definitions and imported elsewhere
 - **History and editions** — DB-backed history with stars, search, thumbnails, and exact reproduction via seeds and edition IDs
 - **Batch / CLI** — designed for straightforward operation by AI agents, the CLI provides access to every inku API. `inku-cli` supports login, painting, batch generation, contact sheets, and everything else available through the GUI
 
@@ -293,9 +317,9 @@ During development, we always move forward while comparing with saved reference 
 
 ## Status
 
-- **Web version** — operational (Python FastAPI + SvelteKit; runs locally or on a server)
+- **Web version** — operational (SvelteKit + Python FastAPI; drawing decisions are made by the shared Rust core; runs locally or on a server)
 - **CLI** — implemented as an independent `cli/` project; drives the API for login, drawing, batch generation, and benchmark output
-- **Android app** — `2.1.4-android.51`; its Kotlin drawing implements render engine 35 and follows the server's render engine 40 afterward (the Renderer is now shared in Rust, and work is underway to share the core in Rust as well)
+- **Android app** — operational (version in [`android/VERSION`](android/VERSION)); it draws on the device by calling the same shared Rust core, without going through the server, and keeps its works on the device. Its specification is [android/ANDROID_SPEC.md](android/ANDROID_SPEC.md)
 
 The author maintains the **Japanese** and **English** versions of inku. Contributions for other languages are welcome as open source. We have learned that the DDL engine needs adjustments for the characteristics of each language, so making DDL native to a language other than Japanese or English may take more than replacing a language module. At present, there is no framework for adding DDL support for another language.
 The internal JSON Score layer is language-neutral and uses English keys. Language-specific UI data is separated, so the UI itself should be comparatively straightforward to localize.
@@ -316,6 +340,8 @@ Developers and AI agents should start with [PROJECT_CONTEXT.md](PROJECT_CONTEXT.
 
 - [SPEC.md](SPEC.md) — maintained public English specification (with excess detail trimmed)
 - [SPEC.ja.md](SPEC.ja.md) — canonical Japanese specification (the author works Japanese-first, so the specification is authored in Japanese)
+- [Architecture](docs/architecture/README.md) — implementation boundaries, DDL processing, APIs, history and lineage, and change impact
+- [PLUGIN.md](PLUGIN.md) — how to write a vocabulary plugin
 - [CHANGELOG.md](CHANGELOG.md) / [CHANGELOG.ja.md](CHANGELOG.ja.md) — release notes (earlier versions live in [`docs/history/`](docs/history/))
 - [SETUP.md](SETUP.md) — installation and operation guide
 

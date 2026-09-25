@@ -10,9 +10,9 @@ This appendix gives one place to survey the languages, frameworks, main runtime 
 | Web process | JavaScript (build output) | SvelteKit adapter-node, Node.js 22 | Static/UI serving and same-origin `/api` proxy | `web/Dockerfile`; `web/src/hooks.server.ts` |
 | Server API | Python 3.12 | FastAPI, Pydantic, Uvicorn | HTTP API, authentication, the shared-pipeline host, and operational status | `server/pyproject.toml`; `server/src/inku_server/api.py` |
 | Server persistence | Python, SQL | SQLAlchemy 2, SQLite | Canonical schema, domain stores, variation authority, versioned migration, and backup | `server/src/inku_server/persistence/`; `persistence/` |
-| Model access | Python / Kotlin | `httpx` (shared-pipeline provider effects), OpenAI SDK and Anthropic SDK (colophon, demo, Vision), OpenAI-compatible / Gemini HTTP, LiteRT-LM | The sketch, color catalog selection, the Stage 1 work plan, known-hole completion, and on-device inference | `server/pyproject.toml`; `server/src/inku_server/pipeline_provider.py`; `android/app/build.gradle.kts` |
+| Model access | Python / Kotlin | `httpx` (shared-pipeline provider effects), OpenAI SDK and Anthropic SDK (colophon, demo, Vision), OpenAI-compatible / Gemini HTTP, LiteRT-LM | The sketch, color catalog selection, the Stage 1 underdrawing, known-hole completion, and on-device inference | `server/pyproject.toml`; `server/src/inku_server/pipeline_provider.py`; `android/app/build.gradle.kts` |
 | Authoring pipeline core | Rust 2024 | `serde` / `serde_json`, `sha2` | Authoring state machine, effect protocol, authority transitions, prompt construction, compile/render boundary | `core/crates/inku-pipeline/` |
-| DDL compiler core | Rust 2024 | `serde` / `serde_json`, `sha2` | Typed compiler, Macros, Stage 1.5, Plan, resource selection, materialization, the work plan, and the saijiki asset | `core/crates/inku-ddl/` |
+| DDL compiler core | Rust 2024 | `serde` / `serde_json`, `sha2` | Typed compiler, Macros, Stage 1.5, Plan, resource selection, materialization, the underdrawing, and the saijiki asset | `core/crates/inku-ddl/` |
 | Score core | Rust 2024 | `serde` / `serde_json`, `sha2` | Score types, canonical digest, compatibility reader, canvas registry, resource authority | `core/crates/inku-score/` |
 | Render core | Rust 2024 | `serde` / `serde_json`, `kurbo`, `svgtypes`, `sha2` | Host-independent planning, geometry, marks, surfaces, and SVG | `core/crates/inku-render/` |
 | Byte façade | Rust | UniFFI | Pipeline entry points that pass only owned JSON byte buffers | `core/crates/inku-pipeline-uniffi/` |
@@ -34,7 +34,7 @@ This appendix gives one place to survey the languages, frameworks, main runtime 
 | SQL / SQLite DDL | `persistence/`, Server migration, Room export | Portable logical constraints, physical schemas, and migration verification |
 | HTML / CSS / Svelte markup | `web/src/` | Browser presentation |
 | Markdown / Mermaid | `SPEC*`, `docs/`, manuals, plugin documents | Product contracts, architecture, diagrams, and plugin documents |
-| JSON | Score, API, pipeline envelopes and snapshots, saijiki and work-plan assets, portable contract, fixtures | Structured data boundary between hosts |
+| JSON | Score, API, pipeline envelopes and snapshots, saijiki and underdrawing assets, portable contract, fixtures | Structured data boundary between hosts |
 | TOML / YAML / KTS | Python/Rust/Android/CI manifests | Dependencies, builds, and workflow settings |
 | Shell | `scripts/` | Product build and check entry points. Private operation entry points are in the internal repository. |
 

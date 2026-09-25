@@ -10,7 +10,7 @@ The normal Server, Web, and Android paths use the same shared-Rust authoring sta
 | Authoring state machine | Snapshot + command/effect result → next snapshot + event + at most one effect | Deterministic. Provider transport and persistence leave core as typed effects; core decides retry, fallback, and authority transitions | `core/crates/inku-pipeline` |
 | Color catalog selection effect (optional) | Description + catalog candidates → catalog ID | Only for a description start with `catalog_mode=auto`. Failure or an exhausted budget falls back to `default`, records `auto_fallback_default`, and continues | `inku-pipeline` prompt/action; host provider adapter |
 | Sketch effect (optional) | Description → a supplement about place and light | Only when the author chooses it. It never rewrites the description; a failure continues as `fallback` with the description alone | `inku-pipeline` prompt/action; host provider adapter |
-| Stage 1 effect | Description (+ sketch) → work-plan JSON → visible normalized DDL candidate | The model writes no DDL string; it returns only a closed-typed work plan. Core drops out-of-range values field by field and prints the plan deterministically as DDL in the requested language. The model does not write Score or receive Macro bodies or hidden meaning | `inku-pipeline/src/prompts.rs`; `inku-ddl/src/work_plan.rs`; host provider adapter |
+| Stage 1 effect | Description (+ sketch) → underdrawing JSON → visible normalized DDL candidate | The model writes no DDL string; it returns only a closed-typed underdrawing. Core drops out-of-range values field by field and prints the plan deterministically as DDL in the requested language. The model does not write Score or receive Macro bodies or hidden meaning | `inku-pipeline/src/prompts.rs`; `inku-ddl/src/work_plan.rs`; host provider adapter |
 | Stage 1 renormalization / residual adoption | A candidate the compiler does not fully accept → a replacement request, or a drawable residual | Within the same Stage 1 budget, core asks again with a new action carrying the description, the rejected DDL, and the reasons and spans. Once the budget is spent, the full candidate is proposed for saving unchanged only if the sealed execution projection has a drawable residual | `inku-pipeline/src/machine.rs` (`correct_stage1`, `residual_execution_preflight`) |
 | CAS persistence | DDL candidate + revision → saved visible DDL | Source and authority advance only after a matching atomic save acknowledgment; core reparses the exact saved bytes | Authority store / pipeline host |
 | Typed compiler | Visible DDL + definition locks → verified meaning + diagnostics | Verifies source, provenance, and Macro definitions, then performs bounded expansion. Ambiguity is not guessed by first/nearest/last. The lock is one of `canonical_ready` / `incomplete_known_hole` / `blocked_conflict` / `blocked_diagnostic` | `core/crates/inku-ddl` |
@@ -32,7 +32,7 @@ flowchart TD
     CORE["Shared-Rust authoring state machine"]
     CATALOG["Color catalog selection effect\n(auto only)"]
     SKETCH["Sketch effect\n(only when the author chooses it)"]
-    S1["Stage 1 effect\nwork-plan JSON → printed DDL"]
+    S1["Stage 1 effect\nunderdrawing JSON → printed DDL"]
     FIT{"Compiler fully accepts?"}
     RETRY["Renormalization\n(same Stage 1 budget)"]
     RESIDUAL{"Drawable residual?"}
@@ -150,7 +150,7 @@ The direct inputs to `rh3` are Score, render seed, wild, engine identity, and th
 | Boundary | Main implementation |
 |---|---|
 | Shared state machine / byte protocol | `core/crates/inku-pipeline`, `core/crates/inku-pipeline-uniffi` |
-| Typed compiler / work plan / Stage 1.5 / lowerer | `core/crates/inku-ddl` |
+| Typed compiler / underdrawing / Stage 1.5 / lowerer | `core/crates/inku-ddl` |
 | Score schema / compatibility / resource policy | `core/crates/inku-score` |
 | SVG performance | `core/crates/inku-render` |
 | Server host | `server/src/inku_server/pipeline_runtime.py`, `pipeline_api.py`, `pipeline_candidate.py`, `pipeline_product.py`, `pipeline_provider.py`, `pipeline_compat.py` |

@@ -342,7 +342,7 @@ Water.さざ波
 
 ### 4.13 正式名と別名
 
-プラグインの正式名は英語の見出し（`Nature.YoungLeaves`）とし、定義は同じ名前空間の別名を`aliases`（例: `["若葉"]`）として宣言できる。可視DDLは正式名と別名のどちらでも同じ定義を呼び、DDLの本文は書いたまま残る。別名は構文が読める文字（文字・数字・`_`・`-`）だけで、見出しや他の別名と重ならない。catalogは、既に他の定義が持つ正式名・別名を名乗る定義を受け付けない。定義を固定するlockは正式名・版・digestに加えて別名を持ち、照合はどの名前でもそのlockへ結び、以後は正式名で扱う。別名を持たない定義の正準bytesとdigestは変わらない。作品計画は、日本語のDDLでは別名、英語のDDLでは正式名でプラグインを書く。DDL Spec 14。
+プラグインの正式名は英語の見出し（`Nature.YoungLeaves`）とし、定義は同じ名前空間の別名を`aliases`（例: `["若葉"]`）として宣言できる。可視DDLは正式名と別名のどちらでも同じ定義を呼び、DDLの本文は書いたまま残る。別名は構文が読める文字（文字・数字・`_`・`-`）だけで、見出しや他の別名と重ならない。catalogは、既に他の定義が持つ正式名・別名を名乗る定義を受け付けない。定義を固定するlockは正式名・版・digestに加えて別名を持ち、照合はどの名前でもそのlockへ結び、以後は正式名で扱う。別名を持たない定義の正準bytesとdigestは変わらない。下絵は、日本語のDDLでは別名、英語のDDLでは正式名でプラグインを書く。DDL Spec 14。
 
 ## 5. 三層パイプライン
 
@@ -709,9 +709,9 @@ PNG 書き出しの選択肢は、設定モーダルのエクスポートタブ�
 | 段 | 名称 | 変わるもの | コスト |
 |---|---|---|---|
 | 演奏 | 別の演奏 | performance seed による領域・関係・配置位相の解決（§13.8 / §14.4） | LLM 呼び出しなし（再レンダリングのみ） |
-| 構図 | 別の構図 | composition seed による Stage 1.5 の焦点選択と、作者が明示したかたむきの具体角度選択・隅の四候補選択（§12.11 / §18） | Stage 2 の1回（保存済み正規化 DDL は不変） |
+| 構図 | 別の構図 | composition seed による Stage 1.5 の焦点選択と、作者が明示したかたむきの具体角度選択・隅の四候補選択（§12.11 / §18） | LLM 呼び出しなし（保存済み正規化 DDL から組み直す） |
 
-別の構図が選び直すのは閉じた六つの焦点候補と、記述にかたむきがあるときの具体角度である。Stage 1.5 transformation自体はfocus-onlyを保ち、角度の数値化はStage 2 consumerが同じ`composition_seed`から行う。構図族、技法、色、タッチ、relation、要素数を発明・再選択してはならない。別の演奏と明示変奏は確定した角度を保つ。明示変奏は、強度（小・中・大）と variation seed が揃ったときだけ焦点軸を動かし、不完全な指定は変奏なしとして扱う。記述、正規化 DDL、明示属性は変えない。
+別の構図が選び直すのは閉じた六つの焦点候補と、記述にかたむきがあるときの具体角度である。Stage 1.5 transformation自体はfocus-onlyを保ち、角度の数値化は共有lowererが同じ`composition_seed`から行う。構図族、技法、色、タッチ、relation、要素数を発明・再選択してはならない。別の演奏と明示変奏は確定した角度を保つ。明示変奏は、強度（小・中・大）と variation seed が揃ったときだけ焦点軸を動かし、不完全な指定は変奏なしとして扱う。記述、正規化 DDL、明示属性は変えない。
 
 この二段が §8.2 の「事後選択を中心にする」の実体である。分散の広い生成系では外れも増えるが、外れの処理は governor による事前の平均化ではなく、並んだものから選ぶという人間の行為に委ねる。選ぶことは記述を推敲することと並ぶ創作の一部である。品質の最終判定もこの事後選択に属し、judge metric は受け入れゲートではなく回帰検知の参考値として扱う。
 
@@ -967,7 +967,7 @@ Stage 1は記述から可視DDLを作り、Stage 2はcompilerが報告したknow
 
 Stage 1 は自由記述を、書き手が観察・編集できる正規化 DDL へ有限に写す。原文の明示要素・数量・色・素材・関係を保ち、隠れた視覚要素や「美しい」解釈を追加しない。語彙、閉じた schema、制限値、出典をプロンプト lock として渡し、出力はその lock の内側だけを使う。これは I-640 で同期した有限 typed normalization 契約であり、特定のモデル名やモデル階級を正本にしない。
 
-**作品計画（Stage 1 prompt `inku.typed-stage1-work-plan-prompt.v1`）**：初回生成のLLMは可視DDLの文字列を書かず、閉じた型の作品計画JSONを返す。作品計画は単独図形命令の層（最大8）と地・背景からなり、各値は歳時記asset、parserの有限修飾語形、揺らぎの分類、Scoreの濃淡値から投影したenumである。形（と比率語）ごとに使える値は、compilerへ一文ずつ問い合わせて生成した受理行列`inku.work-plan-capabilities.v1`が定め、共有Rustの検証が正本になる（providerのdecoding強制には依存しない）。範囲外の値はfield単位で未指定、形の無い層はその層だけを除き、描画を止めない。正規化した計画は要求言語の可視DDLへ決定的に印字され、その文字列だけが既存compilerへ渡る。受理行列と日英の性質試験により印字DDLは全層が診断なしでcompileされるので、初回生成の句が捨てられることはない。応答schemaはobject・array・string enum・有界integerだけを使い、既存の全provider輸送がそのまま運ぶ。保存済み実行の再生のため、`normalized_ddl`を持つ旧応答はそのまま読む。作品計画は一時物で、正本は可視DDLとScoreである。作者の直接DDLと編集DDLは従来どおり全文法で解析し、計画型の部分集合に制限しない。登録プラグインがあるとき、作品計画は任意の`plugins`（その要求で登録済みの修飾名だけの閉じた列挙、最大4）を持てる。Stage 1のsystem promptは登録プラグインの名前と要約を示し、記述にプラグイン名の見出しの語かその言い換えが書かれたときだけ選び、季節・場所・似た物からの連想では選ばない規則を与える。選んだプラグインは名前だけの文として背景の後・層の前に印字する（引数を持たない定義で診断の出ない形）。日本語のDDLでは別名（`Nature.若葉。`）、英語のDDLでは正式名（`Nature.YoungLeaves.`）で書く（§4.13）。計画の列挙は正式名で、応答が別名を返しても正式名として受ける。登録が無い環境では`plugins`もその節も出さず、schemaとpromptは従来と同じになる。コア語彙が主で、Macroは付加機能である。
+**下絵（Stage 1 prompt `inku.typed-stage1-work-plan-prompt.v1`。実装の識別子は`work_plan`、2026-09-25より前の文書では「作品計画」）**：初回生成のLLMは可視DDLの文字列を書かず、閉じた型の下絵JSONを返す。下絵は単独図形命令の層（最大8）と地・背景からなり、各値は歳時記asset、parserの有限修飾語形、揺らぎの分類、Scoreの濃淡値から投影したenumである。形（と比率語）ごとに使える値は、compilerへ一文ずつ問い合わせて生成した受理行列`inku.work-plan-capabilities.v1`が定め、共有Rustの検証が正本になる（providerのdecoding強制には依存しない）。範囲外の値はfield単位で未指定、形の無い層はその層だけを除き、描画を止めない。正規化した下絵は要求言語の可視DDLへ決定的に印字され、その文字列だけが既存compilerへ渡る。受理行列と日英の性質試験により印字DDLは全層が診断なしでcompileされるので、初回生成の句が捨てられることはない。応答schemaはobject・array・string enum・有界integerだけを使い、既存の全provider輸送がそのまま運ぶ。保存済み実行の再生のため、`normalized_ddl`を持つ旧応答はそのまま読む。下絵は一時物で、正本は可視DDLとScoreである。作者の直接DDLと編集DDLは従来どおり全文法で解析し、下絵の型の部分集合に制限しない。登録プラグインがあるとき、下絵は任意の`plugins`（その要求で登録済みの修飾名だけの閉じた列挙、最大4）を持てる。Stage 1のsystem promptは登録プラグインの名前と要約を示し、記述にプラグイン名の見出しの語かその言い換えが書かれたときだけ選び、季節・場所・似た物からの連想では選ばない規則を与える。選んだプラグインは名前だけの文として背景の後・層の前に印字する（引数を持たない定義で診断の出ない形）。日本語のDDLでは別名（`Nature.若葉。`）、英語のDDLでは正式名（`Nature.YoungLeaves.`）で書く（§4.13）。下絵の列挙は正式名で、応答が別名を返しても正式名として受ける。登録が無い環境では`plugins`もその節も出さず、schemaとpromptは従来と同じになる。コア語彙が主で、Macroは付加機能である。
 
 初回の解釈では、記述全体の役割、対比、反復、疎密、余白、質感を短い視覚的構成へまとめる。短さを、必要な複数の役割を中央の一要素へ縮めることや、各名詞を一図形へ対応させることと混同しない。明示数量を最優先し、数量が明示されていない反復は文脈から数量を選んで可視DDLへ記す。単語と数量帯の対応表、決め打ちの最低数、一律の増量は使わず、数や文の多さ自体を品質目標にしない。
 
@@ -981,13 +981,13 @@ Stage 1 は自由記述を、書き手が観察・編集できる正規化 DDL �
 
 ### 12.6.1 写生（場所と光の補足、draw-system03）
 
-作者が選んだときだけ、作品計画の前に**写生**を一度だけ置ける。写生は記述を書き換えず、記述が言外に含む**場所の広がり**と**季節・時刻の光**を、物の言葉で1〜3文に補う。Stage 1は記述と写生文の両方を受け取り、写生文からは場や奥の層・背景の色を加えるだけで、主題・動き・向き・個数・配置は記述に従う。写生文は記述の代わりに置かれず、記述は作品の出自として保存・表示に残る（§12.16）。
+作者が選んだときだけ、下絵の前に**写生**を一度だけ置ける。写生は記述を書き換えず、記述が言外に含む**場所の広がり**と**季節・時刻の光**を、物の言葉で1〜3文に補う。Stage 1は記述と写生文の両方を受け取り、写生文からは場や奥の層・背景の色を加えるだけで、主題・動き・向き・個数・配置は記述に従う。写生文は記述の代わりに置かれず、記述は作品の出自として保存・表示に残る（§12.16）。
 
 写生は描画ごとの選択で、**既定は「なし」**である。「あり」を選ぶと写生を通す。作品ごとの「写生なし／ありで描き直す」は、選んだ作品の子として系譜へ保存する（派生種別は`sketch_grain_change`、metadataは`from_sketch_state`・`to_sketch_mode`）。作者が直した写生文、または保存済みの写生文は、写生を呼ばずにそのまま使う。
 
 記述に応じて写生の要否を自動で判断する「自動」は置かない。開発用70件の盲検では写生あり32・なし30とほぼ互角で、手掛かりの量など一般的な基準では写生が効く作品を選べず、未使用の110件（日英）で確かめた判定規則は写生あり43・なし50と画を良くしなかった（2026-09-25、作者判断）。
 
-写生は**確認待ちで止まらない**。描画を始めてから画が出るまでに、作者の承認を挟まない。写生の要求が失敗しても、記述だけで作品計画へ進み、描画は完走する（`fallback`）。補うものが無い応答は`not_needed`として記述だけで描く。写生文は描画後に表示・編集でき、編集すれば描き直す。
+写生は**確認待ちで止まらない**。描画を始めてから画が出るまでに、作者の承認を挟まない。写生の要求が失敗しても、記述だけで下絵へ進み、描画は完走する（`fallback`）。補うものが無い応答は`not_needed`として記述だけで描く。写生文は描画後に表示・編集でき、編集すれば描き直す。
 
 共有pipelineでは、写生はStage 1前の任意effect `generate_sketch`（結果`sketch_generated`、prompt `inku.sketch-supplement-prompt.v1`、応答は`sketch`文字列だけ）である。開始入力と記述からの再生成は`sketch`（`off`／`on`／`supplied`）を持てる。snapshotの`sketch`記録（`pending`／`supplemented`／`not_needed`／`fallback`／`supplied`）が写生の結果を示し、保存列`sketch_state`は`supplemented`（写生文あり、`sketch_grain`は空）・`not_needed`・`fallback`・`off`になる。再試行予算は`sketch_retry`（無ければ色カタログ選択の予算）。旧写生層（§12.15）の`fine`／`coarse`の区切りは保存互換の表示だけに残り、新しい写生では使わない。
 
@@ -1013,7 +1013,7 @@ Variationの作成元は`stage1_generated`または`user_authored_ddl`として�
 
 系譜からの編集はhistory rowのownerを判別して対応するlinked forkを選び、旧forkを更新も置換もせず保持する。Activeな`/executions/{id}/author-ddl`はsource、revision、optionsを受ける。同じ設定でsourceが変わる場合はrecord metadataを保存し、既存のCAS、origin、DDL authority lockを保つ。canvas／wildなど設定が変わる場合は、元のsource・config・authorityを変えず親関係を持つDDL authorityのdirect-DDL variationを新設する。sourceが不変でrecord metadataだけが変わる場合も既存resultを捨てずnew editionとして保存する。history sidecar v2はcoreの4診断、renderer診断、`resource_execution`を当該revision／sourceに不変保存し、通常の履歴表示へ戻す。v1には診断記録がない。sidecarが壊れていてもその作品だけにwarningを示し、保存DDL、Score、SVGの表示を続け、latestの推測や再compileをしない。
 
-Typed Stage 1 requestは、Saijikiから導出した有限語彙、解決済みcatalog/canvas identity、検証済みMacroのqualified name・version・definition digest・parameter・host提供のlocalized summaryだけをbounded projectionとして持ち、応答schemaは§12.6の作品計画だけを許し、LLMが可視DDLの文字列を直接書くことはない。保存済みvisible DDLのparseが補完可能なknown holeを検出したら、共通pipelineが補完要求を自動で作る。別のユーザー補完操作は要求せず、holeがなければStage2 LLMを呼ばない。ただし§12.8のStage 1残部採用では追加LLM要求を始めず、保存ACK後に決定的な残部配送へ進む。有限文法外の語を含むclauseでも、compilerがexactな描画head、ground、またはbackground anchorとclause境界を確定できる場合は、そのclauseだけをknown holeにできる。Exactな境界を持たないUnknown、conflict、integrityエラーは補完対象にしない。後続の継続clauseがpatch可能な上流holeだけを原因として未確定なら、その継続診断はpatch後の再compileまで保留し、後続clause自体を書換え対象へ広げない。
+Typed Stage 1 requestは、Saijikiから導出した有限語彙、解決済みcatalog/canvas identity、検証済みMacroのqualified name・version・definition digest・parameter・host提供のlocalized summaryだけをbounded projectionとして持ち、応答schemaは§12.6の下絵だけを許し、LLMが可視DDLの文字列を直接書くことはない。保存済みvisible DDLのparseが補完可能なknown holeを検出したら、共通pipelineが補完要求を自動で作る。別のユーザー補完操作は要求せず、holeがなければStage2 LLMを呼ばない。ただし§12.8のStage 1残部採用では追加LLM要求を始めず、保存ACK後に決定的な残部配送へ進む。有限文法外の語を含むclauseでも、compilerがexactな描画head、ground、またはbackground anchorとclause境界を確定できる場合は、そのclauseだけをknown holeにできる。Exactな境界を持たないUnknown、conflict、integrityエラーは補完対象にしない。後続の継続clauseがpatch可能な上流holeだけを原因として未確定なら、その継続診断はpatch後の再compileまで保留し、後続clause自体を書換え対象へ広げない。
 
 Hole補完の要求には、対象の原文、確定済みtyped fact、有限Saijiki語彙と受理構文を渡す。未認識語句も原文へ残し、compilerが依存を確定した参照先等は必要な範囲だけ読取り専用の文脈として渡せる。読む範囲と編集可能範囲を分け、description、無関係なclause、Score、renderer指示、思考過程は渡さない。複数の色や道具だけから交互配置・順序・数量分配を発明せず、表現できない意味を最も近い別の意味へ変更しない。
 

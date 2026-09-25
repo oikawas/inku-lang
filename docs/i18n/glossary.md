@@ -24,6 +24,7 @@
 |---|---|---|---|
 | 記述 | **description** | 名詞。動詞は write | ~~prompt~~（思想に反する） |
 | 解釈（Stage 1） | **interpretation** / **interpret** | 名詞／動詞 | ~~reading~~（読み取りと混線する） |
+| 下絵（Stage 1 の出力） | **underdrawing** | 名詞。LLM が返す閉じた型の設計で、指示書はここから決定的に印字される。浮世絵の絵師の下絵（彫師が版木を彫る元）に倣った名。2026-09-25 に「作品計画」から改名。実装の識別子 `work_plan` と schema ID は変えない | ~~work plan~~（旧称）、~~sketch~~（写生と紛れる）、~~plan~~ 単独（lowerer の symbolic Plan と紛れる） |
 | 指示書（正規化DDL） | **instructions** | **常に複数形**。初出は "Instructions (normalized DDL)" | ~~instruction~~（単数）、~~spec~~ |
 | 楽譜 | **score**（固有表記は **JSON Score**） | 名詞 | — |
 | 演奏 | **performance** / **perform** | 名詞／動詞 | ~~rendering~~（技術文脈のみ） |

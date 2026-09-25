@@ -66,7 +66,7 @@ composition seedとcaller所有の有限上限を使う。副作用がなく決�
 通常のtyped loweringへ合流する。
 
 Description requestでは、Stage 1が受け取れるのは上限付きsignature、parameter schema、
-短いsummaryだけである。定義bodyや展開済みDDLは決して受け取らない。作品計画は、記述に
+短いsummaryだけである。定義bodyや展開済みDDLは決して受け取らない。下絵は、記述に
 プラグイン名の見出しの語かその言い換えが書かれたときだけ、そのプラグインを名前だけの文
 として選ぶ。summaryは、そのプラグインが何を描くかをLLMが判断できるように書く。
 未知または曖昧な修飾語を含むdirect DDLは、隠れたLLM fallbackを発動しない。その文だけを

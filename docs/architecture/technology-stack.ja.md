@@ -10,9 +10,9 @@
 | Web process | JavaScript（build output） | SvelteKit adapter-node、Node.js 22 | static/UI配信とsame-origin `/api` proxy | `web/Dockerfile`; `web/src/hooks.server.ts` |
 | Server API | Python 3.12 | FastAPI、Pydantic、Uvicorn | HTTP API、認証、共有pipelineのhost、運用status | `server/pyproject.toml`; `server/src/inku_server/api.py` |
 | Server persistence | Python、SQL | SQLAlchemy 2、SQLite | 正本schema、domain store、variation authority、versioned migration、backup | `server/src/inku_server/persistence/`; `persistence/` |
-| Model access | Python / Kotlin | `httpx`（共有pipelineのprovider effect）、OpenAI SDK・Anthropic SDK（奥書・デモ・Vision）、OpenAI-compatible / Gemini HTTP、LiteRT-LM | 写生、色カタログ選択、Stage 1作品計画、known-hole補完、端末内推論 | `server/pyproject.toml`; `server/src/inku_server/pipeline_provider.py`; `android/app/build.gradle.kts` |
+| Model access | Python / Kotlin | `httpx`（共有pipelineのprovider effect）、OpenAI SDK・Anthropic SDK（奥書・デモ・Vision）、OpenAI-compatible / Gemini HTTP、LiteRT-LM | 写生、色カタログ選択、Stage 1下絵、known-hole補完、端末内推論 | `server/pyproject.toml`; `server/src/inku_server/pipeline_provider.py`; `android/app/build.gradle.kts` |
 | Authoring pipeline core | Rust 2024 | `serde` / `serde_json`、`sha2` | authoring state machine、effect protocol、authority遷移、prompt構築、compile／render境界 | `core/crates/inku-pipeline/` |
-| DDL compiler core | Rust 2024 | `serde` / `serde_json`、`sha2` | typed compiler、Macro、Stage 1.5、Plan、資源選択、materialize、作品計画、歳時記asset | `core/crates/inku-ddl/` |
+| DDL compiler core | Rust 2024 | `serde` / `serde_json`、`sha2` | typed compiler、Macro、Stage 1.5、Plan、資源選択、materialize、下絵、歳時記asset | `core/crates/inku-ddl/` |
 | Score core | Rust 2024 | `serde` / `serde_json`、`sha2` | Score型、canonical digest、互換reader、canvas registry、資源authority | `core/crates/inku-score/` |
 | Render core | Rust 2024 | `serde` / `serde_json`、`kurbo`、`svgtypes`、`sha2` | host非依存のplanning、geometry、mark、surface、SVG | `core/crates/inku-render/` |
 | Byte facade | Rust | UniFFI | 所有したJSON byte bufferだけを受け渡すpipeline入口 | `core/crates/inku-pipeline-uniffi/` |
@@ -34,7 +34,7 @@
 | SQL / SQLite DDL | `persistence/`, Server migration、Room export | portable論理制約、物理schema、migration検証 |
 | HTML / CSS / Svelte markup | `web/src/` | browser presentation |
 | Markdown / Mermaid | `SPEC*`, `docs/`, manual、plugin document | 製品契約、architecture、図、plugin文書 |
-| JSON | Score、API、pipeline envelopeとsnapshot、歳時記・作品計画asset、portable contract、fixture | host間の構造化data境界 |
+| JSON | Score、API、pipeline envelopeとsnapshot、歳時記・下絵asset、portable contract、fixture | host間の構造化data境界 |
 | TOML / YAML / KTS | Python/Rust/Android/CI manifest | dependency、build、workflow設定 |
 | Shell | `scripts/` | 製品の build と検査の entry point。非公開運用 entry point は internal repository にある。 |
 

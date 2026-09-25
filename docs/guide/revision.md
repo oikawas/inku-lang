@@ -1,18 +1,16 @@
 # Revision, in detail
 
-This continues "Pursuing the work through revision" in [README.md](../../README.md). The strength
-settings of **variation**, the two ways of handing the work to the AI, and the handling of lineage
+This continues "Pursuing the work through revision" in [README.md](../../README.md). How
+**variation** works, the two ways of handing the work to the AI, and the handling of lineage
 and editions are collected here.
 
-## Variation strength
+## Variation
 
-*Variation* is the one where you say how far to go, in three steps. After it runs, the axes that actually moved are listed, so you never have to guess what changed.
+*Variation* moves the focus to a different candidate. The focus is where the elements the instructions place at the center are actually drawn, chosen from six fixed candidates: upper right, upper left, lower right, lower left, upper edge, and right half. It does not move the instructions, the frame of the composition, technique, color, touch, or element count, and it calls no LLM.
 
-| Strength | Axes that move | Axes that hold |
-|---|---|---|
-| Small | One among type swap and count | Focus, color, composition |
-| Medium | The small axes plus touch, focus, main and contrast color (one or two) | Composition family, type family |
-| Large | The medium axes plus composition family and type family (two to four) | — the structure of the picture moves too |
+The strength (Subtle, Moderate, Sweeping) tells the destinations apart: for the same variation seed, the three strengths each choose a different candidate. It is not a scale on which a larger strength moves further or moves more axes.
+
+*Another composition* also rechooses the focus, and when the description has a slant or a corner it rechooses the concrete angle and the position in the corner as well. Variation keeps the angle and corner that another composition settled.
 
 ## Letting the AI carry it
 

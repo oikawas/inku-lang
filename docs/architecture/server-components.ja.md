@@ -141,7 +141,7 @@ flowchart LR
     JNI["inku-render-android\nJNI: render + raster + pipeline"]
     UNIFFI["inku-pipeline-uniffi\nbyte facade\nstep / canvas / palette / Macro catalog\nStage 1 projection / render_saved"]
     PIPE["inku-pipeline\nmachine / protocol / authority\nprompts / core_boundary / hole_completion / replay"]
-    DDL["inku-ddl\ntyped compiler / Stage 1.5 / Plan / materializer\n作品計画 / visible patch / 歳時記asset"]
+    DDL["inku-ddl\ntyped compiler / Stage 1.5 / Plan / materializer\n下絵 / visible patch / 歳時記asset"]
     SCORE["inku-score\nScore型 / canonical digest / compatibility\ncanvas registry / resource authority"]
     RENDER["inku-render\nrender / checked + typed performance\ngeometry / marks / surfaces / SVG"]
     RASTER["inku-svg-raster\nSVG → premultiplied RGBA8"]

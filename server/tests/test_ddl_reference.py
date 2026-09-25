@@ -14,9 +14,21 @@ from inku_server.layer_versions import DDL_ENGINE_VERSION, DDL_VERSION
 
 SERVER_ROOT = Path(__file__).resolve().parents[1]
 GENERATOR_PATH = SERVER_ROOT / "scripts" / "gen_ddl_reference.py"
-MANIFEST_PATH = (
-    SERVER_ROOT / "reference" / f"ddl-engine-{DDL_ENGINE_VERSION}" / "manifest.json"
-)
+
+
+def _latest_frozen_manifest() -> Path:
+    """The newest shared-Rust DDL record; SPEC §2.1 freezes one only at a checkpoint."""
+    frozen = [
+        (int(path.parent.name.rsplit("-", 1)[-1]), path)
+        for path in (SERVER_ROOT / "reference").glob("ddl-engine-*/manifest.json")
+        if path.parent.name.rsplit("-", 1)[-1].isdigit()
+        and json.loads(path.read_text(encoding="utf-8")).get("baseline_kind")
+        == "shared-rust-pipeline"
+    ]
+    return max(frozen)[1]
+
+
+MANIFEST_PATH = _latest_frozen_manifest()
 
 
 def _generator():
@@ -66,8 +78,11 @@ def test_current_manifest_and_outputs_record_the_three_actual_scores() -> None:
     manifest = _manifest()
     assert manifest["corpus_format_version"] == "2"
     assert manifest["baseline_kind"] == "shared-rust-pipeline"
-    assert manifest["engine_version"] == DDL_ENGINE_VERSION
-    assert manifest["ddl_version"] == DDL_VERSION
+    # The record names its own frozen versions; later engines may move on
+    # without a new directory until the next checkpoint.
+    assert MANIFEST_PATH.parent.name == f"ddl-engine-{manifest['engine_version']}"
+    assert int(manifest["engine_version"]) <= int(DDL_ENGINE_VERSION)
+    assert int(manifest["ddl_version"]) <= int(DDL_VERSION)
     assert manifest["binding_version"] == "1.1.0"
     assert manifest["protocol_version"] == "1.0.0"
     assert set(manifest["cases"]) == set(_generator().CASE_SPECS)

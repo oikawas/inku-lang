@@ -81,21 +81,27 @@ def test_fixture_identity_is_independently_framed_and_complete() -> None:
     assert "pixel9_landscape_safe" not in {item["id"] for item in formats}
 
 
-def test_current_server_legacy_projection_matches_ids_ratios_and_pixels() -> None:
-    fixture = _fixture()
-    legacy = _legacy_formats(fixture)
-    assert [aspect.id for aspect in CANVAS_ASPECTS] == [item["id"] for item in legacy]
+def test_server_offers_the_canonical_registry_and_keeps_every_legacy_paper() -> None:
+    """Since the shared cutover the Server projects the Rust registry itself.
 
-    canonical_by_id = {item["id"]: item for item in fixture["formats"]}
-    for aspect, expected in zip(CANVAS_ASPECTS, legacy, strict=True):
+    The nine papers it offered before keep their ratio and pixels, so a saved
+    work still performs on the paper it was drawn on.
+    """
+    fixture = _fixture()
+    canonical = fixture["formats"]
+    assert [aspect.id for aspect in CANVAS_ASPECTS] == [item["id"] for item in canonical]
+    for aspect, item in zip(CANVAS_ASPECTS, canonical, strict=True):
         assert (aspect.ratio_w, aspect.ratio_h) == (
-            expected["ratio_w"],
-            expected["ratio_h"],
+            float(item["width_units"]),
+            float(item["height_units"]),
         )
-        canonical = canonical_by_id[aspect.id]
+
+    offered = {aspect.id: aspect for aspect in CANVAS_ASPECTS}
+    for expected in _legacy_formats(fixture):
+        aspect = offered[expected["id"]]
         assert math.isclose(
             aspect.ratio_w / aspect.ratio_h,
-            canonical["width_units"] / canonical["height_units"],
+            expected["ratio_w"] / expected["ratio_h"],
             rel_tol=0.0,
             abs_tol=1e-12,
         )
@@ -105,46 +111,23 @@ def test_current_server_legacy_projection_matches_ids_ratios_and_pixels() -> Non
             expected["expected_height_px"],
         )
 
-    server_ids = {aspect.id for aspect in CANVAS_ASPECTS}
-    assert "sd_monitor" not in server_ids
-    assert "hd_monitor" not in server_ids
 
+def test_web_and_android_project_the_shared_registry_instead_of_a_list() -> None:
+    """Neither host keeps its own list of papers; both read the shared registry.
 
-def test_web_and_android_sources_keep_the_legacy_host_boundary() -> None:
-    fixture = _fixture()
-    legacy = _legacy_formats(fixture)
-    expected = [
-        (item["id"], float(item["ratio_w"]), float(item["ratio_h"]))
-        for item in legacy
-    ]
-
+    Android's device-only 9:5 paper stays readable for saved works and is never
+    offered as new paper.
+    """
     web_source = (
         PROJECT_ROOT / "web/src/lib/plugins/system/canvas-aspect/index.ts"
     ).read_text(encoding="utf-8")
-    web_block = web_source.split(
-        "export const CANVAS_ASPECT_OPTIONS: CanvasAspectOption[] = [", 1
-    )[1].split("];", 1)[0]
-    web_entries = [
-        (identifier, float(width), float(height))
-        for identifier, width, height in re.findall(
-            r"\{ id: '([^']+)', category: '[^']+', label: '[^']+', "
-            r"ratio: '[^']+', ratioW: ([0-9.]+), ratioH: ([0-9.]+),",
-            web_block,
-        )
-    ]
-    assert web_entries == expected
+    assert "payload.registry.formats" in web_source
+    assert not re.search(r"\{ id: '[a-z0-9_]+', category: '", web_source)
 
     android_source = (
         PROJECT_ROOT
         / "android/app/src/main/java/app/inku/mobile/data/model/CanvasAspects.kt"
     ).read_text(encoding="utf-8")
-    android_entries = [
-        (identifier, float(width), float(height))
-        for identifier, width, height in re.findall(
-            r'CanvasAspect\("([^"]+)", "[^"]+", "[^"]+", '
-            r"([0-9.]+), ([0-9.]+),",
-            android_source,
-        )
-    ]
-    assert android_entries[:9] == expected
-    assert android_entries[9:] == [("pixel9_landscape_safe", 9.0, 5.0)]
+    assert "get() = registry().formats" in android_source
+    literals = re.findall(r'CanvasAspect\(\s*id = ([A-Z_0-9]+)', android_source)
+    assert literals == ["LEGACY_PIXEL9_LANDSCAPE_SAFE_ID"]

@@ -744,7 +744,9 @@ class Arrangement(BaseModel):
             " / accelerando=後半へ向けて間隔を詰める / loose=ゆるい不均等間隔"
         ),
     )
-    resolved: Optional[ResolvedArrangement] = None
+    # Absent while unset, like the Rust Score, so an arrangement without a
+    # resolved recipe keeps its canonical bytes.
+    resolved: Optional[ResolvedArrangement] = Field(default=None, exclude_if=lambda value: value is None)
 
 
 class Instruction(BaseModel):
@@ -1117,7 +1119,7 @@ class PlacementGroup(BaseModel):
         exclude_if=lambda value: not value,
         description="Score 0.9 Macro body boundaries; absent retains the legacy drawable span",
     )
-    resolved: Optional[ResolvedPlacementGroup] = None
+    resolved: Optional[ResolvedPlacementGroup] = Field(default=None, exclude_if=lambda value: value is None)
     cycle_members: Optional[CycleMembersV1] = Field(default=None, exclude_if=lambda value: value is None)
 
     @model_validator(mode="after")
@@ -1472,6 +1474,9 @@ class Score(BaseModel):
     )
     resource_policy: Optional[ScoreResourcePolicy] = Field(
         default=None,
+        # Absent like every later optional field, so a Score without a policy
+        # keeps the canonical bytes, digest and rh3 it had before the field.
+        exclude_if=lambda value: value is None,
         description="Resource authorities captured for saved-Score replay; demand is recomputed",
     )
 

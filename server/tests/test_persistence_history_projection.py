@@ -137,8 +137,13 @@ def test_persistence_history_owns_projection_and_db_keeps_thin_facades() -> None
         [inspect.Parameter("render_hash", inspect.Parameter.POSITIONAL_OR_KEYWORD, annotation="str | None")],
         return_annotation="str | None",
     )
+    # The listing may withhold the picture and still state the work's weight.
     assert inspect.signature(db._row_to_dict) == inspect.Signature(
-        [inspect.Parameter("row", inspect.Parameter.POSITIONAL_OR_KEYWORD, annotation="HistoryRow")],
+        [
+            inspect.Parameter("row", inspect.Parameter.POSITIONAL_OR_KEYWORD, annotation="HistoryRow"),
+            inspect.Parameter("include_svg", inspect.Parameter.KEYWORD_ONLY, default=True, annotation="bool"),
+            inspect.Parameter("svg_bytes", inspect.Parameter.KEYWORD_ONLY, default=None, annotation="int | None"),
+        ],
         return_annotation="dict",
     )
     assert "return _history.render_hash_short(render_hash)" in inspect.getsource(db.render_hash_short)

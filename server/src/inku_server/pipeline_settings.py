@@ -29,6 +29,12 @@ def select_canvas(config: dict, registry: dict | None, format_id: str) -> dict:
     return selected
 
 
+def _saved_limits(work: dict | None) -> dict | None:
+    """The limits a saved work's row recorded, or None when it recorded none."""
+    saved = (work or {}).get("metadata", {}).get("render_limits")
+    return json.loads(saved) if isinstance(saved, str) else saved
+
+
 class PipelineSettings:
     def __init__(self, binding: PipelineBinding, manifest: dict, *,
                  admin_limits_for: Callable[[str], dict],
@@ -38,16 +44,20 @@ class PipelineSettings:
         self.binding, self.manifest = binding, deepcopy(manifest)
         self.admin_limits_for, self.plugin_storage_for = admin_limits_for, plugin_storage_for
 
-    def config_for(self, owner: str, work: dict | None) -> dict:
+    def config_for(self, owner: str, work: dict | None, requested: dict | None = None) -> dict:
         if work and "saved_config" in work:
             # A derived edition inherits the full saved policy/definition lock.
             return deepcopy(work["saved_config"])
         config = deepcopy(self.manifest["pipeline"])
-        metadata = (work or {}).get("metadata", {})
-        saved_limits = metadata.get("render_limits")
-        if isinstance(saved_limits, str):
-            saved_limits = json.loads(saved_limits)
-        limits = normalize_limits(saved_limits if saved_limits is not None else self.admin_limits_for(owner))
+        saved_limits = _saved_limits(work)
+        if requested is not None:
+            # Element-wise under today's settings, as a saved-Score render
+            # bounds it: a request may lower a ceiling, never raise one.
+            settings = normalize_limits(self.admin_limits_for(owner))
+            asked = normalize_limits(requested)
+            limits = {name: min(asked[name], settings[name]) for name in settings}
+        else:
+            limits = normalize_limits(saved_limits if saved_limits is not None else self.admin_limits_for(owner))
         compiler = config["compiler"]
         # Only the four existing settings are translated. The six additional
         # structural dimensions must be supplied explicitly by the manifest.
@@ -66,6 +76,7 @@ class PipelineSettings:
         policy_bytes = json.dumps(compiler["hard_resource_policy"]["budget"], sort_keys=True, separators=(",", ":")).encode()
         compiler["hard_resource_policy"]["identity"] = "host-settings:" + hashlib.sha256(policy_bytes).hexdigest()
         storage = self.plugin_storage_for(owner).get("canvas-aspect", {})
+        metadata = (work or {}).get("metadata", {})
         selected = metadata.get("render_canvas_aspect_id") or metadata.get("render_canvas_aspect")
         if selected is None:
             selected = "square" if storage.get("enabled") is False else storage.get("selected", "square")
@@ -73,6 +84,29 @@ class PipelineSettings:
             if registry is not None and selected not in {entry["id"] for entry in registry["registry"]["formats"]}:
                 selected = "square"
         return select_canvas(config, self.binding.canvas_registry, selected)
+
+    @staticmethod
+    def limits_source(work: dict | None, requested: dict | None = None) -> str:
+        """Where `config_for` took the limits from, in a saved-Score render's words.
+
+        The order differs from `_limits_for_render` in one place: a derived
+        edition keeps the budgets locked into its saved config, so a request
+        does not outrank them there.
+        """
+        from .api_core.rendering import (
+            LIMITS_SOURCE_REQUEST,
+            LIMITS_SOURCE_SETTINGS,
+            LIMITS_SOURCE_WORK,
+            LIMITS_SOURCE_WORK_UNRECORDED,
+        )
+
+        if work and "saved_config" in work:
+            return LIMITS_SOURCE_WORK
+        if requested is not None:
+            return LIMITS_SOURCE_REQUEST
+        if work is None or "metadata" not in work:
+            return LIMITS_SOURCE_SETTINGS
+        return LIMITS_SOURCE_WORK if _saved_limits(work) is not None else LIMITS_SOURCE_WORK_UNRECORDED
 
     def render_for(self, snapshot: dict) -> dict:
         render = deepcopy(self.manifest["render"])

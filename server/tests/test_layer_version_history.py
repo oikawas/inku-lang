@@ -21,4 +21,8 @@ def test_ddl_engine_history_has_no_gap() -> None:
     history = source[: sum(len(line) for line in source.splitlines(keepends=True)[: assignment.lineno - 1])]
     documented = [int(version) for version in re.findall(r"^# (\d+) \(", history, flags=re.MULTILINE)]
 
-    assert documented == list(range(current, 4, -1))
+    # SPEC §2.1 records each new version only in the changelog, so the comment
+    # history stops where that rule began. What it keeps must stay gapless and
+    # must never claim a version beyond the current one.
+    assert documented == list(range(documented[0], 4, -1))
+    assert documented[0] <= current

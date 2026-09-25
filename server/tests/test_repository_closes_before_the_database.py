@@ -91,7 +91,10 @@ def test_the_gate_has_something_to_watch() -> None:
         for path in _sources()
         if BUILDS_REPOSITORY.search(path.read_text(encoding="utf-8"))
     ]
-    assert len(watched) >= 12, (
+    # Twelve when this gate was written. Retiring the Kotlin decision layers
+    # (03bbd686) removed two of them with the old comparison and passthrough
+    # tests, and one has been added since.
+    assert len(watched) >= 11, (
         f"only {len(watched)} instrumented classes build a repository;"
-        " 12 did when this gate was written"
+        " 11 did after the decision layers were retired"
     )

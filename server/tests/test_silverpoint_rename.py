@@ -25,7 +25,10 @@ def test_the_weight_enum_replaced_the_name_rather_than_adding_one() -> None:
     weights = get_args(Weight)
     assert "silverpoint" in weights
     assert "hair" not in weights
-    assert len(weights) == 11
+    # The rename left eleven tools. Engine 47 later added oil_paint as a tool of
+    # its own, which is an addition, not a second name for the same one.
+    assert len(weights) == 12
+    assert "oil_paint" in weights
 
 
 def test_saved_hair_scores_replay_as_silverpoint() -> None:

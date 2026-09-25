@@ -27,21 +27,23 @@ What each stage can get wrong, and what catches it here:
             and one that says so when it did not (T-103);
   spill     the plugin budget reading a module constant instead of the setting,
             so the warning it writes states a number no administrator set
-            (T-104).
+            (T-104). Since the shared compiler (2026-09-14) the budget reaches
+            the compiler itself, so T-104 reads the number a new drawing ran
+            under and where it came from.
 """
 
 from __future__ import annotations
 
 import copy
 import importlib
-import re
+import json
 import uuid
 
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import text as sql_text
 
-from inku_server import db
+from inku_server import db, pipeline_product
 from inku_server.api import app
 from inku_server.api_core.rendering import (
     LIMITS_SOURCE_HEADER,
@@ -50,10 +52,8 @@ from inku_server.api_core.rendering import (
     LIMITS_SOURCE_WORK,
     LIMITS_SOURCE_WORK_UNRECORDED,
 )
-from inku_server.api_core.routers import render as render_routes
 from inku_server.limits import DEFAULT_LIMITS, LIMIT_FIELD_NAMES, Limits, using_limits
 from inku_server.saved_score_compat import coerce_saved_score
-from inku_server.schema import Score
 
 client = TestClient(app)
 
@@ -294,6 +294,22 @@ def test_t98_a_non_display_export_draws_under_the_work_limits(author, stored_lim
     )
 
 
+class _Stage1:
+    """Stage 1 answering one fixed drawing, so the shared pipeline needs no model."""
+
+    def __init__(self, _options, **_kwargs):
+        pass
+
+    def __call__(self, action):
+        assert action["tag"] == "generate_normalized_ddl", action["tag"]
+        return {
+            "tag": "normalized_ddl_generated",
+            "identity": action["identity"],
+            "response": json.dumps({"normalized_ddl": "中心に黒い円を置く。"}),
+            "elapsed_ms": "3",
+        }
+
+
 # --------------------------------------------------------------------------
 # T-99  the four paths all name their source
 # --------------------------------------------------------------------------
@@ -319,21 +335,7 @@ def test_t99_every_render_path_names_the_limits_source(author, monkeypatch):
     assert svg.status_code == 200, svg.text
     assert svg.headers[LIMITS_SOURCE_HEADER] == LIMITS_SOURCE_SETTINGS
 
-    monkeypatch.setattr(
-        render_routes, "interpret_detail", lambda text, **kw: ("中心に黒い円を置く。", None, 3, 4)
-    )
-    monkeypatch.setattr(
-        render_routes,
-        "compose",
-        lambda ddl, **kw: (
-            Score.model_validate(
-                {"instructions": [{"primitive": "circle", "center": [0.5, 0.5], "radius": 0.1}]}
-            ),
-            5,
-            6,
-        ),
-    )
-
+    monkeypatch.setattr(pipeline_product, "SingleAttemptProvider", _Stage1)
     painted = client.post("/api/paint", json={"description": "一滴の墨"}, headers=headers)
     assert painted.status_code == 200, painted.text
     assert painted.json()["render_limits_source"] == LIMITS_SOURCE_SETTINGS
@@ -533,40 +535,38 @@ def test_t103_a_limit_that_did_not_take_effect_says_nothing(author):
 # --------------------------------------------------------------------------
 
 
-def test_t104_the_plugin_budget_states_the_number_that_is_in_force(
+def test_t104_a_new_drawing_runs_under_the_budget_that_is_in_force(
     author, stored_limits, monkeypatch
 ):
-    """The warning writes the budget into its own text.
+    """The work budget a new drawing is compiled under is today's setting.
 
-    Reading `DEFAULT_LIMITS.max_expanded_primitives` there made the sentence say
-    400 on an installation that had set 100 -- and on one that had set 900 it
-    declined an expansion that fitted. This is the fourth direct value [I-132]
-    did not name.
+    This read the number back out of the plugin warning, which wrote
+    `DEFAULT_LIMITS.max_expanded_primitives` into its own text: 400 on an
+    installation that had set 100. The warning left with the Python expander
+    (2026-09-14); the shared compiler receives the budget itself, so the answer
+    says which number drew the work, and a request may lower it but not raise it.
     """
     headers, _user, _created = author
     stored_limits({"max_expanded_primitives": 100})
+    monkeypatch.setattr(pipeline_product, "SingleAttemptProvider", _Stage1)
 
-    monkeypatch.setattr(
-        render_routes, "interpret_detail", lambda text, **kw: ("Nature.青葉を二十個置く。", None, 3, 4)
-    )
-    monkeypatch.setattr(
-        render_routes,
-        "compose",
-        lambda ddl, **kw: (
-            Score.model_validate(
-                {"instructions": [{"primitive": "circle", "center": [0.5, 0.5], "radius": 0.1}]}
-            ),
-            5,
-            6,
-        ),
-    )
+    def paint(**body) -> dict:
+        painted = client.post("/api/paint", json={"description": "青葉を二十", **body}, headers=headers)
+        assert painted.status_code == 200, painted.text
+        return painted.json()
 
-    painted = client.post("/api/paint", json={"description": "青葉を二十"}, headers=headers)
-    assert painted.status_code == 200, painted.text
-    warnings = painted.json()["plugin_warnings"]
-    budgets = {int(found) for line in warnings for found in re.findall(r"(\d+)-mark work budget", line)}
-    assert budgets == {100}, warnings
-    assert DEFAULT_LIMITS.max_expanded_primitives not in budgets
+    drawn = paint()
+    assert drawn["render_limits"]["max_expanded_primitives"] == 100
+    assert DEFAULT_LIMITS.max_expanded_primitives != 100
+    assert drawn["render_limits_source"] == LIMITS_SOURCE_SETTINGS
+
+    lowered = paint(limits={"max_expanded_primitives": 50})
+    assert lowered["render_limits"]["max_expanded_primitives"] == 50
+    assert lowered["render_limits_source"] == LIMITS_SOURCE_REQUEST
+
+    raised = paint(limits={"max_expanded_primitives": 900})
+    assert raised["render_limits"]["max_expanded_primitives"] == 100
+    assert raised["render_limits_source"] == LIMITS_SOURCE_REQUEST
 
 
 # --------------------------------------------------------------------------
@@ -574,13 +574,13 @@ def test_t104_the_plugin_budget_states_the_number_that_is_in_force(
 # --------------------------------------------------------------------------
 
 
-def test_t108_a_second_key_in_a_declared_schema_still_fails_all_three_gates(monkeypatch):
+def test_t108_a_second_key_in_a_declared_schema_still_fails_the_surface_gate(monkeypatch):
     """Six schemas were declared to move. Nothing else in them may.
 
     A declaration written as a bare name -- "this schema is allowed to change"
-    -- passes anything that happens inside it afterwards, and the three gates
+    -- passes anything that happens inside it afterwards, and the gate
     would then be measuring the schema list rather than the schemas. So the
-    surface is doctored with one extra property in one declared schema and each
+    surface is doctored with one extra property in one declared schema and the
     gate is required to notice.
 
     `app.openapi` is replaced rather than the model, because FastAPI settles a
@@ -598,24 +598,15 @@ def test_t108_a_second_key_in_a_declared_schema_still_fails_all_three_gates(monk
 
     monkeypatch.setattr(app, "openapi", doctored)
 
+    # The ACL and card gates left with the legacy decision layers (2026-09-14),
+    # and T-8 no longer hashes schema bodies (2026-09-25); every byte of the
+    # surface is now measured by the one gate against the recorded baseline.
     gates = [
-        (
-            "test_the_acl_only_adds_to_the_api_surface",
-            "test_the_surface_gained_exactly_the_sharing_routes_and_nothing_else",
-        ),
-        (
-            "test_the_card_only_adds_one_route",
-            "test_the_surface_gained_exactly_the_card_and_nothing_else",
-        ),
-        (
-            "test_the_groups_decide_what_you_may_do",
-            "test_t8_the_api_surface_delta_is_exactly_the_three_user_schemas",
-        ),
+        ("test_api_surface", "test_api_surface_is_unchanged"),
     ]
     for module_name, test_name in gates:
-        # As siblings in this package, not by path: two of the three reach the
-        # surface through `from .test_api_surface import ...`, and a path load
-        # gives them no parent package to resolve that against.
+        # As a sibling in this package, the way the other surface readers
+        # import it.
         module = importlib.import_module(f"{__package__}.{module_name}")
         with pytest.raises(AssertionError):
             getattr(module, test_name)()

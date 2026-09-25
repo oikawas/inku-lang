@@ -80,7 +80,7 @@ def test_generated_ts_matches_table():
 _EXPECTED_PAIRING: dict[str, tuple[tuple[str, str], ...]] = {
     "katachi": (
         ("円", "circle"), ("楕円", "ellipse"), ("三角", "triangle"), ("四角", "square"),
-        ("線", "line"), ("弧", "arc"), ("雲形", "cloudform"),
+        ("線", "line"), ("弧", "arc"), ("点", "point"), ("雲形", "cloudform"),
     ),
     "katamuki": (
         ("水平", "horizontal"), ("垂直", "vertical"), ("斜め", "diagonal"),
@@ -141,7 +141,8 @@ _EXPECTED_PAIRING: dict[str, tuple[tuple[str, str], ...]] = {
     ),
     "aida": (
         ("沿う", "along"), ("触れない", "not touching"), ("切る", "cutting"),
-        ("間に", "between"), ("触れる", "touching"),
+        ("間に", "between"), ("触れる", "touching"), ("つながる", "connected"),
+        ("鏡写し", "mirrored"),
     ),
 }
 

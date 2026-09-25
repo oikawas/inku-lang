@@ -19,7 +19,9 @@ def test_surface_intensity_wire_defaults_and_supported_fill_domain() -> None:
             assert "surface_intensity" not in json.loads(encoded)["instructions"][0]
         else:
             assert json.loads(encoded)["instructions"][0]["surface_intensity"] == level
-    assert Score.model_fields["version"].default == "0.3.0"
+    # A new flat Score defaults to 0.9, the flat compatibility edition (SPEC
+    # §4.6); a saved Score without a version still reads as 0.1.
+    assert Score.model_fields["version"].default == "0.9.0"
     assert Score.model_validate({"instructions": []}).version == "0.1.0"
     for edition in ("0.1.0", "0.2.0", "0.3.0"):
         wire = {**old, "version": edition}

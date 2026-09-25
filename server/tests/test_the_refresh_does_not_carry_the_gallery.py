@@ -16,6 +16,7 @@ decision and is measured next door, in
 
 from __future__ import annotations
 
+import json
 import uuid
 
 import pytest
@@ -24,7 +25,7 @@ from fastapi.testclient import TestClient
 from inku_server import db
 from inku_server.api import app
 
-from .test_the_acl_only_adds_to_the_api_surface import ADDED_OPERATIONS
+from .test_api_surface import BASELINE
 
 
 client = TestClient(app)
@@ -213,5 +214,12 @@ def test_t10_the_new_route_is_named_in_what_this_branch_may_add() -> None:
     route appeared". The guard next door checks that nothing else moved with it;
     this checks that the name is on the list at all, which is the thing a
     forgetful implementation drops.
+
+    The list was the ACL gate's declaration of routes added since `3450548c`;
+    that gate left on 2026-09-14, and the recorded surface the whole-surface
+    gate reads is where a route is now named.
     """
-    assert "GET /api/history/state" in ADDED_OPERATIONS
+    recorded = json.loads(BASELINE.read_text(encoding="utf-8"))
+    assert ("GET", "/api/history/state") in {
+        (op["method"], op["path"]) for op in recorded["operations"]
+    }

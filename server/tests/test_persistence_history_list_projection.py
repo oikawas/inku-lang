@@ -8,7 +8,7 @@ import pytest
 
 from inku_server import db
 from inku_server.persistence import history
-from inku_server.persistence.schema import LineageEdgeRow, LineageNodeRow
+from inku_server.persistence.schema import HistoryAclRow, LineageEdgeRow, LineageNodeRow, PipelineHistoryLinkRow
 
 
 class _Query:
@@ -21,7 +21,19 @@ class _Query:
         self._filters = filters
         return self
 
+    def distinct(self) -> "_Query":
+        return self
+
     def all(self) -> list[SimpleNamespace]:
+        # The shared-pipeline history links are one separate read per listing;
+        # they are kept apart so the lineage query order below stays exact.
+        if self._model is PipelineHistoryLinkRow:
+            self._session.link_calls.append(self._filters)
+            return []
+        # Which of the caller's own works are shared with someone by name.
+        if self._model is HistoryAclRow.history_id:
+            self._session.acl_calls.append(self._filters)
+            return []
         self._session.calls.append((self._model, self._filters))
         if self._model is LineageNodeRow:
             return self._session.nodes
@@ -37,6 +49,8 @@ class _ProjectionSession:
         self.nodes = nodes
         self.edge_batches = edge_batches
         self.calls: list[tuple[type, tuple[object, ...]]] = []
+        self.link_calls: list[tuple[object, ...]] = []
+        self.acl_calls: list[tuple[object, ...]] = []
 
     def query(self, model: type) -> _Query:
         return _Query(self, model)
@@ -74,8 +88,12 @@ def test_history_list_projector_is_the_frozen_sole_owner_and_db_is_a_facade(monk
         projector.row_to_dict_fn = lambda row: {"id": row.id}
 
     signature = inspect.signature(db._rows_to_dicts_with_lineage)
-    assert list(signature.parameters) == ["session", "rows", "actor"]
+    assert list(signature.parameters) == ["session", "rows", "actor", "include_svg", "svg_bytes_by_id"]
     assert signature.parameters["actor"].default is None
+    # The listing may withhold the pictures and still state each work's weight.
+    assert signature.parameters["include_svg"].kind is inspect.Parameter.KEYWORD_ONLY
+    assert signature.parameters["include_svg"].default is True
+    assert signature.parameters["svg_bytes_by_id"].default is None
     facade_source = inspect.getsource(db._rows_to_dicts_with_lineage)
     assert "HistoryListProjector" in facade_source
     assert "session.query" not in facade_source
@@ -125,8 +143,9 @@ def test_projector_keeps_order_shared_markers_and_no_node_fast_path():
         lambda edge: {"metadata": {"unreachable": True}},
     )
 
+    # The caller's own work states whether it is shared with anyone by name.
     assert projector.rows_to_dicts_with_lineage(session, rows, actor={"id": "owner"}) == [
-        {"id": "mine"},
+        {"id": "mine", "has_acl_shares": False},
         {"id": "shared", "shared": True},
     ]
     assert projector.rows_to_dicts_with_lineage(_ProjectionSession([], []), rows) == [
@@ -175,14 +194,16 @@ def test_projector_preserves_queries_generation_owner_gates_and_provenance():
         "lineage_parent_node_id": "parent",
         "derivation_kind": "description_edit",
         "derivation_metadata": {"edge": "child"},
+        "has_acl_shares": False,
     }
     assert items[1] == {
         "id": "root-work",
         "lineage_root_node_id": "root",
         "lineage_generation": 1,
         "lineage_state": "lineage_only",
+        "has_acl_shares": False,
     }
-    assert items[2] == {"id": "mismatch-work"}
+    assert items[2] == {"id": "mismatch-work", "has_acl_shares": False}
     assert edge_calls == ["child"]
     assert [model for model, _ in session.calls] == [
         LineageNodeRow,

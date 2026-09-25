@@ -1,9 +1,24 @@
-"""OpenAPI surface helpers shared by focused authorization tests."""
+"""No client-observable byte of the API moves unless the recorded surface moves with it.
+
+Route count and the authorization gate do not cover response models, status
+codes, parameters or request bodies: an endpoint can keep its path and its
+guard while quietly losing a response field (measured 2026-08-01 -- dropping
+HistoryListResponse.limit left both of those green).  So compare the whole
+normalized surface against the recorded baseline, which is regenerated in the
+same change whenever the surface legitimately moves.
+
+The comparison left with the legacy decision layers (2026-09-14) while the
+baseline kept being regenerated, so it recorded changes nothing read.  It is
+back; the helpers below are also shared by focused authorization tests.
+"""
 
 import hashlib
 import json
+import pathlib
 
 from inku_server.api import app
+
+BASELINE = pathlib.Path(__file__).parent / "data" / "api-surface-baseline.json"
 
 
 def _stable(obj) -> str:
@@ -46,3 +61,19 @@ def current_surface() -> dict:
     }
     surface["digest"] = hashlib.sha256(_stable(surface).encode()).hexdigest()
     return surface
+
+
+def test_api_surface_is_unchanged():
+    expected = json.loads(BASELINE.read_text(encoding="utf-8"))
+    actual = current_surface()
+
+    # Name the first differing operation rather than only the hash: a bare
+    # digest mismatch says nothing about what moved.
+    by_key = {(o["method"], o["path"]): o for o in expected["operations"]}
+    for op in actual["operations"]:
+        key = (op["method"], op["path"])
+        assert key in by_key, f"new endpoint: {key}"
+        assert op == by_key[key], f"endpoint changed: {key}"
+    assert {(o["method"], o["path"]) for o in actual["operations"]} == set(by_key)
+    assert actual["schemas"] == expected["schemas"]
+    assert actual["digest"] == expected["digest"]

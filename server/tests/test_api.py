@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import builtins
+import importlib
 import importlib.metadata
 import json
 from datetime import datetime, timezone
@@ -27,7 +28,7 @@ from inku_server.api_core.routers import history as history_routes
 from inku_server.api_core.routers import public as public_routes
 from inku_server.api_core.routers import settings as settings_routes
 from inku_server.api import app
-from inku_server.layer_versions import DDL_ENGINE_VERSION
+from inku_server.layer_versions import DDL_ENGINE_VERSION, DDL_VERSION
 from inku_server.model_settings import (
     connection_for,
     default_model_settings,
@@ -119,8 +120,8 @@ def test_info_reports_version_build_number_and_developer_mode(monkeypatch):
     assert data["build_number"]
     assert data["developer_mode"] is False
     assert data["render_engine_id"] == "default"
-    assert data["render_engine_version"] == "41"
-    assert data["ddl_version"] == "3"
+    assert data["render_engine_version"] == importlib.import_module("inku_render").render_engine_version()
+    assert data["ddl_version"] == DDL_VERSION
     assert data["ddl_engine_version"] == DDL_ENGINE_VERSION
 
     monkeypatch.setenv("INKU_DEVELOPER_MODE", "1")
@@ -1096,16 +1097,29 @@ def test_render_score_changes_only_catalog_metadata_and_colors(auth_context):
     assert alternate_data["svg"] != data["svg"]
 
 
-def _h16_coerce_input() -> tuple[dict, str]:
-    cases = json.loads(
-        (REPO_ROOT / "server/tests/golden/coerce_golden.json").read_text(encoding="utf-8")
-    )
-    case = cases["cases"]["H-16"]["input"]
-    return case["score"], case["ddl"]
+def _saved_flat_score() -> dict:
+    """A saved flat Score: a filled shape, a line, and a scattered group.
+
+    These checks used to borrow case H-16 from the coerce golden, which left
+    with the retired coerce layer. They only need a saved Score of that kind.
+    """
+    return {
+        "background": "white",
+        "canvas": "square",
+        "instructions": [
+            {"primitive": "square", "position": [0.75, 0.35], "size": [0.1, 0.3],
+             "color": "red", "weight": "crayon", "filled": True},
+            {"primitive": "line", "from": [0.8, 0.7], "to": [0.8, 0.85],
+             "color": "black", "weight": "brush_thin"},
+            {"primitive": "ellipse", "center": [0.5, 0.5], "size": [0.02, 0.015],
+             "color": "white", "weight": "pencil",
+             "arrangement": {"count": 40, "layout": "scatter"}},
+        ],
+    }
 
 def test_render_score_empty_ddl_draws_the_same_svg_as_no_ddl(auth_context):
     headers, _, _ = auth_context
-    score, _ = _h16_coerce_input()
+    score = _saved_flat_score()
     payload = {"score": score, "render_seed": 123}
 
     absent = client.post("/api/render-score", json=payload, headers=headers)
@@ -1121,7 +1135,7 @@ def test_render_score_empty_ddl_draws_the_same_svg_as_no_ddl(auth_context):
 
 def test_render_score_without_ddl_matches_the_old_render_svg_drawing(auth_context):
     headers, _, _ = auth_context
-    score, _ = _h16_coerce_input()
+    score = _saved_flat_score()
     payload = {
         "score": score,
         "catalog_id": "default",
@@ -1222,7 +1236,7 @@ def test_paint_rejects_unknown_catalog_id(auth_context):
     headers, _, _ = auth_context
     r = client.post("/api/paint", json={"description": "緑の円", "catalog_id": "missing"}, headers=headers)
     assert r.status_code == 422
-    assert "unsupported color catalog" in r.json()["detail"]
+    assert r.json()["detail"]["code"] == "unknown_color_catalog"
 
 
 def test_save_output_files_logs_missing_png_dependency(tmp_path, monkeypatch, caplog):
@@ -1447,14 +1461,14 @@ def test_settings_status_is_admin_only(tmp_path, monkeypatch):
     assert data["db_backup"]["max_generations"] == 4
     assert data["plugins"]["enabled"] is True
     assert data["plugins"]["runtime_editable"] is True
-    assert data["plugins"]["loaded"][0] == {
-        "name": "canvas-aspect",
-        "namespace": "system",
-        "version": "0.1.0",
-        "status": "enabled",
-        "entries": [],
-        "reasons": [],
-    }
+    # The canvas is owned by the shared registry, not by a plugin (SPEC §4.4),
+    # so the loaded documents are the vocabulary plugins, led by the bundled one.
+    loaded = {(item["namespace"], item["name"]): item for item in data["plugins"]["loaded"]}
+    assert ("system", "canvas-aspect") not in loaded
+    bundled = loaded[("Nature", "leaves")]
+    assert bundled["status"] == "enabled"
+    assert bundled["entries"]
+    assert bundled["reasons"] == []
     assert data["output_save"]["workers"] >= 1
     assert data["output_save"]["queue_limit"] >= data["output_save"]["workers"]
     assert data["output_save"]["enabled"] is True
@@ -1474,7 +1488,8 @@ def test_settings_status_is_admin_only(tmp_path, monkeypatch):
     assert data["stage_execution"]["workers"] >= 1
     assert data["stage_execution"]["queue_limit"] >= data["stage_execution"]["workers"]
     assert {"submitted", "completed", "failed", "timed_out", "rejected"} <= set(data["stage_execution"])
-    assert "bounded executor" in data["stage_execution"]["note"]
+    # Model effects run in the shared pipeline worker pool; the core owns retries.
+    assert "worker pool" in data["stage_execution"]["note"]
 
     db.delete_session(admin_token)
     db.delete_session(user_token)

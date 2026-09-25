@@ -2,7 +2,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use crate::determinism::seed_salt_index_digest;
+use crate::determinism::{SaltedStream, seed_salt_index_digest};
 use crate::geometry::centerline_normals;
 use crate::support::{DEFAULT_SUPPORT, Support, support_response};
 use crate::types::{Point, Seed, Weight};
@@ -188,12 +188,20 @@ pub struct ContourStrokeRequest<'a> {
     pub terminal: StrokeTerminal,
 }
 
+fn unit_from_digest(digest: [u8; 32]) -> f64 {
+    let raw = u64::from_le_bytes(digest[..8].try_into().expect("eight digest bytes"));
+    raw as f64 / u64::MAX as f64
+}
+
 /// Stable unit value used by all stroke and support event streams.
 #[must_use]
 pub(crate) fn unit(seed: Seed, label: &str, index: i64) -> f64 {
-    let digest = seed_salt_index_digest(seed, label, i128::from(index));
-    let raw = u64::from_le_bytes(digest[..8].try_into().expect("eight digest bytes"));
-    raw as f64 / u64::MAX as f64
+    unit_from_digest(seed_salt_index_digest(seed, label, i128::from(index)))
+}
+
+/// `unit(seed, label, index)` for a stream whose seed and label are fixed.
+pub(crate) fn stream_unit(stream: &SaltedStream, index: i64) -> f64 {
+    unit_from_digest(stream.digest(i128::from(index)))
 }
 
 /// Salts of the latent-energy octaves, spelled as `format!("energy-{octave}")`.
@@ -241,33 +249,31 @@ pub fn latent_energy(t: f64, seed: Seed) -> f64 {
 /// samples share lattice points. Each cached value is `unit(seed, salt,
 /// index)` itself, so a stroke is performed exactly as before.
 struct NoiseField {
-    seed: Seed,
-    salt: &'static str,
+    stream: SaltedStream,
     frequency: f64,
     lattice: Vec<Option<f64>>,
 }
 
 impl NoiseField {
-    fn new(seed: Seed, salt: &'static str, frequency: f64) -> Self {
+    fn new(seed: Seed, salt: &str, frequency: f64) -> Self {
         // Parameters in [0, 1] reach lattice points 0 ..= ceil(frequency) + 1.
         let points = frequency.ceil() as usize + 2;
         Self {
-            seed,
-            salt,
+            stream: SaltedStream::new(seed, salt),
             frequency,
             lattice: vec![None; points],
         }
     }
 
     fn sample(&mut self, t: f64) -> f64 {
-        let (seed, salt, lattice) = (self.seed, self.salt, &mut self.lattice);
+        let (stream, lattice) = (&self.stream, &mut self.lattice);
         interpolate_lattice(t * self.frequency, |index| {
             match usize::try_from(index)
                 .ok()
                 .and_then(|slot| lattice.get_mut(slot))
             {
-                Some(slot) => *slot.get_or_insert_with(|| unit(seed, salt, index)),
-                None => unit(seed, salt, index),
+                Some(slot) => *slot.get_or_insert_with(|| stream_unit(stream, index)),
+                None => stream_unit(stream, index),
             }
         })
     }
@@ -383,8 +389,9 @@ fn loaded_profile(t: f64) -> f64 {
 fn event_map(seed: Seed, rate: f64, count: usize) -> BTreeMap<usize, StrokeEvent> {
     let mut events = BTreeMap::new();
     let probability = (rate / count.saturating_sub(2).max(1) as f64).min(0.12);
+    let arrivals = SaltedStream::new(seed, "event-arrival");
     for index in 3..count.saturating_sub(3) {
-        if unit(seed, "event-arrival", index as i64) < probability {
+        if stream_unit(&arrivals, index as i64) < probability {
             let kind = (unit(seed, "event-kind", index as i64) * 3.0) as usize % 3;
             events.insert(
                 index,

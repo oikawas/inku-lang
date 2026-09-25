@@ -85,6 +85,33 @@ pub(crate) fn seed_salt_index_digest(seed: Seed, salt: &str, index: i128) -> [u8
     hasher.finalize().into()
 }
 
+/// Digests of `"{seed}:{salt}:{index}"` for one seed and salt and many indices.
+///
+/// The hasher state after the shared prefix is kept and cloned for each
+/// index, so a loop over samples formats the seed and writes the prefix once.
+/// The hashed bytes are those of [`seed_salt_index_digest`].
+#[derive(Clone)]
+pub(crate) struct SaltedStream {
+    prefix: Sha256,
+}
+
+impl SaltedStream {
+    pub(crate) fn new(seed: Seed, salt: &str) -> Self {
+        let mut prefix = Sha256::new();
+        prefix.update(DecimalText::new(seed).as_bytes());
+        prefix.update(b":");
+        prefix.update(salt.as_bytes());
+        prefix.update(b":");
+        Self { prefix }
+    }
+
+    pub(crate) fn digest(&self, index: i128) -> [u8; 32] {
+        let mut hasher = self.prefix.clone();
+        hasher.update(DecimalText::new(index).as_bytes());
+        hasher.finalize().into()
+    }
+}
+
 /// Map an integer and seed to the same signed unit interval used by Engine 40.
 #[must_use]
 pub fn hash_to_unit(index: i64, seed: Seed) -> f64 {
@@ -373,6 +400,10 @@ mod tests {
                 assert_eq!(
                     seed_index_digest(seed, index),
                     sha256(format!("{seed}:{index}").as_bytes())
+                );
+                assert_eq!(
+                    SaltedStream::new(seed, "salt").digest(index),
+                    sha256(format!("{seed}:salt:{index}").as_bytes())
                 );
             }
         }

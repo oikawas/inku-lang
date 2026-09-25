@@ -1030,6 +1030,8 @@ export const en: LangPack = {
 	historySelectionCount: (n) => `${groupDigits(n)} selected`,
 	historySelectionCleared: (reason) => ({ query: 'Selection cleared because the search changed.', filter: 'Selection cleared because the filter changed.', trash: 'Selection cleared because the trash view changed.' })[reason],
 	historyPreviewTitle: 'Work preview',
+	historyPreviewDetails: 'Work details',
+	historyPreviewOpenHint: 'Double-click to open the work',
 	historyPreviewLoading: 'Loading work…',
 	historyPreviewUnavailable: 'The work details could not be loaded.',
 	historyPreviewOpenArtwork: 'Open work',

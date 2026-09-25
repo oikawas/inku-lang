@@ -955,6 +955,8 @@ export interface LangPack {
 	historySelectionCount: (n: number) => string;
 	historySelectionCleared: (reason: 'query' | 'filter' | 'trash') => string;
 	historyPreviewTitle: string;
+	historyPreviewDetails: string;
+	historyPreviewOpenHint: string;
 	historyPreviewLoading: string;
 	historyPreviewUnavailable: string;
 	historyPreviewOpenArtwork: string;

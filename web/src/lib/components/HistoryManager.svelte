@@ -12,6 +12,7 @@
 	import { formatByteSize, groupDigits } from '$lib/formatNumber';
 	import { formatHistoryMinute, historyListDescription } from '$lib/historyManagerPresentation';
 	import { historyGridPageSize } from '$lib/historyManagerSizing';
+	import { getCanvasAspectOption } from '$lib/plugins/system/canvas-aspect';
 	import HistoryDescription from '$lib/components/HistoryDescription.svelte';
 
 	type HistoryItem = {
@@ -534,6 +535,11 @@
 		if (previewReady && previewItem) onOpenArtwork(previewItem);
 	}
 
+	function activatePreviewArtwork(event: MouseEvent): void {
+		// Keyboard activation and touch use one press; a mouse uses a double-click.
+		if (event.detail === 0 || ('pointerType' in event && event.pointerType === 'touch')) previewArtwork();
+	}
+
 	function previewLineage(): void {
 		if (previewReady && previewItem) onOpenLineage(previewItem);
 	}
@@ -868,12 +874,21 @@
 			{#if previewLoading}<p>{t().historyPreviewLoading}</p>{/if}
 			{#if previewError}<p>{t().historyPreviewUnavailable}</p>{/if}
 			{#if previewItem && !previewLoading && !previewError}
-				<div class="history-preview-art"><HistoryThumbnail item={previewItem} scope={'library-preview-' + previewItem.id} size="manager" /></div>
+				<button
+					class="history-preview-art"
+					type="button"
+					aria-label={t().historyPreviewOpenArtwork}
+					title={t().historyPreviewOpenHint}
+					onclick={activatePreviewArtwork}
+					ondblclick={previewArtwork}
+				>
+					<HistoryThumbnail item={previewItem} scope={'library-preview-' + previewItem.id} size="manager" />
+				</button>
+				<p class="history-preview-open-hint">{t().historyPreviewOpenHint}</p>
 				<p class="history-preview-description">{previewItem.source_text ?? previewItem.input}</p>
 				{@render shareStatus(previewItem)}
 				<div class="history-preview-actions">
 					{#if previewReady}
-						<button class="ghost-btn" type="button" onclick={previewArtwork}>{t().historyPreviewOpenArtwork}</button>
 						<button class="ghost-btn" type="button" onclick={previewLineage}>{t().historyPreviewOpenLineage}</button>
 						<button class="ghost-btn" type="button" onclick={previewRefine}>{t().historyPreviewRefine}</button>
 						{#if onShareItem && previewItem && !previewItem.shared}<button class="ghost-btn" type="button" onclick={() => previewItem && onShareItem?.(previewItem)}>{isJapanese ? '共有設定' : 'Share settings'}</button>{/if}
@@ -890,6 +905,44 @@
 						/>
 					{/if}
 				</div>
+				<section class="history-preview-details" aria-label={t().historyPreviewDetails}>
+					<h3>{t().historyPreviewDetails}</h3>
+					<dl>
+						<div><dt>{t().historyCreatedAtHeader}</dt><dd>{formatHistoryMinute(previewItem.at, isJapanese ? 'ja-JP' : 'en-US')}</dd></div>
+						{#each modelLines(previewItem) as model}
+							<div><dt>{model.label ?? t().historyModelHeader}</dt><dd>{model.full}</dd></div>
+						{/each}
+						<div><dt>{t().historyCatalogHeader}</dt><dd>{catalogName(previewItem.catalog_id)}</dd></div>
+						{#if previewItem.render_canvas_aspect_id || previewItem.render_canvas_aspect}
+							<div><dt>{t().historyCanvasHeader}</dt><dd>{getCanvasAspectOption(previewItem.render_canvas_aspect_id ?? previewItem.render_canvas_aspect).label}</dd></div>
+						{/if}
+						{#if previewItem.elapsed_ms != null}
+							<div><dt>{t().historySecondsHeader}</dt><dd>{groupDigits(previewItem.elapsed_ms / 1000, 1)} s</dd></div>
+						{/if}
+						<div><dt>{t().historySvgSizeHeader}</dt><dd>{formatByteSize(previewItem.svg_bytes)}</dd></div>
+						<div><dt>{t().historyStripFieldEngineVersion}</dt><dd>{previewItem.render_engine_version ?? t().historyVersionNotRecorded}</dd></div>
+						{#if previewItem.lineage_generation}
+							<div><dt>{t().historyStripFieldGeneration}</dt><dd>{groupDigits(previewItem.lineage_generation)}</dd></div>
+						{/if}
+						{#if previewItem.render_hash}
+							<div>
+								<dt>{t().historyHashHeader}</dt>
+								<dd class="history-preview-hash">
+									<span>#{(previewItem.render_hash_short ?? previewItem.render_hash.slice(-4)).toUpperCase()}</span>
+									<button
+										type="button"
+										title={copiedHistoryHash === previewItem.render_hash ? t().historyHashCopied : t().historyHashCopyTitle}
+										aria-label={t().historyHashCopyTitle}
+										onclick={(event) => previewItem && copyHash(previewItem, event)}
+									>
+										<svg viewBox="0 0 20 20" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="7" y="7" width="10" height="10" rx="1.5"/><path d="M13 7V4.5A1.5 1.5 0 0 0 11.5 3h-7A1.5 1.5 0 0 0 3 4.5v7A1.5 1.5 0 0 0 4.5 13H7"/></svg>
+									</button>
+								</dd>
+							</div>
+						{/if}
+						{#if previewItem.note}<div><dt>{t().selectionNoteLabel}</dt><dd>{previewItem.note}</dd></div>{/if}
+					</dl>
+				</section>
 			{/if}
 		</aside>
 	{/if}
@@ -1355,9 +1408,21 @@
 		background: var(--panel2);
 	}
 	.history-preview-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+	.history-preview-art { display: block; width: 100%; padding: 0; border: 1px solid var(--border2); border-radius: var(--r); background: var(--panel); color: inherit; overflow: hidden; cursor: pointer; }
+	.history-preview-art:hover { border-color: var(--accent); }
+	.history-preview-art:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 	.history-preview-art :global(svg) { display: block; width: 100%; max-height: 240px; }
+	.history-preview-open-hint { margin: 5px 0 0; color: var(--fg3); font-size: var(--ui-font-size-10); text-align: right; }
 	.history-preview-description { white-space: pre-wrap; font-size: var(--ui-font-size-14); line-height: 1.55; }
 	.history-preview-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+	.history-preview-details { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--border2); }
+	.history-preview-details h3 { margin: 0 0 8px; font-size: var(--ui-font-size-12); font-weight: 600; }
+	.history-preview-details dl { margin: 0; }
+	.history-preview-details dl > div { display: grid; grid-template-columns: 94px minmax(0, 1fr); gap: 8px; padding: 5px 0; border-top: 1px solid var(--border); font-size: var(--ui-font-size-12); line-height: 1.4; }
+	.history-preview-details dt { color: var(--fg3); }
+	.history-preview-details dd { min-width: 0; margin: 0; overflow-wrap: anywhere; }
+	.history-preview-hash { display: flex; align-items: center; gap: 8px; }
+	.history-preview-hash button { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; padding: 0; border: 1px solid var(--border2); border-radius: var(--btn-sm-radius); background: var(--panel); color: var(--fg); cursor: pointer; }
 	.history-manager-pager {
 		display: flex;
 		align-items: center;

@@ -18,8 +18,18 @@ git-setup:
 	./scripts/git/setup.sh
 
 # Keep each suite callable from the same repository-root entry point.
+# The Server keeps the separately deployed native wheel out of its dependency
+# graph, so its suite builds the wheel from this checkout on every run and
+# injects it. `uv run --with <crate dir>` reuses a cached build after the Rust
+# sources change; a wheel built here cannot be stale. `rustup run` keeps the
+# pinned toolchain even where another cargo comes first on PATH.
+RUST_CHANNEL := $(shell sed -n 's/^channel = "\(.*\)"/\1/p' core/rust-toolchain.toml)
+NATIVE_WHEEL_DIR := $(CURDIR)/.native-wheel
+
 test-server: git-setup
-	cd server && uv run pytest -q -rs $(PYTEST_ARGS)
+	rm -rf "$(NATIVE_WHEEL_DIR)"
+	rustup run $(RUST_CHANNEL) uv build --wheel core/crates/inku-render-python -o "$(NATIVE_WHEEL_DIR)"
+	cd server && uv run --with "$$(ls "$(NATIVE_WHEEL_DIR)"/*.whl)" pytest -q -rs $(PYTEST_ARGS)
 
 test-cli: git-setup
 	cd cli && uv run pytest -q -rs $(PYTEST_ARGS)

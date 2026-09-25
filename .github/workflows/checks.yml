@@ -42,8 +42,15 @@ jobs:
       #     and that set is what changes between the two machines
       # -rs prints the reason for every skip: what does not run here is part of
       # what this backstop cannot see.
+      # `make test-server` builds the native wheel from this checkout with the
+      # pinned toolchain and injects it into the suite.
+      - name: Pinned Rust toolchain
+        run: rustup toolchain install "$(sed -n 's/^channel = "\(.*\)"/\1/p' core/rust-toolchain.toml)" --profile minimal
+      # A literal block: the folded `>` that stood here joined these comments
+      # and the command into one shell line beginning with `#`, so from
+      # 2026-08-17 the step ran nothing and passed.
       - name: Test
-        run: >
+        run: |
           # The two deselects that used to be here compared linux bytes against a
           # darwin bake and read the difference as a defect (ledger I-111, I-222).
           # As of 2026-08-17 the fixture is baked on linux and the platform
@@ -51,7 +58,7 @@ jobs:
           # same day in two containers, glibc 2.36 and 2.41: identical bytes and
           # 8 passed in both. If this job goes red on them, the honest fix is to
           # look at which glibc the runner has before deselecting anything again.
-          make test-server
+          make test-server PYTEST_ARGS="-n auto"
 
   cli:
     runs-on: ubuntu-latest

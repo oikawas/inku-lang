@@ -1,4 +1,10 @@
 //! Thin CPython binding for the platform-independent render core.
+//!
+//! Every call that renders, compiles or advances the pipeline detaches from
+//! the interpreter while Rust works. The server runs these calls on worker
+//! threads; holding the GIL there stopped every other Python thread, including
+//! the one serving HTTP, for the whole render. The core keeps no mutable
+//! global state, so concurrent calls are safe.
 
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
@@ -75,36 +81,44 @@ fn renderer_reference_json() -> PyResult<String> {
 
 /// Render one canonical coarse request and return SVG plus JSON metadata.
 #[pyfunction]
-fn render(request_json: &str) -> PyResult<(String, String)> {
-    let request = serde_json::from_str(request_json)
-        .map_err(|error| PyValueError::new_err(format!("invalid render request: {error}")))?;
-    let output = inku_render::render::render(request)
-        .map_err(|error| PyValueError::new_err(format!("render failed: {error}")))?;
-    let metadata = serde_json::to_string(&output.metadata).map_err(|error| {
-        PyValueError::new_err(format!("metadata serialization failed: {error}"))
-    })?;
-    Ok((output.svg, metadata))
+fn render(py: Python<'_>, request_json: &str) -> PyResult<(String, String)> {
+    py.detach(|| {
+        let request = serde_json::from_str(request_json)
+            .map_err(|error| PyValueError::new_err(format!("invalid render request: {error}")))?;
+        let output = inku_render::render::render(request)
+            .map_err(|error| PyValueError::new_err(format!("render failed: {error}")))?;
+        let metadata = serde_json::to_string(&output.metadata).map_err(|error| {
+            PyValueError::new_err(format!("metadata serialization failed: {error}"))
+        })?;
+        Ok((output.svg, metadata))
+    })
 }
 
 /// Render one canonical coarse request under independent caller-owned resource authority.
 #[pyfunction]
-fn render_with_resources(request_json: &str, resources_json: &str) -> PyResult<(String, String)> {
-    let request = serde_json::from_str(request_json)
-        .map_err(|error| PyValueError::new_err(format!("invalid render request: {error}")))?;
-    let resources: RenderResources = serde_json::from_str(resources_json)
-        .map_err(|error| PyValueError::new_err(format!("invalid render resources: {error}")))?;
-    let clip_policy = resources.clip_policy.resolve()?;
-    let output = inku_render::render::render_with_resources(
-        request,
-        &resources.hard_policy,
-        resources.operational_budget,
-        clip_policy,
-    )
-    .map_err(|error| PyValueError::new_err(format!("render failed: {error}")))?;
-    let metadata = serde_json::to_string(&output.metadata).map_err(|error| {
-        PyValueError::new_err(format!("metadata serialization failed: {error}"))
-    })?;
-    Ok((output.svg, metadata))
+fn render_with_resources(
+    py: Python<'_>,
+    request_json: &str,
+    resources_json: &str,
+) -> PyResult<(String, String)> {
+    py.detach(|| {
+        let request = serde_json::from_str(request_json)
+            .map_err(|error| PyValueError::new_err(format!("invalid render request: {error}")))?;
+        let resources: RenderResources = serde_json::from_str(resources_json)
+            .map_err(|error| PyValueError::new_err(format!("invalid render resources: {error}")))?;
+        let clip_policy = resources.clip_policy.resolve()?;
+        let output = inku_render::render::render_with_resources(
+            request,
+            &resources.hard_policy,
+            resources.operational_budget,
+            clip_policy,
+        )
+        .map_err(|error| PyValueError::new_err(format!("render failed: {error}")))?;
+        let metadata = serde_json::to_string(&output.metadata).map_err(|error| {
+            PyValueError::new_err(format!("metadata serialization failed: {error}"))
+        })?;
+        Ok((output.svg, metadata))
+    })
 }
 
 /// Report the shared pipeline binding and byte-protocol versions.
@@ -132,10 +146,9 @@ fn pipeline_step<'py>(
     snapshot_bytes: &Bound<'py, PyBytes>,
     input_envelope_bytes: &Bound<'py, PyBytes>,
 ) -> Bound<'py, PyBytes> {
-    let output = inku_pipeline_uniffi::step(
-        snapshot_bytes.as_bytes().to_vec(),
-        input_envelope_bytes.as_bytes().to_vec(),
-    );
+    let snapshot = snapshot_bytes.as_bytes().to_vec();
+    let input_envelope = input_envelope_bytes.as_bytes().to_vec();
+    let output = py.detach(|| inku_pipeline_uniffi::step(snapshot, input_envelope));
     PyBytes::new(py, &output)
 }
 
@@ -144,7 +157,8 @@ fn pipeline_resolve_palette<'py>(
     py: Python<'py>,
     input_bytes: &Bound<'py, PyBytes>,
 ) -> Bound<'py, PyBytes> {
-    let output = inku_pipeline_uniffi::resolve_palette(input_bytes.as_bytes().to_vec());
+    let input = input_bytes.as_bytes().to_vec();
+    let output = py.detach(|| inku_pipeline_uniffi::resolve_palette(input));
     PyBytes::new(py, &output)
 }
 
@@ -153,7 +167,8 @@ fn pipeline_resolve_macro_catalog<'py>(
     py: Python<'py>,
     input_bytes: &Bound<'py, PyBytes>,
 ) -> Bound<'py, PyBytes> {
-    let output = inku_pipeline_uniffi::resolve_macro_catalog(input_bytes.as_bytes().to_vec());
+    let input = input_bytes.as_bytes().to_vec();
+    let output = py.detach(|| inku_pipeline_uniffi::resolve_macro_catalog(input));
     PyBytes::new(py, &output)
 }
 
@@ -162,7 +177,8 @@ fn pipeline_explain_plugin_diagnostics<'py>(
     py: Python<'py>,
     input_bytes: &Bound<'py, PyBytes>,
 ) -> Bound<'py, PyBytes> {
-    let output = inku_pipeline_uniffi::explain_plugin_diagnostics(input_bytes.as_bytes().to_vec());
+    let input = input_bytes.as_bytes().to_vec();
+    let output = py.detach(|| inku_pipeline_uniffi::explain_plugin_diagnostics(input));
     PyBytes::new(py, &output)
 }
 
@@ -171,7 +187,8 @@ fn pipeline_render_saved<'py>(
     py: Python<'py>,
     input_bytes: &Bound<'py, PyBytes>,
 ) -> Bound<'py, PyBytes> {
-    let output = inku_pipeline_uniffi::render_saved(input_bytes.as_bytes().to_vec());
+    let input = input_bytes.as_bytes().to_vec();
+    let output = py.detach(|| inku_pipeline_uniffi::render_saved(input));
     PyBytes::new(py, &output)
 }
 

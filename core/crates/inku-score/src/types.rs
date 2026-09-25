@@ -4,7 +4,10 @@
 //! already validated Score and resolved host data; they are not a second tool
 //! schema and deliberately contain no Python or server-registry concepts.
 
-use std::{collections::HashSet, fmt};
+use std::{
+    collections::{BTreeMap, BTreeSet, HashSet},
+    fmt,
+};
 
 use serde::de::{MapAccess, Visitor, value::MapAccessDeserializer};
 use serde::{Deserialize, Serialize};
@@ -1077,6 +1080,155 @@ fn transform_groups_have_drawable_overlap(left: &TransformGroup, right: &Transfo
         && right.start < left.end
 }
 
+/// The conflict, if any, between `group` and one earlier group.
+///
+/// An earlier group that shares drawn instructions or an anchor with `group`
+/// must lie inside it and bring its fixed positions along. `group_anchors` and
+/// `group_fixed` hold `group`'s own validated, unique indices.
+fn transform_group_pair_conflict(
+    group: &TransformGroup,
+    group_anchors: &HashSet<usize>,
+    group_fixed: &HashSet<usize>,
+    prior: &TransformGroup,
+) -> Option<&'static str> {
+    let anchor_overlap = prior
+        .anchor_indices
+        .iter()
+        .any(|index| group_anchors.contains(index));
+    if !transform_groups_have_drawable_overlap(group, prior) && !anchor_overlap {
+        return None;
+    }
+    let range_contains = |outer: &TransformGroup, inner: &TransformGroup| {
+        inner.start == inner.end || (outer.start <= inner.start && inner.end <= outer.end)
+    };
+    // `transform_group_contains` with set lookups; containment covers anchors.
+    let current_contains_prior = range_contains(group, prior)
+        && prior
+            .anchor_indices
+            .iter()
+            .all(|index| group_anchors.contains(index));
+    if !current_contains_prior {
+        let prior_anchors = prior.anchor_indices.iter().collect::<HashSet<_>>();
+        let prior_contains_current = range_contains(prior, group)
+            && group
+                .anchor_indices
+                .iter()
+                .all(|index| prior_anchors.contains(index));
+        return Some(if prior_contains_current {
+            "transform groups must be stored inner-before-outer"
+        } else {
+            "transform group ranges cannot cross"
+        });
+    }
+    (!prior
+        .fixed_position_indices
+        .iter()
+        .all(|index| group_fixed.contains(index)))
+    .then_some("outer transform groups must include descendant fixed_position_indices")
+}
+
+/// Transform groups validated so far, as a forest ordered by containment.
+///
+/// Groups are stored inner before outer, so an earlier group that overlaps a
+/// later one must lie inside it. An earlier group's instructions and anchors
+/// lie inside its root's, so a new group overlaps an earlier group only if it
+/// overlaps that group's root; and containment and fixed-position inclusion
+/// are transitive. Checking the overlapping roots therefore decides every
+/// earlier group. Comparing each group with every earlier one made validation
+/// quadratic: 16,000 groups took 0.65 s, and a saved Score may hold far more.
+struct TransformGroupForest {
+    /// Roots that own instructions, keyed by start. Their ranges are disjoint.
+    ranged_roots: BTreeMap<usize, usize>,
+    /// The root that currently holds each anchor.
+    anchor_roots: Vec<Option<usize>>,
+    children: Vec<Vec<usize>>,
+}
+
+impl TransformGroupForest {
+    fn new(anchor_count: usize, group_count: usize) -> Self {
+        Self {
+            ranged_roots: BTreeMap::new(),
+            anchor_roots: vec![None; anchor_count],
+            children: vec![Vec::new(); group_count],
+        }
+    }
+
+    /// Place `groups[index]` above every root it overlaps, or report the
+    /// conflict the group-by-group rule meets first.
+    fn admit(
+        &mut self,
+        groups: &[TransformGroup],
+        index: usize,
+        anchors: &HashSet<usize>,
+        fixed: &HashSet<usize>,
+    ) -> Result<(), &'static str> {
+        let group = &groups[index];
+        let mut overlapping = BTreeSet::new();
+        if group.start < group.end {
+            for (_, &root) in self.ranged_roots.range(..group.end).rev() {
+                if groups[root].end <= group.start {
+                    break;
+                }
+                overlapping.insert(root);
+            }
+        }
+        for &anchor in &group.anchor_indices {
+            if let Some(root) = self.anchor_roots[anchor] {
+                overlapping.insert(root);
+            }
+        }
+        if overlapping.iter().any(|&root| {
+            transform_group_pair_conflict(group, anchors, fixed, &groups[root]).is_some()
+        }) {
+            return Err(self.first_conflict(groups, index, &overlapping, anchors, fixed));
+        }
+        for root in overlapping {
+            let prior = &groups[root];
+            if prior.start < prior.end {
+                self.ranged_roots.remove(&prior.start);
+            }
+            self.children[index].push(root);
+        }
+        for &anchor in &group.anchor_indices {
+            self.anchor_roots[anchor] = Some(index);
+        }
+        if group.start < group.end {
+            self.ranged_roots.insert(group.start, index);
+        }
+        Ok(())
+    }
+
+    /// The conflict with the smallest earlier index, which comparing groups
+    /// in storage order reports. Every conflicting group lies below one of
+    /// the overlapping roots.
+    fn first_conflict(
+        &self,
+        groups: &[TransformGroup],
+        index: usize,
+        roots: &BTreeSet<usize>,
+        anchors: &HashSet<usize>,
+        fixed: &HashSet<usize>,
+    ) -> &'static str {
+        let group = &groups[index];
+        let mut pending = roots.iter().copied().collect::<Vec<_>>();
+        let mut first: Option<(usize, &'static str)> = None;
+        while let Some(prior) = pending.pop() {
+            pending.extend(&self.children[prior]);
+            if first.is_some_and(|(found, _)| found < prior) {
+                continue;
+            }
+            if let Some(message) =
+                transform_group_pair_conflict(group, anchors, fixed, &groups[prior])
+            {
+                first = Some((prior, message));
+            }
+        }
+        first.map_or("transform group ranges cannot cross", |(_, message)| {
+            message
+        })
+    }
+}
+
 const fn default_transform_scale() -> f64 {
     1.0
 }
@@ -1848,6 +2000,43 @@ impl Score {
         Ok(())
     }
 
+    /// Checks the schema ranges of the values that set renderer work.
+    ///
+    /// Deserialization accepts any number. Paper-grain and grain-texture
+    /// counts grow with their density (a ground density of 1,000 drew 30 MB of
+    /// SVG), a legacy grid draws rows x cols cells, and a zero group size makes
+    /// legacy expansion slice past its group. Other out-of-range values, such
+    /// as polygon sides, are clamped by the renderer and stay accepted.
+    pub fn validate_work_ranges(&self) -> Result<(), &'static str> {
+        let unit = |value: f64| (0.0..=1.0).contains(&value);
+        if let Canvas::Spec(CanvasSpec {
+            ground: Some(ground),
+            ..
+        }) = &self.canvas
+            && !unit(ground.density)
+        {
+            return Err("canvas ground density must be within 0 to 1");
+        }
+        for instruction in &self.instructions {
+            if let Some(surface) = &instruction.surface
+                && !unit(surface.density)
+            {
+                return Err("surface density must be within 0 to 1");
+            }
+            if let Some(arrangement) = &instruction.arrangement {
+                let grid_extent =
+                    |value: Option<u32>| value.is_none_or(|value| (1..=64).contains(&value));
+                if !grid_extent(arrangement.rows) || !grid_extent(arrangement.cols) {
+                    return Err("arrangement rows and cols must be within 1 to 64");
+                }
+                if arrangement.group_size == 0 {
+                    return Err("arrangement group_size must be positive");
+                }
+            }
+        }
+        Ok(())
+    }
+
     pub fn validate_placement_groups(&self) -> Result<(), &'static str> {
         let is_compact = self.version == "0.10.0"
             || (matches!(
@@ -2302,6 +2491,19 @@ impl Score {
             return Err("transform_groups requires Score version 0.4.0");
         }
 
+        // Instructions before each index that carry an unresolved arrangement,
+        // so every group's range is checked in constant time.
+        let mut unresolved_before = Vec::with_capacity(self.instructions.len() + 1);
+        unresolved_before.push(0_usize);
+        for instruction in &self.instructions {
+            let unresolved = instruction
+                .arrangement
+                .as_ref()
+                .is_some_and(|arrangement| arrangement.resolved.is_none());
+            unresolved_before
+                .push(unresolved_before[unresolved_before.len() - 1] + usize::from(unresolved));
+        }
+        let mut forest = TransformGroupForest::new(self.anchors.len(), self.transform_groups.len());
         for (group_index, group) in self.transform_groups.iter().enumerate() {
             if group.start > group.end
                 || (group.start == group.end && group.anchor_indices.is_empty())
@@ -2338,15 +2540,7 @@ impl Score {
             {
                 return Err("scale or translation requires Score version 0.5.0");
             }
-            if self.instructions[group.start..group.end]
-                .iter()
-                .any(|instruction| {
-                    instruction
-                        .arrangement
-                        .as_ref()
-                        .is_some_and(|arrangement| arrangement.resolved.is_none())
-                })
-            {
+            if unresolved_before[group.end] > unresolved_before[group.start] {
                 return Err("transform group members cannot carry arrangements");
             }
 
@@ -2387,39 +2581,12 @@ impl Score {
                 return Err("transform group anchor_indices requires Score version 0.6.0");
             }
 
-            for prior in &self.transform_groups[..group_index] {
-                let current_contains_prior = transform_group_contains(group, prior);
-                let prior_contains_current = transform_group_contains(prior, group);
-                let anchor_overlap = prior
-                    .anchor_indices
-                    .iter()
-                    .any(|index| anchor_indices.contains(index));
-                if !transform_groups_have_drawable_overlap(group, prior) && !anchor_overlap {
-                    continue;
-                }
-                if !current_contains_prior {
-                    if prior_contains_current {
-                        return Err("transform groups must be stored inner-before-outer");
-                    }
-                    return Err("transform group ranges cannot cross");
-                }
-                if !prior
-                    .fixed_position_indices
-                    .iter()
-                    .all(|index| fixed_indices.contains(index))
-                {
-                    return Err(
-                        "outer transform groups must include descendant fixed_position_indices",
-                    );
-                }
-                if !prior
-                    .anchor_indices
-                    .iter()
-                    .all(|index| anchor_indices.contains(index))
-                {
-                    return Err("outer transform groups must include descendant anchor_indices");
-                }
-            }
+            forest.admit(
+                &self.transform_groups,
+                group_index,
+                &anchor_indices,
+                &fixed_indices,
+            )?;
         }
         Ok(())
     }

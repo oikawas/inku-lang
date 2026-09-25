@@ -12,10 +12,10 @@ use crate::materials::{OilPaintStyle, oil_paint_stroke, with_texture_filter};
 use crate::planning::instruction_anchor_on_canvas;
 use crate::stroke::{
     ContourStrokeRequest, ContourStrokeResult, StrokeRequest, StrokeTerminal,
-    outline_for_centerline, synthesize_contour, synthesize_stroke,
+    outline_for_centerline, stroke_event_count, synthesize_contour, synthesize_stroke,
 };
 use crate::support::{Support, support_with_mark_word};
-use crate::svg::{Element, format_number};
+use crate::svg::{Element, closed_polyline_path, format_number, points_list, write_number};
 use crate::types::{Amplitude, CanvasSize, Instruction, LineStyle, Point, Primitive, Weight};
 
 pub(crate) fn rotate(
@@ -46,15 +46,7 @@ pub(crate) fn rotate(
 }
 
 fn closed_subpath(points: &[Point]) -> String {
-    if points.is_empty() {
-        return String::new();
-    }
-    let body = points
-        .iter()
-        .map(|point| format!("{} {}", format_number(point.x), format_number(point.y)))
-        .collect::<Vec<_>>()
-        .join(" L ");
-    format!("M {body} Z")
+    closed_polyline_path(points)
 }
 
 fn split_at_breaks(points: &[Point], minimum: usize) -> Vec<Vec<Point>> {
@@ -126,11 +118,7 @@ pub(crate) fn contour_stroke_path(stroke: &ContourStrokeResult) -> String {
 }
 
 pub(crate) fn points_attribute(points: &[Point]) -> String {
-    points
-        .iter()
-        .map(|point| format!("{},{}", format_number(point.x), format_number(point.y)))
-        .collect::<Vec<_>>()
-        .join(" ")
+    points_list(points)
 }
 
 pub(crate) fn uses_hand_stroke(weight: Weight) -> bool {
@@ -361,17 +349,6 @@ pub(crate) fn hand_line(
     let sample_count =
         stroke_sample_count((end.x - start.x).hypot(end.y - start.y), context.canvas);
     let support = instruction_support(instruction, context.support);
-    let stroke = synthesize_stroke(StrokeRequest {
-        start,
-        end,
-        base_width: style.width,
-        weight: instruction.weight,
-        seed,
-        sample_count,
-        wild: context.wild,
-        grid_step: grid_step(instruction.weight, context.canvas),
-        support,
-    });
     let centerline = connected_centerline.or_else(|| {
         instruction
             .variation
@@ -388,7 +365,10 @@ pub(crate) fn hand_line(
                 )
             })
     });
-    let outline = if let Some(centerline) = centerline {
+    // The class records the straight stroke's controls and events. With a
+    // varied centerline only the stroke along that centerline is drawn, so the
+    // straight one is not synthesized just for these two counts.
+    let (outline, event_count) = if let Some(centerline) = centerline {
         let varied = synthesize_stroke(StrokeRequest {
             start,
             end,
@@ -405,17 +385,27 @@ pub(crate) fn hand_line(
             .iter()
             .map(|sample| sample.width)
             .collect::<Vec<_>>();
-        outline_for_centerline(&centerline, &widths, &varied.cuts)
+        (
+            outline_for_centerline(&centerline, &widths, &varied.cuts),
+            stroke_event_count(instruction.weight, seed, sample_count),
+        )
     } else {
-        stroke.outline
+        let stroke = synthesize_stroke(StrokeRequest {
+            start,
+            end,
+            base_width: style.width,
+            weight: instruction.weight,
+            seed,
+            sample_count,
+            wild: context.wild,
+            grid_step: grid_step(instruction.weight, context.canvas),
+            support,
+        });
+        (stroke.outline, stroke.event_count)
     };
     let mut group = Element::new("g").attr(
         "class",
-        format!(
-            "stroke-engine-v1 controls-{} events-{}",
-            stroke.samples.len(),
-            stroke.event_count
-        ),
+        format!("stroke-engine-v1 controls-{sample_count} events-{event_count}"),
     );
     if instruction.weight == Weight::OilPaint {
         let middle = outline.len() / 2;
@@ -539,11 +529,11 @@ pub(crate) fn cloudform_path(points: &[Point]) -> String {
         return closed_subpath(points);
     }
     let count = points.len();
-    let mut commands = vec![format!(
-        "M {} {}",
-        format_number(points[0].x),
-        format_number(points[0].y)
-    )];
+    let mut path = String::with_capacity(count * 72 + 16);
+    path.push_str("M ");
+    write_number(&mut path, points[0].x);
+    path.push(' ');
+    write_number(&mut path, points[0].y);
     for index in 0..count {
         let p0 = points[(index + count - 1) % count];
         let p1 = points[index];
@@ -551,16 +541,12 @@ pub(crate) fn cloudform_path(points: &[Point]) -> String {
         let p3 = points[(index + 2) % count];
         let c1 = Point::new(p1.x + (p2.x - p0.x) / 6.0, p1.y + (p2.y - p0.y) / 6.0);
         let c2 = Point::new(p2.x - (p3.x - p1.x) / 6.0, p2.y - (p3.y - p1.y) / 6.0);
-        commands.push(format!(
-            "C {} {} {} {} {} {}",
-            format_number(c1.x),
-            format_number(c1.y),
-            format_number(c2.x),
-            format_number(c2.y),
-            format_number(p2.x),
-            format_number(p2.y)
-        ));
+        path.push_str(" C");
+        for value in [c1.x, c1.y, c2.x, c2.y, p2.x, p2.y] {
+            path.push(' ');
+            write_number(&mut path, value);
+        }
     }
-    commands.push("Z".to_owned());
-    commands.join(" ")
+    path.push_str(" Z");
+    path
 }

@@ -1199,6 +1199,99 @@ fn mirror_body_instruction_index(score: &Score, body: &crate::MirrorBodyRef) -> 
     }
 }
 
+/// Demand of a legacy-edition Score, counted the way its hosts limited it.
+///
+/// Legacy editions predate accounting v1 and carry no resource policy. The
+/// Python host capped two totals when it coerced them: the instruction count,
+/// and the sum over composite units of the head's count (rows x cols for an
+/// explicit grid) times the group size. This counts the same two totals, so
+/// saved legacy works stay within the limits they were drawn under.
+///
+/// Stored groups are counted once each, and anchors once plus once for every
+/// group that moves them: scheduling compares every pair of groups and their
+/// anchor lists (100 groups sharing 1,000 anchors took 0.55 s), so both need a
+/// bound before execution starts.
+pub fn legacy_resource_demand(score: &Score) -> Result<ResourceDemand, ResourceDimension> {
+    let mut primitive_marks = 0_u64;
+    let mut index = 0;
+    while let Some(head) = score.instructions.get(index) {
+        let (marks, group_size) = head.arrangement.as_ref().map_or((1, 1), |arrangement| {
+            let marks = match (arrangement.layout, arrangement.rows, arrangement.cols) {
+                (crate::Layout::Grid, Some(rows), Some(cols)) => u64::from(rows) * u64::from(cols),
+                _ => u64::from(arrangement.count),
+            };
+            (marks.max(1), arrangement.group_size.max(1))
+        });
+        primitive_marks = marks
+            .checked_mul(u64::from(group_size))
+            .and_then(|unit| primitive_marks.checked_add(unit))
+            .ok_or(ResourceDimension::PrimitiveMarks)?;
+        index = index.saturating_add(usize::try_from(group_size).unwrap_or(usize::MAX));
+    }
+    let count = |length: usize, dimension| u64::try_from(length).map_err(|_| dimension);
+    let anchor_moves = score
+        .transform_groups
+        .iter()
+        .map(|group| group.anchor_indices.len())
+        .chain(
+            score
+                .placement_groups
+                .iter()
+                .flat_map(|group| &group.members)
+                .map(|member| member.anchor_indices.len()),
+        )
+        .try_fold(score.anchors.len(), usize::checked_add)
+        .ok_or(ResourceDimension::AnchorInstances)?;
+    Ok(ResourceDemand {
+        primitive_marks,
+        object_templates: count(score.instructions.len(), ResourceDimension::ObjectTemplates)?,
+        anchor_instances: count(anchor_moves, ResourceDimension::AnchorInstances)?,
+        transform_instances: count(
+            score.transform_groups.len(),
+            ResourceDimension::TransformInstances,
+        )?,
+        placement_instances: count(
+            score.placement_groups.len(),
+            ResourceDimension::PlacementInstances,
+        )?,
+        fill_instances: count(score.fill_groups.len(), ResourceDimension::FillInstances)?,
+        ..ResourceDemand::default()
+    })
+}
+
+/// Refuse a legacy-edition Score whose demand exceeds either authority.
+///
+/// A compact Score is finalized by [`finalize_saved_score`] instead. Without
+/// this check an explicit budget did not limit a legacy Score at all, and an
+/// arrangement count of 100,000 took 50 s and 95 MB of SVG to render.
+pub fn check_legacy_resource_demand(
+    score: &Score,
+    authorized_hard_policy: &HardResourcePolicy,
+    operational_budget: OperationalResourceBudget,
+) -> Result<ResourceDemand, SavedScoreResourceError> {
+    let demand = legacy_resource_demand(score).map_err(|dimension| {
+        error(
+            SavedScoreResourceOwner::Score,
+            SavedScoreResourceFailure::ArithmeticOverflow(dimension),
+        )
+    })?;
+    authorized_hard_policy
+        .budget
+        .check(demand, ResourceAuthority::HardPolicy)
+        .and_then(|()| {
+            operational_budget
+                .0
+                .check(demand, ResourceAuthority::OperationalBudget)
+        })
+        .map_err(|exceeded| {
+            error(
+                SavedScoreResourceOwner::Score,
+                SavedScoreResourceFailure::BudgetExceeded(exceeded),
+            )
+        })?;
+    Ok(demand)
+}
+
 /// Recompute demand from an untrusted compact Score, omit only offending atomic
 /// source units, and return a schema-valid Score with every retained index remapped.
 pub fn finalize_saved_score(
@@ -1259,6 +1352,38 @@ pub fn finalize_saved_score_with_omitted_instructions(
                 authorized: authorized_hard_policy.clone(),
             },
         ));
+    }
+    // Schema validation compares placement groups with every earlier placement
+    // group and every transform group, before any accounting. A stored group
+    // or anchor is performed at least once unless it belongs to a cycle member
+    // that never occurs, so compiled Scores store far fewer than the hard
+    // policy's instance maxima. Refusing larger stored counts here keeps that
+    // validation bounded for an untrusted Score.
+    let maximum = authorized_hard_policy.budget.maximum;
+    for (stored, dimension) in [
+        (score.anchors.len(), ResourceDimension::AnchorInstances),
+        (
+            score.transform_groups.len(),
+            ResourceDimension::TransformInstances,
+        ),
+        (
+            score.placement_groups.len(),
+            ResourceDimension::PlacementInstances,
+        ),
+        (score.fill_groups.len(), ResourceDimension::FillInstances),
+    ] {
+        let stored = u64::try_from(stored).unwrap_or(u64::MAX);
+        if stored > maximum.get(dimension) {
+            return Err(error(
+                SavedScoreResourceOwner::Score,
+                SavedScoreResourceFailure::BudgetExceeded(ResourceBudgetExceeded {
+                    authority: ResourceAuthority::HardPolicy,
+                    dimension,
+                    required: stored,
+                    maximum: maximum.get(dimension),
+                }),
+            ));
+        }
     }
     score
         .validate_schema_edition()
@@ -2051,6 +2176,65 @@ mod tests {
         assert_eq!(
             relation.target_path_position,
             Some(crate::TargetPathPosition::Exact(0.625))
+        );
+    }
+
+    #[test]
+    fn legacy_demand_counts_marks_like_the_python_host_and_every_anchor_move() {
+        let score: Score = serde_json::from_value(json!({
+            "version": "0.9.0",
+            "instructions": [
+                {"primitive": "circle", "center": [0.5, 0.5], "radius": 0.1,
+                 "arrangement": {"count": 3, "group_size": 2}},
+                {"primitive": "point", "center": [0.2, 0.2], "radius": 0.01},
+                {"primitive": "square", "position": [0.1, 0.1], "size": [0.1, 0.1],
+                 "arrangement": {"count": 1, "layout": "grid", "rows": 4, "cols": 5}}
+            ],
+            "anchors": [{"position": [0.5, 0.5]}, {"position": [0.1, 0.9]}],
+            "transform_groups": [
+                {"start": 0, "end": 0, "rotation_degrees": 5.0, "anchor_indices": [0, 1]},
+                {"start": 0, "end": 2, "rotation_degrees": 5.0, "anchor_indices": [0, 1]}
+            ]
+        }))
+        .unwrap();
+        let demand = legacy_resource_demand(&score).unwrap();
+        // A composite head of 3 with its member, then a 4 x 5 grid.
+        assert_eq!(demand.primitive_marks, 3 * 2 + 4 * 5);
+        assert_eq!(demand.object_templates, 3);
+        // Two anchors, each moved by two groups.
+        assert_eq!(demand.anchor_instances, 2 + 2 + 2);
+        assert_eq!(demand.transform_instances, 2);
+    }
+
+    #[test]
+    fn stored_groups_beyond_the_hard_maximum_are_refused_before_validation() {
+        let policy = hard(100);
+        let mut score = representative_score(policy.clone());
+        let stored = score.transform_groups.len() as u64 + 101;
+        // Groups that validation would reject; the count is refused first.
+        score
+            .transform_groups
+            .extend((0..101).map(|_| crate::TransformGroup {
+                start: 1,
+                end: 0,
+                rotation_degrees: 0.0,
+                scale_x: 1.0,
+                scale_y: 1.0,
+                translate_x: 0.0,
+                translate_y: 0.0,
+                fixed_position_indices: Vec::new(),
+                anchor_indices: Vec::new(),
+            }));
+        let error = finalize_saved_score(&score, &policy, OperationalResourceBudget(budget(100)))
+            .unwrap_err();
+        assert_eq!(
+            error.reason,
+            SavedScoreResourceFailure::BudgetExceeded(ResourceBudgetExceeded {
+                authority: ResourceAuthority::HardPolicy,
+                dimension: ResourceDimension::TransformInstances,
+                required: stored,
+                maximum: 100,
+            })
         );
     }
 

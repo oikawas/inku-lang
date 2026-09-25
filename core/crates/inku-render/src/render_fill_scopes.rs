@@ -4,7 +4,7 @@ use std::collections::BTreeMap;
 
 use crate::compat_clip::{ClipError, ClipLimits, ClipOptions, clip_element};
 use crate::performance::PerformedFillScope;
-use crate::svg::{Element, Node, format_number};
+use crate::svg::{Element, Node};
 use crate::types::SvgProfile;
 use inku_score::{ScoreExecutionDiagnostic, ScoreExecutionDisposition, ScoreExecutionReason};
 
@@ -176,13 +176,7 @@ impl FillPaintForest {
         }
         if profile != SvgProfile::Compat {
             let id = format!("fill_target_{index}");
-            let points = scope
-                .prepared_region
-                .contour()
-                .iter()
-                .map(|point| format!("{},{}", format_number(point.x), format_number(point.y)))
-                .collect::<Vec<_>>()
-                .join(" ");
+            let points = crate::svg::points_list(scope.prepared_region.contour());
             let mut clip = Element::new("clipPath")
                 .attr("id", &id)
                 .attr("clipPathUnits", "userSpaceOnUse");

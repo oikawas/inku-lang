@@ -13,10 +13,109 @@ fn sha256(payload: &[u8]) -> [u8; 32] {
     Sha256::digest(payload).into()
 }
 
+/// The `Display` text of one integer, written into a stack buffer.
+///
+/// Seeded hashes are defined over decimal text. Writing the digits directly
+/// avoids a heap string per sample while hashing exactly the same bytes.
+struct DecimalText {
+    // 39 digits of u128::MAX plus a sign.
+    buffer: [u8; 40],
+    start: usize,
+}
+
+impl DecimalText {
+    fn new(value: i128) -> Self {
+        let mut buffer = [0_u8; 40];
+        let mut start = buffer.len();
+        let magnitude = value.unsigned_abs();
+        // Seeds are usually u64-derived; u64 division is much cheaper than u128.
+        if let Ok(mut rest) = u64::try_from(magnitude) {
+            loop {
+                start -= 1;
+                buffer[start] = b'0' + (rest % 10) as u8;
+                rest /= 10;
+                if rest == 0 {
+                    break;
+                }
+            }
+        } else {
+            let mut rest = magnitude;
+            loop {
+                start -= 1;
+                buffer[start] = b'0' + (rest % 10) as u8;
+                rest /= 10;
+                if rest == 0 {
+                    break;
+                }
+            }
+        }
+        if value < 0 {
+            start -= 1;
+            buffer[start] = b'-';
+        }
+        Self { buffer, start }
+    }
+
+    fn as_bytes(&self) -> &[u8] {
+        &self.buffer[self.start..]
+    }
+}
+
+/// SHA-256 of the text `"{seed}:{index}"`.
+fn seed_index_digest(seed: Seed, index: i128) -> [u8; 32] {
+    let mut hasher = Sha256::new();
+    hasher.update(DecimalText::new(seed).as_bytes());
+    hasher.update(b":");
+    hasher.update(DecimalText::new(index).as_bytes());
+    hasher.finalize().into()
+}
+
+/// SHA-256 of the text `"{seed}:{salt}:{index}"`.
+///
+/// The pieces are streamed in order, so the digest equals the digest of the
+/// formatted string. Every seeded stream keeps its identity; only the
+/// per-call string allocation of the hot stroke and noise paths is gone.
+pub(crate) fn seed_salt_index_digest(seed: Seed, salt: &str, index: i128) -> [u8; 32] {
+    let mut hasher = Sha256::new();
+    hasher.update(DecimalText::new(seed).as_bytes());
+    hasher.update(b":");
+    hasher.update(salt.as_bytes());
+    hasher.update(b":");
+    hasher.update(DecimalText::new(index).as_bytes());
+    hasher.finalize().into()
+}
+
+/// Digests of `"{seed}:{salt}:{index}"` for one seed and salt and many indices.
+///
+/// The hasher state after the shared prefix is kept and cloned for each
+/// index, so a loop over samples formats the seed and writes the prefix once.
+/// The hashed bytes are those of [`seed_salt_index_digest`].
+#[derive(Clone)]
+pub(crate) struct SaltedStream {
+    prefix: Sha256,
+}
+
+impl SaltedStream {
+    pub(crate) fn new(seed: Seed, salt: &str) -> Self {
+        let mut prefix = Sha256::new();
+        prefix.update(DecimalText::new(seed).as_bytes());
+        prefix.update(b":");
+        prefix.update(salt.as_bytes());
+        prefix.update(b":");
+        Self { prefix }
+    }
+
+    pub(crate) fn digest(&self, index: i128) -> [u8; 32] {
+        let mut hasher = self.prefix.clone();
+        hasher.update(DecimalText::new(index).as_bytes());
+        hasher.finalize().into()
+    }
+}
+
 /// Map an integer and seed to the same signed unit interval used by Engine 40.
 #[must_use]
 pub fn hash_to_unit(index: i64, seed: Seed) -> f64 {
-    let digest = sha256(format!("{seed}:{index}").as_bytes());
+    let digest = seed_index_digest(seed, i128::from(index));
     let value = i64::from_le_bytes(digest[..8].try_into().expect("eight digest bytes"));
     value as f64 / 2_f64.powi(63)
 }
@@ -24,7 +123,7 @@ pub fn hash_to_unit(index: i64, seed: Seed) -> f64 {
 /// Map a salted integer and seed to the closed interval from zero to one.
 #[must_use]
 pub fn hash01(index: i64, seed: Seed, salt: &str) -> f64 {
-    let digest = sha256(format!("{seed}:{salt}:{index}").as_bytes());
+    let digest = seed_salt_index_digest(seed, salt, i128::from(index));
     let value = u32::from_le_bytes(digest[..4].try_into().expect("four digest bytes"));
     f64::from(value) / f64::from(u32::MAX)
 }
@@ -274,4 +373,39 @@ pub fn instruction_seed(instruction: &Instruction, performance_seed: Option<Seed
     i128::from(u64::from_le_bytes(
         digest[..8].try_into().expect("eight digest bytes"),
     ))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn streamed_seed_digest_hashes_the_formatted_text() {
+        let values = [
+            0,
+            7,
+            -1,
+            i128::from(i64::MIN),
+            i128::from(u64::MAX),
+            i128::from(u64::MAX) + 1,
+            i128::MIN,
+            i128::MAX,
+        ];
+        for seed in values {
+            for index in values {
+                assert_eq!(
+                    seed_salt_index_digest(seed, "salt", index),
+                    sha256(format!("{seed}:salt:{index}").as_bytes())
+                );
+                assert_eq!(
+                    seed_index_digest(seed, index),
+                    sha256(format!("{seed}:{index}").as_bytes())
+                );
+                assert_eq!(
+                    SaltedStream::new(seed, "salt").digest(index),
+                    sha256(format!("{seed}:salt:{index}").as_bytes())
+                );
+            }
+        }
+    }
 }

@@ -237,6 +237,13 @@ fn fade_level(hint: &str) -> Option<f64> {
     value.parse().ok()
 }
 
+/// Resolve the color, width, opacity, cap and dash of one mark.
+///
+/// Free-text color hints still carry legacy effects: haze and light words,
+/// scent, buds and the five senses cap opacity at a fixed level. Arrangement
+/// expansion writes `fade=` and each member's `fade_level=` into the hint,
+/// and this reads them back as that member's opacity ceiling. Carve marks
+/// ignore the color and scrape to their depth's tone.
 pub(crate) fn mark_style(instruction: &Instruction, context: MarkContext<'_>) -> MarkStyle {
     let fill = instruction.filled
         || instruction
@@ -459,23 +466,7 @@ fn render_crescent(
 }
 
 fn open_path(points: &[Point]) -> String {
-    let Some(first) = points.first() else {
-        return String::new();
-    };
-    let rest = points[1..]
-        .iter()
-        .map(|point| format!("{} {}", format_number(point.x), format_number(point.y)))
-        .collect::<Vec<_>>()
-        .join(" L ");
-    if rest.is_empty() {
-        format!("M {} {}", format_number(first.x), format_number(first.y))
-    } else {
-        format!(
-            "M {} {} L {rest}",
-            format_number(first.x),
-            format_number(first.y)
-        )
-    }
+    crate::svg::open_polyline_path(points)
 }
 
 fn has_closed_area(points: &[Point]) -> bool {

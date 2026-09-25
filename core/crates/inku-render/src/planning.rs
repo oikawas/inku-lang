@@ -222,15 +222,18 @@ fn group_arc_sweep_points(
     let upper = start.max(end);
     // `rotate_point` uses SVG-space clockwise rotation. A pre-rotation angle
     // of `rotation + cardinal` reaches a horizontal or vertical world extremum.
+    // Each direction is one extremum however many turns the sweep makes, so
+    // its first occurrence in the sweep is enough. Pushing every turn let a
+    // saved angle such as 1e11 degrees allocate one point per turn.
     for cardinal in [0.0, 90.0, 180.0, 270.0] {
         let cardinal = cardinal + rotation;
         let first = ((lower - cardinal) / 360.0).ceil() as i32;
         let last = ((upper - cardinal) / 360.0).floor() as i32;
-        for turn in first..=last {
+        if first <= last {
             points.push(arc_point(
                 center,
                 radius,
-                cardinal + 360.0 * f64::from(turn),
+                cardinal + 360.0 * f64::from(first),
             ));
         }
     }
@@ -1044,4 +1047,19 @@ pub fn scale_instruction_on_canvas(
         ));
     }
     scaled
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn group_arc_sweep_points_do_not_grow_with_turns() {
+        let center = Point::new(0.5, 0.5);
+        // Endpoints plus at most one extremum per cardinal direction.
+        assert_eq!(
+            group_arc_sweep_points(center, 0.1, -1.0e6, 1.0e6, 0.0).len(),
+            6
+        );
+    }
 }

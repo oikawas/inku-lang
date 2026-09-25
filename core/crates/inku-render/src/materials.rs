@@ -284,8 +284,8 @@ pub fn texture_filter(weight: Weight, canvas: CanvasSize) -> Option<Element> {
             Element::new("feTurbulence")
                 .attr("type", "fractalNoise")
                 .attr("baseFrequency", format_number(frequency / scale))
-                .attr("numOctaves", spec.octaves)
-                .attr("seed", spec.noise_seed)
+                .attr("numOctaves", spec.octaves.to_string())
+                .attr("seed", spec.noise_seed.to_string())
                 .attr("result", "noise"),
         );
         filter.push(
@@ -335,7 +335,7 @@ pub fn performance_touch_filter(seed: Seed, canvas: CanvasSize) -> (String, Elem
             .attr("type", "fractalNoise")
             .attr("baseFrequency", format_number(frequency))
             .attr("numOctaves", "2")
-            .attr("seed", seed.rem_euclid(9973))
+            .attr("seed", seed.rem_euclid(9973).to_string())
             .attr("result", "touchNoise"),
     );
     filter.push(

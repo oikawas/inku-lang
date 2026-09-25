@@ -47,40 +47,85 @@ fn spectrum_power(variation: Option<&Variation>) -> f64 {
     }
 }
 
-fn harmonic_signal(
-    theta: f64,
-    seed: Seed,
-    label: &str,
-    frequencies: impl Iterator<Item = i32>,
-    power: f64,
-) -> f64 {
-    let mut total = 0.0;
-    let mut normalizer = 0.0;
-    for harmonic in frequencies {
-        let amplitude = 1.0 / f64::from(harmonic).powf(power);
-        let phase = std::f64::consts::TAU * unit(seed, &format!("{label}-phase"), harmonic.into());
-        let sign = if unit(seed, &format!("{label}-sign"), harmonic.into()) < 0.5 {
-            -1.0
-        } else {
-            1.0
-        };
-        total += sign * amplitude * (f64::from(harmonic) * theta + phase).cos();
-        normalizer += amplitude;
-    }
-    total / normalizer.max(1.0e-9)
+struct HarmonicTerm {
+    harmonic: f64,
+    amplitude: f64,
+    phase: f64,
+    sign: f64,
 }
 
-fn base_radius(theta: f64, seed: Seed, variation: Option<&Variation>, weight: Weight) -> f64 {
-    let primary = harmonic_signal(
-        theta,
-        seed,
-        "contour",
-        frequency_range(variation),
-        spectrum_power(variation),
-    );
-    let touch = harmonic_signal(theta, seed ^ 0x7001, "touch", 9..15, 0.65);
-    (0.88 + variation_gain(variation) * primary + grammar(weight).energy_lateral * 0.018 * touch)
-        .clamp(0.58, 1.12)
+/// One seeded harmonic signal around the contour.
+///
+/// Phases and signs depend on the seed, label and harmonic but never on the
+/// angle, so they are hashed once per contour rather than once per point.
+/// Evaluation keeps the original term order, so every value is unchanged.
+struct HarmonicSignal {
+    terms: Vec<HarmonicTerm>,
+    normalizer: f64,
+}
+
+impl HarmonicSignal {
+    fn new(seed: Seed, label: &str, frequencies: impl Iterator<Item = i32>, power: f64) -> Self {
+        let phase_label = format!("{label}-phase");
+        let sign_label = format!("{label}-sign");
+        let mut terms = Vec::new();
+        let mut normalizer = 0.0;
+        for harmonic in frequencies {
+            let amplitude = 1.0 / f64::from(harmonic).powf(power);
+            let phase = std::f64::consts::TAU * unit(seed, &phase_label, harmonic.into());
+            let sign = if unit(seed, &sign_label, harmonic.into()) < 0.5 {
+                -1.0
+            } else {
+                1.0
+            };
+            terms.push(HarmonicTerm {
+                harmonic: f64::from(harmonic),
+                amplitude,
+                phase,
+                sign,
+            });
+            normalizer += amplitude;
+        }
+        Self { terms, normalizer }
+    }
+
+    fn at(&self, theta: f64) -> f64 {
+        let mut total = 0.0;
+        for term in &self.terms {
+            total += term.sign * term.amplitude * (term.harmonic * theta + term.phase).cos();
+        }
+        total / self.normalizer.max(1.0e-9)
+    }
+}
+
+/// The base radius field of one cloudform contour.
+struct BaseRadius {
+    primary: HarmonicSignal,
+    touch: HarmonicSignal,
+    gain: f64,
+    lateral: f64,
+}
+
+impl BaseRadius {
+    fn new(seed: Seed, variation: Option<&Variation>, weight: Weight) -> Self {
+        Self {
+            primary: HarmonicSignal::new(
+                seed,
+                "contour",
+                frequency_range(variation),
+                spectrum_power(variation),
+            ),
+            touch: HarmonicSignal::new(seed ^ 0x7001, "touch", 9..15, 0.65),
+            gain: variation_gain(variation),
+            lateral: grammar(weight).energy_lateral,
+        }
+    }
+
+    fn at(&self, theta: f64) -> f64 {
+        let primary = self.primary.at(theta);
+        let touch = self.touch.at(theta);
+        (0.88 + self.gain * primary + self.lateral * 0.018 * touch).clamp(0.58, 1.12)
+    }
 }
 
 fn distance(first: Point, second: Point) -> f64 {
@@ -124,10 +169,11 @@ pub fn generate_cloudform_contour(request: CloudformRequest<'_>) -> Vec<Point> {
     let angles: Vec<f64> = (0..point_count)
         .map(|index| std::f64::consts::TAU * index as f64 / point_count as f64)
         .collect();
+    let base_radius = BaseRadius::new(seed, request.variation, request.weight);
     let base_points: Vec<Point> = angles
         .iter()
         .map(|theta| {
-            let radius = base_radius(*theta, seed, request.variation, request.weight);
+            let radius = base_radius.at(*theta);
             Point::new(
                 request.center.x + radius_x * radius * theta.cos(),
                 request.center.y + radius_y * radius * theta.sin(),
@@ -149,6 +195,7 @@ pub fn generate_cloudform_contour(request: CloudformRequest<'_>) -> Vec<Point> {
         .collect();
     let gain = variation_gain(request.variation);
     let nominal_scale = radius_x.min(radius_y);
+    let waist_signal = HarmonicSignal::new(seed ^ 0xC10D5EED, "waist", 2..5, 0.72);
     (0..point_count)
         .map(|index| {
             let point = base_points[index];
@@ -162,13 +209,7 @@ pub fn generate_cloudform_contour(request: CloudformRequest<'_>) -> Vec<Point> {
                 normal.x = -normal.x;
                 normal.y = -normal.y;
             }
-            let waist = harmonic_signal(
-                std::f64::consts::TAU * arc_positions[index],
-                seed ^ 0xC10D5EED,
-                "waist",
-                2..5,
-                0.72,
-            );
+            let waist = waist_signal.at(std::f64::consts::TAU * arc_positions[index]);
             let requested = (-waist).max(0.0).powi(2) * (0.08 + gain * 0.36) * nominal_scale;
             let nonlocal_separation = base_points
                 .iter()

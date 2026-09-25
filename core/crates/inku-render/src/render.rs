@@ -256,12 +256,48 @@ fn validate_request(request: &RenderRequest) -> Result<(), RenderError> {
         .map_err(RenderError::InvalidScore)
 }
 
+/// Absolute maxima for [`render`], the entry that receives no host authority.
+///
+/// Its hosts coerce a legacy Score to their own limits first. The Server lets
+/// an administrator raise each limit to at most 100,000 (a typo guard), so
+/// marks and instructions stop there. Anchors and groups stop at 4,096, the
+/// Server's maximum for anchors and transform groups in new works, because
+/// scheduling compares every pair of groups with their anchor lists. Only the
+/// dimensions that legacy demand counts are bounded.
+fn absolute_render_policy() -> inku_score::HardResourcePolicy {
+    let maximum = inku_score::ResourceDemand {
+        logical_objects: u64::MAX,
+        primitive_marks: 100_000,
+        object_templates: 100_000,
+        maximum_per_template_primitive_marks: u64::MAX,
+        maximum_resolved_count: u64::MAX,
+        template_nodes: u64::MAX,
+        anchor_instances: 4_096,
+        transform_instances: 4_096,
+        placement_instances: 4_096,
+        fill_instances: 4_096,
+    };
+    inku_score::HardResourcePolicy {
+        identity: "inku.render.absolute.v1".to_owned(),
+        budget: inku_score::ResourceBudget { maximum },
+    }
+}
+
 /// Render a canonical Score through the complete portable request boundary.
 ///
-/// This entry performs no resource accounting. Its hosts coerce the Score to
-/// their limits first; untrusted Scores go through [`render_with_resources`].
+/// This entry takes no host resource authority. Its hosts coerce the Score to
+/// their limits first, and it refuses only what no host limit allows (an
+/// arrangement count of 4.3 billion kept it computing positions for more than
+/// 20 minutes). Untrusted Scores go through [`render_with_resources`].
 pub fn render(request: RenderRequest) -> Result<RenderOutput, RenderError> {
     validate_request(&request)?;
+    let absolute = absolute_render_policy();
+    inku_score::check_legacy_resource_demand(
+        &request.score,
+        &absolute,
+        inku_score::OperationalResourceBudget(absolute.budget),
+    )
+    .map_err(RenderError::ResourceAuthority)?;
     render_impl(request, None, &[])
 }
 

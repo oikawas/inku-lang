@@ -2466,7 +2466,10 @@ class InkuViewModel @JvmOverloads constructor(
                 lineageDetached = false,
                 ddl = last?.normalizedDdl.orEmpty(),
                 ddlEditedAfterGeneration = false,
-                prompt = last?.originalInput?.removePrefix("#${localState.value.batchActiveLine} ") ?: current.prompt,
+                // The saved prose, not `originalInput` minus a prefix: the prefix
+                // is the last line's number, which is not the last success's
+                // when the final line failed.
+                prompt = last?.let(::sourceTextOf) ?: current.prompt,
                 isDrawing = false,
                 batchCurrent = 0,
                 batchActiveLine = null,

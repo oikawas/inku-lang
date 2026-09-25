@@ -1,7 +1,7 @@
 ---
 namespace: Nature
 name: leaves
-version: 0.3.0
+version: 0.4.0
 authors: [Shinichiro Oikawa]
 languages: [ja, en]
 license: MIT
@@ -167,18 +167,20 @@ surface_ja: 枯葉 | かれは | 枯れ葉
 surface_en: withered leaves | dry leaves
 fires_on_ja: 枯葉, 枯れ葉, 朽ち葉
 fires_on_en: withered leaves, dry leaves, dead leaves
-note_ja: 冬。かたちの記憶だけが残る。ここでのみ雲形を用いる——不定形は乱用せず、輪郭が定義を失った葉にだけ。
-note_en: Winter. Only the memory of a form remains. Cloudform is used here alone — the amorphous reserved for leaves whose outline has lost its definition.
+note_ja: 冬。かたちの記憶だけが残る。乾いて縮れ、縁は崩れかけても、まだ葉として読める。以前の雲形（1.0.1）は葉に見えなかったため、1.1.0で縮れた二弧の葉へ改めた。
+note_en: Winter. Only the memory of a form remains. Dried and curled, its edges crumbling, it still reads as a leaf. The former cloudform edition (1.0.1) did not look like a leaf, so 1.1.0 draws curled two-arc leaves.
 preview: nature-leaves/kareha.png
 
 ### 展開 (ja)
 
-雲形を 2〜4個、{領域: 下の隅} に置く。
-チョークで、灰で。輪郭は細かく震える。
-内側も輪郭と同じ灰で塗る。
+member 枯れ葉形: 深い弧を置き、前の弧に両端で触れる浅い弧(縮れ)
+枯れ葉形を 2〜4枚、{領域: 下の左右の隅} に置く。
+チョークで。灰と黄を枚ごとに交互に。縁は細かく揺れる。回転は枚ごとにばらばら。
+内側も輪郭と同じ色で塗る。
 
 ### 展開 (en)
 
-Place 2-4 cloudforms in {region: lower corner}.
-In chalk, in gray. Outlines finely trembling.
-Fill the interiors with the same gray as their outlines.
+member withered leaf: place a deep arc, then a shallow arc touching it at both ends (curled)
+Place 2-4 withered leaves in {region: lower left or right corner}.
+In chalk. Gray and yellow alternating per leaf. Edges finely swaying. Rotated differently per leaf.
+Fill each interior with its outline color.

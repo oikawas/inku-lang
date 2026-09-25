@@ -10,6 +10,8 @@ use serde::Deserialize;
 use serde_json::Value;
 
 const ASSET: &str = include_str!("../assets/nature-leaves-v1.json");
+/// The cloudform edition of Nature.枯葉 that saved works may still lock.
+const KAREHA_1_0_1: &str = include_str!("fixtures/nature-kareha-1.0.1.json");
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -32,7 +34,7 @@ fn bundled_nature_leaves_are_valid_bounded_definitions_that_reach_normal_score_l
     let package: Package = serde_json::from_str(ASSET).expect("Nature package must be JSON");
     assert_eq!(package.schema, "inku.bundled-macro-package.v1");
     assert_eq!(package.package_id, "Nature.leaves");
-    assert_eq!(package.version, "1.0.1");
+    assert_eq!(package.version, "1.1.0");
     assert_eq!(ASSET.as_bytes().last(), Some(&b'\n'));
 
     let expected = [
@@ -42,7 +44,7 @@ fn bundled_nature_leaves_are_valid_bounded_definitions_that_reach_normal_score_l
         ("Nature.紅葉", "1.0.0", 15, 11..=15),
         ("Nature.落葉", "1.0.1", 24, 16..=24),
         ("Nature.枯草", "1.0.1", 20, 6..=20),
-        ("Nature.枯葉", "1.0.1", 4, 2..=4),
+        ("Nature.枯葉", "1.1.0", 8, 4..=8),
     ];
     assert_eq!(package.entries.len(), expected.len());
 
@@ -141,20 +143,10 @@ fn bundled_nature_leaves_are_valid_bounded_definitions_that_reach_normal_score_l
                 })
             })
             .count();
-        if *qualified_name == "Nature.枯葉" {
-            assert_eq!(touching, 0);
-            assert!(
-                score
-                    .instructions
-                    .iter()
-                    .all(|instruction| instruction.primitive == Primitive::Cloudform)
-            );
-        } else {
-            assert!(
-                touching > 0,
-                "{qualified_name}: missing two-arc leaf relation"
-            );
-        }
+        assert!(
+            touching > 0,
+            "{qualified_name}: missing two-arc leaf relation"
+        );
         if matches!(
             *qualified_name,
             "Nature.下草" | "Nature.紅葉" | "Nature.枯草"
@@ -196,6 +188,21 @@ fn bundled_nature_leaves_are_valid_bounded_definitions_that_reach_normal_score_l
                     && instruction.weight == inku_score::Weight::BrushThin
                     && instruction.filled
             }));
+        }
+        if *qualified_name == "Nature.枯葉" {
+            // Curled withered leaves: a deep and a shallow chalk arc, gray and yellow in turn.
+            for (leaf_index, pair) in score.instructions.chunks_exact(2).enumerate() {
+                let expected_color = if leaf_index % 2 == 0 {
+                    Color::Gray
+                } else {
+                    Color::Yellow
+                };
+                assert!(pair.iter().all(|instruction| {
+                    instruction.primitive == Primitive::Arc
+                        && instruction.color == expected_color
+                        && instruction.weight == inku_score::Weight::Chalk
+                }));
+            }
         }
         if *qualified_name == "Nature.落葉" {
             for (leaf_index, pair) in score.instructions.chunks_exact(2).enumerate() {
@@ -244,7 +251,7 @@ fn saved_retired_fluctuation_definitions_keep_their_v1_locks_and_meaning() {
     wakaba["components"]["leaf_form"]["body"][1]["fields"]["fluctuation_quality"]["id"] =
         Value::String("trembling".to_owned());
 
-    let mut kareha = package.entries[6].definition.clone();
+    let mut kareha: Value = serde_json::from_str(KAREHA_1_0_1).unwrap();
     kareha["version"] = Value::String("1.0.0".to_owned());
     kareha["body"][0]["body"][0]["body"][0]["body"][0]["body"][0]["fields"]["fluctuation_quality"]
         ["id"] = Value::String("trembling".to_owned());
@@ -359,4 +366,45 @@ fn saved_retired_fluctuation_definitions_keep_their_v1_locks_and_meaning() {
                 })
         );
     }
+}
+
+#[test]
+fn a_saved_cloudform_kareha_keeps_its_lock_and_meaning() {
+    let definition = MacroDefinition::from_json(KAREHA_1_0_1).unwrap();
+    let identity = definition.identity().unwrap();
+    assert_eq!(identity.version(), "1.0.1");
+    assert_eq!(
+        identity.full_digest_hex(),
+        "1ceac898eb3b3f5478f8cf6cb8661eae7c4fc40a0a871e10cfeac64b02fafdf5"
+    );
+    let lock = MacroLock::new(
+        identity.qualified_name(),
+        identity.version(),
+        format!("sha256:{}", identity.full_digest_hex()),
+    )
+    .unwrap();
+    let execution = compile_ddl_to_score(
+        NormalizedDdlDocument::new("Nature.枯葉", ResolvedInstructionLanguage::Ja, vec![lock])
+            .unwrap(),
+        std::slice::from_ref(&definition),
+        Some(37),
+        MacroExpansionLimits {
+            max_invocations: 64,
+            max_depth: 16,
+            max_evaluation_steps: 8_192,
+            max_nodes_per_invocation: 128,
+            max_total_nodes: 128,
+        },
+        ScoreLoweringContext::resolve("square", Color::White).unwrap(),
+        None,
+        ScoreErrorPolicy::Stop,
+    );
+    assert_eq!(execution.outcome(), ScoreLoweringOutcome::Complete);
+    let instructions = &execution.score().unwrap().instructions;
+    assert!((2..=4).contains(&instructions.len()));
+    assert!(
+        instructions
+            .iter()
+            .all(|instruction| instruction.primitive == Primitive::Cloudform)
+    );
 }

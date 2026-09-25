@@ -1,7 +1,7 @@
 {
   "schema": "inku.bundled-macro-package.v1",
   "package_id": "Nature.leaves",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "entries": [
     {
       "definition": {
@@ -1833,9 +1833,146 @@
         "schema": "inku.macro-definition.v1",
         "namespace": "Nature",
         "heading": "枯葉",
-        "version": "1.0.1",
+        "version": "1.1.0",
         "parameters": {},
-        "components": {},
+        "components": {
+          "withered_leaf": {
+            "parameters": {
+              "color": {
+                "type": "semantic_ref",
+                "category": "color"
+              },
+              "lean": {
+                "type": "semantic_ref",
+                "category": "angle"
+              },
+              "x": {
+                "type": "exact_decimal",
+                "dimension": "position_x"
+              },
+              "y": {
+                "type": "exact_decimal",
+                "dimension": "position_y"
+              }
+            },
+            "body": [
+              {
+                "op": "emit",
+                "binding": "edge_a",
+                "fields": {
+                  "angle": {
+                    "expr": "parameter",
+                    "name": "lean"
+                  },
+                  "chord": {
+                    "expr": "exact_decimal",
+                    "value": "0.130"
+                  },
+                  "color": {
+                    "expr": "parameter",
+                    "name": "color"
+                  },
+                  "fluctuation_amplitude": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "fine"
+                  },
+                  "fluctuation_quality": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "swaying"
+                  },
+                  "movement": {
+                    "expr": "semantic_ref",
+                    "category": "movement",
+                    "id": "place"
+                  },
+                  "position_x": {
+                    "expr": "parameter",
+                    "name": "x"
+                  },
+                  "position_y": {
+                    "expr": "parameter",
+                    "name": "y"
+                  },
+                  "sagitta": {
+                    "expr": "exact_decimal",
+                    "value": "0.034"
+                  },
+                  "shape": {
+                    "expr": "semantic_ref",
+                    "category": "shape",
+                    "id": "arc"
+                  },
+                  "surface": {
+                    "expr": "semantic_ref",
+                    "category": "surface",
+                    "id": "solid"
+                  },
+                  "touch": {
+                    "expr": "semantic_ref",
+                    "category": "touch",
+                    "id": "chalk"
+                  }
+                }
+              },
+              {
+                "op": "emit",
+                "binding": "edge_b",
+                "fields": {
+                  "chord": {
+                    "expr": "exact_decimal",
+                    "value": "0.130"
+                  },
+                  "color": {
+                    "expr": "parameter",
+                    "name": "color"
+                  },
+                  "fluctuation_amplitude": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "fine"
+                  },
+                  "fluctuation_quality": {
+                    "expr": "semantic_ref",
+                    "category": "variation",
+                    "id": "swaying"
+                  },
+                  "movement": {
+                    "expr": "semantic_ref",
+                    "category": "movement",
+                    "id": "place"
+                  },
+                  "sagitta": {
+                    "expr": "exact_decimal",
+                    "value": "0.010"
+                  },
+                  "shape": {
+                    "expr": "semantic_ref",
+                    "category": "shape",
+                    "id": "arc"
+                  },
+                  "surface": {
+                    "expr": "semantic_ref",
+                    "category": "surface",
+                    "id": "solid"
+                  },
+                  "touch": {
+                    "expr": "semantic_ref",
+                    "category": "touch",
+                    "id": "chalk"
+                  }
+                }
+              },
+              {
+                "op": "relation",
+                "kind": "touching",
+                "from": "edge_a",
+                "to": "edge_b"
+              }
+            ]
+          }
+        },
         "body": [
           {
             "op": "vary",
@@ -1873,19 +2010,19 @@
                     "choices": [
                       {
                         "expr": "exact_decimal",
-                        "value": "0.16"
+                        "value": "0.14"
                       },
                       {
                         "expr": "exact_decimal",
-                        "value": "0.26"
+                        "value": "0.24"
                       },
                       {
                         "expr": "exact_decimal",
-                        "value": "0.74"
+                        "value": "0.76"
                       },
                       {
                         "expr": "exact_decimal",
-                        "value": "0.84"
+                        "value": "0.86"
                       }
                     ],
                     "range": null,
@@ -1897,67 +2034,90 @@
                         "choices": [
                           {
                             "expr": "exact_decimal",
-                            "value": "0.72"
+                            "value": "0.76"
                           },
                           {
                             "expr": "exact_decimal",
-                            "value": "0.82"
+                            "value": "0.83"
                           },
                           {
                             "expr": "exact_decimal",
-                            "value": "0.88"
+                            "value": "0.89"
                           }
                         ],
                         "range": null,
                         "body": [
                           {
-                            "op": "emit",
-                            "binding": null,
-                            "fields": {
-                              "color": {
+                            "op": "vary",
+                            "binding": "leaf_lean",
+                            "domain": "kareha_fallen_lean",
+                            "choices": [
+                              {
                                 "expr": "semantic_ref",
-                                "category": "color",
-                                "id": "gray"
+                                "category": "angle",
+                                "id": "horizontal"
                               },
-                              "fluctuation_amplitude": {
+                              {
                                 "expr": "semantic_ref",
-                                "category": "variation",
-                                "id": "fine"
+                                "category": "angle",
+                                "id": "falling"
                               },
-                              "fluctuation_quality": {
+                              {
                                 "expr": "semantic_ref",
-                                "category": "variation",
-                                "id": "swaying"
+                                "category": "angle",
+                                "id": "left_falling"
                               },
-                              "movement": {
+                              {
                                 "expr": "semantic_ref",
-                                "category": "movement",
-                                "id": "place"
+                                "category": "angle",
+                                "id": "diagonal"
                               },
-                              "position_x": {
-                                "expr": "local",
-                                "name": "leaf_x"
-                              },
-                              "position_y": {
-                                "expr": "local",
-                                "name": "leaf_y"
-                              },
-                              "shape": {
+                              {
                                 "expr": "semantic_ref",
-                                "category": "shape",
-                                "id": "cloudform"
-                              },
-                              "surface": {
-                                "expr": "semantic_ref",
-                                "category": "surface",
-                                "id": "solid"
-                              },
-                              "touch": {
-                                "expr": "semantic_ref",
-                                "category": "touch",
-                                "id": "chalk"
+                                "category": "angle",
+                                "id": "rotated"
                               }
-                            }
+                            ],
+                            "range": null,
+                            "body": [
+                              {
+                                "op": "use",
+                                "component": "withered_leaf",
+                                "arguments": {
+                                  "color": {
+                                    "expr": "cycle",
+                                    "index": {
+                                      "expr": "local",
+                                      "name": "leaf_index"
+                                    },
+                                    "items": [
+                                      {
+                                        "expr": "semantic_ref",
+                                        "category": "color",
+                                        "id": "gray"
+                                      },
+                                      {
+                                        "expr": "semantic_ref",
+                                        "category": "color",
+                                        "id": "yellow"
+                                      }
+                                    ]
+                                  },
+                                  "lean": {
+                                    "expr": "local",
+                                    "name": "leaf_lean"
+                                  },
+                                  "x": {
+                                    "expr": "local",
+                                    "name": "leaf_x"
+                                  },
+                                  "y": {
+                                    "expr": "local",
+                                    "name": "leaf_y"
+                                  }
+                                }
+                              }
+                            ]
                           }
                         ]
                       }
@@ -1970,8 +2130,8 @@
         ]
       },
       "summaries": {
-        "ja": "雲形2〜4個を下の左右の隅に置く。チョークの灰で輪郭を細かく揺らし、内側も同じ灰で塗る。",
-        "en": "Place 2–4 cloudforms in the lower left or right corners. Their outlines sway finely in gray chalk, and their interiors are filled with the same gray."
+        "ja": "縮れた枯葉2〜4枚を下の左右の隅に置く。各葉は両端で触れる深い弧と浅い弧で、チョークの灰と黄を交互にし、縁を細かく揺らし、傾きをばらす。各葉の内側を輪郭と同じ色で塗る。",
+        "en": "Place 2–4 curled withered leaves in the lower left or right corners. Each is a deep arc and a shallow arc touching at both ends, alternating gray and yellow chalk, with finely swaying edges and varied rotations. Fill each leaf interior with the same color as its outline."
       }
     }
   ]

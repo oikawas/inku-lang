@@ -293,7 +293,9 @@
 # performance and no longer carries a hidden flat base fill.
 # 47: A Japanese modifier before a count phrase reaches the same head as one
 # after it, so `大きな四つの円` and `細い三本の線` keep their count and action.
-DDL_ENGINE_VERSION = "47"
+# 48: Bundled Nature.枯葉 1.1.0 draws curled two-arc leaves instead of
+# cloudforms; a saved 1.0.1 lock keeps its cloudform meaning.
+DDL_ENGINE_VERSION = "48"
 # 4 (2026-07-30): yellow, orange, and purple become abstract Score colors, and
 # coerce recognizes the corresponding Japanese and English DDL markers.
 # 3 (2026-07-30): 黄 / 橙 / 紫 joined the saijiki color words, so an author can write

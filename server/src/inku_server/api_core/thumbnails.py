@@ -306,6 +306,24 @@ def stale_targets(scales: tuple[int, ...]) -> list[tuple[str, str | None, int]]:
     return targets
 
 
+def prune_orphans() -> int:
+    """Delete the thumbnails of works that no longer exist. Returns how many.
+
+    A permanent delete drops its works' thumbnails once it has committed, but
+    that second step can fail, and deletions made before it existed dropped
+    none, so the store kept pictures of works nobody can open any more.
+
+    The stored ids are read before the works. A work saved in between is baked
+    only after its save commits, so either its thumbnail is missing from the
+    first read or the work is present in the second; neither pruning a live one.
+    """
+    stored = sorted({history_id for scale in _thumbs.SCALES for history_id in _thumbs.stored_hashes(scale)})
+    if not stored:
+        return 0
+    live = _db.existing_history_ids(stored)
+    return _thumbs.delete_for_history([history_id for history_id in stored if history_id not in live])
+
+
 class RebuildProgress:
     """What a running rebuild has done so far, safe to read from a request."""
 
@@ -436,6 +454,9 @@ def start_rebuild() -> dict:
     the same number.
     """
     _thumbs.init_thumbs_db()
+    pruned = prune_orphans()
+    if pruned:
+        _logger.info("thumbnail rebuild pruned %d thumbnails of deleted works", pruned)
     settings = _db.get_thumbnail_settings()
     workers = int(settings["workers"])
     scales = active_scales()

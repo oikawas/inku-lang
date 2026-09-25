@@ -161,6 +161,23 @@ def test_t5_leaders_do_not_reach_the_admin_routes() -> None:
     assert client.get(ADMIN_ROUTE, headers=headers).status_code == 403
 
 
+def test_t5_leaders_do_not_switch_how_the_server_signs_in() -> None:
+    """The sign-in switches are a global setting, which only admins may write.
+
+    The route sat behind the user-manager guard, so a leader could turn local
+    sign-in off for every account on the server.
+    """
+    _user, headers = _member("reach-lead-auth", ["leaders"])
+    before = db.get_auth_settings()
+    response = client.put(
+        "/api/auth/config",
+        json={"google_enabled": False, "local_enabled": False},
+        headers=headers,
+    )
+    assert response.status_code == 403
+    assert db.get_auth_settings() == before
+
+
 def test_t6_plain_users_do_not_reach_the_user_manager_routes() -> None:
     _user, headers = _member("reach-user", ["users"])
     assert client.get(MANAGER_ROUTE, headers=headers).status_code == 403

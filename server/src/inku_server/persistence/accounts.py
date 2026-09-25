@@ -9,7 +9,7 @@ import json
 import secrets
 from typing import Any
 
-from sqlalchemy import text
+from sqlalchemy import or_, select, text
 
 from .access import has_permission_group
 from .schema import (
@@ -20,11 +20,30 @@ from .schema import (
     LineageNodeRow,
     OkugakiRow,
     PermissionGroupRow,
+    PipelineCandidateExecutionRow,
+    PipelineHistoryLinkRow,
+    ProviderObservationRow,
     UnreadWordRow,
     UserAccountRow,
     UserGroupRow,
     UserPermissionGroupRow,
     UserSessionRow,
+    VariationAuthorityActionRow,
+    VariationAuthorityRow,
+)
+
+# The shared pipeline's tables, every one keyed by the owning account alone:
+# drafts (their descriptions and DDL), acknowledged commits, resumable
+# executions, captured provider requests and responses, and the links from a
+# saved performance back to its authoring revision. Nothing outside the account
+# can reach them, so once the account is gone they are only a copy of its
+# writing that nobody can open or delete.
+_OWNER_KEYED_PIPELINE_ROWS = (
+    PipelineHistoryLinkRow,
+    PipelineCandidateExecutionRow,
+    ProviderObservationRow,
+    VariationAuthorityActionRow,
+    VariationAuthorityRow,
 )
 
 
@@ -708,6 +727,9 @@ class UserAccountDeleter:
     owner_actor_fn: Callable[[str], dict]
     owned_by_fn: Callable[[dict, Any], Any]
     delete_acl_for_histories_fn: Callable[[Any, list[str]], None]
+    # Told the ids of the works a cascade removed, after the commit, so the
+    # thumbnails -- a separate database -- can drop their copies too.
+    after_history_delete_fn: Callable[[list[str]], None] | None = None
 
     def delete_user(
         self,
@@ -716,6 +738,7 @@ class UserAccountDeleter:
         cascade: bool = False,
         actor: dict | None = None,
     ) -> bool:
+        deleted_history_ids: list[str] = []
         with self.session_factory() as session:
             query = session.query(UserAccountRow).filter(UserAccountRow.id == user_id)
             if actor is not None and not self.has_permission_group_fn(actor, "admins"):
@@ -739,16 +762,40 @@ class UserAccountDeleter:
                     .first()
                 ):
                     raise ValueError("user has history")
-            else:
-                self.delete_acl_for_histories_fn(
-                    session,
-                    [
-                        item_id
-                        for item_id, in session.query(HistoryRow.id).filter(
-                            self.owned_by_fn(target_owner, HistoryRow.user_id)
-                        )
-                    ],
-                )
+            # The ownership test `owned_by_fn` applies, written out because it
+            # has to be an expression a subquery can carry.
+            target_nodes = select(LineageNodeRow.id).where(LineageNodeRow.user_id == user_id)
+            # Asked before anything is removed. A lineage may cross owners, so
+            # another account's derivation can name one of this account's nodes
+            # as its parent -- a tombstone included, which is what is left of a
+            # work its owner deleted -- and another account's colophon can be
+            # about one. Deleting the node would leave those pointing at nothing;
+            # the foreign keys refuse that at the commit, and the refusal used to
+            # surface as a bare 500. What should become of somebody else's chain
+            # when its origin's account goes has not been decided, so the
+            # deletion is refused with the reason instead.
+            if (
+                session.query(LineageEdgeRow.id).filter(
+                    LineageEdgeRow.user_id != user_id,
+                    or_(
+                        LineageEdgeRow.parent_node_id.in_(target_nodes),
+                        LineageEdgeRow.child_node_id.in_(target_nodes),
+                    ),
+                ).first()
+                or session.query(OkugakiRow.id).filter(
+                    OkugakiRow.user_id != user_id,
+                    OkugakiRow.target_node_id.in_(target_nodes),
+                ).first()
+            ):
+                raise ValueError("other accounts' works derive from this user's works")
+            if cascade:
+                deleted_history_ids = [
+                    item_id
+                    for item_id, in session.query(HistoryRow.id).filter(
+                        self.owned_by_fn(target_owner, HistoryRow.user_id)
+                    )
+                ]
+                self.delete_acl_for_histories_fn(session, deleted_history_ids)
                 session.query(HistoryRow).filter(
                     self.owned_by_fn(target_owner, HistoryRow.user_id)
                 ).delete()
@@ -773,6 +820,12 @@ class UserAccountDeleter:
             session.query(UserPermissionGroupRow).filter(
                 UserPermissionGroupRow.user_id == user_id
             ).delete()
+            for table in _OWNER_KEYED_PIPELINE_ROWS:
+                session.query(table).filter(table.owner_id == user_id).delete(
+                    synchronize_session=False
+                )
             session.delete(row)
             session.commit()
-            return True
+        if deleted_history_ids and self.after_history_delete_fn is not None:
+            self.after_history_delete_fn(deleted_history_ids)
+        return True

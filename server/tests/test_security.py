@@ -111,3 +111,17 @@ def test_login_endpoint_rate_limits_repeated_failures() -> None:
         assert int(blocked.headers["retry-after"]) >= 1
     finally:
         _login_rate_limiter.reset(rate_key)
+
+
+def test_a_redis_connection_failure_does_not_log_the_password(monkeypatch, caplog) -> None:
+    from inku_server import security
+
+    monkeypatch.setattr(security, "_REDIS_CLIENT", None)
+    monkeypatch.setattr(security, "_REDIS_INITIALIZED", False)
+    # Port 1 refuses at once, and with redis-py absent the import fails instead:
+    # either way the connection fails and the warning is written.
+    monkeypatch.setenv("INKU_REDIS_URL", "redis://:s3cret-pass@127.0.0.1:1/0")
+    with caplog.at_level("WARNING", logger="inku_server.security"):
+        assert security._get_redis_client() is None
+    assert "Failed to connect to Redis at redis://127.0.0.1:1/0" in caplog.text
+    assert "s3cret-pass" not in caplog.text

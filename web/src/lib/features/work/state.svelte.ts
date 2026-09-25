@@ -837,6 +837,18 @@ export function createWorkState(deps: WorkStateDeps) {
 		stopBatch();
 	}
 
+	/**
+	 * End the pipeline run in flight: the server execution and this tab's
+	 * polling of it. An aborted signal alone reaches only the request that
+	 * started the run, so a caller that owns its own stop button (the DDL
+	 * dialog) needs this as well, as stopBatch and stopReplay already do.
+	 */
+	function cancelPipelineRun(): void {
+		pipelineController.cancel().catch((cause) => {
+			console.warn('failed to cancel the pipeline run', cause);
+		});
+	}
+
 	// ── Replay (Stage 2 only) ───────────────────────────────
 	async function replay() {
 		if (!ddl || reloading) return;
@@ -1056,6 +1068,7 @@ export function createWorkState(deps: WorkStateDeps) {
 		stopBatch,
 		stopReplay,
 		stopDdlRender,
+		cancelPipelineRun,
 		replay,
 		clearInput,
 	};

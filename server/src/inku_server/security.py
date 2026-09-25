@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 import logging
 import time
+import urllib.parse
 from collections import OrderedDict, deque
 from dataclasses import dataclass
 from threading import BoundedSemaphore, Lock
@@ -16,6 +17,20 @@ _logger = logging.getLogger(__name__)
 # Redis shared pool
 _REDIS_CLIENT = None
 _REDIS_INITIALIZED = False
+
+
+def _url_without_credentials(url: str) -> str:
+    """The URL as a log line may show it: `redis://:secret@host` carries a password."""
+    try:
+        parts = urllib.parse.urlsplit(url)
+        port = parts.port
+    except ValueError:
+        return "<unparseable URL>"
+    if parts.username is None and parts.password is None:
+        return url
+    host = parts.hostname or ""
+    netloc = f"{host}:{port}" if port else host
+    return urllib.parse.urlunsplit((parts.scheme, netloc, parts.path, parts.query, parts.fragment))
 
 
 def _get_redis_client():
@@ -36,7 +51,7 @@ def _get_redis_client():
         _logger.info("Connected to Redis for distributed rate limiting.")
     except Exception as e:
         _logger.warning(
-            f"Failed to connect to Redis at {redis_url}: {e}. "
+            f"Failed to connect to Redis at {_url_without_credentials(redis_url)}: {e}. "
             "Falling back to in-memory rate limiter."
         )
         _REDIS_CLIENT = None

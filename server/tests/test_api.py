@@ -12,6 +12,7 @@ import logging
 import os
 import sys
 import types
+import urllib.parse
 import urllib.request
 import uuid
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -1540,6 +1541,13 @@ def test_db_backup_settings_and_manual_run_are_admin_only(tmp_path, monkeypatch)
         assert data["manual"] is True
         assert data["size_bytes"] > 0
         assert (tmp_path / "db-backups" / "manual").exists()
+
+        # A second press inside the same second finds the name taken: a refusal
+        # that says so, not a bare 500.
+        monkeypatch.setattr(db, "_now_ms", lambda: data["at"])
+        again_r = client.post("/api/settings/db-backup/run", headers=admin_headers)
+        assert again_r.status_code == 409, again_r.text
+        assert "already exists" in again_r.json()["detail"]
     finally:
         db.delete_session(admin_token)
         db.delete_session(user_token)
@@ -2673,6 +2681,44 @@ def test_model_settings_fetch_models_from_provider(monkeypatch):
     db.delete_session(token)
     db.delete_user(admin["id"])
     db.delete_user_group(group["id"])
+
+
+def test_gemini_model_list_sends_the_key_in_a_header_and_reads_every_page(monkeypatch):
+    """No key in the URL, and a model on the second page is not read as retired."""
+    monkeypatch.setenv("GEMINI_API_KEY", "gemini-test-key")
+    pages = {
+        "": {"models": [{"name": "models/gemini-a", "displayName": "A"}], "nextPageToken": "next"},
+        "next": {"models": [{"name": "models/gemini-b", "displayName": "B"}]},
+    }
+    seen: list[tuple[str, dict[str, str]]] = []
+
+    class FakeResponse:
+        def __init__(self, body):
+            self.body = body
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_):
+            return False
+
+        def read(self):
+            return json.dumps(self.body).encode()
+
+    def fake_urlopen(req, timeout=0):
+        seen.append((req.full_url, dict(req.header_items())))
+        token = urllib.parse.parse_qs(urllib.parse.urlsplit(req.full_url).query).get("pageToken", [""])[0]
+        return FakeResponse(pages[token])
+
+    monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
+    models = settings_routes._fetch_provider_model_list("gemini", default_model_settings())
+
+    assert [model["id"] for model in models] == ["gemini-a", "gemini-b"]
+    assert len(seen) == 2
+    for url, headers in seen:
+        assert "gemini-test-key" not in url
+        assert "pageSize=1000" in url
+        assert headers.get("X-goog-api-key") == "gemini-test-key"
 
 
 def test_render_svg_forwards_wild_to_the_renderer(auth_context, monkeypatch):

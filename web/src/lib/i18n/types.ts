@@ -962,6 +962,7 @@ export interface LangPack {
 	historyLibraryTitle: string;
 	historyLibraryReturn: string;
 	historyLibraryLoadFailed: string;
+	historyMutationFailed: (reason: string) => string;
 	historyLibraryRetry: string;
 	historyDisplayFormat: string;
 	historyGrouping: string;

@@ -33,8 +33,12 @@
 		align-items: center;
 		min-width: 0;
 	}
+	/* Shown for the pointer on hover and for the keyboard on :focus-visible.
+	   Not :focus-within: a clicked button keeps focus, so its bubble stayed up
+	   after the pointer had left, drawn over whatever the click opened -- the
+	   user menu, a confirmation, the heading of the tab it switched to. */
 	.tooltip-wrap:hover,
-	.tooltip-wrap:focus-within {
+	.tooltip-wrap:has(:focus-visible) {
 		z-index: 1010;
 	}
 	.tooltip-wrap.disabled {
@@ -196,7 +200,7 @@
 	}
 
 	.tooltip-wrap:hover .tooltip-bubble,
-	.tooltip-wrap:focus-within .tooltip-bubble {
+	.tooltip-wrap:has(:focus-visible) .tooltip-bubble {
 		opacity: 1;
 	}
 	.tooltip-wrap.disabled .tooltip-bubble {
@@ -204,29 +208,29 @@
 		visibility: hidden;
 	}
 	.tooltip-wrap:hover .tooltip-bubble:not(.bottom):not(.left):not(.right):not(.bottom-left):not(.bottom-right):not(.top-left):not(.top-right),
-	.tooltip-wrap:focus-within .tooltip-bubble:not(.bottom):not(.left):not(.right):not(.bottom-left):not(.bottom-right):not(.top-left):not(.top-right) {
+	.tooltip-wrap:has(:focus-visible) .tooltip-bubble:not(.bottom):not(.left):not(.right):not(.bottom-left):not(.bottom-right):not(.top-left):not(.top-right) {
 		transform: translate(-50%, 0);
 	}
 	.tooltip-wrap:hover .tooltip-bubble.bottom,
-	.tooltip-wrap:focus-within .tooltip-bubble.bottom {
+	.tooltip-wrap:has(:focus-visible) .tooltip-bubble.bottom {
 		transform: translate(-50%, 0);
 	}
 	.tooltip-wrap:hover .tooltip-bubble.left,
-	.tooltip-wrap:focus-within .tooltip-bubble.left {
+	.tooltip-wrap:has(:focus-visible) .tooltip-bubble.left {
 		transform: translate(0, -50%);
 	}
 	.tooltip-wrap:hover .tooltip-bubble.right,
-	.tooltip-wrap:focus-within .tooltip-bubble.right {
+	.tooltip-wrap:has(:focus-visible) .tooltip-bubble.right {
 		transform: translate(0, -50%);
 	}
 	.tooltip-wrap:hover .tooltip-bubble.bottom-left,
-	.tooltip-wrap:focus-within .tooltip-bubble.bottom-left,
+	.tooltip-wrap:has(:focus-visible) .tooltip-bubble.bottom-left,
 	.tooltip-wrap:hover .tooltip-bubble.bottom-right,
-	.tooltip-wrap:focus-within .tooltip-bubble.bottom-right,
+	.tooltip-wrap:has(:focus-visible) .tooltip-bubble.bottom-right,
 	.tooltip-wrap:hover .tooltip-bubble.top-left,
-	.tooltip-wrap:focus-within .tooltip-bubble.top-left,
+	.tooltip-wrap:has(:focus-visible) .tooltip-bubble.top-left,
 	.tooltip-wrap:hover .tooltip-bubble.top-right,
-	.tooltip-wrap:focus-within .tooltip-bubble.top-right {
+	.tooltip-wrap:has(:focus-visible) .tooltip-bubble.top-right {
 		transform: translate(0, 0);
 	}
 </style>

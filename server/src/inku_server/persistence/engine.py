@@ -49,11 +49,17 @@ class DatabaseInfoReader:
             self.config.canonical_url,
             setting=CANONICAL_DB_ENV,
         )
-        file_size = (
-            database_path.stat().st_size
-            if database_path is not None and database_path.exists()
-            else None
-        )
+        file_size = None
+        if database_path is not None and database_path.exists():
+            # Committed pages wait in the write-ahead log until a checkpoint
+            # moves them into the main file, so the main file alone understated
+            # a live database -- 4 KB beside a 2 MB log on a fresh install -- and
+            # so did the backup-space estimate the settings screen builds on it.
+            # A page can be in both files, which errs toward the larger number.
+            file_size = database_path.stat().st_size
+            wal_path = database_path.with_name(database_path.name + "-wal")
+            if wal_path.exists():
+                file_size += wal_path.stat().st_size
         return {
             "backend": url.get_backend_name(),
             "driver": url.get_driver_name(),

@@ -1044,6 +1044,7 @@ export const ja: LangPack = {
 	historyLibraryTitle: 'ライブラリ',
 	historyLibraryReturn: '制作に戻る',
 	historyLibraryLoadFailed: 'ライブラリを読み込めませんでした。',
+	historyMutationFailed: (reason) => `作品を変更できませんでした。${reason}`,
 	historyLibraryRetry: '再試行',
 	historyDisplayFormat: '表示形式',
 	historyGrouping: 'まとめ方',

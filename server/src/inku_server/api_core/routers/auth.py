@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel, Field
 from ...security import SlidingWindowRateLimiter
 from ... import db as _db
-from ..deps import _SESSION_COOKIE_NAME, _current_user, _session_token, _user_manager
+from ..deps import _SESSION_COOKIE_NAME, _admin_user, _current_user, _session_token
 from ..models import UserAccountItem
 
 
@@ -15,7 +15,11 @@ router = APIRouter()
 # Everything in the auth group except logging in itself: reading how the server
 # authenticates is not something logging in needs to know beforehand.
 authenticated_router = APIRouter(dependencies=[Depends(_current_user)])
-manager_router = APIRouter(dependencies=[Depends(_user_manager)])
+# Changing how the whole server authenticates is a global setting, which the
+# SPEC gives to `admins` alone. It used to sit behind the user-manager guard, so
+# a leader -- who manages the members of one organisation group -- could turn
+# local sign-in off for every account on the server.
+admin_router = APIRouter(dependencies=[Depends(_admin_user)])
 
 
 _SESSION_COOKIE_MAX_AGE = int(os.getenv("INKU_SESSION_COOKIE_MAX_AGE", str(60 * 60 * 24 * 30)))
@@ -71,7 +75,7 @@ class AuthSettingsBody(BaseModel):
     local_enabled: bool
 
 
-@manager_router.put("/api/auth/config")
+@admin_router.put("/api/auth/config")
 def api_auth_config_update(body: AuthSettingsBody) -> dict:
     return _db.update_auth_settings(body.google_enabled, body.local_enabled)
 

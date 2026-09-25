@@ -102,7 +102,10 @@
 
 	<div class="rail-actions">
 		<div class="rail-menu-wrap" bind:this={userMenuWrapEl}>
-			<Tooltip placement="right" text={`${t().tooltipAppRailUser} (${currentUser.email || currentUser.username})`}>
+			<!-- Off while the menu is open, as the UI-mode menu below does: the bubble
+			     is drawn over the menu it sits beside. Single-user mode offers no
+			     logout, so the bubble does not name one there. -->
+			<Tooltip placement="right" text={`${singleUserMode ? t().profileButton : t().tooltipAppRailUser} (${currentUser.email || currentUser.username})`} disabled={userMenuOpen}>
 				<button
 					class="rail-action"
 					class:active={userMenuOpen}

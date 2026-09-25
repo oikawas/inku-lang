@@ -1311,6 +1311,7 @@ def _account_deleter() -> _accounts.UserAccountDeleter:
         _owner_actor,
         _owned_by,
         _delete_acl_for_histories,
+        _drop_thumbnails_of_deleted_works,
     )
 
 
@@ -1499,6 +1500,10 @@ def history_render_hashes() -> list[tuple[str, str | None]]:
     return _history.HistoryThumbnailSourceReader(SessionLocal).history_render_hashes()
 
 
+def existing_history_ids(ids: list[str]) -> set[str]:
+    return _history.HistoryThumbnailSourceReader(SessionLocal).existing_ids(ids)
+
+
 def history_svgs(ids: list[str]) -> dict[str, str]:
     return _history.HistoryThumbnailSourceReader(SessionLocal).history_svgs(ids)
 
@@ -1536,12 +1541,30 @@ def restore_items(user_id: str, ids: list[str]) -> int:
     return _history.HistoryTrashStateWriter(SessionLocal, _actor_of).restore_items(user_id, ids)
 
 
+def _drop_thumbnails_of_deleted_works(history_ids: list[str]) -> None:
+    """Delete the thumbnails of works that no longer exist. Never raises.
+
+    The thumbnails live in their own database, so they cannot join the deletion's
+    transaction. Nothing serves them once the work is gone -- every thumbnail
+    read asks the canonical visibility rule first -- but a permanently deleted
+    work's picture must not stay on disk, and the store only grew. A failure
+    here is logged and left to the rebuild, which prunes works that are gone.
+    """
+    from . import thumbs_db
+
+    try:
+        thumbs_db.delete_for_history(history_ids)
+    except Exception:  # noqa: BLE001
+        _logger.exception("could not delete thumbnails of %d deleted works", len(history_ids))
+
+
 def delete_items(user_id: str, ids: list[str], *, require_trashed: bool = False) -> int:
     return _history.HistoryPermanentDeleteWriter(
         SessionLocal,
         _actor_of,
         _now_ms,
         _delete_acl_for_histories,
+        _drop_thumbnails_of_deleted_works,
     ).delete_items(user_id, ids, require_trashed=require_trashed)
 
 

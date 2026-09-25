@@ -116,7 +116,7 @@
 		HistoryBrowsingState,
 		type HistoryStarProjection
 	} from '$lib/features/history/browsing-state.svelte';
-	import { HistoryMutations } from '$lib/features/history/mutations';
+	import { HistoryMutationError, HistoryMutations, type HistoryBulkMutationPath } from '$lib/features/history/mutations';
 	import { saveHistoryItem, type SaveHistoryOptions } from '$lib/features/history/save';
 	import {
 		replayHistoryItem as replaySavedHistoryItem,
@@ -1333,11 +1333,23 @@
 		historyManager.toggleSelectAll();
 	}
 
+	// The confirmation has closed by the time the request answers, so a failure
+	// reopens the same dialog as a notice. A refused request leaves every work
+	// where it was; saying nothing let a failed delete read as a finished one.
+	function postHistoryIds(path: HistoryBulkMutationPath, ids: string[]): void {
+		historyMutations.postIds(path, ids).catch((cause: unknown) => {
+			const reason = cause instanceof HistoryMutationError
+				? describeApiError(cause.detail, cause.status)
+				: cause instanceof Error ? cause.message : String(cause);
+			confirmAction = { message: t().historyMutationFailed(reason), runLabel: t().confirmOk, hideCancel: true, run: () => {} };
+		});
+	}
+
 	function askTrash(ids: string[]) {
 		if (ids.length === 0) return;
 		confirmAction = {
 			message: t().confirmTrashMessage(ids.length),
-			run: () => { void historyMutations.postIds('/api/history/trash', ids); }
+			run: () => postHistoryIds('/api/history/trash', ids)
 		};
 	}
 
@@ -1345,7 +1357,7 @@
 		if (ids.length === 0) return;
 		confirmAction = {
 			message: t().confirmRestoreMessage(ids.length),
-			run: () => { void historyMutations.postIds('/api/history/restore', ids); }
+			run: () => postHistoryIds('/api/history/restore', ids)
 		};
 	}
 
@@ -1354,7 +1366,7 @@
 		confirmAction = {
 			message: t().confirmPermanentDeleteMessage(ids.length),
 			destructive: true,
-			run: () => { void historyMutations.postIds('/api/history/permanent-delete', ids); }
+			run: () => postHistoryIds('/api/history/permanent-delete', ids)
 		};
 	}
 
@@ -1717,9 +1729,19 @@ async function handleDdlDialogDraw(nextDdl: string, signal?: AbortSignal, import
 	if (ddlDialogDrawing) return;
 	ddlDialogDrawing = true;
 	ddlDialogError = null;
+	// The dialog's stop aborts `signal`, which reaches only the request that
+	// starts the run. The execution on the server and the polling that waits
+	// for it end when the pipeline is cancelled, as the description panel's
+	// stop does. Without this the stop did nothing, and the dialog -- which
+	// cannot be closed while drawing -- stayed until the model answered.
+	const cancelRun = () => work.cancelPipelineRun();
+	signal?.addEventListener('abort', cancelRun, { once: true });
 	try {
 		if (ddlDialogMode === 'edit' && ddlDialogNode) await drawLineageDdlEdit(ddlDialogNode, nextDdl, signal);
 		else await drawNewDdl(nextDdl, signal, importedPlugins);
+		// A cancelled run hands back its last view instead of throwing; a stop
+		// keeps the dialog open all the same.
+		signal?.throwIfAborted();
 		ddlDialogOpen = false;
 	} catch (cause) {
 		// Aborted by the dialog stop button: keep the dialog open, no error.
@@ -1727,6 +1749,7 @@ async function handleDdlDialogDraw(nextDdl: string, signal?: AbortSignal, import
 			ddlDialogError = cause instanceof Error ? cause.message : String(cause);
 		}
 	} finally {
+		signal?.removeEventListener('abort', cancelRun);
 		ddlDialogDrawing = false;
 	}
 }

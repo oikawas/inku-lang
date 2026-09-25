@@ -1044,6 +1044,7 @@ export const en: LangPack = {
 	historyLibraryTitle: 'Library',
 	historyLibraryReturn: 'Return to making',
 	historyLibraryLoadFailed: 'The library could not be loaded.',
+	historyMutationFailed: (reason) => `The works could not be changed. ${reason}`,
 	historyLibraryRetry: 'Retry',
 	historyDisplayFormat: 'Display',
 	historyGrouping: 'Group by',

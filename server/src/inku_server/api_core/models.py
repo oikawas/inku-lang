@@ -102,6 +102,9 @@ class HistoryItem(HistoryPostBody):
     # is unchanged on the wire; a client that never learned the field sees what
     # it always saw.
     shared: bool | None = None
+    # Whether this owner has granted access to anyone through this work's ACL.
+    # Omitted for works owned by somebody else; their guest list is private.
+    has_acl_shares: bool | None = None
     # The staffage level a work was drawn at. The axis was folded away in
     # v2.11.0 and nothing writes this any more, so it is declared on the
     # RESPONSE model and not on the post body: a work saved before the removal

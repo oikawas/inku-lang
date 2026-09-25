@@ -12,12 +12,14 @@
 	import { formatByteSize, groupDigits } from '$lib/formatNumber';
 	import { formatHistoryMinute, historyListDescription } from '$lib/historyManagerPresentation';
 	import { historyGridPageSize } from '$lib/historyManagerSizing';
+	import { getCanvasAspectOption } from '$lib/plugins/system/canvas-aspect';
 	import HistoryDescription from '$lib/components/HistoryDescription.svelte';
 
 	type HistoryItem = {
 		// Set only when the work is somebody else's, reached through a group
 		// scope or an explicit grant. Absent for one's own.
 		shared?: boolean;
+		has_acl_shares?: boolean;
 		id?: string;
 		input: string;
 		source_text?: string | null;
@@ -116,6 +118,8 @@
 		onToggleStar: (item: HistoryItem, event?: Event) => void | Promise<void>;
 		// Absent in single-user mode, where there is nobody to share with.
 		onShareItem?: ((item: HistoryItem) => void) | null;
+		aclShareStatus?: Record<string, boolean>;
+		groupShareStatus?: Record<string, boolean>;
 		isJapanese?: boolean;
 		historyModelFull: (model: string) => string;
 		formatHistoryDate: (at: number) => string;
@@ -175,6 +179,8 @@
 		onRefine,
 		onToggleStar,
 		onShareItem = null,
+		aclShareStatus = {},
+		groupShareStatus = {},
 		isJapanese = false,
 		historyModelFull,
 		formatHistoryDate,
@@ -185,6 +191,18 @@
 		currentHistoryId = null,
 		currentLineageRootId = null
 	}: Props = $props();
+
+	function hasAclShares(item: HistoryItem): boolean {
+		return item.id && Object.hasOwn(aclShareStatus, item.id)
+			? aclShareStatus[item.id]
+			: !!item.has_acl_shares;
+	}
+
+	function isGroupShared(item: HistoryItem): boolean {
+		return item.id && Object.hasOwn(groupShareStatus, item.id)
+			? groupShareStatus[item.id]
+			: !!item.for_share;
+	}
 
 	let thumbGridWrapEl = $state<HTMLDivElement | null>(null);
 	let historyDisplayMode = $state<'chronological' | 'lineage'>('chronological');
@@ -517,6 +535,11 @@
 		if (previewReady && previewItem) onOpenArtwork(previewItem);
 	}
 
+	function activatePreviewArtwork(event: MouseEvent): void {
+		// Keyboard activation and touch use one press; a mouse uses a double-click.
+		if (event.detail === 0 || ('pointerType' in event && event.pointerType === 'touch')) previewArtwork();
+	}
+
 	function previewLineage(): void {
 		if (previewReady && previewItem) onOpenLineage(previewItem);
 	}
@@ -678,6 +701,16 @@
 		for (const controller of lineageMemberControllers.values()) controller.abort();
 	});
 </script>
+
+{#snippet shareStatus(item: HistoryItem)}
+	{#if item.shared || hasAclShares(item) || isGroupShared(item)}
+		<span class="share-statuses">
+			{#if item.shared}<span class="share-status" title={isJapanese ? '他の利用者が所有する作品' : 'Owned by another member'}>{isJapanese ? '他の人の作品' : 'Another member’s work'}</span>{/if}
+			{#if hasAclShares(item)}<span class="share-status" title={isJapanese ? '利用者またはグループに個別の権限を設定済み' : 'Individual access grants are set'}>{isJapanese ? '個別共有中' : 'Shared with guests'}</span>{/if}
+			{#if isGroupShared(item)}<span class="share-status" title={isJapanese ? '共有先グループへの閲覧を許可中' : 'Group reading is enabled'}>{isJapanese ? 'グループ共有中' : 'Shared with group'}</span>{/if}
+		</span>
+	{/if}
+{/snippet}
 
 <section class="history-library" class:library-hidden={!active} aria-label={t().historyLibraryTitle} aria-hidden={!active} inert={!active} tabindex="-1">
 	<div class="modal-head">
@@ -841,13 +874,24 @@
 			{#if previewLoading}<p>{t().historyPreviewLoading}</p>{/if}
 			{#if previewError}<p>{t().historyPreviewUnavailable}</p>{/if}
 			{#if previewItem && !previewLoading && !previewError}
-				<div class="history-preview-art"><HistoryThumbnail item={previewItem} scope={'library-preview-' + previewItem.id} size="manager" /></div>
+				<button
+					class="history-preview-art"
+					type="button"
+					aria-label={t().historyPreviewOpenArtwork}
+					title={t().historyPreviewOpenHint}
+					onclick={activatePreviewArtwork}
+					ondblclick={previewArtwork}
+				>
+					<HistoryThumbnail item={previewItem} scope={'library-preview-' + previewItem.id} size="manager" />
+				</button>
+				<p class="history-preview-open-hint">{t().historyPreviewOpenHint}</p>
 				<p class="history-preview-description">{previewItem.source_text ?? previewItem.input}</p>
+				{@render shareStatus(previewItem)}
 				<div class="history-preview-actions">
 					{#if previewReady}
-						<button class="ghost-btn" type="button" onclick={previewArtwork}>{t().historyPreviewOpenArtwork}</button>
 						<button class="ghost-btn" type="button" onclick={previewLineage}>{t().historyPreviewOpenLineage}</button>
 						<button class="ghost-btn" type="button" onclick={previewRefine}>{t().historyPreviewRefine}</button>
+						{#if onShareItem && previewItem && !previewItem.shared}<button class="ghost-btn" type="button" onclick={() => previewItem && onShareItem?.(previewItem)}>{isJapanese ? '共有設定' : 'Share settings'}</button>{/if}
 						<SavedWorkExportMenu
 							scope={previewExportScope}
 							animationSettings={animationExportSettings}
@@ -861,6 +905,44 @@
 						/>
 					{/if}
 				</div>
+				<section class="history-preview-details" aria-label={t().historyPreviewDetails}>
+					<h3>{t().historyPreviewDetails}</h3>
+					<dl>
+						<div><dt>{t().historyCreatedAtHeader}</dt><dd>{formatHistoryMinute(previewItem.at, isJapanese ? 'ja-JP' : 'en-US')}</dd></div>
+						{#each modelLines(previewItem) as model}
+							<div><dt>{model.label ?? t().historyModelHeader}</dt><dd>{model.full}</dd></div>
+						{/each}
+						<div><dt>{t().historyCatalogHeader}</dt><dd>{catalogName(previewItem.catalog_id)}</dd></div>
+						{#if previewItem.render_canvas_aspect_id || previewItem.render_canvas_aspect}
+							<div><dt>{t().historyCanvasHeader}</dt><dd>{getCanvasAspectOption(previewItem.render_canvas_aspect_id ?? previewItem.render_canvas_aspect).label}</dd></div>
+						{/if}
+						{#if previewItem.elapsed_ms != null}
+							<div><dt>{t().historySecondsHeader}</dt><dd>{groupDigits(previewItem.elapsed_ms / 1000, 1)} s</dd></div>
+						{/if}
+						<div><dt>{t().historySvgSizeHeader}</dt><dd>{formatByteSize(previewItem.svg_bytes)}</dd></div>
+						<div><dt>{t().historyStripFieldEngineVersion}</dt><dd>{previewItem.render_engine_version ?? t().historyVersionNotRecorded}</dd></div>
+						{#if previewItem.lineage_generation}
+							<div><dt>{t().historyStripFieldGeneration}</dt><dd>{groupDigits(previewItem.lineage_generation)}</dd></div>
+						{/if}
+						{#if previewItem.render_hash}
+							<div>
+								<dt>{t().historyHashHeader}</dt>
+								<dd class="history-preview-hash">
+									<span>#{(previewItem.render_hash_short ?? previewItem.render_hash.slice(-4)).toUpperCase()}</span>
+									<button
+										type="button"
+										title={copiedHistoryHash === previewItem.render_hash ? t().historyHashCopied : t().historyHashCopyTitle}
+										aria-label={t().historyHashCopyTitle}
+										onclick={(event) => previewItem && copyHash(previewItem, event)}
+									>
+										<svg viewBox="0 0 20 20" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="7" y="7" width="10" height="10" rx="1.5"/><path d="M13 7V4.5A1.5 1.5 0 0 0 11.5 3h-7A1.5 1.5 0 0 0 3 4.5v7A1.5 1.5 0 0 0 4.5 13H7"/></svg>
+									</button>
+								</dd>
+							</div>
+						{/if}
+						{#if previewItem.note}<div><dt>{t().selectionNoteLabel}</dt><dd>{previewItem.note}</dd></div>{/if}
+					</dl>
+				</section>
 			{/if}
 		</aside>
 	{/if}
@@ -910,14 +992,18 @@
 										<div class="lineage-member" class:current-work={currentHistoryId === it.id} class:selected={!!it.id && selectedHistoryIds.includes(it.id)}>
 											<button type="button" class="selection-checkbox" class:checked={!!it.id && selectedHistoryIds.includes(it.id)} title={t().historySelectItem(!!it.id && selectedHistoryIds.includes(it.id))} aria-label={t().historySelectItem(!!it.id && selectedHistoryIds.includes(it.id))} onclick={() => toggleSelection(it)}><span aria-hidden="true">{it.id && selectedHistoryIds.includes(it.id) ? '✓' : ''}</span></button>
 											{#if lineageThumbsMode && it.lineage_generation != null}<span class="lineage-generation-badge" title={t().historyGenerationTitle}>{it.lineage_generation}</span>{/if}
-											<button class="lineage-member-main" type="button" title={t().historyPreviewTitle} onclick={() => void openPreview(it)}>
-												<HistoryThumbnail item={it} scope={'lineage-member-' + it.id} size={historyManagerTab === 'list' ? 'mini' : 'manager'} />
-												<span>{thumbnailPromptText(it.source_text ?? it.input)}</span>
-											</button>
+											<div class="lineage-member-content">
+												<button class="lineage-member-main" type="button" title={t().historyPreviewTitle} onclick={() => void openPreview(it)}>
+													<HistoryThumbnail item={it} scope={'lineage-member-' + it.id} size={historyManagerTab === 'list' ? 'mini' : 'manager'} />
+													<span>{thumbnailPromptText(it.source_text ?? it.input)}</span>
+												</button>
+												{@render shareStatus(it)}
+											</div>
 											<div class="lineage-member-actions">
 												<button class="hash-row-star" class:starred={!!it.starred} title={it.starred ? t().starOn : t().starOff} aria-label={it.starred ? t().starOn : t().starOff} onclick={(event) => toggleLineageMemberStar(it, event)}>★</button>
 												<button class="hash-row-mark" class:marked={!!it.for_revision} title={it.for_revision ? t().forRevisionOn : t().forRevisionOff} aria-label={it.for_revision ? t().forRevisionOn : t().forRevisionOff} onclick={(event) => toggleLineageMemberForRevision(it, event)}>⚑</button>
 												{#if historyManagerView === 'active'}
+													{#if onShareItem && !it.shared}<button class="ghost-btn" type="button" onclick={() => onShareItem?.(it)}>{isJapanese ? '共有設定' : 'Share settings'}</button>{/if}
 													<button class="ghost-btn icon-trash-btn" title={t().historyTrashItemTitle} onclick={() => it.id && onAskTrash([it.id])} aria-label={t().deleteButton}>⌫</button>
 												{:else}
 													<button class="ghost-btn" title={t().historyRestoreTitle} onclick={() => it.id && onAskRestore([it.id])}>{t().historyRestore}</button>
@@ -964,6 +1050,7 @@
 						<div class="manager-thumb-actions">
 							{#if it.display_label}<span class="history-display-label">{it.display_label}</span>{/if}
 							<HistoryDescription text={historyListDescription(it.source_text ?? it.input)} className="thumb-description" />
+							{@render shareStatus(it)}
 							{#if it.note}<div class="thumb-note"><span>{t().selectionNoteLabel}</span>{it.note}</div>{/if}
 							<div class="thumb-action-row">
 								<button
@@ -994,6 +1081,7 @@
 									{/each}
 								</div>
 							</div>
+							{#if historyManagerView === 'active' && onShareItem && !it.shared}<button class="ghost-btn share-settings-btn" type="button" onclick={() => onShareItem?.(it)}>{isJapanese ? '共有設定' : 'Share settings'}</button>{/if}
 						</div>
 					</div>
 				{/each}
@@ -1030,7 +1118,7 @@
 									aria-label={it.starred ? t().starOn : t().starOff}
 								>★</button>
 							</td>
-							<td class="table-description"><HistoryDescription text={historyListDescription(it.source_text ?? it.input)} /></td>
+							<td class="table-description"><HistoryDescription text={historyListDescription(it.source_text ?? it.input)} />{@render shareStatus(it)}</td>
 							<td>{formatHistoryMinute(it.at, isJapanese ? 'ja-JP' : 'en-US')}</td>
 							<td class="table-model">
 								{#each modelLines(it) as model}
@@ -1043,7 +1131,6 @@
 							<td>{catalogName(it.catalog_id)}</td>
 							<td class="table-svg-size">{formatByteSize(it.svg_bytes)}</td>
 							<td>
-								{#if it.shared}<span class="shared-mark" title={isJapanese ? '他の利用者から共有された作品' : 'Shared with you by another member'}>{isJapanese ? '共有' : 'Shared'}</span>{/if}
 								{#if it.render_hash}
 									<Tooltip placement="top" text={copiedHistoryHash === it.render_hash ? t().historyHashCopied : t().historyHashCopyTitle}>
 										<button type="button" class="hash-chip hash-icon table-hash" class:marked={copiedHistoryHash === it.render_hash} onclick={(event) => copyHash(it, event)} aria-label={t().historyHashCopyTitle}>#</button>
@@ -1059,7 +1146,7 @@
 									aria-label={it.for_revision ? t().forRevisionOn : t().forRevisionOff}
 								>⚑</button>
 								{#if historyManagerView === 'active' && onShareItem && !it.shared}
-									<button class="ghost-btn" onclick={() => onShareItem?.(it)} title={isJapanese ? 'この作品を共有する' : 'Share this work'}>{isJapanese ? '共有' : 'Share'}</button>
+									<button class="ghost-btn" onclick={() => onShareItem?.(it)} title={isJapanese ? 'この作品の共有設定' : 'Share settings for this work'}>{isJapanese ? '共有設定' : 'Share settings'}</button>
 								{/if}
 								{#if historyManagerView === 'active'}
 									<button class="ghost-btn icon-trash-btn" onclick={() => it.id && onAskTrash([it.id])} title={t().historyTrashItemTitle} aria-label={t().deleteButton}>
@@ -1086,18 +1173,17 @@
 </section>
 
 <style>
-	/* Not a decoration: this listing is what people select and delete from, so a
-	   work that belongs to someone else has to be legible as such at a glance. */
-	.shared-mark {
+	.share-statuses { display: flex; flex-wrap: wrap; gap: 3px; margin-top: 3px; }
+	.share-status {
 		display: inline-block;
-		margin-right: 0.35rem;
 		padding: 0 0.35em;
 		border: 1px solid var(--accent);
 		border-radius: var(--btn-sm-radius);
 		color: var(--accent);
 		font-size: 0.75em;
-		vertical-align: middle;
+		line-height: 1.35;
 	}
+	.share-settings-btn { align-self: flex-start; font-size: var(--btn-sm-font-size); }
 
 	.lineage-history-list { min-height: 0; overflow: auto; padding: 10px 12px 16px; display: flex; flex-direction: column; gap: 10px; }
 	.lineage-history-message { margin: auto; padding: 30px; color: var(--fg3); text-align: center; }
@@ -1120,10 +1206,11 @@
 	.lineage-member { position: relative; min-width: 0; padding: 5px; border: 1px solid var(--border); border-radius: var(--r); background: var(--panel); }
 	.lineage-member.selected, .lineage-member.current-work { border-color: var(--accent); }
 	.lineage-member > .selection-checkbox { position: absolute; top: 8px; left: 8px; z-index: 5; }
+	.lineage-member-content { min-width: 0; }
 	.lineage-member-main { width: 100%; min-width: 0; padding: 0; border: 0; background: transparent; color: var(--fg2); cursor: pointer; text-align: left; }
 	.lineage-member-main :global(svg) { width: 100%; max-height: 110px; }
 	.lineage-member-main span { display: block; overflow: hidden; margin-top: 4px; text-overflow: ellipsis; white-space: nowrap; font-size: var(--ui-font-size-10); }
-	.lineage-member-actions { display: flex; align-items: center; gap: 4px; margin-top: 5px; }
+	.lineage-member-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin-top: 5px; }
 	.lineage-member-actions .ghost-btn, .lineage-member-actions .danger-btn { margin-left: 0; }
 	.lineage-history-list.list-mode .lineage-member-grid { display: flex; flex-direction: column; }
 	.lineage-history-list.list-mode .lineage-member { display: grid; grid-template-columns: 20px minmax(0, 1fr) auto; align-items: center; gap: 8px; }
@@ -1321,9 +1408,21 @@
 		background: var(--panel2);
 	}
 	.history-preview-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+	.history-preview-art { display: block; width: 100%; padding: 0; border: 1px solid var(--border2); border-radius: var(--r); background: var(--panel); color: inherit; overflow: hidden; cursor: pointer; }
+	.history-preview-art:hover { border-color: var(--accent); }
+	.history-preview-art:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 	.history-preview-art :global(svg) { display: block; width: 100%; max-height: 240px; }
+	.history-preview-open-hint { margin: 5px 0 0; color: var(--fg3); font-size: var(--ui-font-size-10); text-align: right; }
 	.history-preview-description { white-space: pre-wrap; font-size: var(--ui-font-size-14); line-height: 1.55; }
 	.history-preview-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+	.history-preview-details { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--border2); }
+	.history-preview-details h3 { margin: 0 0 8px; font-size: var(--ui-font-size-12); font-weight: 600; }
+	.history-preview-details dl { margin: 0; }
+	.history-preview-details dl > div { display: grid; grid-template-columns: 94px minmax(0, 1fr); gap: 8px; padding: 5px 0; border-top: 1px solid var(--border); font-size: var(--ui-font-size-12); line-height: 1.4; }
+	.history-preview-details dt { color: var(--fg3); }
+	.history-preview-details dd { min-width: 0; margin: 0; overflow-wrap: anywhere; }
+	.history-preview-hash { display: flex; align-items: center; gap: 8px; }
+	.history-preview-hash button { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; padding: 0; border: 1px solid var(--border2); border-radius: var(--btn-sm-radius); background: var(--panel); color: var(--fg); cursor: pointer; }
 	.history-manager-pager {
 		display: flex;
 		align-items: center;
@@ -1613,7 +1712,7 @@
 	.history-table-catalog { width: 10%; }
 	.history-table-size { width: 74px; }
 	.history-table-hash { width: 72px; min-width: 72px; }
-	.history-table-actions { width: 112px; }
+	.history-table-actions { width: 142px; }
 	.table-description { vertical-align: top !important; }
 	.table-model { vertical-align: top !important; overflow-wrap: anywhere; }
 	.history-model-detail + .history-model-detail { margin-top: 3px; }

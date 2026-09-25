@@ -15,6 +15,7 @@ from sqlalchemy.exc import IntegrityError
 from . import access
 from .schema import (
     CoerceTraceCatalogRow,
+    HistoryAclRow,
     HistoryRow,
     LineageEdgeRow,
     LineageNodeRow,
@@ -867,8 +868,21 @@ class HistoryListProjector:
                     if stored_diagnostics is not None:
                         item["pipeline_diagnostics"] = stored_diagnostics
         if actor is not None:
+            owned_ids = {row.id for row in rows if row.user_id == actor["id"]}
+            acl_shared_ids = (
+                {
+                    history_id
+                    for (history_id,) in session.query(HistoryAclRow.history_id)
+                    .filter(HistoryAclRow.history_id.in_(owned_ids))
+                    .distinct()
+                    .all()
+                }
+                if owned_ids else set()
+            )
             for item, row in zip(items, rows):
-                if row.user_id != actor["id"]:
+                if row.id in owned_ids:
+                    item["has_acl_shares"] = row.id in acl_shared_ids
+                else:
                     item["shared"] = True
         node_ids = [row.lineage_node_id for row in rows if row.lineage_node_id]
         if not node_ids:

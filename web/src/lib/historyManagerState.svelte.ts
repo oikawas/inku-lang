@@ -12,6 +12,8 @@ export type HistoryItem = {
 	// or an explicit grant. Absent for one's own, so nothing changes for a
 	// listing of works the caller made.
 	shared?: boolean;
+	/** Set only for one's own works: whether individual ACL grants exist. */
+	has_acl_shares?: boolean;
 	id?: string;
 	pipeline_variation_id?: string | null;
 	pipeline_revision?: string | null;

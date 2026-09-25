@@ -122,6 +122,25 @@ def _listed_ids(headers: dict[str, str], **params) -> list[str]:
     return [item["id"] for item in response.json()["items"]]
 
 
+def test_owner_list_reports_acl_sharing_without_exposing_it_to_other_readers(world) -> None:
+    closed = db.add_item(_item(world.alice["id"], 1_001, f"alice keeps {world.word}"))
+    db.grant_history_acl(world.alice["id"], world.alice_work["id"], "user", world.carol["id"], "read")
+
+    def listed(headers: dict[str, str]) -> dict[str, dict]:
+        response = client.get("/api/history", headers=headers, params={"q": world.word, "limit": 100, "include_svg": False})
+        assert response.status_code == 200, response.text
+        return {item["id"]: item for item in response.json()["items"]}
+
+    own = listed(world.alice_h)
+    assert own[world.alice_work["id"]]["has_acl_shares"] is True
+    assert own[closed["id"]]["has_acl_shares"] is False
+
+    incoming = listed(world.carol_h)[world.alice_work["id"]]
+    assert incoming["shared"] is True
+    assert "has_acl_shares" not in incoming
+    assert "has_acl_shares" not in listed(world.admin_h)[world.alice_work["id"]]
+
+
 # --- T-2: admins read everything --------------------------------------------
 
 

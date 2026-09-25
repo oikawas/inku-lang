@@ -1043,6 +1043,7 @@ export const ja: LangPack = {
 	historySelectionCleared: (reason) => ({ query: '検索条件が変わったため選択を解除しました。', filter: '絞り込みが変わったため選択を解除しました。', trash: 'ごみ箱表示が変わったため選択を解除しました。' })[reason],
 	historyPreviewTitle: '作品プレビュー',
 	historyPreviewDetails: '作品情報',
+	historyPreviewRenderVersion: '描画版',
 	historyPreviewOpenHint: 'ダブルクリックで作品を開く',
 	historyPreviewLoading: '作品を読み込み中…',
 	historyPreviewUnavailable: 'この作品の詳細を読み込めませんでした。',

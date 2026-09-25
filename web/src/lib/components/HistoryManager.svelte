@@ -923,7 +923,7 @@
 							<div><dt>{t().historySecondsHeader}</dt><dd>{groupDigits(previewItem.elapsed_ms / 1000, 1)} s</dd></div>
 						{/if}
 						<div><dt>{t().historySvgSizeHeader}</dt><dd>{formatByteSize(previewItem.svg_bytes)}</dd></div>
-						<div><dt>{t().historyStripFieldEngineVersion}</dt><dd>{previewItem.render_engine_version ?? t().historyVersionNotRecorded}</dd></div>
+						<div><dt>{t().historyPreviewRenderVersion}</dt><dd>{previewItem.render_engine_version ?? t().historyVersionNotRecorded}</dd></div>
 						{#if previewItem.lineage_generation}
 							<div><dt>{t().historyStripFieldGeneration}</dt><dd>{groupDigits(previewItem.lineage_generation)}</dd></div>
 						{/if}

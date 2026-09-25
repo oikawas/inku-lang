@@ -32,13 +32,15 @@ runtime fallbackを持たない。保存済みSVG、Room schema、Score schema�
 
 ## 2026-09-26 現行の接続先・描画設定・書き出し
 
-接続形式ごとに、Serverの`pipeline_provider.py`と同じ形で送る。`openai-compatible`は`/chat/completions`、`gemini`は`/v1beta/models/{model}:generateContent`、`anthropic`（Claude API）は`/v1/messages`で、`x-api-key`と`anthropic-version: 2023-06-01`を付け、描画の応答は強制したtool呼び出しの`input`、写真はbase64の画像ブロックで送る。既定の接続先は起動時に不足分を補うだけで、作者が変えたサービス名とBase URLを保持する（接続形式は既定のまま、端末内の接続先のBase URLは目印なので変えない）。既定の接続先の「サービス削除」は行を消さず、Serverと同じく無効にして一覧から隠し、APIキーを消す。同じIDで追加すれば戻る。作者が追加した接続先は行ごと消す。端末内の接続先は消せない。APIキーは伏せ字とパスワード用キーボード（予測・学習なし）で入力し、「AIサービスを追加」は閉じると入力値を消す。「ローカルLLMはキー無しで使える場合がある」の注記は、キーが必須でない接続先にだけ出す。
+接続形式ごとに、Serverの`pipeline_provider.py`と同じ形で送る。`openai-compatible`は`/chat/completions`、`gemini`は`/v1beta/models/{model}:generateContent`、`anthropic`（Claude API）は`/v1/messages`で、`x-api-key`と`anthropic-version: 2023-06-01`を付け、描画の応答は強制したtool呼び出しの`input`、写真はbase64の画像ブロックで送る。`openai-compatible`の描画の答えは強制した関数呼び出しで求めるが、`ollama`だけはJSON schemaの`response_format`で求め、`ollama`と`ollama-cloud`は`reasoning_effort: none`で推論を切る。既定の接続先は起動時に不足分を補うだけで、作者が変えたサービス名とBase URLを保持する（接続形式は既定のまま、端末内の接続先のBase URLは目印なので変えない）。既定の接続先の「サービス削除」は行を消さず、Serverと同じく無効にして一覧から隠し、APIキーを消す。同じIDで追加すれば戻る。作者が追加した接続先は行ごと消す。端末内の接続先は消せない。APIキーは伏せ字とパスワード用キーボード（予測・学習なし）で入力し、「AIサービスを追加」は閉じると入力値を消す。「ローカルLLMはキー無しで使える場合がある」の注記は、キーが必須でない接続先にだけ出す。
 
 描画表現「暴れる（Wild）」は`app_settings`の`render_wild`（`{"enabled":bool}`）に保存し、記述からの新しい描画（単発・バッチ・デモ・カメラ）に載せる。作品からのDDL描画は作品のWild（`render_metadata.render_wild`）を、推敲の候補は親作品のWildを継ぐ（Webの`targetWild`・`effectiveRefineWild`と同じ）。作品を選ぶと、その作品の色カタログ（自動で描いた作品は自動）とキャンバスを次の描画に使う。起動時に作品が表示されていれば、保存済みの色カタログ・キャンバスより作品の値を優先する。「履歴選択時のキャンバス・色カタログ」「DDL再描画を新しい履歴として保存」は処理を持たなかったため削除した。色カタログ選択ダイアログの戻る・外側タップはキャンセルで、キャンセルは保存値も元に戻す。作品画面・全画面の送り・検索は全作品を対象にする（以前は新しい100件だけ）。
 
 書き出しの表示用SVGは保存したSVGそのもの、編集用SVG・汎用SVGは保存Scoreを作品の色・seed・Wildでそのprofileに描き直したもの（Serverの`GET /api/history/{id}/svg?profile=`と同じ）。共有用に`cacheDir/exports`へ書いたファイルは、1日を過ぎたものを次の書き出しで消す。
 
 キーボード表示中は、記述の「描画する」とバッチの「バッチ描画」をキーボードの上に出し、スクロールの末尾にその高さの余白を置く。「AIサービスを追加」と接続先のモデル選択ダイアログはキーボードに合わせて縮む。推敲の「タッチを変える言葉」の入力中は「候補を作る」の行を画面に入れる。推敲を開いた状態の戻るは推敲を閉じ、「この作品を推敲」の編集中の戻るは作品の表示へ戻る（カメラと上書き確認の戻るはそちらが優先）。
+
+推敲のサブビューは「調整」と「モデル」の二つで、系譜カードの入口は「描画要素」「DDL編集」「モデル」。言語比較（「言語」）はWebが2026-08-29に廃止したので持たない。保存済みの`language_comparison`の作品は系譜のカードに「言語」と出る。推敲の実行中に対象を変えるか閉じると、止めた実行が後で終わっても新しい対象の状態には触れない。
 
 作品の完全削除は、Serverの`HistoryPermanentDeleteWriter`と同じく同じtransactionで系譜ノードを墓標（`tombstone`、履歴・hashを消し`deleted_at`を記録）にし、触れる辺の`metadata_json`を`{}`にする。サムネイルは同じrender hashの作品が残っていなければ消す。画面に削除の入口はなく、debugのheadless（`save_history=false`）だけが使う。
 

@@ -601,12 +601,6 @@ def _write_paint_outputs(
     svg_path.write_text(str(result["svg"]), encoding="utf-8")
     paths["json"] = str(json_path)
     paths["svg"] = str(svg_path)
-    # RAW trace bundle, saved independently of --full-json when the server returns it.
-    trace = result.get("trace")
-    if trace is not None:
-        trace_path = out_dir / f"{prefix}-trace.json"
-        trace_path.write_text(json.dumps(trace, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-        paths["trace"] = str(trace_path)
     if png:
         png_path = out_dir / f"{prefix}.png"
         try:
@@ -1981,11 +1975,10 @@ def _paint_payload(
         "render_seed": getattr(args, "render_seed", None),
         "composition_seed": getattr(args, "composition_seed", None),
         "seed_text": getattr(args, "seed_text", None),
-        "include_trace": getattr(args, "trace", False) or None,
         # Layers the server has always accepted but the CLI never named. `or None`
         # matters: the filter below drops None, not False, so a bare False would be
         # sent explicitly on every run and change the request shape of every
-        # existing bench. `include_trace` above already uses this idiom.
+        # existing bench.
         "sketch": bool(getattr(args, "sketch", False)) or None,
         "sketch_grain": getattr(args, "sketch_grain", None),
         "sketch_text": getattr(args, "sketch_text", None),
@@ -2024,13 +2017,6 @@ def _compose_payload(
         "canvas_aspect": getattr(args, "canvas_aspect", None),
         "render_seed": getattr(args, "render_seed", None),
         "composition_seed": getattr(args, "composition_seed", None),
-        # `/api/compose` has accepted this since the trace was added, but the CLI
-        # never named it, so `--trace` silently did nothing in ddl input mode and
-        # the Stage 2 raw response was unreachable from here. `or None` for the
-        # same reason as in `_paint_payload`: the filter below drops None, not
-        # False, and sending a bare False would change the request shape of every
-        # existing bench.
-        "include_trace": getattr(args, "trace", False) or None,
         "imported_plugins": getattr(args, "imported_plugins", None) or None,
     }
     return {k: v for k, v in payload.items() if v is not None}
@@ -2127,9 +2113,6 @@ def _compose_response_as_paint_result(
         "plugin_provenance": result.get("plugin_provenance") or [],
         "plugin_warnings": result.get("plugin_warnings") or [],
         "catalog_id": result.get("render_color_catalog_id"),
-        # Only present when --trace asked for it; the saver writes the file when
-        # this is not None, and skips it otherwise.
-        "trace": result.get("trace"),
         # /api/compose never runs Stage 0.5, so these stay empty here. They are
         # present so that a paint artifact and a ddl-mode artifact have the same
         # key set and a reader does not have to know which route wrote the file.
@@ -2428,11 +2411,6 @@ def command_paint(args: argparse.Namespace) -> int:
         )
     prefix = args.prefix or f"inku-{started}"
     output_result = _result_with_svg_profile(client, result, svg_profile=args.svg_profile, color_catalog=color_catalog)
-    if getattr(args, "trace", False) and result.get("trace") is None:
-        print(
-            "inku-cli: warning: --trace requested but the server returned no trace (older server?)",
-            file=sys.stderr,
-        )
     paths = _write_paint_outputs(output_result, out_dir=Path(args.out_dir) if args.out_dir else None, prefix=prefix, png=args.png)
     summary = {
         "text": result.get("description"),
@@ -3995,11 +3973,6 @@ def _add_paint_args(parser: argparse.ArgumentParser, *, batch: bool = False) -> 
     parser.add_argument("--save-history", action="store_true")
     parser.add_argument("--save-artifacts", action=argparse.BooleanOptionalAction, default=None)
     parser.add_argument("--no-progress", action="store_true", help="disable elapsed-time progress animation")
-    parser.add_argument(
-        "--trace",
-        action="store_true",
-        help="request RAW per-layer intermediates and save them as <prefix>-trace.json; in --input-mode ddl this is the only way to read what Stage 2 wrote before coerce repaired it",
-    )
     if batch:
         parser.add_argument("--continue-on-error", action="store_true")
         parser.add_argument("--summary-json", help="write batch summary JSON to this path (default: OUT_DIR/analysis-summary.json)")

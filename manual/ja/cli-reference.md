@@ -112,12 +112,6 @@ JSON成果物は、その絵を描いたDDL層の版を `ddl_version` と `ddl_e
 | `--ui-lang LANG` | UI言語として記録する値 |
 | `--include-thinking` | 思考出力を応答に含める |
 
-### 観測
-
-| 旗 | 内容 |
-|---|---|
-| `--trace` | 各層のRAW中間生成物を要求し、`<prefix>-trace.json` として保存する |
-
 batchはさらに `--continue-on-error` を持ちます。
 
 ## 履歴とフィードバック

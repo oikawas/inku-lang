@@ -82,7 +82,7 @@ flowchart TD
 - **空白だけの記述** — `PaintRequest`のvalidatorが422で断る。
 - **札の切除** — 行頭の連番と角括弧のコメントは作者の文書であって記述ではない。`PipelineService.start`が`description_labels.pipeline_description`で一度だけ切り、切った記述だけが写生・色カタログ選択・Stage 1と指示文言語の判定へ届く。作品と表示には書いたままの記述が残る。記述が空でないのに切ると空になる入力は、どの層も走らせる前に400で断る。記述からの再生成（`generate_from_description`）も同じ規則を通る。
 - **冪等な再送** — `Idempotency-Key`が同じ利用者の保存済み作品に一致すれば、新しいvariationを作らずその作品を返す。記述が異なれば409で断る。
-- **受理するoption** — `RunOptions`が`extra="forbid"`で検証する。旧requestの`include_trace`、`stage1_input`、`include_thinking`、`auto_repair`、`sketch_grain`はrequest modelに残るが、互換投影はpipelineへ渡さない。
+- **受理するoption** — `RunOptions`が`extra="forbid"`で検証する。旧requestの`stage1_input`、`include_thinking`、`auto_repair`、`sketch_grain`はrequest modelに残るが、互換投影はpipelineへ渡さない。
 - **指示文言語** — 記述そのものから`_resolve_instruction_lang`が自動判定し、信号が無ければUI言語へ落とす。
 - **model** — Stage 1（写生と色カタログ選択も同じmodel）とStage 2（hole補完）を`resolved_stage_model`がそれぞれ解決する。優先順はrequest指定 → 利用者のStage設定 → manifestの既定。
 - **Macro catalog** — 新しい作品だけ、有効なplugin文書から新作用のMacro定義とlocalized summaryを`resolve_new_work_macro_catalog`が解決する。保存済みconfigからの派生はその定義をそのまま使う。

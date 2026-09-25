@@ -112,12 +112,6 @@ For limits they record the values used in `render_limits`, where those came from
 | `--ui-lang LANG` | The value recorded as the UI language |
 | `--include-thinking` | Include the thinking output in the response |
 
-### Observation
-
-| Flag | Contents |
-|---|---|
-| `--trace` | Request the RAW per-layer intermediates and save them as `<prefix>-trace.json` |
-
 batch additionally takes `--continue-on-error`.
 
 ## History and feedback

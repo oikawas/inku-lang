@@ -125,25 +125,14 @@ def test_paint_payload_makes_the_description_the_text_the_author_typed():
     assert payload["stage1_input"] == "一滴の墨\n\n感情: 静か"
 
 
-def test_paint_payload_includes_trace_only_when_flag_set():
+def test_the_trace_flag_is_retired(capsys):
+    """The RAW trace recorded the Python layers and left with them (2026-09-25)."""
     parser = cli.build_parser()
-    with_trace = cli._paint_payload(parser.parse_args(["paint", "x", "--trace"]), "x")
-    without = cli._paint_payload(parser.parse_args(["paint", "x"]), "x")
-    assert with_trace["include_trace"] is True
-    assert "include_trace" not in without
-
-
-def test_write_paint_outputs_saves_trace_file(tmp_path):
-    result = {"svg": "<svg></svg>", "trace": {"stage1_ddl": "x", "stage2_raw_attempts": []}}
-    paths = cli._write_paint_outputs(result, out_dir=tmp_path, prefix="smoke", png=False)
-    trace_file = tmp_path / "smoke-trace.json"
-    assert trace_file.exists()
-    assert json.loads(trace_file.read_text())["stage1_ddl"] == "x"
-    assert paths["trace"] == str(trace_file)
-    # no trace in the response -> no trace file
-    plain = cli._write_paint_outputs({"svg": "<svg></svg>"}, out_dir=tmp_path, prefix="plain", png=False)
-    assert not (tmp_path / "plain-trace.json").exists()
-    assert "trace" not in plain
+    for argv in (["paint", "x", "--trace"], ["batch", "--file", "-", "--trace"]):
+        with pytest.raises(SystemExit):
+            parser.parse_args(argv)
+    capsys.readouterr()
+    assert "include_trace" not in cli._paint_payload(parser.parse_args(["paint", "x"]), "x")
 
 
 def test_paint_payload_uses_resolved_models():
@@ -1773,7 +1762,6 @@ PAYLOAD_KEYS_BEFORE = {
     "description",
     "history_input",
     "include_thinking",
-    "include_trace",
     "instruction_lang",
     "render_seed",
     "save_artifacts",
@@ -1799,7 +1787,6 @@ ALL_PRIOR_FLAGS = [
     "--render-seed", "11",
     "--composition-seed", "22",
     "--seed-text", "seed",
-    "--trace",
 ]
 
 
@@ -1833,20 +1820,21 @@ def test_paint_payload_without_the_new_flags_is_byte_for_byte_the_old_request():
 
 
 def test_paint_payload_grows_by_exactly_the_eight_keys():
-    """16 keys before, 24 after -- and the 16 are the same 16.
+    """15 keys before, 23 after -- and the 15 are the same 15.
 
     It was 17 and 25 until the staffage level was folded away (v2.11.0) and
-    `tenkei` left the request body with the `--staffage` flag.
+    `tenkei` left the request body with the `--staffage` flag, and 16 and 24
+    until `include_trace` left with the `--trace` flag (2026-09-25).
     """
     parser = cli.build_parser()
     argv = ["paint", "一滴の墨", *ALL_PRIOR_FLAGS]
     prior_only = cli._paint_payload(parser.parse_args(argv), "一滴の墨")
     assert set(prior_only) == PAYLOAD_KEYS_BEFORE
-    assert len(prior_only) == 16
+    assert len(prior_only) == 15
 
     new_flags = [item for argv_fragment, _, _ in SENDER_PARITY_FLAGS for item in argv_fragment]
     everything = cli._paint_payload(parser.parse_args([*argv, *new_flags]), "一滴の墨")
-    assert len(everything) == 24
+    assert len(everything) == 23
     assert set(everything) - PAYLOAD_KEYS_BEFORE == {key for _, key, _ in SENDER_PARITY_FLAGS}
 
 

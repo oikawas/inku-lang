@@ -74,7 +74,6 @@ class ComposeRequest(BaseModel):
         max_length=200,
         description="Deprecated compatibility field; ignored",
     )
-    include_trace: bool = Field(default=False, description="各層の RAW 中間生成物を trace として返すか (観測のみ)")
     imported_plugins: list[dict] | None = Field(
         default=None,
         max_length=64,
@@ -159,7 +158,6 @@ class ComposeResponse(BaseModel):
     # POST /api/history, so the state has to travel back with the drawing or
     # the row it writes has no record of the layer at all.
     sketch_state: str | None = None
-    trace: dict | None = None
     pipeline_variation_id: str | None = None
     pipeline_execution_id: str | None = None
     pipeline_revision: str | None = None
@@ -231,7 +229,6 @@ class PaintRequest(BaseModel):
     composition_seed: int | None = Field(default=None, description="Composition seed: it re-salts the intermediate expansion (Stage 1.5) and, from render engine 23, decides where the renderer places the marks; omitted means the placement follows the performance seed")
     interpretation_seed: str | None = Field(default=None, description="Opaque identifier for an explicit Stage 1 re-interpretation")
     seed_text: str | None = Field(default=None, description="Explicit text used only to derive the Renderer performance seed")
-    include_trace: bool = Field(default=False, description="各層の RAW 中間生成物を trace として返すか (観測のみ)")
     # The sketch. Carried per request, the way render_seed is: it is an
     # option of one drawing, not a setting of the user.
     sketch: bool = Field(default=False, description="写生を通すか（場所の広がりと季節・時刻の光を記述の横に補う）。既定は通さない")
@@ -325,7 +322,6 @@ class PaintResponse(BaseModel):
     # contract). sketch_fallback_used stays: the flag and the column have
     # different readers, and the flag says nothing about the other four states.
     sketch_state: str | None = None
-    trace: dict | None = None
     pipeline_variation_id: str | None = None
     pipeline_execution_id: str | None = None
     pipeline_revision: str | None = None

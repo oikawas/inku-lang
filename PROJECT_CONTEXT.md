@@ -197,8 +197,6 @@ counts the same number of teeth whatever machine draws it.**
 **A fill sits on an underlay that holds the field as a real element, and what sits on top splits at
 coverage 0.2 into scan lines and rubbings.**
 
-`include_trace` is still accepted for compatibility with older requests, but the shared pipeline
-returns no RAW trace.
 Per-layer results live in the response's `compiler_outcome` and `pipeline_diagnostics` and in the
 history sidecar. In developer mode, `developer_capture_provider_io` records raw provider traffic
 for the owner only, never in ordinary history, responses, or logs.

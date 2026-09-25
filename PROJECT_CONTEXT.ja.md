@@ -169,7 +169,6 @@ Androidのmain preview、thumbnail、PNG exportはcanonicalな保存済み／現
 閉図形の輪郭と塗り、弧、材質層、地の抵抗、マスターグリッドによる座標の量子化を持つ。
 **塗りは面を実体で持つ下地の上に載り、上に載るものは被覆率 0.2 で走査線と擦りの痕に分かれる。**
 
-`include_trace` は旧requestとの互換のために受理するが、共有pipelineはRAW traceを返さない。
 層ごとの結果は応答の `compiler_outcome`・`pipeline_diagnostics` と履歴sidecarが持つ。developer modeでは `developer_capture_provider_io` がprovider送受信の原文を所有者限定で記録し、通常の履歴・応答・logへは入れない。
 
 ### web（SvelteKit 2 / Svelte 5）

@@ -116,6 +116,13 @@ class ComparisonScreenTest {
         return model
     }
 
+    /**
+     * The fixture's answers at once. Without a model stood in, `cmp-model`
+     * reaches no configured service, the run fails into the pipeline's own
+     * screen, and the refinement closes with no candidate.
+     */
+    private fun useFixtureModel(): SlowModel = useSlowModel(0L)
+
     private fun paintWork(description: String): HistoryItemEntity = runBlocking {
         repository.renderFromScore(
             description = description,
@@ -171,6 +178,7 @@ class ComparisonScreenTest {
      */
     @Test
     fun t12_aModelComparisonRunsThroughTheRefinementEntryPoints() {
+        useFixtureModel()
         val work = paintWork("赤い線を引く")
         showLineage()
         composeTestRule.runOnIdle {

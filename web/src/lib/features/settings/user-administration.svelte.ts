@@ -1,5 +1,5 @@
 import { t } from '$lib/i18n/index.svelte';
-import { holdsPermissionGroup, type PermissionGroup } from '$lib/permissionGroups';
+import { canManageUsers, holdsPermissionGroup, type PermissionGroup } from '$lib/permissionGroups';
 import type { ApiFetch } from '$lib/transport/api-fetch';
 import type { SettingsConfirmation } from './model-administration.svelte';
 import type { SettingsActor } from './navigation-state.svelte';
@@ -91,7 +91,9 @@ export function createUserAdministration<TActor extends SettingsActor>(
 			if (requestId !== userAdministrationRequestId) return;
 			if (!refreshed) throw new Error(t().loginRequiredMessage);
 			const actor = deps.currentUser();
-			if (!holdsPermissionGroup(actor, 'admins')) {
+			// Leaders load too: the server answers them with their own group
+			// and its ordinary members only.
+			if (!canManageUsers(actor)) {
 				users = [];
 				groups = [];
 				userAdministrationStatus = null;

@@ -164,6 +164,8 @@ export interface LangPack {
 	errorDescriptionOnlyLabels: string;
 	errorUserHasWorks: string;
 	errorUserIsLineageOrigin: string;
+	errorLastAdministrator: string;
+	errorModelNotOffered: string;
 	runStatusElapsed: (seconds: string) => string;
 	runStatusTokens: (input: string, output: string) => string;
 	runStatusProgress: (done: number, total: number) => string;
@@ -944,6 +946,7 @@ export interface LangPack {
 	userSaveChanges: string;
 	userSelectPrompt: string;
 	userManageUnavailable: string;
+	userLeaderScopeNote: string;
 	userGroupLabel: string;
 	userNoGroup: string;
 	userDeleteBlockedMessage: string;

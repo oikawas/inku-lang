@@ -57,9 +57,14 @@ export function describeApiErrorDetail(detail: unknown, status: number, strings:
 	// The account deletions the server refuses, said in the page's language.
 	if (detail === 'user has history') return strings.errorUserHasWorks;
 	if (detail === "other accounts' works derive from this user's works") return strings.errorUserIsLineageOrigin;
+	if (detail === 'the last administrator cannot be removed') return strings.errorLastAdministrator;
+	// A model the administrator has not offered: a string from the routes that
+	// call one directly, a code from the authoring pipeline.
+	if (detail === 'model is not offered on this server') return strings.errorModelNotOffered;
 	if (typeof detail === 'string' && detail) return detail;
 
 	const structured = object(detail);
+	if (structured?.code === 'model_not_offered') return strings.errorModelNotOffered;
 	if (structured) {
 		const pipelineMessage = pipelineActionMessage(structured, strings);
 		if (pipelineMessage) return pipelineMessage;

@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
 	import { t } from '$lib/i18n/index.svelte';
-	import type { PermissionGroup } from '$lib/permissionGroups';
+	import { canManageUsers, type PermissionGroup } from '$lib/permissionGroups';
 	import type {
 		CreateSettingsUserInput,
 		SettingsUserAdministration,
@@ -37,6 +37,10 @@
 	const userSettingsStatus = $derived(loginStatus ?? administration.status);
 	const userSettingsLoading = $derived(administration.loading);
 	const isAdmin = $derived(currentUser?.permission_groups?.includes('admins') === true);
+	// Leaders manage the ordinary members of their own group. The server holds
+	// them to that, and the state layer sends their changes as exactly that, so
+	// the choices only an administrator could make are not shown to them.
+	const managesUsers = $derived(canManageUsers(currentUser));
 
 	// Unsaved account drafts stay with these inputs. Passwords cross into the
 	// controller only as transient operation arguments and are never controller state.
@@ -257,7 +261,7 @@
 <div class="user-administration-settings">
 	<div class="popover-group user-account-group">
 		<div class="popover-group-label">{t().settingsUserSessionLabel}</div>
-		{#if userSettingsStatus && (!currentUser || !isAdmin)}<div class="inline-message">{userSettingsStatus}</div>{/if}
+		{#if userSettingsStatus && (!currentUser || !managesUsers)}<div class="inline-message">{userSettingsStatus}</div>{/if}
 		{#if !currentUser}
 			<div class="login-grid">
 				<input bind:value={loginUserName} placeholder={t().userNamePlaceholder} />
@@ -271,10 +275,11 @@
 			{#if userSettingsLoading}<div class="inline-message">{t().settingsLoading}</div>{/if}
 		{/if}
 	</div>
-	{#if currentUser && isAdmin}
+	{#if currentUser && managesUsers}
 		<section class="popover-group user-management-group">
 			<div class="user-management-head"><div><div class="popover-group-label">{t().settingsUsersLabel}</div><div class="user-management-count">{t().userCountLabel(users.length)}</div></div><div class="user-management-actions"><button class="ghost-btn" onclick={() => (showAddUser = true)} disabled={userBusy || showAddUser}>{t().userAddOpen}</button><button class="ghost-btn" onclick={() => void administration.load()} disabled={userBusy || administrationDirty}>{t().settingsReload}</button></div></div>
 			{#if userSettingsStatus}<div class="inline-message user-operation-status" aria-live="polite">{userSettingsStatus}</div>{/if}
+			{#if !isAdmin}<div class="db-test-result">{t().userLeaderScopeNote}</div>{/if}
 			<div class="user-management-layout">
 				<section class="user-list-panel" aria-label={t().settingsUsersLabel}>
 					<div class="user-list-toolbar"><input type="search" bind:value={userSearch} placeholder={t().userSearchPlaceholder} aria-label={t().userSearchPlaceholder} /><label><span>{t().settingsUsersLabel}</span><select bind:value={userFilter}><option value="all">{t().userFilterAll}</option><option value="admins">{t().permissionGroupAdmins}</option><option value="leaders">{t().permissionGroupLeaders}</option><option value="users">{t().permissionGroupUsers}</option><option value="ungrouped">{t().userFilterNoGroup}</option></select></label></div>
@@ -315,7 +320,7 @@
 						<span>{t().userPasswordPlaceholder}</span>
 						<input bind:value={newUserPassword} type="password" autocomplete="new-password" />
 						</label>
-						<div class="user-form-field">
+						{#if isAdmin}<div class="user-form-field">
 						<span>{t().permissionGroupSelectLabel}</span>
 						<small>{t().userPermissionGroupsHint}</small>
 						<div class="permission-group-choices">
@@ -330,7 +335,7 @@
 						<select bind:value={newUserGroupId}>
 						<option value="">{t().userNoGroup}</option>
 						{#each groups as group (group.id)}<option value={group.id}>{group.name}</option>{/each}</select>
-						</label>
+						</label>{/if}
 						</fieldset>
 						<div class="user-form-actions">
 						<button class="ghost-btn" onclick={cancelAddUser} disabled={userBusy}>{t().confirmCancel}</button>
@@ -357,7 +362,7 @@
 						<span>{t().userNewPasswordPlaceholder}</span>
 						<input bind:value={editUserPassword} type="password" autocomplete="new-password" />
 						</label>
-						<div class="user-form-field">
+						{#if isAdmin}<div class="user-form-field">
 						<span>{t().permissionGroupSelectLabel}</span>
 						<small>{t().userPermissionGroupsHint}</small>
 						<div class="permission-group-choices">
@@ -372,7 +377,7 @@
 						<select bind:value={editUserGroupId}>
 						<option value="">{t().userNoGroup}</option>
 						{#each groups as group (group.id)}<option value={group.id}>{group.name}</option>{/each}</select>
-						</label>
+						</label>{/if}
 						</fieldset>
 						<div class="user-form-actions">
 						<button class="ghost-btn" onclick={onClearEditUser} disabled={userBusy}>{t().userClearSelection}</button>
@@ -380,7 +385,7 @@
 						</div>{:else}<div class="inline-message">{t().userSelectPrompt}</div>{/if}</section>
 				</div>
 			</div>
-			<details class="group-administration">
+			{#if isAdmin}<details class="group-administration">
 						<summary>{t().userGroupLabel}</summary>
 						<div class="plugin-add">
 						<input bind:value={newGroupName} placeholder={t().groupNamePlaceholder} />
@@ -397,7 +402,7 @@
 						<button class="ghost-btn" onclick={() => onSetEditGroup(group)} disabled={userBusy}>{t().editButton}</button>
 						<button class="ghost-btn" onclick={() => onRemoveGroup(group)} disabled={userBusy}>{t().deleteButton}</button>
 						</div>{/if}</div>{/each}</div>
-						</details>
+						</details>{/if}
 		</section>
 	{:else if currentUser}
 		<div class="popover-group"><div class="popover-group-label">{t().settingsUsersLabel}</div><div class="inline-message">{t().userManageUnavailable}</div></div>

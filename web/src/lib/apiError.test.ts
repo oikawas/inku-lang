@@ -48,3 +48,14 @@ test('the account deletions the server refuses read in the page language', () =>
 		ja.errorUserIsLineageOrigin
 	);
 });
+
+test('the last administrator and a withheld model read in the page language', () => {
+	assert.equal(describeApiErrorDetail('the last administrator cannot be removed', 409, ja), ja.errorLastAdministrator);
+	// The same refusal arrives as a string from the routes that call a model and
+	// as a code from the authoring pipeline.
+	assert.equal(describeApiErrorDetail('model is not offered on this server', 403, ja), ja.errorModelNotOffered);
+	assert.equal(
+		describeApiErrorDetail({ code: 'model_not_offered', message: 'model not offered' }, 403, ja),
+		ja.errorModelNotOffered
+	);
+});

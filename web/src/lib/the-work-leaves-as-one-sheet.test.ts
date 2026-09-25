@@ -30,6 +30,9 @@ const CANVAS_PANEL = fileURLToPath(
 	new URL('./components/CanvasPanel.svelte', import.meta.url)
 );
 const PAGE = fileURLToPath(new URL('../routes/+page.svelte', import.meta.url));
+const EXPORT_MENU = fileURLToPath(
+	new URL('./components/SavedWorkExportMenu.svelte', import.meta.url)
+);
 
 /** The selectors of the one rule that hides groups per UI mode, on their own.
  *
@@ -89,10 +92,11 @@ test('the card has two doors, and one of them is open in every mode', () => {
 	]);
 
 	// Door one lives in the history manager, which the simple UI now shows: the
-	// group is on, so the door is reachable from every mode.
+	// group is on, so the door is reachable from every mode. Since 2026-09-22 it
+	// is an item of the saved-work export menu the manager renders.
 	const source = readFileSync(HISTORY_MANAGER, 'utf8');
-	assert.match(source, /downloadSelectedCard/);
-	assert.match(source, /historyCardExport\b/);
+	assert.match(source, /<SavedWorkExportMenu[\s\S]*?onDownloadCard=\{onDownloadSavedWorkCard\}/);
+	assert.match(readFileSync(EXPORT_MENU, 'utf8'), /\{#if onDownloadCard\}[\s\S]*?\{t\(\)\.historyCardExport\}/);
 	assert.equal(SIMPLE_UI_VISIBILITY.history, true);
 
 	// Door two is on the canvas. It used to be a button of its own beside SVG

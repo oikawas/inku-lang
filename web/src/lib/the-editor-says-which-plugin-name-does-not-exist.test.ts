@@ -133,25 +133,34 @@ const DECLARED_SUBSTITUTIONS: readonly [RegExp, string][] = [
 	[/<span class="ddl-token ddl-token-word">薄墨<\/span>/g, '薄墨'],
 	[/<span class="ddl-token ddl-token-word">paper<\/span>/g, 'paper']
 ];
+// 2026-09-14: the place 中央 became an older spelling that the parser reads as
+// 中心, and left the saijiki's words. The four frozen cases that spell it no
+// longer wrap it -- the vocabulary shrank, the plugin-name index did not move.
+// Declared on the frozen side, for the same reason as above.
+const DECLARED_REMOVALS: readonly [RegExp, string][] = [
+	[/<span class="ddl-token ddl-token-place">中央<\/span>/g, '中央']
+];
 
 test('T-7: without the index the output is byte-identical to the branch point', () => {
 	const frozen = JSON.parse(
 		read('fixtures/highlight-without-plugin-names.2f98dbc8.json')
 	) as Record<string, string>;
 	assert.ok(Object.keys(frozen).length >= 60, 'the frozen corpus is thinner than it was');
+	const unwind = (html: string, declarations: readonly [RegExp, string][]) =>
+		declarations.reduce((out, [pattern, plain]) => out.replace(pattern, plain), html);
 	let declared = 0;
 	for (const [key, expected] of Object.entries(frozen)) {
 		const [text, caret] = JSON.parse(key) as [string, number | null];
 		const actual = highlightDDL(text, caret);
 		if (actual === expected) continue;
-		const unwound = DECLARED_SUBSTITUTIONS.reduce(
-			(html, [pattern, plain]) => html.replace(pattern, plain),
-			actual
+		assert.equal(
+			unwind(actual, DECLARED_SUBSTITUTIONS),
+			unwind(expected, DECLARED_REMOVALS),
+			`changed for ${key}`
 		);
-		assert.equal(unwound, expected, `changed for ${key}`);
 		declared += 1;
 	}
-	assert.equal(declared, 8, 'the declared substitutions cover eight cases, no more and no fewer');
+	assert.equal(declared, 12, 'the declared changes cover twelve cases, no more and no fewer');
 });
 
 test('T-7: the four callers pass no index, and the editor passes one', () => {

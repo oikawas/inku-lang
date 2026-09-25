@@ -69,7 +69,8 @@ test('the panel draws it inside the limits field, from the value and the sent co
 	// The region: one `limits-field` block, cut from the opening div to the end
 	// of the loop body. The two checks above would pass over a decision the
 	// panel never reaches, and a whole-file match would pass with the line moved.
-	const start = panel.indexOf('<div class="limits-field">');
+	// The row also carries a changed-marker class since 2026-09-22.
+	const start = panel.search(/<div\b[^>]*\bclass="limits-field"/);
 	assert.ok(start > 0, 'the limits field block is where the panel puts each row');
 	const end = panel.indexOf('{/each}', start);
 	assert.ok(end > start);

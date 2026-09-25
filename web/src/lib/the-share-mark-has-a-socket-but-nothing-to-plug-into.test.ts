@@ -89,7 +89,13 @@ test('T-202: the page hands the canvas a way to save the mark, so it shows', () 
 	// definition too and a whole-file match would be satisfied by that alone.
 	const call = PAGE.slice(PAGE.indexOf('<CanvasPanel'), PAGE.indexOf('/>', PAGE.indexOf('<CanvasPanel')));
 	assert.match(call, /onToggleForRevision=\{toggleHistoryForRevision\}/, 'the wired marks moved');
-	assert.match(call, /onToggleForShare=\{toggleHistoryForShare\}/, 'nothing hands the canvas a way to save the share mark');
+	// Wrapped since 2026-09-25: the mutation now returns the saved work, which
+	// the canvas's handler type does not take.
+	assert.match(
+		call,
+		/onToggleForShare=\{async \(item, event\) => \{ await toggleHistoryForShare\(item, event\); \}\}/,
+		'nothing hands the canvas a way to save the share mark'
+	);
 	// And the prop still defaults to nothing, so a caller that passes no handler
 	// gets no mark rather than one that pretends.
 	assert.match(PANEL, /onToggleForShare = null,/);

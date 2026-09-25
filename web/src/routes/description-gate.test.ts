@@ -13,7 +13,10 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { test } from 'node:test';
 
+import { describeApiErrorDetail } from '../lib/apiError.ts';
 import { pipelineDescription } from '../lib/description-labels.ts';
+import { en } from '../lib/i18n/en.ts';
+import { ja } from '../lib/i18n/ja.ts';
 
 const here = path.dirname(new URL(import.meta.url).pathname);
 const page = fs.readFileSync(path.join(here, '+page.svelte'), 'utf8');
@@ -71,7 +74,13 @@ test('the batch run paints the same lines the counter counted', () => {
 
 test('the server tells the page which refusal this is', () => {
 	// The sentinel is stable and the wording is authored in ja.ts, the way
-	// "render capacity is full" already is.
-	assert.match(page, /detail === 'description is only labels'/);
-	assert.match(page, /t\(\)\.errorDescriptionOnlyLabels/);
+	// "render capacity is full" already is. Since 2026-09-15 the decision lives
+	// in apiError.ts, so it is run here, and the page is held to calling it.
+	for (const strings of [ja, en]) {
+		assert.equal(
+			describeApiErrorDetail('description is only labels', 400, strings),
+			strings.errorDescriptionOnlyLabels
+		);
+	}
+	assert.match(page, /return describeApiErrorDetail\(detail, status, t\(\)\);/);
 });

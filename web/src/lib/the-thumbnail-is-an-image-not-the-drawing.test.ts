@@ -90,10 +90,11 @@ test('the work keeps its shape when it is a PNG', () => {
 // Measured on 28ce4237: seven call sites, in five files. Stated here so that a
 // new grid of works drawn by hand -- which would keep carrying whole SVGs --
 // shows up as a failure rather than as a listing that is quietly still slow.
+// 2026-09-22: the Library preview became the eighth, through this component.
 test('the listings that show works side by side all use this component', () => {
 	const CALL_SITES: Record<string, number> = {
 		'components/HistoryStrip.svelte': 1,
-		'components/HistoryManager.svelte': 4,
+		'components/HistoryManager.svelte': 5,
 		'components/LineagePanel.svelte': 1,
 		'components/AIRefineModal.svelte': 1
 	};
@@ -104,7 +105,7 @@ test('the listings that show works side by side all use this component', () => {
 		assert.equal(found, expected, `${file} draws ${found} thumbnails, expected ${expected}`);
 		total += found;
 	}
-	assert.equal(total, 7);
+	assert.equal(total, 8);
 });
 
 // ── Stage 6: who asks the listing for what ──────────────────────────────────

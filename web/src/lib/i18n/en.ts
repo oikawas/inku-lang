@@ -1,5 +1,5 @@
 import type { LangPack } from './types';
-import { groupDigits } from '$lib/formatNumber';
+import { groupDigits } from '../formatNumber';
 
 export const en: LangPack = {
 	pipelineDescriptionLabel: 'Description',

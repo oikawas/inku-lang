@@ -26,6 +26,7 @@ const CANVAS_ARTWORK = fileURLToPath(
 	new URL('./features/canvas/CanvasArtworkWorkspace.svelte', import.meta.url)
 );
 const MANAGER_STATE = fileURLToPath(new URL('./historyManagerState.svelte.ts', import.meta.url));
+const EXPORT_MENU = fileURLToPath(new URL('./components/SavedWorkExportMenu.svelte', import.meta.url));
 
 const SRC = fileURLToPath(new URL('..', import.meta.url));
 
@@ -188,9 +189,13 @@ test('T-7: the canvas card door is inside the export menu, with the other two', 
 });
 
 test('T-8: the history side keeps its own card button', () => {
+	// Since 2026-09-22 the button is an item of the saved-work export menu the
+	// manager renders, offered whenever the manager hands the menu a card action.
 	const source = read(HISTORY_MANAGER);
-	assert.match(source, /downloadSelectedCard/);
-	assert.match(source, /historyCardExport\b/);
+	assert.match(source, /<SavedWorkExportMenu[\s\S]*?onDownloadCard=\{onDownloadSavedWorkCard\}/);
+	const menu = read(EXPORT_MENU);
+	assert.match(menu, /\{#if onDownloadCard\}[\s\S]*?\{t\(\)\.historyCardExport\}/);
+	assert.match(read(PAGE), /onDownloadSavedWorkCard=\{savedWorkExportActions\.onDownloadCard\}/);
 });
 
 // ── One source for the trash count ──────────────────────────────────────────
@@ -219,13 +224,15 @@ test('T-11: the dead first-page preload is gone from the web sources', () => {
 	assert.deepEqual(hits, []);
 });
 
-test('T-12: the live preload check is kept, with both of its callers', () => {
+test('T-12: the live preload check is kept, with each of its callers', () => {
 	// A control: preloadMatches is what stops the manager re-fetching a page it
 	// already holds. Removing it with the dead path would be a regression.
+	// Three callers since 2026-09-22: opening the manager, the grid's first
+	// measured page size, and a search.
 	const source = read(MANAGER_STATE);
 	assert.match(source, /preloadMatches\(view: HistoryManagerView/);
 	const callers = source.match(/this\.preloadMatches\(/g) ?? [];
-	assert.equal(callers.length, 2);
+	assert.equal(callers.length, 3);
 });
 
 // ── The page-size estimate follows the CSS ──────────────────────────────────

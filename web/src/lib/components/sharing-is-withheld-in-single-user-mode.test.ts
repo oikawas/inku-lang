@@ -41,8 +41,12 @@ test('T-15: the share button renders only when there is a handler', () => {
 });
 
 test('a work reached through someone else’s permission is marked as such', () => {
-	assert.match(manager, /class="shared-mark"/, 'the shared mark is gone');
-	assert.match(manager, /\{#if it\.shared\}/, 'the mark no longer depends on the field');
+	// Since 2026-09-25 the mark is one of the share-status badges, drawn by one
+	// snippet that every listing of the manager renders.
+	const snippet = manager.match(/\{#snippet shareStatus\(item: HistoryItem\)\}[\s\S]*?\{\/snippet\}/);
+	assert.ok(snippet, 'the share-status snippet is gone');
+	assert.match(snippet[0], /\{#if item\.shared\}<span class="share-status"/, 'the mark no longer depends on the field');
+	assert.ok((manager.match(/\{@render shareStatus\(it\)\}/g) ?? []).length >= 3, 'a listing no longer shows the mark');
 });
 
 test('T-20: deleted and withheld carry different words, in both languages', () => {

@@ -16,7 +16,9 @@ const PAGE = readFileSync(fileURLToPath(new URL('../../routes/+page.svelte', imp
 const OWNER = readFileSync(fileURLToPath(new URL('../features/batch/state.svelte.ts', import.meta.url)), 'utf8');
 
 test('T-64  the resume button is withheld unless there is something to finish', () => {
-	assert.match(PANEL, /\{#if canResumeBatch\}/, 'the resume button no longer depends on the flag');
+	// 2026-09-22: the button became a resume card, also withheld while a run is
+	// going (the run's own progress and stop take its place).
+	assert.match(PANEL, /\{#if !batchRunning && canResumeBatch\}/, 'the resume button no longer depends on the flag');
 	// Null the rest of the time -- an empty history and a run that reached its
 	// last line are the same answer here, and both withhold the button.
 	assert.match(PAGE, /canResumeBatch=\{batch\.canResume\}/, 'the flag is not the canonical resume state');
@@ -24,13 +26,18 @@ test('T-64  the resume button is withheld unless there is something to finish', 
 		'a member with no stored batch is offered a resume');
 });
 
-test('T-64  it sits to the left of the paint button', () => {
-	const row = PANEL.match(/<div class="batch-actions">[\s\S]*?<\/div>/);
-	assert.ok(row, 'the two buttons are no longer in one row');
-	assert.ok(
-		row[0].indexOf('batch-resume-btn') < row[0].indexOf('<PaintButton'),
-		'the resume button is not before the paint button',
-	);
+test('T-64  it comes before the button that starts a new run', () => {
+	// 2026-09-22: the resume card moved out of the paint button's row to sit
+	// above the next run's conditions, so the order is read across the panel:
+	// the card, then the conditions, then the new-run button.
+	const card = PANEL.indexOf('<section class="batch-resume-card"');
+	const conditions = PANEL.indexOf('<section class="batch-next-conditions"');
+	const row = PANEL.match(/<div class="batch-actions"[^>]*>[\s\S]*?<\/div>/);
+	assert.ok(row, 'the new-run button is no longer in its row');
+	assert.match(row[0], /<PaintButton[^>]*>\{t\(\)\.batchNewRunBtn\}<\/PaintButton>/);
+	assert.ok(card > 0 && card < conditions, 'the resume card is not before the conditions');
+	assert.ok(conditions < PANEL.indexOf(row[0]), 'the conditions are not before the new-run button');
+	assert.ok(PANEL.slice(card, conditions).includes('batch-resume-btn'), 'the resume button left its card');
 });
 
 test('T-65  a resumed run paints the plan, not the box', () => {
@@ -49,8 +56,9 @@ test('T-65  the numbers on the works come from the prompt, not from the plan', (
 	assert.match(OWNER, /displayLabel: `#\$\{item\.line\}`/);
 	assert.match(OWNER, /batchLineNumber: item\.line/);
 	// And the box is refilled with the whole batch, which is what those numbers
-	// number.
-	assert.match(OWNER, /this\.input = candidate\.prompt;/);
+	// number. The snapshot carries the candidate's prompt, or the session's.
+	assert.match(OWNER, /prompt: candidate\.prompt,/);
+	assert.match(OWNER, /this\.input = snapshot\.prompt;/);
 });
 
 test('T-65  the answer is asked for again when a run ends', () => {
@@ -86,12 +94,17 @@ test('T-66  the mode reaches the row it is read from', () => {
 		fileURLToPath(new URL('../../../../server/src/inku_server/persistence/history.py', import.meta.url)),
 		'utf8',
 	);
-	const RENDER = readFileSync(
-		fileURLToPath(new URL('../../../../server/src/inku_server/api_core/routers/render.py', import.meta.url)),
+	const server = (name: string) => readFileSync(
+		fileURLToPath(new URL(`../../../../server/src/inku_server/${name}`, import.meta.url)),
 		'utf8',
 	);
 	assert.match(SCHEMA, /^ {4}catalog_mode = Column\(String, +nullable=True\)$/m, 'the row has no column for it');
 	assert.match(LEGACY_SCHEMA, /"catalog_mode": "ALTER TABLE history ADD COLUMN catalog_mode VARCHAR"/, 'an existing database never gets the column');
 	assert.match(HISTORY, /"catalog_mode": row\.catalog_mode,/, 'the column is stored but never handed back');
-	assert.match(RENDER, /catalog_mode=req\.catalog_mode,/, 'the paint route drops the mode on the way to the row');
+	// Since the shared-pipeline cutover (2026-09-14) the paint route hands the
+	// whole request to the compatibility layer, and the product host writes the
+	// row: each link has to keep the mode.
+	assert.match(server('api_core/routers/render.py'), /_pipeline_compat\.paint\(\s*actor\["id"\], req\.model_dump\(mode="json"\)/, 'the paint route drops the request');
+	assert.match(server('pipeline_compat.py'), /"catalog_mode": "catalog_mode",/, 'the paint route drops the mode on the way to the row');
+	assert.match(server('pipeline_product.py'), /"catalog_mode": settings\["catalog_mode"\],/, 'the host saves the work without the mode');
 });

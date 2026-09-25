@@ -6,6 +6,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 36 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-26 — The grey label layer lines up with the description text again, and the Web unit tests follow the current UI
+
+Since 2026-09-22 the Describe and Batch editors use 14px text, but the layer beneath them that greys out what the drawing does not read stayed at 13px, so the grey drifted away from its characters. The layer is back to the editors' size, following the text-size setting. The Web unit tests that had not followed the same week's UI reorganization were updated to the current structure, each keeping the property it guards. The Japanese and English string tables import their helper by relative path, so the unit tests can load them directly.
+
 ### 2026-09-25 — The Prompts tab shows the system prompts a work sent
 
 The provenance drawer's Prompts tab again shows the Stage 1 and Stage 2 system prompts beside their inputs, as it did before the switch to the shared pipeline, but now they are the ones this work actually sent. The earlier tab showed a prompt rebuilt from the Python layers as if it had been sent, and it left with those layers. The shared pipeline builds each system prompt per work: installed plugins, the sketch note, and compiler feedback on a retry join Stage 1, and relation grammar joins Stage 2 only when the DDL needs it. The Server therefore keeps, in each execution's saved context, the last system prompt each stage sent, with its prompt ID, digest, language, and attempt number, and only the owner reads it at the new `GET /api/pipeline/variations/{variation_id}/system-prompts` (107 routes). A stage that called no model (Stage 1 of directly written DDL, Stage 2 when no hole needed filling) says so, and a work drawn before this record says it was not recorded. Recording is not limited to developer mode and changes no drawing, retry, or prompt. DDL, Score, and render versions are unchanged.

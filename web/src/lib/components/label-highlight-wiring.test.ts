@@ -38,13 +38,18 @@ test('both textareas are transparent, so the layer below them is visible', () =>
 test('the layer matches the textareas it sits behind', () => {
 	const layer = read('LabelHighlight.svelte');
 	// Same padding, size and line-height as both editors: a mismatch shifts the
-	// grey away from the characters it belongs to.
-	for (const metric of [/padding:\s*9px 10px/, /font-size:\s*13px/, /line-height:\s*1\.65/]) {
+	// grey away from the characters it belongs to. The size is read from the
+	// layer and required of each editor's rule, so moving one alone fails.
+	const size = layer.match(/\.label-mirror-inner \{[^}]*font-size:\s*([^;]+);/)?.[1];
+	assert.ok(size, 'the layer has no font-size');
+	for (const metric of [/padding:\s*9px 10px/, /line-height:\s*1\.65/]) {
 		assert.match(layer, metric);
 	}
-	for (const name of ['InputPanel.svelte', 'BatchPanel.svelte']) {
+	for (const [name, selector] of [['InputPanel.svelte', '.input-ta {'], ['BatchPanel.svelte', '.batch-ta {']]) {
 		const source = read(name);
-		assert.match(source, /padding:\s*9px 10px/, name);
-		assert.match(source, /font-size:\s*13px;\s*line-height:\s*1\.65/, name);
+		const rule = source.slice(source.indexOf(selector));
+		const body = rule.slice(0, rule.indexOf('}'));
+		assert.match(body, /padding:\s*9px 10px/, name);
+		assert.ok(body.includes(`font-size: ${size}; line-height: 1.65`), `${name} is not ${size}/1.65`);
 	}
 });

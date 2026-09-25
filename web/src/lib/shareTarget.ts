@@ -1,4 +1,4 @@
-// The group-sharing mark is separate from per-work ACL grants. The canvas
+// The group-sharing mark (ledger I-191) is separate from per-work ACL grants. The canvas
 // offers it only when a saved work carries the field and a handler is wired.
 // Field presence matters: an absent value is an older response without this
 // capability; false means the server supports it and the work is closed.

@@ -25,7 +25,9 @@ test('T-801: the route constructs one BatchState and no longer owns its state ma
 
 test('T-807: BatchState receives narrow capabilities, not route controllers or a generic bag', () => {
 	assert.doesNotMatch(owner, /HistoryBrowsingState|SettingsController|CanvasViewportState|Record<string, unknown>/);
-	assert.match(work, /paintLine: \(text, paintOptions\) => paintOne\(text, paintOptions\)/);
+	// Since 2026-09-22 each line also carries the models and sketch mode the run
+	// started with; it is still the one paint function, not a controller.
+	assert.match(work, /paintLine: \(text, paintOptions\) => paintOne\(text, \{\s*\.\.\.paintOptions, stage1Model: batchStage1Model, stage2Model: batchStage2Model,\s*sketchMode: batchSketchMode,\s*\}\)/);
 	assert.match(work, /refreshAfterServerSave: \(\) => deps\.history\(\)\.refreshAfterServerSave\(\)/);
 	assert.match(work, /refreshAfterRun: \(\) => deps\.history\(\)\.refreshAfterRun\(\)/);
 });

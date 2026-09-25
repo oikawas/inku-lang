@@ -15,12 +15,13 @@ import { fileURLToPath } from 'node:url';
  */
 
 const SOURCE = fileURLToPath(new URL('./HistoryManager.svelte', import.meta.url));
+const EXPORT_MENU = fileURLToPath(new URL('./SavedWorkExportMenu.svelte', import.meta.url));
 
-/** The labels of the buttons that turn selected works into a file. */
+/** The labels of the menu items that turn selected works into a file. */
 const WORK_TOOLS = [
-	't().historyContactSheet}',
-	't().historyContactSheetAi}',
-	't().historyAnimationExport}',
+	't().savedWorkExportContactSheet}',
+	't().savedWorkExportAiContactSheet}',
+	't().savedWorkExportTransitionAnimation}',
 ];
 
 const ACTIVE_VIEW_GUARD = "historyManagerView === 'active'";
@@ -53,15 +54,21 @@ function openBlocksAt(text: string, line: number): string[] {
 }
 
 test('the work tools sit behind the active-view guard', () => {
+	// The tools are menu items of SavedWorkExportMenu, so each place the manager
+	// renders that menu is what has to sit behind the guard. The preview's menu
+	// is behind previewReady, which is itself derived from the active view.
+	const menu = readFileSync(EXPORT_MENU, 'utf8');
+	for (const tool of WORK_TOOLS) assert.ok(menu.includes(tool), `button not found in the menu: ${tool}`);
 	const text = readFileSync(SOURCE, 'utf8');
+	assert.match(text, /const previewReady = \$derived\(active && historyManagerView === 'active' && /);
 	const lines = text.split('\n');
-	for (const tool of WORK_TOOLS) {
-		const index = lines.findIndex((line) => line.includes(tool));
-		assert.notEqual(index, -1, `button not found in the source: ${tool}`);
+	const menus = lines.flatMap((line, index) => (line.includes('<SavedWorkExportMenu') ? [index] : []));
+	assert.equal(menus.length, 2, 'the manager renders the export menu in the toolbar and the preview');
+	for (const index of menus) {
 		const guards = openBlocksAt(text, index + 1);
 		assert.ok(
-			guards.includes(ACTIVE_VIEW_GUARD),
-			`${tool} is reachable in the trash view; open blocks were ${JSON.stringify(guards)}`,
+			guards.includes(ACTIVE_VIEW_GUARD) || guards.includes('previewReady'),
+			`the export menu on line ${index + 1} is reachable in the trash view; open blocks were ${JSON.stringify(guards)}`,
 		);
 	}
 });

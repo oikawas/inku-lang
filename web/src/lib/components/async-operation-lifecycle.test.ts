@@ -25,7 +25,13 @@ test('the dynamic lineage panel releases draw controllers and its copy timer', (
 	const cleanupEnd = source.indexOf('\n\t\t};', cleanupStart);
 	assert.ok(mount >= 0 && cleanupStart > mount && cleanupEnd > cleanupStart);
 	const cleanup = source.slice(cleanupStart, cleanupEnd);
-	assert.match(cleanup, /sketchDrawController\?\.abort\(\)/);
-	assert.match(cleanup, /editDrawController\?\.abort\(\)/);
 	assert.match(cleanup, /clearTimeout\(copiedHashTimer\)/);
+	// The description and sketch draws moved into WorkEditDialog, which the
+	// panel renders, so they end with the dialog -- and with the panel.
+	assert.doesNotMatch(source, /new AbortController\(\)/);
+	assert.match(source, /<WorkEditDialog node=\{activeEditNode\} mode="description"/);
+	assert.match(source, /<WorkEditDialog node=\{activeSketchNode\} mode="sketch-grain"/);
+	const dialog = read('WorkEditDialog.svelte');
+	assert.match(dialog, /import \{[^}]*onDestroy[^}]*\} from 'svelte';/);
+	assert.match(dialog, /onDestroy\(\(\) => \{ controller\?\.abort\(\);/);
 });

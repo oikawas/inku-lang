@@ -6,7 +6,7 @@
 	//
 	// The metrics below must stay equal to the textarea's: same font, same size,
 	// same line-height, same padding, same wrapping.  Both editors that use this
-	// are 13px/1.65 with 9px 10px of padding.
+	// are 14px/1.65 (scaled by the text size) with 9px 10px of padding.
 	import { labelSegments } from '$lib/description-labels';
 
 	type Props = {
@@ -43,7 +43,7 @@
 	.label-mirror-inner {
 		padding: 9px 10px;
 		font-family: inherit;
-		font-size: var(--ui-font-size-13);
+		font-size: var(--ui-font-size-14);
 		line-height: 1.65;
 		color: transparent;
 		white-space: pre-wrap;

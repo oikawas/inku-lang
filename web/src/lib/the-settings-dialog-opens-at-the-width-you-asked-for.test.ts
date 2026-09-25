@@ -59,17 +59,15 @@ const ALL_TABS = [
 	'misc'
 ];
 
-/** The settings tab bar, without the model picker's own bar above it. */
-const BAR = MODAL.slice(
-	MODAL.indexOf('<div class="settings-tabs">'),
-	MODAL.indexOf('<div class="settings-body">')
-);
+/**
+ * The settings tab bar, without the model picker's own bar above it. Since
+ * 2026-09-22 it is a category navigation rather than a row of tabs.
+ */
+const BAR_START = MODAL.indexOf('<nav class="settings-category-nav"');
+const BAR = MODAL.slice(BAR_START, MODAL.indexOf('</nav>', BAR_START));
 
-/** The dialog's head, up to the first tab bar. */
-const HEAD = MODAL.slice(
-	MODAL.indexOf('<div class="modal-head">'),
-	MODAL.indexOf('<div class="settings-tabs')
-);
+/** The dialog's head, up to the tab bar. */
+const HEAD = MODAL.slice(MODAL.indexOf('<div class="modal-head">'), BAR_START);
 
 // ------------------------------------------------------------------- T-46
 
@@ -126,7 +124,9 @@ test('T-48  the Settings owner asks both gates, and still asks the old one uncha
 // ------------------------------------------------------------------- T-49
 
 test('T-49  the bar hides exactly the tabs the guard refuses', () => {
-	const guarded = [...BAR.matchAll(/showsTab\('([a-z_]+)'\)/g)].map((match) => match[1]);
+	// A name can be asked twice: the extensions category is shown when either of
+	// its two tabs is, and each button then asks for its own.
+	const guarded = [...new Set([...BAR.matchAll(/showsTab\('([a-z_]+)'\)/g)].map((match) => match[1]))];
 	// Both directions again, this time between the bar and the list: a fifth
 	// button wrapped in the guard, or one of the four left unwrapped, fails.
 	assert.deepEqual([...guarded].sort(), [...DETAILED_ONLY_SETTINGS_TABS].sort());

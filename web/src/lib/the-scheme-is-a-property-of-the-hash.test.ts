@@ -70,10 +70,14 @@ test('the surfaces read the scheme from the value, not from a constant', () => {
 	// saying rh2 while the works below it were being saved as rh3.
 	assert.doesNotMatch(lineage, /<dt>rh\d<\/dt>/);
 	assert.doesNotMatch(lineage, /<dt>dh\d<\/dt>/);
-	assert.match(lineage, /hashSchemeLabel\(node\.render_hash, 'rh'\)/);
-	assert.match(lineage, /hashSchemeLabel\(node\.description_hash, 'dh'\)/);
+	// The hashes moved into the work-details dialog on 2026-09-24.
+	assert.match(lineage, /<dt>\{hashSchemeLabel\(detailsNode\.render_hash, 'rh'\)\}<\/dt>/);
+	assert.match(lineage, /<dt>\{hashSchemeLabel\(detailsNode\.description_hash, 'dh'\)\}<\/dt>/);
 
 	// Both copy buttons go through the one decision.
-	assert.match(lineage, /hashDigest\(node\.render_hash\)/);
+	assert.match(
+		lineage,
+		/const value = kind === 'description' \? node\.description_hash : node\.render_hash;[\s\S]{0,80}const hash = hashDigest\(value\);/
+	);
 	assert.match(readFileSync(PAGE, 'utf8'), /statusHashFull = \$derived\(hashDigest\(/);
 });

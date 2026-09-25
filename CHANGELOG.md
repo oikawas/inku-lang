@@ -6,6 +6,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 36 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-25 — A modifier before a count phrase reaches its noun
+
+In `大きな四つの赤い円を置く` the word `大きな` was not recognized and the clause stayed unresolved, and in `細い三本の黒い線を引く` modifier and action ownership became ambiguous and the whole work stopped. The scale word's look-ahead did not skip a number, and both the pre-head modifier collection and the noun-phrase boundary check stopped at the counter attached to a count (本, つ, 個). A number and the counter right after it now stay inside the noun phrase, so a modifier before the count phrase yields the same Score as one after it. The work-plan printer never emits this order, so drawings from the LLM path are unchanged; the word orders an author may write widen. DDL 13, DDL engine 47.
+
 ### 2026-09-25 — Align Android color catalogs and saved-work redraw with Server
 
 Android's `moss_bark` white now matches Server's `#f2efe8`. Redrawing a saved work uses its own color snapshot, retaining its drawn-with catalog ID and colors even if the ID has been retired. An older work without a snapshot uses today's default colors when its ID is invalid. Historical ID aliases affect history display names only. History stores the requested `catalog_mode`, while older rows may retain null. Existing Room schema 11 databases migrate to 12 without a reset.

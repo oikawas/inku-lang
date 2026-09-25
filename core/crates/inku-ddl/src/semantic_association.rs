@@ -1837,6 +1837,15 @@ fn collect_pre_head_phrase_ownership(
                         break;
                     }
                 }
+                // The counter of a pre-head count stays inside the noun phrase,
+                // so modifiers before it still reach the head, e.g.
+                // `細い 三 本 の 黒い 線`.
+                ClauseAtom::FunctionWord { surface, .. }
+                    if crate::parser::is_japanese_counter_surface(surface)
+                        && clause.atoms.iter().any(|candidate| {
+                            matches!(candidate, ClauseAtom::UnattachedExactNumber(number)
+                                if number.span.end_byte == span.start_byte)
+                        }) => {}
                 ClauseAtom::FunctionWord { .. } => break,
                 _ if is_pre_head_modifier_atom(atom) => ownership.insert(head_span, span),
                 _ => {}

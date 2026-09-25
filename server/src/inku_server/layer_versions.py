@@ -291,7 +291,9 @@
 # 45: Bundled Nature uses consolidated semantics; saved Macro IDs keep their locks.
 # 46: An explicit named surface texture on a closed shape is the area's own
 # performance and no longer carries a hidden flat base fill.
-DDL_ENGINE_VERSION = "46"
+# 47: A Japanese modifier before a count phrase reaches the same head as one
+# after it, so `大きな四つの円` and `細い三本の線` keep their count and action.
+DDL_ENGINE_VERSION = "47"
 # 4 (2026-07-30): yellow, orange, and purple become abstract Score colors, and
 # coerce recognizes the corresponding Japanese and English DDL markers.
 # 3 (2026-07-30): 黄 / 橙 / 紫 joined the saijiki color words, so an author can write
@@ -312,4 +314,6 @@ DDL_ENGINE_VERSION = "46"
 # 11 (2026-09-14): Mirrored joins the relation vocabulary.
 # 12 (2026-09-24): English amplitude large also accepts the adverb largely, so
 # it no longer collides with relative size large in one phrase.
-DDL_VERSION = "12"
+# 13 (2026-09-25): A Japanese modifier may stand before a count phrase
+# (`大きな四つの円`, `細い三本の黒い線`) as well as after it.
+DDL_VERSION = "13"

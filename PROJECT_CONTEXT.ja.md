@@ -230,7 +230,7 @@ localStorage への保存・server への永続・描画要求への同梱は、
 
 ### server（FastAPI）
 
-- エンドポイント 105 本は `server/src/inku_server/api_core/routers/` の 10 ファイル（`auth` `feedback` `history` `lineage` `me` `plugins` `public` `render` `settings` `users`）と、共有pipelineの `pipeline_api.py`（`/api/pipeline/*` の 11 本）に在る。本数の正本は `server/tests/test_route_authorization.py` の `EXPECTED_ROUTE_COUNT` である。
+- エンドポイント 106 本は `server/src/inku_server/api_core/routers/` の 10 ファイル（`auth` `feedback` `history` `lineage` `me` `plugins` `public` `render` `settings` `users`）と、共有pipelineの `pipeline_api.py`（`/api/pipeline/*` の 12 本）に在る。本数の正本は `server/tests/test_route_authorization.py` の `EXPECTED_ROUTE_COUNT` である。
 共有される定義は `api_core/{state,models,deps,common,rendering}.py` に置く。
 - `api.py` が持つのは `app` の組み立て・`_lifespan`・ミドルウェア・起動時の呼び出し・`include_router` だけである。
 **依存の向きは `api.py` → routers → 共有の一方向**で、router から `api.py` を import しない。

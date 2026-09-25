@@ -204,17 +204,17 @@ In `inku-render`, `render.rs` is the only overall orchestrator. `render_with_res
 | `lineage` | 8 | Lineage graph/group, promote, colophon | `_current_user` |
 | `render` | 8 | Variation seeds, compose, interpret, render-score/svg, paint, paint stream, vision advice | `_current_user` |
 | `feedback` | 3 | Unread words | `_current_user` |
-| `pipeline` | 11 | Canvas formats; start, read, and fork variations; execution commands; author DDL; history links and forks; reading and forking older works; provider observations | `_current_user` on each route; provider observations also require developer mode |
+| `pipeline` | 12 | Canvas formats; start, read, and fork variations; execution commands; author DDL; history links and forks; DDL export of a work (with the plugin definitions it names); reading and forking older works; provider observations | `_current_user` on each route; provider observations also require developer mode |
 
-Total: 105. The public allowlist contains three paths: `/health`, `/api/info`, and `/api/auth/login` (`test_route_authorization.py`). The standard is to leave out anything login does not need.
+Total: 106. The public allowlist contains three paths: `/health`, `/api/info`, and `/api/auth/login` (`test_route_authorization.py`). The standard is to leave out anything login does not need.
 
-**⚠ The per-router counts were copied by hand, and no check turns them red.** The total's source of truth is `EXPECTED_ROUTE_COUNT` (105) in `test_route_authorization.py`, and `tests/data/api-surface-baseline.json`, generated from the live app's OpenAPI, also records 105 operations.
+**⚠ The per-router counts were copied by hand, and no check turns them red.** The total's source of truth is `EXPECTED_ROUTE_COUNT` (106) in `test_route_authorization.py`, and `tests/data/api-surface-baseline.json`, generated from the live app's OpenAPI, also records 106 operations.
 
 ## Main flows
 
 - `/api/paint`, `/api/paint/stream`, `/api/interpret`, and `/api/compose` go through `pipeline_compat.py` to the same `PipelineService`. The stream re-reads the execution, reports `sketch`, `stage1`, `score`, and `done` in order, and returns a failure after the first event as an in-band `error` event. When a completion proposal needs approval, the three other routes answer 409 with the current view, and the stream answers 409 before its first event or an `error` event after it. A description start hands only the label-cut description to the core and refuses a label-only description with 400.
 - `/api/pipeline/variations` starts a variation from a description or direct DDL; `/executions/{id}/commands` accepts author commands (approve, decline, request completion, regenerate, perform, cancel), and `/executions/{id}/author-ddl` accepts DDL edits. A DDL edit that changes settings leaves the original intact and creates a parent-linked variation.
-- `/api/pipeline/history/{id}` returns the variation and revision of a work saved through the shared pipeline, and `/history/{id}/fork` derives from that moment's configuration, host context, and Macro definitions. `/legacy/{id}` and `/legacy/{id}/fork` read an older work without a link and derive from it without changing the original row.
+- `/api/pipeline/history/{id}` returns the variation and revision of a work saved through the shared pipeline, and `/history/{id}/fork` derives from that moment's configuration, host context, and Macro definitions. `/history/{id}/ddl-export` exports the work's visible DDL together with the plugin definitions it names. `/legacy/{id}` and `/legacy/{id}/fork` read an older work without a link and derive from it without changing the original row.
 - `/api/render-score` and `/api/render-svg` branch on the Score version: compact Scores go through `ProductPipelineEffects.replay`, and those below 0.10 through `saved_score_compat.py`.
 - Provider/model selection resolves the request, the user's Stage settings, and the manifest default through `resolved_stage_model`.
 

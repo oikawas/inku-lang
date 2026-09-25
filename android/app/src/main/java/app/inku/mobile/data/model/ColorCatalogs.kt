@@ -73,7 +73,7 @@ object ColorCatalogs {
         ColorCatalog(
             "moss_bark", "Moss & Bark", "bark, leaf, moss, dappled light",
             "樹皮、葉、苔、木漏れ日", listOf("森の闇", "白樺の肌", "朝霧の灰", "熟した実", "苔", "沢の水", "木漏れ日", "樹皮", "山葡萄", "若葉"),
-            mapOf("white" to "#f2efe7", "black" to "#181a17", "gray" to "#9ba39e", "red" to "#9c3330", "orange" to "#7d5531", "yellow" to "#d5ae43", "green" to "#3e5a41", "blue" to "#43798a", "purple" to "#57355f")
+            mapOf("white" to "#f2efe8", "black" to "#181a17", "gray" to "#9ba39e", "red" to "#9c3330", "orange" to "#7d5531", "yellow" to "#d5ae43", "green" to "#3e5a41", "blue" to "#43798a", "purple" to "#57355f")
         ),
         ColorCatalog(
             "neon_plate", "Neon & Plate", "discharge tube, printing plate, coating",
@@ -88,10 +88,25 @@ object ColorCatalogs {
     )
 
     private val byId = all.associateBy { it.id }
+    private val renamedIds = mapOf(
+        "japanese" to "ink_season",
+        "mexican" to "vivid_material",
+        "indian" to "dye_earth",
+        "british" to "weathered_heritage",
+        "egyptian" to "desert_mineral",
+        "impressionism" to "open_air_light",
+        "greek" to "sea_stone",
+        "renaissance" to "fresco_study",
+        "nordic" to "cool_material",
+        "chinese" to "ink_porcelain",
+    )
 
     fun find(id: String?): ColorCatalog? = byId[id]
 
     fun get(id: String?): ColorCatalog = byId[id] ?: byId.getValue("default")
+
+    // Resolve historical IDs only for display; work snapshots keep their drawn-with ID and colors.
+    fun currentDisplayCatalog(id: String?): ColorCatalog? = find(id?.let(renamedIds::get) ?: id ?: "default")
 
     fun paletteFor(id: String): Map<String, String> = when (id) {
         "default" -> mapOf("Black" to "#111111", "White" to "#ffffff", "Gray" to "#888888", "Red" to "#a2342a", "Green" to "#2f6b3a", "Blue" to "#2c3e91", "Yellow" to "#b8901f", "Orange" to "#b9671e", "Purple" to "#6a4d94", "Deep Red" to "#7c2f26")

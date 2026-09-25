@@ -58,6 +58,25 @@ class GenerationInfoCatalogNameTest {
         )
     }
 
+    @Test
+    fun renamedHistoricalIdUsesCurrentNameWithoutChangingDrawnWithId() {
+        assertEquals(
+            "Ink & Season (japanese)",
+            generationInfoColorCatalogValue(
+                metadata(name = "Japanese", id = "japanese"),
+                fallbackCatalogId = "fallback",
+            ),
+        )
+        assertEquals("Ink & Season", generationInfoColorCatalogValue("{}", "japanese"))
+        assertEquals(
+            "Egyptian (egyptian)",
+            generationInfoColorCatalogValue(
+                metadata(name = "Egyptian", id = "egyptian"),
+                fallbackCatalogId = "fallback",
+            ),
+        )
+    }
+
     private fun metadata(name: String?, id: String, sub: String? = null): String = buildString {
         append("{\"render_color_catalog_id\":\"")
         append(id)

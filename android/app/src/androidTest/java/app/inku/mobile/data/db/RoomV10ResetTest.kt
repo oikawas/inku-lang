@@ -242,14 +242,27 @@ class RoomV10ResetTest {
     }
 
     @Test
+    fun existingV11IsAcceptedForMigrationWithoutReset() {
+        val target = newTargets("keep-v11")
+        createMarkerDatabase(target, 11)
+        writeSentinels(target)
+        val databaseBytes = target.databaseFile.readBytes()
+        val thumbnailBytes = target.thumbnailSentinel.readBytes()
+
+        assertEquals(RoomV10ResetCoordinator.Result.Ready(resetPerformed = false), prepare(target))
+        assertArrayEquals(databaseBytes, target.databaseFile.readBytes())
+        assertArrayEquals(thumbnailBytes, target.thumbnailSentinel.readBytes())
+    }
+
+    @Test
     fun futureVersionNonemptyV0AndUnreadableDatabaseAreBytePreservingRefusals() {
-        val future = newTargets("refuse-v12")
-        createMarkerDatabase(future, 12)
+        val future = newTargets("refuse-v13")
+        createMarkerDatabase(future, 13)
         assertRefusalPreserves(
             future,
             RoomV10ResetCoordinator.Result.Refused(
                 RoomV10ResetCoordinator.RefusalReason.UnexpectedVersion,
-                detectedVersion = 12,
+                detectedVersion = 13,
             ),
         )
 

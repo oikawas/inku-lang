@@ -40,6 +40,12 @@ When updating Android specifications:
 3. Do not introduce English-only Android requirements that are absent from
    `ANDROID_SPEC.ja.md`.
 
+## 2026-09-25 Current color catalogs and saved works
+
+Android's 13 fixed color catalogs have the same IDs, color maps, and `palette` entries as Server. The `white` value in `moss_bark` is `#f2efe8`. An ordinary draw resolves either a fixed choice or automatic selection from the description, and history stores the resolved ID and the requested `catalog_mode`. Older history rows may have a null `catalog_mode`; its absence does not establish whether the request was automatic or fixed. An existing Room schema 11 database is migrated to schema 12 at startup without rejection or reset.
+
+When redrawing a saved work, its own `render_color_map` is the color authority and its drawn-with catalog ID is retained. A valid saved color snapshot allows redraw even when that ID has been retired. An older work without a color snapshot uses today's `default` catalog if its ID is no longer current. Historical ID aliases resolve history display names only; they do not change the render ID or saved colors. If the alias target is also retired, the saved name or original ID is displayed.
+
 ## 2026-09-25 Current sketch behavior (method A)
 
 Under shared SPEC §12.6.1, the author chooses sketching for each draw. It is off by default; there is no automatic per-description decision. The start input and regenerate-from-description command accept `sketch` modes `off`, author-selected `on`, and `supplied` for author-edited or saved prose. Supplied prose bypasses the sketch provider.
@@ -49,6 +55,8 @@ For `on`, `generate_sketch` is an optional effect before Stage 1, using the Stag
 The ordinary Android drawing setting offers off/on and defaults to off. Redrawing a selected work with or without sketching saves a child in lineage, reuses the existing `sketch_grain_change` derivation kind, and records `from_sketch_state` and `to_sketch_mode` metadata. Legacy `fine` and `coarse` values are retained only to display saved works and determine their redraw choice; they are not used for new sketch inputs or records.
 
 This sketch pipeline's rendered output is produced by the packaged `core/crates/inku-render/` through the shared pipeline JNI. Android reports render engine `default / 67`.
+
+Gemini provider generation requests use the Gemini API `models/{model}:generateContent` endpoint. The API key is sent as `x-goog-api-key`, and structured responses for the shared pipeline use native function declarations and `functionCall.args`. A successful model-list fetch does not establish that generation requests work.
 
 ## 2026-09-24 Current bottom actions, photo entry, and Works scrolling
 

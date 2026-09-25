@@ -762,6 +762,15 @@ class InkuRepository(
             .put("render_hash", result.renderHash)
             .put("render_hash_short", result.renderHashShort)
             .toString()
+        // The resolved catalog ID cannot say whether the run was requested as auto.
+        // Resumed runs only pass that resolved ID here, so prefer their saved request mode.
+        val catalogMode = result.managedHistoryLink?.contextJson
+            ?.let { JSONObject(it).optJSONObject("host_options")?.optString("catalog_mode") }
+            ?.takeIf { it.isNotBlank() }
+            ?: result.managedHistoryReplay?.hostOptionsJson
+                ?.let { JSONObject(it).optString("catalog_mode") }
+                ?.takeIf { it.isNotBlank() }
+            ?: if (catalogId == CatalogSelection.AUTO_ID) "auto" else "fixed"
         val historyId = result.pipelineView?.takeIf { result.managedHistoryLink != null }
             ?.let(::pipelineHistoryId) ?: pipeline.newHistoryId()
         database.historyDao().getById(historyId)?.let { saved ->
@@ -808,6 +817,7 @@ class InkuRepository(
             renderHash = result.renderHash,
             renderHashShort = result.renderHashShort,
             colorCatalogId = renderMetadata.optString("catalog_id").ifBlank { catalogId },
+            catalogMode = catalogMode,
             canvasAspect = renderMetadata.optString("canvas_aspect_id").ifBlank { canvasAspect },
             starred = false,
             trashed = false,

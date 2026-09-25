@@ -9,8 +9,8 @@ import java.io.File
  * Decides what may happen to the Android database before Room opens it.
  *
  * The allowlist deliberately lives only here. Anything outside versions 1-9
- * is either the current schema or a refusal; it never reaches a destructive
- * fallback.
+ * is either a migratable schema, the current schema, or a refusal; it never
+ * reaches a destructive fallback.
  */
 object RoomV10ResetCoordinator {
     private const val DATABASE_NAME = "inku.sqlite"
@@ -60,7 +60,7 @@ object RoomV10ResetCoordinator {
 
         return when {
             version == InkuDatabase.SCHEMA_VERSION -> Result.Ready(resetPerformed = false)
-            version == 10 -> Result.Ready(resetPerformed = false)
+            version == 10 || version == 11 -> Result.Ready(resetPerformed = false)
             version in RESETTABLE_VERSIONS -> resetPreV10Database(
                 context = applicationContext,
                 databaseName = databaseName,

@@ -60,18 +60,20 @@ class SharedPipelinePersistenceTest {
 
         migrationHelper.runMigrationsAndValidate(
             databaseName,
-            11,
+            12,
             true,
             InkuDatabase.MIGRATION_10_11,
+            InkuDatabase.MIGRATION_11_12,
         ).use { db ->
-            db.query("SELECT original_input FROM history_items WHERE id = 'legacy-history'").use { cursor ->
+            db.query("SELECT original_input, catalog_mode FROM history_items WHERE id = 'legacy-history'").use { cursor ->
                 assertTrue(cursor.moveToFirst())
                 assertEquals("古い記述", cursor.getString(0))
+                assertTrue(cursor.isNull(1))
             }
         }
 
         val opened = Room.databaseBuilder(context, InkuDatabase::class.java, databaseName)
-            .addMigrations(InkuDatabase.MIGRATION_10_11)
+            .addMigrations(InkuDatabase.MIGRATION_10_11, InkuDatabase.MIGRATION_11_12)
             .build()
             .also { database = it }
         val store = RoomSharedPipelineStore(opened, now = { 1_777_777_777L })

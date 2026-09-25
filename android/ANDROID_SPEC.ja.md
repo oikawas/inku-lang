@@ -30,6 +30,12 @@ runtime fallbackを持たない。保存済みSVG、Room schema、Score schema�
 - Android 仕様を更新するときは、先に `ANDROID_SPEC.ja.md` を更新し、その後で `ANDROID_SPEC.md` を同期する。
 - 英語版だけに存在する仕様・要件を追加してはならない。
 
+## 2026-09-25 現行の色カタログと保存作品
+
+Androidの固定色カタログ13件はServerと同じID、色map、paletteを持つ。`moss_bark`の`white`は`#f2efe8`である。通常描画では固定選択または記述からの自動選択を解決し、履歴には解決済みIDと要求時の`catalog_mode`を保存する。旧履歴行の`catalog_mode`はnullを許し、欠落からautoか固定かを推定しない。既存のRoom schema 11は起動時に拒否・初期化せず、schema 12へ移行する。
+
+保存作品の再描画では、作品自身の`render_color_map`を色の正本とし、描画時のカタログIDを維持する。廃止済みIDでも有効な保存色snapshotがあれば再描画できる。色snapshotのない旧作品でIDが現行一覧に無ければ、現在の`default`カタログで描画する。旧IDから現行IDへの別名解決は履歴の表示名だけに使い、描画IDや保存色を変更しない。対応先も廃止されたIDは、保存名または元のIDを表示する。
+
 ## 2026-09-25 現行の写生（方式A）
 
 共有仕様§12.6.1に従い、写生は描画ごとに作者が選ぶ。既定は「なし」で、記述ごとに要否を決める自動modeは置かない。開始入力と記述からの再生成には`sketch`を渡し、`{"mode":"off"}`、作者が選ぶ`{"mode":"on"}`、作者が直した文または保存済み文を使う`{"mode":"supplied","text":"..."}`を区別する。suppliedでは写生providerを呼ばない。
@@ -39,6 +45,8 @@ runtime fallbackを持たない。保存済みSVG、Room schema、Score schema�
 通常のなし／あり選択はAndroidの描画設定に置き、既定をなしとする。作品からの「写生なし／ありで描き直す」は選択作品の子を系譜へ保存し、派生種別には既存の`sketch_grain_change`を使う。metadataは`from_sketch_state`と`to_sketch_mode`を記録する。旧`fine`／`coarse`は保存済み作品の表示と再描画時の選択判定にのみ使い、新しい写生の入力や保存には使わない。
 
 この写生pipelineの描画結果は、Androidに同梱した`core/crates/inku-render/`を共有pipelineのJNI経由で実行して生成する。Androidが報告するrender engineは`default / 67`である。
+
+Gemini provider の生成要求は Gemini API の `models/{model}:generateContent` に送る。API key は `x-goog-api-key` で渡し、共有pipelineの構造化応答は native function declaration と `functionCall.args` を使う。モデル一覧の取得だけが成功しても、生成要求の到達確認とは扱わない。
 
 ## 2026-09-24 現行の下部操作・写真入力・作品一覧
 

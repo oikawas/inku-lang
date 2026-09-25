@@ -6,6 +6,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 36 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-25 — Align Android color catalogs and saved-work redraw with Server
+
+Android's `moss_bark` white now matches Server's `#f2efe8`. Redrawing a saved work uses its own color snapshot, retaining its drawn-with catalog ID and colors even if the ID has been retired. An older work without a snapshot uses today's default colors when its ID is invalid. Historical ID aliases affect history display names only. History stores the requested `catalog_mode`, while older rows may retain null. Existing Room schema 11 databases migrate to 12 without a reset.
+
 ### 2026-09-25 — Refine the Library work preview and drawing status
 
 Double-clicking the image in a Library work preview opens that work; keyboard and touch input also open it. The area below the image shows the creation time, models, color catalog, drawing duration, SVG size, render engine version, generation, hash, and other available work details. The hash shows its last four digits with a button to copy the full value. While drawing begins with the previous result still on screen, the temporary save-first message no longer appears.
@@ -13,14 +17,15 @@ Double-clicking the image in a Library work preview opens that work; keyboard an
 ### 2026-09-25 — Make per-work sharing controls and status visible
 
 The Library now opens individual sharing settings from work cards, Lineage members, the chronological table, and previews. Sharing settings separately manage group read access and individual read/write grants. The settings dialog now appears above the Library. History listings report whether an owned work has ACL grants and distinguish individual sharing, group sharing, and works owned by others with separate badges. The “Shared only” filter is labeled “Group shared only” to match its actual scope.
-
 ### 2026-09-25 — The sketch runs only when the author chooses it
 
 An optional sketch can now run before the work plan. It never rewrites the description: it supplements the extent of place and the seasonal or time-of-day light in plain words beside it, and Stage 1 reads both. It is off by default and is used through "on" in the describe tab or the work menu's "redraw with or without the sketch". It never waits for a confirmation, and a failed sketch request still draws from the description. The sketch can be read and edited after drawing. There is no automatic mode that decides per description: in a blind comparison on 70 development descriptions the sketch was even (32 with, 30 without), and the rule checked on 110 unused descriptions in Japanese and English came out 43 to 50, so no general criterion that improves the picture was found. Saved states gain `supplemented` and `not_needed`; the retired layer's fine and coarse grains remain only for displaying saved works. The CLI's `--sketch` runs the new sketch. Android follows separately. DDL, Score, and render versions are unchanged.
 
 ### 2026-09-25 — Port author-selected sketching to Android
 
-Android's shared pipeline supports the default-off `sketch` choice, the `generate_sketch` effect before Stage 1, reuse of supplied prose, and description-only continuation for `fallback` and `not_needed`. It carries sketch states into snapshots and saved columns; legacy `fine` and `coarse` remain only for displaying saved works and determining their redraw choice. Redrawing from a lineage work card with or without sketching saves a child using the existing `sketch_grain_change` derivation. The focused Pixel 9 device test passed; the task record distinguishes it from the incomplete live-model save check.
+Android's shared pipeline supports the default-off `sketch` choice, the `generate_sketch` effect before Stage 1, reuse of supplied prose, and description-only continuation for `fallback` and `not_needed`. It carries sketch states into snapshots and saved columns; legacy `fine` and `coarse` remain only for displaying saved works and determining their redraw choice. Redrawing from a lineage work card with or without sketching saves a child using the existing `sketch_grain_change` derivation.
+
+Gemini provider generation now uses native `generateContent`, separately from model-list retrieval. The previous OpenAI-compatible `/chat/completions` request was rejected by Gemini API for Gemma 4 31B. On Pixel 9, that model drew and saved a sketch-on child work from the author's specified Japanese text.
 
 ### 2026-09-24 — The work plan leads through size and overlap, and shows light and time through the scene's color
 

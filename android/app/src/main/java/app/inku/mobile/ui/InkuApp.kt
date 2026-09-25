@@ -4541,7 +4541,7 @@ private fun ProviderConnectionCard(
     statusMessage: String?,
     fetchState: ProviderModelFetchState?,
 ) {
-    val requiresKey = provider.providerId in setOf("openai", "nvidia", "anthropic", "gemini")
+    val requiresKey = provider.providerId in setOf("openai", "nvidia", "anthropic", "gemini", "ollama-cloud")
     val keySet = !provider.encryptedApiKey.isNullOrBlank()
     var displayName by remember(provider.providerId, provider.displayName) { mutableStateOf(provider.displayName) }
     val kind = provider.kind
@@ -5320,12 +5320,14 @@ private fun providerModelCandidates(provider: app.inku.mobile.data.db.ProviderSe
             ProviderModelCandidate("ollama:gpt-oss:20b", "gpt-oss 20B"),
             ProviderModelCandidate("ollama:qwen3:8b", "Qwen3 8B"),
         )
-        "ovms" -> listOf(
-            ProviderModelCandidate("qwen3-api", "Qwen3 8B Instruct", "thinking"),
-            ProviderModelCandidate("qwen-api", "Qwen2.5 7B Instruct"),
-            ProviderModelCandidate("gemma3-12b-api", "Google Gemma 3 12B Instruct"),
-            ProviderModelCandidate("gemma3-4b-api", "Google Gemma 3 4B Instruct"),
-        )
+        // The server's verified Ollama Cloud models, in its order of
+        // recommendation (verified_model_catalog.py).
+        "ollama-cloud" -> listOf(
+            "nemotron-3-ultra", "minimax-m2.5", "nemotron-3-super", "gemma4:31b", "nemotron-3-nano:30b",
+            "gpt-oss:120b", "gpt-oss:20b", "minimax-m3", "deepseek-v4-flash", "deepseek-v4-pro",
+            "glm-5.1", "glm-5.2", "kimi-k2.5", "kimi-k2.6", "kimi-k2.7-code", "minimax-m2.7",
+            "mistral-large-3:675b", "qwen3.5:397b",
+        ).map { ProviderModelCandidate("ollama-cloud:$it", it) }
         else -> emptyList()
     }
     val fetched = fetchedModelIds.orEmpty().map { id ->

@@ -384,6 +384,7 @@ class InkuRepository(
     }
 
     suspend fun ensureDefaultProviderSettings() {
+        dropUntouchedRetiredProviders()
         defaultProviderSettings().forEach { setting ->
             val existing = database.providerSettingDao().get(setting.providerId)
             database.providerSettingDao().upsert(
@@ -1133,11 +1134,13 @@ class InkuRepository(
                 isDefaultLocal = false,
                 updatedAt = System.currentTimeMillis(),
             ),
+            // The server's catalog (model_settings.py): ovms left it on
+            // 2026-07-30 and Ollama Cloud took its place beside local Ollama.
             ProviderSettingEntity(
-                providerId = "ovms",
-                displayName = "Intel OVMS",
+                providerId = "ollama-cloud",
+                displayName = "Ollama Cloud (ollama.com)",
                 kind = "openai-compatible",
-                baseUrl = "http://127.0.0.1:8101/v3",
+                baseUrl = "https://ollama.com/v1",
                 encryptedApiKey = null,
                 publishedModelsJson = models(),
                 isEnabled = true,
@@ -1145,6 +1148,27 @@ class InkuRepository(
                 updatedAt = System.currentTimeMillis(),
             ),
         )
+    }
+
+    /**
+     * Removes a withdrawn built-in connection that is still as the catalog
+     * seeded it.
+     *
+     * The server drops a withdrawn id on the way in (`RETIRED_PROVIDER_IDS`).
+     * Here a row the author configured -- a key, or a name, address or model
+     * list of their own -- is kept as a connection of their own, key and all,
+     * and only an untouched one goes.
+     */
+    private suspend fun dropUntouchedRetiredProviders() {
+        RETIRED_BUILT_IN_PROVIDERS.forEach { retired ->
+            val existing = database.providerSettingDao().get(retired.providerId) ?: return@forEach
+            val models = parseModelIds(existing.publishedModelsJson).toSet()
+            val untouched = existing.encryptedApiKey == null &&
+                existing.displayName == retired.displayName &&
+                existing.baseUrl == retired.baseUrl &&
+                (models.isEmpty() || models == retired.seededModels)
+            if (untouched) database.providerSettingDao().deleteCustom(retired.providerId)
+        }
     }
 
     private fun normalizedPublishedModels(defaultSetting: ProviderSettingEntity, existing: ProviderSettingEntity?): String {
@@ -1164,7 +1188,6 @@ class InkuRepository(
         "anthropic" -> listOf("anthropic:claude-opus-4-7", "anthropic:claude-sonnet-4-6", "anthropic:claude-haiku-4-5-20251001")
         "gemini" -> listOf("gemini:gemini-2.5-pro", "gemini:gemini-2.5-flash", "gemini:gemini-2.5-flash-lite")
         "ollama" -> listOf("ollama:llama3.2", "ollama:gpt-oss:20b", "ollama:qwen3:8b")
-        "ovms" -> listOf("qwen3-api", "qwen-api", "gemma3-12b-api", "gemma3-4b-api")
         else -> emptyList()
     }
 
@@ -1254,3 +1277,20 @@ internal fun refinementColorSnapshot(parent: RefinementParent, plan: RefinementP
 
 /** `plugin_settings` key of the bundled plugin package switch. */
 private const val BUNDLED_PLUGIN_SETTING_KEY = "bundled:$BUNDLED_PLUGIN_PACKAGE:enabled"
+
+/** A built-in connection the server withdrew, as the catalog once seeded it. */
+private data class RetiredProvider(
+    val providerId: String,
+    val displayName: String,
+    val baseUrl: String,
+    val seededModels: Set<String>,
+)
+
+private val RETIRED_BUILT_IN_PROVIDERS = listOf(
+    RetiredProvider(
+        providerId = "ovms",
+        displayName = "Intel OVMS",
+        baseUrl = "http://127.0.0.1:8101/v3",
+        seededModels = setOf("qwen3-api", "qwen-api", "gemma3-12b-api", "gemma3-4b-api"),
+    ),
+)

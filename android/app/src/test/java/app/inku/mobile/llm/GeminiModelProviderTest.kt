@@ -24,8 +24,9 @@ class GeminiModelProviderTest {
                 temperature = 0.0,
                 maxTokens = 1024,
                 systemInstruction = "Submit JSON",
-                tool = ModelTool("submit_pipeline_response", "Submit", """{"type":"object","properties":{"normalized_ddl":{"type":"string"}},"required":["normalized_ddl"],"additionalProperties":false}"""),
+                tool = ModelTool("submit_pipeline_response", "Submit", """{"type":"object","properties":{"normalized_ddl":{"type":"string"},"schema":{"const":"v1","examples":["v1"]}},"required":["normalized_ddl"],"additionalProperties":false}"""),
                 timeoutMs = 12_345,
+                pipelineAction = "generate_normalized_ddl",
             ),
         )
         assertEquals("https://generativelanguage.googleapis.com/v1beta/models/gemma-4-31b-it:generateContent", connection.url.toString())
@@ -38,10 +39,19 @@ class GeminiModelProviderTest {
         assertEquals("Draw a circle", payload.getJSONArray("contents").getJSONObject(0).getJSONArray("parts").getJSONObject(0).getString("text"))
         assertEquals("Submit JSON", payload.getJSONObject("systemInstruction").getJSONArray("parts").getJSONObject(0).getString("text"))
         assertEquals(1024, payload.getJSONObject("generationConfig").getInt("maxOutputTokens"))
-        assertEquals("ANY", payload.getJSONObject("toolConfig").getJSONObject("functionCallingConfig").getString("mode"))
+        // Server pipeline shape: model-default sampling, minimal thinking, one allowed function.
+        assertFalse(payload.getJSONObject("generationConfig").has("temperature"))
+        assertEquals("minimal", payload.getJSONObject("generationConfig").getJSONObject("thinkingConfig").getString("thinkingLevel"))
+        val calling = payload.getJSONObject("toolConfig").getJSONObject("functionCallingConfig")
+        assertEquals("ANY", calling.getString("mode"))
+        assertEquals("submit_pipeline_response", calling.getJSONArray("allowedFunctionNames").getString(0))
         val declaration = payload.getJSONArray("tools").getJSONObject(0).getJSONArray("functionDeclarations").getJSONObject(0)
         assertEquals("submit_pipeline_response", declaration.getString("name"))
-        assertFalse(declaration.getJSONObject("parametersJsonSchema").getBoolean("additionalProperties"))
+        val schema = declaration.getJSONObject("parametersJsonSchema")
+        assertFalse(schema.getBoolean("additionalProperties"))
+        val projected = schema.getJSONObject("properties").getJSONObject("schema")
+        assertEquals("v1", projected.getJSONArray("enum").getString(0))
+        assertFalse(projected.has("const") || projected.has("examples"))
         assertEquals("circle", JSONObject(response.text).getString("normalized_ddl"))
         assertEquals(11, response.promptTokens)
         assertEquals(7, response.completionTokens)

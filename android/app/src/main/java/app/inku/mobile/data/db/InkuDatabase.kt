@@ -169,7 +169,8 @@ abstract class InkuDatabase : RoomDatabase() {
                 context.applicationContext,
                 InkuDatabase::class.java,
                 databaseName,
-            ).addMigrations(MIGRATION_10_11, MIGRATION_11_12).addCallback(FRESH_SCHEMA_CALLBACK).build()
+            ).openHelperFactory(LargeRowOpenHelperFactory())
+                .addMigrations(MIGRATION_10_11, MIGRATION_11_12).addCallback(FRESH_SCHEMA_CALLBACK).build()
         }
     }
 }

@@ -53,6 +53,7 @@ class SingleAttemptModelEffectProvider(
                             parametersJson = prompt.requiredObject("response_schema").toString(),
                         ),
                         timeoutMs = timeoutMs,
+                        pipelineAction = prompt.requiredString("action_name"),
                     ),
                 ).text
             }

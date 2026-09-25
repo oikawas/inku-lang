@@ -48,6 +48,10 @@ Androidの固定色カタログ13件はServerと同じID、色map、paletteを�
 
 Gemini provider の生成要求は Gemini API の `models/{model}:generateContent` に送る。API key は `x-goog-api-key` で渡し、共有pipelineの構造化応答は native function declaration と `functionCall.args` を使う。モデル一覧の取得だけが成功しても、生成要求の到達確認とは扱わない。
 
+共有pipelineのprovider要求はServerの`pipeline_provider.py`と同じ条件で送る。Geminiではtemperatureを送らず、`thinkingConfig.thinkingLevel`を`minimal`とし、`allowedFunctionNames`で応答関数を1つに固定し、core のresponse schemaをServerと同じGemini対応subsetへ変換する（`const`は1要素の`enum`へ、hole補完の`oneOf`は平坦化する。厳密な検証は共有Rustが行う）。OpenAI互換providerではStage 1（`generate_normalized_ddl`）だけtemperature 0.3、他の要求は0.0とする。Stage 1と写生・カタログ選択の出力上限は2048、hole補完は2048とする。
+
+Room DBのcursor windowは40 MiBとする。SVGはServerと同じく12 MiBまで許され、実行状態はその描画結果を含むため、標準の約2 MBでは保存済みの行を読み戻せない。
+
 ## 2026-09-24 現行の下部操作・写真入力・作品一覧
 
 下部の半透過操作エリアには「制作」「カメラ」「作品」「連作」を置く。カメラは画面切替ではなく撮影開始の操作であり、押すと写真入力元や既存内容の上書き確認を挟まず、端末のカメラへ進む。撮影を取り消した場合は、開始前の画面と制作内容に戻す。制作画面内の従来の写真入力元選択は、Photo Pickerを使う入口として残す。

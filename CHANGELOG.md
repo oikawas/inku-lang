@@ -9,6 +9,11 @@ This file records changes chronologically. If a historical note conflicts with t
 ### 2026-09-25 — Fine and thick brush fills show brush marks that change direction (render engine 68)
 
 Fine and thick brush fills drew their marks with a vertically stretched noise filter, so in every work and shape the marks ran one way, top to bottom, and the ground showed through widely where the noise was low. Rotating the noise is not an option: resvg (server and Android images) does not carry a group rotation into feTurbulence, and the browser view would disagree. The marks are now slightly bowed band shapes, turned per fill to a seed-chosen direction within ±60° of horizontal. The gaps between bands are still painted at 0.92 in normal, so at most 8% of the ground shows and a slight unevenness reads as brush marks. Dense uses 0.96 and faint scales the whole deposit by 0.55. Each brush defines one seamless band tile per document and every fill refers to it rotated and offset, so more fills barely grow the SVG. The Compat rendering is unchanged. Stored Score meaning is unchanged; replay follows this engine.
+### 2026-09-25 — Align Android drawing requests and large-work reads with Server
+
+Android sent shared-pipeline requests to Gemini under different conditions from Server: temperature fixed at 0, no thinking level, the core JSON Schema passed unprojected, and a Stage 1 output limit of 1024. Its work plans leaned toward particular tools and combinations. Shared-pipeline requests now match Server: no temperature, `thinkingLevel: minimal`, a single allowed function, and Server's Gemini schema projection. OpenAI-compatible providers use temperature 0.3 for Stage 1 only, as Server does. The Stage 1 output limit is 2048, as on Server. On 75 evaluation descriptions drawn on a Pixel 9 with Gemma 4 31B, instruction count, mark count, and the shape/tool/color distribution closely match Server.
+
+A work whose SVG exceeded about 2 MB could be written but its execution state and history row could not be read back, so it failed only on Android. The database cursor window now fits Server's 12 MiB SVG limit and the execution state that embeds it. The Room schema and saved data are unchanged.
 
 ### 2026-09-25 — A modifier before a count phrase reaches its noun
 

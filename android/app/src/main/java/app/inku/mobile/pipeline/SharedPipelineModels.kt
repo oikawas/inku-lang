@@ -34,7 +34,8 @@ data class PipelineSketchResult(val text: String? = null, val state: String = "o
 data class PipelineModelSelection(
     val stage1ModelId: String,
     val stage2ModelId: String,
-    val stage1MaxTokens: Int = 1024,
+    // Same bound as the server manifest's `stage1_max_tokens`.
+    val stage1MaxTokens: Int = 2048,
     val holeMaxTokens: Int = 2048,
 )
 

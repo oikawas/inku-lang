@@ -1207,8 +1207,10 @@ fn mirror_body_instruction_index(score: &Score, body: &crate::MirrorBodyRef) -> 
 /// explicit grid) times the group size. This counts the same two totals, so
 /// saved legacy works stay within the limits they were drawn under.
 ///
-/// Stored anchors and groups are counted once each. Their validation and
-/// scheduling compare every pair, so they need a bound before that runs.
+/// Stored groups are counted once each, and anchors once plus once for every
+/// group that moves them: scheduling compares every pair of groups and their
+/// anchor lists (100 groups sharing 1,000 anchors took 0.55 s), so both need a
+/// bound before execution starts.
 pub fn legacy_resource_demand(score: &Score) -> Result<ResourceDemand, ResourceDimension> {
     let mut primitive_marks = 0_u64;
     let mut index = 0;
@@ -1227,10 +1229,23 @@ pub fn legacy_resource_demand(score: &Score) -> Result<ResourceDemand, ResourceD
         index = index.saturating_add(usize::try_from(group_size).unwrap_or(usize::MAX));
     }
     let count = |length: usize, dimension| u64::try_from(length).map_err(|_| dimension);
+    let anchor_moves = score
+        .transform_groups
+        .iter()
+        .map(|group| group.anchor_indices.len())
+        .chain(
+            score
+                .placement_groups
+                .iter()
+                .flat_map(|group| &group.members)
+                .map(|member| member.anchor_indices.len()),
+        )
+        .try_fold(score.anchors.len(), usize::checked_add)
+        .ok_or(ResourceDimension::AnchorInstances)?;
     Ok(ResourceDemand {
         primitive_marks,
         object_templates: count(score.instructions.len(), ResourceDimension::ObjectTemplates)?,
-        anchor_instances: count(score.anchors.len(), ResourceDimension::AnchorInstances)?,
+        anchor_instances: count(anchor_moves, ResourceDimension::AnchorInstances)?,
         transform_instances: count(
             score.transform_groups.len(),
             ResourceDimension::TransformInstances,
@@ -2130,6 +2145,33 @@ mod tests {
             relation.target_path_position,
             Some(crate::TargetPathPosition::Exact(0.625))
         );
+    }
+
+    #[test]
+    fn legacy_demand_counts_marks_like_the_python_host_and_every_anchor_move() {
+        let score: Score = serde_json::from_value(json!({
+            "version": "0.9.0",
+            "instructions": [
+                {"primitive": "circle", "center": [0.5, 0.5], "radius": 0.1,
+                 "arrangement": {"count": 3, "group_size": 2}},
+                {"primitive": "point", "center": [0.2, 0.2], "radius": 0.01},
+                {"primitive": "square", "position": [0.1, 0.1], "size": [0.1, 0.1],
+                 "arrangement": {"count": 1, "layout": "grid", "rows": 4, "cols": 5}}
+            ],
+            "anchors": [{"position": [0.5, 0.5]}, {"position": [0.1, 0.9]}],
+            "transform_groups": [
+                {"start": 0, "end": 0, "rotation_degrees": 5.0, "anchor_indices": [0, 1]},
+                {"start": 0, "end": 2, "rotation_degrees": 5.0, "anchor_indices": [0, 1]}
+            ]
+        }))
+        .unwrap();
+        let demand = legacy_resource_demand(&score).unwrap();
+        // A composite head of 3 with its member, then a 4 x 5 grid.
+        assert_eq!(demand.primitive_marks, 3 * 2 + 4 * 5);
+        assert_eq!(demand.object_templates, 3);
+        // Two anchors, each moved by two groups.
+        assert_eq!(demand.anchor_instances, 2 + 2 + 2);
+        assert_eq!(demand.transform_instances, 2);
     }
 
     #[test]

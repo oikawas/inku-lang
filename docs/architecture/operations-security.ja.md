@@ -6,7 +6,7 @@
 - passwordはsalt付きPBKDF2-SHA256。存在しないuserにもdummy hashを計算し、単純なtiming差を減らす。
 - session tokenはDBへhash保存され、clientはBearerまたは`HttpOnly` cookieで提示する。cookieは`SameSite=Lax`、secure属性は環境設定。
 - 権限グループは`admins`、`leaders`、`users`の3つで、1 userが複数に属せる。`_current_user`、`_user_manager`、`_admin_user`でrouteを保護し、guardは所属を1本の述語へ尋ねる。`role`列は所属から導出した写しとして残るが、どの判定も読まない。
-- 106 endpointのうちguardなしは理由付きallowlist 3 pathだけで、live routeをtestが列挙する。共有pipelineの`/api/pipeline/*`は各routeで`_current_user`を要求し、認証済みの利用者をexecution・variation・historyの所有者として全操作へ渡す。他人のexecutionやhistory linkは所有者の不一致で見えない。
+- 107 endpointのうちguardなしは理由付きallowlist 3 pathだけで、live routeをtestが列挙する。共有pipelineの`/api/pipeline/*`は各routeで`_current_user`を要求し、認証済みの利用者をexecution・variation・historyの所有者として全操作へ渡す。他人のexecutionやhistory linkは所有者の不一致で見えない。
 - clientはsnapshot、authority sidecar、effect結果、資源policy、`render` commandを送れない。資源上限はinstallationのmanifestと管理者設定から解決し、作品の保存済みbudgetは上げられない。保存済みScoreも自分の予算を自己申告できず、Serverが所有するhistory linkを持つ作品だけが保存policyで再演される。
 - `INKU_DEVELOPER_MODE`が有効なときだけ、要求は`developer_disable_llm_retries`（全LLM段を1回に限定）と`developer_capture_provider_io`（provider送受信の原文を記録）を指定できる。記録は送信前に作れた場合だけ送信し、URL・header・credential・接続設定・例外文を持たず、同じ所有者だけが`/api/pipeline/executions/{id}/provider-observations`で読む。developer mode外の指定は拒否する。
 - request body上限、process-wide request concurrency、render concurrencyを別々に持つ。

@@ -456,6 +456,14 @@ export interface LangPack {
 	// Prompts tab
 	promptStage1Input: string;
 	promptStage2Input: string;
+	promptStage1System: string;
+	promptStage2System: string;
+	promptLoading: string;
+	promptExpand: string;
+	promptCollapse: string;
+	promptSystemNotSent: string;
+	promptSystemNotRecorded: string;
+	promptSystemUnavailable: string;
 	promptCopy: string;
 	promptCopied: string;
 

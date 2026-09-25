@@ -6,6 +6,10 @@
 
 **本書が持つのは v2.5.0（2026-07-25、render engine 12）以降**の 36 版である。それより前は書庫にある。
 
+### 2026-09-25 — プロンプトタブに、作品が送ったシステムプロンプトを表示する
+
+生成情報のプロンプトタブに、共有pipelineへの切り替え前と同じく、Stage 1・Stage 2のシステムプロンプトをそれぞれの入力の下へ戻した。表示するのは、その作品が実際に送ったものである。以前のタブは、Pythonの層から組み立て直したpromptを送ったもののように示しており、その層と一緒に外れた。共有pipelineはシステムプロンプトを作品ごとに組み立てる。Stage 1には登録プラグイン、写生の注記、再試行時のcompilerの指摘が加わり、Stage 2にはDDLが必要とするときだけrelationの文法が加わる。そのためServerは、実行ごとに各Stageが最後に送ったシステムプロンプトを、prompt ID・digest・言語・試行番号とともに実行の保存contextへ残す。所有者だけが新しい`GET /api/pipeline/variations/{variation_id}/system-prompts`で読む（107 route）。modelを呼ばなかったStage（直接書いたDDLのStage 1、穴埋めが要らなかったStage 2）はその旨を、記録より前に描いた作品は記録が無い旨を表示する。記録はdeveloper modeに限らず、描画・retry・promptを変えない。DDL・Score・描画の版は変えない。
+
 ### 2026-09-25 — RAW trace（`include_trace`、CLIの`--trace`）を撤去する
 
 RAW traceは、Pythonの各層の中間生成物（Stage 1の生の応答、プラグイン展開後とStage 1.5のDDL、Stage 2の試行、coerce前のScore）を返すものだった。共有pipelineへの切り替えでそれらの層は無くなり、2026-09-14からfieldを受け付けたまま何も返していなかった。`/api/paint`と`/api/compose`の要求から`include_trace`を、応答から`trace`を外す。`include_trace`を送る古いclientは拒まず、fieldを無視する。CLIの`paint`・`batch`から`--trace`を外し、`<prefix>-trace.json`も書かない。層ごとの結果は応答の`compiler_outcome`・`pipeline_diagnostics`に残り、developer modeでは`developer_capture_provider_io`がproviderとの送受信の原文を記録する。API surfaceの記録、CLIリファレンス、manualもこれに合わせた。DDL・Score・描画の版は変えない。

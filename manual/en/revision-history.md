@@ -2,6 +2,10 @@
 
 This file records revisions to user and operations documents under `manual/`. See `SPEC.ja.md` for the detailed product change history.
 
+## 2026-09-25 — System prompts in the Prompts tab
+
+The Stage 1 and Stage 2 system prompts return to the provenance drawer's `Prompts` tab, so Creating Images in both languages now says three things: they are the ones actually sent when the work was drawn, they differ from work to work with the plugins, the sketch, and retries, and a stage that called no model or a work drawn before the record began says so instead.
+
 ## 2026-09-25 — Remove the CLI's `--trace`
 
 `--trace` left the CLI's `paint` and `batch`, so the Observation section of the CLI reference and the `paint --trace` section of the AI-facing reference (formerly 0.7) are removed in both languages. "Beware the silent sender" becomes 0.7. The RAW trace recorded the Python layers and had returned nothing since the switch to the shared pipeline (2026-09-14).

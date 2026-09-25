@@ -204,11 +204,11 @@ In `inku-render`, `render.rs` is the only overall orchestrator. `render_with_res
 | `lineage` | 8 | Lineage graph/group, promote, colophon | `_current_user` |
 | `render` | 8 | Variation seeds, compose, interpret, render-score/svg, paint, paint stream, vision advice | `_current_user` |
 | `feedback` | 3 | Unread words | `_current_user` |
-| `pipeline` | 12 | Canvas formats; start, read, and fork variations; execution commands; author DDL; history links and forks; DDL export of a work (with the plugin definitions it names); reading and forking older works; provider observations | `_current_user` on each route; provider observations also require developer mode |
+| `pipeline` | 13 | Canvas formats; start, read, and fork variations; the system prompts a variation sent; execution commands; author DDL; history links and forks; DDL export of a work (with the plugin definitions it names); reading and forking older works; provider observations | `_current_user` on each route; provider observations also require developer mode |
 
-Total: 106. The public allowlist contains three paths: `/health`, `/api/info`, and `/api/auth/login` (`test_route_authorization.py`). The standard is to leave out anything login does not need.
+Total: 107. The public allowlist contains three paths: `/health`, `/api/info`, and `/api/auth/login` (`test_route_authorization.py`). The standard is to leave out anything login does not need.
 
-**⚠ The per-router counts were copied by hand, and no check turns them red.** The total's source of truth is `EXPECTED_ROUTE_COUNT` (106) in `test_route_authorization.py`, and `tests/data/api-surface-baseline.json`, generated from the live app's OpenAPI, also records 106 operations.
+**⚠ The per-router counts were copied by hand, and no check turns them red.** The total's source of truth is `EXPECTED_ROUTE_COUNT` (107) in `test_route_authorization.py`, and `tests/data/api-surface-baseline.json`, generated from the live app's OpenAPI, also records 107 operations.
 
 ## Main flows
 

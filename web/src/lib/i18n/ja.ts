@@ -480,6 +480,14 @@ export const ja: LangPack = {
 
 	promptStage1Input: 'Stage 1 ユーザー入力',
 	promptStage2Input: 'Stage 2 ユーザー入力 (正規化DDL)',
+	promptStage1System: 'Stage 1 システムプロンプト',
+	promptStage2System: 'Stage 2 システムプロンプト',
+	promptLoading: '読み込み中…',
+	promptExpand: '展開',
+	promptCollapse: '折りたたむ',
+	promptSystemNotSent: 'この作品では、このStageはモデルを呼んでいません。',
+	promptSystemNotRecorded: 'この作品は、送った内容を記録する前に描かれたため、記録がありません。',
+	promptSystemUnavailable: '読み込めませんでした。',
 	promptCopy: 'コピー',
 	promptCopied: 'コピーしました',
 

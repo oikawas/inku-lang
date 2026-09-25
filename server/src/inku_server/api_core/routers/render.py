@@ -71,6 +71,11 @@ class ComposeRequest(BaseModel):
         description="Deprecated compatibility field; ignored",
     )
     include_trace: bool = Field(default=False, description="各層の RAW 中間生成物を trace として返すか (観測のみ)")
+    imported_plugins: list[dict] | None = Field(
+        default=None,
+        max_length=64,
+        description="DDL書き出し(inku.ddl-export.v1)が運ぶプラグイン定義。この新しい作品だけで使う",
+    )
     # Stage 0.5: this endpoint starts at Stage 2, so it never runs 0.5 itself.
     # A caller that already has a sketch text (a candidate, a replay) passes it
     # here and it stands in for the description everywhere the description went.

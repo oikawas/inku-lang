@@ -29,7 +29,9 @@ fn score(source: &str) -> Score {
         },
     );
     assert!(
-        compiled.holes.is_empty() && compiled.conflicts.is_empty() && compiled.blocking_diagnostics.is_empty(),
+        compiled.holes.is_empty()
+            && compiled.conflicts.is_empty()
+            && compiled.blocking_diagnostics.is_empty(),
         "{source}: {:?}; {:?}; {:?}",
         compiled.holes,
         compiled.conflicts,
@@ -67,15 +69,28 @@ fn score(source: &str) -> Score {
     .unwrap_or_else(|error| panic!("{source}: {error:?}; plan: {:?}", plan.diagnostics()));
     let delivered = materialize_selected_composition(&selected)
         .unwrap_or_else(|error| panic!("{source}: {error:?}"));
-    assert!(delivered.diagnostics.is_empty(), "{source}: {:?}", delivered.diagnostics);
-    assert!(delivered.resource_omissions.is_empty(), "{source}: {:?}", delivered.resource_omissions);
+    assert!(
+        delivered.diagnostics.is_empty(),
+        "{source}: {:?}",
+        delivered.diagnostics
+    );
+    assert!(
+        delivered.resource_omissions.is_empty(),
+        "{source}: {:?}",
+        delivered.resource_omissions
+    );
     delivered.score
 }
 
 fn assert_same_score(sources: &[&str]) {
     let expected = serde_json::to_value(score(sources[0])).unwrap();
     for source in &sources[1..] {
-        assert_eq!(serde_json::to_value(score(source)).unwrap(), expected, "{source} vs {}", sources[0]);
+        assert_eq!(
+            serde_json::to_value(score(source)).unwrap(),
+            expected,
+            "{source} vs {}",
+            sources[0]
+        );
     }
 }
 
@@ -101,5 +116,11 @@ fn a_thinness_before_a_counted_line_keeps_the_count_and_the_action() {
     let lines = score("細い三本の黒い線を引く。");
     assert_eq!(lines.instructions.len(), 1);
     assert_eq!(lines.instructions[0].color, Color::Black);
-    assert_eq!(lines.instructions[0].arrangement.as_ref().map(|arrangement| arrangement.count), Some(3));
+    assert_eq!(
+        lines.instructions[0]
+            .arrangement
+            .as_ref()
+            .map(|arrangement| arrangement.count),
+        Some(3)
+    );
 }

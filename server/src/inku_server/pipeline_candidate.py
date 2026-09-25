@@ -151,6 +151,8 @@ class PipelineBinding:
             self.resolve_palette = module.pipeline_resolve_palette
             self.render_saved = module.pipeline_render_saved
             self.resolve_macro_catalog = module.pipeline_resolve_macro_catalog
+            # Optional so an older native wheel keeps working without the explanations.
+            self.explain_plugin_diagnostics = getattr(module, "pipeline_explain_plugin_diagnostics", None)
         except (AttributeError, ImportError) as error:
             raise CandidateHostError("binding_unavailable") from error
         self.versions = json.loads(version_report())

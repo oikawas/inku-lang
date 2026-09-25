@@ -1,3 +1,4 @@
+import type { ImportedPlugin } from '$lib/features/ddl-editor/ddl-import';
 import type { DerivationKind } from '../../derivation.ts';
 import { interpretationFeedback } from '../../highlight.ts';
 import type { LangPack } from '../../i18n/types.ts';
@@ -88,6 +89,8 @@ export type PaintResult = {
 };
 
 export type PaintOptions = {
+	/** Plugin definitions from an imported DDL export, for a new work only. */
+	importedPlugins?: ImportedPlugin[];
 	historyInput?: string;
 	saveHistory?: boolean;
 	saveArtifacts?: boolean;

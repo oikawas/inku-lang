@@ -88,6 +88,7 @@
 		onDownloadSavedWorkSVG?: (profile: SvgProfile, snapshot: SavedWorkExportSnapshot) => void | Promise<void>;
 		onDownloadSavedWorkPNG?: (height: number, snapshot: SavedWorkExportSnapshot) => void | Promise<void>;
 		onDownloadSavedWorkCard?: (historyId: string, snapshot: SavedWorkExportSnapshot) => void | Promise<void>;
+		onDownloadSavedWorkDdl?: (snapshot: SavedWorkExportSnapshot) => void | Promise<void>;
 		onDownloadSavedWorkAnimation: (snapshot: SavedWorkExportSnapshot, settings: AnimationExportSettings, directory?: FileSystemDirectoryHandle) => void | Promise<void>;
 		onDownloadSavedWorkContactSheet: (snapshot: SavedWorkExportSnapshot, variant: SheetVariant) => void | Promise<void>;
 		onValidateSavedWorkExport: (snapshot: SavedWorkExportSnapshot) => boolean | Promise<boolean>;
@@ -149,7 +150,7 @@
 		pngTemplates = [],
 		onDownloadSavedWorkSVG,
 		onDownloadSavedWorkPNG,
-		onDownloadSavedWorkCard,
+		onDownloadSavedWorkCard, onDownloadSavedWorkDdl,
 		onDownloadSavedWorkAnimation,
 		onDownloadSavedWorkContactSheet,
 		onValidateSavedWorkExport,
@@ -853,6 +854,7 @@
 					onDownloadSVG={onDownloadSavedWorkSVG}
 					onDownloadPNG={onDownloadSavedWorkPNG}
 					onDownloadCard={onDownloadSavedWorkCard}
+					onDownloadDdl={onDownloadSavedWorkDdl}
 					onDownloadAnimation={onDownloadSavedWorkAnimation}
 					onDownloadContactSheet={onDownloadSavedWorkContactSheet}
 					onValidateSnapshot={onValidateSavedWorkExport}
@@ -899,6 +901,7 @@
 							onDownloadSVG={onDownloadSavedWorkSVG}
 							onDownloadPNG={onDownloadSavedWorkPNG}
 							onDownloadCard={onDownloadSavedWorkCard}
+							onDownloadDdl={onDownloadSavedWorkDdl}
 							onDownloadAnimation={onDownloadSavedWorkAnimation}
 							onDownloadContactSheet={onDownloadSavedWorkContactSheet}
 							onValidateSnapshot={onValidateSavedWorkExport}

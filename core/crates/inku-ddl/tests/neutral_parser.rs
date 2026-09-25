@@ -1251,15 +1251,10 @@ fn grammar_markers_preserve_typed_boundaries_multiword_case_and_unknowns() {
         )
         .unwrap();
         let result = parse_neutral_lexemes(&document);
-        assert!(
-            result
-                .tokens
-                .iter()
-                .all(|token| !matches!(
-                    token.kind,
-                    NeutralTokenKind::GrammarMarker(_) | NeutralTokenKind::FunctionWord
-                ))
-        );
+        assert!(result.tokens.iter().all(|token| !matches!(
+            token.kind,
+            NeutralTokenKind::GrammarMarker(_) | NeutralTokenKind::FunctionWord
+        )));
         assert_eq!(result.diagnostics.len(), 1, "{source}");
         assert_eq!(result.diagnostics[0].surface, source, "{source}");
     }
@@ -1272,15 +1267,10 @@ fn grammar_markers_preserve_typed_boundaries_multiword_case_and_unknowns() {
         )
         .unwrap();
         let result = parse_neutral_lexemes(&document);
-        assert!(
-            result
-                .tokens
-                .iter()
-                .all(|token| !matches!(
-                    token.kind,
-                    NeutralTokenKind::GrammarMarker(_) | NeutralTokenKind::FunctionWord
-                ))
-        );
+        assert!(result.tokens.iter().all(|token| !matches!(
+            token.kind,
+            NeutralTokenKind::GrammarMarker(_) | NeutralTokenKind::FunctionWord
+        )));
         assert!(
             result
                 .diagnostics
@@ -1300,14 +1290,24 @@ fn grammar_markers_preserve_typed_boundaries_multiword_case_and_unknowns() {
     let marker = result
         .tokens
         .iter()
-        .find(|token| matches!(token.kind, NeutralTokenKind::GrammarMarker(MarkerId::EnGroupOf)))
+        .find(|token| {
+            matches!(
+                token.kind,
+                NeutralTokenKind::GrammarMarker(MarkerId::EnGroupOf)
+            )
+        })
         .expect("the existing fixed-space multiword marker remains case-insensitive");
     assert_eq!(marker.surface, "GROUP OF");
-    assert_eq!(&source[marker.span.start_byte..marker.span.end_byte], "GROUP OF");
-    assert!(result
-        .diagnostics
-        .iter()
-        .any(|diagnostic| diagnostic.surface == "qzx"));
+    assert_eq!(
+        &source[marker.span.start_byte..marker.span.end_byte],
+        "GROUP OF"
+    );
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.surface == "qzx")
+    );
 
     let embedded = NormalizedDdlDocument::new(
         "xgroup ofy".to_owned(),
@@ -1316,7 +1316,10 @@ fn grammar_markers_preserve_typed_boundaries_multiword_case_and_unknowns() {
     )
     .unwrap();
     assert!(parse_neutral_lexemes(&embedded).tokens.iter().all(|token| {
-        !matches!(token.kind, NeutralTokenKind::GrammarMarker(MarkerId::EnGroupOf))
+        !matches!(
+            token.kind,
+            NeutralTokenKind::GrammarMarker(MarkerId::EnGroupOf)
+        )
     }));
 }
 

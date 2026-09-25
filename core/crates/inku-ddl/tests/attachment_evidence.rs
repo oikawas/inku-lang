@@ -461,8 +461,8 @@ fn accepted_marker(
     let ClauseAtom::GrammarMarker { marker_id, span } = atom else {
         return None;
     };
-    let recognized = marker_id.language() == language
-        && marker_id.has_capability(MarkerCapability::Attachment);
+    let recognized =
+        marker_id.language() == language && marker_id.has_capability(MarkerCapability::Attachment);
     recognized.then_some(*span)
 }
 

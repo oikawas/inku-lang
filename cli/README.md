@@ -179,13 +179,13 @@ no value at all, which is not the same as carrying the defaults.
 
 ```
 usage: inku-cli [-h]
-                {login,logout,me,models,paint,batch,contact-sheet,rasterize,measure-raster,analyze,ddl-compare,vision-review,render-score,demo-instruction,history,unread-words,history-export,export-card,api,plugin,reference,version,lineage,colophon,refine,inspect,review,user,single-user,group,config}
+                {login,logout,me,models,paint,batch,contact-sheet,rasterize,measure-raster,analyze,ddl-compare,vision-review,ddl-export,render-score,demo-instruction,history,unread-words,history-export,export-card,api,plugin,reference,version,lineage,colophon,refine,inspect,review,user,single-user,group,config}
                 ...
 
 Control an inku API server from the command line
 
 positional arguments:
-  {login,logout,me,models,paint,batch,contact-sheet,rasterize,measure-raster,analyze,ddl-compare,vision-review,render-score,demo-instruction,history,unread-words,history-export,export-card,api,plugin,reference,version,lineage,colophon,refine,inspect,review,user,single-user,group,config}
+  {login,logout,me,models,paint,batch,contact-sheet,rasterize,measure-raster,analyze,ddl-compare,vision-review,ddl-export,render-score,demo-instruction,history,unread-words,history-export,export-card,api,plugin,reference,version,lineage,colophon,refine,inspect,review,user,single-user,group,config}
     login               log in and store an API session
     logout              log out and clear the stored session
     me                  show the current logged-in user
@@ -200,6 +200,9 @@ positional arguments:
     ddl-compare         compare normalized DDL artifacts side by side
     vision-review       use the configured NIM vision model as a read-only
                         visual mirror
+    ddl-export          export a saved work's DDL with the plugin definitions
+                        it names (read back with paint --input-mode ddl
+                        --file)
     render-score        render a Score JSON object without Stage 1 or Stage 2
     demo-instruction    generate one demo prompt from a seed phrase
     history             list history items
@@ -682,6 +685,28 @@ options:
                         Vision model (defaults to the CLI Vision setting)
   --model MODEL         compatibility alias for --vision-model
   --output OUTPUT, -o OUTPUT
+
+```
+
+### `inku-cli ddl-export`
+
+```
+usage: inku-cli ddl-export [-h] [--base-url BASE_URL]
+                           [--timeout-seconds TIMEOUT_SECONDS]
+                           [--output OUTPUT]
+                           work_id
+
+positional arguments:
+  work_id               the saved work (history id)
+
+options:
+  -h, --help            show this help message and exit
+  --base-url BASE_URL   inku API base URL (default: http://127.0.0.1:8100)
+  --timeout-seconds TIMEOUT_SECONDS
+                        HTTP timeout in seconds (default: 600)
+  --output OUTPUT, -o OUTPUT
+                        write the export to this file instead of standard
+                        output
 
 ```
 

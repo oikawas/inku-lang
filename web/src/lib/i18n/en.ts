@@ -60,6 +60,14 @@ export const en: LangPack = {
 	pipelineDiagnosticContinued: 'The rest of the drawing continued.',
 	pipelineDiagnosticDetails: 'Diagnostic details',
 	pipelineDiagnosticUnknown: 'Detailed diagnostic information is available.',
+	pipelinePluginDiagnostic: (reason, name, suggestion) => {
+		switch (reason) {
+			case 'plugin_disabled': return `The plugin ${name} is disabled, so this sentence was not drawn. Enable it to draw it.`;
+			case 'plugin_name_mismatch': return `${name} does not match an installed plugin, so this sentence was not drawn.${suggestion ? ` Did you mean ${suggestion}?` : ''}`;
+			case 'plugin_version_mismatch': return `The plugin ${name} differs from the one this work was saved with, so this sentence was not drawn.`;
+			default: return `The plugin ${name} is not installed here, so this sentence was not drawn.`;
+		}
+	},
 	pipelineDrawing: 'Drawing',
 	code: 'en',
 	label: 'English',
@@ -246,6 +254,9 @@ export const en: LangPack = {
 	ddlEditSectionLabel: 'Instruction editing',
 	ddlNewButton: 'New instructions',
 	ddlEditButton: 'Edit instructions',
+	ddlImportButton: 'Load',
+	ddlImportedPlugins: (names) => `Loaded ${names.length} plugin definition${names.length === 1 ? '' : 's'} (${names.join(', ')}), used for this work only.`,
+	ddlImportInvalid: 'Could not read this DDL file.',
 	ddlEditorInstructions: 'Instructions',
 	ddlEditorVocabulary: 'Saijiki vocabulary',
 	ddlEditorSyntaxGuideToggle: 'Quick guide',
@@ -504,6 +515,7 @@ export const en: LangPack = {
 	savedWorkExportLayerAnimation: 'Layer animation',
 	savedWorkExportTransitionAnimation: 'Transition animation',
 	savedWorkExportContactSheet: 'Review contact sheet',
+	savedWorkExportDdl: 'DDL (with plugin definitions)',
 	savedWorkExportAiContactSheet: 'AI contact sheet',
 	savedWorkExportUnavailable: 'No saved available works could be confirmed.',
 	workActionRefine: 'Refine',

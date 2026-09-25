@@ -550,11 +550,7 @@ pub fn compile_typed_ddl(
         && projection.conflicts.is_empty()
         && projection.blocking.is_empty()
     {
-        add_blocking(
-            &mut projection,
-            MISSING_CANONICAL_SEMANTIC_IDENTITY,
-            None,
-        );
+        add_blocking(&mut projection, MISSING_CANONICAL_SEMANTIC_IDENTITY, None);
     }
     sort_projection(&mut projection);
     let structured_semantic_occurrence_digest = sha256_hex(&structured_semantic_occurrence_bytes(

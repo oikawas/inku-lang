@@ -13,9 +13,12 @@ fn generation_vocabulary_separates_default_annotations_from_surface_forms() {
         let projection = saijiki_derived_projection(language).unwrap();
         assert!(!projection.prompt_block.contains(annotation));
         assert!(projection.prompt_block.contains(surface));
-        assert!(projection.reference_categories.iter().any(|category| {
-            category.words.contains(&format!("{surface}{annotation}"))
-        }));
+        assert!(
+            projection
+                .reference_categories
+                .iter()
+                .any(|category| { category.words.contains(&format!("{surface}{annotation}")) })
+        );
     }
 }
 

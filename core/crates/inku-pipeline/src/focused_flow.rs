@@ -13,8 +13,8 @@ use crate::core_boundary::{
     ResolvedPaletteColorDto, ResolvedPaletteDto,
 };
 use crate::machine::{
-    AuthoringInput, PipelineConfig, PipelineInput, PipelinePhase, PipelineSnapshot,
-    SketchRequest, SketchState, StepOutput,
+    AuthoringInput, PipelineConfig, PipelineInput, PipelinePhase, PipelineSnapshot, SketchRequest,
+    SketchState, StepOutput,
 };
 use crate::prompts::PromptLimits;
 use crate::protocol::{
@@ -436,13 +436,11 @@ fn stage1_compiler_feedback_uses_the_shared_attempt_budget() {
         matches!(state.phase, PipelinePhase::Failed { ref reason } if reason == "stage1_failed")
     );
     assert!(state.action.is_none() && state.document.is_none() && state.delivery.is_none());
-    assert!(
-        rejected_output.events.iter().any(|event| {
-            event.tag == "failed"
-                && event.payload["reason"] == "semantic_violation"
-                && event.payload["detail"] == "macro_resolution_missing_lock"
-        })
-    );
+    assert!(rejected_output.events.iter().any(|event| {
+        event.tag == "failed"
+            && event.payload["reason"] == "semantic_violation"
+            && event.payload["detail"] == "macro_resolution_missing_lock"
+    }));
     assert!(
         rejected_output
             .events
@@ -1191,14 +1189,22 @@ fn stage1_message(state: &PipelineSnapshot) -> serde_json::Value {
 #[test]
 fn a_supplementing_sketch_reaches_stage1_beside_the_description() {
     let pending = sketch_start(SketchRequest::On);
-    let output = sketch_answer(&pending, json!({"sketch": "A wide marsh under a pale winter sky."}));
+    let output = sketch_answer(
+        &pending,
+        json!({"sketch": "A wide marsh under a pale winter sky."}),
+    );
     let state = output.snapshot;
     let record = state.sketch.as_ref().unwrap();
     assert_eq!(record.state, SketchState::Supplemented);
     let message = stage1_message(&state);
     assert_eq!(message["description"], "A crane stands alone");
     assert_eq!(message["sketch"], "A wide marsh under a pale winter sky.");
-    assert!(output.events.iter().any(|event| event.tag == "sketch_ready"));
+    assert!(
+        output
+            .events
+            .iter()
+            .any(|event| event.tag == "sketch_ready")
+    );
 }
 
 #[test]
@@ -1234,7 +1240,10 @@ fn an_edited_sketch_is_used_without_a_request() {
         text: "Reeds in a row along the water.".into(),
     });
     assert_eq!(state.sketch.as_ref().unwrap().state, SketchState::Supplied);
-    assert_eq!(stage1_message(&state)["sketch"], "Reeds in a row along the water.");
+    assert_eq!(
+        stage1_message(&state)["sketch"],
+        "Reeds in a row along the water."
+    );
 }
 
 #[test]

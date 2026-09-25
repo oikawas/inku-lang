@@ -8,6 +8,8 @@
 	import { onMount, tick, untrack } from 'svelte';
 	import { pipelineDescription } from '$lib/description-labels';
 	import { highlightDDL } from '$lib/highlight';
+	import type { ImportedPlugin } from '$lib/features/ddl-editor/ddl-import';
+	import { pluginDisplayName } from '$lib/plugin-names';
 	import { pluginWarningsToShow } from '$lib/plugin-names';
 	import { limitNotesToShow } from '$lib/limitNotes';
 	import { hydrateSaijiki, hydrateSaijikiEn } from '$lib/saijiki';
@@ -151,6 +153,7 @@
 
 	type PluginEntry = {
 		qualified_name: string;
+		aliases?: string[];
 		surface_ja: string[];
 		surface_en: string[];
 		note_ja: string;
@@ -425,6 +428,7 @@
 	 */
 	function pluginPreview(entry: {
 		qualified_name: string;
+		aliases?: string[];
 		note_ja: string;
 		note_en: string;
 		fires_on_ja?: string[];
@@ -438,7 +442,7 @@
 		const firesOn = (wordLang === 'ja' ? entry.fires_on_ja : entry.fires_on_en) ?? [];
 		return {
 			categoryKey: 'plugin',
-			word: entry.qualified_name,
+			word: pluginDisplayName(entry, wordLang),
 			canonicalWord: entry.qualified_name,
 			effect: (uiLang === 'ja' ? entry.note_ja : entry.note_en) || '',
 			example: firesOn[0] ?? '',
@@ -1613,13 +1617,14 @@ async function drawLineageDdlEdit(node: LineageNode, editedDdl: string, signal?:
 }
 
 // Draw a standalone artwork authored directly in DDL (no instruction, no parent).
-async function drawNewDdl(rawDdl: string, signal?: AbortSignal): Promise<void> {
+async function drawNewDdl(rawDdl: string, signal?: AbortSignal, importedPlugins?: ImportedPlugin[]): Promise<void> {
 	const nextDdl = rawDdl.trim();
 	if (!nextDdl) return;
 	work.beginNewAuthoring();
 	await work.authorDdl(nextDdl, {
 		canvasAspectId: effectiveCanvasAspectId(),
 		displayLabel: 'DDL',
+		...(importedPlugins?.length ? { importedPlugins } : {}),
 	}, signal);
 }
 
@@ -1708,13 +1713,13 @@ async function selectDdlDialogDrawingModel(provider: Provider, model: string): P
 	await persistModelSelection();
 }
 
-async function handleDdlDialogDraw(nextDdl: string, signal?: AbortSignal): Promise<void> {
+async function handleDdlDialogDraw(nextDdl: string, signal?: AbortSignal, importedPlugins?: ImportedPlugin[]): Promise<void> {
 	if (ddlDialogDrawing) return;
 	ddlDialogDrawing = true;
 	ddlDialogError = null;
 	try {
 		if (ddlDialogMode === 'edit' && ddlDialogNode) await drawLineageDdlEdit(ddlDialogNode, nextDdl, signal);
-		else await drawNewDdl(nextDdl, signal);
+		else await drawNewDdl(nextDdl, signal, importedPlugins);
 		ddlDialogOpen = false;
 	} catch (cause) {
 		// Aborted by the dialog stop button: keep the dialog open, no error.
@@ -3276,6 +3281,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			onDownloadSavedWorkSVG={savedWorkExportActions.onDownloadSVG}
 			onDownloadSavedWorkPNG={savedWorkExportActions.onDownloadPNG}
 			onDownloadSavedWorkCard={savedWorkExportActions.onDownloadCard}
+			onDownloadSavedWorkDdl={savedWorkExportActions.onDownloadDdl}
 			onDownloadSavedWorkAnimation={savedWorkExportActions.onDownloadAnimation}
 			onDownloadSavedWorkContactSheet={savedWorkExportActions.onDownloadContactSheet}
 			onValidateSavedWorkExport={savedWorkExportActions.onValidateSnapshot}

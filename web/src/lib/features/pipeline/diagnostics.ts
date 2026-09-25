@@ -1,6 +1,6 @@
 import type { LangPack } from '../../i18n/types.ts';
 
-export type PipelineDiagnosticChannel = 'upstream' | 'downstream' | 'resource' | 'relation' | 'render' | 'catalog';
+export type PipelineDiagnosticChannel = 'plugin' | 'upstream' | 'downstream' | 'resource' | 'relation' | 'render' | 'catalog';
 
 export type PipelineDiagnostic = {
 	channel: PipelineDiagnosticChannel;
@@ -14,6 +14,16 @@ export type PipelineHistoryDiagnostics = {
 	relation_omissions: unknown[];
 	render_diagnostics: Record<string, unknown> | null;
 	resource_execution: Record<string, unknown> | null;
+	plugin_diagnostics?: PluginDiagnostic[];
+};
+
+/** Why a plugin sentence was not drawn, from the shared explainer. */
+export type PluginDiagnostic = {
+	name: string;
+	reason: 'plugin_not_installed' | 'plugin_disabled' | 'plugin_name_mismatch' | 'plugin_version_mismatch';
+	suggestion?: string;
+	start_byte: number;
+	end_byte: number;
 };
 
 type JsonObject = Record<string, unknown>;
@@ -117,6 +127,10 @@ export function formatPipelineDiagnostic(
 ): string {
 	const value = object(diagnostic.value);
 	if (!value) return strings.pipelineDiagnosticUnknown;
+	if (diagnostic.channel === 'plugin') {
+		const plugin = value as PluginDiagnostic;
+		return strings.pipelinePluginDiagnostic(plugin.reason, plugin.name, plugin.suggestion ?? null);
+	}
 	if (diagnostic.channel === 'catalog') {
 		const name = typeof value.qualified_name === 'string' ? `${value.qualified_name}: ` : '';
 		return name + strings.pipelineDiagnosticReason(reasonOf(value));

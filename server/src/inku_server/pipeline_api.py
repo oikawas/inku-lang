@@ -358,6 +358,28 @@ class PipelineService:
         work = self.legacy(owner, history_id)
         return self.start(owner, kind, text, parent={"kind": "legacy_history", "id": history_id}, source_work=work, **choices)
 
+    def ddl_export(self, owner: str, history_id: str) -> dict:
+        """The work's visible DDL with the plugin definitions it names."""
+        from .api_core.common import _build_number
+        from .ddl_export import build_ddl_export
+
+        try:
+            linked = self.store.read_linked_history(owner, history_id)
+        except VariationAuthorityAdapterError:
+            linked = None
+        history = linked.history if linked is not None else self.store.read_legacy_history(owner, history_id)
+        if history is None:
+            raise HTTPException(404, "history_not_found")
+        config = linked.saved_config if linked is not None else {}
+        language = history.metadata.get("instruction_lang_resolved") or config.get("language") or "ja"
+        return build_ddl_export(
+            history.source or "",
+            str(language),
+            config.get("definitions") or [],
+            config.get("macro_summaries") or [],
+            {"build_number": _build_number(), "render_engine_version": history.metadata.get("render_engine_version")},
+        )
+
     def fork_description(self, owner: str, variation_id: str, body: ForkDescriptionBody) -> dict:
         previous = self.get(owner, variation_id)
         if previous["authority"]["revision"] != body.expected_revision:
@@ -414,6 +436,10 @@ def pipeline_router(service: PipelineService | Callable[[], PipelineService], ac
         if link is None:
             raise HTTPException(404, "pipeline_history_not_found")
         return link
+
+    @router.get("/history/{history_id}/ddl-export")
+    def ddl_export(history_id: str, actor: dict = Depends(actor_dependency)):
+        return current_service().ddl_export(actor["id"], history_id)
 
     @router.post("/history/{history_id}/fork")
     def fork_linked_history(

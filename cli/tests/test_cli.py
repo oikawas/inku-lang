@@ -3328,3 +3328,17 @@ def test_a_non_display_export_names_the_work_it_is_exporting(monkeypatch):
     unsaved = {"score": {"instructions": []}, "svg": "<svg><title>display</title></svg>"}
     cli._result_with_svg_profile(client, unsaved, svg_profile="editable", color_catalog="default")
     assert "work_id" not in client.calls[0][2]
+
+
+def test_a_ddl_export_file_gives_its_ddl_and_plugins_and_plain_text_stays_ddl():
+    from inku_cli import cli as module
+
+    definition = {"schema": "inku.macro-definition.v1", "namespace": "Nature", "heading": "若葉"}
+    exported = json.dumps({"schema": "inku.ddl-export.v1", "language": "ja", "ddl": "Nature.若葉。",
+                           "plugins": [{"definition": definition, "summary": "若葉"}]}, ensure_ascii=False)
+    assert module._read_ddl_export(exported) == ("Nature.若葉。", [{"definition": definition, "summary": "若葉"}])
+    assert module._read_ddl_export("中央に赤い円を置く。") == ("中央に赤い円を置く。", [])
+    with pytest.raises(module.CliError):
+        module._read_ddl_export(json.dumps({"schema": "inku.ddl-export.v1", "ddl": "x", "plugins": [{}]}))
+    parsed = module.build_parser().parse_args(["ddl-export", "work-1", "-o", "out.json"])
+    assert (parsed.work_id, parsed.output) == ("work-1", "out.json")

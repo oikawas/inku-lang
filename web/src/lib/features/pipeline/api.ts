@@ -1,7 +1,8 @@
 import type { CanvasAspectId } from '$lib/plugins/system/canvas-aspect';
 import type { PaintResult } from '$lib/features/run/current-work';
 import type { ApiFetch } from '$lib/transport/api-fetch';
-import type { PipelineDiagnostic, PipelineHistoryDiagnostics } from './diagnostics';
+import type { PipelineDiagnostic, PipelineHistoryDiagnostics, PluginDiagnostic } from './diagnostics';
+import type { ImportedPlugin } from '../ddl-editor/ddl-import';
 
 export type PipelineAuthority = {
 	revision: string;
@@ -21,6 +22,7 @@ export type PipelineResult = PaintResult & {
 	thinking?: string | null;
 	render_diagnostics?: Record<string, unknown> | null;
 	resource_execution?: Record<string, unknown> | null;
+	pipeline_diagnostics?: { plugin_diagnostics?: PluginDiagnostic[] } | null;
 };
 
 export type PipelineView = {
@@ -45,6 +47,7 @@ export type PipelineView = {
 };
 
 export type PipelineOptions = {
+	imported_plugins?: ImportedPlugin[];
 	sketch?: 'off' | 'on';
 	sketch_text?: string;
 	stage1_model?: string;
@@ -196,9 +199,16 @@ export function pipelineDiagnostics(
 		const value = record?.[field];
 		return Array.isArray(value) ? value : [];
 	};
+	const plugins = (view ? view.result?.pipeline_diagnostics?.plugin_diagnostics : saved?.plugin_diagnostics) ?? [];
+	// A plugin sentence's explanation replaces the compiler's generic entry for the same source range.
+	const explained = (value: unknown) => {
+		const span = (value as { span?: { start_byte?: unknown; end_byte?: unknown } } | null)?.span;
+		return plugins.some((plugin) => plugin.start_byte === span?.start_byte && plugin.end_byte === span?.end_byte);
+	};
 	return [
+		...plugins.map((value) => ({ channel: 'plugin' as const, value })),
 		...catalog,
-		...(delivery?.upstream_diagnostics ?? []).map((value) => ({ channel: 'upstream' as const, value })),
+		...(delivery?.upstream_diagnostics ?? []).filter((value) => !explained(value)).map((value) => ({ channel: 'upstream' as const, value })),
 		...(delivery?.downstream_diagnostics ?? []).map((value) => ({ channel: 'downstream' as const, value })),
 		...(delivery?.resource_omissions ?? []).map((value) => ({ channel: 'resource' as const, value })),
 		...(delivery?.relation_omissions ?? []).map((value) => ({ channel: 'relation' as const, value })),

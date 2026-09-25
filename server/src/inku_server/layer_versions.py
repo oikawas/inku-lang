@@ -293,7 +293,12 @@
 # performance and no longer carries a hidden flat base fill.
 # 47: A Japanese modifier before a count phrase reaches the same head as one
 # after it, so `大きな四つの円` and `細い三本の線` keep their count and action.
-DDL_ENGINE_VERSION = "47"
+# 48: Bundled Nature.leaves 1.1.0 follows each word's image: curled withered
+# leaves instead of cloudforms, upward young leaves, iris-sword undergrowth,
+# leaves growing along the summer branch, a maple palm, a scattered drift of
+# fallen leaves gathering low, and tall withered grass. Saved 1.0 locks keep
+# their meaning.
+DDL_ENGINE_VERSION = "48"
 # 4 (2026-07-30): yellow, orange, and purple become abstract Score colors, and
 # coerce recognizes the corresponding Japanese and English DDL markers.
 # 3 (2026-07-30): 黄 / 橙 / 紫 joined the saijiki color words, so an author can write
@@ -316,4 +321,6 @@ DDL_ENGINE_VERSION = "47"
 # it no longer collides with relative size large in one phrase.
 # 13 (2026-09-25): A Japanese modifier may stand before a count phrase
 # (`大きな四つの円`, `細い三本の黒い線`) as well as after it.
-DDL_VERSION = "13"
+# 14 (2026-09-25): A plugin may be invoked by an alias its definition
+# declares, such as `Nature.若葉` beside the canonical `Nature.YoungLeaves`.
+DDL_VERSION = "14"

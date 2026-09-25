@@ -8,6 +8,7 @@
 	import { restoreWorkActionFocus } from './WorkActionMenu.svelte';
 	import type { Provider, ProviderGroup } from '$lib/models';
 	import type { PluginEntry, PreviewForPlugin, PreviewForWord } from '$lib/features/ddl-editor/types';
+	import { parseDdlImport, type ImportedPlugin } from '$lib/features/ddl-editor/ddl-import';
 
 	type Props = {
 		open: boolean;
@@ -29,7 +30,8 @@
 		wildValue?: boolean;
 		wildInherited?: boolean;
 		onSelectWild?: (value: boolean) => void;
-		onDraw: (ddl: string, signal?: AbortSignal) => void | Promise<void>;
+		/** Imported plugin definitions travel only with a new work. */
+		onDraw: (ddl: string, signal?: AbortSignal, importedPlugins?: ImportedPlugin[]) => void | Promise<void>;
 		onClose: () => void;
 	};
 
@@ -41,6 +43,26 @@
 	}: Props = $props();
 
 	let value = $state('');
+	let importedPlugins = $state<ImportedPlugin[]>([]);
+	let importedNames = $state<string[]>([]);
+	let importError = $state<string | null>(null);
+	let importInput = $state<HTMLInputElement>();
+
+	async function importFile(event: Event): Promise<void> {
+		const input = event.currentTarget as HTMLInputElement;
+		const file = input.files?.[0];
+		input.value = '';
+		if (!file) return;
+		importError = null;
+		try {
+			const read = parseDdlImport(await file.text());
+			value = read.ddl;
+			importedPlugins = read.plugins;
+			importedNames = read.names;
+		} catch {
+			importError = t().ddlImportInvalid;
+		}
+	}
 	let editor = $state<DdlEditor>();
 	let dialogEl = $state<HTMLDivElement>();
 	let lastOpen = false;
@@ -65,6 +87,9 @@
 		if (open && !lastOpen) {
 			fallbackFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
 			value = initialDdl;
+			importedPlugins = [];
+			importedNames = [];
+			importError = null;
 			void tick().then(() => editor?.focus());
 		} else if (!open && lastOpen) {
 			restoreFocus();
@@ -88,7 +113,7 @@
 		if (drawing || drawController || !value.trim()) return;
 		drawController = new AbortController();
 		try {
-			await onDraw(value, drawController.signal);
+			await onDraw(value, drawController.signal, mode === 'new' && importedPlugins.length ? importedPlugins : undefined);
 		} finally {
 			drawController = null;
 		}
@@ -143,6 +168,14 @@
 				<div class="ddled-model">
 					<ModelCardPicker label={t().ddlDialogDrawingModel} selectedModel={drawingModelId} providerGroups={drawingModelGroups} disabled={drawing} onSelect={onSelectDrawingModel} />
 				</div>
+				{#if mode === 'new'}
+					<div class="ddled-import" inert={drawing}>
+						<input bind:this={importInput} type="file" accept=".json,.txt,.ddl,application/json,text/plain" hidden onchange={(event) => void importFile(event)} />
+						<button type="button" onclick={() => importInput?.click()}>{t().ddlImportButton}</button>
+						{#if importedNames.length}<span class="ddled-import-note" role="status">{t().ddlImportedPlugins(importedNames)}</span>{/if}
+						{#if importError}<span class="ddled-error" role="alert">{importError}</span>{/if}
+					</div>
+				{/if}
 				{#if mode === 'edit' && onSelectWild}
 					<div class="ddled-settings" inert={drawing}>
 						<WildToggle value={wildValue} {isJapanese} inherited={wildInherited} onSelect={onSelectWild} />
@@ -182,6 +215,9 @@
 	.ddled-conditions { display: flex; align-items: center; gap: 18px; min-width: 0; flex: 1; }
 	.ddled-model { flex: 1; min-width: 0; max-width: 520px; }
 	.ddled-settings { min-width: 0; }
+	.ddled-import { display: flex; align-items: center; gap: 8px; min-width: 0; }
+	.ddled-import button { border: 1px solid var(--border2); border-radius: var(--btn-sm-radius); padding: 6px 12px; background: var(--panel); color: var(--fg2); font: inherit; font-size: var(--btn-sm-font-size); cursor: pointer; white-space: nowrap; }
+	.ddled-import-note { color: var(--fg3); font-size: var(--ui-font-size-12); line-height: 1.4; }
 	.ddled-settings[inert] { opacity: .5; }
 	.ddled-foot { display: flex; flex-direction: column; gap: 8px; min-width: 0; max-width: 44%; }
 	.ddled-error { max-height: 80px; overflow: auto; color: var(--danger); font-size: var(--ui-font-size-12); overflow-wrap: anywhere; }

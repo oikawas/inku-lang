@@ -4,8 +4,8 @@ use inku_ddl::{
     MacroLock, NormalizedDdlDocument, ResolvedInstructionLanguage, ScoreDiagnosticDisposition,
     ScoreErrorPolicy, ScoreFieldGap, ScoreInstructionField, ScoreInstructionOrigin,
     ScoreLoweringContext, ScoreLoweringOutcome, ScoreOmissionUnit, SemanticPreviousReference,
-    SemanticRelationKind, compile_ddl_to_score, compile_typed_ddl,
-    map_compiler_render_execution, saijiki_asset, stage15_transformation_input,
+    SemanticRelationKind, compile_ddl_to_score, compile_typed_ddl, map_compiler_render_execution,
+    saijiki_asset, stage15_transformation_input,
 };
 use inku_render::checked_performance::resolve_checked_performance;
 use inku_render::performance::PerformanceRequest;
@@ -597,7 +597,10 @@ fn touching_explicit_facts_and_omission_chain_keep_original_dependencies() {
             reason
         );
         let plan = perform(score, ScoreErrorPolicy::OmitAndContinue).unwrap();
-        assert_eq!(stopped.original_instruction_indices, plan.original_instruction_indices);
+        assert_eq!(
+            stopped.original_instruction_indices,
+            plan.original_instruction_indices
+        );
         // An unsatisfiable touch removes only that relation edge; the shapes
         // and the later chain are still drawn.
         assert_eq!(plan.original_instruction_indices, [0, 1, 2, 3]);
@@ -730,7 +733,10 @@ fn touching_flat_macro_color_binding_has_same_effective_score_and_performance() 
     );
     let omitted =
         resolve_checked_performance(request(), ScoreErrorPolicy::OmitAndContinue).unwrap();
-    assert_eq!(stopped.original_instruction_indices, omitted.original_instruction_indices);
+    assert_eq!(
+        stopped.original_instruction_indices,
+        omitted.original_instruction_indices
+    );
     // The conflicting touch removes only its relation edge; all four Macro
     // emits are still drawn.
     assert_eq!(omitted.original_instruction_indices, [0, 1, 2, 3]);
@@ -819,8 +825,7 @@ fn declared_normal_scale_is_fixed_for_touching_and_preserves_omission_owner() {
         if first_scale == "normal" {
             assert!(resolve_checked_performance(request(), ScoreErrorPolicy::Stop).is_ok());
         } else {
-            let stopped =
-                resolve_checked_performance(request(), ScoreErrorPolicy::Stop).unwrap();
+            let stopped = resolve_checked_performance(request(), ScoreErrorPolicy::Stop).unwrap();
             assert_eq!(
                 stopped.execution.as_ref().unwrap().diagnostics[0].reason,
                 ScoreExecutionReason::TouchingGeometryConflict
@@ -1531,10 +1536,15 @@ fn ja_unknown_fragment_and_unsupported_layout_keep_line_and_count() {
             appearance_resolution: None,
         }
     );
-    let score = result.score().expect("the line body survives local omissions");
+    let score = result
+        .score()
+        .expect("the line body survives local omissions");
     assert_eq!(score.instructions.len(), 1);
     assert_eq!(score.instructions[0].primitive, Primitive::Line);
-    assert_eq!(score.instructions[0].arrangement.as_ref().unwrap().count, 10);
+    assert_eq!(
+        score.instructions[0].arrangement.as_ref().unwrap().count,
+        10
+    );
 }
 
 #[test]

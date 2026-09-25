@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { getLang, t } from '$lib/i18n/index.svelte';
+	import { pluginDisplayName } from '$lib/plugin-names';
 	import { SAIJIKI, saijikiWordsFor } from '$lib/saijiki';
 	import type { ResolvedInstructionLang } from '$lib/instructionLang';
 	import type { PluginEntry, PreviewForPlugin, PreviewForWord, SaijikiPreview } from '$lib/features/ddl-editor/types';
@@ -75,10 +76,10 @@
 									class="saijiki-chip plugin-chip"
 									{disabled}
 									onpointerdown={(e) => e.preventDefault()}
-									onclick={() => onInsertWord(entry.qualified_name)}
+									onclick={() => onInsertWord(pluginDisplayName(entry, wordLang))}
 									onpointerenter={() => (activePreview = previewForPlugin(entry, wordLang))}
 									onfocus={() => (activePreview = previewForPlugin(entry, wordLang))}
-								>{entry.qualified_name}</button>
+								>{pluginDisplayName(entry, wordLang)}</button>
 							{/each}
 						</div>
 					</div>

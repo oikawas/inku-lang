@@ -1,9 +1,8 @@
 //! Source-preserving English determiner and noun-phrase candidate evidence.
 
 use crate::{
-    ClauseAtom, ClauseSegment, ClauseStream, ClauseStreamError, CoreRoleKind,
-    MarkerCapability, MarkerId, NormalizedDdlDocument, ResolvedInstructionLanguage, SourceSpan,
-    parse_clause_stream,
+    ClauseAtom, ClauseSegment, ClauseStream, ClauseStreamError, CoreRoleKind, MarkerCapability,
+    MarkerId, NormalizedDdlDocument, ResolvedInstructionLanguage, SourceSpan, parse_clause_stream,
 };
 
 /// Stable identity for the runtime-disconnected English noun-phrase evidence foundation.

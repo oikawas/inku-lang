@@ -71,8 +71,10 @@ def test_the_list_api_carries_the_firing_phrases():
     for entry in entries.values():
         assert isinstance(entry.get("fires_on_ja"), list), entry
         assert isinstance(entry.get("fires_on_en"), list), entry
-    undergrowth = entries.get("Nature.下草")
+    undergrowth = entries.get("Nature.Undergrowth")
     assert undergrowth is not None, sorted(entries)
+    # The English heading is canonical; the Japanese name travels as its alias.
+    assert undergrowth["aliases"] == ["Nature.下草"], undergrowth
     assert "菖蒲" in undergrowth["fires_on_ja"], undergrowth["fires_on_ja"]
     assert undergrowth["fires_on_en"], undergrowth
 
@@ -81,7 +83,7 @@ def test_the_editors_own_list_carries_them_too():
     """The editor hydrates from /api/saijiki, not /api/plugins."""
     headers = _auth()
     entries = _by_name(_saijiki_entries(headers))
-    undergrowth = entries.get("Nature.下草")
+    undergrowth = entries.get("Nature.Undergrowth")
     assert undergrowth is not None, sorted(entries)
     assert "菖蒲" in undergrowth["fires_on_ja"], undergrowth["fires_on_ja"]
 

@@ -60,6 +60,14 @@ export const ja: LangPack = {
 	pipelineDiagnosticContinued: 'ほかの部分の描画は続けました。',
 	pipelineDiagnosticDetails: '診断の詳細',
 	pipelineDiagnosticUnknown: '詳しい診断情報があります。',
+	pipelinePluginDiagnostic: (reason, name, suggestion) => {
+		switch (reason) {
+			case 'plugin_disabled': return `プラグイン ${name} は無効になっているため、この文は描かれていません。有効にすると描けます。`;
+			case 'plugin_name_mismatch': return `プラグイン ${name} は登録名と一致しないため、この文は描かれていません。${suggestion ? `${suggestion} のことですか。` : ''}`;
+			case 'plugin_version_mismatch': return `プラグイン ${name} の中身が作品の保存時と違うため、この文は描かれていません。`;
+			default: return `プラグイン ${name} はこの環境に登録されていないため、この文は描かれていません。`;
+		}
+	},
 	pipelineDrawing: '描画',
 	code: 'ja',
 	label: '日本語',
@@ -246,6 +254,9 @@ export const ja: LangPack = {
 	ddlEditSectionLabel: '指示書編集',
 	ddlNewButton: '指示書を新規作成',
 	ddlEditButton: '指示書を編集',
+	ddlImportButton: '読み込む',
+	ddlImportedPlugins: (names) => `プラグイン定義 ${names.length} 件（${names.join('、')}）を読み込みました。この作品だけで使います。`,
+	ddlImportInvalid: 'DDLファイルを読み込めませんでした。',
 	ddlEditorInstructions: '指示書',
 	ddlEditorVocabulary: '歳時記の語彙',
 	ddlEditorSyntaxGuideToggle: '簡易ガイド',
@@ -504,6 +515,7 @@ export const ja: LangPack = {
 	savedWorkExportLayerAnimation: 'レイヤーアニメーション',
 	savedWorkExportTransitionAnimation: '作品をつなぐアニメーション',
 	savedWorkExportContactSheet: '鑑賞用コンタクトシート',
+	savedWorkExportDdl: 'DDL（プラグイン定義付き）',
 	savedWorkExportAiContactSheet: 'AI用コンタクトシート',
 	savedWorkExportUnavailable: '保存済みの利用可能な作品を確認できませんでした。',
 	workActionRefine: '推敲する',

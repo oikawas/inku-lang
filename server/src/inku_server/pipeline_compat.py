@@ -197,6 +197,8 @@ def compose(owner: str, data: dict[str, Any]) -> dict:
     # completed author drawing. Performance is needed for its SVG projection,
     # but it must keep that accounting contract.
     options["count_generation"] = False
+    if data.get("imported_plugins"):
+        options["imported_plugins"] = data["imported_plugins"]
     view = _settled(
         owner,
         _service().start(

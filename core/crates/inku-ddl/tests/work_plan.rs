@@ -126,6 +126,8 @@ fn random_plans_inside_the_matrix_compile_cleanly_in_both_languages() {
                     .id
                     .clone()
             }),
+            // The clean-compile check runs without installed definitions.
+            plugins: Vec::new(),
             layers,
         };
         for language in [

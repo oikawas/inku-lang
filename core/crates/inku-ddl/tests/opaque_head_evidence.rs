@@ -158,7 +158,10 @@ fn typed_deliveries_holes_numbers_and_function_words_are_not_candidates() {
     );
     assert!(atoms.iter().any(|atom| matches!(
         atom,
-        ClauseAtom::GrammarMarker { marker_id: MarkerId::EnWith, .. }
+        ClauseAtom::GrammarMarker {
+            marker_id: MarkerId::EnWith,
+            ..
+        }
     )));
     assert!(atoms.iter().any(|atom| matches!(
         atom,

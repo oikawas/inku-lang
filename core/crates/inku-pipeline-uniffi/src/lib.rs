@@ -5,8 +5,10 @@ use std::panic::{AssertUnwindSafe, catch_unwind};
 use inku_pipeline::protocol::{ProtocolError, error_bytes};
 
 mod macro_catalog;
+mod plugin_diagnostics;
 
 pub use macro_catalog::resolve_macro_catalog;
+pub use plugin_diagnostics::explain_plugin_diagnostics;
 
 const BINDING_VERSION: &str = "1.1.0";
 const PROTOCOL_VERSION: &str = "1.0.0";

@@ -446,12 +446,20 @@ fn invocation_atom_matches(
     let Some(atom) = clause.atoms.get(resolved.atom_index) else {
         return false;
     };
+    let written = document
+        .source()
+        .get(resolved.span.start_byte..resolved.span.end_byte);
+    let invoked = resolved.invocation.qualified_name();
     matches!(atom, ClauseAtom::UnresolvedDiagnostic(_))
         && atom.span() == resolved.span
-        && document
-            .source()
-            .get(resolved.span.start_byte..resolved.span.end_byte)
-            == Some(resolved.invocation.qualified_name().as_str())
+        && written.is_some_and(|written| {
+            // The visible name is the canonical name or an alias of its lock.
+            written == invoked
+                || document.macro_locks().iter().any(|macro_lock| {
+                    macro_lock.qualified_name() == invoked
+                        && macro_lock.aliases().iter().any(|alias| alias == written)
+                })
+        })
 }
 
 fn clause_facts(

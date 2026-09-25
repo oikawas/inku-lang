@@ -15,6 +15,8 @@ pub struct MacroLock {
     qualified_name: String,
     version: String,
     digest: String,
+    /// Other visible names of the same locked definition (`Namespace.Alias`).
+    aliases: Vec<String>,
 }
 
 impl MacroLock {
@@ -41,11 +43,35 @@ impl MacroLock {
             qualified_name,
             version,
             digest,
+            aliases: Vec::new(),
         })
+    }
+
+    /// The same lock, also invoked in visible DDL by these qualified aliases.
+    pub fn with_aliases(
+        mut self,
+        aliases: impl IntoIterator<Item = String>,
+    ) -> Result<Self, DdlDocumentDiagnostic> {
+        for alias in aliases {
+            validate_qualified_name(&alias)?;
+            if alias != self.qualified_name && !self.aliases.contains(&alias) {
+                self.aliases.push(alias);
+            }
+        }
+        Ok(self)
     }
 
     pub fn qualified_name(&self) -> &str {
         &self.qualified_name
+    }
+
+    pub fn aliases(&self) -> &[String] {
+        &self.aliases
+    }
+
+    /// Every visible name that invokes this lock: the canonical name first.
+    pub fn visible_names(&self) -> impl Iterator<Item = &str> {
+        std::iter::once(self.qualified_name.as_str()).chain(self.aliases.iter().map(String::as_str))
     }
 
     pub fn version(&self) -> &str {

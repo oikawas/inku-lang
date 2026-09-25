@@ -69,7 +69,78 @@ def _installed_candidates() -> tuple[list[dict[str, str]], list[str]]:
     return candidates, bundled_packages
 
 
-def resolve_new_work_macro_catalog(binding: object, pipeline_config: Mapping[str, Any]) -> dict[str, Any]:
+def _imported_candidates(imported: Sequence[Mapping[str, Any]]) -> list[dict[str, str]]:
+    return [
+        {
+            "source_id": f"imported:{index}",
+            "definition_json": json.dumps(item["definition"], ensure_ascii=False, allow_nan=False, separators=(",", ":")),
+            # Stage 1 requires a summary; an export without one still names the plugin.
+            "summary": str(item.get("summary") or "").strip()
+            or f"{item['definition'].get('namespace')}.{item['definition'].get('heading')}",
+        }
+        for index, item in enumerate(imported)
+    ]
+
+
+def _resolve(binding: object, maximum_entries: int, canonical: list, legacy: list, bundled: list, language: str) -> dict:
+    output = json.loads(
+        binding.resolve_macro_catalog(
+            _bytes(
+                {
+                    "maximum_entries": maximum_entries,
+                    "canonical": canonical,
+                    "legacy": legacy,
+                    "bundled_packages": bundled,
+                    "language": language,
+                }
+            )
+        )
+    )
+    if output.get("schema") != "inku.macro-catalog-resolution.v1" or "error" in output:
+        raise CandidateHostError(output.get("error", "invalid_macro_catalog_output"))
+    if not all(isinstance(output.get(key), list) for key in ("entries", "locks", "diagnostics")):
+        raise CandidateHostError("invalid_macro_catalog_output")
+    return output
+
+
+def _with_imported(
+    binding: object, maximum_entries: int, installed: list, legacy: list, bundled: list, language: str,
+    imported: Sequence[Mapping[str, Any]],
+) -> dict:
+    """Resolve imported definitions ahead of the installed ones.
+
+    An imported definition wins its name for this work. The installed edition it
+    shadows is not an error: identical content is silent, a different one or a
+    name this server lacks is reported so the author knows which was used.
+    """
+    base = _resolve(binding, maximum_entries, installed, legacy, bundled, language)
+    installed_digests = {entry["qualified_name"]: entry["digest"] for entry in base["entries"]}
+    output = _resolve(binding, maximum_entries, _imported_candidates(imported) + installed, legacy, bundled, language)
+    imported_names = {
+        entry["qualified_name"]: entry["digest"]
+        for entry in output["entries"]
+        if str(entry.get("source_id", "")).startswith("imported:")
+    }
+    diagnostics = [
+        item for item in output["diagnostics"]
+        if not (item.get("reason") == "duplicate_qualified_name" and item.get("qualified_name") in imported_names
+                and not str(item.get("source_id", "")).startswith("imported:"))
+    ]
+    for name, digest in sorted(imported_names.items()):
+        if name not in installed_digests:
+            reason = "imported_plugin_not_installed"
+        elif installed_digests[name] != digest:
+            reason = "imported_plugin_differs_from_installed"
+        else:
+            continue
+        diagnostics.append({"source_id": "imported", "qualified_name": name, "disposition": "used",
+                            "reason": reason, "warnings": [], "findings": []})
+    return {**output, "diagnostics": diagnostics}
+
+
+def resolve_new_work_macro_catalog(
+    binding: object, pipeline_config: Mapping[str, Any], imported: Sequence[Mapping[str, Any]] = ()
+) -> dict[str, Any]:
     """Resolve current installed definitions for a new work only.
 
     Saved configs already contain their exact definitions and must bypass this
@@ -93,29 +164,72 @@ def resolve_new_work_macro_catalog(binding: object, pipeline_config: Mapping[str
     if not isinstance(summaries, Sequence) or isinstance(summaries, (str, bytes)):
         raise CandidateHostError("invalid_macro_catalog_source")
     legacy, bundled_packages = _installed_candidates()
-    output = json.loads(
-        resolver(
-            _bytes(
-                {
-                    "maximum_entries": maximum_entries,
-                    "canonical": _canonical_candidates(definitions, summaries),
-                    "legacy": legacy,
-                    "bundled_packages": bundled_packages,
-                    "language": pipeline_config.get("language", "en"),
-                }
-            )
-        )
-    )
-    if output.get("schema") != "inku.macro-catalog-resolution.v1" or "error" in output:
-        raise CandidateHostError(output.get("error", "invalid_macro_catalog_output"))
-    entries = output.get("entries")
-    locks = output.get("locks")
-    diagnostics = output.get("diagnostics")
-    if not isinstance(entries, list) or not isinstance(locks, list) or not isinstance(diagnostics, list):
-        raise CandidateHostError("invalid_macro_catalog_output")
+    language = pipeline_config.get("language", "en")
+    installed = _canonical_candidates(definitions, summaries)
+    if imported:
+        output = _with_imported(binding, maximum_entries, installed, legacy, bundled_packages, language, imported)
+    else:
+        output = _resolve(binding, maximum_entries, installed, legacy, bundled_packages, language)
+    entries, locks, diagnostics = output["entries"], output["locks"], output["diagnostics"]
     return {
         "definitions": [entry["definition"] for entry in entries],
         "macro_summaries": [entry["summary"] for entry in entries],
         "definition_locks": locks,
         "diagnostics": diagnostics,
     }
+
+
+def _installed_plugin_names() -> tuple[list[str], list[str]]:
+    """Qualified names of enabled and of installed-but-disabled plugin documents."""
+    from .plugins.document_format import PluginFormatError, parse_plugin_document
+
+    enabled = sorted(
+        name
+        for document in DOCUMENT_PLUGIN_MANAGER.documents()
+        for entry in document.entries
+        for name in entry.visible_qualified_names(document.manifest.namespace)
+    )
+    disabled = []
+    for item in DOCUMENT_PLUGIN_MANAGER.items():
+        if item.enabled:
+            continue
+        try:
+            document = parse_plugin_document(
+                (DOCUMENT_PLUGIN_MANAGER.directory / item.path).read_text(encoding="utf-8"),
+                source_path=item.path,
+            )
+        except (OSError, PluginFormatError):
+            continue
+        disabled.extend(
+            name for entry in document.entries for name in entry.visible_qualified_names(document.manifest.namespace)
+        )
+    return enabled, sorted(disabled)
+
+
+def explain_plugin_diagnostics(
+    binding: object, source: str, upstream_diagnostics: Sequence[Any], work_plugins: Sequence[str] = ()
+) -> list[dict[str, Any]]:
+    """Author-facing reasons for plugin sentences the compiler withheld.
+
+    `work_plugins` are the names this work could use (its saved or imported
+    definitions); they count as enabled even when this server lacks them.
+    An older native wheel without the shared explainer yields no reasons.
+    """
+    explainer = getattr(binding, "explain_plugin_diagnostics", None)
+    if explainer is None or not upstream_diagnostics:
+        return []
+    enabled, disabled = _installed_plugin_names()
+    output = json.loads(
+        explainer(
+            _bytes(
+                {
+                    "source": source,
+                    "upstream_diagnostics": list(upstream_diagnostics),
+                    "enabled": sorted(set(enabled) | set(work_plugins)),
+                    "disabled": disabled,
+                }
+            )
+        )
+    )
+    plugins = output.get("plugins")
+    return plugins if output.get("schema") == "inku.plugin-diagnostics.v1" and isinstance(plugins, list) else []

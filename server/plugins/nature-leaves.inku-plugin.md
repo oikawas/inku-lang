@@ -1,7 +1,7 @@
 ---
 namespace: Nature
 name: leaves
-version: 0.3.0
+version: 2.0.0
 authors: [Shinichiro Oikawa]
 languages: [ja, en]
 license: MIT
@@ -9,8 +9,9 @@ description_ja: 葉の季語群。若葉から枯葉まで、一年の葉の身�
 description_en: Season words of leaves — seven gestures of a leaf's year. Fallen leaves know down; undergrowth knows up. Leaves give the plane a quiet gravity.
 ---
 
-## 語: 若葉
+## 語: YoungLeaves
 
+aliases: 若葉
 surface_ja: 若葉 | わかば
 surface_en: young leaves | new leaves
 fires_on_ja: 若葉, 新芽, 芽吹き
@@ -33,8 +34,9 @@ Scatter 4-6 leaf forms in {region: upper half}.
 In pencil, in green. Fine trembling. Fill the interiors with the same green.
 Tips upward (within a diagonal range, a different lean per leaf).
 
-## 語: 下草
+## 語: Undergrowth
 
+aliases: 下草
 surface_ja: 下草 | したくさ
 surface_en: undergrowth | grasses
 fires_on_ja: 下草, 草むら, 菖蒲, あやめ, 燕子花, かきつばた, 薄, すすき
@@ -59,8 +61,9 @@ From each root, arrange 3-5 tall blades upward. Vary the height per blade; vary 
 In fine-brush, in green. Fill the interiors with the same green.
 note: The ground is never drawn.
 
-## 語: 青葉
+## 語: SummerLeaves
 
+aliases: 青葉
 surface_ja: 青葉 | あおば
 surface_en: summer leaves | green leaves
 fires_on_ja: 青葉, 茂み, 枝葉
@@ -83,8 +86,9 @@ anchor branch in {region: middle}: a thick-brush line, gray, horizontal, slowly 
 Place 6-8 leaf forms along the branch.
 In fine-brush, in green. Fill the interior enclosed by the two arcs with the same green as their outlines.
 
-## 語: 紅葉
+## 語: AutumnLeaves
 
+aliases: 紅葉
 surface_ja: 紅葉 | もみじ
 surface_en: autumn leaves | maple leaves
 fires_on_ja: 紅葉, もみじ, カエデ
@@ -97,7 +101,7 @@ preview: nature-leaves/momiji.png
 
 member 葉形: 弧を置き、前の弧に両端で触れる(膨らみは細く)
 anchor 掌の中心 を {領域: 中域} に置く。
-縦長の葉形を 5〜7枚、掌の中心から放射に並べる。
+縦長の葉形を 5枚か7枚、掌の中心から上へ扇形に並べる。中央ほど長く、左右ほど短い。
 ロットリングで、赤で。内側も線と同じ赤で塗る。
 掌の中心から 線を下へ引く。
 
@@ -105,12 +109,13 @@ anchor 掌の中心 を {領域: 中域} に置く。
 
 member blade: place an arc, then an arc touching the previous arc at both ends (bulge kept slim)
 anchor palm-center in {region: middle}.
-Arrange 5-7 tall blades radially from the palm-center.
+Arrange 5 or 7 tall blades in a fan over the upper side of the palm-center, the middle longest and the sides shorter.
 In rotring, in red. Fill the interiors with the same red.
 From the palm-center, draw a line downward.
 
-## 語: 落葉
+## 語: FallenLeaves
 
+aliases: 落葉
 surface_ja: 落葉 | おちば | 落ち葉
 surface_en: fallen leaves | falling leaves
 fires_on_ja: 落葉, 落ち葉, 散る葉
@@ -125,7 +130,8 @@ member 葉形: 弧を置き、前の弧に両端で触れる
 葉形を 8〜12枚、{領域: 左上から右下への斜めの帯} に散らす。
 クレヨンで。赤と灰を枚ごとに交互に。各葉の内側を線と同じ色で塗る。
 回転は枚ごとにばらばら。端は滲む。
-注: 下ほど密に——密度勾配は将来の展開層構文の候補。
+流れの左右へ大きく散らす。
+注: 下ほど密に集まる。
 
 ### 展開 (en)
 
@@ -133,10 +139,12 @@ member leaf form: place an arc, then an arc touching the previous arc at both en
 Scatter 8-12 leaf forms in {region: diagonal band, upper-left to lower-right}.
 In crayon. Red and gray alternating per leaf. Fill each interior with its outline color.
 Rotated differently per leaf. Edges blurring.
-note: Denser toward the bottom — a density-gradient construct is a future candidate.
+Scatter them widely to both sides of the drift.
+note: Denser toward the bottom.
 
-## 語: 枯草
+## 語: WitheredGrass
 
+aliases: 枯草
 surface_ja: 枯草 | 枯れ草
 surface_en: withered grass | dry grass
 fires_on_ja: 枯草, 枯れ草, 枯尾花, 枯れ薄
@@ -161,24 +169,27 @@ From each root, arrange 3-5 tall blades upward. Vary the lean strongly per blade
 In chalk, in gray. Quickly. Edges blurring. Fill the interiors with the same gray.
 note: The ground is never drawn.
 
-## 語: 枯葉
+## 語: WitheredLeaves
 
+aliases: 枯葉
 surface_ja: 枯葉 | かれは | 枯れ葉
 surface_en: withered leaves | dry leaves
 fires_on_ja: 枯葉, 枯れ葉, 朽ち葉
 fires_on_en: withered leaves, dry leaves, dead leaves
-note_ja: 冬。かたちの記憶だけが残る。ここでのみ雲形を用いる——不定形は乱用せず、輪郭が定義を失った葉にだけ。
-note_en: Winter. Only the memory of a form remains. Cloudform is used here alone — the amorphous reserved for leaves whose outline has lost its definition.
+note_ja: 冬。かたちの記憶だけが残る。乾いて縮れ、縁は崩れかけても、まだ葉として読める。以前の雲形（1.0.1）は葉に見えなかったため、1.1.0で縮れた二弧の葉へ改めた。
+note_en: Winter. Only the memory of a form remains. Dried and curled, its edges crumbling, it still reads as a leaf. The former cloudform edition (1.0.1) did not look like a leaf, so 1.1.0 draws curled two-arc leaves.
 preview: nature-leaves/kareha.png
 
 ### 展開 (ja)
 
-雲形を 2〜4個、{領域: 下の隅} に置く。
-チョークで、灰で。輪郭は細かく震える。
-内側も輪郭と同じ灰で塗る。
+member 枯れ葉形: 弧を置き、前の弧に両端で触れる(膨らみは細く)
+枯れ葉形を 2〜4枚、{領域: 下の隅} に置く。
+チョークで。灰と黄を枚ごとに交互に。各葉の内側を線と同じ色で塗る。
+回転は枚ごとにばらばら。細かく震える。
 
 ### 展開 (en)
 
-Place 2-4 cloudforms in {region: lower corner}.
-In chalk, in gray. Outlines finely trembling.
-Fill the interiors with the same gray as their outlines.
+member withered leaf: place an arc, then an arc touching the previous arc at both ends (bulge kept slim)
+Place 2-4 withered leaves in {region: lower corner}.
+In chalk. Gray and yellow alternating per leaf. Fill each interior with its outline color.
+Rotated differently per leaf. Fine trembling.

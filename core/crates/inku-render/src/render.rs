@@ -22,6 +22,7 @@ use crate::performance::PerformanceRequest;
 pub use crate::render_fill_scopes::CompatFillClipPolicy;
 use crate::render_fill_scopes::FillPaintForest;
 use crate::support::{DEFAULT_SUPPORT, support_for_ground};
+use crate::surface_geometry::mark_bbox;
 use crate::surfaces::render_surface;
 use crate::svg::{Document, Element, format_number};
 use crate::types::{
@@ -51,6 +52,14 @@ pub enum RenderError {
     InvalidCanvas,
     /// A value that sets renderer work lies outside its `score.schema.json` range.
     InvalidScore(&'static str),
+    /// One performed mark spans more than [`MAX_MARK_EXTENT`] canvas lengths.
+    MarkTooLarge {
+        instruction_index: usize,
+    },
+    /// The drawn marks and their definitions exceed the document's allowance.
+    OutputTooLarge {
+        allowed_bytes: usize,
+    },
 }
 
 impl fmt::Display for RenderError {
@@ -70,6 +79,15 @@ impl fmt::Display for RenderError {
             Self::NonFiniteSvg => formatter.write_str("rendered SVG contains a non-finite value"),
             Self::InvalidCanvas => formatter.write_str("canvas size must be finite and positive"),
             Self::InvalidScore(reason) => write!(formatter, "invalid Score: {reason}"),
+            Self::MarkTooLarge { instruction_index } => write!(
+                formatter,
+                "a mark of instruction {instruction_index} spans more than \
+                 {MAX_MARK_EXTENT} canvas lengths"
+            ),
+            Self::OutputTooLarge { allowed_bytes } => write!(
+                formatter,
+                "drawn marks exceed the output allowance of {allowed_bytes} bytes"
+            ),
         }
     }
 }
@@ -237,6 +255,76 @@ fn document_metadata(profile: SvgProfile) -> (String, String) {
     }
 }
 
+/// The most canvas lengths one performed mark may span, after its group transform.
+///
+/// Fill and texture scanlines stop at 4,096 per layer, but each scanline makes
+/// one stroke per span inside the contour, so a wash cloudform 4,096 canvases
+/// tall drew 122,960 strokes (a 302 MB SVG). Saved marks span at most 1.7.
+pub const MAX_MARK_EXTENT: f64 = 8.0;
+
+/// Serialized bytes the drawn marks and their definitions may reach.
+///
+/// Every mark adds a share to a fixed base, so the limit grows with the marks
+/// a host authorized. Saved works stay far below it: at most 7 MB over 12,798
+/// renders, and the Server measures about 16 KB per mark.
+#[derive(Clone, Copy, Debug)]
+struct OutputAllowance {
+    per_mark: usize,
+    allowed: usize,
+    spent: usize,
+}
+
+impl Default for OutputAllowance {
+    fn default() -> Self {
+        Self::new(16 << 20, 64 << 10)
+    }
+}
+
+impl OutputAllowance {
+    const fn new(base: usize, per_mark: usize) -> Self {
+        Self {
+            per_mark,
+            allowed: base,
+            spent: 0,
+        }
+    }
+
+    fn add_mark(&mut self) {
+        self.allowed = self.allowed.saturating_add(self.per_mark);
+    }
+
+    fn spend<'a>(
+        &mut self,
+        elements: impl IntoIterator<Item = &'a Element>,
+    ) -> Result<(), RenderError> {
+        for element in elements {
+            self.spent = self.spent.saturating_add(element.unescaped_len());
+        }
+        if self.spent > self.allowed {
+            return Err(RenderError::OutputTooLarge {
+                allowed_bytes: self.allowed,
+            });
+        }
+        Ok(())
+    }
+}
+
+/// Refuse a mark whose fills and textures would grow past any saved work.
+fn check_mark_extent(
+    instruction: &Instruction,
+    context: MarkContext<'_>,
+) -> Result<(), RenderError> {
+    let limit = MAX_MARK_EXTENT * context.canvas.unit();
+    match mark_bbox(instruction, context) {
+        Some((_, _, width, height)) if !(width.abs() <= limit && height.abs() <= limit) => {
+            Err(RenderError::MarkTooLarge {
+                instruction_index: context.instruction_index,
+            })
+        }
+        _ => Ok(()),
+    }
+}
+
 /// Refuse a request whose canvas or Score values no host could have produced.
 ///
 /// Both entry points check this before any expansion, because the work of
@@ -298,7 +386,7 @@ pub fn render(request: RenderRequest) -> Result<RenderOutput, RenderError> {
         inku_score::OperationalResourceBudget(absolute.budget),
     )
     .map_err(RenderError::ResourceAuthority)?;
-    render_impl(request, None, &[])
+    render_impl(request, None, &[], OutputAllowance::default())
 }
 
 /// Render a typed Score with independently authorized resource policies.
@@ -317,6 +405,7 @@ pub fn render_with_resources(
             request.clone(),
             Some((hard_policy, operational_budget, clip_policy)),
             &excluded,
+            OutputAllowance::default(),
         )?;
         let mut changed = false;
         if let Some(execution) = &mut output.metadata.execution {
@@ -353,7 +442,8 @@ pub fn render_with_resources(
 /// instruction then expands its arrangement and draws its marks; fill scopes
 /// are clipped as a whole afterwards, with `omitted_instructions` excluded by
 /// the caller's retry. Plate tone, presence and ground complete the layers,
-/// and the document is serialized once.
+/// and the document is serialized once. Every mark's extent is checked before
+/// it is drawn, and what it draws is charged to `allowance`.
 fn render_impl(
     request: RenderRequest,
     resources: Option<(
@@ -362,6 +452,7 @@ fn render_impl(
         CompatFillClipPolicy,
     )>,
     omitted_instructions: &[usize],
+    mut allowance: OutputAllowance,
 ) -> Result<RenderOutput, RenderError> {
     let source_score = request.score.clone();
     let profile = request.options.svg_profile;
@@ -544,6 +635,8 @@ fn render_impl(
                     .in_pixels(request.options.canvas.unit()),
                 ..first_context
             };
+            check_mark_extent(instruction, first_context)?;
+            check_mark_extent(follower, follower_context)?;
             if let Some(fill) =
                 render_closed_arc_pair_fill(instruction, first_context, follower, follower_context)?
             {
@@ -551,10 +644,14 @@ fn render_impl(
                     closed_arc_pair_spread_marks.insert(performed_index);
                     closed_arc_pair_spread_marks.insert(follower_performed_index);
                 }
+                let definitions_start = material_definitions.len();
                 material_definitions.extend(accepted_fills::closed_contour_definitions(
                     follower,
                     follower_context,
                 ));
+                allowance.spend(
+                    std::iter::once(&fill).chain(&material_definitions[definitions_start..]),
+                )?;
                 if structured || has_fill_scopes {
                     instruction_group.push(fill);
                 } else {
@@ -578,6 +675,9 @@ fn render_impl(
                 geometry_transform: instruction_transform.in_pixels(request.options.canvas.unit()),
                 oil_fill_pass_limit,
             };
+            check_mark_extent(single, context)?;
+            allowance.add_mark();
+            let definitions_start = (material_definitions.len(), surface_definitions.len());
             if profile != SvgProfile::Compat
                 && owns_surface(single.primitive)
                 && is_noncomputer_solid_fill(single)
@@ -604,6 +704,11 @@ fn render_impl(
             } else {
                 crate::ink_spread::wrap(mark, single, context)
             };
+            allowance.spend(
+                std::iter::once(&mark)
+                    .chain(&material_definitions[definitions_start.0..])
+                    .chain(&surface_definitions[definitions_start.1..]),
+            )?;
             if structured || has_fill_scopes {
                 if structured {
                     mark.set_attr("id", mark_id(single, instruction_index, mark_index));
@@ -787,4 +892,41 @@ fn render_impl(
     }
     metadata.execution = performance.execution;
     Ok(RenderOutput { svg, metadata })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::types::{CanvasSize, RenderOptions};
+
+    #[test]
+    fn marks_past_the_output_allowance_are_refused() {
+        // Stands in for many marks within the extent limit that together would
+        // draw hundreds of megabytes; a small allowance keeps the test fast.
+        let request = RenderRequest {
+            score: serde_json::from_str(
+                r#"{"version":"0.9.0","instructions":[{"primitive":"circle",
+                "center":[0.5,0.5],"radius":0.3,"filled":true}]}"#,
+            )
+            .expect("Score"),
+            options: RenderOptions {
+                resolved_color_map: std::collections::BTreeMap::new(),
+                catalog_id: None,
+                canvas: CanvasSize::new(1000.0, 1000.0),
+                canvas_aspect_id: "square".to_owned(),
+                svg_profile: SvgProfile::Display,
+                render_seed: Some(7),
+                composition_seed: None,
+                wild: false,
+                error_policy: Default::default(),
+            },
+        };
+        let error = render_impl(request, None, &[], OutputAllowance::new(1_000, 10)).unwrap_err();
+        assert_eq!(
+            error,
+            RenderError::OutputTooLarge {
+                allowed_bytes: 1_010
+            }
+        );
+    }
 }

@@ -87,6 +87,28 @@ impl Element {
         self.children.push(Node::Text(text.into()));
     }
 
+    /// Bytes [`Self::write`] produces before escaping, which only adds bytes.
+    pub(crate) fn unescaped_len(&self) -> usize {
+        let attributes = self
+            .attributes
+            .iter()
+            .map(|(name, value)| name.len() + value.len() + 4)
+            .sum::<usize>();
+        let open = 1 + self.name.len() + attributes;
+        if self.children.is_empty() {
+            return open + 2;
+        }
+        let children = self
+            .children
+            .iter()
+            .map(|child| match child {
+                Node::Element(element) => element.unescaped_len(),
+                Node::Text(text) => text.len(),
+            })
+            .sum::<usize>();
+        open + 1 + children + 3 + self.name.len()
+    }
+
     fn write(&self, output: &mut String) {
         output.push('<');
         output.push_str(&self.name);

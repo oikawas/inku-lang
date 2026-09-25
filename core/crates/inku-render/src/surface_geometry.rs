@@ -6,7 +6,7 @@ use crate::geometry::{
     circle_points, crescent_contour_points, ellipse_perimeter, point_to_pixels, polygon_points,
     size_to_pixels, stroke_sample_count,
 };
-use crate::marks::{MarkContext, geometry_points};
+use crate::marks::{MarkContext, geometry_point, geometry_points};
 use crate::types::{ArcForm, Instruction, Point, Primitive, Seed};
 
 pub(crate) fn shape_bbox(
@@ -82,6 +82,50 @@ pub(crate) fn shape_bbox(
         }
         Primitive::Line | Primitive::Arc => None,
     }
+}
+
+/// Pixel bounds of one performed mark's own geometry, after its group transform.
+///
+/// Lines have none: a stroke keeps at most `STROKE_SAMPLE_MAX` samples, so a
+/// long line costs no more than a short one. Arcs are bounded by their circle
+/// or crescent box; every other primitive uses [`shape_bbox`]. `None` also
+/// means missing geometry, which drawing reports on its own.
+pub(crate) fn mark_bbox(
+    instruction: &Instruction,
+    context: MarkContext<'_>,
+) -> Option<(f64, f64, f64, f64)> {
+    let canvas = context.canvas;
+    let (center, half) = match instruction.primitive {
+        Primitive::Line => return None,
+        Primitive::Arc if instruction.arc_form == Some(ArcForm::Crescent) => {
+            let size = size_to_pixels(instruction.size?, canvas);
+            (
+                point_to_pixels(instruction.center?, canvas),
+                Point::new(size.x / 2.0, size.y / 2.0),
+            )
+        }
+        Primitive::Arc => {
+            let radius = instruction.radius? * canvas.unit();
+            (
+                point_to_pixels(instruction.center?, canvas),
+                Point::new(radius, radius),
+            )
+        }
+        _ => return shape_bbox(instruction, context),
+    };
+    let corners = [(-1.0, -1.0), (1.0, -1.0), (1.0, 1.0), (-1.0, 1.0)].map(|(x, y)| {
+        geometry_point(
+            instruction,
+            context,
+            Point::new(center.x + x * half.x, center.y + y * half.y),
+        )
+    });
+    let (mut min, mut max) = (corners[0], corners[0]);
+    for corner in &corners[1..] {
+        min = Point::new(min.x.min(corner.x), min.y.min(corner.y));
+        max = Point::new(max.x.max(corner.x), max.y.max(corner.y));
+    }
+    Some((min.x, min.y, max.x - min.x, max.y - min.y))
 }
 
 pub(crate) fn surface_contour(

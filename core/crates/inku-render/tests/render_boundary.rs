@@ -766,6 +766,22 @@ fn plain_render_refuses_a_count_no_host_allows() {
 }
 
 #[test]
+fn a_mark_spanning_many_canvases_is_refused_before_drawing() {
+    // A wash cloudform 4,096 canvases tall drew a 302 MB SVG in nine seconds.
+    let error = render(request_for(
+        r#"{"version":"0.9.0","instructions":[{"primitive":"circle",
+        "center":[0.5,0.5],"radius":10,"surface":{"texture":"wash"}}]}"#,
+    ))
+    .unwrap_err();
+    assert!(matches!(
+        error,
+        inku_render::render::RenderError::MarkTooLarge {
+            instruction_index: 0
+        }
+    ));
+}
+
+#[test]
 fn explicit_authority_limits_a_legacy_edition_score() {
     let budget = inku_score::ResourceBudget {
         maximum: inku_score::ResourceDemand {

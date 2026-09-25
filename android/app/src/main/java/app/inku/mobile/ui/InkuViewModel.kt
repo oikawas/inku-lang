@@ -1823,7 +1823,11 @@ class InkuViewModel @JvmOverloads constructor(
                 ddlEditedAfterGeneration = false,
                 confirmDdlOverwrite = false,
                 cameraCaptureState = current.cameraCaptureState.clearCameraOrigin(),
-                selectedCatalogId = item.colorCatalogId,
+                // The catalog the work was asked for, not only the one it
+                // resolved to: a work drawn with 自動 keeps 自動 for the next
+                // drawing, as a restored pipeline already does
+                // (`presentPipelineView`).
+                selectedCatalogId = if (item.catalogMode == "auto") CatalogSelection.AUTO_ID else item.colorCatalogId,
                 selectedCanvasAspect = item.canvasAspect,
                 sketchMode = Sketches.modeOfWork(item.sketchState, item.sketchGrain),
                 tab = tab,
@@ -3348,9 +3352,15 @@ class InkuViewModel @JvmOverloads constructor(
         val thinking = modelSelection?.optBoolean("include_thinking", current.includeThinking)
             ?: settings["include_thinking"]?.let { JSONObject(it).optBoolean("enabled", current.includeThinking) }
             ?: current.includeThinking
+        // A work picked while this was reading -- the latest one at start-up,
+        // or the reader's own pick -- has already set the catalog and canvas it
+        // was drawn with. The saved values are for a start with no work on
+        // screen; laid over a pick, they made the result depend on which of the
+        // two reads finished last.
+        val picked = current.selectedHistory != null
         localState.value = current.copy(
-            selectedCatalogId = CatalogSelection.normalizedSelectionId(catalog),
-            selectedCanvasAspect = CanvasAspects.newSelectionOrDefault(canvas),
+            selectedCatalogId = if (picked) current.selectedCatalogId else CatalogSelection.normalizedSelectionId(catalog),
+            selectedCanvasAspect = if (picked) current.selectedCanvasAspect else CanvasAspects.newSelectionOrDefault(canvas),
             displaySafeMarginsEnabled = displaySafeMargins,
             pngAlphaWhite = pngAlpha,
             cameraVisionModelId = cameraVisionModelId,

@@ -3103,8 +3103,11 @@ private fun BatchFailureSummary(state: InkuUiState) {
 
 @Composable
 private fun DemoPanel(state: InkuUiState, viewModel: InkuViewModel, modifier: Modifier = Modifier) {
+    // No scroll of its own. The panel lives inside DemoSettingsPanel's scroll,
+    // and a vertical scroll measured inside another is given an unbounded
+    // height and throws: opening 設定 > デモ closed the app every time.
     Column(
-        modifier = modifier.verticalScroll(rememberScrollState()),
+        modifier = modifier,
         verticalArrangement = Arrangement.spacedBy(Dimens.spaceM),
     ) {
         CanvasHeroCard(

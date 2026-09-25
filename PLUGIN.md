@@ -244,20 +244,31 @@ Canonical macro output reuses its original seed, semantic ordinal, and generated
 provenance without expansion retry. Missing or duplicate execution owners, focus
 joins, global budgets, and integrity failures stop both modes. The public Stage 1.5
 API remains strict. The Score wire, canonical meaning, seed, focus, geometry policy,
-and generated provenance are unchanged. Production runtime integration, UI / API /
-persistence selection, an installable package catalog, preview, legacy cutover, and
-a general user-package loader are not complete.
-This guide therefore does not claim that arbitrary packages can currently be
-installed or loaded or that legacy coerce / LLM fallback has been replaced.
+and generated provenance are unchanged. This is part of ordinary drawing on the Server and on Android. For a new work,
+the host resolves a catalog from the installed definitions and passes their names
+and summaries to Stage 1; the compiler expands them, and the definitions used are
+saved with the work as locks. Definitions come from packages bundled with the
+shared core and from the `definitions` / `macro_summaries` of the Server's
+pipeline manifest. An installable package catalog and a general loader for
+definitions written by users are not complete. This guide therefore does not
+claim that arbitrary packages can currently be installed or loaded.
 
-`Nature` and `Bamboo` are future or explanatory reference-vocabulary names,
-not installed packages or entries in an official registry. The v1.70
-hard-coded Nature expansion and legacy `.inku-plugin.md` / `fires_on` fixtures
-are not the current authoring format.
+The bundled `Nature.leaves` (2.0.0) is an installed package with seven words,
+such as `Nature.YoungLeaves` (alias `Nature.若葉`). Its definitions are
+MacroDefinition v1 values held by the shared core. On the Server,
+`server/plugins/nature-leaves.inku-plugin.md` serves as the unit that is enabled
+or disabled and as the source of the words, notes, and previews the Saijiki
+shows; its prose expansions are not interpreted as definitions. No other
+`.inku-plugin.md` in the same namespace is translated into definitions
+implicitly. `Nature.雨` and `Bamboo` in this guide are explanatory names, not
+entries in an official registry. The v1.70 hard-coded Nature expansion is not
+the current authoring format.
 
-The current `plugin_storage["canvas-aspect"]`, `canvas_aspect` request alias,
-system/user plugin directories, and plugin status or enable controls are
-compatibility surfaces while retirement remains unfinished. They are not an
+`plugin_storage["canvas-aspect"]`, the `canvas_aspect` request alias, and the
+system/user plugin directories are compatibility surfaces while retirement
+remains unfinished. The Server's per-document enable control and Android's
+`Nature.leaves` switch decide whether the bundled package is used for new works;
+saved works use their locked definitions and are unaffected. None of these is an
 authoring or loading API for vocabulary macros.
 
 Score 0.9 `placement_groups.members` carries one Macro body as atomic ordered drawable ranges and Anchor ownership. It does not create a Macro authoring operator or materialize individual repetitions; group-head count and internal Emit count remain separate. A standalone Macro also retains its outer repetitions symbolically; instance materialization belongs to Step11.

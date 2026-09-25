@@ -121,17 +121,26 @@ not_touchingとbetweenはnamed／noncenter位置も通常DDLと同じchecked per
 旧Stop入力も受けるが、recoverableなrelation失敗で新Score全体を止めない。relationだけをerrorとして外し、元ownerと変形後配置を保って描く。OmitAndContinueは既存の最小省略単位を保ち、integrity不良は両mode停止とする。
 
 共有Rust compiler基盤は、MacroDefinition v1の値をparse、validate、identify、lock、bindし、
-決定的に展開できる。Production runtimeへの統合、install可能なpackage catalog、preview、
-legacy cutover、汎用user-package loaderは完了していない。したがって本ガイドは、任意のpackageを
-現在installまたはloadできるとは主張しない。
+決定的に展開できる。これはServerとAndroidの通常の描画に組み込まれている。新しい作品では、hostが
+導入済みの定義からcatalogを解決してStage 1へ名前と要約を渡し、compilerが展開し、使った定義を
+lockとして作品に保存する。定義を供給するのは、共有coreに同梱したpackageと、Serverのpipeline
+manifestの`definitions`・`macro_summaries`である。install可能なpackage catalogと、利用者が書いた
+定義を読み込む汎用のloaderは完了していない。したがって本ガイドは、任意のpackageを現在install
+またはloadできるとは主張しない。
 
-`Nature`と`Bamboo`は将来用または説明用のreference-vocabulary名であり、install済みpackageでも
-official registryのentryでもない。v1.70のhard-coded Nature展開とlegacy
-`.inku-plugin.md` / `fires_on` fixtureは、現在のauthoring formatではない。
+同梱の`Nature.leaves`（2.0.0）は実際に導入されたpackageで、`Nature.YoungLeaves`（別名
+`Nature.若葉`）など七語を持つ。定義の実体は共有coreが持つMacroDefinition v1である。Serverの
+`server/plugins/nature-leaves.inku-plugin.md`は、有効・無効の単位と、歳時記に出す語・note・
+previewの出典として使われ、その展開の散文は定義として解釈されない。同じ名前空間の任意の
+`.inku-plugin.md`が暗黙に定義へ翻訳されることもない。本ガイドの`Nature.雨`や`Bamboo`は説明用の
+名前で、official registryのentryではない。v1.70のhard-coded Nature展開は、現在のauthoring format
+ではない。
 
-現在の`plugin_storage["canvas-aspect"]`、`canvas_aspect` request alias、system/user plugin
-directory、plugin statusまたはenable controlは、退役作業が未完了の間のcompatibility surfaceである。
-語彙macroのauthoring APIまたはloading APIではない。
+`plugin_storage["canvas-aspect"]`、`canvas_aspect` request alias、system/user plugin directoryは、
+退役作業が未完了の間のcompatibility surfaceである。Serverの文書単位の有効・無効と、Androidの
+`Nature.leaves`の切り替えは、同梱packageを新しい作品で使うかどうかを決める。保存済みの作品は
+lockした定義を使うので、切り替えの影響を受けない。どれも語彙macroのauthoring APIまたは
+loading APIではない。
 
 Score 0.9の`placement_groups.members`はMacro bodyを順序付きdrawable範囲とAnchor所有として原子的に運ぶ。Macro authoring operatorや反復個体化を追加せず、group head countと内部Emit countを分ける。standalone Macroの外側反復もsymbolic planへ保持し、個体化はStep11で行う。
 

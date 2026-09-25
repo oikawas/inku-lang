@@ -107,7 +107,7 @@ const RESTRICTED = [
 	{
 		// One word, one sense: Moderate is the middle variation amplitude and nothing else.
 		word: 'Moderate', re: /\bmoderate\b/i, instead: 'for speed use Medium',
-		keys: ['variationMedium', 'variationTooltipLarge'],
+		keys: ['variationMedium'],
 		texts: [],
 	},
 ];

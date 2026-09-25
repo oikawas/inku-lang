@@ -184,7 +184,7 @@ deterministic, and its output rejoins ordinary typed lowering.
 
 For a Description request, Stage 1 may receive only a bounded signature,
 parameter schema, and short summary. It never receives the definition body or
-expanded DDL. The work plan chooses a plugin, as a bare-name sentence, only when
+expanded DDL. The underdrawing chooses a plugin, as a bare-name sentence, only when
 the description writes the heading word of its name or a paraphrase of the same
 thing; write the summary so an LLM can tell what the plugin draws. Direct DDL
 with an unknown or ambiguous qualified term never triggers a hidden LLM

@@ -10,7 +10,7 @@
 | Authoring state machine | snapshot + command/effect result → next snapshot + event + 最大1 effect | 決定的。provider transportと保存はtyped effectとして外出しし、再試行・fallback・authority遷移はcoreが決める | `core/crates/inku-pipeline` |
 | 色カタログ選択 effect（任意） | 記述 + カタログ候補 → カタログID | `catalog_mode=auto`の記述起点だけ。失敗・予算切れは`default`へ落とし`auto_fallback_default`を記録して続行する | `inku-pipeline` prompt/action; host provider adapter |
 | 写生 effect（任意） | 記述 → 場所と光の補足文 | 作者が「あり」を選んだときだけ。記述を書き換えず、失敗しても`fallback`として記述だけで続行する | `inku-pipeline` prompt/action; host provider adapter |
-| Stage 1 effect | 記述（+ 写生文）→ 作品計画JSON → visible normalized DDL候補 | LLMはDDL文字列を書かず、閉じた型の作品計画だけを返す。coreが範囲外の値をfield単位で落とし、要求言語のDDLへ決定的に印字する。Scoreを書かず、Macro本文やhidden meaningを受け取らない | `inku-pipeline/src/prompts.rs`; `inku-ddl/src/work_plan.rs`; host provider adapter |
+| Stage 1 effect | 記述（+ 写生文）→ 下絵JSON → visible normalized DDL候補 | LLMはDDL文字列を書かず、閉じた型の下絵だけを返す。coreが範囲外の値をfield単位で落とし、要求言語のDDLへ決定的に印字する。Scoreを書かず、Macro本文やhidden meaningを受け取らない | `inku-pipeline/src/prompts.rs`; `inku-ddl/src/work_plan.rs`; host provider adapter |
 | Stage 1の再正規化・残部採用 | compilerが完全採用しない候補 → 置換DDL要求、または描画可能な残部 | 同じStage 1予算の中で、原文・未採用DDL・理由とspanを添えた新しいactionとして再要求する。予算が尽きたら、sealed execution projectionが描画可能な残部を持つ場合だけ候補全文をそのまま保存へ提案する | `inku-pipeline/src/machine.rs` (`correct_stage1`, `residual_execution_preflight`) |
 | CAS保存 | DDL候補 + revision → 保存済みvisible DDL | 一致するatomic save acknowledgment後だけsourceとauthorityを進め、exact saved bytesを再parseする | authority store / pipeline host |
 | Typed compiler | visible DDL + definition locks → verified meaning + diagnostics | source、provenance、Macro definitionをlock検証し、bounded expansionする。曖昧さをfirst/nearest/lastで推測しない。lockは`canonical_ready` / `incomplete_known_hole` / `blocked_conflict` / `blocked_diagnostic`のいずれか | `core/crates/inku-ddl` |
@@ -32,7 +32,7 @@ flowchart TD
     CORE["共有Rust authoring state machine"]
     CATALOG["色カタログ選択 effect\n(auto時だけ)"]
     SKETCH["写生 effect\n(作者が選んだときだけ)"]
-    S1["Stage 1 effect\n作品計画JSON → DDL印字"]
+    S1["Stage 1 effect\n下絵JSON → DDL印字"]
     FIT{"compilerが完全採用?"}
     RETRY["再正規化\n(同じStage 1予算)"]
     RESIDUAL{"描画可能な残部?"}
@@ -150,7 +150,7 @@ ServerのPython adapterとAndroidのKotlin/JNI adapterはhost処理を行う薄�
 | 境界 | 主な実装 |
 |---|---|
 | Shared state machine / byte protocol | `core/crates/inku-pipeline`, `core/crates/inku-pipeline-uniffi` |
-| Typed compiler / 作品計画 / Stage 1.5 / lowerer | `core/crates/inku-ddl` |
+| Typed compiler / 下絵 / Stage 1.5 / lowerer | `core/crates/inku-ddl` |
 | Score schema / compatibility / resource policy | `core/crates/inku-score` |
 | SVG performance | `core/crates/inku-render` |
 | Server host | `server/src/inku_server/pipeline_runtime.py`, `pipeline_api.py`, `pipeline_candidate.py`, `pipeline_product.py`, `pipeline_provider.py`, `pipeline_compat.py` |

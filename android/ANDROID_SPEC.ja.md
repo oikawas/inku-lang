@@ -32,7 +32,7 @@ runtime fallbackを持たない。保存済みSVG、Room schema、Score schema�
 
 ## 2026-09-25 現行のプラグイン（draw-system04）
 
-作品計画の任意`plugins`、Stage 1の登録プラグイン節、正式名と別名（DDL Spec 14、同梱`Nature.leaves` 2.0.0）の照合は、同梱した共有Rust coreがそのまま行う。lockの任意`aliases`はRoomへそのまま運ぶ。
+下絵の任意`plugins`、Stage 1の登録プラグイン節、正式名と別名（DDL Spec 14、同梱`Nature.leaves` 2.0.0）の照合は、同梱した共有Rust coreがそのまま行う。lockの任意`aliases`はRoomへそのまま運ぶ。
 
 同梱パッケージ`Nature.leaves`の有効・無効は、設定「その他」の「同梱プラグイン」で切り替える（Serverの文書単位と同じ粒度）。値は`plugin_settings`のキー`bundled:Nature.leaves:enabled`に`{"enabled":bool}`で保存し、欠落・壊れた値は有効とする。無効なら新しい作品のcatalog解決の`bundled_packages`から外す。保存済み作品は自分のconfigの定義で描き直す。語の名前は、日本語表示では別名（若葉など）、英語表示では正式名で示し、どちらも共有coreの定義から取る。
 
@@ -60,7 +60,7 @@ Androidの固定色カタログ13件はServerと同じID、色map、paletteを�
 
 共有仕様§12.6.1に従い、写生は描画ごとに作者が選ぶ。既定は「なし」で、記述ごとに要否を決める自動modeは置かない。開始入力と記述からの再生成には`sketch`を渡し、`{"mode":"off"}`、作者が選ぶ`{"mode":"on"}`、作者が直した文または保存済み文を使う`{"mode":"supplied","text":"..."}`を区別する。suppliedでは写生providerを呼ばない。
 
-`on`ではStage 1と同じmodelでStage 1の前に`generate_sketch`を任意effectとして実行し、prompt `inku.sketch-supplement-prompt.v1`への応答JSON `{"sketch":"..."}`から`sketch_generated`を作り、その文を作品計画へ渡す。失敗時の再試行予算は`sketch_retry`（未設定なら`catalog_retry`）を使う。写生を作者確認で止めず、provider失敗は`fallback`として記述だけで続行し、空の応答は`not_needed`として記述だけで続行する。snapshotの状態は`pending`、`supplemented`、`not_needed`、`fallback`、`supplied`を表す。保存時は`supplemented`または`supplied`の文を`sketch_text`へ保存し、`sketch_grain`はnullとする。`not_needed`と`fallback`はそれぞれ状態だけを保存し、写生記録がない場合は`off`である。`sketch_state`には`supplemented`と`not_needed`を含める。
+`on`ではStage 1と同じmodelでStage 1の前に`generate_sketch`を任意effectとして実行し、prompt `inku.sketch-supplement-prompt.v1`への応答JSON `{"sketch":"..."}`から`sketch_generated`を作り、その文を下絵へ渡す。失敗時の再試行予算は`sketch_retry`（未設定なら`catalog_retry`）を使う。写生を作者確認で止めず、provider失敗は`fallback`として記述だけで続行し、空の応答は`not_needed`として記述だけで続行する。snapshotの状態は`pending`、`supplemented`、`not_needed`、`fallback`、`supplied`を表す。保存時は`supplemented`または`supplied`の文を`sketch_text`へ保存し、`sketch_grain`はnullとする。`not_needed`と`fallback`はそれぞれ状態だけを保存し、写生記録がない場合は`off`である。`sketch_state`には`supplemented`と`not_needed`を含める。
 
 通常のなし／あり選択はAndroidの描画設定に置き、既定をなしとする。作品からの「写生なし／ありで描き直す」は選択作品の子を系譜へ保存し、派生種別には既存の`sketch_grain_change`を使う。metadataは`from_sketch_state`と`to_sketch_mode`を記録する。旧`fine`／`coarse`は保存済み作品の表示と再描画時の選択判定にのみ使い、新しい写生の入力や保存には使わない。
 

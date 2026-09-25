@@ -120,7 +120,7 @@ other known holes that enter the same bounded completion path.
 Stage 1 receives bounded macro signatures, parameter schemas, and localized
 summaries. It receives no definition bodies or expanded DDL. The typed prompt
 edition preserves the distinct meanings of fill, scatter, tile, and background.
-The model returns a closed-typed work plan; the core prints it as visible DDL,
+The model returns a closed-typed underdrawing; the core prints it as visible DDL,
 and only that DDL reaches the compiler.
 
 `render` is an explicit input after a committed compilation has a Score. Its

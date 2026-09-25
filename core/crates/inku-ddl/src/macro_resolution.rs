@@ -7,7 +7,7 @@ use crate::{
     parser::{QualifiedMacroMatch, qualified_macro_match},
 };
 
-/// Stable identity for the runtime-disconnected macro lock resolution overlay.
+/// Stable identity for the macro lock resolution overlay.
 pub const MACRO_INVOCATION_LOCK_RESOLUTION_SCHEMA_ID: &str =
     "inku.macro-invocation-lock-resolution.v1";
 

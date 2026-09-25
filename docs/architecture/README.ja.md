@@ -1,6 +1,6 @@
 # inku アーキテクチャ
 
-この文書群は、DDLの設計段階、現行実装、Web/Server/CLI/Android/外部provider/永続化の境界を、相互に追跡できる形で記録する。実装baselineは公開commit `46f17da8c5b438511f9bd915395763262b55fb72`、app `v2.15.28 / Build 1104`、Render Engine 68、DDL engine 47 である。2026-09-14の共有Rust pipeline cutover後の構造を記す。
+この文書群は、DDLの設計段階、現行実装、Web/Server/CLI/Android/外部provider/永続化の境界を、相互に追跡できる形で記録する。実装baselineは公開commit `f910a11e165ae3169818f3f1311ee869d33930ed`、app `v2.15.28 / Build 1104`、Render Engine 68、DDL engine 47 に、`known-differences.ja.md` F-05〜F-10の修正を加えた状態である。2026-09-14の共有Rust pipeline cutover後の構造を記す。
 
 ## 推奨閲覧順
 

@@ -6,7 +6,7 @@
 - Passwords use salted PBKDF2-SHA256. A missing user still runs a dummy hash to reduce a simple timing distinction.
 - The DB stores a session-token hash. Clients present a Bearer token or `HttpOnly`, `SameSite=Lax` cookie; the secure flag is configured by environment.
 - The permission groups are `admins`, `leaders`, and `users`, and one user may hold several. `_current_user`, `_user_manager`, and `_admin_user` guard routes, and each guard asks a single predicate about membership. The `role` column remains as a mirror derived from the memberships and is read by no decision.
-- Of 105 endpoints (static count; `known-differences.md` F-06), only the reasoned three-path allowlist has no guard; a live-route test enumerates it. The shared pipeline's `/api/pipeline/*` requires `_current_user` on each route and passes the authenticated user to every operation as the owner of the execution, variation, and history. Another user's executions and history links are invisible because the owner does not match.
+- Of 105 endpoints, only the reasoned three-path allowlist has no guard; a live-route test enumerates it. The shared pipeline's `/api/pipeline/*` requires `_current_user` on each route and passes the authenticated user to every operation as the owner of the execution, variation, and history. Another user's executions and history links are invisible because the owner does not match.
 - A client cannot send snapshots, authority sidecars, effect results, resource policies, or the `render` command. Resource limits resolve from the installation manifest and administrator settings, and a work's saved budget cannot be raised. A saved Score cannot declare its own budget either; only a work with a Server-owned history link is replayed under its saved policy.
 - Only with `INKU_DEVELOPER_MODE` enabled can a request set `developer_disable_llm_retries` (limits every LLM stage to one attempt) and `developer_capture_provider_io` (records raw provider traffic). The request is sent only if its record could be created first; the record holds no URL, header, credential, connection configuration, or exception text, and only the same owner reads it through `/api/pipeline/executions/{id}/provider-observations`. Outside developer mode these options are rejected.
 - Request-body, process-wide request, and render concurrency limits are independent.
@@ -87,7 +87,7 @@ Values were not examined.
 |---|---|
 | DB and backup | `INKU_DB_URL`, `INKU_DB_BACKUP_DIR`, `INKU_DB_BACKUP_SCHEDULER` |
 | Output and logs | `INKU_OUTPUT_DIR`, `INKU_OUTPUT_SAVE_WORKERS`, `INKU_LOG_DIR` |
-| Capacity | `INKU_MAX_CONCURRENT_REQUESTS`, `INKU_RENDER_CONCURRENCY`, `INKU_THUMBNAIL_WORKERS`, `INKU_THUMBNAIL_QUEUE_LIMIT`, `INKU_STAGE_WORKERS`, `INKU_STAGE_QUEUE_LIMIT` (the last two remain only for the status display; `known-differences.md` F-10) |
+| Capacity | `INKU_MAX_CONCURRENT_REQUESTS`, `INKU_RENDER_CONCURRENCY`, `INKU_THUMBNAIL_WORKERS`, `INKU_THUMBNAIL_QUEUE_LIMIT` |
 | Pipeline | `INKU_PIPELINE_CONFIG`, `INKU_DEVELOPER_MODE`, `INKU_LLM_REQUEST_TIMEOUT_SECONDS`, `INKU_LLM_RETRY_ATTEMPTS`, `INKU_LLM_RETRY_BASE_DELAY`, `INKU_LLM_STAGE1_ATTEMPT_TIMEOUT_SECONDS`, `INKU_LLM_STAGE1_TOTAL_TIMEOUT_SECONDS` |
 | Auth | `INKU_SESSION_COOKIE_SECURE`, `INKU_LOGIN_RATE_ATTEMPTS`, `INKU_REDIS_URL` |
 | Providers | Provider API-key/base-URL variable names only; never values |

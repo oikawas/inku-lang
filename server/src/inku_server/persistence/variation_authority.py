@@ -1,9 +1,9 @@
-"""Candidate persistence adapter for shared variation-authority commit effects.
+"""Persistence adapter for shared variation-authority commit effects.
 
-The ordinary Server runtime does not import or install these tables. A managed
-candidate host must explicitly call VariationAuthorityStore.install_schema
-before it can apply a shared-core commit effect. This keeps the legacy history
-path unchanged until the later runtime cutover.
+The ordinary Server pipeline service (`pipeline_runtime.py`) keeps variation
+authority, action acknowledgments, execution snapshots, and history links here.
+History rows themselves stay in the existing history store; a link ties one
+immutable performance to the authoring revision that produced it.
 """
 
 from __future__ import annotations

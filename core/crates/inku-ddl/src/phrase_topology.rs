@@ -8,7 +8,7 @@ use crate::{
     collect_english_opaque_head_candidate_evidence,
 };
 
-/// Stable identity for the runtime-disconnected unresolved determiner-phrase topology overlay.
+/// Stable identity for the unresolved determiner-phrase topology overlay.
 pub const UNRESOLVED_DETERMINER_PHRASE_TOPOLOGY_EVIDENCE_SCHEMA_ID: &str =
     "inku.english-unresolved-determiner-phrase-topology-evidence.v1";
 

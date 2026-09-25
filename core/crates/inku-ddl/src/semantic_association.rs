@@ -21,7 +21,7 @@ use crate::{
     saijiki::canonical_relation_identity_is_valid,
 };
 
-/// Stable identity for the runtime-disconnected single-head semantic AST.
+/// Stable identity for the single-head semantic AST.
 pub const SEMANTIC_ENTITY_ASSOCIATION_SCHEMA_ID: &str = "inku.semantic-entity-association.v19";
 
 /// Source-independent semantic identity projected from one accepted Saijiki row.

@@ -6,7 +6,7 @@
 
 | 段階 | 入力 → 出力 | 契約 | 所有module |
 |---|---|---|---|
-| Host入力 | 記述またはdirect DDL → typed command | 記述起点だけLLM段を要求する。Direct DDLは自然文へ戻さない | Server pipeline host / Android pipeline host |
+| Host入力 | 記述またはdirect DDL → typed command | 記述起点だけLLM段を要求する。記述は行頭の連番と角括弧のコメントを切ってからcoreへ渡し、作品には書いたままを残す（Server）。Direct DDLは自然文へ戻さない | Server pipeline host / Android pipeline host |
 | Authoring state machine | snapshot + command/effect result → next snapshot + event + 最大1 effect | 決定的。provider transportと保存はtyped effectとして外出しし、再試行・fallback・authority遷移はcoreが決める | `core/crates/inku-pipeline` |
 | 色カタログ選択 effect（任意） | 記述 + カタログ候補 → カタログID | `catalog_mode=auto`の記述起点だけ。失敗・予算切れは`default`へ落とし`auto_fallback_default`を記録して続行する | `inku-pipeline` prompt/action; host provider adapter |
 | 写生 effect（任意） | 記述 → 場所と光の補足文 | 作者が「あり」を選んだときだけ。記述を書き換えず、失敗しても`fallback`として記述だけで続行する | `inku-pipeline` prompt/action; host provider adapter |

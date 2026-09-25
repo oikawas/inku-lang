@@ -7,7 +7,7 @@ use crate::{
     saijiki::canonical_relation_identity_is_valid,
 };
 
-/// Stable identity for the runtime-disconnected relation/reference evidence envelope.
+/// Stable identity for the relation/reference evidence envelope.
 pub const RELATION_REFERENCE_EVIDENCE_SCHEMA_ID: &str = "inku.relation-reference-evidence.v2";
 
 /// Closed candidate availability without a target-selection policy.

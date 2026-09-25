@@ -1,4 +1,4 @@
-//! Sealed, runtime-disconnected object and placement recipes; never instances or Score.
+//! Sealed object and placement recipes; never instances or Score.
 
 use inku_score::{
     AnchorPoint, CanvasGroundSpec, Color, ConnectedPositionAuthority, LineStyle, Primitive,

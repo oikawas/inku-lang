@@ -14,6 +14,7 @@ from fastapi import APIRouter, Depends, FastAPI, HTTPException
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict
 
+from .description_labels import pipeline_description
 from .pipeline_candidate import CandidateExecution, CandidateHostError, PipelineBinding
 from .pipeline_settings import select_canvas
 from .persistence.variation_authority import (
@@ -28,6 +29,21 @@ _RECORD_OPTIONS = frozenset({
     "save_history", "save_artifacts", "history_input", "history_source_text", "history_at",
     "request_idempotency_key",
 })
+
+_LABEL_ONLY_DESCRIPTION = "description is only labels"
+
+
+def _drawn_description(text: str) -> str:
+    """The description every model stage reads: the author's labels cut away.
+
+    The work keeps the text as written; only what reaches the shared core loses
+    its leading numbers and bracketed comments. A description that was nothing
+    but labels would hand the core an empty prompt, so it is refused here.
+    """
+    drawn = pipeline_description(text)
+    if text.strip() and not drawn.strip():
+        raise HTTPException(400, _LABEL_ONLY_DESCRIPTION)
+    return drawn
 
 
 class NewVariationBody(BaseModel):
@@ -86,6 +102,7 @@ class PipelineService:
             raise ValueError("explicit positive pipeline host limits required")
         self.binding, self.store = binding, store
         self.config_for, self.provider_for, self.render_for = config_for, provider_for, render_for
+        self.max_workers = max_workers
         self.max_effect_steps = max_effect_steps
         self.max_retained_runs = max_retained_runs
         self.auto_catalog = auto_catalog
@@ -142,6 +159,7 @@ class PipelineService:
               canvas_format_id: str | None = None, canvas_aspect: str | None = None,
               options: dict | None = None, prepared: tuple[dict, dict] | None = None) -> dict:
         description = text if kind == "description" else (source_work or {}).get("description", "")
+        drawn = _drawn_description(text) if kind == "description" else text
         context = {"description": description, "committed_description": description, "parent": parent, "derivation_kind": "new"}
         if parent:
             if parent["kind"] == "legacy_history":
@@ -161,7 +179,7 @@ class PipelineService:
                 config, resolved_context = prepared
                 context.update(resolved_context)
             elif self.prepare_for:
-                config, resolved_context = self.prepare_for(owner, kind, text, options or {}, source_work)
+                config, resolved_context = self.prepare_for(owner, kind, drawn, options or {}, source_work)
                 context.update(resolved_context)
             else:
                 config = self.config_for(owner, source_work)
@@ -171,7 +189,7 @@ class PipelineService:
             if selected is not None:
                 config = select_canvas(config, self.binding.canvas_registry, selected)
             run = self._host(owner, config, context)
-            authoring = {"tag": "description", "description": text, "auto_catalog": context.get("auto_catalog", self.auto_catalog)} if kind == "description" else {"tag": "direct_ddl", "source": text}
+            authoring = {"tag": "description", "description": drawn, "auto_catalog": context.get("auto_catalog", self.auto_catalog)} if kind == "description" else {"tag": "direct_ddl", "source": text}
             sketch = context.get("sketch_request") or {"mode": "off"}
             if kind == "description" and sketch["mode"] != "off":
                 authoring["sketch"] = sketch
@@ -241,6 +259,9 @@ class PipelineService:
                 del self._runs[key]
                 self._jobs.pop(key, None)
                 return
+        from .api_core.state import _increment_stage_stat
+
+        _increment_stage_stat("rejected")
         raise HTTPException(429, {"code": "pipeline_capacity_reached", "message": "All authoring workers are busy."})
 
     def _schedule(self, key, run) -> None:
@@ -335,12 +356,16 @@ class PipelineService:
             # A client cannot choose policy, canvas, catalog or palette through
             # the render command. The trusted host resolves these consistently.
             raise HTTPException(422, "unsupported_author_action")
-        elif payload.get("tag") == "generate_from_description":
+        context_updates = None
+        if payload.get("tag") == "generate_from_description":
             payload = {**payload, "auto_catalog": run.context.get("auto_catalog", self.auto_catalog)}
+            if isinstance(payload.get("description"), str):
+                context_updates = {"description": payload["description"]}
+                payload["description"] = _drawn_description(payload["description"])
             sketch = run.context.get("sketch_request") or {"mode": "off"}
             if sketch["mode"] != "off":
                 payload["sketch"] = sketch
-        run.command(payload)
+        run.command(payload, context_updates=context_updates)
         with self._lock:
             self._schedule((owner, execution_id), run)
         return run.view()

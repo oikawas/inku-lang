@@ -4,7 +4,8 @@ This crate owns authoring decisions. Hosts perform the requested provider or
 storage effect and return its result; they do not retry, select a fallback,
 modify DDL, or reconstruct compiler decisions independently.
 
-The candidate API does not switch the existing application runtime.
+The ordinary Server/Web and Android runtimes use this crate through
+`inku-pipeline-uniffi`; there is no other runtime path for new works.
 
 ## Byte boundary
 
@@ -53,9 +54,11 @@ digests, not authenticated bearer tokens for an untrusted client.
 
 ## Effects and commit authority
 
-The four effect tags are `select_description_catalog`,
+The five effect tags are `select_description_catalog`, `generate_sketch`,
 `generate_normalized_ddl`, `commit_visible_normalized_ddl`, and
-`complete_visible_ddl_holes`. Each result echoes action ID, attempt, and request
+`complete_visible_ddl_holes`. `generate_sketch` runs only when the start or a
+regeneration asks for a sketch; its failure continues Stage 1 with the
+description alone. Each result echoes action ID, attempt, and request
 digest. Retries preserve the logical action ID and increase its attempt; a new
 action receives a new identity. Corrective Stage 1 normalization is a new action
 because compiler feedback changes its payload and request digest. The host
@@ -116,8 +119,9 @@ other known holes that enter the same bounded completion path.
 
 Stage 1 receives bounded macro signatures, parameter schemas, and localized
 summaries. It receives no definition bodies or expanded DDL. The typed prompt
-edition preserves the distinct meanings of fill, scatter, tile, and background;
-the existing runtime prompt is unchanged by this candidate API.
+edition preserves the distinct meanings of fill, scatter, tile, and background.
+The model returns a closed-typed work plan; the core prints it as visible DDL,
+and only that DDL reaches the compiler.
 
 `render` is an explicit input after a committed compilation has a Score. Its
 strict options carry exact seeds and resolved rendering values. The adapter

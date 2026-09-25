@@ -110,14 +110,14 @@ Replay は常に最新で行い、当時のエディションの再現は**保�
 | 対象 | 値 | 正本 |
 |---|---|---|
 | アプリ | 本書冒頭の「対象バージョン」 | **`web/APP_VERSION` と `web/BUILD_NUMBER` の 2 ファイル**。UI・`/api/info` の `version`・CLI はすべてここを読む（値をここに写さない） |
-| Render Engine | 66 | `core/crates/inku-render/src/lib.rs` |
-| DDL | `ddl_version` 11 / `ddl_engine_version` 45 | `server/src/inku_server/layer_versions.py` |
-| Android | `2.1.4-android.78` | `android/VERSION`（web / server とは別の名前空間） |
+| Render Engine | 68 | `core/crates/inku-render/src/lib.rs` |
+| DDL | `ddl_version` 13 / `ddl_engine_version` 47 | `server/src/inku_server/layer_versions.py` |
+| Android | `2.1.4-android.80` | `android/VERSION`（web / server とは別の名前空間） |
 | Python パッケージ | 2.7.2 | `server/pyproject.toml`（**製品リリースのときだけ動く**） |
 
 ### 語彙
 
-正本は `server/src/inku_server/schema.py` の Literal で、日本語の語との対応は saijiki テーブル（`saijiki.py`）が持つ。
+正本は共有Rustの `core/crates/inku-ddl/assets/saijiki-v1.json` で、Serverの `schema.py` の Literal と saijiki テーブル（`saijiki.py`）はその投影である。
 
 - 図形 9 — `line` / `circle` / `ellipse` / `triangle` / `square` / `polygon` / `arc` / `point` / `cloudform`
 - 線種 4 — `solid` / `dashed` / `dotted` / `dash_dot`
@@ -126,8 +126,8 @@ Replay は常に最新で行い、当時のエディションの再現は**保�
 - 色 9 — `white` / `black` / `blue` / `red` / `green` / `gray` / `yellow` / `orange` / `purple`
 - 面の質感 9・面の向き 5・地の素材 7
 
-saijiki テーブルは単一の情報源で、Stage 1 プロンプトの語彙ブロック・プラグインの閉包マーカー・relation の固定句・web の歳時記表示・reference §1 をそこから導出する。
-語彙の変更はテーブルと golden test を経由する。
+共有assetは単一の情報源で、Stage 1 の語彙projection・プラグインの閉包マーカー・relation の固定句・web と Android の歳時記表示・reference §1 をそこから導出する。
+語彙の変更は共有assetとその検査（`core/crates/inku-ddl/tests/saijiki_asset.rs` など）を経由する。
 歳時記は 10 カテゴリで、`おもて`（11 語）が閉じた図形の内側の在り方を言う（ddl-engine 15）。
 つらなりが線の在り方を言うのと対になる軸で、語は状態の名詞であって動作ではない。
 面の指定が閉じていない命令に付いたときは、共有compiler／lowererが対応する閉図形へ届け、成立する先が無ければ診断付きで省略する。
@@ -169,8 +169,8 @@ Androidのmain preview、thumbnail、PNG exportはcanonicalな保存済み／現
 閉図形の輪郭と塗り、弧、材質層、地の抵抗、マスターグリッドによる座標の量子化を持つ。
 **塗りは面を実体で持つ下地の上に載り、上に載るものは被覆率 0.2 で走査線と擦りの痕に分かれる。**
 
-観測用に RAW trace がある（`/api/paint` と `/api/compose` の `include_trace`、既定 false）。
-各層の中間生成物を 1 応答に持ち帰るだけで、Score・分岐・回数を変えず DB へも保存しない。
+`include_trace` は旧requestとの互換のために受理するが、共有pipelineはRAW traceを返さない。
+層ごとの結果は応答の `compiler_outcome`・`pipeline_diagnostics` と履歴sidecarが持つ。developer modeでは `developer_capture_provider_io` がprovider送受信の原文を所有者限定で記録し、通常の履歴・応答・logへは入れない。
 
 ### web（SvelteKit 2 / Svelte 5）
 
@@ -230,7 +230,7 @@ localStorage への保存・server への永続・描画要求への同梱は、
 
 ### server（FastAPI）
 
-- エンドポイント 96 本は `server/src/inku_server/api_core/routers/` の 10 ファイルに在る（`auth` `feedback` `history` `lineage` `me` `plugins` `public` `render` `settings` `users`）。本数の正本は `server/tests/test_route_authorization.py` の `EXPECTED_ROUTE_COUNT` である。
+- エンドポイント 105 本は `server/src/inku_server/api_core/routers/` の 10 ファイル（`auth` `feedback` `history` `lineage` `me` `plugins` `public` `render` `settings` `users`）と、共有pipelineの `pipeline_api.py`（`/api/pipeline/*` の 11 本）に在る。本数の正本は `server/tests/test_route_authorization.py` の `EXPECTED_ROUTE_COUNT` である。
 共有される定義は `api_core/{state,models,deps,common,rendering}.py` に置く。
 - `api.py` が持つのは `app` の組み立て・`_lifespan`・ミドルウェア・起動時の呼び出し・`include_router` だけである。
 **依存の向きは `api.py` → routers → 共有の一方向**で、router から `api.py` を import しない。
@@ -270,27 +270,27 @@ Kotlin / Jetpack Compose / Room による別実装で、端末内でパイプラ
 追随の遅れは常にありうるので、Android の版数と server の版数を同じものとして読まない。
 UI は日英で、切替は設定画面から行う（既定は `ja`）。
 画面の文言は Kotlin の言語パックが、歳時記の語彙は `server/scripts/gen_saijiki_kt.py` の生成物が持つ。
-現行AndroidとServerは同じ共有Rust render engine `42`を使い、AndroidのDDL engineは`20`である。
-Android固有のKotlin描画engineとAndroidSVG artwork pathはretire済みで、runtime fallbackは無い。
-Stage 1 / 1.5 / 2、Score coerce、Room、履歴、`rh3` identityは引き続きAndroid hostが所有する。
+現行AndroidとServerは同じ共有Rust authoring pipelineとRender Engineを使う。
+Android固有のKotlin描画engine、AndroidSVG artwork path、Kotlinの旧Stage 1 / 1.5 / 2とScore coerceはretire済みで、runtime fallbackは無い。
+UI、provider通信、Room、履歴、`rh3`の計算はAndroid hostが所有する。
 
 ### 検査面
 
 - **`server/tests`** — pytest。ルート認可の網羅（生きたルートを `fastapi.routing.iter_route_contexts` で歩く。**`app.routes` を直に読むと fastapi 0.141 以降は 1 本も取れない**）、API 表面の同一性（`tests/data/api-surface-baseline.json` と照合）、ルート本体の所在（`route.endpoint.__module__` を数える）を含む。
 - **凍結された参照コーパス** — `server/reference/` に版ごとの校正刷りを置く。
-現役は `render-engine-42`（610 件）と `ddl-engine-20`（49 件）で、再生成のバイト一致を CI が強制する。
+最新の凍結は `render-engine-66`（620 件）と `ddl-engine-45`（3 件、共有Rust pipeline）である。新しい版のdirectoryは明示的な全更新checkpointでだけ作り、版の更新ごとには作らない。
 - **Android の参照材料** — `android/app/src/test/resources/server_reference/` はDDL、Score、coerce、履歴互換だけを保持する。
-描画の正本は`server/reference/render-engine-42/`と共有Rust coreであり、Androidへ版別SVG corpusを複製しない。
+描画の正本は共有Rust coreと `server/reference/` の凍結corpusであり、Androidへ版別SVG corpusを複製しない。
 端末受入はcanonical manifestから選んだ少数のrequestをtest assetへ生成し、同梱JNIのSVG byteとraw pixelを直接照合する。
 - **`cli/tests`** — pytest。
 - **`npm run check`** と **`lint:i18n`** / **`lint:models`** / **`lint:recommendations`** — web の型と用語とモデル解決。
 - **`npm run test:unit`** — web の純関数の単体テスト（Node の `node:test`。依存を足していない）。
 - **`scripts/check_docs.py`** — 公開文書の内部参照と、日英の見出し形状と、**英語側の禁止語**（`GLOSSARY.md` §5-1 の 4 語。バックティックの中は識別子として除く）。
 
-**決定的な層**は`coerce/`・`ddl_expander.py`・`core/crates/inku-render/`・`core/crates/inku-svg-raster/`・native request境界・`render_engines/default/`・`renderer.py`・`schema.py`・`saijiki.py`・`language_support/{ja,en}.py`である。出力へ影響する変更では凍結corpusを照合し、native request/outputを変えないと証明したhost-only変更は比例した直接検査を使う。描画内部ではRust coreがplanning、geometry、mark、surface、layer、SVG emission、決定的seed派生、演奏metadataを所有する。raster crateはSVGから明示pixelを作るpresentationだけを所有する。PythonとAndroidが所有するのはhost adapter、解決済み入力、保存／identityとUI固有変換である。
+**決定的な層**は`core/crates/inku-ddl/`・`core/crates/inku-pipeline/`・`core/crates/inku-score/`・`core/crates/inku-render/`・`core/crates/inku-svg-raster/`・native request境界・`saved_score_compat.py`・`render_engines/default/`・`renderer.py`・`schema.py`・`saijiki.py`・`language_support/{ja,en}.py`である。出力へ影響する変更は、変えた挙動を観測する直接検査で確かめ、凍結corpusは明示checkpointで作る。native request/outputを変えないと証明したhost-only変更は比例した直接検査を使う。描画内部ではRust coreがplanning、geometry、mark、surface、layer、SVG emission、決定的seed派生、演奏metadataを所有する。raster crateはSVGから明示pixelを作るpresentationだけを所有する。PythonとAndroidが所有するのはhost adapter、解決済み入力、保存／identityとUI固有変換である。
 
-**CI は 3 本の workflow を回す。**
-`reference-corpus` が凍結コーパスの再生成を照合し、`checks` が
+**CI は 3 本の workflow を持つ。**
+`reference-corpus` は凍結コーパスの再生成を照合するが、手動dispatchでだけ走る。通常のpush・PRでは `checks` が
 **server（ruff と pytest）・cli（ruff と pytest）・web（`npm run check`・`test:unit`・`lint:i18n`）・
 公開文書（`check_docs.py`）**を回す。`android-native` は共有Rust core / raster / JNI / Android hostの
 変更だけで起動し、Rust 1.95、NDK 29、`arm64-v8a` native library、境界のhost JVM testを検査する。

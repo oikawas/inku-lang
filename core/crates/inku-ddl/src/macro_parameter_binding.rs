@@ -8,7 +8,7 @@ use crate::{
     ResolvedMacroInvocation, SourceSpan, project_macro_semantic_ref, resolve_macro_invocations,
 };
 
-/// Stable identity for the runtime-disconnected typed macro parameter binding overlay.
+/// Stable identity for the typed macro parameter binding overlay.
 pub const MACRO_PARAMETER_BINDING_SCHEMA_ID: &str = "inku.macro-parameter-binding.v1";
 
 /// One source-owned value accepted by the closed I-534 parameter schema.

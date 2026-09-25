@@ -272,7 +272,7 @@ uv run inku-cli --base-url http://127.0.0.1:8100 paint "A blue circle in the upp
 | `INKU_SERVER_HOST` | `inku-server` listen host |
 | `INKU_SERVER_PORT` | `inku-server` listen port |
 | `INKU_BASE_URL` | Default API URL for `inku-cli` |
-| `INKU_STAGE_WORKERS` | Concurrent Stage 1 / Stage 2 LLM calls |
+| `INKU_PIPELINE_CONFIG` | Location of the shared pipeline manifest (JSON). Without it, the built-in default is used. Host limits such as the worker count and retained executions can be changed there |
 | `INKU_LLM_REQUEST_TIMEOUT_SECONDS` | Deadline in seconds for shared-pipeline catalog selection and hole completion, and for legacy LLM requests. Defaults to 120. Normalized-DDL Stage 1 uses the dedicated limits below |
 | `INKU_LLM_RETRY_ATTEMPTS` | Maximum attempts within one LLM stage. Defaults to 4; the total time budget still stops further attempts |
 | `INKU_LLM_RETRY_BASE_DELAY` | Delay in seconds before a retry authorized by core. Defaults to 2 |

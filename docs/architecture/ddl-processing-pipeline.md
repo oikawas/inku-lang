@@ -6,7 +6,7 @@ The normal Server, Web, and Android paths use the same shared-Rust authoring sta
 
 | Stage | Input → output | Contract | Owning module |
 |---|---|---|---|
-| Host input | Description or direct DDL → typed command | Only a description start requests model stages. Direct DDL is never sent back through prose | Server pipeline host / Android pipeline host |
+| Host input | Description or direct DDL → typed command | Only a description start requests model stages. The description reaches the core with leading numbers and bracketed comments cut, while the work keeps it as written (Server). Direct DDL is never sent back through prose | Server pipeline host / Android pipeline host |
 | Authoring state machine | Snapshot + command/effect result → next snapshot + event + at most one effect | Deterministic. Provider transport and persistence leave core as typed effects; core decides retry, fallback, and authority transitions | `core/crates/inku-pipeline` |
 | Color catalog selection effect (optional) | Description + catalog candidates → catalog ID | Only for a description start with `catalog_mode=auto`. Failure or an exhausted budget falls back to `default`, records `auto_fallback_default`, and continues | `inku-pipeline` prompt/action; host provider adapter |
 | Sketch effect (optional) | Description → a supplement about place and light | Only when the author chooses it. It never rewrites the description; a failure continues as `fallback` with the description alone | `inku-pipeline` prompt/action; host provider adapter |

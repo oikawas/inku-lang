@@ -5,10 +5,10 @@ use crate::{
     SourceSpan,
 };
 
-/// Stable identity for the runtime-disconnected core-role composition foundation.
+/// Stable identity for the core-role composition foundation.
 pub const CORE_ROLE_COMPOSITION_SCHEMA_ID: &str = "inku.core-role-composition.v4";
 
-/// Stable identity for the runtime-disconnected remaining-role composition foundation.
+/// Stable identity for the remaining-role composition foundation.
 pub const REMAINING_ROLE_COMPOSITION_SCHEMA_ID: &str = "inku.remaining-role-composition.v5";
 
 /// One of the exact core drawing roles typed by this foundation slice.

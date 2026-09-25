@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import itertools
 import json
+import logging
 import secrets
 from collections.abc import Iterator
 from typing import Literal
@@ -36,6 +38,8 @@ from ..rendering import (
     _work_for_color_snapshot,
 )
 
+
+_logger = logging.getLogger(__name__)
 
 router = APIRouter(dependencies=[Depends(_current_user)])
 
@@ -583,15 +587,33 @@ def api_paint_stream(
     idempotency_key: str | None = Header(default=None, alias="Idempotency-Key", max_length=200),
     actor: dict = Depends(_current_user),
 ) -> StreamingResponse:
-    # The shared core owns progress and durable resumption. The compatibility
-    # stream therefore sends its final projection as one NDJSON record; a patch
-    # approval remains an HTTP 409 before streaming starts.
-    result = _pipeline_compat.paint(
+    # The response is committed once the first event is written. Pulling it
+    # here lets a refusal before any layer settles (a label-only description,
+    # a full pool, a failed Stage 1) reach the client as its HTTP status; a
+    # failure after that point arrives as an in-band ``error`` event.
+    events = _pipeline_compat.paint_events(
         actor["id"], req.model_dump(mode="json"), idempotency_key
     )
+    try:
+        first = next(events)
+    except StopIteration:
+        raise _unexpected_http_error("paint", 500) from None
 
     def lines() -> Iterator[str]:
-        yield json.dumps({"event": "done", **result}, ensure_ascii=False) + "\n"
+        try:
+            for event in itertools.chain([first], events):
+                yield json.dumps(event, ensure_ascii=False) + "\n"
+        except HTTPException as e:
+            yield json.dumps(
+                {"event": "error", "status": e.status_code, "detail": e.detail},
+                ensure_ascii=False,
+            ) + "\n"
+        except Exception as e:  # noqa: BLE001
+            _logger.exception("paint stream failed: %s", e)
+            yield json.dumps(
+                {"event": "error", "status": 500, "detail": "unexpected error"},
+                ensure_ascii=False,
+            ) + "\n"
 
     return StreamingResponse(
         lines(),

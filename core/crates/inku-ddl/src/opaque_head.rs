@@ -6,7 +6,7 @@ use crate::{
     SourceSpan, collect_english_noun_phrase_evidence,
 };
 
-/// Stable identity for the runtime-disconnected opaque head-candidate evidence overlay.
+/// Stable identity for the opaque head-candidate evidence overlay.
 pub const OPAQUE_HEAD_CANDIDATE_EVIDENCE_SCHEMA_ID: &str =
     "inku.english-opaque-head-candidate-evidence.v1";
 

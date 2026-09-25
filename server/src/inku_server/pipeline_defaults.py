@@ -24,6 +24,11 @@ ADDITIONAL_RESOURCE_LIMITS = {
 }
 
 
+# The pipeline worker pool: threads that perform effects, executions kept
+# resident, and effects one drain may advance. A manifest may replace these.
+HOST_LIMITS = {"max_workers": 4, "max_effect_steps": 32, "max_retained_runs": 8}
+
+
 def default_manifest(binding: PipelineBinding) -> dict:
     registry = binding.canvas_registry
     palette = json.loads(binding.resolve_palette(_bytes({
@@ -103,5 +108,5 @@ def default_manifest(binding: PipelineBinding) -> dict:
         },
         "provider": {"stage1_model": "nvidia:google/gemma-4-31b-it", "stage2_model": "nvidia:google/gemma-4-31b-it",
                      "max_tokens": 2048, "stage1_max_tokens": 2048},
-        "host_limits": {"max_workers": 4, "max_effect_steps": 32, "max_retained_runs": 8},
+        "host_limits": deepcopy(HOST_LIMITS),
     }

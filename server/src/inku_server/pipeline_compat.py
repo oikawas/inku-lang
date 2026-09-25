@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import time
+from collections.abc import Iterator
 from typing import Any
 
 from fastapi import HTTPException
@@ -212,23 +213,78 @@ def compose(owner: str, data: dict[str, Any]) -> dict:
     return {**view["result"], **_identity(view)}
 
 
+def _start_paint(owner: str, data: dict[str, Any], idempotency_key: str | None) -> dict:
+    options = _options(data, save_history=bool(data.get("save_history", False)))
+    if idempotency_key:
+        options["request_idempotency_key"] = idempotency_key
+    return _service().start(
+        owner,
+        "description",
+        data["description"],
+        canvas_aspect=data.get("canvas_aspect"),
+        options=options,
+    )
+
+
 def paint(owner: str, data: dict[str, Any], idempotency_key: str | None) -> dict:
     if idempotency_key:
         replay = _history_replay(owner, idempotency_key, data)
         if replay is not None:
             return replay
-    options = _options(data, save_history=bool(data.get("save_history", False)))
-    if idempotency_key:
-        options["request_idempotency_key"] = idempotency_key
-    view = _settled(
-        owner,
-        _service().start(
-            owner,
-            "description",
-            data["description"],
-            canvas_aspect=data.get("canvas_aspect"),
-            options=options,
-        ),
-        perform=True,
-    )
+    view = _settled(owner, _start_paint(owner, data, idempotency_key), perform=True)
     return {**view["result"], **_identity(view)}
+
+
+_SKETCH_SETTLED = {"supplemented": "supplemented", "supplied": "supplemented",
+                   "not_needed": "not_needed", "fallback": "fallback"}
+
+
+def _progress(owner: str, view: dict, started: float, sent: set[str]) -> Iterator[dict]:
+    """Each layer that has settled in this view and has not been reported yet."""
+    elapsed = int((time.monotonic() - started) * 1000)
+    sketch = view.get("sketch") or {}
+    if "sketch" not in sent and sketch.get("state") in _SKETCH_SETTLED:
+        sent.add("sketch")
+        yield {"event": "sketch", "sketch_state": _SKETCH_SETTLED[sketch["state"]],
+               "grain": None, "fallback_used": sketch["state"] == "fallback",
+               "tokens_in": None, "tokens_out": None, "elapsed_ms": elapsed}
+    if "stage1" not in sent and view.get("document") is not None:
+        sent.add("stage1")
+        options = _service().execution(owner, view["execution_id"]).context.get("host_options", {})
+        yield {"event": "stage1", "ddl": view["document"]["source"], "thinking": None,
+               "stage1_model": options.get("stage1_model"), "stage2_model": options.get("stage2_model"),
+               "tokens_in": None, "tokens_out": None, "elapsed_ms": elapsed}
+    score = (view.get("delivery") or {}).get("score")
+    if "score" not in sent and score is not None:
+        sent.add("score")
+        options = _service().execution(owner, view["execution_id"]).context.get("host_options", {})
+        yield {"event": "score", "instruction_count": len(score.get("instructions") or []),
+               "stage2_model": options.get("stage2_model"),
+               "tokens_in": None, "tokens_out": None, "elapsed_ms": elapsed}
+
+
+def paint_events(owner: str, data: dict[str, Any], idempotency_key: str | None) -> Iterator[dict]:
+    """The same drawing as `paint`, reporting each layer as it settles (SPEC §12.10).
+
+    Nothing runs until the first event is pulled, so a refusal before the
+    execution starts (a label-only description, a full pool) is raised to the
+    caller, which can still answer with that HTTP status.
+    """
+    if idempotency_key:
+        replay = _history_replay(owner, idempotency_key, data)
+        if replay is not None:
+            yield {"event": "done", **replay}
+            return
+    started = time.monotonic()
+    view = _start_paint(owner, data, idempotency_key)
+    service = _service()
+    sent: set[str] = set()
+    while True:
+        yield from _progress(owner, view, started, sent)
+        if not view.get("busy"):
+            break
+        time.sleep(_POLL_SECONDS)
+        view = service.get(owner, view["variation_id"])
+    view = _settled(owner, view, perform=True)
+    yield from _progress(owner, view, started, sent)
+    yield {"event": "done", **view["result"], **_identity(view)}

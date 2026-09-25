@@ -1,6 +1,6 @@
 # From a description to an SVG — the road of judgments
 
-Where `ddl-processing-pipeline.md` shows the order of the layers, this document follows the **judgments** — under which condition an entered description is treated which way, what is decided where, how failures are absorbed, and what gets recorded, at the level of the implementing functions. On the Server, the primary evidence is `pipeline_compat.py` (the compatibility projection behind `/api/paint`, `/api/paint/stream`, `/api/interpret`, and `/api/compose`), `pipeline_api.py:PipelineService`, and `pipeline_product.py:ProductPipelineEffects`; in the shared core it is `core/crates/inku-pipeline/src/machine.rs` and `inku-ddl/src/compiler_execution.rs`. Android goes through the same shared core, so apart from host-specific parts it follows the same judgments. The snapshot and versions live in `README.md` and `evidence-inventory.md`.
+Where `ddl-processing-pipeline.md` shows the order of the layers, this document follows the **judgments** — under which condition an entered description is treated which way, what is decided where, how failures are absorbed, and what gets recorded, at the level of the implementing functions. On the Server, the primary evidence is `pipeline_compat.py` (with `paint_events` for the stream, the compatibility projection behind `/api/paint`, `/api/paint/stream`, `/api/interpret`, and `/api/compose`), `pipeline_api.py:PipelineService`, and `pipeline_product.py:ProductPipelineEffects`; in the shared core it is `core/crates/inku-pipeline/src/machine.rs` and `inku-ddl/src/compiler_execution.rs`. Android goes through the same shared core, so apart from host-specific parts it follows the same judgments. The snapshot and versions live in `README.md` and `evidence-inventory.md`.
 
 ## Overall flow
 
@@ -9,6 +9,8 @@ flowchart TD
     REQ["POST /api/paint(/stream)"]
     BLANK{"Whitespace only?"}
     E422["422"]
+    LABEL{"Empty once labels are cut?"}
+    E400["400: label-only"]
     IDEM{"Idempotency-Key matches a saved work?"}
     REPLAY["Return the saved work as it is"]
     PREP["Host preparation\noptions, language, Macro catalog, canvas, seeds, colors"]
@@ -43,7 +45,9 @@ flowchart TD
     BLANK -->|"yes"| E422
     BLANK -->|"no"| IDEM
     IDEM -->|"yes"| REPLAY
-    IDEM -->|"no"| PREP --> AUTO
+    IDEM -->|"no"| LABEL
+    LABEL -->|"yes"| E400
+    LABEL -->|"no: cut text to the core, original to the work"| PREP --> AUTO
     AUTO -->|"yes"| CAT
     CAT -->|"failure / budget spent"| CATF --> SK
     CAT -->|"selected"| SK
@@ -71,11 +75,12 @@ flowchart TD
 
 ## What the entry point settles
 
-There are four drawing entry points: `/api/paint` (one response), `/api/paint/stream` (the same result as NDJSON with a single `done` event), `/api/interpret` (up to the saved DDL), and `/api/compose` (starts from the DDL it receives and does not count a work). All four let `pipeline_compat.py` map the request to shared-pipeline options, call `PipelineService.start`, re-read the saved state until the execution settles, and project `view["result"]`. The response also carries the pipeline's variation ID, execution ID, and revision.
+There are four drawing entry points: `/api/paint` (one response), `/api/paint/stream` (the same generation with an NDJSON event as each layer settles), `/api/interpret` (up to the saved DDL), and `/api/compose` (starts from the DDL it receives and does not count a work). All four let `pipeline_compat.py` map the request to shared-pipeline options, call `PipelineService.start`, re-read the saved state until the execution settles, and project `view["result"]`. The response also carries the pipeline's variation ID, execution ID, and revision.
 
 Before the first LLM call, the request and the host settle the following.
 
-- **Whitespace-only description** — the `PaintRequest` validator rejects it with 422. The current Server has no gate that strips leading numbers and bracketed notes or rejects a description that becomes empty after stripping with 400 (only Web's send check has it; `known-differences.md` F-07).
+- **Whitespace-only description** — the `PaintRequest` validator rejects it with 422.
+- **Cutting labels** — leading numbers and bracketed comments are the author's document, not the description. `PipelineService.start` cuts them once with `description_labels.pipeline_description`, and only the cut description reaches the sketch, color catalog selection, Stage 1, and instruction-language detection. The work and its display keep the description as written. Input that is not empty but becomes empty once cut is refused with 400 before any layer runs. Regeneration from a description (`generate_from_description`) follows the same rule.
 - **Idempotent resend** — when `Idempotency-Key` matches a work the same user already saved, that work is returned without creating a new variation. A different description is rejected with 409.
 - **Accepted options** — `RunOptions` validates with `extra="forbid"`. The old request fields `include_trace`, `stage1_input`, `include_thinking`, `auto_repair`, and `sketch_grain` remain in the request model, but the compatibility projection does not pass them to the pipeline.
 - **Instruction language** — `_resolve_instruction_lang` detects it from the description itself and falls back to the UI language when there is no signal.
@@ -187,13 +192,14 @@ The host supplies trusted render options (resolved color map, render seed, wild,
 - The diagnostics are also saved in the history sidecar, so reopening the history restores that revision's diagnostics. If a sidecar is corrupt, only that work shows a warning, and the saved DDL, Score, and SVG stay visible.
 - The log receives only `pipeline_compiler_outcome`: diagnostic counts and a safe projection that excludes the source text.
 - Raw provider traffic is kept only for an execution run in developer mode with `developer_capture_provider_io`, as an owner-scoped record readable through `/api/pipeline/executions/{id}/provider-observations`. It never enters ordinary history, responses, or logs.
-- The stream emits no progress events and returns the final result as one `done` line. An approval wait arrives as a 409 before the stream starts (`known-differences.md` F-08).
+- The stream re-reads the execution and reports, in order, `sketch` (when the sketch ran), `stage1` (the saved DDL), `score` (the instruction count), and `done` (the ordinary response). A failure before the first event arrives as its HTTP status, and a failure after it (including an approval wait for a completion proposal) as an in-band `error` event. Token counts are null because the shared pipeline does not count them.
 
 ## The judgments, in one table
 
 | # | Where | Condition | Consequence | Record |
 |---|---|---|---|---|
 | 1 | Entry | Whitespace-only description | 422; nothing runs | — |
+| 1a | Entry | Description that is empty once labels are cut | 400; nothing runs | — |
 | 2 | Entry | `Idempotency-Key` matches a saved work | Returns the saved work (409 if the description differs) | — |
 | 3 | Entry | Only one half of the variation pair | 422 `variation_pair_required` | — |
 | 4 | Entry | `seed_text` present | Derives `render_seed` deterministically | Both recorded |
@@ -216,6 +222,7 @@ The host supplies trusted render options (resolved color map, render seed, wild,
 | 21 | Performance | Fill cannot be clipped or exceeds clip limits | Omits the whole source and performs again | Renderer diagnostics |
 | 22 | Save | Queue full | Skips the file only; the DB is written | — |
 | 23 | Save | Idempotency key matches | Creates no new row | `_idempotent_replay` |
+| 24 | Stream | Failure after the first event | An `error` event rather than HTTP | Status and detail |
 
 ## Replaying older Scores
 
@@ -227,4 +234,4 @@ The host supplies trusted render options (resolved color map, render seed, wild,
 
 ## Diagram evidence
 
-`PIPE-HOST`, `PIPE-MACHINE`, `PIPE-CATALOG`, `PIPE-SKETCH`, `PIPE-S1`, `PIPE-TYPED-DDL`, `PIPE-HOLE`, `PIPE-S15`, `PIPE-LOWER`, `PIPE-LIMITS`, `PIPE-RENDER`, `PIPE-COMPAT`, `PIPE-HISTORY`, `DATA-AUTHORITY`, `API-LIMIT`, `DATA-DH1`, `DATA-RH3`, `DATA-FALLBACK`. The primary evidence is `pipeline_compat.py`, `pipeline_api.py:PipelineService`, `pipeline_product.py:{prepare,provider_for,render_options,save_result,replay}`, `inku-pipeline/src/machine.rs:{description,stage1,llm_response,failure_with_detail,accept_result}`, `protocol.rs:RetryPolicy`, `inku-ddl/src/compiler_execution.rs:execute_compilation_with_resources`, `inku-render/src/render.rs:render_with_resources`, `saved_score_compat.py`, and `db.py:render_hash_for_item`.
+`PIPE-HOST`, `PIPE-MACHINE`, `PIPE-CATALOG`, `PIPE-SKETCH`, `PIPE-S1`, `PIPE-TYPED-DDL`, `PIPE-HOLE`, `PIPE-S15`, `PIPE-LOWER`, `PIPE-LIMITS`, `PIPE-RENDER`, `PIPE-COMPAT`, `PIPE-HISTORY`, `DATA-AUTHORITY`, `API-LIMIT`, `DATA-DH1`, `DATA-RH3`, `DATA-FALLBACK`. The primary evidence is `pipeline_compat.py:{paint,paint_events}`, `description_labels.py`, `pipeline_api.py:PipelineService`, `pipeline_product.py:{prepare,provider_for,render_options,save_result,replay}`, `inku-pipeline/src/machine.rs:{description,stage1,llm_response,failure_with_detail,accept_result}`, `protocol.rs:RetryPolicy`, `inku-ddl/src/compiler_execution.rs:execute_compilation_with_resources`, `inku-render/src/render.rs:render_with_resources`, `saved_score_compat.py`, and `db.py:render_hash_for_item`.

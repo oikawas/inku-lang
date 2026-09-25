@@ -243,6 +243,7 @@ class ProductPipelineEffects:
 
     def provider_for(self, owner: str, context: dict):
         from . import db
+        from .api_core.state import _increment_stage_stat
         options = context.get("host_options", {})
         configured = self.manifest["provider"]
         def perform(action):
@@ -260,7 +261,14 @@ class ProductPipelineEffects:
                 owner,
                 context["execution_id"],
             ) if options.get("developer_capture_provider_io") is True else None)
+            _increment_stage_stat("submitted")
             result = transport(action)
+            if result["tag"] != "provider_failed":
+                _increment_stage_stat("completed")
+            elif result["failure"] == "transport_timeout":
+                _increment_stage_stat("timed_out")
+            else:
+                _increment_stage_stat("failed")
             metrics = context.setdefault("metrics", {})
             metrics[stage] = metrics.get(stage, 0) + int(result["elapsed_ms"])
             if result["tag"] == "provider_failed":

@@ -1,6 +1,6 @@
 # inku architecture
 
-This documentation maps the DDL design stages to the current implementation and to the boundaries among Web, Server, CLI, Android, external providers, and persistence. The implementation baseline is public commit `46f17da8c5b438511f9bd915395763262b55fb72`, app `v2.15.28 / Build 1104`, Render Engine 68, DDL engine 47. It describes the structure after the 2026-09-14 shared Rust pipeline cutover.
+This documentation maps the DDL design stages to the current implementation and to the boundaries among Web, Server, CLI, Android, external providers, and persistence. The implementation baseline is public commit `f910a11e165ae3169818f3f1311ee869d33930ed`, app `v2.15.28 / Build 1104`, Render Engine 68, DDL engine 47, plus the fixes for `known-differences.md` F-05 through F-10. It describes the structure after the 2026-09-14 shared Rust pipeline cutover.
 
 ## Reading order
 

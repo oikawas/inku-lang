@@ -52,7 +52,12 @@ PUBLIC = {  # every entry needs a reason
 #   organisation group. The listing filter that reads the bit is an argument on
 #   a route that already exists, so it adds none.
 #   -1 for retiring GET /api/history/{item_id}/neighbors with Nearby works.
-EXPECTED_ROUTE_COUNT = 95
+#   +11 for the shared pipeline router (/api/pipeline/*: canvas formats,
+#   variations and their forks, execution commands, author DDL, history links
+#   and forks, older works and their forks, provider observations), and
+#   -1 for retiring GET /api/prompts when the Python prompt layers left.
+#   Both landed with the shared Rust cutover and were not counted then.
+EXPECTED_ROUTE_COUNT = 105
 
 
 def _guard_names(dependant, seen=None) -> set[str]:

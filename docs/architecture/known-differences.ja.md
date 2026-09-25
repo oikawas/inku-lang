@@ -12,13 +12,13 @@
 
 - 2026-08-24に冒頭を当時の実装へ同期したが、現行の冒頭（最終更新 2026-09-25）は`2.1.4-android.80`、render engine `67`、DDL engine version `20`、serverの`ddl_engine_version` 21と記す。
 - 実装はRender Engine `68`（`core/crates/inku-render/src/lib.rs`）、`ddl_engine_version` `47`（`layer_versions.py`）で、Androidは同じ共有Rust pipelineを使う。
-- 判定: **版の数字が古い**。engine identityはKotlin製品定数でなく同梱native libraryから読むため、runtimeの挙動ではなく文書の差異である。
+- 判定: **版の数字が古い**。engine identityはKotlin製品定数でなく同梱native libraryから読むため、runtimeの挙動ではなく文書の差異である。2026-09-25にAndroid担当へ引き継いだ。
 
 ### F-03 Android外部provider実行
 
 - Android仕様メモの「未実装」節は、外部provider executionを未実装とし、provider recordをcompatibility data structuresと記す。
 - 現行 `RoutingModelProvider` はenabled providerを解決し、`GeminiModelProvider`と`OpenAiCompatibleProvider`へ接続する。共有pipelineのprovider effectは`SingleAttemptModelEffectProvider`がこれらへ送る。同じ仕様メモの前半もGeminiとOpenAI互換への要求条件を記している。
-- 判定: **「未実装」節が古い**。Anthropic固有protocolの実装は確認できず、全providerの同等性は主張しない。
+- 判定: **「未実装」節が古い**。Anthropic固有protocolの実装は確認できず、全providerの同等性は主張しない。2026-09-25にAndroid担当へ引き継いだ。
 
 ### F-04 Stage 1.5の長い旧説明（解消）
 
@@ -26,52 +26,53 @@
 - 現行の§12.11は、`CanonicalReady`のtyped meaningだけを受けて焦点と明示変奏だけを変えるtyped transformationとして書き直されている。
 - 判定: **解消済み**。
 
-### F-05 Project Contextに残る古い記述
+### F-05 Project Contextに残る古い記述（解消）
 
-- `PROJECT_CONTEXT.ja.md`の「版」表はRender Engine `66`、DDL `ddl_version` 11 / `ddl_engine_version` 45、Android `2.1.4-android.78`と記す。実装は68、13 / 47、`2.1.4-android.80`である。
-- 同書のandroid節は「AndroidとServerは同じ共有Rust render engine `42`、AndroidのDDL engineは`20`」「Stage 1 / 1.5 / 2、Score coerce、Room、履歴、`rh3` identityはAndroid hostが所有」と記すが、Androidは共有Rust pipelineへ移っている（同書の「パイプラインの各層」節は現行を記す）。
-- 同書の検査面は現役corpusを`render-engine-42`（610件）と`ddl-engine-20`（49件）、「再生成のバイト一致をCIが強制」と記す。実装の最新凍結はRender Engine 66（620件）とDDL engine 45（3件）で、corpus比較は手動dispatchだけのworkflowである（`server/reference/README.md`は明示checkpoint以外で生成・比較しない方針を記す）。
-- 同書の「決定的な層」に削除済みの`coerce/`（観測互換だけが残る）と`ddl_expander.py`が残り、「RAW trace（`include_trace`）」の記述も残る。現行の互換投影は`include_trace`をpipelineへ渡さず、traceを返さない。
-- 同書の語彙節は正本を`schema.py`と`saijiki.py`とするが、同じ書の設計契約節と実装は共有coreの`saijiki-v1.json`を正本とする。
-- 判定: **Project Contextの一部が実装より古い**。本書群は実装と、実装に一致するSPEC・reference READMEに従った。
+- 旧snapshotの`PROJECT_CONTEXT.ja.md`は、版の表（Render Engine 66、DDL 11 / 45、Android `2.1.4-android.78`）、android節（render engine 42、DDL engine 20、Android hostがStage 1 / 1.5 / 2とcoerceを所有）、検査面（`render-engine-42`・`ddl-engine-20`をCIが強制）、決定的な層（`coerce/`・`ddl_expander.py`）、RAW trace、語彙の正本（`schema.py`）で実装より古かった。
+- 2026-09-25に日英とも現行へ直した。
+- 判定: **解消済み**。
 
-### F-06 route数の検査定数
+### F-06 route数の検査定数（解消）
 
-- 静的な数え上げでは、10 routerの94 endpointと`/api/pipeline`の11 endpointで計105である。
-- `test_route_authorization.py`の`EXPECTED_ROUTE_COUNT`は95で、そのコメントは`/api/pipeline/*`の追加と`/api/prompts`の削除を記録していない。`tests/data/api-surface-baseline.json`も95 operationで、退役済みの`/api/prompts`を含み`/api/pipeline/*`を含まない。
-- `/api/pipeline/*`は2026-09-13（`2ad24df9`）に加わり、`/api/prompts`は2026-09-14（`03bbd686`）に削除された。
-- 判定: **検査定数とbaselineが現行routeと食い違う**と推定する。本調査はnative wheelの無い環境でapp importが失敗したため、live routeの数え上げと当該testの実行はしていない。
+- `test_route_authorization.py`の`EXPECTED_ROUTE_COUNT`は95のままで、`/api/pipeline/*`の11本の追加（2026-09-13、`2ad24df9`）と`/api/prompts`の削除（2026-09-14、`03bbd686`）を数えていなかった。`tests/data/api-surface-baseline.json`も同じ時点のままだった。
+- 2026-09-25に定数を105へ直し、baselineをlive appから作り直した（105 operation、160 schema）。native wheelを入れた環境で`test_route_authorization.py`が通ることを確認した。
+- 判定: **解消済み**。
 
-### F-07 札だけの記述の門
+### F-07 札だけの記述の門（解消）
 
-- `SPEC.ja.md` §12.16は、描く3経路（`/api/interpret`・`/api/paint`・`/api/paint/stream`）が行頭番号と角括弧注記を切った結果が空の記述を400で断り、空白だけを422で断ると記す。
-- 現行Serverには切除の実装（旧`description_labels.py`）が無く、記述はそのまま共有pipelineへ渡る。422の空白判定だけが`PaintRequest`に残る。Webは`description-labels.ts`で送信可否を判定し、そのコメントは削除済みのServer fileを正本として名指す。
-- 判定: **仕様と実装が異なる**。Web以外のclient（CLI等）から札だけの記述を送った場合の扱いは、仕様の400ではない。
+- cutoverで旧`description_labels.py`が削除され、行頭の連番と角括弧のコメントがStage 1・写生・色カタログ選択へそのまま届き、札だけの記述も400にならなかった（`SPEC.ja.md` §12.16と不一致）。
+- 2026-09-25に`description_labels.py`を戻し、`PipelineService.start`（記述起点の全経路）と記述からの再生成で、coreへ渡す記述だけから札を切るようにした。作品には書いたままの記述が残り、札だけの記述は400になる。
+- 判定: **解消済み**。Androidは切除を持ったことがなく、この門はServerの境界にある。
 
-### F-08 streamの進行event
+### F-08 streamの進行event（解消）
 
-- `SPEC.ja.md` §12.10は、`POST /api/paint/stream`が`sketch`・`stage1`・`score`・`done`の順に進行を知らせると記す。
-- 現行の互換streamは、共有pipelineの実行が落ち着いた後に最終結果を`done` 1行だけで返す。補完案の承認待ちはstream開始前の409で届く。進行はWebの`/api/pipeline` viewが読み直しで表示する。
-- 判定: **仕様と実装が異なる**。
+- cutover後の互換streamは、最終結果を`done` 1行だけで返していた（`SPEC.ja.md` §12.10と不一致）。
+- 2026-09-25に、実行を読み直して`sketch`（写生を通した場合）・`stage1`・`score`・`done`を順に出す形へ戻した。最初のeventより前の拒否はHTTPの状態で、後の失敗（補完案の承認待ちを含む）は本文の`error` eventで届く。token数は共有pipelineが数えないためnullである。
+- 判定: **解消済み**。
 
-### F-09 実装内の古い説明文
+### F-09 実装内の古い説明文（解消）
 
-- `core/crates/inku-pipeline/README.md`は「effect tagは4つ」「candidate APIは既存runtimeを切り替えない」「既存のruntime promptは変わらない」と記す。実装のeffectは`generate_sketch`を加えた5つで、共有pipelineが通常runtimeである。
-- `persistence/variation_authority.py`のmodule docstringは「通常のServer runtimeはこれらの表をimportもinstallもしない」と記すが、`pipeline_runtime.py`が通常serviceの保存先として使う。
-- `inku-ddl`の一部module（`compiler_lock.rs`、`composition_plan.rs`、`document.rs`、`macro_definition.rs`、`score_lowering.rs`等）のdoc commentに「runtime-disconnected」が残る。`inku-score/src/types.rs`は「Pythonがschemaの正本」と記す。
-- 判定: **説明文の差異**で、挙動の差ではない。
+- `core/crates/inku-pipeline/README.md`（effect tagの数、candidate APIがruntimeを切り替えない等）、`persistence/variation_authority.py`のdocstring、`inku-ddl`のdoc commentの「runtime-disconnected」が、共有pipelineが通常runtimeになった後も残っていた。
+- 2026-09-25に直した。旧snapshotで挙げた`inku-score`の「Python由来のraw Score JSON Schema」は、`score.schema.json`が今もPythonの`Score`と照合される成果物なので、差異から外した。
+- 判定: **解消済み**。
 
-### F-10 Stage executorの残り
+### F-10 Stage executorの残り（解消）
 
-- `api_core/state.py`は`INKU_STAGE_WORKERS` / `INKU_STAGE_QUEUE_LIMIT`でStage executorとslotを作り、`/api/settings/status`がその件数を返す。
-- 現行コードにこのexecutorへjobを投入する箇所は無い。LLM effectは`PipelineService`のthread poolで走る。
-- 判定: **状態表示だけが残る**。表示される値は現在のLLM処理量を表さない。
+- `INKU_STAGE_WORKERS` / `INKU_STAGE_QUEUE_LIMIT`のStage executorは投入元が無く、`/api/settings/status`の`stage_execution`は使われないpoolと動かない件数を示していた。`SPEC.ja.md` §22とSETUPもこのexecutorを説明していた。
+- 2026-09-25にexecutorを外し、`stage_execution`が共有pipelineのworker pool（`workers`は`max_workers`、`queue_limit`は`max_retained_runs`）とprovider effectの件数を示すようにした。応答schemaは変えていない（権限グループ導入前から凍結されたschemaである）。SPEC §22とSETUPも改めた。
+- 判定: **解消済み**。
 
 ### F-11 Android端末受入の参照corpus
 
-- `prepareRustParityAssets`と`NativeRenderDeviceTest`は`server/reference/render-engine-41`の少数caseを端末へ取り込み、SVG byteを照合する。`android-native.yml`のpath条件も`render-engine-41`を名指す。
-- 現行のRender Engineは68で、最新の凍結corpusは66である。
-- 判定: **未確認**。取り込んだcaseがEngine 68でも同じbyteを出すかは今回確認していない。
+- `prepareRustParityAssets`と`NativeRenderDeviceTest`は`server/reference/render-engine-41`の少数caseを端末へ取り込み、SVG byteを照合する。同testは`NativeRenderBridge.renderEngineVersion()`が`"41"`であることも表明し、`android-native.yml`のpath条件も`render-engine-41`を名指す。
+- 同梱libraryのRender Engineは68なので、この表明は成り立たない。期待SVGもEngine 41のもので、現行engineと同じbyteである保証が無い。
+- 判定: **端末受入が失敗する状態**と推定する（端末では実行していない）。直すにはbuild時に同じcommitのhost coreで期待SVGを作る等の変更とPixel 9での受入が要るため、2026-09-25にAndroid担当へ引き継いだ。
+
+### F-12 hole補完のAPI testの偽provider
+
+- `server/tests/test_pipeline_api.py::test_managed_api_persists_approved_patch_reload_and_legacy_fork`の偽providerは、hole補完要求の本文から`base_source_digest`等を読んで応答する。
+- 現行のhole補完prompt（`inku.visible-ddl-hole-completion-prompt.v3`）はdigestやbyte位置をproviderへ渡さない（`SPEC.ja.md` §12.7.1）。このtestは修正前のcommit（`f910a11e`）でも`KeyError: 'base_source_digest'`で失敗する。
+- 判定: **testがprompt v3に追随していない**。本更新では直していない。
 
 ## 文書間で注意が必要な語
 
@@ -107,7 +108,6 @@ Session、current-workのsubmit/replay/stop、Batch/Demoの非同期lifecycle、
 - 外部LLM providerの現在の到達性、model availability、latency。静的provider routingだけを確認した。
 - Redis rate limiterが実配備で有効か。`INKU_REDIS_URL`の値を読んでいない。
 - Compose imageの現在の稼働状態とvolume persistence。設定は確認したが起動していない。
-- live appのroute数。本調査の環境にnative wheelが無く、app importが失敗したため、route数は宣言の静的な数え上げによる（F-06）。
 - Android端末受入の現行結果（F-11）。
 - Mermaid図の実際の表示。本書群の全44図はmermaid 11のparserで構文を確認したが、GitHub／Gitea上の表示は確認していない。
 
@@ -117,9 +117,7 @@ Session、current-workのsubmit/replay/stop、Batch/Demoの非同期lifecycle、
 
 ## 今後確認すべき質問
 
-1. Project Context（F-05）とAndroid仕様メモ（F-02、F-03）の古い記述を、現行実装に合わせて更新するか。
-2. route数の検査定数とAPI surface baseline（F-06）を現行routeへ合わせるか。
-3. 札だけの記述の門（F-07）とstreamの進行event（F-08）について、SPECを実装へ合わせるか、実装をSPECへ戻すか。
-4. 使われていないStage executor（F-10）と、Android端末受入の参照corpus（F-11）をどう扱うか。
+1. Android仕様メモ（F-02、F-03）と端末受入の参照corpus（F-11）は、Android担当の修正と受入を待つ。
+2. hole補完のAPI test（F-12）を、hole補完prompt v3の要求と応答の形へ合わせるか。
 
 これらは本調査で実装・仕様を変更する課題ではないため、台帳への自動転記はしていない。

@@ -6,7 +6,7 @@ use crate::{
     parse_clause_stream,
 };
 
-/// Stable identity for the runtime-disconnected English noun-phrase evidence foundation.
+/// Stable identity for the English noun-phrase evidence foundation.
 pub const NOUN_PHRASE_EVIDENCE_SCHEMA_ID: &str = "inku.english-noun-phrase-evidence.v1";
 
 /// Canonical identity of an accepted English determiner function word.

@@ -378,7 +378,7 @@ class InkuRepository(
         defaultProviderSettings().forEach { setting ->
             val existing = database.providerSettingDao().get(setting.providerId)
             database.providerSettingDao().upsert(
-                setting.copy(
+                builtInProviderSetting(setting, existing).copy(
                     encryptedApiKey = existing?.encryptedApiKey?.let { key ->
                         if (AndroidSecretBox.isEncrypted(key)) key else AndroidSecretBox.decryptOrPlain(key)?.let(AndroidSecretBox::encrypt)
                     } ?: setting.encryptedApiKey,
@@ -1126,6 +1126,30 @@ class InkuRepository(
             ExportTemplateEntity("png-4320", "PNG 4320px", "", 4320, 2, true, now),
         )
     }
+}
+
+/**
+ * A built-in connection as it is stored again at start-up.
+ *
+ * The author may rename a built-in service and point it at another base URL
+ * (ANDROID_SPEC 2026-05-08), and the server keeps both edits
+ * (`model_settings.py` `normalize_model_settings`). This used to write the
+ * catalog's name and URL back over them on every start and before every model
+ * list fetch, so an edited Ollama URL was gone before the fetch it was made
+ * for. The kind and the switch still come from the catalog: neither is an
+ * author setting any more, and a switch left off by an older version would
+ * have no control to turn it back on. The local provider's URL is only a
+ * marker and stays the catalog's.
+ */
+internal fun builtInProviderSetting(
+    catalog: ProviderSettingEntity,
+    existing: ProviderSettingEntity?,
+): ProviderSettingEntity {
+    if (existing == null) return catalog
+    return catalog.copy(
+        displayName = existing.displayName.takeIf { it.isNotBlank() } ?: catalog.displayName,
+        baseUrl = if (catalog.isDefaultLocal) catalog.baseUrl else existing.baseUrl?.takeIf { it.isNotBlank() } ?: catalog.baseUrl,
+    )
 }
 
 internal fun refinementColorSnapshot(parent: RefinementParent, plan: RefinementPlan) =

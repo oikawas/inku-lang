@@ -562,20 +562,12 @@ fn in_any_transform_group(groups: &[TransformGroup], index: usize) -> bool {
         .any(|group| group.start <= index && index < group.end)
 }
 
-fn uses_compact_resource_contract(score: &inku_score::Score) -> bool {
-    score.version == "0.10.0"
-        || (matches!(
-            score.version.as_str(),
-            "0.11.0" | "0.12.0" | "0.13.0" | "0.14.0" | "0.15.0"
-        ) && score.resource_policy.is_some())
-}
-
 /// Resolve checked relations and transform scopes through one dependency executor.
 pub fn resolve_checked_performance(
     request: PerformanceRequest<'_>,
     policy: ScoreErrorPolicy,
 ) -> Result<PerformancePlan, CheckedPerformanceError> {
-    if uses_compact_resource_contract(request.score) {
+    if request.score.uses_compact_resource_contract() {
         return Err(CheckedPerformanceError {
             diagnostics: vec![ScoreExecutionDiagnostic {
                 instruction_index: 0,
@@ -654,7 +646,7 @@ pub(crate) fn resolve_checked_performance_with_resources_and_omissions(
     operational_budget: inku_score::OperationalResourceBudget,
     omitted_original_instruction_indices: &[usize],
 ) -> Result<PerformancePlan, CheckedPerformanceWithResourcesError> {
-    if !uses_compact_resource_contract(request.score) {
+    if !request.score.uses_compact_resource_contract() {
         inku_score::check_legacy_resource_demand(request.score, hard_policy, operational_budget)?;
         return resolve_checked_performance(request, policy).map_err(Into::into);
     }

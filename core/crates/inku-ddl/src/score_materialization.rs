@@ -418,7 +418,7 @@ pub fn materialize_selected_composition(
     }
     let score = Score {
         version: if !mirror_relations.is_empty() {
-            "0.15.0"
+            inku_score::ScoreEdition::V0_15
         } else if placement_groups
             .iter()
             .any(|group| group.cycle_members.is_some())
@@ -426,7 +426,7 @@ pub fn materialize_selected_composition(
                 .iter()
                 .any(|group| group.cycle_members.is_some())
         {
-            "0.14.0"
+            inku_score::ScoreEdition::V0_14
         } else if instructions.iter().any(|instruction| {
             instruction.relation.as_ref().is_some_and(|relation| {
                 matches!(
@@ -437,7 +437,7 @@ pub fn materialize_selected_composition(
                 )
             })
         }) {
-            "0.13.0"
+            inku_score::ScoreEdition::V0_13
         } else if instructions.iter().any(|instruction| {
             instruction.ink_spread.is_some()
                 || instruction
@@ -445,7 +445,7 @@ pub fn materialize_selected_composition(
                     .as_ref()
                     .is_some_and(|relation| relation.target_endpoint.is_some())
         }) {
-            "0.12.0"
+            inku_score::ScoreEdition::V0_12
         } else if instructions.iter().any(|instruction| {
             instruction.relation.as_ref().is_some_and(|relation| {
                 matches!(
@@ -454,10 +454,11 @@ pub fn materialize_selected_composition(
                 )
             })
         }) {
-            "0.11.0"
+            inku_score::ScoreEdition::V0_11
         } else {
-            "0.10.0"
+            inku_score::ScoreEdition::V0_10
         }
+        .as_str()
         .to_owned(),
         canvas: plan.ground().cloned().map_or_else(
             || Canvas::Id(plan.context().canvas_format().id.to_owned()),

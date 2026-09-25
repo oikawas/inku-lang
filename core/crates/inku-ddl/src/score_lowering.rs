@@ -3456,7 +3456,7 @@ fn lower_verified_stage15_shared<'a>(
                 )
             })
         }) {
-            "0.13.0".to_owned()
+            inku_score::ScoreEdition::V0_13.as_str().to_owned()
         } else if instructions.iter().any(|instruction| {
             instruction.ink_spread.is_some()
                 || instruction
@@ -3464,14 +3464,14 @@ fn lower_verified_stage15_shared<'a>(
                     .as_ref()
                     .is_some_and(|relation| relation.target_endpoint.is_some())
         }) {
-            "0.12.0".to_owned()
+            inku_score::ScoreEdition::V0_12.as_str().to_owned()
         } else if instructions.iter().any(|instruction| {
             instruction
                 .relation
                 .as_ref()
                 .is_some_and(|relation| relation.target_path_position.is_some())
         }) {
-            "0.11.0".to_owned()
+            inku_score::ScoreEdition::V0_11.as_str().to_owned()
         } else {
             score_wire_version()
         },

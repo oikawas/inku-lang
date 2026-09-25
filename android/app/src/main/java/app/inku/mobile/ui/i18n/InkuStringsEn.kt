@@ -33,6 +33,7 @@ object InkuStringsEn : InkuStrings {
     override val productionTools = "Studio tools"
     override val reviseWork = "Refine this work"
     override val interpretationToggle = "View interpretation"
+    override val interpretationHide = "Hide interpretation"
 
     // 生成 is not "generating": Stage 1 interprets and Stage 2 performs, which is
     // what those stages are called throughout (GLOSSARY §2).
@@ -44,6 +45,12 @@ object InkuStringsEn : InkuStrings {
     override val statusComposeFailed = "Composing failed."
     override val statusSaved: (String) -> String = { hash -> "Saved $hash" }
     override val statusSaveFailed = "Saving failed."
+    override val restoreDrawingFailed = "Could not restore the last drawing."
+    override val pipelineDeclineFailed = "Could not decline the DDL changes."
+    override val drawingContextUnreadable = "Could not read the drawing context."
+    override val drawingContextMissing = "The drawing context is missing."
+    override val demoFailed = "The demo drawing failed."
+    override val licenseUpdateFailed = "Could not save the license acceptance."
     override val pipelineProposal = "Review the proposed DDL changes."
     override val pipelineOriginalDdl = "Current DDL"
     override val pipelineProposedDdl = "Proposed DDL"
@@ -310,6 +317,7 @@ object InkuStringsEn : InkuStrings {
     override val uiModeFullLong = "Full layout"
     override val promptLabel = "Description"
     override val searchPlaceholderLong = "Search descriptions, hashes and models"
+    override val noMatchingWorks = "No works match."
     override val mascotTitle = "Mascot"
     override val model = "Model"
     override val modelListFetch = "Fetch the model list"
@@ -510,6 +518,7 @@ object InkuStringsEn : InkuStrings {
     override val filteredOfTotal: (Int, Int) -> String = { filtered, total -> "$filtered of $total" }
     override val groupAlternatives: (String) -> String = { group -> "$group / alternatives" }
     override val lineNumber: (Int) -> String = { line -> "line $line" }
+    override val batchHistoryPill: (String, Int) -> String = { first, lines -> "$first ($lines line${if (lines == 1) "" else "s"})" }
     override val ofOneHundred: (Int) -> String = { count -> "$count of 100" }
     override val apiKeyDeleteBody: (String) -> String = { name -> "Deletes the stored API key for $name." }
     override val serviceDeleteBody: (String) -> String = { name -> "Removes $name from the model services." }

@@ -11,7 +11,6 @@ import app.inku.mobile.ui.i18n.InkuStrings
 import app.inku.mobile.ui.i18n.UiLanguage
 import app.inku.mobile.ui.i18n.inkuError
 import app.inku.mobile.ui.i18n.messageFor
-import app.inku.mobile.ui.i18n.safeErrorMessage
 import app.inku.mobile.ui.i18n.stringsFor
 import app.inku.mobile.data.InkuRepository
 import app.inku.mobile.data.db.HistoryItemEntity
@@ -499,7 +498,7 @@ class InkuViewModel @JvmOverloads constructor(
                         presentPipelineView(view)
                     }
                 }
-                .onFailure { error -> localState.value = localState.value.copy(message = safeErrorMessage(error, "Could not restore drawing.")) }
+                .onFailure { error -> localState.value = localState.value.copy(message = messageFor(error, strings(), strings().restoreDrawingFailed)) }
             withContext(Dispatchers.IO) {
                 repeat(4) {
                     repository.backfillMissingThumbnails(limit = 8)
@@ -649,7 +648,7 @@ class InkuViewModel @JvmOverloads constructor(
         viewModelScope.launch {
             runCatching { withContext(Dispatchers.IO) { repository.declinePipelinePatch(view.executionId) } }
                 .onSuccess { if (localState.value.pipelineView?.executionId == view.executionId) presentPipelineView(it) }
-                .onFailure { localState.value = localState.value.copy(message = safeErrorMessage(it, "Could not decline changes.")) }
+                .onFailure { localState.value = localState.value.copy(message = messageFor(it, strings(), strings().pipelineDeclineFailed)) }
         }
     }
 
@@ -1877,8 +1876,8 @@ class InkuViewModel @JvmOverloads constructor(
                 historyAuthority = history?.authority ?: view?.authority,
                 historyAuthorityLoading = false,
                 message = history?.warning
-                    ?: pipelineView.exceptionOrNull()?.let { safeErrorMessage(it, "Could not read drawing context.") }
-                    ?: managed.exceptionOrNull()?.let { safeErrorMessage(it, "Could not read drawing context.") }
+                    ?: pipelineView.exceptionOrNull()?.let { messageFor(it, strings(), strings().drawingContextUnreadable) }
+                    ?: managed.exceptionOrNull()?.let { messageFor(it, strings(), strings().drawingContextUnreadable) }
                     ?: current.message,
             )
         }
@@ -2226,7 +2225,7 @@ class InkuViewModel @JvmOverloads constructor(
                     localState.value = localState.value.copy(
                         isDrawing = false,
                         historyAuthorityLoading = false,
-                        message = managed?.warning ?: read.exceptionOrNull()?.let { safeErrorMessage(it, "Could not read drawing context.") } ?: "Drawing context is missing.",
+                        message = managed?.warning ?: read.exceptionOrNull()?.let { messageFor(it, strings(), strings().drawingContextUnreadable) } ?: strings().drawingContextMissing,
                     )
                     return@launch
                 }
@@ -2449,7 +2448,7 @@ class InkuViewModel @JvmOverloads constructor(
                     if (error is CancellationException) throw error
                     if (!isCurrentDrawingRun(runId)) return@onFailure
                     if (presentPipelineInteraction(error)) return@launch
-                    failures = (failures + BatchFailure(lineNumber, prompt, safeErrorMessage(error, "Draw failed."))).take(30)
+                    failures = (failures + BatchFailure(lineNumber, prompt, messageFor(error, strings(), strings().statusDrawFailed))).take(30)
                     localState.value = localState.value.copy(
                         batchSuccess = success,
                         batchFailures = failures,
@@ -2578,7 +2577,7 @@ class InkuViewModel @JvmOverloads constructor(
                         if (presentPipelineInteraction(error)) return@launch
                         localState.value = localState.value.copy(
                             demoCurrentElapsedMs = System.currentTimeMillis() - startedAt,
-                            message = safeErrorMessage(error, "Demo failed."),
+                            message = messageFor(error, strings(), strings().demoFailed),
                         )
                         delay(1000)
                     }
@@ -3129,7 +3128,7 @@ class InkuViewModel @JvmOverloads constructor(
             runCatching {
                 repository.acceptModelLicense(modelId)
             }.onFailure { error ->
-                localState.value = localState.value.copy(message = safeErrorMessage(error, "License update failed."))
+                localState.value = localState.value.copy(message = messageFor(error, strings(), strings().licenseUpdateFailed))
             }
         }
     }

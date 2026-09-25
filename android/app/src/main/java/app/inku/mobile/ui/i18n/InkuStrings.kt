@@ -52,6 +52,7 @@ interface InkuStrings {
     val productionTools: String
     val reviseWork: String
     val interpretationToggle: String
+    val interpretationHide: String
 
     // --- Drawing status -----------------------------------------------------
     val statusStage1: String
@@ -62,6 +63,12 @@ interface InkuStrings {
     val statusComposeFailed: String
     val statusSaved: (String) -> String
     val statusSaveFailed: String
+    val restoreDrawingFailed: String
+    val pipelineDeclineFailed: String
+    val drawingContextUnreadable: String
+    val drawingContextMissing: String
+    val demoFailed: String
+    val licenseUpdateFailed: String
     val pipelineProposal: String
     val pipelineOriginalDdl: String
     val pipelineProposedDdl: String
@@ -221,6 +228,7 @@ interface InkuStrings {
     val uiModeFullLong: String
     val promptLabel: String
     val searchPlaceholderLong: String
+    val noMatchingWorks: String
     val mascotTitle: String
     val model: String
     val modelListFetch: String
@@ -417,6 +425,7 @@ interface InkuStrings {
     val filteredOfTotal: (Int, Int) -> String
     val groupAlternatives: (String) -> String
     val lineNumber: (Int) -> String
+    val batchHistoryPill: (String, Int) -> String
     val ofOneHundred: (Int) -> String
     val apiKeyDeleteBody: (String) -> String
     val serviceDeleteBody: (String) -> String

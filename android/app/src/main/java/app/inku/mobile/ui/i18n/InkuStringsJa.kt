@@ -26,18 +26,25 @@ object InkuStringsJa : InkuStrings {
     override val productionTools = "制作ツール"
     override val reviseWork = "この作品を推敲"
     override val interpretationToggle = "解釈を見る"
+    override val interpretationHide = "解釈を閉じる"
 
     override val statusStage1 = "Stage 1: DDL生成中..."
     override val statusStage2 = "Stage 2: 画像生成中..."
     override val statusComposingFromDdl = "DDLからScoreを構成しています..."
     override val statusStopped = "停止しました。"
-    // Both fallbacks were already written in English before the pack existed.
-    // They are kept as they were: translating into the source language would be
-    // changing the Japanese, which a translation pass does not do.
-    override val statusDrawFailed = "Draw failed."
-    override val statusComposeFailed = "Compose failed."
+    // Both were English before the pack existed and were left so by the
+    // translation pass; on the Japanese screen they stood out as the only
+    // English failure lines.
+    override val statusDrawFailed = "描画に失敗しました。"
+    override val statusComposeFailed = "DDLからの構成に失敗しました。"
     override val statusSaved: (String) -> String = { hash -> "保存しました $hash" }
     override val statusSaveFailed = "保存に失敗しました。"
+    override val restoreDrawingFailed = "前回の描画を復元できませんでした。"
+    override val pipelineDeclineFailed = "DDLの変更案を断れませんでした。"
+    override val drawingContextUnreadable = "描画の状態を読めませんでした。"
+    override val drawingContextMissing = "描画の状態が見つかりません。"
+    override val demoFailed = "デモの描画に失敗しました。"
+    override val licenseUpdateFailed = "ライセンスへの同意を保存できませんでした。"
     override val pipelineProposal = "DDLの変更案を確認してください。"
     override val pipelineOriginalDdl = "現在のDDL"
     override val pipelineProposedDdl = "変更後のDDL"
@@ -282,6 +289,7 @@ object InkuStringsJa : InkuStrings {
     override val uiModeFullLong = "フルモード表示"
     override val promptLabel = "プロンプト"
     override val searchPlaceholderLong = "プロンプト・ハッシュ・モデルで検索"
+    override val noMatchingWorks = "条件に合う作品はありません。"
     override val mascotTitle = "マスコット選択"
     override val model = "モデル"
     override val modelListFetch = "モデルリスト取得"
@@ -478,6 +486,7 @@ object InkuStringsJa : InkuStrings {
     override val filteredOfTotal: (Int, Int) -> String = { filtered, total -> "$filtered/${total}件" }
     override val groupAlternatives: (String) -> String = { group -> "$group / 代替候補" }
     override val lineNumber: (Int) -> String = { line -> "${line}行目" }
+    override val batchHistoryPill: (String, Int) -> String = { first, lines -> "$first（${lines}行）" }
     override val ofOneHundred: (Int) -> String = { count -> "${count}件/100件" }
     override val apiKeyDeleteBody: (String) -> String = { name -> "$name の保存済みAPIキーを削除します。" }
     override val serviceDeleteBody: (String) -> String = { name -> "$name をモデル接続先から削除します。" }

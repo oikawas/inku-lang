@@ -173,6 +173,8 @@ import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.semantics.contentDescription
@@ -222,7 +224,7 @@ import app.inku.mobile.pipeline.SketchMode
 import app.inku.mobile.ui.i18n.InkuStrings
 import app.inku.mobile.ui.i18n.LocalStrings
 import app.inku.mobile.ui.i18n.inkuError
-import app.inku.mobile.ui.i18n.safeErrorMessage
+import app.inku.mobile.ui.i18n.messageFor
 import app.inku.mobile.ui.i18n.LocalUiLanguage
 import app.inku.mobile.ui.i18n.stringsFor
 import app.inku.mobile.ui.i18n.UiLanguage
@@ -1584,7 +1586,10 @@ private fun ComposeScreen(state: InkuUiState, viewModel: InkuViewModel) {
                         SecondarySmallButton(S.newWork, onClick = viewModel::clearPrompt)
                     }
                 }
-                state.selectedHistory?.originalInput?.takeIf { it.isNotBlank() }?.let { originalInput ->
+                // While the work is revised, the description field below holds
+                // this same text; showing it here too read as two descriptions.
+                val revisingDescription = showEditor && state.composeMode != ComposeMode.Batch
+                state.selectedHistory?.originalInput?.takeIf { it.isNotBlank() && !revisingDescription }?.let { originalInput ->
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM),
@@ -1602,7 +1607,9 @@ private fun ComposeScreen(state: InkuUiState, viewModel: InkuViewModel) {
                     }
                 }
                 if (!showEditor) {
-                    TextButton(onClick = { resultInterpretationOpen = !resultInterpretationOpen }) { Text(S.interpretationToggle) }
+                    TextButton(onClick = { resultInterpretationOpen = !resultInterpretationOpen }) {
+                        Text(if (resultInterpretationOpen) S.interpretationHide else S.interpretationToggle)
+                    }
                     if (resultInterpretationOpen) {
                         DdlPreviewBox(value = state.ddl, onClick = viewModel::openDdlEditor, modifier = Modifier.fillMaxWidth())
                     }
@@ -2606,7 +2613,7 @@ private fun CanvasHeroCard(
                     canvasMessage = runCatching {
                         shareHistoryDdl(context, it, viewModel.ddlExportJson(it))
                         strings.exportDone("DDL", it.renderHashShort)
-                    }.getOrElse { error -> safeErrorMessage(error, strings.exportFailed("DDL")) }
+                    }.getOrElse { error -> messageFor(error, strings, strings.exportFailed("DDL")) }
                 }
             },
             onExportSvg = { profile ->
@@ -2616,7 +2623,7 @@ private fun CanvasHeroCard(
                     canvasMessage = runCatching {
                         shareHistorySvg(context, it, profile, viewModel.exportSvg(it, profile))
                         strings.exportDone("SVG", it.renderHashShort)
-                    }.getOrElse { error -> safeErrorMessage(error, strings.exportFailed("SVG")) }
+                    }.getOrElse { error -> messageFor(error, strings, strings.exportFailed("SVG")) }
                 }
             },
             onExportPng = { heightPx ->
@@ -2627,7 +2634,7 @@ private fun CanvasHeroCard(
                     canvasMessage = runCatching {
                         shareHistoryPng(context, it, heightPx)
                         strings.exportDone("PNG", it.renderHashShort)
-                    }.getOrElse { error -> safeErrorMessage(error, strings.exportFailed("PNG")) }
+                    }.getOrElse { error -> messageFor(error, strings, strings.exportFailed("PNG")) }
                     pngExporting = false
                 }
             },
@@ -2881,7 +2888,9 @@ private fun DrawPanel(
             simpleContent = {},
             fullContent = {
                 Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
-                    TextButton(onClick = { interpretationOpen = !interpretationOpen }) { Text(S.interpretationToggle) }
+                    TextButton(onClick = { interpretationOpen = !interpretationOpen }) {
+                        Text(if (interpretationOpen) S.interpretationHide else S.interpretationToggle)
+                    }
                     if (interpretationOpen) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -2953,8 +2962,11 @@ private fun BatchPanel(
                 CompactLabel(S.batchHistory)
                 WrapRow(horizontal = Dimens.spaceM, vertical = Dimens.spaceM) {
                     state.batchPromptHistory.forEach { prompt ->
+                        // Two batches that open with the same line looked the
+                        // same; the line count tells most of them apart.
+                        val lines = prompt.lineSequence().map { it.trim() }.filter { it.isNotEmpty() }.toList()
                         MiniPill(
-                            text = prompt.lineSequence().firstOrNull()?.take(22) ?: S.history,
+                            text = S.batchHistoryPill(lines.firstOrNull()?.take(22) ?: S.history, lines.size),
                             onClick = { viewModel.restoreBatchPrompt(prompt) },
                         )
                     }
@@ -3407,6 +3419,18 @@ private fun HistoryScreen(
                     onToggleStar = { viewModel.toggleStar(item) },
                 )
             }
+            // A search or the star filter that matches nothing left an empty
+            // grid under the count; it says so instead.
+            if (filteredHistory.isEmpty() && history.isNotEmpty()) {
+                item(key = "no_match", span = { GridItemSpan(maxLineSpan) }) {
+                    Text(
+                        S.noMatchingWorks,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(vertical = Dimens.spaceL),
+                    )
+                }
+            }
         }
         HistoryGridScrollbar(gridState, Modifier.align(Alignment.CenterEnd))
     }
@@ -3519,13 +3543,20 @@ private fun HistoryHeader(
     viewModel: InkuViewModel,
 ) {
     var searchOpen by remember { mutableStateOf(state.historySearchQuery.isNotBlank()) }
+    // The search icon opens the field ready to type; before, a second tap on
+    // the field itself was needed to bring up the keyboard.
+    val searchFocus = remember { FocusRequester() }
+    var focusSearch by remember { mutableStateOf(false) }
     val searchLabel = S.searchPlaceholderLong
     Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceXs), modifier = Modifier.fillMaxWidth()) {
         StudioHeader(S.worksTitle, viewModel)
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM), modifier = Modifier.fillMaxWidth()) {
             Text(S.filteredOfTotal(filteredCount, sourceCount), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
             TextButton(
-                onClick = { searchOpen = !searchOpen },
+                onClick = {
+                    searchOpen = !searchOpen
+                    focusSearch = searchOpen
+                },
                 modifier = Modifier.size(Dimens.touchTarget).semantics { contentDescription = searchLabel },
             ) { Text("⌕", style = MaterialTheme.typography.titleLarge) }
             ChipButton(S.starredOnly, selected = state.historyStarredOnly, onClick = viewModel::toggleHistoryStarredFilter)
@@ -3535,9 +3566,15 @@ private fun HistoryHeader(
                 value = state.historySearchQuery,
                 onValueChange = viewModel::setHistorySearchQuery,
                 label = S.searchPlaceholderLong,
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().focusRequester(searchFocus),
                 singleLine = true,
             )
+            LaunchedEffect(focusSearch) {
+                if (focusSearch) {
+                    searchFocus.requestFocus()
+                    focusSearch = false
+                }
+            }
         }
     }
 }

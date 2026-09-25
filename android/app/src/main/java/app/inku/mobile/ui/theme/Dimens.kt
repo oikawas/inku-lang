@@ -210,14 +210,14 @@ object Dimens {
     /** 12dp. The gap between works-grid rows. */
     val historyGridRowGap: Dp = 12.dp
 
-    /** 14dp. From the handle's right edge to the rail's centre. */
-    val scrollRailInset: Dp = 14.dp
+    /** 16dp. From the handle's right edge to the rail's centre. */
+    val scrollRailInset: Dp = 16.dp
 
     /** 4dp. The scroll rail's width. */
     val scrollRailWidth: Dp = 4.dp
 
-    /** 10dp. The scroll thumb's width. */
-    val scrollThumbWidth: Dp = 10.dp
+    /** 12dp. The scroll thumb's width. */
+    val scrollThumbWidth: Dp = 12.dp
 
     // --- Lineage, presentation, original photo ----------------------------
 
@@ -250,8 +250,8 @@ object Dimens {
     /** 2dp. A scanline, signal band, or thin noise block over the photo. */
     val cameraSignalLine: Dp = 2.dp
 
-    /** 6dp. A thick noise block over the photo. */
-    val cameraSignalBlock: Dp = 6.dp
+    /** 8dp. A thick noise block over the photo. */
+    val cameraSignalBlock: Dp = 8.dp
 
     /** 2.5dp. The plotter-like stroke of the finishing forms. */
     val cameraPlotterStroke: Dp = 2.5.dp

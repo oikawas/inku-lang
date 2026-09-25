@@ -2031,8 +2031,47 @@ def _compose_payload(
         # False, and sending a bare False would change the request shape of every
         # existing bench.
         "include_trace": getattr(args, "trace", False) or None,
+        "imported_plugins": getattr(args, "imported_plugins", None) or None,
     }
     return {k: v for k, v in payload.items() if v is not None}
+
+
+DDL_EXPORT_SCHEMA = "inku.ddl-export.v1"
+
+
+def _read_ddl_export(text: str) -> tuple[str, list[dict[str, Any]]]:
+    """An inku.ddl-export.v1 file gives its DDL and plugins; other text is DDL alone."""
+    try:
+        data = json.loads(text)
+    except json.JSONDecodeError:
+        return text, []
+    if not isinstance(data, dict) or data.get("schema") != DDL_EXPORT_SCHEMA:
+        return text, []
+    ddl, plugins = data.get("ddl"), data.get("plugins", [])
+    if not isinstance(ddl, str) or not isinstance(plugins, list) or not all(
+        isinstance(item, dict) and isinstance(item.get("definition"), dict) for item in plugins
+    ):
+        raise CliError("the DDL export file is malformed")
+    return ddl, [{"definition": item["definition"], "summary": str(item.get("summary") or "")} for item in plugins]
+
+
+def command_ddl_export(args: argparse.Namespace) -> int:
+    config = load_config()
+    client = ApiClient(
+        args.base_url or config.base_url,
+        config.token,
+        timeout_seconds=_resolved_timeout_seconds(args, config),
+    )
+    exported, _ = client.request("GET", f"/api/pipeline/history/{args.work_id}/ddl-export")
+    if not isinstance(exported, dict) or exported.get("schema") != DDL_EXPORT_SCHEMA:
+        raise CliError("the server did not return a DDL export")
+    body = json.dumps(exported, ensure_ascii=False, indent=2) + "\n"
+    if args.output:
+        Path(args.output).write_text(body, encoding="utf-8")
+        print(json.dumps({"path": args.output, "plugins": len(exported.get("plugins", []))}, ensure_ascii=False))
+    else:
+        sys.stdout.write(body)
+    return 0
 
 def _compose_response_as_paint_result(
     result: dict[str, Any],
@@ -2345,6 +2384,8 @@ def command_paint(args: argparse.Namespace) -> int:
     _print_color_catalog_summary(color_catalog, catalog_data)
     input_mode = getattr(args, "input_mode", "paint")
     if input_mode == "ddl":
+        # An exported DDL file carries the plugin definitions its DDL names.
+        text, args.imported_plugins = _read_ddl_export(text)
         input_text = text
         raw_result, _ = _run_with_progress(
             "drawing from DDL",
@@ -4067,6 +4108,15 @@ def build_parser() -> argparse.ArgumentParser:
     vision_review.add_argument("--model", help="compatibility alias for --vision-model")
     vision_review.add_argument("--output", "-o")
     vision_review.set_defaults(func=command_vision_review)
+
+    ddl_export = subparsers.add_parser(
+        "ddl-export",
+        help="export a saved work's DDL with the plugin definitions it names (read back with paint --input-mode ddl --file)",
+    )
+    _add_common_server_args(ddl_export)
+    ddl_export.add_argument("work_id", help="the saved work (history id)")
+    ddl_export.add_argument("--output", "-o", help="write the export to this file instead of standard output")
+    ddl_export.set_defaults(func=command_ddl_export)
 
     render_score = subparsers.add_parser("render-score", help="render a Score JSON object without Stage 1 or Stage 2")
     _add_common_server_args(render_score)

@@ -46,6 +46,8 @@ When both encryption variables are set, direct key material has priority. A pers
 
 `INKU_REDIS_URL` takes effect only when redis-py is installed. Without it, shared state lives in the process, so set it for any configuration that runs the backend in more than one process.
 
+The distributed web image sets `BODY_SIZE_LIMIT`, the request limit of the proxy that forwards `/api` to the backend, to `16M` (the same as the `INKU_MAX_REQUEST_BODY_BYTES` default). When you raise `INKU_MAX_REQUEST_BODY_BYTES`, raise the web container's `BODY_SIZE_LIMIT` by the same amount; a request over the web limit fails before it reaches the backend.
+
 ### 2.2 Bootstrap Administrator
 
 | Variable | Purpose |

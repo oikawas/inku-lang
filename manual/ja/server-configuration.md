@@ -46,6 +46,8 @@ API keyの環境変数は初期値です。管理UIでDBへ保存したprovider 
 
 `INKU_REDIS_URL`はredis-pyが入っている場合にだけ有効です。設定しなければ共有状態はプロセス内に置かれるので、backendを複数プロセスで動かす構成では設定してください。
 
+配布のweb imageは`/api`をbackendへ中継する際の要求上限`BODY_SIZE_LIMIT`を`16M`（`INKU_MAX_REQUEST_BODY_BYTES`の既定と同じ）にしています。`INKU_MAX_REQUEST_BODY_BYTES`を上げるときは、webコンテナの`BODY_SIZE_LIMIT`も同じだけ上げてください。web側の上限を超えた要求はbackendに届く前に失敗します。
+
 ### 2.2 bootstrap admin
 
 | 変数 | 目的 |

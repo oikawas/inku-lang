@@ -1002,6 +1002,7 @@ export const en: LangPack = {
 	userGenerationCountLabel: 'Works',
 	profileGenerationCountLabel: 'Works painted in total',
 	loginRequiredMessage: 'Please sign in.',
+	sessionExpiredMessage: 'Your session has ended. Please sign in again.',
 	settingsAdminOnlyMessage: 'Only the Administrators group can view DB settings.',
 	userInfoLoadFailed: 'Could not load user information.',
 	userValidationCreate: 'Enter a username, email address, and password of at least 8 characters.',

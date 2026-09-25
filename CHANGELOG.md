@@ -20,6 +20,7 @@ A review of the server and Web source fixed the following defects.
 - **Web: the DDL dialog's stop ends the pipeline run.** It aborted only the start request, and the dialog, which cannot close while drawing, stayed until the model answered.
 - **Web: a refused move to trash, restore, or permanent delete says so.** The response was not read; the action counted as done and cleared the selection and the displayed work.
 - **Web: deleting a user or a group asks first.** One click deleted it. Refusals to delete read in the page's language.
+- **Web: a session that has ended returns to the sign-in screen.** After it expired or was logged out in another tab, the workspace stayed up and every action failed with "invalid session". When the API answers 401, the page says why and returns to sign-in.
 - Web: an empty library view and an empty trash say so. Grouping by lineage in the thumbnail view says it lists only lineages with derivations. A DDL-only lineage is named "DDL".
 
 The route count (107) and the API surface are unchanged. DDL, Score, and render versions are unchanged.

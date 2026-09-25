@@ -5,6 +5,12 @@ type Sleep = (ms: number, signal?: AbortSignal | null) => Promise<void>;
 type ApiFetchDependencies = Readonly<{
 	fetch: ApiFetch;
 	sleep: Sleep;
+	/**
+	 * Told when the server answers 401: the session this page holds is gone
+	 * (expired, logged out in another tab, or the account deleted). The
+	 * response still goes back to the caller unchanged.
+	 */
+	onUnauthorized: (path: string) => void;
 }>;
 
 const RENDER_CAPACITY_RETRIES = 3;
@@ -37,6 +43,7 @@ export function createApiFetch(
 ): ApiFetch {
 	const fetchRequest = dependencies.fetch ?? ((path, init) => globalThis.fetch(path, init));
 	const sleep = dependencies.sleep ?? delay;
+	const onUnauthorized = dependencies.onUnauthorized;
 
 	return async (path: string, init: RequestInit = {}): Promise<Response> => {
 		const headers = new Headers(init.headers);
@@ -51,6 +58,7 @@ export function createApiFetch(
 			// (no queueing) when they are all taken, so a fan-out such as the 4-candidate
 			// grid can lose requests to a 503 that a short wait would have avoided.
 			// Retry that one condition here; every other status is passed through.
+			if (response.status === 401) onUnauthorized?.(path);
 			if (response.status !== 503 || attempt >= RENDER_CAPACITY_RETRIES) return response;
 			const body = await response.clone().text().catch(() => '');
 			if (!body.includes('render capacity is full')) return response;

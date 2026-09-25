@@ -486,7 +486,8 @@
 		return describeApiErrorDetail(detail, status, t());
 	}
 
-	const apiFetch = createApiFetch();
+	// A 401 means this page's session is gone; the session owner returns to sign-in.
+	const apiFetch = createApiFetch({ onUnauthorized: () => session.expireAfterUnauthorized() });
 	const session = createSessionState({
 		apiFetch,
 		describeApiError,

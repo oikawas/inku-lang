@@ -920,6 +920,7 @@ export interface LangPack {
 	userGenerationCountLabel: string;
 	profileGenerationCountLabel: string;
 	loginRequiredMessage: string;
+	sessionExpiredMessage: string;
 	settingsAdminOnlyMessage: string;
 	userInfoLoadFailed: string;
 	userValidationCreate: string;

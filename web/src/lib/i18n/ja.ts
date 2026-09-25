@@ -1002,6 +1002,7 @@ export const ja: LangPack = {
 	userGenerationCountLabel: '生成数',
 	profileGenerationCountLabel: '画像生成累計数',
 	loginRequiredMessage: 'ログインしてください。',
+	sessionExpiredMessage: 'ログインの有効期限が切れました。もう一度ログインしてください。',
 	settingsAdminOnlyMessage: 'DB設定は管理者グループのみ確認できます。',
 	userInfoLoadFailed: 'ユーザー情報を読み込めませんでした。',
 	userValidationCreate: 'ユーザー名、メールアドレス、8文字以上のパスワードを入力してください。',

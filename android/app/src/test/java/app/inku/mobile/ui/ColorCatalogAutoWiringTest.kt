@@ -16,21 +16,6 @@ import org.junit.Test
 class ColorCatalogAutoWiringTest {
 
     @Test
-    fun normalDrawSelectsFromSketchProseBeforeComposing() {
-        val draw = viewModelSection("private fun runSubmit", "fun drawFromDdl()")
-
-        assertTrue(
-            "normal draw must prefer the Stage 0.5 prose while retaining prompt fallback",
-            Regex("interpreted\\.sketchText\\s*\\?:\\s*current\\.prompt").containsMatchIn(draw),
-        )
-        assertEquals("normal draw must choose exactly once", 1, selectorCalls(draw))
-        assertTrue(
-            "a replay must keep its recorded catalog and skip auto selection",
-            Regex("if\\s*\\(sketchRequest\\.text\\s*!=\\s*null\\).*?\\\"default\\\".*?else.*?repository\\.selectCatalogId", RegexOption.DOT_MATCHES_ALL).containsMatchIn(draw),
-        )
-    }
-
-    @Test
     fun batchSelectsOnceForEachNonBlankLine() {
         val batch = viewModelSection("fun runBatch()", "private fun rememberBatchPrompt")
 
@@ -50,7 +35,9 @@ class ColorCatalogAutoWiringTest {
     fun ddlReplayAndRefinementNeverInvokeTheSelector() {
         assertEquals(0, selectorCalls(viewModelSection("fun drawFromDdl()", "fun runBatch()")))
         assertEquals(0, selectorCalls(viewModelSectionToEnd("fun openRefinement")))
-        assertEquals("only normal, batch, and demo own selector calls", 3, selectorCalls(source("app/src/main/java/app/inku/mobile/ui/InkuViewModel.kt")))
+        // A normal draw no longer calls it: its auto catalog is chosen inside
+        // the shared pipeline (catalog_mode "auto").
+        assertEquals("only batch and demo own selector calls", 2, selectorCalls(source("app/src/main/java/app/inku/mobile/ui/InkuViewModel.kt")))
     }
 
     @Test

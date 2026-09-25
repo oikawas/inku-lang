@@ -6,6 +6,12 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 36 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-25 — Align Android drawing requests and large-work reads with Server
+
+Android sent shared-pipeline requests to Gemini under different conditions from Server: temperature fixed at 0, no thinking level, the core JSON Schema passed unprojected, and a Stage 1 output limit of 1024. Its work plans leaned toward particular tools and combinations. Shared-pipeline requests now match Server: no temperature, `thinkingLevel: minimal`, a single allowed function, and Server's Gemini schema projection. OpenAI-compatible providers use temperature 0.3 for Stage 1 only, as Server does. The Stage 1 output limit is 2048, as on Server. On 75 evaluation descriptions drawn on a Pixel 9 with Gemma 4 31B, instruction count, mark count, and the shape/tool/color distribution closely match Server.
+
+A work whose SVG exceeded about 2 MB could be written but its execution state and history row could not be read back, so it failed only on Android. The database cursor window now fits Server's 12 MiB SVG limit and the execution state that embeds it. The Room schema and saved data are unchanged.
+
 ### 2026-09-25 — A modifier before a count phrase reaches its noun
 
 In `大きな四つの赤い円を置く` the word `大きな` was not recognized and the clause stayed unresolved, and in `細い三本の黒い線を引く` modifier and action ownership became ambiguous and the whole work stopped. The scale word's look-ahead did not skip a number, and both the pre-head modifier collection and the noun-phrase boundary check stopped at the counter attached to a count (本, つ, 個). A number and the counter right after it now stay inside the noun phrase, so a modifier before the count phrase yields the same Score as one after it. The work-plan printer never emits this order, so drawings from the LLM path are unchanged; the word orders an author may write widen. DDL 13, DDL engine 47.

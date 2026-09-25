@@ -155,6 +155,7 @@ class SharedPipelineHostTest {
         assertEquals(1_000L, requests.single().timeoutMs)
         assertEquals(MODELS.stage1ModelId, requests.single().modelId)
         assertEquals(MODELS.stage1MaxTokens, requests.single().maxTokens)
+        assertEquals("generate_sketch", requests.single().pipelineAction)
     }
 
     private fun host(
@@ -439,6 +440,7 @@ class SharedPipelineHostTest {
                 JSONObject().put(
                     "prompt",
                     JSONObject()
+                        .put("action_name", tag)
                         .put("system", "system")
                         .put("message", "message")
                         .put("response_schema", JSONObject().put("type", "object").put("properties", JSONObject())),

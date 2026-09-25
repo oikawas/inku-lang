@@ -28,7 +28,7 @@ class OpenAiCompatibleProvider(
                     put(JSONObject().put("role", "user").put("content", request.prompt))
                 },
             )
-            .put("temperature", request.temperature)
+            .put("temperature", pipelineTemperature(request.pipelineAction) ?: request.temperature)
             .put("max_tokens", request.maxTokens)
         request.tool?.let { tool ->
             val function = JSONObject()
@@ -143,6 +143,13 @@ class OpenAiCompatibleProvider(
     internal companion object {
         internal fun modelForRequest(providerId: String, modelId: String): String =
             modelId.removePrefix("$providerId:").ifBlank { modelId }
+
+        /** The server's OpenAI-compatible pipeline sampling: 0.3 for Stage 1, 0.0 otherwise. */
+        internal fun pipelineTemperature(action: String?): Double? = when (action) {
+            null -> null
+            "generate_normalized_ddl" -> 0.3
+            else -> 0.0
+        }
 
         private const val MAX_RESPONSE_CHARS = 2_000_000
         private const val MAX_ERROR_CHARS = 16_384

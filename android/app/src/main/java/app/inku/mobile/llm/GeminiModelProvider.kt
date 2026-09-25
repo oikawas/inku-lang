@@ -79,9 +79,15 @@ class GeminiModelProvider(
     }
 
     private fun payload(request: ModelRequest): JSONObject {
-        val generation = JSONObject()
-            .put("temperature", request.temperature)
-            .put("maxOutputTokens", request.maxTokens)
+        val pipelineAction = request.pipelineAction
+        val generation = JSONObject().put("maxOutputTokens", request.maxTokens)
+        if (pipelineAction == null) {
+            generation.put("temperature", request.temperature)
+        } else {
+            // Shared-pipeline requests use the server's Gemini request shape:
+            // model-default sampling and minimal thinking.
+            generation.put("thinkingConfig", JSONObject().put("thinkingLevel", "minimal"))
+        }
         if (request.stopSequences.isNotEmpty()) generation.put("stopSequences", JSONArray(request.stopSequences))
         val payload = JSONObject()
             .put("contents", JSONArray().put(textContent(request.prompt).put("role", "user")))
@@ -90,12 +96,29 @@ class GeminiModelProvider(
             payload.put("systemInstruction", textContent(it))
         }
         request.tool?.let { tool ->
+            val schema = JSONObject(tool.parametersJson)
             val declaration = JSONObject()
                 .put("name", tool.name)
                 .put("description", tool.description)
-                .put("parametersJsonSchema", JSONObject(tool.parametersJson))
+                .put(
+                    "parametersJsonSchema",
+                    if (pipelineAction == null) {
+                        schema
+                    } else {
+                        GeminiJsonSchema.project(
+                            schema,
+                            compactHoleEdits = pipelineAction == "complete_visible_ddl_holes",
+                        )
+                    },
+                )
             payload.put("tools", JSONArray().put(JSONObject().put("functionDeclarations", JSONArray().put(declaration))))
-            payload.put("toolConfig", JSONObject().put("functionCallingConfig", JSONObject().put("mode", "ANY")))
+            payload.put(
+                "toolConfig",
+                JSONObject().put(
+                    "functionCallingConfig",
+                    JSONObject().put("mode", "ANY").put("allowedFunctionNames", JSONArray().put(tool.name)),
+                ),
+            )
         }
         return payload
     }

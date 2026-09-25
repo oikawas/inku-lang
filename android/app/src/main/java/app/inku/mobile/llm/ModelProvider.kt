@@ -16,6 +16,12 @@ data class ModelRequest(
     val tool: ModelTool? = null,
     /** Host-enforced bound for one transport attempt. */
     val timeoutMs: Long? = null,
+    /**
+     * Shared-pipeline action name (`generate_normalized_ddl`, ...). When set, a
+     * remote transport applies the server's per-provider pipeline request shape
+     * instead of the generic [temperature].
+     */
+    val pipelineAction: String? = null,
 )
 
 class ModelProviderHttpException(

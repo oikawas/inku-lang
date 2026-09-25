@@ -58,6 +58,10 @@ This sketch pipeline's rendered output is produced by the packaged `core/crates/
 
 Gemini provider generation requests use the Gemini API `models/{model}:generateContent` endpoint. The API key is sent as `x-goog-api-key`, and structured responses for the shared pipeline use native function declarations and `functionCall.args`. A successful model-list fetch does not establish that generation requests work.
 
+Shared-pipeline provider requests use the same conditions as Server's `pipeline_provider.py`. For Gemini, no temperature is sent, `thinkingConfig.thinkingLevel` is `minimal`, `allowedFunctionNames` restricts the response to one function, and the core response schema is projected into the same Gemini-supported subset as on Server (`const` becomes a one-element `enum`; hole-completion `oneOf` variants are flattened; shared Rust performs the exact validation). OpenAI-compatible providers use temperature 0.3 for Stage 1 (`generate_normalized_ddl`) and 0.0 for other requests. The output limit is 2048 for Stage 1, sketch, and catalog selection, and 2048 for hole completion.
+
+The Room database cursor window is 40 MiB. SVGs may reach Server's 12 MiB limit, and the execution state embeds that render, so the default window of about 2 MB cannot read such saved rows back.
+
 ## 2026-09-24 Current bottom actions, photo entry, and Works scrolling
 
 The translucent bottom action area contains Studio, Camera, Works, and Series. Camera is a capture action rather than a destination: tapping it opens the device camera directly, without a source chooser or an overwrite confirmation. Cancelling capture restores the previous screen and Studio content. The existing source chooser in Studio remains available for Photo Picker input.

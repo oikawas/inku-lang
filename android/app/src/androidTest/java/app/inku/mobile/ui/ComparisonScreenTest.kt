@@ -23,6 +23,7 @@ import app.inku.mobile.data.refinement.PaintSeeds
 import app.inku.mobile.llm.ModelProvider
 import app.inku.mobile.llm.ModelRequest
 import app.inku.mobile.llm.ModelResponse
+import app.inku.mobile.testing.pipelineFixtureResponse
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
@@ -76,7 +77,7 @@ class ComparisonScreenTest {
         override suspend fun generate(request: ModelRequest): ModelResponse {
             delay(delayMs)
             calls += 1
-            return ModelResponse(text = "細い線を五本、中央付近に置く。", modelId = request.modelId)
+            return pipelineFixtureResponse(request)
         }
     }
 

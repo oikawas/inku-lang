@@ -10,6 +10,7 @@ import app.inku.mobile.data.db.InkuDatabase
 import app.inku.mobile.llm.ModelProvider
 import app.inku.mobile.llm.ModelRequest
 import app.inku.mobile.llm.ModelResponse
+import app.inku.mobile.testing.pipelineFixtureResponse
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.ViewModelStore
@@ -69,7 +70,7 @@ class CatalogSelectionWiringTest {
         override val providerId: String = "test"
 
         override suspend fun generate(request: ModelRequest): ModelResponse =
-            ModelResponse(text = request.prompt, modelId = request.modelId)
+            pipelineFixtureResponse(request)
     }
 
     private lateinit var database: InkuDatabase
@@ -181,6 +182,10 @@ class CatalogSelectionWiringTest {
     fun t2_theDdlPathReachesThePipelineWithTheChosenCatalogue() = runBlocking {
         useCatalog("fresco_study")
         promptFor("配線を見る 二")
+        // The DDL path compiles what is in the DDL field, and the shared core
+        // rejects prose there; a sentence it reads is written in first.
+        viewModel.setDdl("中心に赤の円を1個置く。")
+        settle("the DDL to reach the shared state") { viewModel.state.value.ddl == "中心に赤の円を1個置く。" }
         viewModel.drawFromDdl()
 
         val saved = awaitSavedRuns(1)
@@ -234,6 +239,10 @@ class CatalogSelectionWiringTest {
         viewModel.draw()
         awaitSavedRuns(1)
         settle("the first run to finish") { !viewModel.state.value.isDrawing }
+        // The work just drawn now holds the description (ddl_authoritative),
+        // so the second description starts a new work, as a reader would.
+        viewModel.clearPrompt()
+        settle("the new work to start") { viewModel.state.value.selectedHistory == null }
         promptFor("黒い太筆の線を3本、斜めに置く")
         viewModel.draw()
 

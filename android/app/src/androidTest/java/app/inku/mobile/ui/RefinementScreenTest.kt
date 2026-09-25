@@ -29,6 +29,7 @@ import app.inku.mobile.data.refinement.RefinementElement
 import app.inku.mobile.llm.ModelProvider
 import app.inku.mobile.llm.ModelRequest
 import app.inku.mobile.llm.ModelResponse
+import app.inku.mobile.testing.pipelineFixtureResponse
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
@@ -77,7 +78,7 @@ class RefinementScreenTest {
 
         override suspend fun generate(request: ModelRequest): ModelResponse {
             delay(delayMs)
-            return ModelResponse(text = request.prompt, modelId = request.modelId)
+            return pipelineFixtureResponse(request)
         }
     }
 

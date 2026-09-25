@@ -16,6 +16,7 @@ import app.inku.mobile.llm.ModelProvider
 import app.inku.mobile.llm.ModelRequest
 import app.inku.mobile.llm.ModelResponse
 import app.inku.mobile.pipeline.SketchMode
+import app.inku.mobile.testing.pipelineFixtureResponse
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -52,7 +53,7 @@ class SketchLineageWiringTest {
         override val providerId: String = "test"
 
         override suspend fun generate(request: ModelRequest): ModelResponse =
-            ModelResponse(text = request.prompt, modelId = request.modelId)
+            pipelineFixtureResponse(request)
     }
 
     private lateinit var database: InkuDatabase

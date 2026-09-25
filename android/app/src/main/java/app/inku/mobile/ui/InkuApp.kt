@@ -1105,7 +1105,10 @@ private fun ColorCatalogSelectionDialog(state: InkuUiState, viewModel: InkuViewM
     val autoSelected = state.selectedCatalogId == CatalogSelection.AUTO_ID
     val current = ColorCatalogs.get(state.selectedCatalogId)
     AlertDialog(
-        onDismissRequest = viewModel::confirmCatalogSelection,
+        // Back and a tap outside are a cancel, as in the model dialog. The
+        // dialog window receives the back key before the screen's BackHandler,
+        // which already maps this dialog to cancel.
+        onDismissRequest = viewModel::cancelCatalogSelection,
         title = { Text(S.colorCatalog) },
         text = {
             Column(

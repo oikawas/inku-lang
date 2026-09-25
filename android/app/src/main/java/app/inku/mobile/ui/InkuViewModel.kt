@@ -1491,6 +1491,12 @@ class InkuViewModel @JvmOverloads constructor(
     fun cancelCatalogSelection() {
         val snapshot = catalogSelectionSnapshot
         catalogSelectionSnapshot = null
+        // `setCatalog` saves every choice as it is tapped, so a cancel has to
+        // save the value it restores too; otherwise the next start brings back
+        // the choice that was just cancelled.
+        if (snapshot != null && snapshot != localState.value.selectedCatalogId) {
+            persistSetting("color_catalog", JSONObject().put("value", snapshot).toString())
+        }
         localState.value = localState.value.copy(
             selectedCatalogId = snapshot ?: localState.value.selectedCatalogId,
             catalogSelectionOpen = false,

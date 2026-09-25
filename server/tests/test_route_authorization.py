@@ -57,7 +57,9 @@ PUBLIC = {  # every entry needs a reason
 #   and forks, older works and their forks, provider observations), and
 #   -1 for retiring GET /api/prompts when the Python prompt layers left.
 #   Both landed with the shared Rust cutover and were not counted then.
-EXPECTED_ROUTE_COUNT = 105
+#   +1 for GET /api/pipeline/history/{history_id}/ddl-export, added by
+#   draw-system04 after the Server branch's API surface was recorded.
+EXPECTED_ROUTE_COUNT = 106
 
 
 def _guard_names(dependant, seen=None) -> set[str]:

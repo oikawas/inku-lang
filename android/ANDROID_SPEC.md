@@ -6,7 +6,7 @@ secrets must remain outside tracked files.
 
 Last updated: 2026-09-25.
 
-**Catch-up status**: Android sits at generation `2.1.4-android.79` with **render engine
+**Catch-up status**: Android sits at generation `2.1.4-android.80` with **render engine
 `default / 67`** and **DDL engine version `20`**. Render identity comes from the packaged
 `core/crates/inku-render/` library through JNI rather than a Kotlin compatibility literal;
 `ReferenceCorpus.kt` declares the DDL reference version. The server also uses render engine `67`

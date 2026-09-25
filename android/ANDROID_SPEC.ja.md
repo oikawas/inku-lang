@@ -5,7 +5,7 @@
 
 最終更新: 2026-09-25。
 
-**追随状況**: Android は `2.1.4-android.79` / **render engine `default / 67`** /
+**追随状況**: Android は `2.1.4-android.80` / **render engine `default / 67`** /
 **DDL engine version `20`** の世代にある。描画版は固定Kotlin定数ではなく、同梱する
 `core/crates/inku-render/` からJNI経由で取得し、DDL参照版は`ReferenceCorpus.kt`が名乗る。
 master の web/server も **render engine `67`** で、serverの **`ddl_engine_version` は21** であり、

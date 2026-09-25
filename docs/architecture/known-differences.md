@@ -68,11 +68,12 @@
 - The packaged library's Render Engine is 68, so the assertion cannot hold, and the expected SVGs are Engine 41 bytes with no guarantee of matching the current engine.
 - Result: **inferred that device acceptance fails** (not run on a device). Fixing it needs changes such as generating the expected SVGs with the same commit's host core at build time, plus acceptance on the Pixel 9, so it was handed to the Android owner on 2026-09-25.
 
-### F-12 Fake provider in the hole-completion API test
+### F-12 Fake provider in the hole-completion API test (resolved)
 
 - The fake provider in `server/tests/test_pipeline_api.py::test_managed_api_persists_approved_patch_reload_and_legacy_fork` reads `base_source_digest` and similar fields from the hole-completion request body to answer it.
 - The current hole-completion prompt (`inku.visible-ddl-hole-completion-prompt.v3`) does not pass digests or byte positions to the provider (`SPEC.md` §12.7.1). The test also fails at the commit before the fixes (`f910a11e`) with `KeyError: 'base_source_digest'`.
-- Result: **the test has not followed prompt v3**. This update does not change it.
+- On 2026-09-25 the fake provider was changed to answer in the v3 shape (`proposed` with replacement text per short ID `h1`) and to check that the prompt is v3. The test now also checks that, while approval is pending, the Score of the independent drawing (the red circle) remains as `complete_with_omissions` (the old test expected no Score during the wait).
+- Result: **resolved**.
 
 ## Terms that need care across documents
 
@@ -118,6 +119,5 @@ All major nodes and edges have public-source implementation evidence. No node re
 ## Follow-up questions
 
 1. The Android specification note (F-02, F-03) and the reference corpus for device acceptance (F-11) await the Android owner's fix and acceptance.
-2. Should the hole-completion API test (F-12) be brought to the request and response shape of hole-completion prompt v3?
 
 These are not changes made by this review, so they were not copied into the ledger automatically.

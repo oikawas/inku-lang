@@ -68,11 +68,12 @@
 - 同梱libraryのRender Engineは68なので、この表明は成り立たない。期待SVGもEngine 41のもので、現行engineと同じbyteである保証が無い。
 - 判定: **端末受入が失敗する状態**と推定する（端末では実行していない）。直すにはbuild時に同じcommitのhost coreで期待SVGを作る等の変更とPixel 9での受入が要るため、2026-09-25にAndroid担当へ引き継いだ。
 
-### F-12 hole補完のAPI testの偽provider
+### F-12 hole補完のAPI testの偽provider（解消）
 
 - `server/tests/test_pipeline_api.py::test_managed_api_persists_approved_patch_reload_and_legacy_fork`の偽providerは、hole補完要求の本文から`base_source_digest`等を読んで応答する。
 - 現行のhole補完prompt（`inku.visible-ddl-hole-completion-prompt.v3`）はdigestやbyte位置をproviderへ渡さない（`SPEC.ja.md` §12.7.1）。このtestは修正前のcommit（`f910a11e`）でも`KeyError: 'base_source_digest'`で失敗する。
-- 判定: **testがprompt v3に追随していない**。本更新では直していない。
+- 2026-09-25に、偽providerがv3の形（短いID `h1` ごとの`proposed`と置換文）で答え、promptがv3であることを確かめるよう直した。あわせて、承認待ちの時点で独立した描画（赤い円）のScoreが`complete_with_omissions`として残ることを確かめる検査へ改めた（旧testは承認待ちでScoreが無いことを期待していた）。
+- 判定: **解消済み**。
 
 ## 文書間で注意が必要な語
 
@@ -118,6 +119,5 @@ Session、current-workのsubmit/replay/stop、Batch/Demoの非同期lifecycle、
 ## 今後確認すべき質問
 
 1. Android仕様メモ（F-02、F-03）と端末受入の参照corpus（F-11）は、Android担当の修正と受入を待つ。
-2. hole補完のAPI test（F-12）を、hole補完prompt v3の要求と応答の形へ合わせるか。
 
 これらは本調査で実装・仕様を変更する課題ではないため、台帳への自動転記はしていない。

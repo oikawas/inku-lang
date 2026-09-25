@@ -54,6 +54,7 @@ class AndroidWorkPipeline(
             throw PipelineInteractionRequired(view)
         }
         val ddl = view.visibleDdl ?: throw PipelineHostException("visible_ddl_unavailable")
+        val sketch = savedSketchResult(view.sketch)
         return InterpretResult(
             originalInput = request.originalText,
             normalizedDdl = ddl,
@@ -61,9 +62,9 @@ class AndroidWorkPipeline(
             ddlForDisplay = ddl,
             instructionLangRequested = run.instructionLangRequested,
             instructionLangResolved = run.instructionLangResolved,
-            sketchText = run.sketchText,
-            sketchGrain = run.sketchGrain,
-            sketchState = run.sketchState,
+            sketchText = sketch.text,
+            sketchGrain = null,
+            sketchState = sketch.state,
             executionId = view.executionId,
         )
     }
@@ -261,6 +262,7 @@ class AndroidWorkPipeline(
             throw PipelineInteractionRequired(view)
         }
         val execution = host.executionContext(OWNER_ID, view.executionId)
+        val sketch = savedSketchResult(view.sketch)
         val hostContext = JSONObject(execution.hostContextJson)
         val resultOptions = hostContext.requiredObject("result_options")
         val hostOptions = hostContext.requiredObject("host_options")
@@ -320,9 +322,9 @@ class AndroidWorkPipeline(
             seedText = resultOptions.optionalString("seed_text"),
             instructionLangRequested = resultOptions.optionalString("instruction_lang_requested"),
             instructionLangResolved = resultOptions.optionalString("instruction_lang_resolved"),
-            sketchText = resultOptions.optionalString("sketch_text"),
-            sketchGrain = resultOptions.optionalString("sketch_grain"),
-            sketchState = resultOptions.optionalString("sketch_state"),
+            sketchText = sketch.text,
+            sketchGrain = null,
+            sketchState = sketch.state,
             managedHistoryLink = ManagedHistoryLinkInput(
                 ownerId = OWNER_ID,
                 variationId = view.variationId,
@@ -496,9 +498,6 @@ class AndroidWorkPipeline(
             )
             else -> AuthoringContext(request.description)
         }
-        val sketchText: String? = null
-        val sketchGrain: String? = null
-        val sketchState: String? = null
         return PreparedRun(
             request = SharedPipelineRunRequest(
                 ownerId = OWNER_ID,
@@ -515,17 +514,12 @@ class AndroidWorkPipeline(
                 seedText = request.seedText,
                 instructionLangRequested = requestedLang,
                 instructionLangResolved = resolvedLang,
-                sketchText = sketchText,
-                sketchGrain = sketchGrain,
-                sketchState = sketchState,
+                sketch = PipelineSketchRequest.from(request.sketch),
                 parentHistoryId = request.parentHistoryId,
                 inputProvenanceJson = request.inputProvenance?.toJson()?.toString(),
             ),
             instructionLangRequested = requestedLang,
             instructionLangResolved = resolvedLang,
-            sketchText = sketchText,
-            sketchGrain = sketchGrain,
-            sketchState = sketchState,
         )
     }
 
@@ -791,9 +785,6 @@ class AndroidWorkPipeline(
         val request: SharedPipelineRunRequest,
         val instructionLangRequested: String,
         val instructionLangResolved: String,
-        val sketchText: String?,
-        val sketchGrain: String?,
-        val sketchState: String?,
     )
 
     private data class RestoredRun(
@@ -809,6 +800,17 @@ class AndroidWorkPipeline(
     private data class CanvasInfo(val width: Double, val height: Double, val ratio: Double)
 
     companion object {
+        /** Convert only completed sketch outcomes to the saved-column vocabulary. */
+        internal fun savedSketchResult(sketch: PipelineSketchResult): PipelineSketchResult = when (sketch.state) {
+            "supplemented", "supplied" -> if (sketch.text.isNullOrBlank()) {
+                PipelineSketchResult(state = "fallback")
+            } else {
+                sketch.copy(state = "supplemented")
+            }
+            "off", "not_needed", "fallback" -> PipelineSketchResult(state = sketch.state)
+            else -> throw PipelineHostException("sketch_outcome_not_ready")
+        }
+
         const val OWNER_ID = "local"
         private const val PIXEL9_HOST_ONLY_FORMAT = "pixel9_landscape_safe"
         private const val CANVAS_BASE_PX = 1000.0

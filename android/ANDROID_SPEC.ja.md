@@ -3,12 +3,12 @@
 このディレクトリは、ネイティブ単体 Android アプリのワークスペースであり、Git 管理対象とする。
 ローカル専用成果物、端末ID、ダウンロード済みモデル、ログ、秘密情報は追跡対象に含めない。
 
-最終更新: 2026-09-24。
+最終更新: 2026-09-25。
 
-**追随状況**: Android は `2.1.4-android.79` / **render engine `default / 41`** /
+**追随状況**: Android は `2.1.4-android.79` / **render engine `default / 67`** /
 **DDL engine version `20`** の世代にある。描画版は固定Kotlin定数ではなく、同梱する
 `core/crates/inku-render/` からJNI経由で取得し、DDL参照版は`ReferenceCorpus.kt`が名乗る。
-master の web/server も **render engine `41`** で、serverの **`ddl_engine_version` は21** であり、
+master の web/server も **render engine `67`** で、serverの **`ddl_engine_version` は21** であり、
 ServerとAndroidは同じRust描画実装を共有する。Stage 1.5 展開層も、2026-08-05 に添景水準の畳み込みへ追随した
 （末尾の 2026-08-05 の節を参照）。
 
@@ -29,6 +29,16 @@ runtime fallbackを持たない。保存済みSVG、Room schema、Score schema�
 - `ANDROID_SPEC.md` は英語版として、`ANDROID_SPEC.ja.md` の意図を保った翻訳・要約として更新する。
 - Android 仕様を更新するときは、先に `ANDROID_SPEC.ja.md` を更新し、その後で `ANDROID_SPEC.md` を同期する。
 - 英語版だけに存在する仕様・要件を追加してはならない。
+
+## 2026-09-25 現行の写生（方式A）
+
+共有仕様§12.6.1に従い、写生は描画ごとに作者が選ぶ。既定は「なし」で、記述ごとに要否を決める自動modeは置かない。開始入力と記述からの再生成には`sketch`を渡し、`{"mode":"off"}`、作者が選ぶ`{"mode":"on"}`、作者が直した文または保存済み文を使う`{"mode":"supplied","text":"..."}`を区別する。suppliedでは写生providerを呼ばない。
+
+`on`ではStage 1と同じmodelでStage 1の前に`generate_sketch`を任意effectとして実行し、prompt `inku.sketch-supplement-prompt.v1`への応答JSON `{"sketch":"..."}`から`sketch_generated`を作り、その文を作品計画へ渡す。失敗時の再試行予算は`sketch_retry`（未設定なら`catalog_retry`）を使う。写生を作者確認で止めず、provider失敗は`fallback`として記述だけで続行し、空の応答は`not_needed`として記述だけで続行する。snapshotの状態は`pending`、`supplemented`、`not_needed`、`fallback`、`supplied`を表す。保存時は`supplemented`または`supplied`の文を`sketch_text`へ保存し、`sketch_grain`はnullとする。`not_needed`と`fallback`はそれぞれ状態だけを保存し、写生記録がない場合は`off`である。`sketch_state`には`supplemented`と`not_needed`を含める。
+
+通常のなし／あり選択はAndroidの描画設定に置き、既定をなしとする。作品からの「写生なし／ありで描き直す」は選択作品の子を系譜へ保存し、派生種別には既存の`sketch_grain_change`を使う。metadataは`from_sketch_state`と`to_sketch_mode`を記録する。旧`fine`／`coarse`は保存済み作品の表示と再描画時の選択判定にのみ使い、新しい写生の入力や保存には使わない。
+
+この写生pipelineの描画結果は、Androidに同梱した`core/crates/inku-render/`を共有pipelineのJNI経由で実行して生成する。Androidが報告するrender engineは`default / 67`である。
 
 ## 2026-09-24 現行の下部操作・写真入力・作品一覧
 

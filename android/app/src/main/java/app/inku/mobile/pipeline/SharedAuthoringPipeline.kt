@@ -15,9 +15,7 @@ data class SharedPipelineRunRequest(
     val seedText: String? = null,
     val instructionLangRequested: String? = null,
     val instructionLangResolved: String? = null,
-    val sketchText: String? = null,
-    val sketchGrain: String? = null,
-    val sketchState: String? = null,
+    val sketch: PipelineSketchRequest = PipelineSketchRequest.Off,
     val parentHistoryId: String? = null,
     val inputProvenanceJson: String? = null,
 )
@@ -45,6 +43,7 @@ class SharedAuthoringPipeline(
                 authoring = PipelineAuthoring.Description(
                     text = request.text,
                     autoCatalog = request.config.autoCatalog,
+                    sketch = request.sketch,
                 ),
                 models = request.models,
                 context = request.context,
@@ -137,6 +136,7 @@ class SharedAuthoringPipeline(
         config: PreparedPipelineConfig,
         renderSeed: Long?,
         wild: Boolean,
+        sketch: PipelineSketchRequest = PipelineSketchRequest.Off,
     ): PipelineRunOutcome {
         val next = host.command(
             ownerId,
@@ -145,6 +145,7 @@ class SharedAuthoringPipeline(
                 expectedRevision = view.revision,
                 description = description,
                 autoCatalog = config.autoCatalog,
+                sketch = sketch,
             ),
         )
         return complete(ownerId, next, config, renderSeed, wild)
@@ -184,9 +185,6 @@ class SharedAuthoringPipeline(
                     .put("seed_text", request.seedText)
                     .put("instruction_lang_requested", request.instructionLangRequested)
                     .put("instruction_lang_resolved", request.instructionLangResolved)
-                    .put("sketch_text", request.sketchText)
-                    .put("sketch_grain", request.sketchGrain)
-                    .put("sketch_state", request.sketchState)
                     .put("parent_history_id", request.parentHistoryId)
                     .put("input_provenance", request.inputProvenanceJson?.let { org.json.JSONObject(it) }),
             )

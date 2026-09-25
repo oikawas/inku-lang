@@ -24,6 +24,7 @@ class SingleAttemptModelEffectProvider(
         val action = JSONObject(actionJson)
         val tag = action.requiredString("tag")
         val resultTag = when (tag) {
+            "generate_sketch" -> "sketch_generated"
             "select_description_catalog" -> "description_catalog_selected"
             "generate_normalized_ddl" -> "normalized_ddl_generated"
             "complete_visible_ddl_holes" -> "visible_ddl_hole_patch_generated"

@@ -17,6 +17,49 @@ import org.junit.Test
 
 class SharedPipelineHostTest {
     @Test
+    fun sketchChoiceReachesCoreAndGeneratedRecordSurvivesReloadAndRegeneration() = runBlocking {
+        val binding = ScriptedBinding()
+        val provider = RecordingEffectProvider()
+        val executions = MemoryExecutionStore()
+        val host = host(binding, provider, RecordingCommitStore(), executions)
+
+        val pending = host.start(startRequest(PipelineAuthoring.Description("mist", false, PipelineSketchRequest.On)))
+
+        assertEquals("on", binding.inputs.first().getJSONObject("authoring").getJSONObject("sketch").getString("mode"))
+        assertEquals(listOf("generate_sketch", "generate_normalized_ddl", "complete_visible_ddl_holes"), provider.tags)
+        assertEquals(PipelineSketchResult("light over mist", "supplemented"), pending.sketch)
+        assertEquals(pending.sketch, host.view(OWNER, pending.executionId).sketch)
+
+        val regenerated = host.command(
+            OWNER,
+            pending.executionId,
+            PipelineCommand.GenerateFromDescription(pending.revision, "new mist", false, PipelineSketchRequest.Supplied("saved light")),
+        )
+
+        val command = binding.inputs.first { it.optString("tag") == "generate_from_description" }
+        assertEquals("supplied", command.getJSONObject("sketch").getString("mode"))
+        assertEquals("saved light", command.getJSONObject("sketch").getString("text"))
+        assertEquals(1, provider.tags.count { it == "generate_sketch" })
+        assertEquals(PipelineSketchResult("saved light", "supplied"), regenerated.sketch)
+        assertEquals(PipelineSketchResult("saved light", "supplemented"), AndroidWorkPipeline.savedSketchResult(regenerated.sketch))
+    }
+
+    @Test
+    fun sketchResultsWithoutTextPreserveTheCoreOutcome() {
+        assertEquals("off", PipelineSketchResult.from(null).state)
+        assertEquals("off", PipelineSketchResult.from(JSONObject().put("state", "off")).state)
+        assertEquals("pending", PipelineSketchResult.from(JSONObject().put("state", "pending")).state)
+        assertEquals("not_needed", PipelineSketchResult.from(JSONObject().put("state", "not_needed")).state)
+        assertEquals(PipelineSketchResult(state = "fallback"), PipelineSketchResult.from(JSONObject().put("state", "fallback")))
+        assertEquals(PipelineSketchRequest.Off, PipelineSketchRequest.from(SketchInput()))
+        assertEquals(PipelineSketchRequest.On, PipelineSketchRequest.from(SketchInput(requested = true)))
+        assertEquals(PipelineSketchRequest.Supplied("saved"), PipelineSketchRequest.from(SketchInput(text = " saved ")))
+        val blankSupplied = PipelineSketchResult.from(JSONObject().put("state", "supplied").put("text", " \n "))
+        assertEquals(PipelineSketchResult(state = "supplied"), blankSupplied)
+        assertEquals(PipelineSketchResult(state = "fallback"), AndroidWorkPipeline.savedSketchResult(blankSupplied))
+    }
+
+    @Test
     fun descriptionRunCommitsThenRequestsKnownHoleAndWaitsForApproval() = runBlocking {
         val binding = ScriptedBinding()
         val provider = RecordingEffectProvider()
@@ -27,6 +70,7 @@ class SharedPipelineHostTest {
         val pending = host.start(startRequest(PipelineAuthoring.Description("mist", false)))
 
         assertEquals("awaiting_patch_approval", pending.phaseTag)
+        assertEquals("off", binding.inputs.first().getJSONObject("authoring").getJSONObject("sketch").getString("mode"))
         assertEquals(listOf("generate_normalized_ddl", "complete_visible_ddl_holes"), provider.tags)
         assertEquals(1, provider.tags.count { it == "generate_normalized_ddl" })
         assertEquals(1, provider.tags.count { it == "complete_visible_ddl_holes" })
@@ -96,11 +140,11 @@ class SharedPipelineHostTest {
                 return ModelResponse("exact response", request.modelId)
             }
         })
-        val action = providerAction("generate_normalized_ddl", "provider-1")
+        val action = providerAction("generate_sketch", "provider-1")
 
         val result = JSONObject(adapter.perform(action.toString(), MODELS))
 
-        assertEquals("normalized_ddl_generated", result.getString("tag"))
+        assertEquals("sketch_generated", result.getString("tag"))
         assertEquals(1, requests.size)
         assertEquals("system", requests.single().systemInstruction)
         assertEquals("message", requests.single().prompt)
@@ -109,6 +153,8 @@ class SharedPipelineHostTest {
             requests.single().tool?.parametersJson,
         )
         assertEquals(1_000L, requests.single().timeoutMs)
+        assertEquals(MODELS.stage1ModelId, requests.single().modelId)
+        assertEquals(MODELS.stage1MaxTokens, requests.single().maxTokens)
     }
 
     private fun host(
@@ -143,6 +189,7 @@ class SharedPipelineHostTest {
             val tag = action.getString("tag")
             tags += tag
             return when (tag) {
+                "generate_sketch" -> effectResult(action, "sketch_generated", "{\"sketch\":\"light over mist\"}")
                 "generate_normalized_ddl" -> effectResult(action, "normalized_ddl_generated", "{}")
                 "complete_visible_ddl_holes" -> effectResult(action, "visible_ddl_hole_patch_generated", "{}")
                 else -> error("unexpected provider action")
@@ -202,11 +249,13 @@ class SharedPipelineHostTest {
     }
 
     private class ScriptedBinding : SharedPipelineBinding {
+        val inputs = mutableListOf<JSONObject>()
         override fun versionReport() = """{"binding_version":"1.1.0","protocol_version":"1.0.0"}"""
 
         override fun step(snapshotBytes: ByteArray, inputEnvelopeBytes: ByteArray): ByteArray {
             val input = JSONObject(inputEnvelopeBytes.toString(Charsets.UTF_8))
             val payload = input.getJSONObject("payload")
+            inputs += payload
             val previous = snapshotBytes.takeIf { it.isNotEmpty() }
                 ?.let { JSONObject(it.toString(Charsets.UTF_8)) }
             val direct = payload.optString("tag") == "start" &&
@@ -215,11 +264,19 @@ class SharedPipelineHostTest {
             val previousActionId = previous?.optJSONObject("action")
                 ?.optJSONObject("identity")
                 ?.optString("action_id")
+            val sketchRequest = if (payload.optString("tag") == "start") {
+                payload.getJSONObject("authoring").optJSONObject("sketch")
+            } else if (payload.optString("tag") == "generate_from_description") {
+                payload.optJSONObject("sketch")
+            } else null
             val state = when {
                 payload.optString("tag") == "cancel" -> State.Cancelled
                 payload.optString("tag") == "approve_patch" -> State.SecondCommit
                 direct -> State.FirstCommit
+                sketchRequest?.optString("mode") == "on" -> State.Sketch
+                payload.optString("tag") == "generate_from_description" -> State.Stage1
                 payload.optString("tag") == "start" -> State.Stage1
+                resultTag == "sketch_generated" -> State.Stage1
                 resultTag == "normalized_ddl_generated" -> State.FirstCommit
                 resultTag == "visible_ddl_hole_patch_generated" -> State.AwaitingPatch
                 resultTag == "visible_normalized_ddl_committed" && previousActionId == "commit-1" -> {
@@ -233,6 +290,15 @@ class SharedPipelineHostTest {
             val variationId = previous?.getString("variation_id") ?: payload.getString("variation_id")
             val origin = if (direct || previous?.optString("origin_fixture") == "direct") "direct" else "description"
             val snapshot = snapshot(state, input.getString("sequence"), variationId, config, origin)
+            val sketch = when {
+                sketchRequest?.optString("mode") == "supplied" -> JSONObject()
+                    .put("state", "supplied").put("text", sketchRequest.getString("text"))
+                sketchRequest != null -> if (state == State.Sketch) JSONObject().put("state", "pending") else null
+                resultTag == "sketch_generated" -> JSONObject().put("state", "supplemented")
+                    .put("text", JSONObject(payload.getJSONObject("result").getString("response")).getString("sketch"))
+                else -> previous?.optJSONObject("sketch")
+            }
+            snapshot.put("sketch", sketch ?: JSONObject.NULL)
             val rendered = if (state == State.Completed) {
                 JSONObject().put("svg", "<svg/>").put("metadata", JSONObject())
             } else {
@@ -271,17 +337,18 @@ class SharedPipelineHostTest {
         ): JSONObject {
             val direct = originFixture == "direct"
             val revision = when (state) {
-                State.Stage1, State.FirstCommit -> "0"
+                State.Sketch, State.Stage1, State.FirstCommit -> "0"
                 State.Hole, State.AwaitingPatch, State.SecondCommit -> "1"
                 State.Ready, State.Completed -> if (direct) "1" else "2"
                 State.Cancelled -> "0"
             }
             val document = when (state) {
-                State.Stage1, State.Cancelled -> null
+                State.Sketch, State.Stage1, State.Cancelled -> null
                 State.FirstCommit, State.Hole, State.AwaitingPatch -> if (direct) "place one circle." else "DDL with hole"
                 State.SecondCommit, State.Ready, State.Completed -> if (direct) "place one circle." else "patched DDL"
             }
             val action = when (state) {
+                State.Sketch -> providerAction("generate_sketch", "provider-sketch")
                 State.Stage1 -> providerAction("generate_normalized_ddl", "provider-1")
                 State.FirstCommit -> commitAction("commit-1", document!!, revision)
                 State.Hole -> providerAction("complete_visible_ddl_holes", "provider-2")
@@ -289,7 +356,7 @@ class SharedPipelineHostTest {
                 else -> null
             }
             val phase = when (state) {
-                State.Stage1, State.Hole -> JSONObject().put("tag", "awaiting_llm")
+                State.Sketch, State.Stage1, State.Hole -> JSONObject().put("tag", "awaiting_llm")
                 State.FirstCommit, State.SecondCommit -> JSONObject().put("tag", "awaiting_visible_ddl_commit")
                 State.AwaitingPatch -> JSONObject()
                     .put("tag", "awaiting_patch_approval")
@@ -344,7 +411,7 @@ class SharedPipelineHostTest {
         override fun resolveMacroCatalog(inputBytes: ByteArray) = error("not used")
         override fun renderSaved(inputBytes: ByteArray) = error("not used")
 
-        private enum class State { Stage1, FirstCommit, Hole, AwaitingPatch, SecondCommit, Ready, Completed, Cancelled }
+        private enum class State { Sketch, Stage1, FirstCommit, Hole, AwaitingPatch, SecondCommit, Ready, Completed, Cancelled }
     }
 
     private companion object {

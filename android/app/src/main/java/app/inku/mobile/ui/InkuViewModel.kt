@@ -110,8 +110,6 @@ private fun normalizeUiTextScale(scale: Float): Float =
 
 /** 「推敲要素の選択は前回値をブラウザに記憶する」-- here, the device remembers it. */
 const val SETTING_KEY_REFINEMENT_ELEMENT = "refinement_element"
-/** 写生 (Stage 0.5): which of the three states the control was left in. */
-const val SETTING_KEY_SKETCH_MODE = "sketch_mode"
 const val SETTING_KEY_DISPLAY_SAFE_MARGINS = "display_safe_margins"
 /** Said by every generating entry point that refuses while candidates are drawn. */
 val REFINEMENT_IN_PROGRESS: (InkuStrings) -> String = { it.refinementInProgress }
@@ -239,8 +237,7 @@ data class InkuUiState(
     val canvasPanY: Float = 0f,
     val canvasPresentationMode: Boolean = false,
     val renderWild: Boolean = false,
-    // 写生 (Stage 0.5). One control, three states, and the author's default is
-    // that the layer runs cutting fine (`sketch.ts:26`, `sketch.py:36`).
+    // 写生 runs only when the author chooses it; the initial choice is off.
     val sketchMode: SketchMode = Sketches.DEFAULT_MODE,
     // 推敲 (SPEC :614). The element is one value, never a set: the radio is
     // exclusive because a lineage edge has one cause.
@@ -1259,6 +1256,7 @@ class InkuViewModel @JvmOverloads constructor(
             historyAuthorityLoading = false,
             descriptionForkRequested = false,
             selectedHistory = null,
+            sketchMode = Sketches.DEFAULT_MODE,
             cameraSourcePhotoPath = null,
             lineageDetached = true,
             ddlEditedAfterGeneration = false,
@@ -1565,7 +1563,6 @@ class InkuViewModel @JvmOverloads constructor(
 
     fun setSketchMode(mode: SketchMode) {
         localState.value = localState.value.copy(sketchMode = mode)
-        persistSetting(SETTING_KEY_SKETCH_MODE, JSONObject().put("value", mode.wire).toString())
     }
 
     fun setSaveReplayAsNewVersion(enabled: Boolean) {
@@ -1685,6 +1682,43 @@ class InkuViewModel @JvmOverloads constructor(
 
     fun selectHistory(item: HistoryItemEntity) = applyHistorySelection(item, AppTab.Compose)
 
+    /** Redraw this lineage work with an explicit 写生 choice and a new child edge. */
+    fun redrawSketch(item: HistoryItemEntity, mode: SketchMode) {
+        startSketchRedraw(item, mode, null)
+    }
+
+    /** The author's corrected prose is supplied directly, without another 写生 call. */
+    fun redrawSketchText(item: HistoryItemEntity, text: String) {
+        val supplied = text.trim().takeIf { it.isNotEmpty() } ?: return
+        startSketchRedraw(item, SketchMode.On, supplied)
+    }
+
+    private fun startSketchRedraw(item: HistoryItemEntity, mode: SketchMode, suppliedText: String?) {
+        val description = sourceTextOf(item)
+        if (item.lineageNodeId.isNullOrEmpty() || description.isBlank()) return
+        val before = state.value
+        if (before.isDrawing || before.refinementBusy) return
+        applyHistorySelection(item, AppTab.Lineage)
+        val current = localState.value.copy(
+            prompt = description,
+            sketchMode = mode,
+            selectedCatalogId = item.colorCatalogId,
+            selectedCanvasAspect = item.canvasAspect,
+            descriptionForkRequested = true,
+            refinementOpen = false,
+            refinementPreviewId = null,
+            // This operation starts a new description run from the saved work;
+            // it does not need to resume that work's pipeline authority.
+            historyAuthorityLoading = false,
+        )
+        localState.value = current
+        validateModelsForRun(current, null)?.let { message ->
+            localState.value = current.copy(message = message)
+            return
+        }
+        runSubmit(current, sketchRedraw = true, suppliedSketchText = suppliedText)
+    }
+
     /**
      * @param tab where the pick leaves the reader. Picking out of history opens
      *   the work to be drawn again; picking a node in the lineage re-centres the
@@ -1711,6 +1745,7 @@ class InkuViewModel @JvmOverloads constructor(
                 cameraCaptureState = current.cameraCaptureState.clearCameraOrigin(),
                 selectedCatalogId = item.colorCatalogId,
                 selectedCanvasAspect = item.canvasAspect,
+                sketchMode = Sketches.modeOfWork(item.sketchState, item.sketchGrain),
                 tab = tab,
                 composeMode = ComposeMode.Write,
             )
@@ -1798,6 +1833,7 @@ class InkuViewModel @JvmOverloads constructor(
     fun detachLineage() {
         localState.value = localState.value.copy(
             selectedHistory = null,
+            sketchMode = Sketches.DEFAULT_MODE,
             pipelineView = null,
             historyAuthority = null,
             historyAuthorityLoading = false,
@@ -2006,46 +2042,24 @@ class InkuViewModel @JvmOverloads constructor(
             )
         }
 
-    /**
-     * Whether the 写生 (Stage 0.5) grain differs from the one its parent was
-     * painted at. web reaches the same judgment with
-     * `normalizeSketchGrain(displayedHistoryItem?.sketch_grain) !==
-     * sketchGrainOf(sketchMode)` (+page.svelte:3225-3227), and this is that
-     * comparison, both halves included.
-     *
-     * **What a parent with no grain is compared against: nothing.** The
-     * normalizer used here is web's -- [Sketches.recordedGrainOf], which answers
-     * `null` for an absent value, for `off`, and for a row written before the
-     * column. It is NOT [Sketches.normalizeGrain], which rounds an unknown value
-     * up to the default `fine` because it is resolving a *requested* grain.
-     * Using that one here would invert both readings: redrawing a work that
-     * predates the column with the layer off would look like a grain change,
-     * and redrawing it at `fine` would look like a replay. `off` carries no
-     * grain either ([Sketches.grainOf]), so absence compares equal to absence
-     * and a redraw with the layer off stays a replay -- which is what it is.
-     */
+    /** Old fine/coarse works count as on when comparing an ordinary redraw. */
     private fun grainChanged(mode: SketchMode, parent: HistoryItemEntity): Boolean =
-        Sketches.grainOf(mode) != Sketches.recordedGrainOf(parent.sketchGrain)
+        mode != Sketches.modeOfWork(parent.sketchState, parent.sketchGrain)
 
     /**
      * What the describe screen asks 写生 (Stage 0.5) for.
      *
-     * A redraw that moved neither the description nor the grain replays the
-     * prose its parent was painted from rather than asking the layer again
-     * (+page.svelte:3238-3241): the layer is not deterministic, so calling it a
-     * second time would produce a different sketch, and that is not a replay.
-     * Anything else -- an edited description, a moved grain, no parent at all --
-     * carries no prose, and the layer runs if the control asks it to.
+     * An ordinary replay carries saved prose through the supplied path. The
+     * explicit per-work action forces a fresh request, even at the same mode.
      */
-    private fun describeSketchInput(current: InkuUiState): SketchInput {
+    private fun describeSketchInput(current: InkuUiState, forceFresh: Boolean = false): SketchInput {
         val parent = lineageParent(current)
-        val replaying = parent != null &&
+        val replaying = !forceFresh && parent != null &&
             !descriptionChanged(current.prompt, parent) &&
             !grainChanged(current.sketchMode, parent)
         return SketchInput(
-            requested = current.sketchMode != SketchMode.Off,
+            requested = current.sketchMode == SketchMode.On,
             text = if (replaying) parent?.sketchText else null,
-            grain = Sketches.grainOf(current.sketchMode)?.wire,
         )
     }
 
@@ -2070,7 +2084,7 @@ class InkuViewModel @JvmOverloads constructor(
         return text != sourceTextOf(parent)
     }
 
-    private fun runSubmit(current: InkuUiState, route: CameraNimDrawRoute? = null) {
+    private fun runSubmit(current: InkuUiState, route: CameraNimDrawRoute? = null, sketchRedraw: Boolean = false, suppliedSketchText: String? = null) {
         if (current.descriptionLocked && !current.historyAuthorityLoading) return
         if (current.prompt.isBlank()) {
             localState.value = current.copy(message = "Prompt is empty.")
@@ -2082,7 +2096,27 @@ class InkuViewModel @JvmOverloads constructor(
         }
         // Read before the coroutine starts: the first thing it does is clear
         // `selectedHistory` (below), so a parent read from inside would be gone.
-        val declared = if (route == null) describeLineage(current) else LineageDeclaration()
+        val declared = when {
+            sketchRedraw -> {
+                val parent = requireNotNull(lineageParent(current))
+                LineageDeclaration(
+                    parentNodeId = parent.lineageNodeId,
+                    derivationKind = SubmitDerivationKind.SKETCH_GRAIN_CHANGE,
+                    derivationMetadata = mapOf(
+                        "edited_from_history_id" to parent.id,
+                        "from_sketch_state" to parent.sketchState,
+                        "to_sketch_mode" to current.sketchMode.wire,
+                    ),
+                )
+            }
+            route == null -> describeLineage(current)
+            else -> LineageDeclaration()
+        }
+        val sketchInput = when {
+            suppliedSketchText != null -> SketchInput(text = suppliedSketchText)
+            route == null -> describeSketchInput(current, forceFresh = sketchRedraw)
+            else -> SketchInput()
+        }
         // Read here for the same reason: it is decided against the parent, and
         // the coroutine clears the parent before it draws.
         val stage1ModelId = route?.stage1ModelId ?: current.selectedModelId
@@ -2140,6 +2174,7 @@ class InkuViewModel @JvmOverloads constructor(
                         lineage = lineage,
                         instructionLang = InstructionLanguages.AUTO,
                         uiLang = current.uiLanguage.code,
+                        sketch = sketchInput,
                         parentHistoryId = current.selectedHistory?.id?.takeUnless { current.lineageDetached },
                         inputProvenance = route?.inputProvenance,
                     )
@@ -2162,6 +2197,7 @@ class InkuViewModel @JvmOverloads constructor(
                         message = "Rendered ${item.renderHashShort}",
                     )
                 }
+                if (sketchRedraw) refreshLineage()
             }.onFailure { error ->
                 if (!isCurrentDrawingRun(runId)) return@onFailure
                 if (presentPipelineInteraction(error)) return@onFailure
@@ -3214,11 +3250,6 @@ class InkuViewModel @JvmOverloads constructor(
         val demoSeed = settings["demo_seed_phrase"]?.let { JSONObject(it).optString("value", current.demoSeed) } ?: current.demoSeed
         val demoInterval = settings["demo_interval_seconds"]?.let { JSONObject(it).optInt("value", current.demoIntervalSeconds) } ?: current.demoIntervalSeconds
         val batchHistory = settings["batch_prompt_history"]?.let { parseStringArray(JSONObject(it).optJSONArray("items")) } ?: current.batchPromptHistory
-        // A stored word that is not one of the three is not the author's choice,
-        // so the author's default stands rather than a silent `off`.
-        val sketchMode = settings[SETTING_KEY_SKETCH_MODE]
-            ?.let { stored -> Sketches.MODES.firstOrNull { it.wire == JSONObject(stored).optString("value") } }
-            ?: current.sketchMode
         val refinementElement = settings[SETTING_KEY_REFINEMENT_ELEMENT]
             ?.let { RefinementElement.byId(JSONObject(it).optString("value")) }
             ?: current.refinementElement
@@ -3245,7 +3276,6 @@ class InkuViewModel @JvmOverloads constructor(
             demoSeed = demoSeed,
             demoIntervalSeconds = demoInterval.coerceIn(1, 999),
             batchPromptHistory = batchHistory,
-            sketchMode = sketchMode,
             refinementElement = refinementElement,
             includeThinking = thinking,
             selectedModelId = restoredUnifiedModel,

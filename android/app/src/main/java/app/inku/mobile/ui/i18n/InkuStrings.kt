@@ -253,6 +253,10 @@ interface InkuStrings {
     val unifiedModelNote: String
     val downloadAgain: String
     val sketchFromLife: String
+    val workActionSketchRedraw: String
+    val workActionSketchWithMode: (String) -> String
+    val sketchTextEditLabel: String
+    val sketchTextRedraw: String
     val delete: String
     val downloading: String
     val downloadable: String

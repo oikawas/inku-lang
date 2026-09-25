@@ -143,7 +143,7 @@ object InkuStringsJa : InkuStrings {
             "render_engine_change" -> "描画エンジン"
             "renga_reply" -> "連歌の付句"
             "replay" -> "再描画"
-            "sketch_grain_change" -> "写生の区切り"
+            "sketch_grain_change" -> "写生の有無"
             "touch_change" -> "タッチ"
             "variation" -> "変奏"
             else -> derivationUnknown
@@ -309,6 +309,10 @@ object InkuStringsJa : InkuStrings {
     override val unifiedModelNote = "内部保存と履歴メタデータはserver互換のstage1_model / stage2_modelを維持し、Android UIでは同じモデルを両Stageへ適用します。"
     override val downloadAgain = "再取得"
     override val sketchFromLife = "写生"
+    override val workActionSketchRedraw = "写生なし／ありで描き直す"
+    override val workActionSketchWithMode: (String) -> String = { mode -> "写生${mode}で描き直す" }
+    override val sketchTextEditLabel = "写生文"
+    override val sketchTextRedraw = "直した写生文で描き直す"
     override val delete = "削除"
     override val downloading = "取得中"
     override val downloadable = "取得可能"

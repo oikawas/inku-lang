@@ -224,23 +224,23 @@ class SketchLineageWiringTest {
         val parent = seedParent(PARENT_DESCRIPTION, sketchGrain = "fine", suffix = "t8")
         startViewModel()
         useModel()
-        useSketchMode(SketchMode.Fine)
+        useSketchMode(SketchMode.On)
         chooseFromHistory(parent)
         settle("the parent's description to be the one on screen") {
             vm().state.value.prompt == parent.originalInput
         }
 
-        // Same description, same canvas, same grain: nothing moved.
+        // Same description, canvas and mode: nothing moved.
         vm().draw()
         val replayed = awaitNewestAfter(1)
         assertEquals("replay", edgeOf(replayed)?.derivationKind)
 
-        // The same parent again, and only the grain moves.
+        // The same parent again, and only the 写生 choice moves.
         chooseFromHistory(parent)
         settle("the parent's description to be back on screen") {
             vm().state.value.prompt == parent.originalInput
         }
-        useSketchMode(SketchMode.Coarse)
+        useSketchMode(SketchMode.Off)
         vm().draw()
         val recut = awaitNewestAfter(2)
 
@@ -248,7 +248,7 @@ class SketchLineageWiringTest {
         assertNotNull("the redraw at a new grain was saved with no lineage edge at all", edge)
         assertEquals("sketch_grain_change", edge!!.derivationKind)
         assertEquals(parent.lineageNodeId, edge.parentNodeId)
-        assertEquals("and the new grain is on the row", "coarse", recut.sketchGrain)
+        assertEquals("the new work was drawn without 写生", "off", recut.sketchState)
     }
 
     /**
@@ -284,7 +284,7 @@ class SketchLineageWiringTest {
         settle("the parent's description to be back on screen") {
             vm().state.value.prompt == parent.originalInput
         }
-        useSketchMode(SketchMode.Fine)
+        useSketchMode(SketchMode.On)
         vm().draw()
         val withLayerOn = awaitNewestAfter(2)
         assertEquals(
@@ -306,14 +306,14 @@ class SketchLineageWiringTest {
         val parent = seedParent(PARENT_DESCRIPTION, sketchGrain = "fine", suffix = "t9")
         startViewModel()
         useModel()
-        useSketchMode(SketchMode.Fine)
+        useSketchMode(SketchMode.On)
         chooseFromHistory(parent)
         settle("the parent's description to be the one on screen") {
             vm().state.value.prompt == parent.originalInput
         }
 
         promptFor(CHILD_DESCRIPTION)
-        useSketchMode(SketchMode.Coarse)
+        useSketchMode(SketchMode.Off)
         vm().draw()
         val child = awaitNewestAfter(1)
 

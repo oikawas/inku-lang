@@ -161,7 +161,7 @@ object InkuStringsEn : InkuStrings {
             "render_engine_change" -> "Render engine"
             "renga_reply" -> "Renga reply"
             "replay" -> "Replay"
-            "sketch_grain_change" -> "Sketch grain"
+            "sketch_grain_change" -> "Sketch from life"
             "touch_change" -> "Touch"
             "variation" -> "Variation"
             else -> derivationUnknown
@@ -337,6 +337,12 @@ object InkuStringsEn : InkuStrings {
     override val unifiedModelNote = "Storage and history metadata keep the server’s stage1_model / stage2_model, and this interface applies one model to both stages."
     override val downloadAgain = "Download again"
     override val sketchFromLife = "Sketch from life"
+    override val workActionSketchRedraw = "Redraw with or without sketch from life"
+    override val workActionSketchWithMode: (String) -> String = { mode ->
+        if (mode == "On") "Redraw with sketch from life" else "Redraw without sketch from life"
+    }
+    override val sketchTextEditLabel = "Sketch from life text"
+    override val sketchTextRedraw = "Redraw with edited sketch from life"
     override val delete = "Delete"
     override val downloading = "Downloading"
     override val downloadable = "Ready to download"

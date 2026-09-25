@@ -4,12 +4,12 @@ This directory is the Android workspace for the native standalone app and is
 tracked by Git. Local-only artifacts, device IDs, downloaded models, logs, and
 secrets must remain outside tracked files.
 
-Last updated: 2026-09-24.
+Last updated: 2026-09-25.
 
 **Catch-up status**: Android sits at generation `2.1.4-android.79` with **render engine
-`default / 41`** and **DDL engine version `20`**. Render identity comes from the packaged
+`default / 67`** and **DDL engine version `20`**. Render identity comes from the packaged
 `core/crates/inku-render/` library through JNI rather than a Kotlin compatibility literal;
-`ReferenceCorpus.kt` declares the DDL reference version. The server also uses render engine `41`
+`ReferenceCorpus.kt` declares the DDL reference version. The server also uses render engine `67`
 and DDL engine `21`, so server and Android share one Rust drawing implementation while their DDL
 engine versions remain independently declared. The Stage 1.5 expander followed the staffage level being folded away on
 2026-08-05 (see the 2026-08-05 section at the end of this document).
@@ -39,6 +39,16 @@ When updating Android specifications:
    adaptation of the Japanese source.
 3. Do not introduce English-only Android requirements that are absent from
    `ANDROID_SPEC.ja.md`.
+
+## 2026-09-25 Current sketch behavior (method A)
+
+Under shared SPEC §12.6.1, the author chooses sketching for each draw. It is off by default; there is no automatic per-description decision. The start input and regenerate-from-description command accept `sketch` modes `off`, author-selected `on`, and `supplied` for author-edited or saved prose. Supplied prose bypasses the sketch provider.
+
+For `on`, `generate_sketch` is an optional effect before Stage 1, using the Stage 1 model and prompt `inku.sketch-supplement-prompt.v1`. Its JSON response `{"sketch":"..."}` becomes `sketch_generated`, and that prose is passed into the work plan. The retry budget is `sketch_retry`, falling back to `catalog_retry` when unset. The run never waits for author confirmation. A provider failure becomes `fallback` and continues from the description alone; an empty response becomes `not_needed` and also continues from the description alone. Snapshot states are `pending`, `supplemented`, `not_needed`, `fallback`, and `supplied`. On save, `supplemented` or `supplied` prose is stored in `sketch_text` with null `sketch_grain`; `not_needed` and `fallback` save only their state, while the absence of a sketch record is `off`. `sketch_state` includes `supplemented` and `not_needed`.
+
+The ordinary Android drawing setting offers off/on and defaults to off. Redrawing a selected work with or without sketching saves a child in lineage, reuses the existing `sketch_grain_change` derivation kind, and records `from_sketch_state` and `to_sketch_mode` metadata. Legacy `fine` and `coarse` values are retained only to display saved works and determine their redraw choice; they are not used for new sketch inputs or records.
+
+This sketch pipeline's rendered output is produced by the packaged `core/crates/inku-render/` through the shared pipeline JNI. Android reports render engine `default / 67`.
 
 ## 2026-09-24 Current bottom actions, photo entry, and Works scrolling
 

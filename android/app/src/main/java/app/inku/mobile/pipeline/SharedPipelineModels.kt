@@ -1,5 +1,36 @@
 package app.inku.mobile.pipeline
 
+import org.json.JSONObject
+
+sealed interface PipelineSketchRequest {
+    data object Off : PipelineSketchRequest
+    data object On : PipelineSketchRequest
+    data class Supplied(val text: String) : PipelineSketchRequest
+
+    fun toJson(): JSONObject = when (this) {
+        Off -> JSONObject().put("mode", "off")
+        On -> JSONObject().put("mode", "on")
+        is Supplied -> JSONObject().put("mode", "supplied").put("text", text)
+    }
+
+    companion object {
+        fun from(input: SketchInput): PipelineSketchRequest =
+            input.text?.trim()?.takeIf(String::isNotEmpty)?.let(::Supplied)
+                ?: if (input.requested) On else Off
+    }
+}
+
+/** Sketch state projected from the shared snapshot, including an in-flight request. */
+data class PipelineSketchResult(val text: String? = null, val state: String = "off") {
+    companion object {
+        fun from(record: JSONObject?): PipelineSketchResult {
+            if (record == null) return PipelineSketchResult()
+            val text = record.optString("text").takeUnless { record.isNull("text") || it.isBlank() }
+            return PipelineSketchResult(text, record.requiredString("state"))
+        }
+    }
+}
+
 data class PipelineModelSelection(
     val stage1ModelId: String,
     val stage2ModelId: String,
@@ -8,7 +39,11 @@ data class PipelineModelSelection(
 )
 
 sealed interface PipelineAuthoring {
-    data class Description(val text: String, val autoCatalog: Boolean) : PipelineAuthoring
+    data class Description(
+        val text: String,
+        val autoCatalog: Boolean,
+        val sketch: PipelineSketchRequest = PipelineSketchRequest.Off,
+    ) : PipelineAuthoring
     data class DirectDdl(val source: String) : PipelineAuthoring
 }
 
@@ -37,6 +72,7 @@ sealed interface PipelineCommand {
         val expectedRevision: String,
         val description: String,
         val autoCatalog: Boolean,
+        val sketch: PipelineSketchRequest = PipelineSketchRequest.Off,
     ) : PipelineCommand
     data class ApprovePatch(val expectedRevision: String, val proposalDigest: String) : PipelineCommand
     data class DeclinePatch(val proposalDigest: String) : PipelineCommand
@@ -71,6 +107,7 @@ data class PipelineView(
     val description: String? = null,
     val hostContextJson: String = "{}",
     val models: PipelineModelSelection? = null,
+    val sketch: PipelineSketchResult = PipelineSketchResult(),
 )
 
 class PipelineHostException(

@@ -209,6 +209,7 @@ import app.inku.mobile.data.model.ColorCatalogs
 import app.inku.mobile.pipeline.InstructionLanguages
 import app.inku.mobile.pipeline.SaijikiGenerated
 import app.inku.mobile.pipeline.Sketches
+import app.inku.mobile.pipeline.SketchMode
 import app.inku.mobile.ui.i18n.InkuStrings
 import app.inku.mobile.ui.i18n.LocalStrings
 import app.inku.mobile.ui.i18n.inkuError
@@ -2137,7 +2138,7 @@ private fun DrawSettingsPanel(state: InkuUiState, viewModel: InkuViewModel) {
         Column(modifier = Modifier.fillMaxWidth().clickable { expanded = !expanded }.padding(vertical = Dimens.spaceM)) {
             Text(S.drawingSettings, style = MaterialTheme.typography.labelLarge)
             Text(
-                "${shortModelLabel(state)} · ${shortCatalogLabel(state)} · ${shortCanvasLabel(state)}",
+                "${shortModelLabel(state)} · ${shortCatalogLabel(state)} · ${shortCanvasLabel(state)} · ${S.sketchFromLife} ${Sketches.modeLabel(state.sketchMode, state.uiLanguage.code == "ja")}",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -2148,6 +2149,7 @@ private fun DrawSettingsPanel(state: InkuUiState, viewModel: InkuViewModel) {
                 SecondarySmallButton(text = shortCatalogLabel(state), onClick = viewModel::openCatalogSelection)
                 SecondarySmallButton(text = shortCanvasLabel(state), onClick = viewModel::openCanvasSelection)
             }
+            SketchModeRow(state, viewModel)
         }
     }
 }
@@ -2574,12 +2576,7 @@ private fun exportTemplateDescription(description: String, heightPx: Int): Strin
 }
 
 /**
- * 写生 (Stage 0.5): one control carrying three states.
- *
- * It sits above the description because that is where the layer sits -- it
- * reads the description before Stage 1 does. `切` is kept, since the layer can
- * still be skipped, but it is marked as the one not to reach for: this row is
- * the only place that says so (`sketchModeNote`, `sketch.ts:51-58`).
+ * 写生 is off by default; the author can ask for it on this drawing.
  */
 @Composable
 private fun SketchModeRow(state: InkuUiState, viewModel: InkuViewModel) {
@@ -2591,16 +2588,15 @@ private fun SketchModeRow(state: InkuUiState, viewModel: InkuViewModel) {
         CompactLabel(S.sketchFromLife)
         Spacer(Modifier.weight(1f))
         Sketches.MODES.forEach { mode ->
-            val note = Sketches.modeNote(mode, isJapanese = true)
             MiniPill(
-                text = Sketches.modeLabel(mode, isJapanese = true) + note,
+                text = Sketches.modeLabel(mode, isJapanese = state.uiLanguage.code == "ja"),
                 selected = state.sketchMode == mode,
                 onClick = { viewModel.setSketchMode(mode) },
             )
         }
     }
     Text(
-        Sketches.modeHint(state.sketchMode, isJapanese = true),
+        Sketches.modeHint(state.sketchMode, isJapanese = state.uiLanguage.code == "ja"),
         style = MaterialTheme.typography.labelSmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
@@ -3430,7 +3426,7 @@ internal fun LineageScreen(state: InkuUiState, viewModel: InkuViewModel) {
                 Text(S.lineageLoading, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             graph == null || graph.nodes.isEmpty() ->
                 Text(S.lineageEmpty, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            else -> LineageColumns(graph, viewModel)
+            else -> LineageColumns(graph, viewModel, state.uiLanguage.code == "ja")
         }
     }
 }
@@ -3828,7 +3824,7 @@ private fun RefinementCandidateImage(svg: String, modifier: Modifier = Modifier)
 }
 
 @Composable
-private fun LineageColumns(graph: LineageGraphResult, viewModel: InkuViewModel) {
+private fun LineageColumns(graph: LineageGraphResult, viewModel: InkuViewModel, isJapanese: Boolean) {
     // Grouped by the distance from the topmost node of *this* graph, the way
     // web's `depthByNode` does. The heading names the generation instead, which
     // is counted from the root of the whole lineage and so keeps its number
@@ -3870,6 +3866,9 @@ private fun LineageColumns(graph: LineageGraphResult, viewModel: InkuViewModel) 
                         onToggleStar = viewModel::toggleStar,
                         onRefine = { item, subview -> viewModel.openRefinement(item, subview) },
                         onEditDdl = viewModel::openLineageDdlEditor,
+                        onRedrawSketch = viewModel::redrawSketch,
+                        onRedrawSketchText = viewModel::redrawSketchText,
+                        isJapanese = isJapanese,
                     )
                 }
             }
@@ -3886,9 +3885,16 @@ private fun LineageNodeCard(
     onToggleStar: (HistoryItemEntity) -> Unit,
     onRefine: (HistoryItemEntity, RefinementSubview) -> Unit,
     onEditDdl: (HistoryItemEntity) -> Unit,
+    onRedrawSketch: (HistoryItemEntity, SketchMode) -> Unit,
+    onRedrawSketchText: (HistoryItemEntity, String) -> Unit,
+    isJapanese: Boolean,
 ) {
     val work = node as? LineageGraphNode.Work
     val history = work?.history
+    var sketchChoicesOpen by remember(node.id) { mutableStateOf(false) }
+    var sketchDraft by remember(node.id, history?.item?.sketchText) {
+        mutableStateOf(history?.item?.sketchText.orEmpty())
+    }
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -3958,6 +3964,36 @@ private fun LineageNodeCard(
                         ChipButton(S.ddlEdit, modifier = Modifier.testTag(DDL_ENTRY_TAG), onClick = { onEditDdl(history.item) })
                         ChipButton(S.model, modifier = Modifier.testTag(MODEL_ENTRY_TAG), onClick = { onRefine(history.item, RefinementSubview.Model) })
                         ChipButton(S.language, modifier = Modifier.testTag(LANGUAGE_ENTRY_TAG), onClick = { onRefine(history.item, RefinementSubview.Language) })
+                        ChipButton(S.workActionSketchRedraw, onClick = { sketchChoicesOpen = !sketchChoicesOpen })
+                    }
+                    if (sketchChoicesOpen) {
+                        Text(
+                            Sketches.stateNote(history.item.sketchState, isJapanese),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        history.item.sketchText?.takeIf { it.isNotBlank() }?.let {
+                            OutlinedTextField(
+                                value = sketchDraft,
+                                onValueChange = { sketchDraft = it },
+                                label = { Text(S.sketchTextEditLabel) },
+                                modifier = Modifier.fillMaxWidth(),
+                                minLines = 3,
+                            )
+                            SecondarySmallButton(
+                                text = S.sketchTextRedraw,
+                                onClick = { onRedrawSketchText(history.item, sketchDraft) },
+                                enabled = sketchDraft.isNotBlank(),
+                            )
+                        }
+                        WrapRow(horizontal = Dimens.spaceXs, vertical = Dimens.spaceXs) {
+                            Sketches.MODES.forEach { mode ->
+                                SecondarySmallButton(
+                                    text = S.workActionSketchWithMode(Sketches.modeLabel(mode, isJapanese)),
+                                    onClick = { onRedrawSketch(history.item, mode) },
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -5570,6 +5606,7 @@ internal enum class GenerationInfoField {
     NormalizedImageDimensions,
     SketchGrain,
     SketchState,
+    SketchText,
     Stage1Model,
     Stage2Model,
     LanguageRequested,
@@ -5676,6 +5713,7 @@ internal fun generationInfoSections(item: HistoryItemEntity): List<GenerationInf
             listOf(
                 GenerationInfoRow(GenerationInfoField.SketchGrain, value(item.sketchGrain)),
                 GenerationInfoRow(GenerationInfoField.SketchState, value(item.sketchState)),
+                GenerationInfoRow(GenerationInfoField.SketchText, value(item.sketchText)),
             ),
         ),
         GenerationInfoSection(
@@ -5839,6 +5877,7 @@ private fun generationInfoFieldLabel(field: GenerationInfoField): String = when 
     GenerationInfoField.NormalizedImageDimensions -> S.generationInfoNormalizedImageDimensions
     GenerationInfoField.SketchGrain -> S.generationInfoSketchGrain
     GenerationInfoField.SketchState -> S.generationInfoSketchState
+    GenerationInfoField.SketchText -> S.sketchTextEditLabel
     GenerationInfoField.Stage1Model -> S.generationInfoStage1Model
     GenerationInfoField.Stage2Model -> S.generationInfoStage2Model
     GenerationInfoField.LanguageRequested -> S.generationInfoLanguageRequested

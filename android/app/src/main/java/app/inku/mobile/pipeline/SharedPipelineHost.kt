@@ -67,6 +67,7 @@ class SharedPipelineHost(
                         .put("tag", "description")
                         .put("description", authoring.text)
                         .put("auto_catalog", authoring.autoCatalog)
+                        .put("sketch", authoring.sketch.toJson())
                     is PipelineAuthoring.DirectDdl -> JSONObject()
                         .put("tag", "direct_ddl")
                         .put("source", authoring.source)
@@ -223,6 +224,7 @@ class SharedPipelineHost(
             when (action.requiredString("tag")) {
                 "commit_visible_normalized_ddl" -> runCommitEffect(session, action)
                 "select_description_catalog",
+                "generate_sketch",
                 "generate_normalized_ddl",
                 "complete_visible_ddl_holes"
                 -> if (!runProviderEffect(session, action)) return view(session)
@@ -395,6 +397,7 @@ class SharedPipelineHost(
             description = session.context.description.takeIf(String::isNotEmpty),
             hostContextJson = session.hostContextJson,
             models = session.models,
+            sketch = PipelineSketchResult.from(snapshot.optJSONObject("sketch")),
         )
     }
 
@@ -435,6 +438,7 @@ class SharedPipelineHost(
             .put("expected_revision", command.expectedRevision)
             .put("description", command.description)
             .put("auto_catalog", command.autoCatalog)
+            .put("sketch", command.sketch.toJson())
         is PipelineCommand.ApprovePatch -> JSONObject()
             .put("tag", "approve_patch")
             .put("expected_revision", command.expectedRevision)

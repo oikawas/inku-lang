@@ -37,6 +37,33 @@ class AndroidSharedPipelineTest {
     }
 
     @Test
+    fun sketchOnUsesPackagedPipelineAndSavesGeneratedProse() = runBlocking {
+        val provider = SketchProvider()
+        val db = Room.inMemoryDatabaseBuilder(context, InkuDatabase::class.java)
+            .build().also { database = it }
+        val repo = InkuRepository(context, db, modelProviderOverride = provider)
+            .also { repository = it }
+
+        val work = repo.paint(
+            description = "A tree stands beside a river at dusk.",
+            catalogId = "default", canvasAspect = "square",
+            stage1ModelId = MODEL, stage2ModelId = MODEL,
+            seeds = PaintSeeds(renderSeed = 77L, compositionSeed = 17L),
+            instructionLang = "en", uiLang = "en",
+            sketch = SketchInput(requested = true),
+        )
+
+        assertEquals(listOf("sketch", "normalized_ddl"), provider.requests.map { request ->
+            if (request.tool?.parametersJson?.contains("\"sketch\"") == true) "sketch" else "normalized_ddl"
+        })
+        assertEquals("The river is wide in the low light of dusk.", work.sketchText)
+        assertEquals("supplemented", work.sketchState)
+        assertEquals(null, work.sketchGrain)
+        assertTrue(work.displaySvg.startsWith("<svg"))
+        assertEquals("supplemented", db.historyDao().getById(work.id)?.sketchState)
+    }
+
+    @Test
     fun bundledMacroReachesScoreThroughNormalAuthoring() = runBlocking {
         val provider = ScriptedProvider()
         val db = Room.inMemoryDatabaseBuilder(context, InkuDatabase::class.java)
@@ -245,6 +272,21 @@ class AndroidSharedPipelineTest {
                 "place one black circle at center."
             }
             return ModelResponse(JSONObject().put("normalized_ddl", ddl).toString(), request.modelId)
+        }
+    }
+
+    private class SketchProvider : ModelProvider {
+        override val providerId = "fixture"
+        val requests = mutableListOf<ModelRequest>()
+
+        override suspend fun generate(request: ModelRequest): ModelResponse {
+            requests += request
+            val response = if (request.tool?.parametersJson?.contains("\"sketch\"") == true) {
+                JSONObject().put("sketch", "The river is wide in the low light of dusk.")
+            } else {
+                JSONObject().put("normalized_ddl", "place one black circle at center.")
+            }
+            return ModelResponse(response.toString(), request.modelId)
         }
     }
 

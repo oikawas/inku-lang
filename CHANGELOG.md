@@ -6,6 +6,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 36 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### v2.15.32 — include every locked crate in the API image notices (Build 1108, 2026-09-26)
+
+The v2.15.31 API image build stopped while collecting Rust dependency notices: the native wheel build had fetched only the crates it compiled, while the conservative notice inventory covers all of `Cargo.lock`. The builder now fetches the full lockfile before generating that inventory. This changes the distribution build, not application behavior.
+
 ### v2.15.31 — complete the release checks and API image build (Build 1107, 2026-09-26)
 
 This release carries the product changes described under v2.15.30 below. A Server test fixture had one unused local binding, which made the public Server lint job fail. Removing that binding changes no product behavior or test assertion. The API image build also called the Rust notice bundler with the builder image's older default `python`, which lacks `tomllib`. It now calls the available Python 3.12 interpreter. The v2.15.30 tag remains a historical source snapshot; this version is the release candidate.

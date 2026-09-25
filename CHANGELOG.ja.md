@@ -6,6 +6,10 @@
 
 **本書が持つのは v2.5.0（2026-07-25、render engine 12）以降**の 36 版である。それより前は書庫にある。
 
+### v2.15.32 — API imageの通知にlockfile全体のcrateを含める（Build 1108、2026-09-26）
+
+v2.15.31のAPI image buildはRust依存の通知を集めるところで停止した。native wheelのbuildは実際にコンパイルするcrateだけを取得したが、保守的な通知一覧は`Cargo.lock`全体を対象にしていた。通知を生成する前にlockfileの全crateを取得する。配布物のbuildだけの変更で、アプリの動作は変わらない。
+
 ### v2.15.31 — 公開checkとAPI image buildを修正（Build 1107、2026-09-26）
 
 下のv2.15.30節に記した製品変更を収録する。Serverの試験fixtureに未使用の変数が1行あり、公開GitHubのServer lint jobが失敗したため、その代入を削除した。製品の動作と試験の判定内容は変わらない。API imageのbuildでは、Rustの通知をまとめる処理をbuilder imageの古い既定`python`で起動し、`tomllib`が無く失敗していた。使えることを確認したPython 3.12で起動する。v2.15.30のtagは履歴として保持し、本版を公開候補とする。

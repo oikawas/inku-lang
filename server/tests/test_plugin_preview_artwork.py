@@ -107,7 +107,7 @@ def test_a_word_without_the_key_simply_has_none(tmp_path):
     path = tmp_path / "nature-leaves.inku-plugin.md"
     path.write_text(text, encoding="utf-8")
     document = parse_plugin_document(text, source_path=str(path))
-    first = next(e for e in document.entries if e.heading == "若葉")
+    first = next(e for e in document.entries if e.heading == "YoungLeaves")
     assert first.preview == ""
     assert entry_preview_path(document, first) is None
 

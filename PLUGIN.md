@@ -55,6 +55,8 @@ filesystem, network, clock, or environment access, recursion or component
 cycles, external macro dependencies, raw SVG or Score data, Renderer
 instructions, or plugin-specific parsers, grammars, or renderers.
 
+The optional `aliases` is an array of other headings in the same namespace that invoke the same definition (for example `["若葉"]` for the canonical `YoungLeaves`). Make the English heading canonical and the Japanese name an alias. An alias uses only letters, digits, `_`, and `-`, and may not repeat the heading or another alias. Omit it when empty; it then leaves the canonical bytes and digest unchanged ([SPEC §4.13](SPEC.md#413-canonical-names-and-aliases)). In the bundled plugin document, write `aliases: 若葉` in the word's section.
+
 This small definition reaches the current runtime-disconnected Score lowerer:
 
 ```json

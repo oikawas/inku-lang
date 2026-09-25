@@ -262,3 +262,14 @@ test('T-11: the mark is readable on the editor’s paper in both themes', () => 
 	// tomorrow, so the two must not share a colour.
 	assert.notEqual(lightFg.toLowerCase(), light.match(/--danger:\s*(#[0-9a-f]{6})/i)![1].toLowerCase());
 });
+
+test('an alias is a name the server holds, and the display name follows the DDL language', async () => {
+	const { pluginDisplayName } = await import('./plugin-names.ts');
+	const entry = { qualified_name: 'Nature.YoungLeaves', aliases: ['Nature.若葉'], fires_on_ja: ['若葉'] };
+	const index = buildPluginNameIndex([entry]);
+	assert.deepEqual(unknownPluginNames('Nature.若葉。Nature.YoungLeaves。', index), []);
+	assert.deepEqual(scanPluginReferences('Nature.若葉を置く。', index).map((ref) => [ref.text, ref.known]), [['Nature.若葉', true]]);
+	assert.equal(pluginDisplayName(entry, 'ja'), 'Nature.若葉');
+	assert.equal(pluginDisplayName(entry, 'en'), 'Nature.YoungLeaves');
+	assert.equal(pluginDisplayName({ qualified_name: 'Example.Quiet' }, 'ja'), 'Example.Quiet');
+});

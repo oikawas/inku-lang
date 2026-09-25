@@ -62,7 +62,34 @@ def test_the_shipped_nature_document_loads_with_its_seven_words_and_previews():
 
     path = Path(__file__).resolve().parents[1] / "plugins" / "nature-leaves.inku-plugin.md"
     document = parse_plugin_document(path.read_text(encoding="utf-8"), source_path=str(path))
-    assert [entry.heading for entry in document.entries] == ["若葉", "下草", "青葉", "紅葉", "落葉", "枯草", "枯葉"]
+    assert [(entry.heading, entry.aliases) for entry in document.entries] == [
+        ("YoungLeaves", ("若葉",)),
+        ("Undergrowth", ("下草",)),
+        ("SummerLeaves", ("青葉",)),
+        ("AutumnLeaves", ("紅葉",)),
+        ("FallenLeaves", ("落葉",)),
+        ("WitheredGrass", ("枯草",)),
+        ("WitheredLeaves", ("枯葉",)),
+    ]
+    assert document.entries[0].visible_qualified_names("Nature") == ["Nature.YoungLeaves", "Nature.若葉"]
     for entry in document.entries:
         preview = entry_preview_path(document, entry)
         assert preview is not None and 0 < preview.stat().st_size <= MAX_PREVIEW_BYTES
+
+
+def test_an_alias_must_be_spellable_and_unique_in_its_document():
+    base = (
+        "---\nnamespace: Probe\nname: probe\nversion: 0.1.0\nauthors: [test]\nlanguages: [ja]\n"
+        "license: MIT\ndescription_ja: probe\ndescription_en: probe\n---\n\n"
+    )
+    word = "## 語: {heading}\n\naliases: {aliases}\nsurface_ja: 円\nfires_on_ja: 円\nnote_ja: n\n\n### 展開 (ja)\n\n中心に円を置く。\n\n"
+    good = base + word.format(heading="Round", aliases="円い形")
+    assert parse_plugin_document(good).entries[0].aliases == ("円い形",)
+    for bad in (
+        base + word.format(heading="Round", aliases="円 い"),
+        base + word.format(heading="Round", aliases="Round"),
+        base + word.format(heading="Round", aliases="丸") + word.format(heading="Ball", aliases="丸"),
+    ):
+        with pytest.raises(PluginFormatError):
+            parse_plugin_document(bad)
+

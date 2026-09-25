@@ -21,6 +21,15 @@ def _qualified_name(definition: Mapping[str, Any]) -> str | None:
     return f"{namespace}.{heading}" if isinstance(namespace, str) and isinstance(heading, str) else None
 
 
+def _visible_names(definition: Mapping[str, Any]) -> list[str]:
+    """The canonical qualified name and its aliases; the DDL may write any of them."""
+    name = _qualified_name(definition)
+    if name is None:
+        return []
+    aliases = definition.get("aliases") or []
+    return [name, *(f"{definition['namespace']}.{alias}" for alias in aliases if isinstance(alias, str))]
+
+
 def build_ddl_export(
     source: str,
     language: str,
@@ -33,7 +42,7 @@ def build_ddl_export(
     seen: set[str] = set()
     for index, definition in enumerate(definitions):
         name = _qualified_name(definition)
-        if name is None or name in seen or name not in source:
+        if name is None or name in seen or not any(visible in source for visible in _visible_names(definition)):
             continue
         seen.add(name)
         summary = summaries[index] if index < len(summaries) and isinstance(summaries[index], str) else ""

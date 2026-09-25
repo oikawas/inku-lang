@@ -364,9 +364,10 @@ class ProductPipelineEffects:
             "resource_execution": result["resource_execution"],
         }
         work_plugins = [
-            f"{item['namespace']}.{item['heading']}"
+            f"{item['namespace']}.{heading}"
             for item in (snapshot.get("config") or {}).get("definitions") or []
             if isinstance(item, dict) and isinstance(item.get("namespace"), str) and isinstance(item.get("heading"), str)
+            for heading in (item["heading"], *[alias for alias in item.get("aliases") or [] if isinstance(alias, str)])
         ]
         pipeline_diagnostics["plugin_diagnostics"] = explain_plugin_diagnostics(
             self.binding, document["source"], pipeline_diagnostics["upstream_diagnostics"], work_plugins

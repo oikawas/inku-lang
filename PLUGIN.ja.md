@@ -41,6 +41,8 @@ Bodyでは`emit`、`use`、`group`、`anchor`、`relation`、上限付き`repeat
 再帰またはcomponent cycle、外部macro dependency、raw SVGまたはScore data、Renderer命令、
 plugin固有のparser、grammar、rendererを含められない。
 
+任意の`aliases`は、同じ名前空間で同じ定義を呼ぶ別の見出しの配列である（例: 正式名`YoungLeaves`に`["若葉"]`）。正式名は英語の見出しとし、日本語名は別名にする。別名は文字・数字・`_`・`-`だけで、見出しや他の別名と重ねない。空なら省略し、正準bytesとdigestに影響しない（[SPEC §4.13](SPEC.ja.md#413-正式名と別名)）。同梱プラグイン文書では語の節に`aliases: 若葉`と書く。
+
 受け入れられる最小の定義は次である。
 
 ```json

@@ -1,7 +1,7 @@
 ---
 namespace: Nature
 name: leaves
-version: 0.4.0
+version: 2.0.0
 authors: [Shinichiro Oikawa]
 languages: [ja, en]
 license: MIT
@@ -9,8 +9,9 @@ description_ja: 葉の季語群。若葉から枯葉まで、一年の葉の身�
 description_en: Season words of leaves — seven gestures of a leaf's year. Fallen leaves know down; undergrowth knows up. Leaves give the plane a quiet gravity.
 ---
 
-## 語: 若葉
+## 語: YoungLeaves
 
+aliases: 若葉
 surface_ja: 若葉 | わかば
 surface_en: young leaves | new leaves
 fires_on_ja: 若葉, 新芽, 芽吹き
@@ -33,8 +34,9 @@ Scatter 4-6 leaf forms in {region: upper half}.
 In pencil, in green. Fine trembling. Fill the interiors with the same green.
 Tips upward (within a diagonal range, a different lean per leaf).
 
-## 語: 下草
+## 語: Undergrowth
 
+aliases: 下草
 surface_ja: 下草 | したくさ
 surface_en: undergrowth | grasses
 fires_on_ja: 下草, 草むら, 菖蒲, あやめ, 燕子花, かきつばた, 薄, すすき
@@ -59,8 +61,9 @@ From each root, arrange 3-5 tall blades upward. Vary the height per blade; vary 
 In fine-brush, in green. Fill the interiors with the same green.
 note: The ground is never drawn.
 
-## 語: 青葉
+## 語: SummerLeaves
 
+aliases: 青葉
 surface_ja: 青葉 | あおば
 surface_en: summer leaves | green leaves
 fires_on_ja: 青葉, 茂み, 枝葉
@@ -83,8 +86,9 @@ anchor branch in {region: middle}: a thick-brush line, gray, horizontal, slowly 
 Place 6-8 leaf forms along the branch.
 In fine-brush, in green. Fill the interior enclosed by the two arcs with the same green as their outlines.
 
-## 語: 紅葉
+## 語: AutumnLeaves
 
+aliases: 紅葉
 surface_ja: 紅葉 | もみじ
 surface_en: autumn leaves | maple leaves
 fires_on_ja: 紅葉, もみじ, カエデ
@@ -109,8 +113,9 @@ Arrange 5 or 7 tall blades in a fan over the upper side of the palm-center, the 
 In rotring, in red. Fill the interiors with the same red.
 From the palm-center, draw a line downward.
 
-## 語: 落葉
+## 語: FallenLeaves
 
+aliases: 落葉
 surface_ja: 落葉 | おちば | 落ち葉
 surface_en: fallen leaves | falling leaves
 fires_on_ja: 落葉, 落ち葉, 散る葉
@@ -137,8 +142,9 @@ Rotated differently per leaf. Edges blurring.
 Scatter them widely to both sides of the drift.
 note: Denser toward the bottom.
 
-## 語: 枯草
+## 語: WitheredGrass
 
+aliases: 枯草
 surface_ja: 枯草 | 枯れ草
 surface_en: withered grass | dry grass
 fires_on_ja: 枯草, 枯れ草, 枯尾花, 枯れ薄
@@ -163,8 +169,9 @@ From each root, arrange 3-5 tall blades upward. Vary the lean strongly per blade
 In chalk, in gray. Quickly. Edges blurring. Fill the interiors with the same gray.
 note: The ground is never drawn.
 
-## 語: 枯葉
+## 語: WitheredLeaves
 
+aliases: 枯葉
 surface_ja: 枯葉 | かれは | 枯れ葉
 surface_en: withered leaves | dry leaves
 fires_on_ja: 枯葉, 枯れ葉, 朽ち葉

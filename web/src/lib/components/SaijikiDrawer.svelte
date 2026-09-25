@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { SAIJIKI, saijikiWordsFor } from '$lib/saijiki';
 	import { getLang, t } from '$lib/i18n/index.svelte';
+	import { pluginDisplayName } from '$lib/plugin-names';
 	import { instructionLangOf, type ResolvedInstructionLang } from '$lib/instructionLang';
 
 	type SaijikiPreview = {
@@ -18,6 +19,7 @@
 
 	type PluginEntry = {
 		qualified_name: string;
+		aliases?: string[];
 		note_ja: string;
 		note_en: string;
 		fires_on_ja?: string[];
@@ -146,7 +148,7 @@
 								onclick={() => (activePreview = previewForPlugin(entry, wordLang))}
 								onpointerenter={() => (activePreview = previewForPlugin(entry, wordLang))}
 								onfocus={() => (activePreview = previewForPlugin(entry, wordLang))}
-							>{entry.qualified_name}</button>
+							>{pluginDisplayName(entry, wordLang)}</button>
 						{/each}
 					</div>
 				</div>

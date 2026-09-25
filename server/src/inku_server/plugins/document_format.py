@@ -199,9 +199,20 @@ class PluginEntry:
     # what a document is allowed to put on screen. One image per word, shared
     # by both languages, the same way the built-in previews share theirs.
     preview: str = ""
+    # `aliases: 若葉` -- other headings in the namespace that name this word,
+    # such as the Japanese name beside an English canonical heading. They match
+    # the `aliases` of the word's shared MacroDefinition.
+    aliases: tuple[str, ...] = ()
 
     def qualified_name(self, namespace: str) -> str:
         return f"{namespace}.{self.heading}"
+
+    def alias_qualified_names(self, namespace: str) -> list[str]:
+        return [f"{namespace}.{alias}" for alias in self.aliases]
+
+    def visible_qualified_names(self, namespace: str) -> list[str]:
+        """The canonical qualified name first, then its aliases."""
+        return [self.qualified_name(namespace), *self.alias_qualified_names(namespace)]
 
 
 @dataclass(frozen=True)
@@ -260,7 +271,7 @@ def preview_path_for_qualified_name(qualified_name: str, *, hidpi: bool = False)
     for document in DOCUMENT_PLUGIN_MANAGER.documents():
         namespace = document.manifest.namespace
         for entry in document.entries:
-            if entry.qualified_name(namespace) == qualified_name:
+            if qualified_name in entry.visible_qualified_names(namespace):
                 return entry_preview_path(document, entry, hidpi=hidpi)
     return None
 
@@ -496,6 +507,7 @@ def parse_plugin_document(text: str, *, source_path: str | None = None) -> Plugi
             },
             notes={lang: fields.get(f"note_{lang}", "") for lang in ("ja", "en")},
             preview=fields.get("preview", "").strip(),
+            aliases=_split_values(fields.get("aliases", ""), ","),
             templates={lang: tuple(lines) for lang, lines in templates.items()},
             members={lang: dict(defs) for lang, defs in members.items()},
             comments={lang: tuple(items) for lang, items in comments.items()},
@@ -552,10 +564,15 @@ def parse_plugin_document(text: str, *, source_path: str | None = None) -> Plugi
         reasons.append("at least one word entry is required")
     seen_headings: set[str] = set()
     for entry in entries:
-        folded = entry.heading.casefold()
-        if folded in seen_headings:
-            reasons.append(f"duplicate word entry: {entry.heading}")
-        seen_headings.add(folded)
+        for name in (entry.heading, *entry.aliases):
+            folded = name.casefold()
+            if folded in seen_headings:
+                reasons.append(f"duplicate word entry: {name}")
+            seen_headings.add(folded)
+        for alias in entry.aliases:
+            # The parser reads a heading of letters, digits, `_`, and `-` only.
+            if not alias or not all(character.isalnum() or character in "_-" for character in alias):
+                reasons.append(f"{entry.heading}: invalid alias: {alias}")
         reasons.extend(_validate_entry(entry, manifest))
     if reasons:
         raise PluginFormatError(reasons)
@@ -644,8 +661,9 @@ class PluginDocumentManager:
                         document.manifest.name.casefold(),
                     )
                     qnames = {
-                        entry.qualified_name(document.manifest.namespace).casefold()
+                        name.casefold()
                         for entry in document.entries
+                        for name in entry.visible_qualified_names(document.manifest.namespace)
                     }
                     reasons: list[str] = []
                     if identity in identities:
@@ -670,6 +688,7 @@ class PluginDocumentManager:
                             entries=tuple(
                                 {
                                     "qualified_name": entry.qualified_name(document.manifest.namespace),
+                                    "aliases": entry.alias_qualified_names(document.manifest.namespace),
                                     "surface_ja": list(entry.surfaces.get("ja", ())),
                                     "surface_en": list(entry.surfaces.get("en", ())),
                                     "note_ja": entry.notes.get("ja", ""),

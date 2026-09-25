@@ -87,11 +87,12 @@ test('T-21: a plugin chip reaches the preview the same ways a built-in one does'
 });
 
 test('T-21: clicking keeps each panel\'s own job', () => {
-	// The drawer is read-only, so a click previews; the editor inserts the word.
+	// The drawer is read-only, so a click previews; the editor inserts the word
+	// by the name its DDL language reads (the Japanese alias in Japanese DDL).
 	const drawer = pluginSection(read('./SaijikiDrawer.svelte'));
 	assert.match(drawer, /onclick=\{\(\) => \(activePreview = previewForPlugin\(entry, wordLang\)\)\}/);
 	const inline = pluginSection(read('./SaijikiInline.svelte'));
-	assert.match(inline, /onclick=\{\(\) => onInsertWord\(entry\.qualified_name\)\}/);
+	assert.match(inline, /onclick=\{\(\) => onInsertWord\(pluginDisplayName\(entry, wordLang\)\)\}/);
 });
 
 // ------------------------------------------------------ T-22 (the four parts)
@@ -103,9 +104,11 @@ test('T-22: a plugin preview is built from the document, not invented', () => {
 		page.indexOf('// ── Color catalog')
 	);
 	assert.ok(fn.length > 0, 'the page builds no plugin preview');
-	// Title, effect, example: the qualified name, the note, the first phrase a
+	// Title, effect, example: the qualified name in the DDL's language (the
+	// Japanese alias or the canonical name), the note, the first phrase a
 	// description would use to reach the word.
-	assert.match(fn, /word: entry\.qualified_name/);
+	assert.match(fn, /word: pluginDisplayName\(entry, wordLang\)/);
+	assert.match(fn, /canonicalWord: entry\.qualified_name/);
 	assert.match(fn, /effect: \(uiLang === 'ja' \? entry\.note_ja : entry\.note_en\)/);
 	assert.match(fn, /example: firesOn\[0\]/);
 	// Both languages are read, so neither text is ever shown in the other's.

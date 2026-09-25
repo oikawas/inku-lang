@@ -140,6 +140,7 @@ def _plugin_words() -> list[dict[str, Any]]:
             words.append(
                 {
                     "qualified_name": entry.qualified_name(namespace),
+                    "aliases": entry.alias_qualified_names(namespace),
                     "namespace": namespace,
                     "surface_ja": list(entry.surfaces.get("ja", ())),
                     "surface_en": list(entry.surfaces.get("en", ())),

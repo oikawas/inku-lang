@@ -20,6 +20,8 @@ const REFERENCE_RE = /(?<![A-Za-z0-9_])[A-Z][A-Za-z0-9_-]*\.[^\s、。,;:]+/g;
 
 export type PluginNameEntry = {
 	qualified_name: string;
+	/** Other qualified names of the same word, such as its Japanese alias. */
+	aliases?: string[];
 	fires_on_ja?: string[];
 	fires_on_en?: string[];
 };
@@ -57,7 +59,8 @@ export function buildPluginNameIndex(entries: PluginNameEntry[] | undefined | nu
 	for (const entry of entries ?? []) {
 		const qualified = entry?.qualified_name;
 		if (!qualified) continue;
-		names.push(qualified);
+		// An alias invokes the same word, so it is a name that exists too.
+		names.push(qualified, ...(entry.aliases ?? []).filter(Boolean));
 		const word = localPart(qualified);
 		for (const phrase of [...(entry.fires_on_ja ?? []), ...(entry.fires_on_en ?? [])]) {
 			const trimmed = phrase?.trim();
@@ -156,4 +159,12 @@ export function unknownPluginNames(text: string, index: PluginNameIndex): Unknow
 		});
 	}
 	return unknown;
+}
+
+/**
+ * The name a word is shown and inserted with: its Japanese alias for Japanese
+ * DDL, its canonical (English) name otherwise. Both invoke the same word.
+ */
+export function pluginDisplayName(entry: PluginNameEntry, lang: 'ja' | 'en'): string {
+	return (lang === 'ja' ? entry.aliases?.[0] : undefined) || entry.qualified_name;
 }

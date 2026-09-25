@@ -508,9 +508,12 @@ dependencies get designed once a second real engine is actually needed.
 
 ### 4.9 Reference Vocabulary Names
 
-`Nature.leaves` is a shared bundled catalog containing `Nature.若葉`,
-`Nature.下草`, `Nature.青葉`, `Nature.紅葉`, `Nature.落葉`, `Nature.枯草`,
-and `Nature.枯葉`. Server and Android read these definitions and their display
+`Nature.leaves` is a shared bundled catalog containing `Nature.YoungLeaves`
+(alias `Nature.若葉`), `Nature.Undergrowth` (`Nature.下草`), `Nature.SummerLeaves`
+(`Nature.青葉`), `Nature.AutumnLeaves` (`Nature.紅葉`), `Nature.FallenLeaves`
+(`Nature.落葉`), `Nature.WitheredGrass` (`Nature.枯草`), and `Nature.WitheredLeaves`
+(`Nature.枯葉`). The English heading is canonical and the Japanese name is its
+alias (§4.13). Server and Android read these definitions and their display
 data from the same catalog. This does not claim an external runtime loader, an
 arbitrarily installed package, or a registry for the entire `Nature` namespace.
 `Bamboo`, `Nature.雨`, and `Nature.風` remain future or explanatory reference
@@ -585,6 +588,10 @@ compatibility boundary.
 A sentence whose plugin name does not resolve where it is drawn is omitted alone and the rest is drawn. The work does not stop, the sentence stays in the author's DDL, and no LLM rewrites it into other words. The shared Rust explainer (pipeline binding `explain_plugin_diagnostics`) combines the compiler's resolution diagnostic with the host's enabled and disabled plugin names and the work's own definitions, and returns one reason per sentence: `plugin_not_installed` (no such name), `plugin_disabled` (installed but disabled), `plugin_name_mismatch` (no installed name matches; one installed name with the same heading under another namespace, a case-only difference, or at most two edits away is suggested), or `plugin_version_mismatch` (the same name with different content). The host stores it with the work's diagnostics and shows it in place of the generic entry for the same range.
 
 A saved work keeps the exact definitions it used, so removing a plugin does not change its replay. To carry DDL between environments, a work exports as `inku.ddl-export.v1`: the visible DDL, its language, and the definitions and summaries of the plugins it names. Imported definitions are used for the new work only, ahead of an installed definition of the same name, and are never installed. When one differs from the installed edition or is not installed here, a catalog diagnostic (`imported_plugin_differs_from_installed` / `imported_plugin_not_installed`) says which was used. Definitions are data-only and pass the shared Rust validation boundary again when read.
+
+### 4.13 Canonical Names and Aliases
+
+A plugin's canonical name is its English heading (`Nature.YoungLeaves`), and its definition may declare other headings in the same namespace as `aliases` (for example `["若葉"]`). Visible DDL invokes the same definition by either name, and the DDL text stays as written. An alias uses only characters the grammar reads (letters, digits, `_`, `-`) and may not repeat the heading or another alias. The catalog refuses a definition that claims a canonical name or alias another definition already holds. The lock that pins a definition carries its aliases beside the canonical name, version, and digest; matching binds any of those names to that lock, and everything after works with the canonical name. A definition without aliases keeps its canonical bytes and digest. A work plan writes a plugin by its alias in Japanese DDL and by its canonical name in English DDL. DDL Spec 14.
 
 ## 5. The Three-Layer Pipeline
 
@@ -1517,9 +1524,11 @@ to the plan subset. When plugins are installed, the plan may carry an optional
 most four). The Stage 1 system prompt lists each installed plugin with its
 summary and chooses one only when the description writes the heading word of
 its name or a paraphrase of the same thing, never by association with a season,
-place, or similar thing. A chosen plugin prints as a bare-name sentence
-(`Nature.若葉.`) after the background and before the layers, the form a
-parameterless definition expands without diagnostics. Without installed plugins
+place, or similar thing. A chosen plugin prints as a bare-name sentence after
+the background and before the layers, the form a parameterless definition
+expands without diagnostics: by its alias in Japanese DDL (`Nature.若葉。`) and by
+its canonical name in English DDL (`Nature.YoungLeaves.`) (§4.13). The plan's
+list is canonical, and a response naming an alias is read as its canonical name. Without installed plugins
 neither the list nor its prompt section appears, and schema and prompt are
 unchanged. Core vocabulary is primary and Macros are an optional extension.
 

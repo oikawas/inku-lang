@@ -9,6 +9,7 @@
 	import { pipelineDescription } from '$lib/description-labels';
 	import { highlightDDL } from '$lib/highlight';
 	import type { ImportedPlugin } from '$lib/features/ddl-editor/ddl-import';
+	import { pluginDisplayName } from '$lib/plugin-names';
 	import { pluginWarningsToShow } from '$lib/plugin-names';
 	import { limitNotesToShow } from '$lib/limitNotes';
 	import { hydrateSaijiki, hydrateSaijikiEn } from '$lib/saijiki';
@@ -152,6 +153,7 @@
 
 	type PluginEntry = {
 		qualified_name: string;
+		aliases?: string[];
 		surface_ja: string[];
 		surface_en: string[];
 		note_ja: string;
@@ -426,6 +428,7 @@
 	 */
 	function pluginPreview(entry: {
 		qualified_name: string;
+		aliases?: string[];
 		note_ja: string;
 		note_en: string;
 		fires_on_ja?: string[];
@@ -439,7 +442,7 @@
 		const firesOn = (wordLang === 'ja' ? entry.fires_on_ja : entry.fires_on_en) ?? [];
 		return {
 			categoryKey: 'plugin',
-			word: entry.qualified_name,
+			word: pluginDisplayName(entry, wordLang),
 			canonicalWord: entry.qualified_name,
 			effect: (uiLang === 'ja' ? entry.note_ja : entry.note_en) || '',
 			example: firesOn[0] ?? '',

@@ -82,3 +82,9 @@ def test_imported_plugins_are_bounded_options_for_a_new_work_only():
     with pytest.raises(ValueError):
         RunOptions.model_validate({"imported_plugins": [{"definition": {}, "extra": 1}]})
     assert CandidateHostError("imported_plugins_require_new_work")
+
+
+def test_a_ddl_that_writes_an_alias_still_carries_the_definition():
+    definition = {**_definition("YoungLeaves", "2.0.0"), "aliases": ["若葉"]}
+    exported = build_ddl_export("Nature.若葉。", "ja", [definition], ["若葉の要約"])
+    assert exported["plugins"] == [{"definition": definition, "summary": "若葉の要約"}]

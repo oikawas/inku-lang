@@ -184,9 +184,10 @@ def _installed_plugin_names() -> tuple[list[str], list[str]]:
     from .plugins.document_format import PluginFormatError, parse_plugin_document
 
     enabled = sorted(
-        entry.qualified_name(document.manifest.namespace)
+        name
         for document in DOCUMENT_PLUGIN_MANAGER.documents()
         for entry in document.entries
+        for name in entry.visible_qualified_names(document.manifest.namespace)
     )
     disabled = []
     for item in DOCUMENT_PLUGIN_MANAGER.items():
@@ -199,7 +200,9 @@ def _installed_plugin_names() -> tuple[list[str], list[str]]:
             )
         except (OSError, PluginFormatError):
             continue
-        disabled.extend(entry.qualified_name(document.manifest.namespace) for entry in document.entries)
+        disabled.extend(
+            name for entry in document.entries for name in entry.visible_qualified_names(document.manifest.namespace)
+        )
     return enabled, sorted(disabled)
 
 

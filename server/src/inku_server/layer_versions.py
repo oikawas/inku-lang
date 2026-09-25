@@ -321,4 +321,6 @@ DDL_ENGINE_VERSION = "48"
 # it no longer collides with relative size large in one phrase.
 # 13 (2026-09-25): A Japanese modifier may stand before a count phrase
 # (`大きな四つの円`, `細い三本の黒い線`) as well as after it.
-DDL_VERSION = "13"
+# 14 (2026-09-25): A plugin may be invoked by an alias its definition
+# declares, such as `Nature.若葉` beside the canonical `Nature.YoungLeaves`.
+DDL_VERSION = "14"

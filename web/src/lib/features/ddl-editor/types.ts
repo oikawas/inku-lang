@@ -14,6 +14,7 @@ export type SaijikiPreview = {
 
 export type PluginEntry = {
 	qualified_name: string;
+	aliases?: string[];
 	note_ja: string;
 	note_en: string;
 	fires_on_ja?: string[];

@@ -978,7 +978,9 @@
 								</button>
 							{/if}
 							<div class="lineage-group-summary">
-								<strong>{thumbnailPromptText(group.representative.source_text ?? group.representative.input)}</strong>
+								<!-- A work drawn straight from DDL has no description; its label ('DDL') is what the
+								     thumbnail grid shows for it, so the group names it the same way. -->
+								<strong>{thumbnailPromptText(group.representative.source_text ?? group.representative.input) || group.representative.display_label || ''}</strong>
 								<span>{t().historyLineageWorkCount(group.item_count)} · {t().historyLineageStarCount(group.starred_count)} · {t().historyLineageForRevisionCount(group.for_revision_count)} · {formatHistoryDate(group.latest_at)}</span>
 								{#if currentLineageRootId === group.root_node_id}<span class="current-lineage-badge">{t().historyCurrentLineage}</span>{/if}
 							</div>

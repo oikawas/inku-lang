@@ -1082,7 +1082,10 @@ separate from the web/server `web/BUILD_NUMBER`.
   changes.
 - The Settings menu includes a Version Information panel showing
   `versionName`, `versionCode`, build number, build type, application id,
-  source spec, and render engine version.
+  and render engine version. The fixed source spec label (`inku v1.48`) was
+  never updated and disagreed with the actual versions, so it was removed
+  (2026-09-25). The DDL Spec and DDL engine versions are declared by the
+  server's `layer_versions.py`; Android keeps no version constants for them.
 - Version/build metadata must not contain API keys, device IDs, local server
   details, or personal environment paths.
 

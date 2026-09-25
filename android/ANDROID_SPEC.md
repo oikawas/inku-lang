@@ -52,7 +52,7 @@ The Wild setting is saved in `app_settings` as `render_wild` (`{"enabled":bool}`
 
 The display SVG export is the saved SVG itself; the editable and compat SVGs are the saved Score drawn again in that profile with the work's colors, seeds and Wild (as the server's `GET /api/history/{id}/svg?profile=`). Files written to `cacheDir/exports` for sharing are removed by the next export once they are a day old.
 
-While the keyboard is up, Draw for the description and Batch draw for the batch editor are pinned above it, with room of the same height at the end of the scroll. Add AI service and a connection's model picker shrink for the keyboard. The touch-words field of Refinement brings the Make candidates row into view. Back from an open Refinement closes it.
+While the keyboard is up, Draw for the description and Batch draw for the batch editor are pinned above it, with room of the same height at the end of the scroll. Add AI service and a connection's model picker shrink for the keyboard. The touch-words field of Refinement brings the Make candidates row into view. Back from an open Refinement closes it, and Back while revising a work returns to the work's result (the camera and the overwrite question keep Back when they are showing).
 
 A permanent delete, as the server's `HistoryPermanentDeleteWriter` does, turns the lineage node into a tombstone (no history or hashes, `deleted_at` recorded) and empties `metadata_json` of the edges touching it, in the same transaction. The thumbnail is removed unless another work with the same render hash still uses it. The screens have no delete entry; only the debug headless run (`save_history=false`) uses it.
 

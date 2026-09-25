@@ -1520,6 +1520,16 @@ private fun ComposeScreen(state: InkuUiState, viewModel: InkuViewModel) {
     val imeVisible = WindowInsets.isImeVisible
     val hasWork = state.selectedHistory != null
     val showEditor = !hasWork || editingWork || state.composeMode == ComposeMode.Batch
+    // Back from 「この作品を推敲」 returns to the work's result, one level up,
+    // instead of leaving the app: the screen-wide handler in InkuApp cannot see
+    // this local state. Whatever that handler does own -- the camera, the DDL
+    // overwrite question -- keeps the key.
+    val appOwnsBack = state.cameraCaptureState.locksCameraInteraction ||
+        state.cameraCaptureState is CameraCaptureState.Failed ||
+        state.cameraCaptureState == CameraCaptureState.ChoosingSource ||
+        state.cameraCaptureState == CameraCaptureState.AwaitingOverwriteConfirmation ||
+        state.confirmDdlOverwrite
+    BackHandler(enabled = editingWork && hasWork && !appOwnsBack) { editingWork = false }
     val writeImeBar = state.descriptionFocused && state.composeMode == ComposeMode.Write
     val batchImeBar = batchEditorFocused && imeVisible && state.composeMode == ComposeMode.Batch && !state.isDrawing
     // The pinned bar lies over the bottom of the scroll. Room of the same

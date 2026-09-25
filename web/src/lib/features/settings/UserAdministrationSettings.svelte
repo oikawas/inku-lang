@@ -193,7 +193,12 @@
 		}
 	}
 
-	async function onRemoveUser(id: string): Promise<void> {
+	function onRemoveUser(user: SettingsUserItem): void {
+		if (userMutationPending) return;
+		administration.confirmRemoveUser(user, () => void removeConfirmedUser(user.id));
+	}
+
+	async function removeConfirmedUser(id: string): Promise<void> {
 		if (userMutationPending) return;
 		userMutationPending = true;
 		try {
@@ -213,7 +218,12 @@
 		}
 	}
 
-	async function onRemoveGroup(group: SettingsUserGroup): Promise<void> {
+	function onRemoveGroup(group: SettingsUserGroup): void {
+		if (userMutationPending) return;
+		administration.confirmRemoveGroup(group, () => void removeConfirmedGroup(group));
+	}
+
+	async function removeConfirmedGroup(group: SettingsUserGroup): Promise<void> {
 		if (userMutationPending) return;
 		userMutationPending = true;
 		try {
@@ -282,7 +292,7 @@
 						<span class="user-cell user-count-cell">
 						<small>{t().userGenerationCountLabel}</small>{user.image_generation_count.toLocaleString()}</span>
 						</button>
-						<button class="ghost-btn" onclick={() => onRemoveUser(user.id)} disabled={userBusy}>{t().deleteButton}</button>
+						<button class="ghost-btn" onclick={() => onRemoveUser(user)} disabled={userBusy}>{t().deleteButton}</button>
 						</div>
 						{:else}<div class="inline-message">{t().userNoSearchResults}</div>
 						{/each}

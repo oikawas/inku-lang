@@ -162,6 +162,8 @@ export interface LangPack {
 	errorProviderOther: (stage: string, status: number) => string;
 	errorRenderBusy: string;
 	errorDescriptionOnlyLabels: string;
+	errorUserHasWorks: string;
+	errorUserIsLineageOrigin: string;
 	runStatusElapsed: (seconds: string) => string;
 	runStatusTokens: (input: string, output: string) => string;
 	runStatusProgress: (done: number, total: number) => string;
@@ -757,6 +759,8 @@ export interface LangPack {
 	settingsModelRequiresApiKey: string;
 	settingsModelServiceModels: string;
 	settingsModelDeleteServiceConfirm: (provider: string) => string;
+	userDeleteConfirm: (username: string) => string;
+	groupDeleteConfirm: (group: string) => string;
 	settingsModelDeleteService: string;
 	settingsModelServiceMemoButton: string;
 	settingsModelServiceMemoTitle: (provider: string) => string;

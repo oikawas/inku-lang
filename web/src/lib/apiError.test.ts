@@ -40,3 +40,11 @@ test('a real provider failure keeps its localized stage, status, and provider me
 
 	assert.equal(actual, '解釈のモデル提供元がエラーを返しました（HTTP 502）。\nupstream disconnected');
 });
+
+test('the account deletions the server refuses read in the page language', () => {
+	assert.equal(describeApiErrorDetail('user has history', 409, ja), ja.errorUserHasWorks);
+	assert.equal(
+		describeApiErrorDetail("other accounts' works derive from this user's works", 409, ja),
+		ja.errorUserIsLineageOrigin
+	);
+});

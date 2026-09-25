@@ -54,6 +54,9 @@ function pipelineActionMessage(detail: JsonObject, strings: LangPack): string | 
 export function describeApiErrorDetail(detail: unknown, status: number, strings: LangPack): string {
 	if (detail === 'render capacity is full') return strings.errorRenderBusy;
 	if (detail === 'description is only labels') return strings.errorDescriptionOnlyLabels;
+	// The account deletions the server refuses, said in the page's language.
+	if (detail === 'user has history') return strings.errorUserHasWorks;
+	if (detail === "other accounts' works derive from this user's works") return strings.errorUserIsLineageOrigin;
 	if (typeof detail === 'string' && detail) return detail;
 
 	const structured = object(detail);

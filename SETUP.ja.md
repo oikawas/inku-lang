@@ -34,6 +34,7 @@
 
 - Python 3.12 以上（`server` / `cli` とも `requires-python = ">=3.12"`）
 - `uv`
+- Rust（`core/rust-toolchain.toml` が指定する版）。サーバーが読み込む共有コアの native wheel を作るのに使う
 - Node.js 20 以上を推奨
 - npm
 - SVGからPNGを生成する場合、`resvg-py`（`uv sync` で入る）
@@ -109,6 +110,14 @@ cd server
 uv sync
 ```
 
+サーバーは、描画の判断を担う Rust の共有コアを native wheel（`inku-render-python`）として読み込む。wheel はサーバーの依存に含まれず、無いと起動できないので、`uv sync` の後に作って入れる。`core/` を更新したときも、同じ手順で作り直す。コンテナの image は、build のときにこの wheel を作って入れている。
+
+```sh
+uvx maturin==1.13.3 build --manifest-path ../core/crates/inku-render-python/Cargo.toml \
+  --release --locked -i .venv/bin/python --out /tmp/inku-native
+uv pip install --python .venv/bin/python --no-deps /tmp/inku-native/*.whl
+```
+
 初回起動時に管理者ユーザーを作成するため、8文字以上のパスワードを環境変数で指定する。
 
 ```sh
@@ -174,11 +183,11 @@ npm run build
 
 ## ローカル Ollama を provider として使う
 
-inku は [Ollama](https://ollama.com) へ OpenAI 互換のローカル endpoint として接続できる。これは、Ollama の導入・起動、モデル取得、接続先、段ごとの割り当てを利用者が別途管理する構成であり、**inku 全体を API キーや認証設定なしで利用できるという意味ではない。** 以下で実測済みなのは Stage 1 / Stage 2 の組み合わせだけである。Vision も Ollama が画像入力を扱える対応モデルなら同じ互換経路を使えるが、現在の検証済みローカルカタログには Vision モデルを収録しておらず、標準構成として保証しない。
+inku は [Ollama](https://ollama.com) へ OpenAI 互換のローカル endpoint として接続できる。これは、Ollama の導入・起動、モデル取得、接続先、段ごとの割り当てを利用者が別途管理する構成であり、**inku 全体を API キーや認証設定なしで利用できるという意味ではない。** 以下で実測済みなのは Stage 1 / Stage 2 の組み合わせだけである。**計測は 2026-07-29（Build 764）の旧パイプラインで行った。** 当時の Stage 1 は指示書の文章を直接書き、Stage 2 は指示書を楽譜へ組んでいた。今の Stage 1 は下絵を返し、Stage 2 は読み切れない句の補完案だけを出す。今の構成では計り直していない。Vision も Ollama が画像入力を扱える対応モデルなら同じ互換経路を使えるが、現在の検証済みローカルカタログには Vision モデルを収録しておらず、標準構成として保証しない。
 
 ### 1. コンテキスト長を広げる
 
-Ollama を導入したうえで、コンテキスト長を指定する。**Stage 2 のプロンプトは 12,000〜14,600 トークンあり、短いコンテキストでは入りきらない。あふれた分は黙って捨てられ、応答は返るのに指示の大半が読まれていない状態になる。**
+Ollama を導入したうえで、コンテキスト長を指定する。**計測当時の Stage 2 のプロンプトは 12,000〜14,600 トークンあり、短いコンテキストでは入りきらなかった。あふれた分は黙って捨てられ、応答は返るのに指示の大半が読まれていない状態になる。**
 
 ```sh
 export OLLAMA_CONTEXT_LENGTH=16384
@@ -222,11 +231,17 @@ OLLAMA_BASE_URL=http://host.docker.internal:11434/v1
 | Stage 1 | Ollama | `qwen3.5:4b-q4_K_M` |
 | Stage 2 | Ollama | `ministral-3:8b-instruct-2512-q4_K_M` |
 
+Stage 1 のモデルは、写生と色カタログの自動選択にも使われる。
+
 ### この組み合わせの理由
+
+以下は計測当時の段の役割での理由である。
 
 **Stage 1**（記述を指示書へ読み解く段）は、語彙の外へ出ない文を書けるかで決まる。日本語と英語の両方で成立したのは `qwen3.5:4b-q4_K_M` だけで、しかも候補中で最も小さい。**大きいほど良いという順にはならない。**
 
 **Stage 2**（指示書を JSON Score へ組む段）は、記述した文がいくつ図形の指示まで届くかで決まる。`ministral-3:8b-instruct-2512-q4_K_M` が最も多くを運ぶ。
+
+今の Stage 1 は、下絵の決まった項目を歳時記の語で埋めるので、語彙の外へ出る文はそもそも書けない。Stage 2 は補完が要るときだけ呼ばれる。今の構成でどのモデルが適しているかは、まだ確かめていない。
 
 モデル設定の一覧には、計測した 10 本それぞれについて、この 2 つの観点で分かったことが説明として付いている。手元にある別のモデルを選ぶ場合はそちらを見る。
 
@@ -284,7 +299,7 @@ uv run inku-cli --base-url http://127.0.0.1:8100 paint "青い円を右上に置
 | `GEMINI_API_KEY` | Gemini API key |
 | `NVIDIA_API_KEY` | NVIDIA API key |
 | `OLLAMA_BASE_URL` | ローカル Ollama の接続先。未指定時は `http://localhost:11434/v1` |
-| `OLLAMA_CONTEXT_LENGTH` | Ollama 側で指定するコンテキスト長。inku は読まない。**Stage 2 のプロンプトが入る長さが要る** |
+| `OLLAMA_CONTEXT_LENGTH` | Ollama 側で指定するコンテキスト長。inku は読まない。**LLM へ送るプロンプトが入る長さが要る**（「コンテキスト長を広げる」） |
 
 コンテナで動かす場合のみ使うもの:
 

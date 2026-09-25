@@ -1190,11 +1190,11 @@ and both change only on an explicit action.
 | Stage | Name | What changes | Cost |
 |---|---|---|---|
 | Performance | Another performance | region, relation, and placement phase as resolved by the performance seed (§13.8 / §14.4) | no LLM call (re-render only) |
-| Composition | Another composition | Stage 1.5's focus selection and the concrete angle and corner for explicitly authored angle and corner meaning, from the composition seed (§12.11 / §18) | one Stage 2 call (the saved normalized DDL is unchanged) |
+| Composition | Another composition | Stage 1.5's focus selection and the concrete angle and corner for explicitly authored angle and corner meaning, from the composition seed (§12.11 / §18) | no LLM call (rebuilt from the saved normalized DDL) |
 
 Another composition reselects among the closed six focus candidates and, when
 the description has an angle, reselects its concrete angle. The Stage 1.5
-transformation remains focus-only; the Stage 2 consumer resolves the angle from
+transformation remains focus-only; the shared lowerer resolves the angle from
 the same `composition_seed`. It must not invent or reselect a composition
 family, technique, color, touch, relation, or element count. Another
 performance and explicit variation preserve the resolved angle. Explicit

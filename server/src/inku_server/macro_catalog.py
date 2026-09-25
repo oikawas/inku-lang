@@ -119,3 +119,56 @@ def resolve_new_work_macro_catalog(binding: object, pipeline_config: Mapping[str
         "definition_locks": locks,
         "diagnostics": diagnostics,
     }
+
+
+def _installed_plugin_names() -> tuple[list[str], list[str]]:
+    """Qualified names of enabled and of installed-but-disabled plugin documents."""
+    from .plugins.document_format import PluginFormatError, parse_plugin_document
+
+    enabled = sorted(
+        entry.qualified_name(document.manifest.namespace)
+        for document in DOCUMENT_PLUGIN_MANAGER.documents()
+        for entry in document.entries
+    )
+    disabled = []
+    for item in DOCUMENT_PLUGIN_MANAGER.items():
+        if item.enabled:
+            continue
+        try:
+            document = parse_plugin_document(
+                (DOCUMENT_PLUGIN_MANAGER.directory / item.path).read_text(encoding="utf-8"),
+                source_path=item.path,
+            )
+        except (OSError, PluginFormatError):
+            continue
+        disabled.extend(entry.qualified_name(document.manifest.namespace) for entry in document.entries)
+    return enabled, sorted(disabled)
+
+
+def explain_plugin_diagnostics(
+    binding: object, source: str, upstream_diagnostics: Sequence[Any], work_plugins: Sequence[str] = ()
+) -> list[dict[str, Any]]:
+    """Author-facing reasons for plugin sentences the compiler withheld.
+
+    `work_plugins` are the names this work could use (its saved or imported
+    definitions); they count as enabled even when this server lacks them.
+    An older native wheel without the shared explainer yields no reasons.
+    """
+    explainer = getattr(binding, "explain_plugin_diagnostics", None)
+    if explainer is None or not upstream_diagnostics:
+        return []
+    enabled, disabled = _installed_plugin_names()
+    output = json.loads(
+        explainer(
+            _bytes(
+                {
+                    "source": source,
+                    "upstream_diagnostics": list(upstream_diagnostics),
+                    "enabled": sorted(set(enabled) | set(work_plugins)),
+                    "disabled": disabled,
+                }
+            )
+        )
+    )
+    plugins = output.get("plugins")
+    return plugins if output.get("schema") == "inku.plugin-diagnostics.v1" and isinstance(plugins, list) else []

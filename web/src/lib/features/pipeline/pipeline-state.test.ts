@@ -238,3 +238,23 @@ test('normal authoring keeps approval, fork, stale CAS, and legacy parent on the
 	assert.equal(controller.current, null);
 	assert.equal(calls.length, callsBeforeSupersededRelease);
 });
+
+test('a plugin explanation replaces the generic compiler entry for the same sentence', () => {
+	const listed = pipelineDiagnostics(null, {
+		upstream_diagnostics: [
+			{ reason: 'macro_resolution_missing_lock', span: { start_byte: 28, end_byte: 42 } },
+			{ reason: 'unresolved_clause', span: { start_byte: 0, end_byte: 9 } },
+		],
+		downstream_diagnostics: [],
+		resource_omissions: [],
+		relation_omissions: [],
+		render_diagnostics: null,
+		resource_execution: null,
+		plugin_diagnostics: [
+			{ name: 'Nature.若菜', reason: 'plugin_name_mismatch', suggestion: 'Nature.若葉', start_byte: 28, end_byte: 42 },
+		],
+	});
+	assert.deepEqual(listed.map((item) => item.channel), ['plugin', 'upstream']);
+	assert.equal((listed[1].value as { reason: string }).reason, 'unresolved_clause');
+});
+

@@ -14,7 +14,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, StrictBool, ValidationError
 
 from .color_catalogs import color_catalogs, get_color_catalog, render_color_map_for_catalog
-from .macro_catalog import resolve_new_work_macro_catalog
+from .macro_catalog import explain_plugin_diagnostics, resolve_new_work_macro_catalog
 from .pipeline_candidate import CandidateHostError, PipelineBinding, _bytes
 from .pipeline_provider import ProviderOptions, SingleAttemptProvider, resolved_stage_model
 from .pipeline_settings import PipelineSettings, select_canvas
@@ -351,6 +351,14 @@ class ProductPipelineEffects:
             "render_diagnostics": result["render_diagnostics"],
             "resource_execution": result["resource_execution"],
         }
+        work_plugins = [
+            f"{item['namespace']}.{item['heading']}"
+            for item in (snapshot.get("config") or {}).get("definitions") or []
+            if isinstance(item, dict) and isinstance(item.get("namespace"), str) and isinstance(item.get("heading"), str)
+        ]
+        pipeline_diagnostics["plugin_diagnostics"] = explain_plugin_diagnostics(
+            self.binding, document["source"], pipeline_diagnostics["upstream_diagnostics"], work_plugins
+        )
         result["compiler_outcome"] = snapshot["delivery"]["outcome"]
         result["pipeline_diagnostics"] = pipeline_diagnostics
         compiler_channels = ("upstream_diagnostics", "downstream_diagnostics")

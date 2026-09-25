@@ -60,6 +60,14 @@ export const ja: LangPack = {
 	pipelineDiagnosticContinued: 'ほかの部分の描画は続けました。',
 	pipelineDiagnosticDetails: '診断の詳細',
 	pipelineDiagnosticUnknown: '詳しい診断情報があります。',
+	pipelinePluginDiagnostic: (reason, name, suggestion) => {
+		switch (reason) {
+			case 'plugin_disabled': return `プラグイン ${name} は無効になっているため、この文は描かれていません。有効にすると描けます。`;
+			case 'plugin_name_mismatch': return `プラグイン ${name} は登録名と一致しないため、この文は描かれていません。${suggestion ? `${suggestion} のことですか。` : ''}`;
+			case 'plugin_version_mismatch': return `プラグイン ${name} の中身が作品の保存時と違うため、この文は描かれていません。`;
+			default: return `プラグイン ${name} はこの環境に登録されていないため、この文は描かれていません。`;
+		}
+	},
 	pipelineDrawing: '描画',
 	code: 'ja',
 	label: '日本語',

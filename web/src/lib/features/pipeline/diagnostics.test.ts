@@ -62,3 +62,14 @@ test('saved render clip omission names its instruction, reason, omission, and co
 		'描画指示 3 の箇所。 クリップ処理の上限を超えました。 描画指示 3 を省略しました。 ほかの部分の描画は続けました。',
 	);
 });
+
+test('a withheld plugin sentence is explained in the author\'s language', () => {
+	assert.equal(
+		formatPipelineDiagnostic({ channel: 'plugin', value: { name: 'Nature.若菜', reason: 'plugin_name_mismatch', suggestion: 'Nature.若葉', start_byte: 28, end_byte: 42 } }, ja),
+		'プラグイン Nature.若菜 は登録名と一致しないため、この文は描かれていません。Nature.若葉 のことですか。',
+	);
+	assert.equal(
+		formatPipelineDiagnostic({ channel: 'plugin', value: { name: 'Garden.薔薇', reason: 'plugin_not_installed', start_byte: 0, end_byte: 1 } }, ja),
+		'プラグイン Garden.薔薇 はこの環境に登録されていないため、この文は描かれていません。',
+	);
+});

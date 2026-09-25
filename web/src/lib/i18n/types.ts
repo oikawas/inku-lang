@@ -32,6 +32,7 @@ export interface LangPack {
 	pipelineDiagnosticContinued: string;
 	pipelineDiagnosticDetails: string;
 	pipelineDiagnosticUnknown: string;
+	pipelinePluginDiagnostic: (reason: string, name: string, suggestion: string | null) => string;
 	pipelineDrawing: string;
 	code: string;
 	label: string;

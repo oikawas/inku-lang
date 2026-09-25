@@ -6,6 +6,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 36 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-25 — Prepare license notices for the next public distribution
+
+The Web distribution now carries the product license and license texts for the main third-party code in its generated runtime. A build stops when a covered dependency version differs from its notice. The API image carries the product MIT text and points to its Python, font, and UniFFI notices and exact source archives. No release version was selected or published.
+
 ### 2026-09-25 — Align Android color catalogs and saved-work redraw with Server
 
 Android's `moss_bark` white now matches Server's `#f2efe8`. Redrawing a saved work uses its own color snapshot, retaining its drawn-with catalog ID and colors even if the ID has been retired. An older work without a snapshot uses today's default colors when its ID is invalid. Historical ID aliases affect history display names only. History stores the requested `catalog_mode`, while older rows may retain null. Existing Room schema 11 databases migrate to 12 without a reset.

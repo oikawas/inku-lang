@@ -4,12 +4,15 @@ FROM ghcr.io/pyo3/maturin@sha256:2519833ac5bf071e02fa231ce368b5b69fac8be1b077437
 
 WORKDIR /build
 COPY core/ /build/core/
+COPY server/scripts/build_rust_notices.py /build/build_rust_notices.py
 RUN maturin build \
     --manifest-path /build/core/crates/inku-render-python/Cargo.toml \
     --release \
     --locked \
     --compatibility manylinux2014 \
-    --out /wheelhouse
+    --out /wheelhouse \
+    && python /build/build_rust_notices.py \
+       /build/core/Cargo.lock /wheelhouse/RUST_THIRD_PARTY_NOTICES.txt
 
 FROM python:3.12-slim AS runtime
 
@@ -30,6 +33,8 @@ RUN apt-get update \
 WORKDIR /app
 COPY shared/ /app/shared/
 COPY server/ /app/server/
+COPY LICENSE /app/LICENSE
+COPY --from=native-builder /wheelhouse/RUST_THIRD_PARTY_NOTICES.txt /app/licenses/RUST_THIRD_PARTY_NOTICES.txt
 COPY --from=native-builder /wheelhouse/ /tmp/wheelhouse/
 RUN cd /app/server \
     && uv sync --frozen --no-dev \

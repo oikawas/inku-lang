@@ -11,6 +11,7 @@ WORKDIR /app
 COPY web/package.json web/package-lock.json ./
 RUN npm ci
 COPY web/ ./
+RUN node scripts/verify-license-notices.mjs
 RUN npm run build
 
 FROM node:22-bookworm-slim AS runtime
@@ -20,6 +21,7 @@ ENV NODE_ENV=production \
 WORKDIR /app
 COPY --from=build /app/build ./build
 COPY --from=build /app/package.json /app/package-lock.json ./
+COPY LICENSE /app/LICENSE
 RUN npm ci --omit=dev && npm cache clean --force
 USER node
 EXPOSE 5173

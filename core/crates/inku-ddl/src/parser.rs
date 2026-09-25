@@ -1255,6 +1255,9 @@ fn has_relative_scale_head_context(
                 CandidateDelivery::Token(NeutralTokenKind::GrammarMarker(_)
                     | NeutralTokenKind::FunctionWord) => true,
                 CandidateDelivery::Token(NeutralTokenKind::CoreModifier(_)) => true,
+                // A count between the scale and its head keeps the phrase, e.g.
+                // `大きな 四つ の 円`.
+                CandidateDelivery::Token(NeutralTokenKind::ExactNumber { .. }) => true,
                 CandidateDelivery::Token(NeutralTokenKind::SaijikiWord {
                     category_key, ..
                 }) => category_key != "katachi",

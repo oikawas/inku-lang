@@ -2509,6 +2509,11 @@ fn japanese_entity_segment_is_clear(
         .all(|atom| match atom {
             ClauseAtom::CoreRole(term) => term.role != CoreRoleKind::Ground,
             ClauseAtom::CoreModifier(_) | ClauseAtom::UnattachedExactNumber(_) => true,
+            // The counter of a count inside the entity phrase, e.g. `三 本 の 線`.
+            ClauseAtom::FunctionWord { surface, span, .. }
+                if crate::parser::is_japanese_counter_surface(surface)
+                    && association.clause_stream.clauses[clause_index].atoms.iter().any(|candidate|
+                        matches!(candidate, ClauseAtom::UnattachedExactNumber(number) if number.span.end_byte == span.start_byte)) => true,
             ClauseAtom::FunctionWord {
                 geometry_keyword: Some(_),
                 ..

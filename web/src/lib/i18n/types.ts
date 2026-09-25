@@ -966,6 +966,8 @@ export interface LangPack {
 	historyLibraryTitle: string;
 	historyLibraryReturn: string;
 	historyLibraryLoadFailed: string;
+	historyLibraryEmpty: string;
+	historyTrashEmpty: string;
 	historyMutationFailed: (reason: string) => string;
 	historyLibraryRetry: string;
 	historyDisplayFormat: string;
@@ -989,6 +991,7 @@ export interface LangPack {
 	historyChronologicalMode: string;
 	historyLineageMode: string;
 	historyLineageGroups: string;
+	historyLineageGroupsDerivedOnly: string;
 	historyLineageEmpty: string;
 	historyLineageWorkCount: (n: number) => string;
 	historyLineageStarCount: (n: number) => string;

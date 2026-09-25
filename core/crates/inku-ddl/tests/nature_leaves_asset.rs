@@ -30,22 +30,35 @@ struct Entry {
     summaries: BTreeMap<String, String>,
 }
 
+fn canonical(alias: &str) -> &'static str {
+    match alias {
+        "Nature.若葉" => "Nature.YoungLeaves",
+        "Nature.下草" => "Nature.Undergrowth",
+        "Nature.青葉" => "Nature.SummerLeaves",
+        "Nature.紅葉" => "Nature.AutumnLeaves",
+        "Nature.落葉" => "Nature.FallenLeaves",
+        "Nature.枯草" => "Nature.WitheredGrass",
+        "Nature.枯葉" => "Nature.WitheredLeaves",
+        other => panic!("no canonical name for {other}"),
+    }
+}
+
 #[test]
 fn bundled_nature_leaves_are_valid_bounded_definitions_that_reach_normal_score_lowering() {
     let package: Package = serde_json::from_str(ASSET).expect("Nature package must be JSON");
     assert_eq!(package.schema, "inku.bundled-macro-package.v1");
     assert_eq!(package.package_id, "Nature.leaves");
-    assert_eq!(package.version, "1.1.0");
+    assert_eq!(package.version, "2.0.0");
     assert_eq!(ASSET.as_bytes().last(), Some(&b'\n'));
 
     let expected = [
-        ("Nature.若葉", "1.1.0", 12, 8..=12),
-        ("Nature.下草", "1.1.0", 20, 6..=20),
-        ("Nature.青葉", "1.1.0", 17, 13..=17),
-        ("Nature.紅葉", "1.1.0", 15, 11..=15),
-        ("Nature.落葉", "1.1.0", 24, 16..=24),
-        ("Nature.枯草", "1.1.0", 20, 6..=20),
-        ("Nature.枯葉", "1.1.0", 8, 4..=8),
+        ("Nature.若葉", "2.0.0", 12, 8..=12),
+        ("Nature.下草", "2.0.0", 20, 6..=20),
+        ("Nature.青葉", "2.0.0", 17, 13..=17),
+        ("Nature.紅葉", "2.0.0", 15, 11..=15),
+        ("Nature.落葉", "2.0.0", 24, 16..=24),
+        ("Nature.枯草", "2.0.0", 20, 6..=20),
+        ("Nature.枯葉", "2.0.0", 8, 4..=8),
     ];
     assert_eq!(package.entries.len(), expected.len());
 
@@ -76,7 +89,9 @@ fn bundled_nature_leaves_are_valid_bounded_definitions_that_reach_normal_score_l
         );
         assert_eq!(validation.symbolic_upper_bound(), Some(*upper_bound));
         let identity = definition.identity().unwrap();
-        assert_eq!(identity.qualified_name(), *qualified_name);
+        // The English heading is canonical; the Japanese name is its alias.
+        assert_eq!(identity.qualified_name(), canonical(qualified_name));
+        assert_eq!(definition.alias_qualified_names(), [*qualified_name]);
         assert_eq!(identity.version(), *version);
         assert!(digests.insert(identity.full_digest_hex().to_owned()));
         definitions.push(definition);
@@ -97,9 +112,12 @@ fn bundled_nature_leaves_are_valid_bounded_definitions_that_reach_normal_score_l
             identity.version(),
             format!("sha256:{}", identity.full_digest_hex()),
         )
+        .unwrap()
+        .with_aliases(definition.alias_qualified_names())
         .unwrap();
+        let canonical_source = format!("{}.", identity.qualified_name());
         let (source, language) = if *qualified_name == "Nature.若葉" {
-            ("Nature.若葉.", ResolvedInstructionLanguage::En)
+            (canonical_source.as_str(), ResolvedInstructionLanguage::En)
         } else {
             (*qualified_name, ResolvedInstructionLanguage::Ja)
         };
@@ -460,5 +478,144 @@ fn every_saved_1_0_edition_keeps_its_lock_and_still_expands() {
             "{}",
             identity.qualified_name()
         );
+    }
+}
+
+#[test]
+fn a_bundled_word_draws_the_same_score_by_its_canonical_name_or_its_alias() {
+    let package: Package = serde_json::from_str(ASSET).expect("Nature package must be JSON");
+    let definitions = package
+        .entries
+        .iter()
+        .map(|entry| MacroDefinition::from_json(&entry.definition.to_string()).unwrap())
+        .collect::<Vec<_>>();
+    let locks = definitions
+        .iter()
+        .map(|definition| {
+            let identity = definition.identity().unwrap();
+            MacroLock::new(
+                identity.qualified_name(),
+                identity.version(),
+                format!("sha256:{}", identity.full_digest_hex()),
+            )
+            .unwrap()
+            .with_aliases(definition.alias_qualified_names())
+            .unwrap()
+        })
+        .collect::<Vec<_>>();
+    let limits = MacroExpansionLimits {
+        max_invocations: 64,
+        max_depth: 16,
+        max_evaluation_steps: 8_192,
+        max_nodes_per_invocation: 128,
+        max_total_nodes: 128,
+    };
+    let score = |source: &str, language| {
+        let execution = compile_ddl_to_score(
+            NormalizedDdlDocument::new(source, language, locks.clone()).unwrap(),
+            &definitions,
+            Some(37),
+            limits,
+            ScoreLoweringContext::resolve("square", Color::White).unwrap(),
+            None,
+            ScoreErrorPolicy::Stop,
+        );
+        assert_eq!(
+            execution.outcome(),
+            ScoreLoweringOutcome::Complete,
+            "{source}"
+        );
+        assert!(execution.upstream_diagnostics().is_empty(), "{source}");
+        serde_json::to_value(execution.score().unwrap()).unwrap()
+    };
+    for definition in &definitions {
+        let canonical = definition.qualified_name().unwrap();
+        let alias = &definition.alias_qualified_names()[0];
+        let by_alias = score(
+            &format!("背景を白で埋める。\n{alias}。"),
+            ResolvedInstructionLanguage::Ja,
+        );
+        assert_eq!(
+            score(
+                &format!("背景を白で埋める。\n{canonical}。"),
+                ResolvedInstructionLanguage::Ja
+            ),
+            by_alias,
+            "{canonical}"
+        );
+        assert_eq!(
+            score(
+                &format!("Fill the background with white.\n{canonical}."),
+                ResolvedInstructionLanguage::En
+            )["instructions"],
+            by_alias["instructions"],
+            "{canonical}"
+        );
+    }
+    // An alias that repeats the heading or names another namespace's form is refused.
+    let mut bad = package.entries[0].definition.clone();
+    bad["aliases"] = serde_json::json!(["YoungLeaves"]);
+    assert!(
+        !MacroDefinition::from_json(&bad.to_string())
+            .unwrap()
+            .validate()
+            .is_valid()
+    );
+    bad["aliases"] = serde_json::json!(["若 葉"]);
+    assert!(
+        !MacroDefinition::from_json(&bad.to_string())
+            .unwrap()
+            .validate()
+            .is_valid()
+    );
+}
+
+#[test]
+fn every_bundled_word_expands_without_omission_at_many_placement_seeds() {
+    let package: Package = serde_json::from_str(ASSET).expect("Nature package must be JSON");
+    let definitions = package
+        .entries
+        .iter()
+        .map(|entry| MacroDefinition::from_json(&entry.definition.to_string()).unwrap())
+        .collect::<Vec<_>>();
+    let limits = MacroExpansionLimits {
+        max_invocations: 64,
+        max_depth: 16,
+        max_evaluation_steps: 8_192,
+        max_nodes_per_invocation: 128,
+        max_total_nodes: 128,
+    };
+    for definition in &definitions {
+        let identity = definition.identity().unwrap();
+        let lock = MacroLock::new(
+            identity.qualified_name(),
+            identity.version(),
+            format!("sha256:{}", identity.full_digest_hex()),
+        )
+        .unwrap();
+        // Every count and slot a vary can choose must stay inside the canvas.
+        for seed in 0..32 {
+            let execution = compile_ddl_to_score(
+                NormalizedDdlDocument::new(
+                    identity.qualified_name(),
+                    ResolvedInstructionLanguage::Ja,
+                    vec![lock.clone()],
+                )
+                .unwrap(),
+                &definitions,
+                Some(seed),
+                limits,
+                ScoreLoweringContext::resolve("square", Color::White).unwrap(),
+                None,
+                ScoreErrorPolicy::Stop,
+            );
+            assert_eq!(
+                execution.outcome(),
+                ScoreLoweringOutcome::Complete,
+                "{} at seed {seed}: {:?}",
+                identity.qualified_name(),
+                execution.downstream_diagnostics()
+            );
+        }
     }
 }

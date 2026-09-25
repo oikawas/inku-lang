@@ -78,6 +78,8 @@ struct CatalogEntry {
     definition: serde_json::Value,
     summary: String,
     qualified_name: String,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    aliases: Vec<String>,
     version: String,
     digest: String,
 }
@@ -201,7 +203,14 @@ fn resolve(input_bytes: &[u8]) -> Result<CatalogOutput, ()> {
             }
         };
         let qualified_name = identity.qualified_name().to_owned();
-        if !names.insert(qualified_name.clone()) {
+        let aliases = definition.alias_qualified_names();
+        // A canonical name and every alias share one namespace of visible
+        // names: the first definition to claim any of them keeps it.
+        if std::iter::once(&qualified_name)
+            .chain(&aliases)
+            .any(|name| names.contains(name))
+            || !names.insert(qualified_name.clone())
+        {
             diagnostics.push(omitted(
                 candidate.source_id,
                 Some(qualified_name),
@@ -221,6 +230,7 @@ fn resolve(input_bytes: &[u8]) -> Result<CatalogOutput, ()> {
             ));
             continue;
         }
+        names.extend(aliases.iter().cloned());
         let version = identity.version().to_owned();
         let digest = identity.full_digest_hex().to_owned();
         let canonical = serde_json::from_slice(identity.canonical_json_bytes()).map_err(|_| ())?;
@@ -234,6 +244,7 @@ fn resolve(input_bytes: &[u8]) -> Result<CatalogOutput, ()> {
             definition: canonical,
             summary: candidate.summary,
             qualified_name,
+            aliases,
             version,
             digest,
         });
@@ -304,6 +315,44 @@ pub fn resolve_macro_catalog(input_bytes: Vec<u8>) -> Vec<u8> {
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn an_alias_may_not_claim_a_name_another_definition_already_holds() {
+        let definition = |heading: &str, aliases: &[&str]| {
+            serde_json::json!({
+                "schema": "inku.macro-definition.v1", "namespace": "Nature", "heading": heading,
+                "aliases": aliases, "version": "1.0.0", "parameters": {}, "components": {}, "body": []
+            })
+            .to_string()
+        };
+        let output = resolve(
+            &serde_json::to_vec(&json!({
+                "maximum_entries": 64,
+                "canonical": [
+                    {"source_id": "a", "definition_json": definition("YoungLeaves", &["若葉"]), "summary": "a"},
+                    {"source_id": "b", "definition_json": definition("若葉", &[]), "summary": "b"},
+                    {"source_id": "c", "definition_json": definition("NewLeaves", &["若葉"]), "summary": "c"},
+                    {"source_id": "d", "definition_json": definition("Buds", &["芽"]), "summary": "d"}
+                ]
+            }))
+            .unwrap(),
+        )
+        .unwrap();
+        let kept: Vec<_> = output
+            .entries
+            .iter()
+            .map(|entry| entry.source_id.as_str())
+            .collect();
+        assert_eq!(kept, ["a", "d"]);
+        assert_eq!(output.entries[0].aliases, ["Nature.若葉"]);
+        assert!(
+            output
+                .diagnostics
+                .iter()
+                .all(|item| item.reason == "duplicate_qualified_name")
+        );
+        assert_eq!(output.diagnostics.len(), 2);
+    }
 
     #[test]
     fn bundled_content_has_language_independent_locks_and_respects_explicit_precedence() {

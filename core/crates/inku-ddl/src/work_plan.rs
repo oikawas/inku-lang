@@ -314,6 +314,28 @@ impl WorkPlanLayer {
     }
 }
 
+/// One installed plugin a plan may choose: its canonical qualified name and
+/// its qualified aliases (the first alias is the Japanese display name).
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct WorkPlanPlugin {
+    pub name: String,
+    pub aliases: Vec<String>,
+}
+
+impl WorkPlanPlugin {
+    fn answers_to(&self, value: &str) -> bool {
+        self.name == value || self.aliases.iter().any(|alias| alias == value)
+    }
+
+    /// The name a sentence in `language` is written with.
+    fn written(&self, language: ResolvedInstructionLanguage) -> &str {
+        match language {
+            ResolvedInstructionLanguage::Ja => self.aliases.first().unwrap_or(&self.name),
+            ResolvedInstructionLanguage::En => &self.name,
+        }
+    }
+}
+
 /// A normalized plan. Background and ground are optional document sentences.
 /// Plugins are installed qualified macro names, each printed as its own sentence.
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize)]
@@ -430,12 +452,13 @@ pub fn normalize_work_plan(raw: &Value) -> (WorkPlan, Vec<WorkPlanDiagnostic>) {
     normalize_work_plan_with_plugins(raw, &[])
 }
 
-/// Normalize a provider plan against the installed plugin names. A plugin name
-/// that is not installed, repeated, or over the limit is dropped and reported.
+/// Normalize a provider plan against the installed plugins. A plugin named by
+/// its canonical name or an alias is kept under its canonical name; one that
+/// is not installed, repeated, or over the limit is dropped and reported.
 #[must_use]
 pub fn normalize_work_plan_with_plugins(
     raw: &Value,
-    plugins: &[String],
+    plugins: &[WorkPlanPlugin],
 ) -> (WorkPlan, Vec<WorkPlanDiagnostic>) {
     let vocabulary = work_plan_vocabulary();
     let capabilities = work_plan_capabilities();
@@ -471,12 +494,15 @@ pub fn normalize_work_plan_with_plugins(
         .into_iter()
         .flatten()
     {
-        let Some(name) = text(Some(value)) else {
+        let Some(written) = text(Some(value)) else {
             continue;
         };
-        if !plugins.contains(&name) {
-            note(None, "plugins", name, "unknown_plugin");
-        } else if plan.plugins.contains(&name) {
+        let Some(plugin) = plugins.iter().find(|plugin| plugin.answers_to(&written)) else {
+            note(None, "plugins", written, "unknown_plugin");
+            continue;
+        };
+        let name = plugin.name.clone();
+        if plan.plugins.contains(&name) {
             note(None, "plugins", name, "repeated_plugin");
         } else if plan.plugins.len() >= MAX_WORK_PLAN_PLUGINS {
             note(None, "plugins", name, "over_plugin_limit");
@@ -758,6 +784,17 @@ fn print_layer_en(layer: &WorkPlanLayer) -> String {
 /// Print a normalized plan as visible DDL in the requested language.
 #[must_use]
 pub fn print_work_plan(plan: &WorkPlan, language: ResolvedInstructionLanguage) -> String {
+    print_work_plan_with_plugins(plan, language, &[])
+}
+
+/// Print a plan, writing each plugin by the name its language reads: the
+/// Japanese alias in Japanese DDL, the canonical name in English DDL.
+#[must_use]
+pub fn print_work_plan_with_plugins(
+    plan: &WorkPlan,
+    language: ResolvedInstructionLanguage,
+    plugins: &[WorkPlanPlugin],
+) -> String {
     let mut lines = Vec::new();
     if let Some(ground) = &plan.ground {
         let text = surface(WorkPlanSlot::Ground, ground, language);
@@ -781,10 +818,14 @@ pub fn print_work_plan(plan: &WorkPlan, language: ResolvedInstructionLanguage) -
     }
     // A plugin sentence is the bare qualified name, the one form every
     // parameterless definition expands without caller-meaning diagnostics.
-    for plugin in &plan.plugins {
+    for name in &plan.plugins {
+        let written = plugins
+            .iter()
+            .find(|plugin| &plugin.name == name)
+            .map_or(name.as_str(), |plugin| plugin.written(language));
         lines.push(match language {
-            ResolvedInstructionLanguage::Ja => format!("{plugin}。"),
-            ResolvedInstructionLanguage::En => format!("{plugin}."),
+            ResolvedInstructionLanguage::Ja => format!("{written}。"),
+            ResolvedInstructionLanguage::En => format!("{written}."),
         });
     }
     for layer in &plan.layers {

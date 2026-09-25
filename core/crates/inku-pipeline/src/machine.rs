@@ -62,6 +62,9 @@ pub struct LockedDefinition {
     pub qualified_name: String,
     pub version: String,
     pub digest: String,
+    /// Qualified aliases that also invoke this definition; omitted when empty.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub aliases: Vec<String>,
 }
 
 /// Exact visible source and its sidecar locks; no description or hidden reasoning.
@@ -80,6 +83,7 @@ impl VisibleDocument {
             .iter()
             .map(|lock| {
                 MacroLock::new(&lock.qualified_name, &lock.version, &lock.digest)
+                    .and_then(|macro_lock| macro_lock.with_aliases(lock.aliases.iter().cloned()))
                     .map_err(|_| ProtocolError::SchemaViolation)
             })
             .collect::<Result<Vec<_>, _>>()?;
@@ -98,6 +102,7 @@ impl VisibleDocument {
                     qualified_name: lock.qualified_name().to_owned(),
                     version: lock.version().to_owned(),
                     digest: lock.digest().to_owned(),
+                    aliases: lock.aliases().to_vec(),
                 })
                 .collect(),
         }
@@ -518,6 +523,7 @@ impl PipelineSnapshot {
                 qualified_name: identity.qualified_name().to_owned(),
                 version: identity.version().to_owned(),
                 digest: format!("sha256:{}", identity.full_digest_hex()),
+                aliases: definition.alias_qualified_names(),
             });
         }
         let wire = VisibleDocument {
@@ -1455,14 +1461,7 @@ impl PipelineSnapshot {
                 self.stage1(description.ok_or(ProtocolError::InternalInvariant)?, events)
             }
             LlmStage::GenerateNormalizedDdl => {
-                let mut plugins = self
-                    .config
-                    .definitions
-                    .iter()
-                    .filter_map(MacroDefinition::qualified_name)
-                    .collect::<Vec<_>>();
-                plugins.sort();
-                plugins.dedup();
+                let plugins = crate::prompts::work_plan_plugins(&self.config.definitions);
                 let generated = match parse_stage1_response_with_plugins(
                     &response,
                     self.config.prompt_limits,

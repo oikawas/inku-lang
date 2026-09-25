@@ -368,6 +368,11 @@ pub struct MacroDefinition {
     pub schema: String,
     pub namespace: String,
     pub heading: String,
+    /// Other headings in the same namespace that invoke this definition, such
+    /// as a Japanese name beside an English canonical heading. Omitted when
+    /// empty, so a definition without aliases keeps its canonical bytes.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub aliases: Vec<String>,
     pub version: String,
     pub parameters: SemanticMap<ParameterSchema>,
     pub components: SemanticMap<ComponentDefinition>,
@@ -571,6 +576,18 @@ impl MacroDefinition {
             .map(|invocation| invocation.qualified_name())
     }
 
+    /// Qualified names of the aliases (`Namespace.Alias`), in declared order.
+    pub fn alias_qualified_names(&self) -> Vec<String> {
+        self.aliases
+            .iter()
+            .filter_map(|alias| {
+                MacroInvocation::new(self.namespace.clone(), alias.clone(), 0)
+                    .ok()
+                    .map(|invocation| invocation.qualified_name())
+            })
+            .collect()
+    }
+
     /// Validate names, references, cycles, finite domains, and symbolic resource bounds.
     pub fn validate(&self) -> MacroDefinitionValidation {
         let mut diagnostics = Vec::new();
@@ -588,6 +605,22 @@ impl MacroDefinition {
                     "$.heading"
                 },
             ),
+        }
+        let mut seen_aliases = HashSet::new();
+        for (index, alias) in self.aliases.iter().enumerate() {
+            let path = format!("$.aliases[{index}]");
+            // An alias must be a name visible DDL can spell: the parser reads a
+            // heading of letters, digits, `_`, and `-` only.
+            let spellable = !alias.is_empty()
+                && alias
+                    .chars()
+                    .all(|character| character.is_alphanumeric() || matches!(character, '_' | '-'));
+            if !spellable || MacroInvocation::new(self.namespace.clone(), alias.clone(), 0).is_err()
+            {
+                push_diagnostic(&mut diagnostics, "invalid_alias", path);
+            } else if alias == &self.heading || !seen_aliases.insert(alias.as_str()) {
+                push_diagnostic(&mut diagnostics, "duplicate_alias", path);
+            }
         }
         if !is_semantic_version(&self.version) {
             push_diagnostic(&mut diagnostics, "invalid_semantic_version", "$.version");

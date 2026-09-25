@@ -469,14 +469,16 @@ fn candidates_at_with_locked_macro_boundary(
     let left_end = source[..start_byte].trim_end_matches(is_separator).len();
     let preceded_by_locked_macro = language == ResolvedInstructionLanguage::Ja
         && document.macro_locks().iter().any(|macro_lock| {
-            left_end
-                .checked_sub(macro_lock.qualified_name().len())
-                .filter(|left_start| source.is_char_boundary(*left_start))
-                .and_then(|left_start| qualified_macro_match(document, left_start))
-                .is_some_and(|matched| {
-                    matches!(matched, QualifiedMacroMatch::ExactLock { end_byte, .. }
-                        if end_byte == left_end)
-                })
+            macro_lock.visible_names().any(|name| {
+                left_end
+                    .checked_sub(name.len())
+                    .filter(|left_start| source.is_char_boundary(*left_start))
+                    .and_then(|left_start| qualified_macro_match(document, left_start))
+                    .is_some_and(|matched| {
+                        matches!(matched, QualifiedMacroMatch::ExactLock { end_byte, .. }
+                            if end_byte == left_end)
+                    })
+            })
         });
     for candidate in candidates_at(source, start_byte, language, false) {
         let followed_by_locked_macro = matches!(
@@ -546,24 +548,32 @@ pub(crate) fn qualified_macro_match(
 ) -> Option<QualifiedMacroMatch> {
     let source = document.source();
     let unlocked_end = qualified_macro_end(source, start_byte)?;
-    let lock_indices = document
+    // A lock is invoked by its canonical name or by any of its aliases; the
+    // longest visible name that starts here decides the invocation's extent.
+    let matched = document
         .macro_locks()
         .iter()
         .enumerate()
-        .filter(|(_, macro_lock)| {
-            let qualified_name = macro_lock.qualified_name();
-            is_visible_qualified_name(qualified_name)
-                && source.get(start_byte..start_byte + qualified_name.len()) == Some(qualified_name)
+        .filter_map(|(index, macro_lock)| {
+            macro_lock
+                .visible_names()
+                .filter(|name| {
+                    is_visible_qualified_name(name)
+                        && source.get(start_byte..start_byte + name.len()) == Some(*name)
+                })
+                .map(str::len)
+                .max()
+                .map(|length| (index, length))
         })
-        .map(|(index, _)| index)
         .collect::<Vec<_>>();
+    let lock_indices = matched.iter().map(|(index, _)| *index).collect::<Vec<_>>();
 
-    match lock_indices.as_slice() {
+    match matched.as_slice() {
         [] => Some(QualifiedMacroMatch::Unlocked {
             end_byte: unlocked_end,
         }),
-        [lock_index] => Some(QualifiedMacroMatch::ExactLock {
-            end_byte: start_byte + document.macro_locks()[*lock_index].qualified_name().len(),
+        [(lock_index, length)] => Some(QualifiedMacroMatch::ExactLock {
+            end_byte: start_byte + length,
             lock_index: *lock_index,
         }),
         _ => Some(QualifiedMacroMatch::AmbiguousLocks {

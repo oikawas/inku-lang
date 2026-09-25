@@ -282,7 +282,14 @@ fn occurrence(
         end_byte,
     };
     let surface = document.source()[span.start_byte..span.end_byte].to_owned();
-    let invocation = invocation(&surface, ordinal);
+    // An alias invokes its lock's canonical definition: past this point the
+    // invocation carries the canonical name, and only the span keeps the alias.
+    let invocation = match lock_indices.as_slice() {
+        [index] if document.macro_locks()[*index].aliases().contains(&surface) => {
+            invocation(document.macro_locks()[*index].qualified_name(), ordinal)
+        }
+        _ => invocation(&surface, ordinal),
+    };
     let matching_locks = lock_indices
         .iter()
         .map(|&index| (&document.macro_locks()[index]).into())

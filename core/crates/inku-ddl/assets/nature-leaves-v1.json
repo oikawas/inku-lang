@@ -1,14 +1,17 @@
 {
   "schema": "inku.bundled-macro-package.v1",
   "package_id": "Nature.leaves",
-  "version": "1.1.0",
+  "version": "2.0.0",
   "entries": [
     {
       "definition": {
         "schema": "inku.macro-definition.v1",
         "namespace": "Nature",
-        "heading": "若葉",
-        "version": "1.1.0",
+        "heading": "YoungLeaves",
+        "aliases": [
+          "若葉"
+        ],
+        "version": "2.0.0",
         "parameters": {},
         "components": {
           "leaf_form": {
@@ -299,8 +302,11 @@
       "definition": {
         "schema": "inku.macro-definition.v1",
         "namespace": "Nature",
-        "heading": "下草",
-        "version": "1.1.0",
+        "heading": "Undergrowth",
+        "aliases": [
+          "下草"
+        ],
+        "version": "2.0.0",
         "parameters": {},
         "components": {
           "rooted_blade": {
@@ -608,8 +614,11 @@
       "definition": {
         "schema": "inku.macro-definition.v1",
         "namespace": "Nature",
-        "heading": "青葉",
-        "version": "1.1.0",
+        "heading": "SummerLeaves",
+        "aliases": [
+          "青葉"
+        ],
+        "version": "2.0.0",
         "parameters": {},
         "components": {},
         "body": [
@@ -972,8 +981,11 @@
       "definition": {
         "schema": "inku.macro-definition.v1",
         "namespace": "Nature",
-        "heading": "紅葉",
-        "version": "1.1.0",
+        "heading": "AutumnLeaves",
+        "aliases": [
+          "紅葉"
+        ],
+        "version": "2.0.0",
         "parameters": {},
         "components": {},
         "body": [
@@ -1281,8 +1293,11 @@
       "definition": {
         "schema": "inku.macro-definition.v1",
         "namespace": "Nature",
-        "heading": "落葉",
-        "version": "1.1.0",
+        "heading": "FallenLeaves",
+        "aliases": [
+          "落葉"
+        ],
+        "version": "2.0.0",
         "parameters": {},
         "components": {
           "fallen_leaf": {
@@ -1526,51 +1541,51 @@
                         "items": [
                           {
                             "expr": "exact_decimal",
-                            "value": "0.721"
+                            "value": "0.722"
                           },
                           {
                             "expr": "exact_decimal",
-                            "value": "0.861"
+                            "value": "0.865"
                           },
                           {
                             "expr": "exact_decimal",
-                            "value": "0.762"
+                            "value": "0.767"
                           },
                           {
                             "expr": "exact_decimal",
-                            "value": "0.577"
+                            "value": "0.585"
                           },
                           {
                             "expr": "exact_decimal",
-                            "value": "0.619"
+                            "value": "0.629"
                           },
                           {
                             "expr": "exact_decimal",
-                            "value": "0.596"
+                            "value": "0.610"
                           },
                           {
                             "expr": "exact_decimal",
-                            "value": "0.631"
+                            "value": "0.647"
                           },
                           {
                             "expr": "exact_decimal",
-                            "value": "0.346"
+                            "value": "0.368"
                           },
                           {
                             "expr": "exact_decimal",
-                            "value": "0.360"
+                            "value": "0.384"
                           },
                           {
                             "expr": "exact_decimal",
-                            "value": "0.379"
+                            "value": "0.409"
                           },
                           {
                             "expr": "exact_decimal",
-                            "value": "0.236"
+                            "value": "0.270"
                           },
                           {
                             "expr": "exact_decimal",
-                            "value": "0.036"
+                            "value": "0.119"
                           }
                         ]
                       },
@@ -1583,51 +1598,51 @@
                         "items": [
                           {
                             "expr": "exact_decimal",
-                            "value": "0.916"
+                            "value": "0.896"
                           },
                           {
                             "expr": "exact_decimal",
-                            "value": "0.702"
+                            "value": "0.683"
                           },
                           {
                             "expr": "exact_decimal",
-                            "value": "0.743"
+                            "value": "0.725"
                           },
                           {
                             "expr": "exact_decimal",
-                            "value": "0.825"
+                            "value": "0.809"
                           },
                           {
                             "expr": "exact_decimal",
-                            "value": "0.711"
+                            "value": "0.695"
                           },
                           {
                             "expr": "exact_decimal",
-                            "value": "0.587"
+                            "value": "0.574"
                           },
                           {
                             "expr": "exact_decimal",
-                            "value": "0.465"
+                            "value": "0.453"
                           },
                           {
                             "expr": "exact_decimal",
-                            "value": "0.560"
+                            "value": "0.550"
                           },
                           {
                             "expr": "exact_decimal",
-                            "value": "0.430"
+                            "value": "0.422"
                           },
                           {
                             "expr": "exact_decimal",
-                            "value": "0.192"
+                            "value": "0.187"
                           },
                           {
                             "expr": "exact_decimal",
-                            "value": "0.203"
+                            "value": "0.200"
                           },
                           {
                             "expr": "exact_decimal",
-                            "value": "0.184"
+                            "value": "0.141"
                           }
                         ]
                       }
@@ -1648,8 +1663,11 @@
       "definition": {
         "schema": "inku.macro-definition.v1",
         "namespace": "Nature",
-        "heading": "枯草",
-        "version": "1.1.0",
+        "heading": "WitheredGrass",
+        "aliases": [
+          "枯草"
+        ],
+        "version": "2.0.0",
         "parameters": {},
         "components": {
           "rooted_blade": {
@@ -1977,8 +1995,11 @@
       "definition": {
         "schema": "inku.macro-definition.v1",
         "namespace": "Nature",
-        "heading": "枯葉",
-        "version": "1.1.0",
+        "heading": "WitheredLeaves",
+        "aliases": [
+          "枯葉"
+        ],
+        "version": "2.0.0",
         "parameters": {},
         "components": {
           "withered_leaf": {

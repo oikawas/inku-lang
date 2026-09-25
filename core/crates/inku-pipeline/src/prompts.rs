@@ -17,7 +17,8 @@ use inku_ddl::{
     VisibleDdlPatchEdit, core_modifier_surface_forms, saijiki_asset_sha256_hex,
     saijiki_derived_projection, saijiki_tool_guidance, visible_ddl_patch_available,
     work_plan::{
-        normalize_work_plan_with_plugins, print_work_plan, work_plan_response_schema_with_plugins,
+        WorkPlanPlugin, normalize_work_plan_with_plugins, print_work_plan_with_plugins,
+        work_plan_response_schema_with_plugins,
     },
 };
 use inku_score::{CANVAS_FORMAT_REGISTRY_ID, canvas_format_registry_digest, lookup_canvas_format};
@@ -604,7 +605,10 @@ pub fn build_stage1_prompt_with_sketch(
         }
     })?;
     let (_, macro_catalog_digest) = project_macro_catalog(macros, limits)?;
-    let plugins = installed_plugin_names(macros);
+    let plugins = installed_plugin_names(macros)
+        .into_iter()
+        .map(|plugin| plugin.name)
+        .collect::<Vec<_>>();
     let mut system = stage1_work_plan_system(language)?;
     if !plugins.is_empty() {
         system.push_str(&stage1_plugin_section(macros, language));
@@ -818,15 +822,27 @@ const STAGE1_PLUGINS_EN: &str = r#"
 # plugins (installed plugins)
 Each plugin below draws the subject its summary describes as a whole. The test is the heading word of its name (for Nature.若葉, 若葉, young leaves). When the description writes that word or a paraphrase naming the same thing (fallen leaves for 落葉), put the name in plugins. When it does not, never choose the plugin by association with a season, place, or similar thing. Do not also draw that subject in layers. Draw everything else in the description with layers as usual. Leave plugins empty when none applies."#;
 
-/// Installed qualified names, sorted and unique, that a work plan may choose.
-fn installed_plugin_names(macros: &[MacroPromptEntry<'_>]) -> Vec<String> {
-    let mut names = macros
-        .iter()
-        .filter_map(|entry| entry.definition.qualified_name())
+/// Installed plugins, sorted and unique by canonical name, that a plan may choose.
+fn installed_plugin_names(macros: &[MacroPromptEntry<'_>]) -> Vec<WorkPlanPlugin> {
+    work_plan_plugins(macros.iter().map(|entry| entry.definition))
+}
+
+/// Canonical names and qualified aliases of the given definitions.
+pub fn work_plan_plugins<'a>(
+    definitions: impl IntoIterator<Item = &'a MacroDefinition>,
+) -> Vec<WorkPlanPlugin> {
+    let mut plugins = definitions
+        .into_iter()
+        .filter_map(|definition| {
+            Some(WorkPlanPlugin {
+                name: definition.qualified_name()?,
+                aliases: definition.alias_qualified_names(),
+            })
+        })
         .collect::<Vec<_>>();
-    names.sort();
-    names.dedup();
-    names
+    plugins.sort_by(|left, right| left.name.cmp(&right.name));
+    plugins.dedup_by(|left, right| left.name == right.name);
+    plugins
 }
 
 /// The plugin rule followed by one `name: summary` line per installed plugin.
@@ -838,7 +854,14 @@ fn stage1_plugin_section(
         .iter()
         .filter_map(|entry| {
             let name = entry.definition.qualified_name()?;
-            Some(format!("- {name}: {}", entry.localized_summary))
+            let aliases = entry.definition.alias_qualified_names();
+            // Japanese lists the Japanese alias the plan will print; English
+            // reads the canonical name alone.
+            let label = match (language, aliases.first()) {
+                (ResolvedInstructionLanguage::Ja, Some(alias)) => format!("{name}（別名 {alias}）"),
+                _ => name,
+            };
+            Some(format!("- {label}: {}", entry.localized_summary))
         })
         .collect::<Vec<_>>();
     lines.sort();
@@ -1180,7 +1203,7 @@ pub fn parse_stage1_response_with_plugins(
     response_text: &str,
     limits: PromptLimits,
     language: ResolvedInstructionLanguage,
-    plugins: &[String],
+    plugins: &[WorkPlanPlugin],
 ) -> Result<Stage1Response, PromptError> {
     let value: Value = parse_bounded(response_text, limits)?;
     let response = if value.get("normalized_ddl").is_some() {
@@ -1191,7 +1214,7 @@ pub fn parse_stage1_response_with_plugins(
             return Err(PromptError::EmptyField { field: "layers" });
         }
         Stage1Response {
-            normalized_ddl: print_work_plan(&plan, language),
+            normalized_ddl: print_work_plan_with_plugins(&plan, language, plugins),
         }
     };
     require_nonempty("normalized_ddl", &response.normalized_ddl)?;
@@ -1728,6 +1751,71 @@ mod tests {
     };
 
     #[test]
+    fn a_plugin_prints_by_its_alias_in_japanese_and_by_its_canonical_name_in_english() {
+        let definition = MacroDefinition::from_json(
+            r#"{"schema":"inku.macro-definition.v1","namespace":"Nature","heading":"YoungLeaves","aliases":["若葉"],"version":"2.0.0","parameters":{},"components":{},"body":[]}"#,
+        )
+        .unwrap();
+        let context = Stage1Context {
+            catalog_id: "default".to_owned(),
+            catalog_mode: ResolvedCatalogMode::Default,
+            canvas_format_id: "square".to_owned(),
+            canvas_format_registry_id: CANVAS_FORMAT_REGISTRY_ID.to_owned(),
+            canvas_format_registry_digest: canvas_format_registry_digest().unwrap(),
+        };
+        let entry = [MacroPromptEntry {
+            definition: &definition,
+            localized_summary: "若葉を上半分へ置く。",
+        }];
+        let ja = build_stage1_prompt(
+            "若葉",
+            ResolvedInstructionLanguage::Ja,
+            &context,
+            &entry,
+            LIMITS,
+        )
+        .unwrap();
+        assert!(
+            ja.system
+                .contains("- Nature.YoungLeaves（別名 Nature.若葉）: 若葉を上半分へ置く。")
+        );
+        assert_eq!(
+            ja.response_schema["properties"]["plugins"]["items"]["enum"],
+            serde_json::json!(["Nature.YoungLeaves"])
+        );
+        let plugins = work_plan_plugins([&definition]);
+        let plan = |name: &str| {
+            format!(
+                r#"{{"background":"unspecified","ground":"unspecified","plugins":["{name}"],"layers":[]}}"#
+            )
+        };
+        for written in ["Nature.YoungLeaves", "Nature.若葉"] {
+            assert_eq!(
+                parse_stage1_response_with_plugins(
+                    &plan(written),
+                    LIMITS,
+                    ResolvedInstructionLanguage::Ja,
+                    &plugins
+                )
+                .unwrap()
+                .normalized_ddl,
+                "Nature.若葉。"
+            );
+            assert_eq!(
+                parse_stage1_response_with_plugins(
+                    &plan(written),
+                    LIMITS,
+                    ResolvedInstructionLanguage::En,
+                    &plugins
+                )
+                .unwrap()
+                .normalized_ddl,
+                "Nature.YoungLeaves."
+            );
+        }
+    }
+
+    #[test]
     fn stage1_offers_installed_plugins_as_a_closed_list_and_prints_them_by_name() {
         let definition = MacroDefinition::from_json(
             r#"{"schema":"inku.macro-definition.v1","namespace":"Nature","heading":"若葉","version":"1.0.1","parameters":{},"components":{},"body":[]}"#,
@@ -1775,7 +1863,10 @@ mod tests {
             without.response_schema,
             inku_ddl::work_plan::work_plan_response_schema()
         );
-        let installed = ["Nature.若葉".to_owned()];
+        let installed = [WorkPlanPlugin {
+            name: "Nature.若葉".to_owned(),
+            aliases: Vec::new(),
+        }];
         let plan = r#"{"background":"white","ground":"unspecified","plugins":["Nature.若葉","Garden.薔薇","Nature.若葉"],"layers":[
             {"shape":"circle","proportion":"unspecified","action":"place","count":1,
              "place":"center","size":"unspecified","color":"red","tool":"unspecified",

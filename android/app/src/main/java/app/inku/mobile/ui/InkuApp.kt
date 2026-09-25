@@ -537,6 +537,8 @@ fun InkuApp() {
         state.canvasSelectionOpen -> viewModel::closeTransientPanel
         state.tab == AppTab.Settings && state.settingsPane != SettingsPane.Home ->
             ({ viewModel.setSettingsPane(SettingsPane.Home) })
+        // Up one level from 推敲 is the lineage it was opened on, not 制作.
+        state.tab == AppTab.Lineage && state.refinementOpen -> viewModel::closeRefinement
         state.tab != AppTab.Compose -> ({ viewModel.setTab(AppTab.Compose) })
         // The compose screen is the root. Back leaves the app from here.
         else -> null
@@ -4548,7 +4550,8 @@ private fun ProviderConnectionCard(
                         Text(S.apiKey, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Row(horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM), verticalAlignment = Alignment.CenterVertically) {
                             Text(apiKeyState, style = MaterialTheme.typography.bodySmall)
-                            if (!keySet) Text(S.apiKeyLocalNote, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            // Only where a key is optional; a cloud service always needs one.
+                            if (!keySet && !requiresKey) Text(S.apiKeyLocalNote, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         }
                     }
                     SecondarySmallButton(

@@ -166,7 +166,6 @@ interface InkuStrings {
     val baseUrlChange: String
     val drawFromDdl: String
     val ddlOverwriteTitle: String
-    val ddlReplaySaveAsNew: String
     val ddlEdit: String
     val mascotSubtitle: String
     val mascotIncu: String
@@ -179,7 +178,6 @@ interface InkuStrings {
     val displaySafeMarginsSubtitle: String
     val displaySafeMarginsToggle: String
     val exportSubtitle: String
-    val historySelectionSubtitle: String
     val svgDisplayNote: String
     val mascotYuragi: String
     val exportHeightPx: String
@@ -275,8 +273,6 @@ interface InkuStrings {
     val demoRunAndSeed: String
     val sameStagePairBlocked: String
     val history: String
-    val historyValue: String
-    val historySelection: String
     val showThinking: String
     val openProviderSettings: String
     val providerKind: String
@@ -297,7 +293,6 @@ interface InkuStrings {
     val saijiki: String
     val svgGeneric: String
     val confirm: String
-    val keepCurrentValue: String
     val producedInstructions: String
     val producedInterpretation: String
     val working: String

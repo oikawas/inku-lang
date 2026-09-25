@@ -4349,19 +4349,6 @@ private fun MiscSettingsPanel(state: InkuUiState, viewModel: InkuViewModel, modi
                 ChipButton(S.mascotYuragi, selected = state.mascotKind == "yuragi", onClick = { viewModel.setMascotKind("yuragi") })
             }
         }
-        SettingsCard(S.historySelection, S.historySelectionSubtitle, S.saved) {
-            SettingChoiceRow(
-                title = S.canvas,
-                selected = state.historySelectionCanvas,
-                onSelect = viewModel::setHistorySelectionCanvas,
-            )
-            SettingChoiceRow(
-                title = S.colorCatalog,
-                selected = state.historySelectionCatalog,
-                onSelect = viewModel::setHistorySelectionCatalog,
-            )
-            SettingCheckRow(state.saveReplayAsNewVersion, S.ddlReplaySaveAsNew, viewModel::setSaveReplayAsNewVersion)
-        }
     }
 }
 
@@ -5072,26 +5059,6 @@ private fun SettingCheckRow(checked: Boolean, text: String, onCheckedChange: (Bo
     ) {
         Checkbox(checked = checked, onCheckedChange = onCheckedChange)
         Text(text, style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
-    }
-}
-
-@Composable
-private fun SettingChoiceRow(
-    title: String,
-    selected: HistorySelectionBehavior,
-    onSelect: (HistorySelectionBehavior) -> Unit,
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
-        CompactLabel(title)
-        Row(horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM), modifier = Modifier.fillMaxWidth()) {
-            if (selected == HistorySelectionBehavior.History) {
-                PrimarySmallButton(S.historyValue, onClick = { onSelect(HistorySelectionBehavior.History) }, modifier = Modifier.weight(1f))
-                SecondarySmallButton(S.keepCurrentValue, onClick = { onSelect(HistorySelectionBehavior.Current) }, modifier = Modifier.weight(1f))
-            } else {
-                SecondarySmallButton(S.historyValue, onClick = { onSelect(HistorySelectionBehavior.History) }, modifier = Modifier.weight(1f))
-                PrimarySmallButton(S.keepCurrentValue, onClick = { onSelect(HistorySelectionBehavior.Current) }, modifier = Modifier.weight(1f))
-            }
-        }
     }
 }
 

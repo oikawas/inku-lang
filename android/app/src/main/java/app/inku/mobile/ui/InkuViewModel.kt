@@ -15,6 +15,7 @@ import app.inku.mobile.ui.i18n.safeErrorMessage
 import app.inku.mobile.ui.i18n.stringsFor
 import app.inku.mobile.data.InkuRepository
 import app.inku.mobile.data.db.HistoryItemEntity
+import app.inku.mobile.data.db.drawnWild
 import app.inku.mobile.data.db.HistoryListItem
 import app.inku.mobile.data.db.ExportTemplateEntity
 import app.inku.mobile.data.db.ModelAssetEntity
@@ -113,6 +114,11 @@ private fun normalizeUiTextScale(scale: Float): Float =
 /** 「推敲要素の選択は前回値をブラウザに記憶する」-- here, the device remembers it. */
 const val SETTING_KEY_REFINEMENT_ELEMENT = "refinement_element"
 const val SETTING_KEY_DISPLAY_SAFE_MARGINS = "display_safe_margins"
+/**
+ * Wild (engine 12), one switch for every new drawing. web keeps it as
+ * `inku-wild` and states it on every fresh paint (`features/wild/render.ts`).
+ */
+const val SETTING_KEY_RENDER_WILD = "render_wild"
 /** Said by every generating entry point that refuses while candidates are drawn. */
 val REFINEMENT_IN_PROGRESS: (InkuStrings) -> String = { it.refinementInProgress }
 /** 「固定モードでは固定側を1モデル、比較側を最大4モデル選ぶ」(SPEC `:616`). */
@@ -212,9 +218,6 @@ data class InkuUiState(
     val historyStarredOnly: Boolean = false,
     val displaySafeMarginsEnabled: Boolean = false,
     val pngAlphaWhite: Boolean = false,
-    val saveReplayAsNewVersion: Boolean = true,
-    val historySelectionCanvas: HistorySelectionBehavior = HistorySelectionBehavior.Current,
-    val historySelectionCatalog: HistorySelectionBehavior = HistorySelectionBehavior.Current,
     val saijikiOpen: Boolean = false,
     // Whether the description is being written. The bottom bar reads it: while
     // the keyboard is up, the four destinations give their place to the one
@@ -398,11 +401,6 @@ enum class RenderTab {
     Artwork,
     Prompt,
     Json,
-}
-
-enum class HistorySelectionBehavior {
-    History,
-    Current,
 }
 
 /**
@@ -1132,6 +1130,7 @@ class InkuViewModel @JvmOverloads constructor(
                 uiLang = input.uiLanguageCode,
                 sketch = route.sketch,
                 inputProvenance = input.inputProvenance,
+                renderWild = route.renderWild,
             )
         }
     }
@@ -1234,6 +1233,7 @@ class InkuViewModel @JvmOverloads constructor(
         stage2ModelId = snapshot.selectedStage2ModelId,
         catalogId = snapshot.selectedCatalogId,
         sketchRequested = snapshot.sketchMode == SketchMode.On,
+        renderWild = snapshot.renderWild,
     )
 
     /** Checks the drawing models a camera run started from [snapshot] will call. */
@@ -1647,25 +1647,11 @@ class InkuViewModel @JvmOverloads constructor(
 
     fun setRenderWild(wild: Boolean) {
         localState.value = localState.value.copy(renderWild = wild)
+        persistSetting(SETTING_KEY_RENDER_WILD, JSONObject().put("enabled", wild).toString())
     }
 
     fun setSketchMode(mode: SketchMode) {
         localState.value = localState.value.copy(sketchMode = mode)
-    }
-
-    fun setSaveReplayAsNewVersion(enabled: Boolean) {
-        localState.value = localState.value.copy(saveReplayAsNewVersion = enabled)
-        persistSetting("save_replay_as_new_version", JSONObject().put("enabled", enabled).toString())
-    }
-
-    fun setHistorySelectionCanvas(value: HistorySelectionBehavior) {
-        localState.value = localState.value.copy(historySelectionCanvas = value)
-        persistSetting("history_selection_canvas", JSONObject().put("value", value.name.lowercase()).toString())
-    }
-
-    fun setHistorySelectionCatalog(value: HistorySelectionBehavior) {
-        localState.value = localState.value.copy(historySelectionCatalog = value)
-        persistSetting("history_selection_catalog", JSONObject().put("value", value.name.lowercase()).toString())
     }
 
     fun addExportTemplate() {
@@ -2272,6 +2258,7 @@ class InkuViewModel @JvmOverloads constructor(
                         sketch = sketchInput,
                         parentHistoryId = current.selectedHistory?.id?.takeUnless { current.lineageDetached },
                         inputProvenance = cameraProvenance,
+                        renderWild = current.renderWild,
                     )
                 }
             }.onSuccess { item ->
@@ -2325,6 +2312,9 @@ class InkuViewModel @JvmOverloads constructor(
                         parentHistoryId = parentHistoryId, executionId = matchingPipelineExecutionId(current),
                         // Imported definitions reach a new work only, never an edit of a saved one.
                         importedPlugins = if (parentHistoryId == null) current.importedPlugins else emptyList(),
+                        // A DDL drawn from a work keeps that work's Wild; a new one takes the
+                        // switch (web's `targetWild`, +page.svelte:2300).
+                        renderWild = current.selectedHistory?.takeUnless { current.lineageDetached }?.drawnWild ?: current.renderWild,
                     )
                 }
             }.onSuccess { item ->
@@ -2422,6 +2412,7 @@ class InkuViewModel @JvmOverloads constructor(
                             // The prose without the line number: the same split
                             // the server keeps between `input` and `source_text`.
                             sourceText = prompt,
+                            renderWild = current.renderWild,
                         )
                     }
                 }.onSuccess { item ->
@@ -2554,6 +2545,7 @@ class InkuViewModel @JvmOverloads constructor(
                                 // The prose without the demo marker, for the
                                 // same reason the batch line strips its number.
                                 sourceText = prompt,
+                                renderWild = cycle.renderWild,
                             )
                         }
                     }.onSuccess { item ->
@@ -3330,10 +3322,8 @@ class InkuViewModel @JvmOverloads constructor(
             ?.let { JSONObject(it).optBoolean("enabled", current.displaySafeMarginsEnabled) }
             ?: if (legacyPixel9Paper) true else current.displaySafeMarginsEnabled
         val pngAlpha = settings["png_alpha_white"]?.let { JSONObject(it).optBoolean("enabled", current.pngAlphaWhite) } ?: current.pngAlphaWhite
-        val replay = settings["save_replay_as_new_version"]?.let { JSONObject(it).optBoolean("enabled", current.saveReplayAsNewVersion) } ?: current.saveReplayAsNewVersion
-        val histCanvas = settings["history_selection_canvas"]?.let { parseHistorySelection(JSONObject(it).optString("value")) } ?: current.historySelectionCanvas
-        val histCatalog = settings["history_selection_catalog"]?.let { parseHistorySelection(JSONObject(it).optString("value")) } ?: current.historySelectionCatalog
         val cameraVisionModelId = CameraVisionModelSetting.decode(settings[CameraVisionModelSetting.KEY])
+        val renderWild = settings[SETTING_KEY_RENDER_WILD]?.let { JSONObject(it).optBoolean("enabled", current.renderWild) } ?: current.renderWild
         val uiMode = settings["ui_mode"]?.let { JSONObject(it).optString("value", current.uiMode) } ?: current.uiMode
         // A stored code that is not one of the two falls back to Japanese
         // rather than being rejected -- the same thing the server does with an
@@ -3363,10 +3353,8 @@ class InkuViewModel @JvmOverloads constructor(
             selectedCanvasAspect = CanvasAspects.newSelectionOrDefault(canvas),
             displaySafeMarginsEnabled = displaySafeMargins,
             pngAlphaWhite = pngAlpha,
-            saveReplayAsNewVersion = replay,
-            historySelectionCanvas = histCanvas,
-            historySelectionCatalog = histCatalog,
             cameraVisionModelId = cameraVisionModelId,
+            renderWild = renderWild,
             bundledPluginsEnabled = bundledPluginsEnabled,
             bundledPluginWordsJa = bundledPluginWords.first,
             bundledPluginWordsEn = bundledPluginWords.second,
@@ -3416,10 +3404,6 @@ class InkuViewModel @JvmOverloads constructor(
         return (0 until array.length()).mapNotNull { index ->
             array.optString(index).trim().takeIf { it.isNotBlank() }
         }.take(10)
-    }
-
-    private fun parseHistorySelection(value: String): HistorySelectionBehavior {
-        return if (value == "history") HistorySelectionBehavior.History else HistorySelectionBehavior.Current
     }
 
     /**

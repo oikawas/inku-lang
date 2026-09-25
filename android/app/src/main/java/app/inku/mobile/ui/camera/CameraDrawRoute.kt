@@ -16,6 +16,7 @@ internal data class CameraDrawSettings(
     val stage2ModelId: String,
     val catalogId: String,
     val sketchRequested: Boolean,
+    val renderWild: Boolean = false,
 )
 
 /** Immutable run values used while drawing one camera result. */
@@ -27,6 +28,7 @@ internal data class CameraDrawRoute(
     val stage2ModelId: String get() = settings.stage2ModelId
     val catalogId: String get() = settings.catalogId
     val sketch: SketchInput get() = SketchInput(requested = settings.sketchRequested)
+    val renderWild: Boolean get() = settings.renderWild
     val autoRepair: Boolean get() = true
 }
 

@@ -572,7 +572,7 @@ class InkuRepository(
         )
     }
 
-    suspend fun paint(description: String, catalogId: String, canvasAspect: String, stage1ModelId: String, stage2ModelId: String, autoRepair: Boolean = true, historyInput: String? = null, litertStage1PromptOptimization: Boolean = false, lineage: LineageDeclaration = LineageDeclaration(), historyVisibility: String? = null, seeds: PaintSeeds = PaintSeeds(), instructionLang: String? = null, uiLang: String? = null, sourceText: String? = null, sketch: SketchInput = SketchInput(), parentHistoryId: String? = null, inputProvenance: CameraInputProvenance? = null): HistoryItemEntity {
+    suspend fun paint(description: String, catalogId: String, canvasAspect: String, stage1ModelId: String, stage2ModelId: String, autoRepair: Boolean = true, historyInput: String? = null, litertStage1PromptOptimization: Boolean = false, lineage: LineageDeclaration = LineageDeclaration(), historyVisibility: String? = null, seeds: PaintSeeds = PaintSeeds(), instructionLang: String? = null, uiLang: String? = null, sourceText: String? = null, sketch: SketchInput = SketchInput(), parentHistoryId: String? = null, inputProvenance: CameraInputProvenance? = null, renderWild: Boolean? = null): HistoryItemEntity {
         val started = System.currentTimeMillis()
         val stage1Text = description
         val result = pipeline.paint(
@@ -596,12 +596,13 @@ class InkuRepository(
                 sketch = sketch,
                 parentHistoryId = parentHistoryId,
                 inputProvenance = inputProvenance,
+                renderWild = renderWild,
             ),
         )
         return saveResult(result, catalogId, canvasAspect, stage1ModelId, stage2ModelId, System.currentTimeMillis() - started, historyInput, lineage, historyVisibility, sourceText, inputProvenance)
     }
 
-    suspend fun interpret(description: String, catalogId: String, canvasAspect: String, stage1ModelId: String, stage2ModelId: String, autoRepair: Boolean = true, litertStage1PromptOptimization: Boolean = false, instructionLang: String? = null, uiLang: String? = null, sketch: SketchInput = SketchInput(), inputProvenance: CameraInputProvenance? = null): InterpretResult {
+    suspend fun interpret(description: String, catalogId: String, canvasAspect: String, stage1ModelId: String, stage2ModelId: String, autoRepair: Boolean = true, litertStage1PromptOptimization: Boolean = false, instructionLang: String? = null, uiLang: String? = null, sketch: SketchInput = SketchInput(), inputProvenance: CameraInputProvenance? = null, renderWild: Boolean? = null): InterpretResult {
         val stage1Text = description
         return pipeline.interpret(
             PaintRequest(
@@ -617,11 +618,12 @@ class InkuRepository(
                 uiLang = uiLang,
                 sketch = sketch,
                 inputProvenance = inputProvenance,
+                renderWild = renderWild,
             ),
         )
     }
 
-    suspend fun composeFromDdl(description: String, ddl: String, catalogId: String, canvasAspect: String, stage1ModelId: String, stage2ModelId: String, autoRepair: Boolean = true, litertStage1PromptOptimization: Boolean = false, lineage: LineageDeclaration = LineageDeclaration(), historyVisibility: String? = null, seeds: PaintSeeds = PaintSeeds(), instructionLang: String? = null, uiLang: String? = null, sourceText: String? = null, sketch: SketchInput = SketchInput(), inputProvenance: CameraInputProvenance? = null, onProgress: suspend (ComposeFromDdlProgress) -> Unit = {}, beforeSave: suspend () -> Unit = {}, parentHistoryId: String? = null, executionId: String? = null, originalPhoto: File? = null, importedPlugins: List<ImportedPluginDefinition> = emptyList()): HistoryItemEntity {
+    suspend fun composeFromDdl(description: String, ddl: String, catalogId: String, canvasAspect: String, stage1ModelId: String, stage2ModelId: String, autoRepair: Boolean = true, litertStage1PromptOptimization: Boolean = false, lineage: LineageDeclaration = LineageDeclaration(), historyVisibility: String? = null, seeds: PaintSeeds = PaintSeeds(), instructionLang: String? = null, uiLang: String? = null, sourceText: String? = null, sketch: SketchInput = SketchInput(), inputProvenance: CameraInputProvenance? = null, onProgress: suspend (ComposeFromDdlProgress) -> Unit = {}, beforeSave: suspend () -> Unit = {}, parentHistoryId: String? = null, executionId: String? = null, originalPhoto: File? = null, importedPlugins: List<ImportedPluginDefinition> = emptyList(), renderWild: Boolean? = null): HistoryItemEntity {
         val started = System.currentTimeMillis()
         val result = pipeline.composeFromDdl(
             ddl,
@@ -647,6 +649,7 @@ class InkuRepository(
                 executionId = executionId,
                 inputProvenance = inputProvenance,
                 importedPlugins = importedPlugins,
+                renderWild = renderWild,
             ),
             onProgress = onProgress,
         )
@@ -744,6 +747,7 @@ class InkuRepository(
             // being asked of the layer, and the state derives from the prose.
             sketch = SketchInput(text = parent.sketchText, grain = parent.sketchGrain),
             workColorSnapshot = refinementColorSnapshot(parent, plan),
+            renderWild = parent.renderWild,
             parentHistoryId = parent.historyId,
         )
         return when (plan.route) {

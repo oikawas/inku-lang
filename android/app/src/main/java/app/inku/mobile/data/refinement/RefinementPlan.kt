@@ -1,6 +1,7 @@
 package app.inku.mobile.data.refinement
 
 import app.inku.mobile.data.db.HistoryItemEntity
+import app.inku.mobile.data.db.drawnWild
 import app.inku.mobile.data.model.WorkColorSnapshot
 import app.inku.mobile.data.model.workColorSnapshot
 import app.inku.mobile.ui.i18n.InkuStrings
@@ -85,6 +86,8 @@ data class RefinementParent(
     val sketchText: String? = null,
     val sketchGrain: String? = null,
     val workColorSnapshot: WorkColorSnapshot? = null,
+    /** Wild as the parent was drawn; a candidate inherits it like web's `effectiveRefineWild`. */
+    val renderWild: Boolean = false,
 ) {
     companion object {
         /**
@@ -107,6 +110,7 @@ data class RefinementParent(
             sketchText = item.sketchText,
             sketchGrain = item.sketchGrain,
             workColorSnapshot = workColorSnapshot(item.renderMetadataJson),
+            renderWild = item.drawnWild,
         )
     }
 }

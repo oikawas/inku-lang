@@ -4,6 +4,7 @@ import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
+import org.json.JSONObject
 
 @Entity(
     tableName = "history_items",
@@ -117,3 +118,11 @@ data class HistoryItemEntity(
     @ColumnInfo(name = "sketch_state")
     val sketchState: String? = null,
 )
+
+/**
+ * Whether the work was drawn with Wild. Works saved through the shared core
+ * record it only in their render metadata (`render_wild`); the column is
+ * filled by older paths alone.
+ */
+val HistoryItemEntity.drawnWild: Boolean
+    get() = renderWild ?: runCatching { JSONObject(renderMetadataJson).optBoolean("render_wild", false) }.getOrDefault(false)

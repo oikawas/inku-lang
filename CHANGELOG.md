@@ -6,9 +6,9 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 36 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
-### 2026-09-25 — The bundled withered leaves draw curled leaves (DDL engine 48)
+### 2026-09-25 — The seven bundled leaf words follow their images (DDL engine 48)
 
-The bundled `Nature.枯葉` placed chalk cloudforms in the lower corners, which did not read as leaves. From 1.1.0 it places 2-4 curled leaves there, each a deep and a shallow arc touching at both ends, gray and yellow chalk in turn, with finely swaying edges, varied rotations, and interiors filled in their outline color. The bundled package is 1.1.0, the plugin document 0.4.0, and the preview is rebaked from the new expansion. A saved work's 1.0.1 lock still draws the former cloudforms. The same DDL now expands differently, so this is DDL engine 48; the DDL and Score formats and the render version are unchanged.
+The seven `Nature.leaves` words are redrawn to follow the image each word's note in the plugin document describes. Withered leaves placed cloudforms and did not read as leaves; they are now 2-4 curled leaves of a deep and a shallow arc in the lower corners, gray and yellow chalk in turn. Young leaves are smaller, point upward mostly upright, and each takes its own place. Undergrowth raises long slim iris-sword blades, nearly parallel and slightly spread. Summer leaves grow from the branch alternately above and below, slanting toward the tip and largest at the base. Maple leaves fan upward from the palm center with the middle lobe longest (5 or 7). Fallen leaves scatter widely to both sides of a diagonal drift and gather more densely toward the bottom. Withered grass raises tall blades leaning from upright to lying toward the right. Each word keeps its structure (two-arc leaves, roots, branch, palm center). The seven definitions and the bundled package are 1.1.0, the plugin document 0.4.0, and the previews are rebaked from the new expansions. Saved 1.0 locks keep their former drawings. The same DDL now expands differently, so this is DDL engine 48; the DDL and Score formats and the render version are unchanged.
 
 ### 2026-09-25 — Installed plugins return to the work plan, and DDL travels with its plugin definitions
 

@@ -10,8 +10,9 @@ use serde::Deserialize;
 use serde_json::Value;
 
 const ASSET: &str = include_str!("../assets/nature-leaves-v1.json");
-/// The cloudform edition of Nature.枯葉 that saved works may still lock.
-const KAREHA_1_0_1: &str = include_str!("fixtures/nature-kareha-1.0.1.json");
+/// The bundled package before draw-system04 (1.0.0 / 1.0.1 editions), which
+/// saved works may still lock.
+const PACKAGE_1_0: &str = include_str!("fixtures/nature-leaves-1.0-package.json");
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -38,12 +39,12 @@ fn bundled_nature_leaves_are_valid_bounded_definitions_that_reach_normal_score_l
     assert_eq!(ASSET.as_bytes().last(), Some(&b'\n'));
 
     let expected = [
-        ("Nature.若葉", "1.0.1", 12, 8..=12),
-        ("Nature.下草", "1.0.0", 20, 6..=20),
-        ("Nature.青葉", "1.0.0", 17, 13..=17),
-        ("Nature.紅葉", "1.0.0", 15, 11..=15),
-        ("Nature.落葉", "1.0.1", 24, 16..=24),
-        ("Nature.枯草", "1.0.1", 20, 6..=20),
+        ("Nature.若葉", "1.1.0", 12, 8..=12),
+        ("Nature.下草", "1.1.0", 20, 6..=20),
+        ("Nature.青葉", "1.1.0", 17, 13..=17),
+        ("Nature.紅葉", "1.1.0", 15, 11..=15),
+        ("Nature.落葉", "1.1.0", 24, 16..=24),
+        ("Nature.枯草", "1.1.0", 20, 6..=20),
         ("Nature.枯葉", "1.1.0", 8, 4..=8),
     ];
     assert_eq!(package.entries.len(), expected.len());
@@ -243,7 +244,7 @@ fn bundled_nature_leaves_are_valid_bounded_definitions_that_reach_normal_score_l
 
 #[test]
 fn saved_retired_fluctuation_definitions_keep_their_v1_locks_and_meaning() {
-    let package: Package = serde_json::from_str(ASSET).expect("Nature package must be JSON");
+    let package: Package = serde_json::from_str(PACKAGE_1_0).expect("1.0 package must be JSON");
     let mut wakaba = package.entries[0].definition.clone();
     wakaba["version"] = Value::String("1.0.0".to_owned());
     wakaba["components"]["leaf_form"]["body"][0]["fields"]["fluctuation_quality"]["id"] =
@@ -251,7 +252,7 @@ fn saved_retired_fluctuation_definitions_keep_their_v1_locks_and_meaning() {
     wakaba["components"]["leaf_form"]["body"][1]["fields"]["fluctuation_quality"]["id"] =
         Value::String("trembling".to_owned());
 
-    let mut kareha: Value = serde_json::from_str(KAREHA_1_0_1).unwrap();
+    let mut kareha = package.entries[6].definition.clone();
     kareha["version"] = Value::String("1.0.0".to_owned());
     kareha["body"][0]["body"][0]["body"][0]["body"][0]["body"][0]["fields"]["fluctuation_quality"]
         ["id"] = Value::String("trembling".to_owned());
@@ -370,7 +371,9 @@ fn saved_retired_fluctuation_definitions_keep_their_v1_locks_and_meaning() {
 
 #[test]
 fn a_saved_cloudform_kareha_keeps_its_lock_and_meaning() {
-    let definition = MacroDefinition::from_json(KAREHA_1_0_1).unwrap();
+    let package: Package = serde_json::from_str(PACKAGE_1_0).expect("1.0 package must be JSON");
+    let definition =
+        MacroDefinition::from_json(&package.entries[6].definition.to_string()).unwrap();
     let identity = definition.identity().unwrap();
     assert_eq!(identity.version(), "1.0.1");
     assert_eq!(
@@ -407,4 +410,55 @@ fn a_saved_cloudform_kareha_keeps_its_lock_and_meaning() {
             .iter()
             .all(|instruction| instruction.primitive == Primitive::Cloudform)
     );
+}
+
+#[test]
+fn every_saved_1_0_edition_keeps_its_lock_and_still_expands() {
+    let package: Package = serde_json::from_str(PACKAGE_1_0).expect("1.0 package must be JSON");
+    assert_eq!(package.version, "1.0.1");
+    let current: Package = serde_json::from_str(ASSET).expect("Nature package must be JSON");
+    for (old, new) in package.entries.iter().zip(&current.entries) {
+        let definition = MacroDefinition::from_json(&old.definition.to_string()).unwrap();
+        let identity = definition.identity().unwrap();
+        let replacement = MacroDefinition::from_json(&new.definition.to_string()).unwrap();
+        // Every word changed; a saved lock must never silently pick up the new edition.
+        assert_ne!(
+            identity.full_digest_hex(),
+            replacement.identity().unwrap().full_digest_hex(),
+            "{}",
+            identity.qualified_name()
+        );
+        let lock = MacroLock::new(
+            identity.qualified_name(),
+            identity.version(),
+            format!("sha256:{}", identity.full_digest_hex()),
+        )
+        .unwrap();
+        let execution = compile_ddl_to_score(
+            NormalizedDdlDocument::new(
+                identity.qualified_name(),
+                ResolvedInstructionLanguage::Ja,
+                vec![lock],
+            )
+            .unwrap(),
+            std::slice::from_ref(&definition),
+            Some(37),
+            MacroExpansionLimits {
+                max_invocations: 64,
+                max_depth: 16,
+                max_evaluation_steps: 8_192,
+                max_nodes_per_invocation: 128,
+                max_total_nodes: 128,
+            },
+            ScoreLoweringContext::resolve("square", Color::White).unwrap(),
+            None,
+            ScoreErrorPolicy::Stop,
+        );
+        assert_eq!(
+            execution.outcome(),
+            ScoreLoweringOutcome::Complete,
+            "{}",
+            identity.qualified_name()
+        );
+    }
 }

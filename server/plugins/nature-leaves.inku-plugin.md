@@ -97,7 +97,7 @@ preview: nature-leaves/momiji.png
 
 member 葉形: 弧を置き、前の弧に両端で触れる(膨らみは細く)
 anchor 掌の中心 を {領域: 中域} に置く。
-縦長の葉形を 5〜7枚、掌の中心から放射に並べる。
+縦長の葉形を 5枚か7枚、掌の中心から上へ扇形に並べる。中央ほど長く、左右ほど短い。
 ロットリングで、赤で。内側も線と同じ赤で塗る。
 掌の中心から 線を下へ引く。
 
@@ -105,7 +105,7 @@ anchor 掌の中心 を {領域: 中域} に置く。
 
 member blade: place an arc, then an arc touching the previous arc at both ends (bulge kept slim)
 anchor palm-center in {region: middle}.
-Arrange 5-7 tall blades radially from the palm-center.
+Arrange 5 or 7 tall blades in a fan over the upper side of the palm-center, the middle longest and the sides shorter.
 In rotring, in red. Fill the interiors with the same red.
 From the palm-center, draw a line downward.
 
@@ -125,7 +125,8 @@ member 葉形: 弧を置き、前の弧に両端で触れる
 葉形を 8〜12枚、{領域: 左上から右下への斜めの帯} に散らす。
 クレヨンで。赤と灰を枚ごとに交互に。各葉の内側を線と同じ色で塗る。
 回転は枚ごとにばらばら。端は滲む。
-注: 下ほど密に——密度勾配は将来の展開層構文の候補。
+流れの左右へ大きく散らす。
+注: 下ほど密に集まる。
 
 ### 展開 (en)
 
@@ -133,7 +134,8 @@ member leaf form: place an arc, then an arc touching the previous arc at both en
 Scatter 8-12 leaf forms in {region: diagonal band, upper-left to lower-right}.
 In crayon. Red and gray alternating per leaf. Fill each interior with its outline color.
 Rotated differently per leaf. Edges blurring.
-note: Denser toward the bottom — a density-gradient construct is a future candidate.
+Scatter them widely to both sides of the drift.
+note: Denser toward the bottom.
 
 ## 語: 枯草
 

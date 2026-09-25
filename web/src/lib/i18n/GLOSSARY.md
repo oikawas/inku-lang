@@ -110,7 +110,7 @@ tooltip の型: 一文目に「何が起きるか」、二文目に「何が保�
 | `image` | **Vision が実際に画像を見る**文脈、またはInfoの作者指定文で心にある像を指す用法 | `appInfoConceptBody` / `modelSelectionVisionHint` / `aiRefineVisionModeHint` / `aiRefineVisionReading` / `aiRefineVisionSourceError` |
 | `render*` | **サーバー側の技術設定・DB フィールド名・置換トークン** | `canvasSeedSummary`(`{render}`) / `settingsRenderConcurrency*`(5 件) / `historyReplayMissingSeed`(`render_seed`) / `replayComparisonTitle`(Renderer) |
 | `kotobagaki` | **例外なし**（v2.9.15 で語彙ダイアログの詞書の行が消え、英語表示に残る用例は 0 件） | — |
-| `Moderate` | **変奏の強度・中** | `variationMedium` / `variationTooltipLarge` |
+| `Moderate` | **変奏の強度・中** | `variationMedium` |
 
 **新しく例外を足すときは、`i18n-lint.mjs` の該当リストとこの表を同じ commit で更新する。**
 例外に足す前に、まず訳語を変えられないかを考えること。

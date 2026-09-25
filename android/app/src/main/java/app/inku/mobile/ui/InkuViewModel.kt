@@ -512,7 +512,14 @@ class InkuViewModel @JvmOverloads constructor(
                 // which decides whether the next save has a parent at all.
                 val current = localState.value
                 if (!restoredInitialHistory && !promptEditedByUser && current.selectedHistory == null && !current.isDrawing) {
-                    applyHistorySelection(full, current.tab)
+                    // Restored for display only, as it was before the shared
+                    // pipeline replaced this block with the pick below and the
+                    // detach went with it (12390c01): web puts nothing back on
+                    // opening (`displayedHistoryItem` starts null), so counting
+                    // this as a parent would make this client alone record an
+                    // edge for opening the app and drawing. Only an explicit
+                    // pick becomes a parent.
+                    applyHistorySelection(full, current.tab, asParent = false)
                 }
             }
         }
@@ -1803,7 +1810,7 @@ class InkuViewModel @JvmOverloads constructor(
      *   (+page.svelte:4225-4230) -- there it is the double click
      *   (`openLineageNodeInCanvas`, :4234) that moves to the canvas.
      */
-    private fun applyHistorySelection(item: HistoryItemEntity, tab: AppTab) {
+    private fun applyHistorySelection(item: HistoryItemEntity, tab: AppTab, asParent: Boolean = true) {
         if (localState.value.isDrawing) stopDrawing()
         discardStagedCameraPhoto()
         cameraRetryInput = null
@@ -1813,8 +1820,9 @@ class InkuViewModel @JvmOverloads constructor(
             current.copy(
                 descriptionForkRequested = false,
                 // An explicit pick is what makes a work the parent of the next save
-                // (web's `loadIterationItem`, +page.svelte:4600).
-                lineageDetached = false,
+                // (web's `loadIterationItem`, +page.svelte:4600); the startup
+                // restore shows a work without making it one.
+                lineageDetached = !asParent,
                 prompt = item.originalInput,
                 ddl = item.normalizedDdl,
                 ddlEditedAfterGeneration = false,

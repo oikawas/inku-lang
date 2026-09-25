@@ -6,6 +6,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 36 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### v2.15.31 — complete the v2.15.30 release after the Server lint fix (Build 1107, 2026-09-26)
+
+This release carries the product changes described under v2.15.30 below. A Server test fixture had one unused local binding, which made the public Server lint job fail. Removing that binding changes no product behavior or test assertion. The v2.15.30 tag remains a historical source snapshot; this version is the release candidate.
+
 ### v2.15.30 — shared authoring pipeline and current drawing tools (Build 1106, 2026-09-26)
 
 This release collects the dated changes below since v2.14.1. Server and Web use the shared Rust authoring pipeline; DDL Spec is 14, DDL engine is 48, and render engine is 68. It includes the current work-sharing and plugin tools and their documented API and CLI compatibility changes. The source also carries Android changes, but this release publishes only API and Web images, not an Android APK.

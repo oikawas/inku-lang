@@ -937,26 +937,33 @@ class InkuRepository(
     suspend fun backfillMissingThumbnails(limit: Int = 8) {
         database.historyDao().listMissingThumbnails(limit).forEach { item ->
             val thumbnail = createHistoryThumbnail(item.displaySvg, item.renderHash) ?: return@forEach
-            database.historyDao().updateThumbnail(
-                id = item.id,
-                path = thumbnail.path,
-                width = thumbnail.width,
-                height = thumbnail.height,
-                updatedAt = System.currentTimeMillis(),
-            )
+            attachThumbnail(item.id, thumbnail)
         }
     }
 
     private fun scheduleThumbnailGeneration(id: String, svgText: String, renderHash: String) {
         thumbnailScope.launch {
             val thumbnail = createHistoryThumbnail(svgText, renderHash) ?: return@launch
-            database.historyDao().updateThumbnail(
-                id = id,
-                path = thumbnail.path,
-                width = thumbnail.width,
-                height = thumbnail.height,
-                updatedAt = System.currentTimeMillis(),
-            )
+            attachThumbnail(id, thumbnail)
+        }
+    }
+
+    /**
+     * Points the row at its thumbnail. A work deleted while the thumbnail was
+     * being drawn (a headless run that keeps no history does exactly that)
+     * updates no row, and a file no row shows is removed rather than left.
+     */
+    private suspend fun attachThumbnail(id: String, thumbnail: ThumbnailInfo) {
+        val history = database.historyDao()
+        val updated = history.updateThumbnail(
+            id = id,
+            path = thumbnail.path,
+            width = thumbnail.width,
+            height = thumbnail.height,
+            updatedAt = System.currentTimeMillis(),
+        )
+        if (updated == 0 && history.countWithThumbnail(thumbnail.path) == 0) {
+            File(thumbnail.path).delete()
         }
     }
 
@@ -972,10 +979,39 @@ class InkuRepository(
         database.historyDao().setTrashed(id, false, System.currentTimeMillis())
     }
 
+    /**
+     * Deletes one work for good, as the server's `HistoryPermanentDeleteWriter`
+     * does: in the same transaction its lineage node becomes a tombstone and
+     * the edges touching it lose their metadata. The node keeps its place, so
+     * its children still count their generation from the root, and the planner
+     * refuses it as a parent. Deleting only the row left an `active` node
+     * pointing at nothing.
+     *
+     * The original photo goes with the work, and so does the thumbnail unless
+     * another row drawn to the same render hash still shows it.
+     */
     suspend fun deleteHistoryPermanently(id: String) {
-        database.historyDao().deletePermanently(id)
+        val thumbnail = database.withTransaction {
+            val history = database.historyDao()
+            val nodeId = history.lineageNodeIdOf(id)
+            val thumbnailPath = history.thumbnailPathOf(id)
+            if (nodeId != null) {
+                database.lineageDao().tombstoneNode(nodeId, System.currentTimeMillis())
+                database.lineageDao().clearEdgeMetadataTouching(nodeId)
+            }
+            history.deletePermanently(id)
+            thumbnailPath?.takeIf { history.countWithThumbnail(it) == 0 }
+        }
         originalPhotos.deleteSaved(id)
+        thumbnail?.let { path ->
+            File(path).takeIf { isAppThumbnail(it) }?.delete()
+        }
     }
+
+    private fun isAppThumbnail(file: File): Boolean = runCatching {
+        val root = File(context.filesDir, "thumbnails").canonicalFile
+        file.canonicalFile.path.startsWith(root.path + File.separator)
+    }.getOrDefault(false)
 
     private fun modelSpec(modelId: String): ModelDownloadSpec {
         return DefaultModelDownloads.all.firstOrNull { it.modelId == modelId }

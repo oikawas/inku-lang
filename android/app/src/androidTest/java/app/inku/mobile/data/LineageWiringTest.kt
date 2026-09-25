@@ -61,8 +61,11 @@ class LineageWiringTest {
     ) = repo.renderFromScore(
         description = description,
         scoreJson = score,
-        catalogId = "sumi",
-        canvasAspect = "1:1",
+        // Ids the shared canvas registry and the color catalogs still know:
+        // "1:1" and "sumi" stopped resolving and failed every test here before
+        // anything was saved.
+        catalogId = "default",
+        canvasAspect = "square",
         stage1ModelId = "test-stage1",
         stage2ModelId = "test-stage2",
         lineage = lineage,
@@ -199,5 +202,42 @@ class LineageWiringTest {
         assertEquals(0, countRows("history_items"))
         assertEquals(0, countRows("lineage_nodes"))
         assertEquals(0, countRows("lineage_edges"))
+    }
+
+    /**
+     * The server's permanent delete: the history row goes, its node stays as a
+     * tombstone in the same place, and the edges touching it lose their
+     * metadata. Deleting only the row left an active node pointing at nothing.
+     */
+    @Test
+    fun aPermanentDeleteLeavesATombstoneInTheLineage() = runBlocking<Unit> {
+        val parent = save("消す親")
+        val child = save(
+            "残る子",
+            lineage = LineageDeclaration(
+                parentNodeId = parent.lineageNodeId!!,
+                derivationKind = "touch_change",
+                derivationMetadata = mapOf("a" to 1),
+            ),
+        )
+
+        repository.deleteHistoryPermanently(parent.id)
+
+        assertNull(database.historyDao().getById(parent.id))
+        val node = database.lineageDao().getNodeById(parent.lineageNodeId!!)!!
+        assertEquals("tombstone", node.state)
+        assertNull(node.historyId)
+        assertNull(node.descriptionHash)
+        assertNull(node.renderHash)
+        assertNotNull(node.deletedAt)
+        val edge = database.lineageDao().getEdgeByChildId(child.lineageNodeId!!)!!
+        assertEquals(parent.lineageNodeId, edge.parentNodeId)
+        assertEquals("{}", edge.metadataJson)
+        // Nothing can descend from the deleted work any more.
+        assertThrows(IllegalArgumentException::class.java) {
+            runBlocking {
+                save("消えた親からの派生", lineage = LineageDeclaration(parentNodeId = parent.lineageNodeId!!, derivationKind = "touch_change"))
+            }
+        }
     }
 }

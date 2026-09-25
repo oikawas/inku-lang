@@ -5,12 +5,12 @@
 
 最終更新: 2026-09-25。
 
-**追随状況**: Android は `2.1.4-android.80` / **render engine `default / 67`** /
-**DDL engine version `20`** の世代にある。描画版は固定Kotlin定数ではなく、同梱する
-`core/crates/inku-render/` からJNI経由で取得し、DDL参照版は`ReferenceCorpus.kt`が名乗る。
-master の web/server も **render engine `67`** で、serverの **`ddl_engine_version` は21** であり、
-ServerとAndroidは同じRust描画実装を共有する。Stage 1.5 展開層も、2026-08-05 に添景水準の畳み込みへ追随した
-（末尾の 2026-08-05 の節を参照）。
+**追随状況**: Android は `2.1.4-android.80` の世代にある。DDLの変換とScore → SVGの描画は、
+同じcommitの共有Rust core（`core/crates/`）を同梱してServerと同じ実装で行い、Android独自の版定数を持たない。
+render engineの版は同梱した`core/crates/inku-render/`の`RENDER_ENGINE_VERSION`をJNI経由で名乗り、
+DDL SpecとDDL engineの版はServerの`server/src/inku_server/layer_versions.py`が名乗る。本書には版の数値を写さない（写すと古びる）。
+以前`ReferenceCorpus.kt`が名乗っていたDDL engine `20`は、撤去済みのKotlin Stage 1.5展開層のfixture版であり、現行の版ではない。
+実機の`NativeRenderDeviceTest`は、同梱ライブラリのSVG・版・renderer referenceを、build時に同じcommitのhost coreが`render-parity-expected`で生成した期待値と比べる。凍結corpusはScore入力とraster入力にだけ使い、render engineの版上げで期待値を作り直す必要はない。
 
 **共有Rust切替は完了した**: productionのScore → SVG / metadataは
 `AndroidRenderHost`から1回のJNI requestで`core/crates/inku-render/`を呼ぶ。保存済み／現行SVGの
@@ -44,7 +44,7 @@ Androidの固定色カタログ13件はServerと同じID、色map、paletteを�
 
 通常のなし／あり選択はAndroidの描画設定に置き、既定をなしとする。作品からの「写生なし／ありで描き直す」は選択作品の子を系譜へ保存し、派生種別には既存の`sketch_grain_change`を使う。metadataは`from_sketch_state`と`to_sketch_mode`を記録する。旧`fine`／`coarse`は保存済み作品の表示と再描画時の選択判定にのみ使い、新しい写生の入力や保存には使わない。
 
-この写生pipelineの描画結果は、Androidに同梱した`core/crates/inku-render/`を共有pipelineのJNI経由で実行して生成する。Androidが報告するrender engineは`default / 67`である。
+この写生pipelineの描画結果は、Androidに同梱した`core/crates/inku-render/`を共有pipelineのJNI経由で実行して生成する。render engineの版は同梱coreが名乗る。
 
 Gemini provider の生成要求は Gemini API の `models/{model}:generateContent` に送る。API key は `x-goog-api-key` で渡し、共有pipelineの構造化応答は native function declaration と `functionCall.args` を使う。モデル一覧の取得だけが成功しても、生成要求の到達確認とは扱わない。
 
@@ -196,7 +196,6 @@ Rust authoring pipelineとraster presentationを導入済みである。以下�
 未実装:
 
 - background continuation、notification progress、metered-network policy、low-storage recovery を含む production-polished model download UX。
-- 外部 provider execution。provider record は現時点では compatibility data structures として存在する。
 - import/export、plugin management、advanced settings、user-management equivalents、admin/server-only web features の full web feature parity。
 - Web-compatible JSON export からの import。
 

@@ -6,13 +6,17 @@ secrets must remain outside tracked files.
 
 Last updated: 2026-09-25.
 
-**Catch-up status**: Android sits at generation `2.1.4-android.80` with **render engine
-`default / 67`** and **DDL engine version `20`**. Render identity comes from the packaged
-`core/crates/inku-render/` library through JNI rather than a Kotlin compatibility literal;
-`ReferenceCorpus.kt` declares the DDL reference version. The server also uses render engine `67`
-and DDL engine `21`, so server and Android share one Rust drawing implementation while their DDL
-engine versions remain independently declared. The Stage 1.5 expander followed the staffage level being folded away on
-2026-08-05 (see the 2026-08-05 section at the end of this document).
+**Catch-up status**: Android sits at generation `2.1.4-android.80`. DDL conversion and Score → SVG
+rendering run in the shared Rust core (`core/crates/`) of the same commit, packaged with the app, so
+Android implements them exactly as the server does and declares no version constants of its own.
+The packaged `core/crates/inku-render/` reports its `RENDER_ENGINE_VERSION` through JNI, and the
+server's `server/src/inku_server/layer_versions.py` declares the DDL Spec and DDL engine versions.
+This document does not copy the numbers, which would go stale. The DDL engine `20` that `ReferenceCorpus.kt` used to name was the
+fixture version of the removed Kotlin Stage 1.5 expander, not a current version.
+On the device, `NativeRenderDeviceTest` compares the packaged library's SVG, version, and renderer
+reference with expectations that the host core of the same commit writes at build time
+(`render-parity-expected`). Frozen corpora supply only Score and raster inputs, so a render engine
+bump needs no new expectations.
 
 **The shared-Rust cutover is complete**: production Score-to-SVG/metadata calls
 `core/crates/inku-render/` through one JNI request owned by `AndroidRenderHost`. Preview,
@@ -54,7 +58,7 @@ For `on`, `generate_sketch` is an optional effect before Stage 1, using the Stag
 
 The ordinary Android drawing setting offers off/on and defaults to off. Redrawing a selected work with or without sketching saves a child in lineage, reuses the existing `sketch_grain_change` derivation kind, and records `from_sketch_state` and `to_sketch_mode` metadata. Legacy `fine` and `coarse` values are retained only to display saved works and determine their redraw choice; they are not used for new sketch inputs or records.
 
-This sketch pipeline's rendered output is produced by the packaged `core/crates/inku-render/` through the shared pipeline JNI. Android reports render engine `default / 67`.
+This sketch pipeline's rendered output is produced by the packaged `core/crates/inku-render/` through the shared pipeline JNI. The packaged core reports the render engine version.
 
 Gemini provider generation requests use the Gemini API `models/{model}:generateContent` endpoint. The API key is sent as `x-goog-api-key`, and structured responses for the shared pipeline use native function declarations and `functionCall.args`. A successful model-list fetch does not establish that generation requests work.
 
@@ -244,8 +248,6 @@ Implemented:
 Not implemented yet:
 - Production-polished model download UX, including background continuation,
   notification progress, metered-network policy, and low-storage recovery.
-- External provider execution. Provider records exist only as compatibility
-  data structures at this stage.
 - Full web feature parity for import/export, plugin management, advanced
   settings, user-management equivalents, and admin/server-only web features.
 - Import from web-compatible JSON exports.

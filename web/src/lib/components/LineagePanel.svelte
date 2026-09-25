@@ -58,6 +58,7 @@
 		onDownloadSavedWorkSVG?: (profile: SvgProfile, snapshot: SavedWorkExportSnapshot) => void | Promise<void>;
 		onDownloadSavedWorkPNG?: (height: number, snapshot: SavedWorkExportSnapshot) => void | Promise<void>;
 		onDownloadSavedWorkCard?: (historyId: string, snapshot: SavedWorkExportSnapshot) => void | Promise<void>;
+		onDownloadSavedWorkDdl?: (snapshot: SavedWorkExportSnapshot) => void | Promise<void>;
 		onDownloadSavedWorkAnimation: (snapshot: SavedWorkExportSnapshot, settings: AnimationExportSettings, directory?: FileSystemDirectoryHandle) => void | Promise<void>;
 		onDownloadSavedWorkContactSheet: (snapshot: SavedWorkExportSnapshot, variant: SheetVariant) => void | Promise<void>;
 		onValidateSavedWorkExport: (snapshot: SavedWorkExportSnapshot) => boolean | Promise<boolean>;
@@ -75,7 +76,7 @@
 	}
 
 	type ArrowPath = { id: string; path: string; tombstone: boolean };
-	let { graph, loading, error, isJapanese, onOpenNode, onOpenNodeInCanvas, onToggleStar, onToggleForRevision, onOpenRefinement, onDrawDescription, onOpenDdlEditor, onDrawSketchGrain, stageLabel, stage1ModelLabel, stage2ModelLabel, runTokensIn, runTokensOut, onSaveOkugakiModel, onPromoteNode, onSaveNote, onAskTrash, onDetach, onLoadOverview, onLoadBranch, onPaintOne, onVisionAdvice, onSaveVisionModel, visionModel, okugakiModel, visionProviderGroups, animationExportSettings, pngTemplates = [], onDownloadSavedWorkSVG, onDownloadSavedWorkPNG, onDownloadSavedWorkCard, onDownloadSavedWorkAnimation, onDownloadSavedWorkContactSheet, onValidateSavedWorkExport, browsingState }: Props = $props();
+	let { graph, loading, error, isJapanese, onOpenNode, onOpenNodeInCanvas, onToggleStar, onToggleForRevision, onOpenRefinement, onDrawDescription, onOpenDdlEditor, onDrawSketchGrain, stageLabel, stage1ModelLabel, stage2ModelLabel, runTokensIn, runTokensOut, onSaveOkugakiModel, onPromoteNode, onSaveNote, onAskTrash, onDetach, onLoadOverview, onLoadBranch, onPaintOne, onVisionAdvice, onSaveVisionModel, visionModel, okugakiModel, visionProviderGroups, animationExportSettings, pngTemplates = [], onDownloadSavedWorkSVG, onDownloadSavedWorkPNG, onDownloadSavedWorkCard, onDownloadSavedWorkDdl, onDownloadSavedWorkAnimation, onDownloadSavedWorkContactSheet, onValidateSavedWorkExport, browsingState }: Props = $props();
 
 	let lineageColumnsEl = $state<HTMLDivElement | null>(null);
 	let lineageScrollEl = $state<HTMLDivElement | null>(null);
@@ -688,6 +689,7 @@ $effect(() => {
 					onDownloadSVG={onDownloadSavedWorkSVG}
 					onDownloadPNG={onDownloadSavedWorkPNG}
 					onDownloadCard={onDownloadSavedWorkCard}
+					onDownloadDdl={onDownloadSavedWorkDdl}
 					onDownloadAnimation={onDownloadSavedWorkAnimation}
 					onDownloadContactSheet={onDownloadSavedWorkContactSheet}
 					onValidateSnapshot={onValidateSavedWorkExport}
@@ -703,6 +705,7 @@ $effect(() => {
 					onDownloadSVG={onDownloadSavedWorkSVG}
 					onDownloadPNG={onDownloadSavedWorkPNG}
 					onDownloadCard={onDownloadSavedWorkCard}
+					onDownloadDdl={onDownloadSavedWorkDdl}
 					onDownloadAnimation={onDownloadSavedWorkAnimation}
 					onDownloadContactSheet={onDownloadSavedWorkContactSheet}
 					onValidateSnapshot={onValidateSavedWorkExport}
@@ -718,6 +721,7 @@ $effect(() => {
 					onDownloadSVG={onDownloadSavedWorkSVG}
 					onDownloadPNG={onDownloadSavedWorkPNG}
 					onDownloadCard={onDownloadSavedWorkCard}
+					onDownloadDdl={onDownloadSavedWorkDdl}
 					onDownloadAnimation={onDownloadSavedWorkAnimation}
 					onDownloadContactSheet={onDownloadSavedWorkContactSheet}
 					onValidateSnapshot={onValidateSavedWorkExport}

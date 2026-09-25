@@ -829,6 +829,7 @@
 						onDownloadSavedWorkSVG={savedWorkExportActions.onDownloadSVG}
 						onDownloadSavedWorkPNG={savedWorkExportActions.onDownloadPNG}
 						onDownloadSavedWorkCard={savedWorkExportActions.onDownloadCard}
+						onDownloadSavedWorkDdl={savedWorkExportActions.onDownloadDdl}
 						onDownloadSavedWorkAnimation={savedWorkExportActions.onDownloadAnimation}
 						onDownloadSavedWorkContactSheet={savedWorkExportActions.onDownloadContactSheet}
 						onValidateSavedWorkExport={savedWorkExportActions.onValidateSnapshot} />

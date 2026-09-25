@@ -160,6 +160,14 @@ export function makeSavedWorkExportActions(deps: SavedWorkExportActionsDeps) {
 			const item = await oneSavedWork(snapshot);
 			await downloadCard(deps.apiFetch, item.id as string, exportSettings.card);
 		},
+		/** The visible DDL with the plugin definitions it names (inku.ddl-export.v1). */
+		onDownloadDdl: async (snapshot: SavedWorkExportSnapshot): Promise<void> => {
+			const item = await oneSavedWork(snapshot);
+			const response = await deps.apiFetch(`/api/pipeline/history/${encodeURIComponent(item.id as string)}/ddl-export`, { cache: 'no-store' });
+			if (!response.ok) throw await responseError(response);
+			const blob = new Blob([JSON.stringify(await response.json(), null, 2)], { type: 'application/json' });
+			await saveBlob(blob, savedWorkFilename(item, 'inku-ddl.json'), { enabled: downloadFolderSettings.enabled });
+		},
 		onDownloadAnimation: async (snapshot: SavedWorkExportSnapshot, settings: AnimationExportSettings, directory?: FileSystemDirectoryHandle): Promise<void> => {
 			const items = await resolveSnapshot(snapshot);
 			await downloadAnimation(deps.apiFetch, items.map((item) => item.id as string), settings, directory);

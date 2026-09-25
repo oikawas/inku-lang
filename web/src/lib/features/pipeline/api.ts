@@ -2,6 +2,7 @@ import type { CanvasAspectId } from '$lib/plugins/system/canvas-aspect';
 import type { PaintResult } from '$lib/features/run/current-work';
 import type { ApiFetch } from '$lib/transport/api-fetch';
 import type { PipelineDiagnostic, PipelineHistoryDiagnostics, PluginDiagnostic } from './diagnostics';
+import type { ImportedPlugin } from '../ddl-editor/ddl-import';
 
 export type PipelineAuthority = {
 	revision: string;
@@ -46,6 +47,7 @@ export type PipelineView = {
 };
 
 export type PipelineOptions = {
+	imported_plugins?: ImportedPlugin[];
 	sketch?: 'off' | 'on';
 	sketch_text?: string;
 	stage1_model?: string;

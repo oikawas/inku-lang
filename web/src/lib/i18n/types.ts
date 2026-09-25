@@ -202,6 +202,9 @@ export interface LangPack {
 	ddlEditSectionLabel: string;
 	ddlNewButton: string;
 	ddlEditButton: string;
+	ddlImportButton: string;
+	ddlImportedPlugins: (names: string[]) => string;
+	ddlImportInvalid: string;
 	ddlNewDialogTitle: string;
 	ddlNewDialogSubtitle: string;
 	ddlEditDialogSubtitle: string;
@@ -489,6 +492,7 @@ export interface LangPack {
 	savedWorkExportLayerAnimation: string;
 	savedWorkExportTransitionAnimation: string;
 	savedWorkExportContactSheet: string;
+	savedWorkExportDdl: string;
 	savedWorkExportAiContactSheet: string;
 	savedWorkExportUnavailable: string;
 	workActionRefine: string;

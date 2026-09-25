@@ -241,6 +241,7 @@ export function createWorkState(deps: WorkStateDeps) {
 			lineage_parent_node_id: options.lineageParentNodeId ?? undefined,
 			derivation_kind: options.derivationKind ?? undefined,
 			derivation_metadata: options.derivationMetadata,
+			...(options.importedPlugins?.length ? { imported_plugins: options.importedPlugins } : {}),
 			count_generation: options.countGeneration ?? true,
 		};
 	}

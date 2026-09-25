@@ -8,6 +8,7 @@
 	import { onMount, tick, untrack } from 'svelte';
 	import { pipelineDescription } from '$lib/description-labels';
 	import { highlightDDL } from '$lib/highlight';
+	import type { ImportedPlugin } from '$lib/features/ddl-editor/ddl-import';
 	import { pluginWarningsToShow } from '$lib/plugin-names';
 	import { limitNotesToShow } from '$lib/limitNotes';
 	import { hydrateSaijiki, hydrateSaijikiEn } from '$lib/saijiki';
@@ -1613,13 +1614,14 @@ async function drawLineageDdlEdit(node: LineageNode, editedDdl: string, signal?:
 }
 
 // Draw a standalone artwork authored directly in DDL (no instruction, no parent).
-async function drawNewDdl(rawDdl: string, signal?: AbortSignal): Promise<void> {
+async function drawNewDdl(rawDdl: string, signal?: AbortSignal, importedPlugins?: ImportedPlugin[]): Promise<void> {
 	const nextDdl = rawDdl.trim();
 	if (!nextDdl) return;
 	work.beginNewAuthoring();
 	await work.authorDdl(nextDdl, {
 		canvasAspectId: effectiveCanvasAspectId(),
 		displayLabel: 'DDL',
+		...(importedPlugins?.length ? { importedPlugins } : {}),
 	}, signal);
 }
 
@@ -1708,13 +1710,13 @@ async function selectDdlDialogDrawingModel(provider: Provider, model: string): P
 	await persistModelSelection();
 }
 
-async function handleDdlDialogDraw(nextDdl: string, signal?: AbortSignal): Promise<void> {
+async function handleDdlDialogDraw(nextDdl: string, signal?: AbortSignal, importedPlugins?: ImportedPlugin[]): Promise<void> {
 	if (ddlDialogDrawing) return;
 	ddlDialogDrawing = true;
 	ddlDialogError = null;
 	try {
 		if (ddlDialogMode === 'edit' && ddlDialogNode) await drawLineageDdlEdit(ddlDialogNode, nextDdl, signal);
-		else await drawNewDdl(nextDdl, signal);
+		else await drawNewDdl(nextDdl, signal, importedPlugins);
 		ddlDialogOpen = false;
 	} catch (cause) {
 		// Aborted by the dialog stop button: keep the dialog open, no error.
@@ -3276,6 +3278,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			onDownloadSavedWorkSVG={savedWorkExportActions.onDownloadSVG}
 			onDownloadSavedWorkPNG={savedWorkExportActions.onDownloadPNG}
 			onDownloadSavedWorkCard={savedWorkExportActions.onDownloadCard}
+			onDownloadSavedWorkDdl={savedWorkExportActions.onDownloadDdl}
 			onDownloadSavedWorkAnimation={savedWorkExportActions.onDownloadAnimation}
 			onDownloadSavedWorkContactSheet={savedWorkExportActions.onDownloadContactSheet}
 			onValidateSavedWorkExport={savedWorkExportActions.onValidateSnapshot}

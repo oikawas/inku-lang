@@ -21,6 +21,7 @@
 		onDownloadSVG?: (profile: SvgProfile, snapshot: SavedWorkExportSnapshot) => void | Promise<void>;
 		onDownloadPNG?: (height: number, snapshot: SavedWorkExportSnapshot) => void | Promise<void>;
 		onDownloadCard?: (historyId: string, snapshot: SavedWorkExportSnapshot) => void | Promise<void>;
+		onDownloadDdl?: (snapshot: SavedWorkExportSnapshot) => void | Promise<void>;
 		onDownloadAnimation: (snapshot: SavedWorkExportSnapshot, settings: AnimationExportSettings, directory?: FileSystemDirectoryHandle) => void | Promise<void>;
 		onDownloadContactSheet: (snapshot: SavedWorkExportSnapshot, variant: SheetVariant) => void | Promise<void>;
 		onValidateSnapshot: (snapshot: SavedWorkExportSnapshot) => boolean | Promise<boolean>;
@@ -34,6 +35,7 @@
 		onDownloadSVG,
 		onDownloadPNG,
 		onDownloadCard,
+		onDownloadDdl,
 		onDownloadAnimation,
 		onDownloadContactSheet,
 		onValidateSnapshot,
@@ -185,6 +187,11 @@
 				{#if onDownloadCard}
 					<div class="saved-work-export-group">
 						<button type="button" role="menuitem" disabled={busy} onclick={() => void run((target) => onDownloadCard?.(target.ids[0], target))}>{t().historyCardExport}</button>
+					</div>
+				{/if}
+				{#if onDownloadDdl}
+					<div class="saved-work-export-group">
+						<button type="button" role="menuitem" disabled={busy} onclick={() => void run((target) => onDownloadDdl?.(target))}>{t().savedWorkExportDdl}</button>
 					</div>
 				{/if}
 			{/if}

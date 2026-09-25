@@ -2150,119 +2150,114 @@
                 "body": [
                   {
                     "op": "vary",
-                    "binding": "leaf_x",
-                    "domain": "kareha_lower_corner_x",
+                    "binding": "leaf_y",
+                    "domain": "kareha_lower_y",
                     "choices": [
-                      {
-                        "expr": "exact_decimal",
-                        "value": "0.14"
-                      },
-                      {
-                        "expr": "exact_decimal",
-                        "value": "0.24"
-                      },
                       {
                         "expr": "exact_decimal",
                         "value": "0.76"
                       },
                       {
                         "expr": "exact_decimal",
-                        "value": "0.86"
+                        "value": "0.83"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.89"
                       }
                     ],
                     "range": null,
                     "body": [
                       {
                         "op": "vary",
-                        "binding": "leaf_y",
-                        "domain": "kareha_lower_y",
+                        "binding": "leaf_lean",
+                        "domain": "kareha_fallen_lean",
                         "choices": [
                           {
-                            "expr": "exact_decimal",
-                            "value": "0.76"
+                            "expr": "semantic_ref",
+                            "category": "angle",
+                            "id": "horizontal"
                           },
                           {
-                            "expr": "exact_decimal",
-                            "value": "0.83"
+                            "expr": "semantic_ref",
+                            "category": "angle",
+                            "id": "falling"
                           },
                           {
-                            "expr": "exact_decimal",
-                            "value": "0.89"
+                            "expr": "semantic_ref",
+                            "category": "angle",
+                            "id": "left_falling"
+                          },
+                          {
+                            "expr": "semantic_ref",
+                            "category": "angle",
+                            "id": "diagonal"
+                          },
+                          {
+                            "expr": "semantic_ref",
+                            "category": "angle",
+                            "id": "rotated"
                           }
                         ],
                         "range": null,
                         "body": [
                           {
-                            "op": "vary",
-                            "binding": "leaf_lean",
-                            "domain": "kareha_fallen_lean",
-                            "choices": [
-                              {
-                                "expr": "semantic_ref",
-                                "category": "angle",
-                                "id": "horizontal"
-                              },
-                              {
-                                "expr": "semantic_ref",
-                                "category": "angle",
-                                "id": "falling"
-                              },
-                              {
-                                "expr": "semantic_ref",
-                                "category": "angle",
-                                "id": "left_falling"
-                              },
-                              {
-                                "expr": "semantic_ref",
-                                "category": "angle",
-                                "id": "diagonal"
-                              },
-                              {
-                                "expr": "semantic_ref",
-                                "category": "angle",
-                                "id": "rotated"
-                              }
-                            ],
-                            "range": null,
-                            "body": [
-                              {
-                                "op": "use",
-                                "component": "withered_leaf",
-                                "arguments": {
-                                  "color": {
-                                    "expr": "cycle",
-                                    "index": {
-                                      "expr": "local",
-                                      "name": "leaf_index"
-                                    },
-                                    "items": [
-                                      {
-                                        "expr": "semantic_ref",
-                                        "category": "color",
-                                        "id": "gray"
-                                      },
-                                      {
-                                        "expr": "semantic_ref",
-                                        "category": "color",
-                                        "id": "yellow"
-                                      }
-                                    ]
+                            "op": "use",
+                            "component": "withered_leaf",
+                            "arguments": {
+                              "color": {
+                                "expr": "cycle",
+                                "index": {
+                                  "expr": "local",
+                                  "name": "leaf_index"
+                                },
+                                "items": [
+                                  {
+                                    "expr": "semantic_ref",
+                                    "category": "color",
+                                    "id": "gray"
                                   },
-                                  "lean": {
-                                    "expr": "local",
-                                    "name": "leaf_lean"
-                                  },
-                                  "x": {
-                                    "expr": "local",
-                                    "name": "leaf_x"
-                                  },
-                                  "y": {
-                                    "expr": "local",
-                                    "name": "leaf_y"
+                                  {
+                                    "expr": "semantic_ref",
+                                    "category": "color",
+                                    "id": "yellow"
                                   }
-                                }
+                                ]
+                              },
+                              "lean": {
+                                "expr": "local",
+                                "name": "leaf_lean"
+                              },
+                              "x": {
+                                "expr": "cycle",
+                                "index": {
+                                  "expr": "local",
+                                  "name": "leaf_index"
+                                },
+                                "items": [
+                                  {
+                                    "expr": "exact_decimal",
+                                    "value": "0.14"
+                                  },
+                                  {
+                                    "expr": "exact_decimal",
+                                    "value": "0.86"
+                                  },
+                                  {
+                                    "expr": "exact_decimal",
+                                    "value": "0.24"
+                                  },
+                                  {
+                                    "expr": "exact_decimal",
+                                    "value": "0.76"
+                                  }
+                                ]
+                              },
+                              "y": {
+                                "expr": "local",
+                                "name": "leaf_y"
                               }
-                            ]
+                            }
                           }
                         ]
                       }

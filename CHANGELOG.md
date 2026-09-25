@@ -6,9 +6,9 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 36 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
-### v2.15.31 — complete the v2.15.30 release after the Server lint fix (Build 1107, 2026-09-26)
+### v2.15.31 — complete the release checks and API image build (Build 1107, 2026-09-26)
 
-This release carries the product changes described under v2.15.30 below. A Server test fixture had one unused local binding, which made the public Server lint job fail. Removing that binding changes no product behavior or test assertion. The v2.15.30 tag remains a historical source snapshot; this version is the release candidate.
+This release carries the product changes described under v2.15.30 below. A Server test fixture had one unused local binding, which made the public Server lint job fail. Removing that binding changes no product behavior or test assertion. The API image build also called the Rust notice bundler with the builder image's older default `python`, which lacks `tomllib`. It now calls the available Python 3.12 interpreter. The v2.15.30 tag remains a historical source snapshot; this version is the release candidate.
 
 ### v2.15.30 — shared authoring pipeline and current drawing tools (Build 1106, 2026-09-26)
 

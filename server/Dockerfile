@@ -11,7 +11,7 @@ RUN maturin build \
     --locked \
     --compatibility manylinux2014 \
     --out /wheelhouse \
-    && python /build/build_rust_notices.py \
+    && python3.12 /build/build_rust_notices.py \
        /build/core/Cargo.lock /wheelhouse/RUST_THIRD_PARTY_NOTICES.txt
 
 FROM python:3.12-slim AS runtime

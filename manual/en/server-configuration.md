@@ -85,7 +85,9 @@ An administrator who forgets the password is not shut out for good. `inku-admin 
 
 When the artifact queue is full, DB history remains the priority and only artifact saving is skipped. Distinguish provider queue latency from insufficient server workers.
 
-`INKU_RENDER_CONCURRENCY` and `INKU_CLIENT_FANOUT_LIMIT` **seed the first value only**. After that the DB settings are canonical; change them from `Other (server)`, which appears after switching Settings to `Detailed`, or with `inku-cli config update`. Requests beyond the server limit are refused with 503 rather than queued, and the client retries at a short interval.
+`INKU_RENDER_CONCURRENCY` and `INKU_CLIENT_FANOUT_LIMIT` **seed the first value only**. After that the DB settings are canonical; change them from `Other (server)`, which appears after switching Settings to `Detailed`, or with `inku-cli config update`. Requests beyond the server limit are refused with 503 rather than queued, and the client retries at a short interval. One account renders one picture at a time: a second render waits up to 30 seconds for the first to finish, then gets the same 503.
+
+The distributed Compose files put a memory ceiling on the `api` container (`INKU_API_MEM_LIMIT`, `4g` by default). One render of an extreme shape can take gigabytes, so raise this ceiling when you raise the render concurrency. Past it, only the `api` container stops, and `restart: unless-stopped` brings it back.
 
 ### 2.4 LLM Retry and Timeout
 
@@ -193,7 +195,11 @@ Lineage connects only explicit creation operations. It is never inferred from si
 | `leaders` | User administration within assigned scope |
 | `users` | Generation and management of own history and settings |
 
-An administrator uses `User management` in Settings to create users and change membership, permission groups, and another person's password. Choose the account, fill in `New password` in `Edit user`, and save (**the current password is not asked for**). The current Web UI shows `User management` only to `admins`. A `leaders` member manages ordinary users in their own organisation group through the CLI or API. A person changing their own password does it from `Profile`, where both the current and the new one are required. **None of this is open to a lone administrator who has forgotten theirs** -- the way back is `inku-admin reset-password` in 2.2.
+An administrator uses `User management` in Settings to create users and change membership, permission groups, and another person's password. Choose the account, fill in `New password` in `Edit user`, and save (**the current password is not asked for**). `User management` is shown to `admins` and to `leaders`. A `leaders` member sees only the ordinary users of their own organisation group, and creates, edits, deletes, and sets passwords for them (choosing permission groups or organisation groups, and managing organisation groups, stay with `admins`). A person changing their own password does it from `Profile`, where both the current and the new one are required. **None of this is open to a lone administrator who has forgotten theirs** -- the way back is `inku-admin reset-password` in 2.2.
+
+Setting a password again ends the account's other sessions: a reset by an administrator or by `inku-admin reset-password` ends all of them, and a person's own change ends all but the one that made it.
+
+**The last member of `admins` can be neither removed from the group nor deleted** (409); make someone else an administrator first. Turning local sign-in off (`inku-cli config update --local-auth false`) is refused with 409 as well: the Google switch exists, but nothing signs anyone in through it, so local sign-in is the only way in.
 
 One member may hold several permission groups; where they overlap the stronger one decides (a member holding `admins` and `leaders` passes as `admins`). A user group — the organisational unit — is a separate thing: one per member, and independent of permission.
 
@@ -220,7 +226,7 @@ Open `Settings` from the application rail. The top `Standard` / `Detailed` switc
 | `Display and operation` | Text size, caption position, UI mode, and fields below history thumbnails | Text size, UI mode, and related choices belong to the member. Text size takes effect immediately. |
 | `Making` | Batch retry count and `Demo` | The batch retry count belongs to the member. `Demo` is in the Making category. |
 | `Export` | Save location, PNG templates, animation, and cards | The save location belongs only to the browser that chose it. PNG templates apply to that member's PNG menu. |
-| `Connections and administration` | `Models`, `User management`, `DB settings`, `Log retention`, and, in Detailed mode, `Other (server)` and `Limits` | The current Web UI administration items are available only to `admins`. |
+| `Connections and administration` | `Models`, `User management`, `DB settings`, `Log retention`, and, in Detailed mode, `Other (server)` and `Limits` | `User management` is available to `admins` and to `leaders` (for the ordinary users of their own organisation group); the other items to `admins` only. |
 
 `Model selection` is a separate drawing-time screen for choosing the Stage 1 / Stage 2 models (and Vision when available). In contrast, the administrator's `Models` screen manages connection services, Base URLs, API keys encrypted for storage, models visible to members, and LLM / Vision purpose. Adding or changing a connection does not by itself make its models visible to members.
 
@@ -229,6 +235,8 @@ To change the published models as an administrator:
 1. Choose a connection service in `Models`, then open `Select models` in its published-model section.
 2. Find models with search and filters, and check those to publish. The bulk selection action applies only to the currently filtered results.
 3. Use `Save` to apply the selection, or `Cancel` to close without saving it. Fetching the model list is unavailable while there are unsaved changes; save or discard them first.
+
+A model left unpublished, or one the connection service does not list, is not called when a member outside `admins` names it through the API or the CLI; the request is refused with 403 (`model_not_offered` for drawing). Models are called with the server's API keys, so what you publish is also what members may spend. Models of a connection service that developer mode hides (the built-in Stage defaults among them) stay callable unless you unpublish them. `admins` may call any configured model, to try one before publishing it.
 
 | Stage | Role |
 |---|---|
@@ -389,10 +397,29 @@ A 401 response for the wrong password confirms the path from Web to API. Monitor
 | A work appears but artifacts do not | Queue skip, output permissions, and worker count |
 | Provider key cannot decrypt | Confirm the same recovery-point `INKU_SECRET_KEY_FILE` |
 | DB fails after startup | Migration logs, DB backup, and concurrent mixed backend versions |
-| Painting is refused with 503 | The server concurrency setting. The DB setting is canonical, not the environment variable |
+| Painting is refused with 503 | The server concurrency setting. The DB setting is canonical, not the environment variable. Whether one account's render has run past 30 seconds |
+| No administrator can sign in | A forgotten password: `inku-admin reset-password` in 2.2. Local sign-in turned off: 13.1 |
 | A stated count comes out smaller | `literal_count_threshold` and `represented_count_*` under the limits |
 | The sketch layer seems not to run | The work's `sketch_state`. `fallback` points at the Stage 0.5 timeout and the provider |
 | Plugin words are not expanded | Rejection reasons from `plugin list`, `INKU_DOCUMENT_PLUGIN_DIR`, and `plugin reload` |
+
+### 13.1 Turning Local Sign-in Back On
+
+This version refuses to turn local sign-in off, but a setting made by an earlier version, or `INKU_AUTH_LOCAL_ENABLED=false` in the environment, keeps sign-in answering 403, and `inku-admin reset-password` does not change that. Turn it back on as follows. Single-user mode acts as the oldest administrator, so at least one administrator must exist.
+
+1. Remove `INKU_AUTH_LOCAL_ENABLED=false` if you set it.
+2. Restart the API with `INKU_SINGLE_USER=1` (with Compose, put it in `.env` and run `docker compose up -d`).
+3. Send the request that turns local sign-in back on straight to the API port.
+
+   ```sh
+   inku-cli config --base-url http://127.0.0.1:8101 update --local-auth true
+   # without the CLI
+   curl -X PUT http://127.0.0.1:8101/api/auth/config \
+     -H 'Content-Type: application/json' \
+     -d '{"google_enabled": false, "local_enabled": true}'
+   ```
+
+4. Put `INKU_SINGLE_USER` back, restart, and confirm that you can sign in.
 
 ## 14. Security Baseline
 
@@ -403,3 +430,4 @@ A 401 response for the wrong password confirms the path from Web to API. Monitor
 - Do not grant the service user unnecessary shell, sudo, or access to other users' data.
 - Apply access control to backups and logs because they may contain descriptions and metadata.
 - Prepare recovery procedures before user deletion, permanent history deletion, or key rotation.
+- In single-user mode (`INKU_SINGLE_USER=1`, the default of the source-build `compose.yaml`), every request that reaches the API port is treated as the administrator. Do not publish it to a LAN or beyond (bind the port to loopback, as in `127.0.0.1:8101:8100`), or turn single-user mode off and sign in when several people use the server. A change request that a page on another site makes the browser send is refused on the browser's `Sec-Fetch-Site`.

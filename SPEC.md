@@ -1487,6 +1487,17 @@ selects a model per stage**: users and administrators set a model for Stage 1,
 Stage 2 and Vision separately (the model settings and model comparison of
 §8.4, and the llm / vision catalogs of `/api/models`).
 
+**The models the server calls with its own credentials are the ones the
+administrators offer (2026-09-26).**  For members outside `admins`, drawing, the
+demo instruction, colophons and Vision refinement advice call only a model that
+an active provider lists for that purpose and that the administrators have not
+switched off; a request naming any other is refused with 403 (`model_not_offered`
+for drawing).  Switching a model off used to hide it from the lists only, and a
+request that named it still reached the provider on the server's key.  Developer
+mode is not consulted: it changes what is shown, and the built-in Stage
+defaults sit with a provider that only developer mode shows.  `admins` may call
+any configured model, to try one before offering it.
+
 Stage 1 produces visible DDL from a description. Stage 2 produces only visible patch candidates for known holes reported by the compiler. Select each model for its bounded input and required result. The deterministic shared Rust lowerer structures Score; this is not delegated to an LLM.
 
 ### 12.6 The Design of Stage 1 (Interpretation)
@@ -3454,7 +3465,11 @@ The server stores these values in `app_settings.output_save_settings` as
 `INKU_OUTPUT_PNG_SIZE` provide initial values; if unset, the defaults are
 `~/.local/share/inku/outputs` and 2160px.  The API endpoint
 `PUT /api/settings/output-save` is admin-only, accepts only absolute output
-paths, and restricts PNG size to 1080 or 2160.
+paths, and restricts PNG size to 1080 or 2160.  `POST
+/api/history/rebuild-output-files`, which writes a work's files again from the
+DB, is refused with 409 while automatic saving is off and takes at most 50 works
+per request (2026-09-26) — the files, PNG included, are made inside the request,
+and the 1,000 it used to allow held a worker for minutes.
 
 Disabling automatic artifact saving does not disable DB history saving.  The
 history DB remains the source of truth, and only derived files such as SVG,
@@ -3595,11 +3610,41 @@ The app rail user menu opens a profile dialog for the signed-in user.  The
 dialog can update the user's email address and password through
 `PATCH /api/auth/me/profile`.  Password changes require the current password,
 and the endpoint is separate from admin user-management APIs.
+**Setting a password again ends the account's other sessions (2026-09-26).**  A
+reset by an administrator or by `inku-admin reset-password` ends every session;
+the account's own change ends every session but the one that made it — a reset
+is how someone who learned the old password is locked out, and a session they
+made with it would outlive it.
 
-Settings visibility follows the permission groups.  DB settings and user management
-are visible only to members of the `admins` group.  The plugins tab is visible to all
+Settings visibility follows the permission groups.  DB settings are visible only to
+members of the `admins` group.  **User management is visible to `admins` and to
+`leaders`, who see only the ordinary users of their own organisation group**
+(author's decision, 2026-09-26; the API and the CLI already gave `leaders` that
+scope).  A leader's page shows no choice of permission group or organisation
+group and no management of organisation groups — the server allows each of
+those to `admins` alone.  The plugins tab is visible to all
 signed-in users, but plugin setting changes and plugin-storage update APIs are
 restricted to `admins`.
+
+**The server keeps an administrator and a way in (2026-09-26).**  A change that
+would take `admins` from its last member, and deleting that member, are refused
+with 409 — once it happened, nothing inside the product could undo it: the
+settings that grant `admins` are `admins`-only, `inku-admin` only resets
+passwords, and single-user mode does not engage on a database without an
+administrator.  For the same reason a request to turn local sign-in off
+(`local_enabled: false` on `PUT /api/auth/config`) is refused with 409: the
+Google switch is stored, but nothing signs anyone in through it, so local
+sign-in is the only way in.
+
+**A change the browser marks as sent by another site is refused (2026-09-26).**
+A `POST`, `PUT`, `PATCH` or `DELETE` carrying `Sec-Fetch-Site: cross-site` whose
+`Origin` the CORS policy does not admit (`INKU_CORS_ORIGINS` and localhost) gets
+403.  Single-user mode answers every request without credentials as the owner,
+an administrator, so a page on another site could have the owner's browser send
+a `POST` with no body — a backup, a thumbnail rebuild, a plugin reload — and have
+it done as an administrator without a CORS preflight.  The CLI and the Android
+app send no such header, and the Web's proxy forwards `same-origin`, so they are
+not affected.
 
 The Server's canonical persistence uses SQLite through SQLAlchemy only.
 `INKU_DB_URL` and the derived thumbnail-store setting accept SQLite URLs only;
@@ -3687,6 +3732,13 @@ to the provider once; the core decides whether and when to retry within the
 finite budget of §12.8. The effects one run may advance are bounded as well (32
 by default), so no backlog grows without limit. The installation's pipeline
 manifest holds these limits.
+
+**One render at a time per account (2026-09-26).**  Apart from the server's
+render slots (2 by default; a full server answers 503 at once), a second render
+from the same account waits up to 30 seconds for the first to finish and then
+gets the same 503.  One render of an extreme shape takes gigabytes, so an account
+holding every slot stopped everyone else's drawing too.  It waits rather than
+being refused because the Web asks for four candidates at once.
 
 Per-user drawing counters are updated with a single database-side atomic
 increment so simultaneous `/api/paint` requests for the same user do not lose

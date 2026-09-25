@@ -6,6 +6,21 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 36 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-26 — Source review decisions: keeping an administrator and a way in, enforcing published models, leaders' user management, and render memory
+
+The items the same review left to the author are fixed as decided.
+
+- **The last administrator can be neither removed from `admins` nor deleted.** Once it happened, the settings that grant `admins` were themselves `admins`-only and `inku-admin` only resets passwords, so only editing the database brought it back. Both are refused with 409.
+- **A request to turn local sign-in off is refused.** The Google switch has no sign-in behind it, so turning local sign-in off locked everyone out. The manual now says how to turn it back on from single-user mode after an earlier version turned it off.
+- **Setting a password again ends the account's other sessions.** A reset by an administrator or by `inku-admin reset-password` ends all of them; a person's own change ends all but the one that made it. Sessions made with the old password used to outlive a reset.
+- **A change request that a page on another site makes the browser send is refused.** Single-user mode answers every request without credentials as the administrator, so another site could have the browser send a `POST` with no body (a backup, a thumbnail rebuild, a plugin reload). A change request with `Sec-Fetch-Site: cross-site` from an origin the CORS policy does not admit now gets 403. The CLI, the Android app, and the Web's proxy are unaffected. The manual says not to publish the API port to a LAN in single-user mode.
+- **Members outside the administrators use only published models.** A model an administrator unpublished, or one no list offers, was still called on the server's API key when a request named it through the API or the CLI. Drawing, the demo instruction, colophons, and refinement advice now refuse it with 403. Developer mode, which hides the connection service that holds the built-in defaults, is not consulted.
+- **Web: leaders get user management.** The API and the CLI let a leader manage the ordinary users of their own organisation group while the page kept the tab for administrators. A leader's page shows no choice of permission group or organisation group and no management of organisation groups.
+- **One account renders one picture at a time.** A second render waits up to 30 seconds for the first. One render of an extreme shape takes gigabytes, and an account holding every render slot stopped everyone else's drawing. The distributed Compose files cap the `api` container's memory (`INKU_API_MEM_LIMIT`, `4g` by default).
+- Writing a work's files again (`POST /api/history/rebuild-output-files`) is refused while automatic saving is off and takes at most 50 works at a time. The files, PNG included, are made inside the request, and the 1,000 it allowed held a worker for minutes.
+
+The route count (107) is unchanged. DDL, Score, and render versions are unchanged.
+
 ### 2026-09-26 — Source review: safer deletions and permissions, provider keys, and Web stops, notices, and confirmations
 
 A review of the server and Web source fixed the following defects.

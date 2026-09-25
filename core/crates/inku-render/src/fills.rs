@@ -207,7 +207,7 @@ pub(crate) fn solid_mottle_filter(filter_id: &str, seed: u32) -> Element {
             .attr("type", "fractalNoise")
             .attr("baseFrequency", "0.035000")
             .attr("numOctaves", "3")
-            .attr("seed", seed)
+            .attr("seed", seed.to_string())
             .attr("result", "solidMottleNoise"),
     );
     filter.push(

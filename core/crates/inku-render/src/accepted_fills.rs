@@ -326,7 +326,7 @@ fn grain_filter(instruction: &Instruction, context: MarkContext<'_>) -> Element 
                     ),
                 )
                 .attr("numOctaves", "2")
-                .attr("seed", seed(field_seed, context))
+                .attr("seed", seed(field_seed, context).to_string())
                 .attr("result", result),
         );
     }
@@ -558,7 +558,7 @@ fn engraving(instruction: &Instruction, context: MarkContext<'_>) -> Vec<Element
                 .attr("type", "turbulence")
                 .attr("baseFrequency", "0.55 0.19")
                 .attr("numOctaves", "2")
-                .attr("seed", seed(73, context))
+                .attr("seed", seed(73, context).to_string())
                 .attr("result", "fibers"),
         );
         burr.push(

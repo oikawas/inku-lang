@@ -49,7 +49,7 @@ fn filter(
             .attr("type", "fractalNoise")
             .attr("baseFrequency", format_number(0.026 / scale.max(1.0e-9)))
             .attr("numOctaves", "2")
-            .attr("seed", seed)
+            .attr("seed", seed.to_string())
             .attr("stitchTiles", "stitch")
             .attr("result", "inkSpreadNoise"),
     );

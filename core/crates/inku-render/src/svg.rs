@@ -1,6 +1,8 @@
 //! Small SVG-specific document tree serialized exactly once at the render boundary.
 
-use crate::types::CanvasSize;
+use std::fmt::Write as _;
+
+use crate::types::{CanvasSize, Point};
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Node {
@@ -56,14 +58,16 @@ impl Element {
     }
 
     #[must_use]
-    pub fn attr(mut self, name: impl Into<String>, value: impl ToString) -> Self {
+    pub fn attr(mut self, name: impl Into<String>, value: impl Into<String>) -> Self {
         self.set_attr(name, value);
         self
     }
 
-    pub fn set_attr(&mut self, name: impl Into<String>, value: impl ToString) {
+    /// Set or replace one attribute. An owned value is moved, not copied,
+    /// which matters for path data of tens of kilobytes.
+    pub fn set_attr(&mut self, name: impl Into<String>, value: impl Into<String>) {
         let name = name.into();
-        let value = value.to_string();
+        let value = value.into();
         if let Some((_, current)) = self
             .attributes
             .iter_mut()
@@ -161,15 +165,76 @@ impl Document {
 
 #[must_use]
 pub fn format_number(value: f64) -> String {
-    let rounded = if value == -0.0 { 0.0 } else { value };
-    let mut formatted = format!("{rounded:.6}");
-    while formatted.contains('.') && formatted.ends_with('0') {
-        formatted.pop();
-    }
-    if formatted.ends_with('.') {
-        formatted.pop();
-    }
+    let mut formatted = String::new();
+    write_number(&mut formatted, value);
     formatted
+}
+
+/// Append the text of [`format_number`] to `output`.
+///
+/// Six decimals, then trailing zeros and a bare point removed. Path data
+/// writes thousands of numbers, so they go straight into one buffer.
+pub(crate) fn write_number(output: &mut String, value: f64) {
+    let start = output.len();
+    let rounded = if value == -0.0 { 0.0 } else { value };
+    write!(output, "{rounded:.6}").expect("writing to a String cannot fail");
+    // Non-finite values print without a point and are kept as they are; the
+    // render boundary refuses them afterwards.
+    if output[start..].contains('.') {
+        let trimmed = output.trim_end_matches('0').len();
+        output.truncate(trimmed);
+        if output.ends_with('.') {
+            output.pop();
+        }
+    }
+}
+
+fn write_point(output: &mut String, point: Point, separator: char) {
+    write_number(output, point.x);
+    output.push(separator);
+    write_number(output, point.y);
+}
+
+/// `M x y L x y ... Z`, or an empty string for no points.
+#[must_use]
+pub(crate) fn closed_polyline_path(points: &[Point]) -> String {
+    if points.is_empty() {
+        return String::new();
+    }
+    let mut path = String::with_capacity(points.len() * 24 + 4);
+    path.push_str("M ");
+    for (index, point) in points.iter().enumerate() {
+        if index > 0 {
+            path.push_str(" L ");
+        }
+        write_point(&mut path, *point, ' ');
+    }
+    path.push_str(" Z");
+    path
+}
+
+/// `M x y L x y ...`, or an empty string for no points.
+#[must_use]
+pub(crate) fn open_polyline_path(points: &[Point]) -> String {
+    let mut path = String::with_capacity(points.len() * 24);
+    for (index, point) in points.iter().enumerate() {
+        path.push_str(if index == 0 { "M " } else { " L " });
+        write_point(&mut path, *point, ' ');
+    }
+    path
+}
+
+/// `x,y x,y ...` for a `points` attribute.
+#[must_use]
+pub(crate) fn points_list(points: &[Point]) -> String {
+    let mut list = String::with_capacity(points.len() * 22);
+    for (index, point) in points.iter().enumerate() {
+        if index > 0 {
+            list.push(' ');
+        }
+        write_point(&mut list, *point, ',');
+    }
+    list
 }
 
 fn escape_attribute(value: &str, output: &mut String) {

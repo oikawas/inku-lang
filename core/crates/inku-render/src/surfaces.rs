@@ -109,22 +109,7 @@ fn salted_seed(seed: Seed, label: &str, index: i64) -> Seed {
 }
 
 fn closed_path(points: &[Point]) -> String {
-    let Some(first) = points.first() else {
-        return String::new();
-    };
-    let mut commands = vec![format!(
-        "M {} {}",
-        format_number(first.x),
-        format_number(first.y)
-    )];
-    commands.extend(
-        points
-            .iter()
-            .skip(1)
-            .map(|point| format!("L {} {}", format_number(point.x), format_number(point.y))),
-    );
-    commands.push("Z".to_owned());
-    commands.join(" ")
+    crate::svg::closed_polyline_path(points)
 }
 
 fn surface_color(instruction: &Instruction, context: MarkContext<'_>) -> String {
@@ -562,20 +547,7 @@ fn render_vectors(
                 } else {
                     group.push(
                         Element::new("polygon")
-                            .attr(
-                                "points",
-                                pushed
-                                    .iter()
-                                    .map(|point| {
-                                        format!(
-                                            "{},{}",
-                                            format_number(point.x),
-                                            format_number(point.y)
-                                        )
-                                    })
-                                    .collect::<Vec<_>>()
-                                    .join(" "),
-                            )
+                            .attr("points", crate::svg::points_list(&pushed))
                             .attr("fill", "none")
                             .attr("stroke", &color)
                             .attr("stroke-width", format_number(ring_width))

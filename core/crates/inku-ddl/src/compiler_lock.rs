@@ -1,4 +1,4 @@
-//! Runtime-disconnected typed delivery, canonical compiler identity, and lock construction.
+//! Typed delivery, canonical compiler identity, and lock construction.
 
 use std::collections::{BTreeMap, BTreeSet};
 

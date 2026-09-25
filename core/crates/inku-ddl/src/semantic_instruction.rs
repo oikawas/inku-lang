@@ -19,7 +19,7 @@ use crate::{
     },
 };
 
-/// Stable identity for the runtime-disconnected explicit instruction association AST.
+/// Stable identity for the explicit instruction association AST.
 pub const SEMANTIC_INSTRUCTION_ASSOCIATION_SCHEMA_ID: &str =
     "inku.semantic-instruction-association.v24";
 

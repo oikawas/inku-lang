@@ -9,7 +9,7 @@ use crate::{
     parse_neutral_lexemes,
 };
 
-/// Stable identity for the runtime-disconnected clause-stream foundation.
+/// Stable identity for the clause-stream foundation.
 pub const CLAUSE_STREAM_SCHEMA_ID: &str = "inku.clause-stream.v5";
 
 /// A source separator that ends one clause fragment.

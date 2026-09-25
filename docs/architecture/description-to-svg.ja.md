@@ -9,6 +9,8 @@ flowchart TD
     REQ["POST /api/paint(/stream)"]
     BLANK{"空白だけ?"}
     E422["422"]
+    LABEL{"札を切ると空?"}
+    E400["400: label-only"]
     IDEM{"Idempotency-Key一致の保存済み作品?"}
     REPLAY["保存済み作品をそのまま返す"]
     PREP["host準備\noptions検証・言語・Macro catalog・canvas・seed・色"]
@@ -43,7 +45,9 @@ flowchart TD
     BLANK -->|"はい"| E422
     BLANK -->|"いいえ"| IDEM
     IDEM -->|"はい"| REPLAY
-    IDEM -->|"いいえ"| PREP --> AUTO
+    IDEM -->|"いいえ"| LABEL
+    LABEL -->|"はい"| E400
+    LABEL -->|"いいえ: 切った記述をcoreへ、原文は作品へ"| PREP --> AUTO
     AUTO -->|"はい"| CAT
     CAT -->|"失敗・予算切れ"| CATF --> SK
     CAT -->|"選択"| SK
@@ -71,11 +75,12 @@ flowchart TD
 
 ## 入口で決まること
 
-描画の入口は4つある。`/api/paint`（1応答）、`/api/paint/stream`（同じ結果を`done` event 1行のNDJSONで返す）、`/api/interpret`（保存済みDDLまで）、`/api/compose`（受け取ったDDLから始め、作品数を数えない）。4つとも`pipeline_compat.py`が要求を共有pipelineのoptionへ写し、`PipelineService.start`を呼び、executionが落ち着くまで保存済み状態を読み直してから`view["result"]`を投影する。応答にはpipelineのvariation ID、execution ID、revisionが加わる。
+描画の入口は4つある。`/api/paint`（1応答）、`/api/paint/stream`（同じ生成を、層が落ち着くたびのNDJSON eventつきで返す）、`/api/interpret`（保存済みDDLまで）、`/api/compose`（受け取ったDDLから始め、作品数を数えない）。4つとも`pipeline_compat.py`が要求を共有pipelineのoptionへ写し、`PipelineService.start`を呼び、executionが落ち着くまで保存済み状態を読み直してから`view["result"]`を投影する。応答にはpipelineのvariation ID、execution ID、revisionが加わる。
 
 最初のLLM呼び出しの前に、requestとhostから次が確定する。
 
-- **空白だけの記述** — `PaintRequest`のvalidatorが422で断る。行頭番号と角括弧注記の切除と、切除後が空の記述を400で断る門は、現行Serverには無い（Webの送信判定だけが持つ。`known-differences.ja.md` F-07）。
+- **空白だけの記述** — `PaintRequest`のvalidatorが422で断る。
+- **札の切除** — 行頭の連番と角括弧のコメントは作者の文書であって記述ではない。`PipelineService.start`が`description_labels.pipeline_description`で一度だけ切り、切った記述だけが写生・色カタログ選択・Stage 1と指示文言語の判定へ届く。作品と表示には書いたままの記述が残る。記述が空でないのに切ると空になる入力は、どの層も走らせる前に400で断る。記述からの再生成（`generate_from_description`）も同じ規則を通る。
 - **冪等な再送** — `Idempotency-Key`が同じ利用者の保存済み作品に一致すれば、新しいvariationを作らずその作品を返す。記述が異なれば409で断る。
 - **受理するoption** — `RunOptions`が`extra="forbid"`で検証する。旧requestの`include_trace`、`stage1_input`、`include_thinking`、`auto_repair`、`sketch_grain`はrequest modelに残るが、互換投影はpipelineへ渡さない。
 - **指示文言語** — 記述そのものから`_resolve_instruction_lang`が自動判定し、信号が無ければUI言語へ落とす。
@@ -187,13 +192,14 @@ hostは信頼済みのrender option（解決済みcolor map、render seed、wild
 - 診断は履歴sidecarにも保存され、履歴を開き直すと当該revisionの診断が戻る。sidecarが壊れていても、その作品だけに警告を出し、保存DDL・Score・SVGの表示を続ける。
 - logには`pipeline_compiler_outcome`として、診断の件数と安全な投影（source本文を含まない）だけが出る。
 - providerとの送受信の原文は、developer modeで`developer_capture_provider_io`を指定した実行だけ、所有者限定の記録として残り、`/api/pipeline/executions/{id}/provider-observations`で読める。通常の履歴・応答・logには入らない。
-- streamは進行eventを出さず、最終結果を`done` 1行で返す。承認待ちはstream開始前の409で届く（`known-differences.ja.md` F-08）。
+- streamは実行を読み直し、`sketch`（写生を通した場合）・`stage1`（保存したDDL）・`score`（instruction数）・`done`（通常応答）の順に知らせる。最初のeventより前の失敗はHTTPの状態そのもので届き、最初のeventが出た後の失敗（補完案の承認待ちを含む）は本文の`error` eventで届く。token数は共有pipelineが数えないためnullである。
 
 ## 判定の一覧
 
 | # | どこで | 条件 | 帰結 | 記録 |
 |---|---|---|---|---|
 | 1 | 入口 | 空白だけの記述 | 422、何も走らない | — |
+| 1a | 入口 | 札を切ると空になる記述 | 400、何も走らない | — |
 | 2 | 入口 | `Idempotency-Key`が保存済み作品に一致 | 保存済み作品を返す（記述が違えば409） | — |
 | 3 | 入口 | 変奏の組が片方だけ | 422 `variation_pair_required` | — |
 | 4 | 入口 | `seed_text`あり | `render_seed`を決定的に導出 | 両方を記録 |
@@ -216,6 +222,7 @@ hostは信頼済みのrender option（解決済みcolor map、render seed、wild
 | 21 | 演奏 | 塗りのclip不能・上限超過 | 元source全体を省略して再演奏 | renderer診断 |
 | 22 | 保存 | queue満杯 | fileだけskip、DBは書く | — |
 | 23 | 保存 | 冪等keyが一致 | 新しいrowを作らない | `_idempotent_replay` |
+| 24 | stream | 最初のevent後の失敗 | HTTPでなく`error` event | status・detail |
 
 ## 旧Scoreの再演
 
@@ -227,4 +234,4 @@ hostは信頼済みのrender option（解決済みcolor map、render seed、wild
 
 ## 図の根拠
 
-`PIPE-HOST`、`PIPE-MACHINE`、`PIPE-CATALOG`、`PIPE-SKETCH`、`PIPE-S1`、`PIPE-TYPED-DDL`、`PIPE-HOLE`、`PIPE-S15`、`PIPE-LOWER`、`PIPE-LIMITS`、`PIPE-RENDER`、`PIPE-COMPAT`、`PIPE-HISTORY`、`DATA-AUTHORITY`、`API-LIMIT`、`DATA-DH1`、`DATA-RH3`、`DATA-FALLBACK`。一次根拠は `pipeline_compat.py`、`pipeline_api.py:PipelineService`、`pipeline_product.py:{prepare,provider_for,render_options,save_result,replay}`、`inku-pipeline/src/machine.rs:{description,stage1,llm_response,failure_with_detail,accept_result}`、`protocol.rs:RetryPolicy`、`inku-ddl/src/compiler_execution.rs:execute_compilation_with_resources`、`inku-render/src/render.rs:render_with_resources`、`saved_score_compat.py`、`db.py:render_hash_for_item`。
+`PIPE-HOST`、`PIPE-MACHINE`、`PIPE-CATALOG`、`PIPE-SKETCH`、`PIPE-S1`、`PIPE-TYPED-DDL`、`PIPE-HOLE`、`PIPE-S15`、`PIPE-LOWER`、`PIPE-LIMITS`、`PIPE-RENDER`、`PIPE-COMPAT`、`PIPE-HISTORY`、`DATA-AUTHORITY`、`API-LIMIT`、`DATA-DH1`、`DATA-RH3`、`DATA-FALLBACK`。一次根拠は `pipeline_compat.py:{paint,paint_events}`、`description_labels.py`、`pipeline_api.py:PipelineService`、`pipeline_product.py:{prepare,provider_for,render_options,save_result,replay}`、`inku-pipeline/src/machine.rs:{description,stage1,llm_response,failure_with_detail,accept_result}`、`protocol.rs:RetryPolicy`、`inku-ddl/src/compiler_execution.rs:execute_compilation_with_resources`、`inku-render/src/render.rs:render_with_resources`、`saved_score_compat.py`、`db.py:render_hash_for_item`。

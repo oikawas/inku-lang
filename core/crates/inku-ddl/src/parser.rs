@@ -12,7 +12,7 @@ use crate::{
     saijiki_asset,
 };
 
-/// Stable identity for the runtime-disconnected neutral parser foundation.
+/// Stable identity for the neutral parser foundation.
 pub const NEUTRAL_LEXEME_PARSER_SCHEMA_ID: &str = "inku.neutral-lexeme-parser.v12";
 
 /// A half-open UTF-8 byte span into the source document.

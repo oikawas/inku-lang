@@ -60,18 +60,9 @@ _thumb_stats = {
 }
 
 
-_STAGE_WORKERS = max(1, int(os.getenv("INKU_STAGE_WORKERS", "4")))
-
-
-_STAGE_QUEUE_LIMIT = max(_STAGE_WORKERS, int(os.getenv("INKU_STAGE_QUEUE_LIMIT", str(_STAGE_WORKERS * 2))))
-
-
-_stage_executor = ThreadPoolExecutor(max_workers=_STAGE_WORKERS, thread_name_prefix="inku-stage")
-
-
-_stage_slots = BoundedSemaphore(_STAGE_QUEUE_LIMIT)
-
-
+# Counts of the model effects the shared pipeline performs (catalog selection,
+# sketch, Stage 1, hole completion). The pipeline worker pool runs them; these
+# counters only report what happened there.
 _stage_stats_lock = Lock()
 
 

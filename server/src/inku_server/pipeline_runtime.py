@@ -26,6 +26,21 @@ def get_binding() -> PipelineBinding:
         return _binding
 
 
+def host_limits() -> dict:
+    """The worker-pool limits in force, without starting the service."""
+    with _lock:
+        if _service is not None:
+            return {"max_workers": _service.max_workers,
+                    "max_effect_steps": _service.max_effect_steps,
+                    "max_retained_runs": _service.max_retained_runs}
+    path = os.environ.get("INKU_PIPELINE_CONFIG")
+    if path:
+        return dict(json.loads(Path(path).read_bytes())["host_limits"])
+    from .pipeline_defaults import HOST_LIMITS
+
+    return dict(HOST_LIMITS)
+
+
 def get_service():
     global _service
     with _lock:

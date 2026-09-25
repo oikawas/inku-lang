@@ -25,7 +25,7 @@ from ..common import _env_flag
 from ..deps import _admin_user, _logger
 from ..models import ModelSettingsResponse
 from ..rendering import _output_save_settings
-from ..state import _SAVE_QUEUE_LIMIT, _SAVE_WORKERS, _STAGE_QUEUE_LIMIT, _STAGE_WORKERS, _artifact_save_stats, _render_slots, _stage_execution_stats, _thumbnail_stats
+from ..state import _SAVE_QUEUE_LIMIT, _SAVE_WORKERS, _artifact_save_stats, _render_slots, _stage_execution_stats, _thumbnail_stats
 
 
 router = APIRouter(dependencies=[Depends(_admin_user)])
@@ -202,6 +202,21 @@ class StageExecutionStatus(BaseModel):
     note: str
 
 
+def _stage_execution_status() -> StageExecutionStatus:
+    # Model effects run in the shared pipeline's worker pool. `queue_limit` is
+    # the number of executions it keeps resident; a new start beyond it while
+    # all are busy is refused and counted as rejected.
+    from ...pipeline_runtime import host_limits
+
+    limits = host_limits()
+    return StageExecutionStatus(
+        workers=limits["max_workers"],
+        queue_limit=limits["max_retained_runs"],
+        **_stage_execution_stats(),
+        note="Model effects of the shared pipeline (catalog selection, sketch, Stage 1, hole completion) run in its worker pool. Each effect is sent once; the shared core decides any retry.",
+    )
+
+
 class ModelProviderPatch(BaseModel):
     label: str | None = None
     kind: str | None = None
@@ -289,12 +304,7 @@ def api_settings_status() -> SettingsStatusResponse:
         log_retention=_log_retention_status(log_settings),
         render_concurrency=_render_concurrency_status(),
         render_limits=_render_limits_status(),
-        stage_execution=StageExecutionStatus(
-            workers=_STAGE_WORKERS,
-            queue_limit=_STAGE_QUEUE_LIMIT,
-            **_stage_execution_stats(),
-            note="Stage 1/2 LLM calls share a bounded executor. Timed-out calls keep capacity until the underlying call finishes.",
-        ),
+        stage_execution=_stage_execution_status(),
     )
 
 

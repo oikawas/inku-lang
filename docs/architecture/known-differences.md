@@ -8,17 +8,19 @@
 - Public commit `8b4d43cc` then updated the document to 29, matching `render_engines/default.py` and `server/reference/render-engine-29/manifest.json`.
 - Result: **resolved**. The documentation snapshot follows the updated commit.
 
-### F-02 Android specification-note versions (recurred)
+### F-02 Android specification-note versions (resolved)
 
 - The header was synchronized with the implementation of the time on 2026-08-24, but the current header (last updated 2026-09-25) names `2.1.4-android.80`, render engine `67`, DDL engine version `20`, and a Server `ddl_engine_version` of 21.
 - The implementation is Render Engine `68` (`core/crates/inku-render/src/lib.rs`) and `ddl_engine_version` `47` (`layer_versions.py`), and Android uses the same shared Rust pipeline.
-- Result: **the version numbers are stale**. Engine identity is read from the packaged native library rather than a Kotlin product constant, so this is a documentation difference, not a runtime behavior difference.
+- On 2026-09-25 the Android owner rewrote the header so it no longer copies render engine or DDL version numbers (the packaged core's `RENDER_ENGINE_VERSION` names the render engine, and `layer_versions.py` names DDL Spec and the DDL engine), and removed the unused `ddlEngineVersion = "20"` from `ReferenceCorpus.kt` (`ddb1e19a`).
+- Result: **resolved**.
 
-### F-03 Android external-provider execution
+### F-03 Android external-provider execution (resolved)
 
 - The "not implemented" section of the Android specification note lists external provider execution as not implemented and calls provider records compatibility data structures.
 - Current `RoutingModelProvider` resolves enabled providers and connects to `GeminiModelProvider` and `OpenAiCompatibleProvider`. `SingleAttemptModelEffectProvider` sends shared-pipeline provider effects to them. The first half of the same note also describes the request conditions for Gemini and OpenAI-compatible providers.
-- Result: **the "not implemented" section is stale**. An Anthropic-specific protocol implementation was not found, so parity across every provider is not claimed.
+- On 2026-09-25 the Android owner removed external provider execution from the "not implemented" section (`ddb1e19a`). An Anthropic-specific protocol implementation was not found, so parity across every provider is not claimed.
+- Result: **resolved**.
 
 ### F-04 Long historical Stage 1.5 description (resolved)
 
@@ -26,52 +28,55 @@
 - The current §12.11 is rewritten as a typed transformation that takes only `CanonicalReady` typed meaning and changes only focus and explicit variation.
 - Result: **resolved**.
 
-### F-05 Stale statements in the Project Context
+### F-05 Stale statements in the Project Context (resolved)
 
-- The version table in `PROJECT_CONTEXT.ja.md` names Render Engine `66`, DDL `ddl_version` 11 / `ddl_engine_version` 45, and Android `2.1.4-android.78`. The implementation is 68, 13 / 47, and `2.1.4-android.80`.
-- Its android section says "Android and the Server use the same shared Rust render engine `42`, and Android's DDL engine is `20`" and "the Android host still owns Stage 1 / 1.5 / 2, Score coerce, Room, history, and `rh3` identity", while Android has moved to the shared Rust pipeline (the document's "pipeline layers" section describes the current state).
-- Its test-surface section names the active corpora as `render-engine-42` (610 cases) and `ddl-engine-20` (49 cases) and says "CI enforces byte identity of regeneration". The latest frozen records are Render Engine 66 (620 cases) and DDL engine 45 (3 cases), and the corpus comparison is a manual-dispatch workflow (`server/reference/README.md` states the policy of neither generating nor comparing outside an explicit checkpoint).
-- Its list of deterministic layers still includes the deleted `coerce/` (only observation compatibility remains) and `ddl_expander.py`, and it still describes a "RAW trace (`include_trace`)". The current compatibility projection does not pass `include_trace` to the pipeline and returns no trace.
-- Its vocabulary section names `schema.py` and `saijiki.py` as the source of truth, while its own design-contract section and the implementation name the shared core's `saijiki-v1.json`.
-- Result: **part of the Project Context is older than the implementation**. This documentation follows the implementation and the SPEC and reference README that agree with it.
+- In the earlier snapshot, `PROJECT_CONTEXT.ja.md` was older than the implementation in its version table (Render Engine 66, DDL 11 / 45, Android `2.1.4-android.78`), its android section (render engine 42, DDL engine 20, the Android host owning Stage 1 / 1.5 / 2 and coerce), its test surfaces (CI enforcing `render-engine-42` and `ddl-engine-20`), its deterministic layers (`coerce/`, `ddl_expander.py`), the RAW trace, and the vocabulary's source of truth (`schema.py`).
+- Both language editions were brought up to date on 2026-09-25.
+- Result: **resolved**.
 
-### F-06 Route-count test constants
+### F-06 Route-count test constants (resolved)
 
-- A static count gives 105: 94 endpoints in the ten routers and 11 in `/api/pipeline`.
-- `EXPECTED_ROUTE_COUNT` in `test_route_authorization.py` is 95, and its comment records neither the addition of `/api/pipeline/*` nor the removal of `/api/prompts`. `tests/data/api-surface-baseline.json` also has 95 operations, contains the retired `/api/prompts`, and contains none of `/api/pipeline/*`.
-- `/api/pipeline/*` arrived on 2026-09-13 (`2ad24df9`) and `/api/prompts` was removed on 2026-09-14 (`03bbd686`).
-- Result: **inferred that the test constant and baseline disagree with the current routes**. App import failed in this review's environment for lack of the native wheel, so the live routes were not counted and that test was not run.
+- `EXPECTED_ROUTE_COUNT` in `test_route_authorization.py` was still 95 and counted neither the eleven `/api/pipeline/*` routes added on 2026-09-13 (`2ad24df9`) nor the removal of `/api/prompts` on 2026-09-14 (`03bbd686`). `tests/data/api-surface-baseline.json` was also from before those changes.
+- On 2026-09-25 the constant became 105, and the baseline was regenerated from the live app (105 operations, 160 schemas). `test_route_authorization.py` passes in an environment with the native wheel.
+- Result: **resolved**.
 
-### F-07 Gate for label-only descriptions
+### F-07 Gate for label-only descriptions (resolved)
 
-- `SPEC.ja.md` §12.16 says the three drawing routes (`/api/interpret`, `/api/paint`, `/api/paint/stream`) reject with 400 a description that becomes empty after leading numbers and bracketed notes are stripped, and reject whitespace-only input with 422.
-- The current Server has no stripping implementation (the old `description_labels.py`), and the description goes to the shared pipeline unchanged. Only the 422 whitespace check remains in `PaintRequest`. Web decides whether a description may be sent through `description-labels.ts`, whose comment still names the deleted Server file as the source of truth.
-- Result: **specification and implementation differ**. A label-only description sent from a client other than Web (such as the CLI) is not answered with the specified 400.
+- The cutover deleted the old `description_labels.py`, so leading numbers and bracketed comments reached Stage 1, the sketch, and color catalog selection as written, and a label-only description was no longer refused with 400 (a mismatch with `SPEC.ja.md` §12.16).
+- On 2026-09-25 `description_labels.py` returned, and `PipelineService.start` (every description-origin path) and regeneration from a description cut labels only from the text handed to the core. The work keeps the description as written, and a label-only description is refused with 400.
+- Result: **resolved**. Android never had the cut; this gate sits at the Server boundary.
 
-### F-08 Stream progress events
+### F-08 Stream progress events (resolved)
 
-- `SPEC.ja.md` §12.10 says `POST /api/paint/stream` reports progress in the order `sketch`, `stage1`, `score`, `done`.
-- The current compatibility stream returns the final result as one `done` line after the shared-pipeline execution settles. An approval wait for a completion proposal arrives as a 409 before the stream starts. Web shows progress by re-reading the `/api/pipeline` view.
-- Result: **specification and implementation differ**.
+- After the cutover, the compatibility stream returned the final result as a single `done` line (a mismatch with `SPEC.ja.md` §12.10).
+- On 2026-09-25 it returned to re-reading the execution and emitting `sketch` (when the sketch ran), `stage1`, `score`, and `done` in order. A refusal before the first event arrives as its HTTP status, and a failure after it (including an approval wait for a completion proposal) as an in-band `error` event. Token counts are null because the shared pipeline does not count them.
+- Result: **resolved**.
 
-### F-09 Stale descriptive text inside the implementation
+### F-09 Stale descriptive text inside the implementation (resolved)
 
-- `core/crates/inku-pipeline/README.md` says "there are four effect tags", "the candidate API does not switch the existing runtime", and "the existing runtime prompt is unchanged". The implementation has five effects, adding `generate_sketch`, and the shared pipeline is the normal runtime.
-- The module docstring of `persistence/variation_authority.py` says "the ordinary Server runtime does not import or install these tables", while `pipeline_runtime.py` uses it as the store of the normal service.
-- Doc comments in several `inku-ddl` modules (`compiler_lock.rs`, `composition_plan.rs`, `document.rs`, `macro_definition.rs`, `score_lowering.rs`, and others) still say "runtime-disconnected". `inku-score/src/types.rs` says "Python remains the schema authority".
-- Result: **differences in descriptive text**, not in behavior.
+- `core/crates/inku-pipeline/README.md` (the number of effect tags, the candidate API not switching the runtime, and more), the docstring of `persistence/variation_authority.py`, and "runtime-disconnected" in `inku-ddl` doc comments remained after the shared pipeline became the normal runtime.
+- They were corrected on 2026-09-25. The earlier snapshot's point about `inku-score` calling the raw Score JSON Schema Python-owned was withdrawn, because `score.schema.json` is still an artifact checked against Python's `Score`.
+- Result: **resolved**.
 
-### F-10 Leftover Stage executor
+### F-10 Leftover Stage executor (resolved)
 
-- `api_core/state.py` creates a Stage executor and slots from `INKU_STAGE_WORKERS` / `INKU_STAGE_QUEUE_LIMIT`, and `/api/settings/status` returns its counters.
-- No current code submits a job to this executor. LLM effects run in the thread pool of `PipelineService`.
-- Result: **only the status display remains**. The values shown do not represent the current LLM workload.
+- The Stage executor configured by `INKU_STAGE_WORKERS` / `INKU_STAGE_QUEUE_LIMIT` had no submitter, and `stage_execution` in `/api/settings/status` showed a pool nothing used and counters that never moved. `SPEC.ja.md` §22 and SETUP also described the executor.
+- On 2026-09-25 the executor was removed, and `stage_execution` now reports the shared pipeline worker pool (`workers` is `max_workers`, `queue_limit` is `max_retained_runs`) and the counts of provider effects. The response schema did not change (it is one of the schemas frozen since before permission groups). SPEC §22 and SETUP were revised too.
+- Result: **resolved**.
 
-### F-11 Reference corpus for Android device acceptance
+### F-11 Reference corpus for Android device acceptance (resolved)
 
-- `prepareRustParityAssets` and `NativeRenderDeviceTest` stage a few cases from `server/reference/render-engine-41` onto the device and compare SVG bytes. The path filter in `android-native.yml` also names `render-engine-41`.
-- The current Render Engine is 68, and the latest frozen corpus is 66.
-- Result: **unknown**. This review did not confirm whether the staged cases produce the same bytes under Engine 68.
+- `prepareRustParityAssets` and `NativeRenderDeviceTest` stage a few cases from `server/reference/render-engine-41` onto the device and compare SVG bytes. The test also asserts that `NativeRenderBridge.renderEngineVersion()` is `"41"`, and the path filter in `android-native.yml` names `render-engine-41`.
+- The packaged library's Render Engine is 68, so the assertion cannot hold, and the expected SVGs are Engine 41 bytes with no guarantee of matching the current engine.
+- On 2026-09-25 the Android owner changed `NativeRenderDeviceTest` to compare against the SVG, engine identity, and renderer reference that the same commit's host core (`core/crates/inku-render-android/examples/render-parity-expected.rs`) produces at build time (`ddb1e19a`). The frozen corpus now serves only as Score input and raster input. The Android owner reports that two cases passed on the Pixel 9 safe runner.
+- Result: **resolved**.
+
+### F-12 Fake provider in the hole-completion API test (resolved)
+
+- The fake provider in `server/tests/test_pipeline_api.py::test_managed_api_persists_approved_patch_reload_and_legacy_fork` reads `base_source_digest` and similar fields from the hole-completion request body to answer it.
+- The current hole-completion prompt (`inku.visible-ddl-hole-completion-prompt.v3`) does not pass digests or byte positions to the provider (`SPEC.md` §12.7.1). The test also fails at the commit before the fixes (`f910a11e`) with `KeyError: 'base_source_digest'`.
+- On 2026-09-25 the fake provider was changed to answer in the v3 shape (`proposed` with replacement text per short ID `h1`) and to check that the prompt is v3. The test now also checks that, while approval is pending, the Score of the independent drawing (the red circle) remains as `complete_with_omissions` (the old test expected no Score during the wait).
+- Result: **resolved**.
 
 ## Terms that need care across documents
 
@@ -107,8 +112,6 @@ Line count alone does not show an ownership violation. Consider a split only whe
 - External LLM provider reachability, model availability, and latency were not measured; only static routing was checked.
 - Whether the Redis rate limiter is active in deployment is unknown because `INKU_REDIS_URL` values were not read.
 - Compose runtime health and volume persistence were not started; only configuration was checked.
-- The live app's route count. The review environment had no native wheel and app import failed, so the count comes from a static count of declarations (F-06).
-- Current results of Android device acceptance (F-11).
 - How the Mermaid diagrams actually display. All 44 diagrams in this set were parsed with the mermaid 11 parser, but their display on GitHub or Gitea was not checked.
 
 ## Specification-only parts
@@ -117,9 +120,6 @@ All major nodes and edges have public-source implementation evidence. No node re
 
 ## Follow-up questions
 
-1. Should the stale statements in the Project Context (F-05) and the Android specification note (F-02, F-03) be updated to match the current implementation?
-2. Should the route-count test constant and the API surface baseline (F-06) be aligned with the current routes?
-3. For the label-only gate (F-07) and stream progress events (F-08), should the SPEC follow the implementation, or the implementation return to the SPEC?
-4. How should the unused Stage executor (F-10) and the reference corpus for Android device acceptance (F-11) be handled?
+As of 2026-09-25, every difference listed in this document is resolved. New differences are added here when found.
 
 These are not changes made by this review, so they were not copied into the ledger automatically.

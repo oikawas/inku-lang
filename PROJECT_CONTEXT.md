@@ -128,15 +128,15 @@ To learn why something took its current shape, search the changelog by term, ver
 | Subject | Value | Source of truth |
 |---|---|---|
 | Application | the "Target version" line at the top of this file | **the two files `web/APP_VERSION` and `web/BUILD_NUMBER`**. The UI, `/api/info` `version`, and the CLI all read them (the value is not copied here) |
-| Render Engine | 66 | `core/crates/inku-render/src/lib.rs` |
-| DDL | `ddl_version` 11 / `ddl_engine_version` 45 | `server/src/inku_server/layer_versions.py` |
-| Android | `2.1.4-android.78` | `android/VERSION` (a namespace separate from web and server) |
+| Render Engine | 68 | `core/crates/inku-render/src/lib.rs` |
+| DDL | `ddl_version` 13 / `ddl_engine_version` 47 | `server/src/inku_server/layer_versions.py` |
+| Android | `2.1.4-android.80` | `android/VERSION` (a namespace separate from web and server) |
 | Python package | 2.7.2 | `server/pyproject.toml` (moves only on a product release) |
 
 ### Vocabulary
 
-The Literals in `server/src/inku_server/schema.py` are canonical; the saijiki table (`saijiki.py`)
-holds the mapping to Japanese terms.
+The shared Rust asset `core/crates/inku-ddl/assets/saijiki-v1.json` is canonical; the Literals in
+the Server's `schema.py` and the saijiki table (`saijiki.py`) are projections of it.
 
 - 9 primitives — `line` / `circle` / `ellipse` / `triangle` / `square` / `polygon` / `arc` / `point` / `cloudform`
 - 4 line styles — `solid` / `dashed` / `dotted` / `dash_dot`
@@ -145,9 +145,10 @@ holds the mapping to Japanese terms.
 - 9 colors — `white` / `black` / `blue` / `red` / `green` / `gray` / `yellow` / `orange` / `purple`
 - 9 surface textures, 5 surface directions, 7 ground materials
 
-The saijiki table is a single source: the Stage 1 prompt vocabulary block, plugin closure markers,
-relation phrases, the web Saijiki display, and reference §1 are all derived from it.
-Vocabulary changes go through the table and its golden tests.
+The shared asset is a single source: the Stage 1 vocabulary projection, plugin closure markers, relation
+phrases, the web and Android Saijiki displays, and reference §1 are all derived from it.
+Vocabulary changes go through the shared asset and its checks (such as
+`core/crates/inku-ddl/tests/saijiki_asset.rs`).
 The saijiki holds ten categories, and `おもて` / surfaces (eleven words) says how the inside of a
 closed shape is (ddl-engine 15) — the counterpart to continuity, which says how a line is, with
 state nouns rather than actions. A surface attached to an instruction that encloses nothing is delivered
@@ -196,10 +197,11 @@ counts the same number of teeth whatever machine draws it.**
 **A fill sits on an underlay that holds the field as a real element, and what sits on top splits at
 coverage 0.2 into scan lines and rubbings.**
 
-A RAW trace exists for observation (`include_trace` on `/api/paint` and `/api/compose`, default
-false).
-It returns each layer's intermediate product in one response without changing the Score, branching,
-or call counts, and without persisting anything.
+`include_trace` is still accepted for compatibility with older requests, but the shared pipeline
+returns no RAW trace.
+Per-layer results live in the response's `compiler_outcome` and `pipeline_diagnostics` and in the
+history sidecar. In developer mode, `developer_capture_provider_io` records raw provider traffic
+for the owner only, never in ordinary history, responses, or logs.
 
 ### web (SvelteKit 2 / Svelte 5)
 
@@ -283,8 +285,9 @@ so adding one setting moves no line of `+page.svelte`.
 
 ### server (FastAPI)
 
-- The 96 endpoints live in the ten files under `server/src/inku_server/api_core/routers/` (`auth`,
-`feedback`, `history`, `lineage`, `me`, `plugins`, `public`, `render`, `settings`, `users`).
+- The 105 endpoints live in the ten files under `server/src/inku_server/api_core/routers/` (`auth`,
+`feedback`, `history`, `lineage`, `me`, `plugins`, `public`, `render`, `settings`, `users`) and in
+the shared pipeline's `pipeline_api.py` (the eleven `/api/pipeline/*` routes).
 The count is owned by `EXPECTED_ROUTE_COUNT` in `server/tests/test_route_authorization.py`.
 Shared definitions live in `api_core/{state,models,deps,common,rendering}.py`.
 - `api.py` holds only the `app` assembly, `_lifespan`, middleware, startup calls, and `include_router`
@@ -340,9 +343,10 @@ It can lag at any time, so an Android version number must not be read as the ser
 Its interface is bilingual and the language is chosen in the settings screen (default `ja`).
 A Kotlin language pack holds the wording; `server/scripts/gen_saijiki_kt.py` generates the saijiki
 vocabulary.
-Android and the server now use the same shared Rust render engine `42`; Android's DDL engine is `20`.
-The Android-specific Kotlin drawing engine and AndroidSVG display path are retired, with no runtime
-fallback. Android still owns Stage 1 / 1.5 / 2, Score coerce, Room, history, and `rh3` identity.
+Android and the server now use the same shared Rust authoring pipeline and Render Engine.
+The Android-specific Kotlin drawing engine, the AndroidSVG display path, and Kotlin's old
+Stage 1 / 1.5 / 2 and Score coerce are retired, with no runtime fallback. The Android host owns the
+UI, provider transport, Room, history, and the `rh3` computation.
 
 ### Verification surfaces
 
@@ -352,11 +356,12 @@ fastapi 0.141 onward**), API-surface identity (compared against
 `tests/data/api-surface-baseline.json`), and route-body location (counting
 `route.endpoint.__module__`).
 - **Frozen reference corpora** — proof prints per version under `server/reference/`.
-`render-engine-42` (610 cases) and `ddl-engine-20` (49 cases) are current, and CI enforces
-byte-identical regeneration.
+The latest frozen records are `render-engine-66` (620 cases) and `ddl-engine-45` (3 cases, shared
+Rust pipeline). A new version directory is created only at an explicit full-update checkpoint, not
+with every version bump.
 - **Android reference material** — `android/app/src/test/resources/server_reference/` retains only
 DDL, Score, coerce, and history compatibility fixtures. The drawing oracle is the shared Rust core
-and `server/reference/render-engine-42/`; Android does not copy a versioned SVG corpus. Device
+and the frozen corpora under `server/reference/`; Android does not copy a versioned SVG corpus. Device
 acceptance stages a bounded selection from the canonical manifest and compares packaged-JNI SVG
 bytes and raw pixels directly.
 - **`cli/tests`** — pytest.
@@ -366,10 +371,11 @@ terminology, and model resolution.
 dependency).
 - **`scripts/check_docs.py`** — internal references in public documents, the heading shape of each Japanese/English pair, and the **forbidden words on the English side** (the four words of `GLOSSARY.md` §5-1; a backticked span is an identifier and is skipped).
 
-The **deterministic layers** are `coerce/`, `ddl_expander.py`, `core/crates/inku-render/`,
-`core/crates/inku-svg-raster/`, the native
-request boundary, `render_engines/default/`, `renderer.py`, `schema.py`, `saijiki.py`, and
-`language_support/{ja,en}.py`. An output-affecting change requires the frozen-corpus comparison;
+The **deterministic layers** are `core/crates/inku-ddl/`, `core/crates/inku-pipeline/`,
+`core/crates/inku-score/`, `core/crates/inku-render/`, `core/crates/inku-svg-raster/`, the native
+request boundary, `saved_score_compat.py`, `render_engines/default/`, `renderer.py`, `schema.py`,
+`saijiki.py`, and `language_support/{ja,en}.py`. An output-affecting change is checked by a direct
+test that observes the changed behavior, and frozen corpora are created at explicit checkpoints;
 a host-only change proven not to alter the native request or output uses proportionate direct checks.
 Within rendering, the Rust core owns planning, geometry, marks, surfaces, layers, SVG emission,
 deterministic seed derivation, and performance metadata. The raster crate owns only SVG-to-explicit-
@@ -377,8 +383,9 @@ pixel presentation. Python and Android own host adapters, resolved inputs, persi
 UI-specific conversion; Python additionally owns the registry, the SVG-only compatibility facade,
 and fresh host entropy.
 
-**CI runs three workflows.**
-`reference-corpus` re-bakes the frozen corpora and requires byte-identical output; `checks` runs
+**CI has three workflows.**
+`reference-corpus` re-bakes the frozen corpora and requires byte-identical output, but runs only on
+manual dispatch. On ordinary pushes and pull requests, `checks` runs
 **server (ruff and pytest), cli (ruff and pytest), web (`npm run check`, `test:unit`, `lint:i18n`),
 and the published documents (`check_docs.py`).** `android-native` is path-scoped to shared Rust,
 raster, JNI, and Android-host changes; it checks Rust 1.95, NDK 29, the `arm64-v8a` native library,

@@ -9,7 +9,7 @@ use crate::{
     SourceSpan, collect_english_unresolved_determiner_phrase_topology_evidence,
 };
 
-/// Stable identity for the runtime-disconnected general determiner-phrase evidence envelope.
+/// Stable identity for the general determiner-phrase evidence envelope.
 pub const DETERMINER_PHRASE_EVIDENCE_SCHEMA_ID: &str = "inku.english-determiner-phrase-evidence.v1";
 
 /// Canonical candidate availability for one accepted English determiner region.

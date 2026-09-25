@@ -1,4 +1,4 @@
-//! Runtime-disconnected Score candidates and eligible explicit lowering from verified Stage 1.5.
+//! Score candidates and eligible explicit lowering from verified Stage 1.5.
 
 use crate::composition_plan::{
     CompositionPlanOutcome, CompositionPlanResult, FillCountResolution, FillGroupPlan,

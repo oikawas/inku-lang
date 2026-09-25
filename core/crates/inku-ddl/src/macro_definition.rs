@@ -1,4 +1,4 @@
-//! Runtime-disconnected generic macro definition language and semantic identity.
+//! Generic macro definition language and semantic identity.
 
 use std::{
     collections::{BTreeMap, BTreeSet, HashMap, HashSet},

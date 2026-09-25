@@ -5,9 +5,9 @@
 | 項目 | 値 |
 |---|---|
 | 作成日 | 2026-08-10（JST）、全面更新 2026-08-17、Web・core refactoring再照合 2026-08-24、SQLite persistence refactoring完了を再照合 2026-08-27、Typed DDL Step 8完了を再照合 2026-09-02、共有Rust pipeline cutover後の全面再照合 2026-09-25 |
-| source branch / 実装commit | `main` / `46f17da8c5b438511f9bd915395763262b55fb72`（本書更新前の実装baseline） |
-| source状態 | 実装baselineではclean。本更新は`docs/architecture/`だけを変更する |
-| Project Context | `PROJECT_CONTEXT.ja.md`、対象 `v2.15.28 / Build 1104`。同書の「版」表には実装より古い値が残る（`known-differences.ja.md` F-05） |
+| source branch / 実装commit | `main` / `f910a11e165ae3169818f3f1311ee869d33930ed`（本書更新前の実装baseline） |
+| source状態 | 実装baselineではclean。本更新は、`known-differences.ja.md` F-05〜F-10の修正（Server実装・test・SPEC §22・SETUP・PROJECT_CONTEXT・実装内の説明文）を含み、本書群はその修正後を記す |
+| Project Context | `PROJECT_CONTEXT.ja.md`、対象 `v2.15.28 / Build 1104` |
 | 日本語仕様 | `SPEC.ja.md`、文書版 `v1.92.0` |
 | Web / app | `web/APP_VERSION` = `v2.15.28`、`web/BUILD_NUMBER` = `1104` |
 | Render Engine | `default` / `68`（`core/crates/inku-render/src/lib.rs`）、core API `0.1.0` |
@@ -35,7 +35,7 @@
 | SYS-LOG | ログ領域 | stdoutとアプリ内ローテーションファイル。compiler結果は診断の件数と安全な投影だけを記録する | `logging_setup.py` (`configure_logging`); `pipeline_product.py` (`pipeline_compiler_outcome`) | §21 | 確認済み | 抽象化すれば可 |
 | SYS-BACKUP | DBバックアップ領域 | migration・手動・定時で共有するWAL-safe SQLite snapshotと世代管理 | `persistence/backup.py`; `db.py`の薄いdelegate | §22 | 確認済み | 抽象化すれば可 |
 | DATA-MIGRATION | Server schema lifecycle | SQLite-only事前検証、versioned registry（v1 legacy baseline → v2 共有pipeline sidecar → v3 provider観測）、allowlisted legacy fingerprint、単一writer移行、PK/canonical history byte invariant、fail-closed | `persistence/{config,engine,migrations,legacy_schema,invariants,backup}.py`; portable persistence tests | §22 | 確認済み | 公開可 |
-| API-ROUTERS | Router群 | 10分類のrouterと`/api/pipeline`の共有pipeline router。静的な数え上げで94 + 11 = 105 endpoint | `api_core/routers/{public,auth,me,plugins,settings,users,history,lineage,render,feedback}.py`; `pipeline_api.py:pipeline_router` | Project Context「server」 | 推定（件数は静的数え上げ。`test_route_authorization.py`の`EXPECTED_ROUTE_COUNT`は95のまま。`known-differences.ja.md` F-06） | 公開可 |
+| API-ROUTERS | Router群 | 10分類のrouterと`/api/pipeline`の共有pipeline router。94 + 11 = 105 endpoint（件数の正本は`test_route_authorization.py`の`EXPECTED_ROUTE_COUNT`） | `api_core/routers/{public,auth,me,plugins,settings,users,history,lineage,render,feedback}.py`; `pipeline_api.py:pipeline_router` | Project Context「server」 | 確認済み | 公開可 |
 | API-AUTH | 認証・認可 | Bearer/cookie session、role guard、公開3経路。共有pipeline routerは`_current_user`を所有者として全操作へ渡す | `api_core/deps.py`; `routers/auth.py`; `api.py`（`pipeline_router(_pipeline_service, _current_user, ...)`）; `test_route_authorization.py` | §22 | 確認済み | 公開可 |
 | API-LIMIT | 容量境界 | body、request、render、pipeline worker・保持run・effect段数、envelope byte、保存queueの上限 | `security.py`; `api_core/state.py`; `pipeline_api.py:PipelineService`; `pipeline_defaults.py` (`host_limits`, `envelope_limits`) | §22 | 確認済み | 公開可 |
 | PIPE-HOST | Server pipeline host | 信頼済みconfig・provider・保存effectを共有coreへ供給し、実行snapshotを直列化して保存する。意味分岐を持たない | `pipeline_runtime.py`; `pipeline_api.py:PipelineService`; `pipeline_candidate.py` (`PipelineBinding`, `CandidateExecution`); `pipeline_product.py:ProductPipelineEffects`; `pipeline_settings.py`; `pipeline_defaults.py`; `pipeline_compat.py` | §12.7.1 | 確認済み | 公開可 |
@@ -67,7 +67,7 @@
 | TEST-SERVER | Server検査 | pytest、API surface、認可、route所在、共有pipeline hostとauthority store | `server/tests`; `test_api_surface.py`; `test_route_authorization.py`; `test_pipeline_{api,candidate,compat,product,provider}.py`; `test_persistence_variation_authority.py` | §11; Project Context「検査面」 | 確認済み | 公開可 |
 | TEST-CORE | 共有Rust検査 | crateごとのunit/integration test。authoring flowはnative rendererを呼ばない代表flowで検査する | `core/crates/inku-ddl/tests/`; `core/crates/inku-render/tests/`; `core/crates/inku-score/tests/`; `inku-pipeline/src/focused_flow.rs` | §11 | 確認済み | 公開可 |
 | TEST-CORPUS | 凍結コーパス | 明示的な全更新checkpointだけで新しい版のdirectoryを作る。最新の凍結はRender Engine 66の620件とDDL engine 45の3件（共有Rust pipeline）。DDL engine 1–26は退役した展開・coerce・plugin層の履歴記録 | `server/reference/render-engine-66/manifest.json`; `ddl-engine-45/manifest.json`; `server/reference/README.md`; `reference-corpus.yml` | §11, §22 | 確認済み | 公開可 |
-| TEST-ANDROID | Android受入 | 共有pipelineのhost JVM testと端末受入、canonical corpusの少数caseのSVG byteとraw pixel照合 | `SharedPipelineHostTest`; `AndroidSharedPipelineTest`; `SharedPipelineDeviceAcceptanceTest`; `NativeRenderDeviceTest`; `prepareRustParityAssets` | Android仕様 | 確認済み | 公開可 |
+| TEST-ANDROID | Android受入 | 共有pipelineのhost JVM testと端末受入。同梱libraryのSVG・engine identity・renderer referenceを、build時に同じcommitのhost coreが作る期待値と照合し、raw pixelも照合する（凍結corpusはScore入力とraster入力だけに使う） | `SharedPipelineHostTest`; `AndroidSharedPipelineTest`; `SharedPipelineDeviceAcceptanceTest`; `NativeRenderDeviceTest`; `generateRustParityExpected`; `prepareRustParityAssets`; `inku-render-android/examples/render-parity-expected.rs` | Android仕様 | 確認済み | 公開可 |
 | TEST-WEBCLI | Web/CLI検査 | Svelte check/unit/lint、CLI pytest | `web/package.json`; `web/src/**/*.test.ts`; `cli/tests/test_cli.py` | Project Context「検査面」 | 確認済み | 公開可 |
 | CI-GATES | 現在のCI | server/cli lint+pytest（Rust toolchain guardを含む）、web check+unit+lint:i18n、bilingual docsとportable persistence verifier、共有Rust / raster / JNI / Android hostのpath-scoped native gate、手動dispatchだけのcorpus比較、tag時image build | `.github/workflows/checks.yml`; `android-native.yml`; `reference-corpus.yml`; `release.yml` | §11, §22; Android仕様 | 確認済み | 公開可 |
 

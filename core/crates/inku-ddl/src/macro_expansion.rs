@@ -12,7 +12,7 @@ use crate::{
     macro_definition::canonical_semantic_ref_id,
 };
 
-/// Stable identity for the runtime-disconnected expansion overlay.
+/// Stable identity for the expansion overlay.
 pub const MACRO_EXPANSION_SCHEMA_ID: &str = "inku.macro-expansion.v2";
 
 /// Stable deterministic choice scheme used by `vary`.

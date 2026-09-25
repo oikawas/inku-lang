@@ -222,7 +222,10 @@ class CandidateExecution:
             if context_updates:
                 self.context = {**self.context, **json.loads(_bytes(context_updates))}
             if payload["tag"] == "generate_from_description":
-                self.context = {**self.context, "description": payload.get("description", "")}
+                # The core reads the drawn text; the work keeps what the author
+                # wrote, which the host may pass alongside as the context value.
+                written = (context_updates or {}).get("description", payload.get("description", ""))
+                self.context = {**self.context, "description": written}
             try:
                 return self._advance(payload)
             except Exception:

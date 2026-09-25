@@ -186,7 +186,7 @@ flowchart LR
     AUX -.->|"Stage 1印字・hole patch・語彙"| SRC
 ```
 
-`inku-ddl`の入口は`compile_ddl_to_score_with_resources`（`compiler_execution.rs`）で、元の`NormalizedDdlDocument`を一度だけcompileしてから、Stage 1.5、Plan、資源選択、materializeを順に行う。source・provenance・Macro definitionの照合はlock構築時に済ませ、Stage 1.5へ渡すのはlock検証済みのmeaningだけである。一部のmodule doc commentには「runtime-disconnected」の語が残るが、2026-09-14以降これらは製品runtimeから使われている（`known-differences.ja.md` F-09）。
+`inku-ddl`の入口は`compile_ddl_to_score_with_resources`（`compiler_execution.rs`）で、元の`NormalizedDdlDocument`を一度だけcompileしてから、Stage 1.5、Plan、資源選択、materializeを順に行う。source・provenance・Macro definitionの照合はlock構築時に済ませ、Stage 1.5へ渡すのはlock検証済みのmeaningだけである。
 
 `inku-render`では`render.rs`が唯一の全体統率で、`render_with_resources`は`checked_performance`でScoreの版を見分け、compact Scoreを`typed_performance`（recipeからの個体化と`arrangement_performance`）へ、旧Scoreを従来の`anchor_execution`（`anchor_schedule`による依存順）へ振り分ける。geometry群（`geometry`、`affine`、`affine_geometry`、`arc`、`cloudform`、`contact`、`fill_geometry`、`surface_geometry`）は副作用のない点列計算、material群（`marks`、`mark_paths`、`stroke`、`fills`、`accepted_fills`、`surfaces`、`support`、`materials`、`ink_spread`）はmark／stroke／surfaceとsupportの相互作用、canvas群（`ground`、`ground_patterns`、`layers`、`palette`）はground／presence／色割当、`compat_clip`と`render_fill_scopes`は塗りの境界clipとpaint順、`svg.rs`は小さいdocument treeと最終serializeを所有する。`determinism.rs`は横断的に使われるがhost entropyは作らない。
 
@@ -206,13 +206,13 @@ flowchart LR
 | `feedback` | 3 | unread words | `_current_user` |
 | `pipeline` | 11 | canvas形式、variationの開始・取得・fork、execution command、author DDL、history link・fork、旧作品の読取・fork、provider観測 | 各routeで`_current_user`。provider観測はさらにdeveloper modeだけ |
 
-合計105（静的な数え上げ）。公開allowlistは `/health`、`/api/info`、`/api/auth/login` の3 pathである（`test_route_authorization.py`）。ログインに要らないものは残さない、が基準である。
+合計105。公開allowlistは `/health`、`/api/info`、`/api/auth/login` の3 pathである（`test_route_authorization.py`）。ログインに要らないものは残さない、が基準である。
 
-**⚠ この表の件数はrouteの宣言を数えたもので、live appを起動して数えてはいない。** 件数の正本とされる`test_route_authorization.py`の`EXPECTED_ROUTE_COUNT`は95で、API surface baselineは退役済みの`/api/prompts`を含み`/api/pipeline/*`を含まない（`known-differences.ja.md` F-06）。
+**⚠ router別の件数は手で写したもので、赤くする検査は無い。** 合計の正本は`test_route_authorization.py`の`EXPECTED_ROUTE_COUNT`（105）で、live appのOpenAPIから作った`tests/data/api-surface-baseline.json`も105 operationを記録する。
 
 ## 主要flow
 
-- `/api/paint`、`/api/paint/stream`、`/api/interpret`、`/api/compose`は`pipeline_compat.py`を通って同じ`PipelineService`を使う。streamは最終結果を`done` 1行で返し、層ごとの先行eventを出さない。補完案の承認が要る場合は4つとも409と現在のviewを返す。
+- `/api/paint`、`/api/paint/stream`、`/api/interpret`、`/api/compose`は`pipeline_compat.py`を通って同じ`PipelineService`を使う。streamは実行を読み直して`sketch`・`stage1`・`score`・`done`を順に知らせ、最初のeventの後の失敗を本文の`error` eventで返す。補完案の承認が要る場合、stream以外の3つは409と現在のviewを返し、streamは最初のeventより前なら409、後なら`error` eventを返す。記述起点の開始は札を切った記述だけをcoreへ渡し、札だけの記述を400で断る。
 - `/api/pipeline/variations`は記述またはdirect DDLからvariationを始め、`/executions/{id}/commands`が作者の操作（承認・辞退・補完要求・再生成・演奏・取消し）を、`/executions/{id}/author-ddl`がDDL編集を受ける。設定が変わるDDL編集は元を変えず親付きのvariationを新設する。
 - `/api/pipeline/history/{id}`は共有pipelineで保存した作品のvariation・revisionを返し、`/history/{id}/fork`はその時点のconfig・host context・Macro定義から派生する。`/legacy/{id}`と`/legacy/{id}/fork`はlinkを持たない旧作品を読み、元行を変えずに派生する。
 - `/api/render-score`と`/api/render-svg`はScoreの版で分かれ、compact Scoreは`ProductPipelineEffects.replay`、0.10未満は`saved_score_compat.py`を通る。

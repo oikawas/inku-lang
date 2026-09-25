@@ -3660,14 +3660,15 @@ is the newest automatic backup** and the highest number is the next to be pruned
 listing stops at 50 rows, but the reported total count and total size cover every
 file, so the cutoff cannot understate usage.
 
-Concurrent drawing requests are bounded at the application layer. Stage 1 and
-Stage 2 LLM calls share a bounded executor controlled by `INKU_STAGE_WORKERS`
-and `INKU_STAGE_QUEUE_LIMIT`. If capacity cannot be acquired, or if a stage
-exceeds its hard timeout, the request follows the same deterministic fallback
-path used for stage hard timeouts. Timed-out LLM calls may continue in their
-underlying Python thread until the provider call returns, so their capacity slot
-is retained until that worker actually finishes. This prevents timed-out
-provider calls from creating an unbounded backlog.
+Concurrent drawing requests are bounded at the application layer. The shared
+pipeline's model effects (color catalog selection, sketch, Stage 1, hole
+completion) run in the shared pipeline service's worker pool (4 threads by
+default), and the pool keeps up to 8 executions resident by default. When every
+resident execution is busy, a new start is refused with 429. Each effect is sent
+to the provider once; the core decides whether and when to retry within the
+finite budget of §12.8. The effects one run may advance are bounded as well (32
+by default), so no backlog grows without limit. The installation's pipeline
+manifest holds these limits.
 
 Per-user drawing counters are updated with a single database-side atomic
 increment so simultaneous `/api/paint` requests for the same user do not lose

@@ -6,7 +6,7 @@ use crate::{
     collect_english_noun_phrase_evidence,
 };
 
-/// Stable identity for the runtime-disconnected attachment evidence foundation.
+/// Stable identity for the attachment evidence foundation.
 pub const ATTACHMENT_EVIDENCE_SCHEMA_ID: &str = "inku.attachment-evidence.v2";
 
 /// Language-independent identity of an explicit coordinated-head marker candidate.

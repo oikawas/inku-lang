@@ -1,4 +1,4 @@
-//! Runtime-disconnected source-preserving DDL document foundation.
+//! Source-preserving DDL document foundation.
 
 use std::fmt;
 
@@ -6,7 +6,7 @@ use crate::{
     MacroInvocation, ResolvedInstructionLanguage, validate_macro_definition_semantic_version,
 };
 
-/// Stable identity for the runtime-disconnected DDL document foundation.
+/// Stable identity for the DDL document foundation.
 pub const NORMALIZED_DDL_DOCUMENT_SCHEMA_ID: &str = "inku.normalized-ddl-document.v1";
 
 /// A definition identity locked outside the visible DDL source.

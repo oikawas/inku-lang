@@ -211,29 +211,16 @@ def test_managed_api_persists_approved_patch_reload_and_legacy_fork(
                 "elapsed_ms": "1",
             }
         assert action["tag"] == "complete_visible_ddl_holes"
-        message = json.loads(action["payload"]["prompt"]["message"])
-        hole = message["selected_holes"][0]
-        patch = {
-            "schema_id": "inku.visible-ddl-patch.v1",
-            "base_source_digest": message["base_source_digest"],
-            "base_compiler_lock_digest": message[
-                "base_compiler_lock_digest"
-            ],
-            "edits": [
-                {
-                    "hole_id": hole["hole_id"],
-                    "allowed_span": hole["allowed_span"],
-                    "expected_range_digest": hole[
-                        "expected_range_digest"
-                    ],
-                    "replacement": "8",
-                }
-            ],
-        }
+        # Prompt v3 names each hole by a short ID and keeps source ranges and
+        # digests in the core; the provider answers only with replacement text.
+        assert action["payload"]["prompt"]["prompt_id"] == (
+            "inku.visible-ddl-hole-completion-prompt.v3"
+        )
+        answer = {"results": [{"id": "h1", "status": "proposed", "replacement": "8"}]}
         return {
             "tag": "visible_ddl_hole_patch_generated",
             "identity": action["identity"],
-            "response": json.dumps(patch, separators=(",", ":")),
+            "response": json.dumps(answer, separators=(",", ":")),
             "elapsed_ms": "1",
         }
 
@@ -315,7 +302,13 @@ def test_managed_api_persists_approved_patch_reload_and_legacy_fork(
         assert proposal["variation_id"] == variation_id
         assert proposal["authority"]["origin"] == "stage1_generated"
         assert proposal["authority"]["authority"] == "ddl_authoritative"
-        assert proposal["delivery"] is None
+        # The hole ("many square.") waits for the author, while the independent
+        # red circle already has a safe Score (SPEC §12.7.1).
+        assert proposal["delivery"]["outcome"] == "complete_with_omissions"
+        assert [
+            instruction["primitive"]
+            for instruction in proposal["delivery"]["score"]["instructions"]
+        ] == ["circle"]
         assert [call["tag"] for call in provider_calls] == [
             "generate_normalized_ddl",
             "complete_visible_ddl_holes",

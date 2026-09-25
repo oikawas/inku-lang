@@ -1354,6 +1354,25 @@ def test_history_output_files_are_rebuildable_from_db(tmp_path):
     db.delete_user_group(group["id"])
 
 
+def test_rebuilding_output_files_follows_the_save_switch_in_bounded_batches(monkeypatch):
+    """The files are written inside the request, so the batch is small, and
+    the rebuild used to write them with the administrator's switch off."""
+    suffix = uuid.uuid4().hex[:8]
+    user = db.add_user(f"rebuild-{suffix}", f"rebuild-{suffix}@example.test", "password-123", ["users"], None)
+    headers, token = _auth_headers(user)
+    try:
+        monkeypatch.setattr(history_routes, "_output_save_settings", lambda: {"enabled": False})
+        switched_off = client.post("/api/history/rebuild-output-files", json={"ids": ["any"]}, headers=headers)
+        assert switched_off.status_code == 409
+
+        monkeypatch.setattr(history_routes, "_output_save_settings", lambda: {"enabled": True})
+        too_many = [str(uuid.uuid4()) for _ in range(51)]
+        assert client.post("/api/history/rebuild-output-files", json={"ids": too_many}, headers=headers).status_code == 422
+    finally:
+        db.delete_session(token)
+        db.delete_user(user["id"])
+
+
 def test_artifact_save_submit_skips_when_queue_is_full(monkeypatch, caplog):
     class FullSlots:
         def acquire(self, blocking: bool = True):
@@ -2329,6 +2348,7 @@ def test_render_concurrency_settings_are_admin_only():
         db.delete_user(admin["id"])
         db.delete_user(user["id"])
         db.delete_user_group(group["id"])
+
 
 
 def test_log_retention_settings_are_admin_only():

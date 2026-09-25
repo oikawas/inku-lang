@@ -254,6 +254,9 @@ private const val HISTORY_SWIPE_AXIS_LOCK = 1.6f
 /** How often the running row redraws its elapsed time. */
 private const val RUN_STATUS_TICK_MS = 100L
 
+/** How long a copy or export note stays under the canvas. */
+private const val CANVAS_MESSAGE_MS = 5_000L
+
 /** The description field. The instrumented IME test needs to reach it by name. */
 internal const val DESCRIPTION_INPUT_TAG = "description_input"
 
@@ -1246,7 +1249,11 @@ private fun WebStyleModelStageEditor(
     onSelectModel: (String) -> Unit,
 ) {
     val providers = modelProviderGroupsFor(state)
-    val selectedProviderId = providerOfModelId(selectedModelId, state)
+    // A service picked from the menu that offers no model cannot select one,
+    // so the pick is remembered here; otherwise the menu closed with nothing
+    // changed and no reason given. It gives way once a model is selected.
+    var pickedProviderId by remember(title, selectedModelId) { mutableStateOf<String?>(null) }
+    val selectedProviderId = pickedProviderId ?: providerOfModelId(selectedModelId, state)
     val selectedProvider = providers.firstOrNull { it.providerId == selectedProviderId } ?: providers.firstOrNull()
     val strings = S
     val models = modelOptionsForProvider(state, selectedProviderId, strings)
@@ -1284,9 +1291,8 @@ private fun WebStyleModelStageEditor(
                         },
                         onClick = {
                             providerMenuOpen = false
-                            modelOptionsForProvider(state, provider.providerId, strings).firstOrNull()?.let { option ->
-                                onSelectModel(option.qualifiedId)
-                            }
+                            val first = modelOptionsForProvider(state, provider.providerId, strings).firstOrNull()
+                            if (first != null) onSelectModel(first.qualifiedId) else pickedProviderId = provider.providerId
                         },
                     )
                 }
@@ -2312,6 +2318,15 @@ private fun CanvasHeroCard(
     var exportSheetOpen by remember { mutableStateOf(false) }
     var generationInfoOpen by remember { mutableStateOf(false) }
     var pngExporting by remember { mutableStateOf(false) }
+    // The note under the canvas answers one action -- a copy, an export -- and
+    // used to stay until the next one, beside whatever work came after. It
+    // clears itself now; a PNG still being made keeps its progress line.
+    LaunchedEffect(canvasMessage, pngExporting) {
+        if (canvasMessage != null && !pngExporting) {
+            delay(CANVAS_MESSAGE_MS)
+            canvasMessage = null
+        }
+    }
     var instructionCaptionVisible by remember(state.canvasPresentationMode, state.presentationHistory != null) {
         mutableStateOf(if (state.presentationHistory != null) false else presentationPreferences.getBoolean(PRESENTATION_CAPTION_VISIBLE_KEY, true))
     }

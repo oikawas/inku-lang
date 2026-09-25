@@ -406,7 +406,7 @@ object InkuStringsEn : InkuStrings {
     override val interpretation = "Interpretation"
     override val awaitingInterpretation = "Waiting for the interpretation…"
     override val language = "Language"
-    override val miscSubtitle = "Language, theme and density"
+    override val miscSubtitle = "Language, text size and display"
     override val description = "Description"
     override val camera = "Camera"
     override val cameraInputSourceTitle = "Choose an image"

@@ -376,7 +376,7 @@ object InkuStringsJa : InkuStrings {
     override val interpretation = "解釈"
     override val awaitingInterpretation = "解釈を待機中..."
     override val language = "言語"
-    override val miscSubtitle = "言語・テーマ・密度"
+    override val miscSubtitle = "言語・文字の大きさ・表示"
     override val description = "記述"
     override val camera = "カメラ"
     override val cameraInputSourceTitle = "画像を選ぶ"

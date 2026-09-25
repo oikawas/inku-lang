@@ -956,6 +956,7 @@ export interface LangPack {
 	historySelectionCleared: (reason: 'query' | 'filter' | 'trash') => string;
 	historyPreviewTitle: string;
 	historyPreviewDetails: string;
+	historyPreviewRenderVersion: string;
 	historyPreviewOpenHint: string;
 	historyPreviewLoading: string;
 	historyPreviewUnavailable: string;

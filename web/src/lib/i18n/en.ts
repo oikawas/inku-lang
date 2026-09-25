@@ -1031,6 +1031,7 @@ export const en: LangPack = {
 	historySelectionCleared: (reason) => ({ query: 'Selection cleared because the search changed.', filter: 'Selection cleared because the filter changed.', trash: 'Selection cleared because the trash view changed.' })[reason],
 	historyPreviewTitle: 'Work preview',
 	historyPreviewDetails: 'Work details',
+	historyPreviewRenderVersion: 'Engine ver.',
 	historyPreviewOpenHint: 'Double-click to open the work',
 	historyPreviewLoading: 'Loading work…',
 	historyPreviewUnavailable: 'The work details could not be loaded.',

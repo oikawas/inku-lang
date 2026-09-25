@@ -335,6 +335,20 @@ class PipelineService:
         observations = self.provider_observations(owner, execution_id) if requested and self.provider_observations else []
         return {"capture_enabled": requested, "observations": observations}
 
+    def system_prompts(self, owner: str, variation_id: str) -> dict:
+        """The Stage 1 and Stage 2 system prompts this variation actually sent.
+
+        Read from saved state only. `recorded` is false for an execution saved
+        before the record existed; a stage that never called a model is null.
+        """
+        record = self.store.read_latest_execution_for_variation(owner, variation_id)
+        if record is None:
+            raise HTTPException(404, "variation_not_found")
+        prompts = json.loads(record.state_bytes).get("context", {}).get("system_prompts")
+        if not isinstance(prompts, dict):
+            return {"recorded": False, "stage1": None, "stage2": None}
+        return {"recorded": True, "stage1": prompts.get("stage1"), "stage2": prompts.get("stage2")}
+
     def get(self, owner: str, variation_id: str) -> dict:
         record = self.store.read_latest_execution_for_variation(owner, variation_id)
         if record is None:
@@ -481,6 +495,10 @@ def pipeline_router(service: PipelineService | Callable[[], PipelineService], ac
     @router.get("/variations/{variation_id}")
     def get(variation_id: str, actor: dict = Depends(actor_dependency)):
         return current_service().get(actor["id"], variation_id)
+
+    @router.get("/variations/{variation_id}/system-prompts")
+    def system_prompts(variation_id: str, actor: dict = Depends(actor_dependency)):
+        return current_service().system_prompts(actor["id"], variation_id)
 
     @router.post("/variations/{variation_id}/fork-description")
     def fork(variation_id: str, body: ForkDescriptionBody, actor: dict = Depends(actor_dependency)):

@@ -59,7 +59,9 @@ PUBLIC = {  # every entry needs a reason
 #   Both landed with the shared Rust cutover and were not counted then.
 #   +1 for GET /api/pipeline/history/{history_id}/ddl-export, added by
 #   draw-system04 after the Server branch's API surface was recorded.
-EXPECTED_ROUTE_COUNT = 106
+#   +1 for GET /api/pipeline/variations/{variation_id}/system-prompts, the
+#   system prompts a work actually sent, for the prompt tab (2026-09-25).
+EXPECTED_ROUTE_COUNT = 107
 
 
 def _guard_names(dependant, seen=None) -> set[str]:

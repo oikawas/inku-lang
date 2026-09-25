@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { t } from '$lib/i18n/index.svelte';
+	import type { SystemPromptsState } from '$lib/features/canvas/system-prompts';
 
 	type Props = {
 		outputTab: 'prompts' | 'score';
@@ -7,6 +8,8 @@
 		    holds this reads it to put the reader back where they closed it. */
 		scrollEl?: HTMLElement | null;
 		stage1PromptText: string;
+		/** The system prompts this work sent, as its execution kept them. */
+		systemPrompts?: SystemPromptsState;
 		ddl: string | null;
 		copiedPrompt: 'stage1' | 'stage2' | 'score' | null;
 		scoreJsonText: string;
@@ -20,6 +23,7 @@
 		outputTab,
 		scrollEl = $bindable(null),
 		stage1PromptText,
+		systemPrompts = { state: 'not_recorded' },
 		ddl,
 		copiedPrompt,
 		scoreJsonText,
@@ -30,6 +34,21 @@
 	}: Props = $props();
 
 	const scoreJsonHighlightedLines = $derived(scoreJsonHighlighted ? scoreJsonHighlighted.split('\n') : []);
+
+	let stage1SystemExpanded = $state(false);
+	let stage2SystemExpanded = $state(false);
+	const stage1System = $derived(systemPrompts.state === 'recorded' ? systemPrompts.stage1 : null);
+	const stage2System = $derived(systemPrompts.state === 'recorded' ? systemPrompts.stage2 : null);
+	// Said in place of a stage's system prompt when there is none to show.
+	const systemPromptNote = $derived(
+		systemPrompts.state === 'loading'
+			? t().promptLoading
+			: systemPrompts.state === 'recorded'
+				? t().promptSystemNotSent
+				: systemPrompts.state === 'not_recorded'
+					? t().promptSystemNotRecorded
+					: t().promptSystemUnavailable
+	);
 </script>
 
 {#if outputTab === 'prompts'}
@@ -51,6 +70,20 @@
 			</button>
 		</div>
 		<textarea class="prompt-textarea prompt-user stage1-user" readonly value={stage1PromptText}></textarea>
+		<div class="prompt-collapsible-head">
+			<p class="prompt-label">{t().promptStage1System}</p>
+			{#if stage1System}
+				<button class="ghost-btn" type="button" onclick={() => (stage1SystemExpanded = !stage1SystemExpanded)}>{stage1SystemExpanded ? t().promptCollapse : t().promptExpand}</button>
+			{/if}
+		</div>
+		{#if stage1System}
+			<div class="prompt-collapse" class:expanded={stage1SystemExpanded}>
+				<textarea class="prompt-textarea prompt-system" readonly value={stage1System.system}></textarea>
+				{#if !stage1SystemExpanded}<div class="prompt-fade"></div>{/if}
+			</div>
+		{:else}
+			<p class="prompt-note">{systemPromptNote}</p>
+		{/if}
 		{#if ddl}
 			<div class="prompt-head">
 				<p class="prompt-label">{t().promptStage2Input}</p>
@@ -69,6 +102,20 @@
 				</button>
 			</div>
 			<textarea class="prompt-textarea prompt-user" readonly value={ddl}></textarea>
+		{/if}
+		<div class="prompt-collapsible-head">
+			<p class="prompt-label">{t().promptStage2System}</p>
+			{#if stage2System}
+				<button class="ghost-btn" type="button" onclick={() => (stage2SystemExpanded = !stage2SystemExpanded)}>{stage2SystemExpanded ? t().promptCollapse : t().promptExpand}</button>
+			{/if}
+		</div>
+		{#if stage2System}
+			<div class="prompt-collapse" class:expanded={stage2SystemExpanded}>
+				<textarea class="prompt-textarea prompt-system stage2-system" readonly value={stage2System.system}></textarea>
+				{#if !stage2SystemExpanded}<div class="prompt-fade"></div>{/if}
+			</div>
+		{:else}
+			<p class="prompt-note">{systemPromptNote}</p>
 		{/if}
 	</div>
 {/if}
@@ -179,6 +226,39 @@
 	}
 	.prompt-user { min-height: 120px; }
 	.stage1-user { min-height: 60px; height: 60px; }
+	.prompt-collapsible-head {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		margin-top: 8px;
+	}
+	.prompt-collapsible-head .prompt-label { margin: 0; }
+	.prompt-system { min-height: 120px; height: 220px; }
+	.stage2-system { min-height: 60px; height: 110px; }
+	.prompt-collapse {
+		position: relative;
+		max-height: 80px;
+		overflow: hidden;
+	}
+	.prompt-collapse.expanded {
+		max-height: none;
+		overflow: visible;
+	}
+	.prompt-collapse:not(.expanded) .prompt-system {
+		height: 120px;
+		resize: none;
+	}
+	.prompt-collapse:not(.expanded) .stage2-system { min-height: 60px; height: 60px; }
+	.prompt-fade {
+		position: absolute;
+		left: 0;
+		right: 0;
+		bottom: 0;
+		height: 32px;
+		background: linear-gradient(transparent, var(--bg));
+		pointer-events: none;
+	}
+	.prompt-note { margin: 2px 0 0; font-size: var(--ui-font-size-11); color: var(--fg3); }
 	.score-shell {
 		position: relative;
 		width: 100%;

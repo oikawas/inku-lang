@@ -480,6 +480,14 @@ export const en: LangPack = {
 
 	promptStage1Input: 'Stage 1 user input',
 	promptStage2Input: 'Stage 2 user input (normalized DDL)',
+	promptStage1System: 'Stage 1 system prompt',
+	promptStage2System: 'Stage 2 system prompt',
+	promptLoading: 'loading…',
+	promptExpand: 'Expand',
+	promptCollapse: 'Collapse',
+	promptSystemNotSent: 'This stage called no model for this work.',
+	promptSystemNotRecorded: 'Not recorded: this work was drawn before what it sent was kept.',
+	promptSystemUnavailable: 'Could not be loaded.',
 	promptCopy: 'Copy',
 	promptCopied: 'Copied',
 

@@ -204,11 +204,11 @@ flowchart LR
 | `lineage` | 8 | lineage graph/group、promote、colophon | `_current_user` |
 | `render` | 8 | variation seed、compose、interpret、render-score/svg、paint、paint stream、vision advice | `_current_user` |
 | `feedback` | 3 | unread words | `_current_user` |
-| `pipeline` | 12 | canvas形式、variationの開始・取得・fork、execution command、author DDL、history link・fork、作品のDDL書き出し（名指すplugin定義つき）、旧作品の読取・fork、provider観測 | 各routeで`_current_user`。provider観測はさらにdeveloper modeだけ |
+| `pipeline` | 13 | canvas形式、variationの開始・取得・fork、variationが送ったsystem prompt、execution command、author DDL、history link・fork、作品のDDL書き出し（名指すplugin定義つき）、旧作品の読取・fork、provider観測 | 各routeで`_current_user`。provider観測はさらにdeveloper modeだけ |
 
-合計106。公開allowlistは `/health`、`/api/info`、`/api/auth/login` の3 pathである（`test_route_authorization.py`）。ログインに要らないものは残さない、が基準である。
+合計107。公開allowlistは `/health`、`/api/info`、`/api/auth/login` の3 pathである（`test_route_authorization.py`）。ログインに要らないものは残さない、が基準である。
 
-**⚠ router別の件数は手で写したもので、赤くする検査は無い。** 合計の正本は`test_route_authorization.py`の`EXPECTED_ROUTE_COUNT`（106）で、live appのOpenAPIから作った`tests/data/api-surface-baseline.json`も106 operationを記録する。
+**⚠ router別の件数は手で写したもので、赤くする検査は無い。** 合計の正本は`test_route_authorization.py`の`EXPECTED_ROUTE_COUNT`（107）で、live appのOpenAPIから作った`tests/data/api-surface-baseline.json`も107 operationを記録する。
 
 ## 主要flow
 

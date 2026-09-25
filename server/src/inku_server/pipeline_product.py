@@ -152,6 +152,32 @@ def sketch_result(record: dict | None) -> dict:
     return {"sketch_text": None, "sketch_grain": None, "sketch_state": "fallback"}
 
 
+# The provider actions whose system prompt the prompt tab shows, by the name
+# the tab gives each stage.
+_SYSTEM_PROMPT_STAGES = {"generate_normalized_ddl": "stage1", "complete_visible_ddl_holes": "stage2"}
+
+
+def record_system_prompt(context: dict, action: dict) -> None:
+    """Keep the system prompt this action sends, as it is sent.
+
+    The last attempt of a stage replaces an earlier one, so a retry that
+    carried compiler feedback is what the work shows. The record lives in the
+    execution's saved context and is read only by its owner.
+    """
+    stage = _SYSTEM_PROMPT_STAGES.get(action["tag"])
+    prompt = (action.get("payload") or {}).get("prompt")
+    # A record for the reader: an action without a prompt draws as before.
+    if stage is None or not isinstance(prompt, dict):
+        return
+    context.setdefault("system_prompts", {})[stage] = {
+        "system": prompt["system"],
+        "prompt_id": prompt["prompt_id"],
+        "prompt_digest": prompt["prompt_digest"],
+        "instruction_language": prompt["instruction_language"],
+        "attempt": int(action["identity"]["attempt"]),
+    }
+
+
 class ProductPipelineEffects:
     def __init__(self, binding: PipelineBinding, manifest: dict):
         from . import db
@@ -253,7 +279,10 @@ class ProductPipelineEffects:
         )
         selected["developer_disable_llm_retries"] = options.get("developer_disable_llm_retries") is True
         selected["developer_capture_provider_io"] = options.get("developer_capture_provider_io") is True
+        # Present from the start, so a work whose stage never called a model
+        # reads as "not sent" and one drawn before the record as "not recorded".
         return config, {"host_options": selected, "color_maps": color_maps, "macro_catalog": catalog_context,
+                        "system_prompts": {},
                         "render_limits_source": self.settings.limits_source(work, requested_limits),
                         "auto_catalog": kind == "description" and mode == "auto",
                         "sketch_request": sketch_request_for(kind, options), "metrics": {}}
@@ -278,6 +307,7 @@ class ProductPipelineEffects:
                 owner,
                 context["execution_id"],
             ) if options.get("developer_capture_provider_io") is True else None)
+            record_system_prompt(context, action)
             _increment_stage_stat("submitted")
             result = transport(action)
             if result["tag"] != "provider_failed":

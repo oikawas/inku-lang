@@ -302,7 +302,7 @@ Every row carries an explanation. The render seed is "the seed that fixes the sw
 
 **The weight of a drawing is printed as three quantities.** `SVG size` is the amount of data, `SVG objects` is how many shapes the SVG holds (containers and notes — svg, defs, title, desc, metadata — are not shapes), and `SVG points` is how many points those shapes are drawn from. **None of the three stands in for the others**: at the same size, few objects with many points is a drawing of fine lines, and many objects with few points is a drawing of many forms.
 
-`Prompts` shows the Stage 1 and Stage 2 system prompts and user input; `JSON` shows the JSON Score. Do not confuse the JSON Score itself with the provenance.
+`Prompts` shows the Stage 1 and Stage 2 system prompts and user input; `JSON` shows the JSON Score. The system prompts are the ones actually sent when the work was drawn, and they differ from work to work with the plugins, the sketch, and retries. A stage that called no model (Stage 1 of DDL you wrote yourself, Stage 2 when no hole needed filling) and a work drawn before the record began say so instead. Do not confuse the JSON Score itself with the provenance.
 
 If Stage 1 does not answer in time, returns an empty answer, or fails, a stock set of instructions is performed and the reason is recorded as `Interpretation fallback`.
 

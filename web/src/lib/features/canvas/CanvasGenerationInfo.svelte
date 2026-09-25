@@ -10,6 +10,7 @@
 	import { t } from '$lib/i18n/index.svelte';
 	import { normalizeSketchGrain, normalizeSketchState, sketchGrainLabel, sketchStateNote } from '$lib/sketch';
 	import type { SvgWeight } from '$lib/svgWeight';
+	import { loadSystemPrompts, type SystemPromptsState } from './system-prompts';
 
 	export type GenerationInfoWork = {
 		note?: string | null;
@@ -30,6 +31,8 @@
 		stage1_prompt_digest?: string | null;
 		stage1_prompt_base_digest?: string | null;
 		stage2_prompt_digest?: string | null;
+		pipeline_variation_id?: string | null;
+		pipeline_revision?: string | null;
 		render_color_map?: ColorMap | null;
 		render_canvas_aspect_ratio?: number | null;
 		derivation_kind?: string | null;
@@ -122,6 +125,25 @@
 		onCopyStatusHash,
 		onCopyPromptText
 	}: Props = $props();
+
+	// The system prompts are the ones this work sent, read from its execution
+	// when the tab is first shown for it. A later revision of the same
+	// variation (an approved patch) may have sent another Stage 2.
+	const systemPromptsVariationId = $derived(statusHistoryItem?.pipeline_variation_id ?? result?.pipeline_variation_id ?? null);
+	const systemPromptsRevision = $derived(statusHistoryItem?.pipeline_revision ?? result?.pipeline_revision ?? null);
+	let systemPrompts = $state<SystemPromptsState>({ state: 'loading' });
+	let systemPromptsKey: string | null = null;
+	$effect(() => {
+		if (!open || tab !== 'prompts') return;
+		const variationId = systemPromptsVariationId;
+		const key = `${variationId ?? ''}@${systemPromptsRevision ?? ''}`;
+		if (key === systemPromptsKey) return;
+		systemPromptsKey = key;
+		systemPrompts = { state: 'loading' };
+		void loadSystemPrompts(variationId).then((loaded) => {
+			if (systemPromptsKey === key) systemPrompts = loaded;
+		});
+	});
 
 	const detailRenderSeed = $derived(statusHistoryItem?.render_seed ?? result?.render_seed ?? null);
 	const detailVarySeed = $derived(statusHistoryItem?.composition_seed ?? result?.composition_seed ?? null);
@@ -330,6 +352,7 @@
 				bind:scrollEl={tabsScrollEl}
 				outputTab={tab}
 				{stage1PromptText}
+				{systemPrompts}
 				{ddl}
 				{copiedPrompt}
 				{scoreJsonText}

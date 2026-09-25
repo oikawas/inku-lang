@@ -192,6 +192,7 @@ hostは信頼済みのrender option（解決済みcolor map、render seed、wild
 - 診断は履歴sidecarにも保存され、履歴を開き直すと当該revisionの診断が戻る。sidecarが壊れていても、その作品だけに警告を出し、保存DDL・Score・SVGの表示を続ける。
 - logには`pipeline_compiler_outcome`として、診断の件数と安全な投影（source本文を含まない）だけが出る。
 - providerとの送受信の原文は、developer modeで`developer_capture_provider_io`を指定した実行だけ、所有者限定の記録として残り、`/api/pipeline/executions/{id}/provider-observations`で読める。通常の履歴・応答・logには入らない。
+- Stage 1（作品計画）とhole completion（Stage 2）がproviderへ送ったsystem promptは、実行ごとに各Stageの最後の送信だけを実行のcontextに残す（再試行ではcompilerの指摘を含む最後の送信）。所有者だけが`/api/pipeline/variations/{id}/system-prompts`で読み、Webの生成情報のプロンプトタブが表示する。modelを呼ばなかったStageはnull、この記録より前の実行は`recorded: false`になる。
 - streamは実行を読み直し、`sketch`（写生を通した場合）・`stage1`（保存したDDL）・`score`（instruction数）・`done`（通常応答）の順に知らせる。最初のeventより前の失敗はHTTPの状態そのもので届き、最初のeventが出た後の失敗（補完案の承認待ちを含む）は本文の`error` eventで届く。token数は共有pipelineが数えないためnullである。
 
 ## 判定の一覧

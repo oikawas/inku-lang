@@ -1,6 +1,6 @@
 {
-  "endpoint_count": 106,
-  "operation_count": 106,
+  "endpoint_count": 107,
+  "operation_count": 107,
   "schema_count": 160,
   "operations": [
     {
@@ -984,6 +984,21 @@
       }
     },
     {
+      "path": "/api/pipeline/variations/{variation_id}/system-prompts",
+      "method": "GET",
+      "operationId": "system_prompts_api_pipeline_variations__variation_id__system_prompts_get",
+      "params": [
+        "cookie:inku_session:opt",
+        "header:authorization:opt",
+        "path:variation_id:req"
+      ],
+      "requestBody": "null",
+      "responses": {
+        "200": "{\"content\":{\"application/json\":{\"schema\":{}}},\"description\":\"Successful Response\"}",
+        "422": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/HTTPValidationError\"}}},\"description\":\"Validation Error\"}"
+      }
+    },
+    {
       "path": "/api/plugins",
       "method": "GET",
       "operationId": "api_plugins_api_plugins_get",
@@ -1716,5 +1731,5 @@
     "VisionRefineAdviceBody": "{\"properties\":{\"direction\":{\"default\":\"\",\"maxLength\":2000,\"title\":\"Direction\",\"type\":\"string\"},\"enabled_kinds\":{\"items\":{\"type\":\"string\"},\"maxItems\":5,\"minItems\":1,\"title\":\"Enabled Kinds\",\"type\":\"array\"},\"history_id\":{\"maxLength\":200,\"minLength\":1,\"title\":\"History Id\",\"type\":\"string\"},\"instruction\":{\"maxLength\":100000,\"minLength\":1,\"title\":\"Instruction\",\"type\":\"string\"},\"language\":{\"default\":\"ja\",\"pattern\":\"^(ja|en)$\",\"title\":\"Language\",\"type\":\"string\"},\"model\":{\"anyOf\":[{\"maxLength\":200,\"minLength\":1,\"type\":\"string\"},{\"type\":\"null\"}],\"title\":\"Model\"}},\"required\":[\"history_id\",\"instruction\",\"enabled_kinds\"],\"title\":\"VisionRefineAdviceBody\",\"type\":\"object\"}",
     "VisionRefineAdviceResponse": "{\"properties\":{\"model\":{\"title\":\"Model\",\"type\":\"string\"},\"next_direction\":{\"title\":\"Next Direction\",\"type\":\"string\"},\"observation\":{\"title\":\"Observation\",\"type\":\"string\"},\"suggested_kind\":{\"title\":\"Suggested Kind\",\"type\":\"string\"}},\"required\":[\"observation\",\"next_direction\",\"suggested_kind\",\"model\"],\"title\":\"VisionRefineAdviceResponse\",\"type\":\"object\"}"
   },
-  "digest": "f564190d7a5eabe945ffd096a20bfddc05e7dab1ad96eb53a3dab1fba375144a"
+  "digest": "e9741691f41aeb77ccbdb08183a38bb8fd76255333312f2f94a33981bc20f5c8"
 }

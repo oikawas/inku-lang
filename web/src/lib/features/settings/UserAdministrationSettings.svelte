@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
 	import { t } from '$lib/i18n/index.svelte';
-	import { canManageUsers, type PermissionGroup } from '$lib/permissionGroups';
+	import { canManageUsers, managesListedUser, type PermissionGroup } from '$lib/permissionGroups';
 	import type {
 		CreateSettingsUserInput,
 		SettingsUserAdministration,
@@ -285,8 +285,9 @@
 					<div class="user-list-toolbar"><input type="search" bind:value={userSearch} placeholder={t().userSearchPlaceholder} aria-label={t().userSearchPlaceholder} /><label><span>{t().settingsUsersLabel}</span><select bind:value={userFilter}><option value="all">{t().userFilterAll}</option><option value="admins">{t().permissionGroupAdmins}</option><option value="leaders">{t().permissionGroupLeaders}</option><option value="users">{t().permissionGroupUsers}</option><option value="ungrouped">{t().userFilterNoGroup}</option></select></label></div>
 					<div class="user-list">
 						{#each filteredUsers as user (user.id)}
+							{@const editable = managesListedUser(currentUser, user)}
 							<div class="user-row" class:selected={selectedUserId === user.id}>
-						<button class="user-select" aria-pressed={selectedUserId === user.id} onclick={() => onSetEditUser(user)} disabled={userBusy || editUserDirty}>
+						<button class="user-select" aria-pressed={selectedUserId === user.id} onclick={() => onSetEditUser(user)} disabled={userBusy || editUserDirty || !editable}>
 						<span class="user-cell user-name">{user.username}</span>
 						<span class="user-cell">
 						<small>{t().userEmailPlaceholder}</small>{user.email}</span>
@@ -297,7 +298,7 @@
 						<span class="user-cell user-count-cell">
 						<small>{t().userGenerationCountLabel}</small>{user.image_generation_count.toLocaleString()}</span>
 						</button>
-						<button class="ghost-btn" onclick={() => onRemoveUser(user)} disabled={userBusy}>{t().deleteButton}</button>
+						{#if editable}<button class="ghost-btn" onclick={() => onRemoveUser(user)} disabled={userBusy}>{t().deleteButton}</button>{:else}<span class="user-own-note">{t().userOwnRowProfileHint}</span>{/if}
 						</div>
 						{:else}<div class="inline-message">{t().userNoSearchResults}</div>
 						{/each}
@@ -420,6 +421,11 @@
 		border-radius: var(--r);
 		padding: 12px;
 		background: var(--panel);
+	}
+	.user-own-note {
+		font-size: var(--ui-font-size-10);
+		color: var(--fg3);
+		align-self: center;
 	}
 	.popover-group-label {
 		font-size: var(--ui-font-size-10); color: var(--fg3); text-transform: uppercase; letter-spacing: 0.08em;

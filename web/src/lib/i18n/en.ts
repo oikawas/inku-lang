@@ -1029,6 +1029,7 @@ export const en: LangPack = {
 	userSelectPrompt: 'Select a user from the list to edit.',
 	userManageUnavailable: 'User management is available only to admins and group leads.',
 	userLeaderScopeNote: 'As a leader, you add, edit, and delete only the ordinary users of your own group.',
+	userOwnRowProfileHint: 'Change your own account in your profile',
 	userGroupLabel: 'Groups',
 	userNoGroup: 'No group',
 	userDeleteBlockedMessage: 'Cannot delete a user with history.',

@@ -1029,6 +1029,7 @@ export const ja: LangPack = {
 	userSelectPrompt: '一覧から変更するユーザーを選択してください。',
 	userManageUnavailable: 'ユーザー管理は管理者またはグループリードのみ利用できます。',
 	userLeaderScopeNote: 'リーダーは、所属グループの通常ユーザーだけを追加・編集・削除できます。',
+	userOwnRowProfileHint: '自分のアカウントはプロフィールから変更します',
 	userGroupLabel: 'グループ',
 	userNoGroup: '所属なし',
 	userDeleteBlockedMessage: '履歴を持つユーザーは削除できません。',

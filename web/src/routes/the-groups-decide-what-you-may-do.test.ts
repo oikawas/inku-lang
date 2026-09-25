@@ -17,6 +17,7 @@ import {
 	ADMIN_ONLY_SETTINGS_TABS,
 	USER_MANAGER_SETTINGS_TABS,
 	canAccessSettingsTab,
+	managesListedUser,
 	defaultSettingsTab,
 	holdsPermissionGroup
 } from '../lib/permissionGroups.ts';
@@ -64,4 +65,12 @@ test('a leader opens the users tab, and a plain member does not', () => {
 	assert.deepEqual(USER_MANAGER_SETTINGS_TABS, ['users']);
 	assert.equal(canAccessSettingsTab('users', leader), true);
 	assert.equal(canAccessSettingsTab('users', plain), false);
+});
+
+test('the row of the leader themselves offers no edit or delete, which the server would refuse', () => {
+	const self = { id: 'leader-1', permission_groups: ['leaders'] as const };
+	const administrator = { id: 'admin-1', permission_groups: ['admins'] as const };
+	assert.equal(managesListedUser(self, { id: 'leader-1' }), false);
+	assert.equal(managesListedUser(self, { id: 'member-1' }), true);
+	assert.equal(managesListedUser(administrator, { id: 'admin-1' }), true, 'administrators keep their own row');
 });

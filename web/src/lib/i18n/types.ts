@@ -947,6 +947,7 @@ export interface LangPack {
 	userSelectPrompt: string;
 	userManageUnavailable: string;
 	userLeaderScopeNote: string;
+	userOwnRowProfileHint: string;
 	userGroupLabel: string;
 	userNoGroup: string;
 	userDeleteBlockedMessage: string;

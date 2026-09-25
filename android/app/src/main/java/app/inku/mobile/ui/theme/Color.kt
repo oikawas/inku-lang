@@ -108,6 +108,12 @@ val CameraDevelopmentExposureGlow = Color(0xFFFFF2B8)
 val CameraDevelopmentGrain = Color(0xFF7D6F66)
 val CameraDevelopmentOutline = Color(0xFF1C1C1C)
 
+/** The deep teal wash under the photo-reading scanlines. */
+val CameraDevelopmentScanTint = Color(0xFF062C38)
+
+/** The dark wash under the plotter-like forms while the work is finished. */
+val CameraDevelopmentPlotterShade = Color(0xFF201E22)
+
 // --- Presentation mode ------------------------------------------------------
 // Picked by the artwork's own luminance, so both a dark and a light ground exist.
 

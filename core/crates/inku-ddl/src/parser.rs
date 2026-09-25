@@ -5,8 +5,8 @@ use std::collections::HashSet;
 use serde::Serialize;
 
 use crate::{
-    CanonicalRelationForm, CanonicalRelationIdentity, ExactDecimal, GeometryKeyword,
-    MarkerId, NormalizedDdlDocument, ResolvedInstructionLanguage, SAIJIKI_ASSET_ID,
+    CanonicalRelationForm, CanonicalRelationIdentity, ExactDecimal, GeometryKeyword, MarkerId,
+    NormalizedDdlDocument, ResolvedInstructionLanguage, SAIJIKI_ASSET_ID,
     grammar_markers::{MarkerMatchKind, grammar_marker_definitions},
     saijiki::{canonical_relation_identity, parser_candidate_surfaces},
     saijiki_asset,
@@ -888,17 +888,19 @@ fn candidates_at(
                 definition.id,
                 candidate_identity,
             ),
-            MarkerMatchKind::JapaneseDocumentHead | MarkerMatchKind::EnglishWord => push_surface_candidate(
-                &mut candidates,
-                source,
-                start_byte,
-                language,
-                require_boundary,
-                definition.id.surface(),
-                definition.priority,
-                candidate_identity,
-                CandidateDelivery::Token(NeutralTokenKind::GrammarMarker(definition.id)),
-            ),
+            MarkerMatchKind::JapaneseDocumentHead | MarkerMatchKind::EnglishWord => {
+                push_surface_candidate(
+                    &mut candidates,
+                    source,
+                    start_byte,
+                    language,
+                    require_boundary,
+                    definition.id.surface(),
+                    definition.priority,
+                    candidate_identity,
+                    CandidateDelivery::Token(NeutralTokenKind::GrammarMarker(definition.id)),
+                )
+            }
         }
     }
     if language == ResolvedInstructionLanguage::Ja {
@@ -1252,8 +1254,9 @@ fn has_relative_scale_head_context(
         let next = candidates_at(source, cursor, language, false)
             .into_iter()
             .filter(|candidate| match &candidate.delivery {
-                CandidateDelivery::Token(NeutralTokenKind::GrammarMarker(_)
-                    | NeutralTokenKind::FunctionWord) => true,
+                CandidateDelivery::Token(
+                    NeutralTokenKind::GrammarMarker(_) | NeutralTokenKind::FunctionWord,
+                ) => true,
                 CandidateDelivery::Token(NeutralTokenKind::CoreModifier(_)) => true,
                 // A count between the scale and its head keeps the phrase, e.g.
                 // `大きな 四つ の 円`.
@@ -2011,7 +2014,8 @@ mod tests {
             embedded_source[unknown.span.start_byte..unknown.span.end_byte].starts_with("とばら")
         );
 
-        for coordinated_source in ["黒い線と赤い円を置く。", "黒い線と 赤い円を置く。"] {
+        for coordinated_source in ["黒い線と赤い円を置く。", "黒い線と 赤い円を置く。"]
+        {
             let coordinated = parse_neutral_lexemes(
                 &NormalizedDdlDocument::new(
                     coordinated_source,

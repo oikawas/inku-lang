@@ -1596,8 +1596,18 @@ mod tests {
         let ja = saijiki_tool_guidance(ResolvedInstructionLanguage::Ja).unwrap();
         let en = saijiki_tool_guidance(ResolvedInstructionLanguage::En).unwrap();
         let expected_ja = [
-            "銀筆", "鉛筆", "ペン", "ロットリング", "クレヨン", "チョーク", "細筆",
-            "太筆", "油彩", "ビュラン", "ドライポイント", "コンピュータ",
+            "銀筆",
+            "鉛筆",
+            "ペン",
+            "ロットリング",
+            "クレヨン",
+            "チョーク",
+            "細筆",
+            "太筆",
+            "油彩",
+            "ビュラン",
+            "ドライポイント",
+            "コンピュータ",
         ];
         let expected_en = [
             "silverpoint",

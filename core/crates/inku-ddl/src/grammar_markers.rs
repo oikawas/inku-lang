@@ -170,31 +170,131 @@ pub(crate) struct GrammarMarkerDefinition {
 pub(crate) const GRAMMAR_MARKER_PRIORITY: u8 = 1;
 
 const GRAMMAR_MARKERS: &[GrammarMarkerDefinition] = &[
-    GrammarMarkerDefinition { id: MarkerId::JaRepeat, match_kind: MarkerMatchKind::JapaneseAttached, priority: GRAMMAR_MARKER_PRIORITY },
-    GrammarMarkerDefinition { id: MarkerId::JaGroup, match_kind: MarkerMatchKind::JapaneseAttached, priority: GRAMMAR_MARKER_PRIORITY },
-    GrammarMarkerDefinition { id: MarkerId::JaSequenceTe, match_kind: MarkerMatchKind::JapaneseAttached, priority: GRAMMAR_MARKER_PRIORITY },
-    GrammarMarkerDefinition { id: MarkerId::JaWo, match_kind: MarkerMatchKind::JapaneseAttached, priority: GRAMMAR_MARKER_PRIORITY },
-    GrammarMarkerDefinition { id: MarkerId::JaNi, match_kind: MarkerMatchKind::JapaneseAttached, priority: GRAMMAR_MARKER_PRIORITY },
-    GrammarMarkerDefinition { id: MarkerId::JaDe, match_kind: MarkerMatchKind::JapaneseAttached, priority: GRAMMAR_MARKER_PRIORITY },
-    GrammarMarkerDefinition { id: MarkerId::JaNo, match_kind: MarkerMatchKind::JapaneseAttached, priority: GRAMMAR_MARKER_PRIORITY },
-    GrammarMarkerDefinition { id: MarkerId::JaWa, match_kind: MarkerMatchKind::JapaneseAttached, priority: GRAMMAR_MARKER_PRIORITY },
-    GrammarMarkerDefinition { id: MarkerId::JaGa, match_kind: MarkerMatchKind::JapaneseAttached, priority: GRAMMAR_MARKER_PRIORITY },
-    GrammarMarkerDefinition { id: MarkerId::JaHe, match_kind: MarkerMatchKind::JapaneseAttached, priority: GRAMMAR_MARKER_PRIORITY },
-    GrammarMarkerDefinition { id: MarkerId::JaTo, match_kind: MarkerMatchKind::JapaneseAttached, priority: GRAMMAR_MARKER_PRIORITY },
-    GrammarMarkerDefinition { id: MarkerId::JaBackground, match_kind: MarkerMatchKind::JapaneseDocumentHead, priority: GRAMMAR_MARKER_PRIORITY },
-    GrammarMarkerDefinition { id: MarkerId::EnGroupOf, match_kind: MarkerMatchKind::EnglishWord, priority: GRAMMAR_MARKER_PRIORITY },
-    GrammarMarkerDefinition { id: MarkerId::EnBackground, match_kind: MarkerMatchKind::EnglishWord, priority: GRAMMAR_MARKER_PRIORITY },
-    GrammarMarkerDefinition { id: MarkerId::EnA, match_kind: MarkerMatchKind::EnglishWord, priority: GRAMMAR_MARKER_PRIORITY },
-    GrammarMarkerDefinition { id: MarkerId::EnAn, match_kind: MarkerMatchKind::EnglishWord, priority: GRAMMAR_MARKER_PRIORITY },
-    GrammarMarkerDefinition { id: MarkerId::EnThe, match_kind: MarkerMatchKind::EnglishWord, priority: GRAMMAR_MARKER_PRIORITY },
-    GrammarMarkerDefinition { id: MarkerId::EnWith, match_kind: MarkerMatchKind::EnglishWord, priority: GRAMMAR_MARKER_PRIORITY },
-    GrammarMarkerDefinition { id: MarkerId::EnIn, match_kind: MarkerMatchKind::EnglishWord, priority: GRAMMAR_MARKER_PRIORITY },
-    GrammarMarkerDefinition { id: MarkerId::EnAt, match_kind: MarkerMatchKind::EnglishWord, priority: GRAMMAR_MARKER_PRIORITY },
-    GrammarMarkerDefinition { id: MarkerId::EnOn, match_kind: MarkerMatchKind::EnglishWord, priority: GRAMMAR_MARKER_PRIORITY },
-    GrammarMarkerDefinition { id: MarkerId::EnTo, match_kind: MarkerMatchKind::EnglishWord, priority: GRAMMAR_MARKER_PRIORITY },
-    GrammarMarkerDefinition { id: MarkerId::EnOf, match_kind: MarkerMatchKind::EnglishWord, priority: GRAMMAR_MARKER_PRIORITY },
-    GrammarMarkerDefinition { id: MarkerId::EnAnd, match_kind: MarkerMatchKind::EnglishWord, priority: GRAMMAR_MARKER_PRIORITY },
-    GrammarMarkerDefinition { id: MarkerId::EnRepeating, match_kind: MarkerMatchKind::EnglishWord, priority: GRAMMAR_MARKER_PRIORITY },
+    GrammarMarkerDefinition {
+        id: MarkerId::JaRepeat,
+        match_kind: MarkerMatchKind::JapaneseAttached,
+        priority: GRAMMAR_MARKER_PRIORITY,
+    },
+    GrammarMarkerDefinition {
+        id: MarkerId::JaGroup,
+        match_kind: MarkerMatchKind::JapaneseAttached,
+        priority: GRAMMAR_MARKER_PRIORITY,
+    },
+    GrammarMarkerDefinition {
+        id: MarkerId::JaSequenceTe,
+        match_kind: MarkerMatchKind::JapaneseAttached,
+        priority: GRAMMAR_MARKER_PRIORITY,
+    },
+    GrammarMarkerDefinition {
+        id: MarkerId::JaWo,
+        match_kind: MarkerMatchKind::JapaneseAttached,
+        priority: GRAMMAR_MARKER_PRIORITY,
+    },
+    GrammarMarkerDefinition {
+        id: MarkerId::JaNi,
+        match_kind: MarkerMatchKind::JapaneseAttached,
+        priority: GRAMMAR_MARKER_PRIORITY,
+    },
+    GrammarMarkerDefinition {
+        id: MarkerId::JaDe,
+        match_kind: MarkerMatchKind::JapaneseAttached,
+        priority: GRAMMAR_MARKER_PRIORITY,
+    },
+    GrammarMarkerDefinition {
+        id: MarkerId::JaNo,
+        match_kind: MarkerMatchKind::JapaneseAttached,
+        priority: GRAMMAR_MARKER_PRIORITY,
+    },
+    GrammarMarkerDefinition {
+        id: MarkerId::JaWa,
+        match_kind: MarkerMatchKind::JapaneseAttached,
+        priority: GRAMMAR_MARKER_PRIORITY,
+    },
+    GrammarMarkerDefinition {
+        id: MarkerId::JaGa,
+        match_kind: MarkerMatchKind::JapaneseAttached,
+        priority: GRAMMAR_MARKER_PRIORITY,
+    },
+    GrammarMarkerDefinition {
+        id: MarkerId::JaHe,
+        match_kind: MarkerMatchKind::JapaneseAttached,
+        priority: GRAMMAR_MARKER_PRIORITY,
+    },
+    GrammarMarkerDefinition {
+        id: MarkerId::JaTo,
+        match_kind: MarkerMatchKind::JapaneseAttached,
+        priority: GRAMMAR_MARKER_PRIORITY,
+    },
+    GrammarMarkerDefinition {
+        id: MarkerId::JaBackground,
+        match_kind: MarkerMatchKind::JapaneseDocumentHead,
+        priority: GRAMMAR_MARKER_PRIORITY,
+    },
+    GrammarMarkerDefinition {
+        id: MarkerId::EnGroupOf,
+        match_kind: MarkerMatchKind::EnglishWord,
+        priority: GRAMMAR_MARKER_PRIORITY,
+    },
+    GrammarMarkerDefinition {
+        id: MarkerId::EnBackground,
+        match_kind: MarkerMatchKind::EnglishWord,
+        priority: GRAMMAR_MARKER_PRIORITY,
+    },
+    GrammarMarkerDefinition {
+        id: MarkerId::EnA,
+        match_kind: MarkerMatchKind::EnglishWord,
+        priority: GRAMMAR_MARKER_PRIORITY,
+    },
+    GrammarMarkerDefinition {
+        id: MarkerId::EnAn,
+        match_kind: MarkerMatchKind::EnglishWord,
+        priority: GRAMMAR_MARKER_PRIORITY,
+    },
+    GrammarMarkerDefinition {
+        id: MarkerId::EnThe,
+        match_kind: MarkerMatchKind::EnglishWord,
+        priority: GRAMMAR_MARKER_PRIORITY,
+    },
+    GrammarMarkerDefinition {
+        id: MarkerId::EnWith,
+        match_kind: MarkerMatchKind::EnglishWord,
+        priority: GRAMMAR_MARKER_PRIORITY,
+    },
+    GrammarMarkerDefinition {
+        id: MarkerId::EnIn,
+        match_kind: MarkerMatchKind::EnglishWord,
+        priority: GRAMMAR_MARKER_PRIORITY,
+    },
+    GrammarMarkerDefinition {
+        id: MarkerId::EnAt,
+        match_kind: MarkerMatchKind::EnglishWord,
+        priority: GRAMMAR_MARKER_PRIORITY,
+    },
+    GrammarMarkerDefinition {
+        id: MarkerId::EnOn,
+        match_kind: MarkerMatchKind::EnglishWord,
+        priority: GRAMMAR_MARKER_PRIORITY,
+    },
+    GrammarMarkerDefinition {
+        id: MarkerId::EnTo,
+        match_kind: MarkerMatchKind::EnglishWord,
+        priority: GRAMMAR_MARKER_PRIORITY,
+    },
+    GrammarMarkerDefinition {
+        id: MarkerId::EnOf,
+        match_kind: MarkerMatchKind::EnglishWord,
+        priority: GRAMMAR_MARKER_PRIORITY,
+    },
+    GrammarMarkerDefinition {
+        id: MarkerId::EnAnd,
+        match_kind: MarkerMatchKind::EnglishWord,
+        priority: GRAMMAR_MARKER_PRIORITY,
+    },
+    GrammarMarkerDefinition {
+        id: MarkerId::EnRepeating,
+        match_kind: MarkerMatchKind::EnglishWord,
+        priority: GRAMMAR_MARKER_PRIORITY,
+    },
 ];
 
 pub(crate) fn grammar_marker_definitions(

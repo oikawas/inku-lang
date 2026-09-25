@@ -1,8 +1,8 @@
 //! Meaning-neutral JA/EN attachment-marker evidence over the accepted clause stream.
 
 use crate::{
-    ClauseAtom, ClauseStreamError, EnglishNounPhraseEvidenceResult, NormalizedDdlDocument,
-    MarkerCapability, MarkerId, ResolvedInstructionLanguage, SourceSpan,
+    ClauseAtom, ClauseStreamError, EnglishNounPhraseEvidenceResult, MarkerCapability, MarkerId,
+    NormalizedDdlDocument, ResolvedInstructionLanguage, SourceSpan,
     collect_english_noun_phrase_evidence,
 };
 
@@ -285,14 +285,18 @@ pub(crate) fn collect_coordination_marker_evidence(
 
 pub(crate) const fn marker_from_id(marker_id: MarkerId) -> Option<AttachmentMarkerKind> {
     match marker_id.language() {
-        ResolvedInstructionLanguage::Ja => match JapaneseAttachmentMarkerKind::from_marker_id(marker_id) {
-            Some(marker) => Some(AttachmentMarkerKind::Japanese(marker)),
-            None => None,
-        },
-        ResolvedInstructionLanguage::En => match EnglishAttachmentMarkerKind::from_marker_id(marker_id) {
-            Some(marker) => Some(AttachmentMarkerKind::English(marker)),
-            None => None,
-        },
+        ResolvedInstructionLanguage::Ja => {
+            match JapaneseAttachmentMarkerKind::from_marker_id(marker_id) {
+                Some(marker) => Some(AttachmentMarkerKind::Japanese(marker)),
+                None => None,
+            }
+        }
+        ResolvedInstructionLanguage::En => {
+            match EnglishAttachmentMarkerKind::from_marker_id(marker_id) {
+                Some(marker) => Some(AttachmentMarkerKind::English(marker)),
+                None => None,
+            }
+        }
     }
 }
 

@@ -12,12 +12,13 @@ use std::{
 
 use inku_ddl::{
     ClauseAtom, CoreRoleKind, MacroDefinition, MarkerId, RemainingRoleKind,
-    ResolvedInstructionLanguage,
-    SAIJIKI_ASSET_ID, SourceSpan, TYPED_DDL_COMPILER_LOCK_SCHEMA_ID, TypedDdlCompilation,
-    TypedHole, VISIBLE_DDL_PATCH_SCHEMA_ID, VisibleDdlPatch, VisibleDdlPatchEdit,
-    core_modifier_surface_forms, saijiki_asset_sha256_hex, saijiki_derived_projection,
-    saijiki_tool_guidance, visible_ddl_patch_available,
-    work_plan::{normalize_work_plan, print_work_plan, work_plan_response_schema},
+    ResolvedInstructionLanguage, SAIJIKI_ASSET_ID, SourceSpan, TYPED_DDL_COMPILER_LOCK_SCHEMA_ID,
+    TypedDdlCompilation, TypedHole, VISIBLE_DDL_PATCH_SCHEMA_ID, VisibleDdlPatch,
+    VisibleDdlPatchEdit, core_modifier_surface_forms, saijiki_asset_sha256_hex,
+    saijiki_derived_projection, saijiki_tool_guidance, visible_ddl_patch_available,
+    work_plan::{
+        normalize_work_plan_with_plugins, print_work_plan, work_plan_response_schema_with_plugins,
+    },
 };
 use inku_score::{CANVAS_FORMAT_REGISTRY_ID, canvas_format_registry_digest, lookup_canvas_format};
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
@@ -603,7 +604,11 @@ pub fn build_stage1_prompt_with_sketch(
         }
     })?;
     let (_, macro_catalog_digest) = project_macro_catalog(macros, limits)?;
+    let plugins = installed_plugin_names(macros);
     let mut system = stage1_work_plan_system(language)?;
+    if !plugins.is_empty() {
+        system.push_str(&stage1_plugin_section(macros, language));
+    }
     if sketch.is_some() {
         system.push_str(match language {
             ResolvedInstructionLanguage::Ja => STAGE1_SKETCH_NOTE_JA,
@@ -632,7 +637,7 @@ pub fn build_stage1_prompt_with_sketch(
         instruction_language: language,
         system,
         message,
-        response_schema: work_plan_response_schema(),
+        response_schema: work_plan_response_schema_with_plugins(&plugins),
         prompt_digest: String::new(),
         saijiki_asset_id: Some(SAIJIKI_ASSET_ID.to_owned()),
         saijiki_asset_digest: Some(saijiki_asset_sha256_hex().to_owned()),
@@ -803,6 +808,48 @@ const STAGE1_SKETCH_NOTE_EN: &str = r#"
 # Sketch (supplement)
 The input sketch supplements the extent of place or the seasonal or time-of-day light that the description does not state. Subjects, movement, direction, counts, and placement follow the description; the sketch never replaces them. From the sketch, only add scene or back layers and the background color; never weaken or remove the layers for the description's roles."#;
 
+const STAGE1_PLUGINS_JA: &str = r#"
+
+# plugins（登録プラグイン）
+次のプラグインは、要約に書かれた物をまとめて描く。記述にその物（要約の対象）またはプラグイン名が明示されたときだけ、その名前をpluginsへ入れる。プラグインが描く物をlayersで重ねて描かない。記述のほかの物はこれまでどおりlayersで描く。季節・比喩・連想から選ばず、該当が無ければpluginsは空にする。"#;
+
+const STAGE1_PLUGINS_EN: &str = r#"
+
+# plugins (installed plugins)
+Each plugin below draws the subject its summary describes as a whole. Put a plugin's name in plugins only when the description explicitly names that subject or the plugin itself. Do not also draw that subject in layers. Draw everything else in the description with layers as usual. Never choose a plugin from a season, metaphor, or association; leave plugins empty when none applies."#;
+
+/// Installed qualified names, sorted and unique, that a work plan may choose.
+fn installed_plugin_names(macros: &[MacroPromptEntry<'_>]) -> Vec<String> {
+    let mut names = macros
+        .iter()
+        .filter_map(|entry| entry.definition.qualified_name())
+        .collect::<Vec<_>>();
+    names.sort();
+    names.dedup();
+    names
+}
+
+/// The plugin rule followed by one `name: summary` line per installed plugin.
+fn stage1_plugin_section(
+    macros: &[MacroPromptEntry<'_>],
+    language: ResolvedInstructionLanguage,
+) -> String {
+    let mut lines = macros
+        .iter()
+        .filter_map(|entry| {
+            let name = entry.definition.qualified_name()?;
+            Some(format!("- {name}: {}", entry.localized_summary))
+        })
+        .collect::<Vec<_>>();
+    lines.sort();
+    lines.dedup();
+    let rule = match language {
+        ResolvedInstructionLanguage::Ja => STAGE1_PLUGINS_JA,
+        ResolvedInstructionLanguage::En => STAGE1_PLUGINS_EN,
+    };
+    format!("{rule}\n{}", lines.join("\n"))
+}
+
 fn stage1_work_plan_system(language: ResolvedInstructionLanguage) -> Result<String, PromptError> {
     let tool_guidance =
         saijiki_tool_guidance(language).map_err(|_| PromptError::SaijikiProjection)?;
@@ -810,7 +857,9 @@ fn stage1_work_plan_system(language: ResolvedInstructionLanguage) -> Result<Stri
         ResolvedInstructionLanguage::Ja => (STAGE1_WORK_PLAN_JA, STAGE1_CONTEXT_JA),
         ResolvedInstructionLanguage::En => (STAGE1_WORK_PLAN_EN, STAGE1_CONTEXT_EN),
     };
-    Ok(format!("{plan}\n\n{context}\n\n# tool_marks\n{tool_guidance}"))
+    Ok(format!(
+        "{plan}\n\n{context}\n\n# tool_marks\n{tool_guidance}"
+    ))
 }
 
 /// Project the stable Stage 1 grammar and accepted vocabulary without a response envelope.
@@ -1123,12 +1172,22 @@ pub fn parse_stage1_response(
     limits: PromptLimits,
     language: ResolvedInstructionLanguage,
 ) -> Result<Stage1Response, PromptError> {
+    parse_stage1_response_with_plugins(response_text, limits, language, &[])
+}
+
+/// Parse a Stage 1 response whose plan may name the installed plugins.
+pub fn parse_stage1_response_with_plugins(
+    response_text: &str,
+    limits: PromptLimits,
+    language: ResolvedInstructionLanguage,
+    plugins: &[String],
+) -> Result<Stage1Response, PromptError> {
     let value: Value = parse_bounded(response_text, limits)?;
     let response = if value.get("normalized_ddl").is_some() {
         serde_json::from_value::<Stage1Response>(value).map_err(|_| PromptError::InvalidJson)?
     } else {
-        let (plan, _) = normalize_work_plan(&value);
-        if plan.layers.is_empty() {
+        let (plan, _) = normalize_work_plan_with_plugins(&value, plugins);
+        if plan.layers.is_empty() && plan.plugins.is_empty() {
             return Err(PromptError::EmptyField { field: "layers" });
         }
         Stage1Response {
@@ -1580,8 +1639,12 @@ fn standalone_shape_grammar(language: ResolvedInstructionLanguage) -> String {
     let regular = forms.regular;
     let sides = forms.sides_prefix;
     let modifiers = match language {
-        ResolvedInstructionLanguage::Ja => format!("歳時記外のcore修飾語も有限の受理形を使う。太さは「{thinness}」、相対寸法は「{scale}」。形修飾は「{regular}」という正則な形の制約であり、自然物名を自由に形容するslotではない。辺数は「{sides}<整数>」。これらも対象headへ結び、名詞形と形容形の接続を区別する。語形の列挙は全headとの任意の組合せを許可するものではない。詩の対象は受理済みの図形・配置・属性へ解釈し、その対象名から新しい形修飾語を作らない。"),
-        ResolvedInstructionLanguage::En => format!("Non-Saijiki core modifiers also have finite accepted forms. Thinness: {thinness}. Relative size: {scale}. The shape-form modifier is {regular}, a regularity constraint, not an open slot for describing natural subjects. Sides use {sides}<integer>. Attach these to their target head with the appropriate noun or adjective construction. Listing a form does not authorize arbitrary combinations with every head. Interpret poetic subjects through accepted shapes, placement, and attributes rather than inventing shape modifiers from subject names."),
+        ResolvedInstructionLanguage::Ja => format!(
+            "歳時記外のcore修飾語も有限の受理形を使う。太さは「{thinness}」、相対寸法は「{scale}」。形修飾は「{regular}」という正則な形の制約であり、自然物名を自由に形容するslotではない。辺数は「{sides}<整数>」。これらも対象headへ結び、名詞形と形容形の接続を区別する。語形の列挙は全headとの任意の組合せを許可するものではない。詩の対象は受理済みの図形・配置・属性へ解釈し、その対象名から新しい形修飾語を作らない。"
+        ),
+        ResolvedInstructionLanguage::En => format!(
+            "Non-Saijiki core modifiers also have finite accepted forms. Thinness: {thinness}. Relative size: {scale}. The shape-form modifier is {regular}, a regularity constraint, not an open slot for describing natural subjects. Sides use {sides}<integer>. Attach these to their target head with the appropriate noun or adjective construction. Listing a form does not authorize arbitrary combinations with every head. Interpret poetic subjects through accepted shapes, placement, and attributes rather than inventing shape modifiers from subject names."
+        ),
     };
     format!("{assembly}\n{modifiers}")
 }
@@ -1590,10 +1653,12 @@ fn standalone_shape_grammar_ja() -> String {
     let ni = MarkerId::JaNi.surface();
     let wo = MarkerId::JaWo.surface();
     let no = MarkerId::JaNo.surface();
-    format!(r#"各単独図形命令を「[<位置句>] [<head前修飾句>]<head>{wo} [<並べる配置方向句>] [<数量句>] <動作>。」として組み立てる。位置句は受理位置に「{ni}」を一つ付けた句、headは描画対象一つ、数量句は数と対象に合う助数詞一つを結合した句である。数量句が既に助数詞を含むなら、命令への接続時に助数詞を加えない。動作はうごきの語形で文末を閉じる。
+    format!(
+        r#"各単独図形命令を「[<位置句>] [<head前修飾句>]<head>{wo} [<並べる配置方向句>] [<数量句>] <動作>。」として組み立てる。位置句は受理位置に「{ni}」を一つ付けた句、headは描画対象一つ、数量句は数と対象に合う助数詞一つを結合した句である。数量句が既に助数詞を含むなら、命令への接続時に助数詞を加えない。動作はうごきの語形で文末を閉じる。
 色・道具・線の連続性・図形の向き・面・揺らぎ・比率・相対寸法・太さ・形・辺数はhead前修飾句へまとめる。名詞修飾は「{no}」、形容修飾は受理された形容形でheadへ結ぶ。修飾句はhead直前の接続までを含み、head自体は含まない。接続例は「赤いペンの実線の空の」＋「円」、「青いクレヨンの塗りの」＋「四角」。境界に接続語を再挿入せず、面の名詞を動詞の連体節へ展開しない。例は接続だけを示し、属性・対象・構図を今回の記述へ転写しない。
 accepted_saijiki_vocabularyのわりあい行で弧形を表す語は独立headにせず、対応する弧headの直前へ名詞修飾として一つ結ぶ。「<受理済みの弧形語>{no}弧」の形を使い、その弧の既存arc_formを決める。非弧headへ転用しない。
-図形の向きはhead前、並べる配置方向句は受理方向語に「{ni}」を一つ付けてhead後へ置く。揺らぎもhead前の属性として結び、動作の前後へ説明句として移さない。配置方向を省略した「並べる」は既定で横の左から右なので、その既定だけを言い直す語句は省く。出力前に全ての単独図形命令で、修飾句とhead、headと「{wo}」、数量句、文末動作がこの構造で結ばれることを照合する。組・順序配置・関係はそれぞれの既存構文を使い、この単独図形骨格へ縮約しない。照合内容は出力しない。"#)
+図形の向きはhead前、並べる配置方向句は受理方向語に「{ni}」を一つ付けてhead後へ置く。揺らぎもhead前の属性として結び、動作の前後へ説明句として移さない。配置方向を省略した「並べる」は既定で横の左から右なので、その既定だけを言い直す語句は省く。出力前に全ての単独図形命令で、修飾句とhead、headと「{wo}」、数量句、文末動作がこの構造で結ばれることを照合する。組・順序配置・関係はそれぞれの既存構文を使い、この単独図形骨格へ縮約しない。照合内容は出力しない。"#
+    )
 }
 
 const STANDALONE_SHAPE_GRAMMAR_EN: &str = r#"Assemble every standalone drawing command as <action> [<quantity>] [<pre-head modifier phrase>] <head> [<accepted line-up direction adverb>] [<position phrase>] [<complete accepted relation literal>]. A quantity is one complete count expression, the head names one drawing subject, and a position phrase contains one position preposition and the accepted place. Do not repeat a connector or count component when joining complete slots. Use an accepted movement word as the command's action.
@@ -1630,20 +1695,24 @@ fn hole_system_grammar_ja() -> String {
     let background = MarkerId::JaBackground.surface();
     let wo = MarkerId::JaWo.surface();
     let de = MarkerId::JaDe.surface();
-    format!(r#"あなたは inku の可視DDLの局所翻訳提案器。selected_holesのsourceだけを書換え可能とし、source_regionsとtyped_factsは根拠として読む。read_onlyの文脈を変更しない。原文の未認識語句も検討し、明示された対象、属性と所有者、数量と総数、action、範囲、関係、順序を保持する。typed_factsのownerは語の種類であり、描画対象IDではない。
+    format!(
+        r#"あなたは inku の可視DDLの局所翻訳提案器。selected_holesのsourceだけを書換え可能とし、source_regionsとtyped_factsは根拠として読む。read_onlyの文脈を変更しない。原文の未認識語句も検討し、明示された対象、属性と所有者、数量と総数、action、範囲、関係、順序を保持する。typed_factsのownerは語の種類であり、描画対象IDではない。
 語順、用語の位置や組合せ、自然な言い換えの揺らぎを、既存の受理文法へ直す。原文の語や位置を逐語的に維持する必要はない。「中央付近」は「中央」「中心」に相当する既存の位置語へ言い換えられる。数値座標は追加しない。原文の主旨と確定した対象・個数・色・道具・所有関係を保つ欠落補完も提案できる。複数の色や道具だけから交互配置や数量分配を新たに指定せず、多様な色を単色へ削らない。既存の省略は演奏時補完へ残せる。語句の揺らぎを直しても既存機能で描画できない意味はunresolved/unsupported、意図を一つに定められない場合はunresolved/ambiguous、必要な参照文脈が不足する場合はunresolved/context_limitとする。他のholeについて可能な提案は返す。
 既存の受理構文やその既定が原文の意味を既に担う場合、余分な未受理表現はその受理形へまとめる。未解釈の語句をそのまま返して解決済みとしない。
-accepted_saijiki_vocabularyと共有文法を用いる。unresolved_clauseは原文の描画headとactionを同じ命令へ保持し、背景だけで済ませない。地は受理済みの地の名詞だけで指定でき、Ground:やSurface:という見出しを付けない。地の支持体を面の質感へ変えない。背景の受理形は「{background}{wo}<色>{de}埋める。」。短いidごとに必ず一結果を返す。Score、思考過程、説明、管理情報は返さず、指定されたJSONだけを返す。"#)
+accepted_saijiki_vocabularyと共有文法を用いる。unresolved_clauseは原文の描画headとactionを同じ命令へ保持し、背景だけで済ませない。地は受理済みの地の名詞だけで指定でき、Ground:やSurface:という見出しを付けない。地の支持体を面の質感へ変えない。背景の受理形は「{background}{wo}<色>{de}埋める。」。短いidごとに必ず一結果を返す。Score、思考過程、説明、管理情報は返さず、指定されたJSONだけを返す。"#
+    )
 }
 
 fn hole_system_grammar_en() -> String {
     let article = MarkerId::EnThe.surface();
     let background = MarkerId::EnBackground.surface();
     let with = MarkerId::EnWith.surface();
-    format!(r#"Propose local translations of visible inku DDL. Only source in selected_holes may be replaced; source_regions and typed_facts are evidence. Never edit read_only context. Consider unrecognized original phrases too. Preserve explicit subjects, attributes and their owners, quantities and totals, actions, regions, relations, and order. A typed_facts owner names a fact category, not a drawing object ID.
+    format!(
+        r#"Propose local translations of visible inku DDL. Only source in selected_holes may be replaced; source_regions and typed_facts are evidence. Never edit read_only context. Consider unrecognized original phrases too. Preserve explicit subjects, attributes and their owners, quantities and totals, actions, regions, relations, and order. A typed_facts owner names a fact category, not a drawing object ID.
 Normalize variations in word order, term position, combinations, and natural paraphrases to the existing accepted grammar. You need not copy the original words or their positions. Near the center may be rephrased as the existing named center position; do not add numeric coordinates. You may fill missing detail consistently with the original intent and established subjects, counts, colors, tools, and ownership. Listing colors or tools alone does not specify alternation or count allocation; do not reduce diverse colors to one color. Existing omissions may remain for performance-time completion. Return unresolved/unsupported only for meaning that remains undrawable with existing features after natural rephrasing, unresolved/ambiguous when the intent cannot be determined, and unresolved/context_limit when needed reference context is unavailable. Still return possible proposals for other holes.
 When an accepted construction or its existing default already carries the original meaning, express that meaning through the accepted form instead of retaining redundant unaccepted wording. Do not return uninterpreted phrases unchanged as if they were resolved.
-Use accepted_saijiki_vocabulary and the shared grammar. An unresolved_clause must retain its drawing head and action in the same instruction, not replace them with background alone. A ground can be written as its accepted ground noun alone, without a Ground: or Surface: heading. Never change ground material into surface quality. The accepted background form is "fill {article} {background} {with} <color>." Return exactly one result for every short id. Return only the specified JSON, without Score, chain of thought, explanation, or management metadata."#)
+Use accepted_saijiki_vocabulary and the shared grammar. An unresolved_clause must retain its drawing head and action in the same instruction, not replace them with background alone. A ground can be written as its accepted ground noun alone, without a Ground: or Surface: heading. Never change ground material into surface quality. The accepted background form is "fill {article} {background} {with} <color>." Return exactly one result for every short id. Return only the specified JSON, without Score, chain of thought, explanation, or management metadata."#
+    )
 }
 
 #[cfg(test)]
@@ -1657,6 +1726,89 @@ mod tests {
         max_source_bytes: 4_096,
         max_response_bytes: 8_192,
     };
+
+    #[test]
+    fn stage1_offers_installed_plugins_as_a_closed_list_and_prints_them_by_name() {
+        let definition = MacroDefinition::from_json(
+            r#"{"schema":"inku.macro-definition.v1","namespace":"Nature","heading":"若葉","version":"1.0.1","parameters":{},"components":{},"body":[]}"#,
+        )
+        .unwrap();
+        let context = Stage1Context {
+            catalog_id: "default".to_owned(),
+            catalog_mode: ResolvedCatalogMode::Default,
+            canvas_format_id: "square".to_owned(),
+            canvas_format_registry_id: CANVAS_FORMAT_REGISTRY_ID.to_owned(),
+            canvas_format_registry_digest: canvas_format_registry_digest().unwrap(),
+        };
+        let with_plugin = build_stage1_prompt(
+            "若葉と赤い円",
+            ResolvedInstructionLanguage::Ja,
+            &context,
+            &[MacroPromptEntry {
+                definition: &definition,
+                localized_summary: "若葉を上半分へ散らす。",
+            }],
+            LIMITS,
+        )
+        .unwrap();
+        assert!(with_plugin.system.contains("# plugins"));
+        assert!(
+            with_plugin
+                .system
+                .contains("- Nature.若葉: 若葉を上半分へ散らす。")
+        );
+        assert_eq!(
+            with_plugin.response_schema["properties"]["plugins"]["items"]["enum"],
+            serde_json::json!(["Nature.若葉"])
+        );
+        // Without installed plugins the prompt and schema keep the plugin-free edition.
+        let without = build_stage1_prompt(
+            "若葉と赤い円",
+            ResolvedInstructionLanguage::Ja,
+            &context,
+            &[],
+            LIMITS,
+        )
+        .unwrap();
+        assert!(!without.system.contains("# plugins"));
+        assert_eq!(
+            without.response_schema,
+            inku_ddl::work_plan::work_plan_response_schema()
+        );
+        let installed = ["Nature.若葉".to_owned()];
+        let plan = r#"{"background":"white","ground":"unspecified","plugins":["Nature.若葉","Garden.薔薇","Nature.若葉"],"layers":[
+            {"shape":"circle","proportion":"unspecified","action":"place","count":1,
+             "place":"center","size":"unspecified","color":"red","tool":"unspecified",
+             "surface":"unspecified","motion_quality":"still"}]}"#;
+        let ja = parse_stage1_response_with_plugins(
+            plan,
+            LIMITS,
+            ResolvedInstructionLanguage::Ja,
+            &installed,
+        )
+        .unwrap()
+        .normalized_ddl;
+        assert!(ja.contains("\nNature.若葉。\n"));
+        assert!(!ja.contains("Garden.薔薇"));
+        assert_eq!(ja.matches("Nature.若葉").count(), 1);
+        // A plan may consist of plugins alone; an uninstalled name alone is still empty.
+        let only = r#"{"background":"unspecified","ground":"unspecified","plugins":["Nature.若葉"],"layers":[]}"#;
+        assert_eq!(
+            parse_stage1_response_with_plugins(
+                only,
+                LIMITS,
+                ResolvedInstructionLanguage::En,
+                &installed
+            )
+            .unwrap()
+            .normalized_ddl,
+            "Nature.若葉."
+        );
+        assert!(
+            parse_stage1_response_with_plugins(only, LIMITS, ResolvedInstructionLanguage::En, &[])
+                .is_err()
+        );
+    }
 
     #[test]
     fn typed_prompts_preserve_meanings_expose_exact_holes_and_hide_macro_bodies() {

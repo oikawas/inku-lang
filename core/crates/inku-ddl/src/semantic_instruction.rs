@@ -353,7 +353,7 @@ pub(crate) fn fill_phrase_ranges(
             .filter_map(|(index, atom)| {
                 matches!(atom, ClauseAtom::GrammarMarker { marker_id, .. }
                     if *marker_id == expected)
-                    .then_some(index)
+                .then_some(index)
             })
             .collect::<Vec<_>>()
     };
@@ -507,11 +507,18 @@ fn associate_fill_targets(
                 markers,
             })
         } else if target_heads.is_empty() {
-            let background = clause.atoms.iter().enumerate().filter_map(|(index, atom)| {
-                (target_range.start_byte <= atom.span().start_byte && atom.span().end_byte <= target_range.end_byte
-                    && matches!(atom, ClauseAtom::GrammarMarker {marker_id, ..}
-                        if matches!(marker_id, MarkerId::JaBackground | MarkerId::EnBackground))).then_some(index)
-            }).collect::<Vec<_>>();
+            let background = clause
+                .atoms
+                .iter()
+                .enumerate()
+                .filter_map(|(index, atom)| {
+                    (target_range.start_byte <= atom.span().start_byte
+                        && atom.span().end_byte <= target_range.end_byte
+                        && matches!(atom, ClauseAtom::GrammarMarker {marker_id, ..}
+                        if matches!(marker_id, MarkerId::JaBackground | MarkerId::EnBackground)))
+                    .then_some(index)
+                })
+                .collect::<Vec<_>>();
             let named = positions
                 .iter()
                 .filter(|position| {
@@ -2483,14 +2490,20 @@ fn japanese_group_segment_is_clear(
                     &owned_spans,
                     &head_spans,
                 )
-                || matches!(atom, ClauseAtom::GrammarMarker { marker_id: MarkerId::JaGroup, .. })
+                || matches!(
+                    atom,
+                    ClauseAtom::GrammarMarker {
+                        marker_id: MarkerId::JaGroup,
+                        ..
+                    }
+                )
                 || matches!(atom, ClauseAtom::GrammarMarker { marker_id: MarkerId::JaNo, span }
-                    if association.clause_stream.clauses[clause_index].atoms.iter().any(
-                        |candidate| matches!(candidate,
-                            ClauseAtom::GrammarMarker { marker_id: MarkerId::JaGroup, span: group_span }
-                                if span.end_byte == group_span.start_byte
-                        )
-                    ))
+                if association.clause_stream.clauses[clause_index].atoms.iter().any(
+                    |candidate| matches!(candidate,
+                        ClauseAtom::GrammarMarker { marker_id: MarkerId::JaGroup, span: group_span }
+                            if span.end_byte == group_span.start_byte
+                    )
+                ))
                 || matches!(atom, ClauseAtom::GrammarMarker { span, .. }
                     if association.clause_topology.determiner_starts.contains(&span.start_byte))
         })
@@ -2691,9 +2704,9 @@ fn english_entity_to_marker_gap_is_clear(
             }
             ClauseAtom::GrammarMarker { span, .. } => {
                 association
-                        .clause_topology
-                        .determiner_starts
-                        .contains(&span.start_byte)
+                    .clause_topology
+                    .determiner_starts
+                    .contains(&span.start_byte)
                     || (attachment_marker_at(association, clause_index, span.start_byte)
                         == Some(AttachmentMarkerKind::English(
                             EnglishAttachmentMarkerKind::With,

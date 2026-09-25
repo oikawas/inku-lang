@@ -19,11 +19,10 @@ use crate::core_boundary::{CompiledDelivery, CompilerOptions, ResolvedHostOption
 use crate::prompts::{
     DescriptionCatalogEntry, HOLE_COMPLETION_PROMPT_ID, HoleCompletionResult,
     HolePatchEditResponse, HolePatchResponse, LEGACY_HOLE_COMPLETION_PROMPT_ID, LlmPrompt,
-    LlmStage, MacroPromptEntry, PromptLimits, Stage1Context,
-    build_catalog_selection_prompt, build_hole_completion_prompt, build_sketch_prompt,
-    build_stage1_prompt_with_sketch, parse_catalog_selection_response,
-    parse_hole_completion_response, parse_hole_patch_response, parse_sketch_response,
-    parse_stage1_response, with_stage1_compiler_feedback,
+    LlmStage, MacroPromptEntry, PromptLimits, Stage1Context, build_catalog_selection_prompt,
+    build_hole_completion_prompt, build_sketch_prompt, build_stage1_prompt_with_sketch,
+    parse_catalog_selection_response, parse_hole_completion_response, parse_hole_patch_response,
+    parse_sketch_response, parse_stage1_response_with_plugins, with_stage1_compiler_feedback,
 };
 use crate::protocol::{
     ActionEcho, DecimalU64, EffectAction, EffectResult, Envelope, PROTOCOL_NAME, PROTOCOL_VERSION,
@@ -187,10 +186,16 @@ impl SketchRecord {
     fn from_request(request: SketchRequest) -> Option<Self> {
         match request {
             SketchRequest::Off => None,
-            SketchRequest::On => Some(Self { state: SketchState::Pending, text: None }),
+            SketchRequest::On => Some(Self {
+                state: SketchState::Pending,
+                text: None,
+            }),
             SketchRequest::Supplied { text } => {
                 let text = text.trim().to_owned();
-                (!text.is_empty()).then_some(Self { state: SketchState::Supplied, text: Some(text) })
+                (!text.is_empty()).then_some(Self {
+                    state: SketchState::Supplied,
+                    text: Some(text),
+                })
             }
         }
     }
@@ -604,7 +609,10 @@ impl PipelineSnapshot {
 
     fn retry_policy(&self, stage: LlmStage) -> RetryPolicy {
         match stage {
-            LlmStage::GenerateSketch => self.config.sketch_retry.unwrap_or(self.config.catalog_retry),
+            LlmStage::GenerateSketch => self
+                .config
+                .sketch_retry
+                .unwrap_or(self.config.catalog_retry),
             LlmStage::SelectDescriptionCatalog => self.config.catalog_retry,
             LlmStage::GenerateNormalizedDdl => self.config.stage1_retry,
             LlmStage::CompleteVisibleDdlHoles => self.config.hole_retry,
@@ -709,7 +717,11 @@ impl PipelineSnapshot {
             self.authority
                 .propose_stage1_result_commit(self.authority.revision()),
         )?;
-        if self.sketch.as_ref().is_some_and(|record| record.state == SketchState::Pending) {
+        if self
+            .sketch
+            .as_ref()
+            .is_some_and(|record| record.state == SketchState::Pending)
+        {
             let prompt = build_sketch_prompt(
                 &description,
                 self.config.language,
@@ -731,7 +743,10 @@ impl PipelineSnapshot {
         detail: serde_json::Value,
         events: &mut Vec<PipelineEvent>,
     ) -> Result<(), ProtocolError> {
-        let record = self.sketch.as_mut().ok_or(ProtocolError::InternalInvariant)?;
+        let record = self
+            .sketch
+            .as_mut()
+            .ok_or(ProtocolError::InternalInvariant)?;
         record.state = state;
         record.text = text;
         let mut payload = json!({"state": state, "text": record.text});
@@ -1440,10 +1455,19 @@ impl PipelineSnapshot {
                 self.stage1(description.ok_or(ProtocolError::InternalInvariant)?, events)
             }
             LlmStage::GenerateNormalizedDdl => {
-                let generated = match parse_stage1_response(
+                let mut plugins = self
+                    .config
+                    .definitions
+                    .iter()
+                    .filter_map(MacroDefinition::qualified_name)
+                    .collect::<Vec<_>>();
+                plugins.sort();
+                plugins.dedup();
+                let generated = match parse_stage1_response_with_plugins(
                     &response,
                     self.config.prompt_limits,
                     self.config.language,
+                    &plugins,
                 ) {
                     Ok(value) => value,
                     Err(_) => {
@@ -1804,12 +1828,7 @@ impl PipelineSnapshot {
                 response,
                 elapsed_ms,
                 ..
-            } => self.llm_response(
-                LlmStage::GenerateSketch,
-                response,
-                elapsed_ms.get(),
-                events,
-            ),
+            } => self.llm_response(LlmStage::GenerateSketch, response, elapsed_ms.get(), events),
             EffectResult::DescriptionCatalogSelected {
                 response,
                 elapsed_ms,

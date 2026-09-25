@@ -217,9 +217,8 @@ fn fill_target_roles_keep_bilingual_canonical_meaning_and_original_operand_indic
 
 #[test]
 fn english_grammar_function_words_are_ascii_case_insensitive_after_parsing() {
-    let compile = |source| {
-        compile_typed_ddl(document(source, Language::En, &[]), &[], Some(23), LIMITS)
-    };
+    let compile =
+        |source| compile_typed_ddl(document(source, Language::En, &[]), &[], Some(23), LIMITS);
 
     let background = compile("fill the background with black.");
     let uppercase_background = compile("fill THE BACKGROUND WITH black.");

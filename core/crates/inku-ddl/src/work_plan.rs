@@ -29,6 +29,7 @@ pub const WORK_PLAN_CAPABILITIES_ASSET_BYTES: &[u8] =
 pub const UNSPECIFIED: &str = "unspecified";
 pub const MAX_WORK_PLAN_LAYERS: usize = 8;
 pub const MAX_WORK_PLAN_COUNT: u32 = 60;
+pub const MAX_WORK_PLAN_PLUGINS: usize = 4;
 
 /// One closed plan slot. Slot names are the plan's JSON field names.
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
@@ -314,10 +315,12 @@ impl WorkPlanLayer {
 }
 
 /// A normalized plan. Background and ground are optional document sentences.
+/// Plugins are installed qualified macro names, each printed as its own sentence.
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize)]
 pub struct WorkPlan {
     pub ground: Option<String>,
     pub background: Option<String>,
+    pub plugins: Vec<String>,
     pub layers: Vec<WorkPlanLayer>,
 }
 
@@ -348,6 +351,14 @@ fn ids(slot: WorkPlanSlot) -> Vec<String> {
 /// integer so every structured-output transport can carry it unchanged.
 #[must_use]
 pub fn work_plan_response_schema() -> Value {
+    work_plan_response_schema_with_plugins(&[])
+}
+
+/// The response schema with an optional `plugins` list closed over the
+/// installed qualified names. Without installed plugins it equals
+/// [`work_plan_response_schema`] byte for byte.
+#[must_use]
+pub fn work_plan_response_schema_with_plugins(plugins: &[String]) -> Value {
     let mut layer = Map::new();
     let capabilities = work_plan_capabilities();
     let shapes: Vec<String> = ids(WorkPlanSlot::Shape)
@@ -373,7 +384,7 @@ pub fn work_plan_response_schema() -> Value {
         }
         layer.insert(slot.field().into(), enum_schema(ids(slot)));
     }
-    json!({
+    let mut schema = json!({
         "type": "object",
         "properties": {
             "background": enum_schema(ids(WorkPlanSlot::Color)),
@@ -391,7 +402,15 @@ pub fn work_plan_response_schema() -> Value {
             }
         },
         "required": ["background", "ground", "layers"]
-    })
+    });
+    if !plugins.is_empty() {
+        schema["properties"]["plugins"] = json!({
+            "type": "array",
+            "items": {"type": "string", "enum": plugins},
+            "maxItems": MAX_WORK_PLAN_PLUGINS
+        });
+    }
+    schema
 }
 
 fn text(value: Option<&Value>) -> Option<String> {
@@ -408,6 +427,16 @@ fn text(value: Option<&Value>) -> Option<String> {
 /// dropped. Every change is reported, and nothing here can stop a drawing.
 #[must_use]
 pub fn normalize_work_plan(raw: &Value) -> (WorkPlan, Vec<WorkPlanDiagnostic>) {
+    normalize_work_plan_with_plugins(raw, &[])
+}
+
+/// Normalize a provider plan against the installed plugin names. A plugin name
+/// that is not installed, repeated, or over the limit is dropped and reported.
+#[must_use]
+pub fn normalize_work_plan_with_plugins(
+    raw: &Value,
+    plugins: &[String],
+) -> (WorkPlan, Vec<WorkPlanDiagnostic>) {
     let vocabulary = work_plan_vocabulary();
     let capabilities = work_plan_capabilities();
     let mut diagnostics = Vec::new();
@@ -434,6 +463,25 @@ pub fn normalize_work_plan(raw: &Value) -> (WorkPlan, Vec<WorkPlanDiagnostic>) {
             } else {
                 note(None, field, value, "unknown_value");
             }
+        }
+    }
+    for value in raw
+        .get("plugins")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+    {
+        let Some(name) = text(Some(value)) else {
+            continue;
+        };
+        if !plugins.contains(&name) {
+            note(None, "plugins", name, "unknown_plugin");
+        } else if plan.plugins.contains(&name) {
+            note(None, "plugins", name, "repeated_plugin");
+        } else if plan.plugins.len() >= MAX_WORK_PLAN_PLUGINS {
+            note(None, "plugins", name, "over_plugin_limit");
+        } else {
+            plan.plugins.push(name);
         }
     }
     let layers = raw
@@ -729,6 +777,14 @@ pub fn print_work_plan(plan: &WorkPlan, language: ResolvedInstructionLanguage) -
         lines.push(match language {
             ResolvedInstructionLanguage::Ja => format!("背景を{color}で埋める。"),
             ResolvedInstructionLanguage::En => format!("Fill the background with {color}."),
+        });
+    }
+    // A plugin sentence is the bare qualified name, the one form every
+    // parameterless definition expands without caller-meaning diagnostics.
+    for plugin in &plan.plugins {
+        lines.push(match language {
+            ResolvedInstructionLanguage::Ja => format!("{plugin}。"),
+            ResolvedInstructionLanguage::En => format!("{plugin}."),
         });
     }
     for layer in &plan.layers {

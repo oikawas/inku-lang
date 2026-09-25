@@ -14,8 +14,8 @@ use crate::{
     MacroLockResolutionIdentity, MacroParameterBinding, MacroParameterBindingDiagnosticKind,
     MacroParameterBindingResult, MarkerId, NeutralDiagnostic, NeutralDiagnosticKind,
     NormalizedDdlDocument, ParameterSchema, RemainingRoleKind, ResolvedInstructionLanguage,
-    SAIJIKI_ASSET_ID,
-    SemanticExplicitGeometry, SemanticNumericPosition, SourceSpan, collect_attachment_evidence,
+    SAIJIKI_ASSET_ID, SemanticExplicitGeometry, SemanticNumericPosition, SourceSpan,
+    collect_attachment_evidence,
     geometry::{GeometrySyntaxIssueKind, analyze_clause_geometry},
     project_macro_semantic_ref,
     saijiki::canonical_relation_identity_is_valid,
@@ -1254,7 +1254,13 @@ fn sequence_field_indices(
     operator_id: &str,
 ) -> Vec<usize> {
     let repeating_index = clause.atoms[..operator_index].iter().rposition(|atom| {
-        matches!(atom, ClauseAtom::GrammarMarker { marker_id: MarkerId::EnRepeating, .. })
+        matches!(
+            atom,
+            ClauseAtom::GrammarMarker {
+                marker_id: MarkerId::EnRepeating,
+                ..
+            }
+        )
     });
     clause
         .atoms
@@ -1320,10 +1326,13 @@ fn sequence_unit_head_indices(
         })
         .collect::<Vec<_>>();
     let group_index = clause.atoms.iter().enumerate().find_map(|(index, atom)| {
-        matches!(atom, ClauseAtom::GrammarMarker {
-            marker_id: MarkerId::JaGroup | MarkerId::EnGroupOf,
-            ..
-        })
+        matches!(
+            atom,
+            ClauseAtom::GrammarMarker {
+                marker_id: MarkerId::JaGroup | MarkerId::EnGroupOf,
+                ..
+            }
+        )
         .then_some(index)
     });
     let Some(group_index) = group_index else {
@@ -1349,10 +1358,13 @@ fn sequence_unit_head_indices(
         ResolvedInstructionLanguage::En => {
             let with_index = clause.atoms.iter().enumerate().find_map(|(index, atom)| {
                 (index > group_index
-                    && matches!(atom, ClauseAtom::GrammarMarker {
-                        marker_id: MarkerId::EnWith,
-                        ..
-                    }))
+                    && matches!(
+                        atom,
+                        ClauseAtom::GrammarMarker {
+                            marker_id: MarkerId::EnWith,
+                            ..
+                        }
+                    ))
                 .then_some(index)
             });
             let Some(with_index) = with_index else {
@@ -1399,10 +1411,13 @@ fn member_sequence_markers(
             let in_range = start <= index
                 && (index <= end
                     || (matches!(document.language(), ResolvedInstructionLanguage::Ja)
-                        && matches!(atom, ClauseAtom::GrammarMarker {
-                            marker_id: MarkerId::JaSequenceTe | MarkerId::JaRepeat,
-                            ..
-                        })));
+                        && matches!(
+                            atom,
+                            ClauseAtom::GrammarMarker {
+                                marker_id: MarkerId::JaSequenceTe | MarkerId::JaRepeat,
+                                ..
+                            }
+                        )));
             in_range
                 .then(|| match atom {
                     ClauseAtom::GrammarMarker { span, .. }
@@ -1413,7 +1428,7 @@ fn member_sequence_markers(
                         clause_index,
                         index,
                     )),
-                _ => None,
+                    _ => None,
                 })
                 .flatten()
         })
@@ -1426,9 +1441,15 @@ fn sequence_color_indices(
     operator_index: usize,
     operator_id: &str,
 ) -> Vec<usize> {
-    let repeating_index = clause.atoms[..operator_index]
-        .iter()
-        .rposition(|atom| matches!(atom, ClauseAtom::GrammarMarker { marker_id: MarkerId::EnRepeating, .. }));
+    let repeating_index = clause.atoms[..operator_index].iter().rposition(|atom| {
+        matches!(
+            atom,
+            ClauseAtom::GrammarMarker {
+                marker_id: MarkerId::EnRepeating,
+                ..
+            }
+        )
+    });
     clause
         .atoms
         .iter()
@@ -1479,22 +1500,31 @@ fn sequence_marker_indices(
                     first <= index
                         && (index <= last
                             || (last < index
-                                && matches!(atom, ClauseAtom::GrammarMarker {
-                                    marker_id: MarkerId::JaSequenceTe | MarkerId::JaRepeat,
-                                    ..
-                                })))
+                                && matches!(
+                                    atom,
+                                    ClauseAtom::GrammarMarker {
+                                        marker_id: MarkerId::JaSequenceTe | MarkerId::JaRepeat,
+                                        ..
+                                    }
+                                )))
                 }
                 ResolvedInstructionLanguage::En => {
                     (first <= index && index <= last)
                         || (operator_id == "in_order"
-                            && matches!(atom, ClauseAtom::GrammarMarker {
-                                marker_id: MarkerId::EnRepeating,
-                                ..
-                            }))
+                            && matches!(
+                                atom,
+                                ClauseAtom::GrammarMarker {
+                                    marker_id: MarkerId::EnRepeating,
+                                    ..
+                                }
+                            ))
                 }
             };
             (sequence_marker
-                && matches!(atom, ClauseAtom::GrammarMarker { .. } | ClauseAtom::FunctionWord { .. }))
+                && matches!(
+                    atom,
+                    ClauseAtom::GrammarMarker { .. } | ClauseAtom::FunctionWord { .. }
+                ))
             .then_some(index)
         })
         .collect()
@@ -1546,7 +1576,13 @@ fn sequence_connectors_are_valid(
                 return false;
             };
             let Some(repeating_index) = clause.atoms[..first].iter().rposition(|atom| {
-                matches!(atom, ClauseAtom::GrammarMarker { marker_id: MarkerId::EnRepeating, .. })
+                matches!(
+                    atom,
+                    ClauseAtom::GrammarMarker {
+                        marker_id: MarkerId::EnRepeating,
+                        ..
+                    }
+                )
             }) else {
                 return false;
             };

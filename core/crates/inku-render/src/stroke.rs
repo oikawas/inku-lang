@@ -212,14 +212,18 @@ fn smooth_noise(t: f64, seed: Seed, octave: i32) -> f64 {
     }
 }
 
-fn smooth_noise_salted(t: f64, seed: Seed, salt: &str, frequency: f64) -> f64 {
-    let x = t * frequency;
+/// Smoothstep interpolation between the lattice values around `x`.
+fn interpolate_lattice(x: f64, mut lattice: impl FnMut(i64) -> f64) -> f64 {
     let index = x.floor() as i64;
     let fraction = x - index as f64;
     let smooth = fraction * fraction * (3.0 - 2.0 * fraction);
-    let lower = unit(seed, salt, index) * 2.0 - 1.0;
-    let upper = unit(seed, salt, index + 1) * 2.0 - 1.0;
+    let lower = lattice(index) * 2.0 - 1.0;
+    let upper = lattice(index + 1) * 2.0 - 1.0;
     lower * (1.0 - smooth) + upper * smooth
+}
+
+fn smooth_noise_salted(t: f64, seed: Seed, salt: &str, frequency: f64) -> f64 {
+    interpolate_lattice(t * frequency, |index| unit(seed, salt, index))
 }
 
 #[must_use]
@@ -229,6 +233,100 @@ pub fn latent_energy(t: f64, seed: Seed) -> f64 {
         .sum::<f64>()
         / 1.75)
         .clamp(-1.0, 1.0)
+}
+
+/// One smooth-noise field of a stroke, hashing each lattice point once.
+///
+/// A stroke samples its fields at up to 129 parameters, and neighbouring
+/// samples share lattice points. Each cached value is `unit(seed, salt,
+/// index)` itself, so a stroke is performed exactly as before.
+struct NoiseField {
+    seed: Seed,
+    salt: &'static str,
+    frequency: f64,
+    lattice: Vec<Option<f64>>,
+}
+
+impl NoiseField {
+    fn new(seed: Seed, salt: &'static str, frequency: f64) -> Self {
+        // Parameters in [0, 1] reach lattice points 0 ..= ceil(frequency) + 1.
+        let points = frequency.ceil() as usize + 2;
+        Self {
+            seed,
+            salt,
+            frequency,
+            lattice: vec![None; points],
+        }
+    }
+
+    fn sample(&mut self, t: f64) -> f64 {
+        let (seed, salt, lattice) = (self.seed, self.salt, &mut self.lattice);
+        interpolate_lattice(t * self.frequency, |index| {
+            match usize::try_from(index)
+                .ok()
+                .and_then(|slot| lattice.get_mut(slot))
+            {
+                Some(slot) => *slot.get_or_insert_with(|| unit(seed, salt, index)),
+                None => unit(seed, salt, index),
+            }
+        })
+    }
+}
+
+/// Every smooth-noise field that one performed stroke samples.
+struct StrokeNoise {
+    energy: [NoiseField; 6],
+    swell: NoiseField,
+    gesture_lateral: [NoiseField; 2],
+    gesture_longitudinal: [NoiseField; 2],
+}
+
+impl StrokeNoise {
+    fn new(seed: Seed) -> Self {
+        Self {
+            energy: std::array::from_fn(|index| {
+                let octave = i32::try_from(index).expect("six octaves") + 1;
+                NoiseField::new(seed, ENERGY_OCTAVE_SALTS[index], 2_f64.powi(octave))
+            }),
+            swell: NoiseField::new(seed, "swell", 1.5),
+            gesture_lateral: [
+                NoiseField::new(seed, "gesture-lat", 1.0),
+                NoiseField::new(seed, "gesture-lat", 2.0),
+            ],
+            gesture_longitudinal: [
+                NoiseField::new(seed, "gesture-lon", 1.0),
+                NoiseField::new(seed, "gesture-lon", 2.0),
+            ],
+        }
+    }
+
+    /// The value of `latent_energy(t, seed)`.
+    fn latent_energy(&mut self, t: f64) -> f64 {
+        (self
+            .energy
+            .iter_mut()
+            .zip(1..=6)
+            .map(|(field, octave)| field.sample(t) / 2_f64.powi(octave).sqrt())
+            .sum::<f64>()
+            / 1.75)
+            .clamp(-1.0, 1.0)
+    }
+
+    fn swell(&mut self, t: f64) -> f64 {
+        0.45 + 0.55 * (0.5 + 0.5 * self.swell.sample(t))
+    }
+
+    fn gesture_wave(fields: &mut [NoiseField; 2], t: f64) -> f64 {
+        (fields[0].sample(t) * 0.7 + fields[1].sample(t) * 0.35).clamp(-1.0, 1.0)
+    }
+
+    fn gesture_lateral(&mut self, t: f64) -> f64 {
+        Self::gesture_wave(&mut self.gesture_lateral, t)
+    }
+
+    fn gesture_longitudinal(&mut self, t: f64) -> f64 {
+        Self::gesture_wave(&mut self.gesture_longitudinal, t)
+    }
 }
 
 fn edge_window(t: f64) -> f64 {
@@ -242,15 +340,6 @@ fn edge_window(t: f64) -> f64 {
     } else {
         1.0
     }
-}
-
-fn swell(t: f64, seed: Seed) -> f64 {
-    0.45 + 0.55 * (0.5 + 0.5 * smooth_noise_salted(t, seed, "swell", 1.5))
-}
-
-fn gesture_wave(t: f64, seed: Seed, salt: &str) -> f64 {
-    (smooth_noise_salted(t, seed, salt, 1.0) * 0.7 + smooth_noise_salted(t, seed, salt, 2.0) * 0.35)
-        .clamp(-1.0, 1.0)
 }
 
 fn quantize(value: f64, step: f64) -> f64 {
@@ -436,6 +525,7 @@ pub fn synthesize_stroke(request: StrokeRequest) -> StrokeResult {
     let direction = Point::new(delta.x / length, delta.y / length);
     let normal = Point::new(-direction.y, direction.x);
     let events = event_map(seed, grammar.event_rate, sample_count);
+    let mut noise = StrokeNoise::new(seed);
     let mut position = start;
     let mut velocity = Point::new(
         delta.x / (sample_count - 1) as f64,
@@ -458,7 +548,7 @@ pub fn synthesize_stroke(request: StrokeRequest) -> StrokeResult {
         let (energy, envelope) = if grammar.periodic {
             (machine_energy(t), machine_swell(t))
         } else {
-            (latent_energy(t, seed), edge_window(t) * swell(t, seed))
+            (noise.latent_energy(t), edge_window(t) * noise.swell(t))
         };
         let mut lateral = energy * grammar.energy_lateral * base_width * (0.18 + 0.82 * envelope);
         let event = events.get(&index).copied();
@@ -492,8 +582,8 @@ pub fn synthesize_stroke(request: StrokeRequest) -> StrokeResult {
             } else {
                 (
                     edge_window(t),
-                    gesture_wave(t, seed, "gesture-lat"),
-                    gesture_wave(t, seed, "gesture-lon"),
+                    noise.gesture_lateral(t),
+                    noise.gesture_longitudinal(t),
                 )
             };
             gesture.x = gesture_amplitude
@@ -641,6 +731,7 @@ pub fn synthesize_contour(request: ContourStrokeRequest<'_>) -> ContourStrokeRes
     let normals = centerline_normals(centerline, closed);
     let parameters = arc_length_parameters(centerline, closed);
     let events = event_map(seed, grammar.event_rate, count);
+    let mut noise = StrokeNoise::new(seed);
     let mut gesture_amplitude = 0.0;
     if wild && !grammar.periodic {
         let total_length = centerline
@@ -659,7 +750,7 @@ pub fn synthesize_contour(request: ContourStrokeRequest<'_>) -> ContourStrokeRes
     if gesture_amplitude != 0.0 {
         gestures = parameters
             .iter()
-            .map(|t| gesture_wave(*t, seed, "gesture-lat"))
+            .map(|t| noise.gesture_lateral(*t))
             .collect();
         if closed {
             let mean = gestures.iter().sum::<f64>() / count as f64;
@@ -690,9 +781,9 @@ pub fn synthesize_contour(request: ContourStrokeRequest<'_>) -> ContourStrokeRes
                 if closed { 1.0 } else { machine_swell(t) },
             )
         } else if closed {
-            (latent_energy(t, seed), swell(t, seed))
+            (noise.latent_energy(t), noise.swell(t))
         } else {
-            (latent_energy(t, seed), edge_window(t) * swell(t, seed))
+            (noise.latent_energy(t), edge_window(t) * noise.swell(t))
         };
         let mut lateral = energy * grammar.energy_lateral * base_width * (0.18 + 0.82 * envelope);
         let mut event = events.get(&index).copied();

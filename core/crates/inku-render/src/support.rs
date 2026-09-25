@@ -111,9 +111,11 @@ fn support_envelope(
     }
     let span = ((count as f64 * span_ratio).round_ties_even() as usize).max(2);
     let probability = (rate * bias / (count.saturating_sub(4).max(1)) as f64).min(0.35);
+    let arrival_label = format!("{label}-arrival");
+    let size_label = format!("{label}-size");
     let mut centres = Vec::new();
     for index in 2..count - 2 {
-        if unit(seed, &format!("{label}-arrival"), index as i64) < probability {
+        if unit(seed, &arrival_label, index as i64) < probability {
             centres.push(index);
             if centres.len() >= 3 {
                 break;
@@ -122,7 +124,7 @@ fn support_envelope(
     }
     let mut envelope = vec![0.0_f64; count];
     for centre in centres {
-        let size = 0.6 + 0.4 * unit(seed, &format!("{label}-size"), centre as i64);
+        let size = 0.6 + 0.4 * unit(seed, &size_label, centre as i64);
         for offset in -(span as isize)..=span as isize {
             let index = centre as isize + offset;
             if (0..count as isize).contains(&index) {

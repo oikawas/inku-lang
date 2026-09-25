@@ -334,10 +334,6 @@ interface InkuStrings {
     val cameraPreparingImage: String
     val cameraLoadingLocalModel: String
     val cameraAnalyzingLocally: String
-    val cameraVisionModeTitle: String
-    val cameraVisionModeSubtitle: String
-    val cameraVisionModeDescription: String
-    val cameraVisionModeDdl: String
     val cameraVisionModelTitle: String
     val bundledPluginsTitle: String
     val ddlImportFile: String
@@ -358,10 +354,8 @@ interface InkuStrings {
     val cameraDecodeFailed: String
     val cameraAnalysisFailed: String
     val cameraEmptyResult: String
-    val cameraInvalidDdl: String
     val cameraDrawModelNotReady: String
     val cameraDrawFailed: String
-    val cameraDrawFailedDirectDdl: String
     val retry: String
     val menu: String
     val settings: String

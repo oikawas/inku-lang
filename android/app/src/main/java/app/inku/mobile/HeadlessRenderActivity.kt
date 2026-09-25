@@ -14,7 +14,6 @@ import app.inku.mobile.llm.CameraVisionModelSetting
 import app.inku.mobile.llm.VisionAnalysisRequest
 import app.inku.mobile.llm.VisionAnalysisResult
 import app.inku.mobile.llm.VisionImagePreparer
-import app.inku.mobile.llm.VisionOutputMode
 import app.inku.mobile.llm.VisionPrompts
 import app.inku.mobile.llm.isLocalVisionModel
 import app.inku.mobile.pipeline.SketchInput
@@ -133,33 +132,18 @@ class HeadlessRenderActivity : Activity() {
                     val analysis = requireNotNull(image)
                     val started = System.currentTimeMillis()
                     val sketch = SketchInput(requested = intent.getStringExtra("sketch") == "on")
-                    val drawn = if (analysis.request.outputMode == VisionOutputMode.DDL) {
-                        repository.composeFromDdl(
-                            description = analysis.result.text,
-                            ddl = analysis.result.text,
-                            catalogId = catalogId,
-                            canvasAspect = canvasAspect,
-                            stage1ModelId = analysis.result.modelId,
-                            stage2ModelId = stage2Model,
-                            autoRepair = autoRepair,
-                            seeds = seeds,
-                            sketch = sketch,
-                            inputProvenance = analysis.provenance,
-                        )
-                    } else {
-                        repository.paint(
-                            description = analysis.result.text,
-                            catalogId = catalogId,
-                            canvasAspect = canvasAspect,
-                            stage1ModelId = stage1Model,
-                            stage2ModelId = stage2Model,
-                            autoRepair = autoRepair,
-                            historyInput = analysis.result.text,
-                            seeds = seeds,
-                            sketch = sketch,
-                            inputProvenance = analysis.provenance,
-                        )
-                    }
+                    val drawn = repository.paint(
+                        description = analysis.result.text,
+                        catalogId = catalogId,
+                        canvasAspect = canvasAspect,
+                        stage1ModelId = stage1Model,
+                        stage2ModelId = stage2Model,
+                        autoRepair = autoRepair,
+                        historyInput = analysis.result.text,
+                        seeds = seeds,
+                        sketch = sketch,
+                        inputProvenance = analysis.provenance,
+                    )
                     withContext(Dispatchers.IO) {
                         File(outputDir, "timings.json").writeText(
                             JSONObject(analysis.timings.toString())
@@ -269,10 +253,6 @@ class HeadlessRenderActivity : Activity() {
         val file = resolveHeadlessInputFile(path)
         val modelId = intent.getStringExtra("vision_model")?.takeIf { it.isNotBlank() }
             ?: CameraVisionModelSetting.decode(repository.getSetting(CameraVisionModelSetting.KEY))
-        val outputMode = when (intent.getStringExtra("vision_mode")) {
-            "ddl" -> VisionOutputMode.DDL
-            else -> VisionOutputMode.DESCRIPTION
-        }
         val longEdge = intent.getIntExtra("vision_long_edge", VisionImagePreparer.MAX_LONG_EDGE)
         val languageCode = intent.getStringExtra("ui_lang")?.takeIf { it == "en" } ?: "ja"
         val prepareStarted = System.currentTimeMillis()
@@ -286,7 +266,6 @@ class HeadlessRenderActivity : Activity() {
             width = prepared.width,
             height = prepared.height,
             languageCode = languageCode,
-            outputMode = outputMode,
             modelId = modelId,
         )
         val visionStarted = System.currentTimeMillis()
@@ -294,8 +273,7 @@ class HeadlessRenderActivity : Activity() {
         val visionMs = System.currentTimeMillis() - visionStarted
         val timings = JSONObject()
             .put("vision_model", modelId)
-            .put("vision_mode", outputMode.wireValue)
-            .put("prompt_version", VisionPrompts.versionFor(outputMode))
+            .put("prompt_version", VisionPrompts.VERSION)
             .put("image_width", prepared.width)
             .put("image_height", prepared.height)
             .put("jpeg_bytes", prepared.jpegBytes.size)

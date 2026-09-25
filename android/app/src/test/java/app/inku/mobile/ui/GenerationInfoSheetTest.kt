@@ -5,7 +5,6 @@ import app.inku.mobile.data.model.CameraInputProvenance
 import app.inku.mobile.data.model.mergeInputProvenance
 import app.inku.mobile.llm.VisionAnalysisRequest
 import app.inku.mobile.llm.VisionAnalysisResult
-import app.inku.mobile.llm.VisionOutputMode
 import app.inku.mobile.ui.i18n.InkuStringsEn
 import app.inku.mobile.ui.i18n.InkuStringsJa
 import org.junit.Assert.assertEquals
@@ -175,24 +174,11 @@ class GenerationInfoSheetTest {
     }
 
     @Test
-    fun directDdlGenerationInfoNamesTheSkippedRouteAndLocalProducer() {
-        val metadata = mergeInputProvenance(
-            "{}",
-            CameraInputProvenance.fromAnalysis(
-                request = VisionAnalysisRequest(
-                    normalizedJpeg = byteArrayOf(1),
-                    width = 720,
-                    height = 1280,
-                    languageCode = "ja",
-                    outputMode = VisionOutputMode.DDL,
-                ),
-                result = VisionAnalysisResult(
-                    text = "青い円を右上に置く。",
-                    modelId = "local-litert-lm:gemma-4-e2b",
-                    elapsedMs = 321L,
-                ),
-            ),
-        )
+    fun retiredDirectDdlWorksStillNameTheSkippedRouteAndLocalProducer() {
+        val metadata = """{"input_provenance":{"origin":"camera","route":"ddl_to_pipeline_stage2",""" +
+            """"vision_provider_id":"local-litert-lm","vision_model_id":"local-litert-lm:gemma-4-e2b",""" +
+            """"vision_prompt_version":"camera-ddl-v2","vision_output_mode":"ddl",""" +
+            """"normalized_image_width":720,"normalized_image_height":1280}}"""
         val item = historyItem(
             renderMetadataJson = metadata,
             stage1Model = "local-litert-lm:gemma-4-e2b",

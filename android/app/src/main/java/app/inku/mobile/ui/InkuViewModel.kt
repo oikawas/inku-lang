@@ -40,12 +40,10 @@ import app.inku.mobile.data.refinement.RefinementPlanner
 import app.inku.mobile.data.refinement.VariationAmplitude
 import app.inku.mobile.llm.LOCAL_VISION_MODEL_ID
 import app.inku.mobile.llm.ModelProviderHttpException
-import app.inku.mobile.llm.CameraVisionModeSetting
 import app.inku.mobile.llm.CameraVisionModelSetting
 import app.inku.mobile.llm.isLocalVisionModel
 import app.inku.mobile.llm.VisionAnalysisRequest
 import app.inku.mobile.llm.VisionImagePreparer
-import app.inku.mobile.llm.VisionOutputMode
 import app.inku.mobile.pipeline.ImportedPluginDefinition
 import app.inku.mobile.pipeline.InstructionLanguages
 import app.inku.mobile.pipeline.ComposeFromDdlProgress
@@ -69,7 +67,6 @@ import app.inku.mobile.ui.camera.CameraDrawSettings
 import app.inku.mobile.ui.camera.ModelReadinessIssue
 import app.inku.mobile.ui.camera.CameraInstantPrintCoordinator
 import app.inku.mobile.ui.camera.CameraInstantPrintPhase
-import app.inku.mobile.ui.camera.CameraInstantPrintRoute
 import app.inku.mobile.ui.camera.SelectedImageFileStore
 import app.inku.mobile.ui.camera.cameraDevelopmentPresentation
 import app.inku.mobile.ui.camera.modelReadinessIssue
@@ -226,7 +223,6 @@ data class InkuUiState(
     val ddlEditorOpen: Boolean = false,
     val cameraCaptureState: CameraCaptureState = CameraCaptureState.Idle,
     val cameraSourcePhotoPath: String? = null,
-    val cameraVisionOutputMode: VisionOutputMode = VisionOutputMode.DESCRIPTION,
     val cameraVisionModelId: String = LOCAL_VISION_MODEL_ID,
     val bundledPluginsEnabled: Boolean = true,
     /** Definitions read with an `inku.ddl-export.v1` file, held for the next new work. */
@@ -291,7 +287,6 @@ data class InkuUiState(
 
 private data class CameraDrawRunInput(
     val description: String,
-    val directDdl: String?,
     val inputProvenance: CameraInputProvenance,
     val canvasAspect: String,
     val uiLanguageCode: String,
@@ -300,9 +295,6 @@ private data class CameraDrawRunInput(
 ) {
     val route: CameraDrawRoute
         get() = CameraDrawRoute(inputProvenance, drawSettings)
-
-    val instantPrintRoute: CameraInstantPrintRoute
-        get() = if (directDdl == null) CameraInstantPrintRoute.Description else CameraInstantPrintRoute.DirectDdl
 }
 
 private class CameraStageFailure(val failure: CameraFailure) : RuntimeException()
@@ -918,10 +910,6 @@ class InkuViewModel @JvmOverloads constructor(
         var stagedPhoto: java.io.File? = null
         try {
             val outcome = coordinator.run(
-                route = cameraComposeSnapshot
-                    ?.cameraVisionOutputMode
-                    ?.let { if (it == VisionOutputMode.DDL) CameraInstantPrintRoute.DirectDdl else CameraInstantPrintRoute.Description }
-                    ?: CameraInstantPrintRoute.Description,
                 prepare = {
                     try {
                         val prepared = withContext(Dispatchers.IO) {
@@ -955,18 +943,12 @@ class InkuViewModel @JvmOverloads constructor(
                         width = prepared.width,
                         height = prepared.height,
                         languageCode = uiLanguageCode,
-                        outputMode = snapshot.cameraVisionOutputMode,
                         modelId = snapshot.cameraVisionModelId,
                     )
                     val result = repository.analyzeVision(request)
                     if (result.text.isBlank()) throw CameraStageFailure(CameraFailure.EmptyResult)
-                    val directDdl = when (request.outputMode) {
-                        VisionOutputMode.DESCRIPTION -> null
-                        VisionOutputMode.DDL -> result.text.trim().ifBlank { throw CameraStageFailure(CameraFailure.EmptyResult) }
-                    }
                     CameraDrawRunInput(
-                        description = directDdl ?: result.text.trim(),
-                        directDdl = directDdl,
+                        description = result.text.trim(),
                         inputProvenance = CameraInputProvenance.fromAnalysis(request, result, origin),
                         canvasAspect = snapshot.selectedCanvasAspect,
                         uiLanguageCode = uiLanguageCode,
@@ -979,7 +961,7 @@ class InkuViewModel @JvmOverloads constructor(
                     promptEditedByUser = true
                     localState.value = localState.value.copy(
                         prompt = input.description,
-                        ddl = input.directDdl.orEmpty(),
+                        ddl = "",
                         ddlEditedAfterGeneration = false,
                         message = null,
                     )
@@ -1005,7 +987,7 @@ class InkuViewModel @JvmOverloads constructor(
         } catch (_: Throwable) {
             failCameraRun(
                 serial,
-                cameraRetryInput?.drawFailure() ?: CameraFailure.AnalysisFailed,
+                if (cameraRetryInput != null) CameraFailure.DrawFailed else CameraFailure.AnalysisFailed,
                 canRetryDraw = cameraRetryInput != null,
             )
         } finally {
@@ -1044,7 +1026,6 @@ class InkuViewModel @JvmOverloads constructor(
             val coordinator = cameraCoordinator(serial)
             try {
                 val outcome = coordinator.runFromAnalysis(
-                    route = input.instantPrintRoute,
                     local = input,
                     interpret = ::interpretCameraInput,
                     compose = { retained, interpreted, progress ->
@@ -1063,7 +1044,7 @@ class InkuViewModel @JvmOverloads constructor(
             } catch (error: PipelineInteractionRequired) {
                 if (serial == cameraRunSerial) presentPipelineInteraction(error)
             } catch (_: Throwable) {
-                failCameraRun(serial, input.drawFailure(), canRetryDraw = true)
+                failCameraRun(serial, CameraFailure.DrawFailed, canRetryDraw = true)
             }
         }
     }
@@ -1158,13 +1139,13 @@ class InkuViewModel @JvmOverloads constructor(
     private suspend fun composeCameraInput(
         serial: Long,
         input: CameraDrawRunInput,
-        interpreted: InterpretResult?,
+        interpreted: InterpretResult,
         progress: suspend (CameraInstantPrintPhase) -> Unit,
     ): HistoryItemEntity = withContext(Dispatchers.IO) {
         val route = input.route
         repository.composeFromDdl(
             input.description,
-            input.directDdl ?: requireNotNull(interpreted).ddlForDisplay,
+            interpreted.ddlForDisplay,
             route.catalogId,
             input.canvasAspect,
             route.stage1ModelId,
@@ -1176,7 +1157,7 @@ class InkuViewModel @JvmOverloads constructor(
             uiLang = input.uiLanguageCode,
             sketch = route.sketch,
             inputProvenance = input.inputProvenance,
-            executionId = interpreted?.executionId,
+            executionId = interpreted.executionId,
             originalPhoto = input.originalPhoto,
             onProgress = { pipelinePhase ->
                 progress(
@@ -1261,10 +1242,7 @@ class InkuViewModel @JvmOverloads constructor(
         providers: List<ProviderSettingEntity>,
         assets: List<ModelAssetEntity>,
     ): String? {
-        val models = buildList {
-            if (snapshot.cameraVisionOutputMode == VisionOutputMode.DESCRIPTION) add(snapshot.selectedModelId)
-            add(snapshot.selectedStage2ModelId)
-        }.distinct()
+        val models = listOf(snapshot.selectedModelId, snapshot.selectedStage2ModelId).distinct()
         return models.firstNotNullOfOrNull { modelId ->
             modelReadinessIssue(modelId, providers, assets)?.let { readinessMessage(it, modelId, providers) }
         }
@@ -1275,12 +1253,7 @@ class InkuViewModel @JvmOverloads constructor(
         providers: List<ProviderSettingEntity>,
         assets: List<ModelAssetEntity>,
     ): String? {
-        val models = buildList {
-            if (route.inputProvenance.visionOutputMode == app.inku.mobile.data.model.CameraVisionOutputMode.Description) {
-                add(route.stage1ModelId)
-            }
-            add(route.stage2ModelId)
-        }.distinct()
+        val models = listOf(route.stage1ModelId, route.stage2ModelId).distinct()
         return models.firstNotNullOfOrNull { modelId ->
             modelReadinessIssue(modelId, providers, assets)?.let { readinessMessage(it, modelId, providers) }
         }
@@ -1730,12 +1703,6 @@ class InkuViewModel @JvmOverloads constructor(
         persistSetting("ui_mode", JSONObject().put("value", normalized).toString())
     }
 
-    fun setCameraVisionOutputMode(mode: VisionOutputMode) {
-        if (cameraVisionModeChangeLocked(localState.value.cameraCaptureState)) return
-        localState.value = localState.value.copy(cameraVisionOutputMode = mode, message = null)
-        persistSetting(CameraVisionModeSetting.KEY, CameraVisionModeSetting.encode(mode))
-    }
-
     /** Enables or disables the bundled plugin package for new works. */
     fun setBundledPluginsEnabled(enabled: Boolean) {
         localState.value = localState.value.copy(bundledPluginsEnabled = enabled, message = null)
@@ -1743,7 +1710,7 @@ class InkuViewModel @JvmOverloads constructor(
     }
 
     fun setCameraVisionModel(modelId: String) {
-        if (cameraVisionModeChangeLocked(localState.value.cameraCaptureState)) return
+        if (cameraVisionModelChangeLocked(localState.value.cameraCaptureState)) return
         localState.value = localState.value.copy(cameraVisionModelId = modelId, message = null)
         persistSetting(CameraVisionModelSetting.KEY, CameraVisionModelSetting.encode(modelId))
     }
@@ -3357,7 +3324,6 @@ class InkuViewModel @JvmOverloads constructor(
         val replay = settings["save_replay_as_new_version"]?.let { JSONObject(it).optBoolean("enabled", current.saveReplayAsNewVersion) } ?: current.saveReplayAsNewVersion
         val histCanvas = settings["history_selection_canvas"]?.let { parseHistorySelection(JSONObject(it).optString("value")) } ?: current.historySelectionCanvas
         val histCatalog = settings["history_selection_catalog"]?.let { parseHistorySelection(JSONObject(it).optString("value")) } ?: current.historySelectionCatalog
-        val cameraVisionOutputMode = CameraVisionModeSetting.decode(settings[CameraVisionModeSetting.KEY])
         val cameraVisionModelId = CameraVisionModelSetting.decode(settings[CameraVisionModelSetting.KEY])
         val uiMode = settings["ui_mode"]?.let { JSONObject(it).optString("value", current.uiMode) } ?: current.uiMode
         // A stored code that is not one of the two falls back to Japanese
@@ -3391,7 +3357,6 @@ class InkuViewModel @JvmOverloads constructor(
             saveReplayAsNewVersion = replay,
             historySelectionCanvas = histCanvas,
             historySelectionCatalog = histCatalog,
-            cameraVisionOutputMode = cameraVisionOutputMode,
             cameraVisionModelId = cameraVisionModelId,
             bundledPluginsEnabled = bundledPluginsEnabled,
             bundledPluginWordsJa = bundledPluginWords.first,
@@ -3488,11 +3453,8 @@ class InkuViewModel @JvmOverloads constructor(
 
 internal fun modelDownloadInFlight(job: Job?): Boolean = job != null && !job.isCompleted
 
-internal fun cameraVisionModeChangeLocked(state: CameraCaptureState): Boolean =
+internal fun cameraVisionModelChangeLocked(state: CameraCaptureState): Boolean =
     state.locksCameraInteraction ||
         state == CameraCaptureState.AwaitingOverwriteConfirmation ||
         state == CameraCaptureState.Capturing ||
         state == CameraCaptureState.PickingPhoto
-
-private fun CameraDrawRunInput.drawFailure(): CameraFailure =
-    if (directDdl == null) CameraFailure.DrawFailed else CameraFailure.DrawFailedDirectDdl

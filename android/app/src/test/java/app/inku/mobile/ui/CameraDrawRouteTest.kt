@@ -32,19 +32,6 @@ class CameraDrawRouteTest {
     }
 
     @Test
-    fun directDdlRecordsTheVisionModelAsItsStageOneProducer() {
-        val direct = provenance().copy(
-            route = CameraInputRoute.DdlToPipelineStage2,
-            visionPromptVersion = "camera-ddl-v2",
-            visionOutputMode = CameraVisionOutputMode.Ddl,
-        )
-        val route = CameraDrawRoute(direct, settings())
-
-        assertEquals("local-litert-lm:gemma-4-e2b", route.stage1ModelId)
-        assertEquals("gemini:gemma-4-31b-it", route.stage2ModelId)
-    }
-
-    @Test
     fun onlyReadyToEditCarriesACameraOrigin() {
         assertEquals(provenance(), CameraDrawRouting.provenanceFor(CameraCaptureState.ReadyToEdit(provenance())))
         assertNull(CameraDrawRouting.provenanceFor(CameraCaptureState.Idle))

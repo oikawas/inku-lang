@@ -2,7 +2,6 @@ package app.inku.mobile.data.model
 
 import app.inku.mobile.llm.VisionAnalysisRequest
 import app.inku.mobile.llm.VisionAnalysisResult
-import app.inku.mobile.llm.VisionOutputMode
 import app.inku.mobile.llm.VisionPrompts
 import org.json.JSONObject
 
@@ -19,9 +18,11 @@ enum class CameraInputRoute(val wireValue: String) {
     LocalDdlToNimStage2("local_ddl_to_nim_stage2"),
     // The camera draw uses the author's drawing settings.
     DescriptionToPipeline("description_to_pipeline"),
+    // Saved by earlier builds that let the photo model write DDL directly.
     DdlToPipelineStage2("ddl_to_pipeline_stage2"),
 }
 
+/** `Ddl` is read from works saved while the direct-DDL mode existed. */
 enum class CameraVisionOutputMode(val wireValue: String) {
     Description("description"),
     Ddl("ddl"),
@@ -63,17 +64,11 @@ data class CameraInputProvenance(
             origin: CameraInputOrigin = CameraInputOrigin.Camera,
         ): CameraInputProvenance = CameraInputProvenance(
             origin = origin,
-            route = when (request.outputMode) {
-                VisionOutputMode.DESCRIPTION -> CameraInputRoute.DescriptionToPipeline
-                VisionOutputMode.DDL -> CameraInputRoute.DdlToPipelineStage2
-            },
+            route = CameraInputRoute.DescriptionToPipeline,
             visionProviderId = result.modelId.substringBefore(':'),
             visionModelId = result.modelId,
-            visionPromptVersion = VisionPrompts.versionFor(request.outputMode),
-            visionOutputMode = when (request.outputMode) {
-                VisionOutputMode.DESCRIPTION -> CameraVisionOutputMode.Description
-                VisionOutputMode.DDL -> CameraVisionOutputMode.Ddl
-            },
+            visionPromptVersion = VisionPrompts.VERSION,
+            visionOutputMode = CameraVisionOutputMode.Description,
             normalizedImageWidth = request.width,
             normalizedImageHeight = request.height,
         )

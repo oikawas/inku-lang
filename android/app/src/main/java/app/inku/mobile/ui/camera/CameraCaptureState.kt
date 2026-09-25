@@ -51,10 +51,8 @@ enum class CameraFailure {
     DecodeFailed,
     AnalysisFailed,
     EmptyResult,
-    InvalidDdl,
     DrawModelNotReady,
     DrawFailed,
-    DrawFailedDirectDdl,
 }
 
 internal val CameraCaptureState.locksCameraInteraction: Boolean

@@ -2,7 +2,6 @@ package app.inku.mobile.data.model
 
 import app.inku.mobile.llm.VisionAnalysisRequest
 import app.inku.mobile.llm.VisionAnalysisResult
-import app.inku.mobile.llm.VisionOutputMode
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -41,13 +40,12 @@ class CameraInputProvenanceTest {
     }
 
     @Test
-    fun directDdlSnapshotUsesItsOwnBackwardCompatibleRouteAndPromptVersion() {
-        val snapshot = CameraInputProvenance.fromAnalysis(
-            request = request().copy(outputMode = VisionOutputMode.DDL),
-            result = result().copy(text = "青い円を右上に置く。"),
-        )
-        val parsed = cameraInputProvenance(mergeInputProvenance("{}", snapshot))
-            ?: error("direct DDL provenance missing")
+    fun worksSavedByTheRetiredDirectDdlModeStillReadBack() {
+        val saved = """{"input_provenance":{"origin":"camera","route":"ddl_to_pipeline_stage2",""" +
+            """"vision_provider_id":"gemini","vision_model_id":"gemini:gemma-4-31b-it",""" +
+            """"vision_prompt_version":"camera-ddl-v2","vision_output_mode":"ddl",""" +
+            """"normalized_image_width":964,"normalized_image_height":1280}}"""
+        val parsed = cameraInputProvenance(saved) ?: error("direct DDL provenance missing")
 
         assertEquals(CameraInputRoute.DdlToPipelineStage2, parsed.route)
         assertEquals(CameraVisionOutputMode.Ddl, parsed.visionOutputMode)

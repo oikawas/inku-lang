@@ -5,7 +5,8 @@ FROM ghcr.io/pyo3/maturin@sha256:2519833ac5bf071e02fa231ce368b5b69fac8be1b077437
 WORKDIR /build
 COPY core/ /build/core/
 COPY server/scripts/build_rust_notices.py /build/build_rust_notices.py
-RUN maturin build \
+RUN cargo fetch --manifest-path /build/core/Cargo.toml --locked \
+    && maturin build \
     --manifest-path /build/core/crates/inku-render-python/Cargo.toml \
     --release \
     --locked \

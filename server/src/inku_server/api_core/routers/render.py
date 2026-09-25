@@ -488,7 +488,7 @@ def api_render_score(req: RenderScoreRequest, actor: dict = Depends(_current_use
             "render_limits": limits_as_dict(limits),
         }
         svg, render_metadata = _render_with_metadata(
-            score, render_metadata, svg_profile=req.svg_profile
+            score, render_metadata, svg_profile=req.svg_profile, owner=actor["id"]
         )
         render_metadata = {
             **render_metadata,
@@ -540,6 +540,7 @@ def api_render_svg(req: RenderSvgRequest, actor: dict = Depends(_current_user)) 
             wild=req.wild,
             work=work,
             requested_limits=req.limits,
+            owner=actor["id"],
         )
     except HTTPException:
         raise

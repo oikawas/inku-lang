@@ -559,7 +559,7 @@ class ProductPipelineEffects:
                        error_policy="omit_and_continue")
         payload = {"request": {"score": score, "options": options}, "hard_policy": policy["hard_policy"],
                    "operational_budget": policy["operational_budget"], "clip": self.manifest["render"]["clip"]}
-        with _render_capacity():
+        with _render_capacity(owner):
             rendered = json.loads(self.binding.render_saved(_bytes(payload)))
         if "error" in rendered:
             raise CandidateHostError(rendered["error"])

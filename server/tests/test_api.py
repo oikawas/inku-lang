@@ -2350,6 +2350,19 @@ def test_render_concurrency_settings_are_admin_only():
         db.delete_user_group(group["id"])
 
 
+def test_an_account_renders_one_at_a_time_and_waits_its_turn():
+    """One render can take gigabytes; an account holds at most one shared slot."""
+    import threading
+
+    from inku_server.api_core.state import _RenderTurns
+
+    turns = _RenderTurns()
+    assert turns.acquire("a", timeout=0)
+    assert not turns.acquire("a", timeout=0.05)
+    assert turns.acquire("b", timeout=0), "another account is not held up"
+    threading.Timer(0.05, turns.release, args=("a",)).start()
+    assert turns.acquire("a", timeout=5), "the second render is drawn once the first ends"
+
 
 def test_log_retention_settings_are_admin_only():
     suffix = uuid.uuid4().hex[:8]

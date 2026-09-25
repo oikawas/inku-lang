@@ -207,6 +207,7 @@ def _render_score_svg(
     wild: bool = False,
     work: dict | None = None,
     requested_limits: dict[str, int] | None = None,
+    owner: str | None = None,
 ) -> tuple[str, str, str, str]:
     """Render a Score to SVG.
 
@@ -239,7 +240,7 @@ def _render_score_svg(
     render_metadata, resolved_catalog_id, color_source = _color_render_metadata(
         work=work, catalog_id=catalog_id
     )
-    with _render_capacity():
+    with _render_capacity(owner):
         svg = current_render_engine().render(
             score,
             color_map=render_metadata["render_color_map"],
@@ -386,7 +387,9 @@ def _render_metadata(catalog_id: str | None, *, canvas_aspect: str | None = None
     return metadata
 
 
-def _render_with_metadata(score: Score, render_metadata: dict, *, svg_profile: str | None = None) -> tuple[str, dict]:
+def _render_with_metadata(
+    score: Score, render_metadata: dict, *, svg_profile: str | None = None, owner: str | None = None
+) -> tuple[str, dict]:
     effective_seed = int(render_metadata.get("render_seed") or new_render_seed())
     # The two seeds are read differently on purpose: an absent performance seed
     # is drawn fresh, while an absent composition seed means "the placement
@@ -394,7 +397,7 @@ def _render_with_metadata(score: Score, render_metadata: dict, *, svg_profile: s
     composition_seed = _composition_seed(render_metadata.get("composition_seed"))
     wild = bool(render_metadata.get("render_wild"))
     render_metadata = {**render_metadata, "render_seed": effective_seed, "render_wild": wild}
-    with _render_capacity():
+    with _render_capacity(owner):
         result = current_render_engine().render(
             score,
             color_map=render_metadata["render_color_map"],

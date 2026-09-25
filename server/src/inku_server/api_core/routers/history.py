@@ -327,6 +327,7 @@ def api_history_svg(
             # it today's definition instead of the one it was drawn with.
             svg, _, _, _ = _render_score_svg(
                 item.get("score", {}),
+                owner=actor["id"],
                 catalog_id=item.get("catalog_id") or item.get("render_color_catalog_id"),
                 svg_profile=svg_profile,
                 # Both seeds off the row, not one. `wild` and `composition_seed`
@@ -416,7 +417,7 @@ def api_history_post(
             # the row to say why.
             "render_limits": limits_as_dict(limits),
         }
-        svg, render_metadata = _render_with_metadata(score, render_metadata)
+        svg, render_metadata = _render_with_metadata(score, render_metadata, owner=actor["id"])
     except HTTPException:
         raise
     except Exception as e:  # noqa: BLE001

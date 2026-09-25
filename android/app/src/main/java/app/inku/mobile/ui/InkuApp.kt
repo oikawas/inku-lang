@@ -6208,8 +6208,7 @@ private suspend fun shareHistoryJson(context: Context, item: HistoryItemEntity) 
 /** `inku-<id>-<time>.inku-ddl.json`, the web's name for a DDL export. */
 private suspend fun shareHistoryDdl(context: Context, item: HistoryItemEntity, json: String) {
     val payload = withContext(Dispatchers.IO) {
-        val exportDir = File(context.cacheDir, "exports")
-        check(exportDir.isDirectory || exportDir.mkdirs()) { "Export cache is unavailable." }
+        val exportDir = exportCacheDir(context)
         val stamp = java.text.SimpleDateFormat("yyyyMMdd-HHmmss", java.util.Locale.ROOT).format(java.util.Date())
         val file = File(exportDir, "inku-${item.id}-$stamp.inku-ddl.json")
         file.writeText(json, Charsets.UTF_8)
@@ -6230,8 +6229,7 @@ private suspend fun shareHistoryPng(context: Context, item: HistoryItemEntity, t
 }
 
 private fun buildHistoryJsonPayload(context: Context, item: HistoryItemEntity): SharePayload {
-    val exportDir = File(context.cacheDir, "exports")
-    exportDir.mkdirs()
+    val exportDir = exportCacheDir(context)
     val file = File(exportDir, "inku-${item.renderHashShort}.json")
     file.writeText(historyExportJson(item).toString(2), Charsets.UTF_8)
     val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
@@ -6240,8 +6238,7 @@ private fun buildHistoryJsonPayload(context: Context, item: HistoryItemEntity): 
 
 private fun buildHistorySvgPayload(context: Context, item: HistoryItemEntity, profile: String): SharePayload {
     val normalizedProfile = profile.takeIf { it in setOf("display", "editable", "compat") } ?: "display"
-    val exportDir = File(context.cacheDir, "exports")
-    exportDir.mkdirs()
+    val exportDir = exportCacheDir(context)
     val ext = if (normalizedProfile == "display") "svg" else "$normalizedProfile.svg"
     val file = File(exportDir, "inku-${item.renderHashShort}.$ext")
     file.writeText(svgForExport(item, normalizedProfile), Charsets.UTF_8)
@@ -6257,8 +6254,7 @@ private fun buildHistoryPngPayload(context: Context, item: HistoryItemEntity, ta
         // Not `require`: this sentence reaches the reader, so the language is
         // chosen where it is shown rather than here (see InkuFailure).
         if (estimatedBytes > MaxPngExportBitmapBytes) inkuError { it.exportPngTooLarge }
-        val exportDir = File(context.cacheDir, "exports")
-        check(exportDir.isDirectory || exportDir.mkdirs()) { "Export cache is unavailable." }
+        val exportDir = exportCacheDir(context)
         val file = File(exportDir, "inku-${item.renderHashShort}-${height}.png")
         try {
             FileOutputStream(file).use { out ->
@@ -6279,6 +6275,25 @@ private fun buildHistoryPngPayload(context: Context, item: HistoryItemEntity, ta
 
 private const val MaxPngExportHeightPx = 4320
 private const val MaxPngExportBitmapBytes = 128L * 1024L * 1024L
+
+/**
+ * The shared export folder, with yesterday's files cleared out.
+ *
+ * Every export lands here for the share sheet and nothing removed it: a 4320px
+ * PNG is tens of megabytes, and each work and height kept its own file. A
+ * file older than a day has long been read by whatever it was shared to.
+ */
+private fun exportCacheDir(context: Context): File {
+    val dir = File(context.cacheDir, "exports")
+    check(dir.isDirectory || dir.mkdirs()) { "Export cache is unavailable." }
+    val cutoff = System.currentTimeMillis() - EXPORT_RETENTION_MS
+    dir.listFiles()?.forEach { file ->
+        if (file.isFile && file.lastModified() < cutoff) file.delete()
+    }
+    return dir
+}
+
+private const val EXPORT_RETENTION_MS = 24L * 60L * 60L * 1000L
 
 private fun launchShareIntent(context: Context, payload: SharePayload) {
     val intent = Intent(Intent.ACTION_SEND).apply {

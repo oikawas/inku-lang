@@ -45,6 +45,7 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Box
@@ -125,6 +126,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -1497,6 +1499,7 @@ private fun shortCanvasLabel(state: InkuUiState): String {
 }
 
 /** New work starts with writing; saved work starts with the result. */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun ComposeScreen(state: InkuUiState, viewModel: InkuViewModel) {
     if (state.canvasPresentationMode) {
@@ -1508,8 +1511,18 @@ private fun ComposeScreen(state: InkuUiState, viewModel: InkuViewModel) {
     val keyboardController = LocalSoftwareKeyboardController.current
     var editingWork by remember(state.selectedHistory?.id) { mutableStateOf(false) }
     var resultInterpretationOpen by remember(state.selectedHistory?.id) { mutableStateOf(false) }
+    // Whether a batch line has the focus. The batch run button sits under the
+    // editor, which the keyboard covers, so while the keyboard is up it is
+    // pinned above it the way 「描画する」 is for the description.
+    var batchEditorFocused by remember { mutableStateOf(false) }
+    val imeVisible = WindowInsets.isImeVisible
     val hasWork = state.selectedHistory != null
     val showEditor = !hasWork || editingWork || state.composeMode == ComposeMode.Batch
+    val writeImeBar = state.descriptionFocused && state.composeMode == ComposeMode.Write
+    val batchImeBar = batchEditorFocused && imeVisible && state.composeMode == ComposeMode.Batch && !state.isDrawing
+    // The pinned bar lies over the bottom of the scroll. Room of the same
+    // height at the end lets the field it follows scroll clear of it.
+    var imeBarHeightPx by remember { mutableIntStateOf(0) }
     // Where the top of the scrolling area is on screen, and where the
     // description is. Both are measured in window coordinates: the field's
     // position inside its own parent says nothing about how far down the scroll
@@ -1581,7 +1594,7 @@ private fun ComposeScreen(state: InkuUiState, viewModel: InkuViewModel) {
                 if (!hasWork) Text(S.studioSubtitle, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 if (state.composeMode == ComposeMode.Batch) {
                     DrawSettingsPanel(state, viewModel)
-                    BatchPanel(state, viewModel)
+                    BatchPanel(state, viewModel, onEditorFocusChanged = { batchEditorFocused = it })
                 } else {
                     DrawPanel(
                         state,
@@ -1591,9 +1604,29 @@ private fun ComposeScreen(state: InkuUiState, viewModel: InkuViewModel) {
                     )
                 }
             }
+            if (writeImeBar || batchImeBar) {
+                Spacer(Modifier.height(with(LocalDensity.current) { imeBarHeightPx.toDp() }))
+            }
         }
-        if (state.descriptionFocused && state.composeMode == ComposeMode.Write) {
-            ImeActionBar(state, viewModel, modifier = Modifier.align(Alignment.BottomCenter))
+        val barModifier = Modifier.align(Alignment.BottomCenter).onSizeChanged { imeBarHeightPx = it.height }
+        if (writeImeBar) {
+            ImeActionBar(
+                idleText = "▶  ${drawActionLabel(S)}",
+                runningText = S.drawingButton,
+                state = state,
+                onClick = viewModel::draw,
+                onStop = viewModel::stopDrawing,
+                modifier = barModifier,
+            )
+        } else if (batchImeBar) {
+            ImeActionBar(
+                idleText = S.batchDrawButton,
+                runningText = S.runningButton,
+                state = state,
+                onClick = viewModel::runBatch,
+                onStop = viewModel::stopDrawing,
+                modifier = barModifier,
+            )
         }
     }
 }
@@ -2120,7 +2153,14 @@ private fun systemAnimationsEnabled(context: Context): Boolean = runCatching {
  * the author meant to accept 「ゆらぎ」.
  */
 @Composable
-private fun ImeActionBar(state: InkuUiState, viewModel: InkuViewModel, modifier: Modifier = Modifier) {
+private fun ImeActionBar(
+    idleText: String,
+    runningText: String,
+    state: InkuUiState,
+    onClick: () -> Unit,
+    onStop: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     Surface(
         modifier = modifier.fillMaxWidth(),
         color = MaterialTheme.colorScheme.surface,
@@ -2129,11 +2169,11 @@ private fun ImeActionBar(state: InkuUiState, viewModel: InkuViewModel, modifier:
     ) {
         Box(modifier = Modifier.padding(horizontal = Dimens.spaceL, vertical = Dimens.spaceM)) {
             DrawingActionButton(
-                idleText = "▶  ${drawActionLabel(S)}",
-                runningText = S.drawingButton,
+                idleText = idleText,
+                runningText = runningText,
                 state = state,
-                onClick = viewModel::draw,
-                onStop = viewModel::stopDrawing,
+                onClick = onClick,
+                onStop = onStop,
             )
         }
     }
@@ -2846,7 +2886,12 @@ private fun DrawPanel(
 }
 
 @Composable
-private fun BatchPanel(state: InkuUiState, viewModel: InkuViewModel, modifier: Modifier = Modifier) {
+private fun BatchPanel(
+    state: InkuUiState,
+    viewModel: InkuViewModel,
+    modifier: Modifier = Modifier,
+    onEditorFocusChanged: (Boolean) -> Unit = {},
+) {
     val lines = state.batchText.lines()
     val nonEmpty = lines.count { it.trim().isNotBlank() }
     Column(
@@ -2858,7 +2903,9 @@ private fun BatchPanel(state: InkuUiState, viewModel: InkuViewModel, modifier: M
             value = state.batchText,
             onValueChange = viewModel::setBatchText,
             enabled = !state.isDrawing,
-            modifier = Modifier.fillMaxWidth(),
+            // `hasFocus` is true while any line has it, so moving between
+            // lines does not drop the pinned button.
+            modifier = Modifier.fillMaxWidth().onFocusChanged { onEditorFocusChanged(it.hasFocus) },
         )
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -3531,9 +3578,14 @@ internal fun LineageScreen(state: InkuUiState, viewModel: InkuViewModel) {
  * The radio is the whole of the exclusivity the SPEC asks for: one element at a
  * time, with the amplitude appearing under the variation choice and nowhere else.
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun RefinementPanel(state: InkuUiState, viewModel: InkuViewModel) {
     val parent = state.refinementParent
+    // The touch words field is the last thing above 「候補を作る」; when the
+    // keyboard comes up for it, the button row is scrolled up with it.
+    val generateRowRequester = remember { BringIntoViewRequester() }
+    val scope = rememberCoroutineScope()
     Column(
         modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(Dimens.spaceM),
@@ -3572,12 +3624,20 @@ private fun RefinementPanel(state: InkuUiState, viewModel: InkuViewModel) {
         )
 
         when (state.refinementSubview) {
-            RefinementSubview.Adjust -> RefinementAdjustControls(state, viewModel)
+            RefinementSubview.Adjust -> RefinementAdjustControls(
+                state,
+                viewModel,
+                onTouchWordsFocused = { scope.launchImeBringIntoViewGuard(generateRowRequester) },
+            )
             RefinementSubview.Model -> ModelInspectionControls(state, viewModel)
             RefinementSubview.Language -> LanguageInspectionControls(state, viewModel)
         }
 
-        WrapRow(horizontal = Dimens.spaceM, vertical = Dimens.spaceM) {
+        WrapRow(
+            modifier = Modifier.bringIntoViewRequester(generateRowRequester),
+            horizontal = Dimens.spaceM,
+            vertical = Dimens.spaceM,
+        ) {
             // Both counts stay pressable whichever element is chosen, the way
             // web leaves its own pair alone: the refusal for four touches is
             // stated when the button is pressed, not by hiding the choice.
@@ -3726,7 +3786,11 @@ private fun RefinementProgressLanes(
 
 /** 調整: the five elements, the amplitude under the variation, the touch words. */
 @Composable
-private fun RefinementAdjustControls(state: InkuUiState, viewModel: InkuViewModel) {
+private fun RefinementAdjustControls(
+    state: InkuUiState,
+    viewModel: InkuViewModel,
+    onTouchWordsFocused: () -> Unit = {},
+) {
     WrapRow(horizontal = Dimens.spaceM, vertical = Dimens.spaceM) {
         RefinementElement.entries.forEach { element ->
             ChipButton(
@@ -3757,7 +3821,7 @@ private fun RefinementAdjustControls(state: InkuUiState, viewModel: InkuViewMode
             label = { Text(S.touchWords) },
             singleLine = true,
             enabled = !state.refinementBusy,
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().onFocusChanged { if (it.isFocused) onTouchWordsFocused() },
         )
     }
 }
@@ -4716,10 +4780,13 @@ private fun ProviderModelPickerDialog(
     }
     AlertDialog(
         onDismissRequest = onDismiss,
+        // As in the add dialog: the search field brings up the keyboard, and
+        // the list gives way to it instead of the save button going under it.
+        modifier = Modifier.imePadding(),
         title = { Text(provider.displayName) },
         text = {
             Column(
-                modifier = Modifier.fillMaxWidth().height(Dimens.providerModelDialogHeight),
+                modifier = Modifier.fillMaxWidth().heightIn(max = Dimens.providerModelDialogHeight),
                 verticalArrangement = Arrangement.spacedBy(Dimens.spaceM),
             ) {
                 Row(horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM), modifier = Modifier.fillMaxWidth()) {

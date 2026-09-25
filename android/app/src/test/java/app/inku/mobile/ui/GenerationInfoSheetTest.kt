@@ -124,10 +124,10 @@ class GenerationInfoSheetTest {
         val inputRows = sections.first().rows.associate { it.field to it.value }
         assertEquals(7, inputRows.size)
         assertEquals("camera", inputRows[GenerationInfoField.InputOrigin])
-        assertEquals("local_description_to_nim", inputRows[GenerationInfoField.InputRoute])
+        assertEquals("description_to_pipeline", inputRows[GenerationInfoField.InputRoute])
         assertEquals("local-litert-lm", inputRows[GenerationInfoField.VisionProvider])
         assertEquals("local-litert-lm:gemma-4-e2b", inputRows[GenerationInfoField.VisionModel])
-        assertEquals("camera-description-v1", inputRows[GenerationInfoField.VisionPromptVersion])
+        assertEquals("camera-description-v4", inputRows[GenerationInfoField.VisionPromptVersion])
         assertEquals("description", inputRows[GenerationInfoField.VisionOutputMode])
         assertEquals("720 × 1280", inputRows[GenerationInfoField.NormalizedImageDimensions])
 
@@ -139,7 +139,7 @@ class GenerationInfoSheetTest {
             ),
         )
         assertEquals(
-            "Local description → NIM",
+            "Photo description → drawing settings",
             generationInfoDisplayValue(
                 sections.first().rows.first { it.field == GenerationInfoField.InputRoute },
                 InkuStringsEn,
@@ -200,13 +200,13 @@ class GenerationInfoSheetTest {
         val sections = generationInfoSections(item)
         val rows = sections.flatMap { it.rows }.associate { it.field to it.value }
 
-        assertEquals("local_ddl_to_nim_stage2", rows[GenerationInfoField.InputRoute])
-        assertEquals("camera-ddl-v1", rows[GenerationInfoField.VisionPromptVersion])
+        assertEquals("ddl_to_pipeline_stage2", rows[GenerationInfoField.InputRoute])
+        assertEquals("camera-ddl-v2", rows[GenerationInfoField.VisionPromptVersion])
         assertEquals("ddl", rows[GenerationInfoField.VisionOutputMode])
         assertEquals("local-litert-lm:gemma-4-e2b", rows[GenerationInfoField.Stage1Model])
         assertEquals("stage-2-model", rows[GenerationInfoField.Stage2Model])
         assertEquals(
-            "端末内DDL → NIM Stage 2",
+            "写真のDDL → 描画設定のStage 2",
             generationInfoDisplayValue(
                 sections.first().rows.first { it.field == GenerationInfoField.InputRoute },
                 InkuStringsJa,

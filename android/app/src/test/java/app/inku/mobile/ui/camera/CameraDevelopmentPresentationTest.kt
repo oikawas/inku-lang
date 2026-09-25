@@ -12,8 +12,8 @@ class CameraDevelopmentPresentationTest {
             CameraCaptureState.PreparingImage to Triple("写真を準備しています", "Preparing your photo", CameraDevelopmentEffect.PhotoPreparing),
             CameraCaptureState.LoadingLocalModel to Triple("写真を見る準備をしています", "Getting ready to examine your photo", CameraDevelopmentEffect.PhotoPreparing),
             CameraCaptureState.AnalyzingLocally to Triple("写真の内容を調べています", "Examining your photo", CameraDevelopmentEffect.PhotoReading),
-            CameraCaptureState.InterpretingWithNim to Triple("絵の構図を考えています", "Planning the composition", CameraDevelopmentEffect.GrainAndForms),
-            CameraCaptureState.ComposingWithNim to Triple("色と形を組み立てています", "Building the colors and forms", CameraDevelopmentEffect.VividColorFields),
+            CameraCaptureState.InterpretingStage1 to Triple("絵の構図を考えています", "Planning the composition", CameraDevelopmentEffect.GrainAndForms),
+            CameraCaptureState.Composing to Triple("色と形を組み立てています", "Building the colors and forms", CameraDevelopmentEffect.VividColorFields),
             CameraCaptureState.Rendering to Triple("絵を仕上げています", "Finishing the work", CameraDevelopmentEffect.OutlineSettling),
             CameraCaptureState.Saving to Triple("作品を保存しています", "Saving your work", CameraDevelopmentEffect.Saving),
             CameraCaptureState.Completed("history-id") to Triple("現像できました", "Developed", CameraDevelopmentEffect.FinalArtwork),
@@ -44,7 +44,7 @@ class CameraDevelopmentPresentationTest {
     @Test
     fun animationScaleZeroUsesStaticStagesAndImmediateReveal() {
         val static = cameraDevelopmentPresentation(
-            CameraCaptureState.ComposingWithNim,
+            CameraCaptureState.Composing,
             isJapanese = false,
             animationsEnabled = false,
         ) ?: error("presentation missing")
@@ -57,7 +57,7 @@ class CameraDevelopmentPresentationTest {
     @Test
     fun onlyNimFailureOffersRetryAndAllFailuresCanBeCancelled() {
         val nim = cameraDevelopmentPresentation(
-            CameraCaptureState.Failed(CameraFailure.NimFailed, canRetryNim = true),
+            CameraCaptureState.Failed(CameraFailure.DrawFailed, canRetryDraw = true),
             isJapanese = false,
             animationsEnabled = true,
         ) ?: error("NIM failure presentation missing")
@@ -67,7 +67,7 @@ class CameraDevelopmentPresentationTest {
             animationsEnabled = true,
         ) ?: error("local failure presentation missing")
         val direct = cameraDevelopmentPresentation(
-            CameraCaptureState.Failed(CameraFailure.NimFailedDirectDdl, canRetryNim = true),
+            CameraCaptureState.Failed(CameraFailure.DrawFailedDirectDdl, canRetryDraw = true),
             isJapanese = false,
             animationsEnabled = true,
         ) ?: error("direct DDL NIM failure presentation missing")

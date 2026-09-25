@@ -27,10 +27,10 @@ class CameraInputProvenanceTest {
 
         assertEquals("inku-svg", stored.getString("render_engine_id"))
         assertEquals("camera", provenance.getString("origin"))
-        assertEquals("local_description_to_nim", provenance.getString("route"))
+        assertEquals("description_to_pipeline", provenance.getString("route"))
         assertEquals("local-litert-lm", provenance.getString("vision_provider_id"))
         assertEquals("local-litert-lm:gemma-4-e2b", provenance.getString("vision_model_id"))
-        assertEquals("camera-description-v1", provenance.getString("vision_prompt_version"))
+        assertEquals("camera-description-v4", provenance.getString("vision_prompt_version"))
         assertEquals("description", provenance.getString("vision_output_mode"))
         assertEquals(720, provenance.getInt("normalized_image_width"))
         assertEquals(1280, provenance.getInt("normalized_image_height"))
@@ -49,9 +49,9 @@ class CameraInputProvenanceTest {
         val parsed = cameraInputProvenance(mergeInputProvenance("{}", snapshot))
             ?: error("direct DDL provenance missing")
 
-        assertEquals(CameraInputRoute.LocalDdlToNimStage2, parsed.route)
+        assertEquals(CameraInputRoute.DdlToPipelineStage2, parsed.route)
         assertEquals(CameraVisionOutputMode.Ddl, parsed.visionOutputMode)
-        assertEquals("camera-ddl-v1", parsed.visionPromptVersion)
+        assertEquals("camera-ddl-v2", parsed.visionPromptVersion)
     }
 
     @Test
@@ -98,7 +98,7 @@ class CameraInputProvenanceTest {
         assertNull(cameraInputProvenance("""{"input_provenance":"camera"}"""))
         assertNull(cameraInputProvenance(valid.replace("1280", "0")))
         assertNull(cameraInputProvenance(valid.replace("720", "\"720\"")))
-        assertNull(cameraInputProvenance(valid.replace("local_description_to_nim", "unsupported")))
+        assertNull(cameraInputProvenance(valid.replace("description_to_pipeline", "unsupported")))
     }
 
     private fun request() = VisionAnalysisRequest(

@@ -25,7 +25,7 @@ class OpenAiCompatibleProvider(
                     request.systemInstruction?.takeIf { it.isNotBlank() }?.let {
                         put(JSONObject().put("role", "system").put("content", it))
                     }
-                    put(JSONObject().put("role", "user").put("content", request.prompt))
+                    put(JSONObject().put("role", "user").put("content", userContent(request)))
                 },
             )
             .put("temperature", pipelineTemperature(request.pipelineAction) ?: request.temperature)
@@ -143,6 +143,24 @@ class OpenAiCompatibleProvider(
     internal companion object {
         internal fun modelForRequest(providerId: String, modelId: String): String =
             modelId.removePrefix("$providerId:").ifBlank { modelId }
+
+        /** Plain text, or the prompt with one JPEG as an image_url data URI. */
+        internal fun userContent(request: ModelRequest): Any {
+            val image = request.imageJpeg ?: return request.prompt
+            return JSONArray()
+                .put(JSONObject().put("type", "text").put("text", request.prompt))
+                .put(
+                    JSONObject()
+                        .put("type", "image_url")
+                        .put(
+                            "image_url",
+                            JSONObject().put(
+                                "url",
+                                "data:image/jpeg;base64," + java.util.Base64.getEncoder().encodeToString(image),
+                            ),
+                        ),
+                )
+        }
 
         /** The server's OpenAI-compatible pipeline sampling: 0.3 for Stage 1, 0.0 otherwise. */
         internal fun pipelineTemperature(action: String?): Double? = when (action) {

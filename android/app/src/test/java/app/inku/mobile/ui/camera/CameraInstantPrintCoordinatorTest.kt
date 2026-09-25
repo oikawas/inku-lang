@@ -44,8 +44,8 @@ class CameraInstantPrintCoordinatorTest {
                 CameraInstantPrintPhase.PreparingImage,
                 CameraInstantPrintPhase.LoadingLocalModel,
                 CameraInstantPrintPhase.AnalyzingLocally,
-                CameraInstantPrintPhase.InterpretingWithNim,
-                CameraInstantPrintPhase.ComposingWithNim,
+                CameraInstantPrintPhase.InterpretingStage1,
+                CameraInstantPrintPhase.Composing,
                 CameraInstantPrintPhase.Rendering,
                 CameraInstantPrintPhase.Saving,
                 CameraInstantPrintPhase.Completed,
@@ -72,11 +72,11 @@ class CameraInstantPrintCoordinatorTest {
                         analyze = { awaitIf(blockedPhase, CameraInstantPrintPhase.AnalyzingLocally, release); "local" },
                         onLocalReady = {},
                         interpret = {
-                            awaitIf(blockedPhase, CameraInstantPrintPhase.InterpretingWithNim, release)
+                            awaitIf(blockedPhase, CameraInstantPrintPhase.InterpretingStage1, release)
                             "ddl"
                         },
                         compose = { _, _, progress ->
-                            awaitIf(blockedPhase, CameraInstantPrintPhase.ComposingWithNim, release)
+                            awaitIf(blockedPhase, CameraInstantPrintPhase.Composing, release)
                             progress(CameraInstantPrintPhase.Rendering)
                             awaitIf(blockedPhase, CameraInstantPrintPhase.Rendering, release)
                             progress(CameraInstantPrintPhase.Saving)
@@ -123,7 +123,7 @@ class CameraInstantPrintCoordinatorTest {
         var stageOneCalls = 0
         val coordinator = CameraInstantPrintCoordinator(onPhase = phases::add)
 
-        val outcome = coordinator.runFromNim(
+        val outcome = coordinator.runFromAnalysis(
             local = "retained local description",
             interpret = { stageOneCalls += 1; "ddl" },
             compose = { _, _, progress ->
@@ -136,7 +136,7 @@ class CameraInstantPrintCoordinatorTest {
         assertEquals("saved", outcome.result)
         assertEquals(0, localCalls)
         assertEquals(1, stageOneCalls)
-        assertEquals(CameraInstantPrintPhase.InterpretingWithNim, phases.first())
+        assertEquals(CameraInstantPrintPhase.InterpretingStage1, phases.first())
     }
 
     private suspend fun awaitIf(

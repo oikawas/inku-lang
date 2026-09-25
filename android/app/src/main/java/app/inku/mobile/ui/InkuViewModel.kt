@@ -40,6 +40,8 @@ import app.inku.mobile.data.refinement.VariationAmplitude
 import app.inku.mobile.llm.LOCAL_VISION_MODEL_ID
 import app.inku.mobile.llm.ModelProviderHttpException
 import app.inku.mobile.llm.CameraVisionModeSetting
+import app.inku.mobile.llm.CameraVisionModelSetting
+import app.inku.mobile.llm.isLocalVisionModel
 import app.inku.mobile.llm.VisionAnalysisRequest
 import app.inku.mobile.llm.VisionImagePreparer
 import app.inku.mobile.llm.VisionOutputMode
@@ -55,21 +57,22 @@ import app.inku.mobile.pipeline.SketchMode
 import app.inku.mobile.pipeline.Sketches
 import app.inku.mobile.ui.camera.CameraCaptureFileStore
 import app.inku.mobile.ui.camera.CameraOriginalPhotoStore
+import app.inku.mobile.ui.camera.CameraCaptureRequest
 import app.inku.mobile.ui.camera.CameraCaptureState
 import app.inku.mobile.ui.camera.CameraInputSource
 import app.inku.mobile.ui.camera.CameraFailure
-import app.inku.mobile.ui.camera.CameraNimDrawRoute
-import app.inku.mobile.ui.camera.CameraNimDrawRouting
-import app.inku.mobile.ui.camera.CameraNimProviderIssue
+import app.inku.mobile.ui.camera.CameraDrawRoute
+import app.inku.mobile.ui.camera.CameraDrawRouting
+import app.inku.mobile.ui.camera.CameraDrawSettings
+import app.inku.mobile.ui.camera.ModelReadinessIssue
 import app.inku.mobile.ui.camera.CameraInstantPrintCoordinator
 import app.inku.mobile.ui.camera.CameraInstantPrintPhase
 import app.inku.mobile.ui.camera.CameraInstantPrintRoute
 import app.inku.mobile.ui.camera.SelectedImageFileStore
 import app.inku.mobile.ui.camera.cameraDevelopmentPresentation
-import app.inku.mobile.ui.camera.cameraNimProviderIssue
+import app.inku.mobile.ui.camera.modelReadinessIssue
 import app.inku.mobile.ui.camera.clearCameraOrigin
 import app.inku.mobile.ui.camera.locksCameraInteraction
-import app.inku.mobile.ui.camera.providerIssue
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.CancellationException
@@ -222,6 +225,7 @@ data class InkuUiState(
     val cameraCaptureState: CameraCaptureState = CameraCaptureState.Idle,
     val cameraSourcePhotoPath: String? = null,
     val cameraVisionOutputMode: VisionOutputMode = VisionOutputMode.DESCRIPTION,
+    val cameraVisionModelId: String = LOCAL_VISION_MODEL_ID,
     val isDrawing: Boolean = false,
     val message: String? = null,
     val tab: AppTab = AppTab.Compose,
@@ -277,14 +281,18 @@ data class InkuUiState(
     val isRunning: Boolean get() = isDrawing || refinementBusy || cameraCaptureState.locksCameraInteraction
 }
 
-private data class CameraNimRunInput(
+private data class CameraDrawRunInput(
     val description: String,
     val directDdl: String?,
     val inputProvenance: CameraInputProvenance,
     val canvasAspect: String,
     val uiLanguageCode: String,
     val originalPhoto: java.io.File,
+    val drawSettings: CameraDrawSettings,
 ) {
+    val route: CameraDrawRoute
+        get() = CameraDrawRoute(inputProvenance, drawSettings)
+
     val instantPrintRoute: CameraInstantPrintRoute
         get() = if (directDdl == null) CameraInstantPrintRoute.Description else CameraInstantPrintRoute.DirectDdl
 }
@@ -441,9 +449,9 @@ class InkuViewModel @JvmOverloads constructor(
     private var cameraStateBeforeSourceChooser: CameraCaptureState? = null
     private var cameraRunSerial: Long = 0L
     private var cameraComposeSnapshot: InkuUiState? = null
-    private var cameraRetryInput: CameraNimRunInput? = null
-    private val mutableCameraCaptureRequests = MutableSharedFlow<Uri>(extraBufferCapacity = 1)
-    val cameraCaptureRequests: SharedFlow<Uri> = mutableCameraCaptureRequests.asSharedFlow()
+    private var cameraRetryInput: CameraDrawRunInput? = null
+    private val mutableCameraCaptureRequests = MutableSharedFlow<CameraCaptureRequest>(extraBufferCapacity = 1)
+    val cameraCaptureRequests: SharedFlow<CameraCaptureRequest> = mutableCameraCaptureRequests.asSharedFlow()
     private val mutablePhotoPickerRequests = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
     val photoPickerRequests: SharedFlow<Unit> = mutablePhotoPickerRequests.asSharedFlow()
     private var drawingRunSerial: Long = 0L
@@ -744,23 +752,34 @@ class InkuViewModel @JvmOverloads constructor(
         )
         cameraJob = viewModelScope.launch {
             try {
-                if (!repository.isLocalVisionModelReady()) {
+                val snapshot = cameraComposeSnapshot ?: localState.value
+                val cameraProviders = providerSettings.first()
+                val cameraAssets = modelAssets.first()
+                val visionModelId = snapshot.cameraVisionModelId
+                modelReadinessIssue(visionModelId, cameraProviders, cameraAssets)?.let { issue ->
                     if (serial == cameraRunSerial) {
                         localState.value = localState.value.copy(
                             cameraCaptureState = CameraCaptureState.Failed(CameraFailure.ModelNotReady),
+                            message = readinessMessage(issue, visionModelId, cameraProviders),
                         )
                     }
                     return@launch
                 }
-                val cameraProviders = providerSettings.first()
-                cameraNimProviderIssue(cameraProviders)?.let { issue ->
+                cameraDrawReadiness(snapshot, cameraProviders, cameraAssets)?.let { message ->
                     if (serial == cameraRunSerial) {
                         localState.value = localState.value.copy(
-                            cameraCaptureState = CameraCaptureState.Failed(CameraFailure.NimNotReady),
-                            message = cameraNimIssueMessage(issue, cameraProviders),
+                            cameraCaptureState = CameraCaptureState.Failed(CameraFailure.DrawModelNotReady),
+                            message = message,
                         )
                     }
                     return@launch
+                }
+                // Load a local Vision model while the author is still framing the shot.
+                if (isLocalVisionModel(visionModelId)) {
+                    litertWarmupJob?.cancel()
+                    litertWarmupJob = viewModelScope.launch(Dispatchers.IO) {
+                        runCatching { repository.warmupLocalModelIfReady(visionModelId) }
+                    }
                 }
                 when (inputSource) {
                     CameraInputSource.Camera -> {
@@ -774,7 +793,7 @@ class InkuViewModel @JvmOverloads constructor(
                             cameraCaptureState = CameraCaptureState.Capturing,
                             message = null,
                         )
-                        mutableCameraCaptureRequests.emit(cameraFiles.contentUri(file))
+                        mutableCameraCaptureRequests.emit(CameraCaptureRequest(file, cameraFiles.contentUri(file)))
                     }
                     CameraInputSource.PhotoPicker -> {
                         if (serial != cameraRunSerial) return@launch
@@ -874,7 +893,7 @@ class InkuViewModel @JvmOverloads constructor(
                 }
                 throw error
             } catch (_: Throwable) {
-                failCameraRun(serial, CameraFailure.DecodeFailed, canRetryNim = false)
+                failCameraRun(serial, CameraFailure.DecodeFailed, canRetryDraw = false)
             } finally {
                 selectedImageFiles.delete(file)
             }
@@ -912,30 +931,39 @@ class InkuViewModel @JvmOverloads constructor(
                         throw CameraStageFailure(CameraFailure.DecodeFailed)
                     }
                 },
-                load = { repository.warmupLocalModelIfReady(LOCAL_VISION_MODEL_ID) },
+                load = {
+                    val snapshot = cameraComposeSnapshot ?: localState.value
+                    if (isLocalVisionModel(snapshot.cameraVisionModelId)) {
+                        litertWarmupJob?.join()
+                        repository.warmupLocalModelIfReady(snapshot.cameraVisionModelId)
+                    }
+                },
                 analyze = { prepared ->
                     val current = localState.value
-                    val uiLanguageCode = cameraComposeSnapshot?.uiLanguage?.code ?: current.uiLanguage.code
+                    val snapshot = cameraComposeSnapshot ?: current
+                    val uiLanguageCode = snapshot.uiLanguage.code
                     val request = VisionAnalysisRequest(
                         normalizedJpeg = prepared.jpegBytes,
                         width = prepared.width,
                         height = prepared.height,
                         languageCode = uiLanguageCode,
-                        outputMode = cameraComposeSnapshot?.cameraVisionOutputMode ?: current.cameraVisionOutputMode,
+                        outputMode = snapshot.cameraVisionOutputMode,
+                        modelId = snapshot.cameraVisionModelId,
                     )
-                    val result = repository.analyzeLocalVision(request)
+                    val result = repository.analyzeVision(request)
                     if (result.text.isBlank()) throw CameraStageFailure(CameraFailure.EmptyResult)
                     val directDdl = when (request.outputMode) {
                         VisionOutputMode.DESCRIPTION -> null
                         VisionOutputMode.DDL -> result.text.trim().ifBlank { throw CameraStageFailure(CameraFailure.EmptyResult) }
                     }
-                    CameraNimRunInput(
+                    CameraDrawRunInput(
                         description = directDdl ?: result.text.trim(),
                         directDdl = directDdl,
                         inputProvenance = CameraInputProvenance.fromAnalysis(request, result, origin),
-                        canvasAspect = cameraComposeSnapshot?.selectedCanvasAspect ?: current.selectedCanvasAspect,
+                        canvasAspect = snapshot.selectedCanvasAspect,
                         uiLanguageCode = uiLanguageCode,
                         originalPhoto = requireNotNull(stagedPhoto),
+                        drawSettings = cameraDrawSettings(snapshot),
                     )
                 },
                 onLocalReady = { input ->
@@ -955,7 +983,7 @@ class InkuViewModel @JvmOverloads constructor(
             )
             finishCameraRun(serial, outcome.result)
         } catch (error: CameraStageFailure) {
-            failCameraRun(serial, error.failure, canRetryNim = false)
+            failCameraRun(serial, error.failure, canRetryDraw = false)
         } catch (error: CancellationException) {
             if (serial == cameraRunSerial) {
                 localState.value = localState.value.copy(
@@ -969,8 +997,8 @@ class InkuViewModel @JvmOverloads constructor(
         } catch (_: Throwable) {
             failCameraRun(
                 serial,
-                cameraRetryInput?.nimFailure() ?: CameraFailure.AnalysisFailed,
-                canRetryNim = cameraRetryInput != null,
+                cameraRetryInput?.drawFailure() ?: CameraFailure.AnalysisFailed,
+                canRetryDraw = cameraRetryInput != null,
             )
         } finally {
             cleanup(file)
@@ -989,25 +1017,25 @@ class InkuViewModel @JvmOverloads constructor(
     fun retryCameraDevelopment() {
         val failed = localState.value.cameraCaptureState as? CameraCaptureState.Failed ?: return
         val input = cameraRetryInput ?: return
-        if (!failed.canRetryNim) return
+        if (!failed.canRetryDraw) return
         cameraRunSerial += 1
         val serial = cameraRunSerial
         cameraJob?.cancel()
         cameraJob = viewModelScope.launch {
             val cameraProviders = providerSettings.first()
-            cameraNimProviderIssue(cameraProviders)?.let { issue ->
+            cameraRouteReadiness(input.route, cameraProviders, modelAssets.first())?.let { message ->
                 if (serial == cameraRunSerial) {
                     localState.value = localState.value.copy(
-                        cameraCaptureState = CameraCaptureState.Failed(CameraFailure.NimNotReady, canRetryNim = true),
+                        cameraCaptureState = CameraCaptureState.Failed(CameraFailure.DrawModelNotReady, canRetryDraw = true),
                         isDrawing = false,
-                        message = cameraNimIssueMessage(issue, cameraProviders),
+                        message = message,
                     )
                 }
                 return@launch
             }
             val coordinator = cameraCoordinator(serial)
             try {
-                val outcome = coordinator.runFromNim(
+                val outcome = coordinator.runFromAnalysis(
                     route = input.instantPrintRoute,
                     local = input,
                     interpret = ::interpretCameraInput,
@@ -1027,7 +1055,7 @@ class InkuViewModel @JvmOverloads constructor(
             } catch (error: PipelineInteractionRequired) {
                 if (serial == cameraRunSerial) presentPipelineInteraction(error)
             } catch (_: Throwable) {
-                failCameraRun(serial, input.nimFailure(), canRetryNim = true)
+                failCameraRun(serial, input.drawFailure(), canRetryDraw = true)
             }
         }
     }
@@ -1054,7 +1082,9 @@ class InkuViewModel @JvmOverloads constructor(
             withContext(NonCancellable) {
                 job?.join()
                 warmupJob?.join()
-                repository.releaseLocalVisionModel()
+                repository.releaseLocalVisionModel(
+                    (cameraComposeSnapshot ?: localState.value).cameraVisionModelId,
+                )
             }
             cameraFiles.delete(pendingCameraFile)
             pendingCameraFile = null
@@ -1073,8 +1103,8 @@ class InkuViewModel @JvmOverloads constructor(
             CameraInstantPrintPhase.PreparingImage -> CameraCaptureState.PreparingImage
             CameraInstantPrintPhase.LoadingLocalModel -> CameraCaptureState.LoadingLocalModel
             CameraInstantPrintPhase.AnalyzingLocally -> CameraCaptureState.AnalyzingLocally
-            CameraInstantPrintPhase.InterpretingWithNim -> CameraCaptureState.InterpretingWithNim
-            CameraInstantPrintPhase.ComposingWithNim -> CameraCaptureState.ComposingWithNim
+            CameraInstantPrintPhase.InterpretingStage1 -> CameraCaptureState.InterpretingStage1
+            CameraInstantPrintPhase.Composing -> CameraCaptureState.Composing
             CameraInstantPrintPhase.Rendering -> CameraCaptureState.Rendering
             CameraInstantPrintPhase.Saving -> CameraCaptureState.Saving
             CameraInstantPrintPhase.Completed -> return
@@ -1089,17 +1119,17 @@ class InkuViewModel @JvmOverloads constructor(
             tab = AppTab.Compose,
             composeMode = ComposeMode.Write,
             cameraCaptureState = captureState,
-            isDrawing = phase >= CameraInstantPrintPhase.InterpretingWithNim,
-            selectedHistory = if (phase >= CameraInstantPrintPhase.InterpretingWithNim) null else current.selectedHistory,
-            pipelineView = if (phase >= CameraInstantPrintPhase.InterpretingWithNim) null else current.pipelineView,
-            historyAuthority = if (phase >= CameraInstantPrintPhase.InterpretingWithNim) null else current.historyAuthority,
-            historyAuthorityLoading = if (phase >= CameraInstantPrintPhase.InterpretingWithNim) false else current.historyAuthorityLoading,
+            isDrawing = phase >= CameraInstantPrintPhase.InterpretingStage1,
+            selectedHistory = if (phase >= CameraInstantPrintPhase.InterpretingStage1) null else current.selectedHistory,
+            pipelineView = if (phase >= CameraInstantPrintPhase.InterpretingStage1) null else current.pipelineView,
+            historyAuthority = if (phase >= CameraInstantPrintPhase.InterpretingStage1) null else current.historyAuthority,
+            historyAuthorityLoading = if (phase >= CameraInstantPrintPhase.InterpretingStage1) false else current.historyAuthorityLoading,
             message = presentation?.message,
         )
     }
 
-    private suspend fun interpretCameraInput(input: CameraNimRunInput): InterpretResult {
-        val route = CameraNimDrawRoute(input.inputProvenance)
+    private suspend fun interpretCameraInput(input: CameraDrawRunInput): InterpretResult {
+        val route = input.route
         return withContext(Dispatchers.IO) {
             repository.interpret(
                 input.description,
@@ -1111,7 +1141,7 @@ class InkuViewModel @JvmOverloads constructor(
                 false,
                 instructionLang = InstructionLanguages.AUTO,
                 uiLang = input.uiLanguageCode,
-                sketch = SketchInput(),
+                sketch = route.sketch,
                 inputProvenance = input.inputProvenance,
             )
         }
@@ -1119,11 +1149,11 @@ class InkuViewModel @JvmOverloads constructor(
 
     private suspend fun composeCameraInput(
         serial: Long,
-        input: CameraNimRunInput,
+        input: CameraDrawRunInput,
         interpreted: InterpretResult?,
         progress: suspend (CameraInstantPrintPhase) -> Unit,
     ): HistoryItemEntity = withContext(Dispatchers.IO) {
-        val route = CameraNimDrawRoute(input.inputProvenance)
+        val route = input.route
         repository.composeFromDdl(
             input.description,
             input.directDdl ?: requireNotNull(interpreted).ddlForDisplay,
@@ -1136,7 +1166,7 @@ class InkuViewModel @JvmOverloads constructor(
             lineage = LineageDeclaration(),
             instructionLang = InstructionLanguages.AUTO,
             uiLang = input.uiLanguageCode,
-            sketch = SketchInput(),
+            sketch = route.sketch,
             inputProvenance = input.inputProvenance,
             executionId = interpreted?.executionId,
             originalPhoto = input.originalPhoto,
@@ -1178,10 +1208,10 @@ class InkuViewModel @JvmOverloads constructor(
         }
     }
 
-    private fun failCameraRun(serial: Long, failure: CameraFailure, canRetryNim: Boolean) {
+    private fun failCameraRun(serial: Long, failure: CameraFailure, canRetryDraw: Boolean) {
         if (serial != cameraRunSerial) return
         localState.value = localState.value.copy(
-            cameraCaptureState = CameraCaptureState.Failed(failure, canRetryNim),
+            cameraCaptureState = CameraCaptureState.Failed(failure, canRetryDraw),
             isDrawing = false,
             message = null,
         )
@@ -1209,18 +1239,59 @@ class InkuViewModel @JvmOverloads constructor(
         )
     }
 
-    private fun cameraNimIssueMessage(
-        issue: CameraNimProviderIssue,
+    /** The drawing settings a camera run keeps from its start. */
+    private fun cameraDrawSettings(snapshot: InkuUiState) = CameraDrawSettings(
+        stage1ModelId = snapshot.selectedModelId,
+        stage2ModelId = snapshot.selectedStage2ModelId,
+        catalogId = snapshot.selectedCatalogId,
+        sketchRequested = snapshot.sketchMode == SketchMode.On,
+    )
+
+    /** Checks the drawing models a camera run started from [snapshot] will call. */
+    private fun cameraDrawReadiness(
+        snapshot: InkuUiState,
+        providers: List<ProviderSettingEntity>,
+        assets: List<ModelAssetEntity>,
+    ): String? {
+        val models = buildList {
+            if (snapshot.cameraVisionOutputMode == VisionOutputMode.DESCRIPTION) add(snapshot.selectedModelId)
+            add(snapshot.selectedStage2ModelId)
+        }.distinct()
+        return models.firstNotNullOfOrNull { modelId ->
+            modelReadinessIssue(modelId, providers, assets)?.let { readinessMessage(it, modelId, providers) }
+        }
+    }
+
+    private fun cameraRouteReadiness(
+        route: CameraDrawRoute,
+        providers: List<ProviderSettingEntity>,
+        assets: List<ModelAssetEntity>,
+    ): String? {
+        val models = buildList {
+            if (route.inputProvenance.visionOutputMode == app.inku.mobile.data.model.CameraVisionOutputMode.Description) {
+                add(route.stage1ModelId)
+            }
+            add(route.stage2ModelId)
+        }.distinct()
+        return models.firstNotNullOfOrNull { modelId ->
+            modelReadinessIssue(modelId, providers, assets)?.let { readinessMessage(it, modelId, providers) }
+        }
+    }
+
+    private fun readinessMessage(
+        issue: ModelReadinessIssue,
+        modelId: String,
         providers: List<ProviderSettingEntity>,
     ): String {
-        val providerName = providers
-            .firstOrNull { it.providerId == "nvidia" }
+        val providerName = app.inku.mobile.llm.RoutingModelProvider.resolveProviderForRouting(providers, modelId)
+            ?.takeUnless { it.isDefaultLocal }
             ?.displayName
-            ?: "NVIDIA NIM"
+            ?: modelId.substringBefore(':')
         return when (issue) {
-            CameraNimProviderIssue.MissingOrDisabled -> strings().errorProviderNotFoundForModel(app.inku.mobile.ui.camera.CAMERA_NIM_MODEL_ID)
-            CameraNimProviderIssue.BaseUrlMissing -> strings().errorProviderBaseUrlMissing(providerName)
-            CameraNimProviderIssue.ApiKeyMissing -> strings().errorProviderApiKeyMissing(providerName)
+            ModelReadinessIssue.LocalModelNotReady -> strings().cameraModelNotReady
+            ModelReadinessIssue.ProviderMissingOrDisabled -> strings().errorProviderNotFoundForModel(modelId)
+            ModelReadinessIssue.BaseUrlMissing -> strings().errorProviderBaseUrlMissing(providerName)
+            ModelReadinessIssue.ApiKeyMissing -> strings().errorProviderApiKeyMissing(providerName)
         }
     }
 
@@ -1627,6 +1698,12 @@ class InkuViewModel @JvmOverloads constructor(
         persistSetting(CameraVisionModeSetting.KEY, CameraVisionModeSetting.encode(mode))
     }
 
+    fun setCameraVisionModel(modelId: String) {
+        if (cameraVisionModeChangeLocked(localState.value.cameraCaptureState)) return
+        localState.value = localState.value.copy(cameraVisionModelId = modelId, message = null)
+        persistSetting(CameraVisionModelSetting.KEY, CameraVisionModelSetting.encode(modelId))
+    }
+
     /**
      * The reader picks the language the interface speaks.
      *
@@ -1712,7 +1789,7 @@ class InkuViewModel @JvmOverloads constructor(
             historyAuthorityLoading = false,
         )
         localState.value = current
-        validateModelsForRun(current, null)?.let { message ->
+        validateModelsForRun(current)?.let { message ->
             localState.value = current.copy(message = message)
             return
         }
@@ -1952,7 +2029,7 @@ class InkuViewModel @JvmOverloads constructor(
 
     fun draw() {
         val current = state.value
-        val route = CameraNimDrawRouting.forState(current.cameraCaptureState)
+        val cameraProvenance = CameraDrawRouting.provenanceFor(current.cameraCaptureState)
         // 「候補生成中は他の生成・描画操作を禁止し」. Before the model check, because
         // what stops this drawing has to be the refinement rather than whichever
         // reason happens to be found first.
@@ -1960,11 +2037,11 @@ class InkuViewModel @JvmOverloads constructor(
             localState.value = localState.value.copy(message = REFINEMENT_IN_PROGRESS(strings()))
             return
         }
-        validateModelsForRun(current, route)?.let { message ->
+        validateModelsForRun(current)?.let { message ->
             localState.value = localState.value.copy(message = message)
             return
         }
-        runSubmit(current, route)
+        runSubmit(current, cameraProvenance)
     }
 
     fun cancelDdlOverwrite() {
@@ -2084,7 +2161,7 @@ class InkuViewModel @JvmOverloads constructor(
         return text != sourceTextOf(parent)
     }
 
-    private fun runSubmit(current: InkuUiState, route: CameraNimDrawRoute? = null, sketchRedraw: Boolean = false, suppliedSketchText: String? = null) {
+    private fun runSubmit(current: InkuUiState, cameraProvenance: CameraInputProvenance? = null, sketchRedraw: Boolean = false, suppliedSketchText: String? = null) {
         if (current.descriptionLocked && !current.historyAuthorityLoading) return
         if (current.prompt.isBlank()) {
             localState.value = current.copy(message = "Prompt is empty.")
@@ -2109,20 +2186,21 @@ class InkuViewModel @JvmOverloads constructor(
                     ),
                 )
             }
-            route == null -> describeLineage(current)
+            cameraProvenance == null -> describeLineage(current)
             else -> LineageDeclaration()
         }
         val sketchInput = when {
             suppliedSketchText != null -> SketchInput(text = suppliedSketchText)
-            route == null -> describeSketchInput(current, forceFresh = sketchRedraw)
-            else -> SketchInput()
+            cameraProvenance == null -> describeSketchInput(current, forceFresh = sketchRedraw)
+            // A camera description is a new root; it follows the 写生 setting.
+            else -> SketchInput(requested = current.sketchMode == SketchMode.On)
         }
         // Read here for the same reason: it is decided against the parent, and
         // the coroutine clears the parent before it draws.
-        val stage1ModelId = route?.stage1ModelId ?: current.selectedModelId
-        val stage2ModelId = route?.stage2ModelId ?: current.selectedStage2ModelId
-        val stage1CatalogId = route?.catalogId ?: current.selectedCatalogId
-        val autoRepair = route?.autoRepair ?: true
+        val stage1ModelId = current.selectedModelId
+        val stage2ModelId = current.selectedStage2ModelId
+        val stage1CatalogId = current.selectedCatalogId
+        val autoRepair = true
         val runId = beginDrawingRun()
         drawingJob = viewModelScope.launch {
             if (current.historyAuthorityLoading && current.selectedHistory != null) {
@@ -2176,7 +2254,7 @@ class InkuViewModel @JvmOverloads constructor(
                         uiLang = current.uiLanguage.code,
                         sketch = sketchInput,
                         parentHistoryId = current.selectedHistory?.id?.takeUnless { current.lineageDetached },
-                        inputProvenance = route?.inputProvenance,
+                        inputProvenance = cameraProvenance,
                     )
                 }
             }.onSuccess { item ->
@@ -2192,7 +2270,7 @@ class InkuViewModel @JvmOverloads constructor(
                         // A saved work is what the next one comes from (web lowers
                         // the same flag on every save, +page.svelte:2883, :3304).
                         lineageDetached = false,
-                        cameraCaptureState = if (route != null) CameraCaptureState.Idle else latest.cameraCaptureState,
+                        cameraCaptureState = if (cameraProvenance != null) CameraCaptureState.Idle else latest.cameraCaptureState,
                         isDrawing = false,
                         message = "Rendered ${item.renderHashShort}",
                     )
@@ -3181,26 +3259,11 @@ class InkuViewModel @JvmOverloads constructor(
     private fun validateSelectedModels(state: InkuUiState): String? =
         validateModelsForRun(state)
 
-    private fun validateModelsForRun(
-        state: InkuUiState,
-        route: CameraNimDrawRoute? = null,
-    ): String? {
+    private fun validateModelsForRun(state: InkuUiState): String? {
         val models = listOf(
-            "Stage1" to (route?.stage1ModelId ?: state.selectedModelId),
-            "Stage2" to (route?.stage2ModelId ?: state.selectedStage2ModelId),
+            "Stage1" to state.selectedModelId,
+            "Stage2" to state.selectedStage2ModelId,
         ).distinctBy { it.second }
-
-        route?.providerIssue(state.providerSettings)?.let { issue ->
-            val providerName = state.providerSettings
-                .firstOrNull { it.providerId == "nvidia" }
-                ?.displayName
-                ?: "NVIDIA NIM"
-            return when (issue) {
-                CameraNimProviderIssue.MissingOrDisabled -> strings().errorProviderNotFoundForModel(route.stage1ModelId)
-                CameraNimProviderIssue.BaseUrlMissing -> strings().errorProviderBaseUrlMissing(providerName)
-                CameraNimProviderIssue.ApiKeyMissing -> strings().errorProviderApiKeyMissing(providerName)
-            }
-        }
 
         return models
             .firstNotNullOfOrNull { (stage, modelId) ->
@@ -3236,6 +3299,7 @@ class InkuViewModel @JvmOverloads constructor(
         val histCanvas = settings["history_selection_canvas"]?.let { parseHistorySelection(JSONObject(it).optString("value")) } ?: current.historySelectionCanvas
         val histCatalog = settings["history_selection_catalog"]?.let { parseHistorySelection(JSONObject(it).optString("value")) } ?: current.historySelectionCatalog
         val cameraVisionOutputMode = CameraVisionModeSetting.decode(settings[CameraVisionModeSetting.KEY])
+        val cameraVisionModelId = CameraVisionModelSetting.decode(settings[CameraVisionModelSetting.KEY])
         val uiMode = settings["ui_mode"]?.let { JSONObject(it).optString("value", current.uiMode) } ?: current.uiMode
         // A stored code that is not one of the two falls back to Japanese
         // rather than being rejected -- the same thing the server does with an
@@ -3269,6 +3333,7 @@ class InkuViewModel @JvmOverloads constructor(
             historySelectionCanvas = histCanvas,
             historySelectionCatalog = histCatalog,
             cameraVisionOutputMode = cameraVisionOutputMode,
+            cameraVisionModelId = cameraVisionModelId,
             uiMode = uiMode,
             uiLanguage = uiLanguage,
             uiTextScale = uiTextScale,
@@ -3367,5 +3432,5 @@ internal fun cameraVisionModeChangeLocked(state: CameraCaptureState): Boolean =
         state == CameraCaptureState.Capturing ||
         state == CameraCaptureState.PickingPhoto
 
-private fun CameraNimRunInput.nimFailure(): CameraFailure =
-    if (directDdl == null) CameraFailure.NimFailed else CameraFailure.NimFailedDirectDdl
+private fun CameraDrawRunInput.drawFailure(): CameraFailure =
+    if (directDdl == null) CameraFailure.DrawFailed else CameraFailure.DrawFailedDirectDdl

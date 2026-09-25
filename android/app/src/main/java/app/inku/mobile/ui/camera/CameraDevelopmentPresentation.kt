@@ -34,12 +34,12 @@ internal fun cameraDevelopmentPresentation(
         CameraCaptureState.AnalyzingLocally -> Triple(
             "写真の内容を調べています", "Examining your photo", CameraDevelopmentEffect.PhotoReading,
         )
-        CameraCaptureState.InterpretingWithNim -> Triple(
+        CameraCaptureState.InterpretingStage1 -> Triple(
             "絵の構図を考えています",
             "Planning the composition",
             CameraDevelopmentEffect.GrainAndForms,
         )
-        CameraCaptureState.ComposingWithNim -> Triple(
+        CameraCaptureState.Composing -> Triple(
             "色と形を組み立てています",
             "Building the colors and forms",
             CameraDevelopmentEffect.VividColorFields,
@@ -61,9 +61,9 @@ internal fun cameraDevelopmentPresentation(
             CameraDevelopmentEffect.PhotoPreparing,
         )
         is CameraCaptureState.Failed -> Triple(
-            if (state.reason.isNimFailure) "現像に失敗しました" else "画像処理に失敗しました",
-            if (state.reason.isNimFailure) "Development failed" else "Image processing failed",
-            if (state.reason.isNimFailure) CameraDevelopmentEffect.OutlineSettling else CameraDevelopmentEffect.PhotoPreparing,
+            if (state.reason.isDrawFailure) "現像に失敗しました" else "画像処理に失敗しました",
+            if (state.reason.isDrawFailure) "Development failed" else "Image processing failed",
+            if (state.reason.isDrawFailure) CameraDevelopmentEffect.OutlineSettling else CameraDevelopmentEffect.PhotoPreparing,
         )
         else -> return null
     }
@@ -72,12 +72,12 @@ internal fun cameraDevelopmentPresentation(
         effect = words.third,
         animationsEnabled = animationsEnabled,
         showCancel = state !is CameraCaptureState.Completed,
-        showRetry = state is CameraCaptureState.Failed && state.canRetryNim,
+        showRetry = state is CameraCaptureState.Failed && state.canRetryDraw,
     )
 }
 
-private val CameraFailure.isNimFailure: Boolean
-    get() = this == CameraFailure.NimFailed || this == CameraFailure.NimFailedDirectDdl
+private val CameraFailure.isDrawFailure: Boolean
+    get() = this == CameraFailure.DrawFailed || this == CameraFailure.DrawFailedDirectDdl
 
 internal data class CameraOriginalPhotoWords(
     val label: String,

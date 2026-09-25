@@ -8,8 +8,8 @@ internal enum class CameraInstantPrintPhase {
     PreparingImage,
     LoadingLocalModel,
     AnalyzingLocally,
-    InterpretingWithNim,
-    ComposingWithNim,
+    InterpretingStage1,
+    Composing,
     Rendering,
     Saving,
     Completed,
@@ -54,10 +54,10 @@ internal class CameraInstantPrintCoordinator(
         ensureCurrent()
         onLocalReady(local)
         ensureCurrent()
-        return runFromNim(route, local, interpret, compose)
+        return runFromAnalysis(route, local, interpret, compose)
     }
 
-    suspend fun <Local, Interpreted, Result> runFromNim(
+    suspend fun <Local, Interpreted, Result> runFromAnalysis(
         route: CameraInstantPrintRoute = CameraInstantPrintRoute.Description,
         local: Local,
         interpret: suspend (Local) -> Interpreted,
@@ -69,12 +69,12 @@ internal class CameraInstantPrintCoordinator(
     ): CameraInstantPrintOutcome<Local, Result> {
         val interpreted = when (route) {
             CameraInstantPrintRoute.Description -> {
-                emit(CameraInstantPrintPhase.InterpretingWithNim)
+                emit(CameraInstantPrintPhase.InterpretingStage1)
                 interpret(local).also { ensureCurrent() }
             }
             CameraInstantPrintRoute.DirectDdl -> null
         }
-        emit(CameraInstantPrintPhase.ComposingWithNim)
+        emit(CameraInstantPrintPhase.Composing)
         val result = compose(local, interpreted) { phase ->
             require(
                 phase == CameraInstantPrintPhase.Rendering ||

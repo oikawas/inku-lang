@@ -40,7 +40,7 @@ class CameraPhotoPickerInputTest {
         assertTrue(boundary.contains("selectedImageFiles.importImage"))
         assertTrue(boundary.contains("runCameraInstantPrint"))
         assertTrue(boundary.contains("CameraInputOrigin.PhotoPicker"))
-        assertTrue(boundary.contains("cameraComposeSnapshot?.uiLanguage?.code"))
+        assertTrue(boundary.contains("val uiLanguageCode = snapshot.uiLanguage.code"))
         assertFalse(boundary.contains("takePersistableUriPermission"))
         assertFalse(boundary.contains("persistSetting("))
     }

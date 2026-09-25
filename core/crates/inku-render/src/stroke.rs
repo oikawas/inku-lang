@@ -409,6 +409,11 @@ fn event_map(seed: Seed, rate: f64, count: usize) -> BTreeMap<usize, StrokeEvent
     events
 }
 
+/// The `event_count` that `synthesize_stroke` reports for these inputs.
+pub(crate) fn stroke_event_count(weight: Weight, seed: Seed, sample_count: usize) -> usize {
+    event_map(seed, grammar(weight).event_rate, sample_count).len()
+}
+
 fn ink_runs(cuts: &[bool], minimum: usize) -> Vec<Vec<usize>> {
     let mut runs = Vec::new();
     let mut current = Vec::new();

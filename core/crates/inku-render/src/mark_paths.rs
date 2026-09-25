@@ -12,7 +12,7 @@ use crate::materials::{OilPaintStyle, oil_paint_stroke, with_texture_filter};
 use crate::planning::instruction_anchor_on_canvas;
 use crate::stroke::{
     ContourStrokeRequest, ContourStrokeResult, StrokeRequest, StrokeTerminal,
-    outline_for_centerline, synthesize_contour, synthesize_stroke,
+    outline_for_centerline, stroke_event_count, synthesize_contour, synthesize_stroke,
 };
 use crate::support::{Support, support_with_mark_word};
 use crate::svg::{Element, closed_polyline_path, format_number, points_list, write_number};
@@ -349,17 +349,6 @@ pub(crate) fn hand_line(
     let sample_count =
         stroke_sample_count((end.x - start.x).hypot(end.y - start.y), context.canvas);
     let support = instruction_support(instruction, context.support);
-    let stroke = synthesize_stroke(StrokeRequest {
-        start,
-        end,
-        base_width: style.width,
-        weight: instruction.weight,
-        seed,
-        sample_count,
-        wild: context.wild,
-        grid_step: grid_step(instruction.weight, context.canvas),
-        support,
-    });
     let centerline = connected_centerline.or_else(|| {
         instruction
             .variation
@@ -376,7 +365,10 @@ pub(crate) fn hand_line(
                 )
             })
     });
-    let outline = if let Some(centerline) = centerline {
+    // The class records the straight stroke's controls and events. With a
+    // varied centerline only the stroke along that centerline is drawn, so the
+    // straight one is not synthesized just for these two counts.
+    let (outline, event_count) = if let Some(centerline) = centerline {
         let varied = synthesize_stroke(StrokeRequest {
             start,
             end,
@@ -393,17 +385,27 @@ pub(crate) fn hand_line(
             .iter()
             .map(|sample| sample.width)
             .collect::<Vec<_>>();
-        outline_for_centerline(&centerline, &widths, &varied.cuts)
+        (
+            outline_for_centerline(&centerline, &widths, &varied.cuts),
+            stroke_event_count(instruction.weight, seed, sample_count),
+        )
     } else {
-        stroke.outline
+        let stroke = synthesize_stroke(StrokeRequest {
+            start,
+            end,
+            base_width: style.width,
+            weight: instruction.weight,
+            seed,
+            sample_count,
+            wild: context.wild,
+            grid_step: grid_step(instruction.weight, context.canvas),
+            support,
+        });
+        (stroke.outline, stroke.event_count)
     };
     let mut group = Element::new("g").attr(
         "class",
-        format!(
-            "stroke-engine-v1 controls-{} events-{}",
-            stroke.samples.len(),
-            stroke.event_count
-        ),
+        format!("stroke-engine-v1 controls-{sample_count} events-{event_count}"),
     );
     if instruction.weight == Weight::OilPaint {
         let middle = outline.len() / 2;

@@ -653,7 +653,10 @@ def _history_fork_context_bytes(
 
 
 def _validate_pipeline_diagnostics(value: object) -> dict[str, object]:
-    if not isinstance(value, Mapping) or set(value) != _PIPELINE_DIAGNOSTIC_KEYS:
+    if not isinstance(value, Mapping) or set(value) not in (
+        _PIPELINE_DIAGNOSTIC_KEYS,
+        _PIPELINE_DIAGNOSTIC_KEYS | {"plugin_diagnostics"},
+    ):
         raise VariationAuthorityAdapterError(
             "pipeline diagnostics have an unexpected shape"
         )
@@ -667,6 +670,10 @@ def _validate_pipeline_diagnostics(value: object) -> dict[str, object]:
             raise VariationAuthorityAdapterError(
                 "pipeline diagnostic channels must be arrays"
             )
+    if "plugin_diagnostics" in value and not isinstance(value["plugin_diagnostics"], list):
+        raise VariationAuthorityAdapterError(
+            "pipeline diagnostic channels must be arrays"
+        )
     for key in ("render_diagnostics", "resource_execution"):
         if value[key] is not None and not isinstance(value[key], Mapping):
             raise VariationAuthorityAdapterError(

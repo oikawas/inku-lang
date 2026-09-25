@@ -329,6 +329,7 @@ def test_unsaved_success_exposes_compiler_delivery_and_logs_safe_projection(
         "relation_omissions": [],
         "render_diagnostics": render_diagnostics,
         "resource_execution": resource_execution,
+        "plugin_diagnostics": [],
     }
     assert "history_id" not in result
     records = [
@@ -464,6 +465,7 @@ def test_compact_delivery_preserves_authority_in_normal_history(tmp_path, monkey
         "relation_omissions": snapshot["delivery"]["relation_omissions"],
         "render_diagnostics": render_diagnostics,
         "resource_execution": resource_execution,
+        "plugin_diagnostics": [],
     }
     result = effects.save_result("author", snapshot, run.context, rendered)
     replay = effects.save_result("author", snapshot, run.context, rendered)

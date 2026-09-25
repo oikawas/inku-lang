@@ -8,17 +8,19 @@
 - Public commit `8b4d43cc` then updated the document to 29, matching `render_engines/default.py` and `server/reference/render-engine-29/manifest.json`.
 - Result: **resolved**. The documentation snapshot follows the updated commit.
 
-### F-02 Android specification-note versions (recurred)
+### F-02 Android specification-note versions (resolved)
 
 - The header was synchronized with the implementation of the time on 2026-08-24, but the current header (last updated 2026-09-25) names `2.1.4-android.80`, render engine `67`, DDL engine version `20`, and a Server `ddl_engine_version` of 21.
 - The implementation is Render Engine `68` (`core/crates/inku-render/src/lib.rs`) and `ddl_engine_version` `47` (`layer_versions.py`), and Android uses the same shared Rust pipeline.
-- Result: **the version numbers are stale**. Engine identity is read from the packaged native library rather than a Kotlin product constant, so this is a documentation difference, not a runtime behavior difference. Handed to the Android owner on 2026-09-25.
+- On 2026-09-25 the Android owner rewrote the header so it no longer copies render engine or DDL version numbers (the packaged core's `RENDER_ENGINE_VERSION` names the render engine, and `layer_versions.py` names DDL Spec and the DDL engine), and removed the unused `ddlEngineVersion = "20"` from `ReferenceCorpus.kt` (`ddb1e19a`).
+- Result: **resolved**.
 
-### F-03 Android external-provider execution
+### F-03 Android external-provider execution (resolved)
 
 - The "not implemented" section of the Android specification note lists external provider execution as not implemented and calls provider records compatibility data structures.
 - Current `RoutingModelProvider` resolves enabled providers and connects to `GeminiModelProvider` and `OpenAiCompatibleProvider`. `SingleAttemptModelEffectProvider` sends shared-pipeline provider effects to them. The first half of the same note also describes the request conditions for Gemini and OpenAI-compatible providers.
-- Result: **the "not implemented" section is stale**. An Anthropic-specific protocol implementation was not found, so parity across every provider is not claimed. Handed to the Android owner on 2026-09-25.
+- On 2026-09-25 the Android owner removed external provider execution from the "not implemented" section (`ddb1e19a`). An Anthropic-specific protocol implementation was not found, so parity across every provider is not claimed.
+- Result: **resolved**.
 
 ### F-04 Long historical Stage 1.5 description (resolved)
 
@@ -62,11 +64,12 @@
 - On 2026-09-25 the executor was removed, and `stage_execution` now reports the shared pipeline worker pool (`workers` is `max_workers`, `queue_limit` is `max_retained_runs`) and the counts of provider effects. The response schema did not change (it is one of the schemas frozen since before permission groups). SPEC §22 and SETUP were revised too.
 - Result: **resolved**.
 
-### F-11 Reference corpus for Android device acceptance
+### F-11 Reference corpus for Android device acceptance (resolved)
 
 - `prepareRustParityAssets` and `NativeRenderDeviceTest` stage a few cases from `server/reference/render-engine-41` onto the device and compare SVG bytes. The test also asserts that `NativeRenderBridge.renderEngineVersion()` is `"41"`, and the path filter in `android-native.yml` names `render-engine-41`.
 - The packaged library's Render Engine is 68, so the assertion cannot hold, and the expected SVGs are Engine 41 bytes with no guarantee of matching the current engine.
-- Result: **inferred that device acceptance fails** (not run on a device). Fixing it needs changes such as generating the expected SVGs with the same commit's host core at build time, plus acceptance on the Pixel 9, so it was handed to the Android owner on 2026-09-25.
+- On 2026-09-25 the Android owner changed `NativeRenderDeviceTest` to compare against the SVG, engine identity, and renderer reference that the same commit's host core (`core/crates/inku-render-android/examples/render-parity-expected.rs`) produces at build time (`ddb1e19a`). The frozen corpus now serves only as Score input and raster input. The Android owner reports that two cases passed on the Pixel 9 safe runner.
+- Result: **resolved**.
 
 ### F-12 Fake provider in the hole-completion API test (resolved)
 
@@ -109,7 +112,6 @@ Line count alone does not show an ownership violation. Consider a split only whe
 - External LLM provider reachability, model availability, and latency were not measured; only static routing was checked.
 - Whether the Redis rate limiter is active in deployment is unknown because `INKU_REDIS_URL` values were not read.
 - Compose runtime health and volume persistence were not started; only configuration was checked.
-- Current results of Android device acceptance (F-11).
 - How the Mermaid diagrams actually display. All 44 diagrams in this set were parsed with the mermaid 11 parser, but their display on GitHub or Gitea was not checked.
 
 ## Specification-only parts
@@ -118,6 +120,6 @@ All major nodes and edges have public-source implementation evidence. No node re
 
 ## Follow-up questions
 
-1. The Android specification note (F-02, F-03) and the reference corpus for device acceptance (F-11) await the Android owner's fix and acceptance.
+As of 2026-09-25, every difference listed in this document is resolved. New differences are added here when found.
 
 These are not changes made by this review, so they were not copied into the ledger automatically.

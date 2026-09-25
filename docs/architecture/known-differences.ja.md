@@ -8,17 +8,19 @@
 - その後、公開commit `8b4d43cc` で同文書が29へ更新され、`render_engines/default.py` と `server/reference/render-engine-29/manifest.json` に一致した。
 - 判定: **現在は解消済み**。本書群のsnapshotも更新後commitへ合わせた。
 
-### F-02 Android仕様メモの版記述（再発）
+### F-02 Android仕様メモの版記述（解消）
 
 - 2026-08-24に冒頭を当時の実装へ同期したが、現行の冒頭（最終更新 2026-09-25）は`2.1.4-android.80`、render engine `67`、DDL engine version `20`、serverの`ddl_engine_version` 21と記す。
 - 実装はRender Engine `68`（`core/crates/inku-render/src/lib.rs`）、`ddl_engine_version` `47`（`layer_versions.py`）で、Androidは同じ共有Rust pipelineを使う。
-- 判定: **版の数字が古い**。engine identityはKotlin製品定数でなく同梱native libraryから読むため、runtimeの挙動ではなく文書の差異である。2026-09-25にAndroid担当へ引き継いだ。
+- Android担当が2026-09-25に、冒頭をrender engineとDDLの版の数値を写さない書き方（render engineは同梱coreの`RENDER_ENGINE_VERSION`、DDL SpecとDDL engineは`layer_versions.py`が名乗る）へ改め、未使用だった`ReferenceCorpus.kt`の`ddlEngineVersion = "20"`を削除した（`ddb1e19a`）。
+- 判定: **解消済み**。
 
-### F-03 Android外部provider実行
+### F-03 Android外部provider実行（解消）
 
 - Android仕様メモの「未実装」節は、外部provider executionを未実装とし、provider recordをcompatibility data structuresと記す。
 - 現行 `RoutingModelProvider` はenabled providerを解決し、`GeminiModelProvider`と`OpenAiCompatibleProvider`へ接続する。共有pipelineのprovider effectは`SingleAttemptModelEffectProvider`がこれらへ送る。同じ仕様メモの前半もGeminiとOpenAI互換への要求条件を記している。
-- 判定: **「未実装」節が古い**。Anthropic固有protocolの実装は確認できず、全providerの同等性は主張しない。2026-09-25にAndroid担当へ引き継いだ。
+- Android担当が2026-09-25に「未実装」節から外部provider executionを削除した（`ddb1e19a`）。Anthropic固有protocolの実装は確認できず、全providerの同等性は主張しない。
+- 判定: **解消済み**。
 
 ### F-04 Stage 1.5の長い旧説明（解消）
 
@@ -62,11 +64,12 @@
 - 2026-09-25にexecutorを外し、`stage_execution`が共有pipelineのworker pool（`workers`は`max_workers`、`queue_limit`は`max_retained_runs`）とprovider effectの件数を示すようにした。応答schemaは変えていない（権限グループ導入前から凍結されたschemaである）。SPEC §22とSETUPも改めた。
 - 判定: **解消済み**。
 
-### F-11 Android端末受入の参照corpus
+### F-11 Android端末受入の参照corpus（解消）
 
 - `prepareRustParityAssets`と`NativeRenderDeviceTest`は`server/reference/render-engine-41`の少数caseを端末へ取り込み、SVG byteを照合する。同testは`NativeRenderBridge.renderEngineVersion()`が`"41"`であることも表明し、`android-native.yml`のpath条件も`render-engine-41`を名指す。
 - 同梱libraryのRender Engineは68なので、この表明は成り立たない。期待SVGもEngine 41のもので、現行engineと同じbyteである保証が無い。
-- 判定: **端末受入が失敗する状態**と推定する（端末では実行していない）。直すにはbuild時に同じcommitのhost coreで期待SVGを作る等の変更とPixel 9での受入が要るため、2026-09-25にAndroid担当へ引き継いだ。
+- Android担当が2026-09-25に、`NativeRenderDeviceTest`を、build時に同じcommitのhost core（`core/crates/inku-render-android/examples/render-parity-expected.rs`）が作るSVG・engine identity・renderer referenceとの比較へ改めた（`ddb1e19a`）。凍結corpusはScore入力とraster入力にだけ使う。Android担当の報告では、Pixel 9のsafe runnerで2件が通過した。
+- 判定: **解消済み**。
 
 ### F-12 hole補完のAPI testの偽provider（解消）
 
@@ -109,7 +112,6 @@ Session、current-workのsubmit/replay/stop、Batch/Demoの非同期lifecycle、
 - 外部LLM providerの現在の到達性、model availability、latency。静的provider routingだけを確認した。
 - Redis rate limiterが実配備で有効か。`INKU_REDIS_URL`の値を読んでいない。
 - Compose imageの現在の稼働状態とvolume persistence。設定は確認したが起動していない。
-- Android端末受入の現行結果（F-11）。
 - Mermaid図の実際の表示。本書群の全44図はmermaid 11のparserで構文を確認したが、GitHub／Gitea上の表示は確認していない。
 
 ## 仕様だけに基づく部分
@@ -118,6 +120,6 @@ Session、current-workのsubmit/replay/stop、Batch/Demoの非同期lifecycle、
 
 ## 今後確認すべき質問
 
-1. Android仕様メモ（F-02、F-03）と端末受入の参照corpus（F-11）は、Android担当の修正と受入を待つ。
+本書で挙げた差異は、2026-09-25時点ですべて解消した。新しい差異は見つけた時点で本書へ加える。
 
 これらは本調査で実装・仕様を変更する課題ではないため、台帳への自動転記はしていない。

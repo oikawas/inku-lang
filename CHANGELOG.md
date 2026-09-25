@@ -6,6 +6,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 36 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-25 — The bundled withered leaves draw curled leaves (DDL engine 48)
+
+The bundled `Nature.枯葉` placed chalk cloudforms in the lower corners, which did not read as leaves. From 1.1.0 it places 2-4 curled leaves there, each a deep and a shallow arc touching at both ends, gray and yellow chalk in turn, with finely swaying edges, varied rotations, and interiors filled in their outline color. The bundled package is 1.1.0, the plugin document 0.4.0, and the preview is rebaked from the new expansion. A saved work's 1.0.1 lock still draws the former cloudforms. The same DDL now expands differently, so this is DDL engine 48; the DDL and Score formats and the render version are unchanged.
+
 ### 2026-09-25 — Installed plugins return to the work plan, and DDL travels with its plugin definitions
 
 Since Stage 1 became the work plan it no longer received the installed plugin list and the plan had no place for one, so new works never used a plugin. The work plan gains an optional `plugins` list closed over the installed names (at most four), printed as bare-name sentences. The Stage 1 prompt lists each installed plugin with its summary and chooses one only when the description writes the heading word of its name or a paraphrase of it. Without installed plugins the prompt and schema are unchanged. With the bundled Nature.leaves package, all nine descriptions naming a subject chose the right plugin and two of twenty-five that did not chose one by scene association; nothing stopped and no diagnostic appeared.

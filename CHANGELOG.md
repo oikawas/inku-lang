@@ -6,6 +6,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 36 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-25 — Refine the Library work preview and drawing status
+
+Double-clicking the image in a Library work preview opens that work; keyboard and touch input also open it. The area below the image shows the creation time, models, color catalog, drawing duration, SVG size, render engine version, generation, hash, and other available work details. The hash shows its last four digits with a button to copy the full value. While drawing begins with the previous result still on screen, the temporary save-first message no longer appears.
+
 ### 2026-09-25 — Make per-work sharing controls and status visible
 
 The Library now opens individual sharing settings from work cards, Lineage members, the chronological table, and previews. Sharing settings separately manage group read access and individual read/write grants. The settings dialog now appears above the Library. History listings report whether an owned work has ACL grants and distinguish individual sharing, group sharing, and works owned by others with separate badges. The “Shared only” filter is labeled “Group shared only” to match its actual scope.

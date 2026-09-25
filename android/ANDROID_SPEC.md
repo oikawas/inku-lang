@@ -50,6 +50,8 @@ The ordinary Android drawing setting offers off/on and defaults to off. Redrawin
 
 This sketch pipeline's rendered output is produced by the packaged `core/crates/inku-render/` through the shared pipeline JNI. Android reports render engine `default / 67`.
 
+Gemini provider generation requests use the Gemini API `models/{model}:generateContent` endpoint. The API key is sent as `x-goog-api-key`, and structured responses for the shared pipeline use native function declarations and `functionCall.args`. A successful model-list fetch does not establish that generation requests work.
+
 ## 2026-09-24 Current bottom actions, photo entry, and Works scrolling
 
 The translucent bottom action area contains Studio, Camera, Works, and Series. Camera is a capture action rather than a destination: tapping it opens the device camera directly, without a source chooser or an overwrite confirmation. Cancelling capture restores the previous screen and Studio content. The existing source chooser in Studio remains available for Photo Picker input.

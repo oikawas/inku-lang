@@ -12,7 +12,9 @@
 
 ### 2026-09-25 — Androidへ作者選択式の写生を移植
 
-Androidの共有pipelineは、既定offの`sketch`選択、Stage 1前の`generate_sketch` effect、supplied文の再利用、`fallback`／`not_needed`での記述単独続行に対応する。写生状態をsnapshotと保存列へ反映し、旧`fine`／`coarse`は保存済み作品の表示と再描画判定に限る。系譜の作品カードから写生の有無を変えて描き直すと、既存の`sketch_grain_change`派生として保存する。Pixel 9の限定実機試験は通過し、実モデルの保存完了確認は別記録に残す。
+Androidの共有pipelineは、既定offの`sketch`選択、Stage 1前の`generate_sketch` effect、supplied文の再利用、`fallback`／`not_needed`での記述単独続行に対応する。写生状態をsnapshotと保存列へ反映し、旧`fine`／`coarse`は保存済み作品の表示と再描画判定に限る。系譜の作品カードから写生の有無を変えて描き直すと、既存の`sketch_grain_change`派生として保存する。
+
+Gemini provider の生成要求をモデル一覧取得とは別に native `generateContent` へ接続した。従来の OpenAI 互換 `/chat/completions` への送信では Gemini API の Gemma 4 31B 生成が拒否されていた。Pixel 9 で同モデルを使い、作者指定の日本語記述から写生ありの作品描画・保存と系譜の子作品を確認した。
 
 ### 2026-09-24 — 作品計画に大小と重なり、光と時刻の原則を加える
 

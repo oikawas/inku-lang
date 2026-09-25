@@ -42,13 +42,17 @@ class RoutingModelProvider(
             ?: inkuError { it.errorProviderNotFoundForModel(modelId) }
     }
 
-    private fun remoteProvider(provider: ProviderSettingEntity): OpenAiCompatibleProvider {
+    private fun remoteProvider(provider: ProviderSettingEntity): ModelProvider {
         val baseUrl = provider.baseUrl?.trim()?.ifBlank { null } ?: inkuError { it.errorProviderBaseUrlMissing(provider.displayName) }
         val apiKey = provider.encryptedApiKey?.let(AndroidSecretBox::decryptOrPlain)
         if (provider.providerId in setOf("openai", "nvidia") && apiKey.isNullOrBlank()) {
             inkuError { it.errorProviderApiKeyMissing(provider.displayName) }
         }
-        return OpenAiCompatibleProvider(provider.providerId, baseUrl, apiKey)
+        return if (provider.kind == "gemini") {
+            GeminiModelProvider(provider.providerId, baseUrl, apiKey)
+        } else {
+            OpenAiCompatibleProvider(provider.providerId, baseUrl, apiKey)
+        }
     }
 
     internal companion object {

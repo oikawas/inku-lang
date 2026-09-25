@@ -40,6 +40,8 @@ runtime fallbackを持たない。保存済みSVG、Room schema、Score schema�
 
 この写生pipelineの描画結果は、Androidに同梱した`core/crates/inku-render/`を共有pipelineのJNI経由で実行して生成する。Androidが報告するrender engineは`default / 67`である。
 
+Gemini provider の生成要求は Gemini API の `models/{model}:generateContent` に送る。API key は `x-goog-api-key` で渡し、共有pipelineの構造化応答は native function declaration と `functionCall.args` を使う。モデル一覧の取得だけが成功しても、生成要求の到達確認とは扱わない。
+
 ## 2026-09-24 現行の下部操作・写真入力・作品一覧
 
 下部の半透過操作エリアには「制作」「カメラ」「作品」「連作」を置く。カメラは画面切替ではなく撮影開始の操作であり、押すと写真入力元や既存内容の上書き確認を挟まず、端末のカメラへ進む。撮影を取り消した場合は、開始前の画面と制作内容に戻す。制作画面内の従来の写真入力元選択は、Photo Pickerを使う入口として残す。

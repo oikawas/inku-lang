@@ -12,7 +12,9 @@ An optional sketch can now run before the work plan. It never rewrites the descr
 
 ### 2026-09-25 — Port author-selected sketching to Android
 
-Android's shared pipeline supports the default-off `sketch` choice, the `generate_sketch` effect before Stage 1, reuse of supplied prose, and description-only continuation for `fallback` and `not_needed`. It carries sketch states into snapshots and saved columns; legacy `fine` and `coarse` remain only for displaying saved works and determining their redraw choice. Redrawing from a lineage work card with or without sketching saves a child using the existing `sketch_grain_change` derivation. The focused Pixel 9 device test passed; the task record distinguishes it from the incomplete live-model save check.
+Android's shared pipeline supports the default-off `sketch` choice, the `generate_sketch` effect before Stage 1, reuse of supplied prose, and description-only continuation for `fallback` and `not_needed`. It carries sketch states into snapshots and saved columns; legacy `fine` and `coarse` remain only for displaying saved works and determining their redraw choice. Redrawing from a lineage work card with or without sketching saves a child using the existing `sketch_grain_change` derivation.
+
+Gemini provider generation now uses native `generateContent`, separately from model-list retrieval. The previous OpenAI-compatible `/chat/completions` request was rejected by Gemini API for Gemma 4 31B. On Pixel 9, that model drew and saved a sketch-on child work from the author's specified Japanese text.
 
 ### 2026-09-24 — The work plan leads through size and overlap, and shows light and time through the scene's color
 

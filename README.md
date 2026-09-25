@@ -28,7 +28,7 @@
 A blue line slowly loosens across the night water.
 ```
 
-An inku work begins by writing a short poem or passage of prose like the one above. An LLM breaks the words down into a work plan of visual elements, which is written out as DDL, the language of drawing. A Typed Compiler then compiles the DDL into JSON data that can be rendered as SVG.
+An inku work begins by writing a short poem or passage of prose like the one above. An LLM breaks the words down into visual elements, which are written out as DDL, the language of drawing. A Typed Compiler then compiles the DDL into JSON data that can be rendered as SVG.
 This JSON data is a “score”: even as the application moves from one generation to another, it can continue to “perform” the work consistently as SVG. The computer generates the SVG image by having a dedicated Renderer interpret that JSON. The inku application brings this entire sequence together.
 
 Together, the LLM, Typed Compiler, and Renderer provide a “controllable environment for AI vector-graphic generation.”
@@ -175,9 +175,9 @@ The full environment variable list, per-provider configuration, and the CLI (`in
 
 ```
 Your sentence (written in your native language)
-     │  interpretation — the words are read into a work plan built from Saijiki words (Stage 1, LLM)
+     │  interpretation — the words are read into visual elements named with Saijiki words (Stage 1, LLM)
      ▼
-Instructions (Normalized DDL — a human-readable executable specification, written out deterministically from the work plan)
+Instructions (Normalized DDL — a human-readable executable specification, written out deterministically from those elements)
      │  structuring — the Typed Compiler writes it down as a score (deterministic)
      │    if a phrase cannot be read through, Stage 2 (LLM) proposes a completion and you approve it
      ▼
@@ -191,9 +191,9 @@ SVG (the performance — one-time; for a wall, a page, a screen)
 
 The words land in fields of the score. In the second work above, "shoal" landed in `count` and `cluster_count: 7`; "along an undulating path" landed in `path: wave`; "silver" landed in `color_cycle` and `surface.texture: wash`; and the "opposite bank" became the single vertical line at the right edge. **Neither the sniper nor the fisherman nor the war survives — only shape, material, and motion.**
 
-Interpretation and structuring are separated because they demand different abilities. Interpretation is associative and creative, so it is left to an LLM. What the LLM returns, however, is only a closed, typed work plan built from Saijiki words; the text of the instructions is written out from it deterministically. Structuring is mechanical and rule-abiding, so the Typed Compiler does it, not an LLM. It never fills in meaning by guessing: a phrase that cannot be read through is sent, on its own, to an LLM for a completion, which then waits for your approval. The model used for interpretation can be selected, and in practice it makes a large difference to the work that comes out. **The choice of model is itself a creative variable.**
+Interpretation and structuring are separated because they demand different abilities. Interpretation is associative and creative, so it is left to an LLM. The LLM does not, however, write the text of the instructions itself. It fills in a fixed form — which shape, in which material and color, placed where and how — using only Saijiki words, and the text of the instructions is written out from that form deterministically. Structuring is mechanical and rule-abiding, so the Typed Compiler does it, not an LLM. It never fills in meaning by guessing: a phrase that cannot be read through is sent, on its own, to an LLM for a completion, which then waits for your approval. The model used for interpretation can be selected, and in practice it makes a large difference to the work that comes out. **The choice of model is itself a creative variable.**
 
-Only the places where an LLM is involved are nondeterministic: the interpretation in Stage 1, the optional Sketch from life and automatic color catalog selection, and the proposed completions of the instructions (Stage 2). From the saved instructions onward, the conversion into a score and the Renderer's performance are always deterministic: the same score, the same seed, and the same drawing conditions reproduce the same work. The inku specification itself, however, keeps moving, so a new inku always draws a different work from an old one.
+Only the places where an LLM is involved are nondeterministic: the interpretation in Stage 1, the optional Sketch from life (which adds notes on place and light to the description) and automatic color catalog selection, and the proposed completions of the instructions (Stage 2). From the saved instructions onward, the conversion into a score and the Renderer's performance are always deterministic: the same score, the same seed, and the same drawing conditions reproduce the same work. The inku specification itself, however, keeps moving, so a new inku always draws a different work from an old one.
 
 These deterministic parts — the flow of the processing, the Typed Compiler, the score, and the Renderer — are gathered in a single shared core written in Rust. The server and the Android app call the same core, so the same instructions go through the same decisions wherever they are drawn.
 
@@ -227,7 +227,7 @@ None of them breaks default reproducibility; each acts only on your explicit req
 |---|---|---|---|
 | **Another performance** | Line tremor, placement phase | Interpretation and composition | Very fast, no LLM call |
 | **Another catalog** | The color assignment | Interpretation, composition, performance | Very fast, no LLM call |
-| **Another composition** | The focus (from six closed candidates), the concrete angle of a slant, the position in a corner | The instructions; technique, color, touch, and element count | Fast, no LLM call |
+| **Another composition** | The focus (from six fixed candidates), the concrete angle of a slant, the position in a corner | The instructions; technique, color, touch, and element count | Fast, no LLM call |
 | **Variation** (let the app move Stage 1.5) | Moves the focus to a different candidate; each strength moves it somewhere else | The instructions; the frame of the composition, technique, color, touch, and element count | Fast, no LLM call |
 | **Another reading** | The reading of the words themselves | Your sentence | Slower, from Stage 1 |
 
@@ -296,12 +296,12 @@ During development, we always move forward while comparing with saved reference 
 
 ## Capabilities
 
-- **Multi-stage pipeline** — Sketch from life (adds notes on place and light to the description) and automatic color catalog selection, both optional; Stage 1 (work plan); the Typed Compiler; Stage 1.5 (focus and variation); and the Renderer. Non-deterministic AI layers and deterministic algorithmic layers alternate
+- **Multi-stage pipeline** — Sketch from life and automatic color catalog selection, both optional; Stage 1 (reading the words into visual elements); the Typed Compiler; Stage 1.5 (focus and variation); and the Renderer. Non-deterministic AI layers and deterministic algorithmic layers alternate
 - **Shared core** — the flow of the processing, the Typed Compiler, the score, and the Renderer are gathered in a shared Rust core that the server (Python) and Android (Kotlin) both call
 - **Primitives and arrangement** — point, line, circle, ellipse, arc, square, triangle, cloudform; placing, lining up, drawing, scattering, filling, and tiling, with paths such as waves and diagonal bands, and "alternating" or "in order" sequences
 - **Regions and relations** — scores can state seven kinds of relation between elements ("along the previous line," "not touching the previous shape," "mirrored with the previous shape") that the performance resolves
 - **Material rendering** — silverpoint, pencil, pen, rotring, crayon, chalk, brushes, oil paint, burin, and drypoint, differentiated through the shared stroke engine's width, tracking, and sparse events plus tool-specific edges. Surface qualities (flat, pale ink wash, stipple, hatch, crosshatch, aquatint, and more) and grounds (washi, charcoal ground, canvas, mezzotint, and more) can be chosen too
-- **Plugins** — namespaced vocabulary macros such as `Nature.YoungLeaves` (alias `Nature.若葉`); they may expand only into core vocabulary and cannot modify the core. When a description names one of their words, the work plan can choose it. Instructions that use an unregistered plugin draw everything else and give the reason on that sentence alone. Instructions can be exported together with their plugin definitions and imported elsewhere
+- **Plugins** — namespaced vocabulary macros such as `Nature.YoungLeaves` (alias `Nature.若葉`); they may expand only into core vocabulary and cannot modify the core. When a description names one of their words, Stage 1 can use it in its interpretation. Instructions that use an unregistered plugin draw everything else and give the reason on that sentence alone. Instructions can be exported together with their plugin definitions and imported elsewhere
 - **History and editions** — DB-backed history with stars, search, thumbnails, and exact reproduction via seeds and edition IDs
 - **Batch / CLI** — designed for straightforward operation by AI agents, the CLI provides access to every inku API. `inku-cli` supports login, painting, batch generation, contact sheets, and everything else available through the GUI
 

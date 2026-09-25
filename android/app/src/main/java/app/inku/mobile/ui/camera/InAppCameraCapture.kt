@@ -35,7 +35,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.unit.dp
+import app.inku.mobile.ui.theme.Dimens
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -96,7 +96,7 @@ internal fun InAppCameraCapture(
         TextButton(
             onClick = onCancel,
             enabled = !capturing,
-            modifier = Modifier.align(Alignment.TopStart).statusBarsPadding().padding(8.dp),
+            modifier = Modifier.align(Alignment.TopStart).statusBarsPadding().padding(Dimens.spaceM),
         ) {
             Text(cancelLabel, color = Color.White, style = MaterialTheme.typography.titleMedium)
         }
@@ -104,11 +104,11 @@ internal fun InAppCameraCapture(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .navigationBarsPadding()
-                .padding(bottom = 40.dp)
-                .size(76.dp)
+                .padding(bottom = Dimens.cameraShutterBottomInset)
+                .size(Dimens.cameraShutterSize)
                 .clip(CircleShape)
-                .border(4.dp, Color.White, CircleShape)
-                .padding(8.dp)
+                .border(Dimens.cameraShutterRingWidth, Color.White, CircleShape)
+                .padding(Dimens.spaceM)
                 .clip(CircleShape)
                 .background(if (capturing) Color.Gray else Color.White)
                 .semantics {

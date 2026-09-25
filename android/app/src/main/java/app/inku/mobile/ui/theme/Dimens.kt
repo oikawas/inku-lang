@@ -185,6 +185,77 @@ object Dimens {
     /** 680dp. The local model management dialog. */
     val localModelDialogMaxHeight: Dp = 680.dp
 
+    // --- Headers and touch targets ----------------------------------------
+
+    /** 48dp. The minimum touch target: search button, scroll handle, thumb length. */
+    val touchTarget: Dp = 48.dp
+
+    /** 48dp. The studio header row's minimum height. */
+    val studioHeaderMinHeight: Dp = 48.dp
+
+    /** 8dp. The dot before a studio header title. */
+    val studioHeaderDot: Dp = 8.dp
+
+    /** 1.5dp. The stroke of the drawn bottom-navigation marks. */
+    val navigationMarkStroke: Dp = 1.5.dp
+
+    // --- Works grid and its scroll handle ---------------------------------
+
+    /** 152dp. The narrowest works-grid column; keeps two columns on a Pixel 9. */
+    val historyGridMinCellWidth: Dp = 152.dp
+
+    /** 52dp. The grid's right padding, clearing the 48dp scroll handle. */
+    val historyGridHandleClearance: Dp = 52.dp
+
+    /** 12dp. The gap between works-grid rows. */
+    val historyGridRowGap: Dp = 12.dp
+
+    /** 14dp. From the handle's right edge to the rail's centre. */
+    val scrollRailInset: Dp = 14.dp
+
+    /** 4dp. The scroll rail's width. */
+    val scrollRailWidth: Dp = 4.dp
+
+    /** 10dp. The scroll thumb's width. */
+    val scrollThumbWidth: Dp = 10.dp
+
+    // --- Lineage, presentation, original photo ----------------------------
+
+    /** 112dp. A lineage card's thumbnail. */
+    val lineageThumbSize: Dp = 112.dp
+
+    /** 180dp. The presentation caption's scrolling maximum height. */
+    val presentationCaptionMaxHeight: Dp = 180.dp
+
+    /** 72dp. The original-photo thumbnail beside the description. */
+    val originalPhotoThumbSize: Dp = 72.dp
+
+    /** 360dp. The enlarged original photo. */
+    val originalPhotoPreviewHeight: Dp = 360.dp
+
+    // --- Camera -------------------------------------------------------------
+
+    /** 76dp. The in-app camera shutter. */
+    val cameraShutterSize: Dp = 76.dp
+
+    /** 4dp. The shutter's outer ring. */
+    val cameraShutterRingWidth: Dp = 4.dp
+
+    /** 40dp. From the navigation bar to the shutter. */
+    val cameraShutterBottomInset: Dp = 40.dp
+
+    /** 3dp. The outline drawn while a camera work is saved. */
+    val cameraSavingOutlineWidth: Dp = 3.dp
+
+    /** 2dp. A scanline, signal band, or thin noise block over the photo. */
+    val cameraSignalLine: Dp = 2.dp
+
+    /** 6dp. A thick noise block over the photo. */
+    val cameraSignalBlock: Dp = 6.dp
+
+    /** 2.5dp. The plotter-like stroke of the finishing forms. */
+    val cameraPlotterStroke: Dp = 2.5.dp
+
     // --- Database startup refusal -----------------------------------------
 
     /** 32dp. Page inset on the startup refusal screen. */

@@ -1404,11 +1404,11 @@ private fun StudioHeader(title: String, viewModel: InkuViewModel, showTools: Boo
     var toolsOpen by remember { mutableStateOf(false) }
     val isEnglish = LocalUiLanguage.current.isEnglish
     Row(
-        modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+        modifier = Modifier.fillMaxWidth().heightIn(min = Dimens.studioHeaderMinHeight),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM),
     ) {
-            Box(Modifier.size(8.dp).background(MaterialTheme.colorScheme.primary, RoundedCornerShape(100)))
+            Box(Modifier.size(Dimens.studioHeaderDot).background(MaterialTheme.colorScheme.primary, RoundedCornerShape(100)))
             Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
             if (showTools) {
                 Box {
@@ -1809,7 +1809,7 @@ private fun CameraDevelopmentEffectCanvas(
             CameraDevelopmentEffect.Saving -> {
                 drawRect(
                     CameraDevelopmentOutline.copy(alpha = 0.45f + pulse * 0.25f),
-                    style = Stroke(width = 3.dp.toPx()),
+                    style = Stroke(width = Dimens.cameraSavingOutlineWidth.toPx()),
                 )
             }
             CameraDevelopmentEffect.FinalArtwork -> Unit
@@ -1867,15 +1867,15 @@ private fun DrawScope.drawCameraPhotoTears(photo: ImageBitmap, cycle: Float) {
             (if (index % 2 == 0) CameraDevelopmentVividSky else CameraDevelopmentVividPink)
                 .copy(alpha = 0.42f),
             topLeft = Offset(0f, size.height * yFraction),
-            size = Size(size.width, 2.dp.toPx()),
+            size = Size(size.width, Dimens.cameraSignalLine.toPx()),
         )
     }
 }
 
 /** Video-signal scanlines and bounded interference over the input photo. */
 private fun DrawScope.drawCameraPhotoScan(cycle: Float, animationsEnabled: Boolean) {
-    val hairline = 1.dp.toPx()
-    drawRect(Color(0xFF062C38).copy(alpha = 0.2f))
+    val hairline = Dimens.hairline.toPx()
+    drawRect(CameraDevelopmentScanTint.copy(alpha = 0.2f))
     repeat(52) { index ->
         val y = size.height * (index + 0.5f) / 52f
         drawLine(
@@ -1896,7 +1896,7 @@ private fun DrawScope.drawCameraPhotoScan(cycle: Float, animationsEnabled: Boole
         CameraDevelopmentVividSky.copy(alpha = 0.94f),
         Offset(0f, scanY),
         Offset(size.width, scanY),
-        strokeWidth = 2.dp.toPx(),
+        strokeWidth = Dimens.cameraSignalLine.toPx(),
     )
 
     val noiseFrame = if (animationsEnabled) (cycle * 18f).toInt() else 7
@@ -1915,7 +1915,7 @@ private fun DrawScope.drawCameraPhotoScan(cycle: Float, animationsEnabled: Boole
             (if (index % 3 == 0) CameraDevelopmentVividPink else CameraDevelopmentVividSky)
                 .copy(alpha = 0.56f),
             topLeft = Offset(x, y),
-            size = Size(width, if (index % 5 == 0) 6.dp.toPx() else 2.dp.toPx()),
+            size = Size(width, if (index % 5 == 0) Dimens.cameraSignalBlock.toPx() else Dimens.cameraSignalLine.toPx()),
         )
     }
 }
@@ -1939,8 +1939,8 @@ private fun DrawScope.drawCameraMechanicalComposition(
     animationsEnabled: Boolean,
     colors: List<Color>,
 ) {
-    drawRect(Color(0xFF201E22).copy(alpha = 0.14f))
-    val stroke = 2.5.dp.toPx()
+    drawRect(CameraDevelopmentPlotterShade.copy(alpha = 0.14f))
+    val stroke = Dimens.cameraPlotterStroke.toPx()
     val radius = size.minDimension * 0.105f
     val drawingPosition = if (animationsEnabled) 3f + cycle * 29f else 32f
     val visible = (drawingPosition.toInt() + 1).coerceAtMost(32)
@@ -1959,7 +1959,7 @@ private fun DrawScope.drawCameraMechanicalComposition(
             CameraDevelopmentPaper.copy(alpha = 0.24f),
             Offset(center.x - extent * 1.35f, center.y - extent * 1.35f),
             Offset(center.x + extent * 0.3f, center.y - extent * 1.35f),
-            strokeWidth = 1.dp.toPx(),
+            strokeWidth = Dimens.hairline.toPx(),
         )
         when (index % 4) {
             0 -> {
@@ -2039,12 +2039,12 @@ private fun CameraOriginalPhotoThumbnail(path: String?, isEnglish: Boolean) {
         Text(words.label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Surface(
             modifier = Modifier
-                .size(72.dp)
+                .size(Dimens.originalPhotoThumbSize)
                 .semantics { contentDescription = words.enlarge; role = Role.Button }
                 .clickable { expanded = true },
             shape = RoundedCornerShape(Dimens.radiusCard),
             color = MaterialTheme.colorScheme.surface,
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+            border = BorderStroke(Dimens.hairline, MaterialTheme.colorScheme.outlineVariant),
         ) {
             Image(
                 bitmap = photo,
@@ -2066,7 +2066,7 @@ private fun CameraOriginalPhotoThumbnail(path: String?, isEnglish: Boolean) {
                     Image(
                         bitmap = largePhoto ?: photo,
                         contentDescription = words.label,
-                        modifier = Modifier.fillMaxWidth().height(360.dp),
+                        modifier = Modifier.fillMaxWidth().height(Dimens.originalPhotoPreviewHeight),
                         contentScale = ContentScale.Fit,
                     )
                     TextButton(onClick = { expanded = false }, modifier = Modifier.align(Alignment.End)) {
@@ -3276,13 +3276,13 @@ private fun HistoryScreen(
     }
     Box(Modifier.fillMaxSize()) {
         LazyVerticalGrid(
-            columns = GridCells.Adaptive(152.dp),
+            columns = GridCells.Adaptive(Dimens.historyGridMinCellWidth),
             state = gridState,
             modifier = Modifier.fillMaxSize(),
             // Keep the two columns clear of the 48dp scroll handle on narrow phones.
-            contentPadding = PaddingValues(start = Dimens.spaceL, end = 52.dp, top = Dimens.spaceM, bottom = Dimens.spaceM),
+            contentPadding = PaddingValues(start = Dimens.spaceL, end = Dimens.historyGridHandleClearance, top = Dimens.spaceM, bottom = Dimens.spaceM),
             horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(Dimens.historyGridRowGap),
         ) {
             item(key = "header", span = { GridItemSpan(maxLineSpan) }) { header() }
             gridItems(filteredHistory, key = { it.id }) { item ->
@@ -3315,7 +3315,7 @@ private fun HistoryGridScrollbar(gridState: LazyGridState, modifier: Modifier = 
     }
     val currentProgress by rememberUpdatedState(progress)
     val density = LocalDensity.current
-    val minimumThumbPx = with(density) { 48.dp.toPx() }
+    val minimumThumbPx = with(density) { Dimens.touchTarget.toPx() }
     val isEnglish = LocalUiLanguage.current.isEnglish
     val railColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.42f)
     val thumbColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.95f)
@@ -3334,7 +3334,7 @@ private fun HistoryGridScrollbar(gridState: LazyGridState, modifier: Modifier = 
     Box(
         modifier = modifier
             .fillMaxHeight()
-            .width(48.dp)
+            .width(Dimens.touchTarget)
             .padding(vertical = Dimens.spaceM)
             .onSizeChanged { trackHeightPx = it.height }
             .semantics {
@@ -3378,18 +3378,20 @@ private fun HistoryGridScrollbar(gridState: LazyGridState, modifier: Modifier = 
             },
     ) {
         Canvas(Modifier.fillMaxSize()) {
-            val railX = size.width - 14.dp.toPx()
+            val railX = size.width - Dimens.scrollRailInset.toPx()
+            val railHalf = Dimens.scrollRailWidth.toPx() / 2f
+            val thumbHalf = Dimens.scrollThumbWidth.toPx() / 2f
             drawRoundRect(
                 color = railColor,
-                topLeft = Offset(railX - 2.dp.toPx(), 0f),
-                size = Size(4.dp.toPx(), size.height),
-                cornerRadius = CornerRadius(2.dp.toPx()),
+                topLeft = Offset(railX - railHalf, 0f),
+                size = Size(railHalf * 2f, size.height),
+                cornerRadius = CornerRadius(railHalf),
             )
             drawRoundRect(
                 color = thumbColor,
-                topLeft = Offset(railX - 5.dp.toPx(), progress * thumbTravelPx),
-                size = Size(10.dp.toPx(), thumbHeightPx),
-                cornerRadius = CornerRadius(5.dp.toPx()),
+                topLeft = Offset(railX - thumbHalf, progress * thumbTravelPx),
+                size = Size(thumbHalf * 2f, thumbHeightPx),
+                cornerRadius = CornerRadius(thumbHalf),
             )
         }
     }
@@ -3410,7 +3412,7 @@ private fun HistoryHeader(
             Text(S.filteredOfTotal(filteredCount, sourceCount), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
             TextButton(
                 onClick = { searchOpen = !searchOpen },
-                modifier = Modifier.size(48.dp).semantics { contentDescription = searchLabel },
+                modifier = Modifier.size(Dimens.touchTarget).semantics { contentDescription = searchLabel },
             ) { Text("⌕", style = MaterialTheme.typography.titleLarge) }
             ChipButton(S.starredOnly, selected = state.historyStarredOnly, onClick = viewModel::toggleHistoryStarredFilter)
         }
@@ -3968,7 +3970,7 @@ private fun LineageNodeCard(
             verticalAlignment = Alignment.Top,
         ) {
             if (history != null) {
-                Box(modifier = Modifier.size(112.dp)) {
+                Box(modifier = Modifier.size(Dimens.lineageThumbSize)) {
                     ArtworkThumbnail(
                         id = history.item.id,
                         renderHash = history.item.renderHash,
@@ -3983,7 +3985,7 @@ private fun LineageNodeCard(
                     )
                 }
             } else {
-                Box(modifier = Modifier.size(112.dp).background(LineagePlaceholderSurface))
+                Box(modifier = Modifier.size(Dimens.lineageThumbSize).background(LineagePlaceholderSurface))
             }
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Dimens.spaceXs)) {
                 // The label of the edge that produced this work. A node no edge
@@ -6783,7 +6785,7 @@ private fun PresentationCaption(text: String, rotation: DeviceRotation, modifier
     ) {
         Text(
             text,
-            modifier = Modifier.heightIn(max = 180.dp).verticalScroll(rememberScrollState()).padding(horizontal = Dimens.spaceL, vertical = Dimens.spaceM),
+            modifier = Modifier.heightIn(max = Dimens.presentationCaptionMaxHeight).verticalScroll(rememberScrollState()).padding(horizontal = Dimens.spaceL, vertical = Dimens.spaceM),
             color = PresentationCaptionInk,
             style = MaterialTheme.typography.bodyMedium,
             textAlign = TextAlign.Center,
@@ -6962,7 +6964,7 @@ private fun NavButton(destination: BottomNavigationDestination, label: String, s
 @Composable
 private fun NavigationMark(destination: BottomNavigationDestination, color: Color) {
     Canvas(Modifier.size(Dimens.badgeSize)) {
-        val stroke = Stroke(width = 1.5.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round)
+        val stroke = Stroke(width = Dimens.navigationMarkStroke.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round)
         val w = size.width
         val h = size.height
         when (destination) {

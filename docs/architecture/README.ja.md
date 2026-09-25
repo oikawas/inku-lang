@@ -1,14 +1,14 @@
 # inku アーキテクチャ
 
-この文書群は、DDLの設計段階、現行実装、Web/Server/CLI/Android/外部provider/永続化の境界を、相互に追跡できる形で記録する。実装baselineは公開commit `4433fa4f50c6ee278d824dff4f60b8a4c3c33095`、app `v2.14.1 / Build 1072` である。
+この文書群は、DDLの設計段階、現行実装、Web/Server/CLI/Android/外部provider/永続化の境界を、相互に追跡できる形で記録する。実装baselineは公開commit `46f17da8c5b438511f9bd915395763262b55fb72`、app `v2.15.28 / Build 1104`、Render Engine 68、DDL engine 47 である。2026-09-14の共有Rust pipeline cutover後の構造を記す。
 
 ## 推奨閲覧順
 
 1. `evidence-inventory.ja.md` — IDと一次根拠
 2. `system-context.ja.md` — システム外形
 3. `runtime-containers.ja.md` — 実行単位
-4. `ddl-processing-pipeline.ja.md` — DDL処理
-5. `description-to-svg.ja.md` — 記述からSVGまでの判定の道筋（pipelineの深掘り）
+4. `ddl-processing-pipeline.ja.md` — DDL処理と共有authoring state machine
+5. `description-to-svg.ja.md` — 記述からSVGまでの判定の道筋（共有pipelineの深掘り）
 6. `server-components.ja.md` — Server内部
 7. `client-boundaries.ja.md` — Web内部のcanonical owner図とWeb/CLI/Android境界
 8. `data-history-lineage.ja.md` — DB、同一性、系譜

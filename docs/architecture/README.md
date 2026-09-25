@@ -1,14 +1,14 @@
 # inku architecture
 
-This documentation maps the DDL design stages to the current implementation and to the boundaries among Web, Server, CLI, Android, external providers, and persistence. The implementation baseline is public commit `4433fa4f50c6ee278d824dff4f60b8a4c3c33095`, app `v2.14.1 / Build 1072`.
+This documentation maps the DDL design stages to the current implementation and to the boundaries among Web, Server, CLI, Android, external providers, and persistence. The implementation baseline is public commit `46f17da8c5b438511f9bd915395763262b55fb72`, app `v2.15.28 / Build 1104`, Render Engine 68, DDL engine 47. It describes the structure after the 2026-09-14 shared Rust pipeline cutover.
 
 ## Reading order
 
 1. `evidence-inventory.md` — Evidence IDs and primary sources
 2. `system-context.md` — System boundary
 3. `runtime-containers.md` — Runtime units
-4. `ddl-processing-pipeline.md` — DDL processing
-5. `description-to-svg.md` — From a description to an SVG, decision by decision (the pipeline deep dive)
+4. `ddl-processing-pipeline.md` — DDL processing and the shared authoring state machine
+5. `description-to-svg.md` — From a description to an SVG, decision by decision (the shared pipeline deep dive)
 6. `server-components.md` — Server internals
 7. `client-boundaries.md` — Canonical Web owners and the Web, CLI, and Android boundaries
 8. `data-history-lineage.md` — DB, identity, and lineage

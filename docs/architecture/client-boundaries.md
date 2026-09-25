@@ -7,10 +7,12 @@ flowchart TB
     USER["Author"]
     WEB["Web\nSvelteKit UI"]
     CLI["CLI\nHTTP client + bench instrument"]
-    ANDROID["Android\nseparate pipeline + renderer"]
+    ANDROID["Android\nKotlin UI + host"]
     API["Public Server HTTP API"]
-    SERVER_PIPE["Server pipeline"]
-    ANDROID_PIPE["Android Kotlin pipeline"]
+    SERVER_HOST["Server pipeline host\nPython"]
+    ANDROID_HOST["Android pipeline host\nKotlin + JNI"]
+    CORE["Shared Rust core\npipeline + compiler + renderer"]
+    SERVER_DB[("Server DB")]
     ROOM[("Room DB")]
 
     USER --> WEB
@@ -18,13 +20,15 @@ flowchart TB
     USER --> ANDROID
     WEB -->|"HTTP"| API
     CLI -->|"HTTP only"| API
-    API --> SERVER_PIPE
-    ANDROID --> ANDROID_PIPE
-    ANDROID_PIPE --> ROOM
-    SERVER_PIPE -.->|"later port from canonical Server behavior"| ANDROID_PIPE
+    API --> SERVER_HOST
+    SERVER_HOST -->|"native wheel"| CORE
+    ANDROID --> ANDROID_HOST
+    ANDROID_HOST -->|"JNI"| CORE
+    SERVER_HOST --> SERVER_DB
+    ANDROID_HOST --> ROOM
 ```
 
-Web is the reference UI for Server works. The CLI measures the public API. Android performs every stage on-device as a separate implementation. No ordinary Android path to the Server pipeline was confirmed.
+Web is the reference UI for Server works. The CLI measures the public API. Android is a host that runs every stage on the device. The same shared Rust core makes every decision about meaning from the description to the SVG on both the Server and Android; the hosts hold only provider transport, persistence, and UI. There is no ordinary Android path that calls the Server API as its pipeline.
 
 ## Web internals
 
@@ -36,6 +40,7 @@ flowchart TB
     BATCH["features/batch/state.svelte.ts\nbatch prompt, resume/retry, run identity, and progress"]
     DEMO["features/demo/state.svelte.ts\ndemo settings, repetition, run identity, and current result"]
     RUN["features/run/current-work.ts\nstateless one-Paint operation and stream projection"]
+    PIPELINE_CTRL["features/pipeline/{controller,api,diagnostics}.ts\nview of shared-pipeline executions, forwarding of author commands, diagnostics display"]
     HISTORY["features/history/*\nroute-instance browsing, lineage, mutations, and stateless work actions"]
     VIEWPORT["features/canvas/viewport-state.svelte.ts\nroute-instance zoom, fit, pan, and input handling"]
     REFINE_SESSION["features/canvas/refinement-session.svelte.ts\nbusy, cancellation, progress, and candidates"]
@@ -45,7 +50,7 @@ flowchart TB
     SETTINGS_SLICES["features/settings/{navigation-state,server-administration,model-administration,user-administration}.svelte.ts\nroute-instance Settings owners"]
     COMPONENTS["components/\nroute-facing input, history, lineage, and modal shells"]
     CANVAS_PANEL["CanvasPanel.svelte\nCanvas tab and overlay composition"]
-    CANVAS_ART["`CanvasArtworkWorkspace.svelte`\ncurrent work, controls, export, and zoom view"]
+    CANVAS_ART["CanvasArtworkWorkspace.svelte\ncurrent work, controls, export, and zoom view"]
     CANVAS_REFINE["CanvasRefinementWorkspace.svelte\nstateless refinement shell"]
     REFINE_VIEWS["Refinement{Adjust,ModelCompare,LanguageCompare}View.svelte\ncapability-local focused views"]
     SETTINGS_MODAL["SettingsModal.svelte\nSettings tab composition"]
@@ -65,6 +70,7 @@ flowchart TB
     PAGE -->|"construct once"| VIEWPORT
     PAGE --> COMPONENTS
 
+    WORK -->|"description, DDL, approve, decline, fork"| PIPELINE_CTRL
     WORK -->|"resolved defaults + named capabilities"| RUN
     WORK -->|"one-work Paint + focused callbacks"| BATCH
     WORK -->|"one-work Paint + focused callbacks"| DEMO
@@ -81,6 +87,7 @@ flowchart TB
     SETTINGS_SLICES --> TRANSPORT
     SESSION --> TRANSPORT
     RUN --> TRANSPORT
+    PIPELINE_CTRL --> TRANSPORT
     HISTORY --> TRANSPORT
     REFINE_COORD --> TRANSPORT
 
@@ -104,10 +111,11 @@ flowchart TB
 |---|---|---|
 | Route shell memory | Output tab, modal visibility, short presentation projections, and lifecycle wiring | Lost on reload; not Server-canonical. Domain workflows are constructed once and are not copied back into the route |
 | Route-instance Session owner | Login/logout, current actor, profile editing, member UI/history preferences, and download-folder preference | One `createSessionState` per route; authentication callbacks cross a named boundary and password values stay inside the operation |
-| Route-instance Work owner | Single-work input, submit/replay/stop, current DDL/result/sketch projection, timer/token totals, and one-work Paint coordination with Batch/Demo | One `createWorkState` per route; it owns single-work AbortControllers and stale-run decisions and calls the stateless Paint operation without adding a request or state copy |
+| Route-instance Work owner | Single-work input, submit/replay/stop, current DDL/result/sketch projection, timer/token totals, and one-work Paint coordination with Batch/Demo | One `createWorkState` per route; it owns single-work AbortControllers and stale-run decisions. Single-work submission and DDL edits go to `PipelineController`; one-work Paint for Batch, Demo, and refinement goes to the stateless Paint operation |
+| Route-instance pipeline controller | Current variation, execution, revision, and phase; approving and declining completion proposals; forks from a description; mapping between history and variations; display projection of diagnostics | Work constructs one `PipelineController`. The Server snapshot and revision are authoritative; the controller only re-reads saved state, forwards author commands, and asks for a performance of a completed delivery. It never retries provider effects |
 | Route-instance Batch owner | Prompt history, resume/retry plans, line progress, stopping, failures, and latest-result following | One `BatchState` per route; a private run identity rejects late results, and the owner borrows only one-work Paint plus focused history callbacks from Work |
 | Route-instance Demo owner | Demo settings, prompt generation, repetition, timeout/stop, token/elapsed totals, and current-result saving | One `DemoState` per route; a private run identity rejects results from stopped runs, and the owner borrows only one-work Paint plus focused projections from Work |
-| Stateless run feature | One Paint request, stream progress, and immediate saved-work projection | `runCurrentWork` receives resolved defaults and named capabilities from Work; route/component state and outer run ownership do not enter the operation |
+| Stateless run feature | One Paint request (`/api/paint/stream`), the stream result, and immediate saved-work projection | `runCurrentWork` receives resolved defaults and named capabilities from Work. Batch, Demo, and refinement use it. Route/component state and outer run ownership do not enter the operation |
 | Route-instance lineage query owner | Lineage graph/loading/error, stale-response identity, and branch/overview merge | One `LineageQueryState` per route; query state is not copied into a history action module or the page |
 | Route-instance history browsing owner | Strip items/count/offset/selection, filters, paging/resize, stale-response identity, trash summary, external refresh, mark projections, and manager coordination | One `HistoryBrowsingState` per route constructs exactly one existing `HistoryManagerState`; manager request/cache/page-size semantics are not copied |
 | Route-instance history mutation coordinator | Optimistic star/revision/share mutations and bulk trash/restore/permanent-delete coordination | One `HistoryMutations` per route; it duplicates no state and sends only named projections to the browsing/lineage owners and the current-work capability |
@@ -131,6 +139,8 @@ flowchart TB
 | Server DB | History, SVG, Score, lineage | A client does not choose trusted SVG content |
 
 `+page.svelte` is now the route composition shell: it constructs route-instance owners once, keeps top-level lifecycle, authenticated switching, modal/view visibility, build presentation, and short cross-owner projections, and wires named capabilities. `features/work/state.svelte.ts` owns current single-work state plus submit/replay/stop; `features/batch/state.svelte.ts` and `features/demo/state.svelte.ts` own their asynchronous run lifecycles. Work lends each owner only one-work Paint and focused callbacks. `features/run/current-work.ts` remains the stateless one-Paint operation. `features/session/state.svelte.ts` owns authentication and member preferences. `features/canvas/refinement-coordinator.svelte.ts` owns target identity and refinement orchestration while reusing the existing session and stateless action modules.
+
+The connection to the shared pipeline on 2026-09-13 added `features/pipeline/`. `PipelineController` represents a Server-owned execution as one browser tab sees it: it starts with `POST /api/pipeline/variations` and re-reads the saved view until the execution settles. DDL edits are sent from `DdlEditorDialog`; depending on the selected work, they become a fork from the history link (a work saved through the shared pipeline), `legacy/{id}/fork` (an older work), `author-ddl` (an active variation), or otherwise a new direct-DDL variation. `PipelineStatus` shows a completion proposal next to the saved DDL and sends only the author's approval or decline to `/executions/{id}/commands`; the same `PipelineStatus` shows that revision's diagnostics. Selecting a saved work maps a work saved through the shared pipeline to its variation through the history link, and any other work to `/legacy/{id}` as an older work. A pending, failed, or stale selection is never treated as a new work. `diagnostics.ts` displays diagnostics in six channels: upstream, downstream, resource, relation, renderer, and catalog.
 
 The following Stage 5-7 paragraphs record the boundary after each historical cut. The Stage 10 paragraph and ownership table above describe the current converged boundary.
 
@@ -168,16 +178,18 @@ The Settings aggregate in `features/settings/state.svelte.ts` constructs navigat
 
 - `ApiClient` uses `urllib.request` for `/api/*` and `/health`.
 - Runtime code does not import `inku_server`. Shared `inku_analysis` is used for rasterization/analysis, not to bypass the Server pipeline.
-- Natural-language `paint`/`batch` uses `/api/paint`; DDL mode uses `/api/compose`; history persistence uses `/api/history`.
+- Natural-language `paint`/`batch` uses `/api/paint`; DDL mode uses `/api/compose`; history persistence uses `/api/history`. Both go through the shared pipeline inside the Server and receive 409 with the current view when a completion proposal needs approval. No command uses `/api/pipeline/*` directly.
 - `test_cli_sender_census.py` treats the CLI as the functional sender.
 
 ## Android boundary
 
-- Flow: `InkuRepository` → `LocalFallbackPipeline` → `SvgRenderer` / `AndroidRenderHost` → JNI → shared `inku-render` → Room.
-- `RoutingModelProvider` selects local LiteRT-LM or an OpenAI-compatible remote provider.
+- Flow: `InkuRepository` → `AndroidWorkPipeline` → `SharedAuthoringPipeline` / `SharedPipelineHost` → `NativePipelineBridge` (JNI) → shared `inku-pipeline` / `inku-ddl` / `inku-render` → Room.
+- `SharedPipelineHost` serializes the calls for one execution and performs the effects the core returns. `SingleAttemptModelEffectProvider` sends each provider effect once; retry, fallback, and response judgment stay in Rust. `RoomSharedPipelineStore` holds the CAS save of visible DDL and authority, action acknowledgments, and execution snapshots.
+- `RoutingModelProvider` selects local LiteRT-LM, Gemini, or an OpenAI-compatible remote provider. The request conditions sent to providers (temperature, thinking amount, schema conversion, output limit) match the Server's.
+- Replay of a saved Score uses `renderSaved` under the restored resource policy. Only the device-only legacy 9:5 format uses `AndroidRenderHost` (the JNI `render`).
 - Engine identity and renderer reference come from the packaged Rust core; Kotlin keeps no version literal.
 - Preview, thumbnails, refinement, and PNG export rasterize saved/current SVG through `inku-svg-raster`. There is no AndroidSVG or Kotlin renderer fallback.
-- Kotlin continues to own Stage 1 / 1.5 / 2, Score coerce/repair, host options, Room/history, and `rh3` identity.
+- Kotlin owns the UI, provider settings and transport, camera image preparation and the on-device local LLM, host options, Room/history, and the `rh3` computation. The old Kotlin Stage 1 / 1.5 / 2 and Score coerce are retired, with no runtime fallback.
 
 ## Language and UI sources
 
@@ -190,4 +202,4 @@ The Settings aggregate in `features/settings/state.svelte.ts` constructs navigat
 
 ## Evidence map
 
-Evidence: `SYS-WEB`, `SYS-CLI`, `SYS-ANDROID`, `WEB-FEATURES`, `WEB-REGISTRY`, `WEB-I18N`.
+Evidence: `SYS-WEB`, `SYS-CLI`, `SYS-ANDROID`, `PIPE-HOST`, `PIPE-MACHINE`, `WEB-FEATURES`, `WEB-REGISTRY`, `WEB-I18N`.

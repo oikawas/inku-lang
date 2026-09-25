@@ -4,58 +4,62 @@
 
 | Change area | Contract | Main code | Direct checks | Frozen corpus or output | Additional gate |
 |---|---|---|---|---|---|
-| Saijiki vocabulary | `SPEC.ja.md` §6, §12–14; one vocabulary source | `saijiki.py`, `schema.py`, language support | Saijiki golden/reference/API/Kotlin-current tests | DDL corpus; Web/Android snapshots | Docs and Web terminology |
-| Schema declaration order | Delivery rate of optional Stage 2 fields | `schema.py`, `composer._score_tool_schema` | `test_thinness_declaration_position.py` | Corpus does not test this model behavior | Dedicated check required |
-| Stage 0.5 | Alternate description consumer and `sketch_state` | `sketch.py`, render router, client senders | Stage 0.5, state, sender-census, Web tests | Outside DDL/render corpora | Client census; history migration |
-| Plugin document | Core writing-down immediately after Stage 1 | `plugins/document_format.py`, render router | Plugin format/v2 tests | DDL `A-plugin-*` cases | CRUD/auth and reference dump |
-| Stage 1.5 | No semantic overwrite; focus; explicit variation | `ddl_expander.py`, language support | Expander, variation, staffage-fold tests | DDL Engine corpus | `check_frozen_corpora.py` |
-| Coerce | Drop/repair, request delivery, ceilings, one named abstract color | `coerce/normalize.py`, `compose.py`, `__init__.py` | Coerce, limit, relation, and named-color tests | DDL Engine corpus | `check_frozen_corpora.py` |
-| Render core/strokes | Same Score+seeds+resolved options; forward-only engine; one coarse native boundary | `core/crates/inku-render`; Python/Android bindings; `default/adapter.py`; `AndroidRenderHost` | Rust workspace tests, adapter/JNI contracts, reference API, bounded Android same-version byte sample | 610 current Engine 41 cases; Engine 40 retained as history | Version ruling; rebuild twice for output changes; pinned bindings and Linux/device gates |
-| SVG raster presentation | Canonical SVG unchanged; explicit pixel format/stride; allocation bounds | `core/crates/inku-svg-raster`; `inku-render-android`; `RustArtworkRasterizer` | Rust raster unit tests, host/device raw digest, known color/alpha/stride | Bounded three-current plus one-historical sample; no full raster corpus | Android arm64 packaging, off-main execution, cache key, no external resource |
-| Identity/history | `dh1`, `rh3`, legacy `rh2`, DB canonical data | `identity.py`, `db.py`, rendering/history router | Hash, integrity, lineage acceptance | Android parity fixtures | Migration and stored-row compatibility |
-| API route/model | 96 routes, three public paths, response shape | `api.py`, `api_core/*` | Route auth, module split, API baseline | None | Web/CLI/Android sender census |
-| Web route/workflow | One owner per route, no stale result applied to the current work, stateless Paint operation | `+page.svelte`; `features/session/state.svelte.ts`; `features/work/state.svelte.ts`; `features/{batch,demo}/state.svelte.ts`; `features/run/current-work.ts`; `features/canvas/refinement-coordinator.svelte.ts` | Route-composition, current-work, Batch/Demo, and refinement ownership tests | None | Targeted unit tests, `npm run check`, and `npm run build` |
-| Web Canvas/history/refinement | Single history/lineage/viewport owners, target identity, focused Canvas views | `features/history/*`; `features/canvas/*`; `components/CanvasPanel.svelte` | History state/action, viewport, refinement, and focused-view tests | None | Targeted unit tests, `npm run check`, and `npm run build` |
-| Web Settings | Aggregate constructs four slices once; secrets and drafts stay in focused views; three registry boundaries | `features/settings/*`; `components/SettingsModal.svelte`; `persisted-settings.ts`; `user-settings.ts`; `render-payload.ts` | Settings ownership/slice/focused-view and registry unit tests | None | Targeted unit tests, `npm run check`, and `npm run build`; `lint:i18n` for display text |
-| English Web text | Japanese/English terms and tokens | `i18n/*`, components | Type/check | None | `lint:i18n`; docs check when relevant |
-| CLI flag/API field | Public HTTP only; help/manual move together | `cli.py`, CLI docs/manual | CLI tests and sender census | Bench output is separate | Functional test through CLI |
-| Android host/pipeline | Kotlin Stage 1/1.5/2 and coerce; shared Rust render/raster; Room schema | Kotlin pipeline/data, `AndroidRenderHost`, `RustArtworkRasterizer` | Focused JVM, native CI, device checks as needed | DDL/Score/coerce fixtures only; bounded staging from canonical Server drawing corpus | Preserve device data |
-| Docker/runtime | Two services, persistent volume, health | Compose, Dockerfiles, lockfiles | Build, health, persistence | Container output | Milestone Compose verification |
+| Saijiki vocabulary | `SPEC.md` §6, §12–14; the vocabulary's source of truth is the shared-core asset | `core/crates/inku-ddl/assets/saijiki-v1.json`, `inku-ddl/src/saijiki.rs`, `server/src/inku_server/saijiki.py`, language support | `inku-ddl/tests/{saijiki_asset,saijiki_derived}.rs`, `test_reference.py`, `test_saijiki_api.py`, `test_saijiki_kt_is_current.py` | Android `SaijikiGenerated.kt` (`gen_saijiki_kt.py`); the work-plan capability matrix | Docs check, Web i18n |
+| Stage 1 prompt / work plan | §12.6; the work plan is transient and visible DDL is authoritative | `inku-pipeline/src/prompts.rs`, `inku-ddl/src/work_plan.rs`, `assets/{work-plan-capabilities-v1,prompt-body-templates-v1}.json` | `inku-ddl/tests/{work_plan,prompt_asset}.rs` | The capability matrix is regenerated from the compiler with `examples/work-plan-capabilities.rs` | Japanese/English property tests; provider schema conversion (Server `pipeline_provider.py`, Android `GeminiJsonSchema.kt`) |
+| Sketch and color catalog selection | §12.6.1, §12.7.1 | `inku-pipeline/src/{prompts,machine}.rs`, `pipeline_product.py:sketch_request_for`, `sketch.py` | `test_sketch_state.py`, `test_pipeline_product.py`, Web sketch test, Android `SketchChoiceTest` | None | Compatibility of the saved `sketch_state` column with older values |
+| Authoring state machine / byte protocol | §12.7.1, §12.8; protocol `1.0.0` / binding `1.1.0` | `core/crates/inku-pipeline`, `core/crates/inku-pipeline-uniffi` | `inku-pipeline` unit tests and `focused_flow.rs`, `test_pipeline_candidate.py`, Android `SharedPipelineHostTest` | Replay of saved executions | A version change updates the expectations of Server `PipelineBinding` and the Android binding together |
+| Typed compiler / Stage 1.5 / lowerer | §4.4–4.6, §12.4, §12.11, §18; DDL engine version | `core/crates/inku-ddl`, `server/src/inku_server/layer_versions.py` | `inku-ddl/tests/*` (compiler_lock, stage15_transform, composition_plan, score_lowering, visible_patch, and more) | A DDL engine corpus is created only at an explicit checkpoint (latest: engine 45) | Functional check through the entry point that owns the changed behavior |
+| Score schema / resource authority | §18; minimum Score version selection | `core/crates/inku-score`, `server/src/inku_server/schema.py`, `pipeline_defaults.py` | `inku-score/tests/*` (schema_identity, score_boundary, score_0_12, compatibility, and more) | Saved-Score compatibility fixture | Reading older Scores 0.1.0 through 0.9.0; keeping saved budgets |
+| Render core/stroke | Same Score + seed + resolved options; engine advances; coarse native boundary | `core/crates/inku-render`; `render_engines/default/adapter.py`; `AndroidRenderHost` | `inku-render/tests/*`, adapter/JNI contracts, reference API, bounded Android same-version byte sample | A Render Engine corpus is created only at an explicit checkpoint (latest: 620 engine 66 cases) | Version ruling, pinned binding, and Linux/device gates |
+| SVG raster presentation | Canonical SVG unchanged, explicit pixel format/stride, allocation bound | `core/crates/inku-svg-raster`; `inku-render-android`; `RustArtworkRasterizer` | Rust raster units, host/device raw digest, known color/alpha/stride | Bounded samples only; no full raster corpus | Android arm64 packaging, off-main work, cache key, no external resource |
+| Server pipeline host | The host has no semantic branches, performs each effect once, and cannot receive trusted state from a client | `pipeline_{runtime,api,candidate,product,provider,settings,defaults,compat}.py`, `macro_catalog.py` | `test_pipeline_{api,candidate,compat,product,provider}.py`, `test_pipeline_provider_observation_context.py`, `test_macro_catalog.py` | None | Compatibility response shape of `/api/paint` and the others; the current view in a 409 |
+| Authority and history links | §12.7.1; CAS; idempotent action acknowledgment; sidecar v2 | `persistence/variation_authority.py`, `persistence/schema.py`, `persistence/migrations.py` | `test_persistence_variation_authority.py`, migration tests | None | Registry version and checksum; `legacy_unknown` for older works |
+| Older Score compatibility | Only saved Scores below 0.10; never reads a description or DDL | `saved_score_compat.py`, `coerce/observability.py` | `test_saved_score_compat.py` | The DDL engine 1–26 corpora are historical records | Headers naming the source of colors and limits on `/api/render-score` and `render-svg` |
+| Identity/history | `dh1`, `rh3`, legacy `rh2`, canonical DB | `identity.py`, `db.py`, `pipeline_product.py:save_result`, rendering/history routers | Hash, integrity, lineage acceptance | Android parity fixtures | Migration and existing-row compatibility |
+| API route/model | 105 routes (static count), three public paths, response shapes | `api.py`, `api_core/*`, `pipeline_api.py` | Route authorization, module split, API surface baseline | None | Web/CLI/Android sender census; updating the count constant and baseline (`known-differences.md` F-06) |
+| Web route/workflow | One owner per route instance; stale results never apply to the current work; stateless Paint operation | `+page.svelte`; `features/session/state.svelte.ts`; `features/work/state.svelte.ts`; `features/{batch,demo}/state.svelte.ts`; `features/run/current-work.ts`; `features/canvas/refinement-coordinator.svelte.ts` | Route composition, current-work, Batch/Demo, and refinement ownership tests | None | Targeted unit, `npm run check`, `npm run build` |
+| Web pipeline controller | The Server snapshot and revision are authoritative; only author commands are forwarded; provider effects are never retried | `features/pipeline/{api,controller,diagnostics}.ts`; `components/{PipelineStatus,DdlEditorDialog}.svelte` | `pipeline-state.test.ts`, `diagnostics.test.ts` | None | Targeted unit, `npm run check`; `lint:i18n` when display wording changes |
+| Web Canvas/history/refinement | Single owners for history/lineage/viewport, target identity, focused Canvas views | `features/history/*`; `features/canvas/*`; `components/CanvasPanel.svelte` | History state/action, viewport, refinement, and focused-view tests | None | Targeted unit, `npm run check`, `npm run build` |
+| Web Settings | The aggregate constructs four slices once; secrets and drafts are not copied outside focused views; three registry boundaries | `features/settings/*`; `components/SettingsModal.svelte`; `persisted-settings.ts`; `user-settings.ts`; `render-payload.ts` | Settings ownership/slice/focused-view and registry unit tests | None | Targeted unit, `npm run check`, `npm run build`; `lint:i18n` when display wording changes |
+| Web display terms | Japanese/English vocabulary and tokens | `i18n/*`, components | Type/check | None | `lint:i18n`, docs check when relevant |
+| CLI flags/API fields | Public HTTP only; help/manual stay in sync | `cli.py`, CLI README/manual | `cli/tests/test_cli.py`, sender census | Bench artifacts are separate | Functional test through the CLI |
+| Android host/pipeline | Shared Rust pipeline, render, and raster; Kotlin is the host; Room schema 12 | `SharedPipelineHost`, `AndroidWorkPipeline`, `NativePipelineBridge`, `SingleAttemptModelEffectProvider`, `RoomSharedPipelineStore`, `AndroidRenderHost`, `RustArtworkRasterizer` | Focused JVM (`SharedPipelineHostTest` and others), native CI, instrumentation when needed (`SharedPipelineDeviceAcceptanceTest`, `NativeRenderDeviceTest`) | Rendering uses bounded staging from the canonical Server corpus | Device-data backup rules; never erase device data |
+| Docker/runtime | Two services, persistent volume, health; the native wheel contains the pipeline and the renderer | Compose/Dockerfiles/lockfiles, `inku-render-python` | Build/health/persistence | Container images | Compose verification at milestones |
 
 ## CI and local gates
 
 ```mermaid
 flowchart LR
     CHANGE["Change"]
-    CI_SERVER["CI: server ruff + pytest"]
+    CI_SERVER["CI: Rust toolchain guard + server ruff + pytest"]
     CI_CLI["CI: CLI ruff + pytest"]
     CI_WEB["CI: web check + unit + lint:i18n"]
-    CI_DOCS["CI: check_docs.py"]
-    CI_CORPUS["CI: rebuild render/DDL corpora"]
-    CI_PREVIEW["CI: rebuild Android design preview"]
+    CI_DOCS["CI: check_docs.py + portable persistence"]
     CI_ANDROID["CI: Rust + Android arm64 host boundary"]
+    MANUAL_CORPUS["Manual dispatch: render/DDL corpus regeneration comparison\nAndroid design preview"]
     LOCAL_ANDROID["Local: Gradle JVM / device when needed"]
-    RELEASE["Tag: container build and publication"]
+    RELEASE["Tag: container image build/publish"]
 
     CHANGE --> CI_SERVER
     CHANGE --> CI_CLI
     CHANGE --> CI_WEB
     CHANGE --> CI_DOCS
-    CHANGE --> CI_CORPUS
-    CHANGE --> CI_PREVIEW
-    CHANGE -->|"core/native-related paths"| CI_ANDROID
-    CHANGE -.->|"not in current CI"| LOCAL_ANDROID
+    CHANGE -->|"core/native paths"| CI_ANDROID
+    CHANGE -.->|"explicit checkpoints only"| MANUAL_CORPUS
+    CHANGE -.->|"not run in CI"| LOCAL_ANDROID
     CHANGE -->|"release tag"| RELEASE
 ```
 
-On ordinary pushes and pull requests, current workflows run the Server, CLI, Web, published-document, frozen-corpus, and Android design-preview gates. `android-native.yml` runs only when `core/**` or Android native/host/presentation paths change; it checks the Rust workspace and raster unit suite, Android arm64 `.so` packaging, and focused host JVM tests. Device instrumentation remains a local acceptance gate.
+Current CI runs the Server (with the Rust toolchain guard), CLI, Web, and public-document gates plus the portable persistence verifier on ordinary pushes and pull requests. `android-native.yml` runs the Rust workspace, raster units, Android arm64 `.so` packaging, and focused host JVM tests only when `core/**` or Android native/host/pipeline/presentation paths change. `reference-corpus.yml` (render/DDL corpus regeneration comparison and the Android design preview) starts only through `workflow_dispatch`; it does not run on pushes, pull requests, or engine-version bumps. Device instrumentation is local acceptance.
 
 ## Special rule for deterministic layers
 
-`coerce/`, `ddl_expander.py`, `core/crates/inku-render/`, `core/crates/inku-svg-raster/`, the native request boundary, `render_engines/default/`, `renderer.py`, `schema.py`, `saijiki.py`, and `language_support/` are deterministic layers. A change that can affect Render Engine output requires rebuilding the current frozen corpus; reference tests that only compare stored files do not replace the rebuild. A host-only change proven not to alter the native request or output uses proportionate direct checks and a bounded same-version byte sample.
+`core/crates/inku-ddl/`, `core/crates/inku-pipeline/`, `core/crates/inku-score/`, `core/crates/inku-render/`, `core/crates/inku-svg-raster/`, the native request boundary, `saved_score_compat.py`, `render_engines/default/`, `renderer.py`, `schema.py`, `saijiki.py`, and `language_support/` are deterministic layers.
 
-Rust unit and ownership tests do not by themselves prove drawing identity. Run the direct tests and rebuild the Render Engine corpus for output-affecting core changes so portable algorithm behavior and serialized byte identity are checked together. Native-binding changes also require a pinned wheel build, import and engine-identity checks, and the relevant Linux runtime gate.
+A frozen corpus is not rebuilt with every version bump. A new version directory is created only at an explicit full-update checkpoint after an overall migration, and saved directories are never overwritten (`server/reference/README.md`). Outside a checkpoint, name the concrete failure the changed behavior could cause and choose the smallest direct check that observes it. Some pytest reference tests only read frozen files and manifests, so they do not replace rerunning a generator.
+
+Rust unit/ownership tests alone do not prove rendering identity. For a core change that can affect output, use a direct test that observes the changed behavior and, only where needed, a bounded same-version byte sample. For a native binding change, also perform a pinned wheel build, import, the binding/protocol/engine identity check, and the relevant Linux runtime gate.
 
 ## Evidence map
 
-Evidence: `TEST-SERVER`, `TEST-CORPUS`, `TEST-ANDROID`, `TEST-WEBCLI`, `CI-GATES`.
+`TEST-SERVER`, `TEST-CORE`, `TEST-CORPUS`, `TEST-ANDROID`, `TEST-WEBCLI`, `CI-GATES`. Workflows and package manifests/tests are the primary evidence.

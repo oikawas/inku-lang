@@ -1,50 +1,60 @@
 # Runtime containers
 
-“Container” is used here in two senses: a logical C4 runtime unit and a Docker Compose service. In development, Web and FastAPI are separate processes. The backend owns the DB, output, backups, and logs. Compose packages the same two services and places API persistence on a volume.
+"Container" separates the C4 meaning of an execution unit from the Docker Compose meaning. During development, the execution units are the Web process and the FastAPI process; the backend owns the DB, outputs, backups, and logs. The distribution Compose file places those same two services in separate images and puts only the API's persistent area on a volume.
 
-## Logical runtime units
+## Logical execution units
 
 ```mermaid
 flowchart TB
     BROWSER["Browser"]
     WEB_PROC["SvelteKit process"]
     API_PROC["FastAPI process"]
-    NATIVE_RENDER["inku-render-python wheel\nshared Rust Engine 41 core"]
-    STAGE_POOL["Stage executor / bounded queue"]
-    SAVE_POOL["Work-file executor / bounded queue"]
-    BACKUP_TASK["Lifespan backup scheduler"]
+    PIPE_POOL["Pipeline worker pool\ninku-pipeline threads (default 4)"]
+    NATIVE["inku-render-python wheel\nshared Rust pipeline + typed compiler + Render Engine 68"]
+    SAVE_POOL["Artifact executor / bounded queue"]
+    THUMB_POOL["Thumbnail process pool\nrasterizes in spawned child processes"]
+    BACKUP_TASK["lifespan backup scheduler"]
     MIGRATION["versioned startup\nregistry / snapshot / invariants"]
     PROVIDERS["LLM providers"]
     DB[("canonical SQLite")]
-    OUTPUTS[("Work files")]
+    THUMBS[("thumbs.db / derived")]
+    OUTPUTS[("work files")]
     BACKUPS[("DB replicas")]
-    LOGS[("Application logs + stdout")]
+    LOGS[("app log files + stdout")]
 
     BROWSER -->|"HTTP"| WEB_PROC
     WEB_PROC -->|"/api proxy"| API_PROC
-    API_PROC -->|"one render request"| NATIVE_RENDER
-    API_PROC -->|"Stage 0.5 / 1 / 2 job"| STAGE_POOL
-    STAGE_POOL -->|"provider call"| PROVIDERS
+    API_PROC -->|"start / command"| PIPE_POOL
+    PIPE_POOL -->|"step(snapshot, input)"| NATIVE
+    PIPE_POOL -->|"one effect = one transport attempt"| PROVIDERS
+    PIPE_POOL -->|"CAS save, execution snapshot, history"| DB
+    API_PROC -->|"one replay of an older Score"| NATIVE
     API_PROC -->|"transaction"| DB
     API_PROC -->|"once before serving"| MIGRATION
     MIGRATION -->|"single writer"| DB
-    MIGRATION -->|"legacy-only snapshot"| BACKUPS
-    API_PROC -->|"best-effort job"| SAVE_POOL
-    SAVE_POOL -->|"SVG, JSON, DDL, PNG"| OUTPUTS
+    MIGRATION -->|"snapshot legacy only"| BACKUPS
+    PIPE_POOL -->|"best-effort job"| SAVE_POOL
+    SAVE_POOL -->|"SVG/JSON/DDL/PNG"| OUTPUTS
+    PIPE_POOL -->|"bake job after save"| THUMB_POOL
+    THUMB_POOL -->|"PNG (the parent process writes)"| THUMBS
     API_PROC -->|"owns"| BACKUP_TASK
     BACKUP_TASK -->|"SQLite replica"| BACKUPS
     API_PROC -->|"rotating file + stream"| LOGS
 ```
 
-## Compose distribution
+Ordinary drawing requests (`/api/paint`, `/api/paint/stream`, `/api/interpret`, `/api/compose`, `/api/pipeline/*`) run in the thread pool of `PipelineService`. Calls for one execution are serialized, and a worker performs the effects the core returns in order, up to `max_effect_steps` (default 32). The execution snapshot is saved to the DB by compare-and-set after each effect, so a replacement worker resumes from the saved snapshot. When the number of retained executions reaches `max_retained_runs` (default 8) and all of them are busy, a new start answers 429. The compatibility HTTP routes re-read the saved state at a short interval until the execution settles, then respond.
+
+Replay of an older Score (a Score below 0.10 on `/api/render-score` or `/api/render-svg`) does not go through the pipeline pool: the request thread calls the native wheel once under render capacity. Replay of a compact Score (0.10 through 0.15) calls the shared core's `render_saved` from the same request thread.
+
+## Distribution Compose
 
 ```mermaid
 flowchart LR
     CLIENT["Client"]
-    WEB_IMG["Web service / Node"]
-    API_IMG["API service / Python\nCPython native render wheel"]
-    WHEEL_BUILDER["Ephemeral pinned Rust / maturin builder"]
-    DATA_VOL[("Persistent data volume")]
+    WEB_IMG["web service / Node image"]
+    API_IMG["api service / Python image\nCPython native wheel (pipeline + render)"]
+    WHEEL_BUILDER["temporary pinned Rust / maturin builder"]
+    DATA_VOL[("persistent data volume")]
     PROVIDER["LLM provider"]
 
     CLIENT -->|"HTTP"| WEB_IMG
@@ -54,38 +64,29 @@ flowchart LR
     API_IMG -->|"model request"| PROVIDER
 ```
 
-## Development and Compose
+## Development and distribution
 
-| View | Development | Compose | Evidence |
+| Aspect | Development | Compose distribution | Evidence |
 |---|---|---|---|
-| Web | Vite/SvelteKit process proxies `/api` | adapter-node build under Node | `vite.config.ts`; `web/Dockerfile` |
-| API | `inku-server` / uvicorn with the locally built native render wheel | Python service runs `inku-server` with a prebuilt CPython native wheel | `server/pyproject.toml`; `server/Dockerfile`; `core/crates/inku-render-python` |
-| Native render artifact | Pinned Rust and maturin build the wheel outside the Server package backend | An ephemeral builder creates and audits the wheel; the runtime image contains the accepted wheel, not the toolchain | `rust-toolchain.toml`; `core/crates/inku-render-python/pyproject.toml`; `server/Dockerfile` |
-| DB | `INKU_DB_URL` accepts SQLite URLs only; non-SQLite is rejected before engine creation | Explicit SQLite on the volume | `persistence/config.py`; `server/Dockerfile` |
-| Persistence | Environment-specific DB and output paths | One persistent volume | Dockerfiles; `compose.yaml` |
-| Distribution | Environment-specific and outside this document | Release tag builds and publishes containers | `.github/workflows/release.yml` |
+| Web | Vite/SvelteKit process proxies `/api` to the backend | Node runs the adapter-node build | `vite.config.ts`; `web/Dockerfile` |
+| API | `inku-server` / Uvicorn with a locally built native wheel | `inku-server` in a Python image with a built CPython native wheel | `server/pyproject.toml`; `server/Dockerfile`; `core/crates/inku-render-python` |
+| Native artifact | Pinned Rust and maturin build the wheel outside the Server package backend. Through `inku-pipeline-uniffi`, the wheel contains both the shared pipeline and the renderer | A temporary builder builds and audits the wheel; the runtime image receives only the accepted wheel and keeps no toolchain | `rust-toolchain.toml`; `core/crates/inku-render-python/Cargo.toml`; `server/Dockerfile` |
+| Pipeline configuration | `pipeline_defaults.py` assembles the default manifest. `INKU_PIPELINE_CONFIG` replaces it with an explicit JSON manifest | Same | `pipeline_runtime.py`; `pipeline_defaults.py` |
+| DB | `INKU_DB_URL` accepts only a SQLite URL; non-SQLite URLs are rejected before engine creation | SQLite on the volume is explicit | `persistence/config.py`; `server/Dockerfile` |
+| Persistence | Environment-specific DB and output locations | Under one persistent volume | Dockerfiles and `compose.yaml` |
+| Deployment | Environment-specific and outside this document | Image build/publish on release tags | `.github/workflows/release.yml` |
 
-The Server physically owns a SQLAlchemy/SQLite schema, Android owns a
-Room/SQLite schema, and a possible future iOS adapter would own its own physical
-schema. They share language-neutral meaning through
-[`persistence/README.md`](../../persistence/README.md) and
-[`persistence/contract.json`](../../persistence/contract.json), not file or
-table names. Server-only authentication and administration tables and
-device-only provider, model, and cache tables are host extensions, not parity
-gaps.
+The Server's physical owner is SQLAlchemy/SQLite and Android's is Room/SQLite; a future iOS adapter would own its own physical schema too. What they share is not file or table names but the language-neutral logical contract in [`persistence/README.md`](../../persistence/README.md) and [`persistence/contract.json`](../../persistence/contract.json). Server-only authentication/administration tables and device-only provider/model/cache tables are host extensions, not parity gaps.
 
-FastAPI accepts normal requests only after versioned startup completes. A
-current registry verifies only version and checksum; it does not bring legacy
-whole-database scans back into normal startup. Only an accepted pre-registry
-database passes through a WAL-safe snapshot and single-writer migration. A
-failure prevents serving and retains the snapshot.
+FastAPI does not accept ordinary requests until versioned startup completes. A current registry verifies only version and checksum and does not reintroduce a full legacy scan into normal startup. Only an accepted pre-registry DB or a DB at the previous registry version goes through the WAL-safe snapshot and single-writer migration; on failure the service does not serve and the snapshot remains. The pipeline service and its manifest are not assembled until the first pipeline request. The native wheel itself is a required Server runtime; the Server cannot start without it.
 
-## Evidence map
+## Evidence mapping
 
 | Diagram element | Evidence ID | Implementation |
 |---|---|---|
-| Web/API processes | `SYS-WEB`, `SYS-API` | `hooks.server.ts`, `api.py` |
-| Native render boundary | `PIPE-RENDER` | `default/adapter.py`, `inku-render-python`, `inku-render` |
-| Stage/file pools | `API-LIMIT`, `SYS-FILES` | `api_core/state.py`, `rendering.py` |
-| Migration/backups/logs | `DATA-MIGRATION`, `SYS-BACKUP`, `SYS-LOG` | `persistence/{migrations,backup,invariants}.py`, `api.py:_db.init_db` (migration), `api.py:_lifespan` (backup scheduler), `logging_setup.py` |
+| Web/API process | `SYS-WEB`, `SYS-API` | `hooks.server.ts`, `api.py` |
+| Pipeline worker pool | `PIPE-HOST`, `API-LIMIT` | `pipeline_api.py:PipelineService`, `pipeline_runtime.py`, `pipeline_defaults.py` |
+| Native boundary | `PIPE-MACHINE`, `PIPE-RENDER` | `pipeline_candidate.py:PipelineBinding`, `inku-render-python`, `inku-pipeline-uniffi` |
+| Save/thumbnail pools | `API-LIMIT`, `SYS-FILES` | `api_core/state.py`, `rendering.py`, `api_core/thumbnails.py` |
+| Migration/backup/log | `DATA-MIGRATION`, `SYS-BACKUP`, `SYS-LOG` | `persistence/{migrations,backup,invariants}.py`; `api.py:_db.init_db` (migration); `api.py:_lifespan` (backup scheduler); `logging_setup.py` |
 | Compose | `OPS-COMPOSE` | `compose.yaml`, Dockerfiles |

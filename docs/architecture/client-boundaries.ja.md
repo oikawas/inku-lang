@@ -7,10 +7,12 @@ flowchart TB
     USER["利用者"]
     WEB["Web\nSvelteKit UI"]
     CLI["CLI\nHTTP client + bench補助"]
-    ANDROID["Android\n別pipeline + renderer"]
+    ANDROID["Android\nKotlin UI + host"]
     API["Server公開HTTP API"]
-    SERVER_PIPE["Server pipeline"]
-    ANDROID_PIPE["Android Kotlin pipeline"]
+    SERVER_HOST["Server pipeline host\nPython"]
+    ANDROID_HOST["Android pipeline host\nKotlin + JNI"]
+    CORE["共有Rust core\npipeline + compiler + renderer"]
+    SERVER_DB[("Server DB")]
     ROOM[("Room DB")]
 
     USER --> WEB
@@ -18,13 +20,15 @@ flowchart TB
     USER --> ANDROID
     WEB -->|"HTTP"| API
     CLI -->|"HTTPのみ"| API
-    API --> SERVER_PIPE
-    ANDROID --> ANDROID_PIPE
-    ANDROID_PIPE --> ROOM
-    SERVER_PIPE -.->|"正本として後追い移植"| ANDROID_PIPE
+    API --> SERVER_HOST
+    SERVER_HOST -->|"native wheel"| CORE
+    ANDROID --> ANDROID_HOST
+    ANDROID_HOST -->|"JNI"| CORE
+    SERVER_HOST --> SERVER_DB
+    ANDROID_HOST --> ROOM
 ```
 
-Webはserver作品を操作する参照UI、CLIはserverの公開APIを測るclient、Androidは端末内で全段を動かす別実装である。Androidがserver APIを通常pipelineとして呼ぶ関係は確認できない。
+Webはserver作品を操作する参照UI、CLIはserverの公開APIを測るclient、Androidは端末内で全段を動かすhostである。記述からSVGまでの意味の判断はServerとAndroidで同じ共有Rust coreが持ち、hostはprovider通信、保存、UIだけを持つ。Androidがserver APIを通常pipelineとして呼ぶ関係は無い。
 
 ## Web内部
 
@@ -36,6 +40,7 @@ flowchart TB
     BATCH["features/batch/state.svelte.ts\nbatch prompt・resume/retry・run identity・進行"]
     DEMO["features/demo/state.svelte.ts\ndemo設定・反復・run identity・current result"]
     RUN["features/run/current-work.ts\nstatelessな1回のPaint operation・stream projection"]
+    PIPELINE_CTRL["features/pipeline/{controller,api,diagnostics}.ts\n共有pipeline実行のview・作者操作の転送・診断表示"]
     HISTORY["features/history/*\nroute-instance browsing・lineage・mutationとstateless work action"]
     VIEWPORT["features/canvas/viewport-state.svelte.ts\nroute-instance zoom・fit・pan・input処理"]
     REFINE_SESSION["features/canvas/refinement-session.svelte.ts\nbusy・cancel・進行・candidate"]
@@ -65,6 +70,7 @@ flowchart TB
     PAGE -->|"各1回生成"| VIEWPORT
     PAGE --> COMPONENTS
 
+    WORK -->|"記述・DDL・承認・辞退・fork"| PIPELINE_CTRL
     WORK -->|"解決済みdefault + named capability"| RUN
     WORK -->|"1作品のPaint + focused callback"| BATCH
     WORK -->|"1作品のPaint + focused callback"| DEMO
@@ -81,6 +87,7 @@ flowchart TB
     SETTINGS_SLICES --> TRANSPORT
     SESSION --> TRANSPORT
     RUN --> TRANSPORT
+    PIPELINE_CTRL --> TRANSPORT
     HISTORY --> TRANSPORT
     REFINE_COORD --> TRANSPORT
 
@@ -104,10 +111,11 @@ flowchart TB
 |---|---|---|
 | route shell memory | output tab、modal表示、短い表示用projection、lifecycle配線 | reloadで消える。server正本ではない。domain workflowはrouteごとに1回生成し、routeへ複製しない |
 | route-instance Session owner | login/logout、current actor、profile編集、memberのUI/history preference、download folder preference | routeごとに1個の`createSessionState`。認証後処理はnamed boundaryを通り、password値はoperation内に留まる |
-| route-instance Work owner | single-work input、submit/replay/stop、current DDL/result/sketch projection、timer/token、Batch/Demoとの1作品Paint調停 | routeごとに1個の`createWorkState`。single-workのAbortControllerとstale-run判断を所有し、requestやstate copyを増やさずstateless Paint operationを呼ぶ |
+| route-instance Work owner | single-work input、submit/replay/stop、current DDL/result/sketch projection、timer/token、Batch/Demoとの1作品Paint調停 | routeごとに1個の`createWorkState`。single-workのAbortControllerとstale-run判断を所有する。単一作品の送信とDDL編集は`PipelineController`へ、Batch・Demo・推敲の1作品Paintはstateless Paint operationへ渡す |
+| route-instance pipeline controller | 現在のvariation・execution・revision・phase、補完案の承認・辞退、記述からのfork、履歴とvariationの対応、診断の表示用projection | Workが1個の`PipelineController`を生成する。server snapshotとrevisionを正とし、保存済み状態を読み直し、作者の操作を転送し、完了したdeliveryの演奏を求めるだけで、provider effectを再試行しない |
 | route-instance Batch owner | prompt履歴、resume/retry plan、line進行、停止、failure、latest-result follow | routeごとに1個の`BatchState`。private run identityがlate resultを遮断し、Workから1作品Paintとfocused history callbackだけを借りる |
 | route-instance Demo owner | demo設定、prompt生成、反復、timeout/stop、token/elapsed、current result保存 | routeごとに1個の`DemoState`。private run identityが停止済みrunの遅延結果を遮断し、Workから1作品Paintとfocused projectionだけを借りる |
-| stateless run feature | 1回のPaint request、stream進行、保存直後projection | `runCurrentWork`はWorkから解決済みdefaultと名前付きcapabilityを受ける。route/component stateと外側run ownershipはoperationへ入らない |
+| stateless run feature | 1回のPaint request（`/api/paint/stream`）、stream結果、保存直後projection | `runCurrentWork`はWorkから解決済みdefaultと名前付きcapabilityを受ける。Batch・Demo・推敲がこれを使う。route/component stateと外側run ownershipはoperationへ入らない |
 | route-instance lineage query owner | lineage graph/loading/error、stale-response identity、branch/overview merge | routeごとに1個の`LineageQueryState`。query stateをhistory action moduleやpageへ複製しない |
 | route-instance history browsing owner | stripのitems/count/offset/選択、filter、paging/resize、stale-response identity、trash summary、external refresh、mark projection、manager連携 | routeごとに1個の`HistoryBrowsingState`が既存`HistoryManagerState`を必ず1個だけ生成する。managerのrequest/cache/page-size意味論は複製しない |
 | route-instance history mutation coordinator | star/revision/shareのoptimistic mutation、trash/restore/permanent-deleteのbulk coordination | routeごとに1個の`HistoryMutations`。stateを複製せず、browsing/lineage ownerとcurrent-work capabilityへ名前付きprojectionだけを渡す |
@@ -131,6 +139,8 @@ flowchart TB
 | server DB | 履歴、SVG、Score、系譜 | clientが信頼済みSVGを決めない |
 
 `+page.svelte`はroute composition shellとなった。route-instance ownerを各1回生成し、top-level lifecycle、認証画面切替、modal/view表示、build表示、短いcross-owner projection、named capability配線を保持する。`features/work/state.svelte.ts`がcurrent single-work stateとsubmit/replay/stopを所有し、`features/batch/state.svelte.ts`と`features/demo/state.svelte.ts`が各runの非同期lifecycleを所有する。Workは両ownerへ1作品Paintとfocused callbackだけを貸す。`features/run/current-work.ts`はstatelessな1回のPaint operationに留まる。`features/session/state.svelte.ts`が認証とmember preferenceを所有する。`features/canvas/refinement-coordinator.svelte.ts`がtarget identityとrefinement orchestrationを所有し、既存session/action moduleを再利用する。
+
+2026-09-13に共有pipelineへ接続し、`features/pipeline/`を加えた。`PipelineController`は1つのbrowser tabから見たserver所有の実行を表し、`POST /api/pipeline/variations`で始め、executionが落ち着くまで保存済みviewを読み直す。DDLの編集は`DdlEditorDialog`から送り、選択中の作品に応じて、共有pipelineで保存した作品ならhistory linkからのfork、旧作品なら`legacy/{id}/fork`、実行中のvariationなら`author-ddl`、どれでもなければdirect DDLの新しいvariationになる。補完案は`PipelineStatus`が保存済みDDLと変更案を並べて示し、作者の承認・辞退だけを`/executions/{id}/commands`へ送る。同じ`PipelineStatus`が当該revisionの診断を示す。保存済み作品を選ぶと、共有pipelineで保存した作品はhistory linkからvariationへ、それ以外は旧作品として`/legacy/{id}`へ対応づける。判別中・失敗・選択の失効を新規作品として扱わない。診断は`diagnostics.ts`が上流・下流・資源・relation・renderer・catalogの6経路に分けて表示する。
 
 以下のStage 5〜7の段落は、各cut直後の境界を記録した履歴である。現在の収束後の境界は、上の責務表とStage 10の段落を正とする。
 
@@ -168,16 +178,18 @@ Stage 10では行数ではなく変更理由に沿って5つの高変更面を�
 
 - `ApiClient` は `urllib.request` で `/api/*` と `/health` だけを扱う。
 - runtime codeは `inku_server` をimportしない。`inku_analysis` はrasterize/analysis用の共有packageで、server pipelineを迂回するものではない。
-- `paint` / `batch` の自然文modeは `/api/paint`、DDL modeは `/api/compose`、保存時は `/api/history` を利用する。
+- `paint` / `batch` の自然文modeは `/api/paint`、DDL modeは `/api/compose`、保存時は `/api/history` を利用する。どちらもServer内で共有pipelineを通り、補完案の承認が要る場合は409と現在のviewを受ける。`/api/pipeline/*`を直接使うcommandは無い。
 - 機能試験の送信者として `test_cli_sender_census.py` に検査される。CLI testがserver sourceを読む箇所はテスト上の契約照合であり、製品runtime依存ではない。
 
 ## Android境界
 
-- `InkuRepository` → `LocalFallbackPipeline` → `SvgRenderer` / `AndroidRenderHost` → JNI → 共有`inku-render` → Roomという端末内flow。
-- `RoutingModelProvider` はlocal LiteRT-LMとOpenAI-compatible remote providerを選ぶ。
+- `InkuRepository` → `AndroidWorkPipeline` → `SharedAuthoringPipeline` / `SharedPipelineHost` → `NativePipelineBridge`（JNI）→ 共有`inku-pipeline` / `inku-ddl` / `inku-render` → Roomという端末内flow。
+- `SharedPipelineHost`は1 executionのcallを直列化し、coreが返したeffectを実行する。provider effectは`SingleAttemptModelEffectProvider`が1回だけ送り、再試行・fallback・応答の判定はRustに残す。可視DDLとauthorityのCAS保存、action ACK、実行snapshotは`RoomSharedPipelineStore`が持つ。
+- `RoutingModelProvider` はlocal LiteRT-LM、Gemini、OpenAI-compatible remote providerを選ぶ。providerへの要求条件（temperature、thinking量、schema変換、出力上限）はServerに合わせる。
+- 保存済みScoreの再演は復元した資源policyの下で`renderSaved`を使う。端末専用の旧9:5形式だけ`AndroidRenderHost`（JNIの`render`）を使う。
 - engine identityとrenderer referenceは同梱Rust coreから取得し、Kotlinに版literalを持たない。
 - preview、thumbnail、refinement、PNG exportは保存済み／現行SVGを`inku-svg-raster`でpixel化する。AndroidSVGとKotlin renderer fallbackは無い。
-- Kotlinが引き続き所有するのはStage 1 / 1.5 / 2、Score coerce／repair、host option、Room／history、`rh3` identityである。
+- Kotlinが所有するのはUI、provider設定と通信、カメラ画像の前処理と端末内local LLM、host option、Room／history、`rh3`の計算である。旧KotlinのStage 1 / 1.5 / 2とScore coerceはretire済みで、runtime fallbackは無い。
 
 ## i18nとUI token
 
@@ -190,4 +202,4 @@ Stage 10では行数ではなく変更理由に沿って5つの高変更面を�
 
 ## 根拠対応
 
-`SYS-WEB`, `SYS-CLI`, `SYS-ANDROID`, `WEB-FEATURES`, `WEB-REGISTRY`, `WEB-I18N`。主要pathは図中に記載した。
+`SYS-WEB`, `SYS-CLI`, `SYS-ANDROID`, `PIPE-HOST`, `PIPE-MACHINE`, `WEB-FEATURES`, `WEB-REGISTRY`, `WEB-I18N`。主要pathは図中に記載した。

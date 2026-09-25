@@ -586,6 +586,10 @@ class InkuRepository(
 
     suspend fun markModelDownloadFailed(modelId: String, state: String = "failed") {
         val asset = database.modelAssetDao().getByModelId(modelId) ?: return
+        // The downloader has usually recorded why already (`failed_sha256`,
+        // `failed_http_404`, `failed_size`); a generic `failed` over it would
+        // throw the reason away.
+        if (asset.downloadState.startsWith("failed")) return
         database.modelAssetDao().updateDownload(
             modelId = modelId,
             downloadState = state.take(48),

@@ -5602,24 +5602,29 @@ private fun StatusPill(text: String, color: Color) {
     )
 }
 
-private fun modelStatusLabel(state: String?): String = when (state) {
-    "ready" -> "READY"
-    "queued" -> "QUEUED"
-    "connecting" -> "CONNECT"
-    "downloading" -> "GETTING"
-    "verifying" -> "VERIFY"
-    "failed" -> "FAILED"
-    "cancelled" -> "STOPPED"
-    "ready_to_download" -> "LICENSED"
+/**
+ * The downloader records why a download failed (`failed_sha256`,
+ * `failed_http_<code>`, `failed_size`), and a start-up finds an unfinished one
+ * `interrupted`; each reads as the failure or the stop it is, not as LOCAL.
+ */
+private fun modelStatusLabel(state: String?): String = when {
+    state == "ready" -> "READY"
+    state == "queued" -> "QUEUED"
+    state == "connecting" -> "CONNECT"
+    state == "downloading" -> "GETTING"
+    state == "verifying" -> "VERIFY"
+    state == "failed" || state?.startsWith("failed_") == true -> "FAILED"
+    state == "cancelled" || state == "interrupted" -> "STOPPED"
+    state == "ready_to_download" -> "LICENSED"
     else -> "LOCAL"
 }
 
 @Composable
-private fun modelStatusColor(state: String?): Color = when (state) {
-    "ready" -> MaterialTheme.colorScheme.secondary
-    "queued", "connecting", "downloading", "verifying" -> MaterialTheme.colorScheme.primary
-    "failed", "cancelled" -> StatusFailed
-    "ready_to_download" -> StatusReady
+private fun modelStatusColor(state: String?): Color = when {
+    state == "ready" -> MaterialTheme.colorScheme.secondary
+    state in setOf("queued", "connecting", "downloading", "verifying") -> MaterialTheme.colorScheme.primary
+    state in setOf("failed", "cancelled", "interrupted") || state?.startsWith("failed_") == true -> StatusFailed
+    state == "ready_to_download" -> StatusReady
     else -> MaterialTheme.colorScheme.onSurfaceVariant
 }
 

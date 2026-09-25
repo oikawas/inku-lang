@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import importlib
 import importlib.util
 import inspect
 import json
@@ -13,6 +14,10 @@ from inku_server.render_engines import RenderEngineResult, current_render_engine
 from inku_server.render_engines.default import adapter
 from inku_server.render_engines.default.adapter import DefaultRenderEngine
 from inku_server.schema import Score
+
+# The packaged native core names the engine; tests read it rather than copy a
+# number that the next engine version would leave behind.
+NATIVE_ENGINE_VERSION = importlib.import_module("inku_render").render_engine_version()
 
 
 SERVER_ROOT = Path(__file__).resolve().parents[1]
@@ -85,7 +90,7 @@ def test_default_adapter_uses_one_canonical_request(monkeypatch, legacy_stop):
 def test_current_engine_is_the_default_rust_adapter():
     assert current_render_engine() is adapter.DEFAULT_RENDER_ENGINE
     assert current_render_engine().id == "default"
-    assert current_render_engine().version == "46"
+    assert current_render_engine().version == NATIVE_ENGINE_VERSION
 
 
 def test_default_package_exports_the_thin_adapter_contract():
@@ -258,7 +263,7 @@ def test_step10q_endpoint_family_native():
     )
 
     assert result.metadata["render_engine_id"] == "default"
-    assert result.metadata["render_engine_version"] == "46"
+    assert result.metadata["render_engine_version"] == NATIVE_ENGINE_VERSION
     assert 'id="instruction_000_line_red"' in result.svg
     assert 'id="instruction_001_arc_blue"' in result.svg
     assert 'id="instruction_002_point_black"' in result.svg
@@ -294,7 +299,7 @@ def test_step10r_touching_native():
         ],
     })
     success = current_render_engine().render(score, svg_profile="editable", render_seed=23)
-    assert success.metadata["render_engine_version"] == "46"
+    assert success.metadata["render_engine_version"] == NATIVE_ENGINE_VERSION
     assert "execution" not in success.metadata
     assert "instruction_001_arc_blue" in success.svg
     assert "instruction_002_line_green" in success.svg
@@ -358,7 +363,7 @@ def test_step10q_connected_native():
         render_seed=0,
         composition_seed=0,
     )
-    assert success.metadata["render_engine_version"] == "46"
+    assert success.metadata["render_engine_version"] == NATIVE_ENGINE_VERSION
     assert "execution" not in success.metadata
     assert 'id="instruction_000_line_red"' in success.svg
     assert 'id="instruction_001_arc_blue"' in success.svg

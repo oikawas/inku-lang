@@ -125,6 +125,9 @@ class RunOptions(BaseModel):
     # Plugin definitions carried by an imported DDL export. They are used for
     # this new work only and are never installed.
     imported_plugins: list[ImportedPlugin] | None = Field(default=None, max_length=64)
+    # Render limits the caller asks this drawing to run under (ledger I-154).
+    # They are bounded by today's settings and never kept as a host option.
+    limits: dict[str, int] | None = None
 
 
 def sketch_request_for(kind: str, options: dict) -> dict:
@@ -166,6 +169,7 @@ class ProductPipelineEffects:
             options = RunOptions.model_validate(options).model_dump(exclude_unset=True)
         except ValidationError as error:
             raise CandidateHostError("invalid_authoring_options") from error
+        requested_limits = options.pop("limits", None)
         previous = deepcopy((work or {}).get("host_options", {}))
         metadata = (work or {}).get("metadata", {})
         for name in ("stage1_model", "stage2_model", "catalog_id", "catalog_mode", "composition_seed", "render_seed",
@@ -184,7 +188,7 @@ class ProductPipelineEffects:
                 selected.pop(key, None)
         if "lineage_parent_node_id" not in options and (work or {}).get("result", {}).get("lineage_node_id"):
             selected["lineage_parent_node_id"] = work["result"]["lineage_node_id"]
-        config = self.settings.config_for(owner, work)
+        config = self.settings.config_for(owner, work, requested_limits)
         _apply_developer_options(config, options, developer_mode=_env_flag("INKU_DEVELOPER_MODE"))
         language = _resolve_instruction_lang(text, selected.get("instruction_lang") or "auto", ui_lang=selected.get("ui_lang"))
         config["language"] = language
@@ -250,6 +254,7 @@ class ProductPipelineEffects:
         selected["developer_disable_llm_retries"] = options.get("developer_disable_llm_retries") is True
         selected["developer_capture_provider_io"] = options.get("developer_capture_provider_io") is True
         return config, {"host_options": selected, "color_maps": color_maps, "macro_catalog": catalog_context,
+                        "render_limits_source": self.settings.limits_source(work, requested_limits),
                         "auto_catalog": kind == "description" and mode == "auto",
                         "sketch_request": sketch_request_for(kind, options), "metrics": {}}
 
@@ -357,6 +362,7 @@ class ProductPipelineEffects:
             "composition_seed": None if compiler["composition_seed"] is None else int(compiler["composition_seed"]),
             "instruction_lang_requested": settings["instruction_lang"], "instruction_lang_resolved": settings["instruction_lang_resolved"],
             "ui_lang": settings.get("ui_lang"), "render_limits": limits,
+            "render_limits_source": context.get("render_limits_source"),
             "pipeline_variation_id": snapshot["variation_id"], "pipeline_revision": snapshot["authority"]["revision"],
         }
         result["render_hash"] = db.render_hash_for_item({**result, "input": result["description"]})

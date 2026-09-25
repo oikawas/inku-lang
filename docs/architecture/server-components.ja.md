@@ -204,17 +204,17 @@ flowchart LR
 | `lineage` | 8 | lineage graph/group、promote、colophon | `_current_user` |
 | `render` | 8 | variation seed、compose、interpret、render-score/svg、paint、paint stream、vision advice | `_current_user` |
 | `feedback` | 3 | unread words | `_current_user` |
-| `pipeline` | 11 | canvas形式、variationの開始・取得・fork、execution command、author DDL、history link・fork、旧作品の読取・fork、provider観測 | 各routeで`_current_user`。provider観測はさらにdeveloper modeだけ |
+| `pipeline` | 12 | canvas形式、variationの開始・取得・fork、execution command、author DDL、history link・fork、作品のDDL書き出し（名指すplugin定義つき）、旧作品の読取・fork、provider観測 | 各routeで`_current_user`。provider観測はさらにdeveloper modeだけ |
 
-合計105。公開allowlistは `/health`、`/api/info`、`/api/auth/login` の3 pathである（`test_route_authorization.py`）。ログインに要らないものは残さない、が基準である。
+合計106。公開allowlistは `/health`、`/api/info`、`/api/auth/login` の3 pathである（`test_route_authorization.py`）。ログインに要らないものは残さない、が基準である。
 
-**⚠ router別の件数は手で写したもので、赤くする検査は無い。** 合計の正本は`test_route_authorization.py`の`EXPECTED_ROUTE_COUNT`（105）で、live appのOpenAPIから作った`tests/data/api-surface-baseline.json`も105 operationを記録する。
+**⚠ router別の件数は手で写したもので、赤くする検査は無い。** 合計の正本は`test_route_authorization.py`の`EXPECTED_ROUTE_COUNT`（106）で、live appのOpenAPIから作った`tests/data/api-surface-baseline.json`も106 operationを記録する。
 
 ## 主要flow
 
 - `/api/paint`、`/api/paint/stream`、`/api/interpret`、`/api/compose`は`pipeline_compat.py`を通って同じ`PipelineService`を使う。streamは実行を読み直して`sketch`・`stage1`・`score`・`done`を順に知らせ、最初のeventの後の失敗を本文の`error` eventで返す。補完案の承認が要る場合、stream以外の3つは409と現在のviewを返し、streamは最初のeventより前なら409、後なら`error` eventを返す。記述起点の開始は札を切った記述だけをcoreへ渡し、札だけの記述を400で断る。
 - `/api/pipeline/variations`は記述またはdirect DDLからvariationを始め、`/executions/{id}/commands`が作者の操作（承認・辞退・補完要求・再生成・演奏・取消し）を、`/executions/{id}/author-ddl`がDDL編集を受ける。設定が変わるDDL編集は元を変えず親付きのvariationを新設する。
-- `/api/pipeline/history/{id}`は共有pipelineで保存した作品のvariation・revisionを返し、`/history/{id}/fork`はその時点のconfig・host context・Macro定義から派生する。`/legacy/{id}`と`/legacy/{id}/fork`はlinkを持たない旧作品を読み、元行を変えずに派生する。
+- `/api/pipeline/history/{id}`は共有pipelineで保存した作品のvariation・revisionを返し、`/history/{id}/fork`はその時点のconfig・host context・Macro定義から派生する。`/history/{id}/ddl-export`は作品の可視DDLを、それが名指すplugin定義とともに書き出す。`/legacy/{id}`と`/legacy/{id}/fork`はlinkを持たない旧作品を読み、元行を変えずに派生する。
 - `/api/render-score`と`/api/render-svg`はScoreの版で分かれ、compact Scoreは`ProductPipelineEffects.replay`、0.10未満は`saved_score_compat.py`を通る。
 - provider/modelはrequest指定、userのStage設定、manifestの既定を`resolved_stage_model`で解決する。
 

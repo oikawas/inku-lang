@@ -52,6 +52,7 @@ def _expected_list_items(
     starred: bool = False,
     for_revision: bool = False,
     for_share: bool = False,
+    include_svg: bool = True,
 ) -> tuple[list[dict], int]:
     raise NotImplementedError
 

@@ -1836,10 +1836,26 @@ separate `inku-svg-raster` boundary.
 Shared Rust owns Score structure and meaning. Python retains saved-format read compatibility, including finite actions such as a warned drop of an invalid legacy relation. Hosts must not add a visual event, composition anchor, density floor, or accent shape.
 Renderer sway is bound to `render_seed` and does not alter canonical Score.
 
-The SVG profiles are `display`, `editable`, and `compat`. The database stores
-the `display` SVG; the other profiles are generated from saved Score on
-request. Sections 13.8 and 13.11 define performance and render identity, while
-history lives in the [render-engine version history](docs/spec/render-engine-history.md).
+SVG export has three profiles:
+
+- `display`: the default server-rendered SVG used for web display, history,
+  PNG generation, and artifact rebuilds.
+- `editable`: generated on demand from JSON Score and server-owned color catalog
+  metadata, with stable ASCII IDs and layer-like groups for SVG-native editors.
+  Non-computer solid fills retain a real base fill and standard SVG filter mottle.
+- `compat`: generated on demand in the same way and restricted to a defined
+  portable subset: a filter-free flat vector fallback without filters or
+  clip-paths, which may simplify some effects for broad compatibility. Computer
+  retains the base field, grille, and black scanlines inside the contour path;
+  Oil retains shape and intensity through its existing filter-free paint passes
+  without clipped width expansion. Pixel equality with Display or Editable is not
+  promised.
+
+The database stores only the `display` SVG in `history.svg`. Editable and
+compatible SVG are **regenerated at download time** rather than stored as
+additional database payloads. Sections 13.8 and 13.11 define performance and
+render identity, while history lives in the
+[render-engine version history](docs/spec/render-engine-history.md).
 
 ### 12.15 Saved Compatibility for the Old Sketch Layer (Stage 0.5, v2.9.38)
 

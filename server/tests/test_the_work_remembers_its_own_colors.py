@@ -513,6 +513,14 @@ db.add_item({
 # remain intact; only the new coordinator metadata is absent.
 with db.engine.begin() as connection:
     connection.exec_driver_sql("DROP TABLE schema_migrations")
+# Today's schema without its registry is a shape no release shipped, and it
+# moves with every registered migration, so it is accepted for this start
+# only -- as the legacy-path tests in test_persistence_migrations.py do --
+# rather than pinned as a fingerprint that goes stale.
+from inku_server.persistence import migrations
+with db.engine.connect() as connection:
+    shape = (migrations.schema_fingerprint(connection), migrations.history_fts_state(connection))
+migrations.ACCEPTED_LEGACY_STATES[shape] = "test-current-without-registry"
 db.init_db()
 
 connection = sqlite3.connect(os.environ["INKU_DB_PATH"])

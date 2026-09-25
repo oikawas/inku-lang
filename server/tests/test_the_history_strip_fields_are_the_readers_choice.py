@@ -12,6 +12,7 @@ The web half of this pair is web/src/lib/historyStripFields.ts.
 
 from __future__ import annotations
 
+import re
 import uuid
 
 import pytest
@@ -175,7 +176,10 @@ def test_t162_the_listing_sends_each_works_weight_even_when_it_withholds_the_pic
         event.remove(db.engine, "before_cursor_execute", capture)
     assert withheld["svg"] == "", "this test is not exercising the withholding path"
     assert withheld["svg_bytes"] == expected
-    history_selects = [statement for statement in statements if "FROM history" in statement]
+    # The history rows themselves, not the ACL lookup that marks shared works.
+    history_selects = [
+        statement for statement in statements if re.search(r"FROM history\b(?!_)", statement)
+    ]
     assert history_selects
     selected = history_selects[-1].split("FROM history", 1)[0]
     assert "CAST(history.svg AS BLOB)" in selected

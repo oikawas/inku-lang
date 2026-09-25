@@ -58,7 +58,8 @@ def test_score12_independent_spread_and_selected_endpoint_preserve_legacy_meanin
     assert mark["variation"]["quality"] == "wave"
     assert mark["surface"]["texture"] == "stipple"
     assert mark["relation"]["target_endpoint"] == "start"
-    assert result["resource_policy"] is None
+    # A flat Score has no policy, and the dump omits it as the Rust Score does.
+    assert "resource_policy" not in result
     with pytest.raises(ValueError, match="require Score version 0.12.0"):
         Score.model_validate({**data, "version": "0.11.0"})
     with pytest.raises(ValueError, match="are exclusive"):
@@ -85,7 +86,8 @@ def test_score13_keeps_interior_symbolic_and_preserves_numeric_positions() -> No
     ]}
     result = Score.model_validate(data).model_dump()
     assert result["instructions"][1]["relation"]["target_path_position"] == "interior"
-    assert result["resource_policy"] is None
+    # A flat Score has no policy, and the dump omits it as the Rust Score does.
+    assert "resource_policy" not in result
     with pytest.raises(ValueError, match="requires Score version 0.13.0"):
         Score.model_validate({**data, "version": "0.12.0"})
     with pytest.raises(ValueError, match="are exclusive"):

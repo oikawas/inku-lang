@@ -96,6 +96,8 @@ def test_saijiki_prose_categories_track_enum_sizes() -> None:
         "ゆらぎ",
         "ばしょ",
         "うごき",
+        # The finite sequences a work may cycle through (交互に, 順に); SPEC §3.1.
+        "じゅん",
         "わりあい",
     }
 

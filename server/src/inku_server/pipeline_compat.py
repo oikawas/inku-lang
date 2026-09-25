@@ -116,6 +116,10 @@ def _options(data: dict[str, Any], *, save_history: bool) -> dict:
         options["sketch_text"] = data["sketch_text"]
     elif data.get("sketch") is True:
         options["sketch"] = "on"
+    # Limits the caller lowers for this drawing (ledger I-154); the host bounds
+    # them by today's settings.
+    if data.get("limits") is not None:
+        options["limits"] = data["limits"]
     options["save_history"] = save_history
     return options
 

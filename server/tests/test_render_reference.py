@@ -7,6 +7,8 @@ import json
 import pathlib
 import re
 
+import pytest
+
 from inku_server.master_grid import MASTER_GRID_DECIMALS
 from inku_server.render_engines import current_render_engine
 from inku_server.schema import (
@@ -20,8 +22,31 @@ from inku_server.schema import (
 SERVER_ROOT = pathlib.Path(__file__).resolve().parents[1]
 GENERATOR_PATH = SERVER_ROOT / "scripts" / "gen_render_reference.py"
 ENGINE_VERSION = current_render_engine().version
-CORPUS_DIR = SERVER_ROOT / "reference" / f"render-engine-{ENGINE_VERSION}"
+
+
+def _latest_frozen_version() -> str:
+    versions = [
+        int(path.parent.name.rsplit("-", 1)[-1])
+        for path in (SERVER_ROOT / "reference").glob("render-engine-*/manifest.json")
+        if path.parent.name.rsplit("-", 1)[-1].isdigit()
+    ]
+    return str(max(versions))
+
+
+# SPEC §2.1: a corpus directory is frozen only at an explicit full-update
+# checkpoint, never with every engine bump. The structural checks read the
+# newest frozen record; the live checks below compare the running engine with
+# a record only when that record is its own.
+CORPUS_VERSION = _latest_frozen_version()
+CORPUS_DIR = SERVER_ROOT / "reference" / f"render-engine-{CORPUS_VERSION}"
 MANIFEST_PATH = CORPUS_DIR / "manifest.json"
+live_against_frozen = pytest.mark.skipif(
+    ENGINE_VERSION != CORPUS_VERSION,
+    reason=(
+        f"engine {ENGINE_VERSION} has no frozen corpus (newest is {CORPUS_VERSION}); "
+        "SPEC §2.1 compares the live renderer at the checkpoint that freezes it"
+    ),
+)
 # Attribution claims belong to a version. Reading them from a later manifest
 # silently changes what the claim describes.
 ENGINE_18_MANIFEST = SERVER_ROOT / "reference" / "render-engine-18" / "manifest.json"
@@ -35,6 +60,9 @@ ENGINE_37_MANIFEST = SERVER_ROOT / "reference" / "render-engine-37" / "manifest.
 ENGINE_38_MANIFEST = SERVER_ROOT / "reference" / "render-engine-38" / "manifest.json"
 ENGINE_39_MANIFEST = SERVER_ROOT / "reference" / "render-engine-39" / "manifest.json"
 ENGINE_40_MANIFEST = SERVER_ROOT / "reference" / "render-engine-40" / "manifest.json"
+# The last engine whose fills still branched into dab, stroke and texture scans;
+# engine 48 replaced them with tool-specific solid fills.
+ENGINE_47_MANIFEST = SERVER_ROOT / "reference" / "render-engine-47" / "manifest.json"
 
 
 def _generator():
@@ -125,38 +153,60 @@ def test_render_reference_case_counts() -> None:
     # Engine 46 adds the two direct Score 0.2 filled crescents: rotring fixes
     # the exact cubic SVG path and pen carries that contour through rotation.
     # Engine 47 adds one oil-paint line and one solid-fill material witness.
-    assert len(cases) == 614
+    # Engines 49, 50 and 51 add two cases each: typed Along and Cutting (I),
+    # whole-group connection and rotation (J), and nested affine groups (K).
+    assert len(cases) == 620
     assert {
         prefix: sum(case_id.startswith(f"{prefix}-") for case_id in cases)
-        for prefix in ("A", "B", "C", "D", "E", "F", "G", "H")
-    } == {"A": 89, "B": 72, "C": 91, "D": 61, "E": 119, "F": 128, "G": 50, "H": 4}
+        for prefix in ("A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K")
+    } == {
+        "A": 89, "B": 72, "C": 91, "D": 61, "E": 119, "F": 128, "G": 50, "H": 4,
+        "I": 2, "J": 2, "K": 2,
+    }
+
+
+def _wire_fields(model) -> set[str]:
+    """Fields every dump carries; an `exclude_if` field appears only once it is set."""
+    return {
+        field.alias or name
+        for name, field in model.model_fields.items()
+        if field.exclude_if is None
+    }
 
 
 def test_render_reference_inputs_are_fully_explicit() -> None:
     generator = _generator()
     instruction_fields = set(generator.BASE_INSTRUCTION)
     score_fields = set(generator.BASE_SCORE)
-    assert instruction_fields == {
-        field.alias or name for name, field in Instruction.model_fields.items()
-    } - {"note", "arc_form"}
-    assert score_fields == set(Score.model_fields)
+    # Every field the wire always carries is stated. A field left out of the
+    # wire while unset (`arc_form`, `surface_intensity`, `ink_spread`, and the
+    # compact Score groups and policy) is stated only where a case sets it:
+    # stating it everywhere would move every frozen input for a value none of
+    # them has, as with the span below.
+    assert instruction_fields == _wire_fields(Instruction) - {"note"}
+    assert score_fields == _wire_fields(Score)
     assert set(generator.BASE_SURFACE) == set(SurfaceSpec.model_fields)
     assert set(generator.BASE_GROUND) == set(CanvasGroundSpec.model_fields)
     # Every field is stated except the span, which is stated only where a case
     # states one: writing `group_size: 1` into the base would move all 582
     # inputs frozen before engine 33 for a span none of them has.
-    assert set(generator.BASE_ARRANGEMENT) == set(Arrangement.model_fields) - {
+    assert set(generator.BASE_ARRANGEMENT) == _wire_fields(Arrangement) - {
         "group_size"
     }
+    optional_score = set(Score.model_fields) - score_fields
+    optional_instruction = {
+        field.alias or name for name, field in Instruction.model_fields.items()
+    } - instruction_fields - {"note"}
     for case_id, case in generator.build_inputs().items():
         score = case["score"]
-        assert set(score) == score_fields
+        assert score_fields <= set(score) <= score_fields | optional_score, case_id
         # Every instruction, not the first: engine 33's composite cases are the
         # first scores here to hold more than one, and a member stated with
         # fewer fields than its head would be an input this corpus never froze.
         for instruction in score["instructions"]:
-            expected_fields = instruction_fields | ({"arc_form"} if "arc_form" in instruction else set())
-            assert set(instruction) == expected_fields
+            assert instruction_fields <= set(instruction) <= (
+                instruction_fields | optional_instruction
+            ), case_id
         if case_id.startswith("F-"):
             assert case["catalog_id"] is not None
             assert any(key.startswith("palette:") for key in case["color_map"])
@@ -430,6 +480,7 @@ def test_engine_35_moves_only_the_hatch_cases() -> None:
     assert carried == 579
 
 
+@live_against_frozen
 def test_engine_35_hatch_cases_match_the_current_renderer() -> None:
     """Redraw the nine moved cases with the live renderer, not frozen records.
 
@@ -512,6 +563,7 @@ def test_engine_36_moves_only_the_wash_cases() -> None:
     assert carried == 582
 
 
+@live_against_frozen
 def test_engine_36_wash_cases_match_the_current_renderer() -> None:
     """Redraw the six that moved with the live renderer, not the frozen record.
 
@@ -594,6 +646,7 @@ def test_engine_37_moves_only_the_sheet_cases() -> None:
     assert carried == 585
 
 
+@live_against_frozen
 def test_engine_37_sheet_cases_match_the_current_renderer() -> None:
     """Redraw the twelve that moved with the live renderer, not the frozen record.
 
@@ -673,6 +726,7 @@ def test_engine_38_moves_only_its_own_new_cases() -> None:
     assert carried == 597
 
 
+@live_against_frozen
 def test_engine_38_new_cases_match_the_current_renderer() -> None:
     """Redraw the nine with the live renderer, not the frozen record.
 
@@ -725,6 +779,7 @@ def test_engine_39_moves_only_the_grain_cases() -> None:
     assert carried == 601
 
 
+@live_against_frozen
 def test_engine_39_grain_cases_match_the_current_renderer() -> None:
     """The five changed records are regenerated through the bake's own call."""
     generator = _generator()
@@ -810,6 +865,7 @@ def test_engine_35_hatch_cases_keep_the_pitch_they_had() -> None:
     }
 
 
+@live_against_frozen
 def test_engine_32_cases_match_the_current_renderer() -> None:
     """Redraw the thirteen new cases with the live renderer, not frozen records.
 
@@ -876,6 +932,7 @@ def test_engine_18_palette_cases_cover_the_resolution_chain() -> None:
     )
 
 
+@live_against_frozen
 def test_engine_18_palette_cases_match_the_current_renderer() -> None:
     """Group F must traverse the live resolver, not only frozen SVG files."""
     generator = _generator()
@@ -888,6 +945,7 @@ def test_engine_18_palette_cases_match_the_current_renderer() -> None:
         assert generator._normalized_digest(svg) == manifest["cases"][case_id]["digest"]
 
 
+@live_against_frozen
 def test_group_g_matches_the_current_renderer() -> None:
     """Group G must traverse the live placement stage, not only frozen files.
 
@@ -925,11 +983,14 @@ def test_render_reference_discriminator_cases() -> None:
 
     # Engine 16 stage 2 made the tiny case explicitly a dab; Engine 15 could only
     # show that it was not scan-filled because the area-fill fallback had no class.
-    # Keep this paired with the scan behavior above the boundary.
-    tiny = cases["D-size-tiny-filled-circle"]
+    # Keep this paired with the scan behavior above the boundary. These fill
+    # branches belong to engine 47, the last before tool-specific solid fills,
+    # so they are read from its record rather than from a later manifest.
+    fills = json.loads(ENGINE_47_MANIFEST.read_text(encoding="utf-8"))["cases"]
+    tiny = fills["D-size-tiny-filled-circle"]
     assert not any("fill-stroke-v1" in name for name in tiny["classes"])
     assert "fill-dab-v1" in tiny["classes"]
-    boundary = cases["C-tinyfill-boundary-pen"]
+    boundary = fills["C-tinyfill-boundary-pen"]
     # Engine 22 moved pen at coverage 0.167 to the texture branch. This boundary
     # checks only that it is area-filled rather than dabbed, so either branch is valid.
     assert any(
@@ -938,7 +999,7 @@ def test_render_reference_discriminator_cases() -> None:
     )
     assert "fill-dab-v1" not in boundary["classes"]
     # The machine extreme remains an area fill at every size and emits no class.
-    assert cases["C-tinyfill-circle-rotring"]["classes"] == []
+    assert fills["C-tinyfill-circle-rotring"]["classes"] == []
 
     # Engine 16 stage 1: the production-default display profile reaches brushwork.
     display = cases["C-display-surface-wash-pen"]
@@ -967,13 +1028,13 @@ def _resolve_svg(case_id: str) -> pathlib.Path:
         (int(path.name.rsplit("-", 1)[-1]), path)
         for path in reference_root.glob("render-engine-*")
         if path.name.rsplit("-", 1)[-1].isdigit()
-        and int(path.name.rsplit("-", 1)[-1]) <= int(ENGINE_VERSION)
+        and int(path.name.rsplit("-", 1)[-1]) <= int(CORPUS_VERSION)
     )
     for _, directory in reversed(versions):
         candidate = directory / f"{case_id}.svg"
         if candidate.exists():
             return candidate
-    raise AssertionError(f"no frozen SVG for {case_id} in any version up to {ENGINE_VERSION}")
+    raise AssertionError(f"no frozen SVG for {case_id} in any version up to {CORPUS_VERSION}")
 
 
 def test_render_reference_svg_files_match_manifest() -> None:
@@ -997,7 +1058,7 @@ def test_corpus_bodies_match_the_changed_case_set() -> None:
     assert bodies == changed
     unchanged = set(manifest["cases"]) - changed
     if not unchanged:
-        assert ENGINE_VERSION == "41"
+        assert CORPUS_VERSION == "41"
         assert changed == set(manifest["cases"])
         return
     for case_id in unchanged:
@@ -1008,7 +1069,8 @@ def test_every_corpus_number_uses_at_most_master_grid_precision() -> None:
     """Engine 41 may compact zeroes but never exceeds the six-decimal grid."""
     off_grid = []
     checked = 0
-    files = sorted(CORPUS_DIR.glob("*.svg"))
+    # Every case's current body, wherever the version that last moved it keeps it.
+    files = sorted({_resolve_svg(case_id) for case_id in _manifest()["cases"]})
     for path in files:
         for name, value in re.findall(r'([\w:-]+)="([^"]*)"', path.read_text()):
             if name in ("class", "id", "version"):
@@ -1017,6 +1079,6 @@ def test_every_corpus_number_uses_at_most_master_grid_precision() -> None:
                 checked += 1
                 if not 1 <= len(decimals) <= MASTER_GRID_DECIMALS:
                     off_grid.append((path.name, name, decimals))
-    assert len(files) == len(_manifest()["changed_from_previous"])
+    assert len(files) == len(_manifest()["cases"])
     assert checked > 2_400, checked
     assert off_grid == []

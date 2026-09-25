@@ -6,6 +6,10 @@
 
 **本書が持つのは v2.5.0（2026-07-25、render engine 12）以降**の 36 版である。それより前は書庫にある。
 
+### 2026-09-25 — Scoreの正準bytes、paintの描画上限、API surfaceの比較を戻す
+
+2026-09-13から、PythonのScoreは`resource_policy`・`Arrangement.resolved`・`PlacementGroup.resolved`を値が無いとき`null`として書き、共有RustのScoreは省いていた。このためそれらを持たないScoreは、Pythonでは正準JSON・digest・rh3が異なり、保存形式の経路で再生した保存済みScoreはRustの同一性と一致しなくなっていた。PythonもRustと同じく省く。共有pipelineへの切り替えでは、`/api/paint`が要求の`limits`を読まなくなり、paintとcomposeの応答から`render_limits_source`が消えていた（台帳I-154）。CLIの`paint --limit-*`も効いていなかった。要求は再び今の設定で要素ごとに抑えられ、応答は`settings`・`request`・`work`・`work_unrecorded`のどれかを示す。派生版は保存した設定に固定された予算を保つ。旧層と一緒に消えたまま記録（`api-surface-baseline.json`）だけが作り直されていた、API surface全体の比較を戻した。SPEC.mdには、2026-09-04の整理で英訳からだけ落ちた`display`・`editable`・`compat`のSVG profileの契約を戻した。RAW trace（`include_trace`、CLIの`--trace`）はPythonの各層を記録するもので、2026-09-14から何も返していない（fieldは受け付けたまま）。退役した層、固定したengine版、置き換わった塗りのprofileを期待していた試験は、現行の契約を確かめる形へ改めた。DDL・Score・描画の版とAPI surfaceは変えない。
+
 ### 2026-09-25 — プラグインを英語の正式名で呼び、日本語名を別名にする（DDL Spec 14）
 
 `Nature.若葉`のような日本語の名前は英語のDDLで使いにくいため、プラグインの正式名を英語の見出しにし、日本語名を別名として同じ定義を呼べるようにした。定義は任意の`aliases`を持ち、可視DDLは正式名と別名のどちらでも同じ定義を呼ぶ（DDLの本文は書いたまま）。定義を固定するlockは別名も持ち、照合はどの名前でもそのlockに結ぶ。catalogは他の定義の名前・別名を名乗る定義を受け付けない。別名の無い定義の正準bytes・digestは変わらない。作品計画は日本語のDDLでは別名、英語のDDLでは正式名で書く。同梱の七語は`Nature.YoungLeaves`・`Undergrowth`・`SummerLeaves`・`AutumnLeaves`・`FallenLeaves`・`WitheredGrass`・`WitheredLeaves`（2.0.0）となり、それぞれ旧名（若葉〜枯葉）を別名に持つ。プラグイン文書は見出しを正式名にして`aliases:`を書く。WebのDDLエディタは別名も既知の名前として扱い、日本語表示では別名で示して挿入する。未登録の理由表示とDDLの書き出しも別名を扱う。保存済み作品の1.0系のlockは従来のまま。受け付ける呼び出し名が広がるのでDDL Spec 14。同じ変更で、落葉の12枚目が画面の左外に出て省略される位置を直した。

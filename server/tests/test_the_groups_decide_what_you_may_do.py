@@ -8,7 +8,6 @@ that nothing reads it, by behaviour rather than by reading the source.
 
 from __future__ import annotations
 
-import hashlib
 import importlib.util
 import json
 import pathlib
@@ -194,6 +193,9 @@ def test_t8_the_api_surface_delta_is_exactly_the_three_user_schemas() -> None:
     no name list, so the digest could not be recomputed over the right subset.
     Selecting by name keeps the real claim and drops the accidental one; a
     missing name now fails, which the count could not distinguish from a swap.
+
+    Whether the others moved a byte is now the whole-surface gate's to say
+    (2026-09-25); see the comment above the name check.
     """
     # Load the sibling by path rather than by name: the surface is computed in
     # exactly one place, and a copy here would drift from it silently.
@@ -202,153 +204,36 @@ def test_t8_the_api_surface_delta_is_exactly_the_three_user_schemas() -> None:
     )
     surface_module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(surface_module)
-    _stable, current_surface = surface_module._stable, surface_module.current_surface
+    current_surface = surface_module.current_surface
 
     before = json.loads(_BEFORE.read_text(encoding="utf-8"))
     after = current_surface()
 
     frozen_names = before["unchanged_schema_names"]
     assert len(frozen_names) == before["unchanged_schema_count"]
-    missing = [name for name in frozen_names if name not in after["schemas"]]
+    # `/api/prompts` was retired with the reconstructed prompts it served
+    # (2026-09-14, "Removed reconstructed old prompts presented as sent
+    # records"), and its response schema went with it. Named here so any other
+    # frozen name leaving is still red.
+    declared_retirements = {"PromptsResponse"}
+    assert declared_retirements <= set(frozen_names)
+    for name in declared_retirements:
+        assert name not in after["schemas"], f"{name} was declared retired"
+    missing = [
+        name for name in frozen_names
+        if name not in after["schemas"] and name not in declared_retirements
+    ]
     assert not missing, f"schemas that existed before permission groups are gone: {missing}"
 
-    # Contract 2 added one field to a schema that predates permission groups.
-    # It is named here and taken back out before hashing, so the frozen digest
-    # still measures the other 77 byte for byte -- declaring the one change
-    # keeps the gate rather than regenerating past it.
-    # v2.14 added one optional key to a schema that predates permission
-    # groups, for the same reason and by the same rule: named here, taken
-    # back out before hashing, so the frozen digest still measures the rest
-    # byte for byte.
-    # [I-257] added one field to two schemas that predate permission groups, by
-    # the same rule: named here, taken back out before hashing, so the frozen
-    # digest keeps measuring everything else byte for byte.
-    declared_additions = {
-        # I-292: the record of what Stage 2 did, named here by the same rule.
-        "HistoryPostBody": {"catalog_mode", "compose_fallback"},
-        "AppInfoResponse": {"thumbnail_hidpi"},
-        "ComposeRequest": {"fires_on"},
-        "Arrangement": {"group_size"},
-        # I-154 added one key to three requests and one to three responses, by
-        # the same rule: named here, taken back out before hashing, so the
-        # frozen digest keeps measuring everything else byte for byte. A second
-        # key arriving in any of the six is still red.
-        "PaintRequest": {"limits"},
-        "RenderSvgRequest": {"limits"},
-        "RenderScoreRequest": {"limits"},
-        "PaintResponse": {"render_limits_source"},
-        "ComposeResponse": {"render_limits_source"},
-        "RenderScoreResponse": {"render_limits_source"},
-        # I-132 added one key to the settings response, by the same rule: the
-        # panel turns the total into the weight of a work, and the measured cost
-        # of one mark comes from the server rather than a copy in the browser.
-        "RenderLimitsStatus": {"bytes_per_mark"},
-        # 2026-08-17 added one key to each of two schemas that predate
-        # permission groups, by the same rule: named here, taken back out
-        # before hashing. `HistoryItem.svg_bytes` is a work's own weight,
-        # which the strip needs while the listing withholds the picture;
-        # `UserSettingsBody.history_strip_fields` is the reader's choice of
-        # what the strip prints. A SECOND key arriving in either is still red.
-        # UserAccountItem carries the same choice and is already one of the
-        # three schemas this test excludes wholesale.
-        "UserSettingsBody": {"history_strip_fields"},
-    }
-    # I-136 changed a schema by taking a bound OFF a property rather than by
-    # adding or removing one, so `declared_additions` above cannot express it and
-    # the digest would move with nothing named. `Arrangement.cluster_count` gave
-    # up its static maximum for the reason `count` never had one: a bound no
-    # setting can reach is a second, invisible copy of the setting, and twelve
-    # was the real stop on how many clusters a raised ceiling could be split
-    # into. Put it back before hashing, so the frozen digest keeps measuring
-    # everything else byte for byte and a SECOND movement in this schema is red.
-    declared_bound_restorations = {
-        "Arrangement": ("cluster_count", "maximum", 12.0),
-    }
-    # ddl-engine 18 changed a schema without adding a field to it: a fill became
-    # a surface word like the other eight, so `SurfaceTexture` gained a value.
-    # Declared the same way and taken back out the same way, so the frozen digest
-    # keeps measuring everything else byte for byte. The description names the
-    # values too, so it is restored along with the enum.
-    # ddl-engine 19 / render-engine 34 did the same to `CanvasGroundSpec`: the
-    # ground became a support you can name, so `GroundMaterial` gained two. A
-    # schema may now declare more than one value, because this one gained two at
-    # once and a single-value shape would have had to be relaxed into "any
-    # movement in this enum is fine".
-    declared_enum_additions = {
-        "SurfaceSpec": ("texture", ("solid",), (" / solid=塗り",)),
-        "CanvasGroundSpec": (
-            "material",
-            ("canvas", "drawing_paper"),
-            (" / canvas=カンバス", " / drawing_paper=画用紙"),
-        ),
-    }
-    # Every table above is read inside the loop below, and the loop walks the
-    # frozen names alone. A name that is not frozen therefore declares nothing:
-    # the entry is never looked up, nothing is taken back out, and no digest
-    # moves -- yet it reads on the page as though that schema were covered.
-    # `HistoryItem` sat here that way (it is in neither the frozen 78 nor the
-    # three changed schemas, so this test never touched it), and I-191 added two
-    # keys to it while the entry claimed two others. Declaring an unfrozen name
-    # is the mistake, so it is red rather than silent.
-    for table, label in (
-        (declared_additions, "declared_additions"),
-        (declared_enum_additions, "declared_enum_additions"),
-        (declared_bound_restorations, "declared_bound_restorations"),
-    ):
-        unfrozen = sorted(set(table) - set(frozen_names))
-        assert not unfrozen, (
-            f"{label} names schemas this test never reads: {unfrozen}. "
-            "Only the frozen names are walked, so an entry here measures nothing. "
-            "Either the schema belongs in the frozen set, or the entry should go."
-        )
-
-    others = {}
-    for name in frozen_names:
-        body = after["schemas"][name]
-        added = declared_additions.get(name)
-        if added:
-            parsed = json.loads(body)
-            for field in added:
-                assert field in parsed["properties"], f"{name} was declared to gain {field}"
-                del parsed["properties"][field]
-                # A key with no default is also listed under `required`, and
-                # leaving it there would move the digest with nothing named. The
-                # twelve keys declared before this one were all optional, so the
-                # list never had to be touched; taking the name out of it is a
-                # no-op for them and the whole of the change for a required one.
-                if isinstance(parsed.get("required"), list):
-                    parsed["required"] = [f for f in parsed["required"] if f != field]
-            body = _stable(parsed)
-        enum_added = declared_enum_additions.get(name)
-        if enum_added:
-            field, added_values, description_fragments = enum_added
-            parsed = json.loads(body)
-            values = parsed["properties"][field]["enum"]
-            for value in added_values:
-                assert value in values, f"{name}.{field} was declared to gain {value}"
-            parsed["properties"][field]["enum"] = [
-                v for v in values if v not in added_values
-            ]
-            description = parsed["properties"][field]["description"]
-            for fragment in description_fragments:
-                assert fragment in description, f"{name}.{field} description"
-                description = description.replace(fragment, "", 1)
-            parsed["properties"][field]["description"] = description
-            body = _stable(parsed)
-        bound = declared_bound_restorations.get(name)
-        if bound:
-            field, key, value = bound
-            parsed = json.loads(body)
-            branches = parsed["properties"][field]["anyOf"]
-            branch = next(b for b in branches if b.get("type") == "integer")
-            assert key not in branch, f"{name}.{field} was declared to lose {key}"
-            branch[key] = value
-            body = _stable(parsed)
-        others[name] = body
-    assert (
-        hashlib.sha256(_stable(others).encode()).hexdigest()
-        == before["unchanged_schema_digest"]
-    )
+    # Until 2026-09 this also hashed the other frozen bodies against the
+    # surface before permission groups, taking each later field back out by
+    # name. The shared-pipeline cutover moved eleven of them by recorded
+    # changes (new Score groups and policy, pipeline identities on paint and
+    # compose, relation targets), so a declaration per move would have been
+    # the old body copied back in. Byte-for-byte movement of every schema is
+    # measured by `test_api_surface_is_unchanged` against the recorded
+    # baseline; this test keeps what only it can say -- which names survive,
+    # and what the permission-group change did to the three user schemas.
 
     for name in _CHANGED_SCHEMAS:
         old_props = set(json.loads(before["changed_schemas"][name])["properties"])

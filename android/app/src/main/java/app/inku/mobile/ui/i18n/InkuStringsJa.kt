@@ -496,4 +496,9 @@ object InkuStringsJa : InkuStrings {
     override val batchProgress: (Int, Int) -> String = { current, total -> "進捗 $current / $total" }
 
     override val exportTemplateBuiltinDescription: (Int) -> String = { px -> "PNG / Y軸 ${px}px" }
+
+    override val stateExpanded = "展開中"
+    override val stateCollapsed = "折りたたみ中"
+    override val worksScrollbarDescription = "作品のスクロールバー"
+    override val listSeparator = "・"
 }

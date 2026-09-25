@@ -196,11 +196,16 @@ class WordingLintTest {
             6,
             EXCLUDED.size,
         )
-        // The sixteen untouchable files must still hold their Japanese: this
-        // contract translating a prompt would be the worst outcome, so it is
-        // checked from the same place rather than left to review.
-        val prompts = File(sourceRoot(), "pipeline/WebDdlSpec.kt").readText()
-        assertTrue("the Stage 1 prompt has lost its Japanese", JAPANESE.containsMatchIn(prompts))
+        // The prompts must still hold their Japanese: this contract translating
+        // a prompt would be the worst outcome, so it is checked from the same
+        // place rather than left to review. They left `WebDdlSpec.kt` for the
+        // shared core with the Rust cut-over, so they are read there.
+        val prompts = listOf(
+            File("../../core/crates/inku-ddl/assets/prompt-body-templates-v1.json"),
+            File("../core/crates/inku-ddl/assets/prompt-body-templates-v1.json"),
+        ).firstOrNull(File::isFile)?.readText()
+        assertTrue("the shared prompt templates were not found", prompts != null)
+        assertTrue("the Stage 1 prompt has lost its Japanese", JAPANESE.containsMatchIn(prompts!!))
         assertTrue("the Stage 1 prompt has lost its touch words", prompts.contains("銀筆"))
     }
 

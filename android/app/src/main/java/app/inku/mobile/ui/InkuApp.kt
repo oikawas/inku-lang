@@ -431,6 +431,9 @@ private val saijikiGroupColors = listOf(
     // the case the comment above was written for: the category was added and
     // the pill for it came out the colour of かたち until this line existed.
     SaijikiGroupMist,
+    // The thirteenth, for あいだ / relations. It was added to the generated
+    // table after the twelfth, and its pills took かたち's colour again.
+    SaijikiGroupLemon,
 )
 
 /**
@@ -1431,7 +1434,7 @@ private enum class BottomNavigationDestination {
 @Composable
 private fun StudioHeader(title: String, viewModel: InkuViewModel, showTools: Boolean = false) {
     var toolsOpen by remember { mutableStateOf(false) }
-    val isEnglish = LocalUiLanguage.current.isEnglish
+    val strings = S
     Row(
         modifier = Modifier.fillMaxWidth().heightIn(min = Dimens.studioHeaderMinHeight),
         verticalAlignment = Alignment.CenterVertically,
@@ -1444,11 +1447,7 @@ private fun StudioHeader(title: String, viewModel: InkuViewModel, showTools: Boo
                     TextButton(
                         onClick = { toolsOpen = !toolsOpen },
                         modifier = Modifier.semantics {
-                            stateDescription = if (toolsOpen) {
-                                if (isEnglish) "Expanded" else "展開中"
-                            } else {
-                                if (isEnglish) "Collapsed" else "折りたたみ中"
-                            }
+                            stateDescription = if (toolsOpen) strings.stateExpanded else strings.stateCollapsed
                         },
                     ) {
                         Text(S.productionTools, maxLines = 1)
@@ -3403,7 +3402,7 @@ private fun HistoryGridScrollbar(gridState: LazyGridState, modifier: Modifier = 
     val currentProgress by rememberUpdatedState(progress)
     val density = LocalDensity.current
     val minimumThumbPx = with(density) { Dimens.touchTarget.toPx() }
-    val isEnglish = LocalUiLanguage.current.isEnglish
+    val worksScrollbarLabel = S.worksScrollbarDescription
     val railColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.42f)
     val thumbColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.95f)
     val scope = rememberCoroutineScope()
@@ -3425,7 +3424,7 @@ private fun HistoryGridScrollbar(gridState: LazyGridState, modifier: Modifier = 
             .padding(vertical = Dimens.spaceM)
             .onSizeChanged { trackHeightPx = it.height }
             .semantics {
-                contentDescription = if (isEnglish) "Works scrollbar" else "作品のスクロールバー"
+                contentDescription = worksScrollbarLabel
                 progressBarRangeInfo = ProgressBarRangeInfo(progress, 0f..1f)
                 setProgress { value -> scrollToFraction(value); true }
             }
@@ -4385,7 +4384,7 @@ private fun MiscSettingsPanel(state: InkuUiState, viewModel: InkuViewModel, modi
             val words = if (LocalUiLanguage.current.isEnglish) state.bundledPluginWordsEn else state.bundledPluginWordsJa
             SettingCheckRow(
                 checked = state.bundledPluginsEnabled,
-                text = S.bundledPluginsToggle(words.joinToString(if (LocalUiLanguage.current.isEnglish) ", " else "・")),
+                text = S.bundledPluginsToggle(words.joinToString(S.listSeparator)),
                 onCheckedChange = viewModel::setBundledPluginsEnabled,
             )
         }

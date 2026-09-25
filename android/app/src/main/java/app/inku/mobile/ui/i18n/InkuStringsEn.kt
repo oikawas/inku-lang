@@ -528,4 +528,9 @@ object InkuStringsEn : InkuStrings {
     override val batchProgress: (Int, Int) -> String = { current, total -> "Progress $current / $total" }
 
     override val exportTemplateBuiltinDescription: (Int) -> String = { px -> "PNG / Y axis ${px}px" }
+
+    override val stateExpanded = "Expanded"
+    override val stateCollapsed = "Collapsed"
+    override val worksScrollbarDescription = "Works scrollbar"
+    override val listSeparator = ", "
 }

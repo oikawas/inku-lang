@@ -436,6 +436,14 @@ interface InkuStrings {
 
     // --- Export -------------------------------------------------------------
     val exportTemplateBuiltinDescription: (Int) -> String
+
+    /** Accessibility state of the 制作ツール menu button. */
+    val stateExpanded: String
+    val stateCollapsed: String
+    /** Accessibility name of the Works grid's scrollbar. */
+    val worksScrollbarDescription: String
+    /** Between the names of a list written into a sentence (「・」 / ", "). */
+    val listSeparator: String
 }
 
 /**

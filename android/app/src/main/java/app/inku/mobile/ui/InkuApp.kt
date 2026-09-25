@@ -193,6 +193,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.OffsetMapping
 import androidx.compose.ui.text.input.TransformedText
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.platform.testTag
@@ -4608,6 +4609,7 @@ private fun ProviderConnectionCard(
             title = S.baseUrlChange,
             label = "Base URL",
             initialValue = baseUrl,
+            keyboardOptions = UrlKeyboardOptions,
             onDismiss = { editBaseUrlOpen = false },
             onSave = { value ->
                 baseUrl = value
@@ -4621,6 +4623,7 @@ private fun ProviderConnectionCard(
             title = S.apiKeySet,
             label = S.newApiKey,
             initialValue = apiKey,
+            secret = true,
             onDismiss = { editApiKeyOpen = false },
             onSave = { value ->
                 apiKey = value
@@ -4733,6 +4736,8 @@ private fun TextEditDialog(
     initialValue: String,
     onDismiss: () -> Unit,
     onSave: (String) -> Unit,
+    keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
+    secret: Boolean = false,
 ) {
     var value by remember(title, initialValue) { mutableStateOf(initialValue) }
     AlertDialog(
@@ -4745,6 +4750,8 @@ private fun TextEditDialog(
                 label = label,
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
+                keyboardOptions = if (secret) SecretKeyboardOptions else keyboardOptions,
+                visualTransformation = if (secret) PasswordVisualTransformation() else VisualTransformation.None,
             )
         },
         confirmButton = {
@@ -5036,17 +5043,33 @@ private fun AddProviderCard(
     var kind by remember { mutableStateOf("openai-compatible") }
     var baseUrl by remember { mutableStateOf("") }
     var apiKey by remember { mutableStateOf("") }
+    // Closing forgets what was typed, the key above all: it would otherwise
+    // wait in memory and come back filled in the next time the dialog opens.
+    fun close() {
+        open = false
+        providerId = ""
+        displayName = ""
+        kind = "openai-compatible"
+        baseUrl = ""
+        apiKey = ""
+    }
     SecondaryActionButton(text = S.providerAdd, onClick = { open = true })
     if (open) {
         AlertDialog(
-            onDismissRequest = { open = false },
+            onDismissRequest = ::close,
+            // The dialog window is panned, not resized, for the keyboard; the
+            // inset has to shrink the dialog itself for its buttons to stay
+            // above the keys when the last field is being typed in.
+            modifier = Modifier.imePadding(),
             title = { Text(S.providerAdd) },
             text = {
+                // A ceiling rather than a fixed height: with the keyboard up the
+                // dialog has to shrink, or its buttons end up under the keys.
                 Column(
-                    modifier = Modifier.fillMaxWidth().height(Dimens.addProviderCardHeight).verticalScroll(rememberScrollState()),
+                    modifier = Modifier.fillMaxWidth().heightIn(max = Dimens.addProviderCardHeight).verticalScroll(rememberScrollState()),
                     verticalArrangement = Arrangement.spacedBy(Dimens.spaceM),
                 ) {
-                    ImeAwareOutlinedTextField(value = providerId, onValueChange = { providerId = it }, label = S.serviceId, modifier = Modifier.fillMaxWidth(), singleLine = true)
+                    ImeAwareOutlinedTextField(value = providerId, onValueChange = { providerId = it }, label = S.serviceId, modifier = Modifier.fillMaxWidth(), singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii, autoCorrectEnabled = false))
                     ImeAwareOutlinedTextField(value = displayName, onValueChange = { displayName = it }, label = S.serviceName, modifier = Modifier.fillMaxWidth(), singleLine = true)
                     CompactLabel(S.providerKind)
                     WrapRow(horizontal = Dimens.spaceM, vertical = Dimens.spaceM) {
@@ -5054,21 +5077,29 @@ private fun AddProviderCard(
                             MiniPill(label, selected = kind == value, onClick = { kind = value })
                         }
                     }
-                    ImeAwareOutlinedTextField(value = baseUrl, onValueChange = { baseUrl = it }, label = "Base URL", modifier = Modifier.fillMaxWidth(), singleLine = true)
-                    ImeAwareOutlinedTextField(value = apiKey, onValueChange = { apiKey = it }, label = S.apiKey, modifier = Modifier.fillMaxWidth(), singleLine = true)
+                    ImeAwareOutlinedTextField(value = baseUrl, onValueChange = { baseUrl = it }, label = "Base URL", modifier = Modifier.fillMaxWidth(), singleLine = true, keyboardOptions = UrlKeyboardOptions)
+                    ImeAwareOutlinedTextField(
+                        value = apiKey,
+                        onValueChange = { apiKey = it },
+                        label = S.apiKey,
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        keyboardOptions = SecretKeyboardOptions,
+                        visualTransformation = PasswordVisualTransformation(),
+                    )
                 }
             },
             confirmButton = {
                 TextButton(
                     onClick = {
                         onAdd(providerId, displayName, kind, baseUrl, apiKey, "")
-                        open = false
+                        close()
                     },
                     enabled = providerId.isNotBlank(),
                 ) { Text(S.add) }
             },
             dismissButton = {
-                TextButton(onClick = { open = false }) { Text(S.cancel) }
+                TextButton(onClick = ::close) { Text(S.cancel) }
             },
         )
     }
@@ -6797,6 +6828,7 @@ private fun ImeAwareOutlinedTextField(
     singleLine: Boolean = false,
     enabled: Boolean = true,
     keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
+    visualTransformation: VisualTransformation = VisualTransformation.None,
 ) {
     val bringIntoViewRequester = remember { BringIntoViewRequester() }
     val scope = rememberCoroutineScope()
@@ -6816,9 +6848,17 @@ private fun ImeAwareOutlinedTextField(
         singleLine = singleLine,
         enabled = enabled,
         keyboardOptions = keyboardOptions,
+        visualTransformation = visualTransformation,
         shape = RoundedCornerShape(Dimens.radiusCard),
     )
 }
+
+/**
+ * How an API key is typed: masked on screen, and with the password keyboard,
+ * which keeps it out of the keyboard's suggestions and learned words.
+ */
+private val SecretKeyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, autoCorrectEnabled = false)
+private val UrlKeyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, autoCorrectEnabled = false)
 
 @Composable
 private fun MetaPanel(

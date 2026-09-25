@@ -81,6 +81,24 @@ def rebuild_in_process(monkeypatch):
     monkeypatch.setattr(thumbnails, "multiprocessing", NoContext())
 
 
+@pytest.fixture(autouse=True)
+def keep_the_history_search_route(monkeypatch):
+    """Put the process's full-text search flag back after every test.
+
+    `db._HISTORY_FTS_ENABLED` is a module global that `init_db` and the legacy
+    column migration set from whichever database they ran against. A test that
+    points `db.engine` at a legacy file and migrates it, or assigns the flag to
+    exercise the FTS installer, left it False after monkeypatch had restored
+    the engine, and a later test on the same xdist worker read the real
+    database as having no FTS (T-144 failed only when one of them ran first).
+    `api.py` runs `init_db` at import, so the value taken here is the real
+    database's.
+    """
+    from inku_server import db
+
+    monkeypatch.setattr(db, "_HISTORY_FTS_ENABLED", db._HISTORY_FTS_ENABLED)
+
+
 def _in_process_bake_pool():
     """The save path's pool, standing in as threads of this process."""
     return ThreadPoolExecutor(max_workers=2, thread_name_prefix="inku-thumb-bake")

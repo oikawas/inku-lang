@@ -814,17 +814,7 @@ class InkuRepository(
         return when (plan.route) {
             RefinementRoute.RenderFromScore -> pipeline.renderFromScore(parent.scoreJson, request)
             RefinementRoute.ComposeFromDdl -> pipeline.composeFromDdl(parent.ddl, request)
-            // A pair of languages is passed the way web passes it: the two
-            // stages are asked separately, each with its own language
-            // (`state.svelte.ts:432-435`). A single call could carry only one,
-            // and inventing a per-stage key here would be a shape the server
-            // does not have.
-            RefinementRoute.Paint -> if (plan.stage1Lang != null || plan.stage2Lang != null) {
-                val interpreted = pipeline.interpret(request.copy(instructionLang = plan.stage1Lang))
-                pipeline.composeFromDdl(interpreted.ddlForDisplay, request.copy(instructionLang = plan.stage2Lang, executionId = interpreted.executionId))
-            } else {
-                pipeline.paint(request)
-            }
+            RefinementRoute.Paint -> pipeline.paint(request)
         }
     }
 

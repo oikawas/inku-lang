@@ -31,7 +31,6 @@ import app.inku.mobile.data.lineage.LineageGraphNode
 import app.inku.mobile.data.lineage.LineageGraphResult
 import app.inku.mobile.data.lineage.SubmitDerivationKind
 import app.inku.mobile.data.refinement.ComparisonPlanner
-import app.inku.mobile.data.refinement.LanguageCombo
 import app.inku.mobile.data.refinement.ModelCompareMode
 import app.inku.mobile.data.refinement.RefinementElement
 import app.inku.mobile.data.refinement.RefinementParent
@@ -125,8 +124,6 @@ const val MAX_COMPARE_SELECTION = 4
 val MODEL_SELECT_PROMPT: (InkuStrings) -> String = { it.comparisonModelSelectPrompt }
 val MODEL_FIXED_MISSING: (InkuStrings) -> String = { it.comparisonModelFixedMissing }
 val MODEL_CHOICE_BLOCKED: (InkuStrings) -> String = { it.comparisonModelChoiceBlocked }
-val LANGUAGE_SELECT_PROMPT: (InkuStrings) -> String = { it.comparisonLanguageSelectPrompt }
-val LANGUAGE_COMBO_BLOCKED: (InkuStrings) -> String = { it.comparisonLanguageComboBlocked }
 private const val MaxBatchItems = 100
 private const val MaxDemoCycles = 100
 
@@ -141,9 +138,6 @@ const val CANVAS_FIT_ZOOM = 1.0f
 
 /** Float slack for "is it back at fit", which a pinch never lands on exactly. */
 const val CANVAS_ZOOM_EPSILON = 0.01f
-
-/** 日本語 / English, the two names the language grid shows. */
-fun languageLabel(lang: String): String = if (lang == "en") "English" else "日本語"
 
 val InkuUiState.descriptionLocked: Boolean
     get() = historyAuthorityLoading || (!descriptionForkRequested &&
@@ -265,14 +259,13 @@ data class InkuUiState(
     // The candidate on the canvas that has not been saved. Drawing on from here
     // has to put it in the lineage first (SPEC :2105).
     val refinementPreviewId: String? = null,
-    // 検分 (SPEC :616, :686). The two comparisons are sub-views beside 調整
-    // rather than screens of their own, and they share every field above:
-    // the candidates, the busy flag, the stop and the save are the refinement's.
+    // 検分 (SPEC :616). The model comparison is a sub-view beside 調整 rather
+    // than a screen of its own, and it shares every field above: the
+    // candidates, the busy flag, the stop and the save are the refinement's.
     val refinementSubview: RefinementSubview = RefinementSubview.Adjust,
     val modelCompareMode: ModelCompareMode = ModelCompareMode.Default,
     val modelCompareFixedModel: String = "",
     val modelCompareSelectedModels: List<String> = emptyList(),
-    val languageCompareSelectedCombos: List<String> = emptyList(),
 ) {
     /**
      * Whether any operation is running.
@@ -302,16 +295,17 @@ private data class CameraDrawRunInput(
 private class CameraStageFailure(val failure: CameraFailure) : RuntimeException()
 
 /**
- * The three sub-views of 推敲 (SPEC `:616`, `:686`).
+ * The two sub-views of 推敲 (SPEC `:616`).
  *
- * 調整 varies one of the five elements; the other two vary a model or a
- * language. They are one screen with three faces rather than three screens,
- * which is what「比較のロジックを複製しない」(SPEC `:688`) asks for.
+ * 調整 varies one of the five elements; the other varies the model. They are
+ * one screen with two faces rather than two screens, which is what
+ * 「比較のロジックを複製しない」(SPEC `:688`) asks for. The language comparison
+ * was a third; the web retired it on 2026-08-29 and SPEC keeps only the saved
+ * `language_comparison` works readable, so it is gone here too.
  */
 enum class RefinementSubview(val id: String) {
     Adjust("adjust"),
     Model("model"),
-    Language("language"),
     ;
 
     companion object {
@@ -2644,7 +2638,6 @@ class InkuViewModel @JvmOverloads constructor(
             // target starts from an empty one rather than from choices that were
             // legal for the last work.
             modelCompareSelectedModels = if (previous?.id == item.id) localState.value.modelCompareSelectedModels else emptyList(),
-            languageCompareSelectedCombos = if (previous?.id == item.id) localState.value.languageCompareSelectedCombos else emptyList(),
             modelCompareFixedModel = if (previous?.id == item.id) localState.value.modelCompareFixedModel else "",
             tab = AppTab.Lineage,
         )
@@ -2719,32 +2712,6 @@ class InkuViewModel @JvmOverloads constructor(
         localState.value = current.copy(modelCompareSelectedModels = next, refinementStatus = null)
     }
 
-    fun toggleLanguageCombo(comboId: String) {
-        val current = localState.value
-        if (current.refinementBusy) return
-        val combo = LanguageCombo.byId(comboId) ?: return
-        if (ComparisonPlanner.isLanguageComboBlocked(combo, targetInstructionLang(current.refinementParent))) {
-            localState.value = current.copy(refinementStatus = LANGUAGE_COMBO_BLOCKED(strings()))
-            return
-        }
-        val selected = current.languageCompareSelectedCombos
-        val next = if (comboId in selected) selected - comboId else selected + comboId
-        localState.value = current.copy(languageCompareSelectedCombos = next, refinementStatus = null)
-    }
-
-    /**
-     * The language the target work was drawn in.
-     *
-     * web reads the resolved column and falls back to the UI language
-     * (`languageInspectionTargetLang`, `state.svelte.ts:365-368`). This client
-     * has no UI-language setting, so the fallback is the same `"ja"` its
-     * instruction-language resolution uses.
-     */
-    private fun targetInstructionLang(parent: HistoryItemEntity?): String =
-        parent?.instructionLangResolved
-            ?.takeIf { it in InstructionLanguages.SUPPORTED }
-            ?: InstructionLanguages.DEFAULT_LANG
-
     fun closeRefinement() {
         refinementJob?.cancel()
         refinementJob = null
@@ -2797,15 +2764,14 @@ class InkuViewModel @JvmOverloads constructor(
     /**
      * What to draw, for whichever sub-view is showing.
      *
-     * The three lists are built here and nowhere else, so the drawing loop below
-     * has no idea which comparison it is running -- that is what stops the two
-     * inspections from growing a second copy of it (SPEC `:688`).
+     * Both lists are built here and nowhere else, so the drawing loop below has
+     * no idea which sub-view it is running -- that is what stops the model
+     * comparison from growing a second copy of it (SPEC `:688`).
      */
     private fun candidateJobs(current: InkuUiState, parent: RefinementParent): List<CandidateJob> =
         when (current.refinementSubview) {
             RefinementSubview.Adjust -> adjustJobs(current, parent)
             RefinementSubview.Model -> modelJobs(current, parent)
-            RefinementSubview.Language -> languageJobs(current, parent)
         }
 
     private fun adjustJobs(current: InkuUiState, parent: RefinementParent): List<CandidateJob> {
@@ -2867,21 +2833,6 @@ class InkuViewModel @JvmOverloads constructor(
                 id = "${mode.id}:${plan.stage1Model}:${plan.stage2Model}",
                 label = model,
                 plan = plan,
-            )
-        }
-    }
-
-    private fun languageJobs(current: InkuUiState, parent: RefinementParent): List<CandidateJob> {
-        val targetLang = targetInstructionLang(current.refinementParent)
-        val chosen = current.languageCompareSelectedCombos
-            .mapNotNull { LanguageCombo.byId(it) }
-            .filterNot { ComparisonPlanner.isLanguageComboBlocked(it, targetLang) }
-        if (chosen.isEmpty()) throw InkuFailure(LANGUAGE_SELECT_PROMPT)
-        return chosen.map { combo ->
-            CandidateJob(
-                id = combo.id,
-                label = "${languageLabel(combo.stage1)} / ${languageLabel(combo.stage2)}",
-                plan = ComparisonPlanner.languagePlan(combo, parent),
             )
         }
     }

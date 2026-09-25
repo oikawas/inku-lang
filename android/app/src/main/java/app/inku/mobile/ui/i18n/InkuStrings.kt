@@ -112,8 +112,6 @@ interface InkuStrings {
     val comparisonModelSelectPrompt: String
     val comparisonModelFixedMissing: String
     val comparisonModelChoiceBlocked: String
-    val comparisonLanguageSelectPrompt: String
-    val comparisonLanguageComboBlocked: String
     val comparisonModeLabel: (String) -> String
     val comparisonKindLabel: (String) -> String
     val comparisonKindDescription: (String) -> String
@@ -180,7 +178,6 @@ interface InkuStrings {
     val exportPngTooLarge: String
     val pngAlphaWhite: String
     val stagesShared: String
-    val languageComboNote: String
     val uiModeSubtitle: String
     val displaySafeMarginsSubtitle: String
     val displaySafeMarginsToggle: String
@@ -322,7 +319,6 @@ interface InkuStrings {
     val autoRepair: String
     val interpretation: String
     val awaitingInterpretation: String
-    val language: String
     val miscSubtitle: String
     val description: String
     val camera: String
@@ -368,7 +364,6 @@ interface InkuStrings {
     val ddlOverwriteBody: String
     val selected: String
     val close: String
-    val sameAsTargetSuffix: String
     val renderTabArtwork: String
     val generationInfoTitle: String
     val generationInfoInputSection: String

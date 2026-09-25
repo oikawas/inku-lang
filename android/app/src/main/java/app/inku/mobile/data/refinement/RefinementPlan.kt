@@ -124,7 +124,7 @@ data class RefinementParent(
  * one thing this round varies. There is no second place where a seed is decided.
  */
 data class RefinementPlan(
-    /** `null` for a comparison candidate: those vary a model or a language, neither of which is one of the five elements. */
+    /** `null` for a comparison candidate: it varies the model, which is not one of the five elements. */
     val element: RefinementElement?,
     val route: RefinementRoute,
     val catalogId: String,
@@ -135,17 +135,9 @@ data class RefinementPlan(
     /**
      * What a comparison candidate overrides. `null` is "the parent's", which is
      * every field for an ordinary refinement.
-     *
-     * The two languages are separate because they are two requests: the stages
-     * are asked one at a time, exactly as web asks them (`interpretOne(...,
-     * job.stage1Lang)` then `composeOne(..., job.stage2Lang)`,
-     * `state.svelte.ts:432-435`). There is no single "language per stage" key on
-     * either side.
      */
     val stage1Model: String? = null,
     val stage2Model: String? = null,
-    val stage1Lang: String? = null,
-    val stage2Lang: String? = null,
 )
 
 /**

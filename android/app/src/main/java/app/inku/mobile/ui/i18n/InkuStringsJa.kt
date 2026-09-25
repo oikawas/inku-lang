@@ -112,8 +112,6 @@ object InkuStringsJa : InkuStrings {
     override val comparisonModelSelectPrompt = "比較するモデルを1つ以上選択してください。"
     override val comparisonModelFixedMissing = "固定するモデルを選択してください。"
     override val comparisonModelChoiceBlocked = "対象作品と同じ Stage 1/2 の組み合わせは選べません。"
-    override val comparisonLanguageSelectPrompt = "比較する組み合わせを1つ以上選択してください。"
-    override val comparisonLanguageComboBlocked = "対象作品と同じ言語の組み合わせは選べません。"
     override val comparisonModeLabel: (String) -> String = { id ->
         when (id) {
             "common" -> "Stage 1/2 共通"
@@ -126,7 +124,6 @@ object InkuStringsJa : InkuStrings {
         when (id) {
             "adjust" -> "調整"
             "model" -> "モデル"
-            "language" -> "言語"
             else -> id
         }
     }
@@ -134,7 +131,6 @@ object InkuStringsJa : InkuStrings {
         when (id) {
             "adjust" -> "描画要素を編集する"
             "model" -> "モデルを編集する"
-            "language" -> "言語を編集する"
             else -> id
         }
     }
@@ -241,7 +237,6 @@ object InkuStringsJa : InkuStrings {
     override val exportPngTooLarge = "PNG出力サイズが大きすぎます。キャンバス比率または出力サイズを下げてください。"
     override val pngAlphaWhite = "PNG透過時の白背景"
     override val stagesShared = "Stage 1 / Stage 2 共通"
-    override val languageComboNote = "Stage 1 と Stage 2 の言語の組を選びます。"
     override val uiModeSubtitle = "UIの表示密度・構成"
     override val displaySafeMarginsSubtitle = "全画面表示でカメラ穴や画面端を避けます。用紙の比率は変わりません。"
     override val displaySafeMarginsToggle = "横方向の安全領域を使う"
@@ -383,7 +378,6 @@ object InkuStringsJa : InkuStrings {
     override val autoRepair = "補正"
     override val interpretation = "解釈"
     override val awaitingInterpretation = "解釈を待機中..."
-    override val language = "言語"
     override val miscSubtitle = "言語・文字の大きさ・表示"
     override val description = "記述"
     override val camera = "カメラ"
@@ -429,7 +423,6 @@ object InkuStringsJa : InkuStrings {
     override val ddlOverwriteBody = "通常の描画を実行すると、現在の解釈（正規化DDL）は Stage 1 の結果で上書きされます。"
     override val selected = "選択中"
     override val close = "閉じる"
-    override val sameAsTargetSuffix = "（対象と同じ）"
     override val renderTabArtwork = "描画"
     override val generationInfoTitle = "生成情報"
     override val generationInfoInputSection = "入力"

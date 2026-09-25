@@ -122,9 +122,6 @@ object InkuStringsEn : InkuStrings {
     override val comparisonModelFixedMissing = "Select the model to hold fixed."
     override val comparisonModelChoiceBlocked =
         "The target work's own Stage 1/2 pairing cannot be chosen."
-    override val comparisonLanguageSelectPrompt = "Select one or more pairings to compare."
-    override val comparisonLanguageComboBlocked =
-        "The target work's own language pairing cannot be chosen."
     override val comparisonModeLabel: (String) -> String = { id ->
         when (id) {
             "common" -> "Stage 1/2 shared"
@@ -137,7 +134,6 @@ object InkuStringsEn : InkuStrings {
         when (id) {
             "adjust" -> "Adjust"
             "model" -> "Model"
-            "language" -> "Language"
             else -> id
         }
     }
@@ -145,7 +141,6 @@ object InkuStringsEn : InkuStrings {
         when (id) {
             "adjust" -> "Edit the drawing elements"
             "model" -> "Edit the models"
-            "language" -> "Edit the languages"
             else -> id
         }
     }
@@ -269,7 +264,6 @@ object InkuStringsEn : InkuStrings {
     override val exportPngTooLarge = "The PNG is too large to write. Lower the canvas ratio or the output size."
     override val pngAlphaWhite = "White ground behind a transparent PNG"
     override val stagesShared = "Stage 1 / Stage 2 shared"
-    override val languageComboNote = "Choose a pairing of Stage 1 and Stage 2 languages."
     override val uiModeSubtitle = "Interface density and layout"
     override val displaySafeMarginsSubtitle = "Avoids camera cutouts and screen edges in full screen without changing the paper ratio."
     override val displaySafeMarginsToggle = "Use horizontal safe areas"
@@ -413,7 +407,6 @@ object InkuStringsEn : InkuStrings {
     override val autoRepair = "Auto-repair"
     override val interpretation = "Interpretation"
     override val awaitingInterpretation = "Waiting for the interpretation…"
-    override val language = "Language"
     override val miscSubtitle = "Language, text size and display"
     override val description = "Description"
     override val camera = "Camera"
@@ -461,7 +454,6 @@ object InkuStringsEn : InkuStrings {
     override val ddlOverwriteBody = "Painting normally replaces the current interpretation (the normalized DDL) with what Stage 1 produces."
     override val selected = "Selected"
     override val close = "Close"
-    override val sameAsTargetSuffix = " (same as the target)"
     override val renderTabArtwork = "Work"
     override val generationInfoTitle = "Provenance"
     override val generationInfoInputSection = "Input"

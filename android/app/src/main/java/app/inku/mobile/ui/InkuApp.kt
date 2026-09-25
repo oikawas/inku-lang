@@ -207,7 +207,6 @@ import app.inku.mobile.data.db.HistoryListItem
 import app.inku.mobile.data.lineage.LineageGraphNode
 import app.inku.mobile.data.lineage.LineageGraphResult
 import app.inku.mobile.data.refinement.ComparisonPlanner
-import app.inku.mobile.data.refinement.LanguageCombo
 import app.inku.mobile.data.refinement.ModelCompareMode
 import app.inku.mobile.data.refinement.RefinementElement
 import app.inku.mobile.data.refinement.RefinementPlanner
@@ -216,7 +215,6 @@ import app.inku.mobile.data.model.CatalogSelection
 import app.inku.mobile.data.model.CanvasAspects
 import app.inku.mobile.data.model.DerivationKindRegistry
 import app.inku.mobile.data.model.ColorCatalogs
-import app.inku.mobile.pipeline.InstructionLanguages
 import app.inku.mobile.pipeline.PluginDiagnostic
 import app.inku.mobile.pipeline.SaijikiGenerated
 import app.inku.mobile.pipeline.Sketches
@@ -3591,15 +3589,13 @@ internal const val REFINE_SAVE_TAG = "refine_save"
 internal const val REFINE_STOP_TAG = "refine_stop"
 internal const val REFINE_GENERATE_TAG = "refine_generate"
 
-/** The two comparison entries on a lineage card, beside 描画要素 (SPEC `:618`). */
+/** The model comparison entry on a lineage card, beside 描画要素 (SPEC `:618`). */
 internal const val MODEL_ENTRY_TAG = "model_entry"
-internal const val LANGUAGE_ENTRY_TAG = "language_entry"
 
-/** Tags for the sub-view chips and the two selection grids. */
+/** Tags for the sub-view chips and the model selection grid. */
 internal fun refinementSubviewTag(subview: RefinementSubview): String = "refine_subview_${subview.id}"
 internal fun modelCompareModeTag(mode: ModelCompareMode): String = "model_compare_mode_${mode.id}"
 internal fun modelChoiceTag(modelId: String): String = "model_choice_$modelId"
-internal fun languageComboTag(comboId: String): String = "language_combo_$comboId"
 
 /**
  * 作品の系譜 -- the port of web's `LineagePanel.svelte`, cut to what contract
@@ -3669,7 +3665,7 @@ private fun RefinementPanel(state: InkuUiState, viewModel: InkuViewModel) {
             ChipButton(S.close, onClick = viewModel::closeRefinement)
         }
 
-        // 調整・モデル・言語 (SPEC :616, :686). Three faces of one screen.
+        // 調整・モデル (SPEC :616). Two faces of one screen.
         WrapRow(horizontal = Dimens.spaceM, vertical = Dimens.spaceM) {
             RefinementSubview.entries.forEach { subview ->
                 ChipButton(
@@ -3685,7 +3681,6 @@ private fun RefinementPanel(state: InkuUiState, viewModel: InkuViewModel) {
             when (state.refinementSubview) {
                 RefinementSubview.Adjust -> S.refineOneKindOnly
                 RefinementSubview.Model -> S.sameStagePairBlocked
-                RefinementSubview.Language -> S.languageComboNote
             } + (parent?.let {
                 S.parentSuffix(it.renderHashShort, ColorCatalogs.currentDisplayCatalog(it.colorCatalogId)?.name ?: it.colorCatalogId)
             } ?: ""),
@@ -3700,7 +3695,6 @@ private fun RefinementPanel(state: InkuUiState, viewModel: InkuViewModel) {
                 onTouchWordsFocused = { scope.launchImeBringIntoViewGuard(generateRowRequester) },
             )
             RefinementSubview.Model -> ModelInspectionControls(state, viewModel)
-            RefinementSubview.Language -> LanguageInspectionControls(state, viewModel)
         }
 
         WrapRow(
@@ -3953,34 +3947,6 @@ private fun ModelInspectionControls(state: InkuUiState, viewModel: InkuViewModel
     }
 }
 
-/**
- * 言語検分: the four Stage 1 × Stage 2 pairs, chosen with checkboxes.
- *
- * SPEC `:686` describes the same three modes model comparison has; the reference
- * implementation selects pairs instead (`CanvasPanel.svelte:978-988`), and SPEC
- * `:614` makes the reference implementation the one to follow.
- */
-@Composable
-private fun LanguageInspectionControls(state: InkuUiState, viewModel: InkuViewModel) {
-    WrapRow(horizontal = Dimens.spaceM, vertical = Dimens.spaceM) {
-        LanguageCombo.ALL.forEach { combo ->
-            val blocked = ComparisonPlanner.isLanguageComboBlocked(combo, targetInstructionLangOf(state.refinementParent))
-            ChipButton(
-                text = "${languageLabel(combo.stage1)} / ${languageLabel(combo.stage2)}" + if (blocked) S.sameAsTargetSuffix else "",
-                selected = combo.id in state.languageCompareSelectedCombos,
-                modifier = Modifier.testTag(languageComboTag(combo.id)),
-                onClick = { viewModel.toggleLanguageCombo(combo.id) },
-            )
-        }
-    }
-}
-
-/** The target work's language, read the way `languageInspectionTargetLang` reads it. */
-private fun targetInstructionLangOf(parent: HistoryItemEntity?): String =
-    parent?.instructionLangResolved
-        ?.takeIf { it in InstructionLanguages.SUPPORTED }
-        ?: InstructionLanguages.DEFAULT_LANG
-
 @Composable
 private fun RefinementCandidateCard(
     candidate: RefinementCandidate,
@@ -4179,19 +4145,19 @@ private fun LineageNodeCard(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-                // 「作品を編集する」 in SPEC :618 lists seven items in one order --
-                // 描画要素・記述・DDL・モデル・言語・AI に自律推敲させる・ゴミ箱.
-                // Four are here in that order. 記述 remains another contract, so
-                // DDL follows 描画要素 directly; モデル and 言語 still open the
-                // matching sub-view of the same 推敲 screen rather than a screen
-                // of their own (SPEC :688). A tombstone has no work to edit,
-                // which is why this hangs off `history`.
+                // 「作品を編集する」 in SPEC lists six items in one order --
+                // 描画要素・記述・DDL・モデル・AI に自律推敲させる・ゴミ箱 (言語 was
+                // retired with the web's language comparison on 2026-08-29).
+                // Three are here in that order. 記述 remains another contract, so
+                // DDL follows 描画要素 directly; モデル opens the matching
+                // sub-view of the same 推敲 screen rather than a screen of its
+                // own (SPEC :688). A tombstone has no work to edit, which is why
+                // this hangs off `history`.
                 if (history != null) {
                     WrapRow(horizontal = Dimens.spaceXs, vertical = Dimens.spaceXs) {
                         ChipButton(S.refinementElements, modifier = Modifier.testTag(REFINE_ENTRY_TAG), onClick = { onRefine(history.item, RefinementSubview.Adjust) })
                         ChipButton(S.ddlEdit, modifier = Modifier.testTag(DDL_ENTRY_TAG), onClick = { onEditDdl(history.item) })
                         ChipButton(S.model, modifier = Modifier.testTag(MODEL_ENTRY_TAG), onClick = { onRefine(history.item, RefinementSubview.Model) })
-                        ChipButton(S.language, modifier = Modifier.testTag(LANGUAGE_ENTRY_TAG), onClick = { onRefine(history.item, RefinementSubview.Language) })
                         ChipButton(S.workActionSketchRedraw, onClick = { sketchChoicesOpen = !sketchChoicesOpen })
                     }
                     if (sketchChoicesOpen) {

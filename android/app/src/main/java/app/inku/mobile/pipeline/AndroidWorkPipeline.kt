@@ -191,7 +191,16 @@ class AndroidWorkPipeline(
             return replayResult(scoreJson, request, rendered.svg, metadata, replaySource)
         }
 
-        val run = prepare(request, descriptionFlow = false)
+        // A saved color snapshot is the render authority even if its catalog ID
+        // has since been retired. Older work without one uses today's default.
+        val useDefaultPolicy = request.workColorSnapshot != null ||
+            (request.parentHistoryId != null && ColorCatalogs.find(request.colorCatalogId) == null)
+        val policyRequest = if (useDefaultPolicy) {
+            request.copy(colorCatalogId = "default")
+        } else {
+            request
+        }
+        val run = prepare(policyRequest, descriptionFlow = false)
         val score = JSONObject(scoreJson)
         val compiler = JSONObject(run.request.config.configJson).requiredObject("compiler")
         // A Score cannot authorize its own budget. The independently restored
@@ -199,7 +208,7 @@ class AndroidWorkPipeline(
         // Score resource snapshot against it.
         val hardPolicy = compiler.requiredObject("hard_resource_policy")
         val operationalBudget = compiler.requiredObject("operational_resource_budget")
-        val catalogId = request.workColorSnapshot?.catalogId ?: request.colorCatalogId
+        val catalogId = request.workColorSnapshot?.catalogId ?: policyRequest.colorCatalogId
         val colors = request.workColorSnapshot?.colorMap ?: run.request.config.renderColorMaps[catalogId]
             ?: throw PipelineHostException("saved_color_catalog_unavailable")
         val canvas = canvas(request.canvasAspect)

@@ -47,6 +47,8 @@ data class HistoryItemEntity(
     val renderHashShort: String,
     @ColumnInfo(name = "color_catalog_id")
     val colorCatalogId: String,
+    @ColumnInfo(name = "catalog_mode")
+    val catalogMode: String? = null,
     @ColumnInfo(name = "canvas_aspect")
     val canvasAspect: String,
     val starred: Boolean,

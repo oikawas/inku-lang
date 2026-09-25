@@ -3472,7 +3472,9 @@ private fun RefinementPanel(state: InkuUiState, viewModel: InkuViewModel) {
                 RefinementSubview.Adjust -> S.refineOneKindOnly
                 RefinementSubview.Model -> S.sameStagePairBlocked
                 RefinementSubview.Language -> S.languageComboNote
-            } + (parent?.let { S.parentSuffix(it.renderHashShort, ColorCatalogs.get(it.colorCatalogId).name) } ?: ""),
+            } + (parent?.let {
+                S.parentSuffix(it.renderHashShort, ColorCatalogs.currentDisplayCatalog(it.colorCatalogId)?.name ?: it.colorCatalogId)
+            } ?: ""),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -5650,8 +5652,16 @@ internal fun generationInfoColorCatalogValue(
     renderMetadataJson: String,
     fallbackCatalogId: String,
 ): String {
-    val snapshot = workColorSnapshot(renderMetadataJson) ?: return fallbackCatalogId
-    val catalogName = snapshot.catalogName?.trim()?.takeIf { it.isNotEmpty() }
+    val snapshot = workColorSnapshot(renderMetadataJson) ?: return if (ColorCatalogs.find(fallbackCatalogId) == null) {
+        ColorCatalogs.currentDisplayCatalog(fallbackCatalogId)?.name ?: fallbackCatalogId
+    } else {
+        fallbackCatalogId
+    }
+    val catalogName = if (ColorCatalogs.find(snapshot.catalogId) == null) {
+        ColorCatalogs.currentDisplayCatalog(snapshot.catalogId)?.name
+    } else {
+        null
+    } ?: snapshot.catalogName?.trim()?.takeIf { it.isNotEmpty() }
         ?: return snapshot.catalogId
     return if (catalogName == snapshot.catalogId) {
         snapshot.catalogId

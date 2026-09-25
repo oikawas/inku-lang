@@ -5,7 +5,11 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import app.inku.mobile.data.InkuRepository
 import app.inku.mobile.data.db.InkuDatabase
+import app.inku.mobile.data.model.workColorSnapshot
 import app.inku.mobile.data.refinement.PaintSeeds
+import app.inku.mobile.data.refinement.RefinementElement
+import app.inku.mobile.data.refinement.RefinementParent
+import app.inku.mobile.data.refinement.RefinementPlanner
 import app.inku.mobile.llm.ModelProvider
 import app.inku.mobile.llm.ModelRequest
 import app.inku.mobile.llm.ModelResponse
@@ -256,6 +260,45 @@ class AndroidSharedPipelineTest {
         assertEquals(editedManaged.variationId, replayManaged.variationId)
         assertEquals(editedManaged.revision, replayManaged.revision)
         assertEquals("ddl_authoritative", replayManaged.authority)
+    }
+
+    @Test
+    fun retiredCatalogReplaysFromSnapshotOrDefaultForOldWork() = runBlocking {
+        val provider = ScriptedProvider()
+        val db = Room.inMemoryDatabaseBuilder(context, InkuDatabase::class.java)
+            .build().also { database = it }
+        val repo = InkuRepository(context, db, modelProviderOverride = provider)
+            .also { repository = it }
+        val original = repo.composeFromDdl(
+            description = "One black circle",
+            ddl = "place one black circle at center.",
+            catalogId = "default", canvasAspect = "square",
+            stage1ModelId = MODEL, stage2ModelId = MODEL,
+            seeds = PaintSeeds(renderSeed = 77L, compositionSeed = 17L),
+            instructionLang = "en", uiLang = "en",
+        )
+        val retiredId = "retired_catalog_fixture"
+        val snapshot = workColorSnapshot(original.renderMetadataJson)!!.copy(catalogId = retiredId)
+        val parent = RefinementParent.of(original, original.originalInput).copy(
+            catalogId = retiredId,
+            workColorSnapshot = snapshot,
+        )
+        val plan = RefinementPlanner.plan(RefinementElement.Touch, parent, seedText = "new touch")
+
+        val replay = repo.renderRefinementCandidate(parent, plan)
+
+        val metadata = JSONObject(replay.renderMetadataJson)
+        assertTrue(replay.displaySvg.startsWith("<svg"))
+        assertEquals(retiredId, metadata.getString("render_color_catalog_id"))
+        assertEquals(snapshot.colorMap.getValue("white"), metadata.getJSONObject("render_color_map").getString("white"))
+
+        val oldWork = parent.copy(workColorSnapshot = null)
+        val oldReplay = repo.renderRefinementCandidate(
+            oldWork,
+            RefinementPlanner.plan(RefinementElement.Touch, oldWork, seedText = "older work"),
+        )
+        assertEquals("default", JSONObject(oldReplay.renderMetadataJson).getString("render_color_catalog_id"))
+        assertTrue(provider.requests.isEmpty())
     }
 
     private class ScriptedProvider : ModelProvider {

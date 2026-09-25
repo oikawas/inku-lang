@@ -38,8 +38,14 @@ abstract class InkuDatabase : RoomDatabase() {
     abstract fun sharedPipelineDao(): SharedPipelineDao
 
     companion object {
-        const val SCHEMA_VERSION = 11
+        const val SCHEMA_VERSION = 12
         private const val DB_NAME = "inku.sqlite"
+
+        val MIGRATION_11_12 = object : Migration(11, 12) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `history_items` ADD COLUMN `catalog_mode` TEXT")
+            }
+        }
 
         val MIGRATION_10_11 = object : Migration(10, 11) {
             override fun migrate(db: SupportSQLiteDatabase) {
@@ -163,7 +169,7 @@ abstract class InkuDatabase : RoomDatabase() {
                 context.applicationContext,
                 InkuDatabase::class.java,
                 databaseName,
-            ).addMigrations(MIGRATION_10_11).addCallback(FRESH_SCHEMA_CALLBACK).build()
+            ).addMigrations(MIGRATION_10_11, MIGRATION_11_12).addCallback(FRESH_SCHEMA_CALLBACK).build()
         }
     }
 }

@@ -40,6 +40,12 @@ When updating Android specifications:
 3. Do not introduce English-only Android requirements that are absent from
    `ANDROID_SPEC.ja.md`.
 
+## 2026-09-25 Current color catalogs and saved works
+
+Android's 13 fixed color catalogs have the same IDs, color maps, and `palette` entries as Server. The `white` value in `moss_bark` is `#f2efe8`. An ordinary draw resolves either a fixed choice or automatic selection from the description, and history stores the resolved ID and the requested `catalog_mode`. Older history rows may have a null `catalog_mode`; its absence does not establish whether the request was automatic or fixed. An existing Room schema 11 database is migrated to schema 12 at startup without rejection or reset.
+
+When redrawing a saved work, its own `render_color_map` is the color authority and its drawn-with catalog ID is retained. A valid saved color snapshot allows redraw even when that ID has been retired. An older work without a color snapshot uses today's `default` catalog if its ID is no longer current. Historical ID aliases resolve history display names only; they do not change the render ID or saved colors. If the alias target is also retired, the saved name or original ID is displayed.
+
 ## 2026-09-25 Current sketch behavior (method A)
 
 Under shared SPEC §12.6.1, the author chooses sketching for each draw. It is off by default; there is no automatic per-description decision. The start input and regenerate-from-description command accept `sketch` modes `off`, author-selected `on`, and `supplied` for author-edited or saved prose. Supplied prose bypasses the sketch provider.

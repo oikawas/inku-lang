@@ -6,6 +6,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 36 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-25 — Align Android color catalogs and saved-work redraw with Server
+
+Android's `moss_bark` white now matches Server's `#f2efe8`. Redrawing a saved work uses its own color snapshot, retaining its drawn-with catalog ID and colors even if the ID has been retired. An older work without a snapshot uses today's default colors when its ID is invalid. Historical ID aliases affect history display names only. History stores the requested `catalog_mode`, while older rows may retain null. Existing Room schema 11 databases migrate to 12 without a reset.
+
 ### 2026-09-25 — The sketch runs only when the author chooses it
 
 An optional sketch can now run before the work plan. It never rewrites the description: it supplements the extent of place and the seasonal or time-of-day light in plain words beside it, and Stage 1 reads both. It is off by default and is used through "on" in the describe tab or the work menu's "redraw with or without the sketch". It never waits for a confirmation, and a failed sketch request still draws from the description. The sketch can be read and edited after drawing. There is no automatic mode that decides per description: in a blind comparison on 70 development descriptions the sketch was even (32 with, 30 without), and the rule checked on 110 unused descriptions in Japanese and English came out 43 to 50, so no general criterion that improves the picture was found. Saved states gain `supplemented` and `not_needed`; the retired layer's fine and coarse grains remain only for displaying saved works. The CLI's `--sketch` runs the new sketch. Android follows separately. DDL, Score, and render versions are unchanged.

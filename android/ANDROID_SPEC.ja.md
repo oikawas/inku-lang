@@ -30,6 +30,12 @@ runtime fallbackを持たない。保存済みSVG、Room schema、Score schema�
 - Android 仕様を更新するときは、先に `ANDROID_SPEC.ja.md` を更新し、その後で `ANDROID_SPEC.md` を同期する。
 - 英語版だけに存在する仕様・要件を追加してはならない。
 
+## 2026-09-25 現行の色カタログと保存作品
+
+Androidの固定色カタログ13件はServerと同じID、色map、paletteを持つ。`moss_bark`の`white`は`#f2efe8`である。通常描画では固定選択または記述からの自動選択を解決し、履歴には解決済みIDと要求時の`catalog_mode`を保存する。旧履歴行の`catalog_mode`はnullを許し、欠落からautoか固定かを推定しない。既存のRoom schema 11は起動時に拒否・初期化せず、schema 12へ移行する。
+
+保存作品の再描画では、作品自身の`render_color_map`を色の正本とし、描画時のカタログIDを維持する。廃止済みIDでも有効な保存色snapshotがあれば再描画できる。色snapshotのない旧作品でIDが現行一覧に無ければ、現在の`default`カタログで描画する。旧IDから現行IDへの別名解決は履歴の表示名だけに使い、描画IDや保存色を変更しない。対応先も廃止されたIDは、保存名または元のIDを表示する。
+
 ## 2026-09-25 現行の写生（方式A）
 
 共有仕様§12.6.1に従い、写生は描画ごとに作者が選ぶ。既定は「なし」で、記述ごとに要否を決める自動modeは置かない。開始入力と記述からの再生成には`sketch`を渡し、`{"mode":"off"}`、作者が選ぶ`{"mode":"on"}`、作者が直した文または保存済み文を使う`{"mode":"supplied","text":"..."}`を区別する。suppliedでは写生providerを呼ばない。

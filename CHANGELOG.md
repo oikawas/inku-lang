@@ -6,6 +6,20 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 36 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-26 — a faster render core that refuses inputs with unbounded drawing work
+
+About 60% of render time went into drawing stroke and noise random values, mostly into building the text `"{seed}:{label}:{index}"` that keys each sample. The same bytes now stream straight into SHA-256; stroke noise fields and cloudform harmonics compute each lattice point and phase once; and SVG path data is written into one string instead of one string per number. Across 12,798 renders — 1,598 compact Scores from internal drawing records in three profiles and two seeds, plus every input of the frozen render-engine corpora in three profiles — every SVG and metadata output is identical before and after. Measured single-threaded, alternating before and after three times each, render CPU time fell by a factor of 3.1 to 3.5 on 300 compact Scores (about 24 ms to 7 ms per render) and 2.7 to 3.1 on 300 legacy Scores.
+
+Some drawing work grew with input values, so one request could hold the server for a long time. `/api/render-score` and `/api/render-svg` render Scores that signed-in users send.
+- The bounds of an arc inside a transform group added one point per turn of its angle (±1e9 degrees took 1.8 s and 626 MB; larger angles ran out of memory). The first extremum in each direction is now enough.
+- Paper-ground and grain-texture dot counts grew with density (a ground density of 1,000 took 5.3 s and 30 MB of SVG). A legacy grid draws rows × cols cells, and a group size of 0 made expansion panic. Values outside the schema ranges (density 0–1, rows and cols 1–64, group size at least 1) are refused as `invalid Score` before drawing. Values the renderer clamps, such as polygon sides, are still accepted.
+- A legacy Score without a resource policy was not limited even when a render supplied resource limits (100,000 arranged marks took 50 s and 95 MB of SVG). Its marks, counted as the Python host counts legacy Scores (each composite unit's head count, rows × cols for an explicit grid, times its group size), its instruction count, and its anchor, transform, placement and fill group counts are checked against those limits before drawing.
+- The canvas size must be finite and positive before drawing starts.
+
+The Python binding (`inku_render`) releases the GIL while it renders, steps the pipeline or replays a saved Score. The Server calls these on worker threads, and holding the GIL stopped every other Python thread, including the one serving HTTP, for the whole render.
+
+Saved works look the same, and the DDL, Score and render versions are unchanged.
+
 ### v2.15.31 — complete the release checks and API image build (Build 1107, 2026-09-26)
 
 This release carries the product changes described under v2.15.30 below. A Server test fixture had one unused local binding, which made the public Server lint job fail. Removing that binding changes no product behavior or test assertion. The API image build also called the Rust notice bundler with the builder image's older default `python`, which lacks `tomllib`. It now calls the available Python 3.12 interpreter. The v2.15.30 tag remains a historical source snapshot; this version is the release candidate.

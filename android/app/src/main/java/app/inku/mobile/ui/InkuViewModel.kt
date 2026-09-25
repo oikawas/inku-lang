@@ -2629,6 +2629,7 @@ class InkuViewModel @JvmOverloads constructor(
         // :2143). The running job is cancelled first: a candidate that lands
         // after the target changed belongs to a work that is no longer here.
         refinementJob?.cancel()
+        refinementJob = null
         val previous = localState.value.refinementParent
         localState.value = localState.value.copy(
             refinementOpen = true,
@@ -2747,6 +2748,7 @@ class InkuViewModel @JvmOverloads constructor(
 
     fun closeRefinement() {
         refinementJob?.cancel()
+        refinementJob = null
         localState.value = localState.value.copy(
             refinementOpen = false,
             refinementParent = null,
@@ -2915,7 +2917,7 @@ class InkuViewModel @JvmOverloads constructor(
             refinementCandidates = emptyList(),
             refinementPreviewId = null,
         )
-        refinementJob = viewModelScope.launch {
+        val run = viewModelScope.launch {
             // The stop appears three seconds in, not at once: a candidate that
             // is already done needs no stop button.
             val abortTimer = launch {
@@ -2967,8 +2969,14 @@ class InkuViewModel @JvmOverloads constructor(
             abortTimer.cancel()
             localState.value = localState.value.copy(refinementBusy = false, refinementCanAbort = false)
         }
-        refinementJob?.invokeOnCompletion { cause ->
-            if (cause is CancellationException) {
+        refinementJob = run
+        run.invokeOnCompletion { cause ->
+            // Only the run that still owns the refinement reports a stop. A run
+            // cancelled because the target changed or the refinement closed
+            // ends later -- a candidate being drawn is not interrupted -- and
+            // would otherwise mark the next target's run as stopped and idle
+            // while that run is still drawing, reopening every generate button.
+            if (cause is CancellationException && refinementJob === run) {
                 localState.value = localState.value.copy(
                     refinementBusy = false,
                     refinementCanAbort = false,

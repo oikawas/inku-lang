@@ -31,6 +31,7 @@ import kotlinx.coroutines.withContext
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
@@ -287,6 +288,9 @@ class ComparisonScreenTest {
         assertEquals("the new target is the one on screen", second.id, state.refinementParent?.id)
         assertTrue("the old work's candidates are gone", state.refinementCandidates.isEmpty())
         assertTrue("and the old selection with them", state.modelCompareSelectedModels.isEmpty())
+        // The old run ends after the change; its stop belongs to the old work
+        // and must not be reported against the new one.
+        assertNull("the new target shows no stop", state.refinementStatus)
     }
 
     // ── T-13: the lineage card's menu ─────────────────────────

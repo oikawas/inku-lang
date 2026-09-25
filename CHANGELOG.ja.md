@@ -6,6 +6,10 @@
 
 **本書が持つのは v2.5.0（2026-07-25、render engine 12）以降**の 36 版である。それより前は書庫にある。
 
+### 2026-09-25 — RAW trace（`include_trace`、CLIの`--trace`）を撤去する
+
+RAW traceは、Pythonの各層の中間生成物（Stage 1の生の応答、プラグイン展開後とStage 1.5のDDL、Stage 2の試行、coerce前のScore）を返すものだった。共有pipelineへの切り替えでそれらの層は無くなり、2026-09-14からfieldを受け付けたまま何も返していなかった。`/api/paint`と`/api/compose`の要求から`include_trace`を、応答から`trace`を外す。`include_trace`を送る古いclientは拒まず、fieldを無視する。CLIの`paint`・`batch`から`--trace`を外し、`<prefix>-trace.json`も書かない。層ごとの結果は応答の`compiler_outcome`・`pipeline_diagnostics`に残り、developer modeでは`developer_capture_provider_io`がproviderとの送受信の原文を記録する。API surfaceの記録、CLIリファレンス、manualもこれに合わせた。DDL・Score・描画の版は変えない。
+
 ### 2026-09-25 — Scoreの正準bytes、paintの描画上限、API surfaceの比較を戻す
 
 2026-09-13から、PythonのScoreは`resource_policy`・`Arrangement.resolved`・`PlacementGroup.resolved`を値が無いとき`null`として書き、共有RustのScoreは省いていた。このためそれらを持たないScoreは、Pythonでは正準JSON・digest・rh3が異なり、保存形式の経路で再生した保存済みScoreはRustの同一性と一致しなくなっていた。PythonもRustと同じく省く。共有pipelineへの切り替えでは、`/api/paint`が要求の`limits`を読まなくなり、paintとcomposeの応答から`render_limits_source`が消えていた（台帳I-154）。CLIの`paint --limit-*`も効いていなかった。要求は再び今の設定で要素ごとに抑えられ、応答は`settings`・`request`・`work`・`work_unrecorded`のどれかを示す。派生版は保存した設定に固定された予算を保つ。旧層と一緒に消えたまま記録（`api-surface-baseline.json`）だけが作り直されていた、API surface全体の比較を戻した。SPEC.mdには、2026-09-04の整理で英訳からだけ落ちた`display`・`editable`・`compat`のSVG profileの契約を戻した。RAW trace（`include_trace`、CLIの`--trace`）はPythonの各層を記録するもので、2026-09-14から何も返していない（fieldは受け付けたまま）。退役した層、固定したengine版、置き換わった塗りのprofileを期待していた試験は、現行の契約を確かめる形へ改めた。DDL・Score・描画の版とAPI surfaceは変えない。

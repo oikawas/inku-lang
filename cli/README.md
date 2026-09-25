@@ -344,7 +344,7 @@ usage: inku-cli paint [-h] [--base-url BASE_URL]
                       [--instruction-lang {auto,ja,en}] [--ui-lang UI_LANG]
                       [--include-thinking] [--save-history]
                       [--save-artifacts | --no-save-artifacts] [--no-progress]
-                      [--trace] [--full-json]
+                      [--full-json]
                       [text]
 
 positional arguments:
@@ -425,10 +425,6 @@ options:
   --save-history
   --save-artifacts, --no-save-artifacts
   --no-progress         disable elapsed-time progress animation
-  --trace               request RAW per-layer intermediates and save them as
-                        <prefix>-trace.json; in --input-mode ddl this is the
-                        only way to read what Stage 2 wrote before coerce
-                        repaired it
   --full-json           print the full paint response
 
 ```
@@ -462,8 +458,7 @@ usage: inku-cli batch [-h] [--base-url BASE_URL]
                       [--instruction-lang {auto,ja,en}] [--ui-lang UI_LANG]
                       [--include-thinking] [--save-history]
                       [--save-artifacts | --no-save-artifacts] [--no-progress]
-                      [--trace] [--continue-on-error]
-                      [--summary-json SUMMARY_JSON]
+                      [--continue-on-error] [--summary-json SUMMARY_JSON]
                       [--composition-count COMPOSITION_COUNT]
 
 options:
@@ -542,10 +537,6 @@ options:
   --save-history
   --save-artifacts, --no-save-artifacts
   --no-progress         disable elapsed-time progress animation
-  --trace               request RAW per-layer intermediates and save them as
-                        <prefix>-trace.json; in --input-mode ddl this is the
-                        only way to read what Stage 2 wrote before coerce
-                        repaired it
   --continue-on-error
   --summary-json SUMMARY_JSON
                         write batch summary JSON to this path (default:

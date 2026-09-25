@@ -2,6 +2,10 @@
 
 This file records revisions to user and operations documents under `manual/`. See `SPEC.ja.md` for the detailed product change history.
 
+## 2026-09-25 — Remove the CLI's `--trace`
+
+`--trace` left the CLI's `paint` and `batch`, so the Observation section of the CLI reference and the `paint --trace` section of the AI-facing reference (formerly 0.7) are removed in both languages. "Beware the silent sender" becomes 0.7. The RAW trace recorded the Python layers and had returned nothing since the switch to the shared pipeline (2026-09-14).
+
 ## 2026-09-22 — Align Web UI instructions with v2.15.15 (Web Build 1091)
 
 Updated Creating Images in both languages and the Web UI procedures in the administration and installation guides to match the current interface. This documentation update changes no product behavior or version.

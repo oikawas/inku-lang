@@ -117,9 +117,11 @@ class UiLanguageSettingTest {
      */
     @Test
     fun testEveryResolutionSiteReadsTheCarriedUiLanguage() {
-        val pipeline = source("main/java/app/inku/mobile/pipeline/LocalFallbackPipeline.kt")
+        // The resolution moved into AndroidWorkPipeline with the shared core:
+        // a new run's config and a saved run's derived config.
+        val pipeline = source("main/java/app/inku/mobile/pipeline/AndroidWorkPipeline.kt")
         val calls = Regex("""resolveWithUiLang\(""").findAll(pipeline).count()
-        assertEquals("resolution sites in LocalFallbackPipeline", 2, calls)
+        assertEquals("resolution sites in AndroidWorkPipeline", 2, calls)
         assertEquals(
             "every resolution site must be handed request.uiLang",
             calls,
@@ -130,9 +132,12 @@ class UiLanguageSettingTest {
         val uiLanguageCalls = Regex(
             """uiLang = (?:(?:current|cycle)\.uiLanguage\.code|input\.uiLanguageCode)""",
         ).findAll(viewModel).count()
+        // Six: the single draw, the DDL draw, the batch, the demo, and the
+        // camera's Stage 1 and compose. The camera's direct-DDL call went with
+        // that mode (2026-09-25).
         assertEquals(
             "every screen call that starts a drawing must send the ui language",
-            7,
+            6,
             uiLanguageCalls,
         )
         // Without `auto` the resolution never reaches the fallback, so the wire

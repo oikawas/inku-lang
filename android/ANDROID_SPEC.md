@@ -4,7 +4,7 @@ This directory is the Android workspace for the native standalone app and is
 tracked by Git. Local-only artifacts, device IDs, downloaded models, logs, and
 secrets must remain outside tracked files.
 
-Last updated: 2026-09-25.
+Last updated: 2026-09-26.
 
 **Catch-up status**: Android sits at generation `2.1.4-android.80`. DDL conversion and Score → SVG
 rendering run in the shared Rust core (`core/crates/`) of the same commit, packaged with the app, so
@@ -43,6 +43,18 @@ When updating Android specifications:
    adaptation of the Japanese source.
 3. Do not introduce English-only Android requirements that are absent from
    `ANDROID_SPEC.ja.md`.
+
+## 2026-09-26 Current connections, drawing settings, and export
+
+Each connection kind is sent in the shape the server's `pipeline_provider.py` uses. `openai-compatible` posts `/chat/completions`, `gemini` posts `/v1beta/models/{model}:generateContent`, and `anthropic` (Claude API) posts `/v1/messages` with `x-api-key` and `anthropic-version: 2023-06-01`; a drawing answer is the `input` of a forced tool call, and a photo travels as a base64 image block. Built-in connections are only filled in at start-up: the service name and base URL the author changed are kept (the kind stays the catalog's, and the local connection's base URL is a marker that does not change). Delete service on a built-in connection does not remove the row: as on the server it is switched off, hidden from the list and its API key forgotten, and adding a service with the same id brings it back. A connection the author added is removed; the local connection cannot be deleted. API keys are typed masked with the password keyboard (no suggestions or learning), and Add AI service forgets what was typed when it closes. The note that a local LLM may work without a key is shown only for connections where a key is optional.
+
+The Wild setting is saved in `app_settings` as `render_wild` (`{"enabled":bool}`) and stated on every new drawing from a description (single, batch, demo, camera). A DDL drawn from a work keeps that work's Wild (`render_metadata.render_wild`), and refinement candidates keep the parent's (web's `targetWild` and `effectiveRefineWild`). Picking a work uses its color catalog (automatic for a work drawn with the automatic catalog) and canvas for the next drawing; at start-up a work on screen wins over the saved catalog and canvas. The history-selection canvas and color catalog settings and "save a DDL redraw as new history" had no processing behind them and are removed. Back and a tap outside the color catalog dialog cancel it, and Cancel also restores the saved value. The Works screen, full-screen stepping and search cover every work (previously only the newest 100).
+
+The display SVG export is the saved SVG itself; the editable and compat SVGs are the saved Score drawn again in that profile with the work's colors, seeds and Wild (as the server's `GET /api/history/{id}/svg?profile=`). Files written to `cacheDir/exports` for sharing are removed by the next export once they are a day old.
+
+While the keyboard is up, Draw for the description and Batch draw for the batch editor are pinned above it, with room of the same height at the end of the scroll. Add AI service and a connection's model picker shrink for the keyboard. The touch-words field of Refinement brings the Make candidates row into view. Back from an open Refinement closes it.
+
+A permanent delete, as the server's `HistoryPermanentDeleteWriter` does, turns the lineage node into a tombstone (no history or hashes, `deleted_at` recorded) and empties `metadata_json` of the edges touching it, in the same transaction. The thumbnail is removed unless another work with the same render hash still uses it. The screens have no delete entry; only the debug headless run (`save_history=false`) uses it.
 
 ## 2026-09-25 Current plugins (draw-system04)
 

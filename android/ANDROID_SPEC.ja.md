@@ -3,7 +3,7 @@
 このディレクトリは、ネイティブ単体 Android アプリのワークスペースであり、Git 管理対象とする。
 ローカル専用成果物、端末ID、ダウンロード済みモデル、ログ、秘密情報は追跡対象に含めない。
 
-最終更新: 2026-09-25。
+最終更新: 2026-09-26。
 
 **追随状況**: Android は `2.1.4-android.80` の世代にある。DDLの変換とScore → SVGの描画は、
 同じcommitの共有Rust core（`core/crates/`）を同梱してServerと同じ実装で行い、Android独自の版定数を持たない。
@@ -29,6 +29,18 @@ runtime fallbackを持たない。保存済みSVG、Room schema、Score schema�
 - `ANDROID_SPEC.md` は英語版として、`ANDROID_SPEC.ja.md` の意図を保った翻訳・要約として更新する。
 - Android 仕様を更新するときは、先に `ANDROID_SPEC.ja.md` を更新し、その後で `ANDROID_SPEC.md` を同期する。
 - 英語版だけに存在する仕様・要件を追加してはならない。
+
+## 2026-09-26 現行の接続先・描画設定・書き出し
+
+接続形式ごとに、Serverの`pipeline_provider.py`と同じ形で送る。`openai-compatible`は`/chat/completions`、`gemini`は`/v1beta/models/{model}:generateContent`、`anthropic`（Claude API）は`/v1/messages`で、`x-api-key`と`anthropic-version: 2023-06-01`を付け、描画の応答は強制したtool呼び出しの`input`、写真はbase64の画像ブロックで送る。既定の接続先は起動時に不足分を補うだけで、作者が変えたサービス名とBase URLを保持する（接続形式は既定のまま、端末内の接続先のBase URLは目印なので変えない）。既定の接続先の「サービス削除」は行を消さず、Serverと同じく無効にして一覧から隠し、APIキーを消す。同じIDで追加すれば戻る。作者が追加した接続先は行ごと消す。端末内の接続先は消せない。APIキーは伏せ字とパスワード用キーボード（予測・学習なし）で入力し、「AIサービスを追加」は閉じると入力値を消す。「ローカルLLMはキー無しで使える場合がある」の注記は、キーが必須でない接続先にだけ出す。
+
+描画表現「暴れる（Wild）」は`app_settings`の`render_wild`（`{"enabled":bool}`）に保存し、記述からの新しい描画（単発・バッチ・デモ・カメラ）に載せる。作品からのDDL描画は作品のWild（`render_metadata.render_wild`）を、推敲の候補は親作品のWildを継ぐ（Webの`targetWild`・`effectiveRefineWild`と同じ）。作品を選ぶと、その作品の色カタログ（自動で描いた作品は自動）とキャンバスを次の描画に使う。起動時に作品が表示されていれば、保存済みの色カタログ・キャンバスより作品の値を優先する。「履歴選択時のキャンバス・色カタログ」「DDL再描画を新しい履歴として保存」は処理を持たなかったため削除した。色カタログ選択ダイアログの戻る・外側タップはキャンセルで、キャンセルは保存値も元に戻す。作品画面・全画面の送り・検索は全作品を対象にする（以前は新しい100件だけ）。
+
+書き出しの表示用SVGは保存したSVGそのもの、編集用SVG・汎用SVGは保存Scoreを作品の色・seed・Wildでそのprofileに描き直したもの（Serverの`GET /api/history/{id}/svg?profile=`と同じ）。共有用に`cacheDir/exports`へ書いたファイルは、1日を過ぎたものを次の書き出しで消す。
+
+キーボード表示中は、記述の「描画する」とバッチの「バッチ描画」をキーボードの上に出し、スクロールの末尾にその高さの余白を置く。「AIサービスを追加」と接続先のモデル選択ダイアログはキーボードに合わせて縮む。推敲の「タッチを変える言葉」の入力中は「候補を作る」の行を画面に入れる。推敲を開いた状態の戻るは推敲を閉じる。
+
+作品の完全削除は、Serverの`HistoryPermanentDeleteWriter`と同じく同じtransactionで系譜ノードを墓標（`tombstone`、履歴・hashを消し`deleted_at`を記録）にし、触れる辺の`metadata_json`を`{}`にする。サムネイルは同じrender hashの作品が残っていなければ消す。画面に削除の入口はなく、debugのheadless（`save_history=false`）だけが使う。
 
 ## 2026-09-25 現行のプラグイン（draw-system04）
 

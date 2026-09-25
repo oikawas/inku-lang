@@ -77,6 +77,15 @@ class AuthSettingsBody(BaseModel):
 
 @admin_router.put("/api/auth/config")
 def api_auth_config_update(body: AuthSettingsBody) -> dict:
+    # Local sign-in is the only way in this server implements: the Google
+    # switch is stored, but nothing signs anyone in through it. Turning local
+    # off therefore locked out every account, and `inku-admin reset-password`
+    # could not help, since a new password still has nowhere to be entered.
+    if not body.local_enabled:
+        raise HTTPException(
+            status_code=409,
+            detail="local sign-in is the only sign-in method and cannot be turned off",
+        )
     return _db.update_auth_settings(body.google_enabled, body.local_enabled)
 
 

@@ -73,6 +73,21 @@ class PermissionGroupMembershipStore:
         elevated = session.query(UserPermissionGroupRow.user_id).join(PermissionGroupRow, PermissionGroupRow.id == UserPermissionGroupRow.permission_group_id).filter(PermissionGroupRow.name.in_(ELEVATED_PERMISSION_GROUPS))
         return ~UserAccountRow.id.in_(elevated)
 
+    def an_admin_remains(self, session) -> bool:
+        """Whether some account still holds `admins`, this session's changes included.
+
+        Asked inside the transaction that removes a membership or an account, so
+        the answer and the removal commit together.
+        """
+        session.flush()
+        return (
+            session.query(UserPermissionGroupRow.id)
+            .join(PermissionGroupRow, PermissionGroupRow.id == UserPermissionGroupRow.permission_group_id)
+            .filter(PermissionGroupRow.name == "admins")
+            .first()
+            is not None
+        )
+
 
 def group_to_dict(row: UserGroupRow) -> dict:
     return {"id": row.id, "name": row.name, "at": row.at}

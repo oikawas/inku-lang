@@ -45,7 +45,7 @@ def test_accounts_owns_deleter_and_db_delegates(monkeypatch: pytest.MonkeyPatch)
             return True
 
     monkeypatch.setattr(db._accounts, "UserAccountDeleter", RecordingDeleter)
-    dependencies = tuple(object() for _ in range(7))
+    dependencies = tuple(object() for _ in range(8))
     monkeypatch.setattr(db, "SessionLocal", dependencies[0])
     monkeypatch.setattr(db, "has_permission_group", dependencies[1])
     monkeypatch.setattr(db, "_holds_no_elevated_group", dependencies[2])
@@ -53,6 +53,7 @@ def test_accounts_owns_deleter_and_db_delegates(monkeypatch: pytest.MonkeyPatch)
     monkeypatch.setattr(db, "_owned_by", dependencies[4])
     monkeypatch.setattr(db, "_delete_acl_for_histories", dependencies[5])
     monkeypatch.setattr(db, "_drop_thumbnails_of_deleted_works", dependencies[6])
+    monkeypatch.setattr(db, "_an_admin_remains", dependencies[7])
 
     assert db.delete_user("u", cascade=True, actor={"id": "a"}) is True
     assert calls == [(dependencies, ("u",), {"cascade": True, "actor": {"id": "a"}})]

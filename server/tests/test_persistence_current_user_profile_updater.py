@@ -43,18 +43,19 @@ def test_accounts_owns_current_profile_updater_and_db_delegates(monkeypatch: pyt
             return "sentinel"
 
     monkeypatch.setattr(db._accounts, "CurrentUserProfileUpdater", RecordingUpdater)
-    dependencies = tuple(object() for _ in range(4))
+    dependencies = tuple(object() for _ in range(5))
     monkeypatch.setattr(db, "SessionLocal", dependencies[0])
     monkeypatch.setattr(db, "verify_password", dependencies[1])
     monkeypatch.setattr(db, "_hash_password", dependencies[2])
     monkeypatch.setattr(db, "_user_to_dict", dependencies[3])
+    monkeypatch.setattr(db, "_end_user_sessions", dependencies[4])
 
     assert db.update_current_user_profile("u", email=" mail ") == "sentinel"
     assert calls == [
         (
             dependencies,
             ("u",),
-            {"email": " mail ", "password": None, "current_password": None},
+            {"email": " mail ", "password": None, "current_password": None, "keep_session_token": None},
         )
     ]
 

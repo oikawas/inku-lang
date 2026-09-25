@@ -47,6 +47,18 @@ _OWNER_KEYED_PIPELINE_ROWS = (
 )
 
 
+class LastAdministratorError(ValueError):
+    """The change would leave no account in `admins`.
+
+    Nothing inside the product can undo that: the settings that grant `admins`
+    are themselves `admins`-only, `inku-admin` only resets passwords, and
+    single-user mode keeps refusing requests on a database without one.
+    """
+
+    def __init__(self) -> None:
+        super().__init__("the last administrator cannot be removed")
+
+
 def hash_password(password: str) -> str:
     if not password:
         raise ValueError("password is required")
@@ -606,6 +618,10 @@ class UserAccountUpdater:
     holds_no_elevated_group_fn: Callable[[Any], Any]
     user_to_dict_fn: Callable[[UserAccountRow, str | None], dict]
     unset: object
+    # Asked after a membership change, inside the same transaction.
+    admin_remains_fn: Callable[[Any], bool] | None = None
+    # Signs the account out everywhere when its password is set.
+    end_sessions_fn: Callable[..., int] | None = None
 
     def update_user(
         self,
@@ -642,8 +658,14 @@ class UserAccountUpdater:
                 row.email = email
             if password is not None and password:
                 row.password_hash = self.hash_password_fn(password)
+                # A reset is how an administrator locks out whoever learned the
+                # old password; sessions signed in with it would outlive it.
+                if self.end_sessions_fn is not None:
+                    self.end_sessions_fn(session, row.id)
             if permission_groups is not None:
                 self.set_permission_groups_fn(session, row, permission_groups)
+                if self.admin_remains_fn is not None and not self.admin_remains_fn(session):
+                    raise LastAdministratorError()
             if group_id is not self.unset:
                 group_id = group_id if isinstance(group_id, str) else None
                 if group_id and not session.get(UserGroupRow, group_id):
@@ -661,6 +683,8 @@ class CurrentUserProfileUpdater:
     verify_password_fn: Callable[[str, str], bool]
     hash_password_fn: Callable[[str], str]
     user_to_dict_fn: Callable[[UserAccountRow, str | None], dict]
+    # Signs the account out of its other sessions when the password changes.
+    end_sessions_fn: Callable[..., int] | None = None
 
     def update_current_user_profile(
         self,
@@ -669,6 +693,7 @@ class CurrentUserProfileUpdater:
         email: str | None = None,
         password: str | None = None,
         current_password: str | None = None,
+        keep_session_token: str | None = None,
     ) -> dict | None:
         with self.session_factory() as session:
             row = session.get(UserAccountRow, user_id)
@@ -685,6 +710,10 @@ class CurrentUserProfileUpdater:
                 ):
                     raise ValueError("current password is invalid")
                 row.password_hash = self.hash_password_fn(password)
+                # The device that made the change stays signed in; any other
+                # may be the reason for it.
+                if self.end_sessions_fn is not None:
+                    self.end_sessions_fn(session, row.id, keep_token=keep_session_token)
             session.commit()
             session.refresh(row)
             group_name = session.get(UserGroupRow, row.group_id).name if row.group_id else None
@@ -730,6 +759,8 @@ class UserAccountDeleter:
     # Told the ids of the works a cascade removed, after the commit, so the
     # thumbnails -- a separate database -- can drop their copies too.
     after_history_delete_fn: Callable[[list[str]], None] | None = None
+    # Asked once the account's memberships are gone, inside the transaction.
+    admin_remains_fn: Callable[[Any], bool] | None = None
 
     def delete_user(
         self,
@@ -820,6 +851,8 @@ class UserAccountDeleter:
             session.query(UserPermissionGroupRow).filter(
                 UserPermissionGroupRow.user_id == user_id
             ).delete()
+            if self.admin_remains_fn is not None and not self.admin_remains_fn(session):
+                raise LastAdministratorError()
             for table in _OWNER_KEYED_PIPELINE_ROWS:
                 session.query(table).filter(table.owner_id == user_id).delete(
                     synchronize_session=False

@@ -399,6 +399,10 @@ def _holds_no_elevated_group(session):
     return _permission_group_membership_store().holds_no_elevated_group(session)
 
 
+def _an_admin_remains(session) -> bool:
+    return _permission_group_membership_store().an_admin_remains(session)
+
+
 def _permission_group_membership_store() -> _groups.PermissionGroupMembershipStore:
     return _groups.PermissionGroupMembershipStore(uuid.uuid4, _now_ms)
 
@@ -1052,6 +1056,10 @@ def delete_session(token: str) -> bool:
     return _session_store().delete_session(token)
 
 
+def _end_user_sessions(session, user_id: str, *, keep_token: str | None = None) -> int:
+    return _session_store().end_user_sessions(session, user_id, keep_token=keep_token)
+
+
 def _external_identity_store() -> _identities.ExternalIdentityStore:
     return _identities.ExternalIdentityStore(SessionLocal, uuid.uuid4, _now_ms, _user_to_dict)
 
@@ -1109,6 +1117,8 @@ def _account_updater() -> _accounts.UserAccountUpdater:
         _holds_no_elevated_group,
         _user_to_dict,
         _UNSET,
+        _an_admin_remains,
+        _end_user_sessions,
     )
 
 
@@ -1139,6 +1149,7 @@ def _current_user_profile_updater() -> _accounts.CurrentUserProfileUpdater:
         verify_password,
         _hash_password,
         _user_to_dict,
+        _end_user_sessions,
     )
 
 
@@ -1148,12 +1159,14 @@ def update_current_user_profile(
     email: str | None = None,
     password: str | None = None,
     current_password: str | None = None,
+    keep_session_token: str | None = None,
 ) -> dict | None:
     return _current_user_profile_updater().update_current_user_profile(
         user_id,
         email=email,
         password=password,
         current_password=current_password,
+        keep_session_token=keep_session_token,
     )
 
 
@@ -1312,6 +1325,7 @@ def _account_deleter() -> _accounts.UserAccountDeleter:
         _owned_by,
         _delete_acl_for_histories,
         _drop_thumbnails_of_deleted_works,
+        _an_admin_remains,
     )
 
 

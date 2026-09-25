@@ -44,13 +44,15 @@ def test_accounts_owns_updater_and_db_delegates(monkeypatch: pytest.MonkeyPatch)
             return "sentinel"
 
     monkeypatch.setattr(db._accounts, "UserAccountUpdater", RecordingUpdater)
-    dependencies = tuple(object() for _ in range(6)) + (db._UNSET,)
+    dependencies = tuple(object() for _ in range(6)) + (db._UNSET,) + tuple(object() for _ in range(2))
     monkeypatch.setattr(db, "SessionLocal", dependencies[0])
     monkeypatch.setattr(db, "_hash_password", dependencies[1])
     monkeypatch.setattr(db, "_set_permission_groups", dependencies[2])
     monkeypatch.setattr(db, "has_permission_group", dependencies[3])
     monkeypatch.setattr(db, "_holds_no_elevated_group", dependencies[4])
     monkeypatch.setattr(db, "_user_to_dict", dependencies[5])
+    monkeypatch.setattr(db, "_an_admin_remains", dependencies[7])
+    monkeypatch.setattr(db, "_end_user_sessions", dependencies[8])
 
     assert db.update_user("u", email=" mail ") == "sentinel"
     assert calls == [

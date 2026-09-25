@@ -7,32 +7,53 @@ use crate::typed_performance::{TypedExecutionPlan, TypedMirrorBody, TypedMirrorR
 use crate::types::Point;
 use sha2::{Digest, Sha256};
 
+/// One drawable copy of a source instruction after its relation was resolved.
 #[derive(Clone)]
 struct Performed {
     instruction: Instruction,
+    /// Expanded drawing ordinal; SVG ids and seed material use it.
     ordinal: usize,
     seed_override: Option<crate::types::Seed>,
+    /// Fixed centerline of a connected path host, in short-side units.
     line_centerline: Option<Vec<Point>>,
 }
 
+/// Mutable state of one dependency-ordered execution.
+///
+/// Instruction-indexed vectors follow `request.score.instructions`. Group
+/// nodes follow `request.score.transform_groups`, which here holds the affine
+/// groups with every placement group inserted as an identity scope.
 struct Execution<'a> {
     request: PerformanceRequest<'a>,
+    /// Node order with cyclic relations already dropped.
     schedule: AnchorSchedule,
+    /// Drawable copies of each source instruction, filled when it executes.
     performed: Vec<Vec<Performed>>,
+    /// Accumulated enclosing-group transform, in short-side units.
     transforms: Vec<AffineTransform>,
+    /// Targets of a path position or endpoint; their centerline is kept.
     path_hosts: Vec<bool>,
+    /// Targets of an interior path selection.
     interior_path_hosts: Vec<bool>,
+    /// Resolved anchor points; `None` once omitted.
     anchors: Vec<Option<Point>>,
+    /// Instructions removed because their outermost enclosing group failed.
     omitted: Vec<bool>,
     omitted_groups: Vec<bool>,
+    /// Members of a composite or grid arrangement, which relations cannot move alone.
     structural: Vec<bool>,
     warnings: Vec<PlanningWarning>,
+    /// Sources drawn without their relation after it failed or formed a cycle.
     omitted_relations: Vec<bool>,
     diagnostics: Vec<ScoreExecutionDiagnostic>,
+    /// For each group node, the placement group it stands for, if any.
     placement_indices: Vec<Option<usize>>,
+    /// Fill scopes transformed together with each group node.
     group_fill_scope_indices: Vec<Vec<usize>>,
     omitted_fill_scopes: Vec<bool>,
+    /// Compact-Score facts; `None` for legacy editions.
     typed: Option<TypedExecutionPlan>,
+    /// Mirror relations already applied.
     mirror_done: Vec<bool>,
 }
 

@@ -99,25 +99,41 @@ struct DensePlacement {
     source_member_indices: Vec<usize>,
 }
 
+/// Materializes a compact Score into the dense Score the shared executor runs.
+///
+/// Instruction-indexed vectors run parallel to `output.instructions`; anchor
+/// vectors to `output.anchors`. "Source" indices refer to the compact Score.
 struct Builder<'a> {
     request: PerformanceRequest<'a>,
+    /// Dense Score being built; its groups are rebuilt from the compact ones.
     output: Score,
     original_instruction_indices: Vec<usize>,
     original_anchor_indices: Vec<usize>,
+    /// Instance seeds from the source owner, context path and instance ordinal.
     instruction_seed_overrides: Vec<Option<Seed>>,
+    /// Innermost fill scope of each dense instruction.
     instruction_fill_scope_indices: Vec<Option<usize>>,
+    /// Ordinals of the enclosing repetitions that produced each instruction.
     instruction_context_paths: Vec<Vec<u64>>,
+    /// Placement target or source anchor, in short-side units; mirror bodies use it.
     instruction_semantic_anchors: Vec<Option<Point>>,
+    /// Expansion contexts; each maps source indices to its copies and those of its children.
     contexts: Vec<ContextMap>,
+    /// Every dense copy of each source instruction and anchor.
     global_instructions: BTreeMap<usize, Vec<usize>>,
     global_anchors: BTreeMap<usize, Vec<usize>>,
+    /// Relation targets remapped once every copy exists.
     pending_relations: Vec<PendingRelation>,
     placements: Vec<DensePlacement>,
+    /// Mirror bodies produced by each repetition group.
     repetition_bodies: Vec<Vec<TypedMirrorBody>>,
+    /// Fill scopes transformed with each dense transform group.
     transform_fill_scope_indices: Vec<Vec<usize>>,
     fill_scopes: Vec<PerformedFillScope>,
+    /// Source instruction range of each fill scope.
     scope_sources: Vec<(usize, usize)>,
     diagnostics: Vec<ScoreExecutionDiagnostic>,
+    /// Top-level transform groups already cloned into `output`.
     cloned_top_transforms: HashSet<usize>,
 }
 

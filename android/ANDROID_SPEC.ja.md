@@ -858,7 +858,7 @@ Android 版は web/server の `web/BUILD_NUMBER` とは独立した Android 用 
 - `assemble*` / `bundle*` / `install*` の Android アプリ build タスクを実行するたびに、Gradle が `android/BUILD_NUMBER` を 1 増やし、その増えた値を同じ build の `versionCode` と `BuildConfig.BUILD_NUMBER` に使う。
 - `compileDebugKotlin` などのコンパイル確認タスクでは `android/BUILD_NUMBER` を増やさない。
 - server/spec 世代への追従、DB schema、履歴 JSON、render metadata、export 互換性に影響する変更では、`android/VERSION` も更新する。
-- 設定メニューには `バージョン情報` パネルを置き、`versionName`、`versionCode`、build number、build type、application id、source spec、render engine version を表示する。
+- 設定メニューには `バージョン情報` パネルを置き、`versionName`、`versionCode`、build number、build type、application id、render engine version を表示する。固定表記の source spec（`inku v1.48`）は、更新されず実際の版と食い違っていたため削除した（2026-09-25）。DDL Spec と DDL engine の版は Server の `layer_versions.py` が名乗り、Android は版の定数を持たない。
 - version / build metadata には API キー、端末 ID、ローカルサーバー情報、個人環境パスを含めない。
 
 ## 2026-05-09 モデル設定パネルの追加整理

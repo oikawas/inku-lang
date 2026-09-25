@@ -4380,7 +4380,6 @@ internal fun VersionInfoPanel(viewModel: InkuViewModel, modifier: Modifier = Mod
             VersionInfoRow("build number", BuildConfig.BUILD_NUMBER.toString())
             VersionInfoRow("build type", BuildConfig.BUILD_TYPE)
             VersionInfoRow("applicationId", BuildConfig.APPLICATION_ID)
-            VersionInfoRow("source spec", "inku v1.48")
             VersionInfoRow("render engine", renderEngineIdentity)
         }
     }

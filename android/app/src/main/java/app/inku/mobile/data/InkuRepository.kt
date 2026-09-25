@@ -113,7 +113,15 @@ class InkuRepository(
     private val thumbnailScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val originalPhotos = app.inku.mobile.ui.camera.CameraOriginalPhotoStore(context.filesDir)
 
-    fun history(): Flow<List<HistoryListItem>> = database.historyDao().listActiveSummaries(100, 0)
+    /**
+     * Every active work, newest first, as summaries.
+     *
+     * This stopped at the newest 100 with no way to read further, so an older
+     * work could not be reached from the gallery, the full-screen stepping or
+     * the search, which filters this list. A summary carries no SVG or Score,
+     * a few hundred characters each, so the whole list fits in memory.
+     */
+    fun history(): Flow<List<HistoryListItem>> = database.historyDao().listActiveSummaries(Int.MAX_VALUE, 0)
 
     fun trashedHistory(): Flow<List<HistoryItemEntity>> = database.historyDao().listTrashed(100, 0)
 

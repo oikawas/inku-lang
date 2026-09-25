@@ -206,6 +206,68 @@ class AndroidWorkPipeline(
             return replayResult(scoreJson, request, rendered.svg, metadata, replaySource)
         }
 
+        val saved = renderSaved(scoreJson, request, svgProfile = "display")
+        val catalogId = saved.catalogId
+        val colors = saved.colors
+        val canvas = saved.canvas
+        val renderSeed = saved.renderSeed
+        val output = saved.output
+        val metadata = output.requiredObject("metadata")
+            .put("catalog_id", catalogId)
+            .put("canvas_aspect_id", request.canvasAspect)
+            .put("render_canvas_aspect", request.canvasAspect)
+            .put("render_canvas_aspect_id", request.canvasAspect)
+            .put("render_canvas_aspect_ratio", canvas.ratio)
+            .put("render_color_catalog_id", catalogId)
+            .put("render_color_map", JSONObject(colors))
+            .put("render_seed", java.lang.Long.toUnsignedString(renderSeed))
+            .put("render_wild", request.renderWild == true)
+        val replayRequest = request.copy(renderSeed = renderSeed)
+        return replayResult(
+            scoreJson,
+            replayRequest,
+            output.requiredString("svg"),
+            metadata,
+            replaySource,
+            replayPersistence(replaySource, replayRequest, catalogId, colors, metadata),
+        )
+    }
+
+    /**
+     * A saved work drawn again as an editable or compat SVG file, the way the
+     * server's `GET /api/history/{id}/svg?profile=` redraws it
+     * (`routers/history.py`): the work's own colors, seeds and Wild through
+     * today's engine, under the same restored policy as a replay. Nothing is
+     * saved; the display profile is the saved SVG and needs no drawing.
+     */
+    suspend fun renderExportSvg(scoreJson: String, request: PaintRequest, svgProfile: String): String {
+        if (request.canvasAspect == PIXEL9_HOST_ONLY_FORMAT) {
+            return legacyRenderer.render(
+                RenderRequest(
+                    scoreJson = scoreJson,
+                    colorCatalogId = request.colorCatalogId,
+                    canvasAspect = request.canvasAspect,
+                    svgProfile = svgProfile,
+                    renderSeed = request.renderSeed,
+                    compositionSeed = request.compositionSeed,
+                    workColorSnapshot = request.workColorSnapshot,
+                    wild = request.renderWild,
+                ),
+            ).svg
+        }
+        return renderSaved(scoreJson, request, svgProfile).output.requiredString("svg")
+    }
+
+    private class SavedRender(
+        val output: JSONObject,
+        val catalogId: String,
+        val colors: Map<String, String>,
+        val canvas: CanvasInfo,
+        val renderSeed: Long,
+    )
+
+    /** A saved Score through `renderSaved`, with the policy the work was compiled under. */
+    private suspend fun renderSaved(scoreJson: String, request: PaintRequest, svgProfile: String): SavedRender {
         // A saved color snapshot is the render authority even if its catalog ID
         // has since been retired. Older work without one uses today's default.
         val useDefaultPolicy = request.workColorSnapshot != null ||
@@ -233,7 +295,7 @@ class AndroidWorkPipeline(
             .put("catalog_id", catalogId)
             .put("canvas", JSONObject().put("width", canvas.width).put("height", canvas.height))
             .put("canvas_aspect_id", request.canvasAspect)
-            .put("svg_profile", "display")
+            .put("svg_profile", svgProfile)
             .put("render_seed", BigInteger(java.lang.Long.toUnsignedString(renderSeed)))
             .put("composition_seed", request.compositionSeed?.let { BigInteger(java.lang.Long.toUnsignedString(it)) })
             .put("wild", request.renderWild == true)
@@ -245,25 +307,7 @@ class AndroidWorkPipeline(
             .put("clip", clipPolicy())
         val output = JSONObject(binding.renderSaved(input.toString().encodeToByteArray()).toString(Charsets.UTF_8))
         if (output.has("error")) throw PipelineHostException(output.requiredString("error"))
-        val metadata = output.requiredObject("metadata")
-            .put("catalog_id", catalogId)
-            .put("canvas_aspect_id", request.canvasAspect)
-            .put("render_canvas_aspect", request.canvasAspect)
-            .put("render_canvas_aspect_id", request.canvasAspect)
-            .put("render_canvas_aspect_ratio", canvas.ratio)
-            .put("render_color_catalog_id", catalogId)
-            .put("render_color_map", JSONObject(colors))
-            .put("render_seed", java.lang.Long.toUnsignedString(renderSeed))
-            .put("render_wild", request.renderWild == true)
-        val replayRequest = request.copy(renderSeed = renderSeed)
-        return replayResult(
-            scoreJson,
-            replayRequest,
-            output.requiredString("svg"),
-            metadata,
-            replaySource,
-            replayPersistence(replaySource, replayRequest, catalogId, colors, metadata),
-        )
+        return SavedRender(output, catalogId, colors, canvas, renderSeed)
     }
 
     fun descriptionHash(input: String): String {

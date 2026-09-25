@@ -10,6 +10,7 @@ import app.inku.mobile.data.db.AppSettingEntity
 import app.inku.mobile.data.db.ExportTemplateEntity
 import app.inku.mobile.data.db.HistoryItemEntity
 import app.inku.mobile.data.db.HistoryListItem
+import app.inku.mobile.data.db.drawnWild
 import app.inku.mobile.data.db.InkuDatabase
 import app.inku.mobile.data.db.LineageEdgeEntity
 import app.inku.mobile.data.db.ManagedHistoryLinkInput
@@ -667,6 +668,39 @@ class InkuRepository(
         beforeSave()
         currentCoroutineContext().ensureActive()
         return saveResult(result, catalogId, canvasAspect, stage1ModelId, stage2ModelId, System.currentTimeMillis() - started, lineage = lineage, historyVisibility = historyVisibility, sourceText = sourceText, inputProvenance = inputProvenance, originalPhoto = originalPhoto)
+    }
+
+    /**
+     * The work as an SVG file in one of the three profiles the server offers.
+     *
+     * Display is the saved SVG itself. Editable and compat are drawn again from
+     * the saved Score with the work's own colors, seeds and Wild, as the
+     * server's `GET /api/history/{id}/svg?profile=` does; they used to be the
+     * display SVG with a new title, so neither carried the groups and ids the
+     * editable file promises nor the compat file's simplified effects.
+     */
+    suspend fun exportSvg(item: HistoryItemEntity, profile: String): String {
+        if (profile == "display") return item.displaySvg
+        val seeds = PaintSeeds.of(item)
+        val description = item.sourceText ?: item.originalInput
+        return pipeline.renderExportSvg(
+            item.scoreJson,
+            PaintRequest(
+                description = description,
+                originalText = description,
+                stage1Model = item.stage1Model.orEmpty(),
+                stage2Model = item.stage2Model.orEmpty(),
+                colorCatalogId = item.colorCatalogId,
+                canvasAspect = item.canvasAspect,
+                autoRepair = false,
+                renderSeed = seeds.renderSeed,
+                compositionSeed = seeds.compositionSeed,
+                workColorSnapshot = app.inku.mobile.data.model.workColorSnapshot(item.renderMetadataJson),
+                renderWild = item.drawnWild,
+                parentHistoryId = item.id,
+            ),
+            profile,
+        )
     }
 
     suspend fun generateDemoPrompt(seedPhrase: String, modelId: String): String {

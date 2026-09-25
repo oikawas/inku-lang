@@ -1348,6 +1348,10 @@ class InkuViewModel @JvmOverloads constructor(
         localState.value = localState.value.copy(message = strings().ddlImportInvalid)
     }
 
+    /** The work's SVG in [profile]; editable and compat are drawn again from its Score. */
+    suspend fun exportSvg(item: HistoryItemEntity, profile: String): String =
+        withContext(Dispatchers.IO) { repository.exportSvg(item, profile) }
+
     /** The saved work as `inku.ddl-export.v1` text, for the share sheet. */
     suspend fun ddlExportJson(item: HistoryItemEntity): String =
         withContext(Dispatchers.IO) { repository.ddlExportJson(item) }

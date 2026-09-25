@@ -5,6 +5,7 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import androidx.room.withTransaction
+import app.inku.mobile.BuildConfig
 import app.inku.mobile.data.db.AppSettingEntity
 import app.inku.mobile.data.db.ExportTemplateEntity
 import app.inku.mobile.data.db.HistoryItemEntity
@@ -14,6 +15,7 @@ import app.inku.mobile.data.db.LineageEdgeEntity
 import app.inku.mobile.data.db.ManagedHistoryLinkInput
 import app.inku.mobile.data.db.ManagedHistoryRead
 import app.inku.mobile.data.db.ModelAssetEntity
+import app.inku.mobile.data.db.PluginSettingEntity
 import app.inku.mobile.data.db.ProviderSettingEntity
 import app.inku.mobile.data.db.RoomSharedPipelineStore
 import app.inku.mobile.data.lineage.LineageDeclaration
@@ -41,6 +43,8 @@ import app.inku.mobile.llm.VisionAnalysisResult
 import app.inku.mobile.llm.ProviderUrlValidator
 import app.inku.mobile.llm.RoutingModelProvider
 import app.inku.mobile.pipeline.AndroidWorkPipeline
+import app.inku.mobile.pipeline.BUNDLED_PLUGIN_PACKAGE
+import app.inku.mobile.pipeline.ImportedPluginDefinition
 import app.inku.mobile.pipeline.NativePipelineBridge
 import app.inku.mobile.pipeline.PipelineView
 import app.inku.mobile.pipeline.ComposeFromDdlProgress
@@ -102,6 +106,7 @@ class InkuRepository(
             commitStore = sharedPipelineStore,
             executionStore = sharedPipelineStore,
             readHistory = { id -> sharedPipelineStore.readHistory(AndroidWorkPipeline.OWNER_ID, id) },
+            bundledPluginsEnabled = { isBundledPluginPackageEnabled() },
         )
     }
     private val modelDownloader = LocalModelDownloader(context.applicationContext, database.modelAssetDao())
@@ -205,6 +210,30 @@ class InkuRepository(
 
     suspend fun readManagedHistory(ownerId: String, historyId: String): ManagedHistoryRead? =
         sharedPipelineStore.readHistory(ownerId, historyId)
+
+    /**
+     * The saved work as `inku.ddl-export.v1`: its visible DDL and the plugin
+     * definitions that DDL names, from the work's own saved configuration.
+     */
+    suspend fun ddlExportJson(item: HistoryItemEntity): String {
+        val config = readManagedHistory(AndroidWorkPipeline.OWNER_ID, item.id)
+            ?.forkContextJson
+            ?.let(::JSONObject)
+            ?.optJSONObject("config")
+        val language = config?.optString("language")?.takeIf { it.isNotBlank() }
+            ?: item.instructionLangResolved
+            ?: "ja"
+        val engineVersion = runCatching { JSONObject(item.renderMetadataJson).opt("render_engine_version") }.getOrNull()
+        return DdlExport.build(
+            source = item.normalizedDdl,
+            language = language,
+            definitions = config?.optJSONArray("definitions"),
+            summaries = config?.optJSONArray("macro_summaries"),
+            exportedFrom = JSONObject()
+                .put("build_number", BuildConfig.BUILD_NUMBER)
+                .put("render_engine_version", engineVersion ?: JSONObject.NULL),
+        ).toString(2)
+    }
 
     /**
      * Saves one shared-core performance and its exact authoring revision as one
@@ -367,6 +396,26 @@ class InkuRepository(
     }
 
     suspend fun getSetting(key: String): String? = database.settingsDao().get(key)?.valueJson
+
+    /** The bundled `Nature.leaves` document's switch, as the server's plugin manager keeps one per document. */
+    suspend fun isBundledPluginPackageEnabled(): Boolean = runCatching {
+        database.pluginSettingDao().get(BUNDLED_PLUGIN_SETTING_KEY)
+            ?.valueJson
+            ?.let { JSONObject(it).optBoolean("enabled", true) }
+    }.getOrNull() ?: true
+
+    fun bundledPluginWords(japanese: Boolean): List<String> = pipeline.bundledPluginWords(japanese)
+
+    suspend fun setBundledPluginPackageEnabled(enabled: Boolean) {
+        database.pluginSettingDao().upsert(
+            PluginSettingEntity(
+                key = BUNDLED_PLUGIN_SETTING_KEY,
+                pluginId = BUNDLED_PLUGIN_PACKAGE,
+                valueJson = JSONObject().put("enabled", enabled).toString(),
+                updatedAt = System.currentTimeMillis(),
+            ),
+        )
+    }
 
     suspend fun getSettingsMap(): Map<String, String> =
         database.settingsDao().listAll().associate { it.key to it.valueJson }
@@ -572,7 +621,7 @@ class InkuRepository(
         )
     }
 
-    suspend fun composeFromDdl(description: String, ddl: String, catalogId: String, canvasAspect: String, stage1ModelId: String, stage2ModelId: String, autoRepair: Boolean = true, litertStage1PromptOptimization: Boolean = false, lineage: LineageDeclaration = LineageDeclaration(), historyVisibility: String? = null, seeds: PaintSeeds = PaintSeeds(), instructionLang: String? = null, uiLang: String? = null, sourceText: String? = null, sketch: SketchInput = SketchInput(), inputProvenance: CameraInputProvenance? = null, onProgress: suspend (ComposeFromDdlProgress) -> Unit = {}, beforeSave: suspend () -> Unit = {}, parentHistoryId: String? = null, executionId: String? = null, originalPhoto: File? = null): HistoryItemEntity {
+    suspend fun composeFromDdl(description: String, ddl: String, catalogId: String, canvasAspect: String, stage1ModelId: String, stage2ModelId: String, autoRepair: Boolean = true, litertStage1PromptOptimization: Boolean = false, lineage: LineageDeclaration = LineageDeclaration(), historyVisibility: String? = null, seeds: PaintSeeds = PaintSeeds(), instructionLang: String? = null, uiLang: String? = null, sourceText: String? = null, sketch: SketchInput = SketchInput(), inputProvenance: CameraInputProvenance? = null, onProgress: suspend (ComposeFromDdlProgress) -> Unit = {}, beforeSave: suspend () -> Unit = {}, parentHistoryId: String? = null, executionId: String? = null, originalPhoto: File? = null, importedPlugins: List<ImportedPluginDefinition> = emptyList()): HistoryItemEntity {
         val started = System.currentTimeMillis()
         val result = pipeline.composeFromDdl(
             ddl,
@@ -597,6 +646,7 @@ class InkuRepository(
                 parentHistoryId = parentHistoryId,
                 executionId = executionId,
                 inputProvenance = inputProvenance,
+                importedPlugins = importedPlugins,
             ),
             onProgress = onProgress,
         )
@@ -1084,3 +1134,6 @@ internal fun refinementColorSnapshot(parent: RefinementParent, plan: RefinementP
     } else {
         null
     }
+
+/** `plugin_settings` key of the bundled plugin package switch. */
+private const val BUNDLED_PLUGIN_SETTING_KEY = "bundled:$BUNDLED_PLUGIN_PACKAGE:enabled"

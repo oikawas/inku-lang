@@ -213,6 +213,7 @@ import app.inku.mobile.data.model.CanvasAspects
 import app.inku.mobile.data.model.DerivationKindRegistry
 import app.inku.mobile.data.model.ColorCatalogs
 import app.inku.mobile.pipeline.InstructionLanguages
+import app.inku.mobile.pipeline.PluginDiagnostic
 import app.inku.mobile.pipeline.SaijikiGenerated
 import app.inku.mobile.pipeline.Sketches
 import app.inku.mobile.pipeline.SketchMode
@@ -749,6 +750,21 @@ private fun DdlEditorDialog(state: InkuUiState, viewModel: InkuViewModel) {
         editorValue = value
         viewModel.setDdl(value.text)
     }
+    val context = LocalContext.current
+    val importScope = rememberCoroutineScope()
+    val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        importScope.launch {
+            val text = runCatching { readDdlImportText(context, uri) }.getOrNull()
+            if (text == null) {
+                viewModel.ddlImportFailed()
+                return@launch
+            }
+            viewModel.importDdlFile(text)
+            val imported = viewModel.state.value.ddl
+            editorValue = TextFieldValue(imported, selection = TextRange(imported.length))
+        }
+    }
     fun insertVocabulary(word: String) {
         updateEditor(insertWordAtSelection(editorValue, word))
     }
@@ -779,6 +795,12 @@ private fun DdlEditorDialog(state: InkuUiState, viewModel: InkuViewModel) {
                 ) {
                     Text(S.ddlEdit, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                     Spacer(Modifier.weight(1f))
+                    TextButton(
+                        onClick = { importLauncher.launch(arrayOf("application/json", "text/*", "application/octet-stream")) },
+                        enabled = !state.isDrawing,
+                    ) {
+                        Text(S.ddlImportFile)
+                    }
                     TextButton(onClick = viewModel::closeDdlEditor) {
                         Text(S.close)
                     }
@@ -2506,6 +2528,15 @@ private fun CanvasHeroCard(
                 viewModel.setTab(AppTab.Settings)
                 viewModel.setSettingsPane(SettingsPane.Export)
             },
+            onExportDdl = {
+                exportSheetOpen = false
+                scope.launch {
+                    canvasMessage = runCatching {
+                        shareHistoryDdl(context, it, viewModel.ddlExportJson(it))
+                        "DDL exported F${it.renderHashShort}"
+                    }.getOrElse { error -> safeErrorMessage(error, "DDL export failed.") }
+                }
+            },
             onExportSvg = { profile ->
                 exportSheetOpen = false
                 canvasMessage = "SVG export preparing..."
@@ -2571,6 +2602,7 @@ private fun ExportSheet(
     templates: List<ExportTemplateEntity>,
     onDismiss: () -> Unit,
     onEditTemplates: () -> Unit,
+    onExportDdl: () -> Unit,
     onExportSvg: (String) -> Unit,
     onExportPng: (Int) -> Unit,
 ) {
@@ -2584,6 +2616,8 @@ private fun ExportSheet(
             verticalArrangement = Arrangement.spacedBy(Dimens.spaceM),
         ) {
             Text(S.exportOf(item.renderHashShort), style = MaterialTheme.typography.titleMedium)
+            CompactLabel("DDL")
+            SvgExportOption(title = S.ddlExportWithPlugins, sub = S.ddlExportWithPluginsNote, onClick = onExportDdl)
             CompactLabel("SVG")
             SvgExportOption(title = S.svgDisplay, sub = S.svgDisplayNote, onClick = { onExportSvg("display") })
             SvgExportOption(title = S.svgEditable, sub = S.svgEditableNote, onClick = { onExportSvg("editable") })
@@ -4292,6 +4326,18 @@ private fun MiscSettingsPanel(state: InkuUiState, viewModel: InkuViewModel, modi
                     onClick = { viewModel.setCameraVisionOutputMode(VisionOutputMode.DDL) },
                 )
             }
+        }
+        SettingsCard(
+            S.bundledPluginsTitle,
+            S.bundledPluginsSubtitle,
+            if (state.bundledPluginsEnabled) "ON" else "OFF",
+        ) {
+            val words = if (LocalUiLanguage.current.isEnglish) state.bundledPluginWordsEn else state.bundledPluginWordsJa
+            SettingCheckRow(
+                checked = state.bundledPluginsEnabled,
+                text = S.bundledPluginsToggle(words.joinToString(if (LocalUiLanguage.current.isEnglish) ", " else "・")),
+                onCheckedChange = viewModel::setBundledPluginsEnabled,
+            )
         }
         SettingsCard(
             S.cameraVisionModelTitle,
@@ -6109,6 +6155,20 @@ private suspend fun shareHistoryJson(context: Context, item: HistoryItemEntity) 
     launchShareIntent(context, payload)
 }
 
+/** `inku-<id>-<time>.inku-ddl.json`, the web's name for a DDL export. */
+private suspend fun shareHistoryDdl(context: Context, item: HistoryItemEntity, json: String) {
+    val payload = withContext(Dispatchers.IO) {
+        val exportDir = File(context.cacheDir, "exports")
+        check(exportDir.isDirectory || exportDir.mkdirs()) { "Export cache is unavailable." }
+        val stamp = java.text.SimpleDateFormat("yyyyMMdd-HHmmss", java.util.Locale.ROOT).format(java.util.Date())
+        val file = File(exportDir, "inku-${item.id}-$stamp.inku-ddl.json")
+        file.writeText(json, Charsets.UTF_8)
+        val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+        SharePayload(uri, "application/json", "inku DDL ${item.renderHashShort}", file.name, "Export inku DDL")
+    }
+    launchShareIntent(context, payload)
+}
+
 private suspend fun shareHistorySvg(context: Context, item: HistoryItemEntity, profile: String = "display") {
     val payload = withContext(Dispatchers.IO) { buildHistorySvgPayload(context, item, profile) }
     launchShareIntent(context, payload)
@@ -6374,6 +6434,15 @@ private fun PipelineStatusPanel(state: InkuUiState, viewModel: InkuViewModel) {
                 ?: state.selectedHistory?.renderMetadataJson?.let(::JSONObject)?.optJSONObject("pipeline_diagnostics")
         }.getOrNull()
     }
+    // Plugin reasons are computed when the work is saved; they describe the
+    // live view only while it still shows that saved revision.
+    val pluginReasons = remember(state.selectedHistory?.renderMetadataJson) {
+        runCatching {
+            PluginDiagnostic.listFrom(
+                state.selectedHistory?.renderMetadataJson?.let(::JSONObject)?.optJSONObject("pipeline_diagnostics"),
+            )
+        }.getOrDefault(emptyList())
+    }.takeIf { view == null || savedCurrentRevision }.orEmpty()
     if (diagnostics != null) {
         val issueKeys = listOf("upstream_diagnostics", "downstream_diagnostics", "resource_omissions", "relation_omissions")
         val issues = issueKeys.flatMap { key ->
@@ -6398,8 +6467,16 @@ private fun PipelineStatusPanel(state: InkuUiState, viewModel: InkuViewModel) {
                         style = MaterialTheme.typography.bodySmall,
                     )
                 } else {
-                    val reason = issue.optString("reason").ifBlank { issue.optString("issue_id") }
-                    if (reason.isNotBlank()) Text(reason, style = MaterialTheme.typography.bodySmall)
+                    val span = issue.optJSONObject("span")
+                    val plugin = pluginReasons.firstOrNull {
+                        span != null && it.startByte == span.optInt("start_byte", -2) && it.endByte == span.optInt("end_byte", -2)
+                    }
+                    if (plugin != null) {
+                        Text(S.pipelinePluginDiagnostic(plugin.reason, plugin.name, plugin.suggestion), style = MaterialTheme.typography.bodySmall)
+                    } else {
+                        val reason = issue.optString("reason").ifBlank { issue.optString("issue_id") }
+                        if (reason.isNotBlank()) Text(reason, style = MaterialTheme.typography.bodySmall)
+                    }
                 }
             }
         }
@@ -6424,6 +6501,9 @@ private fun DdlPreviewBox(value: String, onClick: () -> Unit, modifier: Modifier
             value = value,
             onValueChange = {},
             readOnly = true,
+            // A read-only field still takes taps for focus and selection, so the
+            // box never saw them and the DDL editor could not be opened here.
+            enabled = false,
             modifier = Modifier
                 .fillMaxWidth()
                 .heightIn(min = Dimens.panelMinHeight)
@@ -7897,3 +7977,20 @@ internal fun YuragiMascotView(modifier: Modifier = Modifier) {
 }
 
 private data class Tuple5<A, B, C, D, E>(val a: A, val b: B, val c: C, val d: D, val e: E)
+
+/** A DDL file is text; four MiB bounds an export with its definitions. */
+private suspend fun readDdlImportText(context: Context, uri: android.net.Uri): String = withContext(Dispatchers.IO) {
+    val maxBytes = 4 * 1024 * 1024
+    val bytes = context.contentResolver.openInputStream(uri)?.use { input ->
+        val buffer = java.io.ByteArrayOutputStream()
+        val chunk = ByteArray(8192)
+        while (true) {
+            val read = input.read(chunk)
+            if (read < 0) break
+            require(buffer.size() + read <= maxBytes) { "DDL file is too large" }
+            buffer.write(chunk, 0, read)
+        }
+        buffer.toByteArray()
+    } ?: error("DDL file could not be opened")
+    bytes.toString(Charsets.UTF_8)
+}

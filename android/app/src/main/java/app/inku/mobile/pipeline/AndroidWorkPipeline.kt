@@ -29,6 +29,8 @@ class AndroidWorkPipeline(
     executionStore: PipelineExecutionStore,
     private val readHistory: suspend (String) -> ManagedHistoryRead?,
     private val legacyRenderer: SvgRenderer = AndroidRenderHost(),
+    /** Whether the author left the bundled plugin package enabled. */
+    private val bundledPluginsEnabled: suspend () -> Boolean = { true },
 ) {
     private val configBuilder = SharedPipelineConfigBuilder(binding)
     private val host = SharedPipelineHost(
@@ -40,6 +42,19 @@ class AndroidWorkPipeline(
     )
     private val authoring = SharedAuthoringPipeline(host, configBuilder)
     private val random = SecureRandom()
+
+    /**
+     * The bundled package's words for display: the Japanese alias in Japanese,
+     * the canonical English heading otherwise (DDL Spec 14).
+     */
+    fun bundledPluginWords(japanese: Boolean): List<String> {
+        val definitions = configBuilder.bundledPluginDefinitions(if (japanese) "ja" else "en")
+        return (0 until definitions.length()).mapNotNull { index ->
+            val definition = definitions.optJSONObject(index) ?: return@mapNotNull null
+            val alias = definition.optJSONArray("aliases")?.optString(0)?.takeIf { it.isNotEmpty() }
+            if (japanese && alias != null) alias else definition.optString("heading").takeIf { it.isNotEmpty() }
+        }
+    }
 
     suspend fun paint(request: PaintRequest): PaintResult {
         val run = prepare(request, descriptionFlow = true)
@@ -311,6 +326,14 @@ class AndroidWorkPipeline(
                 ?: execution.authoringContext.derivationKind)
         val ddl = document.requiredString("source")
         val diagnostics = pipelineDiagnostics(delivery, metadata)
+            .put(
+                "plugin_diagnostics",
+                pluginDiagnostics(
+                    ddl,
+                    delivery.requiredArray("upstream_diagnostics"),
+                    JSONObject(execution.configJson),
+                ),
+            )
         metadata.put("pipeline_diagnostics", diagnostics)
         val renderHash = renderHash(delivery.requiredObject("score"), metadata, catalogId)
         metadata.put("render_hash", renderHash).put("render_hash_short", renderHash.takeLast(4).uppercase())
@@ -475,6 +498,8 @@ class AndroidWorkPipeline(
                     compositionSeed = request.compositionSeed,
                     variationAmplitude = request.variationAmplitude,
                     variationSeed = request.variationSeed,
+                    bundledPluginsEnabled = bundledPluginsEnabled(),
+                    importedPlugins = request.importedPlugins,
                 ),
             )
         } else {
@@ -689,6 +714,29 @@ class AndroidWorkPipeline(
             (request.instructionLang != null &&
                 InstructionLanguages.normalize(request.instructionLang) !=
                 stored.resultOptions.optionalString("instruction_lang_requested"))
+    }
+
+    /**
+     * Author-facing reasons for withheld plugin sentences, as the server stores
+     * them. The work's own definitions count as enabled; the bundled package's
+     * names are enabled or disabled with its switch.
+     */
+    private suspend fun pluginDiagnostics(source: String, upstream: JSONArray, config: JSONObject): JSONArray {
+        if (upstream.length() == 0) return JSONArray()
+        val bundled = configBuilder.bundledPluginNames(config.optString("language", "ja"))
+        val enabledBundled = bundledPluginsEnabled()
+        val enabled = (pluginVisibleNames(config.optJSONArray("definitions")) + if (enabledBundled) bundled else emptyList())
+            .toSortedSet()
+        val disabled = if (enabledBundled) emptyList() else bundled.filterNot { it in enabled }.sorted()
+        val input = JSONObject()
+            .put("source", source)
+            .put("upstream_diagnostics", upstream)
+            .put("enabled", JSONArray(enabled.toList()))
+            .put("disabled", JSONArray(disabled))
+        val output = JSONObject(binding.explainPluginDiagnostics(input.toString().encodeToByteArray()).decodeToString())
+        return output.optJSONArray("plugins")
+            ?.takeIf { output.optString("schema") == "inku.plugin-diagnostics.v1" }
+            ?: JSONArray()
     }
 
     private fun pipelineDiagnostics(delivery: JSONObject, metadata: JSONObject) = JSONObject()

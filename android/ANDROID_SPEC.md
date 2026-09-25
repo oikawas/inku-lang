@@ -44,6 +44,18 @@ When updating Android specifications:
 3. Do not introduce English-only Android requirements that are absent from
    `ANDROID_SPEC.ja.md`.
 
+## 2026-09-25 Current plugins (draw-system04)
+
+The work plan's optional `plugins`, the Stage 1 installed-plugin section, and canonical-name and alias matching (DDL Spec 14, bundled `Nature.leaves` 2.0.0) are done by the packaged shared Rust core. The lock's optional `aliases` travel into Room unchanged.
+
+The bundled `Nature.leaves` package is enabled or disabled under Settings > Other > Bundled plugins, the same granularity as the server's per-document switch. The value is stored in `plugin_settings` under `bundled:Nature.leaves:enabled` as `{"enabled":bool}`; a missing or corrupt value means enabled. When disabled, it is left out of `bundled_packages` in a new work's catalog resolution; saved works redraw with the definitions in their own config. Word names show the alias (such as 若葉) in Japanese and the canonical name in English, both taken from the shared core's definitions.
+
+When a work is saved and there is at least one upstream diagnostic, the shared `explain_plugin_diagnostics` (JNI `NativePipelineBridge.explainPluginDiagnostics`) is called and its result stored as the `pipeline_diagnostics.plugin_diagnostics` array. `enabled` holds the canonical names and aliases of the work config's definitions plus the enabled bundled package's names; `disabled` holds the disabled bundled package's names. The save-time check still requires the required channels exactly, and also accepts the optional `plugin_diagnostics` channel as an array; saved rows without it still read. Drawing diagnostics show, in place of the upstream diagnostic with the same span, the reason (not installed, disabled, name mismatch with a suggestion, version mismatch) in the web's `pipelinePluginDiagnostic` wording.
+
+DDL export is "DDL (with plugin definitions)" in a saved work's export sheet: it shares `inku.ddl-export.v1` (the DDL and only the definitions it writes by canonical name or alias; `exported_from` holds the build and render engine) as `inku-<id>-<time>.inku-ddl.json`. Reading an export with "Open" in the DDL editor puts the DDL into the editor and passes the definitions to the next new work's catalog resolution only, as leading candidates; they are not installed and never reach an edit of a saved work. A name the device lacks gets the `imported_plugin_not_installed` catalog diagnostic, and one held with other content `imported_plugin_differs_from_installed`. A file that is not an export is read as DDL. An export carries no render seed or canvas, so an imported work draws the same composition (the same Score). The compose screen's DDL box could not open the DDL editor because its read-only text field took the taps; the whole box now receives them.
+
+The server's `layer_versions.py` declares the DDL Spec and DDL engine versions; Android holds no version constants for them.
+
 ## 2026-09-25 Current camera capture, description, and drawing
 
 The bottom "Camera" opens an in-app camera (CameraX back-camera preview and shutter) that writes the photo straight to an app-owned temporary file under `cacheDir/camera/`. It no longer goes through the system camera app and its review screen. The first use asks for the `CAMERA` permission; if it is refused or CameraX cannot start, capture falls back to the system camera (`ActivityResultContracts.TakePicture`). The Photo Picker entry and the original-photo retention and deletion contract are unchanged.

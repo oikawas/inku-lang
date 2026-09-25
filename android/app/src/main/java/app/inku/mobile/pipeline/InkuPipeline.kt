@@ -76,6 +76,8 @@ data class PaintRequest(
     /** Durable shared-core execution returned by [InterpretResult]. */
     val executionId: String? = null,
     val inputProvenance: app.inku.mobile.data.model.CameraInputProvenance? = null,
+    /** Definitions read from an `inku.ddl-export.v1` file; used by a new work only. */
+    val importedPlugins: List<ImportedPluginDefinition> = emptyList(),
 )
 
 /**

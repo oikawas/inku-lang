@@ -73,6 +73,8 @@ interface InkuStrings {
     val pipelineNewDescriptionNotice: String
     val pipelineCheckDdl: String
     val pipelineDiagnostics: String
+    /** Same wording as the web's `pipelinePluginDiagnostic`. */
+    fun pipelinePluginDiagnostic(reason: String, name: String, suggestion: String?): String
     val pipelineOmissions: (Int) -> String
     val pipelinePartialExecution: (Int, Int) -> String
 
@@ -337,6 +339,14 @@ interface InkuStrings {
     val cameraVisionModeDescription: String
     val cameraVisionModeDdl: String
     val cameraVisionModelTitle: String
+    val bundledPluginsTitle: String
+    val ddlImportFile: String
+    val ddlImportInvalid: String
+    fun ddlImportedPlugins(names: String): String
+    val ddlExportWithPlugins: String
+    val ddlExportWithPluginsNote: String
+    val bundledPluginsSubtitle: String
+    fun bundledPluginsToggle(words: String): String
     val cameraVisionModelSubtitle: String
     fun cameraVisionRemoteNotice(provider: String): String
     val cameraReadyToEdit: String

@@ -10,4 +10,8 @@ interface SharedPipelineBinding {
     fun resolvePalette(inputBytes: ByteArray): ByteArray
     fun resolveMacroCatalog(inputBytes: ByteArray): ByteArray
     fun renderSaved(inputBytes: ByteArray): ByteArray
+
+    /** Author-facing reasons for withheld plugin sentences; a host without it has none. */
+    fun explainPluginDiagnostics(inputBytes: ByteArray): ByteArray =
+        """{"schema":"inku.plugin-diagnostics.v1","plugins":[]}""".encodeToByteArray()
 }

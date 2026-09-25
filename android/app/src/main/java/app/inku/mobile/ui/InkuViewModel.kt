@@ -23,6 +23,7 @@ import app.inku.mobile.data.model.CanvasAspects
 import app.inku.mobile.data.model.CatalogSelection
 import app.inku.mobile.data.model.ColorCatalogs
 import app.inku.mobile.data.model.CompatibilityConstants
+import app.inku.mobile.data.DdlExport
 import app.inku.mobile.data.model.CameraInputProvenance
 import app.inku.mobile.data.model.CameraInputOrigin
 import app.inku.mobile.data.lineage.LineageDeclaration
@@ -45,6 +46,7 @@ import app.inku.mobile.llm.isLocalVisionModel
 import app.inku.mobile.llm.VisionAnalysisRequest
 import app.inku.mobile.llm.VisionImagePreparer
 import app.inku.mobile.llm.VisionOutputMode
+import app.inku.mobile.pipeline.ImportedPluginDefinition
 import app.inku.mobile.pipeline.InstructionLanguages
 import app.inku.mobile.pipeline.ComposeFromDdlProgress
 import app.inku.mobile.pipeline.InterpretResult
@@ -226,6 +228,12 @@ data class InkuUiState(
     val cameraSourcePhotoPath: String? = null,
     val cameraVisionOutputMode: VisionOutputMode = VisionOutputMode.DESCRIPTION,
     val cameraVisionModelId: String = LOCAL_VISION_MODEL_ID,
+    val bundledPluginsEnabled: Boolean = true,
+    /** Definitions read with an `inku.ddl-export.v1` file, held for the next new work. */
+    val importedPlugins: List<ImportedPluginDefinition> = emptyList(),
+    val importedPluginNames: List<String> = emptyList(),
+    val bundledPluginWordsJa: List<String> = emptyList(),
+    val bundledPluginWordsEn: List<String> = emptyList(),
     val isDrawing: Boolean = false,
     val message: String? = null,
     val tab: AppTab = AppTab.Compose,
@@ -1341,6 +1349,36 @@ class InkuViewModel @JvmOverloads constructor(
         localState.value = localState.value.copy(ddl = value, ddlEditedAfterGeneration = true, message = null)
     }
 
+    /**
+     * Reads a DDL file into the editor. An `inku.ddl-export.v1` file brings its
+     * plugin definitions for the next new work only; the work is detached from
+     * the current lineage because an import is never an edit of that work.
+     */
+    fun importDdlFile(text: String) {
+        val parsed = runCatching { DdlExport.parse(text) }.getOrElse {
+            localState.value = localState.value.copy(message = strings().ddlImportInvalid)
+            return
+        }
+        localState.value = localState.value.copy(
+            ddl = parsed.ddl,
+            ddlEditedAfterGeneration = true,
+            lineageDetached = true,
+            pipelineView = null,
+            historyAuthority = null,
+            importedPlugins = parsed.plugins,
+            importedPluginNames = parsed.names,
+            message = if (parsed.names.isEmpty()) null else strings().ddlImportedPlugins(parsed.names.joinToString(", ")),
+        )
+    }
+
+    fun ddlImportFailed() {
+        localState.value = localState.value.copy(message = strings().ddlImportInvalid)
+    }
+
+    /** The saved work as `inku.ddl-export.v1` text, for the share sheet. */
+    suspend fun ddlExportJson(item: HistoryItemEntity): String =
+        withContext(Dispatchers.IO) { repository.ddlExportJson(item) }
+
     fun setBatchText(value: String) {
         localState.value = localState.value.copy(batchText = value, message = null)
     }
@@ -1696,6 +1734,12 @@ class InkuViewModel @JvmOverloads constructor(
         if (cameraVisionModeChangeLocked(localState.value.cameraCaptureState)) return
         localState.value = localState.value.copy(cameraVisionOutputMode = mode, message = null)
         persistSetting(CameraVisionModeSetting.KEY, CameraVisionModeSetting.encode(mode))
+    }
+
+    /** Enables or disables the bundled plugin package for new works. */
+    fun setBundledPluginsEnabled(enabled: Boolean) {
+        localState.value = localState.value.copy(bundledPluginsEnabled = enabled, message = null)
+        viewModelScope.launch { repository.setBundledPluginPackageEnabled(enabled) }
     }
 
     fun setCameraVisionModel(modelId: String) {
@@ -2300,7 +2344,15 @@ class InkuViewModel @JvmOverloads constructor(
             localState.value = localState.value.copy(isDrawing = true, message = strings().statusComposingFromDdl)
             runCatching {
                 withContext(Dispatchers.IO) {
-                    repository.composeFromDdl(current.prompt, ddl, current.selectedCatalogId, current.selectedCanvasAspect, current.selectedModelId, current.selectedStage2ModelId, lineage = lineage, instructionLang = InstructionLanguages.AUTO, uiLang = current.uiLanguage.code, parentHistoryId = current.selectedHistory?.id?.takeUnless { current.lineageDetached }, executionId = matchingPipelineExecutionId(current))
+                    val parentHistoryId = current.selectedHistory?.id?.takeUnless { current.lineageDetached }
+                    repository.composeFromDdl(
+                        current.prompt, ddl, current.selectedCatalogId, current.selectedCanvasAspect,
+                        current.selectedModelId, current.selectedStage2ModelId, lineage = lineage,
+                        instructionLang = InstructionLanguages.AUTO, uiLang = current.uiLanguage.code,
+                        parentHistoryId = parentHistoryId, executionId = matchingPipelineExecutionId(current),
+                        // Imported definitions reach a new work only, never an edit of a saved one.
+                        importedPlugins = if (parentHistoryId == null) current.importedPlugins else emptyList(),
+                    )
                 }
             }.onSuccess { item ->
                 if (!isCurrentDrawingRun(runId)) return@onSuccess
@@ -2313,6 +2365,8 @@ class InkuViewModel @JvmOverloads constructor(
                         confirmDdlOverwrite = false,
                         descriptionForkRequested = false,
                         lineageDetached = false,
+                        importedPlugins = emptyList(),
+                        importedPluginNames = emptyList(),
                         isDrawing = false,
                         message = "Composed ${item.renderHashShort}",
                     )
@@ -3280,6 +3334,11 @@ class InkuViewModel @JvmOverloads constructor(
 
     private suspend fun restorePersistedSettings() {
         val settings = repository.getSettingsMap()
+        val bundledPluginsEnabled = repository.isBundledPluginPackageEnabled()
+        val bundledPluginWords = withContext(Dispatchers.IO) {
+            runCatching { repository.bundledPluginWords(japanese = true) to repository.bundledPluginWords(japanese = false) }
+                .getOrDefault(emptyList<String>() to emptyList())
+        }
         // Read after the lookup suspended, not before. Startup runs while the
         // screen is already live: a description typed, a work picked from
         // history, a canvas ratio chosen -- all of it lands in the state while
@@ -3334,6 +3393,9 @@ class InkuViewModel @JvmOverloads constructor(
             historySelectionCatalog = histCatalog,
             cameraVisionOutputMode = cameraVisionOutputMode,
             cameraVisionModelId = cameraVisionModelId,
+            bundledPluginsEnabled = bundledPluginsEnabled,
+            bundledPluginWordsJa = bundledPluginWords.first,
+            bundledPluginWordsEn = bundledPluginWords.second,
             uiMode = uiMode,
             uiLanguage = uiLanguage,
             uiTextScale = uiTextScale,

@@ -6,6 +6,23 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 36 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-26 — Source review: safer deletions and permissions, provider keys, and Web stops, notices, and confirmations
+
+A review of the server and Web source fixed the following defects.
+
+- **Only administrators switch how the server signs people in.** `PUT /api/auth/config` accepted the user-manager permission (administrators or leaders), so, against the SPEC's "global settings are for admins only", a leader could turn local sign-in off for everyone.
+- **A permanent delete also removes the works' thumbnails and pipeline fork links.** Thumbnails live in a separate database that nothing cleaned, so pictures of deleted works stayed on disk. The thumbnail rebuild prunes thumbnails of works that are already gone.
+- **Deleting an account also removes its pipeline records** (drafts, executions, captured provider input and output, fork links). While another account's lineage or colophon points at one of its works (tombstones included), the deletion is refused with a reason (409) instead of failing on a foreign key (500). What should happen in that case is not decided, so it is only refused.
+- **Gemini and Anthropic model lists are read to the last page.** Models past the first page were taken as withdrawn, marked EOL, and switched off. The Gemini API key travels in `x-goog-api-key` instead of the URL. The demo instruction does the same, quotes the model id as a path segment, and gives every provider the same timeout.
+- A second manual DB backup within the same second is refused with 409 instead of 500. The DB size on the settings screen includes the write-ahead log. The secret key file is created owner-only and exclusively in one step. A Redis URL is logged without its password.
+- **Web: tooltips show on hover and keyboard focus only.** A clicked button keeps focus, so its bubble covered the menu, confirmation, or tab heading the click opened. The user menu hides its tooltip while open and names no logout in single-user mode.
+- **Web: the DDL dialog's stop ends the pipeline run.** It aborted only the start request, and the dialog, which cannot close while drawing, stayed until the model answered.
+- **Web: a refused move to trash, restore, or permanent delete says so.** The response was not read; the action counted as done and cleared the selection and the displayed work.
+- **Web: deleting a user or a group asks first.** One click deleted it. Refusals to delete read in the page's language.
+- Web: an empty library view and an empty trash say so. Grouping by lineage in the thumbnail view says it lists only lineages with derivations. A DDL-only lineage is named "DDL".
+
+The route count (107) and the API surface are unchanged. DDL, Score, and render versions are unchanged.
+
 ### v2.15.32 — include every locked crate in the API image notices (Build 1108, 2026-09-26)
 
 The v2.15.31 API image build stopped while collecting Rust dependency notices: the native wheel build had fetched only the crates it compiled, while the conservative notice inventory covers all of `Cargo.lock`. The builder now fetches the full lockfile before generating that inventory. This changes the distribution build, not application behavior.

@@ -2258,19 +2258,19 @@
                                 "items": [
                                   {
                                     "expr": "exact_decimal",
-                                    "value": "0.14"
+                                    "value": "0.13"
                                   },
                                   {
                                     "expr": "exact_decimal",
-                                    "value": "0.86"
+                                    "value": "0.87"
                                   },
                                   {
                                     "expr": "exact_decimal",
-                                    "value": "0.24"
+                                    "value": "0.31"
                                   },
                                   {
                                     "expr": "exact_decimal",
-                                    "value": "0.76"
+                                    "value": "0.69"
                                   }
                                 ]
                               },

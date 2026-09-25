@@ -125,3 +125,20 @@ def test_a_redis_connection_failure_does_not_log_the_password(monkeypatch, caplo
         assert security._get_redis_client() is None
     assert "Failed to connect to Redis at redis://127.0.0.1:1/0" in caplog.text
     assert "s3cret-pass" not in caplog.text
+
+
+def test_another_site_cannot_have_the_browser_change_anything() -> None:
+    """Single-user mode takes every request without credentials as the owner's,
+    and a POST with no body leaves the browser without a CORS preflight."""
+    client = TestClient(inku_app)
+    elsewhere = {"Sec-Fetch-Site": "cross-site", "Origin": "https://elsewhere.example"}
+    local_page = {"Sec-Fetch-Site": "cross-site", "Origin": "http://localhost:5173"}
+
+    refused = client.post("/api/auth/logout", headers=elsewhere)
+
+    assert (refused.status_code, refused.json()) == (403, {"detail": "cross-site request refused"})
+    # Only that is refused. An origin the CORS policy admits, and a client that
+    # sends no such header (the CLI, the Android app), reach the route, which
+    # here asks for a session.
+    assert client.post("/api/auth/logout", headers=local_page).status_code == 401
+    assert client.post("/api/auth/logout").status_code == 401

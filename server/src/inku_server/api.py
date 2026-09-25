@@ -9,6 +9,7 @@ from __future__ import annotations
 import asyncio
 import os
 import platform
+import re
 from contextlib import asynccontextmanager, suppress
 from datetime import datetime, timezone
 from pathlib import Path
@@ -18,7 +19,7 @@ from starlette.middleware import gzip as _gzip
 from .color_catalogs import render_color_map_for_catalog
 from .compression import FlushingGZipMiddleware
 from .render_engines import current_render_engine
-from .security import ConcurrencyLimitMiddleware, RequestBodyLimitMiddleware
+from .security import ConcurrencyLimitMiddleware, CrossSiteWriteGuardMiddleware, RequestBodyLimitMiddleware
 from . import db as _db
 from . import thumbs_db as _thumbs_db
 from .api_core.common import _APP_VERSION, _build_number, _env_flag
@@ -193,10 +194,18 @@ _cors_origins = [
 ]
 
 
+_CORS_ORIGIN_PATTERN = re.compile(r"http://localhost(:\d+)?|http://127\.0\.0\.1(:\d+)?")
+
+
+def _cors_origin_allowed(origin: str) -> bool:
+    """The CORS policy's answer, asked again by the cross-site write guard."""
+    return "*" in _cors_origins or origin in _cors_origins or bool(_CORS_ORIGIN_PATTERN.fullmatch(origin))
+
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_cors_origins,
-    allow_origin_regex=r"http://localhost(:\d+)?|http://127\.0\.0\.1(:\d+)?",
+    allow_origin_regex=_CORS_ORIGIN_PATTERN.pattern,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -204,6 +213,10 @@ app.add_middleware(
 
 
 app.add_middleware(RequestBodyLimitMiddleware, max_bytes=_MAX_REQUEST_BODY_BYTES)
+
+
+# Outside the body limit, so a refused request is refused on its headers alone.
+app.add_middleware(CrossSiteWriteGuardMiddleware, origin_allowed=_cors_origin_allowed)
 
 
 app.add_middleware(ConcurrencyLimitMiddleware, max_requests=_MAX_CONCURRENT_REQUESTS)

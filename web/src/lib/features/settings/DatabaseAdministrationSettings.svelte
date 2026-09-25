@@ -74,10 +74,12 @@
 				<span>Driver</span><strong>{status.database.driver}</strong>
 				<span>URL</span><code>{status.database.url}</code>
 				<span>Database</span><strong>{status.database.database ?? '-'}</strong>
-				<span>Default</span><strong>{status.database.is_default ? t().settingsYes : t().settingsNo}</strong>
+				<span>{t().settingsDbDefaultLabel}</span><strong>{status.database.is_default ? t().settingsYes : t().settingsNo}</strong>
 				<span>{t().settingsDbFileSize}</span><strong>{formatBytes(status.database.file_size_bytes)}</strong>
 			</div>
-			<div class="db-test-result">{status.database.note}</div>
+			<!-- Said in the page's language, as the output-save note is; the server's
+			     English note carries the same fact. -->
+			<div class="db-test-result">{t().settingsDbConnectionNote}</div>
 		{:else}
 			<div class="inline-message">{statusError ?? t().settingsLoadFailed}</div>
 		{/if}
@@ -142,8 +144,8 @@
 				<span>{t().settingsDbBackupLastAuto}</span><strong>{formatTimestamp(status.db_backup.last_auto_backup_at)}</strong>
 				<span>{t().settingsDbBackupNextAuto}</span><strong>{formatTimestamp(status.db_backup.next_auto_backup_at)}</strong>
 				<span>{t().settingsDbBackupEstimatedDisk}</span><strong title={t().settingsDbBackupEstimatedDiskHint}>{formatBytes(dbBackupEstimatedBytes)}</strong>
-				<span>Directory</span><code>{status.db_backup.backup_dir}</code>
-				<span>Saved</span><strong>{t().settingsDbBackupStoredCounts(status.db_backup.auto_count, status.db_backup.manual_count)}</strong>
+				<span>{t().settingsDbBackupDirectoryLabel}</span><code>{status.db_backup.backup_dir}</code>
+				<span>{t().settingsDbBackupSavedLabel}</span><strong>{t().settingsDbBackupStoredCounts(status.db_backup.auto_count, status.db_backup.manual_count)}</strong>
 			</div>
 			<div class="popover-group-label db-backup-list-label">{t().settingsDbBackupListTitle}</div>
 			{#if status.db_backup.backups.length === 0}

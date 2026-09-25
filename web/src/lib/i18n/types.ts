@@ -684,6 +684,10 @@ export interface LangPack {
 	settingsUnreadWordsContexts: string;
 	settingsCurrentDb: string;
 	settingsDbFileSize: string;
+	settingsDbDefaultLabel: string;
+	settingsDbConnectionNote: string;
+	settingsDbBackupDirectoryLabel: string;
+	settingsDbBackupSavedLabel: string;
 	settingsDbBackupTitle: string;
 	settingsDbBackupUnsupported: string;
 	settingsDbBackupInterval: string;

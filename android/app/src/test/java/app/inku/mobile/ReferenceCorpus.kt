@@ -6,13 +6,10 @@ import org.json.JSONObject
 /**
  * Resolves a reference fixture to the corpus directory that governs it.
  *
- * Android keeps only DDL and flat compatibility fixtures. Render parity is owned
+ * Android keeps only flat compatibility fixtures. DDL and render parity are owned
  * by the shared Rust core corpus rather than copied into the application tests.
  */
 object ReferenceCorpus {
-
-    /** The Stage 1.5 expansion version the port implements (`layer_versions.py` on the server). */
-    const val ddlEngineVersion = "20"
 
     /** Fixtures no engine version governs: they are rebaked in place and the port follows them. */
     private val FLAT = setOf(
@@ -23,13 +20,9 @@ object ReferenceCorpus {
         "score_schema_contract.json",
     )
 
-    /** The one fixture the DDL engine governs. */
-    private const val DDL_ENGINE_FIXTURE = "ddl_expand.json"
-
     /** The classpath path a bare fixture name resolves to. */
     fun path(name: String): String = when (name) {
         in FLAT -> "/server_reference/$name"
-        DDL_ENGINE_FIXTURE -> "/server_reference/ddl-engine-$ddlEngineVersion/$name"
         else -> error("Unknown Android reference fixture: $name")
     }
 

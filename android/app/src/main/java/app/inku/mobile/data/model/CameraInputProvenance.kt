@@ -7,7 +7,6 @@ import app.inku.mobile.llm.VisionPrompts
 import org.json.JSONObject
 
 internal const val INPUT_PROVENANCE_KEY = "input_provenance"
-private const val LOCAL_VISION_PROVIDER_ID = "local-litert-lm"
 
 enum class CameraInputOrigin(val wireValue: String) {
     Camera("camera"),
@@ -15,8 +14,12 @@ enum class CameraInputOrigin(val wireValue: String) {
 }
 
 enum class CameraInputRoute(val wireValue: String) {
+    // Saved by earlier builds, whose camera draw was fixed to NVIDIA NIM.
     LocalDescriptionToNim("local_description_to_nim"),
     LocalDdlToNimStage2("local_ddl_to_nim_stage2"),
+    // The camera draw uses the author's drawing settings.
+    DescriptionToPipeline("description_to_pipeline"),
+    DdlToPipelineStage2("ddl_to_pipeline_stage2"),
 }
 
 enum class CameraVisionOutputMode(val wireValue: String) {
@@ -24,7 +27,7 @@ enum class CameraVisionOutputMode(val wireValue: String) {
     Ddl("ddl"),
 }
 
-/** Immutable, non-image audit data captured at the local Vision boundary. */
+/** Immutable, non-image audit data captured at the Vision boundary. */
 data class CameraInputProvenance(
     val origin: CameraInputOrigin,
     val route: CameraInputRoute,
@@ -61,10 +64,10 @@ data class CameraInputProvenance(
         ): CameraInputProvenance = CameraInputProvenance(
             origin = origin,
             route = when (request.outputMode) {
-                VisionOutputMode.DESCRIPTION -> CameraInputRoute.LocalDescriptionToNim
-                VisionOutputMode.DDL -> CameraInputRoute.LocalDdlToNimStage2
+                VisionOutputMode.DESCRIPTION -> CameraInputRoute.DescriptionToPipeline
+                VisionOutputMode.DDL -> CameraInputRoute.DdlToPipelineStage2
             },
-            visionProviderId = LOCAL_VISION_PROVIDER_ID,
+            visionProviderId = result.modelId.substringBefore(':'),
             visionModelId = result.modelId,
             visionPromptVersion = VisionPrompts.versionFor(request.outputMode),
             visionOutputMode = when (request.outputMode) {

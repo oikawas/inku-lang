@@ -63,4 +63,11 @@ class LocalLiteRtLmOutputTest {
             LocalLiteRtLmOutput.visionDescription("A model stands beside a square.", "en"),
         )
     }
+
+    @Test
+    fun descriptionStopsAtTheLastSentenceEndOncePastItsBudget() {
+        assertEquals(null, LocalLiteRtLmOutput.sentenceCut("空が広い。", 10))
+        assertEquals(null, LocalLiteRtLmOutput.sentenceCut("空が広い湖と森と山があり", 10))
+        assertEquals(11, LocalLiteRtLmOutput.sentenceCut("空が広い。湖が静かだ。森", 10))
+    }
 }

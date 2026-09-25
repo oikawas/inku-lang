@@ -5,12 +5,12 @@
 
 最終更新: 2026-09-25。
 
-**追随状況**: Android は `2.1.4-android.80` / **render engine `default / 67`** /
-**DDL engine version `20`** の世代にある。描画版は固定Kotlin定数ではなく、同梱する
-`core/crates/inku-render/` からJNI経由で取得し、DDL参照版は`ReferenceCorpus.kt`が名乗る。
-master の web/server も **render engine `67`** で、serverの **`ddl_engine_version` は21** であり、
-ServerとAndroidは同じRust描画実装を共有する。Stage 1.5 展開層も、2026-08-05 に添景水準の畳み込みへ追随した
-（末尾の 2026-08-05 の節を参照）。
+**追随状況**: Android は `2.1.4-android.80` の世代にある。DDLの変換とScore → SVGの描画は、
+同じcommitの共有Rust core（`core/crates/`）を同梱してServerと同じ実装で行い、Android独自の版定数を持たない。
+render engineの版は同梱した`core/crates/inku-render/`の`RENDER_ENGINE_VERSION`をJNI経由で名乗り、
+DDL SpecとDDL engineの版はServerの`server/src/inku_server/layer_versions.py`が名乗る。本書には版の数値を写さない（写すと古びる）。
+以前`ReferenceCorpus.kt`が名乗っていたDDL engine `20`は、撤去済みのKotlin Stage 1.5展開層のfixture版であり、現行の版ではない。
+実機の`NativeRenderDeviceTest`は、同梱ライブラリのSVG・版・renderer referenceを、build時に同じcommitのhost coreが`render-parity-expected`で生成した期待値と比べる。凍結corpusはScore入力とraster入力にだけ使い、render engineの版上げで期待値を作り直す必要はない。
 
 **共有Rust切替は完了した**: productionのScore → SVG / metadataは
 `AndroidRenderHost`から1回のJNI requestで`core/crates/inku-render/`を呼ぶ。保存済み／現行SVGの
@@ -30,6 +30,14 @@ runtime fallbackを持たない。保存済みSVG、Room schema、Score schema�
 - Android 仕様を更新するときは、先に `ANDROID_SPEC.ja.md` を更新し、その後で `ANDROID_SPEC.md` を同期する。
 - 英語版だけに存在する仕様・要件を追加してはならない。
 
+## 2026-09-25 現行のカメラ撮影・記述生成・描画
+
+下部「カメラ」はアプリ内カメラ（CameraX、背面カメラのプレビューとシャッター）を開き、撮影した写真を`cacheDir/camera/`のアプリ専用一時ファイルへ直接書く。標準カメラアプリの起動と確認画面は通らない。初回は`CAMERA`権限を求め、拒否された場合やCameraXを開始できない場合は、従来の標準カメラ（`ActivityResultContracts.TakePicture`）へ切り替える。Photo Pickerの入口と、元写真の保持・削除の契約は変えない。
+
+写真から記述（DDL直接ではDDL）を作る「記述生成モデル」は、設定「その他」で選ぶ。既定は端末内の`local-litert-lm:gemma-4-e2b`で、取得済みの端末内モデル（E4B等）と、有効な外部providerのモデルも選べる。値は`app_settings`の`camera_vision_model`に保存し、欠落・壊れた値は既定へ戻す。撮影中は変更できない。端末内モデルでは写真は端末の外へ出ない。外部モデルを選んだ場合に限り、向き補正・長辺1280px・JPEG品質85で再エンコードした画像（元のEXIF・位置情報を含まない）を、そのproviderへ送る。Geminiは`inlineData`、OpenAI互換は`image_url`のdata URIで送り、元ファイル、URI、path、表示名は送らない。設定画面は外部モデルの選択中、送信先と送る内容を常に表示する。GeminiのGemmaとGemini 3系では`thinkingLevel: minimal`を付ける（既定の思考は時間を倍以上にし、出力上限を使い切って空応答になることがあった）。記述プロンプトは`camera-description-v4`で、構図、主な対象とその単純な形・数、面積順の色と差し色、光・時刻・季節・天気、質感と繰り返しを3〜5文・180字程度で書かせる。端末内モデルは字数の指示を守らず時間が字数に比例して延びるため、日本語180字（英語450字）を超えた後の最後の文末で生成を止め、途中の文を残さない。
+
+記述からの描画は、NVIDIA NIM・`vivid_material`・写生なしの固定経路を廃止し、撮影開始時の描画設定（Stage 1／2モデル、色カタログ（自動を含む）、写生）を使う。設定はrun単位で固定し、再試行も同じ値を使う。撮影前に、記述生成モデルと描画モデルについて、端末内モデルは取得済みか、外部providerは有効でBase URLと必要なAPI keyがあるかを確かめ、不足時は撮影を始めない。端末内の記述生成モデルは、撮影画面を開いている間に読み込みを始める。DDL直接は記述生成モデルのDDLをStage 2へ渡し、`stage1_model`には記述生成モデルを記録する。新しい作品の`input_provenance.route`は`description_to_pipeline`または`ddl_to_pipeline_stage2`、`vision_provider_id`は実際に使ったproviderである。旧値`local_description_to_nim`／`local_ddl_to_nim_stage2`の作品は従来どおり表示する。
+
 ## 2026-09-25 現行の色カタログと保存作品
 
 Androidの固定色カタログ13件はServerと同じID、色map、paletteを持つ。`moss_bark`の`white`は`#f2efe8`である。通常描画では固定選択または記述からの自動選択を解決し、履歴には解決済みIDと要求時の`catalog_mode`を保存する。旧履歴行の`catalog_mode`はnullを許し、欠落からautoか固定かを推定しない。既存のRoom schema 11は起動時に拒否・初期化せず、schema 12へ移行する。
@@ -44,7 +52,7 @@ Androidの固定色カタログ13件はServerと同じID、色map、paletteを�
 
 通常のなし／あり選択はAndroidの描画設定に置き、既定をなしとする。作品からの「写生なし／ありで描き直す」は選択作品の子を系譜へ保存し、派生種別には既存の`sketch_grain_change`を使う。metadataは`from_sketch_state`と`to_sketch_mode`を記録する。旧`fine`／`coarse`は保存済み作品の表示と再描画時の選択判定にのみ使い、新しい写生の入力や保存には使わない。
 
-この写生pipelineの描画結果は、Androidに同梱した`core/crates/inku-render/`を共有pipelineのJNI経由で実行して生成する。Androidが報告するrender engineは`default / 67`である。
+この写生pipelineの描画結果は、Androidに同梱した`core/crates/inku-render/`を共有pipelineのJNI経由で実行して生成する。render engineの版は同梱coreが名乗る。
 
 Gemini provider の生成要求は Gemini API の `models/{model}:generateContent` に送る。API key は `x-goog-api-key` で渡し、共有pipelineの構造化応答は native function declaration と `functionCall.args` を使う。モデル一覧の取得だけが成功しても、生成要求の到達確認とは扱わない。
 
@@ -196,7 +204,6 @@ Rust authoring pipelineとraster presentationを導入済みである。以下�
 未実装:
 
 - background continuation、notification progress、metered-network policy、low-storage recovery を含む production-polished model download UX。
-- 外部 provider execution。provider record は現時点では compatibility data structures として存在する。
 - import/export、plugin management、advanced settings、user-management equivalents、admin/server-only web features の full web feature parity。
 - Web-compatible JSON export からの import。
 

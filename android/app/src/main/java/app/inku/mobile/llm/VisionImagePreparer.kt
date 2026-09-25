@@ -21,19 +21,20 @@ object VisionImagePreparer {
     internal const val MAX_LONG_EDGE = 1280
     internal const val JPEG_QUALITY = 85
 
-    internal fun boundedSize(width: Int, height: Int): Pair<Int, Int> {
+    internal fun boundedSize(width: Int, height: Int, maxLongEdge: Int = MAX_LONG_EDGE): Pair<Int, Int> {
         require(width > 0 && height > 0) { "Image dimensions must be positive." }
+        require(maxLongEdge > 0) { "Long-edge bound must be positive." }
         val longEdge = maxOf(width, height)
-        if (longEdge <= MAX_LONG_EDGE) return width to height
-        val scale = MAX_LONG_EDGE.toDouble() / longEdge.toDouble()
+        if (longEdge <= maxLongEdge) return width to height
+        val scale = maxLongEdge.toDouble() / longEdge.toDouble()
         return maxOf(1, (width * scale).roundToInt()) to maxOf(1, (height * scale).roundToInt())
     }
 
-    suspend fun prepare(file: File): PreparedVisionImage = withContext(Dispatchers.IO) {
+    suspend fun prepare(file: File, maxLongEdge: Int = MAX_LONG_EDGE): PreparedVisionImage = withContext(Dispatchers.IO) {
         validateSourceFile(file)
         val source = ImageDecoder.createSource(file)
         val bitmap = ImageDecoder.decodeBitmap(source) { decoder, info, _ ->
-            val (width, height) = boundedSize(info.size.width, info.size.height)
+            val (width, height) = boundedSize(info.size.width, info.size.height, maxLongEdge)
             decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
             decoder.setTargetSize(width, height)
         }

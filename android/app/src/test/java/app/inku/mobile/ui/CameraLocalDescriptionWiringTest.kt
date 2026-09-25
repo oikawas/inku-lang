@@ -17,17 +17,18 @@ class CameraLocalDescriptionWiringTest {
     }
 
     @Test
-    fun cameraUsesTakePictureAndARestrictedCachePath() {
+    fun cameraCapturesInAppWithTheSystemCameraAsFallbackInARestrictedCachePath() {
         val app = projectFile("app/src/main/java/app/inku/mobile/ui/InkuApp.kt").readText()
         val paths = projectFile("app/src/main/res/xml/file_paths.xml").readText()
         val manifest = projectFile("app/src/main/AndroidManifest.xml").readText()
 
+        assertTrue(app.contains("InAppCameraCapture("))
+        assertTrue(app.contains("ActivityResultContracts.RequestPermission()"))
         assertTrue(app.contains("ActivityResultContracts.TakePicture"))
-        assertTrue(app.contains("rememberLauncherForActivityResult"))
         assertFalse(app.contains("MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA"))
         assertTrue(paths.contains("name=\"camera\""))
         assertTrue(paths.contains("path=\"camera/\""))
-        assertFalse(manifest.contains("android.permission.CAMERA"))
+        assertTrue(manifest.contains("android.permission.CAMERA"))
         assertFalse(manifest.contains("READ_MEDIA_IMAGES"))
         assertFalse(manifest.contains("WRITE_EXTERNAL_STORAGE"))
     }
@@ -61,11 +62,11 @@ class CameraLocalDescriptionWiringTest {
     }
 
     @Test
-    fun cameraPreflightsLocalVisionAndFixedNimBeforeEmittingTheCaptureRequest() {
+    fun cameraPreflightsTheVisionAndDrawingModelsBeforeEmittingTheCaptureRequest() {
         val viewModel = projectFile("app/src/main/java/app/inku/mobile/ui/InkuViewModel.kt").readText()
         val start = section(viewModel, "private fun startCameraCapture()", "fun onCameraCaptureResult")
-        val localReady = start.indexOf("repository.isLocalVisionModelReady()")
-        val providerReady = start.indexOf("cameraNimProviderIssue(cameraProviders)")
+        val localReady = start.indexOf("modelReadinessIssue(visionModelId, cameraProviders, cameraAssets)")
+        val providerReady = start.indexOf("cameraDrawReadiness(snapshot, cameraProviders, cameraAssets)")
         val createFile = start.indexOf("cameraFiles.createPendingCapture()")
         val emit = start.indexOf("mutableCameraCaptureRequests.emit")
 

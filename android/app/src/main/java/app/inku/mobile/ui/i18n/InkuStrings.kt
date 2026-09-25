@@ -323,6 +323,7 @@ interface InkuStrings {
     val camera: String
     val cameraInputSourceTitle: String
     val cameraTakePhoto: String
+    val cameraShutter: String
     val cameraChoosePhoto: String
     val cameraOverwriteTitle: String
     val cameraOverwriteBody: String
@@ -335,6 +336,9 @@ interface InkuStrings {
     val cameraVisionModeSubtitle: String
     val cameraVisionModeDescription: String
     val cameraVisionModeDdl: String
+    val cameraVisionModelTitle: String
+    val cameraVisionModelSubtitle: String
+    fun cameraVisionRemoteNotice(provider: String): String
     val cameraReadyToEdit: String
     val cameraCancelled: String
     val cameraModelNotReady: String
@@ -345,9 +349,9 @@ interface InkuStrings {
     val cameraAnalysisFailed: String
     val cameraEmptyResult: String
     val cameraInvalidDdl: String
-    val cameraNimNotReady: String
-    val cameraNimFailed: String
-    val cameraNimFailedDirectDdl: String
+    val cameraDrawModelNotReady: String
+    val cameraDrawFailed: String
+    val cameraDrawFailedDirectDdl: String
     val retry: String
     val menu: String
     val settings: String
@@ -377,6 +381,8 @@ interface InkuStrings {
     val generationInfoInputOriginPhotoPicker: String
     val generationInfoInputRouteLocalDescriptionToNim: String
     val generationInfoInputRouteLocalDdlToNimStage2: String
+    val generationInfoInputRouteDescriptionToPipeline: String
+    val generationInfoInputRouteDdlToPipelineStage2: String
     val generationInfoVisionOutputModeDescription: String
     val generationInfoVisionOutputModeDdl: String
     val generationInfoSketchGrain: String

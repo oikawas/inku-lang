@@ -22,6 +22,10 @@ data class ModelRequest(
      * instead of the generic [temperature].
      */
     val pipelineAction: String? = null,
+    /** One normalized JPEG sent with [prompt]; only camera analysis sets it. */
+    val imageJpeg: ByteArray? = null,
+    /** Gemini `thinkingLevel` for a non-pipeline request; null keeps the model default. */
+    val thinkingLevel: String? = null,
 )
 
 class ModelProviderHttpException(

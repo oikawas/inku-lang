@@ -29,7 +29,8 @@ import app.inku.mobile.data.refinement.RefinementParent
 import app.inku.mobile.data.refinement.RefinementPlan
 import app.inku.mobile.data.refinement.RefinementRoute
 import app.inku.mobile.llm.DefaultModelDownloads
-import app.inku.mobile.llm.LOCAL_VISION_MODEL_ID
+import app.inku.mobile.llm.RemoteVisionAnalyzer
+import app.inku.mobile.llm.isLocalVisionModel
 import app.inku.mobile.llm.LocalLiteRtLmProvider
 import app.inku.mobile.llm.LocalModelDownloader
 import app.inku.mobile.llm.ModelDownloadSpec
@@ -476,16 +477,15 @@ class InkuRepository(
         localLiteRtProvider.warmup(modelId)
     }
 
-    suspend fun isLocalVisionModelReady(): Boolean {
-        val asset = database.modelAssetDao().getByModelId(LOCAL_VISION_MODEL_ID) ?: return false
-        val path = asset.localPath ?: return false
-        return asset.downloadState == "ready" && File(path).isFile
-    }
+    /** A local model analyzes on the device; any other model receives the normalized photo. */
+    suspend fun analyzeVision(request: VisionAnalysisRequest): VisionAnalysisResult =
+        if (isLocalVisionModel(request.modelId)) {
+            localLiteRtProvider.analyze(request)
+        } else {
+            RemoteVisionAnalyzer(activeModelProvider).analyze(request)
+        }
 
-    suspend fun analyzeLocalVision(request: VisionAnalysisRequest): VisionAnalysisResult =
-        localLiteRtProvider.analyze(request)
-
-    suspend fun releaseLocalVisionModel() = localLiteRtProvider.releaseVisionModel()
+    suspend fun releaseLocalVisionModel(modelId: String) = localLiteRtProvider.releaseVisionModel(modelId)
 
     suspend fun markModelDownloadQueued(modelId: String) {
         val asset = database.modelAssetDao().getByModelId(modelId) ?: return

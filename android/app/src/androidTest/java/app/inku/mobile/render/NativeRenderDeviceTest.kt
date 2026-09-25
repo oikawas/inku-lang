@@ -2,14 +2,12 @@ package app.inku.mobile.render
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
-import app.inku.mobile.data.model.CanvasAspects
 import app.inku.mobile.data.model.WorkColorSnapshot
 import app.inku.mobile.pipeline.RenderRequest
 import java.security.MessageDigest
 import org.json.JSONObject
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 
@@ -19,50 +17,54 @@ class NativeRenderDeviceTest {
         get() = InstrumentationRegistry.getInstrumentation().context.assets
 
     @Test
-    fun packagedNativeLibraryMatchesFiveFrozenEngine41SvgCases() {
+    fun packagedNativeLibraryMatchesTheHostCoreOfTheSameCommit() {
         assertEquals("0.1.0", NativeRenderBridge.coreApiVersion())
         assertEquals("0.1.0", NativeRenderBridge.rasterApiVersion())
-        assertEquals("default", NativeRenderBridge.renderEngineId())
-        assertEquals("41", NativeRenderBridge.renderEngineVersion())
+        // Rendered at build time by `generateRustParityExpected` from the same
+        // core sources, so the engine version is whatever this commit ships.
+        val expected = JSONObject(assetText("render-parity/expected.json"))
+        val engineId = expected.getString("render_engine_id")
+        val engineVersion = expected.getString("render_engine_version")
+        assertEquals(engineId, NativeRenderBridge.renderEngineId())
+        assertEquals(engineVersion, NativeRenderBridge.renderEngineVersion())
 
-        val manifest = JSONObject(assetText("render-engine-41/manifest.json"))
-        val cases = manifest.getJSONObject("cases")
         CASE_NAMES.forEach { name ->
-            val input = cases.getJSONObject(name).getJSONObject("input")
-            val output = NativeRenderBridge.render(canonicalRequest(input).toString())
+            val output = NativeRenderBridge.render(assetText("render-parity/$name.request.json"))
             val metadata = JSONObject(output.metadataJson)
 
-            assertEquals("SVG mismatch for $name", assetText("render-engine-41/$name.svg"), output.svg)
-            assertEquals("default", metadata.getString("render_engine_id"))
-            assertEquals("41", metadata.getString("render_engine_version"))
+            assertEquals("SVG mismatch for $name", assetText("render-parity/$name.svg"), output.svg)
+            assertEquals(engineId, metadata.getString("render_engine_id"))
+            assertEquals(engineVersion, metadata.getString("render_engine_version"))
         }
 
-        val hostInput = cases.getJSONObject("A-pen-circle").getJSONObject("input")
-        val hostScore = hostInput.getJSONObject("score")
-        val hostAspect = hostScore.getJSONObject("canvas").getString("aspect")
-        val hostColorMap = hostInput.getJSONObject("color_map")
+        // The Kotlin host builds its own request from a Score; it must reach the
+        // same bytes as the canonical request for the same work.
+        val hostRequest = JSONObject(assetText("render-parity/A-pen-circle.request.json"))
+        val hostScore = hostRequest.getJSONObject("score")
+        val hostOptions = hostRequest.getJSONObject("options")
+        val hostColorMap = hostOptions.getJSONObject("resolved_color_map")
         val hostResult = AndroidRenderHost().render(
             RenderRequest(
                 scoreJson = hostScore.toString(),
                 colorCatalogId = "default",
-                canvasAspect = hostAspect,
-                svgProfile = hostInput.getString("svg_profile"),
-                renderSeed = hostInput.optNullableLong("render_seed"),
+                canvasAspect = hostOptions.getString("canvas_aspect_id"),
+                svgProfile = hostOptions.getString("svg_profile"),
+                renderSeed = hostOptions.optNullableLong("render_seed"),
                 compositionSeed = null,
                 workColorSnapshot = WorkColorSnapshot(
                     catalogId = "default",
                     colorMap = hostColorMap.keys().asSequence()
                         .associateWith { hostColorMap.getString(it) },
                 ),
-                wild = hostInput.getBoolean("wild"),
+                wild = hostOptions.getBoolean("wild"),
             ),
         )
-        assertEquals(assetText("render-engine-41/A-pen-circle.svg"), hostResult.svg)
+        assertEquals(assetText("render-parity/A-pen-circle.svg"), hostResult.svg)
 
-        val reference = JSONObject(NativeRenderBridge.rendererReferenceJson())
-        val weights = reference.getJSONObject("weight_properties").getJSONArray("weights")
-        assertEquals(11, weights.length())
-        assertEquals("silverpoint", weights.getJSONObject(0).getString("weight"))
+        assertEquals(
+            JSONObject(assetText("render-parity/renderer_reference.json")).toString(),
+            JSONObject(NativeRenderBridge.rendererReferenceJson()).toString(),
+        )
     }
 
     @Test
@@ -85,26 +87,6 @@ class NativeRenderDeviceTest {
             assertEquals(case.stride, output.stride)
             assertEquals(case.sha256, sha256(output.pixels))
         }
-    }
-
-    private fun canonicalRequest(input: JSONObject): JSONObject {
-        val score = input.getJSONObject("score")
-        val aspect = score.getJSONObject("canvas").getString("aspect")
-        val canvas = CanvasAspects.sizeFor(aspect)
-        return JSONObject()
-            .put("score", score)
-            .put(
-                "options",
-                JSONObject()
-                    .put("resolved_color_map", input.getJSONObject("color_map"))
-                    .put("catalog_id", input.opt("catalog_id"))
-                    .put("canvas", JSONObject().put("width", canvas.width).put("height", canvas.height))
-                    .put("canvas_aspect_id", aspect)
-                    .put("svg_profile", input.getString("svg_profile"))
-                    .put("render_seed", input.opt("render_seed"))
-                    .put("composition_seed", JSONObject.NULL)
-                    .put("wild", input.getBoolean("wild")),
-            )
     }
 
     private fun JSONObject.optNullableLong(key: String): Long? =

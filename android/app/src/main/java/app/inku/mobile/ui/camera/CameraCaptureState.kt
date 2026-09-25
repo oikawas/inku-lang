@@ -9,6 +9,12 @@ import java.io.File
 import java.io.InputStream
 import java.io.OutputStream
 
+/**
+ * One pending capture: the app-owned [file] the in-app camera writes, and its
+ * FileProvider [uri] for the system camera fallback.
+ */
+data class CameraCaptureRequest(val file: File, val uri: Uri)
+
 enum class CameraInputSource {
     Camera,
     PhotoPicker,
@@ -23,8 +29,8 @@ sealed interface CameraCaptureState {
     data object PreparingImage : CameraCaptureState
     data object LoadingLocalModel : CameraCaptureState
     data object AnalyzingLocally : CameraCaptureState
-    data object InterpretingWithNim : CameraCaptureState
-    data object ComposingWithNim : CameraCaptureState
+    data object InterpretingStage1 : CameraCaptureState
+    data object Composing : CameraCaptureState
     data object Rendering : CameraCaptureState
     data object Saving : CameraCaptureState
     data class Completed(val historyId: String) : CameraCaptureState
@@ -32,7 +38,7 @@ sealed interface CameraCaptureState {
     data class ReadyToEdit(val inputProvenance: CameraInputProvenance) : CameraCaptureState
     data class Failed(
         val reason: CameraFailure,
-        val canRetryNim: Boolean = false,
+        val canRetryDraw: Boolean = false,
     ) : CameraCaptureState
     data object Cancelled : CameraCaptureState
 }
@@ -46,9 +52,9 @@ enum class CameraFailure {
     AnalysisFailed,
     EmptyResult,
     InvalidDdl,
-    NimNotReady,
-    NimFailed,
-    NimFailedDirectDdl,
+    DrawModelNotReady,
+    DrawFailed,
+    DrawFailedDirectDdl,
 }
 
 internal val CameraCaptureState.locksCameraInteraction: Boolean
@@ -56,8 +62,8 @@ internal val CameraCaptureState.locksCameraInteraction: Boolean
         CameraCaptureState.PreparingImage,
         CameraCaptureState.LoadingLocalModel,
         CameraCaptureState.AnalyzingLocally,
-        CameraCaptureState.InterpretingWithNim,
-        CameraCaptureState.ComposingWithNim,
+        CameraCaptureState.InterpretingStage1,
+        CameraCaptureState.Composing,
         CameraCaptureState.Rendering,
         CameraCaptureState.Saving,
         CameraCaptureState.Cancelling,

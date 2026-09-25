@@ -6,13 +6,17 @@ secrets must remain outside tracked files.
 
 Last updated: 2026-09-25.
 
-**Catch-up status**: Android sits at generation `2.1.4-android.80` with **render engine
-`default / 67`** and **DDL engine version `20`**. Render identity comes from the packaged
-`core/crates/inku-render/` library through JNI rather than a Kotlin compatibility literal;
-`ReferenceCorpus.kt` declares the DDL reference version. The server also uses render engine `67`
-and DDL engine `21`, so server and Android share one Rust drawing implementation while their DDL
-engine versions remain independently declared. The Stage 1.5 expander followed the staffage level being folded away on
-2026-08-05 (see the 2026-08-05 section at the end of this document).
+**Catch-up status**: Android sits at generation `2.1.4-android.80`. DDL conversion and Score → SVG
+rendering run in the shared Rust core (`core/crates/`) of the same commit, packaged with the app, so
+Android implements them exactly as the server does and declares no version constants of its own.
+The packaged `core/crates/inku-render/` reports its `RENDER_ENGINE_VERSION` through JNI, and the
+server's `server/src/inku_server/layer_versions.py` declares the DDL Spec and DDL engine versions.
+This document does not copy the numbers, which would go stale. The DDL engine `20` that `ReferenceCorpus.kt` used to name was the
+fixture version of the removed Kotlin Stage 1.5 expander, not a current version.
+On the device, `NativeRenderDeviceTest` compares the packaged library's SVG, version, and renderer
+reference with expectations that the host core of the same commit writes at build time
+(`render-parity-expected`). Frozen corpora supply only Score and raster inputs, so a render engine
+bump needs no new expectations.
 
 **The shared-Rust cutover is complete**: production Score-to-SVG/metadata calls
 `core/crates/inku-render/` through one JNI request owned by `AndroidRenderHost`. Preview,
@@ -40,6 +44,14 @@ When updating Android specifications:
 3. Do not introduce English-only Android requirements that are absent from
    `ANDROID_SPEC.ja.md`.
 
+## 2026-09-25 Current camera capture, description, and drawing
+
+The bottom "Camera" opens an in-app camera (CameraX back-camera preview and shutter) that writes the photo straight to an app-owned temporary file under `cacheDir/camera/`. It no longer goes through the system camera app and its review screen. The first use asks for the `CAMERA` permission; if it is refused or CameraX cannot start, capture falls back to the system camera (`ActivityResultContracts.TakePicture`). The Photo Picker entry and the original-photo retention and deletion contract are unchanged.
+
+The "description model" that turns a photo into a description (or DDL in Direct DDL) is chosen in Settings > Other. The default is the on-device `local-litert-lm:gemma-4-e2b`; downloaded on-device models (such as E4B) and models from enabled remote providers can also be chosen. The value is stored as `camera_vision_model` in `app_settings`; a missing or corrupt value falls back to the default. It cannot change during a capture. With an on-device model the photo never leaves the device. Only when a remote model is chosen is the image sent to that provider, re-encoded with orientation applied, a 1280 px long edge, and JPEG quality 85, without the original EXIF or location. Gemini receives it as `inlineData` and OpenAI-compatible providers as an `image_url` data URI; the original file, URI, path, and display name are never sent. While a remote model is selected, the settings screen always shows where the photo goes and what is sent. Gemma and Gemini 3 models on Gemini get `thinkingLevel: minimal` (the default thinking more than doubled the time and could spend the whole output budget, leaving an empty answer). The description prompt is `camera-description-v4`: three to five sentences, about 180 Japanese characters or 70 English words, on layout, the main subjects with their simple forms and counts, colors by area with accents, light, time, season, and weather, and texture and repetition. An on-device model does not keep to a length in the prompt and its time grows with every character, so its generation stops at the last sentence end after 180 Japanese characters (450 in English), with no partial sentence kept.
+
+Drawing from the description no longer uses the fixed NVIDIA NIM, `vivid_material`, sketch-off route. It uses the drawing settings at capture start (Stage 1/2 models, color catalog including auto, and sketch), fixed for the run and its retry. Before capture, the description model and the drawing models are checked: an on-device model must be downloaded, and a remote provider must be enabled with a Base URL and any required API key; otherwise capture does not start. An on-device description model starts loading while the camera screen is open. Direct DDL passes the description model's DDL to Stage 2 and records the description model as `stage1_model`. New works record `input_provenance.route` as `description_to_pipeline` or `ddl_to_pipeline_stage2`, and `vision_provider_id` as the provider actually used. Works saved with the earlier `local_description_to_nim` / `local_ddl_to_nim_stage2` values still display.
+
 ## 2026-09-25 Current color catalogs and saved works
 
 Android's 13 fixed color catalogs have the same IDs, color maps, and `palette` entries as Server. The `white` value in `moss_bark` is `#f2efe8`. An ordinary draw resolves either a fixed choice or automatic selection from the description, and history stores the resolved ID and the requested `catalog_mode`. Older history rows may have a null `catalog_mode`; its absence does not establish whether the request was automatic or fixed. An existing Room schema 11 database is migrated to schema 12 at startup without rejection or reset.
@@ -54,7 +66,7 @@ For `on`, `generate_sketch` is an optional effect before Stage 1, using the Stag
 
 The ordinary Android drawing setting offers off/on and defaults to off. Redrawing a selected work with or without sketching saves a child in lineage, reuses the existing `sketch_grain_change` derivation kind, and records `from_sketch_state` and `to_sketch_mode` metadata. Legacy `fine` and `coarse` values are retained only to display saved works and determine their redraw choice; they are not used for new sketch inputs or records.
 
-This sketch pipeline's rendered output is produced by the packaged `core/crates/inku-render/` through the shared pipeline JNI. Android reports render engine `default / 67`.
+This sketch pipeline's rendered output is produced by the packaged `core/crates/inku-render/` through the shared pipeline JNI. The packaged core reports the render engine version.
 
 Gemini provider generation requests use the Gemini API `models/{model}:generateContent` endpoint. The API key is sent as `x-goog-api-key`, and structured responses for the shared pipeline use native function declarations and `functionCall.args`. A successful model-list fetch does not establish that generation requests work.
 
@@ -244,8 +256,6 @@ Implemented:
 Not implemented yet:
 - Production-polished model download UX, including background continuation,
   notification progress, metered-network policy, and low-storage recovery.
-- External provider execution. Provider records exist only as compatibility
-  data structures at this stage.
 - Full web feature parity for import/export, plugin management, advanced
   settings, user-management equivalents, and admin/server-only web features.
 - Import from web-compatible JSON exports.

@@ -65,6 +65,8 @@ val rustNativeLibraryName = "libinku_render_android.so"
 val rustTargetDirectory = layout.buildDirectory.dir("rust-target")
 val rustGeneratedJniLibsDirectory = layout.buildDirectory.dir("generated/rustJniLibs")
 val rustParityAssetsDirectory = layout.buildDirectory.dir("generated/rustParityAssets")
+val rustParityExpectedDirectory = layout.buildDirectory.dir("generated/rustParityExpected")
+val rustHostTargetDirectory = layout.buildDirectory.dir("rust-host-target")
 val rustNdkHostTag = when {
     System.getProperty("os.name").startsWith("Mac") -> "darwin-x86_64"
     System.getProperty("os.name").startsWith("Linux") -> "linux-x86_64"
@@ -217,12 +219,50 @@ val checkRustNativePackagingInput = tasks.register("checkRustNativePackagingInpu
     }
 }
 
+// The device test compares the packaged library with the host core of the same
+// commit, so a render engine change needs no frozen corpus. Engine 41 inputs
+// are only a stable set of Scores; their frozen SVGs remain raster inputs.
+val generateRustParityExpected = tasks.register<Exec>("generateRustParityExpected") {
+    group = "verification"
+    description = "Render the parity cases with the host core for connected-device comparison."
+    workingDir(rootProject.file("../core"))
+    inputs.files(
+        rootProject.fileTree("../core") {
+            include("Cargo.toml", "Cargo.lock", "rust-toolchain.toml", "crates/**/Cargo.toml", "crates/**/src/**/*.rs", "crates/**/examples/**/*.rs", "crates/**/assets/**")
+            exclude("target/**")
+        },
+    )
+    inputs.file(rootProject.file("../server/reference/render-engine-41/manifest.json"))
+    outputs.dir(rustParityExpectedDirectory)
+    doFirst {
+        val pinnedRustc = providers.exec {
+            commandLine("rustup", "which", "--toolchain", "1.95.0", "rustc")
+        }.standardOutput.asText.get().trim()
+        require(file(pinnedRustc).isFile) { "Pinned Rust 1.95.0 rustc was not found" }
+        environment("RUSTC", pinnedRustc)
+        rustParityExpectedDirectory.get().asFile.deleteRecursively()
+    }
+    commandLine(
+        listOf(
+            "rustup", "run", "1.95.0", "cargo", "run", "--locked", "--release",
+            "--package", "inku-render-android", "--example", "render-parity-expected",
+            "--target-dir", rustHostTargetDirectory.get().asFile.absolutePath,
+            "--",
+            rootProject.file("../server/reference/render-engine-41/manifest.json").absolutePath,
+            rustParityExpectedDirectory.get().asFile.absolutePath,
+        ) + rustParityCaseNames,
+    )
+}
+
 val prepareRustParityAssets = tasks.register<Sync>("prepareRustParityAssets") {
     group = "verification"
-    description = "Stage a bounded canonical Rust parity corpus for connected-device tests."
+    description = "Stage host-rendered parity expectations and raster inputs for connected-device tests."
+    dependsOn(generateRustParityExpected)
+    from(rustParityExpectedDirectory) {
+        into("render-parity")
+    }
     from(rootProject.file("../server/reference/render-engine-41")) {
-        include("manifest.json")
-        rustParityCaseNames.forEach { include("$it.svg") }
+        listOf("A-pen-circle", "C-filter-display-pencil", "D-canvas-wide-region-single").forEach { include("$it.svg") }
         into("render-engine-41")
     }
     from(rootProject.file("../server/reference/render-engine-21")) {
@@ -271,6 +311,12 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.10.0")
 
     implementation("com.google.ai.edge.litertlm:litertlm-android:0.11.0")
+    // In-app capture replaces the system camera round trip for the camera input.
+    val cameraxVersion = "1.6.2"
+    implementation("androidx.camera:camera-camera2:$cameraxVersion")
+    implementation("androidx.camera:camera-lifecycle:$cameraxVersion")
+    implementation("androidx.camera:camera-view:$cameraxVersion")
+    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.10.0")
     implementation("androidx.room:room-runtime:$roomVersion")
     implementation("androidx.room:room-ktx:$roomVersion")
     ksp("androidx.room:room-compiler:$roomVersion")

@@ -3,6 +3,7 @@ package app.inku.mobile.llm
 import app.inku.mobile.security.DisplaySanitizer
 import java.net.HttpURLConnection
 import java.net.URL
+import java.util.Base64
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
@@ -83,14 +84,30 @@ class GeminiModelProvider(
         val generation = JSONObject().put("maxOutputTokens", request.maxTokens)
         if (pipelineAction == null) {
             generation.put("temperature", request.temperature)
+            request.thinkingLevel?.let { generation.put("thinkingConfig", JSONObject().put("thinkingLevel", it)) }
         } else {
             // Shared-pipeline requests use the server's Gemini request shape:
             // model-default sampling and minimal thinking.
             generation.put("thinkingConfig", JSONObject().put("thinkingLevel", "minimal"))
         }
         if (request.stopSequences.isNotEmpty()) generation.put("stopSequences", JSONArray(request.stopSequences))
+        val user = textContent(request.prompt).put("role", "user")
+        request.imageJpeg?.let { image ->
+            // The image part precedes the instruction, as in the local Vision request.
+            val parts = JSONArray()
+                .put(
+                    JSONObject().put(
+                        "inlineData",
+                        JSONObject()
+                            .put("mimeType", "image/jpeg")
+                            .put("data", Base64.getEncoder().encodeToString(image)),
+                    ),
+                )
+                .put(JSONObject().put("text", request.prompt))
+            user.put("parts", parts)
+        }
         val payload = JSONObject()
-            .put("contents", JSONArray().put(textContent(request.prompt).put("role", "user")))
+            .put("contents", JSONArray().put(user))
             .put("generationConfig", generation)
         request.systemInstruction?.takeIf { it.isNotBlank() }?.let {
             payload.put("systemInstruction", textContent(it))

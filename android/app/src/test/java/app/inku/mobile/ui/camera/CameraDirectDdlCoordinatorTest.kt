@@ -32,8 +32,8 @@ class CameraDirectDdlCoordinatorTest {
         assertEquals("青い円を右上に置く。", outcome.result)
         assertEquals(0, interpretations)
         assertEquals(1, compositions)
-        assertFalse(phases.contains(CameraInstantPrintPhase.InterpretingWithNim))
-        assertEquals(CameraInstantPrintPhase.ComposingWithNim, phases[3])
+        assertFalse(phases.contains(CameraInstantPrintPhase.InterpretingStage1))
+        assertEquals(CameraInstantPrintPhase.Composing, phases[3])
     }
 
     @Test
@@ -44,7 +44,7 @@ class CameraDirectDdlCoordinatorTest {
         var stageTwoCalls = 0
         val coordinator = CameraInstantPrintCoordinator(onPhase = phases::add)
 
-        val outcome = coordinator.runFromNim(
+        val outcome = coordinator.runFromAnalysis(
             route = CameraInstantPrintRoute.DirectDdl,
             local = "retained ddl",
             interpret = { stageOneCalls += 1; "must not run" },
@@ -59,6 +59,6 @@ class CameraDirectDdlCoordinatorTest {
         assertEquals(0, localCalls)
         assertEquals(0, stageOneCalls)
         assertEquals(1, stageTwoCalls)
-        assertEquals(CameraInstantPrintPhase.ComposingWithNim, phases.first())
+        assertEquals(CameraInstantPrintPhase.Composing, phases.first())
     }
 }

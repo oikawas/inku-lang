@@ -94,7 +94,7 @@ class LocalLiteRtLmProvider(
     }
 
     override suspend fun analyze(request: VisionAnalysisRequest): VisionAnalysisResult = withContext(Dispatchers.IO) {
-        require(request.modelId == LOCAL_VISION_MODEL_ID) { "Camera analysis requires the local Gemma 4 E2B model." }
+        require(isLocalVisionModel(request.modelId)) { "Device image analysis requires a local model." }
         require(request.normalizedJpeg.isNotEmpty()) { "The normalized camera image is empty." }
         val started = System.currentTimeMillis()
         val prompt = VisionPrompts.forLanguage(request.languageCode, request.outputMode)
@@ -114,6 +114,11 @@ class LocalLiteRtLmProvider(
                         Content.ImageBytes(request.normalizedJpeg),
                         Content.Text(prompt),
                     )
+                    val budget = if (request.outputMode == VisionOutputMode.DESCRIPTION) {
+                        LocalLiteRtLmOutput.descriptionBudget(request.languageCode)
+                    } else {
+                        null
+                    }
                     try {
                         withTimeout(REQUEST_TIMEOUT_MS) {
                             conversation.sendMessageAsync(contents).collect { message ->
@@ -121,8 +126,14 @@ class LocalLiteRtLmProvider(
                                     .filterIsInstance<Content.Text>()
                                     .joinToString("") { it.text }
                                 LocalLiteRtLmOutput.appendStreamChunk(text, chunk)
+                                budget?.let { LocalLiteRtLmOutput.sentenceCut(text, it) }?.let { cut ->
+                                    text.setLength(cut)
+                                    throw DescriptionComplete()
+                                }
                             }
                         }
+                    } catch (_: DescriptionComplete) {
+                        conversation.cancelProcess()
                     } catch (error: TimeoutCancellationException) {
                         conversation.cancelProcess()
                         throw IllegalStateException("Local image analysis timed out.", error)
@@ -238,9 +249,9 @@ class LocalLiteRtLmProvider(
         }
     }
 
-    suspend fun releaseVisionModel(): Unit = withContext(Dispatchers.IO) {
+    suspend fun releaseVisionModel(modelId: String): Unit = withContext(Dispatchers.IO) {
         inferenceMutex.withLock {
-            if (loadedModelId == LOCAL_VISION_MODEL_ID) {
+            if (loadedModelId == modelId) {
                 closeEngine()
                 Log.i(PERF_TAG, "litert_vision_engine_released")
             }
@@ -272,3 +283,8 @@ internal fun ownedLocalModelFileOrNull(filesDir: File, path: String): File? = ru
         it.isFile && it.path.startsWith(root.path + File.separator)
     }
 }.getOrNull()
+
+/** Ends an on-device description stream at a sentence boundary past its budget. */
+private class DescriptionComplete : RuntimeException() {
+    override fun fillInStackTrace(): Throwable = this
+}

@@ -1,8 +1,14 @@
 package app.inku.mobile.ui
 
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.core.content.ContextCompat
+import app.inku.mobile.ui.camera.CameraCaptureRequest
+import app.inku.mobile.ui.camera.InAppCameraCapture
 import app.inku.mobile.data.model.workColorSnapshot
 import app.inku.mobile.data.model.cameraInputProvenance
 import app.inku.mobile.llm.VisionOutputMode
+import app.inku.mobile.llm.isLocalVisionModel
 import app.inku.mobile.ui.mascot.MascotArt
 import app.inku.mobile.ui.theme.*
 import androidx.compose.animation.core.rememberInfiniteTransition
@@ -463,12 +469,39 @@ fun InkuApp() {
     val photoPickerLauncher = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
         viewModel.onPhotoPickerResult(uri)
     }
+    // The in-app camera is the normal capture; the system camera app is the
+    // fallback when the permission is refused or CameraX cannot start.
+    val appContext = LocalContext.current
+    var inAppCapture by remember { mutableStateOf<CameraCaptureRequest?>(null) }
+    var permissionCapture by remember { mutableStateOf<CameraCaptureRequest?>(null) }
+    val launchSystemCamera: (CameraCaptureRequest) -> Unit = { request ->
+        try {
+            cameraCaptureLauncher.launch(request.uri)
+        } catch (_: Throwable) {
+            viewModel.onCameraCaptureLaunchFailed()
+        }
+    }
+    val cameraPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        val request = permissionCapture
+        permissionCapture = null
+        if (request != null) {
+            if (granted) inAppCapture = request else launchSystemCamera(request)
+        }
+    }
     LaunchedEffect(viewModel) {
-        viewModel.cameraCaptureRequests.collect { uri ->
-            try {
-                cameraCaptureLauncher.launch(uri)
-            } catch (_: Throwable) {
-                viewModel.onCameraCaptureLaunchFailed()
+        viewModel.cameraCaptureRequests.collect { request ->
+            val granted = ContextCompat.checkSelfPermission(appContext, Manifest.permission.CAMERA) ==
+                PackageManager.PERMISSION_GRANTED
+            if (granted) {
+                inAppCapture = request
+            } else {
+                permissionCapture = request
+                try {
+                    cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+                } catch (_: Throwable) {
+                    permissionCapture = null
+                    launchSystemCamera(request)
+                }
             }
         }
     }
@@ -577,6 +610,29 @@ fun InkuApp() {
                 }
                 CameraDevelopmentSurface(state, viewModel)
             }
+        }
+        inAppCapture?.let { request ->
+            BackHandler {
+                inAppCapture = null
+                viewModel.onCameraCaptureResult(false)
+            }
+            InAppCameraCapture(
+                file = request.file,
+                shutterLabel = S.cameraShutter,
+                cancelLabel = S.cancel,
+                onCaptured = {
+                    inAppCapture = null
+                    viewModel.onCameraCaptureResult(true)
+                },
+                onCancel = {
+                    inAppCapture = null
+                    viewModel.onCameraCaptureResult(false)
+                },
+                onUnavailable = {
+                    inAppCapture = null
+                    launchSystemCamera(request)
+                },
+            )
         }
     }
     }
@@ -2621,8 +2677,8 @@ private fun cameraStatusText(state: CameraCaptureState): String? = when (state) 
     CameraCaptureState.PreparingImage -> S.cameraPreparingImage
     CameraCaptureState.LoadingLocalModel -> S.cameraLoadingLocalModel
     CameraCaptureState.AnalyzingLocally -> S.cameraAnalyzingLocally
-    CameraCaptureState.InterpretingWithNim,
-    CameraCaptureState.ComposingWithNim,
+    CameraCaptureState.InterpretingStage1,
+    CameraCaptureState.Composing,
     CameraCaptureState.Rendering,
     CameraCaptureState.Saving,
     is CameraCaptureState.Completed,
@@ -2643,9 +2699,9 @@ private fun cameraStatusText(state: CameraCaptureState): String? = when (state) 
         CameraFailure.AnalysisFailed -> S.cameraAnalysisFailed
         CameraFailure.EmptyResult -> S.cameraEmptyResult
         CameraFailure.InvalidDdl -> S.cameraInvalidDdl
-        CameraFailure.NimNotReady -> S.cameraNimNotReady
-        CameraFailure.NimFailed -> S.cameraNimFailed
-        CameraFailure.NimFailedDirectDdl -> S.cameraNimFailedDirectDdl
+        CameraFailure.DrawModelNotReady -> S.cameraDrawModelNotReady
+        CameraFailure.DrawFailed -> S.cameraDrawFailed
+        CameraFailure.DrawFailedDirectDdl -> S.cameraDrawFailedDirectDdl
     }
 }
 
@@ -4232,6 +4288,30 @@ private fun MiscSettingsPanel(state: InkuUiState, viewModel: InkuViewModel, modi
                     selected = state.cameraVisionOutputMode == VisionOutputMode.DDL,
                     modifier = Modifier.fillMaxWidth().heightIn(min = Dimens.cameraControlMinHeight),
                     onClick = { viewModel.setCameraVisionOutputMode(VisionOutputMode.DDL) },
+                )
+            }
+        }
+        SettingsCard(
+            S.cameraVisionModelTitle,
+            S.cameraVisionModelSubtitle,
+            state.cameraVisionModelId.substringAfter(':'),
+        ) {
+            WebStyleModelStageEditor(
+                title = "Vision",
+                sub = S.camera,
+                state = state,
+                selectedModelId = state.cameraVisionModelId,
+                onSelectModel = viewModel::setCameraVisionModel,
+            )
+            if (!isLocalVisionModel(state.cameraVisionModelId)) {
+                val provider = state.providerSettings
+                    .firstOrNull { state.cameraVisionModelId.startsWith("${it.providerId}:") }
+                    ?.displayName
+                    ?: state.cameraVisionModelId.substringBefore(':')
+                Text(
+                    S.cameraVisionRemoteNotice(provider),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.error,
                 )
             }
         }
@@ -5918,6 +5998,8 @@ internal fun generationInfoDisplayValue(row: GenerationInfoRow, strings: InkuStr
     row.field == GenerationInfoField.InputOrigin && row.value == "photo_picker" -> strings.generationInfoInputOriginPhotoPicker
     row.field == GenerationInfoField.InputRoute && row.value == "local_description_to_nim" -> strings.generationInfoInputRouteLocalDescriptionToNim
     row.field == GenerationInfoField.InputRoute && row.value == "local_ddl_to_nim_stage2" -> strings.generationInfoInputRouteLocalDdlToNimStage2
+    row.field == GenerationInfoField.InputRoute && row.value == "description_to_pipeline" -> strings.generationInfoInputRouteDescriptionToPipeline
+    row.field == GenerationInfoField.InputRoute && row.value == "ddl_to_pipeline_stage2" -> strings.generationInfoInputRouteDdlToPipelineStage2
     row.field == GenerationInfoField.VisionOutputMode && row.value == "description" -> strings.generationInfoVisionOutputModeDescription
     row.field == GenerationInfoField.VisionOutputMode && row.value == "ddl" -> strings.generationInfoVisionOutputModeDdl
     row.field == GenerationInfoField.RenderWild && row.value == "true" -> strings.generationInfoOn

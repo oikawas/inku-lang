@@ -58,6 +58,34 @@ class GeminiModelProviderTest {
     }
 }
 
+class GeminiVisionRequestTest {
+    @Test
+    fun cameraImageTravelsAsInlineJpegBeforeThePrompt() = runBlocking {
+        lateinit var connection: GeminiConnection
+        val provider = GeminiModelProvider("gemini", "https://generativelanguage.googleapis.com", "test-key") { url ->
+            GeminiConnection(url).also { connection = it }
+        }
+        // The fixture answers with a function call; only the sent body matters here.
+        runCatching {
+            provider.generate(
+                ModelRequest(
+                    modelId = "gemini:gemma-4-31b-it",
+                    prompt = "Describe the photo",
+                    temperature = 0.2,
+                    maxTokens = 1024,
+                    imageJpeg = byteArrayOf(1, 2, 3),
+                ),
+            )
+        }
+        val parts = JSONObject(connection.body.toString(Charsets.UTF_8.name()))
+            .getJSONArray("contents").getJSONObject(0).getJSONArray("parts")
+        val inline = parts.getJSONObject(0).getJSONObject("inlineData")
+        assertEquals("image/jpeg", inline.getString("mimeType"))
+        assertEquals("AQID", inline.getString("data"))
+        assertEquals("Describe the photo", parts.getJSONObject(1).getString("text"))
+    }
+}
+
 private class GeminiConnection(url: URL) : HttpURLConnection(url) {
     val body = ByteArrayOutputStream()
     override fun getOutputStream() = body

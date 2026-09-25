@@ -1848,6 +1848,43 @@ impl Score {
         Ok(())
     }
 
+    /// Checks the schema ranges of the values that set renderer work.
+    ///
+    /// Deserialization accepts any number. Paper-grain and grain-texture
+    /// counts grow with their density (a ground density of 1,000 drew 30 MB of
+    /// SVG), a legacy grid draws rows x cols cells, and a zero group size makes
+    /// legacy expansion slice past its group. Other out-of-range values, such
+    /// as polygon sides, are clamped by the renderer and stay accepted.
+    pub fn validate_work_ranges(&self) -> Result<(), &'static str> {
+        let unit = |value: f64| (0.0..=1.0).contains(&value);
+        if let Canvas::Spec(CanvasSpec {
+            ground: Some(ground),
+            ..
+        }) = &self.canvas
+            && !unit(ground.density)
+        {
+            return Err("canvas ground density must be within 0 to 1");
+        }
+        for instruction in &self.instructions {
+            if let Some(surface) = &instruction.surface
+                && !unit(surface.density)
+            {
+                return Err("surface density must be within 0 to 1");
+            }
+            if let Some(arrangement) = &instruction.arrangement {
+                let grid_extent =
+                    |value: Option<u32>| value.is_none_or(|value| (1..=64).contains(&value));
+                if !grid_extent(arrangement.rows) || !grid_extent(arrangement.cols) {
+                    return Err("arrangement rows and cols must be within 1 to 64");
+                }
+                if arrangement.group_size == 0 {
+                    return Err("arrangement group_size must be positive");
+                }
+            }
+        }
+        Ok(())
+    }
+
     pub fn validate_placement_groups(&self) -> Result<(), &'static str> {
         let is_compact = self.version == "0.10.0"
             || (matches!(

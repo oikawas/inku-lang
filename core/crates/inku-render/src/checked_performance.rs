@@ -655,6 +655,7 @@ pub(crate) fn resolve_checked_performance_with_resources_and_omissions(
     omitted_original_instruction_indices: &[usize],
 ) -> Result<PerformancePlan, CheckedPerformanceWithResourcesError> {
     if !uses_compact_resource_contract(request.score) {
+        inku_score::check_legacy_resource_demand(request.score, hard_policy, operational_budget)?;
         return resolve_checked_performance(request, policy).map_err(Into::into);
     }
     let finalized = inku_score::finalize_saved_score_with_omitted_instructions(

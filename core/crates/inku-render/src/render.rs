@@ -47,6 +47,10 @@ pub enum RenderError {
     CheckedPerformance(CheckedPerformanceError),
     ResourceAuthority(inku_score::SavedScoreResourceError),
     NonFiniteSvg,
+    /// The canvas size is not finite and positive.
+    InvalidCanvas,
+    /// A value that sets renderer work lies outside its `score.schema.json` range.
+    InvalidScore(&'static str),
 }
 
 impl fmt::Display for RenderError {
@@ -64,6 +68,8 @@ impl fmt::Display for RenderError {
                 write!(formatter, "invalid Score resource authority: {error:?}")
             }
             Self::NonFiniteSvg => formatter.write_str("rendered SVG contains a non-finite value"),
+            Self::InvalidCanvas => formatter.write_str("canvas size must be finite and positive"),
+            Self::InvalidScore(reason) => write!(formatter, "invalid Score: {reason}"),
         }
     }
 }
@@ -231,8 +237,31 @@ fn document_metadata(profile: SvgProfile) -> (String, String) {
     }
 }
 
+/// Refuse a request whose canvas or Score values no host could have produced.
+///
+/// Both entry points check this before any expansion, because the work of
+/// several texture and ground passes grows with these values.
+fn validate_request(request: &RenderRequest) -> Result<(), RenderError> {
+    let canvas = request.options.canvas;
+    if !(canvas.width.is_finite()
+        && canvas.height.is_finite()
+        && canvas.width > 0.0
+        && canvas.height > 0.0)
+    {
+        return Err(RenderError::InvalidCanvas);
+    }
+    request
+        .score
+        .validate_work_ranges()
+        .map_err(RenderError::InvalidScore)
+}
+
 /// Render a canonical Score through the complete portable request boundary.
+///
+/// This entry performs no resource accounting. Its hosts coerce the Score to
+/// their limits first; untrusted Scores go through [`render_with_resources`].
 pub fn render(request: RenderRequest) -> Result<RenderOutput, RenderError> {
+    validate_request(&request)?;
     render_impl(request, None, &[])
 }
 
@@ -244,6 +273,7 @@ pub fn render_with_resources(
     operational_budget: inku_score::OperationalResourceBudget,
     clip_policy: CompatFillClipPolicy,
 ) -> Result<RenderOutput, RenderError> {
+    validate_request(&request)?;
     let mut omitted = std::collections::BTreeMap::new();
     loop {
         let excluded = omitted.keys().copied().collect::<Vec<_>>();
@@ -281,6 +311,13 @@ pub fn render_with_resources(
     }
 }
 
+/// Perform the Score, draw every performed instruction, then assemble layers.
+///
+/// Performance resolves groups and relations first. Each performed
+/// instruction then expands its arrangement and draws its marks; fill scopes
+/// are clipped as a whole afterwards, with `omitted_instructions` excluded by
+/// the caller's retry. Plate tone, presence and ground complete the layers,
+/// and the document is serialized once.
 fn render_impl(
     request: RenderRequest,
     resources: Option<(
@@ -359,6 +396,8 @@ fn render_impl(
             },
         )
         .collect::<Vec<_>>();
+    // Carve marks remove paint, so they follow every additive mark. The sort is
+    // stable, so each part keeps its performed order.
     ordered.sort_by_key(|(_, instruction, _, _, _, _)| instruction.mode_ == InstructionMode::Carve);
     let placement_seed = request
         .options
@@ -664,7 +703,9 @@ fn render_impl(
         document.push(content);
     }
     let svg = document.serialize();
-    if svg.contains("NaN") || svg.contains("inf") || svg.contains("-inf") {
+    // A non-finite f64 prints as `NaN`, `inf` or `-inf`. No element name, id or
+    // class contains either word, and host colors are hex, so a match is a number.
+    if svg.contains("NaN") || svg.contains("inf") {
         return Err(RenderError::NonFiniteSvg);
     }
     let mut metadata = build_render_metadata(&source_score, profile);

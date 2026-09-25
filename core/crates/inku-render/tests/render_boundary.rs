@@ -717,3 +717,82 @@ fn compat_grain_omits_the_nonportable_pattern_class() {
     assert!(!output.svg.contains("class=\"surface-grain-pattern-v1\""));
     assert!(!output.svg.contains("<filter"));
 }
+
+fn request_for(score_json: &str) -> RenderRequest {
+    RenderRequest {
+        score: score(score_json),
+        options: RenderOptions {
+            resolved_color_map: BTreeMap::new(),
+            catalog_id: None,
+            canvas: CanvasSize::new(1000.0, 1000.0),
+            canvas_aspect_id: "square".to_owned(),
+            svg_profile: SvgProfile::Display,
+            render_seed: Some(7),
+            composition_seed: None,
+            wild: false,
+            error_policy: Default::default(),
+        },
+    }
+}
+
+#[test]
+fn values_outside_the_schema_ranges_are_refused_before_drawing() {
+    // A ground density of 1,000 used to draw 30 MB of paper grain.
+    let error = render(request_for(
+        r#"{"version":"0.12.0","canvas":{"aspect":"square",
+        "ground":{"material":"paper","grain":"fine","density":1000}},
+        "instructions":[{"primitive":"circle","center":[0.5,0.5],"radius":0.3}]}"#,
+    ))
+    .unwrap_err();
+    assert!(matches!(
+        error,
+        inku_render::render::RenderError::InvalidScore(_)
+    ));
+}
+
+#[test]
+fn explicit_authority_limits_a_legacy_edition_score() {
+    let budget = inku_score::ResourceBudget {
+        maximum: inku_score::ResourceDemand {
+            primitive_marks: 400,
+            object_templates: 64,
+            ..inku_score::ResourceDemand::default()
+        },
+    };
+    let hard = inku_score::HardResourcePolicy {
+        identity: "test".to_owned(),
+        budget,
+    };
+    let clip = inku_render::render::CompatFillClipPolicy {
+        tolerance_pixels: 0.1,
+        limits: inku_render::compat_clip::ClipLimits {
+            max_nodes: 1000,
+            max_path_elements: 1000,
+            max_flattened_points: 1000,
+            max_work: 1000,
+            max_output_vertices: 1000,
+        },
+    };
+    let render = |count: u32| {
+        inku_render::render::render_with_resources(
+            request_for(&format!(
+                r#"{{"version":"0.12.0","instructions":[{{"primitive":"circle",
+                "center":[0.5,0.5],"radius":0.01,
+                "arrangement":{{"count":{count},"layout":"scatter"}}}}]}}"#
+            )),
+            &hard,
+            inku_score::OperationalResourceBudget(budget),
+            clip,
+        )
+    };
+    assert!(render(400).is_ok());
+    // A legacy Score used to bypass the budget: 100,000 marks took 50 s.
+    let error = render(100_000).unwrap_err();
+    assert!(matches!(
+        error,
+        inku_render::render::RenderError::ResourceAuthority(inku_score::SavedScoreResourceError {
+            reason: inku_score::SavedScoreResourceFailure::BudgetExceeded(_),
+            ..
+        })
+    ));
+}

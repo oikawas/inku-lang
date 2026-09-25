@@ -1199,6 +1199,84 @@ fn mirror_body_instruction_index(score: &Score, body: &crate::MirrorBodyRef) -> 
     }
 }
 
+/// Demand of a legacy-edition Score, counted the way its hosts limited it.
+///
+/// Legacy editions predate accounting v1 and carry no resource policy. The
+/// Python host capped two totals when it coerced them: the instruction count,
+/// and the sum over composite units of the head's count (rows x cols for an
+/// explicit grid) times the group size. This counts the same two totals, so
+/// saved legacy works stay within the limits they were drawn under.
+///
+/// Stored anchors and groups are counted once each. Their validation and
+/// scheduling compare every pair, so they need a bound before that runs.
+pub fn legacy_resource_demand(score: &Score) -> Result<ResourceDemand, ResourceDimension> {
+    let mut primitive_marks = 0_u64;
+    let mut index = 0;
+    while let Some(head) = score.instructions.get(index) {
+        let (marks, group_size) = head.arrangement.as_ref().map_or((1, 1), |arrangement| {
+            let marks = match (arrangement.layout, arrangement.rows, arrangement.cols) {
+                (crate::Layout::Grid, Some(rows), Some(cols)) => u64::from(rows) * u64::from(cols),
+                _ => u64::from(arrangement.count),
+            };
+            (marks.max(1), arrangement.group_size.max(1))
+        });
+        primitive_marks = marks
+            .checked_mul(u64::from(group_size))
+            .and_then(|unit| primitive_marks.checked_add(unit))
+            .ok_or(ResourceDimension::PrimitiveMarks)?;
+        index = index.saturating_add(usize::try_from(group_size).unwrap_or(usize::MAX));
+    }
+    let count = |length: usize, dimension| u64::try_from(length).map_err(|_| dimension);
+    Ok(ResourceDemand {
+        primitive_marks,
+        object_templates: count(score.instructions.len(), ResourceDimension::ObjectTemplates)?,
+        anchor_instances: count(score.anchors.len(), ResourceDimension::AnchorInstances)?,
+        transform_instances: count(
+            score.transform_groups.len(),
+            ResourceDimension::TransformInstances,
+        )?,
+        placement_instances: count(
+            score.placement_groups.len(),
+            ResourceDimension::PlacementInstances,
+        )?,
+        fill_instances: count(score.fill_groups.len(), ResourceDimension::FillInstances)?,
+        ..ResourceDemand::default()
+    })
+}
+
+/// Refuse a legacy-edition Score whose demand exceeds either authority.
+///
+/// A compact Score is finalized by [`finalize_saved_score`] instead. Without
+/// this check an explicit budget did not limit a legacy Score at all, and an
+/// arrangement count of 100,000 took 50 s and 95 MB of SVG to render.
+pub fn check_legacy_resource_demand(
+    score: &Score,
+    authorized_hard_policy: &HardResourcePolicy,
+    operational_budget: OperationalResourceBudget,
+) -> Result<ResourceDemand, SavedScoreResourceError> {
+    let demand = legacy_resource_demand(score).map_err(|dimension| {
+        error(
+            SavedScoreResourceOwner::Score,
+            SavedScoreResourceFailure::ArithmeticOverflow(dimension),
+        )
+    })?;
+    authorized_hard_policy
+        .budget
+        .check(demand, ResourceAuthority::HardPolicy)
+        .and_then(|()| {
+            operational_budget
+                .0
+                .check(demand, ResourceAuthority::OperationalBudget)
+        })
+        .map_err(|exceeded| {
+            error(
+                SavedScoreResourceOwner::Score,
+                SavedScoreResourceFailure::BudgetExceeded(exceeded),
+            )
+        })?;
+    Ok(demand)
+}
+
 /// Recompute demand from an untrusted compact Score, omit only offending atomic
 /// source units, and return a schema-valid Score with every retained index remapped.
 pub fn finalize_saved_score(

@@ -79,6 +79,12 @@ def _resource_omission_log_projection(diagnostic: object) -> dict:
     }
 
 
+class ImportedPlugin(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    definition: dict
+    summary: str = Field(default="", max_length=8192)
+
+
 class RunOptions(BaseModel):
     model_config = ConfigDict(extra="forbid")
     stage1_model: str | None = None
@@ -116,6 +122,9 @@ class RunOptions(BaseModel):
     request_idempotency_key: str | None = Field(default=None, max_length=200)
     developer_disable_llm_retries: StrictBool | None = None
     developer_capture_provider_io: StrictBool | None = None
+    # Plugin definitions carried by an imported DDL export. They are used for
+    # this new work only and are never installed.
+    imported_plugins: list[ImportedPlugin] | None = Field(default=None, max_length=64)
 
 
 def sketch_request_for(kind: str, options: dict) -> dict:
@@ -165,6 +174,9 @@ class ProductPipelineEffects:
                 previous["instruction_lang" if name == "instruction_lang_requested" else name] = metadata[name]
         if metadata.get("render_wild") is not None:
             previous["wild"] = str(metadata["render_wild"]).lower() in {"true", "1"}
+        imported_plugins = options.pop("imported_plugins", None)
+        if imported_plugins and work and "saved_config" in work:
+            raise CandidateHostError("imported_plugins_require_new_work")
         selected = {**previous, **options}
         # Request save metadata belongs to this operation, not to its parent.
         for key in ("request_idempotency_key", "history_at", "history_input", "history_source_text"):
@@ -179,7 +191,7 @@ class ProductPipelineEffects:
         if work and "saved_config" in work:
             catalog_context = deepcopy(work.get("macro_catalog", {}))
         else:
-            catalog = resolve_new_work_macro_catalog(self.binding, config)
+            catalog = resolve_new_work_macro_catalog(self.binding, config, imported_plugins or ())
             config["definitions"] = catalog["definitions"]
             config["macro_summaries"] = catalog["macro_summaries"]
             catalog_context = {"definition_locks": catalog["definition_locks"],

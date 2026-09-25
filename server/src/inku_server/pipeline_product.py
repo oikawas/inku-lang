@@ -188,7 +188,7 @@ class ProductPipelineEffects:
 
     def prepare(self, owner: str, kind: str, text: str, options: dict, work: dict | None) -> tuple[dict, dict]:
         from . import db
-        from .api_core.common import _env_flag, _resolve_instruction_lang
+        from .api_core.common import _env_flag, _model_offered_to, _resolve_instruction_lang
         from .api_core.rendering import _render_seed_from_text
 
         try:
@@ -277,6 +277,15 @@ class ProductPipelineEffects:
             instruction_lang=selected.get("instruction_lang") or "auto",
             instruction_lang_resolved=language, catalog_id=catalog_id,
         )
+        # Refused before anything runs rather than when the stage calls out. A
+        # description is read by Stage 1; hand-written DDL reaches only Stage 2,
+        # which completes its holes.
+        model_settings = db.get_model_settings()
+        for stage in ("stage1", "stage2") if kind == "description" else ("stage2",):
+            if not _model_offered_to(
+                actor, selected[f"{stage}_model"], stage=stage, purpose="llm", settings=model_settings
+            ):
+                raise CandidateHostError("model_not_offered")
         selected["developer_disable_llm_retries"] = options.get("developer_disable_llm_retries") is True
         selected["developer_capture_provider_io"] = options.get("developer_capture_provider_io") is True
         # Present from the start, so a work whose stage never called a model

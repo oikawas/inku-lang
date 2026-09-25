@@ -12,6 +12,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from inku_server import pipeline_compat
+from inku_server.api_core import common as api_common
 from inku_server.api_core.routers.render import ComposeResponse
 from inku_server.persistence.schema import Base
 
@@ -228,6 +229,9 @@ def test_description_pipeline_forces_typed_stage1_transport_and_renders_svg(
         "provider_for_model",
         lambda *args, **kwargs: ("fixture", "fixture-model"),
     )
+    # No administrator published the fixture's model; what is tested here is
+    # the transport past that check.
+    monkeypatch.setattr(api_common, "_model_offered_to", lambda *args, **kwargs: True)
     monkeypatch.setattr(
         pipeline_provider,
         "connection_for",
@@ -328,6 +332,7 @@ def test_a_supplementing_sketch_reaches_stage1_and_is_saved(tmp_path, monkeypatc
     monkeypatch.setattr(db, "engine", engine)
     monkeypatch.setattr(db, "SessionLocal", sessionmaker(bind=engine))
     monkeypatch.setattr(pipeline_provider, "provider_for_model", lambda *args, **kwargs: ("fixture", "fixture-model"))
+    monkeypatch.setattr(api_common, "_model_offered_to", lambda *args, **kwargs: True)
     monkeypatch.setattr(pipeline_provider, "connection_for", lambda *args: {
         "id": "fixture", "kind": "openai_compatible", "base_url": "https://provider.invalid/v1",
         "api_key": "test-only", "requires_api_key": True,

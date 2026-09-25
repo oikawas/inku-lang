@@ -550,6 +550,8 @@ def pipeline_router(service: PipelineService | Callable[[], PipelineService], ac
 
 
 def _host_error_status(code: str) -> int:
+    if code == "model_not_offered":
+        return 403
     return 409 if code in {"authority_conflict", "description_locked", "stale_result"} else 422
 
 

@@ -18,7 +18,7 @@ from ...saijiki import display_categories
 from ...render_engines import current_render_engine
 from ...model_settings import connection_for, model_provider_catalog, provider_for_model
 from ... import db as _db
-from ..common import _APP_VERSION, _RELEASE_VERSION, _build_number, _env_flag, _normalize_instruction_lang, _normalize_ui_lang, _resolve_instruction_lang, _unexpected_http_error
+from ..common import MODEL_NOT_OFFERED_DETAIL, _APP_VERSION, _RELEASE_VERSION, _build_number, _env_flag, _model_offered_to, _normalize_instruction_lang, _normalize_ui_lang, _resolve_instruction_lang, _unexpected_http_error
 from ..deps import _current_user
 from ..models import ModelSettingsResponse
 
@@ -296,7 +296,9 @@ def _generate_demo_instruction(seed_phrase: str, *, model: str | None, lang: str
 
 
 @authenticated_router.post("/api/demo/instruction", response_model=DemoInstructionResponse)
-def api_demo_instruction(req: DemoInstructionBody) -> DemoInstructionResponse:
+def api_demo_instruction(req: DemoInstructionBody, actor: dict = Depends(_current_user)) -> DemoInstructionResponse:
+    if not _model_offered_to(actor, req.model, stage="stage1", purpose="llm", settings=_db.get_model_settings()):
+        raise HTTPException(status_code=403, detail=MODEL_NOT_OFFERED_DETAIL)
     instruction_lang = _resolve_instruction_lang(
         req.seed_phrase,
         _normalize_instruction_lang(req.instruction_lang),

@@ -581,6 +581,27 @@ def model_provider_catalog(
     return catalog
 
 
+def model_is_offered(
+    provider_id: str,
+    model_id: str,
+    settings: dict[str, Any] | None,
+    *,
+    purpose: str,
+) -> bool:
+    """Whether an active provider lists this model for `purpose` and it is switched on.
+
+    Developer mode is not asked: it decides what the lists show, never which
+    model may be called (see model_provider_catalog), and the built-in Stage
+    defaults sit with a provider that only developer mode shows.
+    """
+    for provider in model_provider_catalog(
+        settings, include_disabled=False, include_developer=True, purpose=purpose
+    ):
+        if provider["id"] == provider_id:
+            return any(str(model["id"]) == model_id for model in provider["models"])
+    return False
+
+
 def mask_secret(value: str | None) -> str | None:
     if not value:
         return None

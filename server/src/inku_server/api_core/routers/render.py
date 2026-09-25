@@ -19,7 +19,7 @@ from ...autonomous_refine import ALLOWED_KINDS as AUTONOMOUS_REFINE_KINDS, visio
 from ...limits import limits_as_dict
 from ...saved_score_compat import coerce_saved_score
 from ...schema import Score
-from ..common import _resolve_instruction_lang, _resolved_vision_model, _unexpected_http_error
+from ..common import MODEL_NOT_OFFERED_DETAIL, _model_offered_to, _resolve_instruction_lang, _resolved_vision_model, _unexpected_http_error
 from ..deps import _current_user
 from ..rendering import (
     COLOR_CATALOG_ID_HEADER,
@@ -637,15 +637,19 @@ def api_vision_refine_advice(
     svg = str(items[0].get("svg") or "")
     if not svg:
         raise HTTPException(status_code=422, detail="refinement source has no image")
+    model = _resolved_vision_model(body.model, actor)
+    settings = _db.get_model_settings()
+    if not _model_offered_to(actor, model, stage="stage1", purpose="vision", settings=settings):
+        raise HTTPException(status_code=403, detail=MODEL_NOT_OFFERED_DETAIL)
     try:
         advice = vision_refine_advice(
             svg=svg,
             instruction=body.instruction,
             direction=body.direction,
             enabled_kinds=body.enabled_kinds,
-            model=_resolved_vision_model(body.model, actor),
+            model=model,
             language=body.language,
-            settings=_db.get_model_settings(),
+            settings=settings,
         )
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc

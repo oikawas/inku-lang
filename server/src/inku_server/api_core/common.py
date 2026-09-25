@@ -8,7 +8,7 @@ from pathlib import Path
 from fastapi import HTTPException
 from ..okugaki import DEFAULT_MODEL as DEFAULT_OKUGAKI_MODEL
 from ..languages import SUPPORTED_INSTRUCTION_LANGS, normalize_instruction_lang, resolve_instruction_lang
-from ..model_settings import split_model_ref
+from ..model_settings import model_is_offered, provider_for_model, split_model_ref
 from .. import db as _db
 from .deps import _logger
 
@@ -120,3 +120,24 @@ def _env_flag(name: str, default: bool = False) -> bool:
     if value is None:
         return default
     return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
+# What every route that calls a model answers when the model is withheld; the
+# Web says it in the page's language.
+MODEL_NOT_OFFERED_DETAIL = "model is not offered on this server"
+
+
+def _model_offered_to(actor: dict | None, model_ref: str | None, *, stage: str, purpose: str, settings: dict) -> bool:
+    """Whether the server will call this model with its own credentials for `actor`.
+
+    Administrators may name any configured model: they choose what to offer
+    and try a model before offering it. Everyone else gets the models an
+    active provider lists and the administrator has left switched on. Switching
+    a model off used to take it out of the menus only, so a request that named
+    it -- or named a model no provider lists -- still reached the provider, on
+    the server's account.
+    """
+    if actor is not None and _db.has_permission_group(actor, "admins"):
+        return True
+    provider_id, model_id = provider_for_model(model_ref or None, stage=stage, settings=settings)
+    return model_is_offered(provider_id, model_id, settings, purpose=purpose)

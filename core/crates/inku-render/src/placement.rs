@@ -1,8 +1,6 @@
 //! Deterministic normalized placement for repeated marks.
 
-use sha2::{Digest, Sha256};
-
-use crate::determinism::hash01;
+use crate::determinism::{hash01, seed_salt_index_digest};
 pub use crate::geometry::short_side_scales;
 use crate::types::{ArrangementPath, CanvasSize, Density, Point, RhythmSpacing, Seed};
 
@@ -16,7 +14,8 @@ fn clamp01(value: f64) -> f64 {
 
 #[must_use]
 pub fn scatter_position(index: usize, seed: Seed, margin: f64) -> Point {
-    let digest = Sha256::digest(format!("{seed}:s:{index}").as_bytes());
+    let index = i128::try_from(index).expect("usize fits i128");
+    let digest = seed_salt_index_digest(seed, "s", index);
     let x = u32::from_le_bytes(digest[..4].try_into().expect("four digest bytes"));
     let y = u32::from_le_bytes(digest[4..8].try_into().expect("four digest bytes"));
     let span = 1.0 - 2.0 * margin;

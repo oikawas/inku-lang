@@ -2,8 +2,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use sha2::{Digest, Sha256};
-
+use crate::determinism::seed_salt_index_digest;
 use crate::geometry::centerline_normals;
 use crate::support::{DEFAULT_SUPPORT, Support, support_response};
 use crate::types::{Point, Seed, Weight};
@@ -192,14 +191,25 @@ pub struct ContourStrokeRequest<'a> {
 /// Stable unit value used by all stroke and support event streams.
 #[must_use]
 pub(crate) fn unit(seed: Seed, label: &str, index: i64) -> f64 {
-    let digest = Sha256::digest(format!("{seed}:{label}:{index}").as_bytes());
+    let digest = seed_salt_index_digest(seed, label, i128::from(index));
     let raw = u64::from_le_bytes(digest[..8].try_into().expect("eight digest bytes"));
     raw as f64 / u64::MAX as f64
 }
 
+/// Salts of the latent-energy octaves, spelled as `format!("energy-{octave}")`.
+const ENERGY_OCTAVE_SALTS: [&str; 6] = [
+    "energy-1", "energy-2", "energy-3", "energy-4", "energy-5", "energy-6",
+];
+
 fn smooth_noise(t: f64, seed: Seed, octave: i32) -> f64 {
     let frequency = 2_f64.powi(octave);
-    smooth_noise_salted(t, seed, &format!("energy-{octave}"), frequency)
+    let salt = usize::try_from(octave - 1)
+        .ok()
+        .and_then(|index| ENERGY_OCTAVE_SALTS.get(index));
+    match salt {
+        Some(salt) => smooth_noise_salted(t, seed, salt, frequency),
+        None => smooth_noise_salted(t, seed, &format!("energy-{octave}"), frequency),
+    }
 }
 
 fn smooth_noise_salted(t: f64, seed: Seed, salt: &str, frequency: f64) -> f64 {

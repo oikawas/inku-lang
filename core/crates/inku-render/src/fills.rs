@@ -4,7 +4,7 @@ use std::collections::BTreeSet;
 
 use sha2::{Digest, Sha256};
 
-use crate::determinism::hash01;
+use crate::determinism::{hash01, seed_salt_index_digest};
 use crate::geometry::{point_to_pixels, stroke_sample_count};
 use crate::mark_paths::{contour_stroke_path, grid_step, polygon_path, uses_hand_stroke};
 use crate::marks::{MarkContext, MarkStyle};
@@ -25,7 +25,8 @@ const FILL_DAB_MIN_TRAVEL: f64 = 0.90;
 const SOLID_MOTTLE_OVERLAY_OPACITY: f64 = 0.22;
 
 fn fill_seed(seed: Seed, index: usize) -> Seed {
-    let digest = Sha256::digest(format!("{seed}:fill-stroke:{index}").as_bytes());
+    let index = i128::try_from(index).expect("usize fits i128");
+    let digest = seed_salt_index_digest(seed, "fill-stroke", index);
     i128::from(u64::from_le_bytes(
         digest[..8].try_into().expect("eight digest bytes"),
     ))
@@ -138,7 +139,6 @@ fn stroke_path(
     )
 }
 
-#[must_use]
 /// Loaded passes one oil fill lays down at most, and the document-wide total
 /// that many oil fills share. Each pass writes a body and eight ridge paths.
 pub(crate) const MAX_OIL_FILL_PASSES: usize = 24;

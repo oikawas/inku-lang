@@ -6,6 +6,7 @@ import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import app.inku.mobile.ui.i18n.InkuStringsJa
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -36,14 +37,23 @@ class AppStartupTest {
         composeTestRule.setContent { InkuApp() }
         composeTestRule.waitForIdle()
 
-        // 記述 is on the bottom bar and again on the compose screen's own tabs,
-        // so this counts rather than assumes there is one of each.
+        // Some labels appear twice (制作 is also the studio's title, 連作 also a
+        // canvas action), so this counts rather than assumes there is one of each.
         // デモ left this list on 2026-08-08: the bottom bar is for the places one
-        // returns to, and the demo runs from its settings pane instead.
-        listOf("記述", "履歴", "系譜", "設定").forEach { label ->
+        // returns to, and the demo runs from its settings pane instead. The
+        // labels come from the wording pack: the 2026-09-24 redesign renamed
+        // 記述/履歴/系譜 to 制作/作品/連作 and added カメラ, and the literal list
+        // this test had went stale with it.
+        listOf(
+            InkuStringsJa.studioTitle,
+            InkuStringsJa.camera,
+            InkuStringsJa.worksTitle,
+            InkuStringsJa.seriesTitle,
+            InkuStringsJa.settings,
+        ).forEach { label ->
             val found = composeTestRule.onAllNodesWithText(label).fetchSemanticsNodes()
             assertTrue("the app came up without a $label tab", found.isNotEmpty())
         }
-        composeTestRule.onNodeWithText("系譜").assertIsDisplayed()
+        composeTestRule.onNodeWithText(InkuStringsJa.worksTitle).assertIsDisplayed()
     }
 }

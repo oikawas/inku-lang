@@ -1353,6 +1353,38 @@ pub fn finalize_saved_score_with_omitted_instructions(
             },
         ));
     }
+    // Schema validation compares placement groups with every earlier placement
+    // group and every transform group, before any accounting. A stored group
+    // or anchor is performed at least once unless it belongs to a cycle member
+    // that never occurs, so compiled Scores store far fewer than the hard
+    // policy's instance maxima. Refusing larger stored counts here keeps that
+    // validation bounded for an untrusted Score.
+    let maximum = authorized_hard_policy.budget.maximum;
+    for (stored, dimension) in [
+        (score.anchors.len(), ResourceDimension::AnchorInstances),
+        (
+            score.transform_groups.len(),
+            ResourceDimension::TransformInstances,
+        ),
+        (
+            score.placement_groups.len(),
+            ResourceDimension::PlacementInstances,
+        ),
+        (score.fill_groups.len(), ResourceDimension::FillInstances),
+    ] {
+        let stored = u64::try_from(stored).unwrap_or(u64::MAX);
+        if stored > maximum.get(dimension) {
+            return Err(error(
+                SavedScoreResourceOwner::Score,
+                SavedScoreResourceFailure::BudgetExceeded(ResourceBudgetExceeded {
+                    authority: ResourceAuthority::HardPolicy,
+                    dimension,
+                    required: stored,
+                    maximum: maximum.get(dimension),
+                }),
+            ));
+        }
+    }
     score
         .validate_schema_edition()
         .map_err(|reason| invalid(SavedScoreResourceOwner::Score, reason))?;
@@ -2172,6 +2204,38 @@ mod tests {
         // Two anchors, each moved by two groups.
         assert_eq!(demand.anchor_instances, 2 + 2 + 2);
         assert_eq!(demand.transform_instances, 2);
+    }
+
+    #[test]
+    fn stored_groups_beyond_the_hard_maximum_are_refused_before_validation() {
+        let policy = hard(100);
+        let mut score = representative_score(policy.clone());
+        let stored = score.transform_groups.len() as u64 + 101;
+        // Groups that validation would reject; the count is refused first.
+        score
+            .transform_groups
+            .extend((0..101).map(|_| crate::TransformGroup {
+                start: 1,
+                end: 0,
+                rotation_degrees: 0.0,
+                scale_x: 1.0,
+                scale_y: 1.0,
+                translate_x: 0.0,
+                translate_y: 0.0,
+                fixed_position_indices: Vec::new(),
+                anchor_indices: Vec::new(),
+            }));
+        let error = finalize_saved_score(&score, &policy, OperationalResourceBudget(budget(100)))
+            .unwrap_err();
+        assert_eq!(
+            error.reason,
+            SavedScoreResourceFailure::BudgetExceeded(ResourceBudgetExceeded {
+                authority: ResourceAuthority::HardPolicy,
+                dimension: ResourceDimension::TransformInstances,
+                required: stored,
+                maximum: 100,
+            })
+        );
     }
 
     #[test]

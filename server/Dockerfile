@@ -39,7 +39,11 @@ COPY --from=native-builder /wheelhouse/ /tmp/wheelhouse/
 RUN cd /app/server \
     && uv sync --frozen --no-dev \
     && uv pip install --python /app/server/.venv/bin/python --no-deps /tmp/wheelhouse/*.whl \
-    && rm -rf /tmp/wheelhouse
+    && rm -rf /tmp/wheelhouse \
+    && test -s /app/LICENSE \
+    && test -s /app/server/THIRD_PARTY_NOTICES.md \
+    && test -s /app/licenses/RUST_THIRD_PARTY_NOTICES.txt \
+    && test -s /app/server/src/inku_server/fonts/OFL.txt
 
 # Copied after the dependency sync so re-numbering a build does not invalidate it.
 # api.py resolves the build number relative to the package: parents[3]/web/BUILD_NUMBER.

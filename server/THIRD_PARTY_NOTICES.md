@@ -4,8 +4,9 @@ The inku application code is licensed under the [repository MIT license](../LICE
 The container also carries independently licensed Python packages, native Rust
 code, and Noto Serif JP. This document does not relicense those components.
 
-Python package license files are installed alongside packages in
-`/app/server/.venv/lib/python3.12/site-packages/*-dist-info/licenses/`.
+Where an installed Python distribution supplies license files, they are
+preserved alongside that package under
+`/app/server/.venv/lib/python3.12/site-packages/*-dist-info/`.
 For the MPL-2.0-covered `certifi 2026.2.25`, source is available from
 https://pypi.org/project/certifi/2026.2.25/#files . For the MPL-2.0 and
 MIT-covered `tqdm 4.67.3`, source is available from

@@ -8,7 +8,7 @@ This file records changes chronologically. If a historical note conflicts with t
 
 ### 2026-09-25 — Prepare license notices for the next public distribution
 
-The Web distribution now carries the product license and license texts for the main third-party code in its generated runtime. A build stops when a covered dependency version differs from its notice. The API image carries the product MIT text and points to its Python, font, and UniFFI notices and exact source archives. The OCI label implying the entire image is MIT is removed. No release version was selected or published.
+The Web distribution now carries the product license and license texts for the main third-party code in its generated runtime. A build stops when a covered dependency version differs from its notice. The API image carries the product MIT text and points to its Python, font, and UniFFI notices and exact source archives. Both container builds reject missing notices. The OCI label implying the entire image is MIT is removed. No release version was selected or published.
 
 ### 2026-09-25 — Align Android color catalogs and saved-work redraw with Server
 

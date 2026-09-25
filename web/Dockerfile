@@ -11,8 +11,8 @@ WORKDIR /app
 COPY web/package.json web/package-lock.json ./
 RUN npm ci
 COPY web/ ./
-RUN node scripts/verify-license-notices.mjs
-RUN npm run build
+RUN npm run build \
+    && node scripts/verify-license-notices.mjs
 
 FROM node:22-bookworm-slim AS runtime
 ENV NODE_ENV=production \

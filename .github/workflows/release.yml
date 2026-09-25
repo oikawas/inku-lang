@@ -56,7 +56,6 @@ jobs:
           labels: |
             org.opencontainers.image.title=inku-${{ matrix.name }}
             org.opencontainers.image.description=inku (DDL) ${{ matrix.name }} service
-            org.opencontainers.image.licenses=MIT
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
 
       - name: Build and push

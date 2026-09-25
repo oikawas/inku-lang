@@ -121,7 +121,10 @@ fn group_for_closed_contour(
             format_number(level(instruction, [0.65, 1.0, 0.35])),
         );
     }
-    if matches!(instruction.weight, Weight::Burin | Weight::Drypoint) {
+    if matches!(
+        instruction.weight,
+        Weight::Burin | Weight::Drypoint | Weight::BrushThin | Weight::BrushThick
+    ) {
         group.attr("mask", format!("url(#{}-mask)", identifier(context)))
     } else {
         group.attr("filter", format!("url(#{})", identifier(context)))
@@ -259,22 +262,6 @@ fn grain(instruction: &Instruction) -> Grain {
             0.82,
             9.0,
             [-3.2, -2.65, -3.83],
-        ),
-        Weight::BrushThick => (
-            (0.035, 0.003),
-            (0.007, 0.009),
-            31,
-            0.72,
-            5.0,
-            [-1.43, -1.1, -2.1],
-        ),
-        Weight::BrushThin => (
-            (0.11, 0.002),
-            (0.012, 0.006),
-            29,
-            0.8,
-            2.4,
-            [-0.28, 0.0, -0.87],
         ),
         Weight::Pen => ((0.28, 0.34), (0.28, 0.34), 37, 1.0, 0.8, [0.53, 0.66, 0.16]),
         Weight::Silverpoint => (
@@ -746,6 +733,194 @@ fn computer(instruction: &Instruction, context: MarkContext<'_>) -> Vec<Element>
     definitions
 }
 
+/// Brush band recipe on a 1000-unit canvas: tile size, band width, segment lengths.
+fn brush_recipe(weight: Weight) -> Option<(&'static str, f64, f64, (f64, f64))> {
+    match weight {
+        Weight::BrushThin => Some(("brush_thin", 320.0, 11.0, (90.0, 200.0))),
+        Weight::BrushThick => Some(("brush_thick", 512.0, 34.0, (200.0, 420.0))),
+        _ => None,
+    }
+}
+
+const BRUSH_BAND_ALPHAS: [f64; 3] = [0.3, 0.45, 0.6];
+
+fn brush_unit(payload: &str) -> f64 {
+    let digest = Sha256::digest(payload.as_bytes());
+    f64::from(u32::from_be_bytes(
+        digest[..4].try_into().expect("four bytes"),
+    )) / 4_294_967_296.0
+}
+
+fn brush_tile_id(name: &str) -> String {
+    format!("brush-tile-{name}")
+}
+
+/// The shared, seamless band tile for one brush, defined once per document.
+///
+/// Rows of short, slightly bowed bands run horizontally; each mark rotates the
+/// tile, so the stroke direction varies without a per-mark band set. Bands
+/// leaving an edge reappear on the opposite edge, and neighbours on a row keep
+/// a small lift instead of overlapping round caps.
+pub(crate) fn brush_tile_definition(weight: Weight) -> Option<Element> {
+    let (name, size, width, (short, long)) = brush_recipe(weight)?;
+    let rows = (size / (width * 0.6)).round();
+    let pitch = size / rows;
+    let widths = [(width * 0.8).round(), width.round(), (width * 1.2).round()];
+    let mut classes: std::collections::BTreeMap<(usize, usize), String> =
+        std::collections::BTreeMap::new();
+    for row in 0..rows as usize {
+        let row_unit = |slot: usize| brush_unit(&format!("brush-strokes:{name}:tile:{row}:{slot}"));
+        let y = row as f64 * pitch + (row_unit(1) - 0.5) * pitch * 0.5;
+        let mut x = -row_unit(0) * long;
+        let mut segment = 0;
+        while x < size {
+            let part = |slot: usize| {
+                brush_unit(&format!("brush-strokes:{name}:tile:{row}:{segment}:{slot}"))
+            };
+            let length = short + (long - short) * part(0);
+            let bow = (part(1) - 0.5) * width * 1.6;
+            let stroke = width * (0.75 + 0.5 * part(2));
+            let alpha = 0.25 + 0.45 * part(3);
+            let nearest = |values: &[f64], target: f64| {
+                (0..values.len())
+                    .min_by(|a, b| {
+                        (values[*a] - target)
+                            .abs()
+                            .total_cmp(&(values[*b] - target).abs())
+                    })
+                    .expect("non-empty")
+            };
+            let key = (nearest(&widths, stroke), nearest(&BRUSH_BAND_ALPHAS, alpha));
+            let mut shifts_x = vec![0.0];
+            if x + length > size {
+                shifts_x.push(-size);
+            }
+            if x < 0.0 {
+                shifts_x.push(size);
+            }
+            for shift_x in shifts_x {
+                for shift_y in [-size, 0.0, size] {
+                    let top = y + shift_y;
+                    if -width < top && top < size + width {
+                        classes.entry(key).or_default().push_str(&format!(
+                            "M{} {}q{} {} {} 0",
+                            (x + shift_x).round(),
+                            top.round(),
+                            (length / 2.0).round(),
+                            bow.round(),
+                            length.round()
+                        ));
+                    }
+                }
+            }
+            x += length + width * (0.2 + 0.6 * part(4));
+            segment += 1;
+        }
+    }
+    let mut bands = Element::new("g")
+        .attr("fill", "none")
+        .attr("stroke", "white")
+        .attr("stroke-linecap", "round");
+    for ((width_index, alpha_index), path) in classes {
+        bands.push(
+            Element::new("path")
+                .attr("d", path)
+                .attr("stroke-width", format_number(widths[width_index]))
+                .attr(
+                    "stroke-opacity",
+                    format_number(BRUSH_BAND_ALPHAS[alpha_index]),
+                ),
+        );
+    }
+    let mut tile = Element::new("pattern")
+        .attr("id", brush_tile_id(name))
+        .attr("patternUnits", "userSpaceOnUse")
+        .attr("width", format_number(size))
+        .attr("height", format_number(size));
+    tile.push(bands);
+    Some(tile)
+}
+
+/// Whether a brush weight needs the shared tile in a non-compat document.
+pub(crate) fn uses_brush_tile(instruction: &Instruction, weight: Weight) -> bool {
+    instruction.weight == weight && solid_fill(instruction)
+}
+
+pub(crate) const BRUSH_TILE_WEIGHTS: [Weight; 2] = [Weight::BrushThin, Weight::BrushThick];
+
+fn brush_mark_unit(name: &str, slot: usize, context: MarkContext<'_>) -> f64 {
+    brush_unit(&format!(
+        "brush-strokes:{name}:mark:{slot}:{}:{}:{}",
+        context.render_seed.unwrap_or(0),
+        context.instruction_index,
+        context.mark_index
+    ))
+}
+
+/// Per-mark mask: an even deposit floor plus the shared tile, rotated about the mark.
+fn brush_mask(instruction: &Instruction, context: MarkContext<'_>) -> Vec<Element> {
+    let Some((name, size, _, _)) = brush_recipe(instruction.weight) else {
+        return Vec::new();
+    };
+    let id = identifier(context);
+    let unit = context.canvas.unit() / 1000.0;
+    let (x, y, width, height) = shape_bbox(instruction, context).unwrap_or((
+        0.0,
+        0.0,
+        context.canvas.width,
+        context.canvas.height,
+    ));
+    let angle = (2.0 * brush_mark_unit(name, 0, context) - 1.0) * 60.0;
+    let shift = [
+        (brush_mark_unit(name, 1, context) * size).round(),
+        (brush_mark_unit(name, 2, context) * size).round(),
+    ];
+    let bands = Element::new("pattern")
+        .attr("id", format!("{id}-bands"))
+        .attr("href", format!("#{}", brush_tile_id(name)))
+        .attr(
+            "patternTransform",
+            format!(
+                "translate({} {}) rotate({}) scale({}) translate({} {})",
+                format_number(x + width / 2.0),
+                format_number(y + height / 2.0),
+                format_number((angle * 10.0).round() / 10.0),
+                format_number(unit),
+                format_number(shift[0]),
+                format_number(shift[1])
+            ),
+        );
+    // Normal keeps an 8% lift between bands; dense closes it further; faint thins the whole deposit.
+    let (floor, deposit) = match instruction.surface_intensity {
+        SurfaceIntensity::Normal => (0.92, 1.0),
+        SurfaceIntensity::Dense => (0.96, 1.0),
+        SurfaceIntensity::Faint => (0.92, 0.55),
+    };
+    // Cover the canvas generously: marks may be rotated or displaced after masking.
+    let region = |element: Element| {
+        element
+            .attr("x", format_number(-context.canvas.width))
+            .attr("y", format_number(-context.canvas.height))
+            .attr("width", format_number(context.canvas.width * 3.0))
+            .attr("height", format_number(context.canvas.height * 3.0))
+    };
+    let mut deposit_group = Element::new("g");
+    if deposit < 1.0 {
+        deposit_group.set_attr("opacity", format_number(deposit));
+    }
+    deposit_group.push(
+        region(Element::new("rect"))
+            .attr("fill", "white")
+            .attr("opacity", format_number(floor)),
+    );
+    deposit_group.push(region(Element::new("rect")).attr("fill", format!("url(#{id}-bands)")));
+    let mut mask = region(Element::new("mask"))
+        .attr("id", format!("{id}-mask"))
+        .attr("maskUnits", "userSpaceOnUse");
+    mask.push(deposit_group);
+    vec![bands, mask]
+}
+
 pub(crate) fn definitions(instruction: &Instruction, context: MarkContext<'_>) -> Vec<Element> {
     definitions_for_closed_contour(instruction, context, false)
 }
@@ -771,10 +946,10 @@ fn definitions_for_closed_contour(
     if context.profile == SvgProfile::Compat || instruction.weight == Weight::Rotring {
         return Vec::new();
     }
-    if matches!(instruction.weight, Weight::Burin | Weight::Drypoint) {
-        engraving(instruction, context)
-    } else {
-        vec![grain_filter(instruction, context)]
+    match instruction.weight {
+        Weight::Burin | Weight::Drypoint => engraving(instruction, context),
+        Weight::BrushThin | Weight::BrushThick => brush_mask(instruction, context),
+        _ => vec![grain_filter(instruction, context)],
     }
 }
 
@@ -815,7 +990,12 @@ mod tests {
             }
             if matches!(
                 weight,
-                Weight::Rotring | Weight::Burin | Weight::Drypoint | Weight::Computer
+                Weight::Rotring
+                    | Weight::Burin
+                    | Weight::Drypoint
+                    | Weight::Computer
+                    | Weight::BrushThin
+                    | Weight::BrushThick
             ) {
                 continue;
             }

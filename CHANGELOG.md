@@ -6,6 +6,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 36 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-25 — Fine and thick brush fills show brush marks that change direction (render engine 68)
+
+Fine and thick brush fills drew their marks with a vertically stretched noise filter, so in every work and shape the marks ran one way, top to bottom, and the ground showed through widely where the noise was low. Rotating the noise is not an option: resvg (server and Android images) does not carry a group rotation into feTurbulence, and the browser view would disagree. The marks are now slightly bowed band shapes, turned per fill to a seed-chosen direction within ±60° of horizontal. The gaps between bands are still painted at 0.92 in normal, so at most 8% of the ground shows and a slight unevenness reads as brush marks. Dense uses 0.96 and faint scales the whole deposit by 0.55. Each brush defines one seamless band tile per document and every fill refers to it rotated and offset, so more fills barely grow the SVG. The Compat rendering is unchanged. Stored Score meaning is unchanged; replay follows this engine.
+
 ### 2026-09-25 — A modifier before a count phrase reaches its noun
 
 In `大きな四つの赤い円を置く` the word `大きな` was not recognized and the clause stayed unresolved, and in `細い三本の黒い線を引く` modifier and action ownership became ambiguous and the whole work stopped. The scale word's look-ahead did not skip a number, and both the pre-head modifier collection and the noun-phrase boundary check stopped at the counter attached to a count (本, つ, 個). A number and the counter right after it now stay inside the noun phrase, so a modifier before the count phrase yields the same Score as one after it. The work-plan printer never emits this order, so drawings from the LLM path are unchanged; the word orders an author may write widen. DDL 13, DDL engine 47.

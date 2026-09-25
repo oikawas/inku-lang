@@ -399,6 +399,19 @@ fn render_impl(
             material_definitions.push(filter);
         }
     }
+    if profile != SvgProfile::Compat {
+        for weight in accepted_fills::BRUSH_TILE_WEIGHTS {
+            if performance
+                .score
+                .instructions
+                .iter()
+                .any(|instruction| accepted_fills::uses_brush_tile(instruction, weight))
+                && let Some(tile) = accepted_fills::brush_tile_definition(weight)
+            {
+                material_definitions.push(tile);
+            }
+        }
+    }
     let mut surface_definitions = Vec::new();
     let mut closed_arc_pair_spread_marks = BTreeSet::new();
     for (

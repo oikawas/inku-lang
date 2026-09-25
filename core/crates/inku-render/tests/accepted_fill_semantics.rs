@@ -70,3 +70,33 @@ fn representative_mask_crt_shapes_and_compat_preserve_geometry_and_local_definit
     assert_eq!(values(&compat_dense, "d"), values(&compat_faint, "d"));
     assert_ne!(compat_dense, compat_faint);
 }
+
+#[test]
+fn brush_fills_share_one_band_tile_and_rotate_it_per_mark() {
+    let request = RenderRequest {
+        score: serde_json::from_str(r#"{"instructions":[
+          {"primitive":"circle","center":[0.3,0.3],"radius":0.12,"weight":"brush_thin","color":"blue","filled":true},
+          {"primitive":"square","position":[0.6,0.2],"size":[0.2,0.2],"weight":"brush_thin","color":"blue","filled":true},
+          {"primitive":"circle","center":[0.5,0.7],"radius":0.15,"weight":"brush_thick","color":"blue","filled":true}
+        ]}"#).unwrap(),
+        options: RenderOptions {
+            resolved_color_map: BTreeMap::from([("blue".to_owned(), "#2468ac".to_owned())]),
+            catalog_id: None, canvas: CanvasSize::new(1000.0, 1000.0), canvas_aspect_id: "square".to_owned(),
+            svg_profile: SvgProfile::Display, render_seed: Some(431), composition_seed: None,
+            wild: false, error_policy: Default::default(),
+        },
+    };
+    let svg = render(request.clone()).unwrap().svg;
+    // One tile per brush, however many marks use it; no per-mark grain filter.
+    assert_eq!(svg.matches("id=\"brush-tile-brush_thin\"").count(), 1);
+    assert_eq!(svg.matches("id=\"brush-tile-brush_thick\"").count(), 1);
+    assert!(!svg.contains("feTurbulence type=\"fractalNoise\" baseFrequency=\"0.11 0.002\""));
+    assert_eq!(svg.matches("href=\"#brush-tile-brush_thin\"").count(), 2);
+    assert_eq!(svg.matches("href=\"#brush-tile-brush_thick\"").count(), 1);
+    let rotations: BTreeSet<_> = values(&svg, "patternTransform").into_iter().collect();
+    assert_eq!(rotations.len(), 3);
+    assert_eq!(svg, render(request.clone()).unwrap().svg);
+    let mut compat = request;
+    compat.options.svg_profile = SvgProfile::Compat;
+    assert!(!render(compat).unwrap().svg.contains("brush-tile-"));
+}

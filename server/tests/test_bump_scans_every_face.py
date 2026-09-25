@@ -231,7 +231,6 @@ def test_the_environment_supplies_the_deploy_target(tree: Tree):
 def test_one_environment_variable_stops_the_scan(tree: Tree):
     """A host scan cannot infer the missing private deployment input."""
     # Tree.run supplies both values, so remove one after it builds the fixture.
-    old_run = tree.run
     def run_without_host(*args: str, **kwargs: object) -> subprocess.CompletedProcess:
         environment = dict(os.environ)
         environment["PATH"] = f"{tree.root.parent / 'bin'}{os.pathsep}{os.environ['PATH']}"

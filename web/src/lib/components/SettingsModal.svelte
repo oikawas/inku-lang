@@ -20,6 +20,7 @@
 	import type { UiCustomVisibility, UiMode, UiVisibilityKey } from '$lib/uiMode';
 	import type { HistoryStripField } from '$lib/historyStripFields';
 	import { settingsTabShownAtDetail, type SettingsDetailLevel } from '$lib/settingsDetail';
+	import { canAccessSettingsTab } from '$lib/permissionGroups';
 	import type { SettingsController, SettingsTab, SettingsUserItem } from '$lib/features/settings/state.svelte';
 
 	type Props = {
@@ -143,6 +144,10 @@
 	const onUpdateRenderLimits = (patch: Record<string, number> | null) => settings.updateRenderLimits(patch);
 	// The category navigation asks the same question as the navigation guard from the same module.
 	const showsTab = (tab: string) => settingsTabShownAtDetail(tab, settingsDetail);
+	// And the permission question, from the module the navigation guard asks. The
+	// category used to open for administrators as a whole, which left a leader --
+	// whom the guard lets into the users tab -- without a button that led there.
+	const reaches = (tab: string) => canAccessSettingsTab(tab, currentUser);
 	const detailed = $derived(settingsDetail === 'detailed');
 	const isAdmin = $derived(currentUser?.permission_groups?.includes('admins') === true);
 	let appearanceSection = $state<'display' | 'making'>('display');
@@ -263,17 +268,25 @@
 					<div class="settings-category-label">{t().settingsTabExport}</div>
 					<button aria-current={settingsTab === 'export' ? 'page' : undefined} class:active={settingsTab === 'export'} onclick={() => onSelectSettingsTab('export')}>{t().settingsTabExport}</button>
 				</section>
-				{#if isAdmin}
+				{#if reaches('models') || reaches('users')}
 					<section class="settings-category">
 						<div class="settings-category-label">{t().settingsCategoryAdministration}</div>
-						<button aria-current={settingsTab === 'models' ? 'page' : undefined} class:active={settingsTab === 'models'} onclick={() => onSelectSettingsTab('models')}>{t().settingsTabModels}</button>
-						<button aria-current={settingsTab === 'users' ? 'page' : undefined} class:active={settingsTab === 'users'} onclick={() => onSelectSettingsTab('users')}>{t().settingsTabUsers}</button>
-						<button aria-current={settingsTab === 'db' ? 'page' : undefined} class:active={settingsTab === 'db'} onclick={() => onSelectSettingsTab('db')}>{t().settingsTabDb}</button>
-						{#if showsTab('server_misc')}
+						{#if reaches('models')}
+							<button aria-current={settingsTab === 'models' ? 'page' : undefined} class:active={settingsTab === 'models'} onclick={() => onSelectSettingsTab('models')}>{t().settingsTabModels}</button>
+						{/if}
+						{#if reaches('users')}
+							<button aria-current={settingsTab === 'users' ? 'page' : undefined} class:active={settingsTab === 'users'} onclick={() => onSelectSettingsTab('users')}>{t().settingsTabUsers}</button>
+						{/if}
+						{#if reaches('db')}
+							<button aria-current={settingsTab === 'db' ? 'page' : undefined} class:active={settingsTab === 'db'} onclick={() => onSelectSettingsTab('db')}>{t().settingsTabDb}</button>
+						{/if}
+						{#if reaches('server_misc') && showsTab('server_misc')}
 							<button aria-current={settingsTab === 'server_misc' ? 'page' : undefined} class:active={settingsTab === 'server_misc'} onclick={() => onSelectSettingsTab('server_misc')}>{t().settingsTabServerMisc}</button>
 						{/if}
-						<button aria-current={settingsTab === 'logs' ? 'page' : undefined} class:active={settingsTab === 'logs'} onclick={() => onSelectSettingsTab('logs')}>{t().settingsTabLogs}</button>
-						{#if showsTab('limits')}
+						{#if reaches('logs')}
+							<button aria-current={settingsTab === 'logs' ? 'page' : undefined} class:active={settingsTab === 'logs'} onclick={() => onSelectSettingsTab('logs')}>{t().settingsTabLogs}</button>
+						{/if}
+						{#if reaches('limits') && showsTab('limits')}
 							<button aria-current={settingsTab === 'limits' ? 'page' : undefined} class:active={settingsTab === 'limits'} onclick={() => onSelectSettingsTab('limits')}>{t().settingsTabLimits}</button>
 						{/if}
 					</section>

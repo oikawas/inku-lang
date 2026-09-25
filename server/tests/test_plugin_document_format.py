@@ -51,3 +51,18 @@ def test_manager_rejects_namespace_and_word_collisions(tmp_path: Path) -> None:
     items = PluginDocumentManager(tmp_path).reload()
     assert [item.status for item in items] == ["enabled", "rejected"]
     assert "qualified word collision" in items[1].reasons[0]
+
+
+def test_the_shipped_nature_document_loads_with_its_seven_words_and_previews():
+    """Every expansion line of the bundled document must stay in core vocabulary,
+    or the manager rejects the whole document at load."""
+    from pathlib import Path
+
+    from inku_server.plugins.document_format import MAX_PREVIEW_BYTES, entry_preview_path
+
+    path = Path(__file__).resolve().parents[1] / "plugins" / "nature-leaves.inku-plugin.md"
+    document = parse_plugin_document(path.read_text(encoding="utf-8"), source_path=str(path))
+    assert [entry.heading for entry in document.entries] == ["若葉", "下草", "青葉", "紅葉", "落葉", "枯草", "枯葉"]
+    for entry in document.entries:
+        preview = entry_preview_path(document, entry)
+        assert preview is not None and 0 < preview.stat().st_size <= MAX_PREVIEW_BYTES

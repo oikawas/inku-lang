@@ -173,14 +173,14 @@ preview: nature-leaves/kareha.png
 
 ### 展開 (ja)
 
-member 枯れ葉形: 深い弧を置き、前の弧に両端で触れる浅い弧(縮れ)
-枯れ葉形を 2〜4枚、{領域: 下の左右の隅} に置く。
-チョークで。灰と黄を枚ごとに交互に。縁は細かく揺れる。回転は枚ごとにばらばら。
-内側も輪郭と同じ色で塗る。
+member 枯れ葉形: 弧を置き、前の弧に両端で触れる(膨らみは細く)
+枯れ葉形を 2〜4枚、{領域: 下の隅} に置く。
+チョークで。灰と黄を枚ごとに交互に。各葉の内側を線と同じ色で塗る。
+回転は枚ごとにばらばら。細かく震える。
 
 ### 展開 (en)
 
-member withered leaf: place a deep arc, then a shallow arc touching it at both ends (curled)
-Place 2-4 withered leaves in {region: lower left or right corner}.
-In chalk. Gray and yellow alternating per leaf. Edges finely swaying. Rotated differently per leaf.
-Fill each interior with its outline color.
+member withered leaf: place an arc, then an arc touching the previous arc at both ends (bulge kept slim)
+Place 2-4 withered leaves in {region: lower corner}.
+In chalk. Gray and yellow alternating per leaf. Fill each interior with its outline color.
+Rotated differently per leaf. Fine trembling.

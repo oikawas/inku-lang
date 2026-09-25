@@ -3,7 +3,7 @@
 use std::ptr::null_mut;
 
 use jni::JNIEnv;
-use jni::objects::{JByteArray, JObject, JString};
+use jni::objects::{JByteArray, JObject};
 use jni::sys::{jbyteArray, jstring};
 
 use super::{BindingError, jni_boundary, new_java_string};
@@ -38,24 +38,6 @@ pub extern "system" fn Java_app_inku_mobile_pipeline_NativePipelineBridge_canvas
 ) -> jstring {
     jni_boundary(env, null_mut(), |env| {
         new_java_string(env, &inku_pipeline_uniffi::canvas_registry())
-    })
-}
-
-#[unsafe(no_mangle)]
-#[allow(non_snake_case)]
-pub extern "system" fn Java_app_inku_mobile_pipeline_NativePipelineBridge_stage1SystemProjection(
-    env: JNIEnv<'_>,
-    _receiver: JObject<'_>,
-    language_code: JString<'_>,
-) -> jstring {
-    jni_boundary(env, null_mut(), |env| {
-        let language_code = env
-            .get_string(&language_code)
-            .map_err(|error| BindingError::invalid(format!("invalid language code: {error}")))?;
-        new_java_string(
-            env,
-            &inku_pipeline_uniffi::stage1_system_projection(language_code.into()),
-        )
     })
 }
 

@@ -77,7 +77,7 @@ internal fun cameraDevelopmentPresentation(
 }
 
 private val CameraFailure.isDrawFailure: Boolean
-    get() = this == CameraFailure.DrawFailed || this == CameraFailure.DrawFailedDirectDdl
+    get() = this == CameraFailure.DrawFailed
 
 internal data class CameraOriginalPhotoWords(
     val label: String,

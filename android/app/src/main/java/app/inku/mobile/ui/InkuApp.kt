@@ -7,7 +7,6 @@ import app.inku.mobile.ui.camera.CameraCaptureRequest
 import app.inku.mobile.ui.camera.InAppCameraCapture
 import app.inku.mobile.data.model.workColorSnapshot
 import app.inku.mobile.data.model.cameraInputProvenance
-import app.inku.mobile.llm.VisionOutputMode
 import app.inku.mobile.llm.isLocalVisionModel
 import app.inku.mobile.ui.mascot.MascotArt
 import app.inku.mobile.ui.theme.*
@@ -2732,10 +2731,8 @@ private fun cameraStatusText(state: CameraCaptureState): String? = when (state) 
         CameraFailure.DecodeFailed -> S.cameraDecodeFailed
         CameraFailure.AnalysisFailed -> S.cameraAnalysisFailed
         CameraFailure.EmptyResult -> S.cameraEmptyResult
-        CameraFailure.InvalidDdl -> S.cameraInvalidDdl
         CameraFailure.DrawModelNotReady -> S.cameraDrawModelNotReady
         CameraFailure.DrawFailed -> S.cameraDrawFailed
-        CameraFailure.DrawFailedDirectDdl -> S.cameraDrawFailedDirectDdl
     }
 }
 
@@ -4306,26 +4303,6 @@ private fun MiscSettingsPanel(state: InkuUiState, viewModel: InkuViewModel, modi
                 text = S.displaySafeMarginsToggle,
                 onCheckedChange = viewModel::setDisplaySafeMarginsEnabled,
             )
-        }
-        SettingsCard(
-            S.cameraVisionModeTitle,
-            S.cameraVisionModeSubtitle,
-            if (state.cameraVisionOutputMode == VisionOutputMode.DDL) S.cameraVisionModeDdl else S.cameraVisionModeDescription,
-        ) {
-            Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
-                ChipButton(
-                    S.cameraVisionModeDescription,
-                    selected = state.cameraVisionOutputMode == VisionOutputMode.DESCRIPTION,
-                    modifier = Modifier.fillMaxWidth().heightIn(min = Dimens.cameraControlMinHeight),
-                    onClick = { viewModel.setCameraVisionOutputMode(VisionOutputMode.DESCRIPTION) },
-                )
-                ChipButton(
-                    S.cameraVisionModeDdl,
-                    selected = state.cameraVisionOutputMode == VisionOutputMode.DDL,
-                    modifier = Modifier.fillMaxWidth().heightIn(min = Dimens.cameraControlMinHeight),
-                    onClick = { viewModel.setCameraVisionOutputMode(VisionOutputMode.DDL) },
-                )
-            }
         }
         SettingsCard(
             S.bundledPluginsTitle,

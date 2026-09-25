@@ -1,6 +1,7 @@
 package app.inku.mobile.llm
 
 import java.io.File
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -15,17 +16,17 @@ class LocalVisionRequestContractTest {
     }
 
     @Test
-    fun visionKeepsDescriptionAsTheTypedDefaultWhileAddingDirectDdl() {
+    fun visionHasOneDescriptionPromptAndNoDirectDdlMode() {
         val boundary = source("VisionAnalyzer.kt")
         assertTrue(boundary.contains("interface VisionAnalyzer"))
         assertTrue(boundary.contains("VisionAnalysisRequest"))
         assertTrue(boundary.contains("VisionAnalysisResult"))
-        assertTrue(boundary.contains("VisionOutputMode.DESCRIPTION"))
-        val modeStart = boundary.indexOf("enum class VisionOutputMode")
-        val modeEnd = boundary.indexOf("data class VisionAnalysisRequest", modeStart)
-        assertTrue(modeStart >= 0 && modeEnd > modeStart)
-        assertTrue(boundary.substring(modeStart, modeEnd).contains("DDL"))
-        assertTrue(boundary.contains("val outputMode: VisionOutputMode = VisionOutputMode.DESCRIPTION"))
+        assertFalse(boundary.contains("enum class VisionOutputMode"))
+        assertFalse(boundary.contains("outputMode"))
+        assertFalse(boundary.contains("stage1SystemProjection"))
+        assertEquals("camera-description-v4", VisionPrompts.VERSION)
+        assertTrue(VisionPrompts.forLanguage("ja").contains("3〜5文"))
+        assertTrue(VisionPrompts.forLanguage("en").contains("three to five"))
     }
 
     @Test

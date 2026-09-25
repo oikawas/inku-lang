@@ -3,7 +3,6 @@ package app.inku.mobile.ui.camera
 import app.inku.mobile.data.db.ModelAssetEntity
 import app.inku.mobile.data.db.ProviderSettingEntity
 import app.inku.mobile.data.model.CameraInputProvenance
-import app.inku.mobile.data.model.CameraVisionOutputMode
 import app.inku.mobile.llm.RoutingModelProvider
 import app.inku.mobile.pipeline.SketchInput
 
@@ -24,13 +23,7 @@ internal data class CameraDrawRoute(
     val inputProvenance: CameraInputProvenance,
     val settings: CameraDrawSettings,
 ) {
-    /** Direct DDL skips Stage 1; its DDL producer is the Vision model. */
-    val stage1ModelId: String
-        get() = if (inputProvenance.visionOutputMode == CameraVisionOutputMode.Ddl) {
-            inputProvenance.visionModelId
-        } else {
-            settings.stage1ModelId
-        }
+    val stage1ModelId: String get() = settings.stage1ModelId
     val stage2ModelId: String get() = settings.stage2ModelId
     val catalogId: String get() = settings.catalogId
     val sketch: SketchInput get() = SketchInput(requested = settings.sketchRequested)

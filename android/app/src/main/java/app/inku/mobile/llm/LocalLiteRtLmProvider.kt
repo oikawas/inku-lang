@@ -97,11 +97,11 @@ class LocalLiteRtLmProvider(
         require(isLocalVisionModel(request.modelId)) { "Device image analysis requires a local model." }
         require(request.normalizedJpeg.isNotEmpty()) { "The normalized camera image is empty." }
         val started = System.currentTimeMillis()
-        val prompt = VisionPrompts.forLanguage(request.languageCode, request.outputMode)
+        val prompt = VisionPrompts.forLanguage(request.languageCode)
         Log.i(
             PERF_TAG,
             "litert_vision_start model_id=${request.modelId} width=${request.width} height=${request.height} " +
-                "jpeg_bytes=${request.normalizedJpeg.size} prompt_version=${VisionPrompts.versionFor(request.outputMode)} " +
+                "jpeg_bytes=${request.normalizedJpeg.size} prompt_version=${VisionPrompts.VERSION} " +
                 "prompt_chars=${prompt.length}",
         )
         try {
@@ -114,11 +114,7 @@ class LocalLiteRtLmProvider(
                         Content.ImageBytes(request.normalizedJpeg),
                         Content.Text(prompt),
                     )
-                    val budget = if (request.outputMode == VisionOutputMode.DESCRIPTION) {
-                        LocalLiteRtLmOutput.descriptionBudget(request.languageCode)
-                    } else {
-                        null
-                    }
+                    val budget = LocalLiteRtLmOutput.descriptionBudget(request.languageCode)
                     try {
                         withTimeout(REQUEST_TIMEOUT_MS) {
                             conversation.sendMessageAsync(contents).collect { message ->
@@ -126,7 +122,7 @@ class LocalLiteRtLmProvider(
                                     .filterIsInstance<Content.Text>()
                                     .joinToString("") { it.text }
                                 LocalLiteRtLmOutput.appendStreamChunk(text, chunk)
-                                budget?.let { LocalLiteRtLmOutput.sentenceCut(text, it) }?.let { cut ->
+                                LocalLiteRtLmOutput.sentenceCut(text, budget)?.let { cut ->
                                     text.setLength(cut)
                                     throw DescriptionComplete()
                                 }
@@ -141,10 +137,8 @@ class LocalLiteRtLmProvider(
                         conversation.cancelProcess()
                         throw error
                     }
-                    when (request.outputMode) {
-                        VisionOutputMode.DESCRIPTION -> LocalLiteRtLmOutput.visionDescription(text.toString(), request.languageCode)
-                        VisionOutputMode.DDL -> LocalLiteRtLmOutput.modelText(text.toString())
-                    }.ifBlank { error("Local image analysis returned an empty result.") }
+                    LocalLiteRtLmOutput.visionDescription(text.toString(), request.languageCode)
+                        .ifBlank { error("Local image analysis returned an empty result.") }
                 }
                 val elapsedMs = System.currentTimeMillis() - started
                 Log.i(

@@ -533,4 +533,14 @@ object InkuStringsEn : InkuStrings {
     override val stateCollapsed = "Collapsed"
     override val worksScrollbarDescription = "Works scrollbar"
     override val listSeparator = ", "
+    override val statusRendered: (String) -> String = { hash -> "Rendered F$hash" }
+    override val statusComposed: (String) -> String = { hash -> "Composed F$hash" }
+    override val promptEmpty = "The description is empty."
+    override val batchEmpty = "The batch is empty."
+    override val hashCopied = "Hash copied."
+    override val exportPreparing: (String) -> String = { format -> "Preparing $format…" }
+    override val exportDone: (String, String) -> String = { format, hash -> "$format exported F$hash" }
+    override val exportFailed: (String) -> String = { format -> "$format export failed." }
+    override val copy = "Copy"
+    override val providerLabel = "Provider"
 }

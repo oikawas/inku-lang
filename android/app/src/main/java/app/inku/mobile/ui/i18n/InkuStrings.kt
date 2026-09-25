@@ -444,6 +444,18 @@ interface InkuStrings {
     val worksScrollbarDescription: String
     /** Between the names of a list written into a sentence (「・」 / ", "). */
     val listSeparator: String
+    /** After a drawing is saved; the argument is the short render hash. */
+    val statusRendered: (String) -> String
+    val statusComposed: (String) -> String
+    val promptEmpty: String
+    val batchEmpty: String
+    val hashCopied: String
+    /** Export progress and outcome; the first argument is the format (DDL, SVG, PNG). */
+    val exportPreparing: (String) -> String
+    val exportDone: (String, String) -> String
+    val exportFailed: (String) -> String
+    val copy: String
+    val providerLabel: String
 }
 
 /**

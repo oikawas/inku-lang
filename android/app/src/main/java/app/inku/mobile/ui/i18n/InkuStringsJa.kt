@@ -501,4 +501,14 @@ object InkuStringsJa : InkuStrings {
     override val stateCollapsed = "折りたたみ中"
     override val worksScrollbarDescription = "作品のスクロールバー"
     override val listSeparator = "・"
+    override val statusRendered: (String) -> String = { hash -> "描画しました（F$hash）" }
+    override val statusComposed: (String) -> String = { hash -> "解釈から描画しました（F$hash）" }
+    override val promptEmpty = "記述が空です。"
+    override val batchEmpty = "バッチが空です。"
+    override val hashCopied = "ハッシュをコピーしました。"
+    override val exportPreparing: (String) -> String = { format -> "$format を準備しています…" }
+    override val exportDone: (String, String) -> String = { format, hash -> "$format を書き出しました（F$hash）" }
+    override val exportFailed: (String) -> String = { format -> "$format の書き出しに失敗しました。" }
+    override val copy = "コピー"
+    override val providerLabel = "接続先"
 }

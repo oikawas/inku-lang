@@ -631,7 +631,7 @@ class InkuViewModel @JvmOverloads constructor(
                         descriptionForkRequested = false,
                         lineageDetached = false,
                         isDrawing = false,
-                        message = "Rendered ${item.renderHashShort}",
+                        message = strings().statusRendered(item.renderHashShort),
                     )
                 }
             }.onFailure { error ->
@@ -2175,7 +2175,7 @@ class InkuViewModel @JvmOverloads constructor(
     private fun runSubmit(current: InkuUiState, cameraProvenance: CameraInputProvenance? = null, sketchRedraw: Boolean = false, suppliedSketchText: String? = null) {
         if (current.descriptionLocked && !current.historyAuthorityLoading) return
         if (current.prompt.isBlank()) {
-            localState.value = current.copy(message = "Prompt is empty.")
+            localState.value = current.copy(message = strings().promptEmpty)
             return
         }
         if (current.refinementBusy) {
@@ -2284,7 +2284,7 @@ class InkuViewModel @JvmOverloads constructor(
                         lineageDetached = false,
                         cameraCaptureState = if (cameraProvenance != null) CameraCaptureState.Idle else latest.cameraCaptureState,
                         isDrawing = false,
-                        message = "Rendered ${item.renderHashShort}",
+                        message = strings().statusRendered(item.renderHashShort),
                     )
                 }
                 if (sketchRedraw) refreshLineage()
@@ -2339,7 +2339,7 @@ class InkuViewModel @JvmOverloads constructor(
                         importedPlugins = emptyList(),
                         importedPluginNames = emptyList(),
                         isDrawing = false,
-                        message = "Composed ${item.renderHashShort}",
+                        message = strings().statusComposed(item.renderHashShort),
                     )
                 }
                 if (returnToLineage) refreshLineage()
@@ -2362,7 +2362,7 @@ class InkuViewModel @JvmOverloads constructor(
             .mapIndexed { index, line -> index + 1 to line.trim() }
             .filter { it.second.isNotBlank() }
         if (lines.isEmpty()) {
-            localState.value = current.copy(message = "Batch is empty.")
+            localState.value = current.copy(message = strings().batchEmpty)
             return
         }
         if (lines.size > MaxBatchItems) {
@@ -2387,7 +2387,7 @@ class InkuViewModel @JvmOverloads constructor(
                 batchActiveElapsedMs = null,
                 batchElapsedMs = 0L,
                 batchLatestHashShort = null,
-                message = "Batch running: 0/${lines.size}",
+                message = strings().batchRunning(0, lines.size),
             )
             lines.forEachIndexed { index, (lineNumber, prompt) ->
                 val itemStartedAt = System.currentTimeMillis()

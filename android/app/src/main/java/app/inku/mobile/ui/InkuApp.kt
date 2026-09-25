@@ -1253,7 +1253,7 @@ private fun WebStyleModelStageEditor(
     var providerMenuOpen by remember(title, selectedProviderId) { mutableStateOf(false) }
     Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
         SettingsSectionHeader(title.uppercase(), sub)
-        CompactLabel("Provider")
+        CompactLabel(S.providerLabel)
         Box(modifier = Modifier.fillMaxWidth()) {
             Surface(
                 modifier = Modifier.fillMaxWidth().clickable { providerMenuOpen = true },
@@ -1292,7 +1292,7 @@ private fun WebStyleModelStageEditor(
                 }
             }
         }
-        CompactLabel("Model")
+        CompactLabel(S.model)
         if (models.isEmpty()) {
             Text(S.noPublishedModelsLong, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         } else {
@@ -2292,6 +2292,9 @@ private fun CanvasHeroCard(
     val context = LocalContext.current
     val clipboard = LocalClipboardManager.current
     val scope = rememberCoroutineScope()
+    // Read here: the messages below are written from click handlers and
+    // coroutines, which cannot read the composition local themselves.
+    val strings = S
     val presentationPreferences = remember(context) {
         context.applicationContext.getSharedPreferences(PRESENTATION_PREFS_NAME, Context.MODE_PRIVATE)
     }
@@ -2373,7 +2376,7 @@ private fun CanvasHeroCard(
                                 contentLabel = "F${it.renderHashShort}",
                                 onContentClick = {
                                     clipboard.setText(AnnotatedString(it.renderHashShort))
-                                    canvasMessage = "Hash copied."
+                                    canvasMessage = strings.hashCopied
                                 },
                             )
                             Spacer(Modifier.weight(1f))
@@ -2577,29 +2580,29 @@ private fun CanvasHeroCard(
                 scope.launch {
                     canvasMessage = runCatching {
                         shareHistoryDdl(context, it, viewModel.ddlExportJson(it))
-                        "DDL exported F${it.renderHashShort}"
-                    }.getOrElse { error -> safeErrorMessage(error, "DDL export failed.") }
+                        strings.exportDone("DDL", it.renderHashShort)
+                    }.getOrElse { error -> safeErrorMessage(error, strings.exportFailed("DDL")) }
                 }
             },
             onExportSvg = { profile ->
                 exportSheetOpen = false
-                canvasMessage = "SVG export preparing..."
+                canvasMessage = strings.exportPreparing("SVG")
                 scope.launch {
                     canvasMessage = runCatching {
                         shareHistorySvg(context, it, profile, viewModel.exportSvg(it, profile))
-                        "SVG exported F${it.renderHashShort}"
-                    }.getOrElse { error -> safeErrorMessage(error, "SVG export failed.") }
+                        strings.exportDone("SVG", it.renderHashShort)
+                    }.getOrElse { error -> safeErrorMessage(error, strings.exportFailed("SVG")) }
                 }
             },
             onExportPng = { heightPx ->
                 exportSheetOpen = false
                 pngExporting = true
-                canvasMessage = "PNG export preparing..."
+                canvasMessage = strings.exportPreparing("PNG")
                 scope.launch {
                     canvasMessage = runCatching {
                         shareHistoryPng(context, it, heightPx)
-                        "PNG exported F${it.renderHashShort}"
-                    }.getOrElse { error -> safeErrorMessage(error, "PNG export failed.") }
+                        strings.exportDone("PNG", it.renderHashShort)
+                    }.getOrElse { error -> safeErrorMessage(error, strings.exportFailed("PNG")) }
                     pngExporting = false
                 }
             },
@@ -2611,7 +2614,7 @@ private fun CanvasHeroCard(
     if (!presentation && showControls && pngExporting) {
         Row(horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM), verticalAlignment = Alignment.CenterVertically) {
             CircularProgressIndicator(modifier = Modifier.size(Dimens.spaceL), strokeWidth = Dimens.spaceXs)
-            Text(canvasMessage ?: "PNG export preparing...", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelSmall)
+            Text(canvasMessage ?: strings.exportPreparing("PNG"), color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelSmall)
         }
     } else if (!presentation && showControls) {
         canvasMessage?.let { Text(it, color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelSmall) }
@@ -6113,7 +6116,7 @@ private fun CopyableRenderTextView(text: String, modifier: Modifier = Modifier) 
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(Dimens.spaceXs)) {
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
             MiniPill(
-                text = "Copy",
+                text = S.copy,
                 onClick = { clipboard.setText(AnnotatedString(text)) },
             )
         }

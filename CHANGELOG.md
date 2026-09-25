@@ -6,6 +6,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 36 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### v2.15.30 — shared authoring pipeline and current drawing tools (Build 1106, 2026-09-26)
+
+This release collects the dated changes below since v2.14.1. Server and Web use the shared Rust authoring pipeline; DDL Spec is 14, DDL engine is 48, and render engine is 68. It includes the current work-sharing and plugin tools and their documented API and CLI compatibility changes. The source also carries Android changes, but this release publishes only API and Web images, not an Android APK.
+
 ### 2026-09-26 — The grey label layer lines up with the description text again, and the Web unit tests follow the current UI
 
 Since 2026-09-22 the Describe and Batch editors use 14px text, but the layer beneath them that greys out what the drawing does not read stayed at 13px, so the grey drifted away from its characters. The layer is back to the editors' size, following the text-size setting. The Web unit tests that had not followed the same week's UI reorganization were updated to the current structure, each keeping the property it guards. The Japanese and English string tables import their helper by relative path, so the unit tests can load them directly.

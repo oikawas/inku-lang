@@ -48,10 +48,11 @@ class RoutingModelProvider(
         if (provider.providerId in setOf("openai", "nvidia") && apiKey.isNullOrBlank()) {
             inkuError { it.errorProviderApiKeyMissing(provider.displayName) }
         }
-        return if (provider.kind == "gemini") {
-            GeminiModelProvider(provider.providerId, baseUrl, apiKey)
-        } else {
-            OpenAiCompatibleProvider(provider.providerId, baseUrl, apiKey)
+        // One transport per connection kind, as the server's `_request` has.
+        return when (provider.kind) {
+            "gemini" -> GeminiModelProvider(provider.providerId, baseUrl, apiKey)
+            "anthropic" -> AnthropicModelProvider(provider.providerId, baseUrl, apiKey)
+            else -> OpenAiCompatibleProvider(provider.providerId, baseUrl, apiKey)
         }
     }
 

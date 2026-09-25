@@ -49,6 +49,13 @@ object InkuStringsJa : InkuStrings {
     override val pipelineNewDescriptionNotice = "次の描画は、新しい変奏として保存します。"
     override val pipelineCheckDdl = "DDLと描画の診断を確認してください。"
     override val pipelineDiagnostics = "描画の診断"
+    override fun pipelinePluginDiagnostic(reason: String, name: String, suggestion: String?) = when (reason) {
+        "plugin_disabled" -> "プラグイン $name は無効になっているため、この文は描かれていません。有効にすると描けます。"
+        "plugin_name_mismatch" -> "プラグイン $name は登録名と一致しないため、この文は描かれていません。" +
+            (suggestion?.let { "$it のことですか。" } ?: "")
+        "plugin_version_mismatch" -> "プラグイン $name の中身が作品の保存時と違うため、この文は描かれていません。"
+        else -> "プラグイン $name はこの環境に登録されていないため、この文は描かれていません。"
+    }
     override val pipelineOmissions: (Int) -> String = { count -> "省略した配置・関係: $count 件。ほかの部分は描画を続けます。" }
     override val pipelinePartialExecution: (Int, Int) -> String = { requested, executed ->
         "${requested}個の要求のうち、実行可能な${executed}個を描画しました。"
@@ -393,6 +400,14 @@ object InkuStringsJa : InkuStrings {
     override val cameraVisionModeDescription = "記述（推奨）"
     override val cameraVisionModeDdl = "DDL直接（上級）"
     override val cameraVisionModelTitle = "記述生成モデル"
+    override val bundledPluginsTitle = "同梱プラグイン"
+    override val ddlImportFile = "読込"
+    override val ddlImportInvalid = "DDLファイルを読めませんでした"
+    override fun ddlImportedPlugins(names: String) = "DDLと一緒にプラグイン定義を読み込みました（$names）。次の新しい作品だけに使います。"
+    override val ddlExportWithPlugins = "DDL（プラグイン定義付き）"
+    override val ddlExportWithPluginsNote = "DDLと、それが使うプラグインの定義。別の環境で読み込んでも同じ構図で描けます"
+    override val bundledPluginsSubtitle = "Nature.leaves。無効にすると新しい作品で使われず、その語の文は理由を示して描かれません。保存済みの作品は自分の定義で描き直せます。"
+    override fun bundledPluginsToggle(words: String) = "使う（$words）"
     override val cameraVisionModelSubtitle = "写真から記述（DDL直接ではDDL）を作るモデル。描画には描画設定のモデル・色カタログ・写生を使います。"
     override fun cameraVisionRemoteNotice(provider: String) = "このモデルを使うと、撮影・選択した写真を${provider}へ送信します。送るのは縮小して再圧縮した画像だけで、位置情報などの撮影情報は含みません。"
     override val cameraReadyToEdit = "編集できます"

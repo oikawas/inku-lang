@@ -18,6 +18,12 @@ data class PipelineLegacyMacro(
     val qualifiedName: String,
 )
 
+/** One definition carried by an `inku.ddl-export.v1` file, offered to a new work only. */
+data class ImportedPluginDefinition(
+    val definitionJson: String,
+    val summary: String,
+)
+
 data class SharedPipelineConfigRequest(
     val resolvedLanguage: String,
     val canvasFormatId: String,
@@ -30,6 +36,10 @@ data class SharedPipelineConfigRequest(
     val resourceLimits: PipelineResourceLimits = PipelineResourceLimits(),
     val canonicalMacros: List<PipelineCanonicalMacro> = emptyList(),
     val legacyMacros: List<PipelineLegacyMacro> = emptyList(),
+    /** False when the author disabled the bundled `Nature.leaves` package. */
+    val bundledPluginsEnabled: Boolean = true,
+    /** Definitions from an imported DDL export; they win their names for this work. */
+    val importedPlugins: List<ImportedPluginDefinition> = emptyList(),
 )
 
 data class PipelineResourceLimits(
@@ -306,14 +316,86 @@ class SharedPipelineConfigBuilder(
         }
     }
 
+    /**
+     * The macro catalog for a new work. Imported definitions go ahead of the
+     * installed ones and win their names, as the server's `_with_imported`
+     * does; a name this device lacks, or holds with other content, is reported.
+     */
     private fun resolveMacros(request: SharedPipelineConfigRequest): JSONObject {
+        if (request.importedPlugins.isEmpty()) return resolveMacroCatalog(request, imported = emptyList())
+        val base = resolveMacroCatalog(request, imported = emptyList())
+        val installedDigests = base.requiredArray("entries").objects()
+            .associate { it.requiredString("qualified_name") to it.requiredString("digest") }
+        val output = resolveMacroCatalog(request, request.importedPlugins)
+        val importedNames = output.requiredArray("entries").objects()
+            .filter { it.optString("source_id").startsWith(IMPORTED_SOURCE) }
+            .associate { it.requiredString("qualified_name") to it.requiredString("digest") }
+        val diagnostics = JSONArray()
+        output.requiredArray("diagnostics").objects().forEach { item ->
+            val shadowed = item.optString("reason") == "duplicate_qualified_name" &&
+                item.optString("qualified_name") in importedNames &&
+                !item.optString("source_id").startsWith(IMPORTED_SOURCE)
+            if (!shadowed) diagnostics.put(item)
+        }
+        importedNames.toSortedMap().forEach { (name, digest) ->
+            val reason = when (installedDigests[name]) {
+                null -> "imported_plugin_not_installed"
+                digest -> return@forEach
+                else -> "imported_plugin_differs_from_installed"
+            }
+            diagnostics.put(
+                JSONObject()
+                    .put("source_id", "imported")
+                    .put("qualified_name", name)
+                    .put("disposition", "used")
+                    .put("reason", reason)
+                    .put("warnings", JSONArray())
+                    .put("findings", JSONArray()),
+            )
+        }
+        return output.put("diagnostics", diagnostics)
+    }
+
+    /** Every name of the bundled package, including aliases, whatever its enabled state. */
+    fun bundledPluginNames(language: String): List<String> = pluginVisibleNames(bundledPluginDefinitions(language))
+
+    /** The bundled package's definitions, resolved as if it were enabled. */
+    fun bundledPluginDefinitions(language: String): JSONArray {
+        val output = resolveMacroCatalog(
+            SharedPipelineConfigRequest(
+                resolvedLanguage = language,
+                canvasFormatId = "square",
+                catalogSelectionId = "default",
+            ),
+            imported = emptyList(),
+        )
+        return JSONArray().also { definitions ->
+            output.requiredArray("entries").objects().forEach { definitions.put(it.requiredObject("definition")) }
+        }
+    }
+
+    private fun resolveMacroCatalog(
+        request: SharedPipelineConfigRequest,
+        imported: List<ImportedPluginDefinition>,
+    ): JSONObject {
         val input = JSONObject()
             .put("maximum_entries", 64)
-            .put("bundled_packages", JSONArray().put("Nature.leaves"))
+            .put(
+                "bundled_packages",
+                if (request.bundledPluginsEnabled) JSONArray().put(BUNDLED_PLUGIN_PACKAGE) else JSONArray(),
+            )
             .put("language", request.resolvedLanguage)
             .put(
                 "canonical",
                 JSONArray().also { output ->
+                    imported.forEachIndexed { index, candidate ->
+                        output.put(
+                            JSONObject()
+                                .put("source_id", "$IMPORTED_SOURCE$index")
+                                .put("definition_json", candidate.definitionJson)
+                                .put("summary", candidate.summary),
+                        )
+                    }
                     request.canonicalMacros.forEach { candidate ->
                         output.put(
                             JSONObject()
@@ -427,6 +509,7 @@ class SharedPipelineConfigBuilder(
         const val BINDING_VERSION = "1.1.0"
         const val PROTOCOL_VERSION = "1.0.0"
         const val MACRO_CATALOG_SCHEMA = "inku.macro-catalog-resolution.v1"
+        const val IMPORTED_SOURCE = "imported:"
         const val PIXEL9_HOST_ONLY_FORMAT = "pixel9_landscape_safe"
         const val CANVAS_BASE_PX = 1000.0
     }

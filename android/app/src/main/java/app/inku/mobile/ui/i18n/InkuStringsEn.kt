@@ -55,6 +55,13 @@ object InkuStringsEn : InkuStrings {
     override val pipelineNewDescriptionNotice = "The next drawing will be saved as a new variation."
     override val pipelineCheckDdl = "Check the DDL and drawing diagnostics."
     override val pipelineDiagnostics = "Drawing diagnostics"
+    override fun pipelinePluginDiagnostic(reason: String, name: String, suggestion: String?) = when (reason) {
+        "plugin_disabled" -> "The plugin $name is disabled, so this sentence was not drawn. Enable it to draw it."
+        "plugin_name_mismatch" -> "$name does not match an installed plugin, so this sentence was not drawn." +
+            (suggestion?.let { " Did you mean $it?" } ?: "")
+        "plugin_version_mismatch" -> "The plugin $name differs from the one this work was saved with, so this sentence was not drawn."
+        else -> "The plugin $name is not installed here, so this sentence was not drawn."
+    }
     override val pipelineOmissions: (Int) -> String = { count -> "Omitted placements or relations: $count. The other parts continue drawing." }
     override val pipelinePartialExecution: (Int, Int) -> String = { requested, executed ->
         "Drew $executed of the $requested requested."
@@ -423,6 +430,14 @@ object InkuStringsEn : InkuStrings {
     override val cameraVisionModeDescription = "Description (recommended)"
     override val cameraVisionModeDdl = "Direct DDL (advanced)"
     override val cameraVisionModelTitle = "Description model"
+    override val bundledPluginsTitle = "Bundled plugins"
+    override val ddlImportFile = "Open"
+    override val ddlImportInvalid = "The DDL file could not be read"
+    override fun ddlImportedPlugins(names: String) = "Read plugin definitions with the DDL ($names). They are used by the next new work only."
+    override val ddlExportWithPlugins = "DDL (with plugin definitions)"
+    override val ddlExportWithPluginsNote = "The DDL and the plugin definitions it uses; another setup that reads it draws the same composition"
+    override val bundledPluginsSubtitle = "Nature.leaves. When disabled, new works do not use it, and sentences naming its words are not drawn, with the reason shown. Saved works redraw with their own definitions."
+    override fun bundledPluginsToggle(words: String) = "Use ($words)"
     override val cameraVisionModelSubtitle = "The model that turns a photo into a description (DDL in Direct DDL). Drawing uses the models, color catalog, and sketch setting from your drawing settings."
     override fun cameraVisionRemoteNotice(provider: String) = "With this model, the photo you take or choose is sent to $provider. Only a downsized, re-encoded image is sent, without location or other capture data."
     override val cameraReadyToEdit = "Ready to edit"

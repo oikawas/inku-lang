@@ -30,6 +30,18 @@ runtime fallbackを持たない。保存済みSVG、Room schema、Score schema�
 - Android 仕様を更新するときは、先に `ANDROID_SPEC.ja.md` を更新し、その後で `ANDROID_SPEC.md` を同期する。
 - 英語版だけに存在する仕様・要件を追加してはならない。
 
+## 2026-09-25 現行のプラグイン（draw-system04）
+
+作品計画の任意`plugins`、Stage 1の登録プラグイン節、正式名と別名（DDL Spec 14、同梱`Nature.leaves` 2.0.0）の照合は、同梱した共有Rust coreがそのまま行う。lockの任意`aliases`はRoomへそのまま運ぶ。
+
+同梱パッケージ`Nature.leaves`の有効・無効は、設定「その他」の「同梱プラグイン」で切り替える（Serverの文書単位と同じ粒度）。値は`plugin_settings`のキー`bundled:Nature.leaves:enabled`に`{"enabled":bool}`で保存し、欠落・壊れた値は有効とする。無効なら新しい作品のcatalog解決の`bundled_packages`から外す。保存済み作品は自分のconfigの定義で描き直す。語の名前は、日本語表示では別名（若葉など）、英語表示では正式名で示し、どちらも共有coreの定義から取る。
+
+作品を保存するとき、上流診断が1件以上あれば共有`explain_plugin_diagnostics`（JNI`NativePipelineBridge.explainPluginDiagnostics`）を呼び、結果を`pipeline_diagnostics.plugin_diagnostics`（配列）に保存する。`enabled`は作品configの定義の正式名と別名、および有効な同梱パッケージの名前、`disabled`は無効な同梱パッケージの名前である。保存時の検査は、必須チャンネルの完全一致に加え、任意チャンネル`plugin_diagnostics`を配列として受け付け、この項目の無い保存済みの行も読む。描画の診断は、同じ範囲の上流診断の代わりに、Webの`pipelinePluginDiagnostic`と同じ文言で理由（未登録・無効・名前の不一致と候補・版の不一致）を示す。
+
+DDLの書き出しは、保存作品の書き出しシートの「DDL（プラグイン定義付き）」で、`inku.ddl-export.v1`（DDLと、それが正式名または別名で書く定義だけ、`exported_from`はbuildとrender engine）を`inku-<id>-<日時>.inku-ddl.json`として共有する。DDL編集の「読込」で書き出しファイルを読むと、DDLを編集欄へ入れ、定義を次の新しい作品のcatalog解決だけに先頭の候補として渡す（登録しない、既存作品の編集には渡さない）。登録済みに無い名前は`imported_plugin_not_installed`、中身が違う名前は`imported_plugin_differs_from_installed`のcatalog診断を付ける。書き出し形式でないファイルはそのままDDLとして読む。描画のseedとキャンバスは書き出しに含まれないため、読み込んだ作品は同じ構図（Scoreが同じ）で描かれる。制作画面のDDL欄は、読み取り専用のテキスト欄がタップを取り、DDL編集を開けなかったため、欄全体でタップを受けるよう直した。
+
+DDL SpecとDDL engineの版はServerの`layer_versions.py`が名乗り、Androidは版の定数を持たない。
+
 ## 2026-09-25 現行のカメラ撮影・記述生成・描画
 
 下部「カメラ」はアプリ内カメラ（CameraX、背面カメラのプレビューとシャッター）を開き、撮影した写真を`cacheDir/camera/`のアプリ専用一時ファイルへ直接書く。標準カメラアプリの起動と確認画面は通らない。初回は`CAMERA`権限を求め、拒否された場合やCameraXを開始できない場合は、従来の標準カメラ（`ActivityResultContracts.TakePicture`）へ切り替える。Photo Pickerの入口と、元写真の保持・削除の契約は変えない。

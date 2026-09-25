@@ -212,7 +212,7 @@ Canvasのcanonical ownerはshared coreの`inku.canvas-format-registry.v1`であ�
 
 語彙pluginはコア語彙の組み合わせに名前を付けるdata-only macroである。Visible invocationは`Nature.雨`のような`Namespace.Heading`とし、definition version / canonical digest、document / compiler identity、source / generated provenanceはsidecar lockへ保存する。作者へDDL metadataとして書かせない。
 
-全domainは一つのversioned `inku.macro-definition.v1`を使う。Tree / human / water等のdomain固有grammar、plugin別parser、plugin codeは作らない。Compilerはvisible invocationをlock解決し、closed typed parameterをbindingした後、attested composition seedとcaller-owned finite boundsでLLMなしにsemantic nodeへlate expansionし、通常のtyped loweringへ合流させる。Rendererはpluginを理解せず、後続の通常Scoreだけを受け取る。Description pathでStage 1へ渡せるのはbounded signature、parameter schema、short summaryだけであり、MacroDefinition本文やexpanded DDLをStage 1 / Stage 2 promptへ渡さない。Direct DDLのunknown / ambiguous qualified termをhidden LLM fallbackで補わず、明示errorにする。
+全domainは一つのversioned `inku.macro-definition.v1`を使う。Tree / human / water等のdomain固有grammar、plugin別parser、plugin codeは作らない。Compilerはvisible invocationをlock解決し、closed typed parameterをbindingした後、attested composition seedとcaller-owned finite boundsでLLMなしにsemantic nodeへlate expansionし、通常のtyped loweringへ合流させる。Rendererはpluginを理解せず、後続の通常Scoreだけを受け取る。Description pathでStage 1へ渡せるのはbounded signature、parameter schema、short summaryだけであり、MacroDefinition本文やexpanded DDLをStage 1 / Stage 2 promptへ渡さない。Direct DDLのunknown / ambiguous qualified termをhidden LLM fallbackで補わない。その文だけを省略して描き切り、理由を作者に示す（§4.12）。
 
 同じ対象と明示指示へ一意に解決されたinlineとcontinuationは、文章の分割や照応の表面形から独立した同じcanonical meaningを持つ。したがって同じdrawing condition、policy / definition identity、attested seed、明示変奏なら、surface syntaxだけでmacro seed、focus、effective meaningを変えない。unknown、ambiguity、conflictを等価と推測せず、関係・順序・数量・属性・action・parameter、または真正の複数macro invocationを消さない。この規則は一般の文順交換やgraph isomorphismを保証しない。
 
@@ -333,6 +333,12 @@ Water.さざ波
 **原則を緩める場合も、Emacs 化を避けるための明確な線引きを維持する**。自由度を増やすときは、その自由度が失わせるものを明示し、別のschema / versionと互換性境界を作者裁定してから判断する。
 
 ---
+
+### 4.12 未登録のプラグインとDDLの書き出し
+
+描いた環境でプラグイン名が解決できない文は、その文だけを省略して残りを描き切る。作品全体を止めず、原文のDDLからその文を消さず、LLMに別の語で書き直させない。共有Rust（pipeline binding `explain_plugin_diagnostics`）が、compilerの解決診断と、hostの有効・無効化中のプラグイン名、作品自身の定義から、文ごとに理由を一つ返す: `plugin_not_installed`（その名前が無い）、`plugin_disabled`（導入済みだが無効）、`plugin_name_mismatch`（登録名と一致しない。同じ見出しの別名前空間、大文字小文字の違い、2文字以内の違いの登録名を候補として一つ示す）、`plugin_version_mismatch`（同じ名前で定義の中身が違う）。Hostは作品の診断に保存し、同じ範囲の汎用診断の代わりに表示する。
+
+保存済み作品は使った定義の実物を持つので、プラグインを外しても再演は変わらない。環境をまたいでDDLを持ち運ぶために、作品を`inku.ddl-export.v1`（可視DDL、言語、DDLが名前を書く定義とその要約）として書き出せる。読み込んだ定義は新しい作品だけで使い、登録済みの同名定義より優先する。導入はしない。登録済みと中身が違う、または未登録のときは、どちらを使ったかをcatalog診断（`imported_plugin_differs_from_installed`／`imported_plugin_not_installed`）で知らせる。定義はdata-onlyで、読み込み時も共有Rustの検証境界を通る。
 
 ## 5. 三層パイプライン
 
@@ -957,7 +963,7 @@ Stage 1は記述から可視DDLを作り、Stage 2はcompilerが報告したknow
 
 Stage 1 は自由記述を、書き手が観察・編集できる正規化 DDL へ有限に写す。原文の明示要素・数量・色・素材・関係を保ち、隠れた視覚要素や「美しい」解釈を追加しない。語彙、閉じた schema、制限値、出典をプロンプト lock として渡し、出力はその lock の内側だけを使う。これは I-640 で同期した有限 typed normalization 契約であり、特定のモデル名やモデル階級を正本にしない。
 
-**作品計画（Stage 1 prompt `inku.typed-stage1-work-plan-prompt.v1`）**：初回生成のLLMは可視DDLの文字列を書かず、閉じた型の作品計画JSONを返す。作品計画は単独図形命令の層（最大8）と地・背景からなり、各値は歳時記asset、parserの有限修飾語形、揺らぎの分類、Scoreの濃淡値から投影したenumである。形（と比率語）ごとに使える値は、compilerへ一文ずつ問い合わせて生成した受理行列`inku.work-plan-capabilities.v1`が定め、共有Rustの検証が正本になる（providerのdecoding強制には依存しない）。範囲外の値はfield単位で未指定、形の無い層はその層だけを除き、描画を止めない。正規化した計画は要求言語の可視DDLへ決定的に印字され、その文字列だけが既存compilerへ渡る。受理行列と日英の性質試験により印字DDLは全層が診断なしでcompileされるので、初回生成の句が捨てられることはない。応答schemaはobject・array・string enum・有界integerだけを使い、既存の全provider輸送がそのまま運ぶ。保存済み実行の再生のため、`normalized_ddl`を持つ旧応答はそのまま読む。作品計画は一時物で、正本は可視DDLとScoreである。作者の直接DDLと編集DDLは従来どおり全文法で解析し、計画型の部分集合に制限しない。本版の作品計画はMacro呼出しを含まない（コア語彙が主で、Macroは付加機能）。
+**作品計画（Stage 1 prompt `inku.typed-stage1-work-plan-prompt.v1`）**：初回生成のLLMは可視DDLの文字列を書かず、閉じた型の作品計画JSONを返す。作品計画は単独図形命令の層（最大8）と地・背景からなり、各値は歳時記asset、parserの有限修飾語形、揺らぎの分類、Scoreの濃淡値から投影したenumである。形（と比率語）ごとに使える値は、compilerへ一文ずつ問い合わせて生成した受理行列`inku.work-plan-capabilities.v1`が定め、共有Rustの検証が正本になる（providerのdecoding強制には依存しない）。範囲外の値はfield単位で未指定、形の無い層はその層だけを除き、描画を止めない。正規化した計画は要求言語の可視DDLへ決定的に印字され、その文字列だけが既存compilerへ渡る。受理行列と日英の性質試験により印字DDLは全層が診断なしでcompileされるので、初回生成の句が捨てられることはない。応答schemaはobject・array・string enum・有界integerだけを使い、既存の全provider輸送がそのまま運ぶ。保存済み実行の再生のため、`normalized_ddl`を持つ旧応答はそのまま読む。作品計画は一時物で、正本は可視DDLとScoreである。作者の直接DDLと編集DDLは従来どおり全文法で解析し、計画型の部分集合に制限しない。登録プラグインがあるとき、作品計画は任意の`plugins`（その要求で登録済みの修飾名だけの閉じた列挙、最大4）を持てる。Stage 1のsystem promptは登録プラグインの名前と要約を示し、記述にプラグイン名の見出しの語かその言い換えが書かれたときだけ選び、季節・場所・似た物からの連想では選ばない規則を与える。選んだプラグインは名前だけの文（`Nature.若葉。`）として背景の後・層の前に印字する（引数を持たない定義で診断の出ない形）。登録が無い環境では`plugins`もその節も出さず、schemaとpromptは従来と同じになる。コア語彙が主で、Macroは付加機能である。
 
 初回の解釈では、記述全体の役割、対比、反復、疎密、余白、質感を短い視覚的構成へまとめる。短さを、必要な複数の役割を中央の一要素へ縮めることや、各名詞を一図形へ対応させることと混同しない。明示数量を最優先し、数量が明示されていない反復は文脈から数量を選んで可視DDLへ記す。単語と数量帯の対応表、決め打ちの最低数、一律の増量は使わず、数や文の多さ自体を品質目標にしない。
 

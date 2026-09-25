@@ -182,8 +182,18 @@ deterministic, and its output rejoins ordinary typed lowering.
 
 For a Description request, Stage 1 may receive only a bounded signature,
 parameter schema, and short summary. It never receives the definition body or
-expanded DDL. Direct DDL with an unknown or ambiguous qualified term fails
-explicitly; it does not trigger a hidden LLM fallback.
+expanded DDL. The work plan chooses a plugin, as a bare-name sentence, only when
+the description writes the heading word of its name or a paraphrase of the same
+thing; write the summary so an LLM can tell what the plugin draws. Direct DDL
+with an unknown or ambiguous qualified term never triggers a hidden LLM
+fallback: that sentence alone is omitted, the rest is drawn, and the author is
+told whether the plugin is not installed, disabled, misnamed, or a different
+edition ([SPEC §4.12](SPEC.md#412-unresolved-plugins-and-ddl-export)).
+
+A saved work keeps the exact definitions it used. To carry DDL to another
+environment, export the work as `inku.ddl-export.v1` (the DDL and the
+definitions it names) and load it as new DDL there. Loaded definitions serve
+that work only and are never installed.
 
 ## Exact Numeric Parameters and Delivery
 

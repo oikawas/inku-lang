@@ -64,8 +64,16 @@ composition seedとcaller所有の有限上限を使う。副作用がなく決�
 通常のtyped loweringへ合流する。
 
 Description requestでは、Stage 1が受け取れるのは上限付きsignature、parameter schema、
-短いsummaryだけである。定義bodyや展開済みDDLは決して受け取らない。未知または曖昧な
-修飾語を含むdirect DDLは明示的に失敗し、隠れたLLM fallbackを発動しない。
+短いsummaryだけである。定義bodyや展開済みDDLは決して受け取らない。作品計画は、記述に
+プラグイン名の見出しの語かその言い換えが書かれたときだけ、そのプラグインを名前だけの文
+として選ぶ。summaryは、そのプラグインが何を描くかをLLMが判断できるように書く。
+未知または曖昧な修飾語を含むdirect DDLは、隠れたLLM fallbackを発動しない。その文だけを
+省略して残りを描き、未登録／無効化中／名前の誤り／版違いのどれかを作者に示す
+（[SPEC §4.12](SPEC.ja.md#412-未登録のプラグインとddlの書き出し)）。
+
+保存済み作品は使った定義の実物を持つ。別の環境へDDLを持ち運ぶときは、作品を
+`inku.ddl-export.v1`（DDLと、DDLが名前を書く定義）として書き出し、新規DDLとして読み込む。
+読み込んだ定義はその作品だけで使い、導入はしない。
 
 ## Geometryと個数の境界
 

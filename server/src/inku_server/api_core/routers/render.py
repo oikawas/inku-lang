@@ -6,11 +6,11 @@ import itertools
 import json
 import logging
 import secrets
-from collections.abc import AsyncIterator, Iterator
+from collections.abc import AsyncIterator, Callable, Iterator
 from typing import Literal
 
 import anyio
-from fastapi import APIRouter, Depends, Header, HTTPException, Response
+from fastapi import APIRouter, Depends, Header, HTTPException, Request, Response
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field, field_validator
 
@@ -561,26 +561,32 @@ def api_render_svg(req: RenderSvgRequest, actor: dict = Depends(_current_user)) 
     )
 
 
+def _reader_left(request: Request) -> Callable[[], bool]:
+    """Whether the client of a sync route has gone, asked from its worker thread."""
+    return lambda: anyio.from_thread.run(request.is_disconnected)
+
+
 @router.post("/api/compose", response_model=ComposeResponse, response_model_exclude_none=True)
-def api_compose(req: ComposeRequest, actor: dict = Depends(_current_user)) -> dict:
+def api_compose(req: ComposeRequest, request: Request, actor: dict = Depends(_current_user)) -> dict:
     """Run the old Stage-2 URL through the shared authority pipeline."""
-    return _pipeline_compat.compose(actor["id"], req.model_dump(mode="json"))
+    return _pipeline_compat.compose(actor["id"], req.model_dump(mode="json"), _reader_left(request))
 
 
 @router.post("/api/interpret")
-def api_interpret(req: InterpretRequest, actor: dict = Depends(_current_user)) -> dict:
+def api_interpret(req: InterpretRequest, request: Request, actor: dict = Depends(_current_user)) -> dict:
     """Project the shared pipeline's committed document for old callers."""
-    return _pipeline_compat.interpret(actor["id"], req.model_dump(mode="json"))
+    return _pipeline_compat.interpret(actor["id"], req.model_dump(mode="json"), _reader_left(request))
 
 
 @router.post("/api/paint", response_model=PaintResponse, response_model_exclude_none=True)
 def api_paint(
     req: PaintRequest,
+    request: Request,
     idempotency_key: str | None = Header(default=None, alias="Idempotency-Key", max_length=200),
     actor: dict = Depends(_current_user),
 ) -> dict:
     return _pipeline_compat.paint(
-        actor["id"], req.model_dump(mode="json"), idempotency_key
+        actor["id"], req.model_dump(mode="json"), idempotency_key, _reader_left(request)
     )
 
 

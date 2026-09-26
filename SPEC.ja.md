@@ -1065,7 +1065,7 @@ Shared compiler consumerでは、StopとOmitAndContinueはLLM fallbackではな�
 
 ### 12.10 レイテンシ対策
 
-`POST /api/paint/stream` は `sketch`（写生層が動いた場合）、`stage1`、`score`、`done` の順に有限な進行を知らせる。modelの呼出しの試行が始まるたびと、最後の試行が終わったときには`attempt`も送る。その`provider_attempt`は`action`・`attempt`・`max_attempts`を持ち、終わりはnullとする。何も落ち着かない間も、10秒ごとに経過時間だけの`wait`を送る。中継が無通信の本文を打ち切らないように（Webの中継のNodeは300秒で打ち切る）、また読み手が去ったことを知るためである。読み手が去った（停止した、ページを閉じた）実行は取り消す。`stage1` は正規化 DDL と診断 metadata を先に表示でき、`done` は通常応答を返す。保存済み作品の「別の構図」と「DDL から描画」は保存済み DDL から再開し、Stage 1 を呼び直さない。独立した Stage 1 キャッシュや将来の並列化を現行契約には含めない。
+`POST /api/paint/stream` は `sketch`（写生層が動いた場合）、`stage1`、`score`、`done` の順に有限な進行を知らせる。modelの呼出しの試行が始まるたびと、最後の試行が終わったときには`attempt`も送る。その`provider_attempt`は`action`・`attempt`・`max_attempts`を持ち、終わりはnullとする。何も落ち着かない間も、10秒ごとに経過時間だけの`wait`を送る。中継が無通信の本文を打ち切らないように（Webの中継のNodeは300秒で打ち切る）、また読み手が去ったことを知るためである。読み手が去った（停止した、ページを閉じた）実行は取り消す。流れを使わない`/api/paint`・`/api/interpret`・`/api/compose`も、待つ間に1秒ごとに読み手が残っているかを確かめ、去っていれば実行を取り消す（応答は499）。Webの中継は、ブラウザの接続が閉じたらAPIへの要求を中断する。`stage1` は正規化 DDL と診断 metadata を先に表示でき、`done` は通常応答を返す。保存済み作品の「別の構図」と「DDL から描画」は保存済み DDL から再開し、Stage 1 を呼び直さない。独立した Stage 1 キャッシュや将来の並列化を現行契約には含めない。
 
 ### 12.11 中間フィルタ（Stage 1.5）
 

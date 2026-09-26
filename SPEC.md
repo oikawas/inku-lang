@@ -1724,6 +1724,10 @@ at the end. While nothing settles it still sends `wait`, with the elapsed time
 only, every 10 seconds: a proxy drops a silent body (the Web's Node proxy after
 300 seconds), and a reader's leaving is noticed only when a line is written.
 The run of a reader that has left (a stop, a closed page) is cancelled.
+The plain `/api/paint`, `/api/interpret`, and `/api/compose` ask every second
+while they wait whether their reader is still there, and cancel the run of one
+that has gone (answering 499). The Web's proxy aborts its API request once the
+browser's connection closes.
 `stage1` can expose normalized DDL and diagnostic metadata before drawing
 completes; `done` carries the normal response. "Another composition" and "Paint
 from DDL" resume from saved DDL without calling Stage 1 again. A separate Stage

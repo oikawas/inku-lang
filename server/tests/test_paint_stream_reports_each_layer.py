@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 from types import SimpleNamespace
 
+import pytest
 from fastapi import FastAPI, HTTPException
 from fastapi.testclient import TestClient
 
@@ -145,6 +146,27 @@ def test_a_long_wait_still_writes_lines(monkeypatch) -> None:
     ])
     response = _client(monkeypatch, service).post("/api/paint/stream", json={"description": "円"})
     assert [event["event"] for event in _events(response)] == ["wait", "wait", "stage1", "score", "done"]
+
+
+def test_a_plain_request_whose_caller_left_cancels_its_run(monkeypatch) -> None:
+    # The model comparison's stop, or an interrupted CLI, left the run going
+    # through every retry.
+    monkeypatch.setattr(pipeline_compat, "_READER_CHECK_SECONDS", 0)
+    service = _Service([_running(1), _running(1)])
+    monkeypatch.setattr(pipeline_compat, "_service", lambda: service)
+    with pytest.raises(HTTPException) as refused:
+        pipeline_compat.interpret("author-1", {"description": "円"}, reader_left=lambda: True)
+    assert refused.value.status_code == 499
+    assert service.commands == [{"tag": "cancel"}]
+
+
+def test_a_plain_request_asks_after_its_caller_through_the_route(monkeypatch) -> None:
+    monkeypatch.setattr(pipeline_compat, "_READER_CHECK_SECONDS", 0)
+    service = _Service([_view(busy=True), _view(busy=False, document=DDL)])
+    response = _client(monkeypatch, service).post("/api/interpret", json={"description": "円"})
+    assert response.status_code == 200
+    assert response.json()["ddl"] == DDL
+    assert service.commands == []
 
 
 def test_a_refusal_before_any_layer_keeps_its_http_status(monkeypatch) -> None:

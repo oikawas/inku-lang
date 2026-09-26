@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 import time
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from typing import Any
 
 from fastapi import HTTPException
@@ -21,6 +21,8 @@ _POLL_SECONDS = 0.025
 # Stage 1 attempt may take; and a reader that has left is noticed only when a
 # line is written, so this also bounds how long its run goes on.
 _WAIT_EVENT_SECONDS = 10.0
+# How often a plain request's wait asks whether its caller is still there.
+_READER_CHECK_SECONDS = 1.0
 
 
 def _service():
@@ -31,10 +33,21 @@ def _service():
     return get_service()
 
 
-def _wait(owner: str, view: dict) -> dict:
+def _wait(owner: str, view: dict, reader_left: Callable[[], bool] | None = None) -> dict:
+    """Wait until the run needs no host work; `reader_left` says whether the caller has gone.
+
+    A caller that stopped (the model comparison's stop, a CLI interrupted) used
+    to leave the run going through every model retry.
+    """
     service = _service()
+    checked = time.monotonic()
     while view.get("busy"):
         time.sleep(_POLL_SECONDS)
+        if reader_left is not None and time.monotonic() - checked >= _READER_CHECK_SECONDS:
+            checked = time.monotonic()
+            if reader_left():
+                _end_abandoned_run(owner, view)
+                raise HTTPException(499, "client closed request")
         view = service.get(owner, view["variation_id"])
     return view
 
@@ -59,8 +72,8 @@ def _interaction(view: dict) -> HTTPException:
     )
 
 
-def _settled(owner: str, view: dict, *, perform: bool) -> dict:
-    view = _wait(owner, view)
+def _settled(owner: str, view: dict, *, perform: bool, reader_left: Callable[[], bool] | None = None) -> dict:
+    view = _wait(owner, view, reader_left)
     if (view.get("phase") or {}).get("tag") == "awaiting_patch_approval":
         raise _interaction(view)
     if not perform:
@@ -70,7 +83,7 @@ def _settled(owner: str, view: dict, *, perform: bool) -> dict:
     if view.get("delivery") is None:
         raise _interaction(view)
     if view.get("result") is None:
-        view = _wait(owner, _service().command(owner, view["execution_id"], {"tag": "perform"}))
+        view = _wait(owner, _service().command(owner, view["execution_id"], {"tag": "perform"}), reader_left)
     if view.get("result") is None:
         raise _interaction(view)
     return view
@@ -176,7 +189,7 @@ def _history_replay(owner: str, key: str, data: dict[str, Any]) -> dict | None:
     }
 
 
-def interpret(owner: str, data: dict[str, Any]) -> dict:
+def interpret(owner: str, data: dict[str, Any], reader_left: Callable[[], bool] | None = None) -> dict:
     options = _options(data, save_history=False)
     if data.get("model") is not None:
         options["stage1_model"] = data["model"]
@@ -185,6 +198,7 @@ def interpret(owner: str, data: dict[str, Any]) -> dict:
         owner,
         _service().start(owner, "description", data["description"], options=options),
         perform=False,
+        reader_left=reader_left,
     )
     context = _service().execution(owner, view["execution_id"]).context
     host_options = context.get("host_options", {})
@@ -203,7 +217,7 @@ def interpret(owner: str, data: dict[str, Any]) -> dict:
     }
 
 
-def compose(owner: str, data: dict[str, Any]) -> dict:
+def compose(owner: str, data: dict[str, Any], reader_left: Callable[[], bool] | None = None) -> dict:
     options = _options(data, save_history=False)
     # The old compose endpoint produced a candidate and never counted it as a
     # completed author drawing. Performance is needed for its SVG projection,
@@ -222,6 +236,7 @@ def compose(owner: str, data: dict[str, Any]) -> dict:
             options=options,
         ),
         perform=True,
+        reader_left=reader_left,
     )
     return {**view["result"], **_identity(view)}
 
@@ -239,12 +254,15 @@ def _start_paint(owner: str, data: dict[str, Any], idempotency_key: str | None) 
     )
 
 
-def paint(owner: str, data: dict[str, Any], idempotency_key: str | None) -> dict:
+def paint(
+    owner: str, data: dict[str, Any], idempotency_key: str | None,
+    reader_left: Callable[[], bool] | None = None,
+) -> dict:
     if idempotency_key:
         replay = _history_replay(owner, idempotency_key, data)
         if replay is not None:
             return replay
-    view = _settled(owner, _start_paint(owner, data, idempotency_key), perform=True)
+    view = _settled(owner, _start_paint(owner, data, idempotency_key), perform=True, reader_left=reader_left)
     return {**view["result"], **_identity(view)}
 
 

@@ -31,16 +31,23 @@ pub(crate) struct TypedExecutionPlan {
     pub placement_fill_scope_indices: Vec<Vec<usize>>,
     /// Fill targets transformed by each dense affine group.
     pub transform_fill_scope_indices: Vec<Vec<usize>>,
-    /// Stable brush seeds parallel to dense instructions.
-    pub instruction_seed_overrides: Vec<Option<crate::types::Seed>>,
-    /// Innermost fill scope parallel to dense instructions.
-    pub instruction_fill_scope_indices: Vec<Option<usize>>,
+    /// One entry for each instruction of the dense Score, in the same order.
+    pub instructions: Vec<TypedInstruction>,
     /// Prepared contours in canvas-short-edge units until execution completes.
     pub fill_scopes: Vec<PerformedFillScope>,
     /// Recoverable contour omissions discovered before dependency execution.
     pub diagnostics: Vec<ScoreExecutionDiagnostic>,
     /// Dense bodies selected from fixed Score mirror references.
     pub mirror_relations: Vec<TypedMirrorRelation>,
+}
+
+/// What the typed performance passes on about one dense instruction.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct TypedInstruction {
+    /// Stable brush seed from the source owner, context path and instance ordinal.
+    pub seed_override: Option<crate::types::Seed>,
+    /// Innermost fill scope.
+    pub fill_scope_index: Option<usize>,
 }
 
 #[derive(Clone, Debug)]
@@ -101,22 +108,29 @@ struct DensePlacement {
 
 /// Materializes a compact Score into the dense Score the shared executor runs.
 ///
-/// Instruction-indexed vectors run parallel to `output.instructions`; anchor
-/// vectors to `output.anchors`. "Source" indices refer to the compact Score.
+/// What the Builder records about one dense instruction besides the
+/// instruction itself, which has the same index in `output.instructions`.
+struct DenseInstruction {
+    /// Source instruction in the compact Score.
+    original_index: usize,
+    /// Instance seed from the source owner, context path and instance ordinal.
+    seed_override: Option<Seed>,
+    /// Innermost fill scope.
+    fill_scope_index: Option<usize>,
+    /// Ordinals of the enclosing repetitions that produced the instruction.
+    context_path: Vec<u64>,
+    /// Placement target or source anchor, in short-side units; mirror bodies use it.
+    semantic_anchor: Option<Point>,
+}
+
+/// `dense` runs parallel to `output.instructions`, anchor vectors to
+/// `output.anchors`. "Source" indices refer to the compact Score.
 struct Builder<'a> {
     request: PerformanceRequest<'a>,
     /// Dense Score being built; its groups are rebuilt from the compact ones.
     output: Score,
-    original_instruction_indices: Vec<usize>,
+    dense: Vec<DenseInstruction>,
     original_anchor_indices: Vec<usize>,
-    /// Instance seeds from the source owner, context path and instance ordinal.
-    instruction_seed_overrides: Vec<Option<Seed>>,
-    /// Innermost fill scope of each dense instruction.
-    instruction_fill_scope_indices: Vec<Option<usize>>,
-    /// Ordinals of the enclosing repetitions that produced each instruction.
-    instruction_context_paths: Vec<Vec<u64>>,
-    /// Placement target or source anchor, in short-side units; mirror bodies use it.
-    instruction_semantic_anchors: Vec<Option<Point>>,
     /// Expansion contexts; each maps source indices to its copies and those of its children.
     contexts: Vec<ContextMap>,
     /// Every dense copy of each source instruction and anchor.
@@ -151,12 +165,8 @@ impl<'a> Builder<'a> {
         Self {
             request,
             output,
-            original_instruction_indices: Vec::new(),
+            dense: Vec::new(),
             original_anchor_indices: Vec::new(),
-            instruction_seed_overrides: Vec::new(),
-            instruction_fill_scope_indices: Vec::new(),
-            instruction_context_paths: Vec::new(),
-            instruction_semantic_anchors: Vec::new(),
             contexts: vec![ContextMap::default()],
             global_instructions: BTreeMap::new(),
             global_anchors: BTreeMap::new(),
@@ -244,23 +254,23 @@ impl<'a> Builder<'a> {
             anchor_target: relation.and_then(|value| value.target_anchor_index),
         });
         self.output.instructions.push(instruction);
-        self.original_instruction_indices.push(old);
-        self.instruction_seed_overrides.push(Some(instance_seed(
-            &resolved.owner,
-            &self.contexts[context].path,
-            instance_ordinal,
-            self.request.performance_seed,
-        )));
-        self.instruction_fill_scope_indices.push(innermost_fill);
-        self.instruction_context_paths
-            .push(self.contexts[context].path.clone());
-        self.instruction_semantic_anchors
-            .push(Some(target.unwrap_or_else(|| {
+        self.dense.push(DenseInstruction {
+            original_index: old,
+            seed_override: Some(instance_seed(
+                &resolved.owner,
+                &self.contexts[context].path,
+                instance_ordinal,
+                self.request.performance_seed,
+            )),
+            fill_scope_index: innermost_fill,
+            context_path: self.contexts[context].path.clone(),
+            semantic_anchor: Some(target.unwrap_or_else(|| {
                 crate::geometry::point_to_short_side_units(
                     crate::planning::instruction_anchor_on_canvas(original, self.request.canvas),
                     self.request.canvas,
                 )
-            })));
+            })),
+        });
         // Enclosing Macro transforms also own instructions expanded in an
         // inner fill's child context. Retain their full descendant span.
         let mut enclosing = Some(context);
@@ -645,8 +655,8 @@ impl<'a> Builder<'a> {
                             instruction_indices: (member.start..member.end).collect(),
                             anchor_indices: member.anchor_indices.clone(),
                             fill_scope_indices: scopes.clone(),
-                            context_path: self.instruction_context_paths[member.start].clone(),
-                            semantic_anchor: self.instruction_semantic_anchors[member.start],
+                            context_path: self.dense[member.start].context_path.clone(),
+                            semantic_anchor: self.dense[member.start].semantic_anchor,
                             placement_pending: false,
                             primitive_body: false,
                         }),
@@ -1022,7 +1032,7 @@ impl<'a> Builder<'a> {
             instruction_indices: (member.start..member.end).collect(),
             anchor_indices: member.anchor_indices.clone(),
             fill_scope_indices: fill_scope_indices.to_vec(),
-            context_path: self.instruction_context_paths[member.start].clone(),
+            context_path: self.dense[member.start].context_path.clone(),
             semantic_anchor,
             placement_pending: true,
             primitive_body,
@@ -1039,11 +1049,9 @@ impl<'a> Builder<'a> {
                 .map(|&index| TypedMirrorBody {
                     instruction_indices: vec![index],
                     anchor_indices: Vec::new(),
-                    fill_scope_indices: self.instruction_fill_scope_indices[index]
-                        .into_iter()
-                        .collect(),
-                    context_path: self.instruction_context_paths[index].clone(),
-                    semantic_anchor: self.instruction_semantic_anchors[index],
+                    fill_scope_indices: self.dense[index].fill_scope_index.into_iter().collect(),
+                    context_path: self.dense[index].context_path.clone(),
+                    semantic_anchor: self.dense[index].semantic_anchor,
                     placement_pending: false,
                     primitive_body: true,
                 })
@@ -1126,8 +1134,7 @@ impl<'a> Builder<'a> {
                         body.anchor_indices.extend(&member.anchor_indices);
                         body.fill_scope_indices.extend(scopes);
                         if body.context_path.is_empty() {
-                            body.context_path =
-                                self.instruction_context_paths[member.start].clone();
+                            body.context_path = self.dense[member.start].context_path.clone();
                         }
                     }
                     body
@@ -1175,13 +1182,22 @@ impl<'a> Builder<'a> {
                 placement_scopes,
                 placement_fill_scope_indices,
                 transform_fill_scope_indices: self.transform_fill_scope_indices,
-                instruction_seed_overrides: self.instruction_seed_overrides,
-                instruction_fill_scope_indices: self.instruction_fill_scope_indices,
+                instructions: self
+                    .dense
+                    .iter()
+                    .map(|entry| TypedInstruction {
+                        seed_override: entry.seed_override,
+                        fill_scope_index: entry.fill_scope_index,
+                    })
+                    .collect(),
                 fill_scopes: self.fill_scopes,
                 diagnostics: self.diagnostics,
                 mirror_relations,
             },
-            self.original_instruction_indices,
+            self.dense
+                .iter()
+                .map(|entry| entry.original_index)
+                .collect(),
             self.original_anchor_indices,
         )
     }

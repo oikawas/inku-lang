@@ -517,7 +517,7 @@ impl Execution<'_> {
         let seed = self
             .typed
             .as_ref()
-            .and_then(|typed| typed.instruction_seed_overrides[source])
+            .and_then(|typed| typed.instructions[source].seed_override)
             .unwrap_or_else(|| {
                 crate::determinism::instruction_seed(
                     &self.request.score.instructions[source],
@@ -2340,7 +2340,7 @@ fn resolve_impl(
                     let seed_override = execution
                         .typed
                         .as_ref()
-                        .and_then(|typed| typed.instruction_seed_overrides[index])
+                        .and_then(|typed| typed.instructions[index].seed_override)
                         .or_else(|| {
                             in_any_transform_group(&request.score.transform_groups, index).then(
                                 || {
@@ -2450,7 +2450,7 @@ fn resolve_impl(
             let owner = entry.original_instruction_index;
             dense_to_performed[owner].push(performed_index);
             // The dense scope index until the used scopes are renumbered below.
-            let scope = typed.instruction_fill_scope_indices[owner];
+            let scope = typed.instructions[owner].fill_scope_index;
             entry.fill_scope_index = scope;
             let mut current = scope;
             while let Some(index) = current {

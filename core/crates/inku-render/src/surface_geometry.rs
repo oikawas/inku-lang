@@ -6,15 +6,21 @@ use crate::geometry::{
     circle_points, crescent_contour_points, ellipse_perimeter, point_to_pixels, polygon_points,
     size_to_pixels, stroke_sample_count,
 };
+use crate::mark_geometry::MarkGeometry;
 use crate::marks::{MarkContext, geometry_point, geometry_points};
-use crate::types::{ArcForm, Instruction, Point, Primitive, Seed};
+use crate::types::{Instruction, Point, Seed};
 
+/// Pixel bounds of a closed shape's own geometry.
+///
+/// Lines, open Arcs and, without a group transform, crescents have none here;
+/// [`mark_bbox`] bounds the latter two for the extent check.
 pub(crate) fn shape_bbox(
+    geometry: MarkGeometry,
     instruction: &Instruction,
     context: MarkContext<'_>,
 ) -> Option<(f64, f64, f64, f64)> {
     if !context.geometry_transform.is_identity() {
-        let contour = surface_contour(instruction, context)?;
+        let contour = surface_contour(geometry, instruction, context)?;
         let min_x = contour
             .iter()
             .map(|point| point.x)
@@ -34,10 +40,10 @@ pub(crate) fn shape_bbox(
         return Some((min_x, min_y, max_x - min_x, max_y - min_y));
     }
     let canvas = context.canvas;
-    match instruction.primitive {
-        Primitive::Circle | Primitive::Point => {
-            let center = point_to_pixels(instruction.center?, canvas);
-            let radius = instruction.radius? * canvas.unit();
+    match geometry {
+        MarkGeometry::Circle { center, radius } | MarkGeometry::Polygon { center, radius, .. } => {
+            let center = point_to_pixels(center, canvas);
+            let radius = radius * canvas.unit();
             Some((
                 center.x - radius,
                 center.y - radius,
@@ -45,9 +51,9 @@ pub(crate) fn shape_bbox(
                 radius * 2.0,
             ))
         }
-        Primitive::Ellipse => {
-            let center = point_to_pixels(instruction.center?, canvas);
-            let size = size_to_pixels(instruction.size?, canvas);
+        MarkGeometry::Ellipse { center, size } => {
+            let center = point_to_pixels(center, canvas);
+            let size = size_to_pixels(size, canvas);
             Some((
                 center.x - size.x / 2.0,
                 center.y - size.y / 2.0,
@@ -55,9 +61,9 @@ pub(crate) fn shape_bbox(
                 size.y,
             ))
         }
-        Primitive::Cloudform => {
-            let center = point_to_pixels(instruction.center?, canvas);
-            let size = size_to_pixels(instruction.size?, canvas);
+        MarkGeometry::Cloudform { center, size } => {
+            let center = point_to_pixels(center, canvas);
+            let size = size_to_pixels(size, canvas);
             Some((
                 center.x - size.x * 0.56,
                 center.y - size.y * 0.56,
@@ -65,22 +71,12 @@ pub(crate) fn shape_bbox(
                 size.y * 1.12,
             ))
         }
-        Primitive::Square | Primitive::Triangle => {
-            let position = point_to_pixels(instruction.position?, canvas);
-            let size = size_to_pixels(instruction.size?, canvas);
+        MarkGeometry::Square { position, size } | MarkGeometry::Triangle { position, size } => {
+            let position = point_to_pixels(position, canvas);
+            let size = size_to_pixels(size, canvas);
             Some((position.x, position.y, size.x, size.y))
         }
-        Primitive::Polygon => {
-            let center = point_to_pixels(instruction.center?, canvas);
-            let radius = instruction.radius? * canvas.unit();
-            Some((
-                center.x - radius,
-                center.y - radius,
-                radius * 2.0,
-                radius * 2.0,
-            ))
-        }
-        Primitive::Line | Primitive::Arc => None,
+        MarkGeometry::Line { .. } | MarkGeometry::Arc(_) | MarkGeometry::Crescent { .. } => None,
     }
 }
 
@@ -88,30 +84,30 @@ pub(crate) fn shape_bbox(
 ///
 /// Lines have none: a stroke keeps at most `STROKE_SAMPLE_MAX` samples, so a
 /// long line costs no more than a short one. Arcs are bounded by their circle
-/// or crescent box; every other primitive uses [`shape_bbox`]. `None` also
-/// means missing geometry, which drawing reports on its own.
+/// or crescent box; every other primitive uses [`shape_bbox`].
 pub(crate) fn mark_bbox(
+    geometry: MarkGeometry,
     instruction: &Instruction,
     context: MarkContext<'_>,
 ) -> Option<(f64, f64, f64, f64)> {
     let canvas = context.canvas;
-    let (center, half) = match instruction.primitive {
-        Primitive::Line => return None,
-        Primitive::Arc if instruction.arc_form == Some(ArcForm::Crescent) => {
-            let size = size_to_pixels(instruction.size?, canvas);
+    let (center, half) = match geometry {
+        MarkGeometry::Line { .. } => return None,
+        MarkGeometry::Crescent { center, size } => {
+            let size = size_to_pixels(size, canvas);
             (
-                point_to_pixels(instruction.center?, canvas),
+                point_to_pixels(center, canvas),
                 Point::new(size.x / 2.0, size.y / 2.0),
             )
         }
-        Primitive::Arc => {
-            let radius = instruction.radius? * canvas.unit();
+        MarkGeometry::Arc(arc) => {
+            let radius = arc.radius * canvas.unit();
             (
-                point_to_pixels(instruction.center?, canvas),
+                point_to_pixels(arc.center, canvas),
                 Point::new(radius, radius),
             )
         }
-        _ => return shape_bbox(instruction, context),
+        _ => return shape_bbox(geometry, instruction, context),
     };
     let corners = [(-1.0, -1.0), (1.0, -1.0), (1.0, 1.0), (-1.0, 1.0)].map(|(x, y)| {
         geometry_point(
@@ -128,15 +124,19 @@ pub(crate) fn mark_bbox(
     Some((min.x, min.y, max.x - min.x, max.y - min.y))
 }
 
+/// The closed outline a surface fills, in pixels after the group transform.
+///
+/// Lines and open Arcs have none.
 pub(crate) fn surface_contour(
+    geometry: MarkGeometry,
     instruction: &Instruction,
     context: MarkContext<'_>,
 ) -> Option<Vec<Point>> {
     let canvas = context.canvas;
-    let contour = match instruction.primitive {
-        Primitive::Circle | Primitive::Point => {
-            let center = point_to_pixels(instruction.center?, canvas);
-            let radius = instruction.radius? * canvas.unit();
+    let contour = match geometry {
+        MarkGeometry::Circle { center, radius } => {
+            let center = point_to_pixels(center, canvas);
+            let radius = radius * canvas.unit();
             Some(circle_points(
                 center,
                 radius,
@@ -144,9 +144,9 @@ pub(crate) fn surface_contour(
                 stroke_sample_count(std::f64::consts::TAU * radius, canvas),
             ))
         }
-        Primitive::Ellipse => {
-            let center = point_to_pixels(instruction.center?, canvas);
-            let size = size_to_pixels(instruction.size?, canvas);
+        MarkGeometry::Ellipse { center, size } => {
+            let center = point_to_pixels(center, canvas);
+            let size = size_to_pixels(size, canvas);
             let rx = size.x / 2.0;
             let ry = size.y / 2.0;
             Some(circle_points(
@@ -156,37 +156,40 @@ pub(crate) fn surface_contour(
                 stroke_sample_count(ellipse_perimeter(rx, ry), canvas),
             ))
         }
-        Primitive::Square | Primitive::Triangle => {
-            let position = point_to_pixels(instruction.position?, canvas);
-            let size = size_to_pixels(instruction.size?, canvas);
-            if instruction.primitive == Primitive::Square {
-                Some(vec![
-                    position,
-                    Point::new(position.x + size.x, position.y),
-                    Point::new(position.x + size.x, position.y + size.y),
-                    Point::new(position.x, position.y + size.y),
-                ])
-            } else {
-                Some(vec![
-                    Point::new(position.x + size.x / 2.0, position.y),
-                    Point::new(position.x + size.x, position.y + size.y),
-                    Point::new(position.x, position.y + size.y),
-                ])
-            }
+        MarkGeometry::Square { position, size } => {
+            let position = point_to_pixels(position, canvas);
+            let size = size_to_pixels(size, canvas);
+            Some(vec![
+                position,
+                Point::new(position.x + size.x, position.y),
+                Point::new(position.x + size.x, position.y + size.y),
+                Point::new(position.x, position.y + size.y),
+            ])
         }
-        Primitive::Polygon => {
-            let center = point_to_pixels(instruction.center?, canvas);
-            Some(polygon_points(
-                center,
-                instruction.radius? * canvas.unit(),
-                usize::from(instruction.sides.unwrap_or(5)),
-                0.0,
-            ))
+        MarkGeometry::Triangle { position, size } => {
+            // The surface winds the other way round from the mark's own corners.
+            let position = point_to_pixels(position, canvas);
+            let size = size_to_pixels(size, canvas);
+            Some(vec![
+                Point::new(position.x + size.x / 2.0, position.y),
+                Point::new(position.x + size.x, position.y + size.y),
+                Point::new(position.x, position.y + size.y),
+            ])
         }
-        Primitive::Cloudform => {
+        MarkGeometry::Polygon {
+            center,
+            radius,
+            sides,
+        } => Some(polygon_points(
+            point_to_pixels(center, canvas),
+            radius * canvas.unit(),
+            sides,
+            0.0,
+        )),
+        MarkGeometry::Cloudform { center, size } => {
             let controls = generate_cloudform_contour(CloudformRequest {
-                center: point_to_pixels(instruction.center?, canvas),
-                size: size_to_pixels(instruction.size?, canvas),
+                center: point_to_pixels(center, canvas),
+                size: size_to_pixels(size, canvas),
                 performance_seed: Some(context.seed_for(instruction)),
                 instruction_index: context.instruction_index,
                 mark_index: context.mark_index,
@@ -196,14 +199,12 @@ pub(crate) fn surface_contour(
             });
             Some(sample_closed_catmull_rom(&controls, 5))
         }
-        Primitive::Arc if instruction.arc_form == Some(ArcForm::Crescent) => {
-            Some(crescent_contour_points(
-                point_to_pixels(instruction.center?, canvas),
-                size_to_pixels(instruction.size?, canvas),
-                25,
-            ))
-        }
-        Primitive::Line | Primitive::Arc => None,
+        MarkGeometry::Crescent { center, size } => Some(crescent_contour_points(
+            point_to_pixels(center, canvas),
+            size_to_pixels(size, canvas),
+            25,
+        )),
+        MarkGeometry::Line { .. } | MarkGeometry::Arc(_) => None,
     };
     contour.map(|points| {
         if !context.geometry_transform.is_identity() {

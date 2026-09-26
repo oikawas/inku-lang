@@ -3,6 +3,7 @@
 use sha2::{Digest, Sha256};
 
 use crate::geometry::{point_to_pixels, size_to_pixels};
+use crate::mark_geometry::MarkGeometry;
 use crate::mark_paths::polygon_path;
 use crate::marks::{MarkContext, MarkStyle, mark_style, weight_opacity};
 use crate::surface_geometry::shape_bbox;
@@ -413,7 +414,11 @@ fn engraving_unit(weight: &str, index: usize, slot: usize, context: MarkContext<
     )) / 4_294_967_296.0
 }
 
-fn engraving(instruction: &Instruction, context: MarkContext<'_>) -> Vec<Element> {
+fn engraving(
+    instruction: &Instruction,
+    geometry: MarkGeometry,
+    context: MarkContext<'_>,
+) -> Vec<Element> {
     let dry = instruction.weight == Weight::Drypoint;
     let weight = if dry { "drypoint" } else { "burin" };
     let id = identifier(context);
@@ -485,13 +490,13 @@ fn engraving(instruction: &Instruction, context: MarkContext<'_>) -> Vec<Element
     }
     let mut cuts = Element::new("g").attr("id", format!("{id}-cuts"));
     // Anchor the bounded incision field to the mark, retaining the reference circle's geometry.
-    let (x, y0, width, height) = shape_bbox(instruction, context)
+    let (x, y0, width, height) = shape_bbox(geometry, instruction, context)
         .or_else(|| {
-            if instruction.arc_form != Some(ArcForm::Crescent) {
+            let MarkGeometry::Crescent { center, size } = geometry else {
                 return None;
-            }
-            let center = point_to_pixels(instruction.center?, context.canvas);
-            let size = size_to_pixels(instruction.size?, context.canvas);
+            };
+            let center = point_to_pixels(center, context.canvas);
+            let size = size_to_pixels(size, context.canvas);
             Some((
                 center.x - size.x / 2.0,
                 center.y - size.y / 2.0,
@@ -858,13 +863,17 @@ fn brush_mark_unit(name: &str, slot: usize, context: MarkContext<'_>) -> f64 {
 }
 
 /// Per-mark mask: an even deposit floor plus the shared tile, rotated about the mark.
-fn brush_mask(instruction: &Instruction, context: MarkContext<'_>) -> Vec<Element> {
+fn brush_mask(
+    instruction: &Instruction,
+    geometry: MarkGeometry,
+    context: MarkContext<'_>,
+) -> Vec<Element> {
     let Some((name, size, _, _)) = brush_recipe(instruction.weight) else {
         return Vec::new();
     };
     let id = identifier(context);
     let unit = context.canvas.unit() / 1000.0;
-    let (x, y, width, height) = shape_bbox(instruction, context).unwrap_or((
+    let (x, y, width, height) = shape_bbox(geometry, instruction, context).unwrap_or((
         0.0,
         0.0,
         context.canvas.width,
@@ -921,19 +930,25 @@ fn brush_mask(instruction: &Instruction, context: MarkContext<'_>) -> Vec<Elemen
     vec![bands, mask]
 }
 
-pub(crate) fn definitions(instruction: &Instruction, context: MarkContext<'_>) -> Vec<Element> {
-    definitions_for_closed_contour(instruction, context, false)
+pub(crate) fn definitions(
+    instruction: &Instruction,
+    geometry: MarkGeometry,
+    context: MarkContext<'_>,
+) -> Vec<Element> {
+    definitions_for_closed_contour(instruction, geometry, context, false)
 }
 
 pub(crate) fn closed_contour_definitions(
     instruction: &Instruction,
+    geometry: MarkGeometry,
     context: MarkContext<'_>,
 ) -> Vec<Element> {
-    definitions_for_closed_contour(instruction, context, true)
+    definitions_for_closed_contour(instruction, geometry, context, true)
 }
 
 fn definitions_for_closed_contour(
     instruction: &Instruction,
+    geometry: MarkGeometry,
     context: MarkContext<'_>,
     closed_contour: bool,
 ) -> Vec<Element> {
@@ -947,8 +962,8 @@ fn definitions_for_closed_contour(
         return Vec::new();
     }
     match instruction.weight {
-        Weight::Burin | Weight::Drypoint => engraving(instruction, context),
-        Weight::BrushThin | Weight::BrushThick => brush_mask(instruction, context),
+        Weight::Burin | Weight::Drypoint => engraving(instruction, geometry, context),
+        Weight::BrushThin | Weight::BrushThick => brush_mask(instruction, geometry, context),
         _ => vec![grain_filter(instruction, context)],
     }
 }

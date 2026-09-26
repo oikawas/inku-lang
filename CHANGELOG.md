@@ -6,6 +6,12 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 36 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-26 — the render core reads each primitive's geometry as a type
+
+One `Instruction` type carries every primitive, so all its geometric fields (center, radius, size, position, ends, angles) are optional. Each mark-drawing function unwrapped them itself and stopped with, for example, "Arc requires 'radius'" when one was missing (30 places), while the surface, fill and extent calculations silently drew nothing. The geometry each primitive requires is now a type (`MarkGeometry`), read once per drawn mark. A missing field is refused only there, naming the same field as before (the first in reading order), and the drawing functions receive the values their primitive has. Drawing results do not change (the 12,799 saved renders are identical).
+
+DDL, Score, and render versions are unchanged.
+
 ### 2026-09-26 — fade within a typed placement group takes effect (render engine 69)
 
 Render engine 67 had Score 0.10's typed placement perform `fade` as attenuation within the group, and the SPEC says so. The implementation wrote each member's level (`fade_level=`) into `color_hint` but never the `fade=` the renderer reads it by, so on Score 0.10 and later `fade` never reached opacity and only changed the seed of surfaces without their own seed. A group of two or more members now fades within the group when performed again. Only opacity values change; shapes, positions and patterns do not. Works on Score 0.9 and earlier, and works without fade, are byte-identical.

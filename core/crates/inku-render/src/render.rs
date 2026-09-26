@@ -13,6 +13,7 @@ use crate::determinism::hash01;
 use crate::fills::{is_noncomputer_solid_fill, solid_mottle_filter, solid_mottle_filter_id};
 use crate::ground::render_ground;
 use crate::layers::render_presence_layer;
+use crate::mark_geometry::MarkGeometry;
 use crate::marks::{
     MarkContext, MarkError, render_closed_arc_pair_fill, render_instruction_with_line_centerline,
 };
@@ -289,11 +290,12 @@ impl OutputAllowance {
 
 /// Refuse a mark whose fills and textures would grow past any saved work.
 fn check_mark_extent(
+    geometry: MarkGeometry,
     instruction: &Instruction,
     context: MarkContext<'_>,
 ) -> Result<(), RenderError> {
     let limit = MAX_MARK_EXTENT * context.canvas.unit();
-    match mark_bbox(instruction, context) {
+    match mark_bbox(geometry, instruction, context) {
         Some((_, _, width, height)) if !(width.abs() <= limit && height.abs() <= limit) => {
             Err(RenderError::MarkTooLarge {
                 instruction_index: context.instruction_index,
@@ -594,8 +596,13 @@ fn render_impl(
                 effects: follower_performed.effects,
                 ..first_context
             };
-            check_mark_extent(instruction, first_context)?;
-            check_mark_extent(follower, follower_context)?;
+            // Both extents are checked before either Arc is drawn. An Arc
+            // missing a field has no extent to check; drawing refuses it.
+            for (arc, arc_context) in [(instruction, first_context), (follower, follower_context)] {
+                if let Ok(geometry) = MarkGeometry::of(arc) {
+                    check_mark_extent(geometry, arc, arc_context)?;
+                }
+            }
             if let Some(fill) =
                 render_closed_arc_pair_fill(instruction, first_context, follower, follower_context)?
             {
@@ -604,8 +611,10 @@ fn render_impl(
                     closed_arc_pair_spread_marks.insert(follower_performed_index);
                 }
                 let definitions_start = material_definitions.len();
+                // The pair fill has read the follower's Arc, so its geometry is there.
                 material_definitions.extend(accepted_fills::closed_contour_definitions(
                     follower,
+                    MarkGeometry::of(follower)?,
                     follower_context,
                 ));
                 allowance.spend(
@@ -620,6 +629,8 @@ fn render_impl(
         }
         for (mark_index, copy) in expanded.iter().enumerate() {
             let single = &copy.instruction;
+            // Refuse a mark missing a field its primitive requires.
+            let geometry = MarkGeometry::of(single)?;
             let context = MarkContext {
                 canvas: request.options.canvas,
                 color_map: &request.options.resolved_color_map,
@@ -636,7 +647,7 @@ fn render_impl(
                 oil_fill_pass_limit,
                 effects: copy.effects,
             };
-            check_mark_extent(single, context)?;
+            check_mark_extent(geometry, single, context)?;
             allowance.add_mark();
             let definitions_start = (material_definitions.len(), surface_definitions.len());
             if profile != SvgProfile::Compat
@@ -648,10 +659,10 @@ fn render_impl(
                 let (filter_id, seed) = solid_mottle_filter_id(single, context);
                 material_definitions.push(solid_mottle_filter(&filter_id, seed));
             }
-            material_definitions.extend(accepted_fills::definitions(single, context));
+            material_definitions.extend(accepted_fills::definitions(single, geometry, context));
             let base_mark =
-                render_instruction_with_line_centerline(single, context, line_centerline)?;
-            let mark = if let Some(surface) = render_surface(single, context) {
+                render_instruction_with_line_centerline(single, geometry, context, line_centerline);
+            let mark = if let Some(surface) = render_surface(single, geometry, context) {
                 let mut combined = Element::new("g");
                 combined.push(base_mark);
                 combined.push(surface.group);

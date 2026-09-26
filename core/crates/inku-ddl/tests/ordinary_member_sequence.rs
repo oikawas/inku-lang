@@ -114,6 +114,28 @@ fn ordinary_sequences_deliver_field_shape_group_and_bilingual_identity() {
 }
 
 #[test]
+fn alternation_and_a_mirror_compile_in_one_description() {
+    // The mirror makes the Score 0.15.0, which refused its own cycle members.
+    let result = execute(
+        "鉛筆と太筆を交互にして、線を五本並べる。左端に斜めの赤い弧を置く。右端に前の形と鏡写しの青い弧を置く。",
+        ResolvedInstructionLanguage::Ja,
+        &[],
+        Vec::new(),
+        standard_budget(),
+        ScoreErrorPolicy::Stop,
+    );
+    let score = complete_score(&result);
+    assert_eq!(score.version, "0.15.0");
+    assert_eq!(score.mirror_relations.len(), 1);
+    assert!(
+        score
+            .placement_groups
+            .iter()
+            .any(|group| group.cycle_members.is_some())
+    );
+}
+
+#[test]
 fn natural_japanese_count_boundaries_reach_the_outer_occurrence_count() {
     for (source, count) in [
         ("赤い円と青い線を交互にして、1個並べる。", 1),

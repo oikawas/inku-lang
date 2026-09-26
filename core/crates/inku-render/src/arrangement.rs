@@ -15,33 +15,16 @@ const FRAME_LOW: f64 = 0.02;
 const FRAME_HIGH: f64 = 0.98;
 const ARRANGEMENT_SCALE: f64 = 1_000_000_000.0;
 
-fn density_name(density: Density) -> &'static str {
-    match density {
-        Density::None => "none",
-        Density::Low => "low",
-        Density::Medium => "medium",
-        Density::High => "high",
-    }
-}
-
-fn fade_name(fade: Fade) -> &'static str {
-    match fade {
-        Fade::None => "none",
-        Fade::Outward => "outward",
-        Fade::Directional => "directional",
-    }
-}
-
 fn shift_instruction(instruction: &Instruction, delta: Point) -> Instruction {
     let mut shifted = instruction.clone();
     shifted.arrangement = None;
     if let Some(arrangement) = instruction.arrangement.as_ref() {
         let mut notes = Vec::new();
         if arrangement.density != Density::None {
-            notes.push(format!("density={}", density_name(arrangement.density)));
+            notes.push(format!("density={}", arrangement.density.as_str()));
         }
         if arrangement.fade != Fade::None {
-            notes.push(format!("fade={}", fade_name(arrangement.fade)));
+            notes.push(format!("fade={}", arrangement.fade.as_str()));
         }
         if arrangement.preserve_space {
             notes.push("preserve_space".to_owned());

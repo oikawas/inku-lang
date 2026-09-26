@@ -1315,10 +1315,7 @@ pub fn finalize_saved_score_with_omitted_instructions(
     operational_budget: OperationalResourceBudget,
     omitted_original_instruction_indices: &[usize],
 ) -> Result<FinalizedScore, SavedScoreResourceError> {
-    if !matches!(
-        score.version.as_str(),
-        "0.10.0" | "0.11.0" | "0.12.0" | "0.13.0" | "0.14.0" | "0.15.0"
-    ) {
+    if !score.edition_at_least(crate::ScoreEdition::V0_10) {
         return Err(invalid(
             SavedScoreResourceOwner::Score,
             "saved resource finalization requires compact Score 0.10 or later",

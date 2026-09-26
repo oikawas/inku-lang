@@ -6,6 +6,63 @@ fn score(json: &str) -> Score {
 }
 
 #[test]
+fn editions_are_declared_in_version_order() {
+    // Feature checks compare editions, so a new edition declared out of
+    // order would enable or refuse fields for the wrong Scores.
+    let numbers = |edition: inku_score::ScoreEdition| -> Vec<u32> {
+        edition
+            .as_str()
+            .split('.')
+            .map(|part| part.parse().unwrap())
+            .collect()
+    };
+    for pair in inku_score::ScoreEdition::ALL.windows(2) {
+        assert!(pair[0] < pair[1] && numbers(pair[0]) < numbers(pair[1]));
+    }
+    for edition in inku_score::ScoreEdition::ALL {
+        assert_eq!(
+            inku_score::ScoreEdition::parse(edition.as_str()),
+            Some(edition)
+        );
+    }
+}
+
+#[test]
+fn stored_names_are_the_snake_case_of_each_variant() {
+    // Each stored name is written out once per variant; a typo would change
+    // what Scores store and stop saved Scores from loading.
+    fn check<T: Copy + std::fmt::Debug>(all: &[T], stored: fn(T) -> &'static str) {
+        for &value in all {
+            let mut snake = String::new();
+            for (index, character) in format!("{value:?}").char_indices() {
+                if index > 0 && character.is_uppercase() {
+                    snake.push('_');
+                }
+                snake.push(character.to_ascii_lowercase());
+            }
+            assert_eq!(stored(value), snake);
+        }
+    }
+    check(inku_score::Primitive::ALL, inku_score::Primitive::as_str);
+    check(inku_score::Weight::ALL, inku_score::Weight::as_str);
+    check(inku_score::Color::ALL, inku_score::Color::as_str);
+    check(
+        inku_score::SurfaceTexture::ALL,
+        inku_score::SurfaceTexture::as_str,
+    );
+    check(
+        inku_score::GroundMaterial::ALL,
+        inku_score::GroundMaterial::as_str,
+    );
+    check(
+        inku_score::GroundGrain::ALL,
+        inku_score::GroundGrain::as_str,
+    );
+    check(inku_score::Density::ALL, inku_score::Density::as_str);
+    check(inku_score::Fade::ALL, inku_score::Fade::as_str);
+}
+
+#[test]
 fn explicit_score_round_trips_without_renderer() {
     let input = r#"{"version":"0.1.0","canvas":{"aspect":"portrait","ground":{"material":"paper","tone":"warm","grain":"fine","density":0.45,"opacity":0.16,"seed":13579}},"background":"gray","presence":{"kind":"group_like","intensity":"high","center":[0.2,0.8],"symmetry":"radial","gaze_pressure":"medium","contour_density":"high"},"instructions":[{"primitive":"circle","note":"study","from":null,"to":null,"center":[0.5,0.5],"radius":0.27,"sides":null,"position":null,"size":null,"angle_start":null,"angle_end":null,"rotation":null,"filled":true,"style":"dashed","weight":"brush_thick","mode":"carve","carve_depth":"half","color":"blue","color_hint":"indigo","variation":{"amplitude":"broad","frequency":"high","quality":"pink","dimensions":["radius"]},"arrangement":null,"at":null,"relation":null,"thinness":"extra_fine","surface":{"texture":"grain","density":0.4,"scale":0.5,"opacity":0.3,"bleed":0.0,"direction":"diagonal_rising","spacing_gradient":"dense_to_coarse","tone_steps":4,"seed":-7}}]}"#;
 

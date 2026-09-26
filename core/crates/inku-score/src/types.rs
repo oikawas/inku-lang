@@ -55,18 +55,36 @@ macro_rules! string_enum {
         #[serde(rename_all = "snake_case")]
         pub enum $name { $($variant),+ }
     };
+    // Enums whose stored names the renderer also writes into SVG ids, classes
+    // and labels: each name is written once and serves both.
+    ($name:ident { $($variant:ident => $stored:literal),+ $(,)? }) => {
+        #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+        pub enum $name { $(#[serde(rename = $stored)] $variant),+ }
+
+        impl $name {
+            pub const ALL: &'static [Self] = &[$(Self::$variant),+];
+
+            /// The name a Score stores for this value.
+            #[must_use]
+            pub const fn as_str(self) -> &'static str {
+                match self {
+                    $(Self::$variant => $stored),+
+                }
+            }
+        }
+    };
 }
 
 string_enum!(Primitive {
-    Line,
-    Circle,
-    Ellipse,
-    Triangle,
-    Square,
-    Polygon,
-    Arc,
-    Point,
-    Cloudform,
+    Line => "line",
+    Circle => "circle",
+    Ellipse => "ellipse",
+    Triangle => "triangle",
+    Square => "square",
+    Polygon => "polygon",
+    Arc => "arc",
+    Point => "point",
+    Cloudform => "cloudform",
 });
 string_enum!(ArcForm { Crescent });
 
@@ -231,18 +249,18 @@ string_enum!(LineStyle {
     DashDot,
 });
 string_enum!(Weight {
-    Silverpoint,
-    Pencil,
-    Pen,
-    Rotring,
-    Crayon,
-    Chalk,
-    BrushThin,
-    BrushThick,
-    OilPaint,
-    Burin,
-    Drypoint,
-    Computer,
+    Silverpoint => "silverpoint",
+    Pencil => "pencil",
+    Pen => "pen",
+    Rotring => "rotring",
+    Crayon => "crayon",
+    Chalk => "chalk",
+    BrushThin => "brush_thin",
+    BrushThick => "brush_thick",
+    OilPaint => "oil_paint",
+    Burin => "burin",
+    Drypoint => "drypoint",
+    Computer => "computer",
 });
 string_enum!(Thinness { Fine, ExtraFine });
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -261,15 +279,15 @@ impl SurfaceIntensity {
 }
 
 string_enum!(Color {
-    White,
-    Black,
-    Blue,
-    Red,
-    Green,
-    Gray,
-    Yellow,
-    Orange,
-    Purple,
+    White => "white",
+    Black => "black",
+    Blue => "blue",
+    Red => "red",
+    Green => "green",
+    Gray => "gray",
+    Yellow => "yellow",
+    Orange => "orange",
+    Purple => "purple",
 });
 
 /// One concrete work-palette observation used before Score materialization.
@@ -371,16 +389,16 @@ impl ResolvedPaletteContext {
     }
 }
 string_enum!(SurfaceTexture {
-    None,
-    Solid,
-    Stipple,
-    Hatch,
-    Crosshatch,
-    Aquatint,
-    Grain,
-    Wash,
-    Bleed,
-    PaperGrain,
+    None => "none",
+    Solid => "solid",
+    Stipple => "stipple",
+    Hatch => "hatch",
+    Crosshatch => "crosshatch",
+    Aquatint => "aquatint",
+    Grain => "grain",
+    Wash => "wash",
+    Bleed => "bleed",
+    PaperGrain => "paper_grain",
 });
 string_enum!(SurfaceDirection {
     None,
@@ -395,14 +413,14 @@ string_enum!(SurfaceSpacingGradient {
     DenseToCoarse,
 });
 string_enum!(GroundMaterial {
-    Plain,
-    Paper,
-    Washi,
-    InkWash,
-    CharcoalGround,
-    Canvas,
-    DrawingPaper,
-    Mezzotint,
+    Plain => "plain",
+    Paper => "paper",
+    Washi => "washi",
+    InkWash => "ink_wash",
+    CharcoalGround => "charcoal_ground",
+    Canvas => "canvas",
+    DrawingPaper => "drawing_paper",
+    Mezzotint => "mezzotint",
 });
 string_enum!(GroundTone {
     White,
@@ -413,10 +431,10 @@ string_enum!(GroundTone {
     Black,
 });
 string_enum!(GroundGrain {
-    None,
-    Fine,
-    Medium,
-    Coarse,
+    None => "none",
+    Fine => "fine",
+    Medium => "medium",
+    Coarse => "coarse",
 });
 string_enum!(Amplitude {
     Fine,
@@ -456,15 +474,15 @@ string_enum!(ArrangementPath {
     RightHalf,
 });
 string_enum!(Density {
-    None,
-    Low,
-    Medium,
-    High,
+    None => "none",
+    Low => "low",
+    Medium => "medium",
+    High => "high",
 });
 string_enum!(Fade {
-    None,
-    Outward,
-    Directional,
+    None => "none",
+    Outward => "outward",
+    Directional => "directional",
 });
 string_enum!(RhythmSpacing {
     None,
@@ -575,8 +593,81 @@ const fn default_relation_gap() -> RelationGap {
     RelationGap::Medium
 }
 
+/// A Score edition, named by `Score::version`.
+///
+/// Editions accumulate: each keeps every field of the editions before it, so
+/// a check names the edition that introduced a field. Hosts send the version
+/// as a string; one that names no edition enables no field.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum ScoreEdition {
+    V0_1,
+    V0_2,
+    V0_3,
+    V0_4,
+    V0_5,
+    V0_6,
+    V0_7,
+    V0_8,
+    V0_9,
+    V0_10,
+    V0_11,
+    V0_12,
+    V0_13,
+    V0_14,
+    V0_15,
+}
+
+impl ScoreEdition {
+    pub const ALL: [Self; 15] = [
+        Self::V0_1,
+        Self::V0_2,
+        Self::V0_3,
+        Self::V0_4,
+        Self::V0_5,
+        Self::V0_6,
+        Self::V0_7,
+        Self::V0_8,
+        Self::V0_9,
+        Self::V0_10,
+        Self::V0_11,
+        Self::V0_12,
+        Self::V0_13,
+        Self::V0_14,
+        Self::V0_15,
+    ];
+
+    /// The edition a version string names.
+    #[must_use]
+    pub fn parse(version: &str) -> Option<Self> {
+        Self::ALL
+            .into_iter()
+            .find(|edition| edition.as_str() == version)
+    }
+
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::V0_1 => "0.1.0",
+            Self::V0_2 => "0.2.0",
+            Self::V0_3 => "0.3.0",
+            Self::V0_4 => "0.4.0",
+            Self::V0_5 => "0.5.0",
+            Self::V0_6 => "0.6.0",
+            Self::V0_7 => "0.7.0",
+            Self::V0_8 => "0.8.0",
+            Self::V0_9 => "0.9.0",
+            Self::V0_10 => "0.10.0",
+            Self::V0_11 => "0.11.0",
+            Self::V0_12 => "0.12.0",
+            Self::V0_13 => "0.13.0",
+            Self::V0_14 => "0.14.0",
+            Self::V0_15 => "0.15.0",
+        }
+    }
+}
+
 fn default_score_version() -> String {
-    "0.9.0".to_owned()
+    ScoreEdition::V0_9.as_str().to_owned()
 }
 
 fn default_canvas() -> Canvas {
@@ -1501,11 +1592,31 @@ pub struct Score {
 }
 
 impl Score {
+    /// The edition `version` names, or `None` for a version no edition has.
+    #[must_use]
+    pub fn edition(&self) -> Option<ScoreEdition> {
+        ScoreEdition::parse(&self.version)
+    }
+
+    /// Whether `version` names `edition` or a later one.
+    #[must_use]
+    pub fn edition_at_least(&self, edition: ScoreEdition) -> bool {
+        self.edition().is_some_and(|own| own >= edition)
+    }
+
+    /// Whether the Score is finalized under the compact resource contract:
+    /// every 0.10.0 Score, and a later one that stores a resource policy.
+    #[must_use]
+    pub fn uses_compact_resource_contract(&self) -> bool {
+        self.edition() == Some(ScoreEdition::V0_10)
+            || (self.edition_at_least(ScoreEdition::V0_11) && self.resource_policy.is_some())
+    }
+
     fn validate_mirror_relations(&self) -> Result<(), &'static str> {
         if self.mirror_relations.is_empty() {
             return Ok(());
         }
-        if self.version != "0.15.0" {
+        if !self.edition_at_least(ScoreEdition::V0_15) {
             return Err("mirror relations require Score version 0.15.0");
         }
         for relation in &self.mirror_relations {
@@ -1835,10 +1946,7 @@ impl Score {
     }
 
     fn validate_compact_score_0_10(&self) -> Result<(), &'static str> {
-        let is_compact_edition = matches!(
-            self.version.as_str(),
-            "0.10.0" | "0.11.0" | "0.12.0" | "0.13.0" | "0.14.0" | "0.15.0"
-        );
+        let is_compact_edition = self.edition_at_least(ScoreEdition::V0_10);
         let has_0_10_fields = !self.fill_groups.is_empty()
             || !self.repetition_groups.is_empty()
             || self.resource_policy.is_some()
@@ -1856,7 +1964,7 @@ impl Score {
         if has_0_10_fields && !is_compact_edition {
             return Err("compact symbolic fields require Score version 0.10.0");
         }
-        let is_compact = self.version == "0.10.0" || has_0_10_fields;
+        let is_compact = self.edition() == Some(ScoreEdition::V0_10) || has_0_10_fields;
         if !is_compact {
             return Ok(());
         }
@@ -1986,7 +2094,7 @@ impl Score {
                 return Err("fill members must cover the group and its logical count");
             }
             if let Some(cycle) = &group.cycle_members {
-                if self.version != "0.14.0" {
+                if !self.edition_at_least(ScoreEdition::V0_14) {
                     return Err("cycle members require Score version 0.14.0");
                 }
                 Self::validate_cycle_members(cycle, &group.members, group.logical_count)?;
@@ -2038,14 +2146,10 @@ impl Score {
     }
 
     pub fn validate_placement_groups(&self) -> Result<(), &'static str> {
-        let is_compact = self.version == "0.10.0"
-            || (matches!(
-                self.version.as_str(),
-                "0.11.0" | "0.12.0" | "0.13.0" | "0.14.0" | "0.15.0"
-            ) && self.resource_policy.is_some());
+        let is_compact = self.uses_compact_resource_contract();
         let mut previous_end = 0;
         for group in &self.placement_groups {
-            if group.cycle_members.is_some() && self.version != "0.14.0" {
+            if group.cycle_members.is_some() && !self.edition_at_least(ScoreEdition::V0_14) {
                 return Err("cycle members require Score version 0.14.0");
             }
             if group.members.iter().any(|member| {
@@ -2059,33 +2163,12 @@ impl Score {
             }
             match group.layout {
                 GroupLayout::Overlap | GroupLayout::HorizontalSourceOrder
-                    if !matches!(
-                        self.version.as_str(),
-                        "0.7.0"
-                            | "0.8.0"
-                            | "0.9.0"
-                            | "0.10.0"
-                            | "0.11.0"
-                            | "0.12.0"
-                            | "0.13.0"
-                            | "0.14.0"
-                            | "0.15.0"
-                    ) =>
+                    if !self.edition_at_least(ScoreEdition::V0_7) =>
                 {
                     return Err("placement_groups requires Score version 0.7.0");
                 }
                 GroupLayout::Scatter | GroupLayout::Tile
-                    if !matches!(
-                        self.version.as_str(),
-                        "0.8.0"
-                            | "0.9.0"
-                            | "0.10.0"
-                            | "0.11.0"
-                            | "0.12.0"
-                            | "0.13.0"
-                            | "0.14.0"
-                            | "0.15.0"
-                    ) =>
+                    if !self.edition_at_least(ScoreEdition::V0_8) =>
                 {
                     return Err("scatter and tile placement_groups require Score version 0.8.0");
                 }
@@ -2101,12 +2184,7 @@ impl Score {
                 );
             }
             previous_end = group.end;
-            if !group.members.is_empty()
-                && !matches!(
-                    self.version.as_str(),
-                    "0.9.0" | "0.10.0" | "0.11.0" | "0.12.0" | "0.13.0" | "0.14.0" | "0.15.0"
-                )
-            {
+            if !group.members.is_empty() && !self.edition_at_least(ScoreEdition::V0_9) {
                 return Err("placement members require Score version 0.9.0");
             }
             if is_compact {
@@ -2240,21 +2318,7 @@ impl Score {
     pub fn validate_schema_edition(&self) -> Result<(), &'static str> {
         self.validate_compact_score_0_10()?;
         self.validate_mirror_relations()?;
-        if !self.anchors.is_empty()
-            && !matches!(
-                self.version.as_str(),
-                "0.6.0"
-                    | "0.7.0"
-                    | "0.8.0"
-                    | "0.9.0"
-                    | "0.10.0"
-                    | "0.11.0"
-                    | "0.12.0"
-                    | "0.13.0"
-                    | "0.14.0"
-                    | "0.15.0"
-            )
-        {
+        if !self.anchors.is_empty() && !self.edition_at_least(ScoreEdition::V0_6) {
             return Err("anchors requires Score version 0.6.0");
         }
         for anchor in &self.anchors {
@@ -2295,10 +2359,7 @@ impl Score {
                     }
                     match position {
                         TargetPathPosition::Exact(position) => {
-                            if !matches!(
-                                self.version.as_str(),
-                                "0.11.0" | "0.12.0" | "0.13.0" | "0.14.0" | "0.15.0"
-                            ) {
+                            if !self.edition_at_least(ScoreEdition::V0_11) {
                                 return Err(
                                     "relation target_path_position requires Score version 0.11.0",
                                 );
@@ -2310,7 +2371,7 @@ impl Score {
                             }
                         }
                         TargetPathPosition::Selection(TargetPathSelection::Interior) => {
-                            if !matches!(self.version.as_str(), "0.13.0" | "0.14.0" | "0.15.0") {
+                            if !self.edition_at_least(ScoreEdition::V0_13) {
                                 return Err(
                                     "relation interior target_path_position requires Score version 0.13.0",
                                 );
@@ -2333,10 +2394,7 @@ impl Score {
                     return Err("relation target path position and endpoint are exclusive");
                 }
                 if relation.target_endpoint.is_some() {
-                    if !matches!(
-                        self.version.as_str(),
-                        "0.12.0" | "0.13.0" | "0.14.0" | "0.15.0"
-                    ) {
+                    if !self.edition_at_least(ScoreEdition::V0_12) {
                         return Err("relation target_endpoint requires Score version 0.12.0");
                     }
                     if relation.kind != RelationType::Connected
@@ -2349,19 +2407,7 @@ impl Score {
                     }
                 }
                 if let Some(anchor_index) = relation.target_anchor_index {
-                    if !matches!(
-                        self.version.as_str(),
-                        "0.6.0"
-                            | "0.7.0"
-                            | "0.8.0"
-                            | "0.9.0"
-                            | "0.10.0"
-                            | "0.11.0"
-                            | "0.12.0"
-                            | "0.13.0"
-                            | "0.14.0"
-                            | "0.15.0"
-                    ) {
+                    if !self.edition_at_least(ScoreEdition::V0_6) {
                         return Err("relation target_anchor_index requires Score version 0.6.0");
                     }
                     if anchor_index >= self.anchors.len() {
@@ -2370,20 +2416,7 @@ impl Score {
                 }
             }
             if instruction.surface_intensity != SurfaceIntensity::Normal {
-                if self.version != "0.3.0"
-                    && self.version != "0.4.0"
-                    && self.version != "0.5.0"
-                    && self.version != "0.6.0"
-                    && self.version != "0.7.0"
-                    && self.version != "0.8.0"
-                    && self.version != "0.9.0"
-                    && self.version != "0.10.0"
-                    && self.version != "0.11.0"
-                    && self.version != "0.12.0"
-                    && self.version != "0.13.0"
-                    && self.version != "0.14.0"
-                    && self.version != "0.15.0"
-                {
+                if !self.edition_at_least(ScoreEdition::V0_3) {
                     return Err("surface_intensity requires Score version 0.3.0");
                 }
                 let closed = matches!(
@@ -2411,32 +2444,13 @@ impl Score {
                     return Err("surface_intensity requires a closed solid fill");
                 }
             }
-            if instruction.ink_spread.is_some()
-                && !matches!(
-                    self.version.as_str(),
-                    "0.12.0" | "0.13.0" | "0.14.0" | "0.15.0"
-                )
-            {
+            if instruction.ink_spread.is_some() && !self.edition_at_least(ScoreEdition::V0_12) {
                 return Err("ink_spread requires Score version 0.12.0");
             }
             if instruction.arc_form != Some(ArcForm::Crescent) {
                 continue;
             }
-            if self.version != "0.2.0"
-                && self.version != "0.3.0"
-                && self.version != "0.4.0"
-                && self.version != "0.5.0"
-                && self.version != "0.6.0"
-                && self.version != "0.7.0"
-                && self.version != "0.8.0"
-                && self.version != "0.9.0"
-                && self.version != "0.10.0"
-                && self.version != "0.11.0"
-                && self.version != "0.12.0"
-                && self.version != "0.13.0"
-                && self.version != "0.14.0"
-                && self.version != "0.15.0"
-            {
+            if !self.edition_at_least(ScoreEdition::V0_2) {
                 return Err("arc_form requires Score version 0.2.0");
             }
             if instruction.primitive != Primitive::Arc {
@@ -2473,21 +2487,7 @@ impl Score {
         if self.transform_groups.is_empty() {
             return Ok(());
         }
-        if !matches!(
-            self.version.as_str(),
-            "0.4.0"
-                | "0.5.0"
-                | "0.6.0"
-                | "0.7.0"
-                | "0.8.0"
-                | "0.9.0"
-                | "0.10.0"
-                | "0.11.0"
-                | "0.12.0"
-                | "0.13.0"
-                | "0.14.0"
-                | "0.15.0"
-        ) {
+        if !self.edition_at_least(ScoreEdition::V0_4) {
             return Err("transform_groups requires Score version 0.4.0");
         }
 
@@ -2522,17 +2522,7 @@ impl Score {
             if !group.translate_x.is_finite() || !group.translate_y.is_finite() {
                 return Err("transform group translation must be finite");
             }
-            if self.version != "0.5.0"
-                && self.version != "0.6.0"
-                && self.version != "0.7.0"
-                && self.version != "0.8.0"
-                && self.version != "0.9.0"
-                && self.version != "0.10.0"
-                && self.version != "0.11.0"
-                && self.version != "0.12.0"
-                && self.version != "0.13.0"
-                && self.version != "0.14.0"
-                && self.version != "0.15.0"
+            if !self.edition_at_least(ScoreEdition::V0_5)
                 && (group.scale_x != 1.0
                     || group.scale_y != 1.0
                     || group.translate_x != 0.0
@@ -2563,21 +2553,7 @@ impl Score {
                     return Err("transform group anchor_indices must be unique");
                 }
             }
-            if !group.anchor_indices.is_empty()
-                && !matches!(
-                    self.version.as_str(),
-                    "0.6.0"
-                        | "0.7.0"
-                        | "0.8.0"
-                        | "0.9.0"
-                        | "0.10.0"
-                        | "0.11.0"
-                        | "0.12.0"
-                        | "0.13.0"
-                        | "0.14.0"
-                        | "0.15.0"
-                )
-            {
+            if !group.anchor_indices.is_empty() && !self.edition_at_least(ScoreEdition::V0_6) {
                 return Err("transform group anchor_indices requires Score version 0.6.0");
             }
 

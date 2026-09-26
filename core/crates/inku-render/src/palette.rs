@@ -13,20 +13,6 @@ const HINT_HUE_PRIORITY: [&str; 9] = [
 ];
 const OKLCH_CHROMA_FLOOR: f64 = 0.035;
 
-fn color_name(color: Color) -> &'static str {
-    match color {
-        Color::White => "white",
-        Color::Black => "black",
-        Color::Blue => "blue",
-        Color::Red => "red",
-        Color::Green => "green",
-        Color::Gray => "gray",
-        Color::Yellow => "yellow",
-        Color::Orange => "orange",
-        Color::Purple => "purple",
-    }
-}
-
 #[must_use]
 pub fn default_color(color: Color) -> &'static str {
     match color {
@@ -57,12 +43,7 @@ pub fn default_color_map() -> BTreeMap<String, String> {
         Color::Purple,
     ]
     .into_iter()
-    .map(|color| {
-        (
-            color_name(color).to_owned(),
-            default_color(color).to_owned(),
-        )
-    })
+    .map(|color| (color.as_str().to_owned(), default_color(color).to_owned()))
     .collect()
 }
 
@@ -495,7 +476,7 @@ pub fn resolve_color(
     color_map: &BTreeMap<String, String>,
     assignment: &BTreeMap<String, String>,
 ) -> String {
-    let name = color_name(color);
+    let name = color.as_str();
     let fallback = assignment
         .get(name)
         .or_else(|| color_map.get(name))

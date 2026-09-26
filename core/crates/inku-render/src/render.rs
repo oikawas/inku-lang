@@ -22,10 +22,11 @@ use crate::performance::PerformanceRequest;
 pub use crate::render_fill_scopes::CompatFillClipPolicy;
 use crate::render_fill_scopes::FillPaintForest;
 use crate::support::{DEFAULT_SUPPORT, support_for_ground};
+use crate::surface_geometry::mark_bbox;
 use crate::surfaces::render_surface;
 use crate::svg::{Document, Element, format_number};
 use crate::types::{
-    Canvas, CanvasGroundSpec, Color, Instruction, InstructionMode, Primitive, RenderMetadata,
+    Canvas, CanvasGroundSpec, Instruction, InstructionMode, Primitive, RenderMetadata,
     RenderOutput, RenderRequest, Score, SurfaceTexture, SurfaceTextureMetadata, SvgProfile,
 };
 use crate::{RENDER_ENGINE_ID, RENDER_ENGINE_VERSION};
@@ -51,6 +52,14 @@ pub enum RenderError {
     InvalidCanvas,
     /// A value that sets renderer work lies outside its `score.schema.json` range.
     InvalidScore(&'static str),
+    /// One performed mark spans more than [`MAX_MARK_EXTENT`] canvas lengths.
+    MarkTooLarge {
+        instruction_index: usize,
+    },
+    /// The drawn marks and their definitions exceed the document's allowance.
+    OutputTooLarge {
+        allowed_bytes: usize,
+    },
 }
 
 impl fmt::Display for RenderError {
@@ -70,6 +79,15 @@ impl fmt::Display for RenderError {
             Self::NonFiniteSvg => formatter.write_str("rendered SVG contains a non-finite value"),
             Self::InvalidCanvas => formatter.write_str("canvas size must be finite and positive"),
             Self::InvalidScore(reason) => write!(formatter, "invalid Score: {reason}"),
+            Self::MarkTooLarge { instruction_index } => write!(
+                formatter,
+                "a mark of instruction {instruction_index} spans more than \
+                 {MAX_MARK_EXTENT} canvas lengths"
+            ),
+            Self::OutputTooLarge { allowed_bytes } => write!(
+                formatter,
+                "drawn marks exceed the output allowance of {allowed_bytes} bytes"
+            ),
         }
     }
 }
@@ -134,20 +152,6 @@ pub fn build_render_metadata(score: &Score, profile: SvgProfile) -> RenderMetada
     }
 }
 
-fn color_name(color: Color) -> &'static str {
-    match color {
-        Color::White => "white",
-        Color::Black => "black",
-        Color::Blue => "blue",
-        Color::Red => "red",
-        Color::Green => "green",
-        Color::Gray => "gray",
-        Color::Yellow => "yellow",
-        Color::Orange => "orange",
-        Color::Purple => "purple",
-    }
-}
-
 fn safe_svg_id(value: &str) -> String {
     let mut safe = String::with_capacity(value.len());
     let mut separator = false;
@@ -169,32 +173,18 @@ fn safe_svg_id(value: &str) -> String {
     }
 }
 
-fn primitive_name(primitive: Primitive) -> &'static str {
-    match primitive {
-        Primitive::Line => "line",
-        Primitive::Circle => "circle",
-        Primitive::Ellipse => "ellipse",
-        Primitive::Triangle => "triangle",
-        Primitive::Square => "square",
-        Primitive::Polygon => "polygon",
-        Primitive::Arc => "arc",
-        Primitive::Point => "point",
-        Primitive::Cloudform => "cloudform",
-    }
-}
-
 fn instruction_id(instruction: &Instruction, index: usize) -> String {
     safe_svg_id(&format!(
         "instruction_{index:03}_{}_{}",
-        primitive_name(instruction.primitive),
-        color_name(instruction.color)
+        instruction.primitive.as_str(),
+        instruction.color.as_str()
     ))
 }
 
 fn mark_id(instruction: &Instruction, instruction_index: usize, mark_index: usize) -> String {
     safe_svg_id(&format!(
         "mark_{instruction_index:03}_{mark_index:03}_{}",
-        primitive_name(instruction.primitive)
+        instruction.primitive.as_str()
     ))
 }
 
@@ -202,7 +192,7 @@ fn background_color(
     request: &RenderRequest,
     assignment: &std::collections::BTreeMap<String, String>,
 ) -> String {
-    let name = color_name(request.score.background);
+    let name = request.score.background.as_str();
     assignment
         .get(name)
         .or_else(|| request.options.resolved_color_map.get(name))
@@ -237,6 +227,76 @@ fn document_metadata(profile: SvgProfile) -> (String, String) {
     }
 }
 
+/// The most canvas lengths one performed mark may span, after its group transform.
+///
+/// Fill and texture scanlines stop at 4,096 per layer, but each scanline makes
+/// one stroke per span inside the contour, so a wash cloudform 4,096 canvases
+/// tall drew 122,960 strokes (a 302 MB SVG). Saved marks span at most 1.7.
+pub const MAX_MARK_EXTENT: f64 = 8.0;
+
+/// Serialized bytes the drawn marks and their definitions may reach.
+///
+/// Every mark adds a share to a fixed base, so the limit grows with the marks
+/// a host authorized. Saved works stay far below it: at most 7 MB over 12,798
+/// renders, and the Server measures about 16 KB per mark.
+#[derive(Clone, Copy, Debug)]
+struct OutputAllowance {
+    per_mark: usize,
+    allowed: usize,
+    spent: usize,
+}
+
+impl Default for OutputAllowance {
+    fn default() -> Self {
+        Self::new(16 << 20, 64 << 10)
+    }
+}
+
+impl OutputAllowance {
+    const fn new(base: usize, per_mark: usize) -> Self {
+        Self {
+            per_mark,
+            allowed: base,
+            spent: 0,
+        }
+    }
+
+    fn add_mark(&mut self) {
+        self.allowed = self.allowed.saturating_add(self.per_mark);
+    }
+
+    fn spend<'a>(
+        &mut self,
+        elements: impl IntoIterator<Item = &'a Element>,
+    ) -> Result<(), RenderError> {
+        for element in elements {
+            self.spent = self.spent.saturating_add(element.unescaped_len());
+        }
+        if self.spent > self.allowed {
+            return Err(RenderError::OutputTooLarge {
+                allowed_bytes: self.allowed,
+            });
+        }
+        Ok(())
+    }
+}
+
+/// Refuse a mark whose fills and textures would grow past any saved work.
+fn check_mark_extent(
+    instruction: &Instruction,
+    context: MarkContext<'_>,
+) -> Result<(), RenderError> {
+    let limit = MAX_MARK_EXTENT * context.canvas.unit();
+    match mark_bbox(instruction, context) {
+        Some((_, _, width, height)) if !(width.abs() <= limit && height.abs() <= limit) => {
+            Err(RenderError::MarkTooLarge {
+                instruction_index: context.instruction_index,
+            })
+        }
+        _ => Ok(()),
+    }
+}
+
 /// Refuse a request whose canvas or Score values no host could have produced.
 ///
 /// Both entry points check this before any expansion, because the work of
@@ -256,13 +316,49 @@ fn validate_request(request: &RenderRequest) -> Result<(), RenderError> {
         .map_err(RenderError::InvalidScore)
 }
 
+/// Absolute maxima for [`render`], the entry that receives no host authority.
+///
+/// Its hosts coerce a legacy Score to their own limits first. The Server lets
+/// an administrator raise each limit to at most 100,000 (a typo guard), so
+/// marks and instructions stop there. Anchors and groups stop at 4,096, the
+/// Server's maximum for anchors and transform groups in new works, because
+/// scheduling compares every pair of groups with their anchor lists. Only the
+/// dimensions that legacy demand counts are bounded.
+fn absolute_render_policy() -> inku_score::HardResourcePolicy {
+    let maximum = inku_score::ResourceDemand {
+        logical_objects: u64::MAX,
+        primitive_marks: 100_000,
+        object_templates: 100_000,
+        maximum_per_template_primitive_marks: u64::MAX,
+        maximum_resolved_count: u64::MAX,
+        template_nodes: u64::MAX,
+        anchor_instances: 4_096,
+        transform_instances: 4_096,
+        placement_instances: 4_096,
+        fill_instances: 4_096,
+    };
+    inku_score::HardResourcePolicy {
+        identity: "inku.render.absolute.v1".to_owned(),
+        budget: inku_score::ResourceBudget { maximum },
+    }
+}
+
 /// Render a canonical Score through the complete portable request boundary.
 ///
-/// This entry performs no resource accounting. Its hosts coerce the Score to
-/// their limits first; untrusted Scores go through [`render_with_resources`].
+/// This entry takes no host resource authority. Its hosts coerce the Score to
+/// their limits first, and it refuses only what no host limit allows (an
+/// arrangement count of 4.3 billion kept it computing positions for more than
+/// 20 minutes). Untrusted Scores go through [`render_with_resources`].
 pub fn render(request: RenderRequest) -> Result<RenderOutput, RenderError> {
     validate_request(&request)?;
-    render_impl(request, None, &[])
+    let absolute = absolute_render_policy();
+    inku_score::check_legacy_resource_demand(
+        &request.score,
+        &absolute,
+        inku_score::OperationalResourceBudget(absolute.budget),
+    )
+    .map_err(RenderError::ResourceAuthority)?;
+    render_impl(request, None, &[], OutputAllowance::default())
 }
 
 /// Render a typed Score with independently authorized resource policies.
@@ -281,6 +377,7 @@ pub fn render_with_resources(
             request.clone(),
             Some((hard_policy, operational_budget, clip_policy)),
             &excluded,
+            OutputAllowance::default(),
         )?;
         let mut changed = false;
         if let Some(execution) = &mut output.metadata.execution {
@@ -317,7 +414,8 @@ pub fn render_with_resources(
 /// instruction then expands its arrangement and draws its marks; fill scopes
 /// are clipped as a whole afterwards, with `omitted_instructions` excluded by
 /// the caller's retry. Plate tone, presence and ground complete the layers,
-/// and the document is serialized once.
+/// and the document is serialized once. Every mark's extent is checked before
+/// it is drawn, and what it draws is charged to `allowance`.
 fn render_impl(
     request: RenderRequest,
     resources: Option<(
@@ -326,6 +424,7 @@ fn render_impl(
         CompatFillClipPolicy,
     )>,
     omitted_instructions: &[usize],
+    mut allowance: OutputAllowance,
 ) -> Result<RenderOutput, RenderError> {
     let source_score = request.score.clone();
     let profile = request.options.svg_profile;
@@ -508,6 +607,8 @@ fn render_impl(
                     .in_pixels(request.options.canvas.unit()),
                 ..first_context
             };
+            check_mark_extent(instruction, first_context)?;
+            check_mark_extent(follower, follower_context)?;
             if let Some(fill) =
                 render_closed_arc_pair_fill(instruction, first_context, follower, follower_context)?
             {
@@ -515,10 +616,14 @@ fn render_impl(
                     closed_arc_pair_spread_marks.insert(performed_index);
                     closed_arc_pair_spread_marks.insert(follower_performed_index);
                 }
+                let definitions_start = material_definitions.len();
                 material_definitions.extend(accepted_fills::closed_contour_definitions(
                     follower,
                     follower_context,
                 ));
+                allowance.spend(
+                    std::iter::once(&fill).chain(&material_definitions[definitions_start..]),
+                )?;
                 if structured || has_fill_scopes {
                     instruction_group.push(fill);
                 } else {
@@ -542,6 +647,9 @@ fn render_impl(
                 geometry_transform: instruction_transform.in_pixels(request.options.canvas.unit()),
                 oil_fill_pass_limit,
             };
+            check_mark_extent(single, context)?;
+            allowance.add_mark();
+            let definitions_start = (material_definitions.len(), surface_definitions.len());
             if profile != SvgProfile::Compat
                 && owns_surface(single.primitive)
                 && is_noncomputer_solid_fill(single)
@@ -568,6 +676,11 @@ fn render_impl(
             } else {
                 crate::ink_spread::wrap(mark, single, context)
             };
+            allowance.spend(
+                std::iter::once(&mark)
+                    .chain(&material_definitions[definitions_start.0..])
+                    .chain(&surface_definitions[definitions_start.1..]),
+            )?;
             if structured || has_fill_scopes {
                 if structured {
                     mark.set_attr("id", mark_id(single, instruction_index, mark_index));
@@ -751,4 +864,41 @@ fn render_impl(
     }
     metadata.execution = performance.execution;
     Ok(RenderOutput { svg, metadata })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::types::{CanvasSize, RenderOptions};
+
+    #[test]
+    fn marks_past_the_output_allowance_are_refused() {
+        // Stands in for many marks within the extent limit that together would
+        // draw hundreds of megabytes; a small allowance keeps the test fast.
+        let request = RenderRequest {
+            score: serde_json::from_str(
+                r#"{"version":"0.9.0","instructions":[{"primitive":"circle",
+                "center":[0.5,0.5],"radius":0.3,"filled":true}]}"#,
+            )
+            .expect("Score"),
+            options: RenderOptions {
+                resolved_color_map: std::collections::BTreeMap::new(),
+                catalog_id: None,
+                canvas: CanvasSize::new(1000.0, 1000.0),
+                canvas_aspect_id: "square".to_owned(),
+                svg_profile: SvgProfile::Display,
+                render_seed: Some(7),
+                composition_seed: None,
+                wild: false,
+                error_policy: Default::default(),
+            },
+        };
+        let error = render_impl(request, None, &[], OutputAllowance::new(1_000, 10)).unwrap_err();
+        assert_eq!(
+            error,
+            RenderError::OutputTooLarge {
+                allowed_bytes: 1_010
+            }
+        );
+    }
 }

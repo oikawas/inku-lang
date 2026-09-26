@@ -22,6 +22,10 @@ The route count (107) is unchanged. DDL, Score, and render versions are unchange
 
 The route count (107) is unchanged. DDL, Score, and render versions are unchanged.
 
+### 2026-09-26 — the shared pipeline reports the provider attempt in flight
+
+Provider effects such as Stage 1 have a per-attempt timeout and a retry budget, but the Web and Android screens showed only elapsed time, so a user could not tell a slow answer from a first attempt that had timed out and was being retried. From a stored snapshot, the shared pipeline now reports the running effect's kind (such as `generate_normalized_ddl`), its one-based attempt number, the most attempts the stage's retry policy allows, and the attempt's delay and timeout in milliseconds (`pipeline_provider_attempt` in Python, `providerAttempt` on Android). The core keeps the mapping from stage to policy, such as a sketch without its own policy using the catalog selection policy. The core keeps no clock, so a host computes the deadline from the time it started the attempt. The binding version (1.1.0) and the byte protocol are unchanged. The Server and Android each draw their own display.
+
 ### 2026-09-26 — alternation and a mirror work in one description (DDL engine 49)
 
 A description that both alternated members, such as "alternate pencil and thick brush and line up five lines", and mirrored a shape ("mirrored with the previous shape") stopped the whole work. The mirror makes the Score 0.15, but Score validation accepted the alternation's `cycle_members` only in 0.14, an edition list left unchanged when 0.15 was added. Every edition keeps the fields of the editions before it, so 0.14 and later accept them. The same description now compiles to a different result, so the DDL engine is 49. The DDL and Score formats and the render version are unchanged, and saved works do not change.

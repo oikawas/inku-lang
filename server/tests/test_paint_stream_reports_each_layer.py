@@ -96,6 +96,27 @@ def test_a_run_without_a_sketch_does_not_name_one(monkeypatch) -> None:
     assert [event["event"] for event in _events(response)] == ["stage1", "score", "done"]
 
 
+def test_a_retry_is_reported_as_its_own_attempt(monkeypatch) -> None:
+    # W4: a first attempt that timed out read as a slow answer.
+    def running(attempt: int) -> dict:
+        return {**_view(busy=True), "provider_attempt": {
+            "action": "generate_normalized_ddl", "attempt": attempt, "max_attempts": 4,
+            "delay_ms": "0", "timeout_ms": "300000", "deadline_at": 1,
+        }}
+
+    service = _Service([
+        running(1), running(1), running(2),
+        _view(busy=False, document=DDL, score={"instructions": [{}]}, phase="score_ready"),
+    ])
+    events = _events(_client(monkeypatch, service).post("/api/paint/stream", json={"description": "円"}))
+    assert [event["event"] for event in events] == ["attempt", "attempt", "stage1", "score", "attempt", "done"]
+    assert [event["provider_attempt"] for event in events if event["event"] == "attempt"] == [
+        {"action": "generate_normalized_ddl", "attempt": 1, "max_attempts": 4},
+        {"action": "generate_normalized_ddl", "attempt": 2, "max_attempts": 4},
+        None,
+    ]
+
+
 def test_a_refusal_before_any_layer_keeps_its_http_status(monkeypatch) -> None:
     service = _Service([], refuse=HTTPException(400, "description is only labels"))
     response = _client(monkeypatch, service).post("/api/paint/stream", json={"description": "01. [出典]"})

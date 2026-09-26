@@ -246,7 +246,8 @@ _SKETCH_SETTLED = {"supplemented": "supplemented", "supplied": "supplemented",
 
 
 def _progress(owner: str, view: dict, started: float, sent: set[str]) -> Iterator[dict]:
-    """Each layer that has settled in this view and has not been reported yet."""
+    """Each layer that has settled in this view and has not been reported yet,
+    then the provider attempt when it has changed."""
     elapsed = int((time.monotonic() - started) * 1000)
     sketch = view.get("sketch") or {}
     if "sketch" not in sent and sketch.get("state") in _SKETCH_SETTLED:
@@ -267,6 +268,17 @@ def _progress(owner: str, view: dict, started: float, sent: set[str]) -> Iterato
         yield {"event": "score", "instruction_count": len(score.get("instructions") or []),
                "stage2_model": options.get("stage2_model"),
                "tokens_in": None, "tokens_out": None, "elapsed_ms": elapsed}
+    # Each provider attempt as it begins, and its end once no other follows,
+    # so a timed-out attempt reads as a retry rather than a slow answer.
+    attempt = view.get("provider_attempt")
+    running = f"attempt:{attempt['action']}:{attempt['attempt']}" if attempt else None
+    reported = next((key for key in sent if key.startswith("attempt:")), None)
+    if running != reported:
+        sent.discard(reported)
+        if running is not None:
+            sent.add(running)
+        shown = None if attempt is None else {key: attempt[key] for key in ("action", "attempt", "max_attempts")}
+        yield {"event": "attempt", "provider_attempt": shown, "elapsed_ms": elapsed}
 
 
 def paint_events(owner: str, data: dict[str, Any], idempotency_key: str | None) -> Iterator[dict]:

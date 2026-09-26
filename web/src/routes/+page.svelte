@@ -2619,6 +2619,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 								elapsedMs={work.liveMs}
 								tokensIn={work.activeRunTokensIn}
 								tokensOut={work.activeRunTokensOut}
+								attempt={work.activeRunAttempt}
 								onStop={work.stopDemo}
 							/>
 						</div>
@@ -2669,6 +2670,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 						stage2ModelLabel={work.stage2ModelLabel}
 						runTokensIn={work.activeRunTokensIn}
 						runTokensOut={work.activeRunTokensOut}
+						runAttempt={work.activeRunAttempt}
 						{nextStage1Model}
 						{nextStage2Model}
 						{nextCatalogName}
@@ -2723,6 +2725,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 							elapsedMs={work.liveMs}
 							tokensIn={work.activeRunTokensIn}
 							tokensOut={work.activeRunTokensOut}
+							attempt={work.activeRunAttempt}
 							onStop={work.stopDdlRender}
 						/>
 					{/snippet}
@@ -2954,6 +2957,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				{refinementSession}
 				runTokensIn={work.activeRunTokensIn}
 				runTokensOut={work.activeRunTokensOut}
+				runAttempt={work.activeRunAttempt}
 				{modelInspection}
 				bind:touchSeedText={work.touchSeedText}
 				onGenerateVariationCandidates={refinement.generateVariationCandidates}
@@ -3069,6 +3073,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			onSelectDrawingModel={selectDdlDialogDrawingModel}
 			runTokensIn={work.activeRunTokensIn}
 			runTokensOut={work.activeRunTokensOut}
+			runAttempt={work.activeRunAttempt}
 			error={ddlDialogError}
 			previewForWord={saijikiPreview}
 			previewForPlugin={pluginPreview}
@@ -3092,6 +3097,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		liveMs={work.liveMs}
 		runTokensIn={work.activeRunTokensIn}
 		runTokensOut={work.activeRunTokensOut}
+		runAttempt={work.activeRunAttempt}
 		waitingSeconds={demo.waitingSeconds}
 		currentLiveMs={demo.currentLiveMs}
 		currentElapsedMs={demo.currentElapsedMs}

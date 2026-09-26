@@ -2,6 +2,7 @@
 
 import json
 import logging
+import time
 
 import pytest
 from sqlalchemy import create_engine
@@ -181,6 +182,43 @@ def test_real_binding_commits_source_and_authority_before_automatic_hole_request
     with pytest.raises(CandidateHostError, match="description_locked"):
         run.command({"tag": "generate_from_description", "expected_revision": "2", "description": "overwrite", "auto_catalog": False})
     assert store.read("acceptance", view["variation_id"])["document"]["source"] == edited
+    engine.dispose()
+
+
+def test_a_running_model_call_is_numbered_and_given_a_deadline(tmp_path):
+    # W4: the page showed only elapsed time, so a first attempt that timed out
+    # looked like a slow answer.
+    binding = PipelineBinding()
+    engine = create_engine(f"sqlite:///{tmp_path / 'candidate.db'}")
+    store = VariationAuthorityStore(engine)
+    store.install_schema()
+    seen = []
+
+    def provider(action):
+        seen.append((time.time() * 1000, run.view()["provider_attempt"]))
+        if action["identity"]["attempt"] == 1:
+            return {"tag": "provider_failed", "identity": action["identity"],
+                    "failure": "transport_timeout", "elapsed_ms": "1000"}
+        return {
+            "tag": "normalized_ddl_generated", "identity": action["identity"],
+            "response": json.dumps({"normalized_ddl": "place one black circle at center."}),
+            "elapsed_ms": "1",
+        }
+
+    run = CandidateExecution(binding, store, owner_id="acceptance", config=_fixture_config(), provider=provider)
+    run.start_new({"tag": "description", "description": "One quiet black circle", "auto_catalog": False})
+    # Not begun yet, as after a restart: numbered, but no deadline to show.
+    assert "deadline_at" not in run.view()["provider_attempt"]
+    run.run_effect()
+    run.run_effect()
+
+    assert [(attempt["action"], attempt["attempt"], attempt["max_attempts"]) for _, attempt in seen] == [
+        ("generate_normalized_ddl", 1, 2), ("generate_normalized_ddl", 2, 2),
+    ]
+    for called, attempt in seen:
+        # The deadline counts from before the delay, so it falls within the timeout of the call.
+        assert 0 < attempt["deadline_at"] - called <= int(attempt["timeout_ms"])
+    assert "provider_attempt" not in run.view()
     engine.dispose()
 
 

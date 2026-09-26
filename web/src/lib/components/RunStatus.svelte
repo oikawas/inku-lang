@@ -16,6 +16,7 @@
 	import StopButton from './StopButton.svelte';
 	import { t } from '$lib/i18n/index.svelte';
 	import { getMascot } from '$lib/mascot.svelte';
+	import { providerAttemptText, type ProviderAttemptCount } from '$lib/paintStream';
 
 	type Props = {
 		label: string;
@@ -30,6 +31,8 @@
 		/** Concurrent-job progress. Shown in the meta line when total > 1. */
 		progressDone?: number | null;
 		progressTotal?: number | null;
+		/** The model call being waited on, when the run reports one. */
+		attempt?: ProviderAttemptCount | null;
 		tokensIn?: number | null;
 		tokensOut?: number | null;
 		stopLabel?: string;
@@ -46,6 +49,7 @@
 		elapsedMs = null,
 		progressDone = null,
 		progressTotal = null,
+		attempt = null,
 		tokensIn = null,
 		tokensOut = null,
 		stopLabel,
@@ -68,6 +72,7 @@
 			? t().runStatusProgress(progressDone, progressTotal)
 			: ''
 	);
+	const attemptText = $derived(providerAttemptText(attempt, t()));
 	const elapsedText = $derived(
 		elapsedMs === null ? '' : t().runStatusElapsed((elapsedMs / 1000).toFixed(1))
 	);
@@ -88,6 +93,7 @@
 		{#if modelLine}<span class="run-model">{modelLine}</span>{/if}
 		<span class="run-meta">
 			{#if progressText}<span class="run-progress">{progressText}</span>{/if}
+			{#if attemptText}<span class:run-progress={(attempt?.attempt ?? 1) > 1}>{attemptText}</span>{/if}
 			{#if elapsedText}<span>{elapsedText}</span>{/if}
 			<span>{tokenText}</span>
 		</span>

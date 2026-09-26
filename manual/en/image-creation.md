@@ -519,7 +519,7 @@ Flags you omit fall back to the server defaults, and the server defaults are not
 | The lines are too tidy | Turn `Wild` on |
 | Too many elements | State the count explicitly, as in `three lines` or `twelve` |
 | A stated count is reduced | Check the literal ceiling under `Limits` in the settings |
-| Painting is slow | Wait on the provider's queue, or choose a lighter model |
+| Painting is slow | If the running indicator says `Retrying (try 2/4)`, an earlier attempt timed out or its answer could not be used. Wait on the provider's queue, or choose a lighter model |
 | An error is returned | Shorten the description and split it into one instruction per sentence |
 | Painting is refused | The concurrency ceiling has been reached. Wait a moment |
 | A comparison result is lost | Adopt or star the compared option to keep it in history |

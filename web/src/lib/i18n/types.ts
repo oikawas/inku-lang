@@ -171,6 +171,8 @@ export interface LangPack {
 	runStatusElapsed: (seconds: string) => string;
 	runStatusTokens: (input: string, output: string) => string;
 	runStatusProgress: (done: number, total: number) => string;
+	runStatusAwaitingReply: (attempt: number, maxAttempts: number) => string;
+	runStatusRetrying: (attempt: number, maxAttempts: number) => string;
 	runStatusStage1: string;
 	runStatusStage2: string;
 	stageDdlGenerating: string;

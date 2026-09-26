@@ -27,6 +27,7 @@ import { CanvasViewportState } from '$lib/features/canvas/viewport-state.svelte'
 import type { SaveHistoryOptions } from '$lib/features/history/save';
 import { PipelineApi, PipelineApiError, pipelineDiagnostics, pipelinePatch, pipelineViewFromErrorDetail, type PipelineOptions, type PipelineView } from '$lib/features/pipeline/api';
 import { PipelineController } from '$lib/features/pipeline/controller';
+import type { ProviderAttemptCount } from '$lib/paintStream';
 
 type Iteration = HistoryItem;
 type BatchPaintResult = PaintResult & { ddl: string; thinking: string | null; };
@@ -248,6 +249,7 @@ export function createWorkState(deps: WorkStateDeps) {
 
 	function adoptPipelineView(view: PipelineView | null): void {
 		pipelineView = view;
+		activeRunAttempt = view?.provider_attempt ?? null;
 		if (!view) return;
 		input = view.description;
 		stage1UserPrompt = view.description;
@@ -304,6 +306,7 @@ export function createWorkState(deps: WorkStateDeps) {
 			throw cause;
 		} finally {
 			pipelineBusy = false;
+			activeRunAttempt = null;
 		}
 	}
 
@@ -409,6 +412,10 @@ export function createWorkState(deps: WorkStateDeps) {
 
 	let activeRunTokensOut = $state<number | null>(null);
 
+	// The model call that paint waits on, as its pipeline view or its stream
+	// reports it; null between calls and once the paint finishes.
+	let activeRunAttempt = $state<ProviderAttemptCount | null>(null);
+
 	// Flows that issue several paints per run keep their own running totals.
 	function addTokens(total: number | null, delta: number | null | undefined): number | null {
 		if (delta === null || delta === undefined) return total;
@@ -480,7 +487,8 @@ export function createWorkState(deps: WorkStateDeps) {
 				},
 				attachSavedLineage: () => { lineageDetached = false; },
 				updateGenerationCount: (count) => session.updateGenerationCount(count),
-				adoptPipelineView: (view) => pipelineController.adopt(view)
+				adoptPipelineView: (view) => pipelineController.adopt(view),
+				setProviderAttempt: (attempt) => { activeRunAttempt = attempt; }
 			}
 		);
 	}
@@ -1036,6 +1044,7 @@ export function createWorkState(deps: WorkStateDeps) {
 		set displayedHistoryItem(value) { displayedHistoryItem = value; },
 		get activeRunTokensIn() { return activeRunTokensIn; },
 		get activeRunTokensOut() { return activeRunTokensOut; },
+		get activeRunAttempt() { return activeRunAttempt; },
 		sketchTextFor,
 		sketchPayloadFor,
 		adoptSketch,

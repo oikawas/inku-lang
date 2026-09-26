@@ -224,6 +224,8 @@ export const en: LangPack = {
 	runStatusElapsed: (seconds) => `Elapsed ${seconds}s`,
 	runStatusTokens: (input, output) => `${input}→${output} tok`,
 	runStatusProgress: (done, total) => `${done}/${total} done`,
+	runStatusAwaitingReply: (attempt, maxAttempts) => `Awaiting reply (try ${attempt}/${maxAttempts})`,
+	runStatusRetrying: (attempt, maxAttempts) => `Retrying (try ${attempt}/${maxAttempts})`,
 	runStatusStage1: 'Interpretation',
 	runStatusStage2: 'Performance',
 	stageDdlGenerating: 'Interpreting your words…',

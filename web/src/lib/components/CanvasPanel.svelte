@@ -27,6 +27,7 @@
 	import type { SvgProfile } from '$lib/features/export/download';
 	import type { makeSavedWorkExportActions } from '$lib/features/export/saved-work-actions';
 	import type { CanvasStatusHistoryItem as HistoryItem } from '$lib/features/canvas/view-types';
+	import type { ProviderAttemptCount } from '$lib/paintStream';
 	import type {
 		RefinementSession,
 		RefineKind,
@@ -132,6 +133,7 @@
 		refinementSession: RefinementSession;
 		runTokensIn: number | null;
 		runTokensOut: number | null;
+		runAttempt?: ProviderAttemptCount | null;
 		/** The whole feature, so a new field costs no line here. */
 		modelInspection: ModelInspection;
 		touchSeedText: string;
@@ -256,6 +258,7 @@
 		refinementSession,
 		runTokensIn = null,
 		runTokensOut = null,
+		runAttempt = null,
 		modelInspection,
 		touchSeedText = $bindable(''),
 		onGenerateVariationCandidates,
@@ -821,7 +824,7 @@
 						onToggleForRevision={onToggleLineageForRevision} onOpenRefinement={openLineageRefinement}
 						onDrawDescription={onDrawLineageDescription} onOpenDdlEditor={onOpenLineageDdlEditor}
 						onDrawSketchGrain={onDrawLineageSketchGrain} {stageLabel} stage1ModelLabel={statusStage1Model}
-						stage2ModelLabel={statusStage2Model} {runTokensIn} {runTokensOut} onSaveOkugakiModel={onSaveOkugakiModel}
+						stage2ModelLabel={statusStage2Model} {runTokensIn} {runTokensOut} {runAttempt} onSaveOkugakiModel={onSaveOkugakiModel}
 						{onSaveVisionModel} onPromoteNode={onPromoteLineageNode} onSaveNote={onSaveLineageNote}
 						onAskTrash={onAskTrashLineage} onDetach={onDetachLineage} onLoadOverview={onLoadLineageOverview}
 						onLoadBranch={onLoadLineageBranch} {onPaintOne} {onVisionAdvice} {visionModel} {okugakiModel}
@@ -902,6 +905,7 @@
 		stage2ModelLabel={statusStage2Model}
 		tokensIn={runTokensIn}
 		tokensOut={runTokensOut}
+		attempt={runAttempt}
 		onClose={closeDirectEdit}
 		onDrawDescription={onDrawLineageDescription}
 		onDrawSketchGrain={onDrawLineageSketchGrain}

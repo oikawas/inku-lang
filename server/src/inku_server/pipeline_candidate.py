@@ -153,6 +153,8 @@ class PipelineBinding:
             self.resolve_macro_catalog = module.pipeline_resolve_macro_catalog
             # Optional so an older native wheel keeps working without the explanations.
             self.explain_plugin_diagnostics = getattr(module, "pipeline_explain_plugin_diagnostics", None)
+            # Optional for the same reason; views then carry no attempt.
+            self.provider_attempt = getattr(module, "pipeline_provider_attempt", None)
         except (AttributeError, ImportError) as error:
             raise CandidateHostError("binding_unavailable") from error
         self.versions = json.loads(version_report())
@@ -186,6 +188,8 @@ class CandidateExecution:
         self._lock = threading.RLock()
         self._fresh = False
         self._provider_in_flight = False
+        # The provider action this host is running and when it began, in epoch ms.
+        self._attempt_began: tuple[dict, int] | None = None
         self.transcript: list[dict] = []
         self.last_output: dict | None = None
 
@@ -274,6 +278,7 @@ class CandidateExecution:
                             self.context["description"] = context.description
                 return self._advance({"tag": "effect_result", "result": result})
             self._provider_in_flight = True
+            self._attempt_began = (action, int(time.time() * 1000))
         try:
             # Cancellation can invalidate the action during bounded provider I/O.
             time.sleep(int(action["delay_ms"]) / 1000)
@@ -288,6 +293,7 @@ class CandidateExecution:
         finally:
             with self._lock:
                 self._provider_in_flight = False
+                self._attempt_began = None
 
     def view(self) -> dict:
         """Visible source/diagnostics and exact authority; not a resumable token."""
@@ -307,11 +313,32 @@ class CandidateExecution:
                            "result": self.context.get("result")})
             if self.context.get("provider_failure") is not None:
                 result["provider_failure"] = self.context["provider_failure"]
+            attempt = self._provider_attempt(state)
+            if attempt is not None:
+                result["provider_attempt"] = attempt
             if self.context.get("hole_completion_check") is not None:
                 result["hole_completion_check"] = self.context["hole_completion_check"]
             if self.context.get("host_options", {}).get("developer_capture_provider_io") is True:
                 result["provider_capture_requested"] = True
             return json.loads(_bytes(result))
+
+    def _provider_attempt(self, state: dict) -> dict | None:
+        """The provider attempt in flight, numbered and budgeted by the core.
+
+        The core keeps no clock, so the deadline counts from when this host
+        began the attempt; an attempt it has not begun has none.
+        """
+        report = getattr(self.binding, "provider_attempt", None)
+        action = state["action"]
+        if report is None or action is None or action["tag"] not in _ACTION_STAGES:
+            return None
+        attempt = json.loads(report(_bytes(state))).get("provider_attempt")
+        if attempt is None:
+            return None
+        began = self._attempt_began
+        if began is not None and began[0] == action:
+            attempt["deadline_at"] = began[1] + int(attempt["delay_ms"]) + int(attempt["timeout_ms"])
+        return attempt
 
     def snapshot(self) -> dict:
         """Internal harness/export API, not exposed on the HTTP author surface."""

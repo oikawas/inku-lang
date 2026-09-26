@@ -11,6 +11,7 @@
 	import PaintButton from './PaintButton.svelte';
 	import RunStatus from './RunStatus.svelte';
 	import type { CanvasAspectId, CanvasAspectOption } from '$lib/plugins/system/canvas-aspect';
+	import type { ProviderAttemptCount } from '$lib/paintStream';
 
 	type BatchFailure = {
 		line: number;
@@ -35,6 +36,7 @@
 		hideRunStatus?: boolean;
 		runTokensIn: number | null;
 		runTokensOut: number | null;
+		runAttempt?: ProviderAttemptCount | null;
 		singleDdlReady: boolean;
 		batchActiveLine: number | null;
 		batchObservedLine: number | null;
@@ -96,6 +98,7 @@
 		hideRunStatus = false,
 		runTokensIn,
 		runTokensOut,
+		runAttempt = null,
 		singleDdlReady,
 		batchActiveLine,
 		batchObservedLine,
@@ -211,7 +214,10 @@
 			<div class="condition-row">
 				<div class="condition-row-head">
 					<span class="condition-label">{t().modelButton}</span>
-					<Tooltip text={t().tooltipInputModel}>
+					<!-- The button sits at the panel's right edge. A centred bubble reached
+					     past it even while hidden, so the panel scrolled sideways and a
+					     swipe or a focus cut off the left of every row. -->
+					<Tooltip text={t().tooltipInputModel} placement="top-left">
 						<button class="ghost-btn condition-change" aria-label={t().tooltipInputModel} onclick={onOpenModelSelection}>{t().editButton}</button>
 					</Tooltip>
 				</div>
@@ -227,7 +233,7 @@
 			<div class="condition-row">
 				<div class="condition-row-head">
 					<span class="condition-label">{t().colorCatalogButton}</span>
-					<Tooltip text={t().tooltipInputCatalog}>
+					<Tooltip text={t().tooltipInputCatalog} placement="top-left">
 						<button class="ghost-btn condition-change" aria-label={t().tooltipInputCatalog} onclick={onOpenCatalogModal}>{t().editButton}</button>
 					</Tooltip>
 				</div>
@@ -321,6 +327,7 @@
 				elapsedMs={liveMs}
 				tokensIn={runTokensIn}
 				tokensOut={runTokensOut}
+				attempt={runAttempt}
 				onStop={onStop}
 			/>
 			</div>
@@ -336,6 +343,7 @@
 			settings={inputConditionRows}
 			{runTokensIn}
 			{runTokensOut}
+			{runAttempt}
 			bind:batchInput
 			{lineNumbersText}
 			{batchNonEmpty}
@@ -507,6 +515,9 @@
 		background: var(--panel);
 		border-radius: var(--r);
 	}
+	/* The textarea draws its own 1px border and the mirror has none, so the
+	   grey band sat 1px up and left of its words, and wrapped 2px wider. */
+	.input-ta-wrap :global(.label-mirror) { inset: 1px; }
 	.input-ta {
 		width: 100%; padding: 9px 10px;
 		border: 1px solid var(--border2); border-radius: var(--r);

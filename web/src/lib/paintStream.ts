@@ -1,5 +1,5 @@
 // The NDJSON stream of /api/paint/stream, and the one place that decides which
-// stage the running indicator names.
+// stage the running indicator names and how it counts the model's attempts.
 //
 // A drawing passes through four layers -- sketch from life (Stage 0.5),
 // interpretation (Stage 1), the score (Stage 2) and the performance -- and the
@@ -15,6 +15,7 @@
 // in the page would be visible to no test at all.
 
 import type { LangPack } from './i18n/types.ts';
+import type { PipelineProviderAttempt } from './features/pipeline/api.ts';
 
 export type PaintSketchEvent = {
 	event: 'sketch';
@@ -47,6 +48,16 @@ export type PaintScoreEvent = {
 	elapsed_ms: number;
 };
 
+/** The attempt that began, or null once the last one has ended. */
+export type PaintAttemptEvent = {
+	event: 'attempt';
+	provider_attempt: Pick<PipelineProviderAttempt, 'action' | 'attempt' | 'max_attempts'> | null;
+	elapsed_ms: number;
+};
+
+/** What the running indicator counts: this attempt of at most so many. */
+export type ProviderAttemptCount = Pick<PipelineProviderAttempt, 'attempt' | 'max_attempts'>;
+
 export type PaintStreamHandlers = {
 	/** Stage 0.5 settled. Absent from a run where the layer did not contribute. */
 	onSketch?: (event: PaintSketchEvent) => void;
@@ -54,6 +65,8 @@ export type PaintStreamHandlers = {
 	onStage1?: (event: PaintStage1Event) => void;
 	/** The Score is final; the rest of the wait is the performance. */
 	onScore?: (event: PaintScoreEvent) => void;
+	/** A model call began or, with null, the last one ended. */
+	onAttempt?: (event: PaintAttemptEvent) => void;
 	/**
 	 * Turns an in-band error event into the message the reader sees. The page
 	 * owns that wording (it reads the language pack and the provider failure
@@ -91,6 +104,8 @@ export async function readPaintStream<T>(
 			handlers.onStage1?.(event as unknown as PaintStage1Event);
 		} else if (event.event === 'score') {
 			handlers.onScore?.(event as unknown as PaintScoreEvent);
+		} else if (event.event === 'attempt') {
+			handlers.onAttempt?.(event as unknown as PaintAttemptEvent);
 		} else if (event.event === 'error') {
 			throw new Error(handlers.describeError(event.detail, Number(event.status ?? 500)));
 		} else if (event.event === 'done') {
@@ -144,6 +159,21 @@ export function paintStageLabel(
 	if (moment === 'sketch') return strings.stageInterpreting;
 	if (moment === 'stage1') return strings.stageStructuring('');
 	return strings.stagePerforming;
+}
+
+/**
+ * What the indicator says about the model call it waits on. A first attempt
+ * is a wait; any later one is a retry, so an attempt that timed out does not
+ * read as a slow answer.
+ */
+export function providerAttemptText(
+	attempt: ProviderAttemptCount | null | undefined,
+	strings: LangPack
+): string {
+	if (!attempt) return '';
+	return attempt.attempt > 1
+		? strings.runStatusRetrying(attempt.attempt, attempt.max_attempts)
+		: strings.runStatusAwaitingReply(attempt.attempt, attempt.max_attempts);
 }
 
 /**

@@ -1009,6 +1009,8 @@ Stage 2 LLMは、保存済み可視DDLにcompilerが明示したknown holeがあ
 
 Serverは、Stage 1（作品計画）とhole completion（Stage 2）がproviderへ送ったsystem promptを、developer modeに関係なく実行のcontextへ残す。各Stageの最後の送信（再試行ではcompilerの指摘を含む最後の送信）だけを、prompt ID・digest・言語・試行番号とともに保つ。所有者だけが`/api/pipeline/variations/{variation_id}/system-prompts`で読み、Webの生成情報のプロンプトタブは表示中の作品についてこれを表示する。modelを呼ばなかったStageはnull、この記録より前の実行は`recorded: false`として返す。現在のpromptから組み立て直したものを送った記録として示さない。記録は描画の意味、retry、promptを変えない。
 
+実行中のviewは、modelの呼出し（写生、色カタログ選択、Stage 1、hole補完）を待つ間、`provider_attempt`を持つ。効果の種類（`action`）、1始まりの試行番号（`attempt`）、その段の再試行の方針の上限（`max_attempts`）、その試行の待ちと制限時間（`delay_ms`・`timeout_ms`、10進の文字列）は、共有coreが保存済みsnapshotから返す。hostは段と方針の対応を写さない。coreは時計を持たないので、Serverが自分で試行を始めたときだけ、始めた時刻に待ちと制限時間を足した締切`deadline_at`（epoch ms）を加える。再起動の前に始まった試行には付けない。Webの実行中の表示は、1回目を「応答待ち（1/4回目）」、2回目以降を「再試行中（2/4回目）」と示し、timeoutした1回目を遅い応答と見分けられるようにする。
+
 Androidはinku serverを介さず、Kotlin hostからproviderと共有Rust JNIへ接続する。通常の記述、直接DDL、batch／demo、推敲とカメラの送出は同じ共有pipelineを使用する。カメラ画像の前処理と端末内local LLMはhostに残し、得られた記述またはDDLを正規入口へ渡す。カメラの非画像provenanceは補完承認や再開をまたいで保持する。新規authoringでStage0.5を呼ばず、旧写生文を元記述の代わりに挿入しない。可視patchは通常描画画面に現在のDDLと変更案を示して承認を受ける。iOS接続は今回のAndroid接続に含めず、別途保留する。
 
 Room v10からv11へ既存作品を保持して移行し、origin／authority／sourceの原子保存、action ACK、opaque execution、履歴revisionの不変contextを追加する。同じexecutionの保存再開は同じ演奏の履歴を重複作成しない。保存済みScoreの再演奏も元の短いDDLと当該revisionのauthorityを保持し、独立して保存した資源予算で検証する。新作用紙のIDと整数比は共有Rustの11形式を正本とする。Android専用だった`pixel9_landscape_safe`は端末の表示余白へ移し、旧作品の9:5比率と保存画像は保持する。旧端末設定からの新作用紙選択は既定の`square`とし、9:5を16:9へ別名化しない。
@@ -1063,7 +1065,7 @@ Shared compiler consumerでは、StopとOmitAndContinueはLLM fallbackではな�
 
 ### 12.10 レイテンシ対策
 
-`POST /api/paint/stream` は `sketch`（写生層が動いた場合）、`stage1`、`score`、`done` の順に有限な進行を知らせる。`stage1` は正規化 DDL と診断 metadata を先に表示でき、`done` は通常応答を返す。保存済み作品の「別の構図」と「DDL から描画」は保存済み DDL から再開し、Stage 1 を呼び直さない。独立した Stage 1 キャッシュや将来の並列化を現行契約には含めない。
+`POST /api/paint/stream` は `sketch`（写生層が動いた場合）、`stage1`、`score`、`done` の順に有限な進行を知らせる。modelの呼出しの試行が始まるたびと、最後の試行が終わったときには`attempt`も送る。その`provider_attempt`は`action`・`attempt`・`max_attempts`を持ち、終わりはnullとする。`stage1` は正規化 DDL と診断 metadata を先に表示でき、`done` は通常応答を返す。保存済み作品の「別の構図」と「DDL から描画」は保存済み DDL から再開し、Stage 1 を呼び直さない。独立した Stage 1 キャッシュや将来の並列化を現行契約には含めない。
 
 ### 12.11 中間フィルタ（Stage 1.5）
 

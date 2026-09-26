@@ -48,6 +48,8 @@ runtime fallbackを持たない。保存済みSVG、Room schema、Score schema�
 
 起動時に表示する最新作品は表示のためだけで、次の描画の親にしない（Webは起動時に作品を戻さない）。作品画面・系譜で選んだ作品が親になる。起動時の「前回の描画の復元」は、実行中か作者を待っている実行と、完了したが作品が保存されていない実行だけを戻し（失敗・取り消しの実行は戻さない。Webは起動時に何も戻さず、これはシステムに止められたアプリのためのもの）、推敲を開いている間や候補を作っている間は行わない。描画の表示へ切り替えるときは推敲の実行を止める。推敲の候補が作者の判断を要する状態で止まったときは、Webの`failGrid`と同じく失敗を推敲の中に出し、その実行を取り消す。保留中の実行を表示しているときの「新規作成」は、その実行を取り消す。書き出し設定の「白背景時アルファチャンネルを有効にする」はWebと同じ文言で、SVGが全面の背景を持つため見た目には影響しない。
 
+描画モデルは制作画面のモデル選択ダイアログで選ぶ。どの画面からも開けなかった設定画面のモデル選択パネルと、どこからも呼ばれていなかったキャンバス下の作品サムネイル列は削除した。そのパネルだけが使っていたAndroid独自の推奨モデル一覧（モデル名の後ろの「(推奨: S1)」）も削除した。作品は作品画面・系譜・全画面の送りで選ぶ。Webはモデルを選ぶ画面にサーバーのモデル一覧のオススメ度（Stageごとの★）・速度・コメントを出すが、Androidのダイアログはモデル名だけを出す。
+
 ## 2026-09-25 現行のプラグイン（draw-system04）
 
 下絵の任意`plugins`、Stage 1の登録プラグイン節、正式名と別名（DDL Spec 14、同梱`Nature.leaves` 2.0.0）の照合は、同梱した共有Rust coreがそのまま行う。lockの任意`aliases`はRoomへそのまま運ぶ。
@@ -450,11 +452,11 @@ local single-user equivalent と明記されたものを除き、Web component �
 | `SaijikiDrawer.svelte` | Android では inline Saijiki panel が mobile equivalent。drawer layout は使わない。 |
 | `CanvasPanel.svelte` | artwork/prompt/score tabs、star、hash copy、render metadata、zoom/pan controls、SVG share、PNG share として移植。 |
 | `OutputTabsContent.svelte` | saved Room history item からの prompt / JSON views として移植。 |
-| `HistoryStrip.svelte` | Compose画面のキャンバス直下へthumbnail stripとして移植。選択、モデル名と保存済みmetadataのtooltipを持ち、Star操作を持つ履歴gridも別入口として維持する。 |
+| `HistoryStrip.svelte` | キャンバス直下のthumbnail stripとして移植したが、表示しなくなったため2026-09-26に削除した。作品は作品画面のgrid・系譜・全画面の送りで選ぶ。 |
 | `HistoryManager.svelte` | thumbnails/list modes、search、starred filter、selection、trash、restore、permanent delete として移植。 |
 | `HistoryThumbnail.svelte` | history tiles / list rows の `ArtworkPreview` 経由で移植。 |
 | `ConfirmDialog.svelte` | DDL overwrite と destructive history operations に移植。Non-history destructive settings confirmations は parity test backlog。 |
-| `SettingsModal.svelte` | model selection、model connection settings、plugin setting、DB status、export templates、misc settings に移植。Server-only logs/output-save は local-only equivalents として表現。 |
+| `SettingsModal.svelte` | model connection settings、plugin setting、DB status、export templates、misc settings に移植（model selection は制作画面のダイアログ）。Server-only logs/output-save は local-only equivalents として表現。 |
 | `IncuMascot.svelte` / `YuragiMascot.svelte` | MascotWidget および IncuMascotView / YuragiMascotView として 5x5 ピクセルグリッドとアニメーションを純 Kotlin / Compose Canvas へ移植。 |
 
 ## 実装順序

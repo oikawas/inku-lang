@@ -13,8 +13,8 @@ import org.junit.Test
  * handed down, because a floor measured with one regex is not the same quantity
  * as what a lint decides to look at.
  *
- * What it counts: every Japanese string literal in the ten files that hold
- * interface wording. What it does not count is listed in [EXCLUDED] one line at
+ * What it counts: every Japanese string literal in the files that hold
+ * interface wording (contract §0.0 named ten; nine remain since 2026-09-26). What it does not count is listed in [EXCLUDED] one line at
  * a time -- the exclusions are the dangerous part of this contract, so they are
  * named individually rather than by a pattern that could quietly widen.
  *
@@ -47,7 +47,6 @@ class WordingLintTest {
             "llm/RoutingModelProvider.kt",
             "llm/LocalLiteRtLmProvider.kt",
             "data/refinement/ComparisonPlan.kt",
-            "data/model/ModelRecommendations.kt",
             "llm/ProviderUrlValidator.kt",
         )
 
@@ -187,7 +186,10 @@ class WordingLintTest {
      */
     @Test
     fun testTheLintIsCalibrated() {
-        assertEquals("the ten files of contract §0.0", 10, SCANNED.size)
+        // Contract §0.0 named ten files; `data/model/ModelRecommendations.kt`
+        // left with the file itself on 2026-09-26 (only an unreachable
+        // settings pane showed that list).
+        assertEquals("the files of contract §0.0 that still exist", 9, SCANNED.size)
         SCANNED.forEach { relative ->
             assertTrue("$relative is not a file", File(sourceRoot(), relative).isFile)
         }

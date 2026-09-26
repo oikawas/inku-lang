@@ -144,7 +144,6 @@ interface InkuStrings {
     val modelDownloadFailed: String
     val modelLocalInfoMissing: (String, String) -> String
     val modelNotDownloadedYet: (String, String, String) -> String
-    val modelRecommendationReason: (String) -> String
 
     // --- Errors thrown below the screen -------------------------------------
     val errorServiceIdFormat: String
@@ -269,7 +268,6 @@ interface InkuStrings {
     val selectAll: String
     val noPublishedModels: String
     val noPublishedModelsLong: String
-    val unifiedModelNote: String
     val downloadAgain: String
     val sketchFromLife: String
     val workActionSketchRedraw: String
@@ -281,7 +279,6 @@ interface InkuStrings {
     val downloadable: String
     val downloaded: String
     val downloadState: String
-    val cancelShort: String
     val accepted: String
     val name: String
     val fixedStage1Model: String
@@ -293,7 +290,6 @@ interface InkuStrings {
     val sameStagePairBlocked: String
     val history: String
     val showThinking: String
-    val openProviderSettings: String
     val providerKind: String
     val paint: String
     val drawingModel: String
@@ -425,7 +421,6 @@ interface InkuStrings {
     val generationInfoElapsed: String
     val generationInfoOn: String
     val generationInfoOff: String
-    val recommendedStageSuffix: (Int) -> String
     val parentSuffix: (String, String) -> String
     val downloadOf: (String) -> String
     val choiceSameAsTarget: (String) -> String

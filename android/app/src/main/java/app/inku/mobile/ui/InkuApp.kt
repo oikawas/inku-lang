@@ -85,9 +85,7 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.grid.items as gridItems
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -3250,141 +3248,7 @@ private fun DemoSettingRow(
     }
 }
 
-internal fun selectedHistoryStripIndex(historyIds: List<String>, selectedId: String?): Int =
-    selectedId?.let(historyIds::indexOf) ?: -1
-
-internal fun historyStripModelLabel(modelId: String?): String? {
-    val displayName = modelId
-        ?.trim()
-        ?.takeIf(String::isNotEmpty)
-        ?.substringAfterLast(":")
-        ?.trim()
-        ?.takeIf(String::isNotEmpty)
-    return displayName?.compactLabel(14)
-}
-
-internal fun historyStripModelTooltipText(
-    stage1Model: String?,
-    stage2Model: String?,
-    createdAt: Long? = null,
-    colorCatalogId: String? = null,
-    createdLabel: String? = null,
-    colorCatalogLabel: String? = null,
-    renderHashShort: String? = null,
-    canvasAspect: String? = null,
-    renderHashLabel: String? = null,
-    canvasLabel: String? = null,
-): String? {
-    val stage1 = stage1Model?.trim()?.takeIf(String::isNotEmpty) ?: return null
-    val stage2 = stage2Model?.trim()?.takeIf(String::isNotEmpty) ?: "—"
-    val lines = mutableListOf("Stage 1: $stage1", "Stage 2: $stage2")
-    createdLabel?.trim()?.takeIf(String::isNotEmpty)?.let { label ->
-        val created = if (createdAt != null && createdAt > 0L) {
-            runCatching { java.time.Instant.ofEpochMilli(createdAt).toString() }.getOrDefault("—")
-        } else {
-            "—"
-        }
-        lines += "$label: $created"
-    }
-    colorCatalogLabel?.trim()?.takeIf(String::isNotEmpty)?.let { label ->
-        val catalogId = colorCatalogId?.trim()?.takeIf(String::isNotEmpty) ?: "—"
-        lines += "$label: $catalogId"
-    }
-    renderHashLabel?.trim()?.takeIf(String::isNotEmpty)?.let { label ->
-        val hash = renderHashShort?.trim()?.takeIf(String::isNotEmpty)?.let { "F$it" } ?: "—"
-        lines += "$label: $hash"
-    }
-    canvasLabel?.trim()?.takeIf(String::isNotEmpty)?.let { label ->
-        val aspect = canvasAspect?.trim()?.takeIf(String::isNotEmpty) ?: "—"
-        lines += "$label: $aspect"
-    }
-    return lines.joinToString("\n")
-}
-
 internal fun historyGridStarSymbol(starred: Boolean): String = if (starred) "★" else "☆"
-
-/** Keeps nearby works attached to the ordinary canvas without duplicating HistoryScreen. */
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun HistoryThumbnailStrip(
-    history: List<HistoryListItem>,
-    selectedId: String?,
-    enabled: Boolean,
-    onSelect: (HistoryListItem) -> Unit,
-) {
-    val listState = rememberLazyListState()
-    val selectedIndex = remember(history, selectedId) {
-        selectedHistoryStripIndex(history.map { it.id }, selectedId)
-    }
-    LaunchedEffect(selectedIndex) {
-        if (selectedIndex >= 0) listState.animateScrollToItem(selectedIndex)
-    }
-    LazyRow(
-        modifier = Modifier.fillMaxWidth().testTag("history_thumbnail_strip"),
-        state = listState,
-        horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM),
-    ) {
-        items(history, key = { it.id }) { historyItem ->
-            val selected = historyItem.id == selectedId
-            val modelLabel = historyStripModelLabel(historyItem.stage1Model)
-            Column(
-                modifier = Modifier.width(Dimens.buttonHeightLarge),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(Dimens.spaceXs),
-            ) {
-                Box(modifier = Modifier.size(Dimens.buttonHeightLarge)) {
-                    Surface(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .clickable(enabled = enabled) { onSelect(historyItem) }
-                            .border(
-                                Dimens.selectionRingWidth,
-                                if (selected) SelectionRing else Color.Transparent,
-                                RoundedCornerShape(0.dp),
-                            ),
-                        color = MaterialTheme.colorScheme.surfaceVariant,
-                        shape = RoundedCornerShape(0.dp),
-                    ) {
-                        HistoryArtworkPreview(historyItem, modifier = Modifier.fillMaxSize())
-                    }
-                }
-                modelLabel?.let {
-                    val tooltipText = historyStripModelTooltipText(
-                        stage1Model = historyItem.stage1Model,
-                        stage2Model = historyItem.stage2Model,
-                        createdAt = historyItem.createdAt,
-                        colorCatalogId = historyItem.colorCatalogId,
-                        createdLabel = S.generationInfoCreated,
-                        colorCatalogLabel = S.generationInfoColorCatalog,
-                        renderHashShort = historyItem.renderHashShort,
-                        canvasAspect = historyItem.canvasAspect,
-                        renderHashLabel = S.generationInfoRenderHash,
-                        canvasLabel = S.generationInfoCanvasAspect,
-                    ) ?: return@let
-                    TooltipBox(
-                        positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
-                        tooltip = {
-                            PlainTooltip {
-                                Text(tooltipText)
-                            }
-                        },
-                        state = rememberTooltipState(),
-                    ) {
-                        Text(
-                            text = it,
-                            modifier = Modifier.fillMaxWidth(),
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            style = MaterialTheme.typography.labelSmall,
-                            textAlign = TextAlign.Center,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
 
 @Composable
 private fun HistoryScreen(
@@ -4274,7 +4138,6 @@ private fun LineageNodeCard(
 private fun SettingsPanel(state: InkuUiState, viewModel: InkuViewModel, modifier: Modifier = Modifier) {
     when (state.settingsPane) {
         SettingsPane.Home -> SettingsHomePanel(state, viewModel, modifier)
-        SettingsPane.ModelSelection -> ModelSelectionPanel(state, viewModel, modifier)
         SettingsPane.Models -> ModelSettingsPanel(state, viewModel, modifier)
         SettingsPane.Demo -> DemoSettingsPanel(state, viewModel, modifier)
         SettingsPane.Export -> ExportSettingsPanel(state, viewModel, modifier)
@@ -4325,40 +4188,6 @@ private fun SettingsHeader(selectedPane: SettingsPane, viewModel: InkuViewModel)
             Text(title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Medium)
             Text(subtitle, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
-    }
-}
-
-@Composable
-private fun ModelSelectionPanel(state: InkuUiState, viewModel: InkuViewModel, modifier: Modifier = Modifier) {
-    val modelChoices = remember(state.modelAssets, state.providerSettings) { modelChoicesFor(state) }
-    Column(
-        modifier = modifier
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = Dimens.spaceXs),
-        verticalArrangement = Arrangement.spacedBy(Dimens.spaceL),
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(top = Dimens.spaceXs),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM),
-        ) {
-            Text(S.modelSelection, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
-            SecondarySmallButton(text = S.cancelShort, onClick = viewModel::cancelModelSelection)
-            PrimarySmallButton(text = S.confirm, onClick = viewModel::confirmModelSelection)
-        }
-        SettingsCard(S.drawingModel, S.stagesShared, selectedModelLabel(state)) {
-            ModelChoiceRow(
-                choices = modelChoices,
-                selectedValue = state.selectedModelId,
-                onSelect = viewModel::setSelectedModel,
-            )
-        }
-        Text(
-            S.unifiedModelNote,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        SecondaryActionButton(text = S.openProviderSettings, onClick = { viewModel.setSettingsPane(SettingsPane.Models) })
     }
 }
 
@@ -5242,7 +5071,6 @@ private fun SettingsListItem(mark: String, title: String, sub: String, onClick: 
 @Composable
 private fun settingsPaneTitle(pane: SettingsPane): String = when (pane) {
     SettingsPane.Home -> S.settings
-    SettingsPane.ModelSelection -> S.modelSelection
     SettingsPane.Models -> S.modelSettings
     SettingsPane.Demo -> S.demo
     SettingsPane.Export -> S.export
@@ -5253,7 +5081,6 @@ private fun settingsPaneTitle(pane: SettingsPane): String = when (pane) {
 @Composable
 private fun settingsPaneSubtitle(pane: SettingsPane): String = when (pane) {
     SettingsPane.Home -> "List + Detail"
-    SettingsPane.ModelSelection -> S.stagesShared
     SettingsPane.Models -> "OpenAI / Claude / Gemini / NVIDIA"
     SettingsPane.Demo -> S.demoSubtitle
     SettingsPane.Export -> "PNG / SVG templates"
@@ -5297,27 +5124,6 @@ private fun ExportTemplateRow(template: app.inku.mobile.data.db.ExportTemplateEn
                     text = S.save,
                     onClick = { viewModel.updateExportTemplate(template, name, description, height.toIntOrNull() ?: template.heightPx) },
                     modifier = Modifier.weight(1f),
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun ModelChoiceRow(
-    choices: List<ModelChoice>,
-    selectedValue: String,
-    onSelect: (String) -> Unit,
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceXs)) {
-        WrapRow {
-            choices.forEach { choice ->
-                val rec = app.inku.mobile.data.model.ModelRecommendations.items.find { it.modelId == choice.id }
-                val badgeText = if (rec != null) S.recommendedStageSuffix(rec.recommendedStage) else ""
-                MiniPill(
-                    text = "${choice.providerName.take(10)} / ${choice.label.take(18)}$badgeText",
-                    selected = choice.id == selectedValue,
-                    onClick = { onSelect(choice.id) },
                 )
             }
         }

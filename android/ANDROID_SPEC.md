@@ -62,6 +62,8 @@ The trash offers web's history-manager trash one work at a time. Move to trash, 
 
 The newest work shown on opening is for display only and does not become the parent of the next drawing (web restores no work on opening); a work picked on the Works or lineage screen does. The start-up restore brings back only an execution still running or waiting on the author, or a completed one whose work was not saved -- never one that failed or was cancelled (web restores nothing on opening; this is for an app the system stopped mid-drawing) -- and does not run while a refinement is open or making candidates. Presenting a drawing stops a refinement run. A refinement candidate that stops for the author's attention fails inside the refinement, as web's `failGrid`, and its execution is cancelled. New work while a waiting execution is shown cancels it. The export setting "Enable alpha channel on white background" has the web's wording and changes nothing visible, as the SVG carries a full background.
 
+The drawing model is chosen in the compose screen's model dialog. The settings screen's model-selection pane, which no screen opened, and the thumbnail strip below the canvas, which nothing called, are removed, as is the Android-only list of recommended models that only that pane used (the "(recommended for S1)" after a model's name). Works are chosen from the Works screen, the lineage, and the full-screen view. Web shows the server model catalog's recommendation (stars per stage), speed, and comment wherever a model is chosen; the Android dialog shows the model names only.
+
 ## 2026-09-25 Current plugins (draw-system04)
 
 The underdrawing's optional `plugins`, the Stage 1 installed-plugin section, and canonical-name and alias matching (DDL Spec 14, bundled `Nature.leaves` 2.0.0) are done by the packaged shared Rust core. The lock's optional `aliases` travel into Room unchanged.
@@ -523,11 +525,11 @@ component unless marked as a local single-user equivalent.
 | `SaijikiDrawer.svelte` | Mobile equivalent is the inline Saijiki panel; drawer layout is not used on Android. |
 | `CanvasPanel.svelte` | Ported for `artwork`/`prompt`/`score` tabs, star, hash copy, render metadata, zoom/pan controls, SVG share, and PNG share. |
 | `OutputTabsContent.svelte` | Ported as prompt and JSON views from the saved Room history item. |
-| `HistoryStrip.svelte` | Ported as a thumbnail strip below the Compose canvas, with selection, model names, and saved-metadata tooltips. The Star-capable history grid remains a separate entry point. |
+| `HistoryStrip.svelte` | Ported as a thumbnail strip below the canvas, then removed on 2026-09-26 after it was no longer shown. Works are chosen from the Works grid, the lineage, and the full-screen view. |
 | `HistoryManager.svelte` | Ported for thumbnails/list modes, search, starred filter, selection, trash, restore, and permanent delete. |
 | `HistoryThumbnail.svelte` | Ported through `ArtworkPreview` in history tiles and list rows. |
 | `ConfirmDialog.svelte` | Ported for DDL overwrite and destructive history operations. Non-history destructive settings confirmations remain in the parity test backlog. |
-| `SettingsModal.svelte` | Ported for model selection, model connection settings, plugin setting, DB status, export templates, and misc settings. Server-only logs/output-save are represented as local-only equivalents. |
+| `SettingsModal.svelte` | Ported for model connection settings, plugin setting, DB status, export templates, and misc settings (model selection is the compose screen's dialog). Server-only logs/output-save are represented as local-only equivalents. |
 | `IncuMascot.svelte` / `YuragiMascot.svelte` | Ported as MascotWidget and IncuMascotView / YuragiMascotView with 5x5 pixel grid and animations in pure Kotlin / Compose Canvas. |
 
 ## Implementation Order

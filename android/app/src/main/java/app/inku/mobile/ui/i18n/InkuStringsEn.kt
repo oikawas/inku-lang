@@ -207,14 +207,6 @@ object InkuStringsEn : InkuStrings {
     override val modelNotDownloadedYet: (String, String, String) -> String = { stage, name, state ->
         "$name for $stage has not been downloaded. Finish the download in model settings. Currently: $state"
     }
-    override val modelRecommendationReason: (String) -> String = { id ->
-        when (id) {
-            "stage1_default" -> "Recommended default for Stage 1. Balances composition and color well"
-            "stage1_derived" -> "Recommended alternative for Stage 1. Expressive and stable"
-            "stage2_default" -> "Recommended default for Stage 2. Expands the instructions precisely"
-            else -> id
-        }
-    }
 
     override val errorServiceIdFormat = "A Service ID may hold letters, digits, _ and - only."
     override val errorServiceNotFound: (String) -> String = { id -> "Service not found: $id" }
@@ -356,7 +348,6 @@ object InkuStringsEn : InkuStrings {
     override val selectAll = "Select all"
     override val noPublishedModels = "No models have been offered."
     override val noPublishedModelsLong = "No models have been offered. Select models in the service settings."
-    override val unifiedModelNote = "Storage and history metadata keep the server’s stage1_model / stage2_model, and this interface applies one model to both stages."
     override val downloadAgain = "Download again"
     override val sketchFromLife = "Sketch from life"
     override val workActionSketchRedraw = "Redraw with or without sketch from life"
@@ -370,7 +361,6 @@ object InkuStringsEn : InkuStrings {
     override val downloadable = "Ready to download"
     override val downloaded = "Downloaded"
     override val downloadState = "Download state"
-    override val cancelShort = "Cancel"
     override val accepted = "Accepted"
     override val name = "Name"
     override val fixedStage1Model = "Stage 1 model to hold fixed"
@@ -382,7 +372,6 @@ object InkuStringsEn : InkuStrings {
     override val sameStagePairBlocked = "Only the target work's own Stage 1/2 pairing cannot be chosen."
     override val history = "History"
     override val showThinking = "Show the thinking"
-    override val openProviderSettings = "Open the service settings"
     override val providerKind = "Connection type"
     override val paint = "Paint"
     override val drawingModel = "Drawing model"
@@ -516,7 +505,6 @@ object InkuStringsEn : InkuStrings {
     override val generationInfoElapsed = "Elapsed"
     override val generationInfoOn = "On"
     override val generationInfoOff = "Off"
-    override val recommendedStageSuffix: (Int) -> String = { stage -> " (recommended for S$stage)" }
     override val parentSuffix: (String, String) -> String = { hash, catalog -> " parent: $hash / $catalog" }
     override val downloadOf: (String) -> String = { name -> "Download $name" }
     override val choiceSameAsTarget: (String) -> String = { label -> "$label (same as the target)" }

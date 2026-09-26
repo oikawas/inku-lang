@@ -188,14 +188,6 @@ object InkuStringsJa : InkuStrings {
     override val modelNotDownloadedYet: (String, String, String) -> String = { stage, name, state ->
         "$stage の $name は未取得です。モデル設定で取得を完了してください。現在: $state"
     }
-    override val modelRecommendationReason: (String) -> String = { id ->
-        when (id) {
-            "stage1_default" -> "Stage 1 既定推奨。構図と彩色のバランスに優れる"
-            "stage1_derived" -> "Stage 1 派生推奨。表現力と安定性が高い"
-            "stage2_default" -> "Stage 2 既定推奨。DDL展開の精度が高い"
-            else -> id
-        }
-    }
 
     override val errorServiceIdFormat = "Service ID は英数字・_・- で入力してください。"
     override val errorServiceNotFound: (String) -> String = { id -> "サービスが見つかりません: $id" }
@@ -330,7 +322,6 @@ object InkuStringsJa : InkuStrings {
     override val selectAll = "全選択"
     override val noPublishedModels = "公開モデルは未選択です。"
     override val noPublishedModelsLong = "公開モデルは未選択です。接続先設定でモデルを選択してください。"
-    override val unifiedModelNote = "内部保存と履歴メタデータはserver互換のstage1_model / stage2_modelを維持し、Android UIでは同じモデルを両Stageへ適用します。"
     override val downloadAgain = "再取得"
     override val sketchFromLife = "写生"
     override val workActionSketchRedraw = "写生なし／ありで描き直す"
@@ -342,7 +333,6 @@ object InkuStringsJa : InkuStrings {
     override val downloadable = "取得可能"
     override val downloaded = "取得済み"
     override val downloadState = "取得状況"
-    override val cancelShort = "取消"
     override val accepted = "同意済み"
     override val name = "名前"
     override val fixedStage1Model = "固定する Stage 1 モデル"
@@ -354,7 +344,6 @@ object InkuStringsJa : InkuStrings {
     override val sameStagePairBlocked = "対象作品と同じ Stage 1/2 の組み合わせだけが選べません。"
     override val history = "履歴"
     override val showThinking = "思考を表示"
-    override val openProviderSettings = "接続先設定を開く"
     override val providerKind = "接続形式"
     override val paint = "描画する"
     override val drawingModel = "描画モデル"
@@ -486,7 +475,6 @@ object InkuStringsJa : InkuStrings {
     override val generationInfoElapsed = "処理時間"
     override val generationInfoOn = "あり"
     override val generationInfoOff = "なし"
-    override val recommendedStageSuffix: (Int) -> String = { stage -> " (推奨: S$stage)" }
     override val parentSuffix: (String, String) -> String = { hash, catalog -> " 親: $hash / $catalog" }
     override val downloadOf: (String) -> String = { name -> "$name の取得" }
     override val choiceSameAsTarget: (String) -> String = { label -> "$label（対象と同じ）" }

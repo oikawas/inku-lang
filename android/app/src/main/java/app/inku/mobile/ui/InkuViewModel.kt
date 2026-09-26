@@ -384,7 +384,6 @@ enum class AppTab {
 
 enum class SettingsPane {
     Home,
-    ModelSelection,
     Models,
     Demo,
     Export,
@@ -1455,19 +1454,9 @@ class InkuViewModel @JvmOverloads constructor(
     fun setTab(tab: AppTab) {
         val current = localState.value
         if (current.tab == AppTab.History && tab != AppTab.History) presentationNavigationSerial++
-        val restoredModelSelection = if (tab != AppTab.Settings && current.settingsPane == SettingsPane.ModelSelection) modelSelectionSnapshot else null
-        if (restoredModelSelection != null) modelSelectionSnapshot = null
         localState.value = current.copy(
             tab = tab,
-            selectedModelId = restoredModelSelection?.first ?: current.selectedModelId,
-            selectedStage2ModelId = restoredModelSelection?.second ?: current.selectedStage2ModelId,
-            settingsPane = if (tab == AppTab.Settings && current.tab != AppTab.Settings) {
-                SettingsPane.Home
-            } else if (tab == AppTab.Settings && current.settingsPane == SettingsPane.ModelSelection) {
-                SettingsPane.Home
-            } else {
-                current.settingsPane
-            },
+            settingsPane = if (tab == AppTab.Settings && current.tab != AppTab.Settings) SettingsPane.Home else current.settingsPane,
         )
         // web refetches when the lineage tab comes up (+page.svelte:4556).
         if (tab == AppTab.Lineage) refreshLineage()

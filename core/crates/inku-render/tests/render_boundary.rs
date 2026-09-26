@@ -794,6 +794,24 @@ fn a_mark_missing_its_geometry_is_refused_by_name() {
 }
 
 #[test]
+fn a_non_finite_value_is_refused_with_its_instruction() {
+    // A rotring line is drawn as a plain `<line>`, so an end 1e308 canvas
+    // widths away prints as `inf` in pixels. (Hand strokes drop such points.)
+    let error = render(request_for(
+        r#"{"version":"0.9.0","instructions":[{"primitive":"circle",
+        "center":[0.5,0.5],"radius":0.1},{"primitive":"line","weight":"rotring",
+        "from":[1e308,0.5],"to":[0.5,0.5]}]}"#,
+    ))
+    .unwrap_err();
+    assert_eq!(
+        error,
+        inku_render::render::RenderError::NonFiniteSvg {
+            instruction_index: Some(1)
+        }
+    );
+}
+
+#[test]
 fn explicit_authority_limits_a_legacy_edition_score() {
     let budget = inku_score::ResourceBudget {
         maximum: inku_score::ResourceDemand {

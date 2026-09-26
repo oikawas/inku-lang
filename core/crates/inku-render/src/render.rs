@@ -50,7 +50,11 @@ pub enum RenderError {
     Mark(MarkError),
     CheckedPerformance(CheckedPerformanceError),
     ResourceAuthority(inku_score::SavedScoreResourceError),
-    NonFiniteSvg,
+    /// The SVG holds a non-finite number (`NaN`, `inf`). `instruction_index`
+    /// names the first instruction whose marks wrote one, when one did.
+    NonFiniteSvg {
+        instruction_index: Option<usize>,
+    },
     /// The canvas size is not finite and positive.
     InvalidCanvas,
     /// A value that sets renderer work lies outside its `score.schema.json` range.
@@ -79,7 +83,15 @@ impl fmt::Display for RenderError {
             Self::ResourceAuthority(error) => {
                 write!(formatter, "invalid Score resource authority: {error:?}")
             }
-            Self::NonFiniteSvg => formatter.write_str("rendered SVG contains a non-finite value"),
+            Self::NonFiniteSvg {
+                instruction_index: None,
+            } => formatter.write_str("rendered SVG contains a non-finite value"),
+            Self::NonFiniteSvg {
+                instruction_index: Some(index),
+            } => write!(
+                formatter,
+                "rendered SVG contains a non-finite value from instruction {index}"
+            ),
             Self::InvalidCanvas => formatter.write_str("canvas size must be finite and positive"),
             Self::InvalidScore(reason) => write!(formatter, "invalid Score: {reason}"),
             Self::MarkTooLarge { instruction_index } => write!(
@@ -540,8 +552,10 @@ fn render_impl(
     }
     let mut surface_definitions = Vec::new();
     let mut closed_arc_pair_spread_marks = BTreeSet::new();
+    let mut first_non_finite = None;
     for (performed_index, (instruction, performed)) in ordered {
         let instruction_index = performed.instruction_index;
+        let non_finite_before = crate::svg::non_finite_writes();
         let instruction_seed_override = performed.seed_override;
         let instruction_transform = performed.transform;
         let fill_scope = performed.fill_scope_index;
@@ -705,6 +719,9 @@ fn render_impl(
         } else if structured {
             content.push(instruction_group);
         }
+        if first_non_finite.is_none() && crate::svg::non_finite_writes() != non_finite_before {
+            first_non_finite = Some(instruction_index);
+        }
     }
     if has_fill_scopes {
         let (_, _, clip_policy) =
@@ -828,8 +845,12 @@ fn render_impl(
     let svg = document.serialize();
     // A non-finite f64 prints as `NaN`, `inf` or `-inf`. No element name, id or
     // class contains either word, and host colors are hex, so a match is a number.
+    // The whole text is searched because a few numbers (a hatch spacing in a
+    // class name) are written without `write_number`, which counts them.
     if svg.contains("NaN") || svg.contains("inf") {
-        return Err(RenderError::NonFiniteSvg);
+        return Err(RenderError::NonFiniteSvg {
+            instruction_index: first_non_finite,
+        });
     }
     let mut metadata = build_render_metadata(&source_score, profile);
     if let Some(demand) = performance.resource_demand {

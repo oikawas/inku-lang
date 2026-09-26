@@ -26,28 +26,34 @@ struct Performed {
 /// Instruction-indexed vectors follow `request.score.instructions`. Group
 /// nodes follow `request.score.transform_groups`, which here holds the affine
 /// groups with every placement group inserted as an identity scope.
+/// What execution knows about one source instruction.
+struct Source {
+    /// Drawable copies, filled when it executes.
+    performed: Vec<Performed>,
+    /// Accumulated enclosing-group transform, in short-side units.
+    transform: AffineTransform,
+    /// A target of a path position or endpoint; its centerline is kept.
+    path_host: bool,
+    /// A target of an interior path selection.
+    interior_path_host: bool,
+    /// Removed because its outermost enclosing group failed.
+    omitted: bool,
+    /// A member of a composite or grid arrangement, which relations cannot move alone.
+    structural: bool,
+    /// Drawn without its relation after it failed or formed a cycle.
+    relation_omitted: bool,
+}
+
 struct Execution<'a> {
     request: PerformanceRequest<'a>,
     /// Node order with cyclic relations already dropped.
     schedule: AnchorSchedule,
-    /// Drawable copies of each source instruction, filled when it executes.
-    performed: Vec<Vec<Performed>>,
-    /// Accumulated enclosing-group transform, in short-side units.
-    transforms: Vec<AffineTransform>,
-    /// Targets of a path position or endpoint; their centerline is kept.
-    path_hosts: Vec<bool>,
-    /// Targets of an interior path selection.
-    interior_path_hosts: Vec<bool>,
+    /// What execution knows about each source instruction, by its index.
+    sources: Vec<Source>,
     /// Resolved anchor points; `None` once omitted.
     anchors: Vec<Option<Point>>,
-    /// Instructions removed because their outermost enclosing group failed.
-    omitted: Vec<bool>,
     omitted_groups: Vec<bool>,
-    /// Members of a composite or grid arrangement, which relations cannot move alone.
-    structural: Vec<bool>,
     warnings: Vec<PlanningWarning>,
-    /// Sources drawn without their relation after it failed or formed a cycle.
-    omitted_relations: Vec<bool>,
     diagnostics: Vec<ScoreExecutionDiagnostic>,
     /// For each group node, the placement group it stands for, if any.
     placement_indices: Vec<Option<usize>>,
@@ -454,11 +460,12 @@ impl Execution<'_> {
         index: usize,
         transform: AffineTransform,
     ) -> Result<(), ScoreExecutionReason> {
-        let composed = transform.compose(self.transforms[index]);
+        let composed = transform.compose(self.sources[index].transform);
         if !composed.is_finite() {
             return Err(ScoreExecutionReason::InvalidTransformGroup);
         }
-        let centerlines = self.performed[index]
+        let centerlines = self.sources[index]
+            .performed
             .iter()
             .map(|value| {
                 value
@@ -473,8 +480,8 @@ impl Execution<'_> {
                     .transpose()
             })
             .collect::<Result<Vec<_>, _>>()?;
-        self.transforms[index] = composed;
-        for (value, centerline) in self.performed[index].iter_mut().zip(centerlines) {
+        self.sources[index].transform = composed;
+        for (value, centerline) in self.sources[index].performed.iter_mut().zip(centerlines) {
             value.line_centerline = centerline;
         }
         Ok(())
@@ -486,7 +493,7 @@ impl Execution<'_> {
         instruction: &Instruction,
         seed_override: Option<crate::types::Seed>,
     ) -> Option<Vec<Point>> {
-        if !self.path_hosts[index] {
+        if !self.sources[index].path_host {
             return None;
         }
         let canvas = self
@@ -501,14 +508,14 @@ impl Execution<'_> {
                 instruction,
                 seed,
                 canvas,
-                self.transforms[index],
+                self.sources[index].transform,
             ),
-            Primitive::Arc if self.interior_path_hosts[index] => {
+            Primitive::Arc if self.sources[index].interior_path_host => {
                 crate::mark_paths::connected_arc_centerline(
                     instruction,
                     seed,
                     canvas,
-                    self.transforms[index],
+                    self.sources[index].transform,
                 )
             }
             _ => None,
@@ -625,10 +632,9 @@ impl Execution<'_> {
 
     fn mirror_body_anchor(&self, body: &TypedMirrorBody) -> Option<Point> {
         if body.placement_pending
-            || body
-                .instruction_indices
-                .iter()
-                .any(|&index| self.omitted[index] || self.performed[index].is_empty())
+            || body.instruction_indices.iter().any(|&index| {
+                self.sources[index].omitted || self.sources[index].performed.is_empty()
+            })
         {
             return None;
         }
@@ -670,8 +676,10 @@ impl Execution<'_> {
             .iter()
             .zip(&follower.instruction_indices)
         {
-            let target_instruction = &self.performed[target_index][0].instruction;
-            let mut candidate = self.performed[follower_index][0].instruction.clone();
+            let target_instruction = &self.sources[target_index].performed[0].instruction;
+            let mut candidate = self.sources[follower_index].performed[0]
+                .instruction
+                .clone();
             if target_instruction.primitive != candidate.primitive
                 || target_instruction.arc_form != candidate.arc_form
                 || target_instruction.sides != candidate.sides
@@ -697,13 +705,13 @@ impl Execution<'_> {
             let target_frame = mirror_ideal_frame(
                 target_instruction,
                 self.request.canvas,
-                reflection.compose(self.transforms[target_index]),
+                reflection.compose(self.sources[target_index].transform),
             )
             .ok_or(mismatch)?;
             let follower_frame = mirror_ideal_frame(
                 &candidate,
                 self.request.canvas,
-                self.transforms[follower_index],
+                self.sources[follower_index].transform,
             )
             .ok_or(mismatch)?;
             frames.push((target_frame, follower_frame));
@@ -729,7 +737,7 @@ impl Execution<'_> {
                 let index = follower.instruction_indices[0];
                 let vector =
                     mirror_direction(&candidates[0], self.request.canvas).ok_or(mismatch)?;
-                pose.vector(self.transforms[index].vector(vector))
+                pose.vector(self.sources[index].transform.vector(vector))
             } else {
                 pose.vector(expected)
             };
@@ -773,11 +781,11 @@ impl Execution<'_> {
             .unwrap_or_default();
         let mut staged = Vec::new();
         for (&index, candidate) in follower.instruction_indices.iter().zip(candidates) {
-            let transform = pose.compose(self.transforms[index]);
+            let transform = pose.compose(self.sources[index].transform);
             if !transform.is_finite() {
                 return Err(mismatch);
             }
-            let mut performed = self.performed[index].clone();
+            let mut performed = self.sources[index].performed.clone();
             for value in &mut performed {
                 if single && !relation.follower_facts.dimensions_fixed {
                     value.instruction = candidate.clone();
@@ -803,8 +811,8 @@ impl Execution<'_> {
         // Commit only after every geometry, anchor, fill and path operation
         // succeeded. A rejected occurrence leaves its follower untouched.
         for (index, transform, performed) in staged {
-            self.transforms[index] = transform;
-            self.performed[index] = performed;
+            self.sources[index].transform = transform;
+            self.sources[index].performed = performed;
         }
         for (index, point) in anchors {
             self.anchors[index] = Some(point);
@@ -906,12 +914,12 @@ impl Execution<'_> {
     }
 
     fn drop_relation(&mut self, index: usize, reason: ScoreExecutionReason) {
-        if !self.omitted_relations[index] {
+        if !self.sources[index].relation_omitted {
             self.diagnostics
                 .push(relation_failure(self.request.score, index, reason));
-            self.omitted_relations[index] = true;
+            self.sources[index].relation_omitted = true;
         }
-        for value in &mut self.performed[index] {
+        for value in &mut self.sources[index].performed {
             value.instruction.relation = None;
         }
     }
@@ -925,8 +933,9 @@ impl Execution<'_> {
     }
 
     fn prior(&self, index: usize) -> Option<&Instruction> {
-        self.performed
+        self.sources
             .get(index)?
+            .performed
             .last()
             .map(|value| &value.instruction)
     }
@@ -939,8 +948,8 @@ impl Execution<'_> {
             .unwrap_or(index);
         let group = &groups[outermost];
         for member in group.start..group.end {
-            self.omitted[member] = true;
-            self.performed[member].clear();
+            self.sources[member].omitted = true;
+            self.sources[member].performed.clear();
         }
         for &anchor in &group.anchor_indices {
             self.anchors[anchor] = None;
@@ -970,13 +979,14 @@ impl Execution<'_> {
             .target_instruction_index
             .filter(|&target| {
                 if relation.target_path_position.is_some() || relation.target_endpoint.is_some() {
-                    target < self.performed.len()
+                    target < self.sources.len()
                 } else {
                     Some(target) == source.checked_sub(1)
                 }
             })
             .ok_or(ScoreExecutionReason::MissingConnectedReference)?;
-        let prior = self.performed[target]
+        let prior = self.sources[target]
+            .performed
             .last()
             .ok_or(ScoreExecutionReason::ConnectedReferenceOmitted)?;
         if let Some(endpoint) = relation.target_endpoint {
@@ -1000,7 +1010,7 @@ impl Execution<'_> {
             return crate::affine_geometry::endpoints(
                 &prior.instruction,
                 self.request.canvas,
-                self.transforms[target],
+                self.sources[target].transform,
             )
             .map(|(start, end, _, _)| match endpoint {
                 inku_score::Endpoint::Start => start,
@@ -1038,7 +1048,7 @@ impl Execution<'_> {
             let (start, end, _, _) = crate::affine_geometry::endpoints(
                 &prior.instruction,
                 self.request.canvas,
-                self.transforms[target],
+                self.sources[target].transform,
             )
             .ok_or(ScoreExecutionReason::UnsupportedConnectedPrimitive)?;
             return finite_point(Point::new(
@@ -1050,9 +1060,13 @@ impl Execution<'_> {
         if !supports_connected(prior) {
             return Err(ScoreExecutionReason::UnsupportedConnectedPrimitive);
         }
-        crate::affine_geometry::endpoints(prior, self.request.canvas, self.transforms[target])
-            .map(|geometry| geometry.1)
-            .ok_or(ScoreExecutionReason::UnsupportedConnectedPrimitive)
+        crate::affine_geometry::endpoints(
+            prior,
+            self.request.canvas,
+            self.sources[target].transform,
+        )
+        .map(|geometry| geometry.1)
+        .ok_or(ScoreExecutionReason::UnsupportedConnectedPrimitive)
     }
 
     fn prepare_connected(
@@ -1061,10 +1075,12 @@ impl Execution<'_> {
         mut instruction: Instruction,
     ) -> Result<Instruction, ScoreExecutionReason> {
         let relation = instruction.relation.as_ref().expect("Connected relation");
-        if self.structural[index]
-            || relation
-                .target_instruction_index
-                .is_some_and(|target| self.structural.get(target).copied().unwrap_or(false))
+        if self.sources[index].structural
+            || relation.target_instruction_index.is_some_and(|target| {
+                self.sources
+                    .get(target)
+                    .is_some_and(|target| target.structural)
+            })
             || !supports_connected(&instruction)
         {
             return Err(ScoreExecutionReason::UnsupportedConnectedStructure);
@@ -1118,7 +1134,7 @@ impl Execution<'_> {
         original: &Instruction,
     ) -> Result<Instruction, ScoreExecutionReason> {
         let mut instruction = self.placed_instruction(ordinal, original);
-        if self.omitted_relations[index] {
+        if self.sources[index].relation_omitted {
             instruction.relation = None;
         }
         let Some(relation) = instruction.relation.as_ref() else {
@@ -1157,7 +1173,7 @@ impl Execution<'_> {
                 } else {
                     1
                 })..index)
-                    .any(|target| !self.transforms[target].is_identity()))
+                    .any(|target| !self.sources[target].transform.is_identity()))
         {
             let constraint = self.bounds_constraint(index, ordinal, &instruction, None)?;
             let zero = Point::new(0.0, 0.0);
@@ -1196,9 +1212,12 @@ impl Execution<'_> {
             return Err(ScoreExecutionReason::UnsupportedTransformGroupRelation);
         }
         if is_checked_touching(relation) {
-            if self.structural[index]
-                || target
-                    .is_some_and(|target| self.structural.get(target).copied().unwrap_or(false))
+            if self.sources[index].structural
+                || target.is_some_and(|target| {
+                    self.sources
+                        .get(target)
+                        .is_some_and(|target| target.structural)
+                })
             {
                 return Err(ScoreExecutionReason::UnsupportedTouchingStructure);
             }
@@ -1212,7 +1231,7 @@ impl Execution<'_> {
                 &instruction,
                 prior,
                 self.request.canvas,
-                self.transforms[target],
+                self.sources[target].transform,
             );
         }
         let along = is_checked_line_relation(relation, RelationType::Along);
@@ -1233,9 +1252,12 @@ impl Execution<'_> {
                     ScoreExecutionReason::UnsupportedCuttingPrimitive,
                 )
             };
-            if self.structural[index]
-                || target
-                    .is_some_and(|target| self.structural.get(target).copied().unwrap_or(false))
+            if self.sources[index].structural
+                || target.is_some_and(|target| {
+                    self.sources
+                        .get(target)
+                        .is_some_and(|target| target.structural)
+                })
             {
                 return Err(structure);
             }
@@ -1258,28 +1280,28 @@ impl Execution<'_> {
                 self.request.performance_seed.unwrap_or_default(),
                 ordinal,
                 self.request.canvas,
-                self.transforms[target],
+                self.sources[target].transform,
             );
         }
         if let Some(seed) = self.request.performance_seed {
             let needed = usize::from(relation.kind == RelationType::Between) + 1;
             if index >= needed
-                && self.omitted[index - needed..index]
+                && self.sources[index - needed..index]
                     .iter()
-                    .any(|omitted| *omitted)
+                    .any(|source| source.omitted)
             {
                 return Err(ScoreExecutionReason::ConnectedReferenceOmitted);
             }
             if (index.saturating_sub(needed)..index)
-                .any(|target| !self.transforms[target].is_identity())
+                .any(|target| !self.sources[target].transform.is_identity())
             {
                 return Err(ScoreExecutionReason::UnsupportedTransformGroupRelation);
             }
             // Execution order may differ from drawing order; legacy predecessor
             // relations still receive their original predecessors, never future nodes.
-            let previous = self.performed[..index]
+            let previous = self.sources[..index]
                 .iter()
-                .flatten()
+                .flat_map(|source| &source.performed)
                 .map(|value| value.instruction.clone())
                 .collect::<Vec<_>>();
             let resolved = resolve_relation_on_canvas(
@@ -1330,17 +1352,19 @@ impl Execution<'_> {
         {
             return Err(missing);
         }
-        if self.structural[source] || (first_index..source).any(|target| self.structural[target]) {
+        if self.sources[source].structural
+            || (first_index..source).any(|target| self.sources[target].structural)
+        {
             return Err(geometry);
         }
-        let bounds = |value: &Instruction, index, ordinal, seed_override| {
+        let bounds = |value: &Instruction, index: usize, ordinal, seed_override| {
             crate::affine_geometry::bounds(
                 value,
                 self.request.performance_seed,
                 ordinal,
                 self.request.canvas,
                 seed_override,
-                self.transforms[index],
+                self.sources[index].transform,
             )
             .ok_or(geometry)
         };
@@ -1348,12 +1372,13 @@ impl Execution<'_> {
             instruction,
             source,
             ordinal,
-            self.performed[source]
+            self.sources[source]
+                .performed
                 .last()
                 .and_then(|value| value.seed_override),
         )?;
         let target = |index: usize| {
-            let value = self.performed[index].last().ok_or(omitted)?;
+            let value = self.sources[index].performed.last().ok_or(omitted)?;
             bounds(
                 &value.instruction,
                 index,
@@ -1438,7 +1463,8 @@ impl Execution<'_> {
         if is_bounds_relation(relation) {
             return self.bounds_constraint(
                 source,
-                self.performed[source]
+                self.sources[source]
+                    .performed
                     .last()
                     .expect("performed member")
                     .ordinal,
@@ -1483,16 +1509,18 @@ impl Execution<'_> {
                 ),
                 _ => return Err(ScoreExecutionReason::UnsupportedTransformGroupRelation),
             };
-        if self.structural[source]
-            || relation
-                .target_instruction_index
-                .is_some_and(|target| self.structural.get(target).copied().unwrap_or(false))
+        if self.sources[source].structural
+            || relation.target_instruction_index.is_some_and(|target| {
+                self.sources
+                    .get(target)
+                    .is_some_and(|target| target.structural)
+            })
         {
             return Err(structure);
         }
         relation.position_authority.ok_or(authority_missing)?;
         let (start, end, _, _) =
-            crate::affine_geometry::endpoints(instruction, canvas, self.transforms[source])
+            crate::affine_geometry::endpoints(instruction, canvas, self.sources[source].transform)
                 .ok_or(unsupported)?;
         let exact = |target: Point| ExternalConstraint {
             source,
@@ -1512,7 +1540,7 @@ impl Execution<'_> {
             .ok_or(missing)?;
         let prior = self.prior(target).ok_or(omitted)?;
         let (target_start, target_end, _, _) =
-            crate::affine_geometry::endpoints(prior, canvas, self.transforms[target])
+            crate::affine_geometry::endpoints(prior, canvas, self.sources[target].transform)
                 .ok_or(unsupported)?;
         let vector = Point::new(end.x - start.x, end.y - start.y);
         let target_vector =
@@ -1551,7 +1579,8 @@ impl Execution<'_> {
             / (length * target_length)
             <= GEOMETRY_EPSILON;
         let seed = self.request.performance_seed.unwrap_or_default();
-        let ordinal = self.performed[source]
+        let ordinal = self.sources[source]
+            .performed
             .last()
             .expect("performed member")
             .ordinal;
@@ -1606,7 +1635,7 @@ impl Execution<'_> {
         let mut constraints = Vec::new();
         for source in group.start..group.end {
             if self.schedule.external_groups[source] != Some(index)
-                || self.omitted_relations[source]
+                || self.sources[source].relation_omitted
             {
                 continue;
             }
@@ -1667,7 +1696,7 @@ impl Execution<'_> {
         for member in group.start..group.end {
             self.apply_instruction_transform(member, translation)?;
             if self.schedule.external_groups[member] == Some(index) {
-                for value in &mut self.performed[member] {
+                for value in &mut self.sources[member].performed {
                     value.instruction.relation = None;
                 }
             }
@@ -1688,7 +1717,7 @@ impl Execution<'_> {
         }
         let group = self.request.score.transform_groups[index].clone();
         if (group.start..group.end)
-            .any(|member| self.omitted[member] || self.performed[member].is_empty())
+            .any(|member| self.sources[member].omitted || self.sources[member].performed.is_empty())
             || group
                 .anchor_indices
                 .iter()
@@ -1698,14 +1727,14 @@ impl Execution<'_> {
         }
         let mut bounds = None;
         for member in group.start..group.end {
-            for value in &self.performed[member] {
+            for value in &self.sources[member].performed {
                 let next = crate::affine_geometry::bounds(
                     &value.instruction,
                     self.request.performance_seed,
                     value.ordinal,
                     self.request.canvas,
                     value.seed_override,
-                    self.transforms[member],
+                    self.sources[member].transform,
                 )
                 .ok_or(ScoreExecutionReason::UnsupportedTransformGroupRelation)?;
                 merge_bounds(&mut bounds, next);
@@ -1770,14 +1799,14 @@ impl Execution<'_> {
                 }
             }
             for &member in &group.fixed_position_indices {
-                for value in &self.performed[member] {
+                for value in &self.sources[member].performed {
                     if !crate::affine_geometry::bounds(
                         &value.instruction,
                         self.request.performance_seed,
                         value.ordinal,
                         self.request.canvas,
                         value.seed_override,
-                        self.transforms[member],
+                        self.sources[member].transform,
                     )
                     .is_some_and(|bounds| inside(bounds.min) && inside(bounds.max))
                     {
@@ -1849,7 +1878,7 @@ impl Execution<'_> {
         for (ordinal, member) in members.iter().enumerate() {
             let mut drawable_bounds = None;
             for instruction in member.start..member.end {
-                for value in &self.performed[instruction] {
+                for value in &self.sources[instruction].performed {
                     merge_bounds(
                         &mut drawable_bounds,
                         crate::affine_geometry::bounds(
@@ -1858,7 +1887,7 @@ impl Execution<'_> {
                             value.ordinal,
                             self.request.canvas,
                             value.seed_override,
-                            self.transforms[instruction],
+                            self.sources[instruction].transform,
                         )
                         .ok_or(ScoreExecutionReason::UnsupportedTransformGroupRelation)?,
                     );
@@ -1962,7 +1991,7 @@ impl Execution<'_> {
                     ),
                     Err(reason) => self.drop_relation(member, reason),
                 }
-                for value in &mut self.performed[member] {
+                for value in &mut self.sources[member].performed {
                     value.instruction.relation = None;
                 }
             }
@@ -1995,7 +2024,7 @@ impl Execution<'_> {
         {
             let mut bounds = None;
             for instruction in member.start..member.end {
-                for value in &self.performed[instruction] {
+                for value in &self.sources[instruction].performed {
                     merge_bounds(
                         &mut bounds,
                         crate::affine_geometry::bounds(
@@ -2004,7 +2033,7 @@ impl Execution<'_> {
                             value.ordinal,
                             self.request.canvas,
                             value.seed_override,
-                            self.transforms[instruction],
+                            self.sources[instruction].transform,
                         )
                         .ok_or(ScoreExecutionReason::UnsupportedTransformGroupRelation)?,
                     );
@@ -2050,7 +2079,7 @@ impl Execution<'_> {
                     ),
                     Err(reason) => self.drop_relation(member, reason),
                 }
-                for value in &mut self.performed[member] {
+                for value in &mut self.sources[member].performed {
                     value.instruction.relation = None;
                 }
             }
@@ -2063,7 +2092,7 @@ impl Execution<'_> {
 /// the pair's earlier performed Arc.
 fn mark_closed_arc_pairs(
     score: &Score,
-    omitted_relations: &[bool],
+    sources: &[Source],
     performed: &mut [PerformedInstruction],
 ) {
     for (follower_owner, follower) in score.instructions.iter().enumerate() {
@@ -2073,10 +2102,9 @@ fn mark_closed_arc_pairs(
         let Some(target_owner) = relation.target_instruction_index else {
             continue;
         };
-        if omitted_relations
+        if sources
             .get(follower_owner)
-            .copied()
-            .unwrap_or(true)
+            .is_none_or(|source| source.relation_omitted)
             || !is_checked_touching(relation)
             || target_owner.checked_add(1) != Some(follower_owner)
             || follower.primitive != Primitive::Arc
@@ -2288,21 +2316,25 @@ fn resolve_impl(
         }
         dependency_schedule = schedule(request.score, &omitted_relations);
     }
+    let structural = structural_instruction_indices(request.score);
+    let sources = (0..request.score.instructions.len())
+        .map(|index| Source {
+            performed: Vec::new(),
+            transform: AffineTransform::identity(),
+            path_host: path_hosts[index],
+            interior_path_host: interior_path_hosts[index],
+            omitted: false,
+            structural: structural[index],
+            relation_omitted: omitted_relations[index],
+        })
+        .collect();
     let mut execution = Execution {
         request,
         schedule: dependency_schedule,
-        performed: (0..request.score.instructions.len())
-            .map(|_| Vec::new())
-            .collect(),
-        transforms: vec![AffineTransform::identity(); request.score.instructions.len()],
-        path_hosts,
-        interior_path_hosts,
+        sources,
         anchors,
-        omitted: vec![false; request.score.instructions.len()],
         omitted_groups: vec![false; request.score.transform_groups.len()],
-        structural: structural_instruction_indices(request.score),
         warnings: Vec::new(),
-        omitted_relations,
         diagnostics,
         placement_indices,
         group_fill_scope_indices,
@@ -2321,7 +2353,7 @@ fn resolve_impl(
         }
         let failure = match node {
             ScheduleNode::Instruction(index) => {
-                if execution.omitted[index] {
+                if execution.sources[index].omitted {
                     continue;
                 }
                 for &ordinal in &ordinals[index] {
@@ -2363,7 +2395,7 @@ fn resolve_impl(
                         .map_or(origins[ordinal].effects, |typed| {
                             typed.instructions[index].effects
                         });
-                    execution.performed[index].push(Performed {
+                    execution.sources[index].performed.push(Performed {
                         instruction,
                         ordinal,
                         seed_override,
@@ -2394,8 +2426,8 @@ fn resolve_impl(
     }
     execution.perform_remaining_mirrors();
     let mut rendered = Vec::new();
-    for (owner, values) in execution.performed.into_iter().enumerate() {
-        for value in values {
+    for (owner, source) in execution.sources.iter_mut().enumerate() {
+        for value in std::mem::take(&mut source.performed) {
             rendered.push((owner, value));
         }
     }
@@ -2425,7 +2457,7 @@ fn resolve_impl(
                 instruction_index: value.ordinal,
                 original_instruction_index: owner,
                 seed_override: value.seed_override,
-                transform: execution.transforms[owner],
+                transform: execution.sources[owner].transform,
                 line_centerline: value.line_centerline,
                 closed_arc_pair_follower: None,
                 fill_scope_index: None,
@@ -2434,7 +2466,7 @@ fn resolve_impl(
             (value.instruction, entry)
         })
         .unzip();
-    mark_closed_arc_pairs(request.score, &execution.omitted_relations, &mut performed);
+    mark_closed_arc_pairs(request.score, &execution.sources, &mut performed);
     let mut score = request.score.clone();
     score.instructions = instructions;
     score.transform_groups.clear();

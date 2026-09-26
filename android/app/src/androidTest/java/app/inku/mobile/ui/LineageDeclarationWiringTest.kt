@@ -150,6 +150,15 @@ class LineageDeclarationWiringTest {
 
     /** A setter's value arrives a hop later, because `state` is combined and shared. */
     private suspend fun promptFor(text: String) {
+        // Since the shared pipeline (12390c01) the description of a work on
+        // screen is fixed while its authority is read, and stays fixed for a
+        // work whose DDL the pipeline holds until a new variation is asked for
+        // -- 「記述から新しい変奏を作る」, the screen's path to an edited description.
+        settle("the work's authority to be read") { !vm().state.value.historyAuthorityLoading }
+        if (vm().state.value.descriptionLocked) {
+            vm().startDescriptionVariation()
+            settle("the description to open") { !vm().state.value.descriptionLocked }
+        }
         vm().setPrompt(text)
         settle("the prompt to reach the shared state") { vm().state.value.prompt == text }
     }

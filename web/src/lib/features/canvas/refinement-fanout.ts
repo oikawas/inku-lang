@@ -3,6 +3,7 @@ import type {
 	VariationAmplitude,
 	VariationCandidate
 } from './refinement-session.svelte.ts';
+import type { Seed } from '../run/current-work.ts';
 
 export type RefinementCandidatePlan = {
 	label: string;
@@ -25,7 +26,7 @@ export type RefinementFanoutInput = {
 	amplitude?: VariationAmplitude;
 	signal: AbortSignal;
 	labels: RefinementFanoutLabels;
-	currentCompositionSeed: number | null | undefined;
+	currentCompositionSeed: Seed | null | undefined;
 	previousCandidates: readonly VariationCandidate[];
 	availableCatalogIds: readonly string[];
 	currentCatalogId: string;
@@ -65,13 +66,11 @@ export async function planRefinementCandidates(
 	capabilities: RefinementFanoutCapabilities
 ): Promise<RefinementCandidatePlan[]> {
 	const usedCompositionSeeds = new Set<number>();
-	if (Number.isFinite(input.currentCompositionSeed ?? NaN)) {
-		usedCompositionSeeds.add(Number(input.currentCompositionSeed));
-	}
-	for (const candidate of input.previousCandidates) {
-		if (Number.isFinite(candidate.result.composition_seed ?? NaN)) {
-			usedCompositionSeeds.add(Number(candidate.result.composition_seed));
-		}
+	// Seeds arrive as decimal strings, so read them as numbers before the
+	// check; only avoiding a repeat depends on it, so rounding does no harm.
+	for (const seed of [input.currentCompositionSeed, ...input.previousCandidates.map((candidate) => candidate.result.composition_seed)]) {
+		const used = Number(seed ?? NaN);
+		if (Number.isFinite(used)) usedCompositionSeeds.add(used);
 	}
 
 	// Refinement intentionally draws alternate catalogs. Reading the description

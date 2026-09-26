@@ -18,7 +18,8 @@ test('T-294: replay keeps recorded seeds, work payload, source, and version mism
 	let path = '';
 	let body: Record<string, unknown> = {};
 	const comparison = await replayHistoryItem(item({
-		render_seed: '17',
+		// Past 2^53: Number() would send back 1553303611486672100.
+		render_seed: '1553303611486672067',
 		composition_seed: '23',
 		render_engine_version: 'engine-old',
 		render_color_catalog_id: 'catalog-recorded'
@@ -41,7 +42,7 @@ test('T-294: replay keeps recorded seeds, work payload, source, and version mism
 
 	assert.ok(comparison);
 	assert.equal(path, '/api/render-svg');
-	assert.equal(body.render_seed, 17);
+	assert.equal(body.render_seed, '1553303611486672067');
 	assert.equal(body.composition_seed, '23');
 	assert.equal(body.catalog_id, 'catalog-recorded');
 	assert.equal(body.work_id, 'work-1');

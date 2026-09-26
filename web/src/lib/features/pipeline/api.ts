@@ -1,5 +1,5 @@
 import type { CanvasAspectId } from '$lib/plugins/system/canvas-aspect';
-import type { PaintResult } from '$lib/features/run/current-work';
+import type { PaintResult, Seed } from '$lib/features/run/current-work';
 import type { ApiFetch } from '$lib/transport/api-fetch';
 import type { PipelineDiagnostic, PipelineHistoryDiagnostics, PluginDiagnostic } from './diagnostics';
 import type { ImportedPlugin } from '../ddl-editor/ddl-import';
@@ -76,8 +76,8 @@ export type PipelineOptions = {
 	catalog_id?: string;
 	catalog_mode?: string;
 	canvas_aspect?: CanvasAspectId;
-	render_seed?: number;
-	composition_seed?: number;
+	render_seed?: Seed;
+	composition_seed?: Seed;
 	wild?: boolean;
 	variation_amplitude?: string;
 	variation_seed?: number;

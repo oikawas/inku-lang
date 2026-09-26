@@ -22,6 +22,7 @@ from ...saved_score_compat import coerce_saved_score
 from ...schema import Score
 from ..common import MODEL_NOT_OFFERED_DETAIL, _model_offered_to, _resolve_instruction_lang, _resolved_vision_model, _unexpected_http_error
 from ..deps import _current_user
+from ..models import JsonSeed
 from ..rendering import (
     COLOR_CATALOG_ID_HEADER,
     COLOR_SOURCE_HEADER,
@@ -130,9 +131,9 @@ class ComposeResponse(BaseModel):
     render_canvas_aspect: str | None = None
     render_canvas_aspect_id: str | None = None
     render_canvas_aspect_ratio: float | None = None
-    render_seed: int | None = None
+    render_seed: JsonSeed | None = None
     render_wild: bool | None = None
-    composition_seed: int | None = None
+    composition_seed: JsonSeed | None = None
     focus: str | None = None
     variation_amplitude: str | None = None
     variation_seed: int | None = None
@@ -268,9 +269,9 @@ class PaintResponse(BaseModel):
     render_canvas_aspect: str | None = None
     render_canvas_aspect_id: str | None = None
     render_canvas_aspect_ratio: float | None = None
-    render_seed: int | None = None
+    render_seed: JsonSeed | None = None
     render_wild: bool | None = None
-    composition_seed: int | None = None
+    composition_seed: JsonSeed | None = None
     focus: str | None = None
     variation_amplitude: str | None = None
     variation_seed: int | None = None
@@ -383,8 +384,8 @@ class RenderScoreResponse(BaseModel):
     render_canvas_aspect: str
     render_canvas_aspect_id: str
     render_canvas_aspect_ratio: float
-    render_seed: int
-    composition_seed: int | None = None
+    render_seed: JsonSeed
+    composition_seed: JsonSeed | None = None
     interpretation_seed: str | None = None
     seed_text: str | None = None
     render_hash: str

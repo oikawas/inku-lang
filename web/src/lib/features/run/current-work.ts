@@ -22,6 +22,13 @@ export type PaintScore = {
 	canvas?: string | null;
 };
 
+/**
+ * A seed as the API carries it: a decimal string, exact past 2^53 (a seed drawn
+ * from seed text has 64 bits), or a number the Web drew itself. Send it back as
+ * it came; `Number()` rounds a long one, and a rounded seed draws another picture.
+ */
+export type Seed = number | string;
+
 export type PaintResult = {
 	svg: string;
 	score: PaintScore;
@@ -42,9 +49,9 @@ export type PaintResult = {
 	render_canvas_aspect?: string | null;
 	render_canvas_aspect_id?: string | null;
 	render_canvas_aspect_ratio?: number | null;
-	render_seed?: number | null;
+	render_seed?: Seed | null;
 	render_wild?: boolean | null;
-	composition_seed?: number | null;
+	composition_seed?: Seed | null;
 	interpretation_seed?: string | null;
 	seed_text?: string | null;
 	sketch_text?: string | null;
@@ -97,10 +104,10 @@ export type PaintOptions = {
 	saveArtifacts?: boolean;
 	countGeneration?: boolean;
 	canvasAspectId?: CanvasAspectId;
-	renderSeed?: number;
+	renderSeed?: Seed;
 	/** Per-feature overrides for the render request; built by the features. */
 	renderOverrides?: RenderOverrides;
-	compositionSeed?: number;
+	compositionSeed?: Seed;
 	// Variation shifts the expansion layer only when both values exist.
 	variationAmplitude?: string;
 	variationSeed?: number;

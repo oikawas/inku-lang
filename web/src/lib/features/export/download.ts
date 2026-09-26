@@ -3,6 +3,7 @@ import { withPngCaptureDate } from '$lib/pngMetadata';
 import { exportSettings } from './settings.svelte';
 import { downloadFolderSettings } from './download-folder.svelte';
 import { saveBlob, type SaveOutcome } from './save-target';
+import type { Seed } from '$lib/features/run/current-work';
 
 export type SvgProfile = 'display' | 'editable' | 'compat' | 'live';
 
@@ -24,8 +25,8 @@ export type ExportDeps = {
 		svg: string;
 		score: unknown;
 		history_at?: number | null;
-		render_seed?: number | null;
-		composition_seed?: number | null;
+		render_seed?: Seed | null;
+		composition_seed?: Seed | null;
 	} | null;
 	/** The description that produced it, embedded as <desc> in the display profile. */
 	input: () => string;

@@ -10,7 +10,7 @@ import { modelDisplayName, qualifiedModelId, type Provider, type ProviderGroup }
 import { AUTO_CATALOG_ID, colorCatalogOverride } from '$lib/features/color-catalog/render';
 import { colorCatalogSettings } from '$lib/features/color-catalog/settings.svelte';
 import { renderSettingsPayload, type RenderOverrides } from '$lib/features/render-payload';
-import { runCurrentWork, type InstructionLang, type PaintOptions, type PaintResult } from '$lib/features/run/current-work';
+import { runCurrentWork, type InstructionLang, type PaintOptions, type PaintResult, type Seed } from '$lib/features/run/current-work';
 import { batchSettings } from '$lib/features/batch/settings.svelte';
 import { wildOverride } from '$lib/features/wild/render';
 import { wildSettings } from '$lib/features/wild/settings.svelte';
@@ -554,9 +554,9 @@ export function createWorkState(deps: WorkStateDeps) {
 		render_canvas_aspect?: string | null;
 		render_canvas_aspect_id?: string | null;
 		render_canvas_aspect_ratio?: number | null;
-		render_seed?: number | null;
+		render_seed?: Seed | null;
 		render_wild?: boolean | null;
-		composition_seed?: number | null;
+		composition_seed?: Seed | null;
 		instruction_lang_requested?: string | null;
 		instruction_lang_resolved?: string | null;
 		ui_lang?: string | null;
@@ -605,9 +605,9 @@ export function createWorkState(deps: WorkStateDeps) {
 			render_canvas_aspect?: string | null;
 			render_canvas_aspect_id?: string | null;
 			render_canvas_aspect_ratio?: number | null;
-			render_seed?: number | null;
+			render_seed?: Seed | null;
 			render_wild?: boolean | null;
-			composition_seed?: number | null;
+			composition_seed?: Seed | null;
 			elapsed_ms: number;
 			tokens_in: number | null;
 			tokens_out: number | null;

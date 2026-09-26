@@ -9,7 +9,7 @@ from ...okugaki import generate_okugaki
 from ... import db as _db
 from ..common import MODEL_NOT_OFFERED_DETAIL, _model_offered_to, _resolved_vision_model, _unexpected_http_error
 from ..deps import _current_user
-from ..models import HistoryItem, HistoryListResponse
+from ..models import HistoryItem, HistoryListResponse, json_seeds
 
 
 router = APIRouter(dependencies=[Depends(_current_user)])
@@ -97,6 +97,15 @@ def api_history_lineage_group_items(
     return HistoryListResponse(items=items, total=total, offset=offset, limit=limit)
 
 
+def _with_json_seeds(lineage: dict) -> dict:
+    # These answers leave without a model, so their works' seeds are made
+    # strings here, as HistoryItem sends them.
+    return {**lineage, "nodes": [
+        {**node, "history": json_seeds(node.get("history"))} if node.get("history") else node
+        for node in lineage.get("nodes", [])
+    ]}
+
+
 @router.get("/api/history/{item_id}/lineage")
 def api_history_lineage(
     item_id: str,
@@ -115,7 +124,7 @@ def api_history_lineage(
     )
     if lineage is None:
         raise HTTPException(status_code=404, detail="lineage not found")
-    return lineage
+    return _with_json_seeds(lineage)
 
 
 @router.get("/api/lineage/{node_id}")
@@ -128,7 +137,7 @@ def api_lineage(
     lineage = _db.get_lineage(actor["id"], node_id, descendant_depth=descendant_depth, node_limit=node_limit)
     if lineage is None:
         raise HTTPException(status_code=404, detail="lineage not found")
-    return lineage
+    return _with_json_seeds(lineage)
 
 
 @router.post("/api/lineage/{node_id}/promote", response_model=HistoryItem, response_model_exclude_none=True)

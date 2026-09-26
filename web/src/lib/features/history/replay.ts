@@ -39,7 +39,7 @@ export async function replayHistoryItem(
 	const hasRecordedSeed = item.render_seed != null;
 	const hasSeedText = Boolean(item.seed_text?.trim());
 	const provisionalSeed = !hasRecordedSeed && !hasSeedText ? 0 : null;
-	const replaySeed = hasRecordedSeed ? Number(item.render_seed) : provisionalSeed;
+	const replaySeed = hasRecordedSeed ? item.render_seed : provisionalSeed;
 	const catalogId = item.render_color_catalog_id ?? item.catalog_id ?? defaults.effectiveCatalogId;
 	const canvasId = item.render_canvas_aspect_id
 		?? item.render_canvas_aspect

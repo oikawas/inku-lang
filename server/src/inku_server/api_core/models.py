@@ -2,8 +2,25 @@
 
 from __future__ import annotations
 
-from typing import Literal
-from pydantic import BaseModel, Field
+from typing import Annotated, Literal
+from pydantic import BaseModel, Field, PlainSerializer
+
+# A seed can pass 2**53 (one drawn from seed text has 64 bits), beyond what a
+# JavaScript number holds exactly, and a client that sends back a rounded seed
+# draws another picture. So a JSON answer carries it as a decimal string; a
+# request may send a number or a decimal string.
+JsonSeed = Annotated[int, PlainSerializer(str, return_type=str, when_used="json")]
+
+
+def json_seeds(item: dict | None) -> dict | None:
+    """A work or result dict with its seeds as JsonSeed sends them.
+
+    For the answers that leave as plain dicts rather than through a model.
+    """
+    if not item:
+        return item
+    return {**item, **{key: str(item[key]) for key in ("render_seed", "composition_seed")
+                       if item.get(key) is not None}}
 
 
 class HistoryPostBody(BaseModel):
@@ -47,9 +64,9 @@ class HistoryPostBody(BaseModel):
     render_canvas_aspect: str | None = None
     render_canvas_aspect_id: str | None = None
     render_canvas_aspect_ratio: float | None = None
-    render_seed: int | None = None
+    render_seed: JsonSeed | None = None
     render_wild: bool | None = None
-    composition_seed: int | None = None
+    composition_seed: JsonSeed | None = None
     interpretation_seed: str | None = None
     seed_text: str | None = None
     # Stage 0.5 (v2.10). Carried with the work so a redraw replays the same

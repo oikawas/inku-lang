@@ -6,6 +6,14 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 36 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-26 — the API returns seeds as decimal strings, and the Web sends them back unrounded
+
+The same day's "work seeds stay within what JavaScript can hold" said works whose seed comes from seed text are not affected. That was wrong. A seed from seed text takes 64 bits, and the Web rounded it on reading. The replay comparison also sends the text, so the server derived the seed again and drew it right; but the refinement's touch redraw (which places marks by the work's seed), the refinement's color catalog comparison, and exporting an unsaved canvas send only the seed, and drew another picture. Saved works with a seed past 2^53 (the pipeline's 63-bit seeds) did the same.
+
+The API's JSON answers now carry `render_seed` and `composition_seed` as decimal strings (a work's `HistoryItem`, the `/api/paint`, `/api/compose` and `/api/render-score` answers, the pipeline view's `result`, and the works in a lineage). Requests take a number as before and a decimal string exactly. The Web no longer turns a seed into a number and sends it back as it came, so those works redraw on the Web as they were saved. Only the check that avoids picking the same seed again reads it as a number.
+
+Seeds in the CLI's output become strings too. Android does not read these answers. The route count (107) is unchanged. DDL, Score, and render versions are unchanged.
+
 ### 2026-09-26 — a refusal over a non-finite value names the instruction
 
 When a coordinate or another drawn number became non-finite (`NaN`, `inf`), the render core refused the drawing with "rendered SVG contains a non-finite value", without saying which instruction made it. The function that writes numbers into the SVG now counts non-finite ones, and drawing checks the count per instruction. The refusal adds the first such instruction, as in "… from instruction 1". Whether and when a drawing is refused does not change: the final search of the whole SVG stays, because a few numbers are written without that function. Drawing results do not change (the 12,799 saved renders are identical).

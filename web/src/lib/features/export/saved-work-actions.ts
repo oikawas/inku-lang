@@ -10,6 +10,7 @@ import type { SavedWorkExportSnapshot } from '$lib/features/export/saved-work';
 import { exportSettings } from '$lib/features/export/settings.svelte';
 import type { LineageGraph } from '$lib/features/history/types';
 import type { HistoryItem } from '$lib/historyManagerState.svelte';
+import type { Seed } from '$lib/features/run/current-work';
 import { DEFAULT_CANVAS_ASPECT_ID, normalizeCanvasAspectId } from '$lib/plugins/system/canvas-aspect';
 
 type ApiFetch = (path: string, init?: RequestInit) => Promise<Response>;
@@ -35,10 +36,8 @@ function savedWorkFilename(item: HistoryItem, extension: string, size?: number):
 	return `inku-${id}-${stamp}${size ? `-${size}` : ''}.${extension}`;
 }
 
-function numericSeed(value: number | string | null | undefined): number | null {
-	if (value == null || value === '') return null;
-	const parsed = Number(value);
-	return Number.isFinite(parsed) ? parsed : null;
+function recordedSeed(value: Seed | null | undefined): Seed | null {
+	return value == null || value === '' ? null : value;
 }
 
 async function responseError(response: Response): Promise<Error> {
@@ -124,8 +123,8 @@ export function makeSavedWorkExportActions(deps: SavedWorkExportActionsDeps) {
 				svg: item.svg,
 				score: item.score,
 				history_at: item.at,
-				render_seed: numericSeed(item.render_seed),
-				composition_seed: numericSeed(item.composition_seed),
+				render_seed: recordedSeed(item.render_seed),
+				composition_seed: recordedSeed(item.composition_seed),
 			}),
 			input: () => item.source_text ?? item.input,
 			displayedHistoryItem: () => item,

@@ -54,8 +54,8 @@ test('T-57  the export sends both seeds', () => {
 	assert.match(call, /composition_seed: result\.composition_seed \?\? null/);
 	// Which the deps type has to allow, or the two lines above are `undefined`
 	// with the compiler none the wiser.
-	assert.match(DOWNLOAD, /render_seed\?: number \| null;/);
-	assert.match(DOWNLOAD, /composition_seed\?: number \| null;/);
+	assert.match(DOWNLOAD, /render_seed\?: Seed \| null;/);
+	assert.match(DOWNLOAD, /composition_seed\?: Seed \| null;/);
 });
 
 test('T-57  the display profile is still the stored picture', () => {

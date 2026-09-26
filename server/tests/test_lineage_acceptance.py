@@ -206,6 +206,7 @@ def test_lineage_api_hides_other_users_and_tombstone_content():
             401,
             lineage_parent_node_id=root["lineage_node_id"],
             derivation_kind="description_edit",
+            render_seed=2**63 - 1,
         ))
         other_headers = {"Authorization": f"Bearer {second_token}"}
         assert client.get(f"/api/lineage/{root['lineage_node_id']}", headers=other_headers).status_code == 404
@@ -234,6 +235,9 @@ def test_lineage_api_hides_other_users_and_tombstone_content():
         tombstone = next(node for node in response.json()["nodes"] if node["id"] == root["lineage_node_id"])
         forbidden = {"history", "description_hash", "render_hash", "input", "ddl", "score", "svg"}
         assert forbidden.isdisjoint(tombstone)
+        # A lineage leaves without a model; its works still send seeds as strings.
+        living = next(node for node in response.json()["nodes"] if node["id"] == child["lineage_node_id"])
+        assert living["history"]["render_seed"] == str(2**63 - 1)
     finally:
         db.delete_session(first_token)
         db.delete_session(second_token)

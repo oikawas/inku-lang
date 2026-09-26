@@ -2,6 +2,10 @@
 
 This file records revisions to user and operations documents under `manual/`. See `SPEC.ja.md` for the detailed product change history.
 
+## 2026-09-26 — API seeds come back as strings
+
+The API's JSON answers now carry `render_seed` and `composition_seed` as decimal strings, so the Renderer and Replay section of Server Configuration in both languages says why, and that a seed is sent back as it came.
+
 ## 2026-09-26 — Live SVG, and three troubleshooting rows
 
 The Web export gained `Live`, so the export table in Creating Images in both languages has a row for it, and Live joins the formats drawn again from the Score. The same document's troubleshooting table also gained three rows: a running indicator that says `Retrying (try 2/4)` means an earlier attempt timed out or its answer could not be used; a reason whose parenthesis says the model did not answer within the time limit means the model is not answering in time; and "Cannot reach the server" means the API is stopped or restarting, and the page reopens by itself once it answers.

@@ -69,9 +69,9 @@ export async function runTouchRedraw(
 	capabilities: TouchRedrawCapabilities
 ): Promise<PaintResult | null> {
 	const usedSeeds = new Set<number>();
-	if (Number.isFinite(input.current.render_seed ?? NaN)) {
-		usedSeeds.add(Number(input.current.render_seed));
-	}
+	// A seed may arrive as a decimal string; only avoiding a repeat reads it as a number.
+	const currentSeed = Number(input.current.render_seed ?? NaN);
+	if (Number.isFinite(currentSeed)) usedSeeds.add(currentSeed);
 	const nextSeed = capabilities.createRenderSeed(usedSeeds);
 	const placementSeed = input.current.composition_seed ?? input.current.render_seed ?? null;
 	const response = await capabilities.apiFetch('/api/render-svg', {
@@ -119,9 +119,8 @@ export async function runLayoutRedraw(
 	capabilities: LayoutRedrawCapabilities
 ): Promise<CurrentWorkResult> {
 	const usedSeeds = new Set<number>();
-	if (Number.isFinite(input.current.composition_seed ?? NaN)) {
-		usedSeeds.add(Number(input.current.composition_seed));
-	}
+	const currentSeed = Number(input.current.composition_seed ?? NaN);
+	if (Number.isFinite(currentSeed)) usedSeeds.add(currentSeed);
 	const compositionSeed = capabilities.createCompositionSeed(usedSeeds);
 	return capabilities.paint(input.source, {
 		compositionSeed,

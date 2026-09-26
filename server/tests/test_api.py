@@ -1072,8 +1072,8 @@ def test_render_score_changes_only_catalog_metadata_and_colors(auth_context):
     assert data["render_color_catalog_name"] == "Vivid Material"
     assert data["render_color_map"]["green"] == "#008f39"
     assert data["render_canvas_aspect_id"] == "square"
-    assert data["render_seed"] == 123
-    assert data["composition_seed"] == 456
+    assert data["render_seed"] == "123"
+    assert data["composition_seed"] == "456"
     assert data["interpretation_seed"] == "reading-seed"
     assert data["score"]["instructions"][0]["primitive"] == "circle"
     assert data["score"]["instructions"][0]["center"] == [0.5, 0.5]
@@ -1922,7 +1922,7 @@ def test_history_is_scoped_to_authenticated_user():
     assert "<script" not in item_a["svg"]
     assert "<svg" in item_a["svg"]
     assert item_a["seed_text"] == "夕立"
-    assert item_a["render_seed"] == api_rendering._render_seed_from_text("夕立", None)[0]
+    assert item_a["render_seed"] == str(api_rendering._render_seed_from_text("夕立", None)[0])
     post_a_second = client.post(
         "/api/history",
         json={**payload, "input": "blue crayon search target", "ddl": "青い線", "at": payload["at"] + 1},

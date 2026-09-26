@@ -725,7 +725,7 @@ PNG 書き出しの選択肢は、設定モーダルのエクスポートタブ�
 
 候補生成中は他の生成・描画操作を禁止し、開始3秒後から共通デザインの停止ボタンでAPI要求を中断できる。進行表示は実際の生成対象を示す。読み取りを含む候補は画像hoverで正規化DDLを表示する。
 
-`render_seed` / `composition_seed` はJavaScript safe integer範囲の独立乱数とし、初回生成時から履歴・候補・再生へ引き継ぐ。タッチ候補は利用者が託す言葉から render seed を決め、同じScoreの配置を維持しながら表示上の質感を変える。
+`render_seed` / `composition_seed` はJavaScript safe integer範囲の独立乱数とし、初回生成時から履歴・候補・再生へ引き継ぐ。タッチ候補は利用者が託す言葉から render seed を決め（64bit）、同じScoreの配置を維持しながら表示上の質感を変える。APIのJSONの応答は `render_seed` と `composition_seed` を10進の文字列で返し、2^53を超えるseedもJavaScriptの利用者へ正確に届ける。要求は数と10進の文字列のどちらも受ける。
 
 色カタログ変更は親作品のDDL・Score・キャンバス・配置seed・render seedを固定し、現在とは異なるcatalog IDだけを適用する。4案では可能な限り異なるカタログを使う。色以外の推敲は、次の描画設定ではなく親作品の実使用カタログとキャンバスを継承する。色変更は系譜の `catalog_change` として変更前後のcatalog IDを記録する。
 

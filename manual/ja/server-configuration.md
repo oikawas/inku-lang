@@ -276,6 +276,8 @@ Stage 0.5が動いたとき、**写生文は記述の代わりに三つの消費
 
 `variation_seed`は`variation_amplitude`と揃って初めて効きます。片方だけでは展開層の軸は動きません。
 
+APIのJSONの応答は、`render_seed`と`composition_seed`を10進の文字列（`"1553303611486672067"`）で返します。`seed_text`から作るseedは64bitで、JavaScriptの数では正確に持てず、丸めたseedを送り返すと別の絵になるためです。seedは受け取ったまま送り返してください。要求は数と10進の文字列のどちらも受けます。
+
 `render_wild`は作品全体に効き、`rh3`の材料に入ります。同じScore・同じseedでも、暴れるの有無が違えば別のeditionです。
 
 履歴再現では保存済みScore、色カタログ、キャンバス、seed、render engine versionを使用します。engine変更後のbit一致を保証するのではなく、version情報を監査可能にします。

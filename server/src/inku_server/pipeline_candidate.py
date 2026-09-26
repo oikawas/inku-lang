@@ -15,6 +15,7 @@ import time
 import uuid
 from typing import Callable
 
+from .api_core.models import json_seeds
 from .persistence.variation_authority import VariationAuthoringContext, VariationAuthorityStore
 
 
@@ -310,7 +311,7 @@ class CandidateExecution:
                            "sketch": state.get("sketch"),
                            "catalog_diagnostics": self.context.get("macro_catalog", {}).get("diagnostics", []),
                            "rendered": self._rendered,
-                           "result": self.context.get("result")})
+                           "result": json_seeds(self.context.get("result"))})
             if self.context.get("provider_failure") is not None:
                 result["provider_failure"] = self.context["provider_failure"]
             attempt = self._provider_attempt(state)

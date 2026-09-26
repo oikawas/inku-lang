@@ -288,6 +288,8 @@ Mutually inconsistent values are rounded rather than rejected — if the represe
 
 `variation_seed` takes effect only together with `variation_amplitude`. Either one alone moves no axis of the expansion layer.
 
+The API's JSON answers carry `render_seed` and `composition_seed` as decimal strings (`"1553303611486672067"`). A seed from `seed_text` takes 64 bits, past what a JavaScript number holds exactly, and a rounded seed sent back draws another picture. Send a seed back as it came; requests take either a number or a decimal string.
+
 `render_wild` applies to the whole work and is part of the `rh3` material. The same score and the same seed with a different Wild setting is a different edition.
 
 History replay uses the saved Score, color catalog, canvas, seeds, and render-engine version. Engine version is recorded for audit; bit-identical output across different engine versions is not assumed.

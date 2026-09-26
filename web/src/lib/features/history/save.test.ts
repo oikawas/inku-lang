@@ -69,8 +69,8 @@ test('T-292/T-293: save owns the payload and selects the saved identity after re
 	assert.equal(body.catalog_id, 'catalog-default');
 	assert.equal(body.catalog_mode, 'auto');
 	assert.equal(body.canvas_aspect, 'portrait');
-	assert.equal(body.render_seed, 7);
-	assert.equal(body.composition_seed, 8);
+	assert.equal(body.render_seed, '7');
+	assert.equal(body.composition_seed, '8');
 	assert.equal(body.variation_seed, 9);
 	assert.equal(body.compose_fallback, 'retry');
 	assert.equal(body.sketch_state, 'used');

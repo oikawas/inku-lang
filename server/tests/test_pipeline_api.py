@@ -148,7 +148,7 @@ def test_hole_provider_runs_after_current_safe_render_is_persisted() -> None:
 
     def project(_owner, _snapshot, _context, rendered):
         order.append("project")
-        return {"svg": rendered["svg"]}
+        return {"svg": rendered["svg"], "render_seed": 2**63 - 1}
 
     service = PipelineService(
         Binding(),
@@ -173,6 +173,8 @@ def test_hole_provider_runs_after_current_safe_render_is_persisted() -> None:
         assert view["delivery"]["score"]["instructions"]
         assert view["rendered"]["svg"] == "<svg><circle/></svg>"
         assert view["result"]["svg"] == "<svg><circle/></svg>"
+        # Past 2**53, so the view sends it as a string a JavaScript client keeps exact.
+        assert view["result"]["render_seed"] == str(2**63 - 1)
     finally:
         service.close()
 

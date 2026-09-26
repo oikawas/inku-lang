@@ -22,15 +22,16 @@ object DefaultModelDownloads {
         fileName = "gemma-4-E2B-it.litertlm",
     )
 
-    val gemma4E4b = ModelDownloadSpec(
-        modelId = "local-litert-lm:gemma-4-e4b",
-        displayName = "Gemma 4 E4B",
-        qualityTier = "high",
-        downloadUrl = "https://huggingface.co/litert-community/gemma-4-E4B-it-litert-lm/resolve/main/gemma-4-E4B-it.litertlm",
-        licenseUrl = "https://huggingface.co/litert-community/gemma-4-E4B-it-litert-lm",
-        expectedSha256 = "0b2a8980ce155fd97673d8e820b4d29d9c7d99b8fa6806f425d969b145bd52e0",
-        fileName = "gemma-4-E4B-it.litertlm",
-    )
+    // Gemma 4 E4B was offered as the high-quality option until 2026-09-26.
+    // A Pixel 9 ran short of memory with it: its first engine start in May
+    // ended the process, and describing a photo got the app killed.
+    val all = listOf(gemma4E2b)
 
-    val all = listOf(gemma4E2b, gemma4E4b)
+    /**
+     * [modelId], or the standard model in place of an on-device model the
+     * catalog no longer offers. A choice stored while Gemma 4 E4B was offered
+     * still names it, and nothing on the device can run it now.
+     */
+    fun offeredOrStandard(modelId: String): String =
+        if (modelId.startsWith("local-litert-lm:") && all.none { it.modelId == modelId }) gemma4E2b.modelId else modelId
 }

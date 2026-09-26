@@ -5205,7 +5205,6 @@ private fun providerModelCandidates(provider: app.inku.mobile.data.db.ProviderSe
     val defaults = when (provider.providerId) {
         "local-litert-lm" -> listOf(
             ProviderModelCandidate("local-litert-lm:gemma-4-e2b", "Gemma 4 E2B", "LiteRT-LM"),
-            ProviderModelCandidate("local-litert-lm:gemma-4-e4b", "Gemma 4 E4B", "LiteRT-LM"),
         )
         "openai" -> listOf(
             ProviderModelCandidate("openai:gpt-5.1", "GPT-5.1"),
@@ -5401,7 +5400,8 @@ private fun ModelAssetControls(
                     modifier = Modifier.size(Dimens.iconTileSize).background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(Dimens.radiusCard)),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Text(if (asset.qualityTier.contains("high", ignoreCase = true)) "E4" else "E2", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+                    // The model's size, "E2" of "Gemma 4 E2B".
+                    Text(asset.displayName.substringAfterLast(' ').take(2), style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
                 }
                 Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Dimens.spaceXs)) {
                     Text(asset.displayName, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)

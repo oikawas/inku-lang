@@ -41,6 +41,7 @@ import app.inku.mobile.llm.ModelProvider
 import app.inku.mobile.llm.ModelRequest
 import app.inku.mobile.llm.VisionAnalysisRequest
 import app.inku.mobile.llm.VisionAnalysisResult
+import app.inku.mobile.llm.deleteWithdrawnModelFiles
 import app.inku.mobile.llm.ProviderUrlValidator
 import app.inku.mobile.llm.RoutingModelProvider
 import app.inku.mobile.pipeline.AndroidWorkPipeline
@@ -74,6 +75,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.job
 import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -384,6 +386,7 @@ class InkuRepository(
 
     suspend fun ensureDefaultModelAssets() {
         ensureDefaultProviderSettings()
+        removeWithdrawnModelAssets()
         DefaultModelDownloads.all.forEach { spec ->
             val existing = database.modelAssetDao().getByModelId(spec.modelId)
             val downloadState = when (existing?.downloadState) {
@@ -409,6 +412,21 @@ class InkuRepository(
                     updatedAt = System.currentTimeMillis(),
                 ),
             )
+        }
+    }
+
+    /**
+     * Drops the rows of on-device models the catalog no longer offers (Gemma 4
+     * E4B, 2026-09-26) and the files they point at. The row would still list
+     * the model for selection, and its file -- 3.7 GB for E4B -- would have no
+     * screen left to delete it from.
+     */
+    private suspend fun removeWithdrawnModelAssets() {
+        database.modelAssetDao().getAllExcept(DefaultModelDownloads.all.map { it.modelId }).forEach { asset ->
+            asset.localPath?.let { path ->
+                withContext(Dispatchers.IO) { deleteWithdrawnModelFiles(context.filesDir, context.cacheDir, path) }
+            }
+            database.modelAssetDao().deleteByModelId(asset.modelId)
         }
     }
 
@@ -1203,6 +1221,12 @@ class InkuRepository(
     private fun normalizedPublishedModels(defaultSetting: ProviderSettingEntity, existing: ProviderSettingEntity?): String {
         val current = existing?.publishedModelsJson ?: return defaultSetting.publishedModelsJson
         val currentIds = parseModelIds(current)
+        if (defaultSetting.isDefaultLocal) {
+            // The author's pick among the on-device models, less the ones the
+            // catalog no longer offers.
+            val offered = parseModelIds(defaultSetting.publishedModelsJson)
+            return JSONArray(currentIds.filter { it in offered }.ifEmpty { offered }).toString()
+        }
         val legacyIds = legacyDefaultPublishedModels(defaultSetting.providerId)
         return if (legacyIds.isNotEmpty() && currentIds.toSet() == legacyIds.toSet()) {
             defaultSetting.publishedModelsJson

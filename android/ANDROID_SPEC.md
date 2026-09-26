@@ -66,6 +66,8 @@ The drawing model is chosen in the compose screen's model dialog. The settings s
 
 The running row shows the model call a drawing waits on, from the shared core's `providerAttempt`: "Awaiting reply (try 1/4)", and from the second attempt "Retrying (try 2/4)" in the accent colour (web `RunStatus`'s wording, the Server review's W4). The core gives the limit from each stage's retry policy; the host does not copy it. The wait before a retry already reads as a retry. Nothing is shown while refinement candidates are made.
 
+The on-device models (LiteRT-LM) are Gemma 4 E2B alone. Gemma 4 E4B, offered as the high-quality option, was withdrawn on 2026-09-26. A Pixel 9 ran short of memory with it: in May its first engine initialization ended the process, and on September 26 describing a photo brought system services down one after another and the app was killed in the foreground. At start-up, the `model_assets` row of an on-device model the catalog no longer offers is deleted, together with the model file it points at (a `.part` of an unfinished download included, and only inside `files/models`) and the LiteRT-LM caches whose names begin with that file's name (`cacheDir/litert-lm`); the model also leaves the on-device connection's published models. A stored drawing model (`model_selection`) or description model (`camera_vision_model`) of E4B is read as E2B. Works drawn with E4B keep showing the model name they were saved with.
+
 ## 2026-09-25 Current plugins (draw-system04)
 
 The underdrawing's optional `plugins`, the Stage 1 installed-plugin section, and canonical-name and alias matching (DDL Spec 14, bundled `Nature.leaves` 2.0.0) are done by the packaged shared Rust core. The lock's optional `aliases` travel into Room unchanged.
@@ -82,7 +84,7 @@ The server's `layer_versions.py` declares the DDL Spec and DDL engine versions; 
 
 The bottom "Camera" opens an in-app camera (CameraX back-camera preview and shutter) that writes the photo straight to an app-owned temporary file under `cacheDir/camera/`. It no longer goes through the system camera app and its review screen. The first use asks for the `CAMERA` permission; if it is refused or CameraX cannot start, capture falls back to the system camera (`ActivityResultContracts.TakePicture`). The Photo Picker entry and the original-photo retention and deletion contract are unchanged.
 
-The "description model" that turns a photo into a description is chosen in Settings > Other. The default is the on-device `local-litert-lm:gemma-4-e2b`; downloaded on-device models (such as E4B) and models from enabled remote providers can also be chosen. The value is stored as `camera_vision_model` in `app_settings`; a missing or corrupt value falls back to the default. It cannot change during a capture. With an on-device model the photo never leaves the device. Only when a remote model is chosen is the image sent to that provider, re-encoded with orientation applied, a 1280 px long edge, and JPEG quality 85, without the original EXIF or location. Gemini receives it as `inlineData` and OpenAI-compatible providers as an `image_url` data URI; the original file, URI, path, and display name are never sent. While a remote model is selected, the settings screen always shows where the photo goes and what is sent. Gemma and Gemini 3 models on Gemini get `thinkingLevel: minimal` (the default thinking more than doubled the time and could spend the whole output budget, leaving an empty answer). The description prompt is `camera-description-v4`: three to five sentences, about 180 Japanese characters or 70 English words, on layout, the main subjects with their simple forms and counts, colors by area with accents, light, time, season, and weather, and texture and repetition. An on-device model does not keep to a length in the prompt and its time grows with every character, so its generation stops at the last sentence end after 180 Japanese characters (450 in English), with no partial sentence kept.
+The "description model" that turns a photo into a description is chosen in Settings > Other. The default is the on-device `local-litert-lm:gemma-4-e2b`; models from enabled remote providers can also be chosen. The value is stored as `camera_vision_model` in `app_settings`; a missing or corrupt value, or an on-device model no longer supported (Gemma 4 E4B), falls back to the default. It cannot change during a capture. With an on-device model the photo never leaves the device. Only when a remote model is chosen is the image sent to that provider, re-encoded with orientation applied, a 1280 px long edge, and JPEG quality 85, without the original EXIF or location. Gemini receives it as `inlineData` and OpenAI-compatible providers as an `image_url` data URI; the original file, URI, path, and display name are never sent. While a remote model is selected, the settings screen always shows where the photo goes and what is sent. Gemma and Gemini 3 models on Gemini get `thinkingLevel: minimal` (the default thinking more than doubled the time and could spend the whole output budget, leaving an empty answer). The description prompt is `camera-description-v4`: three to five sentences, about 180 Japanese characters or 70 English words, on layout, the main subjects with their simple forms and counts, colors by area with accents, light, time, season, and weather, and texture and repetition. An on-device model does not keep to a length in the prompt and its time grows with every character, so its generation stops at the last sentence end after 180 Japanese characters (450 in English), with no partial sentence kept.
 
 Drawing from the description no longer uses the fixed NVIDIA NIM, `vivid_material`, sketch-off route. It uses the drawing settings at capture start (Stage 1/2 models, color catalog including auto, and sketch), fixed for the run and its retry. Before capture, the description model and the drawing models are checked: an on-device model must be downloaded, and a remote provider must be enabled with a Base URL and any required API key; otherwise capture does not start. An on-device description model starts loading while the camera screen is open. New works record `input_provenance.route` as `description_to_pipeline`, and `vision_provider_id` as the provider actually used. Works saved with the earlier `local_description_to_nim` / `local_ddl_to_nim_stage2` / `ddl_to_pipeline_stage2` values still display.
 
@@ -157,7 +159,7 @@ Capture and input files under `cacheDir/camera/` are managed separately from the
 - The Kotlin host performs provider transport, camera image preparation and on-device Vision,
   atomic Room persistence, approval UI, and presentation. Shared Rust owns retry and timeout
   decisions for each provider action and selects the next stage.
-- Gemma 4 E2B is the default local model. Gemma 4 E4B is a high-quality option.
+- Gemma 4 E2B is the on-device model (Gemma 4 E4B was withdrawn on 2026-09-26).
 - First launch downloads the selected local model after a license confirmation.
 - Target device class is Pixel 9 or newer.
 
@@ -184,7 +186,7 @@ Implemented:
   - export templates
 - Repository and ViewModel layer for drawing, batch execution, demo execution,
   history selection, local settings, and placeholder model download state.
-- Local model catalog and acquisition state management for Gemma 4 E2B/E4B:
+- Local model catalog and acquisition state management for Gemma 4 E2B:
   - official LiteRT-LM Hugging Face `.litertlm` URLs
   - SHA256 metadata
   - Room-backed license acceptance state
@@ -241,7 +243,7 @@ Implemented:
     history. `summary.json` and the batch aggregate summary include the
     server-side `history_id`.
 - LiteRT-LM is wired as the default local provider for shared-pipeline model
-  effects. The provider reads the selected Gemma 4 E2B/E4B `.litertlm` file path from
+  effects. The provider reads the selected Gemma 4 E2B `.litertlm` file path from
   Room, verifies that the model is in the `ready` state, initializes a cached
   LiteRT-LM `Engine`, sends the core-provided bounded prompt once through a
   `Conversation`, and renders the returned `Message` into text. Shared Rust

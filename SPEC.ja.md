@@ -1819,7 +1819,7 @@ relation は記述者が Stage 1 または direct typed DDL で明示した場�
 - 理由: 開発速度、デモのしやすさ、将来性
 - 開発は Mac 上で行い、負荷の掛かる試験は配備先のテスト専用コンテナで回す（§22）
 
-**補完軸**: ネイティブ Android アプリ（Pixel 9 で検証）+ LiteRT-LM（Gemma 4 E2B / E4B）
+**補完軸**: ネイティブ Android アプリ（Pixel 9 で検証）+ LiteRT-LM（Gemma 4 E2B）
 - server を正本とする後追い移植で、render engine の版を追随させる（現況は `android/ANDROID_SPEC.ja.md`）
 - 「ローカルLLMでも動く」差別化ポイントとして保持
 - Androidアプリの版は `android/VERSION` が独立に持つ

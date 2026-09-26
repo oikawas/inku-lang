@@ -11,6 +11,7 @@ import app.inku.mobile.data.model.CameraInputOrigin
 import app.inku.mobile.data.model.CameraInputProvenance
 import app.inku.mobile.data.model.CompatibilityConstants
 import app.inku.mobile.llm.CameraVisionModelSetting
+import app.inku.mobile.llm.DefaultModelDownloads
 import app.inku.mobile.llm.VisionAnalysisRequest
 import app.inku.mobile.llm.VisionAnalysisResult
 import app.inku.mobile.llm.VisionImagePreparer
@@ -93,10 +94,10 @@ class HeadlessRenderActivity : Activity() {
 
             val settings = repository.getSetting("model_selection")?.let { JSONObject(it) }
             val stage1Model = intent.getStringExtra("stage1_model")?.takeIf { it.isNotBlank() }
-                ?: settings?.optString("stage1_model")?.takeIf { it.isNotBlank() }
+                ?: settings?.optString("stage1_model")?.takeIf { it.isNotBlank() }?.let(DefaultModelDownloads::offeredOrStandard)
                 ?: CompatibilityConstants.defaultStage1Model
             val stage2Model = intent.getStringExtra("stage2_model")?.takeIf { it.isNotBlank() }
-                ?: settings?.optString("stage2_model")?.takeIf { it.isNotBlank() }
+                ?: settings?.optString("stage2_model")?.takeIf { it.isNotBlank() }?.let(DefaultModelDownloads::offeredOrStandard)
                 ?: CompatibilityConstants.defaultStage2Model
             val catalogId = intent.getStringExtra("catalog_id")?.takeIf { it.isNotBlank() }
                 ?: repository.getSetting("color_catalog")?.let { JSONObject(it).optString("value") }?.takeIf { it.isNotBlank() }

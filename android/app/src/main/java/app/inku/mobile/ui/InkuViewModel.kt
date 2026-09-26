@@ -1322,6 +1322,12 @@ class InkuViewModel @JvmOverloads constructor(
 
     fun clearPrompt() {
         if (state.value.isDrawing) return
+        // Starting a new work leaves a drawing that was waiting on the author --
+        // restored at start or presented after a stop -- for good, as the stop
+        // itself does; left open, it was restored again at every start.
+        localState.value.pipelineView?.takeIf { !it.terminal }?.let { view ->
+            viewModelScope.launch { runCatching { repository.cancelPipeline(view.executionId) } }
+        }
         discardStagedCameraPhoto()
         cameraRetryInput = null
         promptEditedByUser = true
@@ -2945,7 +2951,18 @@ class InkuViewModel @JvmOverloads constructor(
                 }
             }.onFailure { error ->
                 if (error is CancellationException) throw error
-                if (!presentPipelineInteraction(error)) {
+                // A candidate that stops for the author's attention is not a
+                // drawing to resume. web keeps the failure in its grid
+                // (`failGrid`) and moves nowhere; here the candidate's execution
+                // used to be presented as the drawing, closing the refinement,
+                // and it came back at every start as the drawing in progress.
+                // It is cancelled now, and the failure stays in the panel.
+                if (error is PipelineInteractionRequired) {
+                    withContext(NonCancellable + Dispatchers.IO) {
+                        runCatching { repository.cancelPipeline(error.view.executionId) }
+                    }
+                    localState.value = localState.value.copy(refinementStatus = strings().refinementFailed)
+                } else {
                     localState.value = localState.value.copy(refinementStatus = messageFor(error, strings(), strings().refinementFailed))
                 }
             }

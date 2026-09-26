@@ -173,13 +173,22 @@ class InkuRepository(
         return executionId.takeIf { it.isNotBlank() }?.let { pipeline.view(it) }
     }
 
+    /**
+     * The drawing to put back on screen at start, if one was left behind: an
+     * execution still running or waiting on the author, or one that completed
+     * without its work being saved. One that failed or was cancelled has
+     * already said so and is not brought back -- before, a failed run (a
+     * refinement candidate among them) came back at every start in place of
+     * the newest work. web restores nothing on opening; this exists for an
+     * app the system stopped mid-drawing.
+     */
     suspend fun restoreActivePipeline(): PipelineView? {
         val execution = database.sharedPipelineDao().latestExecution(AndroidWorkPipeline.OWNER_ID) ?: return null
         val view = pipeline.restore(execution.executionId)
-        if (view.phaseTag == "completed" && database.historyDao().getById(pipelineHistoryId(view)) != null) {
-            return null
+        if (view.phaseTag == "completed") {
+            return view.takeIf { database.historyDao().getById(pipelineHistoryId(view)) == null }
         }
-        return view
+        return view.takeIf { !it.terminal }
     }
 
     private fun pipelineHistoryId(view: PipelineView): String =

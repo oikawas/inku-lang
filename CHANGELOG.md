@@ -6,6 +6,15 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 36 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-26 — Source review decisions, continued: drafts on permanent deletion, the answer to an invalid Score, lineage listings, and unrecorded times
+
+- **Deleting a work for good takes the draft only that work kept.** The description and DDL of a draft used to stay until the account was deleted. A draft stays when another work was saved from it, when another draft was forked from it, or when it was written on after the save. The draft's execution records and captured provider I/O go with it.
+- **Saving a work (`POST /api/history`) with an invalid Score says where it is invalid.** It answered only "history score render failed" and logged a traceback as a failure of the server itself.
+- **A lineage's work listing can leave the SVGs out, and the Web asks it to.** A lineage is read whole, up to 10,000 works, so a large one could run to hundreds of megabytes with every SVG in it. As in the ordinary listing, SQLite measures each SVG's size instead.
+- Web: a work whose processing time was not recorded (one saved through the API, for example) shows "not recorded" in the generation info instead of 0.0s.
+
+The route count (107) is unchanged. DDL, Score, and render versions are unchanged.
+
 ### 2026-09-26 — Source review decisions: keeping an administrator and a way in, enforcing published models, leaders' user management, and render memory
 
 The items the same review left to the author are fixed as decided.

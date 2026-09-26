@@ -6,6 +6,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 36 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### v2.15.33 — update the render core, shared pipeline, Web and Android (Build 1109, 2026-09-26)
+
+This release carries the changes above v2.15.32: render-core safety, speed and typed intermediate forms; render engine 69; the Live SVG profile; shared-pipeline progress and cancellation; Server and Web permission, persistence and presentation fixes; and Android camera, on-device-model and shared-pipeline updates. The entries below state each change's compatibility and effect on saved works.
+
 ### 2026-09-26 — Android also issues JavaScript-safe render seeds
 
 Android follows the Server's fix of the same day. Its shared pipeline drew 63-bit random seeds for works without a given seed (every ordinary drawing) and for redraws and forks with changed run options. SPEC makes render seeds JavaScript-safe, and an Android work may be redrawn on the Web. The pipeline now uses the 53-bit seed Android already had (`SeedFactory`, the same as the Server's `new_render_seed`).

@@ -6,6 +6,10 @@
 
 **本書が持つのは v2.5.0（2026-07-25、render engine 12）以降**の 36 版である。それより前は書庫にある。
 
+### v2.15.33 — 描画core・共有パイプライン・Web／Androidを更新（Build 1109、2026-09-26）
+
+v2.15.32以降の上記変更を収録する。描画coreの安全性・速度・型付き中間表現、render engine 69、ライブ用SVG、共有パイプラインの進行表示と中断、Server／Webの権限・保存・表示の修正、Androidのカメラ・端末内モデル・共有パイプライン追随を含む。各変更の互換性と保存済み作品への影響は、続く各項に記す。
+
 ### 2026-09-26 — Androidも作品のseedをJavaScriptで扱える範囲で作る
 
 Serverの同日の直し（作品のseedをJavaScriptで扱える範囲で作る）にAndroidを揃える。Androidの共有パイプラインは、seedの指定の無い作品（普段の描画）と、描き直し・実行条件を変えたフォークのseedを63bitの乱数で作っていた。SPECはrender seedをJavaScriptで安全な整数としており、Androidの作品もWebで描き直されうる。Androidがすでに持つ53bitの作り方（`SeedFactory`、Serverの`new_render_seed`と同じ）を使う。

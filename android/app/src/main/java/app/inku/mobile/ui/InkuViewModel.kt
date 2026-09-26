@@ -2477,7 +2477,9 @@ class InkuViewModel @JvmOverloads constructor(
                     if (error is CancellationException) throw error
                     if (!isCurrentDrawingRun(runId)) return@onFailure
                     if (presentPipelineInteraction(error)) return@launch
-                    failures = (failures + BatchFailure(lineNumber, prompt, messageFor(error, strings(), strings().statusDrawFailed))).take(30)
+                    // Every failure is kept (at most MaxBatchItems): the tally
+                    // counts this list, as web's report keeps each one.
+                    failures = failures + BatchFailure(lineNumber, prompt, messageFor(error, strings(), strings().statusDrawFailed))
                     localState.value = localState.value.copy(
                         batchSuccess = success,
                         batchFailures = failures,

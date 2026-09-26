@@ -6,6 +6,16 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 36 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-26 — Android's Stage 1 time, Gemini model list and batch failure count follow the Server and Web
+
+Three fixes found while sweeping Android's source for missing comments, the review's last open point.
+
+- Stage 1 (generating the normalized DDL) gets the Server's budget from 2026-09-19: 300 seconds per attempt and 540 in all. Android still gave it 120 and 120, like the other stages, so a first attempt that timed out left no time to retry. Catalog selection and hole completion keep 120 seconds.
+- Fetching Gemini's model list sends the API key in the `x-goog-api-key` header the drawing requests use, not in the URL query (`?key=`), where every proxy and access log it passes would keep it; the Server made the same change the same day. The Claude API and Gemini lists are now read to their last page, as the Server does (1000 per page, at most 20 pages). Only the first page was read before, so Gemini's list stopped at 50.
+- A batch kept only its first 30 failures and reported that as the failure count. A batch runs up to 100 lines, so past 30 failures the final tally was wrong. Every failure is kept now, as on the Web.
+
+Comments were added where the code does not say why (the API key box, download resume, the shared pipeline's store and fork context, which failures the core retries, the owned model path check, the debug render token and others) and where Android mirrors a Server definition. DDL, Score and rendering versions are unchanged.
+
 ### 2026-09-26 — Scores from 0.4.0 on may carry surface intensity
 
 The Server's schema accepted an instruction's `surface_intensity` of `dense` or `faint` only when the Score's version was exactly 0.3.0, and refused 0.4.0 through 0.15.0 with "surface_intensity requires Score version 0.3.0"; SPEC allows it from 0.3.0 on. Only 0.1.0 and 0.2.0 are refused now. The routes that validate a Score they receive (saving a work with `POST /api/history`, redrawing a Score older than 0.10 for `/api/render-score` and `/api/render-svg`, and a saved work's non-display SVG) now take such Scores.

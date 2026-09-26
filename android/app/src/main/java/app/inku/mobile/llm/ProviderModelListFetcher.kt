@@ -6,15 +6,22 @@ import java.net.URL
 import java.net.URLEncoder
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import org.json.JSONArray
 import org.json.JSONException
 import org.json.JSONObject
 
 internal data class ProviderModelListRequest(
     val url: String,
     val headers: Map<String, String>,
+    /** Sent with every page: the largest page the API allows. */
+    val firstQuery: Map<String, String> = emptyMap(),
 )
 
-/** The three catalog endpoints and credential forms used by the server settings API. */
+/**
+ * The three catalog endpoints and credential forms used by the server settings
+ * API (`routers/settings.py`). Every key rides in a header: in the query
+ * string it would be written into each proxy and access log the URL passes.
+ */
 internal fun providerModelListRequest(kind: String, baseUrl: String, apiKey: String?): ProviderModelListRequest {
     ProviderUrlValidator.validateRemoteBaseUrl(baseUrl)
     val root = baseUrl.trimEnd('/')
@@ -26,10 +33,12 @@ internal fun providerModelListRequest(kind: String, baseUrl: String, apiKey: Str
                 key?.let { put("x-api-key", it) }
                 put("anthropic-version", "2023-06-01")
             },
+            mapOf("limit" to MODEL_LIST_PAGE_SIZE),
         )
         "gemini" -> ProviderModelListRequest(
-            "$root/v1beta/models" + (key?.let { "?key=${URLEncoder.encode(it, "UTF-8")}" } ?: ""),
-            emptyMap(),
+            "$root/v1beta/models",
+            key?.let { mapOf("x-goog-api-key" to it) } ?: emptyMap(),
+            mapOf("pageSize" to MODEL_LIST_PAGE_SIZE),
         )
         "openai-compatible", "openai_compatible" -> ProviderModelListRequest(
             "$root/models",
@@ -39,14 +48,27 @@ internal fun providerModelListRequest(kind: String, baseUrl: String, apiKey: Str
     }
 }
 
-internal fun parseProviderModelList(body: String): List<String> {
-    val payload = try {
-        JSONObject(body)
-    } catch (_: JSONException) {
-        error("Model list response was not JSON.")
-    }
-    val raw = payload.optJSONArray("data") ?: payload.optJSONArray("models")
+/** The query for the page after [page], or null when [page] was the last one. */
+internal fun nextModelListQuery(kind: String, page: JSONObject): Map<String, String>? = when (kind) {
+    "anthropic" -> page.optString("last_id").takeIf { page.optBoolean("has_more") && it.isNotEmpty() }
+        ?.let { mapOf("after_id" to it) }
+    "gemini" -> page.optString("nextPageToken").takeIf { it.isNotEmpty() }?.let { mapOf("pageToken" to it) }
+    else -> null
+}
+
+internal fun parseProviderModelList(body: String): List<String> = providerModelIds(modelListItems(parseModelListPage(body)))
+
+private fun parseModelListPage(body: String): JSONObject = try {
+    JSONObject(body)
+} catch (_: JSONException) {
+    error("Model list response was not JSON.")
+}
+
+private fun modelListItems(page: JSONObject): JSONArray =
+    page.optJSONArray("data") ?: page.optJSONArray("models")
         ?: error("Model list response did not contain models.")
+
+private fun providerModelIds(raw: JSONArray): List<String> {
     val models = (0 until raw.length()).mapNotNull { index ->
         val item = raw.optJSONObject(index) ?: return@mapNotNull null
         item.optString("id").ifBlank { item.optString("name") }
@@ -59,14 +81,41 @@ internal fun parseProviderModelList(body: String): List<String> {
 }
 
 internal object ProviderModelListFetcher {
+    /**
+     * Reads every page, as the server does. The page cap only stops a provider
+     * that never says it is done; a list cut short there is an error rather
+     * than a partial answer.
+     */
     suspend fun fetchModels(kind: String, baseUrl: String, apiKey: String?): List<String> = withContext(Dispatchers.IO) {
         val request = providerModelListRequest(kind, baseUrl, apiKey)
-        val host = URL(request.url).host
+        val collected = JSONArray()
+        var query = request.firstQuery
+        repeat(MODEL_LIST_PAGE_LIMIT) {
+            val page = parseModelListPage(fetchPage(pageUrl(request.url, query), request.headers))
+            val items = modelListItems(page)
+            for (index in 0 until items.length()) collected.put(items.get(index))
+            val following = nextModelListQuery(kind, page) ?: return@withContext providerModelIds(collected)
+            query = request.firstQuery + following
+        }
+        error("Model list response did not end.")
+    }
+
+    private fun pageUrl(url: String, query: Map<String, String>): String =
+        if (query.isEmpty()) {
+            url
+        } else {
+            url + "?" + query.entries.joinToString("&") { (name, value) ->
+                "${URLEncoder.encode(name, "UTF-8")}=${URLEncoder.encode(value, "UTF-8")}"
+            }
+        }
+
+    private fun fetchPage(url: String, headers: Map<String, String>): String {
+        val host = URL(url).host
         var connection: HttpURLConnection? = null
         try {
-            connection = (URL(request.url).openConnection() as HttpURLConnection).also {
+            connection = (URL(url).openConnection() as HttpURLConnection).also {
                 configureRemoteConnection(it, method = "GET", apiKey = null, timeoutMs = 20_000)
-                request.headers.forEach { (name, value) -> it.setRequestProperty(name, value) }
+                headers.forEach { (name, value) -> it.setRequestProperty(name, value) }
             }
             val status = connection.responseCode
             if (status !in 200..299) {
@@ -74,7 +123,7 @@ internal object ProviderModelListFetcher {
             }
             val (body, truncated) = readLimited(connection.inputStream, 2_000_000)
             require(!truncated) { "Model list response was too large." }
-            parseProviderModelList(body)
+            return body
         } catch (_: IOException) {
             error("Model list request failed for $host.")
         } finally {
@@ -101,3 +150,7 @@ internal object ProviderModelListFetcher {
         }
     }
 }
+
+// The server's page size and page cap (`_MODEL_LIST_PAGE_SIZE`, `_MODEL_LIST_PAGE_LIMIT`).
+private const val MODEL_LIST_PAGE_SIZE = "1000"
+private const val MODEL_LIST_PAGE_LIMIT = 20

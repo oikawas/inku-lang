@@ -50,7 +50,7 @@ flowchart TD
 
 ## 済んだもの
 
-- **streamの実況** — `/api/paint/stream` は `stage1` と `done` の2 eventしか持たなかった。Build 926で `sketch`（写生の確定時）と `score`（Score確定時）が加わった。cutover後の互換streamは一時期`done` 1行だけになったが、2026-09-25に共有pipelineの実行を読み直して同じ順に知らせる形へ戻した。
+- **streamの実況** — `/api/paint/stream` は `stage1` と `done` の2 eventしか持たなかった。Build 926で `sketch`（写生の確定時）と `score`（Score確定時）が加わった。cutover後の互換streamは一時期`done` 1行だけになったが、2026-09-25に共有pipelineの実行を読み直して同じ順に知らせる形へ戻した。2026-09-26には、modelの呼出しの試行を知らせる`attempt`が加わった。
 - **fallbackの印** — Stage 2の決定的fallbackは応答にしか出ず、保存すると消えていた。`compose_fallback` 列（落ちた理由 / `none` / 記録なしの3値）が加わり、言葉との対応が切れた作品は印を持ち、そこから推敲を続けるときは一度だけ確認を出す（台帳I-292）。過去の作品へはbackfillしない。cutover後の新作はStage 2のfallbackを持たず、この列を書かない。
 - **儀式の二重帳簿の回避** — 「30題を固定条件で描き、署名可否と層帰属を記入する」という提案は、**既存の30題ベンチマークと同じもの**だった。新設はせず、層帰属タグ（`sketch / interpret / expand / score / coerce / render`）を既存の評価手順へ追加した。
 - **文書の補完** — 推敲の再入点の図と、生成パラメータの注入点×rh3該否の表を `ddl-processing-pipeline.ja.md` へ、判定単位の全経路を `description-to-svg.ja.md` へ収めた（本書群・日英同時）。

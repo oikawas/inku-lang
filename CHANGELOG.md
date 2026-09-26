@@ -6,6 +6,12 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 36 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-26 — a refusal over a non-finite value names the instruction
+
+When a coordinate or another drawn number became non-finite (`NaN`, `inf`), the render core refused the drawing with "rendered SVG contains a non-finite value", without saying which instruction made it. The function that writes numbers into the SVG now counts non-finite ones, and drawing checks the count per instruction. The refusal adds the first such instruction, as in "… from instruction 1". Whether and when a drawing is refused does not change: the final search of the whole SVG stays, because a few numbers are written without that function. Drawing results do not change (the 12,799 saved renders are identical).
+
+DDL, Score, and render versions are unchanged.
+
 ### 2026-09-26 — the render core's executor keeps each instruction's facts in one type
 
 The render core's executor, which resolves relations, transform groups and anchors, held what it knew about each source instruction (its drawn copies, its accumulated transform, whether a path connection targets it, whether a failed group removed it, whether it belongs to an arrangement's structure, and whether it is drawn without its relation) in seven arrays beside the instruction list. They are now one record per instruction. Drawing results do not change (the 12,799 saved renders are identical).

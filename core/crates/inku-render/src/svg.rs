@@ -1,5 +1,6 @@
 //! Small SVG-specific document tree serialized exactly once at the render boundary.
 
+use std::cell::Cell;
 use std::fmt::Write as _;
 
 use crate::types::{CanvasSize, Point};
@@ -192,6 +193,19 @@ pub fn format_number(value: f64) -> String {
     formatted
 }
 
+thread_local! {
+    /// How many non-finite numbers [`write_number`] has written on this thread.
+    static NON_FINITE_WRITES: Cell<usize> = const { Cell::new(0) };
+}
+
+/// The running count of non-finite numbers written on this thread.
+///
+/// Rendering runs on one thread, so the count's change across one
+/// instruction's marks tells whether that instruction wrote one.
+pub(crate) fn non_finite_writes() -> usize {
+    NON_FINITE_WRITES.with(Cell::get)
+}
+
 /// Append the text of [`format_number`] to `output`.
 ///
 /// Six decimals, then trailing zeros and a bare point removed. Path data
@@ -200,8 +214,12 @@ pub(crate) fn write_number(output: &mut String, value: f64) {
     let start = output.len();
     let rounded = if value == -0.0 { 0.0 } else { value };
     write!(output, "{rounded:.6}").expect("writing to a String cannot fail");
-    // Non-finite values print without a point and are kept as they are; the
-    // render boundary refuses them afterwards.
+    // Non-finite values print without a point (`NaN`, `inf`) and are kept as
+    // they are. The count lets the render boundary name the instruction when
+    // it refuses them afterwards.
+    if !value.is_finite() {
+        NON_FINITE_WRITES.with(|count| count.set(count.get().wrapping_add(1)));
+    }
     if output[start..].contains('.') {
         let trimmed = output.trim_end_matches('0').len();
         output.truncate(trimmed);

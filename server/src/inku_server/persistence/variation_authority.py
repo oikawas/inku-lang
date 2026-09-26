@@ -30,6 +30,7 @@ from .schema import (
     HistoryRow,
     PipelineCandidateExecutionRow,
     PipelineHistoryLinkRow,
+    ProviderObservationRow,
     VariationAuthorityActionRow,
     VariationAuthorityRow,
 )
@@ -1465,3 +1466,52 @@ class VariationAuthorityStore:
                 "action_id was already acknowledged for different commit bytes"
             )
         return _committed_result(commit)
+
+
+def drop_drafts_left_by_deleted_works(session, saved_from: list[tuple[str, str, str]]) -> int:
+    """Delete the drafts that permanently deleted works were the last trace of.
+
+    `saved_from` is the (owner, variation, revision) each deleted work was
+    saved from, read from its fork link before that link went. A draft goes
+    only when nothing else can still reach or need it:
+
+    - no remaining work was saved from it (one draft can underlie several works),
+    - no other draft was forked from it (the fork names it as its parent), and
+    - its current revision is the one the deleted works were saved at. A draft
+      that moved on after the save holds writing no deleted work captured --
+      the page may still be authoring it -- and stays.
+
+    Its commit acknowledgments, resumable executions and their captured
+    provider I/O go with it. Runs inside the deletion's transaction.
+    """
+    saved_at: dict[tuple[str, str], int] = {}
+    for owner_id, variation_id, revision in saved_from:
+        key = (owner_id, variation_id)
+        saved_at[key] = max(saved_at.get(key, -1), int(revision))
+    dropped = 0
+    for (owner_id, variation_id), revision in saved_at.items():
+        mine = {"owner_id": owner_id, "variation_id": variation_id}
+        if session.query(PipelineHistoryLinkRow.history_id).filter_by(**mine).first() is not None:
+            continue
+        forked = session.query(VariationAuthorityRow.variation_id).filter_by(
+            owner_id=owner_id, parent_variation_id=variation_id
+        ).first()
+        if forked is not None:
+            continue
+        draft = session.get(VariationAuthorityRow, (owner_id, variation_id))
+        if draft is None or int(draft.revision) != revision:
+            continue
+        executions = [
+            execution_id
+            for (execution_id,) in session.query(PipelineCandidateExecutionRow.execution_id).filter_by(**mine)
+        ]
+        if executions:
+            session.query(ProviderObservationRow).filter(
+                ProviderObservationRow.owner_id == owner_id,
+                ProviderObservationRow.execution_id.in_(executions),
+            ).delete(synchronize_session=False)
+            session.query(PipelineCandidateExecutionRow).filter_by(**mine).delete(synchronize_session=False)
+        session.query(VariationAuthorityActionRow).filter_by(**mine).delete(synchronize_session=False)
+        session.delete(draft)
+        dropped += 1
+    return dropped

@@ -34,6 +34,7 @@ from .persistence import access as _access
 from .persistence import okugaki as _okugaki
 from .persistence import sessions as _sessions
 from .persistence import settings as _settings
+from .persistence import variation_authority as _variation_authority
 from .persistence import engine as _persistence_engine
 from .persistence.config import CANONICAL_DB_ENV, PERSISTENCE_CONFIG, sqlite_database_path
 from .persistence.engine import CANONICAL_SQLITE_PRAGMAS, create_sqlite_engine
@@ -1581,7 +1582,12 @@ def delete_items(user_id: str, ids: list[str], *, require_trashed: bool = False)
         _now_ms,
         _delete_acl_for_histories,
         _drop_thumbnails_of_deleted_works,
+        _drop_drafts_left_by_deleted_works,
     ).delete_items(user_id, ids, require_trashed=require_trashed)
+
+
+def _drop_drafts_left_by_deleted_works(session, saved_from: list[tuple[str, str, str]]) -> int:
+    return _variation_authority.drop_drafts_left_by_deleted_works(session, saved_from)
 
 
 def delete_all_trashed_items(user_id: str) -> int:

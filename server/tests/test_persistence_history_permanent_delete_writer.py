@@ -141,17 +141,17 @@ def test_history_permanent_delete_writer_owns_delete_and_db_delegates(
             return 7
 
     monkeypatch.setattr(db._history, "HistoryPermanentDeleteWriter", RecordingWriter)
-    dependencies = (object(), object(), object(), object(), object())
-    for name, dependency in zip(
-        ("SessionLocal", "_actor_of", "_now_ms", "_delete_acl_for_histories", "_drop_thumbnails_of_deleted_works"),
-        dependencies,
-        strict=True,
-    ):
+    names = (
+        "SessionLocal", "_actor_of", "_now_ms", "_delete_acl_for_histories",
+        "_drop_thumbnails_of_deleted_works", "_drop_drafts_left_by_deleted_works",
+    )
+    dependencies = tuple(object() for _ in names)
+    for name, dependency in zip(names, dependencies, strict=True):
         monkeypatch.setattr(db, name, dependency)
     assert db.delete_items("actor", ["item"], require_trashed=True) == 7
-    later_dependencies = (object(), object(), object(), object(), object())
+    later_dependencies = tuple(object() for _ in names)
     for name, dependency in zip(
-        ("SessionLocal", "_actor_of", "_now_ms", "_delete_acl_for_histories", "_drop_thumbnails_of_deleted_works"),
+        names,
         later_dependencies,
         strict=True,
     ):

@@ -581,6 +581,10 @@ class HistoryPermanentDeleteWriter:
     # after the commit on purpose: a failure there leaves a picture behind for
     # the next rebuild to prune, never a work half deleted.
     after_delete_fn: Callable[[list[str]], None] | None = None
+    # Told, inside the transaction and once the fork links are gone, the
+    # (owner, draft, revision) each deleted work was saved from, so the drafts
+    # nothing else reaches go with the works (the author's decision, 2026-09-26).
+    drafts_left_fn: Callable[[object, list[tuple[str, str, str]]], object] | None = None
 
     def delete_items(
         self, user_id: str, ids: list[str], *, require_trashed: bool = False
@@ -626,6 +630,12 @@ class HistoryPermanentDeleteWriter:
             # Read before the commit: the rows are expired and detached after it.
             deleted_ids = [row.id for row in rows]
             if deleted_ids:
+                saved_from = [
+                    (link.owner_id, link.variation_id, link.revision)
+                    for link in session.query(PipelineHistoryLinkRow).filter(
+                        PipelineHistoryLinkRow.history_id.in_(deleted_ids)
+                    ).all()
+                ] if self.drafts_left_fn is not None else []
                 # The link from a performance to its authoring revision exists
                 # only so that performance can be forked, and the performance is
                 # going. Left behind it kept the work's fork inputs, and the link
@@ -633,6 +643,8 @@ class HistoryPermanentDeleteWriter:
                 session.query(PipelineHistoryLinkRow).filter(
                     PipelineHistoryLinkRow.history_id.in_(deleted_ids)
                 ).delete(synchronize_session=False)
+                if saved_from:
+                    self.drafts_left_fn(session, saved_from)
             for row in rows:
                 session.delete(row)
             session.commit()

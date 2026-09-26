@@ -1463,6 +1463,7 @@ def list_lineage_group_items(
     starred: bool = False,
     for_revision: bool = False,
     for_share: bool = False,
+    include_svg: bool = True,
 ) -> tuple[list[dict], int]:
     return _history_lineage_group_reader().list_lineage_group_items(
         user_id,
@@ -1474,6 +1475,7 @@ def list_lineage_group_items(
         starred,
         for_revision,
         for_share,
+        include_svg,
     )
 
 

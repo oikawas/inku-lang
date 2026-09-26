@@ -429,7 +429,9 @@
 		lineageMemberControllers.get(rootNodeId)?.abort();
 		const controller = new AbortController();
 		lineageMemberControllers.set(rootNodeId, controller);
-		const params = new URLSearchParams({ limit: '10000', q: historySearch.trim() });
+		// Thumbnails, like the listing: a whole lineage with every SVG in it could
+		// run to hundreds of megabytes. A preview reads its one SVG when opened.
+		const params = new URLSearchParams({ limit: '10000', q: historySearch.trim(), include_svg: 'false' });
 		if (historyManagerView === 'trash') params.set('trashed', 'true');
 		if (historyManagerStarredOnly) params.set('starred', 'true');
 		if (historyManagerForRevisionOnly) params.set('for_revision', 'true');

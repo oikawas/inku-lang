@@ -78,11 +78,17 @@ def api_history_lineage_group_items(
     for_revision: bool = Query(default=False),
     for_share: bool = Query(default=False),
     q: str = Query(default="", max_length=200),
+    include_svg: bool = Query(
+        default=True,
+        description="Send each work's whole SVG. Clients that draw from thumbnails send false.",
+    ),
     actor: dict = Depends(_current_user),
 ) -> HistoryListResponse:
+    # Emptied, not removed, as the listing does when asked the same: the key
+    # keeps its place and its type, and svg_bytes says how large the work is.
     items, total = _db.list_lineage_group_items(
         actor["id"], root_node_id, offset=offset, limit=limit, trashed=trashed, query_text=q,
-        starred=starred, for_revision=for_revision, for_share=for_share,
+        starred=starred, for_revision=for_revision, for_share=for_share, include_svg=include_svg,
     )
     if total == 0:
         root = _db.get_lineage(actor["id"], root_node_id, descendant_depth=0, node_limit=1)

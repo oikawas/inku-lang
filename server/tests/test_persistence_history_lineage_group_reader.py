@@ -59,7 +59,7 @@ def test_persistence_history_owns_group_reader_and_db_delegates(
     assert db.list_lineage_group_items("user", "root", 4, 5, True, "q", True, True, True) == "sentinel"
     assert calls == [
         (dependencies, "list_lineage_groups", ("user", 1, 2, True, "q", True, True, True, 3)),
-        (dependencies, "list_lineage_group_items", ("user", "root", 4, 5, True, "q", True, True, True)),
+        (dependencies, "list_lineage_group_items", ("user", "root", 4, 5, True, "q", True, True, True, True)),
     ]
 
 

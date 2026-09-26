@@ -9,8 +9,9 @@ from dataclasses import dataclass
 from hashlib import sha256
 from typing import Any
 
-from sqlalchemy import and_, case, func, or_, select
+from sqlalchemy import LargeBinary, and_, case, func, or_, select
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import defer
 
 from . import access
 from .schema import (
@@ -317,6 +318,7 @@ class HistoryLineageGroupReader:
         starred: bool = False,
         for_revision: bool = False,
         for_share: bool = False,
+        include_svg: bool = True,
     ) -> tuple[list[dict], int]:
         actor = self.actor_of_fn(user_id)
         with self.session_factory() as session:
@@ -355,8 +357,23 @@ class HistoryLineageGroupReader:
             if search:
                 query = query.filter(self.history_search_clause_fn(search))
             total: int = query.with_entities(func.count(HistoryRow.id)).scalar() or 0
-            rows = query.order_by(HistoryRow.at.desc(), HistoryRow.id.asc()).offset(offset).limit(limit).all()
-            return self.rows_to_dicts_with_lineage_fn(session, rows, actor), total
+            page = query.order_by(HistoryRow.at.desc(), HistoryRow.id.asc()).offset(offset).limit(limit)
+            if include_svg:
+                rows = page.all()
+                return self.rows_to_dicts_with_lineage_fn(session, rows, actor), total
+            # The listing's projection: the SVG stays in SQLite, which reports its
+            # size. A lineage is asked for whole -- up to 10,000 works -- and one
+            # work's SVG can run to megabytes.
+            projected = page.options(defer(HistoryRow.svg)).add_columns(
+                func.length(func.cast(HistoryRow.svg, LargeBinary)).label("svg_bytes")
+            ).all()
+            return self.rows_to_dicts_with_lineage_fn(
+                session,
+                [row for row, _svg_bytes in projected],
+                actor,
+                include_svg=False,
+                svg_bytes_by_id={row.id: int(svg_bytes or 0) for row, svg_bytes in projected},
+            ), total
 
 
 @dataclass(frozen=True)

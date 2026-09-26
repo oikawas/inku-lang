@@ -2807,3 +2807,27 @@ def test_an_invalid_score_is_answered_with_where_it_is_wrong(auth_context, caplo
     assert refused.status_code == 422
     assert refused.json()["detail"].startswith("score is invalid: instructions.0")
     assert "history score render failed" not in caplog.text
+
+
+def test_a_lineage_page_can_leave_the_pictures_out(auth_context):
+    """A lineage is asked for whole -- up to 10,000 works -- and the Web draws
+    its cards from thumbnails, so it asks for the listing's light projection."""
+    headers, user, _group = auth_context
+    svg = "<svg xmlns='http://www.w3.org/2000/svg'><rect width='1' height='1'/></svg>"
+
+    def work(at: int, **lineage) -> dict:
+        return db.add_item({
+            "id": str(uuid.uuid4()), "user_id": user["id"], "at": at, "input": "松", "source_text": "松",
+            "ddl": "背景を白で塗る。", "score": {"canvas": "square", "instructions": []}, "svg": svg,
+            "history_visibility": "normal", **lineage,
+        })
+
+    root = work(1_700_000_300_000)["lineage_node_id"]
+    work(1_700_000_300_001, lineage_parent_node_id=root, derivation_kind="description_edit")
+    path = f"/api/history/lineage-groups/{root}/items"
+
+    light = client.get(path, params={"include_svg": "false"}, headers=headers)
+    whole = client.get(path, headers=headers)
+
+    assert [(item["svg"], item["svg_bytes"]) for item in light.json()["items"]] == [("", len(svg.encode()))] * 2
+    assert [item["svg"] for item in whole.json()["items"]] == [svg] * 2

@@ -376,6 +376,25 @@ def test_unsaved_success_exposes_compiler_delivery_and_logs_safe_projection(
     assert "secret-value" not in records[0]
 
 
+def test_an_issued_render_seed_survives_a_javascript_number(tmp_path, monkeypatch):
+    # The Web reads a work's seed as a JavaScript number and sends it back to
+    # redraw. A 63-bit seed came back rounded and drew a different picture.
+    import secrets
+    from inku_server import db
+
+    binding = PipelineBinding()
+    engine = create_engine(f"sqlite:///{tmp_path / 'seed.db'}")
+    Base.metadata.create_all(engine)
+    monkeypatch.setattr(db, "engine", engine)
+    monkeypatch.setattr(db, "SessionLocal", sessionmaker(bind=engine))
+    monkeypatch.setattr(secrets, "randbits", lambda bits: (1 << bits) - 1)
+    effects = ProductPipelineEffects(binding, default_manifest(binding))
+    _config, context = effects.prepare("author", "direct_ddl", "Nature.青葉。",
+                                       {"instruction_lang": "ja", "catalog_id": "default"}, None)
+    assert context["host_options"]["render_seed"] == str(2**53 - 1)
+    engine.dispose()
+
+
 def test_compact_delivery_preserves_authority_in_normal_history(tmp_path, monkeypatch):
     from inku_server import db
     from inku_server.api_core import rendering, thumbnails

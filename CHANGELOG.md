@@ -6,6 +6,12 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 36 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-26 — work seeds stay within what JavaScript can hold
+
+SPEC makes render seeds JavaScript-safe integers, but the pipeline (since 2026-09-13) issued 63-bit random seeds for works without a given seed and for redraws. The Web reads a work's seed as a JavaScript number and sends it back, so a seed over 2^53 came back rounded, and the replay comparison, refinement redraws and the like drew a different picture from the saved one (colors and positions moved under the same engine). Most Score 0.10 and later works without a given seed were affected. The pipeline now issues 53-bit seeds, as the older path does.
+
+This applies to works made from now on; saved works keep their seeds. A saved work whose seed is over 2^53 still redraws differently on the Web. Works whose seed comes from seed text, and Android, are not affected. DDL, Score, and render versions and the API shape are unchanged.
+
 ### 2026-09-26 — fade within a typed placement group takes effect (render engine 69)
 
 Render engine 67 had Score 0.10's typed placement perform `fade` as attenuation within the group, and the SPEC says so. The implementation wrote each member's level (`fade_level=`) into `color_hint` but never the `fade=` the renderer reads it by, so on Score 0.10 and later `fade` never reached opacity and only changed the seed of surfaces without their own seed. A group of two or more members now fades within the group when performed again. Only opacity values change; shapes, positions and patterns do not. Works on Score 0.9 and earlier, and works without fade, are byte-identical.

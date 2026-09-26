@@ -190,6 +190,7 @@ class ProductPipelineEffects:
         from . import db
         from .api_core.common import _env_flag, _model_offered_to, _resolve_instruction_lang
         from .api_core.rendering import _render_seed_from_text
+        from .render_engines import new_render_seed
 
         try:
             options = RunOptions.model_validate(options).model_dump(exclude_unset=True)
@@ -229,7 +230,7 @@ class ProductPipelineEffects:
         if selected.get("canvas_aspect") is not None:
             config = select_canvas(config, self.binding.canvas_registry, selected["canvas_aspect"])
         seed, seed_text = _render_seed_from_text(selected.get("seed_text"), selected.get("render_seed"))
-        seed = secrets.randbits(63) if seed is None else int(seed)
+        seed = new_render_seed() if seed is None else int(seed)
         composition_seed = selected.get("composition_seed")
         config["compiler"]["composition_seed"] = None if composition_seed is None else str(int(composition_seed))
         # Stage 1.5 variation applies only when this operation explicitly asks
@@ -510,6 +511,7 @@ class ProductPipelineEffects:
         from . import db
         from .api_core.common import _build_number
         from .api_core.rendering import _limits_for_render, _render_seed_from_text, _SRGB_COLOR_PROFILE
+        from .render_engines import new_render_seed
         from .api_core.state import _render_capacity
         from .layer_versions import DDL_ENGINE_VERSION, DDL_VERSION
         from .limits import LIMIT_FIELD_NAMES
@@ -548,7 +550,7 @@ class ProductPipelineEffects:
             raise CandidateHostError("unknown_color_catalog")
         colors = deepcopy(snapshot_colors) if snapshot_colors else render_color_map_for_catalog(catalog_id)
         seed, seed_text = _render_seed_from_text(request.get("seed_text"), request.get("render_seed"))
-        seed = secrets.randbits(63) if seed is None else seed
+        seed = new_render_seed() if seed is None else seed
         composition_seed = request.get("composition_seed")
         options = deepcopy(self.manifest["render"]["options"])
         height = options["canvas"]["height"]

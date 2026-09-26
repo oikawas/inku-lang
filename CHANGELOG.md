@@ -6,6 +6,12 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 36 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-26 — the builtin Gemini list names models that answer today
+
+- A new server's Gemini list held `gemini-2.5-pro`, `gemini-2.5-flash`, and `gemini-2.5-flash-lite`, which refuse API accounts made after their retirement (generateContent answers 404). The list is now `gemini-3.5-flash-lite` and `gemma-4-31b-it` (through the Gemini API; both answered in the 2026-09-22/23 comparisons). An installation that has ever saved its model settings keeps its stored list (an administrator can refresh it with "Fetch models"). The model names recorded in works do not change.
+
+The route count (107) is unchanged. DDL, Score, and render versions are unchanged.
+
 ### 2026-09-26 — a failure names its cause, and an unreachable start does not ask to sign in
 
 - **A stage that used up its attempts says why, and how often it tried.** A description whose four attempts all timed out ended with only "the description could not be interpreted", with no telling a slow model from an unreachable one or a missing API key. The reason of the stage that stopped (Stage 1, hole completion) now carries that stage's last model-call failure and, above one, the number of attempts (for example "(the model did not answer within the time limit; tried 4 times)"), in the single drawing, a batch's failure list, the model comparison, and the other failure lines.

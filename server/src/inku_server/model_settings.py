@@ -84,10 +84,14 @@ PROVIDER_DEFINITIONS: list[dict[str, Any]] = [
         "base_url_env": "GEMINI_BASE_URL",
         "default_base_url": "https://generativelanguage.googleapis.com",
         "requires_api_key": True,
+        # The 2.5 models refuse API accounts made after their retirement
+        # (generateContent answers 404), so a fresh install offered nothing that
+        # worked. These two answered through this API in the draw session's
+        # 2026-09-22/23 Stage 1 comparisons. A stored list is not touched: it
+        # decides which models an installation has.
         "models": [
-            {"id": "gemini-2.5-pro", "label": "Gemini 2.5 Pro"},
-            {"id": "gemini-2.5-flash", "label": "Gemini 2.5 Flash"},
-            {"id": "gemini-2.5-flash-lite", "label": "Gemini 2.5 Flash-Lite"},
+            {"id": "gemini-3.5-flash-lite", "label": "Gemini 3.5 Flash-Lite"},
+            {"id": "gemma-4-31b-it", "label": "Gemma 4 31B Instruct"},
         ],
     },
     {

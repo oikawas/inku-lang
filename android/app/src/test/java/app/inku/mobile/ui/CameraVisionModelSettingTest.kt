@@ -19,6 +19,8 @@ class CameraVisionModelSettingTest {
         assertEquals(LOCAL_VISION_MODEL_ID, CameraVisionModelSetting.decode(""))
         assertEquals(LOCAL_VISION_MODEL_ID, CameraVisionModelSetting.decode("{broken"))
         assertEquals(LOCAL_VISION_MODEL_ID, CameraVisionModelSetting.decode("{\"value\":\"no-provider\"}"))
+        // Gemma 4 E4B is no longer offered; a device that chose it describes with E2B.
+        assertEquals(LOCAL_VISION_MODEL_ID, CameraVisionModelSetting.decode(CameraVisionModelSetting.encode("local-litert-lm:gemma-4-e4b")))
     }
 
     /**

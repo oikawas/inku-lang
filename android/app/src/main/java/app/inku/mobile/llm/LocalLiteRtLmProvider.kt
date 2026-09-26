@@ -183,7 +183,7 @@ class LocalLiteRtLmProvider(
         closeEngine()
         Engine.setNativeMinLogSeverity(LogSeverity.ERROR)
         ExperimentalFlags.enableSpeculativeDecoding = true
-        val cacheDir = File(context.cacheDir, "litert-lm").also { it.mkdirs() }.absolutePath
+        val cacheDir = File(context.cacheDir, ENGINE_CACHE_DIR).also { it.mkdirs() }.absolutePath
         val initStarted = System.currentTimeMillis()
         val newEngine = createInitializedEngine(modelPath, Backend.GPU(), maxNumTokens, cacheDir)
         Log.i(
@@ -280,6 +280,24 @@ internal fun ownedLocalModelFileOrNull(filesDir: File, path: String): File? = ru
         it.isFile && it.path.startsWith(root.path + File.separator)
     }
 }.getOrNull()
+
+/** Where LiteRT-LM keeps its compiled caches, under the app's cache directory, named after the model file. */
+private const val ENGINE_CACHE_DIR = "litert-lm"
+
+/**
+ * Deletes what a withdrawn model left behind: the file its row points at, the
+ * other of its finished and `.part` files, and the engine caches named after
+ * it. A file outside the owned models directory is left alone.
+ */
+internal fun deleteWithdrawnModelFiles(filesDir: File, cacheDir: File, path: String) {
+    val finished = File(path.removeSuffix(".part"))
+    listOf(finished, File("${finished.path}.part"))
+        .mapNotNull { ownedLocalModelFileOrNull(filesDir, it.path) }
+        .forEach { it.delete() }
+    File(cacheDir, ENGINE_CACHE_DIR)
+        .listFiles { file -> file.name.startsWith("${finished.name}_") || file.name.startsWith("${finished.name}.") }
+        ?.forEach { it.delete() }
+}
 
 /** Ends an on-device description stream at a sentence boundary past its budget. */
 private class DescriptionComplete : RuntimeException() {

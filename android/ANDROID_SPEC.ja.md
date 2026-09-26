@@ -52,6 +52,8 @@ runtime fallbackを持たない。保存済みSVG、Room schema、Score schema�
 
 描画中の行は、描画が待っているモデル呼び出しの試行を、共有coreの`providerAttempt`から「応答待ち（1/4回目）」、2回目からは「再試行中（2/4回目）」（目立つ色）と出す（Webの`RunStatus`と同じ文言、ServerのレビューW4）。上限は共有coreが各Stageの再試行の方針から出し、hostは写さない。再試行を待つ間もすでに「再試行中」と出す。推敲の候補を作っている間は出さない。
 
+端末内モデル（LiteRT-LM）はGemma 4 E2Bだけを持つ。高品質の選択肢としていたGemma 4 E4Bは、2026-09-26にサポート対象から外した。Pixel 9ではメモリが足りず、5月の計測では初回のengine初期化中にプロセスが終了し、9月26日には写真の記述生成の途中でシステムのサービスが次々に落ち、アプリも前面のまま止められた。起動時に、カタログにない端末内モデルの`model_assets`の行と、その行が指すモデルファイル（取得途中の`.part`を含み、`files/models`の中のものだけ）と、そのファイル名で始まるLiteRT-LMのcache（`cacheDir/litert-lm`）を消し、端末内の接続先の公開モデルからも外す。保存済みの描画モデル（`model_selection`）と記述生成モデル（`camera_vision_model`）がE4Bなら、E2Bとして読む。E4Bで描いた作品は、保存したモデル名のまま表示する。
+
 ## 2026-09-25 現行のプラグイン（draw-system04）
 
 下絵の任意`plugins`、Stage 1の登録プラグイン節、正式名と別名（DDL Spec 14、同梱`Nature.leaves` 2.0.0）の照合は、同梱した共有Rust coreがそのまま行う。lockの任意`aliases`はRoomへそのまま運ぶ。
@@ -68,7 +70,7 @@ DDL SpecとDDL engineの版はServerの`layer_versions.py`が名乗り、Android
 
 下部「カメラ」はアプリ内カメラ（CameraX、背面カメラのプレビューとシャッター）を開き、撮影した写真を`cacheDir/camera/`のアプリ専用一時ファイルへ直接書く。標準カメラアプリの起動と確認画面は通らない。初回は`CAMERA`権限を求め、拒否された場合やCameraXを開始できない場合は、従来の標準カメラ（`ActivityResultContracts.TakePicture`）へ切り替える。Photo Pickerの入口と、元写真の保持・削除の契約は変えない。
 
-写真から記述を作る「記述生成モデル」は、設定「その他」で選ぶ。既定は端末内の`local-litert-lm:gemma-4-e2b`で、取得済みの端末内モデル（E4B等）と、有効な外部providerのモデルも選べる。値は`app_settings`の`camera_vision_model`に保存し、欠落・壊れた値は既定へ戻す。撮影中は変更できない。端末内モデルでは写真は端末の外へ出ない。外部モデルを選んだ場合に限り、向き補正・長辺1280px・JPEG品質85で再エンコードした画像（元のEXIF・位置情報を含まない）を、そのproviderへ送る。Geminiは`inlineData`、OpenAI互換は`image_url`のdata URIで送り、元ファイル、URI、path、表示名は送らない。設定画面は外部モデルの選択中、送信先と送る内容を常に表示する。GeminiのGemmaとGemini 3系では`thinkingLevel: minimal`を付ける（既定の思考は時間を倍以上にし、出力上限を使い切って空応答になることがあった）。記述プロンプトは`camera-description-v4`で、構図、主な対象とその単純な形・数、面積順の色と差し色、光・時刻・季節・天気、質感と繰り返しを3〜5文・180字程度で書かせる。端末内モデルは字数の指示を守らず時間が字数に比例して延びるため、日本語180字（英語450字）を超えた後の最後の文末で生成を止め、途中の文を残さない。
+写真から記述を作る「記述生成モデル」は、設定「その他」で選ぶ。既定は端末内の`local-litert-lm:gemma-4-e2b`で、有効な外部providerのモデルも選べる。値は`app_settings`の`camera_vision_model`に保存し、欠落・壊れた値と、サポート対象から外した端末内モデル（Gemma 4 E4B）は既定へ戻す。撮影中は変更できない。端末内モデルでは写真は端末の外へ出ない。外部モデルを選んだ場合に限り、向き補正・長辺1280px・JPEG品質85で再エンコードした画像（元のEXIF・位置情報を含まない）を、そのproviderへ送る。Geminiは`inlineData`、OpenAI互換は`image_url`のdata URIで送り、元ファイル、URI、path、表示名は送らない。設定画面は外部モデルの選択中、送信先と送る内容を常に表示する。GeminiのGemmaとGemini 3系では`thinkingLevel: minimal`を付ける（既定の思考は時間を倍以上にし、出力上限を使い切って空応答になることがあった）。記述プロンプトは`camera-description-v4`で、構図、主な対象とその単純な形・数、面積順の色と差し色、光・時刻・季節・天気、質感と繰り返しを3〜5文・180字程度で書かせる。端末内モデルは字数の指示を守らず時間が字数に比例して延びるため、日本語180字（英語450字）を超えた後の最後の文末で生成を止め、途中の文を残さない。
 
 記述からの描画は、NVIDIA NIM・`vivid_material`・写生なしの固定経路を廃止し、撮影開始時の描画設定（Stage 1／2モデル、色カタログ（自動を含む）、写生）を使う。設定はrun単位で固定し、再試行も同じ値を使う。撮影前に、記述生成モデルと描画モデルについて、端末内モデルは取得済みか、外部providerは有効でBase URLと必要なAPI keyがあるかを確かめ、不足時は撮影を始めない。端末内の記述生成モデルは、撮影画面を開いている間に読み込みを始める。新しい作品の`input_provenance.route`は`description_to_pipeline`、`vision_provider_id`は実際に使ったproviderである。旧値`local_description_to_nim`／`local_ddl_to_nim_stage2`／`ddl_to_pipeline_stage2`の作品は従来どおり表示する。
 
@@ -139,7 +141,7 @@ Room DBのcursor windowは40 MiBとする。SVGはServerと同じく12 MiBまで
   その時点の最新Rust engineで担保する。
 - Kotlin hostはprovider transport、カメラ画像前処理と端末内Vision、Roomの原子保存、
   承認UIと表示を担当する。Provider actionごとのretry／timeout判断と次のStageは共有Rustが所有する。
-- Gemma 4 E2B を標準ローカルモデル、Gemma 4 E4B を高品質オプションとする。
+- Gemma 4 E2B を端末内モデルとする（Gemma 4 E4B は 2026-09-26 にサポート対象から外した）。
 - 初回起動時は、ライセンス同意後に選択されたローカルモデルをダウンロードする。
 - 対象端末クラスは Pixel 9 以降とする。
 
@@ -164,7 +166,7 @@ Rust authoring pipelineとraster presentationを導入済みである。以下�
   - plugin settings
   - export templates
 - 描画、バッチ実行、デモ実行、履歴選択、ローカル設定、モデル取得状態を扱う Repository / ViewModel 層。
-- Gemma 4 E2B/E4B のローカルモデルカタログと取得状態管理:
+- Gemma 4 E2B のローカルモデルカタログと取得状態管理:
   - 公式 LiteRT-LM Hugging Face `.litertlm` URL
   - SHA256 metadata
   - Room に保存するライセンス同意状態
@@ -210,7 +212,7 @@ Rust authoring pipelineとraster presentationを導入済みである。以下�
     `CLI_SAVE_HISTORY=true` をデフォルトとし、`inku-cli paint --save-history` を付与する。
     `summary.json` と batch aggregate summary には server-side `history_id` を含める。
 - LiteRT-LM は共有pipelineのmodel effectを実行するデフォルトlocal providerとして接続済み。
-  provider は Room から選択済み Gemma 4 E2B/E4B `.litertlm` path を読み、
+  provider は Room から選択済み Gemma 4 E2B `.litertlm` path を読み、
   model state が `ready` であることを確認し、cached LiteRT-LM `Engine` を初期化し、
   coreが作ったbounded promptを `Conversation` に一度送って返却 `Message` をtext化する。
   Timeout、再試行、別actionの要否は共有Rustが決定し、Kotlin providerは独自fallbackへ分岐しない。

@@ -6,6 +6,14 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 36 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-26 — Android withdraws Gemma 4 E4B from its on-device models
+
+Gemma 4 E4B, the high-quality option among Android's on-device models (LiteRT-LM), is no longer supported. A Pixel 9 ran short of memory with it: in May its first engine initialization ended the process, and on September 26 describing a single photo brought system services down one after another and the app was killed in the foreground. The on-device models are Gemma 4 E2B alone.
+- At start-up, E4B's `model_assets` row, its downloaded file (3.7 GB) and any unfinished `.part`, and the LiteRT-LM caches named after that file are deleted, and the model leaves the on-device connection's published models. Only files inside `files/models` are deleted.
+- A device that chose E4B as its drawing or description model draws with E2B. Works drawn with E4B keep showing the model name they were saved with.
+
+The DDL, Score and render versions are unchanged.
+
 ### 2026-09-26 — a live SVG profile with both structure and the finished look
 
 A host that performs a work in time (a VJ application, say: drawing it instruction by instruction, moving groups, shaking them with another performance) draws it one instruction group at a time. Editable SVG has the groups and IDs but not display's appearance (the texture filters of pencil, crayon, chalk and the like, and the whole-picture touch). The new `live` profile has editable's groups and IDs with display's texture filters and touch. A group drawn on its own does not inherit its ancestors' filters, so the touch is applied to each instruction group (`instruction_NNN_*`), and to the plate tone where display touches it, rather than to the content group, over the canvas plus 2% on each side in absolute user-space units (2% of a small group's bounding box would cut the pixels its displacement moves). Display too is bounded by the content's bounding box plus 2%, so in a work of one thin line, say, live keeps displaced pixels that display cuts. It is available from the render APIs (`svg_profile="live"`, `/api/history/{id}/svg?profile=live`) and from the CLI's `--svg-profile live`. Like editable and compat it is drawn on request and not stored in the database. The Web and Android export menus do not offer it.

@@ -37,6 +37,7 @@ import app.inku.mobile.data.refinement.RefinementParent
 import app.inku.mobile.data.refinement.RefinementPlan
 import app.inku.mobile.data.refinement.RefinementPlanner
 import app.inku.mobile.data.refinement.VariationAmplitude
+import app.inku.mobile.llm.DefaultModelDownloads
 import app.inku.mobile.llm.LOCAL_VISION_MODEL_ID
 import app.inku.mobile.llm.ModelProviderHttpException
 import app.inku.mobile.llm.CameraVisionModelSetting
@@ -3419,7 +3420,9 @@ class InkuViewModel @JvmOverloads constructor(
         val modelSelection = settings["model_selection"]?.let(::JSONObject)
         val restoredStage1Model = modelSelection?.optString("stage1_model")?.takeIf { it.isNotBlank() }
         val restoredStage2Model = modelSelection?.optString("stage2_model")?.takeIf { it.isNotBlank() }
-        val restoredUnifiedModel = restoredStage1Model ?: restoredStage2Model ?: current.selectedModelId
+        val restoredUnifiedModel = (restoredStage1Model ?: restoredStage2Model)
+            ?.let(DefaultModelDownloads::offeredOrStandard)
+            ?: current.selectedModelId
         val thinking = modelSelection?.optBoolean("include_thinking", current.includeThinking)
             ?: settings["include_thinking"]?.let { JSONObject(it).optBoolean("enabled", current.includeThinking) }
             ?: current.includeThinking

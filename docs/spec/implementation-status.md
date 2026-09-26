@@ -57,8 +57,9 @@ metadata, canvas aspect values, and render hash semantics.  Android-specific UI
 decisions are allowed only when they are explicit mobile equivalents or
 documented omissions.
 
-Android local LLM support uses LiteRT-LM with Gemma 4 E2B as the standard local
-model and Gemma 4 E4B as the higher-quality option.  Model license acceptance,
+Android local LLM support uses LiteRT-LM with Gemma 4 E2B as the on-device model
+(Gemma 4 E4B, once the higher-quality option, ran short of memory on a Pixel 9
+and was withdrawn on 2026-09-26).  Model license acceptance,
 download state, re-download, checksum validation, and model file paths are
 stored in Room.  The LiteRT-LM GPU backend is required; CPU fallback is not part
 of the Android behavior.

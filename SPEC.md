@@ -2970,7 +2970,7 @@ stage (§12.5)
   test container on the deployment host (§22)
 
 **Complementary axis**: a native Android app (verified on a Pixel 9) +
-LiteRT-LM (Gemma 4 E2B / E4B)
+LiteRT-LM (Gemma 4 E2B)
 
 - a port that follows the server as canonical, tracking the render engine
   version by version (the current state is in `android/ANDROID_SPEC.ja.md`)

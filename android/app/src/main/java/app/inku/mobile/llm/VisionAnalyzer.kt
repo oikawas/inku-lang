@@ -21,7 +21,7 @@ internal object CameraVisionModelSetting {
             ?.optString("value")
             ?.trim()
             ?.takeIf { it.contains(':') }
-    }.getOrNull() ?: LOCAL_VISION_MODEL_ID
+    }.getOrNull()?.let(DefaultModelDownloads::offeredOrStandard) ?: LOCAL_VISION_MODEL_ID
 }
 
 data class VisionAnalysisRequest(

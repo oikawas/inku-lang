@@ -25,6 +25,12 @@ interface ModelAssetDao {
     @Query("SELECT * FROM model_assets WHERE model_id = :modelId LIMIT 1")
     suspend fun getByModelId(modelId: String): ModelAssetEntity?
 
+    @Query("SELECT * FROM model_assets WHERE model_id NOT IN (:modelIds)")
+    suspend fun getAllExcept(modelIds: List<String>): List<ModelAssetEntity>
+
+    @Query("DELETE FROM model_assets WHERE model_id = :modelId")
+    suspend fun deleteByModelId(modelId: String)
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(asset: ModelAssetEntity)
 

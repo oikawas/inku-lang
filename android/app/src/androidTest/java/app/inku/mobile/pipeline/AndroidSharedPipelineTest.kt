@@ -233,6 +233,23 @@ class AndroidSharedPipelineTest {
     }
 
     @Test
+    fun aWorkWithoutAGivenSeedGetsAJavaScriptSafeOne() = runBlocking {
+        val db = Room.inMemoryDatabaseBuilder(context, InkuDatabase::class.java)
+            .build().also { database = it }
+        val repo = InkuRepository(context, db, modelProviderOverride = ScriptedProvider())
+            .also { repository = it }
+        val work = repo.paint(
+            description = "Young leaves and a mirror pair",
+            catalogId = "default", canvasAspect = "square",
+            stage1ModelId = MODEL, stage2ModelId = MODEL,
+            instructionLang = "en", uiLang = "en",
+        )
+
+        val seed = work.renderSeed!!.toLong()
+        assertTrue("render seed $seed", seed in 0L until (1L shl 53))
+    }
+
+    @Test
     fun retiredCatalogReplaysFromSnapshotOrDefaultForOldWork() = runBlocking {
         val provider = ScriptedProvider()
         val db = Room.inMemoryDatabaseBuilder(context, InkuDatabase::class.java)

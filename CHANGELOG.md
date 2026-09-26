@@ -6,6 +6,12 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 36 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-26 — Android also issues JavaScript-safe render seeds
+
+Android follows the Server's fix of the same day. Its shared pipeline drew 63-bit random seeds for works without a given seed (every ordinary drawing) and for redraws and forks with changed run options. SPEC makes render seeds JavaScript-safe, and an Android work may be redrawn on the Web. The pipeline now uses the 53-bit seed Android already had (`SeedFactory`, the same as the Server's `new_render_seed`).
+
+This applies to works made from now on; saved works keep their seeds. DDL, Score and rendering versions are unchanged.
+
 ### 2026-09-26 — the render core reads each primitive's geometry as a type
 
 One `Instruction` type carries every primitive, so all its geometric fields (center, radius, size, position, ends, angles) are optional. Each mark-drawing function unwrapped them itself and stopped with, for example, "Arc requires 'radius'" when one was missing (30 places), while the surface, fill and extent calculations silently drew nothing. The geometry each primitive requires is now a type (`MarkGeometry`), read once per drawn mark. A missing field is refused only there, naming the same field as before (the first in reading order), and the drawing functions receive the values their primitive has. Drawing results do not change (the 12,799 saved renders are identical).

@@ -7,12 +7,12 @@ import app.inku.mobile.data.lineage.LineagePlanner
 import app.inku.mobile.data.model.ColorCatalogs
 import app.inku.mobile.data.model.CanvasAspects
 import app.inku.mobile.data.model.cameraInputProvenance
+import app.inku.mobile.data.refinement.SeedFactory
 import app.inku.mobile.llm.ModelProvider
 import app.inku.mobile.render.AndroidRenderHost
 import app.inku.mobile.render.SvgRenderer
 import java.math.BigInteger
 import java.security.MessageDigest
-import java.security.SecureRandom
 import java.text.Normalizer
 import java.util.UUID
 import org.json.JSONArray
@@ -44,7 +44,6 @@ class AndroidWorkPipeline(
         onProviderAttempt = onProviderAttempt,
     )
     private val authoring = SharedAuthoringPipeline(host, configBuilder)
-    private val random = SecureRandom()
 
     /**
      * The bundled package's words for display: the Japanese alias in Japanese,
@@ -823,7 +822,9 @@ class AndroidWorkPipeline(
         .put("max_work", "10000000")
         .put("max_output_vertices", "200000")
 
-    private fun newRenderSeed(): Long = random.nextLong() and Long.MAX_VALUE
+    // JavaScript-safe, as SPEC and the server's pipeline issue it (c2571ac6):
+    // a work Android makes may be redrawn where its seed is a JavaScript number.
+    private fun newRenderSeed(): Long = SeedFactory.newRenderSeed()
 
     private fun sha256(value: String): String = MessageDigest.getInstance("SHA-256")
         .digest(value.encodeToByteArray())

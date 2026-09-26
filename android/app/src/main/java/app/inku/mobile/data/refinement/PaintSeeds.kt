@@ -57,7 +57,7 @@ data class PaintSeeds(
 /**
  * Where new seeds come from.
  *
- * On the server this is two pieces: `new_render_seed()` (`renderer.py:635`) and
+ * On the server this is two pieces: `new_render_seed()` (`render_engines/seeds.py`) and
  * the `/api/variation/seeds` endpoint (`render.py:1288`), which exists so that
  * "seed 空間の管理と重複回避を UI に持ち込まない". There is no server here, so the
  * device allocates; what is ported is how the numbers are made, not who makes

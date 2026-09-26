@@ -6,6 +6,12 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 36 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-26 — the render core reads each primitive's geometry as a type
+
+One `Instruction` type carries every primitive, so all its geometric fields (center, radius, size, position, ends, angles) are optional. Each mark-drawing function unwrapped them itself and stopped with, for example, "Arc requires 'radius'" when one was missing (30 places), while the surface, fill and extent calculations silently drew nothing. The geometry each primitive requires is now a type (`MarkGeometry`), read once per drawn mark. A missing field is refused only there, naming the same field as before (the first in reading order), and the drawing functions receive the values their primitive has. Drawing results do not change (the 12,799 saved renders are identical).
+
+DDL, Score, and render versions are unchanged.
+
 ### 2026-09-26 — work seeds stay within what JavaScript can hold
 
 SPEC makes render seeds JavaScript-safe integers, but the pipeline (since 2026-09-13) issued 63-bit random seeds for works without a given seed and for redraws. The Web reads a work's seed as a JavaScript number and sends it back, so a seed over 2^53 came back rounded, and the replay comparison, refinement redraws and the like drew a different picture from the saved one (colors and positions moved under the same engine). Most Score 0.10 and later works without a given seed were affected. The pipeline now issues 53-bit seeds, as the older path does.

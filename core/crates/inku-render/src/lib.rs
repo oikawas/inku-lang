@@ -26,6 +26,7 @@ mod ground_patterns;
 pub mod group;
 mod ink_spread;
 pub mod layers;
+mod mark_geometry;
 mod mark_paths;
 pub mod marks;
 pub mod materials;

@@ -6,6 +6,7 @@ use sha2::{Digest, Sha256};
 
 use crate::determinism::{hash_to_unit, hash01, seed_salt_index_digest};
 use crate::geometry::{centerline_normals, points_center, stroke_sample_count};
+use crate::mark_geometry::MarkGeometry;
 use crate::mark_paths::{contour_stroke_path, grid_step, rotate, uses_hand_stroke};
 use crate::marks::{MarkContext, mark_width};
 use crate::materials::with_texture_filter;
@@ -326,6 +327,7 @@ fn line_angle(direction: SurfaceDirection) -> f64 {
 fn render_vectors(
     group: &mut Element,
     instruction: &Instruction,
+    geometry: MarkGeometry,
     context: MarkContext<'_>,
     contour: &[Point],
     seed: Seed,
@@ -334,7 +336,7 @@ fn render_vectors(
         .surface
         .as_ref()
         .expect("surface checked by caller");
-    let Some((x, y, width, height)) = shape_bbox(instruction, context) else {
+    let Some((x, y, width, height)) = shape_bbox(geometry, instruction, context) else {
         return;
     };
     let color = surface_color(instruction, context);
@@ -546,10 +548,11 @@ fn render_vectors(
     }
 }
 
-/// Render a closed-shape surface beside its owning mark.
+/// Render a closed-shape surface beside its owning mark of `geometry`.
 #[must_use]
-pub fn render_surface(
+pub(crate) fn render_surface(
     instruction: &Instruction,
+    geometry: MarkGeometry,
     context: MarkContext<'_>,
 ) -> Option<SurfaceRender> {
     let surface = instruction.surface.as_ref()?;
@@ -560,7 +563,7 @@ pub fn render_surface(
     {
         return None;
     }
-    let contour = surface_contour(instruction, context)?;
+    let contour = surface_contour(geometry, instruction, context)?;
     if contour.len() < 3 {
         return None;
     }
@@ -601,7 +604,7 @@ pub fn render_surface(
                 .attr("class", "surface-grain-carrier-v1"),
         );
     } else {
-        render_vectors(&mut group, instruction, context, &contour, seed);
+        render_vectors(&mut group, instruction, geometry, context, &contour, seed);
     }
     Some(SurfaceRender {
         group: if context.geometry_transform.is_identity() {
@@ -665,7 +668,9 @@ mod tests {
         )
         .unwrap();
         let colors = BTreeMap::new();
-        let rendered = render_surface(&score.instructions[0], context(&colors)).unwrap();
+        let instruction = &score.instructions[0];
+        let geometry = MarkGeometry::of(instruction).unwrap();
+        let rendered = render_surface(instruction, geometry, context(&colors)).unwrap();
         assert_eq!(rendered.definitions.len(), 1);
         let group = format!("{:?}", rendered.group);
         assert!(group.contains("surface-grain-carrier-v1"));

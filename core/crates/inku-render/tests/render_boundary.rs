@@ -782,6 +782,18 @@ fn a_mark_spanning_many_canvases_is_refused_before_drawing() {
 }
 
 #[test]
+fn a_mark_missing_its_geometry_is_refused_by_name() {
+    // Drawing reads each primitive's fields once; the first one missing, in
+    // the order drawing reads them, names the refusal instead of a panic.
+    let error = render(request_for(
+        r#"{"version":"0.9.0","instructions":[{"primitive":"arc",
+        "center":[0.5,0.5]}]}"#,
+    ))
+    .unwrap_err();
+    assert_eq!(error.to_string(), "Arc requires 'radius'");
+}
+
+#[test]
 fn explicit_authority_limits_a_legacy_edition_score() {
     let budget = inku_score::ResourceBudget {
         maximum: inku_score::ResourceDemand {

@@ -143,6 +143,13 @@ pub(crate) fn grid_step(weight: Weight, canvas: CanvasSize) -> f64 {
     }
 }
 
+/// How far a varied contour may stray, from the tool's width and the mark's size.
+///
+/// The size comes from the Score's own fields, not from `MarkGeometry`, because
+/// execution calls this before drawing too. A field the Score leaves out counts
+/// as 0.02 short-side units, which is also the floor. That includes a Line's
+/// omitted end, which drawing places on the canvas's midline, and a crescent's
+/// radius, which a valid crescent never carries.
 pub(crate) fn amplitude(instruction: &Instruction, canvas: CanvasSize) -> f64 {
     let Some(variation) = instruction.variation.as_ref() else {
         return 0.0;

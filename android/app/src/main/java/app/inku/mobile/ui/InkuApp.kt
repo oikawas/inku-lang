@@ -1579,8 +1579,14 @@ private fun ComposeScreen(state: InkuUiState, viewModel: InkuViewModel) {
             if (hasWork) {
                 CameraRevealCanvasHeroCard(state, viewModel)
                 if (!showEditor) {
+                    val inTrash = state.selectedHistory?.trashed == true
+                    if (inTrash) {
+                        Text(S.trashedWorkNote, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.error)
+                    }
                     Row(horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM), modifier = Modifier.fillMaxWidth()) {
-                        PrimarySmallButton(S.reviseWork, onClick = { editingWork = true }, modifier = Modifier.weight(1f))
+                        // A work in the trash has no edits on offer, as its
+                        // lineage card has none.
+                        PrimarySmallButton(S.reviseWork, onClick = { editingWork = true }, enabled = !inTrash, modifier = Modifier.weight(1f))
                         SecondarySmallButton(S.newWork, onClick = viewModel::clearPrompt)
                     }
                 }
@@ -3390,13 +3396,19 @@ private fun HistoryScreen(
     val filteredHistory = remember(history, state.historySearchQuery, state.historyStarredOnly) {
         filterHistoryItems(history, state)
     }
+    val trashed by viewModel.trashedItems.collectAsState()
     val header: @Composable () -> Unit = {
         HistoryHeader(
             state = state,
             sourceCount = history.size,
             filteredCount = filteredHistory.size,
+            trashedCount = trashed.size,
             viewModel = viewModel,
         )
+    }
+    if (state.historyTrashView) {
+        TrashGrid(trashed, gridState, header, viewModel)
+        return
     }
     Box(Modifier.fillMaxSize()) {
         LazyVerticalGrid(
@@ -3538,6 +3550,7 @@ private fun HistoryHeader(
     state: InkuUiState,
     sourceCount: Int,
     filteredCount: Int,
+    trashedCount: Int,
     viewModel: InkuViewModel,
 ) {
     var searchOpen by remember { mutableStateOf(state.historySearchQuery.isNotBlank()) }
@@ -3548,6 +3561,21 @@ private fun HistoryHeader(
     val searchLabel = S.searchPlaceholderLong
     Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceXs), modifier = Modifier.fillMaxWidth()) {
         StudioHeader(S.worksTitle, viewModel)
+        WorkNotice(state.workNotice, viewModel)
+        if (state.historyTrashView) {
+            // The trash lists every work in it; search and the star filter are
+            // the works' own.
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                Spacer(Modifier.weight(1f))
+                ChipButton(
+                    S.trashView(trashedCount),
+                    selected = true,
+                    modifier = Modifier.testTag(TRASH_VIEW_TAG),
+                    onClick = { viewModel.setHistoryTrashView(false) },
+                )
+            }
+            return@Column
+        }
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM), modifier = Modifier.fillMaxWidth()) {
             Text(S.filteredOfTotal(filteredCount, sourceCount), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
             TextButton(
@@ -3558,6 +3586,14 @@ private fun HistoryHeader(
                 modifier = Modifier.size(Dimens.touchTarget).semantics { contentDescription = searchLabel },
             ) { Text("⌕", style = MaterialTheme.typography.titleLarge) }
             ChipButton(S.starredOnly, selected = state.historyStarredOnly, onClick = viewModel::toggleHistoryStarredFilter)
+        }
+        Row(modifier = Modifier.fillMaxWidth()) {
+            Spacer(Modifier.weight(1f))
+            ChipButton(
+                S.trashView(trashedCount),
+                modifier = Modifier.testTag(TRASH_VIEW_TAG),
+                onClick = { viewModel.setHistoryTrashView(true) },
+            )
         }
         if (searchOpen || state.historySearchQuery.isNotBlank()) {
             ImeAwareOutlinedTextField(
@@ -3579,6 +3615,11 @@ private fun HistoryHeader(
 
 /** So that an instrumented test can count the cards rather than the labels. */
 internal const val LINEAGE_NODE_TAG = "lineage_node"
+internal const val LINEAGE_TRASHED_TAG = "lineage_trashed"
+internal const val TRASH_ENTRY_TAG = "trash_entry"
+internal const val TRASH_VIEW_TAG = "trash_view"
+internal const val TRASH_RESTORE_TAG = "trash_restore"
+internal const val TRASH_DELETE_TAG = "trash_delete"
 internal const val LINEAGE_STAR_TAG = "lineage_star"
 
 /** Tags for the refinement, so a test counts candidates rather than labels. */
@@ -3625,6 +3666,7 @@ internal fun LineageScreen(state: InkuUiState, viewModel: InkuViewModel) {
             // panel header (LineagePanel.svelte:788). The wording is web's.
             ChipButton(S.makeNewOrigin, onClick = viewModel::detachLineage)
         }
+        WorkNotice(state.workNotice, viewModel)
         when {
             state.refinementOpen -> RefinementPanel(state, viewModel)
             state.lineageLoading && graph == null ->
@@ -4062,6 +4104,7 @@ private fun LineageColumns(graph: LineageGraphResult, viewModel: InkuViewModel, 
                         onEditDdl = viewModel::openLineageDdlEditor,
                         onRedrawSketch = viewModel::redrawSketch,
                         onRedrawSketchText = viewModel::redrawSketchText,
+                        onTrash = viewModel::trashWork,
                         isJapanese = isJapanese,
                     )
                 }
@@ -4081,10 +4124,13 @@ private fun LineageNodeCard(
     onEditDdl: (HistoryItemEntity) -> Unit,
     onRedrawSketch: (HistoryItemEntity, SketchMode) -> Unit,
     onRedrawSketchText: (HistoryItemEntity, String) -> Unit,
+    onTrash: (HistoryItemEntity) -> Unit,
     isJapanese: Boolean,
 ) {
     val work = node as? LineageGraphNode.Work
     val history = work?.history
+    val trashed = history?.item?.trashed == true
+    var confirmTrash by remember(node.id) { mutableStateOf(false) }
     var sketchChoicesOpen by remember(node.id) { mutableStateOf(false) }
     var sketchDraft by remember(node.id, history?.item?.sketchText) {
         mutableStateOf(history?.item?.sketchText.orEmpty())
@@ -4145,6 +4191,18 @@ private fun LineageNodeCard(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
+                // A work in the trash keeps its place in the lineage, marked, and
+                // offers nothing to edit -- web's card goes `trashed` and its
+                // work menu is disabled.
+                if (trashed) {
+                    Text(
+                        S.trashedBadge,
+                        modifier = Modifier.testTag(LINEAGE_TRASHED_TAG),
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
                 // 「作品を編集する」 in SPEC lists six items in one order --
                 // 描画要素・記述・DDL・モデル・AI に自律推敲させる・ゴミ箱 (言語 was
                 // retired with the web's language comparison on 2026-08-29).
@@ -4152,8 +4210,10 @@ private fun LineageNodeCard(
                 // DDL follows 描画要素 directly; モデル opens the matching
                 // sub-view of the same 推敲 screen rather than a screen of its
                 // own (SPEC :688). A tombstone has no work to edit, which is why
-                // this hangs off `history`.
-                if (history != null) {
+                // this hangs off `history`. ゴミ箱 is the last item, kept apart
+                // from the edits and drawn in the error colour: 「ゴミ箱操作は他の
+                // 比較操作と視覚的に区別し」.
+                if (history != null && !trashed) {
                     WrapRow(horizontal = Dimens.spaceXs, vertical = Dimens.spaceXs) {
                         ChipButton(S.refinementElements, modifier = Modifier.testTag(REFINE_ENTRY_TAG), onClick = { onRefine(history.item, RefinementSubview.Adjust) })
                         ChipButton(S.ddlEdit, modifier = Modifier.testTag(DDL_ENTRY_TAG), onClick = { onEditDdl(history.item) })
@@ -4188,6 +4248,21 @@ private fun LineageNodeCard(
                                 )
                             }
                         }
+                    }
+                    DangerChipButton(
+                        S.moveToTrash,
+                        modifier = Modifier.testTag(TRASH_ENTRY_TAG),
+                        onClick = { confirmTrash = true },
+                    )
+                    if (confirmTrash) {
+                        ConfirmDialog(
+                            message = S.confirmTrash(1),
+                            onConfirm = {
+                                confirmTrash = false
+                                onTrash(history.item)
+                            },
+                            onDismiss = { confirmTrash = false },
+                        )
                     }
                 }
             }
@@ -7086,6 +7161,129 @@ private fun ChipButton(text: String, selected: Boolean = false, modifier: Modifi
             shape = RoundedCornerShape(100),
             colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurfaceVariant),
         ) { Text(text, maxLines = 1) }
+    }
+}
+
+/** A chip for the one destructive entry on a card, drawn apart from the rest. */
+@Composable
+private fun DangerChipButton(text: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    OutlinedButton(
+        onClick = onClick,
+        modifier = modifier,
+        shape = RoundedCornerShape(100),
+        border = BorderStroke(Dimens.hairline, MaterialTheme.colorScheme.error),
+        colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
+    ) { Text(text, maxLines = 1) }
+}
+
+/** web's confirm dialog: the question, キャンセル and 実行. */
+@Composable
+private fun ConfirmDialog(message: String, onConfirm: () -> Unit, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        text = { Text(message, style = MaterialTheme.typography.bodyMedium) },
+        confirmButton = { TextButton(onClick = onConfirm) { Text(S.confirmRun) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(S.cancel) } },
+    )
+}
+
+/** What a trash action just did, where it was done; it clears itself. */
+@Composable
+private fun WorkNotice(notice: String?, viewModel: InkuViewModel) {
+    if (notice == null) return
+    LaunchedEffect(notice) {
+        delay(CANVAS_MESSAGE_MS)
+        viewModel.clearWorkNotice()
+    }
+    Text(
+        notice,
+        style = MaterialTheme.typography.labelLarge,
+        fontWeight = FontWeight.Medium,
+        color = MaterialTheme.colorScheme.error,
+    )
+}
+
+/**
+ * The trash: web's history manager in its trash view, one work at a time.
+ * A work comes back with 復元 or goes for good with 完全削除, each asked first
+ * (`confirmRestoreMessage`, `confirmPermanentDeleteMessage`).
+ */
+@Composable
+private fun TrashGrid(
+    trashed: List<HistoryListItem>,
+    gridState: LazyGridState,
+    header: @Composable () -> Unit,
+    viewModel: InkuViewModel,
+) {
+    var pendingRestore by remember { mutableStateOf<String?>(null) }
+    var pendingDelete by remember { mutableStateOf<String?>(null) }
+    LazyVerticalGrid(
+        columns = GridCells.Adaptive(Dimens.historyGridMinCellWidth),
+        state = gridState,
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(start = Dimens.spaceL, end = Dimens.historyGridHandleClearance, top = Dimens.spaceM, bottom = Dimens.spaceM),
+        horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM),
+        verticalArrangement = Arrangement.spacedBy(Dimens.historyGridRowGap),
+    ) {
+        item(key = "header", span = { GridItemSpan(maxLineSpan) }) { header() }
+        if (trashed.isEmpty()) {
+            item(key = "empty", span = { GridItemSpan(maxLineSpan) }) {
+                Text(
+                    S.trashEmpty,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(vertical = Dimens.spaceL),
+                )
+            }
+        }
+        gridItems(trashed, key = { it.id }) { item ->
+            Card(
+                shape = RoundedCornerShape(0.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                modifier = Modifier.border(Dimens.hairline, CardHairline, RoundedCornerShape(0.dp)),
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
+                    HistoryArtworkPreview(item, modifier = Modifier.fillMaxWidth().aspectRatio(1f))
+                    Text(
+                        historyTitle(item),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        minLines = 2,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(horizontal = Dimens.spaceM),
+                    )
+                    WrapRow(
+                        modifier = Modifier.padding(start = Dimens.spaceM, end = Dimens.spaceM, bottom = Dimens.spaceM),
+                        horizontal = Dimens.spaceXs,
+                        vertical = Dimens.spaceXs,
+                    ) {
+                        ChipButton(S.restoreWork, modifier = Modifier.testTag(TRASH_RESTORE_TAG), onClick = { pendingRestore = item.id })
+                        DangerChipButton(S.deleteForGood, modifier = Modifier.testTag(TRASH_DELETE_TAG), onClick = { pendingDelete = item.id })
+                    }
+                }
+            }
+        }
+    }
+    pendingRestore?.let { id ->
+        ConfirmDialog(
+            message = S.confirmRestore(1),
+            onConfirm = {
+                pendingRestore = null
+                viewModel.restoreWork(id)
+            },
+            onDismiss = { pendingRestore = null },
+        )
+    }
+    pendingDelete?.let { id ->
+        ConfirmDialog(
+            message = S.confirmDeleteForGood(1),
+            onConfirm = {
+                pendingDelete = null
+                viewModel.deleteWorkForGood(id)
+            },
+            onDismiss = { pendingDelete = null },
+        )
     }
 }
 

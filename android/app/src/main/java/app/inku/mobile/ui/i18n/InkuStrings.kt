@@ -226,6 +226,20 @@ interface InkuStrings {
     val promptLabel: String
     val searchPlaceholderLong: String
     val noMatchingWorks: String
+    val moveToTrash: String
+    val trashedBadge: String
+    val trashView: (Int) -> String
+    val trashEmpty: String
+    val restoreWork: String
+    val deleteForGood: String
+    val confirmTrash: (Int) -> String
+    val confirmRestore: (Int) -> String
+    val confirmDeleteForGood: (Int) -> String
+    val confirmRun: String
+    val workTrashed: String
+    val workRestored: String
+    val workDeleted: String
+    val trashedWorkNote: String
     val mascotTitle: String
     val model: String
     val modelListFetch: String

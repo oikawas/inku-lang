@@ -209,6 +209,13 @@ data class InkuUiState(
     val lineageLoading: Boolean = false,
     val historySearchQuery: String = "",
     val historyStarredOnly: Boolean = false,
+    /** The works screen lists the trash instead of the works. */
+    val historyTrashView: Boolean = false,
+    /**
+     * What a trash, restore or permanent delete just did, said where it was
+     * done: 「操作結果を明示する」(SPEC, the lineage card's ゴミ箱).
+     */
+    val workNotice: String? = null,
     val displaySafeMarginsEnabled: Boolean = false,
     val pngAlphaWhite: Boolean = false,
     val saijikiOpen: Boolean = false,
@@ -472,6 +479,12 @@ class InkuViewModel @JvmOverloads constructor(
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), InkuUiState())
 
     val historyItems: StateFlow<List<HistoryListItem>> = history.stateIn(
+        viewModelScope,
+        SharingStarted.Eagerly,
+        emptyList(),
+    )
+
+    val trashedItems: StateFlow<List<HistoryListItem>> = repository.trashedHistory().stateIn(
         viewModelScope,
         SharingStarted.Eagerly,
         emptyList(),
@@ -3262,6 +3275,72 @@ class InkuViewModel @JvmOverloads constructor(
         viewModelScope.launch {
             repository.setStarred(item.id, !item.starred)
         }
+    }
+
+    fun setHistoryTrashView(on: Boolean) {
+        localState.value = localState.value.copy(historyTrashView = on)
+    }
+
+    fun clearWorkNotice() {
+        localState.value = localState.value.copy(workNotice = null)
+    }
+
+    /**
+     * Moves a work to the trash: web's `/api/history/trash`, the server's
+     * `HistoryTrashStateWriter.trash_items`. Only the flag moves -- the
+     * lineage keeps the node, and the work can be brought back. A work on
+     * screen stays there marked as in the trash, as web keeps its current
+     * item with `trashed: true`, and the lineage is read again so its card
+     * says so.
+     */
+    fun trashWork(item: HistoryItemEntity) {
+        viewModelScope.launch {
+            repository.trash(item.id)
+            afterTrashFlagChanged(item.id, trashed = true, notice = strings().workTrashed)
+        }
+    }
+
+    fun restoreWork(id: String) {
+        viewModelScope.launch {
+            repository.restore(id)
+            afterTrashFlagChanged(id, trashed = false, notice = strings().workRestored)
+        }
+    }
+
+    /**
+     * Deletes a work in the trash for good: web's `/api/history/permanent-delete`
+     * from its trash view, which the server limits to rows already in the
+     * trash (`require_trashed`). A work that is not in the trash is left alone.
+     * The lineage keeps a tombstone in the work's place.
+     */
+    fun deleteWorkForGood(id: String) {
+        viewModelScope.launch {
+            val row = repository.getHistoryById(id) ?: return@launch
+            if (!row.trashed) return@launch
+            repository.deleteHistoryPermanently(id)
+            val current = localState.value
+            localState.value = if (current.selectedHistory?.id == id) {
+                current.copy(
+                    selectedHistory = null,
+                    lineageDetached = true,
+                    lineageGraph = null,
+                    pipelineView = null,
+                    historyAuthority = null,
+                    workNotice = strings().workDeleted,
+                )
+            } else {
+                current.copy(workNotice = strings().workDeleted)
+            }
+        }
+    }
+
+    private fun afterTrashFlagChanged(id: String, trashed: Boolean, notice: String) {
+        val current = localState.value
+        localState.value = current.copy(
+            selectedHistory = current.selectedHistory?.let { if (it.id == id) it.copy(trashed = trashed) else it },
+            workNotice = notice,
+        )
+        if (current.tab == AppTab.Lineage) refreshLineage()
     }
 
     private fun validateSelectedModels(state: InkuUiState): String? =

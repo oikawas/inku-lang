@@ -286,6 +286,21 @@ object InkuStringsJa : InkuStrings {
     override val promptLabel = "プロンプト"
     override val searchPlaceholderLong = "プロンプト・ハッシュ・モデルで検索"
     override val noMatchingWorks = "条件に合う作品はありません。"
+    // The trash takes web's words (`historyMoveToTrash`, `confirmTrashMessage`, ...).
+    override val moveToTrash = "ごみ箱へ移動"
+    override val trashedBadge = "ごみ箱"
+    override val trashView: (Int) -> String = { count -> "ごみ箱 ($count)" }
+    override val trashEmpty = "ごみ箱は空です。"
+    override val restoreWork = "復元"
+    override val deleteForGood = "完全削除"
+    override val confirmTrash: (Int) -> String = { count -> "${count}件をごみ箱に移動しますか？" }
+    override val confirmRestore: (Int) -> String = { count -> "${count}件を復元しますか？" }
+    override val confirmDeleteForGood: (Int) -> String = { count -> "${count}件を完全に削除しますか？元に戻せません。" }
+    override val confirmRun = "実行"
+    override val workTrashed = "ごみ箱に移動しました。"
+    override val workRestored = "ごみ箱から戻しました。"
+    override val workDeleted = "完全に削除しました。"
+    override val trashedWorkNote = "この作品はごみ箱にあります。"
     override val mascotTitle = "マスコット選択"
     override val model = "モデル"
     override val modelListFetch = "モデルリスト取得"

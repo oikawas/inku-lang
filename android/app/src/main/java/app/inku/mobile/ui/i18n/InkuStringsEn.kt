@@ -313,6 +313,20 @@ object InkuStringsEn : InkuStrings {
     override val promptLabel = "Description"
     override val searchPlaceholderLong = "Search descriptions, hashes and models"
     override val noMatchingWorks = "No works match."
+    override val moveToTrash = "Move to trash"
+    override val trashedBadge = "In the trash"
+    override val trashView: (Int) -> String = { count -> "Trash ($count)" }
+    override val trashEmpty = "The trash is empty."
+    override val restoreWork = "Restore"
+    override val deleteForGood = "Permanently delete"
+    override val confirmTrash: (Int) -> String = { count -> "Move $count item${if (count == 1) "" else "s"} to trash?" }
+    override val confirmRestore: (Int) -> String = { count -> "Restore $count item${if (count == 1) "" else "s"}?" }
+    override val confirmDeleteForGood: (Int) -> String = { count -> "Permanently delete $count item${if (count == 1) "" else "s"}? This cannot be undone." }
+    override val confirmRun = "Run"
+    override val workTrashed = "Moved to the trash."
+    override val workRestored = "Brought back from the trash."
+    override val workDeleted = "Deleted for good."
+    override val trashedWorkNote = "This work is in the trash."
     override val mascotTitle = "Mascot"
     override val model = "Model"
     override val modelListFetch = "Fetch the model list"

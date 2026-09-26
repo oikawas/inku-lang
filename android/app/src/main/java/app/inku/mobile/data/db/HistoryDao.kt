@@ -22,6 +22,14 @@ interface HistoryDao {
     @Query("SELECT * FROM history_items WHERE trashed = 1 ORDER BY created_at DESC LIMIT :limit OFFSET :offset")
     fun listTrashed(limit: Int, offset: Int): Flow<List<HistoryItemEntity>>
 
+    @Query(
+        "SELECT id, created_at, updated_at, original_input, normalized_ddl, stage1_model, stage2_model, " +
+            "render_hash, render_hash_short, color_catalog_id, canvas_aspect, starred, trashed, " +
+            "thumbnail_path, thumbnail_width, thumbnail_height " +
+            "FROM history_items WHERE trashed = 1 ORDER BY created_at DESC LIMIT :limit OFFSET :offset",
+    )
+    fun listTrashedSummaries(limit: Int, offset: Int): Flow<List<HistoryListItem>>
+
     @Query("SELECT * FROM history_items WHERE starred = 1 AND trashed = 0 ORDER BY created_at DESC LIMIT :limit OFFSET :offset")
     fun listStarred(limit: Int, offset: Int): Flow<List<HistoryItemEntity>>
 

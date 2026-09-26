@@ -124,7 +124,8 @@ class InkuRepository(
      */
     fun history(): Flow<List<HistoryListItem>> = database.historyDao().listActiveSummaries(Int.MAX_VALUE, 0)
 
-    fun trashedHistory(): Flow<List<HistoryItemEntity>> = database.historyDao().listTrashed(100, 0)
+    /** The trash, all of it, as the same summaries the works screen lists. */
+    fun trashedHistory(): Flow<List<HistoryListItem>> = database.historyDao().listTrashedSummaries(Int.MAX_VALUE, 0)
 
     fun modelAssets(): Flow<List<ModelAssetEntity>> = database.modelAssetDao().observeAll()
 

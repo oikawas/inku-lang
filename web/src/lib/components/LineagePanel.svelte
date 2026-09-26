@@ -18,6 +18,7 @@
 	import type { SavedWorkExportScope, SavedWorkExportSnapshot } from '$lib/features/export/saved-work';
 	import type { LineageGraph, LineageNode } from '$lib/features/history/types';
 	import type { LineageBrowsingState, LineageOrientation } from '$lib/features/history/lineage-state.svelte';
+	import type { ProviderAttemptCount } from '$lib/paintStream';
 	import WorkActionMenu, { type WorkAction } from './WorkActionMenu.svelte';
 	export type OkugakiItem = { id?: string; target_node_id: string; branch_snapshot: string[]; model: string; at: number; language: 'ja' | 'en'; body: string; warnings: string[] };
 
@@ -38,6 +39,7 @@
 		stage2ModelLabel: string;
 		runTokensIn: number | null;
 		runTokensOut: number | null;
+		runAttempt?: ProviderAttemptCount | null;
 		onSaveOkugakiModel: (provider: Provider, model: string) => void | Promise<void>;
 		onPromoteNode: (node: LineageNode) => void | Promise<void>;
 		onSaveNote: (node: LineageNode, note: string) => void | Promise<void>;
@@ -76,7 +78,7 @@
 	}
 
 	type ArrowPath = { id: string; path: string; tombstone: boolean };
-	let { graph, loading, error, isJapanese, onOpenNode, onOpenNodeInCanvas, onToggleStar, onToggleForRevision, onOpenRefinement, onDrawDescription, onOpenDdlEditor, onDrawSketchGrain, stageLabel, stage1ModelLabel, stage2ModelLabel, runTokensIn, runTokensOut, onSaveOkugakiModel, onPromoteNode, onSaveNote, onAskTrash, onDetach, onLoadOverview, onLoadBranch, onPaintOne, onVisionAdvice, onSaveVisionModel, visionModel, okugakiModel, visionProviderGroups, animationExportSettings, pngTemplates = [], onDownloadSavedWorkSVG, onDownloadSavedWorkPNG, onDownloadSavedWorkCard, onDownloadSavedWorkDdl, onDownloadSavedWorkAnimation, onDownloadSavedWorkContactSheet, onValidateSavedWorkExport, browsingState }: Props = $props();
+	let { graph, loading, error, isJapanese, onOpenNode, onOpenNodeInCanvas, onToggleStar, onToggleForRevision, onOpenRefinement, onDrawDescription, onOpenDdlEditor, onDrawSketchGrain, stageLabel, stage1ModelLabel, stage2ModelLabel, runTokensIn, runTokensOut, runAttempt = null, onSaveOkugakiModel, onPromoteNode, onSaveNote, onAskTrash, onDetach, onLoadOverview, onLoadBranch, onPaintOne, onVisionAdvice, onSaveVisionModel, visionModel, okugakiModel, visionProviderGroups, animationExportSettings, pngTemplates = [], onDownloadSavedWorkSVG, onDownloadSavedWorkPNG, onDownloadSavedWorkCard, onDownloadSavedWorkDdl, onDownloadSavedWorkAnimation, onDownloadSavedWorkContactSheet, onValidateSavedWorkExport, browsingState }: Props = $props();
 
 	let lineageColumnsEl = $state<HTMLDivElement | null>(null);
 	let lineageScrollEl = $state<HTMLDivElement | null>(null);
@@ -917,11 +919,11 @@ $effect(() => {
 {/if}
 
 {#if activeEditNode}
-	<WorkEditDialog node={activeEditNode} mode="description" {isJapanese} {stageLabel} {stage1ModelLabel} {stage2ModelLabel} tokensIn={runTokensIn} tokensOut={runTokensOut} onClose={() => (activeEditNode = null)} onDrawDescription={onDrawDescription} {onDrawSketchGrain} />
+	<WorkEditDialog node={activeEditNode} mode="description" {isJapanese} {stageLabel} {stage1ModelLabel} {stage2ModelLabel} tokensIn={runTokensIn} tokensOut={runTokensOut} attempt={runAttempt} onClose={() => (activeEditNode = null)} onDrawDescription={onDrawDescription} {onDrawSketchGrain} />
 {/if}
 
 {#if activeSketchNode}
-	<WorkEditDialog node={activeSketchNode} mode="sketch-grain" {isJapanese} {stageLabel} {stage1ModelLabel} {stage2ModelLabel} tokensIn={runTokensIn} tokensOut={runTokensOut} onClose={() => (activeSketchNode = null)} onDrawDescription={onDrawDescription} {onDrawSketchGrain} />
+	<WorkEditDialog node={activeSketchNode} mode="sketch-grain" {isJapanese} {stageLabel} {stage1ModelLabel} {stage2ModelLabel} tokensIn={runTokensIn} tokensOut={runTokensOut} attempt={runAttempt} onClose={() => (activeSketchNode = null)} onDrawDescription={onDrawDescription} {onDrawSketchGrain} />
 {/if}
 
 {#if okugakiOpen}

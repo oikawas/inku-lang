@@ -6,6 +6,13 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 36 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-26 — the running indicator shows the wait for a model, and a retry
+
+- **The Web running indicator shows "Awaiting reply (try 1/4)" and "Retrying (try 2/4)".** When a model call such as Stage 1 timed out on its first attempt, the screen showed only elapsed time, and a retry could not be told from a slow answer (the Server source review's W4). It appears for a single drawing, drawing from DDL, a redraw from the lineage, batches, and the demo.
+- **A running view carries `provider_attempt`.** The shared core reports the attempt, the stage's most attempts, and the wait and time limit (`pipeline_provider_attempt`); when the Server began the attempt itself, it adds the deadline `deadline_at` (epoch ms). `/api/paint/stream` sends `attempt` whenever an attempt begins and once the last one has ended. With an older native wheel that lacks the call, neither appears.
+
+The route count (107) is unchanged. DDL, Score, and render versions are unchanged.
+
 ### 2026-09-26 — the reason a Score cannot be drawn, and what the interpretation seed is
 
 - **A Score the render core refuses is answered with 422 and the core's reason.** This covers an invalid mark, more marks than a Score may hold, and a mark or an output past its size limit. `/api/render-score`, `/api/render-svg`, saving a work, and redrawing a work's SVG answered only "… render failed" and logged a traceback as a failure of the server itself. The Web shows the headline of this refusal, and of an invalid Score, in the page's language, with the reason as sent.

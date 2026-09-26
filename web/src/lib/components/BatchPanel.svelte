@@ -4,6 +4,7 @@
 	import LabelHighlight from './LabelHighlight.svelte';
 	import PaintButton from './PaintButton.svelte';
 	import RunStatus from './RunStatus.svelte';
+	import type { ProviderAttemptCount } from '$lib/paintStream';
 
 	type BatchFailure = {
 		line: number;
@@ -32,6 +33,7 @@
 		batchRetryRound: number;
 		runTokensIn: number | null;
 		runTokensOut: number | null;
+		runAttempt?: ProviderAttemptCount | null;
 		batchActiveTokensIn: number | null;
 		batchActiveTokensOut: number | null;
 		batchTokensInTotal: number;
@@ -79,6 +81,7 @@
 		batchRetryRound,
 		runTokensIn,
 		runTokensOut,
+		runAttempt = null,
 		batchActiveTokensIn,
 		batchActiveTokensOut,
 		batchTokensInTotal,
@@ -279,6 +282,7 @@
 			elapsedMs={liveMs}
 			tokensIn={batchTokensInTotal || runTokensIn}
 			tokensOut={batchTokensOutTotal || runTokensOut}
+			attempt={runAttempt}
 			onStop={onStop}
 		/>
 	</div>

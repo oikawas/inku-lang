@@ -11,6 +11,7 @@
 	import PaintButton from './PaintButton.svelte';
 	import RunStatus from './RunStatus.svelte';
 	import type { CanvasAspectId, CanvasAspectOption } from '$lib/plugins/system/canvas-aspect';
+	import type { ProviderAttemptCount } from '$lib/paintStream';
 
 	type BatchFailure = {
 		line: number;
@@ -35,6 +36,7 @@
 		hideRunStatus?: boolean;
 		runTokensIn: number | null;
 		runTokensOut: number | null;
+		runAttempt?: ProviderAttemptCount | null;
 		singleDdlReady: boolean;
 		batchActiveLine: number | null;
 		batchObservedLine: number | null;
@@ -96,6 +98,7 @@
 		hideRunStatus = false,
 		runTokensIn,
 		runTokensOut,
+		runAttempt = null,
 		singleDdlReady,
 		batchActiveLine,
 		batchObservedLine,
@@ -321,6 +324,7 @@
 				elapsedMs={liveMs}
 				tokensIn={runTokensIn}
 				tokensOut={runTokensOut}
+				attempt={runAttempt}
 				onStop={onStop}
 			/>
 			</div>
@@ -336,6 +340,7 @@
 			settings={inputConditionRows}
 			{runTokensIn}
 			{runTokensOut}
+			{runAttempt}
 			bind:batchInput
 			{lineNumbersText}
 			{batchNonEmpty}

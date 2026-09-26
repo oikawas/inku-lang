@@ -25,6 +25,22 @@ export type PipelineResult = PaintResult & {
 	pipeline_diagnostics?: { plugin_diagnostics?: PluginDiagnostic[] } | null;
 };
 
+/**
+ * The model call a running execution is waiting on. The shared core numbers
+ * the attempt and sets its budget; the server adds the deadline once it has
+ * begun the attempt.
+ */
+export type PipelineProviderAttempt = {
+	action: string;
+	/** One-based. */
+	attempt: number;
+	max_attempts: number;
+	delay_ms?: string;
+	timeout_ms?: string;
+	/** Epoch ms when the attempt gives up. */
+	deadline_at?: number;
+};
+
 export type PipelineView = {
 	execution_id: string;
 	variation_id: string;
@@ -42,6 +58,7 @@ export type PipelineView = {
 		relation_omissions: unknown[];
 	} | null;
 	busy: boolean;
+	provider_attempt?: PipelineProviderAttempt;
 	rendered: { svg: string } | null;
 	result: PipelineResult | null;
 };

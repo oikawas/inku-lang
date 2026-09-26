@@ -6,6 +6,7 @@
 	import WildToggle from './WildToggle.svelte';
 	import { normalizeSketchState, sketchStateNote, type SketchMode } from '$lib/sketch';
 	import type { LineageNode } from '$lib/features/history/types';
+	import type { ProviderAttemptCount } from '$lib/paintStream';
 	import { restoreWorkActionFocus } from './WorkActionMenu.svelte';
 
 	type Props = {
@@ -17,12 +18,13 @@
 		stage2ModelLabel: string;
 		tokensIn: number | null;
 		tokensOut: number | null;
+		attempt?: ProviderAttemptCount | null;
 		onClose: () => void;
 		onDrawDescription: (node: LineageNode, text: string, signal?: AbortSignal, wild?: boolean | null) => void | Promise<void>;
 		onDrawSketchGrain: (node: LineageNode, mode: SketchMode, signal?: AbortSignal) => void | Promise<void>;
 	};
 
-	let { node, mode, isJapanese, stageLabel, stage1ModelLabel, stage2ModelLabel, tokensIn, tokensOut, onClose, onDrawDescription, onDrawSketchGrain }: Props = $props();
+	let { node, mode, isJapanese, stageLabel, stage1ModelLabel, stage2ModelLabel, tokensIn, tokensOut, attempt = null, onClose, onDrawDescription, onDrawSketchGrain }: Props = $props();
 	let draft = $state('');
 	let wildOverride = $state<boolean | null>(null);
 	let sketchMode = $state<SketchMode>('on');
@@ -111,7 +113,7 @@
 	</div>
 	<footer>
 		{#if drawing}
-			<RunStatus variant="inline" label={stageLabel || t().pipelineWorking} stage1Model={stage1ModelLabel} stage2Model={stage2ModelLabel} {elapsedMs} tokensIn={tokensIn} tokensOut={tokensOut} onStop={() => controller?.abort()} />
+			<RunStatus variant="inline" label={stageLabel || t().pipelineWorking} stage1Model={stage1ModelLabel} stage2Model={stage2ModelLabel} {elapsedMs} tokensIn={tokensIn} tokensOut={tokensOut} {attempt} onStop={() => controller?.abort()} />
 		{:else}
 			{#if mode === 'description'}
 				<WildToggle value={wildOverride ?? (node.history?.render_wild === true)} {isJapanese} inherited={wildOverride === null} onSelect={(next) => (wildOverride = next)} />

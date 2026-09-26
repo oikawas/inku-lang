@@ -10,7 +10,7 @@ import { test } from 'node:test';
 import { ja } from './i18n/ja.ts';
 import { en } from './i18n/en.ts';
 import type { LangPack } from './i18n/types.ts';
-import { paintStageHandlers, paintStageLabel, readPaintStream } from './paintStream.ts';
+import { paintStageHandlers, paintStageLabel, providerAttemptText, readPaintStream } from './paintStream.ts';
 
 const DONE = { event: 'done', ddl: '黒い円を中心に置く。', svg: '<svg/>' };
 
@@ -130,4 +130,24 @@ test('T-252  with the layer off the wait opens on interpretation, not on the ske
 		assert.equal(paintStageLabel('requested', strings, { sketchOn: false }), strings.stageInterpreting);
 		assert.equal(paintStageLabel('requested', strings, { sketchOn: true }), strings.stageSketching);
 	}
+});
+
+// ---------------------------------------------------------------- W4
+
+test('a retry reads as a retry, not as a longer wait', async () => {
+	// The Server review's W4: the indicator showed only elapsed time, so a
+	// first attempt that timed out looked like a slow answer.
+	const shown: string[] = [];
+	await readPaintStream(
+		streamOf([
+			{ event: 'attempt', provider_attempt: { action: 'generate_normalized_ddl', attempt: 1, max_attempts: 4 } },
+			{ event: 'attempt', provider_attempt: { action: 'generate_normalized_ddl', attempt: 2, max_attempts: 4 } },
+			{ event: 'stage1', tokens_in: 3, tokens_out: 4 },
+			{ event: 'attempt', provider_attempt: null },
+			DONE
+		]),
+		{ describeError, onAttempt: (event) => shown.push(providerAttemptText(event.provider_attempt, ja)) }
+	);
+	assert.deepEqual(shown, ['応答待ち（1/4回目）', '再試行中（2/4回目）', '']);
+	assert.equal(providerAttemptText({ attempt: 2, max_attempts: 4 }, en), 'Retrying (try 2/4)');
 });

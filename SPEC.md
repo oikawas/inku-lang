@@ -1612,6 +1612,8 @@ Only with `INKU_DEVELOPER_MODE`, an authoring request may independently set the 
 
 Outside developer mode as well, the Server keeps in the execution's context the system prompts that Stage 1 (the work plan) and hole completion (Stage 2) sent to the provider: the last send of each stage (on a retry, the last send with the compiler's feedback), with its prompt ID, digest, language, and attempt number. Only the owner reads them at `/api/pipeline/variations/{variation_id}/system-prompts`, and the Web provenance drawer's Prompts tab shows them for the displayed work. A stage that called no model is null, and an execution saved before this record reads `recorded: false`. A prompt rebuilt from the current code is never shown as the one sent. The record changes no drawing semantics, retries, or prompts.
 
+While an execution waits on a model call (sketch, color-catalog selection, Stage 1, or hole completion), its view carries `provider_attempt`. The shared core reports from the saved snapshot the effect (`action`), the one-based attempt (`attempt`), the most attempts the stage's retry policy allows (`max_attempts`), and the attempt's wait and time limit (`delay_ms`, `timeout_ms`, as decimal strings). The host does not copy the mapping from stage to policy. The core keeps no clock, so only when the Server began the attempt itself does it add the deadline `deadline_at` (epoch ms): the start time plus the wait and the time limit. An attempt begun before a restart has none. The Web running indicator shows the first attempt as awaiting a reply (1/4) and any later one as retrying (2/4), so a first attempt that timed out no longer reads as a slow answer.
+
 Android connects its Kotlin host directly to the provider and shared Rust JNI without an inku server. Normal description and direct-DDL input, batch, demo, refinement, and camera output use the same shared pipeline. Image preparation and the on-device local LLM remain host responsibilities; their resulting description or DDL enters the regular pipeline. Non-image camera provenance survives completion approval and resumption. New authoring does not call Stage 0.5 or substitute legacy sketch prose for the original description. Visible patches show the current and proposed DDL for approval in the normal drawing screen. The iOS connection is outside this Android integration and remains separately pending.
 
 Room migrates from v10 to v11 while retaining existing works, adding atomic origin/authority/source saves, action acknowledgments, opaque executions, and immutable context for each history revision. Resuming a save for the same execution does not duplicate that performance in history. Replaying a saved Score also retains its original short DDL and that revision's authority, validated against independently saved resource budgets. The shared Rust registry supplies the 11 new-paper IDs and integer ratios. Android's former `pixel9_landscape_safe` option becomes device display margins; old works retain their 9:5 ratio and saved images. Migrating that old device preference selects the default `square` paper for new works and never aliases 9:5 to 16:9.
@@ -1715,11 +1717,14 @@ implementation order.
 ### 12.10 Handling Latency
 
 `POST /api/paint/stream` reports finite progress as `sketch` (when the sketch
-layer ran), `stage1`, `score`, and `done`. `stage1` can expose normalized DDL and
-diagnostic metadata before drawing completes; `done` carries the normal
-response. "Another composition" and "Paint from DDL" resume from saved DDL
-without calling Stage 1 again. A separate Stage 1 cache and future parallelism
-are not part of the current contract.
+layer ran), `stage1`, `score`, and `done`. It also sends `attempt` whenever a
+model-call attempt begins and once the last one has ended; its
+`provider_attempt` holds `action`, `attempt`, and `max_attempts`, and is null
+at the end. `stage1` can expose normalized DDL and diagnostic metadata before
+drawing completes; `done` carries the normal response. "Another composition"
+and "Paint from DDL" resume from saved DDL without calling Stage 1 again. A
+separate Stage 1 cache and future parallelism are not part of the current
+contract.
 
 ### 12.11 The Intermediate Filter (Stage 1.5)
 

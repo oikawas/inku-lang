@@ -224,6 +224,8 @@ export const ja: LangPack = {
 	runStatusElapsed: (seconds) => `経過 ${seconds}s`,
 	runStatusTokens: (input, output) => `${input}→${output} tok`,
 	runStatusProgress: (done, total) => `完了 ${done}/${total}`,
+	runStatusAwaitingReply: (attempt, maxAttempts) => `応答待ち（${attempt}/${maxAttempts}回目）`,
+	runStatusRetrying: (attempt, maxAttempts) => `再試行中（${attempt}/${maxAttempts}回目）`,
 	runStatusStage1: '解釈',
 	runStatusStage2: '描画',
 	stageDdlGenerating: 'DDL生成',

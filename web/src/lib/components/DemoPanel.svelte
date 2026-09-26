@@ -6,6 +6,7 @@
 	import RunStatus from './RunStatus.svelte';
 	import ModelCardPicker from './ModelCardPicker.svelte';
 	import type { Snippet } from 'svelte';
+	import type { ProviderAttemptCount } from '$lib/paintStream';
 
 	type Props = {
 		settings: DemoSettings;
@@ -18,6 +19,7 @@
 		liveMs: number;
 		runTokensIn: number | null;
 		runTokensOut: number | null;
+		runAttempt?: ProviderAttemptCount | null;
 		waitingSeconds: number | null;
 		currentLiveMs: number | null;
 		currentElapsedMs: number | null;
@@ -51,6 +53,7 @@
 		liveMs,
 		runTokensIn,
 		runTokensOut,
+		runAttempt = null,
 		waitingSeconds,
 		currentLiveMs,
 		currentElapsedMs,
@@ -197,6 +200,7 @@
 				elapsedMs={liveMs}
 				tokensIn={totalTokensIn || runTokensIn}
 				tokensOut={totalTokensOut || runTokensOut}
+				attempt={runAttempt}
 				onStop={onStop}
 			/>
 		{:else}

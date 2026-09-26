@@ -9,6 +9,7 @@
 	import type { Provider, ProviderGroup } from '$lib/models';
 	import type { PluginEntry, PreviewForPlugin, PreviewForWord } from '$lib/features/ddl-editor/types';
 	import { parseDdlImport, type ImportedPlugin } from '$lib/features/ddl-editor/ddl-import';
+	import type { ProviderAttemptCount } from '$lib/paintStream';
 
 	type Props = {
 		open: boolean;
@@ -23,6 +24,7 @@
 		onSelectDrawingModel: (provider: Provider, model: string) => void | Promise<void>;
 		runTokensIn: number | null;
 		runTokensOut: number | null;
+		runAttempt?: ProviderAttemptCount | null;
 		error: string | null;
 		previewForWord: PreviewForWord;
 		previewForPlugin: PreviewForPlugin;
@@ -38,7 +40,7 @@
 	let {
 		open, mode, isJapanese, initialDdl, returnFocusTo = null, drawing,
 		stage2ModelLabel, drawingModelId, drawingModelGroups, onSelectDrawingModel,
-		runTokensIn, runTokensOut, error, previewForWord, previewForPlugin,
+		runTokensIn, runTokensOut, runAttempt = null, error, previewForWord, previewForPlugin,
 		pluginEntries = [], wildValue = false, wildInherited = true, onSelectWild, onDraw, onClose,
 	}: Props = $props();
 
@@ -185,7 +187,7 @@
 			<footer class="ddled-foot">
 				{#if error}<div class="ddled-error" role="alert">{error}</div>{/if}
 				{#if drawing}
-					<RunStatus variant="inline" label={t().stageImageGenerating} stage2Model={stage2ModelLabel} {elapsedMs} tokensIn={runTokensIn} tokensOut={runTokensOut} onStop={stopDraw} />
+					<RunStatus variant="inline" label={t().stageImageGenerating} stage2Model={stage2ModelLabel} {elapsedMs} tokensIn={runTokensIn} tokensOut={runTokensOut} attempt={runAttempt} onStop={stopDraw} />
 				{:else}
 					<div class="ddled-actions">
 						<button type="button" class="ddled-cancel" onclick={requestClose}>{t().pipelineCancel}</button>

@@ -6,7 +6,8 @@ import {
 	paintStageHandlers,
 	paintStageLabel,
 	readPaintStream,
-	type PaintStage1Event
+	type PaintStage1Event,
+	type ProviderAttemptCount
 } from '../../paintStream.ts';
 import type { CanvasAspectId } from '../../plugins/system/canvas-aspect/index.ts';
 import { type SketchMode } from '../../sketch.ts';
@@ -147,6 +148,8 @@ export type CurrentWorkCapabilities = {
 	attachSavedLineage: () => void;
 	updateGenerationCount: (count: number) => void;
 	adoptPipelineView?: (view: PipelineView) => void;
+	/** The model call being waited on; null once there is none. */
+	setProviderAttempt?: (attempt: ProviderAttemptCount | null) => void;
 };
 
 export type CurrentWorkResult = { ddl: string; thinking: string | null } & PaintResult;
@@ -220,16 +223,22 @@ export async function runCurrentWork(
 		throw new Error(capabilities.describeApiError(data.detail, response.status));
 	}
 
-	const result = await readPaintStream<CurrentWorkResult>(response, {
-		describeError: capabilities.describeApiError,
-		...paintStageHandlers(defaults.strings, capabilities.setStageLabel, {
-			sketchOn,
-			onStage1: (event) => {
-				capabilities.setActiveRunTokens(event.tokens_in, event.tokens_out);
-				options.onStage1?.(event);
-			}
-		})
-	});
+	let result: CurrentWorkResult;
+	try {
+		result = await readPaintStream<CurrentWorkResult>(response, {
+			describeError: capabilities.describeApiError,
+			onAttempt: (event) => capabilities.setProviderAttempt?.(event.provider_attempt),
+			...paintStageHandlers(defaults.strings, capabilities.setStageLabel, {
+				sketchOn,
+				onStage1: (event) => {
+					capabilities.setActiveRunTokens(event.tokens_in, event.tokens_out);
+					options.onStage1?.(event);
+				}
+			})
+		});
+	} finally {
+		capabilities.setProviderAttempt?.(null);
+	}
 
 	capabilities.setActiveRunTokens(null, null);
 

@@ -6,6 +6,12 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 36 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-26 — the render core's executor keeps each instruction's facts in one type
+
+The render core's executor, which resolves relations, transform groups and anchors, held what it knew about each source instruction (its drawn copies, its accumulated transform, whether a path connection targets it, whether a failed group removed it, whether it belongs to an arrangement's structure, and whether it is drawn without its relation) in seven arrays beside the instruction list. They are now one record per instruction. Drawing results do not change (the 12,799 saved renders are identical).
+
+DDL, Score, and render versions are unchanged.
+
 ### 2026-09-26 — the render core reads each primitive's geometry as a type
 
 One `Instruction` type carries every primitive, so all its geometric fields (center, radius, size, position, ends, angles) are optional. Each mark-drawing function unwrapped them itself and stopped with, for example, "Arc requires 'radius'" when one was missing (30 places), while the surface, fill and extent calculations silently drew nothing. The geometry each primitive requires is now a type (`MarkGeometry`), read once per drawn mark. A missing field is refused only there, naming the same field as before (the first in reading order), and the drawing functions receive the values their primitive has. Drawing results do not change (the 12,799 saved renders are identical).

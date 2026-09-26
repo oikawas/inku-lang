@@ -45,21 +45,6 @@ struct DabSpec<'a> {
     use_filters: bool,
 }
 
-fn texture_name(texture: SurfaceTexture) -> &'static str {
-    match texture {
-        SurfaceTexture::None => "none",
-        SurfaceTexture::Solid => "solid",
-        SurfaceTexture::Stipple => "stipple",
-        SurfaceTexture::Hatch => "hatch",
-        SurfaceTexture::Crosshatch => "crosshatch",
-        SurfaceTexture::Aquatint => "aquatint",
-        SurfaceTexture::Grain => "grain",
-        SurfaceTexture::Wash => "wash",
-        SurfaceTexture::Bleed => "bleed",
-        SurfaceTexture::PaperGrain => "paper_grain",
-    }
-}
-
 fn owns_surface(primitive: Primitive) -> bool {
     matches!(
         primitive,
@@ -590,7 +575,7 @@ pub fn render_surface(
             "surface_{:03}_{:03}_{}",
             context.instruction_index,
             context.mark_index,
-            texture_name(surface.texture)
+            surface.texture.as_str()
         ),
     );
     let mut definitions = Vec::new();

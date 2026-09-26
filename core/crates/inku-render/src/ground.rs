@@ -5,7 +5,7 @@ use sha2::{Digest, Sha256};
 use crate::determinism::hash01;
 use crate::ground_patterns::build_ground_layers;
 use crate::svg::{Element, format_number};
-use crate::types::{CanvasGroundSpec, CanvasSize, GroundGrain, GroundMaterial, GroundTone, Seed};
+use crate::types::{CanvasGroundSpec, CanvasSize, GroundMaterial, GroundTone, Seed};
 
 const GROUND_OPACITY_DEFAULT: f64 = 0.12;
 const MEZZOTINT_PLATE: &str = "#0d0d0d";
@@ -16,36 +16,14 @@ pub struct GroundRender {
     pub definitions: Vec<Element>,
 }
 
-fn material_name(material: GroundMaterial) -> &'static str {
-    match material {
-        GroundMaterial::Plain => "plain",
-        GroundMaterial::Paper => "paper",
-        GroundMaterial::Washi => "washi",
-        GroundMaterial::InkWash => "ink_wash",
-        GroundMaterial::CharcoalGround => "charcoal_ground",
-        GroundMaterial::Canvas => "canvas",
-        GroundMaterial::DrawingPaper => "drawing_paper",
-        GroundMaterial::Mezzotint => "mezzotint",
-    }
-}
-
-fn grain_name(grain: GroundGrain) -> &'static str {
-    match grain {
-        GroundGrain::None => "none",
-        GroundGrain::Fine => "fine",
-        GroundGrain::Medium => "medium",
-        GroundGrain::Coarse => "coarse",
-    }
-}
-
 fn ground_seed(ground: &CanvasGroundSpec, render_seed: Option<Seed>) -> Seed {
     if let Some(seed) = ground.seed {
         return seed;
     }
     let mut key = format!(
         "{{\"grain\":\"{}\",\"material\":\"{}\"}}",
-        grain_name(ground.grain),
-        material_name(ground.material)
+        ground.grain.as_str(),
+        ground.material.as_str()
     );
     if let Some(seed) = render_seed {
         key.push_str(&format!(":render:{seed}"));
@@ -152,7 +130,7 @@ pub fn render_ground(
             )
             .attr(
                 "class",
-                format!("canvas-ground-{}", material_name(ground.material)),
+                format!("canvas-ground-{}", ground.material.as_str()),
             ),
         );
     }
@@ -162,6 +140,7 @@ pub fn render_ground(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::types::GroundGrain;
 
     fn ground(material: GroundMaterial) -> CanvasGroundSpec {
         CanvasGroundSpec {

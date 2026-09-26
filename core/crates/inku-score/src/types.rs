@@ -55,18 +55,36 @@ macro_rules! string_enum {
         #[serde(rename_all = "snake_case")]
         pub enum $name { $($variant),+ }
     };
+    // Enums whose stored names the renderer also writes into SVG ids, classes
+    // and labels: each name is written once and serves both.
+    ($name:ident { $($variant:ident => $stored:literal),+ $(,)? }) => {
+        #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+        pub enum $name { $(#[serde(rename = $stored)] $variant),+ }
+
+        impl $name {
+            pub const ALL: &'static [Self] = &[$(Self::$variant),+];
+
+            /// The name a Score stores for this value.
+            #[must_use]
+            pub const fn as_str(self) -> &'static str {
+                match self {
+                    $(Self::$variant => $stored),+
+                }
+            }
+        }
+    };
 }
 
 string_enum!(Primitive {
-    Line,
-    Circle,
-    Ellipse,
-    Triangle,
-    Square,
-    Polygon,
-    Arc,
-    Point,
-    Cloudform,
+    Line => "line",
+    Circle => "circle",
+    Ellipse => "ellipse",
+    Triangle => "triangle",
+    Square => "square",
+    Polygon => "polygon",
+    Arc => "arc",
+    Point => "point",
+    Cloudform => "cloudform",
 });
 string_enum!(ArcForm { Crescent });
 
@@ -231,18 +249,18 @@ string_enum!(LineStyle {
     DashDot,
 });
 string_enum!(Weight {
-    Silverpoint,
-    Pencil,
-    Pen,
-    Rotring,
-    Crayon,
-    Chalk,
-    BrushThin,
-    BrushThick,
-    OilPaint,
-    Burin,
-    Drypoint,
-    Computer,
+    Silverpoint => "silverpoint",
+    Pencil => "pencil",
+    Pen => "pen",
+    Rotring => "rotring",
+    Crayon => "crayon",
+    Chalk => "chalk",
+    BrushThin => "brush_thin",
+    BrushThick => "brush_thick",
+    OilPaint => "oil_paint",
+    Burin => "burin",
+    Drypoint => "drypoint",
+    Computer => "computer",
 });
 string_enum!(Thinness { Fine, ExtraFine });
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -261,15 +279,15 @@ impl SurfaceIntensity {
 }
 
 string_enum!(Color {
-    White,
-    Black,
-    Blue,
-    Red,
-    Green,
-    Gray,
-    Yellow,
-    Orange,
-    Purple,
+    White => "white",
+    Black => "black",
+    Blue => "blue",
+    Red => "red",
+    Green => "green",
+    Gray => "gray",
+    Yellow => "yellow",
+    Orange => "orange",
+    Purple => "purple",
 });
 
 /// One concrete work-palette observation used before Score materialization.
@@ -371,16 +389,16 @@ impl ResolvedPaletteContext {
     }
 }
 string_enum!(SurfaceTexture {
-    None,
-    Solid,
-    Stipple,
-    Hatch,
-    Crosshatch,
-    Aquatint,
-    Grain,
-    Wash,
-    Bleed,
-    PaperGrain,
+    None => "none",
+    Solid => "solid",
+    Stipple => "stipple",
+    Hatch => "hatch",
+    Crosshatch => "crosshatch",
+    Aquatint => "aquatint",
+    Grain => "grain",
+    Wash => "wash",
+    Bleed => "bleed",
+    PaperGrain => "paper_grain",
 });
 string_enum!(SurfaceDirection {
     None,
@@ -395,14 +413,14 @@ string_enum!(SurfaceSpacingGradient {
     DenseToCoarse,
 });
 string_enum!(GroundMaterial {
-    Plain,
-    Paper,
-    Washi,
-    InkWash,
-    CharcoalGround,
-    Canvas,
-    DrawingPaper,
-    Mezzotint,
+    Plain => "plain",
+    Paper => "paper",
+    Washi => "washi",
+    InkWash => "ink_wash",
+    CharcoalGround => "charcoal_ground",
+    Canvas => "canvas",
+    DrawingPaper => "drawing_paper",
+    Mezzotint => "mezzotint",
 });
 string_enum!(GroundTone {
     White,
@@ -413,10 +431,10 @@ string_enum!(GroundTone {
     Black,
 });
 string_enum!(GroundGrain {
-    None,
-    Fine,
-    Medium,
-    Coarse,
+    None => "none",
+    Fine => "fine",
+    Medium => "medium",
+    Coarse => "coarse",
 });
 string_enum!(Amplitude {
     Fine,
@@ -456,15 +474,15 @@ string_enum!(ArrangementPath {
     RightHalf,
 });
 string_enum!(Density {
-    None,
-    Low,
-    Medium,
-    High,
+    None => "none",
+    Low => "low",
+    Medium => "medium",
+    High => "high",
 });
 string_enum!(Fade {
-    None,
-    Outward,
-    Directional,
+    None => "none",
+    Outward => "outward",
+    Directional => "directional",
 });
 string_enum!(RhythmSpacing {
     None,

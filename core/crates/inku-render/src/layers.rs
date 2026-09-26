@@ -45,51 +45,6 @@ fn presence_center(score: &Score, canvas: CanvasSize) -> (f64, f64) {
         })
 }
 
-fn primitive_name(primitive: crate::types::Primitive) -> &'static str {
-    match primitive {
-        crate::types::Primitive::Line => "line",
-        crate::types::Primitive::Circle => "circle",
-        crate::types::Primitive::Ellipse => "ellipse",
-        crate::types::Primitive::Triangle => "triangle",
-        crate::types::Primitive::Square => "square",
-        crate::types::Primitive::Polygon => "polygon",
-        crate::types::Primitive::Arc => "arc",
-        crate::types::Primitive::Point => "point",
-        crate::types::Primitive::Cloudform => "cloudform",
-    }
-}
-
-fn color_name(color: Color) -> &'static str {
-    match color {
-        Color::White => "white",
-        Color::Black => "black",
-        Color::Blue => "blue",
-        Color::Red => "red",
-        Color::Green => "green",
-        Color::Gray => "gray",
-        Color::Yellow => "yellow",
-        Color::Orange => "orange",
-        Color::Purple => "purple",
-    }
-}
-
-fn weight_name(weight: crate::types::Weight) -> &'static str {
-    match weight {
-        crate::types::Weight::Silverpoint => "silverpoint",
-        crate::types::Weight::Pencil => "pencil",
-        crate::types::Weight::Pen => "pen",
-        crate::types::Weight::Rotring => "rotring",
-        crate::types::Weight::Crayon => "crayon",
-        crate::types::Weight::Chalk => "chalk",
-        crate::types::Weight::BrushThin => "brush_thin",
-        crate::types::Weight::BrushThick => "brush_thick",
-        crate::types::Weight::OilPaint => "oil_paint",
-        crate::types::Weight::Burin => "burin",
-        crate::types::Weight::Drypoint => "drypoint",
-        crate::types::Weight::Computer => "computer",
-    }
-}
-
 fn presence_seed(score: &Score) -> Seed {
     let presence = score
         .presence
@@ -103,9 +58,9 @@ fn presence_seed(score: &Score) -> Seed {
         .map(|instruction| {
             format!(
                 "{}:{}:{}:{}",
-                primitive_name(instruction.primitive),
-                color_name(instruction.color),
-                weight_name(instruction.weight),
+                instruction.primitive.as_str(),
+                instruction.color.as_str(),
+                instruction.weight.as_str(),
                 instruction
                     .arrangement
                     .as_ref()

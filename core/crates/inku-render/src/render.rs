@@ -26,7 +26,7 @@ use crate::surface_geometry::mark_bbox;
 use crate::surfaces::render_surface;
 use crate::svg::{Document, Element, format_number};
 use crate::types::{
-    Canvas, CanvasGroundSpec, Color, Instruction, InstructionMode, Primitive, RenderMetadata,
+    Canvas, CanvasGroundSpec, Instruction, InstructionMode, Primitive, RenderMetadata,
     RenderOutput, RenderRequest, Score, SurfaceTexture, SurfaceTextureMetadata, SvgProfile,
 };
 use crate::{RENDER_ENGINE_ID, RENDER_ENGINE_VERSION};
@@ -152,20 +152,6 @@ pub fn build_render_metadata(score: &Score, profile: SvgProfile) -> RenderMetada
     }
 }
 
-fn color_name(color: Color) -> &'static str {
-    match color {
-        Color::White => "white",
-        Color::Black => "black",
-        Color::Blue => "blue",
-        Color::Red => "red",
-        Color::Green => "green",
-        Color::Gray => "gray",
-        Color::Yellow => "yellow",
-        Color::Orange => "orange",
-        Color::Purple => "purple",
-    }
-}
-
 fn safe_svg_id(value: &str) -> String {
     let mut safe = String::with_capacity(value.len());
     let mut separator = false;
@@ -187,32 +173,18 @@ fn safe_svg_id(value: &str) -> String {
     }
 }
 
-fn primitive_name(primitive: Primitive) -> &'static str {
-    match primitive {
-        Primitive::Line => "line",
-        Primitive::Circle => "circle",
-        Primitive::Ellipse => "ellipse",
-        Primitive::Triangle => "triangle",
-        Primitive::Square => "square",
-        Primitive::Polygon => "polygon",
-        Primitive::Arc => "arc",
-        Primitive::Point => "point",
-        Primitive::Cloudform => "cloudform",
-    }
-}
-
 fn instruction_id(instruction: &Instruction, index: usize) -> String {
     safe_svg_id(&format!(
         "instruction_{index:03}_{}_{}",
-        primitive_name(instruction.primitive),
-        color_name(instruction.color)
+        instruction.primitive.as_str(),
+        instruction.color.as_str()
     ))
 }
 
 fn mark_id(instruction: &Instruction, instruction_index: usize, mark_index: usize) -> String {
     safe_svg_id(&format!(
         "mark_{instruction_index:03}_{mark_index:03}_{}",
-        primitive_name(instruction.primitive)
+        instruction.primitive.as_str()
     ))
 }
 
@@ -220,7 +192,7 @@ fn background_color(
     request: &RenderRequest,
     assignment: &std::collections::BTreeMap<String, String>,
 ) -> String {
-    let name = color_name(request.score.background);
+    let name = request.score.background.as_str();
     assignment
         .get(name)
         .or_else(|| request.options.resolved_color_map.get(name))

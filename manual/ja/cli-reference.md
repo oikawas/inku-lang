@@ -54,7 +54,7 @@ JSON成果物は、その絵を描いたDDL層の版を `ddl_version` と `ddl_e
 | `--out-dir DIR` / `-o` | JSON / SVG / PNGの出力先 |
 | `--prefix P` | 出力ファイル名の接頭辞 |
 | `--png` | `--out-dir` を指定したとき、PNGも書き出す |
-| `--svg-profile {display,editable,compat}` | 保存するSVGのプロファイル |
+| `--svg-profile {display,editable,compat,live}` | 保存するSVGのプロファイル |
 | `--input-mode {paint,ddl}` | `paint` は自然文をStage 1へ、`ddl` は指示書を直接Stage 2と演奏へ渡す |
 | `--fires-on PROSE` | **`--input-mode ddl` 専用。**プラグイン展開を発火させる自然文を渡す。**発火を決めるのは記述であって指示書ではない**ので、これが無いと指示書にプラグイン語を綴っても展開は起きない |
 | `--ddl-text DDL` | **`render-score` 専用。**指示書をcoerceへ手渡す。paintと同じく、指示書に基づく補修が働く（本数や関係の指定が絵に出る）。**渡さなければ従来どおり補修は働かない** |

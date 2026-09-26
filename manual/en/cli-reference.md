@@ -54,7 +54,7 @@ For limits they record the values used in `render_limits`, where those came from
 | `--out-dir DIR` / `-o` | Destination for JSON, SVG, and PNG output |
 | `--prefix P` | Output filename prefix |
 | `--png` | Also write PNG when `--out-dir` is set |
-| `--svg-profile {display,editable,compat}` | SVG profile for saved files |
+| `--svg-profile {display,editable,compat,live}` | SVG profile for saved files |
 | `--input-mode {paint,ddl}` | `paint` sends prose through Stage 1; `ddl` sends instructions straight to Stage 2 and the performance |
 | `--fires-on PROSE` | **`--input-mode ddl` only.** The prose a plugin expansion fires on. **What fires an expansion is the description, not the instructions**, so without this a DDL that spells a plugin word expands to nothing |
 | `--ddl-text DDL` | **`render-score` only.** Hands the instructions to coerce, so the instruction-driven repairs run as they do in paint (a stated count or relation reaches the picture). **Omit it and those repairs stay off, as before** |

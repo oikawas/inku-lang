@@ -321,7 +321,7 @@ options:
 usage: inku-cli paint [-h] [--base-url BASE_URL]
                       [--timeout-seconds TIMEOUT_SECONDS] [--file FILE]
                       [--out-dir OUT_DIR] [--prefix PREFIX] [--png]
-                      [--svg-profile {display,editable,compat}]
+                      [--svg-profile {display,editable,compat,live}]
                       [--input-mode {paint,ddl}]
                       [--stage1-provider {nvidia,anthropic,local}]
                       [--stage1-model STAGE1_MODEL]
@@ -360,10 +360,11 @@ options:
                         directory for JSON/SVG/PNG outputs
   --prefix PREFIX       output filename prefix
   --png                 also render PNG output when --out-dir is set
-  --svg-profile {display,editable,compat}
+  --svg-profile {display,editable,compat,live}
                         SVG output profile for saved files; editable targets
                         SVG-native editors, compat is a filter-free flat
-                        vector fallback
+                        vector fallback, live keeps editable's groups with the
+                        display appearance for performing the work in time
   --input-mode {paint,ddl}
                         paint: a natural-language description through Stage 1;
                         ddl: normalized DDL directly through Stage 2/render
@@ -435,7 +436,7 @@ options:
 usage: inku-cli batch [-h] [--base-url BASE_URL]
                       [--timeout-seconds TIMEOUT_SECONDS] --file FILE
                       [--out-dir OUT_DIR] [--prefix PREFIX] [--png]
-                      [--svg-profile {display,editable,compat}]
+                      [--svg-profile {display,editable,compat,live}]
                       [--input-mode {paint,ddl}]
                       [--stage1-provider {nvidia,anthropic,local}]
                       [--stage1-model STAGE1_MODEL]
@@ -472,10 +473,11 @@ options:
                         directory for JSON/SVG/PNG outputs
   --prefix PREFIX       output filename prefix
   --png                 also render PNG output when --out-dir is set
-  --svg-profile {display,editable,compat}
+  --svg-profile {display,editable,compat,live}
                         SVG output profile for saved files; editable targets
                         SVG-native editors, compat is a filter-free flat
-                        vector fallback
+                        vector fallback, live keeps editable's groups with the
+                        display appearance for performing the work in time
   --input-mode {paint,ddl}
                         paint: a natural-language description through Stage 1;
                         ddl: normalized DDL directly through Stage 2/render
@@ -708,7 +710,7 @@ usage: inku-cli render-score [-h] [--base-url BASE_URL]
                              [--timeout-seconds TIMEOUT_SECONDS] [--file FILE]
                              [--ddl-text DDL_TEXT] [--ddl-file PATH]
                              [--out-dir OUT_DIR] [--prefix PREFIX] [--png]
-                             [--svg-profile {display,editable,compat}]
+                             [--svg-profile {display,editable,compat,live}]
                              [--canvas-aspect CANVAS_ASPECT]
                              [--render-seed RENDER_SEED]
                              [--composition-seed COMPOSITION_SEED]
@@ -736,10 +738,11 @@ options:
                         directory for JSON/SVG/PNG outputs
   --prefix PREFIX       output filename prefix
   --png                 also render PNG output when --out-dir is set
-  --svg-profile {display,editable,compat}
+  --svg-profile {display,editable,compat,live}
                         SVG output profile for saved files; editable targets
                         SVG-native editors, compat is a filter-free flat
-                        vector fallback
+                        vector fallback, live keeps editable's groups with the
+                        display appearance for performing the work in time
   --canvas-aspect CANVAS_ASPECT
   --render-seed RENDER_SEED
                         renderer performance seed for reproducible replay

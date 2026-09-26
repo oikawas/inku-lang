@@ -27,8 +27,8 @@ The reference implementation currently includes:
 - plugin storage, system/user plugin directories, and `canvas-aspect`
 - SVG export and template-based PNG export
 - a live SVG profile (editable's groups with the display appearance) from the
-  render APIs, the CLI, and the Web export menus, for hosts that perform a work
-  in time
+  render APIs, the CLI, and the Web and Android export menus, for hosts that
+  perform a work in time
 - CLI client foundation, benchmark summary output, and contact sheet generation
 - CLI history export by render hash for benchmark review contact sheets,
   per-item JSON, and summary JSON

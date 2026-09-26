@@ -2735,6 +2735,7 @@ private fun ExportSheet(
             SvgExportOption(title = S.svgDisplay, sub = S.svgDisplayNote, onClick = { onExportSvg("display") })
             SvgExportOption(title = S.svgEditable, sub = S.svgEditableNote, onClick = { onExportSvg("editable") })
             SvgExportOption(title = S.svgGeneric, sub = S.svgPortableNote, onClick = { onExportSvg("compat") })
+            SvgExportOption(title = S.svgLive, sub = S.svgLiveNote, onClick = { onExportSvg("live") })
             CompactLabel("PNG")
             templates.forEach { template ->
                 SvgExportOption(
@@ -6190,7 +6191,7 @@ private fun buildHistoryJsonPayload(context: Context, item: HistoryItemEntity): 
 }
 
 private fun buildHistorySvgPayload(context: Context, item: HistoryItemEntity, profile: String, svg: String): SharePayload {
-    val normalizedProfile = profile.takeIf { it in setOf("display", "editable", "compat") } ?: "display"
+    val normalizedProfile = profile.takeIf { it in setOf("display", "editable", "compat", "live") } ?: "display"
     val exportDir = exportCacheDir(context)
     val ext = if (normalizedProfile == "display") "svg" else "$normalizedProfile.svg"
     val file = File(exportDir, "inku-${item.renderHashShort}.$ext")

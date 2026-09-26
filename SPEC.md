@@ -1889,7 +1889,7 @@ SVG export has four profiles:
   bounded by the content's bounding box plus 2%, cuts displaced pixels (a work
   of one thin line, say). It is available from the render
   APIs (`svg_profile="live"`, `/api/history/{id}/svg?profile=live`), the CLI,
-  and the Web's export menus; Android's export menu does not offer it.
+  and the Web's and Android's export menus.
 
 The database stores only the `display` SVG in `history.svg`. Editable,
 compatible and live SVG are **regenerated at download time** rather than stored as

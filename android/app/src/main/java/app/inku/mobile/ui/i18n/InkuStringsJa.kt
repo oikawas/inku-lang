@@ -374,6 +374,8 @@ object InkuStringsJa : InkuStrings {
     override val edit = "編集"
     override val svgEditable = "編集用SVG"
     override val svgEditableNote = "編集用メタデータとIDを含む"
+    override val svgLive = "ライブ用SVG"
+    override val svgLiveNote = "命令ごとに描く映像ソフト向けの、構造つきの完成画"
     override val renderExpressionSubtitle = "脱・規則化"
     override val colorCatalog = "色カタログ"
     override val colorCatalogAuto = "記述から自動選択"

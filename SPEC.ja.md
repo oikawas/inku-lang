@@ -1142,7 +1142,7 @@ SVG の書き出しは 4 つのプロファイルを持つ。
 - `display`: 既定のサーバー描画 SVG。Web 表示・履歴・PNG 生成・作品の再構築に使う
 - `editable`: JSON Score とサーバー所有の色カタログメタデータから要求に応じて生成する。SVG-native editor での編集に向け、安定した ASCII の ID とレイヤー相当のグループを持つ。non-computer の solid fill は実体の base fill と standard SVG filter のむらを保つ
 - `compat`: 同じく要求に応じて生成し、定義済みportable subsetに制限する。filter と clip-path を使わない filter-free flat vector fallback で、広い互換性のため一部表現を単純化することがある。Computerはcontour path内のbase field、grille、黒いscanlineを保ち、Oilはclipした幅拡張を使わず既存のfilter-freeなpaint passで形とintensityを保つ。Display / Editableとのpixel一致は約束しない
-- `live`: 同じく要求に応じて生成する。`editable` と同じ ID とグループの構造に、`display` と同じ質感の filter とタッチを持つ。作品を時間の中で演奏する host（命令ごとに描き進める、群として動かすなど）が、命令のグループ（`instruction_NNN_*`）を 1 つずつ描いて文書の順に重ねられるよう、タッチは content のグループではなく各命令のグループ（display でタッチが掛かる版面のトーンにも）に付け、その領域はキャンバス全体と各辺 2% を user space の絶対値で持つ。display との画素は、display のタッチが content の外接範囲の 2% で切る画素（細い線だけの作品など）を除いて一致する。描画の API（`svg_profile="live"`、`/api/history/{id}/svg?profile=live`）、CLI、Web の書き出しメニューで取得する。Android の書き出しメニューには出していない
+- `live`: 同じく要求に応じて生成する。`editable` と同じ ID とグループの構造に、`display` と同じ質感の filter とタッチを持つ。作品を時間の中で演奏する host（命令ごとに描き進める、群として動かすなど）が、命令のグループ（`instruction_NNN_*`）を 1 つずつ描いて文書の順に重ねられるよう、タッチは content のグループではなく各命令のグループ（display でタッチが掛かる版面のトーンにも）に付け、その領域はキャンバス全体と各辺 2% を user space の絶対値で持つ。display との画素は、display のタッチが content の外接範囲の 2% で切る画素（細い線だけの作品など）を除いて一致する。描画の API（`svg_profile="live"`、`/api/history/{id}/svg?profile=live`）、CLI、Web と Android の書き出しメニューで取得する。
 
 DB が保存するのは `history.svg` の `display` SVG だけである。編集可能・互換・live の SVG は、DB の追加ペイロードとして保存するのではなく**ダウンロード時に生成し直す**。
 

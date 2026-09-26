@@ -6,6 +6,12 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 36 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-26 — Android offers Gemini models that answer today
+
+Before a Gemini connection's model list was fetched, Android's model picker offered `gemini-2.5-pro`, `gemini-2.5-flash` and `gemini-2.5-flash-lite`, which refuse API accounts made after their retirement. It now offers the server's builtin models (the same day's "the builtin Gemini list names models that answer today"): `gemini-3.5-flash-lite` and `gemma-4-31b-it`. The published models the author chose, and the model names works recorded, are unchanged.
+
+The DDL, Score and render versions are unchanged.
+
 ### 2026-09-26 — Android withdraws Gemma 4 E4B from its on-device models
 
 Gemma 4 E4B, the high-quality option among Android's on-device models (LiteRT-LM), is no longer supported. A Pixel 9 ran short of memory with it: in May its first engine initialization ended the process, and on September 26 describing a single photo brought system services down one after another and the app was killed in the foreground. The on-device models are Gemma 4 E2B alone.

@@ -5222,10 +5222,11 @@ private fun providerModelCandidates(provider: app.inku.mobile.data.db.ProviderSe
             ProviderModelCandidate("anthropic:claude-sonnet-4-6", "Claude Sonnet 4.6"),
             ProviderModelCandidate("anthropic:claude-haiku-4-5-20251001", "Claude Haiku 4.5"),
         )
+        // The server's builtin Gemini models (model_settings.py). The 2.5
+        // models refuse API accounts made after their retirement.
         "gemini" -> listOf(
-            ProviderModelCandidate("gemini:gemini-2.5-pro", "Gemini 2.5 Pro"),
-            ProviderModelCandidate("gemini:gemini-2.5-flash", "Gemini 2.5 Flash"),
-            ProviderModelCandidate("gemini:gemini-2.5-flash-lite", "Gemini 2.5 Flash-Lite"),
+            ProviderModelCandidate("gemini:gemini-3.5-flash-lite", "Gemini 3.5 Flash-Lite"),
+            ProviderModelCandidate("gemini:gemma-4-31b-it", "Gemma 4 31B Instruct"),
         )
         "ollama" -> listOf(
             ProviderModelCandidate("ollama:llama3.2", "Llama 3.2"),

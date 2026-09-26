@@ -55,6 +55,7 @@ import app.inku.mobile.pipeline.InterpretResult
 import app.inku.mobile.pipeline.PipelineCommitStore
 import app.inku.mobile.pipeline.PipelineExecutionStore
 import app.inku.mobile.pipeline.SketchInput
+import app.inku.mobile.pipeline.ProviderAttempt
 import app.inku.mobile.render.RustArtworkRasterizer
 import java.io.File
 import java.io.FileOutputStream
@@ -66,6 +67,10 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.job
 import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
@@ -100,6 +105,15 @@ class InkuRepository(
     // reaches Stage 1, Stage 2 and the demo prompt alike.
     private val activeModelProvider: ModelProvider = modelProviderOverride ?: modelRouter
     private val sharedPipelineStore = RoomSharedPipelineStore(database)
+    private val providerAttemptState = MutableStateFlow<ProviderAttempt?>(null)
+
+    /**
+     * The model call the running drawing waits on, for the running row (the
+     * Server review's W4). A run clears only its own attempt, so the end of one
+     * run cannot blank another's.
+     */
+    val providerAttempt: StateFlow<ProviderAttempt?> = providerAttemptState.asStateFlow()
+
     private val pipeline by lazy {
         AndroidWorkPipeline(
             binding = NativePipelineBridge,
@@ -108,6 +122,11 @@ class InkuRepository(
             executionStore = sharedPipelineStore,
             readHistory = { id -> sharedPipelineStore.readHistory(AndroidWorkPipeline.OWNER_ID, id) },
             bundledPluginsEnabled = { isBundledPluginPackageEnabled() },
+            onProviderAttempt = { executionId, attempt ->
+                providerAttemptState.update { current ->
+                    attempt ?: current.takeIf { it?.executionId != executionId }
+                }
+            },
         )
     }
     private val modelDownloader = LocalModelDownloader(context.applicationContext, database.modelAssetDao())

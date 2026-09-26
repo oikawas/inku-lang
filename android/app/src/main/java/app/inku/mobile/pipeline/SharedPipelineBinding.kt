@@ -12,4 +12,11 @@ interface SharedPipelineBinding {
     /** Author-facing reasons for withheld plugin sentences; a host without it has none. */
     fun explainPluginDiagnostics(inputBytes: ByteArray): ByteArray =
         """{"schema":"inku.plugin-diagnostics.v1","plugins":[]}""".encodeToByteArray()
+
+    /**
+     * The provider attempt in flight for a stored snapshot, as
+     * `{"provider_attempt": {...} | null}`; a host without the call reports none.
+     */
+    fun providerAttempt(snapshotBytes: ByteArray): ByteArray =
+        """{"provider_attempt":null}""".encodeToByteArray()
 }

@@ -294,6 +294,10 @@ interface InkuStrings {
     val paint: String
     val drawingModel: String
     val drawing: String
+    /** The running row's first attempt at a model call (web `runStatusAwaitingReply`). */
+    val runStatusAwaitingReply: (attempt: Int, maxAttempts: Int) -> String
+    /** A later attempt: the one before failed or timed out (web `runStatusRetrying`). */
+    val runStatusRetrying: (attempt: Int, maxAttempts: Int) -> String
     val renderExpression: String
     val refinementElements: String
     val drawingSettings: String

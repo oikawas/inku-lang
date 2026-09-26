@@ -31,6 +31,8 @@ class AndroidWorkPipeline(
     private val legacyRenderer: SvgRenderer = AndroidRenderHost(),
     /** Whether the author left the bundled plugin package enabled. */
     private val bundledPluginsEnabled: suspend () -> Boolean = { true },
+    /** Told which model call a run waits on (see [SharedPipelineHost]). */
+    onProviderAttempt: (executionId: String, attempt: ProviderAttempt?) -> Unit = { _, _ -> },
 ) {
     private val configBuilder = SharedPipelineConfigBuilder(binding)
     private val host = SharedPipelineHost(
@@ -39,6 +41,7 @@ class AndroidWorkPipeline(
         commitStore = commitStore,
         executionStore = executionStore,
         maxEffectSteps = configBuilder.policy.maximumEffectSteps,
+        onProviderAttempt = onProviderAttempt,
     )
     private val authoring = SharedAuthoringPipeline(host, configBuilder)
     private val random = SecureRandom()

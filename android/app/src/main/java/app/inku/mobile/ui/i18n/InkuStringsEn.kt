@@ -376,6 +376,8 @@ object InkuStringsEn : InkuStrings {
     override val paint = "Paint"
     override val drawingModel = "Drawing model"
     override val drawing = "Drawing"
+    override val runStatusAwaitingReply: (Int, Int) -> String = { attempt, maxAttempts -> "Awaiting reply (try $attempt/$maxAttempts)" }
+    override val runStatusRetrying: (Int, Int) -> String = { attempt, maxAttempts -> "Retrying (try $attempt/$maxAttempts)" }
     override val renderExpression = "Stroke"
     override val refinementElements = "Refinement elements"
     override val drawingSettings = "Drawing settings"

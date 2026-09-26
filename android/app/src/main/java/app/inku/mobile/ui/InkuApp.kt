@@ -194,6 +194,8 @@ import androidx.compose.ui.text.input.OffsetMapping
 import androidx.compose.ui.text.input.TransformedText
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.platform.testTag
@@ -217,6 +219,7 @@ import app.inku.mobile.pipeline.PluginDiagnostic
 import app.inku.mobile.pipeline.SaijikiGenerated
 import app.inku.mobile.pipeline.Sketches
 import app.inku.mobile.pipeline.SketchMode
+import app.inku.mobile.pipeline.ProviderAttempt
 import app.inku.mobile.ui.i18n.InkuStrings
 import app.inku.mobile.ui.i18n.LocalStrings
 import app.inku.mobile.ui.i18n.inkuError
@@ -2213,12 +2216,17 @@ private fun ImeActionBar(
  * demo, DDL editor, lineage -- and the mascot lives inside it, so the animation
  * always means the same thing. The port had lifted the mascot out and placed it
  * unconditionally at the top of the compose screen, where it span with nothing
- * around it to say why. Here it is a state display again: mascot, model,
- * elapsed, stop; and when nothing runs, the row is not composed at all.
+ * around it to say why. Here it is a state display again: mascot, model, the
+ * model call a drawing waits on, elapsed, stop; and when nothing runs, the row
+ * is not composed at all.
  */
 @Composable
-private fun RunStatusRow(state: InkuUiState, viewModel: InkuViewModel) {
+internal fun RunStatusRow(state: InkuUiState, viewModel: InkuViewModel) {
     if (!state.isRunning) return
+    val attempt by viewModel.providerAttempt.collectAsState()
+    // A drawing's own row; refinement candidates are made several at once.
+    val attemptText = if (state.isDrawing) providerAttemptText(attempt, S) else ""
+    val retryColor = MaterialTheme.colorScheme.primary
     val startedAt = remember(state.isDrawing, state.refinementBusy) { System.currentTimeMillis() }
     var elapsedMs by remember(startedAt) { mutableStateOf(0L) }
     LaunchedEffect(startedAt) {
@@ -2255,10 +2263,23 @@ private fun RunStatusRow(state: InkuUiState, viewModel: InkuViewModel) {
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
-                    "$progress${formatDuration(elapsedMs)}",
+                    buildAnnotatedString {
+                        append(progress)
+                        if (attemptText.isNotEmpty()) {
+                            // A retry is drawn apart, as web's `run-progress`.
+                            if (attempt?.isRetry == true) {
+                                withStyle(SpanStyle(color = retryColor)) { append(attemptText) }
+                            } else {
+                                append(attemptText)
+                            }
+                            append("   ")
+                        }
+                        append(formatDuration(elapsedMs))
+                    },
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
             }
             MiniPill(
@@ -2267,6 +2288,17 @@ private fun RunStatusRow(state: InkuUiState, viewModel: InkuViewModel) {
             )
         }
     }
+}
+
+/**
+ * What the running row says about the model call it waits on (web
+ * `providerAttemptText`). A first attempt is a wait and any later one a retry,
+ * so an attempt that timed out does not read as a slow answer.
+ */
+internal fun providerAttemptText(attempt: ProviderAttempt?, strings: InkuStrings): String = when {
+    attempt == null -> ""
+    attempt.isRetry -> strings.runStatusRetrying(attempt.attempt, attempt.maxAttempts)
+    else -> strings.runStatusAwaitingReply(attempt.attempt, attempt.maxAttempts)
 }
 
 /**

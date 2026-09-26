@@ -20,6 +20,12 @@ class SharedPipelineHost(
     private val executionStore: PipelineExecutionStore,
     private val maxEffectSteps: Int = 32,
     private val newId: () -> String = { UUID.randomUUID().toString().replace("-", "") },
+    /**
+     * Told which model call a run waits on, and told `null` when that call is
+     * over. Only the drive that made the call clears it: a second drive of the
+     * same execution finds the call taken and must not blank it.
+     */
+    private val onProviderAttempt: (executionId: String, attempt: ProviderAttempt?) -> Unit = { _, _ -> },
 ) {
     private val sessions = mutableMapOf<String, Session>()
     private val sessionsMutex = Mutex()
@@ -144,8 +150,19 @@ class SharedPipelineHost(
         view(session)
     }
 
+    /**
+     * Resumes an execution the app was stopped in the middle of.
+     *
+     * One this process is already driving -- a drawing started before the
+     * start-up restore read the latest execution -- is only viewed. A second
+     * drive would race the first for its next effect, and the drive that lost
+     * would hand its caller a view from the middle of the run, which the
+     * drawing then took for a run waiting on the author.
+     */
     suspend fun restore(ownerId: String, executionId: String): PipelineView =
-        withSession(ownerId, executionId) { driveWithCancellation(it) }
+        withSession(ownerId, executionId) { session ->
+            if (session.mutex.withLock { session.drivers > 0 }) view(session) else driveWithCancellation(session)
+        }
 
     private suspend fun loadSession(ownerId: String, executionId: String): Session {
         val stateBytes = executionStore.load(ownerId, executionId)
@@ -206,6 +223,7 @@ class SharedPipelineHost(
     }
 
     private suspend fun driveWithCancellation(session: Session): PipelineView {
+        session.mutex.withLock { session.drivers += 1 }
         return try {
             drive(session)
         } catch (cancelled: CancellationException) {
@@ -213,6 +231,8 @@ class SharedPipelineHost(
                 runCatching { cancel(session.ownerId, session.snapshot().requiredString("execution_id")) }
             }
             throw cancelled
+        } finally {
+            withContext(NonCancellable) { session.mutex.withLock { session.drivers -= 1 } }
         }
     }
 
@@ -260,13 +280,18 @@ class SharedPipelineHost(
 
     private suspend fun runProviderEffect(session: Session, action: JSONObject): Boolean {
         val actionKey = action.toString()
+        var attempt: ProviderAttempt? = null
         val claimed = session.mutex.withLock {
             if (!sameAction(session.snapshot().optJSONObject("action"), action)) return@withLock false
             if (session.providerActionInFlight != null) return@withLock false
             session.providerActionInFlight = actionKey
+            attempt = providerAttemptOf(session)
             true
         }
         if (!claimed) return false
+        // Told before the retry delay, so the wait before a second attempt
+        // already reads as a retry.
+        attempt?.let { onProviderAttempt(it.executionId, it) }
         return try {
             val delayMs = action.requiredCanonicalUnsigned("delay_ms")
             if (delayMs > 0L) delay(delayMs)
@@ -285,8 +310,23 @@ class SharedPipelineHost(
             session.mutex.withLock {
                 if (session.providerActionInFlight == actionKey) session.providerActionInFlight = null
             }
+            // The call is over; until the next one starts nothing is waited on,
+            // as web shows no attempt while no model call is pending.
+            attempt?.let { onProviderAttempt(it.executionId, null) }
         }
     }
+
+    /**
+     * What the core says about the call about to be made. Only a display: a
+     * binding without the call, or an answer that cannot be read, shows nothing
+     * and never stops the run.
+     */
+    private fun providerAttemptOf(session: Session): ProviderAttempt? = runCatching {
+        ProviderAttempt.fromReport(
+            executionId = session.snapshot().requiredString("execution_id"),
+            report = binding.providerAttempt(session.snapshotBytes),
+        )
+    }.getOrNull()
 
     private suspend fun advanceLocked(session: Session, payload: JSONObject) {
         val previous = session.snapshot()
@@ -541,6 +581,8 @@ class SharedPipelineHost(
         var users: Int = 0,
         var eventsJson: String,
         var providerActionInFlight: String? = null,
+        /** Drives running on this session; guarded by [mutex]. */
+        var drivers: Int = 0,
         val mutex: Mutex = Mutex(),
     ) {
         fun snapshot(): JSONObject = try {

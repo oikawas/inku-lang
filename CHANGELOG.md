@@ -6,6 +6,12 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 36 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-26 — fade within a typed placement group takes effect (render engine 69)
+
+Render engine 67 had Score 0.10's typed placement perform `fade` as attenuation within the group, and the SPEC says so. The implementation wrote each member's level (`fade_level=`) into `color_hint` but never the `fade=` the renderer reads it by, so on Score 0.10 and later `fade` never reached opacity and only changed the seed of surfaces without their own seed. A group of two or more members now fades within the group when performed again. Only opacity values change; shapes, positions and patterns do not. Works on Score 0.9 and earlier, and works without fade, are byte-identical.
+
+Arrangement and group effects now reach the renderer as types (`MarkEffects`) instead of `color_hint` text read back by substring. The text notes remain only as seed material for surfaces without their own seed. A `fade_level=` written in an author's `color_hint` no longer sets opacity, and an arrangement's `fade` takes precedence over fade words in the author's text (`fade directional` and the like). Author atmosphere words (haze, scent, buds, the five senses, reflection and so on) work as before.
+
 ### 2026-09-26 — works on Score 0.10 and later export as editable, compat and live
 
 A saved work's export (`GET /api/history/{id}/svg`) redraws from the Score for every profile but display. That redraw went through the render entry that carries no resource policy, so for a work on Score 0.10 or later (every work the app makes today) the render core refused it ("score cannot be rendered: checked performance stopped: [… InvalidCompactPerformance …]") and the editable, compat and live exports answered 422. The export now goes through the shared replay that `/api/render-svg` uses, and draws under the work's own resource policy, colors, paper, limits and seeds. Display still returns the stored SVG. Exports of works on Score 0.9 and earlier are unchanged.

@@ -6,6 +6,12 @@
 
 **本書が持つのは v2.5.0（2026-07-25、render engine 12）以降**の 36 版である。それより前は書庫にある。
 
+### 2026-09-26 — typed配置の群の中の減衰を効かせる（render engine 69）
+
+render engine 67で、Score 0.10のtyped配置は`fade`を群の中の濃さの減衰として演奏するとした（SPECも同じ）。しかし実装は成員ごとの濃さの段（`fade_level=`）を`color_hint`へ書くだけで、描画がそれを読む条件の`fade=`を書いていなかった。そのためScore 0.10以降の作品では`fade`が濃さに効かず、seedを持たないsurfaceの模様のseedを変えるだけだった。本版から、成員が2つ以上の群は再演で群の中の濃さが減衰する。変わるのは濃さの値だけで、形・位置・模様は変えない。Score 0.9以前の作品とfadeを使わない作品は1 byteも変わらない。
+
+あわせて、並びと群が渡す効果を、`color_hint`の文字列を部分一致で読み戻すのでなく、型（`MarkEffects`）で描画へ渡すようにした。文字列の注記は、seedを持たないsurfaceのseedの材料としてだけ残る。作者の`color_hint`に書かれた`fade_level=`は濃さを変えなくなり、並びの`fade`は作者の文字列のfadeの語（`fade directional`など）より優先する。作者の雰囲気の語（霧・香り・蕾・五感・反射など）の効き方は変えない。
+
 ### 2026-09-26 — Score 0.10以降の作品を、editable・compat・liveで書き出せるようにする
 
 保存した作品の書き出し（`GET /api/history/{id}/svg`）は、display以外のプロファイルではScoreから描き直す。この描き直しは、作品の資源の方針を持たない描画の入口を通っていた。そのためScore 0.10以降の作品（いまのアプリで作る作品すべて）では、描画coreが「score cannot be rendered: checked performance stopped: [… InvalidCompactPerformance …]」と拒み、editable・compat・liveの書き出しが422になっていた。`/api/render-svg`と同じ共通の描き直しへ回し、作品自身の資源の方針・色・キャンバス・上限・seedで描く。displayは従来どおり保存済みのSVGを返す。Score 0.9以前の作品の書き出しは変わらない。

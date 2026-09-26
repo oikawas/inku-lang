@@ -48,6 +48,8 @@ pub(crate) struct TypedInstruction {
     pub seed_override: Option<crate::types::Seed>,
     /// Innermost fill scope.
     pub fill_scope_index: Option<usize>,
+    /// What the instance inherits from its arrangement.
+    pub effects: crate::effects::MarkEffects,
 }
 
 #[derive(Clone, Debug)]
@@ -121,6 +123,8 @@ struct DenseInstruction {
     context_path: Vec<u64>,
     /// Placement target or source anchor, in short-side units; mirror bodies use it.
     semantic_anchor: Option<Point>,
+    /// What the instance inherits from its arrangement.
+    effects: crate::effects::MarkEffects,
 }
 
 /// `dense` runs parallel to `output.instructions`, anchor vectors to
@@ -270,6 +274,7 @@ impl<'a> Builder<'a> {
                     self.request.canvas,
                 )
             })),
+            effects: crate::effects::MarkEffects::default(),
         });
         // Enclosing Macro transforms also own instructions expanded in an
         // inner fill's child context. Retain their full descendant span.
@@ -345,13 +350,17 @@ impl<'a> Builder<'a> {
             .arrangement
             .as_ref()
             .expect("validated Score 0.10 arrangement");
-        crate::arrangement_performance::finish_members(
+        if let Some(fades) = crate::arrangement_performance::finish_members(
             &mut self.output.instructions[start..end],
             arrangement,
             &arrangement.resolved.as_ref().expect("validated").recipe,
             placement_seed,
             self.request.canvas,
-        );
+        ) {
+            for (dense, fade) in self.dense[start..end].iter_mut().zip(fades) {
+                dense.effects.fade = Some(fade);
+            }
+        }
         Fragment {
             start,
             end,
@@ -1188,6 +1197,7 @@ impl<'a> Builder<'a> {
                     .map(|entry| TypedInstruction {
                         seed_override: entry.seed_override,
                         fill_scope_index: entry.fill_scope_index,
+                        effects: entry.effects,
                     })
                     .collect(),
                 fill_scopes: self.fill_scopes,
@@ -2124,6 +2134,71 @@ mod tests {
                 .filter_map(|(instruction, &owner)| { (owner == 2).then_some(instruction.color) })
                 .collect::<Vec<_>>(),
             vec![inku_score::Color::Red, inku_score::Color::Red]
+        );
+    }
+
+    #[test]
+    fn compact_fade_reaches_each_performed_member() {
+        // Engine 67 recorded the levels in the hint without the fade itself,
+        // so no mark ever faded on this path.
+        let policy = hard(100);
+        let mut faded = instruction(
+            json!({"kind": "source_instruction", "instruction_index": 0}),
+            false,
+        );
+        let arrangement = faded.arrangement.as_mut().unwrap();
+        arrangement.count = 3;
+        arrangement.jitter = 0.0;
+        arrangement.fade = inku_score::Fade::Directional;
+        let resolved = arrangement.resolved.as_mut().unwrap();
+        resolved.anchor = ResolvedPlacementAnchor::Named {
+            region: [0.5, 0.5, 0.5, 0.5],
+        };
+        resolved.recipe = ResolvedPlacementRecipe::HorizontalLine { cell_width: 0.3 };
+        let score = Score {
+            version: "0.10.0".into(),
+            canvas: inku_score::Canvas::Id("square".into()),
+            background: inku_score::Color::White,
+            presence: None,
+            instructions: vec![faded],
+            anchors: Vec::new(),
+            transform_groups: Vec::new(),
+            placement_groups: Vec::new(),
+            repetition_groups: Vec::new(),
+            fill_groups: Vec::new(),
+            mirror_relations: Vec::new(),
+            resource_policy: Some(ScoreResourcePolicy {
+                accounting_id: inku_score::RESOURCE_ACCOUNTING_ID.into(),
+                hard_policy: policy.clone(),
+                operational_budget: OperationalResourceBudget(budget(100)),
+            }),
+        };
+        let performance = crate::checked_performance::resolve_checked_performance_with_resources(
+            PerformanceRequest {
+                score: &score,
+                performance_seed: Some(7),
+                composition_seed: Some(11),
+                canvas: Some(crate::types::CanvasSize::new(1.0, 1.0)),
+            },
+            ScoreErrorPolicy::OmitAndContinue,
+            &policy,
+            OperationalResourceBudget(budget(100)),
+        )
+        .unwrap();
+
+        let fade = |level| {
+            Some(crate::effects::FadeEffect {
+                kind: crate::effects::FadeKind::Directional,
+                level: Some(level),
+            })
+        };
+        assert_eq!(
+            performance
+                .performed
+                .iter()
+                .map(|entry| entry.effects.fade)
+                .collect::<Vec<_>>(),
+            vec![fade(0.7), fade(0.48), fade(0.26)]
         );
     }
 

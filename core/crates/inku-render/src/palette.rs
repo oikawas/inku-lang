@@ -322,7 +322,7 @@ fn observe_resolved_color(
     ))
 }
 
-fn normalized_label(value: &str) -> String {
+pub(crate) fn normalized_label(value: &str) -> String {
     let mut result = String::new();
     let mut separator = true;
     for character in value.to_lowercase().chars() {
@@ -502,47 +502,4 @@ pub fn resolve_color(
         }
     }
     fallback
-}
-
-/// Retain only color-hint terms that affect mark rendering after a color cycle.
-#[must_use]
-pub fn render_effect_hint(color_hint: Option<&str>) -> Option<String> {
-    let normalized = normalized_label(color_hint.filter(|hint| !hint.is_empty())?);
-    let tokens = [
-        "membrane",
-        "haze",
-        "fog",
-        "mist",
-        "atmosphere",
-        "膜",
-        "霞",
-        "霧",
-        "靄",
-        "soft light",
-        "柔らかな光",
-        "陽光",
-        "日差し",
-        "scent",
-        "fragrance",
-        "香り",
-        "匂",
-        "waiting buds",
-        "開花を待つ蕾",
-        "蕾",
-        "つぼみ",
-        "five-sense",
-        "五感",
-        "fade directional",
-        "fade=directional",
-        "fade outward",
-        "fade=outward",
-        "reflection",
-        "反射",
-        "映り",
-    ];
-    let kept = tokens
-        .into_iter()
-        .filter(|token| normalized.contains(token))
-        .collect::<Vec<_>>();
-    (!kept.is_empty()).then(|| kept.join("; "))
 }

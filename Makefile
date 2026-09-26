@@ -18,8 +18,25 @@ git-setup:
 	./scripts/git/setup.sh
 
 # Keep each suite callable from the same repository-root entry point.
+# The Server keeps the separately deployed native wheel out of its dependency
+# graph, so its suite builds the wheel from this checkout on every run and
+# injects it. `uv run --with <crate dir>` reuses a cached build after the Rust
+# sources change; a wheel built here cannot be stale. `rustup run` keeps the
+# pinned toolchain even where another cargo comes first on PATH.
+#
+# `python -m pytest`, not `pytest`: the wheel lives only in the interpreter uv
+# layers over the project environment. Where the interpreter's path is too long
+# for a shebang line, uv writes the project's console scripts as /bin/sh
+# launchers that exec the project interpreter by name; `pytest` then ran
+# without the wheel and every test that renders failed to import it. Seen
+# 2026-09-26 with a checkout whose interpreter path was 182 characters.
+RUST_CHANNEL := $(shell sed -n 's/^channel = "\(.*\)"/\1/p' core/rust-toolchain.toml)
+NATIVE_WHEEL_DIR := $(CURDIR)/.native-wheel
+
 test-server: git-setup
-	cd server && uv run pytest -q -rs $(PYTEST_ARGS)
+	rm -rf "$(NATIVE_WHEEL_DIR)"
+	rustup run $(RUST_CHANNEL) uv build --wheel core/crates/inku-render-python -o "$(NATIVE_WHEEL_DIR)"
+	cd server && uv run --with "$$(ls "$(NATIVE_WHEEL_DIR)"/*.whl)" python -m pytest -q -rs $(PYTEST_ARGS)
 
 test-cli: git-setup
 	cd cli && uv run pytest -q -rs $(PYTEST_ARGS)

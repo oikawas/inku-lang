@@ -9,6 +9,9 @@ type ProviderFailure = {
 
 type JsonObject = Record<string, unknown>;
 
+const SCORE_INVALID = 'score is invalid: ';
+const SCORE_NOT_RENDERABLE = 'score cannot be rendered: ';
+
 function object(value: unknown): JsonObject | null {
 	return value !== null && typeof value === 'object' && !Array.isArray(value)
 		? value as JsonObject
@@ -61,6 +64,15 @@ export function describeApiErrorDetail(detail: unknown, status: number, strings:
 	// A model the administrator has not offered: a string from the routes that
 	// call one directly, a code from the authoring pipeline.
 	if (detail === 'model is not offered on this server') return strings.errorModelNotOffered;
+	// A Score the server will not take or the render core will not draw: the
+	// headline in the page's language, the reason as the validator or the core
+	// wrote it.
+	if (typeof detail === 'string' && detail.startsWith(SCORE_INVALID)) {
+		return strings.errorScoreInvalid(detail.slice(SCORE_INVALID.length));
+	}
+	if (typeof detail === 'string' && detail.startsWith(SCORE_NOT_RENDERABLE)) {
+		return strings.errorScoreNotRenderable(detail.slice(SCORE_NOT_RENDERABLE.length));
+	}
 	if (typeof detail === 'string' && detail) return detail;
 
 	const structured = object(detail);

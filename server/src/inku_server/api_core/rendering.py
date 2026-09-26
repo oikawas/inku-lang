@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import uuid
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 from fastapi import HTTPException
@@ -196,6 +197,31 @@ def _composition_seed(value: object) -> int | None:
         return None
 
 
+# How the render binding prefixes the RenderError it raises for a Score the
+# core will not draw.
+_RENDER_REFUSAL_PREFIX = "render failed: "
+
+
+@contextmanager
+def _render_refusals_as_422():
+    """Answer a Score the render core refuses with 422 and the core's reason.
+
+    The core refuses what it will not draw -- an invalid mark, more marks than a
+    Score may hold, a mark or an output past its size limit -- and names the
+    reason. That is the sent Score, not a failure of this server, so the reason
+    is answered and no traceback is logged. The routes' own handlers used to
+    catch it as unexpected: "svg render failed", with a traceback in the log.
+    """
+    try:
+        yield
+    except ValueError as error:
+        message = str(error)
+        if not message.startswith(_RENDER_REFUSAL_PREFIX):
+            raise
+        reason = message[len(_RENDER_REFUSAL_PREFIX):]
+        raise HTTPException(status_code=422, detail=f"score cannot be rendered: {reason}") from error
+
+
 def _render_score_svg(
     score_payload: dict,
     *,
@@ -240,7 +266,7 @@ def _render_score_svg(
     render_metadata, resolved_catalog_id, color_source = _color_render_metadata(
         work=work, catalog_id=catalog_id
     )
-    with _render_capacity(owner):
+    with _render_capacity(owner), _render_refusals_as_422():
         svg = current_render_engine().render(
             score,
             color_map=render_metadata["render_color_map"],
@@ -397,7 +423,7 @@ def _render_with_metadata(
     composition_seed = _composition_seed(render_metadata.get("composition_seed"))
     wild = bool(render_metadata.get("render_wild"))
     render_metadata = {**render_metadata, "render_seed": effective_seed, "render_wild": wild}
-    with _render_capacity(owner):
+    with _render_capacity(owner), _render_refusals_as_422():
         result = current_render_engine().render(
             score,
             color_map=render_metadata["render_color_map"],

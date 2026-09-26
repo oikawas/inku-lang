@@ -2788,3 +2788,22 @@ def test_render_svg_forwards_wild_to_the_renderer(auth_context, monkeypatch):
     r_off = client.post("/api/render-svg", json={"score": score, "wild": False}, headers=headers)
     assert r_off.status_code == 200
     assert captured["wild"] is False
+
+
+def test_an_invalid_score_is_answered_with_where_it_is_wrong(auth_context, caplog):
+    """[S18]: it answered "history score render failed" and logged a traceback."""
+    headers, _user, _group = auth_context
+    payload = {
+        "input": "月が昇る",
+        "ddl": "中心に円",
+        "score": {"instructions": [{"primitive": "no-such-shape"}]},
+        "svg": "<svg></svg>",
+        "at": 1_700_000_200_000,
+    }
+
+    with caplog.at_level("ERROR"):
+        refused = client.post("/api/history", json=payload, headers=headers)
+
+    assert refused.status_code == 422
+    assert refused.json()["detail"].startswith("score is invalid: instructions.0")
+    assert "history score render failed" not in caplog.text

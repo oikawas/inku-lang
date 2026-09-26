@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Literal
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, Response
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationError
 from ...animation_export import build_animation, build_layer_animation
 from ...card_export import build_card
 from ...limits import limits_as_dict
@@ -368,6 +368,16 @@ def _derived_sketch_state(body: HistoryPostBody) -> str:
     )
 
 
+def _invalid_score_detail(error: ValidationError) -> str:
+    """Where a sent Score is wrong, in one line: the first three places."""
+    problems = [
+        f"{'.'.join(str(part) for part in item['loc']) or 'score'}: {item['msg']}"
+        for item in error.errors(include_url=False)
+    ]
+    more = f" (+{len(problems) - 3} more)" if len(problems) > 3 else ""
+    return f"score is invalid: {'; '.join(problems[:3])}{more}"
+
+
 @router.post("/api/history", response_model=HistoryItem, response_model_exclude_none=True)
 def api_history_post(
     body: HistoryPostBody,
@@ -379,6 +389,10 @@ def api_history_post(
     if requested_seed_text is None and isinstance(metadata_seed_text, str):
         requested_seed_text = metadata_seed_text
     render_seed, seed_text = _render_seed_from_text(requested_seed_text, body.render_seed)
+    # A Score that does not validate is the sender's to fix: say where, the way a
+    # malformed body is answered. It used to fall into the handler below, which
+    # answered "history score render failed" and logged a traceback as if the
+    # server had broken.
     try:
         # Site 2 of 5.
         limits = _effective_limits()
@@ -393,6 +407,9 @@ def api_history_post(
             lang=body.instruction_lang_resolved,
             trace=coerce_observability,
         )
+    except ValidationError as e:
+        raise HTTPException(status_code=422, detail=_invalid_score_detail(e)) from e
+    try:
         catalog_id = _resolved_catalog_id(body.catalog_id)
         canvas_aspect = _validated_canvas_aspect_override(body.canvas_aspect)
         if canvas_aspect is not None:

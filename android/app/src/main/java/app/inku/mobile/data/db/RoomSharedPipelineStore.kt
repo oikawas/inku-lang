@@ -42,6 +42,13 @@ data class ManagedHistoryRead(
     val warning: String? = null,
 )
 
+/**
+ * Room's side of the shared pipeline. It keeps each variation's DDL
+ * authority (committed by revision, compare-and-set), the execution
+ * snapshots the core resumes from (checked by SHA-256 when read), and the
+ * fork context saved with each work, so a fork or a replay of it runs under
+ * the policy it was made with.
+ */
 class RoomSharedPipelineStore(
     private val database: InkuDatabase,
     private val now: () -> Long = System::currentTimeMillis,
@@ -49,6 +56,12 @@ class RoomSharedPipelineStore(
     private val dao: SharedPipelineDao
         get() = database.sharedPipelineDao()
 
+    /**
+     * Applies the core's commit action. An action id seen before answers with
+     * its first acknowledgment (a retry after a lost reply) and refuses other
+     * bytes under the same id. A stale expected revision answers
+     * `host_commit_failed` with the current one.
+     */
     override suspend fun commit(
         ownerId: String,
         actionJson: String,
@@ -133,6 +146,8 @@ class RoomSharedPipelineStore(
                 ),
             )
         } catch (_: SQLiteConstraintException) {
+            // The same snapshot written again is a retry; anything else under
+            // this execution id is a conflict.
             val existing = dao.getExecution(ownerId, executionId)
             if (
                 existing == null ||
@@ -282,6 +297,12 @@ class RoomSharedPipelineStore(
         }
     }
 
+    /**
+     * A saved work with its fork context. A work without a link was saved
+     * before the shared pipeline and reads as `legacy_unknown`; one linked
+     * under another owner reads as null. A context that fails its checks comes
+     * back with a [ManagedHistoryRead.warning] instead of the context.
+     */
     suspend fun readHistory(ownerId: String, historyId: String): ManagedHistoryRead? {
         val history = database.historyDao().getById(historyId)?.takeUnless { it.trashed } ?: return null
         val link = dao.getHistoryLink(ownerId, historyId) ?: run {
@@ -661,6 +682,8 @@ class RoomSharedPipelineStore(
             }
         }
 
+        // A description-led variation may become DDL-led; a DDL-led one never
+        // goes back, and the origin never changes.
         private fun validateTransition(current: VariationAuthorityEntity, commit: Commit) {
             require(current.protocolVersion == AUTHORITY_PROTOCOL) { "stored authority protocol mismatch" }
             require(current.origin == commit.origin) { "variation origin is immutable" }

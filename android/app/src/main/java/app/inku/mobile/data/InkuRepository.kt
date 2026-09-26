@@ -212,6 +212,8 @@ class InkuRepository(
         return view.takeIf { !it.terminal }
     }
 
+    // Named after the execution's step, so saving the same completed run again
+    // (a restore after the process ended) finds the row saved first.
     private fun pipelineHistoryId(view: PipelineView): String =
         java.util.UUID.nameUUIDFromBytes("pipeline:${view.executionId}:${view.sequence}".encodeToByteArray()).toString()
 

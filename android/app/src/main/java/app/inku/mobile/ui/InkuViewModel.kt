@@ -2240,6 +2240,8 @@ class InkuViewModel @JvmOverloads constructor(
         val autoRepair = true
         val runId = beginDrawingRun()
         drawingJob = viewModelScope.launch {
+            // The selected work's authority was still being read. A DDL-led
+            // work is not redrawn from its description unless a fork was asked for.
             if (current.historyAuthorityLoading && current.selectedHistory != null) {
                 val read = runCatching {
                     withContext(Dispatchers.IO) {
@@ -2608,6 +2610,8 @@ class InkuViewModel @JvmOverloads constructor(
                         )
                         delay(1000)
                     }
+                    // The interval runs from the cycle's start, so a slow
+                    // drawing shortens the wait before the next one.
                     val elapsed = System.currentTimeMillis() - startedAt
                     val waitMs = (state.value.demoIntervalSeconds * 1000L - elapsed).coerceAtLeast(0L)
                     var left = ((waitMs + 999L) / 1000L).toInt()

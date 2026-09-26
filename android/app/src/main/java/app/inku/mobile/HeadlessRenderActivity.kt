@@ -365,6 +365,9 @@ class HeadlessRenderActivity : Activity() {
         }
     }
 
+    // Debug builds export this activity for adb, so any caller must present
+    // the token only `run-as` can read. Release builds do not export it
+    // (build.gradle.kts), and there nothing outside the app can start it.
     private suspend fun validateHeadlessAuth() = withContext(Dispatchers.IO) {
         if (!BuildConfig.DEBUG) return@withContext
         val expected = ensureHeadlessAuthToken()

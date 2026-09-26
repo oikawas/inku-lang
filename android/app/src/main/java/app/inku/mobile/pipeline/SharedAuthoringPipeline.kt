@@ -154,6 +154,13 @@ class SharedAuthoringPipeline(
     suspend fun cancel(ownerId: String, executionId: String): PipelineView =
         host.cancel(ownerId, executionId)
 
+    /**
+     * The host's options, saved with the execution. A later command and a run
+     * resumed after the process ended read them back, and the saved work keeps
+     * its options, colors and macro catalog for forks and replays
+     * (`RoomSharedPipelineStore`). Seeds are unsigned decimal strings, the
+     * way the core reads 64-bit values.
+     */
     private fun durableHostContext(request: SharedPipelineRunRequest): String =
         org.json.JSONObject()
             .put("schema", "inku.android-pipeline-host-context.v1")

@@ -87,6 +87,14 @@ class AndroidWorkPipeline(
         )
     }
 
+    /**
+     * Draws edited DDL. Without an execution it starts a direct-DDL run. With
+     * one, changed run options (models, colors, canvas, seeds, Wild, variation,
+     * language) fork a new variation from the saved policy. Otherwise the edit
+     * is committed to the same execution, declining a pending patch proposal
+     * first. Unchanged DDL is drawn without a commit, unless a patch proposal
+     * still waits for an answer.
+     */
     suspend fun composeFromDdl(
         ddl: String,
         rawRequest: PaintRequest,
@@ -237,7 +245,7 @@ class AndroidWorkPipeline(
     }
 
     /**
-     * A saved work drawn again as an editable or compat SVG file, the way the
+     * A saved work drawn again as an editable, compat or live SVG file, the way the
      * server's `GET /api/history/{id}/svg?profile=` redraws it
      * (`routers/history.py`): the work's own colors, seeds and Wild through
      * today's engine, under the same restored policy as a replay. Nothing is
@@ -313,6 +321,7 @@ class AndroidWorkPipeline(
         return SavedRender(output, catalogId, colors, canvas, renderSeed)
     }
 
+    /** The server's `description_hash` (`identity.py`): an identity, not a secret. */
     fun descriptionHash(input: String): String {
         val normalized = Normalizer.normalize(input, Normalizer.Form.NFC)
             .replace("\r\n", "\n")
@@ -805,6 +814,7 @@ class AndroidWorkPipeline(
         return CanvasInfo(Math.rint(CANVAS_BASE_PX * ratio), CANVAS_BASE_PX, ratio)
     }
 
+    /** The server's render clip limits (`pipeline_defaults.py`). */
     private fun clipPolicy() = JSONObject()
         .put("tolerance_pixels", 0.1)
         .put("max_nodes", "50000")
@@ -819,6 +829,7 @@ class AndroidWorkPipeline(
         .digest(value.encodeToByteArray())
         .joinToString("") { byte -> "%02x".format(byte.toInt() and 0xff) }
 
+    /** The server's `render_hash_for_item` (`persistence/history.py`), so a work has one hash on both. */
     private fun renderHash(score: JSONObject, metadata: JSONObject, fallbackCatalogId: String): String {
         val payload = JSONObject()
             .put(
@@ -916,6 +927,8 @@ class AndroidWorkPipeline(
         }
 
         const val OWNER_ID = "local"
+        // A canvas only Android had. Its works still draw through the legacy
+        // renderer; a new work started from one uses the default canvas.
         private const val PIXEL9_HOST_ONLY_FORMAT = "pixel9_landscape_safe"
         private const val CANVAS_BASE_PX = 1000.0
     }

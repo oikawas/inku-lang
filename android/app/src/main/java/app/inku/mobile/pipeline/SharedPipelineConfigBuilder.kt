@@ -72,7 +72,11 @@ data class PipelineHostPolicy(
     val maximumEffectSteps: Int = 32,
 )
 
-/** Builds host policy around Rust-owned registries, palettes, prompts, and Macro validation. */
+/**
+ * Builds host policy around Rust-owned registries, palettes, prompts, and Macro validation.
+ * The envelope, macro, prompt and resource limits are the server's defaults
+ * (`pipeline_defaults.py`), so a work compiles under the same bounds on both.
+ */
 class SharedPipelineConfigBuilder(
     private val binding: SharedPipelineBinding,
     val policy: PipelineHostPolicy = PipelineHostPolicy(),
@@ -306,6 +310,7 @@ class SharedPipelineConfigBuilder(
         )
     }
 
+    /** Refuses a native library built for another pipeline protocol than this host speaks. */
     private fun requireCompatibleBinding() {
         val report = JSONObject(binding.versionReport())
         if (

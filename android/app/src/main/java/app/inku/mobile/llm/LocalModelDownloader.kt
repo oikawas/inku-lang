@@ -13,6 +13,13 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import kotlin.coroutines.coroutineContext
 
+/**
+ * Fetches an on-device model into `files/models`. Bytes go to `<file>.part`,
+ * which a cancelled or failed download leaves behind so the next start
+ * resumes it with a Range request; only a file whose SHA-256 matches is
+ * renamed to its final name. Each step is written to the model's
+ * `model_assets` row, which the settings screen shows.
+ */
 class LocalModelDownloader(
     private val context: Context,
     private val modelAssetDao: ModelAssetDao,
@@ -69,6 +76,8 @@ class LocalModelDownloader(
                 error("Model download failed with HTTP $code.")
             }
 
+            // A host that ignores Range answers 200 with the whole file, so
+            // the .part starts over.
             val append = code == HttpURLConnection.HTTP_PARTIAL && existingBytes > 0L
             val retainedPartBytes = if (append) existingBytes else 0L
             val totalBytes = if (code == HttpURLConnection.HTTP_PARTIAL) {
@@ -118,6 +127,7 @@ class LocalModelDownloader(
                 modelAssetDao.updateDownload(spec.modelId, "failed_size", downloaded, totalBytes, partFile.absolutePath, now())
                 error("Model download exceeded the allowed size limit.")
             }
+            // Progress goes to the database at most twice a second.
             val timestamp = now()
             if (timestamp - lastUpdateAt > 500L || totalBytes == downloaded) {
                 modelAssetDao.updateDownload(spec.modelId, "downloading", downloaded, totalBytes, partFile.absolutePath, timestamp)

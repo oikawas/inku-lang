@@ -22,7 +22,8 @@ fn canvas_ratio(registry: &Value, aspect: &str) -> f64 {
         .iter()
         .find(|format| format["id"] == aspect)
         .unwrap_or_else(|| panic!("unknown canvas format {aspect}"));
-    format["width_units"].as_f64().expect("width_units") / format["height_units"].as_f64().expect("height_units")
+    format["width_units"].as_f64().expect("width_units")
+        / format["height_units"].as_f64().expect("height_units")
 }
 
 fn main() {
@@ -32,16 +33,22 @@ fn main() {
     let cases: Vec<String> = args.collect();
     assert!(!cases.is_empty(), "at least one case is required");
 
-    let manifest: Value = serde_json::from_str(&fs::read_to_string(&manifest_path).expect("read manifest"))
-        .expect("parse manifest");
-    let registry: Value =
-        serde_json::from_str(&inku_pipeline_uniffi::canvas_registry()).expect("parse canvas registry");
+    let manifest: Value =
+        serde_json::from_str(&fs::read_to_string(&manifest_path).expect("read manifest"))
+            .expect("parse manifest");
+    let registry: Value = serde_json::from_str(&inku_pipeline_uniffi::canvas_registry())
+        .expect("parse canvas registry");
     fs::create_dir_all(&out_dir).expect("create output directory");
 
     for name in &cases {
         let input = &manifest["cases"][name]["input"];
-        assert!(input.is_object(), "case {name} is missing from the manifest");
-        let aspect = input["score"]["canvas"]["aspect"].as_str().expect("canvas aspect");
+        assert!(
+            input.is_object(),
+            "case {name} is missing from the manifest"
+        );
+        let aspect = input["score"]["canvas"]["aspect"]
+            .as_str()
+            .expect("canvas aspect");
         // Same rounding as Android's CanvasAspects.sizeFor.
         let width = (CANVAS_BASE_PX * canvas_ratio(&registry, aspect)).round_ties_even() as i64;
         let request = json!({
@@ -58,13 +65,20 @@ fn main() {
             },
         });
         let parsed = serde_json::from_value(request.clone()).expect("canonical render request");
-        let output = inku_render::render::render(parsed).unwrap_or_else(|error| panic!("render {name}: {error}"));
-        fs::write(out_dir.join(format!("{name}.request.json")), request.to_string()).expect("write request");
+        let output = inku_render::render::render(parsed)
+            .unwrap_or_else(|error| panic!("render {name}: {error}"));
+        fs::write(
+            out_dir.join(format!("{name}.request.json")),
+            request.to_string(),
+        )
+        .expect("write request");
         fs::write(out_dir.join(format!("{name}.svg")), output.svg).expect("write svg");
     }
 
-    let reference = serde_json::to_string(&inku_render::reference::renderer_reference()).expect("renderer reference");
-    fs::write(out_dir.join("renderer_reference.json"), reference).expect("write renderer reference");
+    let reference = serde_json::to_string(&inku_render::reference::renderer_reference())
+        .expect("renderer reference");
+    fs::write(out_dir.join("renderer_reference.json"), reference)
+        .expect("write renderer reference");
 
     let (engine_id, engine_version) = inku_render::render_engine_identity();
     let expected = json!({

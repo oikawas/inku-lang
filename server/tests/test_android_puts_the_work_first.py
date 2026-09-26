@@ -103,7 +103,9 @@ def test_t2_the_mascot_is_drawn_only_while_something_runs() -> None:
     ]
     assert len(calls) == 2, f"expected two running-state mascot calls, found {len(calls)}"
 
-    run_status = _function_body(text, "private fun RunStatusRow(")
+    # Android made the row internal for its attempt tests; the visibility is
+    # not what this checks.
+    run_status = _function_body(text, "fun RunStatusRow(")
     assert run_status.count("MascotWidget(") == 1
     assert "if (!state.isRunning) return" in run_status
 

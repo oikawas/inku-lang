@@ -485,8 +485,14 @@ class InkuViewModel @JvmOverloads constructor(
             restorePersistedSettings()
             runCatching { withContext(Dispatchers.IO) { repository.restoreActivePipeline() } }
                 .onSuccess { view ->
+                    // The latest execution is read after the settings above,
+                    // and by then the reader can have started one of their
+                    // own: a refinement run writes its execution too, and
+                    // presenting that as the drawing to resume closed the
+                    // refinement under the run that was still going.
                     if (view != null && view.phaseTag != "cancelled" &&
-                        !promptEditedByUser && !localState.value.isDrawing
+                        !promptEditedByUser && !localState.value.isDrawing &&
+                        !localState.value.refinementOpen && !localState.value.refinementBusy
                     ) {
                         restoredInitialHistory = true
                         presentPipelineView(view)
@@ -563,6 +569,12 @@ class InkuViewModel @JvmOverloads constructor(
     }
 
     private fun presentPipelineView(view: PipelineView) {
+        // This closes the refinement; a candidate run left going would keep
+        // asking the model and adding candidates to a panel no longer shown,
+        // with the busy flag already down. When the run itself failed into
+        // this view, cancelling it here only ends what was ending.
+        refinementJob?.cancel()
+        refinementJob = null
         val context = JSONObject(view.hostContextJson)
         val options = context.optJSONObject("host_options")
         val parentId = context.optJSONObject("result_options")?.optString("parent_history_id")

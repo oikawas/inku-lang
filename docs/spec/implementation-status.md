@@ -88,7 +88,7 @@ management, DB administration, plugin administration, and server log controls
 because the Android package is single-user and mobile-first.
 
 Android SVG/PNG export follows the server/web `CanvasPanel` intent.  SVG export
-is a menu with display, editable, and compatibility profiles.  PNG export is a
+is a menu with display, editable, compatibility, and live profiles.  PNG export is a
 menu backed by Room `export_templates`, with `1080px`, `2160px`, and `4320px`
 Y-axis defaults.  Android opens the platform share sheet instead of browser
 downloads.

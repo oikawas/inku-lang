@@ -44,7 +44,7 @@ Android の描画ビューはモバイル固有の操作を提供する — ピ�
 
 Android の履歴ビューは、**意図してサーバー／Web の UI と異なる。** 3 列のサムネイルグリッドを使い、ゴミ箱・リスト表示・一括選択・ユーザー管理・DB 管理・プラグイン管理・サーバーログの操作を省く — Android パッケージが単一利用者でモバイル優先だからである。
 
-Android の SVG／PNG 書き出しはサーバー／Web の `CanvasPanel` の意図に従う。SVG の書き出しは display・editable・compatibility のプロファイルを持つメニューである。PNG の書き出しは Room の `export_templates` に支えられたメニューで、y 軸の既定は `1080px`・`2160px`・`4320px`。**Android はブラウザのダウンロードではなくプラットフォームの共有シートを開く。**
+Android の SVG／PNG 書き出しはサーバー／Web の `CanvasPanel` の意図に従う。SVG の書き出しは display・editable・compatibility・live のプロファイルを持つメニューである。PNG の書き出しは Room の `export_templates` に支えられたメニューで、y 軸の既定は `1080px`・`2160px`・`4320px`。**Android はブラウザのダウンロードではなくプラットフォームの共有シートを開く。**
 
 Android の描画メタデータは `render_canvas_aspect_id` と `render_canvas_aspect_ratio` を含む。いずれもサーバー／Web のシステムプラグインから移植した同じキャンバス比の定義から導く。Android のヘッドレス描画・比較の道具立ては Compose の UI 無しで走れ、サーバー CLI の `--input-mode ddl` の流れと合わせて、DDL から描画・Score から描画の対応を比べるのに使う。
 

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-SVG_PROFILES = frozenset({"display", "editable", "compat"})
+SVG_PROFILES = frozenset({"display", "editable", "compat", "live"})
 
 
 def normalize_svg_profile(svg_profile: str | None) -> str:

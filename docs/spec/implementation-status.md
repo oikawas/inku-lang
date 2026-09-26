@@ -26,6 +26,8 @@ The reference implementation currently includes:
 - dark mode
 - plugin storage, system/user plugin directories, and `canvas-aspect`
 - SVG export and template-based PNG export
+- a live SVG profile (editable's groups with the display appearance) from the
+  render APIs and the CLI, for hosts that perform a work in time
 - CLI client foundation, benchmark summary output, and contact sheet generation
 - CLI history export by render hash for benchmark review contact sheets,
   per-item JSON, and summary JSON

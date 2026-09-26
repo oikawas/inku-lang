@@ -317,19 +317,49 @@ pub fn with_texture_filter(mut element: Element, weight: Weight, enabled: bool) 
     element
 }
 
+/// The whole-drawing touch: display applies it once, to the content group, so
+/// its region is that group's bounding box plus 2% on each side.
 #[must_use]
 pub fn performance_touch_filter(seed: Seed, canvas: CanvasSize) -> (String, Element) {
+    touch_filter(seed, canvas, TouchRegion::GroupBounds)
+}
+
+/// The same touch for a profile that applies it to each instruction group,
+/// which a host may draw on its own. The region is the canvas plus 2% on each
+/// side in user space: 2% of a small group's bounding box is narrower than the
+/// displacement (at most 3 units per 1,000 of the short side), so its displaced
+/// pixels would be cut. The noise is sampled in user space either way, so the
+/// groups share one displacement field with display's whole-drawing touch.
+#[must_use]
+pub fn performance_touch_filter_on_canvas(seed: Seed, canvas: CanvasSize) -> (String, Element) {
+    touch_filter(seed, canvas, TouchRegion::Canvas)
+}
+
+enum TouchRegion {
+    GroupBounds,
+    Canvas,
+}
+
+fn touch_filter(seed: Seed, canvas: CanvasSize, region: TouchRegion) -> (String, Element) {
     let id = format!("performance_touch_{}", seed.rem_euclid(100_000));
     let scale = canvas.unit() / 1000.0;
     let frequency = (0.012 + hash01(0, seed, "performance-touch-frequency") * 0.008) / scale;
     let displacement = (1.6 + hash01(1, seed, "performance-touch-scale") * 1.4) * scale;
-    let mut filter = Element::new("filter")
-        .attr("id", &id)
-        .attr("x", "-2%")
-        .attr("y", "-2%")
-        .attr("width", "104%")
-        .attr("height", "104%")
-        .attr("color-interpolation-filters", "sRGB");
+    let filter = Element::new("filter").attr("id", &id);
+    let filter = match region {
+        TouchRegion::GroupBounds => filter
+            .attr("x", "-2%")
+            .attr("y", "-2%")
+            .attr("width", "104%")
+            .attr("height", "104%"),
+        TouchRegion::Canvas => filter
+            .attr("filterUnits", "userSpaceOnUse")
+            .attr("x", format_number(-0.02 * canvas.width))
+            .attr("y", format_number(-0.02 * canvas.height))
+            .attr("width", format_number(1.04 * canvas.width))
+            .attr("height", format_number(1.04 * canvas.height)),
+    };
+    let mut filter = filter.attr("color-interpolation-filters", "sRGB");
     filter.push(
         Element::new("feTurbulence")
             .attr("type", "fractalNoise")

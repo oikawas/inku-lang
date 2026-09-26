@@ -42,6 +42,9 @@ string_enum!(SvgProfile {
     Display,
     Editable,
     Compat,
+    // Editable's groups and IDs with display's appearance, so that a host can
+    // draw each instruction group on its own, in time.
+    Live,
 });
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]

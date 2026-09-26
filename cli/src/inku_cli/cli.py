@@ -63,7 +63,7 @@ COLOR_KEYS = ("white", "black", "blue", "red", "green", "gray")
 ACHROMATIC_COLOR_KEYS = {"white", "black", "gray"}
 CHROMATIC_ACCENT_COLOR_KEYS = {"blue", "red", "green"}
 DEFAULT_COLOR_CATALOG_ID = "default"
-SVG_PROFILES = ("display", "editable", "compat")
+SVG_PROFILES = ("display", "editable", "compat", "live")
 CANVAS_ASPECT_RATIOS = {
     "square": 1.0,
     "golden": 1.618,
@@ -3898,7 +3898,7 @@ def _add_paint_args(parser: argparse.ArgumentParser, *, batch: bool = False) -> 
     parser.add_argument("--out-dir", "-o", help="directory for JSON/SVG/PNG outputs")
     parser.add_argument("--prefix", help="output filename prefix")
     parser.add_argument("--png", action="store_true", help="also render PNG output when --out-dir is set")
-    parser.add_argument("--svg-profile", choices=SVG_PROFILES, default="display", help="SVG output profile for saved files; editable targets SVG-native editors, compat is a filter-free flat vector fallback")
+    parser.add_argument("--svg-profile", choices=SVG_PROFILES, default="display", help="SVG output profile for saved files; editable targets SVG-native editors, compat is a filter-free flat vector fallback, live keeps editable's groups with the display appearance for performing the work in time")
     parser.add_argument(
         "--input-mode",
         choices=["paint", "ddl"],
@@ -4107,7 +4107,7 @@ def build_parser() -> argparse.ArgumentParser:
     render_score.add_argument("--out-dir", "-o", help="directory for JSON/SVG/PNG outputs")
     render_score.add_argument("--prefix", help="output filename prefix")
     render_score.add_argument("--png", action="store_true", help="also render PNG output when --out-dir is set")
-    render_score.add_argument("--svg-profile", choices=SVG_PROFILES, default="display", help="SVG output profile for saved files; editable targets SVG-native editors, compat is a filter-free flat vector fallback")
+    render_score.add_argument("--svg-profile", choices=SVG_PROFILES, default="display", help="SVG output profile for saved files; editable targets SVG-native editors, compat is a filter-free flat vector fallback, live keeps editable's groups with the display appearance for performing the work in time")
     render_score.add_argument("--canvas-aspect", default="square")
     render_score.add_argument("--render-seed", type=int, help="renderer performance seed for reproducible replay")
     render_score.add_argument("--composition-seed", type=int, help="seed for where the marks are placed; without it the placement follows --render-seed")

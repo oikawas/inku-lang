@@ -8,7 +8,7 @@ flowchart LR
     ROW[("HistoryRow\ncanonical DB")]
     LINK[("pipeline_history_links\nrevision + fork sidecar")]
     SVG["Saved display SVG"]
-    EXPORT["Editable / compat rerender"]
+    EXPORT["Editable / compat / live rerender"]
     FILES["Automatic work files"]
     NODE[("LineageNodeRow")]
     EDGE[("LineageEdgeRow")]
@@ -158,7 +158,7 @@ flowchart TD
 | Operation | Source | Engine |
 |---|---|---|
 | History display SVG | Saved `HistoryRow.svg` | Already generated; not rerendered |
-| Editable / compat export | Saved Score plus the work's own saved color map | Current engine |
+| Editable / compat / live export | Saved Score plus the work's own saved color map | Current engine |
 | Replay / render-score (compact Score) | Saved Score, saved resource policy, explicit seeds, and so on | Current engine (`render_saved`) |
 | Replay / render-score (below 0.10) | Saved Score after structural compatibility, explicit seeds, and so on | Current engine (the established checked performance) |
 | PNG | Raster derivative of SVG | Rasterizer, not a Render Engine version |

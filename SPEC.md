@@ -1864,7 +1864,7 @@ separate `inku-svg-raster` boundary.
 Shared Rust owns Score structure and meaning. Python retains saved-format read compatibility, including finite actions such as a warned drop of an invalid legacy relation. Hosts must not add a visual event, composition anchor, density floor, or accent shape.
 Renderer sway is bound to `render_seed` and does not alter canonical Score.
 
-SVG export has three profiles:
+SVG export has four profiles:
 
 - `display`: the default server-rendered SVG used for web display, history,
   PNG generation, and artifact rebuilds.
@@ -1878,9 +1878,21 @@ SVG export has three profiles:
   Oil retains shape and intensity through its existing filter-free paint passes
   without clipped width expansion. Pixel equality with Display or Editable is not
   promised.
+- `live`: generated on demand in the same way, with editable's IDs and groups
+  and display's texture filters and touch. It serves hosts that perform a work
+  in time (drawing it instruction by instruction, moving groups): so that such a
+  host can draw each instruction group (`instruction_NNN_*`) on its own and
+  composite the groups in document order, the touch is applied to each
+  instruction group (and to the plate tone where display touches it) rather
+  than to the content group, over the canvas plus 2% on each side in absolute
+  user-space units. Its pixels match display's except where display's touch,
+  bounded by the content's bounding box plus 2%, cuts displaced pixels (a work
+  of one thin line, say). It is available from the render
+  APIs (`svg_profile="live"`, `/api/history/{id}/svg?profile=live`) and the CLI;
+  the Web and Android export menus do not offer it.
 
-The database stores only the `display` SVG in `history.svg`. Editable and
-compatible SVG are **regenerated at download time** rather than stored as
+The database stores only the `display` SVG in `history.svg`. Editable,
+compatible and live SVG are **regenerated at download time** rather than stored as
 additional database payloads. Sections 13.8 and 13.11 define performance and
 render identity, while history lives in the
 [render-engine version history](docs/spec/render-engine-history.md).
@@ -3466,7 +3478,7 @@ endpoints so past history can benefit from the current export structure without
 duplicating SVG blobs in the DB.
 
 The CLI `paint` and `batch` commands also accept
-`--svg-profile display|editable|compat` for saved SVG files.
+`--svg-profile display|editable|compat|live` for saved SVG files.
 
 Server-side output artifact saving is an admin-managed, server-wide setting.
 The settings dialog includes an admin-only "other (server)" tab for:

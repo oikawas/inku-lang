@@ -8,7 +8,7 @@ flowchart LR
     ROW[("HistoryRow\nDB正本")]
     LINK[("pipeline_history_links\nrevision + fork sidecar")]
     SVG["保存済みdisplay SVG"]
-    EXPORT["editable / compat再描画"]
+    EXPORT["editable / compat / live再描画"]
     FILES["自動作品ファイル"]
     NODE[("LineageNodeRow")]
     EDGE[("LineageEdgeRow")]
@@ -158,7 +158,7 @@ flowchart TD
 | 操作 | source | engine |
 |---|---|---|
 | history display SVG | DBに保存した`HistoryRow.svg` | 当時生成済み。再描画しない |
-| editable / compat export | 保存Scoreと作品自身の保存色map | 現行engine |
+| editable / compat / live export | 保存Scoreと作品自身の保存色map | 現行engine |
 | replay / render-score（compact Score） | 保存Score、保存資源policy、明示seed等 | 現行engine（`render_saved`） |
 | replay / render-score（0.10未満） | 保存Scoreに構造互換を当てたもの、明示seed等 | 現行engine（従来のchecked performance） |
 | PNG | SVGのrasterize派生 | Render Engineの版ではなくrasterizer |

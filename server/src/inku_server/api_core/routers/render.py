@@ -339,7 +339,7 @@ class RenderSvgRequest(BaseModel):
     limits: dict[str, int] | None = Field(default=None, description=_LIMITS_FIELD_DESCRIPTION)
     catalog_id: str | None = None
     canvas_aspect: str | None = None
-    svg_profile: str = Field(default="display", description="SVG output profile: display / editable / compat")
+    svg_profile: str = Field(default="display", description="SVG output profile: display / editable / compat / live")
     render_seed: int | None = Field(default=None, description="Renderer performance seed for reproducible replay")
     composition_seed: int | None = Field(default=None, description="Placement seed for arrangements; omitted means the placement follows the performance seed")
     wild: bool = Field(default=False, description="Unleash the stroke performance (removes the amplitude ceiling); recorded and replayed like the seed")
@@ -355,7 +355,7 @@ class RenderScoreRequest(BaseModel):
     limits: dict[str, int] | None = Field(default=None, description=_LIMITS_FIELD_DESCRIPTION)
     catalog_id: str | None = None
     canvas_aspect: str | None = None
-    svg_profile: str = Field(default="display", description="SVG output profile: display / editable / compat")
+    svg_profile: str = Field(default="display", description="SVG output profile: display / editable / compat / live")
     render_seed: int | None = None
     wild: bool = False
     composition_seed: int | None = None

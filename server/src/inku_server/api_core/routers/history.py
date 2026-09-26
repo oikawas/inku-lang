@@ -310,7 +310,7 @@ def api_history_thumb(
 @router.get("/api/history/{item_id}/svg")
 def api_history_svg(
     item_id: str,
-    profile: str = Query(default="display", description="SVG output profile: display / editable / compat"),
+    profile: str = Query(default="display", description="SVG output profile: display / editable / compat / live"),
     actor: dict = Depends(_current_user),
 ) -> Response:
     svg_profile = _validated_svg_profile(profile)

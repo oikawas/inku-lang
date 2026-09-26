@@ -7,7 +7,7 @@ use sha2::{Digest, Sha256};
 use crate::determinism::{hash01, seed_salt_index_digest};
 use crate::geometry::{point_to_pixels, stroke_sample_count};
 use crate::mark_paths::{contour_stroke_path, grid_step, polygon_path, uses_hand_stroke};
-use crate::marks::{MarkContext, MarkStyle};
+use crate::marks::{MarkContext, MarkStyle, reaches_canvas};
 use crate::materials::{OilPaintStyle, oil_paint_shade, oil_paint_stroke, with_texture_filter};
 use crate::planning::instruction_anchor_on_canvas;
 use crate::stroke::{ContourStrokeRequest, StrokeTerminal, synthesize_contour};
@@ -353,6 +353,9 @@ fn oil_paint_fill(
         if row % 2 == 1 {
             std::mem::swap(&mut start, &mut end);
         }
+        // A pass off the canvas still shapes the width field below, so it is
+        // synthesized and only left out of the SVG.
+        let visible = reaches_canvas(instruction, context, start, end, width);
         let samples = stroke_sample_count(length, context.canvas).clamp(2, 65);
         let centerline = (0..samples)
             .map(|index| {
@@ -399,6 +402,9 @@ fn oil_paint_fill(
                 xy += dx * dy;
                 yy += dy * dy;
             }
+        }
+        if !visible {
+            continue;
         }
         passes.push(oil_paint_stroke(
             contour_stroke_path(&stroke),
@@ -573,6 +579,9 @@ pub(crate) fn render_interior_fill(
         }
         if row % 2 == 1 {
             std::mem::swap(&mut start, &mut end);
+        }
+        if !reaches_canvas(instruction, context, start, end, style.width) {
+            continue;
         }
         let samples = stroke_sample_count(length, context.canvas).max(2);
         let centerline = (0..samples)

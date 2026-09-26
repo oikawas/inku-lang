@@ -14,6 +14,15 @@ The API's JSON answers now carry `render_seed` and `composition_seed` as decimal
 
 Seeds in the CLI's output become strings too. Android does not read these answers. The route count (107) is unchanged. DDL, Score, and render versions are unchanged.
 
+### 2026-09-27 — strokes wholly off the canvas are left out, and `-0` is written `0` (render engine 70)
+
+- **A stroke wholly off the canvas is not written into the SVG.** This covers fills (scanline strokes and oil-paint fill strokes) and surface textures (wash, hatch and crosshatch lines; stipple, paper-grain and aquatint dots). Only a stroke that cannot reach the canvas even with its width, its wobble and the displacement of the texture and touch filters (four stroke widths plus 3% of the short side) is left out. The remaining strokes keep their indices and seeds, so no visible stroke changes. An oil-paint fill still uses the strokes it leaves out when it orients its width field.
+- **A negative value that rounds to zero is written `0`, not `-0`.** Most came from the path of the brush tiles (brush_thin, brush_thick).
+- Of the 12,799 saved-work render requests, 2,974 (23%) change their SVG. On a tenth of the corpus (1,285 requests), the 295 that changed were rasterized with resvg: 293 are identical to the pixel and one differs by at most 1/255. The last, a work that dropped 48 surface dots, differs in one column at the canvas's left edge, about 30 pixels by up to 76/255, because a filter region measured from the bounding box shrinks with the dropped dots.
+- The English SPEC's leftover `render_engine_version: "61"` now points to where the current version lives (the implementation and saved works).
+
+Render engine 69 → 70. DDL, Score and binding versions are unchanged.
+
 ### 2026-09-27 — faster number writing, checked host colors, and saved-Score replay refusals by reason
 
 - **Writing numbers into the SVG is about 2.7 times as fast.** About a fifth of drawing CPU time went into writing coordinates and other values to six decimals. The digits are now written directly from a whole count of millionths; only values whose rounding lies right next to a half, large values and non-finite values go through the formatter as before. The output does not change by a single character (the 12,799 saved renders are identical, and a test matches the formatter on 200,000 values).

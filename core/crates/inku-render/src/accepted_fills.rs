@@ -807,13 +807,15 @@ pub(crate) fn brush_tile_definition(weight: Weight) -> Option<Element> {
                 for shift_y in [-size, 0.0, size] {
                     let top = y + shift_y;
                     if -width < top && top < size + width {
+                        // Adding zero turns a rounded `-0` into `0`.
+                        let whole = |value: f64| value.round() + 0.0;
                         classes.entry(key).or_default().push_str(&format!(
                             "M{} {}q{} {} {} 0",
-                            (x + shift_x).round(),
-                            top.round(),
-                            (length / 2.0).round(),
-                            bow.round(),
-                            length.round()
+                            whole(x + shift_x),
+                            whole(top),
+                            whole(length / 2.0),
+                            whole(bow),
+                            whole(length)
                         ));
                     }
                 }

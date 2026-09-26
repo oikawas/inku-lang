@@ -95,6 +95,41 @@ impl MarkContext<'_> {
     }
 }
 
+/// How far past a stroke's centerline its ink may land, in pixels: the stroke's
+/// own width and wobble, and the few pixels the texture and touch filters move.
+fn ink_reach(width: f64, canvas: CanvasSize) -> f64 {
+    width * 4.0 + canvas.unit() * 0.03
+}
+
+/// Whether a fill or surface stroke from `start` to `end`, `width` wide, can
+/// put ink on the canvas.
+///
+/// The points are in the mark's own coordinates. On the identity path the
+/// mark's rotation is still to come (an SVG `rotate`), so it is applied here
+/// first. A stroke that cannot reach the canvas is left out of the SVG; the
+/// caller still counts its index, so every other stroke keeps its seed.
+pub(crate) fn reaches_canvas(
+    instruction: &Instruction,
+    context: MarkContext<'_>,
+    start: Point,
+    end: Point,
+    width: f64,
+) -> bool {
+    let (start, end) = if context.geometry_transform.is_identity() {
+        (
+            rotated_instruction_point(instruction, context, start),
+            rotated_instruction_point(instruction, context, end),
+        )
+    } else {
+        (start, end)
+    };
+    let reach = ink_reach(width, context.canvas);
+    start.x.max(end.x) + reach >= 0.0
+        && start.x.min(end.x) - reach <= context.canvas.width
+        && start.y.max(end.y) + reach >= 0.0
+        && start.y.min(end.y) - reach <= context.canvas.height
+}
+
 /// Applies the instruction's own rotation before its containing Transform groups.
 ///
 /// The identity path keeps its established SVG rotation representation. The general
@@ -1209,6 +1244,45 @@ fn render_corner_shape(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_stroke_brought_onto_the_canvas_by_the_mark_rotation_is_kept() {
+        // Fill strokes are laid before the mark's SVG `rotate`, so a stroke
+        // off the canvas in the mark's own coordinates may land on it.
+        let colors = BTreeMap::new();
+        let context = MarkContext {
+            canvas: CanvasSize::new(1000.0, 1000.0),
+            color_map: &colors,
+            work_assignment: &colors,
+            render_seed: Some(1),
+            instruction_seed_override: None,
+            instruction_index: 0,
+            mark_index: 0,
+            wild: false,
+            use_filters: false,
+            profile: SvgProfile::Display,
+            support: crate::support::DEFAULT_SUPPORT,
+            geometry_transform: crate::affine::AffineTransform::identity(),
+            oil_fill_pass_limit: crate::fills::MAX_OIL_FILL_PASSES,
+            effects: crate::effects::MarkEffects::default(),
+        };
+        let circle = |rotation: &str| {
+            serde_json::from_str::<Instruction>(&format!(
+                r#"{{"primitive":"circle","center":[0.1,0.5],"radius":0.4{rotation}}}"#
+            ))
+            .unwrap()
+        };
+        let off = Point::new(-400.0, 500.0);
+        assert!(!reaches_canvas(&circle(""), context, off, off, 1.0));
+        // Turned 90 degrees about (100, 500), the point lands at (100, 0).
+        assert!(reaches_canvas(
+            &circle(r#","rotation":90"#),
+            context,
+            off,
+            off,
+            1.0
+        ));
+    }
 
     #[test]
     fn silverpoint_thinness_stops_at_the_shared_minimum_width() {

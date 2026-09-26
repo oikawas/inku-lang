@@ -8,7 +8,7 @@ use crate::determinism::{hash_to_unit, hash01, seed_salt_index_digest};
 use crate::geometry::{centerline_normals, points_center, stroke_sample_count};
 use crate::mark_geometry::MarkGeometry;
 use crate::mark_paths::{contour_stroke_path, grid_step, rotate, uses_hand_stroke};
-use crate::marks::{MarkContext, mark_width};
+use crate::marks::{MarkContext, mark_width, reaches_canvas};
 use crate::materials::with_texture_filter;
 use crate::palette::resolve_color;
 use crate::stroke::{ContourStrokeRequest, StrokeTerminal, synthesize_contour};
@@ -349,6 +349,11 @@ fn render_vectors(
             let count = SURFACE_MARK_MAX.min(((22.0 + density * 120.0) * area_factor) as usize);
             let radius = (context.canvas.unit() * (0.002 + scale * 0.004)).max(0.45);
             for (index, point) in scatter(contour, count, seed).into_iter().enumerate() {
+                // A dab is at most 1.65 `radius` round, and its stroke runs at
+                // most 1.75 of that from its point.
+                if !reaches_canvas(instruction, context, point, point, radius * 3.0) {
+                    continue;
+                }
                 group.push(dab(
                     instruction,
                     context,
@@ -380,18 +385,20 @@ fn render_vectors(
                                 + hash01(stroke_index, seed, "wash-width")
                                     * SURFACE_WASH_WIDTH_SPAN),
                     );
-                    if let Some(element) = sweep(
-                        instruction,
-                        context,
-                        start,
-                        end,
-                        sweep_width,
-                        &color,
-                        opacity * SURFACE_WASH_OPACITY,
-                        seed,
-                        stroke_index,
-                        "surface-stroke-v1 surface-wash-sweep",
-                    ) {
+                    if reaches_canvas(instruction, context, start, end, sweep_width)
+                        && let Some(element) = sweep(
+                            instruction,
+                            context,
+                            start,
+                            end,
+                            sweep_width,
+                            &color,
+                            opacity * SURFACE_WASH_OPACITY,
+                            seed,
+                            stroke_index,
+                            "surface-stroke-v1 surface-wash-sweep",
+                        )
+                    {
                         group.push(element);
                     }
                     stroke_index += 1;
@@ -436,18 +443,23 @@ fn render_vectors(
                             row_point.y + direction.y * end_t,
                         );
                         let line_width = (context.canvas.unit() * 0.0016).max(0.45);
-                        if let Some(element) = sweep(
-                            instruction,
-                            context,
-                            start,
-                            end,
-                            line_width,
-                            &color,
-                            opacity,
-                            seed,
-                            stroke_index + span_index as i64 * HATCH_SPAN_SEED_STRIDE,
-                            &format!("surface-stroke-v1 hatch-spacing-{:.3}", spacing * gradient),
-                        ) {
+                        if reaches_canvas(instruction, context, start, end, line_width)
+                            && let Some(element) = sweep(
+                                instruction,
+                                context,
+                                start,
+                                end,
+                                line_width,
+                                &color,
+                                opacity,
+                                seed,
+                                stroke_index + span_index as i64 * HATCH_SPAN_SEED_STRIDE,
+                                &format!(
+                                    "surface-stroke-v1 hatch-spacing-{:.3}",
+                                    spacing * gradient
+                                ),
+                            )
+                        {
                             group.push(element);
                         }
                     }
@@ -473,6 +485,9 @@ fn render_vectors(
                 } else {
                     point
                 };
+                if !reaches_canvas(instruction, context, target, target, radius * 2.0) {
+                    continue;
+                }
                 group.push(dab(
                     instruction,
                     context,

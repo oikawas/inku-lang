@@ -111,7 +111,7 @@ Versions and identity IDs are separate namespaces. The work-edition ID is `rh3`,
 
 Saved reference corpora remain comparison records for the versions they froze. Do not rewrite a frozen version's output, and retain its existing case IDs. At an explicit checkpoint after an overall migration is complete, perform one full update and record the difference from the prior version in its manifest. An intermediate render or DDL engine bump, or a rename alone, does not require a full corpus update, a current-version reference directory, or running a generator or manual comparison. Choose focused validation from the change risk. Render records remain SVGs; DDL records remain DDL text or JSON.
 
-SVG fractional values follow the master grid defined by `MASTER_GRID_DECIMALS` and retain six fixed decimal places. The application has no mechanism to choose an old engine for replay: replay uses the latest engine, while a past edition is reproduced by returning its saved SVG. The version history retains the historical rationale and measurements.
+SVG fractional values follow the master grid defined by `MASTER_GRID_DECIMALS` and retain six fixed decimal places. A negative value that rounds to zero is written `0`, never `-0`. The application has no mechanism to choose an old engine for replay: replay uses the latest engine, while a past edition is reproduced by returning its saved SVG. The version history retains the historical rationale and measurements.
 
 A recorded engine version is provenance, not an input to replay. The UI reports when it differs from the current version. Reinterpreting DDL also uses the latest implementation and creates a new edition. Saved SVG, Score, seed, and edition ID remain intact.
 
@@ -328,9 +328,9 @@ target. When a host color value is not `#rrggbb`, the render core does
 not use it: a named color is drawn in its default, a catalog entry
 (`palette:<name>`) or other key is left out, drawing continues, and the render
 metadata's `render_warnings` holds `{"kind": "invalid_color", "name": …}`
-(never the value). Hosts show it with the work and log it. The current engine metadata is
-`render_engine_id: "default"` and
-`render_engine_version: "61"`.  The full catalog `map` / `swatches` / `palette`
+(never the value). Hosts show it with the work and log it. The engine id is
+`render_engine_id: "default"`; the implementation and saved works own the
+current `render_engine_version` (§2.1).  The full catalog `map` / `swatches` / `palette`
 snapshot is not duplicated in render JSON because `render_color_map` is the
 concrete color record needed for replay and audit.
 `render_hash` is the work-edition identifier; what it is derived from, and why

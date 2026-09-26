@@ -208,8 +208,9 @@ pub(crate) fn non_finite_writes() -> usize {
 
 /// Append the text of [`format_number`] to `output`.
 ///
-/// Six decimals, then trailing zeros and a bare point removed. Path data
-/// writes thousands of numbers, so they go straight into one buffer.
+/// Six decimals, then trailing zeros and a bare point removed; a value that
+/// rounds to zero is `0`, never `-0`. Path data writes thousands of numbers,
+/// so they go straight into one buffer.
 pub(crate) fn write_number(output: &mut String, value: f64) {
     let rounded = if value == -0.0 { 0.0 } else { value };
     if !write_micros(output, rounded) {
@@ -237,6 +238,7 @@ fn write_micros(output: &mut String, value: f64) -> bool {
     }
     // Below 1e15 the cast is exact.
     let mut micros = scaled.round() as u64;
+    let negative = value < 0.0 && micros != 0;
     // Digits from the right: at most ten whole digits, a point and six decimals.
     let mut digits = [0u8; 18];
     let mut at = digits.len();
@@ -262,8 +264,7 @@ fn write_micros(output: &mut String, value: f64) -> bool {
             break;
         }
     }
-    if value < 0.0 {
-        // `{:.6}` keeps the sign of a value that rounds to zero: `-0`.
+    if negative {
         output.push('-');
     }
     output.push_str(std::str::from_utf8(&digits[at..]).expect("ASCII digits"));
@@ -271,6 +272,9 @@ fn write_micros(output: &mut String, value: f64) -> bool {
 }
 
 /// Write `value` through `{:.6}`, then trim trailing zeros and a bare point.
+///
+/// `{:.6}` keeps the sign of a negative value that rounds to zero; that `-0`
+/// is written as `0`.
 fn write_exact(output: &mut String, value: f64) {
     let start = output.len();
     write!(output, "{value:.6}").expect("writing to a String cannot fail");
@@ -285,6 +289,9 @@ fn write_exact(output: &mut String, value: f64) {
         output.truncate(trimmed);
         if output.ends_with('.') {
             output.pop();
+        }
+        if &output[start..] == "-0" {
+            output.replace_range(start.., "0");
         }
     }
 }
@@ -397,6 +404,8 @@ mod tests {
                 assert_eq!(format_number(candidate), exact(candidate), "{candidate:e}");
             }
         }
+        assert_eq!(format_number(-1.0e-7), "0");
+        assert_eq!(format_number(-4.0e-7), "0");
         for value in [
             0.0,
             -0.0,

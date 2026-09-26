@@ -2,6 +2,10 @@
 
 This file records revisions to user and operations documents under `manual/`. See `SPEC.ja.md` for the detailed product change history.
 
+## 2026-09-26 — Live SVG, and three troubleshooting rows
+
+The Web export gained `Live`, so the export table in Creating Images in both languages has a row for it, and Live joins the formats drawn again from the Score. The same document's troubleshooting table also gained three rows: a running indicator that says `Retrying (try 2/4)` means an earlier attempt timed out or its answer could not be used; a reason whose parenthesis says the model did not answer within the time limit means the model is not answering in time; and "Cannot reach the server" means the API is stopped or restarting, and the page reopens by itself once it answers.
+
 ## 2026-09-25 — System prompts in the Prompts tab
 
 The Stage 1 and Stage 2 system prompts return to the provenance drawer's `Prompts` tab, so Creating Images in both languages now says three things: they are the ones actually sent when the work was drawn, they differ from work to work with the plugins, the sketch, and retries, and a stage that called no model or a work drawn before the record began says so instead.

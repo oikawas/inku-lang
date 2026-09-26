@@ -367,9 +367,10 @@ Open `Export` at the bottom of the Work tab, check that the target is `Displayed
 | Display | Web display and PNG generation | The stored SVG. Favors visual fidelity and uses filter and clip-path |
 | Editable | Illustrator / Affinity | Regenerated from the score. Carries layer structure and stable IDs, and avoids filter and clip-path |
 | Compatibility | General SVG interchange | Regenerated from the score. Close to Editable, but favors robustness |
+| Live | Video software such as VIA2 | Drawn again from the score. Editable's structure with Display's textures and touch. Meant for software that draws one instruction at a time; for ordinary viewing Display is lighter |
 | PNG | Raster image at a chosen resolution | Standard, high resolution (2×), square, square high resolution. More templates can be added in the settings |
 
-`Editable` and `Compat` are drawn again from the Score, and **a redraw uses the performance that was saved** (both the render seed and the composition seed the saved work carries). **The only difference from the stored SVG is how far the drawing engine has moved on** -- inku keeps no past version, so a redraw after the engine advances is never byte-identical.
+`Editable`, `Compat`, and `Live` are drawn again from the Score, and **a redraw uses the performance that was saved** (both the render seed and the composition seed the saved work carries). **The only difference from the stored SVG is how far the drawing engine has moved on** -- inku keeps no past version, so a redraw after the engine advances is never byte-identical.
 
 Set the download folder under `Settings` → `Export` → `Save location`. Without one, files land in the browser's default folder. The folder itself lives only inside that browser, so another browser or another device needs its own choice. If writing is not permitted, the file lands in the browser's default folder and says so.
 

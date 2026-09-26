@@ -500,6 +500,10 @@ export interface LangPack {
 	svgExportCompatSub: string;
 	svgExportCompatUse: string;
 	svgExportCompatFeature: string;
+	svgExportLiveName: string;
+	svgExportLiveSub: string;
+	svgExportLiveUse: string;
+	svgExportLiveFeature: string;
 	pngStandard: string;
 	pngHighRes: string;
 	pngSquare: string;

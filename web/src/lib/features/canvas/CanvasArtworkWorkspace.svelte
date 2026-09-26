@@ -398,6 +398,7 @@
 													<tr><td>{t().svgExportDisplayName}</td><td>{t().svgExportDisplayUse}</td><td>{t().svgExportDisplayFeature}</td></tr>
 													<tr><td>{t().svgExportEditableName}</td><td>{t().svgExportEditableUse}</td><td>{t().svgExportEditableFeature}</td></tr>
 													<tr><td>{t().svgExportCompatName}</td><td>{t().svgExportCompatUse}</td><td>{t().svgExportCompatFeature}</td></tr>
+													<tr><td>{t().svgExportLiveName}</td><td>{t().svgExportLiveUse}</td><td>{t().svgExportLiveFeature}</td></tr>
 												</tbody>
 											</table>
 										</div>
@@ -413,6 +414,10 @@
 									<button onclick={() => { onDownloadSVG('compat'); exportMenuOpen = false; }}>
 										<span class="png-size">{t().svgExportCompatName}</span>
 										<span class="png-sub">{t().svgExportCompatSub}</span>
+									</button>
+									<button onclick={() => { onDownloadSVG('live'); exportMenuOpen = false; }}>
+										<span class="png-size">{t().svgExportLiveName}</span>
+										<span class="png-sub">{t().svgExportLiveSub}</span>
 									</button>
 								</div>
 								<div class="export-menu-group">

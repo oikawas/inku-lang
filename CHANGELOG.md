@@ -6,6 +6,12 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 36 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-26 — the Web export menus offer the live SVG profile
+
+The `live` SVG profile (editable's structure with display's appearance) now appears as "Live" in the canvas's SVG export (the help table and the buttons) and in a saved work's export menu. Video software such as VIA2 takes works in mainly as files, with a connection to an inku server optional, so a work can now be exported from the Web and handed over. The export redraws on the same path as editable and compat (`/api/history/{id}/svg?profile=live` for a saved work on screen, `/api/render-svg` otherwise). Android's export menu does not offer it. The manual's export table and SPEC follow.
+
+The route count (107) is unchanged. DDL, Score, and render versions are unchanged.
+
 ### 2026-09-26 — Android offers Gemini models that answer today
 
 Before a Gemini connection's model list was fetched, Android's model picker offered `gemini-2.5-pro`, `gemini-2.5-flash` and `gemini-2.5-flash-lite`, which refuse API accounts made after their retirement. It now offers the server's builtin models (the same day's "the builtin Gemini list names models that answer today"): `gemini-3.5-flash-lite` and `gemma-4-31b-it`. The published models the author chose, and the model names works recorded, are unchanged.

@@ -22,7 +22,7 @@
 - ダークモード
 - プラグインストレージ、システム／ユーザーのプラグインディレクトリ、`canvas-aspect`
 - SVG の書き出しとテンプレートに基づく PNG の書き出し
-- live の SVG プロファイル（editable の構造に display の見た目）。描画の API と CLI から取得でき、作品を時間の中で演奏する host に向ける
+- live の SVG プロファイル（editable の構造に display の見た目）。描画の API・CLI・Web の書き出しメニューから取得でき、作品を時間の中で演奏する host に向ける
 - CLI クライアントの基盤、ベンチマーク要約の出力、コンタクトシートの生成
 - ベンチマーク講評のコンタクトシート・項目ごとの JSON・要約 JSON のための、render hash による CLI の履歴書き出し
 - DDL から描画までの対応のための CLI の DDL 入力モード — `inku-cli paint --input-mode ddl` と `batch --input-mode ddl` は `/api/compose` を直接呼び、`--save-history` があれば `/api/history` を通じて保存する

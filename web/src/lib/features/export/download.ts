@@ -4,7 +4,7 @@ import { exportSettings } from './settings.svelte';
 import { downloadFolderSettings } from './download-folder.svelte';
 import { saveBlob, type SaveOutcome } from './save-target';
 
-export type SvgProfile = 'display' | 'editable' | 'compat';
+export type SvgProfile = 'display' | 'editable' | 'compat' | 'live';
 
 /**
  * Downloading the current artwork as SVG or PNG.

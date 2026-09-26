@@ -1888,8 +1888,8 @@ SVG export has four profiles:
   user-space units. Its pixels match display's except where display's touch,
   bounded by the content's bounding box plus 2%, cuts displaced pixels (a work
   of one thin line, say). It is available from the render
-  APIs (`svg_profile="live"`, `/api/history/{id}/svg?profile=live`) and the CLI;
-  the Web and Android export menus do not offer it.
+  APIs (`svg_profile="live"`, `/api/history/{id}/svg?profile=live`), the CLI,
+  and the Web's export menus; Android's export menu does not offer it.
 
 The database stores only the `display` SVG in `history.svg`. Editable,
 compatible and live SVG are **regenerated at download time** rather than stored as
@@ -3472,10 +3472,10 @@ The web UI does not send client-generated SVG back as trusted history content.
 history endpoints re-render from JSON Score instead of trusting SVG sent by the
 client.
 
-For SVG download, the web UI exposes Display, Editable, and Compat variants.
-Display downloads the stored SVG.  Editable and Compat call server render
-endpoints so past history can benefit from the current export structure without
-duplicating SVG blobs in the DB.
+For SVG download, the web UI exposes Display, Editable, Compat, and Live
+variants. Display downloads the stored SVG.  Editable, Compat, and Live call
+server render endpoints so past history can benefit from the current export
+structure without duplicating SVG blobs in the DB.
 
 The CLI `paint` and `batch` commands also accept
 `--svg-profile display|editable|compat|live` for saved SVG files.

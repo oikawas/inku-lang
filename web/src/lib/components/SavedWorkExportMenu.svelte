@@ -177,6 +177,7 @@
 					<button type="button" role="menuitem" disabled={busy} onclick={() => void run((target) => onDownloadSVG?.('display', target))}>{t().svgExportDisplayName}</button>
 					<button type="button" role="menuitem" disabled={busy} onclick={() => void run((target) => onDownloadSVG?.('editable', target))}>{t().svgExportEditableName}</button>
 					<button type="button" role="menuitem" disabled={busy} onclick={() => void run((target) => onDownloadSVG?.('compat', target))}>{t().svgExportCompatName}</button>
+					<button type="button" role="menuitem" disabled={busy} onclick={() => void run((target) => onDownloadSVG?.('live', target))}>{t().svgExportLiveName}</button>
 				</div>
 				<div class="saved-work-export-group">
 					<div class="saved-work-export-heading">PNG</div>

@@ -6,6 +6,12 @@
 
 **本書が持つのは v2.5.0（2026-07-25、render engine 12）以降**の 36 版である。それより前は書庫にある。
 
+### 2026-09-26 — 面の濃さを持つScore 0.4.0以降を断らない
+
+Serverのschemaは、面の濃さ（`surface_intensity`の`dense`・`faint`）を持つ命令があると、Scoreの版がちょうど0.3.0のときしか受け付けず、0.4.0〜0.15.0を「surface_intensity requires Score version 0.3.0」で断っていた。SPECは0.3.0以降としている。断るのを0.1.0と0.2.0だけにした。受け取ったScoreを検査する経路（作品の保存`POST /api/history`、0.10より前の版の描き直し`/api/render-score`・`/api/render-svg`、保存した作品の表示用以外の書き出し）で、面の濃さを持つ0.4.0以降のScoreが通る。
+
+route数（107）は変わらない。DDL・Score・描画の版は変えない。
+
 ### 2026-09-26 — Score 0.10以降の作品を、editable・compat・liveで書き出せるようにする
 
 保存した作品の書き出し（`GET /api/history/{id}/svg`）は、display以外のプロファイルではScoreから描き直す。この描き直しは、作品の資源の方針を持たない描画の入口を通っていた。そのためScore 0.10以降の作品（いまのアプリで作る作品すべて）では、描画coreが「score cannot be rendered: checked performance stopped: [… InvalidCompactPerformance …]」と拒み、editable・compat・liveの書き出しが422になっていた。`/api/render-svg`と同じ共通の描き直しへ回し、作品自身の資源の方針・色・キャンバス・上限・seedで描く。displayは従来どおり保存済みのSVGを返す。Score 0.9以前の作品の書き出しは変わらない。

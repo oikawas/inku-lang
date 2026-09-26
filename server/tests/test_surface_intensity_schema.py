@@ -23,7 +23,7 @@ def test_surface_intensity_wire_defaults_and_supported_fill_domain() -> None:
     # §4.6); a saved Score without a version still reads as 0.1.
     assert Score.model_fields["version"].default == "0.9.0"
     assert Score.model_validate({"instructions": []}).version == "0.1.0"
-    for edition in ("0.1.0", "0.2.0", "0.3.0"):
+    for edition in ("0.1.0", "0.2.0", "0.3.0", "0.4.0", "0.15.0"):
         wire = {**old, "version": edition}
         saved = Score.model_validate(wire)
         canonical = saved.model_dump_json(by_alias=True)
@@ -31,7 +31,7 @@ def test_surface_intensity_wire_defaults_and_supported_fill_domain() -> None:
         assert Score.model_validate_json(canonical).model_dump_json(by_alias=True) == canonical
         for level in ("normal", "dense", "faint"):
             marked = {**wire, "instructions": [{**old["instructions"][0], "surface_intensity": level}]}
-            if level != "normal" and edition != "0.3.0":
+            if level != "normal" and edition in {"0.1.0", "0.2.0"}:
                 with pytest.raises(ValidationError, match="surface_intensity requires Score version 0.3.0"):
                     Score.model_validate(marked)
             elif level == "normal":

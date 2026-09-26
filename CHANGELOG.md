@@ -6,6 +6,12 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 36 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-26 — Scores from 0.4.0 on may carry surface intensity
+
+The Server's schema accepted an instruction's `surface_intensity` of `dense` or `faint` only when the Score's version was exactly 0.3.0, and refused 0.4.0 through 0.15.0 with "surface_intensity requires Score version 0.3.0"; SPEC allows it from 0.3.0 on. Only 0.1.0 and 0.2.0 are refused now. The routes that validate a Score they receive (saving a work with `POST /api/history`, redrawing a Score older than 0.10 for `/api/render-score` and `/api/render-svg`, and a saved work's non-display SVG) now take such Scores.
+
+The route count (107) is unchanged. DDL, Score, and render versions are unchanged.
+
 ### 2026-09-26 — works on Score 0.10 and later export as editable, compat and live
 
 A saved work's export (`GET /api/history/{id}/svg`) redraws from the Score for every profile but display. That redraw went through the render entry that carries no resource policy, so for a work on Score 0.10 or later (every work the app makes today) the render core refused it ("score cannot be rendered: checked performance stopped: [… InvalidCompactPerformance …]") and the editable, compat and live exports answered 422. The export now goes through the shared replay that `/api/render-svg` uses, and draws under the work's own resource policy, colors, paper, limits and seeds. Display still returns the stored SVG. Exports of works on Score 0.9 and earlier are unchanged.

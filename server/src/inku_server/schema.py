@@ -1501,10 +1501,10 @@ class Score(BaseModel):
             instruction.arc_form is not None for instruction in self.instructions
         ):
             raise ValueError("arc_form requires Score version 0.2.0")
-        if self.version != "0.3.0" and any(
+        if self.version in {"0.1.0", "0.2.0"} and any(
             instruction.surface_intensity != "normal" for instruction in self.instructions
         ):
-            raise ValueError("surface_intensity requires Score version 0.3.0")
+            raise ValueError("surface_intensity requires Score version 0.3.0 or later")
         if self.mirror_relations and self.version != "0.15.0":
             raise ValueError("mirror_relations requires Score version 0.15.0")
         covered_until = 0

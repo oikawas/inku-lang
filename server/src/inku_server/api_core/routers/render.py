@@ -26,6 +26,7 @@ from ..rendering import (
     COLOR_CATALOG_ID_HEADER,
     COLOR_SOURCE_HEADER,
     LIMITS_SOURCE_HEADER,
+    _COMPACT_SCORE_VERSIONS,
     _color_render_metadata,
     _limits_for_render,
     _render_hash_metadata,
@@ -451,7 +452,7 @@ def api_variation_seeds(
 
 @router.post("/api/render-score", response_model=RenderScoreResponse, response_model_exclude_none=True)
 def api_render_score(req: RenderScoreRequest, actor: dict = Depends(_current_user)) -> RenderScoreResponse:
-    if req.score.get("version") in {"0.10.0", "0.11.0", "0.12.0", "0.13.0", "0.14.0", "0.15.0"}:
+    if req.score.get("version") in _COMPACT_SCORE_VERSIONS:
         from ...pipeline_runtime import get_service
         work = _work_for_color_snapshot(actor, req.work_id) if req.work_id else None
         return RenderScoreResponse(**get_service().replay_for(actor["id"], req.model_dump(), work))
@@ -519,7 +520,7 @@ def api_render_score(req: RenderScoreRequest, actor: dict = Depends(_current_use
 
 @router.post("/api/render-svg")
 def api_render_svg(req: RenderSvgRequest, actor: dict = Depends(_current_user)) -> Response:
-    if req.score.get("version") in {"0.10.0", "0.11.0", "0.12.0", "0.13.0", "0.14.0", "0.15.0"}:
+    if req.score.get("version") in _COMPACT_SCORE_VERSIONS:
         from ...pipeline_runtime import get_service
         work = _work_for_color_snapshot(actor, req.work_id) if req.work_id else None
         result = get_service().replay_for(actor["id"], req.model_dump(), work)

@@ -537,3 +537,37 @@ def test_partway_score_replay_routes_preserve_the_symbolic_position(monkeypatch)
         assert payload["score"] == score
         assert payload["render_seed"] == 77
         assert work is None
+
+
+def test_a_compact_work_exports_through_the_shared_replay(monkeypatch):
+    # Every profile but display redraws the saved work. The plain render
+    # refuses a compact Score without its resource policy, so editable, compat
+    # and live exports of such a work answered 422 InvalidCompactPerformance.
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+    from types import SimpleNamespace
+    from inku_server.api_core.routers import history as history_routes
+    from inku_server import pipeline_runtime
+
+    app = FastAPI()
+    app.include_router(history_routes.router)
+    app.dependency_overrides[history_routes._current_user] = lambda: {"id": "author"}
+    client = TestClient(app)
+    work = {"id": "work", "score": {"version": "0.10.0", "instructions": []}, "svg": "<svg/>",
+            "render_seed": 77, "composition_seed": 5, "render_wild": True, "catalog_id": "default"}
+    monkeypatch.setattr(history_routes._db, "get_items", lambda owner, ids: [work])
+    calls = []
+
+    def replay(owner_id, payload, row):
+        calls.append((owner_id, payload, row))
+        return {"svg": "<svg id='replayed'/>"}
+
+    monkeypatch.setattr(pipeline_runtime, "get_service", lambda: SimpleNamespace(replay_for=replay))
+    response = client.get("/api/history/work/svg", params={"profile": "live"})
+    assert response.status_code == 200
+    assert response.text == "<svg id='replayed'/>"
+    [(owner_id, payload, row)] = calls
+    assert owner_id == "author"
+    assert row is work
+    assert payload["svg_profile"] == "live"
+    assert (payload["render_seed"], payload["composition_seed"], payload["wild"]) == (77, 5, True)

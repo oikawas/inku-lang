@@ -6,6 +6,12 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 36 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-26 — works on Score 0.10 and later export as editable, compat and live
+
+A saved work's export (`GET /api/history/{id}/svg`) redraws from the Score for every profile but display. That redraw went through the render entry that carries no resource policy, so for a work on Score 0.10 or later (every work the app makes today) the render core refused it ("score cannot be rendered: checked performance stopped: [… InvalidCompactPerformance …]") and the editable, compat and live exports answered 422. The export now goes through the shared replay that `/api/render-svg` uses, and draws under the work's own resource policy, colors, paper, limits and seeds. Display still returns the stored SVG. Exports of works on Score 0.9 and earlier are unchanged.
+
+DDL, Score, and render versions are unchanged.
+
 ### 2026-09-26 — Android's export offers the Live SVG
 
 A work's export sheet gains a fourth SVG, "Live SVG" (`live`: editable's structure with display's textures and touch). As from the Web's export menus (the same day), a work can be handed as a file to video software that draws it per instruction, such as VIA2. The shared core draws the saved Score again with the work's colors, seeds and Wild, so the file is the one the Web exports.

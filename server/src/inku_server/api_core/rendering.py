@@ -201,6 +201,11 @@ def _composition_seed(value: object) -> int | None:
 # core will not draw.
 _RENDER_REFUSAL_PREFIX = "render failed: "
 
+# Score versions whose saved resource policy governs every performance. The
+# plain render refuses them, so their redraws go through the shared replay
+# (`replay_for`) instead.
+_COMPACT_SCORE_VERSIONS = frozenset({"0.10.0", "0.11.0", "0.12.0", "0.13.0", "0.14.0", "0.15.0"})
+
 
 @contextmanager
 def _render_refusals_as_422():

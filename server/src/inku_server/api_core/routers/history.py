@@ -17,7 +17,7 @@ from ... import thumbs_db as _thumbs_db
 from ..common import _unexpected_http_error
 from ..deps import _current_user
 from ..models import HistoryItem, HistoryListResponse, HistoryPostBody
-from ..rendering import _capture_history_coerce_observability, _effective_limits, _add_history_item, _output_save_settings, _render_metadata, _render_score_svg, _render_seed_from_text, _render_with_metadata, _resolved_catalog_id, _save_history_artifacts, _score_canvas_aspect_value, _score_with_canvas, _validated_canvas_aspect_override, _validated_svg_profile, _validated_variation_amplitude
+from ..rendering import _COMPACT_SCORE_VERSIONS, _capture_history_coerce_observability, _effective_limits, _add_history_item, _output_save_settings, _render_metadata, _render_score_svg, _render_seed_from_text, _render_with_metadata, _resolved_catalog_id, _save_history_artifacts, _score_canvas_aspect_value, _score_with_canvas, _validated_canvas_aspect_override, _validated_svg_profile, _validated_variation_amplitude
 
 
 router = APIRouter(dependencies=[Depends(_current_user)])
@@ -318,15 +318,36 @@ def api_history_svg(
     if not items:
         raise HTTPException(status_code=404, detail="history item not found")
     item = items[0]
+    score = item.get("score") or {}
     if svg_profile == "display":
         svg = item.get("svg", "")
+    elif score.get("version") in _COMPACT_SCORE_VERSIONS:
+        # The plain render below cannot carry a compact Score's resource
+        # policy, and the core refuses such a Score without one
+        # (InvalidCompactPerformance). The shared replay reads the policy,
+        # colors, paper and limits off the work itself, as /api/render-svg
+        # does, and a refusal reaches the app's handler with its reason.
+        from ...pipeline_runtime import get_service
+
+        svg = get_service().replay_for(
+            actor["id"],
+            {
+                "score": score,
+                "svg_profile": svg_profile,
+                "catalog_id": item.get("catalog_id") or item.get("render_color_catalog_id"),
+                "render_seed": item.get("render_seed"),
+                "composition_seed": item.get("composition_seed"),
+                "wild": bool(item.get("render_wild")),
+            },
+            item,
+        )["svg"]
     else:
         try:
             # The work is already in hand here, so it supplies its own colors:
             # this redraw is the same work, and re-resolving the id would give
             # it today's definition instead of the one it was drawn with.
             svg, _, _, _ = _render_score_svg(
-                item.get("score", {}),
+                score,
                 owner=actor["id"],
                 catalog_id=item.get("catalog_id") or item.get("render_color_catalog_id"),
                 svg_profile=svg_profile,

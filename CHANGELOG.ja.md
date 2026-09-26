@@ -6,6 +6,12 @@
 
 **本書が持つのは v2.5.0（2026-07-25、render engine 12）以降**の 36 版である。それより前は書庫にある。
 
+### 2026-09-26 — Score 0.10以降の作品を、editable・compat・liveで書き出せるようにする
+
+保存した作品の書き出し（`GET /api/history/{id}/svg`）は、display以外のプロファイルではScoreから描き直す。この描き直しは、作品の資源の方針を持たない描画の入口を通っていた。そのためScore 0.10以降の作品（いまのアプリで作る作品すべて）では、描画coreが「score cannot be rendered: checked performance stopped: [… InvalidCompactPerformance …]」と拒み、editable・compat・liveの書き出しが422になっていた。`/api/render-svg`と同じ共通の描き直しへ回し、作品自身の資源の方針・色・キャンバス・上限・seedで描く。displayは従来どおり保存済みのSVGを返す。Score 0.9以前の作品の書き出しは変わらない。
+
+DDL・Score・描画の版は変えない。
+
 ### 2026-09-26 — Androidの書き出しに「ライブ用SVG」を出す
 
 作品の書き出しシートのSVGに、4つ目として「ライブ用SVG」（`live`。編集用の構造に表示用の質感とタッチを持つ）を出す。Webの書き出しメニュー（同日）と同じく、作品を命令ごとに描く映像ソフト（VIA2等）へファイルで渡せる。保存Scoreを作品の色・seed・Wildで共有coreが描き直すので、Webから書き出したものと同じ中身になる。

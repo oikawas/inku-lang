@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import urllib.parse
 import urllib.request
 from datetime import datetime, timezone
 from typing import Literal
@@ -15,6 +16,7 @@ from ...limits import (
     LIMIT_GROUPS,
     limits_as_dict,
 )
+from ...persistence.backup import SQLiteSnapshotError
 from ...plugins import plugin_status_items
 from ...model_settings import MODEL_METADATA_KEYS, connection_for, model_provider_catalog, normalize_model_settings, public_model_settings, update_model_settings
 from ... import db as _db
@@ -343,6 +345,52 @@ def api_settings_update_models(
     )
 
 
+# Anthropic and Gemini hand their model lists out a page at a time (20 and 50
+# by default). A model past the first page would read as withdrawn below, and a
+# withdrawn model is marked EOL and switched off, so every page is read -- the
+# largest page each API allows, so one request is the usual case. The page cap
+# only stops a provider that never says it is done; a list cut short there
+# would retire real models, so it is an error rather than a partial answer.
+_MODEL_LIST_PAGE_SIZE = 1000
+_MODEL_LIST_PAGE_LIMIT = 20
+
+
+def _get_model_list_page(url: str, headers: dict[str, str]) -> object:
+    try:
+        req = urllib.request.Request(url, headers=headers, method="GET")
+        with urllib.request.urlopen(req, timeout=20) as resp:
+            return json.loads(resp.read().decode("utf-8"))
+    except (OSError, urllib.error.URLError, json.JSONDecodeError) as exc:
+        raise ValueError(f"model list fetch failed: {exc}") from exc
+
+
+def _fetch_paged_model_list(
+    base: str,
+    headers: dict[str, str],
+    *,
+    items_key: str,
+    first_query: dict[str, str],
+    next_query,
+) -> dict:
+    """Read every page of a paginated model list into one `{items_key: [...]}`.
+
+    `next_query(page)` answers the query for the page after `page`, or None when
+    `page` was the last one.
+    """
+    collected: list = []
+    query = first_query
+    for _ in range(_MODEL_LIST_PAGE_LIMIT):
+        page = _get_model_list_page(f"{base}?{urllib.parse.urlencode(query)}", headers)
+        if not isinstance(page, dict) or not isinstance(page.get(items_key), list):
+            raise ValueError("model list response did not contain models")
+        collected.extend(page[items_key])
+        following = next_query(page)
+        if following is None:
+            return {items_key: collected}
+        query = {**first_query, **following}
+    raise ValueError("model list response did not end")
+
+
 def _fetch_provider_model_list(provider_id: str, settings: dict) -> list[dict[str, str]]:
     catalog = {
         str(provider["id"]): provider
@@ -357,23 +405,39 @@ def _fetch_provider_model_list(provider_id: str, settings: dict) -> list[dict[st
     base_url = str(conn["base_url"]).rstrip("/")
     headers: dict[str, str] = {"Accept": "application/json"}
     if conn.get("kind") == "anthropic":
-        url = f"{base_url}/v1/models"
         if conn.get("api_key"):
             headers["x-api-key"] = str(conn["api_key"])
         headers["anthropic-version"] = "2023-06-01"
+        payload = _fetch_paged_model_list(
+            f"{base_url}/v1/models",
+            headers,
+            items_key="data",
+            first_query={"limit": str(_MODEL_LIST_PAGE_SIZE)},
+            next_query=lambda page: (
+                {"after_id": str(page["last_id"])}
+                if page.get("has_more") and page.get("last_id")
+                else None
+            ),
+        )
     elif conn.get("kind") == "gemini":
-        query = f"?key={urllib.parse.quote(str(conn.get('api_key') or ''))}" if conn.get("api_key") else ""
-        url = f"{base_url}/v1beta/models{query}"
+        # The key rides in the header the pipeline transport already uses. In
+        # the query string it would be written into every proxy and access log
+        # the URL passes through.
+        if conn.get("api_key"):
+            headers["x-goog-api-key"] = str(conn["api_key"])
+        payload = _fetch_paged_model_list(
+            f"{base_url}/v1beta/models",
+            headers,
+            items_key="models",
+            first_query={"pageSize": str(_MODEL_LIST_PAGE_SIZE)},
+            next_query=lambda page: (
+                {"pageToken": str(page["nextPageToken"])} if page.get("nextPageToken") else None
+            ),
+        )
     else:
-        url = f"{base_url}/models"
         if conn.get("api_key"):
             headers["Authorization"] = f"Bearer {conn['api_key']}"
-    try:
-        req = urllib.request.Request(url, headers=headers, method="GET")
-        with urllib.request.urlopen(req, timeout=20) as resp:
-            payload = json.loads(resp.read().decode("utf-8"))
-    except (OSError, urllib.error.URLError, json.JSONDecodeError) as exc:
-        raise ValueError(f"model list fetch failed: {exc}") from exc
+        payload = _get_model_list_page(f"{base_url}/models", headers)
 
     raw_models = payload.get("data") if isinstance(payload, dict) else None
     if raw_models is None and isinstance(payload, dict):
@@ -685,6 +749,12 @@ def api_settings_run_db_backup() -> DbBackupResult:
         result = _db.create_db_backup(manual=True)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
+    except SQLiteSnapshotError as e:
+        # A copy is named to the second, so a second press within it finds its
+        # name taken; the copy can also fail to be made or verified. Each says
+        # which in its message. Unhandled, both came back as a bare 500.
+        _logger.warning("manual DB backup was not written: %s", e)
+        raise HTTPException(status_code=409, detail=str(e)) from e
     return DbBackupResult(**result)
 
 

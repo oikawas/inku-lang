@@ -162,6 +162,10 @@ export interface LangPack {
 	errorProviderOther: (stage: string, status: number) => string;
 	errorRenderBusy: string;
 	errorDescriptionOnlyLabels: string;
+	errorUserHasWorks: string;
+	errorUserIsLineageOrigin: string;
+	errorLastAdministrator: string;
+	errorModelNotOffered: string;
 	runStatusElapsed: (seconds: string) => string;
 	runStatusTokens: (input: string, output: string) => string;
 	runStatusProgress: (done: number, total: number) => string;
@@ -682,6 +686,10 @@ export interface LangPack {
 	settingsUnreadWordsContexts: string;
 	settingsCurrentDb: string;
 	settingsDbFileSize: string;
+	settingsDbDefaultLabel: string;
+	settingsDbConnectionNote: string;
+	settingsDbBackupDirectoryLabel: string;
+	settingsDbBackupSavedLabel: string;
 	settingsDbBackupTitle: string;
 	settingsDbBackupUnsupported: string;
 	settingsDbBackupInterval: string;
@@ -757,6 +765,8 @@ export interface LangPack {
 	settingsModelRequiresApiKey: string;
 	settingsModelServiceModels: string;
 	settingsModelDeleteServiceConfirm: (provider: string) => string;
+	userDeleteConfirm: (username: string) => string;
+	groupDeleteConfirm: (group: string) => string;
 	settingsModelDeleteService: string;
 	settingsModelServiceMemoButton: string;
 	settingsModelServiceMemoTitle: (provider: string) => string;
@@ -916,6 +926,7 @@ export interface LangPack {
 	userGenerationCountLabel: string;
 	profileGenerationCountLabel: string;
 	loginRequiredMessage: string;
+	sessionExpiredMessage: string;
 	settingsAdminOnlyMessage: string;
 	userInfoLoadFailed: string;
 	userValidationCreate: string;
@@ -935,6 +946,8 @@ export interface LangPack {
 	userSaveChanges: string;
 	userSelectPrompt: string;
 	userManageUnavailable: string;
+	userLeaderScopeNote: string;
+	userOwnRowProfileHint: string;
 	userGroupLabel: string;
 	userNoGroup: string;
 	userDeleteBlockedMessage: string;
@@ -962,6 +975,9 @@ export interface LangPack {
 	historyLibraryTitle: string;
 	historyLibraryReturn: string;
 	historyLibraryLoadFailed: string;
+	historyLibraryEmpty: string;
+	historyTrashEmpty: string;
+	historyMutationFailed: (reason: string) => string;
 	historyLibraryRetry: string;
 	historyDisplayFormat: string;
 	historyGrouping: string;
@@ -984,6 +1000,7 @@ export interface LangPack {
 	historyChronologicalMode: string;
 	historyLineageMode: string;
 	historyLineageGroups: string;
+	historyLineageGroupsDerivedOnly: string;
 	historyLineageEmpty: string;
 	historyLineageWorkCount: (n: number) => string;
 	historyLineageStarCount: (n: number) => string;

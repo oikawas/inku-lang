@@ -12,6 +12,19 @@ export type HistoryBulkMutationPath =
 	| '/api/history/restore'
 	| '/api/history/permanent-delete';
 
+/** A bulk request the server refused. Nothing was projected locally. */
+export class HistoryMutationError extends Error {
+	readonly status: number;
+	readonly detail: unknown;
+
+	constructor(status: number, detail: unknown) {
+		super(`HTTP ${status}`);
+		this.name = 'HistoryMutationError';
+		this.status = status;
+		this.detail = detail;
+	}
+}
+
 type HistoryMutationManager = {
 	starredOnly: boolean;
 	forRevisionOnly: boolean;
@@ -176,11 +189,18 @@ export class HistoryMutations {
 
 	postIds = async (path: HistoryBulkMutationPath, ids: string[]): Promise<void> => {
 		if (!this.deps.signedIn()) return;
-		await this.deps.apiFetch(path, {
+		const response = await this.deps.apiFetch(path, {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({ ids })
 		});
+		// A refusal changed nothing on the server, so nothing changes here: the
+		// status used to go unread, and a failed permanent delete cleared the
+		// canvas and the selection as if the works were gone. The caller says so.
+		if (!response.ok) {
+			const body = await response.json().catch(() => ({})) as { detail?: unknown };
+			throw new HistoryMutationError(response.status, body.detail);
+		}
 
 		const current = this.deps.currentItem();
 		// Capture this before changing the flag: it decides whether the refreshed

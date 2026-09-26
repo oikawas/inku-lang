@@ -742,6 +742,9 @@
 			<span class="history-manager-count">
 				{#if historyDisplayMode === 'lineage'}
 					{groupDigits(lineageGroupTotal)} {t().historyLineageGroups}
+					<!-- The thumbnail tab lists only lineages that have a derivation
+					     (min_items=2); without saying so, every single work seemed gone. -->
+					{#if lineageThumbsMode}{t().historyLineageGroupsDerivedOnly}{/if}
 				{:else if managedHistoryTotal === 0}
 					0 / 0
 				{:else}
@@ -975,7 +978,9 @@
 								</button>
 							{/if}
 							<div class="lineage-group-summary">
-								<strong>{thumbnailPromptText(group.representative.source_text ?? group.representative.input)}</strong>
+								<!-- A work drawn straight from DDL has no description; its label ('DDL') is what the
+								     thumbnail grid shows for it, so the group names it the same way. -->
+								<strong>{thumbnailPromptText(group.representative.source_text ?? group.representative.input) || group.representative.display_label || ''}</strong>
 								<span>{t().historyLineageWorkCount(group.item_count)} · {t().historyLineageStarCount(group.starred_count)} · {t().historyLineageForRevisionCount(group.for_revision_count)} · {formatHistoryDate(group.latest_at)}</span>
 								{#if currentLineageRootId === group.root_node_id}<span class="current-lineage-badge">{t().historyCurrentLineage}</span>{/if}
 							</div>
@@ -1022,6 +1027,9 @@
 				{/each}
 			{/if}
 		</div>
+	{:else if !historyManagerLoading && managedHistoryItems.length === 0}
+		<!-- An empty page said nothing at all; an emptied trash looked unloaded. -->
+		<div class="history-empty-message">{historyManagerView === 'trash' ? t().historyTrashEmpty : t().historyLibraryEmpty}</div>
 	{:else if historyManagerTab === 'thumbs'}
 		<div class="history-thumb-grid-wrap" bind:this={thumbGridWrapEl}>
 			<div class="history-thumb-grid">
@@ -1189,12 +1197,12 @@
 	.share-settings-btn { align-self: flex-start; font-size: var(--btn-sm-font-size); }
 
 	.lineage-history-list { min-height: 0; overflow: auto; padding: 10px 12px 16px; display: flex; flex-direction: column; gap: 10px; }
-	.lineage-history-message { margin: auto; padding: 30px; color: var(--fg3); text-align: center; }
+	.lineage-history-message, .history-empty-message { margin: auto; padding: 30px; color: var(--fg3); text-align: center; }
 	.history-load-failure { margin: auto; display: grid; justify-items: center; gap: 10px; padding: 30px; color: var(--fg2); text-align: center; }
 	.history-load-failure p { margin: 0; }
 	.history-content { min-height: 0; flex: 1; display: grid; grid-template-columns: minmax(0, 1fr); }
 	.history-content.has-preview { grid-template-columns: minmax(0, 1fr) minmax(280px, 360px); }
-	.lineage-history-list, .history-thumb-grid-wrap, .history-table-wrap, .history-load-failure { order: 1; min-width: 0; }
+	.lineage-history-list, .history-thumb-grid-wrap, .history-table-wrap, .history-load-failure, .history-empty-message { order: 1; min-width: 0; }
 	.lineage-history-group { flex: 0 0 auto; border: 1px solid var(--border); border-radius: var(--r-lg); background: var(--panel); overflow: hidden; }
 	.lineage-history-group.current-lineage { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-light); }
 	.lineage-group-head { display: flex; align-items: center; gap: 10px; padding: 9px 10px; background: var(--panel); }

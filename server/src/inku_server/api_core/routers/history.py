@@ -17,7 +17,7 @@ from ... import thumbs_db as _thumbs_db
 from ..common import _unexpected_http_error
 from ..deps import _current_user
 from ..models import HistoryItem, HistoryListResponse, HistoryPostBody
-from ..rendering import _capture_history_coerce_observability, _effective_limits, _add_history_item, _render_metadata, _render_score_svg, _render_seed_from_text, _render_with_metadata, _resolved_catalog_id, _save_history_artifacts, _score_canvas_aspect_value, _score_with_canvas, _validated_canvas_aspect_override, _validated_svg_profile, _validated_variation_amplitude
+from ..rendering import _capture_history_coerce_observability, _effective_limits, _add_history_item, _output_save_settings, _render_metadata, _render_score_svg, _render_seed_from_text, _render_with_metadata, _resolved_catalog_id, _save_history_artifacts, _score_canvas_aspect_value, _score_with_canvas, _validated_canvas_aspect_override, _validated_svg_profile, _validated_variation_amplitude
 
 
 router = APIRouter(dependencies=[Depends(_current_user)])
@@ -327,6 +327,7 @@ def api_history_svg(
             # it today's definition instead of the one it was drawn with.
             svg, _, _, _ = _render_score_svg(
                 item.get("score", {}),
+                owner=actor["id"],
                 catalog_id=item.get("catalog_id") or item.get("render_color_catalog_id"),
                 svg_profile=svg_profile,
                 # Both seeds off the row, not one. `wild` and `composition_seed`
@@ -416,7 +417,7 @@ def api_history_post(
             # the row to say why.
             "render_limits": limits_as_dict(limits),
         }
-        svg, render_metadata = _render_with_metadata(score, render_metadata)
+        svg, render_metadata = _render_with_metadata(score, render_metadata, owner=actor["id"])
     except HTTPException:
         raise
     except Exception as e:  # noqa: BLE001
@@ -556,8 +557,21 @@ def api_history_acl_put(
     return [HistoryAclEntryOut(**entry) for entry in entries]
 
 
+# The files are written inside the request, each work's PNG rasterized there
+# too, so a request holds a worker for as long as its works take. The 1,000 the
+# other bulk actions share made that minutes for anyone who asked; a client
+# with more works asks again.
+_REBUILD_OUTPUT_FILES_MAX = 50
+
+
 @router.post("/api/history/rebuild-output-files")
 def api_history_rebuild_output_files(body: HistoryIdsBody, actor: dict = Depends(_current_user)) -> dict[str, int | bool]:
+    # Saving files is the administrator's switch; this route used to write them
+    # with the switch off.
+    if not _output_save_settings()["enabled"]:
+        raise HTTPException(status_code=409, detail="output file saving is disabled")
+    if len(body.ids) > _REBUILD_OUTPUT_FILES_MAX:
+        raise HTTPException(status_code=422, detail=f"at most {_REBUILD_OUTPUT_FILES_MAX} works per request")
     items = _db.get_items(actor["id"], body.ids)
     for item in items:
         _save_history_artifacts(item)

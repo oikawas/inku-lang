@@ -371,6 +371,22 @@ def test_a_thumbnail_baked_from_a_different_svg_is_stale(owner):
     assert missing, "a work with no thumbnail at all must be rebuilt"
 
 
+def test_a_permanent_delete_takes_its_thumbnail_and_a_rebuild_prunes_what_is_left(owner):
+    user, _ = owner
+    item = save_work(user)
+    bake_for(item)
+    assert thumbs_db.get_thumb(item["id"], 1) is not None
+
+    db.trash_items(user["id"], [item["id"]])
+    assert db.delete_items(user["id"], [item["id"]], require_trashed=True) == 1
+    assert thumbs_db.get_thumb(item["id"], 1) is None
+
+    # What an earlier build, or a failed second step, left behind.
+    thumbs_db.put_thumb("a-work-that-is-gone", 1, b"orphan", "hash")
+    assert thumbnails.prune_orphans() >= 1
+    assert thumbs_db.get_thumb("a-work-that-is-gone", 1) is None
+
+
 # ── T-9 ─────────────────────────────────────────────────────────────────────
 def test_the_old_thumbnail_is_served_while_it_is_being_rebuilt(owner, monkeypatch, rebuild_in_process):
     user, headers = owner

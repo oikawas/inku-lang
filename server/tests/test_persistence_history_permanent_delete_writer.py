@@ -19,6 +19,7 @@ from inku_server.persistence.schema import (
     HistoryRow,
     LineageEdgeRow,
     LineageNodeRow,
+    PipelineHistoryLinkRow,
 )
 
 
@@ -140,17 +141,17 @@ def test_history_permanent_delete_writer_owns_delete_and_db_delegates(
             return 7
 
     monkeypatch.setattr(db._history, "HistoryPermanentDeleteWriter", RecordingWriter)
-    dependencies = (object(), object(), object(), object())
+    dependencies = (object(), object(), object(), object(), object())
     for name, dependency in zip(
-        ("SessionLocal", "_actor_of", "_now_ms", "_delete_acl_for_histories"),
+        ("SessionLocal", "_actor_of", "_now_ms", "_delete_acl_for_histories", "_drop_thumbnails_of_deleted_works"),
         dependencies,
         strict=True,
     ):
         monkeypatch.setattr(db, name, dependency)
     assert db.delete_items("actor", ["item"], require_trashed=True) == 7
-    later_dependencies = (object(), object(), object(), object())
+    later_dependencies = (object(), object(), object(), object(), object())
     for name, dependency in zip(
-        ("SessionLocal", "_actor_of", "_now_ms", "_delete_acl_for_histories"),
+        ("SessionLocal", "_actor_of", "_now_ms", "_delete_acl_for_histories", "_drop_thumbnails_of_deleted_works"),
         later_dependencies,
         strict=True,
     ):
@@ -287,6 +288,52 @@ def test_permanent_delete_preserves_access_trash_lineage_acl_and_count() -> None
         assert remaining_acl_ids == {"owner-active", "read-row"}
 
 
+def test_permanent_delete_drops_fork_links_and_reports_the_deleted_ids() -> None:
+    """The fork link goes with its performance; the thumbnail hook hears after commit."""
+    engine = create_engine("sqlite+pysqlite:///:memory:")
+    Base.metadata.create_all(engine)
+    sessions = sessionmaker(bind=engine, autocommit=False, autoflush=False)
+
+    def link(history_id: str) -> PipelineHistoryLinkRow:
+        return PipelineHistoryLinkRow(
+            owner_id="owner", history_id=history_id, variation_id="variation",
+            revision="1", ddl_digest="digest", fork_context_bytes=b"{}", fork_context_digest="context",
+        )
+
+    with sessions() as session:
+        session.add_all([
+            _row("deleted", "owner", trashed=1),
+            _row("kept", "owner", trashed=0),
+            link("deleted"),
+            link("kept"),
+        ])
+        session.commit()
+
+    reported: list[list[str]] = []
+
+    def after_delete(ids: list[str]) -> None:
+        with sessions() as session:
+            # Called once the deletion is visible to another session.
+            assert session.get(HistoryRow, "deleted") is None
+        reported.append(list(ids))
+
+    writer = history.HistoryPermanentDeleteWriter(
+        sessions,
+        lambda user_id: {"id": user_id, "permission_groups": [], "group_id": None},
+        lambda: 1,
+        lambda _session, _ids: None,
+        after_delete,
+    )
+    assert writer.delete_items("owner", ["deleted", "kept"], require_trashed=True) == 1
+    assert reported == [["deleted"]]
+    with sessions() as session:
+        remaining = {row.history_id for row in session.query(PipelineHistoryLinkRow).all()}
+    assert remaining == {"kept"}
+
+    assert writer.delete_items("owner", ["kept"], require_trashed=True) == 0
+    assert reported == [["deleted"]]
+
+
 class _RecordingQuery:
     def __init__(self, session: "_RecordingSession", model: object) -> None:
         self.session = session
@@ -295,6 +342,10 @@ class _RecordingQuery:
     def filter(self, *clauses: object) -> "_RecordingQuery":
         self.session.events.append(("filter", self.model, len(clauses)))
         return self
+
+    def delete(self, **kwargs: object) -> int:
+        self.session.events.append(("bulk-delete", self.model, kwargs))
+        return 0
 
     def all(self) -> list[object]:
         self.session.events.append(("all", self.model))

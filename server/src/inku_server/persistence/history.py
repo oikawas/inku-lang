@@ -375,6 +375,24 @@ class HistoryThumbnailSourceReader:
             rows = session.execute(select(HistoryRow.id, HistoryRow.render_hash)).all()
         return [(str(item_id), render_hash) for item_id, render_hash in rows]
 
+    def existing_ids(self, ids: list[str]) -> set[str]:
+        """Which of these ids still name a stored work. Unscoped, as above.
+
+        The thumbnail prune asks this of the ids it holds pictures for. Asked in
+        chunks so a large store never exceeds SQLite's bound-parameter limit.
+        """
+        found: set[str] = set()
+        with self.session_factory() as session:
+            for start in range(0, len(ids), 500):
+                chunk = ids[start:start + 500]
+                found.update(
+                    str(item_id)
+                    for item_id, in session.execute(
+                        select(HistoryRow.id).where(HistoryRow.id.in_(chunk))
+                    )
+                )
+        return found
+
     def history_svgs(self, ids: list[str]) -> dict[str, str]:
         """The stored SVG of each id, for the thumbnail rebuild. Unscoped, as above.
 
@@ -541,6 +559,11 @@ class HistoryPermanentDeleteWriter:
     actor_of_fn: Callable[[str], dict]
     now_ms_fn: Callable[[], int]
     delete_acl_for_histories_fn: Callable[[object, list[str]], None]
+    # Told the ids that are gone once the deletion has committed, so a store
+    # outside this database -- the thumbnails -- can drop its copies. Called
+    # after the commit on purpose: a failure there leaves a picture behind for
+    # the next rebuild to prune, never a work half deleted.
+    after_delete_fn: Callable[[list[str]], None] | None = None
 
     def delete_items(
         self, user_id: str, ids: list[str], *, require_trashed: bool = False
@@ -583,10 +606,22 @@ class HistoryPermanentDeleteWriter:
                 for edge in touching:
                     edge.metadata_json = "{}"
             self.delete_acl_for_histories_fn(session, [row.id for row in rows])
+            # Read before the commit: the rows are expired and detached after it.
+            deleted_ids = [row.id for row in rows]
+            if deleted_ids:
+                # The link from a performance to its authoring revision exists
+                # only so that performance can be forked, and the performance is
+                # going. Left behind it kept the work's fork inputs, and the link
+                # route went on answering 200 for a work that no longer exists.
+                session.query(PipelineHistoryLinkRow).filter(
+                    PipelineHistoryLinkRow.history_id.in_(deleted_ids)
+                ).delete(synchronize_session=False)
             for row in rows:
                 session.delete(row)
             session.commit()
-            return len(rows)
+        if deleted_ids and self.after_delete_fn is not None:
+            self.after_delete_fn(deleted_ids)
+        return len(rows)
 
 
 @dataclass(frozen=True)

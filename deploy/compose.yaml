@@ -48,6 +48,12 @@ services:
     volumes:
       - inku-data:/data
     restart: unless-stopped
+    # A render holds its whole picture in memory: one Score with a single huge
+    # shape took 1.34 GB (measured 2026-09-26), and two renders run at once by
+    # default. Past this ceiling the kernel stops this container alone and
+    # `restart` brings it back, instead of choosing among the host's other
+    # processes. Raise INKU_API_MEM_LIMIT with the server's render concurrency.
+    mem_limit: ${INKU_API_MEM_LIMIT:-4g}
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8100/health', timeout=3)"]
       interval: 15s

@@ -81,6 +81,7 @@ export function createSettingsController<TActor extends SettingsActor>(
 		apiFetch: deps.apiFetch,
 		currentUser: deps.currentUser,
 		refreshCurrentUserSettings: deps.refreshCurrentUserSettings,
+		requestConfirmation: deps.requestConfirmation,
 		describeApiError: deps.describeApiError
 	});
 	const navigation = createSettingsNavigation({

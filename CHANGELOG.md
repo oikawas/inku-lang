@@ -6,6 +6,40 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 36 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-26 — Source review decisions: keeping an administrator and a way in, enforcing published models, leaders' user management, and render memory
+
+The items the same review left to the author are fixed as decided.
+
+- **The last administrator can be neither removed from `admins` nor deleted.** Once it happened, the settings that grant `admins` were themselves `admins`-only and `inku-admin` only resets passwords, so only editing the database brought it back. Both are refused with 409.
+- **A request to turn local sign-in off is refused.** The Google switch has no sign-in behind it, so turning local sign-in off locked everyone out. The manual now says how to turn it back on from single-user mode after an earlier version turned it off.
+- **Setting a password again ends the account's other sessions.** A reset by an administrator or by `inku-admin reset-password` ends all of them; a person's own change ends all but the one that made it. Sessions made with the old password used to outlive a reset.
+- **A change request that a page on another site makes the browser send is refused.** Single-user mode answers every request without credentials as the administrator, so another site could have the browser send a `POST` with no body (a backup, a thumbnail rebuild, a plugin reload). A change request with `Sec-Fetch-Site: cross-site` from an origin the CORS policy does not admit now gets 403. The CLI, the Android app, and the Web's proxy are unaffected. The manual says not to publish the API port to a LAN in single-user mode.
+- **Members outside the administrators use only published models.** A model an administrator unpublished, or one no list offers, was still called on the server's API key when a request named it through the API or the CLI. Drawing, the demo instruction, colophons, and refinement advice now refuse it with 403. Developer mode, which hides the connection service that holds the built-in defaults, is not consulted.
+- **Web: leaders get user management.** The API and the CLI let a leader manage the ordinary users of their own organisation group while the page kept the tab for administrators. A leader's page shows no choice of permission group or organisation group and no management of organisation groups. The leader's own row in the list offers no edit or delete, which the server refuses, and points to their profile instead.
+- **One account renders one picture at a time.** A second render waits up to 30 seconds for the first. One render of an extreme shape takes gigabytes, and an account holding every render slot stopped everyone else's drawing. The distributed Compose files cap the `api` container's memory (`INKU_API_MEM_LIMIT`, `4g` by default).
+- Writing a work's files again (`POST /api/history/rebuild-output-files`) is refused while automatic saving is off and takes at most 50 works at a time. The files, PNG included, are made inside the request, and the 1,000 it allowed held a worker for minutes.
+
+The route count (107) is unchanged. DDL, Score, and render versions are unchanged.
+
+### 2026-09-26 — Source review: safer deletions and permissions, provider keys, and Web stops, notices, and confirmations
+
+A review of the server and Web source fixed the following defects.
+
+- **Only administrators switch how the server signs people in.** `PUT /api/auth/config` accepted the user-manager permission (administrators or leaders), so, against the SPEC's "global settings are for admins only", a leader could turn local sign-in off for everyone.
+- **A permanent delete also removes the works' thumbnails and pipeline fork links.** Thumbnails live in a separate database that nothing cleaned, so pictures of deleted works stayed on disk. The thumbnail rebuild prunes thumbnails of works that are already gone.
+- **Deleting an account also removes its pipeline records** (drafts, executions, captured provider input and output, fork links). While another account's lineage or colophon points at one of its works (tombstones included), the deletion is refused with a reason (409) instead of failing on a foreign key (500). What should happen in that case is not decided, so it is only refused.
+- **Gemini and Anthropic model lists are read to the last page.** Models past the first page were taken as withdrawn, marked EOL, and switched off. The Gemini API key travels in `x-goog-api-key` instead of the URL. The demo instruction does the same, quotes the model id as a path segment, and gives every provider the same timeout.
+- **Requests over 512 KB no longer fail in the distributed web image.** The adapter-node default limit (512K) of the proxy that forwards `/api` was smaller than the API's own (16 MiB), so a large plugin document or the Score of a large work failed with 500 before reaching the API. The web image sets `BODY_SIZE_LIMIT` to `16M`, and the manual says to raise it with the API's limit (the Vite-served web on Pentala has no such limit).
+- A second manual DB backup within the same second is refused with 409 instead of 500. The DB size on the settings screen includes the write-ahead log. The secret key file is created owner-only and exclusively in one step. A Redis URL is logged without its password.
+- **Web: tooltips show on hover and keyboard focus only.** A clicked button keeps focus, so its bubble covered the menu, confirmation, or tab heading the click opened. The user menu hides its tooltip while open and names no logout in single-user mode.
+- **Web: the DDL dialog's stop ends the pipeline run.** It aborted only the start request, and the dialog, which cannot close while drawing, stayed until the model answered.
+- **Web: a refused move to trash, restore, or permanent delete says so.** The response was not read; the action counted as done and cleared the selection and the displayed work.
+- **Web: deleting a user or a group asks first.** One click deleted it. Refusals to delete read in the page's language.
+- **Web: a session that has ended returns to the sign-in screen.** After it expired or was logged out in another tab, the workspace stayed up and every action failed with "invalid session". When the API answers 401, the page says why and returns to sign-in.
+- Web: an empty library view and an empty trash say so. Grouping by lineage in the thumbnail view says it lists only lineages with derivations. A DDL-only lineage is named "DDL". The DB settings show their connection note and some labels in the page's language instead of English.
+
+The route count (107) and the API surface are unchanged. DDL, Score, and render versions are unchanged.
+
 ### v2.15.32 — include every locked crate in the API image notices (Build 1108, 2026-09-26)
 
 The v2.15.31 API image build stopped while collecting Rust dependency notices: the native wheel build had fetched only the crates it compiled, while the conservative notice inventory covers all of `Cargo.lock`. The builder now fetches the full lockfile before generating that inventory. This changes the distribution build, not application behavior.

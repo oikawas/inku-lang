@@ -45,13 +45,15 @@ def test_accounts_owns_deleter_and_db_delegates(monkeypatch: pytest.MonkeyPatch)
             return True
 
     monkeypatch.setattr(db._accounts, "UserAccountDeleter", RecordingDeleter)
-    dependencies = tuple(object() for _ in range(6))
+    dependencies = tuple(object() for _ in range(8))
     monkeypatch.setattr(db, "SessionLocal", dependencies[0])
     monkeypatch.setattr(db, "has_permission_group", dependencies[1])
     monkeypatch.setattr(db, "_holds_no_elevated_group", dependencies[2])
     monkeypatch.setattr(db, "_owner_actor", dependencies[3])
     monkeypatch.setattr(db, "_owned_by", dependencies[4])
     monkeypatch.setattr(db, "_delete_acl_for_histories", dependencies[5])
+    monkeypatch.setattr(db, "_drop_thumbnails_of_deleted_works", dependencies[6])
+    monkeypatch.setattr(db, "_an_admin_remains", dependencies[7])
 
     assert db.delete_user("u", cascade=True, actor={"id": "a"}) is True
     assert calls == [(dependencies, ("u",), {"cascade": True, "actor": {"id": "a"}})]
@@ -221,6 +223,11 @@ def test_deleter_preserves_history_gate_and_complete_cleanup_order() -> None:
         "lineage_edges",
         "lineage_nodes",
         "user_permission_groups",
+        "pipeline_history_links",
+        "pipeline_candidate_executions",
+        "provider_observations",
+        "variation_authority_actions",
+        "variation_authority",
     ]
     history_acl_delete = next(event for event in cascade.events if event[:2] == ("bulk-delete", "history_acl"))
     assert history_acl_delete[2] == {"synchronize_session": False}
@@ -244,3 +251,47 @@ def test_deleter_exceptions_propagate() -> None:
         deleter_type(Session, lambda *_args: False, lambda _session: object(),
                      lambda value: {"id": value}, lambda *_args: object(),
                      lambda *_args: None).delete_user("u")
+
+
+def test_deleter_removes_only_the_accounts_pipeline_rows() -> None:
+    """Drafts, executions and fork links are keyed by owner alone and go with it."""
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+
+    from inku_server.persistence.schema import (
+        Base,
+        PipelineCandidateExecutionRow,
+        PipelineHistoryLinkRow,
+        UserAccountRow,
+    )
+
+    deleter_type = _deleter_or_skip()
+    engine = create_engine("sqlite+pysqlite:///:memory:")
+    Base.metadata.create_all(engine)
+    sessions = sessionmaker(bind=engine, autocommit=False, autoflush=False)
+    with sessions() as session:
+        for owner in ("gone", "stays"):
+            session.add_all([
+                UserAccountRow(id=owner, username=owner, email=f"{owner}@example.test",
+                               password_hash="x", role="user", at=1),
+                PipelineHistoryLinkRow(owner_id=owner, history_id=f"history-{owner}", variation_id="v",
+                                       revision="1", ddl_digest="d", fork_context_bytes=b"{}",
+                                       fork_context_digest="c"),
+                PipelineCandidateExecutionRow(owner_id=owner, execution_id=f"execution-{owner}",
+                                              variation_id="v", sequence="1", state_bytes=b"s",
+                                              state_digest="d", created_at=1, updated_at=1),
+            ])
+        session.commit()
+
+    deleter = deleter_type(
+        sessions,
+        lambda *_args: True,
+        lambda _session: None,
+        lambda user_id: {"id": user_id},
+        lambda actor, column: column == actor["id"],
+        lambda *_args: None,
+    )
+    assert deleter.delete_user("gone") is True
+    with sessions() as session:
+        assert {row.owner_id for row in session.query(PipelineHistoryLinkRow)} == {"stays"}
+        assert {row.owner_id for row in session.query(PipelineCandidateExecutionRow)} == {"stays"}

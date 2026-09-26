@@ -203,6 +203,19 @@ export class SessionState {
 		}
 	}
 
+	/**
+	 * The server stopped recognising this page's session -- it expired, was
+	 * ended in another tab, or its account was deleted. Return to the sign-in
+	 * screen and say why, instead of leaving every later action to fail with
+	 * "invalid session". Nothing to do when already signed out.
+	 */
+	expireAfterUnauthorized(): void {
+		if (!this.currentUser) return;
+		this.profileOpen = false;
+		this.clearActor();
+		this.loginStatus = t().sessionExpiredMessage;
+	}
+
 	async logout(): Promise<void> {
 		if (this.currentUser || this.authToken) {
 			try { await this.deps.apiFetch('/api/auth/logout', { method: 'POST' }); } catch {}

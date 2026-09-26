@@ -5,6 +5,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 from ... import db as _db
+from ...persistence.accounts import LastAdministratorError
 from ..common import _unexpected_http_error
 from ..deps import _user_manager
 from ..models import UserAccountItem
@@ -133,6 +134,10 @@ def api_users_update(
             raise HTTPException(status_code=403, detail="leaders cannot move members outside their group")
     try:
         user = _db.update_user(user_id, actor=actor, **body.model_dump(exclude_unset=True))
+    except LastAdministratorError as e:
+        # A conflict with the server's state, not a malformed request: the
+        # same change succeeds once another account holds `admins`.
+        raise HTTPException(status_code=409, detail=str(e)) from e
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception as e:  # noqa: BLE001

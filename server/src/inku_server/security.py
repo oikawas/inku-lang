@@ -5,7 +5,9 @@ from __future__ import annotations
 import os
 import logging
 import time
+import urllib.parse
 from collections import OrderedDict, deque
+from collections.abc import Callable
 from dataclasses import dataclass
 from threading import BoundedSemaphore, Lock
 from starlette.responses import JSONResponse
@@ -16,6 +18,20 @@ _logger = logging.getLogger(__name__)
 # Redis shared pool
 _REDIS_CLIENT = None
 _REDIS_INITIALIZED = False
+
+
+def _url_without_credentials(url: str) -> str:
+    """The URL as a log line may show it: `redis://:secret@host` carries a password."""
+    try:
+        parts = urllib.parse.urlsplit(url)
+        port = parts.port
+    except ValueError:
+        return "<unparseable URL>"
+    if parts.username is None and parts.password is None:
+        return url
+    host = parts.hostname or ""
+    netloc = f"{host}:{port}" if port else host
+    return urllib.parse.urlunsplit((parts.scheme, netloc, parts.path, parts.query, parts.fragment))
 
 
 def _get_redis_client():
@@ -36,7 +52,7 @@ def _get_redis_client():
         _logger.info("Connected to Redis for distributed rate limiting.")
     except Exception as e:
         _logger.warning(
-            f"Failed to connect to Redis at {redis_url}: {e}. "
+            f"Failed to connect to Redis at {_url_without_credentials(redis_url)}: {e}. "
             "Falling back to in-memory rate limiter."
         )
         _REDIS_CLIENT = None
@@ -128,6 +144,38 @@ class ConcurrencyLimitMiddleware:
             await self.app(scope, receive, send)
         finally:
             self._slots.release()
+
+
+_UNSAFE_METHODS = frozenset({"POST", "PUT", "PATCH", "DELETE"})
+
+
+class CrossSiteWriteGuardMiddleware:
+    """Refuse a request that changes something when the browser says another site sent it.
+
+    Single-user mode answers every request without credentials as the owner,
+    an administrator. A page on any other site could therefore have the
+    owner's browser send a POST that needs no body -- start a backup, rebuild
+    the thumbnails, reload the plugins -- and a browser sends that without a
+    CORS preflight. Browsers mark such a request `Sec-Fetch-Site: cross-site`.
+    The CLI and the Android app send no such header, and the Web's own proxy
+    forwards `same-origin`, so they pass untouched; so does an origin the CORS
+    policy admits, which is a cross-site client someone configured on purpose.
+    """
+
+    def __init__(self, app: ASGIApp, *, origin_allowed: Callable[[str], bool]) -> None:
+        self.app = app
+        self._origin_allowed = origin_allowed
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] == "http" and scope.get("method", "GET").upper() in _UNSAFE_METHODS:
+            headers = dict(scope.get("headers") or [])
+            if headers.get(b"sec-fetch-site") == b"cross-site":
+                origin = headers.get(b"origin", b"").decode("latin-1")
+                if not (origin and self._origin_allowed(origin)):
+                    response = JSONResponse({"detail": "cross-site request refused"}, status_code=403)
+                    await response(scope, receive, send)
+                    return
+        await self.app(scope, receive, send)
 
 
 @dataclass(frozen=True)

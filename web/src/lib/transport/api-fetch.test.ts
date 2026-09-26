@@ -148,3 +148,18 @@ test('an abort during the default wait rejects with AbortError', async () => {
 	assert.equal(calls.length, 1);
 	assert.equal(calls[0].init?.signal, controller.signal);
 });
+
+test('a 401 is reported once per response and still returned to the caller', async () => {
+	const calls: FetchCall[] = [];
+	const unauthorized: string[] = [];
+	const refused = response(401, '{"detail":"invalid session"}');
+	const apiFetch = createApiFetch({
+		fetch: sequenceFetch([refused, response(200, 'ok')], calls),
+		onUnauthorized: (path) => unauthorized.push(path)
+	});
+
+	assert.equal(await apiFetch('/api/history'), refused);
+	assert.deepEqual(unauthorized, ['/api/history']);
+	assert.equal((await apiFetch('/api/info')).status, 200);
+	assert.deepEqual(unauthorized, ['/api/history']);
+});

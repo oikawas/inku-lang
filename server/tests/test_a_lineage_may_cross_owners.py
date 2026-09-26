@@ -303,3 +303,26 @@ def test_a_deriver_cannot_promote_the_parents_node(world) -> None:
     world.share_with(world.bob)
     world.derive(world.bob, 2_000, "bob varies it")
     assert db.promote_lineage_node(world.bob["id"], world.parent_node) is None
+
+
+def test_deleting_the_origins_account_is_refused_while_another_derives_from_it(world) -> None:
+    """Refused with a reason, and nothing removed -- the foreign keys used to 500.
+
+    Bob's edge names Alice's node as its parent, so removing her account would
+    leave his chain pointing at nothing. A tombstone counts too: deleting the
+    parent work first keeps the node, and the account still cannot go.
+    """
+    world.share_with(world.bob)
+    world.derive(world.bob, 2_000, "bob varies it")
+    admin, admin_h, admin_t = _member("cross-admin", ["admins"], None)
+    try:
+        refused = client.delete(f"/api/users/{world.alice['id']}", params={"cascade": "true"}, headers=admin_h)
+        assert refused.status_code == 409, refused.text
+        assert db.get_items(world.alice["id"], [world.parent["id"]]), "the refusal removed the work anyway"
+
+        assert db.delete_items(world.alice["id"], [world.parent["id"]]) == 1
+        tombstone_refused = client.delete(f"/api/users/{world.alice['id']}", headers=admin_h)
+        assert tombstone_refused.status_code == 409, tombstone_refused.text
+    finally:
+        db.delete_session(admin_t)
+        db.delete_user(admin["id"])

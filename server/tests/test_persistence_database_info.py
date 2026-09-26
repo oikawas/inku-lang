@@ -64,6 +64,20 @@ def test_database_info_reports_file_path_and_current_size(tmp_path) -> None:
     assert info["is_default"] is False
 
 
+def test_database_info_counts_the_write_ahead_log(tmp_path) -> None:
+    reader = _reader_or_skip()
+    database_path = tmp_path / "runtime.sqlite"
+    database_path.write_bytes(b"main")
+    (tmp_path / "runtime.sqlite-wal").write_bytes(b"committed-pages")
+    url = f"sqlite:///{database_path}"
+    sql_engine = create_engine(url)
+    try:
+        info = reader(sql_engine, PersistenceConfig(url, url)).get()
+    finally:
+        sql_engine.dispose()
+    assert info["file_size_bytes"] == len(b"main") + len(b"committed-pages")
+
+
 def test_database_info_preserves_memory_database_absence() -> None:
     reader = _reader_or_skip()
     url = "sqlite:///:memory:"

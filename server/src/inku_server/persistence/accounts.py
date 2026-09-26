@@ -9,7 +9,7 @@ import json
 import secrets
 from typing import Any
 
-from sqlalchemy import text
+from sqlalchemy import or_, select, text
 
 from .access import has_permission_group
 from .schema import (
@@ -20,12 +20,43 @@ from .schema import (
     LineageNodeRow,
     OkugakiRow,
     PermissionGroupRow,
+    PipelineCandidateExecutionRow,
+    PipelineHistoryLinkRow,
+    ProviderObservationRow,
     UnreadWordRow,
     UserAccountRow,
     UserGroupRow,
     UserPermissionGroupRow,
     UserSessionRow,
+    VariationAuthorityActionRow,
+    VariationAuthorityRow,
 )
+
+# The shared pipeline's tables, every one keyed by the owning account alone:
+# drafts (their descriptions and DDL), acknowledged commits, resumable
+# executions, captured provider requests and responses, and the links from a
+# saved performance back to its authoring revision. Nothing outside the account
+# can reach them, so once the account is gone they are only a copy of its
+# writing that nobody can open or delete.
+_OWNER_KEYED_PIPELINE_ROWS = (
+    PipelineHistoryLinkRow,
+    PipelineCandidateExecutionRow,
+    ProviderObservationRow,
+    VariationAuthorityActionRow,
+    VariationAuthorityRow,
+)
+
+
+class LastAdministratorError(ValueError):
+    """The change would leave no account in `admins`.
+
+    Nothing inside the product can undo that: the settings that grant `admins`
+    are themselves `admins`-only, `inku-admin` only resets passwords, and
+    single-user mode keeps refusing requests on a database without one.
+    """
+
+    def __init__(self) -> None:
+        super().__init__("the last administrator cannot be removed")
 
 
 def hash_password(password: str) -> str:
@@ -587,6 +618,10 @@ class UserAccountUpdater:
     holds_no_elevated_group_fn: Callable[[Any], Any]
     user_to_dict_fn: Callable[[UserAccountRow, str | None], dict]
     unset: object
+    # Asked after a membership change, inside the same transaction.
+    admin_remains_fn: Callable[[Any], bool] | None = None
+    # Signs the account out everywhere when its password is set.
+    end_sessions_fn: Callable[..., int] | None = None
 
     def update_user(
         self,
@@ -623,8 +658,14 @@ class UserAccountUpdater:
                 row.email = email
             if password is not None and password:
                 row.password_hash = self.hash_password_fn(password)
+                # A reset is how an administrator locks out whoever learned the
+                # old password; sessions signed in with it would outlive it.
+                if self.end_sessions_fn is not None:
+                    self.end_sessions_fn(session, row.id)
             if permission_groups is not None:
                 self.set_permission_groups_fn(session, row, permission_groups)
+                if self.admin_remains_fn is not None and not self.admin_remains_fn(session):
+                    raise LastAdministratorError()
             if group_id is not self.unset:
                 group_id = group_id if isinstance(group_id, str) else None
                 if group_id and not session.get(UserGroupRow, group_id):
@@ -642,6 +683,8 @@ class CurrentUserProfileUpdater:
     verify_password_fn: Callable[[str, str], bool]
     hash_password_fn: Callable[[str], str]
     user_to_dict_fn: Callable[[UserAccountRow, str | None], dict]
+    # Signs the account out of its other sessions when the password changes.
+    end_sessions_fn: Callable[..., int] | None = None
 
     def update_current_user_profile(
         self,
@@ -650,6 +693,7 @@ class CurrentUserProfileUpdater:
         email: str | None = None,
         password: str | None = None,
         current_password: str | None = None,
+        keep_session_token: str | None = None,
     ) -> dict | None:
         with self.session_factory() as session:
             row = session.get(UserAccountRow, user_id)
@@ -666,6 +710,10 @@ class CurrentUserProfileUpdater:
                 ):
                     raise ValueError("current password is invalid")
                 row.password_hash = self.hash_password_fn(password)
+                # The device that made the change stays signed in; any other
+                # may be the reason for it.
+                if self.end_sessions_fn is not None:
+                    self.end_sessions_fn(session, row.id, keep_token=keep_session_token)
             session.commit()
             session.refresh(row)
             group_name = session.get(UserGroupRow, row.group_id).name if row.group_id else None
@@ -708,6 +756,11 @@ class UserAccountDeleter:
     owner_actor_fn: Callable[[str], dict]
     owned_by_fn: Callable[[dict, Any], Any]
     delete_acl_for_histories_fn: Callable[[Any, list[str]], None]
+    # Told the ids of the works a cascade removed, after the commit, so the
+    # thumbnails -- a separate database -- can drop their copies too.
+    after_history_delete_fn: Callable[[list[str]], None] | None = None
+    # Asked once the account's memberships are gone, inside the transaction.
+    admin_remains_fn: Callable[[Any], bool] | None = None
 
     def delete_user(
         self,
@@ -716,6 +769,7 @@ class UserAccountDeleter:
         cascade: bool = False,
         actor: dict | None = None,
     ) -> bool:
+        deleted_history_ids: list[str] = []
         with self.session_factory() as session:
             query = session.query(UserAccountRow).filter(UserAccountRow.id == user_id)
             if actor is not None and not self.has_permission_group_fn(actor, "admins"):
@@ -739,16 +793,40 @@ class UserAccountDeleter:
                     .first()
                 ):
                     raise ValueError("user has history")
-            else:
-                self.delete_acl_for_histories_fn(
-                    session,
-                    [
-                        item_id
-                        for item_id, in session.query(HistoryRow.id).filter(
-                            self.owned_by_fn(target_owner, HistoryRow.user_id)
-                        )
-                    ],
-                )
+            # The ownership test `owned_by_fn` applies, written out because it
+            # has to be an expression a subquery can carry.
+            target_nodes = select(LineageNodeRow.id).where(LineageNodeRow.user_id == user_id)
+            # Asked before anything is removed. A lineage may cross owners, so
+            # another account's derivation can name one of this account's nodes
+            # as its parent -- a tombstone included, which is what is left of a
+            # work its owner deleted -- and another account's colophon can be
+            # about one. Deleting the node would leave those pointing at nothing;
+            # the foreign keys refuse that at the commit, and the refusal used to
+            # surface as a bare 500. What should become of somebody else's chain
+            # when its origin's account goes has not been decided, so the
+            # deletion is refused with the reason instead.
+            if (
+                session.query(LineageEdgeRow.id).filter(
+                    LineageEdgeRow.user_id != user_id,
+                    or_(
+                        LineageEdgeRow.parent_node_id.in_(target_nodes),
+                        LineageEdgeRow.child_node_id.in_(target_nodes),
+                    ),
+                ).first()
+                or session.query(OkugakiRow.id).filter(
+                    OkugakiRow.user_id != user_id,
+                    OkugakiRow.target_node_id.in_(target_nodes),
+                ).first()
+            ):
+                raise ValueError("other accounts' works derive from this user's works")
+            if cascade:
+                deleted_history_ids = [
+                    item_id
+                    for item_id, in session.query(HistoryRow.id).filter(
+                        self.owned_by_fn(target_owner, HistoryRow.user_id)
+                    )
+                ]
+                self.delete_acl_for_histories_fn(session, deleted_history_ids)
                 session.query(HistoryRow).filter(
                     self.owned_by_fn(target_owner, HistoryRow.user_id)
                 ).delete()
@@ -773,6 +851,14 @@ class UserAccountDeleter:
             session.query(UserPermissionGroupRow).filter(
                 UserPermissionGroupRow.user_id == user_id
             ).delete()
+            if self.admin_remains_fn is not None and not self.admin_remains_fn(session):
+                raise LastAdministratorError()
+            for table in _OWNER_KEYED_PIPELINE_ROWS:
+                session.query(table).filter(table.owner_id == user_id).delete(
+                    synchronize_session=False
+                )
             session.delete(row)
             session.commit()
-            return True
+        if deleted_history_ids and self.after_history_delete_fn is not None:
+            self.after_history_delete_fn(deleted_history_ids)
+        return True

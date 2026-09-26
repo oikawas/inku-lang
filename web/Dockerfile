@@ -15,9 +15,17 @@ RUN npm run build \
     && node scripts/verify-license-notices.mjs
 
 FROM node:22-bookworm-slim AS runtime
+# BODY_SIZE_LIMIT matches the API's own ceiling (INKU_MAX_REQUEST_BODY_BYTES,
+# 16 MiB; adapter-node reads "16M" in the same 1024-based units). Every /api
+# request passes through this server's proxy first, and adapter-node's default
+# of 512K made anything larger -- a plugin document near the API's 500,000
+# characters, the Score of a large work -- fail here with a 500 the API never
+# saw. Measured 2026-09-26: a 750 KB body got 500 here and reached the API
+# (422, invalid document) when sent to it directly.
 ENV NODE_ENV=production \
     HOST=0.0.0.0 \
-    PORT=5173
+    PORT=5173 \
+    BODY_SIZE_LIMIT=16M
 WORKDIR /app
 COPY --from=build /app/build ./build
 COPY --from=build /app/package.json /app/package-lock.json ./

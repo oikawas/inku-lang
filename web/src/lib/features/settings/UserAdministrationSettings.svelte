@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
 	import { t } from '$lib/i18n/index.svelte';
-	import type { PermissionGroup } from '$lib/permissionGroups';
+	import { canManageUsers, managesListedUser, type PermissionGroup } from '$lib/permissionGroups';
 	import type {
 		CreateSettingsUserInput,
 		SettingsUserAdministration,
@@ -37,6 +37,10 @@
 	const userSettingsStatus = $derived(loginStatus ?? administration.status);
 	const userSettingsLoading = $derived(administration.loading);
 	const isAdmin = $derived(currentUser?.permission_groups?.includes('admins') === true);
+	// Leaders manage the ordinary members of their own group. The server holds
+	// them to that, and the state layer sends their changes as exactly that, so
+	// the choices only an administrator could make are not shown to them.
+	const managesUsers = $derived(canManageUsers(currentUser));
 
 	// Unsaved account drafts stay with these inputs. Passwords cross into the
 	// controller only as transient operation arguments and are never controller state.
@@ -193,7 +197,12 @@
 		}
 	}
 
-	async function onRemoveUser(id: string): Promise<void> {
+	function onRemoveUser(user: SettingsUserItem): void {
+		if (userMutationPending) return;
+		administration.confirmRemoveUser(user, () => void removeConfirmedUser(user.id));
+	}
+
+	async function removeConfirmedUser(id: string): Promise<void> {
 		if (userMutationPending) return;
 		userMutationPending = true;
 		try {
@@ -213,7 +222,12 @@
 		}
 	}
 
-	async function onRemoveGroup(group: SettingsUserGroup): Promise<void> {
+	function onRemoveGroup(group: SettingsUserGroup): void {
+		if (userMutationPending) return;
+		administration.confirmRemoveGroup(group, () => void removeConfirmedGroup(group));
+	}
+
+	async function removeConfirmedGroup(group: SettingsUserGroup): Promise<void> {
 		if (userMutationPending) return;
 		userMutationPending = true;
 		try {
@@ -247,7 +261,7 @@
 <div class="user-administration-settings">
 	<div class="popover-group user-account-group">
 		<div class="popover-group-label">{t().settingsUserSessionLabel}</div>
-		{#if userSettingsStatus && (!currentUser || !isAdmin)}<div class="inline-message">{userSettingsStatus}</div>{/if}
+		{#if userSettingsStatus && (!currentUser || !managesUsers)}<div class="inline-message">{userSettingsStatus}</div>{/if}
 		{#if !currentUser}
 			<div class="login-grid">
 				<input bind:value={loginUserName} placeholder={t().userNamePlaceholder} />
@@ -261,17 +275,19 @@
 			{#if userSettingsLoading}<div class="inline-message">{t().settingsLoading}</div>{/if}
 		{/if}
 	</div>
-	{#if currentUser && isAdmin}
+	{#if currentUser && managesUsers}
 		<section class="popover-group user-management-group">
 			<div class="user-management-head"><div><div class="popover-group-label">{t().settingsUsersLabel}</div><div class="user-management-count">{t().userCountLabel(users.length)}</div></div><div class="user-management-actions"><button class="ghost-btn" onclick={() => (showAddUser = true)} disabled={userBusy || showAddUser}>{t().userAddOpen}</button><button class="ghost-btn" onclick={() => void administration.load()} disabled={userBusy || administrationDirty}>{t().settingsReload}</button></div></div>
 			{#if userSettingsStatus}<div class="inline-message user-operation-status" aria-live="polite">{userSettingsStatus}</div>{/if}
+			{#if !isAdmin}<div class="db-test-result">{t().userLeaderScopeNote}</div>{/if}
 			<div class="user-management-layout">
 				<section class="user-list-panel" aria-label={t().settingsUsersLabel}>
 					<div class="user-list-toolbar"><input type="search" bind:value={userSearch} placeholder={t().userSearchPlaceholder} aria-label={t().userSearchPlaceholder} /><label><span>{t().settingsUsersLabel}</span><select bind:value={userFilter}><option value="all">{t().userFilterAll}</option><option value="admins">{t().permissionGroupAdmins}</option><option value="leaders">{t().permissionGroupLeaders}</option><option value="users">{t().permissionGroupUsers}</option><option value="ungrouped">{t().userFilterNoGroup}</option></select></label></div>
 					<div class="user-list">
 						{#each filteredUsers as user (user.id)}
+							{@const editable = managesListedUser(currentUser, user)}
 							<div class="user-row" class:selected={selectedUserId === user.id}>
-						<button class="user-select" aria-pressed={selectedUserId === user.id} onclick={() => onSetEditUser(user)} disabled={userBusy || editUserDirty}>
+						<button class="user-select" aria-pressed={selectedUserId === user.id} onclick={() => onSetEditUser(user)} disabled={userBusy || editUserDirty || !editable}>
 						<span class="user-cell user-name">{user.username}</span>
 						<span class="user-cell">
 						<small>{t().userEmailPlaceholder}</small>{user.email}</span>
@@ -282,7 +298,7 @@
 						<span class="user-cell user-count-cell">
 						<small>{t().userGenerationCountLabel}</small>{user.image_generation_count.toLocaleString()}</span>
 						</button>
-						<button class="ghost-btn" onclick={() => onRemoveUser(user.id)} disabled={userBusy}>{t().deleteButton}</button>
+						{#if editable}<button class="ghost-btn" onclick={() => onRemoveUser(user)} disabled={userBusy}>{t().deleteButton}</button>{:else}<span class="user-own-note">{t().userOwnRowProfileHint}</span>{/if}
 						</div>
 						{:else}<div class="inline-message">{t().userNoSearchResults}</div>
 						{/each}
@@ -305,7 +321,7 @@
 						<span>{t().userPasswordPlaceholder}</span>
 						<input bind:value={newUserPassword} type="password" autocomplete="new-password" />
 						</label>
-						<div class="user-form-field">
+						{#if isAdmin}<div class="user-form-field">
 						<span>{t().permissionGroupSelectLabel}</span>
 						<small>{t().userPermissionGroupsHint}</small>
 						<div class="permission-group-choices">
@@ -320,7 +336,7 @@
 						<select bind:value={newUserGroupId}>
 						<option value="">{t().userNoGroup}</option>
 						{#each groups as group (group.id)}<option value={group.id}>{group.name}</option>{/each}</select>
-						</label>
+						</label>{/if}
 						</fieldset>
 						<div class="user-form-actions">
 						<button class="ghost-btn" onclick={cancelAddUser} disabled={userBusy}>{t().confirmCancel}</button>
@@ -347,7 +363,7 @@
 						<span>{t().userNewPasswordPlaceholder}</span>
 						<input bind:value={editUserPassword} type="password" autocomplete="new-password" />
 						</label>
-						<div class="user-form-field">
+						{#if isAdmin}<div class="user-form-field">
 						<span>{t().permissionGroupSelectLabel}</span>
 						<small>{t().userPermissionGroupsHint}</small>
 						<div class="permission-group-choices">
@@ -362,7 +378,7 @@
 						<select bind:value={editUserGroupId}>
 						<option value="">{t().userNoGroup}</option>
 						{#each groups as group (group.id)}<option value={group.id}>{group.name}</option>{/each}</select>
-						</label>
+						</label>{/if}
 						</fieldset>
 						<div class="user-form-actions">
 						<button class="ghost-btn" onclick={onClearEditUser} disabled={userBusy}>{t().userClearSelection}</button>
@@ -370,7 +386,7 @@
 						</div>{:else}<div class="inline-message">{t().userSelectPrompt}</div>{/if}</section>
 				</div>
 			</div>
-			<details class="group-administration">
+			{#if isAdmin}<details class="group-administration">
 						<summary>{t().userGroupLabel}</summary>
 						<div class="plugin-add">
 						<input bind:value={newGroupName} placeholder={t().groupNamePlaceholder} />
@@ -387,7 +403,7 @@
 						<button class="ghost-btn" onclick={() => onSetEditGroup(group)} disabled={userBusy}>{t().editButton}</button>
 						<button class="ghost-btn" onclick={() => onRemoveGroup(group)} disabled={userBusy}>{t().deleteButton}</button>
 						</div>{/if}</div>{/each}</div>
-						</details>
+						</details>{/if}
 		</section>
 	{:else if currentUser}
 		<div class="popover-group"><div class="popover-group-label">{t().settingsUsersLabel}</div><div class="inline-message">{t().userManageUnavailable}</div></div>
@@ -405,6 +421,11 @@
 		border-radius: var(--r);
 		padding: 12px;
 		background: var(--panel);
+	}
+	.user-own-note {
+		font-size: var(--ui-font-size-10);
+		color: var(--fg3);
+		align-self: center;
 	}
 	.popover-group-label {
 		font-size: var(--ui-font-size-10); color: var(--fg3); text-transform: uppercase; letter-spacing: 0.08em;

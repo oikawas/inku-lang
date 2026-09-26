@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from ... import db as _db
 from ..common import _unexpected_http_error
-from ..deps import _admin_user, _current_user
+from ..deps import _admin_user, _current_user, _session_token
 from ..models import UserAccountItem
 
 
@@ -116,13 +116,18 @@ def api_auth_me_settings(body: UserSettingsBody, actor: dict = Depends(_current_
 
 
 @router.patch("/api/auth/me/profile", response_model=UserAccountItem)
-def api_auth_me_profile(body: UserProfileUpdateBody, actor: dict = Depends(_current_user)) -> UserAccountItem:
+def api_auth_me_profile(
+    body: UserProfileUpdateBody,
+    actor: dict = Depends(_current_user),
+    token: str = Depends(_session_token),
+) -> UserAccountItem:
     try:
         user = _db.update_current_user_profile(
             actor["id"],
             email=body.email,
             password=body.password,
             current_password=body.current_password,
+            keep_session_token=token,
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e

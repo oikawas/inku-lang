@@ -11,8 +11,15 @@ test('the page creates one route-local canonical transport', () => {
 		/import \{ createApiFetch \} from '\$lib\/transport\/api-fetch';/,
 		'the page must import the canonical transport factory'
 	);
+	// The factory may take the page's session hook; what stays fixed is that the
+	// route creates one transport and only one.
 	assert.equal(
-		[...PAGE_SOURCE.matchAll(/\bconst apiFetch = createApiFetch\(\);/g)].length,
+		[...PAGE_SOURCE.matchAll(/\bconst apiFetch = createApiFetch\(/g)].length,
+		1,
+		'the route must create exactly one transport instance'
+	);
+	assert.equal(
+		[...PAGE_SOURCE.matchAll(/\bcreateApiFetch\(/g)].length,
 		1,
 		'the route must create exactly one transport instance'
 	);

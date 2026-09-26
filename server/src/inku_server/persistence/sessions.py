@@ -52,6 +52,17 @@ class SessionStore:
             .delete(synchronize_session=False)
         )
 
+    def end_user_sessions(self, session, user_id: str, *, keep_token: str | None = None) -> int:
+        """Sign an account out everywhere, except the session named by `keep_token`.
+
+        Runs in the caller's transaction: a password change and the sign-outs it
+        implies commit together or not at all.
+        """
+        query = session.query(UserSessionRow).filter(UserSessionRow.user_id == user_id)
+        if keep_token:
+            query = query.filter(UserSessionRow.token_hash != self.hash_token_fn(keep_token))
+        return query.delete(synchronize_session=False)
+
     def get_session_user(self, token: str) -> dict | None:
         with self.session_factory() as session:
             session_row = session.get(UserSessionRow, self.hash_token_fn(token))

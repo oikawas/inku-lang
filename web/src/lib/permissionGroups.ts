@@ -12,18 +12,43 @@ export type PermissionGroup = 'admins' | 'leaders' | 'users';
 
 export const PERMISSION_GROUPS: PermissionGroup[] = ['admins', 'leaders', 'users'];
 
-type MemberLike = { permission_groups?: PermissionGroup[] } | null | undefined;
+type MemberLike = { id?: string; permission_groups?: PermissionGroup[] } | null | undefined;
 
 export function holdsPermissionGroup(user: MemberLike, name: PermissionGroup): boolean {
 	return user?.permission_groups?.includes(name) === true;
 }
 
 /** Settings tabs only the administrators group reaches. */
-export const ADMIN_ONLY_SETTINGS_TABS = ['models', 'db', 'users', 'server_misc', 'logs', 'limits'] as const;
+export const ADMIN_ONLY_SETTINGS_TABS = ['models', 'db', 'server_misc', 'logs', 'limits'] as const;
+
+/**
+ * Settings tabs the user managers reach: administrators, and leaders, whom the
+ * server lets manage the ordinary members of their own organisation group.
+ * The API and the CLI allowed that before the page did.
+ */
+export const USER_MANAGER_SETTINGS_TABS = ['users'] as const;
+
+export function canManageUsers(user: MemberLike): boolean {
+	return holdsPermissionGroup(user, 'admins') || holdsPermissionGroup(user, 'leaders');
+}
+
+/**
+ * Whether the users tab offers to edit and delete this listed account. The
+ * server lists a leader together with the members they manage, but answers
+ * their own edit or deletion with 404 (a leader manages ordinary members
+ * only), so a leader's own row offers neither; their own details change from
+ * Profile. Administrators keep both on every row, their own included.
+ */
+export function managesListedUser(viewer: MemberLike, listed: { id: string }): boolean {
+	return holdsPermissionGroup(viewer, 'admins') || listed.id !== viewer?.id;
+}
 
 export function canAccessSettingsTab(tab: string, user: MemberLike): boolean {
 	if ((ADMIN_ONLY_SETTINGS_TABS as readonly string[]).includes(tab)) {
 		return holdsPermissionGroup(user, 'admins');
+	}
+	if ((USER_MANAGER_SETTINGS_TABS as readonly string[]).includes(tab)) {
+		return canManageUsers(user);
 	}
 	return tab !== 'connection';
 }

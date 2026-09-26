@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import type { HistoryItem } from '../../historyManagerState.svelte.ts';
-import { HistoryMutations, type HistoryBulkMutationPath } from './mutations.ts';
+import { HistoryMutationError, HistoryMutations, type HistoryBulkMutationPath } from './mutations.ts';
 
 const work = (overrides: Partial<HistoryItem> = {}): HistoryItem => ({
 	id: 'work-1',
@@ -206,4 +206,16 @@ test('T-288: removing the displayed work reseats the canvas on the refreshed str
 	h.browsing.cursor = 0;
 	await h.mutations.postIds('/api/history/trash', ['work-1']);
 	assert.ok(h.projections.includes('display:work-2'));
+});
+
+test('a refused bulk request rejects and leaves the canvas, selection and listing alone', async () => {
+	const h = harness(async () => jsonResponse({ detail: 'refused' }, 500));
+	await assert.rejects(
+		h.mutations.postIds('/api/history/permanent-delete', ['work-1']),
+		(error: unknown) => error instanceof HistoryMutationError && error.status === 500 && error.detail === 'refused'
+	);
+	assert.deepEqual(h.projections, []);
+	assert.deepEqual(h.refreshes, []);
+	assert.deepEqual(h.manager.selectedIds, ['work-1']);
+	assert.equal(h.current()?.id, 'work-1');
 });

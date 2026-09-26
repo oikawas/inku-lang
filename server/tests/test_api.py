@@ -12,6 +12,7 @@ import logging
 import os
 import sys
 import types
+import urllib.parse
 import urllib.request
 import uuid
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -1353,6 +1354,25 @@ def test_history_output_files_are_rebuildable_from_db(tmp_path):
     db.delete_user_group(group["id"])
 
 
+def test_rebuilding_output_files_follows_the_save_switch_in_bounded_batches(monkeypatch):
+    """The files are written inside the request, so the batch is small, and
+    the rebuild used to write them with the administrator's switch off."""
+    suffix = uuid.uuid4().hex[:8]
+    user = db.add_user(f"rebuild-{suffix}", f"rebuild-{suffix}@example.test", "password-123", ["users"], None)
+    headers, token = _auth_headers(user)
+    try:
+        monkeypatch.setattr(history_routes, "_output_save_settings", lambda: {"enabled": False})
+        switched_off = client.post("/api/history/rebuild-output-files", json={"ids": ["any"]}, headers=headers)
+        assert switched_off.status_code == 409
+
+        monkeypatch.setattr(history_routes, "_output_save_settings", lambda: {"enabled": True})
+        too_many = [str(uuid.uuid4()) for _ in range(51)]
+        assert client.post("/api/history/rebuild-output-files", json={"ids": too_many}, headers=headers).status_code == 422
+    finally:
+        db.delete_session(token)
+        db.delete_user(user["id"])
+
+
 def test_artifact_save_submit_skips_when_queue_is_full(monkeypatch, caplog):
     class FullSlots:
         def acquire(self, blocking: bool = True):
@@ -1540,6 +1560,13 @@ def test_db_backup_settings_and_manual_run_are_admin_only(tmp_path, monkeypatch)
         assert data["manual"] is True
         assert data["size_bytes"] > 0
         assert (tmp_path / "db-backups" / "manual").exists()
+
+        # A second press inside the same second finds the name taken: a refusal
+        # that says so, not a bare 500.
+        monkeypatch.setattr(db, "_now_ms", lambda: data["at"])
+        again_r = client.post("/api/settings/db-backup/run", headers=admin_headers)
+        assert again_r.status_code == 409, again_r.text
+        assert "already exists" in again_r.json()["detail"]
     finally:
         db.delete_session(admin_token)
         db.delete_session(user_token)
@@ -2323,6 +2350,20 @@ def test_render_concurrency_settings_are_admin_only():
         db.delete_user_group(group["id"])
 
 
+def test_an_account_renders_one_at_a_time_and_waits_its_turn():
+    """One render can take gigabytes; an account holds at most one shared slot."""
+    import threading
+
+    from inku_server.api_core.state import _RenderTurns
+
+    turns = _RenderTurns()
+    assert turns.acquire("a", timeout=0)
+    assert not turns.acquire("a", timeout=0.05)
+    assert turns.acquire("b", timeout=0), "another account is not held up"
+    threading.Timer(0.05, turns.release, args=("a",)).start()
+    assert turns.acquire("a", timeout=5), "the second render is drawn once the first ends"
+
+
 def test_log_retention_settings_are_admin_only():
     suffix = uuid.uuid4().hex[:8]
     group = db.add_user_group(f"log-retention-{suffix}")
@@ -2673,6 +2714,44 @@ def test_model_settings_fetch_models_from_provider(monkeypatch):
     db.delete_session(token)
     db.delete_user(admin["id"])
     db.delete_user_group(group["id"])
+
+
+def test_gemini_model_list_sends_the_key_in_a_header_and_reads_every_page(monkeypatch):
+    """No key in the URL, and a model on the second page is not read as retired."""
+    monkeypatch.setenv("GEMINI_API_KEY", "gemini-test-key")
+    pages = {
+        "": {"models": [{"name": "models/gemini-a", "displayName": "A"}], "nextPageToken": "next"},
+        "next": {"models": [{"name": "models/gemini-b", "displayName": "B"}]},
+    }
+    seen: list[tuple[str, dict[str, str]]] = []
+
+    class FakeResponse:
+        def __init__(self, body):
+            self.body = body
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_):
+            return False
+
+        def read(self):
+            return json.dumps(self.body).encode()
+
+    def fake_urlopen(req, timeout=0):
+        seen.append((req.full_url, dict(req.header_items())))
+        token = urllib.parse.parse_qs(urllib.parse.urlsplit(req.full_url).query).get("pageToken", [""])[0]
+        return FakeResponse(pages[token])
+
+    monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
+    models = settings_routes._fetch_provider_model_list("gemini", default_model_settings())
+
+    assert [model["id"] for model in models] == ["gemini-a", "gemini-b"]
+    assert len(seen) == 2
+    for url, headers in seen:
+        assert "gemini-test-key" not in url
+        assert "pageSize=1000" in url
+        assert headers.get("X-goog-api-key") == "gemini-test-key"
 
 
 def test_render_svg_forwards_wild_to_the_renderer(auth_context, monkeypatch):

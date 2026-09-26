@@ -1,6 +1,7 @@
 import { t } from '$lib/i18n/index.svelte';
-import { holdsPermissionGroup, type PermissionGroup } from '$lib/permissionGroups';
+import { canManageUsers, holdsPermissionGroup, type PermissionGroup } from '$lib/permissionGroups';
 import type { ApiFetch } from '$lib/transport/api-fetch';
+import type { SettingsConfirmation } from './model-administration.svelte';
 import type { SettingsActor } from './navigation-state.svelte';
 
 export type SettingsUserGroup = {
@@ -37,6 +38,7 @@ type UserAdministrationDeps<TActor extends SettingsActor> = {
 	apiFetch: ApiFetch;
 	currentUser: () => TActor | null;
 	refreshCurrentUserSettings: () => boolean | Promise<boolean>;
+	requestConfirmation: (confirmation: SettingsConfirmation) => void;
 	describeApiError: (detail: unknown, status: number) => string;
 };
 
@@ -49,8 +51,10 @@ export type SettingsUserAdministration = {
 	addUser: (input: CreateSettingsUserInput) => Promise<boolean>;
 	updateUser: (id: string, input: UpdateSettingsUserInput) => Promise<boolean>;
 	removeUser: (id: string) => Promise<boolean>;
+	confirmRemoveUser: (user: SettingsUserItem, remove: () => void) => void;
 	addGroup: (name: string) => Promise<boolean>;
 	removeGroup: (group: SettingsUserGroup) => Promise<boolean>;
+	confirmRemoveGroup: (group: SettingsUserGroup, remove: () => void) => void;
 	updateGroup: (id: string, name: string) => Promise<boolean>;
 };
 
@@ -87,7 +91,9 @@ export function createUserAdministration<TActor extends SettingsActor>(
 			if (requestId !== userAdministrationRequestId) return;
 			if (!refreshed) throw new Error(t().loginRequiredMessage);
 			const actor = deps.currentUser();
-			if (!holdsPermissionGroup(actor, 'admins')) {
+			// Leaders load too: the server answers them with their own group
+			// and its ordinary members only.
+			if (!canManageUsers(actor)) {
 				users = [];
 				groups = [];
 				userAdministrationStatus = null;
@@ -179,6 +185,16 @@ export function createUserAdministration<TActor extends SettingsActor>(
 		}
 	}
 
+	// Deleting an account or a group cannot be undone, so it is asked first, as
+	// deleting a model service is. The buttons used to delete on the first click.
+	function confirmRemoveUser(user: SettingsUserItem, remove: () => void): void {
+		deps.requestConfirmation({ message: t().userDeleteConfirm(user.username), destructive: true, run: remove });
+	}
+
+	function confirmRemoveGroup(group: SettingsUserGroup, remove: () => void): void {
+		deps.requestConfirmation({ message: t().groupDeleteConfirm(group.name), destructive: true, run: remove });
+	}
+
 	async function removeUser(id: string): Promise<boolean> {
 		try {
 			await administrationRequest(`/api/users/${id}`, { method: 'DELETE' });
@@ -244,8 +260,10 @@ export function createUserAdministration<TActor extends SettingsActor>(
 		addUser,
 		updateUser,
 		removeUser,
+		confirmRemoveUser,
 		addGroup,
 		removeGroup,
+		confirmRemoveGroup,
 		updateGroup,
 		resetForLoggedOut
 	};

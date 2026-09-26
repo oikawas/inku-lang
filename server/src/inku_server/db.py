@@ -399,6 +399,10 @@ def _holds_no_elevated_group(session):
     return _permission_group_membership_store().holds_no_elevated_group(session)
 
 
+def _an_admin_remains(session) -> bool:
+    return _permission_group_membership_store().an_admin_remains(session)
+
+
 def _permission_group_membership_store() -> _groups.PermissionGroupMembershipStore:
     return _groups.PermissionGroupMembershipStore(uuid.uuid4, _now_ms)
 
@@ -1052,6 +1056,10 @@ def delete_session(token: str) -> bool:
     return _session_store().delete_session(token)
 
 
+def _end_user_sessions(session, user_id: str, *, keep_token: str | None = None) -> int:
+    return _session_store().end_user_sessions(session, user_id, keep_token=keep_token)
+
+
 def _external_identity_store() -> _identities.ExternalIdentityStore:
     return _identities.ExternalIdentityStore(SessionLocal, uuid.uuid4, _now_ms, _user_to_dict)
 
@@ -1109,6 +1117,8 @@ def _account_updater() -> _accounts.UserAccountUpdater:
         _holds_no_elevated_group,
         _user_to_dict,
         _UNSET,
+        _an_admin_remains,
+        _end_user_sessions,
     )
 
 
@@ -1139,6 +1149,7 @@ def _current_user_profile_updater() -> _accounts.CurrentUserProfileUpdater:
         verify_password,
         _hash_password,
         _user_to_dict,
+        _end_user_sessions,
     )
 
 
@@ -1148,12 +1159,14 @@ def update_current_user_profile(
     email: str | None = None,
     password: str | None = None,
     current_password: str | None = None,
+    keep_session_token: str | None = None,
 ) -> dict | None:
     return _current_user_profile_updater().update_current_user_profile(
         user_id,
         email=email,
         password=password,
         current_password=current_password,
+        keep_session_token=keep_session_token,
     )
 
 
@@ -1311,6 +1324,8 @@ def _account_deleter() -> _accounts.UserAccountDeleter:
         _owner_actor,
         _owned_by,
         _delete_acl_for_histories,
+        _drop_thumbnails_of_deleted_works,
+        _an_admin_remains,
     )
 
 
@@ -1499,6 +1514,10 @@ def history_render_hashes() -> list[tuple[str, str | None]]:
     return _history.HistoryThumbnailSourceReader(SessionLocal).history_render_hashes()
 
 
+def existing_history_ids(ids: list[str]) -> set[str]:
+    return _history.HistoryThumbnailSourceReader(SessionLocal).existing_ids(ids)
+
+
 def history_svgs(ids: list[str]) -> dict[str, str]:
     return _history.HistoryThumbnailSourceReader(SessionLocal).history_svgs(ids)
 
@@ -1536,12 +1555,30 @@ def restore_items(user_id: str, ids: list[str]) -> int:
     return _history.HistoryTrashStateWriter(SessionLocal, _actor_of).restore_items(user_id, ids)
 
 
+def _drop_thumbnails_of_deleted_works(history_ids: list[str]) -> None:
+    """Delete the thumbnails of works that no longer exist. Never raises.
+
+    The thumbnails live in their own database, so they cannot join the deletion's
+    transaction. Nothing serves them once the work is gone -- every thumbnail
+    read asks the canonical visibility rule first -- but a permanently deleted
+    work's picture must not stay on disk, and the store only grew. A failure
+    here is logged and left to the rebuild, which prunes works that are gone.
+    """
+    from . import thumbs_db
+
+    try:
+        thumbs_db.delete_for_history(history_ids)
+    except Exception:  # noqa: BLE001
+        _logger.exception("could not delete thumbnails of %d deleted works", len(history_ids))
+
+
 def delete_items(user_id: str, ids: list[str], *, require_trashed: bool = False) -> int:
     return _history.HistoryPermanentDeleteWriter(
         SessionLocal,
         _actor_of,
         _now_ms,
         _delete_acl_for_histories,
+        _drop_thumbnails_of_deleted_works,
     ).delete_items(user_id, ids, require_trashed=require_trashed)
 
 

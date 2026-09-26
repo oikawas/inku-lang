@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel, Field
 from ...okugaki import generate_okugaki
 from ... import db as _db
-from ..common import _resolved_vision_model, _unexpected_http_error
+from ..common import MODEL_NOT_OFFERED_DETAIL, _model_offered_to, _resolved_vision_model, _unexpected_http_error
 from ..deps import _current_user
 from ..models import HistoryItem, HistoryListResponse
 
@@ -156,12 +156,16 @@ def api_okugaki_generate(
     if branch is None:
         raise HTTPException(status_code=404, detail="lineage not found")
     at = int(time.time() * 1000)
+    model = _resolved_vision_model(body.model, actor)
+    settings = _db.get_model_settings()
+    if not _model_offered_to(actor, model, stage="stage1", purpose="vision", settings=settings):
+        raise HTTPException(status_code=403, detail=MODEL_NOT_OFFERED_DETAIL)
     try:
         item = generate_okugaki(
             branch,
-            model=_resolved_vision_model(body.model, actor),
+            model=model,
             language=body.language,
-            settings=_db.get_model_settings(),
+            settings=settings,
             at=at,
         )
         if body.save:

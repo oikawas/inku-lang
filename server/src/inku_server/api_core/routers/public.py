@@ -18,7 +18,7 @@ from ...saijiki import display_categories
 from ...render_engines import current_render_engine
 from ...model_settings import connection_for, model_provider_catalog, provider_for_model
 from ... import db as _db
-from ..common import _APP_VERSION, _RELEASE_VERSION, _build_number, _env_flag, _normalize_instruction_lang, _normalize_ui_lang, _resolve_instruction_lang, _unexpected_http_error
+from ..common import MODEL_NOT_OFFERED_DETAIL, _APP_VERSION, _RELEASE_VERSION, _build_number, _env_flag, _model_offered_to, _normalize_instruction_lang, _normalize_ui_lang, _resolve_instruction_lang, _unexpected_http_error
 from ..deps import _current_user
 from ..models import ModelSettingsResponse
 
@@ -227,6 +227,10 @@ def _generate_demo_instruction(seed_phrase: str, *, model: str | None, lang: str
     # every other caller gets.
     settings = _db.get_model_settings()
     provider, model_id = provider_for_model(model or None, stage="stage1", settings=settings)
+    # One deadline for all three transports. The SDK clients default to ten
+    # minutes, which held a request worker that long for a one-line demo prompt
+    # whenever a provider stopped answering.
+    timeout = float(os.getenv("INKU_LLM_REQUEST_TIMEOUT_SECONDS", "120"))
     if provider == "anthropic":
         import anthropic
 
@@ -234,7 +238,7 @@ def _generate_demo_instruction(seed_phrase: str, *, model: str | None, lang: str
         kwargs = {"api_key": connection["api_key"]} if connection.get("api_key") else {}
         if connection.get("base_url"):
             kwargs["base_url"] = connection["base_url"]
-        client = anthropic.Anthropic(**kwargs)
+        client = anthropic.Anthropic(timeout=timeout, **kwargs)
         resp = client.messages.create(
             model=model_id,
             max_tokens=180,
@@ -250,7 +254,11 @@ def _generate_demo_instruction(seed_phrase: str, *, model: str | None, lang: str
         if not api_key:
             raise RuntimeError("Gemini API key is not configured")
         base_url = str(connection.get("base_url") or "https://generativelanguage.googleapis.com").rstrip("/")
-        url = f"{base_url}/v1beta/models/{model_id}:generateContent?key={api_key}"
+        # Same shape as the pipeline transport (pipeline_provider.py): the model
+        # id is one quoted path segment, so a name holding "/", "?" or "#"
+        # cannot move the request elsewhere, and the key travels in a header
+        # instead of the query string, where proxies and access logs keep it.
+        url = f"{base_url}/v1beta/models/{urllib.parse.quote(model_id, safe='')}:generateContent"
         body = {
             "systemInstruction": {"parts": [{"text": _demo_instruction_system(lang)}]},
             "contents": [{"role": "user", "parts": [{"text": seed_phrase}]}],
@@ -259,10 +267,10 @@ def _generate_demo_instruction(seed_phrase: str, *, model: str | None, lang: str
         request = urllib.request.Request(
             url,
             data=json.dumps(body).encode("utf-8"),
-            headers={"Content-Type": "application/json"},
+            headers={"Content-Type": "application/json", "x-goog-api-key": api_key},
             method="POST",
         )
-        with urllib.request.urlopen(request, timeout=float(os.getenv("INKU_LLM_REQUEST_TIMEOUT_SECONDS", "120"))) as response:
+        with urllib.request.urlopen(request, timeout=timeout) as response:
             payload = json.loads(response.read().decode("utf-8"))
         parts = payload.get("candidates", [{}])[0].get("content", {}).get("parts", [])
         text = "\n".join(str(part.get("text", "")) for part in parts).strip()
@@ -270,7 +278,7 @@ def _generate_demo_instruction(seed_phrase: str, *, model: str | None, lang: str
         from openai import OpenAI
 
         connection = connection_for(provider, settings)
-        client = OpenAI(base_url=connection["base_url"], api_key=connection.get("api_key") or "none")
+        client = OpenAI(base_url=connection["base_url"], api_key=connection.get("api_key") or "none", timeout=timeout)
         resp = client.chat.completions.create(
             model=model_id,
             messages=[
@@ -288,7 +296,9 @@ def _generate_demo_instruction(seed_phrase: str, *, model: str | None, lang: str
 
 
 @authenticated_router.post("/api/demo/instruction", response_model=DemoInstructionResponse)
-def api_demo_instruction(req: DemoInstructionBody) -> DemoInstructionResponse:
+def api_demo_instruction(req: DemoInstructionBody, actor: dict = Depends(_current_user)) -> DemoInstructionResponse:
+    if not _model_offered_to(actor, req.model, stage="stage1", purpose="llm", settings=_db.get_model_settings()):
+        raise HTTPException(status_code=403, detail=MODEL_NOT_OFFERED_DETAIL)
     instruction_lang = _resolve_instruction_lang(
         req.seed_phrase,
         _normalize_instruction_lang(req.instruction_lang),

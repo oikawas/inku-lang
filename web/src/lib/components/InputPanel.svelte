@@ -214,7 +214,10 @@
 			<div class="condition-row">
 				<div class="condition-row-head">
 					<span class="condition-label">{t().modelButton}</span>
-					<Tooltip text={t().tooltipInputModel}>
+					<!-- The button sits at the panel's right edge. A centred bubble reached
+					     past it even while hidden, so the panel scrolled sideways and a
+					     swipe or a focus cut off the left of every row. -->
+					<Tooltip text={t().tooltipInputModel} placement="top-left">
 						<button class="ghost-btn condition-change" aria-label={t().tooltipInputModel} onclick={onOpenModelSelection}>{t().editButton}</button>
 					</Tooltip>
 				</div>
@@ -230,7 +233,7 @@
 			<div class="condition-row">
 				<div class="condition-row-head">
 					<span class="condition-label">{t().colorCatalogButton}</span>
-					<Tooltip text={t().tooltipInputCatalog}>
+					<Tooltip text={t().tooltipInputCatalog} placement="top-left">
 						<button class="ghost-btn condition-change" aria-label={t().tooltipInputCatalog} onclick={onOpenCatalogModal}>{t().editButton}</button>
 					</Tooltip>
 				</div>

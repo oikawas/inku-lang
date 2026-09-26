@@ -6,6 +6,13 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 36 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-26 — the reason a Score cannot be drawn, and what the interpretation seed is
+
+- **A Score the render core refuses is answered with 422 and the core's reason.** This covers an invalid mark, more marks than a Score may hold, and a mark or an output past its size limit. `/api/render-score`, `/api/render-svg`, saving a work, and redrawing a work's SVG answered only "… render failed" and logged a traceback as a failure of the server itself. The Web shows the headline of this refusal, and of an invalid Score, in the page's language, with the reason as sent.
+- SPEC: the reading refinement's `interpretation_seed` identifies the re-interpretation; it is not a Stage 1 input, and the same seed does not reproduce a reading (the same on the Server and on Android).
+
+The route count (107) is unchanged. DDL, Score, and render versions are unchanged.
+
 ### 2026-09-26 — Source review decisions, continued: drafts on permanent deletion, the answer to an invalid Score, lineage listings, and unrecorded times
 
 - **Deleting a work for good takes the draft only that work kept.** The description and DDL of a draft used to stay until the account was deleted. A draft stays when another work was saved from it, when another draft was forked from it, or when it was written on after the save. The draft's execution records and captured provider I/O go with it.

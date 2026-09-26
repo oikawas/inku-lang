@@ -6,6 +6,20 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 36 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-26 — alternation and a mirror work in one description (DDL engine 49)
+
+A description that both alternated members, such as "alternate pencil and thick brush and line up five lines", and mirrored a shape ("mirrored with the previous shape") stopped the whole work. The mirror makes the Score 0.15, but Score validation accepted the alternation's `cycle_members` only in 0.14, an edition list left unchanged when 0.15 was added. Every edition keeps the fields of the editions before it, so 0.14 and later accept them. The same description now compiles to a different result, so the DDL engine is 49. The DDL and Score formats and the render version are unchanged, and saved works do not change.
+
+### 2026-09-26 — bounded drawing work for giant shapes and for renders without limits
+
+Two places still let drawing work grow without bound with input values.
+- Shape sizes have no schema maximum. A wash cloudform 4,096 canvases tall took 302 MB of SVG, 1.34 GB of memory and 9 s for one mark: fill and texture scanlines stop at 4,096 per layer, but a bumpy contour splits each scanline into many spans, and each span becomes a stroke. A mark whose width or height, after its transform group scale, exceeds eight canvas lengths is refused before drawing (saved marks reach 1.7). The drawn marks and their definitions are also refused once their size exceeds 16 MiB plus 64 KiB per mark (saved works reach 7 MB; the Server measures about 16 KB per mark).
+- `render()`, which receives no resource limits (the Server's legacy path and Android use it), kept computing positions for more than 20 minutes for an arrangement count of 4.3 billion. It now checks legacy demand against fixed maxima that no host limit reaches (100,000 marks and instructions, 4,096 anchors and groups of each kind) before drawing.
+
+Score edition checks compared the version string with lists of versions (26 sites in `inku-score` `types.rs` alone), so each new edition meant extending every list. An ordered edition type (`ScoreEdition`) now asks, per feature, whether the Score's edition is at least the one that introduced the field. No verdict changes.
+
+Saved works look the same, and the DDL, Score and render versions are unchanged.
+
 ### 2026-09-26 — Source review decisions: keeping an administrator and a way in, enforcing published models, leaders' user management, and render memory
 
 The items the same review left to the author are fixed as decided.
@@ -55,8 +69,6 @@ Some drawing work grew with input values, so one request could hold the server f
 - Transform-group validation compared each group with every earlier one, so its work grew with the square of the group count and further with shared anchor lists (16,000 groups took 0.66 s; 200 groups sharing 1,000 anchors took 6.5 s). This validation runs before resource accounting, even for compact Scores. The validated groups are now kept as a containment forest, and a new group is checked only against the roots it overlaps (3.6 ms and 16 ms for the same inputs). The verdict and the error reported for a conflict are unchanged.
 - Placement-group validation also compares each group with every earlier placement group and every transform group before resource accounting. A Score that stores more anchors, transform, placement or fill groups than the hard resource policy allows is refused before that validation. Compiled Scores store far fewer (across 1,598 internal drawing records, at most 16 anchors and 16 transform groups and one placement group, against default maxima of 4,096, 4,096 and 64).
 - The canvas size must be finite and positive before drawing starts.
-- Shape sizes have no schema maximum. A wash cloudform 4,096 canvases tall took 302 MB of SVG, 1.34 GB of memory and 9 s for one mark: fill and texture scanlines stop at 4,096 per layer, but a bumpy contour splits each scanline into many spans, and each span becomes a stroke. A mark whose width or height, after its transform group scale, exceeds eight canvas lengths is refused before drawing (saved marks reach 1.7). The drawn marks and their definitions are also refused once their size exceeds 16 MiB plus 64 KiB per mark (saved works reach 7 MB; the Server measures about 16 KB per mark).
-- `render()`, which receives no resource limits (the Server's legacy path and Android use it), kept computing positions for more than 20 minutes for an arrangement count of 4.3 billion. It now checks legacy demand against fixed maxima that no host limit reaches (100,000 marks and instructions, 4,096 anchors and groups of each kind) before drawing.
 
 The Python binding (`inku_render`) releases the GIL while it renders, steps the pipeline or replays a saved Score. The Server calls these on worker threads, and holding the GIL stopped every other Python thread, including the one serving HTTP, for the whole render.
 

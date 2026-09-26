@@ -2076,7 +2076,7 @@ impl Score {
                 return Err("fill members must cover the group and its logical count");
             }
             if let Some(cycle) = &group.cycle_members {
-                if self.edition() != Some(ScoreEdition::V0_14) {
+                if !self.edition_at_least(ScoreEdition::V0_14) {
                     return Err("cycle members require Score version 0.14.0");
                 }
                 Self::validate_cycle_members(cycle, &group.members, group.logical_count)?;
@@ -2131,7 +2131,7 @@ impl Score {
         let is_compact = self.uses_compact_resource_contract();
         let mut previous_end = 0;
         for group in &self.placement_groups {
-            if group.cycle_members.is_some() && self.edition() != Some(ScoreEdition::V0_14) {
+            if group.cycle_members.is_some() && !self.edition_at_least(ScoreEdition::V0_14) {
                 return Err("cycle members require Score version 0.14.0");
             }
             if group.members.iter().any(|member| {

@@ -298,7 +298,10 @@
 # leaves growing along the summer branch, a maple palm, a scattered drift of
 # fallen leaves gathering low, and tall withered grass. Saved 1.0 locks keep
 # their meaning.
-DDL_ENGINE_VERSION = "48"
+# 49: A description that both alternates members and mirrors a shape compiles.
+# Its mirror makes the Score 0.15.0, and 0.15.0 now keeps the cycle members that
+# 0.14.0 introduced instead of stopping the whole work.
+DDL_ENGINE_VERSION = "49"
 # 4 (2026-07-30): yellow, orange, and purple become abstract Score colors, and
 # coerce recognizes the corresponding Japanese and English DDL markers.
 # 3 (2026-07-30): 黄 / 橙 / 紫 joined the saijiki color words, so an author can write

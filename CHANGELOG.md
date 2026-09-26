@@ -6,6 +6,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 36 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-26 — Android shows the model call a drawing waits on
+
+The running row (mascot, model, elapsed time) showed only the elapsed time, so a model call retrying after its first attempt timed out looked like a slow answer (the Server review's W4). It now reads the shared pipeline's `providerAttempt` (`4ff4c782`) through JNI and, as on the web, says "Awaiting reply (try 1/4)", and from the second attempt "Retrying (try 2/4)" in the accent colour. The shared core gives the limit from each stage's retry policy; Android does not copy it. Refinement candidates, made several at once, show none. Starting a drawing right after opening could let the start-up restore drive that drawing's execution a second time; the two raced for the next model call, and the drawing could come back mid-run as if waiting on the author (found by this change's device test). The restore no longer drives an execution this device is already driving. The DDL, Score and render versions are unchanged.
+
 ### 2026-09-26 — the running indicator shows the wait for a model, and a retry
 
 - **The Web running indicator shows "Awaiting reply (try 1/4)" and "Retrying (try 2/4)".** When a model call such as Stage 1 timed out on its first attempt, the screen showed only elapsed time, and a retry could not be told from a slow answer (the Server source review's W4). It appears for a single drawing, drawing from DDL, a redraw from the lineage, batches, and the demo.

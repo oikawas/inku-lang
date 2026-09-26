@@ -7,6 +7,8 @@ import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.yield
 import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
@@ -128,6 +130,61 @@ class SharedPipelineHostTest {
         assertEquals("cancelled", cancelled.phaseTag)
         assertEquals("cancelled", completed.phaseTag)
         assertEquals(null, completed.visibleDdl)
+    }
+
+    /**
+     * The start-up restore reads the latest execution, which can be a drawing
+     * started a moment earlier. A second drive of it would race the first for
+     * the next effect, and the drive that lost would hand its caller a view from
+     * the middle of the run. The commit is held so that the restore queues on
+     * the session between two effects, where the race is decided.
+     */
+    @Test
+    fun restoringARunThatIsAlreadyBeingDrivenOnlyViewsIt() = runBlocking {
+        val commitEntered = CompletableDeferred<Unit>()
+        val releaseCommit = CompletableDeferred<Unit>()
+        val recording = RecordingCommitStore()
+        val commits = object : PipelineCommitStore {
+            override suspend fun commit(
+                ownerId: String,
+                actionJson: String,
+                createIfMissing: Boolean,
+                context: AuthoringContext,
+            ): String {
+                commitEntered.complete(Unit)
+                releaseCommit.await()
+                return recording.commit(ownerId, actionJson, createIfMissing, context)
+            }
+        }
+        // The call after the commit is held too: a real one takes seconds, and
+        // it is while it is out that a losing drive returns mid-run.
+        val holeEntered = CompletableDeferred<Unit>()
+        val releaseHole = CompletableDeferred<Unit>()
+        val recordingProvider = RecordingEffectProvider()
+        val provider = PipelineProviderEffect { actionJson, models ->
+            if (JSONObject(actionJson).getString("tag") == "complete_visible_ddl_holes") {
+                holeEntered.complete(Unit)
+                releaseHole.await()
+            }
+            recordingProvider.perform(actionJson, models)
+        }
+        val host = host(ScriptedBinding(), provider, commits, MemoryExecutionStore())
+        val running = async { host.start(startRequest(PipelineAuthoring.Description("mist", false))) }
+        commitEntered.await()
+
+        val restoring = async { host.restore(OWNER, EXECUTION_ID) }
+        repeat(10) { yield() }
+        releaseCommit.complete(Unit)
+        holeEntered.await()
+        repeat(10) { yield() }
+
+        assertFalse("the drawing is still driving its own run", running.isCompleted)
+        releaseHole.complete(Unit)
+        val finished = withTimeout(5_000) { running.await() }
+        val restored = withTimeout(5_000) { restoring.await() }
+        assertFalse("the restore reports the run, it does not finish it", restored.terminal)
+        assertEquals("awaiting_patch_approval", finished.phaseTag)
+        assertEquals(listOf("generate_normalized_ddl", "complete_visible_ddl_holes"), recordingProvider.tags)
     }
 
     @Test

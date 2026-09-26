@@ -106,3 +106,14 @@ pub extern "system" fn Java_app_inku_mobile_pipeline_NativePipelineBridge_render
 ) -> jbyteArray {
     unary_bytes(env, input, inku_pipeline_uniffi::render_saved)
 }
+
+/// The provider attempt in flight for a stored snapshot, for the running row.
+#[unsafe(no_mangle)]
+#[allow(non_snake_case)]
+pub extern "system" fn Java_app_inku_mobile_pipeline_NativePipelineBridge_providerAttempt(
+    env: JNIEnv<'_>,
+    _receiver: JObject<'_>,
+    snapshot: JByteArray<'_>,
+) -> jbyteArray {
+    unary_bytes(env, snapshot, inku_pipeline_uniffi::provider_attempt)
+}

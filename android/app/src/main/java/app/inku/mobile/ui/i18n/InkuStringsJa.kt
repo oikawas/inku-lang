@@ -348,6 +348,8 @@ object InkuStringsJa : InkuStrings {
     override val paint = "描画する"
     override val drawingModel = "描画モデル"
     override val drawing = "描画中"
+    override val runStatusAwaitingReply: (Int, Int) -> String = { attempt, maxAttempts -> "応答待ち（$attempt/${maxAttempts}回目）" }
+    override val runStatusRetrying: (Int, Int) -> String = { attempt, maxAttempts -> "再試行中（$attempt/${maxAttempts}回目）" }
     override val renderExpression = "描画表現"
     override val refinementElements = "描画要素"
     override val drawingSettings = "描画設定"

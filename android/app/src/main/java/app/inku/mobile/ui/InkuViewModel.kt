@@ -54,6 +54,7 @@ import app.inku.mobile.pipeline.PipelineView
 import app.inku.mobile.pipeline.SketchInput
 import app.inku.mobile.pipeline.SketchMode
 import app.inku.mobile.pipeline.Sketches
+import app.inku.mobile.pipeline.ProviderAttempt
 import app.inku.mobile.ui.camera.CameraCaptureFileStore
 import app.inku.mobile.ui.camera.CameraOriginalPhotoStore
 import app.inku.mobile.ui.camera.CameraCaptureRequest
@@ -488,6 +489,9 @@ class InkuViewModel @JvmOverloads constructor(
         SharingStarted.Eagerly,
         emptyList(),
     )
+
+    /** The model call the running drawing waits on; the running row shows it. */
+    val providerAttempt: StateFlow<ProviderAttempt?> = repository.providerAttempt
 
     init {
         viewModelScope.launch {

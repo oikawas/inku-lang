@@ -115,3 +115,31 @@ class PipelineHostException(
     val code: String,
     cause: Throwable? = null,
 ) : IllegalStateException(code, cause)
+
+/**
+ * The model call a run waits on: this attempt of at most so many.
+ *
+ * Read from the shared core (`providerAttempt`), which keeps each stage's retry
+ * policy, so a first attempt that timed out reads as a retry rather than a slow
+ * answer (the Server review's W4, web `providerAttemptText`).
+ */
+data class ProviderAttempt(
+    val executionId: String,
+    val action: String,
+    val attempt: Int,
+    val maxAttempts: Int,
+) {
+    val isRetry: Boolean get() = attempt > 1
+
+    companion object {
+        /** The core's report, or null for none, a broken snapshot, or an answer that cannot be read. */
+        fun fromReport(executionId: String, report: ByteArray): ProviderAttempt? = runCatching {
+            val value = JSONObject(report.toString(Charsets.UTF_8)).optJSONObject("provider_attempt")
+                ?: return null
+            val attempt = value.getInt("attempt")
+            val maxAttempts = value.getInt("max_attempts")
+            if (attempt < 1 || maxAttempts < attempt) return null
+            ProviderAttempt(executionId, value.getString("action"), attempt, maxAttempts)
+        }.getOrNull()
+    }
+}

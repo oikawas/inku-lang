@@ -1134,6 +1134,7 @@ export interface LangPack {
 	provenanceHintComment: string;
 	provenanceHintUiLang: string;
 	provenanceHintElapsed: string;
+	provenanceElapsedNotRecorded: string;
 	provenanceHintTokens: string;
 	historyCreatedAtHeader: string;
 	historyDescriptionHeader: string;

@@ -166,6 +166,8 @@
 	const detailStage1Lang = $derived(typeof detailDerivationMetadata.stage1_language === 'string' ? detailDerivationMetadata.stage1_language : detailResolvedLang);
 	const detailStage2Lang = $derived(typeof detailDerivationMetadata.stage2_language === 'string' ? detailDerivationMetadata.stage2_language : detailResolvedLang);
 	const displayLanguageName = (lang: string) => lang === 'ja' ? (isJapanese ? '日本語' : 'Japanese') : lang === 'en' ? 'English' : lang || '-';
+	// A saved work stores 0 when its sender sent no time (a work saved through the
+	// API, for one): no run takes 0 ms, so 0 reads as "not recorded", not 0.0s.
 	const detailElapsedMs = $derived(statusHistoryItem?.elapsed_ms ?? result?.elapsed_total_ms ?? null);
 	const detailTokensIn = $derived(statusHistoryItem?.tokens_in ?? ((result?.tokens_in_stage1 ?? 0) + (result?.tokens_in_stage2 ?? 0) || null));
 	const detailTokensOut = $derived(statusHistoryItem?.tokens_out ?? ((result?.tokens_out_stage1 ?? 0) + (result?.tokens_out_stage2 ?? 0) || null));
@@ -341,7 +343,7 @@
 					<h4>{t().provenanceSectionRun}</h4>
 					<dl>
 						{@render term(isJapanese ? '作成日' : 'Created', t().provenanceHintCreated)}<dd>{currentRenderedAt ?? '-'}</dd>
-						{@render term(isJapanese ? '処理時間' : 'Elapsed', t().provenanceHintElapsed)}<dd>{detailElapsedMs == null ? '-' : (detailElapsedMs / 1000).toFixed(1) + 's'}</dd>
+						{@render term(isJapanese ? '処理時間' : 'Elapsed', t().provenanceHintElapsed)}<dd>{detailElapsedMs == null ? '-' : detailElapsedMs <= 0 ? t().provenanceElapsedNotRecorded : (detailElapsedMs / 1000).toFixed(1) + 's'}</dd>
 						{@render term('tokens in / out', t().provenanceHintTokens)}<dd>{detailTokensIn == null ? '-' : groupDigits(detailTokensIn)} / {detailTokensOut == null ? '-' : groupDigits(detailTokensOut)}</dd>
 						{@render term(t().provenanceLabelUiLang, t().provenanceHintUiLang)}<dd>{detailUiLang ? displayLanguageName(detailUiLang) : '-'}</dd>
 					</dl>

@@ -267,10 +267,17 @@ class LocalLiteRtLmProvider(
         private const val TAG = "InkuLiteRtLm"
         private const val PERF_TAG = "InkuPerf"
         private const val REQUEST_TIMEOUT_MS = 600_000L
+        // The engine's window for prompt and answer together. A request's
+        // maxTokens is not passed to LiteRT-LM; this window bounds the answer.
         private const val ENGINE_MAX_NUM_TOKENS = 4096
     }
 }
 
+/**
+ * The file at [path] if, with links and `..` resolved, it is a file inside
+ * `files/models`; null otherwise. Stored model paths are read and deleted
+ * only through it.
+ */
 internal fun ownedLocalModelFileOrNull(filesDir: File, path: String): File? = runCatching {
     val filesRoot = filesDir.canonicalFile
     val root = File(filesRoot, "models").canonicalFile

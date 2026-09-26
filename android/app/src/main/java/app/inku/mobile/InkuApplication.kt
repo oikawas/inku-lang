@@ -17,6 +17,7 @@ class InkuApplication : Application() {
     @Volatile
     private var databaseInstance: InkuDatabase? = null
 
+    /** Throws if startup was refused; [MainActivity] shows the refusal before any screen reads this. */
     val database: InkuDatabase
         get() {
             val result = prepareDatabase()
@@ -31,6 +32,7 @@ class InkuApplication : Application() {
         CanvasAspects.installRegistry(NativePipelineBridge.canvasRegistry())
     }
 
+    /** Opens the database once per process. A refusal is not kept, so a retry checks again. */
     fun prepareDatabase(): RoomV10ResetCoordinator.Result = synchronized(databaseLock) {
         databaseInstance?.let {
             return@synchronized RoomV10ResetCoordinator.Result.Ready(resetPerformed = false)

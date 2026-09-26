@@ -7309,6 +7309,12 @@ private fun SecondarySmallButton(text: String, onClick: () -> Unit, enabled: Boo
     ) { Text(text, maxLines = 1) }
 }
 
+/**
+ * A one-finger horizontal swipe steps through the history. A gesture with a
+ * second finger, or one that turns out vertical, is left to the content; once a
+ * swipe fires, the rest of that gesture is consumed. Movement is read in the
+ * device's rotation.
+ */
 private fun Modifier.historySwipeNavigation(
     enabled: Boolean,
     gestureKey: Any?,

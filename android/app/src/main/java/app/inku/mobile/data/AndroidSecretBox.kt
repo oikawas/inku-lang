@@ -9,6 +9,15 @@ import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
 
+/**
+ * Keeps provider API keys encrypted in Room. The AES-GCM key is made in the
+ * Android Keystore and never leaves it. A stored value is `enc:v1:` followed
+ * by Base64 of the 12-byte IV and the ciphertext with its 128-bit tag.
+ *
+ * A value without the prefix was saved before keys were encrypted:
+ * [decryptOrPlain] returns it as it is, and the repository encrypts it on its
+ * next write. A value the key cannot open reads as null, the same as no key.
+ */
 object AndroidSecretBox {
     private const val PREFIX = "enc:v1:"
     private const val KEY_ALIAS = "inku_provider_settings_v1"

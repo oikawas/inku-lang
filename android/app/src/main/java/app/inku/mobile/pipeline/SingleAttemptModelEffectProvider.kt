@@ -81,6 +81,8 @@ class SingleAttemptModelEffectProvider(
             .put("failure", failure)
             .put("elapsed_ms", elapsedMs.toString())
 
+    // The core's failure classes. It retries every one within its budget but
+    // `provider_rejected`, so only a refusal that would repeat maps there.
     private fun failureCode(error: Throwable): String = when (error) {
         is ModelProviderHttpException -> when {
             error.statusCode == 429 -> "rate_limited"

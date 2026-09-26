@@ -222,6 +222,7 @@ class SharedPipelineHost(
         }
     }
 
+    /** A drive whose caller is cancelled cancels the execution too, so it is not left busy. */
     private suspend fun driveWithCancellation(session: Session): PipelineView {
         session.mutex.withLock { session.drivers += 1 }
         return try {
@@ -236,6 +237,11 @@ class SharedPipelineHost(
         }
     }
 
+    /**
+     * Performs the effects the core asks for -- a commit to Room or a model
+     * call -- until it asks for none, at most [maxEffectSteps] of them. A
+     * model call another drive has already taken ends this drive with a view.
+     */
     private suspend fun drive(session: Session): PipelineView {
         repeat(maxEffectSteps) {
             val action = session.mutex.withLock {
@@ -346,6 +352,8 @@ class SharedPipelineHost(
         if (next.requiredString("execution_id") != previous.requiredString("execution_id")) {
             throw PipelineHostException("pipeline_execution_identity_changed")
         }
+        // A step that draws nothing keeps the last drawing only while the
+        // document it drew is unchanged and still delivered.
         val oldDocument = previous.optJSONObject("document")?.toString()
         val nextDocument = next.optJSONObject("document")?.toString()
         val rendered = output.renderedJson ?: session.renderedJson
@@ -576,8 +584,10 @@ class SharedPipelineHost(
         val models: PipelineModelSelection,
         var context: AuthoringContext,
         var hostContextJson: String,
+        /** True until the first commit, the one allowed to create the variation. */
         var fresh: Boolean,
         var renderedJson: String?,
+        /** Callers holding this cached session; at 0 it leaves the cache. */
         var users: Int = 0,
         var eventsJson: String,
         var providerActionInFlight: String? = null,

@@ -68,11 +68,20 @@ data class PipelineHostPolicy(
     val maximumProviderAttempts: Int = 4,
     val providerAttemptTimeoutMs: Long = 120_000L,
     val providerTotalTimeoutMs: Long = 120_000L,
+    // Stage 1 has its own budget, as on the server since 2026-09-19: its
+    // models can need longer than one 120-second request, and a total equal
+    // to one attempt would leave no time to retry.
+    val stage1AttemptTimeoutMs: Long = 300_000L,
+    val stage1TotalTimeoutMs: Long = 540_000L,
     val providerRetryDelayMs: Long = 2_000L,
     val maximumEffectSteps: Int = 32,
 )
 
-/** Builds host policy around Rust-owned registries, palettes, prompts, and Macro validation. */
+/**
+ * Builds host policy around Rust-owned registries, palettes, prompts, and Macro validation.
+ * The envelope, macro, prompt and resource limits are the server's defaults
+ * (`pipeline_defaults.py`), so a work compiles under the same bounds on both.
+ */
 class SharedPipelineConfigBuilder(
     private val binding: SharedPipelineBinding,
     val policy: PipelineHostPolicy = PipelineHostPolicy(),
@@ -210,7 +219,7 @@ class SharedPipelineConfigBuilder(
                     .put("max_response_bytes", 1024 * 1024),
             )
             .put("catalog_retry", JSONObject(retry.toString()))
-            .put("stage1_retry", JSONObject(retry.toString()))
+            .put("stage1_retry", retryPolicy(policy.stage1AttemptTimeoutMs, policy.stage1TotalTimeoutMs))
             .put("hole_retry", JSONObject(retry.toString()))
 
         return PreparedPipelineConfig(
@@ -306,6 +315,7 @@ class SharedPipelineConfigBuilder(
         )
     }
 
+    /** Refuses a native library built for another pipeline protocol than this host speaks. */
     private fun requireCompatibleBinding() {
         val report = JSONObject(binding.versionReport())
         if (
@@ -454,10 +464,13 @@ class SharedPipelineConfigBuilder(
             .put("palette", palette)
     }
 
-    private fun retryPolicy() = JSONObject()
+    private fun retryPolicy(
+        attemptTimeoutMs: Long = policy.providerAttemptTimeoutMs,
+        totalTimeoutMs: Long = policy.providerTotalTimeoutMs,
+    ) = JSONObject()
         .put("max_attempts", policy.maximumProviderAttempts)
-        .put("attempt_timeout_ms", policy.providerAttemptTimeoutMs.toString())
-        .put("total_timeout_ms", policy.providerTotalTimeoutMs.toString())
+        .put("attempt_timeout_ms", attemptTimeoutMs.toString())
+        .put("total_timeout_ms", totalTimeoutMs.toString())
         .put("retry_delay_ms", policy.providerRetryDelayMs.toString())
 
     private fun resourceMaximum(limits: PipelineResourceLimits): Map<String, Int> = linkedMapOf(

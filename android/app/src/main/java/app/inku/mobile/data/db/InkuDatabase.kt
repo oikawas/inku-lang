@@ -126,6 +126,8 @@ abstract class InkuDatabase : RoomDatabase() {
             }
         }
 
+        // The triggers came with the v10 reset, so every database from v10 on
+        // was created with them and no migration needs to add them.
         val FRESH_SCHEMA_CALLBACK = object : RoomDatabase.Callback() {
             override fun onCreate(db: SupportSQLiteDatabase) {
                 super.onCreate(db)

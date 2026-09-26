@@ -57,6 +57,12 @@ class RoutingModelProvider(
     }
 
     internal companion object {
+        /**
+         * The service a model id belongs to: the one it names with a
+         * `provider:` prefix, else the one enabled service that publishes it.
+         * An id no enabled service publishes, or that two publish, goes to
+         * the device's own model.
+         */
         internal fun resolveProviderForRouting(
             providers: List<ProviderSettingEntity>,
             modelId: String,

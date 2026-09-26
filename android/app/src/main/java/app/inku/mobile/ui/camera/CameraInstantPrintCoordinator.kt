@@ -22,6 +22,7 @@ internal data class CameraInstantPrintOutcome<Local, Result>(
 
 /** Runs one capture through real processing boundaries without owning UI or persistence. */
 internal class CameraInstantPrintCoordinator(
+    /** False once a newer capture has replaced this one; the run then stops at its next step. */
     private val isCurrent: () -> Boolean = { true },
     private val onPhase: (CameraInstantPrintPhase) -> Unit,
 ) {

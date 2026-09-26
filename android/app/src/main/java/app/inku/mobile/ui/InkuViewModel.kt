@@ -2240,6 +2240,8 @@ class InkuViewModel @JvmOverloads constructor(
         val autoRepair = true
         val runId = beginDrawingRun()
         drawingJob = viewModelScope.launch {
+            // The selected work's authority was still being read. A DDL-led
+            // work is not redrawn from its description unless a fork was asked for.
             if (current.historyAuthorityLoading && current.selectedHistory != null) {
                 val read = runCatching {
                     withContext(Dispatchers.IO) {
@@ -2475,7 +2477,9 @@ class InkuViewModel @JvmOverloads constructor(
                     if (error is CancellationException) throw error
                     if (!isCurrentDrawingRun(runId)) return@onFailure
                     if (presentPipelineInteraction(error)) return@launch
-                    failures = (failures + BatchFailure(lineNumber, prompt, messageFor(error, strings(), strings().statusDrawFailed))).take(30)
+                    // Every failure is kept (at most MaxBatchItems): the tally
+                    // counts this list, as web's report keeps each one.
+                    failures = failures + BatchFailure(lineNumber, prompt, messageFor(error, strings(), strings().statusDrawFailed))
                     localState.value = localState.value.copy(
                         batchSuccess = success,
                         batchFailures = failures,
@@ -2608,6 +2612,8 @@ class InkuViewModel @JvmOverloads constructor(
                         )
                         delay(1000)
                     }
+                    // The interval runs from the cycle's start, so a slow
+                    // drawing shortens the wait before the next one.
                     val elapsed = System.currentTimeMillis() - startedAt
                     val waitMs = (state.value.demoIntervalSeconds * 1000L - elapsed).coerceAtLeast(0L)
                     var left = ((waitMs + 999L) / 1000L).toInt()

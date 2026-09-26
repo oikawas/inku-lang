@@ -1,17 +1,5 @@
 package app.inku.mobile.data.refinement
 
-import app.inku.mobile.pipeline.InstructionLanguage
-
-/**
- * Which of the two inspections a round of comparison is.
- *
- * The kind is carried rather than inferred, because it is the one thing the
- * lineage edge is named after and the branch that names it lives in exactly one
- * place ([ComparisonPlanner.derivationKindFor], the port of web's single line at
- * `state.svelte.ts:546`).
- */
-enum class ComparisonKind { Model, Language }
-
 /**
  * The three model comparison modes (`state.svelte.ts:135`, SPEC `:616`).
  *
@@ -31,26 +19,12 @@ enum class ModelCompareMode(val id: String) {
     }
 }
 
-/** One Stage 1 × Stage 2 language pair, the unit the language inspection selects. */
-data class LanguageCombo(val stage1: String, val stage2: String) {
-    val id: String get() = "$stage1:$stage2"
-
-    companion object {
-        /**
-         * The four pairs, in the order `CanvasPanel.svelte:978-988` lists them.
-         *
-         * The language inspection selects pairs with checkboxes rather than one
-         * of three modes. SPEC `:686` says it has the same three modes model
-         * comparison has; the reference implementation does not, and the
-         * reference implementation is what this follows (SPEC `:614`).
-         */
-        val ALL: List<LanguageCombo> = InstructionLanguage.entries.flatMap { stage1 ->
-            InstructionLanguage.entries.map { stage2 -> LanguageCombo(stage1.code, stage2.code) }
-        }
-
-        fun byId(id: String?): LanguageCombo? = ALL.firstOrNull { it.id == id }
-    }
-}
+/**
+ * The lineage edge a model comparison candidate is saved under. Works saved as
+ * `language_comparison` before the language comparison was retired (the web on
+ * 2026-08-29, here on 2026-09-26) keep their own kind and stay readable.
+ */
+const val MODEL_COMPARISON_KIND = "model_comparison"
 
 /**
  * Builds the orders for one comparison candidate.
@@ -61,17 +35,6 @@ data class LanguageCombo(val stage1: String, val stage2: String) {
  * 複製しない」).
  */
 object ComparisonPlanner {
-
-    /**
-     * The one place the two comparison edges are told apart.
-     *
-     * web spells the same branch on one line
-     * (`derivationKind: parent ? (kind === 'language' ? 'language_comparison' :
-     * 'model_comparison') : null`, `state.svelte.ts:546`). Splitting it in two
-     * would let one of the kinds be right while the other is a constant.
-     */
-    fun derivationKindFor(kind: ComparisonKind): String =
-        if (kind == ComparisonKind.Language) "language_comparison" else "model_comparison"
 
     /**
      * Which model each stage gets, written as the two lines web decides it with
@@ -102,10 +65,6 @@ object ComparisonPlanner {
         ModelCompareMode.Stage2Fixed -> model == targetStage1Model && fixedModel == targetStage2Model
     }
 
-    /** The target work's own pair, and only that one (`state.svelte.ts:373-375`). */
-    fun isLanguageComboBlocked(combo: LanguageCombo, targetLang: String): Boolean =
-        combo.stage1 == targetLang && combo.stage2 == targetLang
-
     /**
      * A comparison redraws the description from the top, so it carries none of
      * the parent's seeds: a held render seed would hand every model the same
@@ -126,7 +85,7 @@ object ComparisonPlanner {
             catalogId = parent.catalogId,
             canvasAspect = parent.canvasAspect,
             seeds = PaintSeeds(),
-            derivationKind = derivationKindFor(ComparisonKind.Model),
+            derivationKind = MODEL_COMPARISON_KIND,
             derivationMetadata = mapOf(
                 "comparison_mode" to mode.id,
                 "compared_model" to model,
@@ -138,24 +97,5 @@ object ComparisonPlanner {
         )
     }
 
-    /**
-     * `comparison_mode` is `common` for every language candidate
-     * (`state.svelte.ts:469`): the pairs are the selection here, so there is no
-     * mode to record and web records the default rather than inventing one.
-     */
-    fun languagePlan(combo: LanguageCombo, parent: RefinementParent): RefinementPlan = RefinementPlan(
-        element = null,
-        route = RefinementRoute.Paint,
-        catalogId = parent.catalogId,
-        canvasAspect = parent.canvasAspect,
-        seeds = PaintSeeds(),
-        derivationKind = derivationKindFor(ComparisonKind.Language),
-        derivationMetadata = mapOf(
-            "comparison_mode" to ModelCompareMode.Common.id,
-            "stage1_language" to combo.stage1,
-            "stage2_language" to combo.stage2,
-        ),
-        stage1Lang = combo.stage1,
-        stage2Lang = combo.stage2,
-    )
+
 }

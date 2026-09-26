@@ -68,7 +68,8 @@ class DerivationKindTest {
         assertEquals("外部の種", InkuStringsJa.derivationLabel("external_seed_change"))
 
         // 写生 (Stage 0.5). The wording is the web client's ([I-137]).
-        assertEquals("写生の区切り", InkuStringsJa.derivationLabel("sketch_grain_change"))
+        // 写生 became on/off with method A; web names the edge the same way (`derivation.ts`).
+        assertEquals("写生の有無", InkuStringsJa.derivationLabel("sketch_grain_change"))
 
         assertEquals("起点", InkuStringsJa.derivationOrigin)
         assertEquals("起点", InkuStringsJa.derivationOrigin)

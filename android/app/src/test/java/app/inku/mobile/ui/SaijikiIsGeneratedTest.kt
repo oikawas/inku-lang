@@ -33,13 +33,20 @@ class SaijikiIsGeneratedTest {
         return file.readText()
     }
 
-    /** T1: what the screen builds, in either language, is the server's table. */
+    /**
+     * T1: what the screen builds, in either language, is the server's table.
+     *
+     * The numbers are the table's as `gen_saijiki_kt.py` bakes it today
+     * (thirteen categories and 97 words since あいだ gained つながる and 鏡写し);
+     * they move when the server's table does, and the generator is the check
+     * that the Kotlin copy followed.
+     */
     @Test
-    fun testScreenShowsTwelveCategoriesAndNinetyTwoWordsInBothLanguages() {
+    fun testScreenShowsThirteenCategoriesAndNinetySevenWordsInBothLanguages() {
         for (lang in UiLanguage.entries) {
             val groups = saijikiGroups(lang)
-            assertEquals("$lang: display categories", 12, groups.size)
-            assertEquals("$lang: display words", 92, groups.sumOf { it.words.size })
+            assertEquals("$lang: display categories", 13, groups.size)
+            assertEquals("$lang: display words", 97, groups.sumOf { it.words.size })
         }
     }
 
@@ -60,7 +67,7 @@ class SaijikiIsGeneratedTest {
         assertTrue("the aida category is absent from the screen", aida != null)
         assertEquals(
             "aida words",
-            listOf("沿う", "触れない", "切る", "間に", "触れる"),
+            listOf("沿う", "触れない", "切る", "間に", "触れる", "つながる", "鏡写し"),
             aida!!.words,
         )
     }
@@ -132,7 +139,7 @@ class SaijikiIsGeneratedTest {
             val words = saijikiDetectionWords(lang).map { it.first }.toSet()
             assertTrue("$lang: does not recognise the Japanese 円", "円" in words)
             assertTrue("$lang: does not recognise the English circle", "circle" in words)
-            assertEquals("$lang: detection surfaces", 184, words.size)
+            assertEquals("$lang: detection surfaces", 194, words.size)
         }
     }
 

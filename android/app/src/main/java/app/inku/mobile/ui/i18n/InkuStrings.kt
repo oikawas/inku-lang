@@ -52,6 +52,7 @@ interface InkuStrings {
     val productionTools: String
     val reviseWork: String
     val interpretationToggle: String
+    val interpretationHide: String
 
     // --- Drawing status -----------------------------------------------------
     val statusStage1: String
@@ -62,6 +63,12 @@ interface InkuStrings {
     val statusComposeFailed: String
     val statusSaved: (String) -> String
     val statusSaveFailed: String
+    val restoreDrawingFailed: String
+    val pipelineDeclineFailed: String
+    val drawingContextUnreadable: String
+    val drawingContextMissing: String
+    val demoFailed: String
+    val licenseUpdateFailed: String
     val pipelineProposal: String
     val pipelineOriginalDdl: String
     val pipelineProposedDdl: String
@@ -105,8 +112,6 @@ interface InkuStrings {
     val comparisonModelSelectPrompt: String
     val comparisonModelFixedMissing: String
     val comparisonModelChoiceBlocked: String
-    val comparisonLanguageSelectPrompt: String
-    val comparisonLanguageComboBlocked: String
     val comparisonModeLabel: (String) -> String
     val comparisonKindLabel: (String) -> String
     val comparisonKindDescription: (String) -> String
@@ -139,7 +144,6 @@ interface InkuStrings {
     val modelDownloadFailed: String
     val modelLocalInfoMissing: (String, String) -> String
     val modelNotDownloadedYet: (String, String, String) -> String
-    val modelRecommendationReason: (String) -> String
 
     // --- Errors thrown below the screen -------------------------------------
     val errorServiceIdFormat: String
@@ -166,7 +170,6 @@ interface InkuStrings {
     val baseUrlChange: String
     val drawFromDdl: String
     val ddlOverwriteTitle: String
-    val ddlReplaySaveAsNew: String
     val ddlEdit: String
     val mascotSubtitle: String
     val mascotIncu: String
@@ -174,12 +177,10 @@ interface InkuStrings {
     val exportPngTooLarge: String
     val pngAlphaWhite: String
     val stagesShared: String
-    val languageComboNote: String
     val uiModeSubtitle: String
     val displaySafeMarginsSubtitle: String
     val displaySafeMarginsToggle: String
     val exportSubtitle: String
-    val historySelectionSubtitle: String
     val svgDisplayNote: String
     val mascotYuragi: String
     val exportHeightPx: String
@@ -223,6 +224,21 @@ interface InkuStrings {
     val uiModeFullLong: String
     val promptLabel: String
     val searchPlaceholderLong: String
+    val noMatchingWorks: String
+    val moveToTrash: String
+    val trashedBadge: String
+    val trashView: (Int) -> String
+    val trashEmpty: String
+    val restoreWork: String
+    val deleteForGood: String
+    val confirmTrash: (Int) -> String
+    val confirmRestore: (Int) -> String
+    val confirmDeleteForGood: (Int) -> String
+    val confirmRun: String
+    val workTrashed: String
+    val workRestored: String
+    val workDeleted: String
+    val trashedWorkNote: String
     val mascotTitle: String
     val model: String
     val modelListFetch: String
@@ -252,7 +268,6 @@ interface InkuStrings {
     val selectAll: String
     val noPublishedModels: String
     val noPublishedModelsLong: String
-    val unifiedModelNote: String
     val downloadAgain: String
     val sketchFromLife: String
     val workActionSketchRedraw: String
@@ -264,7 +279,6 @@ interface InkuStrings {
     val downloadable: String
     val downloaded: String
     val downloadState: String
-    val cancelShort: String
     val accepted: String
     val name: String
     val fixedStage1Model: String
@@ -275,10 +289,7 @@ interface InkuStrings {
     val demoRunAndSeed: String
     val sameStagePairBlocked: String
     val history: String
-    val historyValue: String
-    val historySelection: String
     val showThinking: String
-    val openProviderSettings: String
     val providerKind: String
     val paint: String
     val drawingModel: String
@@ -297,7 +308,6 @@ interface InkuStrings {
     val saijiki: String
     val svgGeneric: String
     val confirm: String
-    val keepCurrentValue: String
     val producedInstructions: String
     val producedInterpretation: String
     val working: String
@@ -319,7 +329,6 @@ interface InkuStrings {
     val autoRepair: String
     val interpretation: String
     val awaitingInterpretation: String
-    val language: String
     val miscSubtitle: String
     val description: String
     val camera: String
@@ -365,7 +374,6 @@ interface InkuStrings {
     val ddlOverwriteBody: String
     val selected: String
     val close: String
-    val sameAsTargetSuffix: String
     val renderTabArtwork: String
     val generationInfoTitle: String
     val generationInfoInputSection: String
@@ -413,7 +421,6 @@ interface InkuStrings {
     val generationInfoElapsed: String
     val generationInfoOn: String
     val generationInfoOff: String
-    val recommendedStageSuffix: (Int) -> String
     val parentSuffix: (String, String) -> String
     val downloadOf: (String) -> String
     val choiceSameAsTarget: (String) -> String
@@ -422,6 +429,7 @@ interface InkuStrings {
     val filteredOfTotal: (Int, Int) -> String
     val groupAlternatives: (String) -> String
     val lineNumber: (Int) -> String
+    val batchHistoryPill: (String, Int) -> String
     val ofOneHundred: (Int) -> String
     val apiKeyDeleteBody: (String) -> String
     val serviceDeleteBody: (String) -> String
@@ -441,6 +449,26 @@ interface InkuStrings {
 
     // --- Export -------------------------------------------------------------
     val exportTemplateBuiltinDescription: (Int) -> String
+
+    /** Accessibility state of the 制作ツール menu button. */
+    val stateExpanded: String
+    val stateCollapsed: String
+    /** Accessibility name of the Works grid's scrollbar. */
+    val worksScrollbarDescription: String
+    /** Between the names of a list written into a sentence (「・」 / ", "). */
+    val listSeparator: String
+    /** After a drawing is saved; the argument is the short render hash. */
+    val statusRendered: (String) -> String
+    val statusComposed: (String) -> String
+    val promptEmpty: String
+    val batchEmpty: String
+    val hashCopied: String
+    /** Export progress and outcome; the first argument is the format (DDL, SVG, PNG). */
+    val exportPreparing: (String) -> String
+    val exportDone: (String, String) -> String
+    val exportFailed: (String) -> String
+    val copy: String
+    val providerLabel: String
 }
 
 /**

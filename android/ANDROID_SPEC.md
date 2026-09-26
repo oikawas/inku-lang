@@ -4,7 +4,7 @@ This directory is the Android workspace for the native standalone app and is
 tracked by Git. Local-only artifacts, device IDs, downloaded models, logs, and
 secrets must remain outside tracked files.
 
-Last updated: 2026-09-25.
+Last updated: 2026-09-26.
 
 **Catch-up status**: Android sits at generation `2.1.4-android.80`. DDL conversion and Score → SVG
 rendering run in the shared Rust core (`core/crates/`) of the same commit, packaged with the app, so
@@ -43,6 +43,26 @@ When updating Android specifications:
    adaptation of the Japanese source.
 3. Do not introduce English-only Android requirements that are absent from
    `ANDROID_SPEC.ja.md`.
+
+## 2026-09-26 Current connections, drawing settings, and export
+
+Each connection kind is sent in the shape the server's `pipeline_provider.py` uses. `openai-compatible` posts `/chat/completions`, `gemini` posts `/v1beta/models/{model}:generateContent`, and `anthropic` (Claude API) posts `/v1/messages` with `x-api-key` and `anthropic-version: 2023-06-01`; a drawing answer is the `input` of a forced tool call, and a photo travels as a base64 image block. The built-in connections are the server's list: no ovms, and Ollama Cloud (`ollama-cloud`, `https://ollama.com/v1`, key required). An ovms row the author configured -- a key, a name, a base URL or a model list -- is kept as their own connection; one still as the catalog seeded it is removed at start-up. On `openai-compatible` a drawing answer is a forced function call, except on `ollama`, which asks for it through a JSON-schema `response_format`; `ollama` and `ollama-cloud` turn reasoning off with `reasoning_effort: none`. Built-in connections are only filled in at start-up: the service name and base URL the author changed are kept (the kind stays the catalog's, and the local connection's base URL is a marker that does not change). Delete service on a built-in connection does not remove the row: as on the server it is switched off, hidden from the list and its API key forgotten, and adding a service with the same id brings it back. A connection the author added is removed; the local connection cannot be deleted. API keys are typed masked with the password keyboard (no suggestions or learning), and Add AI service forgets what was typed when it closes. The note that a local LLM may work without a key is shown only for connections where a key is optional.
+
+The Wild setting is saved in `app_settings` as `render_wild` (`{"enabled":bool}`) and stated on every new drawing from a description (single, batch, demo, camera). A DDL drawn from a work keeps that work's Wild (`render_metadata.render_wild`), and refinement candidates keep the parent's (web's `targetWild` and `effectiveRefineWild`). Picking a work uses its color catalog (automatic for a work drawn with the automatic catalog) and canvas for the next drawing; at start-up a work on screen wins over the saved catalog and canvas. The history-selection canvas and color catalog settings and "save a DDL redraw as new history" had no processing behind them and are removed. Back and a tap outside the color catalog dialog cancel it, and Cancel also restores the saved value. The Works screen, full-screen stepping and search cover every work (previously only the newest 100).
+
+The display SVG export is the saved SVG itself; the editable and compat SVGs are the saved Score drawn again in that profile with the work's colors, seeds and Wild (as the server's `GET /api/history/{id}/svg?profile=`). Files written to `cacheDir/exports` for sharing are removed by the next export once they are a day old.
+
+While the keyboard is up, Draw for the description and Batch draw for the batch editor are pinned above it, with room of the same height at the end of the scroll. Add AI service and a connection's model picker shrink for the keyboard. The touch-words field of Refinement brings the Make candidates row into view. Back from an open Refinement closes it, and Back while revising a work returns to the work's result (the camera and the overwrite question keep Back when they are showing).
+
+Refinement has two sub-views, Adjust and Model, and a lineage card offers Refinement elements, DDL edit and Model. The language comparison (Language) is not offered, as the web retired it on 2026-08-29; works saved as `language_comparison` still show Language on their lineage card. When the target changes or the refinement closes during a run, the stopped run leaves the new target's state alone when it ends.
+
+A permanent delete, as the server's `HistoryPermanentDeleteWriter` does, turns the lineage node into a tombstone (no history or hashes, `deleted_at` recorded) and empties `metadata_json` of the edges touching it, in the same transaction. The thumbnail is removed unless another work with the same render hash still uses it. On the screens it is the trash's Permanently delete (the debug headless run with `save_history=false` uses it too), and it only acts on a work in the trash, as the server's `require_trashed`.
+
+The trash offers web's history-manager trash one work at a time. Move to trash, last on a lineage card and drawn apart from the other entries, asks first, then raises `trashed` only -- the lineage node stays -- and says what it did on that screen for five seconds. A work in the trash is marked on its card, which offers no edits. A work on screen that goes to the trash stays on screen, marked, and cannot be revised (web keeps its current item with `trashed: true`). The Works screen's Trash (N) switches the list to the trash, where each work can be restored or permanently deleted, each after a question.
+
+The newest work shown on opening is for display only and does not become the parent of the next drawing (web restores no work on opening); a work picked on the Works or lineage screen does. The start-up restore brings back only an execution still running or waiting on the author, or a completed one whose work was not saved -- never one that failed or was cancelled (web restores nothing on opening; this is for an app the system stopped mid-drawing) -- and does not run while a refinement is open or making candidates. Presenting a drawing stops a refinement run. A refinement candidate that stops for the author's attention fails inside the refinement, as web's `failGrid`, and its execution is cancelled. New work while a waiting execution is shown cancels it. The export setting "Enable alpha channel on white background" has the web's wording and changes nothing visible, as the SVG carries a full background.
+
+The drawing model is chosen in the compose screen's model dialog. The settings screen's model-selection pane, which no screen opened, and the thumbnail strip below the canvas, which nothing called, are removed, as is the Android-only list of recommended models that only that pane used (the "(recommended for S1)" after a model's name). Works are chosen from the Works screen, the lineage, and the full-screen view. Web shows the server model catalog's recommendation (stars per stage), speed, and comment wherever a model is chosen; the Android dialog shows the model names only.
 
 ## 2026-09-25 Current plugins (draw-system04)
 
@@ -505,11 +525,11 @@ component unless marked as a local single-user equivalent.
 | `SaijikiDrawer.svelte` | Mobile equivalent is the inline Saijiki panel; drawer layout is not used on Android. |
 | `CanvasPanel.svelte` | Ported for `artwork`/`prompt`/`score` tabs, star, hash copy, render metadata, zoom/pan controls, SVG share, and PNG share. |
 | `OutputTabsContent.svelte` | Ported as prompt and JSON views from the saved Room history item. |
-| `HistoryStrip.svelte` | Ported as a thumbnail strip below the Compose canvas, with selection, model names, and saved-metadata tooltips. The Star-capable history grid remains a separate entry point. |
+| `HistoryStrip.svelte` | Ported as a thumbnail strip below the canvas, then removed on 2026-09-26 after it was no longer shown. Works are chosen from the Works grid, the lineage, and the full-screen view. |
 | `HistoryManager.svelte` | Ported for thumbnails/list modes, search, starred filter, selection, trash, restore, and permanent delete. |
 | `HistoryThumbnail.svelte` | Ported through `ArtworkPreview` in history tiles and list rows. |
 | `ConfirmDialog.svelte` | Ported for DDL overwrite and destructive history operations. Non-history destructive settings confirmations remain in the parity test backlog. |
-| `SettingsModal.svelte` | Ported for model selection, model connection settings, plugin setting, DB status, export templates, and misc settings. Server-only logs/output-save are represented as local-only equivalents. |
+| `SettingsModal.svelte` | Ported for model connection settings, plugin setting, DB status, export templates, and misc settings (model selection is the compose screen's dialog). Server-only logs/output-save are represented as local-only equivalents. |
 | `IncuMascot.svelte` / `YuragiMascot.svelte` | Ported as MascotWidget and IncuMascotView / YuragiMascotView with 5x5 pixel grid and animations in pure Kotlin / Compose Canvas. |
 
 ## Implementation Order

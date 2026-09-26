@@ -16,38 +16,7 @@ class OpenAiCompatibleProvider(
 ) : ModelProvider {
     override suspend fun generate(request: ModelRequest): ModelResponse = withContext(Dispatchers.IO) {
         val started = System.currentTimeMillis()
-        val model = modelForRequest(providerId, request.modelId)
-        val payload = JSONObject()
-            .put("model", model)
-            .put(
-                "messages",
-                JSONArray().apply {
-                    request.systemInstruction?.takeIf { it.isNotBlank() }?.let {
-                        put(JSONObject().put("role", "system").put("content", it))
-                    }
-                    put(JSONObject().put("role", "user").put("content", userContent(request)))
-                },
-            )
-            .put("temperature", pipelineTemperature(request.pipelineAction) ?: request.temperature)
-            .put("max_tokens", request.maxTokens)
-        request.tool?.let { tool ->
-            val function = JSONObject()
-                .put("name", tool.name)
-                .put("description", tool.description)
-                .put("parameters", JSONObject(tool.parametersJson))
-            payload
-                .put("tools", JSONArray().put(JSONObject().put("type", "function").put("function", function)))
-                .put(
-                    "tool_choice",
-                    JSONObject()
-                        .put("type", "function")
-                        .put("function", JSONObject().put("name", tool.name)),
-                )
-        }
-        if (request.stopSequences.isNotEmpty()) {
-            payload.put("stop", JSONArray(request.stopSequences))
-        }
-        val response = postJson(endpoint("/chat/completions"), payload, request.timeoutMs)
+        val response = postJson(endpoint("/chat/completions"), requestBody(providerId, request), request.timeoutMs)
         val choices = response.optJSONArray("choices") ?: error("Chat Completions response did not contain choices.")
         val first = choices.optJSONObject(0) ?: error("Chat Completions response was empty.")
         val message = first.optJSONObject("message")
@@ -144,6 +113,66 @@ class OpenAiCompatibleProvider(
         internal fun modelForRequest(providerId: String, modelId: String): String =
             modelId.removePrefix("$providerId:").ifBlank { modelId }
 
+        /**
+         * The Chat Completions body, in the server's per-connection shape
+         * (`pipeline_provider.py`). A requested answer is a forced function
+         * call, except on `ollama`, whose structured output goes as a strict
+         * JSON-schema `response_format` -- the answer then comes back as the
+         * message text, which [generate] already reads. A pipeline request to
+         * either Ollama connection also turns reasoning off.
+         */
+        internal fun requestBody(providerId: String, request: ModelRequest): JSONObject {
+            val payload = JSONObject()
+                .put("model", modelForRequest(providerId, request.modelId))
+                .put(
+                    "messages",
+                    JSONArray().apply {
+                        request.systemInstruction?.takeIf { it.isNotBlank() }?.let {
+                            put(JSONObject().put("role", "system").put("content", it))
+                        }
+                        put(JSONObject().put("role", "user").put("content", userContent(request)))
+                    },
+                )
+                .put("temperature", pipelineTemperature(request.pipelineAction) ?: request.temperature)
+                .put("max_tokens", request.maxTokens)
+            request.tool?.let { tool ->
+                if (providerId == OLLAMA_PROVIDER_ID) {
+                    payload.put(
+                        "response_format",
+                        JSONObject()
+                            .put("type", "json_schema")
+                            .put(
+                                "json_schema",
+                                JSONObject()
+                                    .put("name", tool.name)
+                                    .put("schema", JSONObject(tool.parametersJson))
+                                    .put("strict", true),
+                            ),
+                    )
+                } else {
+                    val function = JSONObject()
+                        .put("name", tool.name)
+                        .put("description", tool.description)
+                        .put("parameters", JSONObject(tool.parametersJson))
+                    payload
+                        .put("tools", JSONArray().put(JSONObject().put("type", "function").put("function", function)))
+                        .put(
+                            "tool_choice",
+                            JSONObject()
+                                .put("type", "function")
+                                .put("function", JSONObject().put("name", tool.name)),
+                        )
+                }
+            }
+            if (request.pipelineAction != null && providerId in REASONING_OFF_PROVIDER_IDS) {
+                payload.put("reasoning_effort", "none")
+            }
+            if (request.stopSequences.isNotEmpty()) {
+                payload.put("stop", JSONArray(request.stopSequences))
+            }
+            return payload
+        }
+
         /** Plain text, or the prompt with one JPEG as an image_url data URI. */
         internal fun userContent(request: ModelRequest): Any {
             val image = request.imageJpeg ?: return request.prompt
@@ -169,6 +198,8 @@ class OpenAiCompatibleProvider(
             else -> 0.0
         }
 
+        private const val OLLAMA_PROVIDER_ID = "ollama"
+        private val REASONING_OFF_PROVIDER_IDS = setOf("ollama", "ollama-cloud")
         private const val MAX_RESPONSE_CHARS = 2_000_000
         private const val MAX_ERROR_CHARS = 16_384
     }

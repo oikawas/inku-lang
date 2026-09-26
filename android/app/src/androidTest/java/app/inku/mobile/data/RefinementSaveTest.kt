@@ -10,6 +10,10 @@ import app.inku.mobile.data.refinement.RefinementElement
 import app.inku.mobile.data.refinement.RefinementParent
 import app.inku.mobile.data.refinement.RefinementPlanner
 import app.inku.mobile.data.refinement.VariationAmplitude
+import app.inku.mobile.llm.ModelProvider
+import app.inku.mobile.llm.ModelRequest
+import app.inku.mobile.llm.ModelResponse
+import app.inku.mobile.testing.pipelineFixtureResponse
 import kotlinx.coroutines.runBlocking
 import org.json.JSONObject
 import org.junit.After
@@ -35,6 +39,8 @@ class RefinementSaveTest {
     private lateinit var database: InkuDatabase
     private lateinit var repository: InkuRepository
 
+    private val PARENT_DDL = "中心に、鉛筆の細い線をひとつ置く。"
+
     private val score = """
         {"version":"0.1.0","canvas":"square","background":"white","instructions":[
           {"primitive":"line","from":[0.2,0.5],"to":[0.8,0.5],"color":"red","weight":"brush_thick"}
@@ -47,7 +53,16 @@ class RefinementSaveTest {
         database = Room.inMemoryDatabaseBuilder(context, InkuDatabase::class.java)
             .allowMainThreadQueries()
             .build()
-        repository = InkuRepository(context, database)
+        // The reading and variation candidates go back through Stage 1. With no
+        // model stood in, their test model ids reached no configured service
+        // and the pipeline stopped at needs_user_edit.
+        repository = InkuRepository(context, database, modelProviderOverride = FixtureModel)
+    }
+
+    private object FixtureModel : ModelProvider {
+        override val providerId: String = "test-fixture"
+
+        override suspend fun generate(request: ModelRequest): ModelResponse = pipelineFixtureResponse(request)
     }
 
     @After
@@ -72,6 +87,26 @@ class RefinementSaveTest {
             canvasAspect = "square",
             stage1ModelId = "test-stage1",
             stage2ModelId = "test-stage2",
+            seeds = PaintSeeds(renderSeed = 4242L, compositionSeed = 77L, interpretationSeed = "parent-reading"),
+        )
+
+    /**
+     * A work drawn from a DDL, for the elements that recompose from it.
+     *
+     * The layout and variation candidates go back through the DDL, and a work
+     * painted from a Score alone carries none: through the shared pipeline
+     * that stops at needs_user_edit. Works in the app are drawn from a
+     * description, so they always have one.
+     */
+    private suspend fun composeParent(description: String): HistoryItemEntity =
+        repository.composeFromDdl(
+            description = description,
+            ddl = PARENT_DDL,
+            catalogId = "ink_season",
+            canvasAspect = "square",
+            stage1ModelId = "test-stage1",
+            stage2ModelId = "test-stage2",
+            autoRepair = true,
             seeds = PaintSeeds(renderSeed = 4242L, compositionSeed = 77L, interpretationSeed = "parent-reading"),
         )
 
@@ -178,7 +213,7 @@ class RefinementSaveTest {
         )
 
         cases.forEachIndexed { index, (element, expectedKind, words) ->
-            val parent = paintParent("親$index")
+            val parent = composeParent("親$index")
             val edgesBefore = countRows("lineage_edges")
             val child = refineAndSave(
                 parent,
@@ -297,9 +332,14 @@ class RefinementSaveTest {
      */
     @Test
     fun t11_theVariationPairReachesStage1_5ThroughTheRequest() = runBlocking {
-        val ddl = "画面の中央に太い墨の線を一本引く。右上に小さな円を三つ散らす。"
+        // The DDL the shared core's own Stage 1.5 tests vary
+        // (`stage15_transform.rs`). The variation moves the effective document
+        // -- the Score -- and leaves the visible DDL as written, so the Score is
+        // what is compared; the composition and render seeds are held so that
+        // only the pair can move it.
+        val ddl = "中心に、鉛筆の細い線をひとつ置く。"
 
-        suspend fun expandedOf(amplitude: String?, seed: Long?): String = repository.composeFromDdl(
+        suspend fun scoreOf(amplitude: String?, seed: Long?): String = repository.composeFromDdl(
             description = "変奏 $amplitude $seed",
             ddl = ddl,
             catalogId = "default",
@@ -307,14 +347,14 @@ class RefinementSaveTest {
             stage1ModelId = "s1",
             stage2ModelId = "s2",
             autoRepair = true,
-            seeds = PaintSeeds(variationAmplitude = amplitude, variationSeed = seed),
-        ).expandedDdl!!
+            seeds = PaintSeeds(renderSeed = 4242L, compositionSeed = 0L, variationAmplitude = amplitude, variationSeed = seed),
+        ).scoreJson
 
-        val none = expandedOf(null, null)
-        val small7 = expandedOf("small", 7L)
-        val small7Again = expandedOf("small", 7L)
-        val medium7 = expandedOf("medium", 7L)
-        val small8 = expandedOf("small", 8L)
+        val none = scoreOf(null, null)
+        val small7 = scoreOf("small", 7L)
+        val small7Again = scoreOf("small", 7L)
+        val medium7 = scoreOf("medium", 7L)
+        val small8 = scoreOf("small", 8L)
 
         assertEquals("the same pair expands the same way", small7, small7Again)
         assertTrue("a variation is not the unvaried expansion", small7 != none)

@@ -4,8 +4,11 @@ import app.inku.mobile.ui.i18n.InkuStringsJa
 import androidx.compose.ui.semantics.SemanticsNode
 import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performScrollTo
@@ -65,16 +68,35 @@ class ImeKeepsTheMainActionOnScreenTest {
         // (`LaunchedEffect(state.isDrawing, state.selectedHistory?.id)`), and on a
         // cold start the database answers after the first frame. Clicking before
         // that gives the field focus and then takes it back -- a race the reader
-        // never runs into and the test loses every time. 「系譜」 is on the bottom
-        // bar always and beside the hash only when a work is on the canvas, so
-        // two of them means the screen has settled. A device with no work at all
-        // never gets there, and does not need to: nothing clears the focus.
+        // never runs into and the test loses every time. 「連作」 is on the bottom
+        // bar always and under the canvas only when a work is on it, so two of
+        // them means the screen has settled. A device with no work at all never
+        // gets there, and does not need to: nothing clears the focus.
         runCatching {
             composeTestRule.waitUntil(timeoutMillis = SETTLE_TIMEOUT_MS) {
-                composeTestRule.onAllNodesWithText("系譜").fetchSemanticsNodes().size >= 2
+                composeTestRule.onAllNodesWithText(InkuStringsJa.seriesTitle).fetchSemanticsNodes().size >= 2
             }
         }
         composeTestRule.waitForIdle()
+
+        // A saved work opens on its result, and the description is behind a
+        // button there (`showEditor` in ComposeScreen). 「新規作成」 is pressed
+        // until the field is there: start-up restores the last drawing a moment
+        // after the first work appears, and that put the result back over a
+        // press made too early. Only the text on screen is cleared; nothing
+        // saved is touched.
+        var lastPress = 0L
+        composeTestRule.waitUntil(timeoutMillis = SETTLE_TIMEOUT_MS) {
+            if (composeTestRule.onAllNodesWithTag(DESCRIPTION_INPUT_TAG).fetchSemanticsNodes().isNotEmpty()) {
+                return@waitUntil true
+            }
+            val now = System.currentTimeMillis()
+            if (now - lastPress > PRESS_INTERVAL_MS) {
+                lastPress = now
+                runCatching { composeTestRule.onNodeWithText(InkuStringsJa.newWork).performScrollTo().performClick() }
+            }
+            false
+        }
 
         // The description starts below the fold, and a click on a node outside the
         // viewport lands nowhere -- measured, the field never took focus at all.
@@ -90,7 +112,7 @@ class ImeKeepsTheMainActionOnScreenTest {
         // cutting the focus wiring (P-7) times out here instead of passing.
         val gaveWay = runCatching {
             composeTestRule.waitUntil(timeoutMillis = FOCUS_TIMEOUT_MS) {
-                composeTestRule.onAllNodesWithText("履歴").fetchSemanticsNodes().isEmpty()
+                composeTestRule.onAllNodesWithText(InkuStringsJa.worksTitle).fetchSemanticsNodes().isEmpty()
             }
         }.isSuccess
         assertTrue(
@@ -136,5 +158,6 @@ class ImeKeepsTheMainActionOnScreenTest {
     private companion object {
         const val SETTLE_TIMEOUT_MS = 10_000L
         const val FOCUS_TIMEOUT_MS = 5_000L
+        const val PRESS_INTERVAL_MS = 500L
     }
 }

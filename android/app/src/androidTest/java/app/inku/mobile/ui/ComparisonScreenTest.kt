@@ -7,6 +7,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.performClick
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -17,12 +18,12 @@ import androidx.test.platform.app.InstrumentationRegistry
 import app.inku.mobile.data.InkuRepository
 import app.inku.mobile.data.db.HistoryItemEntity
 import app.inku.mobile.data.db.InkuDatabase
-import app.inku.mobile.data.refinement.LanguageCombo
 import app.inku.mobile.data.refinement.ModelCompareMode
 import app.inku.mobile.data.refinement.PaintSeeds
 import app.inku.mobile.llm.ModelProvider
 import app.inku.mobile.llm.ModelRequest
 import app.inku.mobile.llm.ModelResponse
+import app.inku.mobile.testing.pipelineFixtureResponse
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
@@ -30,6 +31,7 @@ import kotlinx.coroutines.withContext
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
@@ -39,10 +41,12 @@ import org.junit.runner.RunWith
 /**
  * T-11, T-12 and T-13 of 契約 android-compares-models-and-languages.
  *
- * The two inspections are driven here through the *shared* entry points --
+ * The model comparison is driven here through the *shared* entry points --
  * `openRefinement` and `generateRefinementCandidates` -- and never through
- * anything of their own. That is what makes T-12 a check rather than a claim:
- * break either entry point and both halves of this class go red at once.
+ * anything of its own. That is what makes T-12 a check rather than a claim:
+ * break either entry point and this class goes red. The language comparison
+ * the contract also covered was retired with the web's (2026-08-29); T-13
+ * checks that its entry is gone.
  */
 @RunWith(AndroidJUnit4::class)
 class ComparisonScreenTest {
@@ -76,7 +80,7 @@ class ComparisonScreenTest {
         override suspend fun generate(request: ModelRequest): ModelResponse {
             delay(delayMs)
             calls += 1
-            return ModelResponse(text = "細い線を五本、中央付近に置く。", modelId = request.modelId)
+            return pipelineFixtureResponse(request)
         }
     }
 
@@ -113,6 +117,13 @@ class ComparisonScreenTest {
         repository = InkuRepository(context, database, modelProviderOverride = model)
         return model
     }
+
+    /**
+     * The fixture's answers at once. Without a model stood in, `cmp-model`
+     * reaches no configured service, the run fails into the pipeline's own
+     * screen, and the refinement closes with no candidate.
+     */
+    private fun useFixtureModel(): SlowModel = useSlowModel(0L)
 
     private fun paintWork(description: String): HistoryItemEntity = runBlocking {
         repository.renderFromScore(
@@ -169,6 +180,7 @@ class ComparisonScreenTest {
      */
     @Test
     fun t12_aModelComparisonRunsThroughTheRefinementEntryPoints() {
+        useFixtureModel()
         val work = paintWork("赤い線を引く")
         showLineage()
         composeTestRule.runOnIdle {
@@ -185,25 +197,6 @@ class ComparisonScreenTest {
         assertEquals("cmp-model", candidate.stage2Model)
     }
 
-    /** The same entry points again, for the other comparison. */
-    @Test
-    fun t12_aLanguageComparisonRunsThroughTheSameEntryPoints() {
-        val work = paintWork("夕暮れの水面に細い線を五本引く")
-        showLineage()
-        composeTestRule.runOnIdle {
-            vm().openRefinement(work, RefinementSubview.Language)
-            vm().toggleLanguageCombo(LanguageCombo("ja", "en").id)
-            vm().generateRefinementCandidates()
-        }
-        awaitState("one language candidate") { it.refinementCandidates.size == 1 && !it.refinementBusy }
-
-        val candidate = vm().state.value.refinementCandidates.first()
-        assertEquals("language_comparison", candidate.plan.derivationKind)
-        assertEquals("ja", candidate.plan.stage1Lang)
-        assertEquals("en", candidate.plan.stage2Lang)
-        assertEquals("en", candidate.instructionLangResolved)
-    }
-
     /** 「比較対象はユーザーが明示的に選び、未選択モデルをfallback実行しない」. */
     @Test
     fun t12_anEmptyModelSelectionDrawsNothingAndSaysSo() {
@@ -216,32 +209,6 @@ class ComparisonScreenTest {
         awaitState("the refusal") { it.refinementStatus == MODEL_SELECT_PROMPT(InkuStringsJa) }
         assertTrue("nothing was drawn", vm().state.value.refinementCandidates.isEmpty())
         assertFalse("and nothing is running", vm().state.value.refinementBusy)
-    }
-
-    /** 「1組も選ばずに実行すると案内文を出して止まる」(`state.svelte.ts:398-401`). */
-    @Test
-    fun t12_anEmptyLanguageSelectionDrawsNothingAndSaysSo() {
-        val work = paintWork("夕暮れの水面")
-        showLineage()
-        composeTestRule.runOnIdle {
-            vm().openRefinement(work, RefinementSubview.Language)
-            vm().generateRefinementCandidates()
-        }
-        awaitState("the refusal") { it.refinementStatus == LANGUAGE_SELECT_PROMPT(InkuStringsJa) }
-        assertTrue("nothing was drawn", vm().state.value.refinementCandidates.isEmpty())
-    }
-
-    /** The target's own pair cannot be selected, so it cannot be run. */
-    @Test
-    fun t12_theTargetsOwnLanguagePairCannotBeSelected() {
-        val work = paintWork("夕暮れの水面")
-        showLineage()
-        composeTestRule.runOnIdle {
-            vm().openRefinement(work, RefinementSubview.Language)
-            vm().toggleLanguageCombo(LanguageCombo("ja", "ja").id)
-        }
-        awaitState("the refusal") { it.refinementStatus == LANGUAGE_COMBO_BLOCKED(InkuStringsJa) }
-        assertTrue("nothing was selected", vm().state.value.languageCompareSelectedCombos.isEmpty())
     }
 
     // ── T-11: the target changes ──────────────────────────────
@@ -286,14 +253,18 @@ class ComparisonScreenTest {
         assertEquals("the new target is the one on screen", second.id, state.refinementParent?.id)
         assertTrue("the old work's candidates are gone", state.refinementCandidates.isEmpty())
         assertTrue("and the old selection with them", state.modelCompareSelectedModels.isEmpty())
+        // The old run ends after the change; its stop belongs to the old work
+        // and must not be reported against the new one.
+        assertNull("the new target shows no stop", state.refinementStatus)
     }
 
     // ── T-13: the lineage card's menu ─────────────────────────
 
     /**
-     * 「描画要素・記述・DDL・モデル・言語・…」(SPEC `:618`). Three of the seven are
-     * built; they appear in that order, each opens its own sub-view with the
-     * card's work as the target, and closing goes back to the lineage.
+     * 「描画要素・記述・DDL・モデル・…」(SPEC, the card's 作品を編集する). The two
+     * sub-view entries here each open their own sub-view with the card's work
+     * as the target, closing goes back to the lineage, and 言語 -- retired with
+     * the web's language comparison -- is no longer offered.
      */
     @Test
     fun t13_theCardMenuOpensEachSubViewAndComesBack() {
@@ -308,7 +279,7 @@ class ComparisonScreenTest {
 
         assertEquals("描画要素 is on the card", 1, nodesWithTag(REFINE_ENTRY_TAG))
         assertEquals("モデル is on the card", 1, nodesWithTag(MODEL_ENTRY_TAG))
-        assertEquals("言語 is on the card", 1, nodesWithTag(LANGUAGE_ENTRY_TAG))
+        assertEquals("言語 is not", 0, composeTestRule.onAllNodesWithText("言語").fetchSemanticsNodes().size)
 
         composeTestRule.onAllNodesWithTag(MODEL_ENTRY_TAG)[0].performClick()
         awaitState("the model sub-view") {
@@ -319,16 +290,8 @@ class ComparisonScreenTest {
         composeTestRule.runOnIdle { vm().closeRefinement() }
         awaitState("the lineage again") { !it.refinementOpen }
         assertEquals("still on the lineage screen", AppTab.Lineage, vm().state.value.tab)
-        assertEquals("and the card is back", 1, nodesWithTag(LANGUAGE_ENTRY_TAG))
+        assertEquals("and the card is back", 1, nodesWithTag(MODEL_ENTRY_TAG))
 
-        composeTestRule.onAllNodesWithTag(LANGUAGE_ENTRY_TAG)[0].performClick()
-        awaitState("the language sub-view") {
-            it.refinementOpen && it.refinementSubview == RefinementSubview.Language
-        }
-        assertEquals("with the card's work as the target", work.id, vm().state.value.refinementParent?.id)
-
-        composeTestRule.runOnIdle { vm().closeRefinement() }
-        awaitState("the lineage again") { !it.refinementOpen }
         composeTestRule.onAllNodesWithTag(REFINE_ENTRY_TAG)[0].performClick()
         awaitState("the adjust sub-view") {
             it.refinementOpen && it.refinementSubview == RefinementSubview.Adjust
@@ -347,8 +310,8 @@ class ComparisonScreenTest {
             assertEquals("the ${subview.id} chip is there", 1, nodesWithTag(refinementSubviewTag(subview)))
         }
 
-        composeTestRule.onAllNodesWithTag(refinementSubviewTag(RefinementSubview.Language))[0].performClick()
-        awaitState("the language sub-view") { it.refinementSubview == RefinementSubview.Language }
+        composeTestRule.onAllNodesWithTag(refinementSubviewTag(RefinementSubview.Model))[0].performClick()
+        awaitState("the model sub-view") { it.refinementSubview == RefinementSubview.Model }
         assertEquals("the target did not change", work.id, vm().state.value.refinementParent?.id)
     }
 }

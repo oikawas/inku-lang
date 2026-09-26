@@ -45,6 +45,7 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Box
@@ -84,9 +85,7 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.grid.items as gridItems
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -125,6 +124,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -171,6 +171,8 @@ import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.semantics.contentDescription
@@ -191,6 +193,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.OffsetMapping
 import androidx.compose.ui.text.input.TransformedText
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.platform.testTag
@@ -202,7 +205,6 @@ import app.inku.mobile.data.db.HistoryListItem
 import app.inku.mobile.data.lineage.LineageGraphNode
 import app.inku.mobile.data.lineage.LineageGraphResult
 import app.inku.mobile.data.refinement.ComparisonPlanner
-import app.inku.mobile.data.refinement.LanguageCombo
 import app.inku.mobile.data.refinement.ModelCompareMode
 import app.inku.mobile.data.refinement.RefinementElement
 import app.inku.mobile.data.refinement.RefinementPlanner
@@ -211,7 +213,6 @@ import app.inku.mobile.data.model.CatalogSelection
 import app.inku.mobile.data.model.CanvasAspects
 import app.inku.mobile.data.model.DerivationKindRegistry
 import app.inku.mobile.data.model.ColorCatalogs
-import app.inku.mobile.pipeline.InstructionLanguages
 import app.inku.mobile.pipeline.PluginDiagnostic
 import app.inku.mobile.pipeline.SaijikiGenerated
 import app.inku.mobile.pipeline.Sketches
@@ -219,7 +220,7 @@ import app.inku.mobile.pipeline.SketchMode
 import app.inku.mobile.ui.i18n.InkuStrings
 import app.inku.mobile.ui.i18n.LocalStrings
 import app.inku.mobile.ui.i18n.inkuError
-import app.inku.mobile.ui.i18n.safeErrorMessage
+import app.inku.mobile.ui.i18n.messageFor
 import app.inku.mobile.ui.i18n.LocalUiLanguage
 import app.inku.mobile.ui.i18n.stringsFor
 import app.inku.mobile.ui.i18n.UiLanguage
@@ -250,6 +251,9 @@ private const val HISTORY_SWIPE_AXIS_LOCK = 1.6f
 
 /** How often the running row redraws its elapsed time. */
 private const val RUN_STATUS_TICK_MS = 100L
+
+/** How long a copy or export note stays under the canvas. */
+private const val CANVAS_MESSAGE_MS = 5_000L
 
 /** The description field. The instrumented IME test needs to reach it by name. */
 internal const val DESCRIPTION_INPUT_TAG = "description_input"
@@ -428,6 +432,9 @@ private val saijikiGroupColors = listOf(
     // the case the comment above was written for: the category was added and
     // the pill for it came out the colour of かたち until this line existed.
     SaijikiGroupMist,
+    // The thirteenth, for あいだ / relations. It was added to the generated
+    // table after the twelfth, and its pills took かたち's colour again.
+    SaijikiGroupLemon,
 )
 
 /**
@@ -534,6 +541,8 @@ fun InkuApp() {
         state.canvasSelectionOpen -> viewModel::closeTransientPanel
         state.tab == AppTab.Settings && state.settingsPane != SettingsPane.Home ->
             ({ viewModel.setSettingsPane(SettingsPane.Home) })
+        // Up one level from 推敲 is the lineage it was opened on, not 制作.
+        state.tab == AppTab.Lineage && state.refinementOpen -> viewModel::closeRefinement
         state.tab != AppTab.Compose -> ({ viewModel.setTab(AppTab.Compose) })
         // The compose screen is the root. Back leaves the app from here.
         else -> null
@@ -1105,7 +1114,10 @@ private fun ColorCatalogSelectionDialog(state: InkuUiState, viewModel: InkuViewM
     val autoSelected = state.selectedCatalogId == CatalogSelection.AUTO_ID
     val current = ColorCatalogs.get(state.selectedCatalogId)
     AlertDialog(
-        onDismissRequest = viewModel::confirmCatalogSelection,
+        // Back and a tap outside are a cancel, as in the model dialog. The
+        // dialog window receives the back key before the screen's BackHandler,
+        // which already maps this dialog to cancel.
+        onDismissRequest = viewModel::cancelCatalogSelection,
         title = { Text(S.colorCatalog) },
         text = {
             Column(
@@ -1235,14 +1247,18 @@ private fun WebStyleModelStageEditor(
     onSelectModel: (String) -> Unit,
 ) {
     val providers = modelProviderGroupsFor(state)
-    val selectedProviderId = providerOfModelId(selectedModelId, state)
+    // A service picked from the menu that offers no model cannot select one,
+    // so the pick is remembered here; otherwise the menu closed with nothing
+    // changed and no reason given. It gives way once a model is selected.
+    var pickedProviderId by remember(title, selectedModelId) { mutableStateOf<String?>(null) }
+    val selectedProviderId = pickedProviderId ?: providerOfModelId(selectedModelId, state)
     val selectedProvider = providers.firstOrNull { it.providerId == selectedProviderId } ?: providers.firstOrNull()
     val strings = S
     val models = modelOptionsForProvider(state, selectedProviderId, strings)
     var providerMenuOpen by remember(title, selectedProviderId) { mutableStateOf(false) }
     Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
         SettingsSectionHeader(title.uppercase(), sub)
-        CompactLabel("Provider")
+        CompactLabel(S.providerLabel)
         Box(modifier = Modifier.fillMaxWidth()) {
             Surface(
                 modifier = Modifier.fillMaxWidth().clickable { providerMenuOpen = true },
@@ -1273,15 +1289,14 @@ private fun WebStyleModelStageEditor(
                         },
                         onClick = {
                             providerMenuOpen = false
-                            modelOptionsForProvider(state, provider.providerId, strings).firstOrNull()?.let { option ->
-                                onSelectModel(option.qualifiedId)
-                            }
+                            val first = modelOptionsForProvider(state, provider.providerId, strings).firstOrNull()
+                            if (first != null) onSelectModel(first.qualifiedId) else pickedProviderId = provider.providerId
                         },
                     )
                 }
             }
         }
-        CompactLabel("Model")
+        CompactLabel(S.model)
         if (models.isEmpty()) {
             Text(S.noPublishedModelsLong, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         } else {
@@ -1423,7 +1438,7 @@ private enum class BottomNavigationDestination {
 @Composable
 private fun StudioHeader(title: String, viewModel: InkuViewModel, showTools: Boolean = false) {
     var toolsOpen by remember { mutableStateOf(false) }
-    val isEnglish = LocalUiLanguage.current.isEnglish
+    val strings = S
     Row(
         modifier = Modifier.fillMaxWidth().heightIn(min = Dimens.studioHeaderMinHeight),
         verticalAlignment = Alignment.CenterVertically,
@@ -1436,11 +1451,7 @@ private fun StudioHeader(title: String, viewModel: InkuViewModel, showTools: Boo
                     TextButton(
                         onClick = { toolsOpen = !toolsOpen },
                         modifier = Modifier.semantics {
-                            stateDescription = if (toolsOpen) {
-                                if (isEnglish) "Expanded" else "展開中"
-                            } else {
-                                if (isEnglish) "Collapsed" else "折りたたみ中"
-                            }
+                            stateDescription = if (toolsOpen) strings.stateExpanded else strings.stateCollapsed
                         },
                     ) {
                         Text(S.productionTools, maxLines = 1)
@@ -1494,6 +1505,7 @@ private fun shortCanvasLabel(state: InkuUiState): String {
 }
 
 /** New work starts with writing; saved work starts with the result. */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun ComposeScreen(state: InkuUiState, viewModel: InkuViewModel) {
     if (state.canvasPresentationMode) {
@@ -1505,8 +1517,28 @@ private fun ComposeScreen(state: InkuUiState, viewModel: InkuViewModel) {
     val keyboardController = LocalSoftwareKeyboardController.current
     var editingWork by remember(state.selectedHistory?.id) { mutableStateOf(false) }
     var resultInterpretationOpen by remember(state.selectedHistory?.id) { mutableStateOf(false) }
+    // Whether a batch line has the focus. The batch run button sits under the
+    // editor, which the keyboard covers, so while the keyboard is up it is
+    // pinned above it the way 「描画する」 is for the description.
+    var batchEditorFocused by remember { mutableStateOf(false) }
+    val imeVisible = WindowInsets.isImeVisible
     val hasWork = state.selectedHistory != null
     val showEditor = !hasWork || editingWork || state.composeMode == ComposeMode.Batch
+    // Back from 「この作品を推敲」 returns to the work's result, one level up,
+    // instead of leaving the app: the screen-wide handler in InkuApp cannot see
+    // this local state. Whatever that handler does own -- the camera, the DDL
+    // overwrite question -- keeps the key.
+    val appOwnsBack = state.cameraCaptureState.locksCameraInteraction ||
+        state.cameraCaptureState is CameraCaptureState.Failed ||
+        state.cameraCaptureState == CameraCaptureState.ChoosingSource ||
+        state.cameraCaptureState == CameraCaptureState.AwaitingOverwriteConfirmation ||
+        state.confirmDdlOverwrite
+    BackHandler(enabled = editingWork && hasWork && !appOwnsBack) { editingWork = false }
+    val writeImeBar = state.descriptionFocused && state.composeMode == ComposeMode.Write
+    val batchImeBar = batchEditorFocused && imeVisible && state.composeMode == ComposeMode.Batch && !state.isDrawing
+    // The pinned bar lies over the bottom of the scroll. Room of the same
+    // height at the end lets the field it follows scroll clear of it.
+    var imeBarHeightPx by remember { mutableIntStateOf(0) }
     // Where the top of the scrolling area is on screen, and where the
     // description is. Both are measured in window coordinates: the field's
     // position inside its own parent says nothing about how far down the scroll
@@ -1545,12 +1577,21 @@ private fun ComposeScreen(state: InkuUiState, viewModel: InkuViewModel) {
             if (hasWork) {
                 CameraRevealCanvasHeroCard(state, viewModel)
                 if (!showEditor) {
+                    val inTrash = state.selectedHistory?.trashed == true
+                    if (inTrash) {
+                        Text(S.trashedWorkNote, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.error)
+                    }
                     Row(horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM), modifier = Modifier.fillMaxWidth()) {
-                        PrimarySmallButton(S.reviseWork, onClick = { editingWork = true }, modifier = Modifier.weight(1f))
+                        // A work in the trash has no edits on offer, as its
+                        // lineage card has none.
+                        PrimarySmallButton(S.reviseWork, onClick = { editingWork = true }, enabled = !inTrash, modifier = Modifier.weight(1f))
                         SecondarySmallButton(S.newWork, onClick = viewModel::clearPrompt)
                     }
                 }
-                state.selectedHistory?.originalInput?.takeIf { it.isNotBlank() }?.let { originalInput ->
+                // While the work is revised, the description field below holds
+                // this same text; showing it here too read as two descriptions.
+                val revisingDescription = showEditor && state.composeMode != ComposeMode.Batch
+                state.selectedHistory?.originalInput?.takeIf { it.isNotBlank() && !revisingDescription }?.let { originalInput ->
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM),
@@ -1568,7 +1609,9 @@ private fun ComposeScreen(state: InkuUiState, viewModel: InkuViewModel) {
                     }
                 }
                 if (!showEditor) {
-                    TextButton(onClick = { resultInterpretationOpen = !resultInterpretationOpen }) { Text(S.interpretationToggle) }
+                    TextButton(onClick = { resultInterpretationOpen = !resultInterpretationOpen }) {
+                        Text(if (resultInterpretationOpen) S.interpretationHide else S.interpretationToggle)
+                    }
                     if (resultInterpretationOpen) {
                         DdlPreviewBox(value = state.ddl, onClick = viewModel::openDdlEditor, modifier = Modifier.fillMaxWidth())
                     }
@@ -1578,7 +1621,7 @@ private fun ComposeScreen(state: InkuUiState, viewModel: InkuViewModel) {
                 if (!hasWork) Text(S.studioSubtitle, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 if (state.composeMode == ComposeMode.Batch) {
                     DrawSettingsPanel(state, viewModel)
-                    BatchPanel(state, viewModel)
+                    BatchPanel(state, viewModel, onEditorFocusChanged = { batchEditorFocused = it })
                 } else {
                     DrawPanel(
                         state,
@@ -1588,9 +1631,29 @@ private fun ComposeScreen(state: InkuUiState, viewModel: InkuViewModel) {
                     )
                 }
             }
+            if (writeImeBar || batchImeBar) {
+                Spacer(Modifier.height(with(LocalDensity.current) { imeBarHeightPx.toDp() }))
+            }
         }
-        if (state.descriptionFocused && state.composeMode == ComposeMode.Write) {
-            ImeActionBar(state, viewModel, modifier = Modifier.align(Alignment.BottomCenter))
+        val barModifier = Modifier.align(Alignment.BottomCenter).onSizeChanged { imeBarHeightPx = it.height }
+        if (writeImeBar) {
+            ImeActionBar(
+                idleText = "▶  ${drawActionLabel(S)}",
+                runningText = S.drawingButton,
+                state = state,
+                onClick = viewModel::draw,
+                onStop = viewModel::stopDrawing,
+                modifier = barModifier,
+            )
+        } else if (batchImeBar) {
+            ImeActionBar(
+                idleText = S.batchDrawButton,
+                runningText = S.runningButton,
+                state = state,
+                onClick = viewModel::runBatch,
+                onStop = viewModel::stopDrawing,
+                modifier = barModifier,
+            )
         }
     }
 }
@@ -2117,7 +2180,14 @@ private fun systemAnimationsEnabled(context: Context): Boolean = runCatching {
  * the author meant to accept 「ゆらぎ」.
  */
 @Composable
-private fun ImeActionBar(state: InkuUiState, viewModel: InkuViewModel, modifier: Modifier = Modifier) {
+private fun ImeActionBar(
+    idleText: String,
+    runningText: String,
+    state: InkuUiState,
+    onClick: () -> Unit,
+    onStop: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     Surface(
         modifier = modifier.fillMaxWidth(),
         color = MaterialTheme.colorScheme.surface,
@@ -2126,11 +2196,11 @@ private fun ImeActionBar(state: InkuUiState, viewModel: InkuViewModel, modifier:
     ) {
         Box(modifier = Modifier.padding(horizontal = Dimens.spaceL, vertical = Dimens.spaceM)) {
             DrawingActionButton(
-                idleText = "▶  ${drawActionLabel(S)}",
-                runningText = S.drawingButton,
+                idleText = idleText,
+                runningText = runningText,
                 state = state,
-                onClick = viewModel::draw,
-                onStop = viewModel::stopDrawing,
+                onClick = onClick,
+                onStop = onStop,
             )
         }
     }
@@ -2247,6 +2317,9 @@ private fun CanvasHeroCard(
     val context = LocalContext.current
     val clipboard = LocalClipboardManager.current
     val scope = rememberCoroutineScope()
+    // Read here: the messages below are written from click handlers and
+    // coroutines, which cannot read the composition local themselves.
+    val strings = S
     val presentationPreferences = remember(context) {
         context.applicationContext.getSharedPreferences(PRESENTATION_PREFS_NAME, Context.MODE_PRIVATE)
     }
@@ -2254,6 +2327,15 @@ private fun CanvasHeroCard(
     var exportSheetOpen by remember { mutableStateOf(false) }
     var generationInfoOpen by remember { mutableStateOf(false) }
     var pngExporting by remember { mutableStateOf(false) }
+    // The note under the canvas answers one action -- a copy, an export -- and
+    // used to stay until the next one, beside whatever work came after. It
+    // clears itself now; a PNG still being made keeps its progress line.
+    LaunchedEffect(canvasMessage, pngExporting) {
+        if (canvasMessage != null && !pngExporting) {
+            delay(CANVAS_MESSAGE_MS)
+            canvasMessage = null
+        }
+    }
     var instructionCaptionVisible by remember(state.canvasPresentationMode, state.presentationHistory != null) {
         mutableStateOf(if (state.presentationHistory != null) false else presentationPreferences.getBoolean(PRESENTATION_CAPTION_VISIBLE_KEY, true))
     }
@@ -2328,7 +2410,7 @@ private fun CanvasHeroCard(
                                 contentLabel = "F${it.renderHashShort}",
                                 onContentClick = {
                                     clipboard.setText(AnnotatedString(it.renderHashShort))
-                                    canvasMessage = "Hash copied."
+                                    canvasMessage = strings.hashCopied
                                 },
                             )
                             Spacer(Modifier.weight(1f))
@@ -2532,29 +2614,29 @@ private fun CanvasHeroCard(
                 scope.launch {
                     canvasMessage = runCatching {
                         shareHistoryDdl(context, it, viewModel.ddlExportJson(it))
-                        "DDL exported F${it.renderHashShort}"
-                    }.getOrElse { error -> safeErrorMessage(error, "DDL export failed.") }
+                        strings.exportDone("DDL", it.renderHashShort)
+                    }.getOrElse { error -> messageFor(error, strings, strings.exportFailed("DDL")) }
                 }
             },
             onExportSvg = { profile ->
                 exportSheetOpen = false
-                canvasMessage = "SVG export preparing..."
+                canvasMessage = strings.exportPreparing("SVG")
                 scope.launch {
                     canvasMessage = runCatching {
-                        shareHistorySvg(context, it, profile)
-                        "SVG exported F${it.renderHashShort}"
-                    }.getOrElse { error -> safeErrorMessage(error, "SVG export failed.") }
+                        shareHistorySvg(context, it, profile, viewModel.exportSvg(it, profile))
+                        strings.exportDone("SVG", it.renderHashShort)
+                    }.getOrElse { error -> messageFor(error, strings, strings.exportFailed("SVG")) }
                 }
             },
             onExportPng = { heightPx ->
                 exportSheetOpen = false
                 pngExporting = true
-                canvasMessage = "PNG export preparing..."
+                canvasMessage = strings.exportPreparing("PNG")
                 scope.launch {
                     canvasMessage = runCatching {
                         shareHistoryPng(context, it, heightPx)
-                        "PNG exported F${it.renderHashShort}"
-                    }.getOrElse { error -> safeErrorMessage(error, "PNG export failed.") }
+                        strings.exportDone("PNG", it.renderHashShort)
+                    }.getOrElse { error -> messageFor(error, strings, strings.exportFailed("PNG")) }
                     pngExporting = false
                 }
             },
@@ -2566,7 +2648,7 @@ private fun CanvasHeroCard(
     if (!presentation && showControls && pngExporting) {
         Row(horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM), verticalAlignment = Alignment.CenterVertically) {
             CircularProgressIndicator(modifier = Modifier.size(Dimens.spaceL), strokeWidth = Dimens.spaceXs)
-            Text(canvasMessage ?: "PNG export preparing...", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelSmall)
+            Text(canvasMessage ?: strings.exportPreparing("PNG"), color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelSmall)
         }
     } else if (!presentation && showControls) {
         canvasMessage?.let { Text(it, color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelSmall) }
@@ -2808,7 +2890,9 @@ private fun DrawPanel(
             simpleContent = {},
             fullContent = {
                 Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
-                    TextButton(onClick = { interpretationOpen = !interpretationOpen }) { Text(S.interpretationToggle) }
+                    TextButton(onClick = { interpretationOpen = !interpretationOpen }) {
+                        Text(if (interpretationOpen) S.interpretationHide else S.interpretationToggle)
+                    }
                     if (interpretationOpen) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -2843,7 +2927,12 @@ private fun DrawPanel(
 }
 
 @Composable
-private fun BatchPanel(state: InkuUiState, viewModel: InkuViewModel, modifier: Modifier = Modifier) {
+private fun BatchPanel(
+    state: InkuUiState,
+    viewModel: InkuViewModel,
+    modifier: Modifier = Modifier,
+    onEditorFocusChanged: (Boolean) -> Unit = {},
+) {
     val lines = state.batchText.lines()
     val nonEmpty = lines.count { it.trim().isNotBlank() }
     Column(
@@ -2855,7 +2944,9 @@ private fun BatchPanel(state: InkuUiState, viewModel: InkuViewModel, modifier: M
             value = state.batchText,
             onValueChange = viewModel::setBatchText,
             enabled = !state.isDrawing,
-            modifier = Modifier.fillMaxWidth(),
+            // `hasFocus` is true while any line has it, so moving between
+            // lines does not drop the pinned button.
+            modifier = Modifier.fillMaxWidth().onFocusChanged { onEditorFocusChanged(it.hasFocus) },
         )
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -2873,8 +2964,11 @@ private fun BatchPanel(state: InkuUiState, viewModel: InkuViewModel, modifier: M
                 CompactLabel(S.batchHistory)
                 WrapRow(horizontal = Dimens.spaceM, vertical = Dimens.spaceM) {
                     state.batchPromptHistory.forEach { prompt ->
+                        // Two batches that open with the same line looked the
+                        // same; the line count tells most of them apart.
+                        val lines = prompt.lineSequence().map { it.trim() }.filter { it.isNotEmpty() }.toList()
                         MiniPill(
-                            text = prompt.lineSequence().firstOrNull()?.take(22) ?: S.history,
+                            text = S.batchHistoryPill(lines.firstOrNull()?.take(22) ?: S.history, lines.size),
                             onClick = { viewModel.restoreBatchPrompt(prompt) },
                         )
                     }
@@ -3050,8 +3144,11 @@ private fun BatchFailureSummary(state: InkuUiState) {
 
 @Composable
 private fun DemoPanel(state: InkuUiState, viewModel: InkuViewModel, modifier: Modifier = Modifier) {
+    // No scroll of its own. The panel lives inside DemoSettingsPanel's scroll,
+    // and a vertical scroll measured inside another is given an unbounded
+    // height and throws: opening 設定 > デモ closed the app every time.
     Column(
-        modifier = modifier.verticalScroll(rememberScrollState()),
+        modifier = modifier,
         verticalArrangement = Arrangement.spacedBy(Dimens.spaceM),
     ) {
         CanvasHeroCard(
@@ -3151,141 +3248,7 @@ private fun DemoSettingRow(
     }
 }
 
-internal fun selectedHistoryStripIndex(historyIds: List<String>, selectedId: String?): Int =
-    selectedId?.let(historyIds::indexOf) ?: -1
-
-internal fun historyStripModelLabel(modelId: String?): String? {
-    val displayName = modelId
-        ?.trim()
-        ?.takeIf(String::isNotEmpty)
-        ?.substringAfterLast(":")
-        ?.trim()
-        ?.takeIf(String::isNotEmpty)
-    return displayName?.compactLabel(14)
-}
-
-internal fun historyStripModelTooltipText(
-    stage1Model: String?,
-    stage2Model: String?,
-    createdAt: Long? = null,
-    colorCatalogId: String? = null,
-    createdLabel: String? = null,
-    colorCatalogLabel: String? = null,
-    renderHashShort: String? = null,
-    canvasAspect: String? = null,
-    renderHashLabel: String? = null,
-    canvasLabel: String? = null,
-): String? {
-    val stage1 = stage1Model?.trim()?.takeIf(String::isNotEmpty) ?: return null
-    val stage2 = stage2Model?.trim()?.takeIf(String::isNotEmpty) ?: "—"
-    val lines = mutableListOf("Stage 1: $stage1", "Stage 2: $stage2")
-    createdLabel?.trim()?.takeIf(String::isNotEmpty)?.let { label ->
-        val created = if (createdAt != null && createdAt > 0L) {
-            runCatching { java.time.Instant.ofEpochMilli(createdAt).toString() }.getOrDefault("—")
-        } else {
-            "—"
-        }
-        lines += "$label: $created"
-    }
-    colorCatalogLabel?.trim()?.takeIf(String::isNotEmpty)?.let { label ->
-        val catalogId = colorCatalogId?.trim()?.takeIf(String::isNotEmpty) ?: "—"
-        lines += "$label: $catalogId"
-    }
-    renderHashLabel?.trim()?.takeIf(String::isNotEmpty)?.let { label ->
-        val hash = renderHashShort?.trim()?.takeIf(String::isNotEmpty)?.let { "F$it" } ?: "—"
-        lines += "$label: $hash"
-    }
-    canvasLabel?.trim()?.takeIf(String::isNotEmpty)?.let { label ->
-        val aspect = canvasAspect?.trim()?.takeIf(String::isNotEmpty) ?: "—"
-        lines += "$label: $aspect"
-    }
-    return lines.joinToString("\n")
-}
-
 internal fun historyGridStarSymbol(starred: Boolean): String = if (starred) "★" else "☆"
-
-/** Keeps nearby works attached to the ordinary canvas without duplicating HistoryScreen. */
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun HistoryThumbnailStrip(
-    history: List<HistoryListItem>,
-    selectedId: String?,
-    enabled: Boolean,
-    onSelect: (HistoryListItem) -> Unit,
-) {
-    val listState = rememberLazyListState()
-    val selectedIndex = remember(history, selectedId) {
-        selectedHistoryStripIndex(history.map { it.id }, selectedId)
-    }
-    LaunchedEffect(selectedIndex) {
-        if (selectedIndex >= 0) listState.animateScrollToItem(selectedIndex)
-    }
-    LazyRow(
-        modifier = Modifier.fillMaxWidth().testTag("history_thumbnail_strip"),
-        state = listState,
-        horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM),
-    ) {
-        items(history, key = { it.id }) { historyItem ->
-            val selected = historyItem.id == selectedId
-            val modelLabel = historyStripModelLabel(historyItem.stage1Model)
-            Column(
-                modifier = Modifier.width(Dimens.buttonHeightLarge),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(Dimens.spaceXs),
-            ) {
-                Box(modifier = Modifier.size(Dimens.buttonHeightLarge)) {
-                    Surface(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .clickable(enabled = enabled) { onSelect(historyItem) }
-                            .border(
-                                Dimens.selectionRingWidth,
-                                if (selected) SelectionRing else Color.Transparent,
-                                RoundedCornerShape(0.dp),
-                            ),
-                        color = MaterialTheme.colorScheme.surfaceVariant,
-                        shape = RoundedCornerShape(0.dp),
-                    ) {
-                        HistoryArtworkPreview(historyItem, modifier = Modifier.fillMaxSize())
-                    }
-                }
-                modelLabel?.let {
-                    val tooltipText = historyStripModelTooltipText(
-                        stage1Model = historyItem.stage1Model,
-                        stage2Model = historyItem.stage2Model,
-                        createdAt = historyItem.createdAt,
-                        colorCatalogId = historyItem.colorCatalogId,
-                        createdLabel = S.generationInfoCreated,
-                        colorCatalogLabel = S.generationInfoColorCatalog,
-                        renderHashShort = historyItem.renderHashShort,
-                        canvasAspect = historyItem.canvasAspect,
-                        renderHashLabel = S.generationInfoRenderHash,
-                        canvasLabel = S.generationInfoCanvasAspect,
-                    ) ?: return@let
-                    TooltipBox(
-                        positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
-                        tooltip = {
-                            PlainTooltip {
-                                Text(tooltipText)
-                            }
-                        },
-                        state = rememberTooltipState(),
-                    ) {
-                        Text(
-                            text = it,
-                            modifier = Modifier.fillMaxWidth(),
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            style = MaterialTheme.typography.labelSmall,
-                            textAlign = TextAlign.Center,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
 
 @Composable
 private fun HistoryScreen(
@@ -3297,13 +3260,19 @@ private fun HistoryScreen(
     val filteredHistory = remember(history, state.historySearchQuery, state.historyStarredOnly) {
         filterHistoryItems(history, state)
     }
+    val trashed by viewModel.trashedItems.collectAsState()
     val header: @Composable () -> Unit = {
         HistoryHeader(
             state = state,
             sourceCount = history.size,
             filteredCount = filteredHistory.size,
+            trashedCount = trashed.size,
             viewModel = viewModel,
         )
+    }
+    if (state.historyTrashView) {
+        TrashGrid(trashed, gridState, header, viewModel)
+        return
     }
     Box(Modifier.fillMaxSize()) {
         LazyVerticalGrid(
@@ -3323,6 +3292,18 @@ private fun HistoryScreen(
                     onSelect = { viewModel.openHistoryPresentation(item, filteredHistory.map { it.id }) },
                     onToggleStar = { viewModel.toggleStar(item) },
                 )
+            }
+            // A search or the star filter that matches nothing left an empty
+            // grid under the count; it says so instead.
+            if (filteredHistory.isEmpty() && history.isNotEmpty()) {
+                item(key = "no_match", span = { GridItemSpan(maxLineSpan) }) {
+                    Text(
+                        S.noMatchingWorks,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(vertical = Dimens.spaceL),
+                    )
+                }
             }
         }
         HistoryGridScrollbar(gridState, Modifier.align(Alignment.CenterEnd))
@@ -3347,7 +3328,7 @@ private fun HistoryGridScrollbar(gridState: LazyGridState, modifier: Modifier = 
     val currentProgress by rememberUpdatedState(progress)
     val density = LocalDensity.current
     val minimumThumbPx = with(density) { Dimens.touchTarget.toPx() }
-    val isEnglish = LocalUiLanguage.current.isEnglish
+    val worksScrollbarLabel = S.worksScrollbarDescription
     val railColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.42f)
     val thumbColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.95f)
     val scope = rememberCoroutineScope()
@@ -3369,7 +3350,7 @@ private fun HistoryGridScrollbar(gridState: LazyGridState, modifier: Modifier = 
             .padding(vertical = Dimens.spaceM)
             .onSizeChanged { trackHeightPx = it.height }
             .semantics {
-                contentDescription = if (isEnglish) "Works scrollbar" else "作品のスクロールバー"
+                contentDescription = worksScrollbarLabel
                 progressBarRangeInfo = ProgressBarRangeInfo(progress, 0f..1f)
                 setProgress { value -> scrollToFraction(value); true }
             }
@@ -3433,34 +3414,76 @@ private fun HistoryHeader(
     state: InkuUiState,
     sourceCount: Int,
     filteredCount: Int,
+    trashedCount: Int,
     viewModel: InkuViewModel,
 ) {
     var searchOpen by remember { mutableStateOf(state.historySearchQuery.isNotBlank()) }
+    // The search icon opens the field ready to type; before, a second tap on
+    // the field itself was needed to bring up the keyboard.
+    val searchFocus = remember { FocusRequester() }
+    var focusSearch by remember { mutableStateOf(false) }
     val searchLabel = S.searchPlaceholderLong
     Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceXs), modifier = Modifier.fillMaxWidth()) {
         StudioHeader(S.worksTitle, viewModel)
+        WorkNotice(state.workNotice, viewModel)
+        if (state.historyTrashView) {
+            // The trash lists every work in it; search and the star filter are
+            // the works' own.
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                Spacer(Modifier.weight(1f))
+                ChipButton(
+                    S.trashView(trashedCount),
+                    selected = true,
+                    modifier = Modifier.testTag(TRASH_VIEW_TAG),
+                    onClick = { viewModel.setHistoryTrashView(false) },
+                )
+            }
+            return@Column
+        }
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM), modifier = Modifier.fillMaxWidth()) {
             Text(S.filteredOfTotal(filteredCount, sourceCount), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
             TextButton(
-                onClick = { searchOpen = !searchOpen },
+                onClick = {
+                    searchOpen = !searchOpen
+                    focusSearch = searchOpen
+                },
                 modifier = Modifier.size(Dimens.touchTarget).semantics { contentDescription = searchLabel },
             ) { Text("⌕", style = MaterialTheme.typography.titleLarge) }
             ChipButton(S.starredOnly, selected = state.historyStarredOnly, onClick = viewModel::toggleHistoryStarredFilter)
+        }
+        Row(modifier = Modifier.fillMaxWidth()) {
+            Spacer(Modifier.weight(1f))
+            ChipButton(
+                S.trashView(trashedCount),
+                modifier = Modifier.testTag(TRASH_VIEW_TAG),
+                onClick = { viewModel.setHistoryTrashView(true) },
+            )
         }
         if (searchOpen || state.historySearchQuery.isNotBlank()) {
             ImeAwareOutlinedTextField(
                 value = state.historySearchQuery,
                 onValueChange = viewModel::setHistorySearchQuery,
                 label = S.searchPlaceholderLong,
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().focusRequester(searchFocus),
                 singleLine = true,
             )
+            LaunchedEffect(focusSearch) {
+                if (focusSearch) {
+                    searchFocus.requestFocus()
+                    focusSearch = false
+                }
+            }
         }
     }
 }
 
 /** So that an instrumented test can count the cards rather than the labels. */
 internal const val LINEAGE_NODE_TAG = "lineage_node"
+internal const val LINEAGE_TRASHED_TAG = "lineage_trashed"
+internal const val TRASH_ENTRY_TAG = "trash_entry"
+internal const val TRASH_VIEW_TAG = "trash_view"
+internal const val TRASH_RESTORE_TAG = "trash_restore"
+internal const val TRASH_DELETE_TAG = "trash_delete"
 internal const val LINEAGE_STAR_TAG = "lineage_star"
 
 /** Tags for the refinement, so a test counts candidates rather than labels. */
@@ -3471,15 +3494,13 @@ internal const val REFINE_SAVE_TAG = "refine_save"
 internal const val REFINE_STOP_TAG = "refine_stop"
 internal const val REFINE_GENERATE_TAG = "refine_generate"
 
-/** The two comparison entries on a lineage card, beside 描画要素 (SPEC `:618`). */
+/** The model comparison entry on a lineage card, beside 描画要素 (SPEC `:618`). */
 internal const val MODEL_ENTRY_TAG = "model_entry"
-internal const val LANGUAGE_ENTRY_TAG = "language_entry"
 
-/** Tags for the sub-view chips and the two selection grids. */
+/** Tags for the sub-view chips and the model selection grid. */
 internal fun refinementSubviewTag(subview: RefinementSubview): String = "refine_subview_${subview.id}"
 internal fun modelCompareModeTag(mode: ModelCompareMode): String = "model_compare_mode_${mode.id}"
 internal fun modelChoiceTag(modelId: String): String = "model_choice_$modelId"
-internal fun languageComboTag(comboId: String): String = "language_combo_$comboId"
 
 /**
  * 作品の系譜 -- the port of web's `LineagePanel.svelte`, cut to what contract
@@ -3509,6 +3530,7 @@ internal fun LineageScreen(state: InkuUiState, viewModel: InkuViewModel) {
             // panel header (LineagePanel.svelte:788). The wording is web's.
             ChipButton(S.makeNewOrigin, onClick = viewModel::detachLineage)
         }
+        WorkNotice(state.workNotice, viewModel)
         when {
             state.refinementOpen -> RefinementPanel(state, viewModel)
             state.lineageLoading && graph == null ->
@@ -3528,9 +3550,14 @@ internal fun LineageScreen(state: InkuUiState, viewModel: InkuViewModel) {
  * The radio is the whole of the exclusivity the SPEC asks for: one element at a
  * time, with the amplitude appearing under the variation choice and nowhere else.
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun RefinementPanel(state: InkuUiState, viewModel: InkuViewModel) {
     val parent = state.refinementParent
+    // The touch words field is the last thing above 「候補を作る」; when the
+    // keyboard comes up for it, the button row is scrolled up with it.
+    val generateRowRequester = remember { BringIntoViewRequester() }
+    val scope = rememberCoroutineScope()
     Column(
         modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(Dimens.spaceM),
@@ -3544,7 +3571,7 @@ private fun RefinementPanel(state: InkuUiState, viewModel: InkuViewModel) {
             ChipButton(S.close, onClick = viewModel::closeRefinement)
         }
 
-        // 調整・モデル・言語 (SPEC :616, :686). Three faces of one screen.
+        // 調整・モデル (SPEC :616). Two faces of one screen.
         WrapRow(horizontal = Dimens.spaceM, vertical = Dimens.spaceM) {
             RefinementSubview.entries.forEach { subview ->
                 ChipButton(
@@ -3560,7 +3587,6 @@ private fun RefinementPanel(state: InkuUiState, viewModel: InkuViewModel) {
             when (state.refinementSubview) {
                 RefinementSubview.Adjust -> S.refineOneKindOnly
                 RefinementSubview.Model -> S.sameStagePairBlocked
-                RefinementSubview.Language -> S.languageComboNote
             } + (parent?.let {
                 S.parentSuffix(it.renderHashShort, ColorCatalogs.currentDisplayCatalog(it.colorCatalogId)?.name ?: it.colorCatalogId)
             } ?: ""),
@@ -3569,12 +3595,19 @@ private fun RefinementPanel(state: InkuUiState, viewModel: InkuViewModel) {
         )
 
         when (state.refinementSubview) {
-            RefinementSubview.Adjust -> RefinementAdjustControls(state, viewModel)
+            RefinementSubview.Adjust -> RefinementAdjustControls(
+                state,
+                viewModel,
+                onTouchWordsFocused = { scope.launchImeBringIntoViewGuard(generateRowRequester) },
+            )
             RefinementSubview.Model -> ModelInspectionControls(state, viewModel)
-            RefinementSubview.Language -> LanguageInspectionControls(state, viewModel)
         }
 
-        WrapRow(horizontal = Dimens.spaceM, vertical = Dimens.spaceM) {
+        WrapRow(
+            modifier = Modifier.bringIntoViewRequester(generateRowRequester),
+            horizontal = Dimens.spaceM,
+            vertical = Dimens.spaceM,
+        ) {
             // Both counts stay pressable whichever element is chosen, the way
             // web leaves its own pair alone: the refusal for four touches is
             // stated when the button is pressed, not by hiding the choice.
@@ -3723,7 +3756,11 @@ private fun RefinementProgressLanes(
 
 /** 調整: the five elements, the amplitude under the variation, the touch words. */
 @Composable
-private fun RefinementAdjustControls(state: InkuUiState, viewModel: InkuViewModel) {
+private fun RefinementAdjustControls(
+    state: InkuUiState,
+    viewModel: InkuViewModel,
+    onTouchWordsFocused: () -> Unit = {},
+) {
     WrapRow(horizontal = Dimens.spaceM, vertical = Dimens.spaceM) {
         RefinementElement.entries.forEach { element ->
             ChipButton(
@@ -3754,7 +3791,7 @@ private fun RefinementAdjustControls(state: InkuUiState, viewModel: InkuViewMode
             label = { Text(S.touchWords) },
             singleLine = true,
             enabled = !state.refinementBusy,
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().onFocusChanged { if (it.isFocused) onTouchWordsFocused() },
         )
     }
 }
@@ -3815,34 +3852,6 @@ private fun ModelInspectionControls(state: InkuUiState, viewModel: InkuViewModel
         }
     }
 }
-
-/**
- * 言語検分: the four Stage 1 × Stage 2 pairs, chosen with checkboxes.
- *
- * SPEC `:686` describes the same three modes model comparison has; the reference
- * implementation selects pairs instead (`CanvasPanel.svelte:978-988`), and SPEC
- * `:614` makes the reference implementation the one to follow.
- */
-@Composable
-private fun LanguageInspectionControls(state: InkuUiState, viewModel: InkuViewModel) {
-    WrapRow(horizontal = Dimens.spaceM, vertical = Dimens.spaceM) {
-        LanguageCombo.ALL.forEach { combo ->
-            val blocked = ComparisonPlanner.isLanguageComboBlocked(combo, targetInstructionLangOf(state.refinementParent))
-            ChipButton(
-                text = "${languageLabel(combo.stage1)} / ${languageLabel(combo.stage2)}" + if (blocked) S.sameAsTargetSuffix else "",
-                selected = combo.id in state.languageCompareSelectedCombos,
-                modifier = Modifier.testTag(languageComboTag(combo.id)),
-                onClick = { viewModel.toggleLanguageCombo(combo.id) },
-            )
-        }
-    }
-}
-
-/** The target work's language, read the way `languageInspectionTargetLang` reads it. */
-private fun targetInstructionLangOf(parent: HistoryItemEntity?): String =
-    parent?.instructionLangResolved
-        ?.takeIf { it in InstructionLanguages.SUPPORTED }
-        ?: InstructionLanguages.DEFAULT_LANG
 
 @Composable
 private fun RefinementCandidateCard(
@@ -3959,6 +3968,7 @@ private fun LineageColumns(graph: LineageGraphResult, viewModel: InkuViewModel, 
                         onEditDdl = viewModel::openLineageDdlEditor,
                         onRedrawSketch = viewModel::redrawSketch,
                         onRedrawSketchText = viewModel::redrawSketchText,
+                        onTrash = viewModel::trashWork,
                         isJapanese = isJapanese,
                     )
                 }
@@ -3978,10 +3988,13 @@ private fun LineageNodeCard(
     onEditDdl: (HistoryItemEntity) -> Unit,
     onRedrawSketch: (HistoryItemEntity, SketchMode) -> Unit,
     onRedrawSketchText: (HistoryItemEntity, String) -> Unit,
+    onTrash: (HistoryItemEntity) -> Unit,
     isJapanese: Boolean,
 ) {
     val work = node as? LineageGraphNode.Work
     val history = work?.history
+    val trashed = history?.item?.trashed == true
+    var confirmTrash by remember(node.id) { mutableStateOf(false) }
     var sketchChoicesOpen by remember(node.id) { mutableStateOf(false) }
     var sketchDraft by remember(node.id, history?.item?.sketchText) {
         mutableStateOf(history?.item?.sketchText.orEmpty())
@@ -4042,19 +4055,33 @@ private fun LineageNodeCard(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-                // 「作品を編集する」 in SPEC :618 lists seven items in one order --
-                // 描画要素・記述・DDL・モデル・言語・AI に自律推敲させる・ゴミ箱.
-                // Four are here in that order. 記述 remains another contract, so
-                // DDL follows 描画要素 directly; モデル and 言語 still open the
-                // matching sub-view of the same 推敲 screen rather than a screen
-                // of their own (SPEC :688). A tombstone has no work to edit,
-                // which is why this hangs off `history`.
-                if (history != null) {
+                // A work in the trash keeps its place in the lineage, marked, and
+                // offers nothing to edit -- web's card goes `trashed` and its
+                // work menu is disabled.
+                if (trashed) {
+                    Text(
+                        S.trashedBadge,
+                        modifier = Modifier.testTag(LINEAGE_TRASHED_TAG),
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+                // 「作品を編集する」 in SPEC lists six items in one order --
+                // 描画要素・記述・DDL・モデル・AI に自律推敲させる・ゴミ箱 (言語 was
+                // retired with the web's language comparison on 2026-08-29).
+                // Three are here in that order. 記述 remains another contract, so
+                // DDL follows 描画要素 directly; モデル opens the matching
+                // sub-view of the same 推敲 screen rather than a screen of its
+                // own (SPEC :688). A tombstone has no work to edit, which is why
+                // this hangs off `history`. ゴミ箱 is the last item, kept apart
+                // from the edits and drawn in the error colour: 「ゴミ箱操作は他の
+                // 比較操作と視覚的に区別し」.
+                if (history != null && !trashed) {
                     WrapRow(horizontal = Dimens.spaceXs, vertical = Dimens.spaceXs) {
                         ChipButton(S.refinementElements, modifier = Modifier.testTag(REFINE_ENTRY_TAG), onClick = { onRefine(history.item, RefinementSubview.Adjust) })
                         ChipButton(S.ddlEdit, modifier = Modifier.testTag(DDL_ENTRY_TAG), onClick = { onEditDdl(history.item) })
                         ChipButton(S.model, modifier = Modifier.testTag(MODEL_ENTRY_TAG), onClick = { onRefine(history.item, RefinementSubview.Model) })
-                        ChipButton(S.language, modifier = Modifier.testTag(LANGUAGE_ENTRY_TAG), onClick = { onRefine(history.item, RefinementSubview.Language) })
                         ChipButton(S.workActionSketchRedraw, onClick = { sketchChoicesOpen = !sketchChoicesOpen })
                     }
                     if (sketchChoicesOpen) {
@@ -4086,6 +4113,21 @@ private fun LineageNodeCard(
                             }
                         }
                     }
+                    DangerChipButton(
+                        S.moveToTrash,
+                        modifier = Modifier.testTag(TRASH_ENTRY_TAG),
+                        onClick = { confirmTrash = true },
+                    )
+                    if (confirmTrash) {
+                        ConfirmDialog(
+                            message = S.confirmTrash(1),
+                            onConfirm = {
+                                confirmTrash = false
+                                onTrash(history.item)
+                            },
+                            onDismiss = { confirmTrash = false },
+                        )
+                    }
                 }
             }
         }
@@ -4096,7 +4138,6 @@ private fun LineageNodeCard(
 private fun SettingsPanel(state: InkuUiState, viewModel: InkuViewModel, modifier: Modifier = Modifier) {
     when (state.settingsPane) {
         SettingsPane.Home -> SettingsHomePanel(state, viewModel, modifier)
-        SettingsPane.ModelSelection -> ModelSelectionPanel(state, viewModel, modifier)
         SettingsPane.Models -> ModelSettingsPanel(state, viewModel, modifier)
         SettingsPane.Demo -> DemoSettingsPanel(state, viewModel, modifier)
         SettingsPane.Export -> ExportSettingsPanel(state, viewModel, modifier)
@@ -4147,40 +4188,6 @@ private fun SettingsHeader(selectedPane: SettingsPane, viewModel: InkuViewModel)
             Text(title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Medium)
             Text(subtitle, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
-    }
-}
-
-@Composable
-private fun ModelSelectionPanel(state: InkuUiState, viewModel: InkuViewModel, modifier: Modifier = Modifier) {
-    val modelChoices = remember(state.modelAssets, state.providerSettings) { modelChoicesFor(state) }
-    Column(
-        modifier = modifier
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = Dimens.spaceXs),
-        verticalArrangement = Arrangement.spacedBy(Dimens.spaceL),
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(top = Dimens.spaceXs),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM),
-        ) {
-            Text(S.modelSelection, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
-            SecondarySmallButton(text = S.cancelShort, onClick = viewModel::cancelModelSelection)
-            PrimarySmallButton(text = S.confirm, onClick = viewModel::confirmModelSelection)
-        }
-        SettingsCard(S.drawingModel, S.stagesShared, selectedModelLabel(state)) {
-            ModelChoiceRow(
-                choices = modelChoices,
-                selectedValue = state.selectedModelId,
-                onSelect = viewModel::setSelectedModel,
-            )
-        }
-        Text(
-            S.unifiedModelNote,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        SecondaryActionButton(text = S.openProviderSettings, onClick = { viewModel.setSettingsPane(SettingsPane.Models) })
     }
 }
 
@@ -4312,7 +4319,7 @@ private fun MiscSettingsPanel(state: InkuUiState, viewModel: InkuViewModel, modi
             val words = if (LocalUiLanguage.current.isEnglish) state.bundledPluginWordsEn else state.bundledPluginWordsJa
             SettingCheckRow(
                 checked = state.bundledPluginsEnabled,
-                text = S.bundledPluginsToggle(words.joinToString(if (LocalUiLanguage.current.isEnglish) ", " else "・")),
+                text = S.bundledPluginsToggle(words.joinToString(S.listSeparator)),
                 onCheckedChange = viewModel::setBundledPluginsEnabled,
             )
         }
@@ -4345,19 +4352,6 @@ private fun MiscSettingsPanel(state: InkuUiState, viewModel: InkuViewModel, modi
                 ChipButton(S.mascotIncu, selected = state.mascotKind == "incu", onClick = { viewModel.setMascotKind("incu") })
                 ChipButton(S.mascotYuragi, selected = state.mascotKind == "yuragi", onClick = { viewModel.setMascotKind("yuragi") })
             }
-        }
-        SettingsCard(S.historySelection, S.historySelectionSubtitle, S.saved) {
-            SettingChoiceRow(
-                title = S.canvas,
-                selected = state.historySelectionCanvas,
-                onSelect = viewModel::setHistorySelectionCanvas,
-            )
-            SettingChoiceRow(
-                title = S.colorCatalog,
-                selected = state.historySelectionCatalog,
-                onSelect = viewModel::setHistorySelectionCatalog,
-            )
-            SettingCheckRow(state.saveReplayAsNewVersion, S.ddlReplaySaveAsNew, viewModel::setSaveReplayAsNewVersion)
         }
     }
 }
@@ -4413,7 +4407,9 @@ private fun ModelSettingsPanel(state: InkuUiState, viewModel: InkuViewModel, mod
         SettingsHeader(state.settingsPane, viewModel)
 
         Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceXs)) {
-            state.providerSettings.forEach { provider ->
+            // A deleted built-in service stays in the table switched off (see
+            // `InkuRepository.deleteProvider`); it is not listed.
+            state.providerSettings.filter { it.isEnabled || it.isDefaultLocal }.forEach { provider ->
                 ProviderConnectionCard(
                     provider = provider,
                     candidateModelIds = state.providerModelCandidates[provider.providerId],
@@ -4449,7 +4445,7 @@ private fun ProviderConnectionCard(
     statusMessage: String?,
     fetchState: ProviderModelFetchState?,
 ) {
-    val requiresKey = provider.providerId in setOf("openai", "nvidia", "anthropic", "gemini")
+    val requiresKey = provider.providerId in setOf("openai", "nvidia", "anthropic", "gemini", "ollama-cloud")
     val keySet = !provider.encryptedApiKey.isNullOrBlank()
     var displayName by remember(provider.providerId, provider.displayName) { mutableStateOf(provider.displayName) }
     val kind = provider.kind
@@ -4493,7 +4489,8 @@ private fun ProviderConnectionCard(
                         Text(S.apiKey, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Row(horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM), verticalAlignment = Alignment.CenterVertically) {
                             Text(apiKeyState, style = MaterialTheme.typography.bodySmall)
-                            if (!keySet) Text(S.apiKeyLocalNote, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            // Only where a key is optional; a cloud service always needs one.
+                            if (!keySet && !requiresKey) Text(S.apiKeyLocalNote, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         }
                     }
                     SecondarySmallButton(
@@ -4554,6 +4551,7 @@ private fun ProviderConnectionCard(
             title = S.baseUrlChange,
             label = "Base URL",
             initialValue = baseUrl,
+            keyboardOptions = UrlKeyboardOptions,
             onDismiss = { editBaseUrlOpen = false },
             onSave = { value ->
                 baseUrl = value
@@ -4567,6 +4565,7 @@ private fun ProviderConnectionCard(
             title = S.apiKeySet,
             label = S.newApiKey,
             initialValue = apiKey,
+            secret = true,
             onDismiss = { editApiKeyOpen = false },
             onSave = { value ->
                 apiKey = value
@@ -4679,6 +4678,8 @@ private fun TextEditDialog(
     initialValue: String,
     onDismiss: () -> Unit,
     onSave: (String) -> Unit,
+    keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
+    secret: Boolean = false,
 ) {
     var value by remember(title, initialValue) { mutableStateOf(initialValue) }
     AlertDialog(
@@ -4691,6 +4692,8 @@ private fun TextEditDialog(
                 label = label,
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
+                keyboardOptions = if (secret) SecretKeyboardOptions else keyboardOptions,
+                visualTransformation = if (secret) PasswordVisualTransformation() else VisualTransformation.None,
             )
         },
         confirmButton = {
@@ -4726,10 +4729,13 @@ private fun ProviderModelPickerDialog(
     }
     AlertDialog(
         onDismissRequest = onDismiss,
+        // As in the add dialog: the search field brings up the keyboard, and
+        // the list gives way to it instead of the save button going under it.
+        modifier = Modifier.imePadding(),
         title = { Text(provider.displayName) },
         text = {
             Column(
-                modifier = Modifier.fillMaxWidth().height(Dimens.providerModelDialogHeight),
+                modifier = Modifier.fillMaxWidth().heightIn(max = Dimens.providerModelDialogHeight),
                 verticalArrangement = Arrangement.spacedBy(Dimens.spaceM),
             ) {
                 Row(horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM), modifier = Modifier.fillMaxWidth()) {
@@ -4979,17 +4985,33 @@ private fun AddProviderCard(
     var kind by remember { mutableStateOf("openai-compatible") }
     var baseUrl by remember { mutableStateOf("") }
     var apiKey by remember { mutableStateOf("") }
+    // Closing forgets what was typed, the key above all: it would otherwise
+    // wait in memory and come back filled in the next time the dialog opens.
+    fun close() {
+        open = false
+        providerId = ""
+        displayName = ""
+        kind = "openai-compatible"
+        baseUrl = ""
+        apiKey = ""
+    }
     SecondaryActionButton(text = S.providerAdd, onClick = { open = true })
     if (open) {
         AlertDialog(
-            onDismissRequest = { open = false },
+            onDismissRequest = ::close,
+            // The dialog window is panned, not resized, for the keyboard; the
+            // inset has to shrink the dialog itself for its buttons to stay
+            // above the keys when the last field is being typed in.
+            modifier = Modifier.imePadding(),
             title = { Text(S.providerAdd) },
             text = {
+                // A ceiling rather than a fixed height: with the keyboard up the
+                // dialog has to shrink, or its buttons end up under the keys.
                 Column(
-                    modifier = Modifier.fillMaxWidth().height(Dimens.addProviderCardHeight).verticalScroll(rememberScrollState()),
+                    modifier = Modifier.fillMaxWidth().heightIn(max = Dimens.addProviderCardHeight).verticalScroll(rememberScrollState()),
                     verticalArrangement = Arrangement.spacedBy(Dimens.spaceM),
                 ) {
-                    ImeAwareOutlinedTextField(value = providerId, onValueChange = { providerId = it }, label = S.serviceId, modifier = Modifier.fillMaxWidth(), singleLine = true)
+                    ImeAwareOutlinedTextField(value = providerId, onValueChange = { providerId = it }, label = S.serviceId, modifier = Modifier.fillMaxWidth(), singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii, autoCorrectEnabled = false))
                     ImeAwareOutlinedTextField(value = displayName, onValueChange = { displayName = it }, label = S.serviceName, modifier = Modifier.fillMaxWidth(), singleLine = true)
                     CompactLabel(S.providerKind)
                     WrapRow(horizontal = Dimens.spaceM, vertical = Dimens.spaceM) {
@@ -4997,21 +5019,29 @@ private fun AddProviderCard(
                             MiniPill(label, selected = kind == value, onClick = { kind = value })
                         }
                     }
-                    ImeAwareOutlinedTextField(value = baseUrl, onValueChange = { baseUrl = it }, label = "Base URL", modifier = Modifier.fillMaxWidth(), singleLine = true)
-                    ImeAwareOutlinedTextField(value = apiKey, onValueChange = { apiKey = it }, label = S.apiKey, modifier = Modifier.fillMaxWidth(), singleLine = true)
+                    ImeAwareOutlinedTextField(value = baseUrl, onValueChange = { baseUrl = it }, label = "Base URL", modifier = Modifier.fillMaxWidth(), singleLine = true, keyboardOptions = UrlKeyboardOptions)
+                    ImeAwareOutlinedTextField(
+                        value = apiKey,
+                        onValueChange = { apiKey = it },
+                        label = S.apiKey,
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        keyboardOptions = SecretKeyboardOptions,
+                        visualTransformation = PasswordVisualTransformation(),
+                    )
                 }
             },
             confirmButton = {
                 TextButton(
                     onClick = {
                         onAdd(providerId, displayName, kind, baseUrl, apiKey, "")
-                        open = false
+                        close()
                     },
                     enabled = providerId.isNotBlank(),
                 ) { Text(S.add) }
             },
             dismissButton = {
-                TextButton(onClick = { open = false }) { Text(S.cancel) }
+                TextButton(onClick = ::close) { Text(S.cancel) }
             },
         )
     }
@@ -5041,7 +5071,6 @@ private fun SettingsListItem(mark: String, title: String, sub: String, onClick: 
 @Composable
 private fun settingsPaneTitle(pane: SettingsPane): String = when (pane) {
     SettingsPane.Home -> S.settings
-    SettingsPane.ModelSelection -> S.modelSelection
     SettingsPane.Models -> S.modelSettings
     SettingsPane.Demo -> S.demo
     SettingsPane.Export -> S.export
@@ -5052,7 +5081,6 @@ private fun settingsPaneTitle(pane: SettingsPane): String = when (pane) {
 @Composable
 private fun settingsPaneSubtitle(pane: SettingsPane): String = when (pane) {
     SettingsPane.Home -> "List + Detail"
-    SettingsPane.ModelSelection -> S.stagesShared
     SettingsPane.Models -> "OpenAI / Claude / Gemini / NVIDIA"
     SettingsPane.Demo -> S.demoSubtitle
     SettingsPane.Export -> "PNG / SVG templates"
@@ -5069,26 +5097,6 @@ private fun SettingCheckRow(checked: Boolean, text: String, onCheckedChange: (Bo
     ) {
         Checkbox(checked = checked, onCheckedChange = onCheckedChange)
         Text(text, style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
-    }
-}
-
-@Composable
-private fun SettingChoiceRow(
-    title: String,
-    selected: HistorySelectionBehavior,
-    onSelect: (HistorySelectionBehavior) -> Unit,
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
-        CompactLabel(title)
-        Row(horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM), modifier = Modifier.fillMaxWidth()) {
-            if (selected == HistorySelectionBehavior.History) {
-                PrimarySmallButton(S.historyValue, onClick = { onSelect(HistorySelectionBehavior.History) }, modifier = Modifier.weight(1f))
-                SecondarySmallButton(S.keepCurrentValue, onClick = { onSelect(HistorySelectionBehavior.Current) }, modifier = Modifier.weight(1f))
-            } else {
-                SecondarySmallButton(S.historyValue, onClick = { onSelect(HistorySelectionBehavior.History) }, modifier = Modifier.weight(1f))
-                PrimarySmallButton(S.keepCurrentValue, onClick = { onSelect(HistorySelectionBehavior.Current) }, modifier = Modifier.weight(1f))
-            }
-        }
     }
 }
 
@@ -5116,27 +5124,6 @@ private fun ExportTemplateRow(template: app.inku.mobile.data.db.ExportTemplateEn
                     text = S.save,
                     onClick = { viewModel.updateExportTemplate(template, name, description, height.toIntOrNull() ?: template.heightPx) },
                     modifier = Modifier.weight(1f),
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun ModelChoiceRow(
-    choices: List<ModelChoice>,
-    selectedValue: String,
-    onSelect: (String) -> Unit,
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceXs)) {
-        WrapRow {
-            choices.forEach { choice ->
-                val rec = app.inku.mobile.data.model.ModelRecommendations.items.find { it.modelId == choice.id }
-                val badgeText = if (rec != null) S.recommendedStageSuffix(rec.recommendedStage) else ""
-                MiniPill(
-                    text = "${choice.providerName.take(10)} / ${choice.label.take(18)}$badgeText",
-                    selected = choice.id == selectedValue,
-                    onClick = { onSelect(choice.id) },
                 )
             }
         }
@@ -5214,12 +5201,14 @@ private fun providerModelCandidates(provider: app.inku.mobile.data.db.ProviderSe
             ProviderModelCandidate("ollama:gpt-oss:20b", "gpt-oss 20B"),
             ProviderModelCandidate("ollama:qwen3:8b", "Qwen3 8B"),
         )
-        "ovms" -> listOf(
-            ProviderModelCandidate("qwen3-api", "Qwen3 8B Instruct", "thinking"),
-            ProviderModelCandidate("qwen-api", "Qwen2.5 7B Instruct"),
-            ProviderModelCandidate("gemma3-12b-api", "Google Gemma 3 12B Instruct"),
-            ProviderModelCandidate("gemma3-4b-api", "Google Gemma 3 4B Instruct"),
-        )
+        // The server's verified Ollama Cloud models, in its order of
+        // recommendation (verified_model_catalog.py).
+        "ollama-cloud" -> listOf(
+            "nemotron-3-ultra", "minimax-m2.5", "nemotron-3-super", "gemma4:31b", "nemotron-3-nano:30b",
+            "gpt-oss:120b", "gpt-oss:20b", "minimax-m3", "deepseek-v4-flash", "deepseek-v4-pro",
+            "glm-5.1", "glm-5.2", "kimi-k2.5", "kimi-k2.6", "kimi-k2.7-code", "minimax-m2.7",
+            "mistral-large-3:675b", "qwen3.5:397b",
+        ).map { ProviderModelCandidate("ollama-cloud:$it", it) }
         else -> emptyList()
     }
     val fetched = fetchedModelIds.orEmpty().map { id ->
@@ -5514,24 +5503,29 @@ private fun StatusPill(text: String, color: Color) {
     )
 }
 
-private fun modelStatusLabel(state: String?): String = when (state) {
-    "ready" -> "READY"
-    "queued" -> "QUEUED"
-    "connecting" -> "CONNECT"
-    "downloading" -> "GETTING"
-    "verifying" -> "VERIFY"
-    "failed" -> "FAILED"
-    "cancelled" -> "STOPPED"
-    "ready_to_download" -> "LICENSED"
+/**
+ * The downloader records why a download failed (`failed_sha256`,
+ * `failed_http_<code>`, `failed_size`), and a start-up finds an unfinished one
+ * `interrupted`; each reads as the failure or the stop it is, not as LOCAL.
+ */
+private fun modelStatusLabel(state: String?): String = when {
+    state == "ready" -> "READY"
+    state == "queued" -> "QUEUED"
+    state == "connecting" -> "CONNECT"
+    state == "downloading" -> "GETTING"
+    state == "verifying" -> "VERIFY"
+    state == "failed" || state?.startsWith("failed_") == true -> "FAILED"
+    state == "cancelled" || state == "interrupted" -> "STOPPED"
+    state == "ready_to_download" -> "LICENSED"
     else -> "LOCAL"
 }
 
 @Composable
-private fun modelStatusColor(state: String?): Color = when (state) {
-    "ready" -> MaterialTheme.colorScheme.secondary
-    "queued", "connecting", "downloading", "verifying" -> MaterialTheme.colorScheme.primary
-    "failed", "cancelled" -> StatusFailed
-    "ready_to_download" -> StatusReady
+private fun modelStatusColor(state: String?): Color = when {
+    state == "ready" -> MaterialTheme.colorScheme.secondary
+    state in setOf("queued", "connecting", "downloading", "verifying") -> MaterialTheme.colorScheme.primary
+    state in setOf("failed", "cancelled", "interrupted") || state?.startsWith("failed_") == true -> StatusFailed
+    state == "ready_to_download" -> StatusReady
     else -> MaterialTheme.colorScheme.onSurfaceVariant
 }
 
@@ -6038,7 +6032,7 @@ private fun CopyableRenderTextView(text: String, modifier: Modifier = Modifier) 
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(Dimens.spaceXs)) {
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
             MiniPill(
-                text = "Copy",
+                text = S.copy,
                 onClick = { clipboard.setText(AnnotatedString(text)) },
             )
         }
@@ -6134,8 +6128,7 @@ private suspend fun shareHistoryJson(context: Context, item: HistoryItemEntity) 
 /** `inku-<id>-<time>.inku-ddl.json`, the web's name for a DDL export. */
 private suspend fun shareHistoryDdl(context: Context, item: HistoryItemEntity, json: String) {
     val payload = withContext(Dispatchers.IO) {
-        val exportDir = File(context.cacheDir, "exports")
-        check(exportDir.isDirectory || exportDir.mkdirs()) { "Export cache is unavailable." }
+        val exportDir = exportCacheDir(context)
         val stamp = java.text.SimpleDateFormat("yyyyMMdd-HHmmss", java.util.Locale.ROOT).format(java.util.Date())
         val file = File(exportDir, "inku-${item.id}-$stamp.inku-ddl.json")
         file.writeText(json, Charsets.UTF_8)
@@ -6145,8 +6138,8 @@ private suspend fun shareHistoryDdl(context: Context, item: HistoryItemEntity, j
     launchShareIntent(context, payload)
 }
 
-private suspend fun shareHistorySvg(context: Context, item: HistoryItemEntity, profile: String = "display") {
-    val payload = withContext(Dispatchers.IO) { buildHistorySvgPayload(context, item, profile) }
+private suspend fun shareHistorySvg(context: Context, item: HistoryItemEntity, profile: String, svg: String) {
+    val payload = withContext(Dispatchers.IO) { buildHistorySvgPayload(context, item, profile, svg) }
     launchShareIntent(context, payload)
 }
 
@@ -6156,21 +6149,19 @@ private suspend fun shareHistoryPng(context: Context, item: HistoryItemEntity, t
 }
 
 private fun buildHistoryJsonPayload(context: Context, item: HistoryItemEntity): SharePayload {
-    val exportDir = File(context.cacheDir, "exports")
-    exportDir.mkdirs()
+    val exportDir = exportCacheDir(context)
     val file = File(exportDir, "inku-${item.renderHashShort}.json")
     file.writeText(historyExportJson(item).toString(2), Charsets.UTF_8)
     val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
     return SharePayload(uri, "application/json", "inku ${item.renderHashShort}", file.name, "Export inku JSON")
 }
 
-private fun buildHistorySvgPayload(context: Context, item: HistoryItemEntity, profile: String): SharePayload {
+private fun buildHistorySvgPayload(context: Context, item: HistoryItemEntity, profile: String, svg: String): SharePayload {
     val normalizedProfile = profile.takeIf { it in setOf("display", "editable", "compat") } ?: "display"
-    val exportDir = File(context.cacheDir, "exports")
-    exportDir.mkdirs()
+    val exportDir = exportCacheDir(context)
     val ext = if (normalizedProfile == "display") "svg" else "$normalizedProfile.svg"
     val file = File(exportDir, "inku-${item.renderHashShort}.$ext")
-    file.writeText(svgForExport(item, normalizedProfile), Charsets.UTF_8)
+    file.writeText(svg, Charsets.UTF_8)
     val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
     return SharePayload(uri, "image/svg+xml", "inku ${item.renderHashShort}", file.name, "Export inku SVG")
 }
@@ -6183,8 +6174,7 @@ private fun buildHistoryPngPayload(context: Context, item: HistoryItemEntity, ta
         // Not `require`: this sentence reaches the reader, so the language is
         // chosen where it is shown rather than here (see InkuFailure).
         if (estimatedBytes > MaxPngExportBitmapBytes) inkuError { it.exportPngTooLarge }
-        val exportDir = File(context.cacheDir, "exports")
-        check(exportDir.isDirectory || exportDir.mkdirs()) { "Export cache is unavailable." }
+        val exportDir = exportCacheDir(context)
         val file = File(exportDir, "inku-${item.renderHashShort}-${height}.png")
         try {
             FileOutputStream(file).use { out ->
@@ -6206,6 +6196,25 @@ private fun buildHistoryPngPayload(context: Context, item: HistoryItemEntity, ta
 private const val MaxPngExportHeightPx = 4320
 private const val MaxPngExportBitmapBytes = 128L * 1024L * 1024L
 
+/**
+ * The shared export folder, with yesterday's files cleared out.
+ *
+ * Every export lands here for the share sheet and nothing removed it: a 4320px
+ * PNG is tens of megabytes, and each work and height kept its own file. A
+ * file older than a day has long been read by whatever it was shared to.
+ */
+private fun exportCacheDir(context: Context): File {
+    val dir = File(context.cacheDir, "exports")
+    check(dir.isDirectory || dir.mkdirs()) { "Export cache is unavailable." }
+    val cutoff = System.currentTimeMillis() - EXPORT_RETENTION_MS
+    dir.listFiles()?.forEach { file ->
+        if (file.isFile && file.lastModified() < cutoff) file.delete()
+    }
+    return dir
+}
+
+private const val EXPORT_RETENTION_MS = 24L * 60L * 60L * 1000L
+
 private fun launchShareIntent(context: Context, payload: SharePayload) {
     val intent = Intent(Intent.ACTION_SEND).apply {
         type = payload.mimeType
@@ -6215,31 +6224,6 @@ private fun launchShareIntent(context: Context, payload: SharePayload) {
         addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
     }
     context.startActivity(Intent.createChooser(intent, payload.chooserTitle))
-}
-
-private fun svgForExport(item: HistoryItemEntity, profile: String): String {
-    val metadata = JSONObject()
-        .put("generator", "inku")
-        .put("svg_profile", profile)
-        .put("source", "android")
-    val title = "inku render ($profile SVG)"
-    val desc = when (profile) {
-        "editable" -> "Generated by inku. Groups and IDs are included for vector editing."
-        else -> item.originalInput.ifBlank { "Generated by inku. Portable SVG output." }
-    }
-    val documentMetadata = "<title>${escapeXml(title)}</title>" +
-        "<desc>${escapeXml(desc)}</desc>" +
-        "<metadata id=\"inku_metadata\">${escapeXml(metadata.toString())}</metadata>"
-    val match = Regex("(<svg\\b[^>]*>)").find(item.displaySvg) ?: return item.displaySvg
-    return item.displaySvg.replaceRange(match.range.last + 1, match.range.last + 1, documentMetadata)
-}
-
-private fun escapeXml(value: String): String {
-    return value
-        .replace("&", "&amp;")
-        .replace("<", "&lt;")
-        .replace(">", "&gt;")
-        .replace("\"", "&quot;")
 }
 
 private fun historyExportJson(item: HistoryItemEntity): JSONObject {
@@ -6760,6 +6744,7 @@ private fun ImeAwareOutlinedTextField(
     singleLine: Boolean = false,
     enabled: Boolean = true,
     keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
+    visualTransformation: VisualTransformation = VisualTransformation.None,
 ) {
     val bringIntoViewRequester = remember { BringIntoViewRequester() }
     val scope = rememberCoroutineScope()
@@ -6779,9 +6764,17 @@ private fun ImeAwareOutlinedTextField(
         singleLine = singleLine,
         enabled = enabled,
         keyboardOptions = keyboardOptions,
+        visualTransformation = visualTransformation,
         shape = RoundedCornerShape(Dimens.radiusCard),
     )
 }
+
+/**
+ * How an API key is typed: masked on screen, and with the password keyboard,
+ * which keeps it out of the keyboard's suggestions and learned words.
+ */
+private val SecretKeyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, autoCorrectEnabled = false)
+private val UrlKeyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, autoCorrectEnabled = false)
 
 @Composable
 private fun MetaPanel(
@@ -6974,6 +6967,129 @@ private fun ChipButton(text: String, selected: Boolean = false, modifier: Modifi
             shape = RoundedCornerShape(100),
             colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurfaceVariant),
         ) { Text(text, maxLines = 1) }
+    }
+}
+
+/** A chip for the one destructive entry on a card, drawn apart from the rest. */
+@Composable
+private fun DangerChipButton(text: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    OutlinedButton(
+        onClick = onClick,
+        modifier = modifier,
+        shape = RoundedCornerShape(100),
+        border = BorderStroke(Dimens.hairline, MaterialTheme.colorScheme.error),
+        colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
+    ) { Text(text, maxLines = 1) }
+}
+
+/** web's confirm dialog: the question, キャンセル and 実行. */
+@Composable
+private fun ConfirmDialog(message: String, onConfirm: () -> Unit, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        text = { Text(message, style = MaterialTheme.typography.bodyMedium) },
+        confirmButton = { TextButton(onClick = onConfirm) { Text(S.confirmRun) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(S.cancel) } },
+    )
+}
+
+/** What a trash action just did, where it was done; it clears itself. */
+@Composable
+private fun WorkNotice(notice: String?, viewModel: InkuViewModel) {
+    if (notice == null) return
+    LaunchedEffect(notice) {
+        delay(CANVAS_MESSAGE_MS)
+        viewModel.clearWorkNotice()
+    }
+    Text(
+        notice,
+        style = MaterialTheme.typography.labelLarge,
+        fontWeight = FontWeight.Medium,
+        color = MaterialTheme.colorScheme.error,
+    )
+}
+
+/**
+ * The trash: web's history manager in its trash view, one work at a time.
+ * A work comes back with 復元 or goes for good with 完全削除, each asked first
+ * (`confirmRestoreMessage`, `confirmPermanentDeleteMessage`).
+ */
+@Composable
+private fun TrashGrid(
+    trashed: List<HistoryListItem>,
+    gridState: LazyGridState,
+    header: @Composable () -> Unit,
+    viewModel: InkuViewModel,
+) {
+    var pendingRestore by remember { mutableStateOf<String?>(null) }
+    var pendingDelete by remember { mutableStateOf<String?>(null) }
+    LazyVerticalGrid(
+        columns = GridCells.Adaptive(Dimens.historyGridMinCellWidth),
+        state = gridState,
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(start = Dimens.spaceL, end = Dimens.historyGridHandleClearance, top = Dimens.spaceM, bottom = Dimens.spaceM),
+        horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM),
+        verticalArrangement = Arrangement.spacedBy(Dimens.historyGridRowGap),
+    ) {
+        item(key = "header", span = { GridItemSpan(maxLineSpan) }) { header() }
+        if (trashed.isEmpty()) {
+            item(key = "empty", span = { GridItemSpan(maxLineSpan) }) {
+                Text(
+                    S.trashEmpty,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(vertical = Dimens.spaceL),
+                )
+            }
+        }
+        gridItems(trashed, key = { it.id }) { item ->
+            Card(
+                shape = RoundedCornerShape(0.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                modifier = Modifier.border(Dimens.hairline, CardHairline, RoundedCornerShape(0.dp)),
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
+                    HistoryArtworkPreview(item, modifier = Modifier.fillMaxWidth().aspectRatio(1f))
+                    Text(
+                        historyTitle(item),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        minLines = 2,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(horizontal = Dimens.spaceM),
+                    )
+                    WrapRow(
+                        modifier = Modifier.padding(start = Dimens.spaceM, end = Dimens.spaceM, bottom = Dimens.spaceM),
+                        horizontal = Dimens.spaceXs,
+                        vertical = Dimens.spaceXs,
+                    ) {
+                        ChipButton(S.restoreWork, modifier = Modifier.testTag(TRASH_RESTORE_TAG), onClick = { pendingRestore = item.id })
+                        DangerChipButton(S.deleteForGood, modifier = Modifier.testTag(TRASH_DELETE_TAG), onClick = { pendingDelete = item.id })
+                    }
+                }
+            }
+        }
+    }
+    pendingRestore?.let { id ->
+        ConfirmDialog(
+            message = S.confirmRestore(1),
+            onConfirm = {
+                pendingRestore = null
+                viewModel.restoreWork(id)
+            },
+            onDismiss = { pendingRestore = null },
+        )
+    }
+    pendingDelete?.let { id ->
+        ConfirmDialog(
+            message = S.confirmDeleteForGood(1),
+            onConfirm = {
+                pendingDelete = null
+                viewModel.deleteWorkForGood(id)
+            },
+            onDismiss = { pendingDelete = null },
+        )
     }
 }
 

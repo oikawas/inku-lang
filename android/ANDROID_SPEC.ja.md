@@ -3,7 +3,7 @@
 このディレクトリは、ネイティブ単体 Android アプリのワークスペースであり、Git 管理対象とする。
 ローカル専用成果物、端末ID、ダウンロード済みモデル、ログ、秘密情報は追跡対象に含めない。
 
-最終更新: 2026-09-25。
+最終更新: 2026-09-26。
 
 **追随状況**: Android は `2.1.4-android.80` の世代にある。DDLの変換とScore → SVGの描画は、
 同じcommitの共有Rust core（`core/crates/`）を同梱してServerと同じ実装で行い、Android独自の版定数を持たない。
@@ -29,6 +29,26 @@ runtime fallbackを持たない。保存済みSVG、Room schema、Score schema�
 - `ANDROID_SPEC.md` は英語版として、`ANDROID_SPEC.ja.md` の意図を保った翻訳・要約として更新する。
 - Android 仕様を更新するときは、先に `ANDROID_SPEC.ja.md` を更新し、その後で `ANDROID_SPEC.md` を同期する。
 - 英語版だけに存在する仕様・要件を追加してはならない。
+
+## 2026-09-26 現行の接続先・描画設定・書き出し
+
+接続形式ごとに、Serverの`pipeline_provider.py`と同じ形で送る。`openai-compatible`は`/chat/completions`、`gemini`は`/v1beta/models/{model}:generateContent`、`anthropic`（Claude API）は`/v1/messages`で、`x-api-key`と`anthropic-version: 2023-06-01`を付け、描画の応答は強制したtool呼び出しの`input`、写真はbase64の画像ブロックで送る。既定の接続先はServerの一覧と同じで、ovmsを持たず、Ollama Cloud（`ollama-cloud`、`https://ollama.com/v1`、キー必須）を持つ。一覧から外したovmsの行は、キー・名前・Base URL・モデル一覧のどれかを作者が設定していれば作者の接続先として残し、既定のままなら起動時に消す。`openai-compatible`の描画の答えは強制した関数呼び出しで求めるが、`ollama`だけはJSON schemaの`response_format`で求め、`ollama`と`ollama-cloud`は`reasoning_effort: none`で推論を切る。既定の接続先は起動時に不足分を補うだけで、作者が変えたサービス名とBase URLを保持する（接続形式は既定のまま、端末内の接続先のBase URLは目印なので変えない）。既定の接続先の「サービス削除」は行を消さず、Serverと同じく無効にして一覧から隠し、APIキーを消す。同じIDで追加すれば戻る。作者が追加した接続先は行ごと消す。端末内の接続先は消せない。APIキーは伏せ字とパスワード用キーボード（予測・学習なし）で入力し、「AIサービスを追加」は閉じると入力値を消す。「ローカルLLMはキー無しで使える場合がある」の注記は、キーが必須でない接続先にだけ出す。
+
+描画表現「暴れる（Wild）」は`app_settings`の`render_wild`（`{"enabled":bool}`）に保存し、記述からの新しい描画（単発・バッチ・デモ・カメラ）に載せる。作品からのDDL描画は作品のWild（`render_metadata.render_wild`）を、推敲の候補は親作品のWildを継ぐ（Webの`targetWild`・`effectiveRefineWild`と同じ）。作品を選ぶと、その作品の色カタログ（自動で描いた作品は自動）とキャンバスを次の描画に使う。起動時に作品が表示されていれば、保存済みの色カタログ・キャンバスより作品の値を優先する。「履歴選択時のキャンバス・色カタログ」「DDL再描画を新しい履歴として保存」は処理を持たなかったため削除した。色カタログ選択ダイアログの戻る・外側タップはキャンセルで、キャンセルは保存値も元に戻す。作品画面・全画面の送り・検索は全作品を対象にする（以前は新しい100件だけ）。
+
+書き出しの表示用SVGは保存したSVGそのもの、編集用SVG・汎用SVGは保存Scoreを作品の色・seed・Wildでそのprofileに描き直したもの（Serverの`GET /api/history/{id}/svg?profile=`と同じ）。共有用に`cacheDir/exports`へ書いたファイルは、1日を過ぎたものを次の書き出しで消す。
+
+キーボード表示中は、記述の「描画する」とバッチの「バッチ描画」をキーボードの上に出し、スクロールの末尾にその高さの余白を置く。「AIサービスを追加」と接続先のモデル選択ダイアログはキーボードに合わせて縮む。推敲の「タッチを変える言葉」の入力中は「候補を作る」の行を画面に入れる。推敲を開いた状態の戻るは推敲を閉じ、「この作品を推敲」の編集中の戻るは作品の表示へ戻る（カメラと上書き確認の戻るはそちらが優先）。
+
+推敲のサブビューは「調整」と「モデル」の二つで、系譜カードの入口は「描画要素」「DDL編集」「モデル」。言語比較（「言語」）はWebが2026-08-29に廃止したので持たない。保存済みの`language_comparison`の作品は系譜のカードに「言語」と出る。推敲の実行中に対象を変えるか閉じると、止めた実行が後で終わっても新しい対象の状態には触れない。
+
+作品の完全削除は、Serverの`HistoryPermanentDeleteWriter`と同じく同じtransactionで系譜ノードを墓標（`tombstone`、履歴・hashを消し`deleted_at`を記録）にし、触れる辺の`metadata_json`を`{}`にする。サムネイルは同じrender hashの作品が残っていなければ消す。画面ではごみ箱の「完全削除」から使い（debugのheadless（`save_history=false`）も使う）、ごみ箱の作品にだけ効く（Serverの`require_trashed`と同じ）。
+
+作品のごみ箱は、Webの作品管理のごみ箱と同じ操作を作品ごとに持つ。系譜カードの最後の「ごみ箱へ移動」（ほかの操作と区別した色）は確認のあと`trashed`だけを立て、系譜ノードはそのまま残し、結果をその画面に5秒出す。ごみ箱の作品のカードには「ごみ箱」と出て、編集の入口を出さない。表示中の作品を移したときは表示を続けてごみ箱の印を付け、「この作品を推敲」を押せなくする（Webも表示中の作品を`trashed`にして残す）。作品画面の「ごみ箱 (N)」で一覧をごみ箱に切り替え、作品ごとに「復元」または「完全削除」を確認のあと行う。
+
+起動時に表示する最新作品は表示のためだけで、次の描画の親にしない（Webは起動時に作品を戻さない）。作品画面・系譜で選んだ作品が親になる。起動時の「前回の描画の復元」は、実行中か作者を待っている実行と、完了したが作品が保存されていない実行だけを戻し（失敗・取り消しの実行は戻さない。Webは起動時に何も戻さず、これはシステムに止められたアプリのためのもの）、推敲を開いている間や候補を作っている間は行わない。描画の表示へ切り替えるときは推敲の実行を止める。推敲の候補が作者の判断を要する状態で止まったときは、Webの`failGrid`と同じく失敗を推敲の中に出し、その実行を取り消す。保留中の実行を表示しているときの「新規作成」は、その実行を取り消す。書き出し設定の「白背景時アルファチャンネルを有効にする」はWebと同じ文言で、SVGが全面の背景を持つため見た目には影響しない。
+
+描画モデルは制作画面のモデル選択ダイアログで選ぶ。どの画面からも開けなかった設定画面のモデル選択パネルと、どこからも呼ばれていなかったキャンバス下の作品サムネイル列は削除した。そのパネルだけが使っていたAndroid独自の推奨モデル一覧（モデル名の後ろの「(推奨: S1)」）も削除した。作品は作品画面・系譜・全画面の送りで選ぶ。Webはモデルを選ぶ画面にサーバーのモデル一覧のオススメ度（Stageごとの★）・速度・コメントを出すが、Androidのダイアログはモデル名だけを出す。
 
 ## 2026-09-25 現行のプラグイン（draw-system04）
 
@@ -432,11 +452,11 @@ local single-user equivalent と明記されたものを除き、Web component �
 | `SaijikiDrawer.svelte` | Android では inline Saijiki panel が mobile equivalent。drawer layout は使わない。 |
 | `CanvasPanel.svelte` | artwork/prompt/score tabs、star、hash copy、render metadata、zoom/pan controls、SVG share、PNG share として移植。 |
 | `OutputTabsContent.svelte` | saved Room history item からの prompt / JSON views として移植。 |
-| `HistoryStrip.svelte` | Compose画面のキャンバス直下へthumbnail stripとして移植。選択、モデル名と保存済みmetadataのtooltipを持ち、Star操作を持つ履歴gridも別入口として維持する。 |
+| `HistoryStrip.svelte` | キャンバス直下のthumbnail stripとして移植したが、表示しなくなったため2026-09-26に削除した。作品は作品画面のgrid・系譜・全画面の送りで選ぶ。 |
 | `HistoryManager.svelte` | thumbnails/list modes、search、starred filter、selection、trash、restore、permanent delete として移植。 |
 | `HistoryThumbnail.svelte` | history tiles / list rows の `ArtworkPreview` 経由で移植。 |
 | `ConfirmDialog.svelte` | DDL overwrite と destructive history operations に移植。Non-history destructive settings confirmations は parity test backlog。 |
-| `SettingsModal.svelte` | model selection、model connection settings、plugin setting、DB status、export templates、misc settings に移植。Server-only logs/output-save は local-only equivalents として表現。 |
+| `SettingsModal.svelte` | model connection settings、plugin setting、DB status、export templates、misc settings に移植（model selection は制作画面のダイアログ）。Server-only logs/output-save は local-only equivalents として表現。 |
 | `IncuMascot.svelte` / `YuragiMascot.svelte` | MascotWidget および IncuMascotView / YuragiMascotView として 5x5 ピクセルグリッドとアニメーションを純 Kotlin / Compose Canvas へ移植。 |
 
 ## 実装順序

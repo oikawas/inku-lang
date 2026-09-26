@@ -10,6 +10,7 @@ import app.inku.mobile.data.db.AppSettingEntity
 import app.inku.mobile.data.db.ExportTemplateEntity
 import app.inku.mobile.data.db.HistoryItemEntity
 import app.inku.mobile.data.db.HistoryListItem
+import app.inku.mobile.data.db.drawnWild
 import app.inku.mobile.data.db.InkuDatabase
 import app.inku.mobile.data.db.LineageEdgeEntity
 import app.inku.mobile.data.db.ManagedHistoryLinkInput
@@ -113,9 +114,18 @@ class InkuRepository(
     private val thumbnailScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val originalPhotos = app.inku.mobile.ui.camera.CameraOriginalPhotoStore(context.filesDir)
 
-    fun history(): Flow<List<HistoryListItem>> = database.historyDao().listActiveSummaries(100, 0)
+    /**
+     * Every active work, newest first, as summaries.
+     *
+     * This stopped at the newest 100 with no way to read further, so an older
+     * work could not be reached from the gallery, the full-screen stepping or
+     * the search, which filters this list. A summary carries no SVG or Score,
+     * a few hundred characters each, so the whole list fits in memory.
+     */
+    fun history(): Flow<List<HistoryListItem>> = database.historyDao().listActiveSummaries(Int.MAX_VALUE, 0)
 
-    fun trashedHistory(): Flow<List<HistoryItemEntity>> = database.historyDao().listTrashed(100, 0)
+    /** The trash, all of it, as the same summaries the works screen lists. */
+    fun trashedHistory(): Flow<List<HistoryListItem>> = database.historyDao().listTrashedSummaries(Int.MAX_VALUE, 0)
 
     fun modelAssets(): Flow<List<ModelAssetEntity>> = database.modelAssetDao().observeAll()
 
@@ -163,13 +173,22 @@ class InkuRepository(
         return executionId.takeIf { it.isNotBlank() }?.let { pipeline.view(it) }
     }
 
+    /**
+     * The drawing to put back on screen at start, if one was left behind: an
+     * execution still running or waiting on the author, or one that completed
+     * without its work being saved. One that failed or was cancelled has
+     * already said so and is not brought back -- before, a failed run (a
+     * refinement candidate among them) came back at every start in place of
+     * the newest work. web restores nothing on opening; this exists for an
+     * app the system stopped mid-drawing.
+     */
     suspend fun restoreActivePipeline(): PipelineView? {
         val execution = database.sharedPipelineDao().latestExecution(AndroidWorkPipeline.OWNER_ID) ?: return null
         val view = pipeline.restore(execution.executionId)
-        if (view.phaseTag == "completed" && database.historyDao().getById(pipelineHistoryId(view)) != null) {
-            return null
+        if (view.phaseTag == "completed") {
+            return view.takeIf { database.historyDao().getById(pipelineHistoryId(view)) == null }
         }
-        return view
+        return view.takeIf { !it.terminal }
     }
 
     private fun pipelineHistoryId(view: PipelineView): String =
@@ -375,10 +394,11 @@ class InkuRepository(
     }
 
     suspend fun ensureDefaultProviderSettings() {
+        dropUntouchedRetiredProviders()
         defaultProviderSettings().forEach { setting ->
             val existing = database.providerSettingDao().get(setting.providerId)
             database.providerSettingDao().upsert(
-                setting.copy(
+                builtInProviderSetting(setting, existing).copy(
                     encryptedApiKey = existing?.encryptedApiKey?.let { key ->
                         if (AndroidSecretBox.isEncrypted(key)) key else AndroidSecretBox.decryptOrPlain(key)?.let(AndroidSecretBox::encrypt)
                     } ?: setting.encryptedApiKey,
@@ -504,8 +524,23 @@ class InkuRepository(
         return models
     }
 
+    /**
+     * Removes a connection. A built-in one cannot leave the catalog -- the next
+     * start would put it back with its defaults -- so, as the server does
+     * (`model_settings.py` `update_model_settings`), it is switched off and
+     * hidden instead, and its key is forgotten. Adding a service with the same
+     * id brings it back.
+     */
     suspend fun deleteProvider(providerId: String) {
-        database.providerSettingDao().deleteCustom(providerId)
+        val builtIn = defaultProviderSettings().any { it.providerId == providerId && !it.isDefaultLocal }
+        if (!builtIn) {
+            database.providerSettingDao().deleteCustom(providerId)
+            return
+        }
+        val existing = database.providerSettingDao().get(providerId) ?: return
+        database.providerSettingDao().upsert(
+            existing.copy(isEnabled = false, encryptedApiKey = null, updatedAt = System.currentTimeMillis()),
+        )
     }
 
     suspend fun acceptModelLicense(modelId: String) {
@@ -562,6 +597,10 @@ class InkuRepository(
 
     suspend fun markModelDownloadFailed(modelId: String, state: String = "failed") {
         val asset = database.modelAssetDao().getByModelId(modelId) ?: return
+        // The downloader has usually recorded why already (`failed_sha256`,
+        // `failed_http_404`, `failed_size`); a generic `failed` over it would
+        // throw the reason away.
+        if (asset.downloadState.startsWith("failed")) return
         database.modelAssetDao().updateDownload(
             modelId = modelId,
             downloadState = state.take(48),
@@ -572,7 +611,7 @@ class InkuRepository(
         )
     }
 
-    suspend fun paint(description: String, catalogId: String, canvasAspect: String, stage1ModelId: String, stage2ModelId: String, autoRepair: Boolean = true, historyInput: String? = null, litertStage1PromptOptimization: Boolean = false, lineage: LineageDeclaration = LineageDeclaration(), historyVisibility: String? = null, seeds: PaintSeeds = PaintSeeds(), instructionLang: String? = null, uiLang: String? = null, sourceText: String? = null, sketch: SketchInput = SketchInput(), parentHistoryId: String? = null, inputProvenance: CameraInputProvenance? = null): HistoryItemEntity {
+    suspend fun paint(description: String, catalogId: String, canvasAspect: String, stage1ModelId: String, stage2ModelId: String, autoRepair: Boolean = true, historyInput: String? = null, litertStage1PromptOptimization: Boolean = false, lineage: LineageDeclaration = LineageDeclaration(), historyVisibility: String? = null, seeds: PaintSeeds = PaintSeeds(), instructionLang: String? = null, uiLang: String? = null, sourceText: String? = null, sketch: SketchInput = SketchInput(), parentHistoryId: String? = null, inputProvenance: CameraInputProvenance? = null, renderWild: Boolean? = null): HistoryItemEntity {
         val started = System.currentTimeMillis()
         val stage1Text = description
         val result = pipeline.paint(
@@ -596,12 +635,13 @@ class InkuRepository(
                 sketch = sketch,
                 parentHistoryId = parentHistoryId,
                 inputProvenance = inputProvenance,
+                renderWild = renderWild,
             ),
         )
         return saveResult(result, catalogId, canvasAspect, stage1ModelId, stage2ModelId, System.currentTimeMillis() - started, historyInput, lineage, historyVisibility, sourceText, inputProvenance)
     }
 
-    suspend fun interpret(description: String, catalogId: String, canvasAspect: String, stage1ModelId: String, stage2ModelId: String, autoRepair: Boolean = true, litertStage1PromptOptimization: Boolean = false, instructionLang: String? = null, uiLang: String? = null, sketch: SketchInput = SketchInput(), inputProvenance: CameraInputProvenance? = null): InterpretResult {
+    suspend fun interpret(description: String, catalogId: String, canvasAspect: String, stage1ModelId: String, stage2ModelId: String, autoRepair: Boolean = true, litertStage1PromptOptimization: Boolean = false, instructionLang: String? = null, uiLang: String? = null, sketch: SketchInput = SketchInput(), inputProvenance: CameraInputProvenance? = null, renderWild: Boolean? = null): InterpretResult {
         val stage1Text = description
         return pipeline.interpret(
             PaintRequest(
@@ -617,11 +657,12 @@ class InkuRepository(
                 uiLang = uiLang,
                 sketch = sketch,
                 inputProvenance = inputProvenance,
+                renderWild = renderWild,
             ),
         )
     }
 
-    suspend fun composeFromDdl(description: String, ddl: String, catalogId: String, canvasAspect: String, stage1ModelId: String, stage2ModelId: String, autoRepair: Boolean = true, litertStage1PromptOptimization: Boolean = false, lineage: LineageDeclaration = LineageDeclaration(), historyVisibility: String? = null, seeds: PaintSeeds = PaintSeeds(), instructionLang: String? = null, uiLang: String? = null, sourceText: String? = null, sketch: SketchInput = SketchInput(), inputProvenance: CameraInputProvenance? = null, onProgress: suspend (ComposeFromDdlProgress) -> Unit = {}, beforeSave: suspend () -> Unit = {}, parentHistoryId: String? = null, executionId: String? = null, originalPhoto: File? = null, importedPlugins: List<ImportedPluginDefinition> = emptyList()): HistoryItemEntity {
+    suspend fun composeFromDdl(description: String, ddl: String, catalogId: String, canvasAspect: String, stage1ModelId: String, stage2ModelId: String, autoRepair: Boolean = true, litertStage1PromptOptimization: Boolean = false, lineage: LineageDeclaration = LineageDeclaration(), historyVisibility: String? = null, seeds: PaintSeeds = PaintSeeds(), instructionLang: String? = null, uiLang: String? = null, sourceText: String? = null, sketch: SketchInput = SketchInput(), inputProvenance: CameraInputProvenance? = null, onProgress: suspend (ComposeFromDdlProgress) -> Unit = {}, beforeSave: suspend () -> Unit = {}, parentHistoryId: String? = null, executionId: String? = null, originalPhoto: File? = null, importedPlugins: List<ImportedPluginDefinition> = emptyList(), renderWild: Boolean? = null): HistoryItemEntity {
         val started = System.currentTimeMillis()
         val result = pipeline.composeFromDdl(
             ddl,
@@ -647,6 +688,7 @@ class InkuRepository(
                 executionId = executionId,
                 inputProvenance = inputProvenance,
                 importedPlugins = importedPlugins,
+                renderWild = renderWild,
             ),
             onProgress = onProgress,
         )
@@ -656,6 +698,39 @@ class InkuRepository(
         beforeSave()
         currentCoroutineContext().ensureActive()
         return saveResult(result, catalogId, canvasAspect, stage1ModelId, stage2ModelId, System.currentTimeMillis() - started, lineage = lineage, historyVisibility = historyVisibility, sourceText = sourceText, inputProvenance = inputProvenance, originalPhoto = originalPhoto)
+    }
+
+    /**
+     * The work as an SVG file in one of the three profiles the server offers.
+     *
+     * Display is the saved SVG itself. Editable and compat are drawn again from
+     * the saved Score with the work's own colors, seeds and Wild, as the
+     * server's `GET /api/history/{id}/svg?profile=` does; they used to be the
+     * display SVG with a new title, so neither carried the groups and ids the
+     * editable file promises nor the compat file's simplified effects.
+     */
+    suspend fun exportSvg(item: HistoryItemEntity, profile: String): String {
+        if (profile == "display") return item.displaySvg
+        val seeds = PaintSeeds.of(item)
+        val description = item.sourceText ?: item.originalInput
+        return pipeline.renderExportSvg(
+            item.scoreJson,
+            PaintRequest(
+                description = description,
+                originalText = description,
+                stage1Model = item.stage1Model.orEmpty(),
+                stage2Model = item.stage2Model.orEmpty(),
+                colorCatalogId = item.colorCatalogId,
+                canvasAspect = item.canvasAspect,
+                autoRepair = false,
+                renderSeed = seeds.renderSeed,
+                compositionSeed = seeds.compositionSeed,
+                workColorSnapshot = app.inku.mobile.data.model.workColorSnapshot(item.renderMetadataJson),
+                renderWild = item.drawnWild,
+                parentHistoryId = item.id,
+            ),
+            profile,
+        )
     }
 
     suspend fun generateDemoPrompt(seedPhrase: String, modelId: String): String {
@@ -744,22 +819,13 @@ class InkuRepository(
             // being asked of the layer, and the state derives from the prose.
             sketch = SketchInput(text = parent.sketchText, grain = parent.sketchGrain),
             workColorSnapshot = refinementColorSnapshot(parent, plan),
+            renderWild = parent.renderWild,
             parentHistoryId = parent.historyId,
         )
         return when (plan.route) {
             RefinementRoute.RenderFromScore -> pipeline.renderFromScore(parent.scoreJson, request)
             RefinementRoute.ComposeFromDdl -> pipeline.composeFromDdl(parent.ddl, request)
-            // A pair of languages is passed the way web passes it: the two
-            // stages are asked separately, each with its own language
-            // (`state.svelte.ts:432-435`). A single call could carry only one,
-            // and inventing a per-stage key here would be a shape the server
-            // does not have.
-            RefinementRoute.Paint -> if (plan.stage1Lang != null || plan.stage2Lang != null) {
-                val interpreted = pipeline.interpret(request.copy(instructionLang = plan.stage1Lang))
-                pipeline.composeFromDdl(interpreted.ddlForDisplay, request.copy(instructionLang = plan.stage2Lang, executionId = interpreted.executionId))
-            } else {
-                pipeline.paint(request)
-            }
+            RefinementRoute.Paint -> pipeline.paint(request)
         }
     }
 
@@ -925,26 +991,33 @@ class InkuRepository(
     suspend fun backfillMissingThumbnails(limit: Int = 8) {
         database.historyDao().listMissingThumbnails(limit).forEach { item ->
             val thumbnail = createHistoryThumbnail(item.displaySvg, item.renderHash) ?: return@forEach
-            database.historyDao().updateThumbnail(
-                id = item.id,
-                path = thumbnail.path,
-                width = thumbnail.width,
-                height = thumbnail.height,
-                updatedAt = System.currentTimeMillis(),
-            )
+            attachThumbnail(item.id, thumbnail)
         }
     }
 
     private fun scheduleThumbnailGeneration(id: String, svgText: String, renderHash: String) {
         thumbnailScope.launch {
             val thumbnail = createHistoryThumbnail(svgText, renderHash) ?: return@launch
-            database.historyDao().updateThumbnail(
-                id = id,
-                path = thumbnail.path,
-                width = thumbnail.width,
-                height = thumbnail.height,
-                updatedAt = System.currentTimeMillis(),
-            )
+            attachThumbnail(id, thumbnail)
+        }
+    }
+
+    /**
+     * Points the row at its thumbnail. A work deleted while the thumbnail was
+     * being drawn (a headless run that keeps no history does exactly that)
+     * updates no row, and a file no row shows is removed rather than left.
+     */
+    private suspend fun attachThumbnail(id: String, thumbnail: ThumbnailInfo) {
+        val history = database.historyDao()
+        val updated = history.updateThumbnail(
+            id = id,
+            path = thumbnail.path,
+            width = thumbnail.width,
+            height = thumbnail.height,
+            updatedAt = System.currentTimeMillis(),
+        )
+        if (updated == 0 && history.countWithThumbnail(thumbnail.path) == 0) {
+            File(thumbnail.path).delete()
         }
     }
 
@@ -960,10 +1033,39 @@ class InkuRepository(
         database.historyDao().setTrashed(id, false, System.currentTimeMillis())
     }
 
+    /**
+     * Deletes one work for good, as the server's `HistoryPermanentDeleteWriter`
+     * does: in the same transaction its lineage node becomes a tombstone and
+     * the edges touching it lose their metadata. The node keeps its place, so
+     * its children still count their generation from the root, and the planner
+     * refuses it as a parent. Deleting only the row left an `active` node
+     * pointing at nothing.
+     *
+     * The original photo goes with the work, and so does the thumbnail unless
+     * another row drawn to the same render hash still shows it.
+     */
     suspend fun deleteHistoryPermanently(id: String) {
-        database.historyDao().deletePermanently(id)
+        val thumbnail = database.withTransaction {
+            val history = database.historyDao()
+            val nodeId = history.lineageNodeIdOf(id)
+            val thumbnailPath = history.thumbnailPathOf(id)
+            if (nodeId != null) {
+                database.lineageDao().tombstoneNode(nodeId, System.currentTimeMillis())
+                database.lineageDao().clearEdgeMetadataTouching(nodeId)
+            }
+            history.deletePermanently(id)
+            thumbnailPath?.takeIf { history.countWithThumbnail(it) == 0 }
+        }
         originalPhotos.deleteSaved(id)
+        thumbnail?.let { path ->
+            File(path).takeIf { isAppThumbnail(it) }?.delete()
+        }
     }
+
+    private fun isAppThumbnail(file: File): Boolean = runCatching {
+        val root = File(context.filesDir, "thumbnails").canonicalFile
+        file.canonicalFile.path.startsWith(root.path + File.separator)
+    }.getOrDefault(false)
 
     private fun modelSpec(modelId: String): ModelDownloadSpec {
         return DefaultModelDownloads.all.firstOrNull { it.modelId == modelId }
@@ -1042,11 +1144,13 @@ class InkuRepository(
                 isDefaultLocal = false,
                 updatedAt = System.currentTimeMillis(),
             ),
+            // The server's catalog (model_settings.py): ovms left it on
+            // 2026-07-30 and Ollama Cloud took its place beside local Ollama.
             ProviderSettingEntity(
-                providerId = "ovms",
-                displayName = "Intel OVMS",
+                providerId = "ollama-cloud",
+                displayName = "Ollama Cloud (ollama.com)",
                 kind = "openai-compatible",
-                baseUrl = "http://127.0.0.1:8101/v3",
+                baseUrl = "https://ollama.com/v1",
                 encryptedApiKey = null,
                 publishedModelsJson = models(),
                 isEnabled = true,
@@ -1054,6 +1158,27 @@ class InkuRepository(
                 updatedAt = System.currentTimeMillis(),
             ),
         )
+    }
+
+    /**
+     * Removes a withdrawn built-in connection that is still as the catalog
+     * seeded it.
+     *
+     * The server drops a withdrawn id on the way in (`RETIRED_PROVIDER_IDS`).
+     * Here a row the author configured -- a key, or a name, address or model
+     * list of their own -- is kept as a connection of their own, key and all,
+     * and only an untouched one goes.
+     */
+    private suspend fun dropUntouchedRetiredProviders() {
+        RETIRED_BUILT_IN_PROVIDERS.forEach { retired ->
+            val existing = database.providerSettingDao().get(retired.providerId) ?: return@forEach
+            val models = parseModelIds(existing.publishedModelsJson).toSet()
+            val untouched = existing.encryptedApiKey == null &&
+                existing.displayName == retired.displayName &&
+                existing.baseUrl == retired.baseUrl &&
+                (models.isEmpty() || models == retired.seededModels)
+            if (untouched) database.providerSettingDao().deleteCustom(retired.providerId)
+        }
     }
 
     private fun normalizedPublishedModels(defaultSetting: ProviderSettingEntity, existing: ProviderSettingEntity?): String {
@@ -1073,7 +1198,6 @@ class InkuRepository(
         "anthropic" -> listOf("anthropic:claude-opus-4-7", "anthropic:claude-sonnet-4-6", "anthropic:claude-haiku-4-5-20251001")
         "gemini" -> listOf("gemini:gemini-2.5-pro", "gemini:gemini-2.5-flash", "gemini:gemini-2.5-flash-lite")
         "ollama" -> listOf("ollama:llama3.2", "ollama:gpt-oss:20b", "ollama:qwen3:8b")
-        "ovms" -> listOf("qwen3-api", "qwen-api", "gemma3-12b-api", "gemma3-4b-api")
         else -> emptyList()
     }
 
@@ -1128,6 +1252,32 @@ class InkuRepository(
     }
 }
 
+/**
+ * A built-in connection as it is stored again at start-up.
+ *
+ * The author may rename a built-in service and point it at another base URL
+ * (ANDROID_SPEC 2026-05-08), and the server keeps both edits
+ * (`model_settings.py` `normalize_model_settings`). This used to write the
+ * catalog's name and URL back over them on every start and before every model
+ * list fetch, so an edited Ollama URL was gone before the fetch it was made
+ * for. The kind still comes from the catalog. The switch is kept, because
+ * off is how a deleted built-in stays deleted; adding a service with the same
+ * id turns it back on. The local provider's URL is only a marker and stays
+ * the catalog's, and the local provider cannot be switched off.
+ */
+internal fun builtInProviderSetting(
+    catalog: ProviderSettingEntity,
+    existing: ProviderSettingEntity?,
+): ProviderSettingEntity {
+    if (existing == null) return catalog
+    return catalog.copy(
+        displayName = existing.displayName.takeIf { it.isNotBlank() } ?: catalog.displayName,
+        baseUrl = if (catalog.isDefaultLocal) catalog.baseUrl else existing.baseUrl?.takeIf { it.isNotBlank() } ?: catalog.baseUrl,
+        // Off means deleted (`deleteProvider`); the local model cannot be.
+        isEnabled = catalog.isDefaultLocal || existing.isEnabled,
+    )
+}
+
 internal fun refinementColorSnapshot(parent: RefinementParent, plan: RefinementPlan) =
     if (plan.route == RefinementRoute.RenderFromScore && plan.catalogId == parent.catalogId) {
         parent.workColorSnapshot
@@ -1137,3 +1287,20 @@ internal fun refinementColorSnapshot(parent: RefinementParent, plan: RefinementP
 
 /** `plugin_settings` key of the bundled plugin package switch. */
 private const val BUNDLED_PLUGIN_SETTING_KEY = "bundled:$BUNDLED_PLUGIN_PACKAGE:enabled"
+
+/** A built-in connection the server withdrew, as the catalog once seeded it. */
+private data class RetiredProvider(
+    val providerId: String,
+    val displayName: String,
+    val baseUrl: String,
+    val seededModels: Set<String>,
+)
+
+private val RETIRED_BUILT_IN_PROVIDERS = listOf(
+    RetiredProvider(
+        providerId = "ovms",
+        displayName = "Intel OVMS",
+        baseUrl = "http://127.0.0.1:8101/v3",
+        seededModels = setOf("qwen3-api", "qwen-api", "gemma3-12b-api", "gemma3-4b-api"),
+    ),
+)

@@ -22,6 +22,14 @@ interface HistoryDao {
     @Query("SELECT * FROM history_items WHERE trashed = 1 ORDER BY created_at DESC LIMIT :limit OFFSET :offset")
     fun listTrashed(limit: Int, offset: Int): Flow<List<HistoryItemEntity>>
 
+    @Query(
+        "SELECT id, created_at, updated_at, original_input, normalized_ddl, stage1_model, stage2_model, " +
+            "render_hash, render_hash_short, color_catalog_id, canvas_aspect, starred, trashed, " +
+            "thumbnail_path, thumbnail_width, thumbnail_height " +
+            "FROM history_items WHERE trashed = 1 ORDER BY created_at DESC LIMIT :limit OFFSET :offset",
+    )
+    fun listTrashedSummaries(limit: Int, offset: Int): Flow<List<HistoryListItem>>
+
     @Query("SELECT * FROM history_items WHERE starred = 1 AND trashed = 0 ORDER BY created_at DESC LIMIT :limit OFFSET :offset")
     fun listStarred(limit: Int, offset: Int): Flow<List<HistoryItemEntity>>
 
@@ -47,8 +55,20 @@ interface HistoryDao {
     @Query("UPDATE history_items SET trashed = :trashed, updated_at = :updatedAt WHERE id = :id")
     suspend fun setTrashed(id: String, trashed: Boolean, updatedAt: Long)
 
+    /** Returns the rows updated: 0 when the work was deleted while its thumbnail was drawn. */
     @Query("UPDATE history_items SET thumbnail_path = :path, thumbnail_width = :width, thumbnail_height = :height, updated_at = :updatedAt WHERE id = :id")
-    suspend fun updateThumbnail(id: String, path: String, width: Int, height: Int, updatedAt: Long)
+    suspend fun updateThumbnail(id: String, path: String, width: Int, height: Int, updatedAt: Long): Int
+
+    // The two columns a permanent delete needs, without loading the SVG.
+    @Query("SELECT lineage_node_id FROM history_items WHERE id = :id")
+    suspend fun lineageNodeIdOf(id: String): String?
+
+    @Query("SELECT thumbnail_path FROM history_items WHERE id = :id")
+    suspend fun thumbnailPathOf(id: String): String?
+
+    /** Thumbnails are named by render hash, so two rows can share one file. */
+    @Query("SELECT COUNT(*) FROM history_items WHERE thumbnail_path = :path")
+    suspend fun countWithThumbnail(path: String): Int
 
     @Query("DELETE FROM history_items WHERE id = :id")
     suspend fun deletePermanently(id: String)

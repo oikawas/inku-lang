@@ -7,6 +7,8 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
@@ -28,6 +30,7 @@ import app.inku.mobile.data.model.DerivationKindRegistry
 import app.inku.mobile.llm.ModelProvider
 import app.inku.mobile.llm.ModelRequest
 import app.inku.mobile.llm.ModelResponse
+import app.inku.mobile.testing.pipelineFixtureResponse
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
@@ -75,7 +78,7 @@ class LineageScreenTest {
         override val providerId: String = "test"
 
         override suspend fun generate(request: ModelRequest): ModelResponse =
-            ModelResponse(text = request.prompt, modelId = request.modelId)
+            pipelineFixtureResponse(request)
     }
 
     private lateinit var database: InkuDatabase
@@ -319,7 +322,11 @@ class LineageScreenTest {
         // registry rather than with a literal: a screen that invented its own
         // wording fails even if it happens to agree today.
         composeTestRule.onNodeWithText(InkuStringsJa.derivationLabel(FIRST_KIND)).assertIsDisplayed()
-        composeTestRule.onNodeWithText(InkuStringsJa.derivationLabel(SECOND_KIND)).assertIsDisplayed()
+        // ddl_edit reads DDL編集, which is also each card's own DDL edit entry;
+        // the edge's name is the one that is not that button.
+        composeTestRule.onNode(
+            hasText(InkuStringsJa.derivationLabel(SECOND_KIND)) and !hasTestTag(DDL_ENTRY_TAG),
+        ).assertIsDisplayed()
         // And the node no edge points at, which the registry answers for too.
         composeTestRule.onNodeWithText(InkuStringsJa.derivationOrigin).assertIsDisplayed()
 

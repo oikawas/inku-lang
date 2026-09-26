@@ -26,18 +26,25 @@ object InkuStringsJa : InkuStrings {
     override val productionTools = "制作ツール"
     override val reviseWork = "この作品を推敲"
     override val interpretationToggle = "解釈を見る"
+    override val interpretationHide = "解釈を閉じる"
 
     override val statusStage1 = "Stage 1: DDL生成中..."
     override val statusStage2 = "Stage 2: 画像生成中..."
     override val statusComposingFromDdl = "DDLからScoreを構成しています..."
     override val statusStopped = "停止しました。"
-    // Both fallbacks were already written in English before the pack existed.
-    // They are kept as they were: translating into the source language would be
-    // changing the Japanese, which a translation pass does not do.
-    override val statusDrawFailed = "Draw failed."
-    override val statusComposeFailed = "Compose failed."
+    // Both were English before the pack existed and were left so by the
+    // translation pass; on the Japanese screen they stood out as the only
+    // English failure lines.
+    override val statusDrawFailed = "描画に失敗しました。"
+    override val statusComposeFailed = "DDLからの構成に失敗しました。"
     override val statusSaved: (String) -> String = { hash -> "保存しました $hash" }
     override val statusSaveFailed = "保存に失敗しました。"
+    override val restoreDrawingFailed = "前回の描画を復元できませんでした。"
+    override val pipelineDeclineFailed = "DDLの変更案を断れませんでした。"
+    override val drawingContextUnreadable = "描画の状態を読めませんでした。"
+    override val drawingContextMissing = "描画の状態が見つかりません。"
+    override val demoFailed = "デモの描画に失敗しました。"
+    override val licenseUpdateFailed = "ライセンスへの同意を保存できませんでした。"
     override val pipelineProposal = "DDLの変更案を確認してください。"
     override val pipelineOriginalDdl = "現在のDDL"
     override val pipelineProposedDdl = "変更後のDDL"
@@ -105,8 +112,6 @@ object InkuStringsJa : InkuStrings {
     override val comparisonModelSelectPrompt = "比較するモデルを1つ以上選択してください。"
     override val comparisonModelFixedMissing = "固定するモデルを選択してください。"
     override val comparisonModelChoiceBlocked = "対象作品と同じ Stage 1/2 の組み合わせは選べません。"
-    override val comparisonLanguageSelectPrompt = "比較する組み合わせを1つ以上選択してください。"
-    override val comparisonLanguageComboBlocked = "対象作品と同じ言語の組み合わせは選べません。"
     override val comparisonModeLabel: (String) -> String = { id ->
         when (id) {
             "common" -> "Stage 1/2 共通"
@@ -119,7 +124,6 @@ object InkuStringsJa : InkuStrings {
         when (id) {
             "adjust" -> "調整"
             "model" -> "モデル"
-            "language" -> "言語"
             else -> id
         }
     }
@@ -127,7 +131,6 @@ object InkuStringsJa : InkuStrings {
         when (id) {
             "adjust" -> "描画要素を編集する"
             "model" -> "モデルを編集する"
-            "language" -> "言語を編集する"
             else -> id
         }
     }
@@ -185,14 +188,6 @@ object InkuStringsJa : InkuStrings {
     override val modelNotDownloadedYet: (String, String, String) -> String = { stage, name, state ->
         "$stage の $name は未取得です。モデル設定で取得を完了してください。現在: $state"
     }
-    override val modelRecommendationReason: (String) -> String = { id ->
-        when (id) {
-            "stage1_default" -> "Stage 1 既定推奨。構図と彩色のバランスに優れる"
-            "stage1_derived" -> "Stage 1 派生推奨。表現力と安定性が高い"
-            "stage2_default" -> "Stage 2 既定推奨。DDL展開の精度が高い"
-            else -> id
-        }
-    }
 
     override val errorServiceIdFormat = "Service ID は英数字・_・- で入力してください。"
     override val errorServiceNotFound: (String) -> String = { id -> "サービスが見つかりません: $id" }
@@ -227,20 +222,18 @@ object InkuStringsJa : InkuStrings {
     override val baseUrlChange = "Base URLを変更"
     override val drawFromDdl = "DDLから描画"
     override val ddlOverwriteTitle = "DDLの編集結果が失われます"
-    override val ddlReplaySaveAsNew = "DDL再描画を新しい履歴として保存"
     override val ddlEdit = "DDL編集"
     override val mascotSubtitle = "Incu (立方体) または Yuragi (蟹)"
     override val mascotIncu = "Incu (立方体)"
     override val localModelNote = "LiteRT-LM でローカル実行する Gemma モデルです。"
     override val exportPngTooLarge = "PNG出力サイズが大きすぎます。キャンバス比率または出力サイズを下げてください。"
-    override val pngAlphaWhite = "PNG透過時の白背景"
+    // Web's wording (`settingsPngAlpha`); the earlier label read the opposite way.
+    override val pngAlphaWhite = "白背景時アルファチャンネルを有効にする"
     override val stagesShared = "Stage 1 / Stage 2 共通"
-    override val languageComboNote = "Stage 1 と Stage 2 の言語の組を選びます。"
     override val uiModeSubtitle = "UIの表示密度・構成"
     override val displaySafeMarginsSubtitle = "全画面表示でカメラ穴や画面端を避けます。用紙の比率は変わりません。"
     override val displaySafeMarginsToggle = "横方向の安全領域を使う"
     override val exportSubtitle = "Web版の出力設定"
-    override val historySelectionSubtitle = "Web版の履歴反映設定"
     override val svgDisplayNote = "Web表示向けの標準SVG"
     override val mascotYuragi = "Yuragi (蟹)"
     override val exportHeightPx = "Y軸px"
@@ -284,6 +277,22 @@ object InkuStringsJa : InkuStrings {
     override val uiModeFullLong = "フルモード表示"
     override val promptLabel = "プロンプト"
     override val searchPlaceholderLong = "プロンプト・ハッシュ・モデルで検索"
+    override val noMatchingWorks = "条件に合う作品はありません。"
+    // The trash takes web's words (`historyMoveToTrash`, `confirmTrashMessage`, ...).
+    override val moveToTrash = "ごみ箱へ移動"
+    override val trashedBadge = "ごみ箱"
+    override val trashView: (Int) -> String = { count -> "ごみ箱 ($count)" }
+    override val trashEmpty = "ごみ箱は空です。"
+    override val restoreWork = "復元"
+    override val deleteForGood = "完全削除"
+    override val confirmTrash: (Int) -> String = { count -> "${count}件をごみ箱に移動しますか？" }
+    override val confirmRestore: (Int) -> String = { count -> "${count}件を復元しますか？" }
+    override val confirmDeleteForGood: (Int) -> String = { count -> "${count}件を完全に削除しますか？元に戻せません。" }
+    override val confirmRun = "実行"
+    override val workTrashed = "ごみ箱に移動しました。"
+    override val workRestored = "ごみ箱から戻しました。"
+    override val workDeleted = "完全に削除しました。"
+    override val trashedWorkNote = "この作品はごみ箱にあります。"
     override val mascotTitle = "マスコット選択"
     override val model = "モデル"
     override val modelListFetch = "モデルリスト取得"
@@ -313,7 +322,6 @@ object InkuStringsJa : InkuStrings {
     override val selectAll = "全選択"
     override val noPublishedModels = "公開モデルは未選択です。"
     override val noPublishedModelsLong = "公開モデルは未選択です。接続先設定でモデルを選択してください。"
-    override val unifiedModelNote = "内部保存と履歴メタデータはserver互換のstage1_model / stage2_modelを維持し、Android UIでは同じモデルを両Stageへ適用します。"
     override val downloadAgain = "再取得"
     override val sketchFromLife = "写生"
     override val workActionSketchRedraw = "写生なし／ありで描き直す"
@@ -325,7 +333,6 @@ object InkuStringsJa : InkuStrings {
     override val downloadable = "取得可能"
     override val downloaded = "取得済み"
     override val downloadState = "取得状況"
-    override val cancelShort = "取消"
     override val accepted = "同意済み"
     override val name = "名前"
     override val fixedStage1Model = "固定する Stage 1 モデル"
@@ -336,10 +343,7 @@ object InkuStringsJa : InkuStrings {
     override val demoRunAndSeed = "実行とシードフレーズ"
     override val sameStagePairBlocked = "対象作品と同じ Stage 1/2 の組み合わせだけが選べません。"
     override val history = "履歴"
-    override val historyValue = "履歴の値"
-    override val historySelection = "履歴選択"
     override val showThinking = "思考を表示"
-    override val openProviderSettings = "接続先設定を開く"
     override val providerKind = "接続形式"
     override val paint = "描画する"
     override val drawingModel = "描画モデル"
@@ -358,7 +362,6 @@ object InkuStringsJa : InkuStrings {
     override val saijiki = "歳時記"
     override val svgGeneric = "汎用SVG"
     override val confirm = "決定"
-    override val keepCurrentValue = "現在値を維持"
     override val producedInstructions = "生成された指示文"
     override val producedInterpretation = "生成された解釈"
     override val working = "生成中…"
@@ -380,8 +383,7 @@ object InkuStringsJa : InkuStrings {
     override val autoRepair = "補正"
     override val interpretation = "解釈"
     override val awaitingInterpretation = "解釈を待機中..."
-    override val language = "言語"
-    override val miscSubtitle = "言語・テーマ・密度"
+    override val miscSubtitle = "言語・文字の大きさ・表示"
     override val description = "記述"
     override val camera = "カメラ"
     override val cameraInputSourceTitle = "画像を選ぶ"
@@ -426,7 +428,6 @@ object InkuStringsJa : InkuStrings {
     override val ddlOverwriteBody = "通常の描画を実行すると、現在の解釈（正規化DDL）は Stage 1 の結果で上書きされます。"
     override val selected = "選択中"
     override val close = "閉じる"
-    override val sameAsTargetSuffix = "（対象と同じ）"
     override val renderTabArtwork = "描画"
     override val generationInfoTitle = "生成情報"
     override val generationInfoInputSection = "入力"
@@ -474,7 +475,6 @@ object InkuStringsJa : InkuStrings {
     override val generationInfoElapsed = "処理時間"
     override val generationInfoOn = "あり"
     override val generationInfoOff = "なし"
-    override val recommendedStageSuffix: (Int) -> String = { stage -> " (推奨: S$stage)" }
     override val parentSuffix: (String, String) -> String = { hash, catalog -> " 親: $hash / $catalog" }
     override val downloadOf: (String) -> String = { name -> "$name の取得" }
     override val choiceSameAsTarget: (String) -> String = { label -> "$label（対象と同じ）" }
@@ -483,6 +483,7 @@ object InkuStringsJa : InkuStrings {
     override val filteredOfTotal: (Int, Int) -> String = { filtered, total -> "$filtered/${total}件" }
     override val groupAlternatives: (String) -> String = { group -> "$group / 代替候補" }
     override val lineNumber: (Int) -> String = { line -> "${line}行目" }
+    override val batchHistoryPill: (String, Int) -> String = { first, lines -> "$first（${lines}行）" }
     override val ofOneHundred: (Int) -> String = { count -> "${count}件/100件" }
     override val apiKeyDeleteBody: (String) -> String = { name -> "$name の保存済みAPIキーを削除します。" }
     override val serviceDeleteBody: (String) -> String = { name -> "$name をモデル接続先から削除します。" }
@@ -501,4 +502,19 @@ object InkuStringsJa : InkuStrings {
     override val batchProgress: (Int, Int) -> String = { current, total -> "進捗 $current / $total" }
 
     override val exportTemplateBuiltinDescription: (Int) -> String = { px -> "PNG / Y軸 ${px}px" }
+
+    override val stateExpanded = "展開中"
+    override val stateCollapsed = "折りたたみ中"
+    override val worksScrollbarDescription = "作品のスクロールバー"
+    override val listSeparator = "・"
+    override val statusRendered: (String) -> String = { hash -> "描画しました（F$hash）" }
+    override val statusComposed: (String) -> String = { hash -> "解釈から描画しました（F$hash）" }
+    override val promptEmpty = "記述が空です。"
+    override val batchEmpty = "バッチが空です。"
+    override val hashCopied = "ハッシュをコピーしました。"
+    override val exportPreparing: (String) -> String = { format -> "$format を準備しています…" }
+    override val exportDone: (String, String) -> String = { format, hash -> "$format を書き出しました（F$hash）" }
+    override val exportFailed: (String) -> String = { format -> "$format の書き出しに失敗しました。" }
+    override val copy = "コピー"
+    override val providerLabel = "接続先"
 }

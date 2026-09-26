@@ -177,7 +177,10 @@ class LocalLiteRtLmProvider(
         if (current != null && loadedModelId == modelId && loadedModelPath == modelPath && loadedMaxNumTokens == maxNumTokens) {
             return current
         }
-        current?.close()
+        // Forget the old engine as it is closed. If the new one fails to
+        // initialize, a later request for the old model must build a fresh
+        // engine rather than find this closed one still registered.
+        closeEngine()
         Engine.setNativeMinLogSeverity(LogSeverity.ERROR)
         ExperimentalFlags.enableSpeculativeDecoding = true
         val cacheDir = File(context.cacheDir, "litert-lm").also { it.mkdirs() }.absolutePath

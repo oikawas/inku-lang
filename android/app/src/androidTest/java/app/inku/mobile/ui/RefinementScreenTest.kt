@@ -29,6 +29,8 @@ import app.inku.mobile.data.refinement.RefinementElement
 import app.inku.mobile.llm.ModelProvider
 import app.inku.mobile.llm.ModelRequest
 import app.inku.mobile.llm.ModelResponse
+import app.inku.mobile.testing.pipelineFixtureResponse
+import app.inku.mobile.ui.i18n.InkuStringsJa
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
@@ -39,6 +41,7 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
@@ -77,7 +80,7 @@ class RefinementScreenTest {
 
         override suspend fun generate(request: ModelRequest): ModelResponse {
             delay(delayMs)
-            return ModelResponse(text = request.prompt, modelId = request.modelId)
+            return pipelineFixtureResponse(request)
         }
     }
 
@@ -108,6 +111,21 @@ class RefinementScreenTest {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         runBlocking { repository.close() }
         repository = InkuRepository(context, database, modelProviderOverride = SlowModel(delayMs))
+    }
+
+    /** Answers with the prompt as plain text, which the pipeline refuses. */
+    private fun useEchoModel() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        runBlocking { repository.close() }
+        repository = InkuRepository(
+            context,
+            database,
+            modelProviderOverride = object : ModelProvider {
+                override val providerId: String = "test-echo"
+                override suspend fun generate(request: ModelRequest): ModelResponse =
+                    ModelResponse(text = request.prompt, modelId = request.modelId)
+            },
+        )
     }
 
     /**
@@ -283,6 +301,28 @@ class RefinementScreenTest {
         composeTestRule.onNodeWithText("停止").performClick()
         awaitState("the run to stop") { !it.refinementBusy }
         assertEquals("停止しました。", vm().state.value.refinementStatus)
+    }
+
+    /**
+     * A candidate that stops for the author's attention fails in the panel, as
+     * web's grid does (`failGrid`), and leaves no drawing to be restored at the
+     * next start.
+     */
+    @Test
+    fun aCandidateThatNeedsAttentionFailsInThePanel() {
+        useEchoModel()
+        openPanel()
+        composeTestRule.runOnIdle {
+            vm().setRefinementElement(RefinementElement.Reading)
+            vm().setRefinementCount(1)
+            vm().generateRefinementCandidates()
+        }
+        awaitState("the failure") { !it.refinementBusy && it.refinementStatus != null }
+
+        val state = vm().state.value
+        assertTrue("the refinement stays open", state.refinementOpen)
+        assertEquals(InkuStringsJa.refinementFailed, state.refinementStatus)
+        assertNull("no drawing is left to restore", runBlocking { repository.restoreActivePipeline() })
     }
 
     /** T-6 on the screen: unsaved → saved, and a second press writes no second row. */

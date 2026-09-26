@@ -11,10 +11,10 @@ import app.inku.mobile.ui.i18n.InkuStrings
 import app.inku.mobile.ui.i18n.UiLanguage
 import app.inku.mobile.ui.i18n.inkuError
 import app.inku.mobile.ui.i18n.messageFor
-import app.inku.mobile.ui.i18n.safeErrorMessage
 import app.inku.mobile.ui.i18n.stringsFor
 import app.inku.mobile.data.InkuRepository
 import app.inku.mobile.data.db.HistoryItemEntity
+import app.inku.mobile.data.db.drawnWild
 import app.inku.mobile.data.db.HistoryListItem
 import app.inku.mobile.data.db.ExportTemplateEntity
 import app.inku.mobile.data.db.ModelAssetEntity
@@ -31,7 +31,6 @@ import app.inku.mobile.data.lineage.LineageGraphNode
 import app.inku.mobile.data.lineage.LineageGraphResult
 import app.inku.mobile.data.lineage.SubmitDerivationKind
 import app.inku.mobile.data.refinement.ComparisonPlanner
-import app.inku.mobile.data.refinement.LanguageCombo
 import app.inku.mobile.data.refinement.ModelCompareMode
 import app.inku.mobile.data.refinement.RefinementElement
 import app.inku.mobile.data.refinement.RefinementParent
@@ -113,6 +112,11 @@ private fun normalizeUiTextScale(scale: Float): Float =
 /** 「推敲要素の選択は前回値をブラウザに記憶する」-- here, the device remembers it. */
 const val SETTING_KEY_REFINEMENT_ELEMENT = "refinement_element"
 const val SETTING_KEY_DISPLAY_SAFE_MARGINS = "display_safe_margins"
+/**
+ * Wild (engine 12), one switch for every new drawing. web keeps it as
+ * `inku-wild` and states it on every fresh paint (`features/wild/render.ts`).
+ */
+const val SETTING_KEY_RENDER_WILD = "render_wild"
 /** Said by every generating entry point that refuses while candidates are drawn. */
 val REFINEMENT_IN_PROGRESS: (InkuStrings) -> String = { it.refinementInProgress }
 /** 「固定モードでは固定側を1モデル、比較側を最大4モデル選ぶ」(SPEC `:616`). */
@@ -120,8 +124,6 @@ const val MAX_COMPARE_SELECTION = 4
 val MODEL_SELECT_PROMPT: (InkuStrings) -> String = { it.comparisonModelSelectPrompt }
 val MODEL_FIXED_MISSING: (InkuStrings) -> String = { it.comparisonModelFixedMissing }
 val MODEL_CHOICE_BLOCKED: (InkuStrings) -> String = { it.comparisonModelChoiceBlocked }
-val LANGUAGE_SELECT_PROMPT: (InkuStrings) -> String = { it.comparisonLanguageSelectPrompt }
-val LANGUAGE_COMBO_BLOCKED: (InkuStrings) -> String = { it.comparisonLanguageComboBlocked }
 private const val MaxBatchItems = 100
 private const val MaxDemoCycles = 100
 
@@ -136,9 +138,6 @@ const val CANVAS_FIT_ZOOM = 1.0f
 
 /** Float slack for "is it back at fit", which a pinch never lands on exactly. */
 const val CANVAS_ZOOM_EPSILON = 0.01f
-
-/** 日本語 / English, the two names the language grid shows. */
-fun languageLabel(lang: String): String = if (lang == "en") "English" else "日本語"
 
 val InkuUiState.descriptionLocked: Boolean
     get() = historyAuthorityLoading || (!descriptionForkRequested &&
@@ -210,11 +209,15 @@ data class InkuUiState(
     val lineageLoading: Boolean = false,
     val historySearchQuery: String = "",
     val historyStarredOnly: Boolean = false,
+    /** The works screen lists the trash instead of the works. */
+    val historyTrashView: Boolean = false,
+    /**
+     * What a trash, restore or permanent delete just did, said where it was
+     * done: 「操作結果を明示する」(SPEC, the lineage card's ゴミ箱).
+     */
+    val workNotice: String? = null,
     val displaySafeMarginsEnabled: Boolean = false,
     val pngAlphaWhite: Boolean = false,
-    val saveReplayAsNewVersion: Boolean = true,
-    val historySelectionCanvas: HistorySelectionBehavior = HistorySelectionBehavior.Current,
-    val historySelectionCatalog: HistorySelectionBehavior = HistorySelectionBehavior.Current,
     val saijikiOpen: Boolean = false,
     // Whether the description is being written. The bottom bar reads it: while
     // the keyboard is up, the four destinations give their place to the one
@@ -263,14 +266,13 @@ data class InkuUiState(
     // The candidate on the canvas that has not been saved. Drawing on from here
     // has to put it in the lineage first (SPEC :2105).
     val refinementPreviewId: String? = null,
-    // 検分 (SPEC :616, :686). The two comparisons are sub-views beside 調整
-    // rather than screens of their own, and they share every field above:
-    // the candidates, the busy flag, the stop and the save are the refinement's.
+    // 検分 (SPEC :616). The model comparison is a sub-view beside 調整 rather
+    // than a screen of its own, and it shares every field above: the
+    // candidates, the busy flag, the stop and the save are the refinement's.
     val refinementSubview: RefinementSubview = RefinementSubview.Adjust,
     val modelCompareMode: ModelCompareMode = ModelCompareMode.Default,
     val modelCompareFixedModel: String = "",
     val modelCompareSelectedModels: List<String> = emptyList(),
-    val languageCompareSelectedCombos: List<String> = emptyList(),
 ) {
     /**
      * Whether any operation is running.
@@ -300,16 +302,17 @@ private data class CameraDrawRunInput(
 private class CameraStageFailure(val failure: CameraFailure) : RuntimeException()
 
 /**
- * The three sub-views of 推敲 (SPEC `:616`, `:686`).
+ * The two sub-views of 推敲 (SPEC `:616`).
  *
- * 調整 varies one of the five elements; the other two vary a model or a
- * language. They are one screen with three faces rather than three screens,
- * which is what「比較のロジックを複製しない」(SPEC `:688`) asks for.
+ * 調整 varies one of the five elements; the other varies the model. They are
+ * one screen with two faces rather than two screens, which is what
+ * 「比較のロジックを複製しない」(SPEC `:688`) asks for. The language comparison
+ * was a third; the web retired it on 2026-08-29 and SPEC keeps only the saved
+ * `language_comparison` works readable, so it is gone here too.
  */
 enum class RefinementSubview(val id: String) {
     Adjust("adjust"),
     Model("model"),
-    Language("language"),
     ;
 
     companion object {
@@ -381,7 +384,6 @@ enum class AppTab {
 
 enum class SettingsPane {
     Home,
-    ModelSelection,
     Models,
     Demo,
     Export,
@@ -398,11 +400,6 @@ enum class RenderTab {
     Artwork,
     Prompt,
     Json,
-}
-
-enum class HistorySelectionBehavior {
-    History,
-    Current,
 }
 
 /**
@@ -486,6 +483,12 @@ class InkuViewModel @JvmOverloads constructor(
         emptyList(),
     )
 
+    val trashedItems: StateFlow<List<HistoryListItem>> = repository.trashedHistory().stateIn(
+        viewModelScope,
+        SharingStarted.Eagerly,
+        emptyList(),
+    )
+
     init {
         viewModelScope.launch {
             repository.ensureDefaultModelAssets()
@@ -494,14 +497,20 @@ class InkuViewModel @JvmOverloads constructor(
             restorePersistedSettings()
             runCatching { withContext(Dispatchers.IO) { repository.restoreActivePipeline() } }
                 .onSuccess { view ->
+                    // The latest execution is read after the settings above,
+                    // and by then the reader can have started one of their
+                    // own: a refinement run writes its execution too, and
+                    // presenting that as the drawing to resume closed the
+                    // refinement under the run that was still going.
                     if (view != null && view.phaseTag != "cancelled" &&
-                        !promptEditedByUser && !localState.value.isDrawing
+                        !promptEditedByUser && !localState.value.isDrawing &&
+                        !localState.value.refinementOpen && !localState.value.refinementBusy
                     ) {
                         restoredInitialHistory = true
                         presentPipelineView(view)
                     }
                 }
-                .onFailure { error -> localState.value = localState.value.copy(message = safeErrorMessage(error, "Could not restore drawing.")) }
+                .onFailure { error -> localState.value = localState.value.copy(message = messageFor(error, strings(), strings().restoreDrawingFailed)) }
             withContext(Dispatchers.IO) {
                 repeat(4) {
                     repository.backfillMissingThumbnails(limit = 8)
@@ -521,7 +530,14 @@ class InkuViewModel @JvmOverloads constructor(
                 // which decides whether the next save has a parent at all.
                 val current = localState.value
                 if (!restoredInitialHistory && !promptEditedByUser && current.selectedHistory == null && !current.isDrawing) {
-                    applyHistorySelection(full, current.tab)
+                    // Restored for display only, as it was before the shared
+                    // pipeline replaced this block with the pick below and the
+                    // detach went with it (12390c01): web puts nothing back on
+                    // opening (`displayedHistoryItem` starts null), so counting
+                    // this as a parent would make this client alone record an
+                    // edge for opening the app and drawing. Only an explicit
+                    // pick becomes a parent.
+                    applyHistorySelection(full, current.tab, asParent = false)
                 }
             }
         }
@@ -565,6 +581,12 @@ class InkuViewModel @JvmOverloads constructor(
     }
 
     private fun presentPipelineView(view: PipelineView) {
+        // This closes the refinement; a candidate run left going would keep
+        // asking the model and adding candidates to a panel no longer shown,
+        // with the busy flag already down. When the run itself failed into
+        // this view, cancelling it here only ends what was ending.
+        refinementJob?.cancel()
+        refinementJob = null
         val context = JSONObject(view.hostContextJson)
         val options = context.optJSONObject("host_options")
         val parentId = context.optJSONObject("result_options")?.optString("parent_history_id")
@@ -633,7 +655,7 @@ class InkuViewModel @JvmOverloads constructor(
                         descriptionForkRequested = false,
                         lineageDetached = false,
                         isDrawing = false,
-                        message = "Rendered ${item.renderHashShort}",
+                        message = strings().statusRendered(item.renderHashShort),
                     )
                 }
             }.onFailure { error ->
@@ -651,7 +673,7 @@ class InkuViewModel @JvmOverloads constructor(
         viewModelScope.launch {
             runCatching { withContext(Dispatchers.IO) { repository.declinePipelinePatch(view.executionId) } }
                 .onSuccess { if (localState.value.pipelineView?.executionId == view.executionId) presentPipelineView(it) }
-                .onFailure { localState.value = localState.value.copy(message = safeErrorMessage(it, "Could not decline changes.")) }
+                .onFailure { localState.value = localState.value.copy(message = messageFor(it, strings(), strings().pipelineDeclineFailed)) }
         }
     }
 
@@ -1132,6 +1154,7 @@ class InkuViewModel @JvmOverloads constructor(
                 uiLang = input.uiLanguageCode,
                 sketch = route.sketch,
                 inputProvenance = input.inputProvenance,
+                renderWild = route.renderWild,
             )
         }
     }
@@ -1234,6 +1257,7 @@ class InkuViewModel @JvmOverloads constructor(
         stage2ModelId = snapshot.selectedStage2ModelId,
         catalogId = snapshot.selectedCatalogId,
         sketchRequested = snapshot.sketchMode == SketchMode.On,
+        renderWild = snapshot.renderWild,
     )
 
     /** Checks the drawing models a camera run started from [snapshot] will call. */
@@ -1297,6 +1321,12 @@ class InkuViewModel @JvmOverloads constructor(
 
     fun clearPrompt() {
         if (state.value.isDrawing) return
+        // Starting a new work leaves a drawing that was waiting on the author --
+        // restored at start or presented after a stop -- for good, as the stop
+        // itself does; left open, it was restored again at every start.
+        localState.value.pipelineView?.takeIf { !it.terminal }?.let { view ->
+            viewModelScope.launch { runCatching { repository.cancelPipeline(view.executionId) } }
+        }
         discardStagedCameraPhoto()
         cameraRetryInput = null
         promptEditedByUser = true
@@ -1347,6 +1377,10 @@ class InkuViewModel @JvmOverloads constructor(
     fun ddlImportFailed() {
         localState.value = localState.value.copy(message = strings().ddlImportInvalid)
     }
+
+    /** The work's SVG in [profile]; editable and compat are drawn again from its Score. */
+    suspend fun exportSvg(item: HistoryItemEntity, profile: String): String =
+        withContext(Dispatchers.IO) { repository.exportSvg(item, profile) }
 
     /** The saved work as `inku.ddl-export.v1` text, for the share sheet. */
     suspend fun ddlExportJson(item: HistoryItemEntity): String =
@@ -1420,19 +1454,9 @@ class InkuViewModel @JvmOverloads constructor(
     fun setTab(tab: AppTab) {
         val current = localState.value
         if (current.tab == AppTab.History && tab != AppTab.History) presentationNavigationSerial++
-        val restoredModelSelection = if (tab != AppTab.Settings && current.settingsPane == SettingsPane.ModelSelection) modelSelectionSnapshot else null
-        if (restoredModelSelection != null) modelSelectionSnapshot = null
         localState.value = current.copy(
             tab = tab,
-            selectedModelId = restoredModelSelection?.first ?: current.selectedModelId,
-            selectedStage2ModelId = restoredModelSelection?.second ?: current.selectedStage2ModelId,
-            settingsPane = if (tab == AppTab.Settings && current.tab != AppTab.Settings) {
-                SettingsPane.Home
-            } else if (tab == AppTab.Settings && current.settingsPane == SettingsPane.ModelSelection) {
-                SettingsPane.Home
-            } else {
-                current.settingsPane
-            },
+            settingsPane = if (tab == AppTab.Settings && current.tab != AppTab.Settings) SettingsPane.Home else current.settingsPane,
         )
         // web refetches when the lineage tab comes up (+page.svelte:4556).
         if (tab == AppTab.Lineage) refreshLineage()
@@ -1491,6 +1515,12 @@ class InkuViewModel @JvmOverloads constructor(
     fun cancelCatalogSelection() {
         val snapshot = catalogSelectionSnapshot
         catalogSelectionSnapshot = null
+        // `setCatalog` saves every choice as it is tapped, so a cancel has to
+        // save the value it restores too; otherwise the next start brings back
+        // the choice that was just cancelled.
+        if (snapshot != null && snapshot != localState.value.selectedCatalogId) {
+            persistSetting("color_catalog", JSONObject().put("value", snapshot).toString())
+        }
         localState.value = localState.value.copy(
             selectedCatalogId = snapshot ?: localState.value.selectedCatalogId,
             catalogSelectionOpen = false,
@@ -1641,25 +1671,11 @@ class InkuViewModel @JvmOverloads constructor(
 
     fun setRenderWild(wild: Boolean) {
         localState.value = localState.value.copy(renderWild = wild)
+        persistSetting(SETTING_KEY_RENDER_WILD, JSONObject().put("enabled", wild).toString())
     }
 
     fun setSketchMode(mode: SketchMode) {
         localState.value = localState.value.copy(sketchMode = mode)
-    }
-
-    fun setSaveReplayAsNewVersion(enabled: Boolean) {
-        localState.value = localState.value.copy(saveReplayAsNewVersion = enabled)
-        persistSetting("save_replay_as_new_version", JSONObject().put("enabled", enabled).toString())
-    }
-
-    fun setHistorySelectionCanvas(value: HistorySelectionBehavior) {
-        localState.value = localState.value.copy(historySelectionCanvas = value)
-        persistSetting("history_selection_canvas", JSONObject().put("value", value.name.lowercase()).toString())
-    }
-
-    fun setHistorySelectionCatalog(value: HistorySelectionBehavior) {
-        localState.value = localState.value.copy(historySelectionCatalog = value)
-        persistSetting("history_selection_catalog", JSONObject().put("value", value.name.lowercase()).toString())
     }
 
     fun addExportTemplate() {
@@ -1814,7 +1830,7 @@ class InkuViewModel @JvmOverloads constructor(
      *   (+page.svelte:4225-4230) -- there it is the double click
      *   (`openLineageNodeInCanvas`, :4234) that moves to the canvas.
      */
-    private fun applyHistorySelection(item: HistoryItemEntity, tab: AppTab) {
+    private fun applyHistorySelection(item: HistoryItemEntity, tab: AppTab, asParent: Boolean = true) {
         if (localState.value.isDrawing) stopDrawing()
         discardStagedCameraPhoto()
         cameraRetryInput = null
@@ -1824,14 +1840,19 @@ class InkuViewModel @JvmOverloads constructor(
             current.copy(
                 descriptionForkRequested = false,
                 // An explicit pick is what makes a work the parent of the next save
-                // (web's `loadIterationItem`, +page.svelte:4600).
-                lineageDetached = false,
+                // (web's `loadIterationItem`, +page.svelte:4600); the startup
+                // restore shows a work without making it one.
+                lineageDetached = !asParent,
                 prompt = item.originalInput,
                 ddl = item.normalizedDdl,
                 ddlEditedAfterGeneration = false,
                 confirmDdlOverwrite = false,
                 cameraCaptureState = current.cameraCaptureState.clearCameraOrigin(),
-                selectedCatalogId = item.colorCatalogId,
+                // The catalog the work was asked for, not only the one it
+                // resolved to: a work drawn with 自動 keeps 自動 for the next
+                // drawing, as a restored pipeline already does
+                // (`presentPipelineView`).
+                selectedCatalogId = if (item.catalogMode == "auto") CatalogSelection.AUTO_ID else item.colorCatalogId,
                 selectedCanvasAspect = item.canvasAspect,
                 sketchMode = Sketches.modeOfWork(item.sketchState, item.sketchGrain),
                 tab = tab,
@@ -1877,8 +1898,8 @@ class InkuViewModel @JvmOverloads constructor(
                 historyAuthority = history?.authority ?: view?.authority,
                 historyAuthorityLoading = false,
                 message = history?.warning
-                    ?: pipelineView.exceptionOrNull()?.let { safeErrorMessage(it, "Could not read drawing context.") }
-                    ?: managed.exceptionOrNull()?.let { safeErrorMessage(it, "Could not read drawing context.") }
+                    ?: pipelineView.exceptionOrNull()?.let { messageFor(it, strings(), strings().drawingContextUnreadable) }
+                    ?: managed.exceptionOrNull()?.let { messageFor(it, strings(), strings().drawingContextUnreadable) }
                     ?: current.message,
             )
         }
@@ -2175,7 +2196,7 @@ class InkuViewModel @JvmOverloads constructor(
     private fun runSubmit(current: InkuUiState, cameraProvenance: CameraInputProvenance? = null, sketchRedraw: Boolean = false, suppliedSketchText: String? = null) {
         if (current.descriptionLocked && !current.historyAuthorityLoading) return
         if (current.prompt.isBlank()) {
-            localState.value = current.copy(message = "Prompt is empty.")
+            localState.value = current.copy(message = strings().promptEmpty)
             return
         }
         if (current.refinementBusy) {
@@ -2226,7 +2247,7 @@ class InkuViewModel @JvmOverloads constructor(
                     localState.value = localState.value.copy(
                         isDrawing = false,
                         historyAuthorityLoading = false,
-                        message = managed?.warning ?: read.exceptionOrNull()?.let { safeErrorMessage(it, "Could not read drawing context.") } ?: "Drawing context is missing.",
+                        message = managed?.warning ?: read.exceptionOrNull()?.let { messageFor(it, strings(), strings().drawingContextUnreadable) } ?: strings().drawingContextMissing,
                     )
                     return@launch
                 }
@@ -2266,6 +2287,7 @@ class InkuViewModel @JvmOverloads constructor(
                         sketch = sketchInput,
                         parentHistoryId = current.selectedHistory?.id?.takeUnless { current.lineageDetached },
                         inputProvenance = cameraProvenance,
+                        renderWild = current.renderWild,
                     )
                 }
             }.onSuccess { item ->
@@ -2283,7 +2305,7 @@ class InkuViewModel @JvmOverloads constructor(
                         lineageDetached = false,
                         cameraCaptureState = if (cameraProvenance != null) CameraCaptureState.Idle else latest.cameraCaptureState,
                         isDrawing = false,
-                        message = "Rendered ${item.renderHashShort}",
+                        message = strings().statusRendered(item.renderHashShort),
                     )
                 }
                 if (sketchRedraw) refreshLineage()
@@ -2319,6 +2341,9 @@ class InkuViewModel @JvmOverloads constructor(
                         parentHistoryId = parentHistoryId, executionId = matchingPipelineExecutionId(current),
                         // Imported definitions reach a new work only, never an edit of a saved one.
                         importedPlugins = if (parentHistoryId == null) current.importedPlugins else emptyList(),
+                        // A DDL drawn from a work keeps that work's Wild; a new one takes the
+                        // switch (web's `targetWild`, +page.svelte:2300).
+                        renderWild = current.selectedHistory?.takeUnless { current.lineageDetached }?.drawnWild ?: current.renderWild,
                     )
                 }
             }.onSuccess { item ->
@@ -2335,7 +2360,7 @@ class InkuViewModel @JvmOverloads constructor(
                         importedPlugins = emptyList(),
                         importedPluginNames = emptyList(),
                         isDrawing = false,
-                        message = "Composed ${item.renderHashShort}",
+                        message = strings().statusComposed(item.renderHashShort),
                     )
                 }
                 if (returnToLineage) refreshLineage()
@@ -2358,7 +2383,7 @@ class InkuViewModel @JvmOverloads constructor(
             .mapIndexed { index, line -> index + 1 to line.trim() }
             .filter { it.second.isNotBlank() }
         if (lines.isEmpty()) {
-            localState.value = current.copy(message = "Batch is empty.")
+            localState.value = current.copy(message = strings().batchEmpty)
             return
         }
         if (lines.size > MaxBatchItems) {
@@ -2383,7 +2408,7 @@ class InkuViewModel @JvmOverloads constructor(
                 batchActiveElapsedMs = null,
                 batchElapsedMs = 0L,
                 batchLatestHashShort = null,
-                message = "Batch running: 0/${lines.size}",
+                message = strings().batchRunning(0, lines.size),
             )
             lines.forEachIndexed { index, (lineNumber, prompt) ->
                 val itemStartedAt = System.currentTimeMillis()
@@ -2416,6 +2441,7 @@ class InkuViewModel @JvmOverloads constructor(
                             // The prose without the line number: the same split
                             // the server keeps between `input` and `source_text`.
                             sourceText = prompt,
+                            renderWild = current.renderWild,
                         )
                     }
                 }.onSuccess { item ->
@@ -2444,7 +2470,7 @@ class InkuViewModel @JvmOverloads constructor(
                     if (error is CancellationException) throw error
                     if (!isCurrentDrawingRun(runId)) return@onFailure
                     if (presentPipelineInteraction(error)) return@launch
-                    failures = (failures + BatchFailure(lineNumber, prompt, safeErrorMessage(error, "Draw failed."))).take(30)
+                    failures = (failures + BatchFailure(lineNumber, prompt, messageFor(error, strings(), strings().statusDrawFailed))).take(30)
                     localState.value = localState.value.copy(
                         batchSuccess = success,
                         batchFailures = failures,
@@ -2460,7 +2486,10 @@ class InkuViewModel @JvmOverloads constructor(
                 lineageDetached = false,
                 ddl = last?.normalizedDdl.orEmpty(),
                 ddlEditedAfterGeneration = false,
-                prompt = last?.originalInput?.removePrefix("#${localState.value.batchActiveLine} ") ?: current.prompt,
+                // The saved prose, not `originalInput` minus a prefix: the prefix
+                // is the last line's number, which is not the last success's
+                // when the final line failed.
+                prompt = last?.let(::sourceTextOf) ?: current.prompt,
                 isDrawing = false,
                 batchCurrent = 0,
                 batchActiveLine = null,
@@ -2545,6 +2574,7 @@ class InkuViewModel @JvmOverloads constructor(
                                 // The prose without the demo marker, for the
                                 // same reason the batch line strips its number.
                                 sourceText = prompt,
+                                renderWild = cycle.renderWild,
                             )
                         }
                     }.onSuccess { item ->
@@ -2569,7 +2599,7 @@ class InkuViewModel @JvmOverloads constructor(
                         if (presentPipelineInteraction(error)) return@launch
                         localState.value = localState.value.copy(
                             demoCurrentElapsedMs = System.currentTimeMillis() - startedAt,
-                            message = safeErrorMessage(error, "Demo failed."),
+                            message = messageFor(error, strings(), strings().demoFailed),
                         )
                         delay(1000)
                     }
@@ -2620,6 +2650,7 @@ class InkuViewModel @JvmOverloads constructor(
         // :2143). The running job is cancelled first: a candidate that lands
         // after the target changed belongs to a work that is no longer here.
         refinementJob?.cancel()
+        refinementJob = null
         val previous = localState.value.refinementParent
         localState.value = localState.value.copy(
             refinementOpen = true,
@@ -2635,7 +2666,6 @@ class InkuViewModel @JvmOverloads constructor(
             // target starts from an empty one rather than from choices that were
             // legal for the last work.
             modelCompareSelectedModels = if (previous?.id == item.id) localState.value.modelCompareSelectedModels else emptyList(),
-            languageCompareSelectedCombos = if (previous?.id == item.id) localState.value.languageCompareSelectedCombos else emptyList(),
             modelCompareFixedModel = if (previous?.id == item.id) localState.value.modelCompareFixedModel else "",
             tab = AppTab.Lineage,
         )
@@ -2710,34 +2740,9 @@ class InkuViewModel @JvmOverloads constructor(
         localState.value = current.copy(modelCompareSelectedModels = next, refinementStatus = null)
     }
 
-    fun toggleLanguageCombo(comboId: String) {
-        val current = localState.value
-        if (current.refinementBusy) return
-        val combo = LanguageCombo.byId(comboId) ?: return
-        if (ComparisonPlanner.isLanguageComboBlocked(combo, targetInstructionLang(current.refinementParent))) {
-            localState.value = current.copy(refinementStatus = LANGUAGE_COMBO_BLOCKED(strings()))
-            return
-        }
-        val selected = current.languageCompareSelectedCombos
-        val next = if (comboId in selected) selected - comboId else selected + comboId
-        localState.value = current.copy(languageCompareSelectedCombos = next, refinementStatus = null)
-    }
-
-    /**
-     * The language the target work was drawn in.
-     *
-     * web reads the resolved column and falls back to the UI language
-     * (`languageInspectionTargetLang`, `state.svelte.ts:365-368`). This client
-     * has no UI-language setting, so the fallback is the same `"ja"` its
-     * instruction-language resolution uses.
-     */
-    private fun targetInstructionLang(parent: HistoryItemEntity?): String =
-        parent?.instructionLangResolved
-            ?.takeIf { it in InstructionLanguages.SUPPORTED }
-            ?: InstructionLanguages.DEFAULT_LANG
-
     fun closeRefinement() {
         refinementJob?.cancel()
+        refinementJob = null
         localState.value = localState.value.copy(
             refinementOpen = false,
             refinementParent = null,
@@ -2787,15 +2792,14 @@ class InkuViewModel @JvmOverloads constructor(
     /**
      * What to draw, for whichever sub-view is showing.
      *
-     * The three lists are built here and nowhere else, so the drawing loop below
-     * has no idea which comparison it is running -- that is what stops the two
-     * inspections from growing a second copy of it (SPEC `:688`).
+     * Both lists are built here and nowhere else, so the drawing loop below has
+     * no idea which sub-view it is running -- that is what stops the model
+     * comparison from growing a second copy of it (SPEC `:688`).
      */
     private fun candidateJobs(current: InkuUiState, parent: RefinementParent): List<CandidateJob> =
         when (current.refinementSubview) {
             RefinementSubview.Adjust -> adjustJobs(current, parent)
             RefinementSubview.Model -> modelJobs(current, parent)
-            RefinementSubview.Language -> languageJobs(current, parent)
         }
 
     private fun adjustJobs(current: InkuUiState, parent: RefinementParent): List<CandidateJob> {
@@ -2861,21 +2865,6 @@ class InkuViewModel @JvmOverloads constructor(
         }
     }
 
-    private fun languageJobs(current: InkuUiState, parent: RefinementParent): List<CandidateJob> {
-        val targetLang = targetInstructionLang(current.refinementParent)
-        val chosen = current.languageCompareSelectedCombos
-            .mapNotNull { LanguageCombo.byId(it) }
-            .filterNot { ComparisonPlanner.isLanguageComboBlocked(it, targetLang) }
-        if (chosen.isEmpty()) throw InkuFailure(LANGUAGE_SELECT_PROMPT)
-        return chosen.map { combo ->
-            CandidateJob(
-                id = combo.id,
-                label = "${languageLabel(combo.stage1)} / ${languageLabel(combo.stage2)}",
-                plan = ComparisonPlanner.languagePlan(combo, parent),
-            )
-        }
-    }
-
     /**
      * Draws the candidates.
      *
@@ -2906,7 +2895,7 @@ class InkuViewModel @JvmOverloads constructor(
             refinementCandidates = emptyList(),
             refinementPreviewId = null,
         )
-        refinementJob = viewModelScope.launch {
+        val run = viewModelScope.launch {
             // The stop appears three seconds in, not at once: a candidate that
             // is already done needs no stop button.
             val abortTimer = launch {
@@ -2951,15 +2940,32 @@ class InkuViewModel @JvmOverloads constructor(
                 }
             }.onFailure { error ->
                 if (error is CancellationException) throw error
-                if (!presentPipelineInteraction(error)) {
+                // A candidate that stops for the author's attention is not a
+                // drawing to resume. web keeps the failure in its grid
+                // (`failGrid`) and moves nowhere; here the candidate's execution
+                // used to be presented as the drawing, closing the refinement,
+                // and it came back at every start as the drawing in progress.
+                // It is cancelled now, and the failure stays in the panel.
+                if (error is PipelineInteractionRequired) {
+                    withContext(NonCancellable + Dispatchers.IO) {
+                        runCatching { repository.cancelPipeline(error.view.executionId) }
+                    }
+                    localState.value = localState.value.copy(refinementStatus = strings().refinementFailed)
+                } else {
                     localState.value = localState.value.copy(refinementStatus = messageFor(error, strings(), strings().refinementFailed))
                 }
             }
             abortTimer.cancel()
             localState.value = localState.value.copy(refinementBusy = false, refinementCanAbort = false)
         }
-        refinementJob?.invokeOnCompletion { cause ->
-            if (cause is CancellationException) {
+        refinementJob = run
+        run.invokeOnCompletion { cause ->
+            // Only the run that still owns the refinement reports a stop. A run
+            // cancelled because the target changed or the refinement closed
+            // ends later -- a candidate being drawn is not interrupted -- and
+            // would otherwise mark the next target's run as stopped and idle
+            // while that run is still drawing, reopening every generate button.
+            if (cause is CancellationException && refinementJob === run) {
                 localState.value = localState.value.copy(
                     refinementBusy = false,
                     refinementCanAbort = false,
@@ -3112,7 +3118,7 @@ class InkuViewModel @JvmOverloads constructor(
             runCatching {
                 repository.acceptModelLicense(modelId)
             }.onFailure { error ->
-                localState.value = localState.value.copy(message = safeErrorMessage(error, "License update failed."))
+                localState.value = localState.value.copy(message = messageFor(error, strings(), strings().licenseUpdateFailed))
             }
         }
     }
@@ -3277,6 +3283,72 @@ class InkuViewModel @JvmOverloads constructor(
         }
     }
 
+    fun setHistoryTrashView(on: Boolean) {
+        localState.value = localState.value.copy(historyTrashView = on)
+    }
+
+    fun clearWorkNotice() {
+        localState.value = localState.value.copy(workNotice = null)
+    }
+
+    /**
+     * Moves a work to the trash: web's `/api/history/trash`, the server's
+     * `HistoryTrashStateWriter.trash_items`. Only the flag moves -- the
+     * lineage keeps the node, and the work can be brought back. A work on
+     * screen stays there marked as in the trash, as web keeps its current
+     * item with `trashed: true`, and the lineage is read again so its card
+     * says so.
+     */
+    fun trashWork(item: HistoryItemEntity) {
+        viewModelScope.launch {
+            repository.trash(item.id)
+            afterTrashFlagChanged(item.id, trashed = true, notice = strings().workTrashed)
+        }
+    }
+
+    fun restoreWork(id: String) {
+        viewModelScope.launch {
+            repository.restore(id)
+            afterTrashFlagChanged(id, trashed = false, notice = strings().workRestored)
+        }
+    }
+
+    /**
+     * Deletes a work in the trash for good: web's `/api/history/permanent-delete`
+     * from its trash view, which the server limits to rows already in the
+     * trash (`require_trashed`). A work that is not in the trash is left alone.
+     * The lineage keeps a tombstone in the work's place.
+     */
+    fun deleteWorkForGood(id: String) {
+        viewModelScope.launch {
+            val row = repository.getHistoryById(id) ?: return@launch
+            if (!row.trashed) return@launch
+            repository.deleteHistoryPermanently(id)
+            val current = localState.value
+            localState.value = if (current.selectedHistory?.id == id) {
+                current.copy(
+                    selectedHistory = null,
+                    lineageDetached = true,
+                    lineageGraph = null,
+                    pipelineView = null,
+                    historyAuthority = null,
+                    workNotice = strings().workDeleted,
+                )
+            } else {
+                current.copy(workNotice = strings().workDeleted)
+            }
+        }
+    }
+
+    private fun afterTrashFlagChanged(id: String, trashed: Boolean, notice: String) {
+        val current = localState.value
+        localState.value = current.copy(
+            selectedHistory = current.selectedHistory?.let { if (it.id == id) it.copy(trashed = trashed) else it },
+            workNotice = notice,
+        )
+        if (current.tab == AppTab.Lineage) refreshLineage()
+    }
+
     private fun validateSelectedModels(state: InkuUiState): String? =
         validateModelsForRun(state)
 
@@ -3321,10 +3393,8 @@ class InkuViewModel @JvmOverloads constructor(
             ?.let { JSONObject(it).optBoolean("enabled", current.displaySafeMarginsEnabled) }
             ?: if (legacyPixel9Paper) true else current.displaySafeMarginsEnabled
         val pngAlpha = settings["png_alpha_white"]?.let { JSONObject(it).optBoolean("enabled", current.pngAlphaWhite) } ?: current.pngAlphaWhite
-        val replay = settings["save_replay_as_new_version"]?.let { JSONObject(it).optBoolean("enabled", current.saveReplayAsNewVersion) } ?: current.saveReplayAsNewVersion
-        val histCanvas = settings["history_selection_canvas"]?.let { parseHistorySelection(JSONObject(it).optString("value")) } ?: current.historySelectionCanvas
-        val histCatalog = settings["history_selection_catalog"]?.let { parseHistorySelection(JSONObject(it).optString("value")) } ?: current.historySelectionCatalog
         val cameraVisionModelId = CameraVisionModelSetting.decode(settings[CameraVisionModelSetting.KEY])
+        val renderWild = settings[SETTING_KEY_RENDER_WILD]?.let { JSONObject(it).optBoolean("enabled", current.renderWild) } ?: current.renderWild
         val uiMode = settings["ui_mode"]?.let { JSONObject(it).optString("value", current.uiMode) } ?: current.uiMode
         // A stored code that is not one of the two falls back to Japanese
         // rather than being rejected -- the same thing the server does with an
@@ -3349,15 +3419,19 @@ class InkuViewModel @JvmOverloads constructor(
         val thinking = modelSelection?.optBoolean("include_thinking", current.includeThinking)
             ?: settings["include_thinking"]?.let { JSONObject(it).optBoolean("enabled", current.includeThinking) }
             ?: current.includeThinking
+        // A work picked while this was reading -- the latest one at start-up,
+        // or the reader's own pick -- has already set the catalog and canvas it
+        // was drawn with. The saved values are for a start with no work on
+        // screen; laid over a pick, they made the result depend on which of the
+        // two reads finished last.
+        val picked = current.selectedHistory != null
         localState.value = current.copy(
-            selectedCatalogId = CatalogSelection.normalizedSelectionId(catalog),
-            selectedCanvasAspect = CanvasAspects.newSelectionOrDefault(canvas),
+            selectedCatalogId = if (picked) current.selectedCatalogId else CatalogSelection.normalizedSelectionId(catalog),
+            selectedCanvasAspect = if (picked) current.selectedCanvasAspect else CanvasAspects.newSelectionOrDefault(canvas),
             displaySafeMarginsEnabled = displaySafeMargins,
             pngAlphaWhite = pngAlpha,
-            saveReplayAsNewVersion = replay,
-            historySelectionCanvas = histCanvas,
-            historySelectionCatalog = histCatalog,
             cameraVisionModelId = cameraVisionModelId,
+            renderWild = renderWild,
             bundledPluginsEnabled = bundledPluginsEnabled,
             bundledPluginWordsJa = bundledPluginWords.first,
             bundledPluginWordsEn = bundledPluginWords.second,
@@ -3407,10 +3481,6 @@ class InkuViewModel @JvmOverloads constructor(
         return (0 until array.length()).mapNotNull { index ->
             array.optString(index).trim().takeIf { it.isNotBlank() }
         }.take(10)
-    }
-
-    private fun parseHistorySelection(value: String): HistorySelectionBehavior {
-        return if (value == "history") HistorySelectionBehavior.History else HistorySelectionBehavior.Current
     }
 
     /**

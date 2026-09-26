@@ -33,6 +33,7 @@ object InkuStringsEn : InkuStrings {
     override val productionTools = "Studio tools"
     override val reviseWork = "Refine this work"
     override val interpretationToggle = "View interpretation"
+    override val interpretationHide = "Hide interpretation"
 
     // 生成 is not "generating": Stage 1 interprets and Stage 2 performs, which is
     // what those stages are called throughout (GLOSSARY §2).
@@ -44,6 +45,12 @@ object InkuStringsEn : InkuStrings {
     override val statusComposeFailed = "Composing failed."
     override val statusSaved: (String) -> String = { hash -> "Saved $hash" }
     override val statusSaveFailed = "Saving failed."
+    override val restoreDrawingFailed = "Could not restore the last drawing."
+    override val pipelineDeclineFailed = "Could not decline the DDL changes."
+    override val drawingContextUnreadable = "Could not read the drawing context."
+    override val drawingContextMissing = "The drawing context is missing."
+    override val demoFailed = "The demo drawing failed."
+    override val licenseUpdateFailed = "Could not save the license acceptance."
     override val pipelineProposal = "Review the proposed DDL changes."
     override val pipelineOriginalDdl = "Current DDL"
     override val pipelineProposedDdl = "Proposed DDL"
@@ -115,9 +122,6 @@ object InkuStringsEn : InkuStrings {
     override val comparisonModelFixedMissing = "Select the model to hold fixed."
     override val comparisonModelChoiceBlocked =
         "The target work's own Stage 1/2 pairing cannot be chosen."
-    override val comparisonLanguageSelectPrompt = "Select one or more pairings to compare."
-    override val comparisonLanguageComboBlocked =
-        "The target work's own language pairing cannot be chosen."
     override val comparisonModeLabel: (String) -> String = { id ->
         when (id) {
             "common" -> "Stage 1/2 shared"
@@ -130,7 +134,6 @@ object InkuStringsEn : InkuStrings {
         when (id) {
             "adjust" -> "Adjust"
             "model" -> "Model"
-            "language" -> "Language"
             else -> id
         }
     }
@@ -138,7 +141,6 @@ object InkuStringsEn : InkuStrings {
         when (id) {
             "adjust" -> "Edit the drawing elements"
             "model" -> "Edit the models"
-            "language" -> "Edit the languages"
             else -> id
         }
     }
@@ -205,14 +207,6 @@ object InkuStringsEn : InkuStrings {
     override val modelNotDownloadedYet: (String, String, String) -> String = { stage, name, state ->
         "$name for $stage has not been downloaded. Finish the download in model settings. Currently: $state"
     }
-    override val modelRecommendationReason: (String) -> String = { id ->
-        when (id) {
-            "stage1_default" -> "Recommended default for Stage 1. Balances composition and color well"
-            "stage1_derived" -> "Recommended alternative for Stage 1. Expressive and stable"
-            "stage2_default" -> "Recommended default for Stage 2. Expands the instructions precisely"
-            else -> id
-        }
-    }
 
     override val errorServiceIdFormat = "A Service ID may hold letters, digits, _ and - only."
     override val errorServiceNotFound: (String) -> String = { id -> "Service not found: $id" }
@@ -255,20 +249,18 @@ object InkuStringsEn : InkuStrings {
     override val baseUrlChange = "Change the Base URL"
     override val drawFromDdl = "Draw from instructions"
     override val ddlOverwriteTitle = "The edited instructions will be lost"
-    override val ddlReplaySaveAsNew = "Save a redraw from instructions as a new history entry"
     override val ddlEdit = "DDL edit"
     override val mascotSubtitle = "Incu (cube) or Yuragi (crab)"
     override val mascotIncu = "Incu (cube)"
     override val localModelNote = "Gemma models that run on the device through LiteRT-LM."
     override val exportPngTooLarge = "The PNG is too large to write. Lower the canvas ratio or the output size."
-    override val pngAlphaWhite = "White ground behind a transparent PNG"
+    // Web's wording (`settingsPngAlpha`); the earlier label read the opposite way.
+    override val pngAlphaWhite = "Enable alpha channel on white background"
     override val stagesShared = "Stage 1 / Stage 2 shared"
-    override val languageComboNote = "Choose a pairing of Stage 1 and Stage 2 languages."
     override val uiModeSubtitle = "Interface density and layout"
     override val displaySafeMarginsSubtitle = "Avoids camera cutouts and screen edges in full screen without changing the paper ratio."
     override val displaySafeMarginsToggle = "Use horizontal safe areas"
     override val exportSubtitle = "The web export settings"
-    override val historySelectionSubtitle = "The web history settings"
     override val svgDisplayNote = "Standard SVG for viewing on the web"
     override val mascotYuragi = "Yuragi (crab)"
     override val exportHeightPx = "Y axis px"
@@ -312,6 +304,21 @@ object InkuStringsEn : InkuStrings {
     override val uiModeFullLong = "Full layout"
     override val promptLabel = "Description"
     override val searchPlaceholderLong = "Search descriptions, hashes and models"
+    override val noMatchingWorks = "No works match."
+    override val moveToTrash = "Move to trash"
+    override val trashedBadge = "In the trash"
+    override val trashView: (Int) -> String = { count -> "Trash ($count)" }
+    override val trashEmpty = "The trash is empty."
+    override val restoreWork = "Restore"
+    override val deleteForGood = "Permanently delete"
+    override val confirmTrash: (Int) -> String = { count -> "Move $count item${if (count == 1) "" else "s"} to trash?" }
+    override val confirmRestore: (Int) -> String = { count -> "Restore $count item${if (count == 1) "" else "s"}?" }
+    override val confirmDeleteForGood: (Int) -> String = { count -> "Permanently delete $count item${if (count == 1) "" else "s"}? This cannot be undone." }
+    override val confirmRun = "Run"
+    override val workTrashed = "Moved to the trash."
+    override val workRestored = "Brought back from the trash."
+    override val workDeleted = "Deleted for good."
+    override val trashedWorkNote = "This work is in the trash."
     override val mascotTitle = "Mascot"
     override val model = "Model"
     override val modelListFetch = "Fetch the model list"
@@ -341,7 +348,6 @@ object InkuStringsEn : InkuStrings {
     override val selectAll = "Select all"
     override val noPublishedModels = "No models have been offered."
     override val noPublishedModelsLong = "No models have been offered. Select models in the service settings."
-    override val unifiedModelNote = "Storage and history metadata keep the server’s stage1_model / stage2_model, and this interface applies one model to both stages."
     override val downloadAgain = "Download again"
     override val sketchFromLife = "Sketch from life"
     override val workActionSketchRedraw = "Redraw with or without sketch from life"
@@ -355,7 +361,6 @@ object InkuStringsEn : InkuStrings {
     override val downloadable = "Ready to download"
     override val downloaded = "Downloaded"
     override val downloadState = "Download state"
-    override val cancelShort = "Cancel"
     override val accepted = "Accepted"
     override val name = "Name"
     override val fixedStage1Model = "Stage 1 model to hold fixed"
@@ -366,10 +371,7 @@ object InkuStringsEn : InkuStrings {
     override val demoRunAndSeed = "Run and seed phrase"
     override val sameStagePairBlocked = "Only the target work's own Stage 1/2 pairing cannot be chosen."
     override val history = "History"
-    override val historyValue = "The history's value"
-    override val historySelection = "History selection"
     override val showThinking = "Show the thinking"
-    override val openProviderSettings = "Open the service settings"
     override val providerKind = "Connection type"
     override val paint = "Paint"
     override val drawingModel = "Drawing model"
@@ -388,7 +390,6 @@ object InkuStringsEn : InkuStrings {
     override val saijiki = "Saijiki"
     override val svgGeneric = "Generic SVG"
     override val confirm = "OK"
-    override val keepCurrentValue = "Keep the current value"
     override val producedInstructions = "Instructions (normalized DDL)"
     override val producedInterpretation = "Interpretation"
     override val working = "Working…"
@@ -410,8 +411,7 @@ object InkuStringsEn : InkuStrings {
     override val autoRepair = "Auto-repair"
     override val interpretation = "Interpretation"
     override val awaitingInterpretation = "Waiting for the interpretation…"
-    override val language = "Language"
-    override val miscSubtitle = "Language, theme and density"
+    override val miscSubtitle = "Language, text size and display"
     override val description = "Description"
     override val camera = "Camera"
     override val cameraInputSourceTitle = "Choose an image"
@@ -458,7 +458,6 @@ object InkuStringsEn : InkuStrings {
     override val ddlOverwriteBody = "Painting normally replaces the current interpretation (the normalized DDL) with what Stage 1 produces."
     override val selected = "Selected"
     override val close = "Close"
-    override val sameAsTargetSuffix = " (same as the target)"
     override val renderTabArtwork = "Work"
     override val generationInfoTitle = "Provenance"
     override val generationInfoInputSection = "Input"
@@ -506,7 +505,6 @@ object InkuStringsEn : InkuStrings {
     override val generationInfoElapsed = "Elapsed"
     override val generationInfoOn = "On"
     override val generationInfoOff = "Off"
-    override val recommendedStageSuffix: (Int) -> String = { stage -> " (recommended for S$stage)" }
     override val parentSuffix: (String, String) -> String = { hash, catalog -> " parent: $hash / $catalog" }
     override val downloadOf: (String) -> String = { name -> "Download $name" }
     override val choiceSameAsTarget: (String) -> String = { label -> "$label (same as the target)" }
@@ -515,6 +513,7 @@ object InkuStringsEn : InkuStrings {
     override val filteredOfTotal: (Int, Int) -> String = { filtered, total -> "$filtered of $total" }
     override val groupAlternatives: (String) -> String = { group -> "$group / alternatives" }
     override val lineNumber: (Int) -> String = { line -> "line $line" }
+    override val batchHistoryPill: (String, Int) -> String = { first, lines -> "$first ($lines line${if (lines == 1) "" else "s"})" }
     override val ofOneHundred: (Int) -> String = { count -> "$count of 100" }
     override val apiKeyDeleteBody: (String) -> String = { name -> "Deletes the stored API key for $name." }
     override val serviceDeleteBody: (String) -> String = { name -> "Removes $name from the model services." }
@@ -533,4 +532,19 @@ object InkuStringsEn : InkuStrings {
     override val batchProgress: (Int, Int) -> String = { current, total -> "Progress $current / $total" }
 
     override val exportTemplateBuiltinDescription: (Int) -> String = { px -> "PNG / Y axis ${px}px" }
+
+    override val stateExpanded = "Expanded"
+    override val stateCollapsed = "Collapsed"
+    override val worksScrollbarDescription = "Works scrollbar"
+    override val listSeparator = ", "
+    override val statusRendered: (String) -> String = { hash -> "Rendered F$hash" }
+    override val statusComposed: (String) -> String = { hash -> "Composed F$hash" }
+    override val promptEmpty = "The description is empty."
+    override val batchEmpty = "The batch is empty."
+    override val hashCopied = "Hash copied."
+    override val exportPreparing: (String) -> String = { format -> "Preparing $format…" }
+    override val exportDone: (String, String) -> String = { format, hash -> "$format exported F$hash" }
+    override val exportFailed: (String) -> String = { format -> "$format export failed." }
+    override val copy = "Copy"
+    override val providerLabel = "Provider"
 }

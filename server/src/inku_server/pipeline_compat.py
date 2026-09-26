@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import time
 from collections.abc import Iterator
 from typing import Any
@@ -13,7 +14,13 @@ from sqlalchemy.orm import Session
 from .persistence.schema import HistoryRow
 
 
+_logger = logging.getLogger(__name__)
 _POLL_SECONDS = 0.025
+# While nothing settles, the stream still writes a line this often. The web
+# server's proxy (Node's fetch) drops a body silent for 300 s, as long as one
+# Stage 1 attempt may take; and a reader that has left is noticed only when a
+# line is written, so this also bounds how long its run goes on.
+_WAIT_EVENT_SECONDS = 10.0
 
 
 def _service():
@@ -297,12 +304,38 @@ def paint_events(owner: str, data: dict[str, Any], idempotency_key: str | None) 
     view = _start_paint(owner, data, idempotency_key)
     service = _service()
     sent: set[str] = set()
-    while True:
+    last_line = time.monotonic()
+    try:
+        while True:
+            for event in _progress(owner, view, started, sent):
+                last_line = time.monotonic()
+                yield event
+            if not view.get("busy"):
+                break
+            if time.monotonic() - last_line >= _WAIT_EVENT_SECONDS:
+                last_line = time.monotonic()
+                yield {"event": "wait", "elapsed_ms": int((last_line - started) * 1000)}
+            time.sleep(_POLL_SECONDS)
+            view = service.get(owner, view["variation_id"])
+        view = _settled(owner, view, perform=True)
         yield from _progress(owner, view, started, sent)
-        if not view.get("busy"):
-            break
-        time.sleep(_POLL_SECONDS)
-        view = service.get(owner, view["variation_id"])
-    view = _settled(owner, view, perform=True)
-    yield from _progress(owner, view, started, sent)
+    except GeneratorExit:
+        _end_abandoned_run(owner, view)
+        raise
     yield {"event": "done", **view["result"], **_identity(view)}
+
+
+def _end_abandoned_run(owner: str, view: dict) -> None:
+    """Cancel the run of a stream whose reader has gone (a stop, a closed page).
+
+    Otherwise the run kept a pipeline worker and went on calling the model
+    through every retry, and a retry of the same request started a second run.
+    Closing the stream must not raise, so a failure here is only logged.
+    """
+    try:
+        service = _service()
+        current = service.get(owner, view["variation_id"])
+        if current.get("busy"):
+            service.command(owner, current["execution_id"], {"tag": "cancel"})
+    except Exception:  # noqa: BLE001
+        _logger.warning("paint stream: could not cancel the abandoned run", exc_info=True)

@@ -6,9 +6,10 @@ import itertools
 import json
 import logging
 import secrets
-from collections.abc import Iterator
+from collections.abc import AsyncIterator, Iterator
 from typing import Literal
 
+import anyio
 from fastapi import APIRouter, Depends, Header, HTTPException, Response
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field, field_validator
@@ -583,6 +584,26 @@ def api_paint(
     )
 
 
+def _next_or_none(iterator: Iterator[str]) -> str | None:
+    return next(iterator, None)
+
+
+async def _closing_in_threadpool(iterator: Iterator[str]) -> AsyncIterator[str]:
+    """Read a blocking generator off the event loop and close it however the
+    read ends.
+
+    Starlette's own threadpool reader, on a client disconnect, drops the
+    generator and leaves its closing to garbage collection, so the run of a
+    reader that had left was cancelled late or never.
+    """
+    try:
+        while (chunk := await anyio.to_thread.run_sync(_next_or_none, iterator)) is not None:
+            yield chunk
+    finally:
+        with anyio.CancelScope(shield=True):
+            await anyio.to_thread.run_sync(iterator.close)
+
+
 @router.post("/api/paint/stream")
 def api_paint_stream(
     req: PaintRequest,
@@ -616,9 +637,12 @@ def api_paint_stream(
                 {"event": "error", "status": 500, "detail": "unexpected error"},
                 ensure_ascii=False,
             ) + "\n"
+        finally:
+            # Closing the events cancels a run still going (SPEC §12.10).
+            events.close()
 
     return StreamingResponse(
-        lines(),
+        _closing_in_threadpool(lines()),
         media_type="application/x-ndjson",
         headers={"Cache-Control": "no-store", "X-Accel-Buffering": "no"},
     )

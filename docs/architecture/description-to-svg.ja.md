@@ -194,7 +194,7 @@ hostは信頼済みのrender option（解決済みcolor map、render seed、wild
 - providerとの送受信の原文は、developer modeで`developer_capture_provider_io`を指定した実行だけ、所有者限定の記録として残り、`/api/pipeline/executions/{id}/provider-observations`で読める。通常の履歴・応答・logには入らない。
 - Stage 1（作品計画）とhole completion（Stage 2）がproviderへ送ったsystem promptは、実行ごとに各Stageの最後の送信だけを実行のcontextに残す（再試行ではcompilerの指摘を含む最後の送信）。所有者だけが`/api/pipeline/variations/{id}/system-prompts`で読み、Webの生成情報のプロンプトタブが表示する。modelを呼ばなかったStageはnull、この記録より前の実行は`recorded: false`になる。
 - streamは実行を読み直し、`sketch`（写生を通した場合）・`stage1`（保存したDDL）・`score`（instruction数）・`done`（通常応答）の順に知らせる。最初のeventより前の失敗はHTTPの状態そのもので届き、最初のeventが出た後の失敗（補完案の承認待ちを含む）は本文の`error` eventで届く。token数は共有pipelineが数えないためnullである。
-- modelの呼出しを待つ間、実行中のviewは`provider_attempt`（効果の種類、1始まりの試行番号、その段の再試行の上限、待ちと制限時間）を持つ。数え方と上限は共有coreが保存済みsnapshotから返し（`pipeline_provider_attempt`）、Serverは自分で始めた試行にだけ締切`deadline_at`（epoch ms）を足す。streamは試行が始まるたびと、最後の試行が終わったとき（null）に`attempt`を送る。Webの描画中の表示は、1回目を「応答待ち」、2回目以降を「再試行中」として回数を出す。
+- modelの呼出しを待つ間、実行中のviewは`provider_attempt`（効果の種類、1始まりの試行番号、その段の再試行の上限、待ちと制限時間）を持つ。数え方と上限は共有coreが保存済みsnapshotから返し（`pipeline_provider_attempt`）、Serverは自分で始めた試行にだけ締切`deadline_at`（epoch ms）を足す。streamは試行が始まるたびと、最後の試行が終わったとき（null）に`attempt`を送る。何も落ち着かない間も10秒ごとに`wait`を送り（無通信の本文を中継が打ち切らないように）、読み手が去った（停止、ページを閉じた）実行は取り消す。Webの描画中の表示は、1回目を「応答待ち」、2回目以降を「再試行中」として回数を出す。
 
 ## 判定の一覧
 

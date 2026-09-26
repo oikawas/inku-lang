@@ -1563,19 +1563,31 @@ async function drawLineageDescriptionEdit(node: LineageNode, text: string, signa
 	// Ask before the words are carried into a child (contract § stage 4).
 	if (!(await work.confirmFallbackRefine(node.history))) return;
 	if (!(await work.selectHistoryAuthority(node.history.id, node.history.pipeline_variation_id, signal))) return;
-	const view = await work.authorDescription(sourceText, {
-		sourceText,
-		canvasAspectId: lineageCanvasAspectId(node),
-		lineageParentNodeId: node.id,
-		derivationKind: 'description_edit',
-		derivationMetadata: { edited_from_history_id: node.history.id ?? null },
-		// null override = inherit the parent work's setting.
-		renderOverrides: {
-			...colorCatalogOverride(lineageCatalogId(node)),
-			...wildOverride(wild ?? node.history.render_wild === true)
-		},
-	}, signal);
-	await showNewLineageChild(view.result?.history_id, view.result?.lineage_node_id);
+	// The edit dialog's stop aborts `signal`, which reaches only the request
+	// that starts the run; cancel the run as the DDL dialog does. Without this
+	// the stop did nothing until every attempt had timed out.
+	const cancelRun = () => work.cancelPipelineRun();
+	signal?.addEventListener('abort', cancelRun, { once: true });
+	try {
+		const view = await work.authorDescription(sourceText, {
+			sourceText,
+			canvasAspectId: lineageCanvasAspectId(node),
+			lineageParentNodeId: node.id,
+			derivationKind: 'description_edit',
+			derivationMetadata: { edited_from_history_id: node.history.id ?? null },
+			// null override = inherit the parent work's setting.
+			renderOverrides: {
+				...colorCatalogOverride(lineageCatalogId(node)),
+				...wildOverride(wild ?? node.history.render_wild === true)
+			},
+		}, signal);
+		// A cancelled run hands back its last view instead of throwing; a stop
+		// keeps the dialog open all the same.
+		signal?.throwIfAborted();
+		await showNewLineageChild(view.result?.history_id, view.result?.lineage_node_id);
+	} finally {
+		signal?.removeEventListener('abort', cancelRun);
+	}
 }
 
 /** Redraw a saved work with the sketch off or on, as its child. The

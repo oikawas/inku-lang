@@ -1720,11 +1720,14 @@ implementation order.
 layer ran), `stage1`, `score`, and `done`. It also sends `attempt` whenever a
 model-call attempt begins and once the last one has ended; its
 `provider_attempt` holds `action`, `attempt`, and `max_attempts`, and is null
-at the end. `stage1` can expose normalized DDL and diagnostic metadata before
-drawing completes; `done` carries the normal response. "Another composition"
-and "Paint from DDL" resume from saved DDL without calling Stage 1 again. A
-separate Stage 1 cache and future parallelism are not part of the current
-contract.
+at the end. While nothing settles it still sends `wait`, with the elapsed time
+only, every 10 seconds: a proxy drops a silent body (the Web's Node proxy after
+300 seconds), and a reader's leaving is noticed only when a line is written.
+The run of a reader that has left (a stop, a closed page) is cancelled.
+`stage1` can expose normalized DDL and diagnostic metadata before drawing
+completes; `done` carries the normal response. "Another composition" and "Paint
+from DDL" resume from saved DDL without calling Stage 1 again. A separate Stage
+1 cache and future parallelism are not part of the current contract.
 
 ### 12.11 The Intermediate Filter (Stage 1.5)
 

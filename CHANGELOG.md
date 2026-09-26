@@ -11,6 +11,7 @@ This file records changes chronologically. If a historical note conflicts with t
 - **The Web running indicator shows "Awaiting reply (try 1/4)" and "Retrying (try 2/4)".** When a model call such as Stage 1 timed out on its first attempt, the screen showed only elapsed time, and a retry could not be told from a slow answer (the Server source review's W4). It appears for a single drawing, drawing from DDL, a redraw from the lineage, batches, and the demo.
 - **A running view carries `provider_attempt`.** The shared core reports the attempt, the stage's most attempts, and the wait and time limit (`pipeline_provider_attempt`); when the Server began the attempt itself, it adds the deadline `deadline_at` (epoch ms). `/api/paint/stream` sends `attempt` whenever an attempt begins and once the last one has ended. With an older native wheel that lacks the call, neither appears.
 - Web: the left input panel could scroll sideways and cut off the left of every row (a sideways trackpad swipe or a focus move did it). The bubbles of the "Edit" buttons at its right edge (model and color catalog) reached past the panel even while hidden; they now extend leftward from the button.
+- Web: the grey band behind a bracketed comment in the description field sat 1px up and left of its words and wrapped 2px wider. Only that field's textarea draws a 1px border, and the band's layer did not allow for it (the batch field has no border and was aligned).
 
 The route count (107) is unchanged. DDL, Score, and render versions are unchanged.
 

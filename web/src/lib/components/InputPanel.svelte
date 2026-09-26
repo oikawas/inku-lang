@@ -515,6 +515,9 @@
 		background: var(--panel);
 		border-radius: var(--r);
 	}
+	/* The textarea draws its own 1px border and the mirror has none, so the
+	   grey band sat 1px up and left of its words, and wrapped 2px wider. */
+	.input-ta-wrap :global(.label-mirror) { inset: 1px; }
 	.input-ta {
 		width: 100%; padding: 9px 10px;
 		border: 1px solid var(--border2); border-radius: var(--r);

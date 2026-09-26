@@ -72,6 +72,9 @@
 		statusStage2Model: string;
 		statusStage1ModelOnly: string;
 		statusStage2ModelOnly: string;
+		/** The models a redraw started here calls: the page's choice, not the displayed work's. */
+		runStage1ModelLabel: string;
+		runStage2ModelLabel: string;
 		visionModel: string;
 		okugakiModel: string;
 		visionProviderGroups: ProviderGroup[];
@@ -212,6 +215,8 @@
 		statusStage2Model,
 		statusStage1ModelOnly,
 		statusStage2ModelOnly,
+		runStage1ModelLabel,
+		runStage2ModelLabel,
 		visionModel,
 		okugakiModel,
 		visionProviderGroups,
@@ -823,8 +828,8 @@
 						onOpenNodeInCanvas={onOpenLineageNodeInCanvas} onToggleStar={onToggleLineageStar}
 						onToggleForRevision={onToggleLineageForRevision} onOpenRefinement={openLineageRefinement}
 						onDrawDescription={onDrawLineageDescription} onOpenDdlEditor={onOpenLineageDdlEditor}
-						onDrawSketchGrain={onDrawLineageSketchGrain} {stageLabel} stage1ModelLabel={statusStage1Model}
-						stage2ModelLabel={statusStage2Model} {runTokensIn} {runTokensOut} {runAttempt} onSaveOkugakiModel={onSaveOkugakiModel}
+						onDrawSketchGrain={onDrawLineageSketchGrain} {stageLabel} stage1ModelLabel={runStage1ModelLabel}
+						stage2ModelLabel={runStage2ModelLabel} {runTokensIn} {runTokensOut} {runAttempt} onSaveOkugakiModel={onSaveOkugakiModel}
 						{onSaveVisionModel} onPromoteNode={onPromoteLineageNode} onSaveNote={onSaveLineageNote}
 						onAskTrash={onAskTrashLineage} onDetach={onDetachLineage} onLoadOverview={onLoadLineageOverview}
 						onLoadBranch={onLoadLineageBranch} {onPaintOne} {onVisionAdvice} {visionModel} {okugakiModel}
@@ -901,8 +906,8 @@
 		mode={directEditMode}
 		{isJapanese}
 		{stageLabel}
-		stage1ModelLabel={statusStage1Model}
-		stage2ModelLabel={statusStage2Model}
+		stage1ModelLabel={runStage1ModelLabel}
+		stage2ModelLabel={runStage2ModelLabel}
 		tokensIn={runTokensIn}
 		tokensOut={runTokensOut}
 		attempt={runAttempt}

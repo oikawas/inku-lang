@@ -2919,6 +2919,8 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				{statusStage2Model}
 				{statusStage1ModelOnly}
 				{statusStage2ModelOnly}
+				runStage1ModelLabel={work.stage1ModelLabel}
+				runStage2ModelLabel={work.stage2ModelLabel}
 				visionModel={qualifiedModelId(visionProvider, visionModel)}
 				{okugakiModel}
 				visionProviderGroups={availableVisionModelCatalog}

@@ -14,6 +14,14 @@ The API's JSON answers now carry `render_seed` and `composition_seed` as decimal
 
 Seeds in the CLI's output become strings too. Android does not read these answers. The route count (107) is unchanged. DDL, Score, and render versions are unchanged.
 
+### 2026-09-27 — faster number writing, checked host colors, and saved-Score replay refusals by reason
+
+- **Writing numbers into the SVG is about 2.7 times as fast.** About a fifth of drawing CPU time went into writing coordinates and other values to six decimals. The digits are now written directly from a whole count of millionths; only values whose rounding lies right next to a half, large values and non-finite values go through the formatter as before. The output does not change by a single character (the 12,799 saved renders are identical, and a test matches the formatter on 200,000 values).
+- **Host color values are checked.** Color values are written into SVG attributes as they are. A value that is not `#rrggbb` (a `url(...)`, a word, hex without `#`) is not drawn: a named color takes its default, a catalog entry or other key is left out, and drawing continues. The render metadata's `render_warnings` records `invalid_color` with the color's name, never its value, for hosts to show and log. The values today's Server and Android pass are all `#rrggbb`, so drawings do not change.
+- **Saved-Score replay (`render_saved`) refuses by reason.** Every failure used to be `invalid_saved_performance`. The resource authority (`resource_authority`), a stopped performance (`performance_stopped`), an invalid Score (`invalid_score`), a mark too large (`mark_too_large`), output too large (`output_too_large`) and a non-finite value (`non_finite_value`) are now told apart, with the core's reason in `message`. Unreadable input keeps `invalid_saved_performance`, and a panic is `internal_invariant`. The binding version is unchanged; this only adds codes.
+
+DDL, Score, and render versions are unchanged.
+
 ### 2026-09-26 — a refusal over a non-finite value names the instruction
 
 When a coordinate or another drawn number became non-finite (`NaN`, `inf`), the render core refused the drawing with "rendered SVG contains a non-finite value", without saying which instruction made it. The function that writes numbers into the SVG now counts non-finite ones, and drawing checks the count per instruction. The refusal adds the first such instruction, as in "… from instruction 1". Whether and when a drawing is refused does not change: the final search of the whole SVG stays, because a few numbers are written without that function. Drawing results do not change (the 12,799 saved renders are identical).

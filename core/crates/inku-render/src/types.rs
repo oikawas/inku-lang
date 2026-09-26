@@ -102,6 +102,18 @@ pub struct RenderResourceExecution {
     pub relation_omissions: Vec<inku_score::SavedScoreRelationDiagnostic>,
 }
 
+/// Something the renderer replaced so that it could keep drawing.
+///
+/// Hosts show it with the work and log it; the drawing itself went ahead.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum RenderWarning {
+    /// A host color value that was not `#rrggbb`. A named color was drawn in
+    /// its default; a catalog entry (`palette:…`) or other key was left out.
+    /// Only the name is kept, never the value.
+    InvalidColor { name: String },
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct RenderMetadata {
     pub render_engine_id: String,
@@ -117,6 +129,8 @@ pub struct RenderMetadata {
     pub execution: Option<ScoreExecutionSummary>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub resource_execution: Option<RenderResourceExecution>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub render_warnings: Vec<RenderWarning>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]

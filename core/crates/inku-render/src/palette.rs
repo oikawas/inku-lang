@@ -62,6 +62,42 @@ fn default_named_color(name: &str) -> &'static str {
     }
 }
 
+/// The longest color name a warning repeats; a longer host key is cut here.
+const WARNING_NAME_LIMIT: usize = 64;
+
+/// Whether a host color value is exactly `#` and six hex digits.
+fn is_hex_color(value: &str) -> bool {
+    value.len() == 7
+        && value.starts_with('#')
+        && value.bytes().skip(1).all(|byte| byte.is_ascii_hexdigit())
+}
+
+/// Replace every host color value that is not `#rrggbb`, so drawing continues.
+///
+/// Values are written into SVG attributes as they are, so anything else (a
+/// `url(...)`, a word, a bare hex) must not reach them. A named color falls
+/// back to its default; a catalog entry (`palette:…`) or any other key is
+/// left out. Returns the names replaced, for the render warnings.
+pub(crate) fn sanitize_color_map(color_map: &mut BTreeMap<String, String>) -> Vec<String> {
+    let invalid = color_map
+        .iter()
+        .filter(|(_, value)| !is_hex_color(value))
+        .map(|(name, _)| name.clone())
+        .collect::<Vec<_>>();
+    for name in &invalid {
+        // The hue list names every Score color, each with a default.
+        if HINT_HUE_PRIORITY.contains(&name.as_str()) {
+            color_map.insert(name.clone(), default_named_color(name).to_owned());
+        } else {
+            color_map.remove(name);
+        }
+    }
+    invalid
+        .into_iter()
+        .map(|name| name.chars().take(WARNING_NAME_LIMIT).collect())
+        .collect()
+}
+
 fn hex_to_rgb(value: &str) -> Option<(u8, u8, u8)> {
     let raw = value.trim().strip_prefix('#').unwrap_or(value.trim());
     if raw.len() != 6 || !raw.bytes().all(|byte| byte.is_ascii_hexdigit()) {

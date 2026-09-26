@@ -14,6 +14,14 @@ APIのJSONの応答は、`render_seed`と`composition_seed`を10進の文字列�
 
 CLIの出力のseedも文字列になる。Androidはこれらの応答を読まない。route数（107）は変わらない。DDL・Score・描画の版は変えない。
 
+### 2026-09-27 — 数値の書き出しを速くし、色表の値を確かめ、保存Score再演が断る理由を分ける
+
+- **SVGへ数値を書く処理を約2.7倍速くした。** 描画のCPU時間の約2割が、座標などを小数6桁で書く処理だった。100万分の1を単位とする整数で数字を直接書き、丸めが半分のすぐ近くに来る値、大きな値、非有限の値だけを従来の書式化へ回す。出力は1文字も変わらない（保存済み作品12,799件の描画は同一。20万個の値で従来の書式化と一致することを試験で確かめる）。
+- **hostが渡す色表の値を確かめる。** 色の値は、SVGの属性へそのまま書かれる。`#rrggbb`でない値（`url(...)`、語、`#`の無い16進など）は描画に使わない。名前つきの色はその既定の色で描き、カタログの項目などは使わずに、描画を続ける。描画のmetadataの`render_warnings`に`invalid_color`と色の名前を残す（値は残さない）。hostはこれを表示し、ログに記録する。いまのServerとAndroidが渡す値はすべて`#rrggbb`なので、描画は変わらない。
+- **保存Score再演（`render_saved`）が断る理由を分ける。** これまでは、どの失敗も`invalid_saved_performance`だった。資源の方針（`resource_authority`）、演奏の停止（`performance_stopped`）、不正なScore（`invalid_score`）、大きすぎる印（`mark_too_large`）、大きすぎる出力（`output_too_large`）、非有限の値（`non_finite_value`）を分け、coreの理由を`message`に添える。読めない入力は従来どおり`invalid_saved_performance`、panicは`internal_invariant`。binding版は変えない（codeを足すだけ）。
+
+DDL・Score・描画の版は変えない。
+
 ### 2026-09-26 — 非有限の値で描画を断るとき、どの命令かを言う
 
 描画の座標などが非有限の数（`NaN`、`inf`）になると、描画coreは「rendered SVG contains a non-finite value」で描画を断る。どの命令が作ったかは言わなかった。数値をSVGへ書く関数が非有限の数を数え、命令ごとに確かめるようにした。断るときは「… from instruction 1」のように、最初にそれを書いた命令の番号を添える。断るかどうかと断る時点は変えない（最後にSVG全体を調べる検査を残す。数値の書き出しの関数を通らない数が少しある）。描画の結果は変えない（保存済み作品12,799件の描画は同一）。

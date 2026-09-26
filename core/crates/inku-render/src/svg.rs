@@ -211,9 +211,69 @@ pub(crate) fn non_finite_writes() -> usize {
 /// Six decimals, then trailing zeros and a bare point removed. Path data
 /// writes thousands of numbers, so they go straight into one buffer.
 pub(crate) fn write_number(output: &mut String, value: f64) {
-    let start = output.len();
     let rounded = if value == -0.0 { 0.0 } else { value };
-    write!(output, "{rounded:.6}").expect("writing to a String cannot fail");
+    if !write_micros(output, rounded) {
+        write_exact(output, rounded);
+    }
+}
+
+/// Numbers below this magnitude keep their millionths within an f64's
+/// 53-bit integer range, where the fast path counts them exactly.
+const FAST_NUMBER_LIMIT: f64 = 1.0e9;
+
+/// Write `value` from its count of millionths, as [`write_exact`] would.
+///
+/// `{:.6}` rounds the exact binary value, while `value * 1e6` is itself
+/// rounded once. The two agree unless the product lies within that rounding
+/// error of a half, so such values, like very large and non-finite ones,
+/// return `false` for the exact formatter.
+fn write_micros(output: &mut String, value: f64) -> bool {
+    if value.is_nan() || value.abs() >= FAST_NUMBER_LIMIT {
+        return false;
+    }
+    let scaled = value.abs() * 1.0e6;
+    if ((scaled - scaled.trunc()) - 0.5).abs() <= scaled * f64::EPSILON {
+        return false;
+    }
+    // Below 1e15 the cast is exact.
+    let mut micros = scaled.round() as u64;
+    // Digits from the right: at most ten whole digits, a point and six decimals.
+    let mut digits = [0u8; 18];
+    let mut at = digits.len();
+    let mut decimals = 6;
+    while decimals > 0 && micros.is_multiple_of(10) {
+        micros /= 10;
+        decimals -= 1;
+    }
+    for _ in 0..decimals {
+        at -= 1;
+        digits[at] = b'0' + (micros % 10) as u8;
+        micros /= 10;
+    }
+    if decimals > 0 {
+        at -= 1;
+        digits[at] = b'.';
+    }
+    loop {
+        at -= 1;
+        digits[at] = b'0' + (micros % 10) as u8;
+        micros /= 10;
+        if micros == 0 {
+            break;
+        }
+    }
+    if value < 0.0 {
+        // `{:.6}` keeps the sign of a value that rounds to zero: `-0`.
+        output.push('-');
+    }
+    output.push_str(std::str::from_utf8(&digits[at..]).expect("ASCII digits"));
+    true
+}
+
+/// Write `value` through `{:.6}`, then trim trailing zeros and a bare point.
+fn write_exact(output: &mut String, value: f64) {
+    let start = output.len();
+    write!(output, "{value:.6}").expect("writing to a String cannot fail");
     // Non-finite values print without a point (`NaN`, `inf`) and are kept as
     // they are. The count lets the render boundary name the instruction when
     // it refuses them afterwards.
@@ -297,6 +357,59 @@ fn escape_text(value: &str, output: &mut String) {
             '<' => output.push_str("&lt;"),
             '>' => output.push_str("&gt;"),
             _ => output.push(character),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn exact(value: f64) -> String {
+        let mut output = String::new();
+        write_exact(&mut output, if value == -0.0 { 0.0 } else { value });
+        output
+    }
+
+    #[test]
+    fn the_fast_number_path_writes_what_the_exact_formatter_writes() {
+        // A value one step either side of each half-millionth is where a
+        // single rounding of `value * 1e6` could pick the other neighbour.
+        let mut state = 0x9e37_79b9_7f4a_7c15_u64;
+        let mut next = || {
+            state ^= state << 13;
+            state ^= state >> 7;
+            state ^= state << 17;
+            state
+        };
+        for _ in 0..50_000 {
+            let bits = next();
+            let magnitude = 10f64.powi((bits % 13) as i32 - 4);
+            let unit = (bits >> 11) as f64 / (1u64 << 53) as f64;
+            let value = (unit - 0.5) * 2.0 * magnitude;
+            let half = ((value * 1.0e6).trunc() + 0.5) / 1.0e6;
+            for candidate in [
+                value,
+                half,
+                f64::from_bits(half.to_bits() + 1),
+                f64::from_bits(half.to_bits() - 1),
+            ] {
+                assert_eq!(format_number(candidate), exact(candidate), "{candidate:e}");
+            }
+        }
+        for value in [
+            0.0,
+            -0.0,
+            -1.0e-7,
+            5.0e-7,
+            -5.0e-7,
+            0.9999995,
+            999_999_999.9999995,
+            1.0e9,
+            -2.5e-6,
+            1.5e-6,
+        ] {
+            assert_eq!(format_number(value), exact(value), "{value:e}");
         }
     }
 }

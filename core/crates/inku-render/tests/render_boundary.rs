@@ -812,6 +812,26 @@ fn a_non_finite_value_is_refused_with_its_instruction() {
 }
 
 #[test]
+fn a_host_color_that_is_not_hex_falls_back_and_is_reported() {
+    // Color values go into SVG attributes as they are.
+    let mut request = request_for(
+        r#"{"version":"0.9.0","instructions":[{"primitive":"circle",
+        "center":[0.5,0.5],"radius":0.1,"color":"black","filled":true}]}"#,
+    );
+    request.options.resolved_color_map =
+        BTreeMap::from([("black".to_owned(), "url(https://example.test/x)".to_owned())]);
+    let output = render(request).unwrap();
+    assert!(!output.svg.contains("url(https"));
+    assert!(output.svg.contains("#111111"));
+    assert_eq!(
+        output.metadata.render_warnings,
+        [inku_render::types::RenderWarning::InvalidColor {
+            name: "black".to_owned()
+        }]
+    );
+}
+
+#[test]
 fn explicit_authority_limits_a_legacy_edition_score() {
     let budget = inku_score::ResourceBudget {
         maximum: inku_score::ResourceDemand {

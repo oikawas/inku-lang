@@ -122,25 +122,102 @@ struct SavedRenderInput {
     clip: inku_pipeline::core_boundary::ClipPolicy,
 }
 
+/// The stable code a host receives when the core does not draw a saved Score.
+///
+/// `invalid_saved_performance` stays the code for input the core cannot read
+/// or authorize, so hosts that knew only that code keep working.
+fn saved_render_error_code(error: &inku_pipeline::core_boundary::BoundaryError) -> &'static str {
+    use inku_pipeline::core_boundary::BoundaryError;
+    use inku_render::render::RenderError;
+    let BoundaryError::Render(error) = error else {
+        return "invalid_saved_performance";
+    };
+    match error {
+        RenderError::ResourceAuthority(_) => "resource_authority",
+        RenderError::CheckedPerformance(_) => "performance_stopped",
+        RenderError::Mark(_) | RenderError::InvalidCanvas | RenderError::InvalidScore(_) => {
+            "invalid_score"
+        }
+        RenderError::MarkTooLarge { .. } => "mark_too_large",
+        RenderError::OutputTooLarge { .. } => "output_too_large",
+        RenderError::NonFiniteSvg { .. } => "non_finite_value",
+    }
+}
+
 /// Replay a saved Score using independently authorized host resource limits.
+///
+/// A refusal is `{"error": code, "message": reason}`: the code is stable, and
+/// the message is the core's own reason, for logs. A panic becomes
+/// `internal_invariant`. The binding version is unchanged: this only adds codes.
 #[uniffi::export]
 pub fn render_saved(input_bytes: Vec<u8>) -> Vec<u8> {
-    fn render(input_bytes: &[u8]) -> Option<Vec<u8>> {
+    fn refusal(code: &str, message: &str) -> Vec<u8> {
+        serde_json::to_vec(&serde_json::json!({ "error": code, "message": message }))
+            .expect("two strings serialize")
+    }
+    fn render(input_bytes: &[u8]) -> Vec<u8> {
         if input_bytes.len() > 16 * 1024 * 1024 {
-            return None;
+            return refusal("invalid_saved_performance", "input is larger than 16 MiB");
         }
-        let input: SavedRenderInput = serde_json::from_slice(input_bytes).ok()?;
-        let output = inku_pipeline::core_boundary::render_saved_score(
+        let input: SavedRenderInput = match serde_json::from_slice(input_bytes) {
+            Ok(input) => input,
+            Err(error) => return refusal("invalid_saved_performance", &error.to_string()),
+        };
+        match inku_pipeline::core_boundary::render_saved_score(
             input.request,
             &input.hard_policy,
             input.operational_budget,
             input.clip,
-        )
-        .ok()?;
-        serde_json::to_vec(&output).ok()
+        ) {
+            Ok(output) => serde_json::to_vec(&output)
+                .unwrap_or_else(|error| refusal("invalid_saved_performance", &error.to_string())),
+            Err(error) => refusal(saved_render_error_code(&error), &error.to_string()),
+        }
     }
     catch_unwind(AssertUnwindSafe(|| render(&input_bytes)))
-        .ok()
-        .flatten()
-        .unwrap_or_else(|| br#"{"error":"invalid_saved_performance"}"#.to_vec())
+        .unwrap_or_else(|_| refusal("internal_invariant", "the core panicked"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_saved_render_refusal_names_its_reason() {
+        // One code for every refusal left the host unable to tell a mark too
+        // large from a budget exceeded or unreadable input.
+        let budget = inku_score::ResourceBudget {
+            maximum: inku_score::ResourceDemand {
+                primitive_marks: 400,
+                object_templates: 64,
+                ..inku_score::ResourceDemand::default()
+            },
+        };
+        let input = serde_json::json!({
+            "request": {
+                "score": {"version": "0.12.0", "instructions": [{"primitive": "circle",
+                    "center": [0.5, 0.5], "radius": 10, "surface": {"texture": "wash"}}]},
+                "options": {"resolved_color_map": {}, "catalog_id": null,
+                    "canvas": {"width": 1000.0, "height": 1000.0},
+                    "canvas_aspect_id": "square", "svg_profile": "display",
+                    "render_seed": 7, "composition_seed": null, "wild": false},
+            },
+            "hard_policy": inku_score::HardResourcePolicy { identity: "test".to_owned(), budget },
+            "operational_budget": inku_score::OperationalResourceBudget(budget),
+            "clip": {"tolerance_pixels": 0.1, "max_nodes": "1000", "max_path_elements": "1000",
+                "max_flattened_points": "1000", "max_work": "1000", "max_output_vertices": "1000"},
+        });
+        let refusal = |bytes: Vec<u8>| {
+            let value: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+            value["error"].as_str().unwrap_or("drawn").to_owned()
+        };
+        assert_eq!(
+            refusal(render_saved(serde_json::to_vec(&input).unwrap())),
+            "mark_too_large"
+        );
+        assert_eq!(
+            refusal(render_saved(b"{".to_vec())),
+            "invalid_saved_performance"
+        );
+    }
 }

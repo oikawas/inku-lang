@@ -164,6 +164,7 @@ pub fn build_render_metadata(score: &Score, profile: SvgProfile) -> RenderMetada
         render_surface_textures,
         execution: None,
         resource_execution: None,
+        render_warnings: Vec::new(),
     }
 }
 
@@ -435,7 +436,7 @@ pub fn render_with_resources(
 /// and the document is serialized once. Every mark's extent is checked before
 /// it is drawn, and what it draws is charged to `allowance`.
 fn render_impl(
-    request: RenderRequest,
+    mut request: RenderRequest,
     resources: Option<(
         &inku_score::HardResourcePolicy,
         inku_score::OperationalResourceBudget,
@@ -444,6 +445,8 @@ fn render_impl(
     omitted_instructions: &[usize],
     mut allowance: OutputAllowance,
 ) -> Result<RenderOutput, RenderError> {
+    let invalid_colors =
+        crate::palette::sanitize_color_map(&mut request.options.resolved_color_map);
     let source_score = request.score.clone();
     let profile = request.options.svg_profile;
     let assignment = work_color_assignment(
@@ -853,6 +856,10 @@ fn render_impl(
         });
     }
     let mut metadata = build_render_metadata(&source_score, profile);
+    metadata.render_warnings = invalid_colors
+        .into_iter()
+        .map(|name| crate::types::RenderWarning::InvalidColor { name })
+        .collect();
     if let Some(demand) = performance.resource_demand {
         use crate::types::{
             RenderResourceExecution, RenderResourceFailure, RenderResourceOmission,

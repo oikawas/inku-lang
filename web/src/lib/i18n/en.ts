@@ -218,6 +218,8 @@ export const en: LangPack = {
 	errorUserIsLineageOrigin: "Other users' works derive from this user's works, so the account cannot be deleted.",
 	errorLastAdministrator: 'The last administrator can be neither removed from the administrators nor deleted. Make another user an administrator first.',
 	errorModelNotOffered: 'This model is not offered on this server. Choose one of the offered models in Settings.',
+	errorScoreInvalid: (reason) => `The Score is invalid: ${reason}`,
+	errorScoreNotRenderable: (reason) => `This Score cannot be drawn: ${reason}`,
 	stopBtn: 'Stop',
 	runStatusElapsed: (seconds) => `Elapsed ${seconds}s`,
 	runStatusTokens: (input, output) => `${input}→${output} tok`,

@@ -2831,3 +2831,30 @@ def test_a_lineage_page_can_leave_the_pictures_out(auth_context):
 
     assert [(item["svg"], item["svg_bytes"]) for item in light.json()["items"]] == [("", len(svg.encode()))] * 2
     assert [item["svg"] for item in whole.json()["items"]] == [svg] * 2
+
+
+def test_a_score_the_render_core_refuses_is_answered_with_its_reason(auth_context, monkeypatch, caplog):
+    """The core names why it will not draw a Score (a mark past eight canvases,
+    an output past its cap); the route answered "history score render failed"
+    and logged a traceback as if the server had broken."""
+    headers, _user, _group = auth_context
+
+    class RefusingEngine:
+        def render(self, *_args, **_kwargs):
+            raise ValueError("render failed: mark bounds exceed eight canvases")
+
+    monkeypatch.setattr(api_rendering, "current_render_engine", lambda: RefusingEngine())
+    payload = {
+        "input": "月が昇る",
+        "ddl": "中心に円",
+        "score": {"instructions": []},
+        "svg": "<svg></svg>",
+        "at": 1_700_000_400_000,
+    }
+
+    with caplog.at_level("ERROR"):
+        refused = client.post("/api/history", json=payload, headers=headers)
+
+    assert refused.status_code == 422
+    assert refused.json()["detail"] == "score cannot be rendered: mark bounds exceed eight canvases"
+    assert "render failed" not in caplog.text

@@ -166,6 +166,8 @@ export interface LangPack {
 	errorUserIsLineageOrigin: string;
 	errorLastAdministrator: string;
 	errorModelNotOffered: string;
+	errorScoreInvalid: (reason: string) => string;
+	errorScoreNotRenderable: (reason: string) => string;
 	runStatusElapsed: (seconds: string) => string;
 	runStatusTokens: (input: string, output: string) => string;
 	runStatusProgress: (done: number, total: number) => string;

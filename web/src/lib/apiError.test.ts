@@ -59,3 +59,14 @@ test('the last administrator and a withheld model read in the page language', ()
 		ja.errorModelNotOffered
 	);
 });
+
+test('a Score the server refuses reads with its headline in the page language', () => {
+	assert.equal(
+		describeApiErrorDetail('score is invalid: instructions.0: bad shape', 422, ja),
+		ja.errorScoreInvalid('instructions.0: bad shape')
+	);
+	assert.equal(
+		describeApiErrorDetail('score cannot be rendered: mark bounds exceed eight canvases', 422, ja),
+		ja.errorScoreNotRenderable('mark bounds exceed eight canvases')
+	);
+});

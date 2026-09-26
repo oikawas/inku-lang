@@ -218,6 +218,8 @@ export const ja: LangPack = {
 	errorUserIsLineageOrigin: 'ほかのユーザーの作品がこのユーザーの作品から派生しているため削除できません。',
 	errorLastAdministrator: '最後の管理者は、管理者から外すことも削除することもできません。先にほかのユーザーを管理者にしてください。',
 	errorModelNotOffered: 'このモデルはこのサーバーで公開されていません。設定で、公開されているモデルを選んでください。',
+	errorScoreInvalid: (reason) => `Scoreが不正です: ${reason}`,
+	errorScoreNotRenderable: (reason) => `このScoreは描けません: ${reason}`,
 	stopBtn: '停止',
 	runStatusElapsed: (seconds) => `経過 ${seconds}s`,
 	runStatusTokens: (input, output) => `${input}→${output} tok`,

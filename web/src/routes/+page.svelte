@@ -2578,6 +2578,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		bind:loginPassword={session.loginPassword}
 		bind:loginPasswordVisible={session.loginPasswordVisible}
 		loginStatus={session.loginStatus}
+		connectionLost={session.connectionLost}
 		onLogin={() => session.login()}
 		appVersion={APP_VERSION}
 		buildNumber={__BUILD_NUMBER__}
@@ -2721,6 +2722,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 						diagnosticsUnavailable={work.pipelineDiagnosticsUnavailable}
 						busy={work.pipelineBusy}
 						reason={work.pipelineView?.phase.reason ?? null}
+						providerFailure={work.pipelineView?.provider_failure ?? null}
 						onApprove={work.approvePipelinePatch}
 						onDecline={work.declinePipelinePatch}
 					/>

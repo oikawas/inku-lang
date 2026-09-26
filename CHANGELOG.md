@@ -6,6 +6,13 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 36 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-26 — a failure names its cause, and an unreachable start does not ask to sign in
+
+- **A stage that used up its attempts says why, and how often it tried.** A description whose four attempts all timed out ended with only "the description could not be interpreted", with no telling a slow model from an unreachable one or a missing API key. The reason of the stage that stopped (Stage 1, hole completion) now carries that stage's last model-call failure and, above one, the number of attempts (for example "(the model did not answer within the time limit; tried 4 times)"), in the single drawing, a batch's failure list, the model comparison, and the other failure lines.
+- **A server that cannot be reached at start-up is not a request to sign in.** A failed start-up `/api/auth/me` or a 5xx (the API restarting, the proxy's 502) showed the sign-in form, asking a single-user install for a password nobody knows. Only 401 and 403 show it now; otherwise the page says "Cannot reach the server", asks again every 3 seconds, and reopens once the server answers.
+
+The route count (107) is unchanged. DDL, Score, and render versions are unchanged.
+
 ### 2026-09-26 — the render core keeps each performed instruction's facts in one type
 
 The render core's performance plan (`PerformancePlan`) held what it knew about each performed instruction (the ordinal behind drawing IDs and seeds, the original instruction, a seed override, a transform, a line centerline, a closed arc pair and a fill scope) in seven arrays beside the instruction list. Drawing read them with `zip`, so an array of the wrong length was silently cut to the shortest. The facts are now one `PerformedInstruction` per instruction, and drawing stops if that list and the instructions differ in length. The instructions themselves stay in `score.instructions`, because the presence layer, the material filters and the oil fill limit read the performed Score as a whole. The typed performance of compact Scores (0.10 and later) likewise keeps what it records about each dense instruction (the source instruction, the seed, the fill scope, the repetition path and the semantic position) in one record instead of five arrays. Drawing results do not change (the 12,798 saved renders are identical).

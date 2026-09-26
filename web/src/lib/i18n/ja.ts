@@ -31,6 +31,19 @@ export const ja: LangPack = {
 		host_commit_failed: '作品の保存を完了できませんでした',
 		compiler_boundary_failed: 'DDLを楽譜へ変換できませんでした',
 	} as Record<string, string>)[reason] ?? reason}`,
+	pipelineFailureCause: (failure, attempts, detail) => {
+		const cause = ({
+			transport_timeout: 'モデルの応答が制限時間内に返りませんでした',
+			transport_unavailable: 'モデルに接続できませんでした',
+			rate_limited: 'モデルの提供元が要求を制限しました',
+			provider_rejected: detail === 'credentials_unavailable' ? 'モデルのAPIキーがありません' : 'モデルの提供元が要求を断りました',
+			malformed_payload: 'モデルの応答を読めませんでした',
+			schema_violation: 'モデルの応答が決まった形になっていませんでした',
+			semantic_violation: 'モデルの応答を描画に使えませんでした',
+		} as Record<string, string>)[failure];
+		if (!cause) return '';
+		return `（${cause}${attempts > 1 ? `。${attempts}回試しました` : ''}）`;
+	},
 	pipelineDiagnosticSourceRange: (start, end) => `原文のバイト位置 ${start}〜${end}。`,
 	pipelineDiagnosticPart: (kind) => ({
 		source_instruction: '原文の指示', instruction: '描画指示', target_instruction: '参照先の指示',
@@ -105,6 +118,8 @@ export const ja: LangPack = {
 	railCollapseLabel: 'サイドバーを格納する',
 
 	loginTitle: 'ログイン',
+	connectionLostTitle: 'サーバーに接続できません',
+	connectionLostMessage: '再接続を待っています。つながったら、この画面は自動で開き直します。',
 	loginUsernamePlaceholder: 'ユーザー名',
 	loginPasswordPlaceholder: 'パスワード',
 	loginSubmit: 'ログイン',

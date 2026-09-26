@@ -31,6 +31,19 @@ export const en: LangPack = {
 		host_commit_failed: 'the work could not be saved',
 		compiler_boundary_failed: 'the DDL could not be converted into a score',
 	} as Record<string, string>)[reason] ?? reason}`,
+	pipelineFailureCause: (failure, attempts, detail) => {
+		const cause = ({
+			transport_timeout: 'the model did not answer within the time limit',
+			transport_unavailable: 'the model could not be reached',
+			rate_limited: 'the model provider rate-limited the request',
+			provider_rejected: detail === 'credentials_unavailable' ? 'the model has no API key' : 'the model provider refused the request',
+			malformed_payload: "the model's answer could not be read",
+			schema_violation: "the model's answer was not in the expected form",
+			semantic_violation: "the model's answer could not be used for the drawing",
+		} as Record<string, string>)[failure];
+		if (!cause) return '';
+		return ` (${cause}${attempts > 1 ? `; tried ${attempts} times` : ''})`;
+	},
 	pipelineDiagnosticSourceRange: (start, end) => `Source byte range ${start}–${end}.`,
 	pipelineDiagnosticPart: (kind) => ({
 		source_instruction: 'source instruction', instruction: 'drawing instruction', target_instruction: 'target instruction',
@@ -105,6 +118,8 @@ export const en: LangPack = {
 	railCollapseLabel: 'collapse sidebar',
 
 	loginTitle: 'Sign in',
+	connectionLostTitle: 'Cannot reach the server',
+	connectionLostMessage: 'Waiting to reconnect. This page reopens by itself once the server answers.',
 	loginUsernamePlaceholder: 'Username',
 	loginPasswordPlaceholder: 'Password',
 	loginSubmit: 'Sign in',

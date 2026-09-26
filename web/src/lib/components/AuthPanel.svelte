@@ -10,6 +10,8 @@
 		appVersion: string;
 		buildNumber: string;
 		developerMode: boolean;
+		/** Start-up could not reach the server: say so, instead of asking to sign in. */
+		connectionLost?: boolean;
 	};
 
 	let {
@@ -20,7 +22,8 @@
 		onLogin,
 		appVersion,
 		buildNumber,
-		developerMode
+		developerMode,
+		connectionLost = false
 	}: Props = $props();
 </script>
 
@@ -45,6 +48,12 @@
 				</div>
 			</div>
 		</div>
+		{#if connectionLost}
+		<div class="login-title" id="login-title">{t().connectionLostTitle}</div>
+		<div class="login-panel-body">
+			<div class="inline-message" role="status">{t().connectionLostMessage}</div>
+		</div>
+		{:else}
 		<div class="login-title" id="login-title">{t().loginTitle}</div>
 		<div class="login-panel-body">
 			{#if loginStatus}
@@ -86,6 +95,7 @@
 				<button class="ghost-btn login-submit" onclick={onLogin}>{t().loginSubmit}</button>
 			</div>
 		</div>
+		{/if}
 		<div class="login-meta">
 			{appVersion}{#if developerMode} {t().appInfoBuildLabel} {buildNumber}{/if}
 		</div>

@@ -1055,7 +1055,7 @@ Transcript replayはcommandと最終effect resultの入力envelopeだけから�
 
 この再正規化は、未commitのcore生成Stage 1候補に対するcompiler rejectionだけに適用する。Direct DDLまたは既に受理された作者DDLを書き換えず、sourceの意味がpre-expansionでcanonicalになった後のMacro expansion予算・整合性failureも対象にしない。Providerが報告するgeneric semantic failureとhole patchのsemantic validationも終端のままで、hostは意味を補修せず、独自にretryしない。Compilerを緩和せず、個数を減らさず、Scoreを補修せず、後段LLMに非表示の意味を変更させず、Stage 1からDDLを返す。
 
-応答と保存履歴は Stage ごとのフォールバック理由、使用モデル、provider failure の分類を保持し、UI は発生した層を示す。`interpret_fallback` / `compose_fallback` は理由、`"none"`、欄導入前の未記録を区別する。印のある親から推敲するときは実行前に一度確認し、既存作品へ遡及して値を書かない。
+応答と保存履歴は Stage ごとのフォールバック理由、使用モデル、provider failure の分類を保持し、UI は発生した層を示す。試行を使い切ってStage 1やhole補完が止まったとき、Webはその段の理由に、同じ段の最後のモデル呼出しの失敗（時間切れ、接続できない、応答が使えない等）と、2回以上なら試行回数を添える。`interpret_fallback` / `compose_fallback` は理由、`"none"`、欄導入前の未記録を区別する。印のある親から推敲するときは実行前に一度確認し、既存作品へ遡及して値を書かない。
 
 Shared compiler consumerでは、StopとOmitAndContinueはLLM fallbackではなく同じverified inputへ適用する決定的な実行方針である。Continueはappearance fieldを既存defaultへ戻せる場合にfield単位で省略し、Macroの未結合caller actionと命令の未対応layout directionも本体を保持してfield単位で省略する。それ以外の成立しないinstruction / Emit / call / structural subtree、Ground、group、relationはそれぞれのtyped単位で省略する。整合性不良は両modeで停止し、全省略を空の新作成功として扱わない。
 
@@ -2091,6 +2091,8 @@ App rail のユーザーメニューは、ログイン中の利用者のプロ�
 **サーバーから管理者と入口を失わせない（2026-09-26）。** 最後の `admins` を外す変更と、その利用者の削除は 409 で断る —— 起きてしまうと、`admins` を与える設定そのものが `admins` 専用で、`inku-admin` はパスワードの再設定しかできず、単独利用モードも管理者の居ない DB では働かないため、製品の中に戻る道が無い。同じ理由で、ローカルログインを止める要求（`PUT /api/auth/config` の `local_enabled: false`）も 409 で断る。Google ログインの切り替えは保存されるが、それで誰かがログインする実装は無く、ローカルログインが唯一の入口である。
 
 **ブラウザが他サイト発と示した変更要求は断る（2026-09-26）。** `POST`・`PUT`・`PATCH`・`DELETE` のうち `Sec-Fetch-Site: cross-site` を持ち、`Origin` が CORS の許可（`INKU_CORS_ORIGINS` と localhost）に無いものを 403 にする。単独利用モードは資格情報の無い要求を持ち主（管理者）として答えるので、他サイトのページが持ち主のブラウザに本文の無い `POST`（バックアップ、サムネイル再構築、プラグイン再読込）を送らせれば、CORS の事前確認なしに管理者として実行された。CLI と Android はこの header を送らず、Web の中継は `same-origin` を渡すので影響を受けない。
+
+**起動時にサーバーへつながらないときは、サインインを求めない（2026-09-26）。** Webは起動時の`/api/auth/me`が401か403のときだけサインイン画面を出す。通信の失敗や5xx（APIの再起動中、中継の502）では「サーバーに接続できません」と出し、3秒ごとに問い合わせ直して、つながったらページを開き直す。以前はこれもサインイン画面になり、単独利用モードでは誰も知らないパスワードを求めていた。
 
 Serverの正本永続化はSQLAlchemy上のSQLiteだけを使う。`INKU_DB_URL`と派生thumbnail DB設定はSQLite URLだけを受け付け、両方を検証してからどちらのengineも作る。非SQLite URLを拒否したあと空の既定DBへ黙って切り替えることはしない。Server SQLAlchemy/SQLiteとAndroid Room/SQLiteはそれぞれ自身の物理schemaを持ち、将来iOS adapterを作る場合も同じ論理契約へ別の物理mappingを持つ。同じDB file、table名、column配置を共有するという意味ではない。論理契約とhost mappingの正本は[`persistence/README.md`](persistence/README.md)と[`persistence/contract.json`](persistence/contract.json)である。Server専用の認証・管理tableと端末専用のprovider・model・cache tableはhost extensionであってparity gapではない。このmappingは保存済みSVG、Score、hash、NULLの意味を変えない。
 

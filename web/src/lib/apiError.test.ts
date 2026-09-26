@@ -20,6 +20,22 @@ test('a failed pipeline action uses its saved phase instead of inventing a provi
 	assert.doesNotMatch(actual, /undefined|モデル提供元|pipeline author action required/);
 });
 
+test('a stage whose every model call timed out says so, and how often it tried', () => {
+	// A run whose four Stage 1 attempts all timed out ended with only "the
+	// description could not be interpreted".
+	const failed = (stage: string) => describeApiErrorDetail({
+		code: 'pipeline_author_action_required',
+		current_view: {
+			phase: { tag: 'failed', reason: 'stage1_failed' },
+			provider_failure: { failure: 'transport_timeout', stage, attempt: 4, elapsed_ms: 300000 },
+		},
+	}, 409, ja);
+
+	assert.equal(failed('stage1'), '処理の結果を確認してください。 理由: 記述の解釈を完了できませんでした（モデルの応答が制限時間内に返りませんでした。4回試しました）');
+	// Another stage's failure does not explain this one.
+	assert.equal(failed('stage2'), '処理の結果を確認してください。 理由: 記述の解釈を完了できませんでした');
+});
+
 test('a required pipeline patch points to the existing approval view', () => {
 	const actual = describeApiErrorDetail({
 		code: 'pipeline_patch_approval_required',

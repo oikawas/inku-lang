@@ -520,7 +520,8 @@ Flags you omit fall back to the server defaults, and the server defaults are not
 | Too many elements | State the count explicitly, as in `three lines` or `twelve` |
 | A stated count is reduced | Check the literal ceiling under `Limits` in the settings |
 | Painting is slow | If the running indicator says `Retrying (try 2/4)`, an earlier attempt timed out or its answer could not be used. Wait on the provider's queue, or choose a lighter model |
-| An error is returned | Shorten the description and split it into one instruction per sentence |
+| An error is returned | Shorten the description and split it into one instruction per sentence. If the reason's parenthesis says the model did not answer within the time limit, the model is not answering in time |
+| "Cannot reach the server" | The API is stopped or restarting. The page reopens by itself once it answers; if this lasts, check the server |
 | Painting is refused | The concurrency ceiling has been reached. Wait a moment |
 | A comparison result is lost | Adopt or star the compared option to keep it in history |
 | Refinement options disappeared | Changing the refinement target discards unsaved options, so save first |

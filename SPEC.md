@@ -1701,7 +1701,10 @@ meaning.
 
 Responses and saved history retain the fallback reason per stage, the models
 used, and provider-failure classification; the UI identifies the affected
-layer. `interpret_fallback` and `compose_fallback` distinguish a reason,
+layer. When Stage 1 or hole completion stops after using its attempts, the Web
+adds to that stage's reason the last model-call failure of the same stage (a
+timeout, an unreachable model, an unusable answer) and, above one, the number
+of attempts. `interpret_fallback` and `compose_fallback` distinguish a reason,
 `"none"`, and absence from records created before the field. Refining from a
 marked parent asks once before execution, and existing works are not backfilled.
 
@@ -3657,6 +3660,13 @@ a `POST` with no body — a backup, a thumbnail rebuild, a plugin reload — and
 it done as an administrator without a CORS preflight.  The CLI and the Android
 app send no such header, and the Web's proxy forwards `same-origin`, so they are
 not affected.
+
+**A server that cannot be reached at start-up is not a request to sign in
+(2026-09-26).**  The Web shows the sign-in form only when its start-up
+`/api/auth/me` answers 401 or 403.  A failed request or a 5xx (the API
+restarting, the proxy's 502) shows "Cannot reach the server" instead, asks
+again every 3 seconds, and reopens the page once the server answers.  It used to
+show the sign-in form, asking a single-user install for a password nobody knows.
 
 The Server's canonical persistence uses SQLite through SQLAlchemy only.
 `INKU_DB_URL` and the derived thumbnail-store setting accept SQLite URLs only;

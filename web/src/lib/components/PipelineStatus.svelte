@@ -2,6 +2,7 @@
 	import { t } from '$lib/i18n/index.svelte';
 	import type { PipelinePhase } from '$lib/features/pipeline/api';
 	import { formatPipelineDiagnostic, type PipelineDiagnostic } from '$lib/features/pipeline/diagnostics';
+	import { pipelineAttentionText, type PipelineProviderFailure } from '$lib/features/pipeline/attention';
 
 	type Props = {
 		patch: PipelinePhase | null;
@@ -10,6 +11,7 @@
 		diagnosticsUnavailable: boolean;
 		busy: boolean;
 		reason: string | null;
+		providerFailure?: PipelineProviderFailure | null;
 		onApprove: () => void | Promise<void>;
 		onDecline: () => void | Promise<void>;
 	};
@@ -21,6 +23,7 @@
 		diagnosticsUnavailable,
 		busy,
 		reason,
+		providerFailure = null,
 		onApprove,
 		onDecline,
 	}: Props = $props();
@@ -63,7 +66,7 @@
 {/if}
 
 {#if reason}
-	<p class="pipeline-attention" role="status">{t().pipelineNeedsAttention} {t().pipelineAttentionReason(reason)}</p>
+	<p class="pipeline-attention" role="status">{pipelineAttentionText(reason, providerFailure, t())}</p>
 {/if}
 
 <style>

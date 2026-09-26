@@ -59,6 +59,8 @@ export type PipelineView = {
 	} | null;
 	busy: boolean;
 	provider_attempt?: PipelineProviderAttempt;
+	/** The last model-call failure, kept so a failed stage can say what happened. */
+	provider_failure?: { failure: string; stage: string; attempt: number; elapsed_ms?: number; detail?: string };
 	rendered: { svg: string } | null;
 	result: PipelineResult | null;
 };

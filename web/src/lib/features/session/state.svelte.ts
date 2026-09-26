@@ -16,6 +16,7 @@ import {
 import type { Provider } from '$lib/models';
 import type { SettingsTab } from '$lib/features/settings/state.svelte';
 import { downloadFolderSettings } from '$lib/features/export/download-folder.svelte';
+import { startupAnswer } from './startup';
 
 export type UserModelSettings = {
 	stage1_provider: Provider;
@@ -63,8 +64,12 @@ type SessionStateDeps = {
 	afterAuthenticated: (source: 'resume' | 'login') => Promise<void>;
 	afterSignedOut: () => void;
 	refreshUserAdministration: () => Promise<void>;
+	/** The server answers again after start-up could not reach it. The page reloads by default. */
+	onServerBack?: () => void;
 	onVisibilityChanged: (visibility: ReturnType<typeof resolveUiVisibility>) => void;
 };
+
+const RECONNECT_MS = 3000;
 
 export class SessionState {
 	private currentUserSettingsRequestId = 0;
@@ -81,6 +86,9 @@ export class SessionState {
 	loginPassword = $state('');
 	loginPasswordVisible = $state(false);
 	loginStatus = $state<string | null>(null);
+	/** Start-up could not reach the server; the page waits for it instead of asking to sign in. */
+	connectionLost = $state(false);
+	private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 	profileOpen = $state(false);
 	profileEmail = $state('');
 	profileCurrentPassword = $state('');
@@ -166,9 +174,19 @@ export class SessionState {
 	}
 
 	async loadCurrentUser(): Promise<void> {
+		let response: Response | null = null;
 		try {
-			const response = await this.deps.apiFetch('/api/auth/me');
-			if (!response.ok) throw new Error('session expired');
+			response = await this.deps.apiFetch('/api/auth/me');
+		} catch {
+			// The request itself failed: the server is away, not the session.
+		}
+		const answer = startupAnswer(response?.status ?? null);
+		if (answer === 'unreachable') {
+			this.waitForServer();
+			return;
+		}
+		try {
+			if (answer === 'signed-out' || !response) throw new Error('session expired');
 			this.currentUser = await response.json() as UserItem;
 			this.applyActorPreferences(this.currentUser);
 			this.authToken = 'cookie';
@@ -177,6 +195,27 @@ export class SessionState {
 		} catch {
 			this.clearActor();
 		}
+	}
+
+	/** Ask again every few seconds; once the server answers, start the page over. */
+	private waitForServer(): void {
+		this.connectionLost = true;
+		if (this.reconnectTimer !== null) return;
+		this.reconnectTimer = setTimeout(async () => {
+			this.reconnectTimer = null;
+			let status: number | null = null;
+			try {
+				status = (await this.deps.apiFetch('/api/auth/me', { cache: 'no-store' })).status;
+			} catch {
+				// Still away.
+			}
+			if (startupAnswer(status) === 'unreachable') {
+				this.waitForServer();
+				return;
+			}
+			// A full start: whatever else start-up failed to read is read again.
+			(this.deps.onServerBack ?? (() => globalThis.location?.reload()))();
+		}, RECONNECT_MS);
 	}
 
 	async login(): Promise<void> {

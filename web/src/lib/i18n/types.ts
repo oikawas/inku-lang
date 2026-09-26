@@ -22,6 +22,8 @@ export interface LangPack {
 	pipelineDiagnosticsUnavailable: string;
 	pipelineNeedsAttention: string;
 	pipelineAttentionReason: (reason: string) => string;
+	/** What happened to the model call behind a failed stage, as a parenthetical; empty when unknown. */
+	pipelineFailureCause: (failure: string, attempts: number, detail: string | null) => string;
 	pipelineDiagnosticSourceRange: (start: number, end: number) => string;
 	pipelineDiagnosticPart: (kind: string) => string;
 	pipelineDiagnosticOwner: (kind: string, index: number) => string;
@@ -70,6 +72,8 @@ export interface LangPack {
 
 	// Login
 	loginTitle: string;
+	connectionLostTitle: string;
+	connectionLostMessage: string;
 	loginUsernamePlaceholder: string;
 	loginPasswordPlaceholder: string;
 	loginSubmit: string;

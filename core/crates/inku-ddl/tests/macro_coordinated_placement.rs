@@ -329,14 +329,17 @@ fn checked_relation_numeric_recovery_and_anchor_member_reach_native_performer() 
     let after = resolve(score);
     assert_eq!(after.score.instructions.len(), 2);
     assert_eq!(after.score.instructions, before.score.instructions);
-    assert_eq!(after.instruction_transforms, before.instruction_transforms);
     assert_eq!(
-        after.original_instruction_indices,
-        before.original_instruction_indices
+        after.instruction_transforms(),
+        before.instruction_transforms()
     );
     assert_eq!(
-        after.instruction_seed_overrides,
-        before.instruction_seed_overrides
+        after.original_instruction_indices(),
+        before.original_instruction_indices()
+    );
+    assert_eq!(
+        after.instruction_seed_overrides(),
+        before.instruction_seed_overrides()
     );
     let diagnostics = &after.execution.as_ref().unwrap().diagnostics;
     assert_eq!(diagnostics.len(), 1);
@@ -583,7 +586,7 @@ fn macro_member_geometry_finishes_internal_scopes_before_outer_placement() {
             .flat_map(|index| {
                 let instruction = &plan.score.instructions[index];
                 [instruction.from_.unwrap(), instruction.to.unwrap()]
-                    .map(|point| plan.instruction_transforms[index].apply(point))
+                    .map(|point| plan.instruction_transforms()[index].apply(point))
             })
             .collect::<Vec<_>>()
     };
@@ -597,7 +600,7 @@ fn macro_member_geometry_finishes_internal_scopes_before_outer_placement() {
         + b.iter().map(|p| p.x).fold(f64::NEG_INFINITY, f64::max))
         / 2.0;
     let circle =
-        placed.instruction_transforms[2].apply(placed.score.instructions[2].center.unwrap());
+        placed.instruction_transforms()[2].apply(placed.score.instructions[2].center.unwrap());
     assert!((circle.x - macro_x - 0.5).abs() < 1e-9);
     // Omission can make an internal transform equal the remaining placement range.
     // Its explicit source ownership still puts it before placement; an unowned
@@ -639,9 +642,9 @@ fn macro_member_geometry_finishes_internal_scopes_before_outer_placement() {
     let anchored = resolve(&anchored_score);
     assert!(anchored.execution.is_none(), "{:?}", anchored.execution);
     let circle =
-        anchored.instruction_transforms[0].apply(anchored.score.instructions[0].center.unwrap());
+        anchored.instruction_transforms()[0].apply(anchored.score.instructions[0].center.unwrap());
     let line_start =
-        anchored.instruction_transforms[1].apply(anchored.score.instructions[1].from_.unwrap());
+        anchored.instruction_transforms()[1].apply(anchored.score.instructions[1].from_.unwrap());
     assert!((circle.x - line_start.x - 0.5).abs() < 1e-9 && (circle.y - line_start.y).abs() < 1e-9);
     let [x0, y0, x1, y1] = anchored_score.placement_groups[0].at.region;
     let target = Point::new(

@@ -134,7 +134,7 @@ fn coordinated_placement_reaches_geometry_once_and_preserves_outer_scope_relatio
             let size = instruction.size.unwrap();
             Point::new(position.x + size.x / 2.0, position.y + size.y / 2.0)
         });
-        plan.instruction_transforms[index].apply(anchor)
+        plan.instruction_transforms()[index].apply(anchor)
     };
     let resolve = |score: &Score| {
         resolve_checked_performance(
@@ -154,11 +154,11 @@ fn coordinated_placement_reaches_geometry_once_and_preserves_outer_scope_relatio
         let score = lower.score().unwrap();
         let performed = resolve(score);
         assert!(performed.execution.is_none());
-        assert_eq!(performed.original_instruction_indices, [0, 1]);
+        assert_eq!(performed.original_instruction_indices(), [0, 1]);
         assert!(performed.score.placement_groups.is_empty());
         assert!(
             performed
-                .instruction_seed_overrides
+                .instruction_seed_overrides()
                 .iter()
                 .all(Option::is_some)
         );
@@ -183,10 +183,10 @@ fn coordinated_placement_reaches_geometry_once_and_preserves_outer_scope_relatio
     let performed = resolve(&input);
     assert!(performed.execution.is_none(), "{:?}", performed.execution);
     let start =
-        performed.instruction_transforms[1].apply(performed.score.instructions[1].from_.unwrap());
+        performed.instruction_transforms()[1].apply(performed.score.instructions[1].from_.unwrap());
     assert!((start.x - 0.3).abs() < 1e-9 && (start.y - 0.1).abs() < 1e-9);
     let other =
-        performed.instruction_transforms[2].apply(performed.score.instructions[2].from_.unwrap());
+        performed.instruction_transforms()[2].apply(performed.score.instructions[2].from_.unwrap());
     assert!((start.x - other.x).abs() < 1e-9 && (start.y - other.y).abs() < 1e-9);
     let mut internal = input;
     internal.instructions[2].relation = Some(
@@ -196,10 +196,10 @@ fn coordinated_placement_reaches_geometry_once_and_preserves_outer_scope_relatio
         .unwrap(),
     );
     let recovered = resolve(&internal);
-    assert_eq!(recovered.original_instruction_indices, [0, 1, 2]);
+    assert_eq!(recovered.original_instruction_indices(), [0, 1, 2]);
     assert_eq!(
-        recovered.instruction_transforms,
-        performed.instruction_transforms
+        recovered.instruction_transforms(),
+        performed.instruction_transforms()
     );
     let diagnostics = &recovered.execution.as_ref().unwrap().diagnostics;
     assert_eq!(diagnostics.len(), 1);
@@ -424,7 +424,7 @@ fn coordinated_actions_geometry_uses_shared_layout_and_target() {
                         height: 90.0,
                     }),
                 );
-                performed.instruction_transforms[index].apply(center)
+                performed.instruction_transforms()[index].apply(center)
             })
             .collect::<Vec<_>>();
         let bounds_center = Point::new(
@@ -479,7 +479,7 @@ fn coordinated_actions_geometry_uses_shared_layout_and_target() {
             assert!(collapsed.execution.is_none());
             for (index, instruction) in collapsed.score.instructions.iter().enumerate() {
                 let center =
-                    collapsed.instruction_transforms[index].apply(instruction.center.unwrap());
+                    collapsed.instruction_transforms()[index].apply(instruction.center.unwrap());
                 assert!((center.x - 0.5).abs() < 1e-9 && (center.y - 0.5).abs() < 1e-9);
             }
         }

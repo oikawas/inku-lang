@@ -32,34 +32,113 @@ pub struct PerformedFillScope {
     pub atomic_instruction_groups: Vec<Vec<usize>>,
 }
 
+/// What the renderer reads about one performed instruction besides the
+/// instruction itself. The instruction stays at the same index of the plan's
+/// `score.instructions`, because the presence layer, the material filters and
+/// the oil fill limit read the performed Score as a whole.
+#[derive(Clone, Debug, PartialEq)]
+pub struct PerformedInstruction {
+    /// Pre-omission expanded ordinal used by drawing IDs and seed material.
+    pub instruction_index: usize,
+    /// Original Score owner of this performed instruction.
+    pub original_instruction_index: usize,
+    /// Stable seed material for rigid group transforms. `None` retains the
+    /// normal seed derived from the performed instruction.
+    pub seed_override: Option<Seed>,
+    /// Geometry-only transform in physical short-side units.
+    pub transform: crate::affine::AffineTransform,
+    /// Performed centerline of a Line targeted by an explicit path connection.
+    /// Points are in physical short-side units and already include every transform.
+    pub line_centerline: Option<Vec<Point>>,
+    /// Performed index of the follower Arc of a successful checked-Touching
+    /// closed pair. The earlier Arc holds it so that the pair's fill can paint
+    /// below both outlines.
+    pub closed_arc_pair_follower: Option<usize>,
+    /// Innermost enclosing entry of the plan's `fill_scopes`.
+    pub fill_scope_index: Option<usize>,
+}
+
+impl PerformedInstruction {
+    /// An instruction performed as written: its own seed, no transform, and no
+    /// centerline, closed pair or fill scope.
+    pub(crate) fn plain(instruction_index: usize, original_instruction_index: usize) -> Self {
+        Self {
+            instruction_index,
+            original_instruction_index,
+            seed_override: None,
+            transform: crate::affine::AffineTransform::identity(),
+            line_centerline: None,
+            closed_arc_pair_follower: None,
+            fill_scope_index: None,
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct PerformancePlan {
     pub score: Score,
     pub warnings: Vec<PlanningWarning>,
-    /// Pre-omission expanded ordinals used by drawing IDs and seed material.
-    pub instruction_indices: Vec<usize>,
-    /// Original Score owners corresponding to each performed instruction.
-    pub original_instruction_indices: Vec<usize>,
-    /// Stable seed material for rigid group transforms, parallel to `score.instructions`.
-    /// `None` retains the normal seed derived from the performed instruction.
-    pub instruction_seed_overrides: Vec<Option<Seed>>,
-    /// Geometry-only transforms in physical short-side units, parallel to instructions.
-    pub instruction_transforms: Vec<crate::affine::AffineTransform>,
-    /// Performed centerlines for Lines targeted by explicit path connections.
-    /// Points are in physical short-side units and already include every transform.
-    pub line_centerlines: Vec<Option<Vec<Point>>>,
-    /// Performed follower Arc index for a successful checked-Touching closed pair.
-    /// Entries are keyed by the earlier Arc so its fill can paint below both outlines.
-    pub closed_arc_pair_followers: Vec<Option<usize>>,
+    /// One entry for each of `score.instructions`, in the same order.
+    pub performed: Vec<PerformedInstruction>,
     /// Prepared fill targets after their enclosing placement/relation/affine transforms.
     pub fill_scopes: Vec<PerformedFillScope>,
-    /// Fill scope index parallel to `score.instructions`.
-    pub instruction_fill_scope_indices: Vec<Option<usize>>,
     /// Recomputed admitted saved-Score demand when explicit authority was supplied.
     pub resource_demand: Option<inku_score::ResourceDemand>,
     pub resource_diagnostics: Vec<inku_score::SavedScoreResourceDiagnostic>,
     pub relation_diagnostics: Vec<inku_score::SavedScoreRelationDiagnostic>,
     pub execution: Option<inku_score::ScoreExecutionSummary>,
+}
+
+impl PerformancePlan {
+    /// Each performed instruction with what the renderer reads about it.
+    ///
+    /// # Panics
+    ///
+    /// When a builder left `score.instructions` and `performed` at different
+    /// lengths; reading them apart would drop instructions without a trace.
+    pub fn performed_instructions(
+        &self,
+    ) -> impl Iterator<Item = (&Instruction, &PerformedInstruction)> {
+        assert_eq!(
+            self.score.instructions.len(),
+            self.performed.len(),
+            "one performed entry per instruction"
+        );
+        self.score.instructions.iter().zip(&self.performed)
+    }
+
+    /// The drawing ordinal of each performed instruction.
+    #[must_use]
+    pub fn instruction_indices(&self) -> Vec<usize> {
+        self.performed
+            .iter()
+            .map(|entry| entry.instruction_index)
+            .collect()
+    }
+
+    /// The original Score owner of each performed instruction.
+    #[must_use]
+    pub fn original_instruction_indices(&self) -> Vec<usize> {
+        self.performed
+            .iter()
+            .map(|entry| entry.original_instruction_index)
+            .collect()
+    }
+
+    /// The geometry-only transform of each performed instruction.
+    #[must_use]
+    pub fn instruction_transforms(&self) -> Vec<crate::affine::AffineTransform> {
+        self.performed.iter().map(|entry| entry.transform).collect()
+    }
+
+    /// The seed override of each performed instruction.
+    #[must_use]
+    pub fn instruction_seed_overrides(&self) -> Vec<Option<Seed>> {
+        self.performed
+            .iter()
+            .map(|entry| entry.seed_override)
+            .collect()
+    }
 }
 
 fn instruction_extent(instruction: &Instruction) -> f64 {
@@ -194,23 +273,18 @@ pub fn resolve_performance(request: PerformanceRequest<'_>) -> PerformancePlan {
         request.performance_seed,
         request.canvas,
     );
+    // Each expanded instruction is performed once, in order.
+    let performed = original_instruction_indices
+        .into_iter()
+        .enumerate()
+        .map(|(index, original)| PerformedInstruction::plain(index, original))
+        .collect();
     let Some(seed) = request.performance_seed else {
-        let expanded_len = expanded.instructions.len();
-        let instruction_seed_overrides = vec![None; original_instruction_indices.len()];
         return PerformancePlan {
-            instruction_indices: (0..expanded.instructions.len()).collect(),
-            original_instruction_indices,
             score: expanded,
             warnings: Vec::new(),
-            instruction_transforms: vec![
-                crate::affine::AffineTransform::identity();
-                instruction_seed_overrides.len()
-            ],
-            line_centerlines: vec![None; expanded_len],
-            closed_arc_pair_followers: vec![None; expanded_len],
-            instruction_seed_overrides,
+            performed,
             fill_scopes: Vec::new(),
-            instruction_fill_scope_indices: vec![None; expanded_len],
             resource_demand: None,
             resource_diagnostics: Vec::new(),
             relation_diagnostics: Vec::new(),
@@ -246,23 +320,11 @@ pub fn resolve_performance(request: PerformanceRequest<'_>) -> PerformancePlan {
     }
     let mut score = expanded;
     score.instructions = resolved;
-    let instruction_indices = (0..score.instructions.len()).collect();
-    let instruction_seed_overrides = vec![None; score.instructions.len()];
-    let score_len = score.instructions.len();
     PerformancePlan {
         score,
         warnings,
-        instruction_indices,
-        original_instruction_indices,
-        instruction_transforms: vec![
-            crate::affine::AffineTransform::identity();
-            instruction_seed_overrides.len()
-        ],
-        line_centerlines: vec![None; score_len],
-        closed_arc_pair_followers: vec![None; score_len],
-        instruction_seed_overrides,
+        performed,
         fill_scopes: Vec::new(),
-        instruction_fill_scope_indices: vec![None; score_len],
         resource_demand: None,
         resource_diagnostics: Vec::new(),
         relation_diagnostics: Vec::new(),

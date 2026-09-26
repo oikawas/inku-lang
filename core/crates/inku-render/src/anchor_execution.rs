@@ -2,6 +2,7 @@
 
 use super::*;
 use crate::anchor_schedule::{AnchorSchedule, ScheduleNode, group_contains, schedule};
+use crate::performance::PerformedInstruction;
 use crate::planning::{Bounds, PlanningWarning};
 use crate::typed_performance::{TypedExecutionPlan, TypedMirrorBody, TypedMirrorRelation};
 use crate::types::Point;
@@ -2056,12 +2057,13 @@ impl Execution<'_> {
     }
 }
 
-fn closed_arc_pair_followers(
+/// Record the follower of each successful checked-Touching closed Arc pair on
+/// the pair's earlier performed Arc.
+fn mark_closed_arc_pairs(
     score: &Score,
     omitted_relations: &[bool],
-    original_instruction_indices: &[usize],
-) -> Vec<Option<usize>> {
-    let mut result = vec![None; original_instruction_indices.len()];
+    performed: &mut [PerformedInstruction],
+) {
     for (follower_owner, follower) in score.instructions.iter().enumerate() {
         let Some(relation) = follower.relation.as_ref() else {
             continue;
@@ -2084,21 +2086,23 @@ fn closed_arc_pair_followers(
         {
             continue;
         }
-        let targets = original_instruction_indices
-            .iter()
-            .enumerate()
-            .filter_map(|(performed, &owner)| (owner == target_owner).then_some(performed));
-        let followers = original_instruction_indices
-            .iter()
-            .enumerate()
-            .filter_map(|(performed, &owner)| (owner == follower_owner).then_some(performed));
-        for (target, follower) in targets.zip(followers) {
-            if target < follower && result[target].is_none() {
-                result[target] = Some(follower);
+        let performed_of = |owner: usize| {
+            performed
+                .iter()
+                .enumerate()
+                .filter_map(|(index, entry)| {
+                    (entry.original_instruction_index == owner).then_some(index)
+                })
+                .collect::<Vec<_>>()
+        };
+        let targets = performed_of(target_owner);
+        let followers = performed_of(follower_owner);
+        for (target, follower) in targets.into_iter().zip(followers) {
+            if target < follower && performed[target].closed_arc_pair_follower.is_none() {
+                performed[target].closed_arc_pair_follower = Some(follower);
             }
         }
     }
-    result
 }
 
 fn resolve_impl(
@@ -2403,30 +2407,24 @@ fn resolve_impl(
             diagnostics: execution.diagnostics,
         });
     }
-    let original_instruction_indices = rendered.iter().map(|(owner, _)| *owner).collect::<Vec<_>>();
-    let instruction_indices = rendered.iter().map(|(_, value)| value.ordinal).collect();
-    let instruction_seed_overrides = rendered
-        .iter()
-        .map(|(_, value)| value.seed_override)
-        .collect();
-    let instruction_transforms = rendered
-        .iter()
-        .map(|(owner, _)| execution.transforms[*owner])
-        .collect();
-    let line_centerlines = rendered
-        .iter()
-        .map(|(_, value)| value.line_centerline.clone())
-        .collect();
-    let closed_arc_pair_followers = closed_arc_pair_followers(
-        request.score,
-        &execution.omitted_relations,
-        &original_instruction_indices,
-    );
-    let mut score = request.score.clone();
-    score.instructions = rendered
+    let (instructions, mut performed): (Vec<_>, Vec<_>) = rendered
         .into_iter()
-        .map(|(_, value)| value.instruction)
-        .collect();
+        .map(|(owner, value)| {
+            let entry = PerformedInstruction {
+                instruction_index: value.ordinal,
+                original_instruction_index: owner,
+                seed_override: value.seed_override,
+                transform: execution.transforms[owner],
+                line_centerline: value.line_centerline,
+                closed_arc_pair_follower: None,
+                fill_scope_index: None,
+            };
+            (value.instruction, entry)
+        })
+        .unzip();
+    mark_closed_arc_pairs(request.score, &execution.omitted_relations, &mut performed);
+    let mut score = request.score.clone();
+    score.instructions = instructions;
     score.transform_groups.clear();
     score.placement_groups.clear();
     score.repetition_groups.clear();
@@ -2440,23 +2438,29 @@ fn resolve_impl(
             |typed| typed.input_score_digest.clone(),
         ),
         diagnostics: execution.diagnostics,
-        rendered_instruction_indices: original_instruction_indices.clone(),
+        rendered_instruction_indices: performed
+            .iter()
+            .map(|entry| entry.original_instruction_index)
+            .collect(),
     });
-    let (fill_scopes, instruction_fill_scope_indices) = if let Some(mut typed) = execution.typed {
+    let fill_scopes = if let Some(mut typed) = execution.typed {
         let mut used = vec![false; typed.fill_scopes.len()];
-        let mut dense_scopes = Vec::with_capacity(original_instruction_indices.len());
         let mut dense_to_performed = vec![Vec::new(); request.score.instructions.len()];
-        for (performed, &owner) in original_instruction_indices.iter().enumerate() {
-            dense_to_performed[owner].push(performed);
+        for (performed_index, entry) in performed.iter_mut().enumerate() {
+            let owner = entry.original_instruction_index;
+            dense_to_performed[owner].push(performed_index);
+            // The dense scope index until the used scopes are renumbered below.
             let scope = typed.instruction_fill_scope_indices[owner];
-            dense_scopes.push(scope);
+            entry.fill_scope_index = scope;
             let mut current = scope;
             while let Some(index) = current {
                 if execution.omitted_fill_scopes[index] {
                     break;
                 }
                 used[index] = true;
-                typed.fill_scopes[index].instruction_indices.push(performed);
+                typed.fill_scopes[index]
+                    .instruction_indices
+                    .push(performed_index);
                 current = typed.fill_scopes[index].parent_scope_index;
             }
         }
@@ -2504,25 +2508,18 @@ fn resolve_impl(
         for scope in &mut scopes {
             scope.parent_scope_index = scope.parent_scope_index.and_then(|old| scope_map[old]);
         }
-        let instruction_scopes = dense_scopes
-            .into_iter()
-            .map(|scope| scope.and_then(|old| scope_map[old]))
-            .collect();
-        (scopes, instruction_scopes)
+        for entry in &mut performed {
+            entry.fill_scope_index = entry.fill_scope_index.and_then(|old| scope_map[old]);
+        }
+        scopes
     } else {
-        (Vec::new(), vec![None; score.instructions.len()])
+        Vec::new()
     };
     Ok(PerformancePlan {
         score,
         warnings: execution.warnings,
-        instruction_indices,
-        original_instruction_indices,
-        instruction_seed_overrides,
-        instruction_transforms,
-        line_centerlines,
-        closed_arc_pair_followers,
+        performed,
         fill_scopes,
-        instruction_fill_scope_indices,
         resource_demand: None,
         resource_diagnostics: Vec::new(),
         relation_diagnostics: Vec::new(),

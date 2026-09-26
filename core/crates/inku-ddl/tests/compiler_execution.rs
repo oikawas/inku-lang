@@ -184,7 +184,7 @@ fn touching_bilingual_targets_reach_performed_both_ends_and_reject_wrong_nouns()
             canvas,
         };
         let plan = resolve_checked_performance(request, ScoreErrorPolicy::Stop).unwrap();
-        assert_eq!(plan.original_instruction_indices, [0, 1, 2, 3]);
+        assert_eq!(plan.original_instruction_indices(), [0, 1, 2, 3]);
         let endpoints = endpoint_geometry(&plan.score.instructions[0], canvas).unwrap();
         for instruction in &plan.score.instructions[1..] {
             let actual = endpoint_geometry(instruction, canvas).unwrap();
@@ -598,13 +598,13 @@ fn touching_explicit_facts_and_omission_chain_keep_original_dependencies() {
         );
         let plan = perform(score, ScoreErrorPolicy::OmitAndContinue).unwrap();
         assert_eq!(
-            stopped.original_instruction_indices,
-            plan.original_instruction_indices
+            stopped.original_instruction_indices(),
+            plan.original_instruction_indices()
         );
         // An unsatisfiable touch removes only that relation edge; the shapes
         // and the later chain are still drawn.
-        assert_eq!(plan.original_instruction_indices, [0, 1, 2, 3]);
-        assert_eq!(plan.instruction_indices, [0, 1, 2, 3]);
+        assert_eq!(plan.original_instruction_indices(), [0, 1, 2, 3]);
+        assert_eq!(plan.instruction_indices(), [0, 1, 2, 3]);
         let summary = plan.execution.as_ref().unwrap();
         assert_eq!(summary.diagnostics.len(), 1);
         assert_eq!(summary.diagnostics[0].instruction_index, 1);
@@ -734,12 +734,12 @@ fn touching_flat_macro_color_binding_has_same_effective_score_and_performance() 
     let omitted =
         resolve_checked_performance(request(), ScoreErrorPolicy::OmitAndContinue).unwrap();
     assert_eq!(
-        stopped.original_instruction_indices,
-        omitted.original_instruction_indices
+        stopped.original_instruction_indices(),
+        omitted.original_instruction_indices()
     );
     // The conflicting touch removes only its relation edge; all four Macro
     // emits are still drawn.
-    assert_eq!(omitted.original_instruction_indices, [0, 1, 2, 3]);
+    assert_eq!(omitted.original_instruction_indices(), [0, 1, 2, 3]);
     assert_eq!(
         omitted.execution.as_ref().unwrap().diagnostics[0].disposition,
         inku_score::ScoreExecutionDisposition::RelationOmitted
@@ -833,7 +833,7 @@ fn declared_normal_scale_is_fixed_for_touching_and_preserves_omission_owner() {
             let continued =
                 resolve_checked_performance(request(), ScoreErrorPolicy::OmitAndContinue).unwrap();
             // Only the touch is removed; both emits are still drawn.
-            assert_eq!(continued.original_instruction_indices, [0, 1]);
+            assert_eq!(continued.original_instruction_indices(), [0, 1]);
             let joined =
                 map_compiler_render_execution(&execution, score, continued.execution.as_ref())
                     .unwrap();

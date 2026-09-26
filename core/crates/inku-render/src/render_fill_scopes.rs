@@ -3,7 +3,7 @@
 use std::collections::BTreeMap;
 
 use crate::compat_clip::{ClipError, ClipLimits, ClipOptions, clip_element};
-use crate::performance::PerformedFillScope;
+use crate::performance::{PerformedFillScope, PerformedInstruction};
 use crate::svg::{Element, Node};
 use crate::types::SvgProfile;
 use inku_score::{ScoreExecutionDiagnostic, ScoreExecutionDisposition, ScoreExecutionReason};
@@ -82,7 +82,7 @@ impl FillPaintForest {
         profile: SvgProfile,
         definitions: &mut Vec<Element>,
         clip_policy: CompatFillClipPolicy,
-        original_indices: &[usize],
+        performed: &[PerformedInstruction],
     ) -> (Vec<Element>, Vec<ScoreExecutionDiagnostic>, Vec<usize>) {
         let roots = std::mem::take(&mut self.roots);
         let mut failures = BTreeMap::new();
@@ -122,7 +122,9 @@ impl FillPaintForest {
         let elements = paints.into_iter().map(|(_, element)| element).collect();
         let mut originals = BTreeMap::new();
         for (index, reason) in failures {
-            originals.entry(original_indices[index]).or_insert(reason);
+            originals
+                .entry(performed[index].original_instruction_index)
+                .or_insert(reason);
         }
         let omitted = originals.keys().copied().collect();
         let diagnostics = originals

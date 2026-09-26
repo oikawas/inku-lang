@@ -463,39 +463,12 @@ fn render_impl(
     });
     let oil_fill_pass_limit = crate::fills::oil_fill_pass_limit(&performance.score.instructions);
     let mut ordered = performance
-        .instruction_indices
-        .iter()
-        .copied()
-        .zip(performance.score.instructions.iter())
-        .zip(performance.instruction_seed_overrides.iter().copied())
-        .zip(performance.instruction_transforms.iter().copied())
-        .zip(performance.instruction_fill_scope_indices.iter().copied())
+        .performed_instructions()
         .enumerate()
-        .map(
-            |(
-                performed_index,
-                (
-                    (
-                        ((instruction_index, instruction), instruction_seed_override),
-                        instruction_transform,
-                    ),
-                    fill_scope,
-                ),
-            )| {
-                (
-                    instruction_index,
-                    instruction,
-                    instruction_seed_override,
-                    instruction_transform,
-                    fill_scope,
-                    performed_index,
-                )
-            },
-        )
         .collect::<Vec<_>>();
     // Carve marks remove paint, so they follow every additive mark. The sort is
     // stable, so each part keeps its performed order.
-    ordered.sort_by_key(|(_, instruction, _, _, _, _)| instruction.mode_ == InstructionMode::Carve);
+    ordered.sort_by_key(|(_, (instruction, _))| instruction.mode_ == InstructionMode::Carve);
     let placement_seed = request
         .options
         .composition_seed
@@ -550,16 +523,12 @@ fn render_impl(
     }
     let mut surface_definitions = Vec::new();
     let mut closed_arc_pair_spread_marks = BTreeSet::new();
-    for (
-        instruction_index,
-        instruction,
-        instruction_seed_override,
-        instruction_transform,
-        fill_scope,
-        performed_index,
-    ) in ordered
-    {
-        let line_centerline = performance.line_centerlines[performed_index].as_deref();
+    for (performed_index, (instruction, performed)) in ordered {
+        let instruction_index = performed.instruction_index;
+        let instruction_seed_override = performed.seed_override;
+        let instruction_transform = performed.transform;
+        let fill_scope = performed.fill_scope_index;
+        let line_centerline = performed.line_centerline.as_deref();
         let expanded = if instruction.arrangement.is_some() {
             expand_arrangement(ArrangementRequest {
                 instruction,
@@ -575,12 +544,12 @@ fn render_impl(
             instruction_group.set_attr("id", instruction_id(instruction, instruction_index));
         }
         if expanded.len() == 1
-            && let Some(follower_performed_index) =
-                performance.closed_arc_pair_followers[performed_index]
+            && let Some(follower_performed_index) = performed.closed_arc_pair_follower
             && let Some(follower) = performance.score.instructions.get(follower_performed_index)
+            && let Some(follower_performed) = performance.performed.get(follower_performed_index)
             && follower.arrangement.is_none()
             && follower.mode_ == instruction.mode_
-            && performance.instruction_fill_scope_indices[follower_performed_index] == fill_scope
+            && follower_performed.fill_scope_index == fill_scope
         {
             let first_context = MarkContext {
                 canvas: request.options.canvas,
@@ -598,10 +567,10 @@ fn render_impl(
                 oil_fill_pass_limit,
             };
             let follower_context = MarkContext {
-                instruction_seed_override: performance.instruction_seed_overrides
-                    [follower_performed_index],
-                instruction_index: performance.instruction_indices[follower_performed_index],
-                geometry_transform: performance.instruction_transforms[follower_performed_index]
+                instruction_seed_override: follower_performed.seed_override,
+                instruction_index: follower_performed.instruction_index,
+                geometry_transform: follower_performed
+                    .transform
                     .in_pixels(request.options.canvas.unit()),
                 ..first_context
             };
@@ -713,7 +682,7 @@ fn render_impl(
             profile,
             &mut definitions,
             clip_policy,
-            &performance.original_instruction_indices,
+            &performance.performed,
         );
         material_definitions.extend(definitions.into_iter().skip(before));
         for element in paint {

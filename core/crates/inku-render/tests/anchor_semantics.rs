@@ -24,14 +24,14 @@ fn start(plan: &PerformancePlan, index: usize) -> Point {
     let point = endpoint_geometry(&plan.score.instructions[index], None)
         .unwrap()
         .0;
-    plan.instruction_transforms[index].apply(point)
+    plan.instruction_transforms()[index].apply(point)
 }
 
 fn endpoints(plan: &PerformancePlan, index: usize, canvas: Option<CanvasSize>) -> (Point, Point) {
     let (start, end, _, _) = endpoint_geometry(&plan.score.instructions[index], canvas).unwrap();
     (
-        plan.instruction_transforms[index].apply(start),
-        plan.instruction_transforms[index].apply(end),
+        plan.instruction_transforms()[index].apply(start),
+        plan.instruction_transforms()[index].apply(end),
     )
 }
 
@@ -126,8 +126,8 @@ fn forward_anchor_and_ordinary_dependent_use_final_position_without_extra_svg() 
     "transform_groups":[{"start":2,"end":3,"rotation_degrees":90,"anchor_indices":[0]}]}"#,
     );
     let performed = resolve_checked_performance(request(&input), ScoreErrorPolicy::Stop).unwrap();
-    assert_eq!(performed.original_instruction_indices, [0, 1, 2]);
-    assert_eq!(performed.instruction_indices, [0, 1, 2]);
+    assert_eq!(performed.original_instruction_indices(), [0, 1, 2]);
+    assert_eq!(performed.instruction_indices(), [0, 1, 2]);
     near(start(&performed, 0), 0.4, 0.4);
     near(start(&performed, 1), 0.5, 0.4);
     assert!(
@@ -236,7 +236,7 @@ fn numeric_conflicts_cycles_and_unsupported_anchor_relations_keep_original_depen
     let anchor_only =
         resolve_checked_performance(request(&anchor_only), ScoreErrorPolicy::OmitAndContinue)
             .unwrap();
-    assert_eq!(anchor_only.original_instruction_indices, [0, 1]);
+    assert_eq!(anchor_only.original_instruction_indices(), [0, 1]);
     let diagnostics = &anchor_only.execution.as_ref().unwrap().diagnostics;
     assert_eq!(
         diagnostics[0].reason,
@@ -263,7 +263,7 @@ fn numeric_conflicts_cycles_and_unsupported_anchor_relations_keep_original_depen
     );
     let omitted =
         resolve_checked_performance(request(&numeric), ScoreErrorPolicy::OmitAndContinue).unwrap();
-    assert_eq!(omitted.original_instruction_indices, [0, 1, 2]);
+    assert_eq!(omitted.original_instruction_indices(), [0, 1, 2]);
     assert_eq!(stopped, omitted);
     let diagnostics = &omitted.execution.as_ref().unwrap().diagnostics;
     assert_eq!(diagnostics.len(), 1);
@@ -294,8 +294,8 @@ fn numeric_conflicts_cycles_and_unsupported_anchor_relations_keep_original_depen
     );
     let omitted =
         resolve_checked_performance(request(&cycle), ScoreErrorPolicy::OmitAndContinue).unwrap();
-    assert_eq!(omitted.original_instruction_indices, [0, 1, 2, 3]);
-    assert_eq!(omitted.instruction_indices, [0, 1, 2, 3]);
+    assert_eq!(omitted.original_instruction_indices(), [0, 1, 2, 3]);
+    assert_eq!(omitted.instruction_indices(), [0, 1, 2, 3]);
     assert_eq!(stopped, omitted);
     near(start(&omitted, 3), 0.2, 0.2);
     assert!(
@@ -318,7 +318,7 @@ fn numeric_conflicts_cycles_and_unsupported_anchor_relations_keep_original_depen
     let omitted =
         resolve_checked_performance(request(&unsupported), ScoreErrorPolicy::OmitAndContinue)
             .unwrap();
-    assert_eq!(omitted.original_instruction_indices, [0, 1]);
+    assert_eq!(omitted.original_instruction_indices(), [0, 1]);
     assert_eq!(
         omitted.execution.unwrap().diagnostics[0].reason,
         ScoreExecutionReason::UnsupportedAnchorRelation
@@ -352,7 +352,7 @@ fn group_connections_require_one_compatible_translation() {
     );
     let omitted =
         resolve_checked_performance(request(&input), ScoreErrorPolicy::OmitAndContinue).unwrap();
-    assert_eq!(omitted.original_instruction_indices, [0, 1, 2, 3]);
+    assert_eq!(omitted.original_instruction_indices(), [0, 1, 2, 3]);
     assert_eq!(stopped, omitted);
     near(start(&omitted, 0), 0.4, 0.4);
     near(start(&omitted, 2), 0.5, 0.5);
@@ -413,10 +413,15 @@ fn path_connected_closed_leaves_follow_one_varied_branch_through_outer_affine() 
     .unwrap();
     assert!(performed.execution.is_none(), "{:?}", performed.execution);
     assert_eq!(
-        performed.closed_arc_pair_followers,
+        performed
+            .performed
+            .iter()
+            .map(|entry| entry.closed_arc_pair_follower)
+            .collect::<Vec<_>>(),
         [None, Some(2), None, Some(4), None]
     );
-    let centerline = performed.line_centerlines[0]
+    let centerline = performed.performed[0]
+        .line_centerline
         .as_deref()
         .expect("the targeted varied branch fixes one performed centerline");
     assert!(centerline.len() > 2);
@@ -515,7 +520,8 @@ fn interior_path_connections_are_reproducible_and_follow_transformed_line_and_ar
     assert!((0.0..1.0).contains(&line_position));
 
     let arc_connection = start(&performed, 3);
-    let arc_centerline = performed.line_centerlines[2]
+    let arc_centerline = performed.performed[2]
+        .line_centerline
         .as_deref()
         .expect("an interior Arc target fixes one rendered centerline");
     assert!(arc_centerline.windows(2).any(|segment| {
@@ -567,8 +573,8 @@ fn selected_line_and_arc_endpoints_keep_identity_through_outer_reflection_and_ro
     )
     .unwrap();
     assert!(performed.execution.is_none(), "{:?}", performed.execution);
-    assert_eq!(performed.original_instruction_indices, [0, 1, 2, 3, 4, 5]);
-    let line = performed.line_centerlines[0].as_deref().unwrap();
+    assert_eq!(performed.original_instruction_indices(), [0, 1, 2, 3, 4, 5]);
+    let line = performed.performed[0].line_centerline.as_deref().unwrap();
     near_point(endpoints(&performed, 1, Some(canvas)).0, line[0]);
     near_point(
         endpoints(&performed, 2, Some(canvas)).0,

@@ -1605,11 +1605,12 @@ pub(crate) fn resolve(
             &dense_anchor_to_original,
         );
     }
-    for owner in &mut performance.original_instruction_indices {
-        *owner = dense_to_original[*owner];
+    for entry in &mut performance.performed {
+        entry.original_instruction_index = dense_to_original[entry.original_instruction_index];
     }
+    let rendered_instruction_indices = performance.original_instruction_indices();
     if let Some(execution) = &mut performance.execution {
-        execution.rendered_instruction_indices = performance.original_instruction_indices.clone();
+        execution.rendered_instruction_indices = rendered_instruction_indices;
         execution.rendered_instruction_indices.sort_unstable();
         execution.rendered_instruction_indices.dedup();
     }
@@ -1856,7 +1857,7 @@ mod tests {
         assert_eq!(first, second);
         assert_eq!(first.score.instructions.len(), 11);
         assert_eq!(
-            first.original_instruction_indices,
+            first.original_instruction_indices(),
             vec![0, 0, 1, 0, 0, 1, 2, 3, 2, 3, 4]
         );
         assert!(
@@ -1870,7 +1871,7 @@ mod tests {
         assert!(first.score.repetition_groups.is_empty());
         assert!(first.score.fill_groups.is_empty());
         assert_eq!(first.fill_scopes.len(), 3);
-        assert!(first.instruction_transforms[0].b.abs() > 0.1);
+        assert!(first.instruction_transforms()[0].b.abs() > 0.1);
         assert_eq!(
             first.fill_scopes[0].instruction_indices,
             vec![0, 1, 2, 3, 4, 5]
@@ -1884,7 +1885,11 @@ mod tests {
             Some(&vec![0, 1, 2, 3, 4, 5])
         );
         assert_eq!(
-            first.instruction_fill_scope_indices,
+            first
+                .performed
+                .iter()
+                .map(|entry| entry.fill_scope_index)
+                .collect::<Vec<_>>(),
             vec![
                 Some(1),
                 Some(1),
@@ -1908,9 +1913,9 @@ mod tests {
                 None,
             );
             assert!(
-                first.fill_scopes[first.instruction_fill_scope_indices[index].unwrap()]
+                first.fill_scopes[first.performed[index].fill_scope_index.unwrap()]
                     .prepared_region
-                    .contains(first.instruction_transforms[index].apply(center))
+                    .contains(first.instruction_transforms()[index].apply(center))
             );
         }
 
@@ -1924,7 +1929,7 @@ mod tests {
             )
             .unwrap();
         assert_eq!(
-            omitted.original_instruction_indices,
+            omitted.original_instruction_indices(),
             vec![0, 0, 1, 0, 0, 1, 4]
         );
         let execution = omitted.execution.unwrap();
@@ -1943,7 +1948,7 @@ mod tests {
             )
             .unwrap();
         assert!(empty.score.instructions.is_empty());
-        assert!(empty.original_instruction_indices.is_empty());
+        assert!(empty.original_instruction_indices().is_empty());
     }
 
     #[test]
@@ -2055,10 +2060,10 @@ mod tests {
                 .windows(2)
                 .all(|pair| (pair[1].x - pair[0].x - 0.2).abs() < 1.0e-12)
         );
-        assert_eq!(cycled.original_instruction_indices, vec![0; 5]);
+        assert_eq!(cycled.original_instruction_indices(), vec![0; 5]);
         assert_eq!(
-            cycled.instruction_seed_overrides,
-            baseline.instruction_seed_overrides
+            cycled.instruction_seed_overrides(),
+            baseline.instruction_seed_overrides()
         );
         assert_eq!(cycled.resource_demand, baseline.resource_demand);
         assert_eq!(
@@ -2099,7 +2104,7 @@ mod tests {
                 .score
                 .instructions
                 .iter()
-                .zip(&performance.original_instruction_indices)
+                .zip(&performance.original_instruction_indices())
                 .filter_map(|(instruction, &owner)| { (owner == 2).then_some(instruction.color) })
                 .collect::<Vec<_>>(),
             vec![inku_score::Color::Red, inku_score::Color::Red]
@@ -2169,7 +2174,7 @@ mod tests {
         index: usize,
         point: Point,
     ) -> Point {
-        performance.instruction_transforms[index].apply(point)
+        performance.instruction_transforms()[index].apply(point)
     }
 
     #[test]
@@ -2218,8 +2223,8 @@ mod tests {
         )
         .unwrap();
         assert_eq!(
-            outer.instruction_seed_overrides,
-            base.instruction_seed_overrides
+            outer.instruction_seed_overrides(),
+            base.instruction_seed_overrides()
         );
         let outer_target = performed_point(&outer, 0, outer.score.instructions[0].from_.unwrap());
         let outer_follower = performed_point(&outer, 1, outer.score.instructions[1].from_.unwrap());
@@ -2261,7 +2266,7 @@ mod tests {
         )
         .unwrap();
         assert_eq!(performance.score.instructions.len(), 3);
-        assert_eq!(performance.original_instruction_indices, vec![0, 1, 2]);
+        assert_eq!(performance.original_instruction_indices(), vec![0, 1, 2]);
         assert!(
             performance
                 .execution
@@ -2376,8 +2381,8 @@ mod tests {
                 .is_none_or(|execution| execution.diagnostics.is_empty())
         );
         assert_eq!(
-            mirrored.instruction_seed_overrides,
-            baseline.instruction_seed_overrides
+            mirrored.instruction_seed_overrides(),
+            baseline.instruction_seed_overrides()
         );
         assert_eq!(
             mirrored.score.instructions[1].color,
@@ -2409,8 +2414,8 @@ mod tests {
             baseline.score.instructions[1]
         );
         assert_eq!(
-            rejected.instruction_transforms[1],
-            baseline.instruction_transforms[1]
+            rejected.instruction_transforms()[1],
+            baseline.instruction_transforms()[1]
         );
     }
 
@@ -2477,8 +2482,8 @@ mod tests {
             baseline.score.instructions[2..]
         );
         assert_eq!(
-            rejected.instruction_transforms[2..],
-            baseline.instruction_transforms[2..]
+            rejected.instruction_transforms()[2..],
+            baseline.instruction_transforms()[2..]
         );
     }
 
@@ -2630,7 +2635,7 @@ mod tests {
 
         assert_eq!(first, second);
         assert_eq!(
-            first.original_instruction_indices,
+            first.original_instruction_indices(),
             vec![0, 1, 2, 0, 1, 2, 0, 1]
         );
         assert_eq!(
@@ -2652,18 +2657,18 @@ mod tests {
             ]
         );
         let circle_centers = [0, 3, 6].map(|index| {
-            first.instruction_transforms[index]
+            first.instruction_transforms()[index]
                 .apply(first.score.instructions[index].center.unwrap())
         });
         let line_midpoints = [1, 4, 7].map(|index| {
             let instruction = &first.score.instructions[index];
             let from = instruction.from_.unwrap();
             let to = instruction.to.unwrap();
-            first.instruction_transforms[index]
+            first.instruction_transforms()[index]
                 .apply(Point::new((from.x + to.x) / 2.0, (from.y + to.y) / 2.0))
         });
         let arc_centers = [2, 5].map(|index| {
-            first.instruction_transforms[index]
+            first.instruction_transforms()[index]
                 .apply(first.score.instructions[index].center.unwrap())
         });
         for centers in [&circle_centers[..], &line_midpoints[..], &arc_centers[..]] {
@@ -2675,7 +2680,7 @@ mod tests {
         assert_eq!(first.resource_demand.as_ref().unwrap().logical_objects, 5);
         assert_eq!(first.resource_demand.as_ref().unwrap().primitive_marks, 8);
         assert_eq!(
-            first.instruction_seed_overrides,
+            first.instruction_seed_overrides(),
             [
                 (0, 0),
                 (1, 0),

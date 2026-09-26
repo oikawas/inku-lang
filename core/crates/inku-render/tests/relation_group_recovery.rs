@@ -23,8 +23,8 @@ fn plan(value: Value, canvas: Option<CanvasSize>, policy: ScoreErrorPolicy) -> P
 fn endpoints(plan: &PerformancePlan, index: usize, canvas: Option<CanvasSize>) -> (Point, Point) {
     let (start, end, _, _) = endpoint_geometry(&plan.score.instructions[index], canvas).unwrap();
     (
-        plan.instruction_transforms[index].apply(start),
-        plan.instruction_transforms[index].apply(end),
+        plan.instruction_transforms()[index].apply(start),
+        plan.instruction_transforms()[index].apply(end),
     )
 }
 
@@ -62,13 +62,13 @@ fn common_translation(
         near(moved_end, Point::new(end.x + delta.x, end.y + delta.y));
     }
     assert_eq!(
-        before.instruction_seed_overrides,
-        after.instruction_seed_overrides
+        before.instruction_seed_overrides(),
+        after.instruction_seed_overrides()
     );
-    assert_eq!(before.instruction_indices, after.instruction_indices);
+    assert_eq!(before.instruction_indices(), after.instruction_indices());
     assert_eq!(
-        before.original_instruction_indices,
-        after.original_instruction_indices
+        before.original_instruction_indices(),
+        after.original_instruction_indices()
     );
 }
 
@@ -151,8 +151,11 @@ fn along_and_cutting_preserve_rigid_geometry_and_omit_only_impossible_relations(
         input["instructions"][1]["relation"]["position_authority"] = json!("numeric_fixed");
         for policy in [ScoreErrorPolicy::Stop, ScoreErrorPolicy::OmitAndContinue] {
             let failed = plan(input.clone(), None, policy);
-            assert_eq!(failed.original_instruction_indices, [0, 1, 2, 3]);
-            assert_eq!(failed.instruction_transforms, before.instruction_transforms);
+            assert_eq!(failed.original_instruction_indices(), [0, 1, 2, 3]);
+            assert_eq!(
+                failed.instruction_transforms(),
+                before.instruction_transforms()
+            );
             assert_eq!(
                 failed.execution.as_ref().unwrap().diagnostics[0].disposition,
                 ScoreExecutionDisposition::RelationOmitted
@@ -162,7 +165,10 @@ fn along_and_cutting_preserve_rigid_geometry_and_omit_only_impossible_relations(
         input["transform_groups"][0]["rotation_degrees"] = json!(90);
         let failed = plan(input.clone(), None, ScoreErrorPolicy::Stop);
         let before = baseline(input, None);
-        assert_eq!(failed.instruction_transforms, before.instruction_transforms);
+        assert_eq!(
+            failed.instruction_transforms(),
+            before.instruction_transforms()
+        );
         assert_eq!(failed.execution.as_ref().unwrap().diagnostics.len(), 1);
     }
 }
@@ -188,7 +194,10 @@ fn common_candidate_uses_relation_predicates_and_conflicts_restore_original_grou
         json!({"type":"connected","target_anchor_index":1,"position_authority":"named_movable"});
     input["anchors"][0]["position"] = json!([0.5, 0.65]);
     let failed = plan(input, None, ScoreErrorPolicy::Stop);
-    assert_eq!(failed.instruction_transforms, before.instruction_transforms);
+    assert_eq!(
+        failed.instruction_transforms(),
+        before.instruction_transforms()
+    );
     let diagnostics = &failed.execution.as_ref().unwrap().diagnostics;
     assert_eq!(
         diagnostics
@@ -236,7 +245,7 @@ fn missing_references_and_cycles_keep_sources_and_downstream_targets_for_both_po
                 .all(|d| d.disposition == ScoreExecutionDisposition::RelationOmitted)
         );
         assert_eq!(
-            stop.original_instruction_indices,
+            stop.original_instruction_indices(),
             (0..stop.score.instructions.len()).collect::<Vec<_>>()
         );
         near(endpoints(&stop, 0, None).0, Point::new(0.1, 0.1));
@@ -276,8 +285,11 @@ fn not_touching_uses_final_bounds_and_keeps_already_separated_numeric_groups() {
 
     input["instructions"][1]["relation"]["position_authority"] = json!("numeric_fixed");
     let failed = plan(input.clone(), canvas, ScoreErrorPolicy::Stop);
-    assert_eq!(failed.original_instruction_indices, [0, 1, 2, 3]);
-    assert_eq!(failed.instruction_transforms, before.instruction_transforms);
+    assert_eq!(failed.original_instruction_indices(), [0, 1, 2, 3]);
+    assert_eq!(
+        failed.instruction_transforms(),
+        before.instruction_transforms()
+    );
     assert_eq!(
         failed.execution.unwrap().diagnostics[0].reason,
         ScoreExecutionReason::NumericNotTouchingPositionConflict
@@ -287,7 +299,10 @@ fn not_touching_uses_final_bounds_and_keeps_already_separated_numeric_groups() {
     let before = baseline(input.clone(), canvas);
     let far = plan(input, canvas, ScoreErrorPolicy::Stop);
     assert!(far.execution.is_none());
-    assert_eq!(far.instruction_transforms, before.instruction_transforms);
+    assert_eq!(
+        far.instruction_transforms(),
+        before.instruction_transforms()
+    );
 
     let standalone = json!({"version":"0.6.0","instructions":[
         {"primitive":"circle","center":[0.2,0.2],"radius":0.03},
@@ -296,7 +311,7 @@ fn not_touching_uses_final_bounds_and_keeps_already_separated_numeric_groups() {
     ]});
     let resolved = plan(standalone, None, ScoreErrorPolicy::Stop);
     assert!(resolved.execution.is_none());
-    assert!(resolved.instruction_transforms[1].is_identity());
+    assert!(resolved.instruction_transforms()[1].is_identity());
 }
 
 #[test]
@@ -330,8 +345,11 @@ fn between_waits_for_both_final_targets_and_moves_an_internal_target_with_its_gr
     let mut fixed = input;
     fixed["instructions"][2]["relation"]["position_authority"] = json!("numeric_fixed");
     let failed = plan(fixed, None, ScoreErrorPolicy::Stop);
-    assert_eq!(failed.instruction_transforms, before.instruction_transforms);
-    assert_eq!(failed.original_instruction_indices, [0, 1, 2, 3]);
+    assert_eq!(
+        failed.instruction_transforms(),
+        before.instruction_transforms()
+    );
+    assert_eq!(failed.original_instruction_indices(), [0, 1, 2, 3]);
     assert_eq!(
         failed.execution.unwrap().diagnostics[0].reason,
         ScoreExecutionReason::NumericBetweenPositionConflict
@@ -345,5 +363,5 @@ fn between_waits_for_both_final_targets_and_moves_an_internal_target_with_its_gr
     ]});
     let resolved = plan(standalone, None, ScoreErrorPolicy::Stop);
     assert!(resolved.execution.is_none());
-    assert!(resolved.instruction_transforms[2].is_identity());
+    assert!(resolved.instruction_transforms()[2].is_identity());
 }

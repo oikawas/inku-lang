@@ -6,6 +6,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 36 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-26 — the render core keeps each performed instruction's facts in one type
+
+The render core's performance plan (`PerformancePlan`) held what it knew about each performed instruction (the ordinal behind drawing IDs and seeds, the original instruction, a seed override, a transform, a line centerline, a closed arc pair and a fill scope) in seven arrays beside the instruction list. Drawing read them with `zip`, so an array of the wrong length was silently cut to the shortest. The facts are now one `PerformedInstruction` per instruction, and drawing stops if that list and the instructions differ in length. The instructions themselves stay in `score.instructions`, because the presence layer, the material filters and the oil fill limit read the performed Score as a whole. Drawing results do not change (the 12,798 saved renders are identical).
+
 ### 2026-09-26 — the public CI's Rust lint passes
 
 The public CI's Android workflow had not reached its Rust lint step (`clippy -D warnings` on Rust 1.95.0) since 27 August, because earlier steps, first the tests and then formatting, failed before it. With formatting fixed, the shared core had 158 findings.

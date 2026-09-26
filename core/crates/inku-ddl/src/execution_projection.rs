@@ -38,7 +38,8 @@ pub(crate) struct ReadyExecutionProjection {
 }
 
 pub(crate) enum ExecutionProjectionResult {
-    Ready(ReadyExecutionProjection),
+    // Boxed: a ready projection is far larger than the stop diagnostics.
+    Ready(Box<ReadyExecutionProjection>),
     Stopped(Vec<CompilerExecutionDiagnostic>),
 }
 
@@ -426,10 +427,10 @@ pub(crate) fn project_compilation_for_execution(
         source_instruction_indices,
         source_group_indices,
     };
-    ExecutionProjectionResult::Ready(ReadyExecutionProjection {
+    ExecutionProjectionResult::Ready(Box::new(ReadyExecutionProjection {
         projection,
         diagnostics,
-    })
+    }))
 }
 
 fn relation_omission_unit(
@@ -915,12 +916,11 @@ fn retain_ast(
         .instructions
         .iter()
         .enumerate()
-        .filter_map(|(index, instruction)| {
-            keep[index].then(|| {
-                index_map[index] = Some(source_instruction_indices.len());
-                source_instruction_indices.push(index);
-                instruction.clone()
-            })
+        .filter(|&(index, _)| keep[index])
+        .map(|(index, instruction)| {
+            index_map[index] = Some(source_instruction_indices.len());
+            source_instruction_indices.push(index);
+            instruction.clone()
         })
         .collect::<Vec<_>>();
     for instruction in &mut instructions {

@@ -620,7 +620,7 @@ fn disabled_row_is_unknown_while_active_rows_remain_source_preserving() {
     assert!(result.diagnostics.iter().any(|diagnostic| {
         diagnostic.kind == NeutralDiagnosticKind::Unknown
             && diagnostic.surface == disabled.1.surface_ja
-            && &source[diagnostic.span.start_byte..diagnostic.span.end_byte] == diagnostic.surface
+            && source[diagnostic.span.start_byte..diagnostic.span.end_byte] == diagnostic.surface
     }));
     for token in &result.tokens {
         assert_eq!(

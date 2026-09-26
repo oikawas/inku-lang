@@ -472,7 +472,7 @@ fn conflict_unknown_and_unresolved_replacements_never_return_a_candidate() {
     let missing_lock = compile_typed_ddl(
         NormalizedDdlDocument::new("Canon.Empty", ResolvedInstructionLanguage::En, Vec::new())
             .unwrap(),
-        &[definition.clone()],
+        std::slice::from_ref(&definition),
         None,
         LIMITS,
     );

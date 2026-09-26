@@ -386,13 +386,11 @@ pub fn render_with_resources(
                     diagnostic.reason,
                     inku_score::ScoreExecutionReason::FillClipUnsupported
                         | inku_score::ScoreExecutionReason::FillClipLimitExceeded
-                ) {
-                    if let std::collections::btree_map::Entry::Vacant(entry) =
-                        omitted.entry(diagnostic.instruction_index)
-                    {
-                        entry.insert(diagnostic.clone());
-                        changed = true;
-                    }
+                ) && let std::collections::btree_map::Entry::Vacant(entry) =
+                    omitted.entry(diagnostic.instruction_index)
+                {
+                    entry.insert(diagnostic.clone());
+                    changed = true;
                 }
             }
             if !changed {

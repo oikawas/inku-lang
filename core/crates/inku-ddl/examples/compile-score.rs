@@ -35,7 +35,7 @@ const LIMITS: MacroExpansionLimits = MacroExpansionLimits {
 #[derive(Deserialize)]
 #[serde(untagged)]
 enum RequestEnvelope {
-    One(Request),
+    One(Box<Request>),
     Many(Vec<Request>),
 }
 
@@ -119,7 +119,7 @@ fn main() -> Result<(), String> {
     let requests = match serde_json::from_str::<RequestEnvelope>(&input)
         .map_err(|error| format!("parse request JSON: {error}"))?
     {
-        RequestEnvelope::One(request) => vec![request],
+        RequestEnvelope::One(request) => vec![*request],
         RequestEnvelope::Many(requests) => requests,
     };
     let responses = requests

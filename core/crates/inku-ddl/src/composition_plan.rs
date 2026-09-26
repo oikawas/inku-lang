@@ -276,7 +276,8 @@ pub enum ObjectAnchor {
     /// Generated exact coordinates; the enclosing plan retains the MacroEmit owner.
     GeneratedNumeric(crate::geometry::ExactPosition),
     /// Original exact coordinates, basis and provenance, including must-fit authority.
-    Numeric(SemanticNumericPosition),
+    /// Boxed: it is several times larger than the other anchors.
+    Numeric(Box<SemanticNumericPosition>),
     /// Existing finite named-region resolution; performance chooses the anchor.
     Named([f64; 4]),
 }

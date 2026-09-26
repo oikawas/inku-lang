@@ -40,7 +40,8 @@ pub enum PlanResourceFailure {
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 pub struct PlanResourceError {
-    pub owner: PlanResourceOwner,
+    /// Boxed so that every Result that can carry this error stays small.
+    pub owner: Box<PlanResourceOwner>,
     pub reason: PlanResourceFailure,
 }
 
@@ -73,7 +74,7 @@ impl<'plan, 'source> AdmittedCompositionPlan<'plan, 'source> {
 
 fn invalid(owner: &PlanResourceOwner, reason: &'static str) -> PlanResourceError {
     PlanResourceError {
-        owner: owner.clone(),
+        owner: Box::new(owner.clone()),
         reason: PlanResourceFailure::InvalidContract(reason),
     }
 }
@@ -99,7 +100,7 @@ impl Accounting {
             .demand
             .checked_add(demand)
             .map_err(|dimension| PlanResourceError {
-                owner: owner.clone(),
+                owner: Box::new(owner.clone()),
                 reason: PlanResourceFailure::ArithmeticOverflow(dimension),
             })?;
         self.hard
@@ -111,7 +112,7 @@ impl Accounting {
                     .check(self.demand, ResourceAuthority::OperationalBudget)
             })
             .map_err(|exceeded| PlanResourceError {
-                owner: owner.clone(),
+                owner: Box::new(owner.clone()),
                 reason: PlanResourceFailure::BudgetExceeded(exceeded),
             })
     }
@@ -302,7 +303,7 @@ fn register_group(
         count = count
             .checked_add(u64::from(member.logical_count()))
             .ok_or_else(|| PlanResourceError {
-                owner: owner.clone(),
+                owner: Box::new(owner.clone()),
                 reason: PlanResourceFailure::ArithmeticOverflow(ResourceDimension::LogicalObjects),
             })?;
         let repetitions = cycle_occurrence_count.map(|occurrence_count| {
@@ -344,7 +345,7 @@ fn account_composition_plan(
 ) -> Result<Accounting, PlanResourceError> {
     if plan.outcome() == CompositionPlanOutcome::Stopped {
         return Err(PlanResourceError {
-            owner: PlanResourceOwner::Plan,
+            owner: Box::new(PlanResourceOwner::Plan),
             reason: PlanResourceFailure::StoppedPlan,
         });
     }
@@ -516,7 +517,7 @@ fn account_composition_plan(
         let primitive_marks = u64::from(object.count())
             .checked_mul(repetitions)
             .ok_or_else(|| PlanResourceError {
-                owner: owner.clone(),
+                owner: Box::new(owner.clone()),
                 reason: PlanResourceFailure::ArithmeticOverflow(ResourceDimension::PrimitiveMarks),
             })?;
         let logical_objects = if claims.objects[index].is_some() {
@@ -560,9 +561,7 @@ fn account_composition_plan(
                 logical_objects: u64::from(
                     claims.anchors[index].is_none() && ungrouped_macros.insert(source),
                 ),
-                anchor_instances: u64::from(
-                    claims.anchors[index].map_or(1, |claim| claim.repetitions),
-                ),
+                anchor_instances: claims.anchors[index].map_or(1, |claim| claim.repetitions),
                 ..ResourceDemand::default()
             },
             &owner,
@@ -604,9 +603,7 @@ fn account_composition_plan(
         }
         accounting.add(
             ResourceDemand {
-                transform_instances: u64::from(
-                    claims.transforms[index].map_or(1, |claim| claim.repetitions),
-                ),
+                transform_instances: claims.transforms[index].map_or(1, |claim| claim.repetitions),
                 ..ResourceDemand::default()
             },
             &owner,
@@ -1014,7 +1011,7 @@ pub fn select_composition_plan_resources<'plan, 'source>(
                 Ok(total) => demands[unit] = total,
                 Err(dimension) => {
                     causes[unit] = Some(PlanResourceError {
-                        owner: owner.clone(),
+                        owner: Box::new(owner.clone()),
                         reason: PlanResourceFailure::ArithmeticOverflow(dimension),
                     })
                 }
@@ -1044,7 +1041,7 @@ pub fn select_composition_plan_resources<'plan, 'source>(
         let candidate = demand.checked_add(demands[unit]);
         let failure = causes[unit].take().or_else(|| match candidate {
             Err(dimension) => Some(PlanResourceError {
-                owner: cause_owner(dimension),
+                owner: Box::new(cause_owner(dimension)),
                 reason: PlanResourceFailure::ArithmeticOverflow(dimension),
             }),
             Ok(candidate) => hard_policy
@@ -1057,7 +1054,7 @@ pub fn select_composition_plan_resources<'plan, 'source>(
                 })
                 .err()
                 .map(|exceeded| PlanResourceError {
-                    owner: cause_owner(exceeded.dimension),
+                    owner: Box::new(cause_owner(exceeded.dimension)),
                     reason: PlanResourceFailure::BudgetExceeded(exceeded),
                 }),
         });
@@ -1258,7 +1255,7 @@ mod tests {
         .err()
         .unwrap();
         assert!(matches!(
-            error.owner,
+            *error.owner,
             PlanResourceOwner::Object(ScoreInstructionOrigin::SourceInstruction {
                 instruction_index: 0
             })
@@ -1365,7 +1362,7 @@ mod tests {
             PlanResourceFailure::ArithmeticOverflow(ResourceDimension::PrimitiveMarks)
         ));
         assert!(matches!(
-            error.owner,
+            *error.owner,
             PlanResourceOwner::Object(ScoreInstructionOrigin::MacroEmit {
                 source_instruction_index: 0,
                 ..
@@ -1387,7 +1384,7 @@ mod tests {
             preflight_composition_plan(&plan, hard(100), OperationalResourceBudget(budget(100)))
                 .err()
                 .unwrap();
-        assert!(matches!(error.owner, PlanResourceOwner::FillGroup(_)));
+        assert!(matches!(*error.owner, PlanResourceOwner::FillGroup(_)));
         assert_eq!(
             error.reason,
             PlanResourceFailure::InvalidContract("group logical count mismatch")
@@ -1399,7 +1396,7 @@ mod tests {
                 .err()
                 .unwrap();
         assert_eq!(
-            error.owner,
+            *error.owner,
             PlanResourceOwner::SourceInstruction {
                 source_instruction_index: 1
             }
@@ -1529,7 +1526,7 @@ mod tests {
                 matches!(error.reason, PlanResourceFailure::BudgetExceeded(ResourceBudgetExceeded { dimension: actual, required, .. }) if actual == dimension && required == maximum + 1),
                 "{source}: {error:?}"
             );
-            assert!(matches!(error.owner, PlanResourceOwner::Object(_)));
+            assert!(matches!(*error.owner, PlanResourceOwner::Object(_)));
         }
     }
 
@@ -1560,7 +1557,7 @@ mod tests {
                 .err()
                 .unwrap();
         assert_eq!(
-            error.owner,
+            *error.owner,
             PlanResourceOwner::SourceInstruction {
                 source_instruction_index: 0
             }

@@ -35,10 +35,10 @@ pub fn read_saved_score_json(bytes: &[u8]) -> serde_json::Result<Score> {
     if matches!(object.get("canvas"), Some(Value::Null)) {
         object.insert("canvas".to_owned(), Value::String("square".to_owned()));
     }
-    if let Some(Value::Object(canvas)) = object.get_mut("canvas") {
-        if let Some(Value::Object(ground)) = canvas.get_mut("ground") {
-            ground.remove("absorbency");
-        }
+    if let Some(Value::Object(canvas)) = object.get_mut("canvas")
+        && let Some(Value::Object(ground)) = canvas.get_mut("ground")
+    {
+        ground.remove("absorbency");
     }
 
     if let Some(Value::Array(instructions)) = object.get_mut("instructions") {
@@ -49,12 +49,12 @@ pub fn read_saved_score_json(bytes: &[u8]) -> serde_json::Result<Score> {
             if let Some(Value::Object(relation)) = instruction.get_mut("relation") {
                 relation.remove("contact");
             }
-            if let Some(Value::Object(variation)) = instruction.get_mut("variation") {
-                if let Some(Value::Array(dimensions)) = variation.get_mut("dimensions") {
-                    dimensions.retain(|dimension| {
-                        !matches!(dimension, Value::String(value) if value == "thickness")
-                    });
-                }
+            if let Some(Value::Object(variation)) = instruction.get_mut("variation")
+                && let Some(Value::Array(dimensions)) = variation.get_mut("dimensions")
+            {
+                dimensions.retain(
+                    |dimension| !matches!(dimension, Value::String(value) if value == "thickness"),
+                );
             }
             if matches!(instruction.get("weight"), Some(Value::String(weight)) if weight == "hair")
             {

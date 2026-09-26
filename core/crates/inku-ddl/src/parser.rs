@@ -627,22 +627,20 @@ fn candidates_at(
         ResolvedInstructionLanguage::En => crate::shape_constraint::SHAPE_HEADS_EN,
     };
     let modifier_forms = core_modifier_surface_forms(language);
-    for surface in [modifier_forms.regular] {
-        push_surface_candidate(
-            &mut candidates,
-            source,
-            start_byte,
-            language,
-            require_boundary,
-            surface,
-            PRIORITY_CORE_MODIFIER,
-            "shape_form:regular".to_owned(),
-            CandidateDelivery::Token(NeutralTokenKind::CoreModifier(CoreModifierIdentity {
-                dimension: CoreModifierDimension::ShapeForm,
-                value: CoreModifierValue::Regular,
-            })),
-        );
-    }
+    push_surface_candidate(
+        &mut candidates,
+        source,
+        start_byte,
+        language,
+        require_boundary,
+        modifier_forms.regular,
+        PRIORITY_CORE_MODIFIER,
+        "shape_form:regular".to_owned(),
+        CandidateDelivery::Token(NeutralTokenKind::CoreModifier(CoreModifierIdentity {
+            dimension: CoreModifierDimension::ShapeForm,
+            value: CoreModifierValue::Regular,
+        })),
+    );
     let sides_prefix = modifier_forms.sides_prefix;
     if let Some(rest) = source[start_byte..].strip_prefix(sides_prefix) {
         let number = rest.trim_start();
@@ -939,15 +937,15 @@ fn candidates_at(
         ResolvedInstructionLanguage::Ja => japanese_kanji_cardinal_at(source, start_byte),
         ResolvedInstructionLanguage::En => english_cardinal_at(source, start_byte),
     };
-    if let Some((end_byte, value)) = word_cardinal {
-        if !require_boundary || has_candidate_boundary(source, start_byte, end_byte, language) {
-            candidates.push(Candidate {
-                end_byte,
-                priority: PRIORITY_NUMBER,
-                identity: format!("number:{value}"),
-                delivery: CandidateDelivery::Token(NeutralTokenKind::ExactNumber { value }),
-            });
-        }
+    if let Some((end_byte, value)) = word_cardinal
+        && (!require_boundary || has_candidate_boundary(source, start_byte, end_byte, language))
+    {
+        candidates.push(Candidate {
+            end_byte,
+            priority: PRIORITY_NUMBER,
+            identity: format!("number:{value}"),
+            delivery: CandidateDelivery::Token(NeutralTokenKind::ExactNumber { value }),
+        });
     }
 
     let qualitative_quantities = match language {

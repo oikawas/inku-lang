@@ -1037,9 +1037,9 @@ pub fn scale_instruction_on_canvas(
         instruction.primitive,
         Primitive::Square | Primitive::Triangle
     ) && scaled.position.is_some()
-        && scaled.size.is_some()
+        && let Some(size) = scaled.size
     {
-        let normalized_size = size_in_normalized_axes(scaled.size.unwrap(), Some(canvas));
+        let normalized_size = size_in_normalized_axes(size, Some(canvas));
         let anchor = point_from_short_side_units(anchor, Some(canvas));
         scaled.position = Some(Point::new(
             anchor.x - normalized_size.x / 2.0,

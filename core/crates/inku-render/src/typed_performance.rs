@@ -316,15 +316,17 @@ impl<'a> Builder<'a> {
             resolved.domain,
             placement_seed,
         );
+        // recipe_centers makes one center per member and shape_centers only
+        // moves them, so the centers number the members.
+        debug_assert_eq!(centers.len(), count);
+        let anchored = !matches!(resolved.anchor, ResolvedPlacementAnchor::EnclosingGroup);
         let start = self.output.instructions.len();
-        for instance in 0..count {
-            let target = (!matches!(resolved.anchor, ResolvedPlacementAnchor::EnclosingGroup))
-                .then(|| centers[instance]);
+        for (instance, &center) in centers.iter().enumerate() {
             self.clone_instruction(
                 context,
                 old,
                 resolved.first_instance_ordinal + instance as u64,
-                target,
+                anchored.then_some(center),
                 innermost_fill,
             );
         }
@@ -1083,19 +1085,14 @@ impl<'a> Builder<'a> {
                             .zip(placement.execution.member_fill_scope_indices.iter())
                             .zip(placement.source_member_indices.iter())
                             .enumerate()
-                            .filter_map(|(dense_index, ((member, scopes), source_member))| {
-                                (*source_member == *member_index).then(|| {
-                                    self.mirror_member_body(
-                                        member,
-                                        scopes,
-                                        placement
-                                            .execution
-                                            .member_centers
-                                            .get(dense_index)
-                                            .copied(),
-                                        primitive_body,
-                                    )
-                                })
+                            .filter(|&(_, (_, source_member))| *source_member == *member_index)
+                            .map(|(dense_index, ((member, scopes), _))| {
+                                self.mirror_member_body(
+                                    member,
+                                    scopes,
+                                    placement.execution.member_centers.get(dense_index).copied(),
+                                    primitive_body,
+                                )
                             })
                     })
                     .collect()
@@ -1546,10 +1543,11 @@ fn remap_dense_diagnostics(
     dense_to_original: &[usize],
     dense_anchor_to_original: &[usize],
 ) {
-    let dense_start = diagnostics
-        .starts_with(source_prefix)
-        .then_some(source_prefix.len())
-        .unwrap_or(0);
+    let dense_start = if diagnostics.starts_with(source_prefix) {
+        source_prefix.len()
+    } else {
+        0
+    };
     for diagnostic in &mut diagnostics[dense_start..] {
         if let Some(&original) = dense_to_original.get(diagnostic.instruction_index) {
             diagnostic.instruction_index = original;

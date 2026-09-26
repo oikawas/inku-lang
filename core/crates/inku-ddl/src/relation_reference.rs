@@ -185,7 +185,7 @@ fn build_evidence(
             > 1;
         match build_envelope(source, &attachment_evidence, item, duplicate) {
             Ok(envelope) => evidence.push(envelope),
-            Err(diagnostic) => diagnostics.push(diagnostic),
+            Err(diagnostic) => diagnostics.push(*diagnostic),
         }
     }
 
@@ -201,7 +201,7 @@ fn build_envelope(
     attachment_evidence: &AttachmentEvidenceResult,
     pending: &PendingOccurrence,
     duplicate: bool,
-) -> Result<RelationReferenceCandidateEnvelope, RelationReferenceEvidenceDiagnostic> {
+) -> Result<RelationReferenceCandidateEnvelope, Box<RelationReferenceEvidenceDiagnostic>> {
     if duplicate {
         return Err(diagnostic(
             pending,
@@ -464,16 +464,18 @@ const fn availability(candidate_count: usize) -> RelationReferenceEvidenceAvaila
     }
 }
 
+/// Boxed because `build_envelope` returns it as its error, which would
+/// otherwise make every Result it returns as large as the occurrence.
 fn diagnostic(
     pending: &PendingOccurrence,
     kind: RelationReferenceEvidenceDiagnosticKind,
-) -> RelationReferenceEvidenceDiagnostic {
-    RelationReferenceEvidenceDiagnostic {
+) -> Box<RelationReferenceEvidenceDiagnostic> {
+    Box::new(RelationReferenceEvidenceDiagnostic {
         kind,
         occurrence: pending.occurrence.clone(),
         declared_clause_index: pending.declared_clause_index,
         occurrence_atom_index: pending.occurrence_atom_index,
-    }
+    })
 }
 
 fn valid_source_span(source: &str, span: SourceSpan) -> bool {

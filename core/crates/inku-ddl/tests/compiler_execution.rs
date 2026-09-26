@@ -1038,9 +1038,9 @@ fn background_does_not_admit_an_omitted_macro_without_drawable_residual() {
             ScoreErrorPolicy::OmitAndContinue,
             inku_score::HardResourcePolicy {
                 identity: "empty-residual-test.v1".to_owned(),
-                budget: budget.clone(),
+                budget,
             },
-            inku_score::OperationalResourceBudget(budget.clone()),
+            inku_score::OperationalResourceBudget(budget),
         )
     };
 
@@ -1969,7 +1969,7 @@ fn one_failed_macro_keeps_the_successful_expansion_with_original_seed_provenance
         .unwrap()
         .expanded[0]
         .provenance;
-    assert_eq!(provenance.invocation, *original);
+    assert_eq!(*provenance.invocation, *original);
     assert_eq!(provenance.invocation.invocation_ordinal, 0);
 }
 
@@ -2202,7 +2202,12 @@ fn nonadjacent_macro_connected_keeps_emits_and_reports_relation_omission_in_both
         r#"{"schema":"inku.macro-definition.v1","namespace":"Path","heading":"NonAdjacent","version":"1.0.0","parameters":{},"components":{},"body":[{"op":"emit","binding":"first","fields":{"shape":{"expr":"semantic_ref","category":"shape","id":"line"},"movement":{"expr":"semantic_ref","category":"movement","id":"place"},"place":{"expr":"semantic_ref","category":"place","id":"center"},"color":{"expr":"semantic_ref","category":"color","id":"red"}}},{"op":"emit","binding":"middle","fields":{"shape":{"expr":"semantic_ref","category":"shape","id":"point"},"movement":{"expr":"semantic_ref","category":"movement","id":"place"},"place":{"expr":"semantic_ref","category":"place","id":"center"},"color":{"expr":"semantic_ref","category":"color","id":"blue"}}},{"op":"emit","binding":"last","fields":{"shape":{"expr":"semantic_ref","category":"shape","id":"arc"},"movement":{"expr":"semantic_ref","category":"movement","id":"place"},"place":{"expr":"semantic_ref","category":"place","id":"center"},"color":{"expr":"semantic_ref","category":"color","id":"green"}}},{"op":"relation","kind":"connected","from":"first","to":"last"}]}"#,
     );
     for policy in [ScoreErrorPolicy::Stop, ScoreErrorPolicy::OmitAndContinue] {
-        let result = execute_locked("Path.NonAdjacent", &[definition.clone()], LIMITS, policy);
+        let result = execute_locked(
+            "Path.NonAdjacent",
+            std::slice::from_ref(&definition),
+            LIMITS,
+            policy,
+        );
         assert_eq!(
             result.outcome(),
             ScoreLoweringOutcome::CompleteWithOmissions,
@@ -2421,7 +2426,7 @@ fn declared_macro_width_and_relative_scale_conflict_recovers_like_ordinary_ddl()
         let ordinary = execute(ordinary_source, &[], LIMITS, policy);
         let declared = execute_locked(
             "Size.RecoveredCircle",
-            &[definition.clone()],
+            std::slice::from_ref(&definition),
             LIMITS,
             policy,
         );

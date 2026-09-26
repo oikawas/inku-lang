@@ -318,7 +318,7 @@ pub fn validate_visible_ddl_patch_detailed(
                 &edit.hole_id,
             ));
         }
-        let actual_range_digest = sha256_hex(source[span.start_byte..span.end_byte].as_bytes());
+        let actual_range_digest = sha256_hex(&source.as_bytes()[span.start_byte..span.end_byte]);
         if edit.expected_range_digest != hole.expected_range_digest
             || edit.expected_range_digest != actual_range_digest
         {
@@ -1291,7 +1291,7 @@ fn outside_conflicts(
                 item.kind.clone(),
                 candidates,
                 item.span
-                    .map(|span| sha256_hex(source[span.start_byte..span.end_byte].as_bytes())),
+                    .map(|span| sha256_hex(&source.as_bytes()[span.start_byte..span.end_byte])),
             )
         })
         .collect::<Vec<_>>();
@@ -1315,7 +1315,7 @@ fn outside_blocking_diagnostics(
             (
                 item.kind.clone(),
                 item.span
-                    .map(|span| sha256_hex(source[span.start_byte..span.end_byte].as_bytes())),
+                    .map(|span| sha256_hex(&source.as_bytes()[span.start_byte..span.end_byte])),
             )
         })
         .collect::<Vec<_>>();

@@ -31,8 +31,10 @@ fn endpoint_reconstruction_preserves_signed_sagitta() {
 fn crescent_uses_the_actual_saijiki_cubic_bbox() {
     assert!((crescent_reference_aspect_ratio() - CRESCENT_REFERENCE_ASPECT_RATIO).abs() < 1.0e-15);
     assert!((CRESCENT_REFERENCE_ASPECT_RATIO - 0.777_434_378_277_882).abs() < 1.0e-15);
-    assert!(CRESCENT_REFERENCE_WIDTH > 47.25);
-    assert!(CRESCENT_REFERENCE_HEIGHT > 60.78);
+    const {
+        assert!(CRESCENT_REFERENCE_WIDTH > 47.25);
+        assert!(CRESCENT_REFERENCE_HEIGHT > 60.78);
+    }
 
     let center = Point::new(0.5, 0.4);
     let size = Point::new(0.2, 0.2 / CRESCENT_REFERENCE_ASPECT_RATIO);

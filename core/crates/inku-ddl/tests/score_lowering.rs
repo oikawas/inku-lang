@@ -597,7 +597,7 @@ fn shared_shape_macro_parameters_and_locals_use_the_same_consumer() {
                         vec![lock_for(&definition)],
                     )
                     .unwrap(),
-                    &[definition.clone()],
+                    std::slice::from_ref(&definition),
                     Some(19),
                     LIMITS,
                     ScoreLoweringContext::resolve("wide", Color::White).unwrap(),
@@ -809,7 +809,7 @@ fn declared_and_literal_macro_positions_match_ordinary_and_keep_generated_owners
         let generated = stage15_locked(
             &format!("Param.One red place {word} pencil"),
             ResolvedInstructionLanguage::En,
-            &[parameter.clone()],
+            std::slice::from_ref(&parameter),
         );
         let mut literal = serde_json::to_value(&parameter).unwrap();
         literal["parameters"] = serde_json::json!({});
@@ -3365,7 +3365,7 @@ fn macro_caller_action_omits_only_action_and_preserves_the_macro_body() {
         assert!(matches!(
             origin,
             ScoreInstructionOrigin::MacroEmit { provenance, .. }
-                if provenance.invocation == action_provenance
+                if *provenance.invocation == action_provenance
                     && provenance.generated_ordinal == generated_ordinal as u64
         ));
     }
@@ -4914,7 +4914,8 @@ fn fluctuation_rejections_preserve_instruction_invocation_and_emit_units() {
         assert_eq!(continued.score().unwrap().instructions.len(), survivors);
         assert!(
             continued.diagnostics().iter().any(|diagnostic| {
-                match (&diagnostic.owner, &diagnostic.disposition, unit) {
+                matches!(
+                    (&diagnostic.owner, &diagnostic.disposition, unit),
                     (
                         _,
                         ScoreDiagnosticDisposition::Omitted {
@@ -4922,25 +4923,22 @@ fn fluctuation_rejections_preserve_instruction_invocation_and_emit_units() {
                             ..
                         },
                         "instruction",
-                    ) => true,
-                    (
+                    ) | (
                         ScoreDiagnosticOwner::GeneratedNode { .. },
                         ScoreDiagnosticDisposition::Omitted {
                             unit: ScoreOmissionUnit::MacroEmit { .. },
                             ..
                         },
                         "emit",
-                    ) => true,
-                    (
+                    ) | (
                         ScoreDiagnosticOwner::MacroInvocation { .. },
                         ScoreDiagnosticDisposition::Omitted {
                             unit: ScoreOmissionUnit::MacroInvocation { .. },
                             ..
                         },
                         "invocation",
-                    ) => true,
-                    _ => false,
-                }
+                    )
+                )
             }),
             "{unit}: {:?}",
             continued.diagnostics()

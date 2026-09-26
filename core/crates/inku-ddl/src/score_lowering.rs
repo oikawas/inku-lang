@@ -638,7 +638,7 @@ fn lower_macro_instruction(
     instruction_origins: &mut Vec<ScoreInstructionOrigin>,
     diagnostics: &mut Vec<ScoreLoweringDiagnostic>,
     mut objects: Option<&mut Vec<ObjectPlacementPlan>>,
-    mut transform_groups: Option<&mut Vec<TransformGroupPlan>>,
+    transform_groups: Option<&mut Vec<TransformGroupPlan>>,
     score_transform_groups: &mut Vec<TransformGroup>,
 ) {
     let caller_invalid = append_macro_caller_diagnostics(
@@ -1283,7 +1283,7 @@ fn lower_macro_instruction(
             left_path.cmp(right_path)
         }
     });
-    if let Some(groups) = transform_groups.as_deref_mut() {
+    if let Some(groups) = transform_groups {
         groups.extend(
             completed_ranges
                 .into_iter()
@@ -3981,7 +3981,7 @@ fn direct_score_relation<'a>(
     checked.target_endpoint = relation.target_endpoint;
     checked.target_path_position = relation
         .target_path_selection
-        .map(|selection| inku_score::TargetPathPosition::Selection(selection));
+        .map(inku_score::TargetPathPosition::Selection);
     Ok(checked)
 }
 
@@ -4727,7 +4727,7 @@ pub(crate) fn lower_resolved_object_template(
             ObjectAnchor::Numeric(position) => lower_numeric_geometry(
                 object.primitive,
                 object.dimensions,
-                position.into(),
+                position.as_ref().into(),
                 context.canvas_format,
                 object.angle,
             )?,
@@ -4825,7 +4825,7 @@ fn resolve_object_plan(
         let anchor = match resolved.placement {
             ScorePlacement::Numeric(position) => input
                 .numeric_position
-                .map(|source| ObjectAnchor::Numeric(source.clone()))
+                .map(|source| ObjectAnchor::Numeric(Box::new(source.clone())))
                 .unwrap_or(ObjectAnchor::GeneratedNumeric(position)),
             ScorePlacement::Named(region) => {
                 if resolved.action == PlacementAction::Tile {
@@ -5409,7 +5409,7 @@ fn resolve_fill_region(
                     {
                         return Err(ScoreFieldGap::PositionOutOfRange);
                     }
-                    ObjectAnchor::Numeric(position.clone())
+                    ObjectAnchor::Numeric(Box::new(position.clone()))
                 }
                 (None, Some(position)) => ObjectAnchor::Named(
                     named_region_bounds(&position.identity.id, effective_focus, angle_context)
@@ -5858,8 +5858,9 @@ fn resolve_complete_object<'a>(
         }
         None => None,
     };
-    let (filled, surface) = if primitive == Primitive::Point && input.surface.is_some() {
-        let identity = input.surface.expect("checked present Point surface");
+    let (filled, surface) = if primitive == Primitive::Point
+        && let Some(identity) = input.surface
+    {
         gaps.push(ScoreFieldGap::UnsupportedSurfaceIdentity {
             category: identity.category.to_owned(),
             id: identity.id.to_owned(),
@@ -6526,17 +6527,16 @@ fn resolve_shape_dimensions(
     {
         return Err(invalid());
     }
-    if let Some(aspect) = aspect {
-        if aspect.category != "ratio"
+    if let Some(aspect) = aspect
+        && (aspect.category != "ratio"
             || !matches!(aspect.id, "tall" | "wide")
             || !matches!(
                 primitive,
                 Primitive::Triangle | Primitive::Square | Primitive::Ellipse | Primitive::Cloudform
             )
-            || constraint.regular
-        {
-            return Err(invalid());
-        }
+            || constraint.regular)
+    {
+        return Err(invalid());
     }
     let normal = || -> Result<Rational, ScoreFieldGap> {
         let (n, d) = relative_scale_factor(scale.unwrap_or(CoreModifierValue::Normal))
@@ -6591,12 +6591,11 @@ fn resolve_shape_dimensions(
         if constraint.regular && width != height {
             return Err(invalid());
         }
-        if let Some(aspect) = aspect {
-            if aspect.id == "tall" && height.le(width)?
-                || aspect.id == "wide" && width.le(height)?
-            {
-                return Err(invalid());
-            }
+        if let Some(aspect) = aspect
+            && (aspect.id == "tall" && height.le(width)?
+                || aspect.id == "wide" && width.le(height)?)
+        {
+            return Err(invalid());
         }
         return Ok(
             if matches!(primitive, Primitive::Triangle | Primitive::Square) {
@@ -6931,6 +6930,7 @@ fn lower_numeric_geometry(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn ensure_rotated_centered_extent(
     primitive: Primitive,
     x: Rational,

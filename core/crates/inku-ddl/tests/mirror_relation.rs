@@ -54,7 +54,7 @@ fn mirror_preserves_whole_macro_and_ordinary_group_boundaries() {
     let macro_result = execute(
         "Mirror.Pair!. mirrored with the previous shape Mirror.Pair!",
         ResolvedInstructionLanguage::En,
-        &[definition.clone()],
+        std::slice::from_ref(&definition),
         vec![macro_lock(&definition)],
     );
     let macro_score = complete_score(&macro_result);

@@ -185,10 +185,11 @@ fn coordinated_head_group_and_predicate_reach_document_canonical_once() {
 
 #[test]
 fn coordination_and_continuation_predicate_overlap_fails_closed() {
-    for (language, source) in [(
-        ResolvedInstructionLanguage::En,
-        "line. place the line and a circle.",
-    )] {
+    {
+        let (language, source) = (
+            ResolvedInstructionLanguage::En,
+            "line. place the line and a circle.",
+        );
         let document = NormalizedDdlDocument::new(source, language, Vec::new()).unwrap();
         let result = associate_semantic_document(&document).unwrap();
         assert!(result.ast.continuations.is_empty(), "{source}");

@@ -1398,7 +1398,7 @@ fn validate_hole(source: &str, hole: &TypedHole) -> Result<(), PromptError> {
             hole_id: hole.id.clone(),
         });
     }
-    let actual = sha256_hex(source[span.start_byte..span.end_byte].as_bytes());
+    let actual = sha256_hex(&source.as_bytes()[span.start_byte..span.end_byte]);
     if actual != hole.expected_range_digest {
         return Err(PromptError::HoleRangeDigestMismatch {
             hole_id: hole.id.clone(),

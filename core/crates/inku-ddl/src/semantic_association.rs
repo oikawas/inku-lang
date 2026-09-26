@@ -1868,11 +1868,13 @@ fn collect_pre_head_phrase_ownership(
             }
             match atom {
                 ClauseAtom::UnresolvedDiagnostic(_) => break,
-                ClauseAtom::GrammarMarker { .. } => {
-                    if !genitive_marker_starts.contains(&span.start_byte) {
-                        break;
-                    }
+                ClauseAtom::GrammarMarker { .. }
+                    if !genitive_marker_starts.contains(&span.start_byte) =>
+                {
+                    break;
                 }
+                // A genitive marker stays inside the noun phrase.
+                ClauseAtom::GrammarMarker { .. } => {}
                 // The counter of a pre-head count stays inside the noun phrase,
                 // so modifiers before it still reach the head, e.g.
                 // `細い 三 本 の 黒い 線`.
@@ -2172,6 +2174,7 @@ pub(crate) fn is_layout_direction(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn build_semantic_entities(
     document: &NormalizedDdlDocument,
     clause_stream: ClauseStream,
@@ -2530,39 +2533,37 @@ fn build_semantic_entities(
             .clauses
             .get(source.clause_index)
             .and_then(|clause| clause.atoms.get(source.atom_index))
+            && term.span == source.span
+            && let Some(value) = term.shape_constraint
         {
-            if term.span == source.span {
-                if let Some(value) = term.shape_constraint {
-                    let head_constraint = crate::SemanticShapeConstraint {
-                        value,
-                        provenance: source.clone(),
-                        additional_provenance: Vec::new(),
-                    };
-                    if let Some(existing) = &mut entity.shape_constraint {
-                        if existing.value.sides.is_some()
-                            && value.sides.is_some()
-                            && existing.value.sides != value.sides
-                        {
-                            issues.push(SemanticAssociationIssue {
-                                kind: SemanticAssociationIssueKind::ConflictingShapeConstraints,
-                                region_index: source.region_index,
-                                occurrences: Vec::new(),
-                                causal_provenance: SemanticIssueCausalProvenance::Unattributed,
-                                upstream_diagnostic: Some(NeutralDiagnostic {
-                                    span: source.span,
-                                    surface: source.surface.clone(),
-                                    kind: NeutralDiagnosticKind::Conflict,
-                                    recognized: true,
-                                }),
-                            });
-                        }
-                        existing.value.regular |= value.regular;
-                        existing.value.sides = existing.value.sides.or(value.sides);
-                        existing.additional_provenance.push(source.clone());
-                    } else {
-                        entity.shape_constraint = Some(head_constraint);
-                    }
+            let head_constraint = crate::SemanticShapeConstraint {
+                value,
+                provenance: source.clone(),
+                additional_provenance: Vec::new(),
+            };
+            if let Some(existing) = &mut entity.shape_constraint {
+                if existing.value.sides.is_some()
+                    && value.sides.is_some()
+                    && existing.value.sides != value.sides
+                {
+                    issues.push(SemanticAssociationIssue {
+                        kind: SemanticAssociationIssueKind::ConflictingShapeConstraints,
+                        region_index: source.region_index,
+                        occurrences: Vec::new(),
+                        causal_provenance: SemanticIssueCausalProvenance::Unattributed,
+                        upstream_diagnostic: Some(NeutralDiagnostic {
+                            span: source.span,
+                            surface: source.surface.clone(),
+                            kind: NeutralDiagnosticKind::Conflict,
+                            recognized: true,
+                        }),
+                    });
                 }
+                existing.value.regular |= value.regular;
+                existing.value.sides = existing.value.sides.or(value.sides);
+                existing.additional_provenance.push(source.clone());
+            } else {
+                entity.shape_constraint = Some(head_constraint);
             }
         }
     }
@@ -3070,6 +3071,7 @@ fn project_remaining_term(
     )
 }
 
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn project_semantic_term(
     document: &NormalizedDdlDocument,
     asset_id: &str,

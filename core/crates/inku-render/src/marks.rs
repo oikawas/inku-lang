@@ -892,7 +892,7 @@ fn render_affine_instruction(
             let provisional = crescent_contour_points(center, size, 25);
             let total_samples =
                 affine_curve_samples(instruction, context, &provisional, true, provisional.len());
-            let samples_per_cubic = (total_samples + 3) / 4;
+            let samples_per_cubic = total_samples.div_ceil(4);
             let contour = if samples_per_cubic == 25 {
                 provisional
             } else {

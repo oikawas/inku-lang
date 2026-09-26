@@ -522,9 +522,7 @@ pub enum LegacyImportOutcome {
 
 impl LegacyImportOutcome {
     pub fn imported(definition: MacroDefinition) -> Result<Self, MacroDefinitionValidation> {
-        if let Err(validation) = definition.identity() {
-            return Err(validation);
-        }
+        definition.identity()?;
         Ok(Self::Imported {
             definition,
             warnings: legacy_warnings(),
@@ -1717,7 +1715,7 @@ fn semantic_category_authority(category: &str) -> Option<SemanticCategoryAuthori
         return Some(SemanticCategoryAuthority::CoreModifier);
     }
     SEMANTIC_CATEGORIES.iter().find_map(|(known, asset)| {
-        (*known == category).then_some(SemanticCategoryAuthority::Asset(*asset))
+        (*known == category).then_some(SemanticCategoryAuthority::Asset(asset))
     })
 }
 

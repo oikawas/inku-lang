@@ -9,6 +9,10 @@ use inku_ddl::{
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 
+/// A named edit that must make the asset fail closed.
+type AssetMutation = (&'static str, fn(&mut SaijikiAsset));
+type ValueMutation = (&'static str, fn(&mut Value));
+
 #[test]
 fn embedded_asset_has_stable_identity_and_exact_digest() {
     let asset = saijiki_asset();
@@ -200,7 +204,7 @@ fn embedded_asset_is_complete_and_orders_are_lossless() {
 
 #[test]
 fn invalid_semantic_aliases_fail_closed_with_distinct_stable_kinds() {
-    let cases: [(&str, fn(&mut SaijikiAsset)); 4] = [
+    let cases: [AssetMutation; 4] = [
         (
             "missing_semantic_alias_target",
             |asset: &mut SaijikiAsset| {
@@ -348,7 +352,7 @@ fn typed_english_grammar_is_row_owned_and_does_not_leak_into_public_projections(
 
 #[test]
 fn invalid_typed_english_grammar_fails_closed_with_stable_kinds() {
-    let cases: [(&str, fn(&mut Value)); 9] = [
+    let cases: [ValueMutation; 9] = [
         ("duplicate_english_grammatical_form", |asset| {
             word_value_mut(asset, "yuragi", "細かく")["english_grammar"]["permitted_forms"] =
                 json!(["adverb", "adverb"]);

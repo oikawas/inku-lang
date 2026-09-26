@@ -6,6 +6,14 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 36 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-26 — the public CI's Rust lint passes
+
+The public CI's Android workflow had not reached its Rust lint step (`clippy -D warnings` on Rust 1.95.0) since 27 August, because earlier steps, first the tests and then formatting, failed before it. With formatting fixed, the shared core had 158 findings.
+- Large error types: errors and enums that held two resource policies, a macro invocation's provenance or a numeric position by value were 248 to 1,024 bytes, and every `Result` that could return them was as large. The rarely built parts are now boxed (`SavedScoreResourceError`, `RenderError` and the pipeline's `BoundaryError` go from 248 to 72 bytes). A box serializes as its contents, so no JSON shape changes.
+- The rest follows clippy's suggestions (let-chains for nested `if`s, `slice::from_ref` for one-element slices, byte slicing for digests over validated ranges, removing a parameter that was only passed to its own recursion, and so on).
+
+Drawing and compilation results do not change (the 12,798 saved renders are identical). DDL, Score and render versions do not change.
+
 ### 2026-09-26 — a stop ends the Server's run, and a redraw's indicator names the models it calls
 
 - **A stop did not stop the Server's run.** Stopping an edited description started from the lineage or the canvas ended only the page's wait: the run went on through every model retry, and the dialog stayed in its drawing state. It now cancels the run, as the DDL edit dialog does. `/api/paint/stream` (batches, the demo, the sketch switch, refinement) kept its run going after a stop or a closed page, holding a pipeline worker and calling the model. The run of a reader that has left is now cancelled. While nothing settles the stream still writes `wait` every 10 seconds: a written line is how the reader's leaving is noticed, and it keeps the Web's proxy (Node's `fetch`) from dropping a body silent for 300 seconds. The plain `/api/paint`, `/api/interpret`, and `/api/compose` (the model comparison, the CLI) ask every second while they wait whether their reader is still there and cancel the run of one that has gone (answering 499). The Web's proxy went on with its API request after the browser's connection closed (SvelteKit's request signal works only while the request body arrives); it now aborts it.

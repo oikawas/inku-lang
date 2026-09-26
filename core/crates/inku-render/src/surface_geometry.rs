@@ -206,9 +206,11 @@ pub(crate) fn surface_contour(
         Primitive::Line | Primitive::Arc => None,
     };
     contour.map(|points| {
-        (!context.geometry_transform.is_identity())
-            .then(|| geometry_points(instruction, context, &points))
-            .unwrap_or(points)
+        if !context.geometry_transform.is_identity() {
+            geometry_points(instruction, context, &points)
+        } else {
+            points
+        }
     })
 }
 

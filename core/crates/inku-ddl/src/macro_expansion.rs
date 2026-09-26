@@ -103,7 +103,9 @@ pub struct MacroInvocationProvenance {
 /// Complete provenance repeated on every generated node.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 pub struct GeneratedNodeProvenance {
-    pub invocation: MacroInvocationProvenance,
+    /// Boxed so that the owners and errors that carry a node's provenance stay
+    /// small; it serializes exactly as the unboxed record.
+    pub invocation: Box<MacroInvocationProvenance>,
     pub generated_ordinal: u64,
     pub expansion_path: Vec<ExpansionPathSegment>,
 }
@@ -498,7 +500,7 @@ fn expand_macros_with_selection(
             Ok(nodes)
                 if evaluator.nodes == item.node_count
                     && nodes.iter().all(|node| {
-                        node.provenance().invocation == provenance
+                        *node.provenance().invocation == provenance
                             && node.provenance().generated_ordinal < item.node_count
                     }) =>
             {
@@ -1535,7 +1537,7 @@ impl<'a> Evaluator<'a> {
         expansion_path: &[ExpansionPathSegment],
     ) -> GeneratedNodeProvenance {
         GeneratedNodeProvenance {
-            invocation: self.provenance.clone(),
+            invocation: Box::new(self.provenance.clone()),
             generated_ordinal,
             expansion_path: expansion_path.to_vec(),
         }

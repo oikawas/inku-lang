@@ -94,7 +94,6 @@ impl FillPaintForest {
                 profile,
                 definitions,
                 clip_policy,
-                original_indices,
                 &mut failures,
             ) {
                 elements.push(element);
@@ -139,7 +138,6 @@ impl FillPaintForest {
         (elements, diagnostics, omitted)
     }
 
-    #[allow(clippy::too_many_arguments)]
     fn resolve(
         &mut self,
         paint: Paint,
@@ -147,7 +145,6 @@ impl FillPaintForest {
         profile: SvgProfile,
         definitions: &mut Vec<Element>,
         clip_policy: CompatFillClipPolicy,
-        original_indices: &[usize],
         failures: &mut BTreeMap<usize, ScoreExecutionReason>,
     ) -> Option<ResolvedPaint> {
         let Paint::Scope(index) = paint else {
@@ -162,15 +159,9 @@ impl FillPaintForest {
         let scope = &scopes[index];
         let mut group = Element::new("g").attr("id", format!("fill_{index}"));
         for child in std::mem::take(&mut self.children[index]) {
-            if let Some(element) = self.resolve(
-                child,
-                scopes,
-                profile,
-                definitions,
-                clip_policy,
-                original_indices,
-                failures,
-            ) {
+            if let Some(element) =
+                self.resolve(child, scopes, profile, definitions, clip_policy, failures)
+            {
                 group.push(element.element);
             }
         }

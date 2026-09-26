@@ -46,7 +46,8 @@ pub struct MaterializedComposition {
 #[serde(tag = "kind", content = "value", rename_all = "snake_case")]
 pub enum ScoreMaterializationError {
     Geometry {
-        owner: ScoreInstructionOrigin,
+        /// Boxed so that every Result that can carry this error stays small.
+        owner: Box<ScoreInstructionOrigin>,
         reason: ScoreFieldGap,
     },
     InvalidContract(&'static str),
@@ -129,7 +130,7 @@ pub fn materialize_selected_composition(
         let mut instruction =
             lower_resolved_object_template(object, plan.context()).map_err(|reason| {
                 ScoreMaterializationError::Geometry {
-                    owner: object.origin().clone(),
+                    owner: Box::new(object.origin().clone()),
                     reason,
                 }
             })?;
@@ -638,7 +639,7 @@ fn saved_placement_anchor(
     Ok(match anchor {
         ObjectAnchor::Named(region) => ResolvedPlacementAnchor::Named { region: *region },
         ObjectAnchor::Numeric(position) => ResolvedPlacementAnchor::Numeric {
-            point: exact_position(position.into())?,
+            point: exact_position(position.as_ref().into())?,
         },
         ObjectAnchor::GeneratedNumeric(position) => ResolvedPlacementAnchor::GeneratedNumeric {
             point: exact_position(*position)?,
@@ -805,7 +806,7 @@ fn saved_target(region: &ResolvedFillRegion) -> Result<FillTarget, ScoreMaterial
             anchor: match anchor {
                 ObjectAnchor::Named(region) => FillTargetAnchor::Named { region: *region },
                 ObjectAnchor::Numeric(position) => FillTargetAnchor::Numeric {
-                    point: exact_position(position.into())?,
+                    point: exact_position(position.as_ref().into())?,
                 },
                 ObjectAnchor::GeneratedNumeric(position) => FillTargetAnchor::GeneratedNumeric {
                     point: exact_position(*position)?,

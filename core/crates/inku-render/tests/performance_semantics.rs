@@ -698,6 +698,8 @@ fn connected_chain_uses_one_endpoint_consumer_for_all_five_required_pairs() {
     assert!(result.execution.is_none());
     assert_eq!(result.instruction_indices, [0, 1, 2, 3, 4, 5]);
     assert_eq!(result.score.instructions[0], input.instructions[0]);
+    // Three sequences are read at each index, and the output also at the one before.
+    #[allow(clippy::needless_range_loop)]
     for index in 1..result.score.instructions.len() {
         let prior = endpoint_geometry(&result.score.instructions[index - 1], Some(canvas)).unwrap();
         let current = endpoint_geometry(&result.score.instructions[index], Some(canvas)).unwrap();

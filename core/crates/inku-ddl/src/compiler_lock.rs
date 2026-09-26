@@ -3635,7 +3635,7 @@ fn validate_expanded_invocation_owner(
             != Some(owner.semantic_ordinal)
         || flatten_nodes(&invocation.nodes)
             .into_iter()
-            .any(|node| node.provenance().invocation != *provenance)
+            .any(|node| *node.provenance().invocation != *provenance)
     {
         return Err(MacroExpansionDiagnosticKind::ProvenanceOwnershipMismatch);
     }

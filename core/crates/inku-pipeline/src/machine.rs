@@ -434,10 +434,10 @@ impl PipelineSnapshot {
         if matches!(
             self.phase,
             PipelinePhase::ScoreReady | PipelinePhase::Completed
-        ) && !self
+        ) && self
             .delivery
             .as_ref()
-            .is_some_and(|delivery| delivery.score.is_some())
+            .is_none_or(|delivery| delivery.score.is_none())
         {
             return Err(ProtocolError::InvalidState);
         }
@@ -922,10 +922,10 @@ impl PipelineSnapshot {
             self.authority
                 .propose_stage1_result_commit(self.authority.revision()),
         )?;
-        if let SketchRequest::Supplied { text } = &sketch {
-            if text.len() > self.config.prompt_limits.max_source_bytes {
-                return Err(ProtocolError::SchemaViolation);
-            }
+        if let SketchRequest::Supplied { text } = &sketch
+            && text.len() > self.config.prompt_limits.max_source_bytes
+        {
+            return Err(ProtocolError::SchemaViolation);
         }
         self.sketch = SketchRecord::from_request(sketch);
         if auto_catalog {
@@ -1973,39 +1973,39 @@ impl PipelineSnapshot {
                     if let Some(report) = self.hole_completion_check.clone() {
                         self.event(events, "hole_completion_checked", report)?;
                     }
-                } else if reason != "stage1_residual_execution" {
-                    if let Some(lock) = delivery.compiler_lock.as_ref().filter(|lock| {
+                } else if reason != "stage1_residual_execution"
+                    && let Some(lock) = delivery.compiler_lock.as_ref().filter(|lock| {
                         lock.get("hole_identities")
                             .and_then(serde_json::Value::as_array)
                             .is_some_and(|identities| !identities.is_empty())
-                    }) {
-                        let hole_ids = lock
-                            .get("hole_identities")
-                            .cloned()
-                            .and_then(|ids| serde_json::from_value::<Vec<String>>(ids).ok())
-                            .unwrap_or_default();
-                        // Known holes enter the shared completion policy without a
-                        // separate user command. Declines and failures do not re-enter
-                        // this commit-only branch; any retry is bounded by its action.
-                        self.delivery = Some(delivery);
-                        if let Err(error) = self.complete_holes(hole_ids, events) {
-                            // This revision is already committed. Preserve it even if
-                            // a completion prompt cannot be constructed within policy.
-                            self.action = None;
-                            self.phase = PipelinePhase::NeedsUserEdit {
-                                reason: "hole_request_unavailable".into(),
-                            };
-                            return self.event(
-                                events,
-                                "needs_user_edit",
-                                json!({
-                                    "reason": "hole_request_unavailable", "error": error,
-                                    "revision": revision,
-                                }),
-                            );
-                        }
-                        return Ok(());
+                    })
+                {
+                    let hole_ids = lock
+                        .get("hole_identities")
+                        .cloned()
+                        .and_then(|ids| serde_json::from_value::<Vec<String>>(ids).ok())
+                        .unwrap_or_default();
+                    // Known holes enter the shared completion policy without a
+                    // separate user command. Declines and failures do not re-enter
+                    // this commit-only branch; any retry is bounded by its action.
+                    self.delivery = Some(delivery);
+                    if let Err(error) = self.complete_holes(hole_ids, events) {
+                        // This revision is already committed. Preserve it even if
+                        // a completion prompt cannot be constructed within policy.
+                        self.action = None;
+                        self.phase = PipelinePhase::NeedsUserEdit {
+                            reason: "hole_request_unavailable".into(),
+                        };
+                        return self.event(
+                            events,
+                            "needs_user_edit",
+                            json!({
+                                "reason": "hole_request_unavailable", "error": error,
+                                "revision": revision,
+                            }),
+                        );
                     }
+                    return Ok(());
                 }
                 let has_score = delivery.score.is_some();
                 self.phase = if has_score {

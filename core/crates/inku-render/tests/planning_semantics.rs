@@ -75,7 +75,8 @@ fn wide_canvas_relation_uses_physical_square_bounds() {
         r#"{"primitive":"circle","center":[0.5,0.5],"radius":0.04,
         "relation":{"type":"not_touching","gap":"narrow"}}"#,
     );
-    let result = resolve_relation_on_canvas(&current, &[prior.clone()], 17, 1, Some(canvas));
+    let result =
+        resolve_relation_on_canvas(&current, std::slice::from_ref(&prior), 17, 1, Some(canvas));
     assert!(result.warning.is_none());
     let prior_bounds =
         performed_instruction_bounds_on_canvas(&prior, Some(17), 0, Some(canvas)).unwrap();

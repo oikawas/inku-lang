@@ -100,7 +100,12 @@ fn exact_decimal_survives_source_parameter_component_and_choices() {
     let seeds = seeds(&binding, source, 7);
     let mut invalid_binding = binding.clone();
     invalid_binding.complete[0].parameters[0].source_fact_clause_index = usize::MAX;
-    let invalid = expand_macros(invalid_binding, &[definition.clone()], &seeds, LIMITS);
+    let invalid = expand_macros(
+        invalid_binding,
+        std::slice::from_ref(&definition),
+        &seeds,
+        LIMITS,
+    );
     assert!(invalid.expanded.is_empty());
     assert!(
         invalid
@@ -177,7 +182,7 @@ fn fixed_fixture_materializes_all_operators_as_closed_nodes_with_complete_proven
         let binding = binding(&definition, &case.source, &case.language);
         let accepted = binding.clone();
         let seeds = seeds(&binding, &case.source, case.composition_seed);
-        let result = expand_macros(binding, &[definition.clone()], &seeds, LIMITS);
+        let result = expand_macros(binding, std::slice::from_ref(&definition), &seeds, LIMITS);
 
         assert_eq!(result.parameter_binding, accepted, "{}", case.id);
         assert!(
@@ -259,7 +264,7 @@ fn fixed_fixture_materializes_all_operators_as_closed_nodes_with_complete_proven
                 (0..u64::try_from(nodes.len()).unwrap()).collect::<Vec<_>>()
             );
             for node in nodes {
-                assert_eq!(node.provenance().invocation, invocation.provenance);
+                assert_eq!(*node.provenance().invocation, invocation.provenance);
                 assert!(!node.provenance().expansion_path.is_empty());
             }
         }
@@ -481,7 +486,7 @@ fn identity_expression_repeat_and_budget_failures_are_atomic_stable_diagnostics(
     assert_global_failure(
         expand_macros(
             empty_binding.clone(),
-            &[empty.clone()],
+            std::slice::from_ref(&empty),
             &empty_seed,
             MacroExpansionLimits {
                 max_depth: 0,
@@ -496,7 +501,7 @@ fn identity_expression_repeat_and_budget_failures_are_atomic_stable_diagnostics(
     assert_global_failure(
         expand_macros(
             two_binding,
-            &[empty.clone()],
+            std::slice::from_ref(&empty),
             &two_seeds,
             MacroExpansionLimits {
                 max_invocations: 1,
@@ -512,7 +517,7 @@ fn identity_expression_repeat_and_budget_failures_are_atomic_stable_diagnostics(
     assert_global_failure(
         expand_macros(
             all_binding.clone(),
-            &[all.clone()],
+            std::slice::from_ref(&all),
             &all_seed,
             MacroExpansionLimits {
                 max_total_nodes: 11,
@@ -524,7 +529,7 @@ fn identity_expression_repeat_and_budget_failures_are_atomic_stable_diagnostics(
     assert_invocation_failure(
         expand_macros(
             all_binding.clone(),
-            &[all.clone()],
+            std::slice::from_ref(&all),
             &all_seed,
             MacroExpansionLimits {
                 max_depth: 1,
@@ -536,7 +541,7 @@ fn identity_expression_repeat_and_budget_failures_are_atomic_stable_diagnostics(
     assert_invocation_failure(
         expand_macros(
             all_binding.clone(),
-            &[all.clone()],
+            std::slice::from_ref(&all),
             &all_seed,
             MacroExpansionLimits {
                 max_evaluation_steps: 2,
@@ -548,7 +553,7 @@ fn identity_expression_repeat_and_budget_failures_are_atomic_stable_diagnostics(
     assert_invocation_failure(
         expand_macros(
             all_binding.clone(),
-            &[all.clone()],
+            std::slice::from_ref(&all),
             &all_seed,
             MacroExpansionLimits {
                 max_nodes_per_invocation: 11,
@@ -558,13 +563,13 @@ fn identity_expression_repeat_and_budget_failures_are_atomic_stable_diagnostics(
         MacroExpansionDiagnosticKind::NodeBudget,
     );
     assert_invocation_failure(
-        expand_macros(all_binding.clone(), &[all.clone()], &[], LIMITS),
+        expand_macros(all_binding.clone(), std::slice::from_ref(&all), &[], LIMITS),
         MacroExpansionDiagnosticKind::MissingSeed,
     );
     assert_invocation_failure(
         expand_macros(
             all_binding.clone(),
-            &[all.clone()],
+            std::slice::from_ref(&all),
             &[all_seed[0].clone(), all_seed[0].clone()],
             LIMITS,
         ),
@@ -576,7 +581,12 @@ fn identity_expression_repeat_and_budget_failures_are_atomic_stable_diagnostics(
         Some(7),
     );
     assert_invocation_failure(
-        expand_macros(all_binding.clone(), &[all.clone()], &[wrong_seed], LIMITS),
+        expand_macros(
+            all_binding.clone(),
+            std::slice::from_ref(&all),
+            &[wrong_seed],
+            LIMITS,
+        ),
         MacroExpansionDiagnosticKind::MismatchedSeed,
     );
     let ordinal_only_seed = derive_macro_seed(
@@ -587,7 +597,7 @@ fn identity_expression_repeat_and_budget_failures_are_atomic_stable_diagnostics(
     assert_invocation_failure(
         expand_macros(
             all_binding.clone(),
-            &[all.clone()],
+            std::slice::from_ref(&all),
             &[ordinal_only_seed],
             LIMITS,
         ),
@@ -600,7 +610,7 @@ fn identity_expression_repeat_and_budget_failures_are_atomic_stable_diagnostics(
     );
     let both_mismatch = expand_macros(
         all_binding.clone(),
-        &[all.clone()],
+        std::slice::from_ref(&all),
         &[both_mismatch_seed],
         LIMITS,
     );
@@ -621,14 +631,24 @@ fn identity_expression_repeat_and_budget_failures_are_atomic_stable_diagnostics(
     let mut corrupt_binding = all_binding.clone();
     corrupt_binding.complete[0].atom_index += 1;
     assert_invocation_failure(
-        expand_macros(corrupt_binding, &[all.clone()], &all_seed, LIMITS),
+        expand_macros(
+            corrupt_binding,
+            std::slice::from_ref(&all),
+            &all_seed,
+            LIMITS,
+        ),
         MacroExpansionDiagnosticKind::BindingOwnershipMismatch,
     );
 
     let repeat_binding = binding(&all, "studio.枝組.共通 4", "en");
     let repeat_seed = seeds(&repeat_binding, "studio.枝組.共通 4", 7);
     assert_invocation_failure(
-        expand_macros(repeat_binding, &[all.clone()], &repeat_seed, LIMITS),
+        expand_macros(
+            repeat_binding,
+            std::slice::from_ref(&all),
+            &repeat_seed,
+            LIMITS,
+        ),
         MacroExpansionDiagnosticKind::RepeatMaximumExceeded,
     );
 

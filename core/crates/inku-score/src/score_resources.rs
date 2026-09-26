@@ -54,9 +54,11 @@ pub enum SavedScoreResourceFailure {
     AccountingIdMismatch {
         saved: String,
     },
+    // Boxed: a correctly configured host never sees this mismatch, and two
+    // inline policies would enlarge every Result that can carry it.
     HardPolicyMismatch {
-        saved: HardResourcePolicy,
-        authorized: HardResourcePolicy,
+        saved: Box<HardResourcePolicy>,
+        authorized: Box<HardResourcePolicy>,
     },
     ArithmeticOverflow(ResourceDimension),
     BudgetExceeded(ResourceBudgetExceeded),
@@ -525,7 +527,7 @@ impl Analysis {
                 || !source_instruction_indices
                     .iter()
                     .copied()
-                    .eq(ordinary_member_sources.into_iter()))
+                    .eq(ordinary_member_sources))
         {
             return Err(invalid(
                 owner,
@@ -772,15 +774,12 @@ impl Analysis {
 
         for fill in self.direct_fills.iter().flatten() {
             let unit = self.source_units[&fill.source];
-            if !self.unit_owners.contains_key(&unit) {
-                self.unit_owners.insert(
-                    unit,
-                    SavedScoreResourceOwner::FillGroup {
-                        fill_group_index: fill.group_index,
-                        owner: score.fill_groups[fill.group_index].owner.clone(),
-                    },
-                );
-            }
+            self.unit_owners
+                .entry(unit)
+                .or_insert_with(|| SavedScoreResourceOwner::FillGroup {
+                    fill_group_index: fill.group_index,
+                    owner: score.fill_groups[fill.group_index].owner.clone(),
+                });
         }
         Ok(())
     }
@@ -920,31 +919,30 @@ impl Analysis {
             }
         }
         for (instruction_index, instruction) in score.instructions.iter().enumerate() {
-            if let Some(relation) = &instruction.relation {
-                if relation
+            if let Some(relation) = &instruction.relation
+                && (relation
                     .target_instruction_index
                     .is_some_and(|index| index >= score.instructions.len())
                     || relation
                         .target_anchor_index
-                        .is_some_and(|index| index >= score.anchors.len())
-                {
-                    let owner = instruction
-                        .arrangement
-                        .as_ref()
-                        .unwrap()
-                        .resolved
-                        .as_ref()
-                        .unwrap()
-                        .owner
-                        .clone();
-                    return Err(invalid(
-                        SavedScoreResourceOwner::Instruction {
-                            instruction_index,
-                            owner,
-                        },
-                        "relation target index exceeds the saved Score",
-                    ));
-                }
+                        .is_some_and(|index| index >= score.anchors.len()))
+            {
+                let owner = instruction
+                    .arrangement
+                    .as_ref()
+                    .unwrap()
+                    .resolved
+                    .as_ref()
+                    .unwrap()
+                    .owner
+                    .clone();
+                return Err(invalid(
+                    SavedScoreResourceOwner::Instruction {
+                        instruction_index,
+                        owner,
+                    },
+                    "relation target index exceeds the saved Score",
+                ));
             }
         }
         Ok(())
@@ -1345,8 +1343,8 @@ pub fn finalize_saved_score_with_omitted_instructions(
         return Err(error(
             SavedScoreResourceOwner::Score,
             SavedScoreResourceFailure::HardPolicyMismatch {
-                saved: snapshot.hard_policy.clone(),
-                authorized: authorized_hard_policy.clone(),
+                saved: Box::new(snapshot.hard_policy.clone()),
+                authorized: Box::new(authorized_hard_policy.clone()),
             },
         ));
     }

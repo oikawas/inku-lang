@@ -684,16 +684,20 @@ struct PendingContinuation {
     claims: Vec<SourceSpan>,
 }
 
-fn associate_continuations(
-    document: &NormalizedDdlDocument,
-    association: &SemanticInstructionAssociationResult,
-) -> (
+/// Instructions, continuations, continuation issues, the owned continuation
+/// occurrence count and the instruction index map, in that order.
+type ContinuationAssociation = (
     Vec<SemanticInstruction>,
     Vec<SemanticContinuationEdge>,
     Vec<SemanticContinuationIssue>,
     usize,
     Vec<Option<usize>>,
-) {
+);
+
+fn associate_continuations(
+    document: &NormalizedDdlDocument,
+    association: &SemanticInstructionAssociationResult,
+) -> ContinuationAssociation {
     let mut instructions = Vec::new();
     let mut continuations = Vec::new();
     let mut issues = Vec::new();

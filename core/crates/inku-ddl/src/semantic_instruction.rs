@@ -1655,7 +1655,7 @@ fn claim_group_mirrored_relations(
             .member_instruction_indices
             .iter()
             .map(|&index| association.ast.entities[index].head.source().region_index)
-            .reduce(|left, right| (left == right).then_some(left).unwrap_or(usize::MAX))
+            .reduce(|left, right| if left == right { left } else { usize::MAX })
             .filter(|region| *region != usize::MAX)
         else {
             continue;

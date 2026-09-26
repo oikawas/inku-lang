@@ -196,7 +196,7 @@ impl VariationAuthorityState {
     }
 
     fn revision_conflict(&self, expected_revision: u64) -> Option<AuthorityTransitionOutcome> {
-        (expected_revision != self.revision).then(|| AuthorityTransitionOutcome {
+        (expected_revision != self.revision).then_some(AuthorityTransitionOutcome {
             protocol_version: self.protocol_version,
             result: AuthorityTransitionResult::Conflict {
                 expected_revision,

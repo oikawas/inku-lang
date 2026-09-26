@@ -1824,7 +1824,7 @@ fn historical_fixture_is_preserved_and_current_known_answers_bind_exactly() {
     let fixture = fixture();
     let definition = fixture_definition(&fixture);
     let document = locked_document("Canon.Empty", ResolvedInstructionLanguage::En, &definition);
-    let accepted = bind_macro_parameters(&document, &[definition.clone()]).unwrap();
+    let accepted = bind_macro_parameters(&document, std::slice::from_ref(&definition)).unwrap();
     let result = compile_typed_ddl(document, &[definition], Some(7), LIMITS);
 
     assert_eq!(result.schema_id, TYPED_DDL_COMPILATION_SCHEMA_ID);
@@ -2048,7 +2048,7 @@ fn definition_identity_changes_structured_meaning_seed_and_lock_but_not_expanded
     let left = compile_locked(
         "Canon.Meaning",
         ResolvedInstructionLanguage::En,
-        &[plain.clone()],
+        std::slice::from_ref(&plain),
         Some(17),
         LIMITS,
     );
@@ -2218,7 +2218,7 @@ fn exhaustive_delivery_mapping_has_no_default_or_ignored_bucket() {
             compile(
                 "Canon.Empty",
                 ResolvedInstructionLanguage::En,
-                &[definition.clone()],
+                std::slice::from_ref(&definition),
                 None,
                 LIMITS,
             ),
@@ -2229,7 +2229,7 @@ fn exhaustive_delivery_mapping_has_no_default_or_ignored_bucket() {
             compile_locked(
                 "Canon.Color white black",
                 ResolvedInstructionLanguage::En,
-                &[color.clone()],
+                std::slice::from_ref(&color),
                 None,
                 LIMITS,
             ),

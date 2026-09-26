@@ -17,17 +17,17 @@ fn member_size_and_rotation_keep_each_anchor_fixed() {
     let items = vec![item.clone(), item.clone(), item];
     let anchors: Vec<Point> = items.iter().map(instruction_anchor).collect();
     let finished = finish_group(items, &arrangement, None, Some(431));
-    assert_eq!(finished.len(), 3);
+    assert_eq!(finished.members.len(), 3);
     assert_eq!(
-        finished.iter().map(instruction_anchor).collect::<Vec<_>>(),
+        finished
+            .members
+            .iter()
+            .map(instruction_anchor)
+            .collect::<Vec<_>>(),
         anchors
     );
-    assert!(finished.iter().all(|item| item.rotation.is_some()));
-    assert!(
-        finished
-            .iter()
-            .all(|item| item.color_hint.as_deref().unwrap().contains("fade_level="))
-    );
+    assert!(finished.members.iter().all(|item| item.rotation.is_some()));
+    assert_eq!(finished.fade_levels, Some(vec![0.7, 0.48, 0.26]));
 }
 
 #[test]

@@ -155,65 +155,6 @@ pub fn fade_levels(
     )
 }
 
-fn normalized_hint(value: &str) -> String {
-    let mut normalized = String::new();
-    let mut separator = false;
-    for character in value.to_lowercase().chars() {
-        if character.is_whitespace() || ":_()'\".,/-".contains(character) {
-            separator = !normalized.is_empty();
-        } else {
-            if separator {
-                normalized.push(' ');
-                separator = false;
-            }
-            normalized.push(character);
-        }
-    }
-    normalized.trim().to_owned()
-}
-
-fn render_effect_hint(hint: Option<&str>) -> Option<String> {
-    const TOKENS: &[&str] = &[
-        "membrane",
-        "haze",
-        "fog",
-        "mist",
-        "atmosphere",
-        "膜",
-        "霞",
-        "霧",
-        "靄",
-        "soft light",
-        "柔らかな光",
-        "陽光",
-        "日差し",
-        "scent",
-        "fragrance",
-        "香り",
-        "匂",
-        "waiting buds",
-        "開花を待つ蕾",
-        "蕾",
-        "つぼみ",
-        "five-sense",
-        "五感",
-        "fade directional",
-        "fade=directional",
-        "fade outward",
-        "fade=outward",
-        "reflection",
-        "反射",
-        "映り",
-    ];
-    let normalized = normalized_hint(hint?);
-    let kept: Vec<&str> = TOKENS
-        .iter()
-        .copied()
-        .filter(|token| normalized.contains(token))
-        .collect();
-    (!kept.is_empty()).then(|| kept.join("; "))
-}
-
 pub(crate) fn apply_color_cycle_at_ordinal(item: &mut Instruction, cycle: &[Color], ordinal: u64) {
     if cycle.is_empty() {
         return;
@@ -221,7 +162,7 @@ pub(crate) fn apply_color_cycle_at_ordinal(item: &mut Instruction, cycle: &[Colo
     let cycle_len = u64::try_from(cycle.len()).expect("color cycle length fits u64");
     let cycle_index = usize::try_from(ordinal % cycle_len).expect("color cycle index fits usize");
     item.color = cycle[cycle_index];
-    item.color_hint = render_effect_hint(item.color_hint.as_deref());
+    item.color_hint = crate::effects::render_effect_hint(item.color_hint.as_deref());
 }
 
 fn apply_color_cycle(items: &mut [Instruction], cycle: &[Color]) {
@@ -237,22 +178,38 @@ fn apply_color_cycle(items: &mut [Instruction], cycle: &[Color]) {
     }
 }
 
+/// Rank each member's fade and append it to the member's hint as seed
+/// material (see `effects`). Returns the levels as the notes record them, to
+/// four decimals.
 fn apply_fade_levels(
     items: &mut [Instruction],
     arrangement: &Arrangement,
     layout_center: Option<Point>,
-) {
-    let Some(levels) = fade_levels(items, arrangement, layout_center) else {
-        return;
-    };
-    for (item, level) in items.iter_mut().zip(levels) {
-        let tag = format!("fade_level={level:.4}");
-        item.color_hint = Some(
-            item.color_hint
-                .as_ref()
-                .map_or(tag.clone(), |hint| format!("{hint}; {tag}")),
-        );
-    }
+) -> Option<Vec<f64>> {
+    let levels = fade_levels(items, arrangement, layout_center)?;
+    Some(
+        items
+            .iter_mut()
+            .zip(levels)
+            .map(|(item, level)| {
+                let recorded = format!("{level:.4}");
+                let tag = format!("fade_level={recorded}");
+                item.color_hint = Some(match &item.color_hint {
+                    Some(hint) => format!("{hint}; {tag}"),
+                    None => tag,
+                });
+                recorded.parse().expect("a formatted level parses")
+            })
+            .collect(),
+    )
+}
+
+/// A finished group's members in order, and each member's fade level when
+/// the group fades by level.
+#[derive(Clone, Debug, PartialEq)]
+pub struct FinishedGroup {
+    pub members: Vec<Instruction>,
+    pub fade_levels: Option<Vec<f64>>,
 }
 
 /// Typed-path member finishing: fade, then the tool's size and rotation hand.
@@ -262,13 +219,16 @@ pub(crate) fn finish_members_in_place(
     arrangement: &Arrangement,
     member_seed: Seed,
     canvas: Option<CanvasSize>,
-) -> Vec<Instruction> {
-    apply_fade_levels(&mut items, arrangement, None);
-    member_rotations(
-        member_sizes(items, arrangement, Some(member_seed), canvas),
-        arrangement,
-        Some(member_seed),
-    )
+) -> FinishedGroup {
+    let fade_levels = apply_fade_levels(&mut items, arrangement, None);
+    FinishedGroup {
+        members: member_rotations(
+            member_sizes(items, arrangement, Some(member_seed), canvas),
+            arrangement,
+            Some(member_seed),
+        ),
+        fade_levels,
+    }
 }
 
 /// Apply group color, fade, size, and rotation in their canonical order.
@@ -278,7 +238,7 @@ pub fn finish_group(
     arrangement: &Arrangement,
     layout_center: Option<Point>,
     member_seed: Option<Seed>,
-) -> Vec<Instruction> {
+) -> FinishedGroup {
     finish_group_on_canvas(items, arrangement, layout_center, member_seed, None)
 }
 
@@ -289,12 +249,15 @@ pub fn finish_group_on_canvas(
     layout_center: Option<Point>,
     member_seed: Option<Seed>,
     canvas: Option<CanvasSize>,
-) -> Vec<Instruction> {
+) -> FinishedGroup {
     apply_color_cycle(&mut items, &arrangement.color_cycle);
-    apply_fade_levels(&mut items, arrangement, layout_center);
-    member_rotations(
-        member_sizes(items, arrangement, member_seed, canvas),
-        arrangement,
-        member_seed,
-    )
+    let fade_levels = apply_fade_levels(&mut items, arrangement, layout_center);
+    FinishedGroup {
+        members: member_rotations(
+            member_sizes(items, arrangement, member_seed, canvas),
+            arrangement,
+            member_seed,
+        ),
+        fade_levels,
+    }
 }

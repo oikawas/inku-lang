@@ -1,6 +1,7 @@
 //! Score-level performance planning and composite-group expansion.
 
 use crate::arrangement::{ArrangementRequest, expand_arrangement};
+use crate::effects::MarkEffects;
 use crate::geometry::{point_from_short_side_units, point_to_short_side_units};
 use crate::planning::{
     PlanningWarning, ensure_line_coordinates, instruction_anchor_on_canvas,
@@ -56,11 +57,13 @@ pub struct PerformedInstruction {
     pub closed_arc_pair_follower: Option<usize>,
     /// Innermost enclosing entry of the plan's `fill_scopes`.
     pub fill_scope_index: Option<usize>,
+    /// What the instruction inherits from the arrangement that copied it.
+    pub effects: MarkEffects,
 }
 
 impl PerformedInstruction {
     /// An instruction performed as written: its own seed, no transform, and no
-    /// centerline, closed pair or fill scope.
+    /// centerline, closed pair, fill scope or arrangement effect.
     pub(crate) fn plain(instruction_index: usize, original_instruction_index: usize) -> Self {
         Self {
             instruction_index,
@@ -70,6 +73,25 @@ impl PerformedInstruction {
             line_centerline: None,
             closed_arc_pair_follower: None,
             fill_scope_index: None,
+            effects: MarkEffects::default(),
+        }
+    }
+}
+
+/// Where one instruction of an expanded Score came from.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) struct ExpandedOrigin {
+    /// Original Score owner.
+    pub original_instruction_index: usize,
+    /// What a composite group's head copy inherits from the arrangement.
+    pub effects: MarkEffects,
+}
+
+impl ExpandedOrigin {
+    fn plain(original_instruction_index: usize) -> Self {
+        Self {
+            original_instruction_index,
+            effects: MarkEffects::default(),
         }
     }
 }
@@ -197,27 +219,27 @@ fn composite_member_copy(
     moved
 }
 
-pub(crate) fn expand_composite_groups_with_indices(
+pub(crate) fn expand_composite_groups_with_origins(
     score: &Score,
     placement_seed: Option<Seed>,
     performance_seed: Option<Seed>,
     canvas: Option<CanvasSize>,
-) -> (Score, Vec<usize>) {
+) -> (Score, Vec<ExpandedOrigin>) {
     let mut expanded = Vec::new();
-    let mut original_instruction_indices = Vec::new();
+    let mut origins = Vec::new();
     let mut index = 0;
     while index < score.instructions.len() {
         let head = &score.instructions[index];
         let Some(arrangement) = head.arrangement.as_ref() else {
             expanded.push(head.clone());
-            original_instruction_indices.push(index);
+            origins.push(ExpandedOrigin::plain(index));
             index += 1;
             continue;
         };
         let group_size = arrangement.group_size as usize;
         if group_size == 1 {
             expanded.push(head.clone());
-            original_instruction_indices.push(index);
+            origins.push(ExpandedOrigin::plain(index));
             index += 1;
             continue;
         }
@@ -237,12 +259,18 @@ pub(crate) fn expand_composite_groups_with_indices(
         let source_rotation = prepared_head.rotation.unwrap_or(0.0);
         let source_extent = instruction_extent(&prepared_head);
         let cycles_color = !arrangement.color_cycle.is_empty();
-        for copy_head in copies {
+        for copy in copies {
+            let copy_head = copy.instruction;
             let rotation_delta = copy_head.rotation.unwrap_or(0.0) - source_rotation;
             let scale = instruction_extent(&copy_head) / source_extent;
             let color = cycles_color.then_some(copy_head.color);
             expanded.push(copy_head.clone());
-            original_instruction_indices.push(index);
+            origins.push(ExpandedOrigin {
+                original_instruction_index: index,
+                effects: copy.effects,
+            });
+            // Members follow the head's place, size and cycled color, not
+            // its fade.
             for (member_offset, member) in members[1..].iter().enumerate() {
                 expanded.push(composite_member_copy(
                     member,
@@ -253,31 +281,34 @@ pub(crate) fn expand_composite_groups_with_indices(
                     color,
                     canvas,
                 ));
-                original_instruction_indices.push(index + member_offset + 1);
+                origins.push(ExpandedOrigin::plain(index + member_offset + 1));
             }
         }
         index += group_size;
     }
     let mut result = score.clone();
     result.instructions = expanded;
-    (result, original_instruction_indices)
+    (result, origins)
 }
 
 /// Resolve the complete deterministic pre-draw instruction sequence.
 #[must_use]
 pub fn resolve_performance(request: PerformanceRequest<'_>) -> PerformancePlan {
     let placement_seed = request.composition_seed.or(request.performance_seed);
-    let (expanded, original_instruction_indices) = expand_composite_groups_with_indices(
+    let (expanded, origins) = expand_composite_groups_with_origins(
         request.score,
         placement_seed,
         request.performance_seed,
         request.canvas,
     );
     // Each expanded instruction is performed once, in order.
-    let performed = original_instruction_indices
+    let performed = origins
         .into_iter()
         .enumerate()
-        .map(|(index, original)| PerformedInstruction::plain(index, original))
+        .map(|(index, origin)| PerformedInstruction {
+            effects: origin.effects,
+            ..PerformedInstruction::plain(index, origin.original_instruction_index)
+        })
         .collect();
     let Some(seed) = request.performance_seed else {
         return PerformancePlan {

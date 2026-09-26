@@ -4,7 +4,7 @@ use std::collections::BTreeSet;
 use std::fmt;
 
 use crate::accepted_fills;
-use crate::arrangement::{ArrangementRequest, expand_arrangement};
+use crate::arrangement::{ArrangedCopy, ArrangementRequest, expand_arrangement};
 use crate::checked_performance::{
     CheckedPerformanceError, CheckedPerformanceWithResourcesError, resolve_checked_performance,
     resolve_checked_performance_with_resources_and_omissions,
@@ -552,7 +552,10 @@ fn render_impl(
                 canvas: Some(request.options.canvas),
             })
         } else {
-            vec![instruction.clone()]
+            vec![ArrangedCopy {
+                instruction: instruction.clone(),
+                effects: performed.effects,
+            }]
         };
         let mut instruction_group = Element::new("g");
         if structured {
@@ -580,6 +583,7 @@ fn render_impl(
                 support,
                 geometry_transform: instruction_transform.in_pixels(request.options.canvas.unit()),
                 oil_fill_pass_limit,
+                effects: performed.effects,
             };
             let follower_context = MarkContext {
                 instruction_seed_override: follower_performed.seed_override,
@@ -587,6 +591,7 @@ fn render_impl(
                 geometry_transform: follower_performed
                     .transform
                     .in_pixels(request.options.canvas.unit()),
+                effects: follower_performed.effects,
                 ..first_context
             };
             check_mark_extent(instruction, first_context)?;
@@ -613,7 +618,8 @@ fn render_impl(
                 }
             }
         }
-        for (mark_index, single) in expanded.iter().enumerate() {
+        for (mark_index, copy) in expanded.iter().enumerate() {
+            let single = &copy.instruction;
             let context = MarkContext {
                 canvas: request.options.canvas,
                 color_map: &request.options.resolved_color_map,
@@ -628,6 +634,7 @@ fn render_impl(
                 support,
                 geometry_transform: instruction_transform.in_pixels(request.options.canvas.unit()),
                 oil_fill_pass_limit,
+                effects: copy.effects,
             };
             check_mark_extent(single, context)?;
             allowance.add_mark();

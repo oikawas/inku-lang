@@ -6,6 +6,12 @@
 
 **本書が持つのは v2.5.0（2026-07-25、render engine 12）以降**の 36 版である。それより前は書庫にある。
 
+### 2026-09-26 — typed配置の群の中の減衰を効かせる（render engine 69）
+
+render engine 67で、Score 0.10のtyped配置は`fade`を群の中の濃さの減衰として演奏するとした（SPECも同じ）。しかし実装は成員ごとの濃さの段（`fade_level=`）を`color_hint`へ書くだけで、描画がそれを読む条件の`fade=`を書いていなかった。そのためScore 0.10以降の作品では`fade`が濃さに効かず、seedを持たないsurfaceの模様のseedを変えるだけだった。本版から、成員が2つ以上の群は再演で群の中の濃さが減衰する。変わるのは濃さの値だけで、形・位置・模様は変えない。Score 0.9以前の作品とfadeを使わない作品は1 byteも変わらない。
+
+あわせて、並びと群が渡す効果を、`color_hint`の文字列を部分一致で読み戻すのでなく、型（`MarkEffects`）で描画へ渡すようにした。文字列の注記は、seedを持たないsurfaceのseedの材料としてだけ残る。作者の`color_hint`に書かれた`fade_level=`は濃さを変えなくなり、並びの`fade`は作者の文字列のfadeの語（`fade directional`など）より優先する。作者の雰囲気の語（霧・香り・蕾・五感・反射など）の効き方は変えない。
+
 ### 2026-09-26 — 面の濃さを持つScore 0.4.0以降を断らない
 
 Serverのschemaは、面の濃さ（`surface_intensity`の`dense`・`faint`）を持つ命令があると、Scoreの版がちょうど0.3.0のときしか受け付けず、0.4.0〜0.15.0を「surface_intensity requires Score version 0.3.0」で断っていた。SPECは0.3.0以降としている。断るのを0.1.0と0.2.0だけにした。受け取ったScoreを検査する経路（作品の保存`POST /api/history`、0.10より前の版の描き直し`/api/render-score`・`/api/render-svg`、保存した作品の表示用以外の書き出し）で、面の濃さを持つ0.4.0以降のScoreが通る。

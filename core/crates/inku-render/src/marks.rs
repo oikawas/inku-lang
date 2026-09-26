@@ -82,6 +82,8 @@ pub struct MarkContext<'a> {
     /// Most loaded passes one oil-paint interior fill may lay down, shared out
     /// of a document-wide budget so many large oil fills stay bounded.
     pub oil_fill_pass_limit: usize,
+    /// What the mark inherits from the arrangement that copied its instruction.
+    pub effects: crate::effects::MarkEffects,
 }
 
 impl MarkContext<'_> {
@@ -228,22 +230,12 @@ pub(crate) fn style_dash(style: LineStyle, weight: Weight, scale: f64) -> Option
     })
 }
 
-fn fade_level(hint: &str) -> Option<f64> {
-    let start = hint.find("fade_level=")? + "fade_level=".len();
-    let value = hint[start..]
-        .chars()
-        .take_while(|character| character.is_ascii_digit() || *character == '.')
-        .collect::<String>();
-    value.parse().ok()
-}
-
 /// Resolve the color, width, opacity, cap and dash of one mark.
 ///
-/// Free-text color hints still carry legacy effects: haze and light words,
-/// scent, buds and the five senses cap opacity at a fixed level. Arrangement
-/// expansion writes `fade=` and each member's `fade_level=` into the hint,
-/// and this reads them back as that member's opacity ceiling. Carve marks
-/// ignore the color and scrape to their depth's tone.
+/// The author's effect words in the color hint (haze and light, scent, buds,
+/// the five senses, reflection, and older Scores' fade words) and the fade
+/// the mark's arrangement gives it cap the tool's opacity; see `effects`.
+/// Carve marks ignore the color and scrape to their depth's tone.
 pub(crate) fn mark_style(instruction: &Instruction, context: MarkContext<'_>) -> MarkStyle {
     let fill = instruction.filled
         || instruction
@@ -256,55 +248,12 @@ pub(crate) fn mark_style(instruction: &Instruction, context: MarkContext<'_>) ->
         context.color_map,
         context.work_assignment,
     );
-    let mut stroke_opacity = weight_opacity(instruction.weight);
-    let mut fill_opacity = None;
-    let hint = instruction
-        .color_hint
-        .as_deref()
-        .unwrap_or_default()
-        .to_lowercase();
-    let has = |tokens: &[&str]| tokens.iter().any(|token| hint.contains(token));
-    if has(&[
-        "membrane",
-        "haze",
-        "fog",
-        "mist",
-        "atmosphere",
-        "膜",
-        "霞",
-        "霧",
-        "靄",
-    ]) {
-        stroke_opacity = stroke_opacity.min(0.26);
-        fill_opacity = fill.then_some(0.12);
-    } else if has(&["soft light", "柔らかな光", "陽光", "日差し"]) {
-        stroke_opacity = stroke_opacity.min(0.30);
-        fill_opacity = fill.then_some(0.14);
-    } else if has(&["scent", "fragrance", "香り", "匂"]) {
-        stroke_opacity = stroke_opacity.min(0.38);
-        fill_opacity = fill.then_some(0.20);
-    } else if has(&["waiting buds", "開花を待つ蕾", "蕾", "つぼみ"]) {
-        stroke_opacity = stroke_opacity.min(0.72);
-        fill_opacity = fill.then_some(0.58);
-    } else if has(&["five-sense", "五感"]) {
-        stroke_opacity = stroke_opacity.min(0.44);
-        fill_opacity = fill.then_some(0.18);
-    } else if has(&["fade directional", "fade=directional"]) {
-        let ceiling = fade_level(&hint).unwrap_or(0.48);
-        stroke_opacity = stroke_opacity.min(ceiling);
-        fill_opacity = fill.then(|| {
-            fade_level(&hint).map_or(0.30, |level| (level * 0.625 * 10_000.0).round() / 10_000.0)
-        });
-    } else if has(&["fade outward", "fade=outward"]) {
-        let ceiling = fade_level(&hint).unwrap_or(0.40);
-        stroke_opacity = stroke_opacity.min(ceiling);
-        fill_opacity = fill.then(|| {
-            fade_level(&hint).map_or(0.22, |level| (level * 0.55 * 10_000.0).round() / 10_000.0)
-        });
-    }
-    if has(&["reflection", "反射", "映り"]) {
-        stroke_opacity = stroke_opacity.min(0.52);
-    }
+    let (mut stroke_opacity, fill_opacity) = crate::effects::effect_opacity(
+        crate::effects::HintWords::read(instruction.color_hint.as_deref()),
+        context.effects,
+        weight_opacity(instruction.weight),
+        fill,
+    );
     if is_wash_mark(instruction) {
         stroke_opacity = (stroke_opacity * 0.35 * 1_000_000.0).round() / 1_000_000.0;
     }

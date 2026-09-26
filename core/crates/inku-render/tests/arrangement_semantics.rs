@@ -7,13 +7,20 @@ fn instruction(json: &str) -> Instruction {
     score.instructions.into_iter().next().unwrap()
 }
 
+fn expand(request: ArrangementRequest<'_>) -> Vec<Instruction> {
+    expand_arrangement(request)
+        .into_iter()
+        .map(|copy| copy.instruction)
+        .collect()
+}
+
 #[test]
 fn horizontal_group_is_fitted_to_the_declared_anchor_and_frame() {
     let original = instruction(
         r#"{"primitive":"circle","center":[0.7,0.3],"radius":0.05,
         "arrangement":{"count":3,"layout":"horizontal","margin":0.1}}"#,
     );
-    let expanded = expand_arrangement(ArrangementRequest {
+    let expanded = expand(ArrangementRequest {
         instruction: &original,
         placement_seed: Some(17),
         performance_seed: Some(431),
@@ -32,7 +39,7 @@ fn explicit_grid_shape_owns_its_full_cell_count() {
         r#"{"primitive":"square","position":[0.4,0.4],"size":[0.1,0.1],
         "arrangement":{"count":3,"layout":"grid","rows":2,"cols":2}}"#,
     );
-    let expanded = expand_arrangement(ArrangementRequest {
+    let expanded = expand(ArrangementRequest {
         instruction: &original,
         placement_seed: None,
         performance_seed: Some(-7),
@@ -76,7 +83,7 @@ fn expansion_moves_only_the_geometry_owned_by_the_primitive() {
         r#"{"primitive":"circle","center":[0.5,0.5],"radius":0.05,
         "position":[0.12,0.34],"arrangement":{"count":2,"layout":"horizontal"}}"#,
     );
-    let expanded = expand_arrangement(ArrangementRequest {
+    let expanded = expand(ArrangementRequest {
         instruction: &original,
         placement_seed: Some(17),
         performance_seed: Some(431),
@@ -102,7 +109,7 @@ fn vertical_square_arrangement_preserves_the_declared_physical_x_anchor() {
         "arrangement":{"count":3,"layout":"vertical","margin":0.1}}"#,
     );
     let expected = instruction_anchor_on_canvas(&original, Some(canvas)).x;
-    let expanded = expand_arrangement(ArrangementRequest {
+    let expanded = expand(ArrangementRequest {
         instruction: &original,
         placement_seed: Some(17),
         performance_seed: Some(431),

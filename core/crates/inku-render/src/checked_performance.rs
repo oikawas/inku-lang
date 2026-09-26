@@ -8,7 +8,7 @@ use inku_score::{
 
 use crate::affine::AffineTransform;
 use crate::performance::{
-    PerformancePlan, PerformanceRequest, expand_composite_groups_with_indices, resolve_performance,
+    PerformancePlan, PerformanceRequest, expand_composite_groups_with_origins, resolve_performance,
 };
 use crate::planning::{
     endpoint_geometry, ensure_line_coordinates, instruction_anchor_on_canvas,

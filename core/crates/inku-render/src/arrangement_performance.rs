@@ -7,6 +7,7 @@
 //! only Score fields; nothing depends on source words or subjects.
 
 use crate::determinism::hash01;
+use crate::effects::{FadeEffect, FadeKind};
 use crate::placement::rhythm_parameter;
 use crate::types::{
     Arrangement, CanvasSize, Density, Instruction, Point, ResolvedPlacementRecipe, RhythmSpacing,
@@ -102,19 +103,30 @@ pub(crate) fn shape_centers(
 }
 
 /// Apply fade and the tool's member hand to one group's performed members.
+/// Returns each member's fade when the group fades; a grid or a single
+/// member does not.
 pub(crate) fn finish_members(
     members: &mut [Instruction],
     arrangement: &Arrangement,
     recipe: &ResolvedPlacementRecipe,
     seed: Seed,
     canvas: Option<CanvasSize>,
-) {
+) -> Option<Vec<FadeEffect>> {
     if members.len() < 2 || matches!(recipe, ResolvedPlacementRecipe::Grid { .. }) {
-        return;
+        return None;
     }
     let finished =
         crate::group::finish_members_in_place(members.to_vec(), arrangement, seed, canvas);
-    members.clone_from_slice(&finished);
+    members.clone_from_slice(&finished.members);
+    let kind = FadeKind::of(arrangement.fade)?;
+    Some(
+        (0..members.len())
+            .map(|index| FadeEffect {
+                kind,
+                level: finished.fade_levels.as_ref().map(|levels| levels[index]),
+            })
+            .collect(),
+    )
 }
 
 #[cfg(test)]

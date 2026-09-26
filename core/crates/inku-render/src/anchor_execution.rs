@@ -17,6 +17,8 @@ struct Performed {
     seed_override: Option<crate::types::Seed>,
     /// Fixed centerline of a connected path host, in short-side units.
     line_centerline: Option<Vec<Point>>,
+    /// What the copy inherits from the arrangement that made it.
+    effects: crate::effects::MarkEffects,
 }
 
 /// Mutable state of one dependency-ordered execution.
@@ -2215,15 +2217,15 @@ fn resolve_impl(
         score: &scoped_score,
         ..request
     };
-    let (expanded, owners) = expand_composite_groups_with_indices(
+    let (expanded, origins) = expand_composite_groups_with_origins(
         request.score,
         request.composition_seed.or(request.performance_seed),
         request.performance_seed,
         request.canvas,
     );
     let mut ordinals = vec![Vec::new(); request.score.instructions.len()];
-    for (ordinal, &owner) in owners.iter().enumerate() {
-        ordinals[owner].push(ordinal);
+    for (ordinal, origin) in origins.iter().enumerate() {
+        ordinals[origin.original_instruction_index].push(ordinal);
     }
     let anchors = request
         .score
@@ -2353,11 +2355,20 @@ fn resolve_impl(
                         });
                     let line_centerline =
                         execution.connected_path_centerline(index, &instruction, seed_override);
+                    // A typed instance's arrangement ran in the typed Builder;
+                    // a legacy composite head's ran in the expansion above.
+                    let effects = execution
+                        .typed
+                        .as_ref()
+                        .map_or(origins[ordinal].effects, |typed| {
+                            typed.instructions[index].effects
+                        });
                     execution.performed[index].push(Performed {
                         instruction,
                         ordinal,
                         seed_override,
                         line_centerline,
+                        effects,
                     });
                 }
                 None
@@ -2418,6 +2429,7 @@ fn resolve_impl(
                 line_centerline: value.line_centerline,
                 closed_arc_pair_follower: None,
                 fill_scope_index: None,
+                effects: value.effects,
             };
             (value.instruction, entry)
         })

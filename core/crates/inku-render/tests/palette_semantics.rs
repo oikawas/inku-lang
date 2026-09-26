@@ -1,8 +1,9 @@
 use std::collections::BTreeMap;
 
+use inku_render::effects::render_effect_hint;
 use inku_render::palette::{
-    PaletteObservationError, default_color_map, render_effect_hint, resolve_color,
-    work_color_assignment, work_palette_context,
+    PaletteObservationError, default_color_map, resolve_color, work_color_assignment,
+    work_palette_context,
 };
 use inku_render::types::Color;
 

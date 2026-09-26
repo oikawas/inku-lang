@@ -1,6 +1,7 @@
 //! Expansion and placement of canonical arrangements.
 
 use crate::determinism::instruction_seed;
+use crate::effects::{FadeEffect, FadeKind, MarkEffects};
 use crate::group::finish_group_on_canvas;
 use crate::placement::{
     ClusterPlacement, clustered_position, path_position, region_in_short_side_units,
@@ -15,6 +16,9 @@ const FRAME_LOW: f64 = 0.02;
 const FRAME_HIGH: f64 = 0.98;
 const ARRANGEMENT_SCALE: f64 = 1_000_000_000.0;
 
+/// Move a copy by `delta`. A copy taken from the arranged instruction itself
+/// gets the arrangement's notes appended to its hint, as seed material (see
+/// `effects`); marks read the arrangement's fade from `ArrangedCopy::effects`.
 fn shift_instruction(instruction: &Instruction, delta: Point) -> Instruction {
     let mut shifted = instruction.clone();
     shifted.arrangement = None;
@@ -182,6 +186,14 @@ pub struct ArrangementRequest<'a> {
     pub canvas: Option<CanvasSize>,
 }
 
+/// One performed copy of an arranged instruction.
+#[derive(Clone, Debug, PartialEq)]
+pub struct ArrangedCopy {
+    pub instruction: Instruction,
+    /// What the copy inherits from the arrangement.
+    pub effects: MarkEffects,
+}
+
 fn grid_targets(
     arrangement: &crate::types::Arrangement,
     instruction: &Instruction,
@@ -236,10 +248,16 @@ fn grid_targets(
 }
 
 /// Expand an arrangement into deterministic performed members.
+///
+/// Every copy fades as the arrangement says, except the lone copy of a
+/// count-one arrangement outside a grid, which is the instruction itself.
 #[must_use]
-pub fn expand_arrangement(request: ArrangementRequest<'_>) -> Vec<Instruction> {
+pub fn expand_arrangement(request: ArrangementRequest<'_>) -> Vec<ArrangedCopy> {
     let Some(arrangement) = request.instruction.arrangement.as_ref() else {
-        return vec![request.instruction.clone()];
+        return vec![ArrangedCopy {
+            instruction: request.instruction.clone(),
+            effects: MarkEffects::default(),
+        }];
     };
     let prepared = ensure_line_coordinates(request.instruction);
     let member_seed = Some(instruction_seed(&prepared, request.performance_seed));
@@ -252,7 +270,14 @@ pub fn expand_arrangement(request: ArrangementRequest<'_>) -> Vec<Instruction> {
             None,
             member_seed,
             request.canvas,
-        );
+        )
+        .members
+        .into_iter()
+        .map(|instruction| ArrangedCopy {
+            instruction,
+            effects: MarkEffects::default(),
+        })
+        .collect();
     }
     let count = arrangement.count as usize;
     let margin = if arrangement.preserve_space {
@@ -364,7 +389,7 @@ pub fn expand_arrangement(request: ArrangementRequest<'_>) -> Vec<Instruction> {
         }
     };
 
-    let mut expanded: Vec<Instruction> = targets
+    let expanded: Vec<Instruction> = targets
         .into_iter()
         .map(|target| {
             let mut item = shift_instruction(
@@ -378,15 +403,30 @@ pub fn expand_arrangement(request: ArrangementRequest<'_>) -> Vec<Instruction> {
             item
         })
         .collect();
-    expanded = finish_group_on_canvas(
+    let finished = finish_group_on_canvas(
         expanded,
         arrangement,
         layout_center,
         member_seed,
         request.canvas,
     );
-    if arrangement.layout != Layout::Grid {
-        expanded = fit_group_to_anchor(&prepared, expanded, request.canvas);
-    }
-    expanded.iter().map(quantize_instruction).collect()
+    let members = if arrangement.layout == Layout::Grid {
+        finished.members
+    } else {
+        fit_group_to_anchor(&prepared, finished.members, request.canvas)
+    };
+    let fade = FadeKind::of(arrangement.fade);
+    members
+        .iter()
+        .enumerate()
+        .map(|(index, member)| ArrangedCopy {
+            instruction: quantize_instruction(member),
+            effects: MarkEffects {
+                fade: fade.map(|kind| FadeEffect {
+                    kind,
+                    level: finished.fade_levels.as_ref().map(|levels| levels[index]),
+                }),
+            },
+        })
+        .collect()
 }

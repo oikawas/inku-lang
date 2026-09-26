@@ -364,6 +364,21 @@ pub struct PipelineSnapshot {
     pub snapshot_digest: String,
 }
 
+/// The provider attempt a host is running, for showing retry progress.
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+pub struct ProviderAttempt {
+    /// The effect tag, such as `generate_normalized_ddl` for Stage 1.
+    pub action: &'static str,
+    /// One-based number of the running attempt.
+    pub attempt: u32,
+    /// The most attempts the stage's retry policy allows.
+    pub max_attempts: u32,
+    /// The wait before the attempt starts.
+    pub delay_ms: DecimalU64,
+    /// The time the attempt may take, already capped by the stage's total budget.
+    pub timeout_ms: DecimalU64,
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct StepOutput {
@@ -666,6 +681,30 @@ fn proposal(
         AuthorityTransitionResult::RevisionExhausted { .. } => {
             Err(ProtocolError::SequenceExhausted)
         }
+    }
+}
+
+impl PipelineSnapshot {
+    /// The provider attempt in flight, or `None` while no provider effect runs.
+    ///
+    /// The core keeps no wall clock, so a host turns `delay_ms` and
+    /// `timeout_ms` into a deadline from the time it started the attempt.
+    pub fn provider_attempt(&self) -> Result<Option<ProviderAttempt>, ProtocolError> {
+        self.validate()?;
+        Ok(match (&self.phase, &self.action) {
+            (PipelinePhase::AwaitingLlm { stage, .. }, Some(action))
+                if action.tag == stage.action_name() =>
+            {
+                Some(ProviderAttempt {
+                    action: stage.action_name(),
+                    attempt: action.identity.attempt,
+                    max_attempts: self.retry_policy(*stage).max_attempts,
+                    delay_ms: action.delay_ms,
+                    timeout_ms: action.timeout_ms,
+                })
+            }
+            _ => None,
+        })
     }
 }
 

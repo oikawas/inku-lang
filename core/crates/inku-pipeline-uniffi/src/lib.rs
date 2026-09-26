@@ -24,6 +24,16 @@ pub fn step(snapshot_bytes: Vec<u8>, input_envelope_bytes: Vec<u8>) -> Vec<u8> {
     .unwrap_or_else(|_| error_bytes(ProtocolError::InternalInvariant))
 }
 
+/// Report the provider attempt in flight for a stored snapshot, so a host can
+/// show retry progress. The binding version is unchanged: this only adds a call.
+#[uniffi::export]
+pub fn provider_attempt(snapshot_bytes: Vec<u8>) -> Vec<u8> {
+    catch_unwind(AssertUnwindSafe(|| {
+        inku_pipeline::byte_envelope::provider_attempt_owned(&snapshot_bytes)
+    }))
+    .unwrap_or_else(|_| br#"{"error":"invalid_snapshot"}"#.to_vec())
+}
+
 /// Report the fixed binding and byte-protocol versions as stable JSON.
 #[uniffi::export]
 pub fn version_report() -> String {

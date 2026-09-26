@@ -152,6 +152,17 @@ fn pipeline_step<'py>(
     PyBytes::new(py, &output)
 }
 
+/// Report the provider attempt in flight for a stored pipeline snapshot.
+#[pyfunction]
+fn pipeline_provider_attempt<'py>(
+    py: Python<'py>,
+    snapshot_bytes: &Bound<'py, PyBytes>,
+) -> Bound<'py, PyBytes> {
+    let snapshot = snapshot_bytes.as_bytes().to_vec();
+    let output = py.detach(|| inku_pipeline_uniffi::provider_attempt(snapshot));
+    PyBytes::new(py, &output)
+}
+
 #[pyfunction]
 fn pipeline_resolve_palette<'py>(
     py: Python<'py>,
@@ -205,6 +216,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(pipeline_canvas_registry, module)?)?;
     module.add_function(wrap_pyfunction!(pipeline_stage1_system_projection, module)?)?;
     module.add_function(wrap_pyfunction!(pipeline_step, module)?)?;
+    module.add_function(wrap_pyfunction!(pipeline_provider_attempt, module)?)?;
     module.add_function(wrap_pyfunction!(pipeline_resolve_palette, module)?)?;
     module.add_function(wrap_pyfunction!(pipeline_resolve_macro_catalog, module)?)?;
     module.add_function(wrap_pyfunction!(

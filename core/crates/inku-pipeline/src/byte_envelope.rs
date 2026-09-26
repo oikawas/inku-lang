@@ -64,6 +64,25 @@ pub fn step_owned(snapshot_bytes: &[u8], input_bytes: &[u8]) -> Vec<u8> {
     }
 }
 
+/// The provider attempt in flight for a stored snapshot, as
+/// `{"provider_attempt": {...}}` or `{"provider_attempt": null}`, or
+/// `{"error": "invalid_snapshot"}` for a snapshot that `step` would refuse.
+pub fn provider_attempt_owned(snapshot_bytes: &[u8]) -> Vec<u8> {
+    let attempt = serde_json::from_slice::<LimitSnapshot>(snapshot_bytes)
+        .ok()
+        .filter(|limits| {
+            let limits = limits.config.envelope_limits;
+            limits.validate().is_ok() && snapshot_bytes.len() <= limits.max_snapshot_bytes
+        })
+        .and_then(|_| serde_json::from_slice::<PipelineSnapshot>(snapshot_bytes).ok())
+        .and_then(|snapshot| snapshot.provider_attempt().ok());
+    match attempt {
+        Some(attempt) => serde_json::to_vec(&json!({ "provider_attempt": attempt }))
+            .expect("provider attempt serializes"),
+        None => br#"{"error":"invalid_snapshot"}"#.to_vec(),
+    }
+}
+
 /// Empty snapshot bytes create an execution. A start reply assigns the execution
 /// identity; subsequent inputs must echo it and advance the returned sequence.
 /// The host must serialize calls per execution and store the returned snapshot.

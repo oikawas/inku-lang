@@ -451,6 +451,54 @@ fn stage1_compiler_feedback_uses_the_shared_attempt_budget() {
 }
 
 #[test]
+fn a_retrying_stage1_reports_its_attempt_and_budget() {
+    // Hosts showed only elapsed time, so a timed-out first attempt looked
+    // like a slow answer.
+    let mut pipeline_config = config();
+    pipeline_config.stage1_retry.max_attempts = 2;
+    let start = envelope(
+        None,
+        PipelineInput::Start {
+            variation_id: "attempt-progress".into(),
+            authoring_nonce: "attempt-progress-1".into(),
+            config: Box::new(pipeline_config),
+            authority: VariationAuthorityState::new_description(),
+            authoring: AuthoringInput::Description {
+                description: "One quiet black circle".into(),
+                auto_catalog: false,
+                sketch: SketchRequest::Off,
+            },
+        },
+    );
+    let first = run(None, &start).snapshot;
+    let failed = envelope(
+        Some(&first),
+        PipelineInput::EffectResult {
+            result: EffectResult::ProviderFailed {
+                identity: first.action.as_ref().unwrap().identity.clone(),
+                failure: ProviderFailure::TransportTimeout,
+                elapsed_ms: DecimalU64::new(1000),
+            },
+        },
+    );
+    let second = run(Some(&first), &failed).snapshot;
+    let report: serde_json::Value = serde_json::from_slice(
+        &crate::byte_envelope::provider_attempt_owned(&serde_json::to_vec(&second).unwrap()),
+    )
+    .unwrap();
+    assert_eq!(
+        report,
+        json!({"provider_attempt": {
+            "action": "generate_normalized_ddl",
+            "attempt": 2,
+            "max_attempts": 2,
+            "delay_ms": "10",
+            "timeout_ms": "1000",
+        }})
+    );
+}
+
+#[test]
 fn exhausted_stage1_proposes_sealed_residual_only_after_visible_ack() {
     let source = "mystery. place one red square at center.";
     let mut pipeline_config = config();

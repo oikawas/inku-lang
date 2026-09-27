@@ -6,6 +6,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 36 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-27 — The render engine version history gains engines 46 to 71
+
+`docs/spec/render-engine-history` (both languages) stopped at engine 45. It now lists engines 46 to 71 and gives each its own section. Only engines 46 to 51 and 66 have a frozen corpus; from 52 on none was made, following the 2026-09-11 ruling that the full reference update runs once when every migration step is done. Engines 69 to 71 carry their saved-Score comparison counts. This changes documents only, not versions.
+
 ### 2026-09-27 — Position words are drawn as ranges (DDL engine 51)
 
 A position word is now drawn as a range built from three equal bands on each canvas axis (the author's decisions: a scatter or line-up stays inside its range, the bands are thirds, and a placed mark anchors in its range shrunk to two thirds).

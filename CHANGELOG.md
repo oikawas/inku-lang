@@ -16,7 +16,7 @@ Until now Stage 1.5 moved every `place:center` in a work (`中心`, `中央`, `c
 - The DDL of the 373 typed works in production was compiled before and after the change (no drawing). 270 changed, each only by a focus region becoming the central region (417 drawing regions, 17 fill bounds, 1 group region). The other 103 Scores are identical, and no compile outcome (complete, with omissions, stopped) changed.
 - Saved works do not change, because a replay draws the saved Score. New works and operations that rebuild from DDL (editing the DDL or the description, another composition) place `center` in the middle.
 
-The Stage 1.5 schema becomes `inku.typed-stage15-transformation.v7` and the geometry policy digest `5703a18f…`. The DDL engine moves to 50 (the Server owns the version and its references). The render engine is unchanged.
+The Stage 1.5 schema becomes `inku.typed-stage15-transformation.v7` and the geometry policy digest `5703a18f…`. The DDL engine moves to 50. The render engine is unchanged.
 
 ### 2026-09-27 — the info panel's version rows explain themselves
 

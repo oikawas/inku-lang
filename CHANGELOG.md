@@ -6,6 +6,12 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 36 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-27 — Android's model pickers mark the supported models
+
+The Web's model pickers show the server catalog's evaluation (per-stage stars, speed, comments), while Android showed model names only (finding V-10 of the 2026-09-26 source review). By the author's ruling, Android's recommendation is a mark on the supported models only: the models Android is verified on a device to draw with, the on-device Gemma 4 E2B and Gemma 4 31B through the Gemini API (`gemma-4-31b-it`, the model the device tests use). The drawing's model picker and the settings' offered-model picker show "Supported" beside them. No other model is rated.
+
+DDL, Score and rendering versions are unchanged.
+
 ### v2.15.34 — update center placement, rendering and refinement labels (Build 1110, 2026-09-27)
 
 This version includes the changes below since v2.15.33: DDL engine 50 places `center` in the middle of the canvas; render engine 71, Web and Android refinement labels, render warnings, saved-work replay and seed handling are updated. Server and CLI also use resvg-py 0.5.0. The dated entries below describe each change and its effect on saved works.

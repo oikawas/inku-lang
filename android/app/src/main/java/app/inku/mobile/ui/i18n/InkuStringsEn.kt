@@ -366,6 +366,7 @@ object InkuStringsEn : InkuStrings {
     override val selectAll = "Select all"
     override val noPublishedModels = "No models have been offered."
     override val noPublishedModelsLong = "No models have been offered. Select models in the service settings."
+    override val supportedModel = "Supported"
     override val downloadAgain = "Download again"
     override val sketchFromLife = "Sketch from life"
     override val workActionSketchRedraw = "Redraw with or without sketch from life"

@@ -7,6 +7,7 @@ import app.inku.mobile.ui.camera.CameraCaptureRequest
 import app.inku.mobile.ui.camera.InAppCameraCapture
 import app.inku.mobile.data.model.workColorSnapshot
 import app.inku.mobile.data.model.cameraInputProvenance
+import app.inku.mobile.llm.SupportedModels
 import app.inku.mobile.llm.isLocalVisionModel
 import app.inku.mobile.ui.mascot.MascotArt
 import app.inku.mobile.ui.theme.*
@@ -1318,7 +1319,10 @@ private fun WebStyleModelStageEditor(
                         ) {
                             Text(if (option.qualifiedId == selectedModelId) "✓" else "", modifier = Modifier.width(Dimens.spaceL), color = MaterialTheme.colorScheme.secondary)
                             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Dimens.spaceXs)) {
-                                Text(option.label, style = MaterialTheme.typography.bodySmall)
+                                ModelLabelWithSupportMark(
+                                    option.label,
+                                    SupportedModels.isSupported(option.qualifiedId.substringBefore(':'), option.qualifiedId),
+                                )
                                 if (option.notes != null) {
                                     Text(option.notes, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 }
@@ -4813,7 +4817,7 @@ private fun ProviderModelPickerDialog(
                                 selected = if (enabled) selected + model.id else selected - model.id
                             })
                             Column(modifier = Modifier.weight(1f)) {
-                                Text(model.label, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                ModelLabelWithSupportMark(model.label, SupportedModels.isSupported(provider.providerId, model.id))
                                 Text(model.notes ?: model.id, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             }
                         }
@@ -5328,6 +5332,23 @@ private fun modelChoiceStatusLabel(downloadState: String, strings: InkuStrings):
 
 private fun qualifyModelId(providerId: String, modelId: String): String {
     return if (modelId.startsWith("$providerId:")) modelId else "$providerId:$modelId"
+}
+
+/** A model's name, followed by the supported mark when Android is verified to draw with it. */
+@Composable
+private fun ModelLabelWithSupportMark(label: String, supported: Boolean) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
+        Text(
+            label,
+            style = MaterialTheme.typography.bodySmall,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f, fill = false),
+        )
+        if (supported) {
+            Text(S.supportedModel, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+        }
+    }
 }
 
 private fun modelDisplayName(modelId: String): String {

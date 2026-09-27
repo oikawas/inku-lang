@@ -282,6 +282,8 @@ interface InkuStrings {
     val selectAll: String
     val noPublishedModels: String
     val noPublishedModelsLong: String
+    /** The mark on a model Android is verified to draw with ([app.inku.mobile.llm.SupportedModels]). */
+    val supportedModel: String
     val downloadAgain: String
     val sketchFromLife: String
     val workActionSketchRedraw: String

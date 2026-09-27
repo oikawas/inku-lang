@@ -340,6 +340,7 @@ object InkuStringsJa : InkuStrings {
     override val selectAll = "全選択"
     override val noPublishedModels = "公開モデルは未選択です。"
     override val noPublishedModelsLong = "公開モデルは未選択です。接続先設定でモデルを選択してください。"
+    override val supportedModel = "サポート対象"
     override val downloadAgain = "再取得"
     override val sketchFromLife = "写生"
     override val workActionSketchRedraw = "写生なし／ありで描き直す"

@@ -409,17 +409,17 @@ fn layout_axes_preserve_rectangular_physics_shape_size_and_large_count() {
                     panic!()
                 };
                 ratio(length, 6, 25);
-                // `中央` is the middle cell of the thirds, so the line-up
-                // spans a third of each canvas axis.
+                // A line-up at `中央` runs through the middle cell and keeps
+                // its canvas-long row.
                 match object.recipe() {
                     PlacementRecipe::VerticalLine { cell_height } => ratio(
                         *cell_height,
                         if canvas == "golden" { 1 } else { 3 },
-                        i128::from(n) * if canvas == "golden" { 1 } else { 2 } * 3,
+                        i128::from(n) * if canvas == "golden" { 1 } else { 2 },
                     ),
                     PlacementRecipe::DiagonalLine { step } => {
-                        ratio(step[0], 1, i128::from(n) * 3);
-                        ratio(step[1], axis[1].into(), i128::from(n) * 3);
+                        ratio(step[0], 1, n.into());
+                        ratio(step[1], axis[1].into(), n.into());
                     }
                     other => panic!("{other:?}"),
                 }
@@ -787,12 +787,14 @@ fn layouts_keep_physical_axes_numeric_centroid_and_named_domain() {
         );
         let line_result = plan_verified_stage15(line.verified_effective_view(), context(canvas));
         let line_object = &line_result.objects().unwrap()[0];
-        let PlacementRecipe::HorizontalLine { cell_width } = line_object.recipe() else {
-            panic!()
+        // Without a direction, a line-up at the left edge runs down the edge,
+        // the range's long side, over the canvas height.
+        let PlacementRecipe::VerticalLine { cell_height } = line_object.recipe() else {
+            panic!("{:?}", line_object.recipe())
         };
-        // The line-up stays inside the left edge, a tenth of the width.
+        assert_eq!(line_object.line_axis(), [0, 1]);
         let (w, h) = context(canvas).canvas_format().integer_ratio();
-        ratio(*cell_width, w.into(), i128::from(w.min(h)) * 4 * 10);
+        ratio(*cell_height, h.into(), i128::from(w.min(h)) * 4);
     }
     let named = stage(
         "tile eight red circle at left-edge.",

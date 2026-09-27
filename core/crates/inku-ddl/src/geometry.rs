@@ -61,7 +61,8 @@ pub(crate) enum RangeUse {
     /// One mark, or several gathered at one spot. The anchor is chosen inside
     /// the range shrunk to two thirds about its center.
     Place,
-    /// A line-up, scatter, or tile. The marks stay inside the whole range.
+    /// A line-up, scatter, or tile over the whole range. A scatter or tile
+    /// stays inside it; a line-up runs through its center.
     Distribute,
 }
 
@@ -337,7 +338,7 @@ pub fn geometry_resolution_policy_canonical_bytes() -> &'static [u8] {
                     "\"supported_geometry\":[\"line\",\"circle\",\"ellipse\",\"square\",\"arc\",\"cloudform\",\"point\"],",
                     "\"geometry_gap\":[\"triangle\",\"polygon\"],",
                     "\"line_up\":\"horizontal_domain_width_equal_cell_centers\",",
-                    "\"layout_direction\":{\"owner\":\"instruction_or_emit\",\"default\":\"horizontal\",",
+                    "\"layout_direction\":{\"owner\":\"instruction_or_emit\",\"default\":\"named_range_long_side_in_canvas_fractions_else_horizontal\",",
                     "\"horizontal\":\"tW,0\",\"vertical\":\"0,tH\",\"rising\":\"ts,-ts\",\"falling\":\"ts,ts\",",
                     "\"t\":\"(i+1/2)/n-1/2\",\"s\":\"min(W,H)\",\"diagonal\":\"seeded_rising_or_falling\",",
                     "\"seed_role\":\"inku.layout-direction-selection.v1\",\"seed\":\"attested_optional_composition_seed_original_meaning_logical_occurrence\",",
@@ -348,7 +349,7 @@ pub fn geometry_resolution_policy_canonical_bytes() -> &'static [u8] {
                     "\"scatter\":\"uniform_xy_then_translate_sample_centroid_at_materialization\",",
                     "\"scatter_seed\":\"existing_performance_seed_owner_instance_ordinal\",",
                     "\"fill\":{\"omitted_target\":\"canvas\",\"target\":\"area_not_anchor\",\"distribution\":\"independent_uniform_in_target\",\"boundary\":\"clip_to_same_target_contour\",\"target_transform\":\"with_contents\",\"centroid_translation\":false,\"omitted_count\":\"max_1_ceil_reference_area_over_reference_extent_squared\",\"explicit_count_size\":\"preserved\",\"count_appearance_dependency\":false,\"cloudform_count_area\":\"declared_envelope\",\"crescent_count_area\":\"shared_cubic_analytic_integral\",\"numeric_motif_position\":\"invalid_not_area\",\"all_counts\":\"same_region_clip\",\"mixed_omission\":\"max_k_ceil_k_times_nonnegative_remaining_area_over_sum_omitted_extent_squared\",\"mixed_explicit_area\":\"sum_count_times_extent_squared\",\"mixed_allocation\":\"equal_omitted_counts_source_order_remainder_minimum_one\",\"macro_reference_extent\":\"max_declared_center_envelope_axis_span_plus_twice_max_primitive_reference_radius\",\"macro_reference_transform\":\"rotate_centers_scale_radius_by_max_absolute_axis\",\"macro_reference_positions\":\"declared_numeric_or_named_center_and_internal_recipe_envelope\",\"macro_reference_exclusions\":[\"outer_count\",\"ink_bounds\",\"instruction_angle\",\"performance_seed\",\"performed_relation_movement\"]},",
-                    "\"non_grid_domain\":{\"named\":\"range_extent_group_centroid_at_range_center\",\"numeric\":\"canvas_axes_group_centroid_at_numeric_anchor\"},",
+                    "\"non_grid_domain\":{\"named_scatter\":\"range_extent_group_centroid_at_range_center\",\"named_line_up\":\"canvas_axes_row_centroid_at_range_center\",\"numeric\":\"canvas_axes_group_centroid_at_numeric_anchor\"},",
                     "\"overlap\":\"allowed_no_resize_no_fit_no_count_change\",",
                     "\"materialization\":\"deferred\",\"score_success\":false},",
                     "\"numeric_basis\":"
@@ -1018,7 +1019,7 @@ mod tests {
             serde_json::json!(omitted_position_bounds())
         );
         assert_eq!(
-            payload["object_placement"]["non_grid_domain"]["named"],
+            payload["object_placement"]["non_grid_domain"]["named_scatter"],
             "range_extent_group_centroid_at_range_center"
         );
         assert!(payload.get("focus_regions").is_none());
@@ -1032,7 +1033,7 @@ mod tests {
         );
         assert_eq!(
             geometry_resolution_policy_digest(),
-            "97ea00bfac2d6f1526d9cf6f798e7239b9b9683c4cc97fa4bb7da78b33deaa84"
+            "b530c70ae1e4b1443d19d2e37f5e87282b8953f52eb75ad861f9a11ad754b162"
         );
         assert_eq!(
             payload["object_placement"]["layout_direction"]["vertical"],

@@ -2442,10 +2442,14 @@ fn lower_verified_stage15_shared<'a>(
             Rational::from_ratio(height.into(), short.into()).expect("valid canvas ratio"),
         ];
         if let Some(bounds) = bounds
-            && cycle_range_use == crate::geometry::RangeUse::Distribute
+            && matches!(action, PlacementAction::Scatter | PlacementAction::Tile)
         {
             scale_domain_to_range(&mut domain, bounds).expect("a closed range scales exactly");
         }
+        let line_axis = match (action, bounds) {
+            (PlacementAction::LineUp, Some(bounds)) => range_long_axis(bounds),
+            _ => [1, 0],
+        };
         supported_member_cycles.push(SupportedMemberCycle {
             owner_projected_index,
             members,
@@ -2454,6 +2458,7 @@ fn lower_verified_stage15_shared<'a>(
             layout,
             region,
             domain,
+            line_axis,
             fill_region,
         });
     }
@@ -3208,7 +3213,7 @@ fn lower_verified_stage15_shared<'a>(
             continue;
         }
         let count = cycle.count.expect("non-fill cycles resolve an outer count");
-        let recipe = placement_recipe(cycle.action, count, cycle.domain, None, false)
+        let recipe = placement_recipe(cycle.action, count, cycle.domain, cycle.line_axis, false)
             .expect("bounded member cycle recipe");
         placement_groups.push(PlacementGroupPlan {
             group_index,
@@ -3250,7 +3255,10 @@ fn lower_verified_stage15_shared<'a>(
             Rational::from_ratio(width.into(), short.into()).expect("valid canvas ratio"),
             Rational::from_ratio(height.into(), short.into()).expect("valid canvas ratio"),
         ];
-        if group_range_use(layout) == crate::geometry::RangeUse::Distribute {
+        if matches!(
+            layout,
+            inku_score::GroupLayout::Scatter | inku_score::GroupLayout::Tile
+        ) {
             scale_domain_to_range(&mut domain, bounds).expect("a closed range scales exactly");
         }
         let recipe = placement_recipe(
@@ -3262,7 +3270,7 @@ fn lower_verified_stage15_shared<'a>(
             },
             logical_count,
             domain,
-            None,
+            [1, 0],
             false,
         )
         .expect("bounded validated group recipe");
@@ -4712,6 +4720,7 @@ fn resolve_object_plan(
             Rational::from_ratio(width.into(), short.into())?,
             Rational::from_ratio(height.into(), short.into())?,
         ];
+        let mut default_line_axis = [1, 0];
         let anchor = match resolved.placement {
             ScorePlacement::Numeric(position) => input
                 .numeric_position
@@ -4730,7 +4739,11 @@ fn resolve_object_plan(
                         input.angle_context.expect("verified occurrence"),
                     )
                     .expect("the shared named range was already resolved");
-                    scale_domain_to_range(&mut domain, range)?;
+                    if resolved.action == PlacementAction::LineUp {
+                        default_line_axis = range_long_axis(range);
+                    } else {
+                        scale_domain_to_range(&mut domain, range)?;
+                    }
                     ObjectAnchor::Named(distribution_anchor(resolved.action, region))
                 } else {
                     ObjectAnchor::Named(region)
@@ -4744,6 +4757,9 @@ fn resolve_object_plan(
             (resolved.count, None)
         };
         let layout_direction = resolved.layout_direction;
+        let line_axis = layout_direction
+            .as_ref()
+            .map_or(default_line_axis, |direction| direction.axis);
         let recipe = if let Some(recipe) = fill_recipe {
             recipe
         } else {
@@ -4751,7 +4767,7 @@ fn resolve_object_plan(
                 resolved.action,
                 u64::from(n),
                 domain,
-                layout_direction.as_ref(),
+                line_axis,
                 matches!(
                     anchor,
                     ObjectAnchor::Numeric(_) | ObjectAnchor::GeneratedNumeric(_)
@@ -4788,6 +4804,7 @@ fn resolve_object_plan(
             color_cycle: resolved.color_cycle,
             angle: resolved.rotation,
             layout_direction,
+            line_axis,
             anchor,
             domain,
             recipe,
@@ -4812,6 +4829,7 @@ struct SupportedMemberCycle {
     layout: inku_score::GroupLayout,
     region: [f64; 4],
     domain: [Rational; 2],
+    line_axis: [i8; 2],
     fill_region: Option<ResolvedFillRegion>,
 }
 
@@ -5457,15 +5475,12 @@ pub(crate) fn placement_recipe(
     action: PlacementAction,
     n: u64,
     domain: [Rational; 2],
-    layout_direction: Option<&crate::composition_plan::ResolvedLayoutDirection>,
+    line_axis: [i8; 2],
     translate_to_numeric_anchor: bool,
 ) -> Result<PlacementRecipe, ScoreFieldGap> {
     Ok(match action {
         PlacementAction::Place => PlacementRecipe::Place,
-        PlacementAction::LineUp => match layout_direction
-            .map(|direction| direction.axis)
-            .unwrap_or([1, 0])
-        {
+        PlacementAction::LineUp => match line_axis {
             [1, 0] => PlacementRecipe::HorizontalLine {
                 cell_width: domain[0].div_i128(n.into())?,
             },
@@ -6047,8 +6062,9 @@ fn group_anchor_region(layout: inku_score::GroupLayout, range: [(u8, u8); 4]) ->
 }
 
 /// How a placement uses the range of its position. A tile always fills its
-/// range; a line-up or scatter of more than one mark stays inside it; one
-/// mark, or several placed at one spot, anchors in the shrunk range.
+/// range; a scatter of more than one mark stays inside it; a line-up of more
+/// than one mark runs through its center along its long side; one mark, or
+/// several placed at one spot, anchors in the shrunk range.
 fn range_use_for(action: PlacementAction, count: u32) -> crate::geometry::RangeUse {
     match action {
         PlacementAction::Tile => crate::geometry::RangeUse::Distribute,
@@ -6059,9 +6075,27 @@ fn range_use_for(action: PlacementAction, count: u32) -> crate::geometry::RangeU
     }
 }
 
+/// The axis a line-up runs along when its direction is omitted: vertical for a
+/// range taller than it is wide in canvas fractions (a left or right edge),
+/// otherwise horizontal. The whole canvas and the middle cell stay horizontal.
+fn range_long_axis(range: [(u8, u8); 4]) -> [i8; 2] {
+    let extent = |start: (u8, u8), end: (u8, u8)| {
+        let (a, b) = (i64::from(start.0), i64::from(start.1));
+        let (c, d) = (i64::from(end.0), i64::from(end.1));
+        (c * b - a * d, b * d)
+    };
+    let (width_n, width_d) = extent(range[0], range[2]);
+    let (height_n, height_d) = extent(range[1], range[3]);
+    if height_n * width_d > width_n * height_d {
+        [0, 1]
+    } else {
+        [1, 0]
+    }
+}
+
 /// Scale a canvas-sized domain to the range, axis by axis. The marks of a
-/// line-up, scatter, or tile then stay inside the range instead of spreading
-/// over a canvas-sized area around it.
+/// scatter or tile then stay inside the range instead of spreading over a
+/// canvas-sized area around it. A line-up keeps its canvas-long row.
 fn scale_domain_to_range(
     domain: &mut [Rational; 2],
     range: [(u8, u8); 4],
@@ -7631,21 +7665,21 @@ mod tests {
                         panic!()
                     };
                     assert_eq!(length.numerator * 800 * 25, 4800 * length.denominator);
-                    // `中央` is the middle cell of the thirds, so the line-up
-                    // spans a third of each canvas axis.
+                    // A line-up at `中央` runs through the middle cell and keeps
+                    // its canvas-long row.
                     match object.recipe() {
                         PlacementRecipe::VerticalLine { cell_height } => assert_eq!(
-                            cell_height.numerator * i128::from(u32::MAX) * 800 * 3,
+                            cell_height.numerator * i128::from(u32::MAX) * 800,
                             i128::from(height) * cell_height.denominator
                         ),
                         PlacementRecipe::DiagonalLine { step } => {
                             assert_eq!(
-                                step[0].numerator * i128::from(u32::MAX) * 3,
+                                step[0].numerator * i128::from(u32::MAX),
                                 step[0].denominator
                             );
                             if y != 2 {
                                 assert_eq!(
-                                    step[1].numerator * i128::from(u32::MAX) * 3,
+                                    step[1].numerator * i128::from(u32::MAX),
                                     i128::from(y) * step[1].denominator
                                 );
                             }

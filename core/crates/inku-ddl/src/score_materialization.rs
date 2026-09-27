@@ -173,7 +173,7 @@ pub fn materialize_selected_composition(
                 action,
                 u64::from(count),
                 object.domain(),
-                object.layout_direction(),
+                object.line_axis(),
                 translate_to_numeric_anchor,
             )
             .map_err(|_| {

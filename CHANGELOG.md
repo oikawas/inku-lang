@@ -12,12 +12,12 @@ A position word is now drawn as a range built from three equal bands on each can
 
 - `top` and `bottom` remain the upper and lower thirds, and `center` (中心, 中央) becomes the middle third on both axes (the middle cell). The edges (a tenth) and the corners (a fifth) are unchanged.
 - Place and draw at one spot: the anchor is chosen inside the range shrunk to two thirds about its center. For `center` that is 7/18 to 11/18 (about 0.389 to 0.611), close to the former 0.39 to 0.61. A mark placed in a corner or on an edge is less often cut by the canvas border.
-- Scatter, line-up, and tile keep their marks inside the range. Before, a scatter or line-up spread over a canvas-sized area and only its centroid landed in the region. In a production work, the ten circles of "scatter ten circles at the bottom" spread from high on the canvas to below it, and three of the ten were off the canvas. The compiler now sizes the group's `domain` to the range and centers it on the range, as a tile already did. The renderer is unchanged.
+- Scatter and tile keep their marks inside the range. Before, a scatter spread over a canvas-sized area and only its centroid landed in the region. In a production work, the ten circles of "scatter ten circles at the bottom" spread from high on the canvas to below it, and three of the ten were off the canvas. The compiler now sizes the group's `domain` to the range and centers it on the range, as a tile already did. The renderer is unchanged.
+- A line-up centers its row on the range's center and keeps the row as long as the canvas in its direction (the author's decision: the position word says where the row runs). Without a direction it follows the range's long side, so the left and right edges get a vertical column. Keeping the row inside the range made marks overlap in the middle cell and the edge bands (checked on a contact sheet).
 - An omitted position is `center` for place and draw, and the whole canvas for a scatter, line-up, or tile.
 - The DDL of the 373 typed production works was compiled before and after (no drawing). 355 Scores changed, and no compile outcome (complete, with omissions, stopped) changed.
-- Lining up marks in a narrow edge band without a direction puts them along the band's short side, where they overlap (8 layers in 7 of the typed production works).
 
-Saved works do not change (a replay draws the saved Score). The geometry policy digest becomes `97ea00bf…`. The DDL engine moves to 51. The render engine is unchanged.
+Saved works do not change (a replay draws the saved Score). The geometry policy digest becomes `b530c70a…`. The DDL engine moves to 51. The render engine is unchanged.
 
 ### 2026-09-27 — Android prepares its database off the main thread at startup
 

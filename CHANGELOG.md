@@ -6,6 +6,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 36 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-27 — resvg-py goes to 0.5.0 in the Server and the CLI
+
+resvg-py, which makes PNGs, is locked at the latest 0.5.0 instead of 0.3.4 (Server and CLI). The arguments of the `svg_to_bytes` the code calls are unchanged. 0.5.0 ships one build for Python 3.10 and later (abi3), usable in the Server's container (Linux, Python 3.12) and on macOS. The dependency floor `>=0.3.4` (0.3.3 took the whole process down on some works) stays. Ten SVGs, scratch works and a test fixture, rasterized by 0.3.4 and 0.5.0 are identical to the pixel. The resvg-py version recorded in a PNG's `rasterizer_info` becomes 0.5.0. DDL, Score, and render versions are unchanged.
+
 ### 2026-09-27 — the info panel's version rows explain themselves
 
 In the info panel ("About inku-lang"), `DDL Spec. ver.`, `DDL engine ver.`, `Render engine ver.` and `Binding protocol ver.` now show an explanation, in Japanese and English, when the pointer rests on them. Each says that it is the version running now and what can change when it rises (what the instructions can say, the score the same instructions become, and how a saved work looks when performed again). They are separate from the explanations of the versions a work records (in the generation details).

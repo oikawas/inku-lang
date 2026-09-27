@@ -6,6 +6,10 @@
 
 **本書が持つのは v2.5.0（2026-07-25、render engine 12）以降**の 36 版である。それより前は書庫にある。
 
+### 2026-09-27 — ServerとCLIのresvg-pyを0.5.0へ上げる
+
+PNGを作るresvg-pyを、lockで0.3.4から最新の0.5.0へ上げた（Server・CLI）。使っている`svg_to_bytes`の引数は変わらない。0.5.0はPython 3.10以降の共通の配布物（abi3）で、Serverのコンテナ（Linux、Python 3.12）とmacOSで使える。依存の下限`>=0.3.4`（0.3.3は一部の作品でプロセスごと落ちた）はそのまま残す。scratchの作品と試験のSVG計10件を0.3.4と0.5.0で画像にし、画素まで同じだった。PNGに記録する`rasterizer_info`のresvg-pyの版は0.5.0になる。DDL・Score・描画の版は変えない。
+
 ### 2026-09-27 — infoパネルの版の項目に説明を付ける
 
 infoパネル（「inku-langについて」）の`DDL Spec. ver.`・`DDL engine ver.`・`Render engine ver.`・`Binding protocol ver.`に、ポインタを合わせると出る説明を日英で付けた。いま動いているアプリの版であることと、上がると何が変わりうるか（書ける言い方、同じ指示書から出るScore、保存した作品を描き直したときの絵）を書く。作品に残る版の説明（生成情報の欄）とは別の文にした。

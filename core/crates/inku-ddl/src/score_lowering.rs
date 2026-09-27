@@ -26,14 +26,14 @@ use crate::geometry::{
 use crate::score_angle::{ScoreAngleContext, ScoreAngleOccurrence, resolve_score_angle};
 use crate::{
     CoreModifierValue, ExactDecimal, ExactDecimalError, ExpandedMacroInvocation, ExpandedMacroNode,
-    ExpandedMacroValue, FocusRegion, GEOMETRY_RESOLUTION_POLICY_ID, GeneratedNodeProvenance,
-    GeneratedTargetId, ScoreAppearanceField, ScoreAppearanceResolution, ScoreDiagnosticDisposition,
+    ExpandedMacroValue, GEOMETRY_RESOLUTION_POLICY_ID, GeneratedNodeProvenance, GeneratedTargetId,
+    ScoreAppearanceField, ScoreAppearanceResolution, ScoreDiagnosticDisposition,
     ScoreDiagnosticOwner, ScoreErrorPolicy, ScoreFieldGap, ScoreInstructionField,
     ScoreLoweringDiagnostic, ScoreLoweringOutcome, ScoreMacroCallerField, ScoreOmissionUnit,
     SemanticExplicitGeometry, SemanticHead, SemanticIdentity, SemanticInstruction,
     SemanticMacroInvocationHead, SemanticNumericPosition, SemanticPreviousReference,
-    SemanticRelation, SemanticRelationKind, SourceSpan, Stage15TargetPath, Stage15TargetProvenance,
-    VerifiedStage15EffectiveView, geometry_resolution_policy_digest,
+    SemanticRelation, SemanticRelationKind, SourceSpan, VerifiedStage15EffectiveView,
+    geometry_resolution_policy_digest,
 };
 
 /// Stable identity for the non-serializable Score-field candidate boundary.
@@ -171,27 +171,10 @@ impl ScoreLoweringContext {
     }
 }
 
-fn direct_instruction_focus(
-    view: VerifiedStage15EffectiveView<'_>,
-    instruction_index: usize,
-) -> Option<FocusRegion> {
-    view.pending_focus_targets()
-        .iter()
-        .find_map(|target| match &target.path {
-            Stage15TargetPath::Instruction {
-                instruction_index: target_index,
-            } if *target_index == instruction_index => Some(target.effective_focus),
-            Stage15TargetPath::Instruction { .. }
-            | Stage15TargetPath::GroupPredicate { .. }
-            | Stage15TargetPath::MacroEmit { .. } => None,
-        })
-}
-
 fn project_source_instruction<'a>(
     view: VerifiedStage15EffectiveView<'a>,
     instruction_index: usize,
     instruction: &'a SemanticInstruction,
-    effective_focus: Option<FocusRegion>,
 ) -> Option<ScoreLoweringInput<'a>> {
     let SemanticHead::Primitive(term) = &instruction.entity.head else {
         return None;
@@ -280,7 +263,6 @@ fn project_source_instruction<'a>(
             .position
             .as_ref()
             .map(|term| (&term.identity).into()),
-        effective_focus,
         explicit_geometry: instruction.entity.explicit_geometry.as_ref(),
         relative_scale: instruction
             .entity
@@ -1035,33 +1017,6 @@ fn lower_macro_instruction(
                 }
             }
         };
-        input.effective_focus = if input
-            .named_position
-            .is_some_and(|place| place.id == "center")
-        {
-            match exact_macro_emit_focus(view, provenance) {
-                Ok(focus) => Some(focus),
-                Err(reason) => {
-                    diagnostics.push(ScoreLoweringDiagnostic {
-                        owner: generated_owner(
-                            source_instruction_index,
-                            provenance,
-                            Some("place".to_owned()),
-                        ),
-                        disposition: diagnostic_disposition(
-                            error_policy,
-                            &reason,
-                            macro_emit_unit(source_instruction_index, provenance),
-                            None,
-                        ),
-                        reason,
-                    });
-                    continue;
-                }
-            }
-        } else {
-            None
-        };
         input.angle_context = Some(ScoreAngleContext {
             composition_seed: view.composition_seed(),
             original_pre_expansion_digest: view.original_pre_expansion_digest(),
@@ -1481,46 +1436,6 @@ fn append_macro_caller_diagnostics(
     invalid
 }
 
-fn exact_macro_emit_focus(
-    view: VerifiedStage15EffectiveView<'_>,
-    provenance: &GeneratedNodeProvenance,
-) -> Result<FocusRegion, ScoreFieldGap> {
-    let mut matches = view.pending_focus_targets().iter().filter(|target| {
-        matches!(
-            &target.path,
-            Stage15TargetPath::MacroEmit {
-                invocation_ordinal,
-                expansion_path,
-                generated_ordinal,
-                field,
-            } if *invocation_ordinal == provenance.invocation.invocation_ordinal
-                && expansion_path == &provenance.expansion_path
-                && *generated_ordinal == provenance.generated_ordinal
-                && field == "place"
-                && matches!(
-                    &target.provenance,
-                    Stage15TargetProvenance::Generated(target_provenance)
-                        if target_provenance == provenance
-                )
-        )
-    });
-    let Some(target) = matches.next() else {
-        return Err(ScoreFieldGap::MissingMacroEmitFocusTarget {
-            invocation_ordinal: provenance.invocation.invocation_ordinal,
-            expansion_path: provenance.expansion_path.clone(),
-            generated_ordinal: provenance.generated_ordinal,
-        });
-    };
-    if matches.next().is_some() {
-        return Err(ScoreFieldGap::DuplicateMacroEmitFocusTarget {
-            invocation_ordinal: provenance.invocation.invocation_ordinal,
-            expansion_path: provenance.expansion_path.clone(),
-            generated_ordinal: provenance.generated_ordinal,
-        });
-    }
-    Ok(target.effective_focus)
-}
-
 const MACRO_SCORE_FIELD_KEYS: [&str; 32] = [
     "radius",
     "diameter",
@@ -1777,7 +1692,6 @@ fn project_macro_emit<'a>(
         numeric_position: None,
         has_named_position: place.is_some(),
         named_position: place,
-        effective_focus: None,
         explicit_geometry: None,
         relative_scale: relative_scale.and_then(|identity| {
             CoreModifierValue::from_semantic_ref(identity.category, identity.id)
@@ -1826,10 +1740,12 @@ fn project_macro_anchor(
         });
     }
     let place = place.expect("one explicit Anchor position was checked");
+    // An Anchor is a point, so its center is the exact canvas center rather
+    // than the center region a drawn shape is placed in.
     let region = if place.id == "center" {
         [0.5, 0.5, 0.5, 0.5]
     } else {
-        named_region_bounds(place.id, None, context)
+        named_region_bounds(place.id, context)
             .ok_or_else(|| vec![ScoreFieldGap::UnsupportedNamedPosition])?
     };
     Ok(AnchorPoint {
@@ -2047,7 +1963,7 @@ impl ScoreInstructionFieldCandidate {
     }
 }
 
-/// Non-serializable candidate that keeps the verified view and pending focus overlay intact.
+/// Non-serializable candidate that keeps the verified view intact.
 #[derive(Clone, Debug)]
 pub struct ScoreLoweringCandidate<'a> {
     verified_effective_view: VerifiedStage15EffectiveView<'a>,
@@ -2257,22 +2173,12 @@ fn lower_verified_stage15_shared<'a>(
             .iter()
             .find(|predicate| predicate.group_index == projected_group_index)
         {
-            let focus = view
-                .pending_focus_targets()
-                .iter()
-                .find_map(|target| match target.path {
-                    Stage15TargetPath::GroupPredicate {
-                        group_index: target_group,
-                        ..
-                    } if target_group == group_index => Some(target.effective_focus),
-                    _ => None,
-                });
             let action = predicate
                 .action
                 .as_ref()
                 .map(|action| action.identity.id.as_str());
             if action == Some("fill") {
-                let allocation = resolve_fill_group(view, group, predicate, focus, context);
+                let allocation = resolve_fill_group(view, group, predicate, context);
                 let reason = match allocation {
                     Ok(allocation) if objects.is_some() => {
                         for (&member, &count) in group
@@ -2333,7 +2239,6 @@ fn lower_verified_stage15_shared<'a>(
                     .position
                     .as_ref()
                     .map(|position| position.identity.id.as_str()),
-                focus,
                 ScoreAngleContext {
                     composition_seed: view.composition_seed(),
                     original_pre_expansion_digest: view.original_pre_expansion_digest(),
@@ -2442,7 +2347,6 @@ fn lower_verified_stage15_shared<'a>(
         let Some(first_source_index) = view.source_instruction_index(first_projected_index) else {
             continue;
         };
-        let focus = direct_instruction_focus(view, first_source_index);
         let fill_region = if action == PlacementAction::Fill {
             let input = ScoreLoweringInput {
                 fill_target: project_fill_target(view, instruction.fill_target.as_ref()),
@@ -2451,7 +2355,6 @@ fn lower_verified_stage15_shared<'a>(
                     .position
                     .as_ref()
                     .map(|term| (&term.identity).into()),
-                effective_focus: focus,
                 angle_context: Some(ScoreAngleContext {
                     composition_seed: view.composition_seed(),
                     original_pre_expansion_digest: view.original_pre_expansion_digest(),
@@ -2477,7 +2380,6 @@ fn lower_verified_stage15_shared<'a>(
                     .position
                     .as_ref()
                     .map(|position| position.identity.id.as_str()),
-                focus,
                 ScoreAngleContext {
                     composition_seed: view.composition_seed(),
                     original_pre_expansion_digest: view.original_pre_expansion_digest(),
@@ -2610,12 +2512,8 @@ fn lower_verified_stage15_shared<'a>(
             let source_index = view
                 .source_instruction_index(projected_index)
                 .expect("verified view maps each region operand");
-            if let Some(target_input) = project_source_instruction(
-                view,
-                source_index,
-                instruction,
-                direct_instruction_focus(view, source_index),
-            ) && let Some(reason) = size_recovery_diagnostic(target_input, context)
+            if let Some(target_input) = project_source_instruction(view, source_index, instruction)
+                && let Some(reason) = size_recovery_diagnostic(target_input, context)
             {
                 diagnostics.push(ScoreLoweringDiagnostic {
                     owner: source_owner_for_gap(source_index, instruction, &reason),
@@ -2649,8 +2547,6 @@ fn lower_verified_stage15_shared<'a>(
             && let crate::SemanticSequenceKind::Field(field) = sequence.kind
             && let Some((region, _)) = group_members.get(&projected_index)
         {
-            let effective_focus =
-                direct_instruction_focus(candidate.verified_effective_view(), instruction_index);
             let mut members = Vec::new();
             let plan_relation = if let Some(objects) = objects.as_deref() {
                 instruction
@@ -2664,7 +2560,6 @@ fn lower_verified_stage15_shared<'a>(
                                 candidate.verified_effective_view(),
                                 instruction_index,
                                 instruction,
-                                effective_focus,
                             )
                             .expect("field cycle has a primitive source"),
                             relation,
@@ -2704,7 +2599,6 @@ fn lower_verified_stage15_shared<'a>(
                                 candidate.verified_effective_view(),
                                 instruction_index,
                                 instruction,
-                                effective_focus,
                             )
                             .expect("field cycle has a primitive source"),
                             relation,
@@ -2744,7 +2638,6 @@ fn lower_verified_stage15_shared<'a>(
                     candidate.verified_effective_view(),
                     instruction_index,
                     &member_instruction,
-                    effective_focus,
                 )
                 .expect("field cycle has a primitive source");
                 input.action = Some(SemanticInputIdentity {
@@ -2844,15 +2737,10 @@ fn lower_verified_stage15_shared<'a>(
         }
         match &instruction.entity.head {
             SemanticHead::Primitive(_) => {
-                let effective_focus = direct_instruction_focus(
-                    candidate.verified_effective_view(),
-                    instruction_index,
-                );
                 let mut input = project_source_instruction(
                     candidate.verified_effective_view(),
                     instruction_index,
                     instruction,
-                    effective_focus,
                 )
                 .expect("source projection is called only for primitive heads");
                 if let Some((region, count)) = group_members.get(&projected_index) {
@@ -3373,7 +3261,7 @@ fn lower_verified_stage15_shared<'a>(
             false,
         )
         .expect("bounded validated group recipe");
-        // These are local coordinates; only the group carries the semantic focus.
+        // These are local coordinates; only the group carries the semantic placement.
         for member in &members {
             if member.kind == PlacementMemberKind::Primitive {
                 if let Some(objects) = objects.as_deref_mut() {
@@ -4560,10 +4448,9 @@ fn macro_key_for_gap(gap: &ScoreFieldGap) -> Option<String> {
         ScoreFieldGap::UnsupportedAngleIdentity { .. }
         | ScoreFieldGap::UnsupportedAngleForPrimitive { .. } => Some("angle".to_owned()),
         ScoreFieldGap::UnsupportedLayoutDirection { .. } => Some("layout_direction".to_owned()),
-        ScoreFieldGap::MissingMacroEmitFocusTarget { .. }
-        | ScoreFieldGap::DuplicateMacroEmitFocusTarget { .. }
-        | ScoreFieldGap::MissingNumericPosition
-        | ScoreFieldGap::UnsupportedNamedPosition => Some("place".to_owned()),
+        ScoreFieldGap::MissingNumericPosition | ScoreFieldGap::UnsupportedNamedPosition => {
+            Some("place".to_owned())
+        }
         ScoreFieldGap::ExactCountZero { .. }
         | ScoreFieldGap::ExactCountExceedsScoreRange { .. }
         | ScoreFieldGap::RepeatedCountUnsupported { .. }
@@ -4610,7 +4497,6 @@ enum FillTargetInput<'a> {
     Shape {
         instruction: &'a SemanticInstruction,
         source_instruction_index: usize,
-        effective_focus: Option<FocusRegion>,
     },
     Invalid,
 }
@@ -4641,7 +4527,6 @@ struct ScoreLoweringInput<'a> {
     numeric_position: Option<&'a SemanticNumericPosition>,
     has_named_position: bool,
     named_position: Option<SemanticInputIdentity<'a>>,
-    effective_focus: Option<FocusRegion>,
     explicit_geometry: Option<&'a SemanticExplicitGeometry>,
     relative_scale: Option<CoreModifierValue>,
     angle: Option<SemanticInputIdentity<'a>>,
@@ -4695,8 +4580,8 @@ fn lower_complete_instruction(
             context.canvas_format,
             resolved.rotation,
         ),
-        ScorePlacement::Named(focus) => {
-            lower_named_geometry(resolved.dimensions, focus, context.canvas_format)
+        ScorePlacement::Named(region) => {
+            lower_named_geometry(resolved.dimensions, region, context.canvas_format)
         }
     }
     .map_err(|gap| vec![gap])?;
@@ -4831,7 +4716,6 @@ fn resolve_object_plan(
                 if resolved.action == PlacementAction::Tile {
                     let bounds = crate::geometry::resolved_position_rational_bounds(
                         input.named_position.map(|position| position.id),
-                        input.effective_focus,
                         input.angle_context.expect("verified occurrence"),
                     )
                     .expect("the shared named region was already resolved");
@@ -4992,7 +4876,6 @@ fn project_fill_target<'a>(
                     FillTargetInput::Shape {
                         instruction,
                         source_instruction_index,
-                        effective_focus: direct_instruction_focus(view, source_instruction_index),
                     }
                 }
                 None => FillTargetInput::Invalid,
@@ -5006,7 +4889,6 @@ fn resolve_fill_group(
     view: VerifiedStage15EffectiveView<'_>,
     group: &crate::SemanticCoordinatedHeadGroup,
     predicate: &crate::SemanticGroupPredicateEdge,
-    focus: Option<FocusRegion>,
     context: ScoreLoweringContext,
 ) -> Result<PreparedFillGroup, ScoreFieldGap> {
     let mut counts = Vec::new();
@@ -5041,7 +4923,6 @@ fn resolve_fill_group(
             .position
             .as_ref()
             .map(|term| (&term.identity).into()),
-        effective_focus: focus,
         angle_context: Some(ScoreAngleContext {
             composition_seed: view.composition_seed(),
             original_pre_expansion_digest: view.original_pre_expansion_digest(),
@@ -5086,7 +4967,6 @@ fn prepare_single_macro_fill(
             .position
             .as_ref()
             .map(|term| (&term.identity).into()),
-        effective_focus: direct_instruction_focus(view, source_index),
         angle_context: Some(ScoreAngleContext {
             composition_seed: view.composition_seed(),
             original_pre_expansion_digest: view.original_pre_expansion_digest(),
@@ -5337,7 +5217,6 @@ fn resolve_fill_region(
         Some(FillTargetInput::Shape {
             instruction,
             source_instruction_index,
-            effective_focus,
         }) => {
             if input.has_named_position
                 || instruction
@@ -5412,7 +5291,7 @@ fn resolve_fill_region(
                     ObjectAnchor::Numeric(Box::new(position.clone()))
                 }
                 (None, Some(position)) => ObjectAnchor::Named(
-                    named_region_bounds(&position.identity.id, effective_focus, angle_context)
+                    named_region_bounds(&position.identity.id, angle_context)
                         .ok_or(ScoreFieldGap::UnsupportedNamedPosition)?,
                 ),
                 (None, None) => ObjectAnchor::Named(crate::geometry::omitted_position_bounds()),
@@ -5475,7 +5354,6 @@ fn resolve_fill_region(
                 }
                 let rational = crate::geometry::named_region_rational_bounds(
                     position.id,
-                    input.effective_focus,
                     input
                         .angle_context
                         .ok_or(ScoreFieldGap::InvalidFillTarget)?,
@@ -5991,7 +5869,7 @@ fn resolve_complete_object<'a>(
     {
         gaps.push(ScoreFieldGap::UnsupportedInstructionMeaning);
     }
-    let named_focus = if input.has_named_position && input.exact_position().is_some() {
+    let named_region = if input.has_named_position && input.exact_position().is_some() {
         gaps.push(ScoreFieldGap::NamedAndNumericPositionConflict);
         None
     } else if let Some(region) = input.group_region {
@@ -6003,7 +5881,6 @@ fn resolve_complete_object<'a>(
             .and_then(|place| {
                 crate::geometry::resolved_position_bounds(
                     Some(place.id),
-                    input.effective_focus,
                     input.angle_context.expect("verified occurrence"),
                 )
             })
@@ -6018,7 +5895,6 @@ fn resolve_complete_object<'a>(
     } else if input.exact_position().is_none() {
         crate::geometry::resolved_position_bounds(
             None,
-            input.effective_focus,
             input.angle_context.expect("verified occurrence"),
         )
     } else {
@@ -6097,9 +5973,9 @@ fn resolve_complete_object<'a>(
         return Err(gaps);
     }
 
-    let placement = match (input.exact_position(), named_focus) {
+    let placement = match (input.exact_position(), named_region) {
         (Some(position), None) => ScorePlacement::Numeric(position),
-        (None, Some(focus)) => ScorePlacement::Named(focus),
+        (None, Some(region)) => ScorePlacement::Named(region),
         _ => unreachable!("checked position authority"),
     };
     let (dimensions, _) =
@@ -7562,7 +7438,6 @@ mod tests {
                     category: "place",
                     id: "center",
                 });
-                input.effective_focus = Some(FocusRegion::UpperRight);
                 input.angle_context = Some(ScoreAngleContext {
                     composition_seed: None,
                     original_pre_expansion_digest: "test",
@@ -7743,23 +7618,13 @@ mod tests {
     }
 
     #[test]
-    fn owner_and_focus_integrity_failures_stop_both_error_modes() {
+    fn owner_integrity_failures_stop_both_error_modes() {
         let failures = [
             ScoreFieldGap::MissingMacroExpansionOwner {
                 invocation_ordinal: 3,
             },
             ScoreFieldGap::DuplicateMacroExpansionOwner {
                 invocation_ordinal: 3,
-            },
-            ScoreFieldGap::MissingMacroEmitFocusTarget {
-                invocation_ordinal: 3,
-                expansion_path: Vec::new(),
-                generated_ordinal: 5,
-            },
-            ScoreFieldGap::DuplicateMacroEmitFocusTarget {
-                invocation_ordinal: 3,
-                expansion_path: Vec::new(),
-                generated_ordinal: 5,
             },
         ];
         for policy in [ScoreErrorPolicy::Stop, ScoreErrorPolicy::OmitAndContinue] {

@@ -8,7 +8,6 @@ use sha2::{Digest, Sha256};
 
 use crate::{
     ClauseAtom, ClauseSegment, ExactDecimal, NormalizedDdlDocument, SourceOccurrence, SourceSpan,
-    stage15_transform::FocusRegion,
 };
 
 pub const GEOMETRY_RESOLUTION_POLICY_ID: &str = "inku.geometry-resolution-policy.v1";
@@ -31,10 +30,9 @@ const GEOMETRY_RESOLUTION_POLICY_MIDDLE: &str = concat!(
     "\"line_length\",\"arc_chord_sagitta\",\"point_radius_or_diameter\",",
     "\"endpoint_rotated_finite_extent\",\"axis_position\",\"triangle_width_height\",\"regular_triangle_exact_side\",\"square_width_height\",\"polygon_circumradius_sides\"],",
     "\"decimal\":{\"canonical\":\"signed_base10_coefficient_scale\",",
-    "\"score_conversion\":\"single_final_f64_boundary\"},\"focus_regions\":{"
+    "\"score_conversion\":\"single_final_f64_boundary\"},"
 );
 const GEOMETRY_RESOLUTION_POLICY_SUFFIX: &str = concat!(
-    "},",
     "\"normal_geometry\":{\"aspect\":{\"cloudform\":\"5:3\",\"ellipse\":\"5:3\"},",
     "\"basis\":\"canvas_short_edge\",\"count_dependency\":\"none\",",
     "\"endpoint_family\":{\"arc\":{\"chord\":\"6/25\",\"sagitta\":\"3/50\"},",
@@ -48,28 +46,23 @@ const GEOMETRY_RESOLUTION_POLICY_SUFFIX: &str = concat!(
     "\"very_large\":\"7/4\",\"very_small\":\"3/8\"},\"unimplemented\":[]}"
 );
 
-const FOCUS_REGION_BOUNDS_HUNDREDTHS: [(FocusRegion, [u8; 4]); 6] = [
-    (FocusRegion::UpperRight, [60, 18, 82, 40]),
-    (FocusRegion::UpperLeft, [18, 18, 40, 40]),
-    (FocusRegion::LowerRight, [60, 60, 82, 82]),
-    (FocusRegion::LowerLeft, [18, 60, 40, 82]),
-    (FocusRegion::UpperEdge, [39, 7, 61, 29]),
-    (FocusRegion::RightHalf, [61, 39, 83, 61]),
-];
-
-// The existing 22%-wide focus region translated to the canvas center. This is
-// an execution default; it does not create a source position or a focus target.
-const OMITTED_POSITION_BOUNDS_HUNDREDTHS: [u8; 4] = [39, 39, 61, 61];
+// The canvas center, shared by the named `center` / `中心` / `中央` and by a
+// shape whose position is omitted. Stage 1.5 used to move `center` to one of
+// six off-center focus regions; `center` now means this region literally.
+// Each axis spans 0.39..0.61 (22%), and the anchor is chosen inside it at
+// performance time.
+const CENTER_REGION: [(u8, u8); 4] = [(39, 100), (39, 100), (61, 100), (61, 100)];
 
 pub(crate) fn omitted_position_bounds() -> [f64; 4] {
-    rational_bounds_as_f64(OMITTED_POSITION_BOUNDS_HUNDREDTHS.map(|value| (value, 100)))
+    rational_bounds_as_f64(CENTER_REGION)
 }
 
 pub(crate) const NORMAL_SHORT_EDGE_RATIO: (i128, i128) = (6, 25);
 pub(crate) const NORMAL_ELLIPTICAL_ASPECT_RATIO: (i128, i128) = (3, 5);
 
 // One exact rational table feeds both policy bytes and the final Score boundary.
-const NAMED_REGIONS: [(&str, [(u8, u8); 4]); 6] = [
+const NAMED_REGIONS: [(&str, [(u8, u8); 4]); 7] = [
+    ("center", CENTER_REGION),
     ("top", [(0, 1), (0, 1), (1, 1), (1, 3)]),
     ("bottom", [(0, 1), (2, 3), (1, 1), (1, 1)]),
     ("left_edge", [(0, 1), (0, 1), (1, 10), (1, 1)]),
@@ -86,33 +79,20 @@ const CORNER_REGIONS: [[(u8, u8); 4]; 4] = [
 const PLACE_SELECTION_SCHEME: &str = "inku.score-place-selection.v1";
 
 pub(crate) fn supports_named_position(id: &str) -> bool {
-    matches!(id, "center" | "corner") || NAMED_REGIONS.iter().any(|(name, _)| *name == id)
+    id == "corner" || NAMED_REGIONS.iter().any(|(name, _)| *name == id)
 }
 
 pub(crate) fn named_region_bounds(
     id: &str,
-    focus: Option<FocusRegion>,
     context: crate::score_angle::ScoreAngleContext<'_>,
 ) -> Option<[f64; 4]> {
-    if id == "center" {
-        return focus.map(focus_region_bounds);
-    }
-    named_region_rational_bounds(id, focus, context)
-        .map(|bounds| bounds.map(|(n, d)| f64::from(n) / f64::from(d)))
+    named_region_rational_bounds(id, context).map(rational_bounds_as_f64)
 }
 
 pub(crate) fn named_region_rational_bounds(
     id: &str,
-    focus: Option<FocusRegion>,
     context: crate::score_angle::ScoreAngleContext<'_>,
 ) -> Option<[(u8, u8); 4]> {
-    if id == "center" {
-        let focus = focus?;
-        return FOCUS_REGION_BOUNDS_HUNDREDTHS
-            .iter()
-            .find(|(candidate, _)| *candidate == focus)
-            .map(|(_, bounds)| bounds.map(|value| (value, 100)));
-    }
     let bounds = if id == "corner" {
         CORNER_REGIONS[corner_index(context)]
     } else {
@@ -126,21 +106,19 @@ pub(crate) fn named_region_rational_bounds(
 /// helper only supplies the exact region used by every consumer.
 pub(crate) fn resolved_position_rational_bounds(
     named_position: Option<&str>,
-    focus: Option<FocusRegion>,
     context: crate::score_angle::ScoreAngleContext<'_>,
 ) -> Option<[(u8, u8); 4]> {
     match named_position {
-        Some(id) => named_region_rational_bounds(id, focus, context),
-        None => Some(OMITTED_POSITION_BOUNDS_HUNDREDTHS.map(|value| (value, 100))),
+        Some(id) => named_region_rational_bounds(id, context),
+        None => Some(CENTER_REGION),
     }
 }
 
 pub(crate) fn resolved_position_bounds(
     named_position: Option<&str>,
-    focus: Option<FocusRegion>,
     context: crate::score_angle::ScoreAngleContext<'_>,
 ) -> Option<[f64; 4]> {
-    resolved_position_rational_bounds(named_position, focus, context).map(rational_bounds_as_f64)
+    resolved_position_rational_bounds(named_position, context).map(rational_bounds_as_f64)
 }
 
 fn rational_bounds_as_f64(bounds: [(u8, u8); 4]) -> [f64; 4] {
@@ -241,14 +219,6 @@ fn write_place_policy(output: &mut String) {
     write!(output, "],\"selection\":{{\"scheme\":\"{PLACE_SELECTION_SCHEME}\",\"draw\":\"sha256_first_byte_modulo_four\",\"order\":[\"upper_left\",\"upper_right\",\"lower_left\",\"lower_right\"],\"fields\":[\"original_pre_expansion_digest\",\"original_expanded_meaning_digest\",\"tagged_composition_seed\",\"logical_occurrence\",\"place_id\"]}}}},").expect("policy String");
 }
 
-pub(crate) fn focus_region_bounds(focus: FocusRegion) -> [f64; 4] {
-    let bounds = FOCUS_REGION_BOUNDS_HUNDREDTHS
-        .iter()
-        .find_map(|(candidate, bounds)| (*candidate == focus).then_some(*bounds))
-        .expect("the closed focus vocabulary has one geometry-policy region");
-    bounds.map(|coordinate| f64::from(coordinate) / 100.0)
-}
-
 pub(crate) const fn relative_scale_factor(value: crate::CoreModifierValue) -> Option<(i128, i128)> {
     match value {
         crate::CoreModifierValue::SlightlySmall => Some((3, 4)),
@@ -273,25 +243,6 @@ pub fn geometry_resolution_policy_canonical_bytes() -> &'static [u8] {
             crate::score_angle::write_angle_policy_json(&mut canonical);
             write_place_policy(&mut canonical);
             canonical.push_str(GEOMETRY_RESOLUTION_POLICY_MIDDLE);
-            for (index, (focus, bounds)) in FOCUS_REGION_BOUNDS_HUNDREDTHS.iter().enumerate() {
-                if index > 0 {
-                    canonical.push(',');
-                }
-                write!(
-                    canonical,
-                    "\"{}\":[{}.{:02},{}.{:02},{}.{:02},{}.{:02}]",
-                    focus.as_str(),
-                    bounds[0] / 100,
-                    bounds[0] % 100,
-                    bounds[1] / 100,
-                    bounds[1] % 100,
-                    bounds[2] / 100,
-                    bounds[2] % 100,
-                    bounds[3] / 100,
-                    bounds[3] % 100,
-                )
-                .expect("writing canonical geometry policy to a String cannot fail");
-            }
             canonical.push_str(GEOMETRY_RESOLUTION_POLICY_SUFFIX);
             // Preserve the existing policy byte layout outside the added member.
             canonical = canonical.replacen(
@@ -949,7 +900,7 @@ mod tests {
             let index = corner_index(context);
             selected.insert(index);
             assert_eq!(
-                named_region_bounds("corner", None, context),
+                named_region_bounds("corner", context),
                 Some(CORNER_REGIONS[index].map(|(n, d)| f64::from(n) / f64::from(d)))
             );
         }
@@ -960,28 +911,19 @@ mod tests {
                 serde_json::json!(bounds.map(|(n, d)| format!("{n}/{d}")))
             );
             assert_eq!(
-                named_region_bounds(id, None, context),
+                named_region_bounds(id, context),
                 Some(bounds.map(|(n, d)| f64::from(n) / f64::from(d)))
             );
         }
-        assert_eq!(named_region_bounds("unknown", None, context), None);
-        assert_eq!(named_region_bounds("center", None, context), None);
-        for (focus, expected) in [
-            (FocusRegion::UpperRight, [0.60, 0.18, 0.82, 0.40]),
-            (FocusRegion::UpperLeft, [0.18, 0.18, 0.40, 0.40]),
-            (FocusRegion::LowerRight, [0.60, 0.60, 0.82, 0.82]),
-            (FocusRegion::LowerLeft, [0.18, 0.60, 0.40, 0.82]),
-            (FocusRegion::UpperEdge, [0.39, 0.07, 0.61, 0.29]),
-            (FocusRegion::RightHalf, [0.61, 0.39, 0.83, 0.61]),
-        ] {
-            let actual = focus_region_bounds(focus);
-            assert_eq!(actual, expected);
-            assert!(actual.into_iter().all(f64::is_finite));
-            assert_eq!(
-                payload["focus_regions"][focus.as_str()],
-                serde_json::json!(expected)
-            );
-        }
+        assert_eq!(named_region_bounds("unknown", context), None);
+        // `center` is the literal canvas center, the same region an omitted
+        // position uses; no focus table remains in the policy.
+        assert_eq!(
+            named_region_bounds("center", context),
+            Some(omitted_position_bounds())
+        );
+        assert_eq!(omitted_position_bounds(), [0.39, 0.39, 0.61, 0.61]);
+        assert!(payload.get("focus_regions").is_none());
         assert_eq!(
             payload["object_placement"]["placement_members"]["source_head"],
             "atomic_logical_slot"
@@ -992,7 +934,7 @@ mod tests {
         );
         assert_eq!(
             geometry_resolution_policy_digest(),
-            "210ddd7bed6b4ae837d17404a91c8a371f1e3f7a9adbf6e41e9fbdae3346d23e"
+            "5703a18f1bb1e18da15ae127192fa587fc59739a99db02b845bbfab8baf0d023"
         );
         assert_eq!(
             payload["object_placement"]["layout_direction"]["vertical"],

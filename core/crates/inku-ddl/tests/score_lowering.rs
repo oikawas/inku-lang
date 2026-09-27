@@ -1,11 +1,11 @@
 use inku_ddl::{
     CompositionPlanOutcome, CoreModifierValue, EXPLICIT_SCORE_LOWERING_SCHEMA_ID,
-    ExactCountFieldCandidate, FocusRegion, GEOMETRY_RESOLUTION_POLICY_ID, MacroDefinition,
-    MacroExpansionLimits, MacroLock, NormalizedDdlDocument, ResolvedInstructionLanguage,
-    SCORE_FIELD_CANDIDATE_SCHEMA_ID, ScoreAppearanceField, ScoreAppearanceResolution,
-    ScoreDiagnosticDisposition, ScoreDiagnosticOwner, ScoreErrorPolicy, ScoreFieldGap,
-    ScoreInstructionField, ScoreInstructionOrigin, ScoreLoweringCandidate, ScoreLoweringContext,
-    ScoreLoweringOutcome, ScoreMacroCallerField, ScoreOmissionUnit, SemanticHead, SemanticIdentity,
+    ExactCountFieldCandidate, GEOMETRY_RESOLUTION_POLICY_ID, MacroDefinition, MacroExpansionLimits,
+    MacroLock, NormalizedDdlDocument, ResolvedInstructionLanguage, SCORE_FIELD_CANDIDATE_SCHEMA_ID,
+    ScoreAppearanceField, ScoreAppearanceResolution, ScoreDiagnosticDisposition,
+    ScoreDiagnosticOwner, ScoreErrorPolicy, ScoreFieldGap, ScoreInstructionField,
+    ScoreInstructionOrigin, ScoreLoweringCandidate, ScoreLoweringContext, ScoreLoweringOutcome,
+    ScoreMacroCallerField, ScoreOmissionUnit, SemanticHead, SemanticIdentity,
     SemanticPreviousReference, SemanticRelationKind, Stage15TransformationResult, Stage15Variation,
     Stage15VariationAmplitude, VerifiedStage15EffectiveView, compile_typed_ddl,
     geometry_resolution_policy_digest, lower_verified_stage15_score,
@@ -740,6 +740,7 @@ fn natural_japanese_named_positions_reach_actual_score() {
 fn explicit_named_table_and_seven_shape_geometry_share_one_builder() {
     let context = ScoreLoweringContext::resolve("wide", Color::White).unwrap();
     for (place, expected) in [
+        ("the center", CENTER_REGION),
         ("top", [0.0, 0.0, 1.0, 1.0 / 3.0]),
         ("bottom", [0.0, 2.0 / 3.0, 1.0, 1.0]),
         ("left-edge", [0.0, 0.0, 0.1, 1.0]),
@@ -749,7 +750,6 @@ fn explicit_named_table_and_seven_shape_geometry_share_one_builder() {
     ] {
         let source = format!("place one red circle at {place}.");
         let result = stage15(&source, ResolvedInstructionLanguage::En);
-        assert!(result.targets().is_empty());
         let lowered = lower_verified_stage15_score(result.verified_effective_view(), context);
         assert_eq!(
             lowered.outcome(),
@@ -830,10 +830,6 @@ fn declared_and_literal_macro_positions_match_ordinary_and_keep_generated_owners
         );
         let mut scores = Vec::new();
         for result in [&generated, &literal, &direct] {
-            assert!(
-                result.targets().is_empty(),
-                "noncenter must never get a synthetic focus"
-            );
             let lowered = lower_verified_stage15_score(result.verified_effective_view(), context);
             assert_eq!(
                 lowered.outcome(),
@@ -1436,13 +1432,12 @@ fn seeded_angles_are_reproducible_bilingual_and_stage15_variation_invariant() {
 }
 
 #[test]
-fn resolved_center_focus_reaches_the_owned_actual_score_instruction() {
+fn center_reaches_the_owned_actual_score_instruction() {
     let result = stage15(
         "place one red circle at the center.",
         ResolvedInstructionLanguage::En,
     );
-    assert_eq!(result.targets().len(), 1);
-    let expected_region = expected_focus_region(result.targets()[0].effective_focus);
+    let expected_region = CENTER_REGION;
     let lowered = lower_verified_stage15_score(
         result.verified_effective_view(),
         ScoreLoweringContext::resolve("wide", Color::White).unwrap(),
@@ -1510,14 +1505,14 @@ fn direct_not_touching_relation_reaches_the_actual_score() {
 }
 
 #[test]
-fn direct_between_relation_preserves_focus_geometry_and_origins() {
+fn direct_between_relation_preserves_center_geometry_and_origins() {
     let source = concat!(
         "place one red circle at horizontal 0.2, vertical 0.3. ",
         "place one blue ellipse at center. ",
         "place one small green square at center between the previous two."
     );
     let result = stage15(source, ResolvedInstructionLanguage::En);
-    let expected_region = expected_focus_region(result.targets()[1].effective_focus);
+    let expected_region = CENTER_REGION;
     let lowered = lower_verified_stage15_score(
         result.verified_effective_view(),
         ScoreLoweringContext::resolve("wide", Color::White).unwrap(),
@@ -1768,7 +1763,7 @@ fn bounds_relation_preserves_numeric_and_noncenter_position_authority() {
 }
 
 #[test]
-fn named_focus_reuses_dimensions_for_all_four_supported_closed_shapes() {
+fn named_center_reuses_dimensions_for_all_four_supported_closed_shapes() {
     for (source, expected_radius, expected_size) in [
         ("place one small red circle at center.", Some(0.06), None),
         (
@@ -1801,7 +1796,7 @@ fn named_focus_reuses_dimensions_for_all_four_supported_closed_shapes() {
         assert!(instruction.position.is_none(), "{source}");
         assert_eq!(
             instruction.at.as_ref().map(|at| at.region),
-            Some(expected_focus_region(result.targets()[0].effective_focus)),
+            Some(CENTER_REGION),
             "{source}"
         );
     }
@@ -1822,17 +1817,13 @@ fn japanese_and_english_center_meaning_lower_to_the_same_effective_score() {
         ja.original_pre_expansion_digest(),
         en.original_pre_expansion_digest()
     );
-    assert_eq!(
-        ja.targets()[0].effective_focus,
-        en.targets()[0].effective_focus
-    );
     assert_eq!(ja_lowered.score(), en_lowered.score());
     assert!(ja_lowered.gaps().is_empty());
     assert!(en_lowered.gaps().is_empty());
 }
 
 #[test]
-fn mixed_numeric_and_center_focus_use_their_exact_instruction_owners_in_order() {
+fn mixed_numeric_and_center_use_their_exact_instruction_owners_in_order() {
     let result = stage15(
         concat!(
             "place one red circle at horizontal 0.3, vertical 0.5. ",
@@ -1840,13 +1831,6 @@ fn mixed_numeric_and_center_focus_use_their_exact_instruction_owners_in_order() 
         ),
         ResolvedInstructionLanguage::En,
     );
-    assert_eq!(result.targets().len(), 1);
-    assert!(matches!(
-        result.targets()[0].path,
-        inku_ddl::Stage15TargetPath::Instruction {
-            instruction_index: 1
-        }
-    ));
     let lowered = lower_verified_stage15_score(
         result.verified_effective_view(),
         ScoreLoweringContext::resolve("wide", Color::White).unwrap(),
@@ -1862,7 +1846,7 @@ fn mixed_numeric_and_center_focus_use_their_exact_instruction_owners_in_order() 
     assert!(instructions[1].position.is_none());
     assert_eq!(
         instructions[1].at.as_ref().map(|at| at.region),
-        Some(expected_focus_region(result.targets()[0].effective_focus))
+        Some(CENTER_REGION)
     );
 }
 
@@ -2057,10 +2041,6 @@ fn four_explicit_primitives_use_short_edge_size_and_axis_position_geometry() {
     ];
     for (source, canvas, primitive, center, radius, position, size, color, weight, style) in cases {
         let result = stage15(source, ResolvedInstructionLanguage::En);
-        assert!(
-            result.targets().is_empty(),
-            "numeric position must not become Stage 1.5 focus: {source}"
-        );
         let lowered = lower_verified_stage15_score(
             result.verified_effective_view(),
             ScoreLoweringContext::resolve(canvas, Color::White).unwrap(),
@@ -3234,7 +3214,7 @@ fn absent_count_and_size_remain_unspecified() {
 }
 
 #[test]
-fn mixed_owner_view_keeps_expansion_and_focus_overlay_pending_with_exact_identity_and_order() {
+fn mixed_owner_view_keeps_expansion_with_exact_identity_and_order() {
     let definition = center_emit_definition();
     let result = stage15_locked(
         "place one thin pencil line at the center. place circle and Focus.Center at center.",
@@ -3261,8 +3241,6 @@ fn mixed_owner_view_keeps_expansion_and_focus_overlay_pending_with_exact_identit
         retained_view.effective_canonical_digest(),
         result.effective_canonical_digest()
     );
-    assert_eq!(retained_view.pending_focus_targets(), result.targets());
-    assert_eq!(retained_view.pending_focus_targets().len(), 4);
     assert_eq!(
         candidate.instructions().len(),
         result.original_semantic_document().instructions.len()
@@ -3291,7 +3269,6 @@ fn complete_flat_macro_sequence_reaches_actual_score() {
 
     assert_eq!(result.original_expanded_invocations().len(), 1);
     assert_eq!(result.original_expanded_invocations()[0].nodes.len(), 2);
-    assert_eq!(result.targets().len(), 2);
     let lowered = lower_verified_stage15_score(
         result.verified_effective_view(),
         ScoreLoweringContext::resolve("wide", Color::White).unwrap(),
@@ -3304,6 +3281,12 @@ fn complete_flat_macro_sequence_reaches_actual_score() {
     assert_eq!(instructions[0].color, Color::Red);
     assert_eq!(instructions[1].primitive, Primitive::Square);
     assert_eq!(instructions[1].color, Color::Blue);
+    // A generated `place:center` is the literal center, like a direct one.
+    assert!(
+        instructions
+            .iter()
+            .all(|instruction| instruction.at.as_ref().map(|at| at.region) == Some(CENTER_REGION))
+    );
     assert!(lowered.instruction_origins().iter().enumerate().all(
         |(expected_generated_ordinal, origin)| matches!(
             origin,
@@ -3350,7 +3333,6 @@ fn macro_caller_action_omits_only_action_and_preserves_the_macro_body() {
     );
     let action_expansion = &action.original_expanded_invocations()[0];
     assert_eq!(action_expansion.nodes.len(), 2);
-    assert_eq!(action.targets().len(), 2);
     let action_provenance = action_expansion.provenance.clone();
     let context = ScoreLoweringContext::resolve("wide", Color::White).unwrap();
 
@@ -3418,7 +3400,7 @@ fn macro_caller_action_omits_only_action_and_preserves_the_macro_body() {
 
 #[test]
 fn macro_continuation_executes_once_and_keeps_source_ordinal_at_no_score_boundary() {
-    let definition = complete_focus_emit_definition();
+    let definition = complete_center_emit_definition();
     let result = stage15_locked(
         "a Focus.Center; the red Focus.Center; a Focus.Center",
         ResolvedInstructionLanguage::En,
@@ -3441,34 +3423,6 @@ fn macro_continuation_executes_once_and_keeps_source_ordinal_at_no_score_boundar
             .original_expanded_invocations()
             .iter()
             .all(|invocation| invocation.nodes.len() == 2)
-    );
-
-    let resolved_focus = result.resolved_focus().unwrap();
-    let generated_focus = result
-        .targets()
-        .iter()
-        .map(|target| match &target.path {
-            inku_ddl::Stage15TargetPath::MacroEmit {
-                invocation_ordinal,
-                generated_ordinal,
-                field,
-                ..
-            } if field == "place" => (
-                *invocation_ordinal,
-                *generated_ordinal,
-                target.effective_focus,
-            ),
-            other => panic!("unexpected Focus.Center target: {other:?}"),
-        })
-        .collect::<Vec<_>>();
-    assert_eq!(
-        generated_focus,
-        [
-            (0, 0, resolved_focus),
-            (0, 1, resolved_focus),
-            (2, 0, resolved_focus),
-            (2, 1, resolved_focus),
-        ]
     );
 
     let lowered = lower_verified_stage15_score_with_policy(
@@ -3816,10 +3770,9 @@ fn declared_core_fields_and_literals_share_ordinary_effective_score() {
                 "{source}: {:?}",
                 lowered.diagnostics()
             );
-            let mut score = lowered.score().unwrap().clone();
-            // Different definition/meaning identities may choose different effective focus.
-            score.instructions[0].at = None;
-            scores.push(score);
+            // `center` no longer depends on definition or meaning identity,
+            // so the region is compared too.
+            scores.push(lowered.score().unwrap().clone());
         }
         assert_eq!(scores[0], scores[1], "{source}");
         assert_eq!(scores[0], scores[2], "{source}");
@@ -5029,7 +4982,7 @@ fn thinness_pair_definition() -> MacroDefinition {
     .unwrap()
 }
 
-fn complete_focus_emit_definition() -> MacroDefinition {
+fn complete_center_emit_definition() -> MacroDefinition {
     MacroDefinition::from_json(
         r#"{"schema":"inku.macro-definition.v1","namespace":"Focus","heading":"Center","version":"1.0.0","parameters":{},"components":{},"body":[{"op":"emit","binding":null,"fields":{"shape":{"expr":"semantic_ref","category":"shape","id":"circle"},"movement":{"expr":"semantic_ref","category":"movement","id":"place"},"place":{"expr":"semantic_ref","category":"place","id":"center"},"color":{"expr":"semantic_ref","category":"color","id":"red"}}},{"op":"emit","binding":null,"fields":{"shape":{"expr":"semantic_ref","category":"shape","id":"square"},"movement":{"expr":"semantic_ref","category":"movement","id":"place"},"place":{"expr":"semantic_ref","category":"place","id":"center"},"color":{"expr":"semantic_ref","category":"color","id":"blue"}}}]}"#,
     )
@@ -5092,13 +5045,4 @@ fn surface_emit_definition(surface: &str) -> MacroDefinition {
     .unwrap()
 }
 
-fn expected_focus_region(focus: FocusRegion) -> [f64; 4] {
-    match focus {
-        FocusRegion::UpperRight => [0.60, 0.18, 0.82, 0.40],
-        FocusRegion::UpperLeft => [0.18, 0.18, 0.40, 0.40],
-        FocusRegion::LowerRight => [0.60, 0.60, 0.82, 0.82],
-        FocusRegion::LowerLeft => [0.18, 0.60, 0.40, 0.82],
-        FocusRegion::UpperEdge => [0.39, 0.07, 0.61, 0.29],
-        FocusRegion::RightHalf => [0.61, 0.39, 0.83, 0.61],
-    }
-}
+const CENTER_REGION: [f64; 4] = [0.39, 0.39, 0.61, 0.61];

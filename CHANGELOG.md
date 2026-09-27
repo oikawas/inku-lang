@@ -4,7 +4,11 @@
 
 This file records changes chronologically. If a historical note conflicts with the current specification, the current specification wins. The more detailed canonical history is maintained in Japanese in [CHANGELOG.ja.md](CHANGELOG.ja.md).
 
-**This file holds the 37 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
+**This file holds the 38 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
+
+### v2.15.37 — show the DDL language in instructions headings (Build 1113, 2026-09-28)
+
+This version includes the change below since v2.15.36. The Web shows whether the instructions and editor are using Japanese DDL or English DDL. The language rule, API, DDL and Score formats, and render version are unchanged.
 
 ### 2026-09-28 — The instructions' language (Japanese DDL or English DDL) is shown
 

@@ -6,6 +6,12 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 36 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-27 — Android prepares its database off the main thread at startup
+
+Android prepared its database while composing the first screen, on the main thread: the check of whether a pre-v10 database may be reset, and opening the writable database with Room's migrations (finding R-2 of the 2026-09-26 source review, deferred then by the author's choice). The preparation now runs in the background; until it answers only the app's background is shown, and the app appears once the database is ready. The refusal screen's retry prepares the same way. An activity recreated after the database opened (a display setting change, for instance) shows the app without waiting.
+
+DDL, Score and rendering versions and the database schema are unchanged.
+
 ### 2026-09-27 — Android says why refinement options cannot be made for a work without a description
 
 Android follows the Web's fix of the same day. Its refinement (the adjust view and the model comparison) went ahead for a work drawn from hand-written DDL, which has no description; an element that runs Stage 1 (reading, model comparison) sent the core an empty description, and the options area showed only `schema_violation`. Without a description no option is made now, and the area says "This work has no description, so no refinement options can be made. Choose a work drawn from a description." Every element is refused, as on the Web. Android refines a saved work's description, so it points to a work drawn from a description rather than to the description field.

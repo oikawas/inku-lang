@@ -1,14 +1,18 @@
 package app.inku.mobile
 
+import android.os.Looper
 import androidx.activity.ComponentActivity
+import androidx.compose.material3.Text
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import app.inku.mobile.data.db.RoomV10ResetCoordinator
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -41,5 +45,23 @@ class DatabaseStartupRefusedScreenTest {
         composeTestRule.runOnIdle {
             assertEquals("Retry invokes the startup callback exactly once", 1, retryCount)
         }
+    }
+
+    @Test
+    fun theDatabaseIsPreparedOffTheMainThreadBeforeTheAppShows() {
+        var preparedOnMainThread: Boolean? = null
+        composeTestRule.setContent {
+            DatabaseStartupGate(
+                prepare = {
+                    preparedOnMainThread = Looper.myLooper() == Looper.getMainLooper()
+                    RoomV10ResetCoordinator.Result.Ready(resetPerformed = false)
+                },
+            ) { Text("the app") }
+        }
+
+        composeTestRule.waitUntil(5_000) {
+            composeTestRule.onAllNodesWithText("the app").fetchSemanticsNodes().isNotEmpty()
+        }
+        assertEquals(false, preparedOnMainThread)
     }
 }

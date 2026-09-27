@@ -17,6 +17,10 @@ class InkuApplication : Application() {
     @Volatile
     private var databaseInstance: InkuDatabase? = null
 
+    /** Whether the database is open; cheap, for the activity to skip the startup gate. */
+    val databaseOpen: Boolean
+        get() = databaseInstance != null
+
     /** Throws if startup was refused; [MainActivity] shows the refusal before any screen reads this. */
     val database: InkuDatabase
         get() {

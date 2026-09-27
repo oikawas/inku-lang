@@ -12,7 +12,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -23,21 +25,56 @@ import app.inku.mobile.data.db.RoomV10ResetCoordinator
 import app.inku.mobile.ui.InkuApp
 import app.inku.mobile.ui.theme.Dimens
 import app.inku.mobile.ui.theme.InkuColors
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
             val application = application as InkuApplication
-            var startupResult by remember { mutableStateOf(application.prepareDatabase()) }
-
-            when (startupResult) {
-                is RoomV10ResetCoordinator.Result.Ready -> InkuApp()
-                is RoomV10ResetCoordinator.Result.Refused -> DatabaseStartupRefusedScreen(
-                    onRetry = { startupResult = application.prepareDatabase() },
-                )
-            }
+            DatabaseStartupGate(
+                prepare = application::prepareDatabase,
+                alreadyOpen = application.databaseOpen,
+            ) { InkuApp() }
         }
+    }
+}
+
+/**
+ * Opens the database before [content], off the main thread: the v10 reset
+ * check and Room's migrations run inside [prepare]. Until it answers, only the
+ * app's background is shown; a refusal shows [DatabaseStartupRefusedScreen],
+ * whose retry prepares again in the same way. An activity recreated after the
+ * database opened ([alreadyOpen]) goes straight to [content], so a
+ * configuration change (theme, font scale) does not pass through the blank frame.
+ */
+@Composable
+internal fun DatabaseStartupGate(
+    prepare: () -> RoomV10ResetCoordinator.Result,
+    alreadyOpen: Boolean = false,
+    content: @Composable () -> Unit,
+) {
+    var attempt by remember { mutableIntStateOf(0) }
+    var result by remember {
+        mutableStateOf<RoomV10ResetCoordinator.Result?>(
+            if (alreadyOpen) RoomV10ResetCoordinator.Result.Ready(resetPerformed = false) else null,
+        )
+    }
+    LaunchedEffect(attempt) {
+        if (result == null) result = withContext(Dispatchers.IO) { prepare() }
+    }
+    when (result) {
+        null -> MaterialTheme(colorScheme = InkuColors) {
+            Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {}
+        }
+        is RoomV10ResetCoordinator.Result.Ready -> content()
+        is RoomV10ResetCoordinator.Result.Refused -> DatabaseStartupRefusedScreen(
+            onRetry = {
+                result = null
+                attempt += 1
+            },
+        )
     }
 }
 

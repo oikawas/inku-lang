@@ -308,7 +308,10 @@
 # `center` is the middle cell. One placed mark anchors in its range shrunk to
 # two thirds; a line-up, scatter, or tile keeps its marks inside the range, and
 # with the position omitted it uses the whole canvas.
-DDL_ENGINE_VERSION = "51"
+# 52: A position range written in numbers draws by the same rules as a named
+# range. A fill target, a Macro caller, or a group member with such a range is
+# reported as unsupported instead of drawn.
+DDL_ENGINE_VERSION = "52"
 # 4 (2026-07-30): yellow, orange, and purple become abstract Score colors, and
 # coerce recognizes the corresponding Japanese and English DDL markers.
 # 3 (2026-07-30): 黄 / 橙 / 紫 joined the saijiki color words, so an author can write
@@ -333,4 +336,8 @@ DDL_ENGINE_VERSION = "51"
 # (`大きな四つの円`, `細い三本の黒い線`) as well as after it.
 # 14 (2026-09-25): A plugin may be invoked by an alias its definition
 # declares, such as `Nature.若葉` beside the canonical `Nature.YoungLeaves`.
-DDL_VERSION = "14"
+# 15 (2026-09-28): A position may be written as a range of canvas fractions,
+# after the author's own words (`右下（横0.67〜1、縦0.67〜1）に`, `at the bottom
+# right (horizontal 0.67 to 1, vertical 0.67 to 1)`) or alone. The words are
+# kept and never read, and each language reads only its own form.
+DDL_VERSION = "15"

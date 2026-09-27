@@ -1080,3 +1080,97 @@ fn gaps_keep_owners_and_stop_continue_never_ready_all_omitted() {
     assert!(exact.objects().unwrap()[0].explicit_geometry().is_some());
     assert_eq!(exact.objects().unwrap()[0].count(), 1);
 }
+
+#[test]
+fn numeric_ranges_draw_like_the_named_range_they_spell() {
+    // The author's words before the parenthesis are kept but never read, so a
+    // position word and its own numbers give one plan.
+    for (language, named, numeric) in [
+        (
+            ResolvedInstructionLanguage::Ja,
+            "右端に、灰色の弧を3本並べる。",
+            "右端（横0.9〜1、縦0〜1）に、灰色の弧を3本並べる。",
+        ),
+        (
+            ResolvedInstructionLanguage::Ja,
+            "下に、黒い円を6個散らす。",
+            "下(横0~1, 縦２／３～１)に、黒い円を6個散らす。",
+        ),
+        (
+            ResolvedInstructionLanguage::Ja,
+            "中心に、赤い小さな円を八個散らす。",
+            "画面の横1/3〜2/3、縦1/3〜2/3の範囲に、赤い小さな円を八個散らす。",
+        ),
+        (
+            ResolvedInstructionLanguage::En,
+            "line up three gray arcs at the right-edge.",
+            "line up three gray arcs at the right edge (horizontal 0.9 to 1, vertical 0 to 1).",
+        ),
+    ] {
+        // Every part of the numeric sentence is read; nothing is left as a hole.
+        let compiled = compile(numeric, language, &[]);
+        assert!(compiled.holes.is_empty(), "{numeric}: {:?}", compiled.holes);
+        let named_stage = stage(named, language, &[]);
+        let named_result =
+            plan_verified_stage15(named_stage.verified_effective_view(), context("golden"));
+        let numeric_stage = stage(numeric, language, &[]);
+        let numeric_result =
+            plan_verified_stage15(numeric_stage.verified_effective_view(), context("golden"));
+        let named_object = &named_result
+            .objects()
+            .unwrap_or_else(|| panic!("{named}: {:?}", named_result.diagnostics()))[0];
+        let numeric_object = &numeric_result
+            .objects()
+            .unwrap_or_else(|| panic!("{numeric}: {:?}", numeric_result.diagnostics()))[0];
+        assert_eq!(numeric_object.anchor(), named_object.anchor(), "{numeric}");
+        assert_eq!(numeric_object.domain(), named_object.domain(), "{numeric}");
+        assert_eq!(numeric_object.recipe(), named_object.recipe(), "{numeric}");
+        assert_eq!(numeric_object.count(), named_object.count(), "{numeric}");
+    }
+}
+
+#[test]
+fn numeric_ranges_are_checked_kept_to_their_language_and_limited_to_shared_paths() {
+    let invalid = compile(
+        "右下（横0.8〜0.2、縦0〜1）に、赤い円を置く。",
+        ResolvedInstructionLanguage::Ja,
+        &[],
+    );
+    assert!(
+        invalid
+            .blocking_diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.kind == "invalid_numeric_range"),
+        "{:?}",
+        invalid.blocking_diagnostics
+    );
+    // English reads a range only with `to`; a Japanese range mark is not a range.
+    let tilde = compile(
+        "place a red circle at the bottom right (horizontal 0.67~1, vertical 0.67~1).",
+        ResolvedInstructionLanguage::En,
+        &[],
+    );
+    assert!(stage15_transformation_input(&tilde).is_err());
+    for (source, reason) in [
+        (
+            "中心に、赤い円を右下（横0.67〜1、縦0.67〜1）に置く。",
+            ScoreFieldGap::NamedAndNumericPositionConflict,
+        ),
+        (
+            "右下（横0.5〜1、縦0.5〜1）に、赤い円を埋める。",
+            ScoreFieldGap::UnsupportedNumericRange,
+        ),
+    ] {
+        let transformed = stage(source, ResolvedInstructionLanguage::Ja, &[]);
+        let result =
+            plan_verified_stage15(transformed.verified_effective_view(), context("golden"));
+        assert!(
+            result
+                .diagnostics()
+                .iter()
+                .any(|diagnostic| diagnostic.reason == reason),
+            "{source}: {:?}",
+            result.diagnostics()
+        );
+    }
+}

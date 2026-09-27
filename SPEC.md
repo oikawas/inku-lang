@@ -242,7 +242,7 @@ whole canvas as the range of a line-up, scatter, or tile (§18). Explicit
 positions take priority, and an explicit `center` uses the middle cell as its
 range. `inku.geometry-resolution-policy.v1` records omitted
 placement and fill meaning; its current digest is
-`b530c70ae1e4b1443d19d2e37f5e87282b8953f52eb75ad861f9a11ad754b162`.
+`aacaf721a566e71d5c3b0649d2dafb43ed2a2382aa34edee0d5133b541fe2411`.
 Single objects, Macros, and coordinated groups share the omitted range: the
 shrunk middle cell for place and draw, and the whole canvas for a line-up,
 scatter, or tile. Fill's omitted target is also the whole canvas. A valid ground alone is
@@ -3071,6 +3071,15 @@ selected corner; the existing Renderer render seed chooses its anchor within tha
 explicit variation preserve the corner. One rational policy table converts to Score f64 only at the final boundary.
 The policy ID stays unchanged while its content digest changes; this does not introduce a semantic schema version.
 Unspecified position remains unsupported; named/numeric conflicts and numeric must-fit remain enforced.
+
+Numeric ranges (DDL Spec 15, DDL engine 52): a position may be written as a range of canvas fractions.
+
+- Form: the range follows the author's own words in parentheses (`右下（横0.67〜1、縦0.67〜1）に`, `at the bottom right (horizontal 0.67 to 1, vertical 0.67 to 1)`), or stands alone (`画面の横0.2〜0.5、縦0〜0.3の範囲に`, `in the range horizontal 0.2 to 0.5, vertical 0 to 0.3`). The words before the parenthesis are kept as the original words, and the compiler never reads them, so no vocabulary grows. In Japanese the words run from the start of the clause, a comma, or `を` to the parenthesis; in English they follow the preposition `at`, `in`, or `on`. A Japanese range is followed by `に`.
+- Language mode: the Japanese forms are read only in a Japanese instruction and the English forms only in an English one. Japanese accepts full-width and ASCII parentheses, the wave dash `〜`, the full-width tilde `～`, and the ASCII tilde `~` as the range mark, `、`, `，`, or `,` between the axes, and full-width digits, periods, and slashes. English accepts ASCII parentheses, `to` for the range, `,` between the axes, and ASCII digits only; `~` is not a range there.
+- Values: a decimal with at most six places, or a fraction with a denominator from 1 to 1,000,000. Every bound lies in 0 to 1 and each start is below its end (a zero width is refused). A range outside these limits is `invalid_numeric_range` (blocking).
+- Meaning: the four bounds are exact rationals and draw by the same rules as a named position (the list above). A named position and a numeric range with the same numbers give the same plan. The original words stay in provenance only, not in the meaning or its digest, so rewording them leaves the drawing unchanged.
+- Conflicts and unsupported uses: two or more of a named position, a numeric position, and a numeric range on one mark conflict. A numeric range on a fill target, a Macro caller, or a coordinated-group member has no Score form yet and is reported as unsupported.
+- The Score format is unchanged. The numbers from the range fill `at.region` and the `anchor` (a `named` region) and `domain` of `arrangement.resolved`.
 Unsupported noncenter relations remain unsupported and are never silently discarded. The normal shared runtime,
 UI, and persistence path uses this delivery.
 
@@ -3262,7 +3271,7 @@ An exact coordinate is never silently moved, clamped, or snapped. Boundary-ancho
 extent clips the canvas are separate matters.
 
 Direct typed DDL accepts the finite JA forms `半径N`, `直径N`, `幅N、高さN`,
-`一辺N`, and `画面の横X、縦Yの位置`, their corresponding EN forms, and the finite
+`一辺N`, `画面の横X、縦Yの位置`, and numeric ranges (§18), their corresponding EN forms, and the finite
 seven-class size modifiers in both languages. A decimal retains its original
 spelling and source span as provenance while its meaning is normalized to a
 signed base-10 coefficient and scale. The entrypoint takes a lock-verified Stage

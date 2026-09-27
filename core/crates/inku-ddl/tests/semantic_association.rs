@@ -2039,6 +2039,7 @@ fn assert_owned_occurrence_join(case: &Case, result: &inku_ddl::SemanticAssociat
             }
             OwnedSemanticOccurrence::ExplicitGeometry(geometry) => geometry.source().span,
             OwnedSemanticOccurrence::NumericPosition(position) => position.source().span,
+            OwnedSemanticOccurrence::NumericRange(range) => range.source().span,
             OwnedSemanticOccurrence::Touch(term)
             | OwnedSemanticOccurrence::Continuity(term)
             | OwnedSemanticOccurrence::Angle(term)

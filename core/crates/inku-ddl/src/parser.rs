@@ -13,7 +13,7 @@ use crate::{
 };
 
 /// Stable identity for the neutral parser foundation.
-pub const NEUTRAL_LEXEME_PARSER_SCHEMA_ID: &str = "inku.neutral-lexeme-parser.v12";
+pub const NEUTRAL_LEXEME_PARSER_SCHEMA_ID: &str = "inku.neutral-lexeme-parser.v13";
 
 /// A half-open UTF-8 byte span into the source document.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
@@ -371,6 +371,16 @@ fn selection_at(
     language: ResolvedInstructionLanguage,
 ) -> Option<Selection> {
     let source = document.source();
+    // A numeric range is one lexeme that may hold the author's own words, so it
+    // is tried before any word inside it could be.
+    if let Some(range) = crate::numeric_range::numeric_range_at(source, start_byte, language) {
+        return Some(Selection::Token {
+            end_byte: range.span.end_byte,
+            kind: NeutralTokenKind::GeometryKeyword {
+                keyword: GeometryKeyword::NumericRange,
+            },
+        });
+    }
     if let Some((end_byte, keyword)) = geometry_keyword_at(source, start_byte, language) {
         return Some(Selection::Token {
             end_byte,
@@ -1193,6 +1203,14 @@ fn has_japanese_recognized_left_candidate(source: &str, start_byte: usize) -> bo
             )
             .iter()
             .any(|candidate| candidate.end_byte == start_byte)
+                // A numeric range is one recognized lexeme, so the particle
+                // after it (`…の範囲に`, `…）に`) is recognized too.
+                || crate::numeric_range::numeric_range_at(
+                    source,
+                    candidate_start,
+                    ResolvedInstructionLanguage::Ja,
+                )
+                .is_some_and(|range| range.span.end_byte == start_byte)
         })
 }
 

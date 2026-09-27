@@ -6,6 +6,19 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 36 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-27 — Position words are drawn as ranges (DDL engine 51)
+
+A position word is now drawn as a range built from three equal bands on each canvas axis (the author's decisions: a scatter or line-up stays inside its range, the bands are thirds, and a placed mark anchors in its range shrunk to two thirds).
+
+- `top` and `bottom` remain the upper and lower thirds, and `center` (中心, 中央) becomes the middle third on both axes (the middle cell). The edges (a tenth) and the corners (a fifth) are unchanged.
+- Place and draw at one spot: the anchor is chosen inside the range shrunk to two thirds about its center. For `center` that is 7/18 to 11/18 (about 0.389 to 0.611), close to the former 0.39 to 0.61. A mark placed in a corner or on an edge is less often cut by the canvas border.
+- Scatter, line-up, and tile keep their marks inside the range. Before, a scatter or line-up spread over a canvas-sized area and only its centroid landed in the region. In a production work, the ten circles of "scatter ten circles at the bottom" spread from high on the canvas to below it, and three of the ten were off the canvas. The compiler now sizes the group's `domain` to the range and centers it on the range, as a tile already did. The renderer is unchanged.
+- An omitted position is `center` for place and draw, and the whole canvas for a scatter, line-up, or tile.
+- The DDL of the 373 typed production works was compiled before and after (no drawing). 355 Scores changed, and no compile outcome (complete, with omissions, stopped) changed.
+- Lining up marks in a narrow edge band without a direction puts them along the band's short side, where they overlap (8 layers in 7 of the typed production works).
+
+Saved works do not change (a replay draws the saved Score). The geometry policy digest becomes `97ea00bf…`. The DDL engine moves to 51. The render engine is unchanged.
+
 ### 2026-09-27 — Android prepares its database off the main thread at startup
 
 Android prepared its database while composing the first screen, on the main thread: the check of whether a pre-v10 database may be reset, and opening the writable database with Room's migrations (finding R-2 of the 2026-09-26 source review, deferred then by the author's choice). The preparation now runs in the background; until it answers only the app's background is shown, and the app appears once the database is ready. The refusal screen's retry prepares the same way. An activity recreated after the database opened (a display setting change, for instance) shows the app without waiting.

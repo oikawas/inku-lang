@@ -358,7 +358,7 @@ The latest frozen records are `render-engine-66` (620 cases) and `ddl-engine-45`
 Rust pipeline). A new version directory is created only at an explicit full-update checkpoint, not
 with every version bump.
 - **Android reference material** — `android/app/src/test/resources/server_reference/` retains only
-DDL, Score, coerce, and history compatibility fixtures. The drawing oracle is the shared Rust core
+the history compatibility fixture (`lineage_wiring.json`). The drawing oracle is the shared Rust core
 and the frozen corpora under `server/reference/`; Android does not copy a versioned SVG corpus. Device
 acceptance stages a bounded selection from the canonical manifest and compares packaged-JNI SVG
 bytes and raw pixels directly.

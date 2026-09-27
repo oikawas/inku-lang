@@ -6,6 +6,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 38 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-28 — Another catalog works without a description
+
+At the author's decision, Another catalog draws its options without a description or DDL: it redraws the saved JSON Score alone in other catalogs and uses neither. Until now it stopped, like the other refinements, on a work without a description (one written directly in DDL), and opening it from a lineage card reloads the work and empties the description field, so that path could not change the colors at all. The other refinement elements keep their conditions.
+
 ### v2.15.37 — show the DDL language in instructions headings (Build 1113, 2026-09-28)
 
 This version includes the change below since v2.15.36. The Web shows whether the instructions and editor are using Japanese DDL or English DDL. The language rule, API, DDL and Score formats, and render version are unchanged.

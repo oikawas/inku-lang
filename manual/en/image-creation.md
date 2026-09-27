@@ -255,7 +255,7 @@ Pressing an option enlarges it inside the dialog; `Back to all options` or a sec
 
 Choose `Another catalog` in the work-editing menu (`Refine` on the work tab, or `…` on each work in the lineage tab) and a dialog of its own opens. It starts at once and lays out the same work in every color catalog except the current one, in the order of the catalog list. The DDL, JSON Score, composition, and performance stay as they are, and no LLM is called. Each option is labeled with its catalog's name.
 
-Choosing, saving, and discarding options work as in 8.2. After a stop or a failure, `Draw in the other catalogs` draws them again. A work without a description (one written directly in DDL) cannot make options, and the dialog says why.
+Choosing, saving, and discarding options work as in 8.2. After a stop or a failure, `Draw in the other catalogs` draws them again. Only the saved JSON Score is redrawn, so a work without a description (one written directly in DDL) makes options too.
 
 ## 9. Autonomous Refinement
 

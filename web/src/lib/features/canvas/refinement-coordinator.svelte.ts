@@ -457,12 +457,13 @@ export function createRefinementCoordinator(deps: RefinementCoordinatorDeps) {
 		if (!work.result || refinementSession.gridBusy || work.loading) return;
 		const source = work.input.trim();
 		// Say why nothing is made instead of returning in silence: a work drawn
-		// from hand-written DDL has no description to refine from.
-		if (!source) {
+		// from hand-written DDL has no description to refine from. A catalog
+		// change redraws the saved Score alone, so it needs neither.
+		if (!source && kind !== 'color') {
 			refinementSession.setStatus(t().refineNeedsDescription);
 			return;
 		}
-		if (!work.ddl) {
+		if (!work.ddl && kind !== 'color') {
 			refinementSession.setStatus(t().refineNeedsDdl);
 			return;
 		}

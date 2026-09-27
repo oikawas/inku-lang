@@ -3,10 +3,7 @@ import { test } from 'node:test';
 
 import type { HistoryItem } from '../../historyManagerState.svelte.ts';
 import type { VariationCandidate } from './refinement-session.svelte.ts';
-import {
-	projectRefinementCandidate,
-	saveRefinementCandidates
-} from './refinement-actions.ts';
+import { saveRefinementCandidates } from './refinement-actions.ts';
 
 function candidate(
 	id: string,
@@ -37,18 +34,6 @@ function candidate(
 		}
 	};
 }
-
-test('T-315: candidate projection keeps source DDL fallback and result identity', () => {
-	const withSource = candidate('source', { source_ddl: 'source ddl' });
-	const sourceProjection = projectRefinementCandidate(withSource);
-	assert.equal(sourceProjection.ddl, 'source ddl');
-	assert.equal(sourceProjection.expandedDdl, 'source expanded');
-	assert.equal(sourceProjection.thinking, 'source thinking');
-	assert.equal(sourceProjection.result, withSource.result);
-
-	const withoutSource = candidate('fallback', { source_ddl: null });
-	assert.equal(projectRefinementCandidate(withoutSource).ddl, 'fallback expanded');
-});
 
 test('T-316/T-318: candidates save sequentially with canonical fields and only current identity adopts', async () => {
 	const first = candidate('first', { render_color_catalog_id: null });

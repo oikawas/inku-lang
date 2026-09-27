@@ -52,9 +52,9 @@ test('T-346: CanvasPanel keeps refinement view coordination and local choices', 
 	}
 	assert.match(panel, /localStorage\.setItem\(REFINE_KIND_KEY, kind\)/);
 	assert.match(panel, /statusDdlOrigin && refineKind === 'reading'/);
-	assert.match(panel, /if \(refineModalOpen\) closeRefineModal\(\)/);
+	assert.match(panel, /if \(refineModalOpen\) requestCloseRefineModal\(\)/);
 	assert.match(panel, /view=\{refineView\}/);
-	assert.match(panel, /onClose=\{closeRefineModal\}/);
+	assert.match(panel, /onClose=\{requestCloseRefineModal\}/);
 	assert.doesNotMatch(view, /\$state\(|localStorage|onMount|URL\.createObjectURL/);
 });
 

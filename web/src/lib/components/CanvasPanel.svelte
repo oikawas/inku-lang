@@ -31,8 +31,7 @@
 	import type {
 		RefinementSession,
 		RefineKind,
-		VariationAmplitude,
-		VariationCandidate
+		VariationAmplitude
 	} from '$lib/features/canvas/refinement-session.svelte';
 
 	type OutputTab = 'canvas' | 'refine' | 'lineage';
@@ -141,8 +140,8 @@
 		modelInspection: ModelInspection;
 		touchSeedText: string;
 		onGenerateVariationCandidates: (kind: RefineKind, count: 1 | 4, touchWords?: string, amplitude?: VariationAmplitude) => void | Promise<void>;
-		onSaveSelectedVariationCandidates: () => void | Promise<void>;
-		onShowVariationCandidate: (candidate: VariationCandidate) => void;
+		/** True when every chosen option is now in the history. */
+		onSaveSelectedVariationCandidates: () => Promise<boolean>;
 		activeComparisonItem: { svg: string } | null;
 		lineageGraph: LineageGraph | null;
 		lineageBrowsingState: LineageBrowsingState;
@@ -268,7 +267,6 @@
 		touchSeedText = $bindable(''),
 		onGenerateVariationCandidates,
 		onSaveSelectedVariationCandidates,
-		onShowVariationCandidate,
 		activeComparisonItem,
 		lineageGraph = null,
 		lineageBrowsingState,
@@ -494,6 +492,31 @@
 		}
 	}
 
+	// Unsaved options pin the dialog open: it is left only by saving the
+	// chosen ones or discarding them all, so no unsaved work stays behind
+	// while another screen is shown.
+	function requestCloseRefineModal(): void {
+		if (refineView === 'adjust' && refinementSession.hasUnsaved) {
+			refinementSession.setStatus(t().refineCloseNeedsDecision);
+			return;
+		}
+		void closeRefineModal();
+	}
+
+	async function saveCandidatesAndClose(): Promise<void> {
+		if (!(await onSaveSelectedVariationCandidates())) return;
+		// The save effect below may not have run yet; the lineage focus on
+		// close needs to know that something was saved.
+		if (directRefinementActive) directRefinementSaveObserved = true;
+		refinementSession.discardCandidates();
+		await closeRefineModal();
+	}
+
+	async function discardCandidatesAndClose(): Promise<void> {
+		refinementSession.discardCandidates();
+		await closeRefineModal();
+	}
+
 	async function closeRefineModal(): Promise<void> {
 		refineModalOpen = false;
 		const savedParentNodeId = directRefinementActive && directRefinementSaveObserved ? directRefinementParentNodeId : null;
@@ -615,9 +638,13 @@
 </script>
 
 <svelte:window
+	onbeforeunload={(event) => {
+		// Reloading or closing the tab would lose them just the same.
+		if (refinementSession.hasUnsaved) event.preventDefault();
+	}}
 	onkeydown={(event) => {
 		if (event.key !== 'Escape') return;
-		if (refineModalOpen) closeRefineModal();
+		if (refineModalOpen) requestCloseRefineModal();
 		else if (generationInfoOpen) closeGenerationInfo();
 		else if (presentationMode) closePresentationMode();
 	}}
@@ -813,11 +840,11 @@
 					{refineDrawingModelGroups}
 					{refineWildValue}
 					{refineWildInherited}
-					onClose={closeRefineModal}
+					onClose={requestCloseRefineModal}
 					onSetRefineKind={setRefineKind}
 					{onGenerateVariationCandidates}
-					{onSaveSelectedVariationCandidates}
-					{onShowVariationCandidate}
+					onSaveAndClose={saveCandidatesAndClose}
+					onDiscardAndClose={discardCandidatesAndClose}
 					{onSelectRefineDrawingModel}
 					{onSetRefineWild}
 				/>

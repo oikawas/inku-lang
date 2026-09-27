@@ -7,8 +7,7 @@
 	import type {
 		RefinementSession,
 		RefineKind,
-		VariationAmplitude,
-		VariationCandidate
+		VariationAmplitude
 	} from '$lib/features/canvas/refinement-session.svelte';
 
 	type ModelInspection = ReturnType<typeof createModelInspection>;
@@ -39,8 +38,8 @@
 		onClose: () => void;
 		onSetRefineKind: (kind: RefineKind) => void;
 		onGenerateVariationCandidates: (kind: RefineKind, count: 1 | 4, touchWords?: string, amplitude?: VariationAmplitude) => void | Promise<void>;
-		onSaveSelectedVariationCandidates: () => void | Promise<void>;
-		onShowVariationCandidate: (candidate: VariationCandidate) => void;
+		onSaveAndClose: () => void | Promise<void>;
+		onDiscardAndClose: () => void | Promise<void>;
 		onSelectRefineDrawingModel: (provider: Provider, model: string) => void | Promise<void>;
 		onSetRefineWild: (value: boolean | null) => void;
 	};
@@ -70,8 +69,8 @@
 		onClose,
 		onSetRefineKind,
 		onGenerateVariationCandidates,
-		onSaveSelectedVariationCandidates,
-		onShowVariationCandidate,
+		onSaveAndClose,
+		onDiscardAndClose,
 		onSelectRefineDrawingModel,
 		onSetRefineWild
 	}: Props = $props();
@@ -114,8 +113,8 @@
 			{refineWildInherited}
 			{onSetRefineKind}
 			{onGenerateVariationCandidates}
-			{onSaveSelectedVariationCandidates}
-			{onShowVariationCandidate}
+			{onSaveAndClose}
+			{onDiscardAndClose}
 			{onSelectRefineDrawingModel}
 			{onSetRefineWild}
 		/>

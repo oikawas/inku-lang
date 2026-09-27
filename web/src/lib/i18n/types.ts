@@ -315,7 +315,11 @@ export interface LangPack {
 	variationAxis: (axis: string) => string;
 	variationGridDefault: string;
 	variationGridWithInterpretation: string;
-	variationGridSaveSelected: string;
+	refineSaveAndClose: string;
+	refineDiscardAndClose: string;
+	tooltipRefineDiscardAndClose: string;
+	refineCloseNeedsDecision: string;
+	refinePreviewBack: string;
 	refineSingleButton: string;
 	tooltipRefineSingle: string;
 	refineSingleSelectionHint: string;

@@ -29,8 +29,8 @@ test('T-326: coordinator delegates refinement planning and fan-out but keeps tra
 	assert.match(coordinator, /async function allocateVariationSeeds\(/);
 
 	const generateStart = coordinator.indexOf('async function generateVariationCandidates');
-	const showStart = coordinator.indexOf('function showVariationCandidate', generateStart);
-	const generate = coordinator.slice(generateStart, showStart);
+	const saveStart = coordinator.indexOf('async function saveSelectedVariationCandidates', generateStart);
+	const generate = coordinator.slice(generateStart, saveStart);
 	assert.match(generate, /refinementSession\.beginGrid\(/);
 	assert.match(generate, /window\.setTimeout\(/);
 	assert.match(generate, /refinementSession\.setPlans\(/);

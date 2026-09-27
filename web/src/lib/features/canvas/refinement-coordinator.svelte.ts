@@ -8,7 +8,7 @@ import type { SaveHistoryOptions } from '$lib/features/history/save';
 import type { PaintResult } from '$lib/features/run/current-work';
 import type { WorkState } from '$lib/features/work/state.svelte';
 import { RefinementSessionState, type RefineKind, type VariationAmplitude, type VariationCandidate } from '$lib/features/canvas/refinement-session.svelte';
-import { projectRefinementCandidate, saveRefinementCandidates } from '$lib/features/canvas/refinement-actions';
+import { saveRefinementCandidates } from '$lib/features/canvas/refinement-actions';
 import { planRefinementCandidates, runRefinementFanout } from '$lib/features/canvas/refinement-fanout';
 import { projectRefinementRedrawResult, runLayoutRedraw, runReadingRedraw, runTouchRedraw, type RefinementRedrawProjection } from '$lib/features/canvas/refinement-redraw';
 
@@ -535,26 +535,13 @@ export function createRefinementCoordinator(deps: RefinementCoordinatorDeps) {
 		}
 	}
 
-	function showVariationCandidate(candidate: VariationCandidate) {
-		const projection = projectRefinementCandidate(candidate);
-		deps.resetTargetScopedState({ preserveVariationCandidates: true });
-		deps.history.clearSelection();
-		work.ddl = projection.ddl;
-		work.expandedDdl = projection.expandedDdl;
-		work.ddlGeneratedBaseline = work.ddl;
-		work.thinking = projection.thinking;
-		work.result = projection.result;
-		work.displayedHistoryItem = null;
-		deps.showCanvas();
-		deps.fitCanvas();
-	}
-
-	async function saveSelectedVariationCandidates() {
+	/** True when every chosen option is now in the history. */
+	async function saveSelectedVariationCandidates(): Promise<boolean> {
 		const contextVersion = targetIdentityVersion;
 		const selected = refinementSession.candidates.filter((candidate) => candidate.selected && !candidate.saved);
 		if (selected.length === 0) {
 			refinementSession.setStatus(t().variationGridEmpty);
-			return;
+			return false;
 		}
 		refinementSession.beginSave();
 		try {
@@ -576,6 +563,7 @@ export function createRefinementCoordinator(deps: RefinementCoordinatorDeps) {
 			if (outcome === 'failed' && contextVersion === targetIdentityVersion) {
 				refinementSession.setStatus(t().pipelineAttentionReason('host_commit_failed'));
 			}
+			return outcome === 'complete';
 		} finally {
 			if (contextVersion === targetIdentityVersion) refinementSession.finishSave();
 		}
@@ -591,7 +579,6 @@ export function createRefinementCoordinator(deps: RefinementCoordinatorDeps) {
 		varyComposition,
 		varyInterpretation,
 		generateVariationCandidates,
-		showVariationCandidate,
 		saveSelectedVariationCandidates,
 	};
 }

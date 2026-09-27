@@ -4,13 +4,6 @@ import type { VariationCandidate } from './refinement-session.svelte.ts';
 
 type CandidateResult = VariationCandidate['result'];
 
-export type RefinementCandidateProjection = {
-	ddl: string;
-	expandedDdl: string;
-	thinking: string | null;
-	result: CandidateResult;
-};
-
 export type SaveRefinementCandidatesInput = {
 	candidates: readonly VariationCandidate[];
 	sourceText: () => string;
@@ -27,18 +20,6 @@ export type SaveRefinementCandidatesCapabilities = {
 };
 
 export type SaveRefinementCandidatesOutcome = 'complete' | 'stale' | 'failed';
-
-/** Map one generated candidate to the route's current-work projection. */
-export function projectRefinementCandidate(
-	candidate: VariationCandidate
-): RefinementCandidateProjection {
-	return {
-		ddl: candidate.result.source_ddl ?? candidate.result.ddl,
-		expandedDdl: candidate.result.ddl,
-		thinking: candidate.result.thinking,
-		result: candidate.result
-	};
-}
 
 /** Persist a selected snapshot without acquiring route or session state. */
 export async function saveRefinementCandidates(

@@ -32,8 +32,15 @@ export type RefinementSession = {
 	readonly elapsedMs: number;
 	readonly tokensIn: number | null;
 	readonly tokensOut: number | null;
+	/** The option shown large inside the dialog; null shows them all. */
+	readonly previewId: string | null;
+	/** Options not yet saved: the dialog does not close over them. */
+	readonly hasUnsaved: boolean;
 	abort(): void;
 	toggleCandidate(id: string): void;
+	preview(id: string | null): void;
+	discardCandidates(): void;
+	setStatus(message: string | null): void;
 };
 
 type GridStart = {
@@ -67,6 +74,7 @@ export class RefinementSessionState implements RefinementSession {
 	gridSlots = $state<VariationSlotState[]>([]);
 	gridSlotLabels = $state<string[]>([]);
 	status = $state<string | null>(null);
+	previewId = $state<string | null>(null);
 	tokensIn = $state<number | null>(null);
 	tokensOut = $state<number | null>(null);
 
@@ -147,6 +155,7 @@ export class RefinementSessionState implements RefinementSession {
 	commitCandidates(controller: AbortController, candidates: VariationCandidate[]): boolean {
 		if (!this.isActive(controller)) return false;
 		this.candidates = candidates;
+		this.previewId = null;
 		return true;
 	}
 
@@ -194,12 +203,28 @@ export class RefinementSessionState implements RefinementSession {
 		this.gridCanAbort = false;
 		this.elapsed.stop();
 		this.candidates = [];
+		this.previewId = null;
 		this.gridIncludesReading = false;
 		this.gridTaskLabel = '';
 		this.gridDone = 0;
 		this.gridTotal = 0;
 		this.gridSlots = [];
 		this.gridSlotLabels = [];
+		this.status = null;
+	}
+
+	get hasUnsaved(): boolean {
+		return this.candidates.some((candidate) => !candidate.saved);
+	}
+
+	preview(id: string | null): void {
+		this.previewId = id;
+	}
+
+	/** Drop the options; the saved ones are already in the history. */
+	discardCandidates(): void {
+		this.candidates = [];
+		this.previewId = null;
 		this.status = null;
 	}
 

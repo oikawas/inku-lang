@@ -26,15 +26,11 @@ test('T-312/T-313: page and panel share one typed refinement session owner', () 
 	assert.doesNotMatch(page, /variationGridAbortController/);
 	assert.match(coordinator, /async function generateVariationCandidates/);
 	assert.match(coordinator, /async function saveSelectedVariationCandidates/);
-	assert.match(actions, /export function projectRefinementCandidate/);
 	assert.match(actions, /export async function saveRefinementCandidates/);
-	assert.match(coordinator, /projectRefinementCandidate\(candidate\)/);
 	assert.match(coordinator, /saveRefinementCandidates\(/);
-	const showStart = coordinator.indexOf('function showVariationCandidate');
 	const saveStart = coordinator.indexOf('async function saveSelectedVariationCandidates');
 	const returnStart = coordinator.indexOf('\n\treturn {', saveStart);
-	assert.ok(showStart >= 0 && saveStart > showStart && returnStart > saveStart);
-	assert.doesNotMatch(coordinator.slice(showStart, saveStart), /candidate\.result\.(?:source_ddl|ddl|thinking)/);
+	assert.ok(saveStart >= 0 && returnStart > saveStart);
 	assert.doesNotMatch(coordinator.slice(saveStart, returnStart), /pushHistory\(\{/);
 
 	assert.match(panel, /refinementSession:\s*RefinementSession/);

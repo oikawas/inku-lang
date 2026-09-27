@@ -129,3 +129,20 @@ test('T-311: selection, saved projection, and save lock stay in the session owne
 	session.reset({ preserveCandidates: true });
 	assert.equal(session.candidates.length, 2);
 });
+
+test('unsaved options hold the dialog until they are saved or discarded', () => {
+	const session = new RefinementSessionState(fakeElapsed());
+	assert.equal(session.hasUnsaved, false);
+	const controller = session.beginGrid({ includesReading: false, taskLabel: 'layout', count: 2 });
+	session.commitCandidates(controller, [candidate('a'), candidate('b')] as never[]);
+	session.finishGrid(controller);
+	assert.equal(session.hasUnsaved, true);
+
+	// Enlarging one stays inside the dialog; a new set of options clears it.
+	session.preview('b');
+	assert.equal(session.previewId, 'b');
+	session.markSaved('a');
+	assert.equal(session.hasUnsaved, true);
+	session.discardCandidates();
+	assert.deepEqual([session.candidates.length, session.previewId, session.hasUnsaved], [0, null, false]);
+});

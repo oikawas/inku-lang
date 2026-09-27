@@ -6,6 +6,15 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 36 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-27 — refinement options keep the dialog until they are saved or discarded
+
+After making one or four options in refinement ("Edit drawing parameters"), unsaved options could be left behind on another screen: the ×, the backdrop and Escape closed the dialog, and pressing an option put it on the canvas and closed it. At the author's request, while unsaved options remain the dialog closes only two ways.
+
+- "Save the chosen ones and close" saves the chosen options to the history, discards the rest and closes. When the save fails it stays open and says why.
+- "Discard all and close" drops every unsaved option and closes (options already saved stay in the history).
+
+The ×, the backdrop and Escape leave it open and say "Save the chosen options, or discard them all, before closing." Pressing an option enlarges it inside the dialog instead of putting it on the canvas; "Back to all options" or a second press returns to all of them. Reloading or closing the tab while unsaved options remain brings up the browser's confirmation. Model comparison ("Edit models") is unchanged.
+
 ### 2026-09-27 — Android drops the local Ollama connection
 
 Local Ollama (`ollama`, `http://127.0.0.1:11434/v1`) leaves Android's built-in connections, by the author's ruling. It pointed at the phone itself, where no Ollama runs, and plain http to a LAN Ollama is refused by the base-URL check and the app's network security settings (a safety limit that stays). At start-up an Ollama row still as the catalog seeded it is removed, and one the author configured (a key, a name, a base URL or a model list) is kept as their own connection, as withdrawn ovms rows are. Ollama Cloud (`ollama-cloud`) stays. The Server still offers local Ollama.

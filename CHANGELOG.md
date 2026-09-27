@@ -6,6 +6,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 36 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-27 — the info panel's version rows explain themselves
+
+In the info panel ("About inku-lang"), `DDL Spec. ver.`, `DDL engine ver.`, `Render engine ver.` and `Binding protocol ver.` now show an explanation, in Japanese and English, when the pointer rests on them. Each says that it is the version running now and what can change when it rises (what the instructions can say, the score the same instructions become, and how a saved work looks when performed again). They are separate from the explanations of the versions a work records (in the generation details).
+
 ### 2026-09-27 — making refinement options for a work without a description says why it cannot
 
 The buttons that make options under "Edit drawing parameters" (one or four) did nothing, and said nothing, when the work had no description; on a work drawn from hand-written DDL, pressing them had no effect. They now say that the work has no description and to enter one on the left first, or that it has no instructions, in the options area. When options can be made is unchanged.

@@ -3236,13 +3236,14 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				</div>
 				<!-- Runtime version labels, in the requested display order. -->
 				<div class="app-info-row">
-					<dt>DDL Spec. ver.</dt>
+					<!-- First on its line: a centred bubble would pass the panel's left edge. -->
+					<dt><Tooltip placement="bottom-right" text={t().appInfoHintDdlSpec}><span>DDL Spec. ver.</span></Tooltip></dt>
 					<dd>{currentDdlVersion ?? t().historyVersionNotRecorded}</dd>
-					<dt>DDL engine ver.</dt>
+					<dt><Tooltip placement="bottom" text={t().appInfoHintDdlEngine}><span>DDL engine ver.</span></Tooltip></dt>
 					<dd>{currentDdlEngineVersion ?? t().historyVersionNotRecorded}</dd>
-					<dt>Render engine ver.</dt>
+					<dt><Tooltip placement="bottom" text={t().appInfoHintRenderEngine}><span>Render engine ver.</span></Tooltip></dt>
 					<dd>{currentRenderEngineVersion ?? t().historyVersionNotRecorded}</dd>
-					<dt>Binding protocol ver.</dt>
+					<dt><Tooltip placement="bottom" text={t().appInfoHintBindingProtocol}><span>Binding protocol ver.</span></Tooltip></dt>
 					<dd>{BINDING_PROTOCOL_VERSION}</dd>
 				</div>
 				<div>

@@ -54,6 +54,11 @@ export interface LangPack {
 	appInfoBuildLabel: string;
 	appInfoBuildDateLabel: string;
 	appInfoRepositoryLabel: string;
+	/** What each running version in the info panel is; the work's own record is provenanceHint*. */
+	appInfoHintDdlSpec: string;
+	appInfoHintDdlEngine: string;
+	appInfoHintRenderEngine: string;
+	appInfoHintBindingProtocol: string;
 	appInfoClose: string;
 	inputSectionHint: string;
 	inputMeterChars: (count: number, guide: number) => string;

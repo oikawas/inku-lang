@@ -1097,11 +1097,19 @@ fn numeric_ranges_draw_like_the_named_range_they_spell() {
             "下(横0~1, 縦２／３～１)に、黒い円を6個散らす。",
         ),
         (
+            ResolvedInstructionLanguage::Ja,
+            "中心に、赤い小さな円を八個散らす。",
+            "画面の横1/3〜2/3、縦1/3〜2/3の範囲に、赤い小さな円を八個散らす。",
+        ),
+        (
             ResolvedInstructionLanguage::En,
             "line up three gray arcs at the right-edge.",
             "line up three gray arcs at the right edge (horizontal 0.9 to 1, vertical 0 to 1).",
         ),
     ] {
+        // Every part of the numeric sentence is read; nothing is left as a hole.
+        let compiled = compile(numeric, language, &[]);
+        assert!(compiled.holes.is_empty(), "{numeric}: {:?}", compiled.holes);
         let named_stage = stage(named, language, &[]);
         let named_result =
             plan_verified_stage15(named_stage.verified_effective_view(), context("golden"));

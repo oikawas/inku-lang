@@ -1203,6 +1203,14 @@ fn has_japanese_recognized_left_candidate(source: &str, start_byte: usize) -> bo
             )
             .iter()
             .any(|candidate| candidate.end_byte == start_byte)
+                // A numeric range is one recognized lexeme, so the particle
+                // after it (`…の範囲に`, `…）に`) is recognized too.
+                || crate::numeric_range::numeric_range_at(
+                    source,
+                    candidate_start,
+                    ResolvedInstructionLanguage::Ja,
+                )
+                .is_some_and(|range| range.span.end_byte == start_byte)
         })
 }
 

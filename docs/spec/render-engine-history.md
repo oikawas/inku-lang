@@ -60,6 +60,32 @@ of SVGs the directory holds.
 
 | Version | Product version | Build | Frozen | Cases | Moved | Unchanged |
 |---|---|---|---|---|---|---|
+| **71** | v2.15.34 | 1110 | — | — | — | — |
+| **70** | v2.15.34 | 1110 | — | — | — | — |
+| **69** | v2.15.33 | 1109 | — | — | — | — |
+| **68** | v2.15.28 | 1104 | — | — | — | — |
+| **67** | v2.15.25 | 1101 | — | — | — | — |
+| **66** | final typed-migration reference (deployed in v2.15.0) | 1076 | 2026-09-14 | 620 | **2** | **618** |
+| **65** | groups and finite sequences | — | — | — | — | — |
+| **64** | partway connection | — | — | — | — | — |
+| **63** | finite color sequences | — | — | — | — | — |
+| **62** | endpoint selection and bleeding | — | — | — | — | — |
+| **61** | two-arc leaf interiors | — | — | — | — | — |
+| **60** | Macro connection positions | — | — | — | — | — |
+| **59** | Step 11 compact Score 0.10 | — | — | — | — | — |
+| **58** | Compat clip-path removal | — | — | — | — | — |
+| **57** | group placement that keeps a Macro body | — | — | — | — | — |
+| **56** | group scatter and tile | — | — | — | — | — |
+| **55** | group internal layout | — | — | — | — | — |
+| **54** | not touching and between | — | — | — | — | — |
+| **53** | omit only the failed relation | — | — | — | — | — |
+| **52** | non-drawing Anchors | — | — | — | — | — |
+| **51** | group scale and translation | — | 2026-09-11 | 620 | **2** | **618** |
+| **50** | group rotation and outside connection | — | 2026-09-11 | 618 | **2** | **616** |
+| **49** | along and cutting | — | 2026-09-11 | 616 | **2** | **614** |
+| **48** | per-tool fills and intensities | — | 2026-09-11 | 614 | **53** | **561** |
+| **47** | oil paint (included in v2.14.2) | — | 2026-09-11 | 614 | **2** | **612** |
+| **46** | crescent, full width, duplicate sizes | — | 2026-09-10 | 612 | **2** | **610** |
 | **45** | Step 10R Touching checked delivery | — | 2026-09-07 | — | — | — |
 | **44** | Step 10Q-2 Connected checked execution | — | 2026-09-07 | — | — | — |
 | **43** | Step 10Q-1 endpoint family | — | 2026-09-07 | — | — | — |
@@ -428,6 +454,110 @@ only the on-screen selection falls back to the first public model). The
 distributed compose file defaults it off; the development and bench compose file
 defaults it on. `/api/info` reports `developer_mode`, and the web app reads it
 before sign-in.
+
+## engine 71 — the display touch region is the canvas (v2.15.34)
+
+The whole-work touch filter region in display moves from 2% around the content bounding box to 2% on each canvas side (`userSpaceOnUse`). The bounding box excludes stroke width, so a thin vertical line gave the group an almost zero-width region and the filter cut the line itself. Of 12,846 saved Scores compared, only 4,266 display SVGs changed, with no status change; editable and compat are identical. Of 857 display pixel comparisons (resvg 0.48.1), 258 are exact. No frozen corpus was made.
+
+## engine 70 — strokes wholly off the canvas are not written, and `-0` is written `0` (v2.15.34)
+
+Fill and surface strokes and dots that cannot reach the canvas even after the mark's rotation and a margin are left out of the SVG. They are still counted, so the seeds of the remaining strokes do not change. A negative number that rounds to zero is written `0`. Of 12,799 saved Scores compared, 2,974 SVGs changed, with no status change; of 295 changed pixel comparisons, 293 are exact. No frozen corpus was made.
+
+## engine 69 — fade reaches opacity on the typed path (v2.15.33)
+
+The typed path for Score 0.10 and later wrote only each member's `fade_level=` and never the `fade=` that sets opacity, so a group did not fade. Effects now travel as a type, and a group of two or more members fades. Of 12,846 saved Scores compared, only the 564 that use fade changed, and only in their `fill-opacity` and `stroke-opacity` values. No frozen corpus was made.
+
+## engine 68 — thin and thick brush fills become turning brush marks (v2.15.28)
+
+Thin and thick brush fills used a vertically stretched noise filter, so the marks all ran one way and the ground showed through widely. The marks are now slightly curved band shapes, turned per fill to a seeded angle (horizontal ±60°). Outside the bands the fill is 0.92 by default, so at most 8% of the ground shows (0.96 for dense; faint scales everything by 0.55). Each tool's band sheet is defined once per work and referenced by each fill, so the SVG barely grows. Compat is unchanged. The author adopted the sheet and the intensities on a contact sheet.
+
+## engine 67 — density, rhythm, jitter, and fade inside a typed arrangement (v2.15.25)
+
+In a Score 0.10 typed arrangement the renderer read none of `density`, `cluster_count`, `rhythm_spacing`, `jitter`, or `fade`, so changing them left the SVG identical. Inside the place and extent the recipe fixes, the renderer now performs clustering and density, rhythm, jitter, fade, and each tool's per-instance variation, and several marks placed at one spot become a bundle. Every choice is bound to `render_seed` and the original owner, and default values leave the recipe's centre points unchanged.
+
+## engine 66 — mirroring, and the final typed-migration reference
+
+`mirrored` performs a single shape, a Macro, or a whole group as its mirror image across the axis between the two (Score 0.15). `server/reference/render-engine-66/` was frozen on 2026-09-14 as the final reference of the shared Rust performance accepted in the typed-DDL migration (repeated groups, endpoint and partway relations, independent bleeding, member cycles, whole-body mirroring): 620 cases, 2 in `changed_from_previous`. The one-step cutover deployed this engine (App v2.15.0, Build 1076).
+
+## engine 65 — groups without brackets, and finite sequences of shapes and attributes
+
+"Line up five: a group of a red circle and a blue line, alternating with a grey arc" is performed as five placement units, three groups and two arcs. The group contents, order, duplicates, and total survive, and sequences of non-color attributes and shapes use the same mechanism (Score 0.14).
+
+## engine 64 — connecting partway along a line or arc
+
+`partway` connects the current shape's start to a point on a line or arc other than its ends. The exact point comes from the performance seed and the existing instance; the drawn centreline and the contact point are shared, and the contact survives later outer transforms (Score 0.13).
+
+## engine 63 — finite color sequences in the stated order
+
+A finite color sequence ("alternating", "in order") reaches the compact performance and keeps its order, duplicates, and total (eight of red, grey, blue are ABCABCAB). Only a placement over the resource limits is omitted; the rest is drawn.
+
+## engine 62 — endpoint selection and independent bleeding
+
+`start` and `end` select only the facing endpoint of the preceding line or arc. `bleeding` becomes an independent `ink_spread:"bleed"` that combines with Wave, Perlin, and a stipple surface. Only a Score with the new field uses 0.12, and saved Scores keep their old representation.
+
+## engine 61 — filling the interior of a leaf closed by two arcs
+
+A two-arc leaf fills one closed contour in the same line color only when its Touching with the preceding Arc succeeds and a Solid fill is stated. The two outlines are unchanged. The Score format is unchanged.
+
+## engine 60 — connection positions for explicit Macro Connected
+
+The connection position of an explicit Macro Connected reaches Score 0.11, and the same centreline of a swaying line is shared by contact resolution and drawing. The contact survives later rotation, scaling, and translation.
+
+## engine 59 — resource-aware performance of compact Score 0.10
+
+Score 0.10 placement, repetition, and fill recipes carry no baked instance coordinates, and the same owner, ordinal, and performance seed replay the exact count and shapes. A fill keeps its target and boundary; Display and Editable clip after appearance, and Compat uses neither a filter nor clip-path. Resources are checked before instancing, and only an over-limit placement is omitted with a diagnostic while later drawing continues.
+
+## engine 58 — Compat SVG drops clip-path
+
+A Compat Computer fill layers its base, grille, and scanlines onto the same contour instead of clipping the whole canvas. Oil paint keeps shape and intensity with the existing filter-free paint pass instead of a clipped widening. Display and Editable are unchanged.
+
+## engine 57 — group placement that keeps a Macro body
+
+A group is placed in units of the source members while each Macro keeps its internal shapes, Emit counts, Transforms, and Anchors (Score 0.9 `placement_groups.members`).
+
+## engine 56 — scatter and tile for groups
+
+A group made only of primitives gains scatter and tile placements beside the existing overlap and side-by-side layouts (Score 0.8.0).
+
+## engine 55 — the internal layout of a group
+
+For a group "placed at the center" with its internal layout omitted, member centres are aligned (`overlap`); "placed side by side" is one row in source order, and "placed overlapping" is `overlap`. The group's bounding-box centre moves to a position chosen once by the performance seed (Score 0.7.0 `placement_groups`).
+
+## engine 54 — delivering not-touching and between
+
+`not touching` and `between` from ordinary DDL and Macros reach the renderer through the same checked path. When a reference is lost or the constraints cannot hold together, only that relation is removed and the shapes and placement remain.
+
+## engine 53 — keep the group, omit only the relation that fails
+
+Relations between a transformed group and outside shapes are met by translating the whole group. A relation that cannot hold returns an error and only that relation is removed; shapes, groups, and later drawing stay (the author's ruling). A recoverable semantic error no longer stops the whole work.
+
+## engine 52 — non-drawing Anchors
+
+An explicit Anchor reaches its connections without being drawn, and a group with no shape rotates and scales about the bounding-box centre of its points (Score 0.6.0). A 2026-09-11 ruling moved the full reference update to a single run when every migration step is done, so no frozen corpus is made from this version on.
+
+## engine 51 — group scale and translation
+
+Macro Transform `scale_x`, `scale_y`, `translate_x`, and `translate_y` are performed. Only the child geometry scales, about the bounding-box centre before rotation; stroke width and grain pitch stay physical canvas quantities (Score 0.5.0). The frozen corpus keeps the old 618 cases unchanged and adds 2, anisotropic scaling and nesting: 620.
+
+## engine 50 — group rotation and outside connection
+
+A Macro rotation happens after placement and internal relations, about the bounding-box centre of all its children. Connected to an outside shape, the whole group moves and keeps its internal layout (Score 0.4.0 `transform_groups`). The frozen corpus keeps the old 616 cases unchanged and adds 2: 618.
+
+## engine 49 — the direction of "along" and the size of "cutting"
+
+With "along", a following line with no stated direction becomes parallel to the preceding line; "cutting" keeps the ordinary or stated size. An old Score without the metadata keeps its old performance. The frozen corpus keeps the old 614 cases unchanged and adds 2: 616.
+
+## engine 48 — per-tool fills and intensities
+
+Normal, dense, and faint fills for twelve tools are drawn by the shared Rust renderer (Score 0.3.0 `surface_intensity`). The author adopted all three intensities of the twelve tools on a contact sheet. In the frozen corpus 53 of 614 fills changed and 561 are unchanged.
+
+## engine 47 — oil paint as its own touch
+
+`oil paint` joins the touch as its own tool, with brush marks that keep paint to the edge and light and dark streaks derived from the chosen color. The frozen corpus keeps the old 612 of 614 cases unchanged; the 2 new cases draw oil paint.
+
+## engine 46 — crescents, full width, and duplicate sizes
+
+A crescent is drawn as a thin filled area with a cubic Bézier outline, and position, rotation, and bounds use the same outline (Score 0.2.0 `arc_form: crescent`). Full and half width refer to the canvas width before rotation, and duplicate sizes draw the smaller one and record a diagnostic. The frozen corpus keeps the old 610 cases unchanged and adds 2 crescents: 612.
 
 ## engine 45 — shared checked performance for both-endpoint Touching
 

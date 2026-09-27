@@ -6,6 +6,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 36 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-27 — The render engine version history gains engines 46 to 71
+
+`docs/spec/render-engine-history` (both languages) stopped at engine 45. It now lists engines 46 to 71 and gives each its own section. Only engines 46 to 51 and 66 have a frozen corpus; from 52 on none was made, following the 2026-09-11 ruling that the full reference update runs once when every migration step is done. Engines 69 to 71 carry their saved-Score comparison counts. This changes documents only, not versions.
+
 ### v2.15.35 — update placement ranges, rasterization, and refinement (Build 1111, 2026-09-27)
 
 This version includes the changes below since v2.15.34. DDL engine 51 draws position words as ranges. Android improves SVG rasterization, Bitmap transfer, and thumbnail replacement and cleanup. Web refinement and export, and Server refinement-option saving are also updated. The dated entries below describe each change and its effect on saved works.

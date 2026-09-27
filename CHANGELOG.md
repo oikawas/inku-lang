@@ -18,6 +18,8 @@ Seeds in the CLI's output become strings too. Android does not read these answer
 
 The filter region of the whole-drawing "touch" (the fine displacement over the picture) is now, in display as already in live, the canvas plus 2% on each side, in absolute user-space units. Display's region used to be the content's bounding box plus 2%. Where 2% of that box was narrower than the displacement (up to 3 units per 1,000 of the short side), displaced pixels were cut: in a work of one thin line, or when content shrank because strokes off the canvas were left out. The per-stroke texture filters keep their bounding-box regions: over the whole canvas, each stroke would compute noise for the whole canvas, and inside a rotated mark the canvas would not cover the content.
 
+Redrawing changes the display SVG (all 4,266 display requests among the saved-work renders); editable and compat are unchanged. Rasterizing a fifth of the display SVGs (857) on Linux, older Scores (one touch over the content) differ only along the edge of thin-line works. Works on Score 0.10 and later (a touch per instruction group) mostly differ at the edges of their groups: an SVG bounding box leaves out stroke width, so a group's region cut the strokes themselves. Thin vertical lines broke up, and stroke tips were shortened. From this version they are drawn as the SVG says.
+
 Render engine 70 → 71. DDL, Score and binding versions are unchanged.
 
 ### 2026-09-27 — strokes wholly off the canvas are left out, and `-0` is written `0` (render engine 70)

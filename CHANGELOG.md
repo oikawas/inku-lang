@@ -6,6 +6,12 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 36 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-27 — Android SVG rasterization shares noise calculations across channels
+
+Vendor resvg 0.48.1 and accelerate the `feTurbulence` used by SVG previews, thumbnails, refinement candidates, and PNG exports. Coordinate, lattice, and interpolation-weight calculations previously repeated for each RGBA channel now run once per pixel and octave, with contiguous gradient storage. Random values, per-channel operation order, and rounding are preserved, maintaining resolution and texture. The upstream source and local changes are documented in `core/vendor/resvg/INKU_PATCHES.md`.
+
+DDL, Score, SVG, rendering versions, and saved works are unchanged.
+
 ### 2026-09-27 — Android drops the local Ollama connection
 
 Local Ollama (`ollama`, `http://127.0.0.1:11434/v1`) leaves Android's built-in connections, by the author's ruling. It pointed at the phone itself, where no Ollama runs, and plain http to a LAN Ollama is refused by the base-URL check and the app's network security settings (a safety limit that stays). At start-up an Ollama row still as the catalog seeded it is removed, and one the author configured (a key, a name, a base URL or a model list) is kept as their own connection, as withdrawn ovms rows are. Ollama Cloud (`ollama-cloud`) stays. The Server still offers local Ollama.

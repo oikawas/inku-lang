@@ -15,4 +15,5 @@ resvg.workspace = true
 serde.workspace = true
 
 [dev-dependencies]
+resvg-upstream = { package = "resvg", version = "=0.48.1", default-features = false }
 sha2.workspace = true

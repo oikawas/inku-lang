@@ -210,9 +210,13 @@ Implemented:
 - `AndroidRenderHost` serializes the coerced Score, resolved canvas and color map, catalog,
   profile, seeds, and `wild` into one canonical JSON request and calls the shared Rust render
   engine (the server's `inku-render`; its version is the one the binding reports) through `NativeRenderBridge`.
-- `inku-svg-raster` uses the `resvg` pinned in `core/Cargo.toml` (0.48.1 as of 2026-09-27) to convert saved/current SVG into explicit
+- `inku-svg-raster` uses the `resvg` pinned in `core/Cargo.toml` (0.48.1, vendored in `core/vendor/resvg/`) to convert saved/current SVG into explicit
   premultiplied RGBA8 pixels with width, height, and stride. Android performs only the
   mechanical conversion to Bitmap backing-byte order.
+  The vendored `feTurbulence` shares coordinate and interpolation calculations across RGBA
+  and stores the four channels' gradients contiguously. Random values, per-channel operation
+  order, rounding, and output resolution are preserved. The patch and upgrade procedure are
+  documented in `core/vendor/resvg/INKU_PATCHES.md`.
 - Main preview, history thumbnails, refinement preview, and PNG export use
   `RustArtworkRasterizer`. Its cache key includes SVG identity, target size, raster API, and
   options so ordinary recomposition does not rerasterize an unchanged work.

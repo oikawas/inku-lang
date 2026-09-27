@@ -1054,6 +1054,7 @@ class InkuRepository(
      */
     private suspend fun attachThumbnail(id: String, thumbnail: ThumbnailInfo): Boolean {
         val history = database.historyDao()
+        val previous = history.thumbnailPathOf(id)
         val updated = history.updateThumbnail(
             id = id,
             path = thumbnail.path,
@@ -1064,7 +1065,26 @@ class InkuRepository(
         if (updated == 0 && history.countWithThumbnail(thumbnail.path) == 0) {
             File(thumbnail.path).delete()
         }
+        // The file this one replaced, once no work points at it: a format
+        // change draws every thumbnail again, and the old files were left behind.
+        if (updated != 0 && previous != null && previous != thumbnail.path && history.countWithThumbnail(previous) == 0) {
+            File(previous).takeIf { isAppThumbnail(it) }?.delete()
+        }
         return updated != 0
+    }
+
+    /** Deletes the earlier-format thumbnails left behind ([staleThumbnailFiles]); returns how many. */
+    suspend fun removeStaleThumbnails(): Int = withContext(Dispatchers.IO) {
+        val root = File(context.filesDir, "thumbnails")
+        val referenced = database.historyDao().thumbnailPaths()
+            .mapNotNull { runCatching { File(it).canonicalPath }.getOrNull() }
+            .toSet()
+        staleThumbnailFiles(
+            files = root.listFiles()?.toList().orEmpty(),
+            referenced = referenced,
+            currentSuffix = thumbnailVersionSuffix,
+            cutoffMillis = System.currentTimeMillis() - STALE_THUMBNAIL_AGE_MS,
+        ).count { it.delete() }
     }
 
     suspend fun setStarred(id: String, starred: Boolean) {
@@ -1328,6 +1348,26 @@ internal fun refinementColorSnapshot(parent: RefinementParent, plan: RefinementP
 
 /** `plugin_settings` key of the bundled plugin package switch. */
 private const val BUNDLED_PLUGIN_SETTING_KEY = "bundled:$BUNDLED_PLUGIN_PACKAGE:enabled"
+
+/**
+ * Thumbnail files of an earlier format that no row points at and that were
+ * not written just now. Only earlier formats are candidates: a row still on
+ * one is always drawn again, so its old file is never needed, while a
+ * current-format file may be one being attached right now, or one another
+ * database points at -- an instrumented test's in-memory one shares this
+ * directory with the app's.
+ */
+internal fun staleThumbnailFiles(
+    files: List<File>,
+    referenced: Set<String>,
+    currentSuffix: String,
+    cutoffMillis: Long,
+): List<File> = files.filter { file ->
+    file.isFile && !file.name.endsWith(currentSuffix) && file.lastModified() < cutoffMillis &&
+        runCatching { file.canonicalPath }.getOrNull() !in referenced
+}
+
+private const val STALE_THUMBNAIL_AGE_MS = 10 * 60_000L
 
 /** A built-in connection that was withdrawn, as the catalog once seeded it. */
 private data class RetiredProvider(

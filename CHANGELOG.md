@@ -6,6 +6,12 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 36 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-27 — Android removes the thumbnails a redraw replaced
+
+When the thumbnail format changed and every thumbnail was drawn again (`-rgba2.webp`), each row moved to its new file but the old file stayed. The replaced file is now deleted once no other work points at it, and when a backfill pass finds every thumbnail current, earlier-format files that no work points at and that were not written in the last ten minutes are removed. Current-format files are never swept, because an instrumented test's in-memory database shares the app's thumbnail directory. On the author's device the 541 old files no work pointed at (about 3.4 MB) went, and the 339 files of the 340 works' thumbnails stayed. Works and the database are unchanged.
+
+DDL, Score and rendering versions are unchanged.
+
 ### 2026-09-27 — Faster Android SVG rasterization, Bitmap transfer, and redisplay
 
 Reuse seed-specific noise lattices and gradients in resvg and prepare row and column coordinates ahead of time. Android keeps the sequential path that measured faster on the device; other targets process large regions with a shared pool of at most two workers. Android copies pixels directly into a Bitmap through the NDK, removing intermediate Java arrays and Kotlin pixel loops. This also fixes the previous red/blue swap; old thumbnails are gradually regenerated from saved SVG.

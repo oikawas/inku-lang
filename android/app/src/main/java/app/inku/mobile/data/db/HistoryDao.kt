@@ -69,6 +69,9 @@ interface HistoryDao {
     @Query("SELECT thumbnail_path FROM history_items WHERE id = :id")
     suspend fun thumbnailPathOf(id: String): String?
 
+    @Query("SELECT DISTINCT thumbnail_path FROM history_items WHERE thumbnail_path IS NOT NULL")
+    suspend fun thumbnailPaths(): List<String>
+
     /** Thumbnails are named by render hash, so two rows can share one file. */
     @Query("SELECT COUNT(*) FROM history_items WHERE thumbnail_path = :path")
     suspend fun countWithThumbnail(path: String): Int

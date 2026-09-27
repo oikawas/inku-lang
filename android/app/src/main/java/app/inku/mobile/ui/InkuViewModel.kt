@@ -522,7 +522,11 @@ class InkuViewModel @JvmOverloads constructor(
                 while (true) {
                     val batch = repository.backfillMissingThumbnails(limit = 2, offset = offset)
                     if (batch.scanned == 0) {
-                        if (refreshedInPass == 0) break
+                        if (refreshedInPass == 0) {
+                            // Every thumbnail is current; the files they replaced can go.
+                            runCatching { repository.removeStaleThumbnails() }
+                            break
+                        }
                         offset = 0
                         refreshedInPass = 0
                     } else {

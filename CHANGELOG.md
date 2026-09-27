@@ -6,6 +6,15 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 38 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-28 — Android calls the DDL the instructions, and heads them as Japanese or English DDL
+
+Following the author's instruction to apply the DDL's language mode strictly and show it in the UI (numeric ranges are written differently in Japanese and English), and the author's ruling after seeing the screen, Android follows the web.
+
+- The DDL is called the instructions, as on the web; interpretation is left only for Stage 1's act of reading a description into instructions (the lineage's reinterpretation, the interpretation seed, the generation info's Interpretation section, the sketch record). View / Hide interpretation become View / Hide instructions, the demo's produced interpretation becomes Instructions for this run, the batch and demo placeholder becomes Waiting for instructions…, and the overwrite confirmations say instructions, as the web's glossary has it (`instructions`, always plural).
+- The instructions' heading in the studio, the instructions opened with View instructions while a work is viewed, and a refinement option's DDL are headed as on the web, "Instructions (Japanese DDL)" / "Instructions (English DDL)", in plain label text rather than a pressable-looking chip, with the web's explanation on a long press. A saved work's DDL shows the language it resolved while unedited; an edit follows the server's `auto` rule (any hiragana, katakana or kanji makes it Japanese, otherwise Latin letters make it English, and neither leaves the interface language).
+
+DDL, Score and rendering versions are unchanged.
+
 ### 2026-09-28 — Positions can be written as numeric ranges (DDL Spec 15, DDL engine 52)
 
 A position can now be written as a range of canvas fractions. By the author's decision the form is "words (numeric range)": the author's words stay in the sentence, and the compiler reads the numbers in the parentheses.

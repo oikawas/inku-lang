@@ -25,8 +25,8 @@ object InkuStringsJa : InkuStrings {
     override val studioSubtitle = "言葉を記して、描く"
     override val productionTools = "制作ツール"
     override val reviseWork = "この作品を推敲"
-    override val interpretationToggle = "解釈を見る"
-    override val interpretationHide = "解釈を閉じる"
+    override val interpretationToggle = "指示書を見る"
+    override val interpretationHide = "指示書を閉じる"
 
     override val statusStage1 = "Stage 1: DDL生成中..."
     override val statusStage2 = "Stage 2: 画像生成中..."
@@ -384,7 +384,7 @@ object InkuStringsJa : InkuStrings {
     override val svgGeneric = "汎用SVG"
     override val confirm = "決定"
     override val producedInstructions = "生成された指示文"
-    override val producedInterpretation = "生成された解釈"
+    override val producedInterpretation = "生成された指示書"
     override val working = "生成中…"
     override val lineage = "系譜"
     override val lineageLoading = "系譜を読み込み中…"
@@ -404,8 +404,9 @@ object InkuStringsJa : InkuStrings {
     override val svgDisplay = "表示用SVG"
     override val demoInterval = "表示間隔"
     override val autoRepair = "補正"
-    override val interpretation = "解釈"
-    override val awaitingInterpretation = "解釈を待機中..."
+    override val ddlLabelIn: (String) -> String = { lang -> if (lang == "en") "指示書（英語DDL）" else "指示書（日本語DDL）" }
+    override val tooltipDdlLang = "指示書はこの言語の文法で読みます。数値の範囲の書き方も日本語と英語で違います。平仮名・片仮名・漢字が1字でもあれば日本語DDLになるので、英語の指示書に日本語の名前が1つ入るだけで日本語として読みます。"
+    override val awaitingInterpretation = "指示書を待機中…"
     override val miscSubtitle = "言語・文字の大きさ・表示"
     override val description = "記述"
     override val camera = "カメラ"
@@ -414,7 +415,7 @@ object InkuStringsJa : InkuStrings {
     override val cameraShutter = "シャッター"
     override val cameraChoosePhoto = "写真を選ぶ"
     override val cameraOverwriteTitle = "現在の記述を置き換えますか？"
-    override val cameraOverwriteBody = "画像の解析が成功すると、現在の記述と解釈は置き換わります。画像入力を取り消した場合は残ります。"
+    override val cameraOverwriteBody = "画像の解析が成功すると、現在の記述と指示書は置き換わります。画像入力を取り消した場合は残ります。"
     override val cameraOverwriteAction = "続ける"
     override val cameraCapturing = "撮影中"
     override val cameraPreparingImage = "画像を準備中"
@@ -448,7 +449,7 @@ object InkuStringsJa : InkuStrings {
     override val saijikiTapNote = "語を押すと DDL 編集欄へ挿入します。"
     override val descriptionField = "説明"
     override val add = "追加"
-    override val ddlOverwriteBody = "通常の描画を実行すると、現在の解釈（正規化DDL）は Stage 1 の結果で上書きされます。"
+    override val ddlOverwriteBody = "通常の描画を実行すると、現在の指示書（正規化DDL）は Stage 1 の結果で上書きされます。"
     override val selected = "選択中"
     override val close = "閉じる"
     override val renderTabArtwork = "描画"
@@ -531,7 +532,7 @@ object InkuStringsJa : InkuStrings {
     override val worksScrollbarDescription = "作品のスクロールバー"
     override val listSeparator = "・"
     override val statusRendered: (String) -> String = { hash -> "描画しました（F$hash）" }
-    override val statusComposed: (String) -> String = { hash -> "解釈から描画しました（F$hash）" }
+    override val statusComposed: (String) -> String = { hash -> "指示書から描画しました（F$hash）" }
     override val promptEmpty = "記述が空です。"
     override val batchEmpty = "バッチが空です。"
     override val hashCopied = "ハッシュをコピーしました。"

@@ -91,4 +91,13 @@ object InstructionLanguages {
         val fallback = if (uiLang in SUPPORTED) uiLang!! else DEFAULT_LANG
         return resolve(text, requested, fallback = fallback)
     }
+
+    /**
+     * The language a DDL is read in, for the label beside it: the one its saved
+     * work resolved while [ddl] is still that work's DDL, else the `auto` rule
+     * over the text, as the core will read an edit. One Japanese character is
+     * enough to make it Japanese, which is what the label is there to show.
+     */
+    fun ofDdl(ddl: String, savedDdl: String?, savedLang: String?, uiLang: String?): String =
+        if (savedDdl != null && ddl == savedDdl && savedLang in SUPPORTED) savedLang!! else resolveWithUiLang(ddl, AUTO, uiLang)
 }

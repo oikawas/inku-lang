@@ -279,13 +279,13 @@ Implemented:
     with line icons. A shared header opens Settings.
   - new work opens with the description editor and no empty canvas.
     Camera and Photo Picker are actions beside the description. Model, color
-    catalog, and canvas settings expand from a summary row; interpretation and
-    DDL can also be collapsed.
+    catalog, and canvas settings expand from a summary row; the instructions (DDL)
+    can also be collapsed.
   - the Studio tools menu provides Description, Batch, and Demo. New Work is a
     separate action from a saved work.
   - saved work opens result-first with the picture and original description.
     “Refine this work” opens the existing editor; “New Work” resets the
-    description. Interpretation and DDL expand independently, and viewing them
+    description. The instructions (DDL) expand independently, and viewing them
     does not create a revision.
   - the Works grid adapts to available width and shows at least two columns;
     Pixel 9 uses two columns with multi-line titles.
@@ -301,6 +301,12 @@ Implemented:
   strip below the canvas is removed.
 - A read-only generation-information sheet shows saved sketch, models and languages, seeds and
   variation, color catalog and color map, canvas, render hash and engine, creation time, and elapsed time.
+- The DDL is called the instructions, as on the web; interpretation names only Stage 1's act of
+  reading a description into instructions (2026-09-28). The instructions' heading in the studio, the
+  instructions opened with View instructions while a work is viewed, and a refinement option's DDL are
+  headed as the web's `ddlLabelIn`, "Instructions (Japanese DDL)" / "Instructions (English DDL)", in
+  plain label text rather than a pressable-looking chip, with the web's explanation on a long press. A saved work's DDL shows its `instruction_lang_resolved`
+  while unedited; an edit follows the server's `auto` rule (one kana or kanji makes it Japanese).
 - Lineage cards support editing saved DDL and Star toggling without changing the current focus when
   the action targets another card.
 - Startup restoration of the latest selected history item into prompt, DDL,
@@ -1188,8 +1194,8 @@ behavior.
   phrases to the displayed DDL.
 - When `補正` is ON, Android uses the server/web-compatible DDL expansion and
   repair path.
-- The compose-screen `新規作成` action clears both the prompt and interpreted
-  DDL, and resets `ddlEditedAfterGeneration` to false.
+- The compose-screen `新規作成` action clears both the prompt and the instructions
+  (DDL), and resets `ddlEditedAfterGeneration` to false.
 - When the IME opens, focused input fields retry `bringIntoView()` at multiple
   timings instead of relying on a single focus-time scroll. This keeps input
   areas visible after Japanese IME candidate rows or keyboard height changes.

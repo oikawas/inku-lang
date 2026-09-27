@@ -349,7 +349,12 @@ interface InkuStrings {
     val svgDisplay: String
     val demoInterval: String
     val autoRepair: String
-    val interpretation: String
+    /**
+     * The web's `ddlLabelIn` / `tooltipDdlLang`: the instructions' heading, named by
+     * the language they are read in (`ja` or `en`), and why that matters.
+     */
+    val ddlLabelIn: (String) -> String
+    val tooltipDdlLang: String
     val awaitingInterpretation: String
     val miscSubtitle: String
     val description: String

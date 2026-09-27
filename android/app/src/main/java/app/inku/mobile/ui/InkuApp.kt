@@ -216,6 +216,7 @@ import app.inku.mobile.data.model.CatalogSelection
 import app.inku.mobile.data.model.CanvasAspects
 import app.inku.mobile.data.model.DerivationKindRegistry
 import app.inku.mobile.data.model.ColorCatalogs
+import app.inku.mobile.pipeline.InstructionLanguages
 import app.inku.mobile.pipeline.PluginDiagnostic
 import app.inku.mobile.pipeline.RenderWarning
 import app.inku.mobile.pipeline.SaijikiGenerated
@@ -1642,6 +1643,14 @@ private fun ComposeScreen(state: InkuUiState, viewModel: InkuViewModel) {
                         Text(if (resultInterpretationOpen) S.interpretationHide else S.interpretationToggle)
                     }
                     if (resultInterpretationOpen) {
+                        DdlHeading(
+                            InstructionLanguages.ofDdl(
+                                ddl = state.ddl,
+                                savedDdl = state.selectedHistory?.normalizedDdl,
+                                savedLang = state.selectedHistory?.instructionLangResolved,
+                                uiLang = state.uiLanguage.code,
+                            ),
+                        )
                         DdlPreviewBox(value = state.ddl, onClick = viewModel::openDdlEditor, modifier = Modifier.fillMaxWidth())
                     }
                 }
@@ -2958,7 +2967,14 @@ private fun DrawPanel(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM),
                     ) {
-                        CompactLabel(S.interpretation)
+                        DdlHeading(
+                            InstructionLanguages.ofDdl(
+                                ddl = state.ddl,
+                                savedDdl = state.selectedHistory?.normalizedDdl,
+                                savedLang = state.selectedHistory?.instructionLangResolved,
+                                uiLang = state.uiLanguage.code,
+                            ),
+                        )
                         Spacer(Modifier.weight(1f))
                         DdlActionRow(state, viewModel)
                     }
@@ -3954,6 +3970,14 @@ private fun RefinementCandidateCard(
                 Text(candidate.label, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text(candidate.renderHashShort, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 if (readingCandidate && ddlOpen) {
+                    DdlHeading(
+                        InstructionLanguages.ofDdl(
+                            ddl = candidate.normalizedDdl,
+                            savedDdl = candidate.normalizedDdl,
+                            savedLang = candidate.instructionLangResolved,
+                            uiLang = LocalUiLanguage.current.code,
+                        ),
+                    )
                     Text(candidate.normalizedDdl, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 // The three states are three different labels, and only the
@@ -7765,6 +7789,23 @@ private fun hash01(index: Int, seed: String): Double {
     val digest = MessageDigest.getInstance("SHA-256").digest("$seed:$index".toByteArray())
     val raw = ((digest[0].toInt() and 0xff) shl 24) or ((digest[1].toInt() and 0xff) shl 16) or ((digest[2].toInt() and 0xff) shl 8) or (digest[3].toInt() and 0xff)
     return (raw.toLong() and 0xffffffffL).toDouble() / 0xffffffffL.toDouble()
+}
+
+/**
+ * The instructions' heading, named by the language they are read in, as the
+ * web's `ddlLabelIn`: plain label text, not a pill that looks pressable (the
+ * author's ruling), with the web's explanation on a long press.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun DdlHeading(lang: String) {
+    TooltipBox(
+        positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
+        tooltip = { PlainTooltip { Text(S.tooltipDdlLang) } },
+        state = rememberTooltipState(),
+    ) {
+        CompactLabel(S.ddlLabelIn(lang))
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

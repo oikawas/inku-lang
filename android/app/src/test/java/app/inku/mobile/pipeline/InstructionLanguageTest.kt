@@ -173,4 +173,17 @@ class InstructionLanguageTest {
             InstructionLanguages.support("fr")
         }
     }
+
+    // ── The DDL language label ────────────────────────────────
+
+    @Test
+    fun aDdlLabelReadsTheSavedLanguageUntilTheDdlIsEdited() {
+        val saved = "place one circle."
+        assertEquals("en", InstructionLanguages.ofDdl(saved, saved, "en", "ja"))
+        // One Japanese name in English instructions makes them Japanese.
+        assertEquals("ja", InstructionLanguages.ofDdl("place one Nature.落葉().", saved, "en", "ja"))
+        // No saved work: the auto rule, and the interface language when neither script appears.
+        assertEquals("en", InstructionLanguages.ofDdl("place two circles.", null, null, "ja"))
+        assertEquals("en", InstructionLanguages.ofDdl("1 2 3", null, null, "en"))
+    }
 }

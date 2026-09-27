@@ -32,8 +32,8 @@ object InkuStringsEn : InkuStrings {
     override val studioSubtitle = "Write, then draw"
     override val productionTools = "Studio tools"
     override val reviseWork = "Refine this work"
-    override val interpretationToggle = "View interpretation"
-    override val interpretationHide = "Hide interpretation"
+    override val interpretationToggle = "View instructions"
+    override val interpretationHide = "Hide instructions"
 
     // 生成 is not "generating": Stage 1 interprets and Stage 2 performs, which is
     // what those stages are called throughout (GLOSSARY §2).
@@ -412,7 +412,7 @@ object InkuStringsEn : InkuStrings {
     override val svgGeneric = "Generic SVG"
     override val confirm = "OK"
     override val producedInstructions = "Instructions (normalized DDL)"
-    override val producedInterpretation = "Interpretation"
+    override val producedInterpretation = "Instructions for this run"
     override val working = "Working…"
     override val lineage = "Lineage"
     override val lineageLoading = "Loading the lineage…"
@@ -432,8 +432,9 @@ object InkuStringsEn : InkuStrings {
     override val svgDisplay = "Display SVG"
     override val demoInterval = "Interval"
     override val autoRepair = "Auto-repair"
-    override val interpretation = "Interpretation"
-    override val awaitingInterpretation = "Waiting for the interpretation…"
+    override val ddlLabelIn: (String) -> String = { lang -> if (lang == "en") "Instructions (English DDL)" else "Instructions (Japanese DDL)" }
+    override val tooltipDdlLang = "The instructions are read with this language's grammar, and numeric ranges are written differently in Japanese and English. A single hiragana, katakana, or kanji character makes it Japanese DDL, so one Japanese name in English instructions has them read as Japanese."
+    override val awaitingInterpretation = "Waiting for instructions…"
     override val miscSubtitle = "Language, text size and display"
     override val description = "Description"
     override val camera = "Camera"
@@ -442,7 +443,7 @@ object InkuStringsEn : InkuStrings {
     override val cameraShutter = "Shutter"
     override val cameraChoosePhoto = "Choose a photo"
     override val cameraOverwriteTitle = "Replace the current description?"
-    override val cameraOverwriteBody = "If image analysis succeeds, it replaces the current description and interpretation. Cancelling image input keeps them."
+    override val cameraOverwriteBody = "If image analysis succeeds, it replaces the current description and instructions. Cancelling image input keeps them."
     override val cameraOverwriteAction = "Continue"
     override val cameraCapturing = "Taking photo"
     override val cameraPreparingImage = "Preparing image"
@@ -478,7 +479,7 @@ object InkuStringsEn : InkuStrings {
     // "Description" with it would put two concepts under one word.
     override val descriptionField = "Details"
     override val add = "Add"
-    override val ddlOverwriteBody = "Painting normally replaces the current interpretation (the normalized DDL) with what Stage 1 produces."
+    override val ddlOverwriteBody = "Painting normally replaces the current instructions (the normalized DDL) with what Stage 1 produces."
     override val selected = "Selected"
     override val close = "Close"
     override val renderTabArtwork = "Work"

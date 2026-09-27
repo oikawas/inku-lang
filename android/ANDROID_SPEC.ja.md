@@ -237,9 +237,9 @@ Rust authoring pipelineとraster presentationを導入済みである。以下�
   描画geometry／material／surface／stroke／SVG serializerは共有Rustだけが所有する。
 - Dark Compose UI は、Pixel 9 で記述から制作へ進み、保存作品を結果から見直せる構成とする:
   - 下部 navigation は「制作」「作品」「連作」の3つの実画面とし、記号文字ではなく線画アイコンを使う。共通headerから設定へ進める
-  - 新規制作は記述欄を最初に表示し、空の作品canvasを先行表示しない。記述欄のカメラ操作から撮影またはPhoto Pickerへ進む。モデル、色カタログ、canvasは要約行から展開し、解釈とDDLも折りたたんで表示する
+  - 新規制作は記述欄を最初に表示し、空の作品canvasを先行表示しない。記述欄のカメラ操作から撮影またはPhoto Pickerへ進む。モデル、色カタログ、canvasは要約行から展開し、指示書（DDL）も折りたたんで表示する
   - 「制作ツール」menuから記述、バッチ、デモへ進む。保存済み作品の「新規制作」は独立した操作とする
-  - 保存済み作品は作品画像と元の記述を先に表示する。「この作品を推敲」から既存編集欄を開き、「新規制作」から記述をリセットする。解釈／DDLは独立して展開でき、閲覧だけではrevisionを作らない
+  - 保存済み作品は作品画像と元の記述を先に表示する。「この作品を推敲」から既存編集欄を開き、「新規制作」から記述をリセットする。指示書（DDL）は独立して展開でき、閲覧だけではrevisionを作らない
   - 作品一覧は画面幅に応じた2列以上のthumbnail gridとし、Pixel 9では2列で作品名を複数行表示する
   - チャコールと紙色を基調とし、角丸と線画iconを抑制して作品画像の視認性を保つ
   - 設定の表示項目で文字サイズを100%、115%、130%、150%から選ぶ。選択はRoomへ保存し、端末の文字倍率に加えてCompose文字を拡大する
@@ -247,6 +247,7 @@ Rust authoring pipelineとraster presentationを導入済みである。以下�
 - 作品画面の選択 item に対する Star／解除、soft trash、Android `FileProvider` 経由のJSON共有。
 - 保存済み作品の生成情報sheetは、写生、モデルと言語、seedと変奏、色カタログと色map、
   canvas、render hash / engine、作成日時、処理時間を読み取り専用で表示する。
+- DDLはWebと同じく「指示書」と呼ぶ（「解釈」は記述を指示書へ読み解くStage 1の行為だけを指す、2026-09-28）。制作の指示書の見出し、作品を見ているときに「指示書を見る」で開いた指示書、推敲の候補のDDLの見出しを、Webの`ddlLabelIn`と同じ「指示書（日本語DDL）」「指示書（英語DDL）」とし、長押しでWebと同じ説明を出す（押せそうに見える小札にはしない）。保存した作品のDDLのままならその作品の`instruction_lang_resolved`、編集したDDLはServerの`auto`と同じ規則（仮名・漢字が1字でもあれば日本語）で決める。
 - 系譜cardは保存済みDDLの編集とStar／解除を持ち、focus外cardの操作でも現在focusを変えない。
 - 起動時、最新選択履歴 item を prompt、DDL、catalog、canvas settings へ復元する。
 - Pixel 9 status bar / navigation bar safe-area handling。
@@ -930,7 +931,7 @@ Android 版の記述画面では、モバイル入力中の状態管理として
 - `補正` のON/OFFは Room 設定 `ddl_auto_repair` に保存し、アプリ再起動後も復元する。
 - `補正` が OFF のとき、Stage 1 後および DDL から描画時に `expandIntermediateDdl()` を実行せず、表示される DDL に Android 側で追加フレーズを付与しない。
 - `補正` が ON のときのみ、server/web 互換の DDL 拡張・補正経路を使う。
-- 記述画面の `新規作成` は指示文だけでなく解釈DDLも同時にクリアし、`ddlEditedAfterGeneration` を false に戻す。
+- 記述画面の `新規作成` は指示文だけでなく指示書（DDL）も同時にクリアし、`ddlEditedAfterGeneration` を false に戻す。
 - IME 表示時は、フォーカス直後の単発スクロールではなく複数タイミングで `bringIntoView()` を再試行し、日本語IMEの候補欄やキーボード高さ変化後も入力領域が見えるようにする。
 - 描画完了時は入力フォーカスを解除してIMEを閉じ、記述画面のスクロール位置を画像エリアへ戻す。
 

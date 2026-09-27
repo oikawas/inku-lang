@@ -278,7 +278,7 @@ UI、provider通信、Room、履歴、`rh3`の計算はAndroid hostが所有す�
 - **`server/tests`** — pytest。ルート認可の網羅（生きたルートを `fastapi.routing.iter_route_contexts` で歩く。**`app.routes` を直に読むと fastapi 0.141 以降は 1 本も取れない**）、API 表面の同一性（`tests/data/api-surface-baseline.json` と照合）、ルート本体の所在（`route.endpoint.__module__` を数える）を含む。
 - **凍結された参照コーパス** — `server/reference/` に版ごとの校正刷りを置く。
 最新の凍結は `render-engine-66`（620 件）と `ddl-engine-45`（3 件、共有Rust pipeline）である。新しい版のdirectoryは明示的な全更新checkpointでだけ作り、版の更新ごとには作らない。
-- **Android の参照材料** — `android/app/src/test/resources/server_reference/` はDDL、Score、coerce、履歴互換だけを保持する。
+- **Android の参照材料** — `android/app/src/test/resources/server_reference/` は履歴互換（`lineage_wiring.json`）だけを保持する。
 描画の正本は共有Rust coreと `server/reference/` の凍結corpusであり、Androidへ版別SVG corpusを複製しない。
 端末受入はcanonical manifestから選んだ少数のrequestをtest assetへ生成し、同梱JNIのSVG byteとraw pixelを直接照合する。
 - **`cli/tests`** — pytest。

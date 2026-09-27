@@ -11,13 +11,13 @@ import org.json.JSONObject
  */
 object ReferenceCorpus {
 
-    /** Fixtures no engine version governs: they are rebaked in place and the port follows them. */
+    /**
+     * Fixtures no engine version governs: they are rebaked in place and the port
+     * follows them. Only the lineage wiring is left; the Kotlin DDL port's
+     * fixtures went with the port (2026-09-27).
+     */
     private val FLAT = setOf(
-        "coerce_governors.json",
-        "count_preservation.json",
         "lineage_wiring.json",
-        "prompts.json",
-        "score_schema_contract.json",
     )
 
     /** The classpath path a bare fixture name resolves to. */

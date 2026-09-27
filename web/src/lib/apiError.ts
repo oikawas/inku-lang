@@ -54,6 +54,11 @@ function pipelineActionMessage(detail: JsonObject, strings: LangPack): string | 
 		: strings.pipelineRequestFailed;
 }
 
+const RENDER_REFUSALS = new Set([
+	'resource_authority', 'performance_stopped', 'invalid_score', 'mark_too_large',
+	'output_too_large', 'non_finite_value', 'invalid_saved_performance', 'internal_invariant',
+]);
+
 /** Turn a Server failure detail into one human-readable line. */
 export function describeApiErrorDetail(detail: unknown, status: number, strings: LangPack): string {
 	if (detail === 'render capacity is full') return strings.errorRenderBusy;
@@ -78,6 +83,11 @@ export function describeApiErrorDetail(detail: unknown, status: number, strings:
 
 	const structured = object(detail);
 	if (structured?.code === 'model_not_offered') return strings.errorModelNotOffered;
+	// The render core's reasons for not drawing a Score again; its own words
+	// stay in the server log.
+	if (typeof structured?.code === 'string' && RENDER_REFUSALS.has(structured.code)) {
+		return strings.errorScoreNotRenderable(strings.renderRefusalReason(structured.code));
+	}
 	if (structured) {
 		const pipelineMessage = pipelineActionMessage(structured, strings);
 		if (pipelineMessage) return pipelineMessage;

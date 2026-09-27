@@ -364,7 +364,7 @@ class ProductPipelineEffects:
     def save_result(self, owner: str, snapshot: dict, context: dict, rendered: dict) -> dict:
         from . import db
         from .api_core.common import _build_number
-        from .api_core.rendering import _output_prefix, _submit_history_artifact_save, _SRGB_COLOR_PROFILE
+        from .api_core.rendering import _output_prefix, _render_warnings, _submit_history_artifact_save, _SRGB_COLOR_PROFILE
         from .api_core.thumbnails import submit_thumbnail_build
         from .layer_versions import DDL_ENGINE_VERSION, DDL_VERSION
 
@@ -417,6 +417,11 @@ class ProductPipelineEffects:
             "render_diagnostics": result["render_diagnostics"],
             "resource_execution": result["resource_execution"],
         }
+        # Kept with the work only when the core raised any, so a work without
+        # warnings saves the diagnostics it always did.
+        warnings = _render_warnings(render_metadata, "pipeline performance")
+        if warnings:
+            result["render_warnings"] = pipeline_diagnostics["render_warnings"] = warnings
         work_plugins = [
             f"{item['namespace']}.{heading}"
             for item in (snapshot.get("config") or {}).get("definitions") or []
@@ -510,7 +515,7 @@ class ProductPipelineEffects:
         """Perform raw compact Score; the route has already authorized work access."""
         from . import db
         from .api_core.common import _build_number
-        from .api_core.rendering import _limits_for_render, _render_seed_from_text, _SRGB_COLOR_PROFILE
+        from .api_core.rendering import _limits_for_render, _render_seed_from_text, _render_warnings, _SRGB_COLOR_PROFILE
         from .render_engines import new_render_seed
         from .api_core.state import _render_capacity
         from .layer_versions import DDL_ENGINE_VERSION, DDL_VERSION
@@ -564,6 +569,8 @@ class ProductPipelineEffects:
         with _render_capacity(owner):
             rendered = json.loads(self.binding.render_saved(_bytes(payload)))
         if "error" in rendered:
+            # The code is the answer; the core's reason is for the log only.
+            _logger.warning("saved replay refused: %s: %s", rendered["error"], rendered.get("message"))
             raise CandidateHostError(rendered["error"])
         metadata = rendered["metadata"]
         result = {"score": score, "svg": rendered["svg"], "catalog_id": catalog_id,
@@ -579,6 +586,9 @@ class ProductPipelineEffects:
                   "render_seed": seed, "composition_seed": composition_seed, "render_wild": options["wild"],
                   "seed_text": seed_text, "render_limits": four_limits, "render_limits_source": limits_source,
                   "render_diagnostics": metadata.get("execution"), "resource_execution": metadata.get("resource_execution")}
+        warnings = _render_warnings(metadata, "saved replay")
+        if warnings:
+            result["render_warnings"] = warnings
         result["render_hash"] = db.render_hash_for_item(result)
         result["render_hash_short"] = db.render_hash_short(result["render_hash"])
         return result

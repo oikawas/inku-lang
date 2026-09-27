@@ -395,7 +395,7 @@ def test_an_issued_render_seed_survives_a_javascript_number(tmp_path, monkeypatc
     engine.dispose()
 
 
-def test_compact_delivery_preserves_authority_in_normal_history(tmp_path, monkeypatch):
+def test_compact_delivery_preserves_authority_in_normal_history(tmp_path, monkeypatch, caplog):
     from inku_server import db
     from inku_server.api_core import rendering, thumbnails
     from inku_server.api_core.models import HistoryItem
@@ -473,10 +473,13 @@ def test_compact_delivery_preserves_authority_in_normal_history(tmp_path, monkey
         "omitted_units": [],
         "relation_omissions": [],
     }
+    # A host color the core would not draw; it drew the default and went on.
+    render_warnings = [{"kind": "invalid_color", "name": "black"}]
     rendered = {"svg": "<svg xmlns='http://www.w3.org/2000/svg'/>",
                 "metadata": {"render_engine_id": "default", "render_engine_version": "59",
                              "execution": render_diagnostics,
-                             "resource_execution": resource_execution}}
+                             "resource_execution": resource_execution,
+                             "render_warnings": render_warnings}}
     expected_diagnostics = {
         "upstream_diagnostics": snapshot["delivery"]["upstream_diagnostics"],
         "downstream_diagnostics": snapshot["delivery"]["downstream_diagnostics"],
@@ -484,6 +487,7 @@ def test_compact_delivery_preserves_authority_in_normal_history(tmp_path, monkey
         "relation_omissions": snapshot["delivery"]["relation_omissions"],
         "render_diagnostics": render_diagnostics,
         "resource_execution": resource_execution,
+        "render_warnings": render_warnings,
         "plugin_diagnostics": [],
     }
     result = effects.save_result("author", snapshot, run.context, rendered)
@@ -491,6 +495,8 @@ def test_compact_delivery_preserves_authority_in_normal_history(tmp_path, monkey
     assert result["history_id"] == replay["history_id"]
     assert result["compiler_outcome"] == snapshot["delivery"]["outcome"]
     assert result["pipeline_diagnostics"] == expected_diagnostics
+    assert result["render_warnings"] == render_warnings
+    assert "invalid_color" in caplog.text
     item = db.get_items("author", [result["history_id"]])[0]
     response = HistoryItem.model_validate(item).model_dump()
     assert response["score"] == snapshot["delivery"]["score"]

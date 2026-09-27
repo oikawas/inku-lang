@@ -81,6 +81,9 @@ export const ja: LangPack = {
 			default: return `プラグイン ${name} はこの環境に登録されていないため、この文は描かれていません。`;
 		}
 	},
+	pipelineRenderWarning: (kind, name) => kind === 'invalid_color'
+		? `色表の「${name ?? '?'}」の値が#rrggbbの形ではないため、この値は使わずに描きました。名前つきの色は既定の色で描いています。`
+		: `描画の警告があります（${kind}）。描画は続けました。`,
 	pipelineDrawing: '描画',
 	code: 'ja',
 	label: '日本語',
@@ -235,6 +238,16 @@ export const ja: LangPack = {
 	errorModelNotOffered: 'このモデルはこのサーバーで公開されていません。設定で、公開されているモデルを選んでください。',
 	errorScoreInvalid: (reason) => `Scoreが不正です: ${reason}`,
 	errorScoreNotRenderable: (reason) => `このScoreは描けません: ${reason}`,
+	renderRefusalReason: (code) => ({
+		resource_authority: '作品の資源の方針を確かめられませんでした',
+		performance_stopped: '描画が上限に達して止まりました',
+		invalid_score: 'Scoreが描ける形ではありません',
+		mark_too_large: '大きすぎる印があります',
+		output_too_large: '描いたSVGが大きすぎます',
+		non_finite_value: '数でない値（無限大など）があります',
+		invalid_saved_performance: '保存された内容を読めません',
+		internal_invariant: '描画coreの内部で問題が起きました',
+	} as Record<string, string>)[code] ?? code.replace(/_/g, ' '),
 	stopBtn: '停止',
 	runStatusElapsed: (seconds) => `経過 ${seconds}s`,
 	runStatusTokens: (input, output) => `${input}→${output} tok`,

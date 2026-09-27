@@ -328,7 +328,12 @@ target. When a host color value is not `#rrggbb`, the render core does
 not use it: a named color is drawn in its default, a catalog entry
 (`palette:<name>`) or other key is left out, drawing continues, and the render
 metadata's `render_warnings` holds `{"kind": "invalid_color", "name": …}`
-(never the value). Hosts show it with the work and log it. The engine id is
+(never the value). Hosts show it with the work and log it: the Server logs it
+for every render, keeps it in a pipeline work's diagnostics (only when there is
+one) and returns it from `/api/render-score`, and the Web lists it among the
+work's diagnostics. When the core will not draw a saved Score again, the Server
+answers 422 with the core's stable code, which the Web states in the page's
+language, and logs the core's own reason. The engine id is
 `render_engine_id: "default"`; the implementation and saved works own the
 current `render_engine_version` (§2.1).  The full catalog `map` / `swatches` / `palette`
 snapshot is not duplicated in render JSON because `render_color_map` is the

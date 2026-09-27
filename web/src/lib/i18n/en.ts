@@ -81,6 +81,9 @@ export const en: LangPack = {
 			default: return `The plugin ${name} is not installed here, so this sentence was not drawn.`;
 		}
 	},
+	pipelineRenderWarning: (kind, name) => kind === 'invalid_color'
+		? `The color table's value for "${name ?? '?'}" is not #rrggbb, so it was not used. A named color was drawn in its default.`
+		: `The performance raised a warning (${kind}) and went on drawing.`,
 	pipelineDrawing: 'Drawing',
 	code: 'en',
 	label: 'English',
@@ -235,6 +238,16 @@ export const en: LangPack = {
 	errorModelNotOffered: 'This model is not offered on this server. Choose one of the offered models in Settings.',
 	errorScoreInvalid: (reason) => `The Score is invalid: ${reason}`,
 	errorScoreNotRenderable: (reason) => `This Score cannot be drawn: ${reason}`,
+	renderRefusalReason: (code) => ({
+		resource_authority: "the work's resource policy could not be confirmed",
+		performance_stopped: 'drawing stopped at a limit',
+		invalid_score: 'the Score is not in a drawable form',
+		mark_too_large: 'a mark is too large',
+		output_too_large: 'the drawn SVG is too large',
+		non_finite_value: 'a value is not a finite number',
+		invalid_saved_performance: 'the saved content cannot be read',
+		internal_invariant: 'something went wrong inside the drawing core',
+	} as Record<string, string>)[code] ?? code.replace(/_/g, ' '),
 	stopBtn: 'Stop',
 	runStatusElapsed: (seconds) => `Elapsed ${seconds}s`,
 	runStatusTokens: (input, output) => `${input}→${output} tok`,

@@ -35,6 +35,8 @@ export interface LangPack {
 	pipelineDiagnosticDetails: string;
 	pipelineDiagnosticUnknown: string;
 	pipelinePluginDiagnostic: (reason: string, name: string, suggestion: string | null) => string;
+	/** What the render core drew around without stopping, such as an unusable color value. */
+	pipelineRenderWarning: (kind: string, name: string | null) => string;
 	pipelineDrawing: string;
 	code: string;
 	label: string;
@@ -172,6 +174,8 @@ export interface LangPack {
 	errorModelNotOffered: string;
 	errorScoreInvalid: (reason: string) => string;
 	errorScoreNotRenderable: (reason: string) => string;
+	/** Why the render core would not draw a Score again, by its stable code. */
+	renderRefusalReason: (code: string) => string;
 	runStatusElapsed: (seconds: string) => string;
 	runStatusTokens: (input: string, output: string) => string;
 	runStatusProgress: (done: number, total: number) => string;

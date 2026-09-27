@@ -86,3 +86,11 @@ test('a Score the server refuses reads with its headline in the page language', 
 		ja.errorScoreNotRenderable('mark bounds exceed eight canvases')
 	);
 });
+
+test('a Score the render core will not draw again reads its reason in the page language', () => {
+	// The core's own message stays in the server log; the code names the reason.
+	assert.equal(
+		describeApiErrorDetail({ code: 'mark_too_large', message: 'mark too large' }, 422, ja),
+		'このScoreは描けません: 大きすぎる印があります'
+	);
+});

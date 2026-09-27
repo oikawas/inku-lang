@@ -418,6 +418,19 @@ def _render_metadata(catalog_id: str | None, *, canvas_aspect: str | None = None
     return metadata
 
 
+def _render_warnings(metadata: dict, during: str) -> list | None:
+    """The render's warnings, logged; None when the core raised none.
+
+    The core does not stop for them: a host color that is not #rrggbb is drawn
+    in its default. So the log, and for a pipeline work its diagnostics, are
+    where they show. They carry names and kinds, never the values.
+    """
+    warnings = metadata.get("render_warnings") or None
+    if warnings:
+        _logger.warning("render warnings during %s: %s", during, json.dumps(warnings, ensure_ascii=False))
+    return warnings
+
+
 def _render_with_metadata(
     score: Score, render_metadata: dict, *, svg_profile: str | None = None, owner: str | None = None
 ) -> tuple[str, dict]:
@@ -441,6 +454,7 @@ def _render_with_metadata(
             composition_seed=composition_seed,
             wild=wild,
         )
+    _render_warnings(result.metadata, "render")
     return result.svg, {**render_metadata, **result.metadata}
 
 

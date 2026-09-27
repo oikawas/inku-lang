@@ -6,6 +6,15 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 36 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-27 — render warnings shown with the work and logged, and saved-replay refusals stated
+
+The Server and the Web follow the same day's render-core change.
+
+- **Render warnings**: the core does not use a color table value that is not `#rrggbb`, goes on drawing, and names the color in `render_warnings` (the author's ruling: show the error, log it, fall back to the default color and keep drawing). The Server logs warnings on all three render paths (an ordinary render, a pipeline performance, and replaying a saved Score). A pipeline work keeps them in its diagnostics (`pipeline_diagnostics.render_warnings`) only when there are any, saved with the work, and a replay's `/api/render-score` answer carries them. The Web lists the color's name, and that its value was not used, among the work's diagnostics. Every color the Server passes today is `#rrggbb`, so nothing shows in practice; a work without warnings saves what it always did.
+- **Saved-replay refusals**: when the core will not replay a saved Score, the Server answers 422 with the core's stable code (one of eight, such as `mark_too_large`) and logs the core's own reason only. The Web follows "This Score cannot be drawn:" with the reason for that code in the page's language.
+
+The `/api/render-score` answer gains `render_warnings` (only when there are any). The route count (107) is unchanged. DDL, Score, and render versions are unchanged.
+
 ### 2026-09-26 — the API returns seeds as decimal strings, and the Web sends them back unrounded
 
 The same day's "work seeds stay within what JavaScript can hold" said works whose seed comes from seed text are not affected. That was wrong. A seed from seed text takes 64 bits, and the Web rounded it on reading. The replay comparison also sends the text, so the server derived the seed again and drew it right; but the refinement's touch redraw (which places marks by the work's seed), the refinement's color catalog comparison, and exporting an unsaved canvas send only the seed, and drew another picture. Saved works with a seed past 2^53 (the pipeline's 63-bit seeds) did the same.

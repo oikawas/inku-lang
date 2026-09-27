@@ -368,6 +368,8 @@ class RenderScoreRequest(BaseModel):
 class RenderScoreResponse(BaseModel):
     score: Score | dict
     render_diagnostics: dict | None = None
+    # What the core drew around without stopping (an unusable host color); absent when nothing.
+    render_warnings: list[dict] | None = None
     resource_execution: dict | None = None
     svg: str
     catalog_id: str

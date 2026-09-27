@@ -22,7 +22,7 @@ export type PipelineResult = PaintResult & {
 	thinking?: string | null;
 	render_diagnostics?: Record<string, unknown> | null;
 	resource_execution?: Record<string, unknown> | null;
-	pipeline_diagnostics?: { plugin_diagnostics?: PluginDiagnostic[] } | null;
+	pipeline_diagnostics?: { plugin_diagnostics?: PluginDiagnostic[]; render_warnings?: unknown[] } | null;
 };
 
 /**
@@ -219,6 +219,7 @@ export function pipelineDiagnostics(
 		return Array.isArray(value) ? value : [];
 	};
 	const plugins = (view ? view.result?.pipeline_diagnostics?.plugin_diagnostics : saved?.plugin_diagnostics) ?? [];
+	const warnings = (view ? view.result?.pipeline_diagnostics?.render_warnings : saved?.render_warnings) ?? [];
 	// A plugin sentence's explanation replaces the compiler's generic entry for the same source range.
 	const explained = (value: unknown) => {
 		const span = (value as { span?: { start_byte?: unknown; end_byte?: unknown } } | null)?.span;
@@ -234,6 +235,7 @@ export function pipelineDiagnostics(
 		...recordArray(renderDiagnostics, 'diagnostics').map((value) => ({ channel: 'render' as const, value })),
 		...recordArray(resourceExecution, 'omissions').map((value) => ({ channel: 'resource' as const, value })),
 		...recordArray(resourceExecution, 'relation_omissions').map((value) => ({ channel: 'relation' as const, value })),
+		...warnings.map((value) => ({ channel: 'warning' as const, value })),
 	];
 }
 

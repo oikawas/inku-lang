@@ -73,3 +73,8 @@ test('a withheld plugin sentence is explained in the author\'s language', () => 
 		'プラグイン Garden.薔薇 はこの環境に登録されていないため、この文は描かれていません。',
 	);
 });
+
+test('a render warning names the color the core would not use, and that drawing went on', () => {
+	const actual = formatPipelineDiagnostic({ channel: 'warning', value: { kind: 'invalid_color', name: 'black' } }, ja);
+	assert.equal(actual, '色表の「black」の値が#rrggbbの形ではないため、この値は使わずに描きました。名前つきの色は既定の色で描いています。');
+});

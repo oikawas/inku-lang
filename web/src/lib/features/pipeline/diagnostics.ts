@@ -1,6 +1,6 @@
 import type { LangPack } from '../../i18n/types.ts';
 
-export type PipelineDiagnosticChannel = 'plugin' | 'upstream' | 'downstream' | 'resource' | 'relation' | 'render' | 'catalog';
+export type PipelineDiagnosticChannel = 'plugin' | 'upstream' | 'downstream' | 'resource' | 'relation' | 'render' | 'catalog' | 'warning';
 
 export type PipelineDiagnostic = {
 	channel: PipelineDiagnosticChannel;
@@ -15,6 +15,8 @@ export type PipelineHistoryDiagnostics = {
 	render_diagnostics: Record<string, unknown> | null;
 	resource_execution: Record<string, unknown> | null;
 	plugin_diagnostics?: PluginDiagnostic[];
+	/** What the render core drew around without stopping; kept only when there were any. */
+	render_warnings?: unknown[];
 };
 
 /** Why a plugin sentence was not drawn, from the shared explainer. */
@@ -130,6 +132,9 @@ export function formatPipelineDiagnostic(
 	if (diagnostic.channel === 'plugin') {
 		const plugin = value as PluginDiagnostic;
 		return strings.pipelinePluginDiagnostic(plugin.reason, plugin.name, plugin.suggestion ?? null);
+	}
+	if (diagnostic.channel === 'warning') {
+		return strings.pipelineRenderWarning(kind(value) ?? 'warning', typeof value.name === 'string' ? value.name : null);
 	}
 	if (diagnostic.channel === 'catalog') {
 		const name = typeof value.qualified_name === 'string' ? `${value.qualified_name}: ` : '';

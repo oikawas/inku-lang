@@ -78,3 +78,20 @@ test('a render warning names the color the core would not use, and that drawing 
 	const actual = formatPipelineDiagnostic({ channel: 'warning', value: { kind: 'invalid_color', name: 'black' } }, ja);
 	assert.equal(actual, '色表の「black」の値が#rrggbbの形ではないため、この値は使わずに描きました。名前つきの色は既定の色で描いています。');
 });
+
+test('a numeric range the author got wrong is said in words, whichever tag carries it', () => {
+	// Upstream: the semantic association names its issue under `issue_kind`.
+	const invalid = formatPipelineDiagnostic({
+		channel: 'upstream',
+		value: { issue_kind: 'invalid_numeric_range' },
+	}, ja);
+	assert.match(invalid, /数値の範囲が正しくありません。/);
+
+	// Downstream: a Score gap is tagged with `type`, not `kind`.
+	const unsupported = formatPipelineDiagnostic({
+		channel: 'downstream',
+		value: { reason: { type: 'unsupported_numeric_range' } },
+	}, ja);
+	assert.match(unsupported, /まだ数値の範囲を書けません。/);
+	assert.doesNotMatch(unsupported, /diagnostic/);
+});

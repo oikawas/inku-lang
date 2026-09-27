@@ -6,6 +6,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 38 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-28 — A numeric range written wrongly is said in words
+
+At the author's direction, the numeric-range diagnostics that came with DDL engine 52 gain Japanese and English sentences: `invalid_numeric_range` (outside 0 to 1, or a start not below its end), `unsupported_numeric_range` (a range on a fill target or a member of a coordinated group), and `conflicting_numeric_positions` and `named_and_numeric_position_conflict`, which now cover ranges too. Also fixed: a Score gap carries its kind under `type` (the core's `ScoreFieldGap`), but the Web's diagnostics read only `kind`, so every Score gap read "Reason: diagnostic." Gaps without a sentence now show their kind's name after the reason label.
+
 ### 2026-09-28 — Android calls the DDL the instructions, and heads them as Japanese or English DDL
 
 Following the author's instruction to apply the DDL's language mode strictly and show it in the UI (numeric ranges are written differently in Japanese and English), and the author's ruling after seeing the screen, Android follows the web.

@@ -42,11 +42,18 @@ function kind(value: unknown): string | null {
 	return typeof item?.kind === 'string' ? item.kind : null;
 }
 
+function typeTag(value: unknown): string | null {
+	const item = object(value);
+	return typeof item?.type === 'string' ? item.type : null;
+}
+
 function reasonOf(value: JsonObject): string {
 	const cause = object(value.cause);
 	for (const candidate of [value.reason, value.failure, cause?.reason, cause?.failure, value.issue_kind]) {
 		if (typeof candidate === 'string') return candidate;
-		const tagged = kind(candidate);
+		// A Score gap names its kind under `type` (serde's tag on ScoreFieldGap);
+		// the other reasons use `kind`.
+		const tagged = kind(candidate) ?? typeTag(candidate);
 		if (tagged) return tagged;
 	}
 	return 'diagnostic';

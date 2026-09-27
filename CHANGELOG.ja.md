@@ -6,6 +6,10 @@
 
 **本書が持つのは v2.5.0（2026-07-25、render engine 12）以降**の 38 版である。それより前は書庫にある。
 
+### 2026-09-28 — 数値の範囲の誤りを言葉で示す
+
+作者の指示で、DDL engine 52で入った数値の範囲の診断に日英の文を足す。`invalid_numeric_range`（0〜1の外、または始めが終わり以上）、`unsupported_numeric_range`（塗りの対象や組み合わせの成員に書いた範囲）、範囲も対象になった`conflicting_numeric_positions`と`named_and_numeric_position_conflict`。あわせて、Scoreの欠けの診断は種類を`type`に入れて渡る（coreの`ScoreFieldGap`）のに、Webの診断の表示は`kind`しか読まず、Scoreの欠けがどれも「理由: diagnostic。」と出ていたのを直した。文の無いほかの欠けは、これからは「理由: 」のあとにその種類の名前が出る。
+
 ### 2026-09-28 — AndroidもDDLを「指示書」と呼び、見出しに日本語DDLか英語DDLかを出す
 
 作者の指示「DDLの言語モードを厳密に適用し、UIにもDDLが日本語モードか英語モードかを表示する」（位置を数値の範囲で書く型は日英で書き方が違う）と、画面を見た作者の指示に従い、Webと揃える。

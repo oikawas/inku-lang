@@ -96,7 +96,7 @@ test('the card has two doors, and one of them is open in every mode', () => {
 	// is an item of the saved-work export menu the manager renders.
 	const source = readFileSync(HISTORY_MANAGER, 'utf8');
 	assert.match(source, /<SavedWorkExportMenu[\s\S]*?onDownloadCard=\{onDownloadSavedWorkCard\}/);
-	assert.match(readFileSync(EXPORT_MENU, 'utf8'), /\{#if onDownloadCard\}[\s\S]*?\{t\(\)\.historyCardExport\}/);
+	assert.match(readFileSync(EXPORT_MENU, 'utf8'), /\{#if onDownloadCard\}[\s\S]*?t\(\)\.historyCardExport/);
 	assert.equal(SIMPLE_UI_VISIBILITY.history, true);
 
 	// Door two is on the canvas. It used to be a button of its own beside SVG

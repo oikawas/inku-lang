@@ -47,15 +47,13 @@ test('T-56  it reads the placement seed off the work, not off the screen', () =>
 
 // ------------------------------------------------------------------- T-57
 
-test('T-57  the export sends both seeds', () => {
-	const body = DOWNLOAD.slice(DOWNLOAD.indexOf("'/api/render-svg'"));
-	const call = body.slice(0, body.indexOf('})'));
-	assert.match(call, /render_seed: result\.render_seed \?\? null/);
-	assert.match(call, /composition_seed: result\.composition_seed \?\? null/);
-	// Which the deps type has to allow, or the two lines above are `undefined`
-	// with the compiler none the wiser.
-	assert.match(DOWNLOAD, /render_seed\?: Seed \| null;/);
-	assert.match(DOWNLOAD, /composition_seed\?: Seed \| null;/);
+test('T-57  the export redraws the saved work, not a Score it sends', () => {
+	// Since 2026-09-27 only a saved work is exported. A profile that redraws
+	// asks the server for the work's own record, which holds both seeds, so
+	// there is no pair of seeds left for the client to carry or drop.
+	const svgExport = DOWNLOAD.slice(DOWNLOAD.indexOf('async function downloadSVG'));
+	assert.match(svgExport, /\/api\/history\/\$\{displayedHistoryItem\.id\}\/svg/);
+	assert.doesNotMatch(svgExport, /\/api\/render-svg/);
 });
 
 test('T-57  the display profile is still the stored picture', () => {
@@ -64,7 +62,7 @@ test('T-57  the display profile is still the stored picture', () => {
 	const svgExport = DOWNLOAD.slice(DOWNLOAD.indexOf('async function downloadSVG'));
 	const branch = svgExport.slice(
 		svgExport.indexOf("if (profile === 'display')"),
-		svgExport.indexOf('} else if')
+		svgExport.indexOf('} else {')
 	);
 	assert.ok(branch.length > 0, 'the display branch is gone');
 	assert.match(branch, /result\.svg\.replace/);

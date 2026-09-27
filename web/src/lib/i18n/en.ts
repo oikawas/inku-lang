@@ -539,6 +539,7 @@ export const en: LangPack = {
 	promptCopied: 'Copied',
 
 	exportLabel: 'Export',
+	exportSaveFirst: 'Save the work first to export it.',
 	dlSvgBtn: '↓ SVG',
 	dlPngLabel: 'PNG:',
 	svgExportHelpTitle: 'SVG export format differences',

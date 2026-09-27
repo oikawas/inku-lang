@@ -28,6 +28,7 @@ const read = (relative: string) => fs.readFileSync(path.join(here, relative), 'u
 const PANEL = read('./components/CanvasPanel.svelte');
 const ARTWORK = read('./features/canvas/CanvasArtworkWorkspace.svelte');
 const HISTORY_STATE = read('./historyManagerState.svelte.ts');
+const MENU = read('./components/SavedWorkExportMenu.svelte');
 const PAGE = read('../routes/+page.svelte');
 
 /**
@@ -66,9 +67,10 @@ function positionsOf(region: string, markers: string[]): number[] {
 test('T-99: SVG, PNG and the card leave through one button', () => {
 	// One button, one menu. Two of the three used to carry a menu of their own
 	// and the third was a button that acted at once, which is why the row read
-	// as three unrelated things.
-	assert.equal((ARTWORK.match(/class="canvas-icon-btn canvas-export-btn"/g) ?? []).length, 1);
-	assert.equal((ARTWORK.match(/<div class="export-menu"/g) ?? []).length, 1);
+	// as three unrelated things. Since 2026-09-27 that one menu is the saved
+	// work's: the canvas no longer keeps a second menu for unsaved pictures.
+	assert.equal((ARTWORK.match(/<SavedWorkExportMenu /g) ?? []).length, 1);
+	assert.doesNotMatch(ARTWORK, /<div class="export-menu"/);
 	// And the separate doors are gone, by their own names.
 	assert.doesNotMatch(ARTWORK, /class="png-wrap"/);
 	assert.doesNotMatch(ARTWORK, /svgMenuOpen/);
@@ -77,18 +79,17 @@ test('T-99: SVG, PNG and the card leave through one button', () => {
 });
 
 test('T-99: the menu keeps the order the three buttons stood in', () => {
-	const menu = ARTWORK.slice(ARTWORK.indexOf('<div class="export-menu"'));
+	const menu = MENU.slice(MENU.indexOf('{#if single && onDownloadSVG && onDownloadPNG}'));
 	const [svg, png, card] = positionsOf(menu, ['onDownloadSVG', 'onDownloadPNG', 'onDownloadCard']);
 	assert.ok(svg < png && png < card, 'the three ways out were reordered by the merge');
 });
 
 test('T-99: the menu closes on a press outside itself, not outside the row', () => {
-	// The wrap the page measures against has to be the menu's own box. Bound to
-	// the corner row instead, a press on any other button in that row would
-	// count as inside and leave the menu standing open.
-	assert.match(ARTWORK, /<div class="canvas-export" bind:this=\{exportWrapEl\}>/);
-	assert.doesNotMatch(ARTWORK, /canvas-corner-right" bind:this=\{exportWrapEl\}/);
-	assert.match(PAGE, /if \(exportMenuOpen && exportWrapEl && !exportWrapEl\.contains\(e\.target as Node\)\) exportMenuOpen = false;/);
+	// The menu measures a press against its own wrapper, so a press on another
+	// button in the corner row counts as outside. The page no longer keeps an
+	// open flag for a second menu of the canvas.
+	assert.match(MENU, /!wrapperEl\?\.contains\(event\.target\)\) open = false/);
+	assert.doesNotMatch(PAGE, /exportMenuOpen|exportWrapEl/);
 });
 
 // -------------------------------------------------- T-100 (the bar is gone)
@@ -243,24 +244,20 @@ test('T-107: the page tells the canvas which of the two jobs the button has', ()
 });
 
 test('T-107: with the work tools gone the button calls the card, not a menu', () => {
-	assert.match(ARTWORK, /if \(exportCardOnly\) onDownloadCard\(\);/);
-	assert.match(ARTWORK, /else exportMenuOpen = !exportMenuOpen;/);
-	// A menu of one is still a menu. The panel must not be able to open it in
-	// that state, whatever the bound flag happens to hold.
-	assert.match(ARTWORK, /\{#if exportMenuOpen && !exportCardOnly\}/);
-	// And it must not announce a menu it will not open.
-	assert.match(ARTWORK, /aria-haspopup=\{exportCardOnly \? undefined : 'menu'\}/);
+	const branch = ARTWORK.slice(ARTWORK.indexOf('{#if exportCardOnly}'), ARTWORK.indexOf('{:else if savedWorkExport}'));
+	assert.ok(branch.length > 0, 'the simple UI export branch is gone');
+	assert.match(branch, /onclick=\{\(e\) => \{ e\.stopPropagation\(\); onDownloadCard\(\); \}\}/);
+	// A menu of one is still a menu: the branch opens none, and the saved
+	// work's menu is only reached when the work tools are shown.
+	assert.doesNotMatch(branch, /SavedWorkExportMenu|aria-haspopup/);
+	assert.ok(ARTWORK.indexOf('{#if exportCardOnly}') < ARTWORK.indexOf('<SavedWorkExportMenu '));
 });
 
 test('T-107: in that state the button is disabled exactly when the card is', () => {
-	// The menu entry is disabled without a saved work or while one is building.
-	// A door that leads only there must refuse in the same two cases -- with
-	// `!result` alone it would be pressable and then do nothing.
-	assert.match(
-		ARTWORK,
-		/disabled=\{exportCardOnly \? \(!currentHistoryId \|\| cardExportBusy\) : !result\}/
-	);
-	assert.match(ARTWORK, /disabled=\{!currentHistoryId \|\| cardExportBusy\}/);
+	// The card needs a saved work and is not built twice at once. A door that
+	// leads only there must refuse in the same two cases.
+	const branch = ARTWORK.slice(ARTWORK.indexOf('{#if exportCardOnly}'), ARTWORK.indexOf('{:else if savedWorkExport}'));
+	assert.match(branch, /disabled=\{!currentHistoryId \|\| cardExportBusy\}/);
 	// It says what it does, too: the card's own label, not "export".
-	assert.match(ARTWORK, /aria-label=\{exportCardOnly \? t\(\)\.historyCardExport : t\(\)\.exportLabel\}/);
+	assert.match(branch, /aria-label=\{t\(\)\.historyCardExport\}/);
 });

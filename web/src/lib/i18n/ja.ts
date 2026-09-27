@@ -539,6 +539,7 @@ export const ja: LangPack = {
 	promptCopied: 'コピーしました',
 
 	exportLabel: '書き出す',
+	exportSaveFirst: '書き出すには、先に作品を保存してください。',
 	dlSvgBtn: '↓ SVG',
 	dlPngLabel: 'PNG:',
 	svgExportHelpTitle: 'SVG保存形式の違い',

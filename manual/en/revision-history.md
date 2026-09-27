@@ -2,6 +2,10 @@
 
 This file records revisions to user and operations documents under `manual/`. See `SPEC.ja.md` for the detailed product change history.
 
+## 2026-09-27 — Refinement options' way out, and one export menu
+
+Refinement options now keep the dialog until they are saved or discarded, and the export menu is the saved work's alone, so 8.2 (Save Options), 15 (Export Images) and the troubleshooting table of Creating Images are corrected in both languages. The passage on continuing from an unsaved option and the row on options lost by switching the target are gone.
+
 ## 2026-09-27 — Variation and Another composition as they work now
 
 Center and middle are no longer read as a focus (DDL engine 50), so the refinement table and 8.1 of Creating Images in both languages are corrected. Variation moves nothing now and its option shows `Moved: nothing`. Another composition only picks again the tilt angles and corners the instructions name, gives the same picture for every option on a work placed only at the center, and calls the Stage 2 LLM only when the instructions still have gaps to fill. The table of axes per strength is gone.

@@ -10,7 +10,6 @@ import type { SavedWorkExportSnapshot } from '$lib/features/export/saved-work';
 import { exportSettings } from '$lib/features/export/settings.svelte';
 import type { LineageGraph } from '$lib/features/history/types';
 import type { HistoryItem } from '$lib/historyManagerState.svelte';
-import type { Seed } from '$lib/features/run/current-work';
 import { DEFAULT_CANVAS_ASPECT_ID, normalizeCanvasAspectId } from '$lib/plugins/system/canvas-aspect';
 
 type ApiFetch = (path: string, init?: RequestInit) => Promise<Response>;
@@ -34,10 +33,6 @@ function savedWorkFilename(item: HistoryItem, extension: string, size?: number):
 	].join('');
 	const id = (item.id ?? 'saved').slice(0, 12);
 	return `inku-${id}-${stamp}${size ? `-${size}` : ''}.${extension}`;
-}
-
-function recordedSeed(value: Seed | null | undefined): Seed | null {
-	return value == null || value === '' ? null : value;
 }
 
 async function responseError(response: Response): Promise<Error> {
@@ -123,16 +118,12 @@ export function makeSavedWorkExportActions(deps: SavedWorkExportActionsDeps) {
 				svg: item.svg,
 				score: item.score,
 				history_at: item.at,
-				render_seed: recordedSeed(item.render_seed),
-				composition_seed: recordedSeed(item.composition_seed),
 			}),
 			input: () => item.source_text ?? item.input,
 			displayedHistoryItem: () => item,
 			apiFetch: deps.apiFetch,
 			apiError: responseError,
 			exportFilename: (extension, size) => savedWorkFilename(item, extension, size),
-			refinementCatalogId: () => item.render_color_catalog_id ?? item.catalog_id ?? '',
-			refinementCanvasAspectId: () => aspect,
 			effectiveCanvasAspectId: () => aspect,
 		});
 	}

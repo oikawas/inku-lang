@@ -92,7 +92,6 @@
 	import { wildOverride } from '$lib/features/wild/render';
 	import { exportSettings } from '$lib/features/export/settings.svelte';
 	import { downloadCard } from '$lib/cardExport';
-	import { createExportActions } from '$lib/features/export/download';
 	import { createModelInspection } from '$lib/features/model-inspection/state.svelte';
 	import { resultLogSettings } from '$lib/features/result-log/settings.svelte';
 	import { batchFailureReportStore } from '$lib/features/batch/failure-report.svelte';
@@ -199,7 +198,6 @@
 	const DDL_ORIGIN_LABEL = 'DDL';
 	let appInfoOpen = $state(false);
 	let leftPanelCollapsed = $state(false);
-	let exportMenuOpen = $state(false);
 	let userMenuOpen = $state(false);
 	let catalogOpen  = $state(false);
 	let canvasAspectMenuOpen = $state(false);
@@ -241,7 +239,6 @@
 	let exportTemplateStatus = $state<string | null>(null);
 
 	// DOM refs for outside-click handling
-	let exportWrapEl   = $state<HTMLDivElement | null>(null);
 	let userMenuWrapEl = $state<HTMLDivElement | null>(null);
 
 	type SaijikiPreview = {
@@ -775,7 +772,6 @@
 		work.displayedHistoryItem = null;
 		history.clearSelection();
 		outputTab = 'canvas';
-		exportMenuOpen = false;
 		canvasViewport.fit();
 		await saveCanvasAspectPluginValue();
 	}
@@ -1177,16 +1173,6 @@
 		libraryMounted = false;
 		lineageState.reset();
 		lineageBrowsingState.reset();
-	}
-
-	// ── Export filenames ────────────────────────────────────
-	function exportFilename(ext: string, size?: number): string {
-		const now = new Date();
-		const pad = (n: number) => String(n).padStart(2, '0');
-		const date = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
-		const time = `${pad(now.getHours())}-${pad(now.getMinutes())}`;
-		const sizeStr = size != null ? `-${size}` : '';
-		return `inku-${date}-${time}${sizeStr}.${ext}`;
 	}
 
 	// ── Models ──────────────────────────────────────────────
@@ -1960,7 +1946,6 @@ $effect(() => {
 	}
 
 	function handleDocClick(e: MouseEvent) {
-		if (exportMenuOpen && exportWrapEl && !exportWrapEl.contains(e.target as Node)) exportMenuOpen = false;
 		if (userMenuOpen && userMenuWrapEl && !userMenuWrapEl.contains(e.target as Node)) userMenuOpen = false;
 		if (canvasAspectMenuOpen) canvasAspectMenuOpen = false;
 	}
@@ -2129,19 +2114,6 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 	// ── Download ────────────────────────────────────────────
 	const savedWorkExportActions = makeSavedWorkExportActions({
 		apiFetch, catalogName, formatDate: formatHistoryDate, previewText: historyPreviewText
-	});
-	// Exporting owns the profile round trip, the canvas rasterisation and the
-	// capture-date stamp; the page only lends it the artwork and the fetch wrapper.
-	const { downloadSVG, downloadPNG } = createExportActions({
-		result: () => work.result,
-		input: () => work.input,
-		displayedHistoryItem: () => work.displayedHistoryItem,
-		apiFetch,
-		apiError,
-		exportFilename,
-		refinementCatalogId: refinement.refinementCatalogId,
-		refinementCanvasAspectId: refinement.refinementCanvasAspectId,
-		effectiveCanvasAspectId,
 	});
 
 	// The canvas toolbar builds the card from the work it is showing, which is
@@ -2902,8 +2874,6 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				{formatHistoryDate}
 				{historyPreviewText}
 				bind:outputTab
-				bind:exportMenuOpen
-				bind:exportWrapEl
 				exportCardOnly={!session.uiVisibility.work_tools}
 				result={work.result}
 				{unsavedRefinementPreview}
@@ -2958,8 +2928,6 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 					if (replayableStatusHistoryItem) return replayHistoryItem(replayableStatusHistoryItem, outputTab);
 				}}
 				replayDisabled={!replayableStatusHistoryItem || work.reloading}
-				onDownloadSVG={downloadSVG}
-				onDownloadPNG={downloadPNG}
 				currentHistoryId={work.displayedHistoryItem?.id ?? work.result?.history_id ?? null}
 				onDownloadCard={downloadCurrentCard}
 				onVaryPerformance={refinement.varyPerformance}

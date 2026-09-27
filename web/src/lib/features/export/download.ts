@@ -3,7 +3,6 @@ import { withPngCaptureDate } from '$lib/pngMetadata';
 import { exportSettings } from './settings.svelte';
 import { downloadFolderSettings } from './download-folder.svelte';
 import { saveBlob, type SaveOutcome } from './save-target';
-import type { Seed } from '$lib/features/run/current-work';
 
 export type SvgProfile = 'display' | 'editable' | 'compat' | 'live';
 
@@ -16,27 +15,19 @@ export type SvgProfile = 'display' | 'editable' | 'compat' | 'live';
  * capture-date stamp) lives here.
  */
 export type ExportDeps = {
-	/**
-	 * The artwork currently on the canvas; null when nothing has been drawn.
-	 * The two seeds are what say which performance of the score this is, so an
-	 * export that redraws has to carry them.
-	 */
+	/** The saved work's stored picture; null when there is nothing to export. */
 	result: () => {
 		svg: string;
 		score: unknown;
 		history_at?: number | null;
-		render_seed?: Seed | null;
-		composition_seed?: Seed | null;
 	} | null;
 	/** The description that produced it, embedded as <desc> in the display profile. */
 	input: () => string;
-	/** The history item on screen, if the artwork came from history. */
+	/** The saved work being exported. */
 	displayedHistoryItem: () => { id?: string; at?: number } | null;
 	apiFetch: (path: string, init?: RequestInit) => Promise<Response>;
 	apiError: (r: Response) => Promise<Error>;
 	exportFilename: (ext: string, size?: number) => string;
-	refinementCatalogId: () => string;
-	refinementCanvasAspectId: () => CanvasAspectId;
 	effectiveCanvasAspectId: () => CanvasAspectId;
 	/** Told where the file actually landed, so a fallback can be reported. */
 	onSaved?: (outcome: SaveOutcome) => void;
@@ -61,30 +52,11 @@ export function createExportActions(deps: ExportDeps) {
 		if (profile === 'display') {
 			const desc = `<desc>${escapeXml(deps.input())}</desc>`;
 			svg = result.svg.replace(/(<svg[^>]*>)/, `$1${desc}`);
-		} else if (displayedHistoryItem?.id) {
-			const r = await deps.apiFetch(`/api/history/${displayedHistoryItem.id}/svg?profile=${profile}`);
-			if (!r.ok) throw await deps.apiError(r);
-			svg = await r.text();
 		} else {
-			const r = await deps.apiFetch('/api/render-svg', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
-					score: result.score,
-					catalog_id: deps.refinementCatalogId(),
-					canvas_aspect: deps.refinementCanvasAspectId(),
-					svg_profile: profile,
-					// Both seeds, so the file carries the performance on screen.
-					// Neither was sent before, which made the export a different
-					// performance of the same score: other marks, drawn by
-					// another hand. The renderer decides the placement with
-					// composition_seed when there is one and render_seed
-					// otherwise (renderer.py:3486), so the raw pair is enough --
-					// repeating that rule here would be a second copy of it.
-					render_seed: result.render_seed ?? null,
-					composition_seed: result.composition_seed ?? null
-				})
-			});
+			// Only a saved work is exported, so a profile that redraws asks the
+			// server for the work's own record.
+			if (!displayedHistoryItem?.id) throw new Error('only a saved work is exported');
+			const r = await deps.apiFetch(`/api/history/${displayedHistoryItem.id}/svg?profile=${profile}`);
 			if (!r.ok) throw await deps.apiError(r);
 			svg = await r.text();
 		}

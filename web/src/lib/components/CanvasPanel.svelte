@@ -24,7 +24,6 @@
 	import { composeFallbackReason, composeFallbackState, composeFallbackValue } from '$lib/composeFallback';
 	import type { CanvasViewport } from '$lib/features/canvas/viewport-state.svelte';
 	import type { PaintResult } from '$lib/features/run/current-work';
-	import type { SvgProfile } from '$lib/features/export/download';
 	import type { makeSavedWorkExportActions } from '$lib/features/export/saved-work-actions';
 	import type { CanvasStatusHistoryItem as HistoryItem } from '$lib/features/canvas/view-types';
 	import type { ProviderAttemptCount } from '$lib/paintStream';
@@ -84,8 +83,6 @@
 		statusHistoryItem: HistoryItem | null;
 		statusHashLabel: string;
 		statusHashCopied: boolean;
-		exportMenuOpen: boolean;
-		exportWrapEl: HTMLDivElement | null;
 		// True when the work tools are hidden. The export button stays on the
 		// canvas in that state, but it stops being a door onto three ways out and
 		// becomes the one way out a simple UI keeps: the share card. SVG and PNG
@@ -117,8 +114,6 @@
 		onToggleForShare?: ((item: HistoryItem | null | undefined, event?: Event) => void | Promise<void>) | null;
 		onReplayCurrent: () => void | Promise<void>;
 		replayDisabled: boolean;
-		onDownloadSVG: (profile: SvgProfile) => void | Promise<void>;
-		onDownloadPNG: (size: number) => void | Promise<void>;
 		// The card is built from a saved work, so the toolbar needs its id, not
 		// just the drawing on screen.
 		currentHistoryId: string | null;
@@ -226,8 +221,6 @@
 		statusHistoryItem,
 		statusHashLabel,
 		statusHashCopied,
-		exportMenuOpen = $bindable(false),
-		exportWrapEl = $bindable(null),
 		exportCardOnly = false,
 		pngTemplates,
 		animationExportSettings,
@@ -246,8 +239,6 @@
 		onToggleForShare = null,
 		onReplayCurrent,
 		replayDisabled,
-		onDownloadSVG,
-		onDownloadPNG,
 		currentHistoryId,
 		savedWorkExportActions,
 		onDownloadCard,
@@ -352,7 +343,6 @@
 			cardExportBusy = false;
 		}
 	}
-	let svgHelpOpen = $state(false);
 	let presentationMode = $state(false);
 	let generationInfoOpen = $state(false);
 	let generationInfoTab = $state<DrawerTab>('details');
@@ -784,13 +774,9 @@
 				{allowEmptyOutputTabs}
 				{generationInfoOpen}
 				bind:generationInfoToggleEl
-				bind:exportMenuOpen
-				bind:exportWrapEl
 				{exportCardOnly}
 				{cardExportBusy}
-				bind:svgHelpOpen
 				{currentHistoryId}
-				{pngTemplates}
 				{isJapanese}
 				onToggleInstructionCaption={toggleInstructionCaption}
 				onInstructionCaptionWritingModeChange={setInstructionCaptionWritingMode}
@@ -801,8 +787,6 @@
 				{onReplayCurrent}
 				onToggleGenerationInfo={() => (generationInfoOpen ? closeGenerationInfo() : openGenerationInfo())}
 				{onToggleSaijiki}
-				{onDownloadSVG}
-				{onDownloadPNG}
 				onDownloadCard={downloadCardFromCanvas}
 				onOpenPresentation={() => (presentationMode = true)}
 			/>

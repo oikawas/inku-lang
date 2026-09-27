@@ -498,6 +498,8 @@ export interface LangPack {
 
 	// Download
 	exportLabel: string;
+	/** The export button when the picture on the canvas is not saved. */
+	exportSaveFirst: string;
 	dlSvgBtn: string;
 	dlPngLabel: string;
 	svgExportHelpTitle: string;

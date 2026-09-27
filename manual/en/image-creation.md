@@ -244,9 +244,9 @@ You may choose `Make one option` or `Make four options`. `Another performance` i
 
 ### 8.2 Save Options
 
-Options are unsaved. Select the ones to adopt and save them to history. Saving and starring are separate actions. You may record why you chose an option.
+Options are unsaved. Select the ones to adopt and choose `Save the chosen ones and close` to save them to history; the others are discarded. To keep none, choose `Discard all and close`. While unsaved options remain, the ×, the backdrop and Escape do not close the dialog and it asks for one of the two. Reloading or closing the tab brings up the browser's confirmation.
 
-Switching the refinement target discards unsaved options belonging to that work. When you continue from an unsaved option, only the direct option is saved to the lineage as an intermediate work, and it is not shown in ordinary history.
+Pressing an option enlarges it inside the dialog; `Back to all options` or a second press returns to all of them. Saving and starring are separate actions. You may record why you chose a saved option.
 
 ## 9. Autonomous Refinement
 
@@ -352,7 +352,9 @@ Both the history strip and `Library` carry a `Shared only` filter, so the marked
 
 ## 15. Export Images
 
-Open `Export` at the bottom of the Work tab, check that the target is `Displayed work`, then choose an SVG format or PNG size. When exporting from the Library or Lineage, check the selected count or path from the origin shown in the menu.
+Open `Export` at the bottom of the Work tab, check that the target is `Displayed work`, then choose an SVG format or PNG size. When exporting from the Library or Lineage, check the selected count or path from the origin shown in the menu. The `?` by the menu's SVG heading opens the same explanation as the table below.
+
+Only a saved work is exported. A picture that is not saved (one drawn by the demo with saving off, for instance) is saved first, then exported. In the simple UI the `Export` button exports the `Share card` alone, directly.
 
 | Format | Use | Characteristics |
 |---|---|---|
@@ -517,7 +519,7 @@ Flags you omit fall back to the server defaults, and the server defaults are not
 | "Cannot reach the server" | The API is stopped or restarting. The page reopens by itself once it answers; if this lasts, check the server |
 | Painting is refused | The concurrency ceiling has been reached. Wait a moment |
 | A comparison result is lost | Adopt or star the compared option to keep it in history |
-| Refinement options disappeared | Changing the refinement target discards unsaved options, so save first |
+| The refinement dialog does not close | Options are unsaved. Choose `Save the chosen ones and close` or `Discard all and close` |
 
 Write observable physical words, not only words of emotional judgment.
 

@@ -173,11 +173,15 @@ test('T-7: the canvas card door is inside the export menu, with the other two', 
 	// The author then ruled: in a simple UI the export button stays and calls
 	// the card alone. So the menu holds all three only where the work tools are
 	// shown; T-107 owns the other state. No rule hides .canvas-export any more.
+	//
+	// Since 2026-09-27 the canvas has one menu, the saved work's, and it holds
+	// all three.
 	const source = read(CANVAS_ARTWORK);
-	const menu = elementBody(source, 'div', /<div class="export-menu"/);
-	assert.match(menu, /onDownloadCard\(\)/, 'the card left the export menu');
-	assert.match(menu, /onDownloadSVG\('display'\)/, 'SVG left the export menu');
-	assert.match(menu, /onDownloadPNG\(/, 'PNG left the export menu');
+	assert.match(source, /<SavedWorkExportMenu \{\.\.\.savedWorkExport\} variant="canvas" \/>/);
+	const menu = read(EXPORT_MENU);
+	assert.match(menu, /onDownloadCard\?\.\(/, 'the card left the export menu');
+	assert.match(menu, /onDownloadSVG\?\.\(profile, target\)/, 'SVG left the export menu');
+	assert.match(menu, /onDownloadPNG\?\.\(/, 'PNG left the export menu');
 	// One button opens all three, and no UI mode takes the button away.
 	assert.match(source, /class="canvas-icon-btn canvas-export-btn"/);
 	assert.doesNotMatch(
@@ -194,7 +198,7 @@ test('T-8: the history side keeps its own card button', () => {
 	const source = read(HISTORY_MANAGER);
 	assert.match(source, /<SavedWorkExportMenu[\s\S]*?onDownloadCard=\{onDownloadSavedWorkCard\}/);
 	const menu = read(EXPORT_MENU);
-	assert.match(menu, /\{#if onDownloadCard\}[\s\S]*?\{t\(\)\.historyCardExport\}/);
+	assert.match(menu, /\{#if onDownloadCard\}[\s\S]*?t\(\)\.historyCardExport/);
 	assert.match(read(PAGE), /onDownloadSavedWorkCard=\{savedWorkExportActions\.onDownloadCard\}/);
 });
 

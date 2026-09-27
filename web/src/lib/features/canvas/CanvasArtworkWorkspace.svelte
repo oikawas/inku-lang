@@ -1,11 +1,9 @@
 <script lang="ts">
 	import { t } from '$lib/i18n/index.svelte';
 	import { placeholderMotifTransform } from '$lib/canvas-placeholder';
-	import type { ExportTemplate } from '$lib/exportTemplates';
 	import { shareTargetOf } from '$lib/shareTarget';
 	import type { CanvasViewport } from '$lib/features/canvas/viewport-state.svelte';
 	import type { PaintResult } from '$lib/features/run/current-work';
-	import type { SvgProfile } from '$lib/features/export/download';
 	import type { CanvasStatusHistoryItem } from './view-types';
 	import Tooltip from '$lib/components/Tooltip.svelte';
 	import CaptionText from '$lib/components/CaptionText.svelte';
@@ -39,14 +37,10 @@
 		allowEmptyOutputTabs: boolean;
 		generationInfoOpen: boolean;
 		generationInfoToggleEl: HTMLButtonElement | null;
-		exportMenuOpen: boolean;
-		exportWrapEl: HTMLDivElement | null;
 		exportCardOnly: boolean;
 		savedWorkExport?: SavedWorkExportMenuProps | null;
 		cardExportBusy: boolean;
-		svgHelpOpen: boolean;
 		currentHistoryId: string | null;
-		pngTemplates: ExportTemplate[];
 		isJapanese: boolean;
 		onToggleInstructionCaption: () => void;
 		onInstructionCaptionWritingModeChange: (event: Event) => void;
@@ -57,8 +51,6 @@
 		onReplayCurrent: () => void | Promise<void>;
 		onToggleGenerationInfo: () => void;
 		onToggleSaijiki: () => void;
-		onDownloadSVG: (profile: SvgProfile) => void | Promise<void>;
-		onDownloadPNG: (size: number) => void | Promise<void>;
 		onDownloadCard: () => void | Promise<void>;
 		onOpenPresentation: () => void;
 	};
@@ -90,14 +82,10 @@
 		allowEmptyOutputTabs,
 		generationInfoOpen,
 		generationInfoToggleEl = $bindable(null),
-		exportMenuOpen = $bindable(false),
-		exportWrapEl = $bindable(null),
 		exportCardOnly,
 		savedWorkExport = null,
 		cardExportBusy,
-		svgHelpOpen = $bindable(false),
 		currentHistoryId,
-		pngTemplates,
 		isJapanese,
 		onToggleInstructionCaption,
 		onInstructionCaptionWritingModeChange,
@@ -108,8 +96,6 @@
 		onReplayCurrent,
 		onToggleGenerationInfo,
 		onToggleSaijiki,
-		onDownloadSVG,
-		onDownloadPNG,
 		onDownloadCard,
 		onOpenPresentation
 	}: Props = $props();
@@ -121,15 +107,6 @@
 	// keeps circles and angles intact on every canvas proportion.
 	const placeholderTransform = $derived(placeholderMotifTransform(placeholderWidth, placeholderHeight));
 	const shareTarget = $derived(shareTargetOf(statusHistoryItem));
-
-	function isDefaultPngTemplate(template: ExportTemplate): boolean {
-		return template.id === `png-${template.y_px}` && [1080, 2160, 4320].includes(template.y_px);
-	}
-
-	function pngTemplateDescription(template: ExportTemplate): string {
-		if (isDefaultPngTemplate(template)) return t().pngYAxisDescription(template.y_px);
-		return template.description || t().pngYAxisDescription(template.y_px);
-	}
 </script>
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -349,98 +326,36 @@
 					<!-- One door for the three ways a work leaves: SVG, PNG, and the
 					     share card. They were three buttons side by side, which said
 					     three things where the reader wanted one. -->
-					<div class="canvas-export" bind:this={exportWrapEl}>
-						{#if savedWorkExport}
+					<div class="canvas-export">
+						{#if exportCardOnly}
+							<!-- A simple UI keeps one way out, the share card (ruled
+							     2026-08-16): the button calls it, and opens no menu. -->
+							<Tooltip placement="top-left" text={t().historyCardExport}>
+								<button
+									type="button"
+									class="canvas-icon-btn canvas-export-btn"
+									disabled={!currentHistoryId || cardExportBusy}
+									aria-label={t().historyCardExport}
+									onclick={(e) => { e.stopPropagation(); onDownloadCard(); }}
+								>
+									<svg class="download-icon" viewBox="0 0 24 24" aria-hidden="true">
+										<path d="M12 3v11m0 0 4-4m-4 4-4-4M5 18h14" />
+									</svg>
+								</button>
+							</Tooltip>
+						{:else if savedWorkExport}
+							<!-- The one export menu. A picture that is not saved has none:
+							     it is saved first, then exported from here. -->
 							<SavedWorkExportMenu {...savedWorkExport} variant="canvas" />
 						{:else}
-						<Tooltip placement="top-left" text={exportCardOnly ? t().historyCardExport : t().exportLabel}>
-							<button
-								type="button"
-								class="canvas-icon-btn canvas-export-btn"
-								class:active={exportMenuOpen && !exportCardOnly}
-								disabled={exportCardOnly ? (!currentHistoryId || cardExportBusy) : !result}
-								aria-haspopup={exportCardOnly ? undefined : 'menu'}
-								aria-expanded={exportCardOnly ? undefined : exportMenuOpen}
-								aria-label={exportCardOnly ? t().historyCardExport : t().exportLabel}
-								onclick={(e) => {
-									e.stopPropagation();
-									// One button, two jobs, decided by which tools the reader kept.
-									// With the work tools gone there is nothing to choose between,
-									// so opening a menu of one would be a door onto a door.
-									if (exportCardOnly) onDownloadCard();
-									else exportMenuOpen = !exportMenuOpen;
-								}}
-							>
-								<svg class="download-icon" viewBox="0 0 24 24" aria-hidden="true">
-									<path d="M12 3v11m0 0 4-4m-4 4-4-4M5 18h14" />
-								</svg>
-							</button>
-						</Tooltip>
-						{#if exportMenuOpen && !exportCardOnly}
-							<div class="export-menu" role="menu">
-								<div class="export-menu-group">
-									<div class="svg-menu-head">
-										<span>{t().svgExportHelpTitle}</span>
-										<button
-											type="button"
-											class="svg-help-btn"
-											aria-label={t().svgExportHelpAria}
-											onclick={(e) => { e.stopPropagation(); svgHelpOpen = !svgHelpOpen; }}
-										>?</button>
-									</div>
-									{#if svgHelpOpen}
-										<div class="svg-help-popover">
-											<table>
-												<thead>
-													<tr><th>{t().svgExportTableFormat}</th><th>{t().svgExportTableUse}</th><th>{t().svgExportTableFeature}</th></tr>
-												</thead>
-												<tbody>
-													<tr><td>{t().svgExportDisplayName}</td><td>{t().svgExportDisplayUse}</td><td>{t().svgExportDisplayFeature}</td></tr>
-													<tr><td>{t().svgExportEditableName}</td><td>{t().svgExportEditableUse}</td><td>{t().svgExportEditableFeature}</td></tr>
-													<tr><td>{t().svgExportCompatName}</td><td>{t().svgExportCompatUse}</td><td>{t().svgExportCompatFeature}</td></tr>
-													<tr><td>{t().svgExportLiveName}</td><td>{t().svgExportLiveUse}</td><td>{t().svgExportLiveFeature}</td></tr>
-												</tbody>
-											</table>
-										</div>
-									{/if}
-									<button onclick={() => { onDownloadSVG('display'); exportMenuOpen = false; }}>
-										<span class="png-size">{t().svgExportDisplayName}</span>
-										<span class="png-sub">{t().svgExportDisplaySub}</span>
-									</button>
-									<button onclick={() => { onDownloadSVG('editable'); exportMenuOpen = false; }}>
-										<span class="png-size">{t().svgExportEditableName}</span>
-										<span class="png-sub">{t().svgExportEditableSub}</span>
-									</button>
-									<button onclick={() => { onDownloadSVG('compat'); exportMenuOpen = false; }}>
-										<span class="png-size">{t().svgExportCompatName}</span>
-										<span class="png-sub">{t().svgExportCompatSub}</span>
-									</button>
-									<button onclick={() => { onDownloadSVG('live'); exportMenuOpen = false; }}>
-										<span class="png-size">{t().svgExportLiveName}</span>
-										<span class="png-sub">{t().svgExportLiveSub}</span>
-									</button>
-								</div>
-								<div class="export-menu-group">
-									<div class="export-menu-head">PNG</div>
-									{#each pngTemplates as template (template.id)}
-										<button onclick={() => { onDownloadPNG(template.y_px); exportMenuOpen = false; }}>
-											<span class="png-size">{template.name}</span>
-											<span class="png-sub">{pngTemplateDescription(template)}</span>
-										</button>
-									{/each}
-								</div>
-								<div class="export-menu-group">
-									<button
-										type="button"
-										disabled={!currentHistoryId || cardExportBusy}
-								onclick={() => { onDownloadCard(); exportMenuOpen = false; }}
-									>
-										<span class="png-size">{cardExportBusy ? t().cardExportBusy : t().historyCardExport}</span>
-										<span class="png-sub">{t().tooltipCanvasDownloadCard}</span>
-									</button>
-								</div>
-							</div>
-						{/if}
+							<!-- With nothing drawn there is nothing to save first. -->
+							<Tooltip placement="top-left" text={result ? t().exportSaveFirst : t().exportLabel}>
+								<button type="button" class="canvas-icon-btn canvas-export-btn" disabled aria-label={t().exportLabel}>
+									<svg class="download-icon" viewBox="0 0 24 24" aria-hidden="true">
+										<path d="M12 3v11m0 0 4-4m-4 4-4-4M5 18h14" />
+									</svg>
+								</button>
+							</Tooltip>
 						{/if}
 					</div>
 					<Tooltip placement="top-left" text={t().tooltipCanvasPresentation}>
@@ -694,108 +609,6 @@
 	/* The export menu hangs off the corner controls, so it opens upward from a
 	   button that sits at the bottom of the canvas. */
 	.canvas-export { position: relative; display: inline-flex; }
-	.export-menu {
-		position: absolute;
-		bottom: calc(100% + 6px);
-		right: 0;
-		z-index: 100;
-		background: var(--panel);
-		border: 1px solid var(--border2);
-		border-radius: var(--r-lg);
-		overflow: hidden;
-		box-shadow: 0 4px 18px rgba(0,0,0,0.12);
-		min-width: 220px;
-	}
-	.export-menu > .export-menu-group > button {
-		display: flex;
-		align-items: center;
-		gap: 8px;
-		width: 100%;
-		text-align: left;
-		padding: 8px 14px;
-		background: none;
-		border: none;
-		border-bottom: 1px solid var(--border);
-		color: var(--fg);
-		cursor: pointer;
-		font-family: inherit;
-		font-size: var(--ui-font-size-13);
-		white-space: nowrap;
-	}
-	.export-menu-group:last-child > button:last-child { border-bottom: none; }
-	.export-menu > .export-menu-group > button:hover:not(:disabled) { background: var(--bg); }
-	.export-menu > .export-menu-group > button:disabled { opacity: .45; cursor: not-allowed; }
-	/* The three ways out are one list, divided rather than stacked in three
-	   boxes: a rule says "another kind" without spending the height a second
-	   frame would. */
-	.export-menu-group + .export-menu-group { border-top: 2px solid var(--border2); }
-	.export-menu-head {
-		padding: 7px 14px 3px;
-		color: var(--fg3);
-		font-size: var(--ui-font-size-10);
-		font-weight: 600;
-		letter-spacing: .08em;
-	}
-	.png-size { font-weight: 500; }
-	.png-sub { color: var(--fg3); font-size: var(--ui-font-size-11); white-space: nowrap; }
-	.svg-menu-head {
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		gap: 12px;
-		padding: 8px 12px;
-		border-bottom: 1px solid var(--border);
-		color: var(--fg2);
-		font-size: var(--ui-font-size-12);
-		font-weight: 600;
-	}
-	.svg-help-btn {
-		width: 18px;
-		height: 18px;
-		border: 1px solid var(--border2);
-		border-radius: 50%;
-		background: var(--bg);
-		color: var(--fg2);
-		font: inherit;
-		font-size: var(--ui-font-size-11);
-		line-height: 1;
-		cursor: pointer;
-		display: inline-flex;
-		align-items: center;
-		justify-content: center;
-		flex: 0 0 auto;
-		padding: 0;
-	}
-	.svg-help-popover {
-		width: min(480px, calc(100vw - 48px));
-		padding: 12px;
-		border-bottom: 1px solid var(--border);
-		background: var(--bg2);
-		color: var(--fg);
-	}
-	.svg-help-popover table {
-		width: 100%;
-		border-collapse: collapse;
-		font-size: var(--ui-font-size-11);
-		line-height: 1.45;
-	}
-	.svg-help-popover th,
-	.svg-help-popover td {
-		padding: 6px 8px;
-		border: 1px solid var(--border);
-		text-align: left;
-		vertical-align: top;
-	}
-	.svg-help-popover th {
-		background: var(--bg);
-		color: var(--fg2);
-		font-weight: 700;
-		white-space: nowrap;
-	}
-	.svg-help-popover td:first-child {
-		white-space: nowrap;
-		font-weight: 600;
-	}
 	@media (max-width: 720px) {
 		.instruction-caption {
 			left: 10%;

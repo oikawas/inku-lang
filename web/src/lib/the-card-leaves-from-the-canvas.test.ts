@@ -26,24 +26,24 @@ const TYPES = read('./i18n/types.ts');
 const ARTWORK = read('./features/canvas/CanvasArtworkWorkspace.svelte');
 const PAGE = read('../routes/+page.svelte');
 
-/** The export menu only -- the list that carries SVG, PNG and the card. */
-function exportMenu(source: string): string {
-	const start = source.indexOf('<div class="export-menu"');
-	assert.notEqual(start, -1, 'the canvas export menu was not found');
-	const end = source.indexOf('<Tooltip placement="top-left" text={t().tooltipCanvasPresentation}>', start);
-	assert.notEqual(end, -1, 'the end of the canvas export menu was not found');
-	return source.slice(start, end);
+const MENU = read('./components/SavedWorkExportMenu.svelte');
+
+/** The single-work entries of the one export menu: SVG, PNG and the card. */
+function exportMenu(): string {
+	const start = MENU.indexOf('{#if single && onDownloadSVG && onDownloadPNG}');
+	assert.notEqual(start, -1, 'the export menu has no single-work entries');
+	const end = MENU.indexOf('{#if onDownloadDdl}', start);
+	assert.notEqual(end, -1, 'the end of the single-work entries was not found');
+	return MENU.slice(start, end);
 }
 
-/** The card entry inside the menu, from its own disabled test to its close. */
-function cardButton(menu: string): string {
-	const start = menu.indexOf('cardExportBusy ? t().cardExportBusy');
-	assert.notEqual(start, -1, 'the card entry is not in the export menu');
-	const open = menu.lastIndexOf('<button', start);
-	assert.notEqual(open, -1, 'the card entry has no button around it');
-	const end = menu.indexOf('</button>', start);
-	assert.notEqual(end, -1, 'the card entry never closes');
-	return menu.slice(open, end);
+/** The simple UI's export button, which calls the card alone. */
+function cardOnlyButton(): string {
+	const start = ARTWORK.indexOf('{#if exportCardOnly}');
+	assert.notEqual(start, -1, 'the simple UI export branch is gone');
+	const end = ARTWORK.indexOf('{:else if savedWorkExport}', start);
+	assert.notEqual(end, -1, 'the simple UI export branch never ends');
+	return ARTWORK.slice(start, end);
 }
 
 // ── T-1: the label ──────────────────────────────────────────────────────────
@@ -58,27 +58,28 @@ test('the label reads 共有カード / Share card, and the old one is gone', ()
 // ── T-2: the position ───────────────────────────────────────────────────────
 
 test('the card is the last of the three ways out, after PNG', () => {
-	const menu = exportMenu(ARTWORK);
+	// Since 2026-09-27 the canvas has one export menu, the saved work's.
+	const menu = exportMenu();
 	const png = menu.indexOf('onDownloadPNG');
 	const card = menu.indexOf('onDownloadCard');
-	assert.notEqual(png, -1, 'the PNG entry left the canvas export menu');
-	assert.notEqual(card, -1, 'the card entry is not in the canvas export menu');
+	assert.notEqual(png, -1, 'the PNG entry left the export menu');
+	assert.notEqual(card, -1, 'the card entry is not in the export menu');
 	assert.ok(card > png, 'the card must come after PNG, not before it');
 	// And SVG before both, so the merge kept the order the three buttons had.
 	const svg = menu.indexOf('onDownloadSVG');
-	assert.notEqual(svg, -1, 'the SVG entries left the canvas export menu');
+	assert.notEqual(svg, -1, 'the SVG entries left the export menu');
 	assert.ok(svg < png, 'SVG must come before PNG');
 });
 
 // ── T-3: a work with no id cannot be carded ─────────────────────────────────
 
 test('the card button is disabled when the shown work has no history id', () => {
-	const button = cardButton(exportMenu(ARTWORK));
-	const disabled = button.match(/disabled=\{([^}]*)\}/);
+	// The menu is only handed over for a saved work, so its card entry always
+	// has an id; the simple UI's button, which calls the card directly, keeps
+	// its own test for that.
+	assert.match(read('./components/CanvasPanel.svelte'), /savedWorkExport=\{currentHistoryId && /);
+	const disabled = cardOnlyButton().match(/disabled=\{([^}]*)\}/);
 	assert.ok(disabled, 'the card button has no disabled expression');
-	// history_id is optional on a result, and displayedHistoryItem can be null,
-	// so the export button's own `!result` would let a press go out with
-	// id === null. The entry keeps its own test for that.
 	assert.match(disabled[1], /currentHistoryId/);
 });
 

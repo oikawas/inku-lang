@@ -49,6 +49,10 @@
 	let wrapperEl = $state<HTMLDivElement | null>(null);
 	let menuEl = $state<HTMLDivElement | null>(null);
 	let triggerEl = $state<HTMLButtonElement | null>(null);
+	// The one export menu now: what the canvas's own menu said (the SVG
+	// profile table, each entry's line under it) is said here.
+	let svgHelpOpen = $state(false);
+	let cardRunning = $state(false);
 	const single = $derived((snapshot?.ids.length ?? 0) === 1);
 	const transition = $derived((snapshot?.ids.length ?? 0) > 1);
 
@@ -132,6 +136,21 @@
 		}
 	}
 
+	function pngTemplateDescription(template: ExportTemplate): string {
+		const builtIn = template.id === `png-${template.y_px}` && [1080, 2160, 4320].includes(template.y_px);
+		if (builtIn) return t().pngYAxisDescription(template.y_px);
+		return template.description || t().pngYAxisDescription(template.y_px);
+	}
+
+	async function runCard(target: SavedWorkExportSnapshot): Promise<void> {
+		cardRunning = true;
+		try {
+			await onDownloadCard?.(target.ids[0], target);
+		} finally {
+			cardRunning = false;
+		}
+	}
+
 	function openAnimation(): void {
 		if (!snapshot || busy) return;
 		animationOpen = true;
@@ -158,7 +177,7 @@
 		{#if variant === 'panel'}<span>{t().exportLabel} ▾</span>{/if}
 	</button>
 	{#if open && snapshot}
-		<div bind:this={menuEl} class="saved-work-export-menu" role="menu" tabindex="-1" onkeydown={onMenuKeydown}>
+		<div bind:this={menuEl} class="saved-work-export-menu" class:wide={svgHelpOpen} role="menu" tabindex="-1" onkeydown={onMenuKeydown}>
 			<div class="saved-work-export-scope">
 				<strong>{scopeLabel(snapshot)}</strong>
 				{#if transition && snapshot.kind !== 'lineage-path'}<span>{t().savedWorkExportOldestFirst}</span>{/if}
@@ -172,22 +191,54 @@
 				</div>
 			{/if}
 			{#if single && onDownloadSVG && onDownloadPNG}
+				{@const svgProfiles = [
+					['display', t().svgExportDisplayName, t().svgExportDisplaySub],
+					['editable', t().svgExportEditableName, t().svgExportEditableSub],
+					['compat', t().svgExportCompatName, t().svgExportCompatSub],
+					['live', t().svgExportLiveName, t().svgExportLiveSub],
+				] as const}
 				<div class="saved-work-export-group">
-					<div class="saved-work-export-heading">SVG</div>
-					<button type="button" role="menuitem" disabled={busy} onclick={() => void run((target) => onDownloadSVG?.('display', target))}>{t().svgExportDisplayName}</button>
-					<button type="button" role="menuitem" disabled={busy} onclick={() => void run((target) => onDownloadSVG?.('editable', target))}>{t().svgExportEditableName}</button>
-					<button type="button" role="menuitem" disabled={busy} onclick={() => void run((target) => onDownloadSVG?.('compat', target))}>{t().svgExportCompatName}</button>
-					<button type="button" role="menuitem" disabled={busy} onclick={() => void run((target) => onDownloadSVG?.('live', target))}>{t().svgExportLiveName}</button>
+					<div class="saved-work-export-heading saved-work-export-svg-head">
+						<span>{t().svgExportHelpTitle}</span>
+						<button type="button" class="saved-work-export-help" aria-label={t().svgExportHelpAria} aria-expanded={svgHelpOpen} onclick={(event) => { event.stopPropagation(); svgHelpOpen = !svgHelpOpen; }}>?</button>
+					</div>
+					{#if svgHelpOpen}
+						<div class="saved-work-export-help-table">
+							<table>
+								<thead>
+									<tr><th>{t().svgExportTableFormat}</th><th>{t().svgExportTableUse}</th><th>{t().svgExportTableFeature}</th></tr>
+								</thead>
+								<tbody>
+									<tr><td>{t().svgExportDisplayName}</td><td>{t().svgExportDisplayUse}</td><td>{t().svgExportDisplayFeature}</td></tr>
+									<tr><td>{t().svgExportEditableName}</td><td>{t().svgExportEditableUse}</td><td>{t().svgExportEditableFeature}</td></tr>
+									<tr><td>{t().svgExportCompatName}</td><td>{t().svgExportCompatUse}</td><td>{t().svgExportCompatFeature}</td></tr>
+									<tr><td>{t().svgExportLiveName}</td><td>{t().svgExportLiveUse}</td><td>{t().svgExportLiveFeature}</td></tr>
+								</tbody>
+							</table>
+						</div>
+					{/if}
+					{#each svgProfiles as [profile, name, sub] (profile)}
+						<button type="button" role="menuitem" disabled={busy} onclick={() => void run((target) => onDownloadSVG?.(profile, target))}>
+							<span class="saved-work-export-name">{name}</span>
+							<span class="saved-work-export-sub">{sub}</span>
+						</button>
+					{/each}
 				</div>
 				<div class="saved-work-export-group">
 					<div class="saved-work-export-heading">PNG</div>
 					{#each pngTemplates as template (template.id)}
-						<button type="button" role="menuitem" disabled={busy} onclick={() => void run((target) => onDownloadPNG?.(template.y_px, target))}>{template.name}</button>
+						<button type="button" role="menuitem" disabled={busy} onclick={() => void run((target) => onDownloadPNG?.(template.y_px, target))}>
+							<span class="saved-work-export-name">{template.name}</span>
+							<span class="saved-work-export-sub">{pngTemplateDescription(template)}</span>
+						</button>
 					{/each}
 				</div>
 				{#if onDownloadCard}
 					<div class="saved-work-export-group">
-						<button type="button" role="menuitem" disabled={busy} onclick={() => void run((target) => onDownloadCard?.(target.ids[0], target))}>{t().historyCardExport}</button>
+						<button type="button" role="menuitem" disabled={busy} onclick={() => void run(runCard)}>
+							<span class="saved-work-export-name">{cardRunning ? t().cardExportBusy : t().historyCardExport}</span>
+							<span class="saved-work-export-sub">{t().tooltipCanvasDownloadCard}</span>
+						</button>
 					</div>
 				{/if}
 				{#if onDownloadDdl}
@@ -240,5 +291,16 @@
 	.saved-work-export-group button { display: block; width: 100%; border: 0; padding: 7px 12px; background: transparent; color: var(--fg); cursor: pointer; font: inherit; font-size: var(--ui-font-size-12); text-align: left; }
 	.saved-work-export-group button:hover:not(:disabled) { background: var(--bg); }
 	.saved-work-export-group button:disabled { opacity: .55; cursor: default; }
+	.saved-work-export-menu.wide { width: min(480px, calc(100vw - 32px)); }
+	.saved-work-export-group button { display: grid; gap: 1px; }
+	.saved-work-export-name { font-weight: 500; }
+	.saved-work-export-sub { color: var(--fg3); font-size: var(--ui-font-size-11); }
+	.saved-work-export-svg-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-right: 12px; letter-spacing: 0; }
+	.saved-work-export-group .saved-work-export-help { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; padding: 0; border: 1px solid var(--border2); border-radius: 50%; background: var(--bg); color: var(--fg2); font-size: var(--ui-font-size-11); line-height: 1; }
+	.saved-work-export-help-table { padding: 8px 12px; background: var(--bg2); border-bottom: 1px solid var(--border); }
+	.saved-work-export-help-table table { width: 100%; border-collapse: collapse; font-size: var(--ui-font-size-11); line-height: 1.45; }
+	.saved-work-export-help-table th, .saved-work-export-help-table td { padding: 6px 8px; border: 1px solid var(--border); text-align: left; vertical-align: top; }
+	.saved-work-export-help-table th { background: var(--bg); color: var(--fg2); font-weight: 700; white-space: nowrap; }
+	.saved-work-export-help-table td:first-child { white-space: nowrap; font-weight: 600; }
 	.saved-work-export-error { margin: 0; padding: 8px 12px; border-top: 1px solid var(--border); color: var(--danger); font-size: var(--ui-font-size-12); }
 </style>

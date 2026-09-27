@@ -304,7 +304,11 @@
 # 50: `center` (中心 / 中央 / middle) is the canvas-center region an omitted
 # position uses. Stage 1.5 no longer moves it to one of six off-center focus
 # regions, and an explicit variation has no axis to move.
-DDL_ENGINE_VERSION = "50"
+# 51: A position word names a range built from three equal bands per axis, and
+# `center` is the middle cell. One placed mark anchors in its range shrunk to
+# two thirds; a line-up, scatter, or tile keeps its marks inside the range, and
+# with the position omitted it uses the whole canvas.
+DDL_ENGINE_VERSION = "51"
 # 4 (2026-07-30): yellow, orange, and purple become abstract Score colors, and
 # coerce recognizes the corresponding Japanese and English DDL markers.
 # 3 (2026-07-30): 黄 / 橙 / 紫 joined the saijiki color words, so an author can write

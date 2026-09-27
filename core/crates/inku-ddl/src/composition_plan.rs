@@ -420,6 +420,7 @@ pub struct ObjectPlacementPlan {
     pub(crate) color_cycle: Vec<Color>,
     pub(crate) angle: Option<f64>,
     pub(crate) layout_direction: Option<ResolvedLayoutDirection>,
+    pub(crate) line_axis: [i8; 2],
     pub(crate) anchor: ObjectAnchor,
     pub(crate) domain: [Rational; 2],
     pub(crate) recipe: PlacementRecipe,
@@ -490,6 +491,11 @@ impl ObjectPlacementPlan {
     }
     pub fn layout_direction(&self) -> Option<&ResolvedLayoutDirection> {
         self.layout_direction.as_ref()
+    }
+    /// The axis a line-up runs along: the explicit direction, or the long
+    /// side of its range when the direction is omitted.
+    pub fn line_axis(&self) -> [i8; 2] {
+        self.line_axis
     }
     pub fn anchor(&self) -> &ObjectAnchor {
         &self.anchor

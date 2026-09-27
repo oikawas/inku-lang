@@ -21,6 +21,17 @@ DDL, Score and rendering versions are unchanged.
 ### 2026-09-27 — resvg-py goes to 0.5.0 in the Server and the CLI
 
 resvg-py, which makes PNGs, is locked at the latest 0.5.0 instead of 0.3.4 (Server and CLI). The arguments of the `svg_to_bytes` the code calls are unchanged. 0.5.0 ships one build for Python 3.10 and later (abi3), usable in the Server's container (Linux, Python 3.12) and on macOS. The dependency floor `>=0.3.4` (0.3.3 took the whole process down on some works) stays. Ten SVGs, scratch works and a test fixture, rasterized by 0.3.4 and 0.5.0 are identical to the pixel. The resvg-py version recorded in a PNG's `rasterizer_info` becomes 0.5.0. DDL, Score, and render versions are unchanged.
+### 2026-09-27 — `center` in instructions means the middle of the canvas
+
+Until now Stage 1.5 moved every `place:center` in a work (`中心`, `中央`, `center`, `middle`) to one "focus" region chosen per work. The six focus candidates were upper right, upper left, lower right, lower left, near the top edge, and the right half, and none of them contained the middle of the canvas, so a shape written at the center never appeared there. Following the author's decision ("中央 is just another word for 中心"; remove the focus feature for now and build a composition feature separately; never read an author's position word as a different position), the reinterpretation is removed.
+
+- `center` is now the same central region an omitted position uses (0.39 to 0.61 on each axis), with its position chosen inside that region at performance time as before. An Anchor's `center` is still the single point (0.5, 0.5).
+- "Another composition" reselects only an explicit slant's angle and a `corner`. For a work whose only placement is `center`, every candidate draws the same picture.
+- Explicit variation (small, medium, large) is still accepted, but it has no axis to move and leaves the picture unchanged. The option stays on screen (the author's decision).
+- The DDL of the 373 typed works in production was compiled before and after the change (no drawing). 270 changed, each only by a focus region becoming the central region (417 drawing regions, 17 fill bounds, 1 group region). The other 103 Scores are identical, and no compile outcome (complete, with omissions, stopped) changed.
+- Saved works do not change, because a replay draws the saved Score. New works and operations that rebuild from DDL (editing the DDL or the description, another composition) place `center` in the middle.
+
+The Stage 1.5 schema becomes `inku.typed-stage15-transformation.v7` and the geometry policy digest `5703a18f…`. The DDL engine moves to 50. The render engine is unchanged.
 
 ### 2026-09-27 — the info panel's version rows explain themselves
 

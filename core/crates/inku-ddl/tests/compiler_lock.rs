@@ -6,7 +6,7 @@ use inku_ddl::{
     RelationReferenceEvidenceAvailability, ResolvedInstructionLanguage,
     SEMANTIC_DOCUMENT_SCHEMA_ID, SEMANTIC_SOURCE_PROVENANCE_SCHEMA_ID, SemanticContinuationTarget,
     SemanticDeliveryOwner, SemanticHead, SemanticIssueCausalProvenance,
-    SemanticUpstreamCausalRelation, Stage15TargetPath, Stage15Variation, Stage15VariationAmplitude,
+    SemanticUpstreamCausalRelation, Stage15Variation, Stage15VariationAmplitude,
     TYPED_DDL_COMPILATION_SCHEMA_ID, TYPED_DDL_COMPILER_LOCK_SCHEMA_ID, bind_macro_parameters,
     compile_typed_ddl, expanded_generated_provenance_canonical_bytes,
     expanded_meaning_canonical_bytes, saijiki_asset, semantic_source_provenance_canonical_bytes,
@@ -211,7 +211,7 @@ const V21_SEED_DIGEST_KNOWN_ANSWER: &str =
 const V21_EXPANDED_MEANING_SHA256_KNOWN_ANSWER: &str =
     "251884860862eff7347cd6cf9c016c1b562d5a2682ce6739f267556a9b370a1c";
 const V21_FULL_LOCK_KNOWN_ANSWER: &str =
-    "97efbc7f7bb7455c4c6c7dfdbbb16b88dc19caa2447ddaa83673af36c6da1444";
+    "4b267bef80d0a1faf2623b2d8649f8f77dee8dc32cb44ce6c15191d8cc95bee7";
 const LIMITS: MacroExpansionLimits = MacroExpansionLimits {
     max_invocations: 16,
     max_depth: 16,
@@ -2507,7 +2507,7 @@ fn step9h_macro_parameter_continuations_preserve_equal_and_block_different_meani
 fn semantic_macro_execution_owner_preserves_continuation_binding_and_stage15_delivery() {
     let definition = center_emit_definition();
     let cases = [
-        ("a red Focus.Center", 1, 0, vec![0], vec![0], 3, 2),
+        ("a red Focus.Center", 1, 0, vec![0], vec![0], 3),
         (
             "a Focus.Center; the red Focus.Center",
             1,
@@ -2515,7 +2515,6 @@ fn semantic_macro_execution_owner_preserves_continuation_binding_and_stage15_del
             vec![0],
             vec![0],
             3,
-            2,
         ),
         (
             "a Focus.Center; a red Focus.Center",
@@ -2524,7 +2523,6 @@ fn semantic_macro_execution_owner_preserves_continuation_binding_and_stage15_del
             vec![0, 1],
             vec![0, 1],
             6,
-            4,
         ),
         (
             "a Focus.Center; the red Focus.Center; a blue Focus.Center",
@@ -2533,7 +2531,6 @@ fn semantic_macro_execution_owner_preserves_continuation_binding_and_stage15_del
             vec![0, 2],
             vec![0, 1],
             6,
-            4,
         ),
     ];
 
@@ -2544,7 +2541,6 @@ fn semantic_macro_execution_owner_preserves_continuation_binding_and_stage15_del
         source_execution_ordinals,
         semantic_execution_ordinals,
         emits,
-        targets,
     ) in cases
     {
         let document = locked_document(source, ResolvedInstructionLanguage::En, &definition);
@@ -2749,30 +2745,6 @@ fn semantic_macro_execution_owner_preserves_continuation_binding_and_stage15_del
             expansion.expanded.as_slice(),
             "{source}"
         );
-        assert_eq!(transformed.targets().len(), targets, "{source}");
-        let target_ordinals = transformed
-            .targets()
-            .iter()
-            .map(|target| match &target.path {
-                Stage15TargetPath::MacroEmit {
-                    invocation_ordinal,
-                    generated_ordinal,
-                    field,
-                    ..
-                } if field == "place" && matches!(generated_ordinal, 0 | 1) => *invocation_ordinal,
-                other => panic!("unexpected Focus.Center target {other:?}: {source}"),
-            })
-            .collect::<Vec<_>>();
-        for ordinal in source_execution_ordinals {
-            assert_eq!(
-                target_ordinals
-                    .iter()
-                    .filter(|candidate| **candidate == ordinal)
-                    .count(),
-                2,
-                "{source}: ordinal {ordinal}"
-            );
-        }
     }
 }
 
@@ -2853,7 +2825,6 @@ fn macro_source_gap_shares_seed_expanded_and_effective_meaning_without_losing_so
     let baseline = results.each_ref().map(|result| {
         transform_stage15(stage15_transformation_input(result).unwrap(), None).unwrap()
     });
-    assert_eq!(baseline[0].baseline_focus(), baseline[1].baseline_focus());
     assert_eq!(
         baseline[0].effective_canonical_bytes(),
         baseline[1].effective_canonical_bytes()
@@ -2868,7 +2839,6 @@ fn macro_source_gap_shares_seed_expanded_and_effective_meaning_without_losing_so
         )
         .unwrap()
     });
-    assert_eq!(varied[0].resolved_focus(), varied[1].resolved_focus());
     assert_eq!(
         varied[0].effective_canonical_bytes(),
         varied[1].effective_canonical_bytes()

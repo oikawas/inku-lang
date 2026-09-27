@@ -142,7 +142,7 @@ spans, invocation, expansion path, generated ordinal, field key, and the actual
 omission unit. If no drawing target remains, the result is stopped.
 
 Place literals and explicitly declared `{"type":"semantic_ref","category":"place"}` parameters
-use the same regions in SPEC §18. Only center requires an exact generated focus join.
+use the same regions in SPEC §18, including center as the canvas-center region.
 Stage 2 selects a corner from attested meaning, composition seed, and original occurrence; the Renderer
 chooses its anchor within that corner. Generated coordinates never masquerade as original source.
 Relation position restrictions above remain; no implicit caller overlay or omitted-place default is added.
@@ -231,7 +231,7 @@ O(count) allocation or materialization.
 
 Primitive-only direct coordinated groups at existing named places reach Score 0.8.0 `placement_groups`. Omitted internal placement uses `overlap` to align member bounding-box centers; “place in a row” retains the source-order `horizontal_source_order` wire value; “overlap” uses `overlap`; `scatter` and `tile` use the new `scatter` and `tile` wire values. One named region resolves once from the performance seed and moves the whole group. Member owners, counts, seeds, and geometry remain intact. An omitted line-up count is one for every member and reaches an actual Score. Scatter and tile preserve explicit counts and divide the remainder up to a total of eight evenly among omitted members, assigning any remainder to earlier omitted members in source order. Each omitted member receives at least one, even when explicit counts plus those minima exceed eight. The same rule applies when all counts are omitted: nine listed kinds receive one each. Fully explicit counts are not topped up to eight. Line-up and place assign one only to omitted members. The group reaches an actual Score only when all resolved counts are one; otherwise it remains a symbolic plan without instance materialization. This direct carrier adds neither a Macro authoring operator nor instance materialization.
 
-Anchors are non-drawing Score 0.6.0 targets that deliver explicit named positions or numeric coordinates to Connected. Anchor `place:center` is the canvas center and does not borrow an Emit's focus-dependent placement. Anchors follow enclosing Transforms while preserving drawing instruction order, seeds, and saved-version compatibility.
+Anchors are non-drawing Score 0.6.0 targets that deliver explicit named positions or numeric coordinates to Connected. Anchor `place:center` is the single canvas-center point, distinct from the central region a drawn shape at `center` uses. Anchors follow enclosing Transforms while preserving drawing instruction order, seeds, and saved-version compatibility.
 
 The shared Rust compiler foundation can parse, validate, identify, lock, bind,
 and deterministically expand MacroDefinition v1 values. Its finite Emit subset, including Groups and rotation-only Transforms,
@@ -241,9 +241,9 @@ The compile-once facade retains the original document, compiler state, lock, and
 issues. Both legacy mode inputs apply the same local recovery to typed upstream holes,
 conflicts, and dependent units in a sealed execution projection while preserving independent instructions.
 Canonical macro output reuses its original seed, semantic ordinal, and generated
-provenance without expansion retry. Missing or duplicate execution owners, focus
-joins, global budgets, and integrity failures stop both modes. The public Stage 1.5
-API remains strict. The Score wire, canonical meaning, seed, focus, geometry policy,
+provenance without expansion retry. Missing or duplicate execution owners,
+global budgets, and integrity failures stop both modes. The public Stage 1.5
+API remains strict. The Score wire, canonical meaning, seed, geometry policy,
 and generated provenance are unchanged. This is part of ordinary drawing on the Server and on Android. For a new work,
 the host resolves a catalog from the installed definitions and passes their names
 and summaries to Stage 1; the compiler expands them, and the definitions used are

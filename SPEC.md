@@ -154,7 +154,7 @@ The core vocabulary consists of twelve Saijiki categories plus relations. Its so
 
 In v1.92 the words 描く (ja draw) and 髪 / hair were removed from the vocabulary by the author's decision. In v2.7.9, 髪 / hair was replaced by 銀筆 / **silverpoint** — 0.5px, the least wavering line a hand can draw. Saved Scores that still say `hair` are rewritten to `silverpoint` as they load, so they replay unchanged in everything but the seed.
 
-Pen, solid, empty, and black remain historical baselines for comparison with legacy Score / coerce behavior, rather than values inserted into typed meaning. When visible DDL omits a corresponding field, typed meaning remains `unspecified`; neither the parser nor semantic association fills it. The current subset resolves omissions only while lowering a lock-verified view to an actual Score: for count-one circle, square, ellipse, cloudform, triangle, and polygon instructions with a numeric position or an original `place:center` resolved to a verified direct `Instruction { instruction_index }` target, plus a place action, omitted count becomes one, touch becomes pen, continuity becomes solid, and an omitted closed surface becomes filled. An omitted color compares the actual work color-catalog background against actual black and white by absolute OKLCH L distance, choosing the farther color and black on a tie. Each explicit value wins independently, and neither these resolutions nor effective focus is written back into source meaning. Legacy Stop and OmitAndContinue inputs remain accepted, but a recoverable field or execution-unit failure uses shared local recovery: it records a typed diagnostic, omits only that unit, and continues with the remaining drawing. This rule does not retroactively change physical Renderer fallbacks or read compatibility for existing works.
+Pen, solid, empty, and black remain historical baselines for comparison with legacy Score / coerce behavior, rather than values inserted into typed meaning. When visible DDL omits a corresponding field, typed meaning remains `unspecified`; neither the parser nor semantic association fills it. The current subset resolves omissions only while lowering a lock-verified view to an actual Score: for count-one circle, square, ellipse, cloudform, triangle, and polygon instructions with a numeric position or `place:center` (the canvas-center region), plus a place action, omitted count becomes one, touch becomes pen, continuity becomes solid, and an omitted closed surface becomes filled. An omitted color compares the actual work color-catalog background against actual black and white by absolute OKLCH L distance, choosing the farther color and black on a tie. Each explicit value wins independently, and these resolutions are not written back into source meaning. Legacy Stop and OmitAndContinue inputs remain accepted, but a recoverable field or execution-unit failure uses shared local recovery: it records a typed diagnostic, omits only that unit, and continues with the remaining drawing. This rule does not retroactively change physical Renderer fallbacks or read compatibility for existing works.
 
 Shape size is a finite local modifier owned by the typed DDL compiler, not Saijiki vocabulary. The current classes are `slightly_small`, `small`, `very_small`, `normal`, `slightly_large`, `large`, and `very_large`. Their Japanese ordinary/small/large surfaces and the corresponding English `normal-sized`, `slightly`, and `very` forms retain exact source spans. The grammar does not grow free-form degree synonyms or use source-substring post-processing.
 
@@ -237,10 +237,10 @@ the context background; only the conflict records a local diagnostic. `draw`
 delivers line and arc through the shared geometry, count, and place resolvers
 exactly once. An omitted source position remains None; the shared resolver
 chooses a performance-time position from the existing-sway central region
-`[0.39, 0.39, 0.61, 0.61]`. Explicit positions and explicit-center Stage 1.5
-focus take priority. `inku.geometry-resolution-policy.v1` records omitted
+`[0.39, 0.39, 0.61, 0.61]`. Explicit positions take priority, and an explicit
+`center` uses this same central region. `inku.geometry-resolution-policy.v1` records omitted
 placement and fill meaning; its current digest is
-`5ce5ec570f913090bec92a9fc2802dfc7c322e866ed965a8486f52f17cb09a56`.
+`5703a18f1bb1e18da15ae127192fa587fc59739a99db02b845bbfab8baf0d023`.
 Single objects, Macros, and coordinated groups share the omitted central
 region, including the exact domain used for tiling. Fill's omitted target
 remains the whole canvas under its separate rule. A valid ground alone is
@@ -424,7 +424,7 @@ A vocabulary plugin is a data-only macro that gives a name to a combination of c
 
 Every domain uses the single versioned `inku.macro-definition.v1`. There are no domain-specific Tree / human / water grammars, per-plugin parsers, or plugin code. The compiler resolves and locks the visible invocation, binds closed typed parameters, then performs late expansion without an LLM into semantic nodes from the attested composition seed and caller-owned finite bounds, rejoining ordinary typed lowering. The Renderer does not understand plugins; it receives only the later ordinary Score. On the Description path, Stage 1 may receive only a bounded signature, parameter schema, and short summary; MacroDefinition bodies and expanded DDL are not sent to Stage 1 or Stage 2 prompts. An unknown or ambiguous qualified term in direct DDL is never filled by a hidden LLM fallback; that sentence alone is omitted, the rest is drawn, and the author is told why (§4.12).
 
-Inline and continuation forms that resolve uniquely to the same subject and explicit instructions have the same source-independent canonical meaning. With the same drawing conditions, policy / definition identity, attested seed, and explicit variation, surface sentence splitting or anaphoric syntax alone does not change a macro seed, focus, or effective meaning. Unknown, ambiguity, and conflict are not guessed equivalent; meaning-bearing relations, order, quantity, attributes, actions, parameters, and genuine multiple macro invocations remain. This rule does not guarantee general word-order exchange or graph isomorphism.
+Inline and continuation forms that resolve uniquely to the same subject and explicit instructions have the same source-independent canonical meaning. With the same drawing conditions, policy / definition identity, attested seed, and explicit variation, surface sentence splitting or anaphoric syntax alone does not change a macro seed or effective meaning. Unknown, ambiguity, and conflict are not guessed equivalent; meaning-bearing relations, order, quantity, attributes, actions, parameters, and genuine multiple macro invocations remain. This rule does not guarantee general word-order exchange or graph isomorphism.
 
 Meaning bound to a declared parameter is read from the expansion result. Attributes left on the outside of an invocation become source-owned diagnostics without reimplementing parameter binding. When OmitAndContinue omits only an unbound appearance field, existing color, touch, continuity, and surface values in the MacroDefinition remain. Unused parameters stay accepted; this adds no parameter defaults, optional parameters, or new whole-invocation conversion semantics.
 
@@ -438,7 +438,7 @@ The current consumer accepts rotation plus `scale_x` / `scale_y` and `translate_
 
 Transform reaches both count-one actual Scores and compact repetition recipes. Score 0.5.0 `transform_groups` retains the range, rotation, scale, translation, and original instruction indices of numerically fixed members. Rotation-only Score 0.4.0 groups, saved 0.1.0 / 0.2.0 / 0.3.0 Scores, and versionless artifacts retain their existing compatibility. An empty group list stays off the wire; `surface_intensity` is valid from Score 0.3.0 onward. The shared lowerer selects the minimum Score version required by the representation: flat compatibility without an explicit path connection remains Score 0.9, resource-aware compact recipes start at Score 0.10, and only works carrying a mirror relation require Score 0.15. Score 0.8.0 direct `placement_groups` place one contiguous source-order member range once. Each Macro is one placement member, retaining its body positions, internal counts, Transforms, Anchors, and ownership ranges. Outer Macro repetition is stored separately in `repetition_groups`, so inner and outer counts and ordinal namespaces do not collide. Group-level repeated actions reach compact recipes under the count rules below. Omitted internal placement uses `overlap`, which aligns bounding-box centers; explicit “place in a row” retains `horizontal_source_order`; explicit “overlap” uses `overlap`; scatter and tile use `scatter` and `tile`. The group bounding-box center moves to one named region resolved from the performance seed, retaining each member's owner, count, seed, and geometry. An omitted line-up count is one for every member. Scatter and tile preserve explicit counts and divide the remainder up to a total of eight evenly among omitted members, assigning any remainder to earlier omitted members in source order. Each omitted member receives at least one, even when explicit counts plus those minima exceed eight. The same rule applies when all counts are omitted: nine listed kinds receive one each. Fully explicit counts are not topped up to eight. Line-up and place assign one only to omitted members. External Connected, Touching / Along / Cutting, and NotTouching / Between attempt one whole-group translation while retaining transformed geometry, direction, and named or numeric placement authority. NotTouching retains the existing gap and Between the existing recipe based on the two prior bounding-box centers. Failure records an error, removes only the relation, and leaves the group at its original transformed placement. Numeric fixed members, legacy Stop input, and owners, original indices, seeds, and lost references retain their rules. `compile_ddl_to_score_with_resources` and `render_with_resources` are the shared-core entrances used by the normal Server, Web, and Android paths. Saved Score and history retain the format compatibility needed for reading and replay.
 
-An Anchor is a non-drawing reference point for line connections, with an explicit `place` or paired `position_x` / `position_y`. Anchor `place:center` means the canvas center (0.5, 0.5), without borrowing an Emit's focus-dependent placement. Other named positions use the existing placement regions. Score 0.6.0 stores `anchors` separately from drawing instructions, and `target_anchor_index` names a Connected target. Original references, ownership, drawing order, and seeds remain intact; Anchors follow the translation, scale, and rotation of their enclosing Transform. Numeric-position authority and legacy Stop-input compatibility remain, but a recoverable relation failure records an error, removes only its relation, and does not stop drawing. A missing position is not filled from nearby shapes or the invocation position. Saved Score 0.1.0 through 0.5.0 and versionless artifacts retain their compatibility.
+An Anchor is a non-drawing reference point for line connections, with an explicit `place` or paired `position_x` / `position_y`. Anchor `place:center` means the single canvas-center point (0.5, 0.5), distinct from the central region a drawn shape at `center` uses. Other named positions use the existing placement regions. Score 0.6.0 stores `anchors` separately from drawing instructions, and `target_anchor_index` names a Connected target. Original references, ownership, drawing order, and seeds remain intact; Anchors follow the translation, scale, and rotation of their enclosing Transform. Numeric-position authority and legacy Stop-input compatibility remain, but a recoverable relation failure records an error, removes only its relation, and does not stop drawing. A missing position is not filled from nearby shapes or the invocation position. Saved Score 0.1.0 through 0.5.0 and versionless artifacts retain their compatibility.
 
 A Macro Connected relation may name a prior Line as `from` and explicitly provide a numeric `target_path_position` expression. Its finite value lies from 0 to 1: zero is the Line start, one its end, and intermediate values interpolate uniformly by sample order along the performed centerline. The Line need not be immediately adjacent; its original reference within the Macro is retained. The connected source follows existing position authority and aligns its endpoint with that point. Connection resolution and final rendering share the same centerline, including variation, and common outer transforms move it together with the attached source. The numeric field alone selects Score 0.11.0. A `target_endpoint` or `ink_spread` selects 0.12.0; the `"interior"` selector described below selects 0.13.0. With none of these fields, outputs retain flat 0.9 or compact 0.10. Flat 0.11 does not require a resource snapshot, while compact 0.11 retains the existing caller-owned resource contract. General Along, adjacency for Connected without a path position, and Touching closure remain unchanged. Invalid or omitted targets produce a diagnostic and remove only the relation while other drawing continues.
 
@@ -464,9 +464,9 @@ Declare a parameter with, for example, `{"type":"exact_decimal","dimension":"rad
 
 Flat Emit fields with those names accept exact values. `width`+`height`, `chord`+`sagitta`, and `position_x`+`position_y` require both components; missing or mistyped values produce diagnostics. Numeric position and named `place` have separate authority and cannot silently overwrite one another. Dimensions and positions reach the ordinary DDL resolver, including diagnostic recovery to the smaller overlapping size. Definition literals belong to their generated Emit and do not receive fabricated source spans. Count-one/place reaches actual Score; repetition reaches the resolved plan and leaves instance generation to later materialization.
 
-The current finite consumer that reaches an actual Score projects each complete `emit` as one instruction into the same semantic input used by ordinary DDL. It also traverses nested `group` containers that carry no placement or transform in their original order, retaining generated ownership and reference IDs already resolved in lexical scope. A Group does not create placement, coordinate transforms, or drawing instructions of its own. `shape` is limited to `line` / `circle` / `ellipse` / `cloudform` / `square` / `triangle` / `polygon` / `arc` / `point`, `movement` must explicitly be `place`, and `place` accepts `center` with its exact generated focus target, or the explicit `top` / `bottom` / four edges / `corner` regions in §18. `color` / `touch` / `continuity` / `surface` / `angle` may carry an existing ID from the category of the same name; omission uses the ordinary lowerer's same defaults. Angle uses the same resolver; Point rejects an explicit angle because it has no orientation. `thinness` accepts `fine` / `extra_fine`, and `relative_scale` accepts the closed core values `slightly_small` / `small` / `very_small` / `normal` / `slightly_large` / `large` / `very_large`. Size uses ordinary DDL normal geometry and its existing factor exactly once, keeping explicit `normal` distinct from omission. `count` reaches the current Score only when omitted or `Integer(1)` and `Number(1.0)` is not treated as equivalent. The consumer adds no field aliases or raw Score fields and does not recover decimal meaning from an `f64`.
+The current finite consumer that reaches an actual Score projects each complete `emit` as one instruction into the same semantic input used by ordinary DDL. It also traverses nested `group` containers that carry no placement or transform in their original order, retaining generated ownership and reference IDs already resolved in lexical scope. A Group does not create placement, coordinate transforms, or drawing instructions of its own. `shape` is limited to `line` / `circle` / `ellipse` / `cloudform` / `square` / `triangle` / `polygon` / `arc` / `point`, `movement` must explicitly be `place`, and `place` accepts the explicit `center` / `top` / `bottom` / four edges / `corner` regions in §18. `color` / `touch` / `continuity` / `surface` / `angle` may carry an existing ID from the category of the same name; omission uses the ordinary lowerer's same defaults. Angle uses the same resolver; Point rejects an explicit angle because it has no orientation. `thinness` accepts `fine` / `extra_fine`, and `relative_scale` accepts the closed core values `slightly_small` / `small` / `very_small` / `normal` / `slightly_large` / `large` / `very_large`. Size uses ordinary DDL normal geometry and its existing factor exactly once, keeping explicit `normal` distinct from omission. `count` reaches the current Score only when omitted or `Integer(1)` and `Number(1.0)` is not treated as equivalent. The consumer adds no field aliases or raw Score fields and does not recover decimal meaning from an `f64`.
 
-The macro head is joined exactly across its source instruction slot, source invocation ordinal, locked definition, and expanded invocation. Only `place:center` uses the effective focus at `MacroEmit { invocation_ordinal, expansion_path, generated_ordinal, field: place }`. Multiple complete Emits replace the head in their existing order as ordinary instructions; an origin through `use`, bounded `repeat`, or `vary` is not itself a rejection. Output instructions correspond in order to either a direct source slot or generated provenance. Adjacent bound Emits in the same Macro and original generated order deliver `connected` / `touching` through the same checked relation rules as ordinary DDL, preserving original reference order, ownership, and numeric-fixed or named-movable position authority. Touching joins both Line / Arc endpoints with the existing Arc reconstruction and fixes explicit relative scale (including normal), dimensions, and chord direction. `not_touching` and `between` also reach the shared checked performer from adjacent bound Emits in the same Macro. NotTouching retains the existing Medium gap, while Between retains the existing recipe using the bounding-box centers of the current Emit's immediately preceding Emit and the Emit before it. Named and noncenter placement is movable; numeric placement is fixed and is never overwritten. Between's `from` is the immediately preceding Emit, with the one before it retained as its second reference and with both owners preserved. `along` / `cutting` also reach the same checked performer from adjacent bound Line Emits, using named-movable or numeric-fixed position authority and the direction/dimension rules in §14.4. Adjacency includes unbound Emits in the original order, and an omitted from or either Between reference never retargets to a survivor. Regardless of legacy Stop or OmitAndContinue input, an incomplete Emit, unknown key, category or type mismatch, unbound caller fact, or expanded unsupported Transform axes / an unpositioned `anchor` / unsupported `relation` omits its established minimum field, Emit, subtree, or invocation with a diagnostic and continues the remaining Score. Unrelated siblings, including those inside Groups, remain in source and generated-provenance order. A missing reference omits only the relation while retaining its original dependency and any independently drawable Emit; it never retargets to a survivor. No child Emit is extracted from an unsupported structural subtree, and adjacency is not created across an unsupported subtree. An unused parameter or unreferenced Emit binding ID alone is not rejected.
+The macro head is joined exactly across its source instruction slot, source invocation ordinal, locked definition, and expanded invocation. An Emit's `place:center` resolves to the same central region as in ordinary DDL. Multiple complete Emits replace the head in their existing order as ordinary instructions; an origin through `use`, bounded `repeat`, or `vary` is not itself a rejection. Output instructions correspond in order to either a direct source slot or generated provenance. Adjacent bound Emits in the same Macro and original generated order deliver `connected` / `touching` through the same checked relation rules as ordinary DDL, preserving original reference order, ownership, and numeric-fixed or named-movable position authority. Touching joins both Line / Arc endpoints with the existing Arc reconstruction and fixes explicit relative scale (including normal), dimensions, and chord direction. `not_touching` and `between` also reach the shared checked performer from adjacent bound Emits in the same Macro. NotTouching retains the existing Medium gap, while Between retains the existing recipe using the bounding-box centers of the current Emit's immediately preceding Emit and the Emit before it. Named and noncenter placement is movable; numeric placement is fixed and is never overwritten. Between's `from` is the immediately preceding Emit, with the one before it retained as its second reference and with both owners preserved. `along` / `cutting` also reach the same checked performer from adjacent bound Line Emits, using named-movable or numeric-fixed position authority and the direction/dimension rules in §14.4. Adjacency includes unbound Emits in the original order, and an omitted from or either Between reference never retargets to a survivor. Regardless of legacy Stop or OmitAndContinue input, an incomplete Emit, unknown key, category or type mismatch, unbound caller fact, or expanded unsupported Transform axes / an unpositioned `anchor` / unsupported `relation` omits its established minimum field, Emit, subtree, or invocation with a diagnostic and continues the remaining Score. Unrelated siblings, including those inside Groups, remain in source and generated-provenance order. A missing reference omits only the relation while retaining its original dependency and any independently drawable Emit; it never retargets to a survivor. No child Emit is extracted from an unsupported structural subtree, and adjacency is not created across an unsupported subtree. An unused parameter or unreferenced Emit binding ID alone is not rejected.
 
 An unbound caller action does not omit the entire Macro invocation. Only the outer action is omitted as `macro_caller_field { field: action }`, retaining its original owner, spans, and reason while preserving the definition's Emits, transforms, counts, order, seed, and provenance. The outer action is neither distributed into the body nor interpreted as a different action. This does not grant unconditional recovery for other unbound caller fields; exact-join integrity failures and the absence of drawable residual content still stop execution.
 
@@ -1199,18 +1199,21 @@ and both change only on an explicit action.
 | Stage | Name | What changes | Cost |
 |---|---|---|---|
 | Performance | Another performance | region, relation, and placement phase as resolved by the performance seed (§13.8 / §14.4) | no LLM call (re-render only) |
-| Composition | Another composition | Stage 1.5's focus selection and the concrete angle and corner for explicitly authored angle and corner meaning, from the composition seed (§12.11 / §18) | no LLM call (rebuilt from the saved normalized DDL) |
+| Composition | Another composition | The concrete angle and corner for explicitly authored angle and corner meaning, from the composition seed (§12.11 / §18) | no LLM call (rebuilt from the saved normalized DDL) |
 
-Another composition reselects among the closed six focus candidates and, when
-the description has an angle, reselects its concrete angle. The Stage 1.5
-transformation remains focus-only; the shared lowerer resolves the angle from
-the same `composition_seed`. It must not invent or reselect a composition
-family, technique, color, touch, relation, or element count. Another
-performance and explicit variation preserve the resolved angle. Explicit
-variation moves the focus axis only when both amplitude (small, medium, or
-large) and a variation seed are present; an incomplete request means no
-variation. The description, normalized DDL, and explicit attributes remain
-unchanged.
+Another composition reselects the concrete angle when the description has an
+angle, and the corner among its four candidates. `center` is the canvas-center
+region and is not reselected, so a work with neither an angle nor a corner
+redraws the same. The shared lowerer resolves the angle from `composition_seed`.
+It must not invent or reselect a composition family, technique, color, touch,
+relation, or element count. Another performance and explicit variation preserve
+the resolved angle. Explicit variation (amplitude small, medium, or large and a
+variation seed) is accepted and recorded, but it currently has no axis to move
+and does not change effective meaning. Stage 1.5 used to reinterpret `center` as
+one of six focus candidates and let variation move that focus; on 2026-09-27
+this was removed so an author's position word is never read as another
+position. A feature that decides composition is to be designed separately. The
+description, normalized DDL, and explicit attributes remain unchanged.
 
 These two stages are the substance of §8.2's "put the weight on the choices made
 afterwards."  A generator with wide dispersion also produces more misses, but a
@@ -1313,7 +1316,7 @@ drop, an explicit failure, or a read-compatibility path; its meaning is not
 guessed and repaired. Repair is neither a quality floor nor a minimum firing
 rate and must not create a recurring stock part.
 
-The shared boundary from lock-verified Stage 1.5 to an actual Score retains the author-selected Stop and OmitAndContinue inputs. A recoverable relation failure, including under legacy Stop input, never prevents the rest of the drawing: it records an error and removes only that relation, leaving its instruction or Macro Emit, group, and dependent instructions in their original transformed placement. OmitAndContinue still narrows only the execution projection for its established appearance and structural units. Both modes stop when no drawing unit remains or when owner / focus joins or host context fail integrity. Neither mode uses an LLM, guesses values, clamps them, or resolves previous-one / two relations against compressed post-omission indices.
+The shared boundary from lock-verified Stage 1.5 to an actual Score retains the author-selected Stop and OmitAndContinue inputs. A recoverable relation failure, including under legacy Stop input, never prevents the rest of the drawing: it records an error and removes only that relation, leaving its instruction or Macro Emit, group, and dependent instructions in their original transformed placement. OmitAndContinue still narrows only the execution projection for its established appearance and structural units. Both modes stop when no drawing unit remains or when owner joins or host context fail integrity. Neither mode uses an LLM, guesses values, clamps them, or resolves previous-one / two relations against compressed post-omission indices.
 
 
 ---
@@ -1355,7 +1358,7 @@ The project evaluates quality through several layers:
 Benchmarks focus on:
 
 - whether Stage 1 preserves the whole input context
-- whether Stage 1.5 preserves explicit meaning and invents nothing beyond focus
+- whether Stage 1.5 preserves explicit meaning and invents nothing
 - whether the shared compiler/lowerer preserves explicit DDL and omits only failures locally with diagnostics
 - whether deterministic fallback keeps enough DDL content to be reviewable
 - whether the renderer makes DDL features visible
@@ -1487,7 +1490,7 @@ Shared standalone grammar makes modifier phrases own their connectors but exclud
 - when an author writes direct DDL or edits generated DDL, permits touch and other fields to be omitted and retains typed meaning as `unspecified`; it does not infer or insert hidden values from texture / context, primitive type, word order, or the current Score default
 - writes shape size as a finite seven-class local modifier combining normal / small / large with mild, standard, and strong steps, while keeping explicit normal distinct from omission. Numeric geometry plus qualitative size, an unknown degree, or ambiguous ownership is a typed conflict or issue
 - treats burin and drypoint as explicit only when visible DDL states them; Stage 1 few-shot quality policy is not direct-DDL compiler semantics
-- in the current actual-Score lowerer, applies the author-resolved normal geometry, relative factors, and omitted drawing attributes only to count-one circle, square, ellipse, cloudform, triangle, and polygon instructions with a resolved numeric position or an original `place:center` owned by a verified direct instruction target, plus a place action. The named path preserves dimensions and places effective focus in `at.region`. Stop rejects the entire Score for unsupported meaning or missing required color-catalog context; explicit OmitAndContinue omits only an independent field or typed execution unit and returns the remaining Score with diagnostics. Neither mode changes original meaning. The normal product runtime uses this Rust path
+- in the current actual-Score lowerer, applies the author-resolved normal geometry, relative factors, and omitted drawing attributes only to count-one circle, square, ellipse, cloudform, triangle, and polygon instructions with a resolved numeric position or `place:center` (the canvas-center region), plus a place action. The named path preserves dimensions and places the named region in `at.region`. Stop rejects the entire Score for unsupported meaning or missing required color-catalog context; explicit OmitAndContinue omits only an independent field or typed execution unit and returns the remaining Score with diagnostics. Neither mode changes original meaning. The normal product runtime uses this Rust path
 
 ### 12.5 Splitting the Model by Stage
 
@@ -1611,7 +1614,7 @@ The Stage 2 LLM returns a span-bounded patch candidate only for known holes expl
 
 A recoverable failure omits the smallest affected field or execution unit with a diagnostic and continues independent drawing, for either legacy Stop or OmitAndContinue input. It does not correct undeliverable meaning into a different Score field, and retains original owners and order. An entirely omitted drawing or an integrity failure stops. Results distinguish complete, complete with omissions, and stopped.
 
-An explicitly authored angle reaches `Score.rotation` exactly once through one shared resolver for direct instructions and flat Macro Emits. Its selection is bound to original meaning, tagged `composition_seed`, logical occurrence, and angle identity; effective focus, variation seed, render seed, and source spelling are excluded.
+An explicitly authored angle reaches `Score.rotation` exactly once through one shared resolver for direct instructions and flat Macro Emits. Its selection is bound to original meaning, tagged `composition_seed`, logical occurrence, and angle identity; variation seed, render seed, and source spelling are excluded.
 
 ### 12.7.1 Shared Authoring State Machine
 
@@ -1749,28 +1752,31 @@ from DDL" resume from saved DDL without calling Stage 1 again. A separate Stage
 
 Stage 1.5 is a deterministic typed transformation that uses no LLM. Its input
 is lock-verified `CanonicalReady` typed meaning, never free prose. Its output
-is the effective DDL / typed meaning consumed by the shared lowerer.
+is the effective DDL / typed meaning consumed by the shared lowerer. On
+2026-09-27 the focus reinterpretation of `place:center` and the variation axis
+were removed; Stage 1.5 now only verifies its input and fixes the identity of
+effective meaning.
 
 - source text, normalized DDL, original typed meaning, effective meaning, and
   source / generated provenance remain distinct; original meaning and explicit
   attributes are not overwritten
 - it invents no sentence, entity, relation, technique, color, touch, primitive,
   or content
-- only `place:center` maps to one of a closed set of six focus candidates;
-  every other place and explicit attribute passes through
+- every place and explicit attribute passes through. `place:center` is not
+  reinterpreted as a focus; the shared lowerer resolves it to the central
+  region in §18
 - when the verified view lowers to an actual Score, a direct
   `Instruction { instruction_index }` owns only the instruction with the same
   source index. A direct coordinated group retains that rule and delivers its
   members through a separate `placement_groups` range. `GroupPredicate` and
-  `MacroEmit` are not treated as same-index owners, numeric positions are not
-  focus targets, and original center is not rewritten to a provisional `(0.5,0.5)`
-- baseline focus selection is bound to lock-verified pre-expansion meaning and
+  `MacroEmit` are not treated as same-index owners
+- effective-meaning identity is bound to lock-verified pre-expansion meaning and
   expanded-meaning digests plus an attested optional `composition_seed`; absent
   seed and present `Some(0)` differ, and the full compiler-lock digest is a
-  source-integrity attestation rather than focus material
-- explicit noncenter place never enters the focus targets; the shared lowerer resolves it to the regions in §18. Corner selection belongs to composition, using original meaning, attested optional seed, and original logical occurrence
+  source-integrity attestation rather than identity material
+- the shared lowerer resolves an explicit place to the regions in §18. Corner selection belongs to composition, using original meaning, attested optional seed, and original logical occurrence
 - an explicit angle passes through as original typed meaning and does not join
-  the center-only target set or variation axis. The shared lowerer selects its concrete
+  the variation axis. The shared lowerer selects its concrete
   angle from the same verified pre- and expanded-meaning digests, tagged
   optional `composition_seed`, and either the direct original logical ordinal
   or the Macro semantic ordinal, expansion path, and generated ordinal
@@ -1780,10 +1786,10 @@ is the effective DDL / typed meaning consumed by the shared lowerer.
   macro's resolved, binding, and semantic-head identity against the compiler
   lock. An input with no `SourceOccurrence` gains no language condition, and
   an unused sidecar need not resolve or execute. Source and provenance are
-  admission-integrity evidence, not meaning or focus material
-- explicit variation is complete only when both amplitude (`small`,
-  `medium`, or `large`) and `variation_seed` are present, and it moves focus
-  only; an incomplete request means no variation
+  admission-integrity evidence, not meaning material
+- explicit variation is accepted as the pair of amplitude (`small`, `medium`,
+  or `large`) and `variation_seed`, but it currently has no axis to move and
+  does not change effective meaning; an incomplete request means no variation
 - output canonical bytes, schema identity, digest, and provenance reproduce the
   same meaning and never present bytes from another schema under the same
   identity
@@ -1803,7 +1809,7 @@ omissions before one seed derivation and expansion and never retries a draw afte
 local failure. Global budgets and source, lock, owner, definition, or provenance
 integrity failures stop both modes. The public Stage 1.5 API remains
 `CanonicalReady`-only and cannot recover an arbitrary mutable compilation. D1
-meaning, seed, focus, source-ordinal gaps, and generated provenance are preserved.
+meaning, seed, source-ordinal gaps, and generated provenance are preserved.
 The added sizing rules update the geometry policy digest, and Score 0.2.0 carries
 the new moon descriptor. The normal Server, Web, and Android paths use this
 shared pipeline while keeping their existing public entry points, and saved
@@ -1813,7 +1819,7 @@ This shared-compiler subset delivers direct and flat-Macro angles for
 circle, ellipse, cloudform, and square through the shared lowerer to actual
 `Score.rotation`. Square uses the same angle resolver for direct and flat Macro
 Emit input. Only numeric placement must fit the rotated declared rectangle;
-named focus adds no must-fit check.
+named placement adds no must-fit check.
 
 The same shared-compiler subset delivers finite two-step thinness from direct and flat
 Macro Emit input to actual `Instruction.thinness`, and binds explicitly declared thinness and size
@@ -1845,15 +1851,14 @@ archive](docs/history/changelog-v1.72-v2.4.md).
 Lock-verified pre-expansion meaning, expanded meaning, and an attested optional
 `composition_seed` carry composition identity. The full compiler-lock digest
 attests source integrity and does not require equivalent expressions to have
-the same lock. "Another composition" reuses saved normalized DDL and selects
-focus from the closed six candidates, and also reselects the concrete angle
-when an explicit angle identity is present, or the corner when corner is explicit. There is no current `vary_seed`
+the same lock. "Another composition" reuses saved normalized DDL and reselects
+the concrete angle when an explicit angle identity is present, or the corner
+when corner is explicit. There is no current `vary_seed`
 input.
 
 Explicit variation is the pair of amplitude (small, medium, or large) and
-`variation_seed`. Only a complete pair moves focus. The same lock-verified
-meaning, attested composition seed, amplitude, and variation seed produce the
-same effective meaning. Composition family, color, touch, technique, relation,
+`variation_seed`. It currently has no axis to move, so even a complete pair
+leaves effective meaning unchanged. Composition family, color, touch, technique, relation,
 and element count do not move.
 
 The current Score and render identity domain is `rh3`. `rh2` is a legacy
@@ -1926,7 +1931,7 @@ changes.  **The description itself is kept for saving and display.**  The work i
 wrote, not what the layer wrote.
 
 This paragraph is limited to the pre-cutover legacy runtime and its historical
-description. The typed pipeline's macro-meaning rule and focus seed source are
+description. The typed pipeline's macro-meaning rule and seed source are
 defined by §§4.5 and 12.11; source text or sketch prose does not return as a
 typed macro seed source.
 
@@ -2004,7 +2009,7 @@ Non-Grid domains use the physical canvas axes and place the group centroid at th
 
 Optional instruction / Emit `layout_direction` owns arrangement direction independently of entity `angle`. Japanese examples such as “中央に、横線を縦に三本並べる。” and “中央に、斜めの線を横に三本並べる。” share the typed entrance with “arrange three horizontal lines vertically at center.” and “line up three diagonal lines horizontally at center.” Japanese particle evidence and English angle-row adverb forms separate the roles. Compiler-only parser aliases leave prompt, display, and legacy markers unchanged. Single-head continuation merges direction into the original entity; conflicting directions stop. Absent-field canonical and provenance bytes remain unchanged; a present field includes its meaning and complete source evidence.
 
-Only line-up delivers direction into placement. Omission retains the horizontal row; explicit horizontal uses the same formula while preserving its explicit identity. With t=(i+1/2)/n-1/2, offsets from the anchor are horizontal=(tW,0), vertical=(0,tH), rising=(ts,-ts), and falling=(ts,ts), where s=min(W,H). Diagonals are physical 45-degree axes with downward-positive Y, never stretched to the canvas diagonal. Bare diagonal chooses one of the two axes using the attested optional composition seed (distinguishing None from Some(0)), original pre / expanded meaning, and original logical occurrence framed with a dedicated layout-direction role. Shape-angle selection, size, and count are unchanged. Focus, variation / render seeds, and source spelling do not select direction. Point accepts layout direction while still rejecting its own angle. Unsupported layout direction on Place / Scatter / Tile, or an unsupported identity such as rotated, is omitted as a field with its original owner, spans, and reason, retaining an instruction or Emit whose body, explicit count, action, and position remain valid without it. Direction is not repurposed as entity angle. Unsupported group / relation structures and other failures retain their existing omission units; an entirely omitted result stops in both modes. The existing Score entrance likewise never silently discards an unsupported field and reports complete success.
+Only line-up delivers direction into placement. Omission retains the horizontal row; explicit horizontal uses the same formula while preserving its explicit identity. With t=(i+1/2)/n-1/2, offsets from the anchor are horizontal=(tW,0), vertical=(0,tH), rising=(ts,-ts), and falling=(ts,ts), where s=min(W,H). Diagonals are physical 45-degree axes with downward-positive Y, never stretched to the canvas diagonal. Bare diagonal chooses one of the two axes using the attested optional composition seed (distinguishing None from Some(0)), original pre / expanded meaning, and original logical occurrence framed with a dedicated layout-direction role. Shape-angle selection, size, and count are unchanged. Variation / render seeds and source spelling do not select direction. Point accepts layout direction while still rejecting its own angle. Unsupported layout direction on Place / Scatter / Tile, or an unsupported identity such as rotated, is omitted as a field with its original owner, spans, and reason, retaining an instruction or Emit whose body, explicit count, action, and position remain valid without it. Direction is not repurposed as entity angle. Unsupported group / relation structures and other failures retain their existing omission units; an entirely omitted result stops in both modes. The existing Score entrance likewise never silently discards an unsupported field and reports complete success.
 
 One plan per instruction / Emit retains exact count, resolved dimensions, appearance, angle, position, layout recipe, and source / generated origin. There are no count-proportional arrays, instance geometry, or duplicated Score instructions. For either legacy Stop or Continue input, recoverable blocking preserves typed owners, spans, reasons, and actual omissions at the smallest affected field or execution unit, returning the remaining plan. An entirely omitted result is never marked Ready. Unsupported fields, relations, and coordination are not silently discarded. The resource-aware materializer maps this plan to replayable recipes with Score 0.10 as the compact baseline, selects the minimum later version required by added fields, and checks demand before instance allocation against both hard policy and a caller-authorized operational budget. Current shipping limits are 400 total primitive marks, 240 primitive marks per expanded Score template, resolved count 2000, and 64 drawable templates, plus 4096 `logical_objects`, 128 `template_nodes`, 4096 `anchor_instances`, 4096 `transform_instances`, 64 `placement_instances`, and 64 `fill_instances`. Administrator control of the existing four limits and budgets saved by older works remain intact. When an explicit count on a standalone primitive exceeds the budget, the original Plan and source retain the requested value, while the Score receives the largest safe source-ordered prefix and resource diagnostics carry the requested count, executed count, and reason to display, persistence, and structured logging. Only a unit for which no instance can run safely, or a coordinated placement / Macro whose structure cannot be partially executed, is omitted at its typed boundary; independent later work continues. A saved Score snapshots the authorized policies but stores no self-reported demand; replay recomputes demand from its recipes. Existing Score wire, lowering outcomes, compiler execution success, and Score 0.9 default / legacy compatibility remain. The same `inku.geometry-resolution-policy.v1` attests this resolution. The normal Server, Web, and Android paths and saved compact Score replay use this shared materializer and local-recovery contract.
 
@@ -2321,7 +2326,7 @@ Explicit sway in the shared compiler always uses `dimensions=["position_x","posi
 Line uses its existing perpendicular performer; Arc and circle / ellipse / square / cloudform
 use their existing inward/outward contour consumers. Short-line thresholds, noise, seeds,
 geometry, placement, angle, thinness, material, and relation endpoint contracts remain unchanged.
-Point and unsupported shapes reject explicit variation. This is separate from Stage 1.5 focus-only variation.
+Point and unsupported shapes reject explicit variation. This is separate from the Stage 1.5 explicit variation request.
 
 The schema keeps `variation`, but it is invisible from the DDL text interface.
 Only those implementing plugins or materials handle these dimensions.
@@ -2808,7 +2813,7 @@ point of the chain and as information.
 The typed compiler carries `connected` from the exact bilingual full literal on
 ordinary adjacent direct instructions, and from an explicit relation between
 adjacent bound flat Macro Emits, into the same Score consumer. It preserves the
-original Score index, dependency slot, owner, focus, and seed. Named positions
+original Score index, dependency slot, owner, and seed. Named positions
 are movable; numeric positions are fixed. After named-region resolution, the
 checked performer applies only the translation needed to join the endpoints and
 does not clamp again. A numeric position succeeds when the required delta is
@@ -2835,7 +2840,7 @@ layout consuming a relation, record a structured warning. Canonically silent
 fallbacks, including missing prior bounds and designated degenerate geometry,
 drop the relation without a warning.
 
-Engine 45 also carries typed `touching` from ordinary direct instructions and adjacent bound Emits in the same flat Macro into the shared checked performer. The four bilingual full literals carry their declared Line / Arc target to the original PreviousOne; a mismatched primitive cannot reach canonical success. Macros check the actual typed Emits without inventing a source noun condition. Only Line / Arc succeed. The prior stays unchanged, both endpoints coincide, and Arc uses the same minor-arc reconstruction described above. Explicit numeric geometry or relative scale (including normal at factor 1) fixes dimensions; an explicit angle fixes the performed chord direction in canonical endpoint order. Omitted normal may adjust to Touching. Numeric positions retain their anchor and the final geometry's existing must-fit requirement; named focus remains movable with clipping. Incompatibility is a typed conflict.
+Engine 45 also carries typed `touching` from ordinary direct instructions and adjacent bound Emits in the same flat Macro into the shared checked performer. The four bilingual full literals carry their declared Line / Arc target to the original PreviousOne; a mismatched primitive cannot reach canonical success. Macros check the actual typed Emits without inventing a source noun condition. Only Line / Arc succeed. The prior stays unchanged, both endpoints coincide, and Arc uses the same minor-arc reconstruction described above. Explicit numeric geometry or relative scale (including normal at factor 1) fixes dimensions; an explicit angle fixes the performed chord direction in canonical endpoint order. Omitted normal may adjust to Touching. Numeric positions retain their anchor and the final geometry's existing must-fit requirement; named placement remains movable with clipping. Incompatibility is a typed conflict.
 
 Typed Touching follows the same relation-recovery and original dependency, owner, and drawing-ordinal rules. On failure it records an error and removes only Touching, leaving the current, its group, and dependent instructions at their original transformed placement. Touching without the new metadata retains legacy reconstruction, warning, and drop behavior, and Connected is unchanged.
 
@@ -3040,9 +3045,10 @@ These `at.region` bounds describe semantic anchors on canvas axes from zero to o
 | right_edge | [9/10,0,1,1] |
 | top_edge | [0,0,1,1/10] |
 | bottom_edge | [0,9/10,1,1] |
+| center | [39/100,39/100,61/100,61/100] (the same central region as an omitted position) |
 | corner | One of upper-left [0,0,1/5,1/5], upper-right [4/5,0,1,1/5], lower-left [0,4/5,1/5,1], lower-right [4/5,4/5,1,1] |
 
-Center / middle retains canonical center and its six exact-owner focus regions. Edges are narrow bands, not fixed points.
+`center` (中心, 中央, middle) is the canvas-center region, the same region an omitted position uses; only an Anchor's `center` is the single point (0.5, 0.5). Edges are narrow bands, not fixed points.
 Stage 2 selects a corner in the dedicated `inku.score-place-selection.v1` domain. It frames verified original
 pre- and expanded-meaning digests, a composition seed tagged to distinguish None from Some(0), and either the
 original direct logical ordinal or the Macro semantic ordinal, expansion path, and generated ordinal.
@@ -3119,27 +3125,21 @@ The angle-specific SHA-256 domain frames the lock-verified original pre- and
 expanded-meaning digests, tagged optional `composition_seed`, logical
 occurrence, and angle identity. Equivalent inline and continuation meaning
 selects the same angle; distinct true occurrences have distinct keys.
-Effective focus, variation seed, render seed, raw source bytes, and the full
-lock digest are excluded.
+Variation seed, render seed, raw source bytes, and the full lock digest are
+excluded.
 
 A circle or point keeps the same radial extent under rotation. An ellipse uses its ideal
 rotated ellipse extent, cloudform and square use the rotated rectangular envelope of
 their declared width and height, and line and arc use their final finite geometry. Numeric placement rotates short-edge units in
 physical space, converts the result back to each canvas axis, and applies
 must-fit only to the rotated extent; it does not reject the unrotated box first,
-relocate, shrink, reduce count, or retry another angle. Named focus keeps the
+relocate, shrink, reduce count, or retry another angle. Named placement keeps the
 existing size and `at.region` without a must-fit check. Line, arc, and square angles use the
 same resolver for direct instructions and flat Macro Emits and reach
 `Score.rotation`. An explicit angle on round point is unsupported and is not
 reinterpreted as another rotated shape.
 
-The same policy owns the six mappings from effective focus to `at.region`:
-`upper_right=[0.60,0.18,0.82,0.40]`,
-`upper_left=[0.18,0.18,0.40,0.40]`,
-`lower_right=[0.60,0.60,0.82,0.82]`,
-`lower_left=[0.18,0.60,0.40,0.82]`,
-`upper_edge=[0.39,0.07,0.61,0.29]`, and
-`right_half=[0.61,0.39,0.83,0.61]`. A named Score instruction has no `center`
+A named Score instruction has no `center`
 or `position`; it carries its resolved `radius` or `size` and `at.region`.
 Line, arc, and point carry finite baseline geometry and a semantic anchor plus
 `at.region`, which the Renderer moves by that anchor.
@@ -3183,7 +3183,7 @@ its original source indices and is never rebound to compressed post-omission
 indices. The lowering result retains canvas, background, resolved color context,
 geometry-policy digest, mode, outcome, gaps, owners, spans, and dispositions,
 while source semantics, canonical meaning, and provenance remain free of
-defaults and focus injection.
+defaults.
 
 The quiet-density governor, which thins repetition for still, membranous, or
 remembered scenes, does not apply to a group whose count was stated: quiet is a
@@ -3245,8 +3245,7 @@ Position coordinates remain normalized from `0.0` to `1.0`: X is a fraction of
 canvas width and Y is a fraction of canvas height. Top-left is `(0.0,0.0)`,
 bottom-right is `(1.0,1.0)`, and exact center is `(0.5,0.5)`. Named center, a
 qualitative region, and an exact numeric coordinate are separate authorities.
-An exact coordinate is not a Stage 1.5 focus target and is never silently moved,
-clamped, or snapped. Boundary-anchor validity and a diagnostic that the shape's
+An exact coordinate is never silently moved, clamped, or snapped. Boundary-anchor validity and a diagnostic that the shape's
 extent clips the canvas are separate matters.
 
 Direct typed DDL accepts the finite JA forms `半径N`, `直径N`, `幅N、高さN`,
@@ -3345,9 +3344,8 @@ and does not reinterpret the natural-language description.
 The drawing tab also exposes two explicit regeneration actions. **Another
 performance** keeps the same Score and asks only the renderer for a new
 performance seed. **Another composition** preserves saved normalized DDL,
-advances `composition_seed`, reselects focus from Stage 1.5's closed six
-candidates, and reselects the concrete angle or corner in the shared lowerer when that
-meaning is explicitly present. It changes no composition family, technique, color, touch,
+advances `composition_seed`, and reselects the concrete angle or corner in the
+shared lowerer when that meaning is explicitly present. It changes no composition family, technique, color, touch,
 relation, or element count. The same lock-verified meaning and attested
 `composition_seed` reproduce the same effective meaning, angle, and corner. Another
 performance and explicit variation preserve the resolved angle and corner. Saved Score / expanded

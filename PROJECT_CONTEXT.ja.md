@@ -139,7 +139,7 @@ Replay は常に最新で行い、当時のエディションの再現は**保�
 - **共有authoring state machine** — 通常Server／WebとAndroidは、version付きsnapshotへcommandを適用する同じ共有Rust coreを使う。Androidの通常UIは`InkuRepository`、`AndroidWorkPipeline`、JNIを通る。Coreは次snapshot、進行event、最大1件のtyped effectを返す。
 - **Host effect** — Python／Kotlin hostは、coreが要求したStage 1またはknown-hole補完のprovider呼出し、もしくはvisible DDLのCAS保存を一度だけ実行し、identityを保ったresultを返す。再試行、authority遷移、次のeffectはcoreが決め、hostは別の意味分岐を持たない。
 - **Visible DDLとauthority** — 記述起点だけがStage 1を使ってvisible normalized DDLを作る。Direct DDLと作者が承認した補完patchは同じCAS保存境界へ入り、保存acknowledgment後のexact bytesだけを再parseする。Description authorityはsource bytesを変更する最初の作者確定後にDDL authorityへ単調にlockする。
-- **Typed compiler／Stage 1.5／lowerer** — compiler lockでsource、provenance、Macro definitionを検証し、bounded Macro expansionとfocus-onlyのtyped Stage 1.5を経てactual Scoreまたはcompact recipeへ一度だけ下ろす。Known holeだけが補完候補となり、holeなしではStage 2 LLMを呼ばない。Recoverableな不成立は最小のfieldまたは実行単位を診断付きで省略し、独立した後続を保つ。
+- **Typed compiler／Stage 1.5／lowerer** — compiler lockでsource、provenance、Macro definitionを検証し、bounded Macro expansionと入力を検証するtyped Stage 1.5を経てactual Scoreまたはcompact recipeへ一度だけ下ろす。Known holeだけが補完候補となり、holeなしではStage 2 LLMを呼ばない。Recoverableな不成立は最小のfieldまたは実行単位を診断付きで省略し、独立した後続を保つ。
 - **Scoreと資源** — lowererは表現に必要な最小Score版を選ぶ。Resource-awareなcompact基準は0.10で、鏡写しrelationを持つ作品だけが0.15を必要とする。保存済みpolicyから需要を再計算し、超過した一sourceまたはcoordinated placement全体を個体化前に省略する。
 - **互換境界** — 旧作品は保存済みScore／SVGと保存時contextで表示・再演する。新しい作品の意味は共有Rustが決定する。AndroidのカメラDDLも共有語彙を使い、履歴表示は保存情報に基づく。記録されていないpromptを旧実装から再構成しない。
 - **Render Engine 66** — 共有Rust coreが所有し、Serverの薄いPython adapterとAndroidの薄いJNI adapterが同じ1 requestで呼ぶSVGの演奏。

@@ -107,10 +107,10 @@ Flat Emitの同名fieldへexact値を渡す。`width`+`height`、`chord`+`sagitt
 
 通常DDLのprimitiveだけからなる既存named位置のdirect coordinated groupはScore 0.8.0の`placement_groups`へ届く。内部配置を省略すると`overlap`でmemberのbbox中心を揃え、「並べて置く」は既存wire値の`horizontal_source_order`、「重ねて置く」は`overlap`、`散らす`と`敷き詰める`は新しいwire値の`scatter`と`tile`となる。一つのnamed regionをperformance seedで一度だけ解決し、group全体を移す。memberのowner、count、seed、geometryは保つ。line-upの省略countは各member 1 でactual Scoreへ届く。scatter / tileは明示countを保ち、合計8までの残りを省略したmemberへ均等配分し、余りはsource順で先の省略memberへ割り当てる。省略memberは最低1個とし、明示数と最低数だけで8を超える場合も減らさない。全省略も同じ規則で、9種類なら各1個になる。全明示なら合計8へ補わない。line-up / placeは省略memberだけ1とする。配分後の全countが1のときだけactual Scoreへ届き、それ以外は個体化せずsymbolic planに残る。このdirect carrierはMacro authoring operatorや個体materializationを追加しない。
 
-AnchorはScore 0.6.0の非描画targetとして、明示したnamed位置または数値座標をConnectedへ届ける。`place:center`は画面中央で、Emitのfocus依存配置を借用しない。包含Transformへ追従し、描画instructionの順序とseed、旧版保存互換を保つ。
+AnchorはScore 0.6.0の非描画targetとして、明示したnamed位置または数値座標をConnectedへ届ける。`place:center`は画面中央の一点で、描画する図形の`center`が使う中央の領域とは別である。包含Transformへ追従し、描画instructionの順序とseed、旧版保存互換を保つ。
 
 Runtime未接続のfinite flat Emit consumerは、明示movement:placeとcircle / ellipse / cloudform /
-square / triangle / polygon / line / arc / pointを通常DDLと同じgeometryへ届ける。Placeはcenter（exact generated focus必須）と
+square / triangle / polygon / line / arc / pointを通常DDLと同じgeometryへ届ける。Placeはcenter（通常DDLと同じ中央の領域）と
 top / bottom / left_edge / right_edge / top_edge / bottom_edge / cornerを受け入れ、SPEC §18の領域を使う。
 Literal semantic_refと明示宣言した`{"type":"semantic_ref","category":"place"}` parameterは同じ経路を通る。
 隅はStage 2がattested meaning / composition seed / 元occurrenceから選び、隅内anchorはRendererが選ぶ。

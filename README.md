@@ -235,8 +235,8 @@ None of them breaks default reproducibility; each acts only on your explicit req
 |---|---|---|---|
 | **Another performance** | Line tremor, placement phase | Interpretation and composition | Very fast, no LLM call |
 | **Another catalog** | The color assignment | Interpretation, composition, performance | Very fast, no LLM call |
-| **Another composition** | The focus (from six fixed candidates), the concrete angle of a slant, the position in a corner | The instructions; technique, color, touch, and element count | Fast, no LLM call |
-| **Variation** (let the app move Stage 1.5) | Moves the focus to a different candidate; each strength moves it somewhere else | The instructions; the frame of the composition, technique, color, touch, and element count | Fast, no LLM call |
+| **Another composition** | The concrete angle of a slant, the position in a corner | The instructions; technique, color, touch, and element count | Fast, no LLM call |
+| **Variation** (let the app move Stage 1.5) | Currently has no axis to move, so the picture stays the same (a composition feature is to be designed separately) | The instructions; the frame of the composition, technique, color, touch, and element count | Fast, no LLM call |
 | **Another reading** | The reading of the words themselves | Your sentence | Slower, from Stage 1 |
 
 With *another reading*, the old and new instructions are shown side by side as a diff. The moment your words are read differently — that gap itself becomes material for the next sentence. You can also hand the act of accumulating generations to the AI; everything born while it runs is still recorded in the lineage.
@@ -304,7 +304,7 @@ During development, we always move forward while comparing with saved reference 
 
 ## Capabilities
 
-- **Multi-stage pipeline** — Sketch from life and automatic color catalog selection, both optional; Stage 1 (underdrawing); the Typed Compiler; Stage 1.5 (focus and variation); and the Renderer. Non-deterministic AI layers and deterministic algorithmic layers alternate
+- **Multi-stage pipeline** — Sketch from life and automatic color catalog selection, both optional; Stage 1 (underdrawing); the Typed Compiler; Stage 1.5 (meaning verification); and the Renderer. Non-deterministic AI layers and deterministic algorithmic layers alternate
 - **Shared core** — the flow of the processing, the Typed Compiler, the score, and the Renderer are gathered in a shared Rust core that the server (Python) and Android (Kotlin) both call
 - **Primitives and arrangement** — point, line, circle, ellipse, arc, square, triangle, cloudform; placing, lining up, drawing, scattering, filling, and tiling, with paths such as waves and diagonal bands, and "alternating" or "in order" sequences
 - **Regions and relations** — scores can state seven kinds of relation between elements ("along the previous line," "not touching the previous shape," "mirrored with the previous shape") that the performance resolves

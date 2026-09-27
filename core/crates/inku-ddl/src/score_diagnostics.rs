@@ -139,16 +139,6 @@ pub enum ScoreFieldGap {
         category: String,
         id: String,
     },
-    MissingMacroEmitFocusTarget {
-        invocation_ordinal: u64,
-        expansion_path: Vec<ExpansionPathSegment>,
-        generated_ordinal: u64,
-    },
-    DuplicateMacroEmitFocusTarget {
-        invocation_ordinal: u64,
-        expansion_path: Vec<ExpansionPathSegment>,
-        generated_ordinal: u64,
-    },
     NonPositiveDimension,
     PositionOutOfRange,
     GeometryExtentOutOfBounds,
@@ -159,10 +149,7 @@ impl ScoreFieldGap {
     pub const fn is_integrity_failure(&self) -> bool {
         matches!(
             self,
-            Self::MissingMacroExpansionOwner { .. }
-                | Self::DuplicateMacroExpansionOwner { .. }
-                | Self::MissingMacroEmitFocusTarget { .. }
-                | Self::DuplicateMacroEmitFocusTarget { .. }
+            Self::MissingMacroExpansionOwner { .. } | Self::DuplicateMacroExpansionOwner { .. }
         )
     }
 }

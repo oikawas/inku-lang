@@ -301,7 +301,10 @@
 # 49: A description that both alternates members and mirrors a shape compiles.
 # Its mirror makes the Score 0.15.0, and 0.15.0 now keeps the cycle members that
 # 0.14.0 introduced instead of stopping the whole work.
-DDL_ENGINE_VERSION = "49"
+# 50: `center` (中心 / 中央 / middle) is the canvas-center region an omitted
+# position uses. Stage 1.5 no longer moves it to one of six off-center focus
+# regions, and an explicit variation has no axis to move.
+DDL_ENGINE_VERSION = "50"
 # 4 (2026-07-30): yellow, orange, and purple become abstract Score colors, and
 # coerce recognizes the corresponding Japanese and English DDL markers.
 # 3 (2026-07-30): 黄 / 橙 / 紫 joined the saijiki color words, so an author can write

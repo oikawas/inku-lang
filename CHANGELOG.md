@@ -6,6 +6,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 36 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-27 — making refinement options for a work without a description says why it cannot
+
+The buttons that make options under "Edit drawing parameters" (one or four) did nothing, and said nothing, when the work had no description; on a work drawn from hand-written DDL, pressing them had no effect. They now say that the work has no description and to enter one on the left first, or that it has no instructions, in the options area. When options can be made is unchanged.
+
 ### 2026-09-27 — render warnings shown with the work and logged, and saved-replay refusals stated
 
 The Server and the Web follow the same day's render-core change.

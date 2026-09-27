@@ -445,7 +445,16 @@ export function createRefinementCoordinator(deps: RefinementCoordinatorDeps) {
 	async function generateVariationCandidates(kind: RefineKind, count: 1 | 4, touchWords?: string, amplitude?: VariationAmplitude) {
 		if (!work.result || refinementSession.gridBusy || work.loading) return;
 		const source = work.input.trim();
-		if (!source || !work.ddl) return;
+		// Say why nothing is made instead of returning in silence: a work drawn
+		// from hand-written DDL has no description to refine from.
+		if (!source) {
+			refinementSession.setStatus(t().refineNeedsDescription);
+			return;
+		}
+		if (!work.ddl) {
+			refinementSession.setStatus(t().refineNeedsDdl);
+			return;
+		}
 		const normalizedTouchWords = touchWords?.trim() ?? '';
 		if (kind === 'touch' && !normalizedTouchWords) {
 			refinementSession.setStatus(getLang() === 'ja' ? 'タッチを変える言葉を入力してください。' : 'Enter words to vary the touch.');

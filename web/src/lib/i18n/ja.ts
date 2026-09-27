@@ -333,6 +333,8 @@ export const ja: LangPack = {
 	variationGridEmpty: '候補を選択してください',
 	refineCandidatePlaceholder: '候補はここに並びます。左の要素を選んで「1案を作る」または「4案を作る」を押してください。',
 	refineNoAlternateCatalog: '変更先として使える別の色カタログがありません',
+	refineNeedsDescription: 'この作品には記述が無いため、推敲の候補を作れません。左の記述欄に記述を入れてから作ってください。',
+	refineNeedsDdl: 'この作品には指示書が無いため、推敲の候補を作れません。',
 	variationTitle: '変奏',
 	variationRadioLabel: '変奏（Stage1.5をお任せで変える）',
 	variationSmall: '小',

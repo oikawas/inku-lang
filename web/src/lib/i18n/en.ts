@@ -333,6 +333,8 @@ export const en: LangPack = {
 	variationGridEmpty: 'choose candidates first',
 	refineCandidatePlaceholder: 'Candidates appear here. Pick an element on the left, then press Make one option or Make four options.',
 	refineNoAlternateCatalog: 'No alternate color catalog is available',
+	refineNeedsDescription: 'This work has no description, so no refinement options can be made. Enter a description on the left first.',
+	refineNeedsDdl: 'This work has no instructions, so no refinement options can be made.',
 	variationTitle: 'Variation',
 	variationRadioLabel: 'Variation (let the app change Stage 1.5)',
 	variationSmall: 'Subtle',

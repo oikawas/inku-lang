@@ -6,6 +6,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 36 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### v2.15.35 — update placement ranges, rasterization, and refinement (Build 1111, 2026-09-27)
+
+This version includes the changes below since v2.15.34. DDL engine 51 draws position words as ranges. Android improves SVG rasterization, Bitmap transfer, and thumbnail replacement and cleanup. Web refinement and export, and Server refinement-option saving are also updated. The dated entries below describe each change and its effect on saved works.
+
 ### 2026-09-27 — Android removes the thumbnails a redraw replaced
 
 When the thumbnail format changed and every thumbnail was drawn again (`-rgba2.webp`), each row moved to its new file but the old file stayed. The replaced file is now deleted once no other work points at it, and when a backfill pass finds every thumbnail current, earlier-format files that no work points at and that were not written in the last ten minutes are removed. Current-format files are never swept, because an instrumented test's in-memory database shares the app's thumbnail directory. On the author's device the 541 old files no work pointed at (about 3.4 MB) went, and the 339 files of the 340 works' thumbnails stayed. Works and the database are unchanged.

@@ -6,6 +6,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 36 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### v2.15.34 — update center placement, rendering and refinement labels (Build 1110, 2026-09-27)
+
+This version includes the changes below since v2.15.33: DDL engine 50 places `center` in the middle of the canvas; render engine 71, Web and Android refinement labels, render warnings, saved-work replay and seed handling are updated. Server and CLI also use resvg-py 0.5.0. The dated entries below describe each change and its effect on saved works.
+
 ### 2026-09-27 — Variation and Another composition follow center no longer being a focus
 
 The Web's refinement labels and explanations follow the render core no longer reading center and middle as a focus (DDL engine 50, the same day), under the author's ruling to keep the Variation screen and say that it moves nothing.

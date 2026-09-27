@@ -62,6 +62,8 @@ runtime fallbackを持たない。保存済みSVG、Room schema、Score schema�
 
 作品を保存するとき、上流診断が1件以上あれば共有`explain_plugin_diagnostics`（JNI`NativePipelineBridge.explainPluginDiagnostics`）を呼び、結果を`pipeline_diagnostics.plugin_diagnostics`（配列）に保存する。`enabled`は作品configの定義の正式名と別名、および有効な同梱パッケージの名前、`disabled`は無効な同梱パッケージの名前である。保存時の検査は、必須チャンネルの完全一致に加え、任意チャンネル`plugin_diagnostics`を配列として受け付け、この項目の無い保存済みの行も読む。描画の診断は、同じ範囲の上流診断の代わりに、Webの`pipelinePluginDiagnostic`と同じ文言で理由（未登録・無効・名前の不一致と候補・版の不一致）を示す。
 
+描画coreが描画を止めずに残す警告（描画のmetadataの`render_warnings`。いまは`#rrggbb`でない色表の値を既定の色で描いた`invalid_color`と色の名前）は、Logcat（tag `InkuRender`）に記録し、作品の描画の診断にWebの`pipelineRenderWarning`と同じ文言で示す。警告があれば`pipeline_diagnostics.render_warnings`（配列）にも保存し、保存時の検査はこれも任意チャンネルとして受け付ける。保存Score再演（`renderSaved`）が断ったときは、coreの理由コードを「このScoreは描けません:」に続けてWebの`renderRefusalReason`と同じ文言で示し、coreの`message`はLogcatにだけ記録する。
+
 DDLの書き出しは、保存作品の書き出しシートの「DDL（プラグイン定義付き）」で、`inku.ddl-export.v1`（DDLと、それが正式名または別名で書く定義だけ、`exported_from`はbuildとrender engine）を`inku-<id>-<日時>.inku-ddl.json`として共有する。DDL編集の「読込」で書き出しファイルを読むと、DDLを編集欄へ入れ、定義を次の新しい作品のcatalog解決だけに先頭の候補として渡す（登録しない、既存作品の編集には渡さない）。登録済みに無い名前は`imported_plugin_not_installed`、中身が違う名前は`imported_plugin_differs_from_installed`のcatalog診断を付ける。書き出し形式でないファイルはそのままDDLとして読む。描画のseedとキャンバスは書き出しに含まれないため、読み込んだ作品は同じ構図（Scoreが同じ）で描かれる。制作画面のDDL欄は、読み取り専用のテキスト欄がタップを取り、DDL編集を開けなかったため、欄全体でタップを受けるよう直した。
 
 DDL SpecとDDL engineの版はServerの`layer_versions.py`が名乗り、Androidは版の定数を持たない。

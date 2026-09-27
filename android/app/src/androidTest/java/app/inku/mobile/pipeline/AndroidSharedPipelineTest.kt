@@ -250,6 +250,44 @@ class AndroidSharedPipelineTest {
     }
 
     @Test
+    fun aColorTheCoreCannotUseIsDrawnAroundAndKeptWithTheWork() = runBlocking {
+        val db = Room.inMemoryDatabaseBuilder(context, InkuDatabase::class.java)
+            .build().also { database = it }
+        val repo = InkuRepository(context, db, modelProviderOverride = ScriptedProvider())
+            .also { repository = it }
+        val original = repo.composeFromDdl(
+            description = "One black circle",
+            ddl = "place one black circle at center.",
+            catalogId = "default", canvasAspect = "square",
+            stage1ModelId = MODEL, stage2ModelId = MODEL,
+            seeds = PaintSeeds(renderSeed = 77L, compositionSeed = 17L),
+            instructionLang = "en", uiLang = "en",
+        )
+        // A saved color that is not #rrggbb, as a damaged older work could hold.
+        val snapshot = workColorSnapshot(original.renderMetadataJson)!!
+        val parent = RefinementParent.of(original, original.originalInput)
+            .copy(workColorSnapshot = snapshot.copy(colorMap = snapshot.colorMap + ("black" to "black")))
+        val plan = RefinementPlanner.plan(RefinementElement.Touch, parent, seedText = "damaged color")
+
+        val replay = repo.renderRefinementCandidate(parent, plan)
+        assertTrue(replay.displaySvg.startsWith("<svg"))
+        assertEquals(
+            listOf(RenderWarning("invalid_color", "black")),
+            RenderWarning.listFrom(JSONObject(replay.renderMetadataJson)),
+        )
+
+        val saved = repo.saveRefinementCandidate(
+            result = replay, plan = plan, parentNodeId = original.lineageNodeId, elapsedMs = 1L,
+            stage1ModelId = MODEL, stage2ModelId = MODEL,
+        )
+        val managed = repo.readManagedHistory(AndroidWorkPipeline.OWNER_ID, saved.id)!!
+        assertEquals(null, managed.warning)
+        val kept = JSONObject(managed.forkContextJson!!).getJSONObject("pipeline_diagnostics")
+            .getJSONArray("render_warnings")
+        assertEquals("invalid_color", kept.getJSONObject(0).getString("kind"))
+    }
+
+    @Test
     fun retiredCatalogReplaysFromSnapshotOrDefaultForOldWork() = runBlocking {
         val provider = ScriptedProvider()
         val db = Room.inMemoryDatabaseBuilder(context, InkuDatabase::class.java)

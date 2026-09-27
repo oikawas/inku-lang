@@ -69,6 +69,22 @@ object InkuStringsEn : InkuStrings {
         "plugin_version_mismatch" -> "The plugin $name differs from the one this work was saved with, so this sentence was not drawn."
         else -> "The plugin $name is not installed here, so this sentence was not drawn."
     }
+    override fun pipelineRenderWarning(kind: String, name: String?) = if (kind == "invalid_color") {
+        "The color table's value for \"${name ?: "?"}\" is not #rrggbb, so it was not used. A named color was drawn in its default."
+    } else {
+        "The performance raised a warning ($kind) and went on drawing."
+    }
+    override fun savedRenderRefused(code: String) = "This Score cannot be drawn: " + when (code) {
+        "resource_authority" -> "the work's resource policy could not be confirmed"
+        "performance_stopped" -> "drawing stopped at a limit"
+        "invalid_score" -> "the Score is not in a drawable form"
+        "mark_too_large" -> "a mark is too large"
+        "output_too_large" -> "the drawn SVG is too large"
+        "non_finite_value" -> "a value is not a finite number"
+        "invalid_saved_performance" -> "the saved content cannot be read"
+        "internal_invariant" -> "something went wrong inside the drawing core"
+        else -> code.replace('_', ' ')
+    }
     override val pipelineOmissions: (Int) -> String = { count -> "Omitted placements or relations: $count. The other parts continue drawing." }
     override val pipelinePartialExecution: (Int, Int) -> String = { requested, executed ->
         "Drew $executed of the $requested requested."

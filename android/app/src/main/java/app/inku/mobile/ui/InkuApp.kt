@@ -216,6 +216,7 @@ import app.inku.mobile.data.model.CanvasAspects
 import app.inku.mobile.data.model.DerivationKindRegistry
 import app.inku.mobile.data.model.ColorCatalogs
 import app.inku.mobile.pipeline.PluginDiagnostic
+import app.inku.mobile.pipeline.RenderWarning
 import app.inku.mobile.pipeline.SaijikiGenerated
 import app.inku.mobile.pipeline.Sketches
 import app.inku.mobile.pipeline.SketchMode
@@ -6437,6 +6438,14 @@ private fun PipelineStatusPanel(state: InkuUiState, viewModel: InkuViewModel) {
             )
         }.getOrDefault(emptyList())
     }.takeIf { view == null || savedCurrentRevision }.orEmpty()
+    // What the render core drew around on the work on screen. Read off the
+    // saved drawing's metadata, so a replayed work shows its own too.
+    val renderWarnings = remember(state.selectedHistory?.renderMetadataJson) {
+        runCatching {
+            RenderWarning.listFrom(state.selectedHistory?.renderMetadataJson?.let(::JSONObject))
+        }.getOrDefault(emptyList())
+    }.takeIf { view == null || savedCurrentRevision }.orEmpty()
+    var diagnosticsHeadingShown = false
     if (diagnostics != null) {
         val issueKeys = listOf("upstream_diagnostics", "downstream_diagnostics", "resource_omissions", "relation_omissions")
         val issues = issueKeys.flatMap { key ->
@@ -6445,6 +6454,7 @@ private fun PipelineStatusPanel(state: InkuUiState, viewModel: InkuViewModel) {
         }
         if (issues.isNotEmpty()) {
             Text(S.pipelineDiagnostics, style = MaterialTheme.typography.labelMedium)
+            diagnosticsHeadingShown = true
             val resources = diagnostics.optJSONArray("resource_omissions")
             val omissions = (0 until (resources?.length() ?: 0)).count { index ->
                 resources?.optJSONObject(index)?.optJSONObject("partial_execution") == null
@@ -6473,6 +6483,16 @@ private fun PipelineStatusPanel(state: InkuUiState, viewModel: InkuViewModel) {
                     }
                 }
             }
+        }
+    }
+    if (renderWarnings.isNotEmpty()) {
+        if (!diagnosticsHeadingShown) Text(S.pipelineDiagnostics, style = MaterialTheme.typography.labelMedium)
+        renderWarnings.forEach { warning ->
+            Text(
+                S.pipelineRenderWarning(warning.kind, warning.name),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error,
+            )
         }
     }
 }

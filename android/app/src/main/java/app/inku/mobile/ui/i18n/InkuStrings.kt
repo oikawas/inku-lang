@@ -82,6 +82,13 @@ interface InkuStrings {
     val pipelineDiagnostics: String
     /** Same wording as the web's `pipelinePluginDiagnostic`. */
     fun pipelinePluginDiagnostic(reason: String, name: String, suggestion: String?): String
+    /** Same wording as the web's `pipelineRenderWarning`: what the render core drew around. */
+    fun pipelineRenderWarning(kind: String, name: String?): String
+    /**
+     * A saved work the render core would not draw again, by the core's refusal
+     * code: the web's `errorScoreNotRenderable` with its `renderRefusalReason`.
+     */
+    fun savedRenderRefused(code: String): String
     val pipelineOmissions: (Int) -> String
     val pipelinePartialExecution: (Int, Int) -> String
 

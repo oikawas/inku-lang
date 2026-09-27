@@ -1,5 +1,6 @@
 package app.inku.mobile.pipeline
 
+import android.util.Log
 import app.inku.mobile.data.db.ManagedHistoryLinkInput
 import app.inku.mobile.data.db.ManagedHistoryRead
 import app.inku.mobile.data.db.ManagedHistoryReplayInput
@@ -11,6 +12,7 @@ import app.inku.mobile.data.refinement.SeedFactory
 import app.inku.mobile.llm.ModelProvider
 import app.inku.mobile.render.AndroidRenderHost
 import app.inku.mobile.render.SvgRenderer
+import app.inku.mobile.ui.i18n.InkuFailure
 import java.math.BigInteger
 import java.security.MessageDigest
 import java.text.Normalizer
@@ -213,6 +215,7 @@ class AndroidWorkPipeline(
             val metadata = JSONObject(rendered.metadataJson)
                 .put("catalog_id", request.workColorSnapshot?.catalogId ?: request.colorCatalogId)
                 .put("canvas_aspect_id", request.canvasAspect)
+            loggedRenderWarnings(metadata, "legacy replay")
             return replayResult(scoreJson, request, rendered.svg, metadata, replaySource)
         }
 
@@ -316,7 +319,15 @@ class AndroidWorkPipeline(
             .put("operational_budget", operationalBudget)
             .put("clip", clipPolicy())
         val output = JSONObject(binding.renderSaved(input.toString().encodeToByteArray()).toString(Charsets.UTF_8))
-        if (output.has("error")) throw PipelineHostException(output.requiredString("error"))
+        if (output.has("error")) {
+            // A code per reason, worded where it is shown; the core's own
+            // reason goes to the log only, as the server logs it.
+            val code = output.requiredString("error")
+            output.optString("message").takeIf { it.isNotEmpty() }
+                ?.let { Log.w(RENDER_LOG_TAG, "saved replay refused ($code): $it") }
+            throw InkuFailure { it.savedRenderRefused(code) }
+        }
+        loggedRenderWarnings(output.requiredObject("metadata"), "saved replay ($svgProfile)")
         return SavedRender(output, catalogId, colors, canvas, renderSeed)
     }
 
@@ -389,6 +400,8 @@ class AndroidWorkPipeline(
                     JSONObject(execution.configJson),
                 ),
             )
+        // Kept with the work only when there are any, as the server keeps them.
+        loggedRenderWarnings(metadata, "pipeline performance")?.let { diagnostics.put("render_warnings", it) }
         metadata.put("pipeline_diagnostics", diagnostics)
         val renderHash = renderHash(delivery.requiredObject("score"), metadata, catalogId)
         metadata.put("render_hash", renderHash).put("render_hash_short", renderHash.takeLast(4).uppercase())
@@ -501,6 +514,9 @@ class AndroidWorkPipeline(
             .put("relation_omissions", priorDiagnostics.requiredArray("relation_omissions"))
             .put("render_diagnostics", metadata.optJSONObject("execution") ?: JSONObject.NULL)
             .put("resource_execution", metadata.optJSONObject("resource_execution") ?: JSONObject.NULL)
+        // Logged by renderSaved already.
+        metadata.optJSONArray("render_warnings")?.takeIf { it.length() > 0 }
+            ?.let { diagnostics.put("render_warnings", it) }
         return ManagedHistoryReplayInput(
             ownerId = OWNER_ID,
             sourceHistoryId = source.history.id,

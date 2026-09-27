@@ -6,6 +6,15 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 36 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-27 — Android also shows and logs render warnings, and states saved-replay refusals
+
+Android follows the render core's change of the same day (host colors are checked, saved-replay refusals carry a code per reason) and the Server's and Web's handling of it. The author's ruling is to show the error, log it, fall back to the default color and keep drawing.
+
+- A drawing's `render_warnings` are logged to Logcat (tag `InkuRender`) and shown among the work's drawing diagnostics in the Web's wording. Shared-pipeline works and saved-Score replays also keep them in `pipeline_diagnostics.render_warnings` when there are any, which the save-time check accepts as an optional channel. Every color value Android passes today is `#rrggbb`, so only a work whose saved colors are damaged raises one.
+- A refused saved-Score replay states the core's refusal code (resource policy, performance stopped, invalid Score, a mark or the output too large, a non-finite value and so on) after "This Score cannot be drawn:" in the Web's wording, instead of `invalid_saved_performance`; the core's own reason goes to Logcat only.
+
+DDL, Score and rendering versions are unchanged.
+
 ### 2026-09-27 — making refinement options for a work without a description says why it cannot
 
 The buttons that make options under "Edit drawing parameters" (one or four) did nothing, and said nothing, when the work had no description; on a work drawn from hand-written DDL, pressing them had no effect. They now say that the work has no description and to enter one on the left first, or that it has no instructions, in the options area. When options can be made is unchanged.

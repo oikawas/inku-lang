@@ -116,6 +116,11 @@ interface InkuStrings {
     val refinementTouchFanoutRefusal: String
     val refinementElementLabel: (String) -> String
     val variationAmplitudeLabel: (String) -> String
+    /**
+     * Under the variation's amplitudes: since draw-system05 `中心` is the middle
+     * and the variation, which moved only the focus, has nothing left to move.
+     */
+    val refinementVariationNotice: String
 
     // --- Comparison ---------------------------------------------------------
     val comparisonModelSelectPrompt: String

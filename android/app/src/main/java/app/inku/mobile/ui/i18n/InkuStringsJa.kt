@@ -125,6 +125,7 @@ object InkuStringsJa : InkuStrings {
             else -> id
         }
     }
+    override val refinementVariationNotice = "変奏は、いまは動かすものがありません。候補は元の作品と同じ絵になります。"
 
     override val comparisonModelSelectPrompt = "比較するモデルを1つ以上選択してください。"
     override val comparisonModelFixedMissing = "固定するモデルを選択してください。"

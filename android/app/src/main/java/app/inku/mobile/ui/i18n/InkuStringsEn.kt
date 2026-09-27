@@ -134,6 +134,7 @@ object InkuStringsEn : InkuStrings {
             else -> id
         }
     }
+    override val refinementVariationNotice = "Variation has nothing to move for now; its options draw the same picture as the work."
 
     override val comparisonModelSelectPrompt = "Select one or more models to compare."
     override val comparisonModelFixedMissing = "Select the model to hold fixed."

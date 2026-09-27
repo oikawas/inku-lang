@@ -6,6 +6,12 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 36 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-27 — Android's variation says it has nothing to move
+
+With the render core's change of the same day (a DDL `中心`/`中央` is placed in the middle instead of being read as a focus; DDL engine 50), the variation's amplitude and seed have no axis left, and its options draw the same picture as the work. Following the author's ruling to keep the variation on screen and say that it does not move, choosing "Variation" in the refinement shows "Variation has nothing to move for now; its options draw the same picture as the work." under the amplitude choices. The choices, and recording the amplitude and seed with the work, are unchanged. No Android text or spec described moving a focus.
+
+DDL, Score and rendering versions are unchanged.
+
 ### 2026-09-27 — Android prepares its database off the main thread at startup
 
 Android prepared its database while composing the first screen, on the main thread: the check of whether a pre-v10 database may be reset, and opening the writable database with Room's migrations (finding R-2 of the 2026-09-26 source review, deferred then by the author's choice). The preparation now runs in the background; until it answers only the app's background is shown, and the app appears once the database is ready. The refusal screen's retry prepares the same way. An activity recreated after the database opened (a display setting change, for instance) shows the app without waiting.

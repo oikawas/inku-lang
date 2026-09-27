@@ -3816,6 +3816,12 @@ private fun RefinementAdjustControls(
                 )
             }
         }
+        // The author's ruling: keep the choice, and say that it moves nothing.
+        Text(
+            LocalStrings.current.refinementVariationNotice,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 
     if (state.refinementElement == RefinementElement.Touch) {

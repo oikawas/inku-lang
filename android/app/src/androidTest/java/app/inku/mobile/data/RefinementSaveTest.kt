@@ -331,15 +331,15 @@ class RefinementSaveTest {
      * only be run on a device.
      */
     @Test
-    fun t11_theVariationPairReachesStage1_5ThroughTheRequest() = runBlocking {
-        // The DDL the shared core's own Stage 1.5 tests vary
-        // (`stage15_transform.rs`). The variation moves the effective document
-        // -- the Score -- and leaves the visible DDL as written, so the Score is
-        // what is compared; the composition and render seeds are held so that
-        // only the pair can move it.
+    fun t11_theVariationPairReachesTheWorkButMovesNothing() = runBlocking {
+        // Since draw-system05 `中心` is the middle of the canvas, and the
+        // variation, which moved only the focus, has no axis left. The pair still
+        // travels from the request to the saved work; the Score is the unvaried
+        // one. The composition and render seeds are held so that only the pair
+        // could move it.
         val ddl = "中心に、鉛筆の細い線をひとつ置く。"
 
-        suspend fun scoreOf(amplitude: String?, seed: Long?): String = repository.composeFromDdl(
+        suspend fun workOf(amplitude: String?, seed: Long?) = repository.composeFromDdl(
             description = "変奏 $amplitude $seed",
             ddl = ddl,
             catalogId = "default",
@@ -348,18 +348,16 @@ class RefinementSaveTest {
             stage2ModelId = "s2",
             autoRepair = true,
             seeds = PaintSeeds(renderSeed = 4242L, compositionSeed = 0L, variationAmplitude = amplitude, variationSeed = seed),
-        ).scoreJson
+        )
 
-        val none = scoreOf(null, null)
-        val small7 = scoreOf("small", 7L)
-        val small7Again = scoreOf("small", 7L)
-        val medium7 = scoreOf("medium", 7L)
-        val small8 = scoreOf("small", 8L)
+        val none = workOf(null, null)
+        val small7 = workOf("small", 7L)
+        val large8 = workOf("large", 8L)
 
-        assertEquals("the same pair expands the same way", small7, small7Again)
-        assertTrue("a variation is not the unvaried expansion", small7 != none)
-        assertTrue("the amplitude alone moves it", small7 != medium7)
-        assertTrue("the seed alone moves it", small7 != small8)
+        assertEquals("small", small7.variationAmplitude)
+        assertEquals("7", small7.variationSeed)
+        assertEquals("a variation moves nothing", none.scoreJson, small7.scoreJson)
+        assertEquals("whatever its amplitude and seed", none.scoreJson, large8.scoreJson)
     }
 
     /** The touch seed reaches the renderer through the request, not only the Score. */

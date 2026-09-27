@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { t } from '$lib/i18n/index.svelte';
-	import { thumbnailConditions, thumbnailSrc } from '$lib/thumbnailSource';
+	import { fallbackSvgSrc, thumbnailConditions, thumbnailSrc } from '$lib/thumbnailSource';
 	import { composeFallbackReason, hasFallbackMark } from '$lib/composeFallback';
 	import { svgImage } from '$lib/svgImage';
 	type HistoryItem = {
@@ -29,6 +29,21 @@
 	// the picture that is already in hand is what gets drawn instead.
 	let thumbMissing = $state(false);
 	const pngSrc = $derived(thumbMissing ? null : thumbnailSrc(item, thumbnailConditions()));
+	// A listing does not carry the SVG, so a work with no thumbnail yet -- one
+	// saved a moment ago -- fetches its stored drawing instead of staying blank.
+	let fetchedSvg = $state('');
+
+	async function onThumbMissing(): Promise<void> {
+		thumbMissing = true;
+		const src = fallbackSvgSrc(item);
+		if (!src) return;
+		try {
+			const response = await fetch(src, { credentials: 'same-origin' });
+			if (response.ok) fetchedSvg = await response.text();
+		} catch {
+			// Blank, as before; the next listing asks for the thumbnail again.
+		}
+	}
 
 	// One mark for both layers, worded so it names the one that fell. The
 	// condition itself lives in $lib/composeFallback so this and the canvas
@@ -46,9 +61,9 @@
 		<span class="thumb-fallback-mark" title={fallbackMarkLabel} aria-label={fallbackMarkLabel}></span>
 	{/if}
 	{#if pngSrc}
-		<img src={pngSrc} alt="" loading="lazy" decoding="async" onerror={() => (thumbMissing = true)} />
+		<img src={pngSrc} alt="" loading="lazy" decoding="async" onerror={() => void onThumbMissing()} />
 	{:else}
-		<img use:svgImage={item.svg} alt="" decoding="async" />
+		<img use:svgImage={item.svg || fetchedSvg} alt="" decoding="async" />
 	{/if}
 </div>
 

@@ -40,6 +40,19 @@ export function thumbnailSrc(item: ThumbnailItem, conditions: ThumbnailCondition
 	return `/api/history/${encodeURIComponent(item.id)}/thumb?${params.toString()}`;
 }
 
+/**
+ * Where to fetch the drawing of a work that has no thumbnail, or null when
+ * the drawing is already in hand or the work is not saved.
+ *
+ * Thumbnails are baked after the save, so a work shown the moment it is saved
+ * has none yet, and the listing leaves the SVG out (`include_svg=false`). The
+ * saved-work SVG in the display profile is the stored one, not a new drawing.
+ */
+export function fallbackSvgSrc(item: { id?: string; svg?: string | null }): string | null {
+	if (item.svg || !item.id) return null;
+	return `/api/history/${encodeURIComponent(item.id)}/svg`;
+}
+
 // The server's answer, learned once from /api/info. A module-level value rather
 // than a prop: every thumbnail on screen wants the same one, and threading it
 // through six call sites would be six chances to forget.

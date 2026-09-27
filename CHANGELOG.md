@@ -6,6 +6,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 38 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-28 — The history strip shows a work's picture right after it is saved
+
+At the author's direction. Thumbnails are baked after a save, so the history strip or library asking for one right after the save got a 404. It then draws the SVG in hand, but the listing is fetched without SVGs (`include_svg=false`), so the picture stayed blank until a reload. When there is no thumbnail and no SVG in hand, the stored SVG is fetched once (`/api/history/{id}/svg`; the display profile returns the saved one as it is, without drawing again) and drawn.
+
 ### 2026-09-28 — Another catalog works without a description
 
 At the author's decision, Another catalog draws its options without a description or DDL: it redraws the saved JSON Score alone in other catalogs and uses neither. Until now it stopped, like the other refinements, on a work without a description (one written directly in DDL), and opening it from a lineage card reloads the work and empties the description field, so that path could not change the colors at all. The other refinement elements keep their conditions.

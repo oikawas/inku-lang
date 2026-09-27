@@ -14,7 +14,7 @@ import { test } from 'node:test';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
-import { thumbnailScale, thumbnailSrc } from './thumbnailSource.ts';
+import { fallbackSvgSrc, thumbnailScale, thumbnailSrc } from './thumbnailSource.ts';
 
 const ORDINARY = { hidpi: false, devicePixelRatio: 1 };
 const WORK = { id: 'work-1', render_hash: 'abc123' };
@@ -53,6 +53,16 @@ test('the URL carries the render hash the thumbnail was baked from', () => {
 	assert.ok(thumbnailSrc({ id: 'old', render_hash: null }, ORDINARY));
 });
 
+// ── A listing without SVGs still has a drawing to fall back to ─────────────
+test('a work with no thumbnail and no SVG in hand fetches its stored drawing', () => {
+	// Saved a moment ago: the thumbnail is not baked yet, and the listing
+	// carries no SVG.
+	assert.equal(fallbackSvgSrc({ id: 'work-1', svg: '' }), '/api/history/work-1/svg');
+	// The drawing is in hand, or there is no saved work to ask about.
+	assert.equal(fallbackSvgSrc({ id: 'work-1', svg: '<svg/>' }), null);
+	assert.equal(fallbackSvgSrc({ id: undefined, svg: '' }), null);
+});
+
 // ── T-10, from the client's side ────────────────────────────────────────────
 test('the second size is asked for only where it exists and is used', () => {
 	assert.equal(thumbnailScale({ hidpi: true, devicePixelRatio: 2 }), 2);
@@ -70,9 +80,10 @@ const THUMBNAIL_SOURCE = readFileSync(
 
 test('a thumbnail that fails to load falls back to the drawing', () => {
 	// The <img> must report its failure...
-	assert.match(THUMBNAIL_SOURCE, /onerror=\{\(\) => \(thumbMissing = true\)\}/);
+	assert.match(THUMBNAIL_SOURCE, /onerror=\{\(\) => void onThumbMissing\(\)\}/);
+	assert.match(THUMBNAIL_SOURCE, /thumbMissing = true;/);
 	// ...and the fallback stays an image document instead of joining the app DOM.
-	assert.match(THUMBNAIL_SOURCE, /\{:else\}\s*<img use:svgImage=\{item\.svg\}/);
+	assert.match(THUMBNAIL_SOURCE, /\{:else\}\s*<img use:svgImage=\{item\.svg \|\| fetchedSvg\}/);
 	assert.doesNotMatch(THUMBNAIL_SOURCE, /\{@html\s+clippedSvg\}/);
 	// The flag has to reach the decision, or reporting the failure changes
 	// nothing and the work stays blank.

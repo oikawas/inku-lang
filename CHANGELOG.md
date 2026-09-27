@@ -6,6 +6,12 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 36 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-27 — Android SVG rasterization shares noise calculations across channels
+
+Vendor resvg 0.48.1 and accelerate the `feTurbulence` used by SVG previews, thumbnails, refinement candidates, and PNG exports. Coordinate, lattice, and interpolation-weight calculations previously repeated for each RGBA channel now run once per pixel and octave, with contiguous gradient storage. Random values, per-channel operation order, and rounding are preserved, maintaining resolution and texture. The upstream source and local changes are documented in `core/vendor/resvg/INKU_PATCHES.md`.
+
+DDL, Score, SVG, rendering versions, and saved works are unchanged.
+
 ### 2026-09-27 — one export menu, the saved work's
 
 The canvas export button opened the saved work's menu for a saved work and a menu of the canvas's own for a picture not saved. At the author's request it is the saved work's menu alone, and a picture that is not saved (one the demo drew with saving off, for instance) is saved first, then exported.

@@ -149,7 +149,7 @@ val buildRustAndroidArm64 = tasks.register<Exec>("buildRustAndroidArm64") {
     workingDir(rootProject.file("../core"))
     inputs.files(
         rootProject.fileTree("../core") {
-            include("Cargo.toml", "Cargo.lock", "rust-toolchain.toml", "crates/**/Cargo.toml", "crates/**/src/**/*.rs", "crates/**/assets/**")
+            include("Cargo.toml", "Cargo.lock", "rust-toolchain.toml", "crates/**/Cargo.toml", "crates/**/src/**/*.rs", "crates/**/assets/**", "vendor/resvg/Cargo.toml", "vendor/resvg/src/**/*.rs")
             exclude("target/**")
         },
     )
@@ -228,7 +228,7 @@ val generateRustParityExpected = tasks.register<Exec>("generateRustParityExpecte
     workingDir(rootProject.file("../core"))
     inputs.files(
         rootProject.fileTree("../core") {
-            include("Cargo.toml", "Cargo.lock", "rust-toolchain.toml", "crates/**/Cargo.toml", "crates/**/src/**/*.rs", "crates/**/examples/**/*.rs", "crates/**/assets/**")
+            include("Cargo.toml", "Cargo.lock", "rust-toolchain.toml", "crates/**/Cargo.toml", "crates/**/src/**/*.rs", "crates/**/examples/**/*.rs", "crates/**/assets/**", "vendor/resvg/Cargo.toml", "vendor/resvg/src/**/*.rs")
             exclude("target/**")
         },
     )

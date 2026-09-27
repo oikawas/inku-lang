@@ -213,6 +213,9 @@ export interface LangPack {
 	vocabInInputLabel: string;
 	thinkingLabel: string;
 	ddlLabel: string;
+	/** The instructions heading, naming the language the DDL is read in. */
+	ddlLabelIn: (lang: 'ja' | 'en') => string;
+	tooltipDdlLang: string;
 	displayedWorkProcess: string;
 	sketchLabel: string;
 	sketchGrainLabel: string;

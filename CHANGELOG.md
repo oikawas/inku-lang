@@ -6,6 +6,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 37 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-28 — The instructions' language (Japanese DDL or English DDL) is shown
+
+At the draw session's request (the author's direction), the Web shows whether a DDL is read with the Japanese or the English grammar, since numeric ranges are to be written differently in each (draw-system05, second stage; the core change is still to come). The instructions heading on the left changes from `Instructions (normalized DDL)` to `Instructions (Japanese DDL)` or `Instructions (English DDL)` after the work's recorded `instruction_lang_resolved` (or, when none is recorded, the Server's auto rule applied to the text), and the instructions editor's heading takes the same form from the auto rule applied to the text being written (plain heading text, at the author's choice, not a framed badge). The heading's note says a single hiragana, katakana, or kanji character makes a DDL Japanese, so one Japanese name in English instructions has them read as Japanese. The rule itself and the API, DDL, and Score formats are unchanged.
+
 ### v2.15.36 — open color catalog options from the work-editing menu (Build 1112, 2026-09-28)
 
 This version includes the changes below since v2.15.35. Another catalog moves to its own dialog in the work-editing menu and shows options in catalog order for every catalog except the work's. The render engine version history is also filled in through engine 71. The DDL, Score, and render versions are unchanged.

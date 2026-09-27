@@ -14,7 +14,7 @@
 	import { limitNotesToShow } from '$lib/limitNotes';
 	import { hydrateSaijiki, hydrateSaijikiEn } from '$lib/saijiki';
 	import { SURFACE_PREVIEWS, localizePreview, shapeSvg, type PreviewEntry } from '$lib/saijiki-surface';
-	import { instructionLangOf, type ResolvedInstructionLang } from '$lib/instructionLang';
+	import { instructionLangOf, resolveInstructionLang, type ResolvedInstructionLang } from '$lib/instructionLang';
 	import AppRail from '$lib/components/AppRail.svelte';
 	import AuthPanel from '$lib/components/AuthPanel.svelte';
 	import CanvasPanel from '$lib/components/CanvasPanel.svelte';
@@ -1788,6 +1788,14 @@ function detachLineage(): void {
 const currentLineageNodeId = $derived(work.displayedHistoryItem?.lineage_node_id ?? work.result?.lineage_node_id ?? null);
 // The description tab's edit button needs both a node to branch from and a DDL
 // to load into the editor.
+	// The language the shown DDL is read in: the one recorded when it was
+	// drawn, else the Server's auto rule on the text itself.
+	const shownDdlLang = $derived.by((): ResolvedInstructionLang | null => {
+		if (work.ddl === null) return null;
+		const recorded = work.result?.instruction_lang_resolved ?? work.displayedHistoryItem?.instruction_lang_resolved;
+		if (recorded === 'ja' || recorded === 'en') return recorded;
+		return resolveInstructionLang(work.ddl, instructionLangOf(getLang()));
+	});
 const canEditCurrentDdl = $derived(!!currentLineageNodeId && !!(work.displayedHistoryItem?.ddl ?? work.ddl));
 
 $effect(() => {
@@ -2763,6 +2771,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 								ddl={work.ddl}
 								expandedDdl={work.expandedDdl}
 								label={t().ddlLabel}
+								lang={shownDdlLang}
 								expandedLabel={t().ddlExpandedLabel}
 								onEdit={openCurrentDdlEditor}
 								editDisabled={!canEditCurrentDdl}

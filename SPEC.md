@@ -747,7 +747,13 @@ With `auto`, the server lightly detects Japanese or English from the input text
 and uses the UI language only when the text itself has no language signal. The resolved language
 is passed to Stage 1, Stage 1.5, Stage 2, and demo-instruction generation. Render metadata
 records `instruction_lang_requested`, `instruction_lang_resolved`, and
-`ui_lang` for audit and replay context.  These language metadata fields are not
+`ui_lang` for audit and replay context. The Web names the language of a DDL in the
+headings of the instructions section and the instructions editor, as
+"Instructions (Japanese DDL)" or "Instructions (English DDL)" in place of
+"Instructions (normalized DDL)": the section shows the work's `instruction_lang_resolved`
+(or the auto rule on the text when none is recorded), and the editor applies the
+auto rule to the text being written. Its note says a single hiragana,
+katakana, or kanji character makes a DDL Japanese.  These language metadata fields are not
 part of the current canonical `render_hash` payload, so existing history hashes
 and benchmark references remain stable.
 

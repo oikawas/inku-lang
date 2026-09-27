@@ -284,6 +284,8 @@ export const ja: LangPack = {
 	vocabInInputLabel: '入力に含まれた語彙',
 	thinkingLabel: '思考 (qwen3 内部)',
 	ddlLabel: '指示書（正規化DDL）',
+	ddlLabelIn: (lang) => (lang === 'ja' ? '指示書（日本語DDL）' : '指示書（英語DDL）'),
+	tooltipDdlLang: '指示書はこの言語の文法で読みます。数値の範囲の書き方も日本語と英語で違います。平仮名・片仮名・漢字が1字でもあれば日本語DDLになるので、英語の指示書に日本語の名前が1つ入るだけで日本語として読みます。',
 	displayedWorkProcess: '表示中作品の写生と指示書',
 	sketchLabel: '写生（Stage 0.5）',
 	sketchGrainLabel: '区切り',

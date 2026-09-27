@@ -136,7 +136,7 @@ The sketch reaches three consumers in place of the description: interpretation, 
 
 If the layer does not answer, the description goes to interpretation unchanged and the work records that. A work painted with the layer off carries the same kind of record.
 
-`Sketch from life (Stage 0.5)` and `Instructions (normalized DDL)` each fold from the triangle in their heading. Folded, the heading, the rule, and `Edit` stay visible, and pressing `Edit` while folded opens the section. **The fold is saved on the account, not in the browser** — another machine opens it the same way. The sketch starts open and the instructions start folded.
+`Sketch from life (Stage 0.5)` and the instructions (`Instructions (Japanese DDL)` and the like) each fold from the triangle in their heading. Folded, the heading, the rule, and `Edit` stay visible, and pressing `Edit` while folded opens the section. **The fold is saved on the account, not in the browser** — another machine opens it the same way. The sketch starts open and the instructions start folded.
 
 ## 5. Consult the Saijiki
 
@@ -154,7 +154,7 @@ Plugin words appear in the same row and wear the same face as built-in ones. The
 
 ## 6. Read and Edit the Instructions
 
-After painting, `Instructions (normalized DDL)` on the left shows how Stage 1 read the input.
+After painting, the instructions section on the left shows how Stage 1 read the input.
 
 - description: the words a human wrote
 - Sketch from life (Stage 0.5): the description restated as prose in the language of things
@@ -162,6 +162,8 @@ After painting, `Instructions (normalized DDL)` on the left shows how Stage 1 re
 - Expanded (Stage 2 input): the DDL Stage 2 actually received, after plugin expansion and the expansion layer filled in
 - JSON Score: the machine-readable score Stage 2 writes
 - Work: the SVG the renderer performs
+
+The headings of the instructions section on the left and of the instructions editor name the language the instructions are read in: `Instructions (Japanese DDL)` or `Instructions (English DDL)`. The editor judges it again from the text being written. Numeric ranges and the like are written differently in Japanese and English, and the instructions are read with that language's grammar. A single hiragana, katakana, or kanji character makes them Japanese DDL, so one Japanese name in English instructions has them read as Japanese.
 
 `Auto-repair` enables or disables the deterministic repairs for invisible colors, overcrowding, contract violations, and the like. The repairs are: making colors that merge with the background visible; damping overcrowded lines, grains, and fills; filling in missing shape parameters; tidying duplicate instructions; removing invalid contact and positional relations; supplying colors and shapes the DDL left short; and supplying the composition's fulcrum, motion, and rhythm.
 

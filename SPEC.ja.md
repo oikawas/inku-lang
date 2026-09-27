@@ -453,6 +453,7 @@ Web UI の表示言語と、ユーザーが入力する指示文の言語は別�
 - `instruction_lang` はAPI互換性・再現・開発者診断のため `auto` / `ja` / `en` を持つが、通常の記述UIは常に `auto` を送る
 - `auto` の場合、サーバーは入力文字列から日本語 / 英語を軽量判定し、Stage 1 / Stage 1.5 / Stage 2 に渡す言語を決める。文字・語彙から判定できない場合だけ `ui_lang` を既定値とする
 - 解決結果は `instruction_lang_requested` / `instruction_lang_resolved` / `ui_lang` として `/api/paint`、`/api/compose`、履歴、JSONタブ、保存 artifact JSON に記録する
+- Webは指示書の表示欄と指示書エディタの見出しを、そのDDLの言語で「指示書（日本語DDL）」「指示書（英語DDL）」とする（以前の「指示書（正規化DDL）」に代わる）。表示欄は作品の `instruction_lang_resolved`（無ければ本文をautoと同じ規則で判定）、エディタは書いている本文をautoと同じ規則で判定する。平仮名・片仮名・漢字が1字でもあれば日本語になることを説明に書く
 - これらの言語メタデータは監査・再現補助用であり、既存履歴の `render_hash` 互換性を壊さないため、現行の `render_hash` canonical payload には含めない
 - 将来の他言語対応は、コア API を増やすのではなく、Instruction Language Registry に言語サポートを追加する形で拡張する
 

@@ -284,6 +284,8 @@ export const en: LangPack = {
 	vocabInInputLabel: 'Vocabulary in the description',
 	thinkingLabel: 'Thinking (Qwen3 internal)',
 	ddlLabel: 'Instructions (normalized DDL)',
+	ddlLabelIn: (lang) => (lang === 'ja' ? 'Instructions (Japanese DDL)' : 'Instructions (English DDL)'),
+	tooltipDdlLang: 'The instructions are read with this language\'s grammar, and numeric ranges are written differently in Japanese and English. A single hiragana, katakana, or kanji character makes it Japanese DDL, so one Japanese name in English instructions has them read as Japanese.',
 	displayedWorkProcess: 'Sketch and instructions of the displayed work',
 	sketchLabel: 'Sketch from life (Stage 0.5)',
 	sketchGrainLabel: 'Grain',

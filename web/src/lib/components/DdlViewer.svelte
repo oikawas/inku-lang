@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { highlightDDL } from '$lib/highlight';
 	import Tooltip from './Tooltip.svelte';
+	import type { ResolvedInstructionLang } from '$lib/instructionLang';
 	import { t } from '$lib/i18n/index.svelte';
 	import { describePanelSettings } from '$lib/features/describe-panel/settings.svelte';
 
@@ -19,9 +20,11 @@
 		paintDisabled?: boolean;
 		/** Status + stop panel for the run this button started. Sits under the button. */
 		runStatus?: import('svelte').Snippet | null;
+		/** The language the DDL is read in; it names the heading. Omitted = `label`. */
+		lang?: ResolvedInstructionLang | null;
 	};
 
-	let { ddl, expandedDdl = null, label, expandedLabel, onEdit = null, editDisabled = false, onPaint = null, paintDisabled = false, runStatus = null }: Props = $props();
+	let { ddl, expandedDdl = null, label, expandedLabel, onEdit = null, editDisabled = false, onPaint = null, paintDisabled = false, runStatus = null, lang = null }: Props = $props();
 
 	// Artworks saved before v1.98 have no input-side DDL: their single stored text
 	// is the expanded one. Show it in the main slot and rename the label so the
@@ -30,7 +33,7 @@
 	// database and can be deleted once those artworks are gone.
 	const legacyExpandedOnly = $derived(!ddl && !!expandedDdl);
 	const primary = $derived(legacyExpandedOnly ? (expandedDdl as string) : ddl);
-	const primaryLabel = $derived(legacyExpandedOnly ? expandedLabel : label);
+	const primaryLabel = $derived(legacyExpandedOnly ? expandedLabel : lang ? t().ddlLabelIn(lang) : label);
 	const showExpanded = $derived(!legacyExpandedOnly && !!expandedDdl && expandedDdl !== ddl);
 	const highlighted = $derived(highlightDDL(primary));
 	const expandedHighlighted = $derived(highlightDDL(expandedDdl ?? ''));
@@ -44,7 +47,18 @@
 
 <div class="ddl-viewer">
 	<div class="ddl-viewer-head">
-		<span class="ddl-viewer-label">{primaryLabel}</span>
+		<!-- The slot, not the label, pushes the buttons right: the note wraps the label. -->
+		<span class="ddl-viewer-label-slot">
+			{#if lang && !legacyExpandedOnly}
+				<!-- The note opens up and to the right of the heading's start: the
+				     panel clips it at its bottom edge and must not widen. -->
+				<Tooltip placement="top-right" text={t().tooltipDdlLang}>
+					<span class="ddl-viewer-label">{primaryLabel}</span>
+				</Tooltip>
+			{:else}
+				<span class="ddl-viewer-label">{primaryLabel}</span>
+			{/if}
+		</span>
 		{#if onEdit}
 			<Tooltip placement="left" text={t().tooltipDdlEdit}>
 				<button class="ghost-btn" type="button" disabled={editDisabled} onclick={() => onEdit?.()}>{t().ddlEditButton}</button>
@@ -88,8 +102,10 @@
 		align-items: center;
 		gap: 8px;
 	}
-	.ddl-viewer-label {
+	.ddl-viewer-label-slot {
 		margin-right: auto;
+	}
+	.ddl-viewer-label {
 		font-size: var(--ui-font-size-12);
 		font-weight: 600;
 		color: var(--fg2);

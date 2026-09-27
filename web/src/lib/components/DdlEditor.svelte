@@ -4,6 +4,7 @@
 	import { highlightDDL } from '$lib/highlight';
 	import { buildPluginNameIndex, unknownPluginNames } from '$lib/plugin-names';
 	import { resolveInstructionLang } from '$lib/instructionLang';
+	import Tooltip from './Tooltip.svelte';
 	import SaijikiInline from './SaijikiInline.svelte';
 	import type { PluginEntry, PreviewForPlugin, PreviewForWord, SaijikiPreview } from '$lib/features/ddl-editor/types';
 
@@ -136,7 +137,10 @@
 
 <section class="ddl-editor" style={`--ddl-editor-scrollbar-width: ${scrollbarWidth}px`}>
 	<div class="ddl-editor-toolbar">
-		<div class="ddl-editor-toolbar-title">{t().ddlEditorInstructions}</div>
+		<!-- The Server resolves the language by the same rule when the DDL is drawn. -->
+		<Tooltip placement="bottom-right" text={t().tooltipDdlLang}>
+			<div class="ddl-editor-toolbar-title">{t().ddlLabelIn(wordLang)}</div>
+		</Tooltip>
 		<div class="ddl-editor-toolbar-actions">
 			<button
 				type="button"

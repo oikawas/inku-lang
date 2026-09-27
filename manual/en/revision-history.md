@@ -2,6 +2,10 @@
 
 This file records revisions to user and operations documents under `manual/`. See `SPEC.ja.md` for the detailed product change history.
 
+## 2026-09-28 — The instructions' language is shown
+
+The instructions headings now read `Instructions (Japanese DDL)` or `Instructions (English DDL)`, so chapter 6 of Creating Images in both languages explains what it means and that a single hiragana, katakana, or kanji character has instructions read as Japanese.
+
 ## 2026-09-27 — Another catalog moves to the work-editing menu
 
 `Another catalog` left the refinement elements for the work-editing menu, where a dialog of its own lays out every other color catalog, so its row is removed from the refinement table of Creating Images in both languages and 8.3 is added.

@@ -22,6 +22,11 @@ fn optimized_turbulence_preserves_upstream_images() {
             1080,
         ),
         (
+            "parallel-full-region",
+            r#"<svg xmlns="http://www.w3.org/2000/svg" width="320" height="256"><defs><filter id="n" x="0" y="0" width="320" height="256" filterUnits="userSpaceOnUse"><feTurbulence type="fractalNoise" baseFrequency="0.07 0.11" numOctaves="3" seed="11"/></filter></defs><rect width="320" height="256" filter="url(#n)"/></svg>"#,
+            320,
+        ),
+        (
             "stitched-negative-seed",
             r#"<svg xmlns="http://www.w3.org/2000/svg" width="37" height="29"><defs><filter id="n" x="-13.5" y="7.25" width="37" height="29" filterUnits="userSpaceOnUse"><feTurbulence type="turbulence" baseFrequency="0.13 0.09" numOctaves="3" seed="-17" stitchTiles="stitch"/></filter></defs><rect width="37" height="29" filter="url(#n)"/></svg>"#,
             43,

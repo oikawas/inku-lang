@@ -66,6 +66,8 @@ val rustTargetDirectory = layout.buildDirectory.dir("rust-target")
 val rustGeneratedJniLibsDirectory = layout.buildDirectory.dir("generated/rustJniLibs")
 val rustParityAssetsDirectory = layout.buildDirectory.dir("generated/rustParityAssets")
 val rustParityExpectedDirectory = layout.buildDirectory.dir("generated/rustParityExpected")
+val importedRustParityExpectedDirectory = providers.gradleProperty("inkuRustParityExpectedDir")
+    .map { file(it) }
 val rustHostTargetDirectory = layout.buildDirectory.dir("rust-host-target")
 val rustNdkHostTag = when {
     System.getProperty("os.name").startsWith("Mac") -> "darwin-x86_64"
@@ -219,12 +221,12 @@ val checkRustNativePackagingInput = tasks.register("checkRustNativePackagingInpu
     }
 }
 
-// The device test compares the packaged library with the host core of the same
-// commit, so a render engine change needs no frozen corpus. Engine 41 inputs
-// are only a stable set of Scores; their frozen SVGs remain raster inputs.
+// Comparison fixtures are generated on Linux from the same core commit.
+// Other build hosts may import that directory explicitly; ordinary device
+// tests only need the checked-in SVG inputs and must not render on the host.
 val generateRustParityExpected = tasks.register<Exec>("generateRustParityExpected") {
     group = "verification"
-    description = "Render the parity cases with the host core for connected-device comparison."
+    description = "Generate same-commit comparison fixtures with the Linux host core."
     workingDir(rootProject.file("../core"))
     inputs.files(
         rootProject.fileTree("../core") {
@@ -235,6 +237,9 @@ val generateRustParityExpected = tasks.register<Exec>("generateRustParityExpecte
     inputs.file(rootProject.file("../server/reference/render-engine-41/manifest.json"))
     outputs.dir(rustParityExpectedDirectory)
     doFirst {
+        check(rustNdkHostTag == "linux-x86_64") {
+            "Generate Rust comparison fixtures on Linux, then import them with -PinkuRustParityExpectedDir=<directory>."
+        }
         val pinnedRustc = providers.exec {
             commandLine("rustup", "which", "--toolchain", "1.95.0", "rustc")
         }.standardOutput.asText.get().trim()
@@ -256,10 +261,21 @@ val generateRustParityExpected = tasks.register<Exec>("generateRustParityExpecte
 
 val prepareRustParityAssets = tasks.register<Sync>("prepareRustParityAssets") {
     group = "verification"
-    description = "Stage host-rendered parity expectations and raster inputs for connected-device tests."
-    dependsOn(generateRustParityExpected)
-    from(rustParityExpectedDirectory) {
-        into("render-parity")
+    description = "Stage fixed raster inputs and available Linux comparison fixtures for device tests."
+    if (importedRustParityExpectedDirectory.isPresent) {
+        from(importedRustParityExpectedDirectory) {
+            into("render-parity")
+        }
+        doFirst {
+            check(importedRustParityExpectedDirectory.get().resolve("expected.json").isFile) {
+                "inkuRustParityExpectedDir must contain the same-commit Linux comparison fixtures."
+            }
+        }
+    } else if (rustNdkHostTag == "linux-x86_64") {
+        dependsOn(generateRustParityExpected)
+        from(rustParityExpectedDirectory) {
+            into("render-parity")
+        }
     }
     from(rootProject.file("../server/reference/render-engine-41")) {
         listOf("A-pen-circle", "C-filter-display-pencil", "D-canvas-wide-region-single").forEach { include("$it.svg") }

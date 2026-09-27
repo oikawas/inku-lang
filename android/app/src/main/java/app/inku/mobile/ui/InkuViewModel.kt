@@ -517,8 +517,19 @@ class InkuViewModel @JvmOverloads constructor(
                 }
                 .onFailure { error -> localState.value = localState.value.copy(message = messageFor(error, strings(), strings().restoreDrawingFailed)) }
             withContext(Dispatchers.IO) {
-                repeat(4) {
-                    repository.backfillMissingThumbnails(limit = 8)
+                var offset = 0
+                var refreshedInPass = 0
+                while (true) {
+                    val batch = repository.backfillMissingThumbnails(limit = 2, offset = offset)
+                    if (batch.scanned == 0) {
+                        if (refreshedInPass == 0) break
+                        offset = 0
+                        refreshedInPass = 0
+                    } else {
+                        // Refreshed rows leave the query; only failed rows remain before the cursor.
+                        offset += batch.scanned - batch.refreshed
+                        refreshedInPass += batch.refreshed
+                    }
                     delay(750)
                 }
             }

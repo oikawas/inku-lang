@@ -6,6 +6,12 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 36 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-27 — Faster Android SVG rasterization, Bitmap transfer, and redisplay
+
+Reuse seed-specific noise lattices and gradients in resvg, prepare row and column coordinates ahead of time, and process large regions with a shared pool of at most two workers. Android copies pixels directly into a Bitmap through the NDK, removing intermediate Java arrays and Kotlin pixel loops. This also fixes the previous red/blue swap; old thumbnails are gradually regenerated from saved SVG.
+
+Work previews and refinement candidates share a 64 MiB cache and coalesce simultaneous requests for the same image. Unrotated images are reused, and queued requests are cancelled when their screens leave. DDL, Score, SVG, rendering versions, and saved work content are unchanged.
+
 ### 2026-09-27 — Android SVG rasterization shares noise calculations across channels
 
 Vendor resvg 0.48.1 and accelerate the `feTurbulence` used by SVG previews, thumbnails, refinement candidates, and PNG exports. Coordinate, lattice, and interpolation-weight calculations previously repeated for each RGBA channel now run once per pixel and octave, with contiguous gradient storage. Random values, per-channel operation order, and rounding are preserved, maintaining resolution and texture. The upstream source and local changes are documented in `core/vendor/resvg/INKU_PATCHES.md`.

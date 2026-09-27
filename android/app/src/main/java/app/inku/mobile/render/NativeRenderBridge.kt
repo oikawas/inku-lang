@@ -1,5 +1,7 @@
 package app.inku.mobile.render
 
+import android.graphics.Bitmap
+
 data class NativeRenderOutput(
     val svg: String,
     val metadataJson: String,
@@ -23,6 +25,8 @@ interface RenderBridge {
     fun rendererReferenceJson(): String
     fun render(requestJson: String): NativeRenderOutput
     fun rasterize(svg: String, rasterOptionsJson: String): NativeRasterOutput
+    fun rasterizeBitmap(svg: String, rasterOptionsJson: String): Bitmap =
+        error("Bitmap rasterization is unavailable on this bridge")
 }
 
 /**
@@ -42,6 +46,7 @@ object NativeRenderBridge : RenderBridge {
     external override fun rendererReferenceJson(): String
     external override fun render(requestJson: String): NativeRenderOutput
     external override fun rasterize(svg: String, rasterOptionsJson: String): NativeRasterOutput
+    external override fun rasterizeBitmap(svg: String, rasterOptionsJson: String): Bitmap
 
     private const val LIBRARY_NAME = "inku_render_android"
 }

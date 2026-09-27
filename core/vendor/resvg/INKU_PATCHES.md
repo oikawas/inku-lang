@@ -9,18 +9,28 @@ standalone lockfile are omitted; `core/Cargo.lock` pins dependencies.
 The README's chart links point to the upstream commit because the published
 crate does not include those images.
 
-The local patch is confined to `src/filter/turbulence.rs`. It computes the
-lattice coordinates and interpolation weights once per pixel and octave,
-then evaluates RGBA together. Gradient vectors are stored contiguously in
-channel order instead of thousands of small allocations. Seed generation,
-per-channel floating-point operation order, stitching, octave accumulation,
-clamping, and byte rounding retain the upstream behavior. It adds no threads
-or unsafe code and does not lower the raster resolution.
+The local patch is confined to `src/filter/turbulence.rs` and its Rayon
+dependency in `Cargo.toml`. It computes lattice coordinates and interpolation
+weights once per axis and octave, then evaluates RGBA together. Gradient
+vectors are stored contiguously in channel order instead of thousands of
+small allocations. An eight-entry LRU cache reuses the seed-dependent lattice
+and gradients across filters. At most 200,000 axis entries are retained during
+a filter; larger tables use the original constant-memory pixel path.
+
+Regions of at least 32,768 pixels and 65,536 pixel-octaves can use a single
+lazy Rayon pool capped at two workers and available CPU parallelism. Smaller
+regions stay sequential, and pool construction failure falls back to the
+sequential path. The pool is shared across concurrent renders, not created
+per filter. Seed generation, per-channel floating-point operation order,
+stitching (including coordinate-dependent wraps), octave accumulation,
+clamping, and byte rounding retain upstream behavior. The patch adds no
+unsafe code and does not lower raster resolution.
 
 `inku-svg-raster` keeps the published resvg 0.48.1 as a test-only dependency.
 Its `raster_equivalence` integration test compares every pixel with that
-independent upstream renderer at preview resolution, including stitched
-turbulence and the zero-octave boundary. When updating resvg, compare the
+independent upstream renderer at preview resolution, including a full region
+above the parallel threshold, stitched turbulence below that threshold, and
+the zero-octave boundary. When updating resvg, compare the
 upstream algorithm and re-evaluate this patch instead of silently carrying it
 onto a different implementation.
 

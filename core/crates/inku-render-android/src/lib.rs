@@ -1,5 +1,7 @@
 //! Thin synchronous JNI transport for the shared render and raster cores.
 
+#[cfg(any(target_os = "android", test))]
+mod bitmap;
 mod pipeline;
 
 use std::panic::{AssertUnwindSafe, catch_unwind};
@@ -243,6 +245,26 @@ pub extern "system" fn Java_app_inku_mobile_render_NativeRenderBridge_rasterize(
         .map_err(|error| {
             BindingError::state(format!("NativeRasterOutput construction failed: {error}"))
         })
+    })
+}
+
+/// Rasterize directly into an Android Bitmap without a Java pixel array.
+#[cfg(target_os = "android")]
+#[unsafe(no_mangle)]
+#[allow(non_snake_case)]
+pub extern "system" fn Java_app_inku_mobile_render_NativeRenderBridge_rasterizeBitmap(
+    env: JNIEnv<'_>,
+    _receiver: JObject<'_>,
+    svg: JString<'_>,
+    raster_options_json: JString<'_>,
+) -> jobject {
+    jni_boundary(env, null_mut(), |env| {
+        let svg = java_string(env, svg)?;
+        let raster_options_json = java_string(env, raster_options_json)?;
+        let options = parse_raster_options(&raster_options_json)?;
+        let output = inku_svg_raster::rasterize(&svg, options)
+            .map_err(|error| BindingError::invalid(format!("rasterize failed: {error}")))?;
+        bitmap::bitmap_from_raster(env, &output)
     })
 }
 

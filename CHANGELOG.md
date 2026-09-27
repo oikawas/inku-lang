@@ -6,6 +6,12 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 36 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-27 — Android says why refinement options cannot be made for a work without a description
+
+Android follows the Web's fix of the same day. Its refinement (the adjust view and the model comparison) went ahead for a work drawn from hand-written DDL, which has no description; an element that runs Stage 1 (reading, model comparison) sent the core an empty description, and the options area showed only `schema_violation`. Without a description no option is made now, and the area says "This work has no description, so no refinement options can be made. Choose a work drawn from a description." Every element is refused, as on the Web. Android refines a saved work's description, so it points to a work drawn from a description rather than to the description field.
+
+DDL, Score and rendering versions are unchanged.
+
 ### 2026-09-27 — resvg-py goes to 0.5.0 in the Server and the CLI
 
 resvg-py, which makes PNGs, is locked at the latest 0.5.0 instead of 0.3.4 (Server and CLI). The arguments of the `svg_to_bytes` the code calls are unchanged. 0.5.0 ships one build for Python 3.10 and later (abi3), usable in the Server's container (Linux, Python 3.12) and on macOS. The dependency floor `>=0.3.4` (0.3.3 took the whole process down on some works) stays. Ten SVGs, scratch works and a test fixture, rasterized by 0.3.4 and 0.5.0 are identical to the pixel. The resvg-py version recorded in a PNG's `rasterizer_info` becomes 0.5.0. DDL, Score, and render versions are unchanged.

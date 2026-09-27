@@ -154,9 +154,9 @@ class RefinementScreenTest {
 
     private fun vm(): InkuViewModel = requireNotNull(viewModel) { "openPanel() was not called" }
 
-    private fun paintParent(): HistoryItemEntity = runBlocking {
+    private fun paintParent(description: String = "赤い線を引く"): HistoryItemEntity = runBlocking {
         repository.renderFromScore(
-            description = "赤い線を引く",
+            description = description,
             scoreJson = score,
             catalogId = "ink_season",
             canvasAspect = "square",
@@ -166,8 +166,8 @@ class RefinementScreenTest {
         )
     }
 
-    private fun openPanel(): HistoryItemEntity {
-        val parent = paintParent()
+    private fun openPanel(description: String = "赤い線を引く"): HistoryItemEntity {
+        val parent = paintParent(description)
         val created = ViewModelStore()
         store = created
         val factory = object : ViewModelProvider.Factory {
@@ -399,6 +399,24 @@ class RefinementScreenTest {
         composeTestRule.runOnIdle {
             assertEquals(
                 "同じ言葉は同じタッチ(Seed)になります。1案だけ生成可能です。",
+                vm().state.value.refinementStatus,
+            )
+            assertTrue("nothing was drawn", vm().state.value.refinementCandidates.isEmpty())
+        }
+    }
+
+    /** A work drawn from hand-written DDL has no description to refine from; say so, as web does. */
+    @Test
+    fun aWorkWithoutADescriptionSaysWhyNoCandidateIsMade() {
+        openPanel(description = "")
+        composeTestRule.runOnIdle {
+            vm().setRefinementElement(RefinementElement.Reading)
+            vm().generateRefinementCandidates()
+        }
+        awaitState("the refusal") { it.refinementStatus != null && !it.refinementBusy }
+        composeTestRule.runOnIdle {
+            assertEquals(
+                "この作品には記述が無いため、推敲の候補を作れません。記述から描いた作品を選んでください。",
                 vm().state.value.refinementStatus,
             )
             assertTrue("nothing was drawn", vm().state.value.refinementCandidates.isEmpty())

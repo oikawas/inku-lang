@@ -2807,11 +2807,17 @@ class InkuViewModel @JvmOverloads constructor(
      * no idea which sub-view it is running -- that is what stops the model
      * comparison from growing a second copy of it (SPEC `:688`).
      */
-    private fun candidateJobs(current: InkuUiState, parent: RefinementParent): List<CandidateJob> =
-        when (current.refinementSubview) {
+    private fun candidateJobs(current: InkuUiState, parent: RefinementParent): List<CandidateJob> {
+        // A work drawn from hand-written DDL has no description to refine
+        // from. Every element is refused, as web refuses them; before this a
+        // route through Stage 1 sent the core an empty description and the
+        // panel showed its bare `schema_violation`.
+        if (parent.description.isBlank()) inkuError { it.refinementNeedsDescription }
+        return when (current.refinementSubview) {
             RefinementSubview.Adjust -> adjustJobs(current, parent)
             RefinementSubview.Model -> modelJobs(current, parent)
         }
+    }
 
     private fun adjustJobs(current: InkuUiState, parent: RefinementParent): List<CandidateJob> {
         val element = current.refinementElement

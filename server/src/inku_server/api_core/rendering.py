@@ -610,7 +610,7 @@ def _add_history_item(
     actor: dict,
     input_text: str,
     ddl: str | None,
-    score: Score,
+    score: Score | dict,
     svg: str,
     at: int,
     expanded_ddl: str | None = None,
@@ -640,7 +640,8 @@ def _add_history_item(
     coerce_observability: dict | None = None,
 ) -> dict:
     item_id = str(uuid.uuid4())
-    score_dict = score.model_dump(by_alias=True)
+    # A compact Score arrives as a dict and is kept exactly as sent.
+    score_dict = score if isinstance(score, dict) else score.model_dump(by_alias=True)
     prefix = _output_prefix(actor["id"], item_id, at)
     metadata = dict(render_metadata or {})
     metadata.setdefault("ddl_version", DDL_VERSION)

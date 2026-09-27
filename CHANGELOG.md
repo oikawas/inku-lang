@@ -6,6 +6,12 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 36 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-27 — refinement options of Score 0.10 and later works can be saved
+
+`POST /api/history`, which saves a refinement option to the history, drew the Score it received through the render entry that carries no resource policy. For Score 0.10 and later works (every work the app makes now) the render core refused with InvalidCompactPerformance, and saving an option answered 422 (the cause fixed earlier the same day for a saved work's export). Scores from 0.10 on are now drawn through the same shared replay as `/api/render-score` and a work's SVG, and are saved exactly as received (no coerce). Saving a Score 0.9 or earlier is unchanged.
+
+The API shape is unchanged. DDL, Score, and render versions are unchanged.
+
 ### 2026-09-27 — refinement options keep the dialog until they are saved or discarded
 
 After making one or four options in refinement ("Edit drawing parameters"), unsaved options could be left behind on another screen: the ×, the backdrop and Escape closed the dialog, and pressing an option put it on the canvas and closed it. At the author's request, while unsaved options remain the dialog closes only two ways.

@@ -410,56 +410,92 @@ def api_history_post(
     if requested_seed_text is None and isinstance(metadata_seed_text, str):
         requested_seed_text = metadata_seed_text
     render_seed, seed_text = _render_seed_from_text(requested_seed_text, body.render_seed)
-    # A Score that does not validate is the sender's to fix: say where, the way a
-    # malformed body is answered. It used to fall into the handler below, which
-    # answered "history score render failed" and logged a traceback as if the
-    # server had broken.
-    try:
-        # Site 2 of 5.
-        limits = _effective_limits()
-        pre_coerce_score = Score.model_validate(body.score)
-        coerce_observability = _capture_history_coerce_observability(
-            pre_coerce_score,
-            lang=body.instruction_lang_resolved,
-        )
-        score = coerce_saved_score(
-            pre_coerce_score,
-            limits=limits,
-            lang=body.instruction_lang_resolved,
-            trace=coerce_observability,
-        )
-    except ValidationError as e:
-        raise HTTPException(status_code=422, detail=_invalid_score_detail(e)) from e
-    try:
+    if isinstance(body.score, dict) and body.score.get("version") in _COMPACT_SCORE_VERSIONS:
+        # A compact Score (0.10 and later, every work the app makes now) is
+        # drawn only through the shared replay with its resource policy, as
+        # /api/render-score and a saved work's SVG are. The plain render below
+        # refuses it with InvalidCompactPerformance, so saving a refinement
+        # option of such a work answered 422. It is kept as sent: it is what a
+        # later redraw replays, and there is nothing to coerce.
+        from ... import pipeline_runtime
+
         catalog_id = _resolved_catalog_id(body.catalog_id)
-        canvas_aspect = _validated_canvas_aspect_override(body.canvas_aspect)
-        if canvas_aspect is not None:
-            score = _score_with_canvas(score, canvas_aspect)
+        replayed = pipeline_runtime.get_service().replay_for(actor["id"], {
+            "score": body.score,
+            "catalog_id": catalog_id,
+            "canvas_aspect": _validated_canvas_aspect_override(body.canvas_aspect),
+            "render_seed": render_seed,
+            "seed_text": seed_text,
+            "composition_seed": body.composition_seed,
+            "wild": bool(body.render_wild),
+        }, None)
+        score = body.score
+        svg = replayed["svg"]
+        coerce_observability = None
         render_metadata = {
-            **_render_metadata(catalog_id, canvas_aspect=_score_canvas_aspect_value(score)),
+            **{key: value for key, value in replayed.items() if key not in {"score", "svg", "catalog_id"}},
             "stage1_prompt_digest": body.stage1_prompt_digest,
             "stage1_prompt_base_digest": body.stage1_prompt_base_digest,
             "stage2_prompt_digest": body.stage2_prompt_digest,
             "instruction_lang_requested": body.instruction_lang_requested,
             "instruction_lang_resolved": body.instruction_lang_resolved,
             "ui_lang": body.ui_lang,
-            "render_seed": render_seed,
-            "composition_seed": body.composition_seed,
             "focus": body.focus if body.focus in SAVED_FOCUS_IDS else None,
             "variation_amplitude": _validated_variation_amplitude(body.variation_amplitude),
             "variation_seed": body.variation_seed,
-            "seed_text": seed_text,
             "interpretation_seed": body.interpretation_seed,
-            # What actually governed this work. Without it a per-install setting
-            # would make the same description a different work with nothing on
-            # the row to say why.
-            "render_limits": limits_as_dict(limits),
         }
-        svg, render_metadata = _render_with_metadata(score, render_metadata, owner=actor["id"])
-    except HTTPException:
-        raise
-    except Exception as e:  # noqa: BLE001
-        raise _unexpected_http_error("history score render", 422) from e
+    else:
+        # A Score that does not validate is the sender's to fix: say where, the way a
+        # malformed body is answered. It used to fall into the handler below, which
+        # answered "history score render failed" and logged a traceback as if the
+        # server had broken.
+        try:
+            # Site 2 of 5.
+            limits = _effective_limits()
+            pre_coerce_score = Score.model_validate(body.score)
+            coerce_observability = _capture_history_coerce_observability(
+                pre_coerce_score,
+                lang=body.instruction_lang_resolved,
+            )
+            score = coerce_saved_score(
+                pre_coerce_score,
+                limits=limits,
+                lang=body.instruction_lang_resolved,
+                trace=coerce_observability,
+            )
+        except ValidationError as e:
+            raise HTTPException(status_code=422, detail=_invalid_score_detail(e)) from e
+        try:
+            catalog_id = _resolved_catalog_id(body.catalog_id)
+            canvas_aspect = _validated_canvas_aspect_override(body.canvas_aspect)
+            if canvas_aspect is not None:
+                score = _score_with_canvas(score, canvas_aspect)
+            render_metadata = {
+                **_render_metadata(catalog_id, canvas_aspect=_score_canvas_aspect_value(score)),
+                "stage1_prompt_digest": body.stage1_prompt_digest,
+                "stage1_prompt_base_digest": body.stage1_prompt_base_digest,
+                "stage2_prompt_digest": body.stage2_prompt_digest,
+                "instruction_lang_requested": body.instruction_lang_requested,
+                "instruction_lang_resolved": body.instruction_lang_resolved,
+                "ui_lang": body.ui_lang,
+                "render_seed": render_seed,
+                "composition_seed": body.composition_seed,
+                "focus": body.focus if body.focus in SAVED_FOCUS_IDS else None,
+                "variation_amplitude": _validated_variation_amplitude(body.variation_amplitude),
+                "variation_seed": body.variation_seed,
+                "seed_text": seed_text,
+                "interpretation_seed": body.interpretation_seed,
+                # What actually governed this work. Without it a per-install setting
+                # would make the same description a different work with nothing on
+                # the row to say why.
+                "render_limits": limits_as_dict(limits),
+            }
+            svg, render_metadata = _render_with_metadata(score, render_metadata, owner=actor["id"])
+        except HTTPException:
+            raise
+        except Exception as e:  # noqa: BLE001
+            raise _unexpected_http_error("history score render", 422) from e
     item_dict = _add_history_item(
         actor=actor,
         input_text=body.input,
@@ -498,7 +534,7 @@ def api_history_post(
         # says nothing still gets a state: leaving NULL here would record every
         # work this endpoint saves as older than the column.
         sketch_state=body.sketch_state or _derived_sketch_state(body),
-        coerce_observability=coerce_observability.persistable(),
+        coerce_observability=coerce_observability.persistable() if coerce_observability else None,
     )
     if body.count_generation and not item_dict.get("_idempotent_replay"):
         if _db.increment_user_generation_count(actor["id"]) is None:

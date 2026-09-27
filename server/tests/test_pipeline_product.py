@@ -596,3 +596,45 @@ def test_a_compact_work_exports_through_the_shared_replay(monkeypatch):
     assert row is work
     assert payload["svg_profile"] == "live"
     assert (payload["render_seed"], payload["composition_seed"], payload["wild"]) == (77, 5, True)
+
+
+def test_a_compact_work_saves_through_the_shared_replay(monkeypatch):
+    # Saving a refinement option of a compact work answered 422: the save drew
+    # its Score through the plain render, which refuses InvalidCompactPerformance.
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+    from types import SimpleNamespace
+    from inku_server.api_core.routers import history as history_routes
+    from inku_server import pipeline_runtime
+
+    app = FastAPI()
+    app.include_router(history_routes.router)
+    app.dependency_overrides[history_routes._current_user] = lambda: {"id": "author"}
+    client = TestClient(app)
+    score = {"version": "0.10.0", "instructions": [], "resource_policy": {"identity": "kept"}}
+    replays, saved = [], []
+
+    def replay(owner_id, payload, work):
+        replays.append((owner_id, payload, work))
+        return {"svg": "<svg id='replayed'/>", "score": payload["score"], "catalog_id": "default",
+                "render_engine_version": "71", "render_seed": payload["render_seed"]}
+
+    def add(**kwargs):
+        saved.append(kwargs)
+        return {"id": "work", "input": kwargs["input_text"], "score": kwargs["score"], "at": kwargs["at"],
+                "svg": kwargs["svg"], **kwargs["render_metadata"]}
+
+    monkeypatch.setattr(pipeline_runtime, "get_service", lambda: SimpleNamespace(replay_for=replay))
+    monkeypatch.setattr(history_routes, "_add_history_item", add)
+    response = client.post("/api/history", json={
+        "input": "a", "score": score, "svg": "<svg/>", "at": 1,
+        "render_seed": "1553303611486672067", "composition_seed": 5, "render_wild": True,
+    })
+    assert response.status_code == 200, response.text
+    [(owner_id, payload, work)] = replays
+    assert (owner_id, work) == ("author", None)
+    assert (payload["render_seed"], payload["composition_seed"], payload["wild"]) == (1553303611486672067, 5, True)
+    [record] = saved
+    assert record["score"] == score
+    assert record["svg"] == "<svg id='replayed'/>"
+    assert record["render_metadata"]["render_engine_version"] == "71"

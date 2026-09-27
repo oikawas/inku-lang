@@ -208,9 +208,9 @@ Implemented:
   - visible DDL and authority revision are atomically saved in Room; known-hole patches commit only after author approval
   - raw Score, render metadata, opaque execution, and context for the selected history revision are retained
 - `AndroidRenderHost` serializes the coerced Score, resolved canvas and color map, catalog,
-  profile, seeds, and `wild` into one canonical JSON request and calls shared Rust Engine 41
-  through `NativeRenderBridge`.
-- `inku-svg-raster` uses `resvg 0.48.0` to convert saved/current SVG into explicit
+  profile, seeds, and `wild` into one canonical JSON request and calls the shared Rust render
+  engine (the server's `inku-render`; its version is the one the binding reports) through `NativeRenderBridge`.
+- `inku-svg-raster` uses the `resvg` pinned in `core/Cargo.toml` (0.48.1 as of 2026-09-27) to convert saved/current SVG into explicit
   premultiplied RGBA8 pixels with width, height, and stride. Android performs only the
   mechanical conversion to Bitmap backing-byte order.
 - Main preview, history thumbnails, refinement preview, and PNG export use

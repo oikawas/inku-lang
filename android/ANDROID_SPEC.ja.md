@@ -188,8 +188,8 @@ Rust authoring pipelineとraster presentationを導入済みである。以下�
   - visible DDLとauthority revisionをRoomへ原子保存し、known-hole patchは作者承認後だけ確定する
   - raw Score、render metadata、opaque execution、当該履歴revisionのcontextを保持する
 - `AndroidRenderHost`が、coerce済みScore、解決済みcanvas／色map、catalog、profile、seed、`wild`を
-  1個のcanonical JSON requestへまとめ、`NativeRenderBridge`から共有Rust Engine 41を呼ぶ。
-- `inku-svg-raster`は`resvg 0.48.0`を使い、保存済み／現行SVGを明示的な
+  1個のcanonical JSON requestへまとめ、`NativeRenderBridge`から共有Rust描画engine（Serverと同じ`inku-render`。版はbindingが名乗る）を呼ぶ。
+- `inku-svg-raster`は`core/Cargo.toml`で固定した`resvg`（2026-09-27時点で0.48.1）を使い、保存済み／現行SVGを明示的な
   premultiplied RGBA8、width、height、strideへ変換する。Android側はBitmapのBGRA byte順へだけ変換する。
 - main preview、履歴thumbnail、refinement preview、PNG exportは`RustArtworkRasterizer`を使う。
   raster cache keyはSVG identity、target size、raster API/optionsを含み、通常recompositionで再rasterしない。

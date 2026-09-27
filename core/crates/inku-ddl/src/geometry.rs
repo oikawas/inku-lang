@@ -24,7 +24,10 @@ const GEOMETRY_RESOLUTION_POLICY_MIDDLE: &str = concat!(
     "\"touch\":\"pen\"},",
     "\"bounds\":{\"named\":{\"anchor\":\"performance_seed_in_range_shrunk_two_thirds_about_center\",",
     "\"extent\":\"not_must_fit\",\"region\":\"unclipped\"},",
-    "\"numeric\":{\"anchor\":\"declared_unit_interval\",\"extent\":\"must_fit\"}},",
+    "\"numeric\":{\"anchor\":\"declared_unit_interval\",\"extent\":\"must_fit\"},",
+    "\"numeric_range\":{\"anchor\":\"same_as_named_range\",\"extent\":\"not_must_fit\",",
+    "\"fill_target\":\"unsupported\",\"region\":\"unclipped\",",
+    "\"values\":\"exact_decimal_or_fraction_unit_interval_nonzero_width\",\"words\":\"kept_unread\"}},",
     "\"capability\":[\"circle_radius_or_diameter\",\"ellipse_width_height\",",
     "\"cloudform_width_height\",\"square_side\",\"square_rotated_declared_rectangle\",",
     "\"line_length\",\"arc_chord_sagitta\",\"point_radius_or_diameter\",",
@@ -55,6 +58,34 @@ const CENTER_RANGE: [(u8, u8); 4] = [(1, 3), (1, 3), (2, 3), (2, 3)];
 // An omitted position lets a line-up, scatter, or tile use the whole canvas.
 const CANVAS_RANGE: [(u8, u8); 4] = [(0, 1), (0, 1), (1, 1), (1, 1)];
 
+/// Exact range bounds in region order, widened so an author's numeric range
+/// and its two-thirds shrink stay exact.
+pub(crate) type RationalRange = [(u64, u64); 4];
+
+const fn widen(range: [(u8, u8); 4]) -> RationalRange {
+    [
+        (range[0].0 as u64, range[0].1 as u64),
+        (range[1].0 as u64, range[1].1 as u64),
+        (range[2].0 as u64, range[2].1 as u64),
+        (range[3].0 as u64, range[3].1 as u64),
+    ]
+}
+
+/// Where a position range comes from: a position word, a range written in
+/// numbers, or nothing at all.
+#[derive(Clone, Copy, Debug)]
+pub(crate) enum RangeSource<'a> {
+    Named(&'a str),
+    Numeric(&'a SemanticNumericRange),
+    Omitted,
+}
+
+impl<'a> RangeSource<'a> {
+    pub(crate) fn from_named(named_position: Option<&'a str>) -> Self {
+        named_position.map_or(Self::Omitted, Self::Named)
+    }
+}
+
 /// How a placement uses the range of its position.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum RangeUse {
@@ -69,7 +100,7 @@ pub(crate) enum RangeUse {
 /// The anchor region of a mark placed with its position omitted: the middle
 /// cell shrunk to two thirds, 7/18..11/18 on both axes.
 pub(crate) fn omitted_position_bounds() -> [f64; 4] {
-    rational_bounds_as_f64(place_anchor_bounds(CENTER_RANGE))
+    rational_bounds_as_f64(place_anchor_bounds(widen(CENTER_RANGE)))
 }
 
 pub(crate) const NORMAL_SHORT_EDGE_RATIO: (i128, i128) = (6, 25);
@@ -101,7 +132,9 @@ pub(crate) fn named_region_bounds(
     id: &str,
     context: crate::score_angle::ScoreAngleContext<'_>,
 ) -> Option<[f64; 4]> {
-    named_region_rational_bounds(id, context).map(rational_bounds_as_f64)
+    named_region_rational_bounds(id, context)
+        .map(widen)
+        .map(rational_bounds_as_f64)
 }
 
 pub(crate) fn named_region_rational_bounds(
@@ -116,60 +149,63 @@ pub(crate) fn named_region_rational_bounds(
     Some(bounds)
 }
 
-/// The range a named source position denotes, or the adopted range when the
-/// position is omitted: the middle cell for a placed mark and the whole canvas
-/// for a line-up, scatter, or tile. The caller retains source authority; this
-/// helper only supplies the exact range used by every consumer.
+/// The range a source position denotes: a position word's range, a range
+/// written in numbers, or the adopted range when the position is omitted (the
+/// middle cell for a placed mark and the whole canvas for a line-up, scatter,
+/// or tile). The caller retains source authority; this helper only supplies
+/// the exact range used by every consumer, so a word and the same numbers draw
+/// alike.
 pub(crate) fn position_range(
-    named_position: Option<&str>,
+    source: RangeSource<'_>,
     range_use: RangeUse,
     context: crate::score_angle::ScoreAngleContext<'_>,
-) -> Option<[(u8, u8); 4]> {
-    match named_position {
-        Some(id) => named_region_rational_bounds(id, context),
-        None => Some(match range_use {
+) -> Option<RationalRange> {
+    match source {
+        RangeSource::Named(id) => named_region_rational_bounds(id, context).map(widen),
+        RangeSource::Numeric(range) => Some(range.rational_bounds()),
+        RangeSource::Omitted => Some(widen(match range_use {
             RangeUse::Place => CENTER_RANGE,
             RangeUse::Distribute => CANVAS_RANGE,
-        }),
+        })),
     }
 }
 
 /// The region a placement anchors in: the shrunk range for a placed mark, and
 /// the whole range for a line-up, scatter, or tile.
 pub(crate) fn anchor_rational_bounds(
-    named_position: Option<&str>,
+    source: RangeSource<'_>,
     range_use: RangeUse,
     context: crate::score_angle::ScoreAngleContext<'_>,
-) -> Option<[(u8, u8); 4]> {
-    position_range(named_position, range_use, context).map(|range| match range_use {
+) -> Option<RationalRange> {
+    position_range(source, range_use, context).map(|range| match range_use {
         RangeUse::Place => place_anchor_bounds(range),
         RangeUse::Distribute => range,
     })
 }
 
 pub(crate) fn anchor_bounds(
-    named_position: Option<&str>,
+    source: RangeSource<'_>,
     range_use: RangeUse,
     context: crate::score_angle::ScoreAngleContext<'_>,
 ) -> Option<[f64; 4]> {
-    anchor_rational_bounds(named_position, range_use, context).map(rational_bounds_as_f64)
+    anchor_rational_bounds(source, range_use, context).map(rational_bounds_as_f64)
 }
 
 /// Shrink a range to two thirds about its center on both axes, exactly. A mark
 /// anchored in a corner cell then stays mostly on the canvas, and the middle
 /// cell gives 7/18..11/18, close to the earlier center region 0.39..0.61.
-pub(crate) fn place_anchor_bounds(range: [(u8, u8); 4]) -> [(u8, u8); 4] {
+pub(crate) fn place_anchor_bounds(range: RationalRange) -> RationalRange {
     let (x0, x1) = shrink_two_thirds(range[0], range[2]);
     let (y0, y1) = shrink_two_thirds(range[1], range[3]);
     [x0, y0, x1, y1]
 }
 
-// start + (end - start) / 6 and end - (end - start) / 6, reduced. Every range in
-// the closed tables stays within u8 after the shrink (the largest denominator
-// is 60, for the edges).
-fn shrink_two_thirds(start: (u8, u8), end: (u8, u8)) -> ((u8, u8), (u8, u8)) {
-    let (a, b) = (i64::from(start.0), i64::from(start.1));
-    let (c, d) = (i64::from(end.0), i64::from(end.1));
+// start + (end - start) / 6 and end - (end - start) / 6, reduced. A range
+// written in numbers has denominators of at most one million, so the shrunk
+// denominator stays below 6e12 and fits u64 exactly.
+fn shrink_two_thirds(start: (u64, u64), end: (u64, u64)) -> ((u64, u64), (u64, u64)) {
+    let (a, b) = (i128::from(start.0), i128::from(start.1));
+    let (c, d) = (i128::from(end.0), i128::from(end.1));
     let denominator = 6 * b * d;
     let width = c * b - a * d;
     (
@@ -178,19 +214,19 @@ fn shrink_two_thirds(start: (u8, u8), end: (u8, u8)) -> ((u8, u8), (u8, u8)) {
     )
 }
 
-fn reduced(numerator: i64, denominator: i64) -> (u8, u8) {
-    fn gcd(a: i64, b: i64) -> i64 {
+fn reduced(numerator: i128, denominator: i128) -> (u64, u64) {
+    fn gcd(a: i128, b: i128) -> i128 {
         if b == 0 { a.abs() } else { gcd(b, a % b) }
     }
     let divisor = gcd(numerator, denominator).max(1);
     (
-        u8::try_from(numerator / divisor).expect("a shrunk closed range fits u8"),
-        u8::try_from(denominator / divisor).expect("a shrunk closed range fits u8"),
+        u64::try_from(numerator / divisor).expect("a shrunk range is non-negative and fits u64"),
+        u64::try_from(denominator / divisor).expect("a shrunk range denominator fits u64"),
     )
 }
 
-fn rational_bounds_as_f64(bounds: [(u8, u8); 4]) -> [f64; 4] {
-    bounds.map(|(n, d)| f64::from(n) / f64::from(d))
+fn rational_bounds_as_f64(bounds: RationalRange) -> [f64; 4] {
+    bounds.map(|(n, d)| n as f64 / d as f64)
 }
 
 // Reuses the already-attested occurrence value, never the angle resolver or its bytes.
@@ -318,7 +354,7 @@ pub fn geometry_resolution_policy_canonical_bytes() -> &'static [u8] {
                 &format!(
                     "\"author_resolved_omission\":{{\"position\":{{\"place_region\":{},\"distribute_range\":{},\"anchor\":\"performance_seed_in_region\",\"source_position\":\"absent\"}},\"fluctuation\":{},",
                     serde_json::to_string(&omitted_position_bounds()).expect("finite default bounds"),
-                    serde_json::to_string(&rational_bounds_as_f64(CANVAS_RANGE)).expect("finite canvas range"),
+                    serde_json::to_string(&rational_bounds_as_f64(widen(CANVAS_RANGE))).expect("finite canvas range"),
                     crate::fluctuation::policy()
                 ),
                 1,
@@ -401,6 +437,8 @@ pub enum GeometryKeyword {
     AxisX,
     AxisY,
     Position,
+    /// A whole numeric range, read again from its source span.
+    NumericRange,
 }
 
 impl GeometryKeyword {
@@ -418,6 +456,7 @@ impl GeometryKeyword {
             Self::AxisX => "axis_x",
             Self::AxisY => "axis_y",
             Self::Position => "position",
+            Self::NumericRange => "numeric_range",
         }
     }
 }
@@ -528,11 +567,36 @@ impl SemanticNumericPosition {
     }
 }
 
+/// A position range written in numbers: horizontal start, vertical start,
+/// horizontal end, vertical end, as exact canvas fractions. The author's
+/// original words before the parenthesis are kept as a span and never read.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SemanticNumericRange {
+    pub bounds: [crate::ExactFraction; 4],
+    pub provenance: SourceOccurrence,
+    pub bound_spans: [SourceSpan; 4],
+    pub annotation: Option<SourceSpan>,
+}
+
+impl SemanticNumericRange {
+    pub const fn source(&self) -> &SourceOccurrence {
+        &self.provenance
+    }
+
+    /// The range as exact `(numerator, denominator)` pairs in region order.
+    pub(crate) fn rational_bounds(&self) -> [(u64, u64); 4] {
+        self.bounds
+            .map(|bound| (bound.numerator(), bound.denominator()))
+    }
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum GeometrySyntaxIssueKind {
     IncompleteGeometry,
     IncompletePosition,
     UnownedDecimal,
+    /// A numeric range off the canvas, without width, or beyond the value limits.
+    InvalidRange,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -545,6 +609,7 @@ pub(crate) struct GeometrySyntaxIssue {
 pub(crate) struct ClauseGeometryAnalysis {
     pub geometries: Vec<SemanticExplicitGeometry>,
     pub positions: Vec<SemanticNumericPosition>,
+    pub ranges: Vec<SemanticNumericRange>,
     pub consumed_numeric_spans: BTreeSet<(usize, usize)>,
     pub issues: Vec<GeometrySyntaxIssue>,
 }
@@ -727,6 +792,31 @@ pub(crate) fn analyze_clause_geometry(
                 index,
                 index + 1,
             )),
+            GeometryKeyword::NumericRange => {
+                let span = atoms[index].span();
+                let lexeme = crate::numeric_range::numeric_range_at(
+                    document.source(),
+                    span.start_byte,
+                    document.language(),
+                )
+                .filter(|lexeme| lexeme.span == span);
+                match lexeme
+                    .and_then(|lexeme| valid_range_bounds(&lexeme).map(|bounds| (lexeme, bounds)))
+                {
+                    Some((lexeme, bounds)) => result.ranges.push(SemanticNumericRange {
+                        bounds,
+                        provenance: occurrence(document, span, region_index, clause_index, index),
+                        bound_spans: lexeme.bound_spans,
+                        annotation: lexeme.annotation,
+                    }),
+                    None => result.issues.push(issue(
+                        GeometrySyntaxIssueKind::InvalidRange,
+                        atoms,
+                        index,
+                        index + 1,
+                    )),
+                }
+            }
             GeometryKeyword::Canvas | GeometryKeyword::Position => {}
         }
     }
@@ -748,6 +838,16 @@ pub(crate) fn analyze_clause_geometry(
         }
     }
     result
+}
+
+// Every bound is on the canvas and each axis has a width.
+fn valid_range_bounds(lexeme: &crate::NumericRangeLexeme) -> Option<[crate::ExactFraction; 4]> {
+    let [x0, y0, x1, y1] = lexeme.bounds;
+    let bounds = [x0?, y0?, x1?, y1?];
+    (bounds.iter().all(|bound| bound.is_at_most_one())
+        && bounds[0].is_below(bounds[2])
+        && bounds[1].is_below(bounds[3]))
+    .then_some(bounds)
 }
 
 fn geometry_value(
@@ -993,25 +1093,30 @@ mod tests {
             Some([1.0 / 3.0, 1.0 / 3.0, 2.0 / 3.0, 2.0 / 3.0])
         );
         assert_eq!(
-            place_anchor_bounds(CENTER_RANGE),
+            place_anchor_bounds(widen(CENTER_RANGE)),
             [(7, 18), (7, 18), (11, 18), (11, 18)]
         );
         assert_eq!(
-            anchor_rational_bounds(None, RangeUse::Place, context),
-            Some(place_anchor_bounds(CENTER_RANGE))
+            anchor_rational_bounds(RangeSource::Omitted, RangeUse::Place, context),
+            Some(place_anchor_bounds(widen(CENTER_RANGE)))
         );
         assert_eq!(
-            anchor_rational_bounds(None, RangeUse::Distribute, context),
-            Some(CANVAS_RANGE)
+            anchor_rational_bounds(RangeSource::Omitted, RangeUse::Distribute, context),
+            Some(widen(CANVAS_RANGE))
         );
         // The shrink is exact for every closed range, including the edges and
         // the corners, whose denominators are the largest.
         assert_eq!(
-            place_anchor_bounds([(9, 10), (0, 1), (1, 1), (1, 1)]),
+            place_anchor_bounds(widen([(9, 10), (0, 1), (1, 1), (1, 1)])),
             [(11, 12), (1, 6), (59, 60), (5, 6)]
         );
+        // A range written in numbers shrinks the same way, beyond u8.
         assert_eq!(
-            place_anchor_bounds(CORNER_REGIONS[0]),
+            place_anchor_bounds([(67, 100), (67, 100), (1, 1), (1, 1)]),
+            [(29, 40), (29, 40), (189, 200), (189, 200)]
+        );
+        assert_eq!(
+            place_anchor_bounds(widen(CORNER_REGIONS[0])),
             [(1, 30), (1, 30), (1, 6), (1, 6)]
         );
         assert_eq!(
@@ -1032,8 +1137,12 @@ mod tests {
             "outer_count"
         );
         assert_eq!(
+            payload["bounds"]["numeric_range"]["anchor"],
+            "same_as_named_range"
+        );
+        assert_eq!(
             geometry_resolution_policy_digest(),
-            "b530c70ae1e4b1443d19d2e37f5e87282b8953f52eb75ad861f9a11ad754b162"
+            "aacaf721a566e71d5c3b0649d2dafb43ed2a2382aa34edee0d5133b541fe2411"
         );
         assert_eq!(
             payload["object_placement"]["layout_direction"]["vertical"],

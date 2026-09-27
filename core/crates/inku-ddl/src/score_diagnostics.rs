@@ -88,6 +88,9 @@ pub enum ScoreFieldGap {
     },
     NamedAndNumericPositionConflict,
     UnsupportedNamedPosition,
+    /// A range written in numbers where no shared range path delivers it yet:
+    /// a fill target, a Macro caller, or a member of a coordinated group.
+    UnsupportedNumericRange,
     UnsupportedInstructionMeaning,
     UnsupportedRelation {
         kind: SemanticRelationKind,

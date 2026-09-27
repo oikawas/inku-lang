@@ -5057,3 +5057,26 @@ fn surface_emit_definition(surface: &str) -> MacroDefinition {
 // The middle cell of the thirds shrunk to two thirds: where one mark placed at
 // `center`, or with its position omitted, anchors.
 const CENTER_REGION: [f64; 4] = [7.0 / 18.0, 7.0 / 18.0, 11.0 / 18.0, 11.0 / 18.0];
+
+#[test]
+fn one_mark_placed_in_a_numeric_range_anchors_in_the_shrunk_range() {
+    let result = stage15(
+        "右下（横0.67〜1、縦0.67〜1）に、赤い円をひとつ置く。",
+        ResolvedInstructionLanguage::Ja,
+    );
+    let lowered = lower_verified_stage15_score(
+        result.verified_effective_view(),
+        ScoreLoweringContext::resolve("square", Color::White).unwrap(),
+    );
+    assert_eq!(
+        lowered.outcome(),
+        ScoreLoweringOutcome::Complete,
+        "{:?}",
+        lowered.gaps()
+    );
+    let score = lowered.score().expect("a numeric range must reach Score");
+    assert_eq!(
+        score.instructions[0].at.as_ref().unwrap().region,
+        [29.0 / 40.0, 29.0 / 40.0, 189.0 / 200.0, 189.0 / 200.0]
+    );
+}

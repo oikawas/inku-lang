@@ -256,6 +256,7 @@ fn project_source_instruction<'a>(
             .as_ref()
             .map(|term| (&term.identity).into()),
         numeric_position: instruction.entity.numeric_position.as_ref(),
+        numeric_range: instruction.entity.numeric_range.as_ref(),
         generated_position: None,
         generated_geometries: [None; 6],
         has_named_position: instruction.position.is_some(),
@@ -1412,6 +1413,7 @@ fn append_macro_caller_diagnostics(
         || instruction.entity.relative_scale.is_some()
         || instruction.entity.explicit_geometry.is_some()
         || instruction.entity.numeric_position.is_some()
+        || instruction.entity.numeric_range.is_some()
         || instruction.entity.angle.is_some()
         || instruction.entity.fluctuation.amplitude.is_some()
         || instruction.entity.fluctuation.frequency.is_some()
@@ -1690,6 +1692,7 @@ fn project_macro_emit<'a>(
         }),
         action,
         numeric_position: None,
+        numeric_range: None,
         has_named_position: place.is_some(),
         named_position: place,
         explicit_geometry: None,
@@ -2247,10 +2250,12 @@ fn lower_verified_stage15_shared<'a>(
             });
             let bounds = layout.and_then(|layout| {
                 crate::geometry::position_range(
-                    predicate
-                        .position
-                        .as_ref()
-                        .map(|position| position.identity.id.as_str()),
+                    crate::geometry::RangeSource::from_named(
+                        predicate
+                            .position
+                            .as_ref()
+                            .map(|position| position.identity.id.as_str()),
+                    ),
                     group_range_use(layout),
                     ScoreAngleContext {
                         composition_seed: view.composition_seed(),
@@ -2384,10 +2389,15 @@ fn lower_verified_stage15_shared<'a>(
             None
         } else {
             let Some(bounds) = crate::geometry::position_range(
-                instruction
-                    .position
-                    .as_ref()
-                    .map(|position| position.identity.id.as_str()),
+                match &instruction.entity.numeric_range {
+                    Some(range) => crate::geometry::RangeSource::Numeric(range),
+                    None => crate::geometry::RangeSource::from_named(
+                        instruction
+                            .position
+                            .as_ref()
+                            .map(|position| position.identity.id.as_str()),
+                    ),
+                },
                 cycle_range_use,
                 ScoreAngleContext {
                     composition_seed: view.composition_seed(),
@@ -2665,6 +2675,8 @@ fn lower_verified_stage15_shared<'a>(
                 input.count = Some(1);
                 input.has_named_position = true;
                 input.group_region = Some(*region);
+                // The cycle's region already came from the source's range.
+                input.numeric_range = None;
                 if let Some(objects) = objects.as_deref_mut() {
                     let attempt = resolve_projected_instruction(
                         input,
@@ -4253,6 +4265,7 @@ fn source_span_for_gap(
         }
         ScoreFieldGap::NamedAndNumericPositionConflict
         | ScoreFieldGap::UnsupportedNamedPosition
+        | ScoreFieldGap::UnsupportedNumericRange
         | ScoreFieldGap::MissingNumericPosition
         | ScoreFieldGap::PositionOutOfRange
         | ScoreFieldGap::GeometryExtentOutOfBounds => instruction
@@ -4265,6 +4278,13 @@ fn source_span_for_gap(
                     .numeric_position
                     .as_ref()
                     .map(|position| position.source().span)
+            })
+            .or_else(|| {
+                instruction
+                    .entity
+                    .numeric_range
+                    .as_ref()
+                    .map(|range| range.source().span)
             }),
         ScoreFieldGap::NonPositiveDimension
         | ScoreFieldGap::GeometryRepresentationLimit
@@ -4461,9 +4481,9 @@ fn macro_key_for_gap(gap: &ScoreFieldGap) -> Option<String> {
         ScoreFieldGap::UnsupportedAngleIdentity { .. }
         | ScoreFieldGap::UnsupportedAngleForPrimitive { .. } => Some("angle".to_owned()),
         ScoreFieldGap::UnsupportedLayoutDirection { .. } => Some("layout_direction".to_owned()),
-        ScoreFieldGap::MissingNumericPosition | ScoreFieldGap::UnsupportedNamedPosition => {
-            Some("place".to_owned())
-        }
+        ScoreFieldGap::MissingNumericPosition
+        | ScoreFieldGap::UnsupportedNamedPosition
+        | ScoreFieldGap::UnsupportedNumericRange => Some("place".to_owned()),
         ScoreFieldGap::ExactCountZero { .. }
         | ScoreFieldGap::ExactCountExceedsScoreRange { .. }
         | ScoreFieldGap::RepeatedCountUnsupported { .. }
@@ -4538,6 +4558,7 @@ struct ScoreLoweringInput<'a> {
     thinness: Option<CoreModifierValue>,
     action: Option<SemanticInputIdentity<'a>>,
     numeric_position: Option<&'a SemanticNumericPosition>,
+    numeric_range: Option<&'a crate::SemanticNumericRange>,
     has_named_position: bool,
     named_position: Option<SemanticInputIdentity<'a>>,
     explicit_geometry: Option<&'a SemanticExplicitGeometry>,
@@ -4550,12 +4571,23 @@ struct ScoreLoweringInput<'a> {
     has_unsupported_meaning: bool,
 }
 
-impl ScoreLoweringInput<'_> {
+impl<'a> ScoreLoweringInput<'a> {
     fn position_authority(self) -> ConnectedPositionAuthority {
         if self.exact_position().is_some() {
             ConnectedPositionAuthority::NumericFixed
         } else {
             ConnectedPositionAuthority::NamedMovable
+        }
+    }
+
+    /// The range this input's position denotes: numbers written by the
+    /// author, a position word, or nothing.
+    fn range_source(self) -> crate::geometry::RangeSource<'a> {
+        match self.numeric_range {
+            Some(range) => crate::geometry::RangeSource::Numeric(range),
+            None => crate::geometry::RangeSource::from_named(
+                self.named_position.map(|position| position.id),
+            ),
         }
     }
 
@@ -4734,11 +4766,11 @@ fn resolve_object_plan(
                         == crate::geometry::RangeUse::Distribute
                 {
                     let range = crate::geometry::position_range(
-                        input.named_position.map(|position| position.id),
+                        input.range_source(),
                         crate::geometry::RangeUse::Distribute,
                         input.angle_context.expect("verified occurrence"),
                     )
-                    .expect("the shared named range was already resolved");
+                    .expect("the shared range was already resolved");
                     if resolved.action == PlacementAction::LineUp {
                         default_line_axis = range_long_axis(range);
                     } else {
@@ -4922,6 +4954,9 @@ fn resolve_fill_group(
         if instruction.entity.numeric_position.is_some() || instruction.position.is_some() {
             return Err(ScoreFieldGap::InvalidFillTarget);
         }
+        if instruction.entity.numeric_range.is_some() {
+            return Err(ScoreFieldGap::UnsupportedNumericRange);
+        }
         let count = instruction
             .entity
             .quantity
@@ -4974,6 +5009,9 @@ fn prepare_single_macro_fill(
 ) -> Result<PreparedFillGroup, ScoreFieldGap> {
     if instruction.entity.numeric_position.is_some() {
         return Err(ScoreFieldGap::InvalidFillTarget);
+    }
+    if instruction.entity.numeric_range.is_some() {
+        return Err(ScoreFieldGap::UnsupportedNumericRange);
     }
     let count = instruction
         .entity
@@ -5233,6 +5271,11 @@ fn resolve_fill_region(
     input: ScoreLoweringInput<'_>,
     context: ScoreLoweringContext,
 ) -> Result<ResolvedFillRegion, ScoreFieldGap> {
+    // A fill region is saved in the Score by its owner, which has no form for
+    // a range written in numbers yet.
+    if input.numeric_range.is_some() {
+        return Err(ScoreFieldGap::UnsupportedNumericRange);
+    }
     let (cw, ch) = context.canvas_format.integer_ratio();
     let short = cw.min(ch);
     let canvas_area =
@@ -5301,6 +5344,9 @@ fn resolve_fill_region(
             angle_context.occurrence = ScoreAngleOccurrence::Direct {
                 logical_ordinal: source_instruction_index as u64,
             };
+            if entity.numeric_range.is_some() {
+                return Err(ScoreFieldGap::UnsupportedNumericRange);
+            }
             let anchor = match (
                 entity.numeric_position.as_ref(),
                 instruction.position.as_ref(),
@@ -5892,18 +5938,34 @@ fn resolve_complete_object<'a>(
         gaps.push(ScoreFieldGap::UnsupportedInstructionMeaning);
     }
     let range_use = range_use_for(action, count);
-    let named_region = if input.has_named_position && input.exact_position().is_some() {
+    // A word, a point, and a range each say where the mark goes; two of them
+    // together are a conflict.
+    let position_sources = usize::from(input.has_named_position)
+        + usize::from(input.exact_position().is_some())
+        + usize::from(input.numeric_range.is_some());
+    let named_region = if input.numeric_range.is_some()
+        && (input.group_region.is_some() || action == PlacementAction::Fill)
+    {
+        gaps.push(ScoreFieldGap::UnsupportedNumericRange);
+        None
+    } else if position_sources > 1 {
         gaps.push(ScoreFieldGap::NamedAndNumericPositionConflict);
         None
     } else if let Some(region) = input.group_region {
         Some(region)
+    } else if let Some(range) = input.numeric_range {
+        crate::geometry::anchor_bounds(
+            crate::geometry::RangeSource::Numeric(range),
+            range_use,
+            input.angle_context.expect("verified occurrence"),
+        )
     } else if input.has_named_position {
         if let Some(region) = input
             .named_position
             .filter(|place| place.category == "place")
             .and_then(|place| {
                 crate::geometry::anchor_bounds(
-                    Some(place.id),
+                    crate::geometry::RangeSource::Named(place.id),
                     range_use,
                     input.angle_context.expect("verified occurrence"),
                 )
@@ -5918,7 +5980,7 @@ fn resolve_complete_object<'a>(
         Some([0.0, 0.0, 1.0, 1.0])
     } else if input.exact_position().is_none() {
         crate::geometry::anchor_bounds(
-            None,
+            crate::geometry::RangeSource::Omitted,
             range_use,
             input.angle_context.expect("verified occurrence"),
         )
@@ -6050,8 +6112,11 @@ fn group_range_use(layout: inku_score::GroupLayout) -> crate::geometry::RangeUse
 /// The group's anchor region over its range: the shrunk range for overlapping
 /// members, the range itself for a tile, and the range's center for a line-up
 /// or scatter.
-fn group_anchor_region(layout: inku_score::GroupLayout, range: [(u8, u8); 4]) -> [f64; 4] {
-    let as_f64 = |bounds: [(u8, u8); 4]| bounds.map(|(n, d)| f64::from(n) / f64::from(d));
+fn group_anchor_region(
+    layout: inku_score::GroupLayout,
+    range: crate::geometry::RationalRange,
+) -> [f64; 4] {
+    let as_f64 = |bounds: crate::geometry::RationalRange| bounds.map(|(n, d)| n as f64 / d as f64);
     match layout {
         inku_score::GroupLayout::Overlap => as_f64(crate::geometry::place_anchor_bounds(range)),
         inku_score::GroupLayout::Tile => as_f64(range),
@@ -6078,10 +6143,10 @@ fn range_use_for(action: PlacementAction, count: u32) -> crate::geometry::RangeU
 /// The axis a line-up runs along when its direction is omitted: vertical for a
 /// range taller than it is wide in canvas fractions (a left or right edge),
 /// otherwise horizontal. The whole canvas and the middle cell stay horizontal.
-fn range_long_axis(range: [(u8, u8); 4]) -> [i8; 2] {
-    let extent = |start: (u8, u8), end: (u8, u8)| {
-        let (a, b) = (i64::from(start.0), i64::from(start.1));
-        let (c, d) = (i64::from(end.0), i64::from(end.1));
+fn range_long_axis(range: crate::geometry::RationalRange) -> [i8; 2] {
+    let extent = |start: (u64, u64), end: (u64, u64)| {
+        let (a, b) = (i128::from(start.0), i128::from(start.1));
+        let (c, d) = (i128::from(end.0), i128::from(end.1));
         (c * b - a * d, b * d)
     };
     let (width_n, width_d) = extent(range[0], range[2]);
@@ -6098,7 +6163,7 @@ fn range_long_axis(range: [(u8, u8); 4]) -> [i8; 2] {
 /// canvas-sized area around it. A line-up keeps its canvas-long row.
 fn scale_domain_to_range(
     domain: &mut [Rational; 2],
-    range: [(u8, u8); 4],
+    range: crate::geometry::RationalRange,
 ) -> Result<(), ScoreFieldGap> {
     for axis in 0..2 {
         let (end_n, end_d) = range[axis + 2];

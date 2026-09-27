@@ -48,7 +48,7 @@ When updating Android specifications:
 
 ## 2026-09-27 SVG rasterization and display cache
 
-The vendored resvg `feTurbulence` reuses up to eight seed-specific lattice and gradient sets and prepares coordinates and interpolation weights per row, column, and octave. Coordinate tables are capped at 200,000 entries in total; larger tables fall back to the previous per-pixel path. Only sufficiently large regions render rows in parallel, using one pool shared across renders with at most two workers. Random values, per-channel operation order, rounding, and resolution are preserved.
+The vendored resvg `feTurbulence` reuses up to eight seed-specific lattice and gradient sets and prepares coordinates and interpolation weights per row, column, and octave. Coordinate tables are capped at 200,000 entries in total; larger tables fall back to the previous per-pixel path. Android executes rows sequentially on the calling render thread because shared row workers regressed Pixel 9 latency. Other targets process sufficiently large regions using one pool shared across renders with at most two workers. Random values, per-channel operation order, rounding, and resolution are preserved.
 
 Android transfer copies Rust's premultiplied RGBA directly into an NDK `RGBA_8888` Bitmap according to its stride. It uses no intermediate Java pixel array or Kotlin per-pixel channel conversion, fixing the previous red/blue swap. Saved thumbnails are regenerated from their original SVG in small batches under versioned filenames, and the display cache includes the updated path in its key.
 

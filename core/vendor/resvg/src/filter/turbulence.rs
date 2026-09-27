@@ -118,7 +118,10 @@ pub fn apply(
             );
         };
         let pixel_count = width_usize.saturating_mul(height_usize);
-        let parallel = height_usize >= 16
+        // Row workers regressed preview latency on Pixel 9. Android retains
+        // prepared coordinates but executes rows on the calling render thread.
+        let parallel = !cfg!(target_os = "android")
+            && height_usize >= 16
             && pixel_count >= PARALLEL_MIN_PIXELS
             && pixel_count.saturating_mul(num_octaves as usize) >= PARALLEL_MIN_OCTAVE_PIXELS;
         if parallel {

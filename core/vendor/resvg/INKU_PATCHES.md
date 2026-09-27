@@ -20,8 +20,9 @@ a filter; larger tables use the original constant-memory pixel path.
 Regions of at least 32,768 pixels and 65,536 pixel-octaves can use a single
 lazy Rayon pool capped at two workers and available CPU parallelism. Smaller
 regions stay sequential, and pool construction failure falls back to the
-sequential path. The pool is shared across concurrent renders, not created
-per filter. Seed generation, per-channel floating-point operation order,
+sequential path. Android always executes prepared rows sequentially: the
+shared row workers regressed representative Pixel 9 preview latency. Other
+targets share the pool across concurrent renders, not per filter. Seed generation, per-channel floating-point operation order,
 stitching (including coordinate-dependent wraps), octave accumulation,
 clamping, and byte rounding retain upstream behavior. The patch adds no
 unsafe code and does not lower raster resolution.

@@ -4,7 +4,11 @@
 
 This file records changes chronologically. If a historical note conflicts with the current specification, the current specification wins. The more detailed canonical history is maintained in Japanese in [CHANGELOG.ja.md](CHANGELOG.ja.md).
 
-**This file holds the 36 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
+**This file holds the 37 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
+
+### v2.15.36 — open color catalog options from the work-editing menu (Build 1112, 2026-09-28)
+
+This version includes the changes below since v2.15.35. Another catalog moves to its own dialog in the work-editing menu and shows options in catalog order for every catalog except the work's. The render engine version history is also filled in through engine 71. The DDL, Score, and render versions are unchanged.
 
 ### 2026-09-27 — Another catalog opens from the work-editing menu
 

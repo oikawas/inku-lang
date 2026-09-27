@@ -18,7 +18,7 @@ A position can now be written as a range of canvas fractions. By the author's de
 - A numeric range draws by the same rules as a named position. A named position and a numeric range with the same numbers give the same plan.
 - A numeric range on a fill target, a Macro caller, or a coordinated-group member has no Score form yet and is reported as unsupported.
 
-Saved works do not change. The Score format and the render engine are unchanged. The geometry policy digest becomes `aacaf721…`.
+The DDL of the 375 typed production works was compiled before and after on Linux (no drawing). All 375 Scores are the same, so existing instructions read as before. Saved works do not change either. The Score format and the render engine are unchanged. The geometry policy digest becomes `aacaf721…`.
 
 ### 2026-09-27 — The render engine version history gains engines 46 to 71
 

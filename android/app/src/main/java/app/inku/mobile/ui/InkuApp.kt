@@ -5240,11 +5240,6 @@ private fun providerModelCandidates(provider: app.inku.mobile.data.db.ProviderSe
             ProviderModelCandidate("gemini:gemini-3.5-flash-lite", "Gemini 3.5 Flash-Lite"),
             ProviderModelCandidate("gemini:gemma-4-31b-it", "Gemma 4 31B Instruct"),
         )
-        "ollama" -> listOf(
-            ProviderModelCandidate("ollama:llama3.2", "Llama 3.2"),
-            ProviderModelCandidate("ollama:gpt-oss:20b", "gpt-oss 20B"),
-            ProviderModelCandidate("ollama:qwen3:8b", "Qwen3 8B"),
-        )
         // The server's verified Ollama Cloud models, in its order of
         // recommendation (verified_model_catalog.py).
         "ollama-cloud" -> listOf(

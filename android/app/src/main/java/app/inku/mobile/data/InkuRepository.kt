@@ -1172,19 +1172,9 @@ class InkuRepository(
                 isDefaultLocal = false,
                 updatedAt = System.currentTimeMillis(),
             ),
-            ProviderSettingEntity(
-                providerId = "ollama",
-                displayName = "Ollama",
-                kind = "openai-compatible",
-                baseUrl = "http://127.0.0.1:11434/v1",
-                encryptedApiKey = null,
-                publishedModelsJson = models(),
-                isEnabled = true,
-                isDefaultLocal = false,
-                updatedAt = System.currentTimeMillis(),
-            ),
             // The server's catalog (model_settings.py): ovms left it on
-            // 2026-07-30 and Ollama Cloud took its place beside local Ollama.
+            // 2026-07-30 and Ollama Cloud took its place. Local Ollama is not
+            // offered on Android (RETIRED_BUILT_IN_PROVIDERS).
             ProviderSettingEntity(
                 providerId = "ollama-cloud",
                 displayName = "Ollama Cloud (ollama.com)",
@@ -1242,7 +1232,6 @@ class InkuRepository(
         "nvidia" -> listOf("google/gemma-4-31b-it", "meta/llama-3.3-70b-instruct", "mistralai/mistral-large-2-instruct")
         "anthropic" -> listOf("anthropic:claude-opus-4-7", "anthropic:claude-sonnet-4-6", "anthropic:claude-haiku-4-5-20251001")
         "gemini" -> listOf("gemini:gemini-2.5-pro", "gemini:gemini-2.5-flash", "gemini:gemini-2.5-flash-lite")
-        "ollama" -> listOf("ollama:llama3.2", "ollama:gpt-oss:20b", "ollama:qwen3:8b")
         else -> emptyList()
     }
 
@@ -1333,7 +1322,7 @@ internal fun refinementColorSnapshot(parent: RefinementParent, plan: RefinementP
 /** `plugin_settings` key of the bundled plugin package switch. */
 private const val BUNDLED_PLUGIN_SETTING_KEY = "bundled:$BUNDLED_PLUGIN_PACKAGE:enabled"
 
-/** A built-in connection the server withdrew, as the catalog once seeded it. */
+/** A built-in connection that was withdrawn, as the catalog once seeded it. */
 private data class RetiredProvider(
     val providerId: String,
     val displayName: String,
@@ -1347,5 +1336,14 @@ private val RETIRED_BUILT_IN_PROVIDERS = listOf(
         displayName = "Intel OVMS",
         baseUrl = "http://127.0.0.1:8101/v3",
         seededModels = setOf("qwen3-api", "qwen-api", "gemma3-12b-api", "gemma3-4b-api"),
+    ),
+    // Withdrawn on Android only, by the author's ruling of 2026-09-27: it
+    // pointed at the phone itself, where no Ollama runs, and plain http to a
+    // LAN Ollama is refused. The server still offers it on its own host.
+    RetiredProvider(
+        providerId = "ollama",
+        displayName = "Ollama",
+        baseUrl = "http://127.0.0.1:11434/v1",
+        seededModels = setOf("ollama:llama3.2", "ollama:gpt-oss:20b", "ollama:qwen3:8b"),
     ),
 )

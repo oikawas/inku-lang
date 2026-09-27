@@ -14,6 +14,12 @@ The API's JSON answers now carry `render_seed` and `composition_seed` as decimal
 
 Seeds in the CLI's output become strings too. Android does not read these answers. The route count (107) is unchanged. DDL, Score, and render versions are unchanged.
 
+### 2026-09-27 — display's touch covers the canvas (render engine 71)
+
+The filter region of the whole-drawing "touch" (the fine displacement over the picture) is now, in display as already in live, the canvas plus 2% on each side, in absolute user-space units. Display's region used to be the content's bounding box plus 2%. Where 2% of that box was narrower than the displacement (up to 3 units per 1,000 of the short side), displaced pixels were cut: in a work of one thin line, or when content shrank because strokes off the canvas were left out. The per-stroke texture filters keep their bounding-box regions: over the whole canvas, each stroke would compute noise for the whole canvas, and inside a rotated mark the canvas would not cover the content.
+
+Render engine 70 → 71. DDL, Score and binding versions are unchanged.
+
 ### 2026-09-27 — strokes wholly off the canvas are left out, and `-0` is written `0` (render engine 70)
 
 - **A stroke wholly off the canvas is not written into the SVG.** This covers fills (scanline strokes and oil-paint fill strokes) and surface textures (wash, hatch and crosshatch lines; stipple, paper-grain and aquatint dots). Only a stroke that cannot reach the canvas even with its width, its wobble and the displacement of the texture and touch filters (four stroke widths plus 3% of the short side) is left out. The remaining strokes keep their indices and seeds, so no visible stroke changes. An oil-paint fill still uses the strokes it leaves out when it orients its width field.

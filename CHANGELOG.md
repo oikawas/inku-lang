@@ -6,6 +6,18 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 36 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-27 — `center` in instructions means the middle of the canvas
+
+Until now Stage 1.5 moved every `place:center` in a work (`中心`, `中央`, `center`, `middle`) to one "focus" region chosen per work. The six focus candidates were upper right, upper left, lower right, lower left, near the top edge, and the right half, and none of them contained the middle of the canvas, so a shape written at the center never appeared there. Following the author's decision ("中央 is just another word for 中心"; remove the focus feature for now and build a composition feature separately; never read an author's position word as a different position), the reinterpretation is removed.
+
+- `center` is now the same central region an omitted position uses (0.39 to 0.61 on each axis), with its position chosen inside that region at performance time as before. An Anchor's `center` is still the single point (0.5, 0.5).
+- "Another composition" reselects only an explicit slant's angle and a `corner`. For a work whose only placement is `center`, every candidate draws the same picture.
+- Explicit variation (small, medium, large) is still accepted, but it has no axis to move and leaves the picture unchanged. The option stays on screen (the author's decision).
+- The DDL of the 373 typed works in production was compiled before and after the change (no drawing). 270 changed, each only by a focus region becoming the central region (417 drawing regions, 17 fill bounds, 1 group region). The other 103 Scores are identical, and no compile outcome (complete, with omissions, stopped) changed.
+- Saved works do not change, because a replay draws the saved Score. New works and operations that rebuild from DDL (editing the DDL or the description, another composition) place `center` in the middle.
+
+The Stage 1.5 schema becomes `inku.typed-stage15-transformation.v7` and the geometry policy digest `5703a18f…`. The DDL engine moves to 50 (the Server owns the version and its references). The render engine is unchanged.
+
 ### 2026-09-27 — the info panel's version rows explain themselves
 
 In the info panel ("About inku-lang"), `DDL Spec. ver.`, `DDL engine ver.`, `Render engine ver.` and `Binding protocol ver.` now show an explanation, in Japanese and English, when the pointer rests on them. Each says that it is the version running now and what can change when it rises (what the instructions can say, the score the same instructions become, and how a saved work looks when performed again). They are separate from the explanations of the versions a work records (in the generation details).

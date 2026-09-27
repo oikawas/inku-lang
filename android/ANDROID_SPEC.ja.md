@@ -3,14 +3,14 @@
 このディレクトリは、ネイティブ単体 Android アプリのワークスペースであり、Git 管理対象とする。
 ローカル専用成果物、端末ID、ダウンロード済みモデル、ログ、秘密情報は追跡対象に含めない。
 
-最終更新: 2026-09-26。
+最終更新: 2026-09-27。
 
 **追随状況**: Android は `2.1.4-android.80` の世代にある。DDLの変換とScore → SVGの描画は、
 同じcommitの共有Rust core（`core/crates/`）を同梱してServerと同じ実装で行い、Android独自の版定数を持たない。
 render engineの版は同梱した`core/crates/inku-render/`の`RENDER_ENGINE_VERSION`をJNI経由で名乗り、
 DDL SpecとDDL engineの版はServerの`server/src/inku_server/layer_versions.py`が名乗る。本書には版の数値を写さない（写すと古びる）。
 以前`ReferenceCorpus.kt`が名乗っていたDDL engine `20`は、撤去済みのKotlin Stage 1.5展開層のfixture版であり、現行の版ではない。
-実機の`NativeRenderDeviceTest`は、同梱ライブラリのSVG・版・renderer referenceを、build時に同じcommitのhost coreが`render-parity-expected`で生成した期待値と比べる。凍結corpusはScore入力とraster入力にだけ使い、render engineの版上げで期待値を作り直す必要はない。
+実機の`NativeRenderDeviceTest`は、同梱ライブラリのSVG・版・renderer referenceを、同じcommitのLinux host coreが`render-parity-expected`で生成した期待値と比べる。Linux以外でその比較を組み込む場合は、生成済みのディレクトリを`-PinkuRustParityExpectedDir=<directory>`で明示して取り込む。通常の実機計装ビルドはMacで比較画像やSVGを生成しない。凍結corpusはScore入力とraster入力にだけ使い、render engineの版上げで期待値を作り直す必要はない。
 
 **共有Rust切替は完了した**: productionのScore → SVG / metadataは
 `AndroidRenderHost`から1回のJNI requestで`core/crates/inku-render/`を呼ぶ。保存済み／現行SVGの
@@ -29,6 +29,14 @@ runtime fallbackを持たない。保存済みSVG、Room schema、Score schema�
 - `ANDROID_SPEC.md` は英語版として、`ANDROID_SPEC.ja.md` の意図を保った翻訳・要約として更新する。
 - Android 仕様を更新するときは、先に `ANDROID_SPEC.ja.md` を更新し、その後で `ANDROID_SPEC.md` を同期する。
 - 英語版だけに存在する仕様・要件を追加してはならない。
+
+## 2026-09-27 SVGの画像化と表示キャッシュ
+
+同梱resvgの`feTurbulence`は、seedごとの格子と勾配を最大8組再利用し、行・列とoctaveごとの座標と補間係数を先に計算する。座標表は合計200,000要素までとし、それを超える場合は従来の画素単位の処理へ戻る。Androidは行を呼び出し元の描画threadで逐次処理する（共有workerによる行並列化はPixel 9で遅くなったため無効）。ほかのtargetは十分大きな領域だけ、全描画で共有する最大2 workerのpoolで処理する。乱数、各色の演算順と丸め、解像度は保つ。
+
+Androidへの転送は、Rustのpremultiplied RGBAをNDKの`RGBA_8888` Bitmapへstrideに従って直接コピーする。Javaの中間配列とKotlinの画素単位の色入れ替えは行わない。旧転送にあった赤・青の入れ替えも修正する。保存済みサムネイルは版を付けた別名で元のSVGから少量ずつ作り直し、更新されたpathを表示キャッシュのキーに含める。
+
+作品のpreviewと推敲の候補は64MiBの画像キャッシュを共有し、同じhash・raster API版・描画寸法への同時要求を一回の描画にまとめる。同時処理は最大2件。回転前の画像も残して向き変更に再利用する。待つ画面がすべて閉じた要求は、開始前なら取り消し、すでにJNIで実行中なら終了後の結果をキャッシュへ入れない。
 
 ## 2026-09-26 現行の接続先・描画設定・書き出し
 

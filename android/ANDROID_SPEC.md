@@ -4,7 +4,7 @@ This directory is the Android workspace for the native standalone app and is
 tracked by Git. Local-only artifacts, device IDs, downloaded models, logs, and
 secrets must remain outside tracked files.
 
-Last updated: 2026-09-26.
+Last updated: 2026-09-27.
 
 **Catch-up status**: Android sits at generation `2.1.4-android.80`. DDL conversion and Score → SVG
 rendering run in the shared Rust core (`core/crates/`) of the same commit, packaged with the app, so
@@ -14,8 +14,10 @@ server's `server/src/inku_server/layer_versions.py` declares the DDL Spec and DD
 This document does not copy the numbers, which would go stale. The DDL engine `20` that `ReferenceCorpus.kt` used to name was the
 fixture version of the removed Kotlin Stage 1.5 expander, not a current version.
 On the device, `NativeRenderDeviceTest` compares the packaged library's SVG, version, and renderer
-reference with expectations that the host core of the same commit writes at build time
-(`render-parity-expected`). Frozen corpora supply only Score and raster inputs, so a render engine
+reference with expectations that the Linux host core of the same commit generates
+(`render-parity-expected`). Other build hosts explicitly import that directory with
+`-PinkuRustParityExpectedDir=<directory>` when packaging this comparison. Ordinary device-test
+builds do not generate comparison images or SVG on macOS. Frozen corpora supply only Score and raster inputs, so a render engine
 bump needs no new expectations.
 
 **The shared-Rust cutover is complete**: production Score-to-SVG/metadata calls
@@ -43,6 +45,14 @@ When updating Android specifications:
    adaptation of the Japanese source.
 3. Do not introduce English-only Android requirements that are absent from
    `ANDROID_SPEC.ja.md`.
+
+## 2026-09-27 SVG rasterization and display cache
+
+The vendored resvg `feTurbulence` reuses up to eight seed-specific lattice and gradient sets and prepares coordinates and interpolation weights per row, column, and octave. Coordinate tables are capped at 200,000 entries in total; larger tables fall back to the previous per-pixel path. Android executes rows sequentially on the calling render thread because shared row workers regressed Pixel 9 latency. Other targets process sufficiently large regions using one pool shared across renders with at most two workers. Random values, per-channel operation order, rounding, and resolution are preserved.
+
+Android transfer copies Rust's premultiplied RGBA directly into an NDK `RGBA_8888` Bitmap according to its stride. It uses no intermediate Java pixel array or Kotlin per-pixel channel conversion, fixing the previous red/blue swap. Saved thumbnails are regenerated from their original SVG in small batches under versioned filenames, and the display cache includes the updated path in its key.
+
+Work previews and refinement candidates share a 64 MiB image cache and coalesce simultaneous requests with the same hash, raster API version, and raster dimensions into one render. At most two requests run concurrently. The unrotated image is retained for orientation changes. When all waiting screens leave, a queued request is cancelled; a request already executing synchronously in JNI finishes but does not populate the cache.
 
 ## 2026-09-26 Current connections, drawing settings, and export
 

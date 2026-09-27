@@ -94,6 +94,9 @@ version = "0.4"
 version = "0.5"
 features = ["eq-separator"]
 
+[dependencies.rayon]
+version = "=1.11.0"
+
 [dependencies.rgb]
 version = "0.8"
 

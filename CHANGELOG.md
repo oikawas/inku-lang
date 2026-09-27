@@ -6,6 +6,12 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 36 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-27 — Faster Android SVG rasterization, Bitmap transfer, and redisplay
+
+Reuse seed-specific noise lattices and gradients in resvg and prepare row and column coordinates ahead of time. Android keeps the sequential path that measured faster on the device; other targets process large regions with a shared pool of at most two workers. Android copies pixels directly into a Bitmap through the NDK, removing intermediate Java arrays and Kotlin pixel loops. This also fixes the previous red/blue swap; old thumbnails are gradually regenerated from saved SVG.
+
+Work previews and refinement candidates share a 64 MiB cache and coalesce simultaneous requests for the same image. Unrotated images are reused, and queued requests are cancelled when their screens leave. DDL, Score, SVG, rendering versions, and saved work content are unchanged.
+
 ### 2026-09-27 — Position words are drawn as ranges (DDL engine 51)
 
 A position word is now drawn as a range built from three equal bands on each canvas axis (the author's decisions: a scatter or line-up stays inside its range, the bands are thirds, and a placed mark anchors in its range shrunk to two thirds).

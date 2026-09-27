@@ -1,10 +1,8 @@
 package app.inku.mobile.render
 
-import android.graphics.Bitmap
 import android.util.Log
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
-import java.nio.ByteBuffer
 import org.junit.Assert.assertEquals
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -20,17 +18,16 @@ class SvgRasterPerformanceTest {
             repeat(4) { iteration ->
                 val started = System.nanoTime()
                 val raw = RustArtworkRasterizer().rasterizeRaw(svg, targetWidth = 1080, targetHeight = 1080)
-                val rasterMs = (System.nanoTime() - started) / 1_000_000.0
-                val transferStarted = System.nanoTime()
-                val bitmap = Bitmap.createBitmap(raw.width, raw.height, Bitmap.Config.ARGB_8888)
-                val bytes = RustArtworkRasterizer.argb8888RowsForBitmap(raw, bitmap.rowBytes)
-                bitmap.copyPixelsFromBuffer(ByteBuffer.wrap(bytes))
-                bitmap.setPremultiplied(true)
-                val transferMs = (System.nanoTime() - transferStarted) / 1_000_000.0
-                bitmap.recycle()
+                val rawMs = (System.nanoTime() - started) / 1_000_000.0
+                val bitmapStarted = System.nanoTime()
+                val bitmap = RustArtworkRasterizer().rasterize(svg, targetWidth = 1080, targetHeight = 1080)
+                val bitmapTotalMs = (System.nanoTime() - bitmapStarted) / 1_000_000.0
                 assertEquals(1080, raw.width)
                 assertEquals(1080, raw.height)
-                Log.i("InkuRasterPerf", "$name iteration=$iteration raster_ms=$rasterMs transfer_ms=$transferMs")
+                assertEquals(1080, bitmap.width)
+                assertEquals(1080, bitmap.height)
+                bitmap.recycle()
+                Log.i("InkuRasterPerf", "$name iteration=$iteration warmup=${iteration == 0} raw_ms=$rawMs bitmap_total_ms=$bitmapTotalMs")
             }
         }
     }

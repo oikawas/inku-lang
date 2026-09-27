@@ -3,6 +3,12 @@
 
 #![allow(clippy::needless_range_loop)]
 
+use std::collections::VecDeque;
+use std::sync::{Arc, Mutex, OnceLock};
+
+use rayon::prelude::*;
+use rgb::RGBA8;
+
 use super::{ImageRefMut, f32_bound};
 use usvg::ApproxZeroUlps;
 
@@ -15,10 +21,39 @@ const B_SIZE_32: i32 = 0x100;
 const B_LEN: usize = B_SIZE + B_SIZE + 2;
 const BM: i32 = 0xff;
 const PERLIN_N: i32 = 0x1000;
+const MAX_CACHED_SEEDS: usize = 8;
+const MAX_AXIS_ENTRIES: usize = 200_000;
+const PARALLEL_MIN_PIXELS: usize = 32_768;
+const PARALLEL_MIN_OCTAVE_PIXELS: usize = 65_536;
 
 // Keep the four channels adjacent. They share lattice points and interpolation
 // weights, so each octave can compute those once and interpolate all channels.
 type Gradient = [[f64; 4]; 2];
+type Lattice = (Vec<usize>, Vec<Gradient>);
+
+static LATTICES: OnceLock<Mutex<VecDeque<(i32, Arc<Lattice>)>>> = OnceLock::new();
+static ROW_POOL: OnceLock<Option<rayon::ThreadPool>> = OnceLock::new();
+
+#[derive(Clone, Copy)]
+struct Axis {
+    b0: usize,
+    b1: usize,
+    r0: f64,
+    r1: f64,
+    curve: f64,
+}
+
+#[derive(Clone, Copy)]
+struct AxisStitch {
+    extent: i32,
+    wrap: i32,
+}
+
+struct Coordinates {
+    x: Vec<Axis>,
+    y: Vec<Axis>,
+    ratios: Vec<f64>,
+}
 
 #[derive(Clone, Copy)]
 struct StitchInfo {
@@ -47,9 +82,72 @@ pub fn apply(
     fractal_noise: bool,
     dest: ImageRefMut,
 ) {
-    let (lattice_selector, gradient) = init(seed);
+    let lattice = lattice_for_seed(seed);
+    let (lattice_selector, gradient) = &*lattice;
     let width = dest.width;
     let height = dest.height;
+    let width_usize = width as usize;
+    let height_usize = height as usize;
+
+    let coordinates = if width_usize != 0 {
+        Coordinates::new(
+            width_usize,
+            height_usize,
+            offset_x,
+            offset_y,
+            sx,
+            sy,
+            base_frequency_x,
+            base_frequency_y,
+            num_octaves,
+            stitch_tiles,
+        )
+    } else {
+        None
+    };
+    if let Some(coordinates) = coordinates {
+        let render = |(row_index, row): (usize, &mut [RGBA8])| {
+            render_row(
+                row_index,
+                row,
+                &coordinates,
+                num_octaves as usize,
+                fractal_noise,
+                lattice_selector,
+                gradient,
+            );
+        };
+        let pixel_count = width_usize.saturating_mul(height_usize);
+        // Row workers regressed preview latency on Pixel 9. Android retains
+        // prepared coordinates but executes rows on the calling render thread.
+        let parallel = !cfg!(target_os = "android")
+            && height_usize >= 16
+            && pixel_count >= PARALLEL_MIN_PIXELS
+            && pixel_count.saturating_mul(num_octaves as usize) >= PARALLEL_MIN_OCTAVE_PIXELS;
+        if parallel {
+            if let Some(pool) = row_pool() {
+                pool.install(|| {
+                    dest.data
+                        .par_chunks_mut(width_usize)
+                        .enumerate()
+                        .for_each(&render)
+                });
+            } else {
+                dest.data
+                    .chunks_mut(width_usize)
+                    .enumerate()
+                    .for_each(&render);
+            }
+        } else {
+            dest.data
+                .chunks_mut(width_usize)
+                .enumerate()
+                .for_each(&render);
+        }
+        return;
+    }
+
+    // Very large axis tables use the original constant-memory path.
     let mut x = 0;
     let mut y = 0;
     for pixel in dest.data.iter_mut() {
@@ -90,6 +188,237 @@ pub fn apply(
             y += 1;
         }
     }
+}
+
+fn lattice_for_seed(seed: i32) -> Arc<Lattice> {
+    let cache = LATTICES.get_or_init(|| Mutex::new(VecDeque::new()));
+    {
+        let mut entries = cache
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        if let Some(index) = entries.iter().position(|(key, _)| *key == seed) {
+            let entry = entries.remove(index).expect("cached index exists");
+            let lattice = Arc::clone(&entry.1);
+            entries.push_back(entry);
+            return lattice;
+        }
+    }
+
+    let computed = Arc::new(init(seed));
+    let mut entries = cache
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    if let Some(index) = entries.iter().position(|(key, _)| *key == seed) {
+        let entry = entries.remove(index).expect("cached index exists");
+        let lattice = Arc::clone(&entry.1);
+        entries.push_back(entry);
+        return lattice;
+    }
+    entries.push_back((seed, Arc::clone(&computed)));
+    if entries.len() > MAX_CACHED_SEEDS {
+        entries.pop_front();
+    }
+    computed
+}
+
+fn row_pool() -> Option<&'static rayon::ThreadPool> {
+    ROW_POOL
+        .get_or_init(|| {
+            let available = std::thread::available_parallelism()
+                .map(|count| count.get())
+                .unwrap_or(1);
+            if available < 2 {
+                None
+            } else {
+                rayon::ThreadPoolBuilder::new()
+                    .num_threads(available.min(2))
+                    .build()
+                    .ok()
+            }
+        })
+        .as_ref()
+}
+
+impl Coordinates {
+    fn new(
+        width: usize,
+        height: usize,
+        offset_x: f64,
+        offset_y: f64,
+        sx: f64,
+        sy: f64,
+        mut base_freq_x: f64,
+        mut base_freq_y: f64,
+        num_octaves: u32,
+        stitch_tiles: bool,
+    ) -> Option<Self> {
+        let octaves = num_octaves as usize;
+        let axis_entries = width.checked_add(height)?.checked_mul(octaves)?;
+        if axis_entries > MAX_AXIS_ENTRIES {
+            return None;
+        }
+
+        if stitch_tiles {
+            base_freq_x = adjusted_frequency(base_freq_x, width as f64);
+            base_freq_y = adjusted_frequency(base_freq_y, height as f64);
+        }
+        let x = axis_table(width, offset_x, sx, base_freq_x, octaves, stitch_tiles);
+        let y = axis_table(height, offset_y, sy, base_freq_y, octaves, stitch_tiles);
+        let mut ratios = Vec::with_capacity(octaves);
+        let mut ratio = 1.0;
+        for _ in 0..num_octaves {
+            ratios.push(ratio);
+            ratio *= 2.0;
+        }
+        Some(Self { x, y, ratios })
+    }
+}
+
+fn adjusted_frequency(mut frequency: f64, extent: f64) -> f64 {
+    if !frequency.approx_zero_ulps(4) {
+        let lo_freq = (extent * frequency).floor() / extent;
+        let hi_freq = (extent * frequency).ceil() / extent;
+        if frequency / lo_freq < hi_freq / frequency {
+            frequency = lo_freq;
+        } else {
+            frequency = hi_freq;
+        }
+    }
+    frequency
+}
+
+fn axis_table(
+    length: usize,
+    offset: f64,
+    scale: f64,
+    frequency: f64,
+    octaves: usize,
+    stitch_tiles: bool,
+) -> Vec<Axis> {
+    let mut axes = Vec::with_capacity(length * octaves);
+    let tile_extent = length as f64;
+    let stitch_extent = (tile_extent * frequency + 0.5) as i32;
+    for index in 0..length {
+        let mut point = (index as f64 + offset) / scale;
+        point *= frequency;
+        let mut stitch = if stitch_tiles {
+            Some(AxisStitch {
+                extent: stitch_extent,
+                wrap: (index as f64 * frequency + PERLIN_N as f64 + stitch_extent as f64) as i32,
+            })
+        } else {
+            None
+        };
+        for _ in 0..octaves {
+            axes.push(axis(point, stitch));
+            point *= 2.0;
+            if let Some(ref mut info) = stitch {
+                info.extent *= 2;
+                info.wrap = 2 * info.wrap - PERLIN_N;
+            }
+        }
+    }
+    axes
+}
+
+fn axis(point: f64, stitch: Option<AxisStitch>) -> Axis {
+    let t = point + PERLIN_N as f64;
+    let mut b0 = t as i32;
+    let mut b1 = b0 + 1;
+    let r0 = t - t as i64 as f64;
+    let r1 = r0 - 1.0;
+    if let Some(info) = stitch {
+        if b0 >= info.wrap {
+            b0 -= info.extent;
+        }
+        if b1 >= info.wrap {
+            b1 -= info.extent;
+        }
+    }
+    b0 &= BM;
+    b1 &= BM;
+    Axis {
+        b0: b0 as usize,
+        b1: b1 as usize,
+        r0,
+        r1,
+        curve: s_curve(r0),
+    }
+}
+
+fn render_row(
+    row_index: usize,
+    row: &mut [RGBA8],
+    coordinates: &Coordinates,
+    octaves: usize,
+    fractal_noise: bool,
+    lattice_selector: &[usize],
+    gradient: &[Gradient],
+) {
+    let y_start = row_index * octaves;
+    for (x, pixel) in row.iter_mut().enumerate() {
+        let x_start = x * octaves;
+        let mut sum = [0.0; 4];
+        for octave in 0..octaves {
+            let noise = noise2_prepared(
+                coordinates.x[x_start + octave],
+                coordinates.y[y_start + octave],
+                lattice_selector,
+                gradient,
+            );
+            if fractal_noise {
+                for channel in 0..4 {
+                    sum[channel] += noise[channel] / coordinates.ratios[octave];
+                }
+            } else {
+                for channel in 0..4 {
+                    sum[channel] += noise[channel].abs() / coordinates.ratios[octave];
+                }
+            }
+        }
+        let bytes = sum.map(|n| {
+            let n = if fractal_noise {
+                (n * 255.0 + 255.0) / 2.0
+            } else {
+                n * 255.0
+            };
+
+            (f32_bound(0.0, n as f32, 255.0) + 0.5) as u8
+        });
+        pixel.r = bytes[0];
+        pixel.g = bytes[1];
+        pixel.b = bytes[2];
+        pixel.a = bytes[3];
+    }
+}
+
+fn noise2_prepared(
+    x: Axis,
+    y: Axis,
+    lattice_selector: &[usize],
+    gradient: &[Gradient],
+) -> [f64; 4] {
+    let i = lattice_selector[x.b0];
+    let j = lattice_selector[x.b1];
+    let b00 = lattice_selector[i + y.b0];
+    let b10 = lattice_selector[j + y.b0];
+    let b01 = lattice_selector[i + y.b1];
+    let b11 = lattice_selector[j + y.b1];
+    let q00 = &gradient[b00];
+    let q10 = &gradient[b10];
+    let q01 = &gradient[b01];
+    let q11 = &gradient[b11];
+    let mut noise = [0.0; 4];
+    for channel in 0..4 {
+        let u = x.r0 * q00[0][channel] + y.r0 * q00[1][channel];
+        let v = x.r1 * q10[0][channel] + y.r0 * q10[1][channel];
+        let a = lerp(x.curve, u, v);
+        let u = x.r0 * q01[0][channel] + y.r1 * q01[1][channel];
+        let v = x.r1 * q11[0][channel] + y.r1 * q11[1][channel];
+        let b = lerp(x.curve, u, v);
+        noise[channel] = lerp(y.curve, a, b);
+    }
+    noise
 }
 
 fn init(mut seed: i32) -> (Vec<usize>, Vec<Gradient>) {

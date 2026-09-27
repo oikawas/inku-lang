@@ -314,7 +314,7 @@ private object HistoryThumbnailCache {
     }
 
     suspend fun get(context: Context, renderHash: String, thumbnailPath: String?): ImageBitmap? {
-        val key = "$renderHash:$THUMBNAIL_PX"
+        val key = "$renderHash:$THUMBNAIL_PX:$thumbnailPath"
         synchronized(cache) {
             cache.get(key)?.let { return it }
         }
@@ -342,12 +342,21 @@ private object HistoryThumbnailCache {
 
 private object ArtworkBitmapCache {
     private const val MAX_RENDER_PX = 2048
-    private const val MAX_CACHE_KB = 64 * 1024
-    private val cache = object : LruCache<String, ImageBitmap>(MAX_CACHE_KB) {
-        override fun sizeOf(key: String, value: ImageBitmap): Int {
-            return ((value.width.toLong() * value.height.toLong() * 4L) / 1024L).coerceAtLeast(1L).toInt()
-        }
-    }
+    private const val CANDIDATE_PX = 512
+    private const val MAX_CACHE_BYTES = 64L * 1024L * 1024L
+    private data class Key(
+        val renderHash: String,
+        val rasterApiVersion: String,
+        val sourceWidth: Int,
+        val sourceHeight: Int,
+        val rotation: Int,
+    )
+
+    private val cache = SharedRenderCache<Key, Bitmap>(
+        maxWeight = MAX_CACHE_BYTES,
+        weightOf = { it.allocationByteCount.toLong() },
+        maxConcurrentRenders = 2,
+    )
     private val rasterizer = RustArtworkRasterizer()
 
     suspend fun get(item: HistoryItemEntity, size: IntSize, rotationDegrees: Int): ImageBitmap? {
@@ -355,25 +364,37 @@ private object ArtworkBitmapCache {
         val scale = minOf(1f, MAX_RENDER_PX.toFloat() / maxOf(size.width, size.height).toFloat())
         val width = maxOf(1, (size.width * scale).toInt())
         val height = maxOf(1, (size.height * scale).toInt())
-        val key = "${item.renderHash}:${NativeRenderBridge.rasterApiVersion()}:$width:$height:${rotationDegrees.floorMod360()}"
-        synchronized(cache) {
-            cache.get(key)?.let { return it }
-        }
-        return withContext(Dispatchers.Default) {
-            val rendered = renderArtworkBitmap(item.displaySvg, width, height, rotationDegrees)
-            if (rendered != null) {
-                synchronized(cache) {
-                    cache.put(key, rendered)
-                }
-            }
-            rendered
-        }
+        return getBitmap(item.renderHash, item.displaySvg, width, height, rotationDegrees)?.asImageBitmap()
     }
 
-    private fun renderArtworkBitmap(svgText: String, width: Int, height: Int, rotationDegrees: Int): ImageBitmap? {
-        return runCatching {
-            rasterizedArtworkBitmap(svgText, width, height, rotationDegrees).asImageBitmap()
-        }.getOrNull()
+    suspend fun getCandidate(renderHash: String, svg: String): ImageBitmap? =
+        getBitmap(renderHash, svg, CANDIDATE_PX, CANDIDATE_PX, 0)?.asImageBitmap()
+
+    private suspend fun getBitmap(
+        renderHash: String,
+        svg: String,
+        width: Int,
+        height: Int,
+        rotationDegrees: Int,
+    ): Bitmap? {
+        val rotation = rotationDegrees.floorMod360()
+        val sourceWidth = if (rotation.swapsAxes()) height else width
+        val sourceHeight = if (rotation.swapsAxes()) width else height
+        val sourceKey = Key(renderHash, NativeRenderBridge.rasterApiVersion(), sourceWidth, sourceHeight, 0)
+        if (rotation != 0) {
+            cache.peek(sourceKey.copy(rotation = rotation))?.let { return it }
+        }
+        val source = cache.get(sourceKey) {
+            runCatching { rasterizer.rasterize(svg, targetWidth = sourceWidth, targetHeight = sourceHeight) }.getOrNull()
+        } ?: return null
+        if (rotation == 0) return source
+        // The source can still be held by another preview, so keep it alive after eviction.
+        return cache.get(sourceKey.copy(rotation = rotation)) {
+            runCatching {
+                val matrix = Matrix().apply { postRotate(rotation.toFloat()) }
+                Bitmap.createBitmap(source, 0, 0, source.width, source.height, matrix, true)
+            }.getOrNull()
+        }
     }
 }
 
@@ -3919,6 +3940,7 @@ private fun RefinementCandidateCard(
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceXs)) {
             RefinementCandidateImage(
+                renderHash = candidate.renderHash,
                 svg = candidate.displaySvg,
                 modifier = Modifier
                     .fillMaxWidth()
@@ -3948,14 +3970,9 @@ private fun RefinementCandidateCard(
 }
 
 @Composable
-private fun RefinementCandidateImage(svg: String, modifier: Modifier = Modifier) {
-    val image by produceState<ImageBitmap?>(initialValue = null, svg) {
-        value = withContext(Dispatchers.Default) {
-            runCatching {
-                val side = 512
-                RustArtworkRasterizer().rasterize(svg, targetWidth = side, targetHeight = side).asImageBitmap()
-            }.getOrNull()
-        }
+private fun RefinementCandidateImage(renderHash: String, svg: String, modifier: Modifier = Modifier) {
+    val image by produceState<ImageBitmap?>(initialValue = null, renderHash, svg) {
+        value = ArtworkBitmapCache.getCandidate(renderHash, svg)
     }
     Surface(color = Color.White, shape = RoundedCornerShape(0.dp), modifier = modifier) {
         val bitmap = image
@@ -7492,21 +7509,6 @@ private fun ArtworkPreview(
                 )
             }
         }
-    }
-}
-
-private fun rasterizedArtworkBitmap(svg: String, width: Int, height: Int, rotationDegrees: Int): Bitmap {
-    val rotation = rotationDegrees.floorMod360()
-    val swapsAxes = rotation.swapsAxes()
-    val source = RustArtworkRasterizer().rasterize(
-        svg,
-        targetWidth = if (swapsAxes) height else width,
-        targetHeight = if (swapsAxes) width else height,
-    )
-    if (rotation == 0) return source
-    val matrix = Matrix().apply { postRotate(rotation.toFloat()) }
-    return Bitmap.createBitmap(source, 0, 0, source.width, source.height, matrix, true).also {
-        if (it !== source) source.recycle()
     }
 }
 

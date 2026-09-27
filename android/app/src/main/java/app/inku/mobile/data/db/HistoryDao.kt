@@ -39,8 +39,11 @@ interface HistoryDao {
     @Query("SELECT * FROM history_items WHERE render_hash = :hash OR render_hash_short = :hash LIMIT 1")
     suspend fun getByHash(hash: String): HistoryItemEntity?
 
-    @Query("SELECT * FROM history_items WHERE thumbnail_path IS NULL ORDER BY created_at DESC LIMIT :limit")
-    suspend fun listMissingThumbnails(limit: Int): List<HistoryItemEntity>
+    @Query(
+        "SELECT * FROM history_items WHERE thumbnail_path IS NULL OR thumbnail_path NOT LIKE :currentVersionPattern " +
+            "ORDER BY created_at DESC, id DESC LIMIT :limit OFFSET :offset",
+    )
+    suspend fun listMissingThumbnails(currentVersionPattern: String, limit: Int, offset: Int): List<HistoryItemEntity>
 
     // A history row is written once and never overwritten by a second insert.
     // The server re-raises the IntegrityError a colliding primary key produces

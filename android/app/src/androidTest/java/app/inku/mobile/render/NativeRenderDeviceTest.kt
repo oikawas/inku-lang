@@ -1,9 +1,11 @@
 package app.inku.mobile.render
 
-import androidx.test.ext.junit.runners.AndroidJUnit4
-import androidx.test.platform.app.InstrumentationRegistry
+import android.graphics.Color
 import app.inku.mobile.data.model.WorkColorSnapshot
 import app.inku.mobile.pipeline.RenderRequest
+import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.platform.app.InstrumentationRegistry
+import java.nio.ByteBuffer
 import java.security.MessageDigest
 import org.json.JSONObject
 import org.junit.Assert.assertArrayEquals
@@ -86,6 +88,36 @@ class NativeRenderDeviceTest {
             assertEquals(case.height, output.height)
             assertEquals(case.stride, output.stride)
             assertEquals(case.sha256, sha256(output.pixels))
+        }
+    }
+
+    @Test
+    fun nativeBitmapTransferKeepsRgbaAlphaAndAdjacentRows() {
+        val svg = """<svg xmlns="http://www.w3.org/2000/svg" width="3" height="2">
+            <path d="M0 0h1v1H0z" fill="#ff0000"/>
+            <path d="M1 0h1v1H1z" fill="#00ff00" fill-opacity="0.5"/>
+            <path d="M2 0h1v1H2z" fill="#0000ff"/>
+            <path d="M0 1h1v1H0z" fill="#0000ff"/>
+            <path d="M1 1h1v1H1z" fill="#ff0000"/>
+            <path d="M2 1h1v1H2z" fill="#00ff00"/>
+        </svg>""".trimIndent()
+        val bitmap = RustArtworkRasterizer().rasterize(svg, targetWidth = 3, targetHeight = 2)
+        try {
+            assertEquals(3, bitmap.width)
+            assertEquals(2, bitmap.height)
+            assertEquals(Color.RED, bitmap.getPixel(0, 0))
+            assertEquals(Color.BLUE, bitmap.getPixel(2, 0))
+            assertEquals(Color.BLUE, bitmap.getPixel(0, 1))
+            assertEquals(Color.GREEN, bitmap.getPixel(2, 1))
+            assertEquals(128, Color.alpha(bitmap.getPixel(1, 0)))
+            val bytes = ByteBuffer.allocate(bitmap.rowBytes * bitmap.height)
+            bitmap.copyPixelsToBuffer(bytes)
+            assertArrayEquals(
+                byteArrayOf(0, 128.toByte(), 0, 128.toByte()),
+                bytes.array().copyOfRange(4, 8),
+            )
+        } finally {
+            bitmap.recycle()
         }
     }
 

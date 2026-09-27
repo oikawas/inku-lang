@@ -94,6 +94,7 @@ class InkuRepository(
     // passing it as a trailing lambda keep working.
     private val newLineageId: () -> String = { java.util.UUID.randomUUID().toString() },
 ) {
+    private val thumbnailVersionSuffix = "-rgba2.webp"
     private val artworkRasterizer by lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
         RustArtworkRasterizer()
     }
@@ -1027,11 +1028,16 @@ class InkuRepository(
         return item
     }
 
-    suspend fun backfillMissingThumbnails(limit: Int = 8) {
-        database.historyDao().listMissingThumbnails(limit).forEach { item ->
+    data class ThumbnailBackfillBatch(val scanned: Int, val refreshed: Int)
+
+    suspend fun backfillMissingThumbnails(limit: Int = 8, offset: Int = 0): ThumbnailBackfillBatch {
+        val items = database.historyDao().listMissingThumbnails("%$thumbnailVersionSuffix", limit, offset)
+        var refreshed = 0
+        items.forEach { item ->
             val thumbnail = createHistoryThumbnail(item.displaySvg, item.renderHash) ?: return@forEach
-            attachThumbnail(item.id, thumbnail)
+            if (attachThumbnail(item.id, thumbnail)) refreshed++
         }
+        return ThumbnailBackfillBatch(items.size, refreshed)
     }
 
     private fun scheduleThumbnailGeneration(id: String, svgText: String, renderHash: String) {
@@ -1046,7 +1052,7 @@ class InkuRepository(
      * being drawn (a headless run that keeps no history does exactly that)
      * updates no row, and a file no row shows is removed rather than left.
      */
-    private suspend fun attachThumbnail(id: String, thumbnail: ThumbnailInfo) {
+    private suspend fun attachThumbnail(id: String, thumbnail: ThumbnailInfo): Boolean {
         val history = database.historyDao()
         val updated = history.updateThumbnail(
             id = id,
@@ -1058,6 +1064,7 @@ class InkuRepository(
         if (updated == 0 && history.countWithThumbnail(thumbnail.path) == 0) {
             File(thumbnail.path).delete()
         }
+        return updated != 0
     }
 
     suspend fun setStarred(id: String, starred: Boolean) {
@@ -1261,7 +1268,7 @@ class InkuRepository(
             artwork.recycle()
 
             val dir = File(context.filesDir, "thumbnails").also { it.mkdirs() }
-            val file = File(dir, "$renderHash.webp")
+            val file = File(dir, "$renderHash$thumbnailVersionSuffix")
             FileOutputStream(file).use { out ->
                 bitmap.compress(Bitmap.CompressFormat.WEBP_LOSSY, 86, out)
             }

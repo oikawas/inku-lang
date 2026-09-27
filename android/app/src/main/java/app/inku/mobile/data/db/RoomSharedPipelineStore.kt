@@ -485,8 +485,8 @@ class RoomSharedPipelineStore(
 
     private fun validateDiagnostics(value: JSONObject) {
         // The required channels exactly, plus optional ones such as
-        // `plugin_diagnostics` (draw-system04). Works saved before an optional
-        // channel existed lack it and must still read.
+        // `plugin_diagnostics` (draw-system04) and `render_warnings`. Works
+        // saved before an optional channel existed lack it and must still read.
         val keys = value.keys().asSequence().toSet()
         require(keys.containsAll(DIAGNOSTIC_KEYS) && (keys - DIAGNOSTIC_KEYS).all { it in OPTIONAL_DIAGNOSTIC_KEYS }) {
             "pipeline diagnostics have an unexpected shape"
@@ -582,7 +582,7 @@ class RoomSharedPipelineStore(
             "render_diagnostics",
             "resource_execution",
         )
-        private val OPTIONAL_DIAGNOSTIC_KEYS = setOf("plugin_diagnostics")
+        private val OPTIONAL_DIAGNOSTIC_KEYS = setOf("plugin_diagnostics", "render_warnings")
         private val HISTORY_CONTEXT_KEYS = setOf(
             "protocol_version",
             "variation_id",

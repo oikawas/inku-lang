@@ -63,6 +63,22 @@ object InkuStringsJa : InkuStrings {
         "plugin_version_mismatch" -> "プラグイン $name の中身が作品の保存時と違うため、この文は描かれていません。"
         else -> "プラグイン $name はこの環境に登録されていないため、この文は描かれていません。"
     }
+    override fun pipelineRenderWarning(kind: String, name: String?) = if (kind == "invalid_color") {
+        "色表の「${name ?: "?"}」の値が#rrggbbの形ではないため、この値は使わずに描きました。名前つきの色は既定の色で描いています。"
+    } else {
+        "描画の警告があります（$kind）。描画は続けました。"
+    }
+    override fun savedRenderRefused(code: String) = "このScoreは描けません: " + when (code) {
+        "resource_authority" -> "作品の資源の方針を確かめられませんでした"
+        "performance_stopped" -> "描画が上限に達して止まりました"
+        "invalid_score" -> "Scoreが描ける形ではありません"
+        "mark_too_large" -> "大きすぎる印があります"
+        "output_too_large" -> "描いたSVGが大きすぎます"
+        "non_finite_value" -> "数でない値（無限大など）があります"
+        "invalid_saved_performance" -> "保存された内容を読めません"
+        "internal_invariant" -> "描画coreの内部で問題が起きました"
+        else -> code.replace('_', ' ')
+    }
     override val pipelineOmissions: (Int) -> String = { count -> "省略した配置・関係: $count 件。ほかの部分は描画を続けます。" }
     override val pipelinePartialExecution: (Int, Int) -> String = { requested, executed ->
         "${requested}個の要求のうち、実行可能な${executed}個を描画しました。"

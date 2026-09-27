@@ -148,9 +148,9 @@ PNGは正本SVGを写す派生出力であり、縮小してもSVGの材質・�
 
 **render JSON が記録する描画文脈**: 描画・構成・JSON タブ・保存済み作品 JSON は、実際に使われた `stage1_model` / `stage2_model` に加えて `render_build_number`・`render_color_profile`・`render_engine_id`・`render_engine_version`・`ddl_version`・`ddl_engine_version`・`render_canvas_aspect`・`render_hash`・`render_hash_short`・`render_color_catalog_id`・`render_color_catalog_name`・`render_color_catalog_sub`・`render_color_map`・`instruction_lang_requested`・`instruction_lang_resolved`・`ui_lang`・`render_seed` を含む。resource-awareなScore 0.10演奏はさらに`resource_execution`へ、Scoreから再計算した需要、予算超過で省略した原子単位と原因、target省略に伴うrelation省略を記録する。hostが渡す色表の値が`#rrggbb`でなければ、描画coreはその値を描画に使わない。名前つきの色はその既定の色で、カタログの項目（`palette:<name>`）などは使わずに描画を続け、描画のmetadataの`render_warnings`に`{"kind": "invalid_color", "name": …}`を残す（値は残さない）。hostはこれを作品とともに表示し、ログに記録する。Serverはどの描画でもログに記録し、パイプラインの作品では警告があるときだけ診断に残して作品と一緒に保存し、`/api/render-score`の応答にも載せる。Webは作品の診断の一覧に出す。保存したScoreの再演をcoreが断ったときは、Serverはcoreの固定の種類で422を返し（Webはページの言語で理由を書く）、coreの説明をログに記録する。`ddl_version` と `ddl_engine_version` は、その絵を決めた DDL 層の版である。描画応答は必ず両方を積み、保存済み作品では版を記録する前に保存した古い行にだけ欠ける。抽象色と `palette:<name>` は SVG 描画に使った `#RRGGBB` へ展開して記録する。カタログの `map` / `swatches` / `palette` の全体は render JSON へ複製しない — 再演奏と監査に要る具体の記録は `render_color_map` だからである。`score.canvas` は楽譜レベルのキャンバス指示のままで、`render_canvas_aspect` はこの描画作品が実際に使ったキャンバス比を記録する。v2.13.14 から両者は食い違いうる — Stage 2 はどの紙のために組むのかを告げられ、そこで宣言した比は「構図が何のために組まれたか」の記録として残り、実際に演奏した紙は `render_canvas_aspect*` が持つ。それ以前に保存した作品は両方に要求比が入っている。描き直しは演奏した紙を作品の行から読むので、古い作品は以前とまったく同じに描き直る。新しいメタデータでは `render_canvas_aspect_id` が明示のキャンバス比識別子、`render_canvas_aspect_ratio` が実際に描画した幅／高さの比を数値で持つ。`render_canvas_aspect` は互換のために残り、古い記録は応答の中でそこから新しい id と比を導いて補える。
 
-`背景を<抽象色>で埋める。` は面の指定ではなく、typed documentが所有する`background`を指定する有限構文である。sourceで明示した背景はhost contextより優先してScoreへ届ける。背景を省略した場合と複数背景が衝突した場合はcontext backgroundを使い、後者だけをtyped diagnosticとして残す。背景markerを持つ句で色のheadまたは背景actionが成立しない場合は、そのsource spanと理由を局所diagnosticとして保持し、canonical identityの欠落だけへ置き換えない。語を別の色や背景構文へ補正せず、resource-aware実行はその句だけを省略して独立した描画を続けられる。`埋める`は面または領域を密に満たし、`散らす`は要素を不規則に散布し、`敷き詰める`は図形を規則的・反復的に配置する。これらの意味を互いに読み替えない。typed fill planは全画面、既存named area、またはinlineの単一閉primitiveをtargetとして、同じ領域内の密な不規則配置とclip recipe、targetのsource owner、geometry、count provenanceを保持する。省略countは`ceil(A / d²)`で決め、明示countは保つ。群の混在countは明示分を引いた残りareaを省略種の平均`d²`で割り、ほぼ均等に配って余りをsource順に置き、各省略種を最低1とする。all-explicitは密度計算をしない。Macroは一つのmotifとしてbody、内部count、内側Transformを保ったreference footprintを使い、outer count、seed、material、instruction angle、performed relation移動からは影響を受けない。無面積/open target、numeric motif area、overflowは局所diagnosticで他描画を続ける。resource-aware compilerはこれをScore 0.10のcompact `fill_groups`へ保存し、個体座標を焼き込まず、ownerとnamespace内ordinal、count origin、target geometry、境界、sampling recipeを再演奏する。個数と図形はexactに保ち、procedural filter/patternによる個数近似は採用しない。filterは画材のappearanceだけに使える。Display / Editableはappearanceを適用してから境界clipし、Compatはfilterも`clip-path`も使わずgroup全体をbounded geometryへclipする。clip不能なら元sourceまたはcoordinated group全体を省略し、countの一部だけを残さず、独立した後続描画を続ける。`引く`はlineとarcを共通のgeometry、count、place resolverへ一度だけ配送する。source positionが未指定ならNoneのまま保ち、共通resolverは既存の揺らぎ幅を保つ中央領域`[0.39, 0.39, 0.61, 0.61]`から演奏時位置を選ぶ。明示位置は優先し、明示`center`もこの同じ中央領域へ置く。`inku.geometry-resolution-policy.v1`はfill planを含むpayloadを保持し、現行digestは`5703a18f1bb1e18da15ae127192fa587fc59739a99db02b845bbfab8baf0d023`である。
+`背景を<抽象色>で埋める。` は面の指定ではなく、typed documentが所有する`background`を指定する有限構文である。sourceで明示した背景はhost contextより優先してScoreへ届ける。背景を省略した場合と複数背景が衝突した場合はcontext backgroundを使い、後者だけをtyped diagnosticとして残す。背景markerを持つ句で色のheadまたは背景actionが成立しない場合は、そのsource spanと理由を局所diagnosticとして保持し、canonical identityの欠落だけへ置き換えない。語を別の色や背景構文へ補正せず、resource-aware実行はその句だけを省略して独立した描画を続けられる。`埋める`は面または領域を密に満たし、`散らす`は要素を不規則に散布し、`敷き詰める`は図形を規則的・反復的に配置する。これらの意味を互いに読み替えない。typed fill planは全画面、既存named area、またはinlineの単一閉primitiveをtargetとして、同じ領域内の密な不規則配置とclip recipe、targetのsource owner、geometry、count provenanceを保持する。省略countは`ceil(A / d²)`で決め、明示countは保つ。群の混在countは明示分を引いた残りareaを省略種の平均`d²`で割り、ほぼ均等に配って余りをsource順に置き、各省略種を最低1とする。all-explicitは密度計算をしない。Macroは一つのmotifとしてbody、内部count、内側Transformを保ったreference footprintを使い、outer count、seed、material、instruction angle、performed relation移動からは影響を受けない。無面積/open target、numeric motif area、overflowは局所diagnosticで他描画を続ける。resource-aware compilerはこれをScore 0.10のcompact `fill_groups`へ保存し、個体座標を焼き込まず、ownerとnamespace内ordinal、count origin、target geometry、境界、sampling recipeを再演奏する。個数と図形はexactに保ち、procedural filter/patternによる個数近似は採用しない。filterは画材のappearanceだけに使える。Display / Editableはappearanceを適用してから境界clipし、Compatはfilterも`clip-path`も使わずgroup全体をbounded geometryへclipする。clip不能なら元sourceまたはcoordinated group全体を省略し、countの一部だけを残さず、独立した後続描画を続ける。`引く`はlineとarcを共通のgeometry、count、place resolverへ一度だけ配送する。source positionが未指定ならNoneのまま保つ。共通resolverは、置く・引く（一か所）なら中の升目を2/3に縮めた`[7/18, 7/18, 11/18, 11/18]`から演奏時位置を選び、並べる・散らす・敷き詰めるなら画面全体を範囲にする（§18）。明示位置は優先し、明示`center`は中の升目を範囲にする。`inku.geometry-resolution-policy.v1`はfill planを含むpayloadを保持し、現行digestは`97ea00bfac2d6f1526d9cf6f798e7239b9b9683c4cc97fa4bb7da78b33deaa84`である。
 
-位置省略の中央領域は、単体・Macro・まとまりで共有し、敷き詰めの配置領域にも同じ厳密値を使う。fillの対象領域省略は別の規則として画面全体を保つ。有効な地だけを指定した作品もScore／Planの描画内容であり、別の不成立な描画指示を省略した場合も、地と診断を保持する。背景色だけは省略後の描画内容ではない。省略によってinstructionも有効な地も残らない場合は停止し、背景を残す空Scoreを省略付き成功として保存・配送しない。
+位置省略の範囲は、単体・Macro・まとまりで共有する。置く・引くは中の升目を2/3に縮めた領域、並べる・散らす・敷き詰めるは画面全体を範囲にする。fillの対象領域省略も画面全体である。有効な地だけを指定した作品もScore／Planの描画内容であり、別の不成立な描画指示を省略した場合も、地と診断を保持する。背景色だけは省略後の描画内容ではない。省略によってinstructionも有効な地も残らない場合は停止し、背景を残す空Scoreを省略付き成功として保存・配送しない。
 
 ### 3.2 エクステンションとして分離するもの
 
@@ -1219,7 +1219,7 @@ Object sizeの基準はcanvas短辺で、count・cell・密度に依存しない
 
 縦長 / 縦に長い / 細長いはtall、横長 / 横に長いはwideとしてtriangle / square / ellipse / cloudformの共有consumerへ届く。数値寸法省略時は長辺6/25×size係数、短辺はその半分。明示WidthHeightは保持して縦横の大小関係を照合し、不一致、regularとの併記、範囲外の辺数は元instruction / Emitの説明付き停止・省略となる。日英の有限構文で「横に長い四角形」「一辺0.24の正三角形」「六角形」、`wide rectangle` / `equilateral triangle`等を扱う。三角・四角のsemantic anchorは物理bbox中心で、Scoreではtop-left＋sizeへ変換する。Polygonはcenter / radius / sidesへ写し、numericの回転後頂点boundsを最後のgeometry境界で確認する。Namedは既存regionとclipping方針を保つ。通常DDLと宣言済みflat Emitは同じresolverを使い、place / count1はactual Score、反復は個体を作らないReady planへ届く。
 
-非Gridのdomainはcanvasの各軸の物理長さで、群の重心をsemantic anchorへ置く。方向省略のline-upは横一列で、幅Wをn分したcellの中央、同じ縦中央に置く式を保持する。TileはW>=Hならcolumns=min(n,max(1,ceil(sqrt(n*W/H))))、rows=ceil(n/columns)、H>Wなら同じ式を長辺のrowsへ適用しcolumns=ceil(n/rows)とする。行優先でn個だけを満たし、rows / columns / cell寸法 / filled countを解決する。Numeric anchorへはfilled prefixのexact重心を平行移動し、named Gridは元region内に置いて重心補正しない。Scatterは矩形のX/Y一様samplingと群の重心をanchorへ移すrecipeだけを持ち、既存performance seedと元owner / instance ordinalを後続materializationへ要求する。Composition seedの代用、乱数実行、fit縮小、個数変更、反発や最小間隔の追加は行わない。例えば1200×800 / 800×1200のnormal circle直径は共に192、4個のline-up間隔は300 / 200、8個のtileは4列2行 / 2列4行である。
+名前の位置（位置の省略を含む）の並べる・散らすは、範囲の各軸の物理長さをdomainとし、群の重心を範囲の中心へ置く（§18）。数値位置の非Gridのdomainはcanvasの各軸の物理長さで、群の重心を数値のanchorへ置く。方向省略のline-upは横一列で、幅Wをn分したcellの中央、同じ縦中央に置く式を保持する。TileはW>=Hならcolumns=min(n,max(1,ceil(sqrt(n*W/H))))、rows=ceil(n/columns)、H>Wなら同じ式を長辺のrowsへ適用しcolumns=ceil(n/rows)とする。行優先でn個だけを満たし、rows / columns / cell寸法 / filled countを解決する。Numeric anchorへはfilled prefixのexact重心を平行移動し、named Gridは元region内に置いて重心補正しない。Scatterは矩形のX/Y一様samplingと群の重心をanchorへ移すrecipeだけを持ち、既存performance seedと元owner / instance ordinalを後続materializationへ要求する。Composition seedの代用、乱数実行、fit縮小、個数変更、反発や最小間隔の追加は行わない。例えば1200×800 / 800×1200のnormal circle直径は共に192、4個のline-up間隔は300 / 200、8個のtileは4列2行 / 2列4行である。
 
 配置方向はoptionalなinstruction / Emitの`layout_direction`が所有し、entityの`angle`と独立する。「中央に、横線を縦に三本並べる。」「中央に、斜めの線を横に三本並べる。」と英語のaction-prefix / shape adjective / direction adverbを同じtyped入口で扱う。日本語の「に」のphrase証拠、英語の既存angle rowのadverb形で役割を分ける。Compiler専用parser aliasはprompt・display・legacy markerを変えない。Single-head continuationの方向も元entityへmergeし、競合は停止する。Field不在のcanonical / provenance bytesは保ち、存在時だけ意味と完全な出典を含める。
 
@@ -1856,8 +1856,11 @@ PoC と初期機能の完了記録は [CHANGELOG.ja.md](CHANGELOG.ja.md) と [�
 
 明示揺らぎは§13.6の三次元resolverから既存`Instruction.variation`へ届く。Scoreのdeserialize default（Medium / Medium / None）は従来どおりであり、sourceの一slot以上から解決するdefaultと区別する。作者は内部Variation JSONを自然DDLへ直接書かない。
 
-明示named位置は通常DDLと宣言済みflat Macroの共通geometry consumerで次の`at.region`へ解決する。
-値はcanvas各軸0..1のsemantic anchor領域であり、図形全体を収める範囲ではない。
+明示named位置は、通常DDLと宣言済みflat Macroの共通geometry consumerで、次の表の範囲から`at.region`へ解決する。範囲はcanvas各軸0..1で、各軸を3等分した帯（0〜1/3、1/3〜2/3、2/3〜1）を基にする（端と隅は狭い独自の範囲）。
+
+- 置く・引く（一か所）: 範囲を中心のまわりに2/3へ縮めた領域を`at.region`とし、その中で演奏時に基準点を選ぶ。図形全体を収める範囲ではない。
+- 並べる・散らす・敷き詰める: 図形を範囲の中に置く。並べる・散らすは範囲の中心を基準点に、範囲の大きさをdomainにする。敷き詰めるは範囲を`at.region`とし、その中に格子を置く。1つだけの並べる・散らすは置くと同じ。
+- 位置の省略: 置く・引くは`center`と同じ。並べる・散らす・敷き詰めるは画面全体を範囲にする。
 
 | place identity | 領域 [x0,y0,x1,y1] |
 |---|---|
@@ -1867,10 +1870,10 @@ PoC と初期機能の完了記録は [CHANGELOG.ja.md](CHANGELOG.ja.md) と [�
 | right_edge | [9/10,0,1,1] |
 | top_edge | [0,0,1,1/10] |
 | bottom_edge | [0,9/10,1,1] |
-| center | [39/100,39/100,61/100,61/100]（位置の省略と同じ中央の領域） |
+| center | [1/3,1/3,2/3,2/3]（中の升目） |
 | corner | 左上[0,0,1/5,1/5]、右上[4/5,0,1,1/5]、左下[0,4/5,1/5,1]、右下[4/5,4/5,1,1]の一つ |
 
-`center`（中心・中央、middle）は画面中央の領域で、位置を省いた図形と同じ領域を使う。Anchorの`center`だけは一点(0.5, 0.5)である。四辺は狭い帯であり固定点ではない。
+`center`（中心・中央、middle）は中の升目で、置くときの基準点は`[7/18,7/18,11/18,11/18]`から選ぶ。位置を省いて置いた図形と同じである。Anchorの`center`だけは一点(0.5, 0.5)である。四辺は狭い帯であり固定点ではない。
 隅はStage 2が`inku.score-place-selection.v1`専用domainで選ぶ。Verified original pre / expanded meaning
 digest、NoneとSome(0)を区別するtag付きcomposition seed、directの元logical ordinalまたはMacroのsemantic
 ordinal / expansion path / generated ordinalをframeし、SHA-256先頭byteのmodulo 4を左上・右上・左下・右下へ写す。

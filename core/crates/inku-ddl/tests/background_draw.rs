@@ -15,6 +15,7 @@ use inku_score::{
 };
 use serde_json::json;
 
+const PLACED_CENTER: [f64; 4] = [7.0 / 18.0, 7.0 / 18.0, 11.0 / 18.0, 11.0 / 18.0];
 const LIMITS: MacroExpansionLimits = MacroExpansionLimits {
     max_invocations: 8,
     max_depth: 8,
@@ -752,11 +753,10 @@ fn omitted_position_is_a_shared_execution_default_with_explicit_position_priorit
             .numeric_position
             .is_none()
     );
+    // A placed mark with its position omitted anchors in the middle cell of
+    // the thirds shrunk to two thirds.
     let instruction = &result.score().unwrap().instructions[0];
-    assert_eq!(
-        instruction.at.as_ref().unwrap().region,
-        [0.39, 0.39, 0.61, 0.61]
-    );
+    assert_eq!(instruction.at.as_ref().unwrap().region, PLACED_CENTER);
     let definition = MacroDefinition::from_json(&json!({"schema":"inku.macro-definition.v1","namespace":"Default","heading":"Circle","version":"1.0.0","parameters":{},"components":{},"body":[{"op":"emit","binding":null,"fields":{
         "shape":{"expr":"semantic_ref","category":"shape","id":"circle"},
         "movement":{"expr":"semantic_ref","category":"movement","id":"place"},
@@ -793,13 +793,17 @@ fn omitted_position_is_a_shared_execution_default_with_explicit_position_priorit
     assert_eq!(object.count(), 3);
     assert_eq!(
         object.anchor(),
-        &inku_ddl::ObjectAnchor::Named([0.39, 0.39, 0.61, 0.61])
+        &inku_ddl::ObjectAnchor::Named(PLACED_CENTER)
     );
     let policy: serde_json::Value =
         serde_json::from_slice(inku_ddl::geometry_resolution_policy_canonical_bytes()).unwrap();
     assert_eq!(
-        policy["author_resolved_omission"]["position"]["region"],
-        json!([0.39, 0.39, 0.61, 0.61])
+        policy["author_resolved_omission"]["position"]["place_region"],
+        json!(PLACED_CENTER)
+    );
+    assert_eq!(
+        policy["author_resolved_omission"]["position"]["distribute_range"],
+        json!([0.0, 0.0, 1.0, 1.0])
     );
 
     let stage = |source, definitions: &[MacroDefinition]| {
@@ -818,11 +822,12 @@ fn omitted_position_is_a_shared_execution_default_with_explicit_position_priorit
         "{:?}",
         direct_tile.diagnostics()
     );
+    // A tile with its position omitted fills the whole canvas.
     let direct_object = &direct_tile.objects().unwrap()[0];
     assert_eq!(direct_object.count(), 3);
     assert_eq!(
         direct_object.anchor(),
-        &inku_ddl::ObjectAnchor::Named([0.39, 0.39, 0.61, 0.61])
+        &inku_ddl::ObjectAnchor::Named([0.0, 0.0, 1.0, 1.0])
     );
     let tile_definition = MacroDefinition::from_json(&json!({"schema":"inku.macro-definition.v1","namespace":"Default","heading":"Tile","version":"1.0.0","parameters":{},"components":{},"body":[{"op":"emit","binding":null,"fields":{
         "shape":{"expr":"semantic_ref","category":"shape","id":"circle"},
@@ -860,7 +865,7 @@ fn omitted_position_is_a_shared_execution_default_with_explicit_position_priorit
     );
     assert_eq!(
         coordinated.score().unwrap().placement_groups[0].at.region,
-        [0.39, 0.39, 0.61, 0.61]
+        PLACED_CENTER
     );
     let mixed_stage = stage(
         "scatter three Default.Circle and one blue square.",
@@ -868,8 +873,10 @@ fn omitted_position_is_a_shared_execution_default_with_explicit_position_priorit
     );
     let mixed = plan_verified_stage15(mixed_stage.verified_effective_view(), context());
     assert!(mixed.diagnostics().is_empty(), "{:?}", mixed.diagnostics());
+    // A scattered group with its position omitted centers on the canvas and
+    // spreads over it.
     let group = &mixed.placement_groups()[0];
-    assert_eq!(group.placement().at.region, [0.39, 0.39, 0.61, 0.61]);
+    assert_eq!(group.placement().at.region, [0.5, 0.5, 0.5, 0.5]);
     assert_eq!(group.members()[0].kind(), PlacementMemberKind::Macro);
     assert_eq!(group.members()[0].body_repeat_count(), 3);
 }

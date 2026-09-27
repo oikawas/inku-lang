@@ -409,15 +409,17 @@ fn layout_axes_preserve_rectangular_physics_shape_size_and_large_count() {
                     panic!()
                 };
                 ratio(length, 6, 25);
+                // `中央` is the middle cell of the thirds, so the line-up
+                // spans a third of each canvas axis.
                 match object.recipe() {
                     PlacementRecipe::VerticalLine { cell_height } => ratio(
                         *cell_height,
                         if canvas == "golden" { 1 } else { 3 },
-                        i128::from(n) * if canvas == "golden" { 1 } else { 2 },
+                        i128::from(n) * if canvas == "golden" { 1 } else { 2 } * 3,
                     ),
                     PlacementRecipe::DiagonalLine { step } => {
-                        ratio(step[0], 1, n.into());
-                        ratio(step[1], axis[1].into(), n.into());
+                        ratio(step[0], 1, i128::from(n) * 3);
+                        ratio(step[1], axis[1].into(), i128::from(n) * 3);
                     }
                     other => panic!("{other:?}"),
                 }
@@ -788,8 +790,9 @@ fn layouts_keep_physical_axes_numeric_centroid_and_named_domain() {
         let PlacementRecipe::HorizontalLine { cell_width } = line_object.recipe() else {
             panic!()
         };
+        // The line-up stays inside the left edge, a tenth of the width.
         let (w, h) = context(canvas).canvas_format().integer_ratio();
-        ratio(*cell_width, w.into(), i128::from(w.min(h)) * 4);
+        ratio(*cell_width, w.into(), i128::from(w.min(h)) * 4 * 10);
     }
     let named = stage(
         "tile eight red circle at left-edge.",

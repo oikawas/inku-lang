@@ -712,9 +712,10 @@ fn explicit_left_edge_reaches_actual_score() {
     let score = lowered
         .score()
         .expect("explicit left-edge must reach Score");
+    // A placed mark anchors in its range shrunk to two thirds about the center.
     assert_eq!(
         score.instructions[0].at.as_ref().unwrap().region,
-        [0.0, 0.0, 0.1, 1.0]
+        [1.0 / 60.0, 1.0 / 6.0, 1.0 / 12.0, 5.0 / 6.0]
     );
 }
 
@@ -739,14 +740,22 @@ fn natural_japanese_named_positions_reach_actual_score() {
 #[test]
 fn explicit_named_table_and_seven_shape_geometry_share_one_builder() {
     let context = ScoreLoweringContext::resolve("wide", Color::White).unwrap();
+    // Each range shrunk to two thirds about its center: the anchor region of
+    // one placed mark.
     for (place, expected) in [
         ("the center", CENTER_REGION),
-        ("top", [0.0, 0.0, 1.0, 1.0 / 3.0]),
-        ("bottom", [0.0, 2.0 / 3.0, 1.0, 1.0]),
-        ("left-edge", [0.0, 0.0, 0.1, 1.0]),
-        ("right-edge", [0.9, 0.0, 1.0, 1.0]),
-        ("top-edge", [0.0, 0.0, 1.0, 0.1]),
-        ("bottom-edge", [0.0, 0.9, 1.0, 1.0]),
+        ("top", [1.0 / 6.0, 1.0 / 18.0, 5.0 / 6.0, 5.0 / 18.0]),
+        ("bottom", [1.0 / 6.0, 13.0 / 18.0, 5.0 / 6.0, 17.0 / 18.0]),
+        ("left-edge", [1.0 / 60.0, 1.0 / 6.0, 1.0 / 12.0, 5.0 / 6.0]),
+        (
+            "right-edge",
+            [11.0 / 12.0, 1.0 / 6.0, 59.0 / 60.0, 5.0 / 6.0],
+        ),
+        ("top-edge", [1.0 / 6.0, 1.0 / 60.0, 5.0 / 6.0, 1.0 / 12.0]),
+        (
+            "bottom-edge",
+            [1.0 / 6.0, 11.0 / 12.0, 5.0 / 6.0, 59.0 / 60.0],
+        ),
     ] {
         let source = format!("place one red circle at {place}.");
         let result = stage15(&source, ResolvedInstructionLanguage::En);
@@ -860,10 +869,10 @@ fn declared_and_literal_macro_positions_match_ordinary_and_keep_generated_owners
 fn assert_corner_region(region: [f64; 4]) {
     assert!(
         [
-            [0.0, 0.0, 0.2, 0.2],
-            [0.8, 0.0, 1.0, 0.2],
-            [0.0, 0.8, 0.2, 1.0],
-            [0.8, 0.8, 1.0, 1.0],
+            [1.0 / 30.0, 1.0 / 30.0, 1.0 / 6.0, 1.0 / 6.0],
+            [5.0 / 6.0, 1.0 / 30.0, 29.0 / 30.0, 1.0 / 6.0],
+            [1.0 / 30.0, 5.0 / 6.0, 1.0 / 6.0, 29.0 / 30.0],
+            [5.0 / 6.0, 5.0 / 6.0, 29.0 / 30.0, 29.0 / 30.0],
         ]
         .contains(&region)
     );
@@ -5045,4 +5054,6 @@ fn surface_emit_definition(surface: &str) -> MacroDefinition {
     .unwrap()
 }
 
-const CENTER_REGION: [f64; 4] = [0.39, 0.39, 0.61, 0.61];
+// The middle cell of the thirds shrunk to two thirds: where one mark placed at
+// `center`, or with its position omitted, anchors.
+const CENTER_REGION: [f64; 4] = [7.0 / 18.0, 7.0 / 18.0, 11.0 / 18.0, 11.0 / 18.0];

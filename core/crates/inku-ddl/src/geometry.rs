@@ -22,7 +22,7 @@ const GEOMETRY_RESOLUTION_POLICY_MIDDLE: &str = concat!(
     "\"tie\":\"black\"},\"continuity\":\"solid\",\"count\":1,",
     "\"surface\":{\"closed_and_point\":\"filled\",\"line_and_arc\":\"unfilled\"},",
     "\"touch\":\"pen\"},",
-    "\"bounds\":{\"named\":{\"anchor\":\"performance_seed_in_region\",",
+    "\"bounds\":{\"named\":{\"anchor\":\"performance_seed_in_range_shrunk_two_thirds_about_center\",",
     "\"extent\":\"not_must_fit\",\"region\":\"unclipped\"},",
     "\"numeric\":{\"anchor\":\"declared_unit_interval\",\"extent\":\"must_fit\"}},",
     "\"capability\":[\"circle_radius_or_diameter\",\"ellipse_width_height\",",
@@ -46,15 +46,29 @@ const GEOMETRY_RESOLUTION_POLICY_SUFFIX: &str = concat!(
     "\"very_large\":\"7/4\",\"very_small\":\"3/8\"},\"unimplemented\":[]}"
 );
 
-// The canvas center, shared by the named `center` / `中心` / `中央` and by a
-// shape whose position is omitted. Stage 1.5 used to move `center` to one of
-// six off-center focus regions; `center` now means this region literally.
-// Each axis spans 0.39..0.61 (22%), and the anchor is chosen inside it at
-// performance time.
-const CENTER_REGION: [(u8, u8); 4] = [(39, 100), (39, 100), (61, 100), (61, 100)];
+// Each canvas axis is divided into three equal bands (0..1/3, 1/3..2/3,
+// 2/3..1), and a position word names a range made of them: `top` and `bottom`
+// are the upper and lower thirds across the width, and `center` (中心 / 中央 /
+// middle) is the middle cell on both axes. The edges (a tenth) and the
+// corners (a fifth) keep their own narrower ranges.
+const CENTER_RANGE: [(u8, u8); 4] = [(1, 3), (1, 3), (2, 3), (2, 3)];
+// An omitted position lets a line-up, scatter, or tile use the whole canvas.
+const CANVAS_RANGE: [(u8, u8); 4] = [(0, 1), (0, 1), (1, 1), (1, 1)];
 
+/// How a placement uses the range of its position.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum RangeUse {
+    /// One mark, or several gathered at one spot. The anchor is chosen inside
+    /// the range shrunk to two thirds about its center.
+    Place,
+    /// A line-up, scatter, or tile. The marks stay inside the whole range.
+    Distribute,
+}
+
+/// The anchor region of a mark placed with its position omitted: the middle
+/// cell shrunk to two thirds, 7/18..11/18 on both axes.
 pub(crate) fn omitted_position_bounds() -> [f64; 4] {
-    rational_bounds_as_f64(CENTER_REGION)
+    rational_bounds_as_f64(place_anchor_bounds(CENTER_RANGE))
 }
 
 pub(crate) const NORMAL_SHORT_EDGE_RATIO: (i128, i128) = (6, 25);
@@ -62,7 +76,7 @@ pub(crate) const NORMAL_ELLIPTICAL_ASPECT_RATIO: (i128, i128) = (3, 5);
 
 // One exact rational table feeds both policy bytes and the final Score boundary.
 const NAMED_REGIONS: [(&str, [(u8, u8); 4]); 7] = [
-    ("center", CENTER_REGION),
+    ("center", CENTER_RANGE),
     ("top", [(0, 1), (0, 1), (1, 1), (1, 3)]),
     ("bottom", [(0, 1), (2, 3), (1, 1), (1, 1)]),
     ("left_edge", [(0, 1), (0, 1), (1, 10), (1, 1)]),
@@ -101,24 +115,77 @@ pub(crate) fn named_region_rational_bounds(
     Some(bounds)
 }
 
-/// Resolve a named source position when present, or the adopted execution
-/// region when position is absent. The caller retains source authority; this
-/// helper only supplies the exact region used by every consumer.
-pub(crate) fn resolved_position_rational_bounds(
+/// The range a named source position denotes, or the adopted range when the
+/// position is omitted: the middle cell for a placed mark and the whole canvas
+/// for a line-up, scatter, or tile. The caller retains source authority; this
+/// helper only supplies the exact range used by every consumer.
+pub(crate) fn position_range(
     named_position: Option<&str>,
+    range_use: RangeUse,
     context: crate::score_angle::ScoreAngleContext<'_>,
 ) -> Option<[(u8, u8); 4]> {
     match named_position {
         Some(id) => named_region_rational_bounds(id, context),
-        None => Some(CENTER_REGION),
+        None => Some(match range_use {
+            RangeUse::Place => CENTER_RANGE,
+            RangeUse::Distribute => CANVAS_RANGE,
+        }),
     }
 }
 
-pub(crate) fn resolved_position_bounds(
+/// The region a placement anchors in: the shrunk range for a placed mark, and
+/// the whole range for a line-up, scatter, or tile.
+pub(crate) fn anchor_rational_bounds(
     named_position: Option<&str>,
+    range_use: RangeUse,
+    context: crate::score_angle::ScoreAngleContext<'_>,
+) -> Option<[(u8, u8); 4]> {
+    position_range(named_position, range_use, context).map(|range| match range_use {
+        RangeUse::Place => place_anchor_bounds(range),
+        RangeUse::Distribute => range,
+    })
+}
+
+pub(crate) fn anchor_bounds(
+    named_position: Option<&str>,
+    range_use: RangeUse,
     context: crate::score_angle::ScoreAngleContext<'_>,
 ) -> Option<[f64; 4]> {
-    resolved_position_rational_bounds(named_position, context).map(rational_bounds_as_f64)
+    anchor_rational_bounds(named_position, range_use, context).map(rational_bounds_as_f64)
+}
+
+/// Shrink a range to two thirds about its center on both axes, exactly. A mark
+/// anchored in a corner cell then stays mostly on the canvas, and the middle
+/// cell gives 7/18..11/18, close to the earlier center region 0.39..0.61.
+pub(crate) fn place_anchor_bounds(range: [(u8, u8); 4]) -> [(u8, u8); 4] {
+    let (x0, x1) = shrink_two_thirds(range[0], range[2]);
+    let (y0, y1) = shrink_two_thirds(range[1], range[3]);
+    [x0, y0, x1, y1]
+}
+
+// start + (end - start) / 6 and end - (end - start) / 6, reduced. Every range in
+// the closed tables stays within u8 after the shrink (the largest denominator
+// is 60, for the edges).
+fn shrink_two_thirds(start: (u8, u8), end: (u8, u8)) -> ((u8, u8), (u8, u8)) {
+    let (a, b) = (i64::from(start.0), i64::from(start.1));
+    let (c, d) = (i64::from(end.0), i64::from(end.1));
+    let denominator = 6 * b * d;
+    let width = c * b - a * d;
+    (
+        reduced(6 * a * d + width, denominator),
+        reduced(6 * c * b - width, denominator),
+    )
+}
+
+fn reduced(numerator: i64, denominator: i64) -> (u8, u8) {
+    fn gcd(a: i64, b: i64) -> i64 {
+        if b == 0 { a.abs() } else { gcd(b, a % b) }
+    }
+    let divisor = gcd(numerator, denominator).max(1);
+    (
+        u8::try_from(numerator / divisor).expect("a shrunk closed range fits u8"),
+        u8::try_from(denominator / divisor).expect("a shrunk closed range fits u8"),
+    )
 }
 
 fn rational_bounds_as_f64(bounds: [(u8, u8); 4]) -> [f64; 4] {
@@ -248,8 +315,9 @@ pub fn geometry_resolution_policy_canonical_bytes() -> &'static [u8] {
             canonical = canonical.replacen(
                 "\"author_resolved_omission\":{",
                 &format!(
-                    "\"author_resolved_omission\":{{\"position\":{{\"region\":{},\"anchor\":\"performance_seed_in_region\",\"source_position\":\"absent\"}},\"fluctuation\":{},",
+                    "\"author_resolved_omission\":{{\"position\":{{\"place_region\":{},\"distribute_range\":{},\"anchor\":\"performance_seed_in_region\",\"source_position\":\"absent\"}},\"fluctuation\":{},",
                     serde_json::to_string(&omitted_position_bounds()).expect("finite default bounds"),
+                    serde_json::to_string(&rational_bounds_as_f64(CANVAS_RANGE)).expect("finite canvas range"),
                     crate::fluctuation::policy()
                 ),
                 1,
@@ -280,7 +348,7 @@ pub fn geometry_resolution_policy_canonical_bytes() -> &'static [u8] {
                     "\"scatter\":\"uniform_xy_then_translate_sample_centroid_at_materialization\",",
                     "\"scatter_seed\":\"existing_performance_seed_owner_instance_ordinal\",",
                     "\"fill\":{\"omitted_target\":\"canvas\",\"target\":\"area_not_anchor\",\"distribution\":\"independent_uniform_in_target\",\"boundary\":\"clip_to_same_target_contour\",\"target_transform\":\"with_contents\",\"centroid_translation\":false,\"omitted_count\":\"max_1_ceil_reference_area_over_reference_extent_squared\",\"explicit_count_size\":\"preserved\",\"count_appearance_dependency\":false,\"cloudform_count_area\":\"declared_envelope\",\"crescent_count_area\":\"shared_cubic_analytic_integral\",\"numeric_motif_position\":\"invalid_not_area\",\"all_counts\":\"same_region_clip\",\"mixed_omission\":\"max_k_ceil_k_times_nonnegative_remaining_area_over_sum_omitted_extent_squared\",\"mixed_explicit_area\":\"sum_count_times_extent_squared\",\"mixed_allocation\":\"equal_omitted_counts_source_order_remainder_minimum_one\",\"macro_reference_extent\":\"max_declared_center_envelope_axis_span_plus_twice_max_primitive_reference_radius\",\"macro_reference_transform\":\"rotate_centers_scale_radius_by_max_absolute_axis\",\"macro_reference_positions\":\"declared_numeric_or_named_center_and_internal_recipe_envelope\",\"macro_reference_exclusions\":[\"outer_count\",\"ink_bounds\",\"instruction_angle\",\"performance_seed\",\"performed_relation_movement\"]},",
-                    "\"non_grid_domain\":\"canvas_axes_group_centroid_at_semantic_anchor\",",
+                    "\"non_grid_domain\":{\"named\":\"range_extent_group_centroid_at_range_center\",\"numeric\":\"canvas_axes_group_centroid_at_numeric_anchor\"},",
                     "\"overlap\":\"allowed_no_resize_no_fit_no_count_change\",",
                     "\"materialization\":\"deferred\",\"score_success\":false},",
                     "\"numeric_basis\":"
@@ -916,13 +984,43 @@ mod tests {
             );
         }
         assert_eq!(named_region_bounds("unknown", context), None);
-        // `center` is the literal canvas center, the same region an omitted
-        // position uses; no focus table remains in the policy.
+        // `center` is the middle cell of the thirds. A mark placed there, or
+        // placed with its position omitted, anchors in the cell shrunk to two
+        // thirds; a distribution with its position omitted uses the canvas.
         assert_eq!(
             named_region_bounds("center", context),
-            Some(omitted_position_bounds())
+            Some([1.0 / 3.0, 1.0 / 3.0, 2.0 / 3.0, 2.0 / 3.0])
         );
-        assert_eq!(omitted_position_bounds(), [0.39, 0.39, 0.61, 0.61]);
+        assert_eq!(
+            place_anchor_bounds(CENTER_RANGE),
+            [(7, 18), (7, 18), (11, 18), (11, 18)]
+        );
+        assert_eq!(
+            anchor_rational_bounds(None, RangeUse::Place, context),
+            Some(place_anchor_bounds(CENTER_RANGE))
+        );
+        assert_eq!(
+            anchor_rational_bounds(None, RangeUse::Distribute, context),
+            Some(CANVAS_RANGE)
+        );
+        // The shrink is exact for every closed range, including the edges and
+        // the corners, whose denominators are the largest.
+        assert_eq!(
+            place_anchor_bounds([(9, 10), (0, 1), (1, 1), (1, 1)]),
+            [(11, 12), (1, 6), (59, 60), (5, 6)]
+        );
+        assert_eq!(
+            place_anchor_bounds(CORNER_REGIONS[0]),
+            [(1, 30), (1, 30), (1, 6), (1, 6)]
+        );
+        assert_eq!(
+            payload["author_resolved_omission"]["position"]["place_region"],
+            serde_json::json!(omitted_position_bounds())
+        );
+        assert_eq!(
+            payload["object_placement"]["non_grid_domain"]["named"],
+            "range_extent_group_centroid_at_range_center"
+        );
         assert!(payload.get("focus_regions").is_none());
         assert_eq!(
             payload["object_placement"]["placement_members"]["source_head"],
@@ -934,7 +1032,7 @@ mod tests {
         );
         assert_eq!(
             geometry_resolution_policy_digest(),
-            "5703a18f1bb1e18da15ae127192fa587fc59739a99db02b845bbfab8baf0d023"
+            "97ea00bfac2d6f1526d9cf6f798e7239b9b9683c4cc97fa4bb7da78b33deaa84"
         );
         assert_eq!(
             payload["object_placement"]["layout_direction"]["vertical"],

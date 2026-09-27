@@ -235,15 +235,17 @@ An explicit source background takes precedence over host context while lowering
 to Score. An omitted background or a conflict between multiple backgrounds uses
 the context background; only the conflict records a local diagnostic. `draw`
 delivers line and arc through the shared geometry, count, and place resolvers
-exactly once. An omitted source position remains None; the shared resolver
-chooses a performance-time position from the existing-sway central region
-`[0.39, 0.39, 0.61, 0.61]`. Explicit positions take priority, and an explicit
-`center` uses this same central region. `inku.geometry-resolution-policy.v1` records omitted
+exactly once. An omitted source position remains None. The shared resolver chooses a
+performance-time position from the middle cell shrunk to two thirds,
+`[7/18, 7/18, 11/18, 11/18]`, for place and draw at one spot, and uses the
+whole canvas as the range of a line-up, scatter, or tile (§18). Explicit
+positions take priority, and an explicit `center` uses the middle cell as its
+range. `inku.geometry-resolution-policy.v1` records omitted
 placement and fill meaning; its current digest is
-`5703a18f1bb1e18da15ae127192fa587fc59739a99db02b845bbfab8baf0d023`.
-Single objects, Macros, and coordinated groups share the omitted central
-region, including the exact domain used for tiling. Fill's omitted target
-remains the whole canvas under its separate rule. A valid ground alone is
+`97ea00bfac2d6f1526d9cf6f798e7239b9b9683c4cc97fa4bb7da78b33deaa84`.
+Single objects, Macros, and coordinated groups share the omitted range: the
+shrunk middle cell for place and draw, and the whole canvas for a line-up,
+scatter, or tile. Fill's omitted target is also the whole canvas. A valid ground alone is
 drawable content in both Score and Plan; omitting another invalid drawing
 instruction preserves that ground and its diagnostics.
 
@@ -2005,7 +2007,7 @@ Shape constraints are optional meaning separate from primitive identity. Equilat
 
 Tall / wide constraints reach the same triangle / square / ellipse / cloudform consumer. Without numeric dimensions the long extent is 6/25 times the size factor and the short extent is half that. Explicit WidthHeight is preserved and checked for the requested ordering. Conflicts, regular plus aspect, and out-of-range sides stop or omit the original instruction / Emit with a diagnostic. Finite Japanese and English grammar includes 横に長い四角形, 一辺0.24の正三角形, 六角形, wide rectangle, and equilateral triangle. Triangle and square use the physical bounding-box center as semantic anchor and convert to Score top-left plus size. Polygon uses center / radius / sides. Numeric rotated vertices are checked at the final geometry boundary; named positions retain the existing regions and clipping policy. Ordinary DDL and declared flat Emits share the resolver: place / count one reaches actual Score, while repetition reaches a Ready plan without creating instances.
 
-Non-Grid domains use the physical canvas axes and place the group centroid at the semantic anchor. Direction-omitted line-up is one horizontal row at equal-width cell centers. Tile uses columns=min(n,max(1,ceil(sqrt(n*W/H)))) and rows=ceil(n/columns) when W>=H; when H>W, the same rule starts with rows on the long axis, then columns=ceil(n/rows). It fills n cells in row-major order and resolves rows, columns, cell dimensions, and filled count. Numeric anchors translate the exact filled-prefix centroid; named Grid stays in its region without centroid correction. Scatter retains a uniform X/Y rectangle-sampling recipe followed by centroid translation, requiring the existing performance seed and original owner / instance ordinal at materialization. It does not substitute composition seed, run RNG, resize to fit, change count, or add repulsion or minimum spacing. For example, on 1200×800 / 800×1200 canvases normal circle diameter is 192 in both cases, four-object line-up spacing is 300 / 200, and eight-object tile is four columns by two rows / two columns by four rows.
+A line-up or scatter at a named position (including an omitted one) uses the range's physical axes as its domain and places the group centroid at the range's center (§18). At a numeric position, non-Grid domains use the physical canvas axes and place the group centroid at the numeric anchor. Direction-omitted line-up is one horizontal row at equal-width cell centers. Tile uses columns=min(n,max(1,ceil(sqrt(n*W/H)))) and rows=ceil(n/columns) when W>=H; when H>W, the same rule starts with rows on the long axis, then columns=ceil(n/rows). It fills n cells in row-major order and resolves rows, columns, cell dimensions, and filled count. Numeric anchors translate the exact filled-prefix centroid; named Grid stays in its region without centroid correction. Scatter retains a uniform X/Y rectangle-sampling recipe followed by centroid translation, requiring the existing performance seed and original owner / instance ordinal at materialization. It does not substitute composition seed, run RNG, resize to fit, change count, or add repulsion or minimum spacing. For example, on 1200×800 / 800×1200 canvases normal circle diameter is 192 in both cases, four-object line-up spacing is 300 / 200, and eight-object tile is four columns by two rows / two columns by four rows.
 
 Optional instruction / Emit `layout_direction` owns arrangement direction independently of entity `angle`. Japanese examples such as “中央に、横線を縦に三本並べる。” and “中央に、斜めの線を横に三本並べる。” share the typed entrance with “arrange three horizontal lines vertically at center.” and “line up three diagonal lines horizontally at center.” Japanese particle evidence and English angle-row adverb forms separate the roles. Compiler-only parser aliases leave prompt, display, and legacy markers unchanged. Single-head continuation merges direction into the original entity; conflicting directions stop. Absent-field canonical and provenance bytes remain unchanged; a present field includes its meaning and complete source evidence.
 
@@ -3034,8 +3036,11 @@ implementation history, and the [version history](docs/spec/render-engine-histor
 
 Explicit sway reaches the existing `Instruction.variation` through the three-dimensional resolver in §13.6. Score deserialization retains its existing Medium / Medium / None defaults, distinct from defaults resolved when source supplies at least one slot. Authors do not write internal Variation JSON directly in natural DDL.
 
-Explicit named positions reach the same geometry consumer from ordinary DDL and declared flat Macros.
-These `at.region` bounds describe semantic anchors on canvas axes from zero to one, not whole-shape fit areas.
+Explicit named positions reach the same geometry consumer from ordinary DDL and declared flat Macros, which resolves `at.region` from the ranges below. Ranges use canvas axes from zero to one and are built from three equal bands on each axis (0 to 1/3, 1/3 to 2/3, 2/3 to 1); the edges and corners keep their own narrower ranges.
+
+- Place and draw at one spot: `at.region` is the range shrunk to two thirds about its center, and the anchor is chosen inside it at performance time. It is not a whole-shape fit area.
+- Line-up, scatter, and tile keep the marks inside the range. A line-up or scatter anchors at the range's center with the range's size as its domain; a tile takes the range as `at.region` and lays its grid inside. A line-up or scatter of one mark behaves like place.
+- An omitted position is `center` for place and draw, and the whole canvas for a line-up, scatter, or tile.
 
 | Place identity | Region [x0,y0,x1,y1] |
 |---|---|
@@ -3045,10 +3050,10 @@ These `at.region` bounds describe semantic anchors on canvas axes from zero to o
 | right_edge | [9/10,0,1,1] |
 | top_edge | [0,0,1,1/10] |
 | bottom_edge | [0,9/10,1,1] |
-| center | [39/100,39/100,61/100,61/100] (the same central region as an omitted position) |
+| center | [1/3,1/3,2/3,2/3] (the middle cell) |
 | corner | One of upper-left [0,0,1/5,1/5], upper-right [4/5,0,1,1/5], lower-left [0,4/5,1/5,1], lower-right [4/5,4/5,1,1] |
 
-`center` (中心, 中央, middle) is the canvas-center region, the same region an omitted position uses; only an Anchor's `center` is the single point (0.5, 0.5). Edges are narrow bands, not fixed points.
+`center` (中心, 中央, middle) is the middle cell, and a mark placed there anchors in `[7/18,7/18,11/18,11/18]`, the same as a mark placed with its position omitted; only an Anchor's `center` is the single point (0.5, 0.5). Edges are narrow bands, not fixed points.
 Stage 2 selects a corner in the dedicated `inku.score-place-selection.v1` domain. It frames verified original
 pre- and expanded-meaning digests, a composition seed tagged to distinguish None from Some(0), and either the
 original direct logical ordinal or the Macro semantic ordinal, expansion path, and generated ordinal.

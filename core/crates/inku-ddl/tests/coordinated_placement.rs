@@ -69,7 +69,16 @@ fn coordinated_placement_lowering_preserves_layout_source_owners_and_plan() {
                 ScoreGroupLayout::Overlap
             }
         );
-        assert_ne!(group.at.region, [0.5; 4]);
+        // Overlapping members anchor in the middle cell shrunk to two thirds;
+        // a line-up centers on the middle cell and spreads over it.
+        assert_eq!(
+            group.at.region,
+            if index == 2 {
+                [0.5; 4]
+            } else {
+                [7.0 / 18.0, 7.0 / 18.0, 11.0 / 18.0, 11.0 / 18.0]
+            }
+        );
         assert_eq!(
             lower.instruction_origins(),
             [

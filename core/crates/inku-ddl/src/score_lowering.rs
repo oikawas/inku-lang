@@ -2234,33 +2234,36 @@ fn lower_verified_stage15_shared<'a>(
                         .collect::<Vec<_>>(),
                 )
             });
-            let bounds = crate::geometry::resolved_position_rational_bounds(
-                predicate
-                    .position
-                    .as_ref()
-                    .map(|position| position.identity.id.as_str()),
-                ScoreAngleContext {
-                    composition_seed: view.composition_seed(),
-                    original_pre_expansion_digest: view.original_pre_expansion_digest(),
-                    original_expanded_meaning_digest: view.original_expanded_meaning_digest(),
-                    occurrence: ScoreAngleOccurrence::Direct {
-                        logical_ordinal: source_member_instruction_indices[0] as u64,
-                    },
+            let layout = action.map(|action| match action {
+                "line_up" => inku_score::GroupLayout::HorizontalSourceOrder,
+                "scatter" => inku_score::GroupLayout::Scatter,
+                "tile" => inku_score::GroupLayout::Tile,
+                _ => match predicate.layout {
+                    crate::GroupLayout::Overlap => inku_score::GroupLayout::Overlap,
+                    crate::GroupLayout::HorizontalSourceOrder => {
+                        inku_score::GroupLayout::HorizontalSourceOrder
+                    }
                 },
-            );
-            if let (Some(counts), Some(bounds)) = (counts, bounds) {
-                let region = bounds.map(|(n, d)| n as f64 / d as f64);
-                let layout = match action.expect("allocated known action") {
-                    "line_up" => inku_score::GroupLayout::HorizontalSourceOrder,
-                    "scatter" => inku_score::GroupLayout::Scatter,
-                    "tile" => inku_score::GroupLayout::Tile,
-                    _ => match predicate.layout {
-                        crate::GroupLayout::Overlap => inku_score::GroupLayout::Overlap,
-                        crate::GroupLayout::HorizontalSourceOrder => {
-                            inku_score::GroupLayout::HorizontalSourceOrder
-                        }
+            });
+            let bounds = layout.and_then(|layout| {
+                crate::geometry::position_range(
+                    predicate
+                        .position
+                        .as_ref()
+                        .map(|position| position.identity.id.as_str()),
+                    group_range_use(layout),
+                    ScoreAngleContext {
+                        composition_seed: view.composition_seed(),
+                        original_pre_expansion_digest: view.original_pre_expansion_digest(),
+                        original_expanded_meaning_digest: view.original_expanded_meaning_digest(),
+                        occurrence: ScoreAngleOccurrence::Direct {
+                            logical_ordinal: source_member_instruction_indices[0] as u64,
+                        },
                     },
-                };
+                )
+            });
+            if let (Some(counts), Some(bounds), Some(layout)) = (counts, bounds, layout) {
+                let region = group_anchor_region(layout, bounds);
                 for (&member, count) in group.member_instruction_indices.iter().zip(counts) {
                     group_members.insert(member, (region, count));
                 }
@@ -2372,14 +2375,20 @@ fn lower_verified_stage15_shared<'a>(
         } else {
             None
         };
+        let cycle_range_use = if action == PlacementAction::Place {
+            crate::geometry::RangeUse::Place
+        } else {
+            crate::geometry::RangeUse::Distribute
+        };
         let bounds = if action == PlacementAction::Fill {
             None
         } else {
-            let Some(bounds) = crate::geometry::resolved_position_rational_bounds(
+            let Some(bounds) = crate::geometry::position_range(
                 instruction
                     .position
                     .as_ref()
                     .map(|position| position.identity.id.as_str()),
+                cycle_range_use,
                 ScoreAngleContext {
                     composition_seed: view.composition_seed(),
                     original_pre_expansion_digest: view.original_pre_expansion_digest(),
@@ -2405,9 +2414,14 @@ fn lower_verified_stage15_shared<'a>(
         if count == Some(0) {
             continue;
         }
-        let region = bounds.map_or([0.5; 4], |bounds| {
-            bounds.map(|(numerator, denominator)| numerator as f64 / denominator as f64)
-        });
+        let layout = match action {
+            PlacementAction::Place => inku_score::GroupLayout::Overlap,
+            PlacementAction::LineUp => inku_score::GroupLayout::HorizontalSourceOrder,
+            PlacementAction::Scatter => inku_score::GroupLayout::Scatter,
+            PlacementAction::Tile => inku_score::GroupLayout::Tile,
+            PlacementAction::Fill => inku_score::GroupLayout::Overlap,
+        };
+        let region = bounds.map_or([0.5; 4], |bounds| group_anchor_region(layout, bounds));
         match &members {
             SupportedCycleMembers::Field {
                 owner_projected_index,
@@ -2423,22 +2437,21 @@ fn lower_verified_stage15_shared<'a>(
         }
         let (width, height) = context.canvas_format.integer_ratio();
         let short = width.min(height);
-        let domain = [
+        let mut domain = [
             Rational::from_ratio(width.into(), short.into()).expect("valid canvas ratio"),
             Rational::from_ratio(height.into(), short.into()).expect("valid canvas ratio"),
         ];
+        if let Some(bounds) = bounds
+            && cycle_range_use == crate::geometry::RangeUse::Distribute
+        {
+            scale_domain_to_range(&mut domain, bounds).expect("a closed range scales exactly");
+        }
         supported_member_cycles.push(SupportedMemberCycle {
             owner_projected_index,
             members,
             count,
             action,
-            layout: match action {
-                PlacementAction::Place => inku_score::GroupLayout::Overlap,
-                PlacementAction::LineUp => inku_score::GroupLayout::HorizontalSourceOrder,
-                PlacementAction::Scatter => inku_score::GroupLayout::Scatter,
-                PlacementAction::Tile => inku_score::GroupLayout::Tile,
-                PlacementAction::Fill => inku_score::GroupLayout::Overlap,
-            },
+            layout,
             region,
             domain,
             fill_region,
@@ -3237,16 +3250,8 @@ fn lower_verified_stage15_shared<'a>(
             Rational::from_ratio(width.into(), short.into()).expect("valid canvas ratio"),
             Rational::from_ratio(height.into(), short.into()).expect("valid canvas ratio"),
         ];
-        if layout == inku_score::GroupLayout::Tile {
-            for axis in 0..2 {
-                let (end_n, end_d) = bounds[axis + 2];
-                let (start_n, start_d) = bounds[axis];
-                let extent = Rational::from_ratio(end_n.into(), end_d.into())
-                    .unwrap()
-                    .sub(Rational::from_ratio(start_n.into(), start_d.into()).unwrap())
-                    .unwrap();
-                domain[axis] = domain[axis].mul(extent).unwrap();
-            }
+        if group_range_use(layout) == crate::geometry::RangeUse::Distribute {
+            scale_domain_to_range(&mut domain, bounds).expect("a closed range scales exactly");
         }
         let recipe = placement_recipe(
             match layout {
@@ -4713,21 +4718,23 @@ fn resolve_object_plan(
                 .map(|source| ObjectAnchor::Numeric(Box::new(source.clone())))
                 .unwrap_or(ObjectAnchor::GeneratedNumeric(position)),
             ScorePlacement::Named(region) => {
-                if resolved.action == PlacementAction::Tile {
-                    let bounds = crate::geometry::resolved_position_rational_bounds(
+                // A group member keeps the group's placement; only the group
+                // distributes over the range.
+                if input.group_region.is_none()
+                    && range_use_for(resolved.action, resolved.count)
+                        == crate::geometry::RangeUse::Distribute
+                {
+                    let range = crate::geometry::position_range(
                         input.named_position.map(|position| position.id),
+                        crate::geometry::RangeUse::Distribute,
                         input.angle_context.expect("verified occurrence"),
                     )
-                    .expect("the shared named region was already resolved");
-                    for axis in 0..2 {
-                        let (end_n, end_d) = bounds[axis + 2];
-                        let (start_n, start_d) = bounds[axis];
-                        let extent = Rational::from_ratio(end_n.into(), end_d.into())?
-                            .sub(Rational::from_ratio(start_n.into(), start_d.into())?)?;
-                        domain[axis] = domain[axis].mul(extent)?;
-                    }
+                    .expect("the shared named range was already resolved");
+                    scale_domain_to_range(&mut domain, range)?;
+                    ObjectAnchor::Named(distribution_anchor(resolved.action, region))
+                } else {
+                    ObjectAnchor::Named(region)
                 }
-                ObjectAnchor::Named(region)
             }
         };
         let (n, fill_recipe) = if resolved.action == PlacementAction::Fill {
@@ -5869,6 +5876,7 @@ fn resolve_complete_object<'a>(
     {
         gaps.push(ScoreFieldGap::UnsupportedInstructionMeaning);
     }
+    let range_use = range_use_for(action, count);
     let named_region = if input.has_named_position && input.exact_position().is_some() {
         gaps.push(ScoreFieldGap::NamedAndNumericPositionConflict);
         None
@@ -5879,8 +5887,9 @@ fn resolve_complete_object<'a>(
             .named_position
             .filter(|place| place.category == "place")
             .and_then(|place| {
-                crate::geometry::resolved_position_bounds(
+                crate::geometry::anchor_bounds(
                     Some(place.id),
+                    range_use,
                     input.angle_context.expect("verified occurrence"),
                 )
             })
@@ -5893,8 +5902,9 @@ fn resolve_complete_object<'a>(
     } else if input.exact_position().is_none() && action == PlacementAction::Fill {
         Some([0.0, 0.0, 1.0, 1.0])
     } else if input.exact_position().is_none() {
-        crate::geometry::resolved_position_bounds(
+        crate::geometry::anchor_bounds(
             None,
+            range_use,
             input.angle_context.expect("verified occurrence"),
         )
     } else {
@@ -6009,6 +6019,73 @@ fn resolve_complete_object<'a>(
         },
         color_cycle,
     })
+}
+
+/// How a coordinated group uses the range of its position: overlapping members
+/// place at one spot, and every other layout distributes over the range.
+fn group_range_use(layout: inku_score::GroupLayout) -> crate::geometry::RangeUse {
+    match layout {
+        inku_score::GroupLayout::Overlap => crate::geometry::RangeUse::Place,
+        inku_score::GroupLayout::HorizontalSourceOrder
+        | inku_score::GroupLayout::Scatter
+        | inku_score::GroupLayout::Tile => crate::geometry::RangeUse::Distribute,
+    }
+}
+
+/// The group's anchor region over its range: the shrunk range for overlapping
+/// members, the range itself for a tile, and the range's center for a line-up
+/// or scatter.
+fn group_anchor_region(layout: inku_score::GroupLayout, range: [(u8, u8); 4]) -> [f64; 4] {
+    let as_f64 = |bounds: [(u8, u8); 4]| bounds.map(|(n, d)| f64::from(n) / f64::from(d));
+    match layout {
+        inku_score::GroupLayout::Overlap => as_f64(crate::geometry::place_anchor_bounds(range)),
+        inku_score::GroupLayout::Tile => as_f64(range),
+        inku_score::GroupLayout::HorizontalSourceOrder | inku_score::GroupLayout::Scatter => {
+            distribution_anchor(PlacementAction::Scatter, as_f64(range))
+        }
+    }
+}
+
+/// How a placement uses the range of its position. A tile always fills its
+/// range; a line-up or scatter of more than one mark stays inside it; one
+/// mark, or several placed at one spot, anchors in the shrunk range.
+fn range_use_for(action: PlacementAction, count: u32) -> crate::geometry::RangeUse {
+    match action {
+        PlacementAction::Tile => crate::geometry::RangeUse::Distribute,
+        PlacementAction::LineUp | PlacementAction::Scatter if count > 1 => {
+            crate::geometry::RangeUse::Distribute
+        }
+        _ => crate::geometry::RangeUse::Place,
+    }
+}
+
+/// Scale a canvas-sized domain to the range, axis by axis. The marks of a
+/// line-up, scatter, or tile then stay inside the range instead of spreading
+/// over a canvas-sized area around it.
+fn scale_domain_to_range(
+    domain: &mut [Rational; 2],
+    range: [(u8, u8); 4],
+) -> Result<(), ScoreFieldGap> {
+    for axis in 0..2 {
+        let (end_n, end_d) = range[axis + 2];
+        let (start_n, start_d) = range[axis];
+        let extent = Rational::from_ratio(end_n.into(), end_d.into())?
+            .sub(Rational::from_ratio(start_n.into(), start_d.into())?)?;
+        domain[axis] = domain[axis].mul(extent)?;
+    }
+    Ok(())
+}
+
+/// The anchor region of a distribution over `range`. A tile stays at the
+/// range's origin (the renderer places a named grid there), while a line-up or
+/// scatter centers its group on the range's center point.
+fn distribution_anchor(action: PlacementAction, range: [f64; 4]) -> [f64; 4] {
+    if action == PlacementAction::Tile {
+        return range;
+    }
+    let x = (range[0] + range[2]) / 2.0;
+    let y = (range[1] + range[3]) / 2.0;
+    [x, y, x, y]
 }
 
 fn surface_spec_from_identity(
@@ -7554,19 +7631,21 @@ mod tests {
                         panic!()
                     };
                     assert_eq!(length.numerator * 800 * 25, 4800 * length.denominator);
+                    // `中央` is the middle cell of the thirds, so the line-up
+                    // spans a third of each canvas axis.
                     match object.recipe() {
                         PlacementRecipe::VerticalLine { cell_height } => assert_eq!(
-                            cell_height.numerator * i128::from(u32::MAX) * 800,
+                            cell_height.numerator * i128::from(u32::MAX) * 800 * 3,
                             i128::from(height) * cell_height.denominator
                         ),
                         PlacementRecipe::DiagonalLine { step } => {
                             assert_eq!(
-                                step[0].numerator * i128::from(u32::MAX),
+                                step[0].numerator * i128::from(u32::MAX) * 3,
                                 step[0].denominator
                             );
                             if y != 2 {
                                 assert_eq!(
-                                    step[1].numerator * i128::from(u32::MAX),
+                                    step[1].numerator * i128::from(u32::MAX) * 3,
                                     i128::from(y) * step[1].denominator
                                 );
                             }

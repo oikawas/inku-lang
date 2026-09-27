@@ -230,25 +230,17 @@ In the refinement area of the work tab, choose exactly one element to change at 
 
 | Element | What changes | Cost |
 |---|---|---|
-| Another composition | Keeps the reading; Stage 2 rebuilds coordinates, sizes, and compositional balance | Medium (Stage 2 LLM and API) |
+| Another composition | Picks again the tilt angles and corners the instructions name. A work placed only at the center gives the same picture for every option | Fast (the Stage 2 LLM only when the instructions still have gaps to fill) |
 | Another reading | Reads again from Stage 1 and regenerates the instructions, composition, and performance | Slow (LLM and API) |
 | Another catalog | Keeps the DDL, JSON Score, composition, and performance, and changes only the color catalog | Very fast (no LLM) |
-| Variation | Shakes Stage 1.5 as a whole. The app decides which axes move | Medium |
+| Variation | Moves nothing now (8.1) | Medium |
 | Another performance | Derives only the renderer's performance seed from your words, changing line quality, weight sway, and bleed | Very fast (no LLM) |
 
 You may choose `Make one option` or `Make four options`. `Another performance` is deterministic, the same words giving the same touch seed, so it makes one option only. The words do not act on the work's meaning, reading, DDL, JSON Score, or composition.
 
 ### 8.1 Variation
 
-`Variation` shakes Stage 1.5 and lets the app choose. Pick one of three amplitudes.
-
-| Amplitude | Axes that move |
-|---|---|
-| Subtle | Moves one axis out of type swap and adopted count. Focus, color, and composition stay |
-| Moderate | Opens touch material, focus, and primary and contrast color as well, moving one or two axes. The composition family and the type family stay |
-| Sweeping | Opens the composition family and the type family as well, moving two to four axes. The skeleton of the picture moves |
-
-The axes that actually moved are shown afterwards under `Axes moved`. The axes are type swap, type family, adopted count, touch material, focus, primary and contrast color, and composition family.
+`Variation` used to move the focus, where elements placed at the center are drawn. Center and middle now mean the middle of the canvas, so a variation moves nothing. You can still choose and record a strength (Subtle, Moderate, Sweeping), but nothing moves, the instructions, color, touch, and element count included, and the option shows `Moved: nothing`. The choice stays until a separate composition feature takes its place.
 
 ### 8.2 Save Options
 

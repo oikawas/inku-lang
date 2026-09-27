@@ -420,6 +420,7 @@ export function createRefinementCoordinator(deps: RefinementCoordinatorDeps) {
 		const data = await r.json();
 		return {
 			id: `variation-${amplitude}-${seed}`,
+			kind: 'variation',
 			label,
 			selected: false,
 			result: {

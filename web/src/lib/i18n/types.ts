@@ -310,6 +310,8 @@ export interface LangPack {
 	variationTooltipMedium: string;
 	variationTooltipLarge: string;
 	variationMovedTitle: string;
+	/** On a variation option whose moved axes are empty: nothing moved. */
+	variationMovedNothing: string;
 	variationAxis: (axis: string) => string;
 	variationGridDefault: string;
 	variationGridWithInterpretation: string;

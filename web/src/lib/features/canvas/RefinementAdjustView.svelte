@@ -257,6 +257,9 @@
 													<span class="variation-moved-axis">{t().variationAxis(moved.axis)} {moved.to}</span>
 												{/each}
 											</span>
+										{:else if candidate.kind === 'variation'}
+											<!-- The core has no axis to move since center stopped being a focus. -->
+											<span class="variation-card-moved">{t().variationMovedNothing}</span>
 										{/if}
 									</span>
 								</button>

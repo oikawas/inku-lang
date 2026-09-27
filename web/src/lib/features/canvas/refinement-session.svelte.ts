@@ -6,6 +6,8 @@ export type VariationAmplitude = 'small' | 'medium' | 'large';
 
 export type VariationCandidate = {
 	id: string;
+	/** Which refinement made it; set where the kind changes what the card says. */
+	kind?: RefineKind;
 	label: string;
 	result: PaintResult & { ddl: string; thinking: string | null };
 	selected: boolean;

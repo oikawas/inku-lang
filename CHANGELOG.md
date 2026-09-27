@@ -6,6 +6,16 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 36 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-27 — Variation and Another composition follow center no longer being a focus
+
+The Web's refinement labels and explanations follow the render core no longer reading center and middle as a focus (DDL engine 50, the same day), under the author's ruling to keep the Variation screen and say that it moves nothing.
+
+- Variation: the choice reads "Variation (moves nothing now)", and the Subtle, Moderate, Sweeping and Variation explanations say that it used to move the focus and moves nothing now that center means the middle of the canvas. A variation option whose moved axes are empty shows "Moved: nothing" (it used to show nothing).
+- Another composition: the explanation now says it picks again the tilt angles and corners the instructions name, and that a work placed only at the center gives the same picture for every option; the old "Stage 2 rebuilds the composition" never matched what it did. The cost reads "Fast (LLM only for gaps to fill)": an option recompiles the work's instructions as they are, so completed instructions call no LLM.
+- The refinement table and the Variation section of Creating Images are corrected in both languages.
+
+The API and the Server are unchanged. Deployed before the DDL engine 50 core change, the explanations would run ahead of what happens, so deploy them together.
+
 ### 2026-09-27 — Android's variation says it has nothing to move
 
 With the render core's change of the same day (a DDL `中心`/`中央` is placed in the middle instead of being read as a focus; DDL engine 50), the variation's amplitude and seed have no axis left, and its options draw the same picture as the work. Following the author's ruling to keep the variation on screen and say that it does not move, choosing "Variation" in the refinement shows "Variation has nothing to move for now; its options draw the same picture as the work." under the amplitude choices. The choices, and recording the amplitude and seed with the work, are unchanged. No Android text or spec described moving a focus.

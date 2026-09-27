@@ -2,6 +2,10 @@
 
 This file records revisions to user and operations documents under `manual/`. See `SPEC.ja.md` for the detailed product change history.
 
+## 2026-09-27 — Variation and Another composition as they work now
+
+Center and middle are no longer read as a focus (DDL engine 50), so the refinement table and 8.1 of Creating Images in both languages are corrected. Variation moves nothing now and its option shows `Moved: nothing`. Another composition only picks again the tilt angles and corners the instructions name, gives the same picture for every option on a work placed only at the center, and calls the Stage 2 LLM only when the instructions still have gaps to fill. The table of axes per strength is gone.
+
 ## 2026-09-26 — API seeds come back as strings
 
 The API's JSON answers now carry `render_seed` and `composition_seed` as decimal strings, so the Renderer and Replay section of Server Configuration in both languages says why, and that a seed is sent back as it came.

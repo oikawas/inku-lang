@@ -587,6 +587,10 @@ fn display_owns_material_filters_but_compat_remains_filter_free() {
     assert!(display.svg.contains("id=\"texture-pencil\""));
     assert!(display.svg.contains("filter=\"url(#texture-pencil)\""));
     assert!(display.svg.contains("id=\"performance_touch_431\""));
+    // A region from this thin line's bounding box would cut displaced pixels.
+    assert!(display.svg.contains(
+        "filterUnits=\"userSpaceOnUse\" x=\"-20\" y=\"-20\" width=\"1040\" height=\"1040\""
+    ));
     let compat = render(make_request(SvgProfile::Compat)).unwrap();
     assert!(!compat.svg.contains("<filter"));
     assert!(!compat.svg.contains("filter=\""));

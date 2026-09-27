@@ -17,9 +17,7 @@ use crate::mark_geometry::MarkGeometry;
 use crate::marks::{
     MarkContext, MarkError, render_closed_arc_pair_fill, render_instruction_with_line_centerline,
 };
-use crate::materials::{
-    performance_touch_filter, performance_touch_filter_on_canvas, texture_filter,
-};
+use crate::materials::{performance_touch_filter, texture_filter};
 use crate::palette::{default_color, work_color_assignment};
 use crate::performance::PerformanceRequest;
 pub use crate::render_fill_scopes::CompatFillClipPolicy;
@@ -525,8 +523,7 @@ fn render_impl(
             if profile == SvgProfile::Live {
                 // A host draws each instruction group on its own, and a group
                 // drawn alone does not inherit its ancestors' filters.
-                let (filter_id, filter) =
-                    performance_touch_filter_on_canvas(seed, request.options.canvas);
+                let (filter_id, filter) = performance_touch_filter(seed, request.options.canvas);
                 scoped_touch_filter = Some(filter_id);
                 material_definitions.push(filter);
             } else {

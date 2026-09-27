@@ -1894,9 +1894,11 @@ SVG export has four profiles:
   composite the groups in document order, the touch is applied to each
   instruction group (and to the plate tone where display touches it) rather
   than to the content group, over the canvas plus 2% on each side in absolute
-  user-space units. Its pixels match display's except where display's touch,
-  bounded by the content's bounding box plus 2%, cuts displaced pixels (a work
-  of one thin line, say). It is available from the render
+  user-space units. Display's touch covers the same region (from render engine
+  71; before, it was the content's bounding box plus 2%, which cut displaced
+  pixels in a work of one thin line, say), so live's pixels differ from
+  display's only by the small effect of touching each group apart. It is
+  available from the render
   APIs (`svg_profile="live"`, `/api/history/{id}/svg?profile=live`), the CLI,
   and the Web's and Android's export menus.
 

@@ -131,7 +131,7 @@ def test_t340_the_current_engine_keeps_the_engine_40_profile_boundary():
     history_ja = (ROOT / "docs/spec/render-engine-history.ja.md").read_text(encoding="utf-8")
     history_en = (ROOT / "docs/spec/render-engine-history.md").read_text(encoding="utf-8")
 
-    assert "svg_profile: profile" in web_download
+    assert "/svg?profile=${profile}" in web_download
     assert '"svg_profile": svg_profile' in cli
     assert "SVG-native editor" in spec_ja
     assert "filter-free flat vector fallback" in spec_ja

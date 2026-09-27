@@ -232,11 +232,12 @@ In the refinement area of the work tab, choose exactly one element to change at 
 |---|---|---|
 | Another composition | Picks again the tilt angles and corners the instructions name. A work placed only at the center gives the same picture for every option | Fast (the Stage 2 LLM only when the instructions still have gaps to fill) |
 | Another reading | Reads again from Stage 1 and regenerates the instructions, composition, and performance | Slow (LLM and API) |
-| Another catalog | Keeps the DDL, JSON Score, composition, and performance, and changes only the color catalog | Very fast (no LLM) |
 | Variation | Moves nothing now (8.1) | Medium |
 | Another performance | Derives only the renderer's performance seed from your words, changing line quality, weight sway, and bleed | Very fast (no LLM) |
 
 You may choose `Make one option` or `Make four options`. `Another performance` is deterministic, the same words giving the same touch seed, so it makes one option only. The words do not act on the work's meaning, reading, DDL, JSON Score, or composition.
+
+The color catalog is changed from the work-editing menu instead (8.3).
 
 ### 8.1 Variation
 
@@ -247,6 +248,12 @@ You may choose `Make one option` or `Make four options`. `Another performance` i
 Options are unsaved. Select the ones to adopt and choose `Save the chosen ones and close` to save them to history; the others are discarded. To keep none, choose `Discard all and close`. While unsaved options remain, the ×, the backdrop and Escape do not close the dialog and it asks for one of the two. Reloading or closing the tab brings up the browser's confirmation.
 
 Pressing an option enlarges it inside the dialog; `Back to all options` or a second press returns to all of them. Saving and starring are separate actions. You may record why you chose a saved option.
+
+### 8.3 Another Catalog
+
+Choose `Another catalog` in the work-editing menu (`Refine` on the work tab, or `…` on each work in the lineage tab) and a dialog of its own opens. It starts at once and lays out the same work in every color catalog except the current one, in the order of the catalog list. The DDL, JSON Score, composition, and performance stay as they are, and no LLM is called. Each option is labeled with its catalog's name.
+
+Choosing, saving, and discarding options work as in 8.2. After a stop or a failure, `Draw in the other catalogs` draws them again. A work without a description (one written directly in DDL) cannot make options, and the dialog says why.
 
 ## 9. Autonomous Refinement
 

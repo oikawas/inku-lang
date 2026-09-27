@@ -29,6 +29,7 @@
 	import type { ProviderAttemptCount } from '$lib/paintStream';
 	import type {
 		RefinementSession,
+		RefinementView,
 		RefineKind,
 		VariationAmplitude
 	} from '$lib/features/canvas/refinement-session.svelte';
@@ -135,6 +136,7 @@
 		modelInspection: ModelInspection;
 		touchSeedText: string;
 		onGenerateVariationCandidates: (kind: RefineKind, count: 1 | 4, touchWords?: string, amplitude?: VariationAmplitude) => void | Promise<void>;
+		onGenerateColorCatalogCandidates: () => void | Promise<void>;
 		/** True when every chosen option is now in the history. */
 		onSaveSelectedVariationCandidates: () => Promise<boolean>;
 		activeComparisonItem: { svg: string } | null;
@@ -257,6 +259,7 @@
 		modelInspection,
 		touchSeedText = $bindable(''),
 		onGenerateVariationCandidates,
+		onGenerateColorCatalogCandidates,
 		onSaveSelectedVariationCandidates,
 		activeComparisonItem,
 		lineageGraph = null,
@@ -376,7 +379,7 @@
 		});
 	}
 	let generationInfoToggleEl = $state<HTMLButtonElement | null>(null);
-	let refineView = $state<'adjust' | 'compare'>('adjust');
+	let refineView = $state<RefinementView>('adjust');
 	let refineModalOpen = $state(false);
 	let refineReturnTab = $state<OutputTab>('lineage');
 	let directRefinementActive = $state(false);
@@ -393,7 +396,8 @@
 	let directAIRefineSaved = $state(false);
 	// Refinement dimensions retain the previous selection.
 	const REFINE_KIND_KEY = 'inku-refine-kind';
-	const REFINE_KINDS: RefineKind[] = ['touch', 'layout', 'reading', 'color', 'variation'];
+	// The color change has a dialog of its own, so it is not a remembered choice here.
+	const REFINE_KINDS: RefineKind[] = ['touch', 'layout', 'reading', 'variation'];
 	let refineKind = $state<RefineKind>('touch');
 	let variationAmplitude = $state<VariationAmplitude>('medium');
 	onMount(() => {
@@ -415,7 +419,7 @@
 			? (isJapanese ? `第${statusGeneration}世代` : `Gen. ${statusGeneration}`)
 			: (isJapanese ? '独立作品' : 'Standalone')
 	);
-	async function openLineageRefinement(node: LineageNode, view: 'adjust' | 'compare'): Promise<void> {
+	async function openLineageRefinement(node: LineageNode, view: RefinementView): Promise<void> {
 		await onOpenLineageNode(node);
 		refineView = view;
 		refineReturnTab = 'lineage';
@@ -423,6 +427,7 @@
 		directRefinementParentNodeId = null;
 		refineModalOpen = true;
 		outputTab = 'refine';
+		if (view === 'color') void onGenerateColorCatalogCandidates();
 	}
 
 	export async function openDirectActionMenu(): Promise<void> {
@@ -435,7 +440,7 @@
 		directActionMenuOpen = !!node;
 	}
 
-	function startDirectRefinement(node: LineageNode, view: 'adjust' | 'compare'): void {
+	function startDirectRefinement(node: LineageNode, view: RefinementView): void {
 		refineView = view;
 		refineReturnTab = 'canvas';
 		directRefinementActive = true;
@@ -452,6 +457,7 @@
 		);
 		refineModalOpen = true;
 		outputTab = 'refine';
+		if (view === 'color') void onGenerateColorCatalogCandidates();
 	}
 
 	function openDirectEdit(node: LineageNode, mode: 'description' | 'sketch-grain'): void {
@@ -469,6 +475,7 @@
 			case 'adjust':
 				startDirectRefinement(node, 'adjust');
 				break;
+			case 'color-catalog': startDirectRefinement(node, 'color'); break;
 			case 'description': openDirectEdit(node, 'description'); break;
 			case 'instructions': onOpenLineageDdlEditor(node); break;
 			case 'sketch-grain': openDirectEdit(node, 'sketch-grain'); break;
@@ -486,7 +493,7 @@
 	// chosen ones or discarding them all, so no unsaved work stays behind
 	// while another screen is shown.
 	function requestCloseRefineModal(): void {
-		if (refineView === 'adjust' && refinementSession.hasUnsaved) {
+		if (refineView !== 'compare' && refinementSession.hasUnsaved) {
 			refinementSession.setStatus(t().refineCloseNeedsDecision);
 			return;
 		}
@@ -827,6 +834,8 @@
 					onClose={requestCloseRefineModal}
 					onSetRefineKind={setRefineKind}
 					{onGenerateVariationCandidates}
+					{onGenerateColorCatalogCandidates}
+					catalogName={statusCatalogName}
 					onSaveAndClose={saveCandidatesAndClose}
 					onDiscardAndClose={discardCandidatesAndClose}
 					{onSelectRefineDrawingModel}

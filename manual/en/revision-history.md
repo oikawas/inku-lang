@@ -2,6 +2,10 @@
 
 This file records revisions to user and operations documents under `manual/`. See `SPEC.ja.md` for the detailed product change history.
 
+## 2026-09-27 — Another catalog moves to the work-editing menu
+
+`Another catalog` left the refinement elements for the work-editing menu, where a dialog of its own lays out every other color catalog, so its row is removed from the refinement table of Creating Images in both languages and 8.3 is added.
+
 ## 2026-09-27 — Refinement options' way out, and one export menu
 
 Refinement options now keep the dialog until they are saved or discarded, and the export menu is the saved work's alone, so 8.2 (Save Options), 15 (Export Images) and the troubleshooting table of Creating Images are corrected in both languages. The passage on continuing from an unsaved option and the row on options lost by switching the target are gone.

@@ -3,6 +3,8 @@ import type { PaintResult } from '../run/current-work.ts';
 
 export type RefineKind = 'touch' | 'layout' | 'reading' | 'color' | 'variation';
 export type VariationAmplitude = 'small' | 'medium' | 'large';
+/** Which dialog the refinement modal shows: drawing elements, models, or the color catalog change. */
+export type RefinementView = 'adjust' | 'compare' | 'color';
 
 export type VariationCandidate = {
 	id: string;

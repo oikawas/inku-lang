@@ -10,7 +10,7 @@ const CONSUMERS: Record<string, number> = {
 	'components/HistoryThumbnail.svelte': 1,
 	'components/LineagePanel.svelte': 0,
 	'components/ReplayComparisonModal.svelte': 2,
-	'features/canvas/RefinementAdjustView.svelte': 1,
+	'features/canvas/RefinementCandidateGrid.svelte': 1,
 	'features/canvas/RefinementModelCompareView.svelte': 2
 };
 

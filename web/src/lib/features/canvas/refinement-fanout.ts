@@ -15,13 +15,13 @@ export type RefinementFanoutLabels = {
 	layout: string;
 	reading: string;
 	variation: string;
-	color: string;
 	noAlternateCatalog: string;
 };
 
 export type RefinementFanoutInput = {
 	kind: RefineKind;
-	count: 1 | 4;
+	/** Ignored for color: that plan offers every other catalog. */
+	count: number;
 	touchWords: string;
 	amplitude?: VariationAmplitude;
 	signal: AbortSignal;
@@ -30,7 +30,6 @@ export type RefinementFanoutInput = {
 	previousCandidates: readonly VariationCandidate[];
 	availableCatalogIds: readonly string[];
 	currentCatalogId: string;
-	random?: () => number;
 };
 
 export type RefinementFanoutCapabilities = {
@@ -49,15 +48,9 @@ export type RefinementFanoutCapabilities = {
 	renderColor(catalogId: string, label: string, signal: AbortSignal): Promise<VariationCandidate>;
 };
 
-function alternateCatalogIds(input: RefinementFanoutInput): string[] {
-	const candidates = input.availableCatalogIds.filter((id) => id && id !== input.currentCatalogId);
-	const random = input.random ?? Math.random;
-	for (let index = candidates.length - 1; index > 0; index -= 1) {
-		const swapIndex = Math.floor(random() * (index + 1));
-		[candidates[index], candidates[swapIndex]] = [candidates[swapIndex], candidates[index]];
-	}
-	if (candidates.length === 0) throw new Error(input.labels.noAlternateCatalog);
-	return Array.from({ length: input.count }, (_, index) => candidates[index % candidates.length]);
+/** Every catalog but the one the work uses, in the catalog list's order. */
+export function otherCatalogIds(availableCatalogIds: readonly string[], currentCatalogId: string): string[] {
+	return availableCatalogIds.filter((id) => id && id !== currentCatalogId);
 }
 
 /** Build every label and factory before the first candidate request starts. */
@@ -73,9 +66,11 @@ export async function planRefinementCandidates(
 		if (Number.isFinite(used)) usedCompositionSeeds.add(used);
 	}
 
-	// Refinement intentionally draws alternate catalogs. Reading the description
-	// would choose once and collapse the author-selectable grid into one answer.
-	const catalogIds = input.kind === 'color' ? alternateCatalogIds(input) : [];
+	// The color change shows the work in every other catalog side by side, so
+	// the author compares them all instead of a random few.
+	const catalogIds = input.kind === 'color' ? otherCatalogIds(input.availableCatalogIds, input.currentCatalogId) : [];
+	if (input.kind === 'color' && catalogIds.length === 0) throw new Error(input.labels.noAlternateCatalog);
+	const planCount = input.kind === 'color' ? catalogIds.length : input.count;
 	const resolvedAmplitude = input.amplitude ?? 'medium';
 	// Allocate the complete seed sequence before planning jobs because the Server
 	// owns variation numbering and candidate order follows the returned indexes.
@@ -83,7 +78,7 @@ export async function planRefinementCandidates(
 		? await capabilities.allocateVariationSeeds(resolvedAmplitude, input.count)
 		: [];
 
-	return Array.from({ length: input.count }, (_, index) => {
+	return Array.from({ length: planCount }, (_, index) => {
 		const sequence = index + 1;
 		if (input.kind === 'touch') {
 			const label = input.labels.touch;
@@ -121,7 +116,7 @@ export async function planRefinementCandidates(
 			};
 		}
 		const catalogId = catalogIds[index];
-		const label = `${input.labels.color} ${sequence} · ${capabilities.catalogName(catalogId)}`;
+		const label = capabilities.catalogName(catalogId);
 		return {
 			label,
 			run: () => capabilities.renderColor(catalogId, label, input.signal)

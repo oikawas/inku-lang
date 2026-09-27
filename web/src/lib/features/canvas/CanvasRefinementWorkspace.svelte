@@ -1,18 +1,19 @@
 <script lang="ts">
 	import RefinementAdjustView from './RefinementAdjustView.svelte';
+	import RefinementColorCatalogView from './RefinementColorCatalogView.svelte';
 	import RefinementModelCompareView from './RefinementModelCompareView.svelte';
 	import './refinement-workspace.css';
+	import { t } from '$lib/i18n/index.svelte';
 	import type { Provider, ProviderGroup } from '$lib/models';
 	import type { createModelInspection } from '$lib/features/model-inspection/state.svelte';
 	import type {
 		RefinementSession,
+		RefinementView,
 		RefineKind,
 		VariationAmplitude
 	} from '$lib/features/canvas/refinement-session.svelte';
 
 	type ModelInspection = ReturnType<typeof createModelInspection>;
-	type RefinementView = 'adjust' | 'compare';
-
 	type Props = {
 		view: RefinementView;
 		modalOpen: boolean;
@@ -35,9 +36,12 @@
 		refineDrawingModelGroups: ProviderGroup[];
 		refineWildValue: boolean;
 		refineWildInherited: boolean;
+		/** The catalog the work uses, named in the color change dialog. */
+		catalogName: string;
 		onClose: () => void;
 		onSetRefineKind: (kind: RefineKind) => void;
 		onGenerateVariationCandidates: (kind: RefineKind, count: 1 | 4, touchWords?: string, amplitude?: VariationAmplitude) => void | Promise<void>;
+		onGenerateColorCatalogCandidates: () => void | Promise<void>;
 		onSaveAndClose: () => void | Promise<void>;
 		onDiscardAndClose: () => void | Promise<void>;
 		onSelectRefineDrawingModel: (provider: Provider, model: string) => void | Promise<void>;
@@ -66,9 +70,11 @@
 		refineDrawingModelGroups,
 		refineWildValue,
 		refineWildInherited,
+		catalogName,
 		onClose,
 		onSetRefineKind,
 		onGenerateVariationCandidates,
+		onGenerateColorCatalogCandidates,
 		onSaveAndClose,
 		onDiscardAndClose,
 		onSelectRefineDrawingModel,
@@ -78,7 +84,9 @@
 	const dialogTitle = $derived(
 		view === 'adjust'
 			? (isJapanese ? '描画要素を編集' : 'Edit drawing elements')
-			: (isJapanese ? 'モデルを編集' : 'Edit models')
+			: view === 'color'
+				? t().canvasVaryColor
+				: (isJapanese ? 'モデルを編集' : 'Edit models')
 	);
 </script>
 
@@ -117,6 +125,22 @@
 			{onDiscardAndClose}
 			{onSelectRefineDrawingModel}
 			{onSetRefineWild}
+		/>
+	{:else if view === 'color'}
+		<RefinementColorCatalogView
+			{isJapanese}
+			{resultAvailable}
+			{artworkUrl}
+			{seedSummary}
+			{canvasAspectWidth}
+			{canvasAspectHeight}
+			{refinementSession}
+			{catalogName}
+			{statusStage1Model}
+			{statusStage2Model}
+			{onGenerateColorCatalogCandidates}
+			{onSaveAndClose}
+			{onDiscardAndClose}
 		/>
 	{:else}
 		<RefinementModelCompareView

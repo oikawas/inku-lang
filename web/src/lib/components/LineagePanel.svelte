@@ -19,6 +19,7 @@
 	import type { LineageGraph, LineageNode } from '$lib/features/history/types';
 	import type { LineageBrowsingState, LineageOrientation } from '$lib/features/history/lineage-state.svelte';
 	import type { ProviderAttemptCount } from '$lib/paintStream';
+	import type { RefinementView } from '$lib/features/canvas/refinement-session.svelte';
 	import WorkActionMenu, { type WorkAction } from './WorkActionMenu.svelte';
 	export type OkugakiItem = { id?: string; target_node_id: string; branch_snapshot: string[]; model: string; at: number; language: 'ja' | 'en'; body: string; warnings: string[] };
 
@@ -31,7 +32,7 @@
 		onOpenNodeInCanvas: (node: LineageNode) => void | Promise<void>;
 		onToggleStar: (node: LineageNode, event?: Event) => void | Promise<void>;
 		onToggleForRevision: (node: LineageNode, event?: Event) => void | Promise<void>;
-		onOpenRefinement: (node: LineageNode, view: 'adjust' | 'compare') => void | Promise<void>;
+		onOpenRefinement: (node: LineageNode, view: RefinementView) => void | Promise<void>;
 		onDrawDescription: (node: LineageNode, text: string, signal?: AbortSignal, wild?: boolean | null) => void | Promise<void>;
 		onOpenDdlEditor: (node: LineageNode) => void;
 		stageLabel: string;
@@ -419,6 +420,7 @@ async function saveNodeNote(node: LineageNode): Promise<void> {
 	async function runWorkAction(action: WorkAction, node: LineageNode): Promise<void> {
 		switch (action) {
 			case 'adjust': await onOpenRefinement(node, 'adjust'); break;
+			case 'color-catalog': await onOpenRefinement(node, 'color'); break;
 			case 'description': openEditDialog(node); break;
 			case 'instructions': onOpenDdlEditor(node); break;
 			case 'sketch-grain': openSketchDialog(node); break;

@@ -330,6 +330,9 @@ export interface LangPack {
 	variationGridEmpty: string;
 	refineCandidatePlaceholder: string;
 	refineNoAlternateCatalog: string;
+	colorCatalogChangeCurrent: string;
+	colorCatalogChangeDraw: string;
+	colorCatalogChangePlaceholder: string;
 	refineNeedsDescription: string;
 	refineNeedsDdl: string;
 	tooltipVariationGridDefault: string;

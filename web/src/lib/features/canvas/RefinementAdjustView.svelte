@@ -7,7 +7,7 @@
 	import VariationLanes from '$lib/components/VariationLanes.svelte';
 	import WildToggle from '$lib/components/WildToggle.svelte';
 	import type { Provider, ProviderGroup } from '$lib/models';
-	import { svgImage } from '$lib/svgImage';
+	import RefinementCandidateGrid from './RefinementCandidateGrid.svelte';
 	import type {
 		RefinementSession,
 		RefineKind,
@@ -73,11 +73,9 @@
 			? t().refineCostReading
 			: refineKind === 'layout'
 				? t().refineCostLayout
-				: refineKind === 'color'
-					? t().refineCostColor
-					: refineKind === 'variation'
-						? t().refineCostLayout
-						: t().refineCostTouch
+				: refineKind === 'variation'
+					? t().refineCostLayout
+					: t().refineCostTouch
 	);
 </script>
 
@@ -116,15 +114,6 @@
 								</Tooltip>
 							</label>
 						{/if}
-						<label class="model-choice" class:checked={refineKind === 'color'}>
-							<input type="radio" name="refine-kind" value="color" checked={refineKind === 'color'} onchange={() => onSetRefineKind('color')} disabled={refinementSession.busy || refinementSession.gridBusy} />
-							<Tooltip placement="bottom" text={t().tooltipCanvasVaryColor}>
-								<span class="refine-choice-label">
-									<strong>{t().canvasVaryColor}</strong>
-									<span class="refine-info-mark" aria-hidden="true">i</span>
-								</span>
-							</Tooltip>
-						</label>
 						<label class="model-choice" class:checked={refineKind === 'variation'}>
 							<input type="radio" name="refine-kind" value="variation" checked={refineKind === 'variation'} onchange={() => onSetRefineKind('variation')} disabled={refinementSession.busy || refinementSession.gridBusy} />
 							<Tooltip placement="bottom" text={t().tooltipVariation}>
@@ -234,69 +223,6 @@
 				</section>
 			</div>
 		</div>
-		<div class="refine-workspace">
-			<section class="refine-action-section refine-candidates-section">
-				{#if refinementSession.candidates.length > 0}
-					<!-- Unsaved options keep the dialog open: these two are its only
-					     ways out, so no unsaved work is left behind on another screen. -->
-					<div class="refine-actions refine-save-actions">
-						{#if refinementSession.previewId}
-							<button class="refine-preview-back" type="button" onclick={() => refinementSession.preview(null)}>{t().refinePreviewBack}</button>
-						{/if}
-						<Tooltip placement="top-left" text={t().tooltipRefineDiscardAndClose}>
-							<button class="refine-discard-btn" type="button" onclick={onDiscardAndClose} disabled={refinementSession.busy || refinementSession.gridBusy}>
-								{t().refineDiscardAndClose}
-							</button>
-						</Tooltip>
-						<Tooltip placement="top-left" text={t().tooltipVariationGridSaveSelected}>
-							<button class="refine-save-btn" type="button" onclick={onSaveAndClose} disabled={refinementSession.busy || refinementSession.gridBusy || refinementSession.candidates.every((candidate) => !candidate.selected)}>
-								{t().refineSaveAndClose}
-							</button>
-						</Tooltip>
-					</div>
-					{@const shown = refinementSession.candidates.filter((candidate) => !refinementSession.previewId || candidate.id === refinementSession.previewId)}
-					<div class="variation-grid" style="--variation-cols: {shown.length > 1 ? 2 : 1};">
-						{#each shown as candidate (candidate.id)}
-							<div class="variation-card-wrap">
-								<!-- Enlarged inside the dialog; a second press returns to all of them. -->
-								<button class="variation-card" class:selected={candidate.selected} class:saved={candidate.saved} onclick={() => refinementSession.preview(refinementSession.previewId === candidate.id ? null : candidate.id)} type="button">
-									<span class="variation-card-art"><img use:svgImage={candidate.result.svg} alt="" /></span>
-									<span class="variation-card-meta">
-										<span>{candidate.label}</span>
-										<span>r {candidate.result.render_seed ?? "-"} / v {candidate.result.composition_seed ?? t().seedBaseLabel}{candidate.result.interpretation_seed ? ` / i ${candidate.result.interpretation_seed.slice(0, 8)}` : ""}</span>
-										{#if candidate.result.variation_moved_axes?.length}
-											<span class="variation-card-moved">
-												{#each candidate.result.variation_moved_axes as moved (moved.axis)}
-													<span class="variation-moved-axis">{t().variationAxis(moved.axis)} {moved.to}</span>
-												{/each}
-											</span>
-										{:else if candidate.kind === 'variation'}
-											<!-- The core has no axis to move since center stopped being a focus. -->
-											<span class="variation-card-moved">{t().variationMovedNothing}</span>
-										{/if}
-									</span>
-								</button>
-							{#if refinementSession.gridIncludesReading}<pre class="variation-ddl-popup">{candidate.result.ddl}</pre>{/if}
-								<button
-									class="variation-select"
-									class:selected={candidate.selected}
-									class:saved={candidate.saved}
-								disabled={candidate.saved}
-								title={candidate.saved ? (isJapanese ? '保存済み' : 'Saved') : undefined}
-								aria-label={candidate.saved ? (isJapanese ? '保存済み' : 'Saved') : undefined}
-								onclick={() => refinementSession.toggleCandidate(candidate.id)}
-								type="button"
-								>{candidate.saved ? "✔" : candidate.selected ? "✓" : "+"}</button>
-							</div>
-						{/each}
-					</div>
-				{:else}
-					<div class="variation-grid-placeholder">
-						<span>{t().refineCandidatePlaceholder}</span>
-					</div>
-				{/if}
-			</section>
-			{#if refinementSession.status}<div class="variation-grid-status">{refinementSession.status}</div>{/if}
-		</div>
+		<RefinementCandidateGrid {isJapanese} {refinementSession} {onSaveAndClose} {onDiscardAndClose} />
 	</div>
 </div>

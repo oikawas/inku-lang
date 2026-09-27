@@ -10,9 +10,11 @@ const read = (path: string): string => {
 	catch { return ''; }
 };
 
-test('T-1001/T-1002: refinement shell composes two capability-local views', () => {
+test('T-1001/T-1002: refinement shell composes capability-local views', () => {
 	const shell = read('./CanvasRefinementWorkspace.svelte');
 	const adjust = read('./RefinementAdjustView.svelte');
+	const color = read('./RefinementColorCatalogView.svelte');
+	const grid = read('./RefinementCandidateGrid.svelte');
 	const models = read('./RefinementModelCompareView.svelte');
 	const styles = read('./refinement-workspace.css');
 	const panel = read('../../components/CanvasPanel.svelte');
@@ -21,9 +23,12 @@ test('T-1001/T-1002: refinement shell composes two capability-local views', () =
 	assert.match(shell, /import RefinementModelCompareView/);
 	assert.match(shell, /<RefinementAdjustView/);
 	assert.match(shell, /<RefinementModelCompareView/);
+	assert.match(shell, /<RefinementColorCatalogView/);
 	assert.doesNotMatch(shell, /RefinementLanguageCompareView|language/);
 	assert.match(adjust, /class="refine-panel"/);
-	assert.match(adjust, /class="variation-grid"/);
+	assert.match(adjust, /<RefinementCandidateGrid/);
+	assert.match(color, /<RefinementCandidateGrid/);
+	assert.match(grid, /class="variation-grid"/);
 	assert.match(adjust, /Same picker and same semantics as DdlEditorDialog/);
 	assert.match(models, /class="compare-mode-tabs"/);
 	assert.match(styles, /Fit candidates into the remaining height/);
@@ -62,8 +67,11 @@ test('T-1002/T-1005: focused refinement views reuse typed owners without cross-v
 	const shell = read('./CanvasRefinementWorkspace.svelte');
 	const adjust = read('./RefinementAdjustView.svelte');
 	const models = read('./RefinementModelCompareView.svelte');
+	const color = read('./RefinementColorCatalogView.svelte');
+	const grid = read('./RefinementCandidateGrid.svelte');
+	const session = read('./refinement-session.svelte.ts');
 
-	assert.match(shell, /type RefinementView = 'adjust' \| 'compare'/);
+	assert.match(session, /type RefinementView = 'adjust' \| 'compare' \| 'color'/);
 	assert.match(shell, /view: RefinementView/);
 	assert.match(shell, /onClose: \(\) => void/);
 	assert.match(adjust, /refinementSession: RefinementSession/);
@@ -71,7 +79,7 @@ test('T-1002/T-1005: focused refinement views reuse typed owners without cross-v
 	assert.doesNotMatch(adjust, /modelInspection/);
 	assert.match(models, /modelInspection: ModelInspection/);
 	assert.doesNotMatch(models, /onGenerateVariationCandidates|touchSeedText|LANGUAGE_COMBOS/);
-	for (const source of [shell, adjust, models]) {
+	for (const source of [shell, adjust, models, color, grid]) {
 		assert.doesNotMatch(source, /\bany\b|apiFetch|CanvasPanel|\+page|createContext|setContext|getContext/);
 		assert.doesNotMatch(source, /\$state\(|localStorage|onMount|URL\.createObjectURL/);
 	}

@@ -6,6 +6,12 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 36 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-27 — Another catalog opens from the work-editing menu
+
+At the author's direction, `Another catalog` leaves the refinement elements of Edit drawing elements and moves to the work-editing menu (Refine on the work tab, and `…` on each work in the lineage tab), after Edit drawing parameters. Choosing it opens a dialog of its own that at once draws the same Score in every color catalog except the work's (twelve today), in catalog-list order. Before, it drew one or four options from catalogs picked at random. Each option is named by its catalog alone. Saving, discarding, and staying open while options are unsaved work as in Edit drawing elements, and both dialogs share one options grid, whose notes (such as asking to save or discard before closing) now sit above the options, where a dozen options no longer push them out of the dialog. No LLM is called. A remembered refinement element of Another catalog falls back to Another performance. Another catalog in autonomous refinement is unchanged.
+
+The DDL, Score, and render versions are unchanged.
+
 ### 2026-09-27 — The render engine version history gains engines 46 to 71
 
 `docs/spec/render-engine-history` (both languages) stopped at engine 45. It now lists engines 46 to 71 and gives each its own section. Only engines 46 to 51 and 66 have a frozen corpus; from 52 on none was made, following the 2026-09-11 ruling that the full reference update runs once when every migration step is done. Engines 69 to 71 carry their saved-Score comparison counts. This changes documents only, not versions.

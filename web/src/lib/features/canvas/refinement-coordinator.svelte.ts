@@ -9,7 +9,7 @@ import type { PaintResult } from '$lib/features/run/current-work';
 import type { WorkState } from '$lib/features/work/state.svelte';
 import { RefinementSessionState, type RefineKind, type VariationAmplitude, type VariationCandidate } from '$lib/features/canvas/refinement-session.svelte';
 import { saveRefinementCandidates } from '$lib/features/canvas/refinement-actions';
-import { planRefinementCandidates, runRefinementFanout } from '$lib/features/canvas/refinement-fanout';
+import { otherCatalogIds, planRefinementCandidates, runRefinementFanout } from '$lib/features/canvas/refinement-fanout';
 import { projectRefinementRedrawResult, runLayoutRedraw, runReadingRedraw, runTouchRedraw, type RefinementRedrawProjection } from '$lib/features/canvas/refinement-redraw';
 
 type Iteration = HistoryItem;
@@ -443,7 +443,17 @@ export function createRefinementCoordinator(deps: RefinementCoordinatorDeps) {
 		return (await r.json()).seeds as number[];
 	}
 
-	async function generateVariationCandidates(kind: RefineKind, count: 1 | 4, touchWords?: string, amplitude?: VariationAmplitude) {
+	/** The work in every other catalog; the color change dialog starts it on open. */
+	async function generateColorCatalogCandidates() {
+		const others = otherCatalogIds(deps.catalog.available().map((catalog) => catalog.id), refinementCatalogId());
+		if (others.length === 0) {
+			refinementSession.setStatus(t().refineNoAlternateCatalog);
+			return;
+		}
+		await generateVariationCandidates('color', others.length);
+	}
+
+	async function generateVariationCandidates(kind: RefineKind, count: number, touchWords?: string, amplitude?: VariationAmplitude) {
 		if (!work.result || refinementSession.gridBusy || work.loading) return;
 		const source = work.input.trim();
 		// Say why nothing is made instead of returning in silence: a work drawn
@@ -499,7 +509,6 @@ export function createRefinementCoordinator(deps: RefinementCoordinatorDeps) {
 					layout: t().canvasVaryComposition,
 					reading: t().canvasVaryInterpretation,
 					variation: t().variationTitle,
-					color: t().canvasVaryColor,
 					noAlternateCatalog: t().refineNoAlternateCatalog
 				},
 				currentCompositionSeed: work.result.composition_seed,
@@ -579,6 +588,7 @@ export function createRefinementCoordinator(deps: RefinementCoordinatorDeps) {
 		varyComposition,
 		varyInterpretation,
 		generateVariationCandidates,
+		generateColorCatalogCandidates,
 		saveSelectedVariationCandidates,
 	};
 }

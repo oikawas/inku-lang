@@ -16,7 +16,6 @@ const labels: RefinementFanoutLabels = {
 	layout: 'Layout',
 	reading: 'Reading',
 	variation: 'Variation',
-	color: 'Color',
 	noAlternateCatalog: 'No alternate catalog'
 };
 
@@ -152,10 +151,10 @@ test('T-322: variation plan allocates once and preserves amplitude, seed, and la
 	]);
 });
 
-test('T-323: color plan excludes current, shuffles, cycles, labels, and rejects no alternate', async () => {
+test('T-323: color plan offers every other catalog in list order and rejects no alternate', async () => {
 	const rendered: string[] = [];
 	const plans = await planRefinementCandidates(
-		input({ kind: 'color', count: 4, random: () => 0 }),
+		input({ kind: 'color', count: 1, availableCatalogIds: ['a', 'current', '', 'b', 'c'] }),
 		capabilities({
 			catalogName: (id) => `Catalog ${id}`,
 			renderColor: async (catalogId, label) => {
@@ -165,14 +164,9 @@ test('T-323: color plan excludes current, shuffles, cycles, labels, and rejects 
 		})
 	);
 
-	assert.deepEqual(plans.map((plan) => plan.label), [
-		'Color 1 · Catalog b',
-		'Color 2 · Catalog a',
-		'Color 3 · Catalog b',
-		'Color 4 · Catalog a'
-	]);
+	assert.deepEqual(plans.map((plan) => plan.label), ['Catalog a', 'Catalog b', 'Catalog c']);
 	await Promise.all(plans.map((plan) => plan.run()));
-	assert.deepEqual(rendered, ['b', 'a', 'b', 'a']);
+	assert.deepEqual(rendered, ['a', 'b', 'c']);
 	await assert.rejects(
 		planRefinementCandidates(input({ kind: 'color', availableCatalogIds: ['', 'current'] }), capabilities()),
 		/No alternate catalog/

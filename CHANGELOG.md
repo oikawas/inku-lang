@@ -6,6 +6,20 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 36 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-28 — Positions can be written as numeric ranges (DDL Spec 15, DDL engine 52)
+
+A position can now be written as a range of canvas fractions. By the author's decision the form is "words (numeric range)": the author's words stay in the sentence, and the compiler reads the numbers in the parentheses.
+
+- Japanese: `右下（横0.67〜1、縦0.67〜1）に、橙色の小さな円を十個散らす。` A range alone: `画面の横0.2〜0.5、縦0〜0.3の範囲に…`.
+- English: `At the bottom right (horizontal 0.67 to 1, vertical 0.67 to 1), scatter ten small orange circles.` A range alone: `In the range horizontal 0.2 to 0.5, vertical 0 to 0.3, …`.
+- The words before the parenthesis are kept as the original words and never read, so no vocabulary grows.
+- The language mode is applied strictly (the author's instruction). The Japanese form is read only in a Japanese instruction and accepts full-width or ASCII parentheses, `〜`, `～`, or `~`, and full-width digits. The English form is read only in an English instruction and writes the range with `to` only; `~` means "about" in English and is not accepted.
+- A value is a decimal or a fraction (`2/3`, `２／３`). A range lies within 0 to 1 and has a width; a range outside these limits stops the work.
+- A numeric range draws by the same rules as a named position. A named position and a numeric range with the same numbers give the same plan.
+- A numeric range on a fill target, a Macro caller, or a coordinated-group member has no Score form yet and is reported as unsupported.
+
+Saved works do not change. The Score format and the render engine are unchanged. The geometry policy digest becomes `aacaf721…`.
+
 ### 2026-09-27 — The render engine version history gains engines 46 to 71
 
 `docs/spec/render-engine-history` (both languages) stopped at engine 45. It now lists engines 46 to 71 and gives each its own section. Only engines 46 to 51 and 66 have a frozen corpus; from 52 on none was made, following the 2026-09-11 ruling that the full reference update runs once when every migration step is done. Engines 69 to 71 carry their saved-Score comparison counts. This changes documents only, not versions.

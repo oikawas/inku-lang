@@ -6,6 +6,13 @@
 
 **本書が持つのは v2.5.0（2026-07-25、render engine 12）以降**の 46 版である。それより前は書庫にある。
 
+### 2026-09-28 — Android: 提供元が断った理由をLogcatに残す
+
+作者の選択。Serverの`provider_http_error`に揃える。Androidのpipelineは、提供元にHTTPで断られると失敗の分類（`provider_rejected`など）だけを残し、提供元が示した理由をどこにも残していなかった。
+
+- 断られたとき、Logcat（tag `InkuProvider`）に`provider_http_error`の1行を残す。操作・モデルid（`openai:gpt-5.6-terra`のように接続先を含む）・状態と、提供元のエラーの`code`・`type`・`param`・`status`、鍵に見える文字列を伏せた240字までのmessageを入れる。
+- 画面の文言は変えない。OpenAI・Gemini・Claude APIの3つの接続形式で同じ。
+
 ### 2026-09-28 — Android: OpenAIのgpt-5系で描けるようにする（Serverと同じ規則）
 
 Serverセッションの依頼（作者の指示）。AndroidのOpenAI互換の接続も、OpenAIに`max_tokens`とtemperatureを送っていたので、Serverと同じくgpt-5系・o系に断られる形だった（既定の候補は`openai:gpt-5.1`）。Serverの`openai_sampling()`と同じ規則にした。

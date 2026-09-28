@@ -80,6 +80,7 @@ class OpenAiCompatibleProvider(
             throw ModelProviderHttpException(
                 connection.responseCode,
                 "HTTP ${connection.responseCode} from $host: ${DisplaySanitizer.redact(body).take(180)}$suffix",
+                providerRefusal(body),
             )
         }
         require(!truncated) { "Remote response was too large." }

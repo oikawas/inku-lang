@@ -1,5 +1,6 @@
 package app.inku.mobile.pipeline
 
+import android.util.Log
 import app.inku.mobile.llm.ModelProvider
 import app.inku.mobile.llm.ModelProviderHttpException
 import app.inku.mobile.llm.ModelRequest
@@ -63,6 +64,9 @@ class SingleAttemptModelEffectProvider(
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (error: Throwable) {
+            if (error is ModelProviderHttpException) {
+                Log.w(PROVIDER_LOG_TAG, providerHttpErrorLine(tag, modelId, error))
+            }
             providerFailure(identity, failureCode(error), elapsedMs(started)).toString()
         }
     }
@@ -99,6 +103,27 @@ class SingleAttemptModelEffectProvider(
     private fun elapsedMs(started: Long): Long =
         ((System.nanoTime() - started) / 1_000_000L).coerceAtLeast(0L)
 }
+
+/**
+ * The pipeline keeps only the failure class; this line is where the provider's
+ * own reason survives (a 400 for a field, a 403 for access), as the server's
+ * `provider_http_error` log line does. The model id names the connection
+ * (`openai:gpt-5.6-luna`).
+ */
+internal fun providerHttpErrorLine(
+    action: String,
+    modelId: String,
+    error: ModelProviderHttpException,
+): String {
+    val fields = JSONObject()
+        .put("action", action)
+        .put("model", modelId)
+        .put("status", error.statusCode)
+    error.refusal.keys().forEach { key -> fields.put(key, error.refusal.get(key)) }
+    return "provider_http_error $fields"
+}
+
+private const val PROVIDER_LOG_TAG = "InkuProvider"
 
 internal fun JSONObject.requiredObject(name: String): JSONObject =
     optJSONObject(name) ?: throw PipelineHostException("pipeline_schema_violation")

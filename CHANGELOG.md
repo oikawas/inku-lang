@@ -6,6 +6,13 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 46 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-28 — Android: a provider's reason for refusing is logged
+
+The author's choice, following the server's `provider_http_error`. When a provider refused a pipeline call over HTTP, Android kept only the failure class (`provider_rejected` and the like) and dropped the reason the provider gave.
+
+- A refusal now leaves one `provider_http_error` line in Logcat (tag `InkuProvider`): the action, the model id (which names the connection, as in `openai:gpt-5.6-terra`), the status, and the error's `code`, `type`, `param` and `status` with a message of up to 240 characters in which anything shaped like a key is masked.
+- The on-screen wording is unchanged. The OpenAI-compatible, Gemini and Claude API connections all do this.
+
 ### 2026-09-28 — Android: OpenAI's gpt-5 models can draw (the server's rule)
 
 Asked by the Server session on the author's instruction. Android's OpenAI-compatible connection also sent OpenAI `max_tokens` and a temperature, the shape the gpt-5 and o-series models refuse (the built-in candidate is `openai:gpt-5.1`). It now follows the server's `openai_sampling()`.

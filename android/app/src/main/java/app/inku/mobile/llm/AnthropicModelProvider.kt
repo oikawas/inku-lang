@@ -55,6 +55,7 @@ class AnthropicModelProvider(
                 throw ModelProviderHttpException(
                     status,
                     "HTTP $status from ${url.host}: ${DisplaySanitizer.redact(body).take(180)}",
+                    providerRefusal(body),
                 )
             }
             require(body.length <= limit) { "Remote response was too large." }

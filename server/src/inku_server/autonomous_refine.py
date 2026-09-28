@@ -4,12 +4,12 @@ from __future__ import annotations
 
 import base64
 import json
-import os
 from typing import Any, Callable
 
 from inku_analysis.rasterizer import svg_to_png
 
 from .model_settings import connection_for, provider_for_model
+from .vision_client import vision_text
 
 ALLOWED_KINDS = ("reinterpretation", "catalog_change", "layout_change", "touch_change", "variation")
 
@@ -38,37 +38,15 @@ def _vision_chat(
     *, model: str, language: str, payload: dict[str, Any], image: str, settings: dict[str, Any]
 ) -> str:
     provider, model_id = provider_for_model(model, stage="stage1", settings=settings)
-    connection = connection_for(provider, settings)
-    if connection.get("kind") != "openai_compatible":
-        raise ValueError("Vision autonomous refinement currently requires an OpenAI-compatible provider")
-    if connection.get("requires_api_key") and not connection.get("api_key"):
-        raise ValueError(f"{provider} API key is not configured")
-    from openai import OpenAI
-
     instruction = (
         ("Observe this generation and return bounded refinement advice. Context:\n" if language == "en" else
          "この世代を観察し、限定された推敲助言を返してください。文脈:\n")
         + json.dumps(payload, ensure_ascii=False, sort_keys=True)
     )
-    client = OpenAI(
-        base_url=connection["base_url"],
-        api_key=connection.get("api_key") or "none",
-        timeout=float(os.getenv("INKU_LLM_REQUEST_TIMEOUT_SECONDS", "180")),
-        max_retries=0,
+    return vision_text(
+        connection_for(provider, settings), model_id, system=_system_prompt(language), text=instruction,
+        images=[image], temperature=0.35, max_tokens=320,
     )
-    response = client.chat.completions.create(
-        model=model_id,
-        messages=[
-            {"role": "system", "content": _system_prompt(language)},
-            {"role": "user", "content": [
-                {"type": "text", "text": instruction},
-                {"type": "image_url", "image_url": {"url": image}},
-            ]},
-        ],
-        temperature=0.35,
-        max_tokens=320,
-    )
-    return (response.choices[0].message.content or "").strip()
 
 
 def _json_body(raw: str) -> str:

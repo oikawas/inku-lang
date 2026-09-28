@@ -6,6 +6,13 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 42 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-28 — The colophon and Vision advice work with Vision models on the Gemini and Anthropic APIs
+
+At the author's note. Choosing Gemma 4 31B on the Gemini API for the colophon stopped with "okugaki currently requires an OpenAI-compatible vision provider". The colophon and the Vision advice of autonomous refinement spoke only the OpenAI-compatible dialect, so a Gemini or Anthropic model published for Vision was refused at the point of use.
+
+- A question with images is now sent by `vision_client.py` to OpenAI-compatible, Anthropic, and Gemini providers, with the endpoints and key headers the shared pipeline uses. The colophon and Vision advice use it.
+- The technology stack table (Japanese and English) says so.
+
 ### v2.15.41 — size of the empty model picker (Build 1117, 2026-09-28)
 
 This version includes the change below since v2.15.40. Only when there are no selectable models, the picker is centered and sized to its explanation. Its size with models is unchanged.

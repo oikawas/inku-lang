@@ -10,7 +10,7 @@
 | Web process | JavaScript（build output） | SvelteKit adapter-node、Node.js 22 | static/UI配信とsame-origin `/api` proxy | `web/Dockerfile`; `web/src/hooks.server.ts` |
 | Server API | Python 3.12 | FastAPI、Pydantic、Uvicorn | HTTP API、認証、共有pipelineのhost、運用status | `server/pyproject.toml`; `server/src/inku_server/api.py` |
 | Server persistence | Python、SQL | SQLAlchemy 2、SQLite | 正本schema、domain store、variation authority、versioned migration、backup | `server/src/inku_server/persistence/`; `persistence/` |
-| Model access | Python / Kotlin | `httpx`（共有pipelineのprovider effect）、OpenAI SDK・Anthropic SDK（奥書・デモ・Vision）、OpenAI-compatible / Gemini HTTP、LiteRT-LM | 写生、色カタログ選択、Stage 1下絵、known-hole補完、端末内推論 | `server/pyproject.toml`; `server/src/inku_server/pipeline_provider.py`; `android/app/build.gradle.kts` |
+| Model access | Python / Kotlin | `httpx`（共有pipelineのprovider effect、奥書とVisionの助言は`vision_client.py`でOpenAI-compatible・Anthropic・Geminiへ）、OpenAI SDK（デモ）、OpenAI-compatible / Gemini HTTP、LiteRT-LM | 写生、色カタログ選択、Stage 1下絵、known-hole補完、端末内推論 | `server/pyproject.toml`; `server/src/inku_server/pipeline_provider.py`; `server/src/inku_server/vision_client.py`; `android/app/build.gradle.kts` |
 | Authoring pipeline core | Rust 2024 | `serde` / `serde_json`、`sha2` | authoring state machine、effect protocol、authority遷移、prompt構築、compile／render境界 | `core/crates/inku-pipeline/` |
 | DDL compiler core | Rust 2024 | `serde` / `serde_json`、`sha2` | typed compiler、Macro、Stage 1.5、Plan、資源選択、materialize、下絵、歳時記asset | `core/crates/inku-ddl/` |
 | Score core | Rust 2024 | `serde` / `serde_json`、`sha2` | Score型、canonical digest、互換reader、canvas registry、資源authority | `core/crates/inku-score/` |

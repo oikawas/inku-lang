@@ -23,6 +23,7 @@ from inku_analysis.rasterizer import svg_to_png
 
 from .feature_analysis import composition_family
 from .model_settings import connection_for, provider_for_model
+from .vision_client import vision_text
 
 DEFAULT_MODEL = os.getenv("INKU_OKUGAKI_MODEL", "meta/llama-3.2-90b-vision-instruct")
 _VISION_RESPONSE_CACHE: OrderedDict[str, tuple[float, str]] = OrderedDict()
@@ -271,10 +272,6 @@ def _vision_chat(
 ) -> str:
     provider, model_id = provider_for_model(model, stage="stage1", settings=settings)
     connection = connection_for(provider, settings)
-    if connection.get("kind") != "openai_compatible":
-        raise ValueError("okugaki currently requires an OpenAI-compatible vision provider")
-    if connection.get("requires_api_key") and not connection.get("api_key"):
-        raise ValueError(f"{provider} API key is not configured")
     if "invariant_prompt" in request:
         instruction = str(request["invariant_prompt"])
     elif language == "ja":
@@ -283,8 +280,6 @@ def _vision_chat(
     else:
         image_note = "The image places the previous generation on the left and the current generation on the right. Describe their visible difference." if len(images) > 0 and request.get("generation_index", 0) else "The image is the current generation. Describe only its visible physical features."
         instruction = image_note + "\nFacts available up to this generation:\n" + json.dumps(request, ensure_ascii=False, sort_keys=True)
-    content: list[dict[str, Any]] = [{"type": "text", "text": instruction}]
-    content.extend({"type": "image_url", "image_url": {"url": image}} for image in images)
     cache_key = _vision_cache_key(
         provider=provider,
         model_id=model_id,
@@ -295,28 +290,12 @@ def _vision_chat(
     )
 
     def request_completion() -> str:
-        from openai import OpenAI
-
-        client = OpenAI(
-            base_url=connection["base_url"],
-            api_key=connection.get("api_key") or "none",
-            timeout=float(os.getenv("INKU_LLM_REQUEST_TIMEOUT_SECONDS", "180")),
-            max_retries=0,
+        return vision_text(
+            connection, model_id, system=_system_prompt(language), text=instruction, images=images,
+            temperature=0.35, max_tokens=260,
         )
-        response = client.chat.completions.create(
-            model=model_id,
-            messages=[{"role": "system", "content": _system_prompt(language)}, {"role": "user", "content": content}],
-            temperature=0.35,
-            max_tokens=260,
-        )
-        return (response.choices[0].message.content or "").strip()
 
-    try:
-        return _cached_vision_response(cache_key, request_completion)
-    except Exception as exc:
-        if type(exc).__name__ in {"APITimeoutError", "ReadTimeout"}:
-            raise TimeoutError("Vision provider timed out") from exc
-        raise
+    return _cached_vision_response(cache_key, request_completion)
 
 
 def _invariant_prompt(language: str, invariants: dict[str, Any]) -> str:

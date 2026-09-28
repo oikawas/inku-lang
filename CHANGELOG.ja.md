@@ -6,6 +6,13 @@
 
 **本書が持つのは v2.5.0（2026-07-25、render engine 12）以降**の 42 版である。それより前は書庫にある。
 
+### 2026-09-28 — 奥書とVisionの助言が、Gemini APIとAnthropic APIのVisionモデルでも動く
+
+作者の指摘。奥書でGemini APIのGemma 4 31Bを選ぶと「okugaki currently requires an OpenAI-compatible vision provider」で止まっていた。奥書とAI自律推敲のVisionの助言は、OpenAI互換の送り方しか持っていなかったため、設定でGemini・AnthropicのモデルをVisionとして公開しても、使う時点で断っていた。
+
+- 画像付きの問い合わせを`vision_client.py`にまとめ、OpenAI互換・Anthropic・Geminiの3つへ、共有pipelineと同じ送り先・鍵の渡し方で送る。奥書とVisionの助言はこれを使う。
+- 技術構成の表（日英）を合わせた。
+
 ### v2.15.41 — 空のモデル選択画面の寸法（Build 1117、2026-09-28）
 
 v2.15.40以降の下記変更を収録する。選べるモデルが無いときだけ、選択画面を中央に置き、説明文に合う大きさにする。モデルがある場合の寸法は変えない。

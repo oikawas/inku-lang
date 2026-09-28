@@ -4,7 +4,11 @@
 
 This file records changes chronologically. If a historical note conflicts with the current specification, the current specification wins. The more detailed canonical history is maintained in Japanese in [CHANGELOG.ja.md](CHANGELOG.ja.md).
 
-**This file holds the 50 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
+**This file holds the 51 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
+
+### v2.15.50 — Judge a `replay`'s description lock by its DDL (Build 1126, 2026-09-28)
+
+This version includes the changes below since v2.15.49. Server and Web judge the saved work's description lock by its DDL. DDL, Score and rendering versions are unchanged.
 
 ### 2026-09-28 — Description locking judges a `replay` by its DDL
 

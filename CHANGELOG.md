@@ -4,7 +4,11 @@
 
 This file records changes chronologically. If a historical note conflicts with the current specification, the current specification wins. The more detailed canonical history is maintained in Japanese in [CHANGELOG.ja.md](CHANGELOG.ja.md).
 
-**This file holds the 43 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
+**This file holds the 44 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
+
+### v2.15.43 — OpenAI gpt-5 request compatibility (Build 1119, 2026-09-28)
+
+This version includes the change below since v2.15.42. Requests to the OpenAI API use fields accepted by gpt-5 and related models, and the log records a provider's reason for refusing a request. DDL, Score, rendering, and the API shape are unchanged.
 
 ### 2026-09-28 — OpenAI's gpt-5 models draw, and a provider's refusal says why in the log
 

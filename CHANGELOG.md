@@ -4,7 +4,11 @@
 
 This file records changes chronologically. If a historical note conflicts with the current specification, the current specification wins. The more detailed canonical history is maintained in Japanese in [CHANGELOG.ja.md](CHANGELOG.ja.md).
 
-**This file holds the 38 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
+**This file holds the 39 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
+
+### v2.15.38 — numeric position ranges and model administration improvements (Build 1114, 2026-09-28)
+
+This version includes the changes below since v2.15.37. DDL Spec 15 and DDL engine 52 allow positions to be specified as numeric ranges. It improves work display and catalog changes, diagnostics, restrictions on offering models, and the model settings screen. The render engine and API route count are unchanged.
 
 ### 2026-09-28 — Offered models are listed under LLM and Vision
 

@@ -6,6 +6,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 41 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-28 — The empty model picker is sized to its sentence (I-297 follow-up)
+
+At the author's note. With nothing to choose, the picker kept the size it has for a grid of models around its one sentence. In that case alone it is now centred and sized to the sentence; the picker with models is unchanged.
+
 ### v2.15.40 — guidance in the model picker (Build 1116, 2026-09-28)
 
 This version includes the change below since v2.15.39. It explains why no models can be selected and where to make them available, and marks a saved model missing from the list. DDL, Score, and rendering versions are unchanged.

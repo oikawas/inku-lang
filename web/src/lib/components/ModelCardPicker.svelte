@@ -99,7 +99,7 @@
 
 {#if open}
 	<div class="picker-backdrop" role="presentation" onclick={closePicker}></div>
-	<div class="picker-dialog" role="dialog" aria-modal="true" aria-label={label} tabindex="-1" bind:this={pickerDialog} onkeydown={trapKeyboard}>
+	<div class="picker-dialog" class:empty={configuredGroups.length === 0} role="dialog" aria-modal="true" aria-label={label} tabindex="-1" bind:this={pickerDialog} onkeydown={trapKeyboard}>
 		<header><h2>{label}</h2><button type="button" bind:this={closeButton} aria-label={t().closeLabel} onclick={closePicker}>×</button></header>
 		{#if selectionError}<p class="selection-error" role="alert">{selectionError}</p>{/if}
 		<div class="picker-groups">
@@ -141,6 +141,8 @@
 	.picker-launch:disabled { opacity: .45; cursor: not-allowed; }
 	.picker-backdrop { position: fixed; inset: 0; z-index: 1600; background: rgba(0,0,0,.28); backdrop-filter: blur(2px); }
 	.picker-dialog { position: fixed; inset: 8vh max(5vw, calc((100vw - 900px)/2)); z-index: 1601; display: flex; flex-direction: column; overflow: hidden; border: 1px solid var(--border2); border-radius: 12px; background: var(--bg); box-shadow: 0 18px 55px rgba(0,0,0,.3); }
+	/* Nothing to choose: one sentence, so the dialog is sized to it, not to a model grid. */
+	.picker-dialog.empty { inset: auto; top: 50%; left: 50%; transform: translate(-50%, -50%); width: min(440px, calc(100vw - 32px)); }
 	.picker-dialog header { display: flex; align-items: center; justify-content: space-between; padding: 13px 16px; border-bottom: 1px solid var(--border); }
 	.picker-dialog h2 { margin: 0; font-size: var(--ui-font-size-15); font-weight: 400; }
 	.picker-dialog header button { border: 0; background: none; color: var(--fg3); font-size: var(--ui-font-size-20); cursor: pointer; }

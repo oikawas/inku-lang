@@ -4,7 +4,11 @@
 
 This file records changes chronologically. If a historical note conflicts with the current specification, the current specification wins. The more detailed canonical history is maintained in Japanese in [CHANGELOG.ja.md](CHANGELOG.ja.md).
 
-**This file holds the 42 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
+**This file holds the 43 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
+
+### v2.15.42 — more Vision providers for colophon and advice (Build 1118, 2026-09-28)
+
+This version includes the change below since v2.15.41. The colophon and Vision advice for autonomous refinement can send images to Vision models on the Gemini and Anthropic APIs as well as OpenAI-compatible providers. DDL, Score, rendering, and the API shape are unchanged.
 
 ### 2026-09-28 — The colophon and Vision advice work with Vision models on the Gemini and Anthropic APIs
 

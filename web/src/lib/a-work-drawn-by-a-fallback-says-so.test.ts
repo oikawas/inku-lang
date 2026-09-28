@@ -181,14 +181,11 @@ test('T-237 refining from a marked work asks before it runs', () => {
 
 test('T-237 every refinement passes through the gate before it draws', () => {
 	// Counted from the source, because the refinements do not leave from one
-	// place: eight actions start one, and a gate on seven of them is a gate on
-	// none of the works that go through the eighth.
+	// place: six actions start one, and a gate on five of them is a gate on
+	// none of the works that go through the sixth.
 	const REFINEMENTS: Array<[string, string]> = [
 		[WORK, 'async function submit('],
 		[WORK, 'async function replay('],
-		[REFINEMENT, 'async function varyPerformance('],
-		[REFINEMENT, 'async function varyComposition('],
-		[REFINEMENT, 'async function varyInterpretation('],
 		[REFINEMENT, 'async function generateVariationCandidates('],
 		[PAGE, 'async function drawLineageDescriptionEdit('],
 		[PAGE, 'async function drawLineageSketchGrain('],
@@ -205,7 +202,7 @@ test('T-237 every refinement passes through the gate before it draws', () => {
 		if (!head.includes('confirmFallbackRefine(')) ungated.push(opening);
 	}
 	assert.deepEqual(ungated, [], `these refinements draw without asking: ${ungated.join(', ')}`);
-	assert.equal(REFINEMENTS.length, 9, 'the census no longer counts nine refinements');
+	assert.equal(REFINEMENTS.length, 6, 'the census no longer counts six refinements');
 	for (const opening of ['async function drawLineageDescriptionEdit(', 'async function drawLineageDdlEdit(']) {
 		const start = PAGE.indexOf(opening);
 		const action = PAGE.slice(start, start + 1800);

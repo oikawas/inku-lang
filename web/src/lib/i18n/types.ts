@@ -451,15 +451,6 @@ export interface LangPack {
 	aiRefineCompleted: string;
 	aiRefineStepStatus: (gens: number, step: number, label: string) => string;
 	aiRefineMinElementsError: string;
-	manualRefineTitle: string;
-	manualRefineKindLabel: string;
-	manualRefineSaijikiLabel: string;
-	manualRefineSaijikiPlaceholder: string;
-	manualRefineColorLabel: string;
-	manualRefineParentDdl: string;
-	manualRefineNoDdl: string;
-	manualRefineGenerateButton: string;
-	manualRefineGeneratingButton: string;
 	canvasPresentationOpen: string;
 	canvasPresentationClose: string;
 	canvasPresentationTitle: string;

@@ -10,18 +10,12 @@ import type { WorkState } from '$lib/features/work/state.svelte';
 import { RefinementSessionState, type RefineKind, type VariationAmplitude, type VariationCandidate } from '$lib/features/canvas/refinement-session.svelte';
 import { saveRefinementCandidates } from '$lib/features/canvas/refinement-actions';
 import { otherCatalogIds, planRefinementCandidates, runRefinementFanout } from '$lib/features/canvas/refinement-fanout';
-import { projectRefinementRedrawResult, runLayoutRedraw, runReadingRedraw, runTouchRedraw, type RefinementRedrawProjection } from '$lib/features/canvas/refinement-redraw';
 
 type Iteration = HistoryItem;
-type DdlDiffPart = { kind: 'same' | 'removed' | 'added'; text: string; };
 type RefinementWork = Pick<WorkState,
-	'confirmFallbackRefine' | 'currentRefineParent' | 'ddl' |
-	'ddlGeneratedBaseline' | 'displayedHistoryItem' | 'elapsedStage1Ms' | 'elapsedStage2Ms' |
-	'elapsedTotalMs' | 'error' | 'expandedDdl' | 'input' | 'instructionLang' | 'loading' |
-	'paintOne' | 'paintTokensIn' | 'paintTokensOut' | 'reloadError' | 'reloading' | 'result' |
-	'pipelineCompatibilityError' |
-	'sketchPayloadFor' | 'sketchTextFor' | 'stopTimer' | 'thinking' | 'tokensInStage1' |
-	'tokensInStage2' | 'tokensOutStage1' | 'tokensOutStage2'
+	'confirmFallbackRefine' | 'currentRefineParent' | 'ddl' | 'displayedHistoryItem' |
+	'input' | 'instructionLang' | 'loading' | 'paintOne' | 'paintTokensIn' | 'paintTokensOut' |
+	'result' | 'pipelineCompatibilityError' | 'sketchPayloadFor' | 'sketchTextFor' | 'thinking'
 >;
 
 export type RefinementCoordinatorDeps = {
@@ -30,9 +24,6 @@ export type RefinementCoordinatorDeps = {
 	work: RefinementWork;
 	session: RefinementSessionState;
 	history: {
-		clearSelection: () => void;
-		fetchOffset: (offset: number, options?: { anchorId?: string; }) => Promise<unknown>;
-		items: () => Iteration[];
 		syncToItem: (item: Iteration) => Promise<unknown>;
 	};
 	models: { stage1: () => string; stage2: () => string; };
@@ -53,12 +44,8 @@ export type RefinementCoordinatorDeps = {
 	};
 	lineageParentId: () => string | null;
 	ensureVisibleLineageParentId: () => Promise<string | null>;
-	buildDdlDiffParts: (before: string | null, after: string | null) => DdlDiffPart[];
-	setInterpretationDiffParts: (parts: DdlDiffPart[]) => void;
 	pushHistory: (item: Iteration, options?: SaveHistoryOptions) => Promise<Iteration | null>;
 	resetTargetScopedState: (options?: { preserveVariationCandidates?: boolean; }) => void;
-	showCanvas: () => void;
-	fitCanvas: () => void;
 };
 
 export function createRefinementCoordinator(deps: RefinementCoordinatorDeps) {
@@ -68,143 +55,6 @@ export function createRefinementCoordinator(deps: RefinementCoordinatorDeps) {
 	function resetTarget(options: { preserveVariationCandidates?: boolean; } = {}): void {
 		targetIdentityVersion += 1;
 		refinementSession.reset({ preserveCandidates: options.preserveVariationCandidates });
-	}
-
-	// The coordinator applies the projection to the canonical Work owner; the
-	// action module decides only which response fields form that projection.
-	function applyRefinementRedrawProjection(projection: RefinementRedrawProjection): void {
-		work.ddl = projection.ddl;
-		work.expandedDdl = projection.expandedDdl;
-		work.ddlGeneratedBaseline = projection.ddl;
-		work.thinking = projection.thinking;
-		work.result = projection.result;
-		work.displayedHistoryItem = null;
-		work.elapsedStage1Ms = projection.elapsedStage1Ms;
-		work.elapsedStage2Ms = projection.elapsedStage2Ms;
-		work.elapsedTotalMs = projection.elapsedTotalMs;
-		work.tokensInStage1 = projection.tokensInStage1;
-		work.tokensOutStage1 = projection.tokensOutStage1;
-		work.tokensInStage2 = projection.tokensInStage2;
-		work.tokensOutStage2 = projection.tokensOutStage2;
-	}
-
-	async function varyPerformance() {
-		if (!work.result || refinementSession.busy) return;
-		// Ask before the words are carried into a child (contract § stage 4).
-		if (!(await work.confirmFallbackRefine(work.currentRefineParent()))) return;
-		const contextVersion = targetIdentityVersion;
-		const parentNodeId = await deps.ensureVisibleLineageParentId();
-		if (contextVersion !== targetIdentityVersion || !work.result) return;
-		refinementSession.beginSingle();
-		work.reloading = true;
-		work.reloadError = null;
-		try {
-		const redrawn = await runTouchRedraw({
-				current: work.result,
-				canvasAspectId: refinementCanvasAspectId(),
-				parentNodeId,
-				workReference: workReferencePayload(refinementWorkId()),
-				renderPayload: renderSettingsPayload('render-svg', colorCatalogOverride(refinementCatalogId()))
-			}, {
-				apiFetch,
-				apiError,
-				createRenderSeed: deps.seeds.composition,
-				isCurrentTarget: () => contextVersion === targetIdentityVersion,
-				currentResult: () => work.result!
-			});
-			if (!redrawn) return;
-			work.result = redrawn;
-			work.displayedHistoryItem = null;
-			deps.history.clearSelection();
-			deps.showCanvas();
-			deps.fitCanvas();
-		} catch (e) {
-			if (contextVersion === targetIdentityVersion) {
-				work.reloadError = e instanceof Error ? e.message : String(e);
-			}
-		} finally {
-			work.reloading = false;
-			if (contextVersion === targetIdentityVersion) refinementSession.finishSingle();
-		}
-	}
-
-	async function varyComposition() {
-		if (!work.result || refinementSession.busy || work.loading) return;
-		const source = work.input.trim();
-		if (!source) return;
-		// Ask before the words are carried into a child (contract § stage 4).
-		if (!(await work.confirmFallbackRefine(work.currentRefineParent()))) return;
-		const parentNodeId = await deps.ensureVisibleLineageParentId();
-		refinementSession.beginSingle();
-		work.loading = true;
-		work.error = null;
-		try {
-			const r = await runLayoutRedraw({
-				source,
-				current: work.result,
-				canvasAspectId: refinementCanvasAspectId(),
-				renderOverrides: inPlaceRedrawOverrides(),
-				parentNodeId
-			}, {
-				createCompositionSeed: deps.seeds.composition,
-				paint: work.paintOne
-			});
-			applyRefinementRedrawProjection(projectRefinementRedrawResult(r));
-			deps.showCanvas();
-			if (r.history_id) {
-				await deps.history.fetchOffset(0, { anchorId: r.history_id });
-				work.displayedHistoryItem = deps.history.items().find((item) => item.id === r.history_id) ?? null;
-			} else {
-				deps.history.clearSelection();
-			}
-			deps.fitCanvas();
-		} catch (e) {
-			work.error = e instanceof Error ? e.message : String(e);
-		} finally {
-			work.loading = false;
-			refinementSession.finishSingle();
-			work.stopTimer();
-		}
-	}
-
-	async function varyInterpretation() {
-		if (!work.result || refinementSession.busy || work.loading) return;
-		const source = work.input.trim();
-		if (!source) return;
-		// Ask before the words are carried into a child (contract § stage 4).
-		if (!(await work.confirmFallbackRefine(work.currentRefineParent()))) return;
-		const parentNodeId = await deps.ensureVisibleLineageParentId();
-		refinementSession.beginSingle();
-		work.loading = true;
-		work.error = null;
-		const previousDdl = work.ddl;
-		try {
-			const r = await runReadingRedraw({
-				source,
-				canvasAspectId: refinementCanvasAspectId(),
-				renderOverrides: inPlaceRedrawOverrides(),
-				parentNodeId
-			}, {
-				createInterpretationSeed: deps.seeds.interpretation,
-				paint: work.paintOne
-			});
-			deps.setInterpretationDiffParts(deps.buildDdlDiffParts(previousDdl, r.ddl));
-			applyRefinementRedrawProjection(projectRefinementRedrawResult(r));
-			deps.showCanvas();
-			if (r.history_id) {
-				await deps.history.fetchOffset(0, { anchorId: r.history_id });
-				work.displayedHistoryItem = deps.history.items().find((item) => item.id === r.history_id) ?? null;
-			} else {
-				deps.history.clearSelection();
-			}
-			deps.fitCanvas();
-		} catch (e) {
-			work.error = e instanceof Error ? e.message : String(e);
-		} finally {
-			work.loading = false;
-			refinementSession.finishSingle();
-			work.stopTimer();
-		}
 	}
 
 	function composeCandidateResult(source: string, baseDdl: string, data: PaintResult & { ddl: string; thinking?: string | null; elapsed_ms?: number; tokens_in?: number | null; tokens_out?: number | null; }): PaintResult & { ddl: string; thinking: string | null; } {
@@ -244,16 +94,6 @@ export function createRefinementCoordinator(deps: RefinementCoordinatorDeps) {
 		return workId ? { work_id: workId } : {};
 	}
 
-	// The two in-place redraws (vary the layout, reinterpret) keep the artwork's
-	// catalog but have never carried the level or the switch: they omit the level
-	// so the parent's is inherited, and draw tame. Preserved as-is.
-	function inPlaceRedrawOverrides(): RenderOverrides {
-		return {
-			...colorCatalogOverride(refinementCatalogId()),
-			...wildOverride(false)
-		};
-	}
-
 	// A refinement redraws against the artwork it refines: its catalog, the level
 	// the author chose for this round, and the switch the artwork was drawn with.
 	function refinementRenderOverrides(): RenderOverrides {
@@ -280,9 +120,10 @@ export function createRefinementCoordinator(deps: RefinementCoordinatorDeps) {
 				input: work.input.trim(),
 				ddl: work.ddl ?? '',
 				canvas_aspect: refinementCanvasAspectId(),
-				// Same reasoning as varyPerformance: the placement on screen followed render_seed
-				// when the work carries no composition_seed, so sending the raw field would send
-				// null and let the placement follow the new performance seed instead.
+				// The renderer places a work with composition_seed when present and otherwise
+				// with render_seed. A work that carries no composition_seed was placed by its
+				// render_seed, so sending the raw field would send null and let the placement
+				// follow the new performance seed instead. Nullish, because seed zero is valid.
 				composition_seed: work.result.composition_seed ?? work.result.render_seed ?? null,
 				interpretation_seed: work.result.interpretation_seed,
 				seed_text: normalizedSeedText,
@@ -585,9 +426,6 @@ export function createRefinementCoordinator(deps: RefinementCoordinatorDeps) {
 		workReferencePayload,
 		refinementCatalogId,
 		refinementCanvasAspectId,
-		varyPerformance,
-		varyComposition,
-		varyInterpretation,
 		generateVariationCandidates,
 		generateColorCatalogCandidates,
 		saveSelectedVariationCandidates,

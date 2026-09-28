@@ -15,20 +15,17 @@ test('T-303/T-304: page and panel use one route-instance Canvas viewport owner',
 	const page = read('../../../routes/+page.svelte');
 	const panel = read('../../components/CanvasPanel.svelte');
 	const work = read('../work/state.svelte.ts');
-	const refinement = read('./refinement-coordinator.svelte.ts');
 
 	assert.match(owner, /export class CanvasViewportState/);
 	assert.match(page, /new CanvasViewportState\(\)/);
 	// Every fit goes through the one owner: the page and the work owner call it
-	// directly, and the refinement coordinator through the capability the page
-	// wires to it. Checked per owner rather than as one total, which fell with
-	// the consolidation of the result paths (2026-09-13) without any fit
-	// leaving the owner -- and which never counted the coordinator's calls.
+	// directly. Checked per owner rather than as one total, which fell with the
+	// consolidation of the result paths (2026-09-13) without any fit leaving the
+	// owner. The refinement coordinator no longer fits: its in-place redraws,
+	// unreachable since 2026-07-11, were removed (I-300).
 	const count = (source: string, pattern: RegExp) => (source.match(pattern) ?? []).length;
 	assert.ok(count(page, /canvasViewport\.fit\(\)/g) >= 1);
 	assert.ok(count(work, /canvasViewport\.fit\(\)/g) >= 1);
-	assert.match(page, /fitCanvas: \(\) => canvasViewport\.fit\(\)/);
-	assert.ok(count(refinement, /deps\.fitCanvas\(\)/g) >= 1);
 	assert.doesNotMatch(page, /let zoom\s*=\s*\$state/);
 	assert.doesNotMatch(page, /function fitCanvasZoom/);
 	assert.doesNotMatch(page, /\bresetZoom\b/);

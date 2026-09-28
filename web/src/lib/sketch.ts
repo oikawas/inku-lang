@@ -90,3 +90,25 @@ export function normalizeSketchGrain(value: unknown): SketchGrain | null {
 export function sketchModeOf(value: unknown): SketchMode {
 	return value === 'on' || normalizeSketchGrain(value) ? 'on' : 'off';
 }
+
+/** What one refinement generation asks of the sketch, as paint options. */
+export type GenerationSketch = { sketchMode: SketchMode; sketchText?: string };
+
+/**
+ * The sketch of a generation drawn from a parent work (ledger I-300).
+ *
+ * A generation follows its parent, not the setting on screen: a parent drawn
+ * without a sketch gives a child drawn without one. A parent with prose hands
+ * that prose on while the text is the parent's own, so the sketch is not run
+ * again and a change of reading, color or layout stays a change of that alone
+ * -- the same hold the refinement candidates keep. Once a direction is added
+ * the text is no longer the one the prose was written for, so it is sketched
+ * again.
+ */
+export function generationSketch(parentProse: string | null | undefined, textChanged: boolean): GenerationSketch {
+	const prose = parentProse?.trim();
+	if (!prose) return { sketchMode: 'off' };
+	if (textChanged) return { sketchMode: 'on' };
+	// 'off' with the prose: the layer is not called, and the run status says so.
+	return { sketchMode: 'off', sketchText: prose };
+}

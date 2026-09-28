@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
-for (const component of ['AIRefineModal.svelte', 'ManualRefineModal.svelte']) {
+for (const component of ['AIRefineModal.svelte']) {
 	test(`${component} closes only for a click on its own backdrop`, () => {
 		const source = readFileSync(fileURLToPath(new URL(`./${component}`, import.meta.url)), 'utf8');
 		assert.match(source, /function handleBackdropClick\(event: MouseEvent\)/);

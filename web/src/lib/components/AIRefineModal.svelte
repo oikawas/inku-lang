@@ -9,6 +9,7 @@
   import WildToggle from './WildToggle.svelte';
   import { t } from '$lib/i18n/index.svelte';
   import { createElapsed } from '$lib/elapsed.svelte';
+  import { generationSketch } from '$lib/sketch';
 
   type RefineMode = 'random' | 'vision';
   type VariationAmplitude = 'small' | 'medium' | 'large';
@@ -137,6 +138,8 @@
     abortController = new AbortController();
     let parentNodeId = node.id;
     let currentText = node.history?.source_text ?? node.history?.input ?? '';
+    // Each generation follows the sketch of the work it is drawn from (I-300).
+    let parentProse = node.history?.sketch_text ?? null;
     let advice: VisionAdvice | null = null;
 
     try {
@@ -159,6 +162,7 @@
           },
           ...(wildOverride !== null ? { wild: wildOverride } : {}),
           ...(paintModelOverride ? { stage1Model: paintModelOverride, stage2Model: paintModelOverride } : {}),
+          ...generationSketch(parentProse, paintText !== currentText),
           historyVisibility: i === generations - 1 ? 'normal' : 'lineage_only',
           saveHistory: true,
           countGeneration: true,
@@ -175,6 +179,7 @@
         parentNodeId = result.lineage_node_id;
         lastGeneratedItem = result.history_id ? result : null;
         if (result.source_text) currentText = result.source_text;
+        parentProse = result.sketch_text ?? null;
         if (refineMode === 'vision' && result.history_id) advice = await readVisionAdvice(result.history_id, currentText);
       }
       statusText = t().aiRefineCompleted;

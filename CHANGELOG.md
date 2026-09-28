@@ -6,6 +6,15 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 39 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-28 — Each generation of autonomous refinement carries its parent's sketch prose (I-300)
+
+At the author's ruling. Autonomous refinement drew every generation with the Describe tab's Sketch from life setting, so with the layer on it ran again and rewrote the prose in color, layout, touch and variation generations as well as reading ones, and whether a generation used the layer could disagree with the work chosen in the lineage.
+
+- Each generation follows its parent. When the parent has sketch prose and the drawing text is the parent's, the parent's prose is passed and the layer is not run (as `Another reading too` in the refinement candidates does). A generation whose text changed because a direction was added goes through the layer again. A parent without prose gives a generation drawn without the layer.
+- Entry points that could no longer be reached are removed: the canvas's in-place performance, layout and reading redraws (their buttons were removed on 2026-07-11) with their redraw module and the reading diff display, and the manual refinement dialog nothing opened, with its strings. The manual no longer describes `Refine manually`.
+
+SPEC "Autonomous Refinement Methods" and the manual (Japanese and English) describe the sketch handling. The server and saved works are unchanged.
+
 ### 2026-09-28 — The Plugins settings become a screen for the vocabulary packages drawing uses (I-703)
 
 At the author's direction. The `User plugins` settings created and edited `.inku-plugin.md` documents, but drawing uses only definitions the developers wrote in JSON: a written document's expansion was never drawn from and its words were left out. The screen is now `Vocabulary plugins`:

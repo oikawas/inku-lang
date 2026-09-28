@@ -230,7 +230,7 @@ grep -rhE -o "getLang\(\) === 'ja' \? '[^']*'" web/src | LC_ALL=C sort | md5
   **この数字は 2026-08-09 に測り直していない**）。ドキュメント側の追随は別作業。
 - **本辞書は英語表示文字列の正本であって、日本語の正本ではない**（`lint:i18n` が見るのは `en.ts` だけ）。
   **日本語 UI は旧語彙のまま**である（2026-07-31 実測: `ja.ts` に 生成 29 / 画像 7。
-  `manualRefineGenerateButton` は ja「生成する」/ en "Refine"、`historyImageHeader` は ja「画像」/ en "Work"）。
+  `manualRefineGenerateButton` は ja「生成する」/ en "Refine"〈この鍵は 2026-09-28 に使われていない手動推敲の画面ごと取り除いた〉、`historyImageHeader` は ja「画像」/ en "Work"）。
   **`README.ja.md` と `manual/ja/` が 生成・画像 を使うのは、その日本語画面を正しく書き写しているから**である
   （台帳 [I-004]・2026-07-31 作者裁定で据え置き）。**日本語側を先に動かすなら UI から**。
 - **履歴ゼロの空状態文言**（原典 §5 の "Nothing here yet. …"）に対応する鍵が UI に無い。足すなら鍵ごと新設する。

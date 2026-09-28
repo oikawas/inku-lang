@@ -171,10 +171,8 @@
 	let copiedPrompt = $state<CopyKind | null>(null);
 	let statusHashCopied = $state(false);
 	let previousInputMode = $state<'single' | 'batch'>('single');
-	type DdlDiffPart = { kind: "same" | "removed" | "added"; text: string };
 	type TextDiffPart = { kind: "same" | "removed" | "added"; text: string };
 	const refinementSession = new RefinementSessionState();
-	let interpretationDiffParts = $state<DdlDiffPart[]>([]);
 	let lineageIntermediateNotice = $state<string | null>(null);
 	let lineageIntermediateNoticeTimer: number | null = null;
 	let historyStarredFilterNotice = $state<string | null>(null);
@@ -1390,9 +1388,6 @@
 		work,
 		session: refinementSession,
 		history: {
-			clearSelection: () => history.clearSelection(),
-			fetchOffset: (offset, options) => history.fetchOffset(offset, options),
-			items: () => historyItems,
 			syncToItem: (item) => history.syncToItem(item)
 		},
 		models: {
@@ -1416,12 +1411,8 @@
 		},
 		lineageParentId: currentLineageParentId,
 		ensureVisibleLineageParentId,
-		buildDdlDiffParts,
-		setInterpretationDiffParts: (parts) => { interpretationDiffParts = parts; },
 		pushHistory,
-		resetTargetScopedState,
-		showCanvas: () => { outputTab = 'canvas'; },
-		fitCanvas: () => canvasViewport.fit()
+		resetTargetScopedState
 	});
 
 	const modelInspection = createModelInspection({
@@ -1807,7 +1798,6 @@ $effect(() => {
 
 		modelInspection.reset();
 
-		interpretationDiffParts = [];
 		work.reloadError = null;
 		work.replayComparison = null;
 		if (lineageIntermediateNoticeTimer !== null) {
@@ -2024,19 +2014,6 @@ $effect(() => {
 			hex.slice(16, 20),
 			hex.slice(20),
 		].join('-');
-	}
-
-	function buildDdlDiffParts(before: string | null, after: string | null): DdlDiffPart[] {
-		const oldLines = (before ?? "").split(/\n+/).map((line) => line.trim()).filter(Boolean);
-		const newLines = (after ?? "").split(/\n+/).map((line) => line.trim()).filter(Boolean);
-		const parts: DdlDiffPart[] = [];
-		for (const line of oldLines) {
-			parts.push({ kind: newLines.includes(line) ? "same" : "removed", text: line });
-		}
-		for (const line of newLines) {
-			if (!oldLines.includes(line)) parts.push({ kind: "added", text: line });
-		}
-		return parts;
 	}
 
 	const unsavedRefinementPreview = $derived(!!work.result && !work.result.lineage_node_id && !!work.result.lineage_parent_node_id && !!work.result.derivation_kind);
@@ -2804,14 +2781,6 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 						</section>
 					{/if}
 
-					{#if interpretationDiffParts.length > 0 && work.inputMode === "single"}
-						<section class="panel-section interpretation-diff">
-							{#each interpretationDiffParts as part}
-								<div class:removed={part.kind === "removed"} class:added={part.kind === "added"} class:same={part.kind === "same"}>{part.kind === "removed" ? "−" : part.kind === "added" ? "+" : " "} {part.text}</div>
-							{/each}
-						</section>
-					{/if}
-
 					<!-- Statistics -->
 					{#if work.result && work.elapsedTotalMs > 0}
 						<section class="panel-section stats-section">
@@ -2939,9 +2908,6 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				replayDisabled={!replayableStatusHistoryItem || work.reloading}
 				currentHistoryId={work.displayedHistoryItem?.id ?? work.result?.history_id ?? null}
 				onDownloadCard={downloadCurrentCard}
-				onVaryPerformance={refinement.varyPerformance}
-				onVaryComposition={refinement.varyComposition}
-				onVaryInterpretation={refinement.varyInterpretation}
 				bind:instructionCaptionVisible
 				onInstructionCaptionVisibleChange={persistInstructionCaptionVisible}
 				instructionCaptionWritingMode={captionSettings.writingMode}
@@ -3576,7 +3542,6 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 	.ui-hide-drawing-settings :global(.input-label .tooltip-wrap),
 	.ui-hide-ddl-tools .ddl-new-action,
 	.ui-hide-ddl-tools :global(.ddl-viewer),
-	.ui-hide-ddl-tools .interpretation-diff,
 	.ui-hide-detail-status .thinking-details,
 	.ui-hide-detail-status .stats-section,
 	.ui-hide-detail-status :global(.render-meta-strip),
@@ -4060,21 +4025,6 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		line-height: 1.5;
 		word-break: break-word;
 	}
-	.interpretation-diff {
-		gap: 2px;
-		padding: 8px 10px;
-		border: 1px solid var(--border);
-		background: color-mix(in srgb, var(--bg2) 68%, transparent);
-		font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-		font-size: var(--ui-font-size-11);
-		line-height: 1.55;
-	}
-	.interpretation-diff div {
-		white-space: pre-wrap;
-		color: var(--fg3);
-	}
-	.interpretation-diff .removed { color: color-mix(in srgb, #a2342a 78%, var(--fg3)); }
-	.interpretation-diff .added { color: color-mix(in srgb, #2f6b3a 78%, var(--fg3)); }
 
 	/* ── Animations ─────────────────────────────────────────── */
 	@keyframes inkupulse {

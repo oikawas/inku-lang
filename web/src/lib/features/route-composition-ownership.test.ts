@@ -53,7 +53,7 @@ test('T-1001/T-1005: the route constructs the Refinement coordinator once', () =
 test('T-1001/T-1004: refinement orchestration and target identity have one owner', () => {
 	const page = read('../../routes/+page.svelte');
 	const coordinator = read('./canvas/refinement-coordinator.svelte.ts');
-	for (const writer of ['varyPerformance', 'varyComposition', 'varyInterpretation', 'generateVariationCandidates', 'saveSelectedVariationCandidates']) {
+	for (const writer of ['generateVariationCandidates', 'saveSelectedVariationCandidates']) {
 		assert.match(coordinator, new RegExp(`(?:async\\s+)?function\\s+${writer}\\(`), writer);
 		assert.doesNotMatch(page, new RegExp(`(?:async\\s+)?function\\s+${writer}\\(`), writer);
 	}

@@ -120,9 +120,6 @@
 		currentHistoryId: string | null;
 		savedWorkExportActions: ReturnType<typeof makeSavedWorkExportActions>;
 		onDownloadCard: () => void | Promise<void>;
-		onVaryPerformance: () => void | Promise<void>;
-		onVaryComposition: () => void | Promise<void>;
-		onVaryInterpretation: () => void | Promise<void>;
 		instructionCaptionVisible: boolean;
 		onInstructionCaptionVisibleChange: (visible: boolean) => void | Promise<void>;
 		instructionCaptionWritingMode: CaptionWritingMode;
@@ -244,9 +241,6 @@
 		currentHistoryId,
 		savedWorkExportActions,
 		onDownloadCard,
-		onVaryPerformance,
-		onVaryComposition,
-		onVaryInterpretation,
 		instructionCaptionVisible = $bindable(true),
 		onInstructionCaptionVisibleChange,
 		instructionCaptionWritingMode,

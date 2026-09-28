@@ -10,6 +10,7 @@ import { test } from 'node:test';
 import { submitDerivationKind } from './derivation.ts';
 import {
 	DEFAULT_SKETCH_MODE,
+	generationSketch,
 	normalizeSketchGrain,
 	normalizeSketchState,
 	sketchGrainLabel,
@@ -229,4 +230,17 @@ test('T-10: the note is its own element, not text joined onto the label', () => 
 	const select = read('./components/SketchSelect.svelte');
 	assert.match(select, /<span class="option-label">\{sketchModeLabel\(mode, isJapanese\)\}<\/span/);
 	assert.match(select, /<span class="option-note"\s*>\{sketchModeNote\(mode, isJapanese\)\}<\/span/);
+});
+
+test('I-300: a refinement generation follows the sketch of the work it is drawn from', () => {
+	// The parent's prose is handed on while the text is the parent's own, so the
+	// layer is not run again.
+	assert.deepEqual(generationSketch('春の野、遠くに山', false), { sketchMode: 'off', sketchText: '春の野、遠くに山' });
+	// A direction was added: the prose no longer belongs to the text.
+	assert.deepEqual(generationSketch('春の野、遠くに山', true), { sketchMode: 'on' });
+	// A parent drawn without a sketch gives a child drawn without one, whatever the screen says.
+	for (const prose of [null, undefined, '', '  ']) {
+		assert.deepEqual(generationSketch(prose, false), { sketchMode: 'off' });
+		assert.deepEqual(generationSketch(prose, true), { sketchMode: 'off' });
+	}
 });

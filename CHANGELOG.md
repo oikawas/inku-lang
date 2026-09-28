@@ -6,6 +6,13 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 43 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-28 — OpenAI's gpt-5 models draw, and a provider's refusal says why in the log
+
+At the author's note. Drawing from a description with gpt-5.6-luna or gpt-5.6-terra on the OpenAI API Platform stopped at Stage 1 with "the model provider refused the request". The shared pipeline sent OpenAI `max_tokens` and a temperature (0.0, 0.3 for DDL generation), but OpenAI's gpt-5 and o-series models refuse `max_tokens` (asking for `max_completion_tokens`) and any temperature but the default.
+
+- When the connection is `api.openai.com`, `max_completion_tokens` is sent, and no temperature for the gpt-5 and o-series models. NVIDIA, Ollama and other OpenAI-compatible connections are unchanged. The drawing pipeline, the colophon and Vision advice, and the demo instruction follow the same rule.
+- When a provider refuses over HTTP, the log (`provider_http_error`) keeps the status, the provider's error `code`, `type`, `param` and `status`, and a short message with anything shaped like a key masked. Until now only the class "refused" was kept, which could not tell a 400 (the request's shape) from a 403 (access).
+
 ### v2.15.42 — more Vision providers for colophon and advice (Build 1118, 2026-09-28)
 
 This version includes the change below since v2.15.41. The colophon and Vision advice for autonomous refinement can send images to Vision models on the Gemini and Anthropic APIs as well as OpenAI-compatible providers. DDL, Score, rendering, and the API shape are unchanged.

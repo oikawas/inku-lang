@@ -6,6 +6,13 @@
 
 **本書が持つのは v2.5.0（2026-07-25、render engine 12）以降**の 43 版である。それより前は書庫にある。
 
+### 2026-09-28 — OpenAIのgpt-5系で描けるようにし、提供元が断った理由をログに残す
+
+作者の指摘。OpenAI API Platformのgpt-5.6-luna・gpt-5.6-terraで記述から描くと、Stage 1が「モデルの提供元が要求を断りました」で止まっていた。共有pipelineはOpenAIにも`max_tokens`とtemperature（0.0、DDLの生成は0.3）を送っていたが、OpenAIのgpt-5系とo系は`max_tokens`を断り（`max_completion_tokens`を求める）、既定以外のtemperatureも断る。
+
+- 接続先が`api.openai.com`のときは`max_completion_tokens`を送り、gpt-5系とo系にはtemperatureを送らない。NVIDIA・OllamaなどほかのOpenAI互換の接続先は変えない。描画のpipeline、奥書とVisionの助言、デモの指示文の生成に同じ規則を当てる。
+- 提供元がHTTPで断ったとき、ログ（`provider_http_error`）に状態、提供元のエラーの`code`・`type`・`param`・`status`と、鍵に見える文字列を伏せた短いmessageを残す。これまでは「断られた」という分類しか残らず、400（送る形）と403（使える権限）を見分けられなかった。
+
 ### v2.15.42 — 奥書とVisionの対応先を拡大（Build 1118、2026-09-28）
 
 v2.15.41以降の下記変更を収録する。奥書とAI自律推敲のVisionの助言は、OpenAI互換に加えてGemini APIとAnthropic APIのVisionモデルにも画像を送れる。DDL・Score・描画の版とAPIの形は変えない。

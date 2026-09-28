@@ -16,6 +16,8 @@ from urllib.parse import quote
 
 import httpx
 
+from .openai_request import openai_sampling
+
 
 def _image_parts(image: str) -> tuple[str, str]:
     """(media type, base64 data) of a `data:` URL."""
@@ -36,7 +38,8 @@ def _request(connection: dict[str, Any], model_id: str, *, system: str, text: st
         content: list[dict[str, Any]] = [{"type": "text", "text": text}]
         content.extend({"type": "image_url", "image_url": {"url": image}} for image in images)
         return base + "/chat/completions", headers, {
-            "model": model_id, "temperature": temperature, "max_tokens": max_tokens, "stream": False,
+            "model": model_id, "stream": False,
+            **openai_sampling(connection, model_id, max_tokens=max_tokens, temperature=temperature),
             "messages": [{"role": "system", "content": system}, {"role": "user", "content": content}],
         }
     if kind == "anthropic":

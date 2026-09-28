@@ -8,6 +8,8 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
+import re
 import time
 from dataclasses import dataclass
 from typing import Any
@@ -18,7 +20,33 @@ import httpx
 from .api_core.common import _is_qualified_model_id
 from .model_settings import connection_for, provider_for_model
 from .provider_limits import provider_slot
+from .openai_request import openai_sampling
 from .provider_observation import ProviderObservationError, ProviderObservationStore
+
+_logger = logging.getLogger(__name__)
+
+_SECRET_LIKE = re.compile(r"\b(?:sk|key|AIza)[-_A-Za-z0-9*]{6,}")
+
+
+def _provider_error(raw: bytes) -> dict[str, Any]:
+    """What a refusal says, without anything that could carry a key.
+
+    OpenAI, Anthropic and Gemini all answer {"error": {...}}; the code, type,
+    param and status fields name the reason. The message is kept short and with
+    anything shaped like a key masked, since a 401 echoes part of the key.
+    """
+    try:
+        error = json.loads(raw).get("error")
+    except (ValueError, AttributeError):
+        return {}
+    if not isinstance(error, dict):
+        return {}
+    found = {key: error[key] for key in ("code", "type", "param", "status")
+             if isinstance(error.get(key), (str, int)) and error.get(key) != ""}
+    message = error.get("message")
+    if isinstance(message, str) and message:
+        found["message"] = _SECRET_LIKE.sub("***", message)[:240]
+    return found
 
 
 _GEMINI_JSON_SCHEMA_KEYS = {
@@ -180,6 +208,8 @@ class SingleAttemptProvider:
     def __call__(self, action: dict) -> dict:
         self.failure_detail = None
         self._observation_truncated = False
+        self._refusal: dict[str, Any] = {}
+        self._target: tuple[str, str] = ("", "")
         tags = {
             "generate_sketch": "sketch_generated",
             "select_description_catalog": "description_catalog_selected",
@@ -200,6 +230,7 @@ class SingleAttemptProvider:
             model_ref = self.options.stage2_model if stage == "stage2" else self.options.stage1_model
             provider_id, model = provider_for_model(model_ref, stage=stage, settings=self.options.settings)
             connection = connection_for(provider_id, self.options.settings)
+            self._target = (provider_id, model)
             if connection["requires_api_key"] and not connection.get("api_key"):
                 self.failure_detail = "credentials_unavailable"
                 raise ValueError("provider credentials unavailable")
@@ -217,6 +248,12 @@ class SingleAttemptProvider:
             failure = "rate_limited" if status == 429 else (
                 "transport_unavailable" if status >= 500 else "provider_rejected"
             )
+            # The pipeline records only the failure class; this line is where the
+            # provider's own reason survives (a 400 for a field, a 403 for access).
+            _logger.warning("provider_http_error %s", json.dumps({
+                "action": action["tag"], "provider": self._target[0], "model": self._target[1],
+                "status": status, **self._refusal,
+            }, ensure_ascii=False, sort_keys=True, separators=(",", ":")))
         except httpx.TransportError:
             failure = "transport_unavailable"
         except (json.JSONDecodeError, KeyError, IndexError, TypeError):
@@ -250,8 +287,9 @@ class SingleAttemptProvider:
         if kind == "openai_compatible":
             url = base + "/chat/completions"
             headers["Authorization"] = "Bearer " + (key or "none")
-            body = {"model": model, "max_tokens": self.options.max_tokens, "stream": False,
-                    "temperature": 0.3 if prompt["action_name"] == "generate_normalized_ddl" else 0.0,
+            body = {"model": model, "stream": False,
+                    **openai_sampling(connection, model, max_tokens=self.options.max_tokens,
+                                      temperature=0.3 if prompt["action_name"] == "generate_normalized_ddl" else 0.0),
                     "messages": [{"role": "system", "content": prompt["system"]},
                                  {"role": "user", "content": prompt["message"]}]}
             # Preserve the established provider-specific structured-output
@@ -330,6 +368,9 @@ class SingleAttemptProvider:
                     # Preserve legacy behavior when capture is disabled: a
                     # status error is classified before reading its body.
                         if self.observation is None:
+                            if result.status_code >= 400:
+                                # Read a bounded refusal so the log can say why.
+                                self._refusal = _provider_error(bytes((await result.aread())[:16384]))
                             result.raise_for_status()
                         async for chunk in result.aiter_bytes():
                             if len(raw) + len(chunk) > self.options.max_response_bytes:
@@ -343,6 +384,8 @@ class SingleAttemptProvider:
                         if self.observation is not None:
                             store, owner_id, execution_id = self.observation
                             store.response(owner_id, execution_id, action, status=result.status_code, raw=bytes(raw))
+                            if result.status_code >= 400:
+                                self._refusal = _provider_error(bytes(raw[:16384]))
                             result.raise_for_status()
             data = json.loads(raw)
         except (TimeoutError, httpx.TimeoutException, httpx.TransportError):

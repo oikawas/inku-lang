@@ -70,6 +70,43 @@ def test_single_attempt_preserves_core_prompt_and_reports_rate_limit_and_deadlin
     assert len(seen) == 3
 
 
+def test_openai_gets_its_own_length_field_and_a_refusal_says_why(monkeypatch, caplog):
+    """gpt-5.6 on api.openai.com was refused before any answer: it takes
+    max_completion_tokens and only the default temperature. The refusal's own
+    reason now reaches the log, with anything shaped like a key masked."""
+    target = {"model": "gpt-5.6-luna"}
+    monkeypatch.setattr("inku_server.pipeline_provider.provider_for_model",
+                        lambda *args, **kwargs: ("openai", target["model"]))
+    monkeypatch.setattr("inku_server.pipeline_provider.connection_for", lambda *args: {
+        "id": "openai", "kind": "openai_compatible", "base_url": "https://api.openai.com/v1",
+        "api_key": "test-only", "requires_api_key": True,
+    })
+    seen = []
+
+    async def request(value):
+        seen.append(json.loads(value.content))
+        if len(seen) == 1:
+            return httpx.Response(200, json={"choices": [{"message": {"content": '{"normalized_ddl":"x"}'}}]})
+        return httpx.Response(400, json={"error": {
+            "message": "Incorrect API key provided: sk-proj-abcdef123456.", "type": "invalid_request_error",
+            "param": "max_tokens", "code": "unsupported_parameter",
+        }})
+
+    provider = SingleAttemptProvider(ProviderOptions({}, "m", "m", 256, 8192), transport=httpx.MockTransport(request))
+    assert provider(_action())["tag"] == "normalized_ddl_generated"
+    assert seen[0]["max_completion_tokens"] == 256
+    assert "max_tokens" not in seen[0] and "temperature" not in seen[0]
+
+    target["model"] = "gpt-4.1"
+    with caplog.at_level("WARNING", logger="inku_server.pipeline_provider"):
+        assert provider(_action())["failure"] == "provider_rejected"
+    assert seen[1]["temperature"] == 0.3 and seen[1]["max_completion_tokens"] == 256
+    logged = json.loads(caplog.records[-1].getMessage().split(" ", 1)[1])
+    assert logged["status"] == 400 and logged["param"] == "max_tokens" and logged["code"] == "unsupported_parameter"
+    assert logged["provider"] == "openai" and logged["model"] == "gpt-4.1"
+    assert "sk-proj" not in logged["message"]
+
+
 def test_missing_credentials_keep_only_safe_failure_detail(monkeypatch):
     monkeypatch.setattr(
         "inku_server.pipeline_provider.provider_for_model",

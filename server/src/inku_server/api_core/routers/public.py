@@ -277,6 +277,8 @@ def _generate_demo_instruction(seed_phrase: str, *, model: str | None, lang: str
     else:
         from openai import OpenAI
 
+        from ...openai_request import openai_sampling
+
         connection = connection_for(provider, settings)
         client = OpenAI(base_url=connection["base_url"], api_key=connection.get("api_key") or "none", timeout=timeout)
         resp = client.chat.completions.create(
@@ -285,8 +287,7 @@ def _generate_demo_instruction(seed_phrase: str, *, model: str | None, lang: str
                 {"role": "system", "content": _demo_instruction_system(lang)},
                 {"role": "user", "content": seed_phrase},
             ],
-            temperature=0.9,
-            max_tokens=180,
+            **openai_sampling(connection, model_id, max_tokens=180, temperature=0.9),
         )
         text = (resp.choices[0].message.content or "").strip()
     text = text.strip().strip("\"'“”‘’")

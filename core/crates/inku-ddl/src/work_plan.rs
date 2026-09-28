@@ -169,7 +169,10 @@ fn core_terms(dimension: fn(CoreModifierValue) -> bool) -> Vec<WorkPlanTerm> {
         }
         let forms_ja = if matches!(
             value,
-            CoreModifierValue::Fine | CoreModifierValue::ExtraFine
+            CoreModifierValue::Fine
+                | CoreModifierValue::ExtraFine
+                | CoreModifierValue::Thick
+                | CoreModifierValue::ExtraThick
         ) {
             ja.thinness
         } else {
@@ -177,7 +180,10 @@ fn core_terms(dimension: fn(CoreModifierValue) -> bool) -> Vec<WorkPlanTerm> {
         };
         let forms_en = if matches!(
             value,
-            CoreModifierValue::Fine | CoreModifierValue::ExtraFine
+            CoreModifierValue::Fine
+                | CoreModifierValue::ExtraFine
+                | CoreModifierValue::Thick
+                | CoreModifierValue::ExtraThick
         ) {
             en.thinness
         } else {
@@ -242,7 +248,10 @@ pub fn work_plan_vocabulary() -> &'static WorkPlanVocabulary {
         for term in core_terms(|value| {
             matches!(
                 value,
-                CoreModifierValue::Fine | CoreModifierValue::ExtraFine
+                CoreModifierValue::Fine
+                    | CoreModifierValue::ExtraFine
+                    | CoreModifierValue::Thick
+                    | CoreModifierValue::ExtraThick
             )
         }) {
             vocabulary.push(WorkPlanSlot::Thinness, term);
@@ -252,6 +261,8 @@ pub fn work_plan_vocabulary() -> &'static WorkPlanVocabulary {
                 value,
                 CoreModifierValue::Fine
                     | CoreModifierValue::ExtraFine
+                    | CoreModifierValue::Thick
+                    | CoreModifierValue::ExtraThick
                     | CoreModifierValue::Regular
                     | CoreModifierValue::Sides(_)
             )

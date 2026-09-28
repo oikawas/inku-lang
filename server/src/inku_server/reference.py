@@ -599,11 +599,16 @@ def render_markdown(reference: dict[str, Any] | None = None) -> str:
     out.append("## 6. Weight properties")
     out.append("")
     out += _table(
-        ["weight", "stroke_width", "stroke_opacity", "stroke_dasharray", "stroke_linecap", "texture_filter"],
+        [
+            "weight", "stroke_width", "thick_stroke_width", "extra_thick_stroke_width",
+            "stroke_opacity", "stroke_dasharray", "stroke_linecap", "texture_filter",
+        ],
         [
             [
                 w["weight"],
                 w["stroke_width"],
+                w["thick_stroke_width"],
+                w["extra_thick_stroke_width"],
                 w["stroke_opacity"],
                 w["stroke_dasharray"],
                 w["stroke_linecap"],

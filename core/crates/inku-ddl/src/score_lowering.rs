@@ -1644,7 +1644,7 @@ fn project_macro_emit<'a>(
         });
     }
     if let Some(identity) = thinness
-        && !matches!(identity.id, "fine" | "extra_fine")
+        && !matches!(identity.id, "fine" | "extra_fine" | "thick" | "extra_thick")
     {
         gaps.push(ScoreFieldGap::UnsupportedMacroEmitIdentity {
             key: "thinness".to_owned(),
@@ -1688,6 +1688,8 @@ fn project_macro_emit<'a>(
         thinness: thinness.map(|identity| match identity.id {
             "fine" => CoreModifierValue::Fine,
             "extra_fine" => CoreModifierValue::ExtraFine,
+            "thick" => CoreModifierValue::Thick,
+            "extra_thick" => CoreModifierValue::ExtraThick,
             _ => unreachable!("unsupported thinness identity checked"),
         }),
         action,
@@ -3360,6 +3362,13 @@ fn lower_verified_stage15_shared<'a>(
     };
     let score = (objects.is_none() && outcome != ScoreLoweringOutcome::Stopped).then(|| Score {
         version: if instructions.iter().any(|instruction| {
+            matches!(
+                instruction.thinness,
+                Some(Thinness::Thick | Thinness::ExtraThick)
+            )
+        }) {
+            inku_score::ScoreEdition::V0_16.as_str().to_owned()
+        } else if instructions.iter().any(|instruction| {
             instruction.relation.as_ref().is_some_and(|relation| {
                 matches!(
                     relation.target_path_position,
@@ -5882,6 +5891,8 @@ fn resolve_complete_object<'a>(
         None => None,
         Some(CoreModifierValue::Fine) => Some(Thinness::Fine),
         Some(CoreModifierValue::ExtraFine) => Some(Thinness::ExtraFine),
+        Some(CoreModifierValue::Thick) => Some(Thinness::Thick),
+        Some(CoreModifierValue::ExtraThick) => Some(Thinness::ExtraThick),
         Some(_) => {
             gaps.push(ScoreFieldGap::UnsupportedInstructionMeaning);
             None

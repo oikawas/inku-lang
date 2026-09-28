@@ -262,7 +262,12 @@ string_enum!(Weight {
     Drypoint => "drypoint",
     Computer => "computer",
 });
-string_enum!(Thinness { Fine, ExtraFine });
+string_enum!(Thinness {
+    Fine,
+    ExtraFine,
+    Thick,
+    ExtraThick
+});
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum SurfaceIntensity {
@@ -615,10 +620,11 @@ pub enum ScoreEdition {
     V0_13,
     V0_14,
     V0_15,
+    V0_16,
 }
 
 impl ScoreEdition {
-    pub const ALL: [Self; 15] = [
+    pub const ALL: [Self; 16] = [
         Self::V0_1,
         Self::V0_2,
         Self::V0_3,
@@ -634,6 +640,7 @@ impl ScoreEdition {
         Self::V0_13,
         Self::V0_14,
         Self::V0_15,
+        Self::V0_16,
     ];
 
     /// The edition a version string names.
@@ -662,6 +669,7 @@ impl ScoreEdition {
             Self::V0_13 => "0.13.0",
             Self::V0_14 => "0.14.0",
             Self::V0_15 => "0.15.0",
+            Self::V0_16 => "0.16.0",
         }
     }
 }
@@ -2446,6 +2454,13 @@ impl Score {
             }
             if instruction.ink_spread.is_some() && !self.edition_at_least(ScoreEdition::V0_12) {
                 return Err("ink_spread requires Score version 0.12.0");
+            }
+            if matches!(
+                instruction.thinness,
+                Some(Thinness::Thick | Thinness::ExtraThick)
+            ) && !self.edition_at_least(ScoreEdition::V0_16)
+            {
+                return Err("thick thinness requires Score version 0.16.0");
             }
             if instruction.arc_form != Some(ArcForm::Crescent) {
                 continue;

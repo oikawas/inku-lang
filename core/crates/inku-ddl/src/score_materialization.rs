@@ -418,7 +418,14 @@ pub fn materialize_selected_composition(
         }
     }
     let score = Score {
-        version: if !mirror_relations.is_empty() {
+        version: if instructions.iter().any(|instruction| {
+            matches!(
+                instruction.thinness,
+                Some(inku_score::Thinness::Thick | inku_score::Thinness::ExtraThick)
+            )
+        }) {
+            inku_score::ScoreEdition::V0_16
+        } else if !mirror_relations.is_empty() {
             inku_score::ScoreEdition::V0_15
         } else if placement_groups
             .iter()

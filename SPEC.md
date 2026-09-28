@@ -466,7 +466,7 @@ Declare a parameter with, for example, `{"type":"exact_decimal","dimension":"rad
 
 Flat Emit fields with those names accept exact values. `width`+`height`, `chord`+`sagitta`, and `position_x`+`position_y` require both components; missing or mistyped values produce diagnostics. Numeric position and named `place` have separate authority and cannot silently overwrite one another. Dimensions and positions reach the ordinary DDL resolver, including diagnostic recovery to the smaller overlapping size. Definition literals belong to their generated Emit and do not receive fabricated source spans. Count-one/place reaches actual Score; repetition reaches the resolved plan and leaves instance generation to later materialization.
 
-The current finite consumer that reaches an actual Score projects each complete `emit` as one instruction into the same semantic input used by ordinary DDL. It also traverses nested `group` containers that carry no placement or transform in their original order, retaining generated ownership and reference IDs already resolved in lexical scope. A Group does not create placement, coordinate transforms, or drawing instructions of its own. `shape` is limited to `line` / `circle` / `ellipse` / `cloudform` / `square` / `triangle` / `polygon` / `arc` / `point`, `movement` must explicitly be `place`, and `place` accepts the explicit `center` / `top` / `bottom` / four edges / `corner` regions in §18. `color` / `touch` / `continuity` / `surface` / `angle` may carry an existing ID from the category of the same name; omission uses the ordinary lowerer's same defaults. Angle uses the same resolver; Point rejects an explicit angle because it has no orientation. `thinness` accepts `fine` / `extra_fine`, and `relative_scale` accepts the closed core values `slightly_small` / `small` / `very_small` / `normal` / `slightly_large` / `large` / `very_large`. Size uses ordinary DDL normal geometry and its existing factor exactly once, keeping explicit `normal` distinct from omission. `count` reaches the current Score only when omitted or `Integer(1)` and `Number(1.0)` is not treated as equivalent. The consumer adds no field aliases or raw Score fields and does not recover decimal meaning from an `f64`.
+The current finite consumer that reaches an actual Score projects each complete `emit` as one instruction into the same semantic input used by ordinary DDL. It also traverses nested `group` containers that carry no placement or transform in their original order, retaining generated ownership and reference IDs already resolved in lexical scope. A Group does not create placement, coordinate transforms, or drawing instructions of its own. `shape` is limited to `line` / `circle` / `ellipse` / `cloudform` / `square` / `triangle` / `polygon` / `arc` / `point`, `movement` must explicitly be `place`, and `place` accepts the explicit `center` / `top` / `bottom` / four edges / `corner` regions in §18. `color` / `touch` / `continuity` / `surface` / `angle` may carry an existing ID from the category of the same name; omission uses the ordinary lowerer's same defaults. Angle uses the same resolver; Point rejects an explicit angle because it has no orientation. `thinness` accepts `fine` / `extra_fine` / `thick` / `extra_thick`, and `relative_scale` accepts the closed core values `slightly_small` / `small` / `very_small` / `normal` / `slightly_large` / `large` / `very_large` / `extra_large` / `huge`. Size uses ordinary DDL normal geometry and its existing factor exactly once, keeping explicit `normal` distinct from omission. `count` reaches the current Score only when omitted or `Integer(1)` and `Number(1.0)` is not treated as equivalent. The consumer adds no field aliases or raw Score fields and does not recover decimal meaning from an `f64`.
 
 The macro head is joined exactly across its source instruction slot, source invocation ordinal, locked definition, and expanded invocation. An Emit's `place:center` resolves to the same central region as in ordinary DDL. Multiple complete Emits replace the head in their existing order as ordinary instructions; an origin through `use`, bounded `repeat`, or `vary` is not itself a rejection. Output instructions correspond in order to either a direct source slot or generated provenance. Adjacent bound Emits in the same Macro and original generated order deliver `connected` / `touching` through the same checked relation rules as ordinary DDL, preserving original reference order, ownership, and numeric-fixed or named-movable position authority. Touching joins both Line / Arc endpoints with the existing Arc reconstruction and fixes explicit relative scale (including normal), dimensions, and chord direction. `not_touching` and `between` also reach the shared checked performer from adjacent bound Emits in the same Macro. NotTouching retains the existing Medium gap, while Between retains the existing recipe using the bounding-box centers of the current Emit's immediately preceding Emit and the Emit before it. Named and noncenter placement is movable; numeric placement is fixed and is never overwritten. Between's `from` is the immediately preceding Emit, with the one before it retained as its second reference and with both owners preserved. `along` / `cutting` also reach the same checked performer from adjacent bound Line Emits, using named-movable or numeric-fixed position authority and the direction/dimension rules in §14.4. Adjacency includes unbound Emits in the original order, and an omitted from or either Between reference never retargets to a survivor. Regardless of legacy Stop or OmitAndContinue input, an incomplete Emit, unknown key, category or type mismatch, unbound caller fact, or expanded unsupported Transform axes / an unpositioned `anchor` / unsupported `relation` omits its established minimum field, Emit, subtree, or invocation with a diagnostic and continues the remaining Score. Unrelated siblings, including those inside Groups, remain in source and generated-provenance order. A missing reference omits only the relation while retaining its original dependency and any independently drawable Emit; it never retargets to a survivor. No child Emit is extracted from an unsupported structural subtree, and adjacency is not created across an unsupported subtree. An unused parameter or unreferenced Emit binding ID alone is not rejected.
 
@@ -2149,13 +2149,36 @@ The three layers match the way bonsai is thought about:
 - the **gardener's hand** enters (motion words)
 - **the environment** (wind, season) is laid over it (plugins)
 
-**Thinness is a dimension, not a sway** (engine 16, v2.9.3). It does not belong to the layer where `weight` carries the sway inherent to a material. A tool has a thinness as its default, but thinness itself is a dimension the writer states independently, and it falls **outside the three layers** (material, motion word, Nature plugin). It has steps on the thin side only; there is no vocabulary for the thick side. `Instruction.thinness` (`fine` / `extra_fine`) carries it. **The principle gains no exception; thinness is placed outside the three layers instead.**
+**Thinness is a dimension, not a sway** (engine 16, v2.9.3). It does not belong to the layer where `weight` carries the sway inherent to a material. A tool has a thinness as its default, but thinness itself is a dimension the writer states independently, and it falls **outside the three layers** (material, motion word, Nature plugin). It has two steps on the thin side and two on the thick side. `Instruction.thinness` (`fine` / `extra_fine` / `thick` / `extra_thick`) carries it. **The principle gains no exception; thinness is placed outside the three layers instead.**
 
-The finite visible DDL forms are Japanese `細い` / English `thin` for Fine and
-Japanese `ごく細い` / English `extra-fine` for ExtraFine. The shared compiler
-keeps both as typed identities independent of source spelling and carries them from supported direct
+The thin side scales the tool's default width (`fine` 0.6, `extra_fine` 0.35, with a floor of 0.5).
+The thick side is not a ratio but a width per tool, since how wide a tool can go is a property of the
+tool. Widths are thousandths of the short side; reading the short side as an A3 sheet (one unit about
+0.3 mm), the default widths of the fine tools match the physical tools. `extra_thick` is the broadest
+mark the tool makes on that scale, and `thick` is the geometric mean of the default and `extra_thick`.
+
+| Tool | Default | `thick` | `extra_thick` |
+|---|---|---|---|
+| silverpoint | 0.5 | 0.9 | 1.5 |
+| pencil | 1.5 | 3.5 | 8 |
+| pen, computer | 2 | 3.5 | 6 |
+| rotring | 1 | 2.6 | 6.7 |
+| crayon | 4 | 9 | 20 |
+| chalk | 3 | 9 | 25 |
+| fine brush | 3 | 6.7 | 15 |
+| thick brush | 8 | 20 | 50 |
+| oil paint | 12 | 27 | 60 |
+| burin | 3.2 | 4.7 | 7 |
+| drypoint | 2.6 | 3.9 | 6 |
+
+A Score with the thick side is Score version 0.16.0.
+
+The finite visible DDL forms are Japanese `細い` / English `thin` for Fine,
+Japanese `ごく細い` / English `extra-fine` for ExtraFine, Japanese `太い` /
+English `thick` for Thick, and Japanese `ごく太い` / English `extra-thick` for
+ExtraThick. The shared compiler keeps all four as typed identities independent of source spelling and carries them from supported direct
 instructions and flat Macro Emits through the common lowerer into the existing
-`Instruction.thinness`. Omission remains `None`; no thick step or open-ended degree synonym is inferred.
+`Instruction.thinness`. Omission remains `None`; no open-ended degree synonym is inferred.
 
 Note that **`thinness` is not a Saijiki word** (author's ruling, 2026-07-29). Stage 1 reads thinness words and writes them into the normalized DDL, but they appear neither in the §3.1 vocabulary table nor in the Saijiki display.
 

@@ -58,6 +58,8 @@ pub enum CoreModifierValue {
     Sides(u64),
     Fine,
     ExtraFine,
+    Thick,
+    ExtraThick,
     SlightlySmall,
     Small,
     VerySmall,
@@ -74,7 +76,9 @@ impl CoreModifierValue {
         match self {
             Self::Regular => CoreModifierDimension::ShapeForm,
             Self::Sides(_) => CoreModifierDimension::ShapeSides,
-            Self::Fine | Self::ExtraFine => CoreModifierDimension::Thinness,
+            Self::Fine | Self::ExtraFine | Self::Thick | Self::ExtraThick => {
+                CoreModifierDimension::Thinness
+            }
             _ => CoreModifierDimension::RelativeScale,
         }
     }
@@ -84,6 +88,8 @@ impl CoreModifierValue {
             "regular" => Self::Regular,
             "fine" => Self::Fine,
             "extra_fine" => Self::ExtraFine,
+            "thick" => Self::Thick,
+            "extra_thick" => Self::ExtraThick,
             "slightly_small" => Self::SlightlySmall,
             "small" => Self::Small,
             "very_small" => Self::VerySmall,
@@ -104,6 +110,8 @@ impl CoreModifierValue {
             Self::Sides(_) => "sides",
             Self::Fine => "fine",
             Self::ExtraFine => "extra_fine",
+            Self::Thick => "thick",
+            Self::ExtraThick => "extra_thick",
             Self::SlightlySmall => "slightly_small",
             Self::Small => "small",
             Self::VerySmall => "very_small",
@@ -209,10 +217,14 @@ const QUALITATIVE_QUANTITIES_EN: &[&str] = &["a few", "several", "many", "numero
 const THINNESS_SURFACES_JA: &[(&str, CoreModifierValue)] = &[
     ("ごく細い", CoreModifierValue::ExtraFine),
     ("細い", CoreModifierValue::Fine),
+    ("ごく太い", CoreModifierValue::ExtraThick),
+    ("太い", CoreModifierValue::Thick),
 ];
 const THINNESS_SURFACES_EN: &[(&str, CoreModifierValue)] = &[
     ("extra-fine", CoreModifierValue::ExtraFine),
     ("thin", CoreModifierValue::Fine),
+    ("extra-thick", CoreModifierValue::ExtraThick),
+    ("thick", CoreModifierValue::Thick),
 ];
 const RELATIVE_SCALE_SURFACES_JA: &[(&str, CoreModifierValue)] = &[
     ("とても小さな", CoreModifierValue::VerySmall),

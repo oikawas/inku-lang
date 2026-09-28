@@ -254,7 +254,7 @@ Parameterは `{"type":"exact_decimal","dimension":"radius"}` のように宣言�
 
 Flat Emitの同名fieldへexact値を渡す。`width`+`height`、`chord`+`sagitta`、`position_x`+`position_y`は両方が必要で、欠落・型不一致は診断する。数値位置はnamed `place`と別authorityで、両者を黙って上書きしない。寸法・位置は通常DDLと同じresolverへ届き、サイズ重複は診断付きで小さい候補を採る。Definition literalのownerは生成元のEmitであり、架空の原文spanを作らない。Count1/placeのactual Scoreと反復planを扱い、反復個体の生成は後続materializationに残す。
 
-Actual Scoreへ届く現行finite consumerは、完成`emit`を一命令ずつ通常DDLと同じsemantic inputへprojectする。配置や変換を持たない`group`の入れ子も元の順序で巡回し、生成元ownerとlexical scopeで解決済みの参照IDを保持する。Group自身が新しい配置・座標変換・描画命令を作ることはない。`shape`は`line` / `circle` / `ellipse` / `cloudform` / `square` / `triangle` / `polygon` / `arc` / `point`、`movement`は明示`place`、`place`は§18の明示`center` / `top` / `bottom` / 四辺 / `corner`を受け入れる。`color` / `touch` / `continuity` / `surface` / `angle`は同名categoryの既存IDを任意で持ち、省略時は通常lowererの同じdefaultを使う。Angleも同じresolverを使い、方向を持たないPointへの明示angleは拒否する。`thinness`は`fine` / `extra_fine`、`relative_scale`は`slightly_small` / `small` / `very_small` / `normal` / `slightly_large` / `large` / `very_large`のclosed core値を受け入れる。大小は通常DDLのnormal geometryと既存係数を一度だけ使い、明示`normal`も省略と区別する。`count`は省略または`Integer(1)`だけが現行Scoreへ届き、`Number(1.0)`を同一視しない。別key alias、raw Score field、f64からのdecimal meaning復元は行わない。
+Actual Scoreへ届く現行finite consumerは、完成`emit`を一命令ずつ通常DDLと同じsemantic inputへprojectする。配置や変換を持たない`group`の入れ子も元の順序で巡回し、生成元ownerとlexical scopeで解決済みの参照IDを保持する。Group自身が新しい配置・座標変換・描画命令を作ることはない。`shape`は`line` / `circle` / `ellipse` / `cloudform` / `square` / `triangle` / `polygon` / `arc` / `point`、`movement`は明示`place`、`place`は§18の明示`center` / `top` / `bottom` / 四辺 / `corner`を受け入れる。`color` / `touch` / `continuity` / `surface` / `angle`は同名categoryの既存IDを任意で持ち、省略時は通常lowererの同じdefaultを使う。Angleも同じresolverを使い、方向を持たないPointへの明示angleは拒否する。`thinness`は`fine` / `extra_fine` / `thick` / `extra_thick`、`relative_scale`は`slightly_small` / `small` / `very_small` / `normal` / `slightly_large` / `large` / `very_large` / `extra_large` / `huge`のclosed core値を受け入れる。大小は通常DDLのnormal geometryと既存係数を一度だけ使い、明示`normal`も省略と区別する。`count`は省略または`Integer(1)`だけが現行Scoreへ届き、`Number(1.0)`を同一視しない。別key alias、raw Score field、f64からのdecimal meaning復元は行わない。
 
 Macro headはsource instruction slot、source invocation ordinal、locked definition、expanded invocationをexact joinする。Emitの`place:center`は通常DDLと同じ中央の領域へ解決する。複数の完成Emitはその場の順序で通常命令列へ置換され、`use` / bounded `repeat` / `vary`由来という理由では拒否しない。出力命令はdirect source slotまたはgenerated provenanceへ順序どおり対応する。同じMacroの元の生成順で隣接するbound Emit間の`connected` / `touching`を、通常DDLと同じchecked relation規則で共有performerへ届け、元参照順とowner、numeric-fixed／named-movableの位置authorityを保つ。TouchingはLine / Arcの両端一致と既存Arc再構成を使い、明示relative scale（normal含む）・寸法・弦方向を固定する。`not_touching`と`between`も同じMacroの隣接bound Emitから通常DDLと同じchecked performerへ届く。NotTouchingは既存Medium gapを、Betweenはcurrentの直前Emitとさらに一つ前のEmitのbbox中心を使う既存recipeを保つ。named／noncenter位置はmovable、数値位置はfixedであり、位置authorityを上書きしない。Betweenの`from`は直前Emit、その一つ前を第二参照として両方のownerを保持する。`along` / `cutting`は両者がLineの隣接bound Emitから同じchecked performerへ届き、named位置はmovable、数値位置はfixedとして§14.4の方向・寸法規則を使う。隣接性はunbound Emitも含む元順序で判定し、省略されたfromまたはBetweenの二参照をsurvivorへ付け替えない。旧Stop / OmitAndContinue入力にかかわらず、不完全Emit、unknown key、category / type不一致、未結合caller fact、展開後の未対応Transform軸 / 位置のない`anchor` / 未対応`relation`は、確立済みの最小field・Emit・subtree・invocationを診断付きで省略して残るScoreを続ける。Group内も含め無関係なsiblingをsource / generated provenance順に残す。参照消失は元の依存先を保って関係だけを省略し、独立して描画可能なEmitを残す。参照を残存Emitへ付け替えない。未対応structural subtreeから子Emitだけを抜き出さず、未対応subtreeを跨いで隣接関係を作らない。未使用parameterと未参照Emit binding IDだけを理由に拒否しない。
 
@@ -1303,14 +1303,32 @@ DDLの揺らぎは、この意味での揺らぎである。
 
 **太さは揺らぎではなく寸法である**（engine 16、v2.9.3）。素材固有の揺らぎを `weight` が内包するのと
 同じ層に太さは属さない。道具は太さを既定として持つが、太さそのものは記述者が独立に書ける寸法であり、
-**三層（素材固有・運動語彙・Nature プラグイン）の対象外**である。細い側にのみ段階があり、
-太い側の語彙は持たない。`Instruction.thinness`（`fine` / `extra_fine`）がこれを運ぶ。
+**三層（素材固有・運動語彙・Nature プラグイン）の対象外**である。細い側と太い側に二段ずつの段階があり、
+`Instruction.thinness`（`fine` / `extra_fine` / `thick` / `extra_thick`）がこれを運ぶ。
 **三層に例外を作るのではなく、太さを三層の外に置く**という整理である。
 
+細い側は道具の既定の線幅に倍率（`fine`=0.6、`extra_fine`=0.35、下限0.5）を掛ける。太い側は倍率ではなく道具ごとの線幅の表で決まる。どこまで太くできるかは道具の性質だからである。値は短い辺の1000分の1で、短い辺をA3の紙（1単位は約0.3 mm）とみると細い道具の既定は実物に合う。`extra_thick`はその物差しで道具が出せる最も太い痕、`thick`は既定と`extra_thick`の相乗平均である。
+
+| 道具 | 既定 | `thick` | `extra_thick` |
+|---|---|---|---|
+| 銀筆 | 0.5 | 0.9 | 1.5 |
+| 鉛筆 | 1.5 | 3.5 | 8 |
+| ペン・コンピュータ | 2 | 3.5 | 6 |
+| ロットリング | 1 | 2.6 | 6.7 |
+| クレヨン | 4 | 9 | 20 |
+| チョーク | 3 | 9 | 25 |
+| 細筆 | 3 | 6.7 | 15 |
+| 太筆 | 8 | 20 | 50 |
+| 油彩 | 12 | 27 | 60 |
+| ビュラン | 3.2 | 4.7 | 7 |
+| ドライポイント | 2.6 | 3.9 | 6 |
+
+太い側を持つScoreは版0.16.0である。
+
 Visible DDLの有限表記は、Fineが日本語`細い` / 英語`thin`、ExtraFineが日本語`ごく細い` /
-英語`extra-fine`である。Shared compilerはこの二段階をsource表記から独立した
+英語`extra-fine`、Thickが日本語`太い` / 英語`thick`、ExtraThickが日本語`ごく太い` / 英語`extra-thick`である。Shared compilerはこの四段階をsource表記から独立した
 typed identityとして保持し、対応範囲のdirect instructionとflat Macro Emitから共通lowererを通して
-既存`Instruction.thinness`へ届ける。未指定は`None`のままで、太い段階や自由なdegree同義語を補わない。
+既存`Instruction.thinness`へ届ける。未指定は`None`のままで、自由なdegree同義語を補わない。
 
 なお **`thinness` は歳時記の語ではない**（2026-07-29 作者裁定）。Stage 1 は太さ語を読んで
 正規化DDL へ書くが、§3.1 の語彙表と歳時記の表示には現れない。

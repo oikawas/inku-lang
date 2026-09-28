@@ -8,7 +8,8 @@ use crate::geometry::{
 };
 use crate::mark_paths::amplitude_width;
 use crate::marks::{
-    MIN_STROKE_WIDTH, style_dash, thinness_scale, weight_linecap, weight_opacity, weight_width,
+    MIN_STROKE_WIDTH, extra_thick_width, style_dash, thick_width, thinness_scale, weight_linecap,
+    weight_opacity, weight_width,
 };
 use crate::materials::texture_filter_id;
 use crate::types::{Amplitude, Frequency, LineStyle, Thinness, Weight};
@@ -45,6 +46,8 @@ pub fn renderer_reference() -> Value {
             json!({
                 "weight": enum_name(weight),
                 "stroke_width": weight_width(weight),
+                "thick_stroke_width": thick_width(weight),
+                "extra_thick_stroke_width": extra_thick_width(weight),
                 "stroke_opacity": weight_opacity(weight),
                 "stroke_dasharray": style_dash(LineStyle::Solid, weight, 1.0),
                 "stroke_linecap": weight_linecap(weight),

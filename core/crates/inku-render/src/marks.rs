@@ -187,9 +187,58 @@ pub(crate) fn weight_width(weight: Weight) -> f64 {
 
 pub(crate) fn thinness_scale(thinness: Option<Thinness>) -> f64 {
     match thinness {
-        None => 1.0,
+        None | Some(Thinness::Thick | Thinness::ExtraThick) => 1.0,
         Some(Thinness::Fine) => 0.6,
         Some(Thinness::ExtraFine) => 0.35,
+    }
+}
+
+/// The widest mark each tool makes, in the same units as `weight_width`.
+///
+/// With the canvas short side read as an A3 sheet (one unit about 0.3 mm), the
+/// default widths of the fine tools already match the physical tools; this is
+/// the broadest mark the physical tool makes on that scale.
+pub(crate) fn extra_thick_width(weight: Weight) -> f64 {
+    match weight {
+        Weight::Silverpoint => 1.5,
+        Weight::Pencil => 8.0,
+        Weight::Pen | Weight::Computer => 6.0,
+        Weight::Rotring => 6.7,
+        Weight::Crayon => 20.0,
+        Weight::Chalk => 25.0,
+        Weight::BrushThin => 15.0,
+        Weight::BrushThick => 50.0,
+        Weight::OilPaint => 60.0,
+        Weight::Burin => 7.0,
+        Weight::Drypoint => 6.0,
+    }
+}
+
+/// The step between each tool's default and its widest mark (their geometric
+/// mean, rounded).
+pub(crate) fn thick_width(weight: Weight) -> f64 {
+    match weight {
+        Weight::Silverpoint => 0.9,
+        Weight::Pencil => 3.5,
+        Weight::Pen | Weight::Computer => 3.5,
+        Weight::Rotring => 2.6,
+        Weight::Crayon | Weight::Chalk => 9.0,
+        Weight::BrushThin => 6.7,
+        Weight::BrushThick => 20.0,
+        Weight::OilPaint => 27.0,
+        Weight::Burin => 4.7,
+        Weight::Drypoint => 3.9,
+    }
+}
+
+/// A tool's width for a thinness: the thin side scales the default, while the
+/// thick side reads each tool's own widths, since how wide a tool can go is a
+/// property of the tool rather than a shared ratio.
+pub(crate) fn thinned_width(weight: Weight, thinness: Option<Thinness>) -> f64 {
+    match thinness {
+        Some(Thinness::Thick) => thick_width(weight),
+        Some(Thinness::ExtraThick) => extra_thick_width(weight),
+        other => (weight_width(weight) * thinness_scale(other)).max(MIN_STROKE_WIDTH),
     }
 }
 
@@ -215,10 +264,7 @@ fn is_wash_mark(instruction: &Instruction) -> bool {
 }
 
 pub(crate) fn mark_width(instruction: &Instruction, canvas: CanvasSize) -> f64 {
-    let width = (weight_width(instruction.weight) * thinness_scale(instruction.thinness))
-        .max(MIN_STROKE_WIDTH)
-        * canvas.unit()
-        / 1000.0;
+    let width = thinned_width(instruction.weight, instruction.thinness) * canvas.unit() / 1000.0;
     width * if is_wash_mark(instruction) { 3.0 } else { 1.0 }
 }
 

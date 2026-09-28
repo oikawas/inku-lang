@@ -337,6 +337,8 @@ pub(crate) const fn relative_scale_factor(value: crate::CoreModifierValue) -> Op
         crate::CoreModifierValue::Huge => Some((8, 3)),
         crate::CoreModifierValue::Fine
         | crate::CoreModifierValue::ExtraFine
+        | crate::CoreModifierValue::Thick
+        | crate::CoreModifierValue::ExtraThick
         | crate::CoreModifierValue::Regular
         | crate::CoreModifierValue::Sides(_) => None,
     }

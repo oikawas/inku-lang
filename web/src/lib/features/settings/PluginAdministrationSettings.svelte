@@ -3,6 +3,10 @@
 	import type { PluginItem, SettingsStatus } from './server-administration.svelte';
 	import './plugin-administration-settings.css';
 
+	// The drawing uses only definitions the developers wrote in JSON; a plugin
+	// document switches such a package on and off and gives its words, notes
+	// and previews. Documents are not written here (I-703): a legacy one without
+	// definitions is shown as not drawn from and may only be deleted.
 	type Props = {
 		pluginsStatus: SettingsStatus['plugins'] | null;
 		settingsStatusError: string | null;
@@ -10,33 +14,19 @@
 		pluginActionStatus: string | null;
 		isAdmin: boolean;
 		onLoadSettingsStatus: () => void;
-		onLoadPluginContent: (id: string) => Promise<string | null>;
-		onSavePlugin: (id: string, content: string) => Promise<string[] | null>;
-		onCreatePlugin: (content: string, filename: string) => Promise<string[] | null>;
 		onDeletePlugin: (id: string) => Promise<boolean>;
 		onSetPluginEnabled: (id: string, enabled: boolean) => Promise<boolean>;
 	};
 
 	let {
 		pluginsStatus, settingsStatusError, settingsStatusLoading, pluginActionStatus,
-		isAdmin, onLoadSettingsStatus, onLoadPluginContent,
-		onSavePlugin, onCreatePlugin, onDeletePlugin, onSetPluginEnabled,
+		isAdmin, onLoadSettingsStatus, onDeletePlugin, onSetPluginEnabled,
 	}: Props = $props();
 
-	let pluginFileInput = $state<HTMLInputElement | null>(null);
 	let pluginBusy = $state(false);
 	let pluginDeleteConfirmId = $state<string | null>(null);
-	let pluginSectionReasons = $state<string[]>([]);
-	let pluginEditorOpen = $state(false);
-	let pluginEditorId = $state<string | null>(null);
-	let pluginEditorTitle = $state('');
-	let pluginEditorContent = $state('');
-	let pluginEditorLoading = $state(false);
-	let pluginEditorSaving = $state(false);
-	let pluginEditorReasons = $state<string[]>([]);
-	// A closed editor can be followed immediately by another one. Request
-	// identity keeps the first plugin's late content out of the second editor.
-	let pluginEditorLoadRequestId = 0;
+	const isJapanese = $derived(t().code === 'ja');
+	const vocabularyPlugins = $derived((pluginsStatus?.loaded ?? []).filter((plugin) => plugin.namespace !== 'system'));
 
 	function pluginId(plugin: PluginItem): string {
 		return plugin.id ?? plugin.path ?? `${plugin.namespace ?? ''}.${plugin.name}`;
@@ -44,8 +34,8 @@
 	function pluginIsEnabled(plugin: PluginItem): boolean {
 		return plugin.enabled ?? plugin.status === 'enabled';
 	}
-	function errorMessage(cause: unknown): string {
-		return cause instanceof Error ? cause.message : String(cause);
+	function previewSrc(qualifiedName: string): string {
+		return `/api/saijiki/plugin-preview?${new URLSearchParams({ name: qualifiedName, scale: '1' })}`;
 	}
 
 	async function togglePluginEnabled(plugin: PluginItem): Promise<void> {
@@ -62,95 +52,55 @@
 		pluginDeleteConfirmId = null;
 		pluginBusy = false;
 	}
-
-	function triggerPluginFile(): void {
-		pluginSectionReasons = [];
-		pluginFileInput?.click();
-	}
-
-	async function onPluginFileChange(event: Event): Promise<void> {
-		const input = event.currentTarget as HTMLInputElement;
-		const file = input.files?.[0];
-		input.value = '';
-		if (!file) return;
-		pluginBusy = true;
-		try {
-			const content = await file.text();
-			const reasons = await onCreatePlugin(content, file.name);
-			pluginSectionReasons = reasons ?? [];
-		} catch (cause) {
-			pluginSectionReasons = [errorMessage(cause)];
-		} finally {
-			pluginBusy = false;
-		}
-	}
-
-	async function openPluginEditor(plugin: PluginItem): Promise<void> {
-		const id = pluginId(plugin);
-		const requestId = ++pluginEditorLoadRequestId;
-		pluginEditorId = id;
-		pluginEditorTitle = plugin.namespace ? `${plugin.namespace}.${plugin.name}` : plugin.name;
-		pluginEditorReasons = [];
-		pluginEditorContent = '';
-		pluginEditorOpen = true;
-		pluginEditorLoading = true;
-		try {
-			const content = await onLoadPluginContent(id);
-			if (requestId !== pluginEditorLoadRequestId) return;
-			if (content === null) { pluginEditorOpen = false; pluginEditorId = null; return; }
-			pluginEditorContent = content;
-		} finally {
-			if (requestId === pluginEditorLoadRequestId) pluginEditorLoading = false;
-		}
-	}
-
-	function closePluginEditor(): void {
-		if (pluginEditorSaving) return;
-		pluginEditorLoadRequestId += 1;
-		pluginEditorLoading = false;
-		pluginEditorOpen = false;
-		pluginEditorId = null;
-	}
-
-	async function savePluginEditor(): Promise<void> {
-		if (!pluginEditorId || pluginEditorSaving) return;
-		pluginEditorSaving = true;
-		const reasons = await onSavePlugin(pluginEditorId, pluginEditorContent);
-		pluginEditorSaving = false;
-		if (reasons === null) { pluginEditorOpen = false; pluginEditorId = null; pluginEditorReasons = []; }
-		else pluginEditorReasons = reasons;
-	}
-
-
 </script>
 
 			<div class="popover-group">
 				<div class="popover-group-label user-plugin-head">
 					<span>{t().settingsUserPlugins}</span>
-					<button class="ghost-btn" onclick={triggerPluginFile} disabled={!isAdmin || pluginBusy}>{t().settingsPluginLoadFile}</button>
-					<input type="file" accept=".md" bind:this={pluginFileInput} onchange={onPluginFileChange} style="display:none" />
 				</div>
 				{#if pluginActionStatus}<div class="db-test-result">{pluginActionStatus}</div>{/if}
-				{#if pluginSectionReasons.length}<div class="db-test-result">{t().settingsPluginInvalid}: {pluginSectionReasons.join(" / ")}</div>{/if}
-			{#if pluginsStatus?.loaded.filter((plugin) => plugin.namespace !== "system").length}
-				{#each pluginsStatus.loaded.filter((plugin) => plugin.namespace !== "system") as plugin (plugin.id ?? plugin.path ?? `${plugin.namespace}.${plugin.name}`)}
+				{#if vocabularyPlugins.length}
+					{#each vocabularyPlugins as plugin (pluginId(plugin))}
 						<div class="user-plugin-row">
 							<div class="user-plugin-info">
 								<div class="system-plugin-title-row">
 									<div class="system-plugin-title">{plugin.namespace ? `${plugin.namespace}.${plugin.name}` : plugin.name}</div>
 									<span class="plugin-version-pill">{plugin.version ? `v${plugin.version}` : plugin.status}</span>
 									{#if plugin.status === "rejected"}<span class="plugin-rejected">{plugin.status}</span>{/if}
+									<span class="plugin-use-mark" class:not-drawn={!plugin.has_definitions}>{plugin.has_definitions ? t().settingsPluginDrawn : t().settingsPluginNotDrawn}</span>
 								</div>
 								<div class="system-plugin-desc">{plugin.path ?? ""}</div>
+								<div class="plugin-use-hint">{plugin.has_definitions ? t().settingsPluginDrawnHint : t().settingsPluginNotDrawnHint}</div>
 								{#if plugin.reasons?.length}<div class="db-test-result">{plugin.reasons.join(" / ")}</div>{/if}
+								{#if plugin.entries?.length}
+									<details class="plugin-words">
+										<summary>{t().settingsPluginWords}（{plugin.entries.length}）</summary>
+										<ul class="plugin-word-list">
+											{#each plugin.entries as entry (entry.qualified_name)}
+												{@const surfaces = (isJapanese ? entry.surface_ja : entry.surface_en) ?? []}
+												{@const note = isJapanese ? entry.note_ja : entry.note_en}
+												<li class="plugin-word">
+													{#if entry.has_preview}<img class="plugin-word-preview" src={previewSrc(entry.qualified_name)} alt="" loading="lazy" />{:else}<span class="plugin-word-preview" aria-hidden="true"></span>{/if}
+													<div class="plugin-word-text">
+														<strong>{entry.qualified_name}</strong>
+														{#if entry.aliases?.length}<small>{entry.aliases.join(', ')}</small>{/if}
+														{#if surfaces.length}<span>{surfaces.join(' | ')}</span>{/if}
+														{#if note}<span>{note}</span>{/if}
+													</div>
+												</li>
+											{/each}
+										</ul>
+									</details>
+								{/if}
 							</div>
 							<div class="user-plugin-controls">
-								<button class="ghost-btn user-plugin-btn" onclick={() => void openPluginEditor(plugin)} disabled={!isAdmin || pluginBusy}>{t().settingsPluginViewEdit}</button>
-								{#if pluginDeleteConfirmId === pluginId(plugin)}
-									<button class="ghost-btn user-plugin-btn danger" onclick={() => void confirmDeletePlugin(plugin)} disabled={pluginBusy}>{t().settingsPluginDeleteConfirm}</button>
-									<button class="ghost-btn user-plugin-btn" onclick={() => (pluginDeleteConfirmId = null)} disabled={pluginBusy}>{t().confirmCancel}</button>
-								{:else}
-									<button class="ghost-btn user-plugin-btn danger" onclick={() => (pluginDeleteConfirmId = pluginId(plugin))} disabled={!isAdmin || pluginBusy}>{t().settingsPluginDelete}</button>
+								{#if !plugin.has_definitions}
+									{#if pluginDeleteConfirmId === pluginId(plugin)}
+										<button class="ghost-btn user-plugin-btn danger" onclick={() => void confirmDeletePlugin(plugin)} disabled={pluginBusy}>{t().settingsPluginDeleteConfirm}</button>
+										<button class="ghost-btn user-plugin-btn" onclick={() => (pluginDeleteConfirmId = null)} disabled={pluginBusy}>{t().confirmCancel}</button>
+									{:else}
+										<button class="ghost-btn user-plugin-btn danger" onclick={() => (pluginDeleteConfirmId = pluginId(plugin))} disabled={!isAdmin || pluginBusy}>{t().settingsPluginDelete}</button>
+									{/if}
 								{/if}
 								{#if plugin.status !== "rejected"}
 									<button
@@ -177,24 +127,3 @@
 				<button class="ghost-btn" onclick={onLoadSettingsStatus} disabled={settingsStatusLoading || !isAdmin}>{t().settingsReload}</button>
 			</div>
 			{#if settingsStatusError}<div class="inline-message">{settingsStatusError}</div>{/if}
-{#if pluginEditorOpen}
-	<div class="modal-backdrop" onclick={closePluginEditor} aria-hidden="true"></div>
-	<div class="plugin-editor-dialog" role="dialog" aria-modal="true" tabindex="-1" onclick={(e) => e.stopPropagation()} onkeydown={(e) => { if (e.key === 'Escape') closePluginEditor(); }}>
-		<div class="modal-head">
-			<div class="catalog-modal-title">{t().settingsPluginEditorTitle} — {pluginEditorTitle}</div>
-			<button class="catalog-close" onclick={closePluginEditor} disabled={pluginEditorSaving}>×</button>
-		</div>
-		<div class="plugin-editor-body">
-			{#if pluginEditorLoading}
-				<div class="inline-message">{t().settingsLoading}</div>
-			{:else}
-				<textarea class="plugin-editor-ta" bind:value={pluginEditorContent} spellcheck="false" disabled={pluginEditorSaving}></textarea>
-			{/if}
-			{#if pluginEditorReasons.length}<div class="db-test-result">{t().settingsPluginInvalid}: {pluginEditorReasons.join(" / ")}</div>{/if}
-		</div>
-		<div class="plugin-editor-foot">
-			<button class="ghost-btn" onclick={closePluginEditor} disabled={pluginEditorSaving}>{t().confirmCancel}</button>
-			<button class="ghost-btn primary" onclick={savePluginEditor} disabled={pluginEditorSaving || pluginEditorLoading || !isAdmin}>{pluginEditorSaving ? t().settingsLoading : t().settingsPluginSave}</button>
-		</div>
-	</div>
-{/if}

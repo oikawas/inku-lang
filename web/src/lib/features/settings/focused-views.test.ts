@@ -31,7 +31,7 @@ test('T-1002/T-1006: drafts and helpers live with their focused views', () => {
 		assert.match(model, new RegExp(name), name);
 		assert.doesNotMatch(modal, new RegExp(name), name);
 	}
-	for (const name of ['pluginEditorContent', 'pluginDeleteConfirmId', 'openPluginEditor']) {
+	for (const name of ['pluginDeleteConfirmId', 'togglePluginEnabled', 'previewSrc']) {
 		assert.match(plugin, new RegExp(name), name);
 		assert.doesNotMatch(modal, new RegExp(name), name);
 	}

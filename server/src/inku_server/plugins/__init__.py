@@ -7,6 +7,7 @@ the stable hook API used by API, renderer, and UI clients.
 from __future__ import annotations
 
 from collections.abc import Iterable, Mapping
+from pathlib import Path
 
 from .system.canvas_aspect import (
     CANVAS_ASPECT_PLUGIN_ID,
@@ -70,8 +71,32 @@ def plugin_item_with_fires_on(item: dict[str, object]) -> dict[str, object]:
     return {**item, "entries": entries_with_fires_on(entries)}
 
 
+# The documents that switch a package bundled with the shared core on and off.
+# Its definitions live in the core; the document gives its words, notes and
+# previews. Any other document is legacy Markdown: nothing reads its prose as
+# a definition, so its words are omitted from drawing with a warning.
+_BUNDLED_DOCUMENTS = {
+    Path(__file__).resolve().parents[3] / "plugins" / "nature-leaves.inku-plugin.md": "Nature.leaves",
+}
+
+
+def bundled_package_for(source_path: str | Path | None) -> str | None:
+    """The bundled package a plugin document switches, or None for legacy Markdown."""
+    if not source_path:
+        return None
+    return _BUNDLED_DOCUMENTS.get(Path(source_path).resolve())
+
+
+def plugin_has_definitions(plugin_id: str) -> bool:
+    """Whether the installed document switches definitions the drawing uses (I-703)."""
+    return bundled_package_for(DOCUMENT_PLUGIN_MANAGER.directory / plugin_id) is not None
+
+
 def plugin_status_items() -> list[dict[str, object]]:
-    return [item.as_dict() for item in DOCUMENT_PLUGIN_MANAGER.items()]
+    return [
+        {**item.as_dict(), "has_definitions": plugin_has_definitions(item.path)}
+        for item in DOCUMENT_PLUGIN_MANAGER.items()
+    ]
 
 
 __all__ = [
@@ -91,5 +116,7 @@ __all__ = [
     "plugin_fires_on_index",
     "plugin_item_with_fires_on",
     "plugin_status_items",
+    "bundled_package_for",
+    "plugin_has_definitions",
     "validate_plugin_document",
 ]

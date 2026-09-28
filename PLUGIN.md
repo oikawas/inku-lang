@@ -266,7 +266,7 @@ the current authoring format.
 
 `plugin_storage["canvas-aspect"]`, the `canvas_aspect` request alias, and the
 system/user plugin directories are compatibility surfaces while retirement
-remains unfinished. The Server's per-document enable control and Android's
+remains unfinished. The Server's settings screen no longer creates or edits documents (2026-09-28) and marks a document without definitions as not used for drawing. The Server's per-document enable control and Android's
 `Nature.leaves` switch decide whether the bundled package is used for new works;
 saved works use their locked definitions and are unaffected. None of these is an
 authoring or loading API for vocabulary macros.

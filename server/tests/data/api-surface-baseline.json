@@ -1,7 +1,7 @@
 {
-  "endpoint_count": 107,
-  "operation_count": 107,
-  "schema_count": 160,
+  "endpoint_count": 104,
+  "operation_count": 104,
+  "schema_count": 158,
   "operations": [
     {
       "path": "/api/admin/unread-words",
@@ -1014,20 +1014,6 @@
       }
     },
     {
-      "path": "/api/plugins",
-      "method": "POST",
-      "operationId": "api_plugin_create_api_plugins_post",
-      "params": [
-        "cookie:inku_session:opt",
-        "header:authorization:opt"
-      ],
-      "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/PluginCreateBody\"}}},\"required\":true}",
-      "responses": {
-        "201": "{\"content\":{\"application/json\":{\"schema\":{\"additionalProperties\":true,\"title\":\"Response Api Plugin Create Api Plugins Post\",\"type\":\"object\"}}},\"description\":\"Successful Response\"}",
-        "422": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/HTTPValidationError\"}}},\"description\":\"Validation Error\"}"
-      }
-    },
-    {
       "path": "/api/plugins/reload",
       "method": "POST",
       "operationId": "api_plugins_reload_api_plugins_reload_post",
@@ -1067,36 +1053,6 @@
       "requestBody": "null",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"additionalProperties\":true,\"title\":\"Response Api Plugin Delete Api Plugins  Plugin Id  Delete\",\"type\":\"object\"}}},\"description\":\"Successful Response\"}",
-        "422": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/HTTPValidationError\"}}},\"description\":\"Validation Error\"}"
-      }
-    },
-    {
-      "path": "/api/plugins/{plugin_id}",
-      "method": "PUT",
-      "operationId": "api_plugin_update_api_plugins__plugin_id__put",
-      "params": [
-        "cookie:inku_session:opt",
-        "header:authorization:opt",
-        "path:plugin_id:req"
-      ],
-      "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/PluginUpdateBody\"}}},\"required\":true}",
-      "responses": {
-        "200": "{\"content\":{\"application/json\":{\"schema\":{\"additionalProperties\":true,\"title\":\"Response Api Plugin Update Api Plugins  Plugin Id  Put\",\"type\":\"object\"}}},\"description\":\"Successful Response\"}",
-        "422": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/HTTPValidationError\"}}},\"description\":\"Validation Error\"}"
-      }
-    },
-    {
-      "path": "/api/plugins/{plugin_id}/content",
-      "method": "GET",
-      "operationId": "api_plugin_content_api_plugins__plugin_id__content_get",
-      "params": [
-        "cookie:inku_session:opt",
-        "header:authorization:opt",
-        "path:plugin_id:req"
-      ],
-      "requestBody": "null",
-      "responses": {
-        "200": "{\"content\":{\"application/json\":{\"schema\":{\"additionalProperties\":true,\"title\":\"Response Api Plugin Content Api Plugins  Plugin Id  Content Get\",\"type\":\"object\"}}},\"description\":\"Successful Response\"}",
         "422": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/HTTPValidationError\"}}},\"description\":\"Validation Error\"}"
       }
     },
@@ -1670,11 +1626,9 @@
     "PlaceRecipe": "{\"additionalProperties\":false,\"properties\":{\"kind\":{\"const\":\"place\",\"title\":\"Kind\",\"type\":\"string\"}},\"required\":[\"kind\"],\"title\":\"PlaceRecipe\",\"type\":\"object\"}",
     "PlacementGroup": "{\"additionalProperties\":false,\"description\":\"One direct coordinated-group placement over a contiguous Score span.\",\"properties\":{\"at\":{\"$ref\":\"#/components/schemas/AtRegion\",\"description\":\"群全体の中心を一度だけ解決する named 配置領域\"},\"cycle_members\":{\"anyOf\":[{\"$ref\":\"#/components/schemas/CycleMembersV1\"},{\"type\":\"null\"}]},\"end\":{\"description\":\"配置する Score instruction 範囲の終端 exclusive index\",\"minimum\":0.0,\"title\":\"End\",\"type\":\"integer\"},\"layout\":{\"enum\":[\"overlap\",\"horizontal_source_order\",\"scatter\",\"tile\"],\"title\":\"Layout\",\"type\":\"string\"},\"members\":{\"description\":\"Score 0.9 Macro body boundaries; absent retains the legacy drawable span\",\"items\":{\"$ref\":\"#/components/schemas/PlacementMember\"},\"title\":\"Members\",\"type\":\"array\"},\"resolved\":{\"anyOf\":[{\"$ref\":\"#/components/schemas/ResolvedPlacementGroup\"},{\"type\":\"null\"}]},\"start\":{\"description\":\"配置する Score instruction 範囲の開始 index\",\"minimum\":0.0,\"title\":\"Start\",\"type\":\"integer\"}},\"required\":[\"start\",\"end\",\"layout\",\"at\"],\"title\":\"PlacementGroup\",\"type\":\"object\"}",
     "PlacementMember": "{\"additionalProperties\":false,\"description\":\"One atomic source member of a Score 0.9 coordinated placement.\",\"properties\":{\"anchor_indices\":{\"items\":{\"minimum\":0.0,\"type\":\"integer\"},\"title\":\"Anchor Indices\",\"type\":\"array\"},\"end\":{\"minimum\":0.0,\"title\":\"End\",\"type\":\"integer\"},\"start\":{\"minimum\":0.0,\"title\":\"Start\",\"type\":\"integer\"},\"symbolic\":{\"anyOf\":[{\"$ref\":\"#/components/schemas/SymbolicMember\"},{\"type\":\"null\"}]},\"transform_group_indices\":{\"items\":{\"minimum\":0.0,\"type\":\"integer\"},\"title\":\"Transform Group Indices\",\"type\":\"array\"}},\"required\":[\"start\",\"end\"],\"title\":\"PlacementMember\",\"type\":\"object\"}",
-    "PluginCreateBody": "{\"properties\":{\"content\":{\"maxLength\":500000,\"minLength\":1,\"title\":\"Content\",\"type\":\"string\"},\"filename\":{\"anyOf\":[{\"maxLength\":200,\"type\":\"string\"},{\"type\":\"null\"}],\"title\":\"Filename\"}},\"required\":[\"content\"],\"title\":\"PluginCreateBody\",\"type\":\"object\"}",
     "PluginEnabledBody": "{\"properties\":{\"enabled\":{\"title\":\"Enabled\",\"type\":\"boolean\"}},\"required\":[\"enabled\"],\"title\":\"PluginEnabledBody\",\"type\":\"object\"}",
     "PluginSettingsStatus": "{\"properties\":{\"enabled\":{\"default\":false,\"title\":\"Enabled\",\"type\":\"boolean\"},\"loaded\":{\"items\":{\"additionalProperties\":true,\"type\":\"object\"},\"title\":\"Loaded\",\"type\":\"array\"},\"note\":{\"title\":\"Note\",\"type\":\"string\"},\"runtime_editable\":{\"default\":false,\"title\":\"Runtime Editable\",\"type\":\"boolean\"}},\"required\":[\"note\"],\"title\":\"PluginSettingsStatus\",\"type\":\"object\"}",
     "PluginStorageBody": "{\"properties\":{\"storage\":{\"additionalProperties\":true,\"title\":\"Storage\",\"type\":\"object\"}},\"title\":\"PluginStorageBody\",\"type\":\"object\"}",
-    "PluginUpdateBody": "{\"properties\":{\"content\":{\"maxLength\":500000,\"minLength\":1,\"title\":\"Content\",\"type\":\"string\"}},\"required\":[\"content\"],\"title\":\"PluginUpdateBody\",\"type\":\"object\"}",
     "PluginValidateBody": "{\"properties\":{\"document\":{\"maxLength\":500000,\"minLength\":1,\"title\":\"Document\",\"type\":\"string\"}},\"required\":[\"document\"],\"title\":\"PluginValidateBody\",\"type\":\"object\"}",
     "PluginValueBody": "{\"properties\":{\"value\":{\"additionalProperties\":true,\"title\":\"Value\",\"type\":\"object\"}},\"title\":\"PluginValueBody\",\"type\":\"object\"}",
     "PointDimensions": "{\"additionalProperties\":false,\"properties\":{\"kind\":{\"const\":\"point\",\"title\":\"Kind\",\"type\":\"string\"},\"radius\":{\"exclusiveMinimum\":0.0,\"title\":\"Radius\",\"type\":\"number\"}},\"required\":[\"kind\",\"radius\"],\"title\":\"PointDimensions\",\"type\":\"object\"}",
@@ -1732,5 +1686,5 @@
     "VisionRefineAdviceBody": "{\"properties\":{\"direction\":{\"default\":\"\",\"maxLength\":2000,\"title\":\"Direction\",\"type\":\"string\"},\"enabled_kinds\":{\"items\":{\"type\":\"string\"},\"maxItems\":5,\"minItems\":1,\"title\":\"Enabled Kinds\",\"type\":\"array\"},\"history_id\":{\"maxLength\":200,\"minLength\":1,\"title\":\"History Id\",\"type\":\"string\"},\"instruction\":{\"maxLength\":100000,\"minLength\":1,\"title\":\"Instruction\",\"type\":\"string\"},\"language\":{\"default\":\"ja\",\"pattern\":\"^(ja|en)$\",\"title\":\"Language\",\"type\":\"string\"},\"model\":{\"anyOf\":[{\"maxLength\":200,\"minLength\":1,\"type\":\"string\"},{\"type\":\"null\"}],\"title\":\"Model\"}},\"required\":[\"history_id\",\"instruction\",\"enabled_kinds\"],\"title\":\"VisionRefineAdviceBody\",\"type\":\"object\"}",
     "VisionRefineAdviceResponse": "{\"properties\":{\"model\":{\"title\":\"Model\",\"type\":\"string\"},\"next_direction\":{\"title\":\"Next Direction\",\"type\":\"string\"},\"observation\":{\"title\":\"Observation\",\"type\":\"string\"},\"suggested_kind\":{\"title\":\"Suggested Kind\",\"type\":\"string\"}},\"required\":[\"observation\",\"next_direction\",\"suggested_kind\",\"model\"],\"title\":\"VisionRefineAdviceResponse\",\"type\":\"object\"}"
   },
-  "digest": "762d4122f741521e41ae3fe00a87da98da0b07ae738958ddd227d0a678310004"
+  "digest": "d726a039297b0d6fd14fb5db5a72d0c30df690961a6a10b4ec39408b9392d8ca"
 }

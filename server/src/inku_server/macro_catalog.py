@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from .pipeline_candidate import CandidateHostError
-from .plugins import DOCUMENT_PLUGIN_MANAGER
+from .plugins import DOCUMENT_PLUGIN_MANAGER, bundled_package_for
 
 
 def _bytes(value: Mapping[str, Any]) -> bytes:
@@ -47,15 +47,15 @@ def _canonical_candidates(
 def _installed_candidates() -> tuple[list[dict[str, str]], list[str]]:
     candidates = []
     bundled_packages = []
-    bundled_document = Path(__file__).resolve().parents[2] / "plugins/nature-leaves.inku-plugin.md"
     for document in DOCUMENT_PLUGIN_MANAGER.documents():
         # The installed document remains the enable/disable handle. Arbitrary
         # user Markdown with the same namespace is not translated implicitly.
-        is_bundled = document.source_path and Path(document.source_path).resolve() == bundled_document
+        package_id = bundled_package_for(document.source_path)
+        is_bundled = package_id is not None
         if is_bundled:
-            bundled_packages.append("Nature.leaves")
+            bundled_packages.append(package_id)
         source_id = (
-            "bundled:Nature.leaves" if is_bundled else Path(document.source_path).name
+            f"bundled:{package_id}" if is_bundled else Path(document.source_path).name
             if document.source_path
             else document.manifest.name
         )

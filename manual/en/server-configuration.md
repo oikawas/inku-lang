@@ -119,6 +119,10 @@ The hard timeout also applies when a stage cannot acquire an execution slot. If 
 | `INKU_COERCE_DISABLE` | Switch off coerce, the auto-repair pass. **Diagnostic only** | unset |
 | `INKU_DEVELOPER_MODE` | Extra developer-facing output | unset |
 
+The `Plugins` settings show vocabulary plugins: whether each is on, and its words (name, aliases, surfaces, notes, preview). Plugin documents cannot be created or edited there. Only a bundled package whose definitions the developers wrote in JSON (today `Nature.leaves`) is drawn from, and its document is marked `Used for drawing`. Any other `.inku-plugin.md` is a legacy document without definitions and is marked `Not used for drawing`: writing its words leaves them out with a diagnostic. A legacy document can be deleted; a bundled package's document cannot (switch it off instead).
+
+A document counts as a bundled package only where it sits in `server/plugins/`. With `INKU_DOCUMENT_PLUGIN_DIR` pointed elsewhere, a `nature-leaves.inku-plugin.md` placed there is treated as legacy and the `Nature.leaves` words are not drawn. If the settings mark it `Not used for drawing`, check that directory.
+
 The default for `INKU_LEARNED_FILE` is under `/tmp`, so it does not survive a restart. Give it a stable path to persist it.
 
 `INKU_COERCE_DISABLE` turns off auto-repair entirely: neither invisible-color correction nor overcrowding damping applies. **Do not set it in production.** It exists for isolating a problem.

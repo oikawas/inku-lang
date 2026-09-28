@@ -232,7 +232,8 @@ def test_t8_the_api_surface_delta_is_exactly_the_three_user_schemas() -> None:
     # (2026-09-14, "Removed reconstructed old prompts presented as sent
     # records"), and its response schema went with it. Named here so any other
     # frozen name leaving is still red.
-    declared_retirements = {"PromptsResponse"}
+    # Plugin document writes left with the editor that used them (I-703).
+    declared_retirements = {"PromptsResponse", "PluginCreateBody", "PluginUpdateBody"}
     assert declared_retirements <= set(frozen_names)
     for name in declared_retirements:
         assert name not in after["schemas"], f"{name} was declared retired"

@@ -6,6 +6,17 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 39 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-28 — The Plugins settings become a screen for the vocabulary packages drawing uses (I-703)
+
+At the author's direction. The `User plugins` settings created and edited `.inku-plugin.md` documents, but drawing uses only definitions the developers wrote in JSON: a written document's expansion was never drawn from and its words were left out. The screen is now `Vocabulary plugins`:
+
+- Creating (load from file) and viewing or editing code are gone, and so are `POST /api/plugins`, `PUT /api/plugins/{id}`, and `GET /api/plugins/{id}/content` (listing, validation, and reload, which the CLI uses, remain).
+- A document that switches a bundled package is marked `Used for drawing`, any other `Not used for drawing`, each with an explanation. Each item of the list (`/api/plugins` and the settings status) gains `has_definitions`.
+- Only a legacy document not used for drawing can be deleted. Deleting a bundled package's document is refused with 409 and the screen suggests switching it off.
+- Each package shows its words (name, aliases, surfaces, notes, preview) read-only.
+
+A document still counts as a bundled package only where it sits in `server/plugins/`; the manual now says that pointing `INKU_DOCUMENT_PLUGIN_DIR` elsewhere treats `Nature.leaves` as legacy too. Definitions, drawing, and saved works are unchanged.
+
 ### v2.15.38 — numeric position ranges and model administration improvements (Build 1114, 2026-09-28)
 
 This version includes the changes below since v2.15.37. DDL Spec 15 and DDL engine 52 allow positions to be specified as numeric ranges. It improves work display and catalog changes, diagnostics, restrictions on offering models, and the model settings screen. The render engine and API route count are unchanged.

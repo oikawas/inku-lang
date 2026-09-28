@@ -206,7 +206,7 @@ Nature plugin（雨・葉・水・風）のような具象語彙をコアに入�
 
 Canvasのcanonical ownerはshared coreの`inku.canvas-format-registry.v1`であり、語彙pluginやsystem pluginではない。Canvas selectionはresolved host optionとしてvisible DDL本文とMacroInvocation / MacroDefinitionの外に置く。同じDDLを異なるcanvasへ使え、選択が無いhost boundaryでは`square`をhost defaultにできるが、DDL compilerが`square`をsemantic factとして挿入する意味ではない。Hostが選択をScore / render context / historyへ運び、RendererがSVGの`width` / `height` / `viewBox`を解決する（§19）。
 
-現行runtimeの`plugin_storage["canvas-aspect"]`、`canvas_aspect` request alias、保存済み`Score.canvas` / `render_canvas_aspect*`、system / user plugin directory、plugin status / enable toggleはlegacy互換操作として残る。これらは読み取りだけでなく、legacy plugin documentやenable状態の更新も行える。しかしそのことはsemantic authorityでも、`MacroDefinition`形式の新規authoring / loading APIでもない。保存済み設定とcatalog発見に必要なstorage／API互換を保ち、これらを旧意味決定実装の実行経路にはしない。Stage 2が現行互換経路でcanvasを受け取る場合もhost-resolved composition contextであり、visible DDL metadataではない。DDL sourceの座標、語、canonical meaningを書き換えない。
+現行runtimeの`plugin_storage["canvas-aspect"]`、`canvas_aspect` request alias、保存済み`Score.canvas` / `render_canvas_aspect*`、system / user plugin directory、plugin status / enable toggleはlegacy互換操作として残る。これらは読み取りと、enable状態の更新、定義を持たないlegacy plugin documentの削除を行える。plugin documentの作成・更新・本文読出しのAPIと設定画面のeditorは廃止した（2026-09-28、I-703）。設定画面は、同梱packageを切り替える文書を「描画に使う」、それ以外を「描画には使われない」と示し、語の一覧（名前・別名・表記・注釈・preview）を読むだけで出す。同梱packageを切り替える文書は削除できない（409）。しかしそのことはsemantic authorityでも、`MacroDefinition`形式の新規authoring / loading APIでもない。保存済み設定とcatalog発見に必要なstorage／API互換を保ち、これらを旧意味決定実装の実行経路にはしない。Stage 2が現行互換経路でcanvasを受け取る場合もhost-resolved composition contextであり、visible DDL metadataではない。DDL sourceの座標、語、canonical meaningを書き換えない。
 
 ### 4.5 MacroDefinitionによる展開モデル
 

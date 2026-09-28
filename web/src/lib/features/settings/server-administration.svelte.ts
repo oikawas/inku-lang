@@ -9,9 +9,20 @@ export type PluginItem = {
 	status: string;
 	path?: string;
 	reasons?: string[];
-	entries?: Array<{ qualified_name: string; note_ja: string; note_en: string }>;
+	entries?: Array<{
+		qualified_name: string;
+		aliases?: string[];
+		surface_ja?: string[];
+		surface_en?: string[];
+		note_ja: string;
+		note_en: string;
+		has_preview?: boolean;
+	}>;
 	id?: string;
 	enabled?: boolean;
+	/** Whether the drawing uses definitions this document switches (a package
+	    bundled with the core). A legacy document without them is not drawn from. */
+	has_definitions?: boolean;
 };
 
 export type DbBackupEntry = {
@@ -112,9 +123,6 @@ export type ServerAdministration = {
 	readonly renderConcurrencyStatus: string | null;
 	loadStatus: () => Promise<void>;
 	resetForLoggedOut: () => void;
-	loadPluginContent: (id: string) => Promise<string | null>;
-	savePlugin: (id: string, content: string) => Promise<string[] | null>;
-	createPlugin: (content: string, filename: string) => Promise<string[] | null>;
 	deletePlugin: (id: string) => Promise<boolean>;
 	setPluginEnabled: (id: string, enabled: boolean) => Promise<boolean>;
 	updateDbBackupSettings: (intervalDays: number, maxGenerations: number, backupHour: number, backupMinute: number) => Promise<void>;
@@ -183,62 +191,6 @@ export function createServerAdministration<TActor extends SettingsActor>(
 		if (Array.isArray(detail)) return (detail as string[]).join(' / ');
 		if (typeof detail === 'string') return detail;
 		return `HTTP ${status}`;
-	}
-
-	async function loadPluginContent(id: string): Promise<string | null> {
-		pluginActionStatus = null;
-		try {
-			const response = await deps.apiFetch(`/api/plugins/${encodeURIComponent(id)}/content`);
-			if (!response.ok) {
-				const body = await response.json().catch(() => ({})) as { detail?: unknown };
-				pluginActionStatus = pluginErrorMessage(response.status, body.detail);
-				return null;
-			}
-			const data = await response.json() as { content?: string };
-			return data.content ?? '';
-		} catch (error) {
-			pluginActionStatus = error instanceof Error ? error.message : String(error);
-			return null;
-		}
-	}
-
-	// Returns null on success, or validation messages on failure.
-	async function savePlugin(id: string, content: string): Promise<string[] | null> {
-		pluginActionStatus = null;
-		try {
-			const response = await deps.apiFetch(`/api/plugins/${encodeURIComponent(id)}`, {
-				method: 'PUT',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ content })
-			});
-			if (!response.ok) {
-				const body = await response.json().catch(() => ({})) as { detail?: unknown };
-				return Array.isArray(body.detail) ? body.detail as string[] : [pluginErrorMessage(response.status, body.detail)];
-			}
-			await loadSettingsStatus();
-			return null;
-		} catch (error) {
-			return [error instanceof Error ? error.message : String(error)];
-		}
-	}
-
-	async function createPlugin(content: string, filename: string): Promise<string[] | null> {
-		pluginActionStatus = null;
-		try {
-			const response = await deps.apiFetch('/api/plugins', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ content, filename })
-			});
-			if (!response.ok) {
-				const body = await response.json().catch(() => ({})) as { detail?: unknown };
-				return Array.isArray(body.detail) ? body.detail as string[] : [pluginErrorMessage(response.status, body.detail)];
-			}
-			await loadSettingsStatus();
-			return null;
-		} catch (error) {
-			return [error instanceof Error ? error.message : String(error)];
-		}
 	}
 
 	async function deletePlugin(id: string): Promise<boolean> {
@@ -417,9 +369,6 @@ export function createServerAdministration<TActor extends SettingsActor>(
 		get renderConcurrencyStatus() { return renderConcurrencyStatus; },
 		loadStatus: loadSettingsStatus,
 		resetForLoggedOut,
-		loadPluginContent,
-		savePlugin,
-		createPlugin,
 		deletePlugin,
 		setPluginEnabled,
 		updateDbBackupSettings,

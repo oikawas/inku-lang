@@ -132,9 +132,6 @@ export function createSettingsController<TActor extends SettingsActor>(
 			userAdministration.resetForLoggedOut();
 			serverAdministration.resetForLoggedOut();
 		},
-		loadPluginContent: serverAdministration.loadPluginContent,
-		savePlugin: serverAdministration.savePlugin,
-		createPlugin: serverAdministration.createPlugin,
 		deletePlugin: serverAdministration.deletePlugin,
 		setPluginEnabled: serverAdministration.setPluginEnabled,
 		updateDbBackupSettings: serverAdministration.updateDbBackupSettings,

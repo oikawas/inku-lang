@@ -137,7 +137,7 @@ previewの出典として使われ、その展開の散文は定義として解�
 ではない。
 
 `plugin_storage["canvas-aspect"]`、`canvas_aspect` request alias、system/user plugin directoryは、
-退役作業が未完了の間のcompatibility surfaceである。Serverの文書単位の有効・無効と、Androidの
+退役作業が未完了の間のcompatibility surfaceである。Serverの設定画面は文書を作成・編集せず（2026-09-28）、定義を持たない文書を「描画には使われない」と示す。Serverの文書単位の有効・無効と、Androidの
 `Nature.leaves`の切り替えは、同梱packageを新しい作品で使うかどうかを決める。保存済みの作品は
 lockした定義を使うので、切り替えの影響を受けない。どれも語彙macroのauthoring APIまたは
 loading APIではない。

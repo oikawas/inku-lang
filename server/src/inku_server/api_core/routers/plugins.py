@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field
 from ...plugins import (
     DOCUMENT_PLUGIN_MANAGER,
     PluginFormatError,
+    plugin_has_definitions,
     plugin_item_with_fires_on,
     validate_plugin_document,
 )
@@ -20,15 +21,6 @@ class PluginValidateBody(BaseModel):
     document: str = Field(..., min_length=1, max_length=500_000)
 
 
-class PluginCreateBody(BaseModel):
-    content: str = Field(..., min_length=1, max_length=500_000)
-    filename: str | None = Field(default=None, max_length=200)
-
-
-class PluginUpdateBody(BaseModel):
-    content: str = Field(..., min_length=1, max_length=500_000)
-
-
 class PluginEnabledBody(BaseModel):
     enabled: bool
 
@@ -39,7 +31,7 @@ def api_plugins() -> dict[str, object]:
     # qualified name would have fired ("Nature.菖蒲" -> 下草).
     return {
         "items": [
-            plugin_item_with_fires_on(item.as_dict())
+            {**plugin_item_with_fires_on(item.as_dict()), "has_definitions": plugin_has_definitions(item.path)}
             for item in DOCUMENT_PLUGIN_MANAGER.items()
         ]
     }
@@ -69,48 +61,13 @@ def api_plugins_reload(actor: dict = Depends(_admin_user)) -> dict[str, object]:
     return {"items": [item.as_dict() for item in items]}
 
 
-@router.get("/api/plugins/{plugin_id}/content")
-def api_plugin_content(plugin_id: str, actor: dict = Depends(_admin_user)) -> dict[str, object]:
-    try:
-        content = DOCUMENT_PLUGIN_MANAGER.content(plugin_id)
-    except PluginFormatError as exc:
-        raise HTTPException(status_code=422, detail=list(exc.reasons)) from exc
-    except FileNotFoundError:
-        raise HTTPException(status_code=404, detail="plugin not found") from None
-    return {"id": plugin_id, "path": plugin_id, "content": content, "editable": True}
-
-
-@router.post("/api/plugins", status_code=201)
-def api_plugin_create(
-    body: PluginCreateBody,
-    actor: dict = Depends(_admin_user),
-) -> dict[str, object]:
-    try:
-        item = DOCUMENT_PLUGIN_MANAGER.create(body.content, filename=body.filename)
-    except PluginFormatError as exc:
-        raise HTTPException(status_code=422, detail=list(exc.reasons)) from exc
-    except FileExistsError as exc:
-        raise HTTPException(status_code=409, detail=f"plugin file already exists: {exc}") from None
-    return item.as_dict()
-
-
-@router.put("/api/plugins/{plugin_id}")
-def api_plugin_update(
-    plugin_id: str,
-    body: PluginUpdateBody,
-    actor: dict = Depends(_admin_user),
-) -> dict[str, object]:
-    try:
-        item = DOCUMENT_PLUGIN_MANAGER.update(plugin_id, body.content)
-    except PluginFormatError as exc:
-        raise HTTPException(status_code=422, detail=list(exc.reasons)) from exc
-    except FileNotFoundError:
-        raise HTTPException(status_code=404, detail="plugin not found") from None
-    return item.as_dict()
-
-
 @router.delete("/api/plugins/{plugin_id}")
 def api_plugin_delete(plugin_id: str, actor: dict = Depends(_admin_user)) -> dict[str, object]:
+    # A package the drawing uses is switched off, not deleted: removing its
+    # document would also remove its words and previews from the Saijiki.
+    # Only legacy Markdown, which nothing draws from, can be removed here.
+    if plugin_has_definitions(plugin_id):
+        raise HTTPException(status_code=409, detail="a package the drawing uses cannot be deleted; switch it off instead")
     try:
         DOCUMENT_PLUGIN_MANAGER.delete(plugin_id)
     except PluginFormatError as exc:

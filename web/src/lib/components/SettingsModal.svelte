@@ -414,8 +414,7 @@
 					pluginsStatus={settingsStatus?.plugins ?? null}
 					{settingsStatusError} {settingsStatusLoading} pluginActionStatus={settings.pluginActionStatus}
 					{isAdmin} onLoadSettingsStatus={settings.loadStatus}
-					onLoadPluginContent={settings.loadPluginContent} onSavePlugin={settings.savePlugin}
-					onCreatePlugin={settings.createPlugin} onDeletePlugin={settings.deletePlugin}
+					onDeletePlugin={settings.deletePlugin}
 					onSetPluginEnabled={settings.setPluginEnabled}
 				/>
 		{:else if settingsTab === 'users'}

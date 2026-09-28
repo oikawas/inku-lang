@@ -56,6 +56,8 @@ def test_silverpoint_keeps_its_rust_render_properties() -> None:
     assert silverpoint == {
         "weight": "silverpoint",
         "stroke_width": 0.5,
+        "thick_stroke_width": 0.9,
+        "extra_thick_stroke_width": 1.5,
         "stroke_opacity": 0.72,
         "stroke_dasharray": None,
         "stroke_linecap": "butt",

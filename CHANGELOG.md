@@ -6,6 +6,14 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 50 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-28 — Description locking judges a `replay` by its DDL
+
+At the author's ruling. Description locking treated every `replay` as keeping its parent's DDL, which mistook two cases.
+
+- A work drawn on the Describe tab with its description unchanged read the description again but was saved as `replay`; such older works under a locked parent were locked. A `replay` whose DDL differs from its parent's is now a reading and not locked.
+- Drawing again from the DDL panel without an edit starts a DDL-authoritative variation, so a work nobody edited was shown `Held (DDL edited)`. A `replay` whose DDL is its parent's is now locked only when its parent is; a pipeline fork with changed words follows the drawn work's lock, and the Web's Describe tab uses the saved work's lock.
+- SPEC (Japanese and English) says so.
+
 ### v2.15.49 — Hold descriptions after DDL edits (Build 1125, 2026-09-28)
 
 This version includes the changes below since v2.15.48. Description locking now applies across Server, Web and CLI routes, and autonomous refinement draws from the held DDL. DDL, Score and rendering versions are unchanged.

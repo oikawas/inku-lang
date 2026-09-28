@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from inku_server.persistence.description_lock import locked_history_ids, node_is_locked
 from inku_server.persistence.schema import (
+    HistoryRow,
     LineageEdgeRow,
     LineageNodeRow,
     PipelineHistoryLinkRow,
@@ -16,13 +17,15 @@ from inku_server.persistence.schema import (
 
 def _session() -> Session:
     engine = create_engine("sqlite://")
-    for table in (LineageNodeRow, LineageEdgeRow, PipelineHistoryLinkRow, VariationAuthorityRow):
+    for table in (HistoryRow, LineageNodeRow, LineageEdgeRow, PipelineHistoryLinkRow, VariationAuthorityRow):
         table.__table__.create(engine)
     return Session(engine)
 
 
 def _work(session: Session, history_id: str, parent: str | None = None, kind: str | None = None,
-          authority: str | None = None) -> None:
+          authority: str | None = None, ddl: str | None = None) -> None:
+    if ddl is not None:
+        session.add(HistoryRow(id=history_id, at=0, input="", ddl=ddl))
     session.add(LineageNodeRow(id=f"n-{history_id}", user_id="u", history_id=history_id, state="active", at=0))
     if parent is not None:
         session.add(LineageEdgeRow(id=f"e-{history_id}", user_id="u", parent_node_id=f"n-{parent}",
@@ -55,3 +58,23 @@ def test_a_ddl_edit_and_what_keeps_its_ddl_are_locked_and_a_new_reading_is_not()
     assert node_is_locked(session, "n-recolored") is True
     assert node_is_locked(session, "n-reread-touched") is False
     assert locked_history_ids(session, []) == set()
+
+
+def test_a_replay_is_held_by_its_ddl_not_by_its_kind():
+    session = _session()
+    _work(session, "edited", authority="ddl_authoritative", ddl="Scene:\n  Moon")
+    # The Describe tab saved an unchanged description drawn again as a replay:
+    # Stage 1 wrote a new DDL, so it went back to the words.
+    _work(session, "reread", "edited", "replay", authority="description_authoritative", ddl="Scene:\n  Sun")
+    # The same DDL drawn again from the DDL panel: a DDL-authoritative variation
+    # with no edit, held because its parent is.
+    _work(session, "redrawn", "edited", "replay", authority="ddl_authoritative", ddl="Scene:  Moon")
+    _work(session, "plain", authority="description_authoritative", ddl="Scene: Sun")
+    _work(session, "plain-redrawn", "plain", "replay", authority="ddl_authoritative", ddl="Scene: Sun")
+    _work(session, "plain-redrawn-touched", "plain-redrawn", "touch_change", ddl="Scene: Sun, soft")
+    _work(session, "unknown-ddl", "edited", "replay")  # nothing to compare: as before
+    session.commit()
+
+    everything = ["edited", "reread", "redrawn", "plain", "plain-redrawn", "plain-redrawn-touched", "unknown-ddl"]
+    assert locked_history_ids(session, everything) == {"edited", "redrawn", "unknown-ddl"}
+    assert node_is_locked(session, "n-plain-redrawn") is False

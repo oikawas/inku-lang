@@ -462,8 +462,14 @@ class PipelineService:
             raise HTTPException(409, "authority_conflict")
         # A variation its DDL holds starts a new one from its description as it
         # stands; the words are changed afterwards, in the variation that follows them.
+        # Once drawn, the saved work decides: a DDL drawn again unedited is held
+        # only if its parent was (persistence/description_lock.py).
         if previous["authority"]["authority"] == "ddl_authoritative" and _rewords(body.description, previous.get("description", "")):
-            raise HTTPException(409, DESCRIPTION_LOCKED)
+            drawn = (previous.get("result") or {}).get("history_id")
+            if drawn:
+                _refuse_if_locked(drawn)
+            else:
+                raise HTTPException(409, DESCRIPTION_LOCKED)
         source_run = self.execution(owner, previous["execution_id"])
         source_work = {**previous, "saved_config": source_run.config,
                        "host_options": source_run.context.get("host_options", {}),

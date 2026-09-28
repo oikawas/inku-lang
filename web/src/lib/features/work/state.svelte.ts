@@ -355,14 +355,17 @@ export function createWorkState(deps: WorkStateDeps) {
 	// server: the question is about this sitting, not about the work (contract
 	// §5-7). See $lib/fallbackRefineGate.
 	const fallbackRefineAsked = new Set<string>();
-	// The work on screen is held by its DDL: the authoring variation, or the
-	// saved work the server marked (an edit, or derived from one without
-	// reading the description again). Its description is not drawn from.
-	const descriptionLocked = $derived(
-		pipelineView
-			? pipelineView.authority.authority === 'ddl_authoritative'
-			: displayedHistoryItem?.description_locked === true
-	);
+	// The work on screen is held by its DDL: the saved work the server marked
+	// (an edit, or derived from one without reading the description again), or,
+	// before it is saved, the authoring variation. A DDL drawn again unedited is
+	// a DDL-authoritative variation, yet held only if its parent was, so once
+	// the variation's work is saved, the server's mark decides.
+	const descriptionLocked = $derived.by(() => {
+		const saved = displayedHistoryItem?.description_locked;
+		if (!pipelineView) return saved === true;
+		if (saved !== undefined && displayedHistoryItem?.id === pipelineView.result?.history_id) return saved;
+		return pipelineView.authority.authority === 'ddl_authoritative';
+	});
 	const ddlEditedAfterGeneration = $derived(inputMode === 'single' && ddl !== null && ddlGeneratedBaseline !== null && ddl !== ddlGeneratedBaseline);
 	const canSubmit = $derived(
 		inputMode === 'single' ? !!pipelineDescription(input).trim() : inputMode === 'batch' ? batch.nonEmpty > 0 : false

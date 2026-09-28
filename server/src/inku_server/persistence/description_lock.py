@@ -12,13 +12,20 @@ from the description would throw the edits away. Such a work is
 
 A work derived by reading the description again is not locked: that is where
 the lineage went back to the words. The kinds below are those readings.
+
+A `replay` is judged by its DDL, not by its kind or its variation. The Describe
+tab saved an unchanged description drawn again as a replay, though it read the
+words again: a replay whose DDL differs from its parent's is such a reading.
+One whose DDL is the parent's is the parent's DDL drawn again; drawing from DDL
+starts a DDL-authoritative variation, but no edit was made, so it is held
+exactly when its parent is.
 """
 
 from __future__ import annotations
 
 from collections.abc import Iterable
 
-from .schema import LineageEdgeRow, LineageNodeRow, PipelineHistoryLinkRow, VariationAuthorityRow
+from .schema import HistoryRow, LineageEdgeRow, LineageNodeRow, PipelineHistoryLinkRow, VariationAuthorityRow
 
 # Derivations that draw from the description again. A child made this way
 # follows its words, whatever its parent was.
@@ -60,18 +67,36 @@ def locked_history_ids(session, history_ids: Iterable[str]) -> set[str]:
             for node in session.query(LineageNodeRow).filter(LineageNodeRow.id.in_(unseen)).all():
                 history_of_node[node.id] = node.history_id
         frontier = {parent for parent in parents if parent not in edge_of_child}
-    ddl_authoritative = _ddl_authoritative_histories(
-        session, list({*starts, *(history for history in history_of_node.values() if history)})
-    )
+    histories = list({*starts, *(history for history in history_of_node.values() if history)})
+    ddl_authoritative = _ddl_authoritative_histories(session, histories)
+    ddl_of_history = _ddl_of_histories(session, [
+        history_of_node.get(node) for node in {
+            node for child, (parent, kind) in edge_of_child.items() if kind == "replay" for node in (child, parent)
+        }
+    ])
+
+    def same_ddl(child: str, parent: str) -> bool | None:
+        child_ddl = ddl_of_history.get(history_of_node.get(child) or "")
+        parent_ddl = ddl_of_history.get(history_of_node.get(parent) or "")
+        if not child_ddl or not parent_ddl:
+            return None
+        return child_ddl == parent_ddl
 
     def locked(node_id: str) -> bool:
         seen: set[str] = set()
         current: str | None = node_id
         while current is not None and current not in seen:
             seen.add(current)
+            edge = edge_of_child.get(current)
+            if edge is not None and edge[1] == "replay":
+                same = same_ddl(current, edge[0])
+                if same is False:
+                    return False
+                if same is True:
+                    current = edge[0]
+                    continue
             if history_of_node.get(current) in ddl_authoritative:
                 return True
-            edge = edge_of_child.get(current)
             if edge is None:
                 return False
             parent, kind = edge
@@ -82,9 +107,18 @@ def locked_history_ids(session, history_ids: Iterable[str]) -> set[str]:
             current = parent
         return False
 
-    return {history_id for history_id, node_id in node_of_history.items() if locked(node_id)} | (
-        set(starts) & ddl_authoritative
-    )
+    return {history_id for history_id, node_id in node_of_history.items() if locked(node_id)} | {
+        history_id for history_id in starts if history_id not in node_of_history and history_id in ddl_authoritative
+    }
+
+
+def _ddl_of_histories(session, history_ids: list[str | None]) -> dict[str, str]:
+    """Each work's DDL, spacing aside, for telling a replay from a reading."""
+    wanted = [history_id for history_id in history_ids if history_id]
+    if not wanted:
+        return {}
+    rows = session.query(HistoryRow.id, HistoryRow.ddl).filter(HistoryRow.id.in_(wanted)).all()
+    return {row.id: " ".join(row.ddl.split()) for row in rows if row.ddl}
 
 
 def _ddl_authoritative_histories(session, history_ids: list[str]) -> set[str]:

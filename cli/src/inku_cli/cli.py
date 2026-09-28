@@ -3374,6 +3374,13 @@ def command_refine(args: argparse.Namespace) -> int:
         parent_node_id = target.get("lineage_node_id")
         if not parent_node_id:
             raise CliError(f"lineage node ID is missing on item {args.item_id}")
+        if target.get("description_locked"):
+            # Every kind here draws from the description, which would throw the
+            # work's edited DDL away; the server refuses it as well.
+            raise CliError(
+                f"history item {args.item_id} is held by its edited DDL, so it is not redrawn from its "
+                "description; refine it in the web app, or start a new variation from its description there"
+            )
         
         derivation_kind = _DERIVATION_KIND_BY_REFINE_KIND[args.kind]
 

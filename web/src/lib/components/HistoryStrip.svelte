@@ -29,6 +29,7 @@
 		trashed?: boolean;
 		starred?: boolean;
 	note?: string | null;
+		description_locked?: boolean;
 	};
 
 	type Props = {
@@ -247,11 +248,16 @@
 							     carries a level, and only a developer is shown it. -->
 							{#if developerMode && it.tenkei}<div class="tooltip-row"><span>{isJapanese ? '添景' : 'Staffage'}</span><strong>{it.tenkei}</strong></div>{/if}
 							<div class="tooltip-row"><span>{isJapanese ? '状態' : 'State'}</span><strong>{lineageStateLabel(it)}</strong></div>
+							{#if it.description_locked}<div class="tooltip-row"><span>{t().inputSectionLabel}</span><strong>{t().descriptionLockedMark}</strong></div>{/if}
 							<div class="tooltip-row"><span>{t().historyTooltipColorCatalog}</span><strong>{catalogName(it.catalog_id)}</strong></div>
 							<div class="tooltip-row"><span>Render</span><strong>{it.render_engine_version || t().historyVersionNotRecorded}</strong></div>
 							{#if it.note}<div class="tooltip-note"><span>{t().selectionNoteLabel}</span>{it.note}</div>{/if}
 						</div>
 						<HistoryThumbnail item={it} scope="strip" size="strip" />
+						{#if it.description_locked}
+							<!-- Held by its edited DDL: a mark, not a control. -->
+							<span class="thumb-held-badge" title={t().descriptionLockedMark} aria-label={t().descriptionLockedMark}><svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"></rect><path d="M8 11V7a4 4 0 0 1 8 0v4"></path></svg></span>
+						{/if}
 						<button
 							class="thumb-star"
 							class:starred={!!it.starred}
@@ -522,6 +528,17 @@
 	   position, not to the fact that used to sit there. */
 	.thumb-meta-first { font-size: var(--ui-font-size-12); font-weight: 650; color: var(--fg2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 	.thumb-meta-second { font-size: var(--ui-font-size-12); color: var(--fg2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+	.thumb-held-badge {
+		position: absolute;
+		top: 3px;
+		left: 3px;
+		display: inline-flex;
+		padding: 2px;
+		border-radius: 3px;
+		background: color-mix(in srgb, var(--bg) 78%, transparent);
+		color: var(--fg2);
+		pointer-events: none;
+	}
 	.thumb-current-badge {
 		position: absolute;
 		bottom: 22px;

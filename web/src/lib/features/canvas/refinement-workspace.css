@@ -339,6 +339,8 @@
 		font-size: var(--ui-font-size-11);
 	}
 	.model-choice.checked { border-color: var(--accent); color: var(--fg); }
+	.model-choice.held { opacity: .5; cursor: not-allowed; }
+	.refine-held-note { margin: 24px; max-width: 520px; color: var(--fg2); font-size: var(--ui-font-size-12); line-height: 1.6; }
 	.model-choice.target {
 		border-color: color-mix(in srgb, var(--accent) 62%, var(--border));
 		border-left-width: 4px;

@@ -285,7 +285,13 @@
 	{#if inputMode === 'single'}
 		<div class="input-label">
 			<div class="input-label-text">
-				<div class="input-heading">{t().inputSectionLabel}</div>
+				<div class="input-heading">
+					{t().inputSectionLabel}
+					{#if descriptionLocked}
+						<!-- A label, not a control: it says why the box below does not take input. -->
+						<span class="description-lock-mark"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"></rect><path d="M8 11V7a4 4 0 0 1 8 0v4"></path></svg>{t().descriptionLockedMark}</span>
+					{/if}
+				</div>
 				<div class="input-description">{t().inputSectionHint}</div>
 			</div>
 			<Tooltip placement="left" text={t().tooltipInputClear}>
@@ -306,10 +312,7 @@
 			></textarea>
 		</div>
 		{#if descriptionLocked}
-			<div class="description-lock">
-				<span>{t().pipelineDescriptionLocked}</span>
-				<button type="button" class="ghost-btn" disabled={singleRunning} onclick={onForkDescription}>{t().pipelineForkDescription}</button>
-			</div>
+			<p class="description-lock">{t().pipelineDescriptionLocked}</p>
 		{/if}
 		<div class="input-meta-row">
 			<span class="input-comment-hint">{t().inputCommentHint}</span>
@@ -332,9 +335,17 @@
 			/>
 			</div>
 		{:else}
-			<Tooltip placement="top" text={t().tooltipSubmit}>
-				<PaintButton onclick={onSubmit} disabled={!canSubmit || generationDisabled}>{t().submitBtn}</PaintButton>
-			</Tooltip>
+			{#if descriptionLocked}
+				<!-- Drawing a held work from its description is the fork, named as such,
+				     never a plain "draw" that throws the edited DDL away. -->
+				<Tooltip placement="top" text={t().tooltipForkDescription}>
+					<PaintButton onclick={onForkDescription} disabled={!canSubmit || generationDisabled}>{t().pipelineForkDescription}</PaintButton>
+				</Tooltip>
+			{:else}
+				<Tooltip placement="top" text={t().tooltipSubmit}>
+					<PaintButton onclick={onSubmit} disabled={!canSubmit || generationDisabled}>{t().submitBtn}</PaintButton>
+				</Tooltip>
+			{/if}
 		{/if}
 
 		{#if error}<p class="error-text">{error}</p>{/if}
@@ -529,7 +540,10 @@
 	}
 	.input-ta:focus { border-color: var(--accent); }
 	.input-ta[readonly] { background: var(--bg2); color: var(--fg2); }
-	.description-lock { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; font-size: var(--ui-font-size-12); color: var(--fg2); }
+	.description-lock { margin: 0; font-size: var(--ui-font-size-12); line-height: 1.55; color: var(--fg2); }
+	.description-lock-mark { display: inline-flex; align-items: center; gap: 4px; margin-left: 8px; color: var(--fg2); font-size: var(--ui-font-size-11); font-weight: 500; vertical-align: middle; }
+	/* Held: the box reads as fixed, not as a field waiting for input. */
+	.input-ta[readonly] { cursor: default; border-style: dashed; }
 	.input-meta-row {
 		display: flex;
 		flex-wrap: wrap;

@@ -83,6 +83,8 @@ export function describeApiErrorDetail(detail: unknown, status: number, strings:
 
 	const structured = object(detail);
 	if (structured?.code === 'model_not_offered') return strings.errorModelNotOffered;
+	// A redraw from the description of a work its edited DDL holds.
+	if (structured?.code === 'description_locked') return strings.descriptionLockedReason;
 	// The render core's reasons for not drawing a Score again; its own words
 	// stay in the server log.
 	if (typeof structured?.code === 'string' && RENDER_REFUSALS.has(structured.code)) {

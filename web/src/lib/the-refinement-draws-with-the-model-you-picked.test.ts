@@ -52,6 +52,6 @@ test('T-166  the run status names the model the run is drawing with', () => {
 test('T-167  random mode is left alone, because it never offered a choice', () => {
 	// The picker only exists in vision mode. Overriding the models in random
 	// mode would change what that mode draws with, which nobody asked for.
-	assert.match(MODAL, /refineMode === 'vision' && selectedVisionModel \? selectedVisionModel : null/);
-	assert.match(MODAL, /\{#if refineMode === 'vision'\}<ModelCardPicker/);
+	assert.match(MODAL, /mode === 'vision' && selectedVisionModel \? selectedVisionModel : null/);
+	assert.match(MODAL, /\{#if mode === 'vision'\}<ModelCardPicker/);
 });

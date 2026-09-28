@@ -186,6 +186,16 @@ A `namespace.word` such as `Nature.青葉` is marked in the plugin color only wh
 - **⚠ A qualified name that does not exist costs the whole sentence.** When the expansion layer strips `namespace.`, it removes that sentence with a warning. **The same warning stays under the work after it is painted.**
 - **A word without a dot is unchanged.** Written as plain `菖蒲` it stays an ordinary word and keeps its color.
 
+### A work whose DDL was edited holds its description
+
+A work whose instructions (DDL) were edited follows its DDL, not its description. Drawing it again from the description would lose the edits, so **its description is held**.
+
+- The Describe tab heading shows `Held (DDL edited)` and the description cannot be changed. In place of `Paint`, `Start a new variation from this description` appears: it draws the description as it stands as a new variation (the work stays as it is, and the description can be changed in the new variation).
+- In the work's edit menu, `Edit the description`, `Redraw with or without sketch from life` and `Change models` are shown but not offered, with the reason. `Another reading` in refinement and model comparison are not offered either.
+- A child made by touch, layout, color or variation carries the DDL and is held as well. A child made by reading the description again is not.
+- The history strip shows a lock mark, and a lineage card shows `Held (DDL edited)`.
+- Autonomous refinement uses no reading rounds and no Vision method, and draws each color, layout, touch or variation round from the DDL.
+
 ## 7. Choose Model, Color Catalog, Sketch, Wild, and Canvas
 
 `Conditions for the next work` on the Describe tab apply to the next painting. The input tabs are `Describe` and `Batch`. Batch shows the same kind of choices as its own `Drawing conditions for the next batch`.

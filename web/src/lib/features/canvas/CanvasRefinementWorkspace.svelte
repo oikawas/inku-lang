@@ -27,6 +27,7 @@
 		modelInspection: ModelInspection;
 		activeComparisonItem: { svg: string } | null;
 		statusDdlOrigin: boolean;
+		statusDescriptionLocked: boolean;
 		refineKind: RefineKind;
 		variationAmplitude: VariationAmplitude;
 		touchSeedText: string;
@@ -61,6 +62,7 @@
 		modelInspection,
 		activeComparisonItem,
 		statusDdlOrigin,
+		statusDescriptionLocked,
 		refineKind,
 		variationAmplitude = $bindable('medium'),
 		touchSeedText = $bindable(''),
@@ -110,6 +112,7 @@
 			{canvasAspectHeight}
 			{refinementSession}
 			{statusDdlOrigin}
+			{statusDescriptionLocked}
 			{refineKind}
 			bind:variationAmplitude
 			bind:touchSeedText
@@ -142,6 +145,10 @@
 			{onSaveAndClose}
 			{onDiscardAndClose}
 		/>
+	{:else if statusDescriptionLocked}
+		<!-- Comparing models reads the description again, which a work its DDL
+		     holds is not drawn from. -->
+		<p class="refine-held-note">{t().descriptionLockedReason}</p>
 	{:else}
 		<RefinementModelCompareView
 			{isJapanese}

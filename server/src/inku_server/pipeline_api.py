@@ -57,7 +57,11 @@ DESCRIPTION_LOCKED = {
 
 
 def _rewords(text: str, description: str) -> bool:
-    return " ".join(str(text).split()) != " ".join(str(description).split())
+    """Whether the words read differ, labels and spacing aside (the stored
+    description may keep the labels the page strips before showing it)."""
+    def read(value: str) -> str:
+        return " ".join(pipeline_description(str(value)).split())
+    return read(text) != read(description)
 
 
 def _refuse_if_locked(history_id: str) -> None:

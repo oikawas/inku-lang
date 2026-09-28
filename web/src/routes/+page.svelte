@@ -1597,6 +1597,17 @@ async function drawLineageSketchGrain(node: LineageNode, mode: SketchMode, signa
 	await showNewLineageChild(rendered.history_id, rendered.lineage_node_id);
 }
 
+/** One autonomous refinement generation of a work its edited DDL holds: drawn
+ *  from the parent's DDL as its child, never from the description. */
+async function paintFromParentDdl(parent: { id: string; pipeline_variation_id?: string | null }, ddl: string, options: PaintOptions & { signal?: AbortSignal }) {
+	if (!parent.id || !ddl.trim()) throw new Error(t().pipelineRequestFailed);
+	if (!(await work.selectHistoryAuthority(parent.id, parent.pipeline_variation_id ?? null, options.signal))) {
+		throw new DOMException('superseded', 'AbortError');
+	}
+	const view = await work.authorDdl(ddl, options, options.signal);
+	return { ...view.result, ddl: view.document?.source ?? ddl, pipeline_variation_id: view.variation_id, source_text: view.description };
+}
+
 async function drawLineageDdlEdit(node: LineageNode, editedDdl: string, signal?: AbortSignal): Promise<void> {
 	const nextDdl = editedDdl.trim();
 	if (!nextDdl || !node.history?.id) return;
@@ -2604,7 +2615,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 						batchNonEmpty={batch.nonEmpty}
 						{batchRunning}
 						singleRunning={work.singleRunning}
-						descriptionLocked={work.pipelineLocked}
+						descriptionLocked={work.descriptionLocked}
 						hideRunStatus={work.reloading}
 						singleDdlReady={work.ddl !== null}
 						batchActiveLine={batch.activeLine}
@@ -2940,6 +2951,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				onToggleSaijiki={() => (saijikiOpen = !saijikiOpen)}
 				onCloseRefinement={refreshLineageAfterRefine}
 				statusDdlOrigin={work.statusDdlOrigin}
+				statusDescriptionLocked={work.descriptionLocked}
 				statusTenkei={work.displayedHistoryItem?.tenkei ?? null}
 				{developerMode}
 				refineDrawingModelId={qualifiedModelId(stage2Provider, stage2Model)}
@@ -2957,6 +2969,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				onLoadLineageOverview={() => lineageState.loadOverview(currentLineageNodeId)}
 				onLoadLineageBranch={lineageState.loadBranch}
 				onPaintOne={work.paintOne}
+				onPaintDdl={paintFromParentDdl}
 				onVisionAdvice={work.requestVisionRefineAdvice}
 				pngTemplates={exportTemplates}
 				animationExportSettings={exportSettings.animation}

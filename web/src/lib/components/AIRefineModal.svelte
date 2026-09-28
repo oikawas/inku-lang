@@ -11,6 +11,9 @@
   import { createElapsed } from '$lib/elapsed.svelte';
   import { generationSketch } from '$lib/sketch';
   import { loadAiRefineSettings, saveAiRefineSettings } from '$lib/features/canvas/ai-refine-settings';
+  import { colorCatalogOverride } from '$lib/features/color-catalog/render';
+  import { ddlGenerationSeeds } from '$lib/features/canvas/ai-refine-generation';
+  import { wildOverride as wildRenderOverride } from '$lib/features/wild/render';
 
   type RefineMode = 'random' | 'vision';
   type VariationAmplitude = 'small' | 'medium' | 'large';
@@ -25,12 +28,14 @@
     stage2ModelLabel: string;
     onClose: () => void;
     onPaintOne: (text: string, options: any) => Promise<any>;
+    /** Draw from a parent's DDL as its child (a work its edited DDL holds). */
+    onPaintDdl: (parent: { id: string; pipeline_variation_id?: string | null }, ddl: string, options: any) => Promise<any>;
     onVisionAdvice: (historyId: string, model: string, instruction: string, direction: string, enabledKinds: string[], signal: AbortSignal) => Promise<VisionAdvice>;
     onLoadBranch: (nodeId: string) => void | Promise<void>;
     onSaveVisionModel: (provider: Provider, model: string) => void | Promise<void>;
   };
 
-  let { node, visionModel, visionProviderGroups, stage1ModelLabel, stage2ModelLabel, onClose, onPaintOne, onVisionAdvice, onLoadBranch, onSaveVisionModel }: Props = $props();
+  let { node, visionModel, visionProviderGroups, stage1ModelLabel, stage2ModelLabel, onClose, onPaintOne, onPaintDdl, onVisionAdvice, onLoadBranch, onSaveVisionModel }: Props = $props();
 
   function addTokens(total: number | null, delta: number): number | null {
     return (total ?? 0) + delta;
@@ -65,6 +70,11 @@
   // null = inherit the parent work's setting (field omitted).
   let wildOverride = $state<boolean | null>(null);
   const parentWild = $derived(node.history?.render_wild === true);
+  // A work its edited DDL holds is not read again from its description: no
+  // reading generations and no Vision (its direction is added to the words);
+  // every generation is drawn from the parent's DDL.
+  const held = $derived(node.history?.description_locked === true);
+  const mode = $derived<RefineMode>(held ? 'random' : refineMode);
 
   $effect(() => { if (!selectedVisionModel) selectedVisionModel = visionModel; });
 
@@ -83,7 +93,7 @@
   // runs are drawn by a model the reader named. Random mode keeps the page's
   // setting, which is the only thing it was ever offered.
   const paintModelOverride = $derived(
-    refineMode === 'vision' && selectedVisionModel ? selectedVisionModel : null
+    mode === 'vision' && selectedVisionModel ? selectedVisionModel : null
   );
   onDestroy(() => {
     abortController?.abort();
@@ -94,7 +104,7 @@
 
   const activeKinds = $derived.by(() => {
     const kinds: string[] = [];
-    if (enableReading) kinds.push('reinterpretation');
+    if (enableReading && !held) kinds.push('reinterpretation');
     if (enableColor) kinds.push('catalog_change');
     if (enableLayout) kinds.push('layout_change');
     if (enableTouch) kinds.push('touch_change');
@@ -135,7 +145,7 @@
 
   async function startRefinement() {
     if (activeKinds.length === 0) { errorText = t().aiRefineMinElementsError; return; }
-    if (refineMode === 'vision' && (!selectedVisionModel || !node.history?.id)) { errorText = t().aiRefineVisionSourceError; return; }
+    if (mode === 'vision' && (!selectedVisionModel || !node.history?.id)) { errorText = t().aiRefineVisionSourceError; return; }
     running = true;
     refineTokensIn = null;
     refineTokensOut = null;
@@ -149,27 +159,43 @@
     let currentText = node.history?.source_text ?? node.history?.input ?? '';
     // Each generation follows the sketch of the work it is drawn from (I-300).
     let parentProse = node.history?.sketch_text ?? null;
+    // What the next generation draws from, moved on after each one.
+    let parent = {
+      id: node.history?.id ?? '',
+      variationId: node.history?.pipeline_variation_id ?? null,
+      ddl: node.history?.ddl ?? '',
+      catalogId: node.history?.render_color_catalog_id ?? node.history?.catalog_id ?? null,
+      renderSeed: node.history?.render_seed ?? null,
+      compositionSeed: node.history?.composition_seed ?? null,
+      wild: node.history?.render_wild === true
+    };
     let advice: VisionAdvice | null = null;
 
     try {
-      if (refineMode === 'vision') advice = await readVisionAdvice(node.history!.id!, currentText);
+      if (mode === 'vision') advice = await readVisionAdvice(node.history!.id!, currentText);
       for (let i = 0; i < generations; i++) {
         currentStep = i + 1;
-        let kind = refineMode === 'vision' && advice ? advice.suggested_kind : activeKinds[Math.floor(Math.random() * activeKinds.length)];
+        let kind = mode === 'vision' && advice ? advice.suggested_kind : activeKinds[Math.floor(Math.random() * activeKinds.length)];
         if (!activeKinds.includes(kind)) kind = activeKinds[0];
-        if (refineMode === 'random' && prompt && enableReading && i === 0) kind = 'reinterpretation';
+        if (mode === 'random' && prompt && activeKinds.includes('reinterpretation') && i === 0) kind = 'reinterpretation';
         statusText = t().aiRefineStepStatus(generations, currentStep, kindLabel(kind));
 
-        const directions = refineMode === 'vision' && advice ? [prompt, advice.next_direction].filter(Boolean) : (prompt && kind === 'reinterpretation' ? [prompt] : []);
+        const directions = mode === 'vision' && advice ? [prompt, advice.next_direction].filter(Boolean) : (prompt && kind === 'reinterpretation' ? [prompt] : []);
         const paintText = directions.length ? `${currentText}\n${t().aiRefineAppliedDirection}: ${directions.join(' / ')}` : currentText;
         const options: any = {
           lineageParentNodeId: parentNodeId,
           derivationKind: kind,
           derivationMetadata: {
-            autonomous_refine_mode: refineMode,
+            autonomous_refine_mode: mode,
             ...(advice ? { vision_model: advice.model, vision_observation: advice.observation, vision_next_direction: advice.next_direction } : {})
           },
-          ...(wildOverride !== null ? { wild: wildOverride } : {}),
+          // The catalog and the wild switch travel as render overrides, which is
+          // what the drawing reads: the parent's catalog (another one for a color
+          // generation) and the parent's switch unless the dialog set one.
+          renderOverrides: {
+            ...colorCatalogOverride(parent.catalogId, kind === 'catalog_change' ? 'random' : undefined),
+            ...wildRenderOverride(wildOverride ?? parent.wild)
+          },
           ...(paintModelOverride ? { stage1Model: paintModelOverride, stage2Model: paintModelOverride } : {}),
           ...generationSketch(parentProse, paintText !== currentText),
           historyVisibility: i === generations - 1 ? 'normal' : 'lineage_only',
@@ -177,19 +203,33 @@
           countGeneration: true,
           signal: abortController.signal
         };
-        if (kind === 'catalog_change') options.catalogMode = 'random';
         if (kind === 'variation') {
           options.variationAmplitude = variationAmplitude;
           options.variationSeed = await allocateVariationSeed(variationAmplitude);
         }
-        const result = await onPaintOne(paintText, options);
+        let result: any;
+        if (held) {
+          Object.assign(options, ddlGenerationSeeds(kind, parent, () => Math.floor(Math.random() * 2 ** 31)));
+          result = await onPaintDdl({ id: parent.id, pipeline_variation_id: parent.variationId }, parent.ddl, options);
+        } else {
+          result = await onPaintOne(paintText, options);
+        }
         refineTokensIn = addTokens(refineTokensIn, (result.tokens_in_stage1 ?? 0) + (result.tokens_in_stage2 ?? 0));
         refineTokensOut = addTokens(refineTokensOut, (result.tokens_out_stage1 ?? 0) + (result.tokens_out_stage2 ?? 0));
         parentNodeId = result.lineage_node_id;
         lastGeneratedItem = result.history_id ? result : null;
         if (result.source_text) currentText = result.source_text;
         parentProse = result.sketch_text ?? null;
-        if (refineMode === 'vision' && result.history_id) advice = await readVisionAdvice(result.history_id, currentText);
+        parent = {
+          id: result.history_id ?? parent.id,
+          variationId: result.pipeline_variation_id ?? null,
+          ddl: result.source_ddl ?? result.ddl ?? parent.ddl,
+          catalogId: result.render_color_catalog_id ?? parent.catalogId,
+          renderSeed: result.render_seed ?? parent.renderSeed,
+          compositionSeed: result.composition_seed ?? parent.compositionSeed,
+          wild: result.render_wild ?? parent.wild
+        };
+        if (mode === 'vision' && result.history_id) advice = await readVisionAdvice(result.history_id, currentText);
       }
       statusText = t().aiRefineCompleted;
       await onLoadBranch(node.id);
@@ -228,16 +268,17 @@
           {#if lastGeneratedItem}<div class="progress-preview"><HistoryThumbnail item={lastGeneratedItem} scope="ai-refine-progress" size="manager" /></div>{/if}
         </RunStatus>
       {:else}
-        <fieldset class="mode-choice"><legend>{t().aiRefineModeLabel}</legend><label><input type="radio" bind:group={refineMode} value="random" /><span><b>{t().aiRefineRandomMode}</b><small>{t().aiRefineRandomModeHint}</small></span></label><label><input type="radio" bind:group={refineMode} value="vision" /><span><b>{t().aiRefineVisionMode}</b><small>{t().aiRefineVisionModeHint}</small></span></label></fieldset>
-        {#if refineMode === 'vision'}<ModelCardPicker label={t().aiRefineVisionModel} selectedModel={selectedVisionModel} providerGroups={visionProviderGroups} purpose="vision" onSelect={(provider: Provider, model: string) => { selectedVisionModel = qualifiedModelId(provider, model); void onSaveVisionModel(provider, model); }} />{/if}
-        <div class="form-group"><label for="ai-direction">{t().aiRefineDirectionLabel}</label><textarea id="ai-direction" placeholder={t().aiRefineDirectionPlaceholder} bind:value={prompt} maxlength="160" rows="2"></textarea>{#if refineMode === 'random'}<small class="field-hint">{t().aiRefineDirectionRandomHint}</small>{/if}</div>
+        {#if held}<p class="held-note">{t().aiRefineHeldNote}</p>{/if}
+        <fieldset class="mode-choice"><legend>{t().aiRefineModeLabel}</legend><label><input type="radio" name="ai-refine-mode" value="random" checked={mode === 'random'} onchange={() => (refineMode = 'random')} /><span><b>{t().aiRefineRandomMode}</b><small>{t().aiRefineRandomModeHint}</small></span></label><label class:held title={held ? t().descriptionLockedReason : undefined}><input type="radio" name="ai-refine-mode" value="vision" checked={mode === 'vision'} disabled={held} onchange={() => (refineMode = 'vision')} /><span><b>{t().aiRefineVisionMode}</b><small>{t().aiRefineVisionModeHint}</small></span></label></fieldset>
+        {#if mode === 'vision'}<ModelCardPicker label={t().aiRefineVisionModel} selectedModel={selectedVisionModel} providerGroups={visionProviderGroups} purpose="vision" onSelect={(provider: Provider, model: string) => { selectedVisionModel = qualifiedModelId(provider, model); void onSaveVisionModel(provider, model); }} />{/if}
+        <div class="form-group"><label for="ai-direction">{t().aiRefineDirectionLabel}</label><textarea id="ai-direction" placeholder={t().aiRefineDirectionPlaceholder} bind:value={prompt} maxlength="160" rows="2" disabled={held}></textarea>{#if mode === 'random'}<small class="field-hint">{t().aiRefineDirectionRandomHint}</small>{/if}</div>
         <div class="form-row"><div class="form-group wild-group"><span class="wild-group-label">&nbsp;</span><WildToggle value={wildOverride ?? parentWild} {isJapanese} inherited={wildOverride === null} onSelect={(next) => (wildOverride = next)} /></div><div class="form-group select-generations"><label for="ai-gens">{t().aiRefineGensLabel}</label><div class="gen-stepper"><button type="button" aria-label="−" onclick={() => (generations = Math.max(1, generations - 1))} disabled={generations <= 1}>−</button><span id="ai-gens" class="gen-value">{generations}</span><button type="button" aria-label="＋" onclick={() => (generations = Math.min(10, generations + 1))} disabled={generations >= 10}>＋</button></div></div></div>
-        <details class="advanced-settings" open><summary>{t().aiRefineElementsLabel}</summary><div class="checkbox-group"><Tooltip placement="bottom" text={t().refineCostReading}><label><input type="checkbox" bind:checked={enableReading} /><span>{t().canvasVaryInterpretation}</span></label></Tooltip><Tooltip placement="bottom" text={t().refineCostColor}><label><input type="checkbox" bind:checked={enableColor} /><span>{t().canvasVaryColor}</span></label></Tooltip><Tooltip placement="bottom" text={t().refineCostLayout}><label><input type="checkbox" bind:checked={enableLayout} /><span>{t().canvasVaryComposition}</span></label></Tooltip><Tooltip placement="bottom" text={t().refineCostTouch}><label><input type="checkbox" bind:checked={enableTouch} /><span>{t().canvasVaryPerformance}</span></label></Tooltip><Tooltip placement="bottom" text={t().tooltipVariation}><label><input type="checkbox" bind:checked={enableVariation} /><span>{t().variationTitle}</span></label></Tooltip>{#if enableVariation}<div class="variation-amplitude-field"><div class="variation-amplitude-grid" role="radiogroup" aria-label={t().variationTitle}>{#each [['small', t().variationSmall, t().variationTooltipSmall, 'top-right'], ['medium', t().variationMedium, t().variationTooltipMedium, 'top'], ['large', t().variationLarge, t().variationTooltipLarge, 'top-left']] as [level, label, hint, place] (level)}<label class="amplitude-choice" class:checked={variationAmplitude === level}><input type="radio" name="ai-variation-amplitude" value={level} checked={variationAmplitude === level} onchange={() => (variationAmplitude = level as VariationAmplitude)} /><Tooltip placement={place as 'top' | 'top-left' | 'top-right'} text={hint}><span class="amplitude-choice-label"><strong>{label}</strong><span class="amplitude-info-mark" aria-hidden="true">i</span></span></Tooltip></label>{/each}</div></div>{/if}</div></details>
+        <details class="advanced-settings" open><summary>{t().aiRefineElementsLabel}</summary><div class="checkbox-group"><Tooltip placement="bottom" text={t().refineCostReading}><label class:held title={held ? t().descriptionLockedReason : undefined}><input type="checkbox" checked={enableReading && !held} disabled={held} onchange={(event) => (enableReading = event.currentTarget.checked)} /><span>{t().canvasVaryInterpretation}</span></label></Tooltip><Tooltip placement="bottom" text={t().refineCostColor}><label><input type="checkbox" bind:checked={enableColor} /><span>{t().canvasVaryColor}</span></label></Tooltip><Tooltip placement="bottom" text={t().refineCostLayout}><label><input type="checkbox" bind:checked={enableLayout} /><span>{t().canvasVaryComposition}</span></label></Tooltip><Tooltip placement="bottom" text={t().refineCostTouch}><label><input type="checkbox" bind:checked={enableTouch} /><span>{t().canvasVaryPerformance}</span></label></Tooltip><Tooltip placement="bottom" text={t().tooltipVariation}><label><input type="checkbox" bind:checked={enableVariation} /><span>{t().variationTitle}</span></label></Tooltip>{#if enableVariation}<div class="variation-amplitude-field"><div class="variation-amplitude-grid" role="radiogroup" aria-label={t().variationTitle}>{#each [['small', t().variationSmall, t().variationTooltipSmall, 'top-right'], ['medium', t().variationMedium, t().variationTooltipMedium, 'top'], ['large', t().variationLarge, t().variationTooltipLarge, 'top-left']] as [level, label, hint, place] (level)}<label class="amplitude-choice" class:checked={variationAmplitude === level}><input type="radio" name="ai-variation-amplitude" value={level} checked={variationAmplitude === level} onchange={() => (variationAmplitude = level as VariationAmplitude)} /><Tooltip placement={place as 'top' | 'top-left' | 'top-right'} text={hint}><span class="amplitude-choice-label"><strong>{label}</strong><span class="amplitude-info-mark" aria-hidden="true">i</span></span></Tooltip></label>{/each}</div></div>{/if}</div></details>
       {/if}
       {#if latestAdvice}<section class="vision-advice"><h4>{t().aiRefineVisionObservation}</h4><p>{latestAdvice.observation}</p><h4>{t().aiRefineVisionDirection}</h4><p>{latestAdvice.next_direction}</p></section>{/if}
       {#if errorText}<div class="error-banner">{errorText}</div>{/if}
     </div>
-    <footer>{#if !running}<button class="cancel-action" type="button" onclick={onClose}>{t().confirmCancel}</button><button class="confirm-action" type="button" disabled={activeKinds.length === 0 || (refineMode === 'vision' && (!selectedVisionModel || !node.history?.id))} onclick={startRefinement}>{t().aiRefineStartButton}</button>{/if}</footer>
+    <footer>{#if !running}<button class="cancel-action" type="button" onclick={onClose}>{t().confirmCancel}</button><button class="confirm-action" type="button" disabled={activeKinds.length === 0 || (mode === 'vision' && (!selectedVisionModel || !node.history?.id)) || (held && !node.history?.ddl)} onclick={startRefinement}>{t().aiRefineStartButton}</button>{/if}</footer>
   </div>
 </div>
 
@@ -247,6 +288,8 @@
   header { display:flex; align-items:center; justify-content:space-between; padding:14px 18px; border-bottom:1px solid var(--border); } header h3 { margin:0; font-size:1rem; font-weight:600; }
   .close-btn { border:0; background:transparent; color:var(--fg3); font-size:1.4rem; cursor:pointer; padding:0 4px; }
   .modal-body { padding:18px; min-height:200px; display:flex; flex-direction:column; gap:14px; overflow-y:auto; max-height:68vh; }
+  .held-note { margin:0; padding:8px 10px; border:1px solid var(--border); border-radius:var(--r); background:var(--bg2); color:var(--fg2); font-size:.78rem; line-height:1.55; }
+  label.held { opacity:.5; cursor:not-allowed; }
   .mode-choice { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin:0; padding:0; border:0; } .mode-choice legend { margin-bottom:6px; color:var(--fg3); font-size:.76rem; font-weight:500; }
   .mode-choice label { display:flex; align-items:flex-start; gap:8px; padding:10px; border:1px solid var(--border2); border-radius:8px; background:var(--bg2); cursor:pointer; } .mode-choice input { margin-top:2px; accent-color:var(--accent); } .mode-choice span { display:grid; gap:3px; } .mode-choice b { font-size:.78rem; } .mode-choice small { color:var(--fg3); font-size:.68rem; line-height:1.35; }
   .form-group { display:flex; flex-direction:column; gap:6px; } .form-group label { font-size:.76rem; color:var(--fg3); font-weight:500; }

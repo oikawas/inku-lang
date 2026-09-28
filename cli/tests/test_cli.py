@@ -1721,6 +1721,28 @@ def test_refine_color_asks_the_server_to_draw_a_different_catalog(monkeypatch):
         assert other[0].get("catalog_mode") is None
 
 
+def test_refine_perform_refuses_a_work_its_ddl_holds(monkeypatch):
+    """A work whose DDL was edited is not redrawn from its description."""
+    posted = []
+
+    class FakeClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def request(self, method, path, *, data=None, **kwargs):
+            if method == "GET":
+                return {"items": [{"id": "work-1", "lineage_node_id": "node-1", "source_text": "春の野",
+                                   "description_locked": True}]}, None
+            posted.append(path)
+            return {"svg": "<svg />"}, None
+
+    monkeypatch.setattr(cli, "ApiClient", FakeClient)
+    args = cli.build_parser().parse_args(["refine", "perform", "work-1", "--kind", "touch"])
+    with pytest.raises(cli.CliError, match="held by its edited DDL"):
+        cli.command_refine(args)
+    assert posted == []
+
+
 def test_refine_perform_follows_the_parent_sketch(monkeypatch):
     """I-704: a refinement is drawn from the parent's sketch prose, as the web does (I-300).
 

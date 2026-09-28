@@ -28,6 +28,7 @@
 	};
 
 	let { node, isJapanese, variant, open, available = undefined, unavailableReason, onRequestOpen, onOpenChange, onAction }: Props = $props();
+	const READS_THE_DESCRIPTION = new Set<WorkAction>(['description', 'sketch-grain', 'models']);
 	let triggerEl = $state<HTMLButtonElement | null>(null);
 	let menuEl = $state<HTMLDivElement | null>(null);
 	let wrapperEl = $state<HTMLDivElement | null>(null);
@@ -36,6 +37,9 @@
 	});
 
 	const ddlOrigin = $derived(node?.history?.display_label === 'DDL');
+	// Held by its edited DDL: the actions that read the description again are
+	// shown, not offered, with the reason -- hiding them would read as missing.
+	const descriptionLocked = $derived(!ddlOrigin && node?.history?.description_locked === true);
 	const enabled = $derived(available ?? (!!node?.history?.id && !node?.history?.trashed));
 
 	function toggle(event: MouseEvent): void {
@@ -51,6 +55,7 @@
 	function select(action: WorkAction, event: MouseEvent): void {
 		event.stopPropagation();
 		if (!node) return;
+		if (descriptionLocked && READS_THE_DESCRIPTION.has(action)) return;
 		lastWorkActionTrigger = triggerEl;
 		triggerEl?.focus();
 		onOpenChange(false);
@@ -113,16 +118,18 @@
 			<div class="work-action-title">
 				{t().workActionMenuTitle}
 				{#if ddlOrigin}<span class="work-action-origin">{t().workActionDdlOrigin}</span>{/if}
+				{#if descriptionLocked}<span class="work-action-origin">{t().descriptionLockedMark}</span>{/if}
 			</div>
 			<button type="button" role="menuitem" onclick={(event) => select('adjust', event)}>{t().workActionAdjust}</button>
 			<button type="button" role="menuitem" onclick={(event) => select('color-catalog', event)}>{t().canvasVaryColor}</button>
 			{#if !ddlOrigin}
-				<button type="button" role="menuitem" onclick={(event) => select('description', event)}>{t().workActionDescription}</button>
+				<button type="button" role="menuitem" aria-disabled={descriptionLocked} class:held={descriptionLocked} title={descriptionLocked ? t().descriptionLockedReason : undefined} onclick={(event) => select('description', event)}>{t().workActionDescription}</button>
 			{/if}
 			<button type="button" role="menuitem" onclick={(event) => select('instructions', event)}>{t().workActionInstructions}</button>
 			{#if !ddlOrigin}
-				<button type="button" role="menuitem" onclick={(event) => select('sketch-grain', event)}>{t().workActionSketchGrain}</button>
-				<button type="button" role="menuitem" onclick={(event) => select('models', event)}>{t().workActionModels}</button>
+				<button type="button" role="menuitem" aria-disabled={descriptionLocked} class:held={descriptionLocked} title={descriptionLocked ? t().descriptionLockedReason : undefined} onclick={(event) => select('sketch-grain', event)}>{t().workActionSketchGrain}</button>
+				<button type="button" role="menuitem" aria-disabled={descriptionLocked} class:held={descriptionLocked} title={descriptionLocked ? t().descriptionLockedReason : undefined} onclick={(event) => select('models', event)}>{t().workActionModels}</button>
+				{#if descriptionLocked}<p class="work-action-held-note">{t().descriptionLockedReason}</p>{/if}
 			{/if}
 			<button type="button" role="menuitem" onclick={(event) => select('autonomous', event)}>{t().workActionAutonomous}</button>
 		</div>
@@ -134,6 +141,8 @@
 	.work-action-menu.card { position: absolute; top: 6px; right: 6px; z-index: 3; }
 	.work-action-trigger { border: 1px solid var(--border2); background: var(--panel); color: var(--fg); font: inherit; cursor: pointer; }
 	.work-action-trigger:disabled { cursor: default; opacity: .55; }
+	.work-action-dropdown button.held, .work-action-dropdown button.held:hover { opacity: .5; cursor: not-allowed; background: transparent; }
+	.work-action-held-note { margin: 4px 10px 6px; max-width: 260px; color: var(--fg3); font-size: var(--ui-font-size-10); line-height: 1.5; white-space: normal; }
 	.work-action-menu.card .work-action-trigger { display: grid; place-items: center; width: 28px; height: 28px; border: 0; padding: 0; border-radius: var(--btn-sm-radius); background: color-mix(in srgb, var(--panel) 88%, transparent); color: var(--fg2); }
 	.work-action-menu.card .work-action-trigger:hover:not(:disabled) { background: var(--bg2); color: var(--fg); }
 	.work-action-menu.header .work-action-trigger { display: inline-flex; align-items: center; gap: 5px; border-radius: var(--btn-sm-radius); padding: var(--btn-sm-padding); font-size: var(--btn-sm-font-size); font-weight: 600; white-space: nowrap; }

@@ -6,6 +6,17 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 49 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-28 — A work whose DDL was edited holds its description on every route
+
+At the author's direction. A work whose DDL was edited was meant to hold its description, but only a work just made on the Describe tab did: a work opened from history, the lineage description edit and sketch change, autonomous refinement, Another reading, model comparison and CLI refinement all drew it again from the description and silently lost the edits. The Describe tab's Paint also started a new variation from the description without asking.
+
+- The server decides which works are description-locked (a DDL-authoritative variation, `ddl_edit`, and what is derived from them without reading the description again) and gives history items and lineage nodes `description_locked`.
+- A redraw from the description with a locked parent is refused 409 `description_locked` on `/api/paint`, a saved description-reading derivation and a fork with changed words; a new variation from the description as it stands remains.
+- Web: the Describe tab shows `Held (DDL edited)`, its description cannot be changed, and Paint becomes `Start a new variation from this description`. The edit menu's Description, Sketch from life and Models, and refinement's Another reading and model comparison, are shown as not offered with the reason. The history strip shows a lock mark and lineage cards a mark.
+- Autonomous refinement of a locked work leaves out reading and Vision and draws each color, layout, touch or variation round from the parent's DDL. It also fixes color rounds, whose catalog draw and wild switch never reached the drawing, and the other rounds, which drew with the page's catalog.
+- CLI `refine perform` stops on a locked work with the reason.
+- SPEC and the manual (Japanese and English) say so.
+
 ### v2.15.48 — Remember autonomous refinement choices (Build 1124, 2026-09-28)
 
 This version includes the changes below since v2.15.47. The Web autonomous refinement dialog remembers the previous choices. Android's Claude request shape also follows the Server. DDL, Score, rendering, and the API shape are unchanged.

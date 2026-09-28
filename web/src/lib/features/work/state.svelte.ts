@@ -334,9 +334,11 @@ export function createWorkState(deps: WorkStateDeps) {
 		return finishPipeline(() => pipelineController.fromDdl(source, pipelineOptions(options), signal));
 	}
 
+	// A new variation from the description of a work its DDL holds. The work
+	// itself is not touched; its description, as it stands, starts again.
 	async function forkPipelineDescription(): Promise<void> {
-		if (pipelineBusy || !pipelineView) return;
-		await finishPipeline(() => pipelineController.forkDescription());
+		if (pipelineBusy || !descriptionLocked) return;
+		await submit({ fork: true });
 	}
 
 	async function approvePipelinePatch(): Promise<void> {
@@ -353,6 +355,14 @@ export function createWorkState(deps: WorkStateDeps) {
 	// server: the question is about this sitting, not about the work (contract
 	// §5-7). See $lib/fallbackRefineGate.
 	const fallbackRefineAsked = new Set<string>();
+	// The work on screen is held by its DDL: the authoring variation, or the
+	// saved work the server marked (an edit, or derived from one without
+	// reading the description again). Its description is not drawn from.
+	const descriptionLocked = $derived(
+		pipelineView
+			? pipelineView.authority.authority === 'ddl_authoritative'
+			: displayedHistoryItem?.description_locked === true
+	);
 	const ddlEditedAfterGeneration = $derived(inputMode === 'single' && ddl !== null && ddlGeneratedBaseline !== null && ddl !== ddlGeneratedBaseline);
 	const canSubmit = $derived(
 		inputMode === 'single' ? !!pipelineDescription(input).trim() : inputMode === 'batch' ? batch.nonEmpty > 0 : false
@@ -690,8 +700,10 @@ export function createWorkState(deps: WorkStateDeps) {
 	 * painted in place of the whole box, each keeping the number the prompt gave
 	 * it. Everything else about the run is unchanged.
 	 */
-	async function submit(options: { resumeLines?: NumberedLine[]; } = {}) {
+	async function submit(options: { resumeLines?: NumberedLine[]; fork?: boolean; } = {}) {
 		if (!canSubmit || loading || refinementSession.gridBusy || (batch.resuming && !options.resumeLines)) return;
+		// Drawing a held work from its description happens only as the explicit fork.
+		if (inputMode === 'single' && descriptionLocked && !options.fork) return;
 		// Ask before resetTargetScopedState and before any intermediate save.
 		if (submitWouldRefine() && !(await confirmFallbackRefine(currentRefineParent()))) return;
 		resetTargetScopedState();
@@ -720,7 +732,7 @@ export function createWorkState(deps: WorkStateDeps) {
 		// Sketching (Stage 0.5). The grain edge fires only when the grain differs from
 		// the parent's, exactly as description_edit fires only when the text does;
 		// one edge, one cause, so a changed description stays a description edit.
-		const submitDerivationKind: DerivationKind | null = submitDerivationKindOf({
+		const submitDerivationKind: DerivationKind | null = options.fork && submitParentNodeId !== null ? 'description_edit' : submitDerivationKindOf({
 			hasParent: submitParentNodeId !== null,
 			canvasAspectChanged: canvasAspectDerivation !== null,
 			textChanged: submitTextChanged,
@@ -952,7 +964,7 @@ export function createWorkState(deps: WorkStateDeps) {
 		get ddlEditedAfterGeneration() { return ddlEditedAfterGeneration; },
 		get pipelineView() { return pipelineView; },
 		get pipelineBusy() { return pipelineBusy; },
-		get pipelineLocked() { return pipelineView?.authority.authority === 'ddl_authoritative'; },
+		get descriptionLocked() { return descriptionLocked; },
 		get pipelinePatch() { return pipelinePatch(pipelineView); },
 		get pipelineDiagnostics() { return pipelineDiagnostics(pipelineView, displayedHistoryItem?.pipeline_diagnostics); },
 		get pipelineDiagnosticsUnavailable() {

@@ -154,6 +154,7 @@
 		onToggleSaijiki: () => void;
 		onCloseRefinement: () => void;
 		statusDdlOrigin: boolean;
+		statusDescriptionLocked: boolean;
 		developerMode: boolean;
 		// The staffage level a work was drawn at, for works saved before the axis
 		// was folded away (v2.11.0). Developer mode only, and only when set.
@@ -175,6 +176,7 @@
 		onLoadLineageOverview: () => void | Promise<void>;
 		onLoadLineageBranch: (nodeId: string) => void | Promise<void>;
 		onPaintOne: (text: string, options: any) => Promise<any>;
+		onPaintDdl: (parent: { id: string; pipeline_variation_id?: string | null }, ddl: string, options: any) => Promise<any>;
 		onVisionAdvice: (historyId: string, model: string, instruction: string, direction: string, enabledKinds: string[], signal: AbortSignal) => Promise<any>;
 	};
 
@@ -273,6 +275,7 @@
 		onToggleSaijiki,
 		onCloseRefinement,
 		statusDdlOrigin,
+		statusDescriptionLocked,
 		developerMode,
 		statusTenkei,
 		refineDrawingModelId,
@@ -290,6 +293,7 @@
 		onLoadLineageOverview,
 		onLoadLineageBranch,
 		onPaintOne,
+		onPaintDdl,
 		onVisionAdvice
 	}: Props = $props();
 
@@ -406,7 +410,7 @@
 	}
 	// DDL-origin works cannot vary interpretation, so remove a restored choice.
 	$effect(() => {
-		if (statusDdlOrigin && refineKind === 'reading') refineKind = 'touch';
+		if ((statusDdlOrigin || statusDescriptionLocked) && refineKind === 'reading') refineKind = 'touch';
 	});
 	const statusGenerationValue = $derived(
 		statusGeneration
@@ -816,6 +820,7 @@
 					{modelInspection}
 					{activeComparisonItem}
 					{statusDdlOrigin}
+					{statusDescriptionLocked}
 					{refineKind}
 					bind:variationAmplitude
 					bind:touchSeedText
@@ -846,7 +851,7 @@
 						stage2ModelLabel={runStage2ModelLabel} {runTokensIn} {runTokensOut} {runAttempt} onSaveOkugakiModel={onSaveOkugakiModel}
 						{onSaveVisionModel} onPromoteNode={onPromoteLineageNode} onSaveNote={onSaveLineageNote}
 						onAskTrash={onAskTrashLineage} onDetach={onDetachLineage} onLoadOverview={onLoadLineageOverview}
-						onLoadBranch={onLoadLineageBranch} {onPaintOne} {onVisionAdvice} {visionModel} {okugakiModel}
+						onLoadBranch={onLoadLineageBranch} {onPaintOne} {onPaintDdl} {onVisionAdvice} {visionModel} {okugakiModel}
 						{visionProviderGroups} {animationExportSettings} {pngTemplates}
 						onDownloadSavedWorkSVG={savedWorkExportActions.onDownloadSVG}
 						onDownloadSavedWorkPNG={savedWorkExportActions.onDownloadPNG}
@@ -937,6 +942,7 @@
 			node={directAIRefineNode}
 			onClose={() => { directAIRefineNode = null; if (directAIRefineSaved) outputTab = 'lineage'; }}
 			{onPaintOne}
+			{onPaintDdl}
 			{onVisionAdvice}
 			{onSaveVisionModel}
 			{visionModel}

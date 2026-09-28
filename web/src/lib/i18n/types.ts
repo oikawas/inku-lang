@@ -6,6 +6,11 @@ export interface LangPack {
 	pipelineDescriptionLocked: string;
 	pipelineFromDescription: string;
 	pipelineForkDescription: string;
+	descriptionLockedMark: string;
+	descriptionLockedShort: string;
+	aiRefineHeldNote: string;
+	tooltipForkDescription: string;
+	descriptionLockedReason: string;
 	pipelineSaveDdl: string;
 	pipelineCancel: string;
 	pipelineReload: string;

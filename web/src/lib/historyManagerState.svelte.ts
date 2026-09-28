@@ -92,6 +92,9 @@ export type HistoryItem = {
 	interpretation_seed?: string | null;
 	// Sketch from life (Stage 0.5, v2.10). Absent on works made before the layer.
 	sketch_text?: string | null;
+	// Held by its DDL (edited, or derived from an edited work without reading
+	// the description again): never drawn from its description (server field).
+	description_locked?: boolean;
 	sketch_grain?: string | null;
 	// What the layer did. Absent means the work predates the record, which is a
 	// different thing from 'off'.

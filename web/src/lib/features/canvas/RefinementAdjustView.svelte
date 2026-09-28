@@ -23,6 +23,7 @@
 		canvasAspectHeight: number;
 		refinementSession: RefinementSession;
 		statusDdlOrigin: boolean;
+		statusDescriptionLocked: boolean;
 		refineKind: RefineKind;
 		variationAmplitude: VariationAmplitude;
 		touchSeedText: string;
@@ -51,6 +52,7 @@
 		canvasAspectHeight,
 		refinementSession,
 		statusDdlOrigin,
+		statusDescriptionLocked,
 		refineKind,
 		variationAmplitude = $bindable('medium'),
 		touchSeedText = $bindable(''),
@@ -104,9 +106,10 @@
 							</Tooltip>
 						</label>
 						{#if !statusDdlOrigin}
-							<label class="model-choice" class:checked={refineKind === 'reading'}>
-								<input type="radio" name="refine-kind" value="reading" checked={refineKind === 'reading'} onchange={() => onSetRefineKind('reading')} disabled={refinementSession.busy || refinementSession.gridBusy} />
-								<Tooltip placement="bottom" text={t().tooltipCanvasVaryInterpretation}>
+							<!-- Held by its edited DDL: another reading is shown, not offered. -->
+							<label class="model-choice" class:checked={refineKind === 'reading'} class:held={statusDescriptionLocked}>
+								<input type="radio" name="refine-kind" value="reading" checked={refineKind === 'reading'} onchange={() => onSetRefineKind('reading')} disabled={statusDescriptionLocked || refinementSession.busy || refinementSession.gridBusy} />
+								<Tooltip placement={statusDescriptionLocked ? 'right' : 'bottom'} text={statusDescriptionLocked ? t().descriptionLockedReason : t().tooltipCanvasVaryInterpretation}>
 									<span class="refine-choice-label">
 										<strong>{t().canvasVaryInterpretation}</strong>
 										<span class="refine-info-mark" aria-hidden="true">i</span>

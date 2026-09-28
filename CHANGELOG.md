@@ -4,7 +4,11 @@
 
 This file records changes chronologically. If a historical note conflicts with the current specification, the current specification wins. The more detailed canonical history is maintained in Japanese in [CHANGELOG.ja.md](CHANGELOG.ja.md).
 
-**This file holds the 46 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
+**This file holds the 47 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
+
+### v2.15.46 — Claude drawing and provider diagnostics (Build 1122, 2026-09-28)
+
+This version includes the changes below since v2.15.45. The Server supports Claude Opus 5.5, and Android adjusts its OpenAI requests and records why a provider refused a call. DDL, Score, rendering, and the API shape are unchanged.
 
 ### 2026-09-28 — Claude Opus 5.5 draws
 

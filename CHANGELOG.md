@@ -4,7 +4,11 @@
 
 This file records changes chronologically. If a historical note conflicts with the current specification, the current specification wins. The more detailed canonical history is maintained in Japanese in [CHANGELOG.ja.md](CHANGELOG.ja.md).
 
-**This file holds the 39 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
+**This file holds the 40 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
+
+### v2.15.39 — vocabulary packages and inherited sketch prose (Build 1115, 2026-09-28)
+
+This version includes the changes below since v2.15.38. It reorganizes the vocabulary package settings and API, and passes a parent's sketch prose through Web autonomous refinement and CLI refinement as appropriate. DDL, Score, and rendering versions are unchanged.
 
 ### 2026-09-28 — CLI refinement carries the parent's sketch prose too (I-704)
 

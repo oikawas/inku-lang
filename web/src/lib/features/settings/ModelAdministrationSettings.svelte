@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { tick } from 'svelte';
 	import { t } from '$lib/i18n/index.svelte';
-	import { sortModels } from '$lib/modelMeta';
+	import { isModelUnselectable, modelStatusLabel, sortModels } from '$lib/modelMeta';
 	import type { ModelOption, Provider, ProviderGroup } from '$lib/models';
 	import type { ModelAdministration, ModelProviderSetting } from './model-administration.svelte';
 	import './model-administration-settings.css';
@@ -169,10 +169,11 @@
 		baseUrlDrafts = nextDrafts;
 	}
 
-	function setAllPublishedModels(models: { id: string }[], enabled: boolean) {
+	function setAllPublishedModels(models: ModelOption[], enabled: boolean) {
 		modelPickerEnabledDraft = {
 			...modelPickerEnabledDraft,
-			...Object.fromEntries(models.map((model) => [model.id, enabled])),
+			// A retired or plan-only model is never published; the Server refuses it too.
+			...Object.fromEntries(models.map((model) => [model.id, enabled && !isModelUnselectable(model)])),
 		};
 	}
 
@@ -531,7 +532,8 @@
 								<label class="model-picker-publish">
 								<input
 									type="checkbox"
-								checked={modelPickerDraftEnabled(model.id)}
+								checked={!isModelUnselectable(model) && modelPickerDraftEnabled(model.id)}
+								disabled={isModelUnselectable(model)}
 								onchange={(e) => {
 									modelPickerEnabledDraft = {
 										...modelPickerEnabledDraft,
@@ -539,7 +541,7 @@
 										};
 									}}
 								/>
-									<span><strong>{model.label}</strong><small>{model.id}</small>{#if model.notes}<em>{model.notes}</em>{/if}</span>
+									<span><strong>{model.label}</strong><small>{model.id}</small>{#if modelStatusLabel(model, t().code === 'ja')}<em class="model-picker-status">{modelStatusLabel(model, t().code === 'ja')}</em>{/if}{#if model.notes}<em>{model.notes}</em>{/if}</span>
 								</label>
 								<div class="model-purpose-controls" aria-label={`${model.label} LLM / Vision`}>
 									<button type="button" class:active={modelPurposeSelected(model.id, 'llm')} aria-pressed={modelPurposeSelected(model.id, 'llm')} onclick={() => toggleModelPurpose(model.id, 'llm')}>LLM</button>

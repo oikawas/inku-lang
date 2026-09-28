@@ -3,8 +3,11 @@
 from __future__ import annotations
 
 import json
+import re
+import urllib.error
 import urllib.parse
 import urllib.request
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from typing import Literal
 from fastapi import APIRouter, Depends, HTTPException
@@ -460,6 +463,83 @@ def _fetch_provider_model_list(provider_id: str, settings: dict) -> list[dict[st
     return models
 
 
+# Ollama Cloud hands its model list, and each model's details, to anyone: both
+# answer without a key, so neither says which models this account may call.
+# What does say it is the service's answer to a call: 403 for a model the
+# account's plan does not reach (measured 2026-07-29), and 410 from /api/show
+# for a retired one (qwen3.5:397b, 2026-09-28). Each model is therefore asked,
+# once per fetch, with the smallest call there is. Anything else -- a busy
+# service, a timeout, a key the service refuses -- settles nothing, and the
+# mark the model already carries stays.
+_ACCESS_PROBE_PROVIDERS = frozenset({"ollama-cloud"})
+_ACCESS_PROBE_TIMEOUT_SECONDS = 20
+# The service refuses by concurrency, and two is its limit (model_settings).
+_ACCESS_PROBE_WORKERS = 2
+_RETIRED_AT = re.compile(r"retired at (\d{4}-\d{2}-\d{2})")
+
+
+def _post_for_status(url: str, headers: dict[str, str], body: dict) -> tuple[int | None, str]:
+    req = urllib.request.Request(
+        url,
+        data=json.dumps(body).encode("utf-8"),
+        headers={**headers, "Content-Type": "application/json", "Accept": "application/json"},
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=_ACCESS_PROBE_TIMEOUT_SECONDS) as resp:
+            return resp.status, ""
+    except urllib.error.HTTPError as exc:
+        try:
+            text = exc.read(2048).decode("utf-8", "replace")
+        except OSError:
+            text = ""
+        return exc.code, text
+    except (OSError, urllib.error.URLError):
+        return None, ""
+
+
+def _probe_model_access(base_url: str, api_key: str, model_id: str) -> dict:
+    """What one model is to this key: {"retired": date}, {"subscription": bool}, or {} when unsettled."""
+    origin = base_url.rstrip("/").removesuffix("/v1")
+    status, text = _post_for_status(f"{origin}/api/show", {}, {"model": model_id})
+    if status == 410:
+        found = _RETIRED_AT.search(text)
+        return {"retired": found.group(1) if found else datetime.now(timezone.utc).date().isoformat()}
+    if not api_key:
+        return {}
+    status, _ = _post_for_status(
+        f"{base_url.rstrip('/')}/chat/completions",
+        {"Authorization": f"Bearer {api_key}"},
+        {"model": model_id, "messages": [{"role": "user", "content": "."}], "max_tokens": 1},
+    )
+    if status == 403:
+        return {"subscription": True}
+    if status == 200:
+        return {"subscription": False}
+    return {}
+
+
+def _apply_model_access(provider_id: str, settings: dict, models: list[dict]) -> None:
+    """Mark the models this key cannot call, in place, for a provider that must be asked."""
+    if provider_id not in _ACCESS_PROBE_PROVIDERS:
+        return
+    conn = connection_for(provider_id, settings)
+    base_url = str(conn["base_url"])
+    api_key = str(conn.get("api_key") or "")
+    asked = [model for model in models if not model.get("eol")]
+    with ThreadPoolExecutor(max_workers=_ACCESS_PROBE_WORKERS) as pool:
+        answers = list(pool.map(lambda model: _probe_model_access(base_url, api_key, str(model["id"])), asked))
+    for model, answer in zip(asked, answers):
+        if "retired" in answer:
+            model["eol"] = True
+            model["eol_date"] = answer["retired"]
+        elif answer.get("subscription") is True:
+            model["requires_subscription"] = True
+        elif answer.get("subscription") is False:
+            # The account reaches it now, whatever the builtin catalog assumed.
+            model.pop("requires_subscription", None)
+
+
 @router.post("/api/settings/models/{provider_id}/fetch-models", response_model=ModelSettingsResponse)
 def api_settings_fetch_provider_models(
     provider_id: str,
@@ -502,6 +582,7 @@ def api_settings_fetch_provider_models(
         # 一度 EOL にしたモデルが再び提供された場合は印を外す。
         model.pop("eol", None)
         model.pop("eol_date", None)
+    _apply_model_access(provider_id, current, models)
 
     # 提供元から消えたモデルは削除せず EOL として末尾に残す。過去の作品が記録して
     # いるモデル名の表示・評価情報を失わないため (v1.98)。

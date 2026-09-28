@@ -2716,6 +2716,96 @@ def test_model_settings_fetch_models_from_provider(monkeypatch):
     db.delete_user_group(group["id"])
 
 
+def test_an_ollama_cloud_fetch_marks_the_models_this_key_cannot_call(monkeypatch):
+    """Retired and plan-only models cannot be published; an unsettled answer keeps the old mark."""
+    suffix = uuid.uuid4().hex[:8]
+    group = db.add_user_group(f"model-access-{suffix}")
+    admin = db.add_user(
+        username=f"model-access-admin-{suffix}",
+        email=f"model-access-admin-{suffix}@example.test",
+        password="password-123",
+        permission_groups=["admins"],
+        group_id=group["id"],
+    )
+    headers, token = _auth_headers(admin)
+    listed = ["gone-model", "paid-model", "kimi-k2.6", "mistral-large-3:675b", "open-model"]
+    monkeypatch.setattr(
+        settings_routes,
+        "_fetch_provider_model_list",
+        lambda provider_id, settings: [{"id": model_id, "label": model_id} for model_id in listed],
+    )
+    answers = {
+        "gone-model": {"retired": "2026-09-25"},
+        "paid-model": {"subscription": True},
+        # The builtin catalog marks these two as plan-only.
+        "kimi-k2.6": {"subscription": False},
+        "mistral-large-3:675b": {},
+        "open-model": {"subscription": False},
+    }
+    monkeypatch.setattr(settings_routes, "_probe_model_access", lambda base_url, api_key, model_id: answers[model_id])
+
+    r = client.post("/api/settings/models/ollama-cloud/fetch-models", headers=headers)
+    assert r.status_code == 200
+    models = {
+        model["id"]: model
+        for provider in r.json()["catalog"]
+        if provider["id"] == "ollama-cloud"
+        for model in provider["models"]
+    }
+    assert models["gone-model"]["eol"] is True and models["gone-model"]["eol_date"] == "2026-09-25"
+    assert models["paid-model"]["requires_subscription"] is True
+    assert "requires_subscription" not in models["kimi-k2.6"]
+    assert models["mistral-large-3:675b"]["requires_subscription"] is True
+
+    r = client.put("/api/settings/models", headers=headers, json={"providers": {"ollama-cloud": {
+        "enabled_models": {"gone-model": True, "paid-model": True, "kimi-k2.6": True, "open-model": True},
+    }}})
+    assert r.status_code == 200
+    enabled = r.json()["settings"]["providers"]["ollama-cloud"]["enabled_models"]
+    assert enabled["gone-model"] is False and enabled["paid-model"] is False
+    assert enabled["kimi-k2.6"] is True and enabled["open-model"] is True
+
+    db.update_model_settings(default_model_settings())
+    db.delete_session(token)
+    db.delete_user(admin["id"])
+    db.delete_user_group(group["id"])
+
+
+def test_the_access_probe_reads_retired_and_plan_only_from_the_status(monkeypatch):
+    """410 from /api/show is retirement, 403 from a call is the plan; anything else settles nothing."""
+    import urllib.error
+
+    statuses = {}
+
+    def fake_urlopen(req, timeout=0):
+        path = urllib.parse.urlparse(req.full_url).path
+        model = json.loads(req.data)["model"]
+        code, body = statuses[model].get(path, (200, ""))
+        if code == 200:
+            class Ok:
+                status = 200
+                def __enter__(self): return self
+                def __exit__(self, *_): return False
+            return Ok()
+        raise urllib.error.HTTPError(req.full_url, code, "", {}, __import__("io").BytesIO(body.encode()))
+
+    statuses.update({
+        "retired": {"/api/show": (410, '{"error":"retired was retired at 2026-09-25 00:00:00 -0700 PDT"}')},
+        "paid": {"/v1/chat/completions": (403, "")},
+        "open": {},
+        "busy": {"/v1/chat/completions": (429, "")},
+    })
+    monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
+    probe = settings_routes._probe_model_access
+    base = "https://ollama.com/v1"
+    assert probe(base, "key", "retired") == {"retired": "2026-09-25"}
+    assert probe(base, "key", "paid") == {"subscription": True}
+    assert probe(base, "key", "open") == {"subscription": False}
+    assert probe(base, "key", "busy") == {}
+    # Without a key only retirement can be told.
+    assert probe(base, "", "paid") == {}
+
+
 def test_gemini_model_list_sends_the_key_in_a_header_and_reads_every_page(monkeypatch):
     """No key in the URL, and a model on the second page is not read as retired."""
     monkeypatch.setenv("GEMINI_API_KEY", "gemini-test-key")

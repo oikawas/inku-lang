@@ -1516,7 +1516,14 @@ for drawing).  Switching a model off used to hide it from the lists only, and a
 request that named it still reached the provider on the server's key.  Developer
 mode is not consulted: it changes what is shown, and the built-in Stage
 defaults sit with a provider that only developer mode shows.  `admins` may call
-any configured model, to try one before offering it.
+any configured model, to try one before offering it.  A model marked retired or
+plan-only cannot be offered (2026-09-28): saving the settings leaves it off, and
+the administration screen disables its checkbox and says why.  Ollama Cloud
+hands its list and model details to anyone, so every fetch of its list asks each
+listed model in turn, two at a time: 410 from `/api/show` is retirement (its
+date becomes `eol_date`), 403 from a one-token call on the key is plan-only, and
+200 clears that mark; any other answer (a busy service, a timeout, a refused or
+missing key) settles nothing and the model keeps its mark.
 
 Stage 1 produces visible DDL from a description. Stage 2 produces only visible patch candidates for known holes reported by the compiler. Select each model for its bounded input and required result. The deterministic shared Rust lowerer structures Score; this is not delegated to an LLM.
 

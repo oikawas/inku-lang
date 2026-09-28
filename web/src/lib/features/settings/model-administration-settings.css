@@ -58,6 +58,8 @@
 	.settings-feature-root .model-picker-publish strong { overflow-wrap: anywhere; font-size: var(--ui-font-size-14); font-weight: 600; line-height: 1.35; }
 	.settings-feature-root .model-picker-publish small { overflow-wrap: anywhere; color: var(--fg3); font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: var(--ui-font-size-12); line-height: 1.35; }
 	.settings-feature-root .model-picker-publish em { overflow-wrap: anywhere; color: var(--fg2); font-size: var(--ui-font-size-12); font-style: normal; line-height: 1.35; }
+	.settings-feature-root .model-picker-publish:has(input:disabled) { cursor: default; }
+	.settings-feature-root .model-picker-publish em.model-picker-status { color: var(--fg3); font-weight: 600; }
 	.settings-feature-root .model-purpose-controls { display: inline-flex; gap: 5px; }
 	.settings-feature-root .model-purpose-controls button { min-height: 32px; padding: 5px 10px; border: 1px solid var(--border); border-radius: 999px; background: transparent; color: var(--fg3); font: inherit; font-size: var(--ui-font-size-13); cursor: pointer; }
 	.settings-feature-root .model-purpose-controls button.active { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--fg); }

@@ -236,6 +236,8 @@ To change the published models as an administrator:
 2. Find models with search and filters, and check those to publish. The bulk selection action applies only to the currently filtered results.
 3. Use `Save` to apply the selection, or `Cancel` to close without saving it. Fetching the model list is unavailable while there are unsaved changes; save or discard them first.
 
+A model marked `End of life` or `Paid plan only` cannot be checked and cannot be offered. Ollama Cloud (ollama.com) returns its list whatever the key's plan, so each `Fetch model list` makes one short call to every listed model with the configured API key. A retired model is marked `End of life`, one the plan does not reach is marked `Paid plan only`, and one the key can call loses the `Paid plan only` mark. A model that could not be checked, because the service was busy or the call timed out, keeps its earlier mark. With one call per model the fetch can take a minute or two, and it spends a little of the Ollama Cloud allowance.
+
 A model left unpublished, or one the connection service does not list, is not called when a member outside `admins` names it through the API or the CLI; the request is refused with 403 (`model_not_offered` for drawing). Models are called with the server's API keys, so what you publish is also what members may spend. Models of a connection service that developer mode hides (the built-in Stage defaults among them) stay callable unless you unpublish them. `admins` may call any configured model, to try one before publishing it.
 
 | Stage | Role |

@@ -690,10 +690,17 @@ def update_model_settings(current: dict[str, Any], patch: dict[str, Any]) -> dic
                 clean["providers"][provider_id]["api_key"] = incoming["api_key"]
             enabled_models = incoming.get("enabled_models")
             if isinstance(enabled_models, dict):
-                known_models = {str(model["id"]) for model in clean["providers"][provider_id].get("models", [])}
+                known_models = {
+                    str(model["id"]): model for model in clean["providers"][provider_id].get("models", [])
+                }
                 for model_id, enabled in enabled_models.items():
                     if model_id in known_models:
-                        clean["providers"][provider_id]["enabled_models"][model_id] = bool(enabled)
+                        # A retired model, or one this account's plan does not reach,
+                        # cannot be published: users would only meet it as an error.
+                        callable_model = not (
+                            known_models[model_id].get("eol") or known_models[model_id].get("requires_subscription")
+                        )
+                        clean["providers"][provider_id]["enabled_models"][model_id] = bool(enabled) and callable_model
     return normalize_model_settings(clean)
 
 

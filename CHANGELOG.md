@@ -4,7 +4,11 @@
 
 This file records changes chronologically. If a historical note conflicts with the current specification, the current specification wins. The more detailed canonical history is maintained in Japanese in [CHANGELOG.ja.md](CHANGELOG.ja.md).
 
-**This file holds the 44 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
+**This file holds the 45 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
+
+### v2.15.44 — follow-up for OpenAI gpt-5 requests (Build 1120, 2026-09-28)
+
+This version includes the change below since v2.15.43. Models from gpt-5.1 onward are asked not to reason so they can accept the function tools used by drawing. DDL, Score, rendering, and the API shape are unchanged.
 
 ### 2026-09-28 — OpenAI's gpt-5.1 and later are asked not to reason (the gpt-5 fix, continued)
 

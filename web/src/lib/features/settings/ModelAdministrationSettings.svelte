@@ -368,11 +368,20 @@
 								<button class="ghost-btn primary-inline" onclick={() => openModelPicker(activeProvider.id)} disabled={modelSettingsLoading}>{t().settingsModelSelectModels}</button>
 							</div>
 							{#if selectedModels(activeProvider, activeProviderSetting, 'llm').length || selectedModels(activeProvider, activeProviderSetting, 'vision').length}
+								<!-- One row per purpose, so the purpose is read once, not on every model. -->
 								<div class="model-publish-selected">
-									{#each ['llm', 'vision'] as purpose}
-										{#each selectedModels(activeProvider, activeProviderSetting, purpose as 'llm' | 'vision') as model, modelIndex (`${purpose}:${model.id}:${modelIndex}`)}
-											<span>{purpose === 'llm' ? 'LLM' : 'Vision'} · {model.label}</span>
-										{/each}
+									{#each ['llm', 'vision'] as purpose (purpose)}
+										{@const models = selectedModels(activeProvider, activeProviderSetting, purpose as 'llm' | 'vision')}
+										{#if models.length}
+											<div class="model-publish-group">
+												<div class="model-publish-group-title">{purpose === 'llm' ? 'LLM' : 'Vision'}<span>{models.length}</span></div>
+												<div class="model-publish-chips">
+													{#each models as model, modelIndex (`${purpose}:${model.id}:${modelIndex}`)}
+														<span>{model.label}</span>
+													{/each}
+												</div>
+											</div>
+										{/if}
 									{/each}
 								</div>
 							{:else}<div class="model-publish-empty">{t().settingsModelNoPublishedModels}</div>{/if}

@@ -6,6 +6,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 38 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-28 — Offered models are listed under LLM and Vision
+
+At the author's direction. `Models visible to users` in the model settings ran every model together, each labeled `LLM · name` or `Vision · name`, which was hard to read. The models now sit in one row per purpose, headed `LLM` or `Vision` with a count, and each model shows its name alone. A purpose with no models has no row.
+
 ### 2026-09-28 — Unusable models cannot be offered, and Ollama Cloud is checked on fetch
 
 At the author's request. Ollama Cloud (ollama.com) hands its model list and model details to anyone without a key, so neither says whether the account's plan reaches a model or whether it has retired (on `192.168.0.89`, `qwen3.5:397b`, retired on 2026-09-25, was still offered and listed to users). Each `Fetch model list` now checks the listed models two at a time: 410 from `/api/show` is end of life (its date becomes `eol_date`), 403 from a one-token call on the key is paid plan only, and 200 clears the paid-plan mark. Any other answer settles nothing and the earlier mark stays. A model marked end of life or paid plan only is also kept out of the offered models when settings are saved, and the administration screen's model selection disables its checkbox and shows why (`Select visible` skips it too). With one call per model, an Ollama Cloud fetch can take a minute or two.

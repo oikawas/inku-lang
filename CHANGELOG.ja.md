@@ -6,6 +6,14 @@
 
 **本書が持つのは v2.5.0（2026-07-25、render engine 12）以降**の 46 版である。それより前は書庫にある。
 
+### 2026-09-28 — Android: OpenAIのgpt-5系で描けるようにする（Serverと同じ規則）
+
+Serverセッションの依頼（作者の指示）。AndroidのOpenAI互換の接続も、OpenAIに`max_tokens`とtemperatureを送っていたので、Serverと同じくgpt-5系・o系に断られる形だった（既定の候補は`openai:gpt-5.1`）。Serverの`openai_sampling()`と同じ規則にした。
+
+- 接続先のhostが`api.openai.com`のときだけ、`max_tokens`の代わりに`max_completion_tokens`を送る。モデルidが`gpt-5`または`o`＋数字で始まればtemperatureを送らず、`gpt-5.`＋数字で始まれば`reasoning_effort: "none"`を送る（gpt-5そのものとo系は`none`を受けない）。
+- NVIDIA・Ollama CloudなどほかのOpenAI互換の接続先は変えない。接続の名前ではなくhostで決める。
+- JVMの試験で確かめた。実際にOpenAIへは送っていない。
+
 ### v2.15.45 — 描画処理の例外を記録（Build 1121、2026-09-28）
 
 v2.15.44以降の下記変更を収録する。描画の処理が例外で止まったとき、実行idとトレースバックをServerのログに残す。DDL・Score・描画の版とAPIの形は変えない。

@@ -16,7 +16,7 @@ class OpenAiCompatibleProvider(
 ) : ModelProvider {
     override suspend fun generate(request: ModelRequest): ModelResponse = withContext(Dispatchers.IO) {
         val started = System.currentTimeMillis()
-        val response = postJson(endpoint("/chat/completions"), requestBody(providerId, request), request.timeoutMs)
+        val response = postJson(endpoint("/chat/completions"), requestBody(providerId, request, baseUrl), request.timeoutMs)
         val choices = response.optJSONArray("choices") ?: error("Chat Completions response did not contain choices.")
         val first = choices.optJSONObject(0) ?: error("Chat Completions response was empty.")
         val message = first.optJSONObject("message")
@@ -119,11 +119,14 @@ class OpenAiCompatibleProvider(
          * call, except on `ollama`, whose structured output goes as a strict
          * JSON-schema `response_format` -- the answer then comes back as the
          * message text, which [generate] already reads. A pipeline request to
-         * either Ollama connection also turns reasoning off.
+         * either Ollama connection also turns reasoning off. OpenAI's own API
+         * takes its length, temperature and reasoning fields differently; see
+         * [putOpenAiSampling].
          */
-        internal fun requestBody(providerId: String, request: ModelRequest): JSONObject {
+        internal fun requestBody(providerId: String, request: ModelRequest, baseUrl: String): JSONObject {
+            val model = modelForRequest(providerId, request.modelId)
             val payload = JSONObject()
-                .put("model", modelForRequest(providerId, request.modelId))
+                .put("model", model)
                 .put(
                     "messages",
                     JSONArray().apply {
@@ -133,8 +136,13 @@ class OpenAiCompatibleProvider(
                         put(JSONObject().put("role", "user").put("content", userContent(request)))
                     },
                 )
-                .put("temperature", pipelineTemperature(request.pipelineAction) ?: request.temperature)
-                .put("max_tokens", request.maxTokens)
+            putOpenAiSampling(
+                payload,
+                baseUrl,
+                model,
+                maxTokens = request.maxTokens,
+                temperature = pipelineTemperature(request.pipelineAction) ?: request.temperature,
+            )
             request.tool?.let { tool ->
                 if (providerId == OLLAMA_PROVIDER_ID) {
                     payload.put(
@@ -173,6 +181,34 @@ class OpenAiCompatibleProvider(
             return payload
         }
 
+        /**
+         * The length and temperature fields, as the server's `openai_sampling()`
+         * (`openai_request.py`) sends them. OpenAI's own API refuses `max_tokens`
+         * for the gpt-5 and o-series models and asks for `max_completion_tokens`,
+         * which every chat model there accepts; the reasoning families refuse a
+         * temperature other than the default; and gpt-5.1 and later refuse
+         * function tools in /v1/chat/completions while they reason, so they are
+         * asked not to (gpt-5 itself and the o-series do not take "none"). Other
+         * OpenAI-compatible servers (NVIDIA, Ollama Cloud and the like) keep the
+         * fields they have always been sent.
+         */
+        internal fun putOpenAiSampling(
+            payload: JSONObject,
+            baseUrl: String,
+            model: String,
+            maxTokens: Int,
+            temperature: Double,
+        ) {
+            val host = runCatching { URL(baseUrl).host }.getOrNull()?.lowercase()
+            if (host != OPENAI_HOST) {
+                payload.put("temperature", temperature).put("max_tokens", maxTokens)
+                return
+            }
+            payload.put("max_completion_tokens", maxTokens)
+            if (!OPENAI_FIXED_TEMPERATURE.containsMatchIn(model)) payload.put("temperature", temperature)
+            if (OPENAI_REASONING_OFF.containsMatchIn(model)) payload.put("reasoning_effort", "none")
+        }
+
         /** Plain text, or the prompt with one JPEG as an image_url data URI. */
         internal fun userContent(request: ModelRequest): Any {
             val image = request.imageJpeg ?: return request.prompt
@@ -199,6 +235,9 @@ class OpenAiCompatibleProvider(
         }
 
         private const val OLLAMA_PROVIDER_ID = "ollama"
+        private const val OPENAI_HOST = "api.openai.com"
+        private val OPENAI_FIXED_TEMPERATURE = Regex("^(gpt-5|o\\d)")
+        private val OPENAI_REASONING_OFF = Regex("^gpt-5\\.\\d")
         private val REASONING_OFF_PROVIDER_IDS = setOf("ollama", "ollama-cloud")
         private const val MAX_RESPONSE_CHARS = 2_000_000
         private const val MAX_ERROR_CHARS = 16_384

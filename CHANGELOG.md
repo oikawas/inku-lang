@@ -4,7 +4,11 @@
 
 This file records changes chronologically. If a historical note conflicts with the current specification, the current specification wins. The more detailed canonical history is maintained in Japanese in [CHANGELOG.ja.md](CHANGELOG.ja.md).
 
-**This file holds the 41 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
+**This file holds the 42 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
+
+### v2.15.41 — size of the empty model picker (Build 1117, 2026-09-28)
+
+This version includes the change below since v2.15.40. Only when there are no selectable models, the picker is centered and sized to its explanation. Its size with models is unchanged.
 
 ### 2026-09-28 — The empty model picker is sized to its sentence (I-297 follow-up)
 

@@ -4,7 +4,11 @@
 
 This file records changes chronologically. If a historical note conflicts with the current specification, the current specification wins. The more detailed canonical history is maintained in Japanese in [CHANGELOG.ja.md](CHANGELOG.ja.md).
 
-**This file holds the 47 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
+**This file holds the 48 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
+
+### v2.15.47 — Claude Sonnet 5 Vision requests (Build 1123, 2026-09-28)
+
+This version includes the change below since v2.15.46. Colophon and autonomous refinement Vision advice requests no longer send temperature to Anthropic, and provider refusals are recorded in the Server log. DDL, Score, rendering, and the API shape are unchanged.
 
 ### 2026-09-28 — Claude Sonnet 5 reads the colophon, and the colophon and Vision advice log why a provider refused
 

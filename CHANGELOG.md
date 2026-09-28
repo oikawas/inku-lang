@@ -6,6 +6,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 48 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-28 — The autonomous refinement dialog remembers the last choices
+
+At the author's request. The autonomous refinement dialog opened at its defaults every time. The method, number of generations, the five refinement elements, variation amplitude and the direction text are now saved in the browser as they change and restored the next time it opens (the author's choice: keep the direction too, in the browser). The Vision model stays an account setting; the wild switch is not kept and follows the work being refined. The manual (Japanese and English) says so.
+
 ### 2026-09-28 — Android: Claude Opus 5.5 can draw (the server's fix)
 
 Asked by the Server session on the author's instruction. Android's Claude API connection also forced the answer's tool with `tool_choice` `{"type":"tool"}`, which Claude Opus 5.5 refuses ("tool_choice: type "tool" and "any" are not supported for this model."). It now follows the server's fix (the author's ruling).

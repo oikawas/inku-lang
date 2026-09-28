@@ -10,9 +10,12 @@
   import { t } from '$lib/i18n/index.svelte';
   import { createElapsed } from '$lib/elapsed.svelte';
   import { generationSketch } from '$lib/sketch';
+  import { loadAiRefineSettings, saveAiRefineSettings } from '$lib/features/canvas/ai-refine-settings';
 
   type RefineMode = 'random' | 'vision';
   type VariationAmplitude = 'small' | 'medium' | 'large';
+  // The choices made last time (kept in this browser).
+  const saved = loadAiRefineSettings();
   type VisionAdvice = { observation: string; next_direction: string; suggested_kind: string; model: string };
   type Props = {
     node: LineageNode;
@@ -32,16 +35,22 @@
   function addTokens(total: number | null, delta: number): number | null {
     return (total ?? 0) + delta;
   }
-  let prompt = $state('');
-  let generations = $state(5);
-  let refineMode = $state<RefineMode>('random');
+  let prompt = $state(saved.direction);
+  let generations = $state(saved.generations);
+  let refineMode = $state<RefineMode>(saved.mode);
   let selectedVisionModel = $state('');
-  let enableReading = $state(true);
-  let enableColor = $state(true);
-  let enableLayout = $state(true);
-  let enableTouch = $state(true);
-  let enableVariation = $state(true);
-  let variationAmplitude = $state<VariationAmplitude>('medium');
+  let enableReading = $state(saved.reading);
+  let enableColor = $state(saved.color);
+  let enableLayout = $state(saved.layout);
+  let enableTouch = $state(saved.touch);
+  let enableVariation = $state(saved.variation);
+  let variationAmplitude = $state<VariationAmplitude>(saved.amplitude);
+  $effect(() => {
+    saveAiRefineSettings({
+      mode: refineMode, generations, reading: enableReading, color: enableColor, layout: enableLayout,
+      touch: enableTouch, variation: enableVariation, amplitude: variationAmplitude, direction: prompt
+    });
+  });
   let running = $state(false);
   const refineElapsed = createElapsed();
   let refineTokensIn = $state<number | null>(null);

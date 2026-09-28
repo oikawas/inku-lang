@@ -270,6 +270,8 @@ You choose the number of generations and which refinement elements to use. A dir
 
 **The model chosen for autonomous refinement with Vision is used to draw each generation, not only to observe it** (the running display names the model it is drawing with). Random autonomous refinement chooses no model, so it draws with the model selected on the page.
 
+The dialog remembers the method, number of generations, refinement elements, variation amplitude and direction you chose last time, and opens with them next time (kept in this browser). The wild switch is not remembered; it starts from the work being refined.
+
 `Sketch from life` follows the work you start from. From a work drawn with it, each generation is drawn from that work's sketch prose and the layer is not run again; only a generation whose text gained a direction goes through the layer again, because its text has changed. From a work drawn without it, the generations are drawn without it too. The setting on the `Describe` tab is not used.
 
 ## 10. Compare Models

@@ -256,22 +256,27 @@ class RefinementScreenTest {
      */
     @Test
     fun t10_noOtherGenerationStartsWhileCandidatesAreBeingMade() {
+        // A reading that waits on a slow model keeps the run busy for seconds.
+        // A colour run makes no model call and can end before drawing is asked.
+        useSlowModel(2_000)
         openPanel()
         composeTestRule.runOnIdle {
-            vm().setRefinementElement(RefinementElement.Color)
+            vm().setRefinementElement(RefinementElement.Reading)
             vm().setRefinementCount(4)
             vm().generateRefinementCandidates()
         }
         awaitState("the run to be busy") { it.refinementBusy }
 
-        composeTestRule.runOnIdle {
+        // On the UI thread without waiting for idle: `runOnIdle` would let the
+        // candidates finish first, and the drawing would then rightly start.
+        composeTestRule.runOnUiThread {
+            assertTrue("the run is still busy when drawing is asked", vm().state.value.refinementBusy)
             vm().draw()
             vm().drawFromDdl()
         }
-        composeTestRule.runOnIdle {
-            assertFalse("no drawing started", vm().state.value.isDrawing)
-            assertEquals("推敲の候補を生成中です。", vm().state.value.message)
-        }
+        awaitState("the refusal") { it.message == "推敲の候補を生成中です。" }
+        assertTrue("the run is still busy after the refusal", vm().state.value.refinementBusy)
+        assertFalse("no drawing started", vm().state.value.isDrawing)
         awaitState("the run to finish") { !it.refinementBusy }
     }
 

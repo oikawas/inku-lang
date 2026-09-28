@@ -42,7 +42,6 @@ pub use plan_resources::{
     PlanResourceOmission, PlanResourceOwner, PlanResourcePartialExecution, SelectedCompositionPlan,
     preflight_composition_plan, select_composition_plan_resources,
 };
-pub mod prompt;
 pub mod relation_reference;
 pub mod render_execution;
 pub mod saijiki;
@@ -181,13 +180,6 @@ pub use phrase_topology::{
     UNRESOLVED_DETERMINER_PHRASE_TOPOLOGY_EVIDENCE_SCHEMA_ID,
     UnresolvedDeterminerPhraseOpaqueCandidateRun, UnresolvedDeterminerPhraseTopologyEvidence,
     collect_english_unresolved_determiner_phrase_topology_evidence,
-};
-pub use prompt::{
-    PROMPT_BODY_TEMPLATE_ASSET_BYTES, PROMPT_BODY_TEMPLATE_ASSET_ID, PromptBodyTemplate,
-    PromptBodyTemplateAsset, PromptBodyTemplateAssetError, PromptBodyTemplateRef,
-    PromptBodyTemplateSlot, PromptBodyTemplateStage, PromptBodyTemplateStageAsset,
-    prompt_body_template, prompt_body_template_asset, prompt_body_template_asset_from_bytes,
-    prompt_body_template_asset_sha256_hex,
 };
 pub use relation_reference::{
     RELATION_REFERENCE_EVIDENCE_SCHEMA_ID, RelationReferenceCandidateEnvelope,

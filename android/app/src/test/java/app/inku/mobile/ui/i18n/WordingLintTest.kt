@@ -201,14 +201,16 @@ class WordingLintTest {
         // The prompts must still hold their Japanese: this contract translating
         // a prompt would be the worst outcome, so it is checked from the same
         // place rather than left to review. They left `WebDdlSpec.kt` for the
-        // shared core with the Rust cut-over, so they are read there.
-        val prompts = listOf(
-            File("../../core/crates/inku-ddl/assets/prompt-body-templates-v1.json"),
-            File("../core/crates/inku-ddl/assets/prompt-body-templates-v1.json"),
-        ).firstOrNull(File::isFile)?.readText()
-        assertTrue("the shared prompt templates were not found", prompts != null)
+        // shared core with the Rust cut-over, so they are read there: the
+        // Stage 1 prompt in the pipeline, and its touch words in the Saijiki.
+        fun shared(relative: String) = listOf(File("../../$relative"), File("../$relative"))
+            .firstOrNull(File::isFile)?.readText()
+        val prompts = shared("core/crates/inku-pipeline/src/prompts.rs")
+        val saijiki = shared("core/crates/inku-ddl/assets/saijiki-v1.json")
+        assertTrue("the shared Stage 1 prompt was not found", prompts != null)
+        assertTrue("the shared Saijiki was not found", saijiki != null)
         assertTrue("the Stage 1 prompt has lost its Japanese", JAPANESE.containsMatchIn(prompts!!))
-        assertTrue("the Stage 1 prompt has lost its touch words", prompts.contains("銀筆"))
+        assertTrue("the Stage 1 prompt has lost its touch words", saijiki!!.contains("銀筆"))
     }
 
     /** T4: the two packs answer the same set of keys. */

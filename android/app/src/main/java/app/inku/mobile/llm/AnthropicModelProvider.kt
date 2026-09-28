@@ -7,6 +7,7 @@ import java.util.Base64
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
+import org.json.JSONException
 import org.json.JSONObject
 
 /**
@@ -96,7 +97,10 @@ class AnthropicModelProvider(
                             .put("input_schema", JSONObject(tool.parametersJson)),
                     ),
                 )
-                .put("tool_choice", JSONObject().put("type", "tool").put("name", tool.name))
+                // "auto" for every model, as the server sends it: Claude Opus 5.5
+                // refuses a forced tool ("tool_choice: type \"tool\" and \"any\" are
+                // not supported for this model"). The answer's tool stays the only one.
+                .put("tool_choice", JSONObject().put("type", "auto"))
         }
         return payload
     }
@@ -125,25 +129,41 @@ class AnthropicModelProvider(
         }
 
         /**
-         * The forced tool call's input when a tool was asked for, the text blocks
-         * otherwise. Like the server, exactly one call of the requested tool is
-         * an answer; anything else is a malformed response.
+         * The answer, read as the server's `pipeline_provider.py` reads it. When a
+         * tool was offered, a call of it is the answer: exactly one call of that
+         * tool, anything else malformed. With `tool_choice` "auto" the model may
+         * answer in text instead; then the object in the text blocks is the
+         * answer (see [jsonObjectIn]). Thinking blocks are never read. Without a
+         * tool, the text blocks are the answer.
          */
         internal fun responseText(blocks: JSONArray, toolName: String?): String {
             val objects = (0 until blocks.length()).mapNotNull { blocks.optJSONObject(it) }
+            val texts = objects.filter { it.optString("type") == "text" }.map { it.optString("text") }
             if (toolName != null) {
                 val calls = objects.filter { it.optString("type") == "tool_use" }
-                check(calls.size == 1 && calls[0].optString("name") == toolName) {
-                    "Claude response did not contain the requested tool call."
+                if (calls.isEmpty()) return jsonObjectIn(texts.joinToString("\n")).toString()
+                if (calls.size != 1 || calls[0].optString("name") != toolName) {
+                    throw JSONException("Claude returned an unexpected tool call.")
                 }
-                val input = calls[0].optJSONObject("input") ?: error("Claude tool call did not contain an input object.")
+                val input = calls[0].optJSONObject("input")
+                    ?: throw JSONException("Claude tool call did not contain an input object.")
                 return input.toString()
             }
-            val text = objects
-                .filter { it.optString("type") == "text" }
-                .joinToString("") { it.optString("text") }
+            val text = texts.joinToString("")
             check(text.isNotBlank()) { "Claude response did not contain text." }
             return text
+        }
+
+        /**
+         * The object an answer given as text carries, fenced or not: from the
+         * first `{` to the last `}` (the server's `_json_object_in`). The shared
+         * core checks its shape; no object is a malformed answer.
+         */
+        internal fun jsonObjectIn(text: String): JSONObject {
+            val start = text.indexOf('{')
+            val end = text.lastIndexOf('}')
+            if (start == -1 || end <= start) throw JSONException("Claude answered without the response object.")
+            return JSONObject(text.substring(start, end + 1))
         }
     }
 }

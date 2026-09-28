@@ -6,6 +6,15 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 48 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-28 — Android: Claude Opus 5.5 can draw (the server's fix)
+
+Asked by the Server session on the author's instruction. Android's Claude API connection also forced the answer's tool with `tool_choice` `{"type":"tool"}`, which Claude Opus 5.5 refuses ("tool_choice: type "tool" and "any" are not supported for this model."). It now follows the server's fix (the author's ruling).
+
+- Every Claude model is sent `tool_choice` `{"type":"auto"}`, still with the answer's tool as the only one. No model list is kept.
+- A `tool_use` in the answer is read as before: its `input` is the answer, and a call that is not exactly one, or names another tool, is malformed (`malformed_payload`; Android used to retry it as `transport_unavailable`).
+- An answer given as text, without a `tool_use`, is read from the first `{` to the last `}` of its joined text blocks; no object there is `malformed_payload`. Thinking blocks are not read. The shared core still checks the answer's shape.
+- Checked with JVM tests; nothing was sent to the Claude API.
+
 ### v2.15.47 — Claude Sonnet 5 Vision requests (Build 1123, 2026-09-28)
 
 This version includes the change below since v2.15.46. Colophon and autonomous refinement Vision advice requests no longer send temperature to Anthropic, and provider refusals are recorded in the Server log. DDL, Score, rendering, and the API shape are unchanged.

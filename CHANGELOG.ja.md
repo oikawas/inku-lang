@@ -6,6 +6,15 @@
 
 **本書が持つのは v2.5.0（2026-07-25、render engine 12）以降**の 48 版である。それより前は書庫にある。
 
+### 2026-09-28 — Android: Claude Opus 5.5で描けるようにする（Serverと同じ直し方）
+
+Serverセッションの依頼（作者の指示）。AndroidのClaude APIの接続も、答えのtoolを`tool_choice` `{"type":"tool"}`で強制していたので、Serverと同じくClaude Opus 5.5に「tool_choice: type "tool" and "any" are not supported for this model.」で断られる形だった。Serverの直し方（作者裁定）に揃えた。
+
+- どのClaudeのモデルにも`tool_choice` `{"type":"auto"}`を送る。渡すtoolは答えの1つだけのまま。モデルの一覧は持たない。
+- 答えに`tool_use`があれば、今までどおりその`input`を答えにする。1つでない、または名前が違う呼び出しは不正な形（`malformed_payload`）とする（Androidはこれまで`transport_unavailable`として送り直していた）。
+- `tool_use`が無く本文で答えたときは、textのブロックをつないだ中の最初の`{`から最後の`}`までをJSONの対象として読む。対象が無ければ`malformed_payload`。thinkingのブロックは読まない。答えの形は、今までどおり共有coreが確かめる。
+- JVMの試験で確かめた。実際にClaude APIへは送っていない。
+
 ### v2.15.47 — Claude Sonnet 5のVision要求を修正（Build 1123、2026-09-28）
 
 v2.15.46以降の下記変更を収録する。奥書とAI自律推敲のVisionの助言では、Anthropicへtemperatureを送らず、提供元が断った理由をServerのログに残す。DDL・Score・描画の版とAPIの形は変えない。

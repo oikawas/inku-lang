@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import threading
 from concurrent.futures import Future, ThreadPoolExecutor
 from copy import deepcopy
@@ -31,6 +32,9 @@ _RECORD_OPTIONS = frozenset({
 })
 
 _LABEL_ONLY_DESCRIPTION = "description is only labels"
+
+
+_logger = logging.getLogger(__name__)
 
 
 def _drawn_description(text: str) -> str:
@@ -269,7 +273,17 @@ class PipelineService:
         if current is not None and not current.done():
             return
         if run.view()["busy"]:
-            self._jobs[key] = self._pool.submit(self._drain, run)
+            job = self._pool.submit(self._drain, run)
+            job.add_done_callback(lambda done, key=key: self._log_job_failure(key, done))
+            self._jobs[key] = job
+
+    @staticmethod
+    def _log_job_failure(key: tuple[str, str], job: Future) -> None:
+        # A failed job answers the client 503 "could not finish" and nothing
+        # else; without this line the exception that stopped it was lost.
+        error = None if job.cancelled() else job.exception()
+        if error is not None:
+            _logger.error("pipeline_job_failed execution_id=%s", key[1], exc_info=error)
 
     def _render_payload(
         self, run: CandidateExecution, command: dict

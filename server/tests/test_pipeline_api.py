@@ -462,3 +462,23 @@ def test_managed_api_persists_approved_patch_reload_and_legacy_fork(
         legacy_values["svg"],
     )
     engine.dispose()
+
+
+def test_a_job_that_stops_on_an_exception_leaves_it_in_the_log(caplog):
+    """The client is told only "could not finish" (503); the exception has to
+    reach the log, or the cause of a failed drawing is lost (Opus 5, 2026-09-28)."""
+    from concurrent.futures import Future
+
+    job: Future = Future()
+    job.set_exception(RuntimeError("the reason"))
+    with caplog.at_level("ERROR", logger="inku_server.pipeline_api"):
+        PipelineService._log_job_failure(("owner", "execution-1"), job)
+    record = caplog.records[-1]
+    assert "execution-1" in record.getMessage()
+    assert record.exc_info[1].args == ("the reason",)
+
+    finished: Future = Future()
+    finished.set_result(None)
+    caplog.clear()
+    PipelineService._log_job_failure(("owner", "execution-2"), finished)
+    assert caplog.records == []

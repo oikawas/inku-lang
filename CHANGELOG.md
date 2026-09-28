@@ -6,6 +6,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 45 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-28 — A drawing job that stops on an exception leaves it in the log
+
+At the author's note (drawing from a description with Claude Opus 5 ended with "The authoring operation could not finish."). A drawing job that stopped on an exception answered the page 503 "could not finish" and kept the exception nowhere. It is now logged as `pipeline_job_failed` with the execution id and the traceback, so the cause can be read and fixed.
+
 ### v2.15.44 — follow-up for OpenAI gpt-5 requests (Build 1120, 2026-09-28)
 
 This version includes the change below since v2.15.43. Models from gpt-5.1 onward are asked not to reason so they can accept the function tools used by drawing. DDL, Score, rendering, and the API shape are unchanged.

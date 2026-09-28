@@ -6,6 +6,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 44 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-28 — OpenAI's gpt-5.1 and later are asked not to reason (the gpt-5 fix, continued)
+
+After the previous fix gpt-5.6-luna and gpt-5.6-terra were still refused, and the newly kept log said why: "Function tools with reasoning_effort are not supported for gpt-5.6-terra in /v1/chat/completions … set reasoning_effort to 'none'". The drawing pipeline takes its answer through function tools, so gpt-5.1 and later models on `api.openai.com` are sent `reasoning_effort: "none"`. gpt-5 itself and the o-series do not accept `none` and are not sent it.
+
 ### v2.15.43 — OpenAI gpt-5 request compatibility (Build 1119, 2026-09-28)
 
 This version includes the change below since v2.15.42. Requests to the OpenAI API use fields accepted by gpt-5 and related models, and the log records a provider's reason for refusing a request. DDL, Score, rendering, and the API shape are unchanged.

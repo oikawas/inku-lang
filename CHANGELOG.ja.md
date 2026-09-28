@@ -6,6 +6,10 @@
 
 **本書が持つのは v2.5.0（2026-07-25、render engine 12）以降**の 44 版である。それより前は書庫にある。
 
+### 2026-09-28 — OpenAIのgpt-5.1以降に推論を切って送る（gpt-5系で描けるようにする続き）
+
+前の修正の後も、gpt-5.6-luna・gpt-5.6-terraは断られた。新しく残るようになったログが理由を示した: 「Function tools with reasoning_effort are not supported for gpt-5.6-terra in /v1/chat/completions … set reasoning_effort to 'none'」。描画のpipelineはfunction toolsで答えを受けるので、`api.openai.com`のgpt-5.1以降のモデルには`reasoning_effort: "none"`を送る。gpt-5そのものとo系は`none`を受けないので送らない。
+
 ### v2.15.43 — OpenAIのgpt-5系の要求を修正（Build 1119、2026-09-28）
 
 v2.15.42以降の下記変更を収録する。OpenAI APIへの要求をgpt-5系などが受け付ける形にし、提供元が断った理由をログで確認できるようにする。DDL・Score・描画の版とAPIの形は変えない。

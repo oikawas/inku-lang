@@ -96,11 +96,14 @@ def test_openai_gets_its_own_length_field_and_a_refusal_says_why(monkeypatch, ca
     assert provider(_action())["tag"] == "normalized_ddl_generated"
     assert seen[0]["max_completion_tokens"] == 256
     assert "max_tokens" not in seen[0] and "temperature" not in seen[0]
+    # Function tools are refused while gpt-5.6 reasons (Pentala, 2026-09-28).
+    assert seen[0]["reasoning_effort"] == "none"
 
     target["model"] = "gpt-4.1"
     with caplog.at_level("WARNING", logger="inku_server.pipeline_provider"):
         assert provider(_action())["failure"] == "provider_rejected"
     assert seen[1]["temperature"] == 0.3 and seen[1]["max_completion_tokens"] == 256
+    assert "reasoning_effort" not in seen[1]
     logged = json.loads(caplog.records[-1].getMessage().split(" ", 1)[1])
     assert logged["status"] == 400 and logged["param"] == "max_tokens" and logged["code"] == "unsupported_parameter"
     assert logged["provider"] == "openai" and logged["model"] == "gpt-4.1"

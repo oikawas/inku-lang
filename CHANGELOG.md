@@ -6,6 +6,13 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 47 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-28 — Claude Sonnet 5 reads the colophon, and the colophon and Vision advice log why a provider refused
+
+At the author's note. Generating a colophon with Claude Sonnet 5 on the Claude API failed with a 400 from the Anthropic API. The colophon and Vision advice (`vision_client.py`) sent Anthropic a temperature, which the drawing pipeline never does (Sonnet 5 draws); the reason for the refusal was not kept.
+
+- No temperature is sent to Anthropic, as in the drawing pipeline.
+- When a provider refuses over HTTP, the same `provider_http_error` line the pipeline writes (with `action` `vision`) is logged. Reading the reason moved to `provider_refusal.py`, which both use.
+
 ### v2.15.46 — Claude drawing and provider diagnostics (Build 1122, 2026-09-28)
 
 This version includes the changes below since v2.15.45. The Server supports Claude Opus 5.5, and Android adjusts its OpenAI requests and records why a provider refused a call. DDL, Score, rendering, and the API shape are unchanged.

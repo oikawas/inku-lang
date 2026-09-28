@@ -6,6 +6,13 @@
 
 **本書が持つのは v2.5.0（2026-07-25、render engine 12）以降**の 47 版である。それより前は書庫にある。
 
+### 2026-09-28 — Claude Sonnet 5で奥書を読めるようにし、奥書とVisionの助言でも断られた理由をログに残す
+
+作者の指摘。Claude APIのClaude Sonnet 5で奥書を生成すると、Anthropic APIが400を返して失敗していた。奥書とVisionの助言の送り方（`vision_client.py`）はAnthropicにtemperatureを送っていたが、描画のpipelineは送っていない（Sonnet 5で描ける）。断った理由は記録されていなかった。
+
+- Anthropicへはtemperatureを送らない（描画のpipelineと同じ）。
+- 提供元がHTTPで断ったとき、描画のpipelineと同じ`provider_http_error`の行（`action`は`vision`）をログに残す。理由の読み出しは`provider_refusal.py`にまとめ、両方で使う。
+
 ### v2.15.46 — Claudeの描画と提供元の診断（Build 1122、2026-09-28）
 
 v2.15.45以降の下記変更を収録する。ServerでClaude Opus 5.5に対応し、AndroidではOpenAIへの要求と提供元が断った理由の記録を整えた。DDL・Score・描画の版とAPIの形は変えない。

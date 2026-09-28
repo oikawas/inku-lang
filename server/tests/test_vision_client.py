@@ -58,6 +58,8 @@ def test_anthropic_sends_a_base64_image_block():
     assert request.url.path == "/v1/messages"
     assert request.headers["x-api-key"] == "k"
     assert body["system"] == "observe"
+    # As the pipeline sends Anthropic; the colophon was refused 400 while one was sent.
+    assert "temperature" not in body
     assert body["messages"][0]["content"][0] == {
         "type": "image", "source": {"type": "base64", "media_type": "image/png", "data": "iVBORw0KGgo="},
     }
@@ -83,3 +85,19 @@ def test_a_timeout_is_a_timeout_and_a_missing_key_is_said_before_sending():
     with pytest.raises(ValueError, match="gemini API key is not configured"):
         vision_text({**connection, "api_key": ""}, "m", system="s", text="t", images=[IMAGE], temperature=0,
                     max_tokens=1)
+
+
+def test_a_refusal_is_logged_with_its_reason(caplog):
+    def refuse(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(400, json={"type": "error", "error": {
+            "type": "invalid_request_error", "message": "temperature is not supported",
+        }})
+
+    connection = {"id": "anthropic", "kind": "anthropic", "base_url": "https://a.example", "api_key": "k",
+                  "requires_api_key": True}
+    with caplog.at_level("WARNING", logger="inku_server.vision_client"), pytest.raises(httpx.HTTPStatusError):
+        vision_text(connection, "claude-sonnet-5", system="s", text="t", images=[IMAGE], temperature=0.35,
+                    max_tokens=260, transport=httpx.MockTransport(refuse))
+    logged = json.loads(caplog.records[-1].getMessage().split(" ", 1)[1])
+    assert logged == {"action": "vision", "provider": "anthropic", "model": "claude-sonnet-5", "status": 400,
+                      "type": "invalid_request_error", "message": "temperature is not supported"}

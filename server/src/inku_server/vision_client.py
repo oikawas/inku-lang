@@ -10,6 +10,8 @@ the same header for the key, the model id as one quoted path segment.
 
 from __future__ import annotations
 
+import json
+import logging
 import os
 from typing import Any
 from urllib.parse import quote
@@ -17,6 +19,9 @@ from urllib.parse import quote
 import httpx
 
 from .openai_request import openai_sampling
+from .provider_refusal import provider_error
+
+_logger = logging.getLogger(__name__)
 
 
 def _image_parts(image: str) -> tuple[str, str]:
@@ -49,8 +54,10 @@ def _request(connection: dict[str, Any], model_id: str, *, system: str, text: st
             media_type, data = _image_parts(image)
             blocks.append({"type": "image", "source": {"type": "base64", "media_type": media_type, "data": data}})
         blocks.append({"type": "text", "text": text})
+        # No temperature, as the pipeline sends Anthropic: the colophon with
+        # claude-sonnet-5 was refused 400 while one was sent (2026-09-28).
         return base + "/v1/messages", headers, {
-            "model": model_id, "temperature": temperature, "max_tokens": max_tokens, "system": system,
+            "model": model_id, "max_tokens": max_tokens, "system": system,
             "messages": [{"role": "user", "content": blocks}],
         }
     if kind == "gemini":
@@ -92,5 +99,11 @@ def vision_text(connection: dict[str, Any], model_id: str, *, system: str, text:
             response = client.post(url, headers=headers, json=body)
     except httpx.TimeoutException as exc:
         raise TimeoutError("Vision provider timed out") from exc
+    if response.status_code >= 400:
+        # The same line the pipeline writes, so a refusal here says why too.
+        _logger.warning("provider_http_error %s", json.dumps({
+            "action": "vision", "provider": connection.get("id"), "model": model_id,
+            "status": response.status_code, **provider_error(response.content[:16384]),
+        }, ensure_ascii=False, sort_keys=True, separators=(",", ":")))
     response.raise_for_status()
     return _answer(str(connection.get("kind")), response.json()).strip()

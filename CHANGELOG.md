@@ -6,6 +6,14 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 45 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-28 — Android: OpenAI's gpt-5 models can draw (the server's rule)
+
+Asked by the Server session on the author's instruction. Android's OpenAI-compatible connection also sent OpenAI `max_tokens` and a temperature, the shape the gpt-5 and o-series models refuse (the built-in candidate is `openai:gpt-5.1`). It now follows the server's `openai_sampling()`.
+
+- Only when the connection's host is `api.openai.com`: `max_completion_tokens` goes in place of `max_tokens`; a model id starting with `gpt-5` or `o` plus a digit gets no temperature; one starting with `gpt-5.` plus a digit gets `reasoning_effort: "none"` (gpt-5 itself and the o-series do not take `none`).
+- NVIDIA, Ollama Cloud and other OpenAI-compatible connections are unchanged. The host decides, not the connection's name.
+- Checked with JVM tests; nothing was sent to OpenAI.
+
 ### v2.15.44 — follow-up for OpenAI gpt-5 requests (Build 1120, 2026-09-28)
 
 This version includes the change below since v2.15.43. Models from gpt-5.1 onward are asked not to reason so they can accept the function tools used by drawing. DDL, Score, rendering, and the API shape are unchanged.

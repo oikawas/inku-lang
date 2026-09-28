@@ -124,6 +124,13 @@ def _env_flag(name: str, default: bool = False) -> bool:
 
 # What every route that calls a model answers when the model is withheld; the
 # Web says it in the page's language.
+# A redraw from the description of a work its edited DDL holds would throw the
+# edits away; the pipeline's fork from the description is the way back.
+DESCRIPTION_LOCKED_DETAIL = {
+    "code": "description_locked",
+    "message": "The parent work is held by its edited DDL; start a new variation from its description instead.",
+}
+
 MODEL_NOT_OFFERED_DETAIL = "model is not offered on this server"
 
 

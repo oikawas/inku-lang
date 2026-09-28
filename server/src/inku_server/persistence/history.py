@@ -24,6 +24,7 @@ from .schema import (
     PipelineHistoryLinkRow,
     UserGroupRow,
 )
+from .description_lock import locked_history_ids
 from .variation_authority import (
     VariationAuthorityAdapterError,
     history_pipeline_diagnostics,
@@ -948,6 +949,11 @@ class HistoryListProjector:
                     item["has_acl_shares"] = row.id in acl_shared_ids
                 else:
                     item["shared"] = True
+        # A work its DDL holds (edited, or derived from an edited one) is not
+        # drawn from its description again; the client offers the fork instead.
+        locked = locked_history_ids(session, [row.id for row in rows])
+        for item, row in zip(items, rows, strict=True):
+            item["description_locked"] = row.id in locked
         node_ids = [row.lineage_node_id for row in rows if row.lineage_node_id]
         if not node_ids:
             return items

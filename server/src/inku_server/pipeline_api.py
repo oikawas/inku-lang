@@ -50,6 +50,23 @@ def _drawn_description(text: str) -> str:
     return drawn
 
 
+DESCRIPTION_LOCKED = {
+    "code": "description_locked",
+    "message": "This work is held by its edited DDL. Start a new variation from its description as it stands, then change the words there.",
+}
+
+
+def _rewords(text: str, description: str) -> bool:
+    return " ".join(str(text).split()) != " ".join(str(description).split())
+
+
+def _refuse_if_locked(history_id: str) -> None:
+    from . import db
+
+    if db.history_description_locked(history_id):
+        raise HTTPException(409, DESCRIPTION_LOCKED)
+
+
 class NewVariationBody(BaseModel):
     model_config = ConfigDict(extra="forbid")
     kind: Literal["description", "direct_ddl"]
@@ -409,6 +426,8 @@ class PipelineService:
 
     def fork_legacy(self, owner: str, history_id: str, kind: str, text: str, **choices) -> dict:
         work = self.legacy(owner, history_id)
+        if kind == "description" and _rewords(text, work["description"]):
+            _refuse_if_locked(history_id)
         return self.start(owner, kind, text, parent={"kind": "legacy_history", "id": history_id}, source_work=work, **choices)
 
     def ddl_export(self, owner: str, history_id: str) -> dict:
@@ -437,6 +456,10 @@ class PipelineService:
         previous = self.get(owner, variation_id)
         if previous["authority"]["revision"] != body.expected_revision:
             raise HTTPException(409, "authority_conflict")
+        # A variation its DDL holds starts a new one from its description as it
+        # stands; the words are changed afterwards, in the variation that follows them.
+        if previous["authority"]["authority"] == "ddl_authoritative" and _rewords(body.description, previous.get("description", "")):
+            raise HTTPException(409, DESCRIPTION_LOCKED)
         source_run = self.execution(owner, previous["execution_id"])
         source_work = {**previous, "saved_config": source_run.config,
                        "host_options": source_run.context.get("host_options", {}),
@@ -454,6 +477,8 @@ class PipelineService:
         if linked is None:
             raise HTTPException(404, "pipeline_history_not_found")
         history = asdict(linked.history)
+        if body.kind == "description" and _rewords(body.text, history["description"]):
+            _refuse_if_locked(history_id)
         lineage_node_id = history["metadata"].get("lineage_node_id")
         source_work = {
             **history,

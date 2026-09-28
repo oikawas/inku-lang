@@ -20,7 +20,7 @@ from ...autonomous_refine import ALLOWED_KINDS as AUTONOMOUS_REFINE_KINDS, visio
 from ...limits import limits_as_dict
 from ...saved_score_compat import coerce_saved_score
 from ...schema import Score
-from ..common import MODEL_NOT_OFFERED_DETAIL, _model_offered_to, _resolve_instruction_lang, _resolved_vision_model, _unexpected_http_error
+from ..common import DESCRIPTION_LOCKED_DETAIL, MODEL_NOT_OFFERED_DETAIL, _model_offered_to, _resolve_instruction_lang, _resolved_vision_model, _unexpected_http_error
 from ..deps import _current_user
 from ..models import JsonSeed
 from ..rendering import (
@@ -582,6 +582,14 @@ def api_interpret(req: InterpretRequest, request: Request, actor: dict = Depends
     return _pipeline_compat.interpret(actor["id"], req.model_dump(mode="json"), _reader_left(request))
 
 
+def _refuse_a_description_redraw_of_a_locked_parent(req: "PaintRequest") -> None:
+    """These routes draw from the description. A child of a work its DDL holds
+    would throw the edited DDL away, so it is refused; the pipeline's fork from
+    the description is the way back to the words."""
+    if req.lineage_parent_node_id and _db.lineage_node_description_locked(req.lineage_parent_node_id):
+        raise HTTPException(status_code=409, detail=DESCRIPTION_LOCKED_DETAIL)
+
+
 @router.post("/api/paint", response_model=PaintResponse, response_model_exclude_none=True)
 def api_paint(
     req: PaintRequest,
@@ -589,6 +597,7 @@ def api_paint(
     idempotency_key: str | None = Header(default=None, alias="Idempotency-Key", max_length=200),
     actor: dict = Depends(_current_user),
 ) -> dict:
+    _refuse_a_description_redraw_of_a_locked_parent(req)
     return _pipeline_compat.paint(
         actor["id"], req.model_dump(mode="json"), idempotency_key, _reader_left(request)
     )
@@ -620,6 +629,7 @@ def api_paint_stream(
     idempotency_key: str | None = Header(default=None, alias="Idempotency-Key", max_length=200),
     actor: dict = Depends(_current_user),
 ) -> StreamingResponse:
+    _refuse_a_description_redraw_of_a_locked_parent(req)
     # The response is committed once the first event is written. Pulling it
     # here lets a refusal before any layer settles (a label-only description,
     # a full pool, a failed Stage 1) reach the client as its HTTP status; a

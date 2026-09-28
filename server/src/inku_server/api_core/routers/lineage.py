@@ -99,9 +99,14 @@ def api_history_lineage_group_items(
 
 def _with_json_seeds(lineage: dict) -> dict:
     # These answers leave without a model, so their works' seeds are made
-    # strings here, as HistoryItem sends them.
+    # strings here, as HistoryItem sends them. Each work also says whether its
+    # DDL holds it, as a history item does.
+    locked = _db.description_locked_history_ids(
+        [node["history"]["id"] for node in lineage.get("nodes", []) if node.get("history")]
+    )
     return {**lineage, "nodes": [
-        {**node, "history": json_seeds(node.get("history"))} if node.get("history") else node
+        {**node, "history": {**json_seeds(node["history"]), "description_locked": node["history"]["id"] in locked}}
+        if node.get("history") else node
         for node in lineage.get("nodes", [])
     ]}
 

@@ -2948,3 +2948,39 @@ def test_a_score_the_render_core_refuses_is_answered_with_its_reason(auth_contex
     assert refused.status_code == 422
     assert refused.json()["detail"] == "score cannot be rendered: mark bounds exceed eight canvases"
     assert "render failed" not in caplog.text
+
+
+def test_a_work_its_ddl_holds_is_not_read_again_from_its_description(auth_context):
+    """A work whose DDL was edited is marked, keeps the mark through a touch, and
+    refuses a child read again from the description -- saved or drawn."""
+    headers, _user, _group = auth_context
+    base = {"input": "月が昇る", "ddl": "中心に円", "score": {"instructions": []}, "svg": "<svg></svg>"}
+    root = client.post("/api/history", json={**base, "at": 1_700_000_200_000}, headers=headers).json()
+    edited = client.post("/api/history", json={
+        **base, "at": 1_700_000_200_001, "ddl": "左に円",
+        "lineage_parent_node_id": root["lineage_node_id"], "derivation_kind": "ddl_edit",
+    }, headers=headers).json()
+    touched = client.post("/api/history", json={
+        **base, "at": 1_700_000_200_002, "ddl": "左に円",
+        "lineage_parent_node_id": edited["lineage_node_id"], "derivation_kind": "touch_change",
+    }, headers=headers)
+    assert touched.status_code == 200
+
+    listed = {item["id"]: item for item in client.get("/api/history", headers=headers).json()["items"]}
+    assert listed[root["id"]]["description_locked"] is False
+    assert listed[edited["id"]]["description_locked"] is True
+    assert listed[touched.json()["id"]]["description_locked"] is True
+
+    compared = client.post("/api/history", json={
+        **base, "at": 1_700_000_200_003,
+        "lineage_parent_node_id": edited["lineage_node_id"], "derivation_kind": "model_comparison",
+    }, headers=headers)
+    assert compared.status_code == 409
+    assert compared.json()["detail"]["code"] == "description_locked"
+
+    redrawn = client.post("/api/paint", json={
+        "description": "月が昇る", "lineage_parent_node_id": edited["lineage_node_id"],
+        "derivation_kind": "reinterpretation",
+    }, headers=headers)
+    assert redrawn.status_code == 409
+    assert redrawn.json()["detail"]["code"] == "description_locked"

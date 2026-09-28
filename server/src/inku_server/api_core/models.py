@@ -99,6 +99,10 @@ class HistoryPostBody(BaseModel):
 class HistoryItem(HistoryPostBody):
     id: str
     pipeline_variation_id: str | None = None
+    # True when the work is held by its DDL (edited, or derived from an edited
+    # work without reading the description again): it is not redrawn from its
+    # description; a new variation from the description is the way back.
+    description_locked: bool = False
     pipeline_revision: str | None = None
     # Raw core and renderer diagnostics frozen with this exact saved performance.
     # None means the work predates this record; empty arrays mean the recorded

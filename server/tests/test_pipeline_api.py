@@ -388,6 +388,14 @@ def test_managed_api_persists_approved_patch_reload_and_legacy_fork(
         )
         assert stale_fork.status_code == 409
         assert client.post(f"/api/pipeline/executions/{execution_id}/author-ddl", headers=another_owner, json=new_edition_body).status_code == 404
+        # The edition is held by its DDL: a new variation from changed words is
+        # refused; it starts from the description as it stands.
+        reworded = client.post(
+            f"/api/pipeline/variations/{edition['variation_id']}/fork-description", headers=owner,
+            json={"expected_revision": edition["authority"]["revision"], "description": edition["description"] + " and a moon"},
+        )
+        assert reworded.status_code == 409, reworded.text
+        assert reworded.json()["detail"]["code"] == "description_locked"
 
     with TestClient(app(service())) as reloaded_client:
         reloaded = reloaded_client.get(

@@ -14,7 +14,8 @@ from ...schema import Score
 from ...sketch import SketchDetail, normalize_sketch_grain, sketch_state_of
 from ... import db as _db
 from ... import thumbs_db as _thumbs_db
-from ..common import _unexpected_http_error
+from ..common import DESCRIPTION_LOCKED_DETAIL, _unexpected_http_error
+from ...persistence.description_lock import DESCRIPTION_READING_KINDS
 from ..deps import _current_user
 from ..models import HistoryItem, HistoryListResponse, HistoryPostBody
 from ..rendering import _COMPACT_SCORE_VERSIONS, _capture_history_coerce_observability, _effective_limits, _add_history_item, _output_save_settings, _render_metadata, _render_score_svg, _render_seed_from_text, _render_with_metadata, _resolved_catalog_id, _save_history_artifacts, _score_canvas_aspect_value, _score_with_canvas, _validated_canvas_aspect_override, _validated_svg_profile, _validated_variation_amplitude
@@ -405,6 +406,14 @@ def api_history_post(
     idempotency_key: str | None = Header(default=None, alias="Idempotency-Key", max_length=200),
     actor: dict = Depends(_current_user),
 ) -> HistoryItem:
+    # A work read again from the description (model or language comparison
+    # and the like) cannot descend from a work its DDL holds.
+    if (
+        body.lineage_parent_node_id
+        and body.derivation_kind in DESCRIPTION_READING_KINDS
+        and _db.lineage_node_description_locked(body.lineage_parent_node_id)
+    ):
+        raise HTTPException(status_code=409, detail=DESCRIPTION_LOCKED_DETAIL)
     metadata_seed_text = body.derivation_metadata.get("seed_text")
     requested_seed_text = body.seed_text
     if requested_seed_text is None and isinstance(metadata_seed_text, str):

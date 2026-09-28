@@ -521,6 +521,30 @@ def _lineage_generations(session, actor: dict, node_ids: list[str]) -> dict[str,
     )._lineage_generations(session, actor, node_ids)
 
 
+def description_locked_history_ids(history_ids: list[str]) -> set[str]:
+    """Which of these saved works are held by their DDL."""
+    from .persistence.description_lock import locked_history_ids
+
+    with SessionLocal() as session:
+        return locked_history_ids(session, history_ids)
+
+
+def history_description_locked(history_id: str) -> bool:
+    """Whether a saved work is held by its DDL (not redrawn from its description)."""
+    from .persistence.description_lock import locked_history_ids
+
+    with SessionLocal() as session:
+        return history_id in locked_history_ids(session, [history_id])
+
+
+def lineage_node_description_locked(node_id: str) -> bool:
+    """Whether the work at this lineage node is held by its DDL (not redrawn from its description)."""
+    from .persistence.description_lock import node_is_locked
+
+    with SessionLocal() as session:
+        return node_is_locked(session, node_id)
+
+
 def get_lineage(user_id: str, focus_node_id: str, descendant_depth: int = 2, node_limit: int = 200) -> dict | None:
     return _lineage.LineageStore(
         session_factory=SessionLocal,

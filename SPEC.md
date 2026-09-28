@@ -242,7 +242,7 @@ whole canvas as the range of a line-up, scatter, or tile (§18). Explicit
 positions take priority, and an explicit `center` uses the middle cell as its
 range. `inku.geometry-resolution-policy.v1` records omitted
 placement and fill meaning; its current digest is
-`aacaf721a566e71d5c3b0649d2dafb43ed2a2382aa34edee0d5133b541fe2411`.
+`6b71a20d40f3756406abc758739ce59eb0b0c4f196125fa46304086469a46fba`.
 Single objects, Macros, and coordinated groups share the omitted range: the
 shrunk middle cell for place and draw, and the whole canvas for a line-up,
 scatter, or tile. Fill's omitted target is also the whole canvas. A valid ground alone is
@@ -3151,7 +3151,8 @@ of width. Normal line length and normal arc chord are also `6/25`; arc sagitta
 is one quarter of its chord, and normal point diameter is `3/250` (0.012).
 Finite relative factors are `3/4`, `1/2`, and `3/8` for mild,
 standard, and strong small; `5/4`, `3/2`, and `7/4` for the corresponding large
-classes; and `1` for normal. One exact rational factor is applied once to the
+classes, with two further steps that mirror standard and strong small, `2`
+(`extra-large`, `特大の`) and `8/3` (`huge`, `巨大な`); and `1` for normal. One exact rational factor is applied once to the
 normal geometry: length for line, similar chord and sagitta for arc, and diameter
 for point. Existing `small` means standard-small, while an explicit
 "normal size" remains distinct from unspecified. Explicit numeric geometry is

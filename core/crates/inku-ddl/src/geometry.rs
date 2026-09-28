@@ -44,7 +44,7 @@ const GEOMETRY_RESOLUTION_POLICY_SUFFIX: &str = concat!(
     "\"numeric_basis\":{\"position\":\"canvas_axes\",\"size\":\"canvas_short_edge\"},",
     "\"policy\":\"inku.geometry-resolution-policy.v1\",",
     "\"shape_constraints\":{\"aspect\":{\"long_to_short\":\"2:1\",\"explicit_dimensions\":\"retain_and_check_order\"},\"regular_triangle\":\"height=side*sqrt(3)/2_at_final_f64_boundary\",\"polygon\":{\"default_sides\":5,\"sides\":[5,6,7,8],\"radius\":\"circumradius\"},\"triangle_anchor\":\"bbox_center\"},",
-    "\"relative_scale\":{\"large\":\"3/2\",\"normal\":\"1/1\",",
+    "\"relative_scale\":{\"extra_large\":\"2/1\",\"huge\":\"8/3\",\"large\":\"3/2\",\"normal\":\"1/1\",",
     "\"slightly_large\":\"5/4\",\"slightly_small\":\"3/4\",\"small\":\"1/2\",",
     "\"very_large\":\"7/4\",\"very_small\":\"3/8\"},\"unimplemented\":[]}"
 );
@@ -332,6 +332,9 @@ pub(crate) const fn relative_scale_factor(value: crate::CoreModifierValue) -> Op
         crate::CoreModifierValue::SlightlyLarge => Some((5, 4)),
         crate::CoreModifierValue::Large => Some((3, 2)),
         crate::CoreModifierValue::VeryLarge => Some((7, 4)),
+        // The two steps above mirror the two lowest ones (3/8 and 1/2) about normal.
+        crate::CoreModifierValue::ExtraLarge => Some((2, 1)),
+        crate::CoreModifierValue::Huge => Some((8, 3)),
         crate::CoreModifierValue::Fine
         | crate::CoreModifierValue::ExtraFine
         | crate::CoreModifierValue::Regular
@@ -1142,7 +1145,7 @@ mod tests {
         );
         assert_eq!(
             geometry_resolution_policy_digest(),
-            "aacaf721a566e71d5c3b0649d2dafb43ed2a2382aa34edee0d5133b541fe2411"
+            "6b71a20d40f3756406abc758739ce59eb0b0c4f196125fa46304086469a46fba"
         );
         assert_eq!(
             payload["object_placement"]["layout_direction"]["vertical"],

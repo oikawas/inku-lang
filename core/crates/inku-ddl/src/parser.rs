@@ -65,6 +65,8 @@ pub enum CoreModifierValue {
     SlightlyLarge,
     Large,
     VeryLarge,
+    ExtraLarge,
+    Huge,
 }
 
 impl CoreModifierValue {
@@ -89,6 +91,8 @@ impl CoreModifierValue {
             "slightly_large" => Self::SlightlyLarge,
             "large" => Self::Large,
             "very_large" => Self::VeryLarge,
+            "extra_large" => Self::ExtraLarge,
+            "huge" => Self::Huge,
             _ => return None,
         };
         (value.dimension().as_str() == category).then_some(value)
@@ -107,6 +111,8 @@ impl CoreModifierValue {
             Self::SlightlyLarge => "slightly_large",
             Self::Large => "large",
             Self::VeryLarge => "very_large",
+            Self::ExtraLarge => "extra_large",
+            Self::Huge => "huge",
         }
     }
 }
@@ -214,6 +220,8 @@ const RELATIVE_SCALE_SURFACES_JA: &[(&str, CoreModifierValue)] = &[
     ("普通の大きさ", CoreModifierValue::Normal),
     ("とても大きな", CoreModifierValue::VeryLarge),
     ("とても大きい", CoreModifierValue::VeryLarge),
+    ("特大の", CoreModifierValue::ExtraLarge),
+    ("巨大な", CoreModifierValue::Huge),
     ("小さめ", CoreModifierValue::SlightlySmall),
     ("小さな", CoreModifierValue::Small),
     ("小さい", CoreModifierValue::Small),
@@ -227,6 +235,8 @@ const RELATIVE_SCALE_SURFACES_EN: &[(&str, CoreModifierValue)] = &[
     ("normal-sized", CoreModifierValue::Normal),
     ("slightly large", CoreModifierValue::SlightlyLarge),
     ("very large", CoreModifierValue::VeryLarge),
+    ("extra-large", CoreModifierValue::ExtraLarge),
+    ("huge", CoreModifierValue::Huge),
     ("small", CoreModifierValue::Small),
     ("large", CoreModifierValue::Large),
 ];

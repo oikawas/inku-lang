@@ -163,6 +163,8 @@ export const en: LangPack = {
 	canvasAspectButton: 'Canvas',
 	canvasAspectTitle: 'Canvas aspect',
 	modelSelectButton: 'Model selection',
+	modelPickerEmpty: 'No models to choose from. An administrator can make models visible in Settings → Models.',
+	modelPickerNotInList: 'Not in the list',
 	modelButton: 'Model',
 	colorCatalogButton: 'Color catalog',
 	instructionLangLabel: 'Description language',

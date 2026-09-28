@@ -6,6 +6,14 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 40 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-28 — The model picker says when there is nothing to choose, and marks a model not in the list (I-297)
+
+At the author's ruling. Where no model was visible for a use, the model picker opened with only its title and close button and gave no reason, and a chosen model missing from the visible list showed only its bare id on the launch button (e.g. `nvidia:google/gemma-4-31b-it`).
+
+- An empty picker now says "No models to choose from. An administrator can make models visible in Settings → Models." It is read by members too, so it names who can fix it and where.
+- A model not in the list is shown by its id, with `Not in the list` in the provider line.
+- The change stays inside the shared picker (`ModelCardPicker`), so all seven users get it: Stage 1 and Stage 2 on the Describe tab, refinement, the DDL editor, the demo, and Vision for autonomous refinement and the colophon. The manual (Japanese and English) says so.
+
 ### v2.15.39 — vocabulary packages and inherited sketch prose (Build 1115, 2026-09-28)
 
 This version includes the changes below since v2.15.38. It reorganizes the vocabulary package settings and API, and passes a parent's sketch prose through Web autonomous refinement and CLI refinement as appropriate. DDL, Score, and rendering versions are unchanged.

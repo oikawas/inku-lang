@@ -316,6 +316,24 @@ export function qualifiedModelId(provider: Provider, modelId: string, groups?: P
 	return splitModelRef(cleanModel, groups).provider ? cleanModel : `${cleanProvider}:${cleanModel}`;
 }
 
+/** What a model picker offers, and where the stored id sits in it (ledger I-297). */
+export type PickerSelection = {
+	/** Providers with at least one model; empty when nothing is published for the purpose. */
+	groups: ProviderGroup[];
+	selected: { group: ProviderGroup; model: ModelOption } | null;
+	/** A stored id that none of the offered models is: shown as it stands and marked. */
+	notInList: boolean;
+};
+
+export function pickerSelection(providerGroups: ProviderGroup[], selectedModel: string): PickerSelection {
+	const groups = providerGroups.filter((group) => group.models.length > 0);
+	for (const group of groups) {
+		const model = group.models.find((item) => item.id === selectedModel || qualifiedModelId(group.id, item.id) === selectedModel);
+		if (model) return { groups, selected: { group, model }, notInList: false };
+	}
+	return { groups, selected: null, notInList: selectedModel.trim() !== '' };
+}
+
 /**
  * Resolve a reference to (provider, model). Same three rules as the server's
  * provider_for_model(): explicit qualification, then sole ownership, then the

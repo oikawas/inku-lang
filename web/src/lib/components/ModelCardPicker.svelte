@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { tick } from 'svelte';
 	import { t } from '$lib/i18n/index.svelte';
-	import { qualifiedModelId, type ModelOption, type Provider, type ProviderGroup } from '$lib/models';
+	import { pickerSelection, type ModelOption, type Provider, type ProviderGroup } from '$lib/models';
 	import { modelPurposes, modelRecommendation, modelSpeed, modelComment, modelStatusLabel, isModelUnselectable, sortModels, type ModelPurpose } from '$lib/modelMeta';
 
 	type Props = {
@@ -20,14 +20,9 @@
 	let pickerDialog = $state<HTMLDivElement>();
 	let closeButton = $state<HTMLButtonElement>();
 
-	const configuredGroups = $derived(providerGroups.filter((group) => group.models.length > 0));
-	const selected = $derived.by(() => {
-		for (const group of configuredGroups) {
-			const model = group.models.find((item) => item.id === selectedModel || qualifiedModelId(group.id, item.id) === selectedModel);
-			if (model) return { group, model };
-		}
-		return null;
-	});
+	const offer = $derived(pickerSelection(providerGroups, selectedModel));
+	const configuredGroups = $derived(offer.groups);
+	const selected = $derived(offer.selected);
 
 	const isJapanese = $derived(t().closeLabel !== 'Close');
 
@@ -97,7 +92,7 @@
 <div class="context-model-picker">
 	<span class="field-label">{label}</span>
 	<button class="picker-launch" type="button" {disabled} bind:this={launchButton} onclick={openPicker}>
-		<span><strong>{selected?.model.label ?? selectedModel}</strong>{#if selected}<small>{selected.group.label}</small>{/if}</span>
+		<span><strong>{selected?.model.label ?? selectedModel}</strong>{#if selected}<small>{selected.group.label}</small>{:else if offer.notInList}<small class="not-in-list">{t().modelPickerNotInList}</small>{/if}</span>
 		<span class="change-label">{t().modelSelectButton}</span>
 	</button>
 </div>
@@ -123,6 +118,8 @@
 						</button>
 					{/each}
 				</div></section>
+			{:else}
+				<p class="picker-empty">{t().modelPickerEmpty}</p>
 			{/each}
 		</div>
 	</div>
@@ -139,6 +136,7 @@
 	.picker-launch > span:first-child { display: grid; gap: 2px; min-width: 0; }
 	.picker-launch strong { overflow-wrap: anywhere; font-size: var(--ui-font-size-12); font-weight: 500; }
 	.picker-launch small { color: var(--fg3); font-size: var(--ui-font-size-10); }
+	.picker-launch small.not-in-list { color: var(--danger); }
 	.change-label { flex: 0 0 auto; color: var(--accent); font-size: var(--ui-font-size-10); }
 	.picker-launch:disabled { opacity: .45; cursor: not-allowed; }
 	.picker-backdrop { position: fixed; inset: 0; z-index: 1600; background: rgba(0,0,0,.28); backdrop-filter: blur(2px); }
@@ -148,6 +146,7 @@
 	.picker-dialog header button { border: 0; background: none; color: var(--fg3); font-size: var(--ui-font-size-20); cursor: pointer; }
 	.selection-error { margin: 12px 15px 0; color: var(--danger); font-size: var(--ui-font-size-12); }
 	.picker-groups { display: grid; gap: 14px; padding: 15px; overflow: auto; }
+	.picker-empty { margin: 0; color: var(--fg2); font-size: var(--ui-font-size-12); line-height: 1.6; }
 	.picker-groups h3 { margin: 0 0 6px; color: var(--fg3); font-size: var(--ui-font-size-10); font-weight: 500; letter-spacing: .06em; }
 	.model-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 7px; }
 	.model-grid > button { position: relative; display: grid; gap: 3px; min-width: 0; padding: 9px 10px; border: 1px solid var(--border2); border-radius: var(--r); background: var(--panel); color: var(--fg2); text-align: left; cursor: pointer; font: inherit; }

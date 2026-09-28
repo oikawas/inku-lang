@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { modelDisplayName, modelShortName, type ProviderGroup } from './models.ts';
+import { modelDisplayName, modelShortName, pickerSelection, type ProviderGroup } from './models.ts';
 
 const GROUPS: ProviderGroup[] = [
 	{
@@ -46,4 +46,21 @@ test('the name is never truncated', () => {
 	const b = modelShortName('nim:google/gemma-4-31b-it-v2', GROUPS);
 	assert.notEqual(a, b);
 	assert.equal(b, 'gemma-4-31b-it-v2');
+});
+
+test('I-297: the picker knows when it has nothing to offer, and when the stored id is not offered', () => {
+	const empty = [{ id: 'nim', label: 'NVIDIA NIM (Cloud)', models: [] } as unknown as ProviderGroup];
+	assert.deepEqual(pickerSelection(empty, 'nim:google/gemma-4-31b-it'), { groups: [], selected: null, notInList: true });
+	assert.deepEqual(pickerSelection([], ''), { groups: [], selected: null, notInList: false });
+
+	const found = pickerSelection(GROUPS, 'nim:google/gemma-4-31b-it');
+	assert.equal(found.selected?.model.id, 'google/gemma-4-31b-it');
+	assert.equal(found.notInList, false);
+	assert.equal(pickerSelection(GROUPS, 'plain-model').selected?.model.label, 'Plain Model');
+
+	// Unpublished, retired, or from a provider no longer listed: named as it stands, marked.
+	const gone = pickerSelection(GROUPS, 'nim:google/gemma-3-27b-it');
+	assert.equal(gone.selected, null);
+	assert.equal(gone.notInList, true);
+	assert.equal(gone.groups.length, GROUPS.filter((group) => group.models.length > 0).length);
 });

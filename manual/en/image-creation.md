@@ -467,7 +467,7 @@ Open it from `Settings` in the app rail. Settings are grouped as `Display and op
 | Connections and administration (administrators) | `Models`, `User management`, `DB settings`, and `Log retention`. `Detailed` also shows `Other (server)` and `Limits` |
 | Extensions and details | `Detailed` shows `Plugins` and `Unread-word ledger` |
 
-To choose the models for drawing, open `Model selection` from the making screen's conditions and select Stage 1, Stage 2, and Vision when needed. The administrator's `Models` page manages connections and which models are published to members.
+To choose the models for drawing, open `Model selection` from the making screen's conditions and select Stage 1, Stage 2, and Vision when needed. The administrator's `Models` page manages connections and which models are published to members. Where no model is visible for a use, `Model selection` says there are no models to choose from and that an administrator can make them visible. A chosen model that has left the list is shown by its id, marked `Not in the list`.
 
 The settings dialog has `Standard` and `Detailed` modes, switched through `Display mode` at upper right. `Standard` shows everyday settings; **`Plugins`, `Limits`, `Unread-word ledger`, and `Other (server)` appear only in `Detailed`.** The choice remains in this browser.
 

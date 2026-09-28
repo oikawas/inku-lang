@@ -163,6 +163,8 @@ export const ja: LangPack = {
 	canvasAspectButton: 'キャンバス',
 	canvasAspectTitle: 'キャンバス比率',
 	modelSelectButton: 'モデル選択',
+	modelPickerEmpty: '選べるモデルがありません。管理者が 設定 → モデル設定 で公開すると選べます。',
+	modelPickerNotInList: '一覧にない',
 	modelButton: 'モデル',
 	colorCatalogButton: '色カタログ',
 	instructionLangLabel: '記述の言語',

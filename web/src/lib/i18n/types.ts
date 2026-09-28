@@ -261,6 +261,8 @@ export interface LangPack {
 	canvasAspectButton: string;
 	canvasAspectTitle: string;
 	modelSelectButton: string;
+	modelPickerEmpty: string;
+	modelPickerNotInList: string;
 	modelButton: string;
 	colorCatalogButton: string;
 	instructionLangLabel: string;

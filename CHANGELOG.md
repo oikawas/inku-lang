@@ -6,6 +6,13 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 46 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-28 — Claude Opus 5.5 draws
+
+At the author's note. Drawing from a description with Claude Opus 5.5 on the Claude API stopped at Stage 1 with "the model provider refused the request". The log (`provider_http_error`) gave the reason: "tool_choice: type "tool" and "any" are not supported for this model." The drawing pipeline forced Anthropic models to call the answer tool, which Opus 5.5 does not accept.
+
+- At the author's ruling, every Anthropic model is sent `tool_choice: {"type": "auto"}` (the answer tool is the only one). No list of models is kept.
+- An answer given as text instead of a tool call is read as the JSON object in the text; the shared core checks its shape as before, and a text without one is `malformed_payload`.
+
 ### 2026-09-28 — Android: a provider's reason for refusing is logged
 
 The author's choice, following the server's `provider_http_error`. When a provider refused a pipeline call over HTTP, Android kept only the failure class (`provider_rejected` and the like) and dropped the reason the provider gave.

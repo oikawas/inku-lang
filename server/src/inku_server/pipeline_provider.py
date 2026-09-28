@@ -25,6 +25,17 @@ from .provider_observation import ProviderObservationError, ProviderObservationS
 
 _logger = logging.getLogger(__name__)
 
+def _json_object_in(text: str) -> dict[str, Any]:
+    """The object an answer given as text carries, fenced or not; the core checks its shape."""
+    start, end = text.find("{"), text.rfind("}")
+    if start == -1 or end <= start:
+        raise TypeError("provider answered without the response object")
+    value = json.loads(text[start:end + 1])
+    if not isinstance(value, dict):
+        raise TypeError("provider answered without the response object")
+    return value
+
+
 _SECRET_LIKE = re.compile(r"\b(?:sk|key|AIza)[-_A-Za-z0-9*]{6,}")
 
 
@@ -318,7 +329,11 @@ class SingleAttemptProvider:
                         "description": "Submit the requested pipeline response.",
                         "input_schema": prompt["response_schema"],
                     }],
-                    "tool_choice": {"type": "tool", "name": response_name}}
+                    # Left to the model: claude-opus-5-5 refuses a forced tool
+                    # ("tool_choice: type \"tool\" and \"any\" are not supported
+                    # for this model", Pentala 2026-09-28). With one tool the
+                    # models call it; an answer given as text is read below.
+                    "tool_choice": {"type": "auto"}}
         elif kind == "gemini":
             url = base + "/v1beta/models/" + quote(model, safe="") + ":generateContent"
             headers["x-goog-api-key"] = key
@@ -405,11 +420,16 @@ class SingleAttemptProvider:
                 text = message.get("content")
         elif kind == "anthropic":
             calls = [block for block in data["content"] if block.get("type") == "tool_use"]
-            if len(calls) != 1 or calls[0].get("name") != response_name:
-                raise TypeError("provider returned an unexpected tool call")
-            arguments = calls[0].get("input")
-            if not isinstance(arguments, dict):
-                raise TypeError("provider returned invalid tool input")
+            if calls:
+                if len(calls) != 1 or calls[0].get("name") != response_name:
+                    raise TypeError("provider returned an unexpected tool call")
+                arguments = calls[0].get("input")
+                if not isinstance(arguments, dict):
+                    raise TypeError("provider returned invalid tool input")
+            else:
+                arguments = _json_object_in("\n".join(
+                    str(block.get("text", "")) for block in data["content"] if block.get("type") == "text"
+                ))
             text = json.dumps(arguments, ensure_ascii=False, separators=(",", ":"))
         elif kind == "gemini":
             calls = [part["functionCall"] for part in data["candidates"][0]["content"]["parts"] if "functionCall" in part]

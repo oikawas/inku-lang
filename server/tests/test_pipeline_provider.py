@@ -138,7 +138,7 @@ def test_missing_credentials_keep_only_safe_failure_detail(monkeypatch):
     assert "raw secret marker" not in repr(result)
 
 
-def test_anthropic_forces_the_core_schema_tool_and_extracts_its_input(monkeypatch):
+def test_anthropic_offers_the_core_schema_tool_and_extracts_its_input(monkeypatch):
     monkeypatch.setattr(
         "inku_server.pipeline_provider.provider_for_model",
         lambda *args, **kwargs: ("anthropic", "claude-fixture"),
@@ -188,10 +188,29 @@ def test_anthropic_forces_the_core_schema_tool_and_extracts_its_input(monkeypatc
             "input_schema": action["payload"]["prompt"]["response_schema"],
         }
     ]
-    assert request_body["tool_choice"] == {
-        "type": "tool",
-        "name": "submit_pipeline_response",
-    }
+    # claude-opus-5-5 refuses a forced tool, so the choice is left to the model.
+    assert request_body["tool_choice"] == {"type": "auto"}
+
+
+def test_anthropic_answer_given_as_text_is_read_as_the_response_object(monkeypatch):
+    monkeypatch.setattr("inku_server.pipeline_provider.provider_for_model",
+                        lambda *args, **kwargs: ("anthropic", "claude-opus-5-5"))
+    monkeypatch.setattr("inku_server.pipeline_provider.connection_for", lambda *args: {
+        "id": "anthropic", "kind": "anthropic", "base_url": "https://api.anthropic.invalid",
+        "api_key": "test-only", "requires_api_key": True,
+    })
+    answers = iter([
+        {"content": [{"type": "thinking", "thinking": "..."},
+                     {"type": "text", "text": 'Here it is:\n```json\n{"normalized_ddl": "keep"}\n```'}]},
+        {"content": [{"type": "text", "text": "I cannot help with that."}]},
+    ])
+
+    async def request(_value):
+        return httpx.Response(200, json=next(answers))
+
+    provider = SingleAttemptProvider(ProviderOptions({}, "m", "m", 256, 8192), transport=httpx.MockTransport(request))
+    assert json.loads(provider(_action())["response"]) == {"normalized_ddl": "keep"}
+    assert provider(_action())["failure"] == "malformed_payload"
 
 
 def test_gemini_forces_one_schema_bound_function_call_with_minimal_thinking(monkeypatch):

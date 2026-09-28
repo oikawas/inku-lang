@@ -6,6 +6,13 @@
 
 **本書が持つのは v2.5.0（2026-07-25、render engine 12）以降**の 46 版である。それより前は書庫にある。
 
+### 2026-09-28 — Claude Opus 5.5で描けるようにする
+
+作者の指摘。Claude APIのClaude Opus 5.5で記述から描くと、Stage 1が「モデルの提供元が要求を断りました」で止まっていた。ログ（`provider_http_error`）の理由は「tool_choice: type "tool" and "any" are not supported for this model.」。描画のpipelineはAnthropicに答えのtoolを必ず呼ばせる指定を送っていたが、Opus 5.5はそれを受けない。
+
+- 作者裁定で、Anthropicのどのモデルにも`tool_choice: {"type": "auto"}`を送る（toolは答えの1つだけ）。モデルの一覧は持たない。
+- toolを呼ばずに本文で答えたときは、本文の中のJSONの対象を答えとして読む。形は共有coreがこれまでどおり検める。対象が無ければ`malformed_payload`。
+
 ### 2026-09-28 — Android: 提供元が断った理由をLogcatに残す
 
 作者の選択。Serverの`provider_http_error`に揃える。Androidのpipelineは、提供元にHTTPで断られると失敗の分類（`provider_rejected`など）だけを残し、提供元が示した理由をどこにも残していなかった。

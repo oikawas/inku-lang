@@ -218,7 +218,7 @@ AIエージェントによる自動生成、評価、および系譜ツリーを
   ```sh
   uv run inku-cli refine perform WORK_ID --kind touch -o ./refinements --png
   ```
-  `--kind` に `touch` (タッチ), `layout` (構図), `reading` (解釈), `color` (配色カタログ) のいずれかを指定し、別案を生成してサーバーに保存します。`-o` が指定された場合はローカルファイルとしても書き出します。`--description` で構図・解釈の推敲に使う記述を差し替えられます。
+  `--kind` に `touch` (タッチ), `layout` (構図), `reading` (解釈), `color` (配色カタログ) のいずれかを指定し、別案を生成してサーバーに保存します。`-o` が指定された場合はローカルファイルとしても書き出します。`--description` で構図・解釈の推敲に使う記述を差し替えられます。写生は元の作品に合わせます。写生ありで描いた作品は、その写生文のまま描き直し、写生を呼び直しません。`--description` で記述を変えたときだけ写生を書き直します。写生なしで描いた作品は、写生なしで描き直します。
 * **手動候補の系譜保存**:
   ```sh
   uv run inku-cli refine save PARENT_NODE_ID --kind layout --file score.json --input-text "入力記述"

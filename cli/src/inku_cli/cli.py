@@ -3321,6 +3321,22 @@ _DERIVATION_KIND_BY_REFINE_KIND = {
 }
 
 
+def _refine_sketch(parent_prose: str | None, text_changed: bool) -> dict[str, Any]:
+    """The sketch of a refinement, following its parent (ledger I-704, as I-300).
+
+    The server never inherits a sketch from the parent, so the CLI carries it:
+    the parent's prose while the text is the parent's own, so the sketch is not
+    run again; a new sketch when --description changed the text; none for a
+    parent drawn without one.
+    """
+    prose = (parent_prose or "").strip()
+    if not prose:
+        return {}
+    if text_changed:
+        return {"sketch": True}
+    return {"sketch_text": prose}
+
+
 def command_refine(args: argparse.Namespace) -> int:
     import uuid
     config = load_config()
@@ -3361,12 +3377,15 @@ def command_refine(args: argparse.Namespace) -> int:
         
         derivation_kind = _DERIVATION_KIND_BY_REFINE_KIND[args.kind]
 
+        parent_text = target.get("source_text") or target.get("input") or ""
+        description = args.description or parent_text
         params = {
-            "description": args.description or target.get("source_text") or target.get("input") or "",
+            "description": description,
             "save_history": args.save_history,
             "lineage_parent_node_id": parent_node_id,
             "derivation_kind": derivation_kind,
         }
+        params.update(_refine_sketch(target.get("sketch_text"), description.strip() != parent_text.strip()))
         
         if args.kind == "touch":
             params["render_seed"] = int(time.time() * 1000) & 0x7fffffff
@@ -4337,7 +4356,7 @@ def build_parser() -> argparse.ArgumentParser:
     def add_refine_perform_arguments(command: argparse.ArgumentParser) -> None:
         command.add_argument("item_id", help="target history item ID to refine")
         command.add_argument("--kind", choices=("touch", "layout", "reading", "color"), required=True, help="refinement element type")
-        command.add_argument("--description", help="override the description for layout/reading variations")
+        command.add_argument("--description", help="override the description for layout/reading variations; without it the parent's Sketch from life prose is carried over, and with it that prose is written again")
         command.add_argument("--save-history", action="store_true", default=True, help="automatically save the result to history")
         command.add_argument("--no-save", dest="save_history", action="store_false", help="do not save the result to history")
         command.add_argument("-o", "--out-dir", help="save outputs (svg/json) to this directory")

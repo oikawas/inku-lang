@@ -1721,6 +1721,44 @@ def test_refine_color_asks_the_server_to_draw_a_different_catalog(monkeypatch):
         assert other[0].get("catalog_mode") is None
 
 
+def test_refine_perform_follows_the_parent_sketch(monkeypatch):
+    """I-704: a refinement is drawn from the parent's sketch prose, as the web does (I-300).
+
+    The server never inherits the sketch from a parent, so without this every
+    refinement of a sketched work was drawn from the description alone.
+    """
+    calls = []
+    parent = {"id": "work-1", "lineage_node_id": "node-1", "source_text": "春の野"}
+
+    class FakeClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def request(self, method, path, *, data=None, **kwargs):
+            calls.append((method, path, data))
+            if method == "GET":
+                return {"items": [parent]}, None
+            return {"svg": "<svg />", "render_hash_short": "ABCD"}, None
+
+    monkeypatch.setattr(cli, "ApiClient", FakeClient)
+    monkeypatch.setattr(cli, "_print_json", lambda data: None)
+    parser = cli.build_parser()
+
+    def sent(*extra):
+        calls.clear()
+        assert cli.command_refine(parser.parse_args(["refine", "perform", "work-1", "--kind", "reading", *extra])) == 0
+        body = [data for method, path, data in calls if method == "POST" and path == "/api/paint"][0]
+        return {key: body[key] for key in ("sketch", "sketch_text") if key in body}
+
+    parent["sketch_text"] = "遠くに山、朝の光"
+    assert sent() == {"sketch_text": "遠くに山、朝の光"}
+    assert sent("--description", "春の野") == {"sketch_text": "遠くに山、朝の光"}
+    assert sent("--description", "夏の野") == {"sketch": True}
+    parent.pop("sketch_text")
+    assert sent() == {}
+    assert sent("--description", "夏の野") == {}
+
+
 # --------------------------------------------------------------------------- #
 # The eight request keys the CLI never named                                    #
 #                                                                               #

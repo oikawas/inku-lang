@@ -6,6 +6,13 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 39 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-28 — CLI refinement carries the parent's sketch prose too (I-704)
+
+At the author's ruling (I-296 refiled, handled as I-300). `inku-cli refine perform` sent no sketch request and the server never inherits one from a parent, so refining a work drawn with Sketch from life drew every kind of refinement without its prose.
+
+- When the parent has sketch prose and the description is the parent's, the prose is sent as `sketch_text` and the layer is not run; when `--description` changes the description, the layer runs again (`sketch: true`); a parent without prose sends no sketch request. No flag is added.
+- The `--description` help, `cli/README.md`, and the manual (Japanese and English) say so.
+
 ### 2026-09-28 — Each generation of autonomous refinement carries its parent's sketch prose (I-300)
 
 At the author's ruling. Autonomous refinement drew every generation with the Describe tab's Sketch from life setting, so with the layer on it ran again and rewrote the prose in color, layout, touch and variation generations as well as reading ones, and whether a generation used the layer could disagree with the work chosen in the lineage.

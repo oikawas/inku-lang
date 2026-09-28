@@ -4,7 +4,11 @@
 
 This file records changes chronologically. If a historical note conflicts with the current specification, the current specification wins. The more detailed canonical history is maintained in Japanese in [CHANGELOG.ja.md](CHANGELOG.ja.md).
 
-**This file holds the 45 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
+**This file holds the 46 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
+
+### v2.15.45 — log drawing job exceptions (Build 1121, 2026-09-28)
+
+This version includes the change below since v2.15.44. When a drawing job stops on an exception, the Server log records its execution id and traceback. DDL, Score, rendering, and the API shape are unchanged.
 
 ### 2026-09-28 — A drawing job that stops on an exception leaves it in the log
 

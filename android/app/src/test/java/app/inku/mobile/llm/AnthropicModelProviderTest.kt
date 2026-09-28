@@ -4,16 +4,18 @@ import java.io.ByteArrayOutputStream
 import java.net.HttpURLConnection
 import java.net.URL
 import kotlinx.coroutines.runBlocking
+import org.json.JSONException
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class AnthropicModelProviderTest {
     @Test
-    fun pipelineRequestUsesTheMessagesApiAndReturnsTheForcedToolInput() = runBlocking {
+    fun pipelineRequestUsesTheMessagesApiAndReturnsTheToolInput() = runBlocking {
         lateinit var connection: AnthropicConnection
         val provider = AnthropicModelProvider("anthropic", "https://api.anthropic.com/", "test-key") { url ->
             AnthropicConnection(url).also { connection = it }
@@ -47,11 +49,34 @@ class AnthropicModelProviderTest {
         val tool = payload.getJSONArray("tools").getJSONObject(0)
         assertEquals("submit_pipeline_response", tool.getString("name"))
         assertEquals(JSONObject(schema).toString(), tool.getJSONObject("input_schema").toString())
-        assertEquals("tool", payload.getJSONObject("tool_choice").getString("type"))
-        assertEquals("submit_pipeline_response", payload.getJSONObject("tool_choice").getString("name"))
+        // "auto" for every model: Claude Opus 5.5 refuses a forced tool.
+        assertEquals(JSONObject().put("type", "auto").toString(), payload.getJSONObject("tool_choice").toString())
         assertEquals("circle", JSONObject(response.text).getString("normalized_ddl"))
         assertEquals(11, response.promptTokens)
         assertEquals(7, response.completionTokens)
+    }
+
+    /** The server's `test_anthropic_answer_given_as_text_is_read_as_the_response_object`. */
+    @Test
+    fun anAnswerGivenAsTextIsReadAsTheResponseObject() {
+        fun blocks(json: String) = JSONObject("""{"content":$json}""").getJSONArray("content")
+        val tool = "submit_pipeline_response"
+
+        val fenced = AnthropicModelProvider.responseText(
+            blocks("""[{"type":"thinking","thinking":"{\"normalized_ddl\":\"square\"}"},{"type":"text","text":"Here it is:\n```json\n{\"normalized_ddl\":"},{"type":"text","text":"\"circle\"}\n```"}]"""),
+            tool,
+        )
+        assertEquals("circle", JSONObject(fenced).getString("normalized_ddl"))
+
+        assertThrows(JSONException::class.java) {
+            AnthropicModelProvider.responseText(blocks("""[{"type":"text","text":"I cannot draw that."}]"""), tool)
+        }
+        assertThrows(JSONException::class.java) {
+            AnthropicModelProvider.responseText(
+                blocks("""[{"type":"tool_use","id":"t1","name":"other","input":{}}]"""),
+                tool,
+            )
+        }
     }
 
     @Test

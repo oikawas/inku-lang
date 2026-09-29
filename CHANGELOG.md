@@ -6,7 +6,7 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 58 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
-### 2026-09-29 — The history listing picks later pages quickly with statistics too
+### v2.15.57 — The history listing picks later pages quickly with statistics too (Build 1133, 2026-09-29)
 
 At the author's request. With statistics made at start (v2.15.56), SQLite 3.37 chose the listing's page ids by walking the `at` index and reading each row, so later pages grew slower (on Pentala, 18 works from the 3,000th went from 50 ms to 249 ms). Only the sort that chooses the ids now avoids that index (`at + 0`, the same order). Checked read-only on the production database with the author's permission: pages from the 0th, 1,000th, 3,000th and 4,100th work went from 1–207 ms to 3–4 ms, with the same ids.
 

@@ -22,7 +22,8 @@ use crate::prompts::{
     LlmStage, MacroPromptEntry, PromptLimits, Stage1Context, build_catalog_selection_prompt,
     build_hole_completion_prompt, build_sketch_prompt, build_stage1_prompt_with_sketch,
     parse_catalog_selection_response, parse_hole_completion_response, parse_hole_patch_response,
-    parse_sketch_response, parse_stage1_response_with_plugins, with_stage1_compiler_feedback,
+    parse_sketch_response, parse_stage1_response_with_plugins, with_stage1_background_feedback,
+    with_stage1_compiler_feedback,
 };
 use crate::protocol::{
     ActionEcho, DecimalU64, EffectAction, EffectResult, Envelope, PROTOCOL_NAME, PROTOCOL_VERSION,
@@ -361,6 +362,11 @@ pub struct PipelineSnapshot {
     pub hole_completion_check: Option<serde_json::Value>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sketch: Option<SketchRecord>,
+    /// A compiled Stage 1 candidate kept while the reader is asked once about
+    /// its layers drawn only in the colour the canvas shows under them. It is
+    /// committed when that request fails.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub stage1_fallback: Option<VisibleDocument>,
     pub snapshot_digest: String,
 }
 
@@ -404,6 +410,18 @@ impl PipelineSnapshot {
             return Err(ProtocolError::StaleResult);
         }
         self.config.validate()?;
+        if let Some(fallback) = &self.stage1_fallback {
+            fallback.document()?;
+            if !matches!(
+                self.phase,
+                PipelinePhase::AwaitingLlm {
+                    stage: LlmStage::GenerateNormalizedDdl,
+                    ..
+                }
+            ) {
+                return Err(ProtocolError::InvalidState);
+            }
+        }
         if let Some(delivery) = &self.delivery {
             delivery
                 .validate()
@@ -608,6 +626,7 @@ impl PipelineSnapshot {
         if reason != "user_approved_patch" {
             self.hole_completion_check = None;
         }
+        self.stage1_fallback = None;
         let payload = json!({
             "variation_id": self.variation_id,
             "document": document,
@@ -869,6 +888,86 @@ impl PipelineSnapshot {
         ) else {
             return Ok(false);
         };
+        self.reissue_stage1(prompt, description, elapsed_ms, next, events)?;
+        self.event(
+            events,
+            "retry_scheduled",
+            json!({
+                "identity": self.action.as_ref().unwrap().identity,
+                "failure": ProviderFailure::SemanticViolation,
+                "detail": stage1_compiler_failure_detail(compiled),
+            }),
+        )?;
+        Ok(true)
+    }
+
+    /// Ask the reader once more when a compiled candidate draws layers only in
+    /// the colour the canvas shows under them, which are not seen on the bare
+    /// ground. The candidate is kept and committed if that request fails.
+    fn return_ground_coloured_layers(
+        &mut self,
+        candidate: &VisibleDocument,
+        description: String,
+        elapsed_ms: u64,
+        events: &mut Vec<PipelineEvent>,
+    ) -> Result<bool, ProtocolError> {
+        if self.stage1_fallback.is_some() {
+            return Ok(false);
+        }
+        let attempt = self
+            .action
+            .as_ref()
+            .ok_or(ProtocolError::InvalidState)?
+            .identity
+            .attempt;
+        let Some(next) = self
+            .config
+            .stage1_retry
+            .next_budgeted_attempt(attempt, elapsed_ms)
+        else {
+            return Ok(false);
+        };
+        let Ok(Some((background, sentences))) = crate::core_boundary::ground_coloured_sentences(
+            candidate.document()?,
+            &self.config.definitions,
+            &self.config.compiler,
+        ) else {
+            return Ok(false);
+        };
+        let Ok(prompt) = with_stage1_background_feedback(
+            self.stage1_prompt(&description)?,
+            &candidate.source,
+            background,
+            &sentences,
+            self.config.prompt_limits,
+        ) else {
+            return Ok(false);
+        };
+        self.reissue_stage1(prompt, description, elapsed_ms, next, events)?;
+        self.stage1_fallback = Some(candidate.clone());
+        self.event(
+            events,
+            "stage1_returned",
+            json!({
+                "identity": self.action.as_ref().unwrap().identity,
+                "reason": "ground_coloured_layers",
+                "background": background,
+                "layers": sentences.len(),
+            }),
+        )?;
+        Ok(true)
+    }
+
+    /// Send a changed Stage 1 request as the next attempt of the stage budget.
+    fn reissue_stage1(
+        &mut self,
+        prompt: LlmPrompt,
+        description: String,
+        elapsed_ms: u64,
+        attempt: u32,
+        events: &mut Vec<PipelineEvent>,
+    ) -> Result<(), ProtocolError> {
+        let policy = self.config.stage1_retry;
         let total = elapsed_ms
             .checked_add(policy.retry_delay_ms.get())
             .ok_or(ProtocolError::InvalidPolicy)?;
@@ -883,20 +982,30 @@ impl PipelineSnapshot {
             LlmStage::GenerateNormalizedDdl.action_name(),
             json!({"prompt": prompt, "policy": policy}),
             policy.remaining_attempt_timeout(total),
-            next,
+            attempt,
             events,
         )?;
         self.action.as_mut().unwrap().delay_ms = policy.retry_delay_ms;
-        self.event(
-            events,
-            "retry_scheduled",
-            json!({
-                "identity": self.action.as_ref().unwrap().identity,
-                "failure": ProviderFailure::SemanticViolation,
-                "detail": stage1_compiler_failure_detail(compiled),
-            }),
-        )?;
-        Ok(true)
+        Ok(())
+    }
+
+    /// Commit the kept candidate after the returned request failed.
+    fn commit_stage1_fallback(
+        &mut self,
+        detail: serde_json::Value,
+        events: &mut Vec<PipelineEvent>,
+    ) -> Result<(), ProtocolError> {
+        let document = self
+            .stage1_fallback
+            .take()
+            .ok_or(ProtocolError::InternalInvariant)?;
+        self.event(events, "stage1_fallback", detail)?;
+        let next = proposal(
+            self.authority
+                .propose_stage1_result_commit(self.authority.revision()),
+        )?
+        .ok_or(ProtocolError::InternalInvariant)?;
+        self.commit_document(document, next, "stage1_generated", events)
     }
 
     fn residual_execution_preflight(&self, candidate: &VisibleDocument) -> bool {
@@ -1077,6 +1186,15 @@ impl PipelineSnapshot {
         else {
             return Err(ProtocolError::InvalidState);
         };
+        if stage == LlmStage::GenerateNormalizedDdl && self.stage1_fallback.is_some() {
+            // The returned request is a second chance, not the run: keep the
+            // compiled candidate rather than wait for another attempt.
+            let mut payload = json!({"failure": failure});
+            if let Some(detail) = detail {
+                payload["detail"] = json!(detail);
+            }
+            return self.commit_stage1_fallback(payload, events);
+        }
         let policy = self.retry_policy(stage);
         let total = elapsed_ms
             .get()
@@ -1530,6 +1648,15 @@ impl PipelineSnapshot {
                     .as_ref()
                     .is_some_and(|lock| lock.state == CompilerLockState::CanonicalReady)
                 {
+                    if self.stage1_fallback.is_some() {
+                        return self.commit_stage1_fallback(
+                            json!({
+                                "failure": ProviderFailure::SemanticViolation,
+                                "detail": stage1_compiler_failure_detail(&compiled),
+                            }),
+                            events,
+                        );
+                    }
                     let retry_exhausted = self
                         .config
                         .stage1_retry
@@ -1570,6 +1697,14 @@ impl PipelineSnapshot {
                         events,
                     );
                 }
+                if self.return_ground_coloured_layers(
+                    &candidate,
+                    description.ok_or(ProtocolError::InternalInvariant)?,
+                    total,
+                    events,
+                )? {
+                    return Ok(());
+                }
                 let next = proposal(
                     self.authority
                         .propose_stage1_result_commit(self.authority.revision()),
@@ -1609,6 +1744,7 @@ pub fn advance(
             PipelineInput::Cancel => {
                 state.action = None;
                 state.delivery = None;
+                state.stage1_fallback = None;
                 state.phase = PipelinePhase::Cancelled;
                 state.event(&mut events, "cancelled", json!({}))?;
             }
@@ -1811,6 +1947,7 @@ pub fn advance(
             delivery: None,
             hole_completion_check: None,
             sketch: None,
+            stage1_fallback: None,
             snapshot_digest: String::new(),
         };
         state.event(

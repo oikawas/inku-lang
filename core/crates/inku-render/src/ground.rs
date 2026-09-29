@@ -5,7 +5,9 @@ use sha2::{Digest, Sha256};
 use crate::determinism::hash01;
 use crate::ground_patterns::build_ground_layers;
 use crate::svg::{Element, format_number};
-use crate::types::{CanvasGroundSpec, CanvasSize, GroundMaterial, GroundTone, Seed};
+use crate::types::{
+    Canvas, CanvasGroundSpec, CanvasSize, Color, GroundMaterial, GroundTone, Score, Seed,
+};
 
 const GROUND_OPACITY_DEFAULT: f64 = 0.12;
 const MEZZOTINT_PLATE: &str = "#0d0d0d";
@@ -44,6 +46,24 @@ fn tone_color(ground: &CanvasGroundSpec, background: &str) -> String {
         GroundTone::Gray => "#e4e2dc".to_owned(),
         GroundTone::Black => "#151515".to_owned(),
     }
+}
+
+/// The Score colour the canvas shows under the marks. The ground paints its
+/// tone over the whole background, and the mezzotint plate over that, so the
+/// background shows only without a ground, on the plain material, or under a
+/// white tone of any other material but mezzotint. Other tones paint colours
+/// no Score colour names, so they give `None`.
+#[must_use]
+pub fn shown_background(score: &Score) -> Option<Color> {
+    let ground = match &score.canvas {
+        Canvas::Spec(canvas) => canvas.ground.as_ref(),
+        Canvas::Id(_) => None,
+    };
+    let covered = ground.is_some_and(|ground| {
+        ground.material != GroundMaterial::Plain
+            && (ground.material == GroundMaterial::Mezzotint || ground.tone != GroundTone::White)
+    });
+    (!covered).then_some(score.background)
 }
 
 fn rect(x: f64, y: f64, width: f64, height: f64, fill: &str, opacity: f64) -> Element {
@@ -140,6 +160,7 @@ pub fn render_ground(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::svg::Node;
     use crate::types::GroundGrain;
 
     fn ground(material: GroundMaterial) -> CanvasGroundSpec {
@@ -187,5 +208,68 @@ mod tests {
         changed.tone = GroundTone::Cool;
         changed.opacity = 0.8;
         assert_eq!(ground_seed(&base, Some(9)), ground_seed(&changed, Some(9)));
+    }
+
+    #[test]
+    fn the_shown_background_is_what_the_ground_rects_leave_showing() {
+        // The pipeline returns marks in this colour to the reader, so it must
+        // follow the whole-canvas rects the ground paints under the marks.
+        for material in [
+            GroundMaterial::Plain,
+            GroundMaterial::Paper,
+            GroundMaterial::Washi,
+            GroundMaterial::InkWash,
+            GroundMaterial::CharcoalGround,
+            GroundMaterial::Canvas,
+            GroundMaterial::DrawingPaper,
+            GroundMaterial::Mezzotint,
+        ] {
+            for tone in [
+                GroundTone::White,
+                GroundTone::OffWhite,
+                GroundTone::Warm,
+                GroundTone::Cool,
+                GroundTone::Gray,
+                GroundTone::Black,
+            ] {
+                let spec = CanvasGroundSpec {
+                    tone,
+                    ..ground(material)
+                };
+                let score: Score = serde_json::from_value(serde_json::json!({
+                    "background": "gray",
+                    "canvas": {"aspect": "square", "ground": spec},
+                    "instructions": [],
+                }))
+                .unwrap();
+                // The renderer draws no ground for the plain material.
+                let fills = render_ground(&spec, CanvasSize::new(100.0, 100.0), "#abcdef", Some(1))
+                    .map(|rendered| {
+                        rendered
+                            .group
+                            .children()
+                            .iter()
+                            .filter_map(|node| match node {
+                                Node::Element(element) => element.attribute("fill"),
+                                Node::Text(_) => None,
+                            })
+                            .filter(|fill| !fill.starts_with("url("))
+                            .map(str::to_owned)
+                            .collect::<Vec<_>>()
+                    })
+                    .unwrap_or_default();
+                let shows = fills.iter().all(|fill| fill == "#abcdef");
+                assert_eq!(
+                    shown_background(&score),
+                    shows.then_some(Color::Gray),
+                    "{material:?} {tone:?} {fills:?}"
+                );
+            }
+        }
+        let without_ground: Score = serde_json::from_value(serde_json::json!({
+            "background": "yellow", "canvas": "square", "instructions": [],
+        }))
+        .unwrap();
+        assert_eq!(shown_background(&without_ground), Some(Color::Yellow));
     }
 }

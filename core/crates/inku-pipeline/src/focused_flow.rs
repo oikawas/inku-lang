@@ -1302,3 +1302,181 @@ fn a_run_without_a_sketch_keeps_its_previous_request_shape() {
     let wire = serde_json::to_value(&state).unwrap();
     assert!(wire.get("sketch").is_none());
 }
+
+fn ground_start(pipeline_config: PipelineConfig) -> PipelineSnapshot {
+    let start = envelope(
+        None,
+        PipelineInput::Start {
+            variation_id: "ground".into(),
+            authoring_nonce: "ground-1".into(),
+            config: Box::new(pipeline_config),
+            authority: VariationAuthorityState::new_description(),
+            authoring: AuthoringInput::Description {
+                description: "A white circle beside a black square".into(),
+                auto_catalog: false,
+                sketch: SketchRequest::Off,
+            },
+        },
+    );
+    run(None, &start).snapshot
+}
+
+fn ground_answer(state: &PipelineSnapshot, ddl: &str) -> StepOutput {
+    let action = state.action.as_ref().unwrap();
+    assert_eq!(action.tag, "generate_normalized_ddl");
+    let result = PipelineInput::EffectResult {
+        result: EffectResult::NormalizedDdlGenerated {
+            identity: action.identity.clone(),
+            response: json!({"normalized_ddl": ddl}).to_string(),
+            elapsed_ms: DecimalU64::new(20),
+        },
+    };
+    run(Some(state), &envelope(Some(state), result))
+}
+
+const WHITE_ON_WHITE: &str = "place one white circle at center.\nplace one black square at center.";
+
+#[test]
+fn stage1_returns_the_layers_drawn_only_in_the_background_colour() {
+    // A white mark on the white ground it lies on is not seen. The reader
+    // gets the compiled candidate back once, with the colour and the sentences.
+    let answered = "Fill the background with gray.\nplace one white circle at center.\nplace one black square at center.";
+    let first = ground_start(config());
+    let first_action = first.action.as_ref().unwrap().identity.clone();
+    let output = ground_answer(&first, WHITE_ON_WHITE);
+    let state = output.snapshot;
+    assert!(state.document.is_none() && state.delivery.is_none());
+    assert_eq!(
+        state.stage1_fallback.as_ref().unwrap().source,
+        WHITE_ON_WHITE
+    );
+    let returned = output
+        .events
+        .iter()
+        .find(|event| event.tag == "stage1_returned")
+        .expect("the candidate goes back to the reader");
+    assert_eq!(returned.payload["reason"], "ground_coloured_layers");
+    assert_eq!(returned.payload["background"], "white");
+    assert_eq!(returned.payload["layers"], 1);
+    assert!(
+        output
+            .events
+            .iter()
+            .all(|event| { event.tag != "retry_scheduled" && event.tag != "visible_ddl_ready" })
+    );
+    let action = state.action.as_ref().unwrap();
+    assert_eq!(action.identity.attempt, 2);
+    assert_ne!(action.identity.action_id, first_action.action_id);
+    let feedback = &stage1_message(&state)["background_feedback"];
+    assert_eq!(feedback["previous_ddl"], WHITE_ON_WHITE);
+    assert_eq!(feedback["background"], "white");
+    let layers = feedback["layers"].as_array().unwrap();
+    assert_eq!(layers.len(), 1);
+    assert_eq!(
+        layers[0]["text"].as_str().unwrap().trim_end_matches('.'),
+        "place one white circle at center"
+    );
+    assert!(
+        action.payload["prompt"]["system"]
+            .as_str()
+            .unwrap()
+            .contains("choose again a background color those marks can be told from")
+    );
+
+    let state = ground_answer(&state, answered).snapshot;
+    assert!(state.stage1_fallback.is_none());
+    let commit = state.action.as_ref().unwrap();
+    assert_eq!(commit.tag, "commit_visible_normalized_ddl");
+    assert_eq!(commit.payload["document"]["source"], answered);
+    assert_eq!(commit.payload["reason"], "stage1_generated");
+    let committed = run(Some(&state), &envelope(Some(&state), ack(&state))).snapshot;
+    assert!(matches!(committed.phase, PipelinePhase::ScoreReady));
+    let score = committed.delivery.unwrap().score.unwrap();
+    assert_eq!(score.background, Color::Gray);
+}
+
+#[test]
+fn a_failed_return_commits_the_kept_candidate() {
+    let returned = ground_answer(&ground_start(config()), WHITE_ON_WHITE).snapshot;
+    let identity = returned.action.as_ref().unwrap().identity.clone();
+    let transport = PipelineInput::EffectResult {
+        result: EffectResult::ProviderFailed {
+            identity,
+            failure: ProviderFailure::TransportUnavailable,
+            elapsed_ms: DecimalU64::new(20),
+        },
+    };
+    let failed = run(Some(&returned), &envelope(Some(&returned), transport));
+    let uncompiled = ground_answer(&returned, "Unknown.Macro.");
+    for output in [failed, uncompiled] {
+        let state = output.snapshot;
+        assert!(state.stage1_fallback.is_none());
+        let commit = state.action.as_ref().unwrap();
+        assert_eq!(commit.tag, "commit_visible_normalized_ddl");
+        assert_eq!(commit.payload["document"]["source"], WHITE_ON_WHITE);
+        assert_eq!(commit.payload["reason"], "stage1_generated");
+        assert!(
+            output
+                .events
+                .iter()
+                .any(|event| event.tag == "stage1_fallback"
+                    && event.payload["failure"].is_string())
+        );
+        assert!(output.events.iter().all(|event| event.tag != "failed"));
+        let committed = run(Some(&state), &envelope(Some(&state), ack(&state))).snapshot;
+        assert!(matches!(committed.phase, PipelinePhase::ScoreReady));
+        assert_eq!(committed.document.unwrap().source, WHITE_ON_WHITE);
+    }
+    let cancelled = run(
+        Some(&returned),
+        &envelope(Some(&returned), PipelineInput::Cancel),
+    )
+    .snapshot;
+    assert!(cancelled.stage1_fallback.is_none());
+    assert!(matches!(cancelled.phase, PipelinePhase::Cancelled));
+}
+
+#[test]
+fn the_return_is_asked_once_and_its_answer_is_kept() {
+    // The reader keeps a colour the description states; a second return
+    // would ask the same question again.
+    let still_white = "place one white square at center.\nplace one black circle at center.";
+    let mut pipeline_config = config();
+    pipeline_config.stage1_retry.max_attempts = 4;
+    let returned = ground_answer(&ground_start(pipeline_config), WHITE_ON_WHITE).snapshot;
+    let output = ground_answer(&returned, still_white);
+    assert!(
+        output
+            .events
+            .iter()
+            .all(|event| event.tag != "stage1_returned")
+    );
+    let commit = output.snapshot.action.as_ref().unwrap();
+    assert_eq!(commit.tag, "commit_visible_normalized_ddl");
+    assert_eq!(commit.payload["document"]["source"], still_white);
+}
+
+#[test]
+fn stage1_keeps_its_candidate_without_budget_or_where_the_ground_covers_the_background() {
+    let mut single = config();
+    single.stage1_retry.max_attempts = 1;
+    let without_budget = ground_answer(&ground_start(single), WHITE_ON_WHITE).snapshot;
+    // The mezzotint plate covers the white background, so a white mark shows.
+    let mezzotint =
+        "Mezzotint.\nplace one white circle at center.\nplace one gray square at center.";
+    let covered = ground_answer(&ground_start(config()), mezzotint).snapshot;
+    let visible = "Fill the background with gray.\nplace one white circle at center.";
+    let distinct = ground_answer(&ground_start(config()), visible).snapshot;
+    for (state, source) in [
+        (without_budget, WHITE_ON_WHITE),
+        (covered, mezzotint),
+        (distinct, visible),
+    ] {
+        assert!(state.stage1_fallback.is_none(), "{source}");
+        let commit = state.action.as_ref().unwrap();
+        assert_eq!(commit.tag, "commit_visible_normalized_ddl", "{source}");
+        assert_eq!(commit.payload["document"]["source"], source);
+        let wire = serde_json::to_value(&state).unwrap();
+        assert!(wire.get("stage1_fallback").is_none(), "{source}");
+    }
+}

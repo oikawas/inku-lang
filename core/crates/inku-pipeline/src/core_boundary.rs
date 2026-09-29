@@ -4,20 +4,21 @@ use std::fmt;
 
 use inku_ddl::{
     MacroDefinition, MacroExpansionLimits, NormalizedDdlDocument,
-    RESOURCE_COMPILER_EXECUTION_SCHEMA_ID, ScoreLoweringContext, ScoreLoweringOutcome,
-    Stage15Variation, Stage15VariationAmplitude, TYPED_DDL_COMPILATION_SCHEMA_ID,
-    compile_ddl_to_score_with_resources,
+    RESOURCE_COMPILER_EXECUTION_SCHEMA_ID, ScoreInstructionOrigin, ScoreLoweringContext,
+    ScoreLoweringOutcome, SourceSpan, Stage15Variation, Stage15VariationAmplitude,
+    TYPED_DDL_COMPILATION_SCHEMA_ID, compile_ddl_to_score_with_resources,
 };
 use inku_render::{
     compat_clip::ClipLimits,
+    ground::shown_background,
     palette::work_palette_context,
     render::{CompatFillClipPolicy, RenderError, render_with_resources},
     types::{RenderOptions, RenderOutput, RenderRequest},
 };
 use inku_score::{
-    CANVAS_FORMAT_REGISTRY_ID, Canvas, Color, HardResourcePolicy, OperationalResourceBudget,
-    ResolvedPaletteColor, ResolvedPaletteContext, ResourceDemand, Score, ScoreErrorPolicy,
-    canonical_score_digest, canvas_format_registry_digest, lookup_canvas_format,
+    CANVAS_FORMAT_REGISTRY_ID, Canvas, Color, HardResourcePolicy, InstructionMode,
+    OperationalResourceBudget, ResolvedPaletteColor, ResolvedPaletteContext, ResourceDemand, Score,
+    ScoreErrorPolicy, canonical_score_digest, canvas_format_registry_digest, lookup_canvas_format,
     validate_canvas_format_id,
 };
 use serde::{Deserialize, Deserializer, Serialize, de};
@@ -494,6 +495,81 @@ pub fn compile_committed(
     };
     delivery.validate()?;
     Ok(delivery)
+}
+
+/// The colour the canvas shows under the marks, with the source sentences
+/// whose marks are drawn only in it, from one compile of the exact document.
+///
+/// Such a mark is not seen where no mark of another colour lies beneath it.
+/// Only additive marks the source asks for itself count, not a Macro's; a
+/// Score whose ground covers the background gives no sentence.
+pub(crate) fn ground_coloured_sentences(
+    document: NormalizedDdlDocument,
+    definitions: &[MacroDefinition],
+    options: &CompilerOptions,
+) -> Result<Option<(Color, Vec<SourceSpan>)>, BoundaryError> {
+    options.validate()?;
+    let result = compile_ddl_to_score_with_resources(
+        document,
+        definitions,
+        options.composition_seed()?,
+        options.macro_limits()?,
+        options.host.lowering_context()?,
+        options.stage15_variation()?,
+        options.error_policy,
+        options.hard_resource_policy.clone(),
+        options.operational_resource_budget,
+    );
+    let (Some(score), Some(semantic)) = (result.score(), &result.compilation().semantic_document)
+    else {
+        return Ok(None);
+    };
+    let Some(ground) = shown_background(score) else {
+        return Ok(None);
+    };
+    if result.instruction_origins().len() != score.instructions.len() {
+        return Ok(None);
+    }
+    let clauses = &semantic
+        .instruction_association
+        .association
+        .clause_stream
+        .clauses;
+    let mut sentences = Vec::new();
+    for (instruction, origin) in score.instructions.iter().zip(result.instruction_origins()) {
+        let ScoreInstructionOrigin::SourceInstruction { instruction_index } = origin else {
+            continue;
+        };
+        let cycle = instruction
+            .arrangement
+            .as_ref()
+            .map_or(&[][..], |arrangement| arrangement.color_cycle.as_slice());
+        let colours = if cycle.is_empty() {
+            std::slice::from_ref(&instruction.color)
+        } else {
+            cycle
+        };
+        if instruction.mode_ != InstructionMode::Additive
+            || colours.iter().any(|colour| *colour != ground)
+        {
+            continue;
+        }
+        let Some(head) = semantic
+            .ast
+            .instructions
+            .get(*instruction_index)
+            .map(|source| source.entity.head.source().span)
+        else {
+            continue;
+        };
+        if let Some(clause) = clauses.iter().find(|clause| {
+            clause.span.start_byte <= head.start_byte && head.end_byte <= clause.span.end_byte
+        }) && !sentences.contains(&clause.span)
+        {
+            sentences.push(clause.span);
+        }
+    }
+    Ok((!sentences.is_empty()).then_some((ground, sentences)))
 }
 
 /// Serializable caller-owned Compat clipping policy with no implicit limits.

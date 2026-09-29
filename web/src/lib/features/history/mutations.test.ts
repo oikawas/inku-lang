@@ -219,3 +219,19 @@ test('a refused bulk request rejects and leaves the canvas, selection and listin
 	assert.deepEqual(h.manager.selectedIds, ['work-1']);
 	assert.equal(h.current()?.id, 'work-1');
 });
+
+test('saving a comment keeps the star and reaches every view of the work', async () => {
+	const h = harness(async () => jsonResponse(work({ starred: true, note: 'kept' })));
+	h.setCurrent(null);
+	const saved = await h.mutations.saveNote(work({ starred: true }), '  kept  ');
+	assert.equal(h.calls[0]?.path, '/api/history/work-1/star');
+	assert.deepEqual(JSON.parse(String(h.calls[0]?.init?.body)), { starred: true, note: 'kept' });
+	assert.equal(saved.note, 'kept');
+	assert.ok(h.projections.includes('browse:star:true:kept'));
+	assert.ok(h.projections.includes('result:star:true:kept'));
+	assert.ok(h.projections.includes('lineage:star:true:kept'));
+
+	const failure = harness(async () => jsonResponse({}, 500));
+	await assert.rejects(failure.mutations.saveNote(work(), 'lost'));
+	assert.deepEqual(failure.projections, []);
+});

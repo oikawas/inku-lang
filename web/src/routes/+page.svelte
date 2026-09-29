@@ -3337,6 +3337,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			onOpenLineage={(item) => void openLibraryWork(item, 'lineage')}
 			onRefine={(item) => void openLibraryWork(item, 'refine')}
 			onToggleStar={toggleHistoryStar}
+			onSaveNote={historyMutations.saveNote}
 			historyModelFull={statusModelName}
 			{formatHistoryDate}
 			{catalogName}

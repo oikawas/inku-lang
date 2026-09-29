@@ -117,6 +117,24 @@ export class HistoryMutations {
 		}
 	};
 
+	/**
+	 * Save a work's comment (its `note`), keeping its star as it is. Every view
+	 * that shows the work takes the saved value; a failure throws, so the
+	 * editor can keep what was typed and say so.
+	 */
+	saveNote = async (item: HistoryStarProjection, note: string): Promise<HistoryItem> => {
+		if (!item.id) throw new Error('history item has no id');
+		const response = await this.deps.apiFetch(`/api/history/${item.id}/star`, {
+			method: 'PATCH',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ starred: !!item.starred, note: note.trim().slice(0, 240) })
+		});
+		if (!response.ok) throw new Error(`HTTP ${response.status}`);
+		const updated = await response.json() as HistoryItem;
+		this.applyStarState(updated);
+		return updated;
+	};
+
 	toggleForRevision = async (
 		item: HistoryForRevisionProjection | null | undefined,
 		event?: Event

@@ -684,6 +684,10 @@ export interface LangPack {
 	historyStripFieldEngineVersion: string;
 	historyStripFieldBytes: string;
 	historyStripFieldsSaveFailed: string;
+	historyPreviewCommentLabel: string;
+	historyPreviewCommentSave: string;
+	historyPreviewCommentSaving: string;
+	historyPreviewCommentSaveFailed: string;
 	generationInfoFollowLabel: string;
 	generationInfoFollowToggle: string;
 	generationInfoFollowDescription: string;

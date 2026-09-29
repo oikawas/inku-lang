@@ -117,6 +117,8 @@
 		onOpenLineage: (item: HistoryItem) => void;
 		onRefine: (item: HistoryItem) => void;
 		onToggleStar: (item: HistoryItem, event?: Event) => void | Promise<void>;
+		/** Save the work's comment (its note); resolves with the saved work. */
+		onSaveNote: (item: HistoryItem, note: string) => Promise<HistoryItem>;
 		// Absent in single-user mode, where there is nobody to share with.
 		onShareItem?: ((item: HistoryItem) => void) | null;
 		aclShareStatus?: Record<string, boolean>;
@@ -179,6 +181,7 @@
 		onOpenLineage,
 		onRefine,
 		onToggleStar,
+		onSaveNote,
 		onShareItem = null,
 		aclShareStatus = {},
 		groupShareStatus = {},
@@ -220,6 +223,35 @@
 	const lineageMemberControllers = new Map<string, AbortController>();
 	let copiedHistoryHash = $state<string | null>(null);
 	let previewItem = $state<HistoryItem | null>(null);
+	// The comment being typed in the preview, per work, until it is saved.
+	let noteDraft = $state<{ id: string; text: string } | null>(null);
+	let noteSaving = $state(false);
+	let noteSaveFailed = $state(false);
+	const previewNote = $derived.by(() => {
+		const draft = noteDraft;
+		if (!previewItem) return '';
+		return draft && draft.id === previewItem.id ? draft.text : (previewItem.note ?? '');
+	});
+	const previewNoteChanged = $derived(!!previewItem && previewNote.trim() !== (previewItem.note ?? '').trim());
+
+	async function savePreviewNote(): Promise<void> {
+		const item = previewItem;
+		if (!item || noteSaving) return;
+		noteSaving = true;
+		noteSaveFailed = false;
+		try {
+			const saved = await onSaveNote(item, previewNote);
+			// The preview holds its own copy of the work, so it takes the saved
+			// comment itself; the listing takes it through the shared projection.
+			const current = previewItem;
+			if (current && current.id === item.id) previewItem = { ...current, note: saved.note ?? null };
+			if (noteDraft?.id === item.id) noteDraft = null;
+		} catch {
+			noteSaveFailed = true;
+		} finally {
+			noteSaving = false;
+		}
+	}
 	let previewLoading = $state(false);
 	let previewError = $state(false);
 	let previewRequestId = 0;
@@ -949,8 +981,25 @@
 								</dd>
 							</div>
 						{/if}
-						{#if previewItem.note}<div><dt>{t().selectionNoteLabel}</dt><dd>{previewItem.note}</dd></div>{/if}
+						{#if previewItem.shared && previewItem.note}<div><dt>{t().historyPreviewCommentLabel}</dt><dd>{previewItem.note}</dd></div>{/if}
 					</dl>
+					{#if !previewItem.shared}
+						<div class="history-preview-note">
+							<label for="history-preview-note-input">{t().historyPreviewCommentLabel}</label>
+							<textarea
+								id="history-preview-note-input"
+								maxlength="240"
+								rows="3"
+								value={previewNote}
+								disabled={noteSaving}
+								oninput={(event) => { if (previewItem?.id) noteDraft = { id: previewItem.id, text: event.currentTarget.value }; noteSaveFailed = false; }}
+							></textarea>
+							<div class="history-preview-note-actions">
+								{#if noteSaveFailed}<span class="error-text">{t().historyPreviewCommentSaveFailed}</span>{/if}
+								<button class="ghost-btn" type="button" disabled={noteSaving || !previewNoteChanged} onclick={() => void savePreviewNote()}>{noteSaving ? t().historyPreviewCommentSaving : t().historyPreviewCommentSave}</button>
+							</div>
+						</div>
+					{/if}
 				</section>
 			{/if}
 		</aside>
@@ -1436,6 +1485,10 @@
 	.history-preview-details dt { color: var(--fg3); }
 	.history-preview-details dd { min-width: 0; margin: 0; overflow-wrap: anywhere; }
 	.history-preview-hash { display: flex; align-items: center; gap: 8px; }
+	.history-preview-note { display: grid; gap: 5px; margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--border); }
+	.history-preview-note label { color: var(--fg2); font-size: var(--ui-font-size-12); }
+	.history-preview-note textarea { box-sizing: border-box; width: 100%; min-height: 4.5em; resize: vertical; border: 1px solid var(--border2); border-radius: 5px; padding: 5px 6px; background: var(--bg); color: var(--fg); font: inherit; line-height: 1.35; }
+	.history-preview-note-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
 	.history-preview-hash button { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; padding: 0; border: 1px solid var(--border2); border-radius: var(--btn-sm-radius); background: var(--panel); color: var(--fg); cursor: pointer; }
 	.history-manager-pager {
 		display: flex;

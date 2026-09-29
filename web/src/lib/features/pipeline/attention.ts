@@ -12,6 +12,22 @@ const STAGE_OF_REASON: Record<string, string> = {
 	hole_completion_failed: 'stage2',
 };
 
+/**
+ * The reason to show the author, or null while the run is still going.
+ *
+ * Three phases carry a reason, and only two of them have stopped: the run
+ * needs the author's edit, or it failed. The third, a Stage 1 result waiting
+ * to be saved, carries the commit's reason (`stage1_generated`) and moves on
+ * by itself; reading it as a stop put "check the result" on screen for the
+ * moment every drawing was being saved.
+ */
+const STOPPED_PHASES = new Set(['needs_user_edit', 'failed']);
+
+export function pipelineAttentionReason(phase: { tag?: unknown; reason?: unknown } | null | undefined): string | null {
+	if (!phase || typeof phase.tag !== 'string' || !STOPPED_PHASES.has(phase.tag)) return null;
+	return typeof phase.reason === 'string' && phase.reason ? phase.reason : null;
+}
+
 export type PipelineProviderFailure = {
 	failure?: unknown;
 	stage?: unknown;

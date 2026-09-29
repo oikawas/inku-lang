@@ -1,5 +1,5 @@
 import type { LangPack } from '$lib/i18n/types';
-import { pipelineAttentionText, type PipelineProviderFailure } from './features/pipeline/attention';
+import { pipelineAttentionReason, pipelineAttentionText, type PipelineProviderFailure } from './features/pipeline/attention';
 
 type ProviderFailure = {
 	code: 'model_gone' | 'provider_auth' | 'provider_rate_limit' | 'provider_error';
@@ -43,8 +43,9 @@ function pipelineActionMessage(detail: JsonObject, strings: LangPack): string | 
 	) return null;
 	const view = object(detail.current_view);
 	const phase = object(view?.phase);
-	if (typeof phase?.reason === 'string' && phase.reason) {
-		return pipelineAttentionText(phase.reason, object(view?.provider_failure) as PipelineProviderFailure | null, strings);
+	const reason = pipelineAttentionReason(phase);
+	if (reason) {
+		return pipelineAttentionText(reason, object(view?.provider_failure) as PipelineProviderFailure | null, strings);
 	}
 	if (phase?.tag === 'awaiting_patch_approval' || detail.code === 'pipeline_patch_approval_required') {
 		return strings.pipelinePatchHint;

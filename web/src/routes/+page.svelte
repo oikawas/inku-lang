@@ -37,6 +37,7 @@
 	import CanvasAspectPlugin from '$lib/components/CanvasAspectPlugin.svelte';
 	import SketchSelect from '$lib/components/SketchSelect.svelte';
 	import PipelineStatus from '$lib/components/PipelineStatus.svelte';
+	import { pipelineAttentionReason } from '$lib/features/pipeline/attention';
 	import RunStatus from '$lib/components/RunStatus.svelte';
 	import Tooltip from '$lib/components/Tooltip.svelte';
 	import { abbreviateStripModel, toggleHistoryStripField, type HistoryStripField } from '$lib/historyStripFields';
@@ -2703,7 +2704,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 						diagnostics={work.pipelineDiagnostics}
 						diagnosticsUnavailable={work.pipelineDiagnosticsUnavailable}
 						busy={work.pipelineBusy}
-						reason={work.pipelineView?.phase.reason ?? null}
+						reason={pipelineAttentionReason(work.pipelineView?.phase)}
 						providerFailure={work.pipelineView?.provider_failure ?? null}
 						onApprove={work.approvePipelinePatch}
 						onDecline={work.declinePipelinePatch}

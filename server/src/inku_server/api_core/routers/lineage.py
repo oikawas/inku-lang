@@ -142,9 +142,16 @@ def api_lineage(
     node_id: str,
     descendant_depth: int = Query(default=2, ge=0, le=200),
     node_limit: int = Query(default=200, ge=1, le=200),
+    include_svg: bool = Query(
+        default=True,
+        description="Send each work's whole SVG. Clients that draw from thumbnails send false.",
+    ),
     actor: dict = Depends(_current_user),
 ) -> dict:
-    lineage = _db.get_lineage(actor["id"], node_id, descendant_depth=descendant_depth, node_limit=node_limit)
+    # Emptied, not removed, as the listing does: svg_bytes says how large it is.
+    lineage = _db.get_lineage(
+        actor["id"], node_id, descendant_depth=descendant_depth, node_limit=node_limit, include_svg=include_svg
+    )
     if lineage is None:
         raise HTTPException(status_code=404, detail="lineage not found")
     return _with_json_seeds(lineage)

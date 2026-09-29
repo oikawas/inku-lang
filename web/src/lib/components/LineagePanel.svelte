@@ -132,12 +132,12 @@
 	const focusExportScope = $derived.by((): SavedWorkExportScope | null => {
 		const history = focusNode?.history;
 		if (!history?.id) return null;
-		return { kind: 'current', works: [{ id: history.id, at: history.at, preview: history.svg ?? null, description: history.source_text ?? history.input ?? null, trashed: history.trashed }] };
+		return { kind: 'current', works: [{ id: history.id, at: history.at, preview: history.svg || null, description: history.source_text ?? history.input ?? null, trashed: history.trashed }] };
 	});
 	const pathExportScope = $derived.by((): SavedWorkExportScope | null => {
 		const works = focusAnimationHistoryIds.flatMap((id) => {
 			const history = graph?.nodes.find((node) => node.history?.id === id)?.history;
-			return history?.id ? [{ id: history.id, at: history.at, preview: history.svg ?? null, description: history.source_text ?? history.input ?? null, trashed: history.trashed }] : [];
+			return history?.id ? [{ id: history.id, at: history.at, preview: history.svg || null, description: history.source_text ?? history.input ?? null, trashed: history.trashed }] : [];
 		});
 		return works.length > 0 ? { kind: 'lineage-path', works } : null;
 	});
@@ -145,7 +145,7 @@
 		const works = (graph?.nodes ?? []).flatMap((node) => {
 			const history = node.history;
 			return history?.id && checkedHistoryIds.includes(history.id)
-				? [{ id: history.id, at: history.at, preview: history.svg ?? null, description: history.source_text ?? history.input ?? null, trashed: history.trashed }]
+				? [{ id: history.id, at: history.at, preview: history.svg || null, description: history.source_text ?? history.input ?? null, trashed: history.trashed }]
 				: [];
 		});
 		return works.length > 0 ? { kind: 'selection', works } : null;
@@ -846,7 +846,7 @@ $effect(() => {
 										{/if}
 									</div>
 									<div class="preview">
-										{#if node.history?.svg}<HistoryThumbnail item={node.history} scope={`lineage-${node.id}`} size="manager" />{:else}<span>{withheldLabel(node) ?? (isJapanese ? '削除済み' : 'Deleted')}</span>{/if}
+										{#if node.history}<HistoryThumbnail item={node.history} scope={`lineage-${node.id}`} size="manager" />{:else}<span>{withheldLabel(node) ?? (isJapanese ? '削除済み' : 'Deleted')}</span>{/if}
 									</div>
 									{#if node.history?.display_label}<div class="display-label">{node.history.display_label}</div>{/if}
 									{#if node.history?.trashed}<div class="trash-state">{isJapanese ? 'ゴミ箱（復元可能）' : 'In trash (restorable)'}</div>{/if}

@@ -102,6 +102,19 @@ def test_history_groups_page_by_lineage_and_exclude_hidden_items():
         assert [item["id"] for item in members.json()["items"]] == [child["id"], root["id"]]
         assert all(item["lineage_root_node_id"] == root["lineage_node_id"] for item in members.json()["items"])
 
+        # The lineage panel draws cards from thumbnails; it leaves the SVG out.
+        whole = client.get(f"/api/lineage/{root['lineage_node_id']}?descendant_depth=200", headers=headers).json()
+        slim = client.get(
+            f"/api/lineage/{root['lineage_node_id']}?descendant_depth=200&include_svg=false", headers=headers
+        ).json()
+        whole_by_id = {node["id"]: node for node in whole["nodes"] if node.get("history")}
+        slim_by_id = {node["id"]: node for node in slim["nodes"] if node.get("history")}
+        assert set(slim_by_id) == set(whole_by_id) and slim_by_id
+        for node_id, node in slim_by_id.items():
+            assert whole_by_id[node_id]["history"]["svg"] == "<svg xmlns='http://www.w3.org/2000/svg'/>"
+            assert node["history"]["svg"] == ""
+            assert node["history"]["svg_bytes"] == len("<svg xmlns='http://www.w3.org/2000/svg'/>")
+
         # A root node saved before root_node_id existed holds NULL; it is still a member.
         with db.SessionLocal() as session:
             session.query(db.LineageNodeRow).filter(db.LineageNodeRow.id == root["lineage_node_id"]).update(

@@ -4,7 +4,11 @@
 
 This file records changes chronologically. If a historical note conflicts with the current specification, the current specification wins. The more detailed canonical history is maintained in Japanese in [CHANGELOG.ja.md](CHANGELOG.ja.md).
 
-**This file holds the 60 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
+**This file holds the 61 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
+
+### 2026-09-29 — The lineage panel is sent no SVG
+
+At the author's request. The lineage panel received each work's whole SVG. On Pentala a lineage of 24 works took about 1.0 s and 12.8 MB (12.2 MB of it SVG) every time it opened, and one of 3 works about 0.1 s and 604 KB. `/api/lineage/{id}` takes `include_svg=false` (the SVG emptied and its size given in `svg_bytes`, as the listing does; the default is unchanged), and the Web asks for it. Cards draw from thumbnails, and opening a work on the canvas reads its one SVG. The export menu opened from the lineage panel no longer shows the small picture of its target, as in the history library.
 
 ### v2.15.59 — The history library's lineage page aggregates quickly (Build 1135, 2026-09-29)
 

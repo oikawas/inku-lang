@@ -117,7 +117,7 @@ export class LineageQueryState {
 		this.error = null;
 		try {
 			const readGraph = async (id: string, depth: number): Promise<LineageGraph> => {
-				const response = await this.apiFetch(`/api/lineage/${encodeURIComponent(id)}?descendant_depth=${depth}&node_limit=200`, { cache: 'no-store' });
+				const response = await this.apiFetch(`/api/lineage/${encodeURIComponent(id)}?descendant_depth=${depth}&node_limit=200&include_svg=false`, { cache: 'no-store' });
 				if (!response.ok) throw new Error(`HTTP ${response.status}`);
 				return await response.json() as LineageGraph;
 			};
@@ -157,7 +157,7 @@ export class LineageQueryState {
 		this.error = null;
 		try {
 			const response = await this.apiFetch(
-				`/api/lineage/${encodeURIComponent(nodeId)}?descendant_depth=1&node_limit=200`,
+				`/api/lineage/${encodeURIComponent(nodeId)}?descendant_depth=1&node_limit=200&include_svg=false`,
 				{ cache: 'no-store' }
 			);
 			if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -186,7 +186,7 @@ export class LineageQueryState {
 		this.loading = true;
 		this.error = null;
 		try {
-			const url = `/api/lineage/${encodeURIComponent(rootNodeId)}?descendant_depth=200&node_limit=200`;
+			const url = `/api/lineage/${encodeURIComponent(rootNodeId)}?descendant_depth=200&node_limit=200&include_svg=false`;
 			const response = await this.apiFetch(url, { cache: 'no-store' });
 			if (!response.ok) throw new Error(`HTTP ${response.status}`);
 			const overview = await response.json() as LineageGraph;

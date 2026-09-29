@@ -46,9 +46,9 @@ test('T-267/T-268: the latest base lineage request alone may settle state', asyn
 	const first = state.load('node-a');
 	const second = state.load('node-b');
 	assert.equal(state.loading, true);
-	assert.equal(requests[0]?.path, '/api/lineage/node-a?descendant_depth=3&node_limit=200');
+	assert.equal(requests[0]?.path, '/api/lineage/node-a?descendant_depth=3&node_limit=200&include_svg=false');
 	assert.equal(requests[0]?.init?.cache, 'no-store');
-	assert.equal(requests[1]?.path, '/api/lineage/node-b?descendant_depth=3&node_limit=200');
+	assert.equal(requests[1]?.path, '/api/lineage/node-b?descendant_depth=3&node_limit=200&include_svg=false');
 
 	requests[1]?.resolve(jsonResponse(graph('node-b')));
 	await second;
@@ -95,7 +95,7 @@ test('T-273: a same-tree refresh retains browsing state but fresh roots and reje
 	browsing.setScroll(true, { left: 34, top: 55 });
 
 	const refresh = state.load('shown', true);
-	assert.equal(requests[0]?.path, '/api/lineage/root?descendant_depth=200&node_limit=200');
+	assert.equal(requests[0]?.path, '/api/lineage/root?descendant_depth=200&node_limit=200&include_svg=false');
 	requests[0]?.resolve(jsonResponse({
 		focus_node_id: 'root',
 		nodes: [
@@ -117,7 +117,7 @@ test('T-273: a same-tree refresh retains browsing state but fresh roots and reje
 	assert.deepEqual(browsing.scrollFor(true), { left: 34, top: 55 });
 
 	const newRoot = state.load('new-shown', true);
-	assert.equal(requests[1]?.path, '/api/lineage/root?descendant_depth=200&node_limit=200');
+	assert.equal(requests[1]?.path, '/api/lineage/root?descendant_depth=200&node_limit=200&include_svg=false');
 	requests[1]?.resolve(jsonResponse(graph('new-shown', ['new-root', 'new-shown'], [
 		{ id: 'new-root-shown', parent_node_id: 'new-root', child_node_id: 'new-shown', derivation_kind: 'replay' }
 	])));
@@ -132,7 +132,7 @@ test('T-273: a same-tree refresh retains browsing state but fresh roots and reje
 
 	browsing.overviewOpen = true;
 	const rejected = state.load('denied', true);
-	assert.equal(requests[2]?.path, '/api/lineage/new-root?descendant_depth=200&node_limit=200');
+	assert.equal(requests[2]?.path, '/api/lineage/new-root?descendant_depth=200&node_limit=200&include_svg=false');
 	requests[2]?.resolve(jsonResponse({}, 403));
 	await rejected;
 	assert.equal(state.graph, null);
@@ -163,7 +163,7 @@ test('T-269: a branch merges by id only while the same focus is current', async 
 	]);
 
 	const merge = state.loadBranch('existing');
-	assert.equal(requests[0]?.path, '/api/lineage/existing?descendant_depth=1&node_limit=200');
+	assert.equal(requests[0]?.path, '/api/lineage/existing?descendant_depth=1&node_limit=200&include_svg=false');
 	requests[0]?.resolve(jsonResponse(graph('existing', ['existing', 'child'], [
 		{ id: 'edge-child', parent_node_id: 'existing', child_node_id: 'child', derivation_kind: 'variation' }
 	])));
@@ -189,7 +189,7 @@ test('T-270: overview starts at the loaded root and keeps the selected focus', a
 	]);
 
 	const pending = state.loadOverview('fallback');
-	assert.equal(requests[0]?.path, '/api/lineage/root?descendant_depth=200&node_limit=200');
+	assert.equal(requests[0]?.path, '/api/lineage/root?descendant_depth=200&node_limit=200&include_svg=false');
 	requests[0]?.resolve(jsonResponse(graph('root', ['root', 'focus', 'descendant'])));
 	await pending;
 

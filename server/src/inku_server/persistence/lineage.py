@@ -6,7 +6,8 @@ import json
 from collections.abc import Callable
 from dataclasses import dataclass
 
-from sqlalchemy import func, or_, text
+from sqlalchemy import LargeBinary, func, or_, text
+from sqlalchemy.orm import defer
 
 from . import access
 from .schema import HistoryRow, LineageEdgeRow, LineageNodeRow
@@ -198,6 +199,7 @@ class LineageStore:
         child_counts: dict,
         history_by_id: dict,
         generations: dict,
+        svg_bytes_by_id: dict | None = None,
     ) -> dict:
         """One node as the lineage answer carries it.
 
@@ -230,7 +232,12 @@ class LineageStore:
         payload["render_hash"] = node.render_hash
         history = history_by_id.get(node.history_id or "")
         if history is not None:
-            payload["history"] = self.row_to_dict_fn(history)
+            if svg_bytes_by_id is None:
+                payload["history"] = self.row_to_dict_fn(history)
+            else:
+                payload["history"] = self.row_to_dict_fn(
+                    history, include_svg=False, svg_bytes=svg_bytes_by_id.get(history.id, 0)
+                )
             payload["history"]["lineage_generation"] = generations.get(node.id)
         return payload
 
@@ -277,6 +284,7 @@ class LineageStore:
         focus_node_id: str,
         descendant_depth: int = 2,
         node_limit: int = 200,
+        include_svg: bool = True,
     ) -> dict | None:
         descendant_depth = max(0, min(descendant_depth, 200))
         node_limit = max(1, min(node_limit, 200))
@@ -327,13 +335,22 @@ class LineageStore:
                 )
             }
             history_ids = [node.history_id for node in nodes if node.history_id and node.id in readable_ids]
-            history_by_id = {
-                row.id: row
-                for row in session.query(HistoryRow).filter(
-                    access._readable_by(actor, HistoryRow.user_id, HistoryRow.id),
-                    HistoryRow.id.in_(history_ids),
+            histories = session.query(HistoryRow).filter(
+                access._readable_by(actor, HistoryRow.user_id, HistoryRow.id),
+                HistoryRow.id.in_(history_ids),
+            )
+            svg_bytes_by_id: dict[str, int] | None = None
+            if include_svg:
+                history_by_id = {row.id: row for row in histories.all()}
+            else:
+                # The panel draws its cards from thumbnails and the canvas reads
+                # the one SVG it opens: a lineage of 24 works sent 12 MB of SVG
+                # and took about a second on production.
+                projected = histories.options(defer(HistoryRow.svg)).add_columns(
+                    func.length(func.cast(HistoryRow.svg, LargeBinary)).label("svg_bytes")
                 ).all()
-            }
+                history_by_id = {row.id: row for row, _svg_bytes in projected}
+                svg_bytes_by_id = {row.id: int(svg_bytes or 0) for row, svg_bytes in projected}
             child_counts = dict(
                 session.query(LineageEdgeRow.parent_node_id, func.count(LineageEdgeRow.id))
                 .filter(
@@ -345,7 +362,9 @@ class LineageStore:
             )
             generations = self._lineage_generations(session, actor, sorted(readable_ids))
             node_payloads = [
-                self._lineage_node_payload(node, node.id in readable_ids, child_counts, history_by_id, generations)
+                self._lineage_node_payload(
+                    node, node.id in readable_ids, child_counts, history_by_id, generations, svg_bytes_by_id
+                )
                 for node in nodes
             ]
             return {

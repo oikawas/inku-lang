@@ -564,12 +564,14 @@ def lineage_node_description_locked(node_id: str) -> bool:
         return node_is_locked(session, node_id)
 
 
-def get_lineage(user_id: str, focus_node_id: str, descendant_depth: int = 2, node_limit: int = 200) -> dict | None:
+def get_lineage(
+    user_id: str, focus_node_id: str, descendant_depth: int = 2, node_limit: int = 200, include_svg: bool = True
+) -> dict | None:
     return _lineage.LineageStore(
         session_factory=SessionLocal,
         actor_of_fn=_actor_of,
         row_to_dict_fn=_row_to_dict,
-    ).get_lineage(user_id, focus_node_id, descendant_depth, node_limit)
+    ).get_lineage(user_id, focus_node_id, descendant_depth, node_limit, include_svg)
 
 
 def promote_lineage_node(user_id: str, node_id: str) -> dict | None:

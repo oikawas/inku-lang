@@ -4,7 +4,11 @@
 
 This file records changes chronologically. If a historical note conflicts with the current specification, the current specification wins. The more detailed canonical history is maintained in Japanese in [CHANGELOG.ja.md](CHANGELOG.ja.md).
 
-**This file holds the 61 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
+**This file holds the 62 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
+
+### v2.15.61 — The provenance drawer follows a work chosen from the history strip (Build 1137, 2026-09-29)
+
+Choosing another work from the history strip while the provenance drawer is open keeps it open and shows that work's provenance. Each account can turn this off under Settings > Display; it is on by default. Pressing a work's star or paging through the strip still closes the drawer.
 
 ### v2.15.60 — The lineage panel is sent no SVG (Build 1136, 2026-09-29)
 

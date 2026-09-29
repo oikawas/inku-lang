@@ -389,7 +389,9 @@ under these principles (author's ruling, 2026-09-29).
 - **One word, one meaning**: each Saijiki word has exactly one meaning and is
   never read differently by its place in a sentence or by the words around it.
   This holds in Japanese and in English, and no word is shared with a grammar
-  modifier (thinness, size) in another sense. Ambiguity and wordplay belong to
+  modifier (thinness, size) in another sense. The values and field names of the
+  work plan response schema, which the reader (Stage 1) reads and writes, count
+  as words under the same principle. Ambiguity and wordplay belong to
   the description (the poetic layer of §5.1); the reader resolves them into
   single words of the visible DDL.
 - **A word sits in the category of its nature, and its name says its
@@ -418,6 +420,11 @@ under these principles (author's ruling, 2026-09-29).
   material; none of them is a technique for a surface.
 - The movements `slowly` and `quickly` set how many waves a sway has, not the
   speed of the brush.
+- In the work plan response schema, the value `fine` names both a thinness
+  (thin) and an amplitude (fine), `large` both a relative size and an
+  amplitude, and `solid` both a line continuity (solid) and a surface (flat).
+  The field name `place` (a position) also meets the action value `place` (to
+  place).
 
 ---
 

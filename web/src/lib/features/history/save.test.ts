@@ -111,3 +111,33 @@ test('T-292: old records preserve absent compose/sketch fields and reconcile the
 	assert.equal('sketch_state' in body, false);
 	assert.deepEqual(order, ['fetch:24:true', 'clear']);
 });
+
+test('a save followed by more reconciles nothing unless it fails', async () => {
+	const deps = (order: string[], response: () => Response) => ({
+		apiFetch: async () => { order.push('post'); return response(); },
+		signedIn: () => true,
+		ensureSvg: async () => '<svg/>',
+		composeFallbackFor: () => null,
+		refreshCountedUser: async () => { order.push('user'); },
+		activeHistoryId: () => 'work-active',
+		currentOffset: () => 0,
+		fetchOffset: async (offset: number, options?: { anchorId?: string }) => {
+			order.push(`fetch:${offset}:${options?.anchorId ?? ''}`);
+			return true;
+		},
+		clearSelection: () => order.push('clear')
+	});
+	const defaults = { catalogId: 'c', catalogMode: 'auto' as const, canvasAspectId: 'portrait', instructionLang: 'auto', uiLang: 'ja' };
+
+	const kept: string[] = [];
+	const saved = await saveHistoryItem(item(), { countGeneration: true, reconcile: false }, defaults,
+		deps(kept, () => jsonResponse(item({ id: 'saved-3' }))));
+	assert.equal(saved?.id, 'saved-3');
+	assert.deepEqual(kept, ['post']);
+
+	const refused: string[] = [];
+	const failed = await saveHistoryItem(item(), { countGeneration: true, reconcile: false }, defaults,
+		deps(refused, () => jsonResponse({ detail: 'no' }, 500)));
+	assert.equal(failed, null);
+	assert.deepEqual(refused, ['post', 'user', 'fetch:0:work-active']);
+});

@@ -27,9 +27,10 @@ export async function saveRefinementCandidates(
 	capabilities: SaveRefinementCandidatesCapabilities
 ): Promise<SaveRefinementCandidatesOutcome> {
 	const now = capabilities.now ?? Date.now;
-	// Saving stays sequential so generation counts and history refreshes retain
-	// the same order as the candidate cards supplied by the session.
-	for (const candidate of input.candidates) {
+	// Saving stays sequential so generation counts retain the same order as the
+	// candidate cards supplied by the session. The listing and the count are
+	// fetched again once, after the last save, not after each one.
+	for (const [index, candidate] of input.candidates.entries()) {
 		const result = candidate.result;
 		const sourceText = input.sourceText();
 		const saved = await capabilities.saveHistory({
@@ -50,7 +51,8 @@ export async function saveRefinementCandidates(
 			sourceText,
 			lineageParentNodeId: result.lineage_parent_node_id ?? null,
 			derivationKind: result.derivation_kind ?? null,
-			derivationMetadata: result.derivation_metadata ?? {}
+			derivationMetadata: result.derivation_metadata ?? {},
+			reconcile: index === input.candidates.length - 1
 		});
 		// The save may finish after the author has switched targets. Check before
 		// changing selection or starting the next write.

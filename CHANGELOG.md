@@ -6,6 +6,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 52 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-29 — Saving refinement options fetches the history listing once, after the last
+
+At the author's request. Saving refinement options fetched the history listing and the generation count again after each option. One listing takes about 0.4 s on Pentala whatever its size, about 0.9 s of the 1.1 s two options took. They are now fetched once, after the last save; a save that fails still fetches them at once.
+
 ### v2.15.51 — The wheel over the export menu no longer zooms the canvas (Build 1127, 2026-09-29)
 
 At the author's request. The saved work's export menu opens over the canvas and scrolls itself, but the wheel over it zoomed the canvas behind instead. Over a menu on the canvas the wheel now scrolls the menu.

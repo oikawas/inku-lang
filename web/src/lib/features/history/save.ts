@@ -13,6 +13,11 @@ export type SaveHistoryOptions = {
 	lineageParentNodeId?: string | null;
 	derivationKind?: DerivationKind | null;
 	derivationMetadata?: Record<string, unknown>;
+	/** False when more saves follow at once: the listing and the generation count
+	 *  are fetched again after the last one, not after each. Each costs a round
+	 *  trip, and the listing's is about 0.4 s on production whatever its size.
+	 *  A save that fails reconciles anyway, so the strip shows what was kept. */
+	reconcile?: boolean;
 };
 
 export type SaveHistoryDefaults = {
@@ -118,6 +123,7 @@ export async function saveHistoryItem(
 		// listing even when the transport failed and receive null for the save.
 	}
 
+	if (options.reconcile === false && saved) return saved;
 	if (options.countGeneration) await deps.refreshCountedUser();
 	if (options.selectSaved && saved?.id && options.historyVisibility !== 'lineage_only') {
 		await deps.fetchOffset(0, { anchorId: saved.id });

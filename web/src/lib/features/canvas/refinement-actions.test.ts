@@ -93,8 +93,11 @@ test('T-316/T-318: candidates save sequentially with canonical fields and only c
 		sourceText: 'source one',
 		lineageParentNodeId: 'parent-1',
 		derivationKind: 'variation',
-		derivationMetadata: { candidate: 'first' }
+		derivationMetadata: { candidate: 'first' },
+		reconcile: false
 	});
+	// The listing and the count are fetched again once, after the last save.
+	assert.equal(calls[1]?.options.reconcile, true);
 	assert.equal(calls[1]?.item.at, 202);
 	assert.equal(calls[1]?.item.input, 'source two');
 	assert.equal(calls[1]?.item.catalog_id, 'candidate-catalog');

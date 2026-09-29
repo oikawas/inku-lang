@@ -99,7 +99,7 @@ It rests on three pillars of constraint:
 2. **Sway is part of the specification** — architectural variation in an LLM is not eliminated as a bug. Sway exists at two scales, micro (line wobble and bleeding) and macro (composition and placement), and both are realized in the performance (Renderer) (Sections 13.8 / 14.4).
 3. **Emotional vocabulary is excluded** — use numbers and the vocabulary of physical materials rather than words such as "beautifully."
 4. **There is no fixed size** — size and position are expressed relative to a reference edge, not as absolute pixel values. The work scales to a wall as readily as to a screen. **The aspect ratio is not fixed either** — it is a constraint that shapes the world of the work, not a dimension the description carries.
-5. **Output is a still image** — the viewer moves, not the image. **How a surface is** is a state of the still image, not the passage of time (author's ruling, 2026-08-12). Fill and texture enter the vocabulary as **state nouns** — "flat", not "to paint". A verb would collide both with this principle and with §3.1's "placing, not drawing", which is why 描く was pruned in v1.92.
+5. **Output is a still image** — the viewer moves, not the image. **How a surface is** is a state of the still image, not the passage of time (author's ruling, 2026-08-12). Fill and texture enter the vocabulary as **state nouns** — "flat", not "to paint". A verb would collide both with this principle and with §3.1's "placing, not drawing", which is why 描く was pruned in v1.92. **Words for how a mark is made (the handling category, sabaki, arriving with the next Saijiki version) may still name the movement of the brush, such as its speed over the time of drawing** (author's ruling, 2026-09-29). The movement stays in the still image as the state of the mark, and the output remains a still image. Surface words stay state nouns.
 6. **The design converts prose into normalized DDL for validation by the Typed Compiler** — input may be free, but DDL has a clear form and rules. Completely free-form input overwhelms the user; appropriate structure supports creation. The normal Server and Web are connected to the shared Typed Compiler; §12 describes the active generation path.
 7. **The engine does not go backwards.** Like a woodblock being carved, the drawing engine only moves in one direction. Past versions are not kept in the system and cannot be selected. **What remains is the printed work — the saved SVG — not the block as it was before the cut** (§2.1).
 
@@ -172,7 +172,9 @@ Canvas format is neither vocabulary nor a plugin. It is a resolved host option o
 
 - vocabulary of physical material only (zero words for feeling)
 - centered on the act of *placing* rather than the act of *drawing* -- the
-  sense in which a bonsai branch is "placed"
+  sense in which a bonsai branch is "placed". Words for how a mark is made
+  (sabaki) may still name the movement of the brush (§2 item 5, author's
+  ruling, 2026-09-29); the motion words stay verbs of placing
 - the design of the motion vocabulary matters most: place, line up, fill --
   these are the verbs of presentation
 - **the movements category describes irregularities in marks**: "swaying finely",
@@ -407,10 +409,14 @@ under these principles (author's ruling, 2026-09-29).
   `inku.saijiki.v1`). A DDL document records the Saijiki version it was read
   with (the field arrives with the next version; a document without it is read
   as `inku.saijiki.v1`). Saved documents are read under their old version and
-  rewritten once, meaning by meaning, into the new version's words, never by
-  string replacement. Saved Scores and SVGs are not rewritten. Compatibility is
-  not kept by leaving old words as hidden aliases or by reading a word by its
-  place.
+  overwritten once, meaning by meaning, with the new version's words, never by
+  string replacement. Saved macro definitions are rewritten the same way, and
+  the macro locks a work holds move to the new definitions (author's ruling,
+  2026-09-29). Saved Scores and SVGs are not rewritten. The old version's
+  reading is not kept, and compatibility is not kept by leaving old words as
+  hidden aliases or by reading a word by its place. The migration keeps every
+  meaning, so it makes no new variation, and it is a different operation from
+  the re-normalization of §12.8, which never rewrites an author's DDL.
 
 **Current exceptions** (they change in the next Saijiki version):
 
@@ -513,7 +519,7 @@ Ordinary DDL accepts `connected partway along the previous line/arc` to join the
 
 Fluctuation parameters keep asset category `variation` and may constrain candidates with an optional closed `dimension`: `amplitude`, `frequency`, `quality`, or `spread`. For example, `{"type":"semantic_ref","category":"variation","dimension":"amplitude"}`. Other categories cannot specify a dimension. Omitted / None preserves legacy category-only matching and canonical bytes / digest; Some participates in the definition digest. Flat Emit uses `fluctuation_amplitude`, `fluctuation_frequency`, `fluctuation_quality`, and `ink_spread`, each carrying an existing `SemanticRef { category: variation, id }` from its dimension. A field name does not change semantic identity. Definition validation, component `use`, binding, and execution boundaries share the same seven-word current classification.
 
-A saved MacroDefinition may retain legacy `variation:trembling` or `variation:blurring` IDs. Each keeps its existing canonical bytes, digest, and lock and continues to resolve to Perlin or Pink respectively. Legacy `place:middle` retains its existing canonical identity shared with `center`. This is shared saved-format compatibility, without a plugin-name branch or a restored public vocabulary entry. New definitions use canonical `swaying` or independent `ink_spread:bleeding`, and body changes receive a new definition version and digest. Saved configs are never rebound to the current catalog definitions.
+A saved MacroDefinition may retain legacy `variation:trembling` or `variation:blurring` IDs. Each keeps its existing canonical bytes, digest, and lock and continues to resolve to Perlin or Pink respectively. Legacy `place:middle` retains its existing canonical identity shared with `center`. This is shared saved-format compatibility, without a plugin-name branch or a restored public vocabulary entry. New definitions use canonical `swaying` or independent `ink_spread:bleeding`, and body changes receive a new definition version and digest. Saved configs are never rebound to the current catalog definitions. A Saijiki version migration (§3.3) is the exception: it rewrites saved macro definitions into the new version's words and moves the locks works hold to the new definitions (author's ruling, 2026-09-29).
 
 Every declared parameter remains required. Declaring three parameters and supplying only one value produces a binding error such as MissingCompatibleFact. Declaring only an amplitude parameter and delivering it to Emit lets the same resolver in §13.6 resolve the other two slots. Undeclared caller overlays, guessing three slots from one generic variation field, and optional parameters are not introduced.
 

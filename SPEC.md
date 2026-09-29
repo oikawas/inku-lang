@@ -197,10 +197,12 @@ Canvas format is neither vocabulary nor a plugin. It is a resolved host option o
   category). Grain and sweep remain applicable to lines and arcs: grain raises
   support absorption and tooth, while sweep changes no sheet properties and
   produces a band at three times the width. A sweep has no paleness of its own
-  (a line's band at 0.64 of its tool's opacity, a closed shape's sweeps at 0.40;
-  candidates for the comparison sheet); paleness belongs to the handling word
-  faint. A saved Score's `wash` (v1's pale ink wash) still draws as the pale band
-  at three times the width and 0.35 of the opacity. The other six qualities move
+  (a line's band at 0.8 of its tool's opacity, a closed shape's sweeps at 0.5,
+  the values the author chose on the comparison sheet, 2026-09-29); paleness
+  belongs to the handling word faint. A saved Score's `wash` (v1's pale ink
+  wash) still draws as the pale band at three times the width and 0.35 of the
+  opacity. The migration turns a pale ink wash into a faint sweep, which draws a
+  little darker (0.44 and 0.275 against the wash's 0.35 and 0.22). The other six qualities move
   to the preceding closed shape and are dropped when there is none. On a closed
   shape, an explicit sweep, grain, stipple, hatch, crosshatch, or aquatint is
   itself the area's performance and adds no flat base fill beneath it (DDL

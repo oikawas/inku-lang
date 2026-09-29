@@ -257,9 +257,10 @@ pub(crate) fn is_closed(primitive: Primitive) -> bool {
 
 /// The opacity factor of a band a line or an arc draws for its surface word.
 /// Wash is the pale band of the retired 薄墨. Sweep (刷き) is the same broad
-/// band without paleness of its own: the handling word 薄い makes it pale.
+/// band without paleness of its own, at the value the author chose on the
+/// comparison sheet (2026-09-29): the handling word 薄い makes it pale.
 const WASH_BAND_OPACITY: f64 = 0.35;
-const SWEEP_BAND_OPACITY: f64 = 0.64;
+const SWEEP_BAND_OPACITY: f64 = 0.8;
 
 fn band_opacity(instruction: &Instruction) -> Option<f64> {
     if is_closed(instruction.primitive) {
@@ -1419,10 +1420,11 @@ mod tests {
         assert_eq!(sweep.width, wash.width);
         assert_eq!(plain.stroke_opacity, 1.0);
         assert_eq!(wash.stroke_opacity, 0.35);
-        assert_eq!(sweep.stroke_opacity, 0.64);
-        // 薄いを添えた刷き comes back to the retired 薄墨 band within a hundredth.
-        assert_eq!(faint_sweep.stroke_opacity, 0.352);
-        assert!((faint_sweep.stroke_opacity - wash.stroke_opacity).abs() < 0.01);
+        assert_eq!(sweep.stroke_opacity, 0.8);
+        // 薄いを添えた刷き reads a little darker than the retired 薄墨 band, so a
+        // migrated work (薄墨 -> 薄い刷き) darkens slightly (the author's choice).
+        assert_eq!(faint_sweep.stroke_opacity, 0.44);
+        assert!(faint_sweep.stroke_opacity > wash.stroke_opacity);
         // A closed shape draws its sweep as a surface, not as a band.
         let circle = serde_json::from_str::<Instruction>(
             r#"{"primitive":"circle","weight":"pen","surface":{"texture":"sweep"}}"#,

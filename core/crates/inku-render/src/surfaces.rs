@@ -27,9 +27,10 @@ const SURFACE_WASH_LAYERS: usize = 2;
 const SURFACE_WASH_WIDTH_BASE: f64 = 0.88;
 const SURFACE_WASH_WIDTH_SPAN: f64 = 0.60;
 const SURFACE_WASH_OPACITY: f64 = 0.22;
-/// One sweep of 刷き: the wash sweeps without their own paleness, so that 薄い
-/// (faint, ×0.55) brings them back to the wash's 0.22.
-const SURFACE_SWEEP_OPACITY: f64 = 0.40;
+/// One sweep of 刷き: the wash sweeps without their own paleness, at the value the
+/// author chose on the comparison sheet (2026-09-29). 薄い (faint, ×0.55) makes
+/// it 0.275, a little darker than the wash's 0.22.
+const SURFACE_SWEEP_OPACITY: f64 = 0.5;
 const SURFACE_BLEED_RINGS: usize = 3;
 
 #[derive(Clone, Debug, PartialEq)]
@@ -726,11 +727,12 @@ mod tests {
             assert_eq!(wash_class, "surface-stroke-v1 surface-wash-sweep");
             assert_eq!(sweep_class, "surface-stroke-v1 surface-sweep");
             assert_eq!(wash_width, sweep_width);
-            assert!((sweep_opacity / wash_opacity - 0.40 / 0.22).abs() < 1e-3);
+            assert!((sweep_opacity / wash_opacity - 0.5 / 0.22).abs() < 1e-3);
         }
-        // 薄いを添えた刷き is the retired 薄墨: faint (×0.55) brings 0.40 back to 0.22.
+        // 薄いを添えた刷き reads a little darker than the retired 薄墨: faint (×0.55)
+        // makes 0.5 into 0.275 against the wash's 0.22.
         for ((_, _, wash_opacity), (_, _, faint_opacity)) in wash.iter().zip(&faint_sweep) {
-            assert!((wash_opacity - faint_opacity).abs() < 1e-6);
+            assert!((faint_opacity / wash_opacity - 0.275 / 0.22).abs() < 1e-3);
         }
     }
 

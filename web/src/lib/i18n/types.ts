@@ -684,6 +684,9 @@ export interface LangPack {
 	historyStripFieldEngineVersion: string;
 	historyStripFieldBytes: string;
 	historyStripFieldsSaveFailed: string;
+	generationInfoFollowLabel: string;
+	generationInfoFollowToggle: string;
+	generationInfoFollowDescription: string;
 	settingsTabServerMisc: string;
 	settingsTabLogs: string;
 	settingsTabLimits: string;

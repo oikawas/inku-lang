@@ -47,6 +47,7 @@ test('the browser owns every module-scoped reactive setting', () => {
 		'features/batch/failure-report.svelte.ts',
 		'features/batch/settings.svelte.ts',
 		'features/canvas/caption-settings.svelte.ts',
+		'features/canvas/generation-info-settings.svelte.ts',
 		'features/color-catalog/settings.svelte.ts',
 		'features/describe-panel/settings.svelte.ts',
 		'features/export/download-folder.svelte.ts',

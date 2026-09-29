@@ -6,6 +6,8 @@
 	import type { Provider, ProviderGroup } from '$lib/models';
 	import CanvasArtworkWorkspace from '$lib/features/canvas/CanvasArtworkWorkspace.svelte';
 	import CanvasGenerationInfo from '$lib/features/canvas/CanvasGenerationInfo.svelte';
+	import { pressChoosesWork } from '$lib/features/canvas/generation-info-follow';
+	import { generationInfoSettings } from '$lib/features/canvas/generation-info-settings.svelte';
 	import CanvasPresentationOverlay from '$lib/features/canvas/CanvasPresentationOverlay.svelte';
 	import CanvasRefinementWorkspace from '$lib/features/canvas/CanvasRefinementWorkspace.svelte';
 	import type { LineageGraph, LineageNode } from '$lib/features/history/types';
@@ -651,6 +653,10 @@
 		if (!target) return;
 		if (generationInfoEl?.contains(target)) return;
 		if (generationInfoToggleEl?.contains(target)) return;
+		// Choosing another work from the history strip keeps the drawer open
+		// when the setting says so; the drawer reads the work on the canvas,
+		// so it shows the chosen one once it is loaded.
+		if (generationInfoSettings.followsSelection && target instanceof Element && pressChoosesWork(target)) return;
 		closeGenerationInfo();
 	}}
 />

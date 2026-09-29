@@ -71,6 +71,7 @@
 	// every branch back into this file -- see lib/features/*/settings.svelte.ts.
 	import { bindColorCatalogPersist, colorCatalogSettings } from '$lib/features/color-catalog/settings.svelte';
 	import { bindDescribePanelPersist, describePanelSettings } from '$lib/features/describe-panel/settings.svelte';
+	import { bindGenerationInfoSettingsPersist } from '$lib/features/canvas/generation-info-settings.svelte';
 	import { bindCaptionSettingsPersist, captionSettings } from '$lib/features/canvas/caption-settings.svelte';
 	import { bindTextSizePersist, textSizeSettings } from '$lib/features/appearance/text-size.svelte';
 	import { bindColorCatalogFallback } from '$lib/features/color-catalog/render';
@@ -951,6 +952,17 @@
 		} catch (e) { console.warn('failed to save describe panel folds', e); }
 	}
 	bindDescribePanelPersist((fields) => { void persistDescribePanelFolds(fields); });
+	// A view preference of the account like the folds: a failed save leaves
+	// the choice as the user just made it.
+	async function persistGenerationInfoSettings(fields: Record<string, boolean>) {
+		if (!session.currentUser) return;
+		try {
+			const r = await apiFetch('/api/auth/me/settings', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ model_settings: fields }) });
+			if (!r.ok) throw new Error(`HTTP ${r.status}`);
+			session.setCurrentUser(await r.json() as UserItem);
+		} catch (e) { console.warn('failed to save generation info settings', e); }
+	}
+	bindGenerationInfoSettingsPersist((fields) => { void persistGenerationInfoSettings(fields); });
 
 	// Serialize quick direction changes so the last choice is also the saved one.
 	let captionSettingsWrite = Promise.resolve();

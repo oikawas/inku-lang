@@ -297,6 +297,9 @@ def default_user_model_settings() -> dict[str, Any]:
         # was always folded, so its default stays closed.
         "sketch_open": True,
         "ddl_expanded_open": False,
+        # Whether the generation-information drawer stays open, and shows the
+        # new work, when another work is chosen from the history strip.
+        "generation_info_follows_selection": True,
     }
 
 
@@ -503,6 +506,7 @@ def normalize_user_model_settings(settings: dict[str, Any] | None) -> dict[str, 
     # default rather than as one shared shape: absent means "never folded".
     clean["sketch_open"] = settings.get("sketch_open") is not False
     clean["ddl_expanded_open"] = settings.get("ddl_expanded_open") is True
+    clean["generation_info_follows_selection"] = settings.get("generation_info_follows_selection") is not False
     return clean
 
 
@@ -530,7 +534,7 @@ def update_user_model_settings(current: dict[str, Any] | None, patch: dict[str, 
         clean["color_catalog_id"] = _normalize_catalog_choice(patch.get("color_catalog_id"))
     if "ui_text_size" in patch:
         clean["ui_text_size"] = _normalize_ui_text_size(patch.get("ui_text_size"))
-    for key in ("sketch_open", "ddl_expanded_open"):
+    for key in ("sketch_open", "ddl_expanded_open", "generation_info_follows_selection"):
         if key in patch:
             clean[key] = bool(patch[key])
     return normalize_user_model_settings(clean)

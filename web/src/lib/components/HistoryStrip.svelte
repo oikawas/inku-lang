@@ -233,6 +233,7 @@
 					<div
 						class="thumb"
 						class:current={i === historyCursor}
+						data-selects-work
 						onclick={() => !interactionLocked && onLoadItem(it)}
 						onkeydown={(event) => handleThumbKeydown(event, it)}
 						role="button"

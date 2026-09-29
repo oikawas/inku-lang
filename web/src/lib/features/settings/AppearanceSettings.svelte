@@ -4,6 +4,7 @@
 	import NumberStepper from '$lib/components/NumberStepper.svelte';
 	import { batchSettings, BATCH_RETRY_MAX, BATCH_RETRY_MIN } from '$lib/features/batch/settings.svelte';
 	import { captionSettings } from '$lib/features/canvas/caption-settings.svelte';
+	import { generationInfoSettings } from '$lib/features/canvas/generation-info-settings.svelte';
 	import { textSizeSettings } from '$lib/features/appearance/text-size.svelte';
 	import { UI_VISIBILITY_KEYS, type UiCustomVisibility, type UiMode, type UiVisibilityKey } from '$lib/uiMode';
 	import { canAddHistoryStripField, HISTORY_STRIP_FIELDS, type HistoryStripField } from '$lib/historyStripFields';
@@ -156,6 +157,18 @@
 				</div>
 				{#if historyStripFieldsSaving}<div class="inline-message">{t().uiModeSaving}</div>{/if}
 				{#if historyStripFieldsSaveError}<div class="inline-message error-text">{t().historyStripFieldsSaveFailed}</div>{/if}
+			</div>
+			<div class="popover-group">
+				<div class="popover-group-label">{t().generationInfoFollowLabel}</div>
+				<div class="db-test-result">{t().generationInfoFollowDescription}</div>
+				<label class="setting-toggle">
+					<input
+						type="checkbox"
+						checked={generationInfoSettings.followsSelection}
+						onchange={(event) => generationInfoSettings.setFollowsSelection(event.currentTarget.checked)}
+					/>
+					<span>{t().generationInfoFollowToggle}</span>
+				</label>
 			</div>
 			<div class="popover-group">
 				<div class="popover-group-label">{t().settingsMascotLabel}</div>

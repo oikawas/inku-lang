@@ -32,6 +32,7 @@ export type UserModelSettings = {
 	color_catalog_id?: string;
 	sketch_open?: boolean;
 	ddl_expanded_open?: boolean;
+	generation_info_follows_selection?: boolean;
 };
 
 export type UserItem = {

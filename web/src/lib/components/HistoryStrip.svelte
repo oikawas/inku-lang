@@ -70,7 +70,7 @@
 		catalogName: (id: string | null | undefined) => string;
 		isJapanese: boolean;
 		developerMode: boolean;
-		/** Up to two, in the order they are declared. Empty means pictures only. */
+		/** Up to three, in the order they are declared. Empty means pictures only. */
 		historyStripFields: HistoryStripField[];
 	};
 

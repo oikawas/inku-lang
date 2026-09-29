@@ -27,6 +27,28 @@ export function formatHistoryStripEngineVersion(value: string | null | undefined
 	return `Ver.${version.replace(/^Ver\.\s*/i, '')}`;
 }
 
+/**
+ * The model as the strip prints it: the provider's first two characters, then
+ * the model's family and version, three characters each, separated by spaces.
+ *
+ * The family is the word just before the first number, so the Claude models
+ * stay apart ("Claude Sonnet 5" -> "Son 5", "Claude Opus 4.7" -> "Opu 4.7");
+ * the version is that first number. A name with no number prints its first
+ * word alone. The tooltip keeps the full name.
+ */
+export function abbreviateStripModel(owner: string, name: string): string {
+	const words = name
+		.trim()
+		.split(/[\s\-_/:]+/)
+		// "gemma4" is a family and a version run together.
+		.flatMap((word) => word.split(/(?<=[A-Za-z])(?=\d)/))
+		.filter(Boolean);
+	const at = words.findIndex((word) => /^\d/.test(word));
+	const family = at > 0 ? words[at - 1] : (words.find((word) => !/^\d/.test(word)) ?? '');
+	const version = at >= 0 ? words[at] : '';
+	return [owner.trim().slice(0, 2), family.slice(0, 3), version.slice(0, 3)].filter(Boolean).join(' ');
+}
+
 /** At most this many at once. Three lines is what the tile has room for. */
 export const HISTORY_STRIP_FIELD_LIMIT = 3;
 

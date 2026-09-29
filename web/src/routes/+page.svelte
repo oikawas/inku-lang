@@ -39,7 +39,7 @@
 	import PipelineStatus from '$lib/components/PipelineStatus.svelte';
 	import RunStatus from '$lib/components/RunStatus.svelte';
 	import Tooltip from '$lib/components/Tooltip.svelte';
-	import { toggleHistoryStripField, type HistoryStripField } from '$lib/historyStripFields';
+	import { abbreviateStripModel, toggleHistoryStripField, type HistoryStripField } from '$lib/historyStripFields';
 	import {
 		PROVIDER_GROUPS,
 		DEFAULT_PROVIDER,
@@ -2322,7 +2322,9 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 	}
 
 	function historyModelStage1Short(it: Iteration): string {
-		return it.stage1_model ? shortModel(it.stage1_model) : '-';
+		if (!it.stage1_model) return '-';
+		const { provider } = resolveModelRefForDisplay(it.stage1_model);
+		return abbreviateStripModel(providerLabel(provider), modelShortName(it.stage1_model));
 	}
 
 	function historyModelStage1Full(it: Iteration): string {

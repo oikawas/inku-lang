@@ -14,6 +14,7 @@ import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 
 import {
+	abbreviateStripModel,
 	canAddHistoryStripField,
 	DEFAULT_HISTORY_STRIP_FIELDS,
 	formatHistoryStripEngineVersion,
@@ -119,4 +120,19 @@ test('T-163  the file size is read from the server, not counted from what arrive
 	// And the listing really does withhold the picture, which is why.
 	const HISTORY_OWNER = readFileSync(new URL('./features/history/browsing-state.svelte.ts', import.meta.url), 'utf-8');
 	assert.match(HISTORY_OWNER, /include_svg: 'false'/);
+});
+
+test('the model is printed as provider (2), family (3) and version (3)', () => {
+	// The table the author chose on 2026-09-29.
+	const cases: [string, string, string][] = [
+		['Claude API (Cloud)', 'Claude Sonnet 5', 'Cl Son 5'],
+		['Claude API (Cloud)', 'Claude Opus 4.7', 'Cl Opu 4.7'],
+		['Claude API (Cloud)', 'Claude Haiku 4.5', 'Cl Hai 4.5'],
+		['Gemini API (Cloud)', 'Gemini 3.5 Flash-Lite', 'Ge Gem 3.5'],
+		['Gemini API (Cloud)', 'Gemma 4 31B Instruct', 'Ge Gem 4'],
+		['OpenAI API Platform', 'GPT-5.1 mini', 'Op GPT 5.1'],
+		['NVIDIA NIM (Cloud)', 'gemma-4-31b-it', 'NV gem 4'],
+		['Ollama Cloud (ollama.com)', 'gemma4:31b', 'Ol gem 4']
+	];
+	for (const [owner, name, expected] of cases) assert.equal(abbreviateStripModel(owner, name), expected, name);
 });

@@ -6,7 +6,7 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 60 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
-### 2026-09-29 — The history library's lineage page aggregates quickly
+### v2.15.59 — The history library's lineage page aggregates quickly (Build 1135, 2026-09-29)
 
 At the author's request. A page of 24 lineages took about 0.7 s, almost all of it three statements that aggregate every work by lineage (about 0.2 s each). SQLite stores a row's columns in order and an SVG overflows into a chain of pages, so reading `lineage_node_id`, which comes after the SVG, from every work walked each chain (as would `history_visibility` when not read from its index). Works and nodes are now joined through the node's `history_id`, and visibility is tested through a subquery of work ids. Checked read-only on the production database with the author's permission: the three statements fell from about 636 ms to about 36 ms, with the same total, the same lineages on the page and the same representatives.
 

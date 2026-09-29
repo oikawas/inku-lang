@@ -180,7 +180,8 @@ Canvas format is neither vocabulary nor a plugin. It is a resolved host option o
   "swaying violently" are excluded (§13 has the detail). English amplitude words may be written as
   adjectives (`fine`, `large`) or adverbs (`finely`, `largely`). Because
   amplitude `large` is spelled like the relative size `large`, use `largely`
-  when a size also appears in the same phrase (DDL 12)
+  when a size also appears in the same phrase (DDL 12). This spelling rule is
+  the current exception to one word, one meaning (§3.3)
 - **the relations category holds observable relations only**: "along" and "not
   touching" are positional relations an outside observer can verify. Words of
   intent or personification, such as "nestling against" or "answering each
@@ -364,6 +365,59 @@ and ratio from it.
 
 **The principle: do not pollute the core.**  Every concrete or culturally
 specific vocabulary is offered in a form that can be added as an extension.
+
+### 3.3 Vocabulary Principles
+
+Saijiki words and the grammar's modifiers are shared by the writer, the reader
+(Stage 1), the compiler, and the renderer. A word is added, moved, or changed
+under these principles (author's ruling, 2026-09-29).
+
+- **Draw what is written**: every word of the visible DDL is drawn as written.
+  The compiler, lowerer, and renderer never reread a word as another word or
+  value because of its pairing or its neighbors (for example, a surface given
+  faintness is not drawn as one without it). This is the same reason §8.4
+  stopped rereading a written position as a focal candidate.
+- **Correct a bias in the vocabulary**: when the reader's choices lean toward
+  particular words or pairings and narrow the range of expression, look for the
+  cause in the Saijiki's words, categories, and descriptions and in their
+  projection (the work plan vocabulary, the capability matrix, and the response
+  schema), and correct it there, not with a rendering adjustment and not with a
+  hidden dictionary outside the Saijiki. **The Saijiki is still never made a
+  characterless, neutral list**: a fully neutral vocabulary is artistically
+  meaningless, and the choice of a limited vocabulary is itself what gives the
+  works their world (§1.1).
+- **One word, one meaning**: each Saijiki word has exactly one meaning and is
+  never read differently by its place in a sentence or by the words around it.
+  This holds in Japanese and in English, and no word is shared with a grammar
+  modifier (thinness, size) in another sense. Ambiguity and wordplay belong to
+  the description (the poetic layer of §5.1); the reader resolves them into
+  single words of the visible DDL.
+- **A word sits in the category of its nature, and its name says its
+  meaning**: surfaces name techniques for a surface; movements name the shape
+  of a mark's sway.
+- **Carry a change through structure**: a word changes in its owner (the shared
+  Saijiki asset or the grammar's modifier table) and reaches the reader through
+  its projection into the work plan vocabulary, the capability matrix, and the
+  response schema. Changing only the instruction text is not a change of the
+  vocabulary.
+- **Raise the version and migrate**: a change to a word's form, meaning, or
+  category raises the Saijiki version (the asset id, currently
+  `inku.saijiki.v1`). A DDL document records the Saijiki version it was read
+  with (the field arrives with the next version; a document without it is read
+  as `inku.saijiki.v1`). Saved documents are read under their old version and
+  rewritten once, meaning by meaning, into the new version's words, never by
+  string replacement. Saved Scores and SVGs are not rewritten. Compatibility is
+  not kept by leaving old words as hidden aliases or by reading a word by its
+  place.
+
+**Current exceptions** (they change in the next Saijiki version):
+
+- English `large` names both a movement amplitude and a relative size (§3.1
+  writes the amplitude `largely` when a size appears in the same phrase).
+- The surfaces `dense` and `faint` are adjectives and `pale ink wash` is a
+  material; none of them is a technique for a surface.
+- The movements `slowly` and `quickly` set how many waves a sway has, not the
+  speed of the brush.
 
 ---
 

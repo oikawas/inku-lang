@@ -219,9 +219,19 @@ class HistorySearchService:
             if search:
                 query = query.filter(_history_search_clause(search))
             total: int = query.with_entities(func.count(HistoryRow.id)).scalar() or 0
-            rows = (
-                query.order_by(HistoryRow.at.desc(), HistoryRow.id.asc())
+            # Choose the page by id first, then read only its rows. Sorting whole
+            # rows made SQLite carry every readable work's columns (and the SVG
+            # length) through the sort: about 0.4 s for one work out of 4,169 on
+            # production, against 0.05 s for the same sort of ids alone.
+            page_ids = [
+                history_id for (history_id,) in query.with_entities(HistoryRow.id)
+                .order_by(HistoryRow.at.desc(), HistoryRow.id.asc())
                 .offset(offset)
                 .limit(limit)
+            ]
+            rows = (
+                session.query(HistoryRow)
+                .filter(HistoryRow.id.in_(page_ids))
+                .order_by(HistoryRow.at.desc(), HistoryRow.id.asc())
             )
             return self._project_rows(session, rows, actor, include_svg=include_svg), total

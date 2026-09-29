@@ -58,9 +58,22 @@ def _expected_list_items(
 
 
 class _Result:
-    def __init__(self, *, scalar=None, rows=()) -> None:
+    def __init__(self, *, scalar=None, rows=(), query=None) -> None:
         self._scalar = scalar
         self._rows = list(rows)
+        self._query = query
+
+    def order_by(self, *clauses):
+        self._query.order_by(*clauses)
+        return self
+
+    def offset(self, value: int):
+        self._query.offset(value)
+        return self
+
+    def limit(self, value: int):
+        self._query.limit(value)
+        return self
 
     def scalar(self):
         return self._scalar
@@ -76,6 +89,10 @@ class _HydrationQuery:
 
     def filter(self, *clauses):
         self.filters.extend(clauses)
+        return self
+
+    def order_by(self, *clauses):
+        self.ordering = clauses
         return self
 
     def all(self):
@@ -112,6 +129,9 @@ class _OrmQuery:
 
     def with_entities(self, *entities):
         assert entities
+        if entities == (HistoryRow.id,):
+            # The page is chosen by id; its rows are read afterwards.
+            return _Result(rows=[(row.id,) for row in self.rows], query=self)
         return _Result(scalar=self.total)
 
     def order_by(self, *clauses):
@@ -133,6 +153,8 @@ class _OrmQuery:
 class _OrmSession:
     def __init__(self, query: _OrmQuery) -> None:
         self.orm_query = query
+        self.hydration_query = _HydrationQuery(query.rows)
+        self.queries = 0
 
     def __enter__(self):
         return self
@@ -142,7 +164,8 @@ class _OrmSession:
 
     def query(self, model):
         assert model is HistoryRow
-        return self.orm_query
+        self.queries += 1
+        return self.orm_query if self.queries == 1 else self.hydration_query
 
 
 def _service(**overrides):
@@ -410,6 +433,11 @@ def test_orm_listing_preserves_visibility_filters_search_page_and_hydration() ->
     assert query.offset_value == 3
     assert query.limit_value == 8
     assert [_sql(clause) for clause in query.ordering] == ["history.at DESC", "history.id ASC"]
+    # Only the page's rows are read, in the page's order.
+    hydration = session.hydration_query
+    assert [_sql(clause) for clause in hydration.filters] == ["history.id IN (__[POSTCOMPILE_id_1])"]
+    assert hydration.filters[0].right.value == ["a", "b"]
+    assert [_sql(clause) for clause in hydration.ordering] == ["history.at DESC", "history.id ASC"]
 
     filters = [_sql(clause) for call in query.filter_calls for clause in call]
     assert _sql(visible) in filters

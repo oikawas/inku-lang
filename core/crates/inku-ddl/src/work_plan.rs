@@ -617,20 +617,6 @@ pub fn normalize_work_plan_with_plugins(
                 out.attributes.insert(slot, value);
             }
         }
-        if out.attribute(WorkPlanSlot::SurfaceIntensity).is_some()
-            && out.attribute(WorkPlanSlot::Surface) != Some("solid")
-        {
-            let value = out
-                .attributes
-                .remove(&WorkPlanSlot::SurfaceIntensity)
-                .unwrap_or_default();
-            note(
-                Some(index),
-                "surface_intensity",
-                value,
-                "requires_flat_surface",
-            );
-        }
         if out.action != "line_up"
             && let Some(value) = out.attributes.remove(&WorkPlanSlot::LineUpDirection)
         {
@@ -986,11 +972,6 @@ pub fn derive_work_plan_capabilities() -> WorkPlanCapabilities {
                         }
                         continue;
                     } else {
-                        if slot == WorkPlanSlot::SurfaceIntensity {
-                            layer
-                                .attributes
-                                .insert(WorkPlanSlot::Surface, "solid".to_owned());
-                        }
                         if matches!(
                             slot,
                             WorkPlanSlot::MotionAmplitude | WorkPlanSlot::MotionSpeed

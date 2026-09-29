@@ -192,16 +192,26 @@ fn surface_intensity_keeps_normal_bytes_and_rejects_unaccepted_texture_meanings(
         ));
         assert!(parsed.validate_schema_edition().is_ok());
     }
+    // A stroke, an outline, or a textured surface takes an intensity from 0.17.0.
     for instruction in [
         json!({"primitive":"line","filled":true,"surface_intensity":"dense"}),
         json!({"primitive":"circle","surface_intensity":"dense"}),
         json!({"primitive":"circle","filled":true,"surface":{"texture":"wash"},"surface_intensity":"dense"}),
     ] {
-        let parsed: Score = serde_json::from_value(json!({"instructions":[instruction]})).unwrap();
+        let parsed: Score = serde_json::from_value(
+            json!({"version":"0.16.0","instructions":[instruction.clone()]}),
+        )
+        .unwrap();
         assert_eq!(
             parsed.validate_schema_edition(),
-            Err("surface_intensity requires a closed solid fill")
+            Err(
+                "surface_intensity on a stroke or a textured surface requires Score version 0.17.0"
+            )
         );
+        let current: Score =
+            serde_json::from_value(json!({"version":"0.17.0","instructions":[instruction]}))
+                .unwrap();
+        assert_eq!(current.validate_schema_edition(), Ok(()));
     }
     assert!(
         serde_json::from_str::<Score>(

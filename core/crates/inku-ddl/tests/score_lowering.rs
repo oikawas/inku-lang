@@ -2609,7 +2609,9 @@ fn named_surface_texture_is_the_area_performance_without_a_hidden_flat_base() {
 }
 
 #[test]
-fn ordinary_non_solid_surface_intensity_omits_only_that_field_and_keeps_quality() {
+fn ordinary_non_solid_surface_intensity_reaches_the_score_and_keeps_quality() {
+    // Before Score 0.17.0 the intensity of a textured surface was omitted;
+    // now it reaches the mark beside its surface quality.
     let result = stage15(
         "place one red grain dense circle at center.",
         ResolvedInstructionLanguage::En,
@@ -2626,42 +2628,25 @@ fn ordinary_non_solid_surface_intensity_omits_only_that_field_and_keeps_quality(
         ScoreErrorPolicy::OmitAndContinue,
     );
 
-    // Legacy Stop input uses the same local recovery as OmitAndContinue.
     assert_eq!(stop.error_policy(), ScoreErrorPolicy::Stop);
     assert_eq!(stop.outcome(), continued.outcome());
     assert_eq!(stop.score(), continued.score());
-    assert_eq!(
-        continued.outcome(),
-        ScoreLoweringOutcome::CompleteWithOmissions
+    assert_eq!(continued.outcome(), ScoreLoweringOutcome::Complete);
+    assert!(
+        continued.diagnostics().is_empty(),
+        "{:?}",
+        continued.diagnostics()
     );
-    assert!(!continued.score().unwrap().instructions[0].filled);
+    let score = continued.score().unwrap();
+    let mark = &score.instructions[0];
+    assert!(!mark.filled);
     assert_eq!(
-        continued.score().unwrap().instructions[0]
-            .surface
-            .as_ref()
-            .unwrap()
-            .texture,
+        mark.surface.as_ref().unwrap().texture,
         SurfaceTexture::Grain
     );
-    assert!(matches!(
-        continued.diagnostics(),
-        [inku_ddl::ScoreLoweringDiagnostic {
-            owner: ScoreDiagnosticOwner::SourceInstruction {
-                instruction_index: 0,
-                field: Some(ScoreAppearanceField::SurfaceIntensity),
-                spans,
-            },
-            disposition: ScoreDiagnosticDisposition::Omitted {
-                unit: ScoreOmissionUnit::AppearanceField {
-                    field: ScoreAppearanceField::SurfaceIntensity
-                },
-                appearance_resolution: Some(
-                    ScoreAppearanceResolution::PreserveExplicitSurfaceQuality
-                ),
-            },
-            ..
-        }] if spans.len() == 1
-    ));
+    assert_eq!(mark.surface_intensity, inku_score::SurfaceIntensity::Dense);
+    assert_eq!(score.version, "0.17.0");
+    assert!(score.validate_schema_edition().is_ok());
 }
 
 #[test]
@@ -2706,16 +2691,32 @@ fn surface_intensity_reaches_direct_and_macro_scores_with_owned_provenance() {
             ]
         ));
     }
+    // A stroke and a point take the stated intensity too (Score 0.17.0 for a
+    // mark that is not a closed flat fill).
     for shape in ["line", "point"] {
         let transformed = stage15(
             &format!("place one red dense {shape} at center."),
             ResolvedInstructionLanguage::En,
         );
         let result = lower_verified_stage15_score(transformed.verified_effective_view(), context);
-        assert!(result.diagnostics().iter().any(|diagnostic| matches!(
-            diagnostic.reason,
-            ScoreFieldGap::UnsupportedSurfaceIntensity { .. }
-        )));
+        assert!(
+            !result.diagnostics().iter().any(|diagnostic| matches!(
+                diagnostic.reason,
+                ScoreFieldGap::UnsupportedSurfaceIntensity { .. }
+            )),
+            "{shape}: {:?}",
+            result.diagnostics()
+        );
+        let score = result.score().unwrap();
+        let mark = &score.instructions[0];
+        assert_eq!(mark.surface_intensity, inku_score::SurfaceIntensity::Dense);
+        assert_eq!(
+            score.version == "0.17.0",
+            !mark.is_closed_solid_fill(),
+            "{shape}: {}",
+            score.version
+        );
+        assert!(score.validate_schema_edition().is_ok(), "{shape}");
     }
 }
 

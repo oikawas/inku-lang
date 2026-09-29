@@ -621,10 +621,11 @@ pub enum ScoreEdition {
     V0_14,
     V0_15,
     V0_16,
+    V0_17,
 }
 
 impl ScoreEdition {
-    pub const ALL: [Self; 16] = [
+    pub const ALL: [Self; 17] = [
         Self::V0_1,
         Self::V0_2,
         Self::V0_3,
@@ -641,6 +642,7 @@ impl ScoreEdition {
         Self::V0_14,
         Self::V0_15,
         Self::V0_16,
+        Self::V0_17,
     ];
 
     /// The edition a version string names.
@@ -670,6 +672,7 @@ impl ScoreEdition {
             Self::V0_14 => "0.14.0",
             Self::V0_15 => "0.15.0",
             Self::V0_16 => "0.16.0",
+            Self::V0_17 => "0.17.0",
         }
     }
 }
@@ -1093,6 +1096,36 @@ pub struct Instruction {
     pub thinness: Option<Thinness>,
     #[serde(default)]
     pub surface: Option<SurfaceSpec>,
+}
+
+impl Instruction {
+    /// Whether the mark fills a closed shape flat. Before Score 0.17.0 a
+    /// stated intensity could reach no other mark.
+    #[must_use]
+    pub fn is_closed_solid_fill(&self) -> bool {
+        let closed = matches!(
+            self.primitive,
+            Primitive::Circle
+                | Primitive::Ellipse
+                | Primitive::Square
+                | Primitive::Triangle
+                | Primitive::Polygon
+                | Primitive::Cloudform
+                | Primitive::Point
+        ) || self.arc_form == Some(ArcForm::Crescent);
+        let solid = self.surface.as_ref().is_none_or(|surface| {
+            matches!(
+                surface.texture,
+                SurfaceTexture::None | SurfaceTexture::Solid
+            )
+        });
+        let filled = self.filled
+            || self
+                .surface
+                .as_ref()
+                .is_some_and(|surface| surface.texture == SurfaceTexture::Solid);
+        closed && solid && filled
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -2427,29 +2460,12 @@ impl Score {
                 if !self.edition_at_least(ScoreEdition::V0_3) {
                     return Err("surface_intensity requires Score version 0.3.0");
                 }
-                let closed = matches!(
-                    instruction.primitive,
-                    Primitive::Circle
-                        | Primitive::Ellipse
-                        | Primitive::Square
-                        | Primitive::Triangle
-                        | Primitive::Polygon
-                        | Primitive::Cloudform
-                        | Primitive::Point
-                ) || instruction.arc_form == Some(ArcForm::Crescent);
-                let solid = instruction.surface.as_ref().is_none_or(|surface| {
-                    matches!(
-                        surface.texture,
-                        SurfaceTexture::None | SurfaceTexture::Solid
-                    )
-                });
-                let filled = instruction.filled
-                    || instruction
-                        .surface
-                        .as_ref()
-                        .is_some_and(|surface| surface.texture == SurfaceTexture::Solid);
-                if !closed || !solid || !filled {
-                    return Err("surface_intensity requires a closed solid fill");
+                if !instruction.is_closed_solid_fill()
+                    && !self.edition_at_least(ScoreEdition::V0_17)
+                {
+                    return Err(
+                        "surface_intensity on a stroke or a textured surface requires Score version 0.17.0",
+                    );
                 }
             }
             if instruction.ink_spread.is_some() && !self.edition_at_least(ScoreEdition::V0_12) {

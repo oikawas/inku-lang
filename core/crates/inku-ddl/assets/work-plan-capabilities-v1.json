@@ -78,7 +78,10 @@
         "crosshatch",
         "aquatint"
       ],
-      "surface_intensity": [],
+      "surface_intensity": [
+        "dense",
+        "faint"
+      ],
       "angle": [
         "horizontal",
         "vertical",
@@ -278,7 +281,10 @@
         "crosshatch",
         "aquatint"
       ],
-      "surface_intensity": [],
+      "surface_intensity": [
+        "dense",
+        "faint"
+      ],
       "angle": [
         "horizontal",
         "vertical",
@@ -375,7 +381,10 @@
         "crosshatch",
         "aquatint"
       ],
-      "surface_intensity": [],
+      "surface_intensity": [
+        "dense",
+        "faint"
+      ],
       "angle": [
         "horizontal",
         "vertical",
@@ -482,7 +491,10 @@
         "crosshatch",
         "aquatint"
       ],
-      "surface_intensity": [],
+      "surface_intensity": [
+        "dense",
+        "faint"
+      ],
       "angle": [
         "horizontal",
         "vertical",
@@ -589,7 +601,10 @@
         "crosshatch",
         "aquatint"
       ],
-      "surface_intensity": [],
+      "surface_intensity": [
+        "dense",
+        "faint"
+      ],
       "angle": [
         "horizontal",
         "vertical",
@@ -696,7 +711,10 @@
         "crosshatch",
         "aquatint"
       ],
-      "surface_intensity": [],
+      "surface_intensity": [
+        "dense",
+        "faint"
+      ],
       "angle": [
         "horizontal",
         "vertical",
@@ -2160,7 +2178,10 @@
         "crosshatch",
         "aquatint"
       ],
-      "surface_intensity": [],
+      "surface_intensity": [
+        "dense",
+        "faint"
+      ],
       "angle": [
         "horizontal",
         "vertical",
@@ -2257,7 +2278,10 @@
         "crosshatch",
         "aquatint"
       ],
-      "surface_intensity": [],
+      "surface_intensity": [
+        "dense",
+        "faint"
+      ],
       "angle": [
         "horizontal",
         "vertical",
@@ -2354,7 +2378,10 @@
         "crosshatch",
         "aquatint"
       ],
-      "surface_intensity": [],
+      "surface_intensity": [
+        "dense",
+        "faint"
+      ],
       "angle": [
         "horizontal",
         "vertical",
@@ -2451,7 +2478,10 @@
         "dash_dot"
       ],
       "surface": [],
-      "surface_intensity": [],
+      "surface_intensity": [
+        "dense",
+        "faint"
+      ],
       "angle": [],
       "line_up_direction": [
         "horizontal",
@@ -2522,7 +2552,10 @@
         "dash_dot"
       ],
       "surface": [],
-      "surface_intensity": [],
+      "surface_intensity": [
+        "dense",
+        "faint"
+      ],
       "angle": [],
       "line_up_direction": [
         "horizontal",
@@ -2593,7 +2626,10 @@
         "dash_dot"
       ],
       "surface": [],
-      "surface_intensity": [],
+      "surface_intensity": [
+        "dense",
+        "faint"
+      ],
       "angle": [],
       "line_up_direction": [
         "horizontal",

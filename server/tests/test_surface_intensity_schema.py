@@ -45,12 +45,20 @@ def test_surface_intensity_wire_defaults_and_supported_fill_domain() -> None:
     assert list(Instruction.model_fields)[-2:] == ["thinness", "surface"]
     assert Instruction(primitive="point", filled=True, surface_intensity="dense").surface_intensity == "dense"
     assert Instruction(primitive="circle", surface={"texture": "solid"}, surface_intensity="faint").surface_intensity == "faint"
+    # A stroke, an outline, or a textured surface takes an intensity from 0.17.0.
     for instruction in (
         {"primitive": "line", "filled": True},
         {"primitive": "circle"},
         {"primitive": "circle", "filled": True, "surface": {"texture": "wash"}},
     ):
-        with pytest.raises(ValidationError, match="surface_intensity requires a closed solid fill"):
-            Instruction.model_validate({**instruction, "surface_intensity": "dense"})
+        marked = {**instruction, "surface_intensity": "dense"}
+        assert Instruction.model_validate(marked).surface_intensity == "dense"
+        with pytest.raises(
+            ValidationError,
+            match="surface_intensity on a stroke or a textured surface requires Score version 0.17.0",
+        ):
+            Score.model_validate({"version": "0.16.0", "instructions": [marked]})
+        current = Score.model_validate({"version": "0.17.0", "instructions": [marked]})
+        assert current.instructions[0].surface_intensity == "dense"
     with pytest.raises(ValidationError):
         Instruction(primitive="circle", filled=True, surface_intensity="unknown")

@@ -551,7 +551,12 @@ fn stage1_background_with_surface_in_color_slot_keeps_local_diagnostics_and_draw
             .recipe,
         ResolvedPlacementRecipe::ScatterUniformWithCentroidTranslation
     );
-    assert!(result.downstream_diagnostics().iter().any(|diagnostic| {
+    // The faint wavy brush line keeps its stated intensity (Score 0.17.0).
+    assert_eq!(
+        score.instructions[0].surface_intensity,
+        inku_score::SurfaceIntensity::Faint
+    );
+    assert!(!result.downstream_diagnostics().iter().any(|diagnostic| {
         matches!(
             diagnostic.reason,
             ScoreFieldGap::UnsupportedSurfaceIntensity { .. }

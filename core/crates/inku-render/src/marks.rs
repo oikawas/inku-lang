@@ -23,7 +23,7 @@ use crate::support::Support;
 use crate::svg::{Element, format_number};
 use crate::types::{
     CRESCENT_REFERENCE_CUBICS, CanvasSize, CarveDepth, Instruction, LineStyle, Point, Primitive,
-    Seed, SurfaceTexture, SvgProfile, Thinness, Weight, crescent_transform_point,
+    Seed, SurfaceIntensity, SurfaceTexture, SvgProfile, Thinness, Weight, crescent_transform_point,
 };
 
 pub(crate) const MIN_STROKE_WIDTH: f64 = 0.5;
@@ -284,6 +284,21 @@ pub(crate) fn weight_opacity(weight: Weight) -> f64 {
     }
 }
 
+/// The factor a stated intensity gives the opacity of a stroke or a textured
+/// surface. A flat fill keeps its own table per tool (`accepted_fills`).
+pub(crate) const fn intensity_factor(intensity: SurfaceIntensity) -> f64 {
+    match intensity {
+        SurfaceIntensity::Normal => 1.0,
+        SurfaceIntensity::Dense => 1.35,
+        SurfaceIntensity::Faint => 0.55,
+    }
+}
+
+/// An opacity scaled by an intensity factor, opaque at most, to six places.
+fn scaled_opacity(opacity: f64, factor: f64) -> f64 {
+    ((opacity * factor).min(1.0) * 1_000_000.0).round() / 1_000_000.0
+}
+
 pub(crate) fn weight_linecap(weight: Weight) -> &'static str {
     match weight {
         Weight::Silverpoint => "butt",
@@ -331,7 +346,7 @@ pub(crate) fn mark_style(instruction: &Instruction, context: MarkContext<'_>) ->
         context.color_map,
         context.work_assignment,
     );
-    let (mut stroke_opacity, fill_opacity) = crate::effects::effect_opacity(
+    let (mut stroke_opacity, mut fill_opacity) = crate::effects::effect_opacity(
         crate::effects::HintWords::read(instruction.color_hint.as_deref()),
         context.effects,
         weight_opacity(instruction.weight),
@@ -339,6 +354,13 @@ pub(crate) fn mark_style(instruction: &Instruction, context: MarkContext<'_>) ->
     );
     if is_wash_mark(instruction) {
         stroke_opacity = (stroke_opacity * 0.35 * 1_000_000.0).round() / 1_000_000.0;
+    }
+    if instruction.surface_intensity != SurfaceIntensity::Normal
+        && !instruction.is_closed_solid_fill()
+    {
+        let factor = intensity_factor(instruction.surface_intensity);
+        stroke_opacity = scaled_opacity(stroke_opacity, factor);
+        fill_opacity = fill_opacity.map(|opacity| scaled_opacity(opacity, factor));
     }
     if instruction.mode_ == crate::types::InstructionMode::Carve {
         let (carve_color, opacity) = match instruction.carve_depth.unwrap_or(CarveDepth::Half) {

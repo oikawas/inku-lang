@@ -80,12 +80,7 @@ fn random_layer(rng: &mut SplitMix) -> WorkPlanLayer {
             }
         }
     }
-    if layer
-        .attributes
-        .get(&WorkPlanSlot::Surface)
-        .map(String::as_str)
-        == Some("solid")
-        && rng.chance(30)
+    if rng.chance(30)
         && let Some(value) = rng.pick(&slots[&WorkPlanSlot::SurfaceIntensity])
     {
         layer

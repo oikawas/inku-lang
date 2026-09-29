@@ -3362,6 +3362,11 @@ fn lower_verified_stage15_shared<'a>(
     };
     let score = (objects.is_none() && outcome != ScoreLoweringOutcome::Stopped).then(|| Score {
         version: if instructions.iter().any(|instruction| {
+            instruction.surface_intensity != SurfaceIntensity::Normal
+                && !instruction.is_closed_solid_fill()
+        }) {
+            inku_score::ScoreEdition::V0_17.as_str().to_owned()
+        } else if instructions.iter().any(|instruction| {
             matches!(
                 instruction.thinness,
                 Some(Thinness::Thick | Thinness::ExtraThick)
@@ -5867,11 +5872,7 @@ fn resolve_complete_object<'a>(
     let surface_intensity = match input.surface_intensity {
         None => SurfaceIntensity::Normal,
         Some(identity)
-            if identity.category == "surface"
-                && filled
-                && surface.is_none()
-                && primitive != Primitive::Point
-                && matches!(identity.id, "dense" | "faint") =>
+            if identity.category == "surface" && matches!(identity.id, "dense" | "faint") =>
         {
             if identity.id == "dense" {
                 SurfaceIntensity::Dense

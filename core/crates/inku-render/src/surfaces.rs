@@ -8,7 +8,7 @@ use crate::determinism::{hash_to_unit, hash01, seed_salt_index_digest};
 use crate::geometry::{centerline_normals, points_center, stroke_sample_count};
 use crate::mark_geometry::MarkGeometry;
 use crate::mark_paths::{contour_stroke_path, grid_step, rotate, uses_hand_stroke};
-use crate::marks::{MarkContext, mark_width, reaches_canvas};
+use crate::marks::{MarkContext, intensity_factor, mark_width, reaches_canvas};
 use crate::materials::with_texture_filter;
 use crate::palette::resolve_color;
 use crate::stroke::{ContourStrokeRequest, StrokeTerminal, synthesize_contour};
@@ -340,7 +340,7 @@ fn render_vectors(
         return;
     };
     let color = surface_color(instruction, context);
-    let opacity = surface.opacity.min(0.75);
+    let opacity = (surface.opacity * intensity_factor(instruction.surface_intensity)).min(0.75);
     let density = surface.density.max(0.02);
     let scale = surface.scale.max(0.04);
     let area_factor = ((width * height) / (context.canvas.unit().powi(2) * 0.18)).clamp(0.2, 1.8);
@@ -608,7 +608,7 @@ pub(crate) fn render_surface(
             context,
             seed,
             &color,
-            surface.opacity.min(0.75),
+            (surface.opacity * intensity_factor(instruction.surface_intensity)).min(0.75),
             &pattern_id,
         ));
         group.push(

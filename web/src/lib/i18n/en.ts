@@ -510,7 +510,6 @@ export const en: LangPack = {
 	canvasPresentationTitle: 'Presentation mode',
 	canvasPresentationControls: 'Presentation controls',
 	selectionNotePrompt: 'Why this one? (optional)',
-	selectionNoteLabel: 'Choice',
 	historyFilterLabel: 'Filters',
 	starOn: 'Remove star',
 	starOff: 'Add star',

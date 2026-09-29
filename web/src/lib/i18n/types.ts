@@ -465,7 +465,6 @@ export interface LangPack {
 	starOn: string;
 	starOff: string;
 	selectionNotePrompt: string;
-	selectionNoteLabel: string;
 	historyFilterLabel: string;
 	historyStarredOnly: string;
 	historyForRevisionOnly: string;

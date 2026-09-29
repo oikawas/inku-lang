@@ -1114,7 +1114,7 @@
 							{#if it.display_label}<span class="history-display-label">{it.display_label}</span>{/if}
 							<HistoryDescription text={historyListDescription(it.source_text ?? it.input)} className="thumb-description" />
 							{@render shareStatus(it)}
-							{#if it.note}<div class="thumb-note"><span>{t().selectionNoteLabel}</span>{it.note}</div>{/if}
+							{#if it.note}<div class="thumb-note"><span>{t().historyPreviewCommentLabel}</span>{it.note}</div>{/if}
 							<div class="thumb-action-row">
 								<button
 									class="hash-row-star"

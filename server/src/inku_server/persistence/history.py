@@ -345,25 +345,35 @@ class HistoryLineageGroupReader:
             root = session.get(LineageNodeRow, root_node_id)
             if root is None or (root.root_node_id or root.id) != root_node_id:
                 return [], 0
+            # The members' nodes first, then their works by the unique
+            # lineage_node_id index. The same test as the coalesce
+            # list_lineage_groups groups by, not a bare ==: the root_node_id
+            # column was added by migration without a backfill, so a root node
+            # created before it holds NULL and would not match its own id. Such
+            # a lineage counted its own root in the group aggregate but dropped
+            # it from the member list. Asked as one join, production's SQLite
+            # (3.37, no statistics) walked every visible work instead and took
+            # about 0.45 s for any lineage, even one of a single work.
+            member_node_ids = [
+                node_id for (node_id,) in session.query(LineageNodeRow.id).filter(
+                    or_(
+                        LineageNodeRow.root_node_id == root_node_id,
+                        and_(LineageNodeRow.root_node_id.is_(None), LineageNodeRow.id == root_node_id),
+                    )
+                )
+            ]
             query = (
                 session.query(HistoryRow)
                 .join(LineageNodeRow, LineageNodeRow.id == HistoryRow.lineage_node_id)
                 .filter(
                     access._readable_by(actor, HistoryRow.user_id, HistoryRow.id),
                     access._readable_node(actor),
-                    # The same test as the coalesce list_lineage_groups groups by, not a
-                    # bare ==: the root_node_id column was added by migration without a
-                    # backfill, so a root node created before it holds NULL and would not
-                    # match its own id. Such a lineage counted its own root in the group
-                    # aggregate but dropped it from the member list. Spelled out so the
-                    # node indexes find the members: the coalesce made SQLite read every
-                    # work (0.5 s for a lineage of 19 on production).
-                    or_(
-                        LineageNodeRow.root_node_id == root_node_id,
-                        and_(LineageNodeRow.root_node_id.is_(None), LineageNodeRow.id == root_node_id),
-                    ),
+                    HistoryRow.lineage_node_id.in_(member_node_ids),
                     HistoryRow.trashed == (1 if trashed else 0),
-                    HistoryRow.history_visibility == "normal",
+                    # Not a bare == (the column is NOT NULL, so the same test): with
+                    # no statistics SQLite 3.37 takes the visibility index for the
+                    # likelier path and walks every visible work again.
+                    func.coalesce(HistoryRow.history_visibility, "") == "normal",
                 )
             )
             if starred:

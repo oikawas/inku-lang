@@ -6,6 +6,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 55 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-29 — The history library opens a lineage quickly on production's SQLite too
+
+At the author's request, following v2.15.54. That release spelled the root test so the indexes could answer it, yet on Pentala even a one-work lineage still took about 0.45 s. A read-only look at the production database, with the author's permission, found SQLite 3.37.2 with no statistics (`sqlite_stat1`) choosing the visibility index and reading every work (215 ms for the count, 216 ms for the page). The lineage's node ids are now gathered first, the works are found through the unique `lineage_node_id` index, and the visibility test is written so it offers no index (a `coalesce`; the column is NOT NULL, so the test is the same). On SQLite 3.37.2, as on Pentala, an empty database with the same definitions plans through `ix_history_lineage_node_id`.
+
 ### v2.15.54 — The history library opens a lineage quickly and sends its cards no SVG (Build 1130, 2026-09-29)
 
 At the author's request, following the slow history listing. On Pentala opening a lineage of 19 works took about 0.5 s, and a page of 24 lineages about 1.0 s and 3.4 MB.

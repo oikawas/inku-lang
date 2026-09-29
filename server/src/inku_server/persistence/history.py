@@ -227,14 +227,23 @@ class HistoryLineageGroupReader:
         """
         actor = self.actor_of_fn(user_id)
         with self.session_factory() as session:
+            # Joined through the node's history_id and filtered through the ids
+            # the visibility index names, so no work's row is read past its SVG.
+            # SQLite keeps a row in order and an SVG overflows into a chain of
+            # pages: reading lineage_node_id or history_visibility from every
+            # work walked each chain, about 0.2 s per statement (three of them)
+            # on production, against 17 ms this way for the same aggregates.
+            listed = select(HistoryRow.id).where(
+                HistoryRow.trashed == (1 if trashed else 0),
+                HistoryRow.history_visibility == "normal",
+            )
             query = (
                 session.query(HistoryRow)
-                .join(LineageNodeRow, LineageNodeRow.id == HistoryRow.lineage_node_id)
+                .join(LineageNodeRow, LineageNodeRow.history_id == HistoryRow.id)
                 .filter(
                     access._readable_by(actor, HistoryRow.user_id, HistoryRow.id),
                     access._readable_node(actor),
-                    HistoryRow.trashed == (1 if trashed else 0),
-                    HistoryRow.history_visibility == "normal",
+                    HistoryRow.id.in_(listed),
                 )
             )
             if starred:

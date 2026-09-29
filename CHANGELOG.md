@@ -4,7 +4,11 @@
 
 This file records changes chronologically. If a historical note conflicts with the current specification, the current specification wins. The more detailed canonical history is maintained in Japanese in [CHANGELOG.ja.md](CHANGELOG.ja.md).
 
-**This file holds the 67 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
+**This file holds the 68 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
+
+### v2.15.67 — Show the attention reason only when a run has stopped (Build 1143, 2026-09-30)
+
+Saving a Stage 1 result no longer displays the request to check the result. A reason is shown only when the run has stopped for an author edit (`needs_user_edit`) or a failure (`failed`). Pipeline status and API error messages use the same check.
 
 ### v2.15.66 — Remove the work comment from the history-strip tooltip (Build 1142, 2026-09-29)
 

@@ -4,9 +4,9 @@
 
 This file records changes chronologically. If a historical note conflicts with the current specification, the current specification wins. The more detailed canonical history is maintained in Japanese in [CHANGELOG.ja.md](CHANGELOG.ja.md).
 
-**This file holds the 54 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
+**This file holds the 55 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
-### 2026-09-29 — The history library opens a lineage quickly and sends its cards no SVG
+### v2.15.54 — The history library opens a lineage quickly and sends its cards no SVG (Build 1130, 2026-09-29)
 
 At the author's request, following the slow history listing. On Pentala opening a lineage of 19 works took about 0.5 s, and a page of 24 lineages about 1.0 s and 3.4 MB.
 

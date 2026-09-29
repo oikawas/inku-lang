@@ -4,7 +4,13 @@
 
 This file records changes chronologically. If a historical note conflicts with the current specification, the current specification wins. The more detailed canonical history is maintained in Japanese in [CHANGELOG.ja.md](CHANGELOG.ja.md).
 
-**This file holds the 68 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
+**This file holds the 69 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
+
+### v2.15.68 — Copy the canvas work to the clipboard as an image (Build 1144, 2026-09-30)
+
+A new canvas button copies the displayed work as a PNG for pasting into another application. Settings > Export > Clipboard selects the picture alone or the card, and a height of 256–4096px (1080px by default). The card uses a saved work. The button explains when the browser or connection does not support image copying.
+
+The card export API accepts an optional height and keeps its existing 1080px output when omitted. PNG downloads share the copy operation's rasterizer while retaining their existing output.
 
 ### v2.15.67 — Show the attention reason only when a run has stopped (Build 1143, 2026-09-30)
 

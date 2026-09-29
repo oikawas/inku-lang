@@ -4,7 +4,11 @@
 
 This file records changes chronologically. If a historical note conflicts with the current specification, the current specification wins. The more detailed canonical history is maintained in Japanese in [CHANGELOG.ja.md](CHANGELOG.ja.md).
 
-**This file holds the 62 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
+**This file holds the 63 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
+
+### v2.15.62 — Show up to three facts under each history thumbnail (Build 1138, 2026-09-29)
+
+The history strip can now show up to three facts under each thumbnail, instead of two, in 10px type instead of 12px. The choices are generation, model, engine version and file size. The description under Settings > Display reflects the new limit. The current-work badge sits on the picture so it does not overlap the facts.
 
 ### v2.15.61 — The provenance drawer follows a work chosen from the history strip (Build 1137, 2026-09-29)
 

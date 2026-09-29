@@ -4,7 +4,11 @@
 
 This file records changes chronologically. If a historical note conflicts with the current specification, the current specification wins. The more detailed canonical history is maintained in Japanese in [CHANGELOG.ja.md](CHANGELOG.ja.md).
 
-**This file holds the 63 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
+**This file holds the 64 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
+
+### v2.15.63 — Abbreviate model names under history thumbnails (Build 1139, 2026-09-29)
+
+The model name under a thumbnail now shows the provider's first two characters, the model family's first three and the version's first three (for example, `Cl Son 5` and `Ge Gem 3.5`). The family is the word immediately before the first number in the display name. The tooltip keeps the full name.
 
 ### v2.15.62 — Show up to three facts under each history thumbnail (Build 1138, 2026-09-29)
 

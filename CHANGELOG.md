@@ -4,9 +4,9 @@
 
 This file records changes chronologically. If a historical note conflicts with the current specification, the current specification wins. The more detailed canonical history is maintained in Japanese in [CHANGELOG.ja.md](CHANGELOG.ja.md).
 
-**This file holds the 56 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
+**This file holds the 57 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
-### 2026-09-29 — The server refreshes SQLite's statistics at every start
+### v2.15.56 — The server refreshes SQLite's statistics at every start (Build 1132, 2026-09-29)
 
 At the author's request. Pentala's database had no SQLite statistics (`sqlite_stat1`), so SQLite 3.37 guessed how narrow each index was, and opening a lineage in the history library chose the visibility index and read every work. The server now runs `ANALYZE` at every start, keeping the statistics current as works are added: about 0.1 s the first time on a local synthetic database of 4,200 works, about 0.03 s after. When the statistics cannot be written (the database is locked, say) the server logs a warning and starts anyway. The statistics table starts with `sqlite_` and stays outside the schema check.
 

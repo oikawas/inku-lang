@@ -1380,7 +1380,9 @@ fn stage1_returns_the_layers_drawn_only_in_the_background_colour() {
         action.payload["prompt"]["system"]
             .as_str()
             .unwrap()
-            .contains("choose again a background color those marks can be told from")
+            .contains(
+                "choose again a background color that every mark of the plan can be told from"
+            )
     );
 
     let state = ground_answer(&state, answered).snapshot;

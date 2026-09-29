@@ -4,7 +4,11 @@
 
 This file records changes chronologically. If a historical note conflicts with the current specification, the current specification wins. The more detailed canonical history is maintained in Japanese in [CHANGELOG.ja.md](CHANGELOG.ja.md).
 
-**This file holds the 66 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
+**This file holds the 67 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
+
+### v2.15.66 — Remove the work comment from the history-strip tooltip (Build 1142, 2026-09-29)
+
+The tooltip over a history-strip thumbnail no longer includes the work's comment. The library card, preview and lineage panel continue to show it.
 
 ### v2.15.65 — Use one label for a work's comment (Build 1141, 2026-09-29)
 

@@ -252,7 +252,6 @@
 							{#if it.description_locked}<div class="tooltip-row"><span>{t().inputSectionLabel}</span><strong>{t().descriptionLockedMark}</strong></div>{/if}
 							<div class="tooltip-row"><span>{t().historyTooltipColorCatalog}</span><strong>{catalogName(it.catalog_id)}</strong></div>
 							<div class="tooltip-row"><span>Render</span><strong>{it.render_engine_version || t().historyVersionNotRecorded}</strong></div>
-							{#if it.note}<div class="tooltip-note"><span>{t().historyPreviewCommentLabel}</span>{it.note}</div>{/if}
 						</div>
 						<!-- The badge sits on the picture, so a taller meta row under it
 						     cannot cover the badge or be covered by it. -->

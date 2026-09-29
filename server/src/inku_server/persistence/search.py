@@ -223,9 +223,13 @@ class HistorySearchService:
             # rows made SQLite carry every readable work's columns (and the SVG
             # length) through the sort: about 0.4 s for one work out of 4,169 on
             # production, against 0.05 s for the same sort of ids alone.
+            # `at + 0`, the same order, so the `at` index is not taken for it:
+            # with statistics SQLite 3.37 walked that index and read each row to
+            # test its filters, 0.2 s for a page 3,000 works back on production,
+            # where sorting the filtered ids takes 4 ms for any page.
             page_ids = [
                 history_id for (history_id,) in query.with_entities(HistoryRow.id)
-                .order_by(HistoryRow.at.desc(), HistoryRow.id.asc())
+                .order_by((HistoryRow.at + 0).desc(), HistoryRow.id.asc())
                 .offset(offset)
                 .limit(limit)
             ]

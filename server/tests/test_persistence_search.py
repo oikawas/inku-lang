@@ -432,7 +432,8 @@ def test_orm_listing_preserves_visibility_filters_search_page_and_hydration() ->
     assert hydration_calls == [(session, rows, actor)]
     assert query.offset_value == 3
     assert query.limit_value == 8
-    assert [_sql(clause) for clause in query.ordering] == ["history.at DESC", "history.id ASC"]
+    # The page's ids are sorted without the `at` index; the rows keep the plain order.
+    assert [_sql(clause) for clause in query.ordering] == ["history.at + :at_1 DESC", "history.id ASC"]
     # Only the page's rows are read, in the page's order.
     hydration = session.hydration_query
     assert [_sql(clause) for clause in hydration.filters] == ["history.id IN (__[POSTCOMPILE_id_1])"]

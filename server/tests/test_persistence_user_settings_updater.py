@@ -149,7 +149,7 @@ def test_user_settings_preserves_validation_before_write() -> None:
         ({"settings_tab": "unknown"}, "invalid settings tab"),
         ({"history_strip_fields": "bytes"}, "invalid history strip fields"),
         ({"history_strip_fields": ["bytes", "bytes"]}, "invalid history strip fields"),
-        ({"history_strip_fields": ["generation", "model", "bytes"]}, "invalid history strip fields"),
+        ({"history_strip_fields": ["generation", "model", "engine_version", "bytes"]}, "invalid history strip fields"),
     )
     for kwargs, message in cases:
         session = _Session(row)

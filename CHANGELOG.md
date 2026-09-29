@@ -4,9 +4,9 @@
 
 This file records changes chronologically. If a historical note conflicts with the current specification, the current specification wins. The more detailed canonical history is maintained in Japanese in [CHANGELOG.ja.md](CHANGELOG.ja.md).
 
-**This file holds the 52 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
+**This file holds the 53 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
-### 2026-09-29 — Saving refinement options fetches the history listing once, after the last
+### v2.15.52 — Saving refinement options fetches the history listing once, after the last (Build 1128, 2026-09-29)
 
 At the author's request. Saving refinement options fetched the history listing and the generation count again after each option. One listing takes about 0.4 s on Pentala whatever its size, about 0.9 s of the 1.1 s two options took. They are now fetched once, after the last save; a save that fails still fetches them at once.
 

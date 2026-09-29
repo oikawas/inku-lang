@@ -163,6 +163,25 @@ def init_db() -> None:
         _logger.error("verified migration safety snapshot retained at %s", exc.snapshot.path)
         raise
     _HISTORY_FTS_ENABLED = outcome.fts_enabled
+    _refresh_planner_statistics()
+
+
+def _refresh_planner_statistics() -> None:
+    """Give SQLite's query planner statistics (sqlite_stat1), again at every start.
+
+    Without them the planner guesses, and production's SQLite 3.37 guessed that
+    "visible works" was a narrow index: opening one lineage in the history
+    library read every work (about 0.45 s). A start re-counts as the database
+    grows; on 4,200 works it took about 0.1 s. A database that cannot be
+    analysed now (locked, read-only) still serves, as it did before.
+    """
+    if engine.dialect.name != "sqlite":
+        return
+    try:
+        with engine.begin() as connection:
+            connection.exec_driver_sql("ANALYZE")
+    except Exception:  # noqa: BLE001
+        _logger.warning("could not refresh the query planner statistics", exc_info=True)
 
 
 def _migrate_columns(connection=None, *, include_fts: bool = True) -> None:

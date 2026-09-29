@@ -6,6 +6,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 56 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-29 — The server refreshes SQLite's statistics at every start
+
+At the author's request. Pentala's database had no SQLite statistics (`sqlite_stat1`), so SQLite 3.37 guessed how narrow each index was, and opening a lineage in the history library chose the visibility index and read every work. The server now runs `ANALYZE` at every start, keeping the statistics current as works are added: about 0.1 s the first time on a local synthetic database of 4,200 works, about 0.03 s after. When the statistics cannot be written (the database is locked, say) the server logs a warning and starts anyway. The statistics table starts with `sqlite_` and stays outside the schema check.
+
 ### v2.15.55 — The history library opens a lineage quickly on production's SQLite too (Build 1131, 2026-09-29)
 
 At the author's request, following v2.15.54. That release spelled the root test so the indexes could answer it, yet on Pentala even a one-work lineage still took about 0.45 s. A read-only look at the production database, with the author's permission, found SQLite 3.37.2 with no statistics (`sqlite_stat1`) choosing the visibility index and reading every work (215 ms for the count, 216 ms for the page). The lineage's node ids are now gathered first, the works are found through the unique `lineage_node_id` index, and the visibility test is written so it offers no index (a `coalesce`; the column is NOT NULL, so the test is the same). On SQLite 3.37.2, as on Pentala, an empty database with the same definitions plans through `ix_history_lineage_node_id`.

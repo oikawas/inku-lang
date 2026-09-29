@@ -879,9 +879,12 @@ class HistoryItemPositionReader:
                 access._readable_by(actor, HistoryRow.user_id, HistoryRow.id),
                 HistoryRow.trashed == (1 if trashed else 0),
                 HistoryRow.history_visibility == "normal",
+                # `at + 0`, the same comparison, so the `at` index is not taken:
+                # with statistics SQLite 3.37 walked its range and read every
+                # newer row, 0.2 s for a work 3,000 back on production.
                 or_(
-                    HistoryRow.at > target.at,
-                    and_(HistoryRow.at == target.at, HistoryRow.id < target.id),
+                    HistoryRow.at + 0 > target.at,
+                    and_(HistoryRow.at + 0 == target.at, HistoryRow.id < target.id),
                 ),
             )
             if starred:

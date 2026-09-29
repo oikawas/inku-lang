@@ -4,7 +4,11 @@
 
 This file records changes chronologically. If a historical note conflicts with the current specification, the current specification wins. The more detailed canonical history is maintained in Japanese in [CHANGELOG.ja.md](CHANGELOG.ja.md).
 
-**This file holds the 58 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
+**This file holds the 59 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
+
+### 2026-09-29 — Finding the page that holds a given work is quick with statistics too
+
+At the author's request. Counting a given work's position (`anchor_id`) also walked the `at` index range once v2.15.56 made statistics, reading every newer work (on Pentala, 195 ms for the 3,000th work and 217 ms for the 4,100th). As in the listing, the time comparison is now `at + 0`. Checked read-only on the production database with the author's permission: works at the 0th, 1,000th, 3,000th and 4,100th position took 3 ms each, with the same positions.
 
 ### v2.15.57 — The history listing picks later pages quickly with statistics too (Build 1133, 2026-09-29)
 

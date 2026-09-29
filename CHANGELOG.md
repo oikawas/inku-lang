@@ -6,6 +6,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 51 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-29 — The wheel over the export menu no longer zooms the canvas
+
+At the author's request. The saved work's export menu opens over the canvas and scrolls itself, but the wheel over it zoomed the canvas behind instead. Over a menu on the canvas the wheel now scrolls the menu.
+
 ### v2.15.50 — Judge a `replay`'s description lock by its DDL (Build 1126, 2026-09-28)
 
 This version includes the changes below since v2.15.49. Server and Web judge the saved work's description lock by its DDL. DDL, Score and rendering versions are unchanged.

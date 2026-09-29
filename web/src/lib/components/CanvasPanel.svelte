@@ -576,7 +576,8 @@
 		const wheelTarget = canvasContentEl;
 		const onWheel = (event: WheelEvent) => {
 			if (outputTab !== 'canvas' || !result) return;
-			if (event.target instanceof Element && event.target.closest('.instruction-caption.vertical, .canvas-caption-writing-mode')) return;
+			// A menu over the canvas (the export menu) scrolls itself; the wheel is not a zoom there.
+			if (event.target instanceof Element && event.target.closest('.instruction-caption.vertical, .canvas-caption-writing-mode, [role="menu"]')) return;
 			event.preventDefault();
 			const step = event.deltaY < 0 ? 0.15 : -0.15;
 			viewport.setZoom(viewport.zoom + step);

@@ -4,9 +4,9 @@
 
 This file records changes chronologically. If a historical note conflicts with the current specification, the current specification wins. The more detailed canonical history is maintained in Japanese in [CHANGELOG.ja.md](CHANGELOG.ja.md).
 
-**This file holds the 53 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
+**This file holds the 54 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
-### 2026-09-29 — The history listing picks the page's ids before reading its rows
+### v2.15.53 — The history listing picks the page's ids before reading its rows (Build 1129, 2026-09-29)
 
 At the author's request, following the slow saving of refinement options. One listing took about 0.4 s whatever its size, longer the more works the caller may read (on Pentala, 408 ms for one work out of 4,169, against 50 ms from 9 in the trash). A caller who may read every work gets no index for the order, so SQLite sorted every readable work carrying all its columns, the SVG length included. The page's ids are now chosen by id and time first, and only those rows are read. On a local synthetic database of 4,200 works read as such a caller, the first page fell from 500 ms to 250 ms and the page from the 3,000th from 890 ms to 238 ms. The rest is the count, which on Pentala should cost what the listing state does, about 50 ms.
 

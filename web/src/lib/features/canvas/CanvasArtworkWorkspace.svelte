@@ -40,6 +40,9 @@
 		exportCardOnly: boolean;
 		savedWorkExport?: SavedWorkExportMenuProps | null;
 		cardExportBusy: boolean;
+		clipboardBusy: boolean;
+		/** The last copy's outcome, shown in the button's tooltip until it clears. */
+		clipboardMessage: string | null;
 		currentHistoryId: string | null;
 		isJapanese: boolean;
 		onToggleInstructionCaption: () => void;
@@ -52,6 +55,7 @@
 		onToggleGenerationInfo: () => void;
 		onToggleSaijiki: () => void;
 		onDownloadCard: () => void | Promise<void>;
+		onCopyToClipboard: () => void | Promise<void>;
 		onOpenPresentation: () => void;
 	};
 
@@ -85,6 +89,8 @@
 		exportCardOnly,
 		savedWorkExport = null,
 		cardExportBusy,
+		clipboardBusy,
+		clipboardMessage,
 		currentHistoryId,
 		isJapanese,
 		onToggleInstructionCaption,
@@ -97,6 +103,7 @@
 		onToggleGenerationInfo,
 		onToggleSaijiki,
 		onDownloadCard,
+		onCopyToClipboard,
 		onOpenPresentation
 	}: Props = $props();
 
@@ -358,6 +365,20 @@
 							</Tooltip>
 						{/if}
 					</div>
+					<Tooltip placement="top-left" text={clipboardMessage ?? t().canvasCopyToClipboard} wide={!!clipboardMessage}>
+						<button
+							type="button"
+							class="canvas-icon-btn canvas-clipboard-btn"
+							disabled={!result || clipboardBusy}
+							aria-label={t().canvasCopyToClipboard}
+							onclick={(e) => { e.stopPropagation(); void onCopyToClipboard(); }}
+						>
+							<svg viewBox="0 0 24 24" aria-hidden="true">
+								<rect x="8" y="3" width="8" height="4" rx="1" />
+								<path d="M8 5H6a1 1 0 0 0-1 1v14a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V6a1 1 0 0 0-1-1h-2" />
+							</svg>
+						</button>
+					</Tooltip>
 					<Tooltip placement="top-left" text={t().tooltipCanvasPresentation}>
 						<button
 							type="button"

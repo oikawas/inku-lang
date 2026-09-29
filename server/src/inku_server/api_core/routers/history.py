@@ -58,6 +58,8 @@ class CardExportBody(BaseModel):
     # On by default. A card that carries no mark of where it came from is the
     # honest option to offer, not the one to make people opt into.
     seal: bool = True
+    # The bitmap's height in pixels; absent keeps the layout's own size.
+    height: int | None = Field(default=None, ge=256, le=4096)
 
 
 class HistoryStarBody(BaseModel):
@@ -246,6 +248,7 @@ def api_history_export_card(
             seed=item.get("render_seed"),
             layout=body.layout,
             seal=body.seal,
+            pixel_height=body.height,
         )
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error

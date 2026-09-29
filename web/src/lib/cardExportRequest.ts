@@ -18,6 +18,8 @@ export type CardExportRequestBody = {
 	id: string;
 	layout: CardLayout;
 	seal: boolean;
+	/** The bitmap's height in pixels; absent keeps the layout's own size. */
+	height?: number;
 };
 
 // The seal is on by default. A card that carries no mark of where it came from
@@ -52,7 +54,10 @@ export function parseCardExportSettings(value: string | null): CardExportSetting
 
 export function cardExportRequestBody(
 	id: string,
-	settings: CardExportSettings
+	settings: CardExportSettings,
+	height?: number
 ): CardExportRequestBody {
-	return { id, layout: settings.layout, seal: settings.seal };
+	const body: CardExportRequestBody = { id, layout: settings.layout, seal: settings.seal };
+	if (height !== undefined) body.height = height;
+	return body;
 }

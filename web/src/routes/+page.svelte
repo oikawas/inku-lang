@@ -93,7 +93,9 @@
 	import { wildSettings } from '$lib/features/wild/settings.svelte';
 	import { wildOverride } from '$lib/features/wild/render';
 	import { exportSettings } from '$lib/features/export/settings.svelte';
-	import { downloadCard } from '$lib/cardExport';
+	import { downloadCard, fetchCardPng } from '$lib/cardExport';
+	import { browserClipboardEnvironment, ClipboardCopyRefused, clipboardUnavailableReason, writePngToClipboard } from '$lib/clipboardExport';
+	import { rasterizeSvgToPng } from '$lib/features/export/download';
 	import { createModelInspection } from '$lib/features/model-inspection/state.svelte';
 	import { resultLogSettings } from '$lib/features/result-log/settings.svelte';
 	import { batchFailureReportStore } from '$lib/features/batch/failure-report.svelte';
@@ -2134,6 +2136,28 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 		await downloadCard(apiFetch, id, exportSettings.card);
 	}
 
+	// The canvas button's clipboard copy: the picture alone, or the share card,
+	// at the height chosen in Settings > Export > Clipboard. The picture is laid
+	// on white, since an application that does not read transparency pastes it
+	// as black. A refusal the author can act on throws ClipboardCopyRefused.
+	async function copyCurrentWorkToClipboard(): Promise<void> {
+		const unavailable = clipboardUnavailableReason(browserClipboardEnvironment());
+		if (unavailable === 'insecure') throw new ClipboardCopyRefused(t().clipboardInsecure);
+		if (unavailable) throw new ClipboardCopyRefused(t().clipboardUnsupported);
+		const { format, height } = exportSettings.clipboard;
+		let png: Promise<Blob>;
+		if (format === 'card') {
+			const id = work.displayedHistoryItem?.id ?? work.result?.history_id ?? null;
+			if (!id) throw new ClipboardCopyRefused(t().clipboardNeedsSavedWork);
+			png = fetchCardPng(apiFetch, id, exportSettings.card, height);
+		} else {
+			const svg = work.result?.svg;
+			if (!svg) throw new Error(t().clipboardCopyFailed);
+			png = rasterizeSvgToPng(svg, height, getCanvasAspectOption(effectiveCanvasAspectId()), false);
+		}
+		await writePngToClipboard(png);
+	}
+
 	async function copyTextToClipboard(value: string): Promise<void> {
 		if (navigator.clipboard?.writeText) {
 			await navigator.clipboard.writeText(value);
@@ -2934,6 +2958,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				replayDisabled={!replayableStatusHistoryItem || work.reloading}
 				currentHistoryId={work.displayedHistoryItem?.id ?? work.result?.history_id ?? null}
 				onDownloadCard={downloadCurrentCard}
+				onCopyToClipboard={copyCurrentWorkToClipboard}
 				bind:instructionCaptionVisible
 				onInstructionCaptionVisibleChange={persistInstructionCaptionVisible}
 				instructionCaptionWritingMode={captionSettings.writingMode}

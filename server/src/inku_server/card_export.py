@@ -239,11 +239,18 @@ def build_card(
     seed: int | str | None = None,
     layout: CardLayout = "square",
     seal: bool = True,
+    pixel_height: int | None = None,
 ) -> bytes:
-    """Compose the card and rasterize it to PNG bytes at the layout's own size."""
+    """Compose the card and rasterize it to PNG bytes.
+
+    At the layout's own size, or ``pixel_height`` pixels tall with the width
+    following the layout's shape (the clipboard copy asks for a chosen size).
+    """
     width, height = LAYOUT_SIZES[layout] if layout in LAYOUT_SIZES else (0, 0)
     if not width:
         raise ValueError(f"unknown layout: {layout!r}")
+    if pixel_height is not None:
+        width, height = max(1, round(width * pixel_height / height)), pixel_height
     document = compose_card_svg(
         svg, headnote=headnote, seed=seed, layout=layout, seal=seal
     )

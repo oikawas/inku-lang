@@ -11,6 +11,7 @@
 	import ModelAdministrationSettings from '$lib/features/settings/ModelAdministrationSettings.svelte';
 	import PluginAdministrationSettings from '$lib/features/settings/PluginAdministrationSettings.svelte';
 	import ExportSettings from '$lib/features/settings/ExportSettings.svelte';
+	import ClipboardExportSettings from '$lib/features/settings/ClipboardExportSettings.svelte';
 	import AppearanceSettings from '$lib/features/settings/AppearanceSettings.svelte';
 	import '$lib/features/settings/settings-modal.css';
 	import type { ExportTemplate } from '$lib/exportTemplates';
@@ -151,6 +152,10 @@
 	const detailed = $derived(settingsDetail === 'detailed');
 	const isAdmin = $derived(currentUser?.permission_groups?.includes('admins') === true);
 	let appearanceSection = $state<'display' | 'making'>('display');
+	// The Export category holds two pages under one remembered tab, as the
+	// display and making pages share `misc`: the settings tab the server keeps
+	// per account names no clipboard page.
+	let exportSection = $state<'files' | 'clipboard'>('files');
 	const settingsPage = $derived.by(() => {
 		const strings = t();
 		switch (settingsTab) {
@@ -162,7 +167,9 @@
 			case 'limits': return { title: strings.settingsTabLimits, hint: strings.settingsLimitsHint };
 			case 'plugins': return { title: strings.settingsTabPlugins, hint: strings.settingsPluginsHint };
 			case 'unread': return { title: strings.settingsTabUnreadWords, hint: strings.settingsUnreadHint };
-			case 'export': return { title: strings.settingsTabExport, hint: strings.settingsExportHint };
+			case 'export': return exportSection === 'clipboard'
+				? { title: strings.settingsTabClipboard, hint: strings.settingsClipboardHint }
+				: { title: strings.settingsTabExport, hint: strings.settingsExportHint };
 			case 'demo': return { title: strings.modeDemo, hint: strings.tooltipInputTabDemo };
 			default: return appearanceSection === 'making'
 				? { title: strings.settingsCategoryMaking, hint: strings.settingsMakingHint }
@@ -213,6 +220,11 @@
 	function selectAppearanceSection(section: 'display' | 'making') {
 		appearanceSection = section;
 		onSelectSettingsTab('misc');
+	}
+
+	function selectExportSection(section: 'files' | 'clipboard') {
+		exportSection = section;
+		onSelectSettingsTab('export');
 	}
 </script>
 
@@ -266,7 +278,8 @@
 				</section>
 				<section class="settings-category">
 					<div class="settings-category-label">{t().settingsTabExport}</div>
-					<button aria-current={settingsTab === 'export' ? 'page' : undefined} class:active={settingsTab === 'export'} onclick={() => onSelectSettingsTab('export')}>{t().settingsTabExport}</button>
+					<button aria-current={settingsTab === 'export' && exportSection === 'files' ? 'page' : undefined} class:active={settingsTab === 'export' && exportSection === 'files'} onclick={() => selectExportSection('files')}>{t().settingsTabExport}</button>
+					<button aria-current={settingsTab === 'export' && exportSection === 'clipboard' ? 'page' : undefined} class:active={settingsTab === 'export' && exportSection === 'clipboard'} onclick={() => selectExportSection('clipboard')}>{t().settingsTabClipboard}</button>
 				</section>
 				{#if reaches('models') || reaches('users')}
 					<section class="settings-category">
@@ -431,6 +444,8 @@
 		{:else if settingsTab === 'unread'}
 			<UnreadWordsPanel {isAdmin} />
 
+			{:else if settingsTab === 'export' && exportSection === 'clipboard'}
+				<ClipboardExportSettings />
 			{:else if settingsTab === 'export'}
 				<ExportSettings
 					bind:pngAlphaWhite bind:animationExportSettings bind:cardExportSettings

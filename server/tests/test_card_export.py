@@ -151,6 +151,13 @@ def test_t4_the_output_carries_the_layouts_aspect_ratio(layout, ratio):
     assert image.width / image.height == pytest.approx(ratio)
 
 
+@pytest.mark.parametrize(("layout", "size"), [("square", (540, 540)), ("portrait", (432, 540))])
+def test_a_chosen_height_sizes_the_card_and_keeps_its_shape(layout, size):
+    # The clipboard copy asks for the bitmap's height; the width follows the page shape.
+    png = build_card(WORK, headnote=HEADNOTE, seed=4821, layout=layout, pixel_height=540)
+    assert Image.open(BytesIO(png)).size == size
+
+
 # --- T-5: the seed belongs to the work --------------------------------------
 
 

@@ -43,6 +43,36 @@ function triggerDownload(blob: Blob, filename: string): Promise<SaveOutcome> {
 	return saveBlob(blob, filename, { enabled: downloadFolderSettings.enabled });
 }
 
+/**
+ * The picture as a PNG, `height` pixels tall and as wide as the canvas shape
+ * makes it. A transparent background unless `transparent` is false, in which
+ * case it is painted white first.
+ */
+export function rasterizeSvgToPng(svgText: string, height: number, aspect: { ratioW: number; ratioH: number }, transparent: boolean): Promise<Blob> {
+	const pngHeight = Math.max(64, Math.round(height));
+	const pngWidth = Math.max(64, Math.round(pngHeight * aspect.ratioW / aspect.ratioH));
+	const svg = svgText.replace(/(<svg)([^>]*)/, (_: string, tag: string, attrs: string) => {
+		const a = attrs.replace(/\s+width="[^"]*"/g, '').replace(/\s+height="[^"]*"/g, '');
+		return `${tag}${a} width="${pngWidth}" height="${pngHeight}"`;
+	});
+	const url = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' }));
+	return new Promise<Blob>((resolve, reject) => {
+		const canvas = document.createElement('canvas');
+		canvas.width = pngWidth; canvas.height = pngHeight;
+		const ctx = canvas.getContext('2d')!;
+		if (!transparent) {
+			ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, pngWidth, pngHeight);
+		}
+		const img = new Image();
+		img.onload = () => {
+			ctx.drawImage(img, 0, 0, pngWidth, pngHeight);
+			canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('canvas error'))), 'image/png');
+		};
+		img.onerror = () => reject(new Error('svg load error'));
+		img.src = url;
+	}).finally(() => URL.revokeObjectURL(url));
+}
+
 export function createExportActions(deps: ExportDeps) {
 	async function downloadSVG(profile: SvgProfile = 'display') {
 		const result = deps.result();
@@ -68,42 +98,12 @@ export function createExportActions(deps: ExportDeps) {
 		const result = deps.result();
 		if (!result) return;
 		const aspect = getCanvasAspectOption(deps.effectiveCanvasAspectId());
-		const pngHeight = Math.max(64, Math.round(size));
-		const pngWidth = Math.max(64, Math.round(pngHeight * aspect.ratioW / aspect.ratioH));
-		const svg = result.svg.replace(/(<svg)([^>]*)/, (_: string, tag: string, attrs: string) => {
-			const a = attrs.replace(/\s+width="[^"]*"/g, '').replace(/\s+height="[^"]*"/g, '');
-			return `${tag}${a} width="${pngWidth}" height="${pngHeight}"`;
-		});
-		const blob = new Blob([svg], { type: 'image/svg+xml' });
-		const url  = URL.createObjectURL(blob);
-		try {
-			await new Promise<void>((resolve, reject) => {
-				const canvas = document.createElement('canvas');
-				canvas.width = pngWidth; canvas.height = pngHeight;
-				const ctx = canvas.getContext('2d')!;
-				if (!exportSettings.pngAlphaWhite) {
-					ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, pngWidth, pngHeight);
-				}
-				const img = new Image();
-				img.onload = () => {
-					ctx.drawImage(img, 0, 0, pngWidth, pngHeight);
-					canvas.toBlob((b) => {
-						if (!b) { reject(new Error('canvas error')); return; }
-						// Stamp the artwork's own generation time, not the download time.
-						// Read through the getters here rather than reusing the values
-						// captured above: rasterisation is async, and the original read
-						// this inside the callback.
-						const generatedAt = deps.displayedHistoryItem()?.at ?? deps.result()?.history_at ?? Date.now();
-						withPngCaptureDate(b, new Date(generatedAt))
-							.then((stamped) => triggerDownload(stamped, deps.exportFilename('png', size)))
-							.then((outcome) => { deps.onSaved?.(outcome); resolve(); })
-							.catch(reject);
-					}, 'image/png');
-				};
-				img.onerror = () => reject(new Error('svg load error'));
-				img.src = url;
-			});
-		} finally { URL.revokeObjectURL(url); }
+		const png = await rasterizeSvgToPng(result.svg, size, aspect, exportSettings.pngAlphaWhite);
+		// Stamp the artwork's own generation time, not the download time. Read
+		// through the getters after the rasterisation, which is asynchronous.
+		const generatedAt = deps.displayedHistoryItem()?.at ?? deps.result()?.history_at ?? Date.now();
+		const stamped = await withPngCaptureDate(png, new Date(generatedAt));
+		deps.onSaved?.(await triggerDownload(stamped, deps.exportFilename('png', size)));
 	}
 
 	return { downloadSVG, downloadPNG };

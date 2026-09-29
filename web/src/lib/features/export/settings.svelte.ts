@@ -8,6 +8,11 @@ import {
 	parseCardExportSettings,
 	type CardExportSettings
 } from '$lib/cardExport';
+import {
+	DEFAULT_CLIPBOARD_EXPORT_SETTINGS,
+	parseClipboardExportSettings,
+	type ClipboardExportSettings
+} from '$lib/clipboardExport';
 import { registerPersistedSetting } from '$lib/features/persisted-settings';
 
 // Export settings that survive a reload.  They are written back as a group by a
@@ -16,11 +21,13 @@ import { registerPersistedSetting } from '$lib/features/persisted-settings';
 const PNG_ALPHA_KEY = 'inku-png-alpha-white';
 const ANIMATION_EXPORT_SETTINGS_KEY = 'inku-animation-export-settings';
 const CARD_EXPORT_SETTINGS_KEY = 'inku-card-export-settings';
+const CLIPBOARD_EXPORT_SETTINGS_KEY = 'inku-clipboard-export-settings';
 
 class ExportSettings {
 	pngAlphaWhite = $state(false);
 	animation = $state<AnimationExportSettings>({ ...DEFAULT_ANIMATION_EXPORT_SETTINGS });
 	card = $state<CardExportSettings>({ ...DEFAULT_CARD_EXPORT_SETTINGS });
+	clipboard = $state<ClipboardExportSettings>({ ...DEFAULT_CLIPBOARD_EXPORT_SETTINGS });
 	private loaded = $state(false);
 
 	// The caller owns the try/catch (see color-catalog).
@@ -29,6 +36,7 @@ class ExportSettings {
 		if (alpha !== null) this.pngAlphaWhite = alpha === '1';
 		this.animation = parseAnimationExportSettings(localStorage.getItem(ANIMATION_EXPORT_SETTINGS_KEY));
 		this.card = parseCardExportSettings(localStorage.getItem(CARD_EXPORT_SETTINGS_KEY));
+		this.clipboard = parseClipboardExportSettings(localStorage.getItem(CLIPBOARD_EXPORT_SETTINGS_KEY));
 	};
 
 	// Called once the whole load block has run, so a failure part-way through it
@@ -44,11 +52,13 @@ class ExportSettings {
 		void this.pngAlphaWhite;
 		void this.animation;
 		void this.card;
+		void this.clipboard;
 		if (!this.loaded) return;
 		try {
 			localStorage.setItem(PNG_ALPHA_KEY, this.pngAlphaWhite ? '1' : '0');
 			localStorage.setItem(ANIMATION_EXPORT_SETTINGS_KEY, JSON.stringify(this.animation));
 			localStorage.setItem(CARD_EXPORT_SETTINGS_KEY, JSON.stringify(this.card));
+			localStorage.setItem(CLIPBOARD_EXPORT_SETTINGS_KEY, JSON.stringify(this.clipboard));
 		} catch {
 			/* private mode / quota: the settings still apply to this session */
 		}

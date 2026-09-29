@@ -8,6 +8,7 @@
 	import CanvasGenerationInfo from '$lib/features/canvas/CanvasGenerationInfo.svelte';
 	import { pressChoosesWork } from '$lib/features/canvas/generation-info-follow';
 	import { generationInfoSettings } from '$lib/features/canvas/generation-info-settings.svelte';
+	import { ClipboardCopyRefused } from '$lib/clipboardExport';
 	import CanvasPresentationOverlay from '$lib/features/canvas/CanvasPresentationOverlay.svelte';
 	import CanvasRefinementWorkspace from '$lib/features/canvas/CanvasRefinementWorkspace.svelte';
 	import type { LineageGraph, LineageNode } from '$lib/features/history/types';
@@ -122,6 +123,8 @@
 		currentHistoryId: string | null;
 		savedWorkExportActions: ReturnType<typeof makeSavedWorkExportActions>;
 		onDownloadCard: () => void | Promise<void>;
+		/** Copy the work on the canvas to the clipboard as a bitmap; a refusal throws ClipboardCopyRefused. */
+		onCopyToClipboard: () => Promise<void>;
 		instructionCaptionVisible: boolean;
 		onInstructionCaptionVisibleChange: (visible: boolean) => void | Promise<void>;
 		instructionCaptionWritingMode: CaptionWritingMode;
@@ -245,6 +248,7 @@
 		currentHistoryId,
 		savedWorkExportActions,
 		onDownloadCard,
+		onCopyToClipboard,
 		instructionCaptionVisible = $bindable(true),
 		onInstructionCaptionVisibleChange,
 		instructionCaptionWritingMode,
@@ -336,6 +340,30 @@
 
 	// The card leaves in one press, so the only state it needs is "in flight".
 	let cardExportBusy = $state(false);
+
+	// What the clipboard button last did, said in its tooltip: busy while the
+	// picture is made, then "copied" for a moment, or the reason it could not.
+	let clipboardBusy = $state(false);
+	let clipboardMessage = $state<string | null>(null);
+	let clipboardMessageTimer: ReturnType<typeof setTimeout> | null = null;
+
+	async function copyToClipboardFromCanvas(): Promise<void> {
+		if (clipboardBusy) return;
+		clipboardBusy = true;
+		if (clipboardMessageTimer) clearTimeout(clipboardMessageTimer);
+		try {
+			await onCopyToClipboard();
+			clipboardMessage = t().canvasCopiedToClipboard;
+			clipboardMessageTimer = setTimeout(() => (clipboardMessage = null), 2500);
+		} catch (error) {
+			// A browser or server failure reads as a DOMException name or a
+			// status; the author is better served by the plain sentence.
+			clipboardMessage = error instanceof ClipboardCopyRefused ? error.message : t().clipboardCopyFailed;
+			clipboardMessageTimer = setTimeout(() => (clipboardMessage = null), 8000);
+		} finally {
+			clipboardBusy = false;
+		}
+	}
 
 	async function downloadCardFromCanvas(): Promise<void> {
 		if (cardExportBusy) return;
@@ -800,6 +828,9 @@
 				onToggleGenerationInfo={() => (generationInfoOpen ? closeGenerationInfo() : openGenerationInfo())}
 				{onToggleSaijiki}
 				onDownloadCard={downloadCardFromCanvas}
+				{clipboardBusy}
+				{clipboardMessage}
+				onCopyToClipboard={copyToClipboardFromCanvas}
 				onOpenPresentation={() => (presentationMode = true)}
 			/>
 		{:else}

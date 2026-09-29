@@ -1,7 +1,7 @@
 // Run with: npm run test:unit  (node:test, no test dependency)
 //
 // The history strip used to print the generation and the Stage 1 model, fixed.
-// Four facts are on offer now, at most two at a time, and none is an answer.
+// Four facts are on offer now, at most three at a time, and none is an answer.
 //
 // The load-bearing distinction is between an absent value and an empty list. An
 // account that predates the column has never answered and takes the default; a
@@ -41,25 +41,30 @@ test('T-147  an absent value takes the default and an empty list does not', () =
 	assert.deepEqual(DEFAULT_HISTORY_STRIP_FIELDS, ['generation', 'model']);
 });
 
-test('T-148  at most two survive, in the order the four are declared', () => {
+test('T-148  at most three survive, in the order the four are declared', () => {
+	assert.equal(HISTORY_STRIP_FIELD_LIMIT, 3);
 	assert.deepEqual(normalizeHistoryStripFields(['bytes', 'generation']), ['generation', 'bytes']);
 	assert.deepEqual(normalizeHistoryStripFields(['bytes', 'bytes']), ['bytes']);
 	assert.deepEqual(normalizeHistoryStripFields(['nope', 'bytes']), ['bytes']);
-	const three = normalizeHistoryStripFields(['generation', 'model', 'bytes']);
-	assert.equal(three.length, HISTORY_STRIP_FIELD_LIMIT);
+	assert.deepEqual(normalizeHistoryStripFields(['bytes', 'generation', 'model']), ['generation', 'model', 'bytes']);
+	const four = normalizeHistoryStripFields(['generation', 'model', 'engine_version', 'bytes']);
+	assert.equal(four.length, HISTORY_STRIP_FIELD_LIMIT);
 });
 
-test('T-149  a third tick is refused rather than evicting one of the two', () => {
+test('T-149  a fourth tick is refused rather than evicting one of the three', () => {
 	const two: HistoryStripField[] = ['generation', 'model'];
-	assert.equal(canAddHistoryStripField(two), false);
-	// The refusal keeps both -- an eviction would silently move a choice the
-	// reader made, and they would find out by reading the strip.
-	assert.deepEqual(toggleHistoryStripField(two, 'bytes'), two);
+	assert.equal(canAddHistoryStripField(two), true);
+	const three = toggleHistoryStripField(two, 'bytes');
+	assert.deepEqual(three, ['generation', 'model', 'bytes']);
+	assert.equal(canAddHistoryStripField(three), false);
+	// The refusal keeps all three -- an eviction would silently move a choice
+	// the reader made, and they would find out by reading the strip.
+	assert.deepEqual(toggleHistoryStripField(three, 'engine_version'), three);
 	// Unticking always works, and then the fourth fits.
-	const one = toggleHistoryStripField(two, 'model');
-	assert.deepEqual(one, ['generation']);
-	assert.equal(canAddHistoryStripField(one), true);
-	assert.deepEqual(toggleHistoryStripField(one, 'bytes'), ['generation', 'bytes']);
+	const back = toggleHistoryStripField(three, 'model');
+	assert.deepEqual(back, ['generation', 'bytes']);
+	assert.equal(canAddHistoryStripField(back), true);
+	assert.deepEqual(toggleHistoryStripField(back, 'engine_version'), ['generation', 'engine_version', 'bytes']);
 });
 
 test('T-150  the strip prints no meta row at all when nothing was chosen', () => {

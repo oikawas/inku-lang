@@ -744,7 +744,7 @@ export const en: LangPack = {
 	uiModeSaving: 'Saving…',
 	uiModeSaveFailed: 'The UI settings could not be saved.',
 	historyStripFieldsLabel: 'Facts under the history thumbnails',
-	historyStripFieldsDescription: 'What the history strip prints under each thumbnail. Choose up to two. Choose none and the strip shows only the pictures.',
+	historyStripFieldsDescription: 'What the history strip prints under each thumbnail. Choose up to three. Choose none and the strip shows only the pictures.',
 	historyStripFieldGeneration: 'Generation',
 	historyStripFieldModel: 'Model',
 	historyStripFieldEngineVersion: 'Engine version',

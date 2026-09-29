@@ -90,10 +90,19 @@ def test_t155_the_declared_order_is_restored_whatever_order_they_were_ticked(acc
     assert saved.json()["history_strip_fields"] == ["generation", "bytes"]
 
 
+def test_three_at_once_are_stored(account):
+    """Three lines fit under a tile in the smaller type (v2.15.62; two before)"""
+    saved = _save(account["headers"], ["bytes", "model", "engine_version"])
+    assert saved.status_code == 200, saved.text
+    assert saved.json()["history_strip_fields"] == ["model", "engine_version", "bytes"]
+    reloaded = client.get("/api/auth/me", headers=account["headers"])
+    assert reloaded.json()["history_strip_fields"] == ["model", "engine_version", "bytes"]
+
+
 @pytest.mark.parametrize(
     "fields",
     [
-        pytest.param(["generation", "model", "bytes"], id="three-at-once"),
+        pytest.param(["generation", "model", "engine_version", "bytes"], id="four-at-once"),
         pytest.param(["generation", "generation"], id="the-same-one-twice"),
         pytest.param(["nope"], id="a-field-that-does-not-exist"),
         pytest.param("generation", id="not-a-list"),
@@ -102,7 +111,7 @@ def test_t155_the_declared_order_is_restored_whatever_order_they_were_ticked(acc
 def test_t156_a_request_the_control_cannot_make_is_refused_not_trimmed(account, fields):
     """T-156  a bad request is refused, so no unmade choice reaches the strip
 
-    Trimming three down to two would put a pair on screen that nobody picked,
+    Trimming four down to three would put a set on screen that nobody picked,
     and the reader's only clue would be the strip itself.
     """
     assert _save(account["headers"], fields).status_code in (400, 422)
@@ -115,7 +124,7 @@ def test_t157_a_refused_request_leaves_the_stored_choice_alone(account):
     holding half of a request that was rejected.
     """
     assert _save(account["headers"], ["bytes"]).status_code == 200
-    assert _save(account["headers"], ["generation", "model", "bytes"]).status_code in (400, 422)
+    assert _save(account["headers"], ["generation", "model", "engine_version", "bytes"]).status_code in (400, 422)
     assert client.get("/api/auth/me", headers=account["headers"]).json()["history_strip_fields"] == ["bytes"]
 
 

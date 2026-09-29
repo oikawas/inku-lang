@@ -254,7 +254,14 @@
 							<div class="tooltip-row"><span>Render</span><strong>{it.render_engine_version || t().historyVersionNotRecorded}</strong></div>
 							{#if it.note}<div class="tooltip-note"><span>{t().selectionNoteLabel}</span>{it.note}</div>{/if}
 						</div>
-						<HistoryThumbnail item={it} scope="strip" size="strip" />
+						<!-- The badge sits on the picture, so a taller meta row under it
+						     cannot cover the badge or be covered by it. -->
+						<div class="thumb-picture">
+							<HistoryThumbnail item={it} scope="strip" size="strip" />
+							{#if i === historyCursor}
+								<div class="thumb-current-badge">{t().historyCurrentBadge}</div>
+							{/if}
+						</div>
 						{#if it.description_locked}
 							<!-- Held by its edited DDL: a mark, not a control. -->
 							<span class="thumb-held-badge" title={t().descriptionLockedMark} aria-label={t().descriptionLockedMark}><svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"></rect><path d="M8 11V7a4 4 0 0 1 8 0v4"></path></svg></span>
@@ -273,12 +280,9 @@
 							<div class="thumb-meta">
 								{#each historyStripFields as field, index (field)}
 									{@const text = stripFieldText(field, it)}
-									<span class={index === 0 ? 'thumb-meta-first' : 'thumb-meta-second'} title={text.full}>{text.short}</span>
+									<span class={index === 0 ? 'thumb-meta-first' : 'thumb-meta-rest'} title={text.full}>{text.short}</span>
 								{/each}
 							</div>
-						{/if}
-						{#if i === historyCursor}
-							<div class="thumb-current-badge">{t().historyCurrentBadge}</div>
 						{/if}
 					</div>
 				{/each}
@@ -524,11 +528,12 @@
 		flex-direction: column;
 		gap: 1px;
 	}
-	/* The first line reads as the heading of the tile and the second as its
-	   footnote, whichever two facts are in them -- the weight belongs to the
-	   position, not to the fact that used to sit there. */
-	.thumb-meta-first { font-size: var(--ui-font-size-12); font-weight: 650; color: var(--fg2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-	.thumb-meta-second { font-size: var(--ui-font-size-12); color: var(--fg2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+	/* The first line reads as the heading of the tile and the rest as its
+	   footnotes, whichever facts are in them -- the weight belongs to the
+	   position, not to the fact that used to sit there. Three lines fit under
+	   an 82px tile at this size. */
+	.thumb-meta-first { font-size: var(--ui-font-size-10); line-height: 1.3; font-weight: 650; color: var(--fg2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+	.thumb-meta-rest { font-size: var(--ui-font-size-10); line-height: 1.3; color: var(--fg2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 	.thumb-held-badge {
 		position: absolute;
 		top: 3px;
@@ -540,9 +545,10 @@
 		color: var(--fg2);
 		pointer-events: none;
 	}
+	.thumb-picture { position: relative; }
 	.thumb-current-badge {
 		position: absolute;
-		bottom: 22px;
+		bottom: 3px;
 		right: 3px;
 		background: var(--accent);
 		color: var(--accent-fg);

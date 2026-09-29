@@ -744,7 +744,7 @@ export const ja: LangPack = {
 	uiModeSaving: '保存中…',
 	uiModeSaveFailed: 'UI設定を保存できませんでした。',
 	historyStripFieldsLabel: '履歴帯に添える情報',
-	historyStripFieldsDescription: '履歴帯のサムネイルの下に出す情報です。最大2つまで選べます。選ばなければ絵だけが並びます。',
+	historyStripFieldsDescription: '履歴帯のサムネイルの下に出す情報です。最大3つまで選べます。選ばなければ絵だけが並びます。',
 	historyStripFieldGeneration: '世代',
 	historyStripFieldModel: 'モデル',
 	historyStripFieldEngineVersion: 'engineバージョン',

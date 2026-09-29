@@ -2,9 +2,9 @@
  * Which facts the history strip prints under each thumbnail.
  *
  * The strip used to print the generation and the Stage 1 model, fixed, with no
- * way to ask for anything else. Four facts are on offer now and at most two are
- * shown: the tile is only a thumbnail wide, and a third line either wraps or
- * pushes the picture out of the strip.
+ * way to ask for anything else. Four facts are on offer now and at most three
+ * are shown, in a smaller type (v2.15.62; two before): the tile is only a
+ * thumbnail wide, and a fourth line would push the picture out of the strip.
  *
  * None is a real answer -- a reader who wants only the pictures gets only the
  * pictures -- so an empty list is a choice and is stored as one. That is why
@@ -27,8 +27,8 @@ export function formatHistoryStripEngineVersion(value: string | null | undefined
 	return `Ver.${version.replace(/^Ver\.\s*/i, '')}`;
 }
 
-/** At most this many at once. Two lines is what the tile has room for. */
-export const HISTORY_STRIP_FIELD_LIMIT = 2;
+/** At most this many at once. Three lines is what the tile has room for. */
+export const HISTORY_STRIP_FIELD_LIMIT = 3;
 
 /** What the strip printed before it could be asked, so nobody's strip moves. */
 export const DEFAULT_HISTORY_STRIP_FIELDS: HistoryStripField[] = ['generation', 'model'];
@@ -59,7 +59,7 @@ export function canAddHistoryStripField(current: readonly HistoryStripField[]): 
 /**
  * The list after one box is clicked.
  *
- * Unticking always works. Ticking is refused once two are on -- the boxes are
+ * Unticking always works. Ticking is refused once three are on -- the boxes are
  * disabled at that point, so this is the second half of the same rule rather
  * than a different one, and refusing is what keeps the reader's two choices
  * where they put them instead of silently evicting one.

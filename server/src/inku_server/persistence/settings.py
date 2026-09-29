@@ -41,7 +41,7 @@ UI_CUSTOM_KEYS = {
 # HISTORY_STRIP_FIELD_LIMIT of them, and an empty list is a choice, not an
 # absence. The web half of this pair is web/src/lib/historyStripFields.ts.
 HISTORY_STRIP_FIELDS = ("generation", "model", "engine_version", "bytes")
-HISTORY_STRIP_FIELD_LIMIT = 2
+HISTORY_STRIP_FIELD_LIMIT = 3
 HISTORY_STRIP_FIELDS_DEFAULT = ["generation", "model"]
 # How many past batch prompts a member keeps. Cut on the way in and on the way
 # out, so lowering it later drops the tail of what is already stored. The web
@@ -139,7 +139,7 @@ def normalize_history_strip_fields(value) -> list[str]:
 
     Anything that is not a list is an absence and takes the default. A list is
     taken at its word -- unknown names drop, repeats collapse, the declared
-    order is restored, and at most two survive -- so an empty list comes back
+    order is restored, and at most three survive -- so an empty list comes back
     empty, which is how "print nothing under the picture" is stored at all.
     """
     if not isinstance(value, list):

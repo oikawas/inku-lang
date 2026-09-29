@@ -62,3 +62,19 @@ def test_surface_intensity_wire_defaults_and_supported_fill_domain() -> None:
         assert current.instructions[0].surface_intensity == "dense"
     with pytest.raises(ValidationError):
         Instruction(primitive="circle", filled=True, surface_intensity="unknown")
+
+
+def test_the_sweep_texture_needs_score_0_17() -> None:
+    # 刷き (sweep) is the wash band without paleness of its own (render engine 72).
+    for instruction in (
+        {"primitive": "line", "surface": {"texture": "sweep"}},
+        {"primitive": "circle", "surface": {"texture": "sweep"}},
+    ):
+        with pytest.raises(ValidationError, match="surface texture sweep requires Score version 0.17.0"):
+            Score.model_validate({"version": "0.16.0", "instructions": [instruction]})
+        current = Score.model_validate({"version": "0.17.0", "instructions": [instruction]})
+        assert current.instructions[0].surface.texture == "sweep"
+    wash = Score.model_validate(
+        {"version": "0.16.0", "instructions": [{"primitive": "line", "surface": {"texture": "wash"}}]}
+    )
+    assert wash.instructions[0].surface.texture == "wash"

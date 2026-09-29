@@ -418,10 +418,10 @@ pub fn materialize_selected_composition(
         }
     }
     let score = Score {
-        version: if instructions.iter().any(|instruction| {
-            instruction.surface_intensity != inku_score::SurfaceIntensity::Normal
-                && !instruction.is_closed_solid_fill()
-        }) {
+        version: if instructions
+            .iter()
+            .any(inku_score::Instruction::requires_edition_0_17)
+        {
             inku_score::ScoreEdition::V0_17
         } else if instructions.iter().any(|instruction| {
             matches!(

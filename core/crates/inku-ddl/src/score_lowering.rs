@@ -3361,10 +3361,10 @@ fn lower_verified_stage15_shared<'a>(
         ScoreLoweringOutcome::Complete
     };
     let score = (objects.is_none() && outcome != ScoreLoweringOutcome::Stopped).then(|| Score {
-        version: if instructions.iter().any(|instruction| {
-            instruction.surface_intensity != SurfaceIntensity::Normal
-                && !instruction.is_closed_solid_fill()
-        }) {
+        version: if instructions
+            .iter()
+            .any(inku_score::Instruction::requires_edition_0_17)
+        {
             inku_score::ScoreEdition::V0_17.as_str().to_owned()
         } else if instructions.iter().any(|instruction| {
             matches!(
@@ -6205,7 +6205,7 @@ fn surface_spec_from_identity(
     let texture: SurfaceTexture = match (identity.category, identity.id) {
         (
             "surface",
-            "wash" | "grain" | "stipple" | "hatch" | "crosshatch" | "bleed" | "aquatint",
+            "wash" | "sweep" | "grain" | "stipple" | "hatch" | "crosshatch" | "bleed" | "aquatint",
         ) => serde_json::from_value(serde_json::Value::String(identity.id.to_owned())).map_err(
             |_| ScoreFieldGap::UnsupportedSurfaceIdentity {
                 category: identity.category.to_owned(),

@@ -255,17 +255,31 @@ pub(crate) fn is_closed(primitive: Primitive) -> bool {
     )
 }
 
-fn is_wash_mark(instruction: &Instruction) -> bool {
-    !is_closed(instruction.primitive)
-        && instruction
-            .surface
-            .as_ref()
-            .is_some_and(|surface| surface.texture == SurfaceTexture::Wash)
+/// The opacity factor of a band a line or an arc draws for its surface word.
+/// Wash is the pale band of the retired 薄墨. Sweep (刷き) is the same broad
+/// band without paleness of its own: the handling word 薄い makes it pale.
+const WASH_BAND_OPACITY: f64 = 0.35;
+const SWEEP_BAND_OPACITY: f64 = 0.64;
+
+fn band_opacity(instruction: &Instruction) -> Option<f64> {
+    if is_closed(instruction.primitive) {
+        return None;
+    }
+    match instruction.surface.as_ref()?.texture {
+        SurfaceTexture::Wash => Some(WASH_BAND_OPACITY),
+        SurfaceTexture::Sweep => Some(SWEEP_BAND_OPACITY),
+        _ => None,
+    }
 }
 
 pub(crate) fn mark_width(instruction: &Instruction, canvas: CanvasSize) -> f64 {
     let width = thinned_width(instruction.weight, instruction.thinness) * canvas.unit() / 1000.0;
-    width * if is_wash_mark(instruction) { 3.0 } else { 1.0 }
+    width
+        * if band_opacity(instruction).is_some() {
+            3.0
+        } else {
+            1.0
+        }
 }
 
 pub(crate) fn weight_opacity(weight: Weight) -> f64 {
@@ -352,8 +366,8 @@ pub(crate) fn mark_style(instruction: &Instruction, context: MarkContext<'_>) ->
         weight_opacity(instruction.weight),
         fill,
     );
-    if is_wash_mark(instruction) {
-        stroke_opacity = (stroke_opacity * 0.35 * 1_000_000.0).round() / 1_000_000.0;
+    if let Some(band) = band_opacity(instruction) {
+        stroke_opacity = (stroke_opacity * band * 1_000_000.0).round() / 1_000_000.0;
     }
     if instruction.surface_intensity != SurfaceIntensity::Normal
         && !instruction.is_closed_solid_fill()
@@ -1366,5 +1380,54 @@ mod tests {
 
         assert_eq!(fine, MIN_STROKE_WIDTH);
         assert_eq!(extra_fine, MIN_STROKE_WIDTH);
+    }
+
+    #[test]
+    fn a_sweep_line_is_the_wash_band_without_its_paleness() {
+        let colors = BTreeMap::new();
+        let context = MarkContext {
+            canvas: CanvasSize::new(1000.0, 1000.0),
+            color_map: &colors,
+            work_assignment: &colors,
+            render_seed: Some(1),
+            instruction_seed_override: None,
+            instruction_index: 0,
+            mark_index: 0,
+            wild: false,
+            use_filters: false,
+            profile: SvgProfile::Display,
+            support: crate::support::DEFAULT_SUPPORT,
+            geometry_transform: crate::affine::AffineTransform::identity(),
+            oil_fill_pass_limit: crate::fills::MAX_OIL_FILL_PASSES,
+            effects: crate::effects::MarkEffects::default(),
+        };
+        let line = |surface: &str, intensity: &str| {
+            serde_json::from_str::<Instruction>(&format!(
+                r#"{{"primitive":"line","weight":"pen","surface_intensity":"{intensity}"{surface}}}"#
+            ))
+            .unwrap()
+        };
+        let plain = mark_style(&line("", "normal"), context);
+        let wash = mark_style(&line(r#","surface":{"texture":"wash"}"#, "normal"), context);
+        let sweep = mark_style(
+            &line(r#","surface":{"texture":"sweep"}"#, "normal"),
+            context,
+        );
+        let faint_sweep = mark_style(&line(r#","surface":{"texture":"sweep"}"#, "faint"), context);
+
+        assert_eq!(wash.width, plain.width * 3.0);
+        assert_eq!(sweep.width, wash.width);
+        assert_eq!(plain.stroke_opacity, 1.0);
+        assert_eq!(wash.stroke_opacity, 0.35);
+        assert_eq!(sweep.stroke_opacity, 0.64);
+        // 薄いを添えた刷き comes back to the retired 薄墨 band within a hundredth.
+        assert_eq!(faint_sweep.stroke_opacity, 0.352);
+        assert!((faint_sweep.stroke_opacity - wash.stroke_opacity).abs() < 0.01);
+        // A closed shape draws its sweep as a surface, not as a band.
+        let circle = serde_json::from_str::<Instruction>(
+            r#"{"primitive":"circle","weight":"pen","surface":{"texture":"sweep"}}"#,
+        )
+        .unwrap();
+        assert_eq!(mark_style(&circle, context).width, plain.width);
     }
 }

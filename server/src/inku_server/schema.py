@@ -66,7 +66,9 @@ CLOSED_SHAPES = frozenset(
 # The three do not all land in the same place. 粒 and にじみ raise the sheet's
 # own two quantities (render engine 37); 薄墨 says nothing about the sheet, so
 # the renderer draws it as a broader, paler band instead (render engine 38).
-MARK_SURFACE_WORDS = frozenset({"grain", "bleed", "wash"})
+# 刷き (sweep, Score 0.17.0) is that broad band without paleness of its own; the
+# handling word 薄い makes it pale (render engine 72).
+MARK_SURFACE_WORDS = frozenset({"grain", "bleed", "wash", "sweep"})
 LineStyle = Literal["solid", "dashed", "dotted", "dash_dot"]
 SurfaceIntensity = Literal["normal", "dense", "faint"]
 Weight = Literal[
@@ -111,6 +113,7 @@ SurfaceTexture = Literal[
     "aquatint",
     "grain",
     "wash",
+    "sweep",
     "bleed",
     "paper_grain",
 ]
@@ -1517,6 +1520,11 @@ class Score(BaseModel):
             raise ValueError(
                 "surface_intensity on a stroke or a textured surface requires Score version 0.17.0"
             )
+        if self.version != "0.17.0" and any(
+            instruction.surface is not None and instruction.surface.texture == "sweep"
+            for instruction in self.instructions
+        ):
+            raise ValueError("surface texture sweep requires Score version 0.17.0")
         if self.mirror_relations and self.version not in {"0.15.0", "0.16.0", "0.17.0"}:
             raise ValueError("mirror_relations requires Score version 0.15.0")
         covered_until = 0

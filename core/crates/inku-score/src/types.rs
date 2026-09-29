@@ -402,6 +402,7 @@ string_enum!(SurfaceTexture {
     Aquatint => "aquatint",
     Grain => "grain",
     Wash => "wash",
+    Sweep => "sweep",
     Bleed => "bleed",
     PaperGrain => "paper_grain",
 });
@@ -1125,6 +1126,17 @@ impl Instruction {
                 .as_ref()
                 .is_some_and(|surface| surface.texture == SurfaceTexture::Solid);
         closed && solid && filled
+    }
+
+    /// Whether the mark needs Score 0.17.0: a stated intensity on a mark other
+    /// than a closed flat fill, or the sweep texture.
+    #[must_use]
+    pub fn requires_edition_0_17(&self) -> bool {
+        (self.surface_intensity != SurfaceIntensity::Normal && !self.is_closed_solid_fill())
+            || self
+                .surface
+                .as_ref()
+                .is_some_and(|surface| surface.texture == SurfaceTexture::Sweep)
     }
 }
 
@@ -2467,6 +2479,14 @@ impl Score {
                         "surface_intensity on a stroke or a textured surface requires Score version 0.17.0",
                     );
                 }
+            }
+            if instruction
+                .surface
+                .as_ref()
+                .is_some_and(|surface| surface.texture == SurfaceTexture::Sweep)
+                && !self.edition_at_least(ScoreEdition::V0_17)
+            {
+                return Err("surface texture sweep requires Score version 0.17.0");
             }
             if instruction.ink_spread.is_some() && !self.edition_at_least(ScoreEdition::V0_12) {
                 return Err("ink_spread requires Score version 0.12.0");

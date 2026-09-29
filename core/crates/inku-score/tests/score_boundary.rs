@@ -222,6 +222,34 @@ fn surface_intensity_keeps_normal_bytes_and_rejects_unaccepted_texture_meanings(
 }
 
 #[test]
+fn the_sweep_texture_needs_score_0_17() {
+    for instruction in [
+        json!({"primitive":"line","surface":{"texture":"sweep"}}),
+        json!({"primitive":"circle","surface":{"texture":"sweep"}}),
+    ] {
+        let older: Score = serde_json::from_value(
+            json!({"version":"0.16.0","instructions":[instruction.clone()]}),
+        )
+        .unwrap();
+        assert_eq!(
+            older.validate_schema_edition(),
+            Err("surface texture sweep requires Score version 0.17.0")
+        );
+        let current: Score =
+            serde_json::from_value(json!({"version":"0.17.0","instructions":[instruction]}))
+                .unwrap();
+        assert_eq!(current.validate_schema_edition(), Ok(()));
+        assert!(current.instructions[0].requires_edition_0_17());
+    }
+    let wash: Score = serde_json::from_value(
+        json!({"version":"0.16.0","instructions":[{"primitive":"line","surface":{"texture":"wash"}}]}),
+    )
+    .unwrap();
+    assert_eq!(wash.validate_schema_edition(), Ok(()));
+    assert!(!wash.instructions[0].requires_edition_0_17());
+}
+
+#[test]
 fn transform_groups_accept_postorder_and_reject_malformed_structure() {
     let anchor_groups = score(
         r#"{"version":"0.6.0",

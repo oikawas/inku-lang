@@ -27,6 +27,9 @@ const SURFACE_WASH_LAYERS: usize = 2;
 const SURFACE_WASH_WIDTH_BASE: f64 = 0.88;
 const SURFACE_WASH_WIDTH_SPAN: f64 = 0.60;
 const SURFACE_WASH_OPACITY: f64 = 0.22;
+/// One sweep of 刷き: the wash sweeps without their own paleness, so that 薄い
+/// (faint, ×0.55) brings them back to the wash's 0.22.
+const SURFACE_SWEEP_OPACITY: f64 = 0.40;
 const SURFACE_BLEED_RINGS: usize = 3;
 
 #[derive(Clone, Debug, PartialEq)]
@@ -370,7 +373,12 @@ fn render_vectors(
                 ));
             }
         }
-        SurfaceTexture::Wash => {
+        SurfaceTexture::Wash | SurfaceTexture::Sweep => {
+            let (sweep_opacity, class_name) = if surface.texture == SurfaceTexture::Wash {
+                (SURFACE_WASH_OPACITY, "surface-stroke-v1 surface-wash-sweep")
+            } else {
+                (SURFACE_SWEEP_OPACITY, "surface-stroke-v1 surface-sweep")
+            };
             let spacing = (context.canvas.unit() * (0.052 - density * 0.024)).max(10.0);
             let base_angle = hash01(0, seed, "fill-angle") * std::f64::consts::PI;
             let mut stroke_index = 0_i64;
@@ -393,10 +401,10 @@ fn render_vectors(
                             end,
                             sweep_width,
                             &color,
-                            opacity * SURFACE_WASH_OPACITY,
+                            opacity * sweep_opacity,
                             seed,
                             stroke_index,
-                            "surface-stroke-v1 surface-wash-sweep",
+                            class_name,
                         )
                     {
                         group.push(element);
@@ -674,6 +682,56 @@ mod tests {
                 .into_iter()
                 .all(|point| point_in_polygon(point, &contour))
         );
+    }
+
+    fn drawn_lines(element: &Element, out: &mut Vec<(String, String, f64)>) {
+        for child in element.children() {
+            if let crate::svg::Node::Element(child) = child {
+                if child.name() == "line" {
+                    out.push((
+                        child.attribute("class").unwrap().to_owned(),
+                        child.attribute("stroke-width").unwrap().to_owned(),
+                        child.attribute("stroke-opacity").unwrap().parse().unwrap(),
+                    ));
+                }
+                drawn_lines(child, out);
+            }
+        }
+    }
+
+    #[test]
+    fn sweep_lays_the_wash_sweeps_without_their_paleness() {
+        let colors = BTreeMap::new();
+        let drawn = |texture: &str, intensity: &str| {
+            let score: Score = serde_json::from_str(&format!(
+                r#"{{"version":"0.17.0","instructions":[{{"primitive":"square","position":[0.3,0.3],"size":[0.4,0.4],"weight":"rotring","surface_intensity":"{intensity}","surface":{{"texture":"{texture}","seed":7}}}}]}}"#
+            ))
+            .unwrap();
+            let instruction = &score.instructions[0];
+            let geometry = MarkGeometry::of(instruction).unwrap();
+            let rendered = render_surface(instruction, geometry, context(&colors)).unwrap();
+            let mut lines = Vec::new();
+            drawn_lines(&rendered.group, &mut lines);
+            lines
+        };
+        let wash = drawn("wash", "normal");
+        let sweep = drawn("sweep", "normal");
+        let faint_sweep = drawn("sweep", "faint");
+        assert!(wash.len() > 10);
+        assert_eq!(wash.len(), sweep.len());
+        assert_eq!(wash.len(), faint_sweep.len());
+        for ((wash_class, wash_width, wash_opacity), (sweep_class, sweep_width, sweep_opacity)) in
+            wash.iter().zip(&sweep)
+        {
+            assert_eq!(wash_class, "surface-stroke-v1 surface-wash-sweep");
+            assert_eq!(sweep_class, "surface-stroke-v1 surface-sweep");
+            assert_eq!(wash_width, sweep_width);
+            assert!((sweep_opacity / wash_opacity - 0.40 / 0.22).abs() < 1e-3);
+        }
+        // 薄いを添えた刷き is the retired 薄墨: faint (×0.55) brings 0.40 back to 0.22.
+        for ((_, _, wash_opacity), (_, _, faint_opacity)) in wash.iter().zip(&faint_sweep) {
+            assert!((wash_opacity - faint_opacity).abs() < 1e-6);
+        }
     }
 
     #[test]

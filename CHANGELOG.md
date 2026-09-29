@@ -6,7 +6,7 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 59 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
-### 2026-09-29 — Finding the page that holds a given work is quick with statistics too
+### v2.15.58 — Finding the page that holds a given work is quick with statistics too (Build 1134, 2026-09-29)
 
 At the author's request. Counting a given work's position (`anchor_id`) also walked the `at` index range once v2.15.56 made statistics, reading every newer work (on Pentala, 195 ms for the 3,000th work and 217 ms for the 4,100th). As in the listing, the time comparison is now `at + 0`. Checked read-only on the production database with the author's permission: works at the 0th, 1,000th, 3,000th and 4,100th position took 3 ms each, with the same positions.
 

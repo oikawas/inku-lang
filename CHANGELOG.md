@@ -6,6 +6,13 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file holds the 54 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
 
+### 2026-09-29 — The history library opens a lineage quickly and sends its cards no SVG
+
+At the author's request, following the slow history listing. On Pentala opening a lineage of 19 works took about 0.5 s, and a page of 24 lineages about 1.0 s and 3.4 MB.
+
+- Opening a lineage read every work and compared its root through a coalesce. The same test is now spelled as "the root matches, or there is no root and the node is the root", which the lineage node indexes answer: on a local synthetic 4,200-work database a lineage of 20 fell from 515 ms to 7 ms.
+- The lineage page sent each representative's whole SVG. With `include_svg=false` the SVG is emptied and its size given in `svg_bytes`; the Web's cards draw from thumbnails and a preview reads its SVG when opened. The rest of the page's time is the aggregate over every work, to be measured after deployment.
+
 ### v2.15.53 — The history listing picks the page's ids before reading its rows (Build 1129, 2026-09-29)
 
 At the author's request, following the slow saving of refinement options. One listing took about 0.4 s whatever its size, longer the more works the caller may read (on Pentala, 408 ms for one work out of 4,169, against 50 ms from 9 in the trash). A caller who may read every work gets no index for the order, so SQLite sorted every readable work carrying all its columns, the SVG length included. The page's ids are now chosen by id and time first, and only those rows are read. On a local synthetic database of 4,200 works read as such a caller, the first page fell from 500 ms to 250 ms and the page from the 3,000th from 890 ms to 238 ms. The rest is the count, which on Pentala should cost what the listing state does, about 50 ms.

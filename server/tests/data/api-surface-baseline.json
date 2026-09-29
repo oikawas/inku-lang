@@ -444,6 +444,7 @@
         "header:authorization:opt",
         "query:for_revision:opt",
         "query:for_share:opt",
+        "query:include_svg:opt",
         "query:limit:opt",
         "query:min_items:opt",
         "query:offset:opt",
@@ -1686,5 +1687,5 @@
     "VisionRefineAdviceBody": "{\"properties\":{\"direction\":{\"default\":\"\",\"maxLength\":2000,\"title\":\"Direction\",\"type\":\"string\"},\"enabled_kinds\":{\"items\":{\"type\":\"string\"},\"maxItems\":5,\"minItems\":1,\"title\":\"Enabled Kinds\",\"type\":\"array\"},\"history_id\":{\"maxLength\":200,\"minLength\":1,\"title\":\"History Id\",\"type\":\"string\"},\"instruction\":{\"maxLength\":100000,\"minLength\":1,\"title\":\"Instruction\",\"type\":\"string\"},\"language\":{\"default\":\"ja\",\"pattern\":\"^(ja|en)$\",\"title\":\"Language\",\"type\":\"string\"},\"model\":{\"anyOf\":[{\"maxLength\":200,\"minLength\":1,\"type\":\"string\"},{\"type\":\"null\"}],\"title\":\"Model\"}},\"required\":[\"history_id\",\"instruction\",\"enabled_kinds\"],\"title\":\"VisionRefineAdviceBody\",\"type\":\"object\"}",
     "VisionRefineAdviceResponse": "{\"properties\":{\"model\":{\"title\":\"Model\",\"type\":\"string\"},\"next_direction\":{\"title\":\"Next Direction\",\"type\":\"string\"},\"observation\":{\"title\":\"Observation\",\"type\":\"string\"},\"suggested_kind\":{\"title\":\"Suggested Kind\",\"type\":\"string\"}},\"required\":[\"observation\",\"next_direction\",\"suggested_kind\",\"model\"],\"title\":\"VisionRefineAdviceResponse\",\"type\":\"object\"}"
   },
-  "digest": "c85d4c11d7be66d27570330769b166a57a2e7155171ded9f94e34de9baba9699"
+  "digest": "47624d7ddbc27208e1ac22f0281150cdc5197220942c6b0e786e0e4ae5c9a73e"
 }

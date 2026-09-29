@@ -373,7 +373,8 @@
 		lineageGroupController = controller;
 		lineageGroupLoading = true;
 		lineageLoadFailed = false;
-		const params = new URLSearchParams({ offset: String(lineageGroupPage * lineageGroupPageSize), limit: String(lineageGroupPageSize), q: historySearch.trim() });
+		// A card draws from its thumbnail and a preview reads its one SVG when opened.
+		const params = new URLSearchParams({ offset: String(lineageGroupPage * lineageGroupPageSize), limit: String(lineageGroupPageSize), q: historySearch.trim(), include_svg: 'false' });
 		if (historyManagerView === 'trash') params.set('trashed', 'true');
 		if (historyManagerStarredOnly) params.set('starred', 'true');
 		if (historyManagerForRevisionOnly) params.set('for_revision', 'true');

@@ -216,6 +216,7 @@ class HistoryLineageGroupReader:
         for_revision: bool = False,
         for_share: bool = False,
         min_item_count: int = 1,
+        include_svg: bool = True,
     ) -> tuple[list[dict], int]:
         """List deterministic history groups, paginated by lineage rather than artwork.
 
@@ -287,11 +288,23 @@ class HistoryLineageGroupReader:
             )
             representative_id_by_root = {root: history_id for root, history_id in representative_pairs}
             representative_ids = list(representative_id_by_root.values())
-            representative_rows = session.query(HistoryRow).filter(HistoryRow.id.in_(representative_ids)).all()
-            representative_by_id = {
-                item["id"]: item
-                for item in self.rows_to_dicts_with_lineage_fn(session, representative_rows, actor)
-            }
+            representatives = session.query(HistoryRow).filter(HistoryRow.id.in_(representative_ids))
+            if include_svg:
+                representative_items = self.rows_to_dicts_with_lineage_fn(session, representatives.all(), actor)
+            else:
+                # A card is drawn from its thumbnail; a page of 24 whole SVGs was
+                # 3.4 MB and about a second on production.
+                projected = representatives.options(defer(HistoryRow.svg)).add_columns(
+                    func.length(func.cast(HistoryRow.svg, LargeBinary)).label("svg_bytes")
+                ).all()
+                representative_items = self.rows_to_dicts_with_lineage_fn(
+                    session,
+                    [row for row, _svg_bytes in projected],
+                    actor,
+                    include_svg=False,
+                    svg_bytes_by_id={row.id: int(svg_bytes or 0) for row, svg_bytes in projected},
+                )
+            representative_by_id = {item["id"]: item for item in representative_items}
             groups = []
             for row in page_rows:
                 representative_id = representative_id_by_root.get(row.root_node_id)
@@ -338,12 +351,17 @@ class HistoryLineageGroupReader:
                 .filter(
                     access._readable_by(actor, HistoryRow.user_id, HistoryRow.id),
                     access._readable_node(actor),
-                    # coalesce, not a bare ==, and the same expression list_lineage_groups
-                    # groups by: the root_node_id column was added by migration without a
+                    # The same test as the coalesce list_lineage_groups groups by, not a
+                    # bare ==: the root_node_id column was added by migration without a
                     # backfill, so a root node created before it holds NULL and would not
                     # match its own id. Such a lineage counted its own root in the group
-                    # aggregate but dropped it from the member list.
-                    func.coalesce(LineageNodeRow.root_node_id, LineageNodeRow.id) == root_node_id,
+                    # aggregate but dropped it from the member list. Spelled out so the
+                    # node indexes find the members: the coalesce made SQLite read every
+                    # work (0.5 s for a lineage of 19 on production).
+                    or_(
+                        LineageNodeRow.root_node_id == root_node_id,
+                        and_(LineageNodeRow.root_node_id.is_(None), LineageNodeRow.id == root_node_id),
+                    ),
                     HistoryRow.trashed == (1 if trashed else 0),
                     HistoryRow.history_visibility == "normal",
                 )

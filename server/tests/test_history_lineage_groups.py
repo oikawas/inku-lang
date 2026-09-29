@@ -83,6 +83,13 @@ def test_history_groups_page_by_lineage_and_exclude_hidden_items():
         assert first["item_count"] == 2
         assert first["representative"]["id"] == child["id"]
         assert first["latest_at"] == 3000
+        assert first["representative"]["svg"] == "<svg xmlns='http://www.w3.org/2000/svg'/>"
+
+        # A client drawing cards from thumbnails leaves the SVG out; its size stays.
+        thumbnails = client.get("/api/history/lineage-groups?limit=1&include_svg=false", headers=headers).json()
+        assert thumbnails["groups"][0]["representative"]["id"] == child["id"]
+        assert thumbnails["groups"][0]["representative"]["svg"] == ""
+        assert thumbnails["groups"][0]["representative"]["svg_bytes"] == len("<svg xmlns='http://www.w3.org/2000/svg'/>")
 
         second_page = client.get("/api/history/lineage-groups?offset=1&limit=1", headers=headers).json()
         assert second_page["groups"][0]["root_node_id"] == independent["lineage_node_id"]
@@ -94,6 +101,18 @@ def test_history_groups_page_by_lineage_and_exclude_hidden_items():
         assert members.status_code == 200
         assert [item["id"] for item in members.json()["items"]] == [child["id"], root["id"]]
         assert all(item["lineage_root_node_id"] == root["lineage_node_id"] for item in members.json()["items"])
+
+        # A root node saved before root_node_id existed holds NULL; it is still a member.
+        with db.SessionLocal() as session:
+            session.query(db.LineageNodeRow).filter(db.LineageNodeRow.id == root["lineage_node_id"]).update(
+                {db.LineageNodeRow.root_node_id: None}
+            )
+            session.commit()
+        legacy_members = client.get(
+            f"/api/history/lineage-groups/{root['lineage_node_id']}/items",
+            headers=headers,
+        ).json()
+        assert [item["id"] for item in legacy_members["items"]] == [child["id"], root["id"]]
 
         searched_groups = client.get(
             "/api/history/lineage-groups?q=cd34",

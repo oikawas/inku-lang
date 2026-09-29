@@ -497,17 +497,26 @@ pub fn compile_committed(
     Ok(delivery)
 }
 
-/// The colour the canvas shows under the marks, with the source sentences
-/// whose marks are drawn only in it, from one compile of the exact document.
+/// The colour the canvas shows under a candidate's marks, the source
+/// sentences drawn only in it, and every colour its additive marks use.
+pub(crate) struct GroundColouredSentences {
+    pub background: Color,
+    pub sentences: Vec<SourceSpan>,
+    pub mark_colours: Vec<Color>,
+}
+
+/// Find, from one compile of the exact document, the source sentences whose
+/// marks are drawn only in the colour the canvas shows under them.
 ///
 /// Such a mark is not seen where no mark of another colour lies beneath it.
 /// Only additive marks the source asks for itself count, not a Macro's; a
-/// Score whose ground covers the background gives no sentence.
+/// Score whose ground covers the background gives no sentence. The colours
+/// of every additive mark, a Macro's too, come along for the new background.
 pub(crate) fn ground_coloured_sentences(
     document: NormalizedDdlDocument,
     definitions: &[MacroDefinition],
     options: &CompilerOptions,
-) -> Result<Option<(Color, Vec<SourceSpan>)>, BoundaryError> {
+) -> Result<Option<GroundColouredSentences>, BoundaryError> {
     options.validate()?;
     let result = compile_ddl_to_score_with_resources(
         document,
@@ -536,10 +545,11 @@ pub(crate) fn ground_coloured_sentences(
         .clause_stream
         .clauses;
     let mut sentences = Vec::new();
+    let mut mark_colours = Vec::new();
     for (instruction, origin) in score.instructions.iter().zip(result.instruction_origins()) {
-        let ScoreInstructionOrigin::SourceInstruction { instruction_index } = origin else {
+        if instruction.mode_ != InstructionMode::Additive {
             continue;
-        };
+        }
         let cycle = instruction
             .arrangement
             .as_ref()
@@ -549,9 +559,15 @@ pub(crate) fn ground_coloured_sentences(
         } else {
             cycle
         };
-        if instruction.mode_ != InstructionMode::Additive
-            || colours.iter().any(|colour| *colour != ground)
-        {
+        for colour in colours {
+            if !mark_colours.contains(colour) {
+                mark_colours.push(*colour);
+            }
+        }
+        let ScoreInstructionOrigin::SourceInstruction { instruction_index } = origin else {
+            continue;
+        };
+        if colours.iter().any(|colour| *colour != ground) {
             continue;
         }
         let Some(head) = semantic
@@ -569,7 +585,11 @@ pub(crate) fn ground_coloured_sentences(
             sentences.push(clause.span);
         }
     }
-    Ok((!sentences.is_empty()).then_some((ground, sentences)))
+    Ok((!sentences.is_empty()).then_some(GroundColouredSentences {
+        background: ground,
+        sentences,
+        mark_colours,
+    }))
 }
 
 /// Serializable caller-owned Compat clipping policy with no implicit limits.

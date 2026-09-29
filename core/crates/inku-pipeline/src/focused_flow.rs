@@ -1376,14 +1376,21 @@ fn stage1_returns_the_layers_drawn_only_in_the_background_colour() {
         layers[0]["text"].as_str().unwrap().trim_end_matches('.'),
         "place one white circle at center"
     );
+    let system = action.payload["prompt"]["system"].as_str().unwrap();
     assert!(
-        action.payload["prompt"]["system"]
-            .as_str()
-            .unwrap()
-            .contains(
-                "choose again a background color that every mark of the plan can be told from"
-            )
+        system.contains(
+            "choose again a background color that every mark of the plan can be told from"
+        )
     );
+    assert!(system.contains("leave out the colors of the previous plan's marks"));
+    // The circle is white and the square black; an unspecified background is white.
+    let choices = action.payload["prompt"]["response_schema"]["properties"]["background"]["enum"]
+        .as_array()
+        .unwrap();
+    for colour in ["white", "black", "unspecified"] {
+        assert!(!choices.iter().any(|choice| choice == colour), "{colour}");
+    }
+    assert!(choices.iter().any(|choice| choice == "gray"));
 
     let state = ground_answer(&state, answered).snapshot;
     assert!(state.stage1_fallback.is_none());
@@ -1481,4 +1488,30 @@ fn stage1_keeps_its_candidate_without_budget_or_where_the_ground_covers_the_back
         let wire = serde_json::to_value(&state).unwrap();
         assert!(wire.get("stage1_fallback").is_none(), "{source}");
     }
+}
+
+#[test]
+fn the_background_choices_stay_whole_when_every_colour_is_a_mark() {
+    let every_colour = [
+        "white", "black", "blue", "red", "green", "gray", "yellow", "orange", "purple",
+    ]
+    .map(|colour| format!("place one {colour} circle at center."))
+    .join("\n");
+    let first = ground_start(config());
+    let whole = first.action.as_ref().unwrap().payload["prompt"]["response_schema"]["properties"]
+        ["background"]["enum"]
+        .clone();
+    let state = ground_answer(&first, &every_colour).snapshot;
+    let action = state.action.as_ref().unwrap();
+    assert_eq!(action.tag, "generate_normalized_ddl");
+    assert_eq!(
+        action.payload["prompt"]["response_schema"]["properties"]["background"]["enum"],
+        whole
+    );
+    assert!(
+        action.payload["prompt"]["system"]
+            .as_str()
+            .unwrap()
+            .contains("When the description states the background color")
+    );
 }

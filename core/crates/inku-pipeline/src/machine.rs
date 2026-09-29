@@ -927,7 +927,7 @@ impl PipelineSnapshot {
         else {
             return Ok(false);
         };
-        let Ok(Some((background, sentences))) = crate::core_boundary::ground_coloured_sentences(
+        let Ok(Some(found)) = crate::core_boundary::ground_coloured_sentences(
             candidate.document()?,
             &self.config.definitions,
             &self.config.compiler,
@@ -937,8 +937,10 @@ impl PipelineSnapshot {
         let Ok(prompt) = with_stage1_background_feedback(
             self.stage1_prompt(&description)?,
             &candidate.source,
-            background,
-            &sentences,
+            found.background,
+            &found.sentences,
+            &found.mark_colours,
+            self.config.compiler.host.background(),
             self.config.prompt_limits,
         ) else {
             return Ok(false);
@@ -951,8 +953,8 @@ impl PipelineSnapshot {
             json!({
                 "identity": self.action.as_ref().unwrap().identity,
                 "reason": "ground_coloured_layers",
-                "background": background,
-                "layers": sentences.len(),
+                "background": found.background,
+                "layers": found.sentences.len(),
             }),
         )?;
         Ok(true)

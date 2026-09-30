@@ -271,9 +271,16 @@ class ProductPipelineEffects:
                                           "description": entry["sub_ja" if language == "ja" else "sub"]},
                                "resolved": resolved[entry["id"]]} for entry in catalogs] if mode == "auto" else []
         actor = db.get_user(owner)
+        # One model draws both stages (2026-09-30, the author). A request that
+        # still names two keeps the Stage 1 one; one that names only Stage 2
+        # (hand-written DDL, the old compose URL) is the one model; none takes
+        # the account's model. The work still records both keys, now equal.
+        model = resolved_stage_model(
+            selected.get("stage1_model") or selected.get("stage2_model"), actor, stage="stage1"
+        )
         selected.update(
-            stage1_model=resolved_stage_model(selected.get("stage1_model"), actor, stage="stage1"),
-            stage2_model=resolved_stage_model(selected.get("stage2_model"), actor, stage="stage2"),
+            stage1_model=model,
+            stage2_model=model,
             render_seed=str(seed), seed_text=seed_text, catalog_mode=mode,
             instruction_lang=selected.get("instruction_lang") or "auto",
             instruction_lang_resolved=language, catalog_id=catalog_id,

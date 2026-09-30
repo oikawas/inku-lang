@@ -414,7 +414,10 @@ def test_current_user_model_selection_is_persisted(auth_context):
     )
     assert updated.status_code == 200
     assert updated.json()["model_settings"]["stage1_provider"] == "openai"
-    assert updated.json()["model_settings"]["stage2_model"] == "gemini:gemini-2.5-flash"
+    # One model draws both stages (2026-09-30, the author): a Stage 2 choice
+    # that differs is not kept; Stage 2 follows Stage 1.
+    assert updated.json()["model_settings"]["stage2_provider"] == "openai"
+    assert updated.json()["model_settings"]["stage2_model"] == "openai:gpt-5.1-mini"
     assert updated.json()["model_settings"]["vision_model"] == "meta/llama-3.2-90b-vision-instruct"
     # v2.9.1: okugaki is stored as a (provider, model) pair like every other
     # stage. A single qualified string sent by an older client is still read;

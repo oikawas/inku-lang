@@ -58,14 +58,6 @@
 			{/if}
 		</div>
 	</div>
-	<div class="compare-mode-tabs" role="tablist" aria-label={t().modelCompareModeLabel}>
-		<button class:active={modelInspection.compareMode === 'common'} onclick={() => modelInspection.setCompareMode('common')}>{t().modelCompareModeCommon}</button>
-		<button class:active={modelInspection.compareMode === 'stage1_fixed'} onclick={() => modelInspection.setCompareMode('stage1_fixed')}>{t().modelCompareModeStage1Fixed}</button>
-		<button class:active={modelInspection.compareMode === 'stage2_fixed'} onclick={() => modelInspection.setCompareMode('stage2_fixed')}>{t().modelCompareModeStage2Fixed}</button>
-	</div>
-	{#if modelInspection.compareMode !== 'common'}
-		<label class="compare-fixed-model"><span>{modelInspection.compareMode === 'stage1_fixed' ? t().modelCompareFixedStage1 : t().modelCompareFixedStage2}</span><select value={modelInspection.compareFixedModel} disabled={modelInspection.busy} onchange={(event) => modelInspection.setCompareFixedModel(event.currentTarget.value)}>{#each modelInspection.choices as choice (choice.id)}<option value={choice.id}>{choice.label} · {choice.providerLabel}</option>{/each}</select></label>
-	{/if}
 	<div class="model-choice-grid" aria-label={t().modelCompareModelSelectLabel}>
 		{#each modelInspection.choices as choice (choice.id)}
 			{@const blocked = modelInspection.isChoiceBlocked(choice.id)}

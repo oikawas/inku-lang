@@ -99,7 +99,6 @@ export interface LangPack {
 	modelLabel: string;
 	showThinkingLabel: string;
 	modelSelectionSharedHint: string;
-	modelSelectionSeparateHint: string;
 	modelSelectionVisionHint: string;
 
 	// Saijiki
@@ -401,12 +400,6 @@ export interface LangPack {
 	comparisonPrev: string;
 	comparisonCurrent: string;
 	modelCompareButton: string;
-	modelCompareModeLabel: string;
-	modelCompareModeCommon: string;
-	modelCompareModeStage1Fixed: string;
-	modelCompareModeStage2Fixed: string;
-	modelCompareFixedStage1: string;
-	modelCompareFixedStage2: string;
 	modelCompareTargetDisabledTooltip: string;
 	modelCompareBusy: string;
 	modelCompareSubtitle: string;

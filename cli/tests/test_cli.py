@@ -334,10 +334,6 @@ def test_models_command_accepts_providers():
         "nvidia",
         "--stage1-model",
         "google/gemma-4-31b-it",
-        "--stage2-provider",
-        "local",
-        "--stage2-model",
-        "qwen-api",
         "--vision-provider",
         "nvidia",
         "--vision-model",
@@ -348,12 +344,28 @@ def test_models_command_accepts_providers():
 
     assert args.stage1_provider == "nvidia"
     assert args.stage1_model == "google/gemma-4-31b-it"
-    assert args.stage2_provider == "local"
-    assert args.stage2_model == "qwen-api"
     assert args.vision_provider == "nvidia"
     assert args.vision_model == "meta/llama-3.2-90b-vision-instruct"
     assert args.color_catalog == "ink_season"
 
+
+
+def test_one_model_draws_both_stages():
+    """2026-09-30, the author: Stage 1 and Stage 2 no longer take different models.
+
+    There is no flag for Stage 2 alone, and a paint that names only the Stage 1
+    model sends that model for Stage 2 as well.
+    """
+    parser = cli.build_parser()
+    for command in (["models"], ["paint", "一滴の墨"]):
+        with pytest.raises(SystemExit):
+            parser.parse_args([*command, "--stage2-model", "other"])
+        with pytest.raises(SystemExit):
+            parser.parse_args([*command, "--stage2-provider", "local"])
+    args = parser.parse_args(["paint", "一滴の墨", "--stage1-model", "s1"])
+    payload = cli._paint_payload(args, "一滴の墨")
+    assert payload["stage1_model"] == "s1"
+    assert payload["stage2_model"] == "s1"
 
 def test_the_colophon_subcommand_replaced_okugaki_outright():
 
@@ -1836,7 +1848,6 @@ PAYLOAD_KEYS_BEFORE = {
 # Every pre-existing flag, so that the "all keys" count is measured and not assumed.
 ALL_PRIOR_FLAGS = [
     "--stage1-model", "s1",
-    "--stage2-model", "s2",
     "--include-thinking",
     "--ui-lang", "ja",
     "--save-history",

@@ -3165,8 +3165,6 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			{singleUserMode}
 			{stage1Provider}
 			{stage1Model}
-			{stage2Provider}
-			{stage2Model}
 			{visionProvider}
 			{visionModel}
 			providerGroups={settings.mode === 'model' ? availableModelCatalog : settings.modelCatalog}

@@ -30,8 +30,6 @@
 		singleUserMode: boolean;
 		stage1Provider: Provider;
 		stage1Model: string;
-		stage2Provider: Provider;
-		stage2Model: string;
 		visionProvider: Provider;
 		visionModel: string;
 		providerGroups: ProviderGroup[];
@@ -79,8 +77,6 @@
 		singleUserMode,
 		stage1Provider,
 		stage1Model,
-		stage2Provider,
-		stage2Model,
 		visionProvider,
 		visionModel,
 		providerGroups,
@@ -259,7 +255,7 @@
 
 	{#if settingsMode === 'model'}
 		<ModelSelectionSettings
-			bind:includeThinking {stage1Provider} {stage1Model} {stage2Provider} {stage2Model}
+			bind:includeThinking {stage1Provider} {stage1Model}
 			{visionProvider} {visionModel} {providerGroups} {visionProviderGroups} {allowVisionSelection}
 			{onSetStage1Provider} {onSetStage1Model} {onSetStage2Provider} {onSetStage2Model}
 			{onSetVisionProvider} {onSetVisionModel} onCancel={settings.close} onConfirm={onConfirmModelSelection}

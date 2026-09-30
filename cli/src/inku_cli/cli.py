@@ -427,14 +427,16 @@ def _display_provider(provider: str | None) -> str:
 def _resolved_stage1_provider(args: argparse.Namespace, config: CliConfig) -> str | None:
     return args.stage1_provider or config.stage1_provider
 
+# One model draws both stages (2026-09-30, the author): Stage 2 is whatever
+# Stage 1 resolves to, and there is no flag or saved setting for it alone.
 def _resolved_stage2_provider(args: argparse.Namespace, config: CliConfig) -> str | None:
-    return args.stage2_provider or config.stage2_provider
+    return _resolved_stage1_provider(args, config)
 
 def _resolved_stage1_model(args: argparse.Namespace, config: CliConfig) -> str | None:
     return args.stage1_model or config.stage1_model
 
 def _resolved_stage2_model(args: argparse.Namespace, config: CliConfig) -> str | None:
-    return args.stage2_model or config.stage2_model
+    return _resolved_stage1_model(args, config)
 
 def _resolved_timeout_seconds(args: argparse.Namespace, config: CliConfig) -> int:
     return args.timeout_seconds or config.timeout_seconds or DEFAULT_REQUEST_TIMEOUT_SECONDS
@@ -1963,7 +1965,7 @@ def _paint_payload(
         "description": text,
         "stage1_input": text,
         "stage1_model": stage1_model if stage1_model is not None else args.stage1_model,
-        "stage2_model": stage2_model if stage2_model is not None else args.stage2_model,
+        "stage2_model": stage2_model if stage2_model is not None else args.stage1_model,
         "include_thinking": args.include_thinking,
         "instruction_lang": args.instruction_lang,
         "ui_lang": args.ui_lang,
@@ -2010,7 +2012,7 @@ def _compose_payload(
     # is the same shape the web sends when it draws a new instruction sheet.
     payload: dict[str, Any] = {
         "ddl": ddl,
-        "model": stage2_model if stage2_model is not None else args.stage2_model,
+        "model": stage2_model if stage2_model is not None else args.stage1_model,
         "instruction_lang": args.instruction_lang,
         "ui_lang": args.ui_lang,
         "catalog_id": color_catalog,
@@ -2302,8 +2304,6 @@ def command_models(args: argparse.Namespace) -> int:
     if (
         args.stage1_provider is not None
         or args.stage1_model is not None
-        or args.stage2_provider is not None
-        or args.stage2_model is not None
         or args.vision_provider is not None
         or args.vision_model is not None
         or args.timeout_seconds is not None
@@ -2318,8 +2318,8 @@ def command_models(args: argparse.Namespace) -> int:
             username=config.username,
             stage1_provider=args.stage1_provider if args.stage1_provider is not None else config.stage1_provider,
             stage1_model=args.stage1_model if args.stage1_model is not None else config.stage1_model,
-            stage2_provider=args.stage2_provider if args.stage2_provider is not None else config.stage2_provider,
-            stage2_model=args.stage2_model if args.stage2_model is not None else config.stage2_model,
+            stage2_provider=args.stage1_provider if args.stage1_provider is not None else config.stage1_provider,
+            stage2_model=args.stage1_model if args.stage1_model is not None else config.stage1_model,
             vision_provider=args.vision_provider if args.vision_provider is not None else config.vision_provider,
             vision_model=args.vision_model if args.vision_model is not None else config.vision_model,
             timeout_seconds=timeout_seconds,
@@ -3933,8 +3933,6 @@ def _add_paint_args(parser: argparse.ArgumentParser, *, batch: bool = False) -> 
     )
     parser.add_argument("--stage1-provider", choices=PROVIDERS)
     parser.add_argument("--stage1-model")
-    parser.add_argument("--stage2-provider", choices=PROVIDERS)
-    parser.add_argument("--stage2-model")
     parser.add_argument("--history-input")
     parser.add_argument("--catalog-id", help="color catalog id (legacy alias)")
     parser.add_argument("--color-catalog", help="server color catalog id for renderer and benchmark tracing")
@@ -4026,10 +4024,8 @@ def build_parser() -> argparse.ArgumentParser:
 
     models = subparsers.add_parser("models", help="show or set CLI default LLM and Vision models")
     _add_common_server_args(models)
-    models.add_argument("--stage1-provider", choices=PROVIDERS, help="save the default Stage 1 provider")
-    models.add_argument("--stage1-model", help="save the default Stage 1 model for paint and batch")
-    models.add_argument("--stage2-provider", choices=PROVIDERS, help="save the default Stage 2 provider")
-    models.add_argument("--stage2-model", help="save the default Stage 2 LLM model for paint and batch")
+    models.add_argument("--stage1-provider", choices=PROVIDERS, help="save the default provider, used for Stage 1 and Stage 2")
+    models.add_argument("--stage1-model", help="save the default model for paint and batch, used for Stage 1 and Stage 2")
     models.add_argument("--vision-provider", choices=PROVIDERS, help="save the default Vision provider")
     models.add_argument("--vision-model", help="save the default Vision model for image-reading operations")
     models.add_argument("--color-catalog", help="save the default server color catalog for paint and batch")

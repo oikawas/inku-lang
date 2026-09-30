@@ -13,9 +13,9 @@ current edition.
 the statements that would write the answers over them, with a report of what
 changes, what stays, and what the core refuses. ``census`` only reports (an
 isolated read-only copy of the production database is counted with it), and
-``migrate_saved_records`` writes the same plan once, inside the startup
-migration's writer transaction (SPEC §3.3; the plan the author and the draw
-session agreed on 2026-09-30):
+``migrate_once`` writes the same plan once, while the service is stopped, by
+hand and not at startup (the author, 2026-09-30; SPEC §3.3 and the plan the
+author and the draw session agreed on the same day):
 
 - the committed document of each variation (``variation_authority``): its
   source, its document with the edition and the moved locks, and its digest;
@@ -44,6 +44,7 @@ from collections import Counter
 from collections.abc import Callable, Iterable, Iterator, Mapping
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
 
 MigrateUnit = Callable[[bytes], bytes]
@@ -51,6 +52,12 @@ Progress = Callable[[str], None]
 
 # The table whose rows the migration discards instead of moving.
 DISCARDED_TABLE = "pipeline_candidate_executions"
+# The app setting that records the migration was written; a second run refuses.
+DONE_SETTING = "saijiki_v2_saved_records"
+
+
+class MigrationAlreadyWritten(RuntimeError):
+    """The saved records were already moved to Saijiki v2; v1 would misread them."""
 
 
 def _canonical(value: Any) -> str:
@@ -182,9 +189,14 @@ class _Core:
 
 @dataclass
 class Plan:
-    """The statements that write the migration over the saved records, and its report."""
+    """The statements that write the migration over the saved records, and its report.
+
+    ``discards`` remove rows on purpose; they run after the updates have been
+    checked against the invariants, which require every existing key to survive.
+    """
 
     statements: list[tuple[str, tuple[Any, ...]]] = field(default_factory=list)
+    discards: list[tuple[str, tuple[Any, ...]]] = field(default_factory=list)
     report: dict[str, Any] = field(default_factory=dict)
 
 
@@ -430,7 +442,7 @@ def plan(connection: Any, migrate: MigrateUnit, *, workers: int = 1, sample: int
                 counts["history_links"]["written"] += 1
 
     counts["executions"]["discarded"] = counts["executions"]["rows"]
-    result.statements.append((f"DELETE FROM {DISCARDED_TABLE}", ()))
+    result.discards.append((f"DELETE FROM {DISCARDED_TABLE}", ()))
 
     result.report = {
         "sample": sample,
@@ -479,12 +491,75 @@ def census(connection: Any, migrate: MigrateUnit, **options: Any) -> dict[str, A
 
 
 def migrate_saved_records(connection: Any, migrate: MigrateUnit, *, workers: int = 1,
-                          progress: Progress | None = None) -> dict[str, Any]:
-    """Write the migration over every saved record, once, inside the caller's transaction."""
+                          progress: Progress | None = None,
+                          checked: Callable[[], None] | None = None) -> dict[str, Any]:
+    """Write the migration over every saved record inside the caller's transaction.
+
+    ``checked`` runs after the updates and before the discards; it raises to
+    stop the transaction (the caller's invariant check).
+    """
     migration = plan(connection, migrate, workers=workers, progress=progress)
     started = time.monotonic()
     for sql, args in migration.statements:
         _execute(connection, sql, args)
+    if checked:
+        checked()
+    for sql, args in migration.discards:
+        _execute(connection, sql, args)
     migration.report["write_seconds"] = round(time.monotonic() - started, 1)
     migration.report["statements"] = len(migration.statements)
     return migration.report
+
+
+def migrate_once(database: Path, migrate: MigrateUnit, *, workers: int = 1,
+                 progress: Progress | None = None) -> dict[str, Any]:
+    """Move the saved records of one SQLite database to Saijiki v2, once.
+
+    Run it while the service is stopped. It keeps a verified Backup API
+    snapshot beside the database first (``migration-backups/``), then writes
+    under a single writer lock: every key and each work's id, description,
+    Score and SVG must survive, SQLite's checks must pass, and the setting
+    ``DONE_SETTING`` records the run, so a second run refuses. Any failure
+    rolls back and keeps the snapshot. Returns the report with its timings.
+    """
+    from sqlalchemy import create_engine
+
+    from .backup import create_sqlite_snapshot
+    from .invariants import capture_invariants, require_integrity, verify_invariants
+
+    started = time.monotonic()
+    database = database.expanduser().resolve(strict=True)
+    engine = create_engine(f"sqlite:///{database}", future=True)
+    try:
+        with engine.connect() as connection:
+            if _already_written(connection):
+                raise MigrationAlreadyWritten(str(database))
+        snapshot = create_sqlite_snapshot(
+            database, database.parent / "migration-backups" / f"{database.stem}-pre-saijiki-v2-{time.time_ns()}.db")
+        snapshot_seconds = time.monotonic() - started
+        with engine.connect() as connection:
+            connection.exec_driver_sql("BEGIN IMMEDIATE")
+            try:
+                if _already_written(connection):
+                    raise MigrationAlreadyWritten(str(database))
+                before = capture_invariants(connection)
+                report = migrate_saved_records(connection, migrate, workers=workers, progress=progress,
+                                               checked=lambda: verify_invariants(connection, before))
+                summary = {"refused_records": len(report["refused_records"]), "statements": report["statements"]}
+                _execute(connection, "INSERT INTO app_settings(key, value, at) VALUES (?, ?, ?)",
+                         (DONE_SETTING, _canonical(summary), int(time.time() * 1000)))
+                require_integrity(connection)
+                connection.commit()
+            except Exception:
+                connection.rollback()
+                raise
+    finally:
+        engine.dispose()
+    report["snapshot"] = str(snapshot.path)
+    report["snapshot_seconds"] = round(snapshot_seconds, 1)
+    report["total_seconds"] = round(time.monotonic() - started, 1)
+    return report
+
+
+def _already_written(connection: Any) -> bool:
+    return bool(list(_rows(connection, "SELECT 1 FROM app_settings WHERE key=?", (DONE_SETTING,))))

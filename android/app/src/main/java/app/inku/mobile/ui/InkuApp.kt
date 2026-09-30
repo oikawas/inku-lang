@@ -73,6 +73,7 @@ import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.relocation.BringIntoViewRequester
@@ -667,6 +668,7 @@ fun InkuApp() {
                     inAppCapture = null
                     launchSystemCamera(request)
                 },
+                overlay = { CameraModelOverlay(state, viewModel, Modifier.align(Alignment.TopEnd)) },
             )
         }
     }
@@ -1096,6 +1098,56 @@ private fun isLightColor(color: Color): Boolean {
     return luminance >= 0.58f
 }
 
+/** Where the photo goes while a remote description model is selected (ANDROID_SPEC). */
+@Composable
+private fun CameraVisionRemoteNotice(state: InkuUiState) {
+    if (isLocalVisionModel(state.cameraVisionModelId)) return
+    val provider = state.providerSettings
+        .firstOrNull { state.cameraVisionModelId.startsWith("${it.providerId}:") }
+        ?.displayName
+        ?: state.cameraVisionModelId.substringBefore(':')
+    Text(
+        S.cameraVisionRemoteNotice(provider),
+        style = MaterialTheme.typography.labelSmall,
+        color = MaterialTheme.colorScheme.error,
+    )
+}
+
+/**
+ * The models a capture will use, over the camera preview, and the way to change
+ * them before the shutter (the author, 2026-09-30).
+ */
+@Composable
+private fun CameraModelOverlay(state: InkuUiState, viewModel: InkuViewModel, modifier: Modifier = Modifier) {
+    Column(
+        modifier = modifier
+            .statusBarsPadding()
+            .padding(Dimens.spaceM)
+            .widthIn(max = Dimens.cameraModelOverlayMaxWidth)
+            .background(HeroOverlayScrim, RoundedCornerShape(Dimens.radiusCard))
+            .padding(horizontal = Dimens.spaceM, vertical = Dimens.spaceXs)
+            .testTag(CAMERA_MODEL_OVERLAY_TAG),
+        verticalArrangement = Arrangement.spacedBy(Dimens.spaceXs),
+    ) {
+        CameraModelOverlayLine(S.cameraVisionModelTitle, modelLabelFor(state, state.cameraVisionModelId))
+        CameraModelOverlayLine(S.drawingModel, modelLabelFor(state, state.selectedModelId))
+        TextButton(
+            onClick = viewModel::openCameraModelSelection,
+            modifier = Modifier.align(Alignment.End).heightIn(min = Dimens.cameraControlMinHeight),
+        ) {
+            Text(S.modelSelection, color = Color.White)
+        }
+    }
+}
+
+@Composable
+private fun CameraModelOverlayLine(label: String, model: String) {
+    Column {
+        Text(label, style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.72f))
+        Text(model, style = MaterialTheme.typography.bodyMedium, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
+    }
+}
+
 @Composable
 private fun ModelSelectionDialog(state: InkuUiState, viewModel: InkuViewModel) {
     AlertDialog(
@@ -1106,6 +1158,16 @@ private fun ModelSelectionDialog(state: InkuUiState, viewModel: InkuViewModel) {
                 modifier = Modifier.fillMaxWidth().heightIn(max = Dimens.modelDialogMaxHeight).verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(Dimens.spaceL),
             ) {
+                if (state.modelSelectionForCamera) {
+                    WebStyleModelStageEditor(
+                        title = S.cameraVisionModelTitle,
+                        sub = S.camera,
+                        state = state,
+                        selectedModelId = state.cameraVisionModelId,
+                        onSelectModel = viewModel::selectCameraVisionModelForCapture,
+                    )
+                    CameraVisionRemoteNotice(state)
+                }
                 WebStyleModelStageEditor(
                     title = S.drawingModel,
                     sub = S.stagesShared,
@@ -1657,7 +1719,7 @@ private fun ComposeScreen(state: InkuUiState, viewModel: InkuViewModel) {
             if (showEditor) {
                 if (!hasWork) Text(S.studioSubtitle, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 if (state.composeMode == ComposeMode.Batch) {
-                    DrawSettingsPanel(state, viewModel)
+                    DrawSettingsRow(state, viewModel)
                     BatchPanel(state, viewModel, onEditorFocusChanged = { batchEditorFocused = it })
                 } else {
                     DrawPanel(
@@ -2341,29 +2403,19 @@ internal fun providerAttemptText(attempt: ProviderAttempt?, strings: InkuStrings
  * One entry per setting, and one place for all of them. The model used to be
  * openable from three separate rows; the colour catalog from two; the canvas
  * aspect sat beside the star and the hash, which belong to the work already on
- * screen rather than to the next one.
+ * screen rather than to the next one. The model, the colour catalog and the
+ * canvas are small buttons always shown under the description; they used to
+ * fold behind a 「描画設定」 row (the author, 2026-09-30).
  */
 @Composable
-private fun DrawSettingsPanel(state: InkuUiState, viewModel: InkuViewModel) {
-    var expanded by remember { mutableStateOf(false) }
+private fun DrawSettingsRow(state: InkuUiState, viewModel: InkuViewModel) {
     Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
-        HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
-        Column(modifier = Modifier.fillMaxWidth().clickable { expanded = !expanded }.padding(vertical = Dimens.spaceM)) {
-            Text(S.drawingSettings, style = MaterialTheme.typography.labelLarge)
-            Text(
-                "${shortModelLabel(state)} · ${shortCatalogLabel(state)} · ${shortCanvasLabel(state)} · ${S.sketchFromLife} ${Sketches.modeLabel(state.sketchMode, state.uiLanguage.code == "ja")}",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+        WrapRow(horizontal = Dimens.spaceM, vertical = Dimens.spaceXs) {
+            MiniPill(text = shortModelLabel(state), onClick = viewModel::openModelSelection)
+            MiniPill(text = shortCatalogLabel(state), onClick = viewModel::openCatalogSelection)
+            MiniPill(text = shortCanvasLabel(state), onClick = viewModel::openCanvasSelection)
         }
-        if (expanded) {
-            WrapRow {
-                SecondarySmallButton(text = shortModelLabel(state), onClick = viewModel::openModelSelection)
-                SecondarySmallButton(text = shortCatalogLabel(state), onClick = viewModel::openCatalogSelection)
-                SecondarySmallButton(text = shortCanvasLabel(state), onClick = viewModel::openCanvasSelection)
-            }
-            SketchModeRow(state, viewModel)
-        }
+        SketchModeRow(state, viewModel)
     }
 }
 
@@ -2844,7 +2896,7 @@ private fun SketchModeRow(state: InkuUiState, viewModel: InkuViewModel) {
  * The description and the action that draws it.
  *
  * The settings that used to head this panel -- the model, the colour catalog,
- * 写生 -- moved to [DrawSettingsPanel] above, which is now the only place any
+ * 写生 -- moved to [DrawSettingsRow] above, which is now the only place any
  * of them is opened from. What is left is the writing itself: the field, the
  * draw, and 解釈 (the DDL) under it.
  */
@@ -2932,7 +2984,7 @@ private fun DrawPanel(
                 style = MaterialTheme.typography.labelSmall,
             )
         }
-        DrawSettingsPanel(state, viewModel)
+        DrawSettingsRow(state, viewModel)
         // While the keyboard is up the same button is pinned above it, and two
         // 「描画する」 on one screen is a question about which one draws.
         if (!state.descriptionFocused) {
@@ -3574,6 +3626,9 @@ internal const val MODEL_ENTRY_TAG = "model_entry"
 /** Tags for the sub-view chips and the model selection grid. */
 internal fun refinementSubviewTag(subview: RefinementSubview): String = "refine_subview_${subview.id}"
 internal fun modelChoiceTag(modelId: String): String = "model_choice_$modelId"
+
+/** The models over the camera preview. */
+internal const val CAMERA_MODEL_OVERLAY_TAG = "camera_model_overlay"
 
 /**
  * 作品の系譜 -- the port of web's `LineagePanel.svelte`, cut to what contract
@@ -4389,17 +4444,7 @@ private fun MiscSettingsPanel(state: InkuUiState, viewModel: InkuViewModel, modi
                 selectedModelId = state.cameraVisionModelId,
                 onSelectModel = viewModel::setCameraVisionModel,
             )
-            if (!isLocalVisionModel(state.cameraVisionModelId)) {
-                val provider = state.providerSettings
-                    .firstOrNull { state.cameraVisionModelId.startsWith("${it.providerId}:") }
-                    ?.displayName
-                    ?: state.cameraVisionModelId.substringBefore(':')
-                Text(
-                    S.cameraVisionRemoteNotice(provider),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.error,
-                )
-            }
+            CameraVisionRemoteNotice(state)
         }
         SettingsCard(S.mascotTitle, S.mascotSubtitle, state.mascotKind) {
             Row(horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
@@ -5654,10 +5699,12 @@ private fun SwatchStrip(colors: List<String>) {
     }
 }
 
-private fun selectedModelLabel(state: InkuUiState): String {
-    modelChoicesFor(state).firstOrNull { it.id == state.selectedModelId }?.let { return it.label }
-    return state.modelAssets.firstOrNull { it.modelId == state.selectedModelId }?.displayName
-        ?: state.selectedModelId.substringAfterLast(":")
+private fun selectedModelLabel(state: InkuUiState): String = modelLabelFor(state, state.selectedModelId)
+
+private fun modelLabelFor(state: InkuUiState, modelId: String): String {
+    modelChoicesFor(state).firstOrNull { it.id == modelId }?.let { return it.label }
+    return state.modelAssets.firstOrNull { it.modelId == modelId }?.displayName
+        ?: modelId.substringAfterLast(":")
 }
 
 @Composable
@@ -5674,12 +5721,6 @@ private fun String.compactLabel(maxChars: Int): String {
     val clean = trim().replace(Regex("\\s+"), " ")
     if (clean.length <= maxChars) return clean
     return clean.take(maxChars - 1).trimEnd() + "…"
-}
-
-private fun selectedStage2ModelLabel(state: InkuUiState): String {
-    modelChoicesFor(state).firstOrNull { it.id == state.selectedStage2ModelId }?.let { return it.label }
-    return state.modelAssets.firstOrNull { it.modelId == state.selectedStage2ModelId }?.displayName
-        ?: state.selectedStage2ModelId.substringAfterLast(":")
 }
 
 @Composable

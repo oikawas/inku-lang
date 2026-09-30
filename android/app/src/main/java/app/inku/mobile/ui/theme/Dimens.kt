@@ -97,6 +97,9 @@ object Dimens {
     /** 48dp. The minimum touch height for camera actions and camera-mode choices. */
     val cameraControlMinHeight: Dp = 48.dp
 
+    /** 240dp. The widest the model panel over the camera preview gets. */
+    val cameraModelOverlayMaxWidth: Dp = 240.dp
+
     /** 56dp. 主 -- the one action a screen is for. */
     val buttonHeightLarge: Dp = 56.dp
 

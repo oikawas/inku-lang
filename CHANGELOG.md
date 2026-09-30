@@ -38,6 +38,12 @@ Web model selection has two tabs, Stage 1/2 and Vision, and comparisons that fix
 
 2026-09-30 documentation correction: removed remaining instructions for separate stage models from the manuals, setup guides and implementation status, and the specification's assumption of a lightweight Stage 2 model. The old Ollama pair's measurements remain historical results; current setup instructions choose one model for both stages.
 
+### 2026-09-30 — Android: choose the models first (the author's instruction)
+
+- Studio: the folded "Drawing settings" row is gone. Model, color catalog, and canvas are small buttons always shown under the description, with sketch from life below them. The model button stays the only way into the model selection.
+- Camera: the capture screen shows the description model and the drawing model over the top right of the preview. "Model selection" changes both before the shutter (with the notice of where the photo goes when a remote model is chosen). The choice is saved and used for that capture, and the description model is checked again after the shutter.
+- The description model's note in Settings > Other now says drawing uses the model, color catalog, and sketch chosen in Studio.
+
 ### 2026-09-30 — Android: one model draws both stages (the Server's rule)
 
 At the Server session's request (the author's decision), Android drops different models for Stage 1 and Stage 2, as Server, Web and cli did. The `stage1_model` and `stage2_model` keys stay in the API and the work records, always equal.

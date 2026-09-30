@@ -192,6 +192,9 @@ data class InkuUiState(
     val selectedStage2ModelId: String = CompatibilityConstants.defaultStage2Model,
     val includeThinking: Boolean = false,
     val modelSelectionOpen: Boolean = false,
+    // The model selection opened over the camera preview: it also carries the
+    // description model, and what it confirms reaches the capture in progress.
+    val modelSelectionForCamera: Boolean = false,
     val catalogSelectionOpen: Boolean = false,
     val canvasSelectionOpen: Boolean = false,
     val selectedCatalogId: String = "default",
@@ -455,6 +458,7 @@ class InkuViewModel @JvmOverloads constructor(
     private var restoredInitialHistory = false
     private var promptEditedByUser = false
     private var modelSelectionSnapshot: Pair<String, String>? = null
+    private var cameraVisionSelectionSnapshot: String? = null
     private var catalogSelectionSnapshot: String? = null
     private var lastHistorySwipeAt = 0L
     private var presentationNavigationSerial = 0L
@@ -883,6 +887,23 @@ class InkuViewModel @JvmOverloads constructor(
         val serial = cameraRunSerial
         cameraJob?.cancel()
         cameraJob = viewModelScope.launch {
+            // A description model chosen over the preview was not there for the
+            // check before the capture; the drawing model is checked again
+            // before drawing (`cameraRouteReadiness`).
+            val snapshot = cameraComposeSnapshot ?: localState.value
+            val providers = providerSettings.first()
+            modelReadinessIssue(snapshot.cameraVisionModelId, providers, modelAssets.first())?.let { issue ->
+                cameraFiles.delete(file)
+                if (serial == cameraRunSerial) {
+                    localState.value = localState.value.copy(
+                        tab = AppTab.Compose,
+                        composeMode = ComposeMode.Write,
+                        cameraCaptureState = CameraCaptureState.Failed(CameraFailure.ModelNotReady),
+                        message = readinessMessage(issue, snapshot.cameraVisionModelId, providers),
+                    )
+                }
+                return@launch
+            }
             runCameraInstantPrint(
                 serial = serial,
                 file = file,
@@ -1482,8 +1503,29 @@ class InkuViewModel @JvmOverloads constructor(
         localState.value = current.copy(modelSelectionOpen = true, message = null)
     }
 
+    /**
+     * The model selection over the camera preview (the author, 2026-09-30):
+     * the description model and the drawing model, chosen while the shot is
+     * being framed. Only a capture in progress opens it.
+     */
+    fun openCameraModelSelection() {
+        val current = localState.value
+        if (current.cameraCaptureState != CameraCaptureState.Capturing) return
+        modelSelectionSnapshot = current.selectedModelId to current.selectedStage2ModelId
+        cameraVisionSelectionSnapshot = current.cameraVisionModelId
+        localState.value = current.copy(modelSelectionOpen = true, modelSelectionForCamera = true, message = null)
+    }
+
+    /** The description model picked in the camera's selection; it is saved on OK. */
+    fun selectCameraVisionModelForCapture(modelId: String) {
+        val current = localState.value
+        if (!current.modelSelectionForCamera || current.cameraCaptureState != CameraCaptureState.Capturing) return
+        localState.value = current.copy(cameraVisionModelId = modelId, message = null)
+    }
+
     fun confirmModelSelection() {
         modelSelectionSnapshot = null
+        cameraVisionSelectionSnapshot = null
         val current = localState.value
         val unifiedModelId = current.selectedModelId
         persistSetting("model_selection", JSONObject()
@@ -1491,22 +1533,43 @@ class InkuViewModel @JvmOverloads constructor(
             .put("stage2_model", unifiedModelId)
             .put("include_thinking", current.includeThinking)
             .toString())
+        val forCamera = current.modelSelectionForCamera
+        if (forCamera) {
+            persistSetting(CameraVisionModelSetting.KEY, CameraVisionModelSetting.encode(current.cameraVisionModelId))
+            // The capture runs on the settings it started with; a choice made
+            // over its preview is the one it is meant to use.
+            cameraComposeSnapshot = cameraComposeSnapshot?.copy(
+                selectedModelId = unifiedModelId,
+                selectedStage2ModelId = unifiedModelId,
+                includeThinking = current.includeThinking,
+                cameraVisionModelId = current.cameraVisionModelId,
+            )
+        }
         localState.value = current.copy(
             selectedModelId = unifiedModelId,
             selectedStage2ModelId = unifiedModelId,
             modelSelectionOpen = false,
+            modelSelectionForCamera = false,
             message = null,
         )
-        warmupLiteRtModels(unifiedModelId)
+        if (forCamera && isLocalVisionModel(current.cameraVisionModelId)) {
+            warmupLiteRtModels(current.cameraVisionModelId, unifiedModelId)
+        } else {
+            warmupLiteRtModels(unifiedModelId)
+        }
     }
 
     fun cancelModelSelection() {
         val snapshot = modelSelectionSnapshot
+        val visionSnapshot = cameraVisionSelectionSnapshot
         modelSelectionSnapshot = null
+        cameraVisionSelectionSnapshot = null
         localState.value = localState.value.copy(
             selectedModelId = snapshot?.first ?: localState.value.selectedModelId,
             selectedStage2ModelId = snapshot?.second ?: localState.value.selectedStage2ModelId,
+            cameraVisionModelId = visionSnapshot ?: localState.value.cameraVisionModelId,
             modelSelectionOpen = false,
+            modelSelectionForCamera = false,
             message = null,
         )
     }

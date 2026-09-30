@@ -1,8 +1,9 @@
 <script lang="ts">
 	import { t } from '$lib/i18n/index.svelte';
 	import type { SettingsStatus } from './state.svelte';
+	import type { MeterSwitches } from '$lib/verseForm';
 
-	type ServerRuntimeStatus = Pick<SettingsStatus, 'output_save' | 'render_concurrency'>;
+	type ServerRuntimeStatus = Pick<SettingsStatus, 'output_save' | 'render_concurrency' | 'description_meter'>;
 
 	type Props = {
 		status: ServerRuntimeStatus | null;
@@ -14,6 +15,8 @@
 		onReload: () => void;
 		onUpdateOutputSave: (enabled: boolean, outputDir: string, pngSize: number) => void | Promise<void>;
 		onUpdateRenderConcurrency: (serverLimit: number, clientLimit: number) => void | Promise<void>;
+		descriptionMeterStatus: string | null;
+		onUpdateDescriptionMeter: (switches: MeterSwitches) => void | Promise<void>;
 	};
 
 	let {
@@ -25,7 +28,9 @@
 		isAdmin,
 		onReload,
 		onUpdateOutputSave,
-		onUpdateRenderConcurrency
+		onUpdateRenderConcurrency,
+		descriptionMeterStatus,
+		onUpdateDescriptionMeter
 	}: Props = $props();
 </script>
 
@@ -126,6 +131,42 @@
 		<div class="inline-message">{statusError ?? t().settingsLoadFailed}</div>
 	{/if}
 </div>
+<div class="popover-group">
+	<div class="popover-group-label">{t().settingsDescriptionMeterTitle}</div>
+	{#if loading}
+		<div class="inline-message">{t().settingsLoading}</div>
+	{:else if status}
+		<label class="setting-toggle">
+			<input
+				type="checkbox"
+				checked={status.description_meter.japanese}
+				onchange={(e) => onUpdateDescriptionMeter({ japanese: (e.currentTarget as HTMLInputElement).checked, english: status.description_meter.english })}
+			/>
+			<span>{t().settingsDescriptionMeterJapanese}</span>
+			<span class="info-dot" aria-label={t().settingsDescriptionMeterJapaneseHelp}>
+				i
+				<span class="info-tooltip">{t().settingsDescriptionMeterJapaneseHelp}</span>
+			</span>
+		</label>
+		<label class="setting-toggle meter-toggle">
+			<input
+				type="checkbox"
+				checked={status.description_meter.english}
+				onchange={(e) => onUpdateDescriptionMeter({ japanese: status.description_meter.japanese, english: (e.currentTarget as HTMLInputElement).checked })}
+			/>
+			<span>{t().settingsDescriptionMeterEnglish}</span>
+			<span class="info-dot" aria-label={t().settingsDescriptionMeterEnglishHelp}>
+				i
+				<span class="info-tooltip">{t().settingsDescriptionMeterEnglishHelp}</span>
+			</span>
+		</label>
+		{#if descriptionMeterStatus}
+			<div class="inline-message">{descriptionMeterStatus}</div>
+		{/if}
+	{:else}
+		<div class="inline-message">{statusError ?? t().settingsLoadFailed}</div>
+	{/if}
+</div>
 <div class="settings-inline-actions">
 	<button class="ghost-btn" onclick={onReload} disabled={loading || !isAdmin}>{t().settingsReloadSettings}</button>
 </div>
@@ -153,6 +194,7 @@
 		color: var(--fg2);
 		cursor: pointer;
 	}
+	.meter-toggle { margin-top: 8px; }
 	.server-path-row {
 		display: flex;
 		flex-direction: column;

@@ -2,6 +2,10 @@
 
 This file records revisions to user and operations documents under `manual/`. See `SPEC.ja.md` for the detailed product change history.
 
+## 2026-09-30 — A form is named only when the description is close to it
+
+The meter below the description names a verse form only when the description is close to one, judges Japanese by its phrases as well (haiku or senryū, and dodoitsu, are added), uses syllables counted with a pronouncing dictionary for English, and can be switched off per language in `Other (server)`. The input field's description in Creating Images and the output section of Server Configuration are corrected in both languages.
+
 ## 2026-09-30 — Change the description, and the verse form in the meter
 
 `Edit the description` in the work-editing menu is now `Change the description`, and the meter below the description names the nearest form: in sounds for Japanese (haiku, katauta, tanka, sedōka, bussokuseki-ka, chōka) and in lines for English (couplet to sestina). The input field's description and the item's name where DDL-edited works are described are corrected in Creating Images in both languages.

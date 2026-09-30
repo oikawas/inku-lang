@@ -814,6 +814,14 @@ def update_render_concurrency_settings(server_limit: int, client_limit: int) -> 
     return _render_concurrency_settings_store().update(server_limit, client_limit)
 
 
+def get_description_meter_settings() -> dict:
+    return _settings.DescriptionMeterSettingsStore(_app_settings_store()).get()
+
+
+def update_description_meter_settings(japanese: bool, english: bool) -> dict:
+    return _settings.DescriptionMeterSettingsStore(_app_settings_store()).update(japanese, english)
+
+
 def get_render_limit_settings() -> dict:
     return _render_limit_settings_store().get()
 

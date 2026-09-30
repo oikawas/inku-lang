@@ -1275,19 +1275,31 @@ worth writing.
 
 To support a tanka-like brevity, the writing surface carries only a non-blocking
 length hint (the box displays the count, but does not enforce the guide).
-Japanese input is measured against the verse form whose length is nearest to its
-total sounds (haiku 17, katauta 19, tanka 31, sedōka and bussokuseki-ka 38, chōka
-12n + 7 from 43), shown as "Sounds 17/17 (haiku)".  The Server counts the sounds
-(`POST /api/description/mora`) from SudachiPy's readings: a small ャュョ joins
-the kana before it, and ッ, ン and ー count one each.  A character the dictionary
-cannot read is estimated and the count is marked approximate; until the Server
-answers, the meter counts characters.  At 38, phrases (split at line breaks,
-spaces and 、) of 5-7-7-5-7-7 are sedōka and 5-7-5-7-7-7 bussokuseki-ka;
-otherwise both are named.  English input is measured in lines against the
-nearest form (couplet 2, haiku or tercet 3, quatrain 4, cinquain 5, sonnet 14,
-villanelle 19, sestina 39); three lines of at most 17 syllables are a haiku,
-longer ones a tercet.  The description box and the work-editing menu's Change
-the description show the same meter.  Input is never blocked.  The UI shows no copy that
+Japanese input is counted in sounds and names a verse form only when it is
+close to one, as "Sounds 17/17 (haiku or senryū)".  The forms are haiku or
+senryū 5-7-5 (17; the sounds do not tell them apart), katauta 5-7-7 (19),
+dodoitsu 7-7-7-5 (26), tanka 5-7-5-7-7 (31), sedōka 5-7-7-5-7-7 and
+bussokuseki-ka 5-7-5-7-7-7 (both 38), and chōka (5-7 at least three times,
+closed by 7; 12n + 7).  A description set out in phrases (line breaks, spaces,
+、) is judged by them: each phrase, and the total, within two sounds of the
+form's.  Otherwise the total decides, within two sounds; at 38 without phrases
+both forms are named.  Near no form, the count stands alone ("Sounds 52").  The
+Server counts the sounds (`POST /api/description/mora`) from SudachiPy's
+readings: a small ャュョ joins the kana before it, and ッ, ン and ー count one
+each.  A character the dictionary cannot read is estimated and the count is
+marked approximate; until the Server answers, the total character count is
+judged.  English input is counted in lines and names a form only when it is
+close to one, as "Lines 3/3 (haiku)": one line is no form; 2 lines a couplet;
+3 lines a haiku at 17 syllables or fewer, a tercet above; 4 a quatrain; 5 a
+cinquain when each line is within one syllable of 2-4-6-8-2; 14, 19 and 39
+lines, each within one, a sonnet, villanelle and sestina.  The Server counts
+syllables (`POST /api/description/syllables`) from the pronunciations in the
+bundled CMU Pronouncing Dictionary (BSD-style licence) and estimates a word it
+lacks from its vowel groups.  Settings > Other (server) switches each
+language's judgement off separately (both on by default); a language switched
+off shows its count (characters or lines) alone and does not ask the Server.
+The description box and the work-editing menu's Change the description show
+the same meter.  Input is never blocked.  The UI shows no copy that
 denies a long description and no evaluative display — only a numeric counter and
 a faint change in density, so the form is quietly present without scolding the
 writer.

@@ -310,7 +310,7 @@ This setting has nothing to do with thumbnails: listings keep baking them even w
 <output_dir>/<user_id>/YYYY-MM-DD/YYYYMMDD_HHMMSS_<history_id>...
 ```
 
-In `Detailed` Settings, administrators change artifact targets and queue settings in `Other (server)`. Verify write permission for the service user after changing the output path. This is where the server automatically saves history byproducts. The member's download location for SVG, PNG, and related exports is separate: choose it under `Export` / `Save location`; it remains only in the browser that chose it. Without a choice, or if the browser loses write permission, the export goes to the browser default download location.
+In `Detailed` Settings, administrators change artifact targets and queue settings in `Other (server)`. Its `Verse form of the description` group switches off, separately, the judgement of Japanese verse forms (sounds) and English forms (lines and syllables) below the description (both on by default). Verify write permission for the service user after changing the output path. This is where the server automatically saves history byproducts. The member's download location for SVG, PNG, and related exports is separate: choose it under `Export` / `Save location`; it remains only in the browser that chose it. Without a choice, or if the browser loses write permission, the export goes to the browser default download location.
 
 ## 8. Backup and Recovery
 

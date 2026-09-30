@@ -43,6 +43,7 @@ test('the browser owns every module-scoped reactive setting', () => {
 		'historyManagerState.svelte.ts'
 	];
 	const moduleScoped = [
+		'descriptionMeter.svelte.ts',
 		'features/appearance/text-size.svelte.ts',
 		'features/batch/failure-report.svelte.ts',
 		'features/batch/settings.svelte.ts',

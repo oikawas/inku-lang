@@ -106,6 +106,10 @@ RENDER_CONCURRENCY_DEFAULT_SETTINGS = {
 RENDER_CONCURRENCY_MIN = 1
 RENDER_CONCURRENCY_MAX = 16
 RENDER_LIMIT_SETTINGS_KEY = "render_limit_settings"
+# Whether the description meter judges Japanese verse forms (the Server counts
+# sounds) and English forms (the Server counts syllables). Both on by default.
+DESCRIPTION_METER_SETTINGS_KEY = "description_meter_settings"
+DESCRIPTION_METER_DEFAULT_SETTINGS = {"japanese": True, "english": True}
 THUMBNAIL_SETTINGS_KEY = "thumbnail_settings"
 # Off by default: the second size doubles the rebuild and roughly quadruples the
 # stored bytes, and is worth neither until someone is looking at the listing on
@@ -437,6 +441,15 @@ def normalize_render_concurrency_settings(settings: dict | None) -> dict:
     return clean
 
 
+def normalize_description_meter_settings(settings: dict | None) -> dict:
+    clean = dict(DESCRIPTION_METER_DEFAULT_SETTINGS)
+    if isinstance(settings, dict):
+        for key in clean:
+            if isinstance(settings.get(key), bool):
+                clean[key] = settings[key]
+    return clean
+
+
 def normalize_thumbnail_settings(settings: dict | None) -> dict:
     clean = dict(THUMBNAIL_DEFAULT_SETTINGS)
     if not isinstance(settings, dict):
@@ -669,6 +682,22 @@ class RenderConcurrencySettingsStore:
             {"server_limit": server_limit, "client_limit": client_limit}
         )
         return self.app_settings.write(RENDER_CONCURRENCY_SETTINGS_KEY, clean)
+
+
+@dataclass(frozen=True)
+class DescriptionMeterSettingsStore:
+    """Read and write whether the description meter judges each language."""
+
+    app_settings: AppSettingsStore
+
+    def get(self) -> dict:
+        return normalize_description_meter_settings(
+            self.app_settings.read(DESCRIPTION_METER_SETTINGS_KEY)
+        )
+
+    def update(self, japanese: bool, english: bool) -> dict:
+        clean = normalize_description_meter_settings({"japanese": japanese, "english": english})
+        return self.app_settings.write(DESCRIPTION_METER_SETTINGS_KEY, clean)
 
 
 @dataclass(frozen=True)

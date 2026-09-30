@@ -68,11 +68,11 @@ export interface LangPack {
 	appInfoClose: string;
 	inputSectionHint: string;
 	/** Characters, the nearest verse form's length, and that form's name (before the sounds arrive). */
-	inputMeterVerse: (count: number, target: number, form: string) => string;
+	inputMeterVerse: (count: number, target: number | null, form: string | null) => string;
 	/** Sounds, the nearest verse form's length, and its name; approximate when a character was not read. */
-	inputMeterMora: (count: number, target: number, form: string, approximate: boolean) => string;
+	inputMeterMora: (count: number, target: number | null, form: string | null, approximate: boolean) => string;
 	/** Lines, the nearest English form's line count, and its name. */
-	inputMeterLines: (count: number, target: number, form: string) => string;
+	inputMeterLines: (count: number, target: number | null, form: string | null) => string;
 	verseFormName: (form: VerseForm) => string;
 	englishFormName: (form: EnglishForm) => string;
 	inputCommentHint: string;
@@ -787,6 +787,12 @@ export interface LangPack {
 	settingsRenderConcurrencyClientHelp: string;
 	settingsRenderConcurrencyRange: (min: number, max: number) => string;
 	settingsRenderConcurrencySaved: string;
+	settingsDescriptionMeterTitle: string;
+	settingsDescriptionMeterJapanese: string;
+	settingsDescriptionMeterJapaneseHelp: string;
+	settingsDescriptionMeterEnglish: string;
+	settingsDescriptionMeterEnglishHelp: string;
+	settingsDescriptionMeterSaved: string;
 	settingsLogRetentionTitle: string;
 	settingsLogRetentionEnabled: string;
 	settingsLogRetentionDays: string;

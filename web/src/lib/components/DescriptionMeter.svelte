@@ -1,35 +1,46 @@
 <script lang="ts">
 	/**
-	 * The length of a description and the verse form it is nearest to, e.g.
-	 * "音数 17/17（俳句）" or "Lines 3/3 (haiku)". The description box and the
-	 * "change the description" dialog both show it under their text, at the
-	 * right.
+	 * The length of a description and the verse form it is, e.g.
+	 * "音数 17/17（俳句/川柳）", "Lines 3/3 (haiku)", or the count alone when
+	 * it is no form. The description box and the "change the description"
+	 * dialog both show it under their text, at the right.
 	 *
-	 * Japanese is counted in sounds by the Server. Until its first answer, or
-	 * when it cannot answer, the meter counts characters; while the author
+	 * The Server counts Japanese sounds and English syllables. Until its first
+	 * answer, or when it cannot answer, the page estimates; while the author
 	 * types it keeps the last answer rather than falling back each keystroke.
+	 * A language switched off in Settings is counted but not judged, and the
+	 * Server is not asked.
 	 */
 	import { t } from '$lib/i18n/index.svelte';
-	import { describeLength, readsAsJapanese, type MoraCount } from '$lib/verseForm';
-	import { fetchMora } from '$lib/descriptionMora';
+	import { describeLength, readsAsJapanese, type MoraCount, type SyllableCount } from '$lib/verseForm';
+	import { fetchMora, fetchSyllables, meterSwitches } from '$lib/descriptionMeter.svelte';
 
 	let { text }: { text: string } = $props();
 
 	// The Server is asked once the typing pauses.
 	const ASK_AFTER_MS = 300;
 	let mora = $state<MoraCount | null>(null);
+	let syllables = $state<SyllableCount | null>(null);
 
 	$effect(() => {
 		const source = text;
-		if (!readsAsJapanese(source, t().code)) {
-			mora = null;
-			return;
-		}
+		const japanese = readsAsJapanese(source, t().code);
+		const judged = japanese ? meterSwitches.japanese : meterSwitches.english;
+		if (!judged) return;
 		const controller = new AbortController();
 		const timer = window.setTimeout(() => {
-			fetchMora(source, controller.signal)
-				.then((counted) => { if (!controller.signal.aborted) mora = counted; })
-				.catch(() => { if (!controller.signal.aborted) mora = null; });
+			const asked = japanese ? fetchMora(source, controller.signal) : fetchSyllables(source, controller.signal);
+			asked
+				.then((counted) => {
+					if (controller.signal.aborted) return;
+					if (japanese) mora = counted as MoraCount | null;
+					else syllables = counted as SyllableCount | null;
+				})
+				.catch(() => {
+					if (controller.signal.aborted) return;
+					if (japanese) mora = null;
+					else syllables = null;
+				});
 		}, ASK_AFTER_MS);
 		return () => {
 			window.clearTimeout(timer);
@@ -37,16 +48,20 @@
 		};
 	});
 
-	const meter = $derived(describeLength(text, t().code, mora));
+	const meter = $derived(describeLength(text, t().code, meterSwitches, { mora, syllables }));
+	const label = $derived.by(() => {
+		const strings = t();
+		if (meter.unit === 'lines') {
+			return strings.inputMeterLines(meter.count, meter.form?.length ?? null, meter.form ? strings.englishFormName(meter.form.form) : null);
+		}
+		const form = meter.form ? strings.verseFormName(meter.form.form) : null;
+		return meter.unit === 'mora'
+			? strings.inputMeterMora(meter.count, meter.form?.length ?? null, form, meter.approximate)
+			: strings.inputMeterVerse(meter.count, meter.form?.length ?? null, form);
+	});
 </script>
 
-<div class="description-meter" class:soft-over={meter.over} aria-hidden="true">
-	{meter.unit === 'lines'
-		? t().inputMeterLines(meter.count, meter.target, t().englishFormName(meter.form))
-		: meter.unit === 'mora'
-			? t().inputMeterMora(meter.count, meter.target, t().verseFormName(meter.form), meter.approximate)
-			: t().inputMeterVerse(meter.count, meter.target, t().verseFormName(meter.form))}
-</div>
+<div class="description-meter" aria-hidden="true">{label}</div>
 
 <style>
 	.description-meter {
@@ -58,5 +73,4 @@
 		text-align: right;
 		color: var(--fg3);
 	}
-	.description-meter.soft-over { color: color-mix(in srgb, var(--fg) 78%, transparent); }
 </style>

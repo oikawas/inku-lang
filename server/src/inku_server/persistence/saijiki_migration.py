@@ -66,6 +66,10 @@ class CoreCallFailed(RuntimeError):
     """A call to the core was killed past its time, or its process died; the run stops."""
 
 
+class BlankListInvalid(ValueError):
+    """A record named to be emptied is missing, already empty, or bound to its link by its digest."""
+
+
 def _canonical(value: Any) -> str:
     return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
 
@@ -338,28 +342,38 @@ class _Link:
 def plan(connection: Any, migrate: MigrateUnit, *, workers: int = 1, sample: int | None = None,
          history_ids: Iterable[str] | None = None, progress: Progress | None = None,
          journal: Path | None = None, timeout: float | None = None,
-         abort_on_failure: bool = False) -> Plan:
+         abort_on_failure: bool = False, blank: Iterable[str] | None = None) -> Plan:
     """Ask the core about every saved record; return what writing its answers would do.
 
     Reads only. ``sample`` counts that many variations and works drawn at
     random; ``history_ids`` only those works. A plan drawn either way is for
     counting, never for writing. ``journal`` keeps each answer as it comes;
     a call longer than ``timeout`` seconds is killed and its record listed.
+
+    ``blank`` names instruction texts (``<history id>:<column>``) that are not
+    migrated but emptied: the core never sees them, and the column becomes
+    NULL, the state of a work saved before its DDL was kept, which the Server
+    and the Web already read as "no DDL" (the author and the draw session,
+    2026-10-01: texts that were not DDL at all, and that the core could not
+    read in time). The list is given explicitly; no rule by length or shape
+    picks it. The work's description, Score and SVG stay.
     """
     core = _Core(migrate, workers, progress, journal, timeout, abort_on_failure)
     try:
-        return _plan(connection, core, sample=sample, history_ids=history_ids)
+        return _plan(connection, core, sample=sample, history_ids=history_ids, blank=set(blank or ()))
     finally:
         core.close()
 
 
-def _plan(connection: Any, core: _Core, *, sample: int | None, history_ids: Iterable[str] | None) -> Plan:
+def _plan(connection: Any, core: _Core, *, sample: int | None, history_ids: Iterable[str] | None,
+          blank: set[str]) -> Plan:
     result = Plan()
     counts: dict[str, Counter[str]] = {kind: Counter() for kind in (
         "definitions", "history_links", "executions", "variation_documents", "history")}
     edits: Counter[str] = Counter()
     refused_records: list[dict[str, object]] = []
     sweep_records: list[dict[str, object]] = []
+    blanked_records: list[dict[str, object]] = []
 
     # The frozen catalogs of the performances, and the definitions each variation saved.
     links: dict[str, _Link] = {}
@@ -440,6 +454,23 @@ def _plan(connection: Any, core: _Core, *, sample: int | None, history_ids: Iter
         if only is None or row[0] in only:
             history_rows.append(row)
 
+    # Every text named to be emptied must be there, hold text, and not be the
+    # instructions a performance's link binds by digest.
+    by_id = {row[0]: row for row in history_rows}
+    for record_id in sorted(blank):
+        history_id, _, column = record_id.partition(":")
+        if column not in {"ddl", "expanded_ddl"}:
+            raise BlankListInvalid(f"{record_id}: not a history text")
+        row = by_id.get(history_id)
+        if row is None:
+            if only is None and not sample:
+                raise BlankListInvalid(f"{record_id}: no such work")
+            continue
+        if not (row[1] if column == "ddl" else row[2]):
+            raise BlankListInvalid(f"{record_id}: already empty")
+        if column == "ddl" and history_id in links:
+            raise BlankListInvalid(f"{record_id}: bound to its performance link by its digest")
+
     variation_units: dict[tuple[str, str], bytes] = {}
     for owner_id, variation_id, _revision, document_json, _digest in variation_rows:
         document = _json(document_json)
@@ -460,7 +491,7 @@ def _plan(connection: Any, core: _Core, *, sample: int | None, history_ids: Iter
         locks = document_locks(link.catalog_locks) if link else []
         definitions = locked(link.definitions, locks) if link else []
         for column, source in (("ddl", ddl), ("expanded_ddl", expanded_ddl)):
-            if source:
+            if source and f"{history_id}:{column}" not in blank:
                 history_units[(history_id, column)] = _document_unit(
                     source, language if language in {"ja", "en"} else "ja", locks, definitions)
     labels = {}
@@ -528,18 +559,24 @@ def _plan(connection: Any, core: _Core, *, sample: int | None, history_ids: Iter
         if link:
             tally["linked"] += 1
         locks = len(link.catalog_locks) if link else 0
-        migrated_texts: dict[str, str] = {}
+        migrated_texts: dict[str, str | None] = {}
         refused = False
         for column, source in (("ddl", ddl), ("expanded_ddl", expanded_ddl)):
             if not source:
                 continue
             tally[f"{column}_present"] += 1
+            if f"{history_id}:{column}" in blank:
+                tally["blanked"] += 1
+                blanked_records.append({"id": f"{history_id}:{column}", "chars": len(source)})
+                migrated_texts[column] = None
+                continue
             answer = document_answer("history", f"{history_id}:{column}",
                                      history_units[(history_id, column)], source, locks)
             if answer is None:
                 refused = True
             elif answer["document"].get("source") != source:
                 migrated_texts[column] = str(answer["document"].get("source"))
+        new_ddl = migrated_texts.get("ddl", ddl)
 
         link_definitions: list[Any] = []
         if link and not refused:
@@ -560,10 +597,10 @@ def _plan(connection: Any, core: _Core, *, sample: int | None, history_ids: Iter
         if migrated_texts:
             result.statements.append((
                 "UPDATE history SET ddl=?, expanded_ddl=? WHERE id=?",
-                (migrated_texts.get("ddl", ddl), migrated_texts.get("expanded_ddl", expanded_ddl), history_id)))
+                (new_ddl, migrated_texts.get("expanded_ddl", expanded_ddl), history_id)))
             tally["rows_written"] += 1
         if link:
-            statement = _link_statement(link, link_definitions, migrated_texts.get("ddl", ddl), definition_answer)
+            statement = _link_statement(link, link_definitions, new_ddl, definition_answer)
             if statement:
                 result.statements.append(statement)
                 counts["history_links"]["written"] += 1
@@ -597,6 +634,7 @@ def _plan(connection: Any, core: _Core, *, sample: int | None, history_ids: Iter
         **{kind: dict(sorted(tally.items())) for kind, tally in counts.items()},
         "edits": dict(edits.most_common()),
         "refused_records": refused_records,
+        "blanked_records": blanked_records,
         "unassociated_sweep_records": sweep_records,
     }
     return result
@@ -641,14 +679,14 @@ def migrate_saved_records(connection: Any, migrate: MigrateUnit, *, workers: int
                           progress: Progress | None = None,
                           checked: Callable[[], None] | None = None,
                           journal: Path | None = None, timeout: float | None = None,
-                          abort_on_failure: bool = False) -> dict[str, Any]:
+                          abort_on_failure: bool = False, blank: Iterable[str] | None = None) -> dict[str, Any]:
     """Write the migration over every saved record inside the caller's transaction.
 
     ``checked`` runs after the updates and before the discards; it raises to
     stop the transaction (the caller's invariant check).
     """
     migration = plan(connection, migrate, workers=workers, progress=progress, journal=journal, timeout=timeout,
-                     abort_on_failure=abort_on_failure)
+                     abort_on_failure=abort_on_failure, blank=blank)
     started = time.monotonic()
     for sql, args in migration.statements:
         _execute(connection, sql, args)
@@ -663,7 +701,8 @@ def migrate_saved_records(connection: Any, migrate: MigrateUnit, *, workers: int
 
 def migrate_once(database: Path, migrate: MigrateUnit, *, workers: int = 1,
                  progress: Progress | None = None, journal: Path | None = None,
-                 timeout: float | None = None, abort_on_failure: bool = False) -> dict[str, Any]:
+                 timeout: float | None = None, abort_on_failure: bool = False,
+                 blank: Iterable[str] | None = None) -> dict[str, Any]:
     """Move the saved records of one SQLite database to Saijiki v2, once.
 
     Run it while the service is stopped. It keeps a verified Backup API
@@ -697,7 +736,7 @@ def migrate_once(database: Path, migrate: MigrateUnit, *, workers: int = 1,
                 report = migrate_saved_records(connection, migrate, workers=workers, progress=progress,
                                                checked=lambda: verify_invariants(connection, before),
                                                journal=journal, timeout=timeout,
-                                               abort_on_failure=abort_on_failure)
+                                               abort_on_failure=abort_on_failure, blank=blank)
                 summary = {"refused_records": len(report["refused_records"]), "statements": report["statements"]}
                 _execute(connection, "INSERT INTO app_settings(key, value, at) VALUES (?, ?, ?)",
                          (DONE_SETTING, _canonical(summary), int(time.time() * 1000)))

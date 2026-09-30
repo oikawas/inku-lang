@@ -43,6 +43,12 @@ def _resolve_guarded_database(run_root: Path, relative_database: Path) -> Path:
     return database
 
 
+def _blank_list(path: Path | None) -> list[str] | None:
+    if path is None:
+        return None
+    return [line.strip() for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--run-root", type=Path, required=True)
@@ -57,6 +63,8 @@ def main() -> int:
                         help="ask the core from this many worker processes at once")
     parser.add_argument("--timeout", type=float, default=60.0,
                         help="kill a call that runs longer than this many seconds, list its record, and go on")
+    parser.add_argument("--blank", type=Path, default=None,
+                        help="empty these history texts instead of migrating them (<history id>:<column>, one per line)")
     parser.add_argument("--out", type=Path, default=None,
                         help="write progress.log, report.json, and journal.jsonl (each answer as it comes) here")
     args = parser.parse_args()
@@ -75,7 +83,8 @@ def main() -> int:
     try:
         report = census(connection, inku_render.pipeline_migrate_saijiki_v1, workers=args.workers,
                         sample=args.sample, history_ids=ids, progress=(lambda line: log.write(line + "\n")) if log else None,
-                        journal=args.out / "journal.jsonl" if args.out else None, timeout=args.timeout)
+                        journal=args.out / "journal.jsonl" if args.out else None, timeout=args.timeout,
+                        blank=_blank_list(args.blank))
     finally:
         connection.close()
         if log:
@@ -84,9 +93,10 @@ def main() -> int:
         (args.out / "report.json").write_text(
             json.dumps({"ok": True, "census": report}, ensure_ascii=False, sort_keys=True), encoding="utf-8")
     counts = {key: value for key, value in report.items()
-              if key not in {"refused_records", "unassociated_sweep_records"}}
+              if key not in {"refused_records", "blanked_records", "unassociated_sweep_records"}}
     counts["refused_records"] = len(report["refused_records"])
     counts["unassociated_sweep_records"] = len(report["unassociated_sweep_records"])
+    counts["blanked_records"] = len(report["blanked_records"])
     json.dump({"ok": True, "census": counts}, sys.stdout, ensure_ascii=False, sort_keys=True)
     sys.stdout.write("\n")
     return 0

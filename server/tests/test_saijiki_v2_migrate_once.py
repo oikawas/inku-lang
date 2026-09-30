@@ -15,7 +15,7 @@ import pytest
 from sqlalchemy import create_engine
 
 from inku_server.persistence import schema
-from inku_server.persistence.saijiki_migration import MigrationAlreadyWritten, migrate_once
+from inku_server.persistence.saijiki_migration import BlankListInvalid, MigrationAlreadyWritten, migrate_once
 from inku_server.persistence.variation_authority import VariationAuthorityStore
 
 
@@ -23,8 +23,8 @@ def _canonical(value: object) -> bytes:
     return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
 
 
-def test_a_migrated_work_still_reads_and_a_second_run_refuses(tmp_path):
-    path = tmp_path / "inku.db"
+def _saved_database(path) -> None:
+    """One work linked to its performance, its variation, and one execution snapshot."""
     engine = create_engine(f"sqlite:///{path}", future=True)
     schema.Base.metadata.create_all(engine)
     ddl = "薄墨の円を置く。"
@@ -53,6 +53,11 @@ def test_a_migrated_work_still_reads_and_a_second_run_refuses(tmp_path):
             state_digest="-", created_at=1, updated_at=1))
     engine.dispose()
 
+
+def test_a_migrated_work_still_reads_and_a_second_run_refuses(tmp_path):
+    path = tmp_path / "inku.db"
+    _saved_database(path)
+
     report = migrate_once(path, inku_render.pipeline_migrate_saijiki_v1)
 
     assert report["refused_records"] == []
@@ -72,3 +77,29 @@ def test_a_migrated_work_still_reads_and_a_second_run_refuses(tmp_path):
 
     with pytest.raises(MigrationAlreadyWritten):
         migrate_once(path, inku_render.pipeline_migrate_saijiki_v1)
+
+
+def test_a_named_text_is_emptied_not_migrated_and_a_linked_work_keeps_its_instructions(tmp_path):
+    path = tmp_path / "inku.db"
+    _saved_database(path)
+    engine = create_engine(f"sqlite:///{path}", future=True)
+    with engine.begin() as connection:
+        connection.execute(schema.HistoryRow.__table__.insert().values(
+            id="h2", user_id="u", at=2, input="another", ddl="薄墨の円を置く。",
+            expanded_ddl="以下は **正規化DDL** に変換した結果です。", score="{}", svg="<svg/>", elapsed_ms=0))
+    engine.dispose()
+
+    # The linked work's instructions are bound by digest: naming them writes nothing.
+    with pytest.raises(BlankListInvalid):
+        migrate_once(path, inku_render.pipeline_migrate_saijiki_v1, blank=["h:ddl"])
+
+    report = migrate_once(path, inku_render.pipeline_migrate_saijiki_v1, blank=["h2:expanded_ddl"])
+
+    assert [record["id"] for record in report["blanked_records"]] == ["h2:expanded_ddl"]
+    assert report["refused_records"] == []
+    engine = create_engine(f"sqlite:///{path}", future=True)
+    with engine.connect() as connection:
+        ddl, expanded, description = connection.exec_driver_sql(
+            "SELECT ddl, expanded_ddl, input FROM history WHERE id='h2'").one()
+    engine.dispose()
+    assert (ddl, expanded, description) == ("薄い刷きの円を置く。", None, "another")

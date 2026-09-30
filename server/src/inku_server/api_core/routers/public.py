@@ -203,7 +203,10 @@ def api_reference(
 @authenticated_router.get("/api/client-config")
 def api_client_config() -> dict[str, object]:
     """Server-owned values every client needs. Editable by admins only."""
-    return {"render_fanout_limit": int(_db.get_render_concurrency_settings()["client_limit"])}
+    return {
+        "render_fanout_limit": int(_db.get_render_concurrency_settings()["client_limit"]),
+        "description_meter": _db.get_description_meter_settings(),
+    }
 
 
 def _demo_instruction_system(lang: str) -> str:

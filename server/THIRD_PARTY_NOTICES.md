@@ -14,6 +14,13 @@ https://pypi.org/project/tqdm/4.67.3/#files . These packages are not modified
 by inku.
 The Noto Serif JP copyright and SIL OFL 1.1 text are in
 `src/inku_server/fonts/OFL.txt` beside the font.
+The Carnegie Mellon Pronouncing Dictionary (Copyright (C) 1993-2015 Carnegie
+Mellon University), which the description meter uses to count English
+syllables, is bundled unmodified in `src/inku_server/cmudict/` from
+https://github.com/cmusphinx/cmudict at commit
+74790861f652b15e4ac49015a90074ad62a27690. Its BSD-style licence is
+`src/inku_server/cmudict/LICENSE` beside it. The PyPI `cmudict` package, which
+wraps the same data under GPL-3.0-or-later, is not used.
 
 The native binding uses UniFFI 0.32.0. The eight MPL-2.0 packages in
 `core/Cargo.lock` are `uniffi`, `uniffi_bindgen`, `uniffi_core`,

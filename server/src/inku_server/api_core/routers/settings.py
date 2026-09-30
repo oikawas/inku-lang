@@ -266,6 +266,11 @@ class RenderLimitsStatus(BaseModel):
     note: str
 
 
+class DescriptionMeterStatus(BaseModel):
+    japanese: bool = Field(description="日本語の記述の詩型を音数で判定する")
+    english: bool = Field(description="英語の記述の形式を行数と音節で判定する")
+
+
 class SettingsStatusResponse(BaseModel):
     database: DatabaseSettingsStatus
     db_backup: DbBackupStatus
@@ -275,6 +280,7 @@ class SettingsStatusResponse(BaseModel):
     stage_execution: StageExecutionStatus
     render_concurrency: RenderConcurrencyStatus
     render_limits: RenderLimitsStatus
+    description_meter: DescriptionMeterStatus
 
 
 @router.get("/api/settings/status", response_model=SettingsStatusResponse)
@@ -310,6 +316,7 @@ def api_settings_status() -> SettingsStatusResponse:
         render_concurrency=_render_concurrency_status(),
         render_limits=_render_limits_status(),
         stage_execution=_stage_execution_status(),
+        description_meter=DescriptionMeterStatus(**_db.get_description_meter_settings()),
     )
 
 
@@ -802,6 +809,16 @@ def api_settings_update_render_concurrency(
     # New limit applies to renders acquired from here on; running renders finish.
     _render_slots.set_limit(int(settings["server_limit"]))
     return _render_concurrency_status()
+
+
+class DescriptionMeterBody(BaseModel):
+    japanese: bool
+    english: bool
+
+
+@router.put("/api/settings/description-meter", response_model=DescriptionMeterStatus)
+def api_settings_update_description_meter(body: DescriptionMeterBody) -> DescriptionMeterStatus:
+    return DescriptionMeterStatus(**_db.update_description_meter_settings(body.japanese, body.english))
 
 
 @router.put("/api/settings/log-retention", response_model=LogRetentionStatus)

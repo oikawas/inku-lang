@@ -65,7 +65,9 @@ PUBLIC = {  # every entry needs a reason
 #   verse-form meter (2026-09-30).
 # The API-surface baseline had 104 endpoints before mora. The older cumulative
 # tally above had drifted by three; mora brings the live count to 105.
-EXPECTED_ROUTE_COUNT = 105
+#   +2 for POST /api/description/syllables and PUT /api/settings/description-meter,
+#   the English meter and the switches for both languages (2026-09-30).
+EXPECTED_ROUTE_COUNT = 107
 
 
 def _guard_names(dependant, seen=None) -> set[str]:

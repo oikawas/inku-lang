@@ -1,7 +1,7 @@
 {
-  "endpoint_count": 105,
-  "operation_count": 105,
-  "schema_count": 160,
+  "endpoint_count": 107,
+  "operation_count": 107,
+  "schema_count": 164,
   "operations": [
     {
       "path": "/api/admin/unread-words",
@@ -336,6 +336,20 @@
       "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/DescriptionMoraBody\"}}},\"required\":true}",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/DescriptionMoraResponse\"}}},\"description\":\"Successful Response\"}",
+        "422": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/HTTPValidationError\"}}},\"description\":\"Validation Error\"}"
+      }
+    },
+    {
+      "path": "/api/description/syllables",
+      "method": "POST",
+      "operationId": "api_description_syllables_api_description_syllables_post",
+      "params": [
+        "cookie:inku_session:opt",
+        "header:authorization:opt"
+      ],
+      "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/DescriptionSyllablesBody\"}}},\"required\":true}",
+      "responses": {
+        "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/DescriptionSyllablesResponse\"}}},\"description\":\"Successful Response\"}",
         "422": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/HTTPValidationError\"}}},\"description\":\"Validation Error\"}"
       }
     },
@@ -1204,6 +1218,20 @@
       }
     },
     {
+      "path": "/api/settings/description-meter",
+      "method": "PUT",
+      "operationId": "api_settings_update_description_meter_api_settings_description_meter_put",
+      "params": [
+        "cookie:inku_session:opt",
+        "header:authorization:opt"
+      ],
+      "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/DescriptionMeterBody\"}}},\"required\":true}",
+      "responses": {
+        "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/DescriptionMeterStatus\"}}},\"description\":\"Successful Response\"}",
+        "422": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/HTTPValidationError\"}}},\"description\":\"Validation Error\"}"
+      }
+    },
+    {
       "path": "/api/settings/limits",
       "method": "PUT",
       "operationId": "api_settings_update_limits_api_settings_limits_put",
@@ -1573,8 +1601,12 @@
     "DemoInstructionBody": "{\"properties\":{\"instruction_lang\":{\"default\":\"auto\",\"title\":\"Instruction Lang\",\"type\":\"string\"},\"model\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"title\":\"Model\"},\"seed_phrase\":{\"maxLength\":1000,\"minLength\":1,\"title\":\"Seed Phrase\",\"type\":\"string\"},\"ui_lang\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"title\":\"Ui Lang\"}},\"required\":[\"seed_phrase\"],\"title\":\"DemoInstructionBody\",\"type\":\"object\"}",
     "DemoInstructionResponse": "{\"properties\":{\"instruction\":{\"title\":\"Instruction\",\"type\":\"string\"}},\"required\":[\"instruction\"],\"title\":\"DemoInstructionResponse\",\"type\":\"object\"}",
     "DemoSettingsBody": "{\"properties\":{\"interval_seconds\":{\"default\":30,\"maximum\":3600.0,\"minimum\":1.0,\"title\":\"Interval Seconds\",\"type\":\"integer\"},\"prompt_model\":{\"default\":\"google/gemma-4-31b-it\",\"minLength\":1,\"title\":\"Prompt Model\",\"type\":\"string\"},\"prompt_provider\":{\"default\":\"nvidia\",\"minLength\":1,\"title\":\"Prompt Provider\",\"type\":\"string\"},\"save_db\":{\"default\":false,\"title\":\"Save Db\",\"type\":\"boolean\"},\"save_files\":{\"default\":false,\"title\":\"Save Files\",\"type\":\"boolean\"},\"seed_phrase\":{\"default\":\"日本の四季を感じさせる文章を40語以内で生成\",\"maxLength\":1000,\"minLength\":1,\"title\":\"Seed Phrase\",\"type\":\"string\"},\"timeout_seconds\":{\"default\":3600,\"maximum\":86400.0,\"minimum\":60.0,\"title\":\"Timeout Seconds\",\"type\":\"integer\"}},\"title\":\"DemoSettingsBody\",\"type\":\"object\"}",
+    "DescriptionMeterBody": "{\"properties\":{\"english\":{\"title\":\"English\",\"type\":\"boolean\"},\"japanese\":{\"title\":\"Japanese\",\"type\":\"boolean\"}},\"required\":[\"japanese\",\"english\"],\"title\":\"DescriptionMeterBody\",\"type\":\"object\"}",
+    "DescriptionMeterStatus": "{\"properties\":{\"english\":{\"description\":\"英語の記述の形式を行数と音節で判定する\",\"title\":\"English\",\"type\":\"boolean\"},\"japanese\":{\"description\":\"日本語の記述の詩型を音数で判定する\",\"title\":\"Japanese\",\"type\":\"boolean\"}},\"required\":[\"japanese\",\"english\"],\"title\":\"DescriptionMeterStatus\",\"type\":\"object\"}",
     "DescriptionMoraBody": "{\"properties\":{\"text\":{\"default\":\"\",\"maxLength\":4000,\"title\":\"Text\",\"type\":\"string\"}},\"title\":\"DescriptionMoraBody\",\"type\":\"object\"}",
     "DescriptionMoraResponse": "{\"properties\":{\"mora\":{\"description\":\"音数の合計（読めなかった字は推定で数える）\",\"title\":\"Mora\",\"type\":\"integer\"},\"phrases\":{\"description\":\"改行・空白・読点で区切った句ごとの音数\",\"items\":{\"type\":\"integer\"},\"title\":\"Phrases\",\"type\":\"array\"},\"unread\":{\"description\":\"辞書が読めなかった字。空でなければ合計は推定を含む\",\"items\":{\"type\":\"string\"},\"title\":\"Unread\",\"type\":\"array\"}},\"required\":[\"mora\",\"phrases\",\"unread\"],\"title\":\"DescriptionMoraResponse\",\"type\":\"object\"}",
+    "DescriptionSyllablesBody": "{\"properties\":{\"text\":{\"default\":\"\",\"maxLength\":4000,\"title\":\"Text\",\"type\":\"string\"}},\"title\":\"DescriptionSyllablesBody\",\"type\":\"object\"}",
+    "DescriptionSyllablesResponse": "{\"properties\":{\"lines\":{\"description\":\"空でない行ごとの音節\",\"items\":{\"type\":\"integer\"},\"title\":\"Lines\",\"type\":\"array\"},\"syllables\":{\"description\":\"音節の合計（辞書に無い語は推定で数える）\",\"title\":\"Syllables\",\"type\":\"integer\"},\"unknown\":{\"description\":\"発音辞書に無かった語。空でなければ合計は推定を含む\",\"items\":{\"type\":\"string\"},\"title\":\"Unknown\",\"type\":\"array\"}},\"required\":[\"syllables\",\"lines\",\"unknown\"],\"title\":\"DescriptionSyllablesResponse\",\"type\":\"object\"}",
     "DiagonalLineRecipe": "{\"additionalProperties\":false,\"properties\":{\"kind\":{\"const\":\"diagonal_line\",\"title\":\"Kind\",\"type\":\"string\"},\"step\":{\"maxItems\":2,\"minItems\":2,\"prefixItems\":[{\"type\":\"number\"},{\"type\":\"number\"}],\"title\":\"Step\",\"type\":\"array\"}},\"required\":[\"kind\",\"step\"],\"title\":\"DiagonalLineRecipe\",\"type\":\"object\"}",
     "EnclosingGroupPlacementAnchor": "{\"additionalProperties\":false,\"properties\":{\"kind\":{\"const\":\"enclosing_group\",\"title\":\"Kind\",\"type\":\"string\"}},\"required\":[\"kind\"],\"title\":\"EnclosingGroupPlacementAnchor\",\"type\":\"object\"}",
     "ExplicitCanvasTargetOwner": "{\"additionalProperties\":false,\"properties\":{\"kind\":{\"const\":\"explicit_canvas\",\"title\":\"Kind\",\"type\":\"string\"},\"source\":{\"$ref\":\"#/components/schemas/ScoreSourceSite\"}},\"required\":[\"kind\",\"source\"],\"title\":\"ExplicitCanvasTargetOwner\",\"type\":\"object\"}",
@@ -1671,7 +1703,7 @@
     "Score": "{\"additionalProperties\":false,\"properties\":{\"anchors\":{\"description\":\"Relation が参照できる非描画の明示基準点\",\"items\":{\"$ref\":\"#/components/schemas/AnchorPoint\"},\"title\":\"Anchors\",\"type\":\"array\"},\"background\":{\"default\":\"white\",\"description\":\"背景色: white=白 / black=黒 / blue=青 / red=赤 / green=緑 / gray=灰 / yellow=黄 / orange=橙 / purple=紫 (省略=white)。「背景を黒で埋める」→ black。旧表現「背景を黒で塗りつぶす」も同じ\",\"enum\":[\"white\",\"black\",\"blue\",\"red\",\"green\",\"gray\",\"yellow\",\"orange\",\"purple\"],\"title\":\"Background\",\"type\":\"string\"},\"canvas\":{\"anyOf\":[{\"type\":\"string\"},{\"$ref\":\"#/components/schemas/CanvasSpec\"}],\"default\":\"square\",\"description\":\"キャンバス比率ID、または {aspect, ground}。標準値は square。ground は紙目・薄墨地などの支持体質感を保持する\",\"title\":\"Canvas\"},\"fill_groups\":{\"description\":\"Score 0.10 compact fill recipes; sampled positions are absent\",\"items\":{\"$ref\":\"#/components/schemas/FillGroup\"},\"title\":\"Fill Groups\",\"type\":\"array\"},\"instructions\":{\"items\":{\"$ref\":\"#/components/schemas/Instruction\"},\"title\":\"Instructions\",\"type\":\"array\"},\"mirror_relations\":{\"description\":\"Score 0.15 binary mirror relations between complete existing bodies\",\"items\":{\"$ref\":\"#/components/schemas/MirrorRelationV1\"},\"title\":\"Mirror Relations\",\"type\":\"array\"},\"placement_groups\":{\"description\":\"通常DDLのdirect coordinated group配置。source順の連続 Score instruction 範囲を overlap、horizontal_source_order、scatter、tile と named 配置領域で一度だけ配置する\",\"items\":{\"$ref\":\"#/components/schemas/PlacementGroup\"},\"title\":\"Placement Groups\",\"type\":\"array\"},\"presence\":{\"anyOf\":[{\"$ref\":\"#/components/schemas/Presence\"},{\"type\":\"null\"}],\"description\":\"人・顔・動物・群れなどの対象物を直接描かず、存在感、重心、対称性、視線の圧力、群れ、輪郭密度へ抽象化した描画パラメータ。目鼻口・四肢・耳・尻尾などの具象部品は禁止\"},\"repetition_groups\":{\"description\":\"Score 0.10 standalone Macro whole-body repetition recipes\",\"items\":{\"$ref\":\"#/components/schemas/RepetitionGroup\"},\"title\":\"Repetition Groups\",\"type\":\"array\"},\"resource_policy\":{\"anyOf\":[{\"$ref\":\"#/components/schemas/ScoreResourcePolicy\"},{\"type\":\"null\"}],\"description\":\"Resource authorities captured for saved-Score replay; demand is recomputed\"},\"transform_groups\":{\"description\":\"Macro のまとまり変換。内側から外側の postorder で、各範囲は Score instruction index の連続区間を表す\",\"items\":{\"$ref\":\"#/components/schemas/TransformGroup\"},\"title\":\"Transform Groups\",\"type\":\"array\"},\"version\":{\"default\":\"0.9.0\",\"enum\":[\"0.15.0\",\"0.14.0\",\"0.13.0\",\"0.12.0\",\"0.11.0\",\"0.10.0\",\"0.9.0\",\"0.8.0\",\"0.7.0\",\"0.6.0\",\"0.5.0\",\"0.4.0\",\"0.3.0\",\"0.2.0\",\"0.1.0\"],\"title\":\"Version\",\"type\":\"string\"}},\"required\":[\"instructions\"],\"title\":\"Score\",\"type\":\"object\"}",
     "ScoreResourcePolicy": "{\"additionalProperties\":false,\"properties\":{\"accounting_id\":{\"const\":\"inku.resource-accounting.v1\",\"title\":\"Accounting Id\",\"type\":\"string\"},\"hard_policy\":{\"$ref\":\"#/components/schemas/HardResourcePolicy\"},\"operational_budget\":{\"$ref\":\"#/components/schemas/ResourceBudget\"}},\"required\":[\"accounting_id\",\"hard_policy\",\"operational_budget\"],\"title\":\"ScoreResourcePolicy\",\"type\":\"object\"}",
     "ScoreSourceSite": "{\"additionalProperties\":false,\"properties\":{\"clause_index\":{\"minimum\":0.0,\"title\":\"Clause Index\",\"type\":\"integer\"},\"region_index\":{\"minimum\":0.0,\"title\":\"Region Index\",\"type\":\"integer\"}},\"required\":[\"region_index\",\"clause_index\"],\"title\":\"ScoreSourceSite\",\"type\":\"object\"}",
-    "SettingsStatusResponse": "{\"properties\":{\"database\":{\"$ref\":\"#/components/schemas/DatabaseSettingsStatus\"},\"db_backup\":{\"$ref\":\"#/components/schemas/DbBackupStatus\"},\"log_retention\":{\"$ref\":\"#/components/schemas/LogRetentionStatus\"},\"output_save\":{\"$ref\":\"#/components/schemas/OutputSaveStatus\"},\"plugins\":{\"$ref\":\"#/components/schemas/PluginSettingsStatus\"},\"render_concurrency\":{\"$ref\":\"#/components/schemas/RenderConcurrencyStatus\"},\"render_limits\":{\"$ref\":\"#/components/schemas/RenderLimitsStatus\"},\"stage_execution\":{\"$ref\":\"#/components/schemas/StageExecutionStatus\"}},\"required\":[\"database\",\"db_backup\",\"plugins\",\"output_save\",\"log_retention\",\"stage_execution\",\"render_concurrency\",\"render_limits\"],\"title\":\"SettingsStatusResponse\",\"type\":\"object\"}",
+    "SettingsStatusResponse": "{\"properties\":{\"database\":{\"$ref\":\"#/components/schemas/DatabaseSettingsStatus\"},\"db_backup\":{\"$ref\":\"#/components/schemas/DbBackupStatus\"},\"description_meter\":{\"$ref\":\"#/components/schemas/DescriptionMeterStatus\"},\"log_retention\":{\"$ref\":\"#/components/schemas/LogRetentionStatus\"},\"output_save\":{\"$ref\":\"#/components/schemas/OutputSaveStatus\"},\"plugins\":{\"$ref\":\"#/components/schemas/PluginSettingsStatus\"},\"render_concurrency\":{\"$ref\":\"#/components/schemas/RenderConcurrencyStatus\"},\"render_limits\":{\"$ref\":\"#/components/schemas/RenderLimitsStatus\"},\"stage_execution\":{\"$ref\":\"#/components/schemas/StageExecutionStatus\"}},\"required\":[\"database\",\"db_backup\",\"plugins\",\"output_save\",\"log_retention\",\"stage_execution\",\"render_concurrency\",\"render_limits\",\"description_meter\"],\"title\":\"SettingsStatusResponse\",\"type\":\"object\"}",
     "ShapeFillTargetGeometry": "{\"additionalProperties\":false,\"properties\":{\"anchor\":{\"anyOf\":[{\"$ref\":\"#/components/schemas/NumericFillTargetAnchor\"},{\"$ref\":\"#/components/schemas/GeneratedNumericFillTargetAnchor\"},{\"$ref\":\"#/components/schemas/NamedFillTargetAnchor\"}],\"title\":\"Anchor\"},\"arc_form\":{\"anyOf\":[{\"const\":\"crescent\",\"type\":\"string\"},{\"type\":\"null\"}],\"title\":\"Arc Form\"},\"contour_variation\":{\"anyOf\":[{\"$ref\":\"#/components/schemas/Variation\"},{\"type\":\"null\"}]},\"dimensions\":{\"anyOf\":[{\"$ref\":\"#/components/schemas/BboxDimensions\"},{\"$ref\":\"#/components/schemas/RegularTriangleDimensions\"},{\"$ref\":\"#/components/schemas/PolygonDimensions\"},{\"$ref\":\"#/components/schemas/LineDimensions\"},{\"$ref\":\"#/components/schemas/CircleDimensions\"},{\"$ref\":\"#/components/schemas/ArcDimensions\"},{\"$ref\":\"#/components/schemas/PointDimensions\"},{\"$ref\":\"#/components/schemas/CenteredSizeDimensions\"},{\"$ref\":\"#/components/schemas/SquareDimensions\"}],\"title\":\"Dimensions\"},\"kind\":{\"const\":\"shape\",\"title\":\"Kind\",\"type\":\"string\"},\"primitive\":{\"enum\":[\"line\",\"circle\",\"ellipse\",\"triangle\",\"square\",\"polygon\",\"arc\",\"point\",\"cloudform\"],\"title\":\"Primitive\",\"type\":\"string\"},\"rotation_degrees\":{\"anyOf\":[{\"type\":\"number\"},{\"type\":\"null\"}],\"title\":\"Rotation Degrees\"}},\"required\":[\"kind\",\"primitive\",\"dimensions\",\"anchor\"],\"title\":\"ShapeFillTargetGeometry\",\"type\":\"object\"}",
     "SingleUserBody": "{\"properties\":{\"user_id\":{\"maxLength\":100,\"minLength\":1,\"title\":\"User Id\",\"type\":\"string\"}},\"required\":[\"user_id\"],\"title\":\"SingleUserBody\",\"type\":\"object\"}",
     "SingleUserCandidate": "{\"properties\":{\"id\":{\"title\":\"Id\",\"type\":\"string\"},\"username\":{\"title\":\"Username\",\"type\":\"string\"}},\"required\":[\"id\",\"username\"],\"title\":\"SingleUserCandidate\",\"type\":\"object\"}",
@@ -1704,5 +1736,5 @@
     "VisionRefineAdviceBody": "{\"properties\":{\"direction\":{\"default\":\"\",\"maxLength\":2000,\"title\":\"Direction\",\"type\":\"string\"},\"enabled_kinds\":{\"items\":{\"type\":\"string\"},\"maxItems\":5,\"minItems\":1,\"title\":\"Enabled Kinds\",\"type\":\"array\"},\"history_id\":{\"maxLength\":200,\"minLength\":1,\"title\":\"History Id\",\"type\":\"string\"},\"instruction\":{\"maxLength\":100000,\"minLength\":1,\"title\":\"Instruction\",\"type\":\"string\"},\"language\":{\"default\":\"ja\",\"pattern\":\"^(ja|en)$\",\"title\":\"Language\",\"type\":\"string\"},\"model\":{\"anyOf\":[{\"maxLength\":200,\"minLength\":1,\"type\":\"string\"},{\"type\":\"null\"}],\"title\":\"Model\"}},\"required\":[\"history_id\",\"instruction\",\"enabled_kinds\"],\"title\":\"VisionRefineAdviceBody\",\"type\":\"object\"}",
     "VisionRefineAdviceResponse": "{\"properties\":{\"model\":{\"title\":\"Model\",\"type\":\"string\"},\"next_direction\":{\"title\":\"Next Direction\",\"type\":\"string\"},\"observation\":{\"title\":\"Observation\",\"type\":\"string\"},\"suggested_kind\":{\"title\":\"Suggested Kind\",\"type\":\"string\"}},\"required\":[\"observation\",\"next_direction\",\"suggested_kind\",\"model\"],\"title\":\"VisionRefineAdviceResponse\",\"type\":\"object\"}"
   },
-  "digest": "1351bd72076e9f35f6cae73d2e443bb108a574291974d42224e6feaee4eb7d78"
+  "digest": "50f5f1a951c58726044721fc3f2d54a37e601133f89a69107c4a403b8f94259e"
 }

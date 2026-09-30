@@ -1,5 +1,5 @@
 import type { ComposeFallbackState } from '$lib/composeFallback';
-import type { VerseForm } from '$lib/verseForm';
+import type { EnglishForm, VerseForm } from '$lib/verseForm';
 
 export interface LangPack {
 	pipelineDescriptionLabel: string;
@@ -67,10 +67,14 @@ export interface LangPack {
 	appInfoHintBindingProtocol: string;
 	appInfoClose: string;
 	inputSectionHint: string;
-	/** Characters, the nearest verse form's length, and that form's name. */
+	/** Characters, the nearest verse form's length, and that form's name (before the sounds arrive). */
 	inputMeterVerse: (count: number, target: number, form: string) => string;
+	/** Sounds, the nearest verse form's length, and its name; approximate when a character was not read. */
+	inputMeterMora: (count: number, target: number, form: string, approximate: boolean) => string;
+	/** Lines, the nearest English form's line count, and its name. */
+	inputMeterLines: (count: number, target: number, form: string) => string;
 	verseFormName: (form: VerseForm) => string;
-	inputMeterWords: (count: number, guide: number) => string;
+	englishFormName: (form: EnglishForm) => string;
 	inputCommentHint: string;
 	appInfoVocabTitle: string;
 	appInfoVocabIntro: string;

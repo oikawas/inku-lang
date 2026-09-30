@@ -20,6 +20,7 @@
 	import CanvasPanel from '$lib/components/CanvasPanel.svelte';
 	import { CanvasViewportState } from '$lib/features/canvas/viewport-state.svelte';
 	import { createRefinementCoordinator } from '$lib/features/canvas/refinement-coordinator.svelte';
+	import { registerMoraTransport } from '$lib/descriptionMora';
 	import { RefinementSessionState } from '$lib/features/canvas/refinement-session.svelte';
 	import { LineageQueryState, LineageBrowsingState } from '$lib/features/history/lineage-state.svelte';
 	import { makeSavedWorkExportActions } from '$lib/features/export/saved-work-actions';
@@ -487,6 +488,8 @@
 
 	// A 401 means this page's session is gone; the session owner returns to sign-in.
 	const apiFetch = createApiFetch({ onUnauthorized: () => session.expireAfterUnauthorized() });
+	// The description meter asks the Server for a description's sounds.
+	registerMoraTransport(apiFetch);
 	const session = createSessionState({
 		apiFetch,
 		describeApiError,

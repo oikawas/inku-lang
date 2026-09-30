@@ -4,7 +4,7 @@ This file records revisions to user and operations documents under `manual/`. Se
 
 ## 2026-09-30 — Change the description, and the verse form in the meter
 
-`Edit the description` in the work-editing menu is now `Change the description`, and the count below the description names the nearest verse form (haiku, katauta, tanka, sedōka and bussokuseki-ka, chōka). The input field's description and the item's name where DDL-edited works are described are corrected in Creating Images in both languages.
+`Edit the description` in the work-editing menu is now `Change the description`, and the meter below the description names the nearest form: in sounds for Japanese (haiku, katauta, tanka, sedōka, bussokuseki-ka, chōka) and in lines for English (couplet to sestina). The input field's description and the item's name where DDL-edited works are described are corrected in Creating Images in both languages.
 
 ## 2026-09-30 — Change models becomes Change the model
 

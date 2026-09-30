@@ -1276,10 +1276,17 @@ worth writing.
 To support a tanka-like brevity, the writing surface carries only a non-blocking
 length hint (the box displays the count, but does not enforce the guide).
 Japanese input is measured against the verse form whose length is nearest to its
-total character count (haiku 17, katauta 19, tanka 31, sedōka and bussokuseki-ka
-38, chōka 12n + 7 from 43), shown as "Characters 17/17 (haiku)"; English input
-uses roughly 12 words.  The forms are counted in sounds, but the guide judges
-them by characters.  The description box and the work-editing menu's Change
+total sounds (haiku 17, katauta 19, tanka 31, sedōka and bussokuseki-ka 38, chōka
+12n + 7 from 43), shown as "Sounds 17/17 (haiku)".  The Server counts the sounds
+(`POST /api/description/mora`) from SudachiPy's readings: a small ャュョ joins
+the kana before it, and ッ, ン and ー count one each.  A character the dictionary
+cannot read is estimated and the count is marked approximate; until the Server
+answers, the meter counts characters.  At 38, phrases (split at line breaks,
+spaces and 、) of 5-7-7-5-7-7 are sedōka and 5-7-5-7-7-7 bussokuseki-ka;
+otherwise both are named.  English input is measured in lines against the
+nearest form (couplet 2, haiku or tercet 3, quatrain 4, cinquain 5, sonnet 14,
+villanelle 19, sestina 39); three lines of at most 17 syllables are a haiku,
+longer ones a tercet.  The description box and the work-editing menu's Change
 the description show the same meter.  Input is never blocked.  The UI shows no copy that
 denies a long description and no evaluative display — only a numeric counter and
 a faint change in density, so the form is quietly present without scolding the

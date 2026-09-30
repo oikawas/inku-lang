@@ -58,8 +58,8 @@ object SaijikiGenerated {
             key = "sabaki",
             nameJa = "さばき",
             nameEn = "handling",
-            wordsJa = listOf("濃い", "薄い"),
-            wordsEn = listOf("dense", "faint"),
+            wordsJa = listOf("濃い", "程よい", "薄い"),
+            wordsEn = listOf("dense", "temperate", "faint"),
         ),
         Category(
             key = "ji",

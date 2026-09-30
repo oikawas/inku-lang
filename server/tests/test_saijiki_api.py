@@ -108,7 +108,10 @@ _EXPECTED_PAIRING: dict[str, tuple[tuple[str, str], ...]] = {
         ("点描", "stipple"), ("平行線", "hatch"), ("交差線", "crosshatch"),
         ("アクアチント", "aquatint"),
     ),
-    "sabaki": (("濃い", "dense"), ("薄い", "faint")),
+    # さばき (2026-09-30): 程よい / temperate lays the medium at the tool's own
+    # density, so a reader who must name the handling of every mark need not
+    # choose dense or faint where the description says neither.
+    "sabaki": (("濃い", "dense"), ("程よい", "temperate"), ("薄い", "faint")),
     # じ (2026-08-14, ddl-engine 19). Seven supports and no `plain`: asking for
     # no ground is not a word you can say. 「カンバス」 and not 「キャンバス」 --
     # the web already spells the sheet's own proportion キャンバス, and one screen

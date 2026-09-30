@@ -36,7 +36,7 @@ export const GENERATED_SAIJIKI: SaijikiCategory[] = [
 		key: 'sabaki',
 		label: 'さばき',
 		en: 'handling',
-		words: ['濃い', '薄い']
+		words: ['濃い', '程よい', '薄い']
 	},
 	{
 		key: 'ji',
@@ -123,7 +123,7 @@ export const GENERATED_SAIJIKI_EN: SaijikiCategory[] = [
 		key: 'sabaki',
 		label: 'さばき',
 		en: 'handling',
-		words: ['dense', 'faint']
+		words: ['dense', 'temperate', 'faint']
 	},
 	{
 		key: 'ji',

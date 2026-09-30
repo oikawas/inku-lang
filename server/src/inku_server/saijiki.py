@@ -222,6 +222,7 @@ SAIJIKI: tuple[SaijikiCategory, ...] = (
         marker_class=None,
         words=(
             _w("濃い", "dense"),
+            _w("程よい", "temperate"),
             _w("薄い", "faint"),
         ),
     ),

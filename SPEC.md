@@ -140,7 +140,7 @@ The core vocabulary consists of thirteen Saijiki categories plus relations. Its 
 | touches | てざわり | silverpoint, pencil, pen, rotring, crayon, chalk, fine-brush, thick-brush, oil paint, burin, drypoint, computer |
 | continuity | つらなり | solid, dashed, dotted, dash-dot |
 | surfaces | おもて | empty, flat, sweep, grain, stipple, hatch, crosshatch, aquatint |
-| handling | さばき | dense, faint |
+| handling | さばき | dense, temperate, faint |
 | grounds | じ | paper, washi, ink-wash ground, charcoal ground, canvas, drawing paper, mezzotint |
 | motions | うごき | place, line-up, draw, scatter, fill, tile |
 | order | じゅん | alternating, in order |
@@ -264,9 +264,14 @@ saving or delivering an empty Score with its background as an omitted success.
   The current vocabulary keeps `stipple` in surfaces as 点描 and moves `bleeding` to movements. It is independent `ink_spread:"bleed"`, so it can combine with Wave, Perlin, and stipple without creating Perlin or an intensity by itself. The old words v1 read as input (`点` for stipple, `滲む` / `blurring`, `震える` / `trembling` / `trembles`, `中央` / `middle`) are rewritten to the current words by the Saijiki v2 migration, and v2 does not read them (§3.3); the shape `点` names the point alone. Saved Scores retain the old rendering meaning of `surface.texture="bleed"` and `variation.quality="pink"`; editing or regenerating creates a new variation.
 
 - **the handling category names how ink or paint is laid on a mark** (Saijiki
-  v2, 2026-09-29): dense and faint, a dimension apart from the surface quality,
-  can go on any mark (a line, an arc, a textured surface, or a flat fill). They
-  are relative to the tool, not an absolute darkness. Words for the movement of
+  v2, 2026-09-29): dense, temperate, and faint, a dimension apart from the
+  surface quality, can go on any mark (a line, an arc, a textured surface, or a
+  flat fill). They are relative to the tool, not an absolute darkness. Temperate
+  (the author's ruling, 2026-09-30) lays the medium at the tool's own density and
+  draws as a mark with no handling word does (the Score's `normal`). The
+  underdrawing (Stage 1) names the handling of every layer (a required field of
+  the response type, 2026-09-30): left optional, the reader skipped it on about
+  half of the layers and dropped the faintness a description stated. Words for the movement of
   the brush, such as its speed, may join this category (§2 item 5)
 - **the grounds category holds the names of supports** (added 2026-08-15, render
   engine 34): **paper, washi, ink-wash ground, charcoal ground, canvas, drawing

@@ -8,6 +8,7 @@ internal enum class CameraInstantPrintPhase {
     PreparingImage,
     LoadingLocalModel,
     AnalyzingLocally,
+    WritingDescription,
     InterpretingStage1,
     Composing,
     Rendering,
@@ -26,10 +27,11 @@ internal class CameraInstantPrintCoordinator(
     private val isCurrent: () -> Boolean = { true },
     private val onPhase: (CameraInstantPrintPhase) -> Unit,
 ) {
-    suspend fun <Prepared, Local, Interpreted, Result> run(
+    suspend fun <Prepared, Observed, Local, Interpreted, Result> run(
         prepare: suspend () -> Prepared,
         load: suspend () -> Unit,
-        analyze: suspend (Prepared) -> Local,
+        analyze: suspend (Prepared) -> Observed,
+        writeDescription: suspend (Observed) -> Local,
         onLocalReady: suspend (Local) -> Unit,
         interpret: suspend (Local) -> Interpreted,
         compose: suspend (
@@ -45,7 +47,10 @@ internal class CameraInstantPrintCoordinator(
         load()
         ensureCurrent()
         emit(CameraInstantPrintPhase.AnalyzingLocally)
-        val local = analyze(prepared)
+        val observed = analyze(prepared)
+        ensureCurrent()
+        emit(CameraInstantPrintPhase.WritingDescription)
+        val local = writeDescription(observed)
         ensureCurrent()
         onLocalReady(local)
         ensureCurrent()

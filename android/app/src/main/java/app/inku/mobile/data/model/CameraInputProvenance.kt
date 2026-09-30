@@ -38,6 +38,8 @@ data class CameraInputProvenance(
     val visionOutputMode: CameraVisionOutputMode,
     val normalizedImageWidth: Int,
     val normalizedImageHeight: Int,
+    val descriptionModelId: String? = null,
+    val descriptionPromptVersion: String? = null,
 ) {
     init {
         require(visionProviderId.isNotBlank())
@@ -45,6 +47,9 @@ data class CameraInputProvenance(
         require(visionPromptVersion.isNotBlank())
         require(normalizedImageWidth > 0)
         require(normalizedImageHeight > 0)
+        require((descriptionModelId == null) == (descriptionPromptVersion == null))
+        require(descriptionModelId == null || descriptionModelId.isNotBlank())
+        require(descriptionPromptVersion == null || descriptionPromptVersion.isNotBlank())
     }
 
     internal fun toJson(): JSONObject = JSONObject()
@@ -56,6 +61,10 @@ data class CameraInputProvenance(
         .put("vision_output_mode", visionOutputMode.wireValue)
         .put("normalized_image_width", normalizedImageWidth)
         .put("normalized_image_height", normalizedImageHeight)
+        .also { value ->
+            descriptionModelId?.let { value.put("description_model_id", it) }
+            descriptionPromptVersion?.let { value.put("description_prompt_version", it) }
+        }
 
     companion object {
         fun fromAnalysis(
@@ -124,5 +133,7 @@ internal fun cameraInputProvenance(renderMetadataJson: String): CameraInputProve
         visionOutputMode = outputMode,
         normalizedImageWidth = requiredPositiveInt("normalized_image_width"),
         normalizedImageHeight = requiredPositiveInt("normalized_image_height"),
+        descriptionModelId = if (value.has("description_model_id")) requiredString("description_model_id") else null,
+        descriptionPromptVersion = if (value.has("description_prompt_version")) requiredString("description_prompt_version") else null,
     )
 }.getOrNull()

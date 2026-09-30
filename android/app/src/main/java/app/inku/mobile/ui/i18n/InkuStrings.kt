@@ -376,7 +376,6 @@ interface InkuStrings {
     val cameraPreparingImage: String
     val cameraLoadingLocalModel: String
     val cameraAnalyzingLocally: String
-    val cameraVisionModelTitle: String
     val bundledPluginsTitle: String
     val ddlImportFile: String
     val ddlImportInvalid: String
@@ -385,7 +384,6 @@ interface InkuStrings {
     val ddlExportWithPluginsNote: String
     val bundledPluginsSubtitle: String
     fun bundledPluginsToggle(words: String): String
-    val cameraVisionModelSubtitle: String
     fun cameraVisionRemoteNotice(provider: String): String
     val cameraReadyToEdit: String
     val cameraCancelled: String

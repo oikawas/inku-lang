@@ -72,6 +72,7 @@ class AnthropicModelProvider(
             modelId = request.modelId,
             promptTokens = usage?.optInt("input_tokens")?.takeIf { it > 0 },
             completionTokens = usage?.optInt("output_tokens")?.takeIf { it > 0 },
+            outputTruncated = response.optString("stop_reason") == "max_tokens",
             elapsedMs = System.currentTimeMillis() - started,
         )
     }

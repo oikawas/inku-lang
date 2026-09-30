@@ -32,6 +32,9 @@ import app.inku.mobile.data.refinement.RefinementParent
 import app.inku.mobile.data.refinement.RefinementPlan
 import app.inku.mobile.data.refinement.RefinementRoute
 import app.inku.mobile.llm.DefaultModelDownloads
+import app.inku.mobile.llm.CameraDescriptionRequest
+import app.inku.mobile.llm.CameraDescriptionResult
+import app.inku.mobile.llm.CameraDescriptionWriter
 import app.inku.mobile.llm.RemoteVisionAnalyzer
 import app.inku.mobile.llm.isLocalVisionModel
 import app.inku.mobile.llm.LocalLiteRtLmProvider
@@ -611,6 +614,9 @@ class InkuRepository(
         }
 
     suspend fun releaseLocalVisionModel(modelId: String) = localLiteRtProvider.releaseVisionModel(modelId)
+
+    suspend fun writeCameraDescription(request: CameraDescriptionRequest): CameraDescriptionResult =
+        CameraDescriptionWriter(activeModelProvider).write(request)
 
     suspend fun markModelDownloadQueued(modelId: String) {
         val asset = database.modelAssetDao().getByModelId(modelId) ?: return

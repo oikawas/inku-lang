@@ -64,6 +64,7 @@ class GeminiModelProvider(
             modelId = request.modelId,
             promptTokens = usage?.optInt("promptTokenCount")?.takeIf { it > 0 },
             completionTokens = usage?.optInt("candidatesTokenCount")?.takeIf { it > 0 },
+            outputTruncated = response.optJSONArray("candidates")?.optJSONObject(0)?.optString("finishReason") == "MAX_TOKENS",
             elapsedMs = System.currentTimeMillis() - started,
         )
     }

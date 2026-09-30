@@ -6,6 +6,12 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file retains the history from v2.5.0 (2026-07-25, render engine 12) onward.** Past records follow the recent ones in a collapsible section of this same document; expand it when needed. Viewers without collapse support show the full text. Earlier history is in the [v1.72–v2.4 archive](docs/history/changelog-v1.72-v2.4.md) and the [v0.1–v1.71 archive](docs/history/changelog-v0.1-v1.71.md).
 
+### 2026-09-30 — Android: turn photo observations into words for a painting, with one model
+
+After reading a photo, an additional text call to the same model shapes its observed features into a short poetic description through light, colors, forms, and empty space. Drawing uses this finished description. Writing has its own progress and failure messages and accepts cancellation; drawing retries reuse the finished description.
+
+Camera and drawing now share one selected model in Studio and the camera preview. The two preview choices and the separate description-model setting are replaced by one choice. Older works retain readable provenance, while new works record the writing model and instruction version.
+
 ### 2026-09-30 — Android: align provider transport with Server and fix Sonnet 5.5 camera input
 
 Anthropic requests omit `temperature` for every model, as Server drawing and Vision requests do. Sonnet 5.5 rejected photo descriptions with `temperature: 0.2` as HTTP 400, shown as Image processing failed. Gemini image requests use minimal thinking regardless of connection or model name, with the description before the image. Anthropic and Gemini preserve text-block boundaries, and OpenAI-compatible and Gemini drawing responses reject multiple answer tools. Image-description API refusals also reach the log through the redaction used for drawing.

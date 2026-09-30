@@ -51,6 +51,7 @@ import app.inku.mobile.pipeline.NativePipelineBridge
 import app.inku.mobile.pipeline.PipelineView
 import app.inku.mobile.pipeline.ComposeFromDdlProgress
 import app.inku.mobile.pipeline.PaintRequest
+import app.inku.mobile.pipeline.drawingModelOf
 import app.inku.mobile.pipeline.PaintResult
 import app.inku.mobile.pipeline.InterpretResult
 import app.inku.mobile.pipeline.PipelineCommitStore
@@ -678,7 +679,8 @@ class InkuRepository(
                 renderWild = renderWild,
             ),
         )
-        return saveResult(result, catalogId, canvasAspect, stage1ModelId, stage2ModelId, System.currentTimeMillis() - started, historyInput, lineage, historyVisibility, sourceText, inputProvenance)
+        val model = drawingModelOf(stage1ModelId, stage2ModelId)
+        return saveResult(result, catalogId, canvasAspect, model, model, System.currentTimeMillis() - started, historyInput, lineage, historyVisibility, sourceText, inputProvenance)
     }
 
     suspend fun interpret(description: String, catalogId: String, canvasAspect: String, stage1ModelId: String, stage2ModelId: String, autoRepair: Boolean = true, litertStage1PromptOptimization: Boolean = false, instructionLang: String? = null, uiLang: String? = null, sketch: SketchInput = SketchInput(), inputProvenance: CameraInputProvenance? = null, renderWild: Boolean? = null): InterpretResult {
@@ -737,7 +739,8 @@ class InkuRepository(
         currentCoroutineContext().ensureActive()
         beforeSave()
         currentCoroutineContext().ensureActive()
-        return saveResult(result, catalogId, canvasAspect, stage1ModelId, stage2ModelId, System.currentTimeMillis() - started, lineage = lineage, historyVisibility = historyVisibility, sourceText = sourceText, inputProvenance = inputProvenance, originalPhoto = originalPhoto)
+        val model = drawingModelOf(stage1ModelId, stage2ModelId)
+        return saveResult(result, catalogId, canvasAspect, model, model, System.currentTimeMillis() - started, lineage = lineage, historyVisibility = historyVisibility, sourceText = sourceText, inputProvenance = inputProvenance, originalPhoto = originalPhoto)
     }
 
     /**
@@ -820,7 +823,8 @@ class InkuRepository(
                 seedText = seeds.seedText,
             ),
         )
-        return saveResult(result, catalogId, canvasAspect, stage1ModelId, stage2ModelId, System.currentTimeMillis() - started, lineage = lineage, historyVisibility = historyVisibility, sourceText = sourceText)
+        val model = drawingModelOf(stage1ModelId, stage2ModelId)
+        return saveResult(result, catalogId, canvasAspect, model, model, System.currentTimeMillis() - started, lineage = lineage, historyVisibility = historyVisibility, sourceText = sourceText)
     }
 
     /**
@@ -890,8 +894,8 @@ class InkuRepository(
         sourceText = sourceText,
         catalogId = plan.catalogId,
         canvasAspect = plan.canvasAspect,
-        stage1ModelId = stage1ModelId,
-        stage2ModelId = stage2ModelId,
+        stage1ModelId = drawingModelOf(stage1ModelId, stage2ModelId),
+        stage2ModelId = drawingModelOf(stage1ModelId, stage2ModelId),
         elapsedMs = elapsedMs,
         lineage = if (parentNodeId.isNullOrEmpty()) {
             LineageDeclaration()

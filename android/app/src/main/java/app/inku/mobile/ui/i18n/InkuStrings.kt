@@ -124,9 +124,7 @@ interface InkuStrings {
 
     // --- Comparison ---------------------------------------------------------
     val comparisonModelSelectPrompt: String
-    val comparisonModelFixedMissing: String
     val comparisonModelChoiceBlocked: String
-    val comparisonModeLabel: (String) -> String
     val comparisonKindLabel: (String) -> String
     val comparisonKindDescription: (String) -> String
 
@@ -297,13 +295,10 @@ interface InkuStrings {
     val downloadState: String
     val accepted: String
     val name: String
-    val fixedStage1Model: String
-    val fixedStage2Model: String
     val change: String
     val failedLines: String
     val demoSubtitle: String
     val demoRunAndSeed: String
-    val sameStagePairBlocked: String
     val history: String
     val showThinking: String
     val providerKind: String

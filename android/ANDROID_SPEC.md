@@ -854,8 +854,14 @@ single drawing-model choice instead of separate Stage 1 and Stage 2 selectors.
 - When the user selects a model, Android writes the same model id to both
   `selectedModelId` and `selectedStage2ModelId`.
 - Persisted settings keep the existing `model_selection.stage1_model` and
-  `model_selection.stage2_model` fields so future per-stage options can be
-  reintroduced without changing the storage shape.
+  `model_selection.stage2_model` fields, always equal. Since the author's
+  decision of 2026-09-30, one model draws both stages.
+- Drawing, refinement and model comparison use the request's Stage 1 model
+  (the Stage 2 one when it is blank) for both stages, and the work records that
+  one model in both fields (`PaintRequest.drawingModel`). Works drawn with two
+  models before the decision keep their records; refining one draws with its
+  Stage 1 model. Model comparison draws both stages with each chosen model; the
+  "Stage 1 fixed" and "Stage 2 fixed" modes are removed.
 - History DB records, JSON display, JSON export, and render metadata continue
   to include server/web-compatible `stage1_model` and `stage2_model` fields.
 - Repository and pipeline calls continue to receive `stage1ModelId` and

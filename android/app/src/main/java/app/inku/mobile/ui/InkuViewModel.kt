@@ -31,7 +31,7 @@ import app.inku.mobile.data.lineage.LineageGraphNode
 import app.inku.mobile.data.lineage.LineageGraphResult
 import app.inku.mobile.data.lineage.SubmitDerivationKind
 import app.inku.mobile.data.refinement.ComparisonPlanner
-import app.inku.mobile.data.refinement.ModelCompareMode
+import app.inku.mobile.data.refinement.MODEL_COMPARISON_MODE
 import app.inku.mobile.data.refinement.RefinementElement
 import app.inku.mobile.data.refinement.RefinementParent
 import app.inku.mobile.data.refinement.RefinementPlan
@@ -45,6 +45,7 @@ import app.inku.mobile.llm.isLocalVisionModel
 import app.inku.mobile.llm.VisionAnalysisRequest
 import app.inku.mobile.llm.VisionImagePreparer
 import app.inku.mobile.pipeline.ImportedPluginDefinition
+import app.inku.mobile.pipeline.drawingModelOf
 import app.inku.mobile.pipeline.InstructionLanguages
 import app.inku.mobile.pipeline.ComposeFromDdlProgress
 import app.inku.mobile.pipeline.InterpretResult
@@ -124,7 +125,6 @@ val REFINEMENT_IN_PROGRESS: (InkuStrings) -> String = { it.refinementInProgress 
 /** 「固定モードでは固定側を1モデル、比較側を最大4モデル選ぶ」(SPEC `:616`). */
 const val MAX_COMPARE_SELECTION = 4
 val MODEL_SELECT_PROMPT: (InkuStrings) -> String = { it.comparisonModelSelectPrompt }
-val MODEL_FIXED_MISSING: (InkuStrings) -> String = { it.comparisonModelFixedMissing }
 val MODEL_CHOICE_BLOCKED: (InkuStrings) -> String = { it.comparisonModelChoiceBlocked }
 private const val MaxBatchItems = 100
 private const val MaxDemoCycles = 100
@@ -272,8 +272,6 @@ data class InkuUiState(
     // than a screen of its own, and it shares every field above: the
     // candidates, the busy flag, the stop and the save are the refinement's.
     val refinementSubview: RefinementSubview = RefinementSubview.Adjust,
-    val modelCompareMode: ModelCompareMode = ModelCompareMode.Default,
-    val modelCompareFixedModel: String = "",
     val modelCompareSelectedModels: List<String> = emptyList(),
 ) {
     /**
@@ -624,8 +622,10 @@ class InkuViewModel @JvmOverloads constructor(
             lineageDetached = selected == null,
             selectedCanvasAspect = options?.optString("canvas_aspect")?.takeIf { it.isNotBlank() } ?: localState.value.selectedCanvasAspect,
             selectedCatalogId = if (options?.optString("catalog_mode") == "auto") CatalogSelection.AUTO_ID else options?.optString("catalog_id")?.takeIf { it.isNotBlank() } ?: localState.value.selectedCatalogId,
-            selectedModelId = view.models?.stage1ModelId ?: localState.value.selectedModelId,
-            selectedStage2ModelId = view.models?.stage2ModelId ?: localState.value.selectedStage2ModelId,
+            // One model draws both stages (2026-09-30, the author): a run started
+            // before then with two resumes on its Stage 1 model.
+            selectedModelId = view.models?.let { drawingModelOf(it.stage1ModelId, it.stage2ModelId) } ?: localState.value.selectedModelId,
+            selectedStage2ModelId = view.models?.let { drawingModelOf(it.stage1ModelId, it.stage2ModelId) } ?: localState.value.selectedStage2ModelId,
             renderWild = options?.optBoolean("wild") ?: localState.value.renderWild,
             prompt = view.description ?: localState.value.prompt,
             ddl = view.visibleDdl ?: localState.value.ddl,
@@ -1453,16 +1453,6 @@ class InkuViewModel @JvmOverloads constructor(
             selectedStage2ModelId = modelId,
             message = null,
         )
-        warmupLiteRtModels(modelId)
-    }
-
-    fun setStage1Model(modelId: String) {
-        localState.value = localState.value.copy(selectedModelId = modelId, message = null)
-        warmupLiteRtModels(modelId)
-    }
-
-    fun setStage2Model(modelId: String) {
-        localState.value = localState.value.copy(selectedStage2ModelId = modelId, message = null)
         warmupLiteRtModels(modelId)
     }
 
@@ -2692,7 +2682,6 @@ class InkuViewModel @JvmOverloads constructor(
             // target starts from an empty one rather than from choices that were
             // legal for the last work.
             modelCompareSelectedModels = if (previous?.id == item.id) localState.value.modelCompareSelectedModels else emptyList(),
-            modelCompareFixedModel = if (previous?.id == item.id) localState.value.modelCompareFixedModel else "",
             tab = AppTab.Lineage,
         )
     }
@@ -2707,48 +2696,12 @@ class InkuViewModel @JvmOverloads constructor(
         )
     }
 
-    /**
-     * The comparison mode. Changing it re-seeds the fixed side with the target's
-     * own model for that stage and drops the selection, the way web does
-     * (`setModelCompareMode`, `state.svelte.ts:200-211`): the previous choices
-     * were legal against a different pair.
-     */
-    fun setModelCompareMode(mode: ModelCompareMode) {
-        if (localState.value.refinementBusy) return
-        val parent = localState.value.refinementParent
-        val fixed = when (mode) {
-            ModelCompareMode.Stage1Fixed -> parent?.stage1Model.orEmpty()
-            ModelCompareMode.Stage2Fixed -> parent?.stage2Model.orEmpty()
-            ModelCompareMode.Common -> ""
-        }
-        localState.value = localState.value.copy(
-            modelCompareMode = mode,
-            modelCompareFixedModel = fixed,
-            modelCompareSelectedModels = emptyList(),
-            refinementCandidates = emptyList(),
-            refinementPreviewId = null,
-            refinementStatus = null,
-        )
-    }
-
-    fun setModelCompareFixedModel(modelId: String) {
-        if (localState.value.refinementBusy) return
-        localState.value = localState.value.copy(
-            modelCompareFixedModel = modelId,
-            refinementCandidates = emptyList(),
-            refinementPreviewId = null,
-            refinementStatus = null,
-        )
-    }
-
-    /** 「固定モードでは固定側を1モデル、比較側を最大4モデル選ぶ」(SPEC `:616`). */
+    /** Up to four models to compare; each draws both stages (2026-09-30, the author). */
     fun toggleModelCompareSelection(modelId: String) {
         val current = localState.value
         if (current.refinementBusy) return
         val parent = current.refinementParent
         if (ComparisonPlanner.isModelChoiceBlocked(
-                mode = current.modelCompareMode,
-                fixedModel = current.modelCompareFixedModel,
                 model = modelId,
                 targetStage1Model = parent?.stage1Model.orEmpty(),
                 targetStage2Model = parent?.stage2Model.orEmpty(),
@@ -2870,17 +2823,10 @@ class InkuViewModel @JvmOverloads constructor(
      * an empty selection draws nothing and says so.
      */
     private fun modelJobs(current: InkuUiState, parent: RefinementParent): List<CandidateJob> {
-        val mode = current.modelCompareMode
-        val fixed = current.modelCompareFixedModel
-        if (mode != ModelCompareMode.Common && fixed.isBlank()) {
-            throw InkuFailure(MODEL_FIXED_MISSING)
-        }
         val chosen = current.modelCompareSelectedModels
             .take(MAX_COMPARE_SELECTION)
             .filterNot {
                 ComparisonPlanner.isModelChoiceBlocked(
-                    mode = mode,
-                    fixedModel = fixed,
                     model = it,
                     targetStage1Model = current.refinementParent?.stage1Model.orEmpty(),
                     targetStage2Model = current.refinementParent?.stage2Model.orEmpty(),
@@ -2888,9 +2834,9 @@ class InkuViewModel @JvmOverloads constructor(
             }
         if (chosen.isEmpty()) throw InkuFailure(MODEL_SELECT_PROMPT)
         return chosen.map { model ->
-            val plan = ComparisonPlanner.modelPlan(mode, fixed, model, parent)
+            val plan = ComparisonPlanner.modelPlan(model, parent)
             CandidateJob(
-                id = "${mode.id}:${plan.stage1Model}:${plan.stage2Model}",
+                id = "$MODEL_COMPARISON_MODE:$model:$model",
                 label = model,
                 plan = plan,
             )

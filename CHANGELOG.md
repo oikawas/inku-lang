@@ -6,6 +6,14 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file retains the history from v2.5.0 (2026-07-25, render engine 12) onward.** Past records follow the recent ones in a collapsible section of this same document; expand it when needed. Viewers without collapse support show the full text. Earlier history is in the [v1.72–v2.4 archive](docs/history/changelog-v1.72-v2.4.md) and the [v0.1–v1.71 archive](docs/history/changelog-v0.1-v1.71.md).
 
+### 2026-09-30 — Android: one model draws both stages (the Server's rule)
+
+At the Server session's request (the author's decision), Android drops different models for Stage 1 and Stage 2, as Server, Web and cli did. The `stage1_model` and `stage2_model` keys stay in the API and the work records, always equal.
+
+- Drawing, refinement and model comparison use the request's Stage 1 model (the Stage 2 one when it is blank) for both stages, and the work records that one model in both fields. Past works drawn with two models keep their records; refining one draws with its Stage 1 model.
+- Model comparison loses "Stage 1 fixed + Stage 2 compared", "Stage 1 compared + Stage 2 fixed" and the choice of the fixed model. Each chosen model draws both stages, and the record's `comparison_mode` is `common`. A model the target work was drawn with cannot be chosen, and the message now says so.
+- Reopening a run in progress and the debug `HeadlessRenderActivity`'s `stage2_model` extra also resolve to one model. The unused per-stage model setters are removed.
+
 ### 2026-09-30 — Collapse past history within the same changelog
 
 Recent records remain at the top, and records from v2.15.34 and earlier can be expanded within this same document. Existing text, entry order, headings and links are preserved. The manually maintained entry count has been removed from the introduction. Product behavior, version and Build are unchanged.

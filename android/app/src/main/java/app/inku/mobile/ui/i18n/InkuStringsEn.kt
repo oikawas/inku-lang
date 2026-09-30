@@ -137,17 +137,8 @@ object InkuStringsEn : InkuStrings {
     override val refinementVariationNotice = "Variation has nothing to move for now; its options draw the same picture as the work."
 
     override val comparisonModelSelectPrompt = "Select one or more models to compare."
-    override val comparisonModelFixedMissing = "Select the model to hold fixed."
     override val comparisonModelChoiceBlocked =
-        "The target work's own Stage 1/2 pairing cannot be chosen."
-    override val comparisonModeLabel: (String) -> String = { id ->
-        when (id) {
-            "common" -> "Stage 1/2 shared"
-            "stage1_fixed" -> "Stage 1 fixed + Stage 2 compared"
-            "stage2_fixed" -> "Stage 1 compared + Stage 2 fixed"
-            else -> id
-        }
-    }
+        "A model the target work was drawn with cannot be chosen."
     override val comparisonKindLabel: (String) -> String = { id ->
         when (id) {
             "adjust" -> "Adjust"
@@ -382,13 +373,10 @@ object InkuStringsEn : InkuStrings {
     override val downloadState = "Download state"
     override val accepted = "Accepted"
     override val name = "Name"
-    override val fixedStage1Model = "Stage 1 model to hold fixed"
-    override val fixedStage2Model = "Stage 2 model to hold fixed"
     override val change = "Change"
     override val failedLines = "Lines that failed"
     override val demoSubtitle = "Run / seed phrase / interval"
     override val demoRunAndSeed = "Run and seed phrase"
-    override val sameStagePairBlocked = "Only the target work's own Stage 1/2 pairing cannot be chosen."
     override val history = "History"
     override val showThinking = "Show the thinking"
     override val providerKind = "Connection type"

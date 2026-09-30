@@ -601,7 +601,9 @@ def pipeline_router(service: PipelineService | Callable[[], PipelineService], ac
 def _host_error_status(code: str) -> int:
     if code == "model_not_offered":
         return 403
-    return 409 if code in {"authority_conflict", "description_locked", "stale_result"} else 422
+    # A saved record the retired Saijiki (v1) wrote is refused until the one-time
+    # migration moves it: a state of the record, like a lock, not a bad request.
+    return 409 if code in {"authority_conflict", "description_locked", "stale_result", "saijiki_migration_required"} else 422
 
 
 def register_pipeline_errors(app: FastAPI) -> None:

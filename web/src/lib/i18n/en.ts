@@ -254,6 +254,7 @@ export const en: LangPack = {
 	errorLastAdministrator: 'The last administrator can be neither removed from the administrators nor deleted. Make another user an administrator first.',
 	errorModelNotOffered: 'This model is not offered on this server. Choose one of the offered models in Settings.',
 	errorDbWriteLocked: 'An administrator has locked writes to the server. Try again once the lock is off.',
+	errorSaijikiMigrationRequired: 'This work was saved in the words of the retired Saijiki (v1) and cannot be opened until it is migrated. Ask the administrator.',
 	errorScoreInvalid: (reason) => `The Score is invalid: ${reason}`,
 	errorScoreNotRenderable: (reason) => `This Score cannot be drawn: ${reason}`,
 	renderRefusalReason: (code) => ({

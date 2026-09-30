@@ -24,14 +24,14 @@ preview: nature-leaves/wakaba.png
 
 member 葉形: 弧を置き、前の弧に両端で触れる
 葉形を 4〜6枚、{領域: 上半分} に散らす。
-鉛筆で、緑で。細かく震える。内側も線と同じ緑で塗る。
+鉛筆で、緑で。細かく揺れる。内側も線と同じ緑で塗る。
 葉先は上向き(斜めの範囲で、枚ごとに別のかたむき)。
 
 ### 展開 (en)
 
 member leaf form: place an arc, then an arc touching the previous arc at both ends
 Scatter 4-6 leaf forms in {region: upper half}.
-In pencil, in green. Fine trembling. Fill the interiors with the same green.
+In pencil, in green. Narrowly swaying. Fill the interiors with the same green.
 Tips upward (within a diagonal range, a different lean per leaf).
 
 ## 語: Undergrowth
@@ -75,14 +75,14 @@ preview: nature-leaves/aoba.png
 ### 展開 (ja)
 
 member 葉形: 弧を置き、前の弧に両端で触れる
-anchor 枝 を {領域: 中域} に置く: 太筆の線、灰で、水平に、ゆっくり波打つ。
+anchor 枝 を {領域: 中域} に置く: 太筆の線、灰で、水平に、ゆるやかに波打つ。
 葉形を 6〜8枚、枝に沿って置く。
 細筆で、緑で。二弧で囲む内側を線と同じ緑で塗る。
 
 ### 展開 (en)
 
 member leaf form: place an arc, then an arc touching the previous arc at both ends
-anchor branch in {region: middle}: a thick-brush line, gray, horizontal, slowly undulating.
+anchor branch in {region: middle}: a thick-brush line, gray, horizontal, loosely undulating.
 Place 6-8 leaf forms along the branch.
 In fine-brush, in green. Fill the interior enclosed by the two arcs with the same green as their outlines.
 
@@ -129,7 +129,7 @@ preview: nature-leaves/ochiba.png
 member 葉形: 弧を置き、前の弧に両端で触れる
 葉形を 8〜12枚、{領域: 左上から右下への斜めの帯} に散らす。
 クレヨンで。赤と灰を枚ごとに交互に。各葉の内側を線と同じ色で塗る。
-回転は枚ごとにばらばら。端は滲む。
+回転は枚ごとにばらばら。端はにじみ。
 流れの左右へ大きく散らす。
 注: 下ほど密に集まる。
 
@@ -138,7 +138,7 @@ member 葉形: 弧を置き、前の弧に両端で触れる
 member leaf form: place an arc, then an arc touching the previous arc at both ends
 Scatter 8-12 leaf forms in {region: diagonal band, upper-left to lower-right}.
 In crayon. Red and gray alternating per leaf. Fill each interior with its outline color.
-Rotated differently per leaf. Edges blurring.
+Rotated differently per leaf. Edges bleeding.
 Scatter them widely to both sides of the drift.
 note: Denser toward the bottom.
 
@@ -158,7 +158,7 @@ preview: nature-leaves/karekusa.png
 member 葉形: 弧を置き、前の弧に両端で触れる(膨らみは細く)
 anchor 根元 を {領域: 下端の帯} に 1〜2箇所 置く。
 各根元から 縦長の葉形を 3〜5本、上へ並べる。かたむきは垂直から斜め・右下がりまで本ごとに大きく違える。
-チョークで、灰で。速く。端は滲む。内側も線と同じ灰で塗る。
+チョークで、灰で。小刻みに。端はにじみ。内側も線と同じ灰で塗る。
 注: 地面は描かない。
 
 ### 展開 (en)
@@ -166,7 +166,7 @@ anchor 根元 を {領域: 下端の帯} に 1〜2箇所 置く。
 member blade: place an arc, then an arc touching the previous arc at both ends (bulge kept slim)
 anchor roots in {region: bottom band}, at 1-2 spots.
 From each root, arrange 3-5 tall blades upward. Vary the lean strongly per blade, from vertical through diagonal to falling.
-In chalk, in gray. Quickly. Edges blurring. Fill the interiors with the same gray.
+In chalk, in gray. Tightly. Edges bleeding. Fill the interiors with the same gray.
 note: The ground is never drawn.
 
 ## 語: WitheredLeaves
@@ -185,11 +185,11 @@ preview: nature-leaves/kareha.png
 member 枯れ葉形: 弧を置き、前の弧に両端で触れる(膨らみは細く)
 枯れ葉形を 2〜4枚、{領域: 下の隅} に置く。
 チョークで。灰と黄を枚ごとに交互に。各葉の内側を線と同じ色で塗る。
-回転は枚ごとにばらばら。細かく震える。
+回転は枚ごとにばらばら。細かく揺れる。
 
 ### 展開 (en)
 
 member withered leaf: place an arc, then an arc touching the previous arc at both ends (bulge kept slim)
 Place 2-4 withered leaves in {region: lower corner}.
 In chalk. Gray and yellow alternating per leaf. Fill each interior with its outline color.
-Rotated differently per leaf. Fine trembling.
+Rotated differently per leaf. Narrowly swaying.

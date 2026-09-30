@@ -189,6 +189,7 @@ export interface LangPack {
 	errorLastAdministrator: string;
 	errorModelNotOffered: string;
 	errorDbWriteLocked: string;
+	errorSaijikiMigrationRequired: string;
 	errorScoreInvalid: (reason: string) => string;
 	errorScoreNotRenderable: (reason: string) => string;
 	/** Why the render core would not draw a Score again, by its stable code. */

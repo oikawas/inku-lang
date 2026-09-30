@@ -73,7 +73,7 @@ The moon rises beyond the mountain
 ```
 
 ```text
-A blue crayon line undulates slowly
+A blue crayon line undulates loosely
 ```
 
 ```text
@@ -106,13 +106,14 @@ Place three small red circles in the upper right.
 | Motion | place, arrange, fill, scatter, draw, tile |
 | Touch | pencil, pen, rotring, crayon, chalk, fine brush, broad brush, burin, drypoint |
 | Continuity | solid, dashed, dotted, dash-dot |
-| Surfaces | empty, flat, pale ink wash, grain, stipple, hatch, crosshatch, bleeding, aquatint, dense, faint |
+| Surfaces | empty, flat, sweep, grain, stipple, hatch, crosshatch, aquatint |
+| Handling | dense, temperate, faint |
 | Grounds | paper, washi, ink-wash ground, charcoal ground, canvas, drawing paper, mezzotint |
-| Sway | fine, broad, slow, fast, waver, undulate, tremble, bleed |
+| Sway | narrowly, broadly, loosely, tightly, swaying, undulating, bleeding |
 
 No layer adds what the description does not ask for. What is written is performed as far as it can be.
 
-**Naming a sheet with `Ground:` changes how the mark runs** (v2.13.31). Each of the seven supports carries its own absorbency and tooth, so the same description with the same settings leaves a different mark on washi than on canvas. How much it shows depends on the tool: a pen picks up almost nothing from the sheet. **`Surface: grain` and `Surface: bleeding` now stay where they are when they land on a line or an arc** (also v2.13.31). These two say how the mark runs rather than how an inside is, so they make that one instruction work the sheet harder (up to three times). **`Surface: wash` now stays there too** (v2.13.35). A wash is not about the sheet but about how the ink was diluted, so instead of working the sheet it **draws that one mark as a broader, paler band** (three times the width at 0.35 of the darkness). **Until now, a wash named on a line or an arc was drawn nowhere at all.** The other surface words move to the closed shape before them as before, and are dropped where there is none.
+**Naming a sheet with `Ground:` changes how the mark runs** (v2.13.31). Each of the seven supports carries its own absorbency and tooth, so the same description with the same settings leaves a different mark on washi than on canvas. How much it shows depends on the tool: a pen picks up almost nothing from the sheet. **`Surface: grain` and the sway `bleeding` now stay where they are when they land on a line or an arc** (also v2.13.31; Saijiki v2 moved bleeding from the surfaces to the sways). These two say how the mark runs rather than how an inside is, so they make that one instruction work the sheet harder (up to three times). **`Surface: sweep` stays there too** (v2.13.35; Saijiki v2's word for the retired pale ink wash, which becomes `faint sweep`). A sweep is not about the sheet but about how the ink was diluted, so instead of working the sheet it **draws that one mark as a broader, paler band** (three times the width at 0.35 of the darkness). **Before v2.13.35, a wash named on a line or an arc was drawn nowhere at all.** The other surface words move to the closed shape before them as before, and are dropped where there is none.
 
 A written number is drawn as written, without having to be emphasised as "three lines only". It takes effect when the sentence points to a single group. If several groups share the same shape, colour and weight so that the sentence does not settle on one of them, the count is left alone. How far the number reaches is set by the boundary in `Stated counts` in [Server configuration](server-configuration.md) — up to 239 by default; above that the work is shown as a crowd. When the number asked for would cross the limit for one work or for one group, it is left as it is rather than drawn part of the way. **Numbers are read the same way in Japanese and in English**: a `12` written in an English description is a count even where the kanji of a plugin word stands beside it. When the phrase naming a plugin states no number, the sentence is read instead (a number in the phrase wins). **Numbers that name a direction, a kind, a degree, a row or a column are not counts, and neither are decimals** (the four of `four directions`, the thirty of `30 degrees`, `0.11`).
 
@@ -506,7 +507,7 @@ The CLI uses the same public HTTP API as the Web UI.
 ```sh
 cd cli
 uv run inku-cli --base-url http://127.0.0.1:8100 login -u admin
-uv run inku-cli --base-url http://127.0.0.1:8100 paint "a blue line undulates slowly from lower left to upper right" -o out --png --save-history
+uv run inku-cli --base-url http://127.0.0.1:8100 paint "a blue line undulates loosely from lower left to upper right" -o out --png --save-history
 ```
 
 The settings offered in the Web UI can be passed as flags.

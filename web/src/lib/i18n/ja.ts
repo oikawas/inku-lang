@@ -254,6 +254,7 @@ export const ja: LangPack = {
 	errorLastAdministrator: '最後の管理者は、管理者から外すことも削除することもできません。先にほかのユーザーを管理者にしてください。',
 	errorModelNotOffered: 'このモデルはこのサーバーで公開されていません。設定で、公開されているモデルを選んでください。',
 	errorDbWriteLocked: '管理者がサーバーへの書き込みをロックしています。ロックが外れてから、もう一度試してください。',
+	errorSaijikiMigrationRequired: 'この作品は旧い歳時記（v1）の語で保存されていて、移行が済むまで開けません。管理者に連絡してください。',
 	errorScoreInvalid: (reason) => `Scoreが不正です: ${reason}`,
 	errorScoreNotRenderable: (reason) => `このScoreは描けません: ${reason}`,
 	renderRefusalReason: (code) => ({

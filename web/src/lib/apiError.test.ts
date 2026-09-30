@@ -94,3 +94,10 @@ test('a Score the render core will not draw again reads its reason in the page l
 		'このScoreは描けません: 大きすぎる印があります'
 	);
 });
+
+test('a work saved before the Saijiki migration says so in the page language', () => {
+	assert.equal(
+		describeApiErrorDetail({ code: 'saijiki_migration_required', message: 'saijiki migration required' }, 409, ja),
+		ja.errorSaijikiMigrationRequired
+	);
+});

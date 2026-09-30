@@ -2,6 +2,10 @@
 
 This file records revisions to user and operations documents under `manual/`. See `SPEC.ja.md` for the detailed product change history.
 
+## 2026-09-30 — The words of Saijiki v2
+
+Following Saijiki v2 (handling, sweep, and the sways loosely, tightly and bleeding), the word table of Creating Images (place, surfaces, handling, sway), its examples, and the paragraph on `Surface: sweep` and bleeding are corrected in both languages.
+
 ## 2026-09-30 — A form is named only when the description is close to it
 
 The meter below the description names a verse form only when the description is close to one, judges Japanese by its phrases as well (haiku or senryū, and dodoitsu, are added), uses syllables counted with a pronouncing dictionary for English, and can be switched off per language in `Other (server)`. The input field's description in Creating Images and the output section of Server Configuration are corrected in both languages.

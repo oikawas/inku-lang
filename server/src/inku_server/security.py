@@ -178,6 +178,42 @@ class CrossSiteWriteGuardMiddleware:
         await self.app(scope, receive, send)
 
 
+DB_WRITE_LOCKED_DETAIL = "db writes are locked"
+
+
+class DbWriteLockMiddleware:
+    """Refuse every request that would write while an administrator has locked writes.
+
+    The saved records then hold still: a copy of the database can be counted,
+    and what the copy says stays true until the service stops. The switch
+    itself, and signing in and out, still pass, so an administrator can always
+    unlock. The lock is read from the database on each such request, so every
+    process of the Server follows it at once; if it cannot be read, the request
+    is refused rather than let through.
+    """
+
+    def __init__(self, app: ASGIApp, *, is_locked: Callable[[], bool], exempt_paths: frozenset[str]) -> None:
+        self.app = app
+        self._is_locked = is_locked
+        self._exempt_paths = exempt_paths
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if (
+            scope["type"] == "http"
+            and scope.get("method", "GET").upper() in _UNSAFE_METHODS
+            and scope.get("path", "") not in self._exempt_paths
+        ):
+            try:
+                locked = self._is_locked()
+            except Exception:  # noqa: BLE001
+                locked = True
+            if locked:
+                response = JSONResponse({"detail": DB_WRITE_LOCKED_DETAIL}, status_code=503)
+                await response(scope, receive, send)
+                return
+        await self.app(scope, receive, send)
+
+
 @dataclass(frozen=True)
 class RateLimitResult:
     allowed: bool

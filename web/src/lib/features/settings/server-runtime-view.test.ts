@@ -25,10 +25,10 @@ test('Stage 3D gives server-runtime presentation one feature-local view', () => 
 });
 
 test('the focused view receives three status slices and named capabilities', () => {
-	assert.match(VIEW, /type ServerRuntimeStatus = Pick<SettingsStatus, 'output_save' \| 'render_concurrency' \| 'description_meter'>;/);
+	assert.match(VIEW, /type ServerRuntimeStatus = Pick<SettingsStatus, 'output_save' \| 'render_concurrency' \| 'description_meter' \| 'db_write_lock'>;/);
 	assert.match(VIEW, /status: ServerRuntimeStatus \| null;/);
 	assert.doesNotMatch(VIEW, /SettingsController|apiFetch|\/api\//);
-	assert.match(SERVER_BRANCH, /status=\{settingsStatus \? \{ output_save: settingsStatus\.output_save, render_concurrency: settingsStatus\.render_concurrency, description_meter: settingsStatus\.description_meter \} : null\}/);
+	assert.match(SERVER_BRANCH, /status=\{settingsStatus \? \{ output_save: settingsStatus\.output_save, render_concurrency: settingsStatus\.render_concurrency, description_meter: settingsStatus\.description_meter, db_write_lock: settingsStatus\.db_write_lock \} : null\}/);
 	for (const capability of ['onReload', 'onUpdateOutputSave', 'onUpdateRenderConcurrency', 'onUpdateDescriptionMeter']) {
 		assert.match(VIEW, new RegExp(capability + ':'), capability);
 		assert.match(SERVER_BRANCH, new RegExp(capability + '='), capability);

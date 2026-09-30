@@ -88,6 +88,7 @@ export type SettingsStatus = {
 		note: string;
 	};
 	description_meter: MeterSwitches;
+	db_write_lock: { locked: boolean };
 	render_limits: {
 		limits: Record<string, number>;
 		defaults: Record<string, number>;
@@ -125,6 +126,7 @@ export type ServerAdministration = {
 	readonly pluginActionStatus: string | null;
 	readonly renderConcurrencyStatus: string | null;
 	readonly descriptionMeterStatus: string | null;
+	readonly dbWriteLockStatus: string | null;
 	loadStatus: () => Promise<void>;
 	resetForLoggedOut: () => void;
 	deletePlugin: (id: string) => Promise<boolean>;
@@ -134,6 +136,7 @@ export type ServerAdministration = {
 	updateOutputSaveSettings: (enabled: boolean, outputDir: string, pngSize: number) => Promise<void>;
 	updateRenderConcurrencySettings: (serverLimit: number, clientLimit: number) => Promise<void>;
 	updateDescriptionMeterSettings: (switches: MeterSwitches) => Promise<void>;
+	updateDbWriteLock: (locked: boolean) => Promise<void>;
 	updateLogRetentionSettings: (enabled: boolean, retentionDays: number, rotate: string, compress: boolean) => Promise<void>;
 	updateRenderLimits: (patch: Record<string, number> | null) => Promise<SettingsStatus['render_limits'] | null>;
 };
@@ -151,6 +154,7 @@ export function createServerAdministration<TActor extends SettingsActor>(
 	let pluginActionStatus = $state<string | null>(null);
 	let renderConcurrencyStatus = $state<string | null>(null);
 	let descriptionMeterStatus = $state<string | null>(null);
+	let dbWriteLockStatus = $state<string | null>(null);
 
 	function resetForLoggedOut(): void {
 		settingsStatus = null;
@@ -339,6 +343,28 @@ export function createServerAdministration<TActor extends SettingsActor>(
 		}
 	}
 
+	// The switch itself is never refused by the lock, so a locked server can always be unlocked here.
+	async function updateDbWriteLock(locked: boolean): Promise<void> {
+		dbWriteLockStatus = null;
+		try {
+			const response = await deps.apiFetch('/api/settings/db-write-lock', {
+				method: 'PUT',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ locked })
+			});
+			if (!response.ok) {
+				const body = await response.json().catch(() => ({})) as { detail?: unknown };
+				throw new Error(deps.describeApiError(body.detail, response.status));
+			}
+			const next = await response.json() as SettingsStatus['db_write_lock'];
+			if (settingsStatus) settingsStatus = { ...settingsStatus, db_write_lock: next };
+			dbWriteLockStatus = next.locked ? t().settingsDbWriteLockOn : t().settingsDbWriteLockOff;
+		} catch (error) {
+			dbWriteLockStatus = error instanceof Error ? error.message : String(error);
+			console.warn('failed to update the database write lock', error);
+		}
+	}
+
 	// A null patch restores defaults. The response is authoritative after server normalization.
 	async function updateRenderLimits(
 		patch: Record<string, number> | null
@@ -397,6 +423,7 @@ export function createServerAdministration<TActor extends SettingsActor>(
 		get pluginActionStatus() { return pluginActionStatus; },
 		get renderConcurrencyStatus() { return renderConcurrencyStatus; },
 		get descriptionMeterStatus() { return descriptionMeterStatus; },
+		get dbWriteLockStatus() { return dbWriteLockStatus; },
 		loadStatus: loadSettingsStatus,
 		resetForLoggedOut,
 		deletePlugin,
@@ -406,6 +433,7 @@ export function createServerAdministration<TActor extends SettingsActor>(
 		updateOutputSaveSettings,
 		updateRenderConcurrencySettings,
 		updateDescriptionMeterSettings,
+		updateDbWriteLock,
 		updateLogRetentionSettings,
 		updateRenderLimits
 	};

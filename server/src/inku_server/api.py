@@ -19,7 +19,12 @@ from starlette.middleware import gzip as _gzip
 from .color_catalogs import render_color_map_for_catalog
 from .compression import FlushingGZipMiddleware
 from .render_engines import current_render_engine
-from .security import ConcurrencyLimitMiddleware, CrossSiteWriteGuardMiddleware, RequestBodyLimitMiddleware
+from .security import (
+    ConcurrencyLimitMiddleware,
+    CrossSiteWriteGuardMiddleware,
+    DbWriteLockMiddleware,
+    RequestBodyLimitMiddleware,
+)
 from . import db as _db
 from . import thumbs_db as _thumbs_db
 from .api_core.common import _APP_VERSION, _build_number, _env_flag
@@ -217,6 +222,14 @@ app.add_middleware(RequestBodyLimitMiddleware, max_bytes=_MAX_REQUEST_BODY_BYTES
 
 # Outside the body limit, so a refused request is refused on its headers alone.
 app.add_middleware(CrossSiteWriteGuardMiddleware, origin_allowed=_cors_origin_allowed)
+
+
+# An administrator's lock on every write; the switch and signing in and out pass.
+app.add_middleware(
+    DbWriteLockMiddleware,
+    is_locked=lambda: bool(_db.get_db_write_lock()["locked"]),
+    exempt_paths=frozenset({"/api/settings/db-write-lock", "/api/auth/login", "/api/auth/logout"}),
+)
 
 
 app.add_middleware(ConcurrencyLimitMiddleware, max_requests=_MAX_CONCURRENT_REQUESTS)

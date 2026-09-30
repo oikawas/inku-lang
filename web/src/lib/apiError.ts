@@ -71,6 +71,7 @@ export function describeApiErrorDetail(detail: unknown, status: number, strings:
 	// A model the administrator has not offered: a string from the routes that
 	// call one directly, a code from the authoring pipeline.
 	if (detail === 'model is not offered on this server') return strings.errorModelNotOffered;
+	if (detail === 'db writes are locked') return strings.errorDbWriteLocked;
 	// A Score the server will not take or the render core will not draw: the
 	// headline in the page's language, the reason as the validator or the core
 	// wrote it.

@@ -67,7 +67,9 @@ PUBLIC = {  # every entry needs a reason
 # tally above had drifted by three; mora brings the live count to 105.
 #   +2 for POST /api/description/syllables and PUT /api/settings/description-meter,
 #   the English meter and the switches for both languages (2026-09-30).
-EXPECTED_ROUTE_COUNT = 107
+#   +1 for PUT /api/settings/db-write-lock, the administrator's lock on every
+#   write (2026-09-30).
+EXPECTED_ROUTE_COUNT = 108
 
 
 def _guard_names(dependant, seen=None) -> set[str]:

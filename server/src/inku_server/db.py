@@ -822,6 +822,14 @@ def update_description_meter_settings(japanese: bool, english: bool) -> dict:
     return _settings.DescriptionMeterSettingsStore(_app_settings_store()).update(japanese, english)
 
 
+def get_db_write_lock() -> dict:
+    return _settings.DbWriteLockSettingsStore(_app_settings_store()).get()
+
+
+def update_db_write_lock(locked: bool) -> dict:
+    return _settings.DbWriteLockSettingsStore(_app_settings_store()).update(locked)
+
+
 def get_render_limit_settings() -> dict:
     return _render_limit_settings_store().get()
 

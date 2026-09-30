@@ -188,6 +188,7 @@ export interface LangPack {
 	errorUserIsLineageOrigin: string;
 	errorLastAdministrator: string;
 	errorModelNotOffered: string;
+	errorDbWriteLocked: string;
 	errorScoreInvalid: (reason: string) => string;
 	errorScoreNotRenderable: (reason: string) => string;
 	/** Why the render core would not draw a Score again, by its stable code. */
@@ -793,6 +794,11 @@ export interface LangPack {
 	settingsDescriptionMeterEnglish: string;
 	settingsDescriptionMeterEnglishHelp: string;
 	settingsDescriptionMeterSaved: string;
+	settingsDbWriteLockTitle: string;
+	settingsDbWriteLock: string;
+	settingsDbWriteLockHelp: string;
+	settingsDbWriteLockOn: string;
+	settingsDbWriteLockOff: string;
 	settingsLogRetentionTitle: string;
 	settingsLogRetentionEnabled: string;
 	settingsLogRetentionDays: string;

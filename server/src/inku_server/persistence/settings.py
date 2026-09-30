@@ -110,6 +110,11 @@ RENDER_LIMIT_SETTINGS_KEY = "render_limit_settings"
 # sounds) and English forms (the Server counts syllables). Both on by default.
 DESCRIPTION_METER_SETTINGS_KEY = "description_meter_settings"
 DESCRIPTION_METER_DEFAULT_SETTINGS = {"japanese": True, "english": True}
+# While locked, the Server refuses every request that would write (an
+# administrator's switch, 2026-09-30: the saved records hold still while a copy
+# of the database is counted and until the service stops for a migration).
+DB_WRITE_LOCK_SETTINGS_KEY = "db_write_lock"
+DB_WRITE_LOCK_DEFAULT_SETTINGS = {"locked": False}
 THUMBNAIL_SETTINGS_KEY = "thumbnail_settings"
 # Off by default: the second size doubles the rebuild and roughly quadruples the
 # stored bytes, and is worth neither until someone is looking at the listing on
@@ -450,6 +455,13 @@ def normalize_description_meter_settings(settings: dict | None) -> dict:
     return clean
 
 
+def normalize_db_write_lock_settings(settings: dict | None) -> dict:
+    clean = dict(DB_WRITE_LOCK_DEFAULT_SETTINGS)
+    if isinstance(settings, dict) and isinstance(settings.get("locked"), bool):
+        clean["locked"] = settings["locked"]
+    return clean
+
+
 def normalize_thumbnail_settings(settings: dict | None) -> dict:
     clean = dict(THUMBNAIL_DEFAULT_SETTINGS)
     if not isinstance(settings, dict):
@@ -698,6 +710,19 @@ class DescriptionMeterSettingsStore:
     def update(self, japanese: bool, english: bool) -> dict:
         clean = normalize_description_meter_settings({"japanese": japanese, "english": english})
         return self.app_settings.write(DESCRIPTION_METER_SETTINGS_KEY, clean)
+
+
+@dataclass(frozen=True)
+class DbWriteLockSettingsStore:
+    """Read and write whether the Server refuses every request that would write."""
+
+    app_settings: AppSettingsStore
+
+    def get(self) -> dict:
+        return normalize_db_write_lock_settings(self.app_settings.read(DB_WRITE_LOCK_SETTINGS_KEY))
+
+    def update(self, locked: bool) -> dict:
+        return self.app_settings.write(DB_WRITE_LOCK_SETTINGS_KEY, normalize_db_write_lock_settings({"locked": locked}))
 
 
 @dataclass(frozen=True)

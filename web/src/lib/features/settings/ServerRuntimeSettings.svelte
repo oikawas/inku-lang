@@ -3,7 +3,7 @@
 	import type { SettingsStatus } from './state.svelte';
 	import type { MeterSwitches } from '$lib/verseForm';
 
-	type ServerRuntimeStatus = Pick<SettingsStatus, 'output_save' | 'render_concurrency' | 'description_meter'>;
+	type ServerRuntimeStatus = Pick<SettingsStatus, 'output_save' | 'render_concurrency' | 'description_meter' | 'db_write_lock'>;
 
 	type Props = {
 		status: ServerRuntimeStatus | null;
@@ -17,6 +17,8 @@
 		onUpdateRenderConcurrency: (serverLimit: number, clientLimit: number) => void | Promise<void>;
 		descriptionMeterStatus: string | null;
 		onUpdateDescriptionMeter: (switches: MeterSwitches) => void | Promise<void>;
+		dbWriteLockStatus: string | null;
+		onUpdateDbWriteLock: (locked: boolean) => void | Promise<void>;
 	};
 
 	let {
@@ -30,7 +32,9 @@
 		onUpdateOutputSave,
 		onUpdateRenderConcurrency,
 		descriptionMeterStatus,
-		onUpdateDescriptionMeter
+		onUpdateDescriptionMeter,
+		dbWriteLockStatus,
+		onUpdateDbWriteLock
 	}: Props = $props();
 </script>
 
@@ -126,6 +130,34 @@
 		<div class="db-test-result">{t().settingsRenderConcurrencyRange(status.render_concurrency.min_limit, status.render_concurrency.max_limit)}</div>
 		{#if renderConcurrencyStatus}
 			<div class="inline-message">{renderConcurrencyStatus}</div>
+		{/if}
+	{:else}
+		<div class="inline-message">{statusError ?? t().settingsLoadFailed}</div>
+	{/if}
+</div>
+<div class="popover-group">
+	<div class="popover-group-label">{t().settingsDbWriteLockTitle}</div>
+	{#if loading}
+		<div class="inline-message">{t().settingsLoading}</div>
+	{:else if status}
+		<label class="setting-toggle">
+			<input
+				type="checkbox"
+				checked={status.db_write_lock.locked}
+				disabled={!isAdmin}
+				onchange={(e) => onUpdateDbWriteLock((e.currentTarget as HTMLInputElement).checked)}
+			/>
+			<span>{t().settingsDbWriteLock}</span>
+			<span class="info-dot" aria-label={t().settingsDbWriteLockHelp}>
+				i
+				<span class="info-tooltip">{t().settingsDbWriteLockHelp}</span>
+			</span>
+		</label>
+		{#if status.db_write_lock.locked}
+			<div class="inline-message">{t().settingsDbWriteLockOn}</div>
+		{/if}
+		{#if dbWriteLockStatus}
+			<div class="inline-message">{dbWriteLockStatus}</div>
 		{/if}
 	{:else}
 		<div class="inline-message">{statusError ?? t().settingsLoadFailed}</div>

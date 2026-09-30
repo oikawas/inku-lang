@@ -6,6 +6,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file retains the history from v2.5.0 (2026-07-25, render engine 12) onward.** Past records follow the recent ones in a collapsible section of this same document; expand it when needed. Viewers without collapse support show the full text. Earlier history is in the [v1.72–v2.4 archive](docs/history/changelog-v1.72-v2.4.md) and the [v0.1–v1.71 archive](docs/history/changelog-v0.1-v1.71.md).
 
+### v2.15.76 — Let an administrator lock database writes (Build 1152, 2026-09-30)
+
+This patch on v2.15.75 adds a database-write lock to Other (server) settings. While locked, write requests return 503 and the Web shows the state and reason. GET, login, logout and the administrator's lock switch remain available. An unreadable lock state also refuses writes while leaving the switch available. Writes are unlocked by default.
+
 ### 2026-09-30 — Android: turn photo observations into words for a painting, with one model
 
 After reading a photo, an additional text call to the same model shapes its observed features into a short poetic description through light, colors, forms, and empty space. Drawing uses this finished description. Writing has its own progress and failure messages and accepts cancellation; drawing retries reuse the finished description.

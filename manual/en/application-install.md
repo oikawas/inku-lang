@@ -170,7 +170,7 @@ systemctl status inku-server.service --no-pager
 2. Sign in as the bootstrap admin.
 3. Open `Models` under `Connections and administration` in Settings and check provider connections, API keys, and models visible to members.
 4. Create users and groups in `User management`.
-5. Choose Stage 1 and Stage 2 in the separate `Model selection` screen.
+5. Choose the drawing model for both stages in `Stage 1/2` on the separate `Model selection` screen.
 6. Paint short Japanese and English descriptions and verify automatic language detection, history saving, and SVG/PNG export.
 
 Normal generation has no manual instruction-language selector. It detects the input language and falls back to the UI language only when the text has no language signal.

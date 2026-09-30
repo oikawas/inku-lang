@@ -309,7 +309,7 @@ works, and a per-work ACL and the group-aimed flag the work carries itself add t
 **The paths written in raw SQL run through the same predicate** — when full-text search is left out,
 it shows up not as "too much is visible" but as "it goes missing when you search".
 - The LLM layer reaches Anthropic and OpenAI-compatible local or cloud providers. A local Ollama is a
-separately installed and operated provider whose models, connection, and stage assignments must be
+separately installed and operated provider whose model, connection, and shared Stage 1/2 drawing model choice must be
 configured; it is not a guarantee that the whole product works without API keys or authentication
 settings. Vision can use the same compatibility path when a separately configured model accepts image
 input, but the verified local catalog has no standard Vision model.

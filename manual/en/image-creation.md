@@ -202,13 +202,13 @@ A work whose instructions (DDL) were edited follows its DDL, not its description
 
 | Control | Contents |
 |---|---|
-| Model | The inference models for Stage 1, interpretation, and Stage 2, structuring |
+| Model | The drawing model used for both Stage 1 and Stage 2 |
 | Color catalog | The catalog that maps abstract color names such as `red`, `blue`, and `gray` onto actual colors |
 | Sketch from life | The grain for Stage 0.5, described in §4 |
 | Wild | Removes the stroke limit |
 | Canvas | The aspect ratio |
 
-One model can serve both stages, or each stage can have its own. Models measured per stage are ordered by the lower of the two stages. The model for Vision, which reads images, is chosen separately.
+Drawing uses the same model for Stage 1 and Stage 2. Models measured per stage are ordered by the lower of the two stages. The model for Vision, which reads images, is chosen separately.
 
 The color catalog list includes `From the description`. Choose it and the server reads each description and picks a catalog for every painting. The choice is saved per user.
 
@@ -475,7 +475,7 @@ Open it from `Settings` in the app rail. Settings are grouped as `Display and op
 | Connections and administration (administrators) | `Models`, `User management`, `DB settings`, and `Log retention`. `Detailed` also shows `Other (server)` and `Limits` |
 | Extensions and details | `Detailed` shows `Plugins` and `Unread-word ledger` |
 
-To choose the models for drawing, open `Model selection` from the making screen's conditions and select Stage 1, Stage 2, and Vision when needed. The administrator's `Models` page manages connections and which models are published to members. Where no model is visible for a use, `Model selection` says there are no models to choose from and that an administrator can make them visible. A chosen model that has left the list is shown by its id, marked `Not in the list`.
+To choose the drawing model, open `Model selection` from the making screen's conditions and select it in `Stage 1/2`. Choose the image-reading model separately in `Vision` when needed. The administrator's `Models` page manages connections and which models are published to members. Where no model is visible for a use, `Model selection` says there are no models to choose from and that an administrator can make them visible. A chosen model that has left the list is shown by its id, marked `Not in the list`.
 
 The settings dialog has `Standard` and `Detailed` modes, switched through `Display mode` at upper right. `Standard` shows everyday settings; **`Plugins`, `Limits`, `Unread-word ledger`, and `Other (server)` appear only in `Detailed`.** The choice remains in this browser.
 

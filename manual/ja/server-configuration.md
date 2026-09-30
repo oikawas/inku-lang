@@ -8,7 +8,7 @@
 
 1. OS／service設定: `/etc/inku/inku-api.env`、systemd、reverse proxy、filesystem権限
 2. 管理者設定: provider接続、公開モデル、制限値、DB backup、artifact、ログ方針、ユーザー管理
-3. ユーザー設定: Stage 1／2モデル、UI言語、UIモード、テーマ、文字サイズ、キャンバス、色カタログ、写生、暴れる、保存先フォルダ、履歴選択動作
+3. ユーザー設定: Stage 1/2共通の描画モデル、Visionモデル、UI言語、UIモード、テーマ、文字サイズ、キャンバス、色カタログ、写生、暴れる、保存先フォルダ、履歴選択動作
 
 API keyの環境変数は初期値です。管理UIでDBへ保存したprovider keyがある場合は暗号化して利用します。ホスト固有情報と秘密をGit追跡文書へ書かないでください。
 

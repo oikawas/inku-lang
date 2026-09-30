@@ -219,9 +219,13 @@ OpenAI API Platform, Claude API, Gemini API, NVIDIA NIM, Ollama, and Ollama
 Cloud. Ollama Cloud declares its own concurrency ceiling, which the
 server enforces per provider rather than exposing as a setting.
 LLM server connection settings are global admin-managed settings.  Each user's
-Stage 1 / Stage 2 provider and model selection is stored separately in
-`user_accounts.model_settings`, saved from the model selection dialog through
-`/api/auth/me/settings`, and restored on login.  Admin users can also toggle
+choice of one drawing model shared by Stage 1/2 and a separate Vision model is
+stored in `user_accounts.model_settings`, saved from the model selection dialog's
+`Stage 1/2` and `Vision` tabs through `/api/auth/me/settings`, and restored on login.
+Settings normalization aligns Stage 2's provider and model with Stage 1.
+Both drawing stages use the request's `stage1_model`, otherwise `stage2_model`,
+otherwise the user's drawing model. Compatibility keys and old works' model
+records remain. Admin users can also toggle
 which models are visible to users for each provider. Published-model selection
 is handled in a separate dialog that also contains model-list fetch, search,
 select-all, and clear-all controls. Checkbox changes inside that dialog are

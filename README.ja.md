@@ -136,7 +136,7 @@ uv run inku-server                        # API（既定は SQLite）
 cd web && npm install && npm run dev      # → http://localhost:5173
 ```
 
-記述から描くには LLM provider が要ります。API キーを環境変数（`OPENAI_API_KEY`・`ANTHROPIC_API_KEY`・`GEMINI_API_KEY`・`NVIDIA_API_KEY`）で渡すか、管理者で Web UI のモデル設定から登録し、段ごとにモデルを選びます。手元の [Ollama](https://ollama.com) も、別途導入・起動・モデル取得・接続・段への割り当てを行う provider として選べます。手順と実測したモデルの組み合わせは [SETUP.ja.md](SETUP.ja.md) にあります。Vision は対応モデルを別途設定した場合に利用でき、標準のローカルモデル構成には含みません。セルフサインアップは無いため、新規 DB では `INKU_BOOTSTRAP_ADMIN_PASSWORD`（8 文字以上）で bootstrap 管理者を作らないと誰もログインできません。
+記述から描くには LLM provider が要ります。API キーを環境変数（`OPENAI_API_KEY`・`ANTHROPIC_API_KEY`・`GEMINI_API_KEY`・`NVIDIA_API_KEY`）で渡すか、管理者で Web UI のモデル設定から登録し、Stage 1/2共通の描画モデルを選びます。手元の [Ollama](https://ollama.com) も、別途導入・起動・モデル取得・接続・描画モデルの選択を行う provider として選べます。現行の手順と旧パイプラインで実測したモデルの組み合わせは [SETUP.ja.md](SETUP.ja.md) にあります。Vision は対応モデルを別途設定した場合に利用でき、標準のローカルモデル構成には含みません。セルフサインアップは無いため、新規 DB では `INKU_BOOTSTRAP_ADMIN_PASSWORD`（8 文字以上）で bootstrap 管理者を作らないと誰もログインできません。
 
 ログインしたら短い記述を書きます。生成後は歳時記を参照し、「どうDDLに変換されたか」を確かめ、必要なら記述を推敲できます。
 

@@ -184,7 +184,7 @@ npm run build
 
 ## Using a local Ollama provider
 
-inku can connect to [Ollama](https://ollama.com) through its local OpenAI-compatible endpoint. This is a separately managed setup: the operator installs and runs Ollama, pulls the models, configures the endpoint, and assigns each stage. **It is not a claim that the whole of inku can be used without API keys or authentication settings.** Only the Stage 1 / Stage 2 pair below has been measured. **It was measured on 2026-07-29 (Build 764), on the former pipeline,** when Stage 1 wrote the instructions directly and Stage 2 built them into a score. Today Stage 1 returns an underdrawing and Stage 2 only proposes completions for phrases that cannot be read through. The pair has not been measured again on the current setup. Vision can use the same compatibility path when Ollama serves a model that accepts image input, but the current verified local catalog contains no Vision model and the standard setup does not guarantee one.
+inku can connect to [Ollama](https://ollama.com) through its local OpenAI-compatible endpoint. This is a separately managed setup: the operator installs and runs Ollama, pulls a model, configures the endpoint, and chooses one drawing model for both stages. **It is not a claim that the whole of inku can be used without API keys or authentication settings.** Only the former Stage 1 / Stage 2 pair below has been measured. **It was measured on 2026-07-29 (Build 764), on the former pipeline,** when Stage 1 wrote the instructions directly and Stage 2 built them into a score. Today Stage 1 returns an underdrawing and Stage 2 only proposes completions for phrases that cannot be read through; both stages use the same model. The current setup has not been measured again. Vision can use the same compatibility path when Ollama serves a model that accepts image input, but the current verified local catalog contains no Vision model and the standard setup does not guarantee one.
 
 ### 1. Widen the context length
 
@@ -194,16 +194,15 @@ Install Ollama, then set its context length. **A Stage 2 prompt ran 12,000 to 14
 export OLLAMA_CONTEXT_LENGTH=16384
 ```
 
-### 2. Pull two models
+### 2. Pull a drawing model
 
-**The two stages want different models, so give each its own.**
+Pull one model for Stage 1 and Stage 2. The example below uses a model from the old measurement; it is not a recommendation for the current pipeline.
 
 ```sh
-ollama pull qwen3.5:4b-q4_K_M                      # Stage 1 (3.4GB)
-ollama pull ministral-3:8b-instruct-2512-q4_K_M    # Stage 2 (6.0GB)
+ollama pull qwen3.5:4b-q4_K_M                      # 3.4GB
 ```
 
-9.4GB together. **Both stay resident at once**, so budget memory for the pair.
+Budget memory for the selected model and context length.
 
 **Name the quantization in the tag.** A bare tag such as `qwen3.5:4b` is replaced upstream over time and comes loose from the notes in the model list.
 
@@ -223,18 +222,17 @@ OLLAMA_BASE_URL=http://host.docker.internal:11434/v1
 
 That one line is all it takes: `deploy/compose.yaml` already resolves `host.docker.internal`.
 
-### 4. Assign one model per stage
+### 4. Choose one drawing model for both stages
 
-Sign in as an administrator and set these in the model settings:
+Sign in as an administrator, fetch Ollama's model list in model settings, and publish the model to use. Choose that model in `Stage 1/2` on the making screen's `Model selection`.
 
-| Stage | Provider | Model |
+| Purpose | Provider | Model |
 | --- | --- | --- |
-| Stage 1 | Ollama | `qwen3.5:4b-q4_K_M` |
-| Stage 2 | Ollama | `ministral-3:8b-instruct-2512-q4_K_M` |
+| Shared Stage 1/2 | Ollama | The drawing model pulled and published |
 
-The Stage 1 model is also used for Sketch from life and automatic color catalog selection.
+The drawing model also serves automatic color catalog selection. Choose the image-reading model for Sketch from life separately in `Vision`.
 
-### Why this pair
+### Why the old measurement used this pair
 
 The reasons below are for the stages as they were when measured.
 

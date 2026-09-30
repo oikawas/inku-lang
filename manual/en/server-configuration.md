@@ -8,7 +8,7 @@ Settings belong to three boundaries.
 
 1. OS and service: `/etc/inku/inku-api.env`, systemd, reverse proxy, and filesystem permissions
 2. Administrator: provider connections, published models, limits, DB backups, artifacts, log policy, and users
-3. User: Stage 1/2 models, UI language, UI mode, theme, text size, canvas, color catalog, sketch, Wild, download folder, and history-selection behavior
+3. User: one drawing model shared by Stage 1/2, Vision model, UI language, UI mode, theme, text size, canvas, color catalog, sketch, Wild, download folder, and history-selection behavior
 
 Provider API key environment variables are initial values. A provider key saved from the admin UI is stored encrypted in the DB. Never put host-specific details or secrets in Git-tracked documentation.
 

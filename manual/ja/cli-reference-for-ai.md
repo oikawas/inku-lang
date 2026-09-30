@@ -134,7 +134,7 @@ uv run inku-cli paint "TEXT" --sketch --catalog-mode auto -o ./out --png
 
 ### 3. `inspect`
 * **`inspect <TEXT> --models <MODEL_A,MODEL_B,...> -o DIR [--png]`**
-  * 同一の入力テキストに対して、複数の LLM モデルを並行して実行し、それぞれの DDL 解釈と描画ファイルをローカルに一括保存します。
+  * 同一の入力テキストに対して、複数の LLM モデルを並行して実行し、それぞれの DDL 解釈と描画ファイルをローカルに一括保存します。各モデルをStage 1とStage 2の両方に使います。
   * どの LLM モデルが最も表現力に富む出力を生み出せるかを AI が検証・比較する際に使用します。
 
 ### 4. `review`

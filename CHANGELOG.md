@@ -12,6 +12,8 @@ At the author's decision, drawing and model comparison no longer use different m
 
 Web model selection has two tabs, Stage 1/2 and Vision, and comparisons that fix either stage are retired. The CLI's `--stage2-provider` / `--stage2-model` options are also retired, and Stage 2 configuration keys are neither read nor written. The corresponding specification and manual explanations are updated in both languages.
 
+2026-09-30 documentation correction: removed remaining instructions for separate stage models from the manuals, setup guides and implementation status, and the specification's assumption of a lightweight Stage 2 model. The old Ollama pair's measurements remain historical results; current setup instructions choose one model for both stages.
+
 ### 2026-09-30 — Collapse past history within the same changelog
 
 Recent records remain at the top, and records from v2.15.34 and earlier can be expanded within this same document. Existing text, entry order, headings and links are preserved. The manually maintained entry count has been removed from the introduction. Product behavior, version and Build are unchanged.

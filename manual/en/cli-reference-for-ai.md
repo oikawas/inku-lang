@@ -134,8 +134,8 @@ Variation takes effect **only when both** `--variation-amplitude` and `--variati
 
 ### 3. `inspect`
 * **`inspect <TEXT> --models <MODEL_A,MODEL_B,...> -o DIR [--png]`**
-  * Runs multiple LLM backends in parallel to inspect and compare DDL interpretations and drawings for the same input text.
-  * Essential for the AI to dynamically select the best Stage 1 model.
+  * Runs multiple LLM backends in parallel to inspect and compare DDL interpretations and drawings for the same input text. Each model serves both Stage 1 and Stage 2.
+  * Use it to compare which LLM model produces the most expressive output.
 
 ### 4. `review`
 * **`review evaluate <PNG_FILE> [--model M] [--prompt P]`**

@@ -62,8 +62,8 @@ pub enum SaijikiMigrationError {
         v1_diagnostics: usize,
         current_diagnostics: usize,
     },
-    /// The migrated source cannot form a document with the same Macro locks.
-    InvalidDocument,
+    /// The document cannot be formed or rewritten; the stage says where, and why.
+    InvalidDocument(InvalidDocumentStage),
     /// The definition is not a Macro definition object.
     UnreadableDefinition,
     /// A pale ink wash or blurring stands where it cannot be rewritten by its mark's fields.
@@ -83,13 +83,35 @@ impl SaijikiMigrationError {
         match self {
             Self::UnmappedV1Surface { .. } => "unmapped_v1_surface",
             Self::MigratedSourceNotRecognized { .. } => "migrated_source_not_recognized",
-            Self::InvalidDocument => "invalid_document",
+            Self::InvalidDocument(_) => "invalid_document",
             Self::UnreadableDefinition => "unreadable_definition",
             Self::IndirectRetiredWord { .. } => "indirect_retired_word",
             Self::AmbiguousSurfaceParameter { .. } => "ambiguous_surface_parameter",
             Self::MigratedDefinitionInvalid { .. } => "migrated_definition_invalid",
         }
     }
+}
+
+/// Where a document stopped as an invalid document, with the reason it was given there.
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[serde(tag = "stage", rename_all = "snake_case")]
+pub enum InvalidDocumentStage {
+    /// A saved lock is not a Macro lock; `lock` is its index in the saved `macro_locks`.
+    V1Locks { lock: usize, cause: &'static str },
+    /// The saved locks cannot form a document, as when a name is locked twice.
+    V1Document { cause: &'static str },
+    /// The source with its washes rewritten cannot form a document with the same locks.
+    ProvisionalDocument { cause: &'static str },
+    /// The intensity the current reading puts on a wash's mark is not one v1 word. Spans are
+    /// in the v1 source; a bound inside a rewritten word widens to that word. `surface` is
+    /// the intensity as the current reading took it.
+    WashIntensity {
+        wash: SourceSpan,
+        intensity: SourceSpan,
+        surface: String,
+    },
+    /// The rewritten source cannot form a document with the same locks.
+    MigratedDocument { cause: &'static str },
 }
 
 const JA: ResolvedInstructionLanguage = ResolvedInstructionLanguage::Ja;
@@ -228,6 +250,42 @@ fn rebuild(
     (rebuilt, rebuilt_spans)
 }
 
+/// A span of a source rebuilt from `source`, in `source`. A bound inside a replaced token
+/// widens to that token; text outside the tokens was copied as it was.
+fn span_before_rebuild(
+    span: SourceSpan,
+    source: &str,
+    spans: &[SourceSpan],
+    rebuilt: &str,
+    rebuilt_spans: &[SourceSpan],
+) -> SourceSpan {
+    let source_offset = |offset: usize, widen_to_end: bool| {
+        // The last token that starts at or before the offset.
+        let Some(index) = rebuilt_spans
+            .partition_point(|token| token.start_byte <= offset)
+            .checked_sub(1)
+        else {
+            return offset;
+        };
+        let (before, after) = (spans[index], rebuilt_spans[index]);
+        if offset >= after.end_byte {
+            before.end_byte + (offset - after.end_byte)
+        } else if source[before.start_byte..before.end_byte]
+            == rebuilt[after.start_byte..after.end_byte]
+        {
+            before.start_byte + (offset - after.start_byte)
+        } else if widen_to_end && offset > after.start_byte {
+            before.end_byte
+        } else {
+            before.start_byte
+        }
+    };
+    SourceSpan {
+        start_byte: source_offset(span.start_byte, false),
+        end_byte: source_offset(span.end_byte, true),
+    }
+}
+
 /// Rewrite one saved v1 document to the current edition, word by word at its positions.
 ///
 /// A pale ink wash becomes a faint sweep: a surface intensity already on its mark becomes
@@ -287,7 +345,13 @@ pub fn migrate_document_from_saijiki_v1(
         let (provisional, provisional_spans) = rebuild(source, &spans, &replacements);
         let provisional_document =
             NormalizedDdlDocument::new(provisional, language, document.macro_locks().to_vec())
-                .map_err(|_| SaijikiMigrationError::InvalidDocument)?;
+                .map_err(|diagnostic| {
+                    SaijikiMigrationError::InvalidDocument(
+                        InvalidDocumentStage::ProvisionalDocument {
+                            cause: diagnostic.code(),
+                        },
+                    )
+                })?;
         let entities = associate_semantic_entities(&provisional_document)
             .map(|association| association.ast.entities)
             .unwrap_or_default();
@@ -301,7 +365,19 @@ pub fn migrate_document_from_saijiki_v1(
             match intensity {
                 Some(Some(term)) => {
                     let Some(index) = token_at(term.provenance.source.span) else {
-                        return Err(SaijikiMigrationError::InvalidDocument);
+                        return Err(SaijikiMigrationError::InvalidDocument(
+                            InvalidDocumentStage::WashIntensity {
+                                wash: spans[wash],
+                                intensity: span_before_rebuild(
+                                    term.provenance.source.span,
+                                    source,
+                                    &spans,
+                                    provisional_document.source(),
+                                    &provisional_spans,
+                                ),
+                                surface: term.provenance.source.surface.clone(),
+                            },
+                        ));
                     };
                     let original = &v1.tokens[index].surface;
                     if !same_surface(language, original, faint_word(language)) {
@@ -329,7 +405,11 @@ pub fn migrate_document_from_saijiki_v1(
     let (migrated, migrated_spans) = rebuild(source, &spans, &replacements);
     let migrated_document =
         NormalizedDdlDocument::new(migrated.clone(), language, document.macro_locks().to_vec())
-            .map_err(|_| SaijikiMigrationError::InvalidDocument)?;
+            .map_err(|diagnostic| {
+                SaijikiMigrationError::InvalidDocument(InvalidDocumentStage::MigratedDocument {
+                    cause: diagnostic.code(),
+                })
+            })?;
     let current_diagnostics = parse_neutral_lexemes(&migrated_document).diagnostics.len();
     if current_diagnostics > v1.diagnostics.len() {
         return Err(SaijikiMigrationError::MigratedSourceNotRecognized {
@@ -712,4 +792,40 @@ pub fn migrate_macro_definition_from_saijiki_v1(
         definition: migrated,
         identity,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_span_of_a_rebuilt_source_is_found_in_the_source_it_was_rebuilt_from() {
+        let source = "ab cd ef";
+        let spans = [(0, 2), (3, 5), (6, 8)].map(|(start_byte, end_byte)| SourceSpan {
+            start_byte,
+            end_byte,
+        });
+        let (rebuilt, rebuilt_spans) =
+            rebuild(source, &spans, &BTreeMap::from([(1, "wxyz".to_owned())]));
+        assert_eq!(rebuilt, "ab wxyz ef");
+        let before = |start_byte, end_byte| {
+            let span = span_before_rebuild(
+                SourceSpan {
+                    start_byte,
+                    end_byte,
+                },
+                source,
+                &spans,
+                &rebuilt,
+                &rebuilt_spans,
+            );
+            source[span.start_byte..span.end_byte].to_owned()
+        };
+        // Kept words and the text between words map exactly; a bound inside the rewritten
+        // word widens to that word.
+        assert_eq!(before(8, 10), "ef");
+        assert_eq!(before(1, 9), "b cd e");
+        assert_eq!(before(4, 6), "cd");
+        assert_eq!(before(7, 8), " ");
+    }
 }

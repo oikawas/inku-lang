@@ -7,9 +7,9 @@
 use std::panic::{AssertUnwindSafe, catch_unwind};
 
 use inku_ddl::{
-    MacroLock, NormalizedDdlDocument, SAIJIKI_ASSET_ID, SAIJIKI_V1_MIGRATION_SCHEMA_ID,
-    SaijikiDefinitionMigration, SaijikiMigrationError, migrate_document_from_saijiki_v1,
-    migrate_macro_definition_from_saijiki_v1,
+    InvalidDocumentStage, MacroLock, NormalizedDdlDocument, SAIJIKI_ASSET_ID,
+    SAIJIKI_V1_MIGRATION_SCHEMA_ID, SaijikiDefinitionMigration, SaijikiMigrationError,
+    migrate_document_from_saijiki_v1, migrate_macro_definition_from_saijiki_v1,
 };
 use inku_pipeline::machine::{LockedDefinition, VisibleDocument};
 use serde::Deserialize;
@@ -72,19 +72,31 @@ fn migrate_document(
         });
     }
     // The v1 source is read with the locks it was saved with; only names matter to it.
-    let v1_locks = document
+    let v1 = document
         .macro_locks
         .iter()
-        .map(|lock| {
+        .enumerate()
+        .map(|(index, lock)| {
             MacroLock::new(&lock.qualified_name, &lock.version, &lock.digest)
                 .and_then(|macro_lock| macro_lock.with_aliases(lock.aliases.iter().cloned()))
+                .map_err(|diagnostic| InvalidDocumentStage::V1Locks {
+                    lock: index,
+                    cause: diagnostic.code(),
+                })
         })
-        .collect::<Result<Vec<_>, _>>();
-    let Ok(v1_locks) = v1_locks else {
-        return json!({"error": {"code": "invalid_document"}});
-    };
-    let Ok(v1) = NormalizedDdlDocument::new(document.source, document.language, v1_locks) else {
-        return json!({"error": {"code": "invalid_document"}});
+        .collect::<Result<Vec<_>, _>>()
+        .and_then(|v1_locks| {
+            NormalizedDdlDocument::new(document.source, document.language, v1_locks).map_err(
+                |diagnostic| InvalidDocumentStage::V1Document {
+                    cause: diagnostic.code(),
+                },
+            )
+        });
+    let v1 = match v1 {
+        Ok(v1) => v1,
+        Err(stage) => {
+            return json!({"error": error_value(&SaijikiMigrationError::InvalidDocument(stage))});
+        }
     };
     match migrate_document_from_saijiki_v1(&v1) {
         Ok(migration) => json!({
@@ -226,6 +238,44 @@ mod tests {
             String::from_utf8(migrate_saijiki_v1(b"not json".to_vec()))
                 .unwrap()
                 .contains("invalid_saijiki_migration_input")
+        );
+    }
+
+    #[test]
+    fn an_invalid_document_says_where_it_stopped_and_why() {
+        let package: Value = serde_json::from_str(PACKAGE_1_0).unwrap();
+        let definition = package["entries"][0]["definition"].clone();
+        let lock = json!({
+            "qualified_name": format!(
+                "{}.{}",
+                definition["namespace"].as_str().unwrap(),
+                definition["heading"].as_str().unwrap()
+            ),
+            "version": definition["version"],
+            "digest": format!("sha256:{}", "0".repeat(64)),
+        });
+        let mut unreadable = lock.clone();
+        unreadable["digest"] = json!("sha256:0");
+        let refusal = |macro_locks: Value| {
+            let output: Value = serde_json::from_slice(&migrate_saijiki_v1(
+                serde_json::to_vec(&json!({
+                    "document": {"source": "円を置く。", "language": "ja", "macro_locks": macro_locks},
+                    "definitions": [definition]
+                }))
+                .unwrap(),
+            ))
+            .unwrap();
+            output["document"]["error"].clone()
+        };
+        assert_eq!(
+            refusal(json!([lock, unreadable])),
+            json!({"code": "invalid_document", "stage": "v1_locks", "lock": 1,
+                "cause": "invalid_digest"})
+        );
+        assert_eq!(
+            refusal(json!([lock, lock])),
+            json!({"code": "invalid_document", "stage": "v1_document",
+                "cause": "duplicate_macro_lock"})
         );
     }
 }

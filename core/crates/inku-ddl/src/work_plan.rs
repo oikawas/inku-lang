@@ -418,6 +418,9 @@ pub fn work_plan_response_schema_with_plugins(plugins: &[String]) -> Value {
         }
         layer.insert(slot.field().into(), enum_schema(ids(slot)));
     }
+    // Every mark is laid with some handling, as it has a surface. Left optional,
+    // providers skipped the field on about half of the layers and dropped the
+    // faintness a description stated with it.
     let mut schema = json!({
         "type": "object",
         "properties": {
@@ -430,7 +433,7 @@ pub fn work_plan_response_schema_with_plugins(plugins: &[String]) -> Value {
                     "properties": layer,
                     "required": [
                         "shape", "proportion", "action", "count", "position", "size",
-                        "color", "tool", "surface", "motion_quality"
+                        "color", "tool", "surface", "handling", "motion_quality"
                     ]
                 }
             }

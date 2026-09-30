@@ -1,6 +1,6 @@
 # inku Project Context
 
-**Target version: v2.15.76 / Build 1152**
+**Target version: v2.15.77 / Build 1153**
 
 This is the starting point for developers and AI agents.
 It avoids reloading the full specification for every task.

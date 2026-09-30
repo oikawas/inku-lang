@@ -6,6 +6,14 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file retains the history from v2.5.0 (2026-07-25, render engine 12) onward.** Past records follow the recent ones in a collapsible section of this same document; expand it when needed. Viewers without collapse support show the full text. Earlier history is in the [v1.72–v2.4 archive](docs/history/changelog-v1.72-v2.4.md) and the [v0.1–v1.71 archive](docs/history/changelog-v0.1-v1.71.md).
 
+### 2026-09-30 — Android: clarify writing, viewing, and refinement navigation
+
+Startup opens Studio's description field without automatically selecting the latest saved work. The global Studio action closes the refinement context and returns to the draft. Settings now uses a gear icon. Works cards and the full-screen viewer directly open lineage, shown with the server's generation cards and arrows, Displayed marker, and vertical or horizontal orientation.
+
+Global bottom navigation offers Studio, Camera, Works, and Settings. Camera remains a primary entrance for receiving an abstract painting from the reality in front of you, with capture one action away on every normal screen. The photo-picker entrance is removed while original photos and provenance remain available for existing works. Model selection before capture and automatic development, saving, and completion after confirming a shot are retained.
+
+The work display, viewer, and lineage share one Refine menu. Change the description opens with the input field visible, and a trip to Settings retains the editing target and draft. Work edits retain the separate authoring draft and return to their entrance when closed. The Series name and destination are removed; lineage opens from work actions. Existing adjustment, model comparison, instruction editing, sketch-from-life redraws, and candidate-generation and saving conditions remain.
+
 ### v2.15.75 — Count English syllables and name only nearby verse forms (Build 1151, 2026-09-30)
 
 The authenticated `POST /api/description/syllables` counts English syllables using the bundled CMU Pronouncing Dictionary. Its original dictionary, license and README are retained, with an entry in the third-party notices. No Python dependency is added.

@@ -227,6 +227,13 @@ object Dimens {
     /** 112dp. A lineage card's thumbnail. */
     val lineageThumbSize: Dp = 112.dp
 
+    /** Server-style lineage cards, with room for the connecting arrows. */
+    val lineageCardWidth: Dp = 212.dp
+    val lineageGenerationGap: Dp = 60.dp
+    val lineageArrowWidth: Dp = 1.5.dp
+    val lineageArrowHead: Dp = 8.dp
+    val lineageTwoCardBreakpoint: Dp = 320.dp
+
     /** 180dp. The presentation caption's scrolling maximum height. */
     val presentationCaptionMaxHeight: Dp = 180.dp
 

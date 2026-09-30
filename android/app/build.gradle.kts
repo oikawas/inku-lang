@@ -50,7 +50,10 @@ fun nextAndroidBuildNumber(): Int {
     if (!shouldIncrementAndroidBuildNumber()) return current
     // Build number is intentionally incremented only for package-producing tasks.
     // Avoid invoking assemble/install from unrelated checks when a clean worktree is required.
-    val next = current + 1
+    // A role checkout can lag behind an APK already on the test device.
+    val floor = providers.gradleProperty("inkuAndroidBuildFloor").orNull?.toInt() ?: current
+    require(floor >= 0) { "inkuAndroidBuildFloor must be non-negative" }
+    val next = maxOf(current, floor) + 1
     buildNumberFile.writeText("$next\n")
     logger.lifecycle("Android BUILD_NUMBER incremented: $current -> $next")
     return next

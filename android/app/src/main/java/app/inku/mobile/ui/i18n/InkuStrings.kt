@@ -51,6 +51,13 @@ interface InkuStrings {
     val studioSubtitle: String
     val productionTools: String
     val reviseWork: String
+    val back: String
+    val descriptionEditAction: String
+    val instructionEditAction: String
+    val drawingEditAction: String
+    val modelEditAction: String
+    val editingWorkLabel: (String) -> String
+    val nextDrawingConditions: String
     val interpretationToggle: String
     val interpretationHide: String
 
@@ -269,6 +276,11 @@ interface InkuStrings {
     val svgPortableNote: String
     val provenanceHash: String
     val workLineage: String
+    val lineageVertical: String
+    val lineageHorizontal: String
+    val lineageDisplayed: String
+    val lineageDeleted: String
+    val lineageChildren: (Int) -> String
     val save: String
     val lineageEmpty: String
     val saving: String

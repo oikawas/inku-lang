@@ -441,22 +441,20 @@ class RefinementScreenTest {
         }
         viewModel = ViewModelProvider(created, factory)[InkuViewModel::class.java]
         composeTestRule.setContent {
-            val state by vm().state.collectAsState()
-            LineageScreen(state, vm())
+            InkuApp(vm())
         }
         composeTestRule.runOnIdle {
             vm().selectHistory(parent)
+            vm().setTab(AppTab.Lineage)
             // Picking a work does not fetch its graph; the screen asks for it.
             vm().refreshLineage()
         }
         awaitState("the graph") { it.lineageGraph?.nodes?.isNotEmpty() == true }
         composeTestRule.waitForIdle()
 
-        // The card grew a button, so the entry can sit below the fold.
-        // The card is clickable, so it merges its descendants: the button's own
-        // tag is only in the unmerged tree.
-        assertEquals("the entry is on the card", 1, nodesWithTag(REFINE_ENTRY_TAG, unmerged = true))
-        composeTestRule.onNodeWithText("描画要素").performClick()
+        composeTestRule.onAllNodesWithTag(LINEAGE_MENU_TAG)[0].performClick()
+        assertEquals("the entry is in the card menu", 1, nodesWithTag(REFINE_ENTRY_TAG))
+        composeTestRule.onAllNodesWithTag(REFINE_ENTRY_TAG)[0].performClick()
         awaitState("the panel to open") { it.refinementOpen }
         assertEquals(parent.id, vm().state.value.refinementParent?.id)
     }

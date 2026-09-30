@@ -209,11 +209,12 @@ DP_LITERAL_VALUE = re.compile(r"^(\d+(?:\.\d+)?)\.dp$")
 SP_DECLARATION = re.compile(r"val\s+(\w+)\s*:\s*TextUnit\s*=\s*(\d+(?:\.\d+)?)\.sp")
 
 # Allowed off the grid: line weights, which are lines, not distances. A 1dp
-# border, and the strokes the navigation marks and the camera development effect
+# border, and strokes in navigation marks, lineage arrows and camera development
 # draw -- on the 4dp grid they would be two to four times as heavy.
 OFF_GRID_EXEMPT = {
     "hairline",
     "navigationMarkStroke",
+    "lineageArrowWidth",
     "cameraSavingOutlineWidth",
     "cameraSignalLine",
     "cameraPlotterStroke",

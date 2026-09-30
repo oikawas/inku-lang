@@ -152,7 +152,7 @@ data class ProviderModelFetchState(
 )
 
 data class InkuUiState(
-    val prompt: String = "青い鉛筆の線を12本、波打つ軌跡に沿って散らす",
+    val prompt: String = "",
     val ddl: String = "",
     val ddlEditedAfterGeneration: Boolean = false,
     val confirmDdlOverwrite: Boolean = false,
@@ -228,6 +228,11 @@ data class InkuUiState(
     // the keyboard is up, the four destinations give their place to the one
     // action the writing is heading for.
     val descriptionFocused: Boolean = false,
+    val descriptionEditing: Boolean = false,
+    /** Contextual work operations never replace the new-work draft. */
+    val workContextId: String? = null,
+    val workActionsTarget: HistoryItemEntity? = null,
+    val workSketchTarget: HistoryItemEntity? = null,
     val ddlEditorOpen: Boolean = false,
     val cameraCaptureState: CameraCaptureState = CameraCaptureState.Idle,
     val cameraSourcePhotoPath: String? = null,
@@ -242,6 +247,7 @@ data class InkuUiState(
     val message: String? = null,
     val tab: AppTab = AppTab.Compose,
     val settingsPane: SettingsPane = SettingsPane.Home,
+    val settingsReturnTab: AppTab = AppTab.Compose,
     val composeMode: ComposeMode = ComposeMode.Write,
     val renderTab: RenderTab = RenderTab.Artwork,
     val uiMode: String = "full",
@@ -429,6 +435,8 @@ class InkuViewModel @JvmOverloads constructor(
     private val repository = repositoryOverride
         ?: InkuRepository(application.applicationContext, (application as? InkuApplication)?.database ?: app.inku.mobile.data.db.InkuDatabase.open(application))
     private val localState = MutableStateFlow(InkuUiState())
+    private var authoringReturnState: InkuUiState? = null
+    private var pausedWorkState: InkuUiState? = null
     private val history = repository.history()
     private val modelAssets = repository.modelAssets()
     private val providerSettings = repository.providerSettings()
@@ -455,7 +463,6 @@ class InkuViewModel @JvmOverloads constructor(
     private val mutablePhotoPickerRequests = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
     val photoPickerRequests: SharedFlow<Unit> = mutablePhotoPickerRequests.asSharedFlow()
     private var drawingRunSerial: Long = 0L
-    private var restoredInitialHistory = false
     private var promptEditedByUser = false
     private var modelSelectionSnapshot: Pair<String, String>? = null
     private var cameraVisionSelectionSnapshot: String? = null
@@ -513,7 +520,6 @@ class InkuViewModel @JvmOverloads constructor(
                         !promptEditedByUser && !localState.value.isDrawing &&
                         !localState.value.refinementOpen && !localState.value.refinementBusy
                     ) {
-                        restoredInitialHistory = true
                         presentPipelineView(view)
                     }
                 }
@@ -537,29 +543,6 @@ class InkuViewModel @JvmOverloads constructor(
                         refreshedInPass += batch.refreshed
                     }
                     delay(750)
-                }
-            }
-        }
-        viewModelScope.launch {
-            val latest = history.first { it.isNotEmpty() }.first()
-            if (restoredInitialHistory || promptEditedByUser || localState.value.selectedHistory != null) return@launch
-            repository.getHistoryById(latest.id)?.let { full ->
-                // Re-read after the lookup suspended. The first history row can
-                // arrive because a drawing just saved it, and that drawing sets
-                // the selection itself a moment later; writing a value captured
-                // before the suspension back over it would restore the flags of
-                // a state that no longer exists -- among them `lineageDetached`,
-                // which decides whether the next save has a parent at all.
-                val current = localState.value
-                if (!restoredInitialHistory && !promptEditedByUser && current.selectedHistory == null && !current.isDrawing) {
-                    // Restored for display only, as it was before the shared
-                    // pipeline replaced this block with the pick below and the
-                    // detach went with it (12390c01): web puts nothing back on
-                    // opening (`displayedHistoryItem` starts null), so counting
-                    // this as a parent would make this client alone record an
-                    // edge for opening the app and drawing. Only an explicit
-                    // pick becomes a parent.
-                    applyHistorySelection(full, current.tab, asParent = false)
                 }
             }
         }
@@ -702,13 +685,7 @@ class InkuViewModel @JvmOverloads constructor(
     }
 
     fun requestCameraCapture() {
-        if (!canRequestCameraInput()) return
-        val captureState = localState.value.cameraCaptureState
-        cameraStateBeforeSourceChooser = captureState
-        localState.value = localState.value.copy(
-            cameraCaptureState = CameraCaptureState.ChoosingSource,
-            message = null,
-        )
+        requestCameraCaptureDirect()
     }
 
     fun requestCameraCaptureDirect() {
@@ -736,6 +713,7 @@ class InkuViewModel @JvmOverloads constructor(
     }
 
     fun chooseCameraInputSource(source: CameraInputSource) {
+        if (source != CameraInputSource.Camera) return
         if (localState.value.cameraCaptureState != CameraCaptureState.ChoosingSource) return
         beginCameraInput(source, confirmOverwrite = true)
     }
@@ -1362,6 +1340,7 @@ class InkuViewModel @JvmOverloads constructor(
 
     fun clearPrompt() {
         if (state.value.isDrawing) return
+        if (localState.value.workContextId != null) closeWorkContext()
         // Starting a new work leaves a drawing that was waiting on the author --
         // restored at start or presented after a stop -- for good, as the stop
         // itself does; left open, it was restored again at every start.
@@ -1379,6 +1358,12 @@ class InkuViewModel @JvmOverloads constructor(
             historyAuthorityLoading = false,
             descriptionForkRequested = false,
             selectedHistory = null,
+            descriptionEditing = false,
+            workContextId = null,
+            tab = AppTab.Compose,
+            canvasPresentationMode = false,
+            presentationHistory = null,
+            presentationSequence = emptyList(),
             sketchMode = Sketches.DEFAULT_MODE,
             cameraSourcePhotoPath = null,
             lineageDetached = true,
@@ -1487,11 +1472,182 @@ class InkuViewModel @JvmOverloads constructor(
         if (current.tab == AppTab.History && tab != AppTab.History) presentationNavigationSerial++
         localState.value = current.copy(
             tab = tab,
+            canvasPresentationMode = false,
+            presentationHistory = null,
+            presentationSequence = emptyList(),
             settingsPane = if (tab == AppTab.Settings && current.tab != AppTab.Settings) SettingsPane.Home else current.settingsPane,
+            settingsReturnTab = if (tab == AppTab.Settings && current.tab != AppTab.Settings) current.tab else current.settingsReturnTab,
         )
         // web refetches when the lineage tab comes up (+page.svelte:4556).
         if (tab == AppTab.Lineage) refreshLineage()
     }
+
+    /** The global Studio action returns to writing, never to a viewed work. */
+    fun openStudio() {
+        if (localState.value.cameraCaptureState.locksCameraInteraction) return
+        if (localState.value.isDrawing) {
+            setTab(AppTab.Compose)
+            return
+        }
+        closeRefinement()
+        var current = localState.value
+        if (current.workContextId != null) {
+            pausedWorkState = current
+            authoringReturnState?.let { current = current.restoreAuthoring(it) }
+            authoringReturnState = null
+        }
+        // A completed result is viewed from Works. An unfinished new-work
+        // draft survives a trip through another work or Settings.
+        if (current.selectedHistory != null) {
+            current = current.copy(
+                prompt = "", ddl = "", ddlEditedAfterGeneration = false,
+                selectedHistory = null, pipelineView = null, historyAuthority = null,
+                historyAuthorityLoading = false, descriptionForkRequested = false,
+                cameraSourcePhotoPath = null, cameraCaptureState = CameraCaptureState.Idle,
+            )
+        }
+        lineageJob?.cancel()
+        presentationNavigationSerial++
+        promptEditedByUser = true
+        localState.value = current.copy(
+            tab = AppTab.Compose, composeMode = ComposeMode.Write,
+            descriptionEditing = false, workContextId = null, descriptionFocused = false,
+            lineageDetached = true, lineageGraph = null, lineageLoading = false,
+            canvasPresentationMode = false, presentationHistory = null,
+            presentationSequence = emptyList(), workActionsTarget = null, workSketchTarget = null,
+            ddlEditorOpen = false, confirmDdlOverwrite = false,
+            refinementOpen = false, refinementParent = null, refinementCandidates = emptyList(),
+            refinementPreviewId = null, refinementStatus = null, message = null,
+        )
+    }
+
+    fun closeSettings() {
+        localState.value = localState.value.copy(tab = localState.value.settingsReturnTab, settingsPane = SettingsPane.Home)
+    }
+
+    fun openWorkActions(item: HistoryItemEntity) {
+        if (state.value.isRunning || item.trashed) return
+        localState.value = localState.value.copy(workActionsTarget = item)
+    }
+
+    fun closeWorkActions() {
+        localState.value = localState.value.copy(workActionsTarget = null)
+    }
+
+    /** Establish the immutable target before any edit changes the shared pipeline input. */
+    private fun enterWorkContext(item: HistoryItemEntity) {
+        val current = localState.value
+        if (current.workContextId == item.id) {
+            localState.value = current.copy(workActionsTarget = null, canvasPresentationMode = false, presentationHistory = null, presentationSequence = emptyList())
+            return
+        }
+        if (authoringReturnState == null) authoringReturnState = current.copy(workActionsTarget = null)
+        val paused = pausedWorkState?.takeIf { it.workContextId == item.id }
+        if (paused != null) {
+            localState.value = current.restoreAuthoring(paused)
+            pausedWorkState = null
+        } else {
+            applyHistorySelection(item, AppTab.Compose)
+        }
+        localState.value = localState.value.copy(
+            workContextId = item.id,
+            canvasPresentationMode = false,
+            presentationHistory = null,
+            presentationSequence = emptyList(),
+            workActionsTarget = null,
+        )
+    }
+
+    fun editWorkDescription(item: HistoryItemEntity) {
+        if (state.value.isRunning) return
+        enterWorkContext(item)
+        localState.value = localState.value.copy(tab = AppTab.Compose, descriptionEditing = true, composeMode = ComposeMode.Write)
+    }
+
+    fun editWorkInstructions(item: HistoryItemEntity) {
+        if (state.value.isRunning) return
+        enterWorkContext(item)
+        openLineageDdlEditor(item)
+    }
+
+    fun refineWork(item: HistoryItemEntity, subview: RefinementSubview) {
+        if (state.value.isRunning) return
+        enterWorkContext(item)
+        openRefinement(item, subview)
+    }
+
+    fun openWorkLineage(item: HistoryItemEntity) {
+        if (state.value.isRunning) return
+        closeRefinement()
+        enterWorkContext(item)
+        localState.value = localState.value.copy(tab = AppTab.Lineage)
+        refreshLineage()
+    }
+
+    fun openWorkLineage(item: HistoryListItem) {
+        viewModelScope.launch {
+            repository.getHistoryById(item.id)?.let { openWorkLineage(it) }
+        }
+    }
+
+    fun showWorkSketch(item: HistoryItemEntity) {
+        if (state.value.isRunning) return
+        localState.value = localState.value.copy(workActionsTarget = null, workSketchTarget = item)
+    }
+
+    fun closeWorkSketch() {
+        localState.value = localState.value.copy(workSketchTarget = null)
+    }
+
+    fun redrawWorkSketch(item: HistoryItemEntity, mode: SketchMode) {
+        if (state.value.isRunning) return
+        enterWorkContext(item)
+        closeWorkSketch()
+        redrawSketch(item, mode)
+    }
+
+    fun redrawWorkSketchText(item: HistoryItemEntity, text: String) {
+        if (state.value.isRunning) return
+        enterWorkContext(item)
+        closeWorkSketch()
+        redrawSketchText(item, text)
+    }
+
+    fun finishDescriptionEditing() {
+        localState.value = localState.value.copy(descriptionEditing = false, descriptionFocused = false)
+    }
+
+    fun closeWorkContext() {
+        if (state.value.isRunning) return
+        val source = authoringReturnState ?: return
+        closeRefinement()
+        lineageJob?.cancel()
+        localState.value = localState.value.restoreAuthoring(source).copy(workActionsTarget = null, workSketchTarget = null)
+        authoringReturnState = null
+        pausedWorkState = null
+        if (source.tab == AppTab.Lineage) refreshLineage()
+    }
+
+    /** Restore only the workspace; provider settings and download progress remain current. */
+    private fun InkuUiState.restoreAuthoring(source: InkuUiState): InkuUiState = copy(
+        prompt = source.prompt, ddl = source.ddl, ddlEditedAfterGeneration = source.ddlEditedAfterGeneration,
+        pipelineView = source.pipelineView, historyAuthority = source.historyAuthority,
+        historyAuthorityLoading = source.historyAuthorityLoading, descriptionForkRequested = source.descriptionForkRequested,
+        selectedHistory = source.selectedHistory, selectedCatalogId = source.selectedCatalogId,
+        selectedCanvasAspect = source.selectedCanvasAspect, sketchMode = source.sketchMode,
+        lineageDetached = source.lineageDetached, cameraSourcePhotoPath = source.cameraSourcePhotoPath,
+        cameraCaptureState = source.cameraCaptureState, importedPlugins = source.importedPlugins,
+        importedPluginNames = source.importedPluginNames, composeMode = source.composeMode,
+        tab = source.tab, renderTab = source.renderTab, descriptionEditing = source.descriptionEditing,
+        workContextId = source.workContextId, descriptionFocused = false, ddlEditorOpen = false,
+        confirmDdlOverwrite = false, canvasPresentationMode = source.canvasPresentationMode,
+        presentationHistory = source.presentationHistory, presentationSequence = source.presentationSequence,
+        lineageGraph = source.lineageGraph, lineageLoading = false, message = source.message,
+        refinementOpen = source.refinementOpen, refinementParent = source.refinementParent,
+        refinementCandidates = source.refinementCandidates, refinementPreviewId = source.refinementPreviewId,
+        refinementSubview = source.refinementSubview, refinementStatus = source.refinementStatus,
+        refinementBusy = false, refinementCanAbort = false,
+    )
 
     fun setSettingsPane(panel: SettingsPane) {
         localState.value = localState.value.copy(settingsPane = panel, message = null)
@@ -1710,17 +1866,8 @@ class InkuViewModel @JvmOverloads constructor(
 
     /** Leave the gallery viewer and explicitly load this work into the editor. */
     fun editPresentedHistory() {
-        val work = localState.value.presentationHistory ?: return
-        presentationNavigationSerial++
-        localState.value = localState.value.copy(
-            canvasPresentationMode = false,
-            presentationHistory = null,
-            presentationSequence = emptyList(),
-            canvasZoom = CANVAS_FIT_ZOOM,
-            canvasPanX = 0f,
-            canvasPanY = 0f,
-        )
-        selectHistory(work)
+        val work = localState.value.presentationHistory ?: localState.value.selectedHistory ?: return
+        openWorkActions(work)
     }
 
     fun panCanvas(dx: Float, dy: Float) {
@@ -1907,14 +2054,11 @@ class InkuViewModel @JvmOverloads constructor(
         if (localState.value.isDrawing) stopDrawing()
         discardStagedCameraPhoto()
         cameraRetryInput = null
-        restoredInitialHistory = true
         promptEditedByUser = false
         adoptSavedHistory(item) { current ->
             current.copy(
                 descriptionForkRequested = false,
-                // An explicit pick is what makes a work the parent of the next save
-                // (web's `loadIterationItem`, +page.svelte:4600); the startup
-                // restore shows a work without making it one.
+                // Only an explicit work operation establishes a parent.
                 lineageDetached = !asParent,
                 prompt = item.originalInput,
                 ddl = item.normalizedDdl,
@@ -2065,7 +2209,9 @@ class InkuViewModel @JvmOverloads constructor(
      */
     fun selectLineageNode(node: LineageGraphNode) {
         val item = (node as? LineageGraphNode.Work)?.history?.item ?: return
+        val inWorkContext = localState.value.workContextId != null
         applyHistorySelection(item, AppTab.Lineage)
+        if (inWorkContext) localState.value = localState.value.copy(workContextId = item.id)
         refreshLineage()
     }
 

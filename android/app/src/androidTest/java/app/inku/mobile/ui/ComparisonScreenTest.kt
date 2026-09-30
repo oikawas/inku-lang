@@ -3,8 +3,6 @@ package app.inku.mobile.ui
 import app.inku.mobile.ui.i18n.InkuStringsJa
 import android.app.Application
 import androidx.activity.ComponentActivity
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
@@ -146,8 +144,7 @@ class ComparisonScreenTest {
         }
         viewModel = ViewModelProvider(created, factory)[InkuViewModel::class.java]
         composeTestRule.setContent {
-            val state by vm().state.collectAsState()
-            LineageScreen(state, vm())
+            InkuApp(vm())
         }
     }
 
@@ -275,8 +272,9 @@ class ComparisonScreenTest {
         composeTestRule.runOnIdle { vm().setTab(AppTab.Lineage) }
         awaitState("the lineage to be drawn") { it.lineageGraph != null }
 
-        assertEquals("描画要素 is on the card", 1, nodesWithTag(REFINE_ENTRY_TAG))
-        assertEquals("モデル is on the card", 1, nodesWithTag(MODEL_ENTRY_TAG))
+        composeTestRule.onAllNodesWithTag(LINEAGE_MENU_TAG)[0].performClick()
+        assertEquals("描画要素 is in the card menu", 1, nodesWithTag(REFINE_ENTRY_TAG))
+        assertEquals("モデル is in the card menu", 1, nodesWithTag(MODEL_ENTRY_TAG))
         assertEquals("言語 is not", 0, composeTestRule.onAllNodesWithText("言語").fetchSemanticsNodes().size)
 
         composeTestRule.onAllNodesWithTag(MODEL_ENTRY_TAG)[0].performClick()
@@ -288,8 +286,9 @@ class ComparisonScreenTest {
         composeTestRule.runOnIdle { vm().closeRefinement() }
         awaitState("the lineage again") { !it.refinementOpen }
         assertEquals("still on the lineage screen", AppTab.Lineage, vm().state.value.tab)
-        assertEquals("and the card is back", 1, nodesWithTag(MODEL_ENTRY_TAG))
+        assertEquals("and the card is back", 1, nodesWithTag(LINEAGE_MENU_TAG))
 
+        composeTestRule.onAllNodesWithTag(LINEAGE_MENU_TAG)[0].performClick()
         composeTestRule.onAllNodesWithTag(REFINE_ENTRY_TAG)[0].performClick()
         awaitState("the adjust sub-view") {
             it.refinementOpen && it.refinementSubview == RefinementSubview.Adjust

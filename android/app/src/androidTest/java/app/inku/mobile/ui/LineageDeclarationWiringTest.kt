@@ -80,9 +80,8 @@ class LineageDeclarationWiringTest {
     }
 
     /**
-     * Started by each test rather than by `setUp`, because the startup restore
-     * this contract has to see only happens when history already holds a row --
-     * so the rows have to be in place before the view model exists.
+     * Seed history before startup so opening the app can be checked without
+     * implicitly choosing an existing work as the next drawing's parent.
      */
     private fun startViewModel() {
         // Held in a store: the view model starts work of its own that outlives a
@@ -248,10 +247,11 @@ class LineageDeclarationWiringTest {
         return item
     }
 
-    private suspend fun awaitStartupRestore(seeded: HistoryItemEntity) {
-        settle("the startup restore to put the seeded work on screen") {
-            vm().state.value.selectedHistory?.id == seeded.id
+    private suspend fun awaitStartupWithoutSelection(seeded: HistoryItemEntity) {
+        settle("the seeded history and settings to be available") {
+            vm().historyItems.value.any { it.id == seeded.id } && vm().state.value.providerSettings.isNotEmpty()
         }
+        assertNull("startup leaves saved works unselected", vm().state.value.selectedHistory)
     }
 
     /** What web's `loadIterationItem` does: an explicit pick, which becomes a parent. */
@@ -291,7 +291,7 @@ class LineageDeclarationWiringTest {
         val parent = seedParent()
         startViewModel()
         useModel()
-        awaitStartupRestore(parent)
+        awaitStartupWithoutSelection(parent)
         chooseFromHistory(parent)
         promptFor("記述を変えて描く 一")
         vm().draw()
@@ -306,7 +306,7 @@ class LineageDeclarationWiringTest {
         val parent = seedParent()
         startViewModel()
         useModel()
-        awaitStartupRestore(parent)
+        awaitStartupWithoutSelection(parent)
         chooseFromHistory(parent)
         vm().setDdl("黒い太筆の線を3本、斜めに置く")
         settle("the edited DDL to reach the shared state") {
@@ -324,7 +324,7 @@ class LineageDeclarationWiringTest {
         val parent = seedParent()
         startViewModel()
         useModel()
-        awaitStartupRestore(parent)
+        awaitStartupWithoutSelection(parent)
         chooseFromHistory(parent)
         // The description moves too. One edge, one cause: the ratio wins.
         promptFor("キャンバスを変えて描く 一")
@@ -344,7 +344,7 @@ class LineageDeclarationWiringTest {
         val parent = seedParent()
         startViewModel()
         useModel()
-        awaitStartupRestore(parent)
+        awaitStartupWithoutSelection(parent)
         chooseFromHistory(parent)
         // Nothing is touched: the pick already put the parent's description and
         // canvas ratio in the state.
@@ -401,14 +401,14 @@ class LineageDeclarationWiringTest {
         assertEquals("every demo cycle is a root of its own", 0, countEdges(saved))
     }
 
-    // --- T-5: the startup restore is for display, not for descent ---
+    // --- T-5: startup does not pick a parent ---
 
     @Test
-    fun t5_theRestoredWorkIsNotAParentButAnExplicitPickIs() = runBlocking {
+    fun t5_startupDoesNotPickAParentButAnExplicitPickDoes() = runBlocking {
         val parent = seedParent()
         startViewModel()
         useModel()
-        awaitStartupRestore(parent)
+        awaitStartupWithoutSelection(parent)
 
         promptFor(FIRST_DRAWING)
         vm().draw()
@@ -416,7 +416,7 @@ class LineageDeclarationWiringTest {
         settle("the first run to finish") { !vm().state.value.isDrawing }
 
         assertNull(
-            "opening the app and drawing must not descend from what was restored for display",
+            "opening the app and drawing must not descend from an unselected saved work",
             edgeOf(afterRestore),
         )
 
@@ -436,7 +436,7 @@ class LineageDeclarationWiringTest {
         val parent = seedParent()
         startViewModel()
         useModel()
-        awaitStartupRestore(parent)
+        awaitStartupWithoutSelection(parent)
 
         chooseFromHistory(parent)
         vm().detachLineage()
@@ -468,7 +468,7 @@ class LineageDeclarationWiringTest {
         val parent = seedParent()
         startViewModel()
         useModel()
-        awaitStartupRestore(parent)
+        awaitStartupWithoutSelection(parent)
         chooseFromHistory(parent)
         promptFor("キャンバスの記録 一")
         vm().setCanvasAspect(CHILD_CANVAS)
@@ -494,7 +494,7 @@ class LineageDeclarationWiringTest {
         val parent = seedParent()
         startViewModel()
         useModel()
-        awaitStartupRestore(parent)
+        awaitStartupWithoutSelection(parent)
         chooseFromHistory(parent)
         promptFor("記述だけ変えて描く 一")
         vm().draw()

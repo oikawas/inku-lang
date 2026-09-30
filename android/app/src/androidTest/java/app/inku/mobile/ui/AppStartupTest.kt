@@ -37,18 +37,12 @@ class AppStartupTest {
         composeTestRule.setContent { InkuApp() }
         composeTestRule.waitForIdle()
 
-        // Some labels appear twice (制作 is also the studio's title, 連作 also a
-        // canvas action), so this counts rather than assumes there is one of each.
-        // デモ left this list on 2026-08-08: the bottom bar is for the places one
-        // returns to, and the demo runs from its settings pane instead. The
-        // labels come from the wording pack: the 2026-09-24 redesign renamed
-        // 記述/履歴/系譜 to 制作/作品/連作 and added カメラ, and the literal list
-        // this test had went stale with it.
+        // Studio can also be the screen title. Camera is a global capture
+        // action; lineage opens from a work rather than the global bar.
         listOf(
             InkuStringsJa.studioTitle,
             InkuStringsJa.camera,
             InkuStringsJa.worksTitle,
-            InkuStringsJa.seriesTitle,
             InkuStringsJa.settings,
         ).forEach { label ->
             val found = composeTestRule.onAllNodesWithText(label).fetchSemanticsNodes()

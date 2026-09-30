@@ -204,6 +204,9 @@ val ChipSurface = Color(0xFF243136)
 /** The square that stands in for a lineage node's artwork before it loads. */
 val LineagePlaceholderSurface = Color(0xFF2A2622)
 
+/** The Server dark theme's route from the origin to a starred work. */
+val LineageStarPath = Color(0xFFF0A44F)
+
 /** The ground under exported render text, which reads as paper. */
 val RenderTextPaper = Color(0xFFF8F8F6)
 

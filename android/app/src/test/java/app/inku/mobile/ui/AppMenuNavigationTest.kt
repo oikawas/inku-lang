@@ -15,11 +15,10 @@ class AppMenuNavigationTest {
     }
 
     @Test
-    fun bottomNavigationIsWriteCameraHistoryAndLineage() {
+    fun bottomNavigationIsWriteCameraHistoryAndSettings() {
         val source = appSource()
         val start = source.indexOf("private fun BottomNavigationBar(")
-        // Up to the next composable: the studio header that now follows the
-        // bar opens Settings itself, and it is not part of the bar.
+        // Bound the global bar separately from the studio header below it.
         val end = source.indexOf("\n@Composable", start)
         assertTrue("bottom navigation must exist", start >= 0 && end > start)
         val bottomNavigation = source.substring(start, end)
@@ -27,8 +26,9 @@ class AppMenuNavigationTest {
         assertTrue("bottom navigation must declare its four fixed destinations", bottomNavigation.contains("BottomNavigationDestination.Write"))
         assertTrue("bottom navigation must launch camera", bottomNavigation.contains("BottomNavigationDestination.Camera"))
         assertTrue("bottom navigation must retain History", bottomNavigation.contains("AppTab.History"))
-        assertTrue("bottom navigation must retain Lineage", bottomNavigation.contains("AppTab.Lineage"))
-        assertFalse("Settings must not remain in the bottom navigation", bottomNavigation.contains("AppTab.Settings"))
+        assertTrue("camera must start capture directly", bottomNavigation.contains("viewModel.requestCameraCaptureDirect()"))
+        assertTrue("bottom navigation must retain Settings", bottomNavigation.contains("AppTab.Settings"))
+        assertFalse("lineage opens from a work, not global navigation", bottomNavigation.contains("AppTab.Lineage"))
     }
 
     @Test

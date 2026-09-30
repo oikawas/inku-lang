@@ -3,8 +3,6 @@ package app.inku.mobile.ui
 import app.inku.mobile.ui.i18n.InkuStringsJa
 import android.app.Application
 import androidx.activity.ComponentActivity
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasTestTag
@@ -14,6 +12,7 @@ import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.ViewModelStore
@@ -136,8 +135,7 @@ class LineageScreenTest {
         }
         viewModel = ViewModelProvider(created, factory)[InkuViewModel::class.java]
         composeTestRule.setContent {
-            val state by vm().state.collectAsState()
-            LineageScreen(state, vm())
+            InkuApp(vm())
         }
     }
 
@@ -321,18 +319,22 @@ class LineageScreenTest {
         // The two edges, named on the cards they point at. Compared with the
         // registry rather than with a literal: a screen that invented its own
         // wording fails even if it happens to agree today.
-        composeTestRule.onNodeWithText(InkuStringsJa.derivationLabel(FIRST_KIND)).assertIsDisplayed()
+        composeTestRule.onNodeWithText(InkuStringsJa.derivationLabel(FIRST_KIND)).performScrollTo().assertIsDisplayed()
         // ddl_edit reads DDL編集, which is also each card's own DDL edit entry;
         // the edge's name is the one that is not that button.
         composeTestRule.onNode(
             hasText(InkuStringsJa.derivationLabel(SECOND_KIND)) and !hasTestTag(DDL_ENTRY_TAG),
-        ).assertIsDisplayed()
+        ).performScrollTo().assertIsDisplayed()
         // And the node no edge points at, which the registry answers for too.
-        composeTestRule.onNodeWithText(InkuStringsJa.derivationOrigin).assertIsDisplayed()
+        composeTestRule.onNodeWithText(InkuStringsJa.derivationOrigin).performScrollTo().assertIsDisplayed()
 
         // The generation is the depth from the root, and it is on the cards.
-        composeTestRule.onNodeWithText("第1世代").assertIsDisplayed()
-        composeTestRule.onNodeWithText("第3世代").assertIsDisplayed()
+        composeTestRule.onNodeWithText("第1世代").performScrollTo().assertIsDisplayed()
+        composeTestRule.onNodeWithText("第3世代").performScrollTo().assertIsDisplayed()
+
+        composeTestRule.onNodeWithText(InkuStringsJa.lineageHorizontal).performClick()
+        composeTestRule.onAllNodesWithTag(LINEAGE_NODE_TAG).assertCountEquals(3)
+        composeTestRule.waitForIdle()
     }
 
     // --- T-6: picking a node opens the work and drops the detach ---
@@ -342,18 +344,7 @@ class LineageScreenTest {
         val (root, _, grand) = seedThreeGenerations()
         showLineage()
 
-        // Started from the state the app really opens in: the newest work is
-        // restored for display with the detach raised (InkuViewModel.kt:240).
-        // That is the only state holding a graph and a raised detach at once --
-        // `detachLineage` drops the work, and web drops the graph with it.
-        awaitState("the startup restore to put the newest work on screen") {
-            it.selectedHistory?.id == grand.id
-        }
-        assertTrue("the restore raises the detach", vm().state.value.lineageDetached)
-
-        vm().setTab(AppTab.Lineage)
-        awaitState("the graph to be read") { it.lineageGraph != null }
-        awaitCards(3)
+        openLineageOn(grand, cards = 3)
 
         // The root card names itself: it is the one node no edge points at.
         composeTestRule.onNodeWithText(InkuStringsJa.derivationOrigin).performClick()
@@ -410,9 +401,8 @@ class LineageScreenTest {
         openLineageOn(grand, cards = 3)
         useModelAndPrompt(grand.originalInput)
 
-        val ddlActions = composeTestRule.onAllNodesWithTag(DDL_ENTRY_TAG)
-        ddlActions.assertCountEquals(3)
-        ddlActions[0].performClick()
+        composeTestRule.onAllNodesWithTag(LINEAGE_MENU_TAG)[0].performClick()
+        composeTestRule.onAllNodesWithTag(DDL_ENTRY_TAG)[0].performClick()
         awaitState("the card DDL action to open the saved work") {
             it.ddlEditorOpen && it.selectedHistory?.id == root.id
         }

@@ -32,7 +32,6 @@ import android.provider.Settings
 import android.util.LruCache
 import android.view.OrientationEventListener
 import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.BorderStroke
@@ -76,6 +75,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.relocation.BringIntoViewRequester
 import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -132,6 +132,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
@@ -142,6 +145,8 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.Path
@@ -493,15 +498,11 @@ private val S: InkuStrings
 internal fun saijikiGroupColorAt(index: Int): Color = saijikiGroupColors[index % saijikiGroupColors.size]
 
 @Composable
-fun InkuApp() {
-    val viewModel: InkuViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
+fun InkuApp(viewModel: InkuViewModel = androidx.lifecycle.viewmodel.compose.viewModel()) {
     val state by viewModel.state.collectAsState()
     val historyGridState = rememberLazyGridState()
     val cameraCaptureLauncher = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { success ->
         viewModel.onCameraCaptureResult(success)
-    }
-    val photoPickerLauncher = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
-        viewModel.onPhotoPickerResult(uri)
     }
     // The in-app camera is the normal capture; the system camera app is the
     // fallback when the permission is refused or CameraX cannot start.
@@ -539,18 +540,8 @@ fun InkuApp() {
             }
         }
     }
-    LaunchedEffect(viewModel) {
-        viewModel.photoPickerRequests.collect {
-            try {
-                photoPickerLauncher.launch(
-                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
-                )
-            } catch (_: Throwable) {
-                viewModel.onPhotoPickerLaunchFailed()
-            }
-        }
-    }
     val deviceRotation = rememberDeviceRotation(enabled = state.canvasPresentationMode)
+    val screenStates = rememberSaveableStateHolder()
 
     // One back key, one destination per screen state. Android's back always means
     // "up one level"; before this it meant "leave the app" from everywhere except
@@ -566,11 +557,15 @@ fun InkuApp() {
         state.modelSelectionOpen -> viewModel::cancelModelSelection
         state.catalogSelectionOpen -> viewModel::cancelCatalogSelection
         state.canvasSelectionOpen -> viewModel::closeTransientPanel
+        state.workActionsTarget != null -> viewModel::closeWorkActions
+        state.workSketchTarget != null -> viewModel::closeWorkSketch
         state.tab == AppTab.Settings && state.settingsPane != SettingsPane.Home ->
             ({ viewModel.setSettingsPane(SettingsPane.Home) })
+        state.tab == AppTab.Settings -> viewModel::closeSettings
         // Up one level from 推敲 is the lineage it was opened on, not 制作.
         state.tab == AppTab.Lineage && state.refinementOpen -> viewModel::closeRefinement
-        state.tab != AppTab.Compose -> ({ viewModel.setTab(AppTab.Compose) })
+        state.workContextId != null && state.tab != AppTab.History -> viewModel::closeWorkContext
+        state.tab != AppTab.Compose -> viewModel::openStudio
         // The compose screen is the root. Back leaves the app from here.
         else -> null
     }
@@ -592,7 +587,7 @@ fun InkuApp() {
                 // between the keyboard and 「描画する」, and going somewhere else
                 // is not what one is about to do mid-sentence.
                 if (!state.canvasPresentationMode && !state.descriptionFocused && !state.cameraCaptureState.locksCameraInteraction) {
-                    BottomNavigationBar(state.tab, viewModel)
+                    BottomNavigationBar(if (state.workContextId != null && state.tab == AppTab.Compose) null else state.tab, viewModel)
                 }
             },
             containerColor = MaterialTheme.colorScheme.background,
@@ -613,21 +608,20 @@ fun InkuApp() {
                 if (state.canvasPresentationMode) {
                     CanvasHeroCard(state, viewModel, modifier = Modifier.fillMaxSize(), deviceRotation = deviceRotation)
                 } else {
-                    when (state.tab) {
-                        AppTab.Compose -> ComposeScreen(state, viewModel)
-                        AppTab.History -> {
-                            val history by viewModel.historyItems.collectAsState()
-                            HistoryScreen(state, history, viewModel, historyGridState)
+                    screenStates.SaveableStateProvider("${state.tab}:${state.workContextId.orEmpty()}") {
+                        when (state.tab) {
+                            AppTab.Compose -> ComposeScreen(state, viewModel)
+                            AppTab.History -> {
+                                val history by viewModel.historyItems.collectAsState()
+                                HistoryScreen(state, history, viewModel, historyGridState)
+                            }
+                            AppTab.Lineage -> LineageScreen(state, viewModel)
+                            AppTab.Settings -> SettingsPanel(state, viewModel, modifier = Modifier.fillMaxSize().padding(Dimens.spaceL))
                         }
-                        AppTab.Lineage -> LineageScreen(state, viewModel)
-                        AppTab.Settings -> SettingsPanel(state, viewModel, modifier = Modifier.fillMaxSize().padding(Dimens.spaceL))
                     }
                 }
                 if (state.confirmDdlOverwrite) {
                     DdlOverwriteDialog(viewModel)
-                }
-                if (state.cameraCaptureState == CameraCaptureState.ChoosingSource) {
-                    CameraInputSourceDialog(viewModel)
                 }
                 if (state.cameraCaptureState == CameraCaptureState.AwaitingOverwriteConfirmation) {
                     CameraOverwriteDialog(viewModel)
@@ -644,6 +638,8 @@ fun InkuApp() {
                 if (state.canvasSelectionOpen) {
                     CanvasAspectSelectionDialog(state, viewModel)
                 }
+                state.workActionsTarget?.let { WorkActionsDialog(it, viewModel) }
+                state.workSketchTarget?.let { WorkSketchDialog(it, viewModel) }
                 CameraDevelopmentSurface(state, viewModel)
             }
         }
@@ -673,38 +669,6 @@ fun InkuApp() {
         }
     }
     }
-}
-
-@Composable
-private fun CameraInputSourceDialog(viewModel: InkuViewModel) {
-    AlertDialog(
-        onDismissRequest = viewModel::cancelCameraInputSource,
-        title = { Text(S.cameraInputSourceTitle) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceXs)) {
-                TextButton(
-                    onClick = { viewModel.chooseCameraInputSource(CameraInputSource.Camera) },
-                    modifier = Modifier.fillMaxWidth().heightIn(min = Dimens.cameraControlMinHeight),
-                ) {
-                    Text(S.cameraTakePhoto)
-                }
-                TextButton(
-                    onClick = { viewModel.chooseCameraInputSource(CameraInputSource.PhotoPicker) },
-                    modifier = Modifier.fillMaxWidth().heightIn(min = Dimens.cameraControlMinHeight),
-                ) {
-                    Text(S.cameraChoosePhoto)
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(
-                onClick = viewModel::cancelCameraInputSource,
-                modifier = Modifier.heightIn(min = Dimens.cameraControlMinHeight),
-            ) {
-                Text(S.cancel)
-            }
-        },
-    )
 }
 
 @Composable
@@ -747,6 +711,58 @@ private fun DdlOverwriteDialog(viewModel: InkuViewModel) {
                 }
             }
         },
+    )
+}
+
+/** All saved-work entrances share this menu and the same immutable target. */
+@Composable
+private fun WorkActionsDialog(item: HistoryItemEntity, viewModel: InkuViewModel) {
+    var confirmTrash by remember(item.id) { mutableStateOf(false) }
+    AlertDialog(
+        onDismissRequest = viewModel::closeWorkActions,
+        title = { Text(S.reviseWork) },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(Dimens.spaceXs)) {
+                Text(S.editingWorkLabel(item.renderHashShort), style = MaterialTheme.typography.labelMedium)
+                TextButton(onClick = { viewModel.refineWork(item, RefinementSubview.Adjust) }, modifier = Modifier.fillMaxWidth().testTag(REFINE_ENTRY_TAG)) { Text(S.drawingEditAction) }
+                TextButton(onClick = { viewModel.editWorkDescription(item) }, modifier = Modifier.fillMaxWidth()) { Text(S.descriptionEditAction) }
+                TextButton(onClick = { viewModel.editWorkInstructions(item) }, modifier = Modifier.fillMaxWidth().testTag(DDL_ENTRY_TAG)) { Text(S.instructionEditAction) }
+                TextButton(onClick = { viewModel.showWorkSketch(item) }, modifier = Modifier.fillMaxWidth()) { Text(S.workActionSketchRedraw) }
+                TextButton(onClick = { viewModel.refineWork(item, RefinementSubview.Model) }, modifier = Modifier.fillMaxWidth().testTag(MODEL_ENTRY_TAG)) { Text(S.modelEditAction) }
+                HorizontalDivider()
+                TextButton(onClick = { viewModel.openWorkLineage(item) }, modifier = Modifier.fillMaxWidth()) { Text(S.workLineage) }
+                TextButton(onClick = { confirmTrash = true }, modifier = Modifier.fillMaxWidth().testTag(TRASH_ENTRY_TAG)) { Text(S.moveToTrash, color = MaterialTheme.colorScheme.error) }
+            }
+        },
+        confirmButton = { TextButton(onClick = viewModel::closeWorkActions) { Text(S.close) } },
+    )
+    if (confirmTrash) ConfirmDialog(
+        message = S.confirmTrash(1),
+        onConfirm = { confirmTrash = false; viewModel.closeWorkActions(); viewModel.trashWork(item) },
+        onDismiss = { confirmTrash = false },
+    )
+}
+
+@Composable
+private fun WorkSketchDialog(item: HistoryItemEntity, viewModel: InkuViewModel) {
+    var draft by remember(item.id) { mutableStateOf(item.sketchText.orEmpty()) }
+    AlertDialog(
+        onDismissRequest = viewModel::closeWorkSketch,
+        title = { Text(S.workActionSketchRedraw) },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
+                Text(S.editingWorkLabel(item.renderHashShort), style = MaterialTheme.typography.labelMedium)
+                Text(Sketches.stateNote(item.sketchState, !LocalUiLanguage.current.isEnglish), style = MaterialTheme.typography.labelSmall)
+                item.sketchText?.takeIf { it.isNotBlank() }?.let {
+                    OutlinedTextField(value = draft, onValueChange = { draft = it }, label = { Text(S.sketchTextEditLabel) }, modifier = Modifier.fillMaxWidth(), minLines = 3)
+                    SecondarySmallButton(S.sketchTextRedraw, onClick = { viewModel.redrawWorkSketchText(item, draft) }, enabled = draft.isNotBlank())
+                }
+                Sketches.MODES.forEach { mode ->
+                    SecondarySmallButton(S.workActionSketchWithMode(Sketches.modeLabel(mode, !LocalUiLanguage.current.isEnglish)), onClick = { viewModel.redrawWorkSketch(item, mode) }, modifier = Modifier.fillMaxWidth())
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = viewModel::closeWorkSketch) { Text(S.close) } },
     )
 }
 
@@ -1472,7 +1488,7 @@ private fun rememberDeviceRotation(enabled: Boolean): DeviceRotation {
 
 @Composable
 private fun BottomNavigationBar(
-    selected: AppTab,
+    selected: AppTab?,
     viewModel: InkuViewModel,
 ) {
     Surface(
@@ -1491,25 +1507,22 @@ private fun BottomNavigationBar(
             BottomNavigationDestination.entries.forEach { destination ->
                 val label = when (destination) {
                     BottomNavigationDestination.Write -> S.studioTitle
-                    BottomNavigationDestination.History -> S.worksTitle
-                    BottomNavigationDestination.Lineage -> S.seriesTitle
                     BottomNavigationDestination.Camera -> S.camera
+                    BottomNavigationDestination.History -> S.worksTitle
+                    BottomNavigationDestination.Settings -> S.settings
                 }
                 NavButton(
                     destination = destination,
                     label = label,
                     selected = destination == BottomNavigationDestination.Write && selected == AppTab.Compose ||
                         destination == BottomNavigationDestination.History && selected == AppTab.History ||
-                        destination == BottomNavigationDestination.Lineage && selected == AppTab.Lineage,
+                        destination == BottomNavigationDestination.Settings && selected == AppTab.Settings,
                     onClick = {
                         when (destination) {
-                            BottomNavigationDestination.Write -> {
-                                viewModel.setComposeMode(ComposeMode.Write)
-                                viewModel.setTab(AppTab.Compose)
-                            }
-                            BottomNavigationDestination.History -> viewModel.setTab(AppTab.History)
-                            BottomNavigationDestination.Lineage -> viewModel.setTab(AppTab.Lineage)
+                            BottomNavigationDestination.Write -> viewModel.openStudio()
                             BottomNavigationDestination.Camera -> viewModel.requestCameraCaptureDirect()
+                            BottomNavigationDestination.History -> viewModel.setTab(AppTab.History)
+                            BottomNavigationDestination.Settings -> viewModel.setTab(AppTab.Settings)
                         }
                     },
                     modifier = Modifier.weight(1f),
@@ -1523,11 +1536,11 @@ private enum class BottomNavigationDestination {
     Write,
     Camera,
     History,
-    Lineage,
+    Settings,
 }
 
 @Composable
-private fun StudioHeader(title: String, viewModel: InkuViewModel, showTools: Boolean = false) {
+private fun StudioHeader(title: String, viewModel: InkuViewModel, showTools: Boolean = false, onBack: (() -> Unit)? = null) {
     var toolsOpen by remember { mutableStateOf(false) }
     val strings = S
     Row(
@@ -1535,7 +1548,11 @@ private fun StudioHeader(title: String, viewModel: InkuViewModel, showTools: Boo
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM),
     ) {
-            Box(Modifier.size(Dimens.studioHeaderDot).background(MaterialTheme.colorScheme.primary, RoundedCornerShape(100)))
+            if (onBack != null) {
+                TextButton(onClick = onBack) { Text(S.back) }
+            } else {
+                Box(Modifier.size(Dimens.studioHeaderDot).background(MaterialTheme.colorScheme.primary, RoundedCornerShape(100)))
+            }
             Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
             if (showTools) {
                 Box {
@@ -1553,6 +1570,11 @@ private fun StudioHeader(title: String, viewModel: InkuViewModel, showTools: Boo
                         DropdownMenuItem(text = { Text(S.description) }, onClick = {
                             toolsOpen = false
                             viewModel.setComposeMode(ComposeMode.Write)
+                            viewModel.finishDescriptionEditing()
+                        })
+                        DropdownMenuItem(text = { Text(S.instructionEditAction) }, onClick = {
+                            toolsOpen = false
+                            viewModel.openDdlEditor()
                         })
                         DropdownMenuItem(text = { Text(S.batch) }, onClick = {
                             toolsOpen = false
@@ -1571,10 +1593,6 @@ private fun StudioHeader(title: String, viewModel: InkuViewModel, showTools: Boo
                     }
                 }
             }
-            TextButton(onClick = {
-                viewModel.setTab(AppTab.Settings)
-                viewModel.setSettingsPane(SettingsPane.Home)
-            }) { Text(S.settings) }
     }
 }
 
@@ -1606,7 +1624,7 @@ private fun ComposeScreen(state: InkuUiState, viewModel: InkuViewModel) {
     val scrollState = rememberScrollState()
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
-    var editingWork by remember(state.selectedHistory?.id) { mutableStateOf(false) }
+    val editingWork = state.descriptionEditing
     var resultInterpretationOpen by remember(state.selectedHistory?.id) { mutableStateOf(false) }
     // Whether a batch line has the focus. The batch run button sits under the
     // editor, which the keyboard covers, so while the keyboard is up it is
@@ -1624,7 +1642,9 @@ private fun ComposeScreen(state: InkuUiState, viewModel: InkuViewModel) {
         state.cameraCaptureState == CameraCaptureState.ChoosingSource ||
         state.cameraCaptureState == CameraCaptureState.AwaitingOverwriteConfirmation ||
         state.confirmDdlOverwrite
-    BackHandler(enabled = editingWork && hasWork && !appOwnsBack) { editingWork = false }
+    BackHandler(enabled = editingWork && hasWork && !appOwnsBack) {
+        if (state.workContextId != null) viewModel.closeWorkContext() else viewModel.finishDescriptionEditing()
+    }
     val writeImeBar = state.descriptionFocused && state.composeMode == ComposeMode.Write
     val batchImeBar = batchEditorFocused && imeVisible && state.composeMode == ComposeMode.Batch && !state.isDrawing
     // The pinned bar lies over the bottom of the scroll. Room of the same
@@ -1638,6 +1658,9 @@ private fun ComposeScreen(state: InkuUiState, viewModel: InkuViewModel) {
     var descriptionTop by remember { mutableStateOf(0f) }
     LaunchedEffect(state.isDrawing, state.selectedHistory?.id) {
         if (!state.isDrawing && state.selectedHistory != null) {
+            if (state.descriptionEditing && state.workContextId != null && state.selectedHistory.id != state.workContextId) {
+                viewModel.finishDescriptionEditing()
+            }
             focusManager.clearFocus(force = true)
             keyboardController?.hide()
             scrollState.animateScrollTo(0)
@@ -1663,9 +1686,20 @@ private fun ComposeScreen(state: InkuUiState, viewModel: InkuViewModel) {
                 .padding(horizontal = Dimens.spaceL, vertical = Dimens.spaceM),
             verticalArrangement = Arrangement.spacedBy(Dimens.spaceM),
         ) {
-            StudioHeader(S.studioTitle, viewModel, showTools = true)
+            StudioHeader(
+                if (editingWork) S.descriptionEditAction else S.studioTitle,
+                viewModel,
+                showTools = state.workContextId == null,
+                onBack = if (state.workContextId != null) viewModel::closeWorkContext else null,
+            )
             RunStatusRow(state, viewModel)
-            if (hasWork) {
+            if (editingWork) {
+                state.selectedHistory?.let { item ->
+                    Text(S.editingWorkLabel(item.renderHashShort), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                DrawPanel(state, viewModel, onDescriptionFocusChanged = viewModel::setDescriptionFocused, onDescriptionPositioned = { descriptionTop = it })
+            }
+            if (hasWork && !editingWork) {
                 CameraRevealCanvasHeroCard(state, viewModel)
                 if (!showEditor) {
                     val inTrash = state.selectedHistory?.trashed == true
@@ -1675,7 +1709,7 @@ private fun ComposeScreen(state: InkuUiState, viewModel: InkuViewModel) {
                     Row(horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM), modifier = Modifier.fillMaxWidth()) {
                         // A work in the trash has no edits on offer, as its
                         // lineage card has none.
-                        PrimarySmallButton(S.reviseWork, onClick = { editingWork = true }, enabled = !inTrash, modifier = Modifier.weight(1f))
+                        PrimarySmallButton(S.reviseWork, onClick = { state.selectedHistory?.let(viewModel::openWorkActions) }, enabled = !inTrash, modifier = Modifier.weight(1f))
                         SecondarySmallButton(S.newWork, onClick = viewModel::clearPrompt)
                     }
                 }
@@ -1716,7 +1750,7 @@ private fun ComposeScreen(state: InkuUiState, viewModel: InkuViewModel) {
                     }
                 }
             }
-            if (showEditor) {
+            if (showEditor && !editingWork) {
                 if (!hasWork) Text(S.studioSubtitle, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 if (state.composeMode == ComposeMode.Batch) {
                     DrawSettingsRow(state, viewModel)
@@ -2431,7 +2465,7 @@ private fun CanvasHeroCard(
 ) {
     val item = if (state.canvasPresentationMode) state.presentationHistory ?: state.selectedHistory else state.selectedHistory
     val canvasAspectId = canvasAspectOverride
-        ?: if (state.canvasPresentationMode) item?.canvasAspect ?: state.selectedCanvasAspect else state.selectedCanvasAspect
+        ?: item?.canvasAspect ?: state.selectedCanvasAspect
     val context = LocalContext.current
     val clipboard = LocalClipboardManager.current
     val scope = rememberCoroutineScope()
@@ -2677,7 +2711,9 @@ private fun CanvasHeroCard(
                             onGoNewer = viewModel::selectPreviousHistory,
                             onToggleStar = { item?.let(viewModel::toggleStar) },
                             onEdit = viewModel::editPresentedHistory,
-                            canEdit = state.presentationHistory != null,
+                            canEdit = item != null && item.trashed != true && !state.isRunning,
+                            canOpenLineage = item != null && !state.isRunning,
+                            onOpenLineage = { item?.let(viewModel::openWorkLineage) },
                             onToggleCaption = {
                                 if (canShowInstructionCaption) {
                                     val nextVisible = !instructionCaptionVisible
@@ -2710,7 +2746,7 @@ private fun CanvasHeroCard(
                             onClick = { viewModel.setRenderTab(tab) },
                         )
                     }
-                    MiniPill(text = S.seriesTitle, onClick = { viewModel.setTab(AppTab.Lineage) })
+                    MiniPill(text = S.seriesTitle, onClick = { item?.let(viewModel::openWorkLineage) })
                     MiniPill(text = S.generationInfoTitle, onClick = { generationInfoOpen = true })
                     MiniPill(text = S.exportButton, onClick = { exportSheetOpen = true })
                 }
@@ -2949,7 +2985,6 @@ private fun DrawPanel(
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Text(S.description, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
-            TextButton(onClick = viewModel::requestCameraCapture, enabled = !state.isRunning) { Text(S.camera) }
         }
         if (state.descriptionLocked && !state.historyAuthorityLoading) {
             Text(S.pipelineDdlAuthority, style = MaterialTheme.typography.bodySmall)
@@ -2984,6 +3019,7 @@ private fun DrawPanel(
                 style = MaterialTheme.typography.labelSmall,
             )
         }
+        Text(S.nextDrawingConditions, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         DrawSettingsRow(state, viewModel)
         // While the keyboard is up the same button is pinned above it, and two
         // 「描画する」 on one screen is a question about which one draws.
@@ -3417,6 +3453,7 @@ private fun HistoryScreen(
                     selected = state.selectedHistory?.id == item.id,
                     onSelect = { viewModel.openHistoryPresentation(item, filteredHistory.map { it.id }) },
                     onToggleStar = { viewModel.toggleStar(item) },
+                    onOpenLineage = { viewModel.openWorkLineage(item) },
                 )
             }
             // A search or the star filter that matches nothing left an empty
@@ -3611,6 +3648,9 @@ internal const val TRASH_VIEW_TAG = "trash_view"
 internal const val TRASH_RESTORE_TAG = "trash_restore"
 internal const val TRASH_DELETE_TAG = "trash_delete"
 internal const val LINEAGE_STAR_TAG = "lineage_star"
+internal const val WORK_LINEAGE_ENTRY_TAG = "work_lineage_entry"
+internal const val LINEAGE_MENU_TAG = "lineage_menu"
+internal const val LINEAGE_GRAPH_TAG = "lineage_graph"
 
 /** Tags for the refinement, so a test counts candidates rather than labels. */
 internal const val REFINE_ENTRY_TAG = "refine_entry"
@@ -3647,13 +3687,14 @@ internal fun LineageScreen(state: InkuUiState, viewModel: InkuViewModel) {
         modifier = Modifier.fillMaxSize().padding(horizontal = Dimens.spaceXl, vertical = Dimens.spaceM),
         verticalArrangement = Arrangement.spacedBy(Dimens.spaceM),
     ) {
-        StudioHeader(S.seriesTitle, viewModel)
+        StudioHeader(if (state.refinementOpen) S.reviseWork else S.workLineage, viewModel,
+            onBack = { if (state.refinementOpen) viewModel.closeRefinement() else if (state.workContextId != null) viewModel.closeWorkContext() else viewModel.openStudio() })
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM),
         ) {
-            Text(S.workLineage, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
+            Spacer(Modifier.weight(1f))
             // web puts the same button in the same place, at the right of the
             // panel header (LineagePanel.svelte:788). The wording is web's.
             ChipButton(S.makeNewOrigin, onClick = viewModel::detachLineage)
@@ -3665,7 +3706,7 @@ internal fun LineageScreen(state: InkuUiState, viewModel: InkuViewModel) {
                 Text(S.lineageLoading, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             graph == null || graph.nodes.isEmpty() ->
                 Text(S.lineageEmpty, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            else -> LineageColumns(graph, viewModel, state.uiLanguage.code == "ja")
+            else -> LineageColumns(graph, viewModel)
         }
     }
 }
@@ -4033,11 +4074,10 @@ private fun RefinementCandidateImage(renderHash: String, svg: String, modifier: 
 }
 
 @Composable
-private fun LineageColumns(graph: LineageGraphResult, viewModel: InkuViewModel, isJapanese: Boolean) {
-    // Grouped by the distance from the topmost node of *this* graph, the way
-    // web's `depthByNode` does. The heading names the generation instead, which
-    // is counted from the root of the whole lineage and so keeps its number
-    // when a graph starts halfway down the tree.
+@OptIn(ExperimentalLayoutApi::class)
+private fun LineageColumns(graph: LineageGraphResult, viewModel: InkuViewModel) {
+    // Generation headings use distance from the topmost visible node, matching
+    // the server panel's depthByNode and depth + 1 headings.
     val parentOf = remember(graph) { graph.edges.associate { it.childNodeId to it.parentNodeId } }
     val depthOf = remember(graph) {
         val shown = graph.nodes.map { it.id }.toSet()
@@ -4056,30 +4096,124 @@ private fun LineageColumns(graph: LineageGraphResult, viewModel: InkuViewModel, 
     }
     val kindOf = remember(graph) { graph.edges.associate { it.childNodeId to it.derivationKind } }
 
-    Column(
-        modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.spacedBy(Dimens.spaceL),
-    ) {
-        // One row per generation, oldest first. web labels each of its columns
-        // 第N世代 (LineagePanel.svelte); here the number is on the cards instead,
-        // where a tombstone -- which the server gives no generation -- can say
-        // so for itself rather than sit under a heading that answers for it.
-        graph.nodes.groupBy { depthOf[it.id] ?: 0 }.toSortedMap().forEach { (_, nodes) ->
-            Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
-                nodes.forEach { node ->
-                    LineageNodeCard(
-                        node = node,
-                        focused = node.id == graph.focusNodeId,
-                        derivationKind = kindOf[node.id],
-                        onSelect = { viewModel.selectLineageNode(node) },
-                        onToggleStar = viewModel::toggleStar,
-                        onRefine = { item, subview -> viewModel.openRefinement(item, subview) },
-                        onEditDdl = viewModel::openLineageDdlEditor,
-                        onRedrawSketch = viewModel::redrawSketch,
-                        onRedrawSketchText = viewModel::redrawSketchText,
-                        onTrash = viewModel::trashWork,
-                        isJapanese = isJapanese,
-                    )
+    val generations = remember(graph, depthOf) { graph.nodes.groupBy { depthOf[it.id] ?: 0 }.toSortedMap() }
+    val starRoutes = remember(graph, parentOf) {
+        buildSet {
+            graph.nodes.filterIsInstance<LineageGraphNode.Work>().filter { it.history?.item?.starred == true }.forEach { node ->
+                var cursor = node.id
+                val seen = mutableSetOf<String>()
+                while (seen.add(cursor)) {
+                    val parent = parentOf[cursor] ?: break
+                    add(cursor)
+                    cursor = parent
+                }
+            }
+        }
+    }
+    var horizontal by rememberSaveable { mutableStateOf(false) }
+    Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(Dimens.spaceXs)) {
+            ChipButton(S.lineageVertical, selected = !horizontal, onClick = { horizontal = false })
+            ChipButton(S.lineageHorizontal, selected = horizontal, onClick = { horizontal = true })
+        }
+        BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
+            val viewportHeight = maxHeight
+            val cardWidth = if (!horizontal && maxWidth >= Dimens.lineageTwoCardBreakpoint && generations.values.any { it.size > 1 }) {
+                minOf(Dimens.lineageCardWidth, (maxWidth - Dimens.spaceM) / 2)
+            } else minOf(Dimens.lineageCardWidth, maxWidth)
+            val graphWidth = if (horizontal) maxOf(maxWidth, (cardWidth + Dimens.lineageGenerationGap) * generations.size - Dimens.lineageGenerationGap) else maxWidth
+            val nodeIds = graph.nodes.map { it.id }
+            val bounds = remember(nodeIds, horizontal) { mutableStateMapOf<String, Rect>() }
+            val coordinates = remember(nodeIds, horizontal) { mutableMapOf<String, LayoutCoordinates>() }
+            var graphCoordinates by remember(horizontal) { mutableStateOf<LayoutCoordinates?>(null) }
+            val edgeColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = .72f)
+            val deletedIds = graph.nodes.filter { it is LineageGraphNode.Tombstone }.map { it.id }.toSet()
+            val verticalScroll = rememberScrollState()
+            val horizontalScroll = rememberScrollState()
+            val scrollModifier = Modifier.fillMaxSize().verticalScroll(verticalScroll).let {
+                if (horizontal) it.horizontalScroll(horizontalScroll) else it
+            }
+            Box(scrollModifier) {
+                Box(
+                    Modifier.width(graphWidth).heightIn(min = viewportHeight)
+                        .testTag(LINEAGE_GRAPH_TAG)
+                        .onGloballyPositioned { canvas ->
+                            graphCoordinates = canvas
+                            coordinates.forEach { (id, card) ->
+                                if (card.isAttached) bounds[id] = canvas.localBoundingBoxOf(card, clipBounds = false)
+                            }
+                        }
+                        .drawBehind {
+                            graph.edges.forEach { edge ->
+                                val parent = bounds[edge.parentNodeId] ?: return@forEach
+                                val child = bounds[edge.childNodeId] ?: return@forEach
+                                val from = if (horizontal) Offset(parent.right, parent.center.y) else Offset(parent.center.x, parent.bottom)
+                                val to = if (horizontal) Offset(child.left, child.center.y) else Offset(child.center.x, child.top)
+                                val path = Path().apply {
+                                    moveTo(from.x, from.y)
+                                    if (horizontal) {
+                                        val mid = (from.x + to.x) / 2
+                                        cubicTo(mid, from.y, mid, to.y, to.x, to.y)
+                                    } else {
+                                        val mid = (from.y + to.y) / 2
+                                        cubicTo(from.x, mid, to.x, mid, to.x, to.y)
+                                    }
+                                }
+                                val color = if (edge.childNodeId in starRoutes) LineageStarPath else edgeColor
+                                val dashed = edge.parentNodeId in deletedIds || edge.childNodeId in deletedIds
+                                drawPath(path, color, style = Stroke(width = Dimens.lineageArrowWidth.toPx(), pathEffect = if (dashed) PathEffect.dashPathEffect(floatArrayOf(Dimens.lineageArrowHead.toPx(), Dimens.spaceXs.toPx())) else null))
+                                val head = Dimens.lineageArrowHead.toPx()
+                                val arrow = Path().apply {
+                                    moveTo(to.x, to.y)
+                                    if (horizontal) {
+                                        lineTo(to.x - head, to.y - head / 2)
+                                        lineTo(to.x - head, to.y + head / 2)
+                                    } else {
+                                        lineTo(to.x - head / 2, to.y - head)
+                                        lineTo(to.x + head / 2, to.y - head)
+                                    }
+                                    close()
+                                }
+                                drawPath(arrow, color)
+                            }
+                        },
+                ) {
+                    val cards: @Composable (List<LineageGraphNode>) -> Unit = { nodes ->
+                        nodes.forEach { node ->
+                            LineageNodeCard(
+                                node = node, focused = node.id == graph.focusNodeId,
+                                derivationKind = kindOf[node.id],
+                                onSelect = { viewModel.selectLineageNode(node) },
+                                onWorkActions = viewModel::openWorkActions,
+                                onToggleStar = viewModel::toggleStar,
+                                modifier = Modifier.width(cardWidth).onGloballyPositioned { card ->
+                                    coordinates[node.id] = card
+                                    graphCoordinates?.takeIf { it.isAttached }?.let { canvas ->
+                                        bounds[node.id] = canvas.localBoundingBoxOf(card, clipBounds = false)
+                                    }
+                                },
+                            )
+                        }
+                    }
+                    if (horizontal) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(Dimens.lineageGenerationGap)) {
+                            generations.forEach { (depth, nodes) ->
+                                Column(Modifier.width(cardWidth), verticalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
+                                    Text(S.generationOf(depth + 1), Modifier.fillMaxWidth(), style = MaterialTheme.typography.labelSmall, textAlign = TextAlign.Center)
+                                    cards(nodes)
+                                }
+                            }
+                        }
+                    } else {
+                        Column(verticalArrangement = Arrangement.spacedBy(Dimens.lineageGenerationGap)) {
+                            generations.forEach { (depth, nodes) ->
+                                Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {
+                                    Text(S.generationOf(depth + 1), Modifier.fillMaxWidth(), style = MaterialTheme.typography.labelSmall, textAlign = TextAlign.Center)
+                                    FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM, Alignment.CenterHorizontally), verticalArrangement = Arrangement.spacedBy(Dimens.spaceM)) { cards(nodes) }
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -4092,153 +4226,61 @@ private fun LineageNodeCard(
     focused: Boolean,
     derivationKind: String?,
     onSelect: () -> Unit,
+    onWorkActions: (HistoryItemEntity) -> Unit,
     onToggleStar: (HistoryItemEntity) -> Unit,
-    onRefine: (HistoryItemEntity, RefinementSubview) -> Unit,
-    onEditDdl: (HistoryItemEntity) -> Unit,
-    onRedrawSketch: (HistoryItemEntity, SketchMode) -> Unit,
-    onRedrawSketchText: (HistoryItemEntity, String) -> Unit,
-    onTrash: (HistoryItemEntity) -> Unit,
-    isJapanese: Boolean,
+    modifier: Modifier = Modifier,
 ) {
-    val work = node as? LineageGraphNode.Work
-    val history = work?.history
-    val trashed = history?.item?.trashed == true
-    var confirmTrash by remember(node.id) { mutableStateOf(false) }
-    var sketchChoicesOpen by remember(node.id) { mutableStateOf(false) }
-    var sketchDraft by remember(node.id, history?.item?.sketchText) {
-        mutableStateOf(history?.item?.sketchText.orEmpty())
-    }
+    val history = (node as? LineageGraphNode.Work)?.history
+    val item = history?.item
+    val trashed = item?.trashed == true
+    val actionLabel = S.reviseWork
     Card(
-        modifier = Modifier
-            .fillMaxWidth()
+        modifier = modifier
             .testTag(LINEAGE_NODE_TAG)
-            .clickable(enabled = history != null, onClick = onSelect)
+            .graphicsLayer { alpha = if (trashed || item == null) .65f else 1f }
             .border(Dimens.hairline, if (focused) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline, RoundedCornerShape(Dimens.radiusCard)),
         shape = RoundedCornerShape(Dimens.radiusCard),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        colors = CardDefaults.cardColors(containerColor = if (focused) MaterialTheme.colorScheme.primary.copy(alpha = .06f) else MaterialTheme.colorScheme.surface),
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(Dimens.spaceM),
-            horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM),
-            verticalAlignment = Alignment.Top,
-        ) {
-            if (history != null) {
-                Box(modifier = Modifier.size(Dimens.lineageThumbSize)) {
-                    ArtworkThumbnail(
-                        id = history.item.id,
-                        renderHash = history.item.renderHash,
-                        thumbnailPath = history.item.thumbnailPath,
-                        modifier = Modifier.fillMaxSize(),
-                    )
+        Column(Modifier.fillMaxWidth().padding(Dimens.spaceM), verticalArrangement = Arrangement.spacedBy(Dimens.spaceXs)) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                if (item != null) {
                     HistoryBadge(
-                        text = if (history.item.starred) "★" else "☆",
-                        selected = history.item.starred,
-                        onClick = { onToggleStar(history.item) },
-                        modifier = Modifier.align(Alignment.TopEnd).padding(Dimens.spaceXs).testTag(LINEAGE_STAR_TAG),
+                        text = if (item.starred) "★" else "☆", selected = item.starred,
+                        onClick = { onToggleStar(item) },
+                        modifier = Modifier.testTag(LINEAGE_STAR_TAG),
                     )
                 }
-            } else {
-                Box(modifier = Modifier.size(Dimens.lineageThumbSize).background(LineagePlaceholderSurface))
-            }
-            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Dimens.spaceXs)) {
-                // The label of the edge that produced this work. A node no edge
-                // points at has no kind, and the answer for that is the origin;
-                // the wording is the pack's, never this screen's.
-                Text(
-                    derivationKindLabel(derivationKind),
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = FontWeight.Medium,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Text(
-                    history?.lineageGeneration?.let { S.generationOf(it) } ?: "—",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                // The server's own value, not a rendering of it.
-                Text(
-                    node.state,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                // A work in the trash keeps its place in the lineage, marked, and
-                // offers nothing to edit -- web's card goes `trashed` and its
-                // work menu is disabled.
-                if (trashed) {
-                    Text(
-                        S.trashedBadge,
-                        modifier = Modifier.testTag(LINEAGE_TRASHED_TAG),
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.Medium,
-                        color = MaterialTheme.colorScheme.error,
-                    )
+                if (focused) {
+                    Text(S.lineageDisplayed, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
                 }
-                // 「作品を編集する」 in SPEC lists six items in one order --
-                // 描画要素・記述・DDL・モデル・AI に自律推敲させる・ゴミ箱 (言語 was
-                // retired with the web's language comparison on 2026-08-29).
-                // Three are here in that order. 記述 remains another contract, so
-                // DDL follows 描画要素 directly; モデル opens the matching
-                // sub-view of the same 推敲 screen rather than a screen of its
-                // own (SPEC :688). A tombstone has no work to edit, which is why
-                // this hangs off `history`. ゴミ箱 is the last item, kept apart
-                // from the edits and drawn in the error colour: 「ゴミ箱操作は他の
-                // 比較操作と視覚的に区別し」.
-                if (history != null && !trashed) {
-                    WrapRow(horizontal = Dimens.spaceXs, vertical = Dimens.spaceXs) {
-                        ChipButton(S.refinementElements, modifier = Modifier.testTag(REFINE_ENTRY_TAG), onClick = { onRefine(history.item, RefinementSubview.Adjust) })
-                        ChipButton(S.ddlEdit, modifier = Modifier.testTag(DDL_ENTRY_TAG), onClick = { onEditDdl(history.item) })
-                        ChipButton(S.model, modifier = Modifier.testTag(MODEL_ENTRY_TAG), onClick = { onRefine(history.item, RefinementSubview.Model) })
-                        ChipButton(S.workActionSketchRedraw, onClick = { sketchChoicesOpen = !sketchChoicesOpen })
-                    }
-                    if (sketchChoicesOpen) {
-                        Text(
-                            Sketches.stateNote(history.item.sketchState, isJapanese),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        history.item.sketchText?.takeIf { it.isNotBlank() }?.let {
-                            OutlinedTextField(
-                                value = sketchDraft,
-                                onValueChange = { sketchDraft = it },
-                                label = { Text(S.sketchTextEditLabel) },
-                                modifier = Modifier.fillMaxWidth(),
-                                minLines = 3,
-                            )
-                            SecondarySmallButton(
-                                text = S.sketchTextRedraw,
-                                onClick = { onRedrawSketchText(history.item, sketchDraft) },
-                                enabled = sketchDraft.isNotBlank(),
-                            )
-                        }
-                        WrapRow(horizontal = Dimens.spaceXs, vertical = Dimens.spaceXs) {
-                            Sketches.MODES.forEach { mode ->
-                                SecondarySmallButton(
-                                    text = S.workActionSketchWithMode(Sketches.modeLabel(mode, isJapanese)),
-                                    onClick = { onRedrawSketch(history.item, mode) },
-                                )
-                            }
-                        }
-                    }
-                    DangerChipButton(
-                        S.moveToTrash,
-                        modifier = Modifier.testTag(TRASH_ENTRY_TAG),
-                        onClick = { confirmTrash = true },
-                    )
-                    if (confirmTrash) {
-                        ConfirmDialog(
-                            message = S.confirmTrash(1),
-                            onConfirm = {
-                                confirmTrash = false
-                                onTrash(history.item)
-                            },
-                            onDismiss = { confirmTrash = false },
-                        )
-                    }
+                Spacer(Modifier.weight(1f))
+                if (item != null && !trashed) {
+                    TextButton(
+                        onClick = { onWorkActions(item) },
+                        modifier = Modifier.size(Dimens.touchTarget).testTag(LINEAGE_MENU_TAG).semantics { contentDescription = actionLabel },
+                    ) { Text("⋯", style = MaterialTheme.typography.titleMedium) }
                 }
             }
+            Column(
+                Modifier.fillMaxWidth().clickable(enabled = item != null, onClick = onSelect),
+                verticalArrangement = Arrangement.spacedBy(Dimens.spaceXs),
+            ) {
+                Text(derivationKindLabel(derivationKind), style = MaterialTheme.typography.labelSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                item?.stage1Model?.takeIf { it.isNotBlank() }?.let { model ->
+                    Text(model.substringAfter(':'), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+                if (item != null) {
+                    ArtworkThumbnail(item.id, item.renderHash, item.thumbnailPath, Modifier.fillMaxWidth().height(Dimens.lineageThumbSize))
+                } else {
+                    Box(Modifier.fillMaxWidth().height(Dimens.lineageThumbSize).background(LineagePlaceholderSurface), contentAlignment = Alignment.Center) {
+                        Text(S.lineageDeleted, style = MaterialTheme.typography.labelSmall)
+                    }
+                }
+                Text(item?.sourceText?.takeIf { it.isNotBlank() } ?: item?.originalInput ?: S.lineageDeleted, style = MaterialTheme.typography.bodySmall, minLines = 2, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            }
+            if (trashed) Text(S.trashedBadge, Modifier.testTag(LINEAGE_TRASHED_TAG), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.error)
+            if (node.childCount > 0) Text(S.lineageChildren(node.childCount), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
@@ -4268,6 +4310,7 @@ private fun SettingsHomePanel(state: InkuUiState, viewModel: InkuViewModel, modi
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM),
         ) {
+            TextButton(onClick = viewModel::closeSettings) { Text(S.back) }
             Text(S.settings, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Medium)
         }
         SettingsListItem(mark = "◇", title = S.modelSettings, sub = "OpenAI / Claude / Gemini / NVIDIA", onClick = { viewModel.setSettingsPane(SettingsPane.Models) })
@@ -6374,6 +6417,7 @@ private fun HistoryGridTile(
     selected: Boolean,
     onSelect: () -> Unit,
     onToggleStar: () -> Unit,
+    onOpenLineage: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Card(
@@ -6407,6 +6451,7 @@ private fun HistoryGridTile(
             Row(modifier = Modifier.padding(horizontal = Dimens.spaceM, vertical = Dimens.spaceM), verticalAlignment = Alignment.CenterVertically) {
                 Text(historyTitle(item), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface, minLines = 2, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.fillMaxWidth())
             }
+            TextButton(onClick = onOpenLineage, modifier = Modifier.fillMaxWidth().testTag(WORK_LINEAGE_ENTRY_TAG)) { Text(S.lineage) }
         }
     }
 }
@@ -6990,6 +7035,8 @@ private fun PresentationControls(
     onToggleStar: () -> Unit,
     canEdit: Boolean,
     onEdit: () -> Unit,
+    canOpenLineage: Boolean,
+    onOpenLineage: () -> Unit,
     onToggleCaption: () -> Unit,
     onClose: () -> Unit,
     modifier: Modifier = Modifier,
@@ -7023,6 +7070,7 @@ private fun PresentationControls(
             Box {
                 PresentationControlButton("⋯", onClick = { menuOpen = true })
                 DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                    if (canOpenLineage) DropdownMenuItem(text = { Text(S.workLineage) }, modifier = Modifier.testTag(WORK_LINEAGE_ENTRY_TAG), onClick = { menuOpen = false; onOpenLineage() })
                     if (canEdit) DropdownMenuItem(text = { Text(S.reviseWork) }, onClick = { menuOpen = false; onEdit() })
                     DropdownMenuItem(text = { Text(if (starred) "★" else "☆") }, enabled = canToggleStar, onClick = { menuOpen = false; onToggleStar() })
                     DropdownMenuItem(text = { Text(S.latest) }, enabled = canGoLatest, onClick = { menuOpen = false; onGoLatest() })
@@ -7272,19 +7320,6 @@ private fun NavigationMark(destination: BottomNavigationDestination, color: Colo
                 drawLine(color, Offset(w * .2f, h * .8f), Offset(w * .4f, h * .75f), strokeWidth = stroke.width, cap = StrokeCap.Round)
                 drawLine(color, Offset(w * .2f, h * .9f), Offset(w * .8f, h * .9f), strokeWidth = stroke.width, cap = StrokeCap.Round)
             }
-            BottomNavigationDestination.History -> {
-                drawRect(color, topLeft = Offset(w * .16f, h * .16f), size = Size(w * .68f, h * .68f), style = stroke)
-                drawLine(color, Offset(w * .16f, h * .65f), Offset(w * .43f, h * .4f), strokeWidth = stroke.width)
-                drawLine(color, Offset(w * .43f, h * .4f), Offset(w * .84f, h * .75f), strokeWidth = stroke.width)
-            }
-            BottomNavigationDestination.Lineage -> {
-                drawLine(color, Offset(w * .5f, h * .3f), Offset(w * .25f, h * .72f), strokeWidth = stroke.width)
-                drawLine(color, Offset(w * .5f, h * .3f), Offset(w * .75f, h * .72f), strokeWidth = stroke.width)
-                listOf(Offset(w * .5f, h * .2f), Offset(w * .2f, h * .8f), Offset(w * .8f, h * .8f)).forEach {
-                    drawCircle(InkBackground, radius = w * .12f, center = it)
-                    drawCircle(color, radius = w * .12f, center = it, style = stroke)
-                }
-            }
             BottomNavigationDestination.Camera -> {
                 drawRoundRect(
                     color = color,
@@ -7297,6 +7332,24 @@ private fun NavigationMark(destination: BottomNavigationDestination, color: Colo
                 drawLine(color, Offset(w * .38f, h * .2f), Offset(w * .62f, h * .2f), strokeWidth = stroke.width)
                 drawLine(color, Offset(w * .62f, h * .2f), Offset(w * .69f, h * .3f), strokeWidth = stroke.width)
                 drawCircle(color, radius = w * .14f, center = Offset(w * .5f, h * .56f), style = stroke)
+            }
+            BottomNavigationDestination.History -> {
+                drawRect(color, topLeft = Offset(w * .16f, h * .16f), size = Size(w * .68f, h * .68f), style = stroke)
+                drawLine(color, Offset(w * .16f, h * .65f), Offset(w * .43f, h * .4f), strokeWidth = stroke.width)
+                drawLine(color, Offset(w * .43f, h * .4f), Offset(w * .84f, h * .75f), strokeWidth = stroke.width)
+            }
+            BottomNavigationDestination.Settings -> {
+                val gear = Path()
+                repeat(48) { step ->
+                    val angle = step * kotlin.math.PI / 24.0
+                    val radius = w * if (step % 6 in 2..3) .42f else .31f
+                    val x = w * .5f + radius * kotlin.math.cos(angle).toFloat()
+                    val y = h * .5f + radius * kotlin.math.sin(angle).toFloat()
+                    if (step == 0) gear.moveTo(x, y) else gear.lineTo(x, y)
+                }
+                gear.close()
+                drawPath(gear, color, style = stroke)
+                drawCircle(color, radius = w * .12f, center = Offset(w * .5f, h * .5f), style = stroke)
             }
         }
     }

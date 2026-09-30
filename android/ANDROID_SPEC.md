@@ -4,7 +4,7 @@ This directory is the Android workspace for the native standalone app and is
 tracked by Git. Local-only artifacts, device IDs, downloaded models, logs, and
 secrets must remain outside tracked files.
 
-Last updated: 2026-09-27.
+Last updated: 2026-09-30.
 
 **Catch-up status**: Android sits at generation `2.1.4-android.80`. DDL conversion and Score → SVG
 rendering run in the shared Rust core (`core/crates/`) of the same commit, packaged with the app, so
@@ -45,6 +45,20 @@ When updating Android specifications:
    adaptation of the Japanese source.
 3. Do not introduce English-only Android requirements that are absent from
    `ANDROID_SPEC.ja.md`.
+
+## 2026-09-30 Navigation for writing, viewing, and refinement
+
+Startup opens Studio for writing without automatically selecting a saved work. Recovery of unfinished runs remains available. The global Studio action closes the work context and returns to the authoring draft instead of restoring a completed work into the input. Settings uses a gear icon with a central hole.
+
+Global bottom navigation offers Studio, Camera, Works, and Settings. Camera is a primary creative entrance on mobile: capture the reality in front of you and receive an abstract painting. Studio, Works, Settings, and work-editing screens start capture in one action without first moving to Studio. Camera is a capture action rather than a selected tab. New photo input uses camera capture only, with no Photo Picker or input-source dialog. Confirming a shot automatically continues through description generation, drawing, saving, and the finished work, without an intervening editor or stage selector. The preview retains description-model and drawing-model selection, development follows real processing stages, cancellation restores the prior screen and input, and failures retain the existing retry flow. Original photos, provenance, and replay remain available for works previously drawn from picked photos.
+
+The work display, gallery viewer, and lineage open the same Refine menu on the selected work. Edit drawing parameters, Change the description, Edit instructions, Redraw with or without sketch from life, and Change the model lead directly to existing operations. The Android-only Series name and destination are removed; lineage opens from a work action. Its origin, star, and trash operations remain, as do Studio's batch and instruction editing and Settings' demo. Server-only refinement operations are not added.
+
+Description editing starts with the input field and names its target work. The authoring input, selected work, color catalog, and canvas are retained separately from the work being viewed or edited; closing a work edit returns to its entrance. Settings remembers its entrance and screens retain their scroll positions. Candidate generation, subview changes, target changes, closure, and saving keep their existing lifecycle. Navigation alone must not make another work's candidate the parent of a new drawing.
+
+When packaging, Gradle's optional `inkuAndroidBuildFloor` supplies a minimum build number. Packaging advances the larger of that floor and the source value by one and writes it through the ordinary automatic `BUILD_NUMBER` mechanism. Compilation alone does not allocate a build.
+
+Each Works card and the full-screen viewer menu directly opens the work's lineage. Following the server's presentation, the graph uses generation headings, work cards, parent-to-child arrows, a Displayed marker, and vertical or horizontal orientation. Paths leading to starred works are highlighted and edges adjoining deleted nodes are dashed. Card menus reach existing refinement and trash actions. Studio also returns from lineage to the authoring draft without reopening refinement.
 
 ## 2026-09-27 SVG rasterization and display cache
 

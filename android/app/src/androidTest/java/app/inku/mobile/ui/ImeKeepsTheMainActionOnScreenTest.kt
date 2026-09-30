@@ -7,8 +7,6 @@ import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
-import androidx.compose.ui.test.onNodeWithText
-import androidx.compose.ui.test.performClick
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performScrollTo
@@ -64,38 +62,9 @@ class ImeKeepsTheMainActionOnScreenTest {
     fun theDrawActionLeavesTheScrollWhenTheDescriptionTakesFocus() {
         composeTestRule.waitForIdle()
 
-        // The compose screen clears focus whenever a work lands on the canvas
-        // (`LaunchedEffect(state.isDrawing, state.selectedHistory?.id)`), and on a
-        // cold start the database answers after the first frame. Clicking before
-        // that gives the field focus and then takes it back -- a race the reader
-        // never runs into and the test loses every time. 「連作」 is on the bottom
-        // bar always and under the canvas only when a work is on it, so two of
-        // them means the screen has settled. A device with no work at all never
-        // gets there, and does not need to: nothing clears the focus.
-        runCatching {
-            composeTestRule.waitUntil(timeoutMillis = SETTLE_TIMEOUT_MS) {
-                composeTestRule.onAllNodesWithText(InkuStringsJa.seriesTitle).fetchSemanticsNodes().size >= 2
-            }
-        }
-        composeTestRule.waitForIdle()
-
-        // A saved work opens on its result, and the description is behind a
-        // button there (`showEditor` in ComposeScreen). 「新規作成」 is pressed
-        // until the field is there: start-up restores the last drawing a moment
-        // after the first work appears, and that put the result back over a
-        // press made too early. Only the text on screen is cleared; nothing
-        // saved is touched.
-        var lastPress = 0L
+        // Startup opens the writing field without selecting a saved work.
         composeTestRule.waitUntil(timeoutMillis = SETTLE_TIMEOUT_MS) {
-            if (composeTestRule.onAllNodesWithTag(DESCRIPTION_INPUT_TAG).fetchSemanticsNodes().isNotEmpty()) {
-                return@waitUntil true
-            }
-            val now = System.currentTimeMillis()
-            if (now - lastPress > PRESS_INTERVAL_MS) {
-                lastPress = now
-                runCatching { composeTestRule.onNodeWithText(InkuStringsJa.newWork).performScrollTo().performClick() }
-            }
-            false
+            composeTestRule.onAllNodesWithTag(DESCRIPTION_INPUT_TAG).fetchSemanticsNodes().isNotEmpty()
         }
 
         // The description starts below the fold, and a click on a node outside the
@@ -158,6 +127,5 @@ class ImeKeepsTheMainActionOnScreenTest {
     private companion object {
         const val SETTLE_TIMEOUT_MS = 10_000L
         const val FOCUS_TIMEOUT_MS = 5_000L
-        const val PRESS_INTERVAL_MS = 500L
     }
 }

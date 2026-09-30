@@ -492,6 +492,10 @@ def normalize_user_model_settings(settings: dict[str, Any] | None) -> dict[str, 
     if okugaki_prefix:
         clean["okugaki_provider"] = okugaki_prefix
         clean["okugaki_model"] = okugaki_bare
+    # One model draws both stages (2026-09-30, the author): Stage 2 always
+    # follows Stage 1, so an account that chose two keeps its Stage 1 model.
+    clean["stage2_provider"] = clean["stage1_provider"]
+    clean["stage2_model"] = clean["stage1_model"]
     clean["model_inspection_selected_models"] = _normalize_selected_model_ids(settings.get("model_inspection_selected_models"))
     clean["instruction_caption_visible"] = settings.get("instruction_caption_visible") is not False
     clean["instruction_caption_writing_mode"] = _normalize_instruction_caption_writing_mode(

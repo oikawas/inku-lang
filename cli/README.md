@@ -285,8 +285,6 @@ usage: inku-cli models [-h] [--base-url BASE_URL]
                        [--timeout-seconds TIMEOUT_SECONDS]
                        [--stage1-provider {nvidia,anthropic,local}]
                        [--stage1-model STAGE1_MODEL]
-                       [--stage2-provider {nvidia,anthropic,local}]
-                       [--stage2-model STAGE2_MODEL]
                        [--vision-provider {nvidia,anthropic,local}]
                        [--vision-model VISION_MODEL]
                        [--color-catalog COLOR_CATALOG]
@@ -297,13 +295,11 @@ options:
   --timeout-seconds TIMEOUT_SECONDS
                         HTTP timeout in seconds (default: 600)
   --stage1-provider {nvidia,anthropic,local}
-                        save the default Stage 1 provider
+                        save the default provider, used for Stage 1 and Stage
+                        2
   --stage1-model STAGE1_MODEL
-                        save the default Stage 1 model for paint and batch
-  --stage2-provider {nvidia,anthropic,local}
-                        save the default Stage 2 provider
-  --stage2-model STAGE2_MODEL
-                        save the default Stage 2 LLM model for paint and batch
+                        save the default model for paint and batch, used for
+                        Stage 1 and Stage 2
   --vision-provider {nvidia,anthropic,local}
                         save the default Vision provider
   --vision-model VISION_MODEL
@@ -325,8 +321,6 @@ usage: inku-cli paint [-h] [--base-url BASE_URL]
                       [--input-mode {paint,ddl}]
                       [--stage1-provider {nvidia,anthropic,local}]
                       [--stage1-model STAGE1_MODEL]
-                      [--stage2-provider {nvidia,anthropic,local}]
-                      [--stage2-model STAGE2_MODEL]
                       [--history-input HISTORY_INPUT]
                       [--catalog-id CATALOG_ID]
                       [--color-catalog COLOR_CATALOG]
@@ -370,8 +364,6 @@ options:
                         ddl: normalized DDL directly through Stage 2/render
   --stage1-provider {nvidia,anthropic,local}
   --stage1-model STAGE1_MODEL
-  --stage2-provider {nvidia,anthropic,local}
-  --stage2-model STAGE2_MODEL
   --history-input HISTORY_INPUT
   --catalog-id CATALOG_ID
                         color catalog id (legacy alias)
@@ -440,8 +432,6 @@ usage: inku-cli batch [-h] [--base-url BASE_URL]
                       [--input-mode {paint,ddl}]
                       [--stage1-provider {nvidia,anthropic,local}]
                       [--stage1-model STAGE1_MODEL]
-                      [--stage2-provider {nvidia,anthropic,local}]
-                      [--stage2-model STAGE2_MODEL]
                       [--history-input HISTORY_INPUT]
                       [--catalog-id CATALOG_ID]
                       [--color-catalog COLOR_CATALOG]
@@ -483,8 +473,6 @@ options:
                         ddl: normalized DDL directly through Stage 2/render
   --stage1-provider {nvidia,anthropic,local}
   --stage1-model STAGE1_MODEL
-  --stage2-provider {nvidia,anthropic,local}
-  --stage2-model STAGE2_MODEL
   --history-input HISTORY_INPUT
   --catalog-id CATALOG_ID
                         color catalog id (legacy alias)

@@ -129,9 +129,11 @@ type ModelInspectionResult = {
 };
 type ModelInspectionChoice = { id: string; label: string; providerLabel: string; model: ModelOption };
 
-type ModelCompareMode = 'common' | 'stage1_fixed' | 'stage2_fixed';
-let modelCompareMode = $state<ModelCompareMode>('common');
-let modelCompareFixedModel = $state('');
+// One model draws both stages (2026-09-30, the author), so each compared
+// model runs Stage 1 and Stage 2 alike; the modes that fixed one stage and
+// varied the other are gone. The saved result still says 'common'.
+type ModelCompareMode = 'common';
+const modelCompareMode: ModelCompareMode = 'common';
 let modelInspectionBusy = $state(false);
 let modelInspectionStatus = $state<string | null>(null);
 let modelInspectionResults = $state<ModelInspectionResult[]>([]);
@@ -178,22 +180,10 @@ const modelInspectionTargetStage1Model = $derived(result?.stage1_model ?? qualif
 const modelInspectionTargetStage2Model = $derived(result?.stage2_model ?? qualifiedModelId(stage2Provider, stage2Model));
 const modelInspectionTargetModel = $derived(modelInspectionTargetStage1Model);
 
-function setModelCompareMode(mode: ModelCompareMode) {
-	if (modelInspectionBusy) return;
-	modelCompareMode = mode;
-	modelCompareFixedModel = mode === 'stage1_fixed' ? modelInspectionTargetStage1Model : mode === 'stage2_fixed' ? modelInspectionTargetStage2Model : '';
-	modelInspectionSelectedModels = []; modelInspectionResults = []; modelInspectionFailedModels = {}; modelInspectionStatus = null;
-}
-
-function setModelCompareFixedModel(model: string) {
-	if (modelInspectionBusy) return;
-	modelCompareFixedModel = model; modelInspectionResults = []; modelInspectionFailedModels = {}; modelInspectionStatus = null;
-}
-
+// A work drawn before the stages shared a model may name two; either one is
+// already on the canvas, so neither is offered for comparison.
 function isModelInspectionChoiceBlocked(model: string) {
-	if (modelCompareMode === 'common') return model === modelInspectionTargetStage1Model || model === modelInspectionTargetStage2Model;
-	if (modelCompareMode === 'stage1_fixed') return modelCompareFixedModel === modelInspectionTargetStage1Model && model === modelInspectionTargetStage2Model;
-	return model === modelInspectionTargetStage1Model && modelCompareFixedModel === modelInspectionTargetStage2Model;
+	return model === modelInspectionTargetStage1Model || model === modelInspectionTargetStage2Model;
 }
 
 async function persistModelInspectionSelection(models: string[]) {
@@ -255,11 +245,7 @@ async function runModelInspection() {
 	if (contextVersion !== deps.targetContextVersion()) return;
 	const selectedModels = modelInspectionSelectedModels.slice(0, 4).filter((model) => !isModelInspectionChoiceBlocked(model));
 	if (selectedModels.length === 0) { modelInspectionStatus = t().modelCompareSelectPrompt; return; }
-	const jobs = selectedModels.map((model) => {
-		const stage1 = modelCompareMode === "stage1_fixed" ? modelCompareFixedModel : model;
-		const stage2 = modelCompareMode === "stage2_fixed" ? modelCompareFixedModel : model;
-		return { model, stage1, stage2, id: modelCompareMode + ":" + stage1 + ":" + stage2 };
-	});
+	const jobs = selectedModels.map((model) => ({ model, stage1: model, stage2: model, id: modelCompareMode + ":" + model + ":" + model }));
 	const rendered = new Set(modelInspectionResults.map((item) => item.id));
 	const pending = jobs.filter((job) => !rendered.has(job.id));
 	if (pending.length === 0) { modelInspectionStatus = t().modelCompareAllRendered; return; }
@@ -434,8 +420,6 @@ async function saveModelInspectionResult(item: ModelInspectionResult, options: {
 		// both reads and writes it.
 		get selectedModels() { return modelInspectionSelectedModels; },
 		set selectedModels(value: string[]) { modelInspectionSelectedModels = value; },
-		get compareMode() { return modelCompareMode; },
-		get compareFixedModel() { return modelCompareFixedModel; },
 		get choices() { return modelInspectionChoices; },
 		get targetStage1Model() { return modelInspectionTargetStage1Model; },
 		get targetStage2Model() { return modelInspectionTargetStage2Model; },
@@ -448,8 +432,6 @@ async function saveModelInspectionResult(item: ModelInspectionResult, options: {
 		get elapsedMs() { return modelInspectionElapsed.ms; },
 		get tokensIn() { return modelInspectionTokensIn; },
 		get tokensOut() { return modelInspectionTokensOut; },
-		setCompareMode: setModelCompareMode,
-		setCompareFixedModel: setModelCompareFixedModel,
 		isChoiceBlocked: isModelInspectionChoiceBlocked,
 		toggleModel: toggleModelInspectionModel,
 		run: runModelInspection,

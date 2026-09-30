@@ -97,11 +97,13 @@ def test_sole_ownership_decides_and_ambiguity_does_not():
     )
 
 
-@pytest.mark.parametrize("case", EXPECTATIONS["stage_dependent"]["cases"], ids=lambda case: case["ref"])
-def test_rule_three_reads_the_stage(case):
-    settings = _settings(EXPECTATIONS["stage_dependent"]["stage_defaults"])
-    assert provider_for_model(case["ref"], stage="stage1", settings=settings)[0] == case["stage1"]
-    assert provider_for_model(case["ref"], stage="stage2", settings=settings)[0] == case["stage2"]
+@pytest.mark.parametrize("case", EXPECTATIONS["rule_three"]["cases"], ids=lambda case: case["ref"])
+@pytest.mark.parametrize("stage", ["stage1", "stage2"])
+def test_rule_three_falls_to_the_drawing_models_provider(case, stage):
+    # One model draws both stages (2026-09-30): a stored Stage 2 provider that
+    # still differs is not read, so both stages land on the Stage 1 provider.
+    settings = _settings(EXPECTATIONS["rule_three"]["stored_settings"])
+    assert provider_for_model(case["ref"], stage=stage, settings=settings)[0] == case["provider"]
 
 
 @pytest.mark.parametrize("ref", EXPECTATIONS["never_ovms"]["refs"])
@@ -113,7 +115,7 @@ def test_nothing_unqualified_lands_on_ovms(ref, stage):
     ones: a retired provider keeps its ids for naming an old artwork, and this is
     what holds that apart from routing.
     """
-    settings = _settings({"stage1_provider": "ollama", "stage2_provider": "anthropic"})
+    settings = _settings({"stage1_provider": "ollama", "stage2_provider": "ollama"})
     assert provider_for_model(ref, stage=stage, settings=settings)[0] != "ovms"
 
 

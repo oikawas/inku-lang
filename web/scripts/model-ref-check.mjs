@@ -53,12 +53,13 @@ for (const c of EXPECTATIONS.cases) {
 	}
 }
 
-// ── rule 3 reads the stage ────────────────────────────────────────────────
+// ── rule 3 falls to the drawing model's provider ──────────────────────────
+// One model draws both stages (2026-09-30): the fallback is the Stage 1
+// provider, whatever a stored Stage 2 provider still says.
 {
-	const { stage1_provider, stage2_provider } = EXPECTATIONS.stage_dependent.stage_defaults;
-	for (const c of EXPECTATIONS.stage_dependent.cases) {
-		check(`stage-dependent ${c.ref} stage1`, resolveModelRef(c.ref, GROUPS, stage1_provider).provider, c.stage1);
-		check(`stage-dependent ${c.ref} stage2`, resolveModelRef(c.ref, GROUPS, stage2_provider).provider, c.stage2);
+	const { stage1_provider } = EXPECTATIONS.rule_three.stored_settings;
+	for (const c of EXPECTATIONS.rule_three.cases) {
+		check(`rule three ${c.ref}`, resolveModelRef(c.ref, GROUPS, stage1_provider).provider, c.provider);
 	}
 }
 

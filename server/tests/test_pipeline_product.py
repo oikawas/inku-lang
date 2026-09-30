@@ -395,6 +395,33 @@ def test_an_issued_render_seed_survives_a_javascript_number(tmp_path, monkeypatc
     engine.dispose()
 
 
+@pytest.mark.parametrize(
+    ("requested", "expected"),
+    [
+        ({"stage1_model": "fixture:one", "stage2_model": "fixture:two"}, "fixture:one"),
+        ({"stage2_model": "fixture:two"}, "fixture:two"),
+    ],
+    ids=["two-named-keeps-stage1", "stage2-alone-is-the-one-model"],
+)
+def test_one_model_draws_both_stages(tmp_path, monkeypatch, requested, expected):
+    # 2026-09-30, the author: Stage 1 and Stage 2 no longer take different models.
+    from inku_server import db
+    from inku_server.api_core import common
+
+    binding = PipelineBinding()
+    engine = create_engine(f"sqlite:///{tmp_path / 'models.db'}")
+    Base.metadata.create_all(engine)
+    monkeypatch.setattr(db, "engine", engine)
+    monkeypatch.setattr(db, "SessionLocal", sessionmaker(bind=engine))
+    monkeypatch.setattr(common, "_model_offered_to", lambda *args, **kwargs: True)
+    effects = ProductPipelineEffects(binding, default_manifest(binding))
+    _config, context = effects.prepare("author", "direct_ddl", "Nature.青葉。",
+                                       {"instruction_lang": "ja", "catalog_id": "default", **requested}, None)
+    assert context["host_options"]["stage1_model"] == expected
+    assert context["host_options"]["stage2_model"] == expected
+    engine.dispose()
+
+
 def test_compact_delivery_preserves_authority_in_normal_history(tmp_path, monkeypatch, caplog):
     from inku_server import db
     from inku_server.api_core import rendering, thumbnails

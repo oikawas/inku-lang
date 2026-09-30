@@ -1,7 +1,7 @@
 {
-  "endpoint_count": 104,
-  "operation_count": 104,
-  "schema_count": 158,
+  "endpoint_count": 105,
+  "operation_count": 105,
+  "schema_count": 160,
   "operations": [
     {
       "path": "/api/admin/unread-words",
@@ -322,6 +322,20 @@
       "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/DemoInstructionBody\"}}},\"required\":true}",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/DemoInstructionResponse\"}}},\"description\":\"Successful Response\"}",
+        "422": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/HTTPValidationError\"}}},\"description\":\"Validation Error\"}"
+      }
+    },
+    {
+      "path": "/api/description/mora",
+      "method": "POST",
+      "operationId": "api_description_mora_api_description_mora_post",
+      "params": [
+        "cookie:inku_session:opt",
+        "header:authorization:opt"
+      ],
+      "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/DescriptionMoraBody\"}}},\"required\":true}",
+      "responses": {
+        "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/DescriptionMoraResponse\"}}},\"description\":\"Successful Response\"}",
         "422": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/HTTPValidationError\"}}},\"description\":\"Validation Error\"}"
       }
     },
@@ -1559,6 +1573,8 @@
     "DemoInstructionBody": "{\"properties\":{\"instruction_lang\":{\"default\":\"auto\",\"title\":\"Instruction Lang\",\"type\":\"string\"},\"model\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"title\":\"Model\"},\"seed_phrase\":{\"maxLength\":1000,\"minLength\":1,\"title\":\"Seed Phrase\",\"type\":\"string\"},\"ui_lang\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"title\":\"Ui Lang\"}},\"required\":[\"seed_phrase\"],\"title\":\"DemoInstructionBody\",\"type\":\"object\"}",
     "DemoInstructionResponse": "{\"properties\":{\"instruction\":{\"title\":\"Instruction\",\"type\":\"string\"}},\"required\":[\"instruction\"],\"title\":\"DemoInstructionResponse\",\"type\":\"object\"}",
     "DemoSettingsBody": "{\"properties\":{\"interval_seconds\":{\"default\":30,\"maximum\":3600.0,\"minimum\":1.0,\"title\":\"Interval Seconds\",\"type\":\"integer\"},\"prompt_model\":{\"default\":\"google/gemma-4-31b-it\",\"minLength\":1,\"title\":\"Prompt Model\",\"type\":\"string\"},\"prompt_provider\":{\"default\":\"nvidia\",\"minLength\":1,\"title\":\"Prompt Provider\",\"type\":\"string\"},\"save_db\":{\"default\":false,\"title\":\"Save Db\",\"type\":\"boolean\"},\"save_files\":{\"default\":false,\"title\":\"Save Files\",\"type\":\"boolean\"},\"seed_phrase\":{\"default\":\"日本の四季を感じさせる文章を40語以内で生成\",\"maxLength\":1000,\"minLength\":1,\"title\":\"Seed Phrase\",\"type\":\"string\"},\"timeout_seconds\":{\"default\":3600,\"maximum\":86400.0,\"minimum\":60.0,\"title\":\"Timeout Seconds\",\"type\":\"integer\"}},\"title\":\"DemoSettingsBody\",\"type\":\"object\"}",
+    "DescriptionMoraBody": "{\"properties\":{\"text\":{\"default\":\"\",\"maxLength\":4000,\"title\":\"Text\",\"type\":\"string\"}},\"title\":\"DescriptionMoraBody\",\"type\":\"object\"}",
+    "DescriptionMoraResponse": "{\"properties\":{\"mora\":{\"description\":\"音数の合計（読めなかった字は推定で数える）\",\"title\":\"Mora\",\"type\":\"integer\"},\"phrases\":{\"description\":\"改行・空白・読点で区切った句ごとの音数\",\"items\":{\"type\":\"integer\"},\"title\":\"Phrases\",\"type\":\"array\"},\"unread\":{\"description\":\"辞書が読めなかった字。空でなければ合計は推定を含む\",\"items\":{\"type\":\"string\"},\"title\":\"Unread\",\"type\":\"array\"}},\"required\":[\"mora\",\"phrases\",\"unread\"],\"title\":\"DescriptionMoraResponse\",\"type\":\"object\"}",
     "DiagonalLineRecipe": "{\"additionalProperties\":false,\"properties\":{\"kind\":{\"const\":\"diagonal_line\",\"title\":\"Kind\",\"type\":\"string\"},\"step\":{\"maxItems\":2,\"minItems\":2,\"prefixItems\":[{\"type\":\"number\"},{\"type\":\"number\"}],\"title\":\"Step\",\"type\":\"array\"}},\"required\":[\"kind\",\"step\"],\"title\":\"DiagonalLineRecipe\",\"type\":\"object\"}",
     "EnclosingGroupPlacementAnchor": "{\"additionalProperties\":false,\"properties\":{\"kind\":{\"const\":\"enclosing_group\",\"title\":\"Kind\",\"type\":\"string\"}},\"required\":[\"kind\"],\"title\":\"EnclosingGroupPlacementAnchor\",\"type\":\"object\"}",
     "ExplicitCanvasTargetOwner": "{\"additionalProperties\":false,\"properties\":{\"kind\":{\"const\":\"explicit_canvas\",\"title\":\"Kind\",\"type\":\"string\"},\"source\":{\"$ref\":\"#/components/schemas/ScoreSourceSite\"}},\"required\":[\"kind\",\"source\"],\"title\":\"ExplicitCanvasTargetOwner\",\"type\":\"object\"}",
@@ -1688,5 +1704,5 @@
     "VisionRefineAdviceBody": "{\"properties\":{\"direction\":{\"default\":\"\",\"maxLength\":2000,\"title\":\"Direction\",\"type\":\"string\"},\"enabled_kinds\":{\"items\":{\"type\":\"string\"},\"maxItems\":5,\"minItems\":1,\"title\":\"Enabled Kinds\",\"type\":\"array\"},\"history_id\":{\"maxLength\":200,\"minLength\":1,\"title\":\"History Id\",\"type\":\"string\"},\"instruction\":{\"maxLength\":100000,\"minLength\":1,\"title\":\"Instruction\",\"type\":\"string\"},\"language\":{\"default\":\"ja\",\"pattern\":\"^(ja|en)$\",\"title\":\"Language\",\"type\":\"string\"},\"model\":{\"anyOf\":[{\"maxLength\":200,\"minLength\":1,\"type\":\"string\"},{\"type\":\"null\"}],\"title\":\"Model\"}},\"required\":[\"history_id\",\"instruction\",\"enabled_kinds\"],\"title\":\"VisionRefineAdviceBody\",\"type\":\"object\"}",
     "VisionRefineAdviceResponse": "{\"properties\":{\"model\":{\"title\":\"Model\",\"type\":\"string\"},\"next_direction\":{\"title\":\"Next Direction\",\"type\":\"string\"},\"observation\":{\"title\":\"Observation\",\"type\":\"string\"},\"suggested_kind\":{\"title\":\"Suggested Kind\",\"type\":\"string\"}},\"required\":[\"observation\",\"next_direction\",\"suggested_kind\",\"model\"],\"title\":\"VisionRefineAdviceResponse\",\"type\":\"object\"}"
   },
-  "digest": "693d9913fbfd8051b8eddb97820b4d1439aeb0fa5061715e7844d1dea00abbbf"
+  "digest": "1351bd72076e9f35f6cae73d2e443bb108a574291974d42224e6feaee4eb7d78"
 }

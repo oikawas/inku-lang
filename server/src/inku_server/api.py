@@ -29,7 +29,7 @@ from .api_core.thumbnails import shutdown_bake_pool
 from .pipeline_api import pipeline_router, register_pipeline_errors
 from .pipeline_runtime import get_binding as _pipeline_binding, get_service as _pipeline_service, shutdown as _shutdown_pipeline
 from .api_core.deps import _current_user
-from .api_core.routers import public, auth, me, plugins, settings, users, history, lineage, render, feedback
+from .api_core.routers import public, auth, me, plugins, settings, users, history, lineage, render, feedback, description
 
 
 _DB_BACKUP_SCHEDULER_TICK_SECONDS = 60
@@ -277,6 +277,7 @@ app.include_router(lineage.router)
 app.include_router(render.router)
 app.include_router(pipeline_router(_pipeline_service, _current_user, binding_for=_pipeline_binding))
 app.include_router(feedback.router)
+app.include_router(description.router)
 
 
 def main() -> None:

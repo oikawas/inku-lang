@@ -16,6 +16,8 @@ dependencies = [
     "sqlalchemy>=2.0.51",
     "uvicorn[standard]>=0.52.1",
     "pillow>=12.3.0",
+    "sudachipy>=0.6.10",
+    "sudachidict-small>=20250825",
 ]
 
 [project.scripts]

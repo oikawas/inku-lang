@@ -61,7 +61,9 @@ PUBLIC = {  # every entry needs a reason
 #   draw-system04 after the Server branch's API surface was recorded.
 #   +1 for GET /api/pipeline/variations/{variation_id}/system-prompts, the
 #   system prompts a work actually sent, for the prompt tab (2026-09-25).
-EXPECTED_ROUTE_COUNT = 107
+#   +1 for POST /api/description/mora, the sounds of a description for the
+#   verse-form meter (2026-09-30).
+EXPECTED_ROUTE_COUNT = 108
 
 
 def _guard_names(dependant, seen=None) -> set[str]:

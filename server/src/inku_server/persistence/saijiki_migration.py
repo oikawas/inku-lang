@@ -371,3 +371,57 @@ def _summary(sample: int | None, clock: _Clock, report: Mapping[str, _Tally],
         **{kind: tally.report() for kind, tally in report.items()},
         "refused_history_texts": refused_samples,
     }
+
+
+def recheck_history(connection: Any, migrate: MigrateUnit, ids: Iterable[str]) -> dict[str, object]:
+    """Put named instruction texts through the core again, and say why each is refused.
+
+    For the texts a census found refused (``<history id>:<column>``): whether
+    each carries a pale ink wash, whether it passes without its locks, and the
+    text itself for the draw session to reproduce (the author allowed it,
+    2026-09-30). Reads only those rows; writes nothing.
+    """
+    records: list[dict[str, object]] = []
+    for record_id in ids:
+        history_id, _, column = record_id.partition(":")
+        if column not in {"ddl", "expanded_ddl"}:
+            continue
+        row = connection.execute(
+            f"SELECT {column}, instruction_lang_resolved FROM history WHERE id=?", (history_id,)
+        ).fetchone()
+        if row is None or not row[0]:
+            records.append({"id": record_id, "found": False})
+            continue
+        source, language = row[0], row[1] if row[1] in {"ja", "en"} else "ja"
+        locks: list[Any] = []
+        definitions: list[Any] = []
+        link = connection.execute(
+            "SELECT fork_context_bytes FROM pipeline_history_links WHERE history_id=?", (history_id,)
+        ).fetchone()
+        context = _json(link[0]) if link else None
+        if isinstance(context, Mapping):
+            found = (context.get("macro_catalog") or {}).get("definition_locks") or []
+            locks = found if isinstance(found, list) else []
+            definitions = _definitions_of(context.get("config"))
+        document = {"source": source, "language": language, "macro_locks": locks}
+        answer = migrate_unit(migrate, document, definitions).get("document") or {}
+        unlocked = migrate_unit(migrate, {**document, "macro_locks": []}, []).get("document") or {}
+        records.append({
+            "id": record_id,
+            "language": language,
+            "linked": link is not None,
+            "locks": len(locks),
+            "wash": any(word in source.lower() for word in _WASH_WORDS),
+            "refused": (answer.get("error") or {}).get("code"),
+            "refused_without_locks": (unlocked.get("error") or {}).get("code"),
+            "source": source,
+        })
+    return {
+        "rechecked": len(records),
+        "still_refused": sum(1 for record in records if record.get("refused")),
+        "with_wash": sum(1 for record in records if record.get("wash")),
+        "refused_with_wash": sum(1 for record in records if record.get("refused") and record.get("wash")),
+        "passes_without_locks": sum(1 for record in records
+                                    if record.get("refused") and not record.get("refused_without_locks")),
+        "records": records,
+    }

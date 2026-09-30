@@ -16,7 +16,7 @@ import sqlite3
 import sys
 from pathlib import Path
 
-from inku_server.persistence.saijiki_migration import census
+from inku_server.persistence.saijiki_migration import census, recheck_history
 
 _RUN_MARKER = ".inku-persistence-rehearsal"
 _RUN_MARKER_CONTENT = "I-372 isolated copy\n"
@@ -49,6 +49,8 @@ def main() -> int:
                         help="count this many rows of each kind, drawn at random")
     parser.add_argument("--refused-texts", type=int, default=0,
                         help="return this many refused instruction texts themselves")
+    parser.add_argument("--history-ids", type=Path, default=None,
+                        help="recheck only these refused texts (<history id>:<column>, one per line)")
     parser.add_argument("--out", type=Path, default=None,
                         help="write progress.log and report.json here as the count goes")
     args = parser.parse_args()
@@ -60,6 +62,16 @@ def main() -> int:
     # create the journal files a read-only open of a WAL database otherwise needs.
     connection = sqlite3.connect(f"file:{database}?mode=ro&immutable=1", uri=True)
     try:
+        if args.history_ids:
+            ids = [line.strip() for line in args.history_ids.read_text(encoding="utf-8").splitlines() if line.strip()]
+            report = recheck_history(connection, inku_render.pipeline_migrate_saijiki_v1, ids)
+            if args.out:
+                (args.out / "report.json").write_text(
+                    json.dumps({"ok": True, "recheck": report}, ensure_ascii=False, sort_keys=True), encoding="utf-8")
+            json.dump({"ok": True, "recheck": {k: v for k, v in report.items() if k != "records"}},
+                      sys.stdout, ensure_ascii=False, sort_keys=True)
+            sys.stdout.write("\n")
+            return 0
         log = (args.out / "progress.log").open("a", encoding="utf-8", buffering=1) if args.out else None
 
         def progress(line: str) -> None:

@@ -63,7 +63,9 @@ PUBLIC = {  # every entry needs a reason
 #   system prompts a work actually sent, for the prompt tab (2026-09-25).
 #   +1 for POST /api/description/mora, the sounds of a description for the
 #   verse-form meter (2026-09-30).
-EXPECTED_ROUTE_COUNT = 108
+# The API-surface baseline had 104 endpoints before mora. The older cumulative
+# tally above had drifted by three; mora brings the live count to 105.
+EXPECTED_ROUTE_COUNT = 105
 
 
 def _guard_names(dependant, seen=None) -> set[str]:

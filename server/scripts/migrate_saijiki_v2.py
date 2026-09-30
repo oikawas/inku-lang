@@ -28,7 +28,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--database", type=Path, required=True, help="the SQLite database to migrate")
     parser.add_argument("--workers", type=int, default=min(6, os.cpu_count() or 1),
-                        help="ask the core from this many threads at once")
+                        help="ask the core from this many worker processes at once")
     parser.add_argument("--report", type=Path, default=None,
                         help="write the whole report here (default: beside the snapshot)")
     args = parser.parse_args()

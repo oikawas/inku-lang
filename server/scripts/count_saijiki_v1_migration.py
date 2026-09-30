@@ -54,7 +54,9 @@ def main() -> int:
     parser.add_argument("--history-ids", type=Path, default=None,
                         help="count only these works (<history id> or <history id>:<column>, one per line)")
     parser.add_argument("--workers", type=int, default=1,
-                        help="ask the core from this many threads at once")
+                        help="ask the core from this many worker processes at once")
+    parser.add_argument("--timeout", type=float, default=60.0,
+                        help="kill a call that runs longer than this many seconds, list its record, and go on")
     parser.add_argument("--out", type=Path, default=None,
                         help="write progress.log, report.json, and journal.jsonl (each answer as it comes) here")
     args = parser.parse_args()
@@ -73,7 +75,7 @@ def main() -> int:
     try:
         report = census(connection, inku_render.pipeline_migrate_saijiki_v1, workers=args.workers,
                         sample=args.sample, history_ids=ids, progress=(lambda line: log.write(line + "\n")) if log else None,
-                        journal=args.out / "journal.jsonl" if args.out else None)
+                        journal=args.out / "journal.jsonl" if args.out else None, timeout=args.timeout)
     finally:
         connection.close()
         if log:

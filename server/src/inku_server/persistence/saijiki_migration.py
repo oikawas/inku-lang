@@ -39,12 +39,13 @@ from __future__ import annotations
 
 import hashlib
 import json
-import threading
+import multiprocessing
+import os
 import time
-from collections import Counter
+from collections import Counter, deque
 from collections.abc import Callable, Iterable, Iterator, Mapping
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
+from multiprocessing.connection import wait as wait_for
 from pathlib import Path
 from typing import Any
 
@@ -134,78 +135,160 @@ def _document_unit(source: str, language: str, locks: list[Any], definitions: li
     return _canonical({"document": document, "definitions": _distinct(definitions)}).encode("utf-8")
 
 
-class _Core:
-    """The core's answers, one call per distinct unit, from several threads.
+def _serve(migrate: MigrateUnit, connection: Any) -> None:
+    """A worker process: answer units until an empty one says stop."""
+    while unit := connection.recv_bytes():
+        started = time.monotonic()
+        output = migrate(unit)
+        connection.send((output, time.monotonic() - started))
+    os._exit(0)
 
-    The binding releases the GIL while the core works, so threads run calls in
-    parallel. Each kind of unit keeps its call count, the time the calls took
-    one by one, and the wall-clock time of its batch.
+
+class _Worker:
+    """One worker process and the unit it is on."""
+
+    def __init__(self, migrate: MigrateUnit) -> None:
+        # fork: the child inherits the migrate function without pickling it.
+        context = multiprocessing.get_context("fork")
+        self.connection, child = context.Pipe()
+        self.process = context.Process(target=_serve, args=(migrate, child), daemon=True)
+        self.process.start()
+        child.close()
+        self.job: tuple[bytes, str, str, float] | None = None
+
+    def give(self, unit: bytes, label: str, key: str) -> None:
+        self.job = (unit, label, key, time.monotonic())
+        self.connection.send_bytes(unit)
+
+    def kill(self) -> None:
+        self.process.kill()
+        self.process.join()
+        self.connection.close()
+
+    def stop(self) -> None:
+        try:
+            self.connection.send_bytes(b"")
+        except OSError:
+            pass
+        self.process.join(5)
+        if self.process.is_alive():
+            self.process.kill()
+            self.process.join()
+        self.connection.close()
+
+
+class _Core:
+    """The core's answers, one call per distinct unit, from several worker processes.
+
+    Each call runs in a worker process, so a call that runs longer than
+    ``timeout`` seconds is killed with its process, answered ``timeout``, and
+    a new process takes the next unit: the run goes on to the last record.
+    Each kind of unit keeps its call count, the time the calls took one by one,
+    and the wall-clock time of its batch.
 
     With a journal, each call is written down as it starts, with the record it
-    was asked for, and again with its answer as it ends: a run that stops
-    leaves every answer it got, and a start without an end names a call that
-    did not return.
+    was asked for, and again as it ends -- with its answer and how long it
+    took, or with how long it ran before it was killed.
     """
 
     def __init__(self, migrate: MigrateUnit, workers: int, progress: Progress | None,
-                 journal: Path | None = None) -> None:
+                 journal: Path | None = None, timeout: float | None = None) -> None:
         self.migrate = migrate
         self.workers = max(1, workers)
         self.progress = progress
+        self.timeout = timeout
         self.answers: dict[bytes, dict[str, Any]] = {}
         self.calls: Counter[str] = Counter()
         self.seconds: Counter[str] = Counter()
         self.wall: Counter[str] = Counter()
         self.slowest: list[tuple[float, str, str]] = []
-        self._lock = threading.Lock()
+        self.killed: list[dict[str, object]] = []
         self._journal = journal.open("a", encoding="utf-8", buffering=1) if journal is not None else None
 
     def _write(self, entry: dict[str, object]) -> None:
         if self._journal is not None:
-            with self._lock:
-                self._journal.write(_canonical(entry) + "\n")
+            self._journal.write(_canonical(entry) + "\n")
 
     def close(self) -> None:
         if self._journal is not None:
             self._journal.close()
             self._journal = None
 
+    def _answered(self, kind: str, unit: bytes, label: str, key: str, answer: dict[str, Any],
+                  seconds: float, event: str) -> None:
+        self.answers[unit] = answer
+        self._write({"event": event, "kind": kind, "unit": key, "record": label,
+                     "ms": round(seconds * 1000), "answer": answer})
+        self.calls[kind] += 1
+        self.seconds[kind] += seconds
+        self.slowest = sorted([*self.slowest, (seconds, kind, label)], reverse=True)[:10]
+
     def ask(self, kind: str, units: Mapping[bytes, str]) -> None:
         """Answer each unit; ``units`` maps a unit to the record it was asked for."""
-        pending = [(unit, label) for unit, label in units.items() if unit not in self.answers]
-
-        def one(unit: bytes, label: str) -> tuple[bytes, float]:
-            self._write({"event": "start", "kind": kind, "unit": hashlib.sha256(unit).hexdigest(),
-                         "record": label})
-            started = time.monotonic()
-            output = self.migrate(unit)
-            return output, time.monotonic() - started
-
+        queue = deque((unit, label, hashlib.sha256(unit).hexdigest())
+                      for unit, label in units.items() if unit not in self.answers)
+        total = len(queue)
         started = time.monotonic()
-        with ThreadPoolExecutor(max_workers=self.workers) as pool:
-            futures = {pool.submit(one, unit, label): (unit, label) for unit, label in pending}
-            for done, future in enumerate(as_completed(futures), 1):
-                unit, label = futures[future]
-                output, seconds = future.result()
-                try:
-                    answer = json.loads(output.decode("utf-8"))
-                except (UnicodeDecodeError, json.JSONDecodeError):
-                    answer = None
-                if not isinstance(answer, dict):
-                    answer = {"error": {"code": "unreadable_answer"}}
-                self.answers[unit] = answer
-                self._write({"event": "done", "kind": kind, "unit": hashlib.sha256(unit).hexdigest(),
-                             "record": label, "ms": round(seconds * 1000), "answer": answer})
-                self.calls[kind] += 1
-                self.seconds[kind] += seconds
-                self.slowest = sorted([*self.slowest, (seconds, kind, label)], reverse=True)[:10]
-                if self.progress and (done % 200 == 0 or done == len(pending)):
-                    self.progress(f"{kind} {done}/{len(pending)} {round(time.monotonic() - started)}s")
+        workers = [_Worker(self.migrate) for _ in range(min(self.workers, total))]
+        done = 0
+        try:
+            while queue or any(worker.job for worker in workers):
+                for worker in workers:
+                    if worker.job is None and queue:
+                        unit, label, key = queue.popleft()
+                        self._write({"event": "start", "kind": kind, "unit": key, "record": label})
+                        worker.give(unit, label, key)
+                busy = {worker.connection: worker for worker in workers if worker.job}
+                for connection in wait_for(list(busy), timeout=1.0):
+                    worker = busy[connection]
+                    unit, label, key, began = worker.job
+                    try:
+                        output, seconds = connection.recv()
+                        try:
+                            answer = json.loads(output.decode("utf-8"))
+                        except (UnicodeDecodeError, json.JSONDecodeError):
+                            answer = None
+                        if not isinstance(answer, dict):
+                            answer = {"error": {"code": "unreadable_answer"}}
+                        self._answered(kind, unit, label, key, answer, seconds, "done")
+                        worker.job = None
+                    except EOFError:
+                        # The process ended without answering (the core aborted it).
+                        self._answered(kind, unit, label, key, {"error": {"code": "worker_died"}},
+                                       time.monotonic() - began, "died")
+                        worker.kill()
+                        workers[workers.index(worker)] = _Worker(self.migrate)
+                    done += 1
+                    if self.progress and (done % 200 == 0 or done == total):
+                        self.progress(f"{kind} {done}/{total} {round(time.monotonic() - started)}s")
+                if self.timeout is None:
+                    continue
+                now = time.monotonic()
+                for index, worker in enumerate(workers):
+                    if worker.job and now - worker.job[3] > self.timeout:
+                        unit, label, key, began = worker.job
+                        worker.kill()
+                        workers[index] = _Worker(self.migrate)
+                        self._answered(kind, unit, label, key,
+                                       {"error": {"code": "timeout", "seconds": self.timeout}},
+                                       now - began, "killed")
+                        self.killed.append({"kind": kind, "record": label, "ms": round((now - began) * 1000)})
+                        done += 1
+                        if self.progress:
+                            self.progress(f"{kind} killed {label} after {round(now - began)}s")
+        finally:
+            for worker in workers:
+                if worker.job:
+                    worker.kill()
+                else:
+                    worker.stop()
         self.wall[kind] += time.monotonic() - started
 
     def report(self) -> dict[str, object]:
         return {
             "workers": self.workers,
+            "timeout_seconds": self.timeout,
+            "killed": self.killed,
             "calls": dict(self.calls),
             "ms_per_call": {kind: round(self.seconds[kind] * 1000 / calls, 1)
                             for kind, calls in self.calls.items() if calls},
@@ -240,14 +323,15 @@ class _Link:
 
 def plan(connection: Any, migrate: MigrateUnit, *, workers: int = 1, sample: int | None = None,
          history_ids: Iterable[str] | None = None, progress: Progress | None = None,
-         journal: Path | None = None) -> Plan:
+         journal: Path | None = None, timeout: float | None = None) -> Plan:
     """Ask the core about every saved record; return what writing its answers would do.
 
     Reads only. ``sample`` counts that many variations and works drawn at
     random; ``history_ids`` only those works. A plan drawn either way is for
-    counting, never for writing. ``journal`` keeps each answer as it comes.
+    counting, never for writing. ``journal`` keeps each answer as it comes;
+    a call longer than ``timeout`` seconds is killed and its record listed.
     """
-    core = _Core(migrate, workers, progress, journal)
+    core = _Core(migrate, workers, progress, journal, timeout)
     try:
         return _plan(connection, core, sample=sample, history_ids=history_ids)
     finally:
@@ -541,13 +625,13 @@ def census(connection: Any, migrate: MigrateUnit, **options: Any) -> dict[str, A
 def migrate_saved_records(connection: Any, migrate: MigrateUnit, *, workers: int = 1,
                           progress: Progress | None = None,
                           checked: Callable[[], None] | None = None,
-                          journal: Path | None = None) -> dict[str, Any]:
+                          journal: Path | None = None, timeout: float | None = None) -> dict[str, Any]:
     """Write the migration over every saved record inside the caller's transaction.
 
     ``checked`` runs after the updates and before the discards; it raises to
     stop the transaction (the caller's invariant check).
     """
-    migration = plan(connection, migrate, workers=workers, progress=progress, journal=journal)
+    migration = plan(connection, migrate, workers=workers, progress=progress, journal=journal, timeout=timeout)
     started = time.monotonic()
     for sql, args in migration.statements:
         _execute(connection, sql, args)
@@ -561,7 +645,8 @@ def migrate_saved_records(connection: Any, migrate: MigrateUnit, *, workers: int
 
 
 def migrate_once(database: Path, migrate: MigrateUnit, *, workers: int = 1,
-                 progress: Progress | None = None, journal: Path | None = None) -> dict[str, Any]:
+                 progress: Progress | None = None, journal: Path | None = None,
+                 timeout: float | None = None) -> dict[str, Any]:
     """Move the saved records of one SQLite database to Saijiki v2, once.
 
     Run it while the service is stopped. It keeps a verified Backup API
@@ -594,7 +679,7 @@ def migrate_once(database: Path, migrate: MigrateUnit, *, workers: int = 1,
                 before = capture_invariants(connection)
                 report = migrate_saved_records(connection, migrate, workers=workers, progress=progress,
                                                checked=lambda: verify_invariants(connection, before),
-                                               journal=journal)
+                                               journal=journal, timeout=timeout)
                 summary = {"refused_records": len(report["refused_records"]), "statements": report["statements"]}
                 _execute(connection, "INSERT INTO app_settings(key, value, at) VALUES (?, ?, ?)",
                          (DONE_SETTING, _canonical(summary), int(time.time() * 1000)))

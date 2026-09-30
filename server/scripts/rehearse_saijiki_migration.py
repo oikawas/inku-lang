@@ -24,7 +24,10 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--run-root", type=Path, required=True)
     parser.add_argument("--database", type=Path, required=True)
-    parser.add_argument("--workers", type=int, default=1, help="ask the core from this many threads at once")
+    parser.add_argument("--workers", type=int, default=1,
+                        help="ask the core from this many worker processes at once")
+    parser.add_argument("--timeout", type=float, default=60.0,
+                        help="kill a call that runs longer than this many seconds, list its record, and go on")
     parser.add_argument("--out", type=Path, required=True, help="write progress.log and report.json here")
     args = parser.parse_args()
     database = _resolve_guarded_database(args.run_root, args.database)
@@ -33,7 +36,8 @@ def main() -> int:
 
     with (args.out / "progress.log").open("a", encoding="utf-8", buffering=1) as log:
         report = migrate_once(database, inku_render.pipeline_migrate_saijiki_v1, workers=args.workers,
-                              progress=lambda line: log.write(line + "\n"), journal=args.out / "journal.jsonl")
+                              progress=lambda line: log.write(line + "\n"), journal=args.out / "journal.jsonl",
+                              timeout=args.timeout)
     (args.out / "report.json").write_text(
         json.dumps({"ok": True, "rehearsal": report}, ensure_ascii=False, sort_keys=True), encoding="utf-8")
     counts = {key: value for key, value in report.items()

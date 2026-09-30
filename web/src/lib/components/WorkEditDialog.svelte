@@ -4,6 +4,7 @@
 	import SketchSelect from './SketchSelect.svelte';
 	import RunStatus from './RunStatus.svelte';
 	import WildToggle from './WildToggle.svelte';
+	import DescriptionMeter from './DescriptionMeter.svelte';
 	import { normalizeSketchState, sketchStateNote, type SketchMode } from '$lib/sketch';
 	import type { LineageNode } from '$lib/features/history/types';
 	import type { ProviderAttemptCount } from '$lib/paintStream';
@@ -102,8 +103,9 @@
 	</header>
 	<div class="work-edit-body">
 		{#if mode === 'description'}
-			<label for="work-edit-text">{t().workActionDescription}</label>
+			<label for="work-edit-text">{t().inputSectionLabel}</label>
 			<textarea id="work-edit-text" rows="9" bind:value={draft} spellcheck disabled={drawing}></textarea>
+			<DescriptionMeter text={draft} />
 		{:else}
 			<SketchSelect compact value={sketchMode} modes={['off', 'on']} {isJapanese} disabled={drawing} onSelect={(next: SketchMode) => (sketchMode = next)} />
 			{#if node.history?.sketch_text}<p class="sketch-parent-prose">{node.history.sketch_text}</p>
@@ -121,7 +123,7 @@
 				<span class="sketch-current">{t().workEditParentGrain}: {node.history?.sketch_text ? (isJapanese ? 'あり' : 'With sketch') : (sketchStateNote(normalizeSketchState(node.history?.sketch_state), isJapanese) || (isJapanese ? 'なし' : 'None'))}</span>
 			{/if}
 			<button type="button" onclick={close}>{t().pipelineCancel}</button>
-			<button type="button" class="work-edit-draw" disabled={mode === 'description' && !draft.trim()} onclick={draw}>{t().pipelinePerform}</button>
+			<button type="button" class="work-edit-draw" disabled={mode === 'description' && !draft.trim()} onclick={draw}>{mode === 'description' ? t().submitBtn : t().pipelinePerform}</button>
 		{/if}
 	</footer>
 </dialog>

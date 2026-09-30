@@ -43,7 +43,7 @@ test('the three history filters follow the history button with one-em spacing', 
 });
 
 test('the comment hint shares the row below the input with the character meter', () => {
-	assert.match(INPUT, /<div class="input-meta-row">[\s\S]*inputCommentHint[\s\S]*input-meter[\s\S]*<\/div>/);
+	assert.match(INPUT, /<div class="input-meta-row">[\s\S]*inputCommentHint[\s\S]*<DescriptionMeter[\s\S]*<\/div>/);
 	assert.equal(ja.inputCommentHint, '[括弧内文字列はコメント扱い]');
 	assert.equal(en.inputCommentHint, '[Text in brackets is treated as a comment]');
 });

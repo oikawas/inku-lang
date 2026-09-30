@@ -80,7 +80,7 @@ A blue crayon line undulates slowly
 Place three small red circles in the upper right of a white margin
 ```
 
-Below the input field a character count, for Japanese, or a word count, for English, is shown against a tanka guide. It is a guide, not a limit.
+Below the input field, at the right, Japanese shows its total character count and the verse form nearest to it, as in `Characters 17/17 (haiku)`. The forms are haiku 17, katauta 19, tanka 31, sedōka and bussokuseki-ka 38 (the same count, so both are named), and chōka from 43 (5-7 repeated and closed by 7). The forms are counted in sounds, but here they are judged by characters, so a description with many kanji counts fewer than its sounds. English shows its word count against a tanka guide of 12 words. Both are guides, not limits. The work-editing menu's `Change the description` shows the same meter.
 
 ## 3. Write a Description
 
@@ -191,7 +191,7 @@ A `namespace.word` such as `Nature.青葉` is marked in the plugin color only wh
 A work whose instructions (DDL) were edited follows its DDL, not its description. Drawing it again from the description would lose the edits, so **its description is held**.
 
 - The Describe tab heading shows `Held (DDL edited)` and the description cannot be changed. In place of `Paint`, `Start a new variation from this description` appears: it draws the description as it stands as a new variation (the work stays as it is, and the description can be changed in the new variation).
-- In the work's edit menu, `Edit the description`, `Redraw with or without sketch from life` and `Change the model` are shown but not offered, with the reason. `Another reading` in refinement is not offered either.
+- In the work's edit menu, `Change the description`, `Redraw with or without sketch from life` and `Change the model` are shown but not offered, with the reason. `Another reading` in refinement is not offered either.
 - A child made by touch, layout, color or variation carries the DDL and is held as well. A child made by reading the description again is not.
 - The history strip shows a lock mark, and a lineage card shows `Held (DDL edited)`.
 - Autonomous refinement uses no reading rounds and no Vision method, and draws each color, layout, touch or variation round from the DDL.

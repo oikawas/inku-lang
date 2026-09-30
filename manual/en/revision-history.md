@@ -2,6 +2,10 @@
 
 This file records revisions to user and operations documents under `manual/`. See `SPEC.ja.md` for the detailed product change history.
 
+## 2026-09-30 — Change the description, and the verse form in the meter
+
+`Edit the description` in the work-editing menu is now `Change the description`, and the count below the description names the nearest verse form (haiku, katauta, tanka, sedōka and bussokuseki-ka, chōka). The input field's description and the item's name where DDL-edited works are described are corrected in Creating Images in both languages.
+
 ## 2026-09-30 — Change models becomes Change the model
 
 `Change models` in the work-editing menu is now `Change the model`. As in Another catalog, the options it draws are chosen with `+` and saved together, and mascots show the progress while they are drawn. Chapter 10 of Creating Images in both languages is rewritten, and the item's name is corrected where DDL-edited works are described. The description of saving one result at a time with `Adopt` or a star is removed. Later the same day the model list went back across the top of the dialog, so where the models are picked now reads "across the top" instead of "on the left".

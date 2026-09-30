@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { t } from '$lib/i18n/index.svelte';
 	import LabelHighlight from './LabelHighlight.svelte';
-	import { pipelineDescription } from '$lib/description-labels';
 	import Tooltip from './Tooltip.svelte';
 	import BatchPanel from './BatchPanel.svelte';
 	import CanvasAspectPlugin from './CanvasAspectPlugin.svelte';
@@ -10,6 +9,7 @@
 	import { wildSettings } from '$lib/features/wild/settings.svelte';
 	import PaintButton from './PaintButton.svelte';
 	import RunStatus from './RunStatus.svelte';
+	import DescriptionMeter from './DescriptionMeter.svelte';
 	import type { CanvasAspectId, CanvasAspectOption } from '$lib/plugins/system/canvas-aspect';
 	import type { ProviderAttemptCount } from '$lib/paintStream';
 
@@ -171,19 +171,6 @@
 		{ mode: 'batch' as const, label: t().modeBatch, running: batchRunning, progress: batchProgress },
 	]);
 
-	const singleInputStats = $derived.by(() => {
-		// The guide is about the description, so the meter counts what the
-		// drawing will read: the author's numbering and comments are not it.
-		const source = pipelineDescription(input).trim();
-		const asciiMostly = source.length > 0 && /^[\x00-\x7F\s.,;:!?()"-]+$/.test(source);
-		const hasJapanese = /[\u3040-\u30ff\u3400-\u9fff]/.test(source);
-		const useWords = !hasJapanese && (asciiMostly || (!source && t().code === 'en'));
-		const guide = useWords ? 12 : 31;
-		const count = useWords
-			? (source.match(/[A-Za-z0-9]+(?:[-][A-Za-z0-9]+)*/g) ?? []).length
-			: Array.from(source.replace(/\s/g, "")).length;
-		return { count, guide, over: count > guide, useWords };
-	});
 </script>
 
 <div class="panel-tabs">
@@ -316,7 +303,7 @@
 		{/if}
 		<div class="input-meta-row">
 			<span class="input-comment-hint">{t().inputCommentHint}</span>
-			<div class="input-meter" class:soft-over={singleInputStats.over} aria-hidden="true">{singleInputStats.useWords ? t().inputMeterWords(singleInputStats.count, singleInputStats.guide) : t().inputMeterChars(singleInputStats.count, singleInputStats.guide)}</div>
+			<DescriptionMeter text={input} />
 		</div>
 
 		{@render inputSettings()}
@@ -557,16 +544,6 @@
 		line-height: 1.5;
 		color: var(--fg3);
 	}
-	.input-meter {
-		min-width: 54px;
-		margin-left: auto;
-		font-size: var(--ui-font-size-12);
-		line-height: 1.5;
-		font-variant-numeric: tabular-nums;
-		text-align: right;
-		color: var(--fg3);
-	}
-	.input-meter.soft-over { color: color-mix(in srgb, var(--fg) 78%, transparent); }
 	.gen-status-wrap { margin-top: 4px; }
 	.error-text { color: var(--danger); font-size: var(--ui-font-size-12); white-space: pre-line; }
 	@media (max-width: 430px) {

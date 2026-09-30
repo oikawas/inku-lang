@@ -6,6 +6,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file retains the history from v2.5.0 (2026-07-25, render engine 12) onward.** Past records follow the recent ones in a collapsible section of this same document; expand it when needed. Viewers without collapse support show the full text. Earlier history is in the [v1.72–v2.4 archive](docs/history/changelog-v1.72-v2.4.md) and the [v0.1–v1.71 archive](docs/history/changelog-v0.1-v1.71.md).
 
+### v2.15.73 — Name each model below its mascot lane (Build 1149, 2026-09-30)
+
+While “Change the model” draws, each mascot lane shows its model's name instead of a number. Names omit the provider and use 10px text over at most two lines, with two lanes per row. Color-catalog changes and other refinement lanes retain their numbers.
+
 ### v2.15.72 — Match the model-selection hint to the picker position (Build 1148, 2026-09-30)
 
 The empty options area in “Change the model” now says to choose models above rather than on the left, matching the picker restored to the top of the dialog. Chapter 10 of the manual and its revision history are updated in both languages.

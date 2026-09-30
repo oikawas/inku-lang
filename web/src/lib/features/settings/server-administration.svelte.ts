@@ -1,6 +1,8 @@
 import { getLang, t } from '$lib/i18n/index.svelte';
 import type { ApiFetch } from '$lib/transport/api-fetch';
 import type { SettingsActor } from './navigation-state.svelte';
+import { applyMeterSwitches } from '$lib/descriptionMeter.svelte';
+import type { MeterSwitches } from '$lib/verseForm';
 
 export type PluginItem = {
 	name: string;
@@ -85,6 +87,7 @@ export type SettingsStatus = {
 		max_limit: number;
 		note: string;
 	};
+	description_meter: MeterSwitches;
 	render_limits: {
 		limits: Record<string, number>;
 		defaults: Record<string, number>;
@@ -121,6 +124,7 @@ export type ServerAdministration = {
 	readonly renderLimitsStatus: string | null;
 	readonly pluginActionStatus: string | null;
 	readonly renderConcurrencyStatus: string | null;
+	readonly descriptionMeterStatus: string | null;
 	loadStatus: () => Promise<void>;
 	resetForLoggedOut: () => void;
 	deletePlugin: (id: string) => Promise<boolean>;
@@ -129,6 +133,7 @@ export type ServerAdministration = {
 	runDbBackupNow: () => Promise<void>;
 	updateOutputSaveSettings: (enabled: boolean, outputDir: string, pngSize: number) => Promise<void>;
 	updateRenderConcurrencySettings: (serverLimit: number, clientLimit: number) => Promise<void>;
+	updateDescriptionMeterSettings: (switches: MeterSwitches) => Promise<void>;
 	updateLogRetentionSettings: (enabled: boolean, retentionDays: number, rotate: string, compress: boolean) => Promise<void>;
 	updateRenderLimits: (patch: Record<string, number> | null) => Promise<SettingsStatus['render_limits'] | null>;
 };
@@ -145,6 +150,7 @@ export function createServerAdministration<TActor extends SettingsActor>(
 	let renderLimitsStatus = $state<string | null>(null);
 	let pluginActionStatus = $state<string | null>(null);
 	let renderConcurrencyStatus = $state<string | null>(null);
+	let descriptionMeterStatus = $state<string | null>(null);
 
 	function resetForLoggedOut(): void {
 		settingsStatus = null;
@@ -310,6 +316,29 @@ export function createServerAdministration<TActor extends SettingsActor>(
 		}
 	}
 
+	async function updateDescriptionMeterSettings(switches: MeterSwitches): Promise<void> {
+		descriptionMeterStatus = null;
+		try {
+			const response = await deps.apiFetch('/api/settings/description-meter', {
+				method: 'PUT',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify(switches)
+			});
+			if (!response.ok) {
+				const body = await response.json().catch(() => ({})) as { detail?: unknown };
+				throw new Error(deps.describeApiError(body.detail, response.status));
+			}
+			const next = await response.json() as MeterSwitches;
+			if (settingsStatus) settingsStatus = { ...settingsStatus, description_meter: next };
+			// This tab's meter follows at once; other tabs read it when they load.
+			applyMeterSwitches(next);
+			descriptionMeterStatus = t().settingsDescriptionMeterSaved;
+		} catch (error) {
+			descriptionMeterStatus = error instanceof Error ? error.message : String(error);
+			console.warn('failed to update description meter settings', error);
+		}
+	}
+
 	// A null patch restores defaults. The response is authoritative after server normalization.
 	async function updateRenderLimits(
 		patch: Record<string, number> | null
@@ -367,6 +396,7 @@ export function createServerAdministration<TActor extends SettingsActor>(
 		get renderLimitsStatus() { return renderLimitsStatus; },
 		get pluginActionStatus() { return pluginActionStatus; },
 		get renderConcurrencyStatus() { return renderConcurrencyStatus; },
+		get descriptionMeterStatus() { return descriptionMeterStatus; },
 		loadStatus: loadSettingsStatus,
 		resetForLoggedOut,
 		deletePlugin,
@@ -375,6 +405,7 @@ export function createServerAdministration<TActor extends SettingsActor>(
 		runDbBackupNow,
 		updateOutputSaveSettings,
 		updateRenderConcurrencySettings,
+		updateDescriptionMeterSettings,
 		updateLogRetentionSettings,
 		updateRenderLimits
 	};

@@ -20,7 +20,7 @@
 	import CanvasPanel from '$lib/components/CanvasPanel.svelte';
 	import { CanvasViewportState } from '$lib/features/canvas/viewport-state.svelte';
 	import { createRefinementCoordinator } from '$lib/features/canvas/refinement-coordinator.svelte';
-	import { registerMoraTransport } from '$lib/descriptionMora';
+	import { applyMeterSwitches, registerMeterTransport } from '$lib/descriptionMeter.svelte';
 	import { RefinementSessionState } from '$lib/features/canvas/refinement-session.svelte';
 	import { LineageQueryState, LineageBrowsingState } from '$lib/features/history/lineage-state.svelte';
 	import { makeSavedWorkExportActions } from '$lib/features/export/saved-work-actions';
@@ -488,8 +488,8 @@
 
 	// A 401 means this page's session is gone; the session owner returns to sign-in.
 	const apiFetch = createApiFetch({ onUnauthorized: () => session.expireAfterUnauthorized() });
-	// The description meter asks the Server for a description's sounds.
-	registerMoraTransport(apiFetch);
+	// The description meter asks the Server for a description's sounds and syllables.
+	registerMeterTransport(apiFetch);
 	const session = createSessionState({
 		apiFetch,
 		describeApiError,
@@ -1150,8 +1150,9 @@
 		try {
 			const r = await apiFetch('/api/client-config', { cache: 'no-store' });
 			if (!r.ok) throw new Error(`HTTP ${r.status}`);
-			const data = await r.json() as { render_fanout_limit?: number };
+			const data = await r.json() as { render_fanout_limit?: number; description_meter?: unknown };
 			if (Number.isFinite(data.render_fanout_limit)) renderFanoutLimit = Number(data.render_fanout_limit);
+			applyMeterSwitches(data.description_meter);
 		} catch (error) {
 			console.warn('failed to load client config', error);
 		}

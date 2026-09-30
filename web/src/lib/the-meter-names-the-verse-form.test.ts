@@ -1,60 +1,70 @@
 // Run with: npm run test:unit  (node:test, no test dependency)
 //
-// The meter under the description names the verse form the description is
-// nearest to. Japanese: haiku 17, katauta 19, tanka 31, sedōka and
-// bussokuseki-ka 38, chōka 12n + 7 from 43, in sounds the Server counts, or in
-// characters until it answers. English: by lines, couplet 2 to sestina 39.
+// The meter under the description names the verse form the description is,
+// and only when it is close to one. Japanese is judged in sounds -- by its
+// phrases when it is set out in them, otherwise by its total, within two
+// sounds. English is judged in lines, and by syllables where the form is made
+// of them. Either language can be switched off, leaving the count alone.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { describeLength, englishSyllables, nearestEnglishForm, nearestVerseForm, verseFormOfSounds } from './verseForm.ts';
+import { describeLength, englishForm, englishSyllables, formByTotal, japaneseForm } from './verseForm.ts';
 
-test('each form is named at its own length', () => {
-	assert.deepEqual(nearestVerseForm(17), { form: 'haiku', length: 17 });
-	assert.deepEqual(nearestVerseForm(19), { form: 'katauta', length: 19 });
-	assert.deepEqual(nearestVerseForm(31), { form: 'tanka', length: 31 });
-	// Sedōka and bussokuseki-ka are both 38: one name covers the two.
-	assert.deepEqual(nearestVerseForm(38), { form: 'sedoka-bussokuseki', length: 38 });
-	assert.deepEqual(nearestVerseForm(43), { form: 'choka', length: 43 });
-	assert.deepEqual(nearestVerseForm(79), { form: 'choka', length: 79 });
+const ON = { japanese: true, english: true };
+
+test('a total names a form only within two sounds of it', () => {
+	assert.equal(formByTotal(17)?.form, 'haiku-senryu');
+	assert.equal(formByTotal(19)?.form, 'katauta');
+	assert.equal(formByTotal(26)?.form, 'dodoitsu');
+	assert.equal(formByTotal(33)?.form, 'tanka');
+	assert.equal(formByTotal(38)?.form, 'sedoka-bussokuseki');
+	assert.deepEqual(formByTotal(55), { form: 'choka', length: 55 });
+	// 18 is within two of both 17 and 19: the nearer, and a tie goes to the shorter.
+	assert.equal(formByTotal(18)?.form, 'haiku-senryu');
+	// The author's prose, 52 sounds, is no form.
+	assert.equal(formByTotal(52), null);
+	assert.equal(formByTotal(23), null);
 });
 
-test('a length between forms goes to the nearer, and a tie to the shorter', () => {
-	assert.equal(nearestVerseForm(18).form, 'haiku');
-	assert.equal(nearestVerseForm(25).form, 'katauta');
-	assert.equal(nearestVerseForm(26).form, 'tanka');
-	assert.equal(nearestVerseForm(40).form, 'sedoka-bussokuseki');
-	assert.deepEqual(nearestVerseForm(41), { form: 'choka', length: 43 });
-	assert.deepEqual(nearestVerseForm(50), { form: 'choka', length: 55 });
-	assert.deepEqual(nearestVerseForm(0), { form: 'haiku', length: 17 });
+test('phrases decide the form before the total does', () => {
+	// 6-7-5 is a haiku with one extra sound, though 18 alone would be too.
+	assert.equal(japaneseForm(18, [6, 7, 5])?.form, 'haiku-senryu');
+	assert.equal(japaneseForm(26, [7, 7, 7, 5])?.form, 'dodoitsu');
+	assert.equal(japaneseForm(38, [5, 7, 7, 5, 7, 7])?.form, 'sedoka');
+	assert.equal(japaneseForm(38, [5, 7, 5, 7, 7, 7])?.form, 'bussokuseki');
+	assert.equal(japaneseForm(43, [5, 7, 5, 7, 5, 7, 7])?.form, 'choka');
+	// Phrases that are no form fall back to the total.
+	assert.equal(japaneseForm(38, [20, 18])?.form, 'sedoka-bussokuseki');
+	assert.equal(japaneseForm(52, [21, 31]), null);
 });
 
-test('at 38 the phrases tell sedōka from bussokuseki-ka, and otherwise both are named', () => {
-	assert.equal(verseFormOfSounds(38, [5, 7, 7, 5, 7, 7]).form, 'sedoka');
-	assert.equal(verseFormOfSounds(38, [5, 7, 5, 7, 7, 7]).form, 'bussokuseki');
-	assert.equal(verseFormOfSounds(38, [38]).form, 'sedoka-bussokuseki');
-	assert.equal(verseFormOfSounds(31, [5, 7, 5, 7, 7]).form, 'tanka');
+test('English names a form by its lines, and by syllables where the form is made of them', () => {
+	assert.equal(englishForm([10]), null);
+	assert.equal(englishForm([8, 8])?.form, 'couplet');
+	assert.equal(englishForm([5, 7, 5])?.form, 'haiku');
+	assert.equal(englishForm([10, 10, 10])?.form, 'tercet');
+	assert.equal(englishForm([2, 4, 6, 8, 2])?.form, 'cinquain');
+	// A limerick's 8-8-5-5-8 is five lines but no cinquain.
+	assert.equal(englishForm([8, 8, 5, 5, 8]), null);
+	assert.equal(englishForm(Array(13).fill(10))?.form, 'sonnet');
+	assert.equal(englishForm(Array(9).fill(10)), null);
+	assert.equal(englishForm(Array(20).fill(8))?.form, 'villanelle');
+	assert.equal(englishSyllables('An old silent pond'), 5);
 });
 
-test('the sounds the Server counted are used once they come, and characters until then', () => {
-	// Seventeen sounds, eleven characters: the kanji are read as several sounds.
-	const text = '古池や　蛙飛び込む\n水の音';
-	assert.deepEqual(describeLength(text, 'ja'), { unit: 'chars', count: 11, target: 17, form: 'haiku', over: false });
-	assert.deepEqual(describeLength(text, 'ja', { mora: 17, phrases: [5, 7, 5], unread: [] }),
-		{ unit: 'mora', count: 17, target: 17, form: 'haiku', approximate: false, over: false });
-	// A character the dictionary could not read makes the count approximate.
-	assert.deepEqual(describeLength('濡', 'ja', { mora: 2, phrases: [2], unread: ['濡'] }),
-		{ unit: 'mora', count: 2, target: 17, form: 'haiku', approximate: true, over: false });
+test('the counts the Server made are used once they come, and the page estimates until then', () => {
+	const haiku = '古池や\n蛙飛び込む\n水の音';
+	// Seventeen sounds, eleven characters: the characters are no form.
+	assert.deepEqual(describeLength(haiku, 'ja', ON), { unit: 'chars', count: 11, form: null });
+	assert.deepEqual(describeLength(haiku, 'ja', ON, { mora: { mora: 17, phrases: [5, 7, 5], unread: [] } }),
+		{ unit: 'mora', count: 17, form: { form: 'haiku-senryu', length: 17 }, approximate: false });
+	const english = 'An old silent pond\nA frog jumps into the pond\nSplash! Silence again';
+	assert.deepEqual(describeLength(english, 'ja', ON), { unit: 'lines', count: 3, form: { form: 'haiku', length: 3 } });
 });
 
-test('English is counted in lines, and three short lines are a haiku', () => {
-	const haiku = ['An old silent pond', 'A frog jumps into the pond', 'Splash! Silence again'];
-	assert.equal(englishSyllables(haiku.join(' ')), 17);
-	assert.deepEqual(nearestEnglishForm(haiku), { form: 'haiku', length: 3 });
-	const tercet = ['The river kept its promise to the valley every spring', 'until the year the snows forgot to come at all', 'and then the valley learned to keep its own'];
-	assert.deepEqual(nearestEnglishForm(tercet), { form: 'tercet', length: 3 });
-	assert.equal(nearestEnglishForm(Array(14).fill('line')).form, 'sonnet');
-	assert.equal(nearestEnglishForm(Array(18).fill('line')).form, 'villanelle');
-	assert.equal(nearestEnglishForm(['one line']).form, 'couplet');
-	assert.deepEqual(describeLength(haiku.join('\n'), 'ja'), { unit: 'lines', count: 3, target: 3, form: 'haiku', over: false });
+test('a language switched off is counted and not judged', () => {
+	const off = { japanese: false, english: false };
+	assert.deepEqual(describeLength('古池や\n蛙飛び込む\n水の音', 'ja', off, { mora: { mora: 17, phrases: [5, 7, 5], unread: [] } }),
+		{ unit: 'chars', count: 11, form: null });
+	assert.deepEqual(describeLength('An old pond\nA frog', 'ja', off), { unit: 'lines', count: 2, form: null });
 });

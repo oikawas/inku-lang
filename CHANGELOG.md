@@ -6,6 +6,12 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file retains the history from v2.5.0 (2026-07-25, render engine 12) onward.** Past records follow the recent ones in a collapsible section of this same document; expand it when needed. Viewers without collapse support show the full text. Earlier history is in the [v1.72–v2.4 archive](docs/history/changelog-v1.72-v2.4.md) and the [v0.1–v1.71 archive](docs/history/changelog-v0.1-v1.71.md).
 
+### v2.15.74 — Show the nearest verse form by sounds or lines (Build 1150, 2026-09-30)
+
+The description-edit action is now “Change the description”, with a “Draw” button. The input and dialog share a meter: Japanese shows the sound count and nearest verse form; English shows the line count and nearest form, such as `Lines 3/3 (haiku)`. Redrawing a sketch keeps its “Perform” button.
+
+The authenticated `POST /api/description/mora` uses SudachiPy and its small dictionary to read Japanese and return total sounds, counts by phrase and unread characters. The specification and manuals are updated in both languages. The route-count test's stale expectation is corrected to 105: the existing 104 endpoints plus this one.
+
 ### v2.15.73 — Name each model below its mascot lane (Build 1149, 2026-09-30)
 
 While “Change the model” draws, each mascot lane shows its model's name instead of a number. Names omit the provider and use 10px text over at most two lines, with two lanes per row. Color-catalog changes and other refinement lanes retain their numbers.

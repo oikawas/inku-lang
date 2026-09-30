@@ -4,7 +4,317 @@
 
 This file records changes chronologically. If a historical note conflicts with the current specification, the current specification wins. The more detailed canonical history is maintained in Japanese in [CHANGELOG.ja.md](CHANGELOG.ja.md).
 
-**This file holds the 37 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
+**This file retains the history from v2.5.0 (2026-07-25, render engine 12) onward.** Past records follow the recent ones in a collapsible section of this same document; expand it when needed. Viewers without collapse support show the full text. Earlier history is in the [v1.72–v2.4 archive](docs/history/changelog-v1.72-v2.4.md) and the [v0.1–v1.71 archive](docs/history/changelog-v0.1-v1.71.md).
+
+### 2026-09-30 — Collapse past history within the same changelog
+
+Recent records remain at the top, and records from v2.15.34 and earlier can be expanded within this same document. Existing text, entry order, headings and links are preserved. The manually maintained entry count has been removed from the introduction. Product behavior, version and Build are unchanged.
+
+### v2.15.68 — Copy the canvas work to the clipboard as an image (Build 1144, 2026-09-30)
+
+A new canvas button copies the displayed work as a PNG for pasting into another application. Settings > Export > Clipboard selects the picture alone or the card, and a height of 256–4096px (1080px by default). The card uses a saved work. The button explains when the browser or connection does not support image copying.
+
+The card export API accepts an optional height and keeps its existing 1080px output when omitted. PNG downloads share the copy operation's rasterizer while retaining their existing output.
+
+### v2.15.67 — Show the attention reason only when a run has stopped (Build 1143, 2026-09-30)
+
+Saving a Stage 1 result no longer displays the request to check the result. A reason is shown only when the run has stopped for an author edit (`needs_user_edit`) or a failure (`failed`). Pipeline status and API error messages use the same check.
+
+### v2.15.66 — Remove the work comment from the history-strip tooltip (Build 1142, 2026-09-29)
+
+The tooltip over a history-strip thumbnail no longer includes the work's comment. The library card, preview and lineage panel continue to show it.
+
+### v2.15.65 — Use one label for a work's comment (Build 1141, 2026-09-29)
+
+The history library card and history-strip tooltip now label the comment “Comment on the work” instead of “Choice”, matching the preview and lineage panel.
+
+### v2.15.64 — Edit a work's comment in the history library preview (Build 1140, 2026-09-29)
+
+The preview for one's own work now has a 240-character comment field and Save button. Saving updates the comment without changing the star and reflects it in the listing, history strip, lineage and provenance. A work shared by another account remains read-only.
+
+### v2.15.63 — Abbreviate model names under history thumbnails (Build 1139, 2026-09-29)
+
+The model name under a thumbnail now shows the provider's first two characters, the model family's first three and the version's first three (for example, `Cl Son 5` and `Ge Gem 3.5`). The family is the word immediately before the first number in the display name. The tooltip keeps the full name.
+
+### v2.15.62 — Show up to three facts under each history thumbnail (Build 1138, 2026-09-29)
+
+The history strip can now show up to three facts under each thumbnail, instead of two, in 10px type instead of 12px. The choices are generation, model, engine version and file size. The description under Settings > Display reflects the new limit. The current-work badge sits on the picture so it does not overlap the facts.
+
+### v2.15.61 — The provenance drawer follows a work chosen from the history strip (Build 1137, 2026-09-29)
+
+Choosing another work from the history strip while the provenance drawer is open keeps it open and shows that work's provenance. Each account can turn this off under Settings > Display; it is on by default. Pressing a work's star or paging through the strip still closes the drawer.
+
+### v2.15.60 — The lineage panel is sent no SVG (Build 1136, 2026-09-29)
+
+At the author's request. The lineage panel received each work's whole SVG. On Pentala a lineage of 24 works took about 1.0 s and 12.8 MB (12.2 MB of it SVG) every time it opened, and one of 3 works about 0.1 s and 604 KB. `/api/lineage/{id}` takes `include_svg=false` (the SVG emptied and its size given in `svg_bytes`, as the listing does; the default is unchanged), and the Web asks for it. Cards draw from thumbnails, and opening a work on the canvas reads its one SVG. The export menu opened from the lineage panel no longer shows the small picture of its target, as in the history library.
+
+### v2.15.59 — The history library's lineage page aggregates quickly (Build 1135, 2026-09-29)
+
+At the author's request. A page of 24 lineages took about 0.7 s, almost all of it three statements that aggregate every work by lineage (about 0.2 s each). SQLite stores a row's columns in order and an SVG overflows into a chain of pages, so reading `lineage_node_id`, which comes after the SVG, from every work walked each chain (as would `history_visibility` when not read from its index). Works and nodes are now joined through the node's `history_id`, and visibility is tested through a subquery of work ids. Checked read-only on the production database with the author's permission: the three statements fell from about 636 ms to about 36 ms, with the same total, the same lineages on the page and the same representatives.
+
+### v2.15.58 — Finding the page that holds a given work is quick with statistics too (Build 1134, 2026-09-29)
+
+At the author's request. Counting a given work's position (`anchor_id`) also walked the `at` index range once v2.15.56 made statistics, reading every newer work (on Pentala, 195 ms for the 3,000th work and 217 ms for the 4,100th). As in the listing, the time comparison is now `at + 0`. Checked read-only on the production database with the author's permission: works at the 0th, 1,000th, 3,000th and 4,100th position took 3 ms each, with the same positions.
+
+### v2.15.57 — The history listing picks later pages quickly with statistics too (Build 1133, 2026-09-29)
+
+At the author's request. With statistics made at start (v2.15.56), SQLite 3.37 chose the listing's page ids by walking the `at` index and reading each row, so later pages grew slower (on Pentala, 18 works from the 3,000th went from 50 ms to 249 ms). Only the sort that chooses the ids now avoids that index (`at + 0`, the same order). Checked read-only on the production database with the author's permission: pages from the 0th, 1,000th, 3,000th and 4,100th work went from 1–207 ms to 3–4 ms, with the same ids.
+
+### v2.15.56 — The server refreshes SQLite's statistics at every start (Build 1132, 2026-09-29)
+
+At the author's request. Pentala's database had no SQLite statistics (`sqlite_stat1`), so SQLite 3.37 guessed how narrow each index was, and opening a lineage in the history library chose the visibility index and read every work. The server now runs `ANALYZE` at every start, keeping the statistics current as works are added: about 0.1 s the first time on a local synthetic database of 4,200 works, about 0.03 s after. When the statistics cannot be written (the database is locked, say) the server logs a warning and starts anyway. The statistics table starts with `sqlite_` and stays outside the schema check.
+
+### v2.15.55 — The history library opens a lineage quickly on production's SQLite too (Build 1131, 2026-09-29)
+
+At the author's request, following v2.15.54. That release spelled the root test so the indexes could answer it, yet on Pentala even a one-work lineage still took about 0.45 s. A read-only look at the production database, with the author's permission, found SQLite 3.37.2 with no statistics (`sqlite_stat1`) choosing the visibility index and reading every work (215 ms for the count, 216 ms for the page). The lineage's node ids are now gathered first, the works are found through the unique `lineage_node_id` index, and the visibility test is written so it offers no index (a `coalesce`; the column is NOT NULL, so the test is the same). On SQLite 3.37.2, as on Pentala, an empty database with the same definitions plans through `ix_history_lineage_node_id`.
+
+### v2.15.54 — The history library opens a lineage quickly and sends its cards no SVG (Build 1130, 2026-09-29)
+
+At the author's request, following the slow history listing. On Pentala opening a lineage of 19 works took about 0.5 s, and a page of 24 lineages about 1.0 s and 3.4 MB.
+
+- Opening a lineage read every work and compared its root through a coalesce. The same test is now spelled as "the root matches, or there is no root and the node is the root", which the lineage node indexes answer: on a local synthetic 4,200-work database a lineage of 20 fell from 515 ms to 7 ms.
+- The lineage page sent each representative's whole SVG. With `include_svg=false` the SVG is emptied and its size given in `svg_bytes`; the Web's cards draw from thumbnails and a preview reads its SVG when opened. The rest of the page's time is the aggregate over every work, to be measured after deployment.
+
+### v2.15.53 — The history listing picks the page's ids before reading its rows (Build 1129, 2026-09-29)
+
+At the author's request, following the slow saving of refinement options. One listing took about 0.4 s whatever its size, longer the more works the caller may read (on Pentala, 408 ms for one work out of 4,169, against 50 ms from 9 in the trash). A caller who may read every work gets no index for the order, so SQLite sorted every readable work carrying all its columns, the SVG length included. The page's ids are now chosen by id and time first, and only those rows are read. On a local synthetic database of 4,200 works read as such a caller, the first page fell from 500 ms to 250 ms and the page from the 3,000th from 890 ms to 238 ms. The rest is the count, which on Pentala should cost what the listing state does, about 50 ms.
+
+### v2.15.52 — Saving refinement options fetches the history listing once, after the last (Build 1128, 2026-09-29)
+
+At the author's request. Saving refinement options fetched the history listing and the generation count again after each option. One listing takes about 0.4 s on Pentala whatever its size, about 0.9 s of the 1.1 s two options took. They are now fetched once, after the last save; a save that fails still fetches them at once.
+
+### v2.15.51 — The wheel over the export menu no longer zooms the canvas (Build 1127, 2026-09-29)
+
+At the author's request. The saved work's export menu opens over the canvas and scrolls itself, but the wheel over it zoomed the canvas behind instead. Over a menu on the canvas the wheel now scrolls the menu.
+
+### v2.15.50 — Judge a `replay`'s description lock by its DDL (Build 1126, 2026-09-28)
+
+This version includes the changes below since v2.15.49. Server and Web judge the saved work's description lock by its DDL. DDL, Score and rendering versions are unchanged.
+
+### 2026-09-28 — Description locking judges a `replay` by its DDL
+
+At the author's ruling. Description locking treated every `replay` as keeping its parent's DDL, which mistook two cases.
+
+- A work drawn on the Describe tab with its description unchanged read the description again but was saved as `replay`; such older works under a locked parent were locked. A `replay` whose DDL differs from its parent's is now a reading and not locked.
+- Drawing again from the DDL panel without an edit starts a DDL-authoritative variation, so a work nobody edited was shown `Held (DDL edited)`. A `replay` whose DDL is its parent's is now locked only when its parent is; a pipeline fork with changed words follows the drawn work's lock, and the Web's Describe tab uses the saved work's lock.
+- SPEC (Japanese and English) says so.
+
+### v2.15.49 — Hold descriptions after DDL edits (Build 1125, 2026-09-28)
+
+This version includes the changes below since v2.15.48. Description locking now applies across Server, Web and CLI routes, and autonomous refinement draws from the held DDL. DDL, Score and rendering versions are unchanged.
+
+### 2026-09-28 — A work whose DDL was edited holds its description on every route
+
+At the author's direction. A work whose DDL was edited was meant to hold its description, but only a work just made on the Describe tab did: a work opened from history, the lineage description edit and sketch change, autonomous refinement, Another reading, model comparison and CLI refinement all drew it again from the description and silently lost the edits. The Describe tab's Paint also started a new variation from the description without asking.
+
+- The server decides which works are description-locked (a DDL-authoritative variation, `ddl_edit`, and what is derived from them without reading the description again) and gives history items and lineage nodes `description_locked`.
+- A redraw from the description with a locked parent is refused 409 `description_locked` on `/api/paint`, a saved description-reading derivation and a fork with changed words; a new variation from the description as it stands remains.
+- Web: the Describe tab shows `Held (DDL edited)`, its description cannot be changed, and Paint becomes `Start a new variation from this description`. The edit menu's Description, Sketch from life and Models, and refinement's Another reading and model comparison, are shown as not offered with the reason. The history strip shows a lock mark and lineage cards a mark.
+- Autonomous refinement of a locked work leaves out reading and Vision and draws each color, layout, touch or variation round from the parent's DDL. It also fixes color rounds, whose catalog draw and wild switch never reached the drawing, and the other rounds, which drew with the page's catalog.
+- CLI `refine perform` stops on a locked work with the reason.
+- SPEC and the manual (Japanese and English) say so.
+
+### v2.15.48 — Remember autonomous refinement choices (Build 1124, 2026-09-28)
+
+This version includes the changes below since v2.15.47. The Web autonomous refinement dialog remembers the previous choices. Android's Claude request shape also follows the Server. DDL, Score, rendering, and the API shape are unchanged.
+
+### 2026-09-28 — The autonomous refinement dialog remembers the last choices
+
+At the author's request. The autonomous refinement dialog opened at its defaults every time. The method, number of generations, the five refinement elements, variation amplitude and the direction text are now saved in the browser as they change and restored the next time it opens (the author's choice: keep the direction too, in the browser). The Vision model stays an account setting; the wild switch is not kept and follows the work being refined. The manual (Japanese and English) says so.
+
+### 2026-09-28 — Android: Claude Opus 5.5 can draw (the server's fix)
+
+Asked by the Server session on the author's instruction. Android's Claude API connection also forced the answer's tool with `tool_choice` `{"type":"tool"}`, which Claude Opus 5.5 refuses ("tool_choice: type "tool" and "any" are not supported for this model."). It now follows the server's fix (the author's ruling).
+
+- Every Claude model is sent `tool_choice` `{"type":"auto"}`, still with the answer's tool as the only one. No model list is kept.
+- A `tool_use` in the answer is read as before: its `input` is the answer, and a call that is not exactly one, or names another tool, is malformed (`malformed_payload`; Android used to retry it as `transport_unavailable`).
+- An answer given as text, without a `tool_use`, is read from the first `{` to the last `}` of its joined text blocks; no object there is `malformed_payload`. Thinking blocks are not read. The shared core still checks the answer's shape.
+- Checked with JVM tests; nothing was sent to the Claude API.
+
+### v2.15.47 — Claude Sonnet 5 Vision requests (Build 1123, 2026-09-28)
+
+This version includes the change below since v2.15.46. Colophon and autonomous refinement Vision advice requests no longer send temperature to Anthropic, and provider refusals are recorded in the Server log. DDL, Score, rendering, and the API shape are unchanged.
+
+### 2026-09-28 — Claude Sonnet 5 reads the colophon, and the colophon and Vision advice log why a provider refused
+
+At the author's note. Generating a colophon with Claude Sonnet 5 on the Claude API failed with a 400 from the Anthropic API. The colophon and Vision advice (`vision_client.py`) sent Anthropic a temperature, which the drawing pipeline never does (Sonnet 5 draws); the reason for the refusal was not kept.
+
+- No temperature is sent to Anthropic, as in the drawing pipeline.
+- When a provider refuses over HTTP, the same `provider_http_error` line the pipeline writes (with `action` `vision`) is logged. Reading the reason moved to `provider_refusal.py`, which both use.
+
+### v2.15.46 — Claude drawing and provider diagnostics (Build 1122, 2026-09-28)
+
+This version includes the changes below since v2.15.45. The Server supports Claude Opus 5.5, and Android adjusts its OpenAI requests and records why a provider refused a call. DDL, Score, rendering, and the API shape are unchanged.
+
+### 2026-09-28 — Claude Opus 5.5 draws
+
+At the author's note. Drawing from a description with Claude Opus 5.5 on the Claude API stopped at Stage 1 with "the model provider refused the request". The log (`provider_http_error`) gave the reason: "tool_choice: type "tool" and "any" are not supported for this model." The drawing pipeline forced Anthropic models to call the answer tool, which Opus 5.5 does not accept.
+
+- At the author's ruling, every Anthropic model is sent `tool_choice: {"type": "auto"}` (the answer tool is the only one). No list of models is kept.
+- An answer given as text instead of a tool call is read as the JSON object in the text; the shared core checks its shape as before, and a text without one is `malformed_payload`.
+
+### 2026-09-28 — Android: a provider's reason for refusing is logged
+
+The author's choice, following the server's `provider_http_error`. When a provider refused a pipeline call over HTTP, Android kept only the failure class (`provider_rejected` and the like) and dropped the reason the provider gave.
+
+- A refusal now leaves one `provider_http_error` line in Logcat (tag `InkuProvider`): the action, the model id (which names the connection, as in `openai:gpt-5.6-terra`), the status, and the error's `code`, `type`, `param` and `status` with a message of up to 240 characters in which anything shaped like a key is masked.
+- The on-screen wording is unchanged. The OpenAI-compatible, Gemini and Claude API connections all do this.
+
+### 2026-09-28 — Android: OpenAI's gpt-5 models can draw (the server's rule)
+
+Asked by the Server session on the author's instruction. Android's OpenAI-compatible connection also sent OpenAI `max_tokens` and a temperature, the shape the gpt-5 and o-series models refuse (the built-in candidate is `openai:gpt-5.1`). It now follows the server's `openai_sampling()`.
+
+- Only when the connection's host is `api.openai.com`: `max_completion_tokens` goes in place of `max_tokens`; a model id starting with `gpt-5` or `o` plus a digit gets no temperature; one starting with `gpt-5.` plus a digit gets `reasoning_effort: "none"` (gpt-5 itself and the o-series do not take `none`).
+- NVIDIA, Ollama Cloud and other OpenAI-compatible connections are unchanged. The host decides, not the connection's name.
+- Checked with JVM tests; nothing was sent to OpenAI.
+
+### v2.15.45 — log drawing job exceptions (Build 1121, 2026-09-28)
+
+This version includes the change below since v2.15.44. When a drawing job stops on an exception, the Server log records its execution id and traceback. DDL, Score, rendering, and the API shape are unchanged.
+
+### 2026-09-28 — A drawing job that stops on an exception leaves it in the log
+
+At the author's note (drawing from a description with Claude Opus 5 ended with "The authoring operation could not finish."). A drawing job that stopped on an exception answered the page 503 "could not finish" and kept the exception nowhere. It is now logged as `pipeline_job_failed` with the execution id and the traceback, so the cause can be read and fixed.
+
+### v2.15.44 — follow-up for OpenAI gpt-5 requests (Build 1120, 2026-09-28)
+
+This version includes the change below since v2.15.43. Models from gpt-5.1 onward are asked not to reason so they can accept the function tools used by drawing. DDL, Score, rendering, and the API shape are unchanged.
+
+### 2026-09-28 — OpenAI's gpt-5.1 and later are asked not to reason (the gpt-5 fix, continued)
+
+After the previous fix gpt-5.6-luna and gpt-5.6-terra were still refused, and the newly kept log said why: "Function tools with reasoning_effort are not supported for gpt-5.6-terra in /v1/chat/completions … set reasoning_effort to 'none'". The drawing pipeline takes its answer through function tools, so gpt-5.1 and later models on `api.openai.com` are sent `reasoning_effort: "none"`. gpt-5 itself and the o-series do not accept `none` and are not sent it.
+
+### v2.15.43 — OpenAI gpt-5 request compatibility (Build 1119, 2026-09-28)
+
+This version includes the change below since v2.15.42. Requests to the OpenAI API use fields accepted by gpt-5 and related models, and the log records a provider's reason for refusing a request. DDL, Score, rendering, and the API shape are unchanged.
+
+### 2026-09-28 — OpenAI's gpt-5 models draw, and a provider's refusal says why in the log
+
+At the author's note. Drawing from a description with gpt-5.6-luna or gpt-5.6-terra on the OpenAI API Platform stopped at Stage 1 with "the model provider refused the request". The shared pipeline sent OpenAI `max_tokens` and a temperature (0.0, 0.3 for DDL generation), but OpenAI's gpt-5 and o-series models refuse `max_tokens` (asking for `max_completion_tokens`) and any temperature but the default.
+
+- When the connection is `api.openai.com`, `max_completion_tokens` is sent, and no temperature for the gpt-5 and o-series models. NVIDIA, Ollama and other OpenAI-compatible connections are unchanged. The drawing pipeline, the colophon and Vision advice, and the demo instruction follow the same rule.
+- When a provider refuses over HTTP, the log (`provider_http_error`) keeps the status, the provider's error `code`, `type`, `param` and `status`, and a short message with anything shaped like a key masked. Until now only the class "refused" was kept, which could not tell a 400 (the request's shape) from a 403 (access).
+
+### v2.15.42 — more Vision providers for colophon and advice (Build 1118, 2026-09-28)
+
+This version includes the change below since v2.15.41. The colophon and Vision advice for autonomous refinement can send images to Vision models on the Gemini and Anthropic APIs as well as OpenAI-compatible providers. DDL, Score, rendering, and the API shape are unchanged.
+
+### 2026-09-28 — The colophon and Vision advice work with Vision models on the Gemini and Anthropic APIs
+
+At the author's note. Choosing Gemma 4 31B on the Gemini API for the colophon stopped with "okugaki currently requires an OpenAI-compatible vision provider". The colophon and the Vision advice of autonomous refinement spoke only the OpenAI-compatible dialect, so a Gemini or Anthropic model published for Vision was refused at the point of use.
+
+- A question with images is now sent by `vision_client.py` to OpenAI-compatible, Anthropic, and Gemini providers, with the endpoints and key headers the shared pipeline uses. The colophon and Vision advice use it.
+- The technology stack table (Japanese and English) says so.
+
+### v2.15.41 — size of the empty model picker (Build 1117, 2026-09-28)
+
+This version includes the change below since v2.15.40. Only when there are no selectable models, the picker is centered and sized to its explanation. Its size with models is unchanged.
+
+### 2026-09-28 — The empty model picker is sized to its sentence (I-297 follow-up)
+
+At the author's note. With nothing to choose, the picker kept the size it has for a grid of models around its one sentence. In that case alone it is now centred and sized to the sentence; the picker with models is unchanged.
+
+### v2.15.40 — guidance in the model picker (Build 1116, 2026-09-28)
+
+This version includes the change below since v2.15.39. It explains why no models can be selected and where to make them available, and marks a saved model missing from the list. DDL, Score, and rendering versions are unchanged.
+
+### 2026-09-28 — The model picker says when there is nothing to choose, and marks a model not in the list (I-297)
+
+At the author's ruling. Where no model was visible for a use, the model picker opened with only its title and close button and gave no reason, and a chosen model missing from the visible list showed only its bare id on the launch button (e.g. `nvidia:google/gemma-4-31b-it`).
+
+- An empty picker now says "No models to choose from. An administrator can make models visible in Settings → Models." It is read by members too, so it names who can fix it and where.
+- A model not in the list is shown by its id, with `Not in the list` in the provider line.
+- The change stays inside the shared picker (`ModelCardPicker`), so all seven users get it: Stage 1 and Stage 2 on the Describe tab, refinement, the DDL editor, the demo, and Vision for autonomous refinement and the colophon. The manual (Japanese and English) says so.
+
+### v2.15.39 — vocabulary packages and inherited sketch prose (Build 1115, 2026-09-28)
+
+This version includes the changes below since v2.15.38. It reorganizes the vocabulary package settings and API, and passes a parent's sketch prose through Web autonomous refinement and CLI refinement as appropriate. DDL, Score, and rendering versions are unchanged.
+
+### 2026-09-28 — CLI refinement carries the parent's sketch prose too (I-704)
+
+At the author's ruling (I-296 refiled, handled as I-300). `inku-cli refine perform` sent no sketch request and the server never inherits one from a parent, so refining a work drawn with Sketch from life drew every kind of refinement without its prose.
+
+- When the parent has sketch prose and the description is the parent's, the prose is sent as `sketch_text` and the layer is not run; when `--description` changes the description, the layer runs again (`sketch: true`); a parent without prose sends no sketch request. No flag is added.
+- The `--description` help, `cli/README.md`, and the manual (Japanese and English) say so.
+
+### 2026-09-28 — Each generation of autonomous refinement carries its parent's sketch prose (I-300)
+
+At the author's ruling. Autonomous refinement drew every generation with the Describe tab's Sketch from life setting, so with the layer on it ran again and rewrote the prose in color, layout, touch and variation generations as well as reading ones, and whether a generation used the layer could disagree with the work chosen in the lineage.
+
+- Each generation follows its parent. When the parent has sketch prose and the drawing text is the parent's, the parent's prose is passed and the layer is not run (as `Another reading too` in the refinement candidates does). A generation whose text changed because a direction was added goes through the layer again. A parent without prose gives a generation drawn without the layer.
+- Entry points that could no longer be reached are removed: the canvas's in-place performance, layout and reading redraws (their buttons were removed on 2026-07-11) with their redraw module and the reading diff display, and the manual refinement dialog nothing opened, with its strings. The manual no longer describes `Refine manually`.
+
+SPEC "Autonomous Refinement Methods" and the manual (Japanese and English) describe the sketch handling. The server and saved works are unchanged.
+
+### 2026-09-28 — The Plugins settings become a screen for the vocabulary packages drawing uses (I-703)
+
+At the author's direction. The `User plugins` settings created and edited `.inku-plugin.md` documents, but drawing uses only definitions the developers wrote in JSON: a written document's expansion was never drawn from and its words were left out. The screen is now `Vocabulary plugins`:
+
+- Creating (load from file) and viewing or editing code are gone, and so are `POST /api/plugins`, `PUT /api/plugins/{id}`, and `GET /api/plugins/{id}/content` (listing, validation, and reload, which the CLI uses, remain).
+- A document that switches a bundled package is marked `Used for drawing`, any other `Not used for drawing`, each with an explanation. Each item of the list (`/api/plugins` and the settings status) gains `has_definitions`.
+- Only a legacy document not used for drawing can be deleted. Deleting a bundled package's document is refused with 409 and the screen suggests switching it off.
+- Each package shows its words (name, aliases, surfaces, notes, preview) read-only.
+
+A document still counts as a bundled package only where it sits in `server/plugins/`; the manual now says that pointing `INKU_DOCUMENT_PLUGIN_DIR` elsewhere treats `Nature.leaves` as legacy too. Definitions, drawing, and saved works are unchanged.
+
+### v2.15.38 — numeric position ranges and model administration improvements (Build 1114, 2026-09-28)
+
+This version includes the changes below since v2.15.37. DDL Spec 15 and DDL engine 52 allow positions to be specified as numeric ranges. It improves work display and catalog changes, diagnostics, restrictions on offering models, and the model settings screen. The render engine and API route count are unchanged.
+
+### 2026-09-28 — Offered models are listed under LLM and Vision
+
+At the author's direction. `Models visible to users` in the model settings ran every model together, each labeled `LLM · name` or `Vision · name`, which was hard to read. The models now sit in one row per purpose, headed `LLM` or `Vision` with a count, and each model shows its name alone. A purpose with no models has no row.
+
+### 2026-09-28 — Unusable models cannot be offered, and Ollama Cloud is checked on fetch
+
+At the author's request. Ollama Cloud (ollama.com) hands its model list and model details to anyone without a key, so neither says whether the account's plan reaches a model or whether it has retired (on `192.168.0.89`, `qwen3.5:397b`, retired on 2026-09-25, was still offered and listed to users). Each `Fetch model list` now checks the listed models two at a time: 410 from `/api/show` is end of life (its date becomes `eol_date`), 403 from a one-token call on the key is paid plan only, and 200 clears the paid-plan mark. Any other answer settles nothing and the earlier mark stays. A model marked end of life or paid plan only is also kept out of the offered models when settings are saved, and the administration screen's model selection disables its checkbox and shows why (`Select visible` skips it too). With one call per model, an Ollama Cloud fetch can take a minute or two.
+
+### 2026-09-28 — A numeric range written wrongly is said in words
+
+At the author's direction, the numeric-range diagnostics that came with DDL engine 52 gain Japanese and English sentences: `invalid_numeric_range` (outside 0 to 1, or a start not below its end), `unsupported_numeric_range` (a range on a fill target or a member of a coordinated group), and `conflicting_numeric_positions` and `named_and_numeric_position_conflict`, which now cover ranges too. Also fixed: a Score gap carries its kind under `type` (the core's `ScoreFieldGap`), but the Web's diagnostics read only `kind`, so every Score gap read "Reason: diagnostic." Gaps without a sentence now show their kind's name after the reason label.
+
+### 2026-09-28 — Android calls the DDL the instructions, and heads them as Japanese or English DDL
+
+Following the author's instruction to apply the DDL's language mode strictly and show it in the UI (numeric ranges are written differently in Japanese and English), and the author's ruling after seeing the screen, Android follows the web.
+
+- The DDL is called the instructions, as on the web; interpretation is left only for Stage 1's act of reading a description into instructions (the lineage's reinterpretation, the interpretation seed, the generation info's Interpretation section, the sketch record). View / Hide interpretation become View / Hide instructions, the demo's produced interpretation becomes Instructions for this run, the batch and demo placeholder becomes Waiting for instructions…, and the overwrite confirmations say instructions, as the web's glossary has it (`instructions`, always plural).
+- The instructions' heading in the studio, the instructions opened with View instructions while a work is viewed, and a refinement option's DDL are headed as on the web, "Instructions (Japanese DDL)" / "Instructions (English DDL)", in plain label text rather than a pressable-looking chip, with the web's explanation on a long press. A saved work's DDL shows the language it resolved while unedited; an edit follows the server's `auto` rule (any hiragana, katakana or kanji makes it Japanese, otherwise Latin letters make it English, and neither leaves the interface language).
+
+DDL, Score and rendering versions are unchanged.
+
+### 2026-09-28 — Positions can be written as numeric ranges (DDL Spec 15, DDL engine 52)
+
+A position can now be written as a range of canvas fractions. By the author's decision the form is "words (numeric range)": the author's words stay in the sentence, and the compiler reads the numbers in the parentheses.
+
+- Japanese: `右下（横0.67〜1、縦0.67〜1）に、橙色の小さな円を十個散らす。` A range alone: `画面の横0.2〜0.5、縦0〜0.3の範囲に…`.
+- English: `At the bottom right (horizontal 0.67 to 1, vertical 0.67 to 1), scatter ten small orange circles.` A range alone: `In the range horizontal 0.2 to 0.5, vertical 0 to 0.3, …`.
+- The words before the parenthesis are kept as the original words and never read, so no vocabulary grows.
+- The language mode is applied strictly (the author's instruction). The Japanese form is read only in a Japanese instruction and accepts full-width or ASCII parentheses, `〜`, `～`, or `~`, and full-width digits. The English form is read only in an English instruction and writes the range with `to` only; `~` means "about" in English and is not accepted.
+- A value is a decimal or a fraction (`2/3`, `２／３`). A range lies within 0 to 1 and has a width; a range outside these limits stops the work.
+- A numeric range draws by the same rules as a named position. A named position and a numeric range with the same numbers give the same plan.
+- A numeric range on a fill target, a Macro caller, or a coordinated-group member has no Score form yet and is reported as unsupported.
+
+The DDL of the 375 typed production works was compiled before and after on Linux (no drawing). All 375 Scores are the same, so existing instructions read as before. Saved works do not change either. The Score format and the render engine are unchanged. The geometry policy digest becomes `aacaf721…`.
+
+### 2026-09-27 — The render engine version history gains engines 46 to 71
+
+`docs/spec/render-engine-history` (both languages) stopped at engine 45. It now lists engines 46 to 71 and gives each its own section. Only engines 46 to 51 and 66 have a frozen corpus; from 52 on none was made, following the 2026-09-11 ruling that the full reference update runs once when every migration step is done. Engines 69 to 71 carry their saved-Score comparison counts. This changes documents only, not versions.
+
+### 2026-09-28 — The history strip shows a work's picture right after it is saved
+
+At the author's direction. Thumbnails are baked after a save, so the history strip or library asking for one right after the save got a 404. It then draws the SVG in hand, but the listing is fetched without SVGs (`include_svg=false`), so the picture stayed blank until a reload. When there is no thumbnail and no SVG in hand, the stored SVG is fetched once (`/api/history/{id}/svg`; the display profile returns the saved one as it is, without drawing again) and drawn.
+
+### 2026-09-28 — Another catalog works without a description
+
+At the author's decision, Another catalog draws its options without a description or DDL: it redraws the saved JSON Score alone in other catalogs and uses neither. Until now it stopped, like the other refinements, on a work without a description (one written directly in DDL), and opening it from a lineage card reloads the work and empties the description field, so that path could not change the colors at all. The other refinement elements keep their conditions.
+
+### v2.15.37 — show the DDL language in instructions headings (Build 1113, 2026-09-28)
+
+This version includes the change below since v2.15.36. The Web shows whether the instructions and editor are using Japanese DDL or English DDL. The language rule, API, DDL and Score formats, and render version are unchanged.
+
+### 2026-09-28 — The instructions' language (Japanese DDL or English DDL) is shown
+
+At the draw session's request (the author's direction), the Web shows whether a DDL is read with the Japanese or the English grammar, since numeric ranges are to be written differently in each (draw-system05, second stage; the core change is still to come). The instructions heading on the left changes from `Instructions (normalized DDL)` to `Instructions (Japanese DDL)` or `Instructions (English DDL)` after the work's recorded `instruction_lang_resolved` (or, when none is recorded, the Server's auto rule applied to the text), and the instructions editor's heading takes the same form from the auto rule applied to the text being written (plain heading text, at the author's choice, not a framed badge). The heading's note says a single hiragana, katakana, or kanji character makes a DDL Japanese, so one Japanese name in English instructions has them read as Japanese. The rule itself and the API, DDL, and Score formats are unchanged.
 
 ### v2.15.36 — open color catalog options from the work-editing menu (Build 1112, 2026-09-28)
 
@@ -15,10 +325,6 @@ This version includes the changes below since v2.15.35. Another catalog moves to
 At the author's direction, `Another catalog` leaves the refinement elements of Edit drawing elements and moves to the work-editing menu (Refine on the work tab, and `…` on each work in the lineage tab), after Edit drawing parameters. Choosing it opens a dialog of its own that at once draws the same Score in every color catalog except the work's (twelve today), in catalog-list order. Before, it drew one or four options from catalogs picked at random. Each option is named by its catalog alone. Saving, discarding, and staying open while options are unsaved work as in Edit drawing elements, and both dialogs share one options grid, whose notes (such as asking to save or discard before closing) now sit above the options, where a dozen options no longer push them out of the dialog. No LLM is called. A remembered refinement element of Another catalog falls back to Another performance. Another catalog in autonomous refinement is unchanged.
 
 The DDL, Score, and render versions are unchanged.
-
-### 2026-09-27 — The render engine version history gains engines 46 to 71
-
-`docs/spec/render-engine-history` (both languages) stopped at engine 45. It now lists engines 46 to 71 and gives each its own section. Only engines 46 to 51 and 66 have a frozen corpus; from 52 on none was made, following the 2026-09-11 ruling that the full reference update runs once when every migration step is done. Engines 69 to 71 carry their saved-Score comparison counts. This changes documents only, not versions.
 
 ### v2.15.35 — update placement ranges, rasterization, and refinement (Build 1111, 2026-09-27)
 
@@ -93,6 +399,9 @@ DDL, Score and rendering versions are unchanged.
 The Web's model pickers show the server catalog's evaluation (per-stage stars, speed, comments), while Android showed model names only (finding V-10 of the 2026-09-26 source review). By the author's ruling, Android's recommendation is a mark on the supported models only: the models Android is verified on a device to draw with, the on-device Gemma 4 E2B and Gemma 4 31B through the Gemini API (`gemma-4-31b-it`, the model the device tests use). The drawing's model picker and the settings' offered-model picker show "Supported" beside them. No other model is rated.
 
 DDL, Score and rendering versions are unchanged.
+
+<details>
+<summary>Open past history (records from v2.15.34 and earlier)</summary>
 
 ### v2.15.34 — update center placement, rendering and refinement labels (Build 1110, 2026-09-27)
 
@@ -10155,3 +10464,5 @@ the author replaced the task**, so four directly assigned pieces of work were do
 - **On-device model downloads and image inputs are bounded and fail closed.** Resumed downloads validate `Content-Range` and the final byte count, while storage reservation discounts only the same request's retained `.part`. Picker and camera inputs share a 64 MiB pre-decode limit, and cancellation or failure reclaims partial files, PNG bitmaps, and cache files.
 - **Provider and native-model security boundaries are explicit.** Cleartext is limited to loopback, provider URLs reject userinfo, queries, fragments, and automatic redirects, and LiteRT accepts only regular files under the app-owned `files/models/` directory. UI and headless logs redact tokens and private paths. Room schema, APIs, storage formats, the render core and pipeline, Server, and Web are unchanged.
 - **Verification:** 14/14 focused tests, 354/354 Debug JVM tests, lint with zero errors, release Kotlin compilation, Debug AndroidTest Kotlin compilation, six Android naming tests, bilingual documentation checks, and the diff check passed. After the source merge, the release APK package including the shared Rust JNI library was built exactly once and stamped as `.78` Build 148121. No ADB device was connected and reconnect found none, so verified backup, signer compatibility, data-preserving installation, and on-device version/Build checks remain pending for the canonical deploy helper after the device reconnects. Real-device instrumentation, live provider/model traffic, storage-pressure testing, pentala, and public GitHub push were not run.
+
+</details>

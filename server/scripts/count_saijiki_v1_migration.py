@@ -56,7 +56,7 @@ def main() -> int:
     parser.add_argument("--workers", type=int, default=1,
                         help="ask the core from this many threads at once")
     parser.add_argument("--out", type=Path, default=None,
-                        help="write progress.log and report.json here")
+                        help="write progress.log, report.json, and journal.jsonl (each answer as it comes) here")
     args = parser.parse_args()
     database = _resolve_guarded_database(args.run_root, args.database)
 
@@ -72,7 +72,8 @@ def main() -> int:
                for line in args.history_ids.read_text(encoding="utf-8").splitlines() if line.strip()}
     try:
         report = census(connection, inku_render.pipeline_migrate_saijiki_v1, workers=args.workers,
-                        sample=args.sample, history_ids=ids, progress=(lambda line: log.write(line + "\n")) if log else None)
+                        sample=args.sample, history_ids=ids, progress=(lambda line: log.write(line + "\n")) if log else None,
+                        journal=args.out / "journal.jsonl" if args.out else None)
     finally:
         connection.close()
         if log:

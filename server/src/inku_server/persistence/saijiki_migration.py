@@ -39,10 +39,11 @@ from __future__ import annotations
 
 import hashlib
 import json
+import threading
 import time
 from collections import Counter
 from collections.abc import Callable, Iterable, Iterator, Mapping
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -139,9 +140,15 @@ class _Core:
     The binding releases the GIL while the core works, so threads run calls in
     parallel. Each kind of unit keeps its call count, the time the calls took
     one by one, and the wall-clock time of its batch.
+
+    With a journal, each call is written down as it starts, with the record it
+    was asked for, and again with its answer as it ends: a run that stops
+    leaves every answer it got, and a start without an end names a call that
+    did not return.
     """
 
-    def __init__(self, migrate: MigrateUnit, workers: int, progress: Progress | None) -> None:
+    def __init__(self, migrate: MigrateUnit, workers: int, progress: Progress | None,
+                 journal: Path | None = None) -> None:
         self.migrate = migrate
         self.workers = max(1, workers)
         self.progress = progress
@@ -149,27 +156,49 @@ class _Core:
         self.calls: Counter[str] = Counter()
         self.seconds: Counter[str] = Counter()
         self.wall: Counter[str] = Counter()
-        self.slowest: list[tuple[float, str, int]] = []
+        self.slowest: list[tuple[float, str, str]] = []
+        self._lock = threading.Lock()
+        self._journal = journal.open("a", encoding="utf-8", buffering=1) if journal is not None else None
 
-    def ask(self, kind: str, units: Iterable[bytes]) -> None:
-        pending = [unit for unit in dict.fromkeys(units) if unit not in self.answers]
+    def _write(self, entry: dict[str, object]) -> None:
+        if self._journal is not None:
+            with self._lock:
+                self._journal.write(_canonical(entry) + "\n")
 
-        def one(unit: bytes) -> tuple[bytes, bytes, float]:
+    def close(self) -> None:
+        if self._journal is not None:
+            self._journal.close()
+            self._journal = None
+
+    def ask(self, kind: str, units: Mapping[bytes, str]) -> None:
+        """Answer each unit; ``units`` maps a unit to the record it was asked for."""
+        pending = [(unit, label) for unit, label in units.items() if unit not in self.answers]
+
+        def one(unit: bytes, label: str) -> tuple[bytes, float]:
+            self._write({"event": "start", "kind": kind, "unit": hashlib.sha256(unit).hexdigest(),
+                         "record": label})
             started = time.monotonic()
             output = self.migrate(unit)
-            return unit, output, time.monotonic() - started
+            return output, time.monotonic() - started
 
         started = time.monotonic()
         with ThreadPoolExecutor(max_workers=self.workers) as pool:
-            for done, (unit, output, seconds) in enumerate(pool.map(one, pending), 1):
+            futures = {pool.submit(one, unit, label): (unit, label) for unit, label in pending}
+            for done, future in enumerate(as_completed(futures), 1):
+                unit, label = futures[future]
+                output, seconds = future.result()
                 try:
                     answer = json.loads(output.decode("utf-8"))
                 except (UnicodeDecodeError, json.JSONDecodeError):
                     answer = None
-                self.answers[unit] = answer if isinstance(answer, dict) else {"error": {"code": "unreadable_answer"}}
+                if not isinstance(answer, dict):
+                    answer = {"error": {"code": "unreadable_answer"}}
+                self.answers[unit] = answer
+                self._write({"event": "done", "kind": kind, "unit": hashlib.sha256(unit).hexdigest(),
+                             "record": label, "ms": round(seconds * 1000), "answer": answer})
                 self.calls[kind] += 1
                 self.seconds[kind] += seconds
-                self.slowest = sorted([*self.slowest, (seconds, kind, len(unit))], reverse=True)[:10]
+                self.slowest = sorted([*self.slowest, (seconds, kind, label)], reverse=True)[:10]
                 if self.progress and (done % 200 == 0 or done == len(pending)):
                     self.progress(f"{kind} {done}/{len(pending)} {round(time.monotonic() - started)}s")
         self.wall[kind] += time.monotonic() - started
@@ -182,8 +211,8 @@ class _Core:
                             for kind, calls in self.calls.items() if calls},
             "call_seconds": {kind: round(seconds, 1) for kind, seconds in self.seconds.items()},
             "wall_seconds": {kind: round(seconds, 1) for kind, seconds in self.wall.items()},
-            "slowest_calls": [{"ms": round(seconds * 1000), "kind": kind, "bytes": size}
-                              for seconds, kind, size in self.slowest],
+            "slowest_calls": [{"ms": round(seconds * 1000), "kind": kind, "record": label}
+                              for seconds, kind, label in self.slowest],
         }
 
 
@@ -210,14 +239,22 @@ class _Link:
 
 
 def plan(connection: Any, migrate: MigrateUnit, *, workers: int = 1, sample: int | None = None,
-         history_ids: Iterable[str] | None = None, progress: Progress | None = None) -> Plan:
+         history_ids: Iterable[str] | None = None, progress: Progress | None = None,
+         journal: Path | None = None) -> Plan:
     """Ask the core about every saved record; return what writing its answers would do.
 
     Reads only. ``sample`` counts that many variations and works drawn at
     random; ``history_ids`` only those works. A plan drawn either way is for
-    counting, never for writing.
+    counting, never for writing. ``journal`` keeps each answer as it comes.
     """
-    core = _Core(migrate, workers, progress)
+    core = _Core(migrate, workers, progress, journal)
+    try:
+        return _plan(connection, core, sample=sample, history_ids=history_ids)
+    finally:
+        core.close()
+
+
+def _plan(connection: Any, core: _Core, *, sample: int | None, history_ids: Iterable[str] | None) -> Plan:
     result = Plan()
     counts: dict[str, Counter[str]] = {kind: Counter() for kind in (
         "definitions", "history_links", "executions", "variation_documents", "history")}
@@ -261,7 +298,12 @@ def plan(connection: Any, migrate: MigrateUnit, *, workers: int = 1, sample: int
     # Every distinct definition once; a document's unit carries the ones its locks name.
     distinct_definitions = _distinct(
         definition for definitions in saved_by_variation.values() for definition in definitions)
-    core.ask("definitions", (_definition_unit(definition) for definition in distinct_definitions))
+    labels: dict[bytes, str] = {}
+    for definition in distinct_definitions:
+        name = (f"{definition.get('namespace')}.{definition.get('heading')}@{definition.get('version')}"
+                if isinstance(definition, Mapping) else "definition")
+        labels.setdefault(_definition_unit(definition), name)
+    core.ask("definitions", labels)
 
     def definition_answer(definition: Any) -> dict[str, Any]:
         answer = core.answers[_definition_unit(definition)]
@@ -308,7 +350,10 @@ def plan(connection: Any, migrate: MigrateUnit, *, workers: int = 1, sample: int
         definitions = locked(saved_by_variation.get((owner_id, variation_id), []), locks)
         variation_units[(owner_id, variation_id)] = _document_unit(
             str(document.get("source")), str(document.get("language")), locks, definitions)
-    core.ask("variation_documents", variation_units.values())
+    labels = {}
+    for (owner_id, variation_id), unit in variation_units.items():
+        labels.setdefault(unit, f"{owner_id}/{variation_id}")
+    core.ask("variation_documents", labels)
 
     history_units: dict[tuple[str, str], bytes] = {}
     for history_id, ddl, expanded_ddl, language in history_rows:
@@ -319,7 +364,10 @@ def plan(connection: Any, migrate: MigrateUnit, *, workers: int = 1, sample: int
             if source:
                 history_units[(history_id, column)] = _document_unit(
                     source, language if language in {"ja", "en"} else "ja", locks, definitions)
-    core.ask("history", history_units.values())
+    labels = {}
+    for (history_id, column), unit in history_units.items():
+        labels.setdefault(unit, f"{history_id}:{column}")
+    core.ask("history", labels)
 
     def document_answer(kind: str, record_id: str, unit: bytes, source: str,
                         locks: int) -> dict[str, Any] | None:
@@ -492,13 +540,14 @@ def census(connection: Any, migrate: MigrateUnit, **options: Any) -> dict[str, A
 
 def migrate_saved_records(connection: Any, migrate: MigrateUnit, *, workers: int = 1,
                           progress: Progress | None = None,
-                          checked: Callable[[], None] | None = None) -> dict[str, Any]:
+                          checked: Callable[[], None] | None = None,
+                          journal: Path | None = None) -> dict[str, Any]:
     """Write the migration over every saved record inside the caller's transaction.
 
     ``checked`` runs after the updates and before the discards; it raises to
     stop the transaction (the caller's invariant check).
     """
-    migration = plan(connection, migrate, workers=workers, progress=progress)
+    migration = plan(connection, migrate, workers=workers, progress=progress, journal=journal)
     started = time.monotonic()
     for sql, args in migration.statements:
         _execute(connection, sql, args)
@@ -512,7 +561,7 @@ def migrate_saved_records(connection: Any, migrate: MigrateUnit, *, workers: int
 
 
 def migrate_once(database: Path, migrate: MigrateUnit, *, workers: int = 1,
-                 progress: Progress | None = None) -> dict[str, Any]:
+                 progress: Progress | None = None, journal: Path | None = None) -> dict[str, Any]:
     """Move the saved records of one SQLite database to Saijiki v2, once.
 
     Run it while the service is stopped. It keeps a verified Backup API
@@ -544,7 +593,8 @@ def migrate_once(database: Path, migrate: MigrateUnit, *, workers: int = 1,
                     raise MigrationAlreadyWritten(str(database))
                 before = capture_invariants(connection)
                 report = migrate_saved_records(connection, migrate, workers=workers, progress=progress,
-                                               checked=lambda: verify_invariants(connection, before))
+                                               checked=lambda: verify_invariants(connection, before),
+                                               journal=journal)
                 summary = {"refused_records": len(report["refused_records"]), "statements": report["statements"]}
                 _execute(connection, "INSERT INTO app_settings(key, value, at) VALUES (?, ?, ?)",
                          (DONE_SETTING, _canonical(summary), int(time.time() * 1000)))

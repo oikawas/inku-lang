@@ -4,7 +4,8 @@ The copy must sit inside a run root that carries the isolated-rehearsal marker,
 as for count_saijiki_v1_migration.py. The migration is the one
 migrate_saijiki_v2.py writes (``saijiki_migration.migrate_once``): its safety
 snapshot lands inside the run root, and its report, with how long each step
-took, is written to --out as report.json; stdout carries the counts only.
+took, is written to --out as report.json, and each answer of the core to
+journal.jsonl as it comes; stdout carries the counts only.
 """
 
 from __future__ import annotations
@@ -32,7 +33,7 @@ def main() -> int:
 
     with (args.out / "progress.log").open("a", encoding="utf-8", buffering=1) as log:
         report = migrate_once(database, inku_render.pipeline_migrate_saijiki_v1, workers=args.workers,
-                              progress=lambda line: log.write(line + "\n"))
+                              progress=lambda line: log.write(line + "\n"), journal=args.out / "journal.jsonl")
     (args.out / "report.json").write_text(
         json.dumps({"ok": True, "rehearsal": report}, ensure_ascii=False, sort_keys=True), encoding="utf-8")
     counts = {key: value for key, value in report.items()

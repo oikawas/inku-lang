@@ -5,9 +5,11 @@ stopped, before the new release starts (the author, 2026-09-30: by hand, not at
 startup). It keeps a verified Backup API snapshot in ``migration-backups/``
 beside the database, then writes under a single writer lock; a failure rolls
 back and keeps the snapshot, and a second run refuses. Records the core
-refuses stay as they were. The whole report -- counts, every refused record
-with its error and text, and the timings -- is written to --report (by
-default beside the snapshot); stdout carries the counts only.
+refuses stay as they were. Each answer of the core is written to a journal
+beside the snapshot as it comes, so a run that stops leaves what it got. The
+whole report -- counts, every refused record with its error and text, and the
+timings -- is written to --report (by default beside the snapshot); stdout
+carries the counts only.
 """
 
 from __future__ import annotations
@@ -33,8 +35,12 @@ def main() -> int:
 
     import inku_render
 
+    journal = args.database.expanduser().resolve().parent / "migration-backups" / (
+        f"{args.database.stem}-saijiki-v2-journal-{time.time_ns()}.jsonl")
+    journal.parent.mkdir(parents=True, exist_ok=True)
+    print(f"journal: {journal}", file=sys.stderr, flush=True)
     report = migrate_once(args.database, inku_render.pipeline_migrate_saijiki_v1, workers=args.workers,
-                          progress=lambda line: print(line, file=sys.stderr, flush=True))
+                          progress=lambda line: print(line, file=sys.stderr, flush=True), journal=journal)
     path = args.report or Path(report["snapshot"]).with_name(
         f"{args.database.stem}-saijiki-v2-{time.time_ns()}.json")
     path.write_text(json.dumps(report, ensure_ascii=False, sort_keys=True), encoding="utf-8")

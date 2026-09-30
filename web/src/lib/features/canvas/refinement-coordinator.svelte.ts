@@ -29,8 +29,10 @@ export type RefinementCoordinatorDeps = {
 	models: {
 		stage1: () => string;
 		stage2: () => string;
-		/** The short name a model's option and lane are labelled with. */
+		/** The name a model's option is labelled with, provider included. */
 		label: (model: string) => string;
+		/** The model's own name, without the provider, for its lane under the mascot. */
+		shortLabel: (model: string) => string;
 	};
 	catalog: {
 		defaultId: () => string;
@@ -464,7 +466,7 @@ export function createRefinementCoordinator(deps: RefinementCoordinatorDeps) {
 		}, 3000);
 		const failed: Record<string, string> = {};
 		try {
-			refinementSession.setPlans(abortController, labels);
+			refinementSession.setPlans(abortController, pending.map((model) => deps.models.shortLabel(model)));
 			const results = await runRefinementFanout(pending.map((model, index) => async () => {
 				try {
 					return await renderModelCandidate(model, labels[index], abortController.signal);

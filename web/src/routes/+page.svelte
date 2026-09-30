@@ -1389,7 +1389,8 @@
 		models: {
 			stage1: () => qualifiedModelId(stage1Provider, stage1Model),
 			stage2: () => qualifiedModelId(stage2Provider, stage2Model),
-			label: statusModelName
+			label: statusModelName,
+			shortLabel: (model) => modelShortName(model)
 		},
 		catalog: {
 			defaultId: () => defaultCatalogId,

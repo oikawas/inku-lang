@@ -26,9 +26,14 @@
 		states: LaneState[];
 		/** Same order as `states`. An empty string is a lane not yet named. */
 		labels?: string[];
+		/**
+		 * Show each lane's label under its mascot instead of its number: the
+		 * model change has a lane per model, and the number does not say which.
+		 */
+		named?: boolean;
 	};
 
-	let { states, labels = [] }: Props = $props();
+	let { states, labels = [], named = false }: Props = $props();
 
 	// The phase offset is made by starting each mascot at a different moment
 	// rather than by reaching into its animations: the two mascots hang their
@@ -56,7 +61,7 @@
 </script>
 
 {#if states.length > 1}
-	<div class="lanes" aria-live="polite">
+	<div class="lanes" class:named aria-live="polite">
 		{#each states as state, index (index)}
 			<div
 				class="lane"
@@ -77,7 +82,7 @@
 				<!-- The number, not the task name: four lanes have to fit across a
 				     narrow panel, and the name is already on the status line above.
 				     The full label stays reachable as the tooltip. -->
-				<span class="lane-label" title={labels[index] || ''}>{index + 1}</span>
+				<span class="lane-label" title={labels[index] || ''}>{named && labels[index] ? labels[index] : index + 1}</span>
 			</div>
 		{/each}
 	</div>
@@ -131,6 +136,22 @@
 		white-space: nowrap;
 		color: var(--fg3);
 		font-size: var(--ui-font-size-11);
+	}
+	/* Two lanes to a row, so a model's name has room for two lines. */
+	.lanes.named {
+		grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+	}
+	.lanes.named .lane-label {
+		display: -webkit-box;
+		-webkit-box-orient: vertical;
+		-webkit-line-clamp: 2;
+		line-clamp: 2;
+		white-space: normal;
+		overflow-wrap: anywhere;
+		text-align: center;
+		/* A step below the number's size: a name is longer than a digit. */
+		font-size: var(--ui-font-size-10);
+		line-height: 1.3;
 	}
 	.lane.done .lane-label {
 		color: var(--fg2);

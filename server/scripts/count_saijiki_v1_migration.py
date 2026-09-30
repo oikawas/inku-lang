@@ -68,8 +68,7 @@ def main() -> int:
             if args.out:
                 (args.out / "report.json").write_text(
                     json.dumps({"ok": True, "recheck": report}, ensure_ascii=False, sort_keys=True), encoding="utf-8")
-            json.dump({"ok": True, "recheck": {k: v for k, v in report.items() if k != "records"}},
-                      sys.stdout, ensure_ascii=False, sort_keys=True)
+            json.dump({"ok": True, "recheck": report}, sys.stdout, ensure_ascii=False, sort_keys=True)
             sys.stdout.write("\n")
             return 0
         log = (args.out / "progress.log").open("a", encoding="utf-8", buffering=1) if args.out else None

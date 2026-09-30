@@ -374,12 +374,12 @@ def _summary(sample: int | None, clock: _Clock, report: Mapping[str, _Tally],
 
 
 def recheck_history(connection: Any, migrate: MigrateUnit, ids: Iterable[str]) -> dict[str, object]:
-    """Put named instruction texts through the core again, and say why each is refused.
+    """Put named instruction texts through the core again, and keep what it says.
 
-    For the texts a census found refused (``<history id>:<column>``): whether
-    each carries a pale ink wash, whether it passes without its locks, and the
-    text itself for the draw session to reproduce (the author allowed it,
-    2026-09-30). Reads only those rows; writes nothing.
+    For the texts a census found refused (``<history id>:<column>``): the core's
+    error as it gives it (the stage it stopped at and why), the locks it was
+    read with, and the text itself for the draw session to reproduce (the
+    author allowed it, 2026-09-30). Reads only those rows; writes nothing.
     """
     records: list[dict[str, object]] = []
     for record_id in ids:
@@ -404,24 +404,17 @@ def recheck_history(connection: Any, migrate: MigrateUnit, ids: Iterable[str]) -
             locks = found if isinstance(found, list) else []
             definitions = _definitions_of(context.get("config"))
         document = {"source": source, "language": language, "macro_locks": locks}
-        answer = migrate_unit(migrate, document, definitions).get("document") or {}
-        unlocked = migrate_unit(migrate, {**document, "macro_locks": []}, []).get("document") or {}
+        answer = migrate_unit(migrate, document, definitions)
         records.append({
             "id": record_id,
             "language": language,
             "linked": link is not None,
-            "locks": len(locks),
-            "wash": any(word in source.lower() for word in _WASH_WORDS),
-            "refused": (answer.get("error") or {}).get("code"),
-            "refused_without_locks": (unlocked.get("error") or {}).get("code"),
+            "macro_locks": locks,
+            "error": (answer.get("document") or {}).get("error") or answer.get("error"),
             "source": source,
         })
     return {
         "rechecked": len(records),
-        "still_refused": sum(1 for record in records if record.get("refused")),
-        "with_wash": sum(1 for record in records if record.get("wash")),
-        "refused_with_wash": sum(1 for record in records if record.get("refused") and record.get("wash")),
-        "passes_without_locks": sum(1 for record in records
-                                    if record.get("refused") and not record.get("refused_without_locks")),
+        "still_refused": sum(1 for record in records if record.get("error")),
         "records": records,
     }

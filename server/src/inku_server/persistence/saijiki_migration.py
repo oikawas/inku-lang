@@ -162,7 +162,11 @@ class _Clock:
             self.seconds[self.kind] += time.monotonic() - started
 
 
-def census(connection: Any, migrate: MigrateUnit, *, sample: int | None = None) -> dict[str, object]:
+_WASH_WORDS = ("薄墨", "pale ink wash")
+
+
+def census(connection: Any, migrate: MigrateUnit, *, sample: int | None = None,
+           refused_texts: int = 0) -> dict[str, object]:
     """Count what the migration would do to the saved records; write nothing.
 
     ``connection`` is a DB-API connection (sqlite3) opened read-only. With
@@ -171,6 +175,12 @@ def census(connection: Any, migrate: MigrateUnit, *, sample: int | None = None) 
     for it, so a drawn document is not refused for a definition that was
     simply not drawn. Each kind reports its total rows, the rows counted, and
     the core's time per call, from which the whole run can be estimated.
+
+    A refused instruction text is also tried without its locks, and counted by
+    whether it carries a pale ink wash (the core refuses a wash whose density
+    word does not fall on a v1 token). ``refused_texts`` returns that many of
+    the refused texts themselves, for the draw session to reproduce; the
+    author allowed it on 2026-09-30.
     """
     clock = _Clock(migrate)
     limit = f" ORDER BY random() LIMIT {int(sample)}" if sample else ""
@@ -286,6 +296,7 @@ def census(connection: Any, migrate: MigrateUnit, *, sample: int | None = None) 
     report["variation_documents"] = variations
 
     clock.kind = "history"
+    refused_samples: list[dict[str, object]] = []
     history = _Tally()
     history.counts["total_rows"] = total("history")
     for history_id, ddl, expanded_ddl, language in rows(
@@ -298,8 +309,22 @@ def census(connection: Any, migrate: MigrateUnit, *, sample: int | None = None) 
             if not source:
                 continue
             history.counts[f"{column}_present"] += 1
-            answer = migrate_unit(clock, {"source": source, "language": language, "macro_locks": locks}, definitions)
+            document = {"source": source, "language": language, "macro_locks": locks}
+            answer = migrate_unit(clock, document, definitions)
             history.document(f"{history_id}:{column}", answer.get("document"))
+            refusal = (answer.get("document") or {}).get("error")
+            if refusal:
+                washed = any(word in source.lower() for word in _WASH_WORDS)
+                history.counts["refused_with_wash" if washed else "refused_without_wash"] += 1
+                unlocked = migrate_unit(clock, {**document, "macro_locks": []}, []).get("document") or {}
+                if locks:
+                    history.counts["refused_passes_without_locks" if "error" not in unlocked
+                                   else "refused_also_without_locks"] += 1
+                if len(refused_samples) < refused_texts:
+                    refused_samples.append({
+                        "id": f"{history_id}:{column}", "language": language, "code": refusal.get("code"),
+                        "wash": washed, "locks": len(locks), "source": source,
+                    })
     report["history"] = history
 
     return {
@@ -309,4 +334,5 @@ def census(connection: Any, migrate: MigrateUnit, *, sample: int | None = None) 
             kind: round(clock.seconds[kind] * 1000 / calls, 1) for kind, calls in clock.calls.items() if calls
         },
         **{kind: tally.report() for kind, tally in report.items()},
+        "refused_history_texts": refused_samples,
     }

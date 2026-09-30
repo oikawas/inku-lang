@@ -3,8 +3,8 @@
 Read-only: the copy is opened with SQLite's ``mode=ro`` (and ``immutable``) and
 nothing is written.
 It prints one JSON object of counts, the word replacements the core would make,
-and the ids (never the contents) of records the core refuses or that carry a
-sweep it cannot associate. The copy must sit inside a run root that carries
+and the ids of records the core refuses or that carry a sweep it cannot
+associate; with --refused-texts, that many refused texts themselves. The copy must sit inside a run root that carries
 the isolated-rehearsal marker, as for rehearse_persistence_migration.py.
 """
 
@@ -47,6 +47,8 @@ def main() -> int:
     parser.add_argument("--database", type=Path, required=True)
     parser.add_argument("--sample", type=int, default=None,
                         help="count this many rows of each kind, drawn at random")
+    parser.add_argument("--refused-texts", type=int, default=0,
+                        help="return this many refused instruction texts themselves")
     args = parser.parse_args()
     database = _resolve_guarded_database(args.run_root, args.database)
 
@@ -56,7 +58,7 @@ def main() -> int:
     # create the journal files a read-only open of a WAL database otherwise needs.
     connection = sqlite3.connect(f"file:{database}?mode=ro&immutable=1", uri=True)
     try:
-        report = census(connection, inku_render.pipeline_migrate_saijiki_v1, sample=args.sample)
+        report = census(connection, inku_render.pipeline_migrate_saijiki_v1, sample=args.sample, refused_texts=args.refused_texts)
     finally:
         connection.close()
     json.dump({"ok": True, "census": report}, sys.stdout, ensure_ascii=False, sort_keys=True)

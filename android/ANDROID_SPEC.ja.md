@@ -30,6 +30,16 @@ runtime fallbackを持たない。保存済みSVG、Room schema、Score schema�
 - Android 仕様を更新するときは、先に `ANDROID_SPEC.ja.md` を更新し、その後で `ANDROID_SPEC.md` を同期する。
 - 英語版だけに存在する仕様・要件を追加してはならない。
 
+## 2026-09-30 Serverとのprovider要求・応答の同期
+
+描画はServerの`pipeline_provider.py`、画像の記述生成は`vision_client.py`と同じprovider種別ごとの要求・応答規則を使う。
+
+- Anthropic: モデルによらず`temperature`を省き、モデルの既定値を使う。写真の記述生成・デモ用記述も同じである。Sonnet 5.5が写真の記述生成の`temperature: 0.2`をHTTP 400で拒否していた不具合を修正した。回答ツールは`auto`で提示し、呼出しがあれば指定したツール1つの`input`を読む。テキストでの回答はJSONオブジェクトを読む。自由文のテキストブロックは改行で結び、thinkingは読まない。
+- OpenAI互換: `stream: false`を明示し、OpenAI自身のAPIでは既存の`openai_sampling()`相当の出力上限・sampling・思考指定を使う。回答ツールの呼出しがあれば指定したツール1つの引数だけを読む。呼出しが無い場合はメッセージのテキストを読む。
+- Gemini: 画像要求では接続名・モデル名によらず`thinkingConfig.thinkingLevel: minimal`とし、記述の後にJPEGの`inlineData`を置く。画像の自由文はtemperature 0.2、描画はtemperatureを省く。描画応答は指定した関数1つの`args`オブジェクトだけを読む。自由文のテキストは改行で結び、thoughtは読まない。
+
+外部モデルによる写真の記述生成でHTTPエラーが起きた場合も、描画と同じ秘匿処理済みの拒否理由を、共通の記述生成境界からLogcatの`InkuProvider`へ`vision`の操作名で残す。
+
 ## 2026-09-30 制作・鑑賞・推敲の遷移
 
 起動時は保存作品を自動選択せず、記述から書き始める制作画面を表示する。未完了の実行の復旧は従来どおり維持する。下部の「制作」は推敲対象を閉じて制作の草稿へ戻る操作とし、完成済み作品を入力欄へ自動復元しない。設定のアイコンは中央に穴のある歯車とする。
@@ -94,7 +104,7 @@ DDL SpecとDDL engineの版はServerの`layer_versions.py`が名乗り、Android
 
 下部「カメラ」はアプリ内カメラ（CameraX、背面カメラのプレビューとシャッター）を開き、撮影した写真を`cacheDir/camera/`のアプリ専用一時ファイルへ直接書く。標準カメラアプリの起動と確認画面は通らない。初回は`CAMERA`権限を求め、拒否された場合やCameraXを開始できない場合は、従来の標準カメラ（`ActivityResultContracts.TakePicture`）へ切り替える。Photo Pickerの入口と、元写真の保持・削除の契約は変えない。
 
-写真から記述を作る「記述生成モデル」は、設定「その他」で選ぶ。既定は端末内の`local-litert-lm:gemma-4-e2b`で、有効な外部providerのモデルも選べる。値は`app_settings`の`camera_vision_model`に保存し、欠落・壊れた値と、サポート対象から外した端末内モデル（Gemma 4 E4B）は既定へ戻す。設定画面からは撮影中に変更できない（撮影画面の「モデル選択」からは変えられ、その撮影に使う）。端末内モデルでは写真は端末の外へ出ない。外部モデルを選んだ場合に限り、向き補正・長辺1280px・JPEG品質85で再エンコードした画像（元のEXIF・位置情報を含まない）を、そのproviderへ送る。Geminiは`inlineData`、OpenAI互換は`image_url`のdata URIで送り、元ファイル、URI、path、表示名は送らない。設定画面は外部モデルの選択中、送信先と送る内容を常に表示する。GeminiのGemmaとGemini 3系では`thinkingLevel: minimal`を付ける（既定の思考は時間を倍以上にし、出力上限を使い切って空応答になることがあった）。記述プロンプトは`camera-description-v4`で、構図、主な対象とその単純な形・数、面積順の色と差し色、光・時刻・季節・天気、質感と繰り返しを3〜5文・180字程度で書かせる。端末内モデルは字数の指示を守らず時間が字数に比例して延びるため、日本語180字（英語450字）を超えた後の最後の文末で生成を止め、途中の文を残さない。
+写真から記述を作る「記述生成モデル」は、設定「その他」で選ぶ。既定は端末内の`local-litert-lm:gemma-4-e2b`で、有効な外部providerのモデルも選べる。値は`app_settings`の`camera_vision_model`に保存し、欠落・壊れた値と、サポート対象から外した端末内モデル（Gemma 4 E4B）は既定へ戻す。設定画面からは撮影中に変更できない（撮影画面の「モデル選択」からは変えられ、その撮影に使う）。端末内モデルでは写真は端末の外へ出ない。外部モデルを選んだ場合に限り、向き補正・長辺1280px・JPEG品質85で再エンコードした画像（元のEXIF・位置情報を含まない）を、そのproviderへ送る。Geminiは`inlineData`、OpenAI互換は`image_url`のdata URIで送り、元ファイル、URI、path、表示名は送らない。設定画面は外部モデルの選択中、送信先と送る内容を常に表示する。Gemini種別の画像要求には、Serverと同じく`thinkingLevel: minimal`を付ける（既定の思考は時間を倍以上にし、出力上限を使い切って空応答になることがあった）。記述プロンプトは`camera-description-v4`で、構図、主な対象とその単純な形・数、面積順の色と差し色、光・時刻・季節・天気、質感と繰り返しを3〜5文・180字程度で書かせる。端末内モデルは字数の指示を守らず時間が字数に比例して延びるため、日本語180字（英語450字）を超えた後の最後の文末で生成を止め、途中の文を残さない。
 
 記述からの描画は、NVIDIA NIM・`vivid_material`・写生なしの固定経路を廃止し、撮影開始時の描画設定（Stage 1／2モデル、色カタログ（自動を含む）、写生）を使う。設定はrun単位で固定し、再試行も同じ値を使う。撮影前に、記述生成モデルと描画モデルについて、端末内モデルは取得済みか、外部providerは有効でBase URLと必要なAPI keyがあるかを確かめ、不足時は撮影を始めない。端末内の記述生成モデルは、撮影画面を開いている間に読み込みを始める。新しい作品の`input_provenance.route`は`description_to_pipeline`、`vision_provider_id`は実際に使ったproviderである。旧値`local_description_to_nim`／`local_ddl_to_nim_stage2`／`ddl_to_pipeline_stage2`の作品は従来どおり表示する。
 

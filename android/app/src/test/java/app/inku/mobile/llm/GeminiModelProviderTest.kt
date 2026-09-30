@@ -4,10 +4,13 @@ import java.io.ByteArrayOutputStream
 import java.net.HttpURLConnection
 import java.net.URL
 import kotlinx.coroutines.runBlocking
+import org.json.JSONArray
+import org.json.JSONException
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertThrows
 import org.junit.Test
 
 class GeminiModelProviderTest {
@@ -56,41 +59,51 @@ class GeminiModelProviderTest {
         assertEquals(11, response.promptTokens)
         assertEquals(7, response.completionTokens)
     }
+
+    @Test
+    fun duplicateFunctionAnswersAreMalformedInsteadOfChoosingTheLast() {
+        val parts = JSONArray("""[{"functionCall":{"name":"submit_pipeline_response","args":{"normalized_ddl":"circle"}}},{"functionCall":{"name":"submit_pipeline_response","args":{"normalized_ddl":"square"}}}]""")
+        assertThrows(JSONException::class.java) {
+            GeminiModelProvider.responseText(parts, "submit_pipeline_response")
+        }
+    }
 }
 
 class GeminiVisionRequestTest {
     @Test
-    fun cameraImageTravelsAsInlineJpegBeforeThePrompt() = runBlocking {
+    fun cameraRequestFollowsTheGeminiKindEvenWithACustomConnectionId() = runBlocking {
         lateinit var connection: GeminiConnection
-        val provider = GeminiModelProvider("gemini", "https://generativelanguage.googleapis.com", "test-key") { url ->
-            GeminiConnection(url).also { connection = it }
+        val provider = GeminiModelProvider("photo-google", "https://generativelanguage.googleapis.com", "test-key") { url ->
+            GeminiConnection(url, answer = """{"candidates":[{"content":{"parts":[{"thought":true,"text":"Internal thought"},{"text":"A red circle."},{"text":"A blue rectangle."}]}}]}""").also { connection = it }
         }
-        // The fixture answers with a function call; only the sent body matters here.
-        runCatching {
-            provider.generate(
-                ModelRequest(
-                    modelId = "gemini:gemma-4-31b-it",
-                    prompt = "Describe the photo",
-                    temperature = 0.2,
-                    maxTokens = 1024,
-                    imageJpeg = byteArrayOf(1, 2, 3),
-                ),
-            )
-        }
-        val parts = JSONObject(connection.body.toString(Charsets.UTF_8.name()))
+        val response = RemoteVisionAnalyzer(provider).analyze(
+            VisionAnalysisRequest(
+                modelId = "photo-google:gemma-4-31b-it", languageCode = "en",
+                normalizedJpeg = byteArrayOf(1, 2, 3), width = 320, height = 240,
+            ),
+        )
+        val payload = JSONObject(connection.body.toString(Charsets.UTF_8.name()))
+        val generation = payload.getJSONObject("generationConfig")
+        assertEquals("minimal", generation.getJSONObject("thinkingConfig").getString("thinkingLevel"))
+        assertEquals(0.2, generation.getDouble("temperature"), 0.0)
+        val parts = payload
             .getJSONArray("contents").getJSONObject(0).getJSONArray("parts")
-        val inline = parts.getJSONObject(0).getJSONObject("inlineData")
+        assertEquals(VisionPrompts.forLanguage("en"), parts.getJSONObject(0).getString("text"))
+        val inline = parts.getJSONObject(1).getJSONObject("inlineData")
         assertEquals("image/jpeg", inline.getString("mimeType"))
         assertEquals("AQID", inline.getString("data"))
-        assertEquals("Describe the photo", parts.getJSONObject(1).getString("text"))
+        assertEquals("A red circle. A blue rectangle.", response.text)
     }
 }
 
-private class GeminiConnection(url: URL) : HttpURLConnection(url) {
+private class GeminiConnection(
+    url: URL,
+    private val answer: String = """{"candidates":[{"content":{"parts":[{"thought":true,"text":"internal thought"},{"functionCall":{"name":"submit_pipeline_response","args":{"normalized_ddl":"circle"}}}]}}],"usageMetadata":{"promptTokenCount":11,"candidatesTokenCount":7}}""",
+) : HttpURLConnection(url) {
     val body = ByteArrayOutputStream()
     override fun getOutputStream() = body
     override fun getResponseCode() = 200
-    override fun getInputStream() = """{"candidates":[{"content":{"parts":[{"thought":true,"text":"internal thought"},{"functionCall":{"name":"submit_pipeline_response","args":{"normalized_ddl":"circle"}}}]}}],"usageMetadata":{"promptTokenCount":11,"candidatesTokenCount":7}}""".byteInputStream()
+    override fun getInputStream() = answer.byteInputStream()
     override fun connect() = Unit
     override fun disconnect() = Unit
     override fun usingProxy() = false

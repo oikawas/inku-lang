@@ -1,5 +1,7 @@
 package app.inku.mobile.llm
 
+import android.util.Log
+import app.inku.mobile.pipeline.providerHttpErrorLine
 import org.json.JSONObject
 
 const val LOCAL_VISION_MODEL_ID = "local-litert-lm:gemma-4-e2b"
@@ -51,17 +53,23 @@ class RemoteVisionAnalyzer(private val provider: ModelProvider) : VisionAnalyzer
         require(!isLocalVisionModel(request.modelId)) { "A local model runs on the device analyzer." }
         require(request.normalizedJpeg.isNotEmpty()) { "The normalized camera image is empty." }
         val started = System.currentTimeMillis()
-        val response = provider.generate(
-            ModelRequest(
-                modelId = request.modelId,
-                prompt = VisionPrompts.forLanguage(request.languageCode),
-                temperature = VISION_TEMPERATURE,
-                maxTokens = DESCRIPTION_MAX_TOKENS,
-                timeoutMs = REMOTE_VISION_TIMEOUT_MS,
-                imageJpeg = request.normalizedJpeg,
-                thinkingLevel = minimalThinkingLevel(request.modelId),
-            ),
-        )
+        val response = try {
+            provider.generate(
+                ModelRequest(
+                    modelId = request.modelId,
+                    prompt = VisionPrompts.forLanguage(request.languageCode),
+                    temperature = VISION_TEMPERATURE,
+                    maxTokens = DESCRIPTION_MAX_TOKENS,
+                    timeoutMs = REMOTE_VISION_TIMEOUT_MS,
+                    imageJpeg = request.normalizedJpeg,
+                ),
+            )
+        } catch (error: ModelProviderHttpException) {
+            // Like server vision_client.py, retain a bounded, redacted refusal
+            // at the common Vision boundary, including debug headless calls.
+            Log.w("InkuProvider", providerHttpErrorLine("vision", request.modelId, error))
+            throw error
+        }
         val text = LocalLiteRtLmOutput.visionDescription(response.text, request.languageCode)
         check(text.isNotBlank()) { "Image analysis returned an empty result." }
         return VisionAnalysisResult(text, request.modelId, System.currentTimeMillis() - started)
@@ -70,17 +78,6 @@ class RemoteVisionAnalyzer(private val provider: ModelProvider) : VisionAnalyzer
     internal companion object {
         // The local Vision sampler's temperature.
         const val VISION_TEMPERATURE = 0.2
-
-        /**
-         * Gemini's default thinking on Gemma doubled the photo-description time
-         * and could spend the whole output budget, leaving no text. Only Gemma
-         * and Gemini 3 accept `thinkingLevel`; other models keep their default.
-         */
-        internal fun minimalThinkingLevel(modelId: String): String? {
-            if (!modelId.startsWith("gemini:")) return null
-            val model = modelId.removePrefix("gemini:").removePrefix("models/")
-            return if (model.startsWith("gemma-") || model.startsWith("gemini-3")) "minimal" else null
-        }
 
         const val DESCRIPTION_MAX_TOKENS = 2048
         const val REMOTE_VISION_TIMEOUT_MS = 120_000L

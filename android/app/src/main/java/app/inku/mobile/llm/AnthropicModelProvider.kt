@@ -15,8 +15,9 @@ import org.json.JSONObject
  *
  * This is the request the server makes for the `anthropic` provider kind
  * (`pipeline_provider.py` `_request`): `POST /v1/messages` with `x-api-key` and
- * `anthropic-version`, and a structured answer as one forced tool call whose
- * `input` is the response. The kind used to fall through to the
+ * `anthropic-version`, and one answer tool offered with `tool_choice: auto`.
+ * Its `input`, or the response object in a text answer, is the response.
+ * The kind used to fall through to the
  * OpenAI-compatible transport, which posted `/chat/completions` with a Bearer
  * header, so the default Claude API base URL answered every drawing with 404.
  */
@@ -76,14 +77,14 @@ class AnthropicModelProvider(
     }
 
     private fun payload(request: ModelRequest): JSONObject {
+        val model = request.modelId.removePrefix("$providerId:")
         val payload = JSONObject()
-            .put("model", request.modelId.removePrefix("$providerId:"))
+            .put("model", model)
             .put("max_tokens", request.maxTokens)
             .put("messages", JSONArray().put(JSONObject().put("role", "user").put("content", userContent(request))))
-        // The server leaves pipeline sampling to the model default for this
-        // kind; only the free-text requests (demo prompt, photo description)
-        // say how warm to be. Claude accepts 0..1.
-        if (request.pipelineAction == null) payload.put("temperature", request.temperature.coerceIn(0.0, 1.0))
+        // Both server transports (pipeline_provider.py and vision_client.py)
+        // omit temperature for this kind. Sonnet 5.5 refuses it on photo
+        // descriptions too; the rule follows the transport, not a model name.
         request.systemInstruction?.takeIf { it.isNotBlank() }?.let { payload.put("system", it) }
         if (request.stopSequences.isNotEmpty()) payload.put("stop_sequences", JSONArray(request.stopSequences))
         request.tool?.let { tool ->
@@ -110,7 +111,7 @@ class AnthropicModelProvider(
         private const val MAX_RESPONSE_CHARS = 2_000_000
         private const val MAX_ERROR_CHARS = 16_384
 
-        /** Plain text, or one base64 JPEG block ahead of the instruction, as the other transports order it. */
+        /** Plain text, or one base64 JPEG ahead of the instruction, as the server sends Anthropic. */
         internal fun userContent(request: ModelRequest): Any {
             val image = request.imageJpeg ?: return request.prompt
             return JSONArray()
@@ -149,7 +150,7 @@ class AnthropicModelProvider(
                     ?: throw JSONException("Claude tool call did not contain an input object.")
                 return input.toString()
             }
-            val text = texts.joinToString("")
+            val text = texts.joinToString("\n")
             check(text.isNotBlank()) { "Claude response did not contain text." }
             return text
         }

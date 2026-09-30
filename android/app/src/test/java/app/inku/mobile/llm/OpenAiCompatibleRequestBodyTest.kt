@@ -1,7 +1,11 @@
 package app.inku.mobile.llm
 
+import org.json.JSONArray
+import org.json.JSONException
+import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -17,6 +21,21 @@ class OpenAiCompatibleRequestBodyTest {
         tool = ModelTool("submit_pipeline_response", "Submit", schema),
         pipelineAction = "generate_normalized_ddl",
     )
+
+    @Test
+    fun openAiToolCallsMustContainOnlyTheRequestedAnswer() {
+        val toolName = "submit_pipeline_response"
+        val function = JSONObject().put("name", toolName).put("arguments", """{"normalized_ddl":"circle"}""")
+        val calls = JSONArray().put(JSONObject().put("function", function))
+        val message = JSONObject().put("content", "Fallback text").put("tool_calls", calls)
+        assertEquals("circle", JSONObject(OpenAiCompatibleProvider.extractToolArguments(message, toolName)!!).getString("normalized_ddl"))
+        calls.put(JSONObject().put("function", JSONObject().put("name", toolName).put("arguments", """{"normalized_ddl":"square"}""")))
+        assertThrows(JSONException::class.java) {
+            OpenAiCompatibleProvider.extractToolArguments(message, toolName)
+        }
+        val payload = OpenAiCompatibleProvider.requestBody("openai", pipelineRequest("openai:gpt-5.6-luna"), OPENAI_URL)
+        assertFalse(payload.getBoolean("stream"))
+    }
 
     /** The server's `pipeline_provider.py` shapes: Ollama answers through `response_format`. */
     @Test

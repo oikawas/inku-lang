@@ -7,6 +7,7 @@ import java.util.Base64
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
+import org.json.JSONException
 import org.json.JSONObject
 
 class GeminiModelProvider(
@@ -57,22 +58,9 @@ class GeminiModelProvider(
         val parts = response.optJSONArray("candidates")?.optJSONObject(0)
             ?.optJSONObject("content")?.optJSONArray("parts")
             ?: error("Gemini response did not contain content.")
-        var arguments: String? = null
-        val text = StringBuilder()
-        for (index in 0 until parts.length()) {
-            val part = parts.optJSONObject(index) ?: continue
-            if (part.optBoolean("thought")) continue
-            val call = part.optJSONObject("functionCall")
-            if (request.tool != null && call?.optString("name") == request.tool.name) {
-                arguments = call.optJSONObject("args")?.toString()
-            }
-            if (part.has("text")) text.append(part.getString("text"))
-        }
-        val content = arguments ?: text.toString()
-        check(content.isNotBlank()) { "Gemini response did not contain text or requested function arguments." }
         val usage = response.optJSONObject("usageMetadata")
         ModelResponse(
-            text = content,
+            text = responseText(parts, request.tool?.name),
             modelId = request.modelId,
             promptTokens = usage?.optInt("promptTokenCount")?.takeIf { it > 0 },
             completionTokens = usage?.optInt("candidatesTokenCount")?.takeIf { it > 0 },
@@ -85,7 +73,10 @@ class GeminiModelProvider(
         val generation = JSONObject().put("maxOutputTokens", request.maxTokens)
         if (pipelineAction == null) {
             generation.put("temperature", request.temperature)
-            request.thinkingLevel?.let { generation.put("thinkingConfig", JSONObject().put("thinkingLevel", it)) }
+            // Server Vision requests use minimal thinking for the Gemini kind,
+            // including a custom connection ID or an unfamiliar model name.
+            val thinkingLevel = if (request.imageJpeg != null) "minimal" else request.thinkingLevel
+            thinkingLevel?.let { generation.put("thinkingConfig", JSONObject().put("thinkingLevel", it)) }
         } else {
             // Shared-pipeline requests use the server's Gemini request shape:
             // model-default sampling and minimal thinking.
@@ -94,8 +85,9 @@ class GeminiModelProvider(
         if (request.stopSequences.isNotEmpty()) generation.put("stopSequences", JSONArray(request.stopSequences))
         val user = textContent(request.prompt).put("role", "user")
         request.imageJpeg?.let { image ->
-            // The image part precedes the instruction, as in the local Vision request.
+            // The server sends Gemini the instruction followed by inline images.
             val parts = JSONArray()
+                .put(JSONObject().put("text", request.prompt))
                 .put(
                     JSONObject().put(
                         "inlineData",
@@ -104,7 +96,6 @@ class GeminiModelProvider(
                             .put("data", Base64.getEncoder().encodeToString(image)),
                     ),
                 )
-                .put(JSONObject().put("text", request.prompt))
             user.put("parts", parts)
         }
         val payload = JSONObject()
@@ -143,4 +134,23 @@ class GeminiModelProvider(
 
     private fun textContent(text: String): JSONObject =
         JSONObject().put("parts", JSONArray().put(JSONObject().put("text", text)))
+
+    internal companion object {
+        /** A pipeline answer is exactly one requested function call, as on the server. */
+        internal fun responseText(parts: JSONArray, toolName: String?): String {
+            val objects = (0 until parts.length()).mapNotNull { parts.optJSONObject(it) }
+            if (toolName != null) {
+                val calls = objects.filter { it.has("functionCall") }.map { it.optJSONObject("functionCall") }
+                if (calls.size != 1 || calls[0]?.optString("name") != toolName) {
+                    throw JSONException("Gemini returned an unexpected function call.")
+                }
+                return calls[0]?.optJSONObject("args")?.toString()
+                    ?: throw JSONException("Gemini function call did not contain an arguments object.")
+            }
+            val text = objects.filter { it.has("text") && !it.optBoolean("thought") }
+                .joinToString("\n") { it.getString("text") }
+            check(text.isNotBlank()) { "Gemini response did not contain text." }
+            return text
+        }
+    }
 }

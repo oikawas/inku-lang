@@ -83,7 +83,7 @@ class AnthropicModelProviderTest {
     fun photoDescriptionSendsTheJpegBeforeThePromptAndReadsText() = runBlocking {
         lateinit var connection: AnthropicConnection
         val provider = AnthropicModelProvider("anthropic", "https://api.anthropic.com", "test-key") { url ->
-            AnthropicConnection(url, answer = """{"content":[{"type":"text","text":"A red chair."}]}""").also { connection = it }
+            AnthropicConnection(url, answer = """{"content":[{"type":"thinking","thinking":"Internal"},{"type":"text","text":"A red chair."},{"type":"text","text":"A blue wall."}]}""").also { connection = it }
         }
         val response = provider.generate(
             ModelRequest(
@@ -95,7 +95,8 @@ class AnthropicModelProviderTest {
             ),
         )
         val payload = JSONObject(connection.body.toString(Charsets.UTF_8.name()))
-        assertEquals(0.2, payload.getDouble("temperature"), 0.0)
+        // Server Vision omits temperature for the entire Anthropic kind.
+        assertFalse(payload.has("temperature"))
         val content = payload.getJSONArray("messages").getJSONObject(0).getJSONArray("content")
         val source = content.getJSONObject(0).getJSONObject("source")
         assertEquals("image", content.getJSONObject(0).getString("type"))
@@ -103,7 +104,28 @@ class AnthropicModelProviderTest {
         assertEquals("AQID", source.getString("data"))
         assertEquals("Describe the photo", content.getJSONObject(1).getString("text"))
         assertTrue(payload.optJSONArray("tools") == null)
-        assertEquals("A red chair.", response.text)
+        assertEquals("A red chair.\nA blue wall.", response.text)
+    }
+
+    @Test
+    fun sonnet55PhotoDescriptionOmitsUnsupportedTemperature() = runBlocking {
+        lateinit var connection: AnthropicConnection
+        val provider = AnthropicModelProvider("anthropic", "https://api.anthropic.com", "test-key") { url ->
+            AnthropicConnection(url, answer = """{"content":[{"type":"text","text":"A red circle and a blue rectangle."}]}""").also { connection = it }
+        }
+        val result = RemoteVisionAnalyzer(provider).analyze(
+            VisionAnalysisRequest(
+                normalizedJpeg = byteArrayOf(1, 2, 3), width = 320, height = 240,
+                languageCode = "en", modelId = "anthropic:claude-sonnet-5-5",
+            ),
+        )
+        val payload = JSONObject(connection.body.toString(Charsets.UTF_8.name()))
+        assertEquals("claude-sonnet-5-5", payload.getString("model"))
+        assertFalse("Sonnet 5.5 rejects non-default temperature", payload.has("temperature"))
+        val content = payload.getJSONArray("messages").getJSONObject(0).getJSONArray("content")
+        assertEquals("AQID", content.getJSONObject(0).getJSONObject("source").getString("data"))
+        assertEquals(VisionPrompts.forLanguage("en"), content.getJSONObject(1).getString("text"))
+        assertEquals("A red circle and a blue rectangle.", result.text)
     }
 }
 

@@ -7,6 +7,7 @@ import java.net.URL
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
+import org.json.JSONException
 import org.json.JSONObject
 
 class OpenAiCompatibleProvider(
@@ -32,20 +33,6 @@ class OpenAiCompatibleProvider(
             completionTokens = usage?.optInt("completion_tokens")?.takeIf { it > 0 },
             elapsedMs = System.currentTimeMillis() - started,
         )
-    }
-
-    private fun extractToolArguments(message: JSONObject?, expectedToolName: String?): String? {
-        if (message == null || expectedToolName.isNullOrBlank()) return null
-        val calls = message.optJSONArray("tool_calls") ?: return null
-        for (i in 0 until calls.length()) {
-            val call = calls.optJSONObject(i) ?: continue
-            val function = call.optJSONObject("function") ?: continue
-            if (function.optString("name") == expectedToolName) {
-                val args = function.optString("arguments").trim()
-                if (args.isNotBlank()) return args
-            }
-        }
-        return null
     }
 
     private fun postJson(url: String, payload: JSONObject, timeoutMs: Long?): JSONObject {
@@ -111,6 +98,19 @@ class OpenAiCompatibleProvider(
     }
 
     internal companion object {
+        /** An offered tool may answer once, or the server reads the message text. */
+        internal fun extractToolArguments(message: JSONObject?, expectedToolName: String?): String? {
+            if (message == null || expectedToolName.isNullOrBlank()) return null
+            val calls = message.optJSONArray("tool_calls") ?: return null
+            if (calls.length() == 0) return null
+            val function = calls.optJSONObject(0)?.optJSONObject("function")
+            if (calls.length() != 1 || function?.optString("name") != expectedToolName) {
+                throw JSONException("Chat Completions returned an unexpected tool call.")
+            }
+            return (function?.opt("arguments") as? String)?.takeIf { it.isNotBlank() }
+                ?: throw JSONException("Chat Completions tool call did not contain arguments text.")
+        }
+
         internal fun modelForRequest(providerId: String, modelId: String): String =
             modelId.removePrefix("$providerId:").ifBlank { modelId }
 
@@ -128,6 +128,7 @@ class OpenAiCompatibleProvider(
             val model = modelForRequest(providerId, request.modelId)
             val payload = JSONObject()
                 .put("model", model)
+                .put("stream", false)
                 .put(
                     "messages",
                     JSONArray().apply {

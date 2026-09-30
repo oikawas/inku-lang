@@ -17,7 +17,7 @@ Run inku-cli COMMAND --help for the complete option list. This document states w
 | Command | Purpose |
 |---|---|
 | login / logout / me | Start, discard, and inspect a session |
-| models | Configure default Stage 1, Stage 2, and Vision models and the color catalog |
+| models | Configure the default drawing model (shared Stage 1/2), Vision model and color catalog |
 | paint / batch | Paint one or many works from descriptions or instructions |
 | refine | Refine an existing work's touch, composition, reading, or color |
 | lineage | Inspect lineage node trees and promote intermediate works |
@@ -106,8 +106,7 @@ For limits they record the values used in `render_limits`, where those came from
 
 | Flag | Contents |
 |---|---|
-| `--stage1-provider` / `--stage1-model` | Provider and model for Stage 1, interpretation |
-| `--stage2-provider` / `--stage2-model` | Provider and model for Stage 2, structuring |
+| `--stage1-provider` / `--stage1-model` | Provider and drawing model used for both stages |
 | `--instruction-lang {auto,ja,en}` | Description language |
 | `--ui-lang LANG` | The value recorded as the UI language |
 | `--include-thinking` | Include the thinking output in the response |

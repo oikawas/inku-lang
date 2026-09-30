@@ -232,7 +232,7 @@ Open `Settings` from the application rail. The top `Standard` / `Detailed` switc
 | `Export` | Save location, PNG templates, animation, and cards | The save location belongs only to the browser that chose it. PNG templates apply to that member's PNG menu. |
 | `Connections and administration` | `Models`, `User management`, `DB settings`, `Log retention`, and, in Detailed mode, `Other (server)` and `Limits` | `User management` is available to `admins` and to `leaders` (for the ordinary users of their own organisation group); the other items to `admins` only. |
 
-`Model selection` is a separate drawing-time screen for choosing the Stage 1 / Stage 2 models (and Vision when available). In contrast, the administrator's `Models` screen manages connection services, Base URLs, API keys encrypted for storage, models visible to members, and LLM / Vision purpose. Adding or changing a connection does not by itself make its models visible to members.
+`Model selection` is a separate drawing-time screen for choosing the drawing and Vision models. It has two tabs, `Stage 1/2` and `Vision`; both drawing stages use the same model. The administrator's `Models` screen manages connection services, Base URLs, API keys encrypted for storage, models visible to members, and LLM / Vision purpose. Adding or changing a connection does not by itself make its models visible to members.
 
 To change the published models as an administrator:
 

@@ -17,7 +17,7 @@ inku-cliはWeb UIと同じ公開HTTP APIを操作するクライアントです�
 | コマンド | 用途 |
 |---|---|
 | login / logout / me | セッションの開始、破棄、本人確認 |
-| models | CLI既定のStage 1 / Stage 2 / Visionモデルと色カタログの設定 |
+| models | CLI既定の描画モデル（Stage 1/2共通）・Visionモデルと色カタログの設定 |
 | paint / batch | 記述または指示書から単体・一括描画 |
 | refine | 既存作品から要素（タッチ・構図・解釈・色）を推敲し派生を生成・保存 |
 | lineage | 作品の系譜（親・子・兄弟）ツリーの探索表示、中間ノードの昇格 |
@@ -106,8 +106,7 @@ JSON成果物は、その絵を描いたDDL層の版を `ddl_version` と `ddl_e
 
 | 旗 | 内容 |
 |---|---|
-| `--stage1-provider` / `--stage1-model` | Stage 1（解釈）の接続先とモデル |
-| `--stage2-provider` / `--stage2-model` | Stage 2（構造化）の接続先とモデル |
+| `--stage1-provider` / `--stage1-model` | 両段に使う描画モデルの接続先とモデル |
 | `--instruction-lang {auto,ja,en}` | 記述の言語 |
 | `--ui-lang LANG` | UI言語として記録する値 |
 | `--include-thinking` | 思考出力を応答に含める |

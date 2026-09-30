@@ -1024,7 +1024,7 @@ Caption visibility, horizontal/vertical writing mode, and left/right position ar
 
 Adjustment candidates are temporary state owned by their source work: explicitly selecting a work from history, lineage, or navigation, or starting a new generation or DDL render, clears them. Merely switching between Adjust and Model comparison does not. A target change also resets the target-owned model-comparison results, reading diff, replay error, intermediate-lineage notice, and lineage fetch state. Any in-flight model comparison is aborted, and only the latest lineage request may update the view.
 
-The web UI keeps direct operational labels while the specification retains the musical metaphor: performance is shown as touch, composition as layout, and interpretation as reading. Model comparison lives beside `Adjust` as a subview inside the Canvas-side `Refine` tab and shows no judge values. It provides three modes: `Shared Stage 1/2`, `Fixed Stage 1 + compare Stage 2`, and `Compare Stage 1 + fixed Stage 2`. Shared mode uses each selected model for both stages. Fixed modes select one model for the fixed stage and up to four for the compared stage. Only the exact Stage 1/2 combination used by the target work is prohibited; a model used by the target remains selectable when the fixed-stage pairing makes the combination different. A floating tooltip explains prohibited choices. Models are always selected explicitly, and no unselected fallback model is run. Changing the target clears stale comparison results and aborts any comparison still in flight. Saved comparison results record the actual Stage 1 and Stage 2 models and may be adopted or starred into history.
+The web UI keeps direct operational labels while the specification retains the musical metaphor: performance is shown as touch, composition as layout, and interpretation as reading. Model comparison lives beside `Adjust` as a subview inside the Canvas-side `Refine` tab and shows no judge values. The user explicitly selects up to four models, and each selected model runs both Stage 1 and Stage 2. Comparisons that fix one stage are retired. A model used by the target work cannot be selected; when an old work used different models for its two stages, neither can be selected. A floating tooltip explains prohibited choices. No unselected fallback model is run. Changing the target clears stale comparison results and aborts any comparison still in flight. Saved comparison results record the actual model under both Stage 1 and Stage 2 keys and may be adopted or starred into history. Old works' model records are not rewritten.
 
 The work header's Refine control and Lineage cards share the same work-editing menu: Edit drawing parameters, Another catalog, Edit the description, Edit instructions, Change the sketch-from-life grain, Change models, and Autonomous refinement process, in that order. Opening the menu does not draw or save. The header entry targets the displayed saved work and asks the user to save an unsaved preview first. DDL-authored works omit Edit the description, Change the sketch-from-life grain, and Change models. Drawing parameters and model changes open the target's existing Refine subview without duplicating comparison logic. Another catalog is a dialog of its own, apart from drawing parameters: on opening it draws the same Score in every color catalog except the target's, in catalog-list order, without calling an LLM. Saving, discarding, and staying open while options are unsaved work as in drawing parameters. Description and instruction dialogs initialize from that work and save a `description_edit` or `ddl_edit` child. Closing without saving returns to the originating work or Lineage view without replacing the description being written. After saving children, Lineage focuses the newest child and its ancestors while retaining the other saved branches; newest does not mean best. The regular top-level Refine tab retains its panel layout, and the former Manual Refine modal has no menu entry. A flag icon and an explicit revision-mark label distinguish the mark from editing; the stored `for_revision` meaning is unchanged.
 
@@ -1243,6 +1243,10 @@ Application."
 Touch refinement is the exception to the one-or-four candidate control: the
 writer enters words for the touch, and the same words produce the same touch
 seed, so it produces one candidate only.
+
+Model comparison follows the placement, selection and saving rules in §7.8. Each selected model runs both stages; comparisons that fix one stage are retired.
+
+Normal drawing uses one model for Stage 1 and Stage 2, while reading image input uses a separate Vision model setting. The model-selection dialog has two tabs, `Stage 1/2` and `Vision`, and model administration identifies each model's LLM/Vision purposes. `GET /api/models` retains the LLM `catalog` for old CLI clients and returns `llm_catalog` and `vision_catalog`. Each user retains a colophon-specific model choice, initialized from the normal Vision default and restored on opening the colophon. Explicit model requests and old settings follow §12.5.
 
 ---
 
@@ -1500,12 +1504,9 @@ Shared standalone grammar makes modifier phrases own their connectors but exclud
 - treats burin and drypoint as explicit only when visible DDL states them; Stage 1 few-shot quality policy is not direct-DDL compiler semantics
 - in the current actual-Score lowerer, applies the author-resolved normal geometry, relative factors, and omitted drawing attributes only to count-one circle, square, ellipse, cloudform, triangle, and polygon instructions with a resolved numeric position or `place:center` (the canvas-center region), plus a place action. The named path preserves dimensions and places the named region in `at.region`. Stop rejects the entire Score for unsupported meaning or missing required color-catalog context; explicit OmitAndContinue omits only an independent field or typed execution unit and returns the remaining Score with diagnostics. Neither mode changes original meaning. The normal product runtime uses this Rust path
 
-### 12.5 Splitting the Model by Stage
+### 12.5 Drawing and Vision Models
 
-A different model can be used for each stage.  **The current implementation
-selects a model per stage**: users and administrators set a model for Stage 1,
-Stage 2 and Vision separately (the model settings and model comparison of
-§8.4, and the llm / vision catalogs of `/api/models`).
+**Stage 1 and Stage 2 use the same drawing model (the author's decision, 2026-09-30).** Both stages use the request's `stage1_model`, otherwise its `stage2_model`, otherwise the account's drawing model. Normalizing account settings aligns `stage2_provider` and `stage2_model` with the Stage 1 values. Vision has a separate model setting (§8.4 and the LLM/Vision catalogs of `/api/models`). The API's `stage1_model` / `stage2_model` keys and old works' model records remain. New drawings record the same actual model under both keys.
 
 **The models the server calls with its own credentials are the ones the
 administrators offer (2026-09-26).**  For members outside `admins`, drawing, the
@@ -1525,7 +1526,7 @@ date becomes `eol_date`), 403 from a one-token call on the key is plan-only, and
 200 clears that mark; any other answer (a busy service, a timeout, a refused or
 missing key) settles nothing and the model keeps its mark.
 
-Stage 1 produces visible DDL from a description. Stage 2 produces only visible patch candidates for known holes reported by the compiler. Select each model for its bounded input and required result. The deterministic shared Rust lowerer structures Score; this is not delegated to an LLM.
+Stage 1 produces visible DDL from a description. Stage 2 produces only visible patch candidates for known holes reported by the compiler. Both use the same model, while each stage retains its bounded input, prompt and required result. The deterministic shared Rust lowerer structures Score; this is not delegated to an LLM.
 
 ### 12.6 The Design of Stage 1 (Interpretation)
 
@@ -3859,6 +3860,8 @@ renderer behavior.
 
 CLI configuration is local and editable.  It stores base URL, provider/model
 selection, and timeout values outside the server DB.
+
+Choose the drawing model with `--stage1-provider` / `--stage1-model`; the CLI sends the same values for both stages. `--stage2-provider` / `--stage2-model` are retired, and Stage 2 keys in the configuration file are neither read nor written.
 
 `inku-cli paint` and `inku-cli batch` support `--input-mode paint|ddl`.
 The default `paint` mode sends natural-language input to `/api/paint` and runs

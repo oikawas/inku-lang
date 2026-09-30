@@ -286,13 +286,9 @@ The dialog remembers the method, number of generations, refinement elements, var
 
 ## 10. Compare Models
 
-The same description is painted under different Stage 1 and Stage 2 model configurations, and the works and instructions are compared. There are three comparison modes.
+The same description is painted with different models, and the works and instructions are compared. Each selected model runs both Stage 1 and Stage 2. Comparisons that fix one stage are retired.
 
-- `Shared Stage 1/2`
-- `Fixed Stage 1 + compare Stage 2`
-- `Compare Stage 1 + fixed Stage 2`
-
-At most four inference models can be compared. The model configuration of the compared work cannot be selected. Models that return an error are dropped from the comparison and their count is reported.
+At most four inference models can be compared. A model used by the target work cannot be selected; when an old work used different models for its two stages, neither can be selected. Old works' records remain unchanged. Models that return an error are dropped from the comparison and their count is reported.
 
 Comparison results are not saved automatically. Use `Adopt` to keep one in history, or star it to save it as a starred history entry.
 

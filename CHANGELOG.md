@@ -6,6 +6,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file retains the history from v2.5.0 (2026-07-25, render engine 12) onward.** Past records follow the recent ones in a collapsible section of this same document; expand it when needed. Viewers without collapse support show the full text. Earlier history is in the [v1.72–v2.4 archive](docs/history/changelog-v1.72-v2.4.md) and the [v0.1–v1.71 archive](docs/history/changelog-v0.1-v1.71.md).
 
+### v2.15.76 — Let an administrator lock database writes (Build 1152, 2026-09-30)
+
+This patch on v2.15.75 adds a database-write lock to Other (server) settings. While locked, write requests return 503 and the Web shows the state and reason. GET, login, logout and the administrator's lock switch remain available. An unreadable lock state also refuses writes while leaving the switch available. Writes are unlocked by default.
+
 ### v2.15.75 — Count English syllables and name only nearby verse forms (Build 1151, 2026-09-30)
 
 The authenticated `POST /api/description/syllables` counts English syllables using the bundled CMU Pronouncing Dictionary. Its original dictionary, license and README are retained, with an entry in the third-party notices. No Python dependency is added.

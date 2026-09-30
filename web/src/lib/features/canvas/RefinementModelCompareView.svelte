@@ -108,7 +108,7 @@
 							onStop={refinementSession.gridBusy && refinementSession.gridCanAbort ? () => refinementSession.abort() : null}
 						/>
 						{#if refinementSession.gridBusy}
-							<VariationLanes states={refinementSession.gridSlots} labels={refinementSession.gridSlotLabels} />
+							<VariationLanes states={refinementSession.gridSlots} labels={refinementSession.gridSlotLabels} named />
 						{/if}
 					{/if}
 				</div>

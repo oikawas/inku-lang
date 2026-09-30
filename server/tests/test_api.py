@@ -41,14 +41,14 @@ from inku_server.model_settings import (
     update_user_model_settings,
 )
 from inku_server.schema import Score
-from inku_server.pipeline_provider import resolved_stage_model
+from inku_server.pipeline_provider import resolved_drawing_model
 
 client = TestClient(app)
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
-def test_resolved_stage_models_qualify_current_user_provider():
+def test_the_drawing_model_is_qualified_by_the_users_provider():
     actor = {
         "model_settings": {
             "stage1_provider": "openai",
@@ -60,10 +60,11 @@ def test_resolved_stage_models_qualify_current_user_provider():
         }
     }
 
-    assert resolved_stage_model(None, actor, stage="stage1") == "openai:gpt-5.2"
-    assert resolved_stage_model("gpt-5.2", actor, stage="stage1") == "openai:gpt-5.2"
-    assert resolved_stage_model(None, actor, stage="stage2") == "anthropic:claude-sonnet-4-6"
-    assert resolved_stage_model("claude-sonnet-4-6", actor, stage="stage2") == "anthropic:claude-sonnet-4-6"
+    assert resolved_drawing_model(None, actor) == "openai:gpt-5.2"
+    assert resolved_drawing_model("gpt-5.2", actor) == "openai:gpt-5.2"
+    # One model draws both stages (2026-09-30): the stored Stage 2 choice, which
+    # still differs here, is not read -- neither as the default nor to qualify.
+    assert resolved_drawing_model("claude-sonnet-4-6", actor) == "claude-sonnet-4-6"
     assert api_common._resolved_vision_model(None, actor) == "nvidia:meta/llama-3.2-90b-vision-instruct"
     assert api_common._resolved_vision_model("openai:gpt-4.1", actor) == "openai:gpt-4.1"
     # A reference qualified by a provider other than this actor's stage is left
@@ -71,10 +72,10 @@ def test_resolved_stage_models_qualify_current_user_provider():
     # ovms was withdrawn: an unqualified reference that is not the stage's own model
     # is also returned unchanged, so the assertion held without rule 1 running.
     assert (
-        resolved_stage_model("gemini:gemini-2.5-pro", actor, stage="stage1")
+        resolved_drawing_model("gemini:gemini-2.5-pro", actor)
         == "gemini:gemini-2.5-pro"
     )
-    assert resolved_stage_model("qwen-api", actor, stage="stage1") == "qwen-api"
+    assert resolved_drawing_model("qwen-api", actor) == "qwen-api"
 
 
 def _auth_headers(user: dict) -> tuple[dict[str, str], str]:

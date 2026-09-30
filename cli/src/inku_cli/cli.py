@@ -151,8 +151,6 @@ class CliConfig:
     username: str | None = None
     stage1_provider: str | None = None
     stage1_model: str | None = None
-    stage2_provider: str | None = None
-    stage2_model: str | None = None
     vision_provider: str | None = None
     vision_model: str | None = None
     timeout_seconds: int | None = None
@@ -185,8 +183,8 @@ def load_config(path: Path | None = None) -> CliConfig:
         username=raw.get("username") or None,
         stage1_provider=raw.get("stage1_provider") or None,
         stage1_model=raw.get("stage1_model") or None,
-        stage2_provider=raw.get("stage2_provider") or None,
-        stage2_model=raw.get("stage2_model") or None,
+        # A config written before one model drew both stages may still hold
+        # stage2_provider / stage2_model; they are not read (2026-09-30).
         vision_provider=raw.get("vision_provider") or None,
         vision_model=raw.get("vision_model") or None,
         timeout_seconds=int(raw["timeout_seconds"]) if raw.get("timeout_seconds") is not None else None,
@@ -202,8 +200,6 @@ def save_config(config: CliConfig, path: Path | None = None) -> None:
         "username": config.username,
         "stage1_provider": config.stage1_provider,
         "stage1_model": config.stage1_model,
-        "stage2_provider": config.stage2_provider,
-        "stage2_model": config.stage2_model,
         "vision_provider": config.vision_provider,
         "vision_model": config.vision_model,
         "timeout_seconds": config.timeout_seconds,
@@ -2259,8 +2255,6 @@ def command_login(args: argparse.Namespace) -> int:
         username=username,
         stage1_provider=existing.stage1_provider,
         stage1_model=existing.stage1_model,
-        stage2_provider=existing.stage2_provider,
-        stage2_model=existing.stage2_model,
         vision_provider=existing.vision_provider,
         vision_model=existing.vision_model,
         timeout_seconds=timeout_seconds,
@@ -2318,8 +2312,6 @@ def command_models(args: argparse.Namespace) -> int:
             username=config.username,
             stage1_provider=args.stage1_provider if args.stage1_provider is not None else config.stage1_provider,
             stage1_model=args.stage1_model if args.stage1_model is not None else config.stage1_model,
-            stage2_provider=args.stage1_provider if args.stage1_provider is not None else config.stage1_provider,
-            stage2_model=args.stage1_model if args.stage1_model is not None else config.stage1_model,
             vision_provider=args.vision_provider if args.vision_provider is not None else config.vision_provider,
             vision_model=args.vision_model if args.vision_model is not None else config.vision_model,
             timeout_seconds=timeout_seconds,
@@ -2338,9 +2330,9 @@ def command_models(args: argparse.Namespace) -> int:
         "vision_model_display": _display_model(config.vision_model),
         **_model_summary(
             config.stage1_model,
-            config.stage2_model,
+            config.stage1_model,
             stage1_provider=config.stage1_provider,
-            stage2_provider=config.stage2_provider,
+            stage2_provider=config.stage1_provider,
         ),
     }
     _print_json(data)

@@ -77,8 +77,6 @@ def test_config_roundtrip(tmp_path):
         username="admin",
         stage1_provider="nvidia",
         stage1_model="stage1",
-        stage2_provider="local",
-        stage2_model="stage2",
         vision_provider="nvidia",
         vision_model="meta/llama-3.2-90b-vision-instruct",
         timeout_seconds=900,
@@ -312,6 +310,18 @@ def test_compose_response_as_paint_result_carries_coerce_diagnostics():
     for key, value in diagnostics.items():
         assert result[key] == value
 
+
+def test_a_stage2_model_left_in_an_old_config_is_not_read(tmp_path):
+    """One model draws both stages (2026-09-30); a config saved before still
+    holds the Stage 2 keys, and they are neither read nor written back."""
+    path = tmp_path / "config.json"
+    path.write_text(json.dumps({
+        "base_url": "http://example.test", "stage1_model": "one", "stage2_model": "two", "stage2_provider": "local",
+    }), encoding="utf-8")
+    config = cli.load_config(path)
+    assert not hasattr(config, "stage2_model")
+    cli.save_config(config, path)
+    assert "stage2_model" not in json.loads(path.read_text(encoding="utf-8"))
 
 def test_model_summary_marks_server_default():
     summary = cli._model_summary(None, "gemma", stage2_provider="nvidia")

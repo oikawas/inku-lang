@@ -165,14 +165,16 @@ class ProviderOptions:
     max_response_bytes: int
 
 
-def resolved_stage_model(model: str | None, actor: dict | None, *, stage: str) -> str:
-    """Resolve a request model against the actor's selected stage provider."""
+def resolved_drawing_model(model: str | None, actor: dict | None) -> str:
+    """Resolve a request model against the actor's drawing model.
+
+    One model draws both stages (2026-09-30), so this reads the Stage 1 keys; a
+    stored Stage 2 choice that still differs is not consulted.
+    """
     settings = (actor or {}).get("model_settings") or {}
-    provider_key = "stage1_provider" if stage == "stage1" else "stage2_provider"
-    model_key = "stage1_model" if stage == "stage1" else "stage2_model"
     default_model = "google/gemma-4-31b-it"
-    provider = str(settings.get(provider_key, "nvidia") or "nvidia")
-    model_id = str(settings.get(model_key, default_model) or default_model)
+    provider = str(settings.get("stage1_provider", "nvidia") or "nvidia")
+    model_id = str(settings.get("stage1_model", default_model) or default_model)
     if model:
         requested = str(model).strip()
         if _is_qualified_model_id(requested):

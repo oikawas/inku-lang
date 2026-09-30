@@ -16,7 +16,7 @@ from pydantic import BaseModel, ConfigDict, Field, StrictBool, ValidationError
 from .color_catalogs import color_catalogs, get_color_catalog, render_color_map_for_catalog
 from .macro_catalog import explain_plugin_diagnostics, resolve_new_work_macro_catalog
 from .pipeline_candidate import CandidateHostError, PipelineBinding, _bytes
-from .pipeline_provider import ProviderOptions, SingleAttemptProvider, resolved_stage_model
+from .pipeline_provider import ProviderOptions, SingleAttemptProvider, resolved_drawing_model
 from .pipeline_settings import PipelineSettings, select_canvas
 from .persistence.variation_authority import VariationAuthorityStore
 from .provider_observation import ProviderObservationStore
@@ -275,9 +275,7 @@ class ProductPipelineEffects:
         # still names two keeps the Stage 1 one; one that names only Stage 2
         # (hand-written DDL, the old compose URL) is the one model; none takes
         # the account's model. The work still records both keys, now equal.
-        model = resolved_stage_model(
-            selected.get("stage1_model") or selected.get("stage2_model"), actor, stage="stage1"
-        )
+        model = resolved_drawing_model(selected.get("stage1_model") or selected.get("stage2_model"), actor)
         selected.update(
             stage1_model=model,
             stage2_model=model,

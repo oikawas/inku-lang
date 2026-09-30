@@ -212,28 +212,25 @@
       "why": "used to land on ovms; this is the one behaviour the new rules change"
     }
   ],
-  "stage_dependent": {
-    "note": "Rule 3 reads the stage, so the same reference resolves differently per stage.",
-    "stage_defaults": {
+  "rule_three": {
+    "note": "Rule 3 falls to the provider of the drawing model. One model draws both stages (2026-09-30), so an account whose stored Stage 2 provider still differs resolves both stages to its Stage 1 provider.",
+    "stored_settings": {
       "stage1_provider": "ollama",
       "stage2_provider": "anthropic"
     },
     "cases": [
       {
         "ref": "my-model",
-        "stage1": "ollama",
-        "stage2": "anthropic"
+        "provider": "ollama"
       },
       {
         "ref": "unknown-model:7b",
-        "stage1": "ollama",
-        "stage2": "anthropic"
+        "provider": "ollama"
       },
       {
         "ref": "qwen3.5:4b-q4_K_M",
-        "stage1": "ollama",
-        "stage2": "ollama",
-        "why": "rule 2 wins before the stage is consulted"
+        "provider": "ollama",
+        "why": "rule 2 wins before rule 3 is consulted"
       }
     ]
   },

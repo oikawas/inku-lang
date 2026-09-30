@@ -144,29 +144,46 @@ def _definitions_of(config: Any) -> list[Any]:
     return list(definitions) if isinstance(definitions, list) else []
 
 
-class _Clock:
-    """Time spent in the core per kind of record, to estimate the whole run."""
+Progress = Callable[[str], None]
 
-    def __init__(self, migrate: MigrateUnit) -> None:
+
+class _Clock:
+    """Time spent in the core per kind of record, to estimate the whole run.
+
+    With ``progress``, each call is announced before it starts and timed after
+    it ends, so a run stopped by a slow record says which record it was.
+    """
+
+    def __init__(self, migrate: MigrateUnit, progress: Progress | None = None) -> None:
         self.migrate = remembering(migrate)
+        self.progress = progress
         self.calls: Counter[str] = Counter()
         self.seconds: Counter[str] = Counter()
+        self.slowest: list[tuple[float, str, str, int]] = []
         self.kind = ""
+        self.record = ""
 
     def __call__(self, unit: bytes) -> bytes:
+        if self.progress:
+            self.progress(f"start {self.kind} {self.record} bytes={len(unit)}")
         started = time.monotonic()
         try:
             return self.migrate(unit)
         finally:
+            seconds = time.monotonic() - started
             self.calls[self.kind] += 1
-            self.seconds[self.kind] += time.monotonic() - started
+            self.seconds[self.kind] += seconds
+            self.slowest = sorted([*self.slowest, (seconds, self.kind, self.record, len(unit))], reverse=True)[:10]
+            if self.progress:
+                self.progress(f"done  {self.kind} {self.record} ms={round(seconds * 1000)}")
 
 
 _WASH_WORDS = ("薄墨", "pale ink wash")
 
 
 def census(connection: Any, migrate: MigrateUnit, *, sample: int | None = None,
-           refused_texts: int = 0) -> dict[str, object]:
+           refused_texts: int = 0, progress: Progress | None = None,
+           partial: Callable[[dict[str, object]], None] | None = None) -> dict[str, object]:
     """Count what the migration would do to the saved records; write nothing.
 
     ``connection`` is a DB-API connection (sqlite3) opened read-only. With
@@ -182,7 +199,7 @@ def census(connection: Any, migrate: MigrateUnit, *, sample: int | None = None,
     the refused texts themselves, for the draw session to reproduce; the
     author allowed it on 2026-09-30.
     """
-    clock = _Clock(migrate)
+    clock = _Clock(migrate, progress)
     limit = f" ORDER BY random() LIMIT {int(sample)}" if sample else ""
 
     def rows(sql: str, *args: Any) -> list[Any]:
@@ -233,6 +250,7 @@ def census(connection: Any, migrate: MigrateUnit, *, sample: int | None = None,
         if not isinstance(context, Mapping):
             links.refused["unreadable_context"] += 1
             continue
+        clock.record = f"{owner_id}/{history_id}"
         definitions = _definitions_of(context.get("config"))
         locks = (context.get("macro_catalog") or {}).get("definition_locks") or []
         links.counts["definition_locks"] += len(locks) if isinstance(locks, list) else 0
@@ -241,6 +259,8 @@ def census(connection: Any, migrate: MigrateUnit, *, sample: int | None = None,
             answer = migrate_unit(clock, None, definitions)
             links.definitions(f"{owner_id}/{history_id}", answer.get("definitions") or [])
     report["history_links"] = links
+    if partial:
+        partial(_summary(sample, clock, report, []))
 
     clock.kind = "executions"
     executions = _Tally()
@@ -257,6 +277,7 @@ def census(connection: Any, migrate: MigrateUnit, *, sample: int | None = None,
         definitions = _definitions_of(snapshot.get("config"))
         document = snapshot.get("document")
         record_id = f"{owner_id}/{execution_id}"
+        clock.record = record_id
         if isinstance(document, Mapping) and "saijiki" not in document:
             executions.counts["documents_v1"] += 1
             executions.document(record_id, migrate_unit(clock, document, definitions).get("document"))
@@ -266,6 +287,8 @@ def census(connection: Any, migrate: MigrateUnit, *, sample: int | None = None,
             executions.counts["with_definitions"] += 1
             executions.definitions(record_id, migrate_unit(clock, None, definitions).get("definitions") or [])
     report["executions"] = executions
+    if partial:
+        partial(_summary(sample, clock, report, []))
 
     clock.kind = "variation_documents"
     variations = _Tally()
@@ -282,6 +305,7 @@ def census(connection: Any, migrate: MigrateUnit, *, sample: int | None = None,
             variations.counts["current"] += 1
             continue
         variations.counts["v1"] += 1
+        clock.record = f"{owner_id}/{variation_id}"
         locked = {(lock.get("qualified_name"), lock.get("version")) for lock in document.get("macro_locks") or []
                   if isinstance(lock, Mapping)}
         definitions = []
@@ -294,6 +318,8 @@ def census(connection: Any, migrate: MigrateUnit, *, sample: int | None = None,
         answer = migrate_unit(clock, document, definitions)
         variations.document(f"{owner_id}/{variation_id}", answer.get("document"))
     report["variation_documents"] = variations
+    if partial:
+        partial(_summary(sample, clock, report, []))
 
     clock.kind = "history"
     refused_samples: list[dict[str, object]] = []
@@ -308,6 +334,7 @@ def census(connection: Any, migrate: MigrateUnit, *, sample: int | None = None,
         for column, source in (("ddl", ddl), ("expanded_ddl", expanded_ddl)):
             if not source:
                 continue
+            clock.record = f"{history_id}:{column}"
             history.counts[f"{column}_present"] += 1
             document = {"source": source, "language": language, "macro_locks": locks}
             answer = migrate_unit(clock, document, definitions)
@@ -326,13 +353,21 @@ def census(connection: Any, migrate: MigrateUnit, *, sample: int | None = None,
                         "wash": washed, "locks": len(locks), "source": source,
                     })
     report["history"] = history
+    return _summary(sample, clock, report, refused_samples)
 
+
+def _summary(sample: int | None, clock: _Clock, report: Mapping[str, _Tally],
+             refused_samples: list[dict[str, object]]) -> dict[str, object]:
     return {
         "sample": sample,
         "core_calls": dict(clock.calls),
         "core_ms_per_call": {
             kind: round(clock.seconds[kind] * 1000 / calls, 1) for kind, calls in clock.calls.items() if calls
         },
+        "slowest_calls": [
+            {"ms": round(seconds * 1000), "kind": kind, "id": record, "bytes": size}
+            for seconds, kind, record, size in clock.slowest
+        ],
         **{kind: tally.report() for kind, tally in report.items()},
         "refused_history_texts": refused_samples,
     }

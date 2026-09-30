@@ -28,6 +28,7 @@ over (the author, 2026-09-30). The records are
 from __future__ import annotations
 
 import json
+import time
 from collections import Counter
 from collections.abc import Callable, Iterable, Mapping
 from typing import Any
@@ -38,17 +39,41 @@ MigrateUnit = Callable[[bytes], bytes]
 LISTED_RECORDS = 200
 
 
+def _canonical(value: Any) -> str:
+    return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+
+
+def _distinct(definitions: Iterable[Any]) -> list[Any]:
+    """Each saved definition once: many performances freeze the same catalog."""
+    seen: dict[str, Any] = {}
+    for definition in definitions:
+        seen.setdefault(_canonical(definition), definition)
+    return list(seen.values())
+
+
+def remembering(migrate: MigrateUnit) -> MigrateUnit:
+    """The same unit gives the same answer: ask the core once per distinct unit."""
+    answers: dict[bytes, bytes] = {}
+
+    def ask(unit: bytes) -> bytes:
+        if unit not in answers:
+            answers[unit] = migrate(unit)
+        return answers[unit]
+
+    return ask
+
+
 def migrate_unit(migrate: MigrateUnit, document: Mapping[str, Any] | None,
                  definitions: Iterable[Any]) -> dict[str, Any]:
     """One saved unit through the core; the core's answer, or a refusal code."""
-    unit: dict[str, Any] = {"definitions": list(definitions)}
+    unit: dict[str, Any] = {"definitions": _distinct(definitions)}
     if document is not None:
         unit["document"] = {
             "source": document.get("source"),
             "language": document.get("language"),
             "macro_locks": document.get("macro_locks") or [],
         }
-    output = migrate(json.dumps(unit, ensure_ascii=False).encode("utf-8"))
+    output = migrate(_canonical(unit).encode("utf-8"))
     try:
         answer = json.loads(output.decode("utf-8"))
     except (UnicodeDecodeError, json.JSONDecodeError):
@@ -125,6 +150,15 @@ def census(connection: Any, migrate: MigrateUnit) -> dict[str, object]:
     ``connection`` is a DB-API connection (sqlite3) opened read-only.
     """
     rows = lambda sql: connection.execute(sql).fetchall()  # noqa: E731
+    migrate = remembering(migrate)
+    elapsed_ms: dict[str, int] = {}
+    started = time.monotonic()
+
+    def lap(name: str) -> None:
+        nonlocal started
+        now = time.monotonic()
+        elapsed_ms[name] = round((now - started) * 1000)
+        started = now
 
     # Definitions saved with each variation, to hand the core with its document.
     saved_definitions: dict[tuple[str, str], list[Any]] = {}
@@ -150,6 +184,7 @@ def census(connection: Any, migrate: MigrateUnit) -> dict[str, object]:
             answer = migrate_unit(migrate, None, definitions)
             links.definitions(f"{owner_id}/{history_id}", answer.get("definitions") or [])
 
+    lap("history_links")
     executions = _Tally()
     for owner_id, execution_id, variation_id, state_bytes in rows(
         "SELECT owner_id, execution_id, variation_id, state_bytes FROM pipeline_candidate_executions"
@@ -174,6 +209,7 @@ def census(connection: Any, migrate: MigrateUnit) -> dict[str, object]:
             executions.counts["with_definitions"] += 1
             executions.definitions(record_id, migrate_unit(migrate, None, definitions).get("definitions") or [])
 
+    lap("executions")
     variations = _Tally()
     for owner_id, variation_id, document_json in rows(
         "SELECT owner_id, variation_id, document_json FROM variation_authority"
@@ -189,9 +225,15 @@ def census(connection: Any, migrate: MigrateUnit) -> dict[str, object]:
         variations.counts["v1"] += 1
         if document.get("macro_locks"):
             variations.counts["with_locks"] += 1
-        answer = migrate_unit(migrate, document, saved_definitions.get((owner_id, variation_id), []))
+        locked = {(lock.get("qualified_name"), lock.get("version")) for lock in document.get("macro_locks") or []
+                  if isinstance(lock, Mapping)}
+        definitions = [definition for definition in saved_definitions.get((owner_id, variation_id), [])
+                       if isinstance(definition, Mapping)
+                       and (f"{definition.get('namespace')}.{definition.get('heading')}", definition.get("version")) in locked]
+        answer = migrate_unit(migrate, document, definitions)
         variations.document(f"{owner_id}/{variation_id}", answer.get("document"))
 
+    lap("variation_documents")
     history = _Tally()
     for history_id, ddl, expanded_ddl, language in rows(
         "SELECT id, ddl, expanded_ddl, instruction_lang_resolved FROM history"
@@ -206,7 +248,9 @@ def census(connection: Any, migrate: MigrateUnit) -> dict[str, object]:
             answer = migrate_unit(migrate, {"source": source, "language": language, "macro_locks": locks}, definitions)
             history.document(f"{history_id}:{column}", answer.get("document"))
 
+    lap("history")
     return {
+        "elapsed_ms": elapsed_ms,
         "variation_documents": variations.report(),
         "history_links": links.report(),
         "executions": executions.report(),

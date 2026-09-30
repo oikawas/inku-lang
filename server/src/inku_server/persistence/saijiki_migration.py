@@ -62,6 +62,10 @@ class MigrationAlreadyWritten(RuntimeError):
     """The saved records were already moved to Saijiki v2; v1 would misread them."""
 
 
+class CoreCallFailed(RuntimeError):
+    """A call to the core was killed past its time, or its process died; the run stops."""
+
+
 def _canonical(value: Any) -> str:
     return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
 
@@ -189,14 +193,20 @@ class _Core:
     With a journal, each call is written down as it starts, with the record it
     was asked for, and again as it ends -- with its answer and how long it
     took, or with how long it ran before it was killed.
+
+    With ``abort_on_failure`` (the production run, the author 2026-09-30), a
+    call that is killed or whose process dies raises ``CoreCallFailed`` instead,
+    and the whole migration stops there.
     """
 
     def __init__(self, migrate: MigrateUnit, workers: int, progress: Progress | None,
-                 journal: Path | None = None, timeout: float | None = None) -> None:
+                 journal: Path | None = None, timeout: float | None = None,
+                 abort_on_failure: bool = False) -> None:
         self.migrate = migrate
         self.workers = max(1, workers)
         self.progress = progress
         self.timeout = timeout
+        self.abort_on_failure = abort_on_failure
         self.answers: dict[bytes, dict[str, Any]] = {}
         self.calls: Counter[str] = Counter()
         self.seconds: Counter[str] = Counter()
@@ -258,6 +268,8 @@ class _Core:
                                        time.monotonic() - began, "died")
                         worker.kill()
                         workers[workers.index(worker)] = _Worker(self.migrate)
+                        if self.abort_on_failure:
+                            raise CoreCallFailed(f"{kind} {label}: the core's process ended without answering")
                     done += 1
                     if self.progress and (done % 200 == 0 or done == total):
                         self.progress(f"{kind} {done}/{total} {round(time.monotonic() - started)}s")
@@ -273,6 +285,8 @@ class _Core:
                                        {"error": {"code": "timeout", "seconds": self.timeout}},
                                        now - began, "killed")
                         self.killed.append({"kind": kind, "record": label, "ms": round((now - began) * 1000)})
+                        if self.abort_on_failure:
+                            raise CoreCallFailed(f"{kind} {label}: no answer within {self.timeout} seconds")
                         done += 1
                         if self.progress:
                             self.progress(f"{kind} killed {label} after {round(now - began)}s")
@@ -323,7 +337,8 @@ class _Link:
 
 def plan(connection: Any, migrate: MigrateUnit, *, workers: int = 1, sample: int | None = None,
          history_ids: Iterable[str] | None = None, progress: Progress | None = None,
-         journal: Path | None = None, timeout: float | None = None) -> Plan:
+         journal: Path | None = None, timeout: float | None = None,
+         abort_on_failure: bool = False) -> Plan:
     """Ask the core about every saved record; return what writing its answers would do.
 
     Reads only. ``sample`` counts that many variations and works drawn at
@@ -331,7 +346,7 @@ def plan(connection: Any, migrate: MigrateUnit, *, workers: int = 1, sample: int
     counting, never for writing. ``journal`` keeps each answer as it comes;
     a call longer than ``timeout`` seconds is killed and its record listed.
     """
-    core = _Core(migrate, workers, progress, journal, timeout)
+    core = _Core(migrate, workers, progress, journal, timeout, abort_on_failure)
     try:
         return _plan(connection, core, sample=sample, history_ids=history_ids)
     finally:
@@ -625,13 +640,15 @@ def census(connection: Any, migrate: MigrateUnit, **options: Any) -> dict[str, A
 def migrate_saved_records(connection: Any, migrate: MigrateUnit, *, workers: int = 1,
                           progress: Progress | None = None,
                           checked: Callable[[], None] | None = None,
-                          journal: Path | None = None, timeout: float | None = None) -> dict[str, Any]:
+                          journal: Path | None = None, timeout: float | None = None,
+                          abort_on_failure: bool = False) -> dict[str, Any]:
     """Write the migration over every saved record inside the caller's transaction.
 
     ``checked`` runs after the updates and before the discards; it raises to
     stop the transaction (the caller's invariant check).
     """
-    migration = plan(connection, migrate, workers=workers, progress=progress, journal=journal, timeout=timeout)
+    migration = plan(connection, migrate, workers=workers, progress=progress, journal=journal, timeout=timeout,
+                     abort_on_failure=abort_on_failure)
     started = time.monotonic()
     for sql, args in migration.statements:
         _execute(connection, sql, args)
@@ -646,7 +663,7 @@ def migrate_saved_records(connection: Any, migrate: MigrateUnit, *, workers: int
 
 def migrate_once(database: Path, migrate: MigrateUnit, *, workers: int = 1,
                  progress: Progress | None = None, journal: Path | None = None,
-                 timeout: float | None = None) -> dict[str, Any]:
+                 timeout: float | None = None, abort_on_failure: bool = False) -> dict[str, Any]:
     """Move the saved records of one SQLite database to Saijiki v2, once.
 
     Run it while the service is stopped. It keeps a verified Backup API
@@ -679,7 +696,8 @@ def migrate_once(database: Path, migrate: MigrateUnit, *, workers: int = 1,
                 before = capture_invariants(connection)
                 report = migrate_saved_records(connection, migrate, workers=workers, progress=progress,
                                                checked=lambda: verify_invariants(connection, before),
-                                               journal=journal, timeout=timeout)
+                                               journal=journal, timeout=timeout,
+                                               abort_on_failure=abort_on_failure)
                 summary = {"refused_records": len(report["refused_records"]), "statements": report["statements"]}
                 _execute(connection, "INSERT INTO app_settings(key, value, at) VALUES (?, ?, ?)",
                          (DONE_SETTING, _canonical(summary), int(time.time() * 1000)))

@@ -5,7 +5,10 @@ stopped, before the new release starts (the author, 2026-09-30: by hand, not at
 startup). It keeps a verified Backup API snapshot in ``migration-backups/``
 beside the database, then writes under a single writer lock; a failure rolls
 back and keeps the snapshot, and a second run refuses. Records the core
-refuses stay as they were. Each answer of the core is written to a journal
+refuses stay as they were. A call to the core that gives no answer within
+--timeout seconds, or whose process dies, stops the whole run: nothing is
+written, the snapshot stays, and the exit status is not zero (the author,
+2026-09-30: a production migration that fails stops there). Each answer of the core is written to a journal
 beside the snapshot as it comes, so a run that stops leaves what it got. The
 whole report -- counts, every refused record with its error and text, and the
 timings -- is written to --report (by default beside the snapshot); stdout
@@ -29,6 +32,8 @@ def main() -> int:
     parser.add_argument("--database", type=Path, required=True, help="the SQLite database to migrate")
     parser.add_argument("--workers", type=int, default=min(6, os.cpu_count() or 1),
                         help="ask the core from this many worker processes at once")
+    parser.add_argument("--timeout", type=float, default=60.0,
+                        help="stop the whole run if a call to the core gives no answer within this many seconds")
     parser.add_argument("--report", type=Path, default=None,
                         help="write the whole report here (default: beside the snapshot)")
     args = parser.parse_args()
@@ -40,7 +45,8 @@ def main() -> int:
     journal.parent.mkdir(parents=True, exist_ok=True)
     print(f"journal: {journal}", file=sys.stderr, flush=True)
     report = migrate_once(args.database, inku_render.pipeline_migrate_saijiki_v1, workers=args.workers,
-                          progress=lambda line: print(line, file=sys.stderr, flush=True), journal=journal)
+                          progress=lambda line: print(line, file=sys.stderr, flush=True), journal=journal,
+                          timeout=args.timeout, abort_on_failure=True)
     path = args.report or Path(report["snapshot"]).with_name(
         f"{args.database.stem}-saijiki-v2-{time.time_ns()}.json")
     path.write_text(json.dumps(report, ensure_ascii=False, sort_keys=True), encoding="utf-8")

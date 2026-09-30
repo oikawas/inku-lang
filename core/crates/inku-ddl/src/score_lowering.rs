@@ -5872,12 +5872,15 @@ fn resolve_complete_object<'a>(
     let surface_intensity = match input.surface_intensity {
         None => SurfaceIntensity::Normal,
         Some(identity)
-            if identity.category == "handling" && matches!(identity.id, "dense" | "faint") =>
+            if identity.category == "handling"
+                && matches!(identity.id, "dense" | "temperate" | "faint") =>
         {
-            if identity.id == "dense" {
-                SurfaceIntensity::Dense
-            } else {
-                SurfaceIntensity::Faint
+            // Temperate lays the medium at the tool's own density, as a mark
+            // without a handling word is drawn.
+            match identity.id {
+                "dense" => SurfaceIntensity::Dense,
+                "temperate" => SurfaceIntensity::Normal,
+                _ => SurfaceIntensity::Faint,
             }
         }
         Some(identity) => {

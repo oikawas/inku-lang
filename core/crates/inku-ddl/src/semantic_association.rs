@@ -1756,7 +1756,7 @@ fn classify_surface_dimension(category: &str, canonical_id: &str) -> Option<Surf
             "none" | "solid" | "sweep" | "grain" | "stipple" | "hatch" | "crosshatch" | "bleed"
             | "aquatint",
         ) => Some(SurfaceDimension::Quality),
-        ("handling", "dense" | "faint") => Some(SurfaceDimension::Intensity),
+        ("handling", "dense" | "temperate" | "faint") => Some(SurfaceDimension::Intensity),
         _ => None,
     }
 }

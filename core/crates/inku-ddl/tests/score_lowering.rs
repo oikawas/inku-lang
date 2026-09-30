@@ -2654,6 +2654,7 @@ fn surface_intensity_reaches_direct_and_macro_scores_with_owned_provenance() {
     let context = ScoreLoweringContext::resolve("wide", Color::White).unwrap();
     for (level, expected) in [
         ("dense", inku_score::SurfaceIntensity::Dense),
+        ("temperate", inku_score::SurfaceIntensity::Normal),
         ("faint", inku_score::SurfaceIntensity::Faint),
     ] {
         let definition = MacroDefinition::from_json(&serde_json::json!({

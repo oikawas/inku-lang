@@ -1034,7 +1034,7 @@ fn apply_continuation_occurrence(
                     "none" | "solid" | "sweep" | "grain" | "stipple" | "hatch" | "crosshatch"
                     | "bleed" | "aquatint",
                 ) => set_if_empty(&mut instruction.entity.surface.quality, term),
-                ("handling", "dense" | "faint") => {
+                ("handling", "dense" | "temperate" | "faint") => {
                     set_if_empty(&mut instruction.entity.surface.intensity, term)
                 }
                 _ => false,

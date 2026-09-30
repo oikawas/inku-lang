@@ -77,7 +77,7 @@ fn embedded_asset_is_complete_and_orders_are_lossless() {
             .iter()
             .map(|category| category.words.len())
             .sum::<usize>(),
-        94
+        95
     );
     assert_eq!(asset.relations.len(), 7);
     assert_eq!(

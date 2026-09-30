@@ -18,7 +18,6 @@ import androidx.test.platform.app.InstrumentationRegistry
 import app.inku.mobile.data.InkuRepository
 import app.inku.mobile.data.db.HistoryItemEntity
 import app.inku.mobile.data.db.InkuDatabase
-import app.inku.mobile.data.refinement.ModelCompareMode
 import app.inku.mobile.data.refinement.PaintSeeds
 import app.inku.mobile.llm.ModelProvider
 import app.inku.mobile.llm.ModelRequest
@@ -185,7 +184,6 @@ class ComparisonScreenTest {
         showLineage()
         composeTestRule.runOnIdle {
             vm().openRefinement(work, RefinementSubview.Model)
-            vm().setModelCompareMode(ModelCompareMode.Common)
             vm().toggleModelCompareSelection("cmp-model")
             vm().generateRefinementCandidates()
         }

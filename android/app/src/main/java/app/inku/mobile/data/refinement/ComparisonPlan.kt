@@ -1,23 +1,12 @@
 package app.inku.mobile.data.refinement
 
 /**
- * The three model comparison modes (`state.svelte.ts:135`, SPEC `:616`).
- *
- * `common` sends the chosen model to both stages; each fixed mode holds one
- * stage on the fixed model and sends the chosen one to the other.
+ * What a model comparison candidate records as its `comparison_mode`. One model
+ * draws both stages (2026-09-30, the author), so each compared model runs Stage 1
+ * and Stage 2 alike; the modes that held one stage fixed are gone, and every new
+ * candidate says `common`, as web's do (`state.svelte.ts`).
  */
-enum class ModelCompareMode(val id: String) {
-    Common("common"),
-    Stage1Fixed("stage1_fixed"),
-    Stage2Fixed("stage2_fixed"),
-    ;
-
-    companion object {
-        val Default = Common
-
-        fun byId(id: String?): ModelCompareMode = entries.firstOrNull { it.id == id } ?: Default
-    }
-}
+const val MODEL_COMPARISON_MODE = "common"
 
 /**
  * The lineage edge a model comparison candidate is saved under. Works saved as
@@ -37,33 +26,15 @@ const val MODEL_COMPARISON_KIND = "model_comparison"
 object ComparisonPlanner {
 
     /**
-     * Which model each stage gets, written as the two lines web decides it with
-     * (`state.svelte.ts:275-277`).
-     */
-    fun stage1ModelFor(mode: ModelCompareMode, fixedModel: String, model: String): String =
-        if (mode == ModelCompareMode.Stage1Fixed) fixedModel else model
-
-    fun stage2ModelFor(mode: ModelCompareMode, fixedModel: String, model: String): String =
-        if (mode == ModelCompareMode.Stage2Fixed) fixedModel else model
-
-    /**
-     * Whether a model may not be chosen: the target work's own pair, and only
-     * that pair (`isModelInspectionChoiceBlocked`, `state.svelte.ts:210-211`).
-     *
-     * In a fixed mode a model the target used is still selectable, as long as
-     * the pair it makes with the fixed side differs from the target's.
+     * Whether a model may not be chosen: one the target work drew with. A work
+     * drawn before the stages shared a model may name two, and either is already
+     * on the canvas (`isModelInspectionChoiceBlocked`, `state.svelte.ts`).
      */
     fun isModelChoiceBlocked(
-        mode: ModelCompareMode,
-        fixedModel: String,
         model: String,
         targetStage1Model: String,
         targetStage2Model: String,
-    ): Boolean = when (mode) {
-        ModelCompareMode.Common -> model == targetStage1Model || model == targetStage2Model
-        ModelCompareMode.Stage1Fixed -> fixedModel == targetStage1Model && model == targetStage2Model
-        ModelCompareMode.Stage2Fixed -> model == targetStage1Model && fixedModel == targetStage2Model
-    }
+    ): Boolean = model == targetStage1Model || model == targetStage2Model
 
     /**
      * A comparison redraws the description from the top, so it carries none of
@@ -72,30 +43,22 @@ object ComparisonPlanner {
      * sends none either -- `interpretOne` / `composeOne` with no seed fields.
      */
     fun modelPlan(
-        mode: ModelCompareMode,
-        fixedModel: String,
         model: String,
         parent: RefinementParent,
-    ): RefinementPlan {
-        val stage1 = stage1ModelFor(mode, fixedModel, model)
-        val stage2 = stage2ModelFor(mode, fixedModel, model)
-        return RefinementPlan(
-            element = null,
-            route = RefinementRoute.Paint,
-            catalogId = parent.catalogId,
-            canvasAspect = parent.canvasAspect,
-            seeds = PaintSeeds(),
-            derivationKind = MODEL_COMPARISON_KIND,
-            derivationMetadata = mapOf(
-                "comparison_mode" to mode.id,
-                "compared_model" to model,
-                "stage1_model" to stage1,
-                "stage2_model" to stage2,
-            ),
-            stage1Model = stage1,
-            stage2Model = stage2,
-        )
-    }
-
-
+    ): RefinementPlan = RefinementPlan(
+        element = null,
+        route = RefinementRoute.Paint,
+        catalogId = parent.catalogId,
+        canvasAspect = parent.canvasAspect,
+        seeds = PaintSeeds(),
+        derivationKind = MODEL_COMPARISON_KIND,
+        derivationMetadata = mapOf(
+            "comparison_mode" to MODEL_COMPARISON_MODE,
+            "compared_model" to model,
+            "stage1_model" to model,
+            "stage2_model" to model,
+        ),
+        stage1Model = model,
+        stage2Model = model,
+    )
 }

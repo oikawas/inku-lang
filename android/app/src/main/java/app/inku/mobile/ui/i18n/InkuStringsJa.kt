@@ -128,16 +128,7 @@ object InkuStringsJa : InkuStrings {
     override val refinementVariationNotice = "変奏は、いまは動かすものがありません。候補は元の作品と同じ絵になります。"
 
     override val comparisonModelSelectPrompt = "比較するモデルを1つ以上選択してください。"
-    override val comparisonModelFixedMissing = "固定するモデルを選択してください。"
-    override val comparisonModelChoiceBlocked = "対象作品と同じ Stage 1/2 の組み合わせは選べません。"
-    override val comparisonModeLabel: (String) -> String = { id ->
-        when (id) {
-            "common" -> "Stage 1/2 共通"
-            "stage1_fixed" -> "Stage 1 固定 + Stage 2 比較"
-            "stage2_fixed" -> "Stage 1 比較 + Stage 2 固定"
-            else -> id
-        }
-    }
+    override val comparisonModelChoiceBlocked = "対象作品を描いたモデルは選べません。"
     override val comparisonKindLabel: (String) -> String = { id ->
         when (id) {
             "adjust" -> "調整"
@@ -354,13 +345,10 @@ object InkuStringsJa : InkuStrings {
     override val downloadState = "取得状況"
     override val accepted = "同意済み"
     override val name = "名前"
-    override val fixedStage1Model = "固定する Stage 1 モデル"
-    override val fixedStage2Model = "固定する Stage 2 モデル"
     override val change = "変更"
     override val failedLines = "失敗した行"
     override val demoSubtitle = "実行 / seed phrase / interval"
     override val demoRunAndSeed = "実行とシードフレーズ"
-    override val sameStagePairBlocked = "対象作品と同じ Stage 1/2 の組み合わせだけが選べません。"
     override val history = "履歴"
     override val showThinking = "思考を表示"
     override val providerKind = "接続形式"

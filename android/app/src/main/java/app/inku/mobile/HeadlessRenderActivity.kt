@@ -93,12 +93,13 @@ class HeadlessRenderActivity : Activity() {
             require(inputMode == "image" || text.isNotBlank()) { "text or text_file extra is required." }
 
             val settings = repository.getSetting("model_selection")?.let { JSONObject(it) }
+            // One model draws both stages (2026-09-30, the author): the Stage 1
+            // extra, else the Stage 2 one, else the saved choice.
             val stage1Model = intent.getStringExtra("stage1_model")?.takeIf { it.isNotBlank() }
+                ?: intent.getStringExtra("stage2_model")?.takeIf { it.isNotBlank() }
                 ?: settings?.optString("stage1_model")?.takeIf { it.isNotBlank() }?.let(DefaultModelDownloads::offeredOrStandard)
                 ?: CompatibilityConstants.defaultStage1Model
-            val stage2Model = intent.getStringExtra("stage2_model")?.takeIf { it.isNotBlank() }
-                ?: settings?.optString("stage2_model")?.takeIf { it.isNotBlank() }?.let(DefaultModelDownloads::offeredOrStandard)
-                ?: CompatibilityConstants.defaultStage2Model
+            val stage2Model = stage1Model
             val catalogId = intent.getStringExtra("catalog_id")?.takeIf { it.isNotBlank() }
                 ?: repository.getSetting("color_catalog")?.let { JSONObject(it).optString("value") }?.takeIf { it.isNotBlank() }
                 ?: CompatibilityConstants.defaultColorCatalogId

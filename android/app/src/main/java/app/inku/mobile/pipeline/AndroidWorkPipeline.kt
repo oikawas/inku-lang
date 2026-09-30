@@ -609,7 +609,7 @@ class AndroidWorkPipeline(
                 text = text,
                 originalInput = request.originalText,
                 config = config,
-                models = PipelineModelSelection(request.stage1Model, request.stage2Model),
+                models = PipelineModelSelection(request.drawingModel, request.drawingModel),
                 context = context,
                 renderSeed = renderSeed,
                 wild = request.renderWild == true,
@@ -769,8 +769,8 @@ class AndroidWorkPipeline(
 
     private fun runtimeOptionsChanged(request: PaintRequest, stored: RestoredRun): Boolean {
         val options = stored.hostOptions
-        return request.stage1Model != stored.models.stage1ModelId ||
-            request.stage2Model != stored.models.stage2ModelId ||
+        return request.drawingModel != stored.models.stage1ModelId ||
+            request.drawingModel != stored.models.stage2ModelId ||
             (request.colorCatalogId == "auto") != (options.requiredString("catalog_mode") == "auto") ||
             (request.colorCatalogId != "auto" && request.colorCatalogId != options.requiredString("catalog_id")) ||
             request.canvasAspect != options.requiredString("canvas_aspect") ||

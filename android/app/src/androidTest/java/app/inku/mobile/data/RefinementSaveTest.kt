@@ -264,6 +264,39 @@ class RefinementSaveTest {
         assertEquals("the canvas is the parent's", parent.canvasAspect, stored.canvasAspect)
     }
 
+    /**
+     * One model draws both stages (2026-09-30, the author). A work drawn before
+     * then may name two; its candidate is drawn and saved with the Stage 1 model.
+     */
+    @Test
+    fun t8_aCandidateOfATwoModelWorkDrawsWithItsStage1Model() = runBlocking {
+        val parentItem = composeParent("赤い線を引く")
+        val parent = parentOf(parentItem).copy(stage1Model = "test-stage1", stage2Model = "test-stage2")
+        val plan = RefinementPlanner.plan(
+            element = RefinementElement.Layout,
+            parent = parent,
+            amplitude = VariationAmplitude.Large,
+        )
+        val result = repository.renderRefinementCandidate(parent, plan)
+        assertEquals(
+            "Stage 2 ran on the Stage 1 model",
+            "test-stage1",
+            JSONObject(result.renderMetadataJson).getString("stage2_model"),
+        )
+
+        val child = repository.saveRefinementCandidate(
+            result = result,
+            plan = plan,
+            parentNodeId = parentItem.lineageNodeId,
+            elapsedMs = 1L,
+            stage1ModelId = parent.stage1Model,
+            stage2ModelId = parent.stage2Model,
+        )
+        val stored = database.historyDao().getById(child.id)!!
+        assertEquals("test-stage1", stored.stage1Model)
+        assertEquals("the row records the one model for both", "test-stage1", stored.stage2Model)
+    }
+
     // ── T-9 ────────────────────────────────────────────────
 
     /**

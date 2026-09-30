@@ -746,7 +746,8 @@ Android 版のモデル選択 UI は、モバイル操作の単純化を優先�
 - 記述画面のモデル選択ダイアログは、モバイルでの即時選択を優先し、server/web 互換メタデータ維持に関する説明文を表示しない。
 - 記述画面のモデル選択ダイアログは、単一選択に必要な provider / model list / OK / cancel に絞ったコンパクトなサイズにする。
 - ユーザーがモデルを選択した場合、Android 内部状態では `selectedModelId` と `selectedStage2ModelId` の両方へ同じ model id を設定する。
-- 設定保存は将来の個別オプション復活に備え、従来通り `model_selection.stage1_model` と `model_selection.stage2_model` を保持する。
+- 設定保存は従来通り `model_selection.stage1_model` と `model_selection.stage2_model` を保持し、常に同じ値にする。2026-09-30 の作者の決定で、1 つのモデルが両方の段を描く（段ごとに別のモデルは使わない）。
+- 描画・推敲・モデル比較は、依頼の Stage 1 のモデル（空なら Stage 2 のモデル）を両方の段に使い、作品にもその 1 つを両方の欄へ記録する（`PaintRequest.drawingModel`）。この決定より前に 2 つのモデルで描いた作品の記録は変えず、その作品を推敲したときは Stage 1 のモデルで描く。モデル比較は、選んだ各モデルで両方の段を描く（「Stage 1 固定」「Stage 2 固定」は削除した）。
 - 履歴 DB、JSON 表示、JSON export、render metadata の `stage1_model` / `stage2_model` は server/web 互換のため維持する。
 - Repository / pipeline の引数も `stage1ModelId` / `stage2ModelId` を維持し、Android UI の単一選択値を両方へ渡す。
 - 既存設定に Stage 1 / Stage 2 の異なる値が残っている場合、Android UI 復元時は Stage 1 側を優先して単一選択へ正規化する。

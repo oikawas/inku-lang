@@ -78,7 +78,18 @@ data class PaintRequest(
     val inputProvenance: app.inku.mobile.data.model.CameraInputProvenance? = null,
     /** Definitions read from an `inku.ddl-export.v1` file; used by a new work only. */
     val importedPlugins: List<ImportedPluginDefinition> = emptyList(),
-)
+) {
+    /**
+     * The one model that draws both stages (2026-09-30, the author): the Stage 1
+     * model, else the Stage 2 one, as the server resolves a request
+     * (`pipeline_product.py`). A request that still names two -- a refinement of
+     * a work drawn before the stages shared a model -- keeps its Stage 1 model.
+     */
+    val drawingModel: String get() = drawingModelOf(stage1Model, stage2Model)
+}
+
+/** The rule of [PaintRequest.drawingModel], for a save that records the models it drew with. */
+fun drawingModelOf(stage1Model: String, stage2Model: String): String = stage1Model.ifBlank { stage2Model }
 
 /**
  * [renderSeed] is what the drawing was actually performed with, not what was

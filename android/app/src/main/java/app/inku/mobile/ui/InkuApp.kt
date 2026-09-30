@@ -208,7 +208,6 @@ import app.inku.mobile.data.db.HistoryListItem
 import app.inku.mobile.data.lineage.LineageGraphNode
 import app.inku.mobile.data.lineage.LineageGraphResult
 import app.inku.mobile.data.refinement.ComparisonPlanner
-import app.inku.mobile.data.refinement.ModelCompareMode
 import app.inku.mobile.data.refinement.RefinementElement
 import app.inku.mobile.data.refinement.RefinementPlanner
 import app.inku.mobile.data.refinement.VariationAmplitude
@@ -3574,7 +3573,6 @@ internal const val MODEL_ENTRY_TAG = "model_entry"
 
 /** Tags for the sub-view chips and the model selection grid. */
 internal fun refinementSubviewTag(subview: RefinementSubview): String = "refine_subview_${subview.id}"
-internal fun modelCompareModeTag(mode: ModelCompareMode): String = "model_compare_mode_${mode.id}"
 internal fun modelChoiceTag(modelId: String): String = "model_choice_$modelId"
 
 /**
@@ -3661,7 +3659,7 @@ private fun RefinementPanel(state: InkuUiState, viewModel: InkuViewModel) {
         Text(
             when (state.refinementSubview) {
                 RefinementSubview.Adjust -> S.refineOneKindOnly
-                RefinementSubview.Model -> S.sameStagePairBlocked
+                RefinementSubview.Model -> S.comparisonModelChoiceBlocked
             } + (parent?.let {
                 S.parentSuffix(it.renderHashShort, ColorCatalogs.currentDisplayCatalog(it.colorCatalogId)?.name ?: it.colorCatalogId)
             } ?: ""),
@@ -3878,8 +3876,8 @@ private fun RefinementAdjustControls(
 }
 
 /**
- * モデル検分: the three modes, the fixed model when a mode has one, and the
- * models to compare (SPEC `:616`).
+ * モデル検分: the models to compare (SPEC `:616`). Each draws both stages; the
+ * modes that held one stage fixed were removed on 2026-09-30 (the author).
  *
  * No judge value is shown -- the SPEC says so twice, and there is nothing on
  * this screen that would carry one.
@@ -3887,39 +3885,10 @@ private fun RefinementAdjustControls(
 @Composable
 private fun ModelInspectionControls(state: InkuUiState, viewModel: InkuViewModel) {
     val choices = remember(state.modelAssets, state.providerSettings) { modelChoicesFor(state) }
-    WrapRow(horizontal = Dimens.spaceM, vertical = Dimens.spaceM) {
-        ModelCompareMode.entries.forEach { mode ->
-            ChipButton(
-                text = LocalStrings.current.comparisonModeLabel(mode.id),
-                selected = state.modelCompareMode == mode,
-                modifier = Modifier.testTag(modelCompareModeTag(mode)),
-                onClick = { viewModel.setModelCompareMode(mode) },
-            )
-        }
-    }
-
-    if (state.modelCompareMode != ModelCompareMode.Common) {
-        Text(
-            if (state.modelCompareMode == ModelCompareMode.Stage1Fixed) S.fixedStage1Model else S.fixedStage2Model,
-            style = MaterialTheme.typography.labelMedium,
-        )
-        WrapRow(horizontal = Dimens.spaceM, vertical = Dimens.spaceM) {
-            choices.forEach { choice ->
-                ChipButton(
-                    text = choice.label,
-                    selected = state.modelCompareFixedModel == choice.id,
-                    onClick = { viewModel.setModelCompareFixedModel(choice.id) },
-                )
-            }
-        }
-    }
-
     Text(S.modelsToCompare(MAX_COMPARE_SELECTION), style = MaterialTheme.typography.labelMedium)
     WrapRow(horizontal = Dimens.spaceM, vertical = Dimens.spaceM) {
         choices.forEach { choice ->
             val blocked = ComparisonPlanner.isModelChoiceBlocked(
-                mode = state.modelCompareMode,
-                fixedModel = state.modelCompareFixedModel,
                 model = choice.id,
                 targetStage1Model = state.refinementParent?.stage1Model.orEmpty(),
                 targetStage2Model = state.refinementParent?.stage2Model.orEmpty(),

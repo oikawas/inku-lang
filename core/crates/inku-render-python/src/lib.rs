@@ -203,6 +203,17 @@ fn pipeline_render_saved<'py>(
     PyBytes::new(py, &output)
 }
 
+/// Migrate one saved Saijiki v1 unit (a document and its definitions) for a one-time host migration.
+#[pyfunction]
+fn pipeline_migrate_saijiki_v1<'py>(
+    py: Python<'py>,
+    input_bytes: &Bound<'py, PyBytes>,
+) -> Bound<'py, PyBytes> {
+    let input = input_bytes.as_bytes().to_vec();
+    let output = py.detach(|| inku_pipeline_uniffi::migrate_saijiki_v1(input));
+    PyBytes::new(py, &output)
+}
+
 #[pymodule]
 fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(core_api_version, module)?)?;
@@ -224,5 +235,6 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
         module
     )?)?;
     module.add_function(wrap_pyfunction!(pipeline_render_saved, module)?)?;
+    module.add_function(wrap_pyfunction!(pipeline_migrate_saijiki_v1, module)?)?;
     Ok(())
 }

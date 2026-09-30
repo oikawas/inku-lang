@@ -626,8 +626,13 @@ class RoomSharedPipelineStore(
             val reason = payload.stringField("reason")
             require(reason.isNotEmpty()) { "commit reason must not be empty" }
             val document = payload.objectField("document")
-            require(document.keySet() == setOf("source", "language", "macro_locks")) {
+            // A document written with the current Saijiki names its edition; a saved one without
+            // the field was written with v1 (SPEC §3.3), and the core refuses it until migrated.
+            require(document.keySet() - "saijiki" == setOf("source", "language", "macro_locks")) {
                 "document has an unexpected shape"
+            }
+            if (document.has("saijiki")) {
+                require(document.stringField("saijiki").isNotEmpty()) { "document saijiki edition must be a name" }
             }
             val source = document.stringField("source")
             document.stringField("language")

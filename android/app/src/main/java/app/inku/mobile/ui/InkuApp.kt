@@ -467,6 +467,9 @@ private val saijikiGroupColors = listOf(
     // The thirteenth, for あいだ / relations. It was added to the generated
     // table after the twelfth, and its pills took かたち's colour again.
     SaijikiGroupLemon,
+    // The fourteenth, for さばき / handling (Saijiki v2). It sits after おもて in
+    // the table, so the categories after it move one colour along.
+    SaijikiGroupPeach,
 )
 
 /**

@@ -233,6 +233,24 @@ class SharedPipelinePersistenceTest {
                 .length() == 0,
         )
 
+        val unnamedEdition = runCatching {
+            store.commit(
+                "local-owner",
+                actionJson(
+                    actionId = "3".repeat(64),
+                    attempt = 1,
+                    source = "赤い円と線を描く。",
+                    expectedRevision = "1",
+                    nextRevision = "2",
+                    saijiki = "",
+                ),
+                false,
+                context,
+            )
+        }.exceptionOrNull()
+        assertNotNull("a document naming no Saijiki edition is refused", unnamedEdition)
+
+        // A document written with the current Saijiki names its edition (SPEC §3.3).
         val advanced = JSONObject(
             store.commit(
                 "local-owner",
@@ -242,12 +260,17 @@ class SharedPipelinePersistenceTest {
                     source = "赤い円と線を描く。",
                     expectedRevision = "1",
                     nextRevision = "2",
+                    saijiki = "inku.saijiki.v2",
                 ),
                 false,
                 context,
             ),
         )
         assertEquals("2", advanced.getString("revision"))
+        assertEquals(
+            "inku.saijiki.v2",
+            JSONObject(store.readAuthority("local-owner", "variation-1")!!.documentJson).getString("saijiki"),
+        )
 
         val replayHistory = historyItem("managed-replay", source).copy(
             lineageNodeId = "managed-replay-node",
@@ -320,6 +343,7 @@ class SharedPipelinePersistenceTest {
         source: String,
         expectedRevision: String,
         nextRevision: String,
+        saijiki: String? = null,
     ): String {
         val nextState = JSONObject()
             .put("protocol_version", RoomSharedPipelineStore.AUTHORITY_PROTOCOL)
@@ -347,7 +371,8 @@ class SharedPipelinePersistenceTest {
                         JSONObject()
                             .put("source", source)
                             .put("language", "ja")
-                            .put("macro_locks", JSONArray()),
+                            .put("macro_locks", JSONArray())
+                            .apply { saijiki?.let { put("saijiki", it) } },
                     )
                     .put("ddl_digest", sha256(source))
                     .put(

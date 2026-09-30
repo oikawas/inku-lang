@@ -6,6 +6,12 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file retains the history from v2.5.0 (2026-07-25, render engine 12) onward.** Past records follow the recent ones in a collapsible section of this same document; expand it when needed. Viewers without collapse support show the full text. Earlier history is in the [v1.72–v2.4 archive](docs/history/changelog-v1.72-v2.4.md) and the [v0.1–v1.71 archive](docs/history/changelog-v0.1-v1.71.md).
 
+### v2.15.75 — Count English syllables and name only nearby verse forms (Build 1151, 2026-09-30)
+
+The authenticated `POST /api/description/syllables` counts English syllables using the bundled CMU Pronouncing Dictionary. Its original dictionary, license and README are retained, with an entry in the third-party notices. No Python dependency is added.
+
+Other (server) settings now switch Japanese and English meters on or off, both on by default. A disabled language's counting API returns 409. Verse names appear only for nearby forms: Japanese checks phrase shape within two sounds, including haiku/senryu and dodoitsu. English names no form for one line, checks the Cinquain syllable pattern and uses line-count proximity for forms such as Sonnet. The specification and manuals are updated in both languages.
+
 ### v2.15.74 — Show the nearest verse form by sounds or lines (Build 1150, 2026-09-30)
 
 The description-edit action is now “Change the description”, with a “Draw” button. The input and dialog share a meter: Japanese shows the sound count and nearest verse form; English shows the line count and nearest form, such as `Lines 3/3 (haiku)`. Redrawing a sketch keeps its “Perform” button.

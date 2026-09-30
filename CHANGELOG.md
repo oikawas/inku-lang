@@ -6,6 +6,12 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file retains the history from v2.5.0 (2026-07-25, render engine 12) onward.** Past records follow the recent ones in a collapsible section of this same document; expand it when needed. Viewers without collapse support show the full text. Earlier history is in the [v1.72–v2.4 archive](docs/history/changelog-v1.72-v2.4.md) and the [v0.1–v1.71 archive](docs/history/changelog-v0.1-v1.71.md).
 
+### 2026-09-30 — Android: choose the models first (the author's instruction)
+
+- Studio: the folded "Drawing settings" row is gone. Model, color catalog, and canvas are small buttons always shown under the description, with sketch from life below them. The model button stays the only way into the model selection.
+- Camera: the capture screen shows the description model and the drawing model over the top right of the preview. "Model selection" changes both before the shutter (with the notice of where the photo goes when a remote model is chosen). The choice is saved and used for that capture, and the description model is checked again after the shutter.
+- The description model's note in Settings > Other now says drawing uses the model, color catalog, and sketch chosen in Studio.
+
 ### 2026-09-30 — Android: one model draws both stages (the Server's rule)
 
 At the Server session's request (the author's decision), Android drops different models for Stage 1 and Stage 2, as Server, Web and cli did. The `stage1_model` and `stage2_model` keys stay in the API and the work records, always equal.

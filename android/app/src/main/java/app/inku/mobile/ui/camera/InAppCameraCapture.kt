@@ -10,6 +10,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
@@ -46,6 +47,7 @@ import java.io.File
  *
  * Replaces the round trip through the system camera app and its review step.
  * The file stays under the app's camera cache; the caller owns it afterwards.
+ * [overlay] is drawn over the preview, above the shutter's layer.
  */
 @Composable
 internal fun InAppCameraCapture(
@@ -55,6 +57,7 @@ internal fun InAppCameraCapture(
     onCaptured: () -> Unit,
     onCancel: () -> Unit,
     onUnavailable: () -> Unit,
+    overlay: @Composable BoxScope.() -> Unit = {},
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -93,6 +96,7 @@ internal fun InAppCameraCapture(
 
     Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
         AndroidView(factory = { previewView }, modifier = Modifier.fillMaxSize())
+        overlay()
         TextButton(
             onClick = onCancel,
             enabled = !capturing,

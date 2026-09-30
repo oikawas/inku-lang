@@ -387,7 +387,6 @@ object InkuStringsEn : InkuStrings {
     override val runStatusRetrying: (Int, Int) -> String = { attempt, maxAttempts -> "Retrying (try $attempt/$maxAttempts)" }
     override val renderExpression = "Stroke"
     override val refinementElements = "Refinement elements"
-    override val drawingSettings = "Drawing settings"
     override val newApiKey = "New API key"
     override val makeNewOrigin = "Make this a new origin"
     override val newWork = "New"
@@ -446,7 +445,7 @@ object InkuStringsEn : InkuStrings {
     override val ddlExportWithPluginsNote = "The DDL and the plugin definitions it uses; another setup that reads it draws the same composition"
     override val bundledPluginsSubtitle = "Nature.leaves. When disabled, new works do not use it, and sentences naming its words are not drawn, with the reason shown. Saved works redraw with their own definitions."
     override fun bundledPluginsToggle(words: String) = "Use ($words)"
-    override val cameraVisionModelSubtitle = "The model that turns a photo into a description. Drawing uses the models, color catalog, and sketch setting from your drawing settings."
+    override val cameraVisionModelSubtitle = "The model that turns a photo into a description. Drawing uses the model, color catalog, and sketch chosen in Studio."
     override fun cameraVisionRemoteNotice(provider: String) = "With this model, the photo you take or choose is sent to $provider. Only a downsized, re-encoded image is sent, without location or other capture data."
     override val cameraReadyToEdit = "Ready to edit"
     override val cameraCancelled = "Image processing cancelled"

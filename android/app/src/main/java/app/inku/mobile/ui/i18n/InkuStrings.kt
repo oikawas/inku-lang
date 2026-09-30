@@ -311,7 +311,6 @@ interface InkuStrings {
     val runStatusRetrying: (attempt: Int, maxAttempts: Int) -> String
     val renderExpression: String
     val refinementElements: String
-    val drawingSettings: String
     val newApiKey: String
     val makeNewOrigin: String
     val newWork: String

@@ -144,29 +144,79 @@ def _definitions_of(config: Any) -> list[Any]:
     return list(definitions) if isinstance(definitions, list) else []
 
 
-def census(connection: Any, migrate: MigrateUnit) -> dict[str, object]:
-    """Count what the migration would do to every saved record; write nothing.
+class _Clock:
+    """Time spent in the core per kind of record, to estimate the whole run."""
 
-    ``connection`` is a DB-API connection (sqlite3) opened read-only.
+    def __init__(self, migrate: MigrateUnit) -> None:
+        self.migrate = remembering(migrate)
+        self.calls: Counter[str] = Counter()
+        self.seconds: Counter[str] = Counter()
+        self.kind = ""
+
+    def __call__(self, unit: bytes) -> bytes:
+        started = time.monotonic()
+        try:
+            return self.migrate(unit)
+        finally:
+            self.calls[self.kind] += 1
+            self.seconds[self.kind] += time.monotonic() - started
+
+
+def census(connection: Any, migrate: MigrateUnit, *, sample: int | None = None) -> dict[str, object]:
+    """Count what the migration would do to the saved records; write nothing.
+
+    ``connection`` is a DB-API connection (sqlite3) opened read-only. With
+    ``sample``, each kind of record is counted on that many rows drawn at
+    random, and the definitions and locks a drawn record needs are looked up
+    for it, so a drawn document is not refused for a definition that was
+    simply not drawn. Each kind reports its total rows, the rows counted, and
+    the core's time per call, from which the whole run can be estimated.
     """
-    rows = lambda sql: connection.execute(sql).fetchall()  # noqa: E731
-    migrate = remembering(migrate)
-    elapsed_ms: dict[str, int] = {}
-    started = time.monotonic()
+    clock = _Clock(migrate)
+    limit = f" ORDER BY random() LIMIT {int(sample)}" if sample else ""
 
-    def lap(name: str) -> None:
-        nonlocal started
-        now = time.monotonic()
-        elapsed_ms[name] = round((now - started) * 1000)
-        started = now
+    def rows(sql: str, *args: Any) -> list[Any]:
+        return connection.execute(sql, args).fetchall()
 
-    # Definitions saved with each variation, to hand the core with its document.
-    saved_definitions: dict[tuple[str, str], list[Any]] = {}
-    # The locks and definitions a saved work was performed with, for its instructions.
-    performed_with: dict[str, tuple[list[Any], list[Any]]] = {}
+    def total(table: str) -> int:
+        return int(rows(f"SELECT COUNT(*) FROM {table}")[0][0])
+
+    def definitions_saved_for(owner_id: str, variation_id: str) -> list[Any]:
+        found: list[Any] = []
+        for (context_bytes,) in rows(
+            "SELECT fork_context_bytes FROM pipeline_history_links WHERE owner_id=? AND variation_id=?",
+            owner_id, variation_id,
+        ):
+            context = _json(context_bytes)
+            if isinstance(context, Mapping):
+                found.extend(_definitions_of(context.get("config")))
+        for (state_bytes,) in rows(
+            "SELECT state_bytes FROM pipeline_candidate_executions WHERE owner_id=? AND variation_id=?",
+            owner_id, variation_id,
+        ):
+            wrapper = _json(state_bytes)
+            snapshot = wrapper.get("snapshot") if isinstance(wrapper, Mapping) else None
+            if isinstance(snapshot, Mapping):
+                found.extend(_definitions_of(snapshot.get("config")))
+        return _distinct(found)
+
+    def performed_with(history_id: str) -> tuple[list[Any], list[Any]]:
+        for (context_bytes,) in rows(
+            "SELECT fork_context_bytes FROM pipeline_history_links WHERE history_id=?", history_id
+        ):
+            context = _json(context_bytes)
+            if isinstance(context, Mapping):
+                locks = (context.get("macro_catalog") or {}).get("definition_locks") or []
+                return (locks if isinstance(locks, list) else []), _definitions_of(context.get("config"))
+        return [], []
+
+    report: dict[str, object] = {}
+
+    clock.kind = "history_links"
     links = _Tally()
-    for owner_id, history_id, variation_id, context_bytes in rows(
-        "SELECT owner_id, history_id, variation_id, fork_context_bytes FROM pipeline_history_links"
+    links.counts["total_rows"] = total("pipeline_history_links")
+    for owner_id, history_id, context_bytes in rows(
+        "SELECT owner_id, history_id, fork_context_bytes FROM pipeline_history_links" + limit
     ):
         links.counts["rows"] += 1
         context = _json(context_bytes)
@@ -175,19 +225,18 @@ def census(connection: Any, migrate: MigrateUnit) -> dict[str, object]:
             continue
         definitions = _definitions_of(context.get("config"))
         locks = (context.get("macro_catalog") or {}).get("definition_locks") or []
-        locks = locks if isinstance(locks, list) else []
-        links.counts["definition_locks"] += len(locks)
-        performed_with[history_id] = (locks, definitions)
+        links.counts["definition_locks"] += len(locks) if isinstance(locks, list) else 0
         if definitions:
             links.counts["with_definitions"] += 1
-            saved_definitions.setdefault((owner_id, variation_id), []).extend(definitions)
-            answer = migrate_unit(migrate, None, definitions)
+            answer = migrate_unit(clock, None, definitions)
             links.definitions(f"{owner_id}/{history_id}", answer.get("definitions") or [])
+    report["history_links"] = links
 
-    lap("history_links")
+    clock.kind = "executions"
     executions = _Tally()
-    for owner_id, execution_id, variation_id, state_bytes in rows(
-        "SELECT owner_id, execution_id, variation_id, state_bytes FROM pipeline_candidate_executions"
+    executions.counts["total_rows"] = total("pipeline_candidate_executions")
+    for owner_id, execution_id, state_bytes in rows(
+        "SELECT owner_id, execution_id, state_bytes FROM pipeline_candidate_executions" + limit
     ):
         executions.counts["rows"] += 1
         wrapper = _json(state_bytes)
@@ -196,23 +245,23 @@ def census(connection: Any, migrate: MigrateUnit) -> dict[str, object]:
             executions.refused["unreadable_snapshot"] += 1
             continue
         definitions = _definitions_of(snapshot.get("config"))
-        if definitions:
-            saved_definitions.setdefault((owner_id, variation_id), []).extend(definitions)
         document = snapshot.get("document")
         record_id = f"{owner_id}/{execution_id}"
         if isinstance(document, Mapping) and "saijiki" not in document:
             executions.counts["documents_v1"] += 1
-            executions.document(record_id, migrate_unit(migrate, document, definitions).get("document"))
+            executions.document(record_id, migrate_unit(clock, document, definitions).get("document"))
         elif isinstance(document, Mapping):
             executions.counts["documents_current"] += 1
         if definitions:
             executions.counts["with_definitions"] += 1
-            executions.definitions(record_id, migrate_unit(migrate, None, definitions).get("definitions") or [])
+            executions.definitions(record_id, migrate_unit(clock, None, definitions).get("definitions") or [])
+    report["executions"] = executions
 
-    lap("executions")
+    clock.kind = "variation_documents"
     variations = _Tally()
+    variations.counts["total_rows"] = total("variation_authority")
     for owner_id, variation_id, document_json in rows(
-        "SELECT owner_id, variation_id, document_json FROM variation_authority"
+        "SELECT owner_id, variation_id, document_json FROM variation_authority" + limit
     ):
         variations.counts["rows"] += 1
         document = _json(document_json)
@@ -223,36 +272,41 @@ def census(connection: Any, migrate: MigrateUnit) -> dict[str, object]:
             variations.counts["current"] += 1
             continue
         variations.counts["v1"] += 1
-        if document.get("macro_locks"):
-            variations.counts["with_locks"] += 1
         locked = {(lock.get("qualified_name"), lock.get("version")) for lock in document.get("macro_locks") or []
                   if isinstance(lock, Mapping)}
-        definitions = [definition for definition in saved_definitions.get((owner_id, variation_id), [])
-                       if isinstance(definition, Mapping)
-                       and (f"{definition.get('namespace')}.{definition.get('heading')}", definition.get("version")) in locked]
-        answer = migrate_unit(migrate, document, definitions)
+        definitions = []
+        if locked:
+            variations.counts["with_locks"] += 1
+            definitions = [definition for definition in definitions_saved_for(owner_id, variation_id)
+                           if isinstance(definition, Mapping)
+                           and (f"{definition.get('namespace')}.{definition.get('heading')}",
+                                definition.get("version")) in locked]
+        answer = migrate_unit(clock, document, definitions)
         variations.document(f"{owner_id}/{variation_id}", answer.get("document"))
+    report["variation_documents"] = variations
 
-    lap("variation_documents")
+    clock.kind = "history"
     history = _Tally()
+    history.counts["total_rows"] = total("history")
     for history_id, ddl, expanded_ddl, language in rows(
-        "SELECT id, ddl, expanded_ddl, instruction_lang_resolved FROM history"
+        "SELECT id, ddl, expanded_ddl, instruction_lang_resolved FROM history" + limit
     ):
         history.counts["rows"] += 1
         language = language if language in {"ja", "en"} else "ja"
+        locks, definitions = performed_with(history_id)
         for column, source in (("ddl", ddl), ("expanded_ddl", expanded_ddl)):
             if not source:
                 continue
             history.counts[f"{column}_present"] += 1
-            locks, definitions = performed_with.get(history_id, ([], []))
-            answer = migrate_unit(migrate, {"source": source, "language": language, "macro_locks": locks}, definitions)
+            answer = migrate_unit(clock, {"source": source, "language": language, "macro_locks": locks}, definitions)
             history.document(f"{history_id}:{column}", answer.get("document"))
+    report["history"] = history
 
-    lap("history")
     return {
-        "elapsed_ms": elapsed_ms,
-        "variation_documents": variations.report(),
-        "history_links": links.report(),
-        "executions": executions.report(),
-        "history": history.report(),
+        "sample": sample,
+        "core_calls": dict(clock.calls),
+        "core_ms_per_call": {
+            kind: round(clock.seconds[kind] * 1000 / calls, 1) for kind, calls in clock.calls.items() if calls
+        },
+        **{kind: tally.report() for kind, tally in report.items()},
     }

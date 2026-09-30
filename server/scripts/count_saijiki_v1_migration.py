@@ -45,6 +45,8 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--run-root", type=Path, required=True)
     parser.add_argument("--database", type=Path, required=True)
+    parser.add_argument("--sample", type=int, default=None,
+                        help="count this many rows of each kind, drawn at random")
     args = parser.parse_args()
     database = _resolve_guarded_database(args.run_root, args.database)
 
@@ -54,7 +56,7 @@ def main() -> int:
     # create the journal files a read-only open of a WAL database otherwise needs.
     connection = sqlite3.connect(f"file:{database}?mode=ro&immutable=1", uri=True)
     try:
-        report = census(connection, inku_render.pipeline_migrate_saijiki_v1)
+        report = census(connection, inku_render.pipeline_migrate_saijiki_v1, sample=args.sample)
     finally:
         connection.close()
     json.dump({"ok": True, "census": report}, sys.stdout, ensure_ascii=False, sort_keys=True)

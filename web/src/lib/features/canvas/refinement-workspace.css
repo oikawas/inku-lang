@@ -277,6 +277,19 @@
 		opacity: 1;
 	}
 
+	.compare-head {
+		display: flex;
+		align-items: flex-start;
+		justify-content: space-between;
+		gap: 16px;
+	}
+	.compare-head-settings { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-width: 0; }
+	.compare-action-wrap {
+		width: min(260px, 34%);
+		min-width: 210px;
+	}
+	.compare-action-wrap .tooltip-wrap { width: 100%; }
+	.compare-action-wrap .paint-btn { margin-top: 0; }
 	.model-metadata-hover { position: relative; display: flex; min-width: 0; }
 	.model-metadata-hover > .model-choice { width: 100%; }
 	.model-metadata-hover:hover .model-hover-card,

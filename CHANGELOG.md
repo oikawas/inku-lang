@@ -4,7 +4,11 @@
 
 This file records changes chronologically. If a historical note conflicts with the current specification, the current specification wins. The more detailed canonical history is maintained in Japanese in [CHANGELOG.ja.md](CHANGELOG.ja.md).
 
-**This file holds the 69 entries from v2.5.0 (2026-07-25, render engine 12) onward.** Earlier entries are archived.
+**This file retains the history from v2.5.0 (2026-07-25, render engine 12) onward.** Past records follow the recent ones in a collapsible section of this same document; expand it when needed. Viewers without collapse support show the full text. Earlier history is in the [v1.72–v2.4 archive](docs/history/changelog-v1.72-v2.4.md) and the [v0.1–v1.71 archive](docs/history/changelog-v0.1-v1.71.md).
+
+### 2026-09-30 — Collapse past history within the same changelog
+
+Recent records remain at the top, and records from v2.15.34 and earlier can be expanded within this same document. Existing text, entry order, headings and links are preserved. The manually maintained entry count has been removed from the introduction. Product behavior, version and Build are unchanged.
 
 ### v2.15.68 — Copy the canvas work to the clipboard as an image (Build 1144, 2026-09-30)
 
@@ -395,6 +399,9 @@ DDL, Score and rendering versions are unchanged.
 The Web's model pickers show the server catalog's evaluation (per-stage stars, speed, comments), while Android showed model names only (finding V-10 of the 2026-09-26 source review). By the author's ruling, Android's recommendation is a mark on the supported models only: the models Android is verified on a device to draw with, the on-device Gemma 4 E2B and Gemma 4 31B through the Gemini API (`gemma-4-31b-it`, the model the device tests use). The drawing's model picker and the settings' offered-model picker show "Supported" beside them. No other model is rated.
 
 DDL, Score and rendering versions are unchanged.
+
+<details>
+<summary>Open past history (records from v2.15.34 and earlier)</summary>
 
 ### v2.15.34 — update center placement, rendering and refinement labels (Build 1110, 2026-09-27)
 
@@ -10457,3 +10464,5 @@ the author replaced the task**, so four directly assigned pieces of work were do
 - **On-device model downloads and image inputs are bounded and fail closed.** Resumed downloads validate `Content-Range` and the final byte count, while storage reservation discounts only the same request's retained `.part`. Picker and camera inputs share a 64 MiB pre-decode limit, and cancellation or failure reclaims partial files, PNG bitmaps, and cache files.
 - **Provider and native-model security boundaries are explicit.** Cleartext is limited to loopback, provider URLs reject userinfo, queries, fragments, and automatic redirects, and LiteRT accepts only regular files under the app-owned `files/models/` directory. UI and headless logs redact tokens and private paths. Room schema, APIs, storage formats, the render core and pipeline, Server, and Web are unchanged.
 - **Verification:** 14/14 focused tests, 354/354 Debug JVM tests, lint with zero errors, release Kotlin compilation, Debug AndroidTest Kotlin compilation, six Android naming tests, bilingual documentation checks, and the diff check passed. After the source merge, the release APK package including the shared Rust JNI library was built exactly once and stamped as `.78` Build 148121. No ADB device was connected and reconnect found none, so verified backup, signer compatibility, data-preserving installation, and on-device version/Build checks remain pending for the canonical deploy helper after the device reconnects. Real-device instrumentation, live provider/model traffic, storage-pressure testing, pentala, and public GitHub push were not run.
+
+</details>

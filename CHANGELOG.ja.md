@@ -4,7 +4,11 @@
 
 この文書は時系列の実装・設計記録である。仕様との不一致がある場合は、現行契約を記す `SPEC.ja.md` を優先する。
 
-**本書が持つのは v2.5.0（2026-07-25、render engine 12）以降**の 69 版である。それより前は書庫にある。
+**本書は v2.5.0（2026-07-25、render engine 12）以降の履歴を保持する。** 最近の記録に続く過去の履歴は、同じ文書内で折りたたんである。必要なときに展開して読める。折りたたみに対応しないビューアでは全文を表示する。それより前の履歴は [v1.72〜v2.4の書庫](docs/history/changelog-v1.72-v2.4.ja.md) と [v0.1〜v1.71の書庫](docs/history/changelog-v0.1-v1.71.ja.md) にある。
+
+### 2026-09-30 — 変更履歴の過去部分を同じ文書内で折りたたむ
+
+最近の記録を先頭に表示し、v2.15.34以前の記録は同じ文書内で展開して読めるようにした。既存の本文・項目順・見出し・リンクは保持する。冒頭の手動の収録件数を削除した。製品の動作・版・Buildは変更していない。
 
 ### v2.15.68 — キャンバスの作品を画像としてクリップボードへコピーする（Build 1144、2026-09-30）
 
@@ -395,6 +399,9 @@ DDL・Score・描画の版は変えない。
 Webのモデル選択は、サーバーのモデル一覧の評価（段ごとの★・速度・コメント）を出すが、Androidはモデル名だけだった（2026-09-26のソースレビューの所見V-10）。作者の裁定で、Androidのオススメ度は、サポート対象のモデルに印を付けるだけとする。サポート対象は、Androidで描けることを実機で確かめたモデル、つまり端末内のGemma 4 E2Bと、Gemini APIのGemma 4 31B（`gemma-4-31b-it`、実機の試験の標準）である。制作のモデル選択と、設定の「ユーザーに公開するモデル」の選択で、このモデルの名前の横に「サポート対象」を出す。ほかのモデルに評価は付けない。
 
 DDL・Score・描画の版は変えない。
+
+<details>
+<summary>過去の履歴を開く（v2.15.34以前の記録）</summary>
 
 ### v2.15.34 — 中心の配置と描画・推敲表示を更新（Build 1110、2026-09-27）
 
@@ -9558,3 +9565,5 @@ server の `_shape_bbox` はどの枝でも**図形を置く 2 つの欄が両�
 - **端末内model取得と画像入力をboundedかつfail-closedにした。** Download再開時の`Content-Range`と最終byte数を検証し、同一requestの`.part`だけを空き容量予約へ反映する。Picker／camera入力はdecode前に共有64 MiB上限を適用し、取消・失敗時のpartial file、PNG bitmap、cache fileを回収する。
 - **providerとnative modelのsecurity境界を明示した。** Cleartextはloopbackだけに限定し、provider URLのuserinfo／query／fragmentとautomatic redirectを拒否する。LiteRT modelはapp-owned `files/models/`配下のregular fileだけを受理し、UI／headless logはtokenやprivate pathをredactionする。Room schema、API、保存形式、render core／pipeline、server／webは変更していない。
 - **検証:** focused 14/14、Debug JVM 354/354、lint 0 errors、release Kotlin compile、debug AndroidTest Kotlin compile、Android名義test 6/6、日英docs gate、diff checkがgreen。main統合後に共有Rust JNIを含むrelease APK packageを一度だけ生成し、`.78` Build 148121へ採番した。ADB接続端末が0台でreconnectにも応答しなかったため、verified backup、署名互換確認、data-preserving install、端末上version／Build確認は未実行であり、端末接続後にcanonical deploy helperで完了する。Real-device instrumentation、live provider／model通信、storage-pressure試験、pentala、public GitHub pushは行っていない。
+
+</details>

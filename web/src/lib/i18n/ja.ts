@@ -432,7 +432,7 @@ export const ja: LangPack = {
 	modelCompareMaxSelected: '比較できる推論モデルは最大4つです。',
 	modelCompareFailedModel: 'NG',
 	modelCompareFailedSummary: (count) => `${count}件のモデルがエラーを返したため、その候補は描けませんでした。`,
-	modelChangePlaceholder: '候補はここに並びます。左で描くモデルを選び、「選んだモデルで描く」を押してください。',
+	modelChangePlaceholder: '候補はここに並びます。上で描くモデルを選び、「選んだモデルで描く」を押してください。',
 	modelCompareAllRendered: 'チェック済みのモデルはすべて描画済みです。',
 	modelCompareSelectedCount: (selected, max) => `${selected} / ${max} モデルを選択中`,
 	modelCompareTargetModel: '対象作品で使用中',

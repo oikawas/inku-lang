@@ -432,7 +432,7 @@ export const en: LangPack = {
 	modelCompareMaxSelected: 'You can compare up to four inference models.',
 	modelCompareFailedModel: 'NG',
 	modelCompareFailedSummary: (count) => `${count} model${count === 1 ? '' : 's'} returned an error, so no option was drawn for ${count === 1 ? 'it' : 'them'}.`,
-	modelChangePlaceholder: 'Options appear here. Pick the models on the left, then press Draw with the chosen models.',
+	modelChangePlaceholder: 'Options appear here. Pick the models above, then press Draw with the chosen models.',
 	modelCompareAllRendered: 'All checked models have already been painted.',
 	modelCompareSelectedCount: (selected, max) => `${selected} / ${max} models selected`,
 	modelCompareTargetModel: 'Used by the target work',

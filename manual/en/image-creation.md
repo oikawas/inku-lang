@@ -286,7 +286,7 @@ The dialog remembers the method, number of generations, refinement elements, var
 
 ## 10. Change the Model
 
-Choose `Change the model` from the work-editing menu (`Refine` on the Work tab, or `…` on each work in the Lineage tab) and a dialog of its own opens. Pick the models on the left and press `Draw with the chosen models`: each chosen model redraws the work from its description, and the options are laid out side by side. Each chosen model runs both Stage 1 and Stage 2; neither stage is held fixed. The color catalog and the canvas are the target work's.
+Choose `Change the model` from the work-editing menu (`Refine` on the Work tab, or `…` on each work in the Lineage tab) and a dialog of its own opens. Pick the models from those laid out across the top and press `Draw with the chosen models`: each chosen model redraws the work from its description, and the options are laid out side by side. Each chosen model runs both Stage 1 and Stage 2; neither stage is held fixed. The color catalog and the canvas are the target work's.
 
 At most four models can be chosen. A model used by the target work cannot be chosen; when an old work used different models for its two stages, neither can be chosen. Old works' records remain unchanged.
 

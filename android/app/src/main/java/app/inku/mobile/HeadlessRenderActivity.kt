@@ -10,10 +10,10 @@ import app.inku.mobile.data.refinement.PaintSeeds
 import app.inku.mobile.data.model.CameraInputOrigin
 import app.inku.mobile.data.model.CameraInputProvenance
 import app.inku.mobile.data.model.CompatibilityConstants
-import app.inku.mobile.llm.CameraVisionModelSetting
+import app.inku.mobile.llm.CameraDescriptionRequest
+import app.inku.mobile.llm.CameraDescriptionPrompts
 import app.inku.mobile.llm.DefaultModelDownloads
 import app.inku.mobile.llm.VisionAnalysisRequest
-import app.inku.mobile.llm.VisionAnalysisResult
 import app.inku.mobile.llm.VisionImagePreparer
 import app.inku.mobile.llm.VisionPrompts
 import app.inku.mobile.llm.isLocalVisionModel
@@ -93,10 +93,11 @@ class HeadlessRenderActivity : Activity() {
             require(inputMode == "image" || text.isNotBlank()) { "text or text_file extra is required." }
 
             val settings = repository.getSetting("model_selection")?.let { JSONObject(it) }
-            // One model draws both stages (2026-09-30, the author): the Stage 1
-            // extra, else the Stage 2 one, else the saved choice.
+            // One model reads, writes and draws. The old vision_model extra is
+            // an alias for that whole choice, never a separate image model.
             val stage1Model = intent.getStringExtra("stage1_model")?.takeIf { it.isNotBlank() }
                 ?: intent.getStringExtra("stage2_model")?.takeIf { it.isNotBlank() }
+                ?: intent.getStringExtra("vision_model")?.takeIf { it.isNotBlank() }
                 ?: settings?.optString("stage1_model")?.takeIf { it.isNotBlank() }?.let(DefaultModelDownloads::offeredOrStandard)
                 ?: CompatibilityConstants.defaultStage1Model
             val stage2Model = stage1Model
@@ -127,7 +128,7 @@ class HeadlessRenderActivity : Activity() {
                 seedText = intent.getStringExtra("seed_text")?.takeIf { it.isNotBlank() },
             )
 
-            val image = if (inputMode == "image") analyzeHeadlessImage(repository, outputDir, runId) else null
+            val image = if (inputMode == "image") analyzeHeadlessImage(repository, outputDir, runId, stage1Model) else null
             if (image != null && intent.getBooleanExtra("skip_draw", false)) return
             val item = when (inputMode) {
                 "image" -> {
@@ -135,13 +136,13 @@ class HeadlessRenderActivity : Activity() {
                     val started = System.currentTimeMillis()
                     val sketch = SketchInput(requested = intent.getStringExtra("sketch") == "on")
                     val drawn = repository.paint(
-                        description = analysis.result.text,
+                        description = analysis.description,
                         catalogId = catalogId,
                         canvasAspect = canvasAspect,
                         stage1ModelId = stage1Model,
                         stage2ModelId = stage2Model,
                         autoRepair = autoRepair,
-                        historyInput = analysis.result.text,
+                        historyInput = analysis.description,
                         seeds = seeds,
                         sketch = sketch,
                         inputProvenance = analysis.provenance,
@@ -234,27 +235,25 @@ class HeadlessRenderActivity : Activity() {
     }
 
     private class HeadlessImageAnalysis(
-        val request: VisionAnalysisRequest,
-        val result: VisionAnalysisResult,
+        val description: String,
         val provenance: CameraInputProvenance,
         val timings: JSONObject,
     )
 
     /**
-     * The camera path from a saved photo: normalize, then describe with the
-     * chosen Vision model. Writes the description and per-stage timings.
+     * The camera path from a saved photo: normalize, observe, then write the
+     * poetic description with the drawing model. Writes per-stage timings.
      */
     private suspend fun analyzeHeadlessImage(
         repository: InkuRepository,
         outputDir: File,
         runId: String,
+        modelId: String,
     ): HeadlessImageAnalysis {
         val path = requireNotNull(intent.getStringExtra("text_file")?.takeIf { it.isNotBlank() }) {
             "text_file must name the image for input_mode=image."
         }
         val file = resolveHeadlessInputFile(path)
-        val modelId = intent.getStringExtra("vision_model")?.takeIf { it.isNotBlank() }
-            ?: CameraVisionModelSetting.decode(repository.getSetting(CameraVisionModelSetting.KEY))
         val longEdge = intent.getIntExtra("vision_long_edge", VisionImagePreparer.MAX_LONG_EDGE)
         val languageCode = intent.getStringExtra("ui_lang")?.takeIf { it == "en" } ?: "ja"
         val prepareStarted = System.currentTimeMillis()
@@ -273,6 +272,9 @@ class HeadlessRenderActivity : Activity() {
         val visionStarted = System.currentTimeMillis()
         val result = repository.analyzeVision(request)
         val visionMs = System.currentTimeMillis() - visionStarted
+        val description = repository.writeCameraDescription(
+            CameraDescriptionRequest(result.text, modelId, languageCode),
+        )
         val timings = JSONObject()
             .put("vision_model", modelId)
             .put("prompt_version", VisionPrompts.VERSION)
@@ -282,20 +284,26 @@ class HeadlessRenderActivity : Activity() {
             .put("prepare_ms", prepareMs)
             .put("warmup_ms", warmupMs)
             .put("vision_ms", visionMs)
+            .put("description_model", description.modelId)
+            .put("description_prompt_version", CameraDescriptionPrompts.VERSION)
+            .put("description_ms", description.elapsedMs)
         withContext(Dispatchers.IO) {
-            File(outputDir, "description.txt").writeText(result.text)
+            File(outputDir, "observation.txt").writeText(result.text)
+            File(outputDir, "description.txt").writeText(description.text)
             File(outputDir, "timings.json").writeText(timings.toString(2))
             if (intent.getBooleanExtra("skip_draw", false)) {
                 File(outputDir, "result.json").writeText(
-                    JSONObject().put("run_id", runId).put("status", "ok").put("vision_only", true).toString(2),
+                    JSONObject().put("run_id", runId).put("status", "ok").put("description_only", true).toString(2),
                 )
                 File(outputDir, "status.json").writeText(JSONObject().put("status", "ok").put("run_id", runId).toString(2))
             }
         }
         return HeadlessImageAnalysis(
-            request = request,
-            result = result,
-            provenance = CameraInputProvenance.fromAnalysis(request, result, CameraInputOrigin.PhotoPicker),
+            description = description.text,
+            provenance = CameraInputProvenance.fromAnalysis(request, result, CameraInputOrigin.PhotoPicker).copy(
+                descriptionModelId = description.modelId,
+                descriptionPromptVersion = CameraDescriptionPrompts.VERSION,
+            ),
             timings = timings,
         )
     }

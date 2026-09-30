@@ -17,6 +17,7 @@ class CameraInstantPrintCoordinatorTest {
         var prepares = 0
         var loads = 0
         var analyses = 0
+        var descriptions = 0
         var interpretations = 0
         var compositions = 0
         var saves = 0
@@ -25,9 +26,18 @@ class CameraInstantPrintCoordinatorTest {
         val outcome = coordinator.run(
             prepare = { prepares += 1; "prepared" },
             load = { loads += 1 },
-            analyze = { analyses += 1; "local description" },
-            onLocalReady = {},
-            interpret = { local -> interpretations += 1; "$local ddl" },
+            analyze = { analyses += 1; "photo observation" },
+            writeDescription = { observation ->
+                assertEquals("photo observation", observation)
+                descriptions += 1
+                "poetic description"
+            },
+            onLocalReady = { assertEquals("poetic description", it) },
+            interpret = { local ->
+                assertEquals("poetic description", local)
+                interpretations += 1
+                "$local ddl"
+            },
             compose = { _, _, progress ->
                 compositions += 1
                 progress(CameraInstantPrintPhase.Rendering)
@@ -38,12 +48,14 @@ class CameraInstantPrintCoordinatorTest {
         )
 
         assertEquals("saved", outcome.result)
-        assertEquals(listOf(1, 1, 1, 1, 1, 1), listOf(prepares, loads, analyses, interpretations, compositions, saves))
+        assertEquals("poetic description", outcome.local)
+        assertEquals(listOf(1, 1, 1, 1, 1, 1, 1), listOf(prepares, loads, analyses, descriptions, interpretations, compositions, saves))
         assertEquals(
             listOf(
                 CameraInstantPrintPhase.PreparingImage,
                 CameraInstantPrintPhase.LoadingLocalModel,
                 CameraInstantPrintPhase.AnalyzingLocally,
+                CameraInstantPrintPhase.WritingDescription,
                 CameraInstantPrintPhase.InterpretingStage1,
                 CameraInstantPrintPhase.Composing,
                 CameraInstantPrintPhase.Rendering,
@@ -57,7 +69,7 @@ class CameraInstantPrintCoordinatorTest {
     @Test
     fun cancellationAtEveryBlockingStagePreventsSave() = runBlocking {
         CameraInstantPrintPhase.entries
-            .filterNot { it == CameraInstantPrintPhase.Completed }
+            .filterNot { it == CameraInstantPrintPhase.Completed || it == CameraInstantPrintPhase.WritingDescription }
             .forEach { blockedPhase ->
                 val entered = CompletableDeferred<Unit>()
                 val release = CompletableDeferred<Unit>()
@@ -70,6 +82,7 @@ class CameraInstantPrintCoordinatorTest {
                         prepare = { awaitIf(blockedPhase, CameraInstantPrintPhase.PreparingImage, release); "prepared" },
                         load = { awaitIf(blockedPhase, CameraInstantPrintPhase.LoadingLocalModel, release) },
                         analyze = { awaitIf(blockedPhase, CameraInstantPrintPhase.AnalyzingLocally, release); "local" },
+                        writeDescription = { it },
                         onLocalReady = {},
                         interpret = {
                             awaitIf(blockedPhase, CameraInstantPrintPhase.InterpretingStage1, release)
@@ -105,6 +118,7 @@ class CameraInstantPrintCoordinatorTest {
                     prepare = { current = false; "prepared" },
                     load = {},
                     analyze = { "local" },
+                    writeDescription = { it },
                     onLocalReady = {},
                     interpret = { "ddl" },
                     compose = { _, _, _ -> "saved" },
@@ -117,15 +131,18 @@ class CameraInstantPrintCoordinatorTest {
     }
 
     @Test
-    fun nimRetryStartsAtStageOneWithoutRepeatingLocalVision() = runBlocking {
+    fun drawingRetryStartsFromTheRetainedPoeticDescription() = runBlocking {
         val phases = mutableListOf<CameraInstantPrintPhase>()
-        var localCalls = 0
         var stageOneCalls = 0
         val coordinator = CameraInstantPrintCoordinator(onPhase = phases::add)
 
         val outcome = coordinator.runFromAnalysis(
-            local = "retained local description",
-            interpret = { stageOneCalls += 1; "ddl" },
+            local = "retained poetic description",
+            interpret = {
+                assertEquals("retained poetic description", it)
+                stageOneCalls += 1
+                "ddl"
+            },
             compose = { _, _, progress ->
                 progress(CameraInstantPrintPhase.Rendering)
                 progress(CameraInstantPrintPhase.Saving)
@@ -134,9 +151,32 @@ class CameraInstantPrintCoordinatorTest {
         )
 
         assertEquals("saved", outcome.result)
-        assertEquals(0, localCalls)
         assertEquals(1, stageOneCalls)
         assertEquals(CameraInstantPrintPhase.InterpretingStage1, phases.first())
+        assertTrue(CameraInstantPrintPhase.WritingDescription !in phases)
+    }
+
+    @Test
+    fun cancellingTheDescriptionCallNeverReachesDrawingOrSave() = runBlocking {
+        val entered = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        var interpretations = 0
+        var saves = 0
+        val job = launch {
+            CameraInstantPrintCoordinator(onPhase = {}).run(
+                prepare = { "photo" },
+                load = {},
+                analyze = { "observation" },
+                writeDescription = { entered.complete(Unit); release.await(); "description" },
+                onLocalReady = {},
+                interpret = { interpretations += 1; "ddl" },
+                compose = { _, _, _ -> saves += 1; "saved" },
+            )
+        }
+        entered.await()
+        job.cancelAndJoin()
+        assertEquals(0, interpretations)
+        assertEquals(0, saves)
     }
 
     private suspend fun awaitIf(

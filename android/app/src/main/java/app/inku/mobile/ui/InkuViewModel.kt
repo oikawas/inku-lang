@@ -38,9 +38,9 @@ import app.inku.mobile.data.refinement.RefinementPlan
 import app.inku.mobile.data.refinement.RefinementPlanner
 import app.inku.mobile.data.refinement.VariationAmplitude
 import app.inku.mobile.llm.DefaultModelDownloads
-import app.inku.mobile.llm.LOCAL_VISION_MODEL_ID
 import app.inku.mobile.llm.ModelProviderHttpException
-import app.inku.mobile.llm.CameraVisionModelSetting
+import app.inku.mobile.llm.CameraDescriptionRequest
+import app.inku.mobile.llm.CameraDescriptionPrompts
 import app.inku.mobile.llm.isLocalVisionModel
 import app.inku.mobile.llm.VisionAnalysisRequest
 import app.inku.mobile.llm.VisionImagePreparer
@@ -192,8 +192,7 @@ data class InkuUiState(
     val selectedStage2ModelId: String = CompatibilityConstants.defaultStage2Model,
     val includeThinking: Boolean = false,
     val modelSelectionOpen: Boolean = false,
-    // The model selection opened over the camera preview: it also carries the
-    // description model, and what it confirms reaches the capture in progress.
+    // A model choice confirmed over the preview reaches the capture in progress.
     val modelSelectionForCamera: Boolean = false,
     val catalogSelectionOpen: Boolean = false,
     val canvasSelectionOpen: Boolean = false,
@@ -236,7 +235,6 @@ data class InkuUiState(
     val ddlEditorOpen: Boolean = false,
     val cameraCaptureState: CameraCaptureState = CameraCaptureState.Idle,
     val cameraSourcePhotoPath: String? = null,
-    val cameraVisionModelId: String = LOCAL_VISION_MODEL_ID,
     val bundledPluginsEnabled: Boolean = true,
     /** Definitions read with an `inku.ddl-export.v1` file, held for the next new work. */
     val importedPlugins: List<ImportedPluginDefinition> = emptyList(),
@@ -465,7 +463,6 @@ class InkuViewModel @JvmOverloads constructor(
     private var drawingRunSerial: Long = 0L
     private var promptEditedByUser = false
     private var modelSelectionSnapshot: Pair<String, String>? = null
-    private var cameraVisionSelectionSnapshot: String? = null
     private var catalogSelectionSnapshot: String? = null
     private var lastHistorySwipeAt = 0L
     private var presentationNavigationSerial = 0L
@@ -779,7 +776,7 @@ class InkuViewModel @JvmOverloads constructor(
                 val snapshot = cameraComposeSnapshot ?: localState.value
                 val cameraProviders = providerSettings.first()
                 val cameraAssets = modelAssets.first()
-                val visionModelId = snapshot.cameraVisionModelId
+                val visionModelId = snapshot.selectedModelId
                 modelReadinessIssue(visionModelId, cameraProviders, cameraAssets)?.let { issue ->
                     if (serial == cameraRunSerial) {
                         localState.value = localState.value.copy(
@@ -870,14 +867,14 @@ class InkuViewModel @JvmOverloads constructor(
             // before drawing (`cameraRouteReadiness`).
             val snapshot = cameraComposeSnapshot ?: localState.value
             val providers = providerSettings.first()
-            modelReadinessIssue(snapshot.cameraVisionModelId, providers, modelAssets.first())?.let { issue ->
+            modelReadinessIssue(snapshot.selectedModelId, providers, modelAssets.first())?.let { issue ->
                 cameraFiles.delete(file)
                 if (serial == cameraRunSerial) {
                     localState.value = localState.value.copy(
                         tab = AppTab.Compose,
                         composeMode = ComposeMode.Write,
                         cameraCaptureState = CameraCaptureState.Failed(CameraFailure.ModelNotReady),
-                        message = readinessMessage(issue, snapshot.cameraVisionModelId, providers),
+                        message = readinessMessage(issue, snapshot.selectedModelId, providers),
                     )
                 }
                 return@launch
@@ -970,9 +967,9 @@ class InkuViewModel @JvmOverloads constructor(
                 },
                 load = {
                     val snapshot = cameraComposeSnapshot ?: localState.value
-                    if (isLocalVisionModel(snapshot.cameraVisionModelId)) {
+                    if (isLocalVisionModel(snapshot.selectedModelId)) {
                         litertWarmupJob?.join()
-                        repository.warmupLocalModelIfReady(snapshot.cameraVisionModelId)
+                        repository.warmupLocalModelIfReady(snapshot.selectedModelId)
                     }
                 },
                 analyze = { prepared ->
@@ -984,7 +981,7 @@ class InkuViewModel @JvmOverloads constructor(
                         width = prepared.width,
                         height = prepared.height,
                         languageCode = uiLanguageCode,
-                        modelId = snapshot.cameraVisionModelId,
+                        modelId = snapshot.selectedModelId,
                     )
                     val result = repository.analyzeVision(request)
                     if (result.text.isBlank()) throw CameraStageFailure(CameraFailure.EmptyResult)
@@ -996,6 +993,28 @@ class InkuViewModel @JvmOverloads constructor(
                         originalPhoto = requireNotNull(stagedPhoto),
                         drawSettings = cameraDrawSettings(snapshot),
                     )
+                },
+                writeDescription = { observed ->
+                    try {
+                        val result = repository.writeCameraDescription(
+                            CameraDescriptionRequest(
+                                observation = observed.description,
+                                modelId = observed.drawSettings.stage1ModelId,
+                                languageCode = observed.uiLanguageCode,
+                            ),
+                        )
+                        observed.copy(
+                            description = result.text,
+                            inputProvenance = observed.inputProvenance.copy(
+                                descriptionModelId = result.modelId,
+                                descriptionPromptVersion = CameraDescriptionPrompts.VERSION,
+                            ),
+                        )
+                    } catch (error: CancellationException) {
+                        throw error
+                    } catch (_: Throwable) {
+                        throw CameraStageFailure(CameraFailure.DescriptionFailed)
+                    }
                 },
                 onLocalReady = { input ->
                     cameraRetryInput = input
@@ -1113,7 +1132,7 @@ class InkuViewModel @JvmOverloads constructor(
                 job?.join()
                 warmupJob?.join()
                 repository.releaseLocalVisionModel(
-                    (cameraComposeSnapshot ?: localState.value).cameraVisionModelId,
+                    (cameraComposeSnapshot ?: localState.value).selectedModelId,
                 )
             }
             cameraFiles.delete(pendingCameraFile)
@@ -1133,6 +1152,7 @@ class InkuViewModel @JvmOverloads constructor(
             CameraInstantPrintPhase.PreparingImage -> CameraCaptureState.PreparingImage
             CameraInstantPrintPhase.LoadingLocalModel -> CameraCaptureState.LoadingLocalModel
             CameraInstantPrintPhase.AnalyzingLocally -> CameraCaptureState.AnalyzingLocally
+            CameraInstantPrintPhase.WritingDescription -> CameraCaptureState.WritingDescription
             CameraInstantPrintPhase.InterpretingStage1 -> CameraCaptureState.InterpretingStage1
             CameraInstantPrintPhase.Composing -> CameraCaptureState.Composing
             CameraInstantPrintPhase.Rendering -> CameraCaptureState.Rendering
@@ -1661,27 +1681,18 @@ class InkuViewModel @JvmOverloads constructor(
 
     /**
      * The model selection over the camera preview (the author, 2026-09-30):
-     * the description model and the drawing model, chosen while the shot is
-     * being framed. Only a capture in progress opens it.
+     * one model reads the photo, writes the description, and draws the work.
+     * Only a capture in progress opens it.
      */
     fun openCameraModelSelection() {
         val current = localState.value
         if (current.cameraCaptureState != CameraCaptureState.Capturing) return
         modelSelectionSnapshot = current.selectedModelId to current.selectedStage2ModelId
-        cameraVisionSelectionSnapshot = current.cameraVisionModelId
         localState.value = current.copy(modelSelectionOpen = true, modelSelectionForCamera = true, message = null)
-    }
-
-    /** The description model picked in the camera's selection; it is saved on OK. */
-    fun selectCameraVisionModelForCapture(modelId: String) {
-        val current = localState.value
-        if (!current.modelSelectionForCamera || current.cameraCaptureState != CameraCaptureState.Capturing) return
-        localState.value = current.copy(cameraVisionModelId = modelId, message = null)
     }
 
     fun confirmModelSelection() {
         modelSelectionSnapshot = null
-        cameraVisionSelectionSnapshot = null
         val current = localState.value
         val unifiedModelId = current.selectedModelId
         persistSetting("model_selection", JSONObject()
@@ -1691,14 +1702,12 @@ class InkuViewModel @JvmOverloads constructor(
             .toString())
         val forCamera = current.modelSelectionForCamera
         if (forCamera) {
-            persistSetting(CameraVisionModelSetting.KEY, CameraVisionModelSetting.encode(current.cameraVisionModelId))
             // The capture runs on the settings it started with; a choice made
             // over its preview is the one it is meant to use.
             cameraComposeSnapshot = cameraComposeSnapshot?.copy(
                 selectedModelId = unifiedModelId,
                 selectedStage2ModelId = unifiedModelId,
                 includeThinking = current.includeThinking,
-                cameraVisionModelId = current.cameraVisionModelId,
             )
         }
         localState.value = current.copy(
@@ -1708,22 +1717,15 @@ class InkuViewModel @JvmOverloads constructor(
             modelSelectionForCamera = false,
             message = null,
         )
-        if (forCamera && isLocalVisionModel(current.cameraVisionModelId)) {
-            warmupLiteRtModels(current.cameraVisionModelId, unifiedModelId)
-        } else {
-            warmupLiteRtModels(unifiedModelId)
-        }
+        warmupLiteRtModels(unifiedModelId)
     }
 
     fun cancelModelSelection() {
         val snapshot = modelSelectionSnapshot
-        val visionSnapshot = cameraVisionSelectionSnapshot
         modelSelectionSnapshot = null
-        cameraVisionSelectionSnapshot = null
         localState.value = localState.value.copy(
             selectedModelId = snapshot?.first ?: localState.value.selectedModelId,
             selectedStage2ModelId = snapshot?.second ?: localState.value.selectedStage2ModelId,
-            cameraVisionModelId = visionSnapshot ?: localState.value.cameraVisionModelId,
             modelSelectionOpen = false,
             modelSelectionForCamera = false,
             message = null,
@@ -1943,12 +1945,6 @@ class InkuViewModel @JvmOverloads constructor(
     fun setBundledPluginsEnabled(enabled: Boolean) {
         localState.value = localState.value.copy(bundledPluginsEnabled = enabled, message = null)
         viewModelScope.launch { repository.setBundledPluginPackageEnabled(enabled) }
-    }
-
-    fun setCameraVisionModel(modelId: String) {
-        if (cameraVisionModelChangeLocked(localState.value.cameraCaptureState)) return
-        localState.value = localState.value.copy(cameraVisionModelId = modelId, message = null)
-        persistSetting(CameraVisionModelSetting.KEY, CameraVisionModelSetting.encode(modelId))
     }
 
     /**
@@ -3580,7 +3576,6 @@ class InkuViewModel @JvmOverloads constructor(
             ?.let { JSONObject(it).optBoolean("enabled", current.displaySafeMarginsEnabled) }
             ?: if (legacyPixel9Paper) true else current.displaySafeMarginsEnabled
         val pngAlpha = settings["png_alpha_white"]?.let { JSONObject(it).optBoolean("enabled", current.pngAlphaWhite) } ?: current.pngAlphaWhite
-        val cameraVisionModelId = CameraVisionModelSetting.decode(settings[CameraVisionModelSetting.KEY])
         val renderWild = settings[SETTING_KEY_RENDER_WILD]?.let { JSONObject(it).optBoolean("enabled", current.renderWild) } ?: current.renderWild
         val uiMode = settings["ui_mode"]?.let { JSONObject(it).optString("value", current.uiMode) } ?: current.uiMode
         // A stored code that is not one of the two falls back to Japanese
@@ -3619,7 +3614,6 @@ class InkuViewModel @JvmOverloads constructor(
             selectedCanvasAspect = if (picked) current.selectedCanvasAspect else CanvasAspects.newSelectionOrDefault(canvas),
             displaySafeMarginsEnabled = displaySafeMargins,
             pngAlphaWhite = pngAlpha,
-            cameraVisionModelId = cameraVisionModelId,
             renderWild = renderWild,
             bundledPluginsEnabled = bundledPluginsEnabled,
             bundledPluginWordsJa = bundledPluginWords.first,
@@ -3711,9 +3705,3 @@ class InkuViewModel @JvmOverloads constructor(
 }
 
 internal fun modelDownloadInFlight(job: Job?): Boolean = job != null && !job.isCompleted
-
-internal fun cameraVisionModelChangeLocked(state: CameraCaptureState): Boolean =
-    state.locksCameraInteraction ||
-        state == CameraCaptureState.AwaitingOverwriteConfirmation ||
-        state == CameraCaptureState.Capturing ||
-        state == CameraCaptureState.PickingPhoto

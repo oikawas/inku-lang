@@ -2,29 +2,12 @@ package app.inku.mobile.llm
 
 import android.util.Log
 import app.inku.mobile.pipeline.providerHttpErrorLine
-import org.json.JSONObject
 
 const val LOCAL_VISION_MODEL_ID = "local-litert-lm:gemma-4-e2b"
 const val LOCAL_VISION_PROVIDER_ID = "local-litert-lm"
 
 /** True when [modelId] runs on the device, so the photo never leaves it. */
 fun isLocalVisionModel(modelId: String): Boolean = modelId.startsWith("$LOCAL_VISION_PROVIDER_ID:")
-
-/** The model that turns a photo into a description. */
-internal object CameraVisionModelSetting {
-    const val KEY = "camera_vision_model"
-
-    fun encode(modelId: String): String = JSONObject().put("value", modelId).toString()
-
-    fun decode(valueJson: String?): String = runCatching {
-        valueJson
-            ?.takeIf { it.isNotBlank() }
-            ?.let(::JSONObject)
-            ?.optString("value")
-            ?.trim()
-            ?.takeIf { it.contains(':') }
-    }.getOrNull()?.let(DefaultModelDownloads::offeredOrStandard) ?: LOCAL_VISION_MODEL_ID
-}
 
 data class VisionAnalysisRequest(
     val normalizedJpeg: ByteArray,

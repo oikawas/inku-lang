@@ -65,6 +65,8 @@ data class ModelResponse(
     val promptTokens: Int? = null,
     val completionTokens: Int? = null,
     val elapsedMs: Long? = null,
+    /** The transport reported an output-token limit rather than a complete answer. */
+    val outputTruncated: Boolean = false,
 )
 
 data class ModelTool(

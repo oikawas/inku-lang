@@ -29,6 +29,7 @@ sealed interface CameraCaptureState {
     data object PreparingImage : CameraCaptureState
     data object LoadingLocalModel : CameraCaptureState
     data object AnalyzingLocally : CameraCaptureState
+    data object WritingDescription : CameraCaptureState
     data object InterpretingStage1 : CameraCaptureState
     data object Composing : CameraCaptureState
     data object Rendering : CameraCaptureState
@@ -51,6 +52,7 @@ enum class CameraFailure {
     DecodeFailed,
     AnalysisFailed,
     EmptyResult,
+    DescriptionFailed,
     DrawModelNotReady,
     DrawFailed,
 }
@@ -60,6 +62,7 @@ internal val CameraCaptureState.locksCameraInteraction: Boolean
         CameraCaptureState.PreparingImage,
         CameraCaptureState.LoadingLocalModel,
         CameraCaptureState.AnalyzingLocally,
+        CameraCaptureState.WritingDescription,
         CameraCaptureState.InterpretingStage1,
         CameraCaptureState.Composing,
         CameraCaptureState.Rendering,

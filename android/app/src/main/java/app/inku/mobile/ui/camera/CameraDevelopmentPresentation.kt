@@ -34,6 +34,9 @@ internal fun cameraDevelopmentPresentation(
         CameraCaptureState.AnalyzingLocally -> Triple(
             "写真の内容を調べています", "Examining your photo", CameraDevelopmentEffect.PhotoReading,
         )
+        CameraCaptureState.WritingDescription -> Triple(
+            "絵になる言葉を紡いでいます", "Finding words for the painting", CameraDevelopmentEffect.GrainAndForms,
+        )
         CameraCaptureState.InterpretingStage1 -> Triple(
             "絵の構図を考えています",
             "Planning the composition",
@@ -60,7 +63,9 @@ internal fun cameraDevelopmentPresentation(
             "Cancelling",
             CameraDevelopmentEffect.PhotoPreparing,
         )
-        is CameraCaptureState.Failed -> Triple(
+        is CameraCaptureState.Failed -> if (state.reason == CameraFailure.DescriptionFailed) Triple(
+            "記述をまとめられませんでした", "Could not shape the description", CameraDevelopmentEffect.GrainAndForms,
+        ) else Triple(
             if (state.reason.isDrawFailure) "現像に失敗しました" else "画像処理に失敗しました",
             if (state.reason.isDrawFailure) "Development failed" else "Image processing failed",
             if (state.reason.isDrawFailure) CameraDevelopmentEffect.OutlineSettling else CameraDevelopmentEffect.PhotoPreparing,

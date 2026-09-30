@@ -15,6 +15,16 @@ import org.junit.Test
 
 class AnthropicModelProviderTest {
     @Test
+    fun aPartialTextAnswerCarriesItsOutputLimitToTheWriter() = runBlocking {
+        val provider = AnthropicModelProvider("anthropic", "https://api.anthropic.com", "test-key") { url ->
+            AnthropicConnection(url, answer = """{"stop_reason":"max_tokens","content":[{"type":"text","text":"クリーム色のひろがりに、赤い"}]}""")
+        }
+        val response = provider.generate(ModelRequest("anthropic:claude-sonnet-5-5", "Describe", 0.7, 512))
+        assertTrue(response.outputTruncated)
+        assertEquals("クリーム色のひろがりに、赤い", response.text)
+    }
+
+    @Test
     fun pipelineRequestUsesTheMessagesApiAndReturnsTheToolInput() = runBlocking {
         lateinit var connection: AnthropicConnection
         val provider = AnthropicModelProvider("anthropic", "https://api.anthropic.com/", "test-key") { url ->

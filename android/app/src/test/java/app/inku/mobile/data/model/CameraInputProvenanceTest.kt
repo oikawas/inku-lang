@@ -11,6 +11,23 @@ import org.junit.Test
 
 class CameraInputProvenanceTest {
     @Test
+    fun poeticDescriptionAuditRoundTripsAndOlderWorksStillRead() {
+        val older = CameraInputProvenance.fromAnalysis(request(), result())
+        assertEquals(older, cameraInputProvenance(mergeInputProvenance("{}", older)))
+        val current = older.copy(
+            descriptionModelId = "local-litert-lm:gemma-4-e2b",
+            descriptionPromptVersion = "camera-poetic-description-v1",
+        )
+        val saved = mergeInputProvenance("{}", current)
+        assertEquals(current, cameraInputProvenance(saved))
+        val json = JSONObject(saved).getJSONObject("input_provenance")
+        assertEquals(10, json.length())
+        assertFalse(json.has("observation"))
+        json.remove("description_model_id")
+        assertNull(cameraInputProvenance(JSONObject().put("input_provenance", json).toString()))
+    }
+
+    @Test
     fun analysisSnapshotSerializesOnlyTheApprovedAuditFields() {
         val snapshot = CameraInputProvenance.fromAnalysis(
             request = request(),

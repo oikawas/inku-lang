@@ -1114,14 +1114,14 @@ private fun isLightColor(color: Color): Boolean {
     return luminance >= 0.58f
 }
 
-/** Where the photo goes while a remote description model is selected (ANDROID_SPEC). */
+/** Where the photo goes while a remote model is selected (ANDROID_SPEC). */
 @Composable
 private fun CameraVisionRemoteNotice(state: InkuUiState) {
-    if (isLocalVisionModel(state.cameraVisionModelId)) return
+    if (isLocalVisionModel(state.selectedModelId)) return
     val provider = state.providerSettings
-        .firstOrNull { state.cameraVisionModelId.startsWith("${it.providerId}:") }
+        .firstOrNull { state.selectedModelId.startsWith("${it.providerId}:") }
         ?.displayName
-        ?: state.cameraVisionModelId.substringBefore(':')
+        ?: state.selectedModelId.substringBefore(':')
     Text(
         S.cameraVisionRemoteNotice(provider),
         style = MaterialTheme.typography.labelSmall,
@@ -1130,8 +1130,7 @@ private fun CameraVisionRemoteNotice(state: InkuUiState) {
 }
 
 /**
- * The models a capture will use, over the camera preview, and the way to change
- * them before the shutter (the author, 2026-09-30).
+ * The model a capture will use and the way to change it before the shutter.
  */
 @Composable
 private fun CameraModelOverlay(state: InkuUiState, viewModel: InkuViewModel, modifier: Modifier = Modifier) {
@@ -1145,8 +1144,7 @@ private fun CameraModelOverlay(state: InkuUiState, viewModel: InkuViewModel, mod
             .testTag(CAMERA_MODEL_OVERLAY_TAG),
         verticalArrangement = Arrangement.spacedBy(Dimens.spaceXs),
     ) {
-        CameraModelOverlayLine(S.cameraVisionModelTitle, modelLabelFor(state, state.cameraVisionModelId))
-        CameraModelOverlayLine(S.drawingModel, modelLabelFor(state, state.selectedModelId))
+        CameraModelOverlayLine(S.model, modelLabelFor(state, state.selectedModelId))
         TextButton(
             onClick = viewModel::openCameraModelSelection,
             modifier = Modifier.align(Alignment.End).heightIn(min = Dimens.cameraControlMinHeight),
@@ -1174,23 +1172,14 @@ private fun ModelSelectionDialog(state: InkuUiState, viewModel: InkuViewModel) {
                 modifier = Modifier.fillMaxWidth().heightIn(max = Dimens.modelDialogMaxHeight).verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(Dimens.spaceL),
             ) {
-                if (state.modelSelectionForCamera) {
-                    WebStyleModelStageEditor(
-                        title = S.cameraVisionModelTitle,
-                        sub = S.camera,
-                        state = state,
-                        selectedModelId = state.cameraVisionModelId,
-                        onSelectModel = viewModel::selectCameraVisionModelForCapture,
-                    )
-                    CameraVisionRemoteNotice(state)
-                }
                 WebStyleModelStageEditor(
-                    title = S.drawingModel,
-                    sub = S.stagesShared,
+                    title = if (state.modelSelectionForCamera) S.model else S.drawingModel,
+                    sub = if (state.modelSelectionForCamera) S.camera else S.stagesShared,
                     state = state,
                     selectedModelId = state.selectedModelId,
                     onSelectModel = viewModel::setSelectedModel,
                 )
+                if (state.modelSelectionForCamera) CameraVisionRemoteNotice(state)
                 if (state.selectedModelId.contains("qwen3")) {
                     SettingCheckRow(
                         checked = state.includeThinking,
@@ -2947,6 +2936,7 @@ private fun cameraStatusText(state: CameraCaptureState): String? = when (state) 
     CameraCaptureState.PreparingImage -> S.cameraPreparingImage
     CameraCaptureState.LoadingLocalModel -> S.cameraLoadingLocalModel
     CameraCaptureState.AnalyzingLocally -> S.cameraAnalyzingLocally
+    CameraCaptureState.WritingDescription,
     CameraCaptureState.InterpretingStage1,
     CameraCaptureState.Composing,
     CameraCaptureState.Rendering,
@@ -2968,6 +2958,11 @@ private fun cameraStatusText(state: CameraCaptureState): String? = when (state) 
         CameraFailure.DecodeFailed -> S.cameraDecodeFailed
         CameraFailure.AnalysisFailed -> S.cameraAnalysisFailed
         CameraFailure.EmptyResult -> S.cameraEmptyResult
+        CameraFailure.DescriptionFailed -> cameraDevelopmentPresentation(
+            state,
+            isJapanese = !LocalUiLanguage.current.isEnglish,
+            animationsEnabled = false,
+        )?.message
         CameraFailure.DrawModelNotReady -> S.cameraDrawModelNotReady
         CameraFailure.DrawFailed -> S.cameraDrawFailed
     }
@@ -4474,20 +4469,6 @@ private fun MiscSettingsPanel(state: InkuUiState, viewModel: InkuViewModel, modi
                 text = S.bundledPluginsToggle(words.joinToString(S.listSeparator)),
                 onCheckedChange = viewModel::setBundledPluginsEnabled,
             )
-        }
-        SettingsCard(
-            S.cameraVisionModelTitle,
-            S.cameraVisionModelSubtitle,
-            state.cameraVisionModelId.substringAfter(':'),
-        ) {
-            WebStyleModelStageEditor(
-                title = "Vision",
-                sub = S.camera,
-                state = state,
-                selectedModelId = state.cameraVisionModelId,
-                onSelectModel = viewModel::setCameraVisionModel,
-            )
-            CameraVisionRemoteNotice(state)
         }
         SettingsCard(S.mascotTitle, S.mascotSubtitle, state.mascotKind) {
             Row(horizontalArrangement = Arrangement.spacedBy(Dimens.spaceM)) {

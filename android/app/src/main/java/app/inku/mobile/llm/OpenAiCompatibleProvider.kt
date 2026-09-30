@@ -31,6 +31,7 @@ class OpenAiCompatibleProvider(
             modelId = request.modelId,
             promptTokens = usage?.optInt("prompt_tokens")?.takeIf { it > 0 },
             completionTokens = usage?.optInt("completion_tokens")?.takeIf { it > 0 },
+            outputTruncated = first.optString("finish_reason") == "length",
             elapsedMs = System.currentTimeMillis() - started,
         )
     }

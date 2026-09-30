@@ -30,8 +30,10 @@ test('T-1001/T-1002: refinement shell composes capability-local views', () => {
 	assert.match(color, /<RefinementCandidateGrid/);
 	assert.match(grid, /class="variation-grid"/);
 	assert.match(adjust, /Same picker and same semantics as DdlEditorDialog/);
-	// Each compared model draws both stages; there is no mode that fixes one.
+	// Each picked model draws both stages; there is no mode that fixes one.
+	// Its drawings are options kept with "+", as in the color change.
 	assert.match(models, /class="model-choice-grid"/);
+	assert.match(models, /<RefinementCandidateGrid/);
 	assert.doesNotMatch(models, /compare-mode-tabs|stage1_fixed|stage2_fixed/);
 	assert.match(styles, /Fit candidates into the remaining height/);
 	assert.doesNotMatch(styles, /:global\(/, 'external CSS must use standard selectors');

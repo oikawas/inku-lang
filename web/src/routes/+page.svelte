@@ -1376,27 +1376,8 @@
 		if (item) loadIterationItem(item);
 	}
 
-	function currentComparisonItem(): Iteration | null {
-		if (work.displayedHistoryItem) return work.displayedHistoryItem;
-		if (!work.result) return null;
-		return {
-			input: work.input,
-			ddl: work.ddl,
-			score: work.result.score,
-			svg: work.result.svg,
-			at: Date.now(),
-			elapsed_ms: work.result.elapsed_total_ms,
-			stage1_model: work.result.stage1_model ?? qualifiedModelId(stage1Provider, stage1Model),
-			stage2_model: work.result.stage2_model ?? qualifiedModelId(stage2Provider, stage2Model),
-		};
-	}
-
-	const activeComparisonItem = $derived(currentComparisonItem());
 
 
-	// Model comparison owns its selection, its results
-	// and their run state; the page lends the artwork, the two paint stages and
-	// the history writes.
 	const refinement = createRefinementCoordinator({
 		apiFetch,
 		apiError,
@@ -1407,7 +1388,8 @@
 		},
 		models: {
 			stage1: () => qualifiedModelId(stage1Provider, stage1Model),
-			stage2: () => qualifiedModelId(stage2Provider, stage2Model)
+			stage2: () => qualifiedModelId(stage2Provider, stage2Model),
+			label: statusModelName
 		},
 		catalog: {
 			defaultId: () => defaultCatalogId,
@@ -1437,21 +1419,16 @@
 		stage1Model: () => stage1Model,
 		stage2Provider: () => stage2Provider,
 		stage2Model: () => stage2Model,
-		loading: () => work.loading,
-		input: () => work.input,
 		currentUser: () => session.currentUser,
 		setCurrentUser: (user) => session.setCurrentUser(user as UserItem),
-		targetContextVersion: () => refinement.contextVersion,
 		apiFetch,
-		interpretOne: work.interpretOne,
-		composeOne: work.composeOne,
-		ensureVisibleLineageParentId,
-		pushHistory: (it, options) => pushHistory(it as unknown as Iteration, options),
-		toggleHistoryStar,
-		addTokens: work.addTokens,
-		statusModelName,
-		effectiveCanvasAspectId,
 	});
+
+	// The "change the model" dialog: each picked model draws an option, and a
+	// model that failed is marked in the picker.
+	async function generateModelCandidates(): Promise<void> {
+		modelInspection.recordFailures(await refinement.generateModelCandidates(modelInspection.drawableModels()));
+	}
 
 	async function replayHistoryItem(it: Iteration, source: ReplaySource = outputTab) {
 		if (demoRunning || work.reloading) return;
@@ -2972,8 +2949,8 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 				bind:touchSeedText={work.touchSeedText}
 				onGenerateVariationCandidates={refinement.generateVariationCandidates}
 				onGenerateColorCatalogCandidates={refinement.generateColorCatalogCandidates}
+				onGenerateModelCandidates={generateModelCandidates}
 				onSaveSelectedVariationCandidates={refinement.saveSelectedVariationCandidates}
-				{activeComparisonItem}
 				lineageGraph={lineageState.graph}
 				{lineageBrowsingState}
 				lineageLoading={lineageState.loading}

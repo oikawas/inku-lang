@@ -25,7 +25,6 @@
 		canvasAspectHeight: number;
 		refinementSession: RefinementSession;
 		modelInspection: ModelInspection;
-		activeComparisonItem: { svg: string } | null;
 		statusDdlOrigin: boolean;
 		statusDescriptionLocked: boolean;
 		refineKind: RefineKind;
@@ -43,6 +42,7 @@
 		onSetRefineKind: (kind: RefineKind) => void;
 		onGenerateVariationCandidates: (kind: RefineKind, count: 1 | 4, touchWords?: string, amplitude?: VariationAmplitude) => void | Promise<void>;
 		onGenerateColorCatalogCandidates: () => void | Promise<void>;
+		onGenerateModelCandidates: () => void | Promise<void>;
 		onSaveAndClose: () => void | Promise<void>;
 		onDiscardAndClose: () => void | Promise<void>;
 		onSelectRefineDrawingModel: (provider: Provider, model: string) => void | Promise<void>;
@@ -60,7 +60,6 @@
 		canvasAspectHeight,
 		refinementSession,
 		modelInspection,
-		activeComparisonItem,
 		statusDdlOrigin,
 		statusDescriptionLocked,
 		refineKind,
@@ -77,6 +76,7 @@
 		onSetRefineKind,
 		onGenerateVariationCandidates,
 		onGenerateColorCatalogCandidates,
+		onGenerateModelCandidates,
 		onSaveAndClose,
 		onDiscardAndClose,
 		onSelectRefineDrawingModel,
@@ -88,7 +88,7 @@
 			? (isJapanese ? '描画要素を編集' : 'Edit drawing elements')
 			: view === 'color'
 				? t().canvasVaryColor
-				: (isJapanese ? 'モデルを編集' : 'Edit models')
+				: t().workActionModels
 	);
 </script>
 
@@ -153,14 +153,18 @@
 		<RefinementModelCompareView
 			{isJapanese}
 			{resultAvailable}
+			{artworkUrl}
+			{seedSummary}
 			{canvasAspectWidth}
 			{canvasAspectHeight}
 			{refinementSession}
 			{modelInspection}
-			{activeComparisonItem}
 			{refineWildValue}
 			{refineWildInherited}
 			{onSetRefineWild}
+			{onGenerateModelCandidates}
+			{onSaveAndClose}
+			{onDiscardAndClose}
 		/>
 	{/if}
 </div>

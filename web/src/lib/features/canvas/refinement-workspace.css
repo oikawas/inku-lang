@@ -14,8 +14,7 @@
 	.refine-modal-header { flex: 0 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 48px; padding: 0 16px; border-bottom: 1px solid var(--border); background: var(--panel); }
 	.refine-modal-header h2 { margin: 0; color: var(--fg); font-size: 1rem; }
 	.refine-modal-header button { display: grid; place-items: center; width: 30px; height: 30px; border: 1px solid var(--border2); border-radius: 6px; background: var(--bg); color: var(--fg); font-size: 1.25rem; line-height: 1; cursor: pointer; }
-	.refine-shell .refine-panel,
-	.refine-shell .compare-panel {
+	.refine-shell .refine-panel {
 		align-self: auto;
 		width: 100%;
 		max-height: none;
@@ -278,34 +277,6 @@
 		opacity: 1;
 	}
 
-	.compare-panel {
-		align-self: stretch;
-		width: min(1120px, calc(100% - 136px));
-		max-height: calc(100% - 28px);
-		overflow: auto;
-		display: flex;
-		flex-direction: column;
-		gap: 12px;
-		padding: 16px;
-		box-sizing: border-box;
-	}
-	.compare-head {
-		display: flex;
-		align-items: flex-start;
-		justify-content: space-between;
-		gap: 16px;
-	}
-	.compare-head-settings { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-width: 0; }
-	.compare-action-wrap {
-		width: min(260px, 34%);
-		min-width: 210px;
-	}
-	.compare-action-wrap .tooltip-wrap { width: 100%; }
-	.compare-action-wrap .paint-btn { margin-top: 0; }
-	/* While comparing, let the status widen past the button width so the full
-	   model name shows without truncation. The view marks its wrapper as running
-	   so this rule does not depend on RunStatus's internal markup. */
-	.compare-action-wrap.running { width: auto; min-width: 0; max-width: 62%; }
 	.model-metadata-hover { position: relative; display: flex; min-width: 0; }
 	.model-metadata-hover > .model-choice { width: 100%; }
 	.model-metadata-hover:hover .model-hover-card,
@@ -363,23 +334,6 @@
 		font-size: var(--ui-font-size-11);
 		color: var(--fg3);
 	}
-	.model-compare-stage {
-		display: grid;
-		grid-template-columns: minmax(220px, 280px) minmax(0, 1fr);
-		gap: 14px;
-		align-items: start;
-	}
-	.model-target-card,
-	.model-inspection-card {
-		border: 1px solid var(--border);
-		background: var(--panel);
-		padding: 8px;
-		min-width: 0;
-	}
-	.model-target-card {
-		position: sticky;
-		top: 0;
-	}
 	.comparison-label {
 		font-size: var(--ui-font-size-11);
 		color: var(--fg3);
@@ -395,51 +349,3 @@
 	.comparison-art > img { width: 100%; height: 100%; display: block; object-fit: contain; }
 	.comparison-art > .canvas-art { width: 100%; height: 100%; display: block; }
 	.model-target-meta { margin-top: 7px; }
-	.model-results-column {
-		display: flex;
-		flex-direction: column;
-		gap: 10px;
-		min-width: 0;
-	}
-	.model-inspection-grid {
-		display: grid;
-		grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-		gap: 10px;
-	}
-	.model-inspection-card { position: relative; }
-	.model-inspection-card.saved {
-		border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
-	}
-	.model-comparison-art-wrap { position: relative; }
-	.model-adopt-select:disabled { cursor: default; opacity: 1; }
-	.model-result-actions {
-		display: flex;
-		align-items: center;
-		justify-content: flex-end;
-		gap: 8px;
-		margin-top: 8px;
-	}
-	.model-result-star {
-		width: 30px;
-		height: 30px;
-		border: 1px solid var(--border);
-		background: var(--panel);
-		color: var(--fg3);
-		font-size: var(--ui-font-size-17);
-		cursor: pointer;
-	}
-	.model-result-star.starred {
-		color: var(--star-fg);
-		border-color: var(--star-border);
-		background: var(--star-bg);
-	}
-	.model-result-star:disabled { opacity: 0.45; cursor: not-allowed; }
-	.model-inspection-card pre {
-		margin: 8px 0 0;
-		max-height: 120px;
-		overflow: auto;
-		white-space: pre-wrap;
-		font-size: var(--ui-font-size-10);
-		line-height: 1.45;
-		color: var(--fg3);
-	}

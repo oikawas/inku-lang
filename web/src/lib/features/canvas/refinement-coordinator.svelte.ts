@@ -26,7 +26,12 @@ export type RefinementCoordinatorDeps = {
 	history: {
 		syncToItem: (item: Iteration) => Promise<unknown>;
 	};
-	models: { stage1: () => string; stage2: () => string; };
+	models: {
+		stage1: () => string;
+		stage2: () => string;
+		/** The short name a model's option and lane are labelled with. */
+		label: (model: string) => string;
+	};
 	catalog: {
 		defaultId: () => string;
 		effectiveId: () => string;
@@ -236,6 +241,42 @@ export function createRefinementCoordinator(deps: RefinementCoordinatorDeps) {
 		};
 	}
 
+	function modelCandidateId(model: string): string {
+		return `model-${model}`;
+	}
+
+	// The work drawn again from its description by another model, which draws
+	// both stages. The render settings are the work's own, as for the other
+	// options, so only the model differs.
+	async function renderModelCandidate(model: string, label: string, signal: AbortSignal): Promise<VariationCandidate> {
+		const source = work.input.trim();
+		const r = await work.paintOne(source, {
+			historyInput: source,
+			sourceText: source,
+			saveHistory: false,
+			saveArtifacts: false,
+			countGeneration: false,
+			canvasAspectId: refinementCanvasAspectId(),
+			sketchText: work.sketchTextFor(source),
+			signal,
+			renderOverrides: refinementRenderOverrides(),
+			lineageParentNodeId: deps.lineageParentId(),
+			stage1Model: model,
+			stage2Model: model,
+		});
+		return {
+			id: modelCandidateId(model),
+			label,
+			selected: false,
+			result: {
+				...r,
+				lineage_parent_node_id: deps.lineageParentId(),
+				derivation_kind: deps.lineageParentId() ? 'model_comparison' : null,
+				derivation_metadata: { comparison_mode: 'common', compared_model: model, stage1_model: r.stage1_model ?? model, stage2_model: r.stage2_model ?? model },
+			},
+		};
+	}
+
 	async function variationCandidateLabel(amplitude: VariationAmplitude, seed: number, label: string, signal?: AbortSignal): Promise<VariationCandidate> {
 		const source = work.input.trim();
 		const baseDdl = work.ddl ?? "";
@@ -386,6 +427,74 @@ export function createRefinementCoordinator(deps: RefinementCoordinatorDeps) {
 		}
 	}
 
+	/**
+	 * The work drawn by each picked model, as options beside the ones already
+	 * drawn: a model that has drawn once is not drawn again. A model that fails
+	 * leaves the others' options; the failures come back so the picker can
+	 * mark them.
+	 */
+	async function generateModelCandidates(models: readonly string[]): Promise<Record<string, string>> {
+		if (!work.result || refinementSession.gridBusy || work.loading) return {};
+		const source = work.input.trim();
+		if (!source) {
+			refinementSession.setStatus(t().refineNeedsDescription);
+			return {};
+		}
+		if (models.length === 0) {
+			refinementSession.setStatus(t().modelCompareSelectPrompt);
+			return {};
+		}
+		const drawn = new Set(refinementSession.candidates.map((candidate) => candidate.id));
+		const pending = models.filter((model) => !drawn.has(modelCandidateId(model)));
+		if (pending.length === 0) {
+			refinementSession.setStatus(t().modelCompareAllRendered);
+			return {};
+		}
+		const contextVersion = targetIdentityVersion;
+		await deps.ensureVisibleLineageParentId();
+		if (contextVersion !== targetIdentityVersion) return {};
+		const labels = pending.map((model) => deps.models.label(model));
+		const abortController = refinementSession.beginGrid({
+			includesReading: true,
+			taskLabel: t().workActionModels,
+			count: pending.length
+		});
+		const abortTimer = window.setTimeout(() => {
+			refinementSession.enableAbort(abortController);
+		}, 3000);
+		const failed: Record<string, string> = {};
+		try {
+			refinementSession.setPlans(abortController, labels);
+			const results = await runRefinementFanout(pending.map((model, index) => async () => {
+				try {
+					return await renderModelCandidate(model, labels[index], abortController.signal);
+				} catch (e) {
+					if (abortController.signal.aborted) throw e;
+					failed[model] = e instanceof Error ? e.message : String(e);
+					return null;
+				}
+			}), deps.render.fanoutLimit(), {
+				onStart: (index) => refinementSession.seatSlot(abortController, index, 'running'),
+				onDone: (index) => { refinementSession.finishSlot(abortController, index); },
+			});
+			const candidates = results.filter((candidate): candidate is VariationCandidate => candidate !== null);
+			refinementSession.commitCandidates(abortController, [...refinementSession.candidates, ...candidates]);
+			for (const candidate of candidates) {
+				refinementSession.addTokens(abortController, work.paintTokensIn(candidate.result), work.paintTokensOut(candidate.result));
+			}
+			const failures = Object.keys(failed).length;
+			if (failures > 0) refinementSession.failGrid(abortController, t().modelCompareFailedSummary(failures));
+		} catch (e) {
+			if (!(e instanceof DOMException && e.name === "AbortError")) {
+				refinementSession.failGrid(abortController, e instanceof Error ? e.message : String(e));
+			}
+		} finally {
+			window.clearTimeout(abortTimer);
+			refinementSession.finishGrid(abortController);
+		}
+		return contextVersion === targetIdentityVersion ? failed : {};
+	}
+
 	/** True when every chosen option is now in the history. */
 	async function saveSelectedVariationCandidates(): Promise<boolean> {
 		const contextVersion = targetIdentityVersion;
@@ -428,6 +537,7 @@ export function createRefinementCoordinator(deps: RefinementCoordinatorDeps) {
 		refinementCanvasAspectId,
 		generateVariationCandidates,
 		generateColorCatalogCandidates,
+		generateModelCandidates,
 		saveSelectedVariationCandidates,
 	};
 }

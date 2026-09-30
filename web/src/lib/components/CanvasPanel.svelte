@@ -139,9 +139,10 @@
 		touchSeedText: string;
 		onGenerateVariationCandidates: (kind: RefineKind, count: 1 | 4, touchWords?: string, amplitude?: VariationAmplitude) => void | Promise<void>;
 		onGenerateColorCatalogCandidates: () => void | Promise<void>;
+		/** Draws the work with each model picked in the "change the model" dialog. */
+		onGenerateModelCandidates: () => void | Promise<void>;
 		/** True when every chosen option is now in the history. */
 		onSaveSelectedVariationCandidates: () => Promise<boolean>;
-		activeComparisonItem: { svg: string } | null;
 		lineageGraph: LineageGraph | null;
 		lineageBrowsingState: LineageBrowsingState;
 		lineageLoading: boolean;
@@ -262,8 +263,8 @@
 		touchSeedText = $bindable(''),
 		onGenerateVariationCandidates,
 		onGenerateColorCatalogCandidates,
+		onGenerateModelCandidates,
 		onSaveSelectedVariationCandidates,
-		activeComparisonItem,
 		lineageGraph = null,
 		lineageBrowsingState,
 		lineageLoading = false,
@@ -415,7 +416,6 @@
 	let directRefinementParentNodeId = $state<string | null>(null);
 	let directRefinementKnownChildNodeIds = $state<Set<string>>(new Set());
 	let directRefinementSavedCandidateIds = $state<Set<string>>(new Set());
-	let directRefinementSavedModelHistoryIds = $state<Set<string>>(new Set());
 	let directActionNode = $state<LineageNode | null>(null);
 	let directActionMenuOpen = $state(false);
 	let directEditNode = $state<LineageNode | null>(null);
@@ -480,9 +480,6 @@
 		directRefinementSavedCandidateIds = new Set(
 			refinementSession.candidates.filter((candidate) => candidate.saved).map((candidate) => candidate.id)
 		);
-		directRefinementSavedModelHistoryIds = new Set(
-			modelInspection.results.flatMap((item) => item.savedHistoryId ? [item.savedHistoryId] : [])
-		);
 		refineModalOpen = true;
 		outputTab = 'refine';
 		if (view === 'color') void onGenerateColorCatalogCandidates();
@@ -521,7 +518,7 @@
 	// chosen ones or discarding them all, so no unsaved work stays behind
 	// while another screen is shown.
 	function requestCloseRefineModal(): void {
-		if (refineView !== 'compare' && refinementSession.hasUnsaved) {
+		if (refinementSession.hasUnsaved) {
 			refinementSession.setStatus(t().refineCloseNeedsDecision);
 			return;
 		}
@@ -560,8 +557,7 @@
 	$effect(() => {
 		if (!directRefinementActive) return;
 		const savedCandidate = refinementSession.candidates.some((candidate) => candidate.saved && !directRefinementSavedCandidateIds.has(candidate.id));
-		const savedModel = modelInspection.results.some((item) => !!item.savedHistoryId && !directRefinementSavedModelHistoryIds.has(item.savedHistoryId));
-		if (savedCandidate || savedModel) directRefinementSaveObserved = true;
+		if (savedCandidate) directRefinementSaveObserved = true;
 	});
 
 	$effect(() => {
@@ -856,7 +852,6 @@
 					{canvasAspectHeight}
 					{refinementSession}
 					{modelInspection}
-					{activeComparisonItem}
 					{statusDdlOrigin}
 					{statusDescriptionLocked}
 					{refineKind}
@@ -872,6 +867,7 @@
 					onSetRefineKind={setRefineKind}
 					{onGenerateVariationCandidates}
 					{onGenerateColorCatalogCandidates}
+					{onGenerateModelCandidates}
 					catalogName={statusCatalogName}
 					onSaveAndClose={saveCandidatesAndClose}
 					onDiscardAndClose={discardCandidatesAndClose}

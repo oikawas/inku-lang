@@ -2,6 +2,10 @@
 
 This file records revisions to user and operations documents under `manual/`. See `SPEC.ja.md` for the detailed product change history.
 
+## 2026-09-30 — Change models becomes Change the model
+
+`Change models` in the work-editing menu is now `Change the model`. As in Another catalog, the options it draws are chosen with `+` and saved together, and mascots show the progress while they are drawn. Chapter 10 of Creating Images in both languages is rewritten, and the item's name is corrected where DDL-edited works are described. The description of saving one result at a time with `Adopt` or a star is removed.
+
 ## 2026-09-28 — The instructions' language is shown
 
 The instructions headings now read `Instructions (Japanese DDL)` or `Instructions (English DDL)`, so chapter 6 of Creating Images in both languages explains what it means and that a single hiragana, katakana, or kanji character has instructions read as Japanese.

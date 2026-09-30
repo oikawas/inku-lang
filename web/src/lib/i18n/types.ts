@@ -401,13 +401,13 @@ export interface LangPack {
 	comparisonCurrent: string;
 	modelCompareButton: string;
 	modelCompareTargetDisabledTooltip: string;
-	modelCompareBusy: string;
 	modelCompareSubtitle: string;
 	modelCompareModelSelectLabel: string;
 	modelCompareSelectPrompt: string;
 	modelCompareMaxSelected: string;
 	modelCompareFailedModel: string;
 	modelCompareFailedSummary: (count: number) => string;
+	modelChangePlaceholder: string;
 	modelCompareAllRendered: string;
 	modelCompareSelectedCount: (selected: number, max: number) => string;
 	modelCompareTargetModel: string;
@@ -417,10 +417,6 @@ export interface LangPack {
 	modelCompareDrawingBody: string;
 	modelCompareEmpty: string;
 	modelCompareAdopt: string;
-	modelCompareAdopted: string;
-	modelCompareSaving: string;
-	modelCompareAdoptTooltip: string;
-	modelCompareStarTooltip: string;
 	canvasSeedSummary: string;
 	seedBaseLabel: string;
 	refineTargetTitle: string;

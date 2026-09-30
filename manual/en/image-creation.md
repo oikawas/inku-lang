@@ -191,7 +191,7 @@ A `namespace.word` such as `Nature.青葉` is marked in the plugin color only wh
 A work whose instructions (DDL) were edited follows its DDL, not its description. Drawing it again from the description would lose the edits, so **its description is held**.
 
 - The Describe tab heading shows `Held (DDL edited)` and the description cannot be changed. In place of `Paint`, `Start a new variation from this description` appears: it draws the description as it stands as a new variation (the work stays as it is, and the description can be changed in the new variation).
-- In the work's edit menu, `Edit the description`, `Redraw with or without sketch from life` and `Change models` are shown but not offered, with the reason. `Another reading` in refinement and model comparison are not offered either.
+- In the work's edit menu, `Edit the description`, `Redraw with or without sketch from life` and `Change the model` are shown but not offered, with the reason. `Another reading` in refinement is not offered either.
 - A child made by touch, layout, color or variation carries the DDL and is held as well. A child made by reading the description again is not.
 - The history strip shows a lock mark, and a lineage card shows `Held (DDL edited)`.
 - Autonomous refinement uses no reading rounds and no Vision method, and draws each color, layout, touch or variation round from the DDL.
@@ -284,13 +284,15 @@ The dialog remembers the method, number of generations, refinement elements, var
 
 `Sketch from life` follows the work you start from. From a work drawn with it, each generation is drawn from that work's sketch prose and the layer is not run again; only a generation whose text gained a direction goes through the layer again, because its text has changed. From a work drawn without it, the generations are drawn without it too. The setting on the `Describe` tab is not used.
 
-## 10. Compare Models
+## 10. Change the Model
 
-The same description is painted with different models, and the works and instructions are compared. Each selected model runs both Stage 1 and Stage 2. Comparisons that fix one stage are retired.
+Choose `Change the model` from the work-editing menu (`Refine` on the Work tab, or `…` on each work in the Lineage tab) and a dialog of its own opens. Pick the models on the left and press `Draw with the chosen models`: each chosen model redraws the work from its description, and the options are laid out side by side. Each chosen model runs both Stage 1 and Stage 2; neither stage is held fixed. The color catalog and the canvas are the target work's.
 
-At most four inference models can be compared. A model used by the target work cannot be selected; when an old work used different models for its two stages, neither can be selected. Old works' records remain unchanged. Models that return an error are dropped from the comparison and their count is reported.
+At most four models can be chosen. A model used by the target work cannot be chosen; when an old work used different models for its two stages, neither can be chosen. Old works' records remain unchanged.
 
-Comparison results are not saved automatically. Use `Adopt` to keep one in history, or star it to save it as a starred history entry.
+While the options are drawn, the mascots show each model's progress, as in Another catalog. A model that returns an error is marked `NG` in the picker and the count is reported; the other models' options stay. Pressing again with other models chosen adds their options after the others. A model that has drawn once is not drawn again.
+
+Choosing, saving, and discarding options work as in 8.2: choose the ones to keep with `+` at their top right, then save them to history with `Save the chosen ones and close`. The dialog does not close while options are unsaved.
 
 ## 11. Read the Provenance
 

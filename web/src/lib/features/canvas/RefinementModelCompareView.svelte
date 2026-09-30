@@ -4,107 +4,120 @@
 	import PaintButton from '$lib/components/PaintButton.svelte';
 	import RunStatus from '$lib/components/RunStatus.svelte';
 	import Tooltip from '$lib/components/Tooltip.svelte';
+	import VariationLanes from '$lib/components/VariationLanes.svelte';
 	import WildToggle from '$lib/components/WildToggle.svelte';
+	import RefinementCandidateGrid from './RefinementCandidateGrid.svelte';
 	import type { createModelInspection } from '$lib/features/model-inspection/state.svelte';
 	import type { RefinementSession } from '$lib/features/canvas/refinement-session.svelte';
-	import { svgImage } from '$lib/svgImage';
 
 	type ModelInspection = ReturnType<typeof createModelInspection>;
 	type Props = {
 		isJapanese: boolean;
 		resultAvailable: boolean;
+		artworkUrl: string | null;
+		seedSummary: string;
 		canvasAspectWidth: number;
 		canvasAspectHeight: number;
 		refinementSession: RefinementSession;
 		modelInspection: ModelInspection;
-		activeComparisonItem: { svg: string } | null;
 		refineWildValue: boolean;
 		refineWildInherited: boolean;
 		onSetRefineWild: (value: boolean | null) => void;
+		/** Draws the work with each picked model, as options like the color change's. */
+		onGenerateModelCandidates: () => void | Promise<void>;
+		onSaveAndClose: () => void | Promise<void>;
+		onDiscardAndClose: () => void | Promise<void>;
 	};
 
 	let {
 		isJapanese,
 		resultAvailable,
+		artworkUrl,
+		seedSummary,
 		canvasAspectWidth,
 		canvasAspectHeight,
 		refinementSession,
 		modelInspection,
-		activeComparisonItem,
 		refineWildValue,
 		refineWildInherited,
-		onSetRefineWild
+		onSetRefineWild,
+		onGenerateModelCandidates,
+		onSaveAndClose,
+		onDiscardAndClose
 	}: Props = $props();
+
+	const busy = $derived(refinementSession.busy || refinementSession.gridBusy);
 </script>
 
-	<div class="compare-panel">
-	<div class="compare-head">
-		<!-- One box, so `space-between` puts the settings at the left and the
-		     action at the right instead of stranding the switch between them. -->
-		<div class="compare-head-settings"><WildToggle value={refineWildValue} {isJapanese} inherited={refineWildInherited} onSelect={(next) => onSetRefineWild(next)} /></div>
-		<div class="compare-action-wrap" class:running={modelInspection.busy}>
-			{#if modelInspection.busy}
-				<RunStatus
-					variant="inline"
-					label={t().modelCompareBusy}
-					model={modelInspection.currentModel}
-					elapsedMs={modelInspection.elapsedMs}
-					tokensIn={modelInspection.tokensIn}
-					tokensOut={modelInspection.tokensOut}
-					onStop={modelInspection.abort}
-				/>
-			{:else}
-				<Tooltip placement="bottom-left" text={t().tooltipModelCompare}><PaintButton onclick={modelInspection.run} disabled={!resultAvailable || refinementSession.gridBusy || modelInspection.selectedModels.length === 0}>{t().modelCompareButton}</PaintButton></Tooltip>
-			{/if}
-		</div>
-	</div>
-	<div class="model-choice-grid" aria-label={t().modelCompareModelSelectLabel}>
-		{#each modelInspection.choices as choice (choice.id)}
-			{@const blocked = modelInspection.isChoiceBlocked(choice.id)}
-			{@const checked = modelInspection.selectedModels.includes(choice.id)}
-			{@const failed = !!modelInspection.failedModels[choice.id]}
-			{@const choiceExtra = [blocked ? t().modelCompareTargetDisabledTooltip : '', failed ? t().modelCompareFailedModel : ''].filter(Boolean).join(' · ')}
-			<div class="model-metadata-hover">
-				<label class="model-choice" class:checked={checked} class:target={blocked} class:failed={failed} class:disabled={blocked || (!checked && modelInspection.selectedModels.length >= 4)}>
-					<input type="checkbox" checked={checked} disabled={modelInspection.busy || blocked || (!checked && modelInspection.selectedModels.length >= 4)} onchange={() => modelInspection.toggleModel(choice.id)} />
-					<span><strong>{choice.label}</strong><small>{choice.providerLabel}{blocked ? ` · ${t().modelCompareTargetModel}` : ''}{failed ? ` · ${t().modelCompareFailedModel}` : ''}</small></span>
-				</label>
-				<ModelMetaCard model={choice.model} {isJapanese} extra={choiceExtra} purpose="llm" />
+<div class="refine-panel">
+	<div class="refine-stage">
+		<div class="refine-target-column">
+			<div class="refine-target-card">
+				<div class="comparison-label">{t().modelCompareTargetTitle}</div>
+				<div class="comparison-art" style="aspect-ratio: {canvasAspectWidth} / {canvasAspectHeight};">{#if artworkUrl}<img class="canvas-art" src={artworkUrl} alt="" />{/if}</div>
+				<div class="model-target-meta">{modelInspection.targetModel}{#if resultAvailable}<br />{seedSummary}{/if}</div>
 			</div>
-		{/each}
-	</div>
-	<div class="model-choice-count">{t().modelCompareSelectedCount(modelInspection.selectedModels.length, 4)}</div>
-	{#if modelInspection.status}<div class="variation-grid-status">{modelInspection.status}</div>{/if}
-	<div class="model-compare-stage" class:busy={modelInspection.busy}>
-		<div class="model-target-card"><div class="comparison-label">{t().modelCompareTargetTitle}</div><div class="comparison-art" style="aspect-ratio: {canvasAspectWidth} / {canvasAspectHeight};">{#if activeComparisonItem}<img use:svgImage={activeComparisonItem.svg} alt="" />{/if}</div><div class="model-target-meta">Stage 1: {modelInspection.targetStage1Model}<br />Stage 2: {modelInspection.targetStage2Model}</div></div>
-		<div class="model-results-column">
-			{#if modelInspection.results.length > 0}
-				<div class="model-inspection-grid">
-					{#each modelInspection.results as item (item.id)}
-						<div class="model-inspection-card" class:saved={!!item.savedHistoryId}>
-							<div class="comparison-label">{item.label}</div>
-							<div class="model-comparison-art-wrap">
-								<div class="comparison-art" style="aspect-ratio: {canvasAspectWidth} / {canvasAspectHeight};"><img use:svgImage={item.svg} alt="" /></div>
-								<button
-									class="variation-select model-adopt-select"
-									class:selected={!!item.savedHistoryId}
-									type="button"
-									disabled={item.saving || !!item.savedHistoryId}
-									onclick={() => modelInspection.saveResult(item)}
-									title={item.saving ? t().modelCompareSaving : item.savedHistoryId ? t().modelCompareAdopted : t().modelCompareAdoptTooltip}
-									aria-label={item.saving ? t().modelCompareSaving : item.savedHistoryId ? t().modelCompareAdopted : t().modelCompareAdoptTooltip}
-								>{item.saving ? '…' : item.savedHistoryId ? '✓' : '+'}</button>
+			<div class="refine-target-controls">
+				<section class="refine-action-section">
+					<div class="refine-section-head">
+						<div class="refine-section-title">{t().modelCompareModelSelectLabel}</div>
+						<div class="refine-selection-hint">{t().tooltipModelCompare}</div>
+					</div>
+					<WildToggle value={refineWildValue} {isJapanese} inherited={refineWildInherited} onSelect={(next) => onSetRefineWild(next)} />
+					<div class="model-choice-grid" aria-label={t().modelCompareModelSelectLabel}>
+						{#each modelInspection.choices as choice (choice.id)}
+							{@const blocked = modelInspection.isChoiceBlocked(choice.id)}
+							{@const checked = modelInspection.selectedModels.includes(choice.id)}
+							{@const failed = !!modelInspection.failedModels[choice.id]}
+							{@const full = !checked && modelInspection.selectedModels.length >= 4}
+							{@const choiceExtra = [blocked ? t().modelCompareTargetDisabledTooltip : '', failed ? t().modelCompareFailedModel : ''].filter(Boolean).join(' · ')}
+							<div class="model-metadata-hover">
+								<label class="model-choice" class:checked={checked} class:target={blocked} class:failed={failed} class:disabled={blocked || full}>
+									<input type="checkbox" checked={checked} disabled={busy || blocked || full} onchange={() => modelInspection.toggleModel(choice.id)} />
+									<span><strong>{choice.label}</strong><small>{choice.providerLabel}{blocked ? ` · ${t().modelCompareTargetModel}` : ''}{failed ? ` · ${t().modelCompareFailedModel}` : ''}</small></span>
+								</label>
+								<ModelMetaCard model={choice.model} {isJapanese} extra={choiceExtra} purpose="llm" />
 							</div>
-							<div class="model-result-actions">
-								<Tooltip text={item.starred ? t().starOn : t().modelCompareStarTooltip}>
-									<button class="model-result-star" class:starred={!!item.starred} type="button" disabled={item.saving} onclick={() => modelInspection.saveResult(item, { star: true })} aria-label={item.starred ? t().starOn : t().starOff}>{item.starred ? '★' : '☆'}</button>
+						{/each}
+					</div>
+					<div class="model-choice-count">{t().modelCompareSelectedCount(modelInspection.selectedModels.length, 4)}</div>
+					{#if modelInspection.status}<div class="variation-grid-status">{modelInspection.status}</div>{/if}
+					<div class="refine-actions refine-paint-actions">
+						{#if !busy}
+							<div class="refine-action-wrap">
+								<Tooltip placement="bottom-left" text={t().tooltipModelCompare}>
+									<PaintButton onclick={onGenerateModelCandidates} disabled={!resultAvailable || modelInspection.drawableModels().length === 0}>
+										{t().modelCompareButton}
+									</PaintButton>
 								</Tooltip>
 							</div>
-							<pre>{item.ddl}</pre>
+						{/if}
+						<div class="refine-cost-indicator" aria-live="polite">
+							<svg viewBox="0 0 24 24" aria-hidden="true">
+								<circle cx="12" cy="12" r="8.5" />
+								<path d="M12 7.5v5l3 2" />
+							</svg>
+							<span>{t().refineCostReading}</span>
 						</div>
-					{/each}
-				</div>
-			{/if}
+						{#if busy}
+							<RunStatus
+								label={t().refineGeneratingTask(refinementSession.gridTaskLabel)}
+								progressDone={refinementSession.gridDone}
+								progressTotal={refinementSession.gridTotal}
+								model={refinementSession.gridSlotLabels.filter(Boolean).join(' / ')}
+								elapsedMs={refinementSession.elapsedMs}
+								tokensIn={refinementSession.tokensIn}
+								tokensOut={refinementSession.tokensOut}
+								onStop={refinementSession.gridBusy && refinementSession.gridCanAbort ? () => refinementSession.abort() : null}
+							/>
+							{#if refinementSession.gridBusy}
+								<VariationLanes states={refinementSession.gridSlots} labels={refinementSession.gridSlotLabels} />
+							{/if}
+						{/if}
+					</div>
+				</section>
+			</div>
 		</div>
+		<RefinementCandidateGrid {isJapanese} {refinementSession} {onSaveAndClose} {onDiscardAndClose} placeholder={t().modelChangePlaceholder} />
 	</div>
-	</div>
+</div>

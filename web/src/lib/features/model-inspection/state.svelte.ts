@@ -1,87 +1,34 @@
-import { createElapsed } from '$lib/elapsed.svelte';
-import { t, getLang } from '$lib/i18n/index.svelte';
+import { t } from '$lib/i18n/index.svelte';
 import { qualifiedModelId, type ModelOption, type Provider, type ProviderGroup } from '$lib/models';
-import { type CanvasAspectId } from '$lib/plugins/system/canvas-aspect';
-import { type RenderOverrides } from '$lib/features/render-payload';
-import type { Seed } from '$lib/features/run/current-work';
 import { registerUserSettingsContributor } from '$lib/features/user-settings';
-import { type Score } from '$lib/historyManagerState.svelte';
-import { colorCatalogSettings } from '$lib/features/color-catalog/settings.svelte';
-
-/**
- * Model comparison: draw the same description with several models and let the
- * author adopt the ones worth keeping.
- *
- * A factory rather than a class so the function bodies move across unchanged --
- * they still close over plain `let ... = $state(...)` bindings, and the $effect
- * inside is created in the component's effect context because the page calls
- * this during initialisation.  The page lends what it owns through `deps`; the
- * selection, the results and the run state belong here.
- *
- * Only what this feature actually reads is declared, structurally.  Hoisting
- * the page's types into a shared file would create exactly the shared append
- * point this split exists to remove.
- */
-type PaintedStage1 = { ddl: string; thinking: string | null; tokens_in: number | null; tokens_out: number | null };
-type PaintedStage2 = {
-	svg: string;
-	score: Score;
-	stage2_model?: string | null;
-	tokens_in: number | null;
-	tokens_out: number | null;
-	render_build_number?: string | null;
-	render_color_profile?: Record<string, string> | null;
-	render_engine_id?: string | null;
-	render_engine_version?: string | null;
-	render_color_catalog_id?: string | null;
-	render_color_catalog_name?: string | null;
-	render_color_catalog_sub?: string | null;
-	render_color_map?: Record<string, string> | null;
-	render_canvas_aspect?: string | null;
-	render_canvas_aspect_id?: string | null;
-	render_canvas_aspect_ratio?: number | null;
-	render_seed?: Seed | null;
-	render_wild?: boolean | null;
-	composition_seed?: Seed | null;
-	interpretation_seed?: string | null;
-	instruction_lang_requested?: string | null;
-	instruction_lang_resolved?: string | null;
-};
 
 export type ModelInspectionDeps = {
 	/** Page state, read through getters so the bodies below stay reactive. */
 	availableModelCatalog: () => ProviderGroup[];
-	result: () => { stage1_model?: string | null; stage2_model?: string | null; instruction_lang_resolved?: string | null } | null;
+	result: () => { stage1_model?: string | null; stage2_model?: string | null } | null;
 	stage1Provider: () => Provider;
 	stage1Model: () => string;
 	stage2Provider: () => Provider;
 	stage2Model: () => string;
-	loading: () => boolean;
-	input: () => string;
 	currentUser: () => { username: string } | null;
 	setCurrentUser: (user: unknown) => void;
-	/**
-	 * A plain counter, not $state: every flow snapshots it and bails when it has
-	 * moved. It is read through a call rather than a $derived for that reason.
-	 */
-	targetContextVersion: () => number;
-	/** Page collaborators, taken as-is. */
 	apiFetch: (path: string, init?: RequestInit) => Promise<Response>;
-	interpretOne: (text: string, signal?: AbortSignal, modelOverride?: string, langOverride?: 'ja' | 'en') => Promise<PaintedStage1>;
-	composeOne: (currentDdl: string, originalText: string, signal?: AbortSignal, modelOverride?: string, langOverride?: 'ja' | 'en', renderOptions?: { canvasAspectId?: CanvasAspectId; lineageParentNodeId?: string | null; renderOverrides?: RenderOverrides }) => Promise<PaintedStage2>;
-	ensureVisibleLineageParentId: () => Promise<string | null>;
-	pushHistory: (it: Record<string, unknown>, options?: Record<string, unknown>) => Promise<{ id?: string; starred?: boolean; note?: string | null } | null>;
-	toggleHistoryStar: (item: { id?: string; starred?: boolean; note?: string | null }) => Promise<void>;
-	addTokens: (total: number | null, delta: number | null | undefined) => number | null;
-	statusModelName: (m: string | null | undefined) => string;
-	effectiveCanvasAspectId: () => CanvasAspectId;
 };
 
+/**
+ * The models the "change the model" dialog draws the work with: which ones the
+ * author picked, which one is already on the canvas, and which ones failed.
+ *
+ * The drawing itself goes through the refinement session like the color
+ * change: each picked model draws an option, and the author keeps the ones
+ * worth keeping with "+" before saving them.
+ *
+ * A factory rather than a class so the $effect inside is created in the
+ * component's effect context, because the page calls this during
+ * initialisation.
+ */
 export function createModelInspection(deps: ModelInspectionDeps) {
-	// Collaborators bind straight through, so the bodies below are unchanged.
-	const { apiFetch, interpretOne, composeOne, ensureVisibleLineageParentId,
-		pushHistory, toggleHistoryStar, addTokens, statusModelName,
-		effectiveCanvasAspectId } = deps;
+	const { apiFetch } = deps;
 	// Page state the bodies read as plain values.
 	const availableModelCatalog = $derived(deps.availableModelCatalog());
 	const result = $derived(deps.result());
@@ -89,54 +36,10 @@ export function createModelInspection(deps: ModelInspectionDeps) {
 	const stage1Model = $derived(deps.stage1Model());
 	const stage2Provider = $derived(deps.stage2Provider());
 	const stage2Model = $derived(deps.stage2Model());
-	const loading = $derived(deps.loading());
-	const input = $derived(deps.input());
 	const currentUser = $derived(deps.currentUser());
-type ModelInspectionResult = {
-	id: string;
-	model: string;
-	stage1Model?: string | null;
-	label: string;
-	input: string;
-	ddl: string;
-	svg: string;
-	score: Score;
-	stage2Model?: string | null;
-	renderBuildNumber?: string | null;
-	renderColorProfile?: Record<string, string> | null;
-	renderEngineId?: string | null;
-	renderEngineVersion?: string | null;
-	renderColorCatalogId?: string | null;
-	renderColorCatalogName?: string | null;
-	renderColorCatalogSub?: string | null;
-	renderColorMap?: Record<string, string> | null;
-	renderCanvasAspect?: string | null;
-	renderCanvasAspectId?: string | null;
-	renderCanvasAspectRatio?: number | null;
-	renderSeed?: Seed | null;
-	renderWild?: boolean | null;
-	compositionSeed?: Seed | null;
-	tokensIn: number | null;
-	tokensOut: number | null;
-	tokensInStage2: number | null;
-	tokensOutStage2: number | null;
-	elapsedMs: number;
-	lineageParentNodeId?: string | null;
-	compareMode: ModelCompareMode;
-	savedHistoryId?: string | null;
-	starred?: boolean;
-	saving?: boolean;
-};
 type ModelInspectionChoice = { id: string; label: string; providerLabel: string; model: ModelOption };
 
-// One model draws both stages (2026-09-30, the author), so each compared
-// model runs Stage 1 and Stage 2 alike; the modes that fixed one stage and
-// varied the other are gone. The saved result still says 'common'.
-type ModelCompareMode = 'common';
-const modelCompareMode: ModelCompareMode = 'common';
-let modelInspectionBusy = $state(false);
 let modelInspectionStatus = $state<string | null>(null);
-let modelInspectionResults = $state<ModelInspectionResult[]>([]);
 let modelInspectionSelectedModels = $state<string[]>([]);
 // The selection rides along in the user's model_settings on the server. The
 // key is the one the server already stores; nothing is renamed.
@@ -152,13 +55,6 @@ registerUserSettingsContributor({
 	}
 });
 let modelInspectionFailedModels = $state<Record<string, string>>({});
-let modelInspectionRunId = 0;
-let modelInspectionAbortController: AbortController | null = null;
-let modelInspectionCurrentModel = $state('');
-let modelInspectionTokensIn = $state<number | null>(null);
-let modelInspectionTokensOut = $state<number | null>(null);
-const modelInspectionElapsed = createElapsed();
-
 
 function modelInspectionModelChoices(): ModelInspectionChoice[] {
 	const seen = new Set<string>();
@@ -215,7 +111,7 @@ $effect(() => {
 });
 
 function toggleModelInspectionModel(modelId: string) {
-	if (modelInspectionBusy || isModelInspectionChoiceBlocked(modelId)) return;
+	if (isModelInspectionChoiceBlocked(modelId)) return;
 	if (modelInspectionSelectedModels.includes(modelId)) {
 		const next = modelInspectionSelectedModels.filter((id) => id !== modelId);
 		modelInspectionSelectedModels = next;
@@ -236,181 +132,18 @@ function toggleModelInspectionModel(modelId: string) {
 	modelInspectionStatus = null;
 }
 
-async function runModelInspection() {
-	if (modelInspectionBusy || loading) return;
-	const source = input.trim();
-	if (!source) return;
-	const contextVersion = deps.targetContextVersion();
-	const modelParentNodeId = await ensureVisibleLineageParentId();
-	if (contextVersion !== deps.targetContextVersion()) return;
-	const selectedModels = modelInspectionSelectedModels.slice(0, 4).filter((model) => !isModelInspectionChoiceBlocked(model));
-	if (selectedModels.length === 0) { modelInspectionStatus = t().modelCompareSelectPrompt; return; }
-	const jobs = selectedModels.map((model) => ({ model, stage1: model, stage2: model, id: modelCompareMode + ":" + model + ":" + model }));
-	const rendered = new Set(modelInspectionResults.map((item) => item.id));
-	const pending = jobs.filter((job) => !rendered.has(job.id));
-	if (pending.length === 0) { modelInspectionStatus = t().modelCompareAllRendered; return; }
-
-	const runId = ++modelInspectionRunId;
-	const abortController = new AbortController();
-	modelInspectionAbortController = abortController;
-	modelInspectionBusy = true;
-	modelInspectionStatus = null;
-	modelInspectionTokensIn = null;
-	modelInspectionTokensOut = null;
-	modelInspectionElapsed.start();
-	const successful = [...modelInspectionResults];
-	const failed: Record<string, string> = {};
-	try {
-		for (const job of pending) {
-			if (abortController.signal.aborted || modelInspectionRunId !== runId) return;
-			const jobStage1Name = statusModelName(job.stage1);
-			const jobStage2Name = statusModelName(job.stage2);
-			modelInspectionCurrentModel = jobStage1Name === jobStage2Name ? jobStage1Name : `${jobStage1Name} / ${jobStage2Name}`;
-			try {
-				const started = Date.now();
-				const interpreted = await interpretOne(source, abortController.signal, job.stage1);
-				if (abortController.signal.aborted || modelInspectionRunId !== runId) return;
-				modelInspectionTokensIn = addTokens(modelInspectionTokensIn, interpreted.tokens_in);
-				modelInspectionTokensOut = addTokens(modelInspectionTokensOut, interpreted.tokens_out);
-				const composed = await composeOne(interpreted.ddl, source, abortController.signal, job.stage2, undefined, { lineageParentNodeId: modelParentNodeId });
-				if (abortController.signal.aborted || modelInspectionRunId !== runId) return;
-				modelInspectionTokensIn = addTokens(modelInspectionTokensIn, composed.tokens_in);
-				modelInspectionTokensOut = addTokens(modelInspectionTokensOut, composed.tokens_out);
-				successful.push({
-					id: job.id,
-					model: job.model,
-					stage1Model: job.stage1,
-					label: statusModelName(job.stage1) + " / " + statusModelName(job.stage2),
-					input: source,
-					ddl: interpreted.ddl,
-					svg: composed.svg,
-					score: composed.score,
-					stage2Model: composed.stage2_model ?? job.stage2,
-					renderBuildNumber: composed.render_build_number ?? null,
-					renderColorProfile: composed.render_color_profile ?? null,
-					renderEngineId: composed.render_engine_id ?? null,
-					renderEngineVersion: composed.render_engine_version ?? null,
-					renderColorCatalogId: composed.render_color_catalog_id ?? null,
-					renderColorCatalogName: composed.render_color_catalog_name ?? null,
-					renderColorCatalogSub: composed.render_color_catalog_sub ?? null,
-					renderColorMap: composed.render_color_map ?? null,
-					renderCanvasAspect: composed.render_canvas_aspect ?? null,
-					renderCanvasAspectId: composed.render_canvas_aspect_id ?? null,
-					renderCanvasAspectRatio: composed.render_canvas_aspect_ratio ?? null,
-					renderSeed: composed.render_seed ?? null,
-					renderWild: composed.render_wild ?? null,
-					compositionSeed: composed.composition_seed ?? null,
-					tokensIn: interpreted.tokens_in,
-					tokensOut: interpreted.tokens_out,
-					tokensInStage2: composed.tokens_in,
-					tokensOutStage2: composed.tokens_out,
-					elapsedMs: Date.now() - started,
-					lineageParentNodeId: modelParentNodeId,
-					compareMode: modelCompareMode,
-					savedHistoryId: null,
-					starred: false,
-					saving: false,
-				});
-				modelInspectionResults = [...successful];
-			} catch (cause) {
-				if (abortController.signal.aborted || modelInspectionRunId !== runId) return;
-				failed[job.model] = cause instanceof Error ? cause.message : String(cause);
-				modelInspectionFailedModels = { ...modelInspectionFailedModels, [job.model]: failed[job.model] };
-			}
-		}
-		if (Object.keys(failed).length > 0 && modelInspectionRunId === runId) {
-			modelInspectionStatus = t().modelCompareFailedSummary(Object.keys(failed).length);
-		}
-	} finally {
-		if (modelInspectionRunId === runId) {
-			modelInspectionAbortController = null;
-			modelInspectionBusy = false;
-			modelInspectionCurrentModel = '';
-			modelInspectionElapsed.stop();
-		}
-	}
+/** The picked models the work can be drawn with, in the order picked. */
+function drawableModels(): string[] {
+	return modelInspectionSelectedModels.slice(0, 4).filter((model) => !isModelInspectionChoiceBlocked(model));
 }
 
-function abortModelInspection() {
-	modelInspectionAbortController?.abort();
+/** Mark the models that failed to draw, so their choices say so. */
+function recordFailures(failed: Record<string, string>) {
+	modelInspectionFailedModels = { ...modelInspectionFailedModels, ...failed };
 }
 
-function updateModelInspectionResult(id: string, patch: Partial<ModelInspectionResult>) {
-	modelInspectionResults = modelInspectionResults.map((item) => item.id === id ? { ...item, ...patch } : item);
-}
-
-async function saveModelInspectionResult(item: ModelInspectionResult, options: { star?: boolean } = {}) {
-	if (item.saving) return;
-	const contextVersion = deps.targetContextVersion();
-	if (item.savedHistoryId) {
-		if (options.star) {
-			await toggleHistoryStar({ id: item.savedHistoryId, starred: !!item.starred });
-			if (contextVersion === deps.targetContextVersion()) updateModelInspectionResult(item.id, { starred: !item.starred });
-		}
-		return;
-	}
-	updateModelInspectionResult(item.id, { saving: true });
-	modelInspectionStatus = null;
-	try {
-		const saved = await pushHistory({
-			input: item.input,
-			ddl: item.ddl,
-			score: item.score,
-			svg: item.svg,
-			at: Date.now(),
-			elapsed_ms: item.elapsedMs,
-			stage1_model: item.stage1Model ?? item.model,
-			stage2_model: item.stage2Model ?? null,
-			tokens_in: (item.tokensIn ?? 0) + (item.tokensInStage2 ?? 0) || null,
-			tokens_out: (item.tokensOut ?? 0) + (item.tokensOutStage2 ?? 0) || null,
-			catalog_id: item.renderColorCatalogId ?? colorCatalogSettings.effectiveId,
-			render_build_number: item.renderBuildNumber ?? null,
-			render_color_profile: item.renderColorProfile ?? null,
-			render_engine_id: item.renderEngineId ?? null,
-			render_engine_version: item.renderEngineVersion ?? null,
-			render_color_catalog_id: item.renderColorCatalogId ?? null,
-			render_color_catalog_name: item.renderColorCatalogName ?? null,
-			render_color_catalog_sub: item.renderColorCatalogSub ?? null,
-			render_color_map: item.renderColorMap ?? null,
-			render_canvas_aspect: item.renderCanvasAspect ?? item.renderCanvasAspectId ?? effectiveCanvasAspectId(),
-			render_canvas_aspect_id: item.renderCanvasAspectId ?? item.renderCanvasAspect ?? effectiveCanvasAspectId(),
-			render_canvas_aspect_ratio: item.renderCanvasAspectRatio ?? null,
-			render_seed: item.renderSeed ?? null,
-			render_wild: item.renderWild ?? null,
-			composition_seed: item.compositionSeed ?? null,
-			ui_lang: getLang(),
-		}, {
-			countGeneration: true,
-			sourceText: item.input,
-			lineageParentNodeId: item.lineageParentNodeId ?? null,
-			derivationKind: item.lineageParentNodeId ? 'model_comparison' : null,
-			derivationMetadata: { comparison_mode: item.compareMode, compared_model: item.model, stage1_model: item.stage1Model, stage2_model: item.stage2Model },
-		});
-		if (!saved?.id) throw new Error('failed to save comparison result');
-		if (contextVersion !== deps.targetContextVersion()) return;
-		updateModelInspectionResult(item.id, { savedHistoryId: saved.id, starred: !!saved.starred, saving: false });
-		if (options.star) {
-			await toggleHistoryStar({ id: saved.id, starred: !!saved.starred, note: saved.note });
-			if (contextVersion === deps.targetContextVersion()) updateModelInspectionResult(item.id, { starred: !saved.starred });
-		}
-	} catch (e) {
-		if (contextVersion === deps.targetContextVersion()) {
-			updateModelInspectionResult(item.id, { saving: false });
-			modelInspectionStatus = e instanceof Error ? e.message : String(e);
-		}
-	}
-}
-
-	/** Abort the comparison run and drop its results: the target artwork changed. */
+	/** Forget the failures: the target artwork changed. */
 	function reset() {
-		if (modelInspectionAbortController) modelInspectionAbortController.abort();
-		modelInspectionAbortController = null;
-		modelInspectionRunId += 1;
-		modelInspectionBusy = false;
-		// Incrementing the identity makes the stale run's finally block a no-op,
-		// so target reset must release the interval itself.
-		modelInspectionElapsed.stop();
-		modelInspectionResults = [];
 		modelInspectionFailedModels = {};
 		modelInspectionStatus = null;
 	}
@@ -424,19 +157,12 @@ async function saveModelInspectionResult(item: ModelInspectionResult, options: {
 		get targetStage1Model() { return modelInspectionTargetStage1Model; },
 		get targetStage2Model() { return modelInspectionTargetStage2Model; },
 		get targetModel() { return modelInspectionTargetModel; },
-		get busy() { return modelInspectionBusy; },
 		get status() { return modelInspectionStatus; },
-		get results() { return modelInspectionResults; },
 		get failedModels() { return modelInspectionFailedModels; },
-		get currentModel() { return modelInspectionCurrentModel; },
-		get elapsedMs() { return modelInspectionElapsed.ms; },
-		get tokensIn() { return modelInspectionTokensIn; },
-		get tokensOut() { return modelInspectionTokensOut; },
 		isChoiceBlocked: isModelInspectionChoiceBlocked,
 		toggleModel: toggleModelInspectionModel,
-		run: runModelInspection,
-		abort: abortModelInspection,
-		saveResult: saveModelInspectionResult,
+		drawableModels,
+		recordFailures,
 		reset,
 	};
 }

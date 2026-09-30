@@ -219,7 +219,7 @@ fn macro_inside_anonymous_group_keeps_real_source_ownership() {
 
 #[test]
 fn invalid_and_over_budget_member_cycles_omit_only_their_placement() {
-    let invalid_source = "赤い円・青い線・灰の弧を交互にして、五つ並べる。緑の正方形を中央に置く。";
+    let invalid_source = "赤い円・青い線・灰の弧を交互にして、五つ並べる。緑の正方形を中心に置く。";
     let document =
         NormalizedDdlDocument::new(invalid_source, ResolvedInstructionLanguage::Ja, Vec::new())
             .unwrap();
@@ -245,7 +245,7 @@ fn invalid_and_over_budget_member_cycles_omit_only_their_placement() {
     assert_eq!(invalid_score.instructions[0].primitive, Primitive::Square);
 
     let budgeted = execute(
-        "赤い円と青い線の組を、灰の弧と交互に5つ並べる。緑の正方形を中央に置く。",
+        "赤い円と青い線の組を、灰の弧と交互に5つ並べる。緑の正方形を中心に置く。",
         ResolvedInstructionLanguage::Ja,
         &[],
         Vec::new(),

@@ -13,10 +13,47 @@ use sha2::{Digest, Sha256};
 use crate::ResolvedInstructionLanguage;
 
 /// Stable identity for the Saijiki asset semantics.
-pub const SAIJIKI_ASSET_ID: &str = "inku.saijiki.v1";
+pub const SAIJIKI_ASSET_ID: &str = "inku.saijiki.v2";
 
 /// The exact embedded UTF-8 source bytes for this asset edition.
-pub const SAIJIKI_ASSET_BYTES: &[u8] = include_bytes!("../assets/saijiki-v1.json");
+pub const SAIJIKI_ASSET_BYTES: &[u8] = include_bytes!("../assets/saijiki-v2.json");
+
+/// Identity of the retired first edition. Its asset is embedded only so that saved documents
+/// and Macro definitions written with it can be migrated once to the current edition (SPEC
+/// §3.3); nothing compiles against it.
+pub const SAIJIKI_V1_ASSET_ID: &str = "inku.saijiki.v1";
+
+const SAIJIKI_V1_ASSET_BYTES: &[u8] = include_bytes!("../assets/saijiki-v1.json");
+
+/// The Saijiki edition a reader recognizes words from.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum SaijikiEdition {
+    /// The retired edition, read only by the migration.
+    V1,
+    V2,
+}
+
+impl SaijikiEdition {
+    /// The edition every compilation reads.
+    pub(crate) const CURRENT: Self = Self::V2;
+
+    pub(crate) fn asset(self) -> &'static SaijikiAsset {
+        match self {
+            Self::V1 => SAIJIKI_V1_ASSET.get_or_init(|| {
+                serde_json::from_slice(SAIJIKI_V1_ASSET_BYTES)
+                    .expect("embedded inku.saijiki.v1 asset must remain valid JSON")
+            }),
+            Self::V2 => saijiki_asset(),
+        }
+    }
+
+    pub(crate) fn asset_id(self) -> &'static str {
+        match self {
+            Self::V1 => SAIJIKI_V1_ASSET_ID,
+            Self::V2 => SAIJIKI_ASSET_ID,
+        }
+    }
+}
 
 /// Lossless bilingual representation of the versioned Saijiki source asset.
 #[derive(Debug, Deserialize, Eq, PartialEq)]
@@ -397,6 +434,7 @@ pub(crate) fn connected_endpoint_phrase(
 
 static SAIJIKI_ASSET: OnceLock<SaijikiAsset> = OnceLock::new();
 static SAIJIKI_ASSET_SHA256_HEX: OnceLock<String> = OnceLock::new();
+static SAIJIKI_V1_ASSET: OnceLock<SaijikiAsset> = OnceLock::new();
 
 /// Return the parsed embedded asset, parsing it exactly once per process.
 ///
@@ -405,7 +443,7 @@ static SAIJIKI_ASSET_SHA256_HEX: OnceLock<String> = OnceLock::new();
 pub fn saijiki_asset() -> &'static SaijikiAsset {
     SAIJIKI_ASSET.get_or_init(|| {
         serde_json::from_slice(SAIJIKI_ASSET_BYTES)
-            .expect("embedded inku.saijiki.v1 asset must remain valid JSON")
+            .expect("embedded inku.saijiki.v2 asset must remain valid JSON")
     })
 }
 
@@ -709,6 +747,35 @@ fn validate_english_grammar(asset: &SaijikiAsset) -> Result<(), SaijikiProjectio
     Ok(())
 }
 
+/// One Japanese surface names one word (SPEC §3.3). The canonical and parser surfaces of every
+/// row a reader can recognize are distinct across the asset, so no word is read by position.
+fn validate_japanese_surfaces(asset: &SaijikiAsset) -> Result<(), SaijikiProjectionError> {
+    let mut owners = HashMap::<&str, (&str, &str)>::new();
+    for category in &asset.categories {
+        for word in &category.words {
+            if !(word.prompt || word.display || word.marker == Some(true)) {
+                continue;
+            }
+            for surface in std::iter::once(word.surface_ja.as_str())
+                .chain(word.parser_surfaces_ja.iter().flatten().map(String::as_str))
+            {
+                if let Some((first_category_key, first_surface_ja)) =
+                    owners.insert(surface, (&category.key, &word.surface_ja))
+                {
+                    return Err(SaijikiProjectionError::ParserSurfaceCollision {
+                        surface: surface.to_owned(),
+                        first_category_key: first_category_key.to_owned(),
+                        first_surface_ja: first_surface_ja.to_owned(),
+                        second_category_key: category.key.clone(),
+                        second_surface_ja: word.surface_ja.clone(),
+                    });
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
 fn register_parser_surface(
     asset: &SaijikiAsset,
     owners: &mut HashMap<String, (String, String)>,
@@ -732,19 +799,6 @@ fn register_parser_surface(
 
     let key = surface.to_ascii_lowercase();
     if let Some((first_category_key, first_surface_ja)) = owners.get(&key) {
-        if surface == "点"
-            && first_surface_ja == "点"
-            && surface_ja == "点"
-            && matches!(
-                (first_category_key.as_str(), category_key),
-                ("omote", "katachi") | ("katachi", "omote")
-            )
-        {
-            // This one declared Japanese homograph is resolved from phrase
-            // ownership in the parser: a noun head is the Point shape, while
-            // a modifier owned by another explicit shape remains stipple.
-            return Ok(());
-        }
         return Err(SaijikiProjectionError::ParserSurfaceCollision {
             surface: surface.to_owned(),
             first_category_key: first_category_key.clone(),
@@ -1165,6 +1219,7 @@ pub fn saijiki_derived_projection_from_asset(
 ) -> Result<SaijikiDerivedProjection, SaijikiProjectionError> {
     validate_semantic_aliases(asset)?;
     validate_english_grammar(asset)?;
+    validate_japanese_surfaces(asset)?;
     let prompt_rows = prompt_rows(asset, language)?;
     let prompt_block = prompt_rows
         .iter()

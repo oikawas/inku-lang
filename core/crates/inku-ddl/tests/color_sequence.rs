@@ -132,7 +132,7 @@ fn known_invalid_sequence_is_local_and_plain_multiple_colors_do_not_imply_a_cycl
         "交互に"
     );
     let recovered = execute_with_policy(
-        "赤・灰・青を交互にして、円を五つ並べる。青い正方形を中央に置く。",
+        "赤・灰・青を交互にして、円を五つ並べる。青い正方形を中心に置く。",
         ResolvedInstructionLanguage::Ja,
         ScoreErrorPolicy::OmitAndContinue,
     );

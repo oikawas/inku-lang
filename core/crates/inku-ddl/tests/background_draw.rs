@@ -381,7 +381,7 @@ fn execute(
 #[test]
 fn stage1_background_and_draw_keep_bilingual_meaning_and_source_ownership() {
     let ja = execute(
-        "背景を黒で埋める。白い横線を中央に引く。",
+        "背景を黒で埋める。白い横線を中心に引く。",
         Language::Ja,
         &[],
         context(),
@@ -450,7 +450,7 @@ fn stage1_background_and_draw_keep_bilingual_meaning_and_source_ownership() {
 
 #[test]
 fn stage1_background_with_surface_in_color_slot_keeps_local_diagnostics_and_drawable_residual() {
-    let source = "背景を薄墨で埋める。下端に薄い灰の太筆の波打つ線を3本引く。中心に小さな黒いペンの点を3個散らす。";
+    let source = "背景を刷きで埋める。下端に薄い灰の太筆の波打つ線を3本引く。中心に小さな黒いペンの点を3個散らす。";
     let budget = ResourceBudget {
         maximum: ResourceDemand {
             logical_objects: 400,
@@ -512,7 +512,7 @@ fn stage1_background_with_surface_in_color_slot_keeps_local_diagnostics_and_draw
         local_diagnostics,
         [
             ("missing_action_entity", "埋める"),
-            ("missing_entity_head", "薄墨"),
+            ("missing_entity_head", "刷き"),
         ]
     );
 
@@ -620,7 +620,7 @@ fn source_background_selects_the_work_palette_for_implicit_color_and_preserves_e
 #[test]
 fn conflicting_backgrounds_recover_without_losing_source_candidates() {
     let result = execute(
-        "背景を黒で埋める。背景を青で埋める。白い線を中央に引く。",
+        "背景を黒で埋める。背景を青で埋める。白い線を中心に引く。",
         Language::Ja,
         &[],
         context(),

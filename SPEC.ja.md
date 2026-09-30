@@ -95,7 +95,7 @@ PNGは正本SVGを写す派生出力であり、縮小してもSVGの材質・�
 
 語彙辞書は俳句の季語辞典にならって**歳時記**と呼ぶ。inku において歳時記は常時開いておくものではなく、必要なときに参照するものとする。
 
-コア語彙は歳時記の 12 カテゴリと、あいだ（関係）で構成される。**語の正は共有Rustの `core/crates/inku-ddl/assets/saijiki-v1.json` であり、ServerのsaijikiテーブルとWeb／Androidの表示も同じ語彙へ揃える。機械生成の reference §1（`GET /api/reference` / `inku-cli reference`）が現行値を公開する。** 以下は概観で、語の追加・削除は reference を正とする。
+コア語彙は歳時記の 13 カテゴリと、あいだ（関係）で構成される。**語の正は共有Rustの `core/crates/inku-ddl/assets/saijiki-v2.json` であり、ServerのsaijikiテーブルとWeb／Androidの表示も同じ語彙へ揃える。機械生成の reference §1（`GET /api/reference` / `inku-cli reference`）が現行値を公開する。** 以下は概観で、語の追加・削除は reference を正とする。
 
 | カテゴリ | 語彙（概観） |
 |---|---|
@@ -103,10 +103,11 @@ PNGは正本SVGを写す派生出力であり、縮小してもSVGの材質・�
 | **かたむき** | 水平、垂直、斜め、右上がり、右下がり、回転 |
 | **てざわり** | 銀筆、鉛筆、ペン、ロットリング、クレヨン、チョーク、細筆、太筆、油彩、ビュラン、ドライポイント、コンピュータ |
 | **つらなり** | 実線、破線、点線、一点鎖線 |
-| **おもて** | 空、塗り、薄墨、粒、点描、平行線、交差線、アクアチント、濃い、薄い |
+| **おもて** | 空、塗り、刷き、粒、点描、平行線、交差線、アクアチント |
+| **さばき** | 濃い、薄い |
 | **じ** | 紙、和紙、薄墨地、木炭地、カンバス、画用紙、メゾチント |
 | **いろ** | 白、黒、青、赤、緑、灰、黄、橙、紫 |
-| **ゆらぎ** | 細かく、大きく、ゆっくり、速く、揺れる、波打つ、にじみ |
+| **ゆらぎ** | 細かく、大きく、ゆるやかに、小刻みに、揺れる、波打つ、にじみ |
 | **ばしょ** | 上、下、中心、左端、右端、上端、下端、始点、終点、途中、隅 |
 | **うごき** | 置く、並べる、引く、散らす、埋める、敷き詰める |
 | **じゅん** | 交互に、順に |
@@ -133,12 +134,13 @@ PNGは正本SVGを写す派生出力であり、縮小してもSVGの材質・�
 - 物理素材の語彙のみ（感情語ゼロ）
 - 「描く動作」ではなく「配置する動作」を中心とする（盆栽で枝を「置く」感覚）。ただし、痕の作り方を言う語（さばき）は筆の運びを言ってよい（§2の5、2026-09-29 作者裁定）。うごきの語は配置の動詞のままである
 - Actionの語彙設計が特に重要：置く・並べる・埋める——これは提示の動詞
-- **ゆらぎカテゴリは痕の不均一さを言う語彙**：「細かく揺れる」「ゆっくり波打つ」「にじみ」は許容し、「美しく揺れる」「激しく揺れる」は排除する（詳細は Section 13）。英語の振幅語は形容詞のまま（`fine` / `large`）でも副詞形（`finely` / `largely`）でも書ける。`large`は大小の`large`と同形なので、大きさと同じ句に振幅を書くときは`largely`を使う（DDL 12）。この書き分けは§3.3の一語一意の現行の例外である
+- **ゆらぎカテゴリは痕の不均一さを言う語彙**：「細かく揺れる」「ゆるやかに波打つ」「にじみ」は許容し、「美しく揺れる」「激しく揺れる」は排除する（詳細は Section 13）。細かく／大きくは揺れの振れ幅を、ゆるやかに／小刻みには波の間隔（波の数）を言う。英語の振れ幅は副詞だけで書き（`narrowly` / `broadly`）、大小の`large`とは別の語である（歳時記 v2、DDL 16）
 - **あいだカテゴリは観察可能な関係のみ**：「沿う」「触れない」は外部から観察できる位置関係。「寄り添う」「呼応する」のような意図・擬人の語は排除（詳細は Section 14）。語彙（名詞）ではなく述語（統語）の追加であり、プラグイン原則1と矛盾しない
-- **おもてカテゴリは面や痕の在り方を言う状態の名詞**：動作の「塗る」ではなく「塗り」を使う。**質**（空・塗り・薄墨・粒・点描・平行線・交差線・アクアチント）と**濃さ**（濃い・薄い）の2次元を持つ。濃い／薄いは道具ごとの相対指定であり、絶対の濃さではない。紙目は支持体（じカテゴリ）が引き取る。`粒`と`薄墨`は線・弧にも残し、痕の在り方として読む。粒は支持体の吸い方・歯を上げ、薄墨は紙の性質を変えず、幅3.0倍・不透明度0.35倍の淡い帯を作る。残る6種は直前の閉じた図形へ移し、対象がなければ落とす。閉じた図形に明示した薄墨・粒・点描・平行線・交差線・アクアチントは、それ自体がその面の演奏であり、下に平塗りを重ねない（DDL engine 46）。平塗りは「塗り」を明示した場合と、面を省略した閉じた図形の既定だけに使う。現行のにじみは独立したゆらぎであり、おもての質には含めない。背景を埋める指示は面の指定ではなく、documentの`background`へ届く。
+- **おもてカテゴリは面や痕の技法を言う状態の名詞**：動作の「塗る」ではなく「塗り」を使う。語は面の質（空・塗り・刷き・粒・点描・平行線・交差線・アクアチント）だけを言い、濃さはさばきが言う。紙目は支持体（じカテゴリ）が引き取る。`粒`と`刷き`は線・弧にも残し、痕の在り方として読む。粒は支持体の吸い方・歯を上げ、刷きは紙の性質を変えず、幅3.0倍の帯を作る。刷きは自らの淡さを持たない（線の帯は道具の不透明度の0.64倍、閉じた面の掃きは0.40。比較シートで決める候補）。淡さはさばきの「薄い」が持つ。保存済みScoreの`wash`（v1の薄墨）は、幅3.0倍・不透明度0.35倍の淡い帯のまま描く。残る6種は直前の閉じた図形へ移し、対象がなければ落とす。閉じた図形に明示した刷き・粒・点描・平行線・交差線・アクアチントは、それ自体がその面の演奏であり、下に平塗りを重ねない（DDL engine 46）。平塗りは「塗り」を明示した場合と、面を省略した閉じた図形の既定だけに使う。現行のにじみは独立したゆらぎであり、おもての質には含めない。背景を埋める指示は面の指定ではなく、documentの`background`へ届く。
 
-現行の `点描` はおもての `stipple`、`にじみ` はゆらぎの `bleeding` である。にじみは `ink_spread:"bleed"` として Wave / Perlin と独立に併用でき、単独では Perlin を加えず、強度語を増やさない通常の広がりを作る。旧入力の `滲む` / `blurring`、`震える` / `trembling`、`中央` / `middle` はそれぞれ新しい正規語へ正規化する。保存済みScoreの`surface.texture="bleed"`と`variation.quality="pink"`は旧描画の意味を保持する。編集または再生成は新しい変奏へ進む。
-- **じカテゴリは支持体の名前のみ**（2026-08-15 新設・render engine 34）：**紙・和紙・薄墨地・木炭地・カンバス・画用紙・メゾチント の 7 語**で、`canvas.ground.material` の値になる。**おもてが閉じた図形の内側を言うのに対し、じはキャンバスそのものを言う** —— 記述では地の名を一文として「和紙。」「薄墨地。」のように書く。見出しを付けた「地: ...」「面: ...」の書き方は受理しない（2026-09-24）。面の質は「薄墨の円」のように図形の修飾語として書く。**7 種は `<pattern>` のタイルとして敷かれ、`<filter>` を 1 つも使わないので、3 つの SVG profile が同じ地を出す。****費用の歯止めは要素数ではなく地の層のバイト数である**（24 KB）。
+現行の `点描` はおもての `stipple`、`にじみ` はゆらぎの `bleeding` である。にじみは `ink_spread:"bleed"` として Wave / Perlin と独立に併用でき、単独では Perlin を加えず、強度語を増やさない通常の広がりを作る。v1 が入力として読んだ旧い語（点描の意味の`点`、`滲む` / `blurring`、`震える` / `trembling` / `trembles`、`中央` / `middle`）は、歳時記 v2 の移行で今の語へ書き換え、v2 は読まない（§3.3）。形の`点`は形の点だけを言う。保存済みScoreの`surface.texture="bleed"`と`variation.quality="pink"`は旧描画の意味を保持する。編集または再生成は新しい変奏へ進む。
+- **さばきカテゴリは墨や絵具の置き方を言う語**（歳時記 v2、2026-09-29）：濃い・薄いの2語で、面の質とは別の次元として、どの痕（線・弧・質感の面・平らな塗り）にも付けられる。道具ごとの相対指定であり、絶対の濃さではない。筆の運び（速さなど）を言う語は、このカテゴリに加えてよい（§2の5）。
+- **じカテゴリは支持体の名前のみ**（2026-08-15 新設・render engine 34）：**紙・和紙・薄墨地・木炭地・カンバス・画用紙・メゾチント の 7 語**で、`canvas.ground.material` の値になる。**おもてが閉じた図形の内側を言うのに対し、じはキャンバスそのものを言う** —— 記述では地の名を一文として「和紙。」「薄墨地。」のように書く。見出しを付けた「地: ...」「面: ...」の書き方は受理しない（2026-09-24）。面の質は「刷きの円」のように図形の修飾語として書く。**7 種は `<pattern>` のタイルとして敷かれ、`<filter>` を 1 つも使わないので、3 つの SVG profile が同じ地を出す。****費用の歯止めは要素数ではなく地の層のバイト数である**（24 KB）。
 - **「ランダム」は記述者の入力としては禁止しない**。禁止されるのは Score / 正規化DDL の内部表現に無秩序を残すことであり、記述者が「ランダムに散らす」と書いた場合は Stage 1 が「画面全体に点々と」「ばらつく」「散らす」などの観察可能な配置へ解釈する。
 - **コアの色語彙は9色**（白・黒・青・赤・緑・灰・黄・橙・紫）であり、記述者が書ける抽象色を表す。色カタログはこの9色の解決先を差し替える server-owned metadata で、語彙の拡張ではない。**黄・橙・紫は v2.9.11 で加わった** — カタログの `palette` には黄が12色あるのに実描画は0.6%で、**出口となる語が存在しなかった**（公称13.6%との差はそこから生まれていた）。3語は他の抽象色と同格であり、`color_hint` は依然として抽象色に収まらないニュアンスの置き場である。 **v2.9.12（render engine 17）から、9色は作品ごとに1回だけカタログの `palette` から決定的に割り当てられる** — 材料は `(render_seed, catalog_id, 抽象色)` の3つだけで、有彩6語は OKLCh の色相帯（CIELAB は青と紫を分離できない）、無彩3役は `map` 値と同じhexを予約してから明度の近い順に取る。背景も同じ割当を通り、`color_hint` は帯を指す語彙表としてだけ働く（ASCII は単語境界で照合する）。 **v2.9.14（render engine 18）から、13のカタログはそれぞれ9キーの `map` を持ち、その9キーはすべてそのカタログ自身の `palette` から選ばれる** — palette は無彩ちょうど3・有彩ちょうど7で6帯すべてを埋めるので、記述が求めた帯は最近傍の色ではなくその帯から答えられる。**1帯だけは意図して空にしてある** — `sea_stone` は紫を持たず、`blue` と同じ `Night Sea` が代役に立つ。**v2.11.11 から、保存済み作品を描き直すときの色の正本は作品自身が持つ記録である** — 描画要求が作品を名指せば（`/api/render-svg` と `/api/render-score` の `work_id`、CLI の `--from-work`）、サーバーはその行の `render_color_map` で描き、カタログの今日の定義を読まない。**したがって改名されたカタログも退役したカタログも描ける**（id の解決を通らないので 422 にならない）。記録を持たない古い作品は現行の定義へ落ち、そこでも 422 を出さない。作品を名指さない要求は従来どおりで、**退役したカタログidは既定へ落ちず何も返さないので、そのidを指定した描画は既定カタログで描かれる**。
 
@@ -148,7 +150,7 @@ PNGは正本SVGを写す派生出力であり、縮小してもSVGの材質・�
 
 **render JSON が記録する描画文脈**: 描画・構成・JSON タブ・保存済み作品 JSON は、実際に使われた `stage1_model` / `stage2_model` に加えて `render_build_number`・`render_color_profile`・`render_engine_id`・`render_engine_version`・`ddl_version`・`ddl_engine_version`・`render_canvas_aspect`・`render_hash`・`render_hash_short`・`render_color_catalog_id`・`render_color_catalog_name`・`render_color_catalog_sub`・`render_color_map`・`instruction_lang_requested`・`instruction_lang_resolved`・`ui_lang`・`render_seed` を含む。resource-awareなScore 0.10演奏はさらに`resource_execution`へ、Scoreから再計算した需要、予算超過で省略した原子単位と原因、target省略に伴うrelation省略を記録する。hostが渡す色表の値が`#rrggbb`でなければ、描画coreはその値を描画に使わない。名前つきの色はその既定の色で、カタログの項目（`palette:<name>`）などは使わずに描画を続け、描画のmetadataの`render_warnings`に`{"kind": "invalid_color", "name": …}`を残す（値は残さない）。hostはこれを作品とともに表示し、ログに記録する。Serverはどの描画でもログに記録し、パイプラインの作品では警告があるときだけ診断に残して作品と一緒に保存し、`/api/render-score`の応答にも載せる。Webは作品の診断の一覧に出す。保存したScoreの再演をcoreが断ったときは、Serverはcoreの固定の種類で422を返し（Webはページの言語で理由を書く）、coreの説明をログに記録する。`ddl_version` と `ddl_engine_version` は、その絵を決めた DDL 層の版である。描画応答は必ず両方を積み、保存済み作品では版を記録する前に保存した古い行にだけ欠ける。抽象色と `palette:<name>` は SVG 描画に使った `#RRGGBB` へ展開して記録する。カタログの `map` / `swatches` / `palette` の全体は render JSON へ複製しない — 再演奏と監査に要る具体の記録は `render_color_map` だからである。`score.canvas` は楽譜レベルのキャンバス指示のままで、`render_canvas_aspect` はこの描画作品が実際に使ったキャンバス比を記録する。v2.13.14 から両者は食い違いうる — Stage 2 はどの紙のために組むのかを告げられ、そこで宣言した比は「構図が何のために組まれたか」の記録として残り、実際に演奏した紙は `render_canvas_aspect*` が持つ。それ以前に保存した作品は両方に要求比が入っている。描き直しは演奏した紙を作品の行から読むので、古い作品は以前とまったく同じに描き直る。新しいメタデータでは `render_canvas_aspect_id` が明示のキャンバス比識別子、`render_canvas_aspect_ratio` が実際に描画した幅／高さの比を数値で持つ。`render_canvas_aspect` は互換のために残り、古い記録は応答の中でそこから新しい id と比を導いて補える。
 
-`背景を<抽象色>で埋める。` は面の指定ではなく、typed documentが所有する`background`を指定する有限構文である。sourceで明示した背景はhost contextより優先してScoreへ届ける。背景を省略した場合と複数背景が衝突した場合はcontext backgroundを使い、後者だけをtyped diagnosticとして残す。背景markerを持つ句で色のheadまたは背景actionが成立しない場合は、そのsource spanと理由を局所diagnosticとして保持し、canonical identityの欠落だけへ置き換えない。語を別の色や背景構文へ補正せず、resource-aware実行はその句だけを省略して独立した描画を続けられる。`埋める`は面または領域を密に満たし、`散らす`は要素を不規則に散布し、`敷き詰める`は図形を規則的・反復的に配置する。これらの意味を互いに読み替えない。typed fill planは全画面、既存named area、またはinlineの単一閉primitiveをtargetとして、同じ領域内の密な不規則配置とclip recipe、targetのsource owner、geometry、count provenanceを保持する。省略countは`ceil(A / d²)`で決め、明示countは保つ。群の混在countは明示分を引いた残りareaを省略種の平均`d²`で割り、ほぼ均等に配って余りをsource順に置き、各省略種を最低1とする。all-explicitは密度計算をしない。Macroは一つのmotifとしてbody、内部count、内側Transformを保ったreference footprintを使い、outer count、seed、material、instruction angle、performed relation移動からは影響を受けない。無面積/open target、numeric motif area、overflowは局所diagnosticで他描画を続ける。resource-aware compilerはこれをScore 0.10のcompact `fill_groups`へ保存し、個体座標を焼き込まず、ownerとnamespace内ordinal、count origin、target geometry、境界、sampling recipeを再演奏する。個数と図形はexactに保ち、procedural filter/patternによる個数近似は採用しない。filterは画材のappearanceだけに使える。Display / Editableはappearanceを適用してから境界clipし、Compatはfilterも`clip-path`も使わずgroup全体をbounded geometryへclipする。clip不能なら元sourceまたはcoordinated group全体を省略し、countの一部だけを残さず、独立した後続描画を続ける。`引く`はlineとarcを共通のgeometry、count、place resolverへ一度だけ配送する。source positionが未指定ならNoneのまま保つ。共通resolverは、置く・引く（一か所）なら中の升目を2/3に縮めた`[7/18, 7/18, 11/18, 11/18]`から演奏時位置を選び、並べる・散らす・敷き詰めるなら画面全体を範囲にする（§18）。明示位置は優先し、明示`center`は中の升目を範囲にする。`inku.geometry-resolution-policy.v1`はfill planを含むpayloadを保持し、現行digestは`6b71a20d40f3756406abc758739ce59eb0b0c4f196125fa46304086469a46fba`である。
+`背景を<抽象色>で埋める。` は面の指定ではなく、typed documentが所有する`background`を指定する有限構文である。sourceで明示した背景はhost contextより優先してScoreへ届ける。背景を省略した場合と複数背景が衝突した場合はcontext backgroundを使い、後者だけをtyped diagnosticとして残す。背景markerを持つ句で色のheadまたは背景actionが成立しない場合は、そのsource spanと理由を局所diagnosticとして保持し、canonical identityの欠落だけへ置き換えない。語を別の色や背景構文へ補正せず、resource-aware実行はその句だけを省略して独立した描画を続けられる。`埋める`は面または領域を密に満たし、`散らす`は要素を不規則に散布し、`敷き詰める`は図形を規則的・反復的に配置する。これらの意味を互いに読み替えない。typed fill planは全画面、既存named area、またはinlineの単一閉primitiveをtargetとして、同じ領域内の密な不規則配置とclip recipe、targetのsource owner、geometry、count provenanceを保持する。省略countは`ceil(A / d²)`で決め、明示countは保つ。群の混在countは明示分を引いた残りareaを省略種の平均`d²`で割り、ほぼ均等に配って余りをsource順に置き、各省略種を最低1とする。all-explicitは密度計算をしない。Macroは一つのmotifとしてbody、内部count、内側Transformを保ったreference footprintを使い、outer count、seed、material、instruction angle、performed relation移動からは影響を受けない。無面積/open target、numeric motif area、overflowは局所diagnosticで他描画を続ける。resource-aware compilerはこれをScore 0.10のcompact `fill_groups`へ保存し、個体座標を焼き込まず、ownerとnamespace内ordinal、count origin、target geometry、境界、sampling recipeを再演奏する。個数と図形はexactに保ち、procedural filter/patternによる個数近似は採用しない。filterは画材のappearanceだけに使える。Display / Editableはappearanceを適用してから境界clipし、Compatはfilterも`clip-path`も使わずgroup全体をbounded geometryへclipする。clip不能なら元sourceまたはcoordinated group全体を省略し、countの一部だけを残さず、独立した後続描画を続ける。`引く`はlineとarcを共通のgeometry、count、place resolverへ一度だけ配送する。source positionが未指定ならNoneのまま保つ。共通resolverは、置く・引く（一か所）なら中の升目を2/3に縮めた`[7/18, 7/18, 11/18, 11/18]`から演奏時位置を選び、並べる・散らす・敷き詰めるなら画面全体を範囲にする（§18）。明示位置は優先し、明示`center`は中の升目を範囲にする。`inku.geometry-resolution-policy.v1`はfill planを含むpayloadを保持し、現行digestは`0567c999cfa0c5d25e8bfe65a3bd50808c7cad550273a9bb2461c0e74380d4da`である。
 
 位置省略の範囲は、単体・Macro・まとまりで共有する。置く・引くは中の升目を2/3に縮めた領域、並べる・散らす・敷き詰めるは画面全体を範囲にする。fillの対象領域省略も画面全体である。有効な地だけを指定した作品もScore／Planの描画内容であり、別の不成立な描画指示を省略した場合も、地と診断を保持する。背景色だけは省略後の描画内容ではない。省略によってinstructionも有効な地も残らない場合は停止し、背景を残す空Scoreを省略付き成功として保存・配送しない。
 
@@ -168,13 +170,9 @@ PNGは正本SVGを写す派生出力であり、縮小してもSVGの材質・�
 - **一語一意**：歳時記の一つの語は一つの意味だけを持ち、文の中の位置や前後の語で意味を読み分けない。日本語と英語の両方で守り、構文の修飾語（太さ・大きさ）とも同じ語を別の意味で使わない。読み手（Stage 1）が読み書きする下絵の応答の型の値と欄の名も語として扱い、同じ原則に従う。多義や掛詞は記述（§5.1の詩歌の層）の自由であり、読み手がそれを可視DDLの一つの語へ読み解く。
 - **語はその性質のカテゴリに置き、名は意味を言う**：おもては面の技法を、ゆらぎは痕の揺れの形を言う。
 - **構造で伝える**：語は持ち主（歳時記の共有assetと構文の修飾語の表）で変え、下絵の語の一覧・受理行列・応答の型へ投影して読み手に届ける。指示文の説明だけを変えて済ませない。
-- **版を上げて移行する**：語の形・意味・カテゴリを変えるときは、歳時記の版（資料のid。現行は`inku.saijiki.v1`）を上げる。DDLの文書は、読んだ歳時記の版を記録する（欄は次の版とともに加える。欄の無い文書は`inku.saijiki.v1`として読む）。保存済みの文書は旧い版の文法で読み、語の意味ごとに新しい版の語へ一度だけ上書きで書き換える。保存済みのMacro定義も同じく書き換え、作品が持つMacroのlockは新しい定義へ移す（2026-09-29 作者裁定）。文字列は置換しない。保存済みのScoreとSVGは書き換えない。旧い版の読み方は残さず、旧い語を隠れた別名として残したり、位置で読み分けたりして互換を取らない。この移行は語の意味を変えないので新しい変奏を作らず、§12.8の再正規化（作者のDDLを書き換えない）とは別の操作である。
+- **版を上げて移行する**：語の形・意味・カテゴリを変えるときは、歳時記の版（資料のid。現行は`inku.saijiki.v2`）を上げる。DDLの文書は、読んだ歳時記の版を記録する。pipelineの文書と作品の保存に資料のidを書き、欄の無い文書は`inku.saijiki.v1`で書かれたものとする。pipelineは欄の無い文書と、移行でしか通らない定義を`saijiki_migration_required`で止め、hostが移行して上書きで保存する（2026-09-29 作者裁定）。保存済みの文書は旧い版の文法で読み、語の意味ごとに新しい版の語へ一度だけ上書きで書き換える。保存済みのMacro定義も同じく書き換え、作品が持つMacroのlockは新しい定義へ移す（2026-09-29 作者裁定）。文字列は置換しない。保存済みのScoreとSVGは書き換えない。旧い版の読み方は残さず、旧い語を隠れた別名として残したり、位置で読み分けたりして互換を取らない。この移行は語の意味を変えないので新しい変奏を作らず、§12.8の再正規化（作者のDDLを書き換えない）とは別の操作である。
 
-**現行の例外**（歳時記の次の版で改める）：
-- 英語の`large`は、ゆらぎの振幅と大小の両方を言う（§3.1。大きさと同じ句では振幅を`largely`と書き分けている）。
-- おもての`濃い`・`薄い`は形容詞、`薄墨`は素材の名であり、どれも面の技法ではない。
-- ゆらぎの`ゆっくり`・`速く`は、筆の速さではなく、揺れの波の数を決める。
-- 下絵の応答の型では、値`fine`が太さ（細い）と振幅（細かく）、`large`が大小と振幅、`solid`が線種（実線）と面（塗り）を指す。欄の名`place`（位置）と動作の値`place`（置く）も重なる。
+歳時記 v2（2026-09-29）で、v1 の例外は改めた：英語の`large`の二義、おもての`濃い`・`薄い`（形容詞）と`薄墨`（素材の名）、ゆらぎの`ゆっくり`・`速く`（波の数）、下絵の応答の型の値`fine`・`large`・`solid`と欄の名`place`。今は例外を持たない。
 
 ---
 
@@ -257,7 +255,7 @@ MacroのConnectedは、先行するLineを`from`に指定し、任意の数値�
 
 揺らぎparameterはasset category `variation`のまま、任意のclosed `dimension`（`amplitude` / `frequency` / `quality` / `spread`）で候補を制限できる。例は`{"type":"semantic_ref","category":"variation","dimension":"amplitude"}`である。SemanticRefの`dimension`はvariation以外では禁止し、省略／Noneは旧category-only matchingとcanonical bytes / digestを保つ。Someはdefinition digestに含む。Flat Emitは`fluctuation_amplitude` / `fluctuation_frequency` / `fluctuation_quality` / `ink_spread`を使い、値は各dimensionに属する既存`SemanticRef { category: variation, id }`である。Field名は語義identityを変更しない。Definition、component `use`、binding、実行境界で同じ現行7語の分類を検査する。
 
-保存済みMacroDefinitionの旧`variation:trembling`と`variation:blurring`は、定義のcanonical bytes／digestとlockを変えずに受理し、それぞれ従来のPerlinとPinkへ届ける。旧`place:middle`は従来どおり`center`と同じcanonical identityを保つ。これは共有の保存形式互換であり、特定plugin名への分岐や歳時記への旧語の再追加ではない。新しい定義はcanonicalな`swaying`や独立した`ink_spread:bleeding`を使い、本文変更は新しいdefinition version／digestで識別する。保存済みconfigを現在のcatalog定義へ差し替えない。ただし、歳時記の版の移行（§3.3）では、保存済みのMacro定義を新しい版の語へ書き換え、作品が持つlockを新しい定義へ移す（2026-09-29 作者裁定）。
+v1が保存済みMacroDefinitionのために受理した旧`variation:trembling`・`variation:blurring`・`place:middle`は、歳時記 v2 の移行でそれぞれ`swaying`・`ink_spread:bleeding`・`center`へ書き換え、v2は受理しない（2026-09-29 作者裁定）。blurringが描いたPinkの揺れはDDLから届かなくなり、保存済みScoreにだけ残る。本文変更は新しいdefinition version／digestで識別し、保存済みconfigを現在のcatalog定義へ差し替えない。ただし、歳時記の版の移行（§3.3）では、保存済みのMacro定義を新しい版の語へ書き換え、作品が持つlockを新しい定義へ移す（2026-09-29 作者裁定）。移行した定義は版を変えず、digestだけが変わる。同梱の`Nature.leaves`も同じ移行で書き換え、版は2.0.0のままである。
 
 宣言parameterはすべて必須である。三parameterを宣言してcallerが一値だけならMissingCompatibleFact等のbinding errorとなる。一振幅parameterだけを宣言してEmitへ届けた場合は、§13.6の同じresolverが残る二slotを解決する。未宣言callerの推測overlay、generic variation一fieldからの三slot推測、parameter optional化は行わない。
 
@@ -987,7 +985,7 @@ Stage 1は記述から可視DDLを作り、Stage 2はcompilerが報告したknow
 
 Stage 1 は自由記述を、書き手が観察・編集できる正規化 DDL へ有限に写す。原文の明示要素・数量・色・素材・関係を保ち、隠れた視覚要素や「美しい」解釈を追加しない。語彙、閉じた schema、制限値、出典をプロンプト lock として渡し、出力はその lock の内側だけを使う。これは I-640 で同期した有限 typed normalization 契約であり、特定のモデル名やモデル階級を正本にしない。
 
-**下絵（Stage 1 prompt `inku.typed-stage1-work-plan-prompt.v1`。実装の識別子は`work_plan`、2026-09-25より前の文書では「作品計画」）**：初回生成のLLMは可視DDLの文字列を書かず、閉じた型の下絵JSONを返す。下絵は単独図形命令の層（最大8）と地・背景からなり、各値は歳時記asset、parserの有限修飾語形、揺らぎの分類、Scoreの濃淡値から投影したenumである。形（と比率語）ごとに使える値は、compilerへ一文ずつ問い合わせて生成した受理行列`inku.work-plan-capabilities.v1`が定め、共有Rustの検証が正本になる（providerのdecoding強制には依存しない）。範囲外の値はfield単位で未指定、形の無い層はその層だけを除き、描画を止めない。正規化した下絵は要求言語の可視DDLへ決定的に印字され、その文字列だけが既存compilerへ渡る。受理行列と日英の性質試験により印字DDLは全層が診断なしでcompileされるので、初回生成の句が捨てられることはない。応答schemaはobject・array・string enum・有界integerだけを使い、既存の全provider輸送がそのまま運ぶ。保存済み実行の再生のため、`normalized_ddl`を持つ旧応答はそのまま読む。下絵は一時物で、正本は可視DDLとScoreである。作者の直接DDLと編集DDLは従来どおり全文法で解析し、下絵の型の部分集合に制限しない。登録プラグインがあるとき、下絵は任意の`plugins`（その要求で登録済みの修飾名だけの閉じた列挙、最大4）を持てる。Stage 1のsystem promptは登録プラグインの名前と要約を示し、記述にプラグイン名の見出しの語かその言い換えが書かれたときだけ選び、季節・場所・似た物からの連想では選ばない規則を与える。選んだプラグインは名前だけの文として背景の後・層の前に印字する（引数を持たない定義で診断の出ない形）。日本語のDDLでは別名（`Nature.若葉。`）、英語のDDLでは正式名（`Nature.YoungLeaves.`）で書く（§4.13）。下絵の列挙は正式名で、応答が別名を返しても正式名として受ける。登録が無い環境では`plugins`もその節も出さず、schemaとpromptは従来と同じになる。コア語彙が主で、Macroは付加機能である。
+**下絵（Stage 1 prompt `inku.typed-stage1-work-plan-prompt.v1`。実装の識別子は`work_plan`、2026-09-25より前の文書では「作品計画」）**：初回生成のLLMは可視DDLの文字列を書かず、閉じた型の下絵JSONを返す。下絵は単独図形命令の層（最大8）と地・背景からなり、各値は歳時記asset、parserの有限修飾語形、揺らぎの分類、Scoreの濃淡値から投影したenumである。値はその語の英語をそのまま使い（空白とハイフンは`_`）、欄の名も意味を言う（`position`・`handling`・`motion_spacing`など。下絵の型`inku.work-plan.v2`、歳時記 v2）。形（と比率語）ごとに使える値は、compilerへ一文ずつ問い合わせて生成した受理行列`inku.work-plan-capabilities.v2`が定め、共有Rustの検証が正本になる（providerのdecoding強制には依存しない）。範囲外の値はfield単位で未指定、形の無い層はその層だけを除き、描画を止めない。正規化した下絵は要求言語の可視DDLへ決定的に印字され、その文字列だけが既存compilerへ渡る。受理行列と日英の性質試験により印字DDLは全層が診断なしでcompileされるので、初回生成の句が捨てられることはない。応答schemaはobject・array・string enum・有界integerだけを使い、既存の全provider輸送がそのまま運ぶ。保存済み実行の再生のため、`normalized_ddl`を持つ旧応答はそのまま読む。下絵は一時物で、正本は可視DDLとScoreである。作者の直接DDLと編集DDLは従来どおり全文法で解析し、下絵の型の部分集合に制限しない。登録プラグインがあるとき、下絵は任意の`plugins`（その要求で登録済みの修飾名だけの閉じた列挙、最大4）を持てる。Stage 1のsystem promptは登録プラグインの名前と要約を示し、記述にプラグイン名の見出しの語かその言い換えが書かれたときだけ選び、季節・場所・似た物からの連想では選ばない規則を与える。選んだプラグインは名前だけの文として背景の後・層の前に印字する（引数を持たない定義で診断の出ない形）。日本語のDDLでは別名（`Nature.若葉。`）、英語のDDLでは正式名（`Nature.YoungLeaves.`）で書く（§4.13）。下絵の列挙は正式名で、応答が別名を返しても正式名として受ける。登録が無い環境では`plugins`もその節も出さず、schemaとpromptは従来と同じになる。コア語彙が主で、Macroは付加機能である。
 
 初回の解釈では、記述全体の役割、対比、反復、疎密、余白、質感を短い視覚的構成へまとめる。短さを、必要な複数の役割を中央の一要素へ縮めることや、各名詞を一図形へ対応させることと混同しない。明示数量を最優先し、数量が明示されていない反復は文脈から数量を選んで可視DDLへ記す。単語と数量帯の対応表、決め打ちの最低数、一律の増量は使わず、数や文の多さ自体を品質目標にしない。
 
@@ -1043,7 +1041,7 @@ Typed Stage 1 requestは、Saijikiから導出した有限語彙、解決済みc
 
 Hole補完の要求には、対象の原文、確定済みtyped fact、有限Saijiki語彙と受理構文を渡す。未認識語句も原文へ残し、compilerが依存を確定した参照先等は必要な範囲だけ読取り専用の文脈として渡せる。読む範囲と編集可能範囲を分け、description、無関係なclause、Score、renderer指示、思考過程は渡さない。複数の色や道具だけから交互配置・順序・数量分配を発明せず、表現できない意味を最も近い別の意味へ変更しない。
 
-この補完は語順、用語の出現位置や組合せ、自然な言い換えの揺らぎを既存文法へ正規化するためのものであり、表層の語や位置を逐語的に固定しない。「中央付近」を既存の中央・中心の位置語へ言い換えることは許容し、数値座標を発明しない。既存機能で描画できない箇所は未対応診断を表示・記録し、残りを可能な限り描画する。補完のために新文法、Score型、描画機能を追加する契約ではない。
+この補完は語順、用語の出現位置や組合せ、自然な言い換えの揺らぎを既存文法へ正規化するためのものであり、表層の語や位置を逐語的に固定しない。「中央付近」や「中央」を既存の位置語「中心」へ言い換えることは許容し、数値座標を発明しない。既存機能で描画できない箇所は未対応診断を表示・記録し、残りを可能な限り描画する。補完のために新文法、Score型、描画機能を追加する契約ではない。
 
 描画headまたはrelationを含む補完要求には、既存の修飾語・数量・動作・位置の結合構文を短く示し、語の種類と確定したownerの役割を区別する。未結合語彙の役割は原文の文脈から判断し、確定bindingの不在だけを明示意味の削除や推測の根拠にしない。位置指定のないscatterの分布領域は既定でcanvas寸法となり、そのextentだけを重複して述べる表現は受理構文へまとめられるが、明示された領域や位置を既定と同一視しない。固定参照句は既存Saijiki assetから要求言語で投影する。未知の参照表現にはrelation factがまだない場合もあるため、そのfactの認識だけを案内の前提にしない。新しいalias、文法、応答fieldは追加せず、確定fact・owner・数量・診断の検証を維持する。
 
@@ -1241,7 +1239,7 @@ Object sizeの基準はcanvas短辺で、count・cell・密度に依存しない
 
 名前の位置（位置の省略を含む）の散らすは、範囲の各軸の物理長さをdomainとし、群の重心を範囲の中心へ置く（§18）。並べるはcanvasの各軸の物理長さをdomainとし、列の重心を範囲の中心へ置く。数値位置の非Gridのdomainはcanvasの各軸の物理長さで、群の重心を数値のanchorへ置く。方向省略のline-upは、名前の範囲が画面の割合で縦に長ければ縦一列、それ以外は横一列で、幅Wをn分したcellの中央、同じ縦中央に置く式を保持する。TileはW>=Hならcolumns=min(n,max(1,ceil(sqrt(n*W/H))))、rows=ceil(n/columns)、H>Wなら同じ式を長辺のrowsへ適用しcolumns=ceil(n/rows)とする。行優先でn個だけを満たし、rows / columns / cell寸法 / filled countを解決する。Numeric anchorへはfilled prefixのexact重心を平行移動し、named Gridは元region内に置いて重心補正しない。Scatterは矩形のX/Y一様samplingと群の重心をanchorへ移すrecipeだけを持ち、既存performance seedと元owner / instance ordinalを後続materializationへ要求する。Composition seedの代用、乱数実行、fit縮小、個数変更、反発や最小間隔の追加は行わない。例えば1200×800 / 800×1200のnormal circle直径は共に192、4個のline-up間隔は300 / 200、8個のtileは4列2行 / 2列4行である。
 
-配置方向はoptionalなinstruction / Emitの`layout_direction`が所有し、entityの`angle`と独立する。「中央に、横線を縦に三本並べる。」「中央に、斜めの線を横に三本並べる。」と英語のaction-prefix / shape adjective / direction adverbを同じtyped入口で扱う。日本語の「に」のphrase証拠、英語の既存angle rowのadverb形で役割を分ける。Compiler専用parser aliasはprompt・display・legacy markerを変えない。Single-head continuationの方向も元entityへmergeし、競合は停止する。Field不在のcanonical / provenance bytesは保ち、存在時だけ意味と完全な出典を含める。
+配置方向はoptionalなinstruction / Emitの`layout_direction`が所有し、entityの`angle`と独立する。「中心に、横線を縦に三本並べる。」「中心に、斜めの線を横に三本並べる。」と英語のaction-prefix / shape adjective / direction adverbを同じtyped入口で扱う。日本語の「に」のphrase証拠、英語の既存angle rowのadverb形で役割を分ける。Compiler専用parser aliasはprompt・display・legacy markerを変えない。Single-head continuationの方向も元entityへmergeし、競合は停止する。Field不在のcanonical / provenance bytesは保ち、存在時だけ意味と完全な出典を含める。
 
 Line-upだけが方向を配置へ届ける。省略は、名前の範囲が画面の割合で縦に長いとき縦一列、それ以外は従来の横一列で、明示horizontalは同じ式でも元の明示identityを保持する。t=(i+1/2)/n-1/2としてanchorからのoffsetはhorizontal=(tW,0)、vertical=(0,tH)、rising=(ts,-ts)、falling=(ts,ts)、s=min(W,H)である。Y下向きの物理座標で斜めは45度とし、長方形の対角線へ引き伸ばさない。Bare diagonalはattestされたoptional composition seed（NoneとSome(0)を区別）、元pre / expanded meaning、元logical occurrenceを専用layout-direction roleでframeして二軸から選ぶ。Shape angleの選択scheme・size・countは変えず、variation / render seedやsource spellingを方向選択へ使わない。Pointにも方向は届くがPoint自身のangleは拒否する。Place / Scatter / Tileやrotated等の未対応layout directionは、そのfieldだけを元owner・span・理由付きで省略し、方向を外して成立するinstruction / Emitの本体・明示個数・動作・位置を保持する。方向をentity angleへ転用しない。group / relationの未対応構造や他の不成立理由は既存単位で省略し、全省略は両mode停止する。既存Score入口も未対応fieldを黙って捨てて完全成功とは扱わない。
 
@@ -1390,7 +1388,7 @@ typed identityとして保持し、対応範囲のdirect instructionとflat Macr
 
 #### 道具別の塗りと濃淡
 
-閉じた塗りは、選んだ道具の質感を持つ。Score 0.3.0以後の`surface_intensity`は`normal`（省略時）／`dense`／`faint`で、通常の値はwire出力へ追加しない。保存済みScore 0.1.0／0.2.0／0.3.0は元の版を保持して読み書きする。通常DDLとMacroは同じ濃淡を共通lowererから渡し、反復planも個体生成前のappearanceへ保持する。濃淡だけを変えて、選択色のidentity、図形や筆跡を決めるseedを変えない。
+閉じた塗りは、選んだ道具の質感を持つ。Score 0.3.0以後の`surface_intensity`は`normal`（省略時）／`dense`／`faint`で、通常の値はwire出力へ追加しない。濃淡は平らな塗り以外の痕（線・弧・質感の面）にも届き、道具の不透明度を`faint`は0.55倍、`dense`は1.35倍（不透明まで）にする。平らな塗り以外の痕に濃淡を持つScoreは0.17.0である（render engine 72）。保存済みScore 0.1.0／0.2.0／0.3.0は元の版を保持して読み書きする。通常DDLとMacroは同じ濃淡を共通lowererから渡し、反復planも個体生成前のappearanceへ保持する。濃淡だけを変えて、選択色のidentity、図形や筆跡を決めるseedを変えない。
 
 | 道具 | 塗りの表現 |
 |---|---|
@@ -1423,24 +1421,24 @@ Saijiki（歳時記）に「ゆらぎ（movements）」カテゴリを追加す�
 | 次元 | 語彙 |
 |---|---|
 | 振幅 | 細かく、大きく |
-| 周波数 | 速く、ゆっくり |
+| 周波数 | 小刻みに、ゆるやかに |
 | 質 | 揺れる、波打つ |
 | 広がり | にじみ |
 
-`にじみ`はゆらぎの一語であり、`ink_spread:"bleed"`を独立に届ける。DisplayとEditableでは輪郭と面の痕を合わせてから適用する。Compatでは痕を残してにじみを省き、`texture_degraded`に記録する。Wave / Perlinや点描surfaceと併用できるが、単独でPerlinを補わず、強度語を増やさない通常の広がりに留める。`滲む` / `blurring`は現行入力ではこの語へ正規化する。
+`にじみ`はゆらぎの一語であり、`ink_spread:"bleed"`を独立に届ける。DisplayとEditableでは輪郭と面の痕を合わせてから適用する。Compatでは痕を残してにじみを省き、`texture_degraded`に記録する。Wave / Perlinや点描surfaceと併用できるが、単独でPerlinを補わず、強度語を増やさない通常の広がりに留める。v1の`滲む` / `blurring`は、歳時記 v2 の移行でこの語へ書き換え、v2は読まない。
 
 **英語版「movements」:**
 
 | Dimension | Vocabulary |
 |---|---|
-| amplitude | fine, large |
-| frequency | quickly, slowly |
+| amplitude | narrowly, broadly |
+| frequency | tightly, loosely |
 | quality | swaying, undulating |
 | spread | bleeding |
 
 配置のばらつきは ゆらぎ ではなく、うごき（散らす）と arrangement（layout / path / jitter）が担う。
 
-Shared compilerでは、通常DDLと宣言済みflat Macroが一つのresolverを通る。`fine` / `large`はFine / Broad、`slowly` / `quickly`はSlow / High、`swaying`はPerlin、`undulating`はWaveへ写す。`bleeding`は独立した`ink_spread:"bleed"`へ届く。旧語の`trembling`と`blurring`は先にそれぞれ`swaying`と`bleeding`へ正規化する。振幅／周波数／質の三slotが全て無ければ`Instruction.variation=None`、一つ以上あれば不足するslotだけをMedium / Medium / Perlinで補う。明示値が優先し、三次元は独立である。`swaying`からFineやHighを推測せず、にじみ単独でvariationを追加しない。Sourceやtyped meaningへdefaultを注入せず、既存geometry-resolution-policyのauthor-resolved omissionがこの共通定義をattestする。
+Shared compilerでは、通常DDLと宣言済みflat Macroが一つのresolverを通る。`narrowly` / `broadly`はFine / Broad、`loosely` / `tightly`はSlow / High、`swaying`はPerlin、`undulating`はWaveへ写す。`bleeding`は独立した`ink_spread:"bleed"`へ届く。v1の語（`fine`・`large`・`slowly`・`quickly`・`trembling`・`blurring`）は、歳時記 v2 の移行で書き換え、v2は読まない。振幅／周波数／質の三slotが全て無ければ`Instruction.variation=None`、一つ以上あれば不足するslotだけをMedium / Medium / Perlinで補う。明示値が優先し、三次元は独立である。`swaying`からFineやHighを推測せず、にじみ単独でvariationを追加しない。Sourceやtyped meaningへdefaultを注入せず、既存geometry-resolution-policyのauthor-resolved omissionがこの共通定義をattestする。
 
 ### 13.7 Nature plugin による現象の揺らぎ
 
@@ -1510,9 +1508,9 @@ JSON Score の `variation` フィールドは、次元ごとに分離した構�
 
 `quality` の使い分けは以下を基本とする。
 
-- `perlin`: 「震える」「細かく揺れる」などの微細で不規則な線の揺らぎ
-- `wave`: 「ゆっくり揺れる」「波打つ」などの低周期で読み取りやすいうねり
-- `pink`: 「滲む」などの境界のぼかし
+- `perlin`: 「揺れる」「細かく揺れる」などの微細で不規則な線の揺らぎ
+- `wave`: 「ゆるやかに揺れる」「波打つ」などの低周期で読み取りやすいうねり
+- `pink`: 境界のぼかし。歳時記 v2 のDDLの語からは届かず、保存済みScoreに残る
 - `white`: 粗いノイズ的なばらつき
 
 Shared compilerの明示揺らぎは常に`dimensions=["position_x","position_y"]`を使う。Lineは既存の直交方向、Arcとcircle / ellipse / square / cloudform / triangle / polygonは既存の内外方向のconsumerで演奏する。短線threshold、noise、seed、geometry、位置、angle、thinness、material、関係端点の契約を変更しない。Pointと未対応shapeへの明示variationは拒否する。Stage 1.5のfocus-only変奏とは別である。
@@ -1821,7 +1819,7 @@ relation は記述者が Stage 1 または direct typed DDL で明示した場�
 
 雲形が受け取る修飾はすべて既存語彙で表す:
 
-- **ゆらぎ** → 輪郭のオクターブ配分(細かく / 大きく / 波打つ / 震える / 滲む)
+- **ゆらぎ** → 輪郭のオクターブ配分(細かく / 大きく / 波打つ / 揺れる / にじみ)
 - **わりあい** → 縦横比(縦長の雲形 / 横長・全幅の雲形——霞の帯はこれで書ける)
 - **てざわり** → 輪郭の筆致(道具文法)
 - **surface / いろ** → 内部の質感と色
@@ -1913,7 +1911,7 @@ PoC と初期機能の完了記録は [CHANGELOG.ja.md](CHANGELOG.ja.md) と [�
 | center | [1/3,1/3,2/3,2/3]（中の升目） |
 | corner | 左上[0,0,1/5,1/5]、右上[4/5,0,1,1/5]、左下[0,4/5,1/5,1]、右下[4/5,4/5,1,1]の一つ |
 
-`center`（中心・中央、middle）は中の升目で、置くときの基準点は`[7/18,7/18,11/18,11/18]`から選ぶ。位置を省いて置いた図形と同じである。Anchorの`center`だけは一点(0.5, 0.5)である。四辺は狭い帯であり固定点ではない。
+`center`（中心）は中の升目で、置くときの基準点は`[7/18,7/18,11/18,11/18]`から選ぶ。位置を省いて置いた図形と同じである。Anchorの`center`だけは一点(0.5, 0.5)である。四辺は狭い帯であり固定点ではない。
 隅はStage 2が`inku.score-place-selection.v1`専用domainで選ぶ。Verified original pre / expanded meaning
 digest、NoneとSome(0)を区別するtag付きcomposition seed、directの元logical ordinalまたはMacroのsemantic
 ordinal / expansion path / generated ordinalをframeし、SHA-256先頭byteのmodulo 4を左上・右上・左下・右下へ写す。

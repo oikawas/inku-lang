@@ -1,6 +1,6 @@
 """inku 歳時記 (Saijiki) — Server 表示・保存互換 projection.
 
-生成語彙の正は共有 core の ``assets/saijiki-v1.json`` にある。このテーブルは
+生成語彙の正は共有 core の ``assets/saijiki-v2.json`` にある。このテーブルは
 その内容と同期し、Server 側の次の読み取り用途へ投影する:
 
 - プラグイン閉包マーカー (plugins/document_format.py)
@@ -205,12 +205,22 @@ SAIJIKI: tuple[SaijikiCategory, ...] = (
         words=(
             _w("空", "empty", default=True, score_value="none"),
             _w("塗り", "flat", score_value="solid"),
-            _w("薄墨", "pale ink wash", score_value="wash"),
+            _w("刷き", "sweep", score_value="sweep"),
             _w("粒", "grain", score_value="grain"),
-            _w("点描", "stipple", score_value="stipple", parser_surfaces_ja=("点",)),
+            _w("点描", "stipple", score_value="stipple"),
             _w("平行線", "hatch", score_value="hatch"),
             _w("交差線", "crosshatch", score_value="crosshatch"),
             _w("アクアチント", "aquatint", score_value="aquatint"),
+        ),
+    ),
+    SaijikiCategory(
+        key="sabaki",
+        name_ja="さばき",
+        name_en="handling",
+        # How the ink or paint is laid on any mark, apart from the surface quality;
+        # like おもて it says how a mark is made, so the plugin closure never quotes it.
+        marker_class=None,
+        words=(
             _w("濃い", "dense"),
             _w("薄い", "faint"),
         ),
@@ -261,19 +271,10 @@ SAIJIKI: tuple[SaijikiCategory, ...] = (
         name_en="movements",
         marker_class="variation",
         words=(
-            _w(
-                "細かく",
-                "fine",
-                english_grammar=_EnglishGrammar(
-                    lemma="fine",
-                    lexical_class="adjective",
-                    canonical_form="base",
-                    permitted_forms=("adverb",),
-                ),
-            ),
-            _w("大きく", "large"),
-            _w("ゆっくり", "slowly"),
-            _w("速く", "quickly"),
+            _w("細かく", "narrowly"),
+            _w("大きく", "broadly"),
+            _w("ゆるやかに", "loosely"),
+            _w("小刻みに", "tightly"),
             _w(
                 "揺れる",
                 "swaying",
@@ -283,8 +284,6 @@ SAIJIKI: tuple[SaijikiCategory, ...] = (
                     canonical_form="present_participle",
                     permitted_forms=("third_person_singular",),
                 ),
-                parser_surfaces_ja=("震える",),
-                parser_surfaces_en=("trembling", "trembles"),
             ),
             _w(
                 "波打つ",
@@ -296,7 +295,7 @@ SAIJIKI: tuple[SaijikiCategory, ...] = (
                     permitted_forms=("third_person_singular",),
                 ),
             ),
-            _w("にじみ", "bleeding", parser_surfaces_ja=("滲む",), parser_surfaces_en=("blurring",)),
+            _w("にじみ", "bleeding"),
         ),
     ),
     SaijikiCategory(
@@ -307,7 +306,7 @@ SAIJIKI: tuple[SaijikiCategory, ...] = (
         words=(
             _w("上", "top"),
             _w("下", "bottom"),
-            _w("中心", "center", parser_surfaces_ja=("中央",), parser_surfaces_en=("middle",)),
+            _w("中心", "center"),
             _w("左端", "left-edge"),
             _w("右端", "right-edge"),
             _w("上端", "top-edge"),

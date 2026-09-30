@@ -324,11 +324,16 @@ def _parse_commit(owner_id: str, action: Mapping[str, Any]) -> _Commit:
             "request_digest does not identify the commit payload"
         )
 
-    document = _mapping(
-        payload["document"],
-        "document",
-        keys=frozenset({"source", "language", "macro_locks"}),
-    )
+    # A document written with the current Saijiki names its edition; a saved one without
+    # the field was written with v1 (SPEC §3.3), and the core refuses it until migrated.
+    document_keys = frozenset({"source", "language", "macro_locks"})
+    if isinstance(payload["document"], Mapping) and "saijiki" in payload["document"]:
+        document_keys |= {"saijiki"}
+    document = _mapping(payload["document"], "document", keys=document_keys)
+    if "saijiki" in document and (
+        not isinstance(document["saijiki"], str) or not document["saijiki"]
+    ):
+        raise VariationAuthorityAdapterError("document saijiki edition must be a name")
     source = document["source"]
     if not isinstance(source, str):
         raise VariationAuthorityAdapterError("document source must be UTF-8 text")

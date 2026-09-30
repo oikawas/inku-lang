@@ -394,7 +394,7 @@ fn project_atom(atom: &ClauseAtom, source: &str) -> ExpectedAtom {
             relation_type,
             ..
         } => {
-            assert_eq!(asset_id, "inku.saijiki.v1");
+            assert_eq!(asset_id, "inku.saijiki.v2");
             assert_eq!(surface, &source[span.start_byte..span.end_byte]);
             assert_eq!(canonical_identity.kind.as_str(), relation_type);
             format!(

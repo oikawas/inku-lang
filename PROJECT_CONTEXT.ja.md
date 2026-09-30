@@ -90,7 +90,7 @@ JSON Scoreのキーは英語で統一する。
 - 品質指標、類似度、Vision所見は監査の鏡であり、生成ゲートや「最良枝」の自動選択に接続しない。
 - 言語上のmacroはdomain別codeや個別文法を足さず、一つの汎用`MacroDefinition`形式で
   記述する。保存済みMacro定義と旧作品のScore／SVGは互換性を保ち、新作の意味は共有compilerが決定する。
-- 語彙の正本は共有Rustの`core/crates/inku-ddl/assets/saijiki-v1.json`である。共有Stage 1 promptはそのprojectionを使い、Serverの表示表・Web／Android歳時記・referenceも同じ語彙へ揃える。
+- 語彙の正本は共有Rustの`core/crates/inku-ddl/assets/saijiki-v2.json`である。共有Stage 1 promptはそのprojectionを使い、Serverの表示表・Web／Android歳時記・referenceも同じ語彙へ揃える。
 - 日本語と英語の挙動を揃え、英語だけの要件を追加しない。
 - **エンジンは後戻りしない**（SPEC.ja §15.8）。
 過去の描画エンジンをシステムとして保持せず、版を選び直す機構も作らない。
@@ -117,7 +117,7 @@ Replay は常に最新で行い、当時のエディションの再現は**保�
 
 ### 語彙
 
-正本は共有Rustの `core/crates/inku-ddl/assets/saijiki-v1.json` で、Serverの `schema.py` の Literal と saijiki テーブル（`saijiki.py`）はその投影である。
+正本は共有Rustの `core/crates/inku-ddl/assets/saijiki-v2.json` で、Serverの `schema.py` の Literal と saijiki テーブル（`saijiki.py`）はその投影である。
 
 - 図形 9 — `line` / `circle` / `ellipse` / `triangle` / `square` / `polygon` / `arc` / `point` / `cloudform`
 - 線種 4 — `solid` / `dashed` / `dotted` / `dash_dot`
@@ -152,7 +152,7 @@ Androidのmain preview、thumbnail、PNG exportはcanonicalな保存済み／現
 面の質感（平行線・交差線）は行の両端を輪郭で切るので、それを持つ図形の中だけに残る。
 切るのは描く前の座標計算なので、フィルタを使わない profile でも同じ形に収まり、
 角度・間隔・濃さの傾きは切る前と 1 つも変わらない。
-薄墨は掃きの幅が間隔と同じかそれより広いので、掃きと掃きのあいだに紙が残らない面になる
+刷き（と保存済みScoreの薄墨）は掃きの幅が間隔と同じかそれより広いので、掃きと掃きのあいだに紙が残らない面になる
 （縞ではない）。1 本ずつの濃さはそのぶん薄く、重なって出る濃さが読み手の見る濃さである。
 地は名前で呼べる 7 つの支持体（紙・和紙・薄墨地・木炭地・カンバス・画用紙・メゾチント）で、
 **`<pattern>` のタイルとして敷く。フィルタは 1 つも使わないので、3 つの profile がまったく同じ地を出す。**

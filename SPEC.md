@@ -132,18 +132,19 @@ The vocabulary dictionary is called Saijiki, following the haiku term for a
 seasonal word dictionary.  In inku, Saijiki is consulted rather than kept open
 at all times.
 
-The core vocabulary consists of twelve Saijiki categories plus relations. Its source of truth is the shared Rust asset `core/crates/inku-ddl/assets/saijiki-v1.json`; the Server Saijiki table and Web / Android displays follow the same vocabulary. The machine-generated reference dump (`GET /api/reference` / `inku-cli reference`) publishes the current values; the table below is an overview, and reference §1 decides additions and removals.
+The core vocabulary consists of thirteen Saijiki categories plus relations. Its source of truth is the shared Rust asset `core/crates/inku-ddl/assets/saijiki-v2.json`; the Server Saijiki table and Web / Android displays follow the same vocabulary. The machine-generated reference dump (`GET /api/reference` / `inku-cli reference`) publishes the current values; the table below is an overview, and reference §1 decides additions and removals.
 
 | English | Japanese | Vocabulary |
 | --- | --- | --- |
 | forms | かたち | circle, ellipse, triangle, square, line, arc, cloudform |
 | touches | てざわり | silverpoint, pencil, pen, rotring, crayon, chalk, fine-brush, thick-brush, oil paint, burin, drypoint, computer |
 | continuity | つらなり | solid, dashed, dotted, dash-dot |
-| surfaces | おもて | empty, flat, pale ink wash, grain, stipple, hatch, crosshatch, aquatint, dense, faint |
+| surfaces | おもて | empty, flat, sweep, grain, stipple, hatch, crosshatch, aquatint |
+| handling | さばき | dense, faint |
 | grounds | じ | paper, washi, ink-wash ground, charcoal ground, canvas, drawing paper, mezzotint |
 | motions | うごき | place, line-up, draw, scatter, fill, tile |
 | order | じゅん | alternating, in order |
-| movements | ゆらぎ | fine, large, slowly, quickly, swaying, undulating, bleeding |
+| movements | ゆらぎ | narrowly, broadly, loosely, tightly, swaying, undulating, bleeding |
 | relations | あいだ | along, not touching, cutting, between, touching, connected — with fixed phrases such as `along the previous line` and `connected to the previous shape` |
 | places | ばしょ | top, bottom, center, left-edge, right-edge, top-edge, bottom-edge, start, end, partway, corner |
 | angles | かたむき | horizontal, vertical, diagonal, rising, falling, rotated |
@@ -177,29 +178,31 @@ Canvas format is neither vocabulary nor a plugin. It is a resolved host option o
   ruling, 2026-09-29); the motion words stay verbs of placing
 - the design of the motion vocabulary matters most: place, line up, fill --
   these are the verbs of presentation
-- **the movements category describes irregularities in marks**: "swaying finely",
-  "undulating slowly", and "bleeding" are allowed; "swaying beautifully" and
-  "swaying violently" are excluded (§13 has the detail). English amplitude words may be written as
-  adjectives (`fine`, `large`) or adverbs (`finely`, `largely`). Because
-  amplitude `large` is spelled like the relative size `large`, use `largely`
-  when a size also appears in the same phrase (DDL 12). This spelling rule is
-  the current exception to one word, one meaning (§3.3)
+- **the movements category describes irregularities in marks**: "swaying narrowly",
+  "undulating loosely", and "bleeding" are allowed; "swaying beautifully" and
+  "swaying violently" are excluded (§13 has the detail). Narrowly and broadly
+  set how far a mark sways, loosely and tightly how far apart its waves are
+  (how many waves it has). English amplitude words are adverbs only (`narrowly`,
+  `broadly`), apart from the relative size `large` (Saijiki v2, DDL 16)
 - **the relations category holds observable relations only**: "along" and "not
   touching" are positional relations an outside observer can verify. Words of
   intent or personification, such as "nestling against" or "answering each
   other", are excluded (§14 has the detail). This is the addition of a
   predicate (syntax), not of vocabulary (nouns), so it does not contradict
   plugin principle 1
-- **the surfaces category holds state nouns for surfaces and marks**: use a
-  noun such as "flat", not the act of painting. Its two dimensions are **quality**
-  (empty, flat, pale ink wash, grain, stipple, hatch, crosshatch, aquatint) and
-  **density** (dense, faint). Density is relative to the tool, not an absolute
-  darkness. Paper grain belongs to the support (the grounds category). Grain and
-  wash remain applicable to lines and arcs: grain raises support absorption and
-  tooth, while wash changes no sheet properties and produces a pale band at
-  three times the width and 0.35 of the opacity. The other six qualities move
+- **the surfaces category holds state nouns for the techniques of surfaces and
+  marks**: use a noun such as "flat", not the act of painting. Its words name the
+  quality only (empty, flat, sweep, grain, stipple, hatch, crosshatch, aquatint);
+  density belongs to handling. Paper grain belongs to the support (the grounds
+  category). Grain and sweep remain applicable to lines and arcs: grain raises
+  support absorption and tooth, while sweep changes no sheet properties and
+  produces a band at three times the width. A sweep has no paleness of its own
+  (a line's band at 0.64 of its tool's opacity, a closed shape's sweeps at 0.40;
+  candidates for the comparison sheet); paleness belongs to the handling word
+  faint. A saved Score's `wash` (v1's pale ink wash) still draws as the pale band
+  at three times the width and 0.35 of the opacity. The other six qualities move
   to the preceding closed shape and are dropped when there is none. On a closed
-  shape, an explicit wash, grain, stipple, hatch, crosshatch, or aquatint is
+  shape, an explicit sweep, grain, stipple, hatch, crosshatch, or aquatint is
   itself the area's performance and adds no flat base fill beneath it (DDL
   engine 46). A flat fill comes only from an explicit flat surface or the
   omitted-surface default of a closed shape. Current
@@ -245,7 +248,7 @@ whole canvas as the range of a line-up, scatter, or tile (§18). Explicit
 positions take priority, and an explicit `center` uses the middle cell as its
 range. `inku.geometry-resolution-policy.v1` records omitted
 placement and fill meaning; its current digest is
-`6b71a20d40f3756406abc758739ce59eb0b0c4f196125fa46304086469a46fba`.
+`0567c999cfa0c5d25e8bfe65a3bd50808c7cad550273a9bb2461c0e74380d4da`.
 Single objects, Macros, and coordinated groups share the omitted range: the
 shrunk middle cell for place and draw, and the whole canvas for a line-up,
 scatter, or tile. Fill's omitted target is also the whole canvas. A valid ground alone is
@@ -256,8 +259,13 @@ A background color alone is not drawable residual content. When an omission
 leaves neither an instruction nor valid ground, execution stops instead of
 saving or delivering an empty Score with its background as an omitted success.
 
-  The current vocabulary keeps `stipple` in surfaces as 点描 and moves `bleeding` to movements. It is independent `ink_spread:"bleed"`, so it can combine with Wave, Perlin, and stipple without creating Perlin or an intensity by itself. Legacy `blurring`, `trembling`, and `middle` input normalizes to `bleeding`, `swaying`, and `center`. Saved Scores retain the old rendering meaning of `surface.texture="bleed"` and `variation.quality="pink"`; editing or regenerating creates a new variation.
+  The current vocabulary keeps `stipple` in surfaces as 点描 and moves `bleeding` to movements. It is independent `ink_spread:"bleed"`, so it can combine with Wave, Perlin, and stipple without creating Perlin or an intensity by itself. The old words v1 read as input (`点` for stipple, `滲む` / `blurring`, `震える` / `trembling` / `trembles`, `中央` / `middle`) are rewritten to the current words by the Saijiki v2 migration, and v2 does not read them (§3.3); the shape `点` names the point alone. Saved Scores retain the old rendering meaning of `surface.texture="bleed"` and `variation.quality="pink"`; editing or regenerating creates a new variation.
 
+- **the handling category names how ink or paint is laid on a mark** (Saijiki
+  v2, 2026-09-29): dense and faint, a dimension apart from the surface quality,
+  can go on any mark (a line, an arc, a textured surface, or a flat fill). They
+  are relative to the tool, not an absolute darkness. Words for the movement of
+  the brush, such as its speed, may join this category (§2 item 5)
 - **the grounds category holds the names of supports** (added 2026-08-15, render
   engine 34): **paper, washi, ink-wash ground, charcoal ground, canvas, drawing
   paper, mezzotint** -- the seven values of `canvas.ground.material`. **Where
@@ -265,7 +273,7 @@ saving or delivering an empty Score with its background as an omitted success.
   canvas itself is**, and a description names it as a sentence of its own, such as “washi.” or
   “ink-wash ground.” Headed forms such as `Ground: ...` and `Surface: ...` are
   not accepted (2026-09-24); a surface quality is written as a modifier of its
-  shape, as in “a pale ink wash circle”. **All seven are tiled as a `<pattern>` and use no
+  shape, as in “a sweep circle”. **All seven are tiled as a `<pattern>` and use no
   `<filter>`, so the three SVG profiles emit the same ground.** **The cost limit
   is the byte size of the ground layer (24 KB), not a count of elements.**
 
@@ -406,9 +414,12 @@ under these principles (author's ruling, 2026-09-29).
   vocabulary.
 - **Raise the version and migrate**: a change to a word's form, meaning, or
   category raises the Saijiki version (the asset id, currently
-  `inku.saijiki.v1`). A DDL document records the Saijiki version it was read
-  with (the field arrives with the next version; a document without it is read
-  as `inku.saijiki.v1`). Saved documents are read under their old version and
+  `inku.saijiki.v2`). A DDL document records the Saijiki version it was read
+  with: the pipeline's document and the saved work carry the asset id, and a
+  document without it was written with `inku.saijiki.v1`. The pipeline stops
+  such a document, and a definition that only the migration makes valid, with
+  `saijiki_migration_required`; the host migrates it and saves the result
+  (author's ruling, 2026-09-29). Saved documents are read under their old version and
   overwritten once, meaning by meaning, with the new version's words, never by
   string replacement. Saved macro definitions are rewritten the same way, and
   the macro locks a work holds move to the new definitions (author's ruling,
@@ -418,19 +429,11 @@ under these principles (author's ruling, 2026-09-29).
   meaning, so it makes no new variation, and it is a different operation from
   the re-normalization of §12.8, which never rewrites an author's DDL.
 
-**Current exceptions** (they change in the next Saijiki version):
-
-- English `large` names both a movement amplitude and a relative size (§3.1
-  writes the amplitude `largely` when a size appears in the same phrase).
-- The surfaces `dense` and `faint` are adjectives and `pale ink wash` is a
-  material; none of them is a technique for a surface.
-- The movements `slowly` and `quickly` set how many waves a sway has, not the
-  speed of the brush.
-- In the work plan response schema, the value `fine` names both a thinness
-  (thin) and an amplitude (fine), `large` both a relative size and an
-  amplitude, and `solid` both a line continuity (solid) and a surface (flat).
-  The field name `place` (a position) also meets the action value `place` (to
-  place).
+Saijiki v2 (2026-09-29) removed the exceptions of v1: English `large` for both
+an amplitude and a size, the surfaces `dense` and `faint` (adjectives) and
+`pale ink wash` (a material), the movements `slowly` and `quickly` (a number of
+waves), and the work plan values `fine`, `large`, and `solid` and field name
+`place`. There are no exceptions now.
 
 ---
 
@@ -519,7 +522,7 @@ Ordinary DDL accepts `connected partway along the previous line/arc` to join the
 
 Fluctuation parameters keep asset category `variation` and may constrain candidates with an optional closed `dimension`: `amplitude`, `frequency`, `quality`, or `spread`. For example, `{"type":"semantic_ref","category":"variation","dimension":"amplitude"}`. Other categories cannot specify a dimension. Omitted / None preserves legacy category-only matching and canonical bytes / digest; Some participates in the definition digest. Flat Emit uses `fluctuation_amplitude`, `fluctuation_frequency`, `fluctuation_quality`, and `ink_spread`, each carrying an existing `SemanticRef { category: variation, id }` from its dimension. A field name does not change semantic identity. Definition validation, component `use`, binding, and execution boundaries share the same seven-word current classification.
 
-A saved MacroDefinition may retain legacy `variation:trembling` or `variation:blurring` IDs. Each keeps its existing canonical bytes, digest, and lock and continues to resolve to Perlin or Pink respectively. Legacy `place:middle` retains its existing canonical identity shared with `center`. This is shared saved-format compatibility, without a plugin-name branch or a restored public vocabulary entry. New definitions use canonical `swaying` or independent `ink_spread:bleeding`, and body changes receive a new definition version and digest. Saved configs are never rebound to the current catalog definitions. A Saijiki version migration (§3.3) is the exception: it rewrites saved macro definitions into the new version's words and moves the locks works hold to the new definitions (author's ruling, 2026-09-29).
+The legacy `variation:trembling`, `variation:blurring`, and `place:middle` IDs v1 accepted for saved MacroDefinitions are rewritten by the Saijiki v2 migration to `swaying`, `ink_spread:bleeding`, and `center`, and v2 does not accept them (author's ruling, 2026-09-29). The Pink sway blurring drew is no longer reachable from DDL and stays only in saved Scores. Body changes receive a new definition version and digest, and saved configs are never rebound to the current catalog definitions. A Saijiki version migration (§3.3) is the exception: it rewrites saved macro definitions into the new version's words and moves the locks works hold to the new definitions (author's ruling, 2026-09-29). A migrated definition keeps its version; only its digest changes. The bundled `Nature.leaves` is rewritten by the same migration and stays at 2.0.0.
 
 Every declared parameter remains required. Declaring three parameters and supplying only one value produces a binding error such as MissingCompatibleFact. Declaring only an amplitude parameter and delivering it to Emit lets the same resolver in §13.6 resolve the other two slots. Undeclared caller overlays, guessing three slots from one generic variation field, and optional parameters are not introduced.
 
@@ -1548,7 +1551,7 @@ the core.**
 normalized DDL (example, in the form the corpus uses):
 
   中心に鉛筆の細い線をひとつ置く。線は細かく揺れる。
-  (Place one thin pencil line at the center.  The line sways finely.)
+  (Place one thin pencil line at the center.  The line sways narrowly.)
 ```
 
 In the typed DDL compiler, the second sentence in this example does not create a second drawable entity. When a canonical head marked by `は` / `が`, or by the meaning-equivalent English determiner topology, reintroduces exactly one prior entity, a source-preserving continuation edge attaches the following predicate to that same entity and instruction. Zero or multiple target candidates, an unclear clause boundary, or an unknown or conflict fails closed as a typed issue; the compiler does not guess by first, nearest, or last position.
@@ -1576,7 +1579,7 @@ Shared standalone grammar makes modifier phrases own their connectors but exclud
 | fully natural sentences ("place a thin line, with a slight sway, near the center") | leaves room for a second *interpretation* in stage two |
 | a structured list (YAML-like) | looks like code; it takes the pleasure out of describing, and similar graphical description languages already exist |
 | function-call style (`place(subject=line, position=center)`) | too close to code |
-| a separate modifier line (an early draft that wrote "sway: small" on a line of its own) | never adopted in the implementation. Motion words are written inline as sentences, as in "the line sways finely" (the fixture corpus is canonical). Surface and ground follow the same rule: headed forms such as 「面: ...」 and 「地: ...」 are not adopted (removed from this specification on 2026-09-24). A ground is a sentence of its own such as “washi.”, and a surface is a modifier of its shape |
+| a separate modifier line (an early draft that wrote "sway: small" on a line of its own) | never adopted in the implementation. Motion words are written inline as sentences, as in "the line sways narrowly" (the fixture corpus is canonical). Surface and ground follow the same rule: headed forms such as 「面: ...」 and 「地: ...」 are not adopted (removed from this specification on 2026-09-24). A ground is a sentence of its own such as “washi.”, and a surface is a modifier of its shape |
 
 **What the adopted form does:**
 
@@ -1633,9 +1636,12 @@ initial-generation LLM does not write visible DDL text; it returns a closed,
 typed underdrawing as JSON. An underdrawing holds up to eight standalone-shape layers
 plus optional ground and background, and every value is an enum projected from
 the Saijiki asset, the parser's finite modifier forms, the fluctuation
-classifier, and the Score intensity values. The values each form (with its
+classifier, and the Score intensity values. A value is its word's English as
+written (spaces and hyphens become `_`), and field names say their meaning
+(`position`, `handling`, `motion_spacing`, and so on; the underdrawing type
+`inku.work-plan.v2`, Saijiki v2). The values each form (with its
 proportion word) accepts come from the capability matrix
-`inku.work-plan-capabilities.v1`, generated by compiling one sentence per value,
+`inku.work-plan-capabilities.v2`, generated by compiling one sentence per value,
 and shared-Rust validation is authoritative rather than provider-side decoding.
 An out-of-range value becomes unspecified for that field, a layer without a
 shape is removed alone, and nothing stops the drawing. The normalized underdrawing is
@@ -2115,7 +2121,7 @@ Tall / wide constraints reach the same triangle / square / ellipse / cloudform c
 
 A scatter at a named position (including an omitted one) uses the range's physical axes as its domain and places the group centroid at the range's center (§18). A line-up uses the physical canvas axes as its domain and places the row's centroid at the range's center. At a numeric position, non-Grid domains use the physical canvas axes and place the group centroid at the numeric anchor. Direction-omitted line-up is one vertical column when the named range is taller than wide in canvas fractions, and otherwise one horizontal row at equal-width cell centers. Tile uses columns=min(n,max(1,ceil(sqrt(n*W/H)))) and rows=ceil(n/columns) when W>=H; when H>W, the same rule starts with rows on the long axis, then columns=ceil(n/rows). It fills n cells in row-major order and resolves rows, columns, cell dimensions, and filled count. Numeric anchors translate the exact filled-prefix centroid; named Grid stays in its region without centroid correction. Scatter retains a uniform X/Y rectangle-sampling recipe followed by centroid translation, requiring the existing performance seed and original owner / instance ordinal at materialization. It does not substitute composition seed, run RNG, resize to fit, change count, or add repulsion or minimum spacing. For example, on 1200×800 / 800×1200 canvases normal circle diameter is 192 in both cases, four-object line-up spacing is 300 / 200, and eight-object tile is four columns by two rows / two columns by four rows.
 
-Optional instruction / Emit `layout_direction` owns arrangement direction independently of entity `angle`. Japanese examples such as “中央に、横線を縦に三本並べる。” and “中央に、斜めの線を横に三本並べる。” share the typed entrance with “arrange three horizontal lines vertically at center.” and “line up three diagonal lines horizontally at center.” Japanese particle evidence and English angle-row adverb forms separate the roles. Compiler-only parser aliases leave prompt, display, and legacy markers unchanged. Single-head continuation merges direction into the original entity; conflicting directions stop. Absent-field canonical and provenance bytes remain unchanged; a present field includes its meaning and complete source evidence.
+Optional instruction / Emit `layout_direction` owns arrangement direction independently of entity `angle`. Japanese examples such as “中心に、横線を縦に三本並べる。” and “中心に、斜めの線を横に三本並べる。” share the typed entrance with “arrange three horizontal lines vertically at center.” and “line up three diagonal lines horizontally at center.” Japanese particle evidence and English angle-row adverb forms separate the roles. Compiler-only parser aliases leave prompt, display, and legacy markers unchanged. Single-head continuation merges direction into the original entity; conflicting directions stop. Absent-field canonical and provenance bytes remain unchanged; a present field includes its meaning and complete source evidence.
 
 Only line-up delivers direction into placement. Omission gives a vertical column when the named range is taller than wide in canvas fractions and otherwise retains the horizontal row; explicit horizontal uses the same formula while preserving its explicit identity. With t=(i+1/2)/n-1/2, offsets from the anchor are horizontal=(tW,0), vertical=(0,tH), rising=(ts,-ts), and falling=(ts,ts), where s=min(W,H). Diagonals are physical 45-degree axes with downward-positive Y, never stretched to the canvas diagonal. Bare diagonal chooses one of the two axes using the attested optional composition seed (distinguishing None from Some(0)), original pre / expanded meaning, and original logical occurrence framed with a dedicated layout-direction role. Shape-angle selection, size, and count are unchanged. Variation / render seeds and source spelling do not select direction. Point accepts layout direction while still rejecting its own angle. Unsupported layout direction on Place / Scatter / Tile, or an unsupported identity such as rotated, is omitted as a field with its original owner, spans, and reason, retaining an instruction or Emit whose body, explicit count, action, and position remain valid without it. Direction is not repurposed as entity angle. Unsupported group / relation structures and other failures retain their existing omission units; an entirely omitted result stops in both modes. The existing Score entrance likewise never silently discards an unsupported field and reports complete success.
 
@@ -2319,7 +2325,7 @@ The Saijiki carries a category called ゆらぎ (movements).
 | Dimension | Vocabulary |
 |---|---|
 | amplitude | 細かく, 大きく |
-| frequency | 速く, ゆっくり |
+| frequency | 小刻みに, ゆるやかに |
 | quality | 揺れる, 波打つ |
 | spread | にじみ |
 
@@ -2327,8 +2333,8 @@ The Saijiki carries a category called ゆらぎ (movements).
 
 | Dimension | Vocabulary |
 |---|---|
-| amplitude | fine, large |
-| frequency | quickly, slowly |
+| amplitude | narrowly, broadly |
+| frequency | tightly, loosely |
 | quality | swaying, undulating |
 | spread | bleeding |
 
@@ -2336,12 +2342,13 @@ The Saijiki carries a category called ゆらぎ (movements).
 Display and Editable apply it after combining the contour and surface marks.
 Compat preserves the marks, omits ink spread, and reports `texture_degraded`.
 It combines with Wave, Perlin, and the stipple surface, but does not add Perlin by itself
-or introduce an intensity word. Current `blurring` input normalizes to it.
+or introduce an intensity word. v1's `滲む` / `blurring` is rewritten to it by the
+Saijiki v2 migration, and v2 does not read it.
 
 Scatter in placement is not ゆらぎ. It is carried by うごき (motions, "scatter")
 and by `arrangement` (layout / path / jitter).
 
-In the shared compiler, ordinary DDL and declared flat Macros use one resolver. `fine` / `large` map to Fine / Broad; `slowly` / `quickly` to Slow / High; `swaying` (and its accepted legacy `trembling` forms) maps to Perlin; `undulating` maps to Wave; and `bleeding` maps independently to `ink_spread:"bleed"`. With all three variation slots absent, `Instruction.variation=None`. When at least one is present, only the missing amplitude, frequency, and quality slots default to Medium, Medium, and Perlin. Ink spread alone does not create variation. Explicit values win and the dimensions are independent: swaying does not imply Fine or High. Defaults do not enter source or typed meaning. The existing geometry-resolution-policy author-resolved omission owner attests this shared definition.
+In the shared compiler, ordinary DDL and declared flat Macros use one resolver. `narrowly` / `broadly` map to Fine / Broad; `loosely` / `tightly` to Slow / High; `swaying` maps to Perlin; `undulating` maps to Wave; and `bleeding` maps independently to `ink_spread:"bleed"`. v1's words (`fine`, `large`, `slowly`, `quickly`, `trembling`, `blurring`) are rewritten by the Saijiki v2 migration, and v2 does not read them. With all three variation slots absent, `Instruction.variation=None`. When at least one is present, only the missing amplitude, frequency, and quality slots default to Medium, Medium, and Perlin. Ink spread alone does not create variation. Explicit values win and the dimensions are independent: swaying does not imply Fine or High. Defaults do not enter source or typed meaning. The existing geometry-resolution-policy author-resolved omission owner attests this shared definition.
 
 ### 13.7 Sway from Phenomena: the Nature Plugin
 
@@ -2448,9 +2455,9 @@ smaller than its own mark.
 
 `quality` is chosen roughly as follows:
 
-- `perlin`: fine, irregular sway of a line — "trembling", "swaying finely"
-- `wave`: low-period, legible undulation — "swaying slowly", "undulating"
-- `pink`: blurring of the boundary — "blurring"
+- `perlin`: fine, irregular sway of a line — "swaying", "swaying narrowly"
+- `wave`: low-period, legible undulation — "swaying loosely", "undulating"
+- `pink`: blurring of the boundary; no Saijiki v2 word reaches it, and it stays in saved Scores
 - `white`: coarse, noise-like scatter
 
 Explicit sway in the shared compiler always uses `dimensions=["position_x","position_y"]`.
@@ -2629,7 +2636,7 @@ The description:
 
 ```
 鉛筆の破線の横線を縦に三本並べる。線は細かく揺れる。
-(line up three horizontal dashed pencil lines vertically. the lines sway finely.)
+(line up three horizontal dashed pencil lines vertically. the lines sway narrowly.)
 ```
 
 **An excerpt of a legacy Score expressing the same drawing intent. New work uses shared lowering into repetition recipes.**
@@ -3032,8 +3039,8 @@ depends on the performance seed, and the same seed reproduces the same contour.
 
 1. **The base closed curve**: a closed curve whose polar radius r(θ) carries a
    seamless multi-octave 1/f signal.  Low-frequency components make a few large
-   lobes ("undulating largely"), high-frequency components make fine unevenness
-   ("swaying finely").  The sway vocabulary maps onto the octave distribution
+   lobes ("undulating broadly"), high-frequency components make fine unevenness
+   ("swaying narrowly").  The sway vocabulary maps onto the octave distribution
 2. **Normal displacement**: a second periodic signal running along the arc length
    of the base curve displaces it along the normal, creating bays and waists —
    suhama-like concavities.  The displacement amplitude is clamped geometrically
@@ -3052,8 +3059,8 @@ Output passes through Bezier fitting and obeys the point budget.
 
 Every modifier a cloudform takes is expressed in existing vocabulary:
 
-- **sway** -> the octave distribution of the contour (finely / largely /
-  undulating / trembling / blurring)
+- **sway** -> the octave distribution of the contour (narrowly / broadly /
+  undulating / swaying / bleeding)
 - **proportion** -> the aspect ratio (a tall cloudform, a wide or full-width one —
   a band of haze is written this way)
 - **touch** -> the stroke of the contour (the tool grammar)
@@ -3184,7 +3191,7 @@ Explicit named positions reach the same geometry consumer from ordinary DDL and 
 | center | [1/3,1/3,2/3,2/3] (the middle cell) |
 | corner | One of upper-left [0,0,1/5,1/5], upper-right [4/5,0,1,1/5], lower-left [0,4/5,1/5,1], lower-right [4/5,4/5,1,1] |
 
-`center` (中心, 中央, middle) is the middle cell, and a mark placed there anchors in `[7/18,7/18,11/18,11/18]`, the same as a mark placed with its position omitted; only an Anchor's `center` is the single point (0.5, 0.5). Edges are narrow bands, not fixed points.
+`center` (中心) is the middle cell, and a mark placed there anchors in `[7/18,7/18,11/18,11/18]`, the same as a mark placed with its position omitted; only an Anchor's `center` is the single point (0.5, 0.5). Edges are narrow bands, not fixed points.
 Stage 2 selects a corner in the dedicated `inku.score-place-selection.v1` domain. It frames verified original
 pre- and expanded-meaning digests, a composition seed tagged to distinguish None from Some(0), and either the
 original direct logical ordinal or the Macro semantic ordinal, expansion path, and generated ordinal.

@@ -37,8 +37,9 @@ for category variation. Omitted / None preserves legacy category-only matching a
 bytes / digest; a specified constraint participates in the digest. Parameter names do not imply dimensions.
 
 Flat Emit keys are `fluctuation_amplitude`, `fluctuation_frequency`, and `fluctuation_quality`;
-their expression category stays `variation`. The respective IDs are `fine` / `large`,
-`slowly` / `quickly`, and `swaying` / `trembling` / `undulating` / `blurring`.
+their expression category stays `variation`. The respective IDs are `narrowly` / `broadly`,
+`loosely` / `tightly`, and `swaying` / `undulating` (Saijiki v2; the Saijiki v2 migration rewrote
+v1's `fine`, `large`, `slowly`, `quickly`, `trembling`, and `blurring`).
 Definition-local `use` shares the classification, and deferred actual values are checked at
 execution boundaries. Mapping, missing-slot defaults, and supported shapes follow ordinary DDL in SPEC §13.6.
 

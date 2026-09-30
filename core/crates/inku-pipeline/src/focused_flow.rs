@@ -218,6 +218,93 @@ fn canonical_macro_crosses_owned_start_and_commit() {
 }
 
 #[test]
+fn a_saved_unit_of_the_retired_saijiki_waits_for_its_host_to_migrate_it() {
+    let start = envelope(
+        None,
+        PipelineInput::Start {
+            variation_id: "retired-saijiki".into(),
+            authoring_nonce: "retired-saijiki-1".into(),
+            config: Box::new(config()),
+            authority: VariationAuthorityState::new_direct_ddl(),
+            authoring: AuthoringInput::DirectDdl {
+                source: "place one red circle at center.".into(),
+            },
+        },
+    );
+    let pending = run(None, &start).snapshot;
+    let committed = run(Some(&pending), &envelope(Some(&pending), ack(&pending))).snapshot;
+    let document = committed.document.as_ref().unwrap();
+    // A new document names the edition it is written with.
+    assert_eq!(document.saijiki, inku_ddl::SAIJIKI_ASSET_ID);
+    assert_eq!(
+        serde_json::to_value(document).unwrap()["saijiki"],
+        inku_ddl::SAIJIKI_ASSET_ID
+    );
+
+    // A document saved before the field was written with v1 and keeps its saved bytes.
+    let mut retired = committed.clone();
+    retired.document.as_mut().unwrap().saijiki = inku_ddl::SAIJIKI_V1_ASSET_ID.into();
+    assert!(
+        serde_json::to_value(retired.document.as_ref().unwrap())
+            .unwrap()
+            .get("saijiki")
+            .is_none()
+    );
+    retired.snapshot_digest.clear();
+    retired.snapshot_digest =
+        crate::protocol::value_digest("inku.pipeline-snapshot.v1", &retired).unwrap();
+    let edit = PipelineInput::CommitUserDdl {
+        expected_revision: DecimalU64::new(retired.authority.revision()),
+        source: "place one blue circle at center.".into(),
+    };
+    let refused = run_error(Some(&retired), &envelope(Some(&retired), edit));
+    assert_eq!(refused["payload"]["code"], "saijiki_migration_required");
+
+    // A saved definition that only a migration makes valid is refused the same way.
+    let definition = |amplitude: &str| {
+        inku_ddl::MacroDefinition::from_json(
+            &json!({
+                "schema": "inku.macro-definition.v1", "namespace": "Saved", "heading": "Sway",
+                "version": "1.0.0", "parameters": {}, "components": {}, "body": [{
+                    "op": "emit", "binding": null, "fields": {
+                        "shape": {"expr": "semantic_ref", "category": "shape", "id": "line"},
+                        "fluctuation_amplitude":
+                            {"expr": "semantic_ref", "category": "variation", "id": amplitude}
+                    }
+                }]
+            })
+            .to_string(),
+        )
+        .unwrap()
+    };
+    for (amplitude, code) in [
+        ("fine", "saijiki_migration_required"),
+        ("unknown", "schema_violation"),
+    ] {
+        let mut saved = config();
+        saved.definitions = vec![definition(amplitude)];
+        saved.macro_summaries = vec!["A swaying line".into()];
+        let start = envelope(
+            None,
+            PipelineInput::Start {
+                variation_id: format!("retired-definition-{amplitude}"),
+                authoring_nonce: "retired-definition-1".into(),
+                config: Box::new(saved),
+                authority: VariationAuthorityState::new_direct_ddl(),
+                authoring: AuthoringInput::DirectDdl {
+                    source: "Saved.Sway.".into(),
+                },
+            },
+        );
+        assert_eq!(
+            run_error(None, &start)["payload"]["code"],
+            code,
+            "{amplitude}"
+        );
+    }
+}
+
+#[test]
 fn unresolved_qualified_macro_blocks_without_stage2_completion() {
     let mut pipeline_config = config();
     pipeline_config.language = inku_ddl::ResolvedInstructionLanguage::Ja;
@@ -1021,7 +1108,7 @@ fn committed_hole_with_local_diagnostics_still_requests_bounded_completion() {
             config: Box::new(pipeline_config),
             authority: VariationAuthorityState::new_direct_ddl(),
             authoring: AuthoringInput::DirectDdl {
-                source: "出力: 黒い背景に、粗筆の黒い四角を中央に置く。面: 粗く塗りつぶす。".into(),
+                source: "出力: 黒い背景に、粗筆の黒い四角を中心に置く。面: 粗く塗りつぶす。".into(),
             },
         },
     );

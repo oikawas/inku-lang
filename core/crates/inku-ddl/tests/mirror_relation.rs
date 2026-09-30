@@ -119,7 +119,7 @@ fn mirror_preserves_whole_macro_and_ordinary_group_boundaries() {
 #[test]
 fn incompatible_mirror_drops_only_relation_and_keeps_later_sibling() {
     let result = execute(
-        "左端に赤い円を置く。右端に前の形と鏡写しの青い線を置く。中央に緑の正方形を置く。",
+        "左端に赤い円を置く。右端に前の形と鏡写しの青い線を置く。中心に緑の正方形を置く。",
         ResolvedInstructionLanguage::Ja,
         &[],
         Vec::new(),

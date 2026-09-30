@@ -50,7 +50,7 @@
                   "fluctuation_amplitude": {
                     "expr": "semantic_ref",
                     "category": "variation",
-                    "id": "narrowly"
+                    "id": "fine"
                   },
                   "fluctuation_quality": {
                     "expr": "semantic_ref",
@@ -107,7 +107,7 @@
                   "fluctuation_amplitude": {
                     "expr": "semantic_ref",
                     "category": "variation",
-                    "id": "narrowly"
+                    "id": "fine"
                   },
                   "fluctuation_quality": {
                     "expr": "semantic_ref",
@@ -295,7 +295,7 @@
       },
       "summaries": {
         "ja": "若葉4〜6枚を上半分に、葉ごとに別の位置へ置く。各葉は両端で触れる二つの小さな弧で、鉛筆の緑、細かな揺れ、縦を中心に左右へ少し傾いて上を向く。各葉の内側を輪郭と同じ色で塗る。",
-        "en": "Place 4–6 young leaves in the upper half, each at its own position. Each is two small pencil-green arcs touching at both ends, narrowly swaying, pointing upward mostly upright with a slight lean either way. Fill each leaf interior with the same color as its outline."
+        "en": "Place 4–6 young leaves in the upper half, each at its own position. Each is two small pencil-green arcs touching at both ends, finely swaying, pointing upward mostly upright with a slight lean either way. Fill each leaf interior with the same color as its outline."
       }
     },
     {
@@ -639,7 +639,7 @@
               "fluctuation_frequency": {
                 "expr": "semantic_ref",
                 "category": "variation",
-                "id": "loosely"
+                "id": "slowly"
               },
               "fluctuation_quality": {
                 "expr": "semantic_ref",
@@ -973,8 +973,8 @@
         ]
       },
       "summaries": {
-        "ja": "中域の水平な灰の太筆枝をゆるやかに波打たせ、その上に青葉6〜8枚を上下交互に、枝先の方へ斜めに出す。葉は根元側ほど大きく枝先ほど小さく、両端で触れる二弧を細筆の緑で描き、内側も同じ緑で塗る。",
-        "en": "Draw one horizontal gray thick-brush branch loosely undulating through the middle, and grow 6–8 summer leaves from it alternately above and below, slanting toward the tip. Leaves are largest at the base and smaller toward the tip; each is two fine-brush green arcs touching at both ends, filled with the same green."
+        "ja": "中域の水平な灰の太筆枝をゆっくり波打たせ、その上に青葉6〜8枚を上下交互に、枝先の方へ斜めに出す。葉は根元側ほど大きく枝先ほど小さく、両端で触れる二弧を細筆の緑で描き、内側も同じ緑で塗る。",
+        "en": "Draw one horizontal gray thick-brush branch slowly undulating through the middle, and grow 6–8 summer leaves from it alternately above and below, slanting toward the tip. Leaves are largest at the base and smaller toward the tip; each is two fine-brush green arcs touching at both ends, filled with the same green."
       }
     },
     {
@@ -1737,7 +1737,7 @@
                       "fluctuation_frequency": {
                         "expr": "semantic_ref",
                         "category": "variation",
-                        "id": "tightly"
+                        "id": "quickly"
                       },
                       "ink_spread": {
                         "expr": "semantic_ref",
@@ -1786,7 +1786,7 @@
                       "fluctuation_frequency": {
                         "expr": "semantic_ref",
                         "category": "variation",
-                        "id": "tightly"
+                        "id": "quickly"
                       },
                       "ink_spread": {
                         "expr": "semantic_ref",
@@ -1987,8 +1987,8 @@
         ]
       },
       "summaries": {
-        "ja": "下端の1〜2箇所の同じ根元から、枯れた長い葉を3〜5本ずつ上へ並べる。丈を葉ごとに変え、傾きを垂直から右へ倒れるまで大きく違え、チョークの灰で小刻みに揺らし、縁ににじみを加え、地面は描かない。各葉の内側を輪郭と同じ色で塗る。",
-        "en": "From 1–2 shared root spots at the bottom edge, raise 3–5 long withered blades each. Heights differ per blade and the lean ranges widely from upright to lying toward the right, in tightly swaying gray chalk with bleeding edges and no ground. Fill each blade interior with the same color as its outline."
+        "ja": "下端の1〜2箇所の同じ根元から、枯れた長い葉を3〜5本ずつ上へ並べる。丈を葉ごとに変え、傾きを垂直から右へ倒れるまで大きく違え、チョークの灰で速く揺らし、縁ににじみを加え、地面は描かない。各葉の内側を輪郭と同じ色で塗る。",
+        "en": "From 1–2 shared root spots at the bottom edge, raise 3–5 long withered blades each. Heights differ per blade and the lean ranges widely from upright to lying toward the right, in quickly swaying gray chalk with bleeding edges and no ground. Fill each blade interior with the same color as its outline."
       }
     },
     {
@@ -2041,7 +2041,7 @@
                   "fluctuation_amplitude": {
                     "expr": "semantic_ref",
                     "category": "variation",
-                    "id": "narrowly"
+                    "id": "fine"
                   },
                   "fluctuation_quality": {
                     "expr": "semantic_ref",
@@ -2097,7 +2097,7 @@
                   "fluctuation_amplitude": {
                     "expr": "semantic_ref",
                     "category": "variation",
-                    "id": "narrowly"
+                    "id": "fine"
                   },
                   "fluctuation_quality": {
                     "expr": "semantic_ref",
@@ -2292,7 +2292,7 @@
       },
       "summaries": {
         "ja": "縮れた枯葉2〜4枚を下の左右の隅に置く。各葉は両端で触れる深い弧と浅い弧で、チョークの灰と黄を交互にし、縁を細かく揺らし、傾きをばらす。各葉の内側を輪郭と同じ色で塗る。",
-        "en": "Place 2–4 curled withered leaves in the lower left or right corners. Each is a deep arc and a shallow arc touching at both ends, alternating gray and yellow chalk, with narrowly swaying edges and varied rotations. Fill each leaf interior with the same color as its outline."
+        "en": "Place 2–4 curled withered leaves in the lower left or right corners. Each is a deep arc and a shallow arc touching at both ends, alternating gray and yellow chalk, with finely swaying edges and varied rotations. Fill each leaf interior with the same color as its outline."
       }
     }
   ]

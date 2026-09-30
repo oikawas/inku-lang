@@ -6,9 +6,11 @@ use inku_pipeline::protocol::{ProtocolError, error_bytes};
 
 mod macro_catalog;
 mod plugin_diagnostics;
+mod saijiki_migration;
 
 pub use macro_catalog::resolve_macro_catalog;
 pub use plugin_diagnostics::explain_plugin_diagnostics;
+pub use saijiki_migration::migrate_saijiki_v1;
 
 const BINDING_VERSION: &str = "1.1.0";
 const PROTOCOL_VERSION: &str = "1.0.0";

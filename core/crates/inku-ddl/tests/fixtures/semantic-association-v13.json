@@ -487,7 +487,7 @@
       "issue_kinds": [
 
       ],
-      "canonical": "{\"entities\":[{\"angle\":{\"category\":\"angle\",\"id\":\"horizontal\"},\"color\":{\"category\":\"color\",\"id\":\"blue\"},\"continuity\":{\"category\":\"continuity\",\"id\":\"dashed\"},\"explicit_geometry\":null,\"fluctuation\":{\"amplitude\":null,\"frequency\":null,\"quality\":null},\"head\":{\"category\":\"shape\",\"id\":\"circle\"},\"numeric_position\":null,\"proportion\":{\"arc_form\":null,\"aspect\":null,\"width_extent\":null},\"quantity\":8,\"relative_scale\":null,\"surface\":{\"intensity\":{\"category\":\"surface\",\"id\":\"dense\"},\"quality\":{\"category\":\"surface\",\"id\":\"solid\"}},\"thinness\":null,\"touch\":{\"category\":\"touch\",\"id\":\"pen\"}}],\"schema\":\"inku.semantic-entity-association.v19\"}",
+      "canonical": "{\"entities\":[{\"angle\":{\"category\":\"angle\",\"id\":\"horizontal\"},\"color\":{\"category\":\"color\",\"id\":\"blue\"},\"continuity\":{\"category\":\"continuity\",\"id\":\"dashed\"},\"explicit_geometry\":null,\"fluctuation\":{\"amplitude\":null,\"frequency\":null,\"quality\":null},\"head\":{\"category\":\"shape\",\"id\":\"circle\"},\"numeric_position\":null,\"proportion\":{\"arc_form\":null,\"aspect\":null,\"width_extent\":null},\"quantity\":8,\"relative_scale\":null,\"surface\":{\"intensity\":{\"category\":\"handling\",\"id\":\"dense\"},\"quality\":{\"category\":\"surface\",\"id\":\"solid\"}},\"thinness\":null,\"touch\":{\"category\":\"touch\",\"id\":\"pen\"}}],\"schema\":\"inku.semantic-entity-association.v19\"}",
       "owned_occurrence_count": 8,
       "explicit_touches": [
         "pen"
@@ -513,7 +513,7 @@
       "issue_kinds": [
 
       ],
-      "canonical": "{\"entities\":[{\"angle\":{\"category\":\"angle\",\"id\":\"horizontal\"},\"color\":{\"category\":\"color\",\"id\":\"blue\"},\"continuity\":{\"category\":\"continuity\",\"id\":\"dashed\"},\"explicit_geometry\":null,\"fluctuation\":{\"amplitude\":null,\"frequency\":null,\"quality\":null},\"head\":{\"category\":\"shape\",\"id\":\"circle\"},\"numeric_position\":null,\"proportion\":{\"arc_form\":null,\"aspect\":null,\"width_extent\":null},\"quantity\":8,\"relative_scale\":null,\"surface\":{\"intensity\":{\"category\":\"surface\",\"id\":\"dense\"},\"quality\":{\"category\":\"surface\",\"id\":\"solid\"}},\"thinness\":null,\"touch\":{\"category\":\"touch\",\"id\":\"pen\"}}],\"schema\":\"inku.semantic-entity-association.v19\"}",
+      "canonical": "{\"entities\":[{\"angle\":{\"category\":\"angle\",\"id\":\"horizontal\"},\"color\":{\"category\":\"color\",\"id\":\"blue\"},\"continuity\":{\"category\":\"continuity\",\"id\":\"dashed\"},\"explicit_geometry\":null,\"fluctuation\":{\"amplitude\":null,\"frequency\":null,\"quality\":null},\"head\":{\"category\":\"shape\",\"id\":\"circle\"},\"numeric_position\":null,\"proportion\":{\"arc_form\":null,\"aspect\":null,\"width_extent\":null},\"quantity\":8,\"relative_scale\":null,\"surface\":{\"intensity\":{\"category\":\"handling\",\"id\":\"dense\"},\"quality\":{\"category\":\"surface\",\"id\":\"solid\"}},\"thinness\":null,\"touch\":{\"category\":\"touch\",\"id\":\"pen\"}}],\"schema\":\"inku.semantic-entity-association.v19\"}",
       "owned_occurrence_count": 8,
       "explicit_touches": [
         "pen"
@@ -539,7 +539,7 @@
       "issue_kinds": [
 
       ],
-      "canonical": "{\"entities\":[{\"angle\":{\"category\":\"angle\",\"id\":\"horizontal\"},\"color\":{\"category\":\"color\",\"id\":\"blue\"},\"continuity\":{\"category\":\"continuity\",\"id\":\"dashed\"},\"explicit_geometry\":null,\"fluctuation\":{\"amplitude\":null,\"frequency\":null,\"quality\":null},\"head\":{\"category\":\"shape\",\"id\":\"circle\"},\"numeric_position\":null,\"proportion\":{\"arc_form\":null,\"aspect\":null,\"width_extent\":null},\"quantity\":8,\"relative_scale\":null,\"surface\":{\"intensity\":{\"category\":\"surface\",\"id\":\"dense\"},\"quality\":{\"category\":\"surface\",\"id\":\"solid\"}},\"thinness\":null,\"touch\":{\"category\":\"touch\",\"id\":\"pen\"}}],\"schema\":\"inku.semantic-entity-association.v19\"}",
+      "canonical": "{\"entities\":[{\"angle\":{\"category\":\"angle\",\"id\":\"horizontal\"},\"color\":{\"category\":\"color\",\"id\":\"blue\"},\"continuity\":{\"category\":\"continuity\",\"id\":\"dashed\"},\"explicit_geometry\":null,\"fluctuation\":{\"amplitude\":null,\"frequency\":null,\"quality\":null},\"head\":{\"category\":\"shape\",\"id\":\"circle\"},\"numeric_position\":null,\"proportion\":{\"arc_form\":null,\"aspect\":null,\"width_extent\":null},\"quantity\":8,\"relative_scale\":null,\"surface\":{\"intensity\":{\"category\":\"handling\",\"id\":\"dense\"},\"quality\":{\"category\":\"surface\",\"id\":\"solid\"}},\"thinness\":null,\"touch\":{\"category\":\"touch\",\"id\":\"pen\"}}],\"schema\":\"inku.semantic-entity-association.v19\"}",
       "owned_occurrence_count": 8,
       "explicit_touches": [
         "pen"
@@ -565,7 +565,7 @@
       "issue_kinds": [
 
       ],
-      "canonical": "{\"entities\":[{\"angle\":{\"category\":\"angle\",\"id\":\"horizontal\"},\"color\":{\"category\":\"color\",\"id\":\"blue\"},\"continuity\":{\"category\":\"continuity\",\"id\":\"dashed\"},\"explicit_geometry\":null,\"fluctuation\":{\"amplitude\":null,\"frequency\":null,\"quality\":null},\"head\":{\"category\":\"shape\",\"id\":\"circle\"},\"numeric_position\":null,\"proportion\":{\"arc_form\":null,\"aspect\":null,\"width_extent\":null},\"quantity\":8,\"relative_scale\":null,\"surface\":{\"intensity\":{\"category\":\"surface\",\"id\":\"dense\"},\"quality\":{\"category\":\"surface\",\"id\":\"solid\"}},\"thinness\":null,\"touch\":{\"category\":\"touch\",\"id\":\"pen\"}}],\"schema\":\"inku.semantic-entity-association.v19\"}",
+      "canonical": "{\"entities\":[{\"angle\":{\"category\":\"angle\",\"id\":\"horizontal\"},\"color\":{\"category\":\"color\",\"id\":\"blue\"},\"continuity\":{\"category\":\"continuity\",\"id\":\"dashed\"},\"explicit_geometry\":null,\"fluctuation\":{\"amplitude\":null,\"frequency\":null,\"quality\":null},\"head\":{\"category\":\"shape\",\"id\":\"circle\"},\"numeric_position\":null,\"proportion\":{\"arc_form\":null,\"aspect\":null,\"width_extent\":null},\"quantity\":8,\"relative_scale\":null,\"surface\":{\"intensity\":{\"category\":\"handling\",\"id\":\"dense\"},\"quality\":{\"category\":\"surface\",\"id\":\"solid\"}},\"thinness\":null,\"touch\":{\"category\":\"touch\",\"id\":\"pen\"}}],\"schema\":\"inku.semantic-entity-association.v19\"}",
       "owned_occurrence_count": 8,
       "explicit_touches": [
         "pen"
@@ -605,7 +605,7 @@
       "issue_kinds": [
 
       ],
-      "canonical": "{\"entities\":[{\"angle\":null,\"color\":null,\"continuity\":null,\"explicit_geometry\":null,\"fluctuation\":{\"amplitude\":null,\"frequency\":null,\"quality\":null},\"head\":{\"category\":\"shape\",\"id\":\"line\"},\"numeric_position\":null,\"proportion\":{\"arc_form\":null,\"aspect\":null,\"width_extent\":null},\"quantity\":null,\"relative_scale\":null,\"surface\":{\"intensity\":{\"category\":\"surface\",\"id\":\"faint\"},\"quality\":null},\"thinness\":null,\"touch\":null}],\"schema\":\"inku.semantic-entity-association.v19\"}",
+      "canonical": "{\"entities\":[{\"angle\":null,\"color\":null,\"continuity\":null,\"explicit_geometry\":null,\"fluctuation\":{\"amplitude\":null,\"frequency\":null,\"quality\":null},\"head\":{\"category\":\"shape\",\"id\":\"line\"},\"numeric_position\":null,\"proportion\":{\"arc_form\":null,\"aspect\":null,\"width_extent\":null},\"quantity\":null,\"relative_scale\":null,\"surface\":{\"intensity\":{\"category\":\"handling\",\"id\":\"faint\"},\"quality\":null},\"thinness\":null,\"touch\":null}],\"schema\":\"inku.semantic-entity-association.v19\"}",
       "owned_occurrence_count": 2,
       "surface_intensities": [
         "faint"
@@ -619,7 +619,7 @@
       "issue_kinds": [
 
       ],
-      "canonical": "{\"entities\":[{\"angle\":{\"category\":\"angle\",\"id\":\"horizontal\"},\"color\":{\"category\":\"color\",\"id\":\"blue\"},\"continuity\":{\"category\":\"continuity\",\"id\":\"dashed\"},\"explicit_geometry\":null,\"fluctuation\":{\"amplitude\":null,\"frequency\":null,\"quality\":null},\"head\":{\"category\":\"shape\",\"id\":\"circle\"},\"numeric_position\":null,\"proportion\":{\"arc_form\":null,\"aspect\":null,\"width_extent\":null},\"quantity\":8,\"relative_scale\":null,\"surface\":{\"intensity\":{\"category\":\"surface\",\"id\":\"dense\"},\"quality\":{\"category\":\"surface\",\"id\":\"hatch\"}},\"thinness\":null,\"touch\":{\"category\":\"touch\",\"id\":\"pen\"}}],\"schema\":\"inku.semantic-entity-association.v19\"}",
+      "canonical": "{\"entities\":[{\"angle\":{\"category\":\"angle\",\"id\":\"horizontal\"},\"color\":{\"category\":\"color\",\"id\":\"blue\"},\"continuity\":{\"category\":\"continuity\",\"id\":\"dashed\"},\"explicit_geometry\":null,\"fluctuation\":{\"amplitude\":null,\"frequency\":null,\"quality\":null},\"head\":{\"category\":\"shape\",\"id\":\"circle\"},\"numeric_position\":null,\"proportion\":{\"arc_form\":null,\"aspect\":null,\"width_extent\":null},\"quantity\":8,\"relative_scale\":null,\"surface\":{\"intensity\":{\"category\":\"handling\",\"id\":\"dense\"},\"quality\":{\"category\":\"surface\",\"id\":\"hatch\"}},\"thinness\":null,\"touch\":{\"category\":\"touch\",\"id\":\"pen\"}}],\"schema\":\"inku.semantic-entity-association.v19\"}",
       "owned_occurrence_count": 8,
       "explicit_touches": [
         "pen"
@@ -645,7 +645,7 @@
       "issue_kinds": [
 
       ],
-      "canonical": "{\"entities\":[{\"angle\":{\"category\":\"angle\",\"id\":\"horizontal\"},\"color\":{\"category\":\"color\",\"id\":\"blue\"},\"continuity\":{\"category\":\"continuity\",\"id\":\"dashed\"},\"explicit_geometry\":null,\"fluctuation\":{\"amplitude\":null,\"frequency\":null,\"quality\":null},\"head\":{\"category\":\"shape\",\"id\":\"circle\"},\"numeric_position\":null,\"proportion\":{\"arc_form\":null,\"aspect\":null,\"width_extent\":null},\"quantity\":8,\"relative_scale\":null,\"surface\":{\"intensity\":{\"category\":\"surface\",\"id\":\"faint\"},\"quality\":{\"category\":\"surface\",\"id\":\"solid\"}},\"thinness\":null,\"touch\":{\"category\":\"touch\",\"id\":\"pen\"}}],\"schema\":\"inku.semantic-entity-association.v19\"}",
+      "canonical": "{\"entities\":[{\"angle\":{\"category\":\"angle\",\"id\":\"horizontal\"},\"color\":{\"category\":\"color\",\"id\":\"blue\"},\"continuity\":{\"category\":\"continuity\",\"id\":\"dashed\"},\"explicit_geometry\":null,\"fluctuation\":{\"amplitude\":null,\"frequency\":null,\"quality\":null},\"head\":{\"category\":\"shape\",\"id\":\"circle\"},\"numeric_position\":null,\"proportion\":{\"arc_form\":null,\"aspect\":null,\"width_extent\":null},\"quantity\":8,\"relative_scale\":null,\"surface\":{\"intensity\":{\"category\":\"handling\",\"id\":\"faint\"},\"quality\":{\"category\":\"surface\",\"id\":\"solid\"}},\"thinness\":null,\"touch\":{\"category\":\"touch\",\"id\":\"pen\"}}],\"schema\":\"inku.semantic-entity-association.v19\"}",
       "owned_occurrence_count": 8,
       "explicit_touches": [
         "pen"
@@ -704,7 +704,7 @@
       "issue_kinds": [
 
       ],
-      "canonical": "{\"entities\":[{\"angle\":null,\"color\":null,\"continuity\":null,\"explicit_geometry\":null,\"fluctuation\":{\"amplitude\":null,\"frequency\":null,\"quality\":null},\"head\":{\"category\":\"shape\",\"id\":\"circle\"},\"numeric_position\":null,\"proportion\":{\"arc_form\":null,\"aspect\":null,\"width_extent\":null},\"quantity\":null,\"relative_scale\":null,\"surface\":{\"intensity\":{\"category\":\"surface\",\"id\":\"dense\"},\"quality\":{\"category\":\"surface\",\"id\":\"solid\"}},\"thinness\":null,\"touch\":null},{\"angle\":null,\"color\":null,\"continuity\":null,\"explicit_geometry\":null,\"fluctuation\":{\"amplitude\":null,\"frequency\":null,\"quality\":null},\"head\":{\"category\":\"shape\",\"id\":\"line\"},\"numeric_position\":null,\"proportion\":{\"arc_form\":null,\"aspect\":null,\"width_extent\":null},\"quantity\":null,\"relative_scale\":null,\"surface\":{\"intensity\":null,\"quality\":null},\"thinness\":null,\"touch\":null}],\"schema\":\"inku.semantic-entity-association.v19\"}",
+      "canonical": "{\"entities\":[{\"angle\":null,\"color\":null,\"continuity\":null,\"explicit_geometry\":null,\"fluctuation\":{\"amplitude\":null,\"frequency\":null,\"quality\":null},\"head\":{\"category\":\"shape\",\"id\":\"circle\"},\"numeric_position\":null,\"proportion\":{\"arc_form\":null,\"aspect\":null,\"width_extent\":null},\"quantity\":null,\"relative_scale\":null,\"surface\":{\"intensity\":{\"category\":\"handling\",\"id\":\"dense\"},\"quality\":{\"category\":\"surface\",\"id\":\"solid\"}},\"thinness\":null,\"touch\":null},{\"angle\":null,\"color\":null,\"continuity\":null,\"explicit_geometry\":null,\"fluctuation\":{\"amplitude\":null,\"frequency\":null,\"quality\":null},\"head\":{\"category\":\"shape\",\"id\":\"line\"},\"numeric_position\":null,\"proportion\":{\"arc_form\":null,\"aspect\":null,\"width_extent\":null},\"quantity\":null,\"relative_scale\":null,\"surface\":{\"intensity\":null,\"quality\":null},\"thinness\":null,\"touch\":null}],\"schema\":\"inku.semantic-entity-association.v19\"}",
       "owned_occurrence_count": 4,
       "surface_qualities": [
         "solid"
@@ -721,7 +721,7 @@
       "issue_kinds": [
 
       ],
-      "canonical": "{\"entities\":[{\"angle\":null,\"color\":null,\"continuity\":null,\"explicit_geometry\":null,\"fluctuation\":{\"amplitude\":null,\"frequency\":null,\"quality\":null},\"head\":{\"category\":\"shape\",\"id\":\"circle\"},\"numeric_position\":null,\"proportion\":{\"arc_form\":null,\"aspect\":null,\"width_extent\":null},\"quantity\":null,\"relative_scale\":null,\"surface\":{\"intensity\":{\"category\":\"surface\",\"id\":\"dense\"},\"quality\":{\"category\":\"surface\",\"id\":\"solid\"}},\"thinness\":null,\"touch\":null},{\"angle\":null,\"color\":null,\"continuity\":null,\"explicit_geometry\":null,\"fluctuation\":{\"amplitude\":null,\"frequency\":null,\"quality\":null},\"head\":{\"category\":\"shape\",\"id\":\"line\"},\"numeric_position\":null,\"proportion\":{\"arc_form\":null,\"aspect\":null,\"width_extent\":null},\"quantity\":null,\"relative_scale\":null,\"surface\":{\"intensity\":{\"category\":\"surface\",\"id\":\"faint\"},\"quality\":{\"category\":\"surface\",\"id\":\"grain\"}},\"thinness\":null,\"touch\":null}],\"schema\":\"inku.semantic-entity-association.v19\"}",
+      "canonical": "{\"entities\":[{\"angle\":null,\"color\":null,\"continuity\":null,\"explicit_geometry\":null,\"fluctuation\":{\"amplitude\":null,\"frequency\":null,\"quality\":null},\"head\":{\"category\":\"shape\",\"id\":\"circle\"},\"numeric_position\":null,\"proportion\":{\"arc_form\":null,\"aspect\":null,\"width_extent\":null},\"quantity\":null,\"relative_scale\":null,\"surface\":{\"intensity\":{\"category\":\"handling\",\"id\":\"dense\"},\"quality\":{\"category\":\"surface\",\"id\":\"solid\"}},\"thinness\":null,\"touch\":null},{\"angle\":null,\"color\":null,\"continuity\":null,\"explicit_geometry\":null,\"fluctuation\":{\"amplitude\":null,\"frequency\":null,\"quality\":null},\"head\":{\"category\":\"shape\",\"id\":\"line\"},\"numeric_position\":null,\"proportion\":{\"arc_form\":null,\"aspect\":null,\"width_extent\":null},\"quantity\":null,\"relative_scale\":null,\"surface\":{\"intensity\":{\"category\":\"handling\",\"id\":\"faint\"},\"quality\":{\"category\":\"surface\",\"id\":\"grain\"}},\"thinness\":null,\"touch\":null}],\"schema\":\"inku.semantic-entity-association.v19\"}",
       "owned_occurrence_count": 6,
       "surface_qualities": [
         "solid",
@@ -740,7 +740,7 @@
       "issue_kinds": [
 
       ],
-      "canonical": "{\"entities\":[{\"angle\":{\"category\":\"angle\",\"id\":\"horizontal\"},\"color\":{\"category\":\"color\",\"id\":\"blue\"},\"continuity\":{\"category\":\"continuity\",\"id\":\"dashed\"},\"explicit_geometry\":null,\"fluctuation\":{\"amplitude\":null,\"frequency\":null,\"quality\":null},\"head\":{\"category\":\"shape\",\"id\":\"circle\"},\"numeric_position\":null,\"proportion\":{\"arc_form\":null,\"aspect\":null,\"width_extent\":null},\"quantity\":8,\"relative_scale\":null,\"surface\":{\"intensity\":{\"category\":\"surface\",\"id\":\"dense\"},\"quality\":{\"category\":\"surface\",\"id\":\"solid\"}},\"thinness\":null,\"touch\":{\"category\":\"touch\",\"id\":\"pen\"}}],\"schema\":\"inku.semantic-entity-association.v19\"}",
+      "canonical": "{\"entities\":[{\"angle\":{\"category\":\"angle\",\"id\":\"horizontal\"},\"color\":{\"category\":\"color\",\"id\":\"blue\"},\"continuity\":{\"category\":\"continuity\",\"id\":\"dashed\"},\"explicit_geometry\":null,\"fluctuation\":{\"amplitude\":null,\"frequency\":null,\"quality\":null},\"head\":{\"category\":\"shape\",\"id\":\"circle\"},\"numeric_position\":null,\"proportion\":{\"arc_form\":null,\"aspect\":null,\"width_extent\":null},\"quantity\":8,\"relative_scale\":null,\"surface\":{\"intensity\":{\"category\":\"handling\",\"id\":\"dense\"},\"quality\":{\"category\":\"surface\",\"id\":\"solid\"}},\"thinness\":null,\"touch\":{\"category\":\"touch\",\"id\":\"pen\"}}],\"schema\":\"inku.semantic-entity-association.v19\"}",
       "owned_occurrence_count": 8,
       "explicit_touches": [
         "pen"
@@ -778,15 +778,15 @@
     {
       "id": "unobserved-line-surface-combination",
       "language": "en",
-      "source": "pale ink wash faint line.",
+      "source": "sweep faint line.",
       "entity_count": 1,
       "issue_kinds": [
 
       ],
-      "canonical": "{\"entities\":[{\"angle\":null,\"color\":null,\"continuity\":null,\"explicit_geometry\":null,\"fluctuation\":{\"amplitude\":null,\"frequency\":null,\"quality\":null},\"head\":{\"category\":\"shape\",\"id\":\"line\"},\"numeric_position\":null,\"proportion\":{\"arc_form\":null,\"aspect\":null,\"width_extent\":null},\"quantity\":null,\"relative_scale\":null,\"surface\":{\"intensity\":{\"category\":\"surface\",\"id\":\"faint\"},\"quality\":{\"category\":\"surface\",\"id\":\"wash\"}},\"thinness\":null,\"touch\":null}],\"schema\":\"inku.semantic-entity-association.v19\"}",
+      "canonical": "{\"entities\":[{\"angle\":null,\"color\":null,\"continuity\":null,\"explicit_geometry\":null,\"fluctuation\":{\"amplitude\":null,\"frequency\":null,\"quality\":null},\"head\":{\"category\":\"shape\",\"id\":\"line\"},\"numeric_position\":null,\"proportion\":{\"arc_form\":null,\"aspect\":null,\"width_extent\":null},\"quantity\":null,\"relative_scale\":null,\"surface\":{\"intensity\":{\"category\":\"handling\",\"id\":\"faint\"},\"quality\":{\"category\":\"surface\",\"id\":\"sweep\"}},\"thinness\":null,\"touch\":null}],\"schema\":\"inku.semantic-entity-association.v19\"}",
       "owned_occurrence_count": 3,
       "surface_qualities": [
-        "wash"
+        "sweep"
       ],
       "surface_intensities": [
         "faint"
@@ -800,7 +800,7 @@
       "issue_kinds": [
 
       ],
-      "canonical": "{\"entities\":[{\"angle\":null,\"color\":null,\"continuity\":null,\"explicit_geometry\":null,\"fluctuation\":{\"amplitude\":null,\"frequency\":null,\"quality\":null},\"head\":{\"category\":\"shape\",\"id\":\"arc\"},\"numeric_position\":null,\"proportion\":{\"arc_form\":null,\"aspect\":null,\"width_extent\":null},\"quantity\":null,\"relative_scale\":null,\"surface\":{\"intensity\":{\"category\":\"surface\",\"id\":\"dense\"},\"quality\":{\"category\":\"surface\",\"id\":\"grain\"}},\"thinness\":null,\"touch\":null}],\"schema\":\"inku.semantic-entity-association.v19\"}",
+      "canonical": "{\"entities\":[{\"angle\":null,\"color\":null,\"continuity\":null,\"explicit_geometry\":null,\"fluctuation\":{\"amplitude\":null,\"frequency\":null,\"quality\":null},\"head\":{\"category\":\"shape\",\"id\":\"arc\"},\"numeric_position\":null,\"proportion\":{\"arc_form\":null,\"aspect\":null,\"width_extent\":null},\"quantity\":null,\"relative_scale\":null,\"surface\":{\"intensity\":{\"category\":\"handling\",\"id\":\"dense\"},\"quality\":{\"category\":\"surface\",\"id\":\"grain\"}},\"thinness\":null,\"touch\":null}],\"schema\":\"inku.semantic-entity-association.v19\"}",
       "owned_occurrence_count": 3,
       "surface_qualities": [
         "grain"
@@ -812,12 +812,12 @@
     {
       "id": "ja-fluctuation-order-one",
       "language": "ja",
-      "source": "八つ、青、ペン、破線、水平、粒、濃い、細かく、ゆっくり、波打つ、円。",
+      "source": "八つ、青、ペン、破線、水平、粒、濃い、細かく、ゆるやかに、波打つ、円。",
       "entity_count": 1,
       "issue_kinds": [
 
       ],
-      "canonical": "{\"entities\":[{\"angle\":{\"category\":\"angle\",\"id\":\"horizontal\"},\"color\":{\"category\":\"color\",\"id\":\"blue\"},\"continuity\":{\"category\":\"continuity\",\"id\":\"dashed\"},\"explicit_geometry\":null,\"fluctuation\":{\"amplitude\":{\"category\":\"variation\",\"id\":\"fine\"},\"frequency\":{\"category\":\"variation\",\"id\":\"slowly\"},\"quality\":{\"category\":\"variation\",\"id\":\"undulating\"}},\"head\":{\"category\":\"shape\",\"id\":\"circle\"},\"numeric_position\":null,\"proportion\":{\"arc_form\":null,\"aspect\":null,\"width_extent\":null},\"quantity\":8,\"relative_scale\":null,\"surface\":{\"intensity\":{\"category\":\"surface\",\"id\":\"dense\"},\"quality\":{\"category\":\"surface\",\"id\":\"grain\"}},\"thinness\":null,\"touch\":{\"category\":\"touch\",\"id\":\"pen\"}}],\"schema\":\"inku.semantic-entity-association.v19\"}",
+      "canonical": "{\"entities\":[{\"angle\":{\"category\":\"angle\",\"id\":\"horizontal\"},\"color\":{\"category\":\"color\",\"id\":\"blue\"},\"continuity\":{\"category\":\"continuity\",\"id\":\"dashed\"},\"explicit_geometry\":null,\"fluctuation\":{\"amplitude\":{\"category\":\"variation\",\"id\":\"narrowly\"},\"frequency\":{\"category\":\"variation\",\"id\":\"loosely\"},\"quality\":{\"category\":\"variation\",\"id\":\"undulating\"}},\"head\":{\"category\":\"shape\",\"id\":\"circle\"},\"numeric_position\":null,\"proportion\":{\"arc_form\":null,\"aspect\":null,\"width_extent\":null},\"quantity\":8,\"relative_scale\":null,\"surface\":{\"intensity\":{\"category\":\"handling\",\"id\":\"dense\"},\"quality\":{\"category\":\"surface\",\"id\":\"grain\"}},\"thinness\":null,\"touch\":{\"category\":\"touch\",\"id\":\"pen\"}}],\"schema\":\"inku.semantic-entity-association.v19\"}",
       "owned_occurrence_count": 11,
       "explicit_touches": [
         "pen"
@@ -835,10 +835,10 @@
         "dense"
       ],
       "fluctuation_amplitudes": [
-        "fine"
+        "narrowly"
       ],
       "fluctuation_frequencies": [
-        "slowly"
+        "loosely"
       ],
       "fluctuation_qualities": [
         "undulating"
@@ -847,12 +847,12 @@
     {
       "id": "ja-fluctuation-order-two",
       "language": "ja",
-      "source": "波打つ、ゆっくり、細かく、濃い、粒、水平、破線、ペン、青、八つ、円。",
+      "source": "波打つ、ゆるやかに、細かく、濃い、粒、水平、破線、ペン、青、八つ、円。",
       "entity_count": 1,
       "issue_kinds": [
 
       ],
-      "canonical": "{\"entities\":[{\"angle\":{\"category\":\"angle\",\"id\":\"horizontal\"},\"color\":{\"category\":\"color\",\"id\":\"blue\"},\"continuity\":{\"category\":\"continuity\",\"id\":\"dashed\"},\"explicit_geometry\":null,\"fluctuation\":{\"amplitude\":{\"category\":\"variation\",\"id\":\"fine\"},\"frequency\":{\"category\":\"variation\",\"id\":\"slowly\"},\"quality\":{\"category\":\"variation\",\"id\":\"undulating\"}},\"head\":{\"category\":\"shape\",\"id\":\"circle\"},\"numeric_position\":null,\"proportion\":{\"arc_form\":null,\"aspect\":null,\"width_extent\":null},\"quantity\":8,\"relative_scale\":null,\"surface\":{\"intensity\":{\"category\":\"surface\",\"id\":\"dense\"},\"quality\":{\"category\":\"surface\",\"id\":\"grain\"}},\"thinness\":null,\"touch\":{\"category\":\"touch\",\"id\":\"pen\"}}],\"schema\":\"inku.semantic-entity-association.v19\"}",
+      "canonical": "{\"entities\":[{\"angle\":{\"category\":\"angle\",\"id\":\"horizontal\"},\"color\":{\"category\":\"color\",\"id\":\"blue\"},\"continuity\":{\"category\":\"continuity\",\"id\":\"dashed\"},\"explicit_geometry\":null,\"fluctuation\":{\"amplitude\":{\"category\":\"variation\",\"id\":\"narrowly\"},\"frequency\":{\"category\":\"variation\",\"id\":\"loosely\"},\"quality\":{\"category\":\"variation\",\"id\":\"undulating\"}},\"head\":{\"category\":\"shape\",\"id\":\"circle\"},\"numeric_position\":null,\"proportion\":{\"arc_form\":null,\"aspect\":null,\"width_extent\":null},\"quantity\":8,\"relative_scale\":null,\"surface\":{\"intensity\":{\"category\":\"handling\",\"id\":\"dense\"},\"quality\":{\"category\":\"surface\",\"id\":\"grain\"}},\"thinness\":null,\"touch\":{\"category\":\"touch\",\"id\":\"pen\"}}],\"schema\":\"inku.semantic-entity-association.v19\"}",
       "owned_occurrence_count": 11,
       "explicit_touches": [
         "pen"
@@ -870,10 +870,10 @@
         "dense"
       ],
       "fluctuation_amplitudes": [
-        "fine"
+        "narrowly"
       ],
       "fluctuation_frequencies": [
-        "slowly"
+        "loosely"
       ],
       "fluctuation_qualities": [
         "undulating"
@@ -882,12 +882,12 @@
     {
       "id": "en-fluctuation-order-one",
       "language": "en",
-      "source": "eight blue pen dashed horizontal grain dense fine slowly undulating circle.",
+      "source": "eight blue pen dashed horizontal grain dense narrowly loosely undulating circle.",
       "entity_count": 1,
       "issue_kinds": [
 
       ],
-      "canonical": "{\"entities\":[{\"angle\":{\"category\":\"angle\",\"id\":\"horizontal\"},\"color\":{\"category\":\"color\",\"id\":\"blue\"},\"continuity\":{\"category\":\"continuity\",\"id\":\"dashed\"},\"explicit_geometry\":null,\"fluctuation\":{\"amplitude\":{\"category\":\"variation\",\"id\":\"fine\"},\"frequency\":{\"category\":\"variation\",\"id\":\"slowly\"},\"quality\":{\"category\":\"variation\",\"id\":\"undulating\"}},\"head\":{\"category\":\"shape\",\"id\":\"circle\"},\"numeric_position\":null,\"proportion\":{\"arc_form\":null,\"aspect\":null,\"width_extent\":null},\"quantity\":8,\"relative_scale\":null,\"surface\":{\"intensity\":{\"category\":\"surface\",\"id\":\"dense\"},\"quality\":{\"category\":\"surface\",\"id\":\"grain\"}},\"thinness\":null,\"touch\":{\"category\":\"touch\",\"id\":\"pen\"}}],\"schema\":\"inku.semantic-entity-association.v19\"}",
+      "canonical": "{\"entities\":[{\"angle\":{\"category\":\"angle\",\"id\":\"horizontal\"},\"color\":{\"category\":\"color\",\"id\":\"blue\"},\"continuity\":{\"category\":\"continuity\",\"id\":\"dashed\"},\"explicit_geometry\":null,\"fluctuation\":{\"amplitude\":{\"category\":\"variation\",\"id\":\"narrowly\"},\"frequency\":{\"category\":\"variation\",\"id\":\"loosely\"},\"quality\":{\"category\":\"variation\",\"id\":\"undulating\"}},\"head\":{\"category\":\"shape\",\"id\":\"circle\"},\"numeric_position\":null,\"proportion\":{\"arc_form\":null,\"aspect\":null,\"width_extent\":null},\"quantity\":8,\"relative_scale\":null,\"surface\":{\"intensity\":{\"category\":\"handling\",\"id\":\"dense\"},\"quality\":{\"category\":\"surface\",\"id\":\"grain\"}},\"thinness\":null,\"touch\":{\"category\":\"touch\",\"id\":\"pen\"}}],\"schema\":\"inku.semantic-entity-association.v19\"}",
       "owned_occurrence_count": 11,
       "explicit_touches": [
         "pen"
@@ -905,10 +905,10 @@
         "dense"
       ],
       "fluctuation_amplitudes": [
-        "fine"
+        "narrowly"
       ],
       "fluctuation_frequencies": [
-        "slowly"
+        "loosely"
       ],
       "fluctuation_qualities": [
         "undulating"
@@ -917,12 +917,12 @@
     {
       "id": "en-fluctuation-order-two",
       "language": "en",
-      "source": "undulating slowly fine dense grain horizontal dashed pen blue eight circle.",
+      "source": "undulating loosely narrowly dense grain horizontal dashed pen blue eight circle.",
       "entity_count": 1,
       "issue_kinds": [
 
       ],
-      "canonical": "{\"entities\":[{\"angle\":{\"category\":\"angle\",\"id\":\"horizontal\"},\"color\":{\"category\":\"color\",\"id\":\"blue\"},\"continuity\":{\"category\":\"continuity\",\"id\":\"dashed\"},\"explicit_geometry\":null,\"fluctuation\":{\"amplitude\":{\"category\":\"variation\",\"id\":\"fine\"},\"frequency\":{\"category\":\"variation\",\"id\":\"slowly\"},\"quality\":{\"category\":\"variation\",\"id\":\"undulating\"}},\"head\":{\"category\":\"shape\",\"id\":\"circle\"},\"numeric_position\":null,\"proportion\":{\"arc_form\":null,\"aspect\":null,\"width_extent\":null},\"quantity\":8,\"relative_scale\":null,\"surface\":{\"intensity\":{\"category\":\"surface\",\"id\":\"dense\"},\"quality\":{\"category\":\"surface\",\"id\":\"grain\"}},\"thinness\":null,\"touch\":{\"category\":\"touch\",\"id\":\"pen\"}}],\"schema\":\"inku.semantic-entity-association.v19\"}",
+      "canonical": "{\"entities\":[{\"angle\":{\"category\":\"angle\",\"id\":\"horizontal\"},\"color\":{\"category\":\"color\",\"id\":\"blue\"},\"continuity\":{\"category\":\"continuity\",\"id\":\"dashed\"},\"explicit_geometry\":null,\"fluctuation\":{\"amplitude\":{\"category\":\"variation\",\"id\":\"narrowly\"},\"frequency\":{\"category\":\"variation\",\"id\":\"loosely\"},\"quality\":{\"category\":\"variation\",\"id\":\"undulating\"}},\"head\":{\"category\":\"shape\",\"id\":\"circle\"},\"numeric_position\":null,\"proportion\":{\"arc_form\":null,\"aspect\":null,\"width_extent\":null},\"quantity\":8,\"relative_scale\":null,\"surface\":{\"intensity\":{\"category\":\"handling\",\"id\":\"dense\"},\"quality\":{\"category\":\"surface\",\"id\":\"grain\"}},\"thinness\":null,\"touch\":{\"category\":\"touch\",\"id\":\"pen\"}}],\"schema\":\"inku.semantic-entity-association.v19\"}",
       "owned_occurrence_count": 11,
       "explicit_touches": [
         "pen"
@@ -940,10 +940,10 @@
         "dense"
       ],
       "fluctuation_amplitudes": [
-        "fine"
+        "narrowly"
       ],
       "fluctuation_frequencies": [
-        "slowly"
+        "loosely"
       ],
       "fluctuation_qualities": [
         "undulating"
@@ -952,29 +952,29 @@
     {
       "id": "fluctuation-amplitude-only",
       "language": "en",
-      "source": "fine arc.",
+      "source": "narrowly arc.",
       "entity_count": 1,
       "issue_kinds": [
 
       ],
-      "canonical": "{\"entities\":[{\"angle\":null,\"color\":null,\"continuity\":null,\"explicit_geometry\":null,\"fluctuation\":{\"amplitude\":{\"category\":\"variation\",\"id\":\"fine\"},\"frequency\":null,\"quality\":null},\"head\":{\"category\":\"shape\",\"id\":\"arc\"},\"numeric_position\":null,\"proportion\":{\"arc_form\":null,\"aspect\":null,\"width_extent\":null},\"quantity\":null,\"relative_scale\":null,\"surface\":{\"intensity\":null,\"quality\":null},\"thinness\":null,\"touch\":null}],\"schema\":\"inku.semantic-entity-association.v19\"}",
+      "canonical": "{\"entities\":[{\"angle\":null,\"color\":null,\"continuity\":null,\"explicit_geometry\":null,\"fluctuation\":{\"amplitude\":{\"category\":\"variation\",\"id\":\"narrowly\"},\"frequency\":null,\"quality\":null},\"head\":{\"category\":\"shape\",\"id\":\"arc\"},\"numeric_position\":null,\"proportion\":{\"arc_form\":null,\"aspect\":null,\"width_extent\":null},\"quantity\":null,\"relative_scale\":null,\"surface\":{\"intensity\":null,\"quality\":null},\"thinness\":null,\"touch\":null}],\"schema\":\"inku.semantic-entity-association.v19\"}",
       "owned_occurrence_count": 2,
       "fluctuation_amplitudes": [
-        "fine"
+        "narrowly"
       ]
     },
     {
       "id": "fluctuation-frequency-only",
       "language": "en",
-      "source": "quickly line.",
+      "source": "tightly line.",
       "entity_count": 1,
       "issue_kinds": [
 
       ],
-      "canonical": "{\"entities\":[{\"angle\":null,\"color\":null,\"continuity\":null,\"explicit_geometry\":null,\"fluctuation\":{\"amplitude\":null,\"frequency\":{\"category\":\"variation\",\"id\":\"quickly\"},\"quality\":null},\"head\":{\"category\":\"shape\",\"id\":\"line\"},\"numeric_position\":null,\"proportion\":{\"arc_form\":null,\"aspect\":null,\"width_extent\":null},\"quantity\":null,\"relative_scale\":null,\"surface\":{\"intensity\":null,\"quality\":null},\"thinness\":null,\"touch\":null}],\"schema\":\"inku.semantic-entity-association.v19\"}",
+      "canonical": "{\"entities\":[{\"angle\":null,\"color\":null,\"continuity\":null,\"explicit_geometry\":null,\"fluctuation\":{\"amplitude\":null,\"frequency\":{\"category\":\"variation\",\"id\":\"tightly\"},\"quality\":null},\"head\":{\"category\":\"shape\",\"id\":\"line\"},\"numeric_position\":null,\"proportion\":{\"arc_form\":null,\"aspect\":null,\"width_extent\":null},\"quantity\":null,\"relative_scale\":null,\"surface\":{\"intensity\":null,\"quality\":null},\"thinness\":null,\"touch\":null}],\"schema\":\"inku.semantic-entity-association.v19\"}",
       "owned_occurrence_count": 2,
       "fluctuation_frequencies": [
-        "quickly"
+        "tightly"
       ]
     },
     {
@@ -994,12 +994,12 @@
     {
       "id": "fluctuation-amplitude-contrast",
       "language": "ja",
-      "source": "八つ、青、ペン、破線、水平、粒、濃い、大きく、ゆっくり、波打つ、円。",
+      "source": "八つ、青、ペン、破線、水平、粒、濃い、大きく、ゆるやかに、波打つ、円。",
       "entity_count": 1,
       "issue_kinds": [
 
       ],
-      "canonical": "{\"entities\":[{\"angle\":{\"category\":\"angle\",\"id\":\"horizontal\"},\"color\":{\"category\":\"color\",\"id\":\"blue\"},\"continuity\":{\"category\":\"continuity\",\"id\":\"dashed\"},\"explicit_geometry\":null,\"fluctuation\":{\"amplitude\":{\"category\":\"variation\",\"id\":\"large\"},\"frequency\":{\"category\":\"variation\",\"id\":\"slowly\"},\"quality\":{\"category\":\"variation\",\"id\":\"undulating\"}},\"head\":{\"category\":\"shape\",\"id\":\"circle\"},\"numeric_position\":null,\"proportion\":{\"arc_form\":null,\"aspect\":null,\"width_extent\":null},\"quantity\":8,\"relative_scale\":null,\"surface\":{\"intensity\":{\"category\":\"surface\",\"id\":\"dense\"},\"quality\":{\"category\":\"surface\",\"id\":\"grain\"}},\"thinness\":null,\"touch\":{\"category\":\"touch\",\"id\":\"pen\"}}],\"schema\":\"inku.semantic-entity-association.v19\"}",
+      "canonical": "{\"entities\":[{\"angle\":{\"category\":\"angle\",\"id\":\"horizontal\"},\"color\":{\"category\":\"color\",\"id\":\"blue\"},\"continuity\":{\"category\":\"continuity\",\"id\":\"dashed\"},\"explicit_geometry\":null,\"fluctuation\":{\"amplitude\":{\"category\":\"variation\",\"id\":\"broadly\"},\"frequency\":{\"category\":\"variation\",\"id\":\"loosely\"},\"quality\":{\"category\":\"variation\",\"id\":\"undulating\"}},\"head\":{\"category\":\"shape\",\"id\":\"circle\"},\"numeric_position\":null,\"proportion\":{\"arc_form\":null,\"aspect\":null,\"width_extent\":null},\"quantity\":8,\"relative_scale\":null,\"surface\":{\"intensity\":{\"category\":\"handling\",\"id\":\"dense\"},\"quality\":{\"category\":\"surface\",\"id\":\"grain\"}},\"thinness\":null,\"touch\":{\"category\":\"touch\",\"id\":\"pen\"}}],\"schema\":\"inku.semantic-entity-association.v19\"}",
       "owned_occurrence_count": 11,
       "explicit_touches": [
         "pen"
@@ -1017,10 +1017,10 @@
         "dense"
       ],
       "fluctuation_amplitudes": [
-        "large"
+        "broadly"
       ],
       "fluctuation_frequencies": [
-        "slowly"
+        "loosely"
       ],
       "fluctuation_qualities": [
         "undulating"
@@ -1029,12 +1029,12 @@
     {
       "id": "fluctuation-frequency-contrast",
       "language": "en",
-      "source": "eight blue pen dashed horizontal grain dense fine quickly undulating circle.",
+      "source": "eight blue pen dashed horizontal grain dense narrowly tightly undulating circle.",
       "entity_count": 1,
       "issue_kinds": [
 
       ],
-      "canonical": "{\"entities\":[{\"angle\":{\"category\":\"angle\",\"id\":\"horizontal\"},\"color\":{\"category\":\"color\",\"id\":\"blue\"},\"continuity\":{\"category\":\"continuity\",\"id\":\"dashed\"},\"explicit_geometry\":null,\"fluctuation\":{\"amplitude\":{\"category\":\"variation\",\"id\":\"fine\"},\"frequency\":{\"category\":\"variation\",\"id\":\"quickly\"},\"quality\":{\"category\":\"variation\",\"id\":\"undulating\"}},\"head\":{\"category\":\"shape\",\"id\":\"circle\"},\"numeric_position\":null,\"proportion\":{\"arc_form\":null,\"aspect\":null,\"width_extent\":null},\"quantity\":8,\"relative_scale\":null,\"surface\":{\"intensity\":{\"category\":\"surface\",\"id\":\"dense\"},\"quality\":{\"category\":\"surface\",\"id\":\"grain\"}},\"thinness\":null,\"touch\":{\"category\":\"touch\",\"id\":\"pen\"}}],\"schema\":\"inku.semantic-entity-association.v19\"}",
+      "canonical": "{\"entities\":[{\"angle\":{\"category\":\"angle\",\"id\":\"horizontal\"},\"color\":{\"category\":\"color\",\"id\":\"blue\"},\"continuity\":{\"category\":\"continuity\",\"id\":\"dashed\"},\"explicit_geometry\":null,\"fluctuation\":{\"amplitude\":{\"category\":\"variation\",\"id\":\"narrowly\"},\"frequency\":{\"category\":\"variation\",\"id\":\"tightly\"},\"quality\":{\"category\":\"variation\",\"id\":\"undulating\"}},\"head\":{\"category\":\"shape\",\"id\":\"circle\"},\"numeric_position\":null,\"proportion\":{\"arc_form\":null,\"aspect\":null,\"width_extent\":null},\"quantity\":8,\"relative_scale\":null,\"surface\":{\"intensity\":{\"category\":\"handling\",\"id\":\"dense\"},\"quality\":{\"category\":\"surface\",\"id\":\"grain\"}},\"thinness\":null,\"touch\":{\"category\":\"touch\",\"id\":\"pen\"}}],\"schema\":\"inku.semantic-entity-association.v19\"}",
       "owned_occurrence_count": 11,
       "explicit_touches": [
         "pen"
@@ -1052,10 +1052,10 @@
         "dense"
       ],
       "fluctuation_amplitudes": [
-        "fine"
+        "narrowly"
       ],
       "fluctuation_frequencies": [
-        "quickly"
+        "tightly"
       ],
       "fluctuation_qualities": [
         "undulating"
@@ -1064,12 +1064,12 @@
     {
       "id": "fluctuation-quality-contrast",
       "language": "en",
-      "source": "eight blue pen dashed horizontal grain dense fine slowly swaying circle.",
+      "source": "eight blue pen dashed horizontal grain dense narrowly loosely swaying circle.",
       "entity_count": 1,
       "issue_kinds": [
 
       ],
-      "canonical": "{\"entities\":[{\"angle\":{\"category\":\"angle\",\"id\":\"horizontal\"},\"color\":{\"category\":\"color\",\"id\":\"blue\"},\"continuity\":{\"category\":\"continuity\",\"id\":\"dashed\"},\"explicit_geometry\":null,\"fluctuation\":{\"amplitude\":{\"category\":\"variation\",\"id\":\"fine\"},\"frequency\":{\"category\":\"variation\",\"id\":\"slowly\"},\"quality\":{\"category\":\"variation\",\"id\":\"swaying\"}},\"head\":{\"category\":\"shape\",\"id\":\"circle\"},\"numeric_position\":null,\"proportion\":{\"arc_form\":null,\"aspect\":null,\"width_extent\":null},\"quantity\":8,\"relative_scale\":null,\"surface\":{\"intensity\":{\"category\":\"surface\",\"id\":\"dense\"},\"quality\":{\"category\":\"surface\",\"id\":\"grain\"}},\"thinness\":null,\"touch\":{\"category\":\"touch\",\"id\":\"pen\"}}],\"schema\":\"inku.semantic-entity-association.v19\"}",
+      "canonical": "{\"entities\":[{\"angle\":{\"category\":\"angle\",\"id\":\"horizontal\"},\"color\":{\"category\":\"color\",\"id\":\"blue\"},\"continuity\":{\"category\":\"continuity\",\"id\":\"dashed\"},\"explicit_geometry\":null,\"fluctuation\":{\"amplitude\":{\"category\":\"variation\",\"id\":\"narrowly\"},\"frequency\":{\"category\":\"variation\",\"id\":\"loosely\"},\"quality\":{\"category\":\"variation\",\"id\":\"swaying\"}},\"head\":{\"category\":\"shape\",\"id\":\"circle\"},\"numeric_position\":null,\"proportion\":{\"arc_form\":null,\"aspect\":null,\"width_extent\":null},\"quantity\":8,\"relative_scale\":null,\"surface\":{\"intensity\":{\"category\":\"handling\",\"id\":\"dense\"},\"quality\":{\"category\":\"surface\",\"id\":\"grain\"}},\"thinness\":null,\"touch\":{\"category\":\"touch\",\"id\":\"pen\"}}],\"schema\":\"inku.semantic-entity-association.v19\"}",
       "owned_occurrence_count": 11,
       "explicit_touches": [
         "pen"
@@ -1087,10 +1087,10 @@
         "dense"
       ],
       "fluctuation_amplitudes": [
-        "fine"
+        "narrowly"
       ],
       "fluctuation_frequencies": [
-        "slowly"
+        "loosely"
       ],
       "fluctuation_qualities": [
         "swaying"
@@ -1110,7 +1110,7 @@
     {
       "id": "conflicting-fluctuation-frequencies",
       "language": "en",
-      "source": "quickly slowly circle.",
+      "source": "tightly loosely circle.",
       "entity_count": 1,
       "issue_kinds": [
         "conflicting_fluctuation_frequencies"
@@ -1132,7 +1132,7 @@
     {
       "id": "orphan-fluctuation-terms",
       "language": "en",
-      "source": "fine slowly undulating.",
+      "source": "narrowly loosely undulating.",
       "entity_count": 0,
       "issue_kinds": [
         "missing_entity_head"
@@ -1143,18 +1143,18 @@
     {
       "id": "multi-head-fluctuation-ambiguity",
       "language": "en",
-      "source": "fine slowly undulating circle line.",
+      "source": "narrowly loosely undulating circle line.",
       "entity_count": 2,
       "issue_kinds": [
 
       ],
-      "canonical": "{\"entities\":[{\"angle\":null,\"color\":null,\"continuity\":null,\"explicit_geometry\":null,\"fluctuation\":{\"amplitude\":{\"category\":\"variation\",\"id\":\"fine\"},\"frequency\":{\"category\":\"variation\",\"id\":\"slowly\"},\"quality\":{\"category\":\"variation\",\"id\":\"undulating\"}},\"head\":{\"category\":\"shape\",\"id\":\"circle\"},\"numeric_position\":null,\"proportion\":{\"arc_form\":null,\"aspect\":null,\"width_extent\":null},\"quantity\":null,\"relative_scale\":null,\"surface\":{\"intensity\":null,\"quality\":null},\"thinness\":null,\"touch\":null},{\"angle\":null,\"color\":null,\"continuity\":null,\"explicit_geometry\":null,\"fluctuation\":{\"amplitude\":null,\"frequency\":null,\"quality\":null},\"head\":{\"category\":\"shape\",\"id\":\"line\"},\"numeric_position\":null,\"proportion\":{\"arc_form\":null,\"aspect\":null,\"width_extent\":null},\"quantity\":null,\"relative_scale\":null,\"surface\":{\"intensity\":null,\"quality\":null},\"thinness\":null,\"touch\":null}],\"schema\":\"inku.semantic-entity-association.v19\"}",
+      "canonical": "{\"entities\":[{\"angle\":null,\"color\":null,\"continuity\":null,\"explicit_geometry\":null,\"fluctuation\":{\"amplitude\":{\"category\":\"variation\",\"id\":\"narrowly\"},\"frequency\":{\"category\":\"variation\",\"id\":\"loosely\"},\"quality\":{\"category\":\"variation\",\"id\":\"undulating\"}},\"head\":{\"category\":\"shape\",\"id\":\"circle\"},\"numeric_position\":null,\"proportion\":{\"arc_form\":null,\"aspect\":null,\"width_extent\":null},\"quantity\":null,\"relative_scale\":null,\"surface\":{\"intensity\":null,\"quality\":null},\"thinness\":null,\"touch\":null},{\"angle\":null,\"color\":null,\"continuity\":null,\"explicit_geometry\":null,\"fluctuation\":{\"amplitude\":null,\"frequency\":null,\"quality\":null},\"head\":{\"category\":\"shape\",\"id\":\"line\"},\"numeric_position\":null,\"proportion\":{\"arc_form\":null,\"aspect\":null,\"width_extent\":null},\"quantity\":null,\"relative_scale\":null,\"surface\":{\"intensity\":null,\"quality\":null},\"thinness\":null,\"touch\":null}],\"schema\":\"inku.semantic-entity-association.v19\"}",
       "owned_occurrence_count": 5,
       "fluctuation_amplitudes": [
-        "fine"
+        "narrowly"
       ],
       "fluctuation_frequencies": [
-        "slowly"
+        "loosely"
       ],
       "fluctuation_qualities": [
         "undulating"
@@ -1163,20 +1163,20 @@
     {
       "id": "regional-fluctuation-ownership",
       "language": "en",
-      "source": "fine slowly undulating circle. finely quickly swaying line.",
+      "source": "narrowly loosely undulating circle. narrowly tightly swaying line.",
       "entity_count": 2,
       "issue_kinds": [
 
       ],
-      "canonical": "{\"entities\":[{\"angle\":null,\"color\":null,\"continuity\":null,\"explicit_geometry\":null,\"fluctuation\":{\"amplitude\":{\"category\":\"variation\",\"id\":\"fine\"},\"frequency\":{\"category\":\"variation\",\"id\":\"slowly\"},\"quality\":{\"category\":\"variation\",\"id\":\"undulating\"}},\"head\":{\"category\":\"shape\",\"id\":\"circle\"},\"numeric_position\":null,\"proportion\":{\"arc_form\":null,\"aspect\":null,\"width_extent\":null},\"quantity\":null,\"relative_scale\":null,\"surface\":{\"intensity\":null,\"quality\":null},\"thinness\":null,\"touch\":null},{\"angle\":null,\"color\":null,\"continuity\":null,\"explicit_geometry\":null,\"fluctuation\":{\"amplitude\":{\"category\":\"variation\",\"id\":\"fine\"},\"frequency\":{\"category\":\"variation\",\"id\":\"quickly\"},\"quality\":{\"category\":\"variation\",\"id\":\"swaying\"}},\"head\":{\"category\":\"shape\",\"id\":\"line\"},\"numeric_position\":null,\"proportion\":{\"arc_form\":null,\"aspect\":null,\"width_extent\":null},\"quantity\":null,\"relative_scale\":null,\"surface\":{\"intensity\":null,\"quality\":null},\"thinness\":null,\"touch\":null}],\"schema\":\"inku.semantic-entity-association.v19\"}",
+      "canonical": "{\"entities\":[{\"angle\":null,\"color\":null,\"continuity\":null,\"explicit_geometry\":null,\"fluctuation\":{\"amplitude\":{\"category\":\"variation\",\"id\":\"narrowly\"},\"frequency\":{\"category\":\"variation\",\"id\":\"loosely\"},\"quality\":{\"category\":\"variation\",\"id\":\"undulating\"}},\"head\":{\"category\":\"shape\",\"id\":\"circle\"},\"numeric_position\":null,\"proportion\":{\"arc_form\":null,\"aspect\":null,\"width_extent\":null},\"quantity\":null,\"relative_scale\":null,\"surface\":{\"intensity\":null,\"quality\":null},\"thinness\":null,\"touch\":null},{\"angle\":null,\"color\":null,\"continuity\":null,\"explicit_geometry\":null,\"fluctuation\":{\"amplitude\":{\"category\":\"variation\",\"id\":\"narrowly\"},\"frequency\":{\"category\":\"variation\",\"id\":\"tightly\"},\"quality\":{\"category\":\"variation\",\"id\":\"swaying\"}},\"head\":{\"category\":\"shape\",\"id\":\"line\"},\"numeric_position\":null,\"proportion\":{\"arc_form\":null,\"aspect\":null,\"width_extent\":null},\"quantity\":null,\"relative_scale\":null,\"surface\":{\"intensity\":null,\"quality\":null},\"thinness\":null,\"touch\":null}],\"schema\":\"inku.semantic-entity-association.v19\"}",
       "owned_occurrence_count": 8,
       "fluctuation_amplitudes": [
-        "fine",
-        "fine"
+        "narrowly",
+        "narrowly"
       ],
       "fluctuation_frequencies": [
-        "slowly",
-        "quickly"
+        "loosely",
+        "tightly"
       ],
       "fluctuation_qualities": [
         "undulating",
@@ -1186,12 +1186,12 @@
     {
       "id": "fluctuation-soft-line-break",
       "language": "en",
-      "source": "eight blue pen dashed horizontal grain dense fine slowly undulating circle.\n",
+      "source": "eight blue pen dashed horizontal grain dense narrowly loosely undulating circle.\n",
       "entity_count": 1,
       "issue_kinds": [
 
       ],
-      "canonical": "{\"entities\":[{\"angle\":{\"category\":\"angle\",\"id\":\"horizontal\"},\"color\":{\"category\":\"color\",\"id\":\"blue\"},\"continuity\":{\"category\":\"continuity\",\"id\":\"dashed\"},\"explicit_geometry\":null,\"fluctuation\":{\"amplitude\":{\"category\":\"variation\",\"id\":\"fine\"},\"frequency\":{\"category\":\"variation\",\"id\":\"slowly\"},\"quality\":{\"category\":\"variation\",\"id\":\"undulating\"}},\"head\":{\"category\":\"shape\",\"id\":\"circle\"},\"numeric_position\":null,\"proportion\":{\"arc_form\":null,\"aspect\":null,\"width_extent\":null},\"quantity\":8,\"relative_scale\":null,\"surface\":{\"intensity\":{\"category\":\"surface\",\"id\":\"dense\"},\"quality\":{\"category\":\"surface\",\"id\":\"grain\"}},\"thinness\":null,\"touch\":{\"category\":\"touch\",\"id\":\"pen\"}}],\"schema\":\"inku.semantic-entity-association.v19\"}",
+      "canonical": "{\"entities\":[{\"angle\":{\"category\":\"angle\",\"id\":\"horizontal\"},\"color\":{\"category\":\"color\",\"id\":\"blue\"},\"continuity\":{\"category\":\"continuity\",\"id\":\"dashed\"},\"explicit_geometry\":null,\"fluctuation\":{\"amplitude\":{\"category\":\"variation\",\"id\":\"narrowly\"},\"frequency\":{\"category\":\"variation\",\"id\":\"loosely\"},\"quality\":{\"category\":\"variation\",\"id\":\"undulating\"}},\"head\":{\"category\":\"shape\",\"id\":\"circle\"},\"numeric_position\":null,\"proportion\":{\"arc_form\":null,\"aspect\":null,\"width_extent\":null},\"quantity\":8,\"relative_scale\":null,\"surface\":{\"intensity\":{\"category\":\"handling\",\"id\":\"dense\"},\"quality\":{\"category\":\"surface\",\"id\":\"grain\"}},\"thinness\":null,\"touch\":{\"category\":\"touch\",\"id\":\"pen\"}}],\"schema\":\"inku.semantic-entity-association.v19\"}",
       "owned_occurrence_count": 11,
       "explicit_touches": [
         "pen"
@@ -1209,10 +1209,10 @@
         "dense"
       ],
       "fluctuation_amplitudes": [
-        "fine"
+        "narrowly"
       ],
       "fluctuation_frequencies": [
-        "slowly"
+        "loosely"
       ],
       "fluctuation_qualities": [
         "undulating"
@@ -1221,7 +1221,7 @@
     {
       "id": "fluctuation-upstream-issue-retained",
       "language": "en",
-      "source": "fine slowly undulating circle orchard.",
+      "source": "narrowly loosely undulating circle orchard.",
       "entity_count": 1,
       "issue_kinds": [
         "upstream_unknown"
@@ -1229,10 +1229,10 @@
       "canonical": null,
       "owned_occurrence_count": 4,
       "fluctuation_amplitudes": [
-        "fine"
+        "narrowly"
       ],
       "fluctuation_frequencies": [
-        "slowly"
+        "loosely"
       ],
       "fluctuation_qualities": [
         "undulating"
@@ -1258,18 +1258,18 @@
     {
       "id": "unobserved-primitive-fluctuation-combination",
       "language": "en",
-      "source": "finely quickly undulating square.",
+      "source": "narrowly tightly undulating square.",
       "entity_count": 1,
       "issue_kinds": [
 
       ],
-      "canonical": "{\"entities\":[{\"angle\":null,\"color\":null,\"continuity\":null,\"explicit_geometry\":null,\"fluctuation\":{\"amplitude\":{\"category\":\"variation\",\"id\":\"fine\"},\"frequency\":{\"category\":\"variation\",\"id\":\"quickly\"},\"quality\":{\"category\":\"variation\",\"id\":\"undulating\"}},\"head\":{\"category\":\"shape\",\"id\":\"square\"},\"numeric_position\":null,\"proportion\":{\"arc_form\":null,\"aspect\":null,\"width_extent\":null},\"quantity\":null,\"relative_scale\":null,\"surface\":{\"intensity\":null,\"quality\":null},\"thinness\":null,\"touch\":null}],\"schema\":\"inku.semantic-entity-association.v19\"}",
+      "canonical": "{\"entities\":[{\"angle\":null,\"color\":null,\"continuity\":null,\"explicit_geometry\":null,\"fluctuation\":{\"amplitude\":{\"category\":\"variation\",\"id\":\"narrowly\"},\"frequency\":{\"category\":\"variation\",\"id\":\"tightly\"},\"quality\":{\"category\":\"variation\",\"id\":\"undulating\"}},\"head\":{\"category\":\"shape\",\"id\":\"square\"},\"numeric_position\":null,\"proportion\":{\"arc_form\":null,\"aspect\":null,\"width_extent\":null},\"quantity\":null,\"relative_scale\":null,\"surface\":{\"intensity\":null,\"quality\":null},\"thinness\":null,\"touch\":null}],\"schema\":\"inku.semantic-entity-association.v19\"}",
       "owned_occurrence_count": 4,
       "fluctuation_amplitudes": [
-        "fine"
+        "narrowly"
       ],
       "fluctuation_frequencies": [
-        "quickly"
+        "tightly"
       ],
       "fluctuation_qualities": [
         "undulating"

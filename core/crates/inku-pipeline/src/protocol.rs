@@ -111,6 +111,9 @@ pub enum ProtocolError {
     HostCommitFailed,
     Cancelled,
     InternalInvariant,
+    /// A saved document or definition was written with a retired Saijiki edition; its host
+    /// migrates it once and saves the result before the pipeline reads it (SPEC §3.3).
+    SaijikiMigrationRequired,
 }
 
 /// Stable pipeline failures are values, including at the generated-binding boundary.

@@ -88,6 +88,9 @@ def test_saijiki_prose_categories_track_enum_sizes() -> None:
         "てざわり",
         "つらなり",
         "おもて",
+        # Saijiki v2 (2026-09-29): how the ink or paint is laid on any mark, apart
+        # from the surface quality おもて names.
+        "さばき",
         # ddl-engine 19: the support a work is made on. It stands beside おもて
         # for the reason おもて stands beside つらなり -- one says how the inside
         # of a shape is, the other how the sheet under it is.

@@ -38,7 +38,7 @@ fn surface_intensity_stays_one_recipe_at_maximum_repetition() {
                 "color":{"expr":"semantic_ref","category":"color","id":"red"},
                 "count":{"expr":"integer","value":u32::MAX},
                 "surface":{"expr":"semantic_ref","category":"surface","id":"solid"},
-                "surface_intensity":{"expr":"semantic_ref","category":"surface","id":level}
+                "surface_intensity":{"expr":"semantic_ref","category":"handling","id":level}
             }}]
         }).to_string()).unwrap();
         let generated = stage("Fill.Row", ResolvedInstructionLanguage::En, &[definition]);
@@ -337,7 +337,7 @@ fn ratio(value: Rational, numerator: i128, denominator: i128) {
 fn explicit_layout_direction_natural_source_reaches_ready_plan() {
     for (source, language) in [
         (
-            "中央に、横線を縦に三本並べる。",
+            "中心に、横線を縦に三本並べる。",
             ResolvedInstructionLanguage::Ja,
         ),
         (
@@ -345,7 +345,7 @@ fn explicit_layout_direction_natural_source_reaches_ready_plan() {
             ResolvedInstructionLanguage::En,
         ),
         (
-            "中央に、斜めの線を横に三本並べる。",
+            "中心に、斜めの線を横に三本並べる。",
             ResolvedInstructionLanguage::Ja,
         ),
         (
@@ -353,7 +353,7 @@ fn explicit_layout_direction_natural_source_reaches_ready_plan() {
             ResolvedInstructionLanguage::En,
         ),
         (
-            "中央に、横線を三本並べる。線は縦に。",
+            "中心に、横線を三本並べる。線は縦に。",
             ResolvedInstructionLanguage::Ja,
         ),
         (
@@ -393,7 +393,7 @@ fn layout_axes_preserve_rectangular_physics_shape_size_and_large_count() {
     for canvas in ["golden", "oban"] {
         for (word, axis) in [("縦", [0, 1]), ("右上がり", [1, -1]), ("右下がり", [1, 1])] {
             for n in [4, u32::MAX] {
-                let source = format!("中央に、横線を{word}に{n}本並べる。");
+                let source = format!("中心に、横線を{word}に{n}本並べる。");
                 let transformed = stage(&source, ResolvedInstructionLanguage::Ja, &[]);
                 let result =
                     plan_verified_stage15(transformed.verified_effective_view(), context(canvas));
@@ -409,7 +409,7 @@ fn layout_axes_preserve_rectangular_physics_shape_size_and_large_count() {
                     panic!()
                 };
                 ratio(length, 6, 25);
-                // A line-up at `中央` runs through the middle cell and keeps
+                // A line-up at `中心` runs through the middle cell and keeps
                 // its canvas-long row.
                 match object.recipe() {
                     PlacementRecipe::VerticalLine { cell_height } => ratio(
@@ -601,7 +601,7 @@ fn unsupported_direction_and_conflicts_preserve_execution_boundaries() {
         ),
         (
             ResolvedInstructionLanguage::Ja,
-            "中央に、線と円を縦に並べる。",
+            "中心に、線と円を縦に並べる。",
         ),
     ] {
         assert!(

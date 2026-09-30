@@ -50,6 +50,7 @@ def _action(
     authority: str = "description_authoritative",
     attempt: int = 1,
     reason: str = "focused_test",
+    saijiki: object | None = None,
 ) -> dict:
     state = {
         "protocol_version": AUTHORITY_PROTOCOL,
@@ -58,6 +59,8 @@ def _action(
         "authority": authority,
     }
     document = {"source": source, "language": "ja", "macro_locks": []}
+    if saijiki is not None:
+        document["saijiki"] = saijiki
     payload = {
         "variation_id": "variation-1",
         "document": document,
@@ -152,6 +155,35 @@ def test_atomic_authority_commit_replays_ack_and_rejects_stale_tab(
     }
     first_engine.dispose()
     second_engine.dispose()
+
+
+def test_a_document_naming_its_saijiki_edition_commits(tmp_path) -> None:
+    # The core writes the edition on every new document (SPEC §3.3); a saved
+    # document without the field was written with v1.
+    engine = create_engine(f"sqlite:///{tmp_path / 'authority.db'}", future=True)
+    store = VariationAuthorityStore(engine)
+    store.install_schema()
+    named = _action(
+        action_digit="1",
+        source="赤い円を置く。",
+        expected_revision="0",
+        next_revision="1",
+        saijiki="inku.saijiki.v2",
+    )
+    assert store.commit_effect("author-1", named, create_if_missing=True)["tag"] == (
+        "visible_normalized_ddl_committed"
+    )
+    for digit, malformed in (("2", ""), ("3", 2)):
+        refused = _action(
+            action_digit=digit,
+            source="青い円を置く。",
+            expected_revision="1",
+            next_revision="2",
+            saijiki=malformed,
+        )
+        with pytest.raises(VariationAuthorityAdapterError, match="saijiki edition"):
+            store.commit_effect("author-1", refused)
+    engine.dispose()
 
 
 def test_origin_and_description_lock_are_immutable(tmp_path) -> None:

@@ -7,11 +7,11 @@
       "language": "ja",
       "source": "  紙、青\n円 ペン 塗り。\r\n",
       "expected_roles": [
-        {"role": "ground", "asset_id": "inku.saijiki.v1", "category_key": "ji", "canonical_surface_ja": "紙", "start_byte": 2, "end_byte": 5},
-        {"role": "color", "asset_id": "inku.saijiki.v1", "category_key": "iro", "canonical_surface_ja": "青", "start_byte": 8, "end_byte": 11},
-        {"role": "primitive", "asset_id": "inku.saijiki.v1", "category_key": "katachi", "canonical_surface_ja": "円", "start_byte": 12, "end_byte": 15},
-        {"role": "touch", "asset_id": "inku.saijiki.v1", "category_key": "tezawari", "canonical_surface_ja": "ペン", "start_byte": 16, "end_byte": 22},
-        {"role": "surface", "asset_id": "inku.saijiki.v1", "category_key": "omote", "canonical_surface_ja": "塗り", "start_byte": 23, "end_byte": 29}
+        {"role": "ground", "asset_id": "inku.saijiki.v2", "category_key": "ji", "canonical_surface_ja": "紙", "start_byte": 2, "end_byte": 5},
+        {"role": "color", "asset_id": "inku.saijiki.v2", "category_key": "iro", "canonical_surface_ja": "青", "start_byte": 8, "end_byte": 11},
+        {"role": "primitive", "asset_id": "inku.saijiki.v2", "category_key": "katachi", "canonical_surface_ja": "円", "start_byte": 12, "end_byte": 15},
+        {"role": "touch", "asset_id": "inku.saijiki.v2", "category_key": "tezawari", "canonical_surface_ja": "ペン", "start_byte": 16, "end_byte": 22},
+        {"role": "surface", "asset_id": "inku.saijiki.v2", "category_key": "omote", "canonical_surface_ja": "塗り", "start_byte": 23, "end_byte": 29}
       ],
       "expected_deferred": [],
       "expected_diagnostics": [],
@@ -22,11 +22,11 @@
       "language": "en",
       "source": " flat, PAPER\r\nblue pencil circle ",
       "expected_roles": [
-        {"role": "surface", "asset_id": "inku.saijiki.v1", "category_key": "omote", "canonical_surface_ja": "塗り", "start_byte": 1, "end_byte": 5},
-        {"role": "ground", "asset_id": "inku.saijiki.v1", "category_key": "ji", "canonical_surface_ja": "紙", "start_byte": 7, "end_byte": 12},
-        {"role": "color", "asset_id": "inku.saijiki.v1", "category_key": "iro", "canonical_surface_ja": "青", "start_byte": 14, "end_byte": 18},
-        {"role": "touch", "asset_id": "inku.saijiki.v1", "category_key": "tezawari", "canonical_surface_ja": "鉛筆", "start_byte": 19, "end_byte": 25},
-        {"role": "primitive", "asset_id": "inku.saijiki.v1", "category_key": "katachi", "canonical_surface_ja": "円", "start_byte": 26, "end_byte": 32}
+        {"role": "surface", "asset_id": "inku.saijiki.v2", "category_key": "omote", "canonical_surface_ja": "塗り", "start_byte": 1, "end_byte": 5},
+        {"role": "ground", "asset_id": "inku.saijiki.v2", "category_key": "ji", "canonical_surface_ja": "紙", "start_byte": 7, "end_byte": 12},
+        {"role": "color", "asset_id": "inku.saijiki.v2", "category_key": "iro", "canonical_surface_ja": "青", "start_byte": 14, "end_byte": 18},
+        {"role": "touch", "asset_id": "inku.saijiki.v2", "category_key": "tezawari", "canonical_surface_ja": "鉛筆", "start_byte": 19, "end_byte": 25},
+        {"role": "primitive", "asset_id": "inku.saijiki.v2", "category_key": "katachi", "canonical_surface_ja": "円", "start_byte": 26, "end_byte": 32}
       ],
       "expected_deferred": [],
       "expected_diagnostics": [],
@@ -37,9 +37,9 @@
       "language": "en",
       "source": "circle arc square",
       "expected_roles": [
-        {"role": "primitive", "asset_id": "inku.saijiki.v1", "category_key": "katachi", "canonical_surface_ja": "円", "start_byte": 0, "end_byte": 6},
-        {"role": "primitive", "asset_id": "inku.saijiki.v1", "category_key": "katachi", "canonical_surface_ja": "弧", "start_byte": 7, "end_byte": 10},
-        {"role": "primitive", "asset_id": "inku.saijiki.v1", "category_key": "katachi", "canonical_surface_ja": "四角", "start_byte": 11, "end_byte": 17}
+        {"role": "primitive", "asset_id": "inku.saijiki.v2", "category_key": "katachi", "canonical_surface_ja": "円", "start_byte": 0, "end_byte": 6},
+        {"role": "primitive", "asset_id": "inku.saijiki.v2", "category_key": "katachi", "canonical_surface_ja": "弧", "start_byte": 7, "end_byte": 10},
+        {"role": "primitive", "asset_id": "inku.saijiki.v2", "category_key": "katachi", "canonical_surface_ja": "四角", "start_byte": 11, "end_byte": 17}
       ],
       "expected_deferred": [],
       "expected_diagnostics": [],
@@ -48,18 +48,18 @@
     {
       "id": "en-all-deferred-kinds",
       "language": "en",
-      "source": "horizontal solid fine top place tall with 12 along",
+      "source": "horizontal solid narrowly top place tall with 12 along",
       "expected_roles": [],
       "expected_deferred": [
-        {"kind": "saijiki_word", "surface": "horizontal", "start_byte": 0, "end_byte": 10, "asset_id": "inku.saijiki.v1", "category_key": "katamuki", "canonical_surface_ja": "水平"},
-        {"kind": "saijiki_word", "surface": "solid", "start_byte": 11, "end_byte": 16, "asset_id": "inku.saijiki.v1", "category_key": "tsuranari", "canonical_surface_ja": "実線"},
-        {"kind": "saijiki_word", "surface": "fine", "start_byte": 17, "end_byte": 21, "asset_id": "inku.saijiki.v1", "category_key": "yuragi", "canonical_surface_ja": "細かく"},
-        {"kind": "saijiki_word", "surface": "top", "start_byte": 22, "end_byte": 25, "asset_id": "inku.saijiki.v1", "category_key": "basho", "canonical_surface_ja": "上"},
-        {"kind": "saijiki_word", "surface": "place", "start_byte": 26, "end_byte": 31, "asset_id": "inku.saijiki.v1", "category_key": "ugoki", "canonical_surface_ja": "置く"},
-        {"kind": "saijiki_word", "surface": "tall", "start_byte": 32, "end_byte": 36, "asset_id": "inku.saijiki.v1", "category_key": "wariai", "canonical_surface_ja": "縦長"},
-        {"kind": "function_word", "surface": "with", "start_byte": 37, "end_byte": 41},
-        {"kind": "exact_number", "surface": "12", "start_byte": 42, "end_byte": 44, "value": 12},
-        {"kind": "saijiki_relation", "surface": "along", "start_byte": 45, "end_byte": 50, "asset_id": "inku.saijiki.v1", "relation_type": "along"}
+        {"kind": "saijiki_word", "surface": "horizontal", "start_byte": 0, "end_byte": 10, "asset_id": "inku.saijiki.v2", "category_key": "katamuki", "canonical_surface_ja": "水平"},
+        {"kind": "saijiki_word", "surface": "solid", "start_byte": 11, "end_byte": 16, "asset_id": "inku.saijiki.v2", "category_key": "tsuranari", "canonical_surface_ja": "実線"},
+        {"kind": "saijiki_word", "surface": "narrowly", "start_byte": 17, "end_byte": 25, "asset_id": "inku.saijiki.v2", "category_key": "yuragi", "canonical_surface_ja": "細かく"},
+        {"kind": "saijiki_word", "surface": "top", "start_byte": 26, "end_byte": 29, "asset_id": "inku.saijiki.v2", "category_key": "basho", "canonical_surface_ja": "上"},
+        {"kind": "saijiki_word", "surface": "place", "start_byte": 30, "end_byte": 35, "asset_id": "inku.saijiki.v2", "category_key": "ugoki", "canonical_surface_ja": "置く"},
+        {"kind": "saijiki_word", "surface": "tall", "start_byte": 36, "end_byte": 40, "asset_id": "inku.saijiki.v2", "category_key": "wariai", "canonical_surface_ja": "縦長"},
+        {"kind": "function_word", "surface": "with", "start_byte": 41, "end_byte": 45},
+        {"kind": "exact_number", "surface": "12", "start_byte": 46, "end_byte": 48, "value": 12},
+        {"kind": "saijiki_relation", "surface": "along", "start_byte": 49, "end_byte": 54, "asset_id": "inku.saijiki.v2", "relation_type": "along"}
       ],
       "expected_diagnostics": [],
       "recognized_delivery_count": 9
@@ -69,7 +69,7 @@
       "language": "en",
       "source": "circle with many orchard Nature.petals",
       "expected_roles": [
-        {"role": "primitive", "asset_id": "inku.saijiki.v1", "category_key": "katachi", "canonical_surface_ja": "円", "start_byte": 0, "end_byte": 6}
+        {"role": "primitive", "asset_id": "inku.saijiki.v2", "category_key": "katachi", "canonical_surface_ja": "円", "start_byte": 0, "end_byte": 6}
       ],
       "expected_deferred": [
         {"kind": "function_word", "surface": "with", "start_byte": 7, "end_byte": 11}
@@ -100,8 +100,8 @@
       "language": "ja",
       "source": "鉛筆の細い線",
       "expected_roles": [
-        {"role": "touch", "asset_id": "inku.saijiki.v1", "category_key": "tezawari", "canonical_surface_ja": "鉛筆", "start_byte": 0, "end_byte": 6},
-        {"role": "primitive", "asset_id": "inku.saijiki.v1", "category_key": "katachi", "canonical_surface_ja": "線", "start_byte": 15, "end_byte": 18}
+        {"role": "touch", "asset_id": "inku.saijiki.v2", "category_key": "tezawari", "canonical_surface_ja": "鉛筆", "start_byte": 0, "end_byte": 6},
+        {"role": "primitive", "asset_id": "inku.saijiki.v2", "category_key": "katachi", "canonical_surface_ja": "線", "start_byte": 15, "end_byte": 18}
       ],
       "expected_core_modifiers": [
         {"dimension": "thinness", "value": "fine", "start_byte": 9, "end_byte": 15}
@@ -117,7 +117,7 @@
       "language": "en",
       "source": "small circle",
       "expected_roles": [
-        {"role": "primitive", "asset_id": "inku.saijiki.v1", "category_key": "katachi", "canonical_surface_ja": "円", "start_byte": 6, "end_byte": 12}
+        {"role": "primitive", "asset_id": "inku.saijiki.v2", "category_key": "katachi", "canonical_surface_ja": "円", "start_byte": 6, "end_byte": 12}
       ],
       "expected_core_modifiers": [
         {"dimension": "relative_scale", "value": "small", "start_byte": 0, "end_byte": 5}

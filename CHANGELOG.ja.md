@@ -6,6 +6,19 @@
 
 **本書は v2.5.0（2026-07-25、render engine 12）以降の履歴を保持する。** 最近の記録に続く過去の履歴は、同じ文書内で折りたたんである。必要なときに展開して読める。折りたたみに対応しないビューアでは全文を表示する。それより前の履歴は [v1.72〜v2.4の書庫](docs/history/changelog-v1.72-v2.4.ja.md) と [v0.1〜v1.71の書庫](docs/history/changelog-v0.1-v1.71.ja.md) にある。
 
+### 2026-09-30 — 歳時記 v2: さばき・刷き・波の数の語と、保存データの移行（DDL Spec 16、DDL engine 53）
+
+作者の裁定（2026-09-29）で、歳時記を v2（`inku.saijiki.v2`）にした。歳時記の語は一語一意とし、読み手（Stage 1）の選び方の偏りは、描く段ではなく語彙で直す（SPEC §3.3）。
+
+- 新しいカテゴリ「さばき」（handling）を置き、濃い・薄いを「おもて」から移した。濃淡は平らな塗りだけでなく、線・弧・質感の面にも届く（faint は道具の不透明度の 0.55 倍、dense は 1.35 倍。Score 0.17.0）。
+- 薄墨を「刷き」（sweep）に改めた。刷きは薄墨と同じ幅の広い掃きで、自らの淡さを持たない（線の帯 0.64、面の掃き 0.40 は比較シートの候補）。淡さは、さばきの「薄い」が持つ。Score に面の値 `sweep` を足した。保存済みの Score の `wash` は、今の淡い描き方のまま残る（render engine 72）。
+- ゆっくり・速くを、波の数を言う「ゆるやかに」「小刻みに」に改めた。英語の振れ幅は副詞だけで書く（narrowly・broadly）。
+- 下絵の値は語の英語をそのまま使い、欄の名を `position`・`handling`・`motion_spacing` にした（`inku.work-plan.v2`、受理行列 `inku.work-plan-capabilities.v2`）。
+- v1 が入力として読んだ旧い語（点描の意味の「点」、震える・trembling・滲む・blurring・中央・middle）は読まない。「点」は形の点だけを言う。
+- 保存済みの文書と Macro 定義は、一度だけ上書きで移行する。移行の関数は共有 core にあり、host は `migrate_saijiki_v1` で呼ぶ。文書は版の欄 `saijiki` を持ち、欄の無い文書と、移行でしか通らない定義は `saijiki_migration_required` で止まる。移行した定義は版を変えず、digest だけが変わる。同梱の Nature.leaves も同じ移行で書き換え、版は 2.0.0 のまま。保存済みの定義の blurring（Pink の揺れ）は、にじみ（墨のにじみ）へ移した。
+
+幾何の方針の digest は `0567c999…` になる。
+
 ### 2026-09-30 — Android: provider通信をServerに同期し、Sonnet 5.5の撮影入力を修正
 
 Anthropicへの要求は、Serverの描画・Visionと同じくモデルによらず`temperature`を省く。Sonnet 5.5の写真記述が`temperature: 0.2`をHTTP 400で拒否し、「画像処理に失敗しました」と表示していた。Geminiの画像要求は接続名・モデル名によらず最小の思考を使い、記述の後に画像を送る。Anthropic・Geminiのテキストブロックの区切りを保ち、OpenAI互換・Geminiの描画応答で複数の回答ツールを受け入れないようにした。画像の記述生成のAPI拒否理由も、描画と同じ秘匿処理を通してログへ残す。

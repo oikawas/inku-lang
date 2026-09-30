@@ -20,56 +20,57 @@ use crate::fluctuation::{FluctuationDimension, classify_fluctuation_dimension};
 use crate::grammar_markers::MarkerId;
 use crate::macro_definition::project_macro_semantic_ref;
 use crate::parser::{CoreModifierValue, core_modifier_surface_forms};
-use crate::saijiki::saijiki_asset;
+use crate::saijiki::{canonical_wire_id, saijiki_asset};
 
-pub const WORK_PLAN_SCHEMA_ID: &str = "inku.work-plan.v1";
-pub const WORK_PLAN_CAPABILITIES_ASSET_ID: &str = "inku.work-plan-capabilities.v1";
+pub const WORK_PLAN_SCHEMA_ID: &str = "inku.work-plan.v2";
+pub const WORK_PLAN_CAPABILITIES_ASSET_ID: &str = "inku.work-plan-capabilities.v2";
 pub const WORK_PLAN_CAPABILITIES_ASSET_BYTES: &[u8] =
-    include_bytes!("../assets/work-plan-capabilities-v1.json");
+    include_bytes!("../assets/work-plan-capabilities-v2.json");
 pub const UNSPECIFIED: &str = "unspecified";
 pub const MAX_WORK_PLAN_LAYERS: usize = 8;
 pub const MAX_WORK_PLAN_COUNT: u32 = 60;
 pub const MAX_WORK_PLAN_PLUGINS: usize = 4;
 
-/// One closed plan slot. Slot names are the plan's JSON field names.
+/// One closed plan slot. Slot names are the plan's JSON field names, and each
+/// names what its words mean (the Saijiki's one word, one meaning).
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum WorkPlanSlot {
     Shape,
     Proportion,
     Action,
-    Place,
+    Position,
     Size,
     Color,
     Tool,
     Thinness,
     Continuity,
     Surface,
-    SurfaceIntensity,
+    Handling,
     Angle,
     LineUpDirection,
     MotionQuality,
     MotionAmplitude,
-    MotionSpeed,
+    MotionSpacing,
     Bleeding,
     Ground,
 }
 
 impl WorkPlanSlot {
     pub const LAYER_ATTRIBUTES: [Self; 15] = [
-        Self::Place,
+        Self::Position,
         Self::Size,
         Self::Color,
         Self::Tool,
         Self::Thinness,
         Self::Continuity,
         Self::Surface,
-        Self::SurfaceIntensity,
+        Self::Handling,
         Self::Angle,
         Self::LineUpDirection,
         Self::MotionQuality,
         Self::MotionAmplitude,
-        Self::MotionSpeed,
+        Self::MotionSpacing,
         Self::Bleeding,
         Self::Action,
     ];
@@ -80,26 +81,28 @@ impl WorkPlanSlot {
             Self::Shape => "shape",
             Self::Proportion => "proportion",
             Self::Action => "action",
-            Self::Place => "place",
+            Self::Position => "position",
             Self::Size => "size",
             Self::Color => "color",
             Self::Tool => "tool",
             Self::Thinness => "thinness",
             Self::Continuity => "continuity",
             Self::Surface => "surface",
-            Self::SurfaceIntensity => "surface_intensity",
+            Self::Handling => "handling",
             Self::Angle => "angle",
             Self::LineUpDirection => "line_up_direction",
             Self::MotionQuality => "motion_quality",
             Self::MotionAmplitude => "motion_amplitude",
-            Self::MotionSpeed => "motion_speed",
+            Self::MotionSpacing => "motion_spacing",
             Self::Bleeding => "bleeding",
             Self::Ground => "ground",
         }
     }
 }
 
-/// One closed value with its visible surfaces.
+/// One closed value with its visible surfaces. The value a provider reads and
+/// writes is the word's own English, so a word that keeps one meaning in the
+/// Saijiki keeps it in the plan too.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct WorkPlanTerm {
     pub id: String,
@@ -129,7 +132,9 @@ impl WorkPlanVocabulary {
     }
 }
 
-fn saijiki_terms(category_key: &str) -> Vec<WorkPlanTerm> {
+/// Each prompt word of one category with its canonical semantic ID, which
+/// decides the slot of a word whose category spans several slots.
+fn saijiki_terms(category_key: &str) -> Vec<(String, WorkPlanTerm)> {
     let Some(category) = saijiki_asset()
         .categories
         .iter()
@@ -142,12 +147,17 @@ fn saijiki_terms(category_key: &str) -> Vec<WorkPlanTerm> {
         .iter()
         .filter(|word| word.prompt)
         .filter_map(|word| {
-            let id = project_macro_semantic_ref(category_key, &word.surface_ja)?.canonical_id;
-            Some(WorkPlanTerm {
-                id,
-                ja: word.surface_ja.clone(),
-                en: word.surface_en.clone()?,
-            })
+            let canonical =
+                project_macro_semantic_ref(category_key, &word.surface_ja)?.canonical_id;
+            let en = word.surface_en.clone()?;
+            Some((
+                canonical,
+                WorkPlanTerm {
+                    id: canonical_wire_id(&en),
+                    ja: word.surface_ja.clone(),
+                    en,
+                },
+            ))
         })
         .collect()
 }
@@ -162,11 +172,13 @@ fn core_terms(dimension: fn(CoreModifierValue) -> bool) -> Vec<WorkPlanTerm> {
             .map(|(surface, _)| (*surface).to_owned())
     };
     let mut out: Vec<WorkPlanTerm> = Vec::new();
+    let mut seen: Vec<CoreModifierValue> = Vec::new();
     for (_, value) in ja.thinness.iter().chain(ja.relative_scale) {
         let value = *value;
-        if !dimension(value) || out.iter().any(|term| term.id == value.as_str()) {
+        if !dimension(value) || seen.contains(&value) {
             continue;
         }
+        seen.push(value);
         let forms_ja = if matches!(
             value,
             CoreModifierValue::Fine
@@ -191,7 +203,7 @@ fn core_terms(dimension: fn(CoreModifierValue) -> bool) -> Vec<WorkPlanTerm> {
         };
         if let (Some(ja), Some(en)) = (first(forms_ja, value), first(forms_en, value)) {
             out.push(WorkPlanTerm {
-                id: value.as_str().to_owned(),
+                id: canonical_wire_id(&en),
                 ja,
                 en,
             });
@@ -210,35 +222,24 @@ pub fn work_plan_vocabulary() -> &'static WorkPlanVocabulary {
             (WorkPlanSlot::Shape, "katachi"),
             (WorkPlanSlot::Proportion, "wariai"),
             (WorkPlanSlot::Action, "ugoki"),
-            (WorkPlanSlot::Place, "basho"),
+            (WorkPlanSlot::Position, "basho"),
             (WorkPlanSlot::Color, "iro"),
             (WorkPlanSlot::Tool, "tezawari"),
             (WorkPlanSlot::Continuity, "tsuranari"),
             (WorkPlanSlot::Angle, "katamuki"),
             (WorkPlanSlot::LineUpDirection, "katamuki"),
             (WorkPlanSlot::Ground, "ji"),
+            (WorkPlanSlot::Surface, "omote"),
+            (WorkPlanSlot::Handling, "sabaki"),
         ] {
-            for term in saijiki_terms(key) {
+            for (_, term) in saijiki_terms(key) {
                 vocabulary.push(slot, term);
             }
         }
-        let intensity_ids = [
-            inku_score::SurfaceIntensity::Dense,
-            inku_score::SurfaceIntensity::Faint,
-        ]
-        .map(|value| serde_json::to_value(value).unwrap_or_default());
-        for term in saijiki_terms("omote") {
-            let slot = if intensity_ids.iter().any(|id| id == term.id.as_str()) {
-                WorkPlanSlot::SurfaceIntensity
-            } else {
-                WorkPlanSlot::Surface
-            };
-            vocabulary.push(slot, term);
-        }
-        for term in saijiki_terms("yuragi") {
-            let slot = match classify_fluctuation_dimension(&term.id) {
+        for (canonical, term) in saijiki_terms("yuragi") {
+            let slot = match classify_fluctuation_dimension(&canonical) {
                 Some(FluctuationDimension::Amplitude) => WorkPlanSlot::MotionAmplitude,
-                Some(FluctuationDimension::Frequency) => WorkPlanSlot::MotionSpeed,
+                Some(FluctuationDimension::Frequency) => WorkPlanSlot::MotionSpacing,
                 Some(FluctuationDimension::Quality) => WorkPlanSlot::MotionQuality,
                 Some(FluctuationDimension::Spread) => WorkPlanSlot::Bleeding,
                 None => continue,
@@ -428,7 +429,7 @@ pub fn work_plan_response_schema_with_plugins(plugins: &[String]) -> Value {
                     "type": "object",
                     "properties": layer,
                     "required": [
-                        "shape", "proportion", "action", "count", "place", "size",
+                        "shape", "proportion", "action", "count", "position", "size",
                         "color", "tool", "surface", "motion_quality"
                     ]
                 }
@@ -623,7 +624,7 @@ pub fn normalize_work_plan_with_plugins(
             note(Some(index), "line_up_direction", value, "requires_line_up");
         }
         if out.attribute(WorkPlanSlot::MotionQuality).is_none() {
-            for slot in [WorkPlanSlot::MotionAmplitude, WorkPlanSlot::MotionSpeed] {
+            for slot in [WorkPlanSlot::MotionAmplitude, WorkPlanSlot::MotionSpacing] {
                 if let Some(value) = out.attributes.remove(&slot) {
                     note(Some(index), slot.field(), value, "requires_motion_quality");
                 }
@@ -656,13 +657,13 @@ fn print_layer_ja(layer: &WorkPlanLayer) -> String {
     let ja = ResolvedInstructionLanguage::Ja;
     let no = MarkerId::JaNo.surface();
     let mut out = String::new();
-    if let Some(place) = layer.attribute(WorkPlanSlot::Place) {
-        out.push_str(&surface(WorkPlanSlot::Place, place, ja));
+    if let Some(place) = layer.attribute(WorkPlanSlot::Position) {
+        out.push_str(&surface(WorkPlanSlot::Position, place, ja));
         out.push_str(MarkerId::JaNi.surface());
         out.push('、');
     }
     if let Some(quality) = layer.attribute(WorkPlanSlot::MotionQuality) {
-        for slot in [WorkPlanSlot::MotionAmplitude, WorkPlanSlot::MotionSpeed] {
+        for slot in [WorkPlanSlot::MotionAmplitude, WorkPlanSlot::MotionSpacing] {
             if let Some(value) = layer.attribute(slot) {
                 out.push_str(&surface(slot, value, ja));
             }
@@ -678,8 +679,8 @@ fn print_layer_ja(layer: &WorkPlanLayer) -> String {
         WorkPlanSlot::Thinness,
         WorkPlanSlot::Tool,
         WorkPlanSlot::Continuity,
+        WorkPlanSlot::Handling,
         WorkPlanSlot::Surface,
-        WorkPlanSlot::SurfaceIntensity,
         WorkPlanSlot::Angle,
     ] {
         if let Some(value) = layer.attribute(slot) {
@@ -709,15 +710,10 @@ fn print_layer_en(layer: &WorkPlanLayer) -> String {
     let en = ResolvedInstructionLanguage::En;
     let mut words: Vec<String> = Vec::new();
     if let Some(quality) = layer.attribute(WorkPlanSlot::MotionQuality) {
-        for slot in [WorkPlanSlot::MotionAmplitude, WorkPlanSlot::MotionSpeed] {
+        // Amplitude and wave spacing words are adverbs (narrowly, loosely).
+        for slot in [WorkPlanSlot::MotionAmplitude, WorkPlanSlot::MotionSpacing] {
             if let Some(value) = layer.attribute(slot) {
-                let base = surface(slot, value, en);
-                // Amplitude is written as its adverb so it never reads as a size.
-                words.push(if slot == WorkPlanSlot::MotionAmplitude {
-                    format!("{base}ly")
-                } else {
-                    base
-                });
+                words.push(surface(slot, value, en));
             }
         }
         words.push(surface(WorkPlanSlot::MotionQuality, quality, en));
@@ -730,8 +726,8 @@ fn print_layer_en(layer: &WorkPlanLayer) -> String {
         WorkPlanSlot::Thinness,
         WorkPlanSlot::Tool,
         WorkPlanSlot::Continuity,
+        WorkPlanSlot::Handling,
         WorkPlanSlot::Surface,
-        WorkPlanSlot::SurfaceIntensity,
         WorkPlanSlot::Angle,
     ] {
         if let Some(value) = layer.attribute(slot) {
@@ -768,10 +764,10 @@ fn print_layer_en(layer: &WorkPlanLayer) -> String {
             surface(WorkPlanSlot::LineUpDirection, direction, en)
         ));
     }
-    if let Some(place) = layer.attribute(WorkPlanSlot::Place) {
+    if let Some(place) = layer.attribute(WorkPlanSlot::Position) {
         out.push_str(&format!(
             " at the {}",
-            surface(WorkPlanSlot::Place, place, en)
+            surface(WorkPlanSlot::Position, place, en)
         ));
     }
     out.push('.');
@@ -974,7 +970,7 @@ pub fn derive_work_plan_capabilities() -> WorkPlanCapabilities {
                     } else {
                         if matches!(
                             slot,
-                            WorkPlanSlot::MotionAmplitude | WorkPlanSlot::MotionSpeed
+                            WorkPlanSlot::MotionAmplitude | WorkPlanSlot::MotionSpacing
                         ) {
                             let Some(quality) =
                                 vocabulary.terms(WorkPlanSlot::MotionQuality).first()

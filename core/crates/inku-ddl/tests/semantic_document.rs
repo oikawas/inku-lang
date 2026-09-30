@@ -18,14 +18,14 @@ const FIXTURE: &str = include_str!("fixtures/semantic-document-v14.json");
 fn shape_constraints_keep_base_head_continuation_and_canonical_meaning() {
     for (inline, continuation, primitive, sides) in [
         (
-            "赤い正三角形を中央に置く。",
-            "正三角形を中央に置く。三角は赤い。",
+            "赤い正三角形を中心に置く。",
+            "正三角形を中心に置く。三角は赤い。",
             "triangle",
             None,
         ),
         (
-            "赤い六角形を中央に置く。",
-            "六角形を中央に置く。多角形は赤い。",
+            "赤い六角形を中心に置く。",
+            "六角形を中心に置く。多角形は赤い。",
             "polygon",
             Some(6),
         ),
@@ -71,8 +71,8 @@ fn layout_direction_continuation_has_same_meaning_and_distinct_source() {
     for (language, inline, continuation) in [
         (
             ResolvedInstructionLanguage::Ja,
-            "中央に、横線を縦に三本並べる。",
-            "中央に、横線を三本並べる。線は縦に。",
+            "中心に、横線を縦に三本並べる。",
+            "中心に、横線を三本並べる。線は縦に。",
         ),
         (
             ResolvedInstructionLanguage::En,
@@ -475,7 +475,7 @@ fn multi_head_continuation_predicate_occurrences_have_one_exclusive_owner() {
         ),
         (
             ResolvedInstructionLanguage::En,
-            "line circle. the line the circle swaying fine.",
+            "line circle. the line the circle swaying narrowly.",
             2,
         ),
         (
@@ -809,7 +809,7 @@ fn marked_subject_predicate_continues_the_unique_prior_entity() {
         ),
         (
             ResolvedInstructionLanguage::En,
-            "place one thin pencil line at the center. the line swaying fine.",
+            "place one thin pencil line at the center. the line swaying narrowly.",
         ),
     ] {
         let document = NormalizedDdlDocument::new(source, language, Vec::new()).unwrap();
@@ -835,7 +835,7 @@ fn marked_subject_predicate_continues_the_unique_prior_entity() {
                 .amplitude
                 .as_ref()
                 .map(|term| term.identity.id.as_str()),
-            Some("fine"),
+            Some("narrowly"),
             "{source}"
         );
         assert_eq!(
@@ -903,23 +903,23 @@ fn inline_and_continuation_forms_share_primitive_canonical_meaning() {
 fn continuation_target_cardinality_and_boundary_fail_closed_without_order_fallback() {
     for (source, expected) in [
         (
-            "circle. the line swaying fine.",
+            "circle. the line swaying narrowly.",
             SemanticContinuationIssueKind::MissingTarget,
         ),
         (
-            "line. line. the line swaying fine.",
+            "line. line. the line swaying narrowly.",
             SemanticContinuationIssueKind::AmbiguousTarget,
         ),
         (
-            "line. mystery. the line swaying fine.",
+            "line. mystery. the line swaying narrowly.",
             SemanticContinuationIssueKind::BlockedBoundary,
         ),
         (
-            "line. mystery. orchard. the line swaying fine.",
+            "line. mystery. orchard. the line swaying narrowly.",
             SemanticContinuationIssueKind::BlockedBoundary,
         ),
         (
-            "fine line. the line large swaying.",
+            "narrowly line. the line broadly swaying.",
             SemanticContinuationIssueKind::ConflictingPredicate,
         ),
     ] {
@@ -970,7 +970,10 @@ fn continuation_target_cardinality_and_boundary_fail_closed_without_order_fallba
 fn leading_marked_predicate_is_missing_target_but_head_only_remains_independent() {
     for (language, source) in [
         (ResolvedInstructionLanguage::Ja, "線は細かく揺れる。"),
-        (ResolvedInstructionLanguage::En, "the line swaying fine."),
+        (
+            ResolvedInstructionLanguage::En,
+            "the line swaying narrowly.",
+        ),
     ] {
         let document = NormalizedDdlDocument::new(source, language, Vec::new()).unwrap();
         let result = associate_semantic_document(&document).unwrap();
@@ -1010,8 +1013,8 @@ fn leading_marked_predicate_is_missing_target_but_head_only_remains_independent(
 #[test]
 fn continuation_preserves_original_fields_and_accepts_reordered_predicate_atoms() {
     let sources = [
-        "place one thin pencil line at center. the line swaying fine.",
-        "place one thin pencil line at center. the line fine swaying.",
+        "place one thin pencil line at center. the line swaying narrowly.",
+        "place one thin pencil line at center. the line narrowly swaying.",
     ];
     let results = sources.map(|source| {
         let document =

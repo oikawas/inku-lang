@@ -7,16 +7,16 @@
       "language": "ja",
       "source": "円 青、水平\r\n破線 細かく 上 置く 縦長 を 八つ 8 沿う たくさん",
       "expected_core_roles": [
-        {"role": "primitive", "asset_id": "inku.saijiki.v1", "category_key": "katachi", "canonical_surface_ja": "円", "start_byte": 0, "end_byte": 3},
-        {"role": "color", "asset_id": "inku.saijiki.v1", "category_key": "iro", "canonical_surface_ja": "青", "start_byte": 4, "end_byte": 7}
+        {"role": "primitive", "asset_id": "inku.saijiki.v2", "category_key": "katachi", "canonical_surface_ja": "円", "start_byte": 0, "end_byte": 3},
+        {"role": "color", "asset_id": "inku.saijiki.v2", "category_key": "iro", "canonical_surface_ja": "青", "start_byte": 4, "end_byte": 7}
       ],
       "expected_remaining_roles": [
-        {"role": "angle", "asset_id": "inku.saijiki.v1", "category_key": "katamuki", "canonical_surface_ja": "水平", "start_byte": 10, "end_byte": 16},
-        {"role": "continuity", "asset_id": "inku.saijiki.v1", "category_key": "tsuranari", "canonical_surface_ja": "破線", "start_byte": 18, "end_byte": 24},
-        {"role": "fluctuation", "asset_id": "inku.saijiki.v1", "category_key": "yuragi", "canonical_surface_ja": "細かく", "start_byte": 25, "end_byte": 34},
-        {"role": "place", "asset_id": "inku.saijiki.v1", "category_key": "basho", "canonical_surface_ja": "上", "start_byte": 35, "end_byte": 38},
-        {"role": "motion", "asset_id": "inku.saijiki.v1", "category_key": "ugoki", "canonical_surface_ja": "置く", "start_byte": 39, "end_byte": 45},
-        {"role": "proportion", "asset_id": "inku.saijiki.v1", "category_key": "wariai", "canonical_surface_ja": "縦長", "start_byte": 46, "end_byte": 52}
+        {"role": "angle", "asset_id": "inku.saijiki.v2", "category_key": "katamuki", "canonical_surface_ja": "水平", "start_byte": 10, "end_byte": 16},
+        {"role": "continuity", "asset_id": "inku.saijiki.v2", "category_key": "tsuranari", "canonical_surface_ja": "破線", "start_byte": 18, "end_byte": 24},
+        {"role": "fluctuation", "asset_id": "inku.saijiki.v2", "category_key": "yuragi", "canonical_surface_ja": "細かく", "start_byte": 25, "end_byte": 34},
+        {"role": "place", "asset_id": "inku.saijiki.v2", "category_key": "basho", "canonical_surface_ja": "上", "start_byte": 35, "end_byte": 38},
+        {"role": "motion", "asset_id": "inku.saijiki.v2", "category_key": "ugoki", "canonical_surface_ja": "置く", "start_byte": 39, "end_byte": 45},
+        {"role": "proportion", "asset_id": "inku.saijiki.v2", "category_key": "wariai", "canonical_surface_ja": "縦長", "start_byte": 46, "end_byte": 52}
       ],
       "expected_unattached_exact_numbers": [
         {"value": 8, "start_byte": 57, "end_byte": 63},
@@ -24,7 +24,7 @@
       ],
       "expected_deferred": [
         {"kind": "function_word", "surface": "を", "start_byte": 53, "end_byte": 56},
-        {"kind": "saijiki_relation", "surface": "沿う", "start_byte": 66, "end_byte": 72, "asset_id": "inku.saijiki.v1", "relation_type": "along"}
+        {"kind": "saijiki_relation", "surface": "沿う", "start_byte": 66, "end_byte": 72, "asset_id": "inku.saijiki.v2", "relation_type": "along"}
       ],
       "expected_diagnostics": [
         {"kind": "hole", "surface": "たくさん", "start_byte": 73, "end_byte": 85, "recognized": true}
@@ -34,29 +34,29 @@
     {
       "id": "en-mixed-six",
       "language": "en",
-      "source": "circle blue, horizontal\r\ndashed fine top place tall with eight 8 along many",
+      "source": "circle blue, horizontal\r\ndashed narrowly top place tall with eight 8 along many",
       "expected_core_roles": [
-        {"role": "primitive", "asset_id": "inku.saijiki.v1", "category_key": "katachi", "canonical_surface_ja": "円", "start_byte": 0, "end_byte": 6},
-        {"role": "color", "asset_id": "inku.saijiki.v1", "category_key": "iro", "canonical_surface_ja": "青", "start_byte": 7, "end_byte": 11}
+        {"role": "primitive", "asset_id": "inku.saijiki.v2", "category_key": "katachi", "canonical_surface_ja": "円", "start_byte": 0, "end_byte": 6},
+        {"role": "color", "asset_id": "inku.saijiki.v2", "category_key": "iro", "canonical_surface_ja": "青", "start_byte": 7, "end_byte": 11}
       ],
       "expected_remaining_roles": [
-        {"role": "angle", "asset_id": "inku.saijiki.v1", "category_key": "katamuki", "canonical_surface_ja": "水平", "start_byte": 13, "end_byte": 23},
-        {"role": "continuity", "asset_id": "inku.saijiki.v1", "category_key": "tsuranari", "canonical_surface_ja": "破線", "start_byte": 25, "end_byte": 31},
-        {"role": "fluctuation", "asset_id": "inku.saijiki.v1", "category_key": "yuragi", "canonical_surface_ja": "細かく", "start_byte": 32, "end_byte": 36},
-        {"role": "place", "asset_id": "inku.saijiki.v1", "category_key": "basho", "canonical_surface_ja": "上", "start_byte": 37, "end_byte": 40},
-        {"role": "motion", "asset_id": "inku.saijiki.v1", "category_key": "ugoki", "canonical_surface_ja": "置く", "start_byte": 41, "end_byte": 46},
-        {"role": "proportion", "asset_id": "inku.saijiki.v1", "category_key": "wariai", "canonical_surface_ja": "縦長", "start_byte": 47, "end_byte": 51}
+        {"role": "angle", "asset_id": "inku.saijiki.v2", "category_key": "katamuki", "canonical_surface_ja": "水平", "start_byte": 13, "end_byte": 23},
+        {"role": "continuity", "asset_id": "inku.saijiki.v2", "category_key": "tsuranari", "canonical_surface_ja": "破線", "start_byte": 25, "end_byte": 31},
+        {"role": "fluctuation", "asset_id": "inku.saijiki.v2", "category_key": "yuragi", "canonical_surface_ja": "細かく", "start_byte": 32, "end_byte": 40},
+        {"role": "place", "asset_id": "inku.saijiki.v2", "category_key": "basho", "canonical_surface_ja": "上", "start_byte": 41, "end_byte": 44},
+        {"role": "motion", "asset_id": "inku.saijiki.v2", "category_key": "ugoki", "canonical_surface_ja": "置く", "start_byte": 45, "end_byte": 50},
+        {"role": "proportion", "asset_id": "inku.saijiki.v2", "category_key": "wariai", "canonical_surface_ja": "縦長", "start_byte": 51, "end_byte": 55}
       ],
       "expected_unattached_exact_numbers": [
-        {"value": 8, "start_byte": 57, "end_byte": 62},
-        {"value": 8, "start_byte": 63, "end_byte": 64}
+        {"value": 8, "start_byte": 61, "end_byte": 66},
+        {"value": 8, "start_byte": 67, "end_byte": 68}
       ],
       "expected_deferred": [
-        {"kind": "function_word", "surface": "with", "start_byte": 52, "end_byte": 56},
-        {"kind": "saijiki_relation", "surface": "along", "start_byte": 65, "end_byte": 70, "asset_id": "inku.saijiki.v1", "relation_type": "along"}
+        {"kind": "function_word", "surface": "with", "start_byte": 56, "end_byte": 60},
+        {"kind": "saijiki_relation", "surface": "along", "start_byte": 69, "end_byte": 74, "asset_id": "inku.saijiki.v2", "relation_type": "along"}
       ],
       "expected_diagnostics": [
-        {"kind": "hole", "surface": "many", "start_byte": 71, "end_byte": 75, "recognized": true}
+        {"kind": "hole", "surface": "many", "start_byte": 75, "end_byte": 79, "recognized": true}
       ],
       "recognized_delivery_count": 13
     },
@@ -66,9 +66,9 @@
       "source": "vertical horizontal diagonal",
       "expected_core_roles": [],
       "expected_remaining_roles": [
-        {"role": "angle", "asset_id": "inku.saijiki.v1", "category_key": "katamuki", "canonical_surface_ja": "垂直", "start_byte": 0, "end_byte": 8},
-        {"role": "angle", "asset_id": "inku.saijiki.v1", "category_key": "katamuki", "canonical_surface_ja": "水平", "start_byte": 9, "end_byte": 19},
-        {"role": "angle", "asset_id": "inku.saijiki.v1", "category_key": "katamuki", "canonical_surface_ja": "斜め", "start_byte": 20, "end_byte": 28}
+        {"role": "angle", "asset_id": "inku.saijiki.v2", "category_key": "katamuki", "canonical_surface_ja": "垂直", "start_byte": 0, "end_byte": 8},
+        {"role": "angle", "asset_id": "inku.saijiki.v2", "category_key": "katamuki", "canonical_surface_ja": "水平", "start_byte": 9, "end_byte": 19},
+        {"role": "angle", "asset_id": "inku.saijiki.v2", "category_key": "katamuki", "canonical_surface_ja": "斜め", "start_byte": 20, "end_byte": 28}
       ],
       "expected_unattached_exact_numbers": [],
       "expected_deferred": [],
@@ -94,13 +94,13 @@
       "language": "en",
       "source": "circle with along",
       "expected_core_roles": [
-        {"role": "primitive", "asset_id": "inku.saijiki.v1", "category_key": "katachi", "canonical_surface_ja": "円", "start_byte": 0, "end_byte": 6}
+        {"role": "primitive", "asset_id": "inku.saijiki.v2", "category_key": "katachi", "canonical_surface_ja": "円", "start_byte": 0, "end_byte": 6}
       ],
       "expected_remaining_roles": [],
       "expected_unattached_exact_numbers": [],
       "expected_deferred": [
         {"kind": "function_word", "surface": "with", "start_byte": 7, "end_byte": 11},
-        {"kind": "saijiki_relation", "surface": "along", "start_byte": 12, "end_byte": 17, "asset_id": "inku.saijiki.v1", "relation_type": "along"}
+        {"kind": "saijiki_relation", "surface": "along", "start_byte": 12, "end_byte": 17, "asset_id": "inku.saijiki.v2", "relation_type": "along"}
       ],
       "expected_diagnostics": [],
       "recognized_delivery_count": 3
@@ -110,7 +110,7 @@
       "language": "en",
       "source": "thin line",
       "expected_core_roles": [
-        {"role": "primitive", "asset_id": "inku.saijiki.v1", "category_key": "katachi", "canonical_surface_ja": "線", "start_byte": 5, "end_byte": 9}
+        {"role": "primitive", "asset_id": "inku.saijiki.v2", "category_key": "katachi", "canonical_surface_ja": "線", "start_byte": 5, "end_byte": 9}
       ],
       "expected_core_modifiers": [
         {"dimension": "thinness", "value": "fine", "start_byte": 0, "end_byte": 4}
@@ -126,7 +126,7 @@
       "language": "ja",
       "source": "小さな円",
       "expected_core_roles": [
-        {"role": "primitive", "asset_id": "inku.saijiki.v1", "category_key": "katachi", "canonical_surface_ja": "円", "start_byte": 9, "end_byte": 12}
+        {"role": "primitive", "asset_id": "inku.saijiki.v2", "category_key": "katachi", "canonical_surface_ja": "円", "start_byte": 9, "end_byte": 12}
       ],
       "expected_core_modifiers": [
         {"dimension": "relative_scale", "value": "small", "start_byte": 0, "end_byte": 9}

@@ -60,7 +60,7 @@ fn unresolved_drawing_clauses_are_bounded_known_holes() {
 
 #[test]
 fn unresolved_clause_owns_its_invalid_sequence_diagnostic() {
-    let source = "背景を灰で埋める。赤いクレヨンの折れ線を右上がりから右下がりへ交互に組み合わせて、上端から下端へ一本引く。細かく震える。";
+    let source = "背景を灰で埋める。赤いクレヨンの折れ線を右上がりから右下がりへ交互に組み合わせて、上端から下端へ一本引く。細かく揺れる。";
     let result = compile(
         source,
         ResolvedInstructionLanguage::Ja,
@@ -211,7 +211,7 @@ const V21_SEED_DIGEST_KNOWN_ANSWER: &str =
 const V21_EXPANDED_MEANING_SHA256_KNOWN_ANSWER: &str =
     "251884860862eff7347cd6cf9c016c1b562d5a2682ce6739f267556a9b370a1c";
 const V21_FULL_LOCK_KNOWN_ANSWER: &str =
-    "00f6576f5bd1a8b23cd3f6b93e5a65509893962ec6e25e04eb3c6f8ce1878cac";
+    "0d28d8b352f2048198f615361a017fced0a62eb81a1f51a5c81f2c46b2943558";
 const LIMITS: MacroExpansionLimits = MacroExpansionLimits {
     max_invocations: 16,
     max_depth: 16,
@@ -640,7 +640,7 @@ fn multi_head_continuation_claims_project_one_conflict_per_predicate_occurrence(
         ),
         (
             ResolvedInstructionLanguage::En,
-            "line circle. the line the circle swaying fine.",
+            "line circle. the line the circle swaying narrowly.",
             2,
             &["owner=fluctuation_amplitude", "owner=fluctuation_quality"][..],
         ),
@@ -1348,7 +1348,8 @@ fn structured_ownership_action_position_ground_and_previous_relation_change_the_
 }
 
 #[test]
-fn lexical_place_aliases_share_compiler_meaning_and_keep_source_provenance() {
+fn a_place_word_keeps_its_source_provenance_beside_the_compiler_meaning() {
+    // The v1 alias `middle` shared this meaning; v2 does not read it (SPEC §3.3).
     let center = compile(
         "place circle at center",
         ResolvedInstructionLanguage::En,
@@ -1356,36 +1357,14 @@ fn lexical_place_aliases_share_compiler_meaning_and_keep_source_provenance() {
         None,
         LIMITS,
     );
-    let middle = compile(
-        "place circle at middle",
-        ResolvedInstructionLanguage::En,
-        &[],
-        None,
-        LIMITS,
-    );
-
-    assert_eq!(canonical_bytes_of(&center), canonical_bytes_of(&middle));
-    assert_eq!(
-        center
-            .compiler_lock
-            .as_ref()
-            .unwrap()
-            .expanded_meaning_digest,
-        middle
-            .compiler_lock
-            .as_ref()
-            .unwrap()
-            .expanded_meaning_digest
-    );
-    for (result, source_surface) in [(&center, "center"), (&middle, "middle")] {
-        let position = result.semantic_document.as_ref().unwrap().ast.instructions[0]
-            .position
-            .as_ref()
-            .unwrap();
-        assert_eq!(position.identity.category, "place");
-        assert_eq!(position.identity.id, "center");
-        assert_eq!(position.provenance.source.surface, source_surface);
-    }
+    let (result, source_surface) = (&center, "center");
+    let position = result.semantic_document.as_ref().unwrap().ast.instructions[0]
+        .position
+        .as_ref()
+        .unwrap();
+    assert_eq!(position.identity.category, "place");
+    assert_eq!(position.identity.id, "center");
+    assert_eq!(position.provenance.source.surface, source_surface);
 }
 
 #[test]
@@ -1459,14 +1438,14 @@ fn typed_subject_continuation_reaches_canonical_lock_and_fail_closed_states() {
         LIMITS,
     );
     let en = compile(
-        "Place one thin pencil line at the center. The line sways finely.",
+        "Place one thin pencil line at the center. The line sways narrowly.",
         ResolvedInstructionLanguage::En,
         &[],
         None,
         LIMITS,
     );
     let legacy_en = compile(
-        "place one thin pencil line at the center. the line swaying fine.",
+        "place one thin pencil line at the center. the line swaying narrowly.",
         ResolvedInstructionLanguage::En,
         &[],
         None,
@@ -1540,21 +1519,21 @@ fn typed_subject_continuation_reaches_canonical_lock_and_fail_closed_states() {
 
     for head in ["circle", "arc"] {
         let canonical = compile(
-            &format!("{head}. the {head} sways finely."),
+            &format!("{head}. the {head} sways narrowly."),
             ResolvedInstructionLanguage::En,
             &[],
             None,
             LIMITS,
         );
         let reordered = compile(
-            &format!("{head}. the {head} finely sways."),
+            &format!("{head}. the {head} narrowly sways."),
             ResolvedInstructionLanguage::En,
             &[],
             None,
             LIMITS,
         );
         let legacy = compile(
-            &format!("{head}. the {head} swaying fine."),
+            &format!("{head}. the {head} swaying narrowly."),
             ResolvedInstructionLanguage::En,
             &[],
             None,
@@ -1590,16 +1569,16 @@ fn typed_subject_continuation_reaches_canonical_lock_and_fail_closed_states() {
         );
     }
 
-    for (canonical_form, derived_form) in [("undulating", "undulates"), ("trembling", "trembles")] {
+    for (canonical_form, derived_form) in [("undulating", "undulates"), ("swaying", "sways")] {
         let canonical = compile(
-            &format!("circle. the circle {canonical_form} fine."),
+            &format!("circle. the circle {canonical_form} narrowly."),
             ResolvedInstructionLanguage::En,
             &[],
             None,
             LIMITS,
         );
         let derived = compile(
-            &format!("circle. the circle {derived_form} fine."),
+            &format!("circle. the circle {derived_form} narrowly."),
             ResolvedInstructionLanguage::En,
             &[],
             None,
@@ -1620,7 +1599,7 @@ fn typed_subject_continuation_reaches_canonical_lock_and_fail_closed_states() {
     }
 
     let ambiguous = compile(
-        "line. line. the line swaying fine.",
+        "line. line. the line swaying narrowly.",
         ResolvedInstructionLanguage::En,
         &[],
         None,
@@ -1645,7 +1624,10 @@ fn typed_subject_continuation_reaches_canonical_lock_and_fail_closed_states() {
             .any(|conflict| conflict.kind == "ambiguous_entity_ownership")
     );
 
-    for source in ["circle. the line swaying fine.", "the line swaying fine."] {
+    for source in [
+        "circle. the line swaying narrowly.",
+        "the line swaying narrowly.",
+    ] {
         let missing = compile(source, ResolvedInstructionLanguage::En, &[], None, LIMITS);
         assert_eq!(
             missing.compiler_lock.as_ref().map(|lock| lock.state),
@@ -1671,7 +1653,7 @@ fn failed_continuation_projection_preserves_owners_and_unique_occurrences() {
         ),
         (
             ResolvedInstructionLanguage::En,
-            "triangle square. the circle the arc swaying fine.",
+            "triangle square. the circle the arc swaying narrowly.",
         ),
     ] {
         let result = compile(source, language, &[], None, LIMITS);
@@ -1735,7 +1717,7 @@ fn failed_continuation_projection_preserves_owners_and_unique_occurrences() {
     }
 
     let ambiguous = compile(
-        "line. line. the line the line swaying fine.",
+        "line. line. the line the line swaying narrowly.",
         ResolvedInstructionLanguage::En,
         &[],
         None,
@@ -1787,7 +1769,7 @@ fn failed_continuation_preserves_preexisting_explicit_fingerprints() {
         (
             ResolvedInstructionLanguage::En,
             "place one thin red pencil line at the center. the circle.",
-            "place one thin red pencil line at the center. the circle swaying fine.",
+            "place one thin red pencil line at the center. the circle swaying narrowly.",
         ),
     ] {
         let accepted = compile(before, language, &[], None, LIMITS);

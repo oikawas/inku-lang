@@ -263,7 +263,8 @@ fn role_for_category(category_key: &str) -> Option<CoreRoleKind> {
         "katachi" => Some(CoreRoleKind::Primitive),
         "tezawari" => Some(CoreRoleKind::Touch),
         "iro" => Some(CoreRoleKind::Color),
-        "omote" => Some(CoreRoleKind::Surface),
+        // Handling (さばき) words attach to a mark like its surface words do.
+        "omote" | "sabaki" => Some(CoreRoleKind::Surface),
         "ji" => Some(CoreRoleKind::Ground),
         _ => None,
     }

@@ -45,6 +45,12 @@ pub use plan_resources::{
 pub mod relation_reference;
 pub mod render_execution;
 pub mod saijiki;
+pub mod saijiki_migration;
+pub use saijiki_migration::{
+    SAIJIKI_V1_MIGRATION_SCHEMA_ID, SaijikiDefinitionMigration, SaijikiDocumentMigration,
+    SaijikiMigrationEdit, SaijikiMigrationError, migrate_document_from_saijiki_v1,
+    migrate_macro_definition_from_saijiki_v1,
+};
 mod score_angle;
 pub mod score_diagnostics;
 pub mod score_lowering;
@@ -196,11 +202,12 @@ pub use saijiki::{
     CanonicalPreviousReference, CanonicalRelationForm, CanonicalRelationIdentity,
     CanonicalRelationKind, DisplayCategoryProjection, MarkerClassProjection, MarkerOrder,
     ReferenceCategoryProjection, RelationAsset, RelationLiteralProjection, SAIJIKI_ASSET_BYTES,
-    SAIJIKI_ASSET_ID, SaijikiAsset, SaijikiCategoryAsset, SaijikiDerivedProjection,
-    SaijikiPhysicalDescriptionAsset, SaijikiProjectionError, SaijikiScoreWireMaps,
-    SaijikiSurfaceScoreProjection, SaijikiWordAsset, saijiki_asset, saijiki_asset_sha256_hex,
-    saijiki_derived_projection, saijiki_derived_projection_from_asset, saijiki_marker_class_table,
-    saijiki_relation_literal_table, saijiki_score_wire_maps, saijiki_tool_guidance,
+    SAIJIKI_ASSET_ID, SAIJIKI_V1_ASSET_ID, SaijikiAsset, SaijikiCategoryAsset,
+    SaijikiDerivedProjection, SaijikiPhysicalDescriptionAsset, SaijikiProjectionError,
+    SaijikiScoreWireMaps, SaijikiSurfaceScoreProjection, SaijikiWordAsset, saijiki_asset,
+    saijiki_asset_sha256_hex, saijiki_derived_projection, saijiki_derived_projection_from_asset,
+    saijiki_marker_class_table, saijiki_relation_literal_table, saijiki_score_wire_maps,
+    saijiki_tool_guidance,
 };
 pub use score_diagnostics::{
     ScoreAppearanceField, ScoreAppearanceResolution, ScoreDiagnosticDisposition,

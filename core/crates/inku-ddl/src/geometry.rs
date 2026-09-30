@@ -51,8 +51,8 @@ const GEOMETRY_RESOLUTION_POLICY_SUFFIX: &str = concat!(
 
 // Each canvas axis is divided into three equal bands (0..1/3, 1/3..2/3,
 // 2/3..1), and a position word names a range made of them: `top` and `bottom`
-// are the upper and lower thirds across the width, and `center` (中心 / 中央 /
-// middle) is the middle cell on both axes. The edges (a tenth) and the
+// are the upper and lower thirds across the width, and `center` (中心) is the
+// middle cell on both axes. The edges (a tenth) and the
 // corners (a fifth) keep their own narrower ranges.
 const CENTER_RANGE: [(u8, u8); 4] = [(1, 3), (1, 3), (2, 3), (2, 3)];
 // An omitted position lets a line-up, scatter, or tile use the whole canvas.
@@ -974,8 +974,8 @@ mod tests {
             serde_json::from_slice(geometry_resolution_policy_canonical_bytes()).unwrap();
         assert_eq!(payload["policy"], GEOMETRY_RESOLUTION_POLICY_ID);
         let fluctuation = &payload["author_resolved_omission"]["fluctuation"];
-        assert_eq!(fluctuation["words"].as_object().unwrap().len(), 9);
-        assert_eq!(fluctuation["words"]["large"]["value"], "broad");
+        assert_eq!(fluctuation["words"].as_object().unwrap().len(), 7);
+        assert_eq!(fluctuation["words"]["broadly"]["value"], "broad");
         assert_eq!(fluctuation["words"]["bleeding"]["dimension"], "spread");
         assert_eq!(fluctuation["words"]["swaying"]["dimension"], "quality");
         assert_eq!(fluctuation["absent"], "none");
@@ -1147,7 +1147,7 @@ mod tests {
         );
         assert_eq!(
             geometry_resolution_policy_digest(),
-            "6b71a20d40f3756406abc758739ce59eb0b0c4f196125fa46304086469a46fba"
+            "0567c999cfa0c5d25e8bfe65a3bd50808c7cad550273a9bb2461c0e74380d4da"
         );
         assert_eq!(
             payload["object_placement"]["layout_direction"]["vertical"],

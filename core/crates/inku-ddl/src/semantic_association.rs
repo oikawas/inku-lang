@@ -1226,11 +1226,12 @@ fn sequence_field_for_term(term: &SemanticTerm) -> Option<SemanticSequenceField>
         ("touch", _) => Some(SemanticSequenceField::Touch),
         ("continuity", _) => Some(SemanticSequenceField::Continuity),
         ("angle", _) => Some(SemanticSequenceField::Angle),
-        ("surface", id) => match classify_surface_dimension(id) {
-            Some(SurfaceDimension::Quality) => Some(SemanticSequenceField::SurfaceQuality),
-            Some(SurfaceDimension::Intensity) => Some(SemanticSequenceField::SurfaceIntensity),
-            None => None,
-        },
+        ("surface", id) => (classify_surface_dimension("surface", id)
+            == Some(SurfaceDimension::Quality))
+        .then_some(SemanticSequenceField::SurfaceQuality),
+        ("handling", id) => (classify_surface_dimension("handling", id)
+            == Some(SurfaceDimension::Intensity))
+        .then_some(SemanticSequenceField::SurfaceIntensity),
         ("variation", id) => match classify_fluctuation_dimension(id) {
             Some(FluctuationDimension::Amplitude) => {
                 Some(SemanticSequenceField::FluctuationAmplitude)
@@ -1748,11 +1749,14 @@ enum SurfaceDimension {
     Intensity,
 }
 
-fn classify_surface_dimension(canonical_id: &str) -> Option<SurfaceDimension> {
-    match canonical_id {
-        "none" | "solid" | "wash" | "grain" | "stipple" | "hatch" | "crosshatch" | "bleed"
-        | "aquatint" => Some(SurfaceDimension::Quality),
-        "dense" | "faint" => Some(SurfaceDimension::Intensity),
+fn classify_surface_dimension(category: &str, canonical_id: &str) -> Option<SurfaceDimension> {
+    match (category, canonical_id) {
+        (
+            "surface",
+            "none" | "solid" | "sweep" | "grain" | "stipple" | "hatch" | "crosshatch" | "bleed"
+            | "aquatint",
+        ) => Some(SurfaceDimension::Quality),
+        ("handling", "dense" | "faint") => Some(SurfaceDimension::Intensity),
         _ => None,
     }
 }
@@ -2336,7 +2340,7 @@ fn build_semantic_entities(
                 }
                 ClauseAtom::CoreRole(term) if term.role == CoreRoleKind::Surface => {
                     let term = project_term(document, term, region_index, clause_index, atom_index);
-                    match classify_surface_dimension(&term.identity.id) {
+                    match classify_surface_dimension(&term.identity.category, &term.identity.id) {
                         Some(SurfaceDimension::Quality) => region.surface_qualities.push(term),
                         Some(SurfaceDimension::Intensity) => region.surface_intensities.push(term),
                         None => region.unclassified_surfaces.push(term),

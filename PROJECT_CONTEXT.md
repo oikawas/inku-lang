@@ -106,7 +106,7 @@ Never infer parentage from similarity, time, or matching hashes.
 - Metrics, similarity, and vision reviews are diagnostic mirrors, not generation gates or automatic best-branch selectors.
 - Language-level macros use one generic `MacroDefinition` format rather than domain-specific code
   or grammars. Saved Macro definitions and old Score/SVG artifacts retain compatibility; the shared compiler determines new-work meaning.
-- The shared Rust asset `core/crates/inku-ddl/assets/saijiki-v1.json` is the vocabulary authority. Shared Stage 1 prompts use its projection; the Server display table, Web/Android Saijiki, and reference follow the same vocabulary.
+- The shared Rust asset `core/crates/inku-ddl/assets/saijiki-v2.json` is the vocabulary authority. Shared Stage 1 prompts use its projection; the Server display table, Web/Android Saijiki, and reference follow the same vocabulary.
 - Japanese and English behavior must stay aligned.
 Do not introduce English-only requirements.
 - **The engine does not go backwards** (SPEC "Design Principles", principle 9).
@@ -135,7 +135,7 @@ To learn why something took its current shape, search the changelog by term, ver
 
 ### Vocabulary
 
-The shared Rust asset `core/crates/inku-ddl/assets/saijiki-v1.json` is canonical; the Literals in
+The shared Rust asset `core/crates/inku-ddl/assets/saijiki-v2.json` is canonical; the Literals in
 the Server's `schema.py` and the saijiki table (`saijiki.py`) are projections of it.
 
 - 9 primitives — `line` / `circle` / `ellipse` / `triangle` / `square` / `polygon` / `arc` / `point` / `cloudform`
@@ -177,7 +177,7 @@ A surface texture (hatch, crosshatch) has each row clipped at its ends to the ou
 inside the shape that carries it. The clipping happens in the coordinates before anything is drawn,
 so a profile that uses no filters keeps the same shape, and the angle, spacing, and density gradient
 are exactly what they were before the clipping.
-A wash lays each sweep as wide as the pitch or wider, so no paper is left between two sweeps: it
+A sweep (and a saved Score's wash) lays each stroke as wide as the pitch or wider, so no paper is left between two sweeps: it
 reads as a field rather than as stripes. Each sweep is correspondingly lighter, and the ink a reader
 sees is the composite of the overlapping layers.
 The ground is one of seven supports you can name (paper, washi, ink-wash ground, charcoal ground, canvas, drawing paper, mezzotint), tiled as a `<pattern>`.

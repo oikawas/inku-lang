@@ -3,9 +3,9 @@ use inku_score::{Color, GroupLayout as ScoreGroupLayout, Score};
 use serde_json::json;
 
 const SOURCES: [&str; 3] = [
-    "赤い円と青い四角を中央に置く",
-    "赤い円と青い四角を中央に重ねて置く",
-    "赤い円と青い四角を中央に並べて置く",
+    "赤い円と青い四角を中心に置く",
+    "赤い円と青い四角を中心に重ねて置く",
+    "赤い円と青い四角を中心に並べて置く",
 ];
 
 fn stage(source: &str) -> Stage15TransformationResult {
@@ -223,7 +223,7 @@ fn coordinated_placement_reaches_geometry_once_and_preserves_outer_scope_relatio
 fn coordinated_actions_plan_preserves_quantities_and_one_named_target() {
     for (source, counts, layout) in [
         (
-            "赤い円と青い四角を中央に並べる",
+            "赤い円と青い四角を中心に並べる",
             vec![1, 1],
             ScoreGroupLayout::HorizontalSourceOrder,
         ),

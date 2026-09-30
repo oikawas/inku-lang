@@ -38,7 +38,7 @@ fn shape_angle_and_action_direction_have_distinct_exact_owners() {
     for (language, source) in [
         (
             ResolvedInstructionLanguage::Ja,
-            "中央に、横線を縦に三本並べる。",
+            "中心に、横線を縦に三本並べる。",
         ),
         (
             ResolvedInstructionLanguage::En,
@@ -113,7 +113,7 @@ fn ja_unresolved_predicate_fragment_does_not_steal_exact_object_predicate_owners
 
 #[test]
 fn ja_unresolved_entity_fragment_does_not_steal_exact_object_predicate_owners() {
-    let source = "中央付近に黒いクレヨンの楕円を一つ置く。";
+    let source = "中心付近に黒いクレヨンの楕円を一つ置く。";
     let document =
         NormalizedDdlDocument::new(source, ResolvedInstructionLanguage::Ja, Vec::new()).unwrap();
     let result = associate_semantic_instructions(&document).unwrap();
@@ -159,7 +159,7 @@ fn ja_unowned_typed_modifier_does_not_steal_exact_object_predicate_owners() {
 
 #[test]
 fn ja_compound_position_keeps_the_exact_object_predicate_owner() {
-    let source = "赤い線を右下がりの中央に一本引く。";
+    let source = "赤い線を右下がりの中心に一本引く。";
     let document =
         NormalizedDdlDocument::new(source, ResolvedInstructionLanguage::Ja, Vec::new()).unwrap();
     let result = associate_semantic_instructions(&document).unwrap();
@@ -1176,7 +1176,7 @@ fn spec_ja_and_en_use_one_clause_local_instruction_meaning() {
 fn ja_and_en_multi_instruction_pairs_keep_source_order_and_shared_meaning() {
     let cases = [
         (
-            "中央に円をひとつ置く。左端に線を二つ並べる。",
+            "中心に円をひとつ置く。左端に線を二つ並べる。",
             ResolvedInstructionLanguage::Ja,
         ),
         (
@@ -1512,17 +1512,17 @@ fn coordinated_place_layout_is_explicit_and_source_ordered() {
     let cases = [
         (
             ResolvedInstructionLanguage::Ja,
-            "赤い円と青い四角を中央に置く。",
+            "赤い円と青い四角を中心に置く。",
             GroupLayout::Overlap,
         ),
         (
             ResolvedInstructionLanguage::Ja,
-            "赤い円と青い四角を中央に重ねて置く。",
+            "赤い円と青い四角を中心に重ねて置く。",
             GroupLayout::Overlap,
         ),
         (
             ResolvedInstructionLanguage::Ja,
-            "赤い円と青い四角を中央に並べて置く。",
+            "赤い円と青い四角を中心に並べて置く。",
             GroupLayout::HorizontalSourceOrder,
         ),
         (
@@ -2047,7 +2047,7 @@ fn macro_first_coordinated_heads_claim_the_shared_predicate_in_source_order() {
         ),
         (
             ResolvedInstructionLanguage::Ja,
-            "Draw.Pairと青い四角を中央に並べる",
+            "Draw.Pairと青い四角を中心に並べる",
         ),
     ] {
         let document = instruction_macro_document_in_language(

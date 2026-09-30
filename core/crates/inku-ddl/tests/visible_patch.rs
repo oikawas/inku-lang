@@ -120,7 +120,7 @@ fn unresolved_clause_patch_keeps_typed_facts_and_resolves_the_clause() {
 
 #[test]
 fn patch_preserves_unchanged_local_diagnostics_outside_the_hole() {
-    let source = "出力: 黒い背景に、粗筆の黒い四角を中央に置く。面: 粗く塗りつぶす。";
+    let source = "出力: 黒い背景に、粗筆の黒い四角を中心に置く。面: 粗く塗りつぶす。";
     let base = compile_typed_ddl(
         NormalizedDdlDocument::new(source, ResolvedInstructionLanguage::Ja, Vec::new()).unwrap(),
         &[],
@@ -146,7 +146,7 @@ fn patch_preserves_unchanged_local_diagnostics_outside_the_hole() {
             &base,
             vec![edit(
                 &base.holes[0],
-                "背景を黒で埋める。太筆の黒い四角を中央に置く。",
+                "背景を黒で埋める。太筆の黒い四角を中心に置く。",
             )],
         ),
         &[],
@@ -487,7 +487,7 @@ fn conflict_unknown_and_unresolved_replacements_never_return_a_candidate() {
 
 #[test]
 fn visible_patch_preserves_continuation_identity_and_rejects_unresolved_reference_bases() {
-    let continuation_base = base("line. the line swaying fine. many circle");
+    let continuation_base = base("line. the line swaying narrowly. many circle");
     assert_eq!(continuation_base.holes.len(), 1);
     let continuation = &continuation_base
         .semantic_document
@@ -521,7 +521,7 @@ fn visible_patch_preserves_continuation_identity_and_rejects_unresolved_referenc
         target
     );
 
-    let unresolved = base("circle. the line swaying fine.");
+    let unresolved = base("circle. the line swaying narrowly.");
     assert_eq!(
         unresolved.compiler_lock.as_ref().unwrap().state,
         CompilerLockState::BlockedDiagnostic

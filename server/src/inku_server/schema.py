@@ -189,7 +189,7 @@ class SurfaceSpec(BaseModel):
         default="none",
         description=(
             "面の質感: none=なし / solid=塗り / stipple=点 / hatch=平行線 / crosshatch=交差線"
-            " / aquatint=段階的な粒 / grain=粒立つ / wash=薄墨・水彩 / bleed=端が滲む / paper_grain=紙目"
+            " / aquatint=段階的な粒 / grain=粒立つ / wash=薄墨・水彩 / sweep=刷き / bleed=端が滲む / paper_grain=紙目"
         ),
     )
     density: float = Field(default=0.35, ge=0.0, le=1.0, description="質感密度 0.0-1.0")

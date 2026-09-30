@@ -4,8 +4,9 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use inku_ddl::{
     CompilerLockState, MacroDefinition, MacroLock, NormalizedDdlDocument,
-    ResolvedInstructionLanguage, TypedDdlCompilation, compile_typed_ddl,
-    validate_visible_ddl_patch, validate_visible_ddl_patch_detailed, visible_ddl_patch_available,
+    ResolvedInstructionLanguage, SAIJIKI_ASSET_ID, SAIJIKI_V1_ASSET_ID, TypedDdlCompilation,
+    compile_typed_ddl, migrate_macro_definition_from_saijiki_v1, validate_visible_ddl_patch,
+    validate_visible_ddl_patch_detailed, visible_ddl_patch_available,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -75,10 +76,45 @@ pub struct VisibleDocument {
     pub source: String,
     pub language: ResolvedInstructionLanguage,
     pub macro_locks: Vec<LockedDefinition>,
+    /// The Saijiki edition the source is written with (SPEC §3.3). A saved document without
+    /// it was written with v1; it is kept without the field so its saved bytes still verify.
+    #[serde(
+        default = "retired_saijiki_edition",
+        skip_serializing_if = "is_retired_saijiki_edition"
+    )]
+    pub saijiki: String,
+}
+
+fn retired_saijiki_edition() -> String {
+    SAIJIKI_V1_ASSET_ID.to_owned()
+}
+
+fn is_retired_saijiki_edition(edition: &str) -> bool {
+    edition == SAIJIKI_V1_ASSET_ID
+}
+
+/// Whether a definition that does not validate would validate once migrated from v1.
+fn needs_saijiki_migration(definition: &MacroDefinition) -> bool {
+    serde_json::to_value(definition)
+        .ok()
+        .and_then(|value| migrate_macro_definition_from_saijiki_v1(&value).ok())
+        .is_some_and(|migration| migration.changed)
 }
 
 impl VisibleDocument {
+    /// Refuse a document of another Saijiki edition; only the current one is read.
+    pub fn require_current_saijiki(&self) -> Result<(), ProtocolError> {
+        if self.saijiki == SAIJIKI_ASSET_ID {
+            Ok(())
+        } else if self.saijiki == SAIJIKI_V1_ASSET_ID {
+            Err(ProtocolError::SaijikiMigrationRequired)
+        } else {
+            Err(ProtocolError::SchemaViolation)
+        }
+    }
+
     pub fn document(&self) -> Result<NormalizedDdlDocument, ProtocolError> {
+        self.require_current_saijiki()?;
         let locks = self
             .macro_locks
             .iter()
@@ -106,6 +142,7 @@ impl VisibleDocument {
                     aliases: lock.aliases().to_vec(),
                 })
                 .collect(),
+            saijiki: SAIJIKI_ASSET_ID.to_owned(),
         }
     }
 
@@ -409,6 +446,22 @@ impl PipelineSnapshot {
         if copy.snapshot_digest != self.snapshot_digest {
             return Err(ProtocolError::StaleResult);
         }
+        // A saved document of a retired edition is migrated by its host before anything else.
+        let phase_document = match &self.phase {
+            PipelinePhase::AwaitingVisibleDdlCommit { document, .. } => Some(document),
+            PipelinePhase::AwaitingPatchApproval { candidate, .. } => Some(candidate),
+            _ => None,
+        };
+        for document in [
+            self.document.as_ref(),
+            self.stage1_fallback.as_ref(),
+            phase_document,
+        ]
+        .into_iter()
+        .flatten()
+        {
+            document.require_current_saijiki()?;
+        }
         self.config.validate()?;
         if let Some(fallback) = &self.stage1_fallback {
             fallback.document()?;
@@ -563,6 +616,7 @@ impl PipelineSnapshot {
             source,
             language: self.config.language,
             macro_locks: locks,
+            saijiki: SAIJIKI_ASSET_ID.to_owned(),
         };
         Ok(VisibleDocument::from_document(&wire.document()?))
     }
@@ -747,9 +801,13 @@ impl PipelineConfig {
         }
         let mut names = std::collections::BTreeSet::new();
         for definition in &self.definitions {
-            let identity = definition
-                .identity()
-                .map_err(|_| ProtocolError::SchemaViolation)?;
+            let identity = definition.identity().map_err(|_| {
+                if needs_saijiki_migration(definition) {
+                    ProtocolError::SaijikiMigrationRequired
+                } else {
+                    ProtocolError::SchemaViolation
+                }
+            })?;
             if !names.insert(identity.qualified_name().to_owned()) {
                 return Err(ProtocolError::SchemaViolation);
             }

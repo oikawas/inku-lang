@@ -51,8 +51,15 @@ object SaijikiGenerated {
             key = "omote",
             nameJa = "おもて",
             nameEn = "surfaces",
-            wordsJa = listOf("空", "塗り", "薄墨", "粒", "点描", "平行線", "交差線", "アクアチント", "濃い", "薄い"),
-            wordsEn = listOf("empty", "flat", "pale ink wash", "grain", "stipple", "hatch", "crosshatch", "aquatint", "dense", "faint"),
+            wordsJa = listOf("空", "塗り", "刷き", "粒", "点描", "平行線", "交差線", "アクアチント"),
+            wordsEn = listOf("empty", "flat", "sweep", "grain", "stipple", "hatch", "crosshatch", "aquatint"),
+        ),
+        Category(
+            key = "sabaki",
+            nameJa = "さばき",
+            nameEn = "handling",
+            wordsJa = listOf("濃い", "薄い"),
+            wordsEn = listOf("dense", "faint"),
         ),
         Category(
             key = "ji",
@@ -72,8 +79,8 @@ object SaijikiGenerated {
             key = "yuragi",
             nameJa = "ゆらぎ",
             nameEn = "movements",
-            wordsJa = listOf("細かく", "大きく", "ゆっくり", "速く", "揺れる", "波打つ", "にじみ"),
-            wordsEn = listOf("fine", "large", "slowly", "quickly", "swaying", "undulating", "bleeding"),
+            wordsJa = listOf("細かく", "大きく", "ゆるやかに", "小刻みに", "揺れる", "波打つ", "にじみ"),
+            wordsEn = listOf("narrowly", "broadly", "loosely", "tightly", "swaying", "undulating", "bleeding"),
         ),
         Category(
             key = "basho",

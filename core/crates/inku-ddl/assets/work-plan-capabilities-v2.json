@@ -1,5 +1,5 @@
 {
-  "asset_id": "inku.work-plan-capabilities.v1",
+  "asset_id": "inku.work-plan-capabilities.v2",
   "forms": {
     "arc": {
       "action": [
@@ -10,7 +10,7 @@
         "fill",
         "tile"
       ],
-      "place": [
+      "position": [
         "top",
         "bottom",
         "center",
@@ -22,7 +22,7 @@
       ],
       "size": [
         "very_small",
-        "normal",
+        "normal_sized",
         "very_large",
         "extra_large",
         "huge",
@@ -49,8 +49,8 @@
         "rotring",
         "crayon",
         "chalk",
-        "brush_thin",
-        "brush_thick",
+        "fine_brush",
+        "thick_brush",
         "oil_paint",
         "burin",
         "drypoint",
@@ -58,7 +58,7 @@
       ],
       "thinness": [
         "extra_fine",
-        "fine",
+        "thin",
         "extra_thick",
         "thick"
       ],
@@ -69,16 +69,16 @@
         "dash_dot"
       ],
       "surface": [
-        "none",
-        "solid",
-        "wash",
+        "empty",
+        "flat",
+        "sweep",
         "grain",
         "stipple",
         "hatch",
         "crosshatch",
         "aquatint"
       ],
-      "surface_intensity": [
+      "handling": [
         "dense",
         "faint"
       ],
@@ -100,12 +100,12 @@
         "undulating"
       ],
       "motion_amplitude": [
-        "fine",
-        "large"
+        "narrowly",
+        "broadly"
       ],
-      "motion_speed": [
-        "slowly",
-        "quickly"
+      "motion_spacing": [
+        "loosely",
+        "tightly"
       ],
       "bleeding": [
         "bleeding"
@@ -120,7 +120,7 @@
         "fill",
         "tile"
       ],
-      "place": [
+      "position": [
         "top",
         "bottom",
         "center",
@@ -132,7 +132,7 @@
       ],
       "size": [
         "very_small",
-        "normal",
+        "normal_sized",
         "very_large",
         "extra_large",
         "huge",
@@ -159,8 +159,8 @@
         "rotring",
         "crayon",
         "chalk",
-        "brush_thin",
-        "brush_thick",
+        "fine_brush",
+        "thick_brush",
         "oil_paint",
         "burin",
         "drypoint",
@@ -168,7 +168,7 @@
       ],
       "thinness": [
         "extra_fine",
-        "fine",
+        "thin",
         "extra_thick",
         "thick"
       ],
@@ -179,9 +179,9 @@
         "dash_dot"
       ],
       "surface": [
-        "solid"
+        "flat"
       ],
-      "surface_intensity": [
+      "handling": [
         "dense",
         "faint"
       ],
@@ -203,12 +203,12 @@
         "undulating"
       ],
       "motion_amplitude": [
-        "fine",
-        "large"
+        "narrowly",
+        "broadly"
       ],
-      "motion_speed": [
-        "slowly",
-        "quickly"
+      "motion_spacing": [
+        "loosely",
+        "tightly"
       ],
       "bleeding": [
         "bleeding"
@@ -223,7 +223,7 @@
         "fill",
         "tile"
       ],
-      "place": [
+      "position": [
         "top",
         "bottom",
         "center",
@@ -252,8 +252,8 @@
         "rotring",
         "crayon",
         "chalk",
-        "brush_thin",
-        "brush_thick",
+        "fine_brush",
+        "thick_brush",
         "oil_paint",
         "burin",
         "drypoint",
@@ -261,7 +261,7 @@
       ],
       "thinness": [
         "extra_fine",
-        "fine",
+        "thin",
         "extra_thick",
         "thick"
       ],
@@ -272,16 +272,16 @@
         "dash_dot"
       ],
       "surface": [
-        "none",
-        "solid",
-        "wash",
+        "empty",
+        "flat",
+        "sweep",
         "grain",
         "stipple",
         "hatch",
         "crosshatch",
         "aquatint"
       ],
-      "surface_intensity": [
+      "handling": [
         "dense",
         "faint"
       ],
@@ -303,12 +303,12 @@
         "undulating"
       ],
       "motion_amplitude": [
-        "fine",
-        "large"
+        "narrowly",
+        "broadly"
       ],
-      "motion_speed": [
-        "slowly",
-        "quickly"
+      "motion_spacing": [
+        "loosely",
+        "tightly"
       ],
       "bleeding": [
         "bleeding"
@@ -323,7 +323,7 @@
         "fill",
         "tile"
       ],
-      "place": [
+      "position": [
         "top",
         "bottom",
         "center",
@@ -352,8 +352,8 @@
         "rotring",
         "crayon",
         "chalk",
-        "brush_thin",
-        "brush_thick",
+        "fine_brush",
+        "thick_brush",
         "oil_paint",
         "burin",
         "drypoint",
@@ -361,7 +361,7 @@
       ],
       "thinness": [
         "extra_fine",
-        "fine",
+        "thin",
         "extra_thick",
         "thick"
       ],
@@ -372,16 +372,16 @@
         "dash_dot"
       ],
       "surface": [
-        "none",
-        "solid",
-        "wash",
+        "empty",
+        "flat",
+        "sweep",
         "grain",
         "stipple",
         "hatch",
         "crosshatch",
         "aquatint"
       ],
-      "surface_intensity": [
+      "handling": [
         "dense",
         "faint"
       ],
@@ -403,12 +403,12 @@
         "undulating"
       ],
       "motion_amplitude": [
-        "fine",
-        "large"
+        "narrowly",
+        "broadly"
       ],
-      "motion_speed": [
-        "slowly",
-        "quickly"
+      "motion_spacing": [
+        "loosely",
+        "tightly"
       ],
       "bleeding": [
         "bleeding"
@@ -423,7 +423,7 @@
         "fill",
         "tile"
       ],
-      "place": [
+      "position": [
         "top",
         "bottom",
         "center",
@@ -435,7 +435,7 @@
       ],
       "size": [
         "very_small",
-        "normal",
+        "normal_sized",
         "very_large",
         "extra_large",
         "huge",
@@ -462,8 +462,8 @@
         "rotring",
         "crayon",
         "chalk",
-        "brush_thin",
-        "brush_thick",
+        "fine_brush",
+        "thick_brush",
         "oil_paint",
         "burin",
         "drypoint",
@@ -471,7 +471,7 @@
       ],
       "thinness": [
         "extra_fine",
-        "fine",
+        "thin",
         "extra_thick",
         "thick"
       ],
@@ -482,16 +482,16 @@
         "dash_dot"
       ],
       "surface": [
-        "none",
-        "solid",
-        "wash",
+        "empty",
+        "flat",
+        "sweep",
         "grain",
         "stipple",
         "hatch",
         "crosshatch",
         "aquatint"
       ],
-      "surface_intensity": [
+      "handling": [
         "dense",
         "faint"
       ],
@@ -513,12 +513,12 @@
         "undulating"
       ],
       "motion_amplitude": [
-        "fine",
-        "large"
+        "narrowly",
+        "broadly"
       ],
-      "motion_speed": [
-        "slowly",
-        "quickly"
+      "motion_spacing": [
+        "loosely",
+        "tightly"
       ],
       "bleeding": [
         "bleeding"
@@ -533,7 +533,7 @@
         "fill",
         "tile"
       ],
-      "place": [
+      "position": [
         "top",
         "bottom",
         "center",
@@ -545,7 +545,7 @@
       ],
       "size": [
         "very_small",
-        "normal",
+        "normal_sized",
         "very_large",
         "extra_large",
         "huge",
@@ -572,8 +572,8 @@
         "rotring",
         "crayon",
         "chalk",
-        "brush_thin",
-        "brush_thick",
+        "fine_brush",
+        "thick_brush",
         "oil_paint",
         "burin",
         "drypoint",
@@ -581,7 +581,7 @@
       ],
       "thinness": [
         "extra_fine",
-        "fine",
+        "thin",
         "extra_thick",
         "thick"
       ],
@@ -592,16 +592,16 @@
         "dash_dot"
       ],
       "surface": [
-        "none",
-        "solid",
-        "wash",
+        "empty",
+        "flat",
+        "sweep",
         "grain",
         "stipple",
         "hatch",
         "crosshatch",
         "aquatint"
       ],
-      "surface_intensity": [
+      "handling": [
         "dense",
         "faint"
       ],
@@ -623,12 +623,12 @@
         "undulating"
       ],
       "motion_amplitude": [
-        "fine",
-        "large"
+        "narrowly",
+        "broadly"
       ],
-      "motion_speed": [
-        "slowly",
-        "quickly"
+      "motion_spacing": [
+        "loosely",
+        "tightly"
       ],
       "bleeding": [
         "bleeding"
@@ -643,7 +643,7 @@
         "fill",
         "tile"
       ],
-      "place": [
+      "position": [
         "top",
         "bottom",
         "center",
@@ -655,7 +655,7 @@
       ],
       "size": [
         "very_small",
-        "normal",
+        "normal_sized",
         "very_large",
         "extra_large",
         "huge",
@@ -682,8 +682,8 @@
         "rotring",
         "crayon",
         "chalk",
-        "brush_thin",
-        "brush_thick",
+        "fine_brush",
+        "thick_brush",
         "oil_paint",
         "burin",
         "drypoint",
@@ -691,7 +691,7 @@
       ],
       "thinness": [
         "extra_fine",
-        "fine",
+        "thin",
         "extra_thick",
         "thick"
       ],
@@ -702,16 +702,16 @@
         "dash_dot"
       ],
       "surface": [
-        "none",
-        "solid",
-        "wash",
+        "empty",
+        "flat",
+        "sweep",
         "grain",
         "stipple",
         "hatch",
         "crosshatch",
         "aquatint"
       ],
-      "surface_intensity": [
+      "handling": [
         "dense",
         "faint"
       ],
@@ -733,12 +733,12 @@
         "undulating"
       ],
       "motion_amplitude": [
-        "fine",
-        "large"
+        "narrowly",
+        "broadly"
       ],
-      "motion_speed": [
-        "slowly",
-        "quickly"
+      "motion_spacing": [
+        "loosely",
+        "tightly"
       ],
       "bleeding": [
         "bleeding"
@@ -752,7 +752,7 @@
         "fill",
         "tile"
       ],
-      "place": [
+      "position": [
         "top",
         "bottom",
         "center",
@@ -764,7 +764,7 @@
       ],
       "size": [
         "very_small",
-        "normal",
+        "normal_sized",
         "very_large",
         "extra_large",
         "huge",
@@ -791,8 +791,8 @@
         "rotring",
         "crayon",
         "chalk",
-        "brush_thin",
-        "brush_thick",
+        "fine_brush",
+        "thick_brush",
         "oil_paint",
         "burin",
         "drypoint",
@@ -800,7 +800,7 @@
       ],
       "thinness": [
         "extra_fine",
-        "fine",
+        "thin",
         "extra_thick",
         "thick"
       ],
@@ -811,16 +811,16 @@
         "dash_dot"
       ],
       "surface": [
-        "none",
-        "solid",
-        "wash",
+        "empty",
+        "flat",
+        "sweep",
         "grain",
         "stipple",
         "hatch",
         "crosshatch",
         "aquatint"
       ],
-      "surface_intensity": [
+      "handling": [
         "dense",
         "faint"
       ],
@@ -842,12 +842,12 @@
         "undulating"
       ],
       "motion_amplitude": [
-        "fine",
-        "large"
+        "narrowly",
+        "broadly"
       ],
-      "motion_speed": [
-        "slowly",
-        "quickly"
+      "motion_spacing": [
+        "loosely",
+        "tightly"
       ],
       "bleeding": [
         "bleeding"
@@ -861,7 +861,7 @@
         "fill",
         "tile"
       ],
-      "place": [
+      "position": [
         "top",
         "bottom",
         "center",
@@ -890,8 +890,8 @@
         "rotring",
         "crayon",
         "chalk",
-        "brush_thin",
-        "brush_thick",
+        "fine_brush",
+        "thick_brush",
         "oil_paint",
         "burin",
         "drypoint",
@@ -899,7 +899,7 @@
       ],
       "thinness": [
         "extra_fine",
-        "fine",
+        "thin",
         "extra_thick",
         "thick"
       ],
@@ -910,16 +910,16 @@
         "dash_dot"
       ],
       "surface": [
-        "none",
-        "solid",
-        "wash",
+        "empty",
+        "flat",
+        "sweep",
         "grain",
         "stipple",
         "hatch",
         "crosshatch",
         "aquatint"
       ],
-      "surface_intensity": [
+      "handling": [
         "dense",
         "faint"
       ],
@@ -941,12 +941,12 @@
         "undulating"
       ],
       "motion_amplitude": [
-        "fine",
-        "large"
+        "narrowly",
+        "broadly"
       ],
-      "motion_speed": [
-        "slowly",
-        "quickly"
+      "motion_spacing": [
+        "loosely",
+        "tightly"
       ],
       "bleeding": [
         "bleeding"
@@ -960,7 +960,7 @@
         "fill",
         "tile"
       ],
-      "place": [
+      "position": [
         "top",
         "bottom",
         "center",
@@ -989,8 +989,8 @@
         "rotring",
         "crayon",
         "chalk",
-        "brush_thin",
-        "brush_thick",
+        "fine_brush",
+        "thick_brush",
         "oil_paint",
         "burin",
         "drypoint",
@@ -998,7 +998,7 @@
       ],
       "thinness": [
         "extra_fine",
-        "fine",
+        "thin",
         "extra_thick",
         "thick"
       ],
@@ -1009,16 +1009,16 @@
         "dash_dot"
       ],
       "surface": [
-        "none",
-        "solid",
-        "wash",
+        "empty",
+        "flat",
+        "sweep",
         "grain",
         "stipple",
         "hatch",
         "crosshatch",
         "aquatint"
       ],
-      "surface_intensity": [
+      "handling": [
         "dense",
         "faint"
       ],
@@ -1040,12 +1040,12 @@
         "undulating"
       ],
       "motion_amplitude": [
-        "fine",
-        "large"
+        "narrowly",
+        "broadly"
       ],
-      "motion_speed": [
-        "slowly",
-        "quickly"
+      "motion_spacing": [
+        "loosely",
+        "tightly"
       ],
       "bleeding": [
         "bleeding"
@@ -1059,7 +1059,7 @@
         "fill",
         "tile"
       ],
-      "place": [
+      "position": [
         "top",
         "bottom",
         "center",
@@ -1071,7 +1071,7 @@
       ],
       "size": [
         "very_small",
-        "normal",
+        "normal_sized",
         "very_large",
         "extra_large",
         "huge",
@@ -1098,8 +1098,8 @@
         "rotring",
         "crayon",
         "chalk",
-        "brush_thin",
-        "brush_thick",
+        "fine_brush",
+        "thick_brush",
         "oil_paint",
         "burin",
         "drypoint",
@@ -1107,7 +1107,7 @@
       ],
       "thinness": [
         "extra_fine",
-        "fine",
+        "thin",
         "extra_thick",
         "thick"
       ],
@@ -1118,16 +1118,16 @@
         "dash_dot"
       ],
       "surface": [
-        "none",
-        "solid",
-        "wash",
+        "empty",
+        "flat",
+        "sweep",
         "grain",
         "stipple",
         "hatch",
         "crosshatch",
         "aquatint"
       ],
-      "surface_intensity": [
+      "handling": [
         "dense",
         "faint"
       ],
@@ -1149,12 +1149,12 @@
         "undulating"
       ],
       "motion_amplitude": [
-        "fine",
-        "large"
+        "narrowly",
+        "broadly"
       ],
-      "motion_speed": [
-        "slowly",
-        "quickly"
+      "motion_spacing": [
+        "loosely",
+        "tightly"
       ],
       "bleeding": [
         "bleeding"
@@ -1168,7 +1168,7 @@
         "fill",
         "tile"
       ],
-      "place": [
+      "position": [
         "top",
         "bottom",
         "center",
@@ -1197,8 +1197,8 @@
         "rotring",
         "crayon",
         "chalk",
-        "brush_thin",
-        "brush_thick",
+        "fine_brush",
+        "thick_brush",
         "oil_paint",
         "burin",
         "drypoint",
@@ -1206,7 +1206,7 @@
       ],
       "thinness": [
         "extra_fine",
-        "fine",
+        "thin",
         "extra_thick",
         "thick"
       ],
@@ -1217,16 +1217,16 @@
         "dash_dot"
       ],
       "surface": [
-        "none",
-        "solid",
-        "wash",
+        "empty",
+        "flat",
+        "sweep",
         "grain",
         "stipple",
         "hatch",
         "crosshatch",
         "aquatint"
       ],
-      "surface_intensity": [
+      "handling": [
         "dense",
         "faint"
       ],
@@ -1248,12 +1248,12 @@
         "undulating"
       ],
       "motion_amplitude": [
-        "fine",
-        "large"
+        "narrowly",
+        "broadly"
       ],
-      "motion_speed": [
-        "slowly",
-        "quickly"
+      "motion_spacing": [
+        "loosely",
+        "tightly"
       ],
       "bleeding": [
         "bleeding"
@@ -1267,7 +1267,7 @@
         "fill",
         "tile"
       ],
-      "place": [
+      "position": [
         "top",
         "bottom",
         "center",
@@ -1296,8 +1296,8 @@
         "rotring",
         "crayon",
         "chalk",
-        "brush_thin",
-        "brush_thick",
+        "fine_brush",
+        "thick_brush",
         "oil_paint",
         "burin",
         "drypoint",
@@ -1305,7 +1305,7 @@
       ],
       "thinness": [
         "extra_fine",
-        "fine",
+        "thin",
         "extra_thick",
         "thick"
       ],
@@ -1316,16 +1316,16 @@
         "dash_dot"
       ],
       "surface": [
-        "none",
-        "solid",
-        "wash",
+        "empty",
+        "flat",
+        "sweep",
         "grain",
         "stipple",
         "hatch",
         "crosshatch",
         "aquatint"
       ],
-      "surface_intensity": [
+      "handling": [
         "dense",
         "faint"
       ],
@@ -1347,12 +1347,12 @@
         "undulating"
       ],
       "motion_amplitude": [
-        "fine",
-        "large"
+        "narrowly",
+        "broadly"
       ],
-      "motion_speed": [
-        "slowly",
-        "quickly"
+      "motion_spacing": [
+        "loosely",
+        "tightly"
       ],
       "bleeding": [
         "bleeding"
@@ -1366,7 +1366,7 @@
         "fill",
         "tile"
       ],
-      "place": [
+      "position": [
         "top",
         "bottom",
         "center",
@@ -1378,7 +1378,7 @@
       ],
       "size": [
         "very_small",
-        "normal",
+        "normal_sized",
         "very_large",
         "extra_large",
         "huge",
@@ -1405,8 +1405,8 @@
         "rotring",
         "crayon",
         "chalk",
-        "brush_thin",
-        "brush_thick",
+        "fine_brush",
+        "thick_brush",
         "oil_paint",
         "burin",
         "drypoint",
@@ -1414,7 +1414,7 @@
       ],
       "thinness": [
         "extra_fine",
-        "fine",
+        "thin",
         "extra_thick",
         "thick"
       ],
@@ -1425,16 +1425,16 @@
         "dash_dot"
       ],
       "surface": [
-        "none",
-        "solid",
-        "wash",
+        "empty",
+        "flat",
+        "sweep",
         "grain",
         "stipple",
         "hatch",
         "crosshatch",
         "aquatint"
       ],
-      "surface_intensity": [
+      "handling": [
         "dense",
         "faint"
       ],
@@ -1456,12 +1456,12 @@
         "undulating"
       ],
       "motion_amplitude": [
-        "fine",
-        "large"
+        "narrowly",
+        "broadly"
       ],
-      "motion_speed": [
-        "slowly",
-        "quickly"
+      "motion_spacing": [
+        "loosely",
+        "tightly"
       ],
       "bleeding": [
         "bleeding"
@@ -1475,7 +1475,7 @@
         "fill",
         "tile"
       ],
-      "place": [
+      "position": [
         "top",
         "bottom",
         "center",
@@ -1487,7 +1487,7 @@
       ],
       "size": [
         "very_small",
-        "normal",
+        "normal_sized",
         "very_large",
         "extra_large",
         "huge",
@@ -1514,8 +1514,8 @@
         "rotring",
         "crayon",
         "chalk",
-        "brush_thin",
-        "brush_thick",
+        "fine_brush",
+        "thick_brush",
         "oil_paint",
         "burin",
         "drypoint",
@@ -1523,7 +1523,7 @@
       ],
       "thinness": [
         "extra_fine",
-        "fine",
+        "thin",
         "extra_thick",
         "thick"
       ],
@@ -1534,16 +1534,16 @@
         "dash_dot"
       ],
       "surface": [
-        "none",
-        "solid",
-        "wash",
+        "empty",
+        "flat",
+        "sweep",
         "grain",
         "stipple",
         "hatch",
         "crosshatch",
         "aquatint"
       ],
-      "surface_intensity": [
+      "handling": [
         "dense",
         "faint"
       ],
@@ -1565,12 +1565,12 @@
         "undulating"
       ],
       "motion_amplitude": [
-        "fine",
-        "large"
+        "narrowly",
+        "broadly"
       ],
-      "motion_speed": [
-        "slowly",
-        "quickly"
+      "motion_spacing": [
+        "loosely",
+        "tightly"
       ],
       "bleeding": [
         "bleeding"
@@ -1584,7 +1584,7 @@
         "fill",
         "tile"
       ],
-      "place": [
+      "position": [
         "top",
         "bottom",
         "center",
@@ -1596,7 +1596,7 @@
       ],
       "size": [
         "very_small",
-        "normal",
+        "normal_sized",
         "very_large",
         "extra_large",
         "huge",
@@ -1623,8 +1623,8 @@
         "rotring",
         "crayon",
         "chalk",
-        "brush_thin",
-        "brush_thick",
+        "fine_brush",
+        "thick_brush",
         "oil_paint",
         "burin",
         "drypoint",
@@ -1632,7 +1632,7 @@
       ],
       "thinness": [
         "extra_fine",
-        "fine",
+        "thin",
         "extra_thick",
         "thick"
       ],
@@ -1643,16 +1643,16 @@
         "dash_dot"
       ],
       "surface": [
-        "none",
-        "solid",
-        "wash",
+        "empty",
+        "flat",
+        "sweep",
         "grain",
         "stipple",
         "hatch",
         "crosshatch",
         "aquatint"
       ],
-      "surface_intensity": [
+      "handling": [
         "dense",
         "faint"
       ],
@@ -1674,12 +1674,12 @@
         "undulating"
       ],
       "motion_amplitude": [
-        "fine",
-        "large"
+        "narrowly",
+        "broadly"
       ],
-      "motion_speed": [
-        "slowly",
-        "quickly"
+      "motion_spacing": [
+        "loosely",
+        "tightly"
       ],
       "bleeding": [
         "bleeding"
@@ -1693,7 +1693,7 @@
         "fill",
         "tile"
       ],
-      "place": [
+      "position": [
         "top",
         "bottom",
         "center",
@@ -1722,8 +1722,8 @@
         "rotring",
         "crayon",
         "chalk",
-        "brush_thin",
-        "brush_thick",
+        "fine_brush",
+        "thick_brush",
         "oil_paint",
         "burin",
         "drypoint",
@@ -1731,7 +1731,7 @@
       ],
       "thinness": [
         "extra_fine",
-        "fine",
+        "thin",
         "extra_thick",
         "thick"
       ],
@@ -1742,16 +1742,16 @@
         "dash_dot"
       ],
       "surface": [
-        "none",
-        "solid",
-        "wash",
+        "empty",
+        "flat",
+        "sweep",
         "grain",
         "stipple",
         "hatch",
         "crosshatch",
         "aquatint"
       ],
-      "surface_intensity": [
+      "handling": [
         "dense",
         "faint"
       ],
@@ -1773,12 +1773,12 @@
         "undulating"
       ],
       "motion_amplitude": [
-        "fine",
-        "large"
+        "narrowly",
+        "broadly"
       ],
-      "motion_speed": [
-        "slowly",
-        "quickly"
+      "motion_spacing": [
+        "loosely",
+        "tightly"
       ],
       "bleeding": [
         "bleeding"
@@ -1792,7 +1792,7 @@
         "fill",
         "tile"
       ],
-      "place": [
+      "position": [
         "top",
         "bottom",
         "center",
@@ -1821,8 +1821,8 @@
         "rotring",
         "crayon",
         "chalk",
-        "brush_thin",
-        "brush_thick",
+        "fine_brush",
+        "thick_brush",
         "oil_paint",
         "burin",
         "drypoint",
@@ -1830,7 +1830,7 @@
       ],
       "thinness": [
         "extra_fine",
-        "fine",
+        "thin",
         "extra_thick",
         "thick"
       ],
@@ -1841,16 +1841,16 @@
         "dash_dot"
       ],
       "surface": [
-        "none",
-        "solid",
-        "wash",
+        "empty",
+        "flat",
+        "sweep",
         "grain",
         "stipple",
         "hatch",
         "crosshatch",
         "aquatint"
       ],
-      "surface_intensity": [
+      "handling": [
         "dense",
         "faint"
       ],
@@ -1872,12 +1872,12 @@
         "undulating"
       ],
       "motion_amplitude": [
-        "fine",
-        "large"
+        "narrowly",
+        "broadly"
       ],
-      "motion_speed": [
-        "slowly",
-        "quickly"
+      "motion_spacing": [
+        "loosely",
+        "tightly"
       ],
       "bleeding": [
         "bleeding"
@@ -1891,7 +1891,7 @@
         "fill",
         "tile"
       ],
-      "place": [
+      "position": [
         "top",
         "bottom",
         "center",
@@ -1903,7 +1903,7 @@
       ],
       "size": [
         "very_small",
-        "normal",
+        "normal_sized",
         "very_large",
         "extra_large",
         "huge",
@@ -1930,8 +1930,8 @@
         "rotring",
         "crayon",
         "chalk",
-        "brush_thin",
-        "brush_thick",
+        "fine_brush",
+        "thick_brush",
         "oil_paint",
         "burin",
         "drypoint",
@@ -1939,7 +1939,7 @@
       ],
       "thinness": [
         "extra_fine",
-        "fine",
+        "thin",
         "extra_thick",
         "thick"
       ],
@@ -1950,16 +1950,16 @@
         "dash_dot"
       ],
       "surface": [
-        "none",
-        "solid",
-        "wash",
+        "empty",
+        "flat",
+        "sweep",
         "grain",
         "stipple",
         "hatch",
         "crosshatch",
         "aquatint"
       ],
-      "surface_intensity": [
+      "handling": [
         "dense",
         "faint"
       ],
@@ -1981,12 +1981,12 @@
         "undulating"
       ],
       "motion_amplitude": [
-        "fine",
-        "large"
+        "narrowly",
+        "broadly"
       ],
-      "motion_speed": [
-        "slowly",
-        "quickly"
+      "motion_spacing": [
+        "loosely",
+        "tightly"
       ],
       "bleeding": [
         "bleeding"
@@ -2000,7 +2000,7 @@
         "fill",
         "tile"
       ],
-      "place": [
+      "position": [
         "top",
         "bottom",
         "center",
@@ -2012,7 +2012,7 @@
       ],
       "size": [
         "very_small",
-        "normal",
+        "normal_sized",
         "very_large",
         "extra_large",
         "huge",
@@ -2039,8 +2039,8 @@
         "rotring",
         "crayon",
         "chalk",
-        "brush_thin",
-        "brush_thick",
+        "fine_brush",
+        "thick_brush",
         "oil_paint",
         "burin",
         "drypoint",
@@ -2048,7 +2048,7 @@
       ],
       "thinness": [
         "extra_fine",
-        "fine",
+        "thin",
         "extra_thick",
         "thick"
       ],
@@ -2059,16 +2059,16 @@
         "dash_dot"
       ],
       "surface": [
-        "none",
-        "solid",
-        "wash",
+        "empty",
+        "flat",
+        "sweep",
         "grain",
         "stipple",
         "hatch",
         "crosshatch",
         "aquatint"
       ],
-      "surface_intensity": [
+      "handling": [
         "dense",
         "faint"
       ],
@@ -2090,12 +2090,12 @@
         "undulating"
       ],
       "motion_amplitude": [
-        "fine",
-        "large"
+        "narrowly",
+        "broadly"
       ],
-      "motion_speed": [
-        "slowly",
-        "quickly"
+      "motion_spacing": [
+        "loosely",
+        "tightly"
       ],
       "bleeding": [
         "bleeding"
@@ -2110,7 +2110,7 @@
         "fill",
         "tile"
       ],
-      "place": [
+      "position": [
         "top",
         "bottom",
         "center",
@@ -2122,7 +2122,7 @@
       ],
       "size": [
         "very_small",
-        "normal",
+        "normal_sized",
         "very_large",
         "extra_large",
         "huge",
@@ -2149,8 +2149,8 @@
         "rotring",
         "crayon",
         "chalk",
-        "brush_thin",
-        "brush_thick",
+        "fine_brush",
+        "thick_brush",
         "oil_paint",
         "burin",
         "drypoint",
@@ -2158,7 +2158,7 @@
       ],
       "thinness": [
         "extra_fine",
-        "fine",
+        "thin",
         "extra_thick",
         "thick"
       ],
@@ -2169,16 +2169,16 @@
         "dash_dot"
       ],
       "surface": [
-        "none",
-        "solid",
-        "wash",
+        "empty",
+        "flat",
+        "sweep",
         "grain",
         "stipple",
         "hatch",
         "crosshatch",
         "aquatint"
       ],
-      "surface_intensity": [
+      "handling": [
         "dense",
         "faint"
       ],
@@ -2200,12 +2200,12 @@
         "undulating"
       ],
       "motion_amplitude": [
-        "fine",
-        "large"
+        "narrowly",
+        "broadly"
       ],
-      "motion_speed": [
-        "slowly",
-        "quickly"
+      "motion_spacing": [
+        "loosely",
+        "tightly"
       ],
       "bleeding": [
         "bleeding"
@@ -2220,7 +2220,7 @@
         "fill",
         "tile"
       ],
-      "place": [
+      "position": [
         "top",
         "bottom",
         "center",
@@ -2249,8 +2249,8 @@
         "rotring",
         "crayon",
         "chalk",
-        "brush_thin",
-        "brush_thick",
+        "fine_brush",
+        "thick_brush",
         "oil_paint",
         "burin",
         "drypoint",
@@ -2258,7 +2258,7 @@
       ],
       "thinness": [
         "extra_fine",
-        "fine",
+        "thin",
         "extra_thick",
         "thick"
       ],
@@ -2269,16 +2269,16 @@
         "dash_dot"
       ],
       "surface": [
-        "none",
-        "solid",
-        "wash",
+        "empty",
+        "flat",
+        "sweep",
         "grain",
         "stipple",
         "hatch",
         "crosshatch",
         "aquatint"
       ],
-      "surface_intensity": [
+      "handling": [
         "dense",
         "faint"
       ],
@@ -2300,12 +2300,12 @@
         "undulating"
       ],
       "motion_amplitude": [
-        "fine",
-        "large"
+        "narrowly",
+        "broadly"
       ],
-      "motion_speed": [
-        "slowly",
-        "quickly"
+      "motion_spacing": [
+        "loosely",
+        "tightly"
       ],
       "bleeding": [
         "bleeding"
@@ -2320,7 +2320,7 @@
         "fill",
         "tile"
       ],
-      "place": [
+      "position": [
         "top",
         "bottom",
         "center",
@@ -2349,8 +2349,8 @@
         "rotring",
         "crayon",
         "chalk",
-        "brush_thin",
-        "brush_thick",
+        "fine_brush",
+        "thick_brush",
         "oil_paint",
         "burin",
         "drypoint",
@@ -2358,7 +2358,7 @@
       ],
       "thinness": [
         "extra_fine",
-        "fine",
+        "thin",
         "extra_thick",
         "thick"
       ],
@@ -2369,16 +2369,16 @@
         "dash_dot"
       ],
       "surface": [
-        "none",
-        "solid",
-        "wash",
+        "empty",
+        "flat",
+        "sweep",
         "grain",
         "stipple",
         "hatch",
         "crosshatch",
         "aquatint"
       ],
-      "surface_intensity": [
+      "handling": [
         "dense",
         "faint"
       ],
@@ -2400,12 +2400,12 @@
         "undulating"
       ],
       "motion_amplitude": [
-        "fine",
-        "large"
+        "narrowly",
+        "broadly"
       ],
-      "motion_speed": [
-        "slowly",
-        "quickly"
+      "motion_spacing": [
+        "loosely",
+        "tightly"
       ],
       "bleeding": [
         "bleeding"
@@ -2419,7 +2419,7 @@
         "fill",
         "tile"
       ],
-      "place": [
+      "position": [
         "top",
         "bottom",
         "center",
@@ -2431,7 +2431,7 @@
       ],
       "size": [
         "very_small",
-        "normal",
+        "normal_sized",
         "very_large",
         "extra_large",
         "huge",
@@ -2458,8 +2458,8 @@
         "rotring",
         "crayon",
         "chalk",
-        "brush_thin",
-        "brush_thick",
+        "fine_brush",
+        "thick_brush",
         "oil_paint",
         "burin",
         "drypoint",
@@ -2467,7 +2467,7 @@
       ],
       "thinness": [
         "extra_fine",
-        "fine",
+        "thin",
         "extra_thick",
         "thick"
       ],
@@ -2478,7 +2478,7 @@
         "dash_dot"
       ],
       "surface": [],
-      "surface_intensity": [
+      "handling": [
         "dense",
         "faint"
       ],
@@ -2490,7 +2490,7 @@
       ],
       "motion_quality": [],
       "motion_amplitude": [],
-      "motion_speed": [],
+      "motion_spacing": [],
       "bleeding": [
         "bleeding"
       ]
@@ -2503,7 +2503,7 @@
         "fill",
         "tile"
       ],
-      "place": [
+      "position": [
         "top",
         "bottom",
         "center",
@@ -2532,8 +2532,8 @@
         "rotring",
         "crayon",
         "chalk",
-        "brush_thin",
-        "brush_thick",
+        "fine_brush",
+        "thick_brush",
         "oil_paint",
         "burin",
         "drypoint",
@@ -2541,7 +2541,7 @@
       ],
       "thinness": [
         "extra_fine",
-        "fine",
+        "thin",
         "extra_thick",
         "thick"
       ],
@@ -2552,7 +2552,7 @@
         "dash_dot"
       ],
       "surface": [],
-      "surface_intensity": [
+      "handling": [
         "dense",
         "faint"
       ],
@@ -2564,7 +2564,7 @@
       ],
       "motion_quality": [],
       "motion_amplitude": [],
-      "motion_speed": [],
+      "motion_spacing": [],
       "bleeding": [
         "bleeding"
       ]
@@ -2577,7 +2577,7 @@
         "fill",
         "tile"
       ],
-      "place": [
+      "position": [
         "top",
         "bottom",
         "center",
@@ -2606,8 +2606,8 @@
         "rotring",
         "crayon",
         "chalk",
-        "brush_thin",
-        "brush_thick",
+        "fine_brush",
+        "thick_brush",
         "oil_paint",
         "burin",
         "drypoint",
@@ -2615,7 +2615,7 @@
       ],
       "thinness": [
         "extra_fine",
-        "fine",
+        "thin",
         "extra_thick",
         "thick"
       ],
@@ -2626,7 +2626,7 @@
         "dash_dot"
       ],
       "surface": [],
-      "surface_intensity": [
+      "handling": [
         "dense",
         "faint"
       ],
@@ -2638,7 +2638,7 @@
       ],
       "motion_quality": [],
       "motion_amplitude": [],
-      "motion_speed": [],
+      "motion_spacing": [],
       "bleeding": [
         "bleeding"
       ]
@@ -2651,7 +2651,7 @@
         "fill",
         "tile"
       ],
-      "place": [
+      "position": [
         "top",
         "bottom",
         "center",
@@ -2663,7 +2663,7 @@
       ],
       "size": [
         "very_small",
-        "normal",
+        "normal_sized",
         "very_large",
         "extra_large",
         "huge",
@@ -2690,8 +2690,8 @@
         "rotring",
         "crayon",
         "chalk",
-        "brush_thin",
-        "brush_thick",
+        "fine_brush",
+        "thick_brush",
         "oil_paint",
         "burin",
         "drypoint",
@@ -2699,7 +2699,7 @@
       ],
       "thinness": [
         "extra_fine",
-        "fine",
+        "thin",
         "extra_thick",
         "thick"
       ],
@@ -2710,16 +2710,16 @@
         "dash_dot"
       ],
       "surface": [
-        "none",
-        "solid",
-        "wash",
+        "empty",
+        "flat",
+        "sweep",
         "grain",
         "stipple",
         "hatch",
         "crosshatch",
         "aquatint"
       ],
-      "surface_intensity": [
+      "handling": [
         "dense",
         "faint"
       ],
@@ -2741,12 +2741,12 @@
         "undulating"
       ],
       "motion_amplitude": [
-        "fine",
-        "large"
+        "narrowly",
+        "broadly"
       ],
-      "motion_speed": [
-        "slowly",
-        "quickly"
+      "motion_spacing": [
+        "loosely",
+        "tightly"
       ],
       "bleeding": [
         "bleeding"
@@ -2760,7 +2760,7 @@
         "fill",
         "tile"
       ],
-      "place": [
+      "position": [
         "top",
         "bottom",
         "center",
@@ -2789,8 +2789,8 @@
         "rotring",
         "crayon",
         "chalk",
-        "brush_thin",
-        "brush_thick",
+        "fine_brush",
+        "thick_brush",
         "oil_paint",
         "burin",
         "drypoint",
@@ -2798,7 +2798,7 @@
       ],
       "thinness": [
         "extra_fine",
-        "fine",
+        "thin",
         "extra_thick",
         "thick"
       ],
@@ -2809,16 +2809,16 @@
         "dash_dot"
       ],
       "surface": [
-        "none",
-        "solid",
-        "wash",
+        "empty",
+        "flat",
+        "sweep",
         "grain",
         "stipple",
         "hatch",
         "crosshatch",
         "aquatint"
       ],
-      "surface_intensity": [
+      "handling": [
         "dense",
         "faint"
       ],
@@ -2840,12 +2840,12 @@
         "undulating"
       ],
       "motion_amplitude": [
-        "fine",
-        "large"
+        "narrowly",
+        "broadly"
       ],
-      "motion_speed": [
-        "slowly",
-        "quickly"
+      "motion_spacing": [
+        "loosely",
+        "tightly"
       ],
       "bleeding": [
         "bleeding"
@@ -2859,7 +2859,7 @@
         "fill",
         "tile"
       ],
-      "place": [
+      "position": [
         "top",
         "bottom",
         "center",
@@ -2888,8 +2888,8 @@
         "rotring",
         "crayon",
         "chalk",
-        "brush_thin",
-        "brush_thick",
+        "fine_brush",
+        "thick_brush",
         "oil_paint",
         "burin",
         "drypoint",
@@ -2897,7 +2897,7 @@
       ],
       "thinness": [
         "extra_fine",
-        "fine",
+        "thin",
         "extra_thick",
         "thick"
       ],
@@ -2908,16 +2908,16 @@
         "dash_dot"
       ],
       "surface": [
-        "none",
-        "solid",
-        "wash",
+        "empty",
+        "flat",
+        "sweep",
         "grain",
         "stipple",
         "hatch",
         "crosshatch",
         "aquatint"
       ],
-      "surface_intensity": [
+      "handling": [
         "dense",
         "faint"
       ],
@@ -2939,12 +2939,12 @@
         "undulating"
       ],
       "motion_amplitude": [
-        "fine",
-        "large"
+        "narrowly",
+        "broadly"
       ],
-      "motion_speed": [
-        "slowly",
-        "quickly"
+      "motion_spacing": [
+        "loosely",
+        "tightly"
       ],
       "bleeding": [
         "bleeding"
@@ -2958,7 +2958,7 @@
         "fill",
         "tile"
       ],
-      "place": [
+      "position": [
         "top",
         "bottom",
         "center",
@@ -2970,7 +2970,7 @@
       ],
       "size": [
         "very_small",
-        "normal",
+        "normal_sized",
         "very_large",
         "extra_large",
         "huge",
@@ -2997,8 +2997,8 @@
         "rotring",
         "crayon",
         "chalk",
-        "brush_thin",
-        "brush_thick",
+        "fine_brush",
+        "thick_brush",
         "oil_paint",
         "burin",
         "drypoint",
@@ -3006,7 +3006,7 @@
       ],
       "thinness": [
         "extra_fine",
-        "fine",
+        "thin",
         "extra_thick",
         "thick"
       ],
@@ -3017,16 +3017,16 @@
         "dash_dot"
       ],
       "surface": [
-        "none",
-        "solid",
-        "wash",
+        "empty",
+        "flat",
+        "sweep",
         "grain",
         "stipple",
         "hatch",
         "crosshatch",
         "aquatint"
       ],
-      "surface_intensity": [
+      "handling": [
         "dense",
         "faint"
       ],
@@ -3048,12 +3048,12 @@
         "undulating"
       ],
       "motion_amplitude": [
-        "fine",
-        "large"
+        "narrowly",
+        "broadly"
       ],
-      "motion_speed": [
-        "slowly",
-        "quickly"
+      "motion_spacing": [
+        "loosely",
+        "tightly"
       ],
       "bleeding": [
         "bleeding"
@@ -3067,7 +3067,7 @@
         "fill",
         "tile"
       ],
-      "place": [
+      "position": [
         "top",
         "bottom",
         "center",
@@ -3079,7 +3079,7 @@
       ],
       "size": [
         "very_small",
-        "normal",
+        "normal_sized",
         "very_large",
         "extra_large",
         "huge",
@@ -3106,8 +3106,8 @@
         "rotring",
         "crayon",
         "chalk",
-        "brush_thin",
-        "brush_thick",
+        "fine_brush",
+        "thick_brush",
         "oil_paint",
         "burin",
         "drypoint",
@@ -3115,7 +3115,7 @@
       ],
       "thinness": [
         "extra_fine",
-        "fine",
+        "thin",
         "extra_thick",
         "thick"
       ],
@@ -3126,16 +3126,16 @@
         "dash_dot"
       ],
       "surface": [
-        "none",
-        "solid",
-        "wash",
+        "empty",
+        "flat",
+        "sweep",
         "grain",
         "stipple",
         "hatch",
         "crosshatch",
         "aquatint"
       ],
-      "surface_intensity": [
+      "handling": [
         "dense",
         "faint"
       ],
@@ -3157,12 +3157,12 @@
         "undulating"
       ],
       "motion_amplitude": [
-        "fine",
-        "large"
+        "narrowly",
+        "broadly"
       ],
-      "motion_speed": [
-        "slowly",
-        "quickly"
+      "motion_spacing": [
+        "loosely",
+        "tightly"
       ],
       "bleeding": [
         "bleeding"
@@ -3176,7 +3176,7 @@
         "fill",
         "tile"
       ],
-      "place": [
+      "position": [
         "top",
         "bottom",
         "center",
@@ -3188,7 +3188,7 @@
       ],
       "size": [
         "very_small",
-        "normal",
+        "normal_sized",
         "very_large",
         "extra_large",
         "huge",
@@ -3215,8 +3215,8 @@
         "rotring",
         "crayon",
         "chalk",
-        "brush_thin",
-        "brush_thick",
+        "fine_brush",
+        "thick_brush",
         "oil_paint",
         "burin",
         "drypoint",
@@ -3224,7 +3224,7 @@
       ],
       "thinness": [
         "extra_fine",
-        "fine",
+        "thin",
         "extra_thick",
         "thick"
       ],
@@ -3235,16 +3235,16 @@
         "dash_dot"
       ],
       "surface": [
-        "none",
-        "solid",
-        "wash",
+        "empty",
+        "flat",
+        "sweep",
         "grain",
         "stipple",
         "hatch",
         "crosshatch",
         "aquatint"
       ],
-      "surface_intensity": [
+      "handling": [
         "dense",
         "faint"
       ],
@@ -3266,12 +3266,12 @@
         "undulating"
       ],
       "motion_amplitude": [
-        "fine",
-        "large"
+        "narrowly",
+        "broadly"
       ],
-      "motion_speed": [
-        "slowly",
-        "quickly"
+      "motion_spacing": [
+        "loosely",
+        "tightly"
       ],
       "bleeding": [
         "bleeding"
@@ -3285,7 +3285,7 @@
         "fill",
         "tile"
       ],
-      "place": [
+      "position": [
         "top",
         "bottom",
         "center",
@@ -3314,8 +3314,8 @@
         "rotring",
         "crayon",
         "chalk",
-        "brush_thin",
-        "brush_thick",
+        "fine_brush",
+        "thick_brush",
         "oil_paint",
         "burin",
         "drypoint",
@@ -3323,7 +3323,7 @@
       ],
       "thinness": [
         "extra_fine",
-        "fine",
+        "thin",
         "extra_thick",
         "thick"
       ],
@@ -3334,16 +3334,16 @@
         "dash_dot"
       ],
       "surface": [
-        "none",
-        "solid",
-        "wash",
+        "empty",
+        "flat",
+        "sweep",
         "grain",
         "stipple",
         "hatch",
         "crosshatch",
         "aquatint"
       ],
-      "surface_intensity": [
+      "handling": [
         "dense",
         "faint"
       ],
@@ -3365,12 +3365,12 @@
         "undulating"
       ],
       "motion_amplitude": [
-        "fine",
-        "large"
+        "narrowly",
+        "broadly"
       ],
-      "motion_speed": [
-        "slowly",
-        "quickly"
+      "motion_spacing": [
+        "loosely",
+        "tightly"
       ],
       "bleeding": [
         "bleeding"
@@ -3384,7 +3384,7 @@
         "fill",
         "tile"
       ],
-      "place": [
+      "position": [
         "top",
         "bottom",
         "center",
@@ -3413,8 +3413,8 @@
         "rotring",
         "crayon",
         "chalk",
-        "brush_thin",
-        "brush_thick",
+        "fine_brush",
+        "thick_brush",
         "oil_paint",
         "burin",
         "drypoint",
@@ -3422,7 +3422,7 @@
       ],
       "thinness": [
         "extra_fine",
-        "fine",
+        "thin",
         "extra_thick",
         "thick"
       ],
@@ -3433,16 +3433,16 @@
         "dash_dot"
       ],
       "surface": [
-        "none",
-        "solid",
-        "wash",
+        "empty",
+        "flat",
+        "sweep",
         "grain",
         "stipple",
         "hatch",
         "crosshatch",
         "aquatint"
       ],
-      "surface_intensity": [
+      "handling": [
         "dense",
         "faint"
       ],
@@ -3464,12 +3464,12 @@
         "undulating"
       ],
       "motion_amplitude": [
-        "fine",
-        "large"
+        "narrowly",
+        "broadly"
       ],
-      "motion_speed": [
-        "slowly",
-        "quickly"
+      "motion_spacing": [
+        "loosely",
+        "tightly"
       ],
       "bleeding": [
         "bleeding"
@@ -3483,7 +3483,7 @@
         "fill",
         "tile"
       ],
-      "place": [
+      "position": [
         "top",
         "bottom",
         "center",
@@ -3495,7 +3495,7 @@
       ],
       "size": [
         "very_small",
-        "normal",
+        "normal_sized",
         "very_large",
         "extra_large",
         "huge",
@@ -3522,8 +3522,8 @@
         "rotring",
         "crayon",
         "chalk",
-        "brush_thin",
-        "brush_thick",
+        "fine_brush",
+        "thick_brush",
         "oil_paint",
         "burin",
         "drypoint",
@@ -3531,7 +3531,7 @@
       ],
       "thinness": [
         "extra_fine",
-        "fine",
+        "thin",
         "extra_thick",
         "thick"
       ],
@@ -3542,16 +3542,16 @@
         "dash_dot"
       ],
       "surface": [
-        "none",
-        "solid",
-        "wash",
+        "empty",
+        "flat",
+        "sweep",
         "grain",
         "stipple",
         "hatch",
         "crosshatch",
         "aquatint"
       ],
-      "surface_intensity": [
+      "handling": [
         "dense",
         "faint"
       ],
@@ -3573,12 +3573,12 @@
         "undulating"
       ],
       "motion_amplitude": [
-        "fine",
-        "large"
+        "narrowly",
+        "broadly"
       ],
-      "motion_speed": [
-        "slowly",
-        "quickly"
+      "motion_spacing": [
+        "loosely",
+        "tightly"
       ],
       "bleeding": [
         "bleeding"
@@ -3592,7 +3592,7 @@
         "fill",
         "tile"
       ],
-      "place": [
+      "position": [
         "top",
         "bottom",
         "center",
@@ -3604,7 +3604,7 @@
       ],
       "size": [
         "very_small",
-        "normal",
+        "normal_sized",
         "very_large",
         "extra_large",
         "huge",
@@ -3631,8 +3631,8 @@
         "rotring",
         "crayon",
         "chalk",
-        "brush_thin",
-        "brush_thick",
+        "fine_brush",
+        "thick_brush",
         "oil_paint",
         "burin",
         "drypoint",
@@ -3640,7 +3640,7 @@
       ],
       "thinness": [
         "extra_fine",
-        "fine",
+        "thin",
         "extra_thick",
         "thick"
       ],
@@ -3651,16 +3651,16 @@
         "dash_dot"
       ],
       "surface": [
-        "none",
-        "solid",
-        "wash",
+        "empty",
+        "flat",
+        "sweep",
         "grain",
         "stipple",
         "hatch",
         "crosshatch",
         "aquatint"
       ],
-      "surface_intensity": [
+      "handling": [
         "dense",
         "faint"
       ],
@@ -3682,12 +3682,12 @@
         "undulating"
       ],
       "motion_amplitude": [
-        "fine",
-        "large"
+        "narrowly",
+        "broadly"
       ],
-      "motion_speed": [
-        "slowly",
-        "quickly"
+      "motion_spacing": [
+        "loosely",
+        "tightly"
       ],
       "bleeding": [
         "bleeding"

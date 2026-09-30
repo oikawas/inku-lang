@@ -1103,7 +1103,7 @@ fn conflicting_modifiers_inside_one_pre_head_phrase_use_existing_typed_conflict(
 #[test]
 fn pre_head_phrases_deliver_every_closed_modifier_dimension() {
     let document = NormalizedDdlDocument::new(
-        "red two pen dashed horizontal hatch dense fine slowly swaying tall full-width semicircle circle blue three pencil dotted vertical grain faint finely quickly trembling wide half-width crescent line",
+        "red two pen dashed horizontal hatch dense narrowly loosely swaying tall full-width semicircle circle blue three pencil dotted vertical grain faint narrowly tightly undulating wide half-width crescent line",
         ResolvedInstructionLanguage::En,
         Vec::new(),
     )
@@ -1127,11 +1127,11 @@ fn pre_head_phrases_deliver_every_closed_modifier_dimension() {
     );
     assert_eq!(
         first.fluctuation.amplitude.as_ref().unwrap().identity.id,
-        "fine"
+        "narrowly"
     );
     assert_eq!(
         first.fluctuation.frequency.as_ref().unwrap().identity.id,
-        "slowly"
+        "loosely"
     );
     assert_eq!(
         first.fluctuation.quality.as_ref().unwrap().identity.id,
@@ -1165,15 +1165,15 @@ fn pre_head_phrases_deliver_every_closed_modifier_dimension() {
     );
     assert_eq!(
         second.fluctuation.amplitude.as_ref().unwrap().identity.id,
-        "fine"
+        "narrowly"
     );
     assert_eq!(
         second.fluctuation.frequency.as_ref().unwrap().identity.id,
-        "quickly"
+        "tightly"
     );
     assert_eq!(
         second.fluctuation.quality.as_ref().unwrap().identity.id,
-        "swaying"
+        "undulating"
     );
     assert_eq!(
         second.proportion.aspect.as_ref().unwrap().identity.id,
@@ -1283,7 +1283,7 @@ fn pre_head_ownership_stops_at_typed_boundaries_and_keeps_remaining_issues() {
 #[test]
 fn multi_head_remaining_modifiers_are_issues_without_redelivering_heads() {
     let document = NormalizedDdlDocument::new(
-        "red circle blue line eight pen dashed horizontal solid dense fine slowly swaying tall full-width semicircle",
+        "red circle blue line eight pen dashed horizontal solid dense narrowly loosely swaying tall full-width semicircle",
         ResolvedInstructionLanguage::En,
         Vec::new(),
     )
@@ -1336,47 +1336,50 @@ fn multi_head_remaining_modifiers_are_issues_without_redelivering_heads() {
 }
 
 #[test]
-fn every_accepted_surface_row_belongs_to_exactly_one_closed_dimension() {
-    let category = saijiki_asset()
-        .categories
-        .iter()
-        .find(|category| category.key == "omote")
-        .expect("accepted asset has the Surface category");
-    assert_eq!(category.words.len(), 10);
-
+fn every_accepted_surface_and_handling_row_belongs_to_exactly_one_closed_dimension() {
     let mut quality_ids = HashSet::new();
     let mut intensity_ids = HashSet::new();
-    for word in &category.words {
-        let projection = project_macro_semantic_ref(&category.key, &word.surface_ja)
-            .expect("accepted Surface row has canonical identity");
-        let source = format!(
-            "{} circle.",
-            word.surface_en
-                .as_deref()
-                .expect("accepted Surface row has English source surface")
-        );
-        let document =
-            NormalizedDdlDocument::new(source, ResolvedInstructionLanguage::En, Vec::new())
-                .expect("accepted Surface row forms a normalized document");
-        let result = associate_semantic_entities(&document)
-            .expect("accepted Surface row forms a clause stream");
-        assert!(result.issues.is_empty(), "{}", projection.canonical_id);
-        let entity = result.ast.entities.first().expect("one entity");
-        match (&entity.surface.quality, &entity.surface.intensity) {
-            (Some(term), None) => {
-                assert_eq!(term.identity.category, "surface");
-                assert_eq!(term.identity.id, projection.canonical_id);
-                assert!(quality_ids.insert(term.identity.id.clone()));
+    // Surface words name a technique; handling words (さばき) how the medium is laid.
+    for (key, semantic_category, rows) in [("omote", "surface", 8), ("sabaki", "handling", 2)] {
+        let category = saijiki_asset()
+            .categories
+            .iter()
+            .find(|category| category.key == key)
+            .expect("accepted asset has the category");
+        assert_eq!(category.words.len(), rows);
+        for word in &category.words {
+            let projection = project_macro_semantic_ref(&category.key, &word.surface_ja)
+                .expect("accepted row has canonical identity");
+            assert_eq!(projection.category, semantic_category);
+            let source = format!(
+                "{} circle.",
+                word.surface_en
+                    .as_deref()
+                    .expect("accepted row has English source surface")
+            );
+            let document =
+                NormalizedDdlDocument::new(source, ResolvedInstructionLanguage::En, Vec::new())
+                    .expect("accepted row forms a normalized document");
+            let result =
+                associate_semantic_entities(&document).expect("accepted row forms a clause stream");
+            assert!(result.issues.is_empty(), "{}", projection.canonical_id);
+            let entity = result.ast.entities.first().expect("one entity");
+            match (&entity.surface.quality, &entity.surface.intensity) {
+                (Some(term), None) if key == "omote" => {
+                    assert_eq!(term.identity.category, "surface");
+                    assert_eq!(term.identity.id, projection.canonical_id);
+                    assert!(quality_ids.insert(term.identity.id.clone()));
+                }
+                (None, Some(term)) if key == "sabaki" => {
+                    assert_eq!(term.identity.category, "handling");
+                    assert_eq!(term.identity.id, projection.canonical_id);
+                    assert!(intensity_ids.insert(term.identity.id.clone()));
+                }
+                _ => panic!(
+                    "{} must belong to exactly one dimension of its category",
+                    projection.canonical_id
+                ),
             }
-            (None, Some(term)) => {
-                assert_eq!(term.identity.category, "surface");
-                assert_eq!(term.identity.id, projection.canonical_id);
-                assert!(intensity_ids.insert(term.identity.id.clone()));
-            }
-            _ => panic!(
-                "{} must belong to exactly one Surface dimension",
-                projection.canonical_id
-            ),
         }
     }
 
@@ -1385,7 +1388,7 @@ fn every_accepted_surface_row_belongs_to_exactly_one_closed_dimension() {
         [
             "none",
             "solid",
-            "wash",
+            "sweep",
             "grain",
             "stipple",
             "hatch",
@@ -1401,7 +1404,6 @@ fn every_accepted_surface_row_belongs_to_exactly_one_closed_dimension() {
         ["dense", "faint"].map(str::to_owned).into_iter().collect()
     );
 }
-
 #[test]
 fn every_accepted_fluctuation_row_belongs_to_exactly_one_closed_dimension() {
     let category = saijiki_asset()
@@ -1505,11 +1507,14 @@ fn every_accepted_fluctuation_row_belongs_to_exactly_one_closed_dimension() {
 
     assert_eq!(
         amplitude_ids,
-        ["fine", "large"].map(str::to_owned).into_iter().collect()
+        ["broadly", "narrowly"]
+            .map(str::to_owned)
+            .into_iter()
+            .collect()
     );
     assert_eq!(
         frequency_ids,
-        ["quickly", "slowly"]
+        ["loosely", "tightly"]
             .map(str::to_owned)
             .into_iter()
             .collect()
@@ -2265,26 +2270,26 @@ fn macro_place_parameter_keeps_lexical_provenance_with_one_typed_identity() {
         serde_json::json!([]),
     );
 
-    for source_surface in ["center", "middle"] {
-        let source = format!("Bind.Place {source_surface}");
-        let result = macro_association(
-            &source,
-            ResolvedInstructionLanguage::En,
-            std::slice::from_ref(&definition),
-        );
-        assert!(result.issues.is_empty(), "{source_surface}");
-        let parameter = &macro_head(&result.ast.entities[0]).parameters[0];
-        assert!(matches!(
-            &parameter.value,
-            SemanticMacroParameterValue::SemanticRef(identity)
-                if identity.category == "place" && identity.id == "center"
-        ));
-        assert_eq!(parameter.provenance.surface, source_surface);
-        assert_eq!(
-            &source[parameter.provenance.span.start_byte..parameter.provenance.span.end_byte],
-            source_surface
-        );
-    }
+    // The v1 alias `middle` bound the same value; v2 does not read it (SPEC §3.3).
+    let source_surface = "center";
+    let source = format!("Bind.Place {source_surface}");
+    let result = macro_association(
+        &source,
+        ResolvedInstructionLanguage::En,
+        std::slice::from_ref(&definition),
+    );
+    assert!(result.issues.is_empty(), "{source_surface}");
+    let parameter = &macro_head(&result.ast.entities[0]).parameters[0];
+    assert!(matches!(
+        &parameter.value,
+        SemanticMacroParameterValue::SemanticRef(identity)
+            if identity.category == "place" && identity.id == "center"
+    ));
+    assert_eq!(parameter.provenance.surface, source_surface);
+    assert_eq!(
+        &source[parameter.provenance.span.start_byte..parameter.provenance.span.end_byte],
+        source_surface
+    );
 }
 
 #[test]

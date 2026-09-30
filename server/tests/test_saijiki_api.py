@@ -101,12 +101,14 @@ _EXPECTED_PAIRING: dict[str, tuple[tuple[str, str], ...]] = {
     # and one word in two adjacent lines of the vocabulary block meaning two
     # different things is a collision the author ruled out (2026-08-12). The
     # Japanese is the noun 塗り, not the verb 塗る, by the same ruling.
+    # Saijiki v2 (2026-09-29): 刷き / sweep is a technique with no paleness of its
+    # own, and 濃い / 薄い left おもて for さばき, which says how the ink is laid.
     "omote": (
-        ("空", "empty"), ("塗り", "flat"), ("薄墨", "pale ink wash"), ("粒", "grain"),
+        ("空", "empty"), ("塗り", "flat"), ("刷き", "sweep"), ("粒", "grain"),
         ("点描", "stipple"), ("平行線", "hatch"), ("交差線", "crosshatch"),
         ("アクアチント", "aquatint"),
-        ("濃い", "dense"), ("薄い", "faint"),
     ),
+    "sabaki": (("濃い", "dense"), ("薄い", "faint")),
     # じ (2026-08-14, ddl-engine 19). Seven supports and no `plain`: asking for
     # no ground is not a word you can say. 「カンバス」 and not 「キャンバス」 --
     # the web already spells the sheet's own proportion キャンバス, and one screen
@@ -122,7 +124,7 @@ _EXPECTED_PAIRING: dict[str, tuple[tuple[str, str], ...]] = {
         ("黄", "yellow"), ("橙", "orange"), ("紫", "purple"),
     ),
     "yuragi": (
-        ("細かく", "fine"), ("大きく", "large"), ("ゆっくり", "slowly"), ("速く", "quickly"),
+        ("細かく", "narrowly"), ("大きく", "broadly"), ("ゆるやかに", "loosely"), ("小刻みに", "tightly"),
         ("揺れる", "swaying"), ("波打つ", "undulating"), ("にじみ", "bleeding"),
     ),
     "basho": (

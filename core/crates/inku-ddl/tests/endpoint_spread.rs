@@ -6,9 +6,9 @@ use inku_score::{
 use serde_json::json;
 
 #[test]
-fn old_surface_aliases_use_current_meaning_and_self_endpoint_is_not_retargeted() {
+fn consolidated_words_carry_their_meaning_and_self_endpoint_is_not_retargeted() {
     let spread = compile(
-        "place red blurring circle at middle.",
+        "place red bleeding circle at center.",
         ResolvedInstructionLanguage::En,
         &[],
     );
@@ -19,8 +19,36 @@ fn old_surface_aliases_use_current_meaning_and_self_endpoint_is_not_retargeted()
     );
     assert_eq!(spread_score.instructions[0].variation, None);
 
+    // The v1 aliases (blurring, middle, 中央, 震える, 点 for stipple) were rewritten to
+    // these words by the v2 migration, and v2 does not read them (SPEC §3.3).
+    for (source, language, retired) in [
+        (
+            "place red blurring circle at middle.",
+            ResolvedInstructionLanguage::En,
+            &["blurring", "middle"][..],
+        ),
+        (
+            "中央に赤い震える円を置く。",
+            ResolvedInstructionLanguage::Ja,
+            &["中央", "震える"][..],
+        ),
+    ] {
+        let parsed = parse_neutral_lexemes(
+            &NormalizedDdlDocument::new(source, language, Vec::new()).unwrap(),
+        );
+        for word in retired {
+            assert!(
+                parsed.diagnostics.iter().any(|diagnostic| {
+                    diagnostic.kind == NeutralDiagnosticKind::Unknown
+                        && diagnostic.surface.contains(word)
+                }),
+                "{source}: {word}"
+            );
+        }
+    }
+
     let aliases = compile(
-        "中央に赤い震える点の円を置く。",
+        "中心に赤い揺れる点描の円を置く。",
         ResolvedInstructionLanguage::Ja,
         &[],
     );

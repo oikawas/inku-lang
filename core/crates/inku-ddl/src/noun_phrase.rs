@@ -235,7 +235,7 @@ mod tests {
                 },
                 ClauseAtom::CoreRole(CoreRoleTerm {
                     role: CoreRoleKind::Primitive,
-                    asset_id: "inku.saijiki.v1".to_owned(),
+                    asset_id: "inku.saijiki.v2".to_owned(),
                     category_key: "katachi".to_owned(),
                     canonical_surface_ja: "円".to_owned(),
                     shape_constraint: None,

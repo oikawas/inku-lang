@@ -192,7 +192,7 @@ fn moon_forms_preserve_semicircle_direction_and_filled_reference_crescent() {
     }
     for source in [
         "place one red crescent arc at center.",
-        "赤い三日月の弧を中央に置く。",
+        "赤い三日月の弧を中心に置く。",
     ] {
         let language = if source.starts_with("place") {
             ResolvedInstructionLanguage::En
@@ -379,7 +379,7 @@ fn shared_shape_constraints_reach_actual_score() {
             ResolvedInstructionLanguage::En,
         ),
         (
-            "横長の赤い四角を中央に置く。",
+            "横長の赤い四角を中心に置く。",
             ResolvedInstructionLanguage::Ja,
         ),
         (
@@ -391,14 +391,14 @@ fn shared_shape_constraints_reach_actual_score() {
             ResolvedInstructionLanguage::En,
         ),
         (
-            "赤い正三角形を中央に置く。",
+            "赤い正三角形を中心に置く。",
             ResolvedInstructionLanguage::Ja,
         ),
         (
             "place one red hexagon at center.",
             ResolvedInstructionLanguage::En,
         ),
-        ("赤い六角形を中央に置く。", ResolvedInstructionLanguage::Ja),
+        ("赤い六角形を中心に置く。", ResolvedInstructionLanguage::Ja),
         (
             "place one red sides 6 polygon at center.",
             ResolvedInstructionLanguage::En,
@@ -441,14 +441,14 @@ fn shared_shape_geometry_preserves_physical_extents_and_exact_rules() {
             0.12,
         ),
         (
-            "横に長い赤い四角形を中央に置く。",
+            "横に長い赤い四角形を中心に置く。",
             ResolvedInstructionLanguage::Ja,
             Primitive::Square,
             0.24,
             0.12,
         ),
         (
-            "細長い赤い三角形を中央に置く。",
+            "細長い赤い三角形を中心に置く。",
             ResolvedInstructionLanguage::Ja,
             Primitive::Triangle,
             0.12,
@@ -462,7 +462,7 @@ fn shared_shape_geometry_preserves_physical_extents_and_exact_rules() {
             0.24 * 3.0_f64.sqrt() / 2.0,
         ),
         (
-            "一辺0.24の赤い正三角形を中央に置く。",
+            "一辺0.24の赤い正三角形を中心に置く。",
             ResolvedInstructionLanguage::Ja,
             Primitive::Triangle,
             0.24,
@@ -476,7 +476,7 @@ fn shared_shape_geometry_preserves_physical_extents_and_exact_rules() {
             0.36 * 3.0_f64.sqrt() / 2.0,
         ),
         (
-            "赤い正方形を中央に置く。",
+            "赤い正方形を中心に置く。",
             ResolvedInstructionLanguage::Ja,
             Primitive::Square,
             0.24,
@@ -2563,9 +2563,9 @@ fn supported_input_is_identical_under_both_error_modes() {
 }
 
 #[test]
-fn english_largely_is_fluctuation_amplitude_not_a_second_size() {
+fn english_broadly_is_fluctuation_amplitude_not_a_second_size() {
     let result = stage15(
-        "draw one largely swaying small red line at center.",
+        "draw one broadly swaying small red line at center.",
         ResolvedInstructionLanguage::En,
     );
     let lowered = lower_verified_stage15_score(
@@ -2584,7 +2584,7 @@ fn english_largely_is_fluctuation_amplitude_not_a_second_size() {
 fn named_surface_texture_is_the_area_performance_without_a_hidden_flat_base() {
     let context = ScoreLoweringContext::resolve("square", Color::White).unwrap();
     for (surface, filled, texture) in [
-        ("pale ink wash", false, Some(SurfaceTexture::Wash)),
+        ("sweep", false, Some(SurfaceTexture::Sweep)),
         ("grain", false, Some(SurfaceTexture::Grain)),
         ("stipple", false, Some(SurfaceTexture::Stipple)),
         ("hatch", false, Some(SurfaceTexture::Hatch)),
@@ -2664,7 +2664,7 @@ fn surface_intensity_reaches_direct_and_macro_scores_with_owned_provenance() {
                 "place":{"expr":"semantic_ref","category":"place","id":"center"},
                 "color":{"expr":"semantic_ref","category":"color","id":"red"},
                 "surface":{"expr":"semantic_ref","category":"surface","id":"solid"},
-                "surface_intensity":{"expr":"semantic_ref","category":"surface","id":level}
+                "surface_intensity":{"expr":"semantic_ref","category":"handling","id":level}
             }}]
         }).to_string()).unwrap();
         let transformed = stage15_locked(
@@ -2762,7 +2762,7 @@ fn explicit_surface_and_ground_reach_the_actual_score() {
 fn delivered_surface_ids_use_shared_defaults_and_flat_macro_parity() {
     let context = ScoreLoweringContext::resolve("wide", Color::White).unwrap();
     for (surface, expected_texture) in [
-        ("wash", SurfaceTexture::Wash),
+        ("sweep", SurfaceTexture::Sweep),
         ("grain", SurfaceTexture::Grain),
         ("stipple", SurfaceTexture::Stipple),
         ("hatch", SurfaceTexture::Hatch),
@@ -4651,7 +4651,7 @@ fn resolved_palette(
 #[test]
 fn explicit_fluctuation_reaches_actual_score() {
     let result = stage15(
-        "place one red fine slowly undulating circle at center.",
+        "place one red narrowly loosely undulating circle at center.",
         ResolvedInstructionLanguage::En,
     );
     let lowered = lower_verified_stage15_score(
@@ -4699,10 +4699,10 @@ fn fluctuation_definition(slots: &[(&str, &str)], declared: bool, shape: &str) -
 fn fluctuation_closed_words_defaults_and_six_consumers_reach_score() {
     let context = ScoreLoweringContext::resolve("wide", Color::White).unwrap();
     for (dimension, id, amplitude, frequency, quality) in [
-        ("amplitude", "fine", "fine", "medium", "perlin"),
-        ("amplitude", "large", "broad", "medium", "perlin"),
-        ("frequency", "slowly", "medium", "slow", "perlin"),
-        ("frequency", "quickly", "medium", "high", "perlin"),
+        ("amplitude", "narrowly", "fine", "medium", "perlin"),
+        ("amplitude", "broadly", "broad", "medium", "perlin"),
+        ("frequency", "loosely", "medium", "slow", "perlin"),
+        ("frequency", "tightly", "medium", "high", "perlin"),
         ("quality", "swaying", "medium", "medium", "perlin"),
         ("quality", "undulating", "medium", "medium", "wave"),
     ] {
@@ -4754,29 +4754,29 @@ fn fluctuation_ordinary_literal_and_declared_macro_share_effective_score_and_own
     for (language, ordinary, caller, slots) in [
         (
             ResolvedInstructionLanguage::En,
-            "place one red fine slowly undulating circle at left-edge.",
-            "Draw.Pair fine slowly undulating",
+            "place one red narrowly loosely undulating circle at left-edge.",
+            "Draw.Pair narrowly loosely undulating",
             vec![
-                ("amplitude", "fine"),
-                ("frequency", "slowly"),
+                ("amplitude", "narrowly"),
+                ("frequency", "loosely"),
                 ("quality", "undulating"),
             ],
         ),
         (
             ResolvedInstructionLanguage::Ja,
-            "左端に、赤い円をひとつ置く。円は細かくゆっくり波打つ。",
-            "Draw.Pair 細かくゆっくり波打つ",
+            "左端に、赤い円をひとつ置く。円は細かくゆるやかに波打つ。",
+            "Draw.Pair 細かくゆるやかに波打つ",
             vec![
-                ("amplitude", "fine"),
-                ("frequency", "slowly"),
+                ("amplitude", "narrowly"),
+                ("frequency", "loosely"),
                 ("quality", "undulating"),
             ],
         ),
         (
             ResolvedInstructionLanguage::En,
-            "place one red fine circle at left-edge.",
-            "Draw.Pair fine",
-            vec![("amplitude", "fine")],
+            "place one red narrowly circle at left-edge.",
+            "Draw.Pair narrowly",
+            vec![("amplitude", "narrowly")],
         ),
     ] {
         let direct = stage15(ordinary, language);
@@ -4818,7 +4818,7 @@ fn fluctuation_ordinary_literal_and_declared_macro_share_effective_score_and_own
 fn fluctuation_rejections_preserve_instruction_invocation_and_emit_units() {
     let context = ScoreLoweringContext::resolve("wide", Color::White).unwrap();
     let point = stage15(
-        "place one red trembling point at left-edge. place one blue circle at left-edge.",
+        "place one red swaying point at left-edge. place one blue circle at left-edge.",
         ResolvedInstructionLanguage::En,
     );
     let point_emit = stage15_locked(
@@ -4831,7 +4831,7 @@ fn fluctuation_rejections_preserve_instruction_invocation_and_emit_units() {
         )],
     );
     let unbound = stage15_locked(
-        "place one blue circle at left-edge. trembling Draw.Pair",
+        "place one blue circle at left-edge. swaying Draw.Pair",
         ResolvedInstructionLanguage::En,
         &[fluctuation_definition(&[], false, "circle")],
     );
@@ -4848,7 +4848,7 @@ fn fluctuation_rejections_preserve_instruction_invocation_and_emit_units() {
         .remove("dimension");
     let malformed = MacroDefinition::from_json(&malformed.to_string()).unwrap();
     let malformed = stage15_locked(
-        "place one blue circle at left-edge. Draw.Pair fine",
+        "place one blue circle at left-edge. Draw.Pair narrowly",
         ResolvedInstructionLanguage::En,
         &[malformed],
     );

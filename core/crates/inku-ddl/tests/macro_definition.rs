@@ -182,9 +182,9 @@ fn fluctuation_dimension_preserves_legacy_identity_and_checks_known_constraints(
     assert!(MacroDefinition::from_json(&constrained.to_string()).is_err());
 
     for (dimension, valid, invalid) in [
-        ("amplitude", "large", "slowly"),
-        ("frequency", "quickly", "trembling"),
-        ("quality", "undulating", "fine"),
+        ("amplitude", "broadly", "loosely"),
+        ("frequency", "tightly", "swaying"),
+        ("quality", "undulating", "narrowly"),
     ] {
         let field = format!("fluctuation_{dimension}");
         let mut data = legacy.clone();
@@ -269,24 +269,24 @@ fn all_finite_core_values_validate_only_their_own_category_and_field() {
 }
 
 #[test]
-fn central_place_rows_share_one_typed_semantic_identity() {
-    let central = project_macro_semantic_ref("basho", "中央").unwrap();
-    let middle = project_macro_semantic_ref("basho", "中心").unwrap();
-
-    assert_eq!(central.category, "place");
-    assert_eq!(middle.category, "place");
-    assert_eq!(central.canonical_id, "center");
-    assert_eq!(middle.canonical_id, "center");
+fn the_center_row_projects_from_its_own_word_only() {
+    let center = project_macro_semantic_ref("basho", "中心").unwrap();
+    assert_eq!(center.category, "place");
+    assert_eq!(center.canonical_id, "center");
+    // 中央 was an accepted spelling in v1; the v2 migration rewrote it to 中心.
+    assert_eq!(project_macro_semantic_ref("basho", "中央"), None);
 }
 
 #[test]
-fn lexical_place_ids_remain_valid_inputs_but_share_canonical_definition_identity() {
-    let definition = |id: &str| {
+fn retired_semantic_ids_are_unknown_and_left_to_the_migration() {
+    // v1 kept these ids readable for saved definitions; v2 keeps no old reading (SPEC
+    // §3.3) and the migration rewrites them to center, swaying, and ink spread bleeding.
+    let definition = |field: &str, category: &str, id: &str| {
         MacroDefinition::from_json(
             &serde_json::json!({
                 "schema": "inku.macro-definition.v1",
-                "namespace": "Alias",
-                "heading": "Place",
+                "namespace": "Retired",
+                "heading": "Word",
                 "version": "1.0.0",
                 "parameters": {},
                 "components": {},
@@ -294,31 +294,32 @@ fn lexical_place_ids_remain_valid_inputs_but_share_canonical_definition_identity
                     "op": "emit",
                     "binding": null,
                     "fields": {
-                        "place": {"expr": "semantic_ref", "category": "place", "id": id}
+                        field: {"expr": "semantic_ref", "category": category, "id": id}
                     }
                 }]
             })
             .to_string(),
         )
         .unwrap()
+        .validate()
     };
-    let center = definition("center");
-    let middle = definition("middle");
-
-    assert!(serde_json::to_string(&middle).unwrap().contains("middle"));
-    assert_eq!(
-        middle.canonical_json_bytes().unwrap(),
-        center.canonical_json_bytes().unwrap()
-    );
-    assert_eq!(
-        middle.identity().unwrap().full_digest_hex(),
-        center.identity().unwrap().full_digest_hex()
-    );
-    assert!(
-        !std::str::from_utf8(&middle.canonical_json_bytes().unwrap())
-            .unwrap()
-            .contains("middle")
-    );
+    for (field, category, retired, current) in [
+        ("place", "place", "middle", "center"),
+        ("fluctuation_quality", "variation", "trembling", "swaying"),
+        ("fluctuation_quality", "variation", "blurring", "undulating"),
+    ] {
+        assert!(definition(field, category, current).is_valid(), "{current}");
+        let refused = definition(field, category, retired);
+        assert_eq!(
+            refused
+                .diagnostics()
+                .iter()
+                .map(|diagnostic| diagnostic.code())
+                .collect::<Vec<_>>(),
+            ["unknown_semantic_id"],
+            "{retired}"
+        );
+    }
 }
 
 #[test]

@@ -1027,15 +1027,24 @@ fn apply_continuation_occurrence(
             set_if_empty(&mut instruction.entity.continuity, term)
         }
         OwnedSemanticOccurrence::Angle(term) => set_if_empty(&mut instruction.entity.angle, term),
-        OwnedSemanticOccurrence::Surface(term) => match term.identity.id.as_str() {
-            "none" | "solid" | "wash" | "grain" | "stipple" | "hatch" | "crosshatch" | "bleed"
-            | "aquatint" => set_if_empty(&mut instruction.entity.surface.quality, term),
-            "dense" | "faint" => set_if_empty(&mut instruction.entity.surface.intensity, term),
-            _ => false,
-        },
+        OwnedSemanticOccurrence::Surface(term) => {
+            match (term.identity.category.as_str(), term.identity.id.as_str()) {
+                (
+                    "surface",
+                    "none" | "solid" | "sweep" | "grain" | "stipple" | "hatch" | "crosshatch"
+                    | "bleed" | "aquatint",
+                ) => set_if_empty(&mut instruction.entity.surface.quality, term),
+                ("handling", "dense" | "faint") => {
+                    set_if_empty(&mut instruction.entity.surface.intensity, term)
+                }
+                _ => false,
+            }
+        }
         OwnedSemanticOccurrence::Fluctuation(term) => match term.identity.id.as_str() {
-            "fine" | "large" => set_if_empty(&mut instruction.entity.fluctuation.amplitude, term),
-            "quickly" | "slowly" => {
+            "narrowly" | "broadly" => {
+                set_if_empty(&mut instruction.entity.fluctuation.amplitude, term)
+            }
+            "loosely" | "tightly" => {
                 set_if_empty(&mut instruction.entity.fluctuation.frequency, term)
             }
             "bleeding" => set_if_empty(&mut instruction.entity.fluctuation.spread, term),

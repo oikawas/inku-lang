@@ -188,7 +188,7 @@ fn every_accepted_short_and_full_relation_keeps_one_canonical_identity() {
             else {
                 unreachable!();
             };
-            assert_eq!(asset_id, "inku.saijiki.v1", "{surface}");
+            assert_eq!(asset_id, "inku.saijiki.v2", "{surface}");
             assert_eq!(relation_type, &relation.relation_type, "{surface}");
             assert_eq!(canonical_identity.kind.as_str(), relation.relation_type);
             assert_eq!(canonical_identity.form, form, "{surface}");

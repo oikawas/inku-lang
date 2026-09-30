@@ -1369,16 +1369,16 @@ mod tests {
 
     #[test]
     fn unresolved_clause_with_drawing_facts_requires_an_associated_instruction() {
-        let base = compile("出力: 黒い背景に、粗筆の黒い四角を中央に置く。面: 粗く塗りつぶす。");
+        let base = compile("出力: 黒い背景に、粗筆の黒い四角を中心に置く。面: 粗く塗りつぶす。");
         let hole = base.holes.first().expect("whole unresolved clause");
         assert_eq!(hole.allowed_span.start_byte, 0);
         assert_eq!(hole.allowed_span.end_byte, 65);
 
         let mut candidate =
-            compile("背景を黒で埋める。太筆の黒い四角を中央に置く。面: 粗く塗りつぶす。");
+            compile("背景を黒で埋める。太筆の黒い四角を中心に置く。面: 粗く塗りつぶす。");
         let range = SourceSpan {
             start_byte: 0,
-            end_byte: "背景を黒で埋める。太筆の黒い四角を中央に置く。".len(),
+            end_byte: "背景を黒で埋める。太筆の黒い四角を中心に置く。".len(),
         };
         assert_eq!(
             candidate.compiler_lock.as_ref().unwrap().state,
@@ -1415,7 +1415,7 @@ mod tests {
 
     #[test]
     fn detailed_validation_attributes_owner_reassignment_to_the_exact_hole() {
-        let base = compile("出力: 赤い円と青い円を中央に置く。面: 粗く塗りつぶす。");
+        let base = compile("出力: 赤い円と青い円を中心に置く。面: 粗く塗りつぶす。");
         let hole = base.holes.first().expect("whole unresolved clause");
         assert_eq!(hole.kind, "unresolved_clause");
         let patch = VisibleDdlPatch::new(
@@ -1425,7 +1425,7 @@ mod tests {
                 hole_id: hole.id.clone(),
                 allowed_span: hole.allowed_span,
                 expected_range_digest: hole.expected_range_digest.clone(),
-                replacement: "青い円と赤い円を中央に置く。".to_owned(),
+                replacement: "青い円と赤い円を中心に置く。".to_owned(),
             }],
         );
 

@@ -32,17 +32,13 @@ enum ResolvedValue {
     Spread(inku_score::InkSpread),
 }
 
-const WORDS: [(&str, ResolvedValue); 9] = [
-    ("fine", ResolvedValue::Amplitude(Amplitude::Fine)),
-    ("large", ResolvedValue::Amplitude(Amplitude::Broad)),
-    ("slowly", ResolvedValue::Frequency(Frequency::Slow)),
-    ("quickly", ResolvedValue::Frequency(Frequency::High)),
+const WORDS: [(&str, ResolvedValue); 7] = [
+    ("narrowly", ResolvedValue::Amplitude(Amplitude::Fine)),
+    ("broadly", ResolvedValue::Amplitude(Amplitude::Broad)),
+    ("loosely", ResolvedValue::Frequency(Frequency::Slow)),
+    ("tightly", ResolvedValue::Frequency(Frequency::High)),
     ("swaying", ResolvedValue::Quality(Quality::Perlin)),
-    // Saved MacroDefinitions retain their wire identity and lock digest. New
-    // authoring and bundled definitions use `swaying` and `bleeding`.
-    ("trembling", ResolvedValue::Quality(Quality::Perlin)),
     ("undulating", ResolvedValue::Quality(Quality::Wave)),
-    ("blurring", ResolvedValue::Quality(Quality::Pink)),
     (
         "bleeding",
         ResolvedValue::Spread(inku_score::InkSpread::Bleed),

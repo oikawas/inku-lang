@@ -3,7 +3,7 @@ use std::collections::{BTreeMap, HashSet};
 use inku_ddl::{
     MacroDefinition, MacroExpansionLimits, MacroLock, NormalizedDdlDocument,
     ResolvedInstructionLanguage, ScoreErrorPolicy, ScoreLoweringContext, ScoreLoweringOutcome,
-    compile_ddl_to_score,
+    compile_ddl_to_score, migrate_macro_definition_from_saijiki_v1,
 };
 use inku_score::{Color, Frequency, InkSpread, Primitive, Quality, RelationType};
 use serde::Deserialize;
@@ -11,8 +11,10 @@ use serde_json::Value;
 
 const ASSET: &str = include_str!("../assets/nature-leaves-v1.json");
 /// The bundled package before draw-system04 (1.0.0 / 1.0.1 editions), which
-/// saved works may still lock.
+/// saved works may still hold. Its words are Saijiki v1.
 const PACKAGE_1_0: &str = include_str!("fixtures/nature-leaves-1.0-package.json");
+/// The bundled 2.0.0 package as it was written with Saijiki v1 words.
+const PACKAGE_2_0_V1: &str = include_str!("fixtures/nature-leaves-2.0-package.json");
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -260,8 +262,81 @@ fn bundled_nature_leaves_are_valid_bounded_definitions_that_reach_normal_score_l
     }
 }
 
+const MIGRATION_LIMITS: MacroExpansionLimits = MacroExpansionLimits {
+    max_invocations: 64,
+    max_depth: 16,
+    max_evaluation_steps: 8_192,
+    max_nodes_per_invocation: 128,
+    max_total_nodes: 128,
+};
+
+/// Migrate one saved v1 definition and draw it by its own lock. A definition without a v1
+/// word comes back unchanged and keeps its lock.
+fn migrate_and_compile(
+    value: &Value,
+    source: &str,
+    language: ResolvedInstructionLanguage,
+) -> (MacroDefinition, inku_ddl::CompilerExecutionResult) {
+    let migrated = migrate_macro_definition_from_saijiki_v1(value)
+        .unwrap_or_else(|error| panic!("{source}: {error:?}"));
+    assert_eq!(migrated.changed, migrated.definition != *value, "{source}");
+    let definition = MacroDefinition::from_json(&migrated.definition.to_string()).unwrap();
+    let identity = definition.identity().unwrap();
+    assert_eq!(identity, migrated.identity);
+    let lock = MacroLock::new(
+        identity.qualified_name(),
+        identity.version(),
+        format!("sha256:{}", identity.full_digest_hex()),
+    )
+    .unwrap();
+    let execution = compile_ddl_to_score(
+        NormalizedDdlDocument::new(source, language, vec![lock]).unwrap(),
+        std::slice::from_ref(&definition),
+        Some(37),
+        MIGRATION_LIMITS,
+        ScoreLoweringContext::resolve("square", Color::White).unwrap(),
+        None,
+        ScoreErrorPolicy::Stop,
+    );
+    assert_eq!(
+        execution.outcome(),
+        ScoreLoweringOutcome::Complete,
+        "{source}: upstream={:?}, downstream={:?}",
+        execution.upstream_diagnostics(),
+        execution.downstream_diagnostics()
+    );
+    (definition, execution)
+}
+
 #[test]
-fn saved_retired_fluctuation_definitions_keep_their_v1_locks_and_meaning() {
+fn the_bundled_package_is_its_v1_edition_migrated() {
+    let previous: Package = serde_json::from_str(PACKAGE_2_0_V1).unwrap();
+    let current: Package = serde_json::from_str(ASSET).unwrap();
+    assert_eq!(previous.version, current.version);
+    assert_eq!(previous.entries.len(), current.entries.len());
+    let mut changed = 0;
+    for (old, new) in previous.entries.iter().zip(&current.entries) {
+        let migrated = migrate_macro_definition_from_saijiki_v1(&old.definition).unwrap();
+        // The migration keeps the version and every other field; only words move.
+        assert_eq!(migrated.definition, new.definition);
+        assert_eq!(
+            migrated.identity,
+            MacroDefinition::from_json(&new.definition.to_string())
+                .unwrap()
+                .identity()
+                .unwrap()
+        );
+        assert_eq!(migrated.changed, old.definition != new.definition);
+        changed += usize::from(migrated.changed);
+        // Migrating a current definition again changes nothing.
+        let again = migrate_macro_definition_from_saijiki_v1(&new.definition).unwrap();
+        assert!(!again.changed);
+    }
+    assert_eq!(changed, 4);
+}
+
+#[test]
+fn saved_retired_fluctuation_definitions_migrate_to_their_current_words() {
     let package: Package = serde_json::from_str(PACKAGE_1_0).expect("1.0 package must be JSON");
     let mut wakaba = package.entries[0].definition.clone();
     wakaba["version"] = Value::String("1.0.0".to_owned());
@@ -309,118 +384,85 @@ fn saved_retired_fluctuation_definitions_keep_their_v1_locks_and_meaning() {
         );
     }
 
+    // The v1 digests these saved definitions were locked by; the migration moves each lock.
     let cases = [
         (
             "Nature.若葉.",
             ResolvedInstructionLanguage::En,
             wakaba,
             "572f04f5b127e660a6d4876fa9eed344bd31e675b7d06da5c69d93a64c850e95",
-            Quality::Perlin,
+            false,
         ),
         (
             "Nature.落葉",
             ResolvedInstructionLanguage::Ja,
             ochiba,
             "81f36ea2703757cee78205b0bec2721e0a519fc0399000f2c41944583e608661",
-            Quality::Pink,
+            true,
         ),
         (
             "Nature.枯草",
             ResolvedInstructionLanguage::Ja,
             karekusa,
             "0d3a6f2316cec02e20322f9e9db43affb540a523e57c38ed1ae4729a47393b92",
-            Quality::Pink,
+            true,
         ),
         (
             "Nature.枯葉",
             ResolvedInstructionLanguage::Ja,
             kareha,
             "710c6ebb21cc6d1271dca9fa0922f2f8e9f377d70ff885adb033f69036bdf9b5",
-            Quality::Perlin,
+            false,
         ),
     ];
-    let limits = MacroExpansionLimits {
-        max_invocations: 64,
-        max_depth: 16,
-        max_evaluation_steps: 8_192,
-        max_nodes_per_invocation: 128,
-        max_total_nodes: 128,
-    };
-
-    for (source, language, value, expected_digest, expected_quality) in cases {
-        let definition = MacroDefinition::from_json(&value.to_string()).unwrap();
+    for (source, language, value, v1_digest, blurred) in cases {
+        assert!(
+            migrate_macro_definition_from_saijiki_v1(&value)
+                .unwrap()
+                .changed
+        );
+        let (definition, execution) = migrate_and_compile(&value, source, language);
         let identity = definition.identity().unwrap();
         assert_eq!(identity.version(), "1.0.0");
-        assert_eq!(identity.full_digest_hex(), expected_digest);
-        let lock = MacroLock::new(
-            identity.qualified_name(),
-            identity.version(),
-            format!("sha256:{expected_digest}"),
-        )
-        .unwrap();
-        let execution = compile_ddl_to_score(
-            NormalizedDdlDocument::new(source, language, vec![lock]).unwrap(),
-            std::slice::from_ref(&definition),
-            Some(37),
-            limits,
-            ScoreLoweringContext::resolve("square", Color::White).unwrap(),
-            None,
-            ScoreErrorPolicy::Stop,
-        );
-        assert_eq!(execution.outcome(), ScoreLoweringOutcome::Complete);
-        assert!(execution.upstream_diagnostics().is_empty());
-        assert!(execution.downstream_diagnostics().is_empty());
-        assert!(
-            execution
-                .score()
-                .unwrap()
-                .instructions
-                .iter()
-                .all(|instruction| {
-                    instruction.ink_spread.is_none()
-                        && instruction
-                            .variation
-                            .as_ref()
-                            .is_some_and(|variation| variation.quality == expected_quality)
-                })
-        );
+        assert_ne!(identity.full_digest_hex(), v1_digest);
+        let instructions = &execution.score().unwrap().instructions;
+        assert!(!instructions.is_empty());
+        for instruction in instructions {
+            let quality = instruction
+                .variation
+                .as_ref()
+                .map(|variation| variation.quality);
+            // Blurring (the Pink quality) became bleeding ink; trembling became swaying.
+            assert_ne!(quality, Some(Quality::Pink), "{source}");
+            if blurred {
+                assert_eq!(instruction.ink_spread, Some(InkSpread::Bleed), "{source}");
+            } else {
+                assert_eq!(instruction.ink_spread, None, "{source}");
+                assert_eq!(quality, Some(Quality::Perlin), "{source}");
+            }
+        }
     }
 }
 
 #[test]
-fn a_saved_cloudform_kareha_keeps_its_lock_and_meaning() {
+fn a_saved_cloudform_kareha_migrates_and_keeps_its_meaning() {
     let package: Package = serde_json::from_str(PACKAGE_1_0).expect("1.0 package must be JSON");
-    let definition =
-        MacroDefinition::from_json(&package.entries[6].definition.to_string()).unwrap();
+    assert!(
+        migrate_macro_definition_from_saijiki_v1(&package.entries[6].definition)
+            .unwrap()
+            .changed
+    );
+    let (definition, execution) = migrate_and_compile(
+        &package.entries[6].definition,
+        "Nature.枯葉",
+        ResolvedInstructionLanguage::Ja,
+    );
     let identity = definition.identity().unwrap();
     assert_eq!(identity.version(), "1.0.1");
-    assert_eq!(
+    assert_ne!(
         identity.full_digest_hex(),
         "1ceac898eb3b3f5478f8cf6cb8661eae7c4fc40a0a871e10cfeac64b02fafdf5"
     );
-    let lock = MacroLock::new(
-        identity.qualified_name(),
-        identity.version(),
-        format!("sha256:{}", identity.full_digest_hex()),
-    )
-    .unwrap();
-    let execution = compile_ddl_to_score(
-        NormalizedDdlDocument::new("Nature.枯葉", ResolvedInstructionLanguage::Ja, vec![lock])
-            .unwrap(),
-        std::slice::from_ref(&definition),
-        Some(37),
-        MacroExpansionLimits {
-            max_invocations: 64,
-            max_depth: 16,
-            max_evaluation_steps: 8_192,
-            max_nodes_per_invocation: 128,
-            max_total_nodes: 128,
-        },
-        ScoreLoweringContext::resolve("square", Color::White).unwrap(),
-        None,
-        ScoreErrorPolicy::Stop,
-    );
-    assert_eq!(execution.outcome(), ScoreLoweringOutcome::Complete);
     let instructions = &execution.score().unwrap().instructions;
     assert!((2..=4).contains(&instructions.len()));
     assert!(
@@ -431,52 +473,27 @@ fn a_saved_cloudform_kareha_keeps_its_lock_and_meaning() {
 }
 
 #[test]
-fn every_saved_1_0_edition_keeps_its_lock_and_still_expands() {
+fn every_saved_1_0_edition_migrates_and_still_expands() {
     let package: Package = serde_json::from_str(PACKAGE_1_0).expect("1.0 package must be JSON");
     assert_eq!(package.version, "1.0.1");
     let current: Package = serde_json::from_str(ASSET).expect("Nature package must be JSON");
     for (old, new) in package.entries.iter().zip(&current.entries) {
-        let definition = MacroDefinition::from_json(&old.definition.to_string()).unwrap();
+        let version = old.definition["version"].as_str().unwrap().to_owned();
+        let name = format!(
+            "{}.{}",
+            old.definition["namespace"].as_str().unwrap(),
+            old.definition["heading"].as_str().unwrap()
+        );
+        let (definition, _) =
+            migrate_and_compile(&old.definition, &name, ResolvedInstructionLanguage::Ja);
         let identity = definition.identity().unwrap();
+        assert_eq!(identity.version(), version, "{name}");
+        // A saved 1.0 edition stays its own definition; it does not become the 2.0.0 one.
         let replacement = MacroDefinition::from_json(&new.definition.to_string()).unwrap();
-        // Every word changed; a saved lock must never silently pick up the new edition.
         assert_ne!(
             identity.full_digest_hex(),
             replacement.identity().unwrap().full_digest_hex(),
-            "{}",
-            identity.qualified_name()
-        );
-        let lock = MacroLock::new(
-            identity.qualified_name(),
-            identity.version(),
-            format!("sha256:{}", identity.full_digest_hex()),
-        )
-        .unwrap();
-        let execution = compile_ddl_to_score(
-            NormalizedDdlDocument::new(
-                identity.qualified_name(),
-                ResolvedInstructionLanguage::Ja,
-                vec![lock],
-            )
-            .unwrap(),
-            std::slice::from_ref(&definition),
-            Some(37),
-            MacroExpansionLimits {
-                max_invocations: 64,
-                max_depth: 16,
-                max_evaluation_steps: 8_192,
-                max_nodes_per_invocation: 128,
-                max_total_nodes: 128,
-            },
-            ScoreLoweringContext::resolve("square", Color::White).unwrap(),
-            None,
-            ScoreErrorPolicy::Stop,
-        );
-        assert_eq!(
-            execution.outcome(),
-            ScoreLoweringOutcome::Complete,
-            "{}",
-            identity.qualified_name()
+            "{name}"
         );
     }
 }

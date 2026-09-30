@@ -1553,7 +1553,7 @@ fn project_macro_emit<'a>(
         .then(|| macro_semantic_field(fields, "surface", "surface", false, &mut gaps))
         .flatten();
     let surface_intensity = (!omitted_appearance.contains(&ScoreAppearanceField::SurfaceIntensity))
-        .then(|| macro_semantic_field(fields, "surface_intensity", "surface", false, &mut gaps))
+        .then(|| macro_semantic_field(fields, "surface_intensity", "handling", false, &mut gaps))
         .flatten();
     let angle = macro_semantic_field(fields, "angle", "angle", false, &mut gaps);
     let layout_direction =
@@ -5872,7 +5872,7 @@ fn resolve_complete_object<'a>(
     let surface_intensity = match input.surface_intensity {
         None => SurfaceIntensity::Normal,
         Some(identity)
-            if identity.category == "surface" && matches!(identity.id, "dense" | "faint") =>
+            if identity.category == "handling" && matches!(identity.id, "dense" | "faint") =>
         {
             if identity.id == "dense" {
                 SurfaceIntensity::Dense
@@ -6205,7 +6205,7 @@ fn surface_spec_from_identity(
     let texture: SurfaceTexture = match (identity.category, identity.id) {
         (
             "surface",
-            "wash" | "sweep" | "grain" | "stipple" | "hatch" | "crosshatch" | "bleed" | "aquatint",
+            "sweep" | "grain" | "stipple" | "hatch" | "crosshatch" | "bleed" | "aquatint",
         ) => serde_json::from_value(serde_json::Value::String(identity.id.to_owned())).map_err(
             |_| ScoreFieldGap::UnsupportedSurfaceIdentity {
                 category: identity.category.to_owned(),
@@ -7715,7 +7715,7 @@ mod tests {
                 for seed in [None, Some(0), Some(19)] {
                     let compilation = crate::compile_typed_ddl(
                         crate::NormalizedDdlDocument::new(
-                            format!("中央に、黒い横線を{word}に4294967295本並べる。"),
+                            format!("中心に、黒い横線を{word}に4294967295本並べる。"),
                             crate::ResolvedInstructionLanguage::Ja,
                             vec![],
                         )
@@ -7742,7 +7742,7 @@ mod tests {
                         panic!()
                     };
                     assert_eq!(length.numerator * 800 * 25, 4800 * length.denominator);
-                    // A line-up at `中央` runs through the middle cell and keeps
+                    // A line-up at `中心` runs through the middle cell and keeps
                     // its canvas-long row.
                     match object.recipe() {
                         PlacementRecipe::VerticalLine { cell_height } => assert_eq!(

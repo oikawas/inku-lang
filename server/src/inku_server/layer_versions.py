@@ -311,7 +311,11 @@
 # 52: A position range written in numbers draws by the same rules as a named
 # range. A fill target, a Macro caller, or a group member with such a range is
 # reported as unsupported instead of drawn.
-DDL_ENGINE_VERSION = "52"
+# 53: Dense and faint reach strokes and textured surfaces, not only flat fills,
+# and a sweep is drawn as the wash band without the wash's own paleness (Score
+# 0.17.0). The compiler reads Saijiki v2 and refuses a saved v1 document until
+# its host migrates it.
+DDL_ENGINE_VERSION = "53"
 # 4 (2026-07-30): yellow, orange, and purple become abstract Score colors, and
 # coerce recognizes the corresponding Japanese and English DDL markers.
 # 3 (2026-07-30): 黄 / 橙 / 紫 joined the saijiki color words, so an author can write
@@ -340,4 +344,10 @@ DDL_ENGINE_VERSION = "52"
 # after the author's own words (`右下（横0.67〜1、縦0.67〜1）に`, `at the bottom
 # right (horizontal 0.67 to 1, vertical 0.67 to 1)`) or alone. The words are
 # kept and never read, and each language reads only its own form.
-DDL_VERSION = "15"
+# 16 (2026-09-29): Saijiki v2 (`inku.saijiki.v2`). The handling category さばき
+# holds 濃い / 薄い apart from the surface quality; 刷き / sweep replaces 薄墨 /
+# pale ink wash; ゆるやかに / 小刻みに and the adverbs narrowly / broadly name
+# the wave spacing and amplitude. The v1 aliases (点 for stipple, 震える, 滲む,
+# 中央, trembling, blurring, middle) are not read. Saved documents and Macro
+# definitions are rewritten once to the v2 words.
+DDL_VERSION = "16"

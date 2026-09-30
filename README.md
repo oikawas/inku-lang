@@ -257,19 +257,20 @@ The reference dictionary is called **Saijiki**（歳時記）— a word borrowed
 | angles | かたむき | horizontal, vertical, diagonal, rising, falling, rotated |
 | touches | てざわり | silverpoint, pencil, pen, rotring, crayon, chalk, fine-brush, thick-brush, oil paint, burin, drypoint, computer |
 | continuity | つらなり | solid, dashed, dotted, dash-dot |
-| surfaces | おもて | empty, flat, pale ink wash, grain, stipple, hatch, crosshatch, aquatint, dense, faint |
+| surfaces | おもて | empty, flat, sweep, grain, stipple, hatch, crosshatch, aquatint |
+| handling | さばき | dense, faint |
 | grounds | じ | paper, washi, ink wash ground, charcoal ground, canvas, drawing paper, mezzotint |
 | colors | いろ | white, black, blue, red, green, gray, yellow, orange, purple |
-| movements | ゆらぎ | fine, large, slowly, quickly, swaying, undulating, bleeding |
+| movements | ゆらぎ | narrowly, broadly, loosely, tightly, swaying, undulating, bleeding |
 | places | ばしょ | top, bottom, center, left-edge, right-edge, top-edge, bottom-edge, start, end, partway, corner |
 | motions | うごき | place, line-up, draw, scatter, fill, tile |
 | order | じゅん | alternating, in order |
 | proportions | わりあい | tall, wide, full-width, half-width, semicircle, waxing, waning, crescent |
 | relations | あいだ | along, not touching, cutting, between, touching, connected, mirrored (used as "along the previous line" or "mirrored with the previous shape") |
 
-Surfaces name the inside of a closed shape or the way a mark sits; grounds name the canvas itself, the support. A ground is written as a sentence of its own, such as "Washi." Words from registered plugins (for the bundled `Nature.leaves`, words such as "YoungLeaves" and "FallenLeaves") appear in the Saijiki in the same way as the core words.
+Surfaces name the inside of a closed shape or the way a mark sits; handling names how the ink is laid on any mark; grounds name the canvas itself, the support. A ground is written as a sentence of its own, such as "Washi." Words from registered plugins (for the bundled `Nature.leaves`, words such as "YoungLeaves" and "FallenLeaves") appear in the Saijiki in the same way as the core words.
 
-The source of truth for the vocabulary is the Saijiki definition held by the shared core (`core/crates/inku-ddl/assets/saijiki-v1.json`). The table above lists the words the app's Saijiki displays; `inku-cli reference --md` produces a machine-generated listing at any time.
+The source of truth for the vocabulary is the Saijiki definition held by the shared core (`core/crates/inku-ddl/assets/saijiki-v2.json`). The table above lists the words the app's Saijiki displays; `inku-cli reference --md` produces a machine-generated listing at any time.
 
 Only physical, observable words belong to the core. Emotional evaluation — "beautifully," "delicately," "boldly" — is excluded, because evaluation belongs to the viewer, not the writer. Read the gallery descriptions again and you will find not one evaluative word among them.
 
@@ -308,7 +309,7 @@ During development, we always move forward while comparing with saved reference 
 - **Shared core** — the flow of the processing, the Typed Compiler, the score, and the Renderer are gathered in a shared Rust core that the server (Python) and Android (Kotlin) both call
 - **Primitives and arrangement** — point, line, circle, ellipse, arc, square, triangle, cloudform; placing, lining up, drawing, scattering, filling, and tiling, with paths such as waves and diagonal bands, and "alternating" or "in order" sequences
 - **Regions and relations** — scores can state seven kinds of relation between elements ("along the previous line," "not touching the previous shape," "mirrored with the previous shape") that the performance resolves
-- **Material rendering** — silverpoint, pencil, pen, rotring, crayon, chalk, brushes, oil paint, burin, and drypoint, differentiated through the shared stroke engine's width, tracking, and sparse events plus tool-specific edges. Surface qualities (flat, pale ink wash, stipple, hatch, crosshatch, aquatint, and more) and grounds (washi, charcoal ground, canvas, mezzotint, and more) can be chosen too
+- **Material rendering** — silverpoint, pencil, pen, rotring, crayon, chalk, brushes, oil paint, burin, and drypoint, differentiated through the shared stroke engine's width, tracking, and sparse events plus tool-specific edges. Surface qualities (flat, sweep, stipple, hatch, crosshatch, aquatint, and more) and grounds (washi, charcoal ground, canvas, mezzotint, and more) can be chosen too
 - **Plugins** — namespaced vocabulary macros such as `Nature.YoungLeaves` (alias `Nature.若葉`); they may expand only into core vocabulary and cannot modify the core. When a description names one of their words, the underdrawing can choose it. Instructions that use an unregistered plugin draw everything else and give the reason on that sentence alone. Instructions can be exported together with their plugin definitions and imported elsewhere
 - **History and editions** — DB-backed history with stars, search, thumbnails, and exact reproduction via seeds and edition IDs
 - **Batch / CLI** — designed for straightforward operation by AI agents, the CLI provides access to every inku API. `inku-cli` supports login, painting, batch generation, contact sheets, and everything else available through the GUI

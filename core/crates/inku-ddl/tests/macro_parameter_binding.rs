@@ -134,12 +134,12 @@ fn fluctuation_matching_is_disjoint_only_when_declared_and_required_stays_requir
                 .unwrap();
         bind_macro_parameters(&document, &[definition]).unwrap()
     };
-    let result = bind(&data, "Sway.Mark fine slowly undulating");
+    let result = bind(&data, "Sway.Mark narrowly loosely undulating");
     assert!(result.diagnostics.is_empty(), "{:?}", result.diagnostics);
     assert_eq!(result.complete.len(), 1);
     let parameters = &result.complete[0].parameters;
     assert_eq!(parameters.len(), 3);
-    for (name, id) in [("z", "fine"), ("a", "slowly"), ("m", "undulating")] {
+    for (name, id) in [("z", "narrowly"), ("a", "loosely"), ("m", "undulating")] {
         let parameter = parameters
             .iter()
             .find(|parameter| parameter.parameter_name == name)
@@ -159,7 +159,7 @@ fn fluctuation_matching_is_disjoint_only_when_declared_and_required_stays_requir
             .len(),
         3
     );
-    let missing = bind(&data, "Sway.Mark fine");
+    let missing = bind(&data, "Sway.Mark narrowly");
     assert!(missing.complete.is_empty());
     assert!(
         missing.diagnostics.iter().any(|diagnostic| diagnostic.kind
@@ -168,8 +168,8 @@ fn fluctuation_matching_is_disjoint_only_when_declared_and_required_stays_requir
     let mut broad = data.clone();
     broad["parameters"] =
         serde_json::json!({"token":{"type":"semantic_ref","category":"variation"}});
-    assert_eq!(bind(&broad, "Sway.Mark fine").complete.len(), 1);
-    let ambiguous = bind(&broad, "Sway.Mark fine slowly");
+    assert_eq!(bind(&broad, "Sway.Mark narrowly").complete.len(), 1);
+    let ambiguous = bind(&broad, "Sway.Mark narrowly loosely");
     assert!(ambiguous.complete.is_empty());
     assert!(
         ambiguous
@@ -180,7 +180,11 @@ fn fluctuation_matching_is_disjoint_only_when_declared_and_required_stays_requir
     );
     broad["parameters"]["other"] =
         serde_json::json!({"type":"semantic_ref","category":"variation"});
-    assert!(bind(&broad, "Sway.Mark fine slowly").complete.is_empty());
+    assert!(
+        bind(&broad, "Sway.Mark narrowly loosely")
+            .complete
+            .is_empty()
+    );
 }
 
 #[derive(Deserialize)]
@@ -324,7 +328,7 @@ fn unique_complete_assignments_bind_typed_same_clause_facts_without_changing_i58
                 ..
             } = &actual.value
             {
-                assert_eq!(source_asset_id, "inku.saijiki.v1", "{}", case.id);
+                assert_eq!(source_asset_id, "inku.saijiki.v2", "{}", case.id);
                 assert!(!canonical_surface_ja.is_empty(), "{}", case.id);
             }
         }
@@ -527,34 +531,33 @@ fn lexical_place_facts_bind_as_one_canonical_value_without_losing_source() {
     )
     .unwrap();
 
-    for source_surface in ["center", "middle"] {
-        let identity = definition.identity().unwrap();
-        let lock = MacroLock::new(
-            identity.qualified_name(),
-            identity.version(),
-            format!("sha256:{}", identity.full_digest_hex()),
-        )
-        .unwrap();
-        let source = format!("Bind.Place {source_surface}");
-        let document =
-            NormalizedDdlDocument::new(source, ResolvedInstructionLanguage::En, vec![lock])
-                .unwrap();
-        let result = bind_macro_parameters(&document, std::slice::from_ref(&definition)).unwrap();
+    // The v1 alias `middle` bound the same value; v2 does not read it (SPEC §3.3).
+    let source_surface = "center";
+    let identity = definition.identity().unwrap();
+    let lock = MacroLock::new(
+        identity.qualified_name(),
+        identity.version(),
+        format!("sha256:{}", identity.full_digest_hex()),
+    )
+    .unwrap();
+    let source = format!("Bind.Place {source_surface}");
+    let document =
+        NormalizedDdlDocument::new(source, ResolvedInstructionLanguage::En, vec![lock]).unwrap();
+    let result = bind_macro_parameters(&document, std::slice::from_ref(&definition)).unwrap();
 
-        assert!(result.diagnostics.is_empty(), "{source_surface}");
-        let parameter = &result.complete[0].parameters[0];
-        assert_eq!(parameter.source_surface, source_surface);
-        let BoundMacroParameterValue::SemanticRef {
-            category,
-            canonical_id,
-            ..
-        } = &parameter.value
-        else {
-            panic!("{source_surface}: expected semantic Place binding");
-        };
-        assert_eq!(category, "place");
-        assert_eq!(canonical_id, "center");
-    }
+    assert!(result.diagnostics.is_empty(), "{source_surface}");
+    let parameter = &result.complete[0].parameters[0];
+    assert_eq!(parameter.source_surface, source_surface);
+    let BoundMacroParameterValue::SemanticRef {
+        category,
+        canonical_id,
+        ..
+    } = &parameter.value
+    else {
+        panic!("{source_surface}: expected semantic Place binding");
+    };
+    assert_eq!(category, "place");
+    assert_eq!(canonical_id, "center");
 }
 
 #[test]
@@ -584,7 +587,7 @@ fn schema_fixture_and_required_boundary_coverage_are_stable() {
         "en-whitespace",
         "integer",
         "integer-to-number",
-        "all-eleven-semantic-categories",
+        "all-twelve-semantic-categories",
         "unique-multiple-parameters",
         "two-invocations-disjoint-facts",
         "unrelated-fact-preserved",

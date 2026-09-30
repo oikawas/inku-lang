@@ -862,15 +862,15 @@ const STAGE1_WORK_PLAN_JA: &str = r#"あなたは inku の作品計画者であ�
 1. 記述が明示した形・数・色・画材・位置・関係は保つ。明示された色を見やすさの理由で変えない。
 2. 記述全体を幾つかの視覚的な役割に分ける（場の広がり、主となるもの、動きや伝播、散らばるもの、余白）。役割ごとに層を分け、役割どうしの対比（大と小、疎と密、重と軽、直と曲、静と動）が画面で見分けられるようにする。
 3. 一つの対象を一つの図形へ写すのではなく、広がり・質感・動き・数の多さを、痕の反復・大きさの幅・揺らぎで表す。広がるもの・群れるもの・流れるもの・面として在るものは小さな痕の多数の反復で、焦点となるものは少数で他と大きさや重さで区別する。数の明示がなければ記述全体の疎密から個数を選び、全層を同じ個数・大きさにしない。
-4. 閉じた形（円・楕円・三角・四角・雲形）は面を必ず選ぶ。輪郭で描く形は空、塗りつぶした塊を意図するときだけ塗り、ざらつきや陰影の層が要るときは質感（粒・点描・平行線・交差線・アクアチント・薄墨）を選ぶ。塗りや濃い面は画面の重さを作る。その広さは、記述が示す塊や広がりの大きさに合わせる。線・弧には粒（紙の歯に擦れた痕）や薄墨（淡い帯）を痕の質として付けられる。点の面は空にする。
+4. 閉じた形（円・楕円・三角・四角・雲形）は面を必ず選ぶ。輪郭で描く形は空、塗りつぶした塊を意図するときだけ塗り、ざらつきや陰影の層が要るときは質感（粒・点描・平行線・交差線・アクアチント・刷き）を選ぶ。塗りの面は画面の重さを作る。その広さは、記述が示す塊や広がりの大きさに合わせる。線・弧には粒（紙の歯に擦れた痕）や刷き（幅の広い筆の帯）を痕の質として付けられる。点の面は空にする。さばき（濃い・薄い）は、面の質とは別の、墨や絵具の置き方で、どの痕にも付けられる。
 5. 画材と太さは痕の性格を決める。軽く繊細な痕には細い画材や細さ、重く強い痕には太い画材を選ぶ。一作品の中で画材を使い分けてよい。
 6. 複数の痕は、並べる・散らす・敷き詰める・埋めるで配置する。置く・引くは一か所に置く動作で、複数にすると一か所の束になる。埋めるは範囲の中を痕の反復で満たし、範囲からはみ出した部分は切り取られる。痕の大きさは記述に合わせる。
-7. 揺らぎは痕の生きた不均一さである。層ごとに揺らぎなし（still）・揺れる・波打つを選び、揺らぐなら振幅と速さも選ぶ。反復する痕は、揺らぎ・大きさの幅・画材の擦れや質感で一本ごとに違いを持たせ、機械的な同一の繰り返しにしない。
+7. 揺らぎは痕の生きた不均一さである。層ごとに揺らぎなし（still）・揺れる・波打つを選び、揺らぐなら振れ幅と波の間隔も選ぶ。反復する痕は、揺らぎ・大きさの幅・画材の擦れや質感で一本ごとに違いを持たせ、機械的な同一の繰り返しにしない。
 8. 余白も構図の一部である。全層を中心に集めず、位置・大きさ・個数で重心と空いた部分を作る。
 9. 背景は画面の地色、groundは紙などの支持体である。どちらも任意で、描く対象の代わりにしない。背景を暗くするなら、痕の色がそれと見分けられるようにする。
 10. 感情・物語・題材名・説明は出力しない。
 
-11. 大小と重なりで主従を示す。記述が大きさの違い（広い場の中の小さなもの、大きく迫るもの）を含むときは、焦点となる痕と場の痕の大きさをはっきり違える。濃さや強さ、密集は、痕を重ねて表す。
+11. 大小と重なりで主従を示す。記述が大きさの違い（広い場の中の小さなもの、大きく迫るもの）を含むときは、焦点となる痕と場の痕の大きさをはっきり違える。強さや密集は、痕を重ねて表す。
 12. 光と時刻を場の色で示す。夜・夕暮れ・闇が場の性格なら背景を暗くし、光るもの（月、灯、星、輝き）は明るい色の痕で、暗い場から浮かび上がらせる。明るい昼や白い広がりは明るい背景のまま、痕の色で対比を作る。
 
 未指定の項目は unspecified を選ぶ。層は1〜8。指定のJSONだけを返す。"#;
@@ -879,17 +879,17 @@ const STAGE1_WORK_PLAN_EN: &str = r#"You are inku's work planner. Read the autho
 
 # How to read
 1. Keep every shape, count, color, tool, position, and relation the description states. Never change a stated color for visibility.
-2. Divide the whole description into a few visual roles (the extent of the scene, the main presence, movement or propagation, scattered things, empty space). Give each role its own layer so contrasts between roles (large and small, sparse and dense, heavy and light, straight and curved, still and moving) are visible.
+2. Divide the whole description into a few visual roles (the extent of the scene, the main presence, movement or propagation, scattered things, empty space). Give each role its own layer so contrasts between roles (large and small, sparse and crowded, heavy and light, straight and curved, still and moving) are visible.
 3. Do not map one subject to one shape. Express extent, texture, movement, and multiplicity through repeated marks, a range of sizes, and fluctuation. Things that spread, gather, flow, or exist as a surface become many small repeated marks; a focal presence stays few and differs by size or weight. Without a stated count, choose counts from the density of the whole description, and do not give every layer the same count and size.
-4. Always choose a surface for closed shapes (circle, ellipse, triangle, square, cloudform): empty for an outline, flat only when a solid mass is intended, and a texture (grain, stipple, hatch, crosshatch, aquatint, pale ink wash) when the area needs a layer of roughness or shading. Flat or dense areas carry the picture's weight; size them to the mass or expanse the description shows. Lines and arcs may carry grain (marks scraped by the paper's tooth) or pale ink wash (a pale band) as the quality of the mark. Use empty for points.
-5. Tool and thinness set the character of a mark: fine tools or thinness for light, delicate marks and thick tools for heavy, strong ones. Tools may differ within one work.
+4. Always choose a surface for closed shapes (circle, ellipse, triangle, square, cloudform): empty for an outline, flat only when an evenly painted mass is intended, and a texture (grain, stipple, hatch, crosshatch, aquatint, sweep) when the area needs a layer of roughness or shading. Flat areas carry the picture's weight; size them to the mass or expanse the description shows. Lines and arcs may carry grain (marks scraped by the paper's tooth) or sweep (a broad band of the brush) as the quality of the mark. Use empty for points. Handling (dense, faint) is how the ink or paint is laid, apart from the surface quality, and any mark may take it.
+5. Tool and thinness set the character of a mark: thin tools or thinness for light, delicate marks and thick tools for heavy, strong ones. Tools may differ within one work.
 6. Arrange multiple marks with line up, scatter, tile, or fill. Place and draw put marks at one spot, where several form a bundle. Fill repeats marks inside the region and clips what crosses its edge; size the marks to the description.
-7. Fluctuation is the living irregularity of a mark. For each layer choose still, swaying, or undulating, and when it moves also choose amplitude and speed. Give repeated marks individual differences through fluctuation, a range of sizes, and the scrape or texture of the tool, rather than a mechanical identical repetition.
+7. Fluctuation is the living irregularity of a mark. For each layer choose still, swaying, or undulating, and when it moves also choose amplitude and wave spacing. Give repeated marks individual differences through fluctuation, a range of sizes, and the scrape or texture of the tool, rather than a mechanical identical repetition.
 8. Empty space is part of the composition. Do not gather every layer at the center; use position, size, and count to create a center of weight and open areas.
 9. Background is the canvas color and ground is the support such as paper. Both are optional and never replace a drawn subject. With a dark background, keep mark colors distinguishable from it.
 10. Output no emotions, narrative, subject names, or explanations.
 
-11. Show what leads through size and overlap. When the description holds a difference in scale (a small thing within a wide scene, something large and looming), make the focal marks clearly differ in size from the marks of the scene. Express depth of color, intensity, or crowding by overlapping marks.
+11. Show what leads through size and overlap. When the description holds a difference in scale (a small thing within a wide scene, something large and looming), make the focal marks clearly differ in size from the marks of the scene. Express strength or crowding by overlapping marks.
 12. Show light and time through the color of the scene. When night, dusk, or darkness is the character of the scene, darken the background and let what shines (moon, lamp, stars, brightness) rise from it in light-colored marks. Keep a bright day or a white expanse on a light background and build contrast with the marks' colors.
 
 Choose unspecified for a field you leave open. Use one to eight layers. Return only the specified JSON."#;
@@ -1828,7 +1828,7 @@ fn hole_system_grammar_ja() -> String {
     let de = MarkerId::JaDe.surface();
     format!(
         r#"あなたは inku の可視DDLの局所翻訳提案器。selected_holesのsourceだけを書換え可能とし、source_regionsとtyped_factsは根拠として読む。read_onlyの文脈を変更しない。原文の未認識語句も検討し、明示された対象、属性と所有者、数量と総数、action、範囲、関係、順序を保持する。typed_factsのownerは語の種類であり、描画対象IDではない。
-語順、用語の位置や組合せ、自然な言い換えの揺らぎを、既存の受理文法へ直す。原文の語や位置を逐語的に維持する必要はない。「中央付近」は「中央」「中心」に相当する既存の位置語へ言い換えられる。数値座標は追加しない。原文の主旨と確定した対象・個数・色・道具・所有関係を保つ欠落補完も提案できる。複数の色や道具だけから交互配置や数量分配を新たに指定せず、多様な色を単色へ削らない。既存の省略は演奏時補完へ残せる。語句の揺らぎを直しても既存機能で描画できない意味はunresolved/unsupported、意図を一つに定められない場合はunresolved/ambiguous、必要な参照文脈が不足する場合はunresolved/context_limitとする。他のholeについて可能な提案は返す。
+語順、用語の位置や組合せ、自然な言い換えの揺らぎを、既存の受理文法へ直す。原文の語や位置を逐語的に維持する必要はない。「中央付近」や「中央」は、既存の位置語「中心」へ言い換えられる。数値座標は追加しない。原文の主旨と確定した対象・個数・色・道具・所有関係を保つ欠落補完も提案できる。複数の色や道具だけから交互配置や数量分配を新たに指定せず、多様な色を単色へ削らない。既存の省略は演奏時補完へ残せる。語句の揺らぎを直しても既存機能で描画できない意味はunresolved/unsupported、意図を一つに定められない場合はunresolved/ambiguous、必要な参照文脈が不足する場合はunresolved/context_limitとする。他のholeについて可能な提案は返す。
 既存の受理構文やその既定が原文の意味を既に担う場合、余分な未受理表現はその受理形へまとめる。未解釈の語句をそのまま返して解決済みとしない。
 accepted_saijiki_vocabularyと共有文法を用いる。unresolved_clauseは原文の描画headとactionを同じ命令へ保持し、背景だけで済ませない。地は受理済みの地の名詞だけで指定でき、Ground:やSurface:という見出しを付けない。地の支持体を面の質感へ変えない。背景の受理形は「{background}{wo}<色>{de}埋める。」。短いidごとに必ず一結果を返す。Score、思考過程、説明、管理情報は返さず、指定されたJSONだけを返す。"#
     )
@@ -1977,7 +1977,7 @@ mod tests {
         }];
         let plan = r#"{"background":"white","ground":"unspecified","plugins":["Nature.若葉","Garden.薔薇","Nature.若葉"],"layers":[
             {"shape":"circle","proportion":"unspecified","action":"place","count":1,
-             "place":"center","size":"unspecified","color":"red","tool":"unspecified",
+             "position":"center","size":"unspecified","color":"red","tool":"unspecified",
              "surface":"unspecified","motion_quality":"still"}]}"#;
         let ja = parse_stage1_response_with_plugins(
             plan,
@@ -2070,8 +2070,8 @@ mod tests {
         // A work plan is normalized and printed in the request language.
         let plan = r#"{"background":"unspecified","ground":"unspecified","layers":[
             {"shape":"square","proportion":"unspecified","action":"fill","count":12,
-             "place":"right_edge","size":"small","color":"red","tool":"unspecified",
-             "surface":"solid","motion_quality":"still"}]}"#;
+             "position":"right_edge","size":"small","color":"red","tool":"unspecified",
+             "surface":"flat","motion_quality":"still"}]}"#;
         assert_eq!(
             parse_stage1_response(plan, LIMITS, ResolvedInstructionLanguage::En)
                 .unwrap()

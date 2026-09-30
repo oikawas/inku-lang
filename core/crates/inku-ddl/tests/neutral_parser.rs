@@ -2,8 +2,8 @@ use std::collections::HashSet;
 
 use inku_ddl::{
     CanonicalPreviousReference, CanonicalRelationForm, MarkerId, NEUTRAL_LEXEME_PARSER_SCHEMA_ID,
-    NeutralDiagnosticKind, NeutralToken, NeutralTokenKind, NormalizedDdlDocument,
-    ResolvedInstructionLanguage, parse_neutral_lexemes, project_macro_semantic_ref, saijiki_asset,
+    NeutralDiagnosticKind, NeutralTokenKind, NormalizedDdlDocument, ResolvedInstructionLanguage,
+    parse_neutral_lexemes, project_macro_semantic_ref, saijiki_asset,
 };
 use serde::Deserialize;
 
@@ -14,7 +14,7 @@ fn direction_surfaces_are_recognized_without_rewriting_source() {
     for (language, source) in [
         (
             ResolvedInstructionLanguage::Ja,
-            "中央に、横線を縦に三本並べる。",
+            "中心に、横線を縦に三本並べる。",
         ),
         (
             ResolvedInstructionLanguage::En,
@@ -243,9 +243,9 @@ fn typed_english_grammar_preserves_source_and_canonical_row_identity() {
     };
 
     for (source, expected_surfaces) in [
-        ("swaying fine", ["swaying", "fine"]),
-        ("sways finely", ["sways", "finely"]),
-        ("SWAYS FINELY", ["SWAYS", "FINELY"]),
+        ("swaying narrowly", ["swaying", "narrowly"]),
+        ("sways narrowly", ["sways", "narrowly"]),
+        ("SWAYS NARROWLY", ["SWAYS", "NARROWLY"]),
     ] {
         let result = parse(source);
         assert!(result.diagnostics.is_empty(), "{source}");
@@ -289,7 +289,7 @@ fn typed_english_grammar_preserves_source_and_canonical_row_identity() {
 
     for (canonical, derived, expected_surface_ja) in [
         ("undulating", "undulates", "波打つ"),
-        ("trembling", "trembles", "揺れる"),
+        ("swaying", "sways", "揺れる"),
     ] {
         let mut identities = Vec::new();
         for source in [canonical, derived] {
@@ -331,8 +331,8 @@ fn typed_english_grammar_preserves_source_and_canonical_row_identity() {
         values
     };
     assert_eq!(
-        semantic_values("the circle sways finely"),
-        semantic_values("the circle finely sways")
+        semantic_values("the circle sways narrowly"),
+        semantic_values("the circle narrowly sways")
     );
 
     for source in [
@@ -344,6 +344,17 @@ fn typed_english_grammar_preserves_source_and_canonical_row_identity() {
         "finest",
         "xswaysy",
         "finelyish",
+        // The retired amplitude forms and the adjectives of the current adverbs.
+        "fine",
+        "finely",
+        "largely",
+        "narrow",
+        "broad",
+        // The retired aliases, rewritten to their words by the v2 migration.
+        "trembling",
+        "trembles",
+        "blurring",
+        "middle",
     ] {
         let result = parse(source);
         assert!(
@@ -361,14 +372,24 @@ fn typed_english_grammar_preserves_source_and_canonical_row_identity() {
 }
 
 #[test]
-fn central_place_aliases_preserve_each_lexical_row_and_source_occurrence() {
+fn the_center_row_is_read_by_its_own_words_and_not_by_the_retired_aliases() {
+    // 中央 and middle were accepted spellings of the center row in v1; the v2
+    // migration rewrote them to 中心 and center, and v2 does not read them.
+    for (language, source) in [
+        (ResolvedInstructionLanguage::Ja, "中央"),
+        (ResolvedInstructionLanguage::Ja, "震える"),
+        (ResolvedInstructionLanguage::Ja, "滲む"),
+    ] {
+        let document = NormalizedDdlDocument::new(source, language, Vec::new()).unwrap();
+        let result = parse_neutral_lexemes(&document);
+        assert!(result.tokens.is_empty(), "{source}");
+        assert_eq!(result.diagnostics.len(), 1, "{source}");
+        assert_eq!(result.diagnostics[0].kind, NeutralDiagnosticKind::Unknown);
+        assert_eq!(result.diagnostics[0].surface, source);
+    }
     for (language, source, canonical_surface_ja) in [
-        // The consolidated vocabulary keeps one center row; 中央 remains an
-        // accepted spelling of it.
-        (ResolvedInstructionLanguage::Ja, "中央", "中心"),
         (ResolvedInstructionLanguage::Ja, "中心", "中心"),
         (ResolvedInstructionLanguage::En, "center", "中心"),
-        (ResolvedInstructionLanguage::En, "middle", "中心"),
     ] {
         let document = NormalizedDdlDocument::new(source, language, Vec::new()).unwrap();
         let result = parse_neutral_lexemes(&document);
@@ -467,7 +488,9 @@ fn asset_flags_drive_candidate_eligibility_without_losing_semantic_identity() {
 }
 
 #[test]
-fn japanese_point_homograph_uses_typed_phrase_ownership() {
+fn japanese_point_is_only_the_point_shape_and_stipple_is_its_own_word() {
+    // v1 also read 点 as stipple, told apart by the words after it. v2 reads each word by
+    // itself (SPEC §3.3); the v2 migration rewrote those stipple readings to 点描.
     let parse = |source: &str| {
         let document = NormalizedDdlDocument::new(
             source.to_owned(),
@@ -477,45 +500,35 @@ fn japanese_point_homograph_uses_typed_phrase_ownership() {
         .unwrap();
         parse_neutral_lexemes(&document)
     };
-    let standalone = parse("点");
-    assert!(matches!(
-        standalone.tokens.as_slice(),
-        [NeutralToken {
-            kind: NeutralTokenKind::SaijikiWord { category_key, canonical_surface_ja, .. },
-            ..
-        }] if category_key == "katachi" && canonical_surface_ja == "点"
-    ));
+    for source in ["点", "点の円", "点の点", "面: 点"] {
+        let result = parse(source);
+        let points = result
+            .tokens
+            .iter()
+            .filter(|token| token.surface == "点")
+            .collect::<Vec<_>>();
+        assert_eq!(points.len(), source.matches('点').count(), "{source}");
+        assert!(
+            points.iter().all(|token| matches!(
+                &token.kind,
+                NeutralTokenKind::SaijikiWord { category_key, canonical_surface_ja, .. }
+                    if category_key == "katachi" && canonical_surface_ja == "点"
+            )),
+            "{source}"
+        );
+    }
 
-    let modified = parse("点の円");
+    let stipple = parse("点描の円");
     assert!(matches!(
-        &modified.tokens[0].kind,
+        &stipple.tokens[0].kind,
         NeutralTokenKind::SaijikiWord { category_key, canonical_surface_ja, .. }
             if category_key == "omote" && canonical_surface_ja == "点描"
     ));
     assert!(matches!(
-        &modified.tokens[2].kind,
+        &stipple.tokens[2].kind,
         NeutralTokenKind::SaijikiWord { category_key, canonical_surface_ja, .. }
             if category_key == "katachi" && canonical_surface_ja == "円"
     ));
-
-    let point_modified = parse("点の点");
-    assert!(matches!(
-        &point_modified.tokens[0].kind,
-        NeutralTokenKind::SaijikiWord { category_key, canonical_surface_ja, .. }
-            if category_key == "omote" && canonical_surface_ja == "点描"
-    ));
-    assert!(matches!(
-        &point_modified.tokens[2].kind,
-        NeutralTokenKind::SaijikiWord { category_key, canonical_surface_ja, .. }
-            if category_key == "katachi" && canonical_surface_ja == "点"
-    ));
-
-    let surface_clause = parse("面: 点");
-    assert!(surface_clause.tokens.iter().any(|token| matches!(
-        &token.kind,
-        NeutralTokenKind::SaijikiWord { category_key, canonical_surface_ja, .. }
-            if category_key == "omote" && canonical_surface_ja == "点描"
-    )));
 }
 
 #[test]

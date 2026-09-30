@@ -1398,7 +1398,7 @@ fn ja_unresolved_predicate_fragment_preserves_typed_drawing_in_both_resource_mod
 
 #[test]
 fn ja_unresolved_entity_fragment_preserves_typed_drawing() {
-    let source = "中央付近に黒いクレヨンの楕円を一つ置く。";
+    let source = "中心付近に黒いクレヨンの楕円を一つ置く。";
     let result = execute_language(
         source,
         ResolvedInstructionLanguage::Ja,
@@ -1418,7 +1418,7 @@ fn ja_unresolved_entity_fragment_preserves_typed_drawing() {
     // The unresolved part is reported as the whole clause hole it belongs to.
     assert_eq!(
         &source[span.start_byte..span.end_byte],
-        "中央付近に黒いクレヨンの楕円を一つ置く"
+        "中心付近に黒いクレヨンの楕円を一つ置く"
     );
     assert_eq!(result.score().unwrap().instructions.len(), 1);
 }
@@ -2456,7 +2456,7 @@ fn declared_macro_width_and_relative_scale_conflict_recovers_like_ordinary_ddl()
 
 #[test]
 fn unsupported_surface_clause_preserves_the_independent_completed_drawing() {
-    let source = "背景を黒で埋める。太筆の黒い四角を中央に置く。面: 粗く塗りつぶす。";
+    let source = "背景を黒で埋める。太筆の黒い四角を中心に置く。面: 粗く塗りつぶす。";
     let continued = execute_language(
         source,
         ResolvedInstructionLanguage::Ja,

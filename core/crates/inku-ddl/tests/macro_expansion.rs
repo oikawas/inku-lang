@@ -687,7 +687,7 @@ fn incomplete_i581_outcome_is_owned_unchanged_and_never_expanded() {
 }
 
 #[test]
-fn definition_local_place_alias_materializes_only_the_canonical_value() {
+fn definition_local_place_materializes_its_canonical_value() {
     let definition = |id: &str| {
         MacroDefinition::from_json(
             &serde_json::json!({
@@ -710,23 +710,23 @@ fn definition_local_place_alias_materializes_only_the_canonical_value() {
         .unwrap()
     };
 
-    for id in ["center", "middle"] {
-        let definition = definition(id);
-        let binding = binding(&definition, "Alias.Place", "en");
-        let seeds = seeds(&binding, "Alias.Place", 17);
-        let result = expand_macros(binding, &[definition], &seeds, LIMITS);
-        assert!(result.diagnostics.is_empty(), "{id}");
-        let ExpandedMacroNode::Emit { fields, .. } = &result.expanded[0].nodes[0] else {
-            panic!("{id}: expected emitted node");
-        };
-        assert_eq!(
-            fields.get("place"),
-            Some(&ExpandedMacroValue::SemanticRef {
-                category: "place".to_owned(),
-                id: "center".to_owned(),
-            })
-        );
-    }
+    // The v1 alias `middle` is an unknown id in v2; the migration rewrote it to `center`.
+    let id = "center";
+    let definition = definition(id);
+    let binding = binding(&definition, "Alias.Place", "en");
+    let seeds = seeds(&binding, "Alias.Place", 17);
+    let result = expand_macros(binding, &[definition], &seeds, LIMITS);
+    assert!(result.diagnostics.is_empty(), "{id}");
+    let ExpandedMacroNode::Emit { fields, .. } = &result.expanded[0].nodes[0] else {
+        panic!("{id}: expected emitted node");
+    };
+    assert_eq!(
+        fields.get("place"),
+        Some(&ExpandedMacroValue::SemanticRef {
+            category: "place".to_owned(),
+            id: "center".to_owned(),
+        })
+    );
 }
 
 #[test]
@@ -825,7 +825,7 @@ fn fluctuation_use_checks_deferred_broad_values_and_preserves_semantic_identity(
         "body":[{"op":"use","component":"part","arguments":{"q":{"expr":"parameter","name":"token"}}}]
     }).to_string()).unwrap();
     assert!(definition.validate().is_valid());
-    for (source, succeeds) in [("Sway.Mark trembling", true), ("Sway.Mark fine", false)] {
+    for (source, succeeds) in [("Sway.Mark swaying", true), ("Sway.Mark narrowly", false)] {
         let binding = binding(&definition, source, "en");
         assert_eq!(binding.complete.len(), 1);
         let seeds = seeds(&binding, source, 17);

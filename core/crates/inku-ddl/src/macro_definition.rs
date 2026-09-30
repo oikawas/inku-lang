@@ -26,12 +26,13 @@ pub const MACRO_DEFINITION_DIGEST_DOMAIN: &[u8] = b"inku.macro-definition.v1";
 /// Stable warning attached to every legacy per-macro outcome.
 pub const LEGACY_PLUGIN_FORMAT_WARNING: &str = "legacy_plugin_format";
 
-const SEMANTIC_CATEGORIES: [(&str, &str); 12] = [
+const SEMANTIC_CATEGORIES: [(&str, &str); 13] = [
     ("shape", "katachi"),
     ("angle", "katamuki"),
     ("touch", "tezawari"),
     ("continuity", "tsuranari"),
     ("surface", "omote"),
+    ("handling", "sabaki"),
     ("ground", "ji"),
     ("color", "iro"),
     ("variation", "yuragi"),
@@ -1010,7 +1011,7 @@ fn validate_body(
                     } else if field == "layout_direction" {
                         "angle"
                     } else if field == "surface_intensity" {
-                        "surface"
+                        "handling"
                     } else if matches!(
                         field.as_str(),
                         "proportion_aspect" | "proportion_width_extent" | "proportion_arc_form"
@@ -1731,16 +1732,6 @@ fn known_semantic_id(category: &str, id: &str) -> bool {
 }
 
 pub(crate) fn canonical_semantic_ref_id(category: &str, id: &str) -> Option<String> {
-    match (category, id) {
-        // This spelling already shared center's canonical identity before the
-        // display rows were consolidated.
-        ("place", "middle") => return Some("center".to_owned()),
-        // These retired MacroDefinition wire IDs remain byte-distinct so saved
-        // definitions continue to match their existing locks. Visible DDL is
-        // normalized by the Saijiki parser; current definitions use the new IDs.
-        ("variation", "trembling" | "blurring") => return Some(id.to_owned()),
-        _ => {}
-    }
     match semantic_category_authority(category)? {
         SemanticCategoryAuthority::Relation => known_relation(id).then(|| id.to_owned()),
         SemanticCategoryAuthority::CoreModifier => {

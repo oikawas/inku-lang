@@ -6,6 +6,19 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file retains the history from v2.5.0 (2026-07-25, render engine 12) onward.** Past records follow the recent ones in a collapsible section of this same document; expand it when needed. Viewers without collapse support show the full text. Earlier history is in the [v1.72–v2.4 archive](docs/history/changelog-v1.72-v2.4.md) and the [v0.1–v1.71 archive](docs/history/changelog-v0.1-v1.71.md).
 
+### 2026-09-30 — Saijiki v2: handling, sweep, and wave-spacing words, and the migration of saved data (DDL Spec 16, DDL engine 53)
+
+By the author's ruling (2026-09-29) the Saijiki becomes v2 (`inku.saijiki.v2`). Its words keep one word, one meaning, and a bias in how the reader (Stage 1) chooses them is corrected in the vocabulary rather than when drawing (SPEC §3.3).
+
+- A new category, handling (さばき), takes dense and faint from surfaces. An intensity now reaches lines, arcs, and textured surfaces as well as flat fills (faint scales the tool's opacity by 0.55, dense by 1.35; Score 0.17.0).
+- The pale ink wash becomes sweep (刷き): the same broad sweeps with no paleness of their own (a line's band at 0.64 and a surface's sweeps at 0.40 are candidates for the comparison sheet). Paleness belongs to the handling word faint. Score gains the surface value `sweep`; a saved Score's `wash` keeps its present pale rendering (render engine 72).
+- Slowly and quickly become loosely and tightly, words for the number of waves. English amplitude words are adverbs only (narrowly, broadly).
+- An underdrawing value is its word's English as written, and the fields are named `position`, `handling`, and `motion_spacing` (`inku.work-plan.v2`, capability matrix `inku.work-plan-capabilities.v2`).
+- The old words v1 read as input (点 for stipple, 震える, trembling, 滲む, blurring, 中央, middle) are no longer read. 点 names the point shape alone.
+- Saved documents and Macro definitions are migrated once, by overwriting. The migration lives in the shared core, and a host calls it as `migrate_saijiki_v1`. A document carries the edition field `saijiki`; a document without it, and a definition that only the migration makes valid, stop with `saijiki_migration_required`. A migrated definition keeps its version and only its digest changes. The bundled Nature.leaves is rewritten by the same migration and stays at 2.0.0. A saved definition's blurring (the Pink sway) moves to bleeding ink.
+
+The geometry policy digest becomes `0567c999…`.
+
 ### 2026-09-30 — Android: align provider transport with Server and fix Sonnet 5.5 camera input
 
 Anthropic requests omit `temperature` for every model, as Server drawing and Vision requests do. Sonnet 5.5 rejected photo descriptions with `temperature: 0.2` as HTTP 400, shown as Image processing failed. Gemini image requests use minimal thinking regardless of connection or model name, with the description before the image. Anthropic and Gemini preserve text-block boundaries, and OpenAI-compatible and Gemini drawing responses reject multiple answer tools. Image-description API refusals also reach the log through the redaction used for drawing.

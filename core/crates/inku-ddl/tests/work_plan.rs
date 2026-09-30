@@ -50,7 +50,7 @@ fn random_layer(rng: &mut SplitMix) -> WorkPlanLayer {
         ..WorkPlanLayer::default()
     };
     for slot in [
-        WorkPlanSlot::Place,
+        WorkPlanSlot::Position,
         WorkPlanSlot::Size,
         WorkPlanSlot::Color,
         WorkPlanSlot::Tool,
@@ -72,7 +72,7 @@ fn random_layer(rng: &mut SplitMix) -> WorkPlanLayer {
         layer
             .attributes
             .insert(WorkPlanSlot::MotionQuality, quality.clone());
-        for slot in [WorkPlanSlot::MotionAmplitude, WorkPlanSlot::MotionSpeed] {
+        for slot in [WorkPlanSlot::MotionAmplitude, WorkPlanSlot::MotionSpacing] {
             if rng.chance(50)
                 && let Some(value) = rng.pick(&slots[&slot])
             {
@@ -81,11 +81,11 @@ fn random_layer(rng: &mut SplitMix) -> WorkPlanLayer {
         }
     }
     if rng.chance(30)
-        && let Some(value) = rng.pick(&slots[&WorkPlanSlot::SurfaceIntensity])
+        && let Some(value) = rng.pick(&slots[&WorkPlanSlot::Handling])
     {
         layer
             .attributes
-            .insert(WorkPlanSlot::SurfaceIntensity, value.clone());
+            .insert(WorkPlanSlot::Handling, value.clone());
     }
     if layer.action == "line_up"
         && rng.chance(50)
@@ -147,7 +147,7 @@ fn normalization_turns_unusable_values_into_diagnostics_without_stopping() {
             {"shape": "moon", "action": "place", "count": 1},
             {"shape": "arc", "proportion": "crescent", "action": "draw", "count": 3,
              "surface": "grain", "size": "medium", "color": "blue",
-             "motion_quality": "still", "motion_amplitude": "large"},
+             "motion_quality": "still", "motion_amplitude": "broadly"},
             {"shape": "point", "action": "draw", "count": 999, "angle": "horizontal"}
         ]
     }));
@@ -213,4 +213,70 @@ fn response_schema_uses_the_portable_subset_and_the_projected_vocabulary() {
         colors.len(),
         1 + work_plan_vocabulary().terms(WorkPlanSlot::Color).len()
     );
+}
+
+/// The reader reads and writes the plan's values and field names, so they keep
+/// the Saijiki's one word, one meaning: each value is its word's own English,
+/// and no token names two meanings in two fields. Color is also the background,
+/// and a direction is both an angle and a line-up direction, with one meaning.
+#[test]
+fn plan_values_are_the_words_english_with_one_meaning_each() {
+    let vocabulary = work_plan_vocabulary();
+    let mut meanings: std::collections::BTreeMap<String, Vec<(WorkPlanSlot, String)>> =
+        std::collections::BTreeMap::new();
+    let slots = WorkPlanSlot::LAYER_ATTRIBUTES.into_iter().chain([
+        WorkPlanSlot::Shape,
+        WorkPlanSlot::Proportion,
+        WorkPlanSlot::Ground,
+    ]);
+    let mut compared = 0;
+    for slot in slots {
+        for term in vocabulary.terms(slot) {
+            assert_eq!(
+                term.id,
+                term.en.replace(['-', ' '], "_"),
+                "{slot:?}: the value is not the word's English"
+            );
+            meanings
+                .entry(term.id.clone())
+                .or_default()
+                .push((slot, term.ja.clone()));
+            compared += 1;
+        }
+    }
+    assert!(compared > 100, "compared {compared}");
+    for (value, uses) in &meanings {
+        let words: std::collections::BTreeSet<&String> = uses.iter().map(|(_, ja)| ja).collect();
+        assert_eq!(words.len(), 1, "{value} names two meanings: {uses:?}");
+    }
+    let schema = work_plan_response_schema();
+    let fields = schema["properties"]["layers"]["items"]["properties"]
+        .as_object()
+        .unwrap();
+    for field in ["position", "handling", "motion_spacing"] {
+        assert!(fields.contains_key(field), "{field}");
+    }
+    for retired in ["place", "surface_intensity", "motion_speed"] {
+        assert!(!fields.contains_key(retired), "{retired}");
+    }
+    let values = |field: &str| fields[field]["enum"].to_string();
+    for (field, value) in [
+        ("surface", "\"flat\""),
+        ("surface", "\"empty\""),
+        ("surface", "\"sweep\""),
+        ("thinness", "\"thin\""),
+        ("handling", "\"faint\""),
+        ("motion_amplitude", "\"narrowly\""),
+        ("motion_spacing", "\"loosely\""),
+    ] {
+        assert!(values(field).contains(value), "{field} {value}");
+    }
+    for (field, value) in [
+        ("surface", "\"solid\""),
+        ("surface", "\"wash\""),
+        ("thinness", "\"fine\""),
+        ("motion_amplitude", "\"large\""),
+    ] {
+        assert!(!values(field).contains(value), "{field} {value}");
+    }
 }

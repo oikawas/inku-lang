@@ -6,6 +6,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file retains the history from v2.5.0 (2026-07-25, render engine 12) onward.** Past records follow the recent ones in a collapsible section of this same document; expand it when needed. Viewers without collapse support show the full text. Earlier history is in the [v1.72–v2.4 archive](docs/history/changelog-v1.72-v2.4.md) and the [v0.1–v1.71 archive](docs/history/changelog-v0.1-v1.71.md).
 
+### v2.15.72 — Match the model-selection hint to the picker position (Build 1148, 2026-09-30)
+
+The empty options area in “Change the model” now says to choose models above rather than on the left, matching the picker restored to the top of the dialog. Chapter 10 of the manual and its revision history are updated in both languages.
+
 ### v2.15.71 — Lay the model picker across the dialog (Build 1147, 2026-09-30)
 
 The model list in “Change the model” spans the dialog again instead of occupying a narrow left column. The Wild switch and draw button sit above the list. Below it, the target work, run status and per-model mascot lanes sit on the left, with the options on the right. This keeps the draw button and run status from being hidden below a long model list. Run status separates model names with “ · ”.

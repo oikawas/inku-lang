@@ -1,6 +1,7 @@
 """Count what the Saijiki v1 migration would do to an isolated copy of a database.
 
-Read-only: the copy is opened with SQLite's ``mode=ro`` and nothing is written.
+Read-only: the copy is opened with SQLite's ``mode=ro`` (and ``immutable``) and
+nothing is written.
 It prints one JSON object of counts, the word replacements the core would make,
 and the ids (never the contents) of records the core refuses or that carry a
 sweep it cannot associate. The copy must sit inside a run root that carries
@@ -49,7 +50,9 @@ def main() -> int:
 
     import inku_render
 
-    connection = sqlite3.connect(f"file:{database}?mode=ro", uri=True)
+    # immutable: the copy may sit on a read-only mount, where SQLite could not
+    # create the journal files a read-only open of a WAL database otherwise needs.
+    connection = sqlite3.connect(f"file:{database}?mode=ro&immutable=1", uri=True)
     try:
         report = census(connection, inku_render.pipeline_migrate_saijiki_v1)
     finally:

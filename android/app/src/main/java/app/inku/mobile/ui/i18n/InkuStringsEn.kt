@@ -74,6 +74,7 @@ object InkuStringsEn : InkuStrings {
         "plugin_name_mismatch" -> "$name does not match an installed plugin, so this sentence was not drawn." +
             (suggestion?.let { " Did you mean $it?" } ?: "")
         "plugin_version_mismatch" -> "The plugin $name differs from the one this work was saved with, so this sentence was not drawn."
+        "plugin_count_out_of_range" -> "The count written on the plugin $name is outside the range it takes, so this sentence was not drawn."
         else -> "The plugin $name is not installed here, so this sentence was not drawn."
     }
     override fun pipelineRenderWarning(kind: String, name: String?) = if (kind == "invalid_color") {

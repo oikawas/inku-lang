@@ -87,6 +87,7 @@ export const ja: LangPack = {
 			case 'plugin_disabled': return `プラグイン ${name} は無効になっているため、この文は描かれていません。有効にすると描けます。`;
 			case 'plugin_name_mismatch': return `プラグイン ${name} は登録名と一致しないため、この文は描かれていません。${suggestion ? `${suggestion} のことですか。` : ''}`;
 			case 'plugin_version_mismatch': return `プラグイン ${name} の中身が作品の保存時と違うため、この文は描かれていません。`;
+			case 'plugin_count_out_of_range': return `プラグイン ${name} に書いた数がこの語の受けられる範囲の外のため、この文は描かれていません。`;
 			default: return `プラグイン ${name} はこの環境に登録されていないため、この文は描かれていません。`;
 		}
 	},

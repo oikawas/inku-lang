@@ -137,7 +137,11 @@ pub(crate) fn explain(
             reason,
             "macro_resolution_version_mismatch" | "macro_resolution_digest_mismatch"
         );
+        // A resolved word whose written count lies outside what it receives
+        // (SPEC §4.6) is left out the same way, so it is explained here too.
+        let count = reason == "macro_binding_count_out_of_range";
         if !version
+            && !count
             && !matches!(
                 reason,
                 "macro_resolution_missing_lock" | "macro_resolution_missing_definition"
@@ -163,7 +167,9 @@ pub(crate) fn explain(
         let Some(name) = written_name(text, &known) else {
             continue;
         };
-        let (reason, suggestion) = if version {
+        let (reason, suggestion) = if count {
+            ("plugin_count_out_of_range", None)
+        } else if version {
             ("plugin_version_mismatch", None)
         } else if disabled.contains(&name) && !enabled.contains(&name) {
             ("plugin_disabled", None)
@@ -227,7 +233,7 @@ mod tests {
 
     #[test]
     fn each_withheld_plugin_sentence_gets_one_author_facing_reason() {
-        let source = "背景を白で埋める。\nGarden.薔薇。\nNature.若葉を置く。\nnature.若葉。\nStudio.若葉。\nNature.若菜。\nOld.Mark。\nNature.紅葉。";
+        let source = "背景を白で埋める。\nGarden.薔薇。\nNature.若葉を置く。\nnature.若葉。\nStudio.若葉。\nNature.若菜。\nOld.Mark。\nNature.紅葉。\n13枚のNature.若葉。";
         let diagnostics = [
             missing(source, "Garden.薔薇", "macro_resolution_missing_lock"),
             missing(source, "Nature.若葉を置く", "macro_resolution_missing_lock"),
@@ -236,6 +242,11 @@ mod tests {
             missing(source, "Nature.若菜", "macro_resolution_missing_lock"),
             missing(source, "Old.Mark", "macro_resolution_missing_lock"),
             missing(source, "Nature.紅葉", "macro_resolution_digest_mismatch"),
+            missing(
+                source,
+                "13枚のNature.若葉",
+                "macro_binding_count_out_of_range",
+            ),
             json!({"reason": "unresolved_clause", "span": {"start_byte": 0, "end_byte": 3}}),
         ];
         let enabled = ["Nature.紅葉".to_owned(), "Nature.若葉".to_owned()];
@@ -256,6 +267,7 @@ mod tests {
                 ("Nature.若菜", "plugin_name_mismatch", Some("Nature.若葉")),
                 ("Old.Mark", "plugin_disabled", None),
                 ("Nature.紅葉", "plugin_version_mismatch", None),
+                ("Nature.若葉", "plugin_count_out_of_range", None),
             ]
         );
         let bytes = explain_plugin_diagnostics(
@@ -264,7 +276,7 @@ mod tests {
         );
         let output: Value = serde_json::from_slice(&bytes).unwrap();
         assert_eq!(output["schema"], SCHEMA);
-        assert_eq!(output["plugins"].as_array().unwrap().len(), 7);
+        assert_eq!(output["plugins"].as_array().unwrap().len(), 8);
         assert!(
             String::from_utf8(explain_plugin_diagnostics(b"{}".to_vec()))
                 .unwrap()

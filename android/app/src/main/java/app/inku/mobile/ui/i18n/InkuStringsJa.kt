@@ -68,6 +68,7 @@ object InkuStringsJa : InkuStrings {
         "plugin_name_mismatch" -> "プラグイン $name は登録名と一致しないため、この文は描かれていません。" +
             (suggestion?.let { "$it のことですか。" } ?: "")
         "plugin_version_mismatch" -> "プラグイン $name の中身が作品の保存時と違うため、この文は描かれていません。"
+        "plugin_count_out_of_range" -> "プラグイン $name に書いた数がこの語の受けられる範囲の外のため、この文は描かれていません。"
         else -> "プラグイン $name はこの環境に登録されていないため、この文は描かれていません。"
     }
     override fun pipelineRenderWarning(kind: String, name: String?) = if (kind == "invalid_color") {

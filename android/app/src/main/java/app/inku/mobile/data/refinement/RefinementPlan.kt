@@ -100,7 +100,7 @@ data class RefinementParent(
             historyId = item.id,
             lineageNodeId = item.lineageNodeId,
             description = description,
-            ddl = item.normalizedDdl,
+            ddl = item.normalizedDdl.orEmpty(),
             scoreJson = item.scoreJson,
             catalogId = item.colorCatalogId,
             canvasAspect = item.canvasAspect,

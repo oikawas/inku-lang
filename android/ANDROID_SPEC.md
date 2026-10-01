@@ -4,7 +4,7 @@ This directory is the Android workspace for the native standalone app and is
 tracked by Git. Local-only artifacts, device IDs, downloaded models, logs, and
 secrets must remain outside tracked files.
 
-Last updated: 2026-09-30.
+Last updated: 2026-10-01.
 
 **Catch-up status**: Android sits at generation `2.1.4-android.80`. DDL conversion and Score → SVG
 rendering run in the shared Rust core (`core/crates/`) of the same commit, packaged with the app, so
@@ -45,6 +45,12 @@ When updating Android specifications:
    adaptation of the Japanese source.
 3. Do not introduce English-only Android requirements that are absent from
    `ANDROID_SPEC.ja.md`.
+
+## 2026-10-01 Store an absent DDL as NULL
+
+Room schema 13 makes `history_items.normalized_ddl` and the summary field `HistoryListItem.normalizedDdl` nullable. Migration 12→13 rebuilds the work table and changes only an existing empty DDL to NULL. Nonempty DDL, descriptions, Scores, SVGs, seeds, thumbnail references, lineage, other tables, and indexes are preserved. Newly saved works without DDL also store NULL.
+
+Screens, search, copying, the instruction editor, and text exports read NULL as an empty string without displaying the word `null`. Instruction JSON exports carry an empty `ddl`; work JSON exports carry `normalized_ddl: null`. Operations requiring DDL retain their existing empty-input behavior. Display, export, and replay from saved Scores or SVGs remain available without DDL. Drawing, refinement, and forks from a description use the saved description. Replaying a saved Score never substitutes that description for an absent DDL.
 
 ## 2026-09-30 From a photo to a poetic description, with one model
 

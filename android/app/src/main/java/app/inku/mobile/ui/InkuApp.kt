@@ -6202,7 +6202,7 @@ private fun renderPromptText(item: HistoryItemEntity): String {
         appendLine(source)
         appendLine()
         appendLine("Saved normalized DDL:")
-        appendLine(item.normalizedDdl)
+        appendLine(item.normalizedDdl.orEmpty())
         appendLine()
         appendLine("Prompt transcript:")
         appendLine("Unavailable: this history row does not persist a prompt transcript or digest.")
@@ -6369,7 +6369,7 @@ private fun historyExportJson(item: HistoryItemEntity): JSONObject {
         put("created_at", item.createdAt)
         put("updated_at", item.updatedAt)
         put("original_input", item.originalInput)
-        put("normalized_ddl", item.normalizedDdl)
+        put("normalized_ddl", item.normalizedDdl ?: JSONObject.NULL)
         put("expanded_ddl", item.expandedDdl)
         put("score_json", JSONObject(item.scoreJson))
         put("display_svg", item.displaySvg)
@@ -6468,7 +6468,7 @@ private fun historyTitle(item: HistoryListItem): String {
     if (original.isNotBlank() && !original.startsWith("{") && !original.startsWith("[")) {
         return original
     }
-    val normalized = item.normalizedDdl.trim()
+    val normalized = item.normalizedDdl.orEmpty().trim()
     if (normalized.isNotBlank() && !normalized.startsWith("{") && !normalized.startsWith("[")) {
         return normalized
     }

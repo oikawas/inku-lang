@@ -272,7 +272,7 @@ class InkuRepository(
             ?: "ja"
         val engineVersion = runCatching { JSONObject(item.renderMetadataJson).opt("render_engine_version") }.getOrNull()
         return DdlExport.build(
-            source = item.normalizedDdl,
+            source = item.normalizedDdl.orEmpty(),
             language = language,
             definitions = config?.optJSONArray("definitions"),
             summaries = config?.optJSONArray("macro_summaries"),
@@ -293,7 +293,7 @@ class InkuRepository(
         historyVisibility: String?,
         link: ManagedHistoryLinkInput,
     ): HistoryItemEntity {
-        require(item.id.isNotEmpty() && item.normalizedDdl.isNotEmpty()) {
+        require(item.id.isNotEmpty() && !item.normalizedDdl.isNullOrEmpty()) {
             "managed history identity and source must not be empty"
         }
         val nodeId = item.lineageNodeId ?: newLineageId()
@@ -973,7 +973,7 @@ class InkuRepository(
             createdAt = now,
             updatedAt = now,
             originalInput = originalInput,
-            normalizedDdl = result.normalizedDdl,
+            normalizedDdl = result.normalizedDdl.takeIf { it.isNotEmpty() },
             expandedDdl = result.expandedDdl,
             scoreJson = result.scoreJson,
             displaySvg = result.displaySvg,

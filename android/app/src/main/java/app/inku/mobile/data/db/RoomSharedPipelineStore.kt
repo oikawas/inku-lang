@@ -202,7 +202,7 @@ class RoomSharedPipelineStore(
         history: HistoryItemEntity,
         input: ManagedHistoryLinkInput,
     ): PipelineHistoryLinkEntity {
-        require(history.normalizedDdl.sha256() == input.ddlDigest) {
+        require(history.normalizedDdl.orEmpty().sha256() == input.ddlDigest) {
             "history source does not match its committed revision"
         }
         val acknowledged = dao.findCommittedAction(
@@ -253,7 +253,7 @@ class RoomSharedPipelineStore(
             require(history.normalizedDdl == sourceHistory.normalizedDdl) {
                 "replay source DDL changed"
             }
-            require(history.normalizedDdl.sha256() == sourceLink.ddlDigest) {
+            require(history.normalizedDdl.orEmpty().sha256() == sourceLink.ddlDigest) {
                 "replay source does not match its committed revision"
             }
             require(
@@ -448,7 +448,7 @@ class RoomSharedPipelineStore(
         if (sha256(link.forkContextBytes) != link.forkContextDigest) {
             throw SharedPipelinePersistenceException("stored history fork context failed integrity validation")
         }
-        if (history.normalizedDdl.sha256() != link.ddlDigest) {
+        if (history.normalizedDdl.orEmpty().sha256() != link.ddlDigest) {
             throw SharedPipelinePersistenceException("history source does not match its committed revision")
         }
         val text = link.forkContextBytes.toString(Charsets.UTF_8)

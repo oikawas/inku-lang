@@ -29,7 +29,7 @@ data class HistoryItemEntity(
     @ColumnInfo(name = "original_input")
     val originalInput: String,
     @ColumnInfo(name = "normalized_ddl")
-    val normalizedDdl: String,
+    val normalizedDdl: String?,
     @ColumnInfo(name = "expanded_ddl")
     val expandedDdl: String?,
     @ColumnInfo(name = "score_json")

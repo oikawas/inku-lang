@@ -172,7 +172,19 @@ pub enum ParameterSchema {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         dimension: Option<ExactDecimalDimension>,
     },
-    Integer,
+    /// A plain integer, or with `receives: count` the count written on the word
+    /// itself. Only a count parameter has bounds and an omitted-count choice;
+    /// without them it serializes as the bare `{"type":"integer"}`.
+    Integer {
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        receives: Option<IntegerReceives>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        minimum: Option<i64>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        maximum: Option<i64>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        omitted: Option<Vec<i64>>,
+    },
     Boolean,
     List {
         length: u64,
@@ -183,6 +195,53 @@ pub enum ParameterSchema {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         dimension: Option<crate::fluctuation::FluctuationDimension>,
     },
+}
+
+/// What an integer parameter receives from the caller besides a bare number.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum IntegerReceives {
+    /// The count written on the invocation (`Nature.若葉を10枚`), taken inside
+    /// the word instead of repeating the whole word.
+    Count,
+}
+
+/// The validated bounds and omitted-count choices of one count parameter.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct CountParameter<'a> {
+    pub minimum: i64,
+    pub maximum: i64,
+    pub omitted: &'a [i64],
+}
+
+impl ParameterSchema {
+    /// The plain integer parameter, bound only to a bare caller number.
+    pub const fn integer() -> Self {
+        Self::Integer {
+            receives: None,
+            minimum: None,
+            maximum: None,
+            omitted: None,
+        }
+    }
+
+    /// The count declaration when this parameter receives the word's count.
+    /// Bounds are present on every definition that passed validation.
+    pub fn count_parameter(&self) -> Option<CountParameter<'_>> {
+        match self {
+            Self::Integer {
+                receives: Some(IntegerReceives::Count),
+                minimum: Some(minimum),
+                maximum: Some(maximum),
+                omitted: Some(omitted),
+            } => Some(CountParameter {
+                minimum: *minimum,
+                maximum: *maximum,
+                omitted,
+            }),
+            _ => None,
+        }
+    }
 }
 
 /// A closed, data-only expression language.
@@ -626,6 +685,19 @@ impl MacroDefinition {
         }
 
         validate_parameter_map(&self.parameters, "$.parameters", &mut diagnostics);
+        // A word has one count, so at most one parameter may receive it.
+        for (name, _) in self
+            .parameters
+            .iter()
+            .filter(|(_, schema)| receives_count(schema))
+            .skip(1)
+        {
+            push_diagnostic(
+                &mut diagnostics,
+                "duplicate_count_parameter",
+                format!("$.parameters.{name}"),
+            );
+        }
         for (component_id, component) in self.components.iter() {
             let component_path = format!("$.components.{component_id}");
             if !is_ascii_identifier(component_id) {
@@ -640,6 +712,18 @@ impl MacroDefinition {
                 &format!("{component_path}.parameters"),
                 &mut diagnostics,
             );
+            // A component is called by `use`, never by a written word with a count.
+            for (name, _) in component
+                .parameters
+                .iter()
+                .filter(|(_, schema)| receives_count(schema))
+            {
+                push_diagnostic(
+                    &mut diagnostics,
+                    "count_parameter_in_component",
+                    format!("{component_path}.parameters.{name}"),
+                );
+            }
         }
 
         let component_edges = component_edges(self);
@@ -897,11 +981,43 @@ fn validate_parameter_schema(
                 push_diagnostic(diagnostics, "unknown_semantic_category", path);
             }
         }
+        ParameterSchema::Integer {
+            receives,
+            minimum,
+            maximum,
+            omitted,
+        } => {
+            let valid = match (receives, minimum, maximum, omitted) {
+                (None, None, None, None) => true,
+                (Some(IntegerReceives::Count), Some(minimum), Some(maximum), Some(omitted)) => {
+                    let mut seen = HashSet::new();
+                    1 <= *minimum
+                        && minimum <= maximum
+                        && !omitted.is_empty()
+                        && omitted.iter().all(|value| {
+                            (*minimum..=*maximum).contains(value) && seen.insert(*value)
+                        })
+                }
+                _ => false,
+            };
+            if !valid {
+                push_diagnostic(diagnostics, "invalid_count_parameter", path);
+            }
+        }
         ParameterSchema::Number
         | ParameterSchema::ExactDecimal { .. }
-        | ParameterSchema::Integer
         | ParameterSchema::Boolean => {}
     }
+}
+
+fn receives_count(schema: &ParameterSchema) -> bool {
+    matches!(
+        schema,
+        ParameterSchema::Integer {
+            receives: Some(IntegerReceives::Count),
+            ..
+        }
+    )
 }
 
 fn parameter_types(parameters: &SemanticMap<ParameterSchema>) -> BTreeMap<String, ValueKind> {
@@ -915,7 +1031,7 @@ fn parameter_kind(schema: &ParameterSchema) -> ValueKind {
     match schema {
         ParameterSchema::Number => ValueKind::Number,
         ParameterSchema::ExactDecimal { .. } => ValueKind::ExactDecimal,
-        ParameterSchema::Integer => ValueKind::Integer,
+        ParameterSchema::Integer { .. } => ValueKind::Integer,
         ParameterSchema::Boolean => ValueKind::Boolean,
         ParameterSchema::List { .. } => ValueKind::List,
         ParameterSchema::SemanticRef {

@@ -683,7 +683,7 @@ fn value_text(value: &BoundMacroParameterValue) -> String {
 fn schema_kind(schema: &ParameterSchema) -> String {
     match schema {
         ParameterSchema::ExactDecimal { .. } => "exact_decimal",
-        ParameterSchema::Integer => "integer",
+        ParameterSchema::Integer { .. } => "integer",
         ParameterSchema::Number => "number",
         ParameterSchema::SemanticRef { .. } => "semantic_ref",
         ParameterSchema::Boolean => "boolean",
@@ -702,6 +702,7 @@ fn diagnostic_kind_name(kind: MacroParameterBindingDiagnosticKind) -> &'static s
         MacroParameterBindingDiagnosticKind::UnsupportedSchema => "unsupported_schema",
         MacroParameterBindingDiagnosticKind::NumericRange => "numeric_range",
         MacroParameterBindingDiagnosticKind::NumericPrecision => "numeric_precision",
+        MacroParameterBindingDiagnosticKind::CountOutOfRange => "count_out_of_range",
         MacroParameterBindingDiagnosticKind::DefinitionIdentityOwnershipMismatch => {
             "definition_identity_ownership_mismatch"
         }

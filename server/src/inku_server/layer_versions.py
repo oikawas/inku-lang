@@ -315,7 +315,12 @@
 # and a sweep is drawn as the wash band without the wash's own paleness (Score
 # 0.17.0). The compiler reads Saijiki v2 and refuses a saved v1 document until
 # its host migrates it.
-DDL_ENGINE_VERSION = "53"
+# 54: A Macro integer parameter declared with `receives: count` takes the count
+# written on its word (`Nature.若葉を10枚`) instead of repeating the word, and
+# an omitted count is the definition's choice. Bundled Nature.YoungLeaves 2.1.0
+# takes 1-12 leaves, one per cell of a six-by-two grid over the upper half. Saved locks keep their
+# definitions.
+DDL_ENGINE_VERSION = "54"
 # 4 (2026-07-30): yellow, orange, and purple become abstract Score colors, and
 # coerce recognizes the corresponding Japanese and English DDL markers.
 # 3 (2026-07-30): 黄 / 橙 / 紫 joined the saijiki color words, so an author can write

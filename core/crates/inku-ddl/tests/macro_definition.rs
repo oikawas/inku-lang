@@ -55,6 +55,65 @@ const STEP10Z_SCORE_PARITY_FIXTURE: &str =
     include_str!("fixtures/step10z-macro-score-parity-v1.json");
 
 #[test]
+fn a_count_parameter_declares_its_bounds_and_its_omitted_choices() {
+    let make = |parameters: Value, components: Value| {
+        MacroDefinition::from_json(&serde_json::json!({
+            "schema":"inku.macro-definition.v1", "namespace":"Count", "heading":"Leaves", "version":"1.0.0",
+            "parameters":parameters, "components":components, "body":[]
+        }).to_string()).unwrap()
+    };
+    let count = |omitted: Value| serde_json::json!({"type":"integer","receives":"count","minimum":1,"maximum":12,"omitted":omitted});
+    assert!(
+        make(
+            serde_json::json!({"n":count(serde_json::json!([4,5,6]))}),
+            serde_json::json!({})
+        )
+        .validate()
+        .is_valid()
+    );
+    for (parameters, components, code) in [
+        // Bounds or omitted choices belong only to a count parameter.
+        (
+            serde_json::json!({"n":{"type":"integer","maximum":12}}),
+            serde_json::json!({}),
+            "invalid_count_parameter",
+        ),
+        (
+            serde_json::json!({"n":{"type":"integer","receives":"count","minimum":1,"maximum":12}}),
+            serde_json::json!({}),
+            "invalid_count_parameter",
+        ),
+        (
+            serde_json::json!({"n":count(serde_json::json!([0, 4]))}),
+            serde_json::json!({}),
+            "invalid_count_parameter",
+        ),
+        (
+            serde_json::json!({"n":count(serde_json::json!([4, 4]))}),
+            serde_json::json!({}),
+            "invalid_count_parameter",
+        ),
+        (
+            serde_json::json!({"n":count(serde_json::json!([4])),"m":count(serde_json::json!([4]))}),
+            serde_json::json!({}),
+            "duplicate_count_parameter",
+        ),
+        (
+            serde_json::json!({}),
+            serde_json::json!({"leaf":{"parameters":{"n":count(serde_json::json!([4]))},"body":[]}}),
+            "count_parameter_in_component",
+        ),
+    ] {
+        assert!(
+            make(parameters.clone(), components)
+                .validate()
+                .has_code(code),
+            "{parameters}: {code}"
+        );
+    }
+}
+
+#[test]
 fn shape_emit_fields_validate_real_categories_and_integer_type() {
     let mut value = serde_json::json!({"schema":"inku.macro-definition.v1","namespace":"Shape","heading":"Mark","version":"1.0.0","parameters":{},"components":{},"body":[{"op":"emit","binding":null,"fields":{
         "proportion_aspect":{"expr":"semantic_ref","category":"ratio","id":"wide"},

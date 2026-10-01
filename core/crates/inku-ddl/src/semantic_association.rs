@@ -666,6 +666,7 @@ const fn macro_parameter_binding_issue_kind(
         }
         MacroParameterBindingDiagnosticKind::NumericRange => "macro_binding_numeric_range",
         MacroParameterBindingDiagnosticKind::NumericPrecision => "macro_binding_numeric_precision",
+        MacroParameterBindingDiagnosticKind::CountOutOfRange => "macro_binding_count_out_of_range",
         MacroParameterBindingDiagnosticKind::DefinitionIdentityOwnershipMismatch => {
             "macro_binding_definition_identity_ownership_mismatch"
         }
@@ -4630,7 +4631,7 @@ mod tests {
         let original = vec![
             execution_owner_parameter(
                 "count",
-                ParameterSchema::Integer,
+                ParameterSchema::integer(),
                 SemanticMacroParameterValue::Integer(2),
                 SourceSpan {
                     start_byte: 0,

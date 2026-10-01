@@ -675,7 +675,7 @@ fn root_environment(
     binding: &CompleteMacroParameterBinding,
     definition: &MacroDefinition,
 ) -> Result<Environment, EvalError> {
-    if binding.parameters.len() != definition.parameters.len() {
+    if binding.parameters.len() > definition.parameters.len() {
         return Err(EvalError::new(
             MacroExpansionDiagnosticKind::BindingOwnershipMismatch,
         ));
@@ -772,10 +772,11 @@ fn root_environment(
             ));
         }
     }
+    // Only a count parameter may be left unwritten; the evaluator chooses it.
     if definition
         .parameters
-        .keys()
-        .any(|name| !parameters.contains_key(name))
+        .iter()
+        .any(|(name, schema)| !parameters.contains_key(name) && schema.count_parameter().is_none())
     {
         return Err(EvalError::new(
             MacroExpansionDiagnosticKind::BindingOwnershipMismatch,
@@ -832,7 +833,14 @@ fn coerce_to_schema(
         (ParameterSchema::Number, ExpandedMacroValue::Integer(value)) => {
             exact_number_from_integer(value).map(ExpandedMacroValue::Number)
         }
-        (ParameterSchema::Integer, ExpandedMacroValue::Integer(value)) => {
+        (ParameterSchema::Integer { .. }, ExpandedMacroValue::Integer(value)) => {
+            // Binding withholds an out-of-range count; this keeps the bound exact.
+            if schema
+                .count_parameter()
+                .is_some_and(|count| !(count.minimum..=count.maximum).contains(&value))
+            {
+                return Err(EvalError::new(MacroExpansionDiagnosticKind::NumericRange));
+            }
             Ok(ExpandedMacroValue::Integer(value))
         }
         (ParameterSchema::Boolean, ExpandedMacroValue::Boolean(value)) => {
@@ -1004,9 +1012,29 @@ impl<'a> Evaluator<'a> {
         &mut self,
         environment: &Environment,
     ) -> Result<Vec<ExpandedMacroNode>, EvalError> {
+        // An unwritten count is the definition's own choice, drawn from the
+        // invocation seed under the parameter name at the root path, which no
+        // statement's `vary` can share.
+        let mut environment = environment.clone();
+        for (name, schema) in self.definition.parameters.iter() {
+            let Some(count) = schema.count_parameter() else {
+                continue;
+            };
+            if environment.parameters.contains_key(name) {
+                continue;
+            }
+            let candidates = u64::try_from(count.omitted.len())
+                .map_err(|_| EvalError::new(MacroExpansionDiagnosticKind::NumericRange))?;
+            let selected = usize::try_from(self.vary_index(&[], name, candidates)?)
+                .map_err(|_| EvalError::new(MacroExpansionDiagnosticKind::NumericRange))?;
+            environment.parameters.insert(
+                name.clone(),
+                ExpandedMacroValue::Integer(count.omitted[selected]),
+            );
+        }
         self.evaluate_body(
             &self.definition.body,
-            environment,
+            &environment,
             &BTreeMap::new(),
             0,
             &[],

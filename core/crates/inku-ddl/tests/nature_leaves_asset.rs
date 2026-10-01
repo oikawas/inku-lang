@@ -50,11 +50,11 @@ fn bundled_nature_leaves_are_valid_bounded_definitions_that_reach_normal_score_l
     let package: Package = serde_json::from_str(ASSET).expect("Nature package must be JSON");
     assert_eq!(package.schema, "inku.bundled-macro-package.v1");
     assert_eq!(package.package_id, "Nature.leaves");
-    assert_eq!(package.version, "2.0.0");
+    assert_eq!(package.version, "2.1.0");
     assert_eq!(ASSET.as_bytes().last(), Some(&b'\n'));
 
     let expected = [
-        ("Nature.若葉", "2.0.0", 12, 8..=12),
+        ("Nature.若葉", "2.1.0", 24, 8..=12),
         ("Nature.下草", "2.0.0", 20, 6..=20),
         ("Nature.青葉", "2.0.0", 17, 13..=17),
         ("Nature.紅葉", "2.0.0", 15, 11..=15),
@@ -312,11 +312,22 @@ fn migrate_and_compile(
 fn the_bundled_package_is_its_v1_edition_migrated() {
     let previous: Package = serde_json::from_str(PACKAGE_2_0_V1).unwrap();
     let current: Package = serde_json::from_str(ASSET).unwrap();
-    assert_eq!(previous.version, current.version);
+    assert_eq!(previous.version, "2.0.0");
     assert_eq!(previous.entries.len(), current.entries.len());
     let mut changed = 0;
     for (old, new) in previous.entries.iter().zip(&current.entries) {
         let migrated = migrate_macro_definition_from_saijiki_v1(&old.definition).unwrap();
+        changed += usize::from(migrated.changed);
+        // 2.1.0 rewrote YoungLeaves to take its count; it is already v2.
+        if new.definition["heading"] == "YoungLeaves" {
+            assert_eq!(new.definition["version"], "2.1.0");
+            assert!(
+                !migrate_macro_definition_from_saijiki_v1(&new.definition)
+                    .unwrap()
+                    .changed
+            );
+            continue;
+        }
         // The migration keeps the version and every other field; only words move.
         assert_eq!(migrated.definition, new.definition);
         assert_eq!(
@@ -327,7 +338,6 @@ fn the_bundled_package_is_its_v1_edition_migrated() {
                 .unwrap()
         );
         assert_eq!(migrated.changed, old.definition != new.definition);
-        changed += usize::from(migrated.changed);
         // Migrating a current definition again changes nothing.
         let again = migrate_macro_definition_from_saijiki_v1(&new.definition).unwrap();
         assert!(!again.changed);
@@ -635,4 +645,76 @@ fn every_bundled_word_expands_without_omission_at_many_placement_seeds() {
             );
         }
     }
+}
+
+#[test]
+fn young_leaves_take_the_written_count_inside_the_word() {
+    let package: Package = serde_json::from_str(ASSET).expect("Nature package must be JSON");
+    let definitions = package
+        .entries
+        .iter()
+        .map(|entry| MacroDefinition::from_json(&entry.definition.to_string()).unwrap())
+        .collect::<Vec<_>>();
+    let locks = definitions
+        .iter()
+        .map(|definition| {
+            let identity = definition.identity().unwrap();
+            MacroLock::new(
+                identity.qualified_name(),
+                identity.version(),
+                format!("sha256:{}", identity.full_digest_hex()),
+            )
+            .unwrap()
+            .with_aliases(definition.alias_qualified_names())
+            .unwrap()
+        })
+        .collect::<Vec<_>>();
+    let compile = |source: &str, language| {
+        compile_ddl_to_score(
+            NormalizedDdlDocument::new(source, language, locks.clone()).unwrap(),
+            &definitions,
+            Some(37),
+            MIGRATION_LIMITS,
+            ScoreLoweringContext::resolve("square", Color::White).unwrap(),
+            None,
+            ScoreErrorPolicy::OmitAndContinue,
+        )
+    };
+    // Ten leaves are twenty arcs in one word, not the word drawn ten times.
+    for (source, language) in [
+        ("Nature.若葉を10枚置く。", ResolvedInstructionLanguage::Ja),
+        (
+            "Place 10 Nature.YoungLeaves.",
+            ResolvedInstructionLanguage::En,
+        ),
+    ] {
+        let execution = compile(source, language);
+        let score = execution
+            .score()
+            .unwrap_or_else(|| panic!("{source}: {:?}", execution.downstream_diagnostics()));
+        assert_eq!(score.instructions.len(), 20, "{source}");
+        assert!(
+            score
+                .instructions
+                .iter()
+                .all(|i| i.primitive == Primitive::Arc)
+        );
+        assert!(execution.upstream_diagnostics().is_empty(), "{source}");
+    }
+    // Thirteen is past the word's twelve: only the word is left out, with its reason.
+    let execution = compile(
+        "Nature.若葉を13枚置く。\n赤い円を置く。",
+        ResolvedInstructionLanguage::Ja,
+    );
+    assert_eq!(
+        execution
+            .upstream_diagnostics()
+            .iter()
+            .map(|diagnostic| diagnostic.reason.as_str())
+            .collect::<Vec<_>>(),
+        ["macro_binding_count_out_of_range"]
+    );
+    let score = execution.score().unwrap();
+    assert_eq!(score.instructions.len(), 1);
+    assert_eq!(score.instructions[0].primitive, Primitive::Circle);
 }

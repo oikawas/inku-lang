@@ -106,6 +106,8 @@ pub enum MacroParameterBindingDiagnosticKind {
     UnsupportedSchema,
     NumericRange,
     NumericPrecision,
+    /// The count written on a word lies outside its count parameter's bounds.
+    CountOutOfRange,
     DefinitionIdentityOwnershipMismatch,
     SourceClauseAtomOwnershipMismatch,
 }
@@ -321,7 +323,7 @@ fn build_parameter_bindings(
             continue;
         }
 
-        let values = slots
+        let mut values = slots
             .iter()
             .map(|slot| {
                 facts
@@ -330,6 +332,20 @@ fn build_parameter_bindings(
                     .collect::<Vec<_>>()
             })
             .collect::<Vec<_>>();
+        // A word written without a count leaves its count parameter to the
+        // definition. Every other parameter stays required.
+        let mut kept = 0;
+        for index in 0..slots.len() {
+            let omitted = slots[index].parameter_schema.count_parameter().is_some()
+                && values[index].iter().all(Option::is_none);
+            if !omitted {
+                slots.swap(kept, index);
+                values.swap(kept, index);
+                kept += 1;
+            }
+        }
+        slots.truncate(kept);
+        values.truncate(kept);
         let adjacency = values
             .iter()
             .map(|row| {
@@ -378,12 +394,21 @@ fn build_parameter_bindings(
             continue;
         }
         let mut parameters_by_invocation = BTreeMap::<usize, Vec<MacroParameterBinding>>::new();
+        let mut out_of_range = Vec::new();
         for (slot_index, fact_index) in matching.into_iter().enumerate() {
             let slot = &slots[slot_index];
             let fact = &facts[fact_index];
             let value = values[slot_index][fact_index]
                 .clone()
                 .expect("a matched edge must retain its typed value");
+            // The count stays owned by its word, so it never falls back to
+            // repeating the whole word; only that word is withheld.
+            if let (Some(count), BoundMacroParameterValue::Integer { value, .. }) =
+                (slot.parameter_schema.count_parameter(), &value)
+                && !(count.minimum..=count.maximum).contains(value)
+            {
+                out_of_range.push(slot.invocation_index);
+            }
             parameters_by_invocation
                 .entry(slot.invocation_index)
                 .or_default()
@@ -406,15 +431,25 @@ fn build_parameter_bindings(
             if invocation.definition.parameters.is_empty() {
                 continue;
             }
+            if out_of_range.contains(&invocation.invocation_index) {
+                diagnostics.push(diagnostic(
+                    invocation.resolved,
+                    invocation.invocation_index,
+                    MacroParameterBindingDiagnosticKind::CountOutOfRange,
+                    invocation.definition.parameters.keys().cloned().collect(),
+                ));
+                continue;
+            }
             complete.push(CompleteMacroParameterBinding {
                 invocation_index: invocation.invocation_index,
                 invocation_ordinal: invocation.resolved.invocation.ordinal(),
                 clause_index: invocation.resolved.clause_index,
                 atom_index: invocation.resolved.atom_index,
                 definition_identity: invocation.resolved.definition_identity.clone(),
+                // A word whose only parameter is an unwritten count owns none.
                 parameters: parameters_by_invocation
                     .remove(&invocation.invocation_index)
-                    .expect("every complete invocation must own all of its parameters"),
+                    .unwrap_or_default(),
             });
         }
     }
@@ -652,8 +687,9 @@ fn compatible_value(schema: &ParameterSchema, fact: &Fact) -> Option<BoundMacroP
                 source_span: fact.span,
             })
         }
+        // Sides belong to a shape, never to how many of the word are drawn.
         (
-            ParameterSchema::Integer,
+            ParameterSchema::Integer { receives: None, .. },
             FactKind::CoreModifier(crate::CoreModifierValue::Sides(value)),
         ) => i64::try_from(*value)
             .ok()
@@ -673,14 +709,12 @@ fn compatible_value(schema: &ParameterSchema, fact: &Fact) -> Option<BoundMacroP
                 source_span: fact.span,
             })
         }
-        (ParameterSchema::Integer, FactKind::ExactNumber(value)) => {
-            i64::try_from(*value)
-                .ok()
-                .map(|value| BoundMacroParameterValue::Integer {
-                    value,
-                    source_span: fact.span,
-                })
-        }
+        (ParameterSchema::Integer { .. }, FactKind::ExactNumber(value)) => i64::try_from(*value)
+            .ok()
+            .map(|value| BoundMacroParameterValue::Integer {
+                value,
+                source_span: fact.span,
+            }),
         (ParameterSchema::Number, FactKind::ExactNumber(value)) => {
             exact_u64_as_f64(*value).map(|value| BoundMacroParameterValue::Number {
                 value,
@@ -731,7 +765,7 @@ fn incomplete_kind(
         if !candidates.is_empty() {
             continue;
         }
-        if matches!(slot.parameter_schema, ParameterSchema::Integer)
+        if matches!(slot.parameter_schema, ParameterSchema::Integer { .. })
             && facts.iter().any(|fact| {
                 matches!(fact.kind, FactKind::ExactNumber(value) if i64::try_from(value).is_err())
             })

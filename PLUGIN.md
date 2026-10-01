@@ -206,6 +206,21 @@ Declare a parameter with, for example, `{"type":"exact_decimal","dimension":"rad
 
 Flat Emit fields with those names accept exact values. `width`+`height`, `chord`+`sagitta`, and `position_x`+`position_y` require both components; missing or mistyped values produce diagnostics. Numeric position and named `place` have separate authority and cannot silently overwrite one another. Dimensions and positions reach the ordinary DDL resolver, including diagnostic recovery to the smaller overlapping size. Definition literals belong to their generated Emit and do not receive fabricated source spans. Count-one/place reaches actual Score; repetition reaches the resolved plan and leaves instance generation to later materialization.
 
+## A Parameter That Receives the Word's Count
+
+A count written on a word (`Nature.若葉を10枚`, `Place 10 Nature.YoungLeaves`) repeats the whole word from outside unless the definition declares that it receives it. To take it as the inner count, declare an integer parameter with `receives: "count"`, its bounds, and the choices for a call that writes no count, and read that parameter as the `count` of a body `repeat`.
+
+```json
+"leaf_count": {"type": "integer", "receives": "count", "minimum": 1, "maximum": 12, "omitted": [4, 5, 6]}
+```
+
+- Only one top-level parameter may declare it, never a component parameter. `minimum` is at least 1 and at most `maximum`; `omitted` lists distinct integers inside the bounds and is not empty. An integer parameter without `receives` cannot carry these fields. Make the `repeat` `maximum` at least the parameter's `maximum`.
+- Only a number written on the call binds to it, never a modifier such as sides. The word then owns that count, so the word is not also repeated.
+- When no count is written, one of the `omitted` choices is chosen deterministically from the call's seed. This is the only parameter that may be omitted; every other declared parameter stays required.
+- A count outside the bounds leaves out only that word with the `macro_binding_count_out_of_range` diagnostic and draws the rest. It is never clamped silently.
+
+Bundled `Nature.YoungLeaves` (若葉) declares it in 2.1.0 (1–12 leaves, 4–6 when none is written). It splits the upper half into twelve cells, six columns by two rows, and puts each leaf in its own cell with a small shift inside it. The cells are taken in an order that stays balanced left and right at any count. The other six words declare no count, so a written count still repeats the whole word. Stage 1's work plan carries plugins by name only, so a count written in a description does not yet reach a plugin.
+
 ## Geometry and Count Boundary
 
 Macros emit typed core meaning rather than final geometry. Size has three

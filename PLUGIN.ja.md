@@ -77,6 +77,21 @@ Description requestでは、Stage 1が受け取れるのは上限付きsignature
 `inku.ddl-export.v1`（DDLと、DDLが名前を書く定義）として書き出し、新規DDLとして読み込む。
 読み込んだ定義はその作品だけで使い、導入はしない。
 
+## 語の個数を受ける引数
+
+語に書いた個数（`Nature.若葉を10枚`、`Place 10 Nature.YoungLeaves`）は、定義が受けると宣言しない限り、語全体の外側の繰り返しになる。中の個数として受けるには、整数のparameterに`receives: "count"`、範囲、書かれなかったときの候補を宣言し、本体の`repeat`の`count`でそのparameterを読む。
+
+```json
+"leaf_count": {"type": "integer", "receives": "count", "minimum": 1, "maximum": 12, "omitted": [4, 5, 6]}
+```
+
+- 宣言できるのは定義の最上位のparameterに一つだけで、componentのparameterには置けない。`minimum`は1以上で`maximum`以下、`omitted`は空でなく、重複せず、範囲の中の整数だけを並べる。`receives`の無い整数parameterはこれらを持てない。`repeat`の`maximum`はparameterの`maximum`以上にする。
+- 受けるのは呼出しに付いた数だけで、辺数などの修飾は受けない。受けた個数はその語のものになり、外側の繰り返しにはならない。
+- 個数が書かれていなければ、`omitted`の候補から、その呼出しのseedで一つを決定的に選ぶ。省略できるのはこのparameterだけで、ほかの宣言parameterは従来どおり必須である。
+- 範囲の外の個数は`macro_binding_count_out_of_range`の診断を出してその語だけを外し、ほかは描く。黙って丸めない。
+
+同梱の`Nature.YoungLeaves`（若葉）は2.1.0でこの宣言を持つ（1〜12枚、書かなければ4〜6枚）。若葉は上半分を6列2段の12の区画に分け、枚ごとに別の区画へ、区画の中で少しずらして置く。区画の順は、どの枚数でも左右に偏らないように決めてある。ほかの六語は宣言を持たず、書いた個数は語全体の繰り返しのままである。Stage 1の作業計画のpluginsは名前だけを運ぶので、記述に書かれた個数はまだプラグインへ渡らない。
+
 ## Geometryと個数の境界
 
 Macroが出力するのは最終geometryではなく、型付きcore meaningである。Sizeには、未指定、

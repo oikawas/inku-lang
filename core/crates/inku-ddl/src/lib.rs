@@ -132,9 +132,10 @@ pub use language::{
     resolve_instruction_language_for_ui,
 };
 pub use macro_definition::{
-    ComponentDefinition, ExactDecimalDimension, Expression, LEGACY_PLUGIN_FORMAT_WARNING,
-    LegacyImportOutcome, LegacyWarning, MACRO_DEFINITION_DIGEST_DOMAIN, MACRO_DEFINITION_SCHEMA_ID,
-    MacroDefinition, MacroDefinitionDiagnostic, MacroDefinitionIdentity, MacroDefinitionParseError,
+    ComponentDefinition, CountParameter, ExactDecimalDimension, Expression, IntegerReceives,
+    LEGACY_PLUGIN_FORMAT_WARNING, LegacyImportOutcome, LegacyWarning,
+    MACRO_DEFINITION_DIGEST_DOMAIN, MACRO_DEFINITION_SCHEMA_ID, MacroDefinition,
+    MacroDefinitionDiagnostic, MacroDefinitionIdentity, MacroDefinitionParseError,
     MacroDefinitionValidation, MacroSemanticRefProjection, MacroTargetPathPosition, NumericRange,
     ParameterSchema, SemanticMap, Statement, TransformExpression, project_macro_semantic_ref,
     validate_macro_definition_semantic_version,

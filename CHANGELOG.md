@@ -6,6 +6,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file retains the history from v2.5.0 (2026-07-25, render engine 12) onward.** Past records follow the recent ones in a collapsible section of this same document; expand it when needed. Viewers without collapse support show the full text. Earlier history is in the [v1.72–v2.4 archive](docs/history/changelog-v1.72-v2.4.md) and the [v0.1–v1.71 archive](docs/history/changelog-v0.1-v1.71.md).
 
+### 2026-10-01 — Young leaves take a written count as their own leaf count (DDL engine 54, I-702)
+
+Following the author's decision (2026-09-28), a vocabulary plugin definition that declares an integer parameter with `receives: "count"`, bounds, and omitted-count choices now receives the count written on the word (`Nature.若葉を10枚`) through that parameter. Before, the whole word was repeated ten times. Without a written count the definition's choice is drawn from the call's seed; a count outside the bounds leaves out only that word with the `macro_binding_count_out_of_range` diagnostic. Words without the declaration keep the outer repetition. Bundled `Nature.YoungLeaves` (若葉) is rewritten as 2.1.0: it takes 1–12 leaves and draws 4–6 when none is written. The upper half is split into twelve cells, six columns by two rows, and each leaf takes its own cell, so the leaves stay apart at any count. Saved works keep their definition copies and do not change. Stage 1's work plan does not yet pass a count to a plugin.
+
 ### v2.15.78 — Read long Japanese instructions without rebuilding boundary candidates (Build 1154, 2026-10-01)
 
 The Japanese lexer now finds left-boundary candidates once per source and reuses their positions. This removes repeated scans from the beginning of the text that made long instructions progressively slower to read. The existing Saijiki row-count test is also corrected to include temperate, the 94th eligible row.

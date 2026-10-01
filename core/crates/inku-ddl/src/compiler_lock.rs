@@ -1091,7 +1091,8 @@ fn project_deliveries(
                 }
             }
             SemanticAssociationIssueKind::MacroParameterBinding(
-                MacroParameterBindingDiagnosticKind::MissingCompatibleFact,
+                MacroParameterBindingDiagnosticKind::MissingCompatibleFact
+                | MacroParameterBindingDiagnosticKind::CountOutOfRange,
             ) => {
                 if let Some(span) = span {
                     add_hole(

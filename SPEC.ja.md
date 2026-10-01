@@ -231,7 +231,7 @@ Canvasのcanonical ownerはshared coreの`inku.canvas-format-registry.v1`であ�
 
 同じ対象と明示指示へ一意に解決されたinlineとcontinuationは、文章の分割や照応の表面形から独立した同じcanonical meaningを持つ。したがって同じdrawing condition、policy / definition identity、attested seed、明示変奏なら、surface syntaxだけでmacro seed、effective meaningを変えない。unknown、ambiguity、conflictを等価と推測せず、関係・順序・数量・属性・action・parameter、または真正の複数macro invocationを消さない。この規則は一般の文順交換やgraph isomorphismを保証しない。
 
-宣言済みparameterへbindingされたmeaningは展開結果から読む。呼出し外側に残った属性はparameter bindingを再実装せずsource-owned診断とし、OmitAndContinueで未結合appearance fieldだけを省略した場合もMacroDefinition内の既存配色・touch・continuity・surfaceを保持する。未使用parameterは従来どおり受け入れ、parameter default / optionalや呼出し全体の新しい変換意味を追加しない。
+宣言済みparameterへbindingされたmeaningは展開結果から読む。呼出し外側に残った属性はparameter bindingを再実装せずsource-owned診断とし、OmitAndContinueで未結合appearance fieldだけを省略した場合もMacroDefinition内の既存配色・touch・continuity・surfaceを保持する。未使用parameterは従来どおり受け入れ、parameter default / optionalや呼出し全体の新しい変換意味を追加しない。ただし語の個数を受けるparameter（§4.6）だけは、個数を書かない呼出しで定義が決める。
 
 この境界により、Rendererはcore meaningだけを知ればよく、pluginは新primitive・新syntax・core語義の変更を持ち込めない。Plugin間依存は許さず、導入と削除を独立させる。
 
@@ -258,6 +258,8 @@ MacroのConnectedは、先行するLineを`from`に指定し、任意の数値�
 v1が保存済みMacroDefinitionのために受理した旧`variation:trembling`・`variation:blurring`・`place:middle`は、歳時記 v2 の移行でそれぞれ`swaying`・`ink_spread:bleeding`・`center`へ書き換え、v2は受理しない（2026-09-29 作者裁定）。blurringが描いたPinkの揺れはDDLから届かなくなり、保存済みScoreにだけ残る。本文変更は新しいdefinition version／digestで識別し、保存済みconfigを現在のcatalog定義へ差し替えない。ただし、歳時記の版の移行（§3.3）では、保存済みのMacro定義を新しい版の語へ書き換え、作品が持つlockを新しい定義へ移す（2026-09-29 作者裁定）。移行した定義は版を変えず、digestだけが変わる。同梱の`Nature.leaves`も同じ移行で書き換え、版は2.0.0のままである。
 
 宣言parameterはすべて必須である。三parameterを宣言してcallerが一値だけならMissingCompatibleFact等のbinding errorとなる。一振幅parameterだけを宣言してEmitへ届けた場合は、§13.6の同じresolverが残る二slotを解決する。未宣言callerの推測overlay、generic variation一fieldからの三slot推測、parameter optional化は行わない。
+
+例外は語の個数を受けるparameterだけである（2026-09-28 作者決定、I-702）。語に書いた個数（`Nature.若葉を10枚`、`Place 10 Nature.YoungLeaves`）は、定義が受けると宣言しない限り、従来どおり語全体の外側の反復になる。定義は整数parameterに`{"type":"integer","receives":"count","minimum":1,"maximum":12,"omitted":[4,5,6]}`のように宣言して、それを中の個数として受ける。宣言できるのは定義の最上位のparameterに一つだけで、componentのparameterには置けない。`minimum`は1以上で`maximum`以下、`omitted`は空でなく重複しない範囲内の整数列である。`receives`の無い整数parameterはこれらのfieldを持たず、canonical bytesは従来の`{"type":"integer"}`のままである。個数を受けるのは呼出しに付いた単独の数だけで、辺数の修飾は受けない。受けた個数はそのparameterが所有し、外側の反復にはならない。個数を書かない呼出しでは、`omitted`の候補から、その呼出しのattested seedとparameter名で決定的に一つを選ぶ。範囲外の個数は`macro_binding_count_out_of_range`の診断付きでその呼出しだけを省き、ほかを描く。黙って範囲へ丸めない。同梱`Nature.YoungLeaves` 2.1.0がこの宣言を持つ（1〜12枚、省略時4〜6枚）。ほかの同梱語は宣言を持たない。Stage 1の作業計画のpluginsは名前だけを運ぶため、記述に書かれた個数はまだプラグインへ渡らない。
 
 `inku.macro-definition.v1`はclosed typed parameterと、definition-local `components`、共通operator `emit` / `use` / `group` / `anchor` / `relation` / bounded `repeat` / typed `transform` / deterministic bounded `vary`だけを持つ。任意code、I/O、無制限loop、recursion / component cycle、filesystem / network / clock / environment、外部macro依存、raw SVG / Score / renderer instructionの生成を許さない。Expansionはeffect-freeで、attested composition seedと明示boundsから決定的なsemantic nodeとsource / generated typed provenanceを返す。
 

@@ -1,14 +1,21 @@
 package app.inku.mobile
 
 import android.app.Application
+import android.util.Log
 import app.inku.mobile.data.db.InkuDatabase
 import app.inku.mobile.data.db.RoomV10ResetCoordinator
+import app.inku.mobile.data.db.SaijikiV1Migration
 import app.inku.mobile.data.model.CanvasAspects
 import app.inku.mobile.pipeline.NativePipelineBridge
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+
+private const val MIGRATION_LOG_TAG = "InkuMigration"
+
+/** The report of the Saijiki v2 migration, kept in the app's files for the count. */
+internal const val MIGRATION_REPORT = "saijiki-v2-migration.json"
 
 class InkuApplication : Application() {
     val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -47,7 +54,7 @@ class InkuApplication : Application() {
                 var database: InkuDatabase? = null
                 try {
                     database = InkuDatabase.openPrepared(this)
-                    database.openHelper.writableDatabase
+                    migrateSavedRecords(database.openHelper.writableDatabase)
                     databaseInstance = database
                     result
                 } catch (_: RuntimeException) {
@@ -59,6 +66,27 @@ class InkuApplication : Application() {
             }
             is RoomV10ResetCoordinator.Result.Refused -> result
         }
+    }
+
+    /**
+     * Moves the saved records to Saijiki v2 once, before any screen reads a work.
+     * A failure writes nothing and is logged; the app opens, an unmoved work is
+     * refused with `saijiki_migration_required`, and the next start tries again.
+     */
+    private fun migrateSavedRecords(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+        val report = runCatching {
+            SaijikiV1Migration(NativePipelineBridge::migrateSaijikiV1, discardExecutions = true).runOnce(db)
+        }.getOrElse { error ->
+            Log.e(MIGRATION_LOG_TAG, "Saijiki v2 migration failed; nothing was written", error)
+            return
+        } ?: return
+        runCatching { filesDir.resolve(MIGRATION_REPORT).writeText(report.toString(1)) }
+        Log.i(
+            MIGRATION_LOG_TAG,
+            "Saijiki v2 migration written: ${report.optLong("total_ms")} ms, " +
+                "${report.optInt("statements")} statements, " +
+                "${report.optJSONArray("refused_records")?.length() ?: 0} refused records",
+        )
     }
 
     override fun onTerminate() {

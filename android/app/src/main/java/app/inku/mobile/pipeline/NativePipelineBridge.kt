@@ -14,4 +14,7 @@ object NativePipelineBridge : SharedPipelineBinding {
     external override fun renderSaved(inputBytes: ByteArray): ByteArray
     external override fun explainPluginDiagnostics(inputBytes: ByteArray): ByteArray
     external override fun providerAttempt(snapshotBytes: ByteArray): ByteArray
+
+    /** One saved Saijiki v1 unit in, the same unit in the current edition out (SPEC §3.3). */
+    external fun migrateSaijikiV1(inputBytes: ByteArray): ByteArray
 }

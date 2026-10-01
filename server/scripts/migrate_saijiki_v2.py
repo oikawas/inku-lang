@@ -27,13 +27,21 @@ from pathlib import Path
 from inku_server.persistence.saijiki_migration import migrate_once
 
 
+def _blank_list(path: Path | None) -> list[str] | None:
+    if path is None:
+        return None
+    return [line.strip() for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--database", type=Path, required=True, help="the SQLite database to migrate")
     parser.add_argument("--workers", type=int, default=min(6, os.cpu_count() or 1),
                         help="ask the core from this many worker processes at once")
-    parser.add_argument("--timeout", type=float, default=60.0,
+    parser.add_argument("--timeout", type=float, default=120.0,
                         help="stop the whole run if a call to the core gives no answer within this many seconds")
+    parser.add_argument("--blank", type=Path, default=None,
+                        help="empty these history texts instead of migrating them (<history id>:<column>, one per line)")
     parser.add_argument("--report", type=Path, default=None,
                         help="write the whole report here (default: beside the snapshot)")
     args = parser.parse_args()
@@ -46,15 +54,16 @@ def main() -> int:
     print(f"journal: {journal}", file=sys.stderr, flush=True)
     report = migrate_once(args.database, inku_render.pipeline_migrate_saijiki_v1, workers=args.workers,
                           progress=lambda line: print(line, file=sys.stderr, flush=True), journal=journal,
-                          timeout=args.timeout, abort_on_failure=True)
+                          timeout=args.timeout, abort_on_failure=True, blank=_blank_list(args.blank))
     path = args.report or Path(report["snapshot"]).with_name(
         f"{args.database.stem}-saijiki-v2-{time.time_ns()}.json")
     path.write_text(json.dumps(report, ensure_ascii=False, sort_keys=True), encoding="utf-8")
     path.chmod(0o600)
     counts = {key: value for key, value in report.items()
-              if key not in {"refused_records", "unassociated_sweep_records"}}
+              if key not in {"refused_records", "blanked_records", "unassociated_sweep_records"}}
     counts["refused_records"] = len(report["refused_records"])
     counts["unassociated_sweep_records"] = len(report["unassociated_sweep_records"])
+    counts["blanked_records"] = len(report["blanked_records"])
     counts["report"] = str(path)
     json.dump({"ok": True, "migration": counts}, sys.stdout, ensure_ascii=False, sort_keys=True)
     sys.stdout.write("\n")

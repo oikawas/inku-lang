@@ -82,7 +82,7 @@ Description requestでは、Stage 1が受け取れるのは上限付きsignature
 語に書いた個数（`Nature.若葉を10枚`、`Place 10 Nature.YoungLeaves`）は、定義が受けると宣言しない限り、語全体の外側の繰り返しになる。中の個数として受けるには、整数のparameterに`receives: "count"`、範囲、書かれなかったときの候補を宣言し、本体の`repeat`の`count`でそのparameterを読む。
 
 ```json
-"leaf_count": {"type": "integer", "receives": "count", "minimum": 1, "maximum": 12, "omitted": [4, 5, 6]}
+"leaf_count": {"type": "integer", "receives": "count", "minimum": 1, "maximum": 12, "omitted": [4, 5, 6], "counter": "flat"}
 ```
 
 - 宣言できるのは定義の最上位のparameterに一つだけで、componentのparameterには置けない。`minimum`は1以上で`maximum`以下、`omitted`は空でなく、重複せず、範囲の中の整数だけを並べる。`receives`の無い整数parameterはこれらを持てない。`repeat`の`maximum`はparameterの`maximum`以上にする。
@@ -100,7 +100,7 @@ Description requestでは、Stage 1が受け取れるのは上限付きsignature
 | 落葉 | 葉の枚数 | 1〜16枚 | 8〜12枚 | 斜めの帯の16の位置（下ほど密）へ散らし、少しずらす |
 | 枯葉 | 葉の枚数 | 1〜8枚 | 2〜4枚 | 下の左右の隅を4列2段の8区画に分け、1枚ずつ置く |
 
-どの語も、位置の順はどの個数でも偏らないように決めてある。紅葉は一枚の葉の裂片を描く語なので宣言を持たず、書いた個数は紅葉の葉の数として語全体の繰り返しのままである。Stage 1の作業計画のpluginsは名前だけを運ぶので、記述に書かれた個数はまだプラグインへ渡らない。
+どの語も、位置の順はどの個数でも偏らないように決めてある。紅葉は一枚の葉の裂片を描く語なので宣言を持たず、書いた個数は紅葉の葉の数として語全体の繰り返しのままである。任意の`counter`（`flat`は枚、`long`は本、`general`は個）は、Stage 1が日本語のDDLに個数を書くときの助数詞だけを決める。記述に書かれた個数は、Stage 1の下絵が`10枚のNature.若葉。`の形でプラグインへ渡す。
 
 ## Geometryと個数の境界
 

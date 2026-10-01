@@ -326,12 +326,14 @@ impl WorkPlanLayer {
     }
 }
 
-/// One installed plugin a plan may choose: its canonical qualified name and
-/// its qualified aliases (the first alias is the Japanese display name).
+/// One installed plugin a plan may choose: its canonical qualified name, its
+/// qualified aliases (the first alias is the Japanese display name), and, when
+/// its definition receives the word's count, what that count counts.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct WorkPlanPlugin {
     pub name: String,
     pub aliases: Vec<String>,
+    pub counter: Option<crate::CountCounter>,
 }
 
 impl WorkPlanPlugin {
@@ -354,8 +356,16 @@ impl WorkPlanPlugin {
 pub struct WorkPlan {
     pub ground: Option<String>,
     pub background: Option<String>,
-    pub plugins: Vec<String>,
+    pub plugins: Vec<WorkPlanPluginCall>,
     pub layers: Vec<WorkPlanLayer>,
+}
+
+/// One chosen plugin and the count the description wrote for it. A count is
+/// kept only for a plugin whose definition receives it.
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize)]
+pub struct WorkPlanPluginCall {
+    pub name: String,
+    pub count: Option<u64>,
 }
 
 /// A provider value that normalization replaced by unspecified or dropped.
@@ -389,7 +399,8 @@ pub fn work_plan_response_schema() -> Value {
 }
 
 /// The response schema with an optional `plugins` list closed over the
-/// installed qualified names. Without installed plugins it equals
+/// installed qualified names. Each entry also carries the count the
+/// description wrote, 0 when it wrote none. Without installed plugins it equals
 /// [`work_plan_response_schema`] byte for byte.
 #[must_use]
 pub fn work_plan_response_schema_with_plugins(plugins: &[String]) -> Value {
@@ -441,9 +452,18 @@ pub fn work_plan_response_schema_with_plugins(plugins: &[String]) -> Value {
         "required": ["background", "ground", "layers"]
     });
     if !plugins.is_empty() {
+        // The count has no maximum: a count past the word's range is left
+        // to the compiler, which reports it instead of clamping it.
         schema["properties"]["plugins"] = json!({
             "type": "array",
-            "items": {"type": "string", "enum": plugins},
+            "items": {
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string", "enum": plugins},
+                    "count": {"type": "integer", "minimum": 0}
+                },
+                "required": ["name", "count"]
+            },
             "maxItems": MAX_WORK_PLAN_PLUGINS
         });
     }
@@ -469,7 +489,10 @@ pub fn normalize_work_plan(raw: &Value) -> (WorkPlan, Vec<WorkPlanDiagnostic>) {
 
 /// Normalize a provider plan against the installed plugins. A plugin named by
 /// its canonical name or an alias is kept under its canonical name; one that
-/// is not installed, repeated, or over the limit is dropped and reported.
+/// is not installed, repeated, or over the limit is dropped and reported. An
+/// entry is an object with `name` and `count`, or a bare name as plans had it
+/// before counts. A positive count is kept for a plugin that receives one and
+/// is otherwise dropped and reported; 0 means the description wrote none.
 #[must_use]
 pub fn normalize_work_plan_with_plugins(
     raw: &Value,
@@ -509,7 +532,11 @@ pub fn normalize_work_plan_with_plugins(
         .into_iter()
         .flatten()
     {
-        let Some(written) = text(Some(value)) else {
+        let (written, count) = match value {
+            Value::Object(entry) => (text(entry.get("name")), entry.get("count")),
+            other => (text(Some(other)), None),
+        };
+        let Some(written) = written else {
             continue;
         };
         let Some(plugin) = plugins.iter().find(|plugin| plugin.answers_to(&written)) else {
@@ -517,12 +544,37 @@ pub fn normalize_work_plan_with_plugins(
             continue;
         };
         let name = plugin.name.clone();
-        if plan.plugins.contains(&name) {
+        let count = match count {
+            None | Some(Value::Null) => None,
+            Some(value) => match value.as_u64() {
+                Some(0) => None,
+                Some(count) if plugin.counter.is_some() => Some(count),
+                Some(count) => {
+                    note(
+                        None,
+                        "plugins",
+                        format!("{name}:{count}"),
+                        "plugin_takes_no_count",
+                    );
+                    None
+                }
+                None => {
+                    note(
+                        None,
+                        "plugins",
+                        format!("{name}:{value}"),
+                        "invalid_plugin_count",
+                    );
+                    None
+                }
+            },
+        };
+        if plan.plugins.iter().any(|call| call.name == name) {
             note(None, "plugins", name, "repeated_plugin");
         } else if plan.plugins.len() >= MAX_WORK_PLAN_PLUGINS {
             note(None, "plugins", name, "over_plugin_limit");
         } else {
-            plan.plugins.push(name);
+            plan.plugins.push(WorkPlanPluginCall { name, count });
         }
     }
     let layers = raw
@@ -812,16 +864,23 @@ pub fn print_work_plan_with_plugins(
             ResolvedInstructionLanguage::En => format!("Fill the background with {color}."),
         });
     }
-    // A plugin sentence is the bare qualified name, the one form every
-    // parameterless definition expands without caller-meaning diagnostics.
-    for name in &plan.plugins {
-        let written = plugins
-            .iter()
-            .find(|plugin| &plugin.name == name)
-            .map_or(name.as_str(), |plugin| plugin.written(language));
-        lines.push(match language {
-            ResolvedInstructionLanguage::Ja => format!("{written}。"),
-            ResolvedInstructionLanguage::En => format!("{written}."),
+    // A plugin sentence is the qualified name, the one form every definition
+    // expands without caller-meaning diagnostics, with the count before it
+    // when the description wrote one. No action word follows it.
+    for call in &plan.plugins {
+        let plugin = plugins.iter().find(|plugin| plugin.name == call.name);
+        let written = plugin.map_or(call.name.as_str(), |plugin| plugin.written(language));
+        let counter = plugin
+            .and_then(|plugin| plugin.counter)
+            .unwrap_or_default()
+            .japanese();
+        lines.push(match (language, call.count) {
+            (ResolvedInstructionLanguage::Ja, Some(count)) => {
+                format!("{count}{counter}の{written}。")
+            }
+            (ResolvedInstructionLanguage::En, Some(count)) => format!("{count} {written}."),
+            (ResolvedInstructionLanguage::Ja, None) => format!("{written}。"),
+            (ResolvedInstructionLanguage::En, None) => format!("{written}."),
         });
     }
     for layer in &plan.layers {

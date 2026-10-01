@@ -98,7 +98,7 @@ Androidへの転送は、Rustのpremultiplied RGBAをNDKの`RGBA_8888` Bitmapへ
 
 ## 2026-09-25 現行のプラグイン（draw-system04）
 
-下絵の任意`plugins`、Stage 1の登録プラグイン節、正式名と別名（DDL Spec 14、同梱`Nature.leaves` 2.0.0）の照合は、同梱した共有Rust coreがそのまま行う。lockの任意`aliases`はRoomへそのまま運ぶ。
+下絵の任意`plugins`とその個数（`count`）、Stage 1の登録プラグイン節、正式名と別名（DDL Spec 14、同梱`Nature.leaves` 2.1.0）の照合と、語に書いた個数の受け取り（SPEC §4.6）は、同梱した共有Rust coreがそのまま行う。lockの任意`aliases`はRoomへそのまま運ぶ。
 
 同梱パッケージ`Nature.leaves`の有効・無効は、設定「その他」の「同梱プラグイン」で切り替える（Serverの文書単位と同じ粒度）。値は`plugin_settings`のキー`bundled:Nature.leaves:enabled`に`{"enabled":bool}`で保存し、欠落・壊れた値は有効とする。無効なら新しい作品のcatalog解決の`bundled_packages`から外す。保存済み作品は自分のconfigの定義で描き直す。語の名前は、日本語表示では別名（若葉など）、英語表示では正式名で示し、どちらも共有coreの定義から取る。
 

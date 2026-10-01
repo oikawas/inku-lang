@@ -79,6 +79,11 @@ fn a_count_parameter_declares_its_bounds_and_its_omitted_choices() {
             "invalid_count_parameter",
         ),
         (
+            serde_json::json!({"n":{"type":"integer","counter":"flat"}}),
+            serde_json::json!({}),
+            "invalid_count_parameter",
+        ),
+        (
             serde_json::json!({"n":{"type":"integer","receives":"count","minimum":1,"maximum":12}}),
             serde_json::json!({}),
             "invalid_count_parameter",

@@ -687,6 +687,7 @@ fn counted_words_take_the_written_count_inside_the_word() {
             "Place 10 Nature.YoungLeaves.",
             ResolvedInstructionLanguage::En,
         ),
+        ("10 Nature.YoungLeaves.", ResolvedInstructionLanguage::En),
     ] {
         let execution = compile(source, language);
         let score = execution
@@ -708,6 +709,9 @@ fn counted_words_take_the_written_count_inside_the_word() {
         ("Nature.落葉を16枚置く。", 32),
         ("Nature.枯草を2本置く。", 4),
         ("Nature.枯葉を7枚置く。", 14),
+        // The forms Stage 1 prints, with no action word.
+        ("10枚のNature.若葉。", 20),
+        ("3本のNature.下草。", 6),
     ] {
         let execution = compile(source, ResolvedInstructionLanguage::Ja);
         let score = execution

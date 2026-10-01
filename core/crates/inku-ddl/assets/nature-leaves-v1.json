@@ -22,7 +22,8 @@
               4,
               5,
               6
-            ]
+            ],
+            "counter": "flat"
           }
         },
         "components": {
@@ -730,7 +731,8 @@
               6,
               8,
               10
-            ]
+            ],
+            "counter": "long"
           }
         },
         "components": {
@@ -1075,7 +1077,8 @@
               6,
               7,
               8
-            ]
+            ],
+            "counter": "flat"
           }
         },
         "components": {},
@@ -1810,7 +1813,8 @@
               10,
               11,
               12
-            ]
+            ],
+            "counter": "flat"
           }
         },
         "components": {
@@ -2516,7 +2520,8 @@
               6,
               8,
               10
-            ]
+            ],
+            "counter": "long"
           }
         },
         "components": {
@@ -2881,7 +2886,8 @@
               2,
               3,
               4
-            ]
+            ],
+            "counter": "flat"
           }
         },
         "components": {

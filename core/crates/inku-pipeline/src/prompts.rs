@@ -923,12 +923,12 @@ The input sketch supplements the extent of place or the seasonal or time-of-day 
 const STAGE1_PLUGINS_JA: &str = r#"
 
 # plugins（登録プラグイン）
-次のプラグインは、要約に書かれた物をまとめて描く。判断の基準は名前の見出しの語（Nature.若葉なら「若葉」）である。記述にその語か、同じ物を指す言い換え（落葉に対する「落ち葉」など）が書かれていれば、その名前をpluginsへ入れる。書かれていなければ、季節・場所・似た物からの連想では選ばない。プラグインが描く物をlayersで重ねて描かない。記述のほかの物はこれまでどおりlayersで描く。該当が無ければpluginsは空にする。"#;
+次のプラグインは、要約に書かれた物をまとめて描く。判断の基準は名前の見出しの語（Nature.若葉なら「若葉」）である。記述にその語か、同じ物を指す言い換え（落葉に対する「落ち葉」など）が書かれていれば、その名前をpluginsへ入れる。書かれていなければ、季節・場所・似た物からの連想では選ばない。プラグインが描く物をlayersで重ねて描かない。記述のほかの物はこれまでどおりlayersで描く。該当が無ければpluginsは空にする。pluginsの各項目は name と count である。記述がその物の数を書いていれば（「若葉が十枚」「三本の下草」）count にその数を、書いていなければ 0 を入れる。数を推測で補わない。"#;
 
 const STAGE1_PLUGINS_EN: &str = r#"
 
 # plugins (installed plugins)
-Each plugin below draws the subject its summary describes as a whole. The test is the heading word of its name (for Nature.若葉, 若葉, young leaves). When the description writes that word or a paraphrase naming the same thing (fallen leaves for 落葉), put the name in plugins. When it does not, never choose the plugin by association with a season, place, or similar thing. Do not also draw that subject in layers. Draw everything else in the description with layers as usual. Leave plugins empty when none applies."#;
+Each plugin below draws the subject its summary describes as a whole. The test is the heading word of its name (for Nature.若葉, 若葉, young leaves). When the description writes that word or a paraphrase naming the same thing (fallen leaves for 落葉), put the name in plugins. When it does not, never choose the plugin by association with a season, place, or similar thing. Do not also draw that subject in layers. Draw everything else in the description with layers as usual. Leave plugins empty when none applies. Each plugins entry has name and count. When the description states how many of that subject there are ("ten young leaves", "three blades of undergrowth"), set count to that number; otherwise set count to 0. Never guess a number."#;
 
 /// Installed plugins, sorted and unique by canonical name, that a plan may choose.
 fn installed_plugin_names(macros: &[MacroPromptEntry<'_>]) -> Vec<WorkPlanPlugin> {
@@ -945,6 +945,11 @@ pub fn work_plan_plugins<'a>(
             Some(WorkPlanPlugin {
                 name: definition.qualified_name()?,
                 aliases: definition.alias_qualified_names(),
+                counter: definition
+                    .parameters
+                    .iter()
+                    .find_map(|(_, schema)| schema.count_parameter())
+                    .map(|count| count.counter),
             })
         })
         .collect::<Vec<_>>();
@@ -1971,10 +1976,18 @@ mod tests {
             without.response_schema,
             inku_ddl::work_plan::work_plan_response_schema()
         );
-        let installed = [WorkPlanPlugin {
-            name: "Nature.若葉".to_owned(),
-            aliases: Vec::new(),
-        }];
+        let installed = [
+            WorkPlanPlugin {
+                name: "Nature.若葉".to_owned(),
+                aliases: Vec::new(),
+                counter: Some(inku_ddl::CountCounter::Flat),
+            },
+            WorkPlanPlugin {
+                name: "Nature.紅葉".to_owned(),
+                aliases: Vec::new(),
+                counter: None,
+            },
+        ];
         let plan = r#"{"background":"white","ground":"unspecified","plugins":["Nature.若葉","Garden.薔薇","Nature.若葉"],"layers":[
             {"shape":"circle","proportion":"unspecified","action":"place","count":1,
              "position":"center","size":"unspecified","color":"red","tool":"unspecified",
@@ -2006,6 +2019,28 @@ mod tests {
         assert!(
             parse_stage1_response_with_plugins(only, LIMITS, ResolvedInstructionLanguage::En, &[])
                 .is_err()
+        );
+        // A written count goes before a plugin that receives it, and nowhere else.
+        let counted = r#"{"background":"unspecified","ground":"unspecified","layers":[],"plugins":[
+            {"name":"Nature.若葉","count":10},{"name":"Nature.紅葉","count":3}]}"#;
+        let print = |plan, language| {
+            parse_stage1_response_with_plugins(plan, LIMITS, language, &installed)
+                .unwrap()
+                .normalized_ddl
+        };
+        assert_eq!(
+            print(counted, ResolvedInstructionLanguage::Ja),
+            "10枚のNature.若葉。\nNature.紅葉。"
+        );
+        assert_eq!(
+            print(counted, ResolvedInstructionLanguage::En),
+            "10 Nature.若葉.\nNature.紅葉."
+        );
+        let unwritten = r#"{"background":"unspecified","ground":"unspecified","layers":[],"plugins":[
+            {"name":"Nature.若葉","count":0}]}"#;
+        assert_eq!(
+            print(unwritten, ResolvedInstructionLanguage::Ja),
+            "Nature.若葉。"
         );
     }
 

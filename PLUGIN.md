@@ -211,7 +211,7 @@ Flat Emit fields with those names accept exact values. `width`+`height`, `chord`
 A count written on a word (`Nature.若葉を10枚`, `Place 10 Nature.YoungLeaves`) repeats the whole word from outside unless the definition declares that it receives it. To take it as the inner count, declare an integer parameter with `receives: "count"`, its bounds, and the choices for a call that writes no count, and read that parameter as the `count` of a body `repeat`.
 
 ```json
-"leaf_count": {"type": "integer", "receives": "count", "minimum": 1, "maximum": 12, "omitted": [4, 5, 6]}
+"leaf_count": {"type": "integer", "receives": "count", "minimum": 1, "maximum": 12, "omitted": [4, 5, 6], "counter": "flat"}
 ```
 
 - Only one top-level parameter may declare it, never a component parameter. `minimum` is at least 1 and at most `maximum`; `omitted` lists distinct integers inside the bounds and is not empty. An integer parameter without `receives` cannot carry these fields. Make the `repeat` `maximum` at least the parameter's `maximum`.
@@ -229,7 +229,7 @@ In bundled `Nature.leaves` 2.1.0 every word but AutumnLeaves declares it.
 | FallenLeaves | leaves | 1–16 | 8–12 | sixteen points along the diagonal drift, denser low, with a small shift |
 | WitheredLeaves | leaves | 1–8 | 2–4 | eight cells of the lower left and right corners, four columns by two rows |
 
-Each word takes its positions in an order that stays balanced at any count. AutumnLeaves draws the lobes of one maple leaf, so it declares no count, and a written count still repeats the whole word as the number of maple leaves. Stage 1's work plan carries plugins by name only, so a count written in a description does not yet reach a plugin.
+Each word takes its positions in an order that stays balanced at any count. AutumnLeaves draws the lobes of one maple leaf, so it declares no count, and a written count still repeats the whole word as the number of maple leaves. The optional `counter` (`flat` for 枚, `long` for 本, `general` for 個) decides only the counter Stage 1 writes with a count in Japanese DDL. Stage 1's underdrawing passes a count written in a description to its plugin as `10枚のNature.若葉。` or `10 Nature.YoungLeaves.`.
 
 ## Geometry and Count Boundary
 

@@ -184,6 +184,8 @@ pub enum ParameterSchema {
         maximum: Option<i64>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         omitted: Option<Vec<i64>>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        counter: Option<CountCounter>,
     },
     Boolean,
     List {
@@ -206,12 +208,35 @@ pub enum IntegerReceives {
     Count,
 }
 
+/// The kind of thing a count parameter counts, which names the Japanese
+/// counter a printed count takes: 枚 for flat things, 本 for long ones, and 個
+/// otherwise. It never changes what the count means.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CountCounter {
+    Flat,
+    Long,
+    #[default]
+    General,
+}
+
+impl CountCounter {
+    pub const fn japanese(self) -> &'static str {
+        match self {
+            Self::Flat => "枚",
+            Self::Long => "本",
+            Self::General => "個",
+        }
+    }
+}
+
 /// The validated bounds and omitted-count choices of one count parameter.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct CountParameter<'a> {
     pub minimum: i64,
     pub maximum: i64,
     pub omitted: &'a [i64],
+    pub counter: CountCounter,
 }
 
 impl ParameterSchema {
@@ -222,6 +247,7 @@ impl ParameterSchema {
             minimum: None,
             maximum: None,
             omitted: None,
+            counter: None,
         }
     }
 
@@ -234,10 +260,12 @@ impl ParameterSchema {
                 minimum: Some(minimum),
                 maximum: Some(maximum),
                 omitted: Some(omitted),
+                counter,
             } => Some(CountParameter {
                 minimum: *minimum,
                 maximum: *maximum,
                 omitted,
+                counter: counter.unwrap_or_default(),
             }),
             _ => None,
         }
@@ -986,9 +1014,10 @@ fn validate_parameter_schema(
             minimum,
             maximum,
             omitted,
+            counter,
         } => {
             let valid = match (receives, minimum, maximum, omitted) {
-                (None, None, None, None) => true,
+                (None, None, None, None) => counter.is_none(),
                 (Some(IntegerReceives::Count), Some(minimum), Some(maximum), Some(omitted)) => {
                     let mut seen = HashSet::new();
                     1 <= *minimum

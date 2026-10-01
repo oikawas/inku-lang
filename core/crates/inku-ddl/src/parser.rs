@@ -1,6 +1,10 @@
 //! Meaning-neutral lexeme recognition over a source-preserving DDL document.
 
-use std::collections::HashSet;
+use std::{
+    cell::RefCell,
+    collections::{HashMap, HashSet},
+    rc::Rc,
+};
 
 use serde::Serialize;
 
@@ -1255,31 +1259,69 @@ fn has_japanese_recognized_left_boundary(
         || has_japanese_recognized_left_candidate(edition, source, start_byte)
 }
 
+/// Where Japanese candidates that start earlier in one source end: each end byte with the
+/// first byte a candidate ending there starts at. A reading asks whether a candidate ends
+/// at a position for every particle and marker it meets, and the answer depends only on
+/// the source, so it is found once per source instead of from the start of the source at
+/// each question (I-705).
+struct LeftCandidateEnds {
+    edition: SaijikiEdition,
+    source: String,
+    earliest_start: HashMap<usize, usize>,
+}
+
+thread_local! {
+    static LEFT_CANDIDATE_ENDS: RefCell<Option<Rc<LeftCandidateEnds>>> =
+        const { RefCell::new(None) };
+}
+
+fn left_candidate_ends(edition: SaijikiEdition, source: &str) -> Rc<LeftCandidateEnds> {
+    let cached = LEFT_CANDIDATE_ENDS.with(|cell| cell.borrow().clone());
+    if let Some(ends) = cached.filter(|ends| ends.edition == edition && ends.source == source) {
+        return ends;
+    }
+    let mut earliest_start = HashMap::new();
+    for (candidate_start, _) in source.char_indices() {
+        let candidates = candidates_at(
+            edition,
+            source,
+            candidate_start,
+            ResolvedInstructionLanguage::Ja,
+            false,
+        );
+        // A numeric range is one recognized lexeme, so the particle after it
+        // (`…の範囲に`, `…）に`) is recognized too.
+        let range = crate::numeric_range::numeric_range_at(
+            source,
+            candidate_start,
+            ResolvedInstructionLanguage::Ja,
+        );
+        for end_byte in candidates
+            .iter()
+            .map(|candidate| candidate.end_byte)
+            .chain(range.map(|range| range.span.end_byte))
+        {
+            earliest_start.entry(end_byte).or_insert(candidate_start);
+        }
+    }
+    let ends = Rc::new(LeftCandidateEnds {
+        edition,
+        source: source.to_owned(),
+        earliest_start,
+    });
+    LEFT_CANDIDATE_ENDS.with(|cell| *cell.borrow_mut() = Some(Rc::clone(&ends)));
+    ends
+}
+
 fn has_japanese_recognized_left_candidate(
     edition: SaijikiEdition,
     source: &str,
     start_byte: usize,
 ) -> bool {
-    source[..start_byte]
-        .char_indices()
-        .any(|(candidate_start, _)| {
-            candidates_at(edition,
-                source,
-                candidate_start,
-                ResolvedInstructionLanguage::Ja,
-                false,
-            )
-            .iter()
-            .any(|candidate| candidate.end_byte == start_byte)
-                // A numeric range is one recognized lexeme, so the particle
-                // after it (`…の範囲に`, `…）に`) is recognized too.
-                || crate::numeric_range::numeric_range_at(
-                    source,
-                    candidate_start,
-                    ResolvedInstructionLanguage::Ja,
-                )
-                .is_some_and(|range| range.span.end_byte == start_byte)
-        })
+    left_candidate_ends(edition, source)
+        .earliest_start
+        .get(&start_byte)
+        .is_some_and(|&candidate_start| candidate_start < start_byte)
 }
 
 fn has_japanese_recognized_left_candidate_across_separators(
@@ -2085,6 +2127,70 @@ fn is_separator(character: char) -> bool {
 mod tests {
     use super::*;
     use crate::SAIJIKI_ASSET_ID;
+
+    /// The left-candidate scan as it was before I-705: from the start of the source at
+    /// every question.
+    fn has_japanese_recognized_left_candidate_by_scan(
+        edition: SaijikiEdition,
+        source: &str,
+        start_byte: usize,
+    ) -> bool {
+        source[..start_byte]
+            .char_indices()
+            .any(|(candidate_start, _)| {
+                candidates_at(edition,
+                    source,
+                    candidate_start,
+                    ResolvedInstructionLanguage::Ja,
+                    false,
+                )
+                .iter()
+                .any(|candidate| candidate.end_byte == start_byte)
+                    // A numeric range is one recognized lexeme, so the particle
+                    // after it (`…の範囲に`, `…）に`) is recognized too.
+                    || crate::numeric_range::numeric_range_at(
+                        source,
+                        candidate_start,
+                        ResolvedInstructionLanguage::Ja,
+                    )
+                    .is_some_and(|range| range.span.end_byte == start_byte)
+            })
+    }
+
+    #[test]
+    fn a_left_candidate_found_once_per_source_answers_as_the_scan_from_the_start_did() {
+        let sources = [
+            "背景を黒で埋める。右端（横0.9〜1、縦0〜1）に灰色のペンの実線の弧を3本並べる。",
+            "中心に赤い小さな円を八個置き、その周りに青い線と緑の線を順に引く。",
+            "地: 灰色の紙（細かい粒）。青い横長の四角を下端寄りに一つ置く。面: 濃い青。緑の細い線を右上から下へ十本垂らす。",
+            "以下は、入力の文を整えた結果です。\n\n**背景を灰色で埋める。**\n1. **池の縁**\n   - **薄墨の円を中央に置く。**（水面）",
+        ];
+        for edition in [SaijikiEdition::V1, SaijikiEdition::V2] {
+            for source in sources {
+                for (start_byte, _) in source.char_indices().chain([(source.len(), ' ')]) {
+                    assert_eq!(
+                        has_japanese_recognized_left_candidate(edition, source, start_byte),
+                        has_japanese_recognized_left_candidate_by_scan(edition, source, start_byte),
+                        "{edition:?} {source} at {start_byte}"
+                    );
+                }
+            }
+        }
+        // Alternating sources and editions does not answer from another source's table.
+        let (first, second) = (sources[0], sources[1]);
+        let at = first.find('に').unwrap();
+        let other = second.find('に').unwrap();
+        for _ in 0..2 {
+            for (source, start_byte) in [(first, at), (second, other)] {
+                for edition in [SaijikiEdition::V2, SaijikiEdition::V1] {
+                    assert_eq!(
+                        has_japanese_recognized_left_candidate(edition, source, start_byte),
+                        has_japanese_recognized_left_candidate_by_scan(edition, source, start_byte)
+                    );
+                }
+            }
+        }
+    }
 
     #[test]
     fn same_span_collision_is_conflict() {

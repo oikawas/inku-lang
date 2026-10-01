@@ -97,6 +97,17 @@ pub extern "system" fn Java_app_inku_mobile_pipeline_NativePipelineBridge_explai
     unary_bytes(env, input, inku_pipeline_uniffi::explain_plugin_diagnostics)
 }
 
+/// The one-time Saijiki v1 migration of one saved unit, for the startup migration.
+#[unsafe(no_mangle)]
+#[allow(non_snake_case)]
+pub extern "system" fn Java_app_inku_mobile_pipeline_NativePipelineBridge_migrateSaijikiV1(
+    env: JNIEnv<'_>,
+    _receiver: JObject<'_>,
+    input: JByteArray<'_>,
+) -> jbyteArray {
+    unary_bytes(env, input, inku_pipeline_uniffi::migrate_saijiki_v1)
+}
+
 #[unsafe(no_mangle)]
 #[allow(non_snake_case)]
 pub extern "system" fn Java_app_inku_mobile_pipeline_NativePipelineBridge_renderSaved(

@@ -37,16 +37,17 @@ class SaijikiIsGeneratedTest {
      * T1: what the screen builds, in either language, is the server's table.
      *
      * The numbers are the table's as `gen_saijiki_kt.py` bakes it today
-     * (thirteen categories and 97 words since あいだ gained つながる and 鏡写し);
+     * (fourteen categories and 98 words since Saijiki v2 added さばき and took
+     * 濃い and 薄い out of おもて);
      * they move when the server's table does, and the generator is the check
      * that the Kotlin copy followed.
      */
     @Test
-    fun testScreenShowsThirteenCategoriesAndNinetySevenWordsInBothLanguages() {
+    fun testScreenShowsFourteenCategoriesAndNinetyEightWordsInBothLanguages() {
         for (lang in UiLanguage.entries) {
             val groups = saijikiGroups(lang)
-            assertEquals("$lang: display categories", 13, groups.size)
-            assertEquals("$lang: display words", 97, groups.sumOf { it.words.size })
+            assertEquals("$lang: display categories", 14, groups.size)
+            assertEquals("$lang: display words", 98, groups.sumOf { it.words.size })
         }
     }
 
@@ -139,7 +140,7 @@ class SaijikiIsGeneratedTest {
             val words = saijikiDetectionWords(lang).map { it.first }.toSet()
             assertTrue("$lang: does not recognise the Japanese 円", "円" in words)
             assertTrue("$lang: does not recognise the English circle", "circle" in words)
-            assertEquals("$lang: detection surfaces", 194, words.size)
+            assertEquals("$lang: detection surfaces", 196, words.size)
         }
     }
 

@@ -8,6 +8,7 @@ import androidx.sqlite.db.framework.FrameworkSQLiteOpenHelperFactory
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import app.inku.mobile.data.refinement.RefinementParent
+import java.io.File
 import java.util.UUID
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
@@ -23,7 +24,7 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class HistoryDdlNullableMigrationTest {
     private val context: Context = InstrumentationRegistry.getInstrumentation().targetContext
-    private val databaseName = "nullable-ddl-${UUID.randomUUID()}.sqlite"
+    private val databaseName = "i376-test-nullable-ddl-${UUID.randomUUID()}.sqlite"
     private var database: InkuDatabase? = null
 
     @get:Rule
@@ -71,6 +72,16 @@ class HistoryDdlNullableMigrationTest {
             before = rows(db)
         }
 
+        // The shipped application classifies the schema before Room opens it.
+        // v12 must be admitted for this migration without resetting any data.
+        assertEquals(
+            RoomV10ResetCoordinator.Result.Ready(resetPerformed = false),
+            RoomV10ResetCoordinator.prepare(
+                context,
+                databaseName,
+                File(context.filesDir, "$databaseName-thumbnails"),
+            ),
+        )
         migrationHelper.runMigrationsAndValidate(
             databaseName,
             13,

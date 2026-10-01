@@ -6,6 +6,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file retains the history from v2.5.0 (2026-07-25, render engine 12) onward.** Past records follow the recent ones in a collapsible section of this same document; expand it when needed. Viewers without collapse support show the full text. Earlier history is in the [v1.72–v2.4 archive](docs/history/changelog-v1.72-v2.4.md) and the [v0.1–v1.71 archive](docs/history/changelog-v0.1-v1.71.md).
 
+### v2.15.78 — Read long Japanese instructions without rebuilding boundary candidates (Build 1154, 2026-10-01)
+
+The Japanese lexer now finds left-boundary candidates once per source and reuses their positions. This removes repeated scans from the beginning of the text that made long instructions progressively slower to read. The existing Saijiki row-count test is also corrected to include temperate, the 94th eligible row.
+
 ### v2.15.77 — Saijiki v2 and a one-time migration of saved records (Build 1153, 2026-09-30)
 
 This version brings together Saijiki v2 (DDL Spec 16, DDL engine 53, render engine 72) and a manual, one-time migration while the service is stopped. Records the core refuses remain unchanged and are listed while migration continues. A core call exceeding 60 seconds, a worker process failure, or a write, invariant or integrity failure aborts the migration and rolls back its transaction. A safety snapshot and a journal of the core's answers so far are retained. Documents requiring migration return 409 with the reason. Old vocabulary in the manual and plugin documentation is aligned with v2.

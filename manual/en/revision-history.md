@@ -2,6 +2,10 @@
 
 This file records revisions to user and operations documents under `manual/`. See `SPEC.ja.md` for the detailed product change history.
 
+## 2026-10-01 — Locking writes to the database
+
+Administrators can now lock writes to the database in `Other (server)`. The output section of Server Configuration describes the switch and what still works while writes are locked.
+
 ## 2026-09-30 — The words of Saijiki v2
 
 Following Saijiki v2 (handling, sweep, and the sways loosely, tightly and bleeding), the word table of Creating Images (place, surfaces, handling, sway), its examples, and the paragraph on `Surface: sweep` and bleeding are corrected in both languages.

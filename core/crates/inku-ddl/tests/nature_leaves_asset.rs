@@ -740,3 +740,62 @@ fn counted_words_take_the_written_count_inside_the_word() {
     assert_eq!(score.instructions.len(), 1);
     assert_eq!(score.instructions[0].primitive, Primitive::Circle);
 }
+
+#[test]
+fn every_counted_word_expands_without_omission_at_its_maximum_count() {
+    let package: Package = serde_json::from_str(ASSET).expect("Nature package must be JSON");
+    let definitions = package
+        .entries
+        .iter()
+        .map(|entry| MacroDefinition::from_json(&entry.definition.to_string()).unwrap())
+        .collect::<Vec<_>>();
+    let locks = definitions
+        .iter()
+        .map(|definition| {
+            let identity = definition.identity().unwrap();
+            MacroLock::new(
+                identity.qualified_name(),
+                identity.version(),
+                format!("sha256:{}", identity.full_digest_hex()),
+            )
+            .unwrap()
+            .with_aliases(definition.alias_qualified_names())
+            .unwrap()
+        })
+        .collect::<Vec<_>>();
+    for definition in &definitions {
+        let Some(count) = definition
+            .parameters
+            .iter()
+            .find_map(|(_, schema)| schema.count_parameter())
+        else {
+            continue;
+        };
+        // The form Stage 1 prints, which carries no action word.
+        let source = format!(
+            "{}{}の{}。",
+            count.maximum,
+            count.counter.japanese(),
+            definition.alias_qualified_names()[0]
+        );
+        for seed in 0..32 {
+            let execution = compile_ddl_to_score(
+                NormalizedDdlDocument::new(&source, ResolvedInstructionLanguage::Ja, locks.clone())
+                    .unwrap(),
+                &definitions,
+                Some(seed),
+                MIGRATION_LIMITS,
+                ScoreLoweringContext::resolve("square", Color::White).unwrap(),
+                None,
+                ScoreErrorPolicy::Stop,
+            );
+            assert_eq!(
+                execution.outcome(),
+                ScoreLoweringOutcome::Complete,
+                "{source} at seed {seed}: upstream={:?}, downstream={:?}",
+                execution.upstream_diagnostics(),
+                execution.downstream_diagnostics()
+            );
+        }
+    }
+}

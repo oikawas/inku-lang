@@ -55,11 +55,11 @@ fn bundled_nature_leaves_are_valid_bounded_definitions_that_reach_normal_score_l
 
     let expected = [
         ("Nature.若葉", "2.1.0", 24, 8..=12),
-        ("Nature.下草", "2.1.0", 20, 6..=20),
+        ("Nature.下草", "2.1.0", 30, 6..=20),
         ("Nature.青葉", "2.1.0", 25, 13..=17),
         ("Nature.紅葉", "2.0.0", 15, 11..=15),
         ("Nature.落葉", "2.1.0", 32, 16..=24),
-        ("Nature.枯草", "2.1.0", 20, 6..=20),
+        ("Nature.枯草", "2.1.0", 30, 6..=20),
         ("Nature.枯葉", "2.1.0", 16, 4..=8),
     ];
     assert_eq!(package.entries.len(), expected.len());
@@ -226,15 +226,12 @@ fn bundled_nature_leaves_are_valid_bounded_definitions_that_reach_normal_score_l
             }
         }
         if *qualified_name == "Nature.落葉" {
-            for (leaf_index, pair) in score.instructions.chunks_exact(2).enumerate() {
-                let expected_color = if leaf_index % 2 == 0 {
-                    Color::Red
-                } else {
-                    Color::Gray
-                };
+            // Each leaf is red or gray in its drift cell; both arcs share it.
+            for pair in score.instructions.chunks_exact(2) {
+                assert!(matches!(pair[0].color, Color::Red | Color::Gray));
                 assert!(
                     pair.iter()
-                        .all(|instruction| instruction.color == expected_color)
+                        .all(|instruction| instruction.color == pair[0].color)
                 );
                 assert!(pair.iter().all(|instruction| {
                     instruction.variation.is_none()
@@ -703,15 +700,16 @@ fn counted_words_take_the_written_count_inside_the_word() {
         assert!(execution.upstream_diagnostics().is_empty(), "{source}");
     }
     // Each counted word draws the written count inside itself.
+    // Undergrowth and WitheredGrass count clumps of three to five blades.
     for (source, arcs) in [
-        ("Nature.下草を7本置く。", 14),
-        ("Nature.青葉を10枚置く。", 20),
-        ("Nature.落葉を16枚置く。", 32),
-        ("Nature.枯草を2本置く。", 4),
-        ("Nature.枯葉を7枚置く。", 14),
+        ("Nature.下草を3個置く。", 18..=30),
+        ("Nature.青葉を10枚置く。", 20..=20),
+        ("Nature.落葉を16枚置く。", 32..=32),
+        ("Nature.枯草を1個置く。", 6..=10),
+        ("Nature.枯葉を7枚置く。", 14..=14),
         // The forms Stage 1 prints, with no action word.
-        ("10枚のNature.若葉。", 20),
-        ("3本のNature.下草。", 6),
+        ("10枚のNature.若葉。", 20..=20),
+        ("2個のNature.下草。", 12..=20),
     ] {
         let execution = compile(source, ResolvedInstructionLanguage::Ja);
         let score = execution
@@ -722,7 +720,7 @@ fn counted_words_take_the_written_count_inside_the_word() {
             .iter()
             .filter(|i| i.primitive == Primitive::Arc)
             .count();
-        assert_eq!(drawn, arcs, "{source}");
+        assert!(arcs.contains(&drawn), "{source}: {drawn} arcs");
         assert!(execution.upstream_diagnostics().is_empty(), "{source}");
     }
     // Thirteen is past the word's twelve: only the word is left out, with its reason.

@@ -224,10 +224,10 @@ In bundled `Nature.leaves` 2.1.0 every word but AutumnLeaves declares it.
 | Word | Count | Range | When omitted | Placement |
 |---|---|---|---|---|
 | YoungLeaves | leaves | 1–12 | 4–6 | twelve cells of the upper half, six columns by two rows, one leaf per cell with a small shift |
-| Undergrowth, WitheredGrass | blades | 1–10 | 3, 4, 6, 8, or 10 | up to four on the left root, then the right, then alternating |
+| Undergrowth, WitheredGrass | clumps of 3–5 blades | 1–3 | 1–2 | three root spots along the bottom; each clump's blade count and order come from the seed |
 | SummerLeaves | leaves on the branch | 1–12 | 6–8 | twelve points along the branch; the point sets the side and size |
-| FallenLeaves | leaves | 1–16 | 8–12 | sixteen points along the diagonal drift, denser low, with a small shift |
-| WitheredLeaves | leaves | 1–8 | 2–4 | eight cells of the lower left and right corners, four columns by two rows |
+| FallenLeaves | leaves | 1–16 | 8–12 | sixteen cells of the drift, eight steps finer toward the bottom by two sides, a seed-chosen spot in each; red and gray alternate across the cells |
+| WitheredLeaves | leaves | 1–8 | 2–4 | each leaf takes the left or right lower corner from the seed, and its own of eight cells there with a seed-chosen shift |
 
 Each word takes its positions in an order that stays balanced at any count. AutumnLeaves draws the lobes of one maple leaf, so it declares no count, and a written count still repeats the whole word as the number of maple leaves. The optional `counter` (`flat` for 枚, `long` for 本, `general` for 個) decides only the counter Stage 1 writes with a count in Japanese DDL. Stage 1's underdrawing passes a count written in a description to its plugin as `10枚のNature.若葉。` or `10 Nature.YoungLeaves.`.
 

@@ -1893,7 +1893,7 @@ mod tests {
                 .contains("- Nature.YoungLeaves（別名 Nature.若葉）: 若葉を上半分へ置く。")
         );
         assert_eq!(
-            ja.response_schema["properties"]["plugins"]["items"]["enum"],
+            ja.response_schema["properties"]["plugins"]["items"]["properties"]["name"]["enum"],
             serde_json::json!(["Nature.YoungLeaves"])
         );
         let plugins = work_plan_plugins([&definition]);
@@ -1959,7 +1959,7 @@ mod tests {
                 .contains("- Nature.若葉: 若葉を上半分へ散らす。")
         );
         assert_eq!(
-            with_plugin.response_schema["properties"]["plugins"]["items"]["enum"],
+            with_plugin.response_schema["properties"]["plugins"]["items"]["properties"]["name"]["enum"],
             serde_json::json!(["Nature.若葉"])
         );
         // Without installed plugins the prompt and schema keep the plugin-free edition.

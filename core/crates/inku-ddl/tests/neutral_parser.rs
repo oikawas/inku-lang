@@ -484,7 +484,7 @@ fn asset_flags_drive_candidate_eligibility_without_losing_semantic_identity() {
         }
     }
 
-    assert_eq!((active, marker_only, disabled), (93, 3, 1));
+    assert_eq!((active, marker_only, disabled), (94, 3, 1));
 }
 
 #[test]

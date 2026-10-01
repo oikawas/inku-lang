@@ -317,9 +317,9 @@
 # its host migrates it.
 # 54: A Macro integer parameter declared with `receives: count` takes the count
 # written on its word (`Nature.若葉を10枚`) instead of repeating the word, and
-# an omitted count is the definition's choice. Bundled Nature.YoungLeaves 2.1.0
-# takes 1-12 leaves, one per cell of a six-by-two grid over the upper half. Saved locks keep their
-# definitions.
+# an omitted count is the definition's choice. Bundled Nature.leaves 2.1.0
+# lets every word but AutumnLeaves take its leaf or blade count. Saved locks
+# keep their definitions.
 DDL_ENGINE_VERSION = "54"
 # 4 (2026-07-30): yellow, orange, and purple become abstract Score colors, and
 # coerce recognizes the corresponding Japanese and English DDL markers.

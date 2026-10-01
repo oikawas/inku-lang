@@ -717,8 +717,22 @@
         "aliases": [
           "下草"
         ],
-        "version": "2.0.0",
-        "parameters": {},
+        "version": "2.1.0",
+        "parameters": {
+          "blade_count": {
+            "type": "integer",
+            "receives": "count",
+            "minimum": 1,
+            "maximum": 10,
+            "omitted": [
+              3,
+              4,
+              6,
+              8,
+              10
+            ]
+          }
+        },
         "components": {
           "rooted_blade": {
             "parameters": {
@@ -868,157 +882,178 @@
         },
         "body": [
           {
-            "op": "vary",
-            "binding": "root_count",
-            "domain": "shitakusa_root_count",
-            "choices": [
-              {
-                "expr": "integer",
-                "value": 1
-              },
-              {
-                "expr": "integer",
-                "value": 2
-              }
-            ],
-            "range": null,
+            "op": "repeat",
+            "count": {
+              "expr": "parameter",
+              "name": "blade_count"
+            },
+            "maximum": 10,
+            "index": "blade_index",
             "body": [
               {
-                "op": "repeat",
-                "count": {
-                  "expr": "local",
-                  "name": "root_count"
-                },
-                "maximum": 2,
-                "index": "root_index",
-                "body": [
-                  {
-                    "op": "vary",
-                    "binding": "blade_count",
-                    "domain": "shitakusa_blade_count",
-                    "choices": [
+                "op": "use",
+                "component": "rooted_blade",
+                "arguments": {
+                  "chord": {
+                    "expr": "cycle",
+                    "index": {
+                      "expr": "local",
+                      "name": "blade_index"
+                    },
+                    "items": [
                       {
-                        "expr": "integer",
-                        "value": 3
+                        "expr": "exact_decimal",
+                        "value": "0.40"
                       },
                       {
-                        "expr": "integer",
-                        "value": 4
+                        "expr": "exact_decimal",
+                        "value": "0.52"
                       },
                       {
-                        "expr": "integer",
-                        "value": 5
-                      }
-                    ],
-                    "range": null,
-                    "body": [
+                        "expr": "exact_decimal",
+                        "value": "0.34"
+                      },
                       {
-                        "op": "repeat",
-                        "count": {
-                          "expr": "local",
-                          "name": "blade_count"
-                        },
-                        "maximum": 5,
-                        "index": "blade_index",
-                        "body": [
-                          {
-                            "op": "use",
-                            "component": "rooted_blade",
-                            "arguments": {
-                              "chord": {
-                                "expr": "cycle",
-                                "index": {
-                                  "expr": "local",
-                                  "name": "blade_index"
-                                },
-                                "items": [
-                                  {
-                                    "expr": "exact_decimal",
-                                    "value": "0.40"
-                                  },
-                                  {
-                                    "expr": "exact_decimal",
-                                    "value": "0.52"
-                                  },
-                                  {
-                                    "expr": "exact_decimal",
-                                    "value": "0.34"
-                                  },
-                                  {
-                                    "expr": "exact_decimal",
-                                    "value": "0.46"
-                                  },
-                                  {
-                                    "expr": "exact_decimal",
-                                    "value": "0.30"
-                                  }
-                                ]
-                              },
-                              "rotation": {
-                                "expr": "cycle",
-                                "index": {
-                                  "expr": "local",
-                                  "name": "blade_index"
-                                },
-                                "items": [
-                                  {
-                                    "expr": "number",
-                                    "value": -96.0
-                                  },
-                                  {
-                                    "expr": "number",
-                                    "value": -86.0
-                                  },
-                                  {
-                                    "expr": "number",
-                                    "value": -104.0
-                                  },
-                                  {
-                                    "expr": "number",
-                                    "value": -80.0
-                                  },
-                                  {
-                                    "expr": "number",
-                                    "value": -110.0
-                                  }
-                                ]
-                              },
-                              "x": {
-                                "expr": "cycle",
-                                "index": {
-                                  "expr": "local",
-                                  "name": "root_index"
-                                },
-                                "items": [
-                                  {
-                                    "expr": "exact_decimal",
-                                    "value": "0.28"
-                                  },
-                                  {
-                                    "expr": "exact_decimal",
-                                    "value": "0.72"
-                                  }
-                                ]
-                              },
-                              "y": {
-                                "expr": "exact_decimal",
-                                "value": "0.90"
-                              }
-                            }
-                          }
-                        ]
+                        "expr": "exact_decimal",
+                        "value": "0.46"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.40"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.52"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.34"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.46"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.30"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.30"
                       }
                     ]
+                  },
+                  "rotation": {
+                    "expr": "cycle",
+                    "index": {
+                      "expr": "local",
+                      "name": "blade_index"
+                    },
+                    "items": [
+                      {
+                        "expr": "number",
+                        "value": -96.0
+                      },
+                      {
+                        "expr": "number",
+                        "value": -86.0
+                      },
+                      {
+                        "expr": "number",
+                        "value": -104.0
+                      },
+                      {
+                        "expr": "number",
+                        "value": -80.0
+                      },
+                      {
+                        "expr": "number",
+                        "value": -96.0
+                      },
+                      {
+                        "expr": "number",
+                        "value": -86.0
+                      },
+                      {
+                        "expr": "number",
+                        "value": -104.0
+                      },
+                      {
+                        "expr": "number",
+                        "value": -80.0
+                      },
+                      {
+                        "expr": "number",
+                        "value": -110.0
+                      },
+                      {
+                        "expr": "number",
+                        "value": -110.0
+                      }
+                    ]
+                  },
+                  "x": {
+                    "expr": "cycle",
+                    "index": {
+                      "expr": "local",
+                      "name": "blade_index"
+                    },
+                    "items": [
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.28"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.28"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.28"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.28"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.72"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.72"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.72"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.72"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.28"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.72"
+                      }
+                    ]
+                  },
+                  "y": {
+                    "expr": "exact_decimal",
+                    "value": "0.90"
                   }
-                ]
+                }
               }
             ]
           }
         ]
       },
       "summaries": {
-        "ja": "下端の1〜2箇所の同じ根元から、菖蒲の剣のような長く細い葉を3〜5本ずつ、ほぼ平行に少し開いて上へ並べる。丈は葉ごとに違え、細筆の緑で描き、地面は描かない。各葉の内側を輪郭と同じ色で塗る。",
-        "en": "From 1–2 shared root spots at the bottom edge, raise 3–5 long slim sword-like blades each, nearly parallel and slightly spread. Heights differ per blade; drawn in fine-brush green, no ground. Fill each blade interior with the same color as its outline."
+        "ja": "下端の1〜2箇所の同じ根元から、菖蒲の剣のような長く細い葉を、ほぼ平行に少し開いて上へ並べる。本数を書けばその本数（1〜10本、左の根元に4本まで、次に右）、書かなければ3・4・6・8・10本。丈は葉ごとに違え、細筆の緑で描き、地面は描かない。各葉の内側を輪郭と同じ色で塗る。",
+        "en": "From one or two shared root spots at the bottom edge, raise long slim sword-like blades, nearly parallel and slightly spread: the written count (1–10, up to four on the left root, then the right), or 3, 4, 6, 8, or 10 when none is written. Heights differ per blade; drawn in fine-brush green, no ground. Fill each blade interior with the same color as its outline."
       }
     },
     {
@@ -1029,8 +1064,20 @@
         "aliases": [
           "青葉"
         ],
-        "version": "2.0.0",
-        "parameters": {},
+        "version": "2.1.0",
+        "parameters": {
+          "leaf_count": {
+            "type": "integer",
+            "receives": "count",
+            "minimum": 1,
+            "maximum": 12,
+            "omitted": [
+              6,
+              7,
+              8
+            ]
+          }
+        },
         "components": {},
         "body": [
           {
@@ -1087,42 +1134,90 @@
             }
           },
           {
-            "op": "vary",
-            "binding": "leaf_count",
-            "domain": "aoba_leaf_count",
-            "choices": [
-              {
-                "expr": "integer",
-                "value": 6
-              },
-              {
-                "expr": "integer",
-                "value": 7
-              },
-              {
-                "expr": "integer",
-                "value": 8
-              }
-            ],
-            "range": null,
+            "op": "repeat",
+            "count": {
+              "expr": "parameter",
+              "name": "leaf_count"
+            },
+            "maximum": 12,
+            "index": "leaf_index",
             "body": [
               {
-                "op": "repeat",
-                "count": {
-                  "expr": "local",
-                  "name": "leaf_count"
+                "op": "transform",
+                "transform": {
+                  "translate_x": null,
+                  "translate_y": null,
+                  "scale_x": null,
+                  "scale_y": null,
+                  "rotate_degrees": {
+                    "expr": "cycle",
+                    "index": {
+                      "expr": "local",
+                      "name": "leaf_index"
+                    },
+                    "items": [
+                      {
+                        "expr": "number",
+                        "value": 39.0
+                      },
+                      {
+                        "expr": "number",
+                        "value": -52.0
+                      },
+                      {
+                        "expr": "number",
+                        "value": 32.0
+                      },
+                      {
+                        "expr": "number",
+                        "value": -45.0
+                      },
+                      {
+                        "expr": "number",
+                        "value": 36.0
+                      },
+                      {
+                        "expr": "number",
+                        "value": -48.0
+                      },
+                      {
+                        "expr": "number",
+                        "value": -41.0
+                      },
+                      {
+                        "expr": "number",
+                        "value": 43.0
+                      },
+                      {
+                        "expr": "number",
+                        "value": 47.0
+                      },
+                      {
+                        "expr": "number",
+                        "value": -34.0
+                      },
+                      {
+                        "expr": "number",
+                        "value": -37.0
+                      },
+                      {
+                        "expr": "number",
+                        "value": 50.0
+                      }
+                    ]
+                  }
                 },
-                "maximum": 8,
-                "index": "leaf_index",
                 "body": [
                   {
-                    "op": "transform",
-                    "transform": {
-                      "translate_x": null,
-                      "translate_y": null,
-                      "scale_x": null,
-                      "scale_y": null,
-                      "rotate_degrees": {
+                    "op": "emit",
+                    "binding": "edge_a",
+                    "fields": {
+                      "angle": {
+                        "expr": "semantic_ref",
+                        "category": "angle",
+                        "id": "horizontal"
+                      },
+                      "chord": {
                         "expr": "cycle",
                         "index": {
                           "expr": "local",
@@ -1130,252 +1225,246 @@
                         },
                         "items": [
                           {
-                            "expr": "number",
-                            "value": -50.0
+                            "expr": "exact_decimal",
+                            "value": "0.117"
                           },
                           {
-                            "expr": "number",
-                            "value": 46.0
+                            "expr": "exact_decimal",
+                            "value": "0.150"
                           },
                           {
-                            "expr": "number",
-                            "value": -42.0
+                            "expr": "exact_decimal",
+                            "value": "0.098"
                           },
                           {
-                            "expr": "number",
-                            "value": 54.0
+                            "expr": "exact_decimal",
+                            "value": "0.131"
                           },
                           {
-                            "expr": "number",
-                            "value": -36.0
+                            "expr": "exact_decimal",
+                            "value": "0.107"
                           },
                           {
-                            "expr": "number",
-                            "value": 44.0
+                            "expr": "exact_decimal",
+                            "value": "0.141"
                           },
                           {
-                            "expr": "number",
-                            "value": -30.0
+                            "expr": "exact_decimal",
+                            "value": "0.122"
                           },
                           {
-                            "expr": "number",
-                            "value": 38.0
+                            "expr": "exact_decimal",
+                            "value": "0.126"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.136"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.103"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.112"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.145"
                           }
                         ]
+                      },
+                      "color": {
+                        "expr": "semantic_ref",
+                        "category": "color",
+                        "id": "green"
+                      },
+                      "movement": {
+                        "expr": "semantic_ref",
+                        "category": "movement",
+                        "id": "place"
+                      },
+                      "sagitta": {
+                        "expr": "exact_decimal",
+                        "value": "0.030"
+                      },
+                      "shape": {
+                        "expr": "semantic_ref",
+                        "category": "shape",
+                        "id": "arc"
+                      },
+                      "surface": {
+                        "expr": "semantic_ref",
+                        "category": "surface",
+                        "id": "solid"
+                      },
+                      "touch": {
+                        "expr": "semantic_ref",
+                        "category": "touch",
+                        "id": "brush_thin"
                       }
-                    },
-                    "body": [
-                      {
-                        "op": "emit",
-                        "binding": "edge_a",
-                        "fields": {
-                          "angle": {
-                            "expr": "semantic_ref",
-                            "category": "angle",
-                            "id": "horizontal"
-                          },
-                          "chord": {
-                            "expr": "cycle",
-                            "index": {
-                              "expr": "local",
-                              "name": "leaf_index"
-                            },
-                            "items": [
-                              {
-                                "expr": "exact_decimal",
-                                "value": "0.150"
-                              },
-                              {
-                                "expr": "exact_decimal",
-                                "value": "0.146"
-                              },
-                              {
-                                "expr": "exact_decimal",
-                                "value": "0.140"
-                              },
-                              {
-                                "expr": "exact_decimal",
-                                "value": "0.134"
-                              },
-                              {
-                                "expr": "exact_decimal",
-                                "value": "0.126"
-                              },
-                              {
-                                "expr": "exact_decimal",
-                                "value": "0.118"
-                              },
-                              {
-                                "expr": "exact_decimal",
-                                "value": "0.108"
-                              },
-                              {
-                                "expr": "exact_decimal",
-                                "value": "0.098"
-                              }
-                            ]
-                          },
-                          "color": {
-                            "expr": "semantic_ref",
-                            "category": "color",
-                            "id": "green"
-                          },
-                          "movement": {
-                            "expr": "semantic_ref",
-                            "category": "movement",
-                            "id": "place"
-                          },
-                          "sagitta": {
+                    }
+                  },
+                  {
+                    "op": "emit",
+                    "binding": "edge_b",
+                    "fields": {
+                      "chord": {
+                        "expr": "cycle",
+                        "index": {
+                          "expr": "local",
+                          "name": "leaf_index"
+                        },
+                        "items": [
+                          {
                             "expr": "exact_decimal",
-                            "value": "0.030"
+                            "value": "0.117"
                           },
-                          "shape": {
-                            "expr": "semantic_ref",
-                            "category": "shape",
-                            "id": "arc"
-                          },
-                          "surface": {
-                            "expr": "semantic_ref",
-                            "category": "surface",
-                            "id": "solid"
-                          },
-                          "touch": {
-                            "expr": "semantic_ref",
-                            "category": "touch",
-                            "id": "brush_thin"
-                          }
-                        }
-                      },
-                      {
-                        "op": "emit",
-                        "binding": "edge_b",
-                        "fields": {
-                          "chord": {
-                            "expr": "cycle",
-                            "index": {
-                              "expr": "local",
-                              "name": "leaf_index"
-                            },
-                            "items": [
-                              {
-                                "expr": "exact_decimal",
-                                "value": "0.150"
-                              },
-                              {
-                                "expr": "exact_decimal",
-                                "value": "0.146"
-                              },
-                              {
-                                "expr": "exact_decimal",
-                                "value": "0.140"
-                              },
-                              {
-                                "expr": "exact_decimal",
-                                "value": "0.134"
-                              },
-                              {
-                                "expr": "exact_decimal",
-                                "value": "0.126"
-                              },
-                              {
-                                "expr": "exact_decimal",
-                                "value": "0.118"
-                              },
-                              {
-                                "expr": "exact_decimal",
-                                "value": "0.108"
-                              },
-                              {
-                                "expr": "exact_decimal",
-                                "value": "0.098"
-                              }
-                            ]
-                          },
-                          "color": {
-                            "expr": "semantic_ref",
-                            "category": "color",
-                            "id": "green"
-                          },
-                          "movement": {
-                            "expr": "semantic_ref",
-                            "category": "movement",
-                            "id": "place"
-                          },
-                          "sagitta": {
+                          {
                             "expr": "exact_decimal",
-                            "value": "0.030"
+                            "value": "0.150"
                           },
-                          "shape": {
-                            "expr": "semantic_ref",
-                            "category": "shape",
-                            "id": "arc"
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.098"
                           },
-                          "surface": {
-                            "expr": "semantic_ref",
-                            "category": "surface",
-                            "id": "solid"
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.131"
                           },
-                          "touch": {
-                            "expr": "semantic_ref",
-                            "category": "touch",
-                            "id": "brush_thin"
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.107"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.141"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.122"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.126"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.136"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.103"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.112"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.145"
                           }
-                        }
+                        ]
                       },
-                      {
-                        "op": "relation",
-                        "kind": "connected",
-                        "from": "branch",
-                        "to": "edge_a",
-                        "target_path_position": {
-                          "expr": "cycle",
-                          "index": {
-                            "expr": "local",
-                            "name": "leaf_index"
-                          },
-                          "items": [
-                            {
-                              "expr": "number",
-                              "value": 0.1
-                            },
-                            {
-                              "expr": "number",
-                              "value": 0.22
-                            },
-                            {
-                              "expr": "number",
-                              "value": 0.34
-                            },
-                            {
-                              "expr": "number",
-                              "value": 0.46
-                            },
-                            {
-                              "expr": "number",
-                              "value": 0.58
-                            },
-                            {
-                              "expr": "number",
-                              "value": 0.7
-                            },
-                            {
-                              "expr": "number",
-                              "value": 0.82
-                            },
-                            {
-                              "expr": "number",
-                              "value": 0.9
-                            }
-                          ]
-                        }
+                      "color": {
+                        "expr": "semantic_ref",
+                        "category": "color",
+                        "id": "green"
                       },
-                      {
-                        "op": "relation",
-                        "kind": "touching",
-                        "from": "edge_a",
-                        "to": "edge_b"
+                      "movement": {
+                        "expr": "semantic_ref",
+                        "category": "movement",
+                        "id": "place"
+                      },
+                      "sagitta": {
+                        "expr": "exact_decimal",
+                        "value": "0.030"
+                      },
+                      "shape": {
+                        "expr": "semantic_ref",
+                        "category": "shape",
+                        "id": "arc"
+                      },
+                      "surface": {
+                        "expr": "semantic_ref",
+                        "category": "surface",
+                        "id": "solid"
+                      },
+                      "touch": {
+                        "expr": "semantic_ref",
+                        "category": "touch",
+                        "id": "brush_thin"
                       }
-                    ]
+                    }
+                  },
+                  {
+                    "op": "relation",
+                    "kind": "connected",
+                    "from": "branch",
+                    "to": "edge_a",
+                    "target_path_position": {
+                      "expr": "cycle",
+                      "index": {
+                        "expr": "local",
+                        "name": "leaf_index"
+                      },
+                      "items": [
+                        {
+                          "expr": "number",
+                          "value": 0.615
+                        },
+                        {
+                          "expr": "number",
+                          "value": 0.08
+                        },
+                        {
+                          "expr": "number",
+                          "value": 0.92
+                        },
+                        {
+                          "expr": "number",
+                          "value": 0.385
+                        },
+                        {
+                          "expr": "number",
+                          "value": 0.767
+                        },
+                        {
+                          "expr": "number",
+                          "value": 0.233
+                        },
+                        {
+                          "expr": "number",
+                          "value": 0.538
+                        },
+                        {
+                          "expr": "number",
+                          "value": 0.462
+                        },
+                        {
+                          "expr": "number",
+                          "value": 0.309
+                        },
+                        {
+                          "expr": "number",
+                          "value": 0.844
+                        },
+                        {
+                          "expr": "number",
+                          "value": 0.691
+                        },
+                        {
+                          "expr": "number",
+                          "value": 0.156
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "op": "relation",
+                    "kind": "touching",
+                    "from": "edge_a",
+                    "to": "edge_b"
                   }
                 ]
               }
@@ -1384,8 +1473,8 @@
         ]
       },
       "summaries": {
-        "ja": "中域の水平な灰の太筆枝をゆるやかに波打たせ、その上に青葉6〜8枚を上下交互に、枝先の方へ斜めに出す。葉は根元側ほど大きく枝先ほど小さく、両端で触れる二弧を細筆の緑で描き、内側も同じ緑で塗る。",
-        "en": "Draw one horizontal gray thick-brush branch loosely undulating through the middle, and grow 6–8 summer leaves from it alternately above and below, slanting toward the tip. Leaves are largest at the base and smaller toward the tip; each is two fine-brush green arcs touching at both ends, filled with the same green."
+        "ja": "中域の水平な灰の太筆枝をゆるやかに波打たせ、その上に青葉を上下交互に、枝先の方へ斜めに出す。枚数を書けばその枚数（1〜12枚）、書かなければ6〜8枚を、枝の12の付け位置へ散らす。葉は根元側ほど大きく枝先ほど小さく、両端で触れる二弧を細筆の緑で描き、内側も同じ緑で塗る。",
+        "en": "Draw one horizontal gray thick-brush branch loosely undulating through the middle, and grow summer leaves from it alternately above and below, slanting toward the tip: the written count (1–12), or 6–8 when none is written, spread over twelve points along the branch. Leaves are largest at the base and smaller toward the tip; each is two fine-brush green arcs touching at both ends, filled with the same green."
       }
     },
     {
@@ -1708,8 +1797,22 @@
         "aliases": [
           "落葉"
         ],
-        "version": "2.0.0",
-        "parameters": {},
+        "version": "2.1.0",
+        "parameters": {
+          "leaf_count": {
+            "type": "integer",
+            "receives": "count",
+            "minimum": 1,
+            "maximum": 16,
+            "omitted": [
+              8,
+              9,
+              10,
+              11,
+              12
+            ]
+          }
+        },
         "components": {
           "fallen_leaf": {
             "parameters": {
@@ -1840,110 +1943,247 @@
         },
         "body": [
           {
-            "op": "vary",
-            "binding": "leaf_count",
-            "domain": "ochiba_leaf_count",
-            "choices": [
-              {
-                "expr": "integer",
-                "value": 8
-              },
-              {
-                "expr": "integer",
-                "value": 9
-              },
-              {
-                "expr": "integer",
-                "value": 10
-              },
-              {
-                "expr": "integer",
-                "value": 11
-              },
-              {
-                "expr": "integer",
-                "value": 12
-              }
-            ],
-            "range": null,
+            "op": "repeat",
+            "count": {
+              "expr": "parameter",
+              "name": "leaf_count"
+            },
+            "maximum": 16,
+            "index": "leaf_index",
             "body": [
               {
-                "op": "repeat",
-                "count": {
-                  "expr": "local",
-                  "name": "leaf_count"
-                },
-                "maximum": 12,
-                "index": "leaf_index",
+                "op": "vary",
+                "binding": "leaf_x",
+                "domain": "ochiba_shift_x",
+                "choices": [
+                  {
+                    "expr": "cycle",
+                    "index": {
+                      "expr": "local",
+                      "name": "leaf_index"
+                    },
+                    "items": [
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.595"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.104"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.885"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.394"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.085"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.405"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.850"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.369"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.707"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.765"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.570"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.255"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.353"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.632"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.614"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.752"
+                      }
+                    ]
+                  },
+                  {
+                    "expr": "cycle",
+                    "index": {
+                      "expr": "local",
+                      "name": "leaf_index"
+                    },
+                    "items": [
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.610"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.119"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.900"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.409"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.100"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.420"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.865"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.384"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.722"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.780"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.585"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.270"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.368"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.647"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.629"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.767"
+                      }
+                    ]
+                  },
+                  {
+                    "expr": "cycle",
+                    "index": {
+                      "expr": "local",
+                      "name": "leaf_index"
+                    },
+                    "items": [
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.625"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.134"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.915"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.424"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.115"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.435"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.880"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.399"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.737"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.795"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.600"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.285"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.383"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.662"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.644"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.782"
+                      }
+                    ]
+                  }
+                ],
+                "range": null,
                 "body": [
                   {
-                    "op": "use",
-                    "component": "fallen_leaf",
-                    "arguments": {
-                      "color": {
-                        "expr": "cycle",
-                        "index": {
-                          "expr": "local",
-                          "name": "leaf_index"
-                        },
-                        "items": [
-                          {
-                            "expr": "semantic_ref",
-                            "category": "color",
-                            "id": "red"
-                          },
-                          {
-                            "expr": "semantic_ref",
-                            "category": "color",
-                            "id": "gray"
-                          }
-                        ]
-                      },
-                      "lean": {
-                        "expr": "cycle",
-                        "index": {
-                          "expr": "local",
-                          "name": "leaf_index"
-                        },
-                        "items": [
-                          {
-                            "expr": "semantic_ref",
-                            "category": "angle",
-                            "id": "rising"
-                          },
-                          {
-                            "expr": "semantic_ref",
-                            "category": "angle",
-                            "id": "rotated"
-                          },
-                          {
-                            "expr": "semantic_ref",
-                            "category": "angle",
-                            "id": "falling"
-                          },
-                          {
-                            "expr": "semantic_ref",
-                            "category": "angle",
-                            "id": "diagonal"
-                          },
-                          {
-                            "expr": "semantic_ref",
-                            "category": "angle",
-                            "id": "left_falling"
-                          },
-                          {
-                            "expr": "semantic_ref",
-                            "category": "angle",
-                            "id": "horizontal"
-                          },
-                          {
-                            "expr": "semantic_ref",
-                            "category": "angle",
-                            "id": "left_rising"
-                          }
-                        ]
-                      },
-                      "x": {
+                    "op": "vary",
+                    "binding": "leaf_y",
+                    "domain": "ochiba_shift_y",
+                    "choices": [
+                      {
                         "expr": "cycle",
                         "index": {
                           "expr": "local",
@@ -1952,68 +2192,23 @@
                         "items": [
                           {
                             "expr": "exact_decimal",
-                            "value": "0.722"
+                            "value": "0.559"
                           },
                           {
                             "expr": "exact_decimal",
-                            "value": "0.865"
+                            "value": "0.126"
                           },
                           {
                             "expr": "exact_decimal",
-                            "value": "0.767"
+                            "value": "0.905"
                           },
                           {
                             "expr": "exact_decimal",
-                            "value": "0.585"
+                            "value": "0.172"
                           },
                           {
                             "expr": "exact_decimal",
-                            "value": "0.629"
-                          },
-                          {
-                            "expr": "exact_decimal",
-                            "value": "0.610"
-                          },
-                          {
-                            "expr": "exact_decimal",
-                            "value": "0.647"
-                          },
-                          {
-                            "expr": "exact_decimal",
-                            "value": "0.368"
-                          },
-                          {
-                            "expr": "exact_decimal",
-                            "value": "0.384"
-                          },
-                          {
-                            "expr": "exact_decimal",
-                            "value": "0.409"
-                          },
-                          {
-                            "expr": "exact_decimal",
-                            "value": "0.270"
-                          },
-                          {
-                            "expr": "exact_decimal",
-                            "value": "0.119"
-                          }
-                        ]
-                      },
-                      "y": {
-                        "expr": "cycle",
-                        "index": {
-                          "expr": "local",
-                          "name": "leaf_index"
-                        },
-                        "items": [
-                          {
-                            "expr": "exact_decimal",
-                            "value": "0.896"
-                          },
-                          {
-                            "expr": "exact_decimal",
-                            "value": "0.683"
+                            "value": "0.405"
                           },
                           {
                             "expr": "exact_decimal",
@@ -2021,27 +2216,64 @@
                           },
                           {
                             "expr": "exact_decimal",
-                            "value": "0.809"
+                            "value": "0.668"
                           },
                           {
                             "expr": "exact_decimal",
-                            "value": "0.695"
+                            "value": "0.407"
                           },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.881"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.525"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.794"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.185"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.535"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.438"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.680"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.710"
+                          }
+                        ]
+                      },
+                      {
+                        "expr": "cycle",
+                        "index": {
+                          "expr": "local",
+                          "name": "leaf_index"
+                        },
+                        "items": [
                           {
                             "expr": "exact_decimal",
                             "value": "0.574"
                           },
                           {
                             "expr": "exact_decimal",
-                            "value": "0.453"
+                            "value": "0.141"
                           },
                           {
                             "expr": "exact_decimal",
-                            "value": "0.550"
-                          },
-                          {
-                            "expr": "exact_decimal",
-                            "value": "0.422"
+                            "value": "0.920"
                           },
                           {
                             "expr": "exact_decimal",
@@ -2049,15 +2281,208 @@
                           },
                           {
                             "expr": "exact_decimal",
+                            "value": "0.420"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.740"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.683"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.422"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.896"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.540"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.809"
+                          },
+                          {
+                            "expr": "exact_decimal",
                             "value": "0.200"
                           },
                           {
                             "expr": "exact_decimal",
-                            "value": "0.141"
+                            "value": "0.550"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.453"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.695"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.725"
+                          }
+                        ]
+                      },
+                      {
+                        "expr": "cycle",
+                        "index": {
+                          "expr": "local",
+                          "name": "leaf_index"
+                        },
+                        "items": [
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.589"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.156"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.935"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.202"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.435"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.755"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.698"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.437"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.911"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.555"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.824"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.215"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.565"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.468"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.710"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.740"
                           }
                         ]
                       }
-                    }
+                    ],
+                    "range": null,
+                    "body": [
+                      {
+                        "op": "use",
+                        "component": "fallen_leaf",
+                        "arguments": {
+                          "color": {
+                            "expr": "cycle",
+                            "index": {
+                              "expr": "local",
+                              "name": "leaf_index"
+                            },
+                            "items": [
+                              {
+                                "expr": "semantic_ref",
+                                "category": "color",
+                                "id": "red"
+                              },
+                              {
+                                "expr": "semantic_ref",
+                                "category": "color",
+                                "id": "gray"
+                              }
+                            ]
+                          },
+                          "lean": {
+                            "expr": "cycle",
+                            "index": {
+                              "expr": "local",
+                              "name": "leaf_index"
+                            },
+                            "items": [
+                              {
+                                "expr": "semantic_ref",
+                                "category": "angle",
+                                "id": "rising"
+                              },
+                              {
+                                "expr": "semantic_ref",
+                                "category": "angle",
+                                "id": "rotated"
+                              },
+                              {
+                                "expr": "semantic_ref",
+                                "category": "angle",
+                                "id": "falling"
+                              },
+                              {
+                                "expr": "semantic_ref",
+                                "category": "angle",
+                                "id": "diagonal"
+                              },
+                              {
+                                "expr": "semantic_ref",
+                                "category": "angle",
+                                "id": "left_falling"
+                              },
+                              {
+                                "expr": "semantic_ref",
+                                "category": "angle",
+                                "id": "horizontal"
+                              },
+                              {
+                                "expr": "semantic_ref",
+                                "category": "angle",
+                                "id": "left_rising"
+                              }
+                            ]
+                          },
+                          "x": {
+                            "expr": "local",
+                            "name": "leaf_x"
+                          },
+                          "y": {
+                            "expr": "local",
+                            "name": "leaf_y"
+                          }
+                        }
+                      }
+                    ]
                   }
                 ]
               }
@@ -2066,8 +2491,8 @@
         ]
       },
       "summaries": {
-        "ja": "落葉8〜12枚を左上から右下へ流れる斜めの帯に、流れの左右へ大きく不揃いに散らし、下ほど密に集める。各葉は両端で触れる二弧で、クレヨンの赤と灰を交互にし、傾きをばらし、縁ににじみを加える。各葉の内側を輪郭と同じ色で塗る。",
-        "en": "Scatter 8–12 fallen leaves widely and unevenly to both sides of a drift from upper left to lower right, gathering more densely toward the bottom. Each is a bleeding crayon two-arc form touching at both ends, alternating red and gray with varied rotations. Fill each leaf interior with the same color as its outline."
+        "ja": "落葉を左上から右下へ流れる斜めの帯に、流れの左右へ大きく不揃いに散らし、下ほど密に集める。枚数を書けばその枚数（1〜16枚）、書かなければ8〜12枚。各葉は両端で触れる二弧で、クレヨンの赤と灰を交互にし、傾きをばらし、縁ににじみを加える。各葉の内側を輪郭と同じ色で塗る。",
+        "en": "Scatter fallen leaves widely and unevenly to both sides of a drift from upper left to lower right, gathering more densely toward the bottom: the written count (1–16), or 8–12 when none is written. Each is a bleeding crayon two-arc form touching at both ends, alternating red and gray with varied rotations. Fill each leaf interior with the same color as its outline."
       }
     },
     {
@@ -2078,8 +2503,22 @@
         "aliases": [
           "枯草"
         ],
-        "version": "2.0.0",
-        "parameters": {},
+        "version": "2.1.0",
+        "parameters": {
+          "blade_count": {
+            "type": "integer",
+            "receives": "count",
+            "minimum": 1,
+            "maximum": 10,
+            "omitted": [
+              3,
+              4,
+              6,
+              8,
+              10
+            ]
+          }
+        },
         "components": {
           "rooted_blade": {
             "parameters": {
@@ -2249,157 +2688,178 @@
         },
         "body": [
           {
-            "op": "vary",
-            "binding": "root_count",
-            "domain": "karekusa_root_count",
-            "choices": [
-              {
-                "expr": "integer",
-                "value": 1
-              },
-              {
-                "expr": "integer",
-                "value": 2
-              }
-            ],
-            "range": null,
+            "op": "repeat",
+            "count": {
+              "expr": "parameter",
+              "name": "blade_count"
+            },
+            "maximum": 10,
+            "index": "blade_index",
             "body": [
               {
-                "op": "repeat",
-                "count": {
-                  "expr": "local",
-                  "name": "root_count"
-                },
-                "maximum": 2,
-                "index": "root_index",
-                "body": [
-                  {
-                    "op": "vary",
-                    "binding": "blade_count",
-                    "domain": "karekusa_blade_count",
-                    "choices": [
+                "op": "use",
+                "component": "rooted_blade",
+                "arguments": {
+                  "chord": {
+                    "expr": "cycle",
+                    "index": {
+                      "expr": "local",
+                      "name": "blade_index"
+                    },
+                    "items": [
                       {
-                        "expr": "integer",
-                        "value": 3
+                        "expr": "exact_decimal",
+                        "value": "0.42"
                       },
                       {
-                        "expr": "integer",
-                        "value": 4
+                        "expr": "exact_decimal",
+                        "value": "0.34"
                       },
                       {
-                        "expr": "integer",
-                        "value": 5
-                      }
-                    ],
-                    "range": null,
-                    "body": [
+                        "expr": "exact_decimal",
+                        "value": "0.48"
+                      },
                       {
-                        "op": "repeat",
-                        "count": {
-                          "expr": "local",
-                          "name": "blade_count"
-                        },
-                        "maximum": 5,
-                        "index": "blade_index",
-                        "body": [
-                          {
-                            "op": "use",
-                            "component": "rooted_blade",
-                            "arguments": {
-                              "chord": {
-                                "expr": "cycle",
-                                "index": {
-                                  "expr": "local",
-                                  "name": "blade_index"
-                                },
-                                "items": [
-                                  {
-                                    "expr": "exact_decimal",
-                                    "value": "0.42"
-                                  },
-                                  {
-                                    "expr": "exact_decimal",
-                                    "value": "0.34"
-                                  },
-                                  {
-                                    "expr": "exact_decimal",
-                                    "value": "0.48"
-                                  },
-                                  {
-                                    "expr": "exact_decimal",
-                                    "value": "0.28"
-                                  },
-                                  {
-                                    "expr": "exact_decimal",
-                                    "value": "0.38"
-                                  }
-                                ]
-                              },
-                              "rotation": {
-                                "expr": "cycle",
-                                "index": {
-                                  "expr": "local",
-                                  "name": "blade_index"
-                                },
-                                "items": [
-                                  {
-                                    "expr": "number",
-                                    "value": -94.0
-                                  },
-                                  {
-                                    "expr": "number",
-                                    "value": -62.0
-                                  },
-                                  {
-                                    "expr": "number",
-                                    "value": -84.0
-                                  },
-                                  {
-                                    "expr": "number",
-                                    "value": -24.0
-                                  },
-                                  {
-                                    "expr": "number",
-                                    "value": -44.0
-                                  }
-                                ]
-                              },
-                              "x": {
-                                "expr": "cycle",
-                                "index": {
-                                  "expr": "local",
-                                  "name": "root_index"
-                                },
-                                "items": [
-                                  {
-                                    "expr": "exact_decimal",
-                                    "value": "0.28"
-                                  },
-                                  {
-                                    "expr": "exact_decimal",
-                                    "value": "0.72"
-                                  }
-                                ]
-                              },
-                              "y": {
-                                "expr": "exact_decimal",
-                                "value": "0.90"
-                              }
-                            }
-                          }
-                        ]
+                        "expr": "exact_decimal",
+                        "value": "0.28"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.42"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.34"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.48"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.28"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.38"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.38"
                       }
                     ]
+                  },
+                  "rotation": {
+                    "expr": "cycle",
+                    "index": {
+                      "expr": "local",
+                      "name": "blade_index"
+                    },
+                    "items": [
+                      {
+                        "expr": "number",
+                        "value": -94.0
+                      },
+                      {
+                        "expr": "number",
+                        "value": -62.0
+                      },
+                      {
+                        "expr": "number",
+                        "value": -84.0
+                      },
+                      {
+                        "expr": "number",
+                        "value": -24.0
+                      },
+                      {
+                        "expr": "number",
+                        "value": -94.0
+                      },
+                      {
+                        "expr": "number",
+                        "value": -62.0
+                      },
+                      {
+                        "expr": "number",
+                        "value": -84.0
+                      },
+                      {
+                        "expr": "number",
+                        "value": -24.0
+                      },
+                      {
+                        "expr": "number",
+                        "value": -44.0
+                      },
+                      {
+                        "expr": "number",
+                        "value": -44.0
+                      }
+                    ]
+                  },
+                  "x": {
+                    "expr": "cycle",
+                    "index": {
+                      "expr": "local",
+                      "name": "blade_index"
+                    },
+                    "items": [
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.28"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.28"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.28"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.28"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.72"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.72"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.72"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.72"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.28"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.72"
+                      }
+                    ]
+                  },
+                  "y": {
+                    "expr": "exact_decimal",
+                    "value": "0.90"
                   }
-                ]
+                }
               }
             ]
           }
         ]
       },
       "summaries": {
-        "ja": "下端の1〜2箇所の同じ根元から、枯れた長い葉を3〜5本ずつ上へ並べる。丈を葉ごとに変え、傾きを垂直から右へ倒れるまで大きく違え、チョークの灰で小刻みに揺らし、縁ににじみを加え、地面は描かない。各葉の内側を輪郭と同じ色で塗る。",
-        "en": "From 1–2 shared root spots at the bottom edge, raise 3–5 long withered blades each. Heights differ per blade and the lean ranges widely from upright to lying toward the right, in tightly swaying gray chalk with bleeding edges and no ground. Fill each blade interior with the same color as its outline."
+        "ja": "下端の1〜2箇所の同じ根元から、枯れた長い葉を上へ並べる。本数を書けばその本数（1〜10本、左の根元に4本まで、次に右）、書かなければ3・4・6・8・10本。丈を葉ごとに変え、傾きを垂直から右へ倒れるまで大きく違え、チョークの灰で小刻みに揺らし、縁ににじみを加え、地面は描かない。各葉の内側を輪郭と同じ色で塗る。",
+        "en": "From one or two shared root spots at the bottom edge, raise long withered blades: the written count (1–10, up to four on the left root, then the right), or 3, 4, 6, 8, or 10 when none is written. Heights differ per blade and the lean ranges widely from upright to lying toward the right, in tightly swaying gray chalk with bleeding edges and no ground. Fill each blade interior with the same color as its outline."
       }
     },
     {
@@ -2410,8 +2870,20 @@
         "aliases": [
           "枯葉"
         ],
-        "version": "2.0.0",
-        "parameters": {},
+        "version": "2.1.0",
+        "parameters": {
+          "leaf_count": {
+            "type": "integer",
+            "receives": "count",
+            "minimum": 1,
+            "maximum": 8,
+            "omitted": [
+              2,
+              3,
+              4
+            ]
+          }
+        },
         "components": {
           "withered_leaf": {
             "parameters": {
@@ -2552,50 +3024,272 @@
         },
         "body": [
           {
-            "op": "vary",
-            "binding": "leaf_count",
-            "domain": "kareha_leaf_count",
-            "choices": [
-              {
-                "expr": "integer",
-                "value": 2
-              },
-              {
-                "expr": "integer",
-                "value": 3
-              },
-              {
-                "expr": "integer",
-                "value": 4
-              }
-            ],
-            "range": null,
+            "op": "repeat",
+            "count": {
+              "expr": "parameter",
+              "name": "leaf_count"
+            },
+            "maximum": 8,
+            "index": "leaf_index",
             "body": [
               {
-                "op": "repeat",
-                "count": {
-                  "expr": "local",
-                  "name": "leaf_count"
-                },
-                "maximum": 4,
-                "index": "leaf_index",
+                "op": "vary",
+                "binding": "leaf_x",
+                "domain": "kareha_shift_x",
+                "choices": [
+                  {
+                    "expr": "cycle",
+                    "index": {
+                      "expr": "local",
+                      "name": "leaf_index"
+                    },
+                    "items": [
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.110"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.850"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.290"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.670"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.850"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.110"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.670"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.290"
+                      }
+                    ]
+                  },
+                  {
+                    "expr": "cycle",
+                    "index": {
+                      "expr": "local",
+                      "name": "leaf_index"
+                    },
+                    "items": [
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.130"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.870"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.310"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.690"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.870"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.130"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.690"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.310"
+                      }
+                    ]
+                  },
+                  {
+                    "expr": "cycle",
+                    "index": {
+                      "expr": "local",
+                      "name": "leaf_index"
+                    },
+                    "items": [
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.150"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.890"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.330"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.710"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.890"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.150"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.710"
+                      },
+                      {
+                        "expr": "exact_decimal",
+                        "value": "0.330"
+                      }
+                    ]
+                  }
+                ],
+                "range": null,
                 "body": [
                   {
                     "op": "vary",
                     "binding": "leaf_y",
-                    "domain": "kareha_lower_y",
+                    "domain": "kareha_shift_y",
                     "choices": [
                       {
-                        "expr": "exact_decimal",
-                        "value": "0.76"
+                        "expr": "cycle",
+                        "index": {
+                          "expr": "local",
+                          "name": "leaf_index"
+                        },
+                        "items": [
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.880"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.760"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.760"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.880"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.880"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.760"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.760"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.880"
+                          }
+                        ]
                       },
                       {
-                        "expr": "exact_decimal",
-                        "value": "0.83"
+                        "expr": "cycle",
+                        "index": {
+                          "expr": "local",
+                          "name": "leaf_index"
+                        },
+                        "items": [
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.900"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.780"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.780"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.900"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.900"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.780"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.780"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.900"
+                          }
+                        ]
                       },
                       {
-                        "expr": "exact_decimal",
-                        "value": "0.89"
+                        "expr": "cycle",
+                        "index": {
+                          "expr": "local",
+                          "name": "leaf_index"
+                        },
+                        "items": [
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.920"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.800"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.800"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.920"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.920"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.800"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.800"
+                          },
+                          {
+                            "expr": "exact_decimal",
+                            "value": "0.920"
+                          }
+                        ]
                       }
                     ],
                     "range": null,
@@ -2661,29 +3355,8 @@
                                 "name": "leaf_lean"
                               },
                               "x": {
-                                "expr": "cycle",
-                                "index": {
-                                  "expr": "local",
-                                  "name": "leaf_index"
-                                },
-                                "items": [
-                                  {
-                                    "expr": "exact_decimal",
-                                    "value": "0.13"
-                                  },
-                                  {
-                                    "expr": "exact_decimal",
-                                    "value": "0.87"
-                                  },
-                                  {
-                                    "expr": "exact_decimal",
-                                    "value": "0.31"
-                                  },
-                                  {
-                                    "expr": "exact_decimal",
-                                    "value": "0.69"
-                                  }
-                                ]
+                                "expr": "local",
+                                "name": "leaf_x"
                               },
                               "y": {
                                 "expr": "local",
@@ -2702,8 +3375,8 @@
         ]
       },
       "summaries": {
-        "ja": "縮れた枯葉2〜4枚を下の左右の隅に置く。各葉は両端で触れる深い弧と浅い弧で、チョークの灰と黄を交互にし、縁を細かく揺らし、傾きをばらす。各葉の内側を輪郭と同じ色で塗る。",
-        "en": "Place 2–4 curled withered leaves in the lower left or right corners. Each is a deep arc and a shallow arc touching at both ends, alternating gray and yellow chalk, with narrowly swaying edges and varied rotations. Fill each leaf interior with the same color as its outline."
+        "ja": "縮れた枯葉を下の左右の隅の8つの区画へ、1枚ずつ別の区画に置く。枚数を書けばその枚数（1〜8枚）、書かなければ2〜4枚。各葉は両端で触れる深い弧と浅い弧で、チョークの灰と黄を交互にし、縁を細かく揺らし、傾きをばらす。各葉の内側を輪郭と同じ色で塗る。",
+        "en": "Place curled withered leaves in eight cells of the lower left and right corners, one leaf per cell: the written count (1–8), or 2–4 when none is written. Each is a deep arc and a shallow arc touching at both ends, alternating gray and yellow chalk, with narrowly swaying edges and varied rotations. Fill each leaf interior with the same color as its outline."
       }
     }
   ]

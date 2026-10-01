@@ -219,7 +219,17 @@ A count written on a word (`Nature.若葉を10枚`, `Place 10 Nature.YoungLeaves
 - When no count is written, one of the `omitted` choices is chosen deterministically from the call's seed. This is the only parameter that may be omitted; every other declared parameter stays required.
 - A count outside the bounds leaves out only that word with the `macro_binding_count_out_of_range` diagnostic and draws the rest. It is never clamped silently.
 
-Bundled `Nature.YoungLeaves` (若葉) declares it in 2.1.0 (1–12 leaves, 4–6 when none is written). It splits the upper half into twelve cells, six columns by two rows, and puts each leaf in its own cell with a small shift inside it. The cells are taken in an order that stays balanced left and right at any count. The other six words declare no count, so a written count still repeats the whole word. Stage 1's work plan carries plugins by name only, so a count written in a description does not yet reach a plugin.
+In bundled `Nature.leaves` 2.1.0 every word but AutumnLeaves declares it.
+
+| Word | Count | Range | When omitted | Placement |
+|---|---|---|---|---|
+| YoungLeaves | leaves | 1–12 | 4–6 | twelve cells of the upper half, six columns by two rows, one leaf per cell with a small shift |
+| Undergrowth, WitheredGrass | blades | 1–10 | 3, 4, 6, 8, or 10 | up to four on the left root, then the right, then alternating |
+| SummerLeaves | leaves on the branch | 1–12 | 6–8 | twelve points along the branch; the point sets the side and size |
+| FallenLeaves | leaves | 1–16 | 8–12 | sixteen points along the diagonal drift, denser low, with a small shift |
+| WitheredLeaves | leaves | 1–8 | 2–4 | eight cells of the lower left and right corners, four columns by two rows |
+
+Each word takes its positions in an order that stays balanced at any count. AutumnLeaves draws the lobes of one maple leaf, so it declares no count, and a written count still repeats the whole word as the number of maple leaves. Stage 1's work plan carries plugins by name only, so a count written in a description does not yet reach a plugin.
 
 ## Geometry and Count Boundary
 

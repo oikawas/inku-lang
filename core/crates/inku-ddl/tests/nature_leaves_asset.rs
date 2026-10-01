@@ -55,12 +55,12 @@ fn bundled_nature_leaves_are_valid_bounded_definitions_that_reach_normal_score_l
 
     let expected = [
         ("Nature.若葉", "2.1.0", 24, 8..=12),
-        ("Nature.下草", "2.0.0", 20, 6..=20),
-        ("Nature.青葉", "2.0.0", 17, 13..=17),
+        ("Nature.下草", "2.1.0", 20, 6..=20),
+        ("Nature.青葉", "2.1.0", 25, 13..=17),
         ("Nature.紅葉", "2.0.0", 15, 11..=15),
-        ("Nature.落葉", "2.0.0", 24, 16..=24),
-        ("Nature.枯草", "2.0.0", 20, 6..=20),
-        ("Nature.枯葉", "2.0.0", 8, 4..=8),
+        ("Nature.落葉", "2.1.0", 32, 16..=24),
+        ("Nature.枯草", "2.1.0", 20, 6..=20),
+        ("Nature.枯葉", "2.1.0", 16, 4..=8),
     ];
     assert_eq!(package.entries.len(), expected.len());
 
@@ -318,8 +318,8 @@ fn the_bundled_package_is_its_v1_edition_migrated() {
     for (old, new) in previous.entries.iter().zip(&current.entries) {
         let migrated = migrate_macro_definition_from_saijiki_v1(&old.definition).unwrap();
         changed += usize::from(migrated.changed);
-        // 2.1.0 rewrote YoungLeaves to take its count; it is already v2.
-        if new.definition["heading"] == "YoungLeaves" {
+        // 2.1.0 rewrote every word but AutumnLeaves to take its count; they are already v2.
+        if new.definition["heading"] != "AutumnLeaves" {
             assert_eq!(new.definition["version"], "2.1.0");
             assert!(
                 !migrate_macro_definition_from_saijiki_v1(&new.definition)
@@ -648,7 +648,7 @@ fn every_bundled_word_expands_without_omission_at_many_placement_seeds() {
 }
 
 #[test]
-fn young_leaves_take_the_written_count_inside_the_word() {
+fn counted_words_take_the_written_count_inside_the_word() {
     let package: Package = serde_json::from_str(ASSET).expect("Nature package must be JSON");
     let definitions = package
         .entries
@@ -699,6 +699,26 @@ fn young_leaves_take_the_written_count_inside_the_word() {
                 .iter()
                 .all(|i| i.primitive == Primitive::Arc)
         );
+        assert!(execution.upstream_diagnostics().is_empty(), "{source}");
+    }
+    // Each counted word draws the written count inside itself.
+    for (source, arcs) in [
+        ("Nature.下草を7本置く。", 14),
+        ("Nature.青葉を10枚置く。", 20),
+        ("Nature.落葉を16枚置く。", 32),
+        ("Nature.枯草を2本置く。", 4),
+        ("Nature.枯葉を7枚置く。", 14),
+    ] {
+        let execution = compile(source, ResolvedInstructionLanguage::Ja);
+        let score = execution
+            .score()
+            .unwrap_or_else(|| panic!("{source}: {:?}", execution.downstream_diagnostics()));
+        let drawn = score
+            .instructions
+            .iter()
+            .filter(|i| i.primitive == Primitive::Arc)
+            .count();
+        assert_eq!(drawn, arcs, "{source}");
         assert!(execution.upstream_diagnostics().is_empty(), "{source}");
     }
     // Thirteen is past the word's twelve: only the word is left out, with its reason.

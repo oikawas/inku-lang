@@ -736,6 +736,9 @@ fn counted_words_take_the_written_count_inside_the_word() {
             .collect::<Vec<_>>(),
         ["macro_binding_count_out_of_range"]
     );
+    // It is a reported omission, not a hole: a hole sends the work to LLM
+    // completion, which cannot repair a count, and stops the drawing.
+    assert!(execution.compilation().holes.is_empty());
     let score = execution.score().unwrap();
     assert_eq!(score.instructions.len(), 1);
     assert_eq!(score.instructions[0].primitive, Primitive::Circle);

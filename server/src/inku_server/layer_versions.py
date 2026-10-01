@@ -320,7 +320,9 @@
 # an omitted count is the definition's choice. Bundled Nature.leaves 2.1.0
 # lets every word but AutumnLeaves take its leaf or blade count. Saved locks
 # keep their definitions.
-DDL_ENGINE_VERSION = "54"
+# 55: A count outside a word's range is a reported omission, not a hole, so
+# LLM completion is never asked to repair it and the rest of the work draws.
+DDL_ENGINE_VERSION = "55"
 # 4 (2026-07-30): yellow, orange, and purple become abstract Score colors, and
 # coerce recognizes the corresponding Japanese and English DDL markers.
 # 3 (2026-07-30): 黄 / 橙 / 紫 joined the saijiki color words, so an author can write

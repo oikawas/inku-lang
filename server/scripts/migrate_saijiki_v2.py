@@ -38,7 +38,7 @@ def main() -> int:
     parser.add_argument("--database", type=Path, required=True, help="the SQLite database to migrate")
     parser.add_argument("--workers", type=int, default=min(6, os.cpu_count() or 1),
                         help="ask the core from this many worker processes at once")
-    parser.add_argument("--timeout", type=float, default=60.0,
+    parser.add_argument("--timeout", type=float, default=120.0,
                         help="stop the whole run if a call to the core gives no answer within this many seconds")
     parser.add_argument("--blank", type=Path, default=None,
                         help="empty these history texts instead of migrating them (<history id>:<column>, one per line)")

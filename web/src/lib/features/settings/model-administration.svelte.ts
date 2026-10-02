@@ -9,6 +9,7 @@ export type ModelProviderSetting = {
 	default_base_url?: string;
 	requires_api_key?: boolean;
 	memo?: string;
+	rate_limits?: { rpm: number; tpm: number; rpd: number };
 	models?: ModelOption[];
 	delete?: boolean;
 	base_url: string;
@@ -122,6 +123,7 @@ export function createModelAdministration<TActor extends SettingsActor>(
 					kind: patch.kind,
 					requires_api_key: patch.requires_api_key,
 					memo: patch.memo,
+					rate_limits: patch.rate_limits,
 					models: patch.models ?? [],
 					base_url: patch.base_url ?? patch.default_base_url ?? '',
 					api_key: patch.api_key || undefined,
@@ -233,6 +235,7 @@ export function createModelAdministration<TActor extends SettingsActor>(
 			kind: catalogProvider?.kind,
 			requires_api_key: catalogProvider?.requires_api_key,
 			memo: memoOverride ?? catalogProvider?.memo,
+			rate_limits: provider.rate_limits,
 			models: provider.models ?? catalogProvider?.models ?? [],
 			base_url: provider.base_url,
 			api_key: provider.api_key || undefined,

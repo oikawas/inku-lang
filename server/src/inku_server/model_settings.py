@@ -46,6 +46,15 @@ MODEL_METADATA_KEYS = (
     "comment_en",
 )
 
+
+def normalize_rate_limits(value: Any, *, provider_id: str = "") -> dict[str, int]:
+    defaults = {"rpm": 30, "tpm": 16_000, "rpd": 14_400} if provider_id == "gemini" else {"rpm": 0, "tpm": 0, "rpd": 0}
+    incoming = value if isinstance(value, dict) else {}
+    return {key: incoming[key] if isinstance(incoming.get(key), int)
+            and not isinstance(incoming[key], bool) and 0 <= incoming[key] <= 1_000_000_000
+            else default for key, default in defaults.items()}
+
+
 PROVIDER_DEFINITIONS: list[dict[str, Any]] = [
     {
         "id": "openai",
@@ -255,6 +264,7 @@ def default_model_settings() -> dict[str, Any]:
                 "default_base_url": provider["default_base_url"],
                 "requires_api_key": provider["requires_api_key"],
                 "memo": "",
+                "rate_limits": normalize_rate_limits(None, provider_id=str(provider["id"])),
                 "models": _normalize_models(deepcopy(provider["models"])),
                 "builtin": True,
                 "active": True,
@@ -361,6 +371,7 @@ def normalize_model_settings(settings: dict[str, Any] | None) -> dict[str, Any]:
                 provider["requires_api_key"] = bool(incoming["requires_api_key"])
             if isinstance(incoming.get("memo"), str):
                 provider["memo"] = incoming["memo"].strip()
+            provider["rate_limits"] = normalize_rate_limits(incoming.get("rate_limits"), provider_id=provider_id)
             models = _normalize_models(incoming.get("models"))
             if models:
                 # A stored list is the installation's own -- it may name models pulled
@@ -650,6 +661,7 @@ def public_model_settings(
             "api_key_set": bool(api_key),
             "api_key_hint": mask_secret(api_key),
             "enabled_models": dict(stored.get("enabled_models") or {}),
+            "rate_limits": dict(stored["rate_limits"]),
         }
     return {"providers": providers}
 
@@ -692,6 +704,10 @@ def update_model_settings(current: dict[str, Any], patch: dict[str, Any]) -> dic
                 }})
             if isinstance(incoming.get("base_url"), str) and incoming["base_url"].strip():
                 clean["providers"][provider_id]["base_url"] = _normalize_provider_base_url(provider_id, incoming["base_url"])
+            if isinstance(incoming.get("rate_limits"), dict):
+                clean["providers"][provider_id]["rate_limits"] = {
+                    **clean["providers"][provider_id].get("rate_limits", {}), **incoming["rate_limits"],
+                }
             if incoming.get("clear_api_key") is True:
                 clean["providers"][provider_id]["api_key"] = ""
             elif isinstance(incoming.get("api_key"), str) and incoming["api_key"]:
@@ -840,4 +856,5 @@ def connection_for(provider_id: str, settings: dict[str, Any]) -> dict[str, Any]
         "base_url": provider.get("base_url") or provider["default_base_url"],
         "api_key": decrypt_secret(str(provider.get("api_key") or "")) or os.getenv(str(provider["api_key_env"]), ""),
         "requires_api_key": provider["requires_api_key"],
+        "rate_limits": dict(provider["rate_limits"]),
     }

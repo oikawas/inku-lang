@@ -222,6 +222,13 @@ def _stage_execution_status() -> StageExecutionStatus:
     )
 
 
+class ProviderRateLimitsPatch(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    rpm: int = Field(default=0, ge=0, le=1_000_000_000, strict=True)
+    tpm: int = Field(default=0, ge=0, le=1_000_000_000, strict=True)
+    rpd: int = Field(default=0, ge=0, le=1_000_000_000, strict=True)
+
+
 class ModelProviderPatch(BaseModel):
     label: str | None = None
     kind: str | None = None
@@ -230,6 +237,7 @@ class ModelProviderPatch(BaseModel):
     default_base_url: str | None = None
     requires_api_key: bool | None = None
     memo: str | None = None
+    rate_limits: ProviderRateLimitsPatch | None = None
     models: list[dict] = Field(default_factory=list)
     active: bool | None = None
     delete: bool = False

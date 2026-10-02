@@ -856,6 +856,13 @@ export interface LangPack {
 	settingsModelFetchDisabledWhileDirty: string;
 	settingsModelMetadataDetails: string;
 	settingsModelConnectionDetails: string;
+	settingsModelRateLimits: string;
+	settingsModelRpm: string;
+	settingsModelRpmHelp: string;
+	settingsModelTpm: string;
+	settingsModelTpmHelp: string;
+	settingsModelRpd: string;
+	settingsModelRpdHelp: string;
 	settingsModelSelectVisible: string;
 	settingsModelClearVisible: string;
 	settingsModelFilterLabel: string;

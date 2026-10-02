@@ -22,6 +22,7 @@ from .provider_limits import provider_slot
 from .openai_request import openai_sampling
 from .provider_refusal import provider_error as _provider_error
 from .provider_observation import ProviderObservationError, ProviderObservationStore
+from .provider_rate_limits import ProviderRateBudget, RateAccountingUnavailable, RateLimitUnavailable, retry_after_seconds
 
 _logger = logging.getLogger(__name__)
 
@@ -187,12 +188,14 @@ def resolved_drawing_model(model: str | None, actor: dict | None) -> str:
 
 class SingleAttemptProvider:
     def __init__(self, options: ProviderOptions, *, transport: httpx.AsyncBaseTransport | None = None,
-                 observation: tuple[ProviderObservationStore, str, str] | None = None):
+                 observation: tuple[ProviderObservationStore, str, str] | None = None,
+                 rate_budget: ProviderRateBudget | None = None):
         if options.max_tokens <= 0 or options.max_response_bytes <= 0:
             raise ValueError("positive provider limits required")
         self.options = options
         self.transport = transport
         self.observation = observation
+        self.rate_budget = rate_budget
         self.failure_detail: str | None = None
         self._observation_truncated = False
 
@@ -233,7 +236,13 @@ class SingleAttemptProvider:
                     connection, model, action, action["payload"]["prompt"], remaining
                 ))
         except (TimeoutError, httpx.TimeoutException):
-            failure = "transport_timeout"
+            failure = "rate_limited" if self.failure_detail == "rate_limit_wait" else "transport_timeout"
+        except RateLimitUnavailable:
+            self.failure_detail = "rate_limit_wait"
+            failure = "rate_limited"
+        except RateAccountingUnavailable:
+            _logger.warning("provider_rate_accounting_unavailable provider=%s", self._target[0])
+            failure = "transport_unavailable"
         except httpx.HTTPStatusError as error:
             status = error.response.status_code
             failure = "rate_limited" if status == 429 else (
@@ -358,9 +367,45 @@ class SingleAttemptProvider:
         # attempt. HTTPX performs no retries; redirects are not followed.
         raw = bytearray()
         response_status: int | None = None
+        budget = self.rate_budget
+        limits = connection.get("rate_limits")
+        if limits is not None and budget is None:
+            from . import db
+            budget = ProviderRateBudget(db.engine)
+        reservation = None
+        input_used = None
+        refused_raw = b""
         try:
             async with asyncio.timeout(timeout):
                 async with httpx.AsyncClient(timeout=timeout, transport=self.transport, follow_redirects=False) as client:
+                    if budget is not None and limits is not None:
+                        input_tokens = len(body_bytes) + 128 if limits["tpm"] else 0
+                        if kind == "gemini" and limits["tpm"]:
+                            # Count the exact system, content and function schema,
+                            # rather than guessing Japanese tokens from characters.
+                            count_raw = bytearray()
+                            async with client.stream("POST", url.removesuffix(":generateContent") + ":countTokens",
+                                                     headers=headers, json={"generateContentRequest": {
+                                                         "model": "models/" + model, **body,
+                                                     }}) as counted:
+                                async for chunk in counted.aiter_bytes():
+                                    if len(count_raw) + len(chunk) > min(16384, self.options.max_response_bytes):
+                                        raise ValueError("token count response limit exceeded")
+                                    count_raw.extend(chunk)
+                                if counted.status_code >= 400:
+                                    refused_raw = bytes(count_raw)
+                                    self._refusal = {**_provider_error(refused_raw), "operation": "count_tokens"}
+                                    counted.raise_for_status()
+                            count_data = json.loads(count_raw)
+                            if not isinstance(count_data, dict):
+                                raise TypeError("token count response is not an object")
+                            count = count_data.get("totalTokens")
+                            if not isinstance(count, int) or isinstance(count, bool) or count < 0:
+                                raise RateLimitUnavailable("input token count is unavailable")
+                            input_tokens = (count * 11 + 9) // 10
+                        self.failure_detail = "rate_limit_wait"
+                        reservation = await budget.reserve(str(connection["id"]), kind, limits, input_tokens)
+                        self.failure_detail = None
                     async with client.stream("POST", url, headers=headers, content=body_bytes) as result:
                         response_status = result.status_code
                     # Preserve legacy behavior when capture is disabled: a
@@ -368,7 +413,8 @@ class SingleAttemptProvider:
                         if self.observation is None:
                             if result.status_code >= 400:
                                 # Read a bounded refusal so the log can say why.
-                                self._refusal = _provider_error(bytes((await result.aread())[:16384]))
+                                refused_raw = bytes((await result.aread())[:16384])
+                                self._refusal = _provider_error(refused_raw)
                             result.raise_for_status()
                         async for chunk in result.aiter_bytes():
                             if len(raw) + len(chunk) > self.options.max_response_bytes:
@@ -383,15 +429,35 @@ class SingleAttemptProvider:
                             store, owner_id, execution_id = self.observation
                             store.response(owner_id, execution_id, action, status=result.status_code, raw=bytes(raw))
                             if result.status_code >= 400:
-                                self._refusal = _provider_error(bytes(raw[:16384]))
+                                refused_raw = bytes(raw[:16384])
+                                self._refusal = _provider_error(refused_raw)
                             result.raise_for_status()
             data = json.loads(raw)
+            if not isinstance(data, dict):
+                raise TypeError("provider response is not an object")
+            usage = data.get("usageMetadata", {}) if kind == "gemini" else data.get("usage", {})
+            if not isinstance(usage, dict):
+                usage = {}
+            used = usage.get("promptTokenCount") if kind == "gemini" else usage.get(
+                "input_tokens" if kind == "anthropic" else "prompt_tokens")
+            if isinstance(used, int) and not isinstance(used, bool) and used >= 0:
+                input_used = used
+        except httpx.HTTPStatusError as error:
+            if budget is not None and error.response.status_code == 429:
+                budget.cool_down(str(connection["id"]), retry_after_seconds(
+                    error.response.headers, refused_raw, now=budget.clock(),
+                ))
+            raise
         except (TimeoutError, httpx.TimeoutException, httpx.TransportError):
             if self.observation is not None and response_status is not None:
                 store, owner_id, execution_id = self.observation
                 store.response(owner_id, execution_id, action, status=response_status, raw=bytes(raw), truncated=True)
                 self._observation_truncated = True
             raise
+        finally:
+            if budget is not None and reservation is not None:
+                budget.settle(str(connection["id"]), reservation, input_used if input_used is not None
+                              else (None if limits["tpm"] else 0))
         if kind == "openai_compatible":
             message = data["choices"][0]["message"]
             calls = message.get("tool_calls") or []

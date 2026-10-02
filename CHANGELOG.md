@@ -6,6 +6,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file retains the history from v2.5.0 (2026-07-25, render engine 12) onward.** Past records follow the recent ones in a collapsible section of this same document; expand it when needed. Viewers without collapse support show the full text. Earlier history is in the [v1.72–v2.4 archive](docs/history/changelog-v1.72-v2.4.md) and the [v0.1–v1.71 archive](docs/history/changelog-v0.1-v1.71.md).
 
+### 2026-10-02 — Configure service rate limits and pace batch requests
+
+Gemini batches retried roughly every two seconds after exhausting their allowance. Model settings now offer per-service RPM, input TPM, and RPD with explanatory tooltips. The shared pipeline counts every stage and retry, waits for minute capacity and provider cooldowns, and retains daily usage across restart. An exhausted daily allowance prevents further generation requests. Gemini starts at the recorded 30 / 16,000 / 14,400; other services start at zero (uncapped), and administrators can edit each value.
+
 ### 2026-10-02 — Clear a previous single-work error when a batch starts
 
 Starting a batch after a failed single-work draw kept showing the old failure reason and attempt count even while the batch succeeded. Starting or resuming a batch now clears that execution state; failed batch lines remain in the batch failure report. This applies to every model and provider.

@@ -46,6 +46,39 @@
 	let memoProviderLabel = $state('');
 	let memoProviderText = $state('');
 	let baseUrlDrafts = $state<Record<string, string>>({});
+	type RateField = 'rpm' | 'tpm' | 'rpd';
+	let rateLimitDrafts = $state<Record<string, Partial<Record<RateField, string>>>>({});
+	const rateFields: RateField[] = ['rpm', 'tpm', 'rpd'];
+
+	function rateValue(provider: Provider, setting: ModelProviderSetting, field: RateField): string {
+		return rateLimitDrafts[provider]?.[field] ?? String(setting.rate_limits?.[field] ?? 0);
+	}
+
+	function setRateDraft(provider: Provider, field: RateField, value: string) {
+		rateLimitDrafts = { ...rateLimitDrafts, [provider]: { ...rateLimitDrafts[provider], [field]: value } };
+	}
+
+	function rateDraftValid(provider: Provider, setting: ModelProviderSetting): boolean {
+		return rateFields.every((field) => {
+			const text = rateValue(provider, setting, field);
+			const number = Number(text);
+			return text.trim() !== '' && Number.isSafeInteger(number) && number >= 0 && number <= 1_000_000_000;
+		});
+	}
+
+	async function saveRateLimits(provider: Provider, setting: ModelProviderSetting) {
+		if (!rateDraftValid(provider, setting)) return;
+		const rate_limits = {
+			rpm: Number(rateValue(provider, setting, 'rpm')),
+			tpm: Number(rateValue(provider, setting, 'tpm')),
+			rpd: Number(rateValue(provider, setting, 'rpd')),
+		};
+		if (await onSaveModelProvider(provider, { rate_limits })) {
+			const next = { ...rateLimitDrafts };
+			delete next[provider];
+			rateLimitDrafts = next;
+		}
+	}
 
 	function trapDialogFocus(node: HTMLElement, close: () => void) {
 		const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
@@ -386,6 +419,20 @@
 								</div>
 							{:else}<div class="model-publish-empty">{t().settingsModelNoPublishedModels}</div>{/if}
 						</section>
+						<details class="model-connection-details">
+							<summary>{t().settingsModelRateLimits}</summary>
+							<div class="model-connection-fields model-rate-fields">
+								{#each rateFields as field (field)}
+									{@const label = field === 'rpm' ? t().settingsModelRpm : field === 'tpm' ? t().settingsModelTpm : t().settingsModelRpd}
+									{@const help = field === 'rpm' ? t().settingsModelRpmHelp : field === 'tpm' ? t().settingsModelTpmHelp : t().settingsModelRpdHelp}
+									<label>
+										<span class="model-add-label-with-help">{label}<button type="button" class="model-key-info" aria-label={help}>i<span class="model-key-tooltip" role="tooltip">{help}</span></button></span>
+										<input type="number" min="0" max="1000000000" step="1" value={rateValue(activeProvider.id, activeProviderSetting, field)} oninput={(e) => setRateDraft(activeProvider!.id, field, e.currentTarget.value)} />
+									</label>
+								{/each}
+								<div class="model-connection-actions"><button class="ghost-btn" onclick={() => saveRateLimits(activeProvider!.id, activeProviderSetting!)} disabled={modelSettingsLoading || !rateLimitDrafts[activeProvider.id] || !rateDraftValid(activeProvider.id, activeProviderSetting)}>{t().profileSaveButton}</button></div>
+							</div>
+						</details>
 						<details class="model-connection-details">
 							<summary>{t().settingsModelConnectionDetails}</summary>
 							<div class="model-connection-fields">

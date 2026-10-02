@@ -56,6 +56,8 @@ VERSION_PARITY_EXEMPT = frozenset({"CHANGELOG.ja.md"})
 PAIRS: tuple[tuple[str, str, str, str | None], ...] = (
     ("README.ja.md", "README.md", "shape", None),
     ("persistence/README.ja.md", "persistence/README.md", "shape", None),
+    ("apple/README.ja.md", "apple/README.md", "shape", None),
+    ("apple/SWIFT_SPEC.ja.md", "apple/SWIFT_SPEC.md", "sections", None),
     ("PLUGIN.ja.md", "PLUGIN.md", "shape", None),
     (
         "docs/spec/render-engine-history.ja.md",

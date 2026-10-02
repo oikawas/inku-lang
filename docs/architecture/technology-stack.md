@@ -1,6 +1,6 @@
 # Appendix: technology stack
 
-This appendix gives one place to survey the languages, frameworks, main runtime components, and build/test tools that the current implementation uses directly. It covers the implementation baseline `46f17da8c5b438511f9bd915395763262b55fb72` of 2026-09-25 and is not a complete list of transitive dependencies. Manifests and lock files remain canonical for versions; the numbers here are an architecture snapshot.
+This appendix gives one place to survey the languages, frameworks, main runtime components, and build/test tools that the current implementation uses directly. The existing components use the 2026-09-25 baseline `46f17da8c5b438511f9bd915395763262b55fb72`, with the initial Swift foundation added on 2026-10-02. This is not a complete list of transitive dependencies. Manifests and lock files remain canonical for versions; the numbers here are an architecture snapshot.
 
 ## Runtime components
 
@@ -19,6 +19,7 @@ This appendix gives one place to survey the languages, frameworks, main runtime 
 | Python binding | Rust / Python | PyO3, maturin | Coarse CPython wheel boundary from the Server to the render core and the shared pipeline | `core/crates/inku-render-python/`; `server/Dockerfile` |
 | Android binding | Rust / Kotlin | JNI, `resvg` | Calls the shared pipeline, the render core, and the SVG raster core from Android | `core/crates/inku-render-android/`; `core/crates/inku-svg-raster/` |
 | Android app | Kotlin, Gradle Kotlin DSL | Jetpack Compose, Room 2.8.4, KSP, AndroidX | Device UI, the shared-pipeline host, Room history, and provider/model management | `android/app/build.gradle.kts`; `android/app/src/` |
+| Swift client foundation | Swift 6, SQL | SwiftUI, Observation, UniFFI, GRDB 7.11.1, system SQLite, URLSession, Keychain, CoreGraphics | macOS-first native UI, shared-pipeline host, persistence, providers, owned raster display | `apple/Package.swift`; `apple/Packages/`; `apple/Sources/` |
 | CLI | Python 3.12 | Standard HTTP client, Pillow, `inku-analysis` | Public HTTP API operations, batch, artifact save, and functional testing | `cli/pyproject.toml`; `cli/src/inku_cli/` |
 | Shared analysis | Python 3.12 | `resvg-py`, Pillow | Read-only composition mirror, SVG raster/measurement, thumbnails | `shared/pyproject.toml`; `shared/src/inku_analysis/` |
 | Distribution | Dockerfile, YAML | Docker Compose, GHCR, GitHub Actions | API/Web images, persistent volume, CI/release | `deploy/compose.yaml`; Dockerfiles; `.github/workflows/` |
@@ -30,6 +31,7 @@ This appendix gives one place to survey the languages, frameworks, main runtime 
 | Python | `server/`, `cli/`, `shared/` | API, pipeline host, provider transport, persistence, CLI, and analysis |
 | TypeScript / JavaScript | `web/` | Svelte components, browser state, Node runtime, and unit tests |
 | Kotlin / Kotlin DSL | `android/` | Android production code, Compose UI, pipeline host, and Gradle build |
+| Swift | `apple/` | Apple native UI, pipeline host, provider transport, GRDB persistence, OS lifecycle |
 | Rust | `core/` | Shared authoring pipeline, typed compiler, Score types, render engine, CPython/JNI bindings, and SVG raster |
 | SQL / SQLite DDL | `persistence/`, Server migration, Room export | Portable logical constraints, physical schemas, and migration verification |
 | HTML / CSS / Svelte markup | `web/src/` | Browser presentation |
@@ -68,18 +70,26 @@ This appendix gives one place to survey the languages, frameworks, main runtime 
 
 ## Build, test, and quality gates
 
+The initial Swift foundation requires macOS 14/iOS 17, Swift tools 6.1, UniFFI
+0.32.0, and GRDB 7.11.1. XcodeGen/Xcode build an arm64/x86_64 Universal macOS
+app; Rust is packaged as platform-specific XCFramework slices. iOS has Rust
+device/simulator slices, with app screens and camera integration still pending.
+Python generates resources from Server-owned source at build time and is not
+embedded in the app. See the [build guide and current scope](../../apple/README.md).
+
 | Area | Build / package | Main checks |
 |---|---|---|
 | Server / CLI / shared | `uv`, `uv_build`, CPython wheel | pytest, Ruff, portable persistence verifier |
 | Web | npm, Vite, adapter-node | Node test runner, `svelte-check`, i18n/model lint |
 | Rust | pinned rustup/Cargo, maturin, UniFFI | `cargo test`, fmt, clippy, wheel/import smoke, matching binding and protocol versions |
 | Android | Gradle, KSP, Room schema export, NDK | JVM units, Compose/Room instrumentation, device acceptance of the shared pipeline, native parity |
+| Swift | SwiftPM, XcodeGen, Xcode, UniFFI/XCFramework | Change-specific core/host/DB checks, AppCheck, Universal linking, native UI |
 | Documentation | Markdown, Mermaid, JSON | Bilingual checker, link/path checks, portable mapping checks |
 | Distribution | Docker Buildx, Compose, GitHub Actions | Multi-architecture image build, health, release gates |
 
 ## Intentional non-sharing
 
-- The Server and Android share the Rust core (authoring pipeline, typed compiler, Score types, render, raster) and the logical meaning of portable persistence; they do not share DB files, ORM/DAO code, UI frameworks, or provider transport.
+- Server, Android, and Swift share the Rust core (authoring pipeline, typed compiler, Score types, render, raster) and the logical meaning of portable persistence; they do not share DB files, ORM/DAO code, UI frameworks, or provider transport.
 - Web and the CLI use only the public HTTP API and do not import Server Python modules at runtime.
-- A future iOS adapter is designable, but Swift, SwiftUI, and an iOS DB framework are not part of the current stack.
+- Swift, SwiftUI, and GRDB are part of the current macOS-first foundation. iPad/iPhone UI, camera, and real-device acceptance remain unfinished.
 - A PostgreSQL compatibility layer, past Render Engine runtimes, and the old Python/Kotlin Stage 1, Stage 1.5, Stage 2, and coerce are not part of the current architecture.

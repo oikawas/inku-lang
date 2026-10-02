@@ -296,7 +296,7 @@ Render Engine は、`JSON Score + render options + server-owned color metadata` 
 `SVG + render metadata` を返す境界である。現行serverの`renderer.py`はdefault engineへのSVG-only互換facadeであり、
 薄いadapterが検証済みScoreと解決済みoptionを1個のrequestにしてnative `inku_render` bindingを呼ぶ。
 
-決定的な描画coreはRust crate `core/crates/inku-render`である。Serverはnative wheel、AndroidはJNIを通して同じcoreを使う。iOSのhost接続は別途pendingである。
+決定的な描画coreはRust crate `core/crates/inku-render`である。Serverはnative wheel、AndroidはJNI、Swiftクライアントの初期基盤はUniFFIを通して同じcoreを使う。SwiftはmacOS先行の単一利用者standalone hostとしてprovider、SQLite、OSのUIを所有し、ServerのDDL意味・retry判断を複製しない。Swift固有の仕様・現在の実装範囲と更新ルールの正本は[`apple/SWIFT_SPEC.ja.md`](apple/SWIFT_SPEC.ja.md)、build手順は[`apple/README.ja.md`](apple/README.ja.md)とする。共有coreの意味は本書、Swiftの仕様・履歴はAndroid同様に日本語正本と対応英語版へ記録する。
 
 履歴、JSONタブ、CLI、ベンチマークが読む正規メタデータ形式は安定させる。`render_hash` は作品エディションIDで、SVG本文・入力文・正規化DDL・LLM応答本文は hash の主材料に含めない。
 
@@ -2167,7 +2167,7 @@ App rail のユーザーメニューは、ログイン中の利用者のプロ�
 
 **起動時にサーバーへつながらないときは、サインインを求めない（2026-09-26）。** Webは起動時の`/api/auth/me`が401か403のときだけサインイン画面を出す。通信の失敗や5xx（APIの再起動中、中継の502）では「サーバーに接続できません」と出し、3秒ごとに問い合わせ直して、つながったらページを開き直す。以前はこれもサインイン画面になり、単独利用モードでは誰も知らないパスワードを求めていた。
 
-Serverの正本永続化はSQLAlchemy上のSQLiteだけを使う。`INKU_DB_URL`と派生thumbnail DB設定はSQLite URLだけを受け付け、両方を検証してからどちらのengineも作る。非SQLite URLを拒否したあと空の既定DBへ黙って切り替えることはしない。Server SQLAlchemy/SQLiteとAndroid Room/SQLiteはそれぞれ自身の物理schemaを持ち、将来iOS adapterを作る場合も同じ論理契約へ別の物理mappingを持つ。同じDB file、table名、column配置を共有するという意味ではない。論理契約とhost mappingの正本は[`persistence/README.md`](persistence/README.md)と[`persistence/contract.json`](persistence/contract.json)である。Server専用の認証・管理tableと端末専用のprovider・model・cache tableはhost extensionであってparity gapではない。このmappingは保存済みSVG、Score、hash、NULLの意味を変えない。
+Serverの正本永続化はSQLAlchemy上のSQLiteだけを使う。`INKU_DB_URL`と派生thumbnail DB設定はSQLite URLだけを受け付け、両方を検証してからどちらのengineも作る。非SQLite URLを拒否したあと空の既定DBへ黙って切り替えることはしない。Server SQLAlchemy/SQLite、Android Room/SQLite、Swift GRDB/SQLiteはそれぞれ自身の物理schemaを持ち、同じ論理契約v2へmappingする。同じDB file、table名、column配置を共有するという意味ではない。Swiftの物理schemaはversion 1であり、ServerやRoomのschema版を流用しない。論理契約とhost mappingの正本は[`persistence/README.ja.md`](persistence/README.ja.md)と[`persistence/contract.json`](persistence/contract.json)である。Server専用の認証・管理tableと端末専用のprovider・model・cache tableはhost extensionであってparity gapではない。このmappingは保存済みSVG、Score、hash、NULLの意味を変えない。
 
 Serverのschema lifecycleはversion付きmigration registryが所有する。fresh DBはschemaとregistryを同じ単一writer transactionで作る。registryを持つDBは版とchecksumを検証して通常起動し、旧schema用の全件repair scanを毎回は行わない。registry導入前のDBは、明示的に登録されたschema fingerprintと完全なFTS状態だけを受け入れる。未知のfingerprint、部分的なFTS、未来のregistry版、checksum不一致は、schemaやrowを変更する前にfail closedする。
 
@@ -2254,7 +2254,8 @@ inku-lang/                 # github.com/oikawas/inku-lang
 ├── cli/                               # inku-cli (HTTP API クライアント、uv 管理)
 ├── shared/                            # server と CLI が共有する解析パッケージ (inku_analysis)
 ├── core/                              # 共有 Rust core（DDL compiler / render engine / score / SVG raster）
-├── persistence/                       # Server と Android が共有する論理 SQLite 永続化契約
+├── persistence/                       # Server・Android・Swiftの論理 SQLite 永続化契約
+├── apple/                             # macOS先行のSwiftUI・共有Rust・GRDBクライアント基盤
 ├── docs/                              # 公開文書（architecture / spec / guide / history / i18n）
 ├── manual/ja|en/                      # 利用者マニュアル（日英 7 対）
 └── android/                           # ネイティブ Android 実装（正本: android/ANDROID_SPEC.ja.md）

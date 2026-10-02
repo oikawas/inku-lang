@@ -6,6 +6,12 @@
 
 **本書は v2.5.0（2026-07-25、render engine 12）以降の履歴を保持する。** 最近の記録に続く過去の履歴は、同じ文書内で折りたたんである。必要なときに展開して読める。折りたたみに対応しないビューアでは全文を表示する。それより前の履歴は [v1.72〜v2.4の書庫](docs/history/changelog-v1.72-v2.4.ja.md) と [v0.1〜v1.71の書庫](docs/history/changelog-v0.1-v1.71.ja.md) にある。
 
+### 2026-10-02 — SwiftクライアントのmacOS初期基盤
+
+SwiftUIのmacOS Universalアプリと、同じRustを呼ぶUniFFI／XCFramework、standalone host、GRDB／SQLite adapterを追加した。最低OSはmacOS 14／iOS 17。直接DDLからScore／SVGを作り、保存・再表示・再演奏と新しい系譜childの保存、native画像表示、SVG／PNG書出し、手動DB backup／restoreを接続する。provider通信・Keychain・opaque snapshot・CAS／ACK・取消しとlocal-only再開もhostに実装した。Serverが開発正本であること、単一利用者であること、macOSにcameraを設けないことを維持する。
+
+macOSの両CPU向けlinkとApple Siliconのnative画面で生成・履歴・再演奏を確認した。iOS用Rust sliceを生成したが、iOSアプリ、camera、macOSの全機能UIとSVG性能受入は後続である。実provider通信、Intel実機の起動・性能、公開配布の受入をこの初期実装の確認へ読み替えない。Swiftの仕様はAndroid同様に[`SWIFT_SPEC.ja.md`](apple/SWIFT_SPEC.ja.md)を正本として英語を同期し、製品履歴は本CHANGELOGの日英対へ記録する。build手順は[`apple/README.ja.md`](apple/README.ja.md)を参照。
+
 ### 2026-10-02 — プロバイダのレート制限を設定し、バッチの送信を待つ
 
 Geminiのバッチで利用制限に達しても約2秒間隔で再送していた。設定にプロバイダごとのRPM・入力TPM・RPDと各項目の説明ツールチップを追加し、共有pipelineの全段階と再試行をまとめて制御する。毎分の枠が空くまで待ち、429の待機指定も反映する。日次の使用量は再起動後も保ち、上限時は生成要求を送らない。Geminiの初期値は記録済みの30・16,000・14,400、他は0（上限なし）で、管理者が変更できる。

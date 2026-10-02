@@ -1,0 +1,8 @@
+.build/
+build/
+DerivedData/
+Inku.xcodeproj/
+*.xcuserstate
+xcuserdata/
+Sources/InkuUI/Resources/server-defaults.json
+Sources/InkuUI/Resources/color-catalogs.json

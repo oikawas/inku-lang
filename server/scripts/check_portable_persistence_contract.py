@@ -251,9 +251,9 @@ def _validate_contract_shape(contract: dict[str, Any]) -> dict[str, dict[str, di
                 for host_name, host in contract["hosts"].items()
                 if field_name in host["records"][record_name]["fields"]
             }
-            if field["classification"] == "required_common" and mapped_hosts != {"server", "android"}:
+            if field["classification"] == "required_common" and mapped_hosts != set(contract["hosts"]):
                 raise ContractError(
-                    f"required field {record_name}.{field_name} is not mapped by both hosts"
+                    f"required field {record_name}.{field_name} is not mapped by every host"
                 )
             if field["classification"] == "optional_common" and not mapped_hosts:
                 raise ContractError(f"optional field {record_name}.{field_name} has no mapping")
@@ -421,6 +421,125 @@ def _insert_dict(connection: sqlite3.Connection, table: str, row: dict[str, Any]
     )
 
 
+def export_swift_schema(root: Path, contract: dict[str, Any]) -> dict[str, Any]:
+    """Export the bundled Swift SQL using an isolated in-memory database only."""
+    host = contract["hosts"]["swift"]
+    sql_path = root / host["schema_sql"]
+    try:
+        sql_bytes = sql_path.read_bytes()
+        sql = sql_bytes.decode("utf-8")
+    except (OSError, UnicodeDecodeError) as exc:
+        raise ContractError("cannot read Swift SQL authority") from exc
+    connection = sqlite3.connect(":memory:")
+    try:
+        connection.executescript(sql)
+        tables: dict[str, Any] = {}
+        for name, create_sql in connection.execute(
+            "SELECT name, sql FROM sqlite_master WHERE type = 'table' "
+            "AND substr(name, 1, 7) <> 'sqlite_' ORDER BY name"
+        ):
+            # Names come exclusively from the checked-in schema authority.
+            quoted_name = '"' + name.replace('"', '""') + '"'
+            columns = {
+                row[1]: {
+                    "affinity": row[2].upper(),
+                    "nullable": not bool(row[3]),
+                    "primary_key": bool(row[5]),
+                }
+                for row in connection.execute(f"PRAGMA table_info({quoted_name})")  # noqa: S608
+            }
+            indices = []
+            for index in connection.execute(f"PRAGMA index_list({quoted_name})"):  # noqa: S608
+                quoted_index = '"' + index[1].replace('"', '""') + '"'
+                indices.append({
+                    "name": index[1],
+                    "unique": bool(index[2]),
+                    "columnNames": [
+                        row[2] for row in connection.execute(f"PRAGMA index_info({quoted_index})")  # noqa: S608
+                    ],
+                })
+            tables[name] = {
+                "columns": columns,
+                "indices": sorted(indices, key=lambda index: index["name"]),
+                "create_sql": create_sql,
+            }
+        return {
+            "schema_version": connection.execute("PRAGMA user_version").fetchone()[0],
+            "contract_version": contract["contract_version"],
+            "sql_source": host["schema_sql"],
+            "sql_sha256": hashlib.sha256(sql_bytes).hexdigest(),
+            "tables": tables,
+        }
+    except sqlite3.Error as exc:
+        raise ContractError("invalid Swift SQL authority") from exc
+    finally:
+        connection.close()
+
+
+def _validate_swift(
+    root: Path,
+    contract: dict[str, Any],
+    logical_records: dict[str, dict[str, dict[str, Any]]],
+) -> dict[str, dict[str, Any]]:
+    host = contract["hosts"]["swift"]
+    actual = export_swift_schema(root, contract)
+    if actual != _load_json(root / host["source"]):
+        raise ContractError("Swift schema export differs from the bundled SQL authority")
+    if actual["schema_version"] != 1 or host["schema_version"] != 1:
+        raise ContractError("Swift schema must start at independent version 1")
+    tables = actual["tables"]
+    source = (root / host["records_source"]).read_text(encoding="utf-8")
+    for record_name, mapping in host["records"].items():
+        table_name = mapping["table"]
+        if table_name not in tables:
+            raise ContractError(f"missing Swift table: {table_name}")
+        table = tables[table_name]
+        for field_name, physical_mapping in mapping["fields"].items():
+            _check_physical_field(
+                "swift", record_name, field_name, logical_records[record_name][field_name],
+                physical_mapping, table,
+            )
+        declaration = re.search(
+            rf"public struct {re.escape(mapping['model'])}:.*?(?=\npublic struct|\npublic enum|\Z)",
+            source, re.DOTALL,
+        )
+        keys = re.search(r"public enum CodingKeys: String, CodingKey \{(.*?)\n    \}",
+                         declaration.group(0) if declaration else "", re.DOTALL)
+        if keys is None:
+            raise ContractError(f"missing Swift Codable mapping: {mapping['model']}")
+        coding_columns = set()
+        for line in re.findall(r"\bcase ([^\n]+)", keys.group(1)):
+            for item in line.split(","):
+                identifier, separator, value = item.strip().partition("=")
+                coding_columns.add(value.strip().strip('"') if separator else identifier.strip())
+        if coding_columns != set(table["columns"]):
+            raise ContractError(f"Swift Codable fields differ for {mapping['model']}")
+
+    history = tables[host["records"]["history"]["table"]]
+    _validate_history_column_coverage("swift", host, set(history["columns"]))
+    if not history["columns"]["id"]["primary_key"]:
+        raise ContractError("Swift history ID must be a primary key")
+    hash_indices = [index for index in history["indices"] if index["columnNames"] == ["render_hash"]]
+    if not hash_indices or any(index["unique"] for index in hash_indices):
+        raise ContractError("Swift render_hash index must exist and remain non-unique")
+    for table, column in (
+        (history, "lineage_node_id"),
+        (tables["lineage_nodes"], "history_id"),
+        (tables["lineage_edges"], "child_node_id"),
+    ):
+        if not _has_unique_index(table, [column]):
+            raise ContractError(f"Swift unique constraint is missing: {column}")
+    edge_sql = re.sub(r"\s+", " ", tables["lineage_edges"]["create_sql"])
+    if "CHECK (parent_node_id <> child_node_id)" not in edge_sql:
+        raise ContractError("Swift lineage edge must reject self-edges")
+    whitespace = re.search(r"bodyWhitespaceCodepoints: Set<UInt32> = \[(.*?)\]", source, re.DOTALL)
+    if whitespace is None or [int(value) for value in re.findall(r"\d+", whitespace.group(1))] != contract[
+        "ddl_body_whitespace_codepoints"
+    ]:
+        raise ContractError("Swift DDL body whitespace differs from the fixed contract")
+    return tables
+
+
 def validate_reference(root: Path, logical_records: dict[str, dict[str, dict[str, Any]]]) -> None:
     connection = sqlite3.connect(":memory:")
     connection.executescript(
@@ -577,6 +696,7 @@ def run_checks(root: Path) -> dict[str, int]:
     logical_records = _validate_contract_shape(contract)
     models, server_tables = _validate_server(root, contract, logical_records)
     room_tables = _validate_android(root, contract, logical_records)
+    swift_tables = _validate_swift(root, contract, logical_records)
     validate_reference(root, logical_records)
     return {
         "logical_fields": sum(len(fields) for fields in logical_records.values()),
@@ -589,6 +709,7 @@ def run_checks(root: Path) -> dict[str, int]:
         "server_models": len(models),
         "server_tables": len(server_tables),
         "room_tables": len(room_tables),
+        "swift_tables": len(swift_tables),
     }
 
 
@@ -600,7 +721,25 @@ def main() -> int:
         action="store_true",
         help="read sqlite_master JSON from stdin and print schema aggregates only",
     )
+    parser.add_argument("--swift-only", action="store_true", help="verify only the Swift host and shared declaration")
+    parser.add_argument("--export-swift-schema", action="store_true", help="refresh the generated Swift schema export")
     args = parser.parse_args()
+    if args.export_swift_schema or args.swift_only:
+        try:
+            contract = _load_json(root / "persistence/contract.json")
+            if args.export_swift_schema:
+                target = root / contract["hosts"]["swift"]["source"]
+                target.write_text(json.dumps(export_swift_schema(root, contract), ensure_ascii=False, indent=2) + "\n",
+                                  encoding="utf-8")
+                print(f"portable persistence Swift schema: exported {target.relative_to(root)}")
+                return 0
+            logical_records = _validate_contract_shape(contract)
+            swift_tables = _validate_swift(root, contract, logical_records)
+        except (ContractError, OSError) as exc:
+            print(f"portable persistence Swift contract: FAIL: {exc}")
+            return 1
+        print(f"portable persistence Swift contract: OK v2 schema=1 tables={len(swift_tables)}")
+        return 0
     if args.fingerprint_stdin:
         try:
             rows = json.load(sys.stdin)
@@ -627,7 +766,8 @@ def main() -> int:
         "portable persistence contract: OK "
         f"v2 fields={summary['logical_fields']} rules={summary['semantic_rules']} "
         f"declared_gaps={summary['declared_gaps']} "
-        f"server_tables={summary['server_tables']} room_tables={summary['room_tables']}"
+        f"server_tables={summary['server_tables']} room_tables={summary['room_tables']} "
+        f"swift_tables={summary['swift_tables']}"
     )
     return 0
 

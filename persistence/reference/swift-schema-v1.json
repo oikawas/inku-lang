@@ -1,0 +1,464 @@
+{
+  "schema_version": 1,
+  "contract_version": 2,
+  "sql_source": "apple/Packages/InkuPersistence/Sources/InkuPersistence/Resources/schema-v1.sql",
+  "sql_sha256": "ee1d638c68c0be94b8bcf99ea1c1117e99dce00c8aff88a07e7f5fcb13551748",
+  "tables": {
+    "effect_acknowledgements": {
+      "columns": {
+        "execution_id": {
+          "affinity": "TEXT",
+          "nullable": false,
+          "primary_key": true
+        },
+        "effect_id": {
+          "affinity": "TEXT",
+          "nullable": false,
+          "primary_key": true
+        },
+        "revision": {
+          "affinity": "INTEGER",
+          "nullable": false,
+          "primary_key": false
+        },
+        "snapshot": {
+          "affinity": "BLOB",
+          "nullable": false,
+          "primary_key": false
+        },
+        "acknowledgement": {
+          "affinity": "BLOB",
+          "nullable": false,
+          "primary_key": false
+        },
+        "save_payload": {
+          "affinity": "BLOB",
+          "nullable": false,
+          "primary_key": false
+        }
+      },
+      "indices": [
+        {
+          "name": "sqlite_autoindex_effect_acknowledgements_1",
+          "unique": true,
+          "columnNames": [
+            "execution_id",
+            "effect_id"
+          ]
+        }
+      ],
+      "create_sql": "CREATE TABLE effect_acknowledgements (\n    execution_id TEXT NOT NULL REFERENCES execution_snapshots(id),\n    effect_id TEXT NOT NULL,\n    revision INTEGER NOT NULL CHECK (revision >= 0),\n    snapshot BLOB NOT NULL,\n    acknowledgement BLOB NOT NULL,\n    save_payload BLOB NOT NULL,\n    PRIMARY KEY (execution_id, effect_id)\n)"
+    },
+    "execution_snapshots": {
+      "columns": {
+        "id": {
+          "affinity": "TEXT",
+          "nullable": false,
+          "primary_key": true
+        },
+        "revision": {
+          "affinity": "INTEGER",
+          "nullable": false,
+          "primary_key": false
+        },
+        "snapshot": {
+          "affinity": "BLOB",
+          "nullable": false,
+          "primary_key": false
+        }
+      },
+      "indices": [
+        {
+          "name": "sqlite_autoindex_execution_snapshots_1",
+          "unique": true,
+          "columnNames": [
+            "id"
+          ]
+        }
+      ],
+      "create_sql": "CREATE TABLE execution_snapshots (\n    id TEXT PRIMARY KEY NOT NULL,\n    revision INTEGER NOT NULL CHECK (revision >= 0),\n    snapshot BLOB NOT NULL\n)"
+    },
+    "history": {
+      "columns": {
+        "id": {
+          "affinity": "TEXT",
+          "nullable": false,
+          "primary_key": true
+        },
+        "at": {
+          "affinity": "INTEGER",
+          "nullable": false,
+          "primary_key": false
+        },
+        "input": {
+          "affinity": "TEXT",
+          "nullable": false,
+          "primary_key": false
+        },
+        "source_text": {
+          "affinity": "TEXT",
+          "nullable": true,
+          "primary_key": false
+        },
+        "ddl": {
+          "affinity": "TEXT",
+          "nullable": true,
+          "primary_key": false
+        },
+        "ddl_source_origin": {
+          "affinity": "TEXT",
+          "nullable": true,
+          "primary_key": false
+        },
+        "score": {
+          "affinity": "TEXT",
+          "nullable": false,
+          "primary_key": false
+        },
+        "svg": {
+          "affinity": "TEXT",
+          "nullable": false,
+          "primary_key": false
+        },
+        "elapsed_ms": {
+          "affinity": "INTEGER",
+          "nullable": true,
+          "primary_key": false
+        },
+        "stage1_model": {
+          "affinity": "TEXT",
+          "nullable": true,
+          "primary_key": false
+        },
+        "stage2_model": {
+          "affinity": "TEXT",
+          "nullable": true,
+          "primary_key": false
+        },
+        "catalog_id": {
+          "affinity": "TEXT",
+          "nullable": true,
+          "primary_key": false
+        },
+        "render_engine_id": {
+          "affinity": "TEXT",
+          "nullable": true,
+          "primary_key": false
+        },
+        "render_engine_version": {
+          "affinity": "TEXT",
+          "nullable": true,
+          "primary_key": false
+        },
+        "render_color_catalog_id": {
+          "affinity": "TEXT",
+          "nullable": true,
+          "primary_key": false
+        },
+        "render_color_catalog_name": {
+          "affinity": "TEXT",
+          "nullable": true,
+          "primary_key": false
+        },
+        "render_color_catalog_sub": {
+          "affinity": "TEXT",
+          "nullable": true,
+          "primary_key": false
+        },
+        "render_color_profile": {
+          "affinity": "TEXT",
+          "nullable": true,
+          "primary_key": false
+        },
+        "render_color_map": {
+          "affinity": "TEXT",
+          "nullable": true,
+          "primary_key": false
+        },
+        "render_canvas_aspect": {
+          "affinity": "TEXT",
+          "nullable": true,
+          "primary_key": false
+        },
+        "render_canvas_aspect_id": {
+          "affinity": "TEXT",
+          "nullable": true,
+          "primary_key": false
+        },
+        "render_canvas_aspect_ratio": {
+          "affinity": "REAL",
+          "nullable": true,
+          "primary_key": false
+        },
+        "render_seed": {
+          "affinity": "TEXT",
+          "nullable": true,
+          "primary_key": false
+        },
+        "render_wild": {
+          "affinity": "INTEGER",
+          "nullable": true,
+          "primary_key": false
+        },
+        "composition_seed": {
+          "affinity": "TEXT",
+          "nullable": true,
+          "primary_key": false
+        },
+        "interpretation_seed": {
+          "affinity": "TEXT",
+          "nullable": true,
+          "primary_key": false
+        },
+        "variation_amplitude": {
+          "affinity": "TEXT",
+          "nullable": true,
+          "primary_key": false
+        },
+        "variation_seed": {
+          "affinity": "TEXT",
+          "nullable": true,
+          "primary_key": false
+        },
+        "seed_text": {
+          "affinity": "TEXT",
+          "nullable": true,
+          "primary_key": false
+        },
+        "instruction_lang_requested": {
+          "affinity": "TEXT",
+          "nullable": true,
+          "primary_key": false
+        },
+        "instruction_lang_resolved": {
+          "affinity": "TEXT",
+          "nullable": true,
+          "primary_key": false
+        },
+        "interpret_fallback": {
+          "affinity": "TEXT",
+          "nullable": true,
+          "primary_key": false
+        },
+        "compose_fallback": {
+          "affinity": "TEXT",
+          "nullable": true,
+          "primary_key": false
+        },
+        "sketch_text": {
+          "affinity": "TEXT",
+          "nullable": true,
+          "primary_key": false
+        },
+        "sketch_grain": {
+          "affinity": "TEXT",
+          "nullable": true,
+          "primary_key": false
+        },
+        "sketch_state": {
+          "affinity": "TEXT",
+          "nullable": true,
+          "primary_key": false
+        },
+        "render_limits": {
+          "affinity": "TEXT",
+          "nullable": true,
+          "primary_key": false
+        },
+        "render_hash": {
+          "affinity": "TEXT",
+          "nullable": true,
+          "primary_key": false
+        },
+        "description_hash": {
+          "affinity": "TEXT",
+          "nullable": true,
+          "primary_key": false
+        },
+        "starred": {
+          "affinity": "INTEGER",
+          "nullable": false,
+          "primary_key": false
+        },
+        "trashed": {
+          "affinity": "INTEGER",
+          "nullable": false,
+          "primary_key": false
+        },
+        "history_visibility": {
+          "affinity": "TEXT",
+          "nullable": false,
+          "primary_key": false
+        },
+        "lineage_node_id": {
+          "affinity": "TEXT",
+          "nullable": true,
+          "primary_key": false
+        }
+      },
+      "indices": [
+        {
+          "name": "index_history_at",
+          "unique": false,
+          "columnNames": [
+            "at",
+            "id"
+          ]
+        },
+        {
+          "name": "index_history_render_hash",
+          "unique": false,
+          "columnNames": [
+            "render_hash"
+          ]
+        },
+        {
+          "name": "sqlite_autoindex_history_1",
+          "unique": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        {
+          "name": "sqlite_autoindex_history_2",
+          "unique": true,
+          "columnNames": [
+            "lineage_node_id"
+          ]
+        }
+      ],
+      "create_sql": "CREATE TABLE history (\n    id TEXT PRIMARY KEY NOT NULL,\n    at INTEGER NOT NULL,\n    input TEXT NOT NULL,\n    source_text TEXT,\n    ddl TEXT,\n    ddl_source_origin TEXT CHECK (ddl_source_origin IS NULL OR ddl_source_origin = 'legacy_expanded'),\n    score TEXT NOT NULL,\n    svg TEXT NOT NULL,\n    elapsed_ms INTEGER,\n    stage1_model TEXT,\n    stage2_model TEXT,\n    catalog_id TEXT,\n    render_engine_id TEXT,\n    render_engine_version TEXT,\n    render_color_catalog_id TEXT,\n    render_color_catalog_name TEXT,\n    render_color_catalog_sub TEXT,\n    render_color_profile TEXT,\n    render_color_map TEXT,\n    render_canvas_aspect TEXT,\n    render_canvas_aspect_id TEXT,\n    render_canvas_aspect_ratio REAL,\n    render_seed TEXT,\n    render_wild INTEGER CHECK (render_wild IS NULL OR render_wild IN (0, 1)),\n    composition_seed TEXT,\n    interpretation_seed TEXT,\n    variation_amplitude TEXT,\n    variation_seed TEXT,\n    seed_text TEXT,\n    instruction_lang_requested TEXT,\n    instruction_lang_resolved TEXT,\n    interpret_fallback TEXT,\n    compose_fallback TEXT,\n    sketch_text TEXT,\n    sketch_grain TEXT,\n    sketch_state TEXT,\n    render_limits TEXT,\n    render_hash TEXT,\n    description_hash TEXT,\n    starred INTEGER NOT NULL DEFAULT 0 CHECK (starred IN (0, 1)),\n    trashed INTEGER NOT NULL DEFAULT 0 CHECK (trashed IN (0, 1)),\n    history_visibility TEXT NOT NULL DEFAULT 'normal',\n    lineage_node_id TEXT UNIQUE REFERENCES lineage_nodes(id) DEFERRABLE INITIALLY DEFERRED\n)"
+    },
+    "lineage_edges": {
+      "columns": {
+        "id": {
+          "affinity": "TEXT",
+          "nullable": false,
+          "primary_key": true
+        },
+        "parent_node_id": {
+          "affinity": "TEXT",
+          "nullable": false,
+          "primary_key": false
+        },
+        "child_node_id": {
+          "affinity": "TEXT",
+          "nullable": false,
+          "primary_key": false
+        },
+        "derivation_kind": {
+          "affinity": "TEXT",
+          "nullable": false,
+          "primary_key": false
+        },
+        "metadata_json": {
+          "affinity": "TEXT",
+          "nullable": false,
+          "primary_key": false
+        },
+        "at": {
+          "affinity": "INTEGER",
+          "nullable": false,
+          "primary_key": false
+        }
+      },
+      "indices": [
+        {
+          "name": "sqlite_autoindex_lineage_edges_1",
+          "unique": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        {
+          "name": "sqlite_autoindex_lineage_edges_2",
+          "unique": true,
+          "columnNames": [
+            "child_node_id"
+          ]
+        }
+      ],
+      "create_sql": "CREATE TABLE lineage_edges (\n    id TEXT PRIMARY KEY NOT NULL,\n    parent_node_id TEXT NOT NULL REFERENCES lineage_nodes(id),\n    child_node_id TEXT NOT NULL UNIQUE REFERENCES lineage_nodes(id),\n    derivation_kind TEXT NOT NULL,\n    metadata_json TEXT NOT NULL DEFAULT '{}',\n    at INTEGER NOT NULL,\n    CHECK (parent_node_id <> child_node_id)\n)"
+    },
+    "lineage_nodes": {
+      "columns": {
+        "id": {
+          "affinity": "TEXT",
+          "nullable": false,
+          "primary_key": true
+        },
+        "history_id": {
+          "affinity": "TEXT",
+          "nullable": true,
+          "primary_key": false
+        },
+        "state": {
+          "affinity": "TEXT",
+          "nullable": false,
+          "primary_key": false
+        },
+        "description_hash": {
+          "affinity": "TEXT",
+          "nullable": true,
+          "primary_key": false
+        },
+        "render_hash": {
+          "affinity": "TEXT",
+          "nullable": true,
+          "primary_key": false
+        },
+        "at": {
+          "affinity": "INTEGER",
+          "nullable": false,
+          "primary_key": false
+        },
+        "deleted_at": {
+          "affinity": "INTEGER",
+          "nullable": true,
+          "primary_key": false
+        },
+        "root_node_id": {
+          "affinity": "TEXT",
+          "nullable": true,
+          "primary_key": false
+        }
+      },
+      "indices": [
+        {
+          "name": "sqlite_autoindex_lineage_nodes_1",
+          "unique": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        {
+          "name": "sqlite_autoindex_lineage_nodes_2",
+          "unique": true,
+          "columnNames": [
+            "history_id"
+          ]
+        }
+      ],
+      "create_sql": "CREATE TABLE lineage_nodes (\n    id TEXT PRIMARY KEY NOT NULL,\n    history_id TEXT UNIQUE REFERENCES history(id),\n    state TEXT NOT NULL,\n    description_hash TEXT,\n    render_hash TEXT,\n    at INTEGER NOT NULL,\n    deleted_at INTEGER,\n    root_node_id TEXT REFERENCES lineage_nodes(id)\n)"
+    },
+    "schema_migrations": {
+      "columns": {
+        "identifier": {
+          "affinity": "TEXT",
+          "nullable": false,
+          "primary_key": true
+        }
+      },
+      "indices": [
+        {
+          "name": "sqlite_autoindex_schema_migrations_1",
+          "unique": true,
+          "columnNames": [
+            "identifier"
+          ]
+        }
+      ],
+      "create_sql": "CREATE TABLE schema_migrations (\n    identifier TEXT PRIMARY KEY NOT NULL\n)"
+    }
+  }
+}

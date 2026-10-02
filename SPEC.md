@@ -574,8 +574,15 @@ the default engine; a thin adapter sends one request containing the validated
 Score and resolved options to the native `inku_render` binding.
 
 The deterministic rendering core is the Rust crate `core/crates/inku-render`.
-Server uses the native wheel and Android uses JNI to reach the same core.
-The iOS host connection remains separately pending.
+Server uses the native wheel, Android uses JNI, and the initial Swift client
+foundation uses UniFFI to reach the same core. Swift is a macOS-first,
+single-user standalone host that owns providers, SQLite, and native UI without
+duplicating Server DDL meaning or retry decisions. Swift-specific behavior,
+current implementation scope, and update rules are defined by
+[`apple/SWIFT_SPEC.md`](apple/SWIFT_SPEC.md); the build guide is
+[`apple/README.md`](apple/README.md). This document owns shared-core meaning.
+Swift specifications and history follow Android's Japanese-canonical and
+maintained-English workflow.
 
 The canonical metadata format read by history, the JSON tab, the CLI, and the
 benchmarks stays stable.  `render_hash` is the work-edition identifier; SVG
@@ -3895,10 +3902,11 @@ The Server's canonical persistence uses SQLite through SQLAlchemy only.
 `INKU_DB_URL` and the derived thumbnail-store setting accept SQLite URLs only;
 both are validated before either engine is created. Rejection of a non-SQLite
 URL never falls through to a new empty default database. Server
-SQLAlchemy/SQLite and Android Room/SQLite each own a
-physical schema; a possible future iOS adapter would map another physical
-schema to the same logical contract. This does not mean sharing one database
-file, table names, or column layout. Canonical logical meaning and host mappings
+SQLAlchemy/SQLite, Android Room/SQLite, and Swift GRDB/SQLite each own a
+physical schema mapped to the same version 2 logical contract. This does not mean
+sharing one database file, table names, or column layout. Swift starts at physical
+schema version 1 and does not reuse the Server or Room schema version.
+Canonical logical meaning and host mappings
 live in [`persistence/README.md`](persistence/README.md) and
 [`persistence/contract.json`](persistence/contract.json). Server-only
 authentication and administration tables and device-only provider, model, and
@@ -4115,7 +4123,8 @@ inku-lang/                 # github.com/oikawas/inku-lang
 ├── cli/                               # inku-cli (an HTTP API client, managed with uv)
 ├── shared/                            # the analysis package the server and CLI share (inku_analysis)
 ├── core/                              # shared Rust core (DDL compiler / render engine / score / SVG raster)
-├── persistence/                       # logical SQLite persistence contract shared by Server and Android
+├── persistence/                       # logical SQLite persistence contract for Server, Android, and Swift
+├── apple/                             # macOS-first SwiftUI/shared-Rust/GRDB client foundation
 ├── docs/                              # published documents (architecture / spec / guide / history / i18n)
 ├── manual/ja|en/                      # the user manual (seven Japanese/English pairs)
 └── android/                           # the native Android implementation (canonical: android/ANDROID_SPEC.ja.md)

@@ -6,11 +6,15 @@ use inku_pipeline::protocol::{ProtocolError, error_bytes};
 
 mod macro_catalog;
 mod plugin_diagnostics;
+mod raster;
 mod saijiki_migration;
+mod standalone;
 
 pub use macro_catalog::resolve_macro_catalog;
 pub use plugin_diagnostics::explain_plugin_diagnostics;
+pub use raster::{RasterFailure, RasterFrame, raster_api_version, rasterize_svg};
 pub use saijiki_migration::migrate_saijiki_v1;
+pub use standalone::{compile_document, render_compiled};
 
 const BINDING_VERSION: &str = "1.1.0";
 const PROTOCOL_VERSION: &str = "1.0.0";

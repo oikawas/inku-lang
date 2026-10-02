@@ -1,0 +1,6 @@
+[crates.inku_pipeline_uniffi.bindings.swift]
+module_name = "InkuCoreBindings"
+ffi_module_name = "InkuCoreFFI"
+ffi_module_filename = "InkuCoreFFI"
+generate_module_map = true
+generate_immutable_records = true

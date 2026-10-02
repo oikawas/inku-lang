@@ -6,6 +6,26 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file retains the history from v2.5.0 (2026-07-25, render engine 12) onward.** Past records follow the recent ones in a collapsible section of this same document; expand it when needed. Viewers without collapse support show the full text. Earlier history is in the [v1.72–v2.4 archive](docs/history/changelog-v1.72-v2.4.md) and the [v0.1–v1.71 archive](docs/history/changelog-v0.1-v1.71.md).
 
+### 2026-10-02 — Initial macOS foundation for Swift clients
+
+Added a SwiftUI Universal macOS app, UniFFI/XCFramework access to the same Rust
+core, a standalone host, and a GRDB/SQLite adapter. Minimum systems are macOS 14
+and iOS 17. Direct DDL reaches Score/SVG generation, saving, restoration,
+saved-Score replay with a new lineage child, native image display, SVG/PNG export,
+and manual database backup/restore. The host also implements provider transport,
+Keychain credentials, opaque snapshots, CAS/ACK, cancellation, and local-only
+resumption. Server remains the development source of truth, clients are
+single-user, and macOS has no camera.
+
+Both macOS architectures linked, and generation, history, and replay were
+checked in a native Apple Silicon window. iOS Rust slices were built; the iOS
+app and camera, full macOS UI parity, and SVG performance acceptance follow
+later. This initial acceptance does not cover live provider calls, Intel runtime
+or performance, or public distribution. Swift follows Android's documentation
+workflow: Japanese canonical [SWIFT_SPEC.ja.md](apple/SWIFT_SPEC.ja.md), a
+maintained [English specification](apple/SWIFT_SPEC.md), and product history in
+this paired root CHANGELOG. See [`apple/README.md`](apple/README.md) for building.
+
 ### 2026-10-02 — Configure service rate limits and pace batch requests
 
 Gemini batches retried roughly every two seconds after exhausting their allowance. Model settings now offer per-service RPM, input TPM, and RPD with explanatory tooltips. The shared pipeline counts every stage and retry, waits for minute capacity and provider cooldowns, and retains daily usage across restart. An exhausted daily allowance prevents further generation requests. Gemini starts at the recorded 30 / 16,000 / 14,400; other services start at zero (uncapped), and administrators can edit each value.

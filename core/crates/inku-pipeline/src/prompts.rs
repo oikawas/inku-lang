@@ -17,7 +17,7 @@ use inku_ddl::{
     VisibleDdlPatchEdit, core_modifier_surface_forms, saijiki_asset_sha256_hex,
     saijiki_derived_projection, saijiki_tool_guidance, visible_ddl_patch_available,
     work_plan::{
-        UNSPECIFIED, WorkPlanPlugin, normalize_work_plan_with_plugins,
+        UNSPECIFIED, WorkPlan, WorkPlanPlugin, normalize_work_plan_with_plugins,
         print_work_plan_with_plugins, work_plan_response_schema_with_plugins,
     },
 };
@@ -44,7 +44,8 @@ pub(crate) const LEGACY_HOLE_COMPLETION_PROMPT_ID: &str =
 const PROMPT_DIGEST_DOMAIN: &[u8] = b"inku.llm-prompt.v1";
 const CATALOG_DIGEST_DOMAIN: &[u8] = b"inku.prompt-catalog-projection.v1";
 
-/// The LLM effects accepted by I-523, plus the optional sketch before Stage 1.
+/// The LLM effects accepted by I-523, plus the optional sketch before Stage 1
+/// and the composition reading after it.
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum LlmStage {
@@ -52,6 +53,7 @@ pub enum LlmStage {
     SelectDescriptionCatalog,
     GenerateNormalizedDdl,
     CompleteVisibleDdlHoles,
+    ReadComposition,
 }
 
 impl LlmStage {
@@ -62,6 +64,7 @@ impl LlmStage {
             Self::SelectDescriptionCatalog => "select_description_catalog",
             Self::GenerateNormalizedDdl => "generate_normalized_ddl",
             Self::CompleteVisibleDdlHoles => "complete_visible_ddl_holes",
+            Self::ReadComposition => "read_composition",
         }
     }
 }
@@ -586,6 +589,30 @@ pub fn build_stage1_prompt_with_sketch(
     macros: &[MacroPromptEntry<'_>],
     limits: PromptLimits,
 ) -> Result<LlmPrompt, PromptError> {
+    build_stage1_prompt_for_run(
+        description,
+        sketch,
+        language,
+        context,
+        macros,
+        limits,
+        false,
+    )
+}
+
+/// Build the Stage 1 request of a run. A run that composes its plan asks for a
+/// place only where the description states one (principle 8) and leaves the rest
+/// to the composition step; any other run keeps the principle that spreads the
+/// layers itself, so a run without the step does not gather them at the center.
+pub fn build_stage1_prompt_for_run(
+    description: &str,
+    sketch: Option<&str>,
+    language: ResolvedInstructionLanguage,
+    context: &Stage1Context,
+    macros: &[MacroPromptEntry<'_>],
+    limits: PromptLimits,
+    composes: bool,
+) -> Result<LlmPrompt, PromptError> {
     require_nonempty("description", description)?;
     if let Some(sketch) = sketch {
         require_nonblank("sketch", sketch)?;
@@ -611,7 +638,7 @@ pub fn build_stage1_prompt_with_sketch(
         .into_iter()
         .map(|plugin| plugin.name)
         .collect::<Vec<_>>();
-    let mut system = stage1_work_plan_system(language)?;
+    let mut system = stage1_work_plan_system_for(language, composes)?;
     if !plugins.is_empty() {
         system.push_str(&stage1_plugin_section(macros, language));
     }
@@ -866,7 +893,7 @@ const STAGE1_WORK_PLAN_JA: &str = r#"あなたは inku の作品計画者であ�
 5. 画材と太さは痕の性格を決める。軽く繊細な痕には細い画材や細さ、重く強い痕には太い画材を選ぶ。一作品の中で画材を使い分けてよい。
 6. 複数の痕は、並べる・散らす・敷き詰める・埋めるで配置する。置く・引くは一か所に置く動作で、複数にすると一か所の束になる。埋めるは範囲の中を痕の反復で満たし、範囲からはみ出した部分は切り取られる。痕の大きさは記述に合わせる。
 7. 揺らぎは痕の生きた不均一さである。層ごとに揺らぎなし（still）・揺れる・波打つを選び、揺らぐなら振れ幅と波の間隔も選ぶ。反復する痕は、揺らぎ・大きさの幅・画材の擦れや質感で一本ごとに違いを持たせ、機械的な同一の繰り返しにしない。
-8. 余白も構図の一部である。全層を中心に集めず、位置・大きさ・個数で重心と空いた部分を作る。
+8. 位置は、記述が場所を言葉で言う層にだけ選ぶ。それ以外の層は位置を unspecified にする（画面のどこに置くかは、後で構図を決めるときに選ばれる）。余白も構図の一部なので、大きさと個数で重心と空いた部分を作る。
 9. 背景は画面の地色、groundは紙などの支持体である。どちらも任意で、描く対象の代わりにしない。背景を暗くするなら、痕の色がそれと見分けられるようにする。
 10. 感情・物語・題材名・説明は出力しない。
 
@@ -885,7 +912,7 @@ const STAGE1_WORK_PLAN_EN: &str = r#"You are inku's work planner. Read the autho
 5. Tool and thinness set the character of a mark: thin tools or thinness for light, delicate marks and thick tools for heavy, strong ones. Tools may differ within one work.
 6. Arrange multiple marks with line up, scatter, tile, or fill. Place and draw put marks at one spot, where several form a bundle. Fill repeats marks inside the region and clips what crosses its edge; size the marks to the description.
 7. Fluctuation is the living irregularity of a mark. For each layer choose still, swaying, or undulating, and when it moves also choose amplitude and wave spacing. Give repeated marks individual differences through fluctuation, a range of sizes, and the scrape or texture of the tool, rather than a mechanical identical repetition.
-8. Empty space is part of the composition. Do not gather every layer at the center; use position, size, and count to create a center of weight and open areas.
+8. Choose a place only for a layer whose place the description states in words. Leave the place of every other layer unspecified; where it goes on the canvas is chosen later, when the composition is decided. Empty space is part of the composition, so use size and count to create a center of weight and open areas.
 9. Background is the canvas color and ground is the support such as paper. Both are optional and never replace a drawn subject. With a dark background, keep mark colors distinguishable from it.
 10. Output no emotions, narrative, subject names, or explanations.
 
@@ -986,12 +1013,38 @@ fn stage1_plugin_section(
     format!("{rule}\n{}", lines.join("\n"))
 }
 
-fn stage1_work_plan_system(language: ResolvedInstructionLanguage) -> Result<String, PromptError> {
+/// Principle 8 for a run that composes: a place only where the description states it.
+const STAGE1_STATED_PLACES_JA: &str = "8. 位置は、記述が場所を言葉で言う層にだけ選ぶ。それ以外の層は位置を unspecified にする（画面のどこに置くかは、後で構図を決めるときに選ばれる）。余白も構図の一部なので、大きさと個数で重心と空いた部分を作る。";
+const STAGE1_STATED_PLACES_EN: &str = "8. Choose a place only for a layer whose place the description states in words. Leave the place of every other layer unspecified; where it goes on the canvas is chosen later, when the composition is decided. Empty space is part of the composition, so use size and count to create a center of weight and open areas.";
+/// Principle 8 for a run without the composition step: the plan spreads its layers.
+const STAGE1_SPREAD_PLACES_JA: &str =
+    "8. 余白も構図の一部である。全層を中心に集めず、位置・大きさ・個数で重心と空いた部分を作る。";
+const STAGE1_SPREAD_PLACES_EN: &str = "8. Empty space is part of the composition. Do not gather every layer at the center; use position, size, and count to create a center of weight and open areas.";
+
+fn stage1_work_plan_system_for(
+    language: ResolvedInstructionLanguage,
+    composes: bool,
+) -> Result<String, PromptError> {
     let tool_guidance =
         saijiki_tool_guidance(language).map_err(|_| PromptError::SaijikiProjection)?;
-    let (plan, context) = match language {
-        ResolvedInstructionLanguage::Ja => (STAGE1_WORK_PLAN_JA, STAGE1_CONTEXT_JA),
-        ResolvedInstructionLanguage::En => (STAGE1_WORK_PLAN_EN, STAGE1_CONTEXT_EN),
+    let (plan, context, stated, spread) = match language {
+        ResolvedInstructionLanguage::Ja => (
+            STAGE1_WORK_PLAN_JA,
+            STAGE1_CONTEXT_JA,
+            STAGE1_STATED_PLACES_JA,
+            STAGE1_SPREAD_PLACES_JA,
+        ),
+        ResolvedInstructionLanguage::En => (
+            STAGE1_WORK_PLAN_EN,
+            STAGE1_CONTEXT_EN,
+            STAGE1_STATED_PLACES_EN,
+            STAGE1_SPREAD_PLACES_EN,
+        ),
+    };
+    let plan = if composes {
+        plan.to_owned()
+    } else {
+        plan.replace(stated, spread)
     };
     Ok(format!(
         "{plan}\n\n{context}\n\n# tool_marks\n{tool_guidance}"
@@ -1318,17 +1371,35 @@ pub fn parse_stage1_response_with_plugins(
     language: ResolvedInstructionLanguage,
     plugins: &[WorkPlanPlugin],
 ) -> Result<Stage1Response, PromptError> {
+    parse_stage1_response_and_plan_with_plugins(response_text, limits, language, plugins)
+        .map(|(response, _)| response)
+}
+
+/// Parse a Stage 1 response and keep the normalized plan it was printed from, for
+/// the composition step. A saved response that carries visible DDL directly has no
+/// plan.
+pub fn parse_stage1_response_and_plan_with_plugins(
+    response_text: &str,
+    limits: PromptLimits,
+    language: ResolvedInstructionLanguage,
+    plugins: &[WorkPlanPlugin],
+) -> Result<(Stage1Response, Option<WorkPlan>), PromptError> {
     let value: Value = parse_bounded(response_text, limits)?;
-    let response = if value.get("normalized_ddl").is_some() {
-        serde_json::from_value::<Stage1Response>(value).map_err(|_| PromptError::InvalidJson)?
+    let (response, plan) = if value.get("normalized_ddl").is_some() {
+        (
+            serde_json::from_value::<Stage1Response>(value)
+                .map_err(|_| PromptError::InvalidJson)?,
+            None,
+        )
     } else {
         let (plan, _) = normalize_work_plan_with_plugins(&value, plugins);
         if plan.layers.is_empty() && plan.plugins.is_empty() {
             return Err(PromptError::EmptyField { field: "layers" });
         }
-        Stage1Response {
+        let response = Stage1Response {
             normalized_ddl: print_work_plan_with_plugins(&plan, language, plugins),
-        }
+        };
+        (response, Some(plan))
     };
     require_nonempty("normalized_ddl", &response.normalized_ddl)?;
     require_within(
@@ -1336,7 +1407,7 @@ pub fn parse_stage1_response_with_plugins(
         response.normalized_ddl.len(),
         limits.max_source_bytes,
     )?;
-    Ok(response)
+    Ok((response, plan))
 }
 
 /// Parse the exact visible-patch response. The caller validates it against the compilation.
@@ -1377,7 +1448,7 @@ pub fn parse_hole_completion_response(
     Ok(response)
 }
 
-fn parse_bounded<T: DeserializeOwned>(
+pub(crate) fn parse_bounded<T: DeserializeOwned>(
     response_text: &str,
     limits: PromptLimits,
 ) -> Result<T, PromptError> {
@@ -1550,7 +1621,7 @@ fn hole_response_schema(count: usize, max_replacement_bytes: usize) -> Value {
     })
 }
 
-fn finish_prompt(mut prompt: LlmPrompt) -> Result<LlmPrompt, PromptError> {
+pub(crate) fn finish_prompt(mut prompt: LlmPrompt) -> Result<LlmPrompt, PromptError> {
     let schema_text =
         serde_json::to_string(&prompt.response_schema).map_err(|_| PromptError::Serialization)?;
     let response_instruction = match prompt.instruction_language {
@@ -1562,8 +1633,12 @@ fn finish_prompt(mut prompt: LlmPrompt) -> Result<LlmPrompt, PromptError> {
         }
     };
     // v3 transports supply response_schema through their structured-output contract.
-    // Preserve old stage prompt bytes and persisted request editions.
-    if prompt.prompt_id != HOLE_COMPLETION_PROMPT_ID {
+    // Preserve old stage prompt bytes and persisted request editions. The prompts
+    // written for that contract (hole completion, the composition reading) carry the
+    // schema only there.
+    if prompt.prompt_id != HOLE_COMPLETION_PROMPT_ID
+        && prompt.prompt_id != crate::composition_reading::COMPOSITION_READING_PROMPT_ID
+    {
         prompt.system.push_str(&format!(
             "\n\n{response_instruction}\n# response_schema\n{schema_text}"
         ));
@@ -1612,7 +1687,7 @@ fn hash_prompt(mut prompt: LlmPrompt, schema_text: &str) -> LlmPrompt {
     prompt
 }
 
-fn require_nonempty(field: &'static str, value: &str) -> Result<(), PromptError> {
+pub(crate) fn require_nonempty(field: &'static str, value: &str) -> Result<(), PromptError> {
     if value.is_empty() {
         Err(PromptError::EmptyField { field })
     } else {
@@ -1628,7 +1703,11 @@ fn require_nonblank(field: &'static str, value: &str) -> Result<(), PromptError>
     }
 }
 
-fn require_within(field: &'static str, actual: usize, maximum: usize) -> Result<(), PromptError> {
+pub(crate) fn require_within(
+    field: &'static str,
+    actual: usize,
+    maximum: usize,
+) -> Result<(), PromptError> {
     if actual > maximum {
         Err(PromptError::LimitExceeded {
             field,
@@ -1853,6 +1932,30 @@ Use accepted_saijiki_vocabulary and the shared grammar. An unresolved_clause mus
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn principle_8_asks_for_stated_places_only_in_a_run_that_composes() {
+        for (language, stated, spread, plan) in [
+            (
+                ResolvedInstructionLanguage::Ja,
+                STAGE1_STATED_PLACES_JA,
+                STAGE1_SPREAD_PLACES_JA,
+                STAGE1_WORK_PLAN_JA,
+            ),
+            (
+                ResolvedInstructionLanguage::En,
+                STAGE1_STATED_PLACES_EN,
+                STAGE1_SPREAD_PLACES_EN,
+                STAGE1_WORK_PLAN_EN,
+            ),
+        ] {
+            assert_eq!(plan.matches(stated).count(), 1);
+            let composing = stage1_work_plan_system_for(language, true).unwrap();
+            assert!(composing.contains(stated) && !composing.contains(spread));
+            let printing = stage1_work_plan_system_for(language, false).unwrap();
+            assert!(printing.contains(spread) && !printing.contains(stated));
+        }
+    }
+
     use super::*;
 
     const LIMITS: PromptLimits = PromptLimits {
@@ -2225,7 +2328,7 @@ mod tests {
             ResolvedInstructionLanguage::Ja,
             ResolvedInstructionLanguage::En,
         ] {
-            let system = stage1_work_plan_system(language).unwrap();
+            let system = stage1_work_plan_system_for(language, false).unwrap();
             let guide = saijiki_tool_guidance(language).unwrap();
             assert!(!guide.is_empty());
             assert_eq!(system.matches(&guide).count(), 1);
@@ -2265,11 +2368,9 @@ mod tests {
         .unwrap();
         let ja_projection = stage1_system_projection(ResolvedInstructionLanguage::Ja).unwrap();
         let en_projection = stage1_system_projection(ResolvedInstructionLanguage::En).unwrap();
-        assert!(
-            prompt
-                .system
-                .starts_with(&stage1_work_plan_system(ResolvedInstructionLanguage::En).unwrap())
-        );
+        assert!(prompt.system.starts_with(
+            &stage1_work_plan_system_for(ResolvedInstructionLanguage::En, false).unwrap()
+        ));
         let (_, schema_text) = prompt.system.split_once("# response_schema\n").unwrap();
         assert_eq!(
             serde_json::from_str::<Value>(schema_text).unwrap(),

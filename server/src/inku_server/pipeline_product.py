@@ -16,7 +16,7 @@ from pydantic import BaseModel, ConfigDict, Field, StrictBool, ValidationError
 from .color_catalogs import color_catalogs, get_color_catalog, render_color_map_for_catalog
 from .macro_catalog import explain_plugin_diagnostics, resolve_new_work_macro_catalog
 from .pipeline_candidate import CandidateHostError, PipelineBinding, _bytes
-from .pipeline_provider import ProviderOptions, SingleAttemptProvider, resolved_drawing_model
+from .pipeline_provider import ProviderOptions, SingleAttemptProvider, provider_stage_record, resolved_drawing_model
 from .pipeline_settings import PipelineSettings, select_canvas
 from .persistence.variation_authority import VariationAuthorityStore
 from .provider_observation import ProviderObservationStore
@@ -320,6 +320,8 @@ class ProductPipelineEffects:
         def perform(action):
             from .chatgpt_runtime import execution_cancel
             stage = "stage2" if action["tag"] == "complete_visible_ddl_holes" else "stage1"
+            # The reading uses Stage 1's limits and is timed apart from it.
+            recorded = provider_stage_record(action["tag"])
             transport = SingleAttemptProvider(ProviderOptions(
                 settings=db.get_model_settings(), stage1_model=options.get("stage1_model", configured["stage1_model"]),
                 stage2_model=options.get("stage2_model", configured["stage2_model"]),
@@ -346,11 +348,11 @@ class ProductPipelineEffects:
             else:
                 _increment_stage_stat("failed")
             metrics = context.setdefault("metrics", {})
-            metrics[stage] = metrics.get(stage, 0) + int(result["elapsed_ms"])
+            metrics[recorded] = metrics.get(recorded, 0) + int(result["elapsed_ms"])
             if result["tag"] == "provider_failed":
                 context["provider_failure"] = {
                     "failure": result["failure"],
-                    "stage": stage,
+                    "stage": recorded,
                     "attempt": int(action["identity"]["attempt"]),
                     "elapsed_ms": int(result["elapsed_ms"]),
                 }

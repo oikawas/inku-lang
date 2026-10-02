@@ -2,6 +2,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
+use inku_ddl::work_plan::{WorkPlan, print_work_plan_composed};
 use inku_ddl::{
     CompilerLockState, MacroDefinition, MacroLock, NormalizedDdlDocument,
     ResolvedInstructionLanguage, SAIJIKI_ASSET_ID, SAIJIKI_V1_ASSET_ID, TypedDdlCompilation,
@@ -15,16 +16,20 @@ use crate::authority::{
     AuthorityTransitionOutcome, AuthorityTransitionProposal, AuthorityTransitionResult,
     VariationAuthorityState,
 };
+use crate::composition::{self, CheckedReading};
+use crate::composition_reading::{
+    build_composition_reading_prompt, parse_composition_reading_response,
+};
 use crate::core_boundary::CatalogMode;
 use crate::core_boundary::{CompiledDelivery, CompilerOptions, ResolvedHostOptions};
 use crate::prompts::{
     DescriptionCatalogEntry, HOLE_COMPLETION_PROMPT_ID, HoleCompletionResult,
     HolePatchEditResponse, HolePatchResponse, LEGACY_HOLE_COMPLETION_PROMPT_ID, LlmPrompt,
     LlmStage, MacroPromptEntry, PromptLimits, Stage1Context, build_catalog_selection_prompt,
-    build_hole_completion_prompt, build_sketch_prompt, build_stage1_prompt_with_sketch,
+    build_hole_completion_prompt, build_sketch_prompt, build_stage1_prompt_for_run,
     parse_catalog_selection_response, parse_hole_completion_response, parse_hole_patch_response,
-    parse_sketch_response, parse_stage1_response_with_plugins, with_stage1_background_feedback,
-    with_stage1_compiler_feedback,
+    parse_sketch_response, parse_stage1_response_and_plan_with_plugins,
+    with_stage1_background_feedback, with_stage1_compiler_feedback,
 };
 use crate::protocol::{
     ActionEcho, DecimalU64, EffectAction, EffectResult, Envelope, PROTOCOL_NAME, PROTOCOL_VERSION,
@@ -179,6 +184,35 @@ pub struct PipelineConfig {
     /// Budget for the optional sketch; the catalog budget when absent.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sketch_retry: Option<RetryPolicy>,
+    /// The composition step after Stage 1. Absent, a run commits Stage 1 as it
+    /// printed it (runs from before the step, and hosts that do not offer it).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub composition: Option<CompositionConfig>,
+    /// Budget for the composition reading; the catalog budget when absent.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub composition_retry: Option<RetryPolicy>,
+}
+
+/// How a run composes its Stage 1 plan: the layers whose place the description
+/// does not state are placed on ranges of the thirds grid, from a reading of the
+/// description or, without one, from the author's defaults.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CompositionConfig {
+    /// Send the composition reading. When false (an on-device model), the default
+    /// reading places the layers without a request.
+    pub read: bool,
+}
+
+/// A settled Stage 1 result waiting for its composition reading: the plan, the
+/// document as Stage 1 printed it (committed when the plan cannot be composed),
+/// and the reason its commit carries.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PendingComposition {
+    pub plan: WorkPlan,
+    pub document: VisibleDocument,
+    pub reason: String,
 }
 
 /// Whether a description run sketches before Stage 1. The sketch only
@@ -404,6 +438,12 @@ pub struct PipelineSnapshot {
     /// committed when that request fails.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub stage1_fallback: Option<VisibleDocument>,
+    /// The plan of the kept candidate, composed when the candidate is committed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub stage1_fallback_plan: Option<WorkPlan>,
+    /// A settled Stage 1 result waiting for its composition reading.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub composition: Option<PendingComposition>,
     pub snapshot_digest: String,
 }
 
@@ -455,6 +495,7 @@ impl PipelineSnapshot {
         for document in [
             self.document.as_ref(),
             self.stage1_fallback.as_ref(),
+            self.composition.as_ref().map(|pending| &pending.document),
             phase_document,
         ]
         .into_iter()
@@ -463,6 +504,21 @@ impl PipelineSnapshot {
             document.require_current_saijiki()?;
         }
         self.config.validate()?;
+        if self.stage1_fallback_plan.is_some() && self.stage1_fallback.is_none() {
+            return Err(ProtocolError::InvalidState);
+        }
+        if let Some(pending) = &self.composition {
+            pending.document.document()?;
+            if !matches!(
+                self.phase,
+                PipelinePhase::AwaitingLlm {
+                    stage: LlmStage::ReadComposition,
+                    ..
+                }
+            ) {
+                return Err(ProtocolError::InvalidState);
+            }
+        }
         if let Some(fallback) = &self.stage1_fallback {
             fallback.document()?;
             if !matches!(
@@ -681,6 +737,8 @@ impl PipelineSnapshot {
             self.hole_completion_check = None;
         }
         self.stage1_fallback = None;
+        self.stage1_fallback_plan = None;
+        self.composition = None;
         let payload = json!({
             "variation_id": self.variation_id,
             "document": document,
@@ -710,6 +768,10 @@ impl PipelineSnapshot {
             LlmStage::SelectDescriptionCatalog => self.config.catalog_retry,
             LlmStage::GenerateNormalizedDdl => self.config.stage1_retry,
             LlmStage::CompleteVisibleDdlHoles => self.config.hole_retry,
+            LlmStage::ReadComposition => self
+                .config
+                .composition_retry
+                .unwrap_or(self.config.catalog_retry),
         }
     }
 
@@ -789,6 +851,9 @@ impl PipelineConfig {
             .map_err(|_| ProtocolError::InvalidPolicy)?;
         self.catalog_retry.validate()?;
         if let Some(policy) = self.sketch_retry {
+            policy.validate()?;
+        }
+        if let Some(policy) = self.composition_retry {
             policy.validate()?;
         }
         self.stage1_retry.validate()?;
@@ -911,13 +976,14 @@ impl PipelineSnapshot {
             )
             .map_err(|_| ProtocolError::SchemaViolation)?,
         };
-        build_stage1_prompt_with_sketch(
+        build_stage1_prompt_for_run(
             description,
             self.sketch.as_ref().and_then(SketchRecord::stage1_text),
             self.config.language,
             &context,
             &macros,
             self.config.prompt_limits,
+            self.config.composition.is_some(),
         )
         .map_err(|_| ProtocolError::SchemaViolation)
     }
@@ -965,6 +1031,7 @@ impl PipelineSnapshot {
     fn return_ground_coloured_layers(
         &mut self,
         candidate: &VisibleDocument,
+        plan: Option<&WorkPlan>,
         description: String,
         elapsed_ms: u64,
         events: &mut Vec<PipelineEvent>,
@@ -1005,6 +1072,7 @@ impl PipelineSnapshot {
         };
         self.reissue_stage1(prompt, description, elapsed_ms, next, events)?;
         self.stage1_fallback = Some(candidate.clone());
+        self.stage1_fallback_plan = plan.cloned();
         self.event(
             events,
             "stage1_returned",
@@ -1059,13 +1127,185 @@ impl PipelineSnapshot {
             .stage1_fallback
             .take()
             .ok_or(ProtocolError::InternalInvariant)?;
+        let plan = self.stage1_fallback_plan.take();
+        let description = match &self.phase {
+            PipelinePhase::AwaitingLlm { description, .. } => description.clone(),
+            _ => None,
+        };
         self.event(events, "stage1_fallback", detail)?;
+        self.settle_stage1(document, plan, "stage1_generated", description, events)
+    }
+
+    /// Commit a settled Stage 1 result. When the run composes, the plan's layers
+    /// are placed first: from a composition reading when the run sends one,
+    /// otherwise from the default reading.
+    fn settle_stage1(
+        &mut self,
+        candidate: VisibleDocument,
+        plan: Option<WorkPlan>,
+        reason: &str,
+        description: Option<String>,
+        events: &mut Vec<PipelineEvent>,
+    ) -> Result<(), ProtocolError> {
+        let (Some(config), Some(plan)) = (
+            self.config.composition,
+            plan.filter(|plan| !plan.layers.is_empty()),
+        ) else {
+            return self.commit_stage1(candidate, reason, events);
+        };
+        if config.read
+            && let Some(description) = description
+        {
+            let plugins = crate::prompts::work_plan_plugins(&self.config.definitions);
+            match build_composition_reading_prompt(
+                &description,
+                &plan,
+                &plugins,
+                self.config.language,
+                self.config.prompt_limits,
+            ) {
+                Ok(prompt) => {
+                    self.composition = Some(PendingComposition {
+                        plan,
+                        document: candidate,
+                        reason: reason.to_owned(),
+                    });
+                    return self.begin_llm(prompt, Some(description), Vec::new(), events);
+                }
+                Err(_) => {
+                    self.event(events, "composition_fallback", json!({"failure": "prompt"}))?;
+                }
+            }
+        }
+        let reading = composition::default_reading(&plan.layers);
+        self.compose_and_commit(candidate, plan, reading, reason, events)
+    }
+
+    fn commit_stage1(
+        &mut self,
+        document: VisibleDocument,
+        reason: &str,
+        events: &mut Vec<PipelineEvent>,
+    ) -> Result<(), ProtocolError> {
         let next = proposal(
             self.authority
                 .propose_stage1_result_commit(self.authority.revision()),
         )?
         .ok_or(ProtocolError::InternalInvariant)?;
-        self.commit_document(document, next, "stage1_generated", events)
+        self.commit_document(document, next, reason, events)
+    }
+
+    /// Read the composition reply, check it against the plan and commit the
+    /// composed document. A reply that cannot be read is a schema violation of
+    /// the reading stage: retried within its budget, then the default reading.
+    fn composition_response(
+        &mut self,
+        response: &str,
+        spent_ms: u64,
+        description: Option<String>,
+        events: &mut Vec<PipelineEvent>,
+    ) -> Result<(), ProtocolError> {
+        let pending = self
+            .composition
+            .as_ref()
+            .ok_or(ProtocolError::InternalInvariant)?;
+        let Ok(parsed) = parse_composition_reading_response(
+            response,
+            pending.plan.layers.len(),
+            self.config.prompt_limits,
+        ) else {
+            return self.failure(ProviderFailure::SchemaViolation, spent_ms, events);
+        };
+        let description = description.unwrap_or_default();
+        let quoted = |_: usize, words: &str| description.contains(words);
+        let Ok((reading, findings)) =
+            composition::check(&parsed.reading, &pending.plan.layers, Some(&quoted))
+        else {
+            return self.failure(ProviderFailure::SchemaViolation, spent_ms, events);
+        };
+        self.action = None;
+        let pending = self
+            .composition
+            .take()
+            .ok_or(ProtocolError::InternalInvariant)?;
+        let codes: Vec<&str> = findings.iter().map(|finding| finding.code).collect();
+        self.event(events, "composition_read", json!({"findings": codes}))?;
+        self.compose_and_commit(
+            pending.document,
+            pending.plan,
+            reading,
+            &pending.reason,
+            events,
+        )
+    }
+
+    /// Place the plan's layers from a checked reading and commit the composed
+    /// document. When the plan cannot be composed, Stage 1 is committed as it
+    /// printed it and an event says why.
+    fn compose_and_commit(
+        &mut self,
+        candidate: VisibleDocument,
+        plan: WorkPlan,
+        reading: CheckedReading,
+        reason: &str,
+        events: &mut Vec<PipelineEvent>,
+    ) -> Result<(), ProtocolError> {
+        match self.composed_document(&candidate, &plan, &reading) {
+            Ok(document) => self.commit_stage1(document, reason, events),
+            Err(skipped) => {
+                self.event(events, "composition_skipped", json!({"reason": skipped}))?;
+                self.commit_stage1(candidate, reason, events)
+            }
+        }
+    }
+
+    fn composed_document(
+        &self,
+        candidate: &VisibleDocument,
+        plan: &WorkPlan,
+        reading: &CheckedReading,
+    ) -> Result<VisibleDocument, &'static str> {
+        let background = plan.background.as_deref().unwrap_or("white");
+        let searched =
+            composition::search(&plan.layers, reading, background).map_err(|unsolved| {
+                match unsolved {
+                    composition::Unsolved::Combinations(_) => "combinations",
+                    composition::Unsolved::NoRanges => "no_ranges",
+                    composition::Unsolved::UnknownPlace(_) => "unknown_place",
+                }
+            })?;
+        let composition_seed = self
+            .config
+            .compiler
+            .composition_seed()
+            .map_err(|_| "policy")?;
+        let solution = composition::solve(
+            &plan.layers,
+            reading,
+            background,
+            &searched,
+            composition_seed.unwrap_or(1),
+            &candidate.source_digest(),
+        )
+        .map_err(|_| "unsolved")?;
+        let (composed, ranges) = composition::composed_plan(plan, &solution.regions);
+        let plugins = crate::prompts::work_plan_plugins(&self.config.definitions);
+        let source = print_work_plan_composed(&composed, self.config.language, &plugins, &ranges);
+        let document = self.new_document(source).map_err(|_| "document")?;
+        let compiled = compile_typed_ddl(
+            document.document().map_err(|_| "document")?,
+            &self.config.definitions,
+            composition_seed,
+            self.config.compiler.macro_limits().map_err(|_| "policy")?,
+        );
+        if !compiled
+            .compiler_lock
+            .as_ref()
+            .is_some_and(|lock| lock.state == CompilerLockState::CanonicalReady)
+        {
+            return Err("compile");
+        }
+        Ok(document)
     }
 
     fn residual_execution_preflight(&self, candidate: &VisibleDocument) -> bool {
@@ -1322,6 +1562,25 @@ impl PipelineSnapshot {
                     payload["detail"] = json!(detail);
                 }
                 self.event(events, "needs_user_edit", payload)
+            }
+            LlmStage::ReadComposition => {
+                let pending = self
+                    .composition
+                    .take()
+                    .ok_or(ProtocolError::InternalInvariant)?;
+                let mut payload = json!({"failure": failure});
+                if let Some(detail) = detail {
+                    payload["detail"] = json!(detail);
+                }
+                self.event(events, "composition_fallback", payload)?;
+                let reading = composition::default_reading(&pending.plan.layers);
+                self.compose_and_commit(
+                    pending.document,
+                    pending.plan,
+                    reading,
+                    &pending.reason,
+                    events,
+                )
             }
         }
     }
@@ -1679,7 +1938,7 @@ impl PipelineSnapshot {
             }
             LlmStage::GenerateNormalizedDdl => {
                 let plugins = crate::prompts::work_plan_plugins(&self.config.definitions);
-                let generated = match parse_stage1_response_with_plugins(
+                let (generated, plan) = match parse_stage1_response_and_plan_with_plugins(
                     &response,
                     self.config.prompt_limits,
                     self.config.language,
@@ -1759,18 +2018,19 @@ impl PipelineSnapshot {
                 }
                 if self.return_ground_coloured_layers(
                     &candidate,
-                    description.ok_or(ProtocolError::InternalInvariant)?,
+                    plan.as_ref(),
+                    description
+                        .clone()
+                        .ok_or(ProtocolError::InternalInvariant)?,
                     total,
                     events,
                 )? {
                     return Ok(());
                 }
-                let next = proposal(
-                    self.authority
-                        .propose_stage1_result_commit(self.authority.revision()),
-                )?
-                .ok_or(ProtocolError::InternalInvariant)?;
-                self.commit_document(candidate, next, "stage1_generated", events)
+                self.settle_stage1(candidate, plan, "stage1_generated", description, events)
+            }
+            LlmStage::ReadComposition => {
+                self.composition_response(&response, spent_ms, description, events)
             }
             LlmStage::CompleteVisibleDdlHoles => {
                 self.hole_response(&response, &hole_ids, spent_ms, events)
@@ -2008,6 +2268,8 @@ pub fn advance(
             hole_completion_check: None,
             sketch: None,
             stage1_fallback: None,
+            stage1_fallback_plan: None,
+            composition: None,
             snapshot_digest: String::new(),
         };
         state.event(
@@ -2090,6 +2352,16 @@ impl PipelineSnapshot {
                 ..
             } => self.llm_response(
                 LlmStage::CompleteVisibleDdlHoles,
+                response,
+                elapsed_ms.get(),
+                events,
+            ),
+            EffectResult::CompositionRead {
+                response,
+                elapsed_ms,
+                ..
+            } => self.llm_response(
+                LlmStage::ReadComposition,
                 response,
                 elapsed_ms.get(),
                 events,

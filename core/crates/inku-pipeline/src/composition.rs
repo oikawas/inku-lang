@@ -2207,7 +2207,8 @@ mod tests {
     #[test]
     fn fractions_compare_exactly_and_round_once() {
         assert!(frac(1, 3) < frac(1, 2));
-        assert_eq!(frac(2, 6), Frac::new(1, 3));
+        assert_eq!(Frac::new(2, 6), frac(1, 3));
+        assert_eq!(Frac::new(3, -6), frac(-1, 2));
         assert_eq!((frac(1, 3) + frac(1, 6)).f(), 0.5);
         assert_eq!(frac(1, 3).f(), 1.0 / 3.0);
     }

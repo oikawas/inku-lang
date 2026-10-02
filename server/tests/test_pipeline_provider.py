@@ -110,6 +110,52 @@ def test_openai_gets_its_own_length_field_and_a_refusal_says_why(monkeypatch, ca
     assert "sk-proj" not in logged["message"]
 
 
+def test_mlx_profile_survives_settings_and_requests_core_schema_without_tools(monkeypatch):
+    """Forced tools made Gemma 4 repeat thought markers up to max_tokens.
+    A stored MLX profile must reach constrained JSON decoding, even under a
+    custom provider ID, without changing the prompt or losing its credentials.
+    """
+    from inku_server.model_settings import connection_for, update_model_settings
+
+    settings = update_model_settings({}, {"providers": {"mac-models": {
+        "kind": "openai_compatible", "base_url": "http://mlx.invalid/v1",
+        "api_key": "test-only", "requires_api_key": True,
+        "models": [{"id": "fixture-model"}],
+    }}})
+    settings = update_model_settings(settings, {"providers": {"mac-models": {"kind": "mlx"}}})
+    connection = connection_for("mac-models", settings)
+    assert connection["kind"] == "openai_compatible"  # list and Vision endpoints
+    assert connection["api_key"] == "test-only"
+    assert connection["base_url"] == "http://mlx.invalid/v1"
+    monkeypatch.setattr("inku_server.pipeline_provider.provider_for_model",
+                        lambda *args, **kwargs: ("mac-models", "fixture-model"))
+    seen = []
+
+    async def request(value):
+        seen.append(json.loads(value.content))
+        return httpx.Response(200, json={"choices": [{"message": {
+            "content": '{"normalized_ddl":"keep these bytes"}',
+        }, "finish_reason": "stop"}]})
+
+    provider = SingleAttemptProvider(
+        ProviderOptions(settings, "fixture-model", "fixture-model", 256, 8192),
+        transport=httpx.MockTransport(request),
+    )
+    action = _action()
+    result = provider(action)
+    assert result["response"] == '{"normalized_ddl":"keep these bytes"}'
+    assert len(seen) == 1
+    body = seen[0]
+    assert body["messages"] == [
+        {"role": "system", "content": action["payload"]["prompt"]["system"]},
+        {"role": "user", "content": action["payload"]["prompt"]["message"]},
+    ]
+    assert body["response_format"]["json_schema"]["schema"] == action["payload"]["prompt"]["response_schema"]
+    assert body["enable_thinking"] is False
+    assert body["max_tokens"] == 256
+    assert "tools" not in body and "tool_choice" not in body
+
+
 def test_missing_credentials_keep_only_safe_failure_detail(monkeypatch):
     monkeypatch.setattr(
         "inku_server.pipeline_provider.provider_for_model",

@@ -19,7 +19,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::ops::{Add, Mul, Sub};
 use std::sync::OnceLock;
 
-use inku_ddl::work_plan::{WorkPlanLayer, WorkPlanSlot};
+use inku_ddl::work_plan::{ComposedRange, WorkPlan, WorkPlanLayer, WorkPlanSlot};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
@@ -1243,6 +1243,98 @@ fn stated_regions(place: &str) -> Option<Vec<usize>> {
         );
     }
     named_region(place).map(|index| vec![index])
+}
+
+/// The keys of the ranges a layer can be composed into: the 28 composition ranges,
+/// then the four corners a stated corner chooses from.
+#[must_use]
+pub fn placement_keys() -> Vec<&'static str> {
+    regions()
+        .all
+        .iter()
+        .filter(|region| !region.key.starts_with("named-"))
+        .map(|region| region.key.as_str())
+        .collect()
+}
+
+/// The index of a range by its key.
+#[must_use]
+pub fn region_index(key: &str) -> Option<usize> {
+    regions().all.iter().position(|region| region.key == key)
+}
+
+/// The words that name a composition range in the visible DDL (Japanese, English).
+fn region_words(key: &str) -> Option<(&'static str, &'static str)> {
+    Some(match key {
+        "cell-00" => ("左上", "top left"),
+        "cell-10" => ("上中央", "top center"),
+        "cell-20" => ("右上", "top right"),
+        "cell-01" => ("左中央", "center left"),
+        "cell-11" => ("中心", "center"),
+        "cell-21" => ("右中央", "center right"),
+        "cell-02" => ("左下", "bottom left"),
+        "cell-12" => ("下中央", "bottom center"),
+        "cell-22" => ("右下", "bottom right"),
+        "hband-0" => ("上", "top"),
+        "hband-1" => ("中ほど", "middle"),
+        "hband-2" => ("下", "bottom"),
+        "vband-0" => ("左", "left"),
+        "vband-1" => ("中央の縦", "center column"),
+        "vband-2" => ("右", "right"),
+        "half-top" => ("上半分", "upper half"),
+        "half-bottom" => ("下半分", "lower half"),
+        "half-left" => ("左半分", "left half"),
+        "half-right" => ("右半分", "right half"),
+        "twothirds-top" => ("上の3分の2", "upper two thirds"),
+        "twothirds-bottom" => ("下の3分の2", "lower two thirds"),
+        "twothirds-left" => ("左の3分の2", "left two thirds"),
+        "twothirds-right" => ("右の3分の2", "right two thirds"),
+        "quarter-tl" => ("左上の四半分", "upper left quarter"),
+        "quarter-tr" => ("右上の四半分", "upper right quarter"),
+        "quarter-bl" => ("左下の四半分", "lower left quarter"),
+        "quarter-br" => ("右下の四半分", "lower right quarter"),
+        "whole" => ("画面全体", "whole canvas"),
+        "corner-tl" => ("左上の隅", "top left corner"),
+        "corner-tr" => ("右上の隅", "top right corner"),
+        "corner-bl" => ("左下の隅", "bottom left corner"),
+        "corner-br" => ("右下の隅", "bottom right corner"),
+        _ => return None,
+    })
+}
+
+/// The plan and the ranges to print for a solved placement. A layer placed on a
+/// stated place keeps (or takes) that place word; every other layer is written with
+/// the composition mark and its range, and loses any place the plan guessed.
+#[must_use]
+pub fn composed_plan(plan: &WorkPlan, chosen: &[usize]) -> (WorkPlan, Vec<Option<ComposedRange>>) {
+    let table = regions();
+    let mut plan = plan.clone();
+    let mut ranges = Vec::with_capacity(plan.layers.len());
+    for (layer, index) in plan.layers.iter_mut().zip(chosen) {
+        let region = &table.all[*index];
+        if let Some(place) = region.key.strip_prefix("named-") {
+            layer
+                .attributes
+                .insert(WorkPlanSlot::Position, place.to_owned());
+            ranges.push(None);
+            continue;
+        }
+        layer.attributes.remove(&WorkPlanSlot::Position);
+        let (words_ja, words_en) =
+            region_words(&region.key).expect("every composition range has words");
+        let bound = |value: Frac| {
+            (
+                u32::try_from(value.n).expect("a range lies on the canvas"),
+                u32::try_from(value.d).expect("a positive denominator"),
+            )
+        };
+        ranges.push(Some(ComposedRange {
+            words_ja: words_ja.to_owned(),
+            words_en: words_en.to_owned(),
+            bounds: region.rect.map(bound),
+        }));
+    }
+    (plan, ranges)
 }
 
 /// The key of a range (`cell-22`, `named-bottom`, ...).

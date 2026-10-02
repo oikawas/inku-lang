@@ -708,11 +708,49 @@ fn ja_modifier(surface: &str) -> String {
     }
 }
 
-fn print_layer_ja(layer: &WorkPlanLayer) -> String {
+/// The mark that says the composition step chose a range, before the words that
+/// name it. The compiler keeps these words unread, so removing the mark makes the
+/// range the author's own.
+pub const COMPOSITION_MARK_JA: &str = "［構図］";
+pub const COMPOSITION_MARK_EN: &str = "[composition]";
+
+/// A range the composition step placed a layer in: the words that name it in each
+/// language and its bounds (left, top, right, bottom; y = 0 at the top), each an
+/// exact fraction `(numerator, denominator)`.
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct ComposedRange {
+    pub words_ja: String,
+    pub words_en: String,
+    pub bounds: [(u32, u32); 4],
+}
+
+impl ComposedRange {
+    fn bound(&self, index: usize) -> String {
+        let (numerator, denominator) = self.bounds[index];
+        if denominator == 1 {
+            numerator.to_string()
+        } else {
+            format!("{numerator}/{denominator}")
+        }
+    }
+}
+
+fn print_layer_ja(layer: &WorkPlanLayer, range: Option<&ComposedRange>) -> String {
     let ja = ResolvedInstructionLanguage::Ja;
     let no = MarkerId::JaNo.surface();
     let mut out = String::new();
-    if let Some(place) = layer.attribute(WorkPlanSlot::Position) {
+    if let Some(range) = range {
+        out.push_str(&format!(
+            "{COMPOSITION_MARK_JA}{}（横{}〜{}、縦{}〜{}）",
+            range.words_ja,
+            range.bound(0),
+            range.bound(2),
+            range.bound(1),
+            range.bound(3)
+        ));
+        out.push_str(MarkerId::JaNi.surface());
+        out.push('、');
+    } else if let Some(place) = layer.attribute(WorkPlanSlot::Position) {
         out.push_str(&surface(WorkPlanSlot::Position, place, ja));
         out.push_str(MarkerId::JaNi.surface());
         out.push('、');
@@ -761,7 +799,7 @@ fn print_layer_ja(layer: &WorkPlanLayer) -> String {
     out
 }
 
-fn print_layer_en(layer: &WorkPlanLayer) -> String {
+fn print_layer_en(layer: &WorkPlanLayer, range: Option<&ComposedRange>) -> String {
     let en = ResolvedInstructionLanguage::En;
     let mut words: Vec<String> = Vec::new();
     if let Some(quality) = layer.attribute(WorkPlanSlot::MotionQuality) {
@@ -819,7 +857,16 @@ fn print_layer_en(layer: &WorkPlanLayer) -> String {
             surface(WorkPlanSlot::LineUpDirection, direction, en)
         ));
     }
-    if let Some(place) = layer.attribute(WorkPlanSlot::Position) {
+    if let Some(range) = range {
+        out.push_str(&format!(
+            " at the {COMPOSITION_MARK_EN} {} (horizontal {} to {}, vertical {} to {})",
+            range.words_en,
+            range.bound(0),
+            range.bound(2),
+            range.bound(1),
+            range.bound(3)
+        ));
+    } else if let Some(place) = layer.attribute(WorkPlanSlot::Position) {
         out.push_str(&format!(
             " at the {}",
             surface(WorkPlanSlot::Position, place, en)
@@ -842,6 +889,19 @@ pub fn print_work_plan_with_plugins(
     plan: &WorkPlan,
     language: ResolvedInstructionLanguage,
     plugins: &[WorkPlanPlugin],
+) -> String {
+    print_work_plan_composed(plan, language, plugins, &[])
+}
+
+/// Print a plan whose layers the composition step placed: a layer with a range is
+/// written with the composition mark and the range instead of a place word. Layers
+/// past the end of `ranges`, or with `None`, keep their own place.
+#[must_use]
+pub fn print_work_plan_composed(
+    plan: &WorkPlan,
+    language: ResolvedInstructionLanguage,
+    plugins: &[WorkPlanPlugin],
+    ranges: &[Option<ComposedRange>],
 ) -> String {
     let mut lines = Vec::new();
     if let Some(ground) = &plan.ground {
@@ -883,10 +943,11 @@ pub fn print_work_plan_with_plugins(
             (ResolvedInstructionLanguage::En, None) => format!("{written}."),
         });
     }
-    for layer in &plan.layers {
+    for (index, layer) in plan.layers.iter().enumerate() {
+        let range = ranges.get(index).and_then(Option::as_ref);
         lines.push(match language {
-            ResolvedInstructionLanguage::Ja => print_layer_ja(layer),
-            ResolvedInstructionLanguage::En => print_layer_en(layer),
+            ResolvedInstructionLanguage::Ja => print_layer_ja(layer, range),
+            ResolvedInstructionLanguage::En => print_layer_en(layer, range),
         });
     }
     lines.join("\n")

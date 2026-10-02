@@ -57,6 +57,26 @@ fn nature_definitions() -> Vec<MacroDefinition> {
         .collect()
 }
 
+fn first_difference(left: &str, right: &str) -> usize {
+    left.bytes()
+        .zip(right.bytes())
+        .position(|(a, b)| a != b)
+        .unwrap_or(left.len().min(right.len()))
+}
+
+/// A few hundred bytes around `at`, cut on character boundaries.
+fn excerpt(text: &str, at: usize) -> &str {
+    let mut start = at.saturating_sub(120);
+    while !text.is_char_boundary(start) {
+        start -= 1;
+    }
+    let mut end = (at + 240).min(text.len());
+    while !text.is_char_boundary(end) {
+        end += 1;
+    }
+    &text[start..end]
+}
+
 #[test]
 fn the_reading_request_is_built_as_the_prototype_built_it() {
     let fixture: Fixture = serde_json::from_str(FIXTURE).expect("the fixture is JSON");
@@ -71,6 +91,7 @@ fn the_reading_request_is_built_as_the_prototype_built_it() {
         max_response_bytes: 1024 * 1024,
     };
     let (mut compared, mut failures) = (0, Vec::new());
+    let mut differing: BTreeMap<&str, Vec<&str>> = BTreeMap::new();
     for case in &fixture.cases {
         let prompt = build_composition_reading_prompt(
             &fixture.placeholder[&case.lang],
@@ -82,10 +103,19 @@ fn the_reading_request_is_built_as_the_prototype_built_it() {
         .unwrap_or_else(|error| panic!("{}: {error:?}", case.id));
         assert_eq!(prompt.stage, LlmStage::ReadComposition);
         assert_eq!(prompt.prompt_id, COMPOSITION_READING_PROMPT_ID);
-        if prompt.system != fixture.system[&case.lang] {
-            failures.push(format!("{}: system differs", case.id));
+        let expected_system = &fixture.system[&case.lang];
+        if &prompt.system != expected_system {
+            differing.entry("system").or_default().push(&case.id);
+            let at = first_difference(&prompt.system, expected_system);
+            failures.push(format!(
+                "{}: system from byte {at}\n{}\nexpected\n{}",
+                case.id,
+                excerpt(&prompt.system, at),
+                excerpt(expected_system, at)
+            ));
         }
         if prompt.message != case.message {
+            differing.entry("message").or_default().push(&case.id);
             failures.push(format!(
                 "{}: message\n{}\nexpected\n{}",
                 case.id, prompt.message, case.message
@@ -93,6 +123,10 @@ fn the_reading_request_is_built_as_the_prototype_built_it() {
         }
         let expected = &fixture.response_schemas[&case.plan.layers.len().to_string()];
         if &prompt.response_schema != expected {
+            differing
+                .entry("response schema")
+                .or_default()
+                .push(&case.id);
             failures.push(format!(
                 "{}: response schema\n{}\nexpected\n{}",
                 case.id, prompt.response_schema, expected
@@ -101,11 +135,17 @@ fn the_reading_request_is_built_as_the_prototype_built_it() {
         compared += 1;
     }
     println!("{compared} reading requests compared");
+    // The summary comes last: a runner may keep only the tail of the output.
+    let summary: Vec<String> = differing
+        .iter()
+        .map(|(part, ids)| format!("{part}: {} ({})", ids.len(), ids.join(", ")))
+        .collect();
     assert!(
         failures.is_empty(),
-        "{} of {compared} differ:\n{}",
+        "{}\n\n{} of {compared} differ; {}",
+        failures.join("\n\n"),
         failures.len(),
-        failures.join("\n\n")
+        summary.join("; ")
     );
     assert_eq!(compared, 49);
 }

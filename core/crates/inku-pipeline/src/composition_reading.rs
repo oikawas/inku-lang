@@ -236,6 +236,10 @@ fn message(
 }
 
 /// The response schema for a plan of `layer_count` layers: fixed values only.
+///
+/// Each object names its property order (`propertyOrdering`), the order the
+/// prototype wrote and measured: the thesis is written first. JSON values here
+/// keep no key order, so a transport that orders properties reads it from there.
 fn response_schema(layer_count: usize) -> Value {
     let optional = |values: &[&str]| {
         let mut values: Vec<&str> = values.to_vec();
@@ -249,6 +253,7 @@ fn response_schema(layer_count: usize) -> Value {
     let axes: Vec<&str> = composition::TENSION.iter().map(|(axis, _)| *axis).collect();
     json!({
         "type": "object",
+        "propertyOrdering": ["thesis", "roles", "relations", "tension", "stated_places"],
         "properties": {
             "thesis": {"type": "string"},
             "roles": {
@@ -259,6 +264,7 @@ fn response_schema(layer_count: usize) -> Value {
             },
             "relations": {"type": "array", "items": {
                 "type": "object",
+                "propertyOrdering": ["type", "layers", "side", "toward"],
                 "properties": {
                     "type": {"type": "string", "enum": composition::RELATION_NAMES},
                     "layers": {"type": "array", "items": {"type": "integer", "minimum": 0}, "minItems": 1, "maxItems": 3},
@@ -267,9 +273,10 @@ fn response_schema(layer_count: usize) -> Value {
                 },
                 "required": ["type", "layers", "side", "toward"]
             }},
-            "tension": {"type": "object", "properties": tension, "required": axes},
+            "tension": {"type": "object", "propertyOrdering": axes, "properties": tension, "required": axes},
             "stated_places": {"type": "array", "items": {
                 "type": "object",
+                "propertyOrdering": ["layer", "words", "place"],
                 "properties": {
                     "layer": {"type": "integer", "minimum": 0},
                     "words": {"type": "string"},

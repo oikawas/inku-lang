@@ -1633,8 +1633,12 @@ pub(crate) fn finish_prompt(mut prompt: LlmPrompt) -> Result<LlmPrompt, PromptEr
         }
     };
     // v3 transports supply response_schema through their structured-output contract.
-    // Preserve old stage prompt bytes and persisted request editions.
-    if prompt.prompt_id != HOLE_COMPLETION_PROMPT_ID {
+    // Preserve old stage prompt bytes and persisted request editions. The prompts
+    // written for that contract (hole completion, the composition reading) carry the
+    // schema only there.
+    if prompt.prompt_id != HOLE_COMPLETION_PROMPT_ID
+        && prompt.prompt_id != crate::composition_reading::COMPOSITION_READING_PROMPT_ID
+    {
         prompt.system.push_str(&format!(
             "\n\n{response_instruction}\n# response_schema\n{schema_text}"
         ));

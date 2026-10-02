@@ -30,8 +30,6 @@ data class HistoryItemEntity(
     val originalInput: String,
     @ColumnInfo(name = "normalized_ddl")
     val normalizedDdl: String?,
-    @ColumnInfo(name = "expanded_ddl")
-    val expandedDdl: String?,
     @ColumnInfo(name = "score_json")
     val scoreJson: String,
     @ColumnInfo(name = "display_svg")
@@ -117,6 +115,9 @@ data class HistoryItemEntity(
     val sketchGrain: String? = null,
     @ColumnInfo(name = "sketch_state")
     val sketchState: String? = null,
+    /** A retired-text transfer marker, never an authoring authority. */
+    @ColumnInfo(name = "ddl_source_origin")
+    val ddlSourceOrigin: String? = null,
 )
 
 /**

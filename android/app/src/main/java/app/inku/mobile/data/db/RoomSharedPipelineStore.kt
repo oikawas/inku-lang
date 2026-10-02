@@ -253,6 +253,9 @@ class RoomSharedPipelineStore(
             require(history.normalizedDdl == sourceHistory.normalizedDdl) {
                 "replay source DDL changed"
             }
+            require(history.ddlSourceOrigin == sourceHistory.ddlSourceOrigin) {
+                "replay source DDL origin changed"
+            }
             require(history.normalizedDdl.orEmpty().sha256() == sourceLink.ddlDigest) {
                 "replay source does not match its committed revision"
             }

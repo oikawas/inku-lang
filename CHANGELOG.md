@@ -6,6 +6,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file retains the history from v2.5.0 (2026-07-25, render engine 12) onward.** Past records follow the recent ones in a collapsible section of this same document; expand it when needed. Viewers without collapse support show the full text. Earlier history is in the [v1.72–v2.4 archive](docs/history/changelog-v1.72-v2.4.md) and the [v0.1–v1.71 archive](docs/history/changelog-v0.1-v1.71.md).
 
+### 2026-10-02 — Android: Unify saved instructions into one DDL (I-706)
+
+Room migration 13→14 prefers DDL with a body and transfers old expanded text verbatim only when DDL has no body. It records `ddl_source_origin=legacy_expanded` and removes the old column. When neither has a body, the original NULL, empty string, or whitespace remains. Legacy JSON input, editing, and redraw use the fixed Unicode whitespace set. Migration preserves saved Scores/SVGs, lineage, and authority. Startup Saijiki migration now handles the single DDL, and work and instruction JSON export DDL with origin. Drawing entrances are disabled without a body; saved-Score replay preserves DDL and origin.
+
 ### 2026-10-02 — Unify saved instructions into DDL and align old-work redraw (I-706)
 
 Server and Web saving, display, editing, and redraw now use one `ddl`. Old

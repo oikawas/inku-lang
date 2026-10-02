@@ -53,7 +53,6 @@ class HistoryDuplicateRenderHashTest {
         updatedAt = 1L,
         originalInput = input,
         normalizedDdl = input,
-        expandedDdl = null,
         scoreJson = "{}",
         displaySvg = "<svg xmlns=\"http://www.w3.org/2000/svg\"></svg>",
         stage1Model = "test-stage1",

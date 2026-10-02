@@ -1,6 +1,7 @@
 package app.inku.mobile.pipeline
 
 import android.util.Log
+import app.inku.mobile.data.DdlSource
 import app.inku.mobile.data.db.ManagedHistoryLinkInput
 import app.inku.mobile.data.db.ManagedHistoryRead
 import app.inku.mobile.data.db.ManagedHistoryReplayInput
@@ -77,8 +78,6 @@ class AndroidWorkPipeline(
         return InterpretResult(
             originalInput = request.originalText,
             normalizedDdl = ddl,
-            expandedDdl = ddl,
-            ddlForDisplay = ddl,
             instructionLangRequested = run.instructionLangRequested,
             instructionLangResolved = run.instructionLangResolved,
             sketchText = sketch.text,
@@ -101,6 +100,7 @@ class AndroidWorkPipeline(
         rawRequest: PaintRequest,
         onProgress: suspend (ComposeFromDdlProgress) -> Unit = {},
     ): PaintResult {
+        require(DdlSource.hasBody(ddl)) { "ddl_body_required" }
         val request = authoringRequest(rawRequest)
         onProgress(ComposeFromDdlProgress.Rendering)
         val existingId = request.executionId
@@ -408,7 +408,6 @@ class AndroidWorkPipeline(
         return PaintResult(
             originalInput = resultOptions.optString("original_input", execution.authoringContext.description),
             normalizedDdl = ddl,
-            expandedDdl = ddl,
             scoreJson = delivery.requiredObject("score").toString(),
             displaySvg = svg,
             renderMetadataJson = metadata.toString(),
@@ -453,10 +452,8 @@ class AndroidWorkPipeline(
         metadata.put("render_hash", hash).put("render_hash_short", hash.takeLast(4).uppercase())
         return PaintResult(
             originalInput = request.originalText,
-            normalizedDdl = if (source != null) source.history.normalizedDdl.orEmpty() else request.description,
-            expandedDdl = if (source != null) {
-                source.history.expandedDdl ?: source.history.normalizedDdl.orEmpty()
-            } else request.description,
+            normalizedDdl = if (source != null) source.history.normalizedDdl else null,
+            ddlSourceOrigin = source?.history?.ddlSourceOrigin,
             scoreJson = JSONObject(scoreJson).toString(),
             displaySvg = svg,
             renderMetadataJson = metadata.toString(),

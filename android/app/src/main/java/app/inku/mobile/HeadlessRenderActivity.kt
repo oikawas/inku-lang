@@ -222,6 +222,7 @@ class HeadlessRenderActivity : Activity() {
                     .put("input_mode", inputMode)
                     .put("elapsed_ms", item.elapsedMs)
                     .put("normalized_ddl", item.normalizedDdl ?: JSONObject.NULL)
+                    .put("ddl_source_origin", item.ddlSourceOrigin ?: JSONObject.NULL)
                     .put("score_path", "files/headless/$runId/score.json")
                     .put("svg_path", "files/headless/$runId/output.svg")
                     .put("metadata_path", "files/headless/$runId/metadata.json")

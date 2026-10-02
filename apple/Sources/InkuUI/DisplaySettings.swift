@@ -12,7 +12,7 @@ public struct DisplayPreferences: Codable, Sendable, Equatable {
     public var captionVisible = true
     public var captionVertical = false
     public var captionPosition = "left"
-    public var historyFields: Set<String> = ["model", "engine", "size"]
+    public var historyFields: Set<String> = ["generation", "model"]
     public var keepGenerationInfo = true
     public var showTooltips = true
     public var mascot = "incu"

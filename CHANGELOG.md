@@ -6,6 +6,12 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file retains the history from v2.5.0 (2026-07-25, render engine 12) onward.** Past records follow the recent ones in a collapsible section of this same document; expand it when needed. Viewers without collapse support show the full text. Earlier history is in the [v1.72–v2.4 archive](docs/history/changelog-v1.72-v2.4.md) and the [v0.1–v1.71 archive](docs/history/changelog-v0.1-v1.71.md).
 
+### 2026-10-03 — Refine Swift creation views and standard macOS actions
+
+Grouped creation input, upcoming conditions, and saved information into panels, with Generate/Stop outside scrolling. Compact saved facts and a detail popover leave more room for the canvas. Registered service/model choices reach both interpretation and structure stages while preserving saved defaults and running batch/demo snapshots. Added active-scene New, DDL import, Settings, navigation, copy, and export menus/shortcuts plus system-sidebar Settings categories.
+
+Distinguished library display from checkbox selection and lineage display from focus; improved DDL titles, hashes, comments, marks, and parent/child actions. History now shows actual primary-parent generations instead of variation amplitude, with generation/model as new defaults. Export uses creation's displayed work, library selection, or the lineage path without mixing another screen's checkboxes. Universal build, selected model/generation checks, and isolated native checks confirmed menus, generations one/two, two versus one export candidates, and two window sizes. Actual model discovery/provider calls, every width, VoiceOver, and author design acceptance remain separate. Updated the [Swift specification](apple/SWIFT_SPEC.md) and [build guide](apple/README.md).
+
 ### 2026-10-03 — Align Swift macOS views, whole-database history and export with Server
 
 Connected creation inputs and independent saved-work facts, DDL editing and patch approval, Saijiki/plugins, whole-database history/library, marks/comments/Trash/restore, lineage graphs, explicit comparison saves, model advice/colophons, batch/demo and display/language/export/backup settings. Swift schema v2 has nine tables; known-v1 migration and backup restoration preserve source text, Score/SVG and ACKs. Native shared boundaries use the Sudachi Japanese dictionary and English CMUdict without a runtime Python dependency.

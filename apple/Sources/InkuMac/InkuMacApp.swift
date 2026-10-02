@@ -18,5 +18,6 @@ struct InkuMacApp: App {
                 .frame(minWidth: 1000, minHeight: 680)
         }
         .defaultSize(width: 1320, height: 880)
+        .commands { InkuCommands(display: model.display) }
     }
 }

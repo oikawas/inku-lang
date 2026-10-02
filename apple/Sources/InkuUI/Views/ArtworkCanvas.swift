@@ -27,11 +27,12 @@ struct ArtworkCanvas: View {
         VStack(spacing: 8) {
             GeometryReader { geometry in
               ZStack {
-                RoundedRectangle(cornerRadius: 10).fill(.quaternary.opacity(0.3))
+                RoundedRectangle(cornerRadius: 14, style: .continuous).fill(.quaternary.opacity(0.3))
                 if let image {
                     Image(decorative: image, scale: 1)
                         .resizable().interpolation(.high).scaledToFit()
                         .padding(18)
+                        .shadow(color: .black.opacity(0.08), radius: 8, y: 3)
                         .scaleEffect(scale).offset(offset)
                         .gesture(MagnificationGesture()
                             .onChanged { value in scale = bounded(gestureScale * value) }
@@ -55,7 +56,8 @@ struct ArtworkCanvas: View {
                 }
                 if loading && image != nil { ProgressView().controlSize(.small).padding(12).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing) }
               }
-              .clipped()
+              .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+              .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(.quaternary))
               .task(id: requestKey(size: geometry.size)) { await render(size: geometry.size) }
             }
             .frame(minHeight: 280, maxHeight: .infinity)
@@ -64,12 +66,18 @@ struct ArtworkCanvas: View {
                 Spacer(minLength: 12)
                 Button { setScale(scale / 1.25) } label: { Image(systemName: "minus.magnifyingglass") }
                     .accessibilityLabel(display.localized("縮小"))
+                    .help(display.preferences.showTooltips ? display.localized("縮小") : "")
+                    .disabled(scale <= 0.25)
                 Text(Double(scale).formatted(.percent.precision(.fractionLength(0)))).font(.caption.monospacedDigit())
                 Button { setScale(scale * 1.25) } label: { Image(systemName: "plus.magnifyingglass") }
                     .accessibilityLabel(display.localized("拡大"))
-                Button(display.localized("全体")) { reset() }
+                    .help(display.preferences.showTooltips ? display.localized("拡大") : "")
+                    .disabled(scale >= 8)
+                Button(display.localized("用紙に合わせる")) { reset() }
+                    .help(display.preferences.showTooltips ? display.localized("拡大率と位置をリセット") : "")
             }
             .buttonStyle(.borderless)
+            .controlSize(.small)
             .disabled(image == nil)
         }
         .onChange(of: svg) { _, _ in image = nil; error = nil; reset() }

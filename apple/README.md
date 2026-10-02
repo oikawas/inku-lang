@@ -50,6 +50,8 @@ open apple/build/macOS/DerivedData/Build/Products/Release/Inku.app
 
 The initial input is direct English DDL, so generation can be tried without a model connection. For description input, save a provider type, base URL, model, and any required API key in Settings, then select description mode in the creation screen. Multiple API services can be registered; Stage1/Stage2 share the drawing model. Model discovery uses an explicit button. Saving a connection does not send an LLM request.
 
+Choose the next service/model in the creation screen's Next generation settings. This does not change saved Settings defaults or running batch/demo requests. Generate/Stop remains outside the input scroll area. Command-N creates a new work, Command-O imports DDL, Command-comma opens Settings, Command-1 through 4 navigate screens, and Shift-Command-E opens export. Library checkboxes are distinct from the displayed work; creation exports its displayed saved work.
+
 The database is stored in the application's Application Support directory. Ordinary provider settings are stored beside it in `providers.json`; API keys are separate Keychain items. SQLite backup contains works, lineage, executions/ACKs/snapshots, comments/marks, colophons, and unread words. It does not back up adjacent settings JSON or Keychain items.
 
 To try the application with a temporary database, pass `--database` to its executable:
@@ -89,4 +91,4 @@ uv sync --project server --frozen
 python3 apple/scripts/prepare-meter-resources.py
 ```
 
-Bounded CLI checks are available through `apple/scripts/check-core.sh` after artifact generation and `swift run --package-path apple InkuAppCheck` after resource generation. Select `--authoring-only`, `--comparison-only`, `--automation-only`, `--plugin-only`, or `--raster-only <SVG path>` for the relevant change. These do not replace native screen, real-provider, or device acceptance. Run only checks needed for the concrete failure a change prevents.
+Bounded CLI checks are available through `apple/scripts/check-core.sh` after artifact generation and `swift run --package-path apple InkuAppCheck` after resource generation. Select `--authoring-only`, `--comparison-only`, `--automation-only`, `--plugin-only`, `--model-selection-only`, or `--raster-only <SVG path>` for the relevant change. `--model-selection-only` uses a temporary DB and zero provider calls to verify creation model selection separately from saved defaults and startup snapshots. These do not replace native screen, real-provider, or device acceptance. Run only checks needed for the concrete failure a change prevents.

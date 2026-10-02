@@ -5,7 +5,11 @@ import Observation
 @MainActor @Observable
 public final class HistoryModel {
     public let library = LibraryModel()
+    public private(set) var generations: [String: Int] = [:]
+    public private(set) var generationLoading = true
+    public private(set) var generationError: String?
     @ObservationIgnored private var database: InkuDatabase?
+    @ObservationIgnored private var generationToken = UUID()
     public init() { library.pageSize = 20 }
     public func connect(app: AppModel) async {
         guard database == nil else { return }
@@ -16,6 +20,30 @@ public final class HistoryModel {
             await locate(app: app)
         } catch { app.errorText = error.localizedDescription }
     }
+
+    /// Fetch page metadata independently of the selected work or visible ancestors.
+    public func refreshGenerations() async {
+        guard let database else { return }
+        let nodeIDs = library.works.compactMap(\.lineageNodeID)
+        let token = UUID()
+        generationToken = token
+        generationLoading = true
+        generationError = nil
+        generations = [:]
+        do {
+            let result = try await database.lineageGenerations(nodeIDs: nodeIDs)
+            guard generationToken == token, !Task.isCancelled,
+                  library.works.compactMap(\.lineageNodeID) == nodeIDs else { return }
+            generations = result
+            generationLoading = false
+        } catch {
+            guard generationToken == token, !Task.isCancelled,
+                  library.works.compactMap(\.lineageNodeID) == nodeIDs else { return }
+            generationLoading = false
+            generationError = error.localizedDescription
+        }
+    }
+
     public func locate(app: AppModel) async {
         guard let database, let id = app.selectedWorkID else { return }
         do {

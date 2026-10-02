@@ -6,6 +6,12 @@
 
 **本書は v2.5.0（2026-07-25、render engine 12）以降の履歴を保持する。** 最近の記録に続く過去の履歴は、同じ文書内で折りたたんである。必要なときに展開して読める。折りたたみに対応しないビューアでは全文を表示する。それより前の履歴は [v1.72〜v2.4の書庫](docs/history/changelog-v1.72-v2.4.ja.md) と [v0.1〜v1.71の書庫](docs/history/changelog-v0.1-v1.71.ja.md) にある。
 
+### 2026-10-03 — Swiftの制作画面とmacOS標準操作を整える
+
+制作の入力・次の条件・保存情報をpanelへまとめ、生成／停止をscrollの外へ固定した。保存条件をcompactな要約と詳細へ移し、canvasを広げた。登録済みservice／modelの選択を記述解釈・構造化の両段へ渡し、保存defaultと開始済みbatch／demoの固定条件を保持する。active sceneに従う新規・DDL読込・設定・画面移動・copy・書出しmenuとshortcut、system sidebarの設定categoryを追加した。
+
+libraryの表示作品とcheckbox、系譜の表示作品とfocusを明示し、DDL作品名・hash・comment・mark・親子移動を整えた。履歴の世代欄をvariation幅から実際のprimary-parent世代へ修正し、初期表示を世代＋modelに合わせた。書出し対象は制作の表示作品、libraryの選択、系譜pathへ分け、他画面のcheckbox混入を防ぐ。Universal build、model選択と世代の限定確認、隔離DBでのnative menu・世代1／2・書出し対象2件／1件と2種類のwindowサイズを確認した。実model一覧取得・provider送信、全幅・VoiceOver・作者のデザイン受入は別の確認とする。[Swift仕様](apple/SWIFT_SPEC.ja.md)と[build手順](apple/README.ja.md)を更新した。
+
 ### 2026-10-03 — SwiftのmacOS画面・全件履歴・書き出しをServerに合わせる
 
 制作の入力と表示作品の条件を分け、DDL編集・補完案の承認、歳時記／plugin、SQLite全件の履歴とlibrary、印・comment・trash／復元、系譜graph、比較候補の明示保存、model助言・奥書、batch／demo、表示／言語／export／backup設定を接続した。Swift schemaをv2／9tableへ進め、既知v1の移行とbackup復元で保存本文・Score／SVG・ACKを保持する。日本語のSudachi辞書と英語のCMUdictをnative共通境界で読み、runtimeにPythonを要求しない。

@@ -14,18 +14,30 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .limits: "制限値"; case .about: "inkuについて"
         }
     }
+    var symbol: String {
+        switch self {
+        case .display: "slider.horizontal.3"; case .making: "paintbrush.pointed"
+        case .models: "cpu"; case .personalPlan: "person.crop.circle"
+        case .database: "externaldrive"; case .export: "square.and.arrow.up"
+        case .clipboard: "doc.on.clipboard"; case .plugins: "puzzlepiece.extension"
+        case .unread: "text.magnifyingglass"; case .limits: "gauge.with.dots.needle.33percent"
+        case .about: "info.circle"
+        }
+    }
 }
 
 @MainActor struct SettingsView: View {
     @Bindable var model: AppModel
     @State private var settings = SettingsModel()
-    @State private var section = SettingsSection.display
+    @Binding var section: SettingsSection
     @State private var confirmRestore = false
     @State private var confirmClearKey = false
 
     var body: some View {
         HStack(alignment: .top, spacing: 0) {
-            List(SettingsSection.allCases, selection: $section) { item in Text(model.display.localized(item.title)).tag(item) }.frame(width: 190)
+            List(SettingsSection.allCases, selection: $section) { item in
+                Label(model.display.localized(item.title), systemImage: item.symbol).tag(item)
+            }.listStyle(.sidebar).frame(width: 190)
             Divider()
             Form {
                 switch section {

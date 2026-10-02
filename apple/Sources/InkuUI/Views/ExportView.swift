@@ -57,7 +57,7 @@ struct ExportView: View {
                             if included { selectedIDs.insert(work.id) } else { selectedIDs.remove(work.id) }
                         })) {
                             VStack(alignment: .leading, spacing: 3) {
-                                Text(work.effectiveSourceText.isEmpty ? model.display.localized("無題") : work.effectiveSourceText).lineLimit(2)
+                                LibraryWorkTitle(work: work, untitled: model.display.localized("無題"))
                                 Text(Date(timeIntervalSince1970: Double(work.at) / 1000), format: .dateTime).font(.caption).foregroundStyle(.secondary)
                             }
                         }.disabled(isBusy || work.trashed)

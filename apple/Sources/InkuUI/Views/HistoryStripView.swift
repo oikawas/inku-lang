@@ -25,6 +25,9 @@ import SwiftUI
                     .disabled(library.page + 1 >= library.pageCount)
             }.controlSize(.small)
             if let error = library.errorText { Text(error).font(.caption).foregroundStyle(.red) }
+            if let error = history.generationError {
+                Text(model.display.localizedFormat("世代を読み込めませんでした: %@", error)).font(.caption).foregroundStyle(.red)
+            }
             ScrollView(.horizontal) {
                 LazyHStack(spacing: 10) {
                     ForEach(library.works, id: \.id) { work in
@@ -36,20 +39,44 @@ import SwiftUI
                             }.font(.caption2).frame(width: 90, alignment: .leading).padding(5)
                                 .background(model.selectedWorkID == work.id ? Color.accentColor.opacity(0.15) : Color.clear, in: RoundedRectangle(cornerRadius: 6))
                                 .overlay(RoundedRectangle(cornerRadius: 6).stroke(model.selectedWorkID == work.id ? Color.accentColor : .clear))
-                        }.buttonStyle(.plain).help(model.display.preferences.showTooltips ? work.effectiveSourceText : "").accessibilityLabel(model.display.localizedFormat("作品を開く: %@", work.effectiveSourceText))
+                        }.buttonStyle(.plain).help(model.display.preferences.showTooltips ? title(work) : "").accessibilityLabel(model.display.localizedFormat("作品を開く: %@", title(work)))
                     }
                 }
             }
             .frame(height: CGFloat(84 + min(3, model.display.preferences.historyFields.count) * 13))
         }.disabled(model.isBusy || library.loading).padding(.horizontal, 16).padding(.vertical, 10)
+            .task(id: GenerationRequest(nodeIDs: library.works.compactMap(\.lineageNodeID), loading: library.loading)) {
+                guard !library.loading else { return }
+                await history.refreshGenerations()
+            }
     }
     private func metadata(_ work: SavedWork) -> [String] {
         let fields = model.display.preferences.historyFields
         var output: [String] = []
-        if fields.contains("generation") { output.append(work.variationAmplitude.map { model.display.localizedFormat("変奏 %@", $0) } ?? model.display.localized("制作")) }
+        if fields.contains("generation") { output.append(generationLabel(work)) }
         if fields.contains("model") { output.append(work.stage1Model ?? "DDL") }
         if fields.contains("engine") { output.append("Ver. \(work.renderEngineVersion ?? "—")") }
         if fields.contains("size") { output.append(ByteCountFormatter.string(fromByteCount: Int64(work.svg.utf8.count), countStyle: .file)) }
         return Array(output.prefix(3))
+    }
+
+    private func generationLabel(_ work: SavedWork) -> String {
+        if let nodeID = work.lineageNodeID {
+            if let generation = history.generations[nodeID] { return model.display.localizedFormat("第%ld世代", generation) }
+            if history.generationLoading || history.generationError != nil { return "—" }
+        }
+        return model.display.localized("独立作品")
+    }
+
+    private func title(_ work: SavedWork) -> String {
+        let source = work.effectiveSourceText
+        if !source.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return source }
+        if let ddl = work.ddl, !ddl.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return ddl }
+        return work.id
+    }
+
+    private struct GenerationRequest: Equatable {
+        let nodeIDs: [String]
+        let loading: Bool
     }
 }

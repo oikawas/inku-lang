@@ -62,7 +62,7 @@ public final class ComparisonModel {
             let context = try await app.savedConfiguration(workID: work.id)
             sourceIsLocked = context.authority == "ddl_authoritative"
             contextAvailable = true
-            let settings = await app.hostSettings()
+            let settings = await app.nextGenerationSettings()
             var seen: Set<String> = []
             modelReferencesText = [settings.models.stage1Model, settings.models.stage2Model]
                 .filter { !$0.isEmpty && seen.insert($0).inserted }.joined(separator: "\n")

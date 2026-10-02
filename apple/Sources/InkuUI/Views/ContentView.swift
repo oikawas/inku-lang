@@ -54,6 +54,10 @@ public struct ContentView: View {
     @State private var dialog: WorkDialog?
     @State private var presentation = false
     @State private var presentationWasFullScreen = false
+    @State private var settingsSection = SettingsSection.display
+    #if os(macOS)
+    @State private var importer = DDLImportController()
+    #endif
 
     public init(model: AppModel) { self.model = model }
 
@@ -65,6 +69,8 @@ public struct ContentView: View {
                     List(AppSection.allCases.filter { $0 != .automation || model.display.visible("automation") }, selection: $section) { item in
                         NavigationLink(value: item) { Label(model.display.localized(item.title), systemImage: item.symbol) }
                     }
+                    .listStyle(.sidebar)
+                    .disabled(!canNavigateSections)
                     .navigationTitle("inku")
                     .navigationSplitViewColumnWidth(min: 160, ideal: 190, max: 240)
                 } detail: {
@@ -78,6 +84,10 @@ public struct ContentView: View {
                 }
             }
         }
+        #if os(macOS)
+        .environment(importer)
+        .onDisappear { importer.cancel() }
+        #endif
         .environment(model.display)
         .environment(\.locale, Locale(identifier: model.display.preferences.language))
         .preferredColorScheme(model.display.colorScheme)
@@ -99,7 +109,11 @@ public struct ContentView: View {
         .onChange(of: model.selectedWorkID) { _, _ in Task { await history.locate(app: model) } }
         .onChange(of: model.works) { _, _ in Task { await history.library.refresh() } }
         .onReceive(NotificationCenter.default.publisher(for: .inkuOpenSection)) { message in
-            if let raw = message.object as? String, let target = AppSection(rawValue: raw), !automation.running { section = target }
+            if let raw = message.object as? String, let target = AppSection(rawValue: raw), canNavigateSections {
+                if target == .settings, let raw = message.userInfo?["settingsSection"] as? String,
+                   let destination = SettingsSection(rawValue: raw) { settingsSection = destination }
+                section = target
+            }
         }
         .sheet(item: $dialog) { item in
             dialogView(item).environment(\.locale, Locale(identifier: model.display.preferences.language))
@@ -107,15 +121,72 @@ public struct ContentView: View {
         .alert(model.display.localized("処理できませんでした"), isPresented: Binding(get: { model.errorText != nil }, set: { if !$0 { model.errorText = nil } })) {
             Button(model.display.localized("閉じる"), role: .cancel) { model.errorText = nil }
         } message: { Text(model.errorText ?? "") }
+        .focusedSceneValue(\.inkuCommandContext, commandContext)
     }
 
     @ViewBuilder private var detail: some View {
         switch section ?? .create {
-        case .create: CreationView(model: model, history: history).disabled(automation.running)
-        case .library: LibraryView(model: model).disabled(automation.running)
-        case .lineage: LineageView(model: model).disabled(automation.running)
+        case .create: CreationView(model: model, history: history).disabled(automation.running || importing)
+        case .library: LibraryView(model: model).disabled(automation.running || importing)
+        case .lineage: LineageView(model: model).disabled(automation.running || importing)
         case .automation: AutomationView(model: model, automation: automation)
-        case .settings: SettingsView(model: model).disabled(automation.running)
+        case .settings: SettingsView(model: model, section: $settingsSection).disabled(automation.running || importing)
+        }
+    }
+
+    private var importing: Bool {
+        #if os(macOS)
+        importer.isReading
+        #else
+        false
+        #endif
+    }
+    private var canNavigateSections: Bool { !automation.running && !importing && dialog == nil && !presentation }
+    private var canUseWork: Bool { !model.isBusy && !automation.running && !importing && dialog == nil && !presentation }
+    private var hasSavedWork: Bool { !model.isPreview && model.selectedWork?.trashed == false }
+    private var canCopyImage: Bool { canUseWork && !model.currentSVG.isEmpty && [.create, .library, .lineage].contains(section ?? .create) }
+    private var canExport: Bool {
+        guard canUseWork else { return false }
+        switch section ?? .create {
+        case .create: return hasSavedWork
+        case .library: return !model.library.isTrash && (!model.library.selectedIDs.isEmpty || hasSavedWork)
+        case .lineage: return !model.library.lineageLoading && model.library.graph?.nodes.contains(where: { $0.work?.trashed == false }) == true
+        case .automation, .settings: return false
+        }
+    }
+    private var commandContext: InkuCommandContext {
+        var enabled: Set<InkuCommandAction> = []
+        if canNavigateSections {
+            enabled.formUnion([.settings, .creation, .library, .lineage])
+            if model.display.visible("automation") { enabled.insert(.automation) }
+        }
+        if canUseWork {
+            enabled.insert(.newWork)
+            #if os(macOS)
+            enabled.insert(.openDDL)
+            #endif
+        }
+        if canExport { enabled.insert(.export) }
+        if canCopyImage { enabled.formUnion([.copyImage, .presentation]) }
+        return InkuCommandContext(enabledActions: enabled, perform: performCommand)
+    }
+    private func performCommand(_ action: InkuCommandAction) {
+        guard commandContext.isEnabled(action) else { return }
+        switch action {
+        case .newWork: model.newWork(); section = .create
+        case .openDDL:
+            #if os(macOS)
+            section = .create
+            importer.read(app: model)
+            #endif
+        case .settings: section = .settings
+        case .creation: section = .create
+        case .library: section = .library
+        case .lineage: section = .lineage
+        case .automation: section = .automation
+        case .export: Task { await openExport() }
+        case .copyImage: Task { await model.copyImage() }
+        case .presentation: enterPresentation()
         }
     }
 
@@ -130,7 +201,7 @@ public struct ContentView: View {
             Spacer()
             if automation.running {
                 Button(model.display.localized(automation.stopping ? "停止中" : "停止")) { Task { await automation.stop(app: model) } }
-                    .disabled(automation.stopping)
+                    .disabled(automation.stopping).keyboardShortcut(.escape, modifiers: [])
             }
         }.font(.callout).foregroundStyle(.secondary).padding(.horizontal, 16).padding(.vertical, 8)
     }
@@ -141,20 +212,26 @@ public struct ContentView: View {
                 Button(model.display.localized("停止"), systemImage: "stop.fill") { Task { await model.cancel() } }.keyboardShortcut(.escape, modifiers: [])
             } else if section == .create {
                 Button(model.display.localized("生成"), systemImage: "play.fill") { Task { await model.generate() } }
-                    .disabled(!model.canGenerate || automation.running).keyboardShortcut(.return, modifiers: .command)
+                    .disabled(!model.canGenerate || !canUseWork).keyboardShortcut(.return, modifiers: .command)
+                    .help(model.display.preferences.showTooltips ? model.display.localized("生成") : "")
             }
             if section == .create || section == .library || section == .lineage {
                 Button(model.display.localized("画像をコピー"), systemImage: "doc.on.doc") { Task { await model.copyImage() } }
-                    .disabled(model.currentSVG.isEmpty || model.isBusy || automation.running)
+                    .disabled(!canCopyImage)
+                    .help(model.display.preferences.showTooltips ? model.display.localized("画像をコピー") : "")
                 Button(model.display.localized("書き出す"), systemImage: "square.and.arrow.up") { Task { await openExport() } }
-                    .disabled((model.selectedWork == nil && model.library.selectedIDs.isEmpty) || model.isBusy || automation.running)
+                    .disabled(!canExport)
+                    .help(model.display.preferences.showTooltips ? model.display.localized("書き出す") : "")
                 Menu(model.display.localized("作品の操作"), systemImage: "ellipsis.circle") {
-                    Button(model.display.localized("配色・モデルを比較")) { dialog = .comparison }
-                    Button(model.display.localized("AIの助言・自律推敲")) { dialog = .advice }
-                    Button(model.display.localized("系譜の奥書")) { dialog = .colophon }
-                    Button(model.display.localized("系譜を開く")) { section = .lineage }
-                    Button(model.display.localized("全画面で表示")) { enterPresentation() }.keyboardShortcut("f", modifiers: [.command, .shift])
-                }.disabled(model.selectedWork == nil || model.isBusy || automation.running)
+                    Button(model.display.localized("配色・モデルを比較")) { dialog = .comparison }.disabled(!hasSavedWork)
+                    Button(model.display.localized("AIの助言・自律推敲")) { dialog = .advice }.disabled(!hasSavedWork)
+                    Button(model.display.localized("系譜の奥書")) { dialog = .colophon }.disabled(!hasSavedWork)
+                    Button(model.display.localized("系譜を開く")) { section = .lineage }.disabled(!hasSavedWork)
+                    Divider()
+                    Button(model.display.localized("全画面で表示")) { enterPresentation() }
+                        .disabled(model.currentSVG.isEmpty).keyboardShortcut("f", modifiers: [.command, .shift])
+                }.disabled(!canUseWork || (model.currentSVG.isEmpty && !hasSavedWork))
+                    .help(model.display.preferences.showTooltips ? model.display.localized("作品の操作") : "")
             }
         }
     }
@@ -179,14 +256,17 @@ public struct ContentView: View {
     }
 
     private func openExport() async {
+        guard canExport else { return }
+        let sourceSection = section ?? .create
         do {
-            let preserveOrder = section == .lineage
+            let preserveOrder = sourceSection == .lineage
             let works: [SavedWork]
-            if section == .lineage && model.library.selectedIDs.isEmpty {
+            if sourceSection == .lineage {
                 works = try await model.library.lineagePathWorks()
-            } else if !model.library.selectedIDs.isEmpty {
+            } else if sourceSection == .library && !model.library.selectedIDs.isEmpty {
                 works = try await model.library.selectedWorks()
             } else { works = model.selectedWork.map { [$0] } ?? [] }
+            guard canExport, section == sourceSection else { return }
             if !works.isEmpty { dialog = .export(ExportSession(works: works, preserveOrder: preserveOrder)) }
         } catch { model.errorText = error.localizedDescription }
     }

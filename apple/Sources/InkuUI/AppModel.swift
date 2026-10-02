@@ -42,6 +42,8 @@ public final class AppModel {
     public var providerModel = ""
     public var providerKind = "openai_compatible"
     public var providerKey = ""
+    public private(set) var nextDrawingModelReference = ""
+    public private(set) var providerSettingsRevision = 0
     public private(set) var catalogs: [ColorCatalogOption] = []
     public private(set) var canvases: [CanvasOption] = []
     public private(set) var saijiki: [SaijikiCategory] = []
@@ -107,12 +109,15 @@ public final class AppModel {
     public var displayedWork: SavedWork? { previewWork ?? selectedWork }
     public var isPreview: Bool { previewWork != nil }
     public var hasConfiguredProviders: Bool { !settings.providers.isEmpty }
+    public var hasNextDrawingModel: Bool {
+        settings.providers.contains { nextDrawingModelReference.hasPrefix($0.id + ":") && nextDrawingModelReference.count > $0.id.count + 1 }
+    }
     public var canCommitDDL: Bool { !isBusy && !isPreview && !ddlText.isEmpty && ddlText != visibleDDL && (currentExecutionID != nil || selectedContext != nil) }
     public var canCompleteHoles: Bool { !isBusy && currentExecutionID != nil && !holeIDs.isEmpty && !settings.providers.isEmpty && ddlText == visibleDDL }
     public var canRegenerateDescription: Bool { !isBusy && !sourceLocked && currentExecutionID != nil && !settings.providers.isEmpty && !descriptionText.isEmpty }
     public var canGenerate: Bool {
         database != nil && !isBusy && !isPreview && !(inputMode == "ddl" ? ddlText : descriptionText).trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            && (inputMode == "ddl" || (!settings.providers.isEmpty && !(selectedWorkID != nil && sourceLocked)))
+            && (inputMode == "ddl" || (hasNextDrawingModel && !(selectedWorkID != nil && sourceLocked)))
     }
 
     public func initialize() async {
@@ -132,6 +137,7 @@ public final class AppModel {
             self.host = PipelineHost(database: database, transport: routed, credentials: credentials)
             self.settingsStore = store
             self.settings = settings
+            synchronizeNextDrawingModel(previousSettings: nil)
             self.bootstrap = bootstrap
             display.connect(directory: url.deletingLastPathComponent())
             descriptionMeter.connect(directory: url.deletingLastPathComponent())
@@ -305,6 +311,28 @@ public final class AppModel {
 
     public func hostSettings() async -> HostSettings { settings }
 
+    public func nextGenerationSettings() async -> HostSettings { nextGenerationHostSettings }
+
+    public func selectNextDrawingModel(_ reference: String) {
+        guard !isBusy, settings.providers.contains(where: { reference.hasPrefix($0.id + ":") && reference.count > $0.id.count + 1 }) else { return }
+        nextDrawingModelReference = reference
+    }
+
+    private var nextGenerationHostSettings: HostSettings {
+        var next = settings
+        next.models.stage1Model = nextDrawingModelReference
+        next.models.stage2Model = nextDrawingModelReference
+        return next
+    }
+
+    private func synchronizeNextDrawingModel(previousSettings: HostSettings?) {
+        if previousSettings == nil || previousSettings?.models != settings.models || !hasNextDrawingModel {
+            nextDrawingModelReference = settings.models.stage1Model
+            if !hasNextDrawingModel { nextDrawingModelReference = "" }
+        }
+        providerSettingsRevision += 1
+    }
+
     public func updateHostSettings(_ settings: HostSettings) async throws {
         guard !isBusy, let settingsStore else { throw HostError("settings_busy_or_unavailable") }
         if let limits = settings.operationalLimits {
@@ -315,7 +343,9 @@ public final class AppModel {
         }
         let diagnostics = try bootstrap.map { try Self.pretty($0.macroCatalogValue(language: language, settings: settings, importedPlugins: importedDDL?.plugins ?? []).data) }
         try await settingsStore.save(settings)
+        let previousSettings = self.settings
         self.settings = settings
+        synchronizeNextDrawingModel(previousSettings: previousSettings)
         if let bootstrap {
             pluginWords = bootstrap.pluginWords.filter { settings.plugins?.isEnabled($0.packageID ?? "") ?? true }
             macroDiagnostics = diagnostics ?? ""
@@ -443,7 +473,7 @@ public final class AppModel {
         let savedConfig = parentWorkID == selectedWorkID && parentWorkID != nil ? selectedContext?.configuration : nil
         return try bootstrap.request(inputMode: mode, source: source ?? ddlText,
             description: description ?? descriptionText, language: language, catalogID: catalogID,
-            canvasID: canvasID, seed: seedText, wild: wild, settings: settings,
+            canvasID: canvasID, seed: seedText, wild: wild, settings: nextGenerationHostSettings,
             parentWorkID: parentWorkID, derivationKind: derivationKind, catalogMode: catalogMode,
             sketch: sketch, savedConfiguration: savedConfig,
             importedPlugins: mode == "ddl" && parentWorkID == nil ? importedDDL?.plugins ?? [] : [])
@@ -475,7 +505,7 @@ public final class AppModel {
         let sketch: SketchRequest = work.sketchText.map(SketchRequest.supplied) ?? .off
         var request = try bootstrap.request(inputMode: reading ? "description" : "ddl", source: work.ddl ?? "", description: description,
             language: language, catalogID: chosenCatalog, canvasID: canvasID, seed: chosenRenderSeed, wild: wildOverride ?? work.renderWild ?? false,
-            settings: settings, parentWorkID: work.id, derivationKind: kind, sketch: sketch,
+            settings: nextGenerationHostSettings, parentWorkID: work.id, derivationKind: kind, sketch: sketch,
             variationAmplitude: kind == "variation" ? amplitude : nil, variationSeed: kind == "variation" ? fresh : nil,
             savedConfiguration: saved.configuration)
         var nextConfig = try ExactJSON(data: request.configuration)

@@ -24,6 +24,10 @@ struct AppCheck {
             try await runAutomationChecks()
             return
         }
+        if CommandLine.arguments.contains("--model-selection-only") {
+            try await runModelSelectionChecks()
+            return
+        }
         if CommandLine.arguments.contains("--plugin-only") {
             try await runPluginChecks()
             return

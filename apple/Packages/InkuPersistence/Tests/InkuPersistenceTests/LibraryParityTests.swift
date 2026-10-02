@@ -100,6 +100,22 @@ struct LibraryParityTests {
         #expect(try await db.libraryGroups().groups.first?.rootNodeID == rootNode.id)
     }
 
+    @Test func historyGenerationProjectionCountsPrimaryParentsAndTombstones() async throws {
+        let file = url()
+        defer { try? FileManager.default.removeItem(at: file.deletingLastPathComponent()) }
+        let db = try InkuDatabase(url: file)
+        let (root, rootNode) = record("root", at: 1)
+        let (child, childNode) = record("child", at: 2, root: rootNode.id)
+        try await db.save(root, node: rootNode)
+        try await db.save(child, node: childNode, edge: LineageEdge(id: "edge-child", parentNodeID: rootNode.id,
+            childNodeID: childNode.id, derivationKind: "ddl_edit", at: child.at))
+        let nodeIDs = [rootNode.id, childNode.id, "missing-node", childNode.id]
+        #expect(try await db.lineageGenerations(nodeIDs: nodeIDs) == [rootNode.id: 1, childNode.id: 2])
+        try await db.setTrashed(ids: [root.id], trashed: true)
+        #expect(try await db.permanentlyDelete(ids: [root.id]) == 1)
+        #expect(try await db.lineageGenerations(nodeIDs: nodeIDs) == [rootNode.id: 1, childNode.id: 2])
+    }
+
     @Test func rootOverviewFromLeafIncludesSiblingBranches() async throws {
         let file = url()
         defer { try? FileManager.default.removeItem(at: file.deletingLastPathComponent()) }

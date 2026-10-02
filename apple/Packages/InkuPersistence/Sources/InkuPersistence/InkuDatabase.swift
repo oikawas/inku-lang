@@ -90,6 +90,18 @@ public actor InkuDatabase {
         }
     }
 
+    /// Root is generation 1; every primary-parent edge adds one, including tombstones.
+    /// Missing nodes are omitted, matching the Server history-list projection.
+    public func lineageGenerations(nodeIDs: [String]) throws -> [String: Int] {
+        try queue.read { db in
+            var result: [String: Int] = [:]
+            for id in Set(nodeIDs) where try LineageNode.fetchOne(db, key: id) != nil {
+                result[id] = try Self.generation(id: id, in: db)
+            }
+            return result
+        }
+    }
+
     /// Count and select the same database predicate in one consistent read.
     public func libraryPage(query: LibraryQuery = LibraryQuery(), limit: Int = 24,
                             offset: Int = 0, rootNodeID: String? = nil) throws -> LibraryPage {

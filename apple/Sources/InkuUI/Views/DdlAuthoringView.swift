@@ -8,9 +8,8 @@ struct DdlAuthoringView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack {
+            VStack(alignment: .leading, spacing: 6) {
                 Text(model.display.localized("DDLを編集")).font(.headline)
-                Spacer()
                 if !model.authoringAuthority.isEmpty {
                     Label(model.display.localized(model.sourceLocked ? "DDL確定・記述ロック" : "記述から生成可能"),
                           systemImage: model.sourceLocked ? "lock.fill" : "pencil")
@@ -23,18 +22,23 @@ struct DdlAuthoringView: View {
             }
             TextEditor(text: $model.ddlText)
                 .font(.system(.body, design: .monospaced))
-                .frame(minHeight: 180, maxHeight: 320)
+                .scrollContentBackground(.hidden)
+                .padding(6)
+                .frame(height: 210)
                 .disabled(model.isBusy)
-                .overlay(RoundedRectangle(cornerRadius: 6).stroke(.quaternary))
+                .background(.background, in: RoundedRectangle(cornerRadius: 8))
+                .overlay(RoundedRectangle(cornerRadius: 8).stroke(.quaternary))
                 .accessibilityLabel(model.display.localized("DDL編集"))
-            HStack {
-                Button(model.display.localized("検査")) { Task { await model.checkDDL() } }.disabled(model.isBusy || model.ddlText.isEmpty)
-                Button(model.display.localized("変更を確定・描画")) { Task { await model.commitDDL() } }
-                    .disabled(!model.canCommitDDL)
-                if model.canRegenerateDescription {
-                    Button(model.display.localized("記述から作り直す")) { Task { await model.regenerateDescription() } }
+            VStack(alignment: .leading, spacing: 8) {
+                Button { Task { await model.commitDDL() } } label: {
+                    Text(model.display.localized("変更を確定・描画")).frame(maxWidth: .infinity)
+                }.buttonStyle(.borderedProminent).disabled(!model.canCommitDDL)
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: 8) { checkButton; regenerateButton }.fixedSize(horizontal: true, vertical: false)
+                    VStack(alignment: .leading, spacing: 8) { checkButton; regenerateButton }
                 }
             }
+            .controlSize(.small)
             if model.sourceLocked {
                 Text(model.display.localized("確定したDDLの変更後は、この作品の記述を生成元へ戻せません。新規作品では別の記述を使えます。"))
                     .font(.caption).foregroundStyle(.secondary)
@@ -56,15 +60,22 @@ struct DdlAuthoringView: View {
             if !model.patchProposalJSON.isEmpty {
                 VStack(alignment: .leading, spacing: 8) {
                     Label(model.display.localized("補完案の承認待ち"), systemImage: "checkmark.bubble").font(.headline)
-                    HStack(alignment: .top, spacing: 12) {
-                        sourcePane("確定済み", model.visibleDDL)
-                        sourcePane("補完案", model.patchCandidate)
+                    ViewThatFits(in: .horizontal) {
+                        HStack(alignment: .top, spacing: 12) {
+                            sourcePane("確定済み", model.visibleDDL).frame(width: 250)
+                            sourcePane("補完案", model.patchCandidate).frame(width: 250)
+                        }
+                        VStack(alignment: .leading, spacing: 12) {
+                            sourcePane("確定済み", model.visibleDDL)
+                            sourcePane("補完案", model.patchCandidate)
+                        }
                     }
-                    HStack {
-                        Button(model.display.localized("承認して確定・描画")) { Task { await model.approvePatch() } }
-                            .buttonStyle(.borderedProminent)
+                    VStack(alignment: .leading, spacing: 8) {
+                        Button { Task { await model.approvePatch() } } label: {
+                            Text(model.display.localized("承認して確定・描画")).frame(maxWidth: .infinity)
+                        }.buttonStyle(.borderedProminent)
                         Button(model.display.localized("却下")) { Task { await model.declinePatch() } }
-                    }.disabled(model.isBusy)
+                    }.controlSize(.small).disabled(model.isBusy)
                     DisclosureGroup(model.display.localized("補完案の詳細")) { sourcePane("", model.patchProposalJSON) }
                 }
                 .padding(12).background(.quaternary.opacity(0.25), in: RoundedRectangle(cornerRadius: 8))
@@ -86,6 +97,17 @@ struct DdlAuthoringView: View {
         }
         .onChange(of: model.displayedWork?.id) { _, _ in
             if !model.display.preferences.keepGenerationInfo { detailsExpanded = false }
+        }
+    }
+
+    private var checkButton: some View {
+        Button(model.display.localized("検査")) { Task { await model.checkDDL() } }
+            .disabled(model.isBusy || model.ddlText.isEmpty)
+    }
+
+    @ViewBuilder private var regenerateButton: some View {
+        if model.canRegenerateDescription {
+            Button(model.display.localized("記述から作り直す")) { Task { await model.regenerateDescription() } }
         }
     }
 

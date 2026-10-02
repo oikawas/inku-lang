@@ -50,6 +50,8 @@ open apple/build/macOS/DerivedData/Build/Products/Release/Inku.app
 
 初期入力は英語の直接DDLです。モデル接続なしで生成を試せます。記述から生成する場合は「設定」でprovider方式、base URL、model、必要なAPI keyを保存してから制作画面の記述modeを使います。複数のAPIサービスを登録でき、Stage1／Stage2は共通の描画modelを使用します。model一覧の取得は明示したボタン操作で行います。接続を保存するだけではLLM requestを送りません。
 
+制作画面の「次の生成条件」で次に使うservice／modelを選びます。この選択は設定の保存defaultや開始済みbatch／demoを変えません。生成／停止buttonは入力のscroll領域の外にあります。⌘Nで新規、⌘OでDDL読込、⌘,で設定、⌘1〜4で画面移動、⇧⌘Eで書出しを開けます。libraryのcheckboxと表示作品を区別し、制作からの書出しは表示中の保存作品を使います。
+
 作品のDBはアプリのApplication Supportに、通常のprovider設定はDBと同じdirectoryの`providers.json`に保存します。API keyはKeychainの別itemです。SQLite backupは作品・系譜・execution／ACK／snapshot、comment／mark、奥書、未読語を含むDBの整合したcopyであり、隣接設定JSONやKeychainのbackupではありません。
 
 通常の作品DBを使わずに試す場合は、実行fileへ`--database`を渡します。
@@ -89,4 +91,4 @@ uv sync --project server --frozen
 python3 apple/scripts/prepare-meter-resources.py
 ```
 
-限定したCLI確認は、artifact生成後の`apple/scripts/check-core.sh`と、resource生成後の`swift run --package-path apple InkuAppCheck`です。AppCheckの`--authoring-only`、`--comparison-only`、`--automation-only`、`--plugin-only`、`--raster-only <SVG path>`はそれぞれの変更に対応する確認だけを選びます。これらはnative画面、実provider、実機の受入を代替しません。変更が防ぐ具体的な失敗に合わせて必要な確認だけを選択してください。
+限定したCLI確認は、artifact生成後の`apple/scripts/check-core.sh`と、resource生成後の`swift run --package-path apple InkuAppCheck`です。AppCheckの`--authoring-only`、`--comparison-only`、`--automation-only`、`--plugin-only`、`--model-selection-only`、`--raster-only <SVG path>`はそれぞれの変更に対応する確認だけを選びます。`--model-selection-only`は一時DBとprovider呼出し0件で、制作のmodel選択と保存default・開始時snapshotの分離を確認します。これらはnative画面、実provider、実機の受入を代替しません。変更が防ぐ具体的な失敗に合わせて必要な確認だけを選択してください。

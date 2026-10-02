@@ -18,7 +18,11 @@ binding／protocolの版は同梱Rust coreのversion report、描画層の版は
 
 ### 制作と保存作品の表示
 
-制作画面は左に記述／直接DDLと次に描く条件、保存作品の写生・指示書を置き、右に表示中作品の条件と作品／系譜canvasを置く。保存作品のmodel、色catalog、用紙、サイズを次の入力条件と区別する。画面上の記述caption、縦書き／横書き、配置、pan／zoom、プレゼンテーションは表示合成であり、保存SVGを変更しない。
+制作画面は左に記述／直接DDLと次に描く条件、保存作品の写生・指示書を置き、右に表示中作品の条件と作品／系譜canvasを置く。入力・次の条件・保存情報をpanelにまとめ、生成／停止は入力のscroll領域の外へ固定する。狭い幅では縦配置へ切り替える。保存作品のmodel、色catalog、用紙、サイズはcompactな要約と詳細popoverで読み、次の入力条件と区別する。画面上の記述caption、縦書き／横書き、配置、pan／zoom、プレゼンテーションは表示合成であり、保存SVGを変更しない。「用紙に合わせる」はzoomと移動を初期位置へ戻す。
+
+制作画面で登録済みのserviceと描画modelを選択する。設定したmodelと明示取得したmodel一覧を表示し、一覧取得は利用者のbutton操作だけで始める。選択した次のmodelは記述解釈と構造化の両段へ渡し、設定画面の保存defaultや親作品のmodelを書き換えない。新しい生成要求・推敲・比較の初期選択は次のmodelを使い、開始済みbatch／demoのmodelはそのsnapshotへ固定する。未接続時はモデル設定へ案内する。
+
+macOS menuはactive sceneの操作可否を使う。⌘Nは新規制作、⌘Oは画面buttonと共通のDDL file読込、⌘,は設定、⌘1〜4は制作／library／系譜／batch・demo、⇧⌘Eは書出し、⇧⌘Cは画像copy。既存の⌘Return生成、Escape停止、⇧⌘Fプレゼンテーションと併用する。生成・自動実行・読込・dialog・presentationの状態に合わせて対象操作を無効化し、menu経由で別の書込みを割り込ませない。設定はsystem sidebarとgrouped formを使い、モデル設定への導線は該当categoryを開く。
 
 同梱の歳時記、13色catalog、11用紙と7語のMacro／plugin定義はServer sourceから生成し、共通Rustで定義とdigest lockを解決する。pluginの有効切替は新作品へ適用し、保存作品の定義を置き換えない。DDL packageのimportは`inku.ddl-export.v1`の本文・付属定義・lock・整数表現を検証し、次の新作品へ添える。4MiB／64定義を超える入力や不完全な定義は拒否し、途中結果を採用しない。
 
@@ -29,6 +33,8 @@ DDLのdraft確認は読出しだけとし、変更確定を共通coreのrevision
 履歴はSQLite全件を対象とする20件page、libraryは独立した30件pageである。最新100件のapp内一覧を検索や作品移動の母集団にしない。最新／新しい／古い／最古への移動、全文記述・全文hash・末尾4桁の検索、star・推敲・export markのAND絞込、thumbnail／listと時系列／系譜groupの独立選択を提供する。
 
 comment、mark、trash／復元、明示した完全削除、複数選択、系譜graph／pathをSQLiteへ接続する。完全削除後は作品本文を消し、nodeのidentity、root、日時と親子関係をtombstoneとして保持する。ACL、group利用者やServerの共有権限は追加しない。
+
+履歴の世代はServerと同じくrootを1とし、primary parentのedgeごとに1加算する。削除済みの祖先も数え、nodeのない作品は独立作品と表示する。初期表示は世代とmodel、保存済みの表示項目は保持する。世代をvariationの種類や幅で代用しない。libraryでは表示中の作品と複数選択のcheckbox、系譜では表示作品と範囲を決めるfocusを区別する。記述のないDDL作品は保存DDLの先頭行を表示名へ使い、保存本文を補わない。hash、comment、mark、親子への移動はcardとmenuから操作できる。
 
 Swift物理schemaはv2で、v1の6tableにlocal annotation、奥書、未読語を追加した9table構成とする。正本は[bundled migration](Packages/InkuPersistence/Sources/InkuPersistence/Resources/migration-v2.sql)と[schema export](../persistence/reference/swift-schema-v2.json)。既知の完全なv1だけを原子的に移行し、作品・snapshot・ACKの値を保持する。未知schemaは引き続き拒否する。backup／restoreは全9tableを対象とし、v1 backupは隔離snapshotをv2へ移行してから復元する。Server／Android DBや旧JSONのimportは含めない。
 
@@ -62,6 +68,8 @@ Personal ChatGPTは通常のAPI key接続と別に扱い、既定は無効とす
 
 単作品animationのlayer進行／restart・reverse・once、複数作品のcut・crossfade・fade_white・slide、保存日時順と明示系譜path順を区別する。日本語文字はServerと同じNoto Serif JPをlicenseと共に同梱する。保存先folderのbookmarkとPNG templateを保持し、複数出力は新規folderへ保存する。Finder表示とOS共有へ接続する。
 
+書出し対象は開いている画面で決める。制作は表示中の保存作品、libraryはcheckboxの選択作品（未選択なら表示作品）、系譜はfocusへ至るpathをsnapshotとして渡す。別画面のcheckboxを制作や系譜の対象へ混ぜない。未保存previewは保存作品の書出しへ含めない。書出しdialogもDDL作品の表示名をlibraryと揃える。
+
 共通rasterにimmutableなprepared sceneを追加し、SVG parse結果を解像度間とexport tile間で再利用する。native rendererはscene推定cost16MiB／8件、image64MiB／256件を上限とし、保存SVGや画材効果を変更しない。表示はRetina scale、120ms resize debounce、要求寸法の8Mpixel枠に合わせる。限定したRelease計測では6000 pathの4解像度で準備時間込み約20%短縮し、pencilの重いfilterは改善が小さかった。全作品・全処理の同じ改善率を保証しない。
 
 ### 確認範囲
@@ -69,6 +77,8 @@ Personal ChatGPTは通常のAPI key接続と別に扱い、既定は無効とす
 実coreと一時DBによるauthoring、比較候補の明示保存／取消し、batchの固定条件と不明行、保存pluginの固定、prepared scene／image cacheの限定確認は成功した。辞書、library、SQLite移行・backup、exportとtileの境界も具体的な失敗に対応する確認で扱った。Personal接続のidentity、SSE、loopback、refresh取消し・quota・model解決はsynthetic署名とmock transportで確認し、実本人認証へ読み替えない。
 
 更新したunsigned Universal appは両CPUでlinkし、最低OS14を保持した。Apple Silicon／macOS27.0.1の一時DBでDDL生成、編集child、libraryのcomment／star、trash／復元、restart後の保持、日英切替、親子の系譜と全体表示、Stringの正しい改訂番号、複数選択2作品のPNG2160書出しを実画面で確認した。出力2fileは両方2160×2160で、画像の質感も視覚確認した。起動時のページサイズ再帰、シートの空選択、Foundationの保存option組合せによる終了を修正した。作者の通常利用、他exportのnative・性能、実provider／OAuth、Intel／macOS14実機、署名・配布、iOS app／cameraの受入は残る。
+
+追加の限定確認では、制作で選んだmodelが実際のrequest両段へ反映され、保存default・開始済みtemplateが変わらず、provider呼出し0件であることを確認した。SQLiteの世代projectionはroot・child・欠落・削除祖先の1件を確認した。nativeでは1320×880と標準tileの1281×733で固定生成button・canvas・履歴、世代1／2、設定／移動／新規／読込取消し、model設定categoryへの導線、系譜focusと表示作品の分離、library2件と制作1件の書出し対象を確認した。小さい幅の全配置、VoiceOver、作者のデザイン受入をこの代表確認へ読み替えない。
 
 ## 2026-10-02 macOS向けの共有Rust・standalone基盤（当時の記録）
 

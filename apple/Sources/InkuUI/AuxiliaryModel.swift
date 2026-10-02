@@ -54,7 +54,7 @@ public final class AuxiliaryModel {
             advice = nil; colophonDraft = nil; draftText = ""; errorText = nil
         }
         sourceWorkID = app.selectedWorkID
-        let settings = await app.hostSettings()
+        let settings = await app.nextGenerationSettings()
         if modelReference.isEmpty { modelReference = settings.models.stage1Model }
         do { database = try app.auxiliaryDatabase() }
         catch { errorText = error.localizedDescription; return }
@@ -155,7 +155,7 @@ public final class AuxiliaryModel {
             var parent = first
             var runPin: ChatGPTPlanSession? = nil
             do {
-                let settings = await app.hostSettings()
+                let settings = await app.nextGenerationSettings()
                 for index in 0..<count {
                     try Task.checkCancellation()
                     guard self.token == runToken else { return }

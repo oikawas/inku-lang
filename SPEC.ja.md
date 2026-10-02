@@ -983,6 +983,8 @@ Stage 1、camera projection、hole補完は既存の共有grammar helperを使�
 
 ### 12.5 描画とVisionのモデル
 
+予約provider `chatgpt`（ChatGPTプラン）は本人OAuth・scope・本人catalogによる共有pipeline専用接続である。明示有効化、`developer_mode || single_user_mode`、検証済みlocal/self-hosted起動を要求し、管理者にも迂回を許さない。`chatgpt:<slug>`を共有APIキー接続やbare名の所有へ混ぜず、利用不可でも保存指定を保持する。両段共通の描画、写生文、カタログ選択、可視hole補完をResponses/SSEへ接続し、Rustのprompt/schema/retry・Score/SVGは変えない。実行のowner/profile/generationを固定し、quota・cancel・sign-out・モード変更で追加通信と遅い結果を停止する。Vision・奥書・デモ指示生成・モデル検査へは提供しない。[接続・移送・復旧](docs/guide/chatgpt-plan.ja.md)を参照。
+
 MLXの`mlx-vlm`サーバーはサービス種別`mlx`（管理画面の「MLX (mlx-vlm)」）で登録する。接続先・キー・モデル一覧はOpenAI互換APIとして扱い、描画の応答は共有コアが渡すJSON Schemaをそのまま`response_format`へ渡して制約する。関数ツールは送らず、`enable_thinking: false`を明示する。コアによる応答検証と再試行の権限は継続する。登録済みサービスは種別だけを変更でき、キー・URL・公開モデルを保持する。
 
 MLXのGemma 4は、[モデルの推奨生成設定](https://ai.google.dev/gemma/docs/core/model_card_4)である`temperature: 1.0`、`top_p: 0.95`、`top_k: 64`を明示する。低いtemperatureで同じ層を繰り返し、JSONが出力上限で途中終了する現象への対処であり、prompt・応答Schema・出力上限はそのまま使う。

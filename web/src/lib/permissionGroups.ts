@@ -43,7 +43,8 @@ export function managesListedUser(viewer: MemberLike, listed: { id: string }): b
 	return holdsPermissionGroup(viewer, 'admins') || listed.id !== viewer?.id;
 }
 
-export function canAccessSettingsTab(tab: string, user: MemberLike): boolean {
+export function canAccessSettingsTab(tab: string, user: MemberLike, chatgptAvailable = false): boolean {
+	if (tab === 'chatgpt') return !!user?.id && chatgptAvailable;
 	if ((ADMIN_ONLY_SETTINGS_TABS as readonly string[]).includes(tab)) {
 		return holdsPermissionGroup(user, 'admins');
 	}

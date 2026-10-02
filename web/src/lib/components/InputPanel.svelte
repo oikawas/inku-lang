@@ -24,6 +24,8 @@
 		failures: BatchFailure[];
 	};
 	type Props = {
+		chatgptPlanSelected?: boolean;
+		chatgptModelAvailable?: boolean;
 		inputMode: 'single' | 'batch';
 		input: string;
 		batchInput: string;
@@ -87,6 +89,8 @@
 	};
 
 	let {
+		chatgptPlanSelected = false,
+		chatgptModelAvailable = false,
 		inputMode = $bindable('single'),
 		input = $bindable(''),
 		batchInput = $bindable(''),
@@ -332,6 +336,10 @@
 				<Tooltip placement="top" text={t().tooltipSubmit}>
 					<PaintButton onclick={onSubmit} disabled={!canSubmit || generationDisabled}>{t().submitBtn}</PaintButton>
 				</Tooltip>
+			{/if}
+			{#if chatgptPlanSelected}
+				<p role="status">{chatgptModelAvailable ? t().chatgptUsingPlan : t().chatgptModelUnavailable}</p>
+				<a href="https://chatgpt.com/settings/usage" target="_blank" rel="noopener noreferrer">{t().chatgptManageUsage}</a>
 			{/if}
 		{/if}
 

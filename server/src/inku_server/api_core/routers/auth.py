@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel, Field
 from ...security import SlidingWindowRateLimiter
 from ... import db as _db
-from ..deps import _SESSION_COOKIE_NAME, _admin_user, _current_user, _session_token
+from ..deps import _SESSION_COOKIE_NAME, _SINGLE_USER_TOKEN, _admin_user, _current_user, _session_token
 from ..models import UserAccountItem
 
 
@@ -114,6 +114,14 @@ def api_auth_login(body: LoginBody, response: Response, request: Request) -> Log
 
 @router.post("/api/auth/logout")
 def api_auth_logout(response: Response, token: str = Depends(_session_token)) -> dict[str, bool]:
+    actor = _db.get_session_user(token)
+    if actor is None and token == _SINGLE_USER_TOKEN:
+        actor = _db.single_user_account()
+    if actor:
+        from ...chatgpt_auth import attempts
+        from ...chatgpt_runtime import cancel_owner
+        attempts.stop(actor["id"])
+        cancel_owner(actor["id"])
     _db.delete_session(token)
     _clear_session_cookie(response)
     return {"ok": True}

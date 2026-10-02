@@ -135,6 +135,8 @@ export INKU_DB_URL='sqlite:///./inku.db'
 
 APIキーは環境変数、または起動後に管理者ユーザーでWeb UIのモデル設定から登録する。Web UIから登録したAPIキーはDB内に暗号化して保存され、画面には再表示されない。
 
+ChatGPT利用枠は[専用起動・本人認可・自己ホスト移送](docs/guide/chatgpt-plan.ja.md)に従う。`INKU_CHATGPT_PLAN_ENABLED`は既定無効、`INKU_CHATGPT_AUTH_DIR`はhostごとの保護保存先である。APIキー設定にOAuth tokenを登録しない。
+
 ```sh
 export OPENAI_API_KEY='...'
 export ANTHROPIC_API_KEY='...'

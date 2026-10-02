@@ -169,6 +169,8 @@ Once you are logged in, write a short description. After generating, consult the
 
 The full environment variable list, per-provider configuration, and the CLI (`inku-cli`) are covered in [SETUP.md](SETUP.md).
 
+The [ChatGPT plan connection](docs/guide/chatgpt-plan.md) uses your account's allowance. It requires explicit enablement, developer or single-user mode and account OAuth. It is separate from the API-key connection and uses one model shared by Stage 1/2.
+
 ---
 
 ## How it works — score and performance

@@ -2,7 +2,7 @@
 
 ## API面
 
-`api.py` はprocess-wideな組立てを持ち、endpoint本体は10 routerと共有pipeline routerへ分かれる。router-level default dependencyと個別dependencyの両方が認可を作る。`test_route_module_split.py` はlive routeの`endpoint.__module__`を検査し、endpointが`api.py`へ戻る退行を防ぐ。
+`api.py` はprocess-wideな組立てを持ち、endpoint本体は用途別routerと共有pipeline routerへ分かれる。router-level default dependencyと個別dependencyの両方が認可を作る。`test_route_module_split.py` はlive routeの`endpoint.__module__`を検査し、endpointが`api.py`へ戻る退行を防ぐ。本人用ChatGPT routerはOAuth/profile/catalogの公開境界を持ち、専用auth・store・transfer・runtime・provider moduleへ接続する。
 
 ```mermaid
 flowchart TD

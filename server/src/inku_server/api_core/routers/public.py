@@ -39,6 +39,8 @@ class AppInfoResponse(BaseModel):
     # Whether this server belongs to one person.  The client reads it to drop
     # the doors that lead nowhere when there is nobody else to be.
     single_user_mode: bool = False
+    chatgpt_plan_available: bool = False
+    chatgpt_plan_unavailable_reason: str | None = None
     # Whether this server keeps the second thumbnail size. The client asks for
     # it only where both this is on and the screen is dense enough to use it;
     # asking otherwise would be a 404 per thumbnail.
@@ -76,6 +78,8 @@ def health() -> dict[str, bool]:
 
 @router.get("/api/info", response_model=AppInfoResponse)
 def api_info() -> AppInfoResponse:
+    from ...chatgpt_runtime import availability
+    available, reason = availability()
     engine = current_render_engine()
     return AppInfoResponse(
         name="inku-server",
@@ -84,6 +88,8 @@ def api_info() -> AppInfoResponse:
         build_number=_build_number(),
         developer_mode=_env_flag("INKU_DEVELOPER_MODE"),
         single_user_mode=_db.single_user_mode_enabled(),
+        chatgpt_plan_available=available,
+        chatgpt_plan_unavailable_reason=reason,
         thumbnail_hidpi=bool(_db.get_thumbnail_settings()["hidpi"]),
         render_engine_id=engine.id,
         render_engine_version=engine.version,
@@ -105,7 +111,26 @@ def api_color_catalogs() -> ColorCatalogsResponse:
 def api_models(actor: dict = Depends(_current_user)) -> ModelSettingsResponse:
     settings = _db.get_model_settings()
     developer_mode = _env_flag("INKU_DEVELOPER_MODE")
+    drawing = model_provider_catalog(settings, include_disabled=False, include_developer=developer_mode, purpose="llm")
+    profile_id = generation = None
+    chatgpt_available = False
+    from ...chatgpt_runtime import check_owner
+    from ...chatgpt_provider import pin, catalog
+    from ...chatgpt_store import ChatGPTError
+    import asyncio
+    import time
+    import httpx
+    try:
+        check_owner(actor["id"])
+        chatgpt_available = True
+        profile_id, generation = pin(actor["id"])
+        models = asyncio.run(catalog(actor["id"], profile_id, generation, time.monotonic() + 15))
+        drawing.append({"id": "chatgpt", "label": "ChatGPT plan", "kind": "chatgpt_responses", "requires_api_key": False, "models": models})
+    except (ChatGPTError, httpx.HTTPError, TimeoutError, ValueError, KeyError):
+        profile_id = generation = None
     return ModelSettingsResponse(
+        drawing_catalog=drawing, chatgpt_profile_id=profile_id, chatgpt_generation=generation,
+        chatgpt_plan_available=chatgpt_available,
         catalog=model_provider_catalog(
             settings, include_disabled=False, include_developer=developer_mode, purpose="llm"
         ),

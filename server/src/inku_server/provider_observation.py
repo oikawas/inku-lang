@@ -72,13 +72,14 @@ class ProviderObservationStore:
             raise ProviderObservationError("request_save_failed") from error
         return request_truncated
 
-    def response(self, owner_id: str, execution_id: str, action: dict, *, status: int, raw: bytes, truncated: bool = False) -> None:
+    def response(self, owner_id: str, execution_id: str, action: dict, *, status: int, raw: bytes, truncated: bool = False, decoded: dict | None = None) -> None:
         response_body, response_truncated = _bounded_text(raw, self.limit)
         response_truncated = response_truncated or truncated
-        try:
-            decoded = json.loads(raw)
-        except (UnicodeDecodeError, json.JSONDecodeError):
-            decoded = None
+        if decoded is None:
+            try:
+                decoded = json.loads(raw)
+            except (UnicodeDecodeError, json.JSONDecodeError):
+                decoded = None
         values = {
             "response_body": response_body, "response_truncated": response_truncated,
             "http_status": status, "usage_json": None if _usage(decoded) is None else _json(_usage(decoded)),

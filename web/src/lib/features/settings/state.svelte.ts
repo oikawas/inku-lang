@@ -1,6 +1,7 @@
 import type { ApiFetch } from '$lib/transport/api-fetch';
 import type { SettingsDetailLevel } from '$lib/settingsDetail';
 import type { Provider, ProviderGroup } from '$lib/models';
+import { createChatGPTSettings, type ChatGPTSettingsController } from './chatgpt.svelte';
 import {
 	createSettingsNavigation,
 	type SettingsActor,
@@ -44,6 +45,8 @@ export type {
 } from './user-administration.svelte';
 
 type SettingsControllerDeps<TActor extends SettingsActor> = {
+	chatgptAvailable?: () => boolean;
+	invalidateChatGPTModels?: () => void;
 	apiFetch: ApiFetch;
 	currentUser: () => TActor | null;
 	setCurrentUser: (actor: TActor) => void;
@@ -57,6 +60,7 @@ type SettingsControllerDeps<TActor extends SettingsActor> = {
 };
 
 export type SettingsController = SettingsNavigation & ServerAdministration & ModelAdministration & {
+	readonly chatgpt: ChatGPTSettingsController;
 	readonly modelAdministration: ModelAdministration;
 	readonly userAdministration: SettingsUserAdministration;
 };
@@ -64,6 +68,8 @@ export type SettingsController = SettingsNavigation & ServerAdministration & Mod
 export function createSettingsController<TActor extends SettingsActor>(
 	deps: SettingsControllerDeps<TActor>
 ): SettingsController {
+	const chatgpt = createChatGPTSettings({ apiFetch: deps.apiFetch, owner: () => deps.currentUser()?.id,
+		available: () => deps.chatgptAvailable?.() === true, invalidate: () => deps.invalidateChatGPTModels?.(), changed: deps.loadAvailableModels });
 	const serverAdministration = createServerAdministration({
 		apiFetch: deps.apiFetch,
 		currentUser: deps.currentUser,
@@ -85,6 +91,7 @@ export function createSettingsController<TActor extends SettingsActor>(
 		describeApiError: deps.describeApiError
 	});
 	const navigation = createSettingsNavigation({
+		chatgptAvailable: deps.chatgptAvailable,
 		apiFetch: deps.apiFetch,
 		currentUser: deps.currentUser,
 		setCurrentUser: deps.setCurrentUser,
@@ -100,6 +107,7 @@ export function createSettingsController<TActor extends SettingsActor>(
 	});
 
 	return {
+		chatgpt,
 		get opened() { return navigation.opened; },
 		get mode() { return navigation.mode; },
 		get tab() { return navigation.tab; },
@@ -131,6 +139,7 @@ export function createSettingsController<TActor extends SettingsActor>(
 		selectTab: navigation.selectTab,
 		loadStatus: serverAdministration.loadStatus,
 		resetForLoggedOut() {
+			chatgpt.reset();
 			userAdministration.resetForLoggedOut();
 			serverAdministration.resetForLoggedOut();
 		},

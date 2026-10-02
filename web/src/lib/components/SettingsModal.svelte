@@ -9,6 +9,7 @@
 	import ServerRuntimeSettings from '$lib/features/settings/ServerRuntimeSettings.svelte';
 	import UserAdministrationSettings from '$lib/features/settings/UserAdministrationSettings.svelte';
 	import ModelSelectionSettings from '$lib/features/settings/ModelSelectionSettings.svelte';
+	import ChatGPTSettings from '$lib/features/settings/ChatGPTSettings.svelte';
 	import ModelAdministrationSettings from '$lib/features/settings/ModelAdministrationSettings.svelte';
 	import PluginAdministrationSettings from '$lib/features/settings/PluginAdministrationSettings.svelte';
 	import ExportSettings from '$lib/features/settings/ExportSettings.svelte';
@@ -29,6 +30,7 @@
 		settings: SettingsController;
 		demoContent?: Snippet;
 		singleUserMode: boolean;
+		chatgptAvailable: boolean;
 		stage1Provider: Provider;
 		stage1Model: string;
 		visionProvider: Provider;
@@ -76,6 +78,7 @@
 		settings,
 		demoContent,
 		singleUserMode,
+		chatgptAvailable,
 		stage1Provider,
 		stage1Model,
 		visionProvider,
@@ -149,7 +152,7 @@
 	// And the permission question, from the module the navigation guard asks. The
 	// category used to open for administrators as a whole, which left a leader --
 	// whom the guard lets into the users tab -- without a button that led there.
-	const reaches = (tab: string) => canAccessSettingsTab(tab, currentUser);
+	const reaches = (tab: string) => canAccessSettingsTab(tab, currentUser, chatgptAvailable);
 	const detailed = $derived(settingsDetail === 'detailed');
 	const isAdmin = $derived(currentUser?.permission_groups?.includes('admins') === true);
 	let appearanceSection = $state<'display' | 'making'>('display');
@@ -160,6 +163,7 @@
 	const settingsPage = $derived.by(() => {
 		const strings = t();
 		switch (settingsTab) {
+			case 'chatgpt': return { title: strings.chatgptPlanLabel, hint: strings.chatgptPlanNotice };
 			case 'models': return { title: strings.settingsTabModels, hint: strings.settingsModelsHint };
 			case 'users': return { title: strings.settingsTabUsers, hint: strings.settingsUsersHint };
 			case 'db': return { title: strings.settingsTabDb, hint: strings.settingsDatabaseHint };
@@ -276,6 +280,7 @@
 					<div class="settings-category-label">{t().settingsCategoryMaking}</div>
 					<button aria-current={settingsTab === 'misc' && appearanceSection === 'making' ? 'page' : undefined} class:active={settingsTab === 'misc' && appearanceSection === 'making'} onclick={() => selectAppearanceSection('making')}>{t().settingsBatchRetryLabel}</button>
 					<button aria-current={settingsTab === 'demo' ? 'page' : undefined} class:active={settingsTab === 'demo'} onclick={() => onSelectSettingsTab('demo')}>{t().modeDemo}</button>
+					{#if reaches('chatgpt')}<button aria-current={settingsTab === 'chatgpt' ? 'page' : undefined} class:active={settingsTab === 'chatgpt'} onclick={() => onSelectSettingsTab('chatgpt')}>{t().chatgptPlanLabel}</button>{/if}
 				</section>
 				<section class="settings-category">
 					<div class="settings-category-label">{t().settingsTabExport}</div>
@@ -324,6 +329,7 @@
 					<p>{settingsPage.hint}</p>
 				</header>
 			<div class:limits-body={settingsTab === 'limits'} class="settings-body">
+				{#if settingsTab === 'chatgpt' && reaches('chatgpt')}<ChatGPTSettings connection={settings.chatgpt} />{/if}
 			{#if settingsTab === 'models'}
 				<ModelAdministrationSettings administration={settings.modelAdministration} {providerGroups} />
 		{:else if settingsTab === 'db'}

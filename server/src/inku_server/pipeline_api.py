@@ -141,6 +141,8 @@ class PipelineService:
         self._pool = ThreadPoolExecutor(max_workers=max_workers, thread_name_prefix="inku-pipeline")
 
     def close(self) -> None:
+        from .chatgpt_runtime import stop
+        stop()
         with self._lock:
             for run in self._runs.values():
                 if run.view()["busy"]:
@@ -281,6 +283,8 @@ class PipelineService:
         for key, run in list(self._runs.items()):
             job = self._jobs.get(key)
             if not run.view()["busy"] and (job is None or job.done()):
+                from .chatgpt_runtime import retire_execution
+                retire_execution(*key)
                 del self._runs[key]
                 self._jobs.pop(key, None)
                 return
@@ -294,6 +298,9 @@ class PipelineService:
         if current is not None and not current.done():
             return
         if run.view()["busy"]:
+            if run.context.get("host_options", {}).get("chatgpt_profile"):
+                from .chatgpt_runtime import begin_execution
+                begin_execution(*key)
             job = self._pool.submit(self._drain, run)
             job.add_done_callback(lambda done, key=key: self._log_job_failure(key, done))
             self._jobs[key] = job
@@ -396,6 +403,9 @@ class PipelineService:
         return run.view()
 
     def command(self, owner: str, execution_id: str, payload: dict) -> dict:
+        if payload.get("tag") == "cancel":
+            from .chatgpt_runtime import cancel_execution
+            cancel_execution(owner, execution_id)
         run = self.execution(owner, execution_id)
         if payload.get("tag") == "perform":
             payload = self._render_payload(run, payload)
@@ -599,6 +609,8 @@ def pipeline_router(service: PipelineService | Callable[[], PipelineService], ac
 
 
 def _host_error_status(code: str) -> int:
+    if code.startswith("chatgpt_"):
+        return 503 if code in {"chatgpt_transport_unavailable", "chatgpt_auth_unavailable", "chatgpt_refresh_not_ready"} else 403
     if code == "model_not_offered":
         return 403
     # A saved record the retired Saijiki (v1) wrote is refused until the one-time

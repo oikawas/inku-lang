@@ -13,6 +13,7 @@ dependencies = [
     "pydantic>=2.13.4",
     "python-dotenv>=1.2.2",
     "cryptography>=50.0.0",
+    "PyJWT[crypto]>=2.10.1",
     "sqlalchemy>=2.0.51",
     "uvicorn[standard]>=0.52.1",
     "pillow>=12.3.0",
@@ -23,6 +24,7 @@ dependencies = [
 [project.scripts]
 inku-server = "inku_server:main"
 inku-admin = "inku_server.admin:main"
+inku-chatgpt = "inku_server.chatgpt_cli:main"
 
 [build-system]
 requires = ["uv_build>=0.11.7,<0.12.0"]

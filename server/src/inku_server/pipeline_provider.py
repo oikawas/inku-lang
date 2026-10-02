@@ -23,6 +23,7 @@ from .openai_request import openai_sampling
 from .provider_refusal import provider_error as _provider_error
 from .provider_observation import ProviderObservationError, ProviderObservationStore
 from .provider_rate_limits import ProviderRateBudget, RateAccountingUnavailable, RateLimitUnavailable, retry_after_seconds
+from .chatgpt_store import ChatGPTError
 
 _logger = logging.getLogger(__name__)
 
@@ -164,6 +165,10 @@ class ProviderOptions:
     stage2_model: str
     max_tokens: int
     max_response_bytes: int
+    chatgpt_owner: str | None = None
+    chatgpt_profile: str | None = None
+    chatgpt_generation: int | None = None
+    chatgpt_cancel: Any = None
 
 
 def resolved_drawing_model(model: str | None, actor: dict | None) -> str:
@@ -196,6 +201,7 @@ class SingleAttemptProvider:
 
     def __call__(self, action: dict) -> dict:
         self.failure_detail = None
+        self.chatgpt_failure_detail = None
         self._observation_truncated = False
         self._refusal: dict[str, Any] = {}
         self._target: tuple[str, str] = ("", "")
@@ -218,18 +224,34 @@ class SingleAttemptProvider:
             stage = "stage2" if action["tag"] == "complete_visible_ddl_holes" else "stage1"
             model_ref = self.options.stage2_model if stage == "stage2" else self.options.stage1_model
             provider_id, model = provider_for_model(model_ref, stage=stage, settings=self.options.settings)
-            connection = connection_for(provider_id, self.options.settings)
             self._target = (provider_id, model)
-            if connection["requires_api_key"] and not connection.get("api_key"):
-                self.failure_detail = "credentials_unavailable"
-                raise ValueError("provider credentials unavailable")
-            with provider_slot(provider_id, timeout=timeout):
-                remaining = timeout - (time.monotonic() - started)
-                if remaining <= 0:
-                    raise TimeoutError
-                response = asyncio.run(self._request(
-                    connection, model, action, action["payload"]["prompt"], remaining
+            if provider_id == "chatgpt":
+                from .chatgpt_provider import request
+                if not self.options.chatgpt_owner or not self.options.chatgpt_profile or self.options.chatgpt_generation is None:
+                    raise ChatGPTError("chatgpt_profile_required")
+                response = asyncio.run(request(
+                    self.options.chatgpt_owner, self.options.chatgpt_profile, self.options.chatgpt_generation,
+                    model, action, started + timeout, self.options.max_response_bytes, self.options.chatgpt_cancel,
+                    (self.observation[0], self.observation[2]) if self.observation else None,
                 ))
+            else:
+                connection = connection_for(provider_id, self.options.settings)
+                if connection["requires_api_key"] and not connection.get("api_key"):
+                    self.failure_detail = "credentials_unavailable"
+                    raise ValueError("provider credentials unavailable")
+                with provider_slot(provider_id, timeout=timeout):
+                    remaining = timeout - (time.monotonic() - started)
+                    if remaining <= 0:
+                        raise TimeoutError
+                    response = asyncio.run(self._request(
+                        connection, model, action, action["payload"]["prompt"], remaining
+                    ))
+        except ChatGPTError as error:
+            failure = error.failure
+            self.chatgpt_failure_detail = {"code": error.code, "action": error.action,
+                                          "request_id": getattr(error, "request_id", None), "param": getattr(error, "param", None),
+                                          "status": getattr(error, "status", None)}
+            self._observation_truncated = error.code in {"chatgpt_response_incomplete", "chatgpt_response_too_large", "chatgpt_cancelled"}
         except (TimeoutError, httpx.TimeoutException):
             failure = "rate_limited" if self.failure_detail == "rate_limit_wait" else "transport_timeout"
         except RateLimitUnavailable:

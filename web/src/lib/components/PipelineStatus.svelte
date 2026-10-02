@@ -67,6 +67,9 @@
 
 {#if reason}
 	<p class="pipeline-attention" role="status">{pipelineAttentionText(reason, providerFailure, t())}</p>
+	{#if providerFailure?.chatgpt?.action === 'usage'}
+		<a href="https://chatgpt.com/settings/usage" target="_blank" rel="noopener noreferrer">{t().chatgptManageUsage}</a>
+	{/if}
 {/if}
 
 <style>

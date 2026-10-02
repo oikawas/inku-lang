@@ -2,6 +2,22 @@ import type { ComposeFallbackState } from '$lib/composeFallback';
 import type { EnglishForm, VerseForm } from '$lib/verseForm';
 
 export interface LangPack {
+	chatgptPlanLabel: string;
+	chatgptPlanNotice: string;
+	chatgptLocalHelperHint: string;
+	chatgptContinue: string;
+	chatgptCheckConnection: string;
+	chatgptManageUsage: string;
+	chatgptActive: string;
+	chatgptSelect: string;
+	chatgptReconnect: string;
+	chatgptGrantPlan: string;
+	chatgptRetry: string;
+	chatgptSignOut: string;
+	chatgptRefreshModels: string;
+	chatgptUsingPlan: string;
+	chatgptModelUnavailable: string;
+	chatgptStatus: (code: string) => string;
 	pipelineDescriptionLabel: string;
 	pipelineLegacyForkHint: string;
 	pipelineDescriptionLocked: string;

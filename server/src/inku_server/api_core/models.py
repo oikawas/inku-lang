@@ -208,4 +208,8 @@ class ModelSettingsResponse(BaseModel):
     catalog: list[dict] = Field(default_factory=list)
     llm_catalog: list[dict] = Field(default_factory=list)
     vision_catalog: list[dict] = Field(default_factory=list)
+    drawing_catalog: list[dict] = Field(default_factory=list)
+    chatgpt_profile_id: str | None = None
+    chatgpt_generation: int | None = None
+    chatgpt_plan_available: bool = False
     settings: dict = Field(default_factory=dict)

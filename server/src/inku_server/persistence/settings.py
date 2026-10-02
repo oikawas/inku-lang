@@ -15,6 +15,7 @@ from .schema import AppSettingRow, UserAccountRow, UserGroupRow
 
 
 SETTINGS_TABS = {
+    "chatgpt",
     "models",
     "db",
     "plugins",

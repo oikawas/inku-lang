@@ -130,7 +130,7 @@ DESCRIPTION_LOCKED_DETAIL = {
 MODEL_NOT_OFFERED_DETAIL = "model is not offered on this server"
 
 
-def _model_offered_to(actor: dict | None, model_ref: str | None, *, stage: str, purpose: str, settings: dict) -> bool:
+def _model_offered_to(actor: dict | None, model_ref: str | None, *, stage: str, purpose: str, settings: dict, operation: str | None = None) -> bool:
     """Whether the server will call this model with its own credentials for `actor`.
 
     Administrators may name any configured model: they choose what to offer
@@ -140,7 +140,12 @@ def _model_offered_to(actor: dict | None, model_ref: str | None, *, stage: str, 
     it -- or named a model no provider lists -- still reached the provider, on
     the server's account.
     """
+    provider_id, model_id = provider_for_model(model_ref or None, stage=stage, settings=settings)
+    if provider_id == "chatgpt":
+        if actor is None or operation != "pipeline" or purpose != "llm":
+            return False
+        from ..chatgpt_provider import offered
+        return offered(actor["id"], model_id)
     if actor is not None and _db.has_permission_group(actor, "admins"):
         return True
-    provider_id, model_id = provider_for_model(model_ref or None, stage=stage, settings=settings)
     return model_is_offered(provider_id, model_id, settings, purpose=purpose)

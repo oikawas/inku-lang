@@ -1,7 +1,7 @@
 {
-  "endpoint_count": 108,
-  "operation_count": 108,
-  "schema_count": 168,
+  "endpoint_count": 117,
+  "operation_count": 117,
+  "schema_count": 169,
   "operations": [
     {
       "path": "/api/admin/unread-words",
@@ -789,6 +789,137 @@
       "requestBody": "null",
       "responses": {
         "200": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/HistoryItem\"}}},\"description\":\"Successful Response\"}",
+        "422": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/HTTPValidationError\"}}},\"description\":\"Validation Error\"}"
+      }
+    },
+    {
+      "path": "/api/me/chatgpt",
+      "method": "GET",
+      "operationId": "state_api_me_chatgpt_get",
+      "params": [
+        "cookie:inku_session:opt",
+        "header:authorization:opt"
+      ],
+      "requestBody": "null",
+      "responses": {
+        "200": "{\"content\":{\"application/json\":{\"schema\":{\"additionalProperties\":true,\"title\":\"Response State Api Me Chatgpt Get\",\"type\":\"object\"}}},\"description\":\"Successful Response\"}",
+        "422": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/HTTPValidationError\"}}},\"description\":\"Validation Error\"}"
+      }
+    },
+    {
+      "path": "/api/me/chatgpt/attempts/{attempt_id}",
+      "method": "GET",
+      "operationId": "attempt_api_me_chatgpt_attempts__attempt_id__get",
+      "params": [
+        "cookie:inku_session:opt",
+        "header:authorization:opt",
+        "path:attempt_id:req"
+      ],
+      "requestBody": "null",
+      "responses": {
+        "200": "{\"content\":{\"application/json\":{\"schema\":{\"additionalProperties\":true,\"title\":\"Response Attempt Api Me Chatgpt Attempts  Attempt Id  Get\",\"type\":\"object\"}}},\"description\":\"Successful Response\"}",
+        "422": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/HTTPValidationError\"}}},\"description\":\"Validation Error\"}"
+      }
+    },
+    {
+      "path": "/api/me/chatgpt/attempts/{attempt_id}/cancel",
+      "method": "POST",
+      "operationId": "cancel_api_me_chatgpt_attempts__attempt_id__cancel_post",
+      "params": [
+        "cookie:inku_session:opt",
+        "header:authorization:opt",
+        "path:attempt_id:req"
+      ],
+      "requestBody": "null",
+      "responses": {
+        "200": "{\"content\":{\"application/json\":{\"schema\":{\"additionalProperties\":true,\"title\":\"Response Cancel Api Me Chatgpt Attempts  Attempt Id  Cancel Post\",\"type\":\"object\"}}},\"description\":\"Successful Response\"}",
+        "422": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/HTTPValidationError\"}}},\"description\":\"Validation Error\"}"
+      }
+    },
+    {
+      "path": "/api/me/chatgpt/authorize",
+      "method": "POST",
+      "operationId": "authorize_api_me_chatgpt_authorize_post",
+      "params": [
+        "cookie:inku_session:opt",
+        "header:authorization:opt"
+      ],
+      "requestBody": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/AuthorizeBody\"}}},\"required\":true}",
+      "responses": {
+        "200": "{\"content\":{\"application/json\":{\"schema\":{\"additionalProperties\":true,\"title\":\"Response Authorize Api Me Chatgpt Authorize Post\",\"type\":\"object\"}}},\"description\":\"Successful Response\"}",
+        "422": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/HTTPValidationError\"}}},\"description\":\"Validation Error\"}"
+      }
+    },
+    {
+      "path": "/api/me/chatgpt/models",
+      "method": "GET",
+      "operationId": "get_models_api_me_chatgpt_models_get",
+      "params": [
+        "cookie:inku_session:opt",
+        "header:authorization:opt"
+      ],
+      "requestBody": "null",
+      "responses": {
+        "200": "{\"content\":{\"application/json\":{\"schema\":{\"additionalProperties\":true,\"title\":\"Response Get Models Api Me Chatgpt Models Get\",\"type\":\"object\"}}},\"description\":\"Successful Response\"}",
+        "422": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/HTTPValidationError\"}}},\"description\":\"Validation Error\"}"
+      }
+    },
+    {
+      "path": "/api/me/chatgpt/models/refresh",
+      "method": "POST",
+      "operationId": "refresh_models_api_me_chatgpt_models_refresh_post",
+      "params": [
+        "cookie:inku_session:opt",
+        "header:authorization:opt"
+      ],
+      "requestBody": "null",
+      "responses": {
+        "200": "{\"content\":{\"application/json\":{\"schema\":{\"additionalProperties\":true,\"title\":\"Response Refresh Models Api Me Chatgpt Models Refresh Post\",\"type\":\"object\"}}},\"description\":\"Successful Response\"}",
+        "422": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/HTTPValidationError\"}}},\"description\":\"Validation Error\"}"
+      }
+    },
+    {
+      "path": "/api/me/chatgpt/profiles/{profile_id}/retry",
+      "method": "POST",
+      "operationId": "retry_api_me_chatgpt_profiles__profile_id__retry_post",
+      "params": [
+        "cookie:inku_session:opt",
+        "header:authorization:opt",
+        "path:profile_id:req"
+      ],
+      "requestBody": "null",
+      "responses": {
+        "200": "{\"content\":{\"application/json\":{\"schema\":{\"additionalProperties\":true,\"title\":\"Response Retry Api Me Chatgpt Profiles  Profile Id  Retry Post\",\"type\":\"object\"}}},\"description\":\"Successful Response\"}",
+        "422": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/HTTPValidationError\"}}},\"description\":\"Validation Error\"}"
+      }
+    },
+    {
+      "path": "/api/me/chatgpt/profiles/{profile_id}/select",
+      "method": "POST",
+      "operationId": "select_api_me_chatgpt_profiles__profile_id__select_post",
+      "params": [
+        "cookie:inku_session:opt",
+        "header:authorization:opt",
+        "path:profile_id:req"
+      ],
+      "requestBody": "null",
+      "responses": {
+        "200": "{\"content\":{\"application/json\":{\"schema\":{\"additionalProperties\":true,\"title\":\"Response Select Api Me Chatgpt Profiles  Profile Id  Select Post\",\"type\":\"object\"}}},\"description\":\"Successful Response\"}",
+        "422": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/HTTPValidationError\"}}},\"description\":\"Validation Error\"}"
+      }
+    },
+    {
+      "path": "/api/me/chatgpt/profiles/{profile_id}/sign-out",
+      "method": "POST",
+      "operationId": "disconnect_api_me_chatgpt_profiles__profile_id__sign_out_post",
+      "params": [
+        "cookie:inku_session:opt",
+        "header:authorization:opt",
+        "path:profile_id:req"
+      ],
+      "requestBody": "null",
+      "responses": {
+        "200": "{\"content\":{\"application/json\":{\"schema\":{\"additionalProperties\":true,\"title\":\"Response Disconnect Api Me Chatgpt Profiles  Profile Id  Sign Out Post\",\"type\":\"object\"}}},\"description\":\"Successful Response\"}",
         "422": "{\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/HTTPValidationError\"}}},\"description\":\"Validation Error\"}"
       }
     },
@@ -1587,12 +1718,13 @@
   "schemas": {
     "AnchorPoint": "{\"additionalProperties\":false,\"description\":\"A non-drawing explicit point that Relations may target.\",\"properties\":{\"at\":{\"anyOf\":[{\"$ref\":\"#/components/schemas/AtRegion\"},{\"type\":\"null\"}]},\"position\":{\"anyOf\":[{\"maxItems\":2,\"minItems\":2,\"prefixItems\":[{\"type\":\"number\"},{\"type\":\"number\"}],\"type\":\"array\"},{\"type\":\"null\"}],\"title\":\"Position\"}},\"title\":\"AnchorPoint\",\"type\":\"object\"}",
     "AnimationExportBody": "{\"properties\":{\"format\":{\"default\":\"apng\",\"enum\":[\"apng\",\"gif\"],\"title\":\"Format\",\"type\":\"string\"},\"height_px\":{\"anyOf\":[{\"maximum\":12000.0,\"minimum\":64.0,\"type\":\"integer\"},{\"type\":\"null\"}],\"title\":\"Height Px\"},\"hold_seconds\":{\"default\":1.0,\"maximum\":30.0,\"minimum\":0.1,\"title\":\"Hold Seconds\",\"type\":\"number\"},\"ids\":{\"items\":{\"type\":\"string\"},\"maxItems\":100,\"minItems\":1,\"title\":\"Ids\",\"type\":\"array\"},\"layer_frame_count\":{\"default\":12,\"maximum\":120.0,\"minimum\":2.0,\"title\":\"Layer Frame Count\",\"type\":\"integer\"},\"pattern\":{\"default\":\"cut\",\"enum\":[\"cut\",\"crossfade\",\"fade_white\",\"slide\"],\"title\":\"Pattern\",\"type\":\"string\"},\"replay\":{\"default\":\"restart\",\"enum\":[\"restart\",\"reverse\",\"once\"],\"title\":\"Replay\",\"type\":\"string\"},\"resolution\":{\"default\":\"1k\",\"enum\":[\"1k\",\"4k\",\"8k\"],\"title\":\"Resolution\",\"type\":\"string\"}},\"required\":[\"ids\"],\"title\":\"AnimationExportBody\",\"type\":\"object\"}",
-    "AppInfoResponse": "{\"properties\":{\"build_number\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"title\":\"Build Number\"},\"ddl_engine_version\":{\"title\":\"Ddl Engine Version\",\"type\":\"string\"},\"ddl_version\":{\"title\":\"Ddl Version\",\"type\":\"string\"},\"developer_mode\":{\"default\":false,\"title\":\"Developer Mode\",\"type\":\"boolean\"},\"name\":{\"title\":\"Name\",\"type\":\"string\"},\"release_version\":{\"title\":\"Release Version\",\"type\":\"string\"},\"render_engine_id\":{\"title\":\"Render Engine Id\",\"type\":\"string\"},\"render_engine_version\":{\"title\":\"Render Engine Version\",\"type\":\"string\"},\"single_user_mode\":{\"default\":false,\"title\":\"Single User Mode\",\"type\":\"boolean\"},\"thumbnail_hidpi\":{\"default\":false,\"title\":\"Thumbnail Hidpi\",\"type\":\"boolean\"},\"version\":{\"title\":\"Version\",\"type\":\"string\"}},\"required\":[\"name\",\"version\",\"release_version\",\"render_engine_id\",\"render_engine_version\",\"ddl_version\",\"ddl_engine_version\"],\"title\":\"AppInfoResponse\",\"type\":\"object\"}",
+    "AppInfoResponse": "{\"properties\":{\"build_number\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"title\":\"Build Number\"},\"chatgpt_plan_available\":{\"default\":false,\"title\":\"Chatgpt Plan Available\",\"type\":\"boolean\"},\"chatgpt_plan_unavailable_reason\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"title\":\"Chatgpt Plan Unavailable Reason\"},\"ddl_engine_version\":{\"title\":\"Ddl Engine Version\",\"type\":\"string\"},\"ddl_version\":{\"title\":\"Ddl Version\",\"type\":\"string\"},\"developer_mode\":{\"default\":false,\"title\":\"Developer Mode\",\"type\":\"boolean\"},\"name\":{\"title\":\"Name\",\"type\":\"string\"},\"release_version\":{\"title\":\"Release Version\",\"type\":\"string\"},\"render_engine_id\":{\"title\":\"Render Engine Id\",\"type\":\"string\"},\"render_engine_version\":{\"title\":\"Render Engine Version\",\"type\":\"string\"},\"single_user_mode\":{\"default\":false,\"title\":\"Single User Mode\",\"type\":\"boolean\"},\"thumbnail_hidpi\":{\"default\":false,\"title\":\"Thumbnail Hidpi\",\"type\":\"boolean\"},\"version\":{\"title\":\"Version\",\"type\":\"string\"}},\"required\":[\"name\",\"version\",\"release_version\",\"render_engine_id\",\"render_engine_version\",\"ddl_version\",\"ddl_engine_version\"],\"title\":\"AppInfoResponse\",\"type\":\"object\"}",
     "ArcDimensions": "{\"additionalProperties\":false,\"properties\":{\"chord\":{\"exclusiveMinimum\":0.0,\"title\":\"Chord\",\"type\":\"number\"},\"kind\":{\"const\":\"arc\",\"title\":\"Kind\",\"type\":\"string\"},\"sagitta\":{\"exclusiveMinimum\":0.0,\"title\":\"Sagitta\",\"type\":\"number\"}},\"required\":[\"kind\",\"chord\",\"sagitta\"],\"title\":\"ArcDimensions\",\"type\":\"object\"}",
     "Arrangement": "{\"additionalProperties\":false,\"properties\":{\"center\":{\"anyOf\":[{\"maxItems\":2,\"minItems\":2,\"prefixItems\":[{\"type\":\"number\"},{\"type\":\"number\"}],\"type\":\"array\"},{\"type\":\"null\"}],\"description\":\"radial の回転中心 [x,y] (省略=0.5,0.5)\",\"title\":\"Center\"},\"cluster_count\":{\"anyOf\":[{\"minimum\":1.0,\"type\":\"integer\"},{\"type\":\"null\"}],\"description\":\"群を何個のまとまりに分けるか。大数量を全面均一に埋めず、3-9 個程度のクラスタで余白を残す時に使う\",\"title\":\"Cluster Count\"},\"color_cycle\":{\"description\":\"配色サイクル: 空=全要素同色。設定するとインデックス順に color_cycle を循環して各要素に適用する。色とりどり・ランダム配色の表現に使う\",\"items\":{\"enum\":[\"white\",\"black\",\"blue\",\"red\",\"green\",\"gray\",\"yellow\",\"orange\",\"purple\"],\"type\":\"string\"},\"title\":\"Color Cycle\",\"type\":\"array\"},\"cols\":{\"anyOf\":[{\"maximum\":64.0,\"minimum\":1.0,\"type\":\"integer\"},{\"type\":\"null\"}],\"description\":\"gridの列数 1-64。省略時はcountと領域比率から推定\",\"title\":\"Cols\"},\"count\":{\"description\":\"配置数。通常配置は1-1000、gridは1-2000。同一図形・同一配置の反復に使い、反復を N 件の instruction へ展開しない\",\"minimum\":1.0,\"title\":\"Count\",\"type\":\"integer\"},\"density\":{\"default\":\"none\",\"description\":\"群の視覚密度。none=通常配置 / low=粗い間隔 / medium=まとまりを感じる密度 / high=粒・雨・雪などの濃い群。count が大きい時の見え方を Renderer に伝える\",\"enum\":[\"none\",\"low\",\"medium\",\"high\"],\"title\":\"Density\",\"type\":\"string\"},\"fade\":{\"default\":\"none\",\"description\":\"群の薄れ方。outward=中心から端へ薄れる / directional=軌跡方向へ薄れる / none=薄れなし\",\"enum\":[\"none\",\"outward\",\"directional\"],\"title\":\"Fade\",\"type\":\"string\"},\"group_size\":{\"default\":1,\"description\":\"One repeated unit spans this many consecutive instructions, starting with the instruction that owns this arrangement. Use 1 for an ordinary single-mark arrangement.\",\"minimum\":1.0,\"title\":\"Group Size\",\"type\":\"integer\"},\"jitter\":{\"default\":0.12,\"description\":\"gridセル内の決定的な位置揺らぎ 0.0-1.0 (省略=0.12)\",\"maximum\":1.0,\"minimum\":0.0,\"title\":\"Jitter\",\"type\":\"number\"},\"layout\":{\"default\":\"horizontal\",\"description\":\"horizontal=x軸等間隔 / vertical=y軸等間隔 / radial=指定中心周囲に円状 / scatter=決定的ランダム散布 / grid=等間隔の全面反復（敷き詰め）。scatter と違い偏り・薄れを持たない\",\"enum\":[\"horizontal\",\"vertical\",\"radial\",\"scatter\",\"grid\"],\"title\":\"Layout\",\"type\":\"string\"},\"margin\":{\"default\":0.1,\"description\":\"端余白 0.0-0.45 (省略=0.1)。grid全面敷き詰めでは0.02-0.08を使い、部分領域はat.regionで指定\",\"maximum\":0.45,\"minimum\":0.0,\"title\":\"Margin\",\"type\":\"number\"},\"path\":{\"default\":\"none\",\"description\":\"配置軌跡。none=layout通り / diagonal=斜めの帯 / wave=波打つ軌跡 / top_to_bottom=上から下 / left_to_right=左から右 / right_half=右半分\",\"enum\":[\"none\",\"diagonal\",\"wave\",\"top_to_bottom\",\"left_to_right\",\"right_half\"],\"title\":\"Path\",\"type\":\"string\"},\"preserve_space\":{\"default\":false,\"description\":\"true の場合、Renderer は margin と分布を広めに取り、余白を構図要素として残す\",\"title\":\"Preserve Space\",\"type\":\"boolean\"},\"radius\":{\"anyOf\":[{\"type\":\"number\"},{\"type\":\"null\"}],\"description\":\"radial の配置半径 (省略=0.3)\",\"title\":\"Radius\"},\"resolved\":{\"anyOf\":[{\"$ref\":\"#/components/schemas/ResolvedArrangement\"},{\"type\":\"null\"}]},\"rhythm_spacing\":{\"default\":\"none\",\"description\":\"反復間隔の揺らし方。none=等間隔 / syncopated=詰まりと抜けを交互に作る / accelerando=後半へ向けて間隔を詰める / loose=ゆるい不均等間隔\",\"enum\":[\"none\",\"syncopated\",\"accelerando\",\"loose\"],\"title\":\"Rhythm Spacing\",\"type\":\"string\"},\"rows\":{\"anyOf\":[{\"maximum\":64.0,\"minimum\":1.0,\"type\":\"integer\"},{\"type\":\"null\"}],\"description\":\"gridの行数 1-64。rowsとcolsの両方を指定した場合はrows×colsを優先\",\"title\":\"Rows\"}},\"required\":[\"count\"],\"title\":\"Arrangement\",\"type\":\"object\"}",
     "AtRegion": "{\"additionalProperties\":false,\"properties\":{\"region\":{\"description\":\"[x0,y0,x1,y1] の正規化領域。Renderer が render_seed で実座標へ解決する\",\"maxItems\":4,\"minItems\":4,\"prefixItems\":[{\"type\":\"number\"},{\"type\":\"number\"},{\"type\":\"number\"},{\"type\":\"number\"}],\"title\":\"Region\",\"type\":\"array\"}},\"required\":[\"region\"],\"title\":\"AtRegion\",\"type\":\"object\"}",
     "AuthSettingsBody": "{\"properties\":{\"google_enabled\":{\"title\":\"Google Enabled\",\"type\":\"boolean\"},\"local_enabled\":{\"title\":\"Local Enabled\",\"type\":\"boolean\"}},\"required\":[\"google_enabled\",\"local_enabled\"],\"title\":\"AuthSettingsBody\",\"type\":\"object\"}",
     "AuthorDdlBody": "{\"additionalProperties\":false,\"properties\":{\"expected_revision\":{\"title\":\"Expected Revision\",\"type\":\"string\"},\"options\":{\"additionalProperties\":true,\"default\":{},\"title\":\"Options\",\"type\":\"object\"},\"source\":{\"title\":\"Source\",\"type\":\"string\"}},\"required\":[\"expected_revision\",\"source\"],\"title\":\"AuthorDdlBody\",\"type\":\"object\"}",
+    "AuthorizeBody": "{\"additionalProperties\":false,\"properties\":{\"consent\":{\"default\":false,\"title\":\"Consent\",\"type\":\"boolean\"},\"profile_id\":{\"anyOf\":[{\"maxLength\":128,\"type\":\"string\"},{\"type\":\"null\"}],\"title\":\"Profile Id\"}},\"title\":\"AuthorizeBody\",\"type\":\"object\"}",
     "BatchPromptHistoryBody": "{\"properties\":{\"items\":{\"items\":{\"type\":\"string\"},\"title\":\"Items\",\"type\":\"array\"}},\"title\":\"BatchPromptHistoryBody\",\"type\":\"object\"}",
     "BatchPromptHistoryResponse": "{\"properties\":{\"items\":{\"items\":{\"type\":\"string\"},\"title\":\"Items\",\"type\":\"array\"}},\"title\":\"BatchPromptHistoryResponse\",\"type\":\"object\"}",
     "BboxDimensions": "{\"additionalProperties\":false,\"properties\":{\"height\":{\"exclusiveMinimum\":0.0,\"title\":\"Height\",\"type\":\"number\"},\"kind\":{\"const\":\"bbox\",\"title\":\"Kind\",\"type\":\"string\"},\"width\":{\"exclusiveMinimum\":0.0,\"title\":\"Width\",\"type\":\"number\"}},\"required\":[\"kind\",\"width\",\"height\"],\"title\":\"BboxDimensions\",\"type\":\"object\"}",
@@ -1671,7 +1803,7 @@
     "MirrorRepetitionGroupRef": "{\"additionalProperties\":false,\"properties\":{\"kind\":{\"const\":\"repetition_group\",\"title\":\"Kind\",\"type\":\"string\"},\"repetition_group_index\":{\"minimum\":0.0,\"title\":\"Repetition Group Index\",\"type\":\"integer\"}},\"required\":[\"kind\",\"repetition_group_index\"],\"title\":\"MirrorRepetitionGroupRef\",\"type\":\"object\"}",
     "ModelProviderPatch": "{\"properties\":{\"active\":{\"anyOf\":[{\"type\":\"boolean\"},{\"type\":\"null\"}],\"title\":\"Active\"},\"api_key\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"title\":\"Api Key\"},\"api_key_env\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"title\":\"Api Key Env\"},\"base_url\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"title\":\"Base Url\"},\"base_url_env\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"title\":\"Base Url Env\"},\"clear_api_key\":{\"default\":false,\"title\":\"Clear Api Key\",\"type\":\"boolean\"},\"default_base_url\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"title\":\"Default Base Url\"},\"delete\":{\"default\":false,\"title\":\"Delete\",\"type\":\"boolean\"},\"enabled_models\":{\"additionalProperties\":{\"type\":\"boolean\"},\"title\":\"Enabled Models\",\"type\":\"object\"},\"kind\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"title\":\"Kind\"},\"label\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"title\":\"Label\"},\"memo\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"title\":\"Memo\"},\"models\":{\"items\":{\"additionalProperties\":true,\"type\":\"object\"},\"title\":\"Models\",\"type\":\"array\"},\"rate_limits\":{\"anyOf\":[{\"$ref\":\"#/components/schemas/ProviderRateLimitsPatch\"},{\"type\":\"null\"}]},\"requires_api_key\":{\"anyOf\":[{\"type\":\"boolean\"},{\"type\":\"null\"}],\"title\":\"Requires Api Key\"}},\"title\":\"ModelProviderPatch\",\"type\":\"object\"}",
     "ModelSettingsPatch": "{\"properties\":{\"providers\":{\"additionalProperties\":{\"$ref\":\"#/components/schemas/ModelProviderPatch\"},\"title\":\"Providers\",\"type\":\"object\"},\"stage1_model\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"title\":\"Stage1 Model\"},\"stage1_provider\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"title\":\"Stage1 Provider\"},\"stage2_model\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"title\":\"Stage2 Model\"},\"stage2_provider\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"title\":\"Stage2 Provider\"}},\"title\":\"ModelSettingsPatch\",\"type\":\"object\"}",
-    "ModelSettingsResponse": "{\"properties\":{\"catalog\":{\"items\":{\"additionalProperties\":true,\"type\":\"object\"},\"title\":\"Catalog\",\"type\":\"array\"},\"llm_catalog\":{\"items\":{\"additionalProperties\":true,\"type\":\"object\"},\"title\":\"Llm Catalog\",\"type\":\"array\"},\"settings\":{\"additionalProperties\":true,\"title\":\"Settings\",\"type\":\"object\"},\"vision_catalog\":{\"items\":{\"additionalProperties\":true,\"type\":\"object\"},\"title\":\"Vision Catalog\",\"type\":\"array\"}},\"title\":\"ModelSettingsResponse\",\"type\":\"object\"}",
+    "ModelSettingsResponse": "{\"properties\":{\"catalog\":{\"items\":{\"additionalProperties\":true,\"type\":\"object\"},\"title\":\"Catalog\",\"type\":\"array\"},\"chatgpt_generation\":{\"anyOf\":[{\"type\":\"integer\"},{\"type\":\"null\"}],\"title\":\"Chatgpt Generation\"},\"chatgpt_plan_available\":{\"default\":false,\"title\":\"Chatgpt Plan Available\",\"type\":\"boolean\"},\"chatgpt_profile_id\":{\"anyOf\":[{\"type\":\"string\"},{\"type\":\"null\"}],\"title\":\"Chatgpt Profile Id\"},\"drawing_catalog\":{\"items\":{\"additionalProperties\":true,\"type\":\"object\"},\"title\":\"Drawing Catalog\",\"type\":\"array\"},\"llm_catalog\":{\"items\":{\"additionalProperties\":true,\"type\":\"object\"},\"title\":\"Llm Catalog\",\"type\":\"array\"},\"settings\":{\"additionalProperties\":true,\"title\":\"Settings\",\"type\":\"object\"},\"vision_catalog\":{\"items\":{\"additionalProperties\":true,\"type\":\"object\"},\"title\":\"Vision Catalog\",\"type\":\"array\"}},\"title\":\"ModelSettingsResponse\",\"type\":\"object\"}",
     "NamedFillTargetAnchor": "{\"additionalProperties\":false,\"properties\":{\"kind\":{\"const\":\"named\",\"title\":\"Kind\",\"type\":\"string\"},\"region\":{\"maxItems\":4,\"minItems\":4,\"prefixItems\":[{\"type\":\"number\"},{\"type\":\"number\"},{\"type\":\"number\"},{\"type\":\"number\"}],\"title\":\"Region\",\"type\":\"array\"}},\"required\":[\"kind\",\"region\"],\"title\":\"NamedFillTargetAnchor\",\"type\":\"object\"}",
     "NamedPlacementAnchor": "{\"additionalProperties\":false,\"properties\":{\"kind\":{\"const\":\"named\",\"title\":\"Kind\",\"type\":\"string\"},\"region\":{\"maxItems\":4,\"minItems\":4,\"prefixItems\":[{\"type\":\"number\"},{\"type\":\"number\"},{\"type\":\"number\"},{\"type\":\"number\"}],\"title\":\"Region\",\"type\":\"array\"}},\"required\":[\"kind\",\"region\"],\"title\":\"NamedPlacementAnchor\",\"type\":\"object\"}",
     "NamedTargetOwner": "{\"additionalProperties\":false,\"properties\":{\"category\":{\"title\":\"Category\",\"type\":\"string\"},\"id\":{\"title\":\"Id\",\"type\":\"string\"},\"kind\":{\"const\":\"named\",\"title\":\"Kind\",\"type\":\"string\"}},\"required\":[\"kind\",\"category\",\"id\"],\"title\":\"NamedTargetOwner\",\"type\":\"object\"}",
@@ -1754,5 +1886,5 @@
     "VisionRefineAdviceBody": "{\"properties\":{\"direction\":{\"default\":\"\",\"maxLength\":2000,\"title\":\"Direction\",\"type\":\"string\"},\"enabled_kinds\":{\"items\":{\"type\":\"string\"},\"maxItems\":5,\"minItems\":1,\"title\":\"Enabled Kinds\",\"type\":\"array\"},\"history_id\":{\"maxLength\":200,\"minLength\":1,\"title\":\"History Id\",\"type\":\"string\"},\"instruction\":{\"maxLength\":100000,\"minLength\":1,\"title\":\"Instruction\",\"type\":\"string\"},\"language\":{\"default\":\"ja\",\"pattern\":\"^(ja|en)$\",\"title\":\"Language\",\"type\":\"string\"},\"model\":{\"anyOf\":[{\"maxLength\":200,\"minLength\":1,\"type\":\"string\"},{\"type\":\"null\"}],\"title\":\"Model\"}},\"required\":[\"history_id\",\"instruction\",\"enabled_kinds\"],\"title\":\"VisionRefineAdviceBody\",\"type\":\"object\"}",
     "VisionRefineAdviceResponse": "{\"properties\":{\"model\":{\"title\":\"Model\",\"type\":\"string\"},\"next_direction\":{\"title\":\"Next Direction\",\"type\":\"string\"},\"observation\":{\"title\":\"Observation\",\"type\":\"string\"},\"suggested_kind\":{\"title\":\"Suggested Kind\",\"type\":\"string\"}},\"required\":[\"observation\",\"next_direction\",\"suggested_kind\",\"model\"],\"title\":\"VisionRefineAdviceResponse\",\"type\":\"object\"}"
   },
-  "digest": "a211abf0e4709e2044cd67cc712a81113882f122afd0b04a1cec6c8adc3848b9"
+  "digest": "5d3b5d13e563b94467ea22ba51b26bc7b95d421b289ff1317fc337e0ecba7ca3"
 }

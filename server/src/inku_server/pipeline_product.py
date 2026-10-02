@@ -287,9 +287,19 @@ class ProductPipelineEffects:
         # description is read by Stage 1; hand-written DDL reaches only Stage 2,
         # which completes its holes.
         model_settings = db.get_model_settings()
+        from .model_settings import provider_for_model
+        selected.pop("chatgpt_profile", None)
+        selected.pop("chatgpt_generation", None)
+        if provider_for_model(model, stage="stage1", settings=model_settings)[0] == "chatgpt":
+            from .chatgpt_provider import pin
+            from .chatgpt_store import ChatGPTError
+            try:
+                selected["chatgpt_profile"], selected["chatgpt_generation"] = pin(owner)
+            except ChatGPTError as error:
+                raise CandidateHostError(error.code) from None
         for stage in ("stage1", "stage2") if kind == "description" else ("stage2",):
             if not _model_offered_to(
-                actor, selected[f"{stage}_model"], stage=stage, purpose="llm", settings=model_settings
+                actor, selected[f"{stage}_model"], stage=stage, purpose="llm", settings=model_settings, operation="pipeline"
             ):
                 raise CandidateHostError("model_not_offered")
         selected["developer_disable_llm_retries"] = options.get("developer_disable_llm_retries") is True
@@ -308,12 +318,16 @@ class ProductPipelineEffects:
         options = context.get("host_options", {})
         configured = self.manifest["provider"]
         def perform(action):
+            from .chatgpt_runtime import execution_cancel
             stage = "stage2" if action["tag"] == "complete_visible_ddl_holes" else "stage1"
             transport = SingleAttemptProvider(ProviderOptions(
                 settings=db.get_model_settings(), stage1_model=options.get("stage1_model", configured["stage1_model"]),
                 stage2_model=options.get("stage2_model", configured["stage2_model"]),
                 max_tokens=configured.get("stage1_max_tokens", configured["max_tokens"]) if stage == "stage1" else configured["max_tokens"],
                 max_response_bytes=self.manifest["pipeline"]["prompt_limits"]["max_response_bytes"],
+                chatgpt_owner=owner, chatgpt_profile=options.get("chatgpt_profile"),
+                chatgpt_generation=options.get("chatgpt_generation"),
+                chatgpt_cancel=execution_cancel(owner, context.get("execution_id", "")) if options.get("chatgpt_profile") else None,
             ), observation=(
                 ProviderObservationStore(
                     db.engine,
@@ -343,6 +357,9 @@ class ProductPipelineEffects:
                 detail = getattr(transport, "failure_detail", None)
                 if result["failure"] == "provider_rejected" and detail in {"credentials_unavailable", "observation_incomplete"}:
                     context["provider_failure"]["detail"] = detail
+                safe_detail = getattr(transport, "chatgpt_failure_detail", None)
+                if safe_detail:
+                    context["provider_failure"].update(chatgpt=safe_detail, action_id=str(action["identity"]["action_id"]))
             else:
                 context.pop("provider_failure", None)
             return result

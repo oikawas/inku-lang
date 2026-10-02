@@ -210,6 +210,7 @@ import androidx.core.content.FileProvider
 import app.inku.mobile.BuildConfig
 import app.inku.mobile.data.db.ExportTemplateEntity
 import app.inku.mobile.data.db.HistoryItemEntity
+import app.inku.mobile.data.DdlSource
 import app.inku.mobile.data.db.HistoryListItem
 import app.inku.mobile.data.lineage.LineageGraphNode
 import app.inku.mobile.data.lineage.LineageGraphResult
@@ -864,7 +865,7 @@ private fun DdlEditorDialog(state: InkuUiState, viewModel: InkuViewModel) {
                             viewModel.closeDdlEditor()
                             viewModel.drawFromDdl()
                         },
-                        enabled = !state.isDrawing,
+                        enabled = !state.isDrawing && DdlSource.hasBody(state.ddl),
                     ) {
                         Text(S.renderTabArtwork)
                     }
@@ -3078,6 +3079,7 @@ private fun DrawPanel(
                         onClick = viewModel::drawFromDdl,
                         onStop = viewModel::stopDrawing,
                         tonal = true,
+                        enabled = DdlSource.hasBody(state.ddl),
                     )
                     }
                 }
@@ -6364,13 +6366,12 @@ private fun launchShareIntent(context: Context, payload: SharePayload) {
 private fun historyExportJson(item: HistoryItemEntity): JSONObject {
     return JSONObject().apply {
         put("schema", "inku.history_item")
-        put("schema_version", "0.1.0")
+        put("schema_version", "0.2.0")
         put("id", item.id)
         put("created_at", item.createdAt)
         put("updated_at", item.updatedAt)
         put("original_input", item.originalInput)
-        put("normalized_ddl", item.normalizedDdl ?: JSONObject.NULL)
-        put("expanded_ddl", item.expandedDdl)
+        DdlSource.putJson(this, item.normalizedDdl, item.ddlSourceOrigin)
         put("score_json", JSONObject(item.scoreJson))
         put("display_svg", item.displaySvg)
         put("stage1_model", item.stage1Model)
@@ -7347,6 +7348,7 @@ private fun DrawingActionButton(
     onClick: () -> Unit,
     onStop: () -> Unit,
     tonal: Boolean = false,
+    enabled: Boolean = true,
     modifier: Modifier = Modifier,
 ) {
     if (state.isDrawing) {
@@ -7386,11 +7388,12 @@ private fun DrawingActionButton(
             SecondaryActionButton(text = S.stop, onClick = onStop, modifier = Modifier.width(Dimens.chipWidth))
         }
     } else if (tonal) {
-        SecondaryActionButton(text = idleText, onClick = onClick, modifier = modifier)
+        SecondaryActionButton(text = idleText, onClick = onClick, enabled = enabled, modifier = modifier)
     } else {
         Button(
             onClick = onClick,
             modifier = modifier.fillMaxWidth().heightIn(min = Dimens.buttonHeightLarge),
+            enabled = enabled,
             shape = RoundedCornerShape(Dimens.radiusCard),
             colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary, contentColor = InkOnSecondary),
         ) { Text(idleText, maxLines = 1) }

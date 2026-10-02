@@ -33,6 +33,8 @@ data class HistoryListItem(
     val thumbnailWidth: Int?,
     @ColumnInfo(name = "thumbnail_height")
     val thumbnailHeight: Int?,
+    @ColumnInfo(name = "ddl_source_origin")
+    val ddlSourceOrigin: String? = null,
 ) {
     @Ignore
     val searchText: String = listOf(

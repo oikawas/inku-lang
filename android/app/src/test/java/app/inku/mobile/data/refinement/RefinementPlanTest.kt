@@ -31,7 +31,6 @@ class RefinementPlanTest {
         updatedAt = 1L,
         originalInput = "青い線を引く",
         normalizedDdl = "青い線を一本引く。",
-        expandedDdl = "青い線を一本引く。",
         scoreJson = """{"version":"0.1.0","canvas":"square","background":"white","instructions":[]}""",
         displaySvg = "<svg/>",
         stage1Model = "stage1",

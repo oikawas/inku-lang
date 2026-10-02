@@ -50,7 +50,7 @@ class WorkspaceNavigationTest {
         repository = InkuRepository(context, database)
         work = HistoryItemEntity(
             id = "navigation-target", createdAt = 1, updatedAt = 1, originalInput = "赤い円の作品",
-            normalizedDdl = "赤い円を描く", expandedDdl = null, scoreJson = "{}",
+            normalizedDdl = "赤い円を描く", scoreJson = "{}",
             displaySvg = "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 100 100\"><circle cx=\"50\" cy=\"50\" r=\"30\" fill=\"red\"/></svg>",
             stage1Model = "fixture", stage2Model = "fixture", renderMetadataJson = "{}",
             renderHash = "workspace-navigation-fixture", renderHashShort = "NAV01", colorCatalogId = "default",

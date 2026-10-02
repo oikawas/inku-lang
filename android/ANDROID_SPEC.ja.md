@@ -30,11 +30,21 @@ runtime fallbackを持たない。保存済みSVG、Room schema、Score schema�
 - Android 仕様を更新するときは、先に `ANDROID_SPEC.ja.md` を更新し、その後で `ANDROID_SPEC.md` を同期する。
 - 英語版だけに存在する仕様・要件を追加してはならない。
 
+## 2026-10-02 保存指示書を一つのDDLに統合
+
+保存・表示・編集・再描画の本文を一つのDDLに揃える（SPEC §21、共通保存契約v2）。Room schema 14では物理名`history_items.normalized_ddl`をNULL可のまま維持し、`expanded_ddl`を削除、NULL可のTEXT列`ddl_source_origin`を追加する。13→14は明示列で表を非破壊コピーし、本文があるDDLを全文そのまま優先する。DDLに本文がない場合だけ旧expanded本文を全文移し、`legacy_expanded`の由来を記録する。両方に本文がなければ元のDDLのNULL・空文字・空白を保持する。本文なしの判定は共通契約の固定Unicode White_Space集合で行い、trim・改行変換・Unicode正規化はしない。U+001CとU+200Bは本文に含む。
+
+移行はcompile・LLM・描画を呼ばず、保存Score/SVG・ID・版・seed・色・権限・系譜・pipeline linkとauthority・その他の列・表・indexを保持する。起動前gateは13を非破壊でRoomへ通し、未知・未来版や読めないDBは拒否する。旧版1–9だけのreset境界と歴史的12→13移行・schemaは保持する。Roomを開いた後の歳時記v2変換は統合DDLだけを読み書きし、既存の済み印・了承済みの変換・保存描画を保つ。
+
+指示書エディタと再描画は保存した統合本文を使い、本文なしの描画入口を無効にする。記述をDDLの代わりに用いない。保存Scoreの再演・コピーは元のNULL・空文字・空白と由来を保ち、新たな共有pipelineの描画は確定document.sourceと新しいauthorityを保存する。由来から過去の入力やauthoring authorityを推測しない。旧expanded本文は旧エンジンの補完出力であり、現行エンジンとの100%互換は保証しない。
+
+現行作品JSON（`inku.history_item`、形式0.2.0）と`inku.ddl-export.v1`は`ddl`と`ddl_source_origin`を出力し、旧二本文のキーを出さない。JSONの指示書読込みでは旧`ddl`／`normalized_ddl`と`expanded_ddl`にも同じ選択規則を当て、由来を読み書きで保持する。読込んだ本文から描く作品は新しい作品であり、旧authorityは復元しない。画面・テキスト書出しはNULLを空文字として扱う。
+
 ## 2026-10-01 DDLの無い作品をNULLで保存
 
 Room schema 13では、`history_items.normalized_ddl`と一覧用の`HistoryListItem.normalizedDdl`をNULL可とする。12→13の移行は作品の表を作り直し、既存の空文字だけをNULLへ変える。通常のDDL、記述、Score、SVG、seed、サムネイルの参照、系譜、その他の表とindexは保持する。新たにDDLの無い作品を保存するときもNULLにする。
 
-画面・検索・コピー・指示書編集欄・テキスト書き出しではNULLを空文字として扱い、文字列`null`を表示しない。指示書のJSON書き出しは空の`ddl`、作品のJSON書き出しは`normalized_ddl: null`を持つ。DDLを必要とする操作は既存の空入力の扱いを維持し、保存Score・SVGを使う表示・書き出し・再演はDDLが無くても行える。記述からの描画・推敲・フォークは保存した記述を使う。保存Scoreの再演で、記述を欠けたDDLの代わりに保存しない。
+画面・検索・コピー・指示書編集欄・テキスト書き出しではNULLを空文字として扱い、文字列`null`を表示しない。schema 13当時は指示書のJSON書き出しが空の`ddl`、作品のJSON書き出しが`normalized_ddl: null`を持った（現行の形式は上のschema 14の節）。保存Score・SVGを使う表示・書き出し・再演はDDLが無くても行える。記述からの描画・推敲・フォークは保存した記述を使う。保存Scoreの再演で、記述を欠けたDDLの代わりに保存しない。
 
 ## 2026-09-30 撮影から詩的な記述へ・モデルの統一
 

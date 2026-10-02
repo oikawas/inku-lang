@@ -90,7 +90,6 @@ class LineageGraphReferenceTest {
                 updatedAt = 0L,
                 originalInput = id,
                 normalizedDdl = "$id を描く。",
-                expandedDdl = null,
                 scoreJson = "{}",
                 displaySvg = "<svg id='$id'/>",
                 stage1Model = null,

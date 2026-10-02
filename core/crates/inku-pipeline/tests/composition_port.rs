@@ -238,6 +238,19 @@ fn run(limit: Option<u64>) -> Outcome {
         };
         let mut differences = compare_check(case, &checked, &findings);
         outcome.checked += 1;
+        // Larger works are searched only by the full run: an unoptimised exhaustive
+        // search of every work takes minutes.
+        if case.solve.skipped.is_none()
+            && limit.is_some_and(|limit| case.solve.combinations.unwrap_or(0) > limit)
+        {
+            outcome.left_for_the_full_run += 1;
+            if !differences.is_empty() {
+                outcome
+                    .failures
+                    .push(format!("{}: {}", case.id, differences.join("; ")));
+            }
+            continue;
+        }
         match (
             &case.solve.skipped,
             composition::search(&case.layers, &checked, &case.background),
@@ -259,15 +272,11 @@ fn run(limit: Option<u64>) -> Outcome {
                         searched.combinations, case.solve.combinations
                     ));
                 }
-                if limit.is_some_and(|limit| searched.combinations > limit) {
-                    outcome.left_for_the_full_run += 1;
-                } else {
-                    for (seed, expected) in [(1, &case.solve.s1), (2, &case.solve.s2)] {
-                        let expected = expected.as_ref().expect("a solved case has both seeds");
-                        differences.extend(compare_seed(case, &checked, &searched, seed, expected));
-                    }
-                    outcome.solved += 1;
+                for (seed, expected) in [(1, &case.solve.s1), (2, &case.solve.s2)] {
+                    let expected = expected.as_ref().expect("a solved case has both seeds");
+                    differences.extend(compare_seed(case, &checked, &searched, seed, expected));
                 }
+                outcome.solved += 1;
             }
             (expected, got) => differences.push(format!(
                 "solve {expected:?} but {:?}",

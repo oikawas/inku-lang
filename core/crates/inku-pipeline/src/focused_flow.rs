@@ -1655,6 +1655,12 @@ fn composition_start(composition: Option<CompositionConfig>) -> PipelineSnapshot
     run(None, &start).snapshot
 }
 
+fn stage1_system(state: &PipelineSnapshot) -> &str {
+    let action = state.action.as_ref().unwrap();
+    assert_eq!(action.tag, "generate_normalized_ddl");
+    action.payload["prompt"]["system"].as_str().unwrap()
+}
+
 fn plan_answer(state: &PipelineSnapshot) -> StepOutput {
     let action = state.action.as_ref().unwrap();
     assert_eq!(action.tag, "generate_normalized_ddl");
@@ -1688,6 +1694,8 @@ fn tags(output: &StepOutput) -> Vec<&str> {
 #[test]
 fn a_composing_run_reads_the_settled_plan_and_commits_marked_ranges() {
     let pending = composition_start(Some(CompositionConfig { read: true }));
+    // A composing run asks Stage 1 for a place only where the description states one.
+    assert!(stage1_system(&pending).contains("8. Choose a place only for a layer"));
     let reading_requested = plan_answer(&pending);
     let state = reading_requested.snapshot;
     let action = state.action.as_ref().unwrap();
@@ -1786,6 +1794,10 @@ fn a_failed_reading_composes_from_the_default_reading() {
 #[test]
 fn a_run_without_composition_commits_the_plan_as_printed() {
     let pending = composition_start(None);
+    // Without the step Stage 1 keeps the principle that spreads the layers itself.
+    let system = stage1_system(&pending);
+    assert!(system.contains("8. Empty space is part of the composition. Do not gather"));
+    assert!(!system.contains("8. Choose a place only"));
     let output = plan_answer(&pending);
     let source = committed_source(&output.snapshot);
     assert!(!source.contains("[composition]"), "{source}");

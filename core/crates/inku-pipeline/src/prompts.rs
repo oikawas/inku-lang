@@ -589,6 +589,30 @@ pub fn build_stage1_prompt_with_sketch(
     macros: &[MacroPromptEntry<'_>],
     limits: PromptLimits,
 ) -> Result<LlmPrompt, PromptError> {
+    build_stage1_prompt_for_run(
+        description,
+        sketch,
+        language,
+        context,
+        macros,
+        limits,
+        false,
+    )
+}
+
+/// Build the Stage 1 request of a run. A run that composes its plan asks for a
+/// place only where the description states one (principle 8) and leaves the rest
+/// to the composition step; any other run keeps the principle that spreads the
+/// layers itself, so a run without the step does not gather them at the center.
+pub fn build_stage1_prompt_for_run(
+    description: &str,
+    sketch: Option<&str>,
+    language: ResolvedInstructionLanguage,
+    context: &Stage1Context,
+    macros: &[MacroPromptEntry<'_>],
+    limits: PromptLimits,
+    composes: bool,
+) -> Result<LlmPrompt, PromptError> {
     require_nonempty("description", description)?;
     if let Some(sketch) = sketch {
         require_nonblank("sketch", sketch)?;
@@ -614,7 +638,7 @@ pub fn build_stage1_prompt_with_sketch(
         .into_iter()
         .map(|plugin| plugin.name)
         .collect::<Vec<_>>();
-    let mut system = stage1_work_plan_system(language)?;
+    let mut system = stage1_work_plan_system_for(language, composes)?;
     if !plugins.is_empty() {
         system.push_str(&stage1_plugin_section(macros, language));
     }
@@ -989,12 +1013,38 @@ fn stage1_plugin_section(
     format!("{rule}\n{}", lines.join("\n"))
 }
 
-fn stage1_work_plan_system(language: ResolvedInstructionLanguage) -> Result<String, PromptError> {
+/// Principle 8 for a run that composes: a place only where the description states it.
+const STAGE1_STATED_PLACES_JA: &str = "8. 位置は、記述が場所を言葉で言う層にだけ選ぶ。それ以外の層は位置を unspecified にする（画面のどこに置くかは、後で構図を決めるときに選ばれる）。余白も構図の一部なので、大きさと個数で重心と空いた部分を作る。";
+const STAGE1_STATED_PLACES_EN: &str = "8. Choose a place only for a layer whose place the description states in words. Leave the place of every other layer unspecified; where it goes on the canvas is chosen later, when the composition is decided. Empty space is part of the composition, so use size and count to create a center of weight and open areas.";
+/// Principle 8 for a run without the composition step: the plan spreads its layers.
+const STAGE1_SPREAD_PLACES_JA: &str =
+    "8. 余白も構図の一部である。全層を中心に集めず、位置・大きさ・個数で重心と空いた部分を作る。";
+const STAGE1_SPREAD_PLACES_EN: &str = "8. Empty space is part of the composition. Do not gather every layer at the center; use position, size, and count to create a center of weight and open areas.";
+
+fn stage1_work_plan_system_for(
+    language: ResolvedInstructionLanguage,
+    composes: bool,
+) -> Result<String, PromptError> {
     let tool_guidance =
         saijiki_tool_guidance(language).map_err(|_| PromptError::SaijikiProjection)?;
-    let (plan, context) = match language {
-        ResolvedInstructionLanguage::Ja => (STAGE1_WORK_PLAN_JA, STAGE1_CONTEXT_JA),
-        ResolvedInstructionLanguage::En => (STAGE1_WORK_PLAN_EN, STAGE1_CONTEXT_EN),
+    let (plan, context, stated, spread) = match language {
+        ResolvedInstructionLanguage::Ja => (
+            STAGE1_WORK_PLAN_JA,
+            STAGE1_CONTEXT_JA,
+            STAGE1_STATED_PLACES_JA,
+            STAGE1_SPREAD_PLACES_JA,
+        ),
+        ResolvedInstructionLanguage::En => (
+            STAGE1_WORK_PLAN_EN,
+            STAGE1_CONTEXT_EN,
+            STAGE1_STATED_PLACES_EN,
+            STAGE1_SPREAD_PLACES_EN,
+        ),
+    };
+    let plan = if composes {
+        plan.to_owned()
+    } else {
+        plan.replace(stated, spread)
     };
     Ok(format!(
         "{plan}\n\n{context}\n\n# tool_marks\n{tool_guidance}"
@@ -1878,6 +1928,30 @@ Use accepted_saijiki_vocabulary and the shared grammar. An unresolved_clause mus
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn principle_8_asks_for_stated_places_only_in_a_run_that_composes() {
+        for (language, stated, spread, plan) in [
+            (
+                ResolvedInstructionLanguage::Ja,
+                STAGE1_STATED_PLACES_JA,
+                STAGE1_SPREAD_PLACES_JA,
+                STAGE1_WORK_PLAN_JA,
+            ),
+            (
+                ResolvedInstructionLanguage::En,
+                STAGE1_STATED_PLACES_EN,
+                STAGE1_SPREAD_PLACES_EN,
+                STAGE1_WORK_PLAN_EN,
+            ),
+        ] {
+            assert_eq!(plan.matches(stated).count(), 1);
+            let composing = stage1_work_plan_system_for(language, true).unwrap();
+            assert!(composing.contains(stated) && !composing.contains(spread));
+            let printing = stage1_work_plan_system_for(language, false).unwrap();
+            assert!(printing.contains(spread) && !printing.contains(stated));
+        }
+    }
+
     use super::*;
 
     const LIMITS: PromptLimits = PromptLimits {
@@ -2250,7 +2324,7 @@ mod tests {
             ResolvedInstructionLanguage::Ja,
             ResolvedInstructionLanguage::En,
         ] {
-            let system = stage1_work_plan_system(language).unwrap();
+            let system = stage1_work_plan_system_for(language, false).unwrap();
             let guide = saijiki_tool_guidance(language).unwrap();
             assert!(!guide.is_empty());
             assert_eq!(system.matches(&guide).count(), 1);
@@ -2290,11 +2364,9 @@ mod tests {
         .unwrap();
         let ja_projection = stage1_system_projection(ResolvedInstructionLanguage::Ja).unwrap();
         let en_projection = stage1_system_projection(ResolvedInstructionLanguage::En).unwrap();
-        assert!(
-            prompt
-                .system
-                .starts_with(&stage1_work_plan_system(ResolvedInstructionLanguage::En).unwrap())
-        );
+        assert!(prompt.system.starts_with(
+            &stage1_work_plan_system_for(ResolvedInstructionLanguage::En, false).unwrap()
+        ));
         let (_, schema_text) = prompt.system.split_once("# response_schema\n").unwrap();
         assert_eq!(
             serde_json::from_str::<Value>(schema_text).unwrap(),

@@ -26,7 +26,7 @@ use crate::prompts::{
     DescriptionCatalogEntry, HOLE_COMPLETION_PROMPT_ID, HoleCompletionResult,
     HolePatchEditResponse, HolePatchResponse, LEGACY_HOLE_COMPLETION_PROMPT_ID, LlmPrompt,
     LlmStage, MacroPromptEntry, PromptLimits, Stage1Context, build_catalog_selection_prompt,
-    build_hole_completion_prompt, build_sketch_prompt, build_stage1_prompt_with_sketch,
+    build_hole_completion_prompt, build_sketch_prompt, build_stage1_prompt_for_run,
     parse_catalog_selection_response, parse_hole_completion_response, parse_hole_patch_response,
     parse_sketch_response, parse_stage1_response_and_plan_with_plugins,
     with_stage1_background_feedback, with_stage1_compiler_feedback,
@@ -976,13 +976,14 @@ impl PipelineSnapshot {
             )
             .map_err(|_| ProtocolError::SchemaViolation)?,
         };
-        build_stage1_prompt_with_sketch(
+        build_stage1_prompt_for_run(
             description,
             self.sketch.as_ref().and_then(SketchRecord::stage1_text),
             self.config.language,
             &context,
             &macros,
             self.config.prompt_limits,
+            self.config.composition.is_some(),
         )
         .map_err(|_| ProtocolError::SchemaViolation)
     }

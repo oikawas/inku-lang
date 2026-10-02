@@ -180,7 +180,7 @@ def _normalize_provider_id(value: Any) -> str:
 
 
 def _normalize_provider_kind(value: Any) -> str:
-    return str(value) if value in {"openai_compatible", "anthropic", "gemini"} else "openai_compatible"
+    return str(value) if value in {"openai_compatible", "mlx", "anthropic", "gemini"} else "openai_compatible"
 
 
 def _normalize_models(models: Any) -> list[dict[str, Any]]:
@@ -833,7 +833,10 @@ def connection_for(provider_id: str, settings: dict[str, Any]) -> dict[str, Any]
         raise ValueError(f"unknown model provider: {provider_id}")
     return {
         "id": provider_id,
-        "kind": provider["kind"],
+        # MLX uses the OpenAI-compatible endpoints, with its own generation
+        # profile. Keep list fetching and Vision on the same wire protocol.
+        "kind": "openai_compatible" if provider["kind"] == "mlx" else provider["kind"],
+        "api_profile": provider["kind"],
         "base_url": provider.get("base_url") or provider["default_base_url"],
         "api_key": decrypt_secret(str(provider.get("api_key") or "")) or os.getenv(str(provider["api_key_env"]), ""),
         "requires_api_key": provider["requires_api_key"],

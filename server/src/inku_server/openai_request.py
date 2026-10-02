@@ -24,10 +24,14 @@ def openai_sampling(connection: dict, model: str, *, max_tokens: int, temperatur
     gpt-5.1-and-later models are asked not to reason. That also keeps a short
     answer from being spent on reasoning before it is written. Other
     OpenAI-compatible servers (NVIDIA, Ollama and the like) keep the fields
-    they have always been sent.
+    they have always been sent. The explicit MLX profile also disables thinking
+    in the model's chat template so the answer has the full output budget.
     """
     if httpx.URL(str(connection["base_url"])).host != "api.openai.com":
-        return {"max_tokens": max_tokens, "temperature": temperature}
+        fields = {"max_tokens": max_tokens, "temperature": temperature}
+        if connection.get("api_profile") == "mlx":
+            fields["enable_thinking"] = False
+        return fields
     fields: dict[str, Any] = {"max_completion_tokens": max_tokens}
     if not _OPENAI_FIXED_TEMPERATURE.match(model):
         fields["temperature"] = temperature

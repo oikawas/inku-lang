@@ -285,7 +285,10 @@ class SingleAttemptProvider:
                                  {"role": "user", "content": prompt["message"]}]}
             # Preserve the established provider-specific structured-output
             # transport, using the schema owned by the shared core verbatim.
-            if connection["id"] == "ollama":
+            # Gemma 4 on mlx-vlm loops on thought-channel markers when given
+            # the forced function tool (2026-10-02). Its grammar-constrained
+            # JSON output accepts the same core schema without a tool template.
+            if connection["id"] == "ollama" or connection.get("api_profile") == "mlx":
                 body["response_format"] = {
                     "type": "json_schema",
                     "json_schema": {"name": response_name, "schema": prompt["response_schema"], "strict": True},

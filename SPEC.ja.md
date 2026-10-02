@@ -977,6 +977,8 @@ Stage 1、camera projection、hole補完は既存の共有grammar helperを使�
 
 ### 12.5 描画とVisionのモデル
 
+MLXの`mlx-vlm`サーバーはサービス種別`mlx`（管理画面の「MLX (mlx-vlm)」）で登録する。接続先・キー・モデル一覧はOpenAI互換APIとして扱い、描画の応答は共有コアが渡すJSON Schemaをそのまま`response_format`へ渡して制約する。関数ツールは送らず、`enable_thinking: false`を明示する。コアによる応答検証と再試行の権限は継続する。登録済みサービスは種別だけを変更でき、キー・URL・公開モデルを保持する。
+
 **描画のStage 1とStage 2は同じモデルを使う（作者の決定、2026-09-30）。** 要求の`stage1_model`、無ければ`stage2_model`、どちらも無ければアカウントの描画モデルを両段に使う。アカウントの設定を正規化すると、`stage2_provider`と`stage2_model`をStage 1の値へ揃える。Visionは描画とは別のモデル設定を持つ（§8.4、`/api/models`のLLM/Visionカタログ）。APIの`stage1_model` / `stage2_model`の鍵と過去の作品のモデル記録は保持し、新しい描画では両方の鍵に同じ実使用モデルを記録する。
 
 **サーバーの資格情報で呼ぶモデルは、管理者が公開したものに限る（2026-09-26）。** `admins` 以外の利用者の生成、デモ指示、奥書、Vision 推敲の助言は、有効な provider がその用途の一覧に持ち、管理者が無効にしていないモデルだけを呼ぶ。それ以外を名指した要求は 403（生成は `model_not_offered`）で断る。提供終了と有料プラン限定の印が付いたモデルは公開に入れられない（2026-09-28）。以前は無効化が一覧から隠すだけで、名指した要求はサーバーの鍵で provider へ届いた。developer mode は判定に使わない —— 表示だけを変える設定であり、組み込みの Stage 既定は developer mode でしか表示されない provider にある。`admins` は公開前に試すため、構成済みの任意のモデルを呼べる。

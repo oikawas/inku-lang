@@ -34,6 +34,8 @@ apple/scripts/build-macos.sh Release
 
 `build-macos.sh`はServer sourceからdefault・catalog・歳時記・plugin resourceを生成し、`uv sync --project server --frozen`で固定したbuild用依存を用意します。[辞書準備script](scripts/prepare-meter-resources.py)がSudachi small（約113MiB）、読み設定とCMUdictをhash検証し、licenseと共にInkuHost resourceへコピーします。共通RustとSwift binding／XCFrameworkを生成し、`project.yml`からXcode projectを作ってmacOS appをbuildします。generic Mac destination、`ARCHS=arm64 x86_64`、`ONLY_ACTIVE_ARCH=NO`を指定し、最後に両sliceの存在を検査します。Apple account、Team、証明書を使わないunsigned local buildです。署名、notarization、配布はこの手順に含みません。
 
+Rust 1.95のmacOS host proc-macro stripによる[LINKEDIT alignment問題](https://github.com/rust-lang/rust/issues/157750)を避けるため、releaseのhost build dependencyだけstripを無効にします。target Rust archiveの最適化とstripは維持します。cache削除やtoolchain変更は不要です。
+
 defaultはRelease appとrelease Rustです。XcodeのDebug appを選んでも、Rustは明示指定しない限りreleaseのままです。両方をdebugにする場合は次を使います。
 
 ```sh
@@ -66,7 +68,7 @@ apple/build/macOS/DerivedData/Build/Products/Release/Inku.app/Contents/MacOS/Ink
   --database "$preview_dir/inku.sqlite"
 ```
 
-この指定はDBと隣接するprovider JSONの保存先を変えます。Keychainは独立したままです。保存作品の読出しだけでDDLを再compileしたり、保存SVGを再生成したりしません。再演奏は明示操作として新しい保存結果を作ります。
+この指定はDBと隣接するprovider JSONの保存先を変えます。Keychainは独立したままです。保存作品の読出しだけでDDLを再compileしたり、保存SVGを再生成したりしません。通常の「再演奏」は保存SVGと現行エンジンの再現を比較し、保存・履歴・系譜を変更しません。「次の条件で再演奏」は新しい保存childを作ります。
 
 ## 共通packageとiOS artifact
 
@@ -95,4 +97,4 @@ uv sync --project server --frozen
 python3 apple/scripts/prepare-meter-resources.py
 ```
 
-限定したCLI確認は、artifact生成後の`apple/scripts/check-core.sh`と、resource生成後の`swift run --package-path apple InkuAppCheck`です。AppCheckの`--authoring-only`、`--comparison-only`、`--automation-only`、`--plugin-only`、`--model-selection-only`、`--work-edit-only`、`--refinement-only`、`--raster-only <SVG path>`はそれぞれの変更に対応する確認だけを選びます。`--model-selection-only`は一時DBとprovider呼出し0件で、制作のmodel選択と保存default・開始時snapshotの分離を確認します。`--work-edit-only`はmock transportと共通coreで保存親の編集・写生・childのDDL authority・取消しを確認します。`--refinement-only`は語句seedと保存Score、固定4案、無変更の変奏、明示採用・再表示後のDDL child、edge metadataと遅い応答の拒否を同じ隔離境界で確認します。これらはnative画面、実provider、実機の受入を代替しません。変更が防ぐ具体的な失敗に合わせて必要な確認だけを選択してください。
+限定したCLI確認は、artifact生成後の`apple/scripts/check-core.sh`と、resource生成後の`swift run --package-path apple InkuAppCheck`です。AppCheckの`--authoring-only`、`--comparison-only`、`--automation-only`、`--plugin-only`、`--model-selection-only`、`--work-edit-only`、`--refinement-only`、`--replay-comparison-only`、`--auxiliary-provenance-only`、`--raster-only <SVG path>`はそれぞれの変更に対応する確認だけを選びます。`--model-selection-only`は一時DBとprovider呼出し0件で、制作のmodel選択と保存default・開始時snapshotの分離を確認します。`--work-edit-only`はmock transportと共通coreで保存親の編集・写生・childのDDL authority・取消しを確認します。`--refinement-only`は語句seedと保存Score、固定4案、無変更の変奏、明示採用・再表示後のDDL child、edge metadataと遅い応答の拒否を同じ隔離境界で確認します。`--replay-comparison-only`はprovider0件の再現比較が保存・表示を変えないこととseed・停止の境界、`--auxiliary-provenance-only`はmockによる世代ごとのVision／random来歴を確認します。これらはnative画面、実provider、実機の受入を代替しません。変更が防ぐ具体的な失敗に合わせて必要な確認だけを選択してください。

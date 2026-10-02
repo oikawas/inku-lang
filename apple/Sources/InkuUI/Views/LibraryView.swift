@@ -6,6 +6,7 @@ struct LibraryView: View {
     @Bindable var model: AppModel
     let onEditWork: (SavedWork, WorkEditMode) -> Void
     let onAdjustWork: (SavedWork) -> Void
+    let onReplayWork: (SavedWork) -> Void
     @State private var deletion: LibraryDeletion?
     @State private var loadingGroups: Set<String> = []
     @FocusState private var focusedWorkID: String?
@@ -417,7 +418,7 @@ struct LibraryView: View {
 
     @ViewBuilder
     private var selected: some View {
-        if let work = model.selectedWork { LibraryWorkDetails(model: model, work: work).id(work.id) }
+        if let work = model.selectedWork { LibraryWorkDetails(model: model, work: work, onReplayWork: onReplayWork).id(work.id) }
         else {
             ContentUnavailableView(model.display.localized("表示する作品を選択"), systemImage: "photo",
                                    description: Text(model.display.localized("作品をクリックすると詳細を表示します。チェックは書き出しやごみ箱への複数選択に使います。")))
@@ -468,6 +469,7 @@ private struct LibraryDeletion: Identifiable {
 struct LibraryWorkDetails: View {
     @Bindable var model: AppModel
     let work: SavedWork
+    let onReplayWork: (SavedWork) -> Void
     @State private var note = ""
     @State private var savedNote = ""
     private var library: LibraryModel { model.library }
@@ -536,7 +538,7 @@ struct LibraryWorkDetails: View {
             Button(model.display.localized("制作で編集"), systemImage: "pencil") {
                 Task { await model.selectWork(work); NotificationCenter.default.post(name: .inkuOpenSection, object: "create") }
             }.disabled(model.isBusy || work.trashed)
-            Button(model.display.localized("再演奏"), systemImage: "arrow.clockwise") { Task { await model.replay(work) } }.disabled(model.isBusy || work.trashed)
+            Button(model.display.localized("再演奏"), systemImage: "arrow.clockwise") { onReplayWork(work) }.disabled(model.isBusy || work.trashed)
         }.controlSize(.small).fixedSize()
     }
 

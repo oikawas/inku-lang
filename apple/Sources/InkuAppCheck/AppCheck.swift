@@ -41,6 +41,14 @@ struct AppCheck {
             try await runRefinementChecks()
             return
         }
+        if CommandLine.arguments.contains("--replay-comparison-only") {
+            try await runReplayComparisonChecks()
+            return
+        }
+        if CommandLine.arguments.contains("--auxiliary-provenance-only") {
+            try await runAuxiliaryProvenanceChecks()
+            return
+        }
         if CommandLine.arguments.contains("--plugin-only") {
             try await runPluginChecks()
             return

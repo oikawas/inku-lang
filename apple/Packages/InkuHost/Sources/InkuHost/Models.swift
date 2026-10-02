@@ -141,6 +141,22 @@ public struct PreparedCandidate: Identifiable, Sendable {
     }
 }
 
+/// A read-only comparison of the saved SVG and the same Score rendered by the current engine.
+public struct ReplayComparisonSnapshot: Sendable {
+    public let workID: String
+    public let originalSVG: String
+    public let replayedSVG: String
+    public let recordedVersion: String?
+    public let currentVersion: String
+    public let provisionalSeed: String?
+    public init(workID: String, originalSVG: String, replayedSVG: String, recordedVersion: String?,
+                currentVersion: String, provisionalSeed: String?) {
+        self.workID = workID; self.originalSVG = originalSVG; self.replayedSVG = replayedSVG
+        self.recordedVersion = recordedVersion; self.currentVersion = currentVersion
+        self.provisionalSeed = provisionalSeed
+    }
+}
+
 /// An owned saved-Score snapshot. Only the host constructs or interprets its payload.
 public struct SavedScoreReplayPlan: Sendable {
     let work: SavedWork

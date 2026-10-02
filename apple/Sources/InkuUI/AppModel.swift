@@ -864,6 +864,21 @@ public final class AppModel {
         return PreparedCandidate(executionID: view.executionID, work: work, authority: view.authority)
     }
 
+    public func prepareReplayComparison(work: SavedWork, token: UUID) async throws -> ReplayComparisonSnapshot {
+        guard generationToken == token, !stopping, let host else { throw CancellationError() }
+        try Task.checkCancellation()
+        _ = try await checkedSavedAdjustmentParent(work)
+        try Task.checkCancellation()
+        guard generationToken == token, !stopping else { throw CancellationError() }
+        let snapshot = try await host.prepareReplayComparison(work: work)
+        try Task.checkCancellation()
+        guard generationToken == token, !stopping, snapshot.workID == work.id else { throw CancellationError() }
+        _ = try await checkedSavedAdjustmentParent(work)
+        try Task.checkCancellation()
+        guard generationToken == token, !stopping else { throw CancellationError() }
+        return snapshot
+    }
+
     public func previewCatalogCandidate(work: SavedWork, catalogID: String, token: UUID) async throws -> PreparedCandidate {
         guard generationToken == token, !stopping, let host, let bootstrap else { throw CancellationError() }
         let context = try await savedConfiguration(workID: work.id)

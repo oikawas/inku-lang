@@ -30,11 +30,15 @@ macOS menuはactive sceneの操作可否を使う。⌘Nは新規制作、⌘O�
 
 macOSでは1つのDDL fileをwindowへdropでき、標準panelと同じURL読込・検証を通す。読込中の生成／batch開始を抑止し、取消し、scene終了、制作内容の変更後に遅い結果を採用しない。成功後に制作を表示し、定義を伴うimportの表示は現在のdraftへ結び付ける。「新規」または保存作品を開いた後は古い完了表示を消す。
 
-DDLのdraft確認は読出しだけとし、変更確定を共通coreのrevision／authorityへ渡す。最初の確定DDL変更後は記述の権限へ戻さず、新しい作品と系譜childを保存する。補完は候補の表示と採用・却下を分け、採用前の本文を書き換えない。保存Scoreの再演奏では保存条件か明示した次の条件を使用し、元作品のScore／SVGを保持する。保存欄`ddl_source_origin`は従来どおりNULLまたは`legacy_expanded`だけであり、編集authorityをこの欄へ保存しない。
+DDLのdraft確認は読出しだけとし、変更確定を共通coreのrevision／authorityへ渡す。最初の確定DDL変更後は記述の権限へ戻さず、新しい作品と系譜childを保存する。補完は候補の表示と採用・却下を分け、採用前の本文を書き換えない。保存欄`ddl_source_origin`は従来どおりNULLまたは`legacy_expanded`だけであり、編集authorityをこの欄へ保存しない。
+
+通常の「再演奏」はServerと同じ読出し専用の再現比較を開く。固定した保存作品のSVGと、保存Score・保存条件を共通Rustで描いた現行SVGを表示し、履歴・系譜・表示作品・元のexecutionを変更しない。保存時／現行の描画エンジンの版、版の不一致・記録なしを表示する。タッチの語句があれば共通Rustのseedを優先し、なければ保存seed、両方なければ暫定0とその注意を表示する。未保存のcomposition seedは未設定のままcoreのfallbackへ渡す。制作・library・系譜・作品menuは同じ比較へ接続し、系譜の保存情報sheetを閉じてから比較を開く。停止・closeは所有Taskの終了を待ち、遅い結果を除外する。「次の条件で再演奏」は明示した条件から新しい保存childを作る別操作として保持する。
 
 保存作品の「記述を変える」「写生なし／ありで描き直す」は、制作toolbarとlibrary／系譜cardから同じdialogを開く。開いた作品を親として固定し、保存configuration、用紙、seed、budget、定義とlockを保持して共通coreから新しいchildを保存する。開始時の次の描画modelを両段へ固定する。記述が変わった場合は親の古い写生文を再利用せず、写生「あり」を明示した場合も生成し直す。保存contextのauthorityを確認し、直接DDL・確定DDL編集の作品を記述へ戻さない。取消しは作業の終了を待ち、成功したchildの保存後にだけdialogを閉じて制作を表示する。
 
 編集childのedgeにはServerと同じ`edited_from_history_id`、写生操作では`from_sketch_state`／`to_sketch_mode`も保存する。GenerationRequestの追加項目はoptionalとし、既存の固定requestを読み出せる。
+
+記述／写生dialogは題名と操作footerを固定し、親の画像・記述を入力と同じscroll領域へ置く。親画像は120角、記述は最大4行とtooltipで表示し、dialogの再表示でも入力に押し潰されない構成とする。
 
 ### 履歴・library・系譜
 
@@ -58,7 +62,7 @@ Swift物理schemaはv2で、v1の6tableにlocal annotation、奥書、未読語�
 
 catalog／model比較は開始時の作品・Score・設定を固定する。候補は採用前に通常履歴／系譜へ保存せず、選択した候補だけをidempotentに保存する。選べる候補の総数を4に制限せず、Swiftでは逐次生成する。停止とdialogのcloseは処理の終了を待ち、遅れて届いた候補を混入させない。
 
-model助言、random／Vision推敲、奥書は通常生成と同じprovider transportとrate予算を使う。記述の編集採用と新variation生成を分け、DDL権限の作品へ記述を上書きしない。中間の推敲作品は`lineage_only`として保持する。奥書は生成した原文と採用本文を別に保存し、DB backupへ含める。
+model助言、random／Vision推敲、奥書は通常生成と同じprovider transportとrate予算を使う。記述の編集採用と新variation生成を分け、DDL権限の作品へ記述を上書きしない。中間の推敲作品は`lineage_only`として保持する。自動推敲の各child edgeはWebと同じ`autonomous_refine_mode`を記録し、Visionではその世代の`vision_model`／`vision_observation`／`vision_next_direction`も記録する。randomの来歴へ以前の画面上のVision助言を混ぜない。奥書は生成した原文と採用本文を別に保存し、DB backupへ含める。
 
 batchは空行を除く最大1000入力を受け、元の行番号とmodel、provider、定義、seed等を開始時に固定する。一巡後の失敗行だけを既定0／最大5回再実行する。明示した再開でも固定条件を保持する。再起動時に実行結果が不明な行は利用者の再試行／省略選択を待ち、自動再送しない。demoは開始時の設定を固定し、生成記述と作品を表示する。保存は既定で無効、間隔1〜3600秒、実行時間60〜86400秒で、停止・満了後の処理を継続しない。
 
@@ -96,9 +100,13 @@ Personal ChatGPTは通常のAPI key接続と別に扱い、既定は無効とす
 
 追加の限定確認では、制作で選んだmodelが実際のrequest両段へ反映され、保存default・開始済みtemplateが変わらず、provider呼出し0件であることを確認した。SQLiteの世代projectionはroot・child・欠落・削除祖先の1件を確認した。nativeでは1320×880と標準tileの1281×733で固定生成button・canvas・履歴、世代1／2、設定／移動／新規／読込取消し、model設定categoryへの導線、系譜focusと表示作品の分離、library2件と制作1件の書出し対象を確認した。小さい幅の全配置、VoiceOver、作者のデザイン受入をこの代表確認へ読み替えない。
 
-保存作品編集の限定mock／共通core確認では、live executionのない親の再表示、固定した保存条件・plugin lockと次のmodel、写生の生成し直し、child保存後のDDL authority、停止後の遅い応答拒否を確認した。nativeでは記述／写生dialogのdraft取消し、色カタログの取消しと次の条件への確定、日英の色名とHEX、標準panelから単一DDLを読み込む操作を確認した。編集dialogの再表示時に親画像・記述の見出しが見えない場合を確認し、原因は未確定である。window dropの実操作と実providerの編集生成も未確認である。
+保存作品編集の限定mock／共通core確認では、live executionのない親の再表示、固定した保存条件・plugin lockと次のmodel、写生の生成し直し、child保存後のDDL authority、停止後の遅い応答拒否を確認した。nativeでは記述／写生dialogのdraft取消し、色カタログの取消しと次の条件への確定、日英の色名とHEX、標準panelから単一DDLを読み込む操作を確認した。親cardをscroll領域へ移した後は、同じ親の記述→取消し→写生→取消し→記述で画像・記述と元draftを確認し、history・系譜全行は不変だった。Finder dropは操作接続・DB・file選択から再試行したが、操作ツールのwindow位置エラー、またはドラッグ後の入力不変となり、成功を確認できていない。source不具合との切り分けは未完了で、標準panelの成功へ読み替えない。実providerの編集生成も未受入である。
 
 描画要素の限定mock／共通core確認は、2^53を超える語句seed、seed0の配置fallback、保存Score／色／DDLとprovider0件、固定4案、現行変奏の同一性、読み取りmodel、採用前の通常履歴保持、二重採用・再表示後のDDL child、編集edge補助項目と旧Codable、停止の遅い応答を確認した。Rustの語句seedと新しいPyO3から実Server helperへの限定確認も成功した。Debug Universal appの一時DBでは、タッチ1案のseed表示と破棄、配置4案から選択2案だけの保存（通常履歴2件から4件）、640px幅の比較画面、候補への自動scroll、変奏の「動いたもの: なし」、閉じた後に準備中表示が残らないことを確認した。実provider・全幅・VoiceOver・作者受入は別の確認である。
+
+追加の`--replay-comparison-only`は実Rust・一時SQLite・provider0件で、保存／現行SVG・版、seedの優先順と暫定0、未設定composition、履歴・系譜・表示・execution不変、古い親／tokenと停止後の応答拒否を確認した。`--auxiliary-provenance-only`は実Rustとmockで、2世代のVision来歴、randomへの古い助言混入防止、親子・中間作品・固定条件と呼出し予算を確認した。Release Universalのnative画面では制作と系譜の保存情報から比較を開き、狭い画面で両画像と版をscrollして確認した。close後もhistory2件・節点2件・edge1件・execution2件の全行が一致した。
+
+Rust 1.95のmacOS host proc-macro stripによるLINKEDIT alignment失敗は、release buildのhost build dependencyだけ`strip="none"`へ変更して回避した。target archiveの最適化とstrip設定は保持し、最新Mac coreとunsigned Release Universal appの両CPU buildが成功した。最低OS14を保持する。これはIntel実機、macOS14実機、最新iOS artifactやRelease性能の受入ではない。再試行ごとの経過時間・実model／token表示と、modelの適性・用途案内は引き続きServerとの差分として残る。
 
 ## 2026-10-02 macOS向けの共有Rust・standalone基盤（当時の記録）
 

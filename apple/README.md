@@ -34,6 +34,8 @@ apple/scripts/build-macos.sh Release
 
 `build-macos.sh` generates defaults, catalogs, saijiki, and plugin resources from Server source and prepares locked build dependencies with `uv sync --project server --frozen`. The [dictionary script](scripts/prepare-meter-resources.py) verifies hashes for Sudachi small (about 113 MiB), reading configuration, and CMUdict, then copies them with their licenses into InkuHost resources. It builds shared Rust/bindings/XCFramework, generates the Xcode project, and builds a generic Mac destination with `ARCHS=arm64 x86_64` and `ONLY_ACTIVE_ARCH=NO`, then verifies both slices. This is an unsigned local build without an Apple account, Team, or certificate. Signing, notarization, and distribution are outside this procedure.
 
+To avoid Rust 1.95's macOS host proc-macro [LINKEDIT alignment issue](https://github.com/rust-lang/rust/issues/157750), release builds disable stripping only for host build dependencies. Target Rust archive optimization and stripping remain enabled. No cache deletion or toolchain change is required.
+
 The default is a Release application with release Rust archives. Selecting a Debug Xcode application still uses release Rust unless explicitly overridden. For both debug configurations, use:
 
 ```sh
@@ -66,7 +68,7 @@ apple/build/macOS/DerivedData/Build/Products/Release/Inku.app/Contents/MacOS/Ink
   --database "$preview_dir/inku.sqlite"
 ```
 
-This changes the database location and adjacent provider JSON location. Keychain remains independent. Reading saved work does not recompile DDL or regenerate its stored SVG. Replay is an explicit operation that creates a new saved result.
+This changes the database location and adjacent provider JSON location. Keychain remains independent. Reading saved work does not recompile DDL or regenerate its stored SVG. Ordinary Replay compares the stored SVG with the current engine's recreation without changing saved work, history, or lineage. Replay with next conditions saves a new child.
 
 ## Shared packages and iOS artifacts
 
@@ -95,4 +97,4 @@ uv sync --project server --frozen
 python3 apple/scripts/prepare-meter-resources.py
 ```
 
-Bounded CLI checks are available through `apple/scripts/check-core.sh` after artifact generation and `swift run --package-path apple InkuAppCheck` after resource generation. Select `--authoring-only`, `--comparison-only`, `--automation-only`, `--plugin-only`, `--model-selection-only`, `--work-edit-only`, `--refinement-only`, or `--raster-only <SVG path>` for the relevant change. `--model-selection-only` uses a temporary DB and zero provider calls to verify creation model selection separately from saved defaults and startup snapshots. `--work-edit-only` uses mock transport and the shared core for saved-parent editing, sketch changes, a child's DDL authority, and cancellation. `--refinement-only` uses that isolated boundary for word seeds/saved Score, frozen four-option plans, no-op variation, explicit adoption/reopened DDL children, edge metadata, and late-response rejection. These do not replace native screen, real-provider, or device acceptance. Run only checks needed for the concrete failure a change prevents.
+Bounded CLI checks are available through `apple/scripts/check-core.sh` after artifact generation and `swift run --package-path apple InkuAppCheck` after resource generation. Select `--authoring-only`, `--comparison-only`, `--automation-only`, `--plugin-only`, `--model-selection-only`, `--work-edit-only`, `--refinement-only`, `--replay-comparison-only`, `--auxiliary-provenance-only`, or `--raster-only <SVG path>` for the relevant change. `--model-selection-only` uses a temporary DB and zero provider calls to verify creation model selection separately from saved defaults and startup snapshots. `--work-edit-only` uses mock transport and the shared core for saved-parent editing, sketch changes, a child's DDL authority, and cancellation. `--refinement-only` uses that isolated boundary for word seeds/saved Score, frozen four-option plans, no-op variation, explicit adoption/reopened DDL children, edge metadata, and late-response rejection. `--replay-comparison-only` checks provider-free comparison without persistence/display changes and its seed/stop boundaries; `--auxiliary-provenance-only` checks per-generation Vision/random provenance with mocks. These do not replace native screen, real-provider, or device acceptance. Run only checks needed for the concrete failure a change prevents.

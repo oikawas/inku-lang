@@ -194,6 +194,14 @@ public final class AuxiliaryModel {
                     request.models = settings.models
                     request.providers = settings.providers
                     if useVision, !model.isEmpty { request.models.stage1Model = model; request.models.stage2Model = model }
+                    var metadata = try request.derivationMetadata.map { try ExactJSON(data: $0) } ?? .object([:])
+                    metadata["autonomous_refine_mode"] = .string(useVision ? "vision" : "random")
+                    if let answer = nextAdvice {
+                        metadata["vision_model"] = .string(answer.model)
+                        metadata["vision_observation"] = .string(answer.observation)
+                        metadata["vision_next_direction"] = .string(answer.nextDirection)
+                    }
+                    request.derivationMetadata = metadata.data
                     request.historyVisibility = index == count - 1 ? "normal" : "lineage_only"
                     if index == 0 {
                         request = try await app.pinPersonalPlanRequests([request])[0]

@@ -7,6 +7,7 @@ struct CreationView: View {
     @Bindable var history: HistoryModel
     let onEditWork: (SavedWork, WorkEditMode) -> Void
     let onAdjustWork: (SavedWork) -> Void
+    let onReplayWork: (SavedWork) -> Void
     @State private var showSaijiki = false
     @State private var workspaceTab = "artwork"
     @State private var sketchExpanded = false
@@ -239,7 +240,7 @@ struct CreationView: View {
                       .accessibilityLabel(savedSummary(work))
               }
             }
-            if workspaceTab == "lineage" { LineageView(model: model, onEditWork: onEditWork, onAdjustWork: onAdjustWork) }
+            if workspaceTab == "lineage" { LineageView(model: model, onEditWork: onEditWork, onAdjustWork: onAdjustWork, onReplayWork: onReplayWork) }
             else {
                 ArtworkCanvas(svg: model.currentSVG, renderer: model.renderer, caption: model.displayedWork?.effectiveSourceText ?? "")
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -302,7 +303,7 @@ struct CreationView: View {
                 .accessibilityLabel(model.display.localized("書き出し用の印"))
                 .accessibilityValue(model.display.localized(model.library.annotation(for: work.id).forShare ? "オン" : "オフ"))
                 .help(model.display.preferences.showTooltips ? model.display.localized("書き出し用の印") : "")
-            Button(model.display.localized("再演奏"), systemImage: "arrow.clockwise") { Task { await model.replay(work) } }
+            Button(model.display.localized("再演奏"), systemImage: "arrow.clockwise") { onReplayWork(work) }.disabled(model.isBusy)
         }
     }
 

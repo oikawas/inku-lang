@@ -43,13 +43,19 @@ private struct RefinementSession {
     let work: SavedWork
 }
 
+private struct ReplaySession {
+    let id = UUID()
+    let work: SavedWork
+}
+
 private enum WorkDialog: Identifiable {
-    case export(ExportSession), edit(WorkEditSession), refinement(RefinementSession), comparison, advice, colophon
+    case export(ExportSession), edit(WorkEditSession), refinement(RefinementSession), replay(ReplaySession), comparison, advice, colophon
     var id: String {
         switch self {
         case .export(let session): session.id.uuidString
         case .edit(let session): session.id.uuidString
         case .refinement(let session): session.id.uuidString
+        case .replay(let session): session.id.uuidString
         case .comparison: "comparison"
         case .advice: "advice"
         case .colophon: "colophon"
@@ -142,9 +148,9 @@ public struct ContentView: View {
 
     @ViewBuilder private var detail: some View {
         switch section ?? .create {
-        case .create: CreationView(model: model, history: history, onEditWork: openWorkEdit, onAdjustWork: openRefinement).disabled(automation.running || importing)
-        case .library: LibraryView(model: model, onEditWork: openWorkEdit, onAdjustWork: openRefinement).disabled(automation.running || importing)
-        case .lineage: LineageView(model: model, onEditWork: openWorkEdit, onAdjustWork: openRefinement).disabled(automation.running || importing)
+        case .create: CreationView(model: model, history: history, onEditWork: openWorkEdit, onAdjustWork: openRefinement, onReplayWork: openReplay).disabled(automation.running || importing)
+        case .library: LibraryView(model: model, onEditWork: openWorkEdit, onAdjustWork: openRefinement, onReplayWork: openReplay).disabled(automation.running || importing)
+        case .lineage: LineageView(model: model, onEditWork: openWorkEdit, onAdjustWork: openRefinement, onReplayWork: openReplay).disabled(automation.running || importing)
         case .automation: AutomationView(model: model, automation: automation).disabled(importing)
         case .settings: SettingsView(model: model, section: $settingsSection).disabled(automation.running || importing)
         }
@@ -243,6 +249,9 @@ public struct ContentView: View {
                     .disabled(!canExport)
                     .help(model.display.preferences.showTooltips ? model.display.localized("書き出す") : "")
                 Menu(model.display.localized("作品の操作"), systemImage: "ellipsis.circle") {
+                    Button(model.display.localized("再演奏"), systemImage: "arrow.clockwise") {
+                        if let work = model.selectedWork { openReplay(work) }
+                    }.disabled(!hasSavedWork)
                     Button(model.display.localized("描画パラメータの編集"), systemImage: "slider.horizontal.3") {
                         if let work = model.selectedWork { openRefinement(work) }
                     }.disabled(!hasSavedWork)
@@ -288,6 +297,10 @@ public struct ContentView: View {
             })
                 .id(session.id)
                 .environment(model.display)
+        case .replay(let session):
+            ReplayComparisonView(model: model, work: session.work)
+                .id(session.id)
+                .environment(model.display)
         case .comparison:
             ComparisonView(model: model).environment(model.display)
         case .advice:
@@ -305,6 +318,11 @@ public struct ContentView: View {
     private func openRefinement(_ work: SavedWork) {
         guard canUseWork, !work.trashed else { return }
         dialog = .refinement(RefinementSession(work: work))
+    }
+
+    private func openReplay(_ work: SavedWork) {
+        guard canUseWork, !work.trashed else { return }
+        dialog = .replay(ReplaySession(work: work))
     }
 
     private func openExport() async {

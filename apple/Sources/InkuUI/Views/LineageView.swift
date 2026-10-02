@@ -6,7 +6,9 @@ struct LineageView: View {
     @Bindable var model: AppModel
     let onEditWork: (SavedWork, WorkEditMode) -> Void
     let onAdjustWork: (SavedWork) -> Void
+    let onReplayWork: (SavedWork) -> Void
     @State private var details: LineageItem?
+    @State private var replayAfterDetails: SavedWork?
     @State private var scrollToFocus = 0
     @FocusState private var focusedNodeID: String?
     private var library: LibraryModel { model.library }
@@ -54,7 +56,12 @@ struct LineageView: View {
             }
         }
         .task(id: model.selectedWorkID) { if let work = model.selectedWork { await library.loadLineage(work: work) } }
-        .sheet(item: $details) { item in nodeDetails(item) }
+        .sheet(item: $details, onDismiss: {
+            if let work = replayAfterDetails {
+                replayAfterDetails = nil
+                onReplayWork(work)
+            }
+        }) { item in nodeDetails(item) }
     }
 
     private var toolbar: some View {
@@ -351,7 +358,12 @@ struct LineageView: View {
             if let deleted = item.node.deletedAt {
                 Text(model.display.localizedFormat("削除日時: %@", Date(timeIntervalSince1970: Double(deleted) / 1000).formatted())).font(.caption)
             }
-            if let work = item.work { LibraryWorkDetails(model: model, work: work).id(work.id) }
+            if let work = item.work {
+                LibraryWorkDetails(model: model, work: work, onReplayWork: { parent in
+                    replayAfterDetails = parent
+                    details = nil
+                }).id(work.id)
+            }
             else { Text(model.display.localized("元の節点と接続を保持しています。作品本文は削除されています。")).foregroundStyle(.secondary) }
         }.padding(24).frame(minWidth: 340, idealWidth: 700, minHeight: item.work == nil ? 240 : 660)
     }

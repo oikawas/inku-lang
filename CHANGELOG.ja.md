@@ -6,6 +6,12 @@
 
 **本書は v2.5.0（2026-07-25、render engine 12）以降の履歴を保持する。** 最近の記録に続く過去の履歴は、同じ文書内で折りたたんである。必要なときに展開して読める。折りたたみに対応しないビューアでは全文を表示する。それより前の履歴は [v1.72〜v2.4の書庫](docs/history/changelog-v1.72-v2.4.ja.md) と [v0.1〜v1.71の書庫](docs/history/changelog-v0.1-v1.71.ja.md) にある。
 
+### 2026-10-03 — Swiftの読出し専用再現比較と推敲来歴、Mac Release build
+
+通常の再演奏は保存SVGと現行エンジンの描き直しを比較し、作品・履歴・系譜を変えない操作に揃えた。制作・library・系譜・作品menuから同じ比較へ接続し、描画エンジンの版と暫定seedの注意を表示する。新しいchildを作る「次の条件で再演奏」は維持する。自動推敲は世代ごとのVision／random来歴を保存し、古い助言をrandomへ混ぜない。
+
+保存親の編集dialogは画像・記述をscroll領域へ移し、記述／写生の再表示とdraft取消しを確認した。Rust 1.95のhost proc-macro stripによるMac link失敗を、target最適化を保って回避した。限定mock／共通core確認、Release Universal build、nativeの両画像・版表示とclose後の保存全行保持が成功した。Finder dropは最初から再試行したが読み込み成功は未確認。実provider・全幅・VoiceOver・作者受入は残る。[Swift仕様](apple/SWIFT_SPEC.ja.md)と[build手順](apple/README.ja.md)を更新した。
+
 ### 2026-10-03 — Swiftの描画要素を未保存候補として比較・採用
 
 保存親から配置・読み取り・変奏の1案／4案、言葉によるタッチの1案を用意するnative画面を追加した。条件を先に固定し、候補の比較・拡大と明示保存を分け、選択した候補だけを系譜childへ保存する。候補へ自動scrollし、準備後の制作画面へ進行表示を残さない。二重採用、採用後・再表示後のDDL編集、停止の遅い応答を扱う。現在の変奏は無変更であることを表示し、保存Scoreと実model記録を保持する。

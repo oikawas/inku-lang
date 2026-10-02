@@ -38,7 +38,11 @@ export CARGO_TARGET_DIR="$RUST_TARGET"
 export MACOSX_DEPLOYMENT_TARGET=14.0
 export IPHONEOS_DEPLOYMENT_TARGET=17.0
 PROFILE_ARGS=()
-[[ "$PROFILE" == debug ]] || PROFILE_ARGS+=(--release)
+if [[ "$PROFILE" == release ]]; then
+    # Rust 1.95's debuginfo stripping can misalign macOS proc-macro LINKEDIT.
+    # Keep host build dependencies loadable while target libraries stay optimized.
+    PROFILE_ARGS+=(--release --config 'profile.release.build-override.strip="none"')
+fi
 for target in "${TARGETS[@]}"; do
     "$ROOT/scripts/rust-toolchain.sh" build --locked -p inku-pipeline-uniffi --lib --target "$target" "${PROFILE_ARGS[@]}"
 done

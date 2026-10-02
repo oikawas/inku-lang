@@ -119,6 +119,36 @@ public actor PipelineHost {
         return try ack.requiredObject("performance")
     }
 
+    /// Ordinary replay compares SVGs without creating an execution, history row or lineage child.
+    public func prepareReplayComparison(work: SavedWork) async throws -> ReplayComparisonSnapshot {
+        try Task.checkCancellation()
+        try await checkReplayComparisonParent(work)
+        let context = try await savedPerformanceContext(workID: work.id)
+        let comparison = try SavedPerformance.replayComparisonRequest(work: work, context: context)
+        try Task.checkCancellation()
+        let rendered = try ExactJSON(data: InkuCore.renderSaved(comparison.request.data))
+        if let code = rendered["error"].string { throw HostError(code) }
+        let snapshot = ReplayComparisonSnapshot(workID: work.id, originalSVG: work.svg,
+            replayedSVG: try rendered.requiredString("svg"), recordedVersion: work.renderEngineVersion,
+            currentVersion: try rendered["metadata"].requiredString("render_engine_version"),
+            provisionalSeed: comparison.provisionalSeed)
+        try Task.checkCancellation()
+        try await checkReplayComparisonParent(work)
+        try Task.checkCancellation()
+        return snapshot
+    }
+
+    private func checkReplayComparisonParent(_ work: SavedWork) async throws {
+        guard let stored = try await database.work(id: work.id), !stored.trashed,
+              let nodeID = work.lineageNodeID,
+              try await database.node(id: nodeID)?.historyID == work.id else {
+            throw HostError("saved_work_changed_or_unavailable")
+        }
+        var expected = work
+        expected.starred = stored.starred; expected.trashed = stored.trashed
+        guard stored == expected else { throw HostError("saved_work_changed_or_unavailable") }
+    }
+
     /// Draws the saved Score with its attested policies and saves one new lineage child.
     public func replay(workID: String, renderSeed: String? = nil, wild: Bool? = nil, options replayOptions: ReplayOptions? = nil) async throws -> SavedWork {
         let candidate = try await previewReplay(workID: workID, renderSeed: renderSeed, wild: wild, options: replayOptions, derivationKind: "replay")

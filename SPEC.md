@@ -3544,6 +3544,12 @@ shows a mascot of its own.**
 
 ### Batch Drawing
 
+Starting or resuming a batch clears the previous single-work execution from
+the screen. A failed line is reported with its line number, input, and reason
+in the batch failure report, rather than the single-work attention notice.
+A successful batch does not keep showing a previous work's failure reason or
+attempt count.
+
 The batch panel groups the input, next-work conditions, progress, and resume for
 multiple instruction lines. During execution, the active line is highlighted
 and the current DDL interpretation is displayed read-only. Batch execution

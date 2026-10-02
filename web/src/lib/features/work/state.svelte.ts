@@ -500,7 +500,7 @@ export function createWorkState(deps: WorkStateDeps) {
 				},
 				attachSavedLineage: () => { lineageDetached = false; },
 				updateGenerationCount: (count) => session.updateGenerationCount(count),
-				adoptPipelineView: (view) => pipelineController.adopt(view),
+				adoptPipelineView: options.batchRunId ? undefined : (view) => pipelineController.adopt(view),
 				setProviderAttempt: (attempt) => { activeRunAttempt = attempt; }
 			}
 		);
@@ -787,6 +787,8 @@ export function createWorkState(deps: WorkStateDeps) {
 		const batchStage2Model = qualifiedModelId(deps.models.stage2Provider(), deps.models.stage2Model());
 		const batchSketchMode = sketchMode;
 		const batchWild = wildSettings.enabled;
+		// The batch owns its line failures; the previous single-work run is no longer current.
+		pipelineController.clear();
 		loading = true; error = null;
 		activeRunMode = 'batch';
 		ddl = null; expandedDdl = null; ddlGeneratedBaseline = null; thinking = null;

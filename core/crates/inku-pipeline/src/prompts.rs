@@ -866,7 +866,7 @@ const STAGE1_WORK_PLAN_JA: &str = r#"あなたは inku の作品計画者であ�
 5. 画材と太さは痕の性格を決める。軽く繊細な痕には細い画材や細さ、重く強い痕には太い画材を選ぶ。一作品の中で画材を使い分けてよい。
 6. 複数の痕は、並べる・散らす・敷き詰める・埋めるで配置する。置く・引くは一か所に置く動作で、複数にすると一か所の束になる。埋めるは範囲の中を痕の反復で満たし、範囲からはみ出した部分は切り取られる。痕の大きさは記述に合わせる。
 7. 揺らぎは痕の生きた不均一さである。層ごとに揺らぎなし（still）・揺れる・波打つを選び、揺らぐなら振れ幅と波の間隔も選ぶ。反復する痕は、揺らぎ・大きさの幅・画材の擦れや質感で一本ごとに違いを持たせ、機械的な同一の繰り返しにしない。
-8. 余白も構図の一部である。全層を中心に集めず、位置・大きさ・個数で重心と空いた部分を作る。
+8. 位置は、記述が場所を言葉で言う層にだけ選ぶ。それ以外の層は位置を unspecified にする（画面のどこに置くかは、後で構図を決めるときに選ばれる）。余白も構図の一部なので、大きさと個数で重心と空いた部分を作る。
 9. 背景は画面の地色、groundは紙などの支持体である。どちらも任意で、描く対象の代わりにしない。背景を暗くするなら、痕の色がそれと見分けられるようにする。
 10. 感情・物語・題材名・説明は出力しない。
 
@@ -885,7 +885,7 @@ const STAGE1_WORK_PLAN_EN: &str = r#"You are inku's work planner. Read the autho
 5. Tool and thinness set the character of a mark: thin tools or thinness for light, delicate marks and thick tools for heavy, strong ones. Tools may differ within one work.
 6. Arrange multiple marks with line up, scatter, tile, or fill. Place and draw put marks at one spot, where several form a bundle. Fill repeats marks inside the region and clips what crosses its edge; size the marks to the description.
 7. Fluctuation is the living irregularity of a mark. For each layer choose still, swaying, or undulating, and when it moves also choose amplitude and wave spacing. Give repeated marks individual differences through fluctuation, a range of sizes, and the scrape or texture of the tool, rather than a mechanical identical repetition.
-8. Empty space is part of the composition. Do not gather every layer at the center; use position, size, and count to create a center of weight and open areas.
+8. Choose a place only for a layer whose place the description states in words. Leave the place of every other layer unspecified; where it goes on the canvas is chosen later, when the composition is decided. Empty space is part of the composition, so use size and count to create a center of weight and open areas.
 9. Background is the canvas color and ground is the support such as paper. Both are optional and never replace a drawn subject. With a dark background, keep mark colors distinguishable from it.
 10. Output no emotions, narrative, subject names, or explanations.
 

@@ -2,7 +2,7 @@
 
 ## API surface
 
-`api.py` owns process-wide assembly, while endpoint bodies live in ten routers and the shared pipeline router. Router-level default dependencies and per-route dependencies both participate in authorization. `test_route_module_split.py` checks live routes' `endpoint.__module__` so endpoints do not regress back into `api.py`.
+`api.py` owns process-wide assembly, while endpoint bodies live in purpose-specific routers and the shared pipeline router. Router-level default dependencies and per-route dependencies both participate in authorization. `test_route_module_split.py` checks live routes' `endpoint.__module__` so endpoints do not regress back into `api.py`. The personal ChatGPT router exposes the OAuth/profile/catalog boundary and delegates to dedicated auth, store, transfer, runtime and provider modules.
 
 ```mermaid
 flowchart TD

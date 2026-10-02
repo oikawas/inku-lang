@@ -321,7 +321,7 @@ def normalize_model_settings(settings: dict[str, Any] | None) -> dict[str, Any]:
             provider_id = _normalize_provider_id(raw_provider_id)
             if not provider_id or not isinstance(incoming, dict):
                 continue
-            if provider_id in RETIRED_PROVIDER_IDS:
+            if provider_id in RETIRED_PROVIDER_IDS or provider_id == "chatgpt":
                 continue
             builtin = _BUILTIN_PROVIDER_BY_ID.get(provider_id)
             provider = clean["providers"].get(provider_id) or {
@@ -666,6 +666,8 @@ def update_model_settings(current: dict[str, Any], patch: dict[str, Any]) -> dic
     if isinstance(providers, dict):
         for raw_provider_id, incoming in providers.items():
             provider_id = _normalize_provider_id(raw_provider_id)
+            if provider_id == "chatgpt":
+                continue
             if not isinstance(incoming, dict):
                 continue
             if incoming.get("delete") is True:
@@ -736,8 +738,8 @@ def _known_provider_ids(settings: dict[str, Any] | None) -> set[str]:
     of asking NVIDIA for a model named "ovms:gemma3-4b-api".
     """
     if isinstance(settings, dict) and isinstance(settings.get("providers"), dict):
-        return {str(provider_id) for provider_id in settings["providers"]} | RETIRED_PROVIDER_IDS
-    return set(BUILTIN_PROVIDER_IDS) | RETIRED_PROVIDER_IDS
+        return {str(provider_id) for provider_id in settings["providers"]} | RETIRED_PROVIDER_IDS | {"chatgpt"}
+    return set(BUILTIN_PROVIDER_IDS) | RETIRED_PROVIDER_IDS | {"chatgpt"}
 
 
 def split_model_ref(ref: str, settings: dict[str, Any] | None) -> tuple[str | None, str]:

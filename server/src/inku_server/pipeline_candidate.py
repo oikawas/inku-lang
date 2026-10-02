@@ -129,6 +129,8 @@ def _pipeline_failures(state: dict | None, envelope: dict, result: dict) -> list
         if failure not in _PIPELINE_FAILURES or stage is None:
             continue
         diagnostic: dict[str, object] = {"failure": failure, "stage": stage}
+        if action_identity.get("action_id"):
+            diagnostic["action_id"] = str(action_identity["action_id"])
         detail = _safe_compiler_failure_detail(payload.get("detail"))
         if failure == "semantic_violation" and detail is not None:
             diagnostic["detail"] = detail
@@ -384,6 +386,15 @@ class CandidateExecution:
             ):
                 diagnostic["detail"] = existing["detail"]
             self.context["provider_failure"] = diagnostic
+            if (isinstance(existing, dict) and isinstance(existing.get("chatgpt"), dict)
+                    and all(existing.get(key) == diagnostic.get(key) for key in ("failure", "stage", "attempt", "action_id"))):
+                from .chatgpt_provider import PUBLIC_CODES, safe_identifier
+                detail = existing["chatgpt"]
+                code = detail.get("code")
+                if isinstance(code, str) and (code in PUBLIC_CODES or (code.startswith("chatgpt_") and _safe_compiler_failure_detail(code))):
+                    diagnostic["chatgpt"] = {"code": code, "action": detail.get("action") if detail.get("action") in {"usage", "retry", "reconnect", "consent", "settings", "models", "diagnose", "edit"} else "diagnose",
+                                            "request_id": safe_identifier(detail.get("request_id")), "param": safe_identifier(detail.get("param")),
+                                            "status": detail.get("status") if isinstance(detail.get("status"), int) and 100 <= detail["status"] <= 599 else None}
             _logger.warning(
                 "pipeline_failure %s",
                 json.dumps(

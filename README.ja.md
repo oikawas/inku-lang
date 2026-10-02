@@ -142,6 +142,8 @@ cd web && npm install && npm run dev      # → http://localhost:5173
 
 環境変数の一覧、provider ごとの設定、CLI（`inku-cli`）の使い方は [SETUP.ja.md](SETUP.ja.md) にあります。
 
+本人のChatGPT利用枠を使う[ChatGPTプラン接続](docs/guide/chatgpt-plan.ja.md)も選べます。明示有効化とデベロッパー／シングルユーザーモード、本人OAuthが必要です。APIキー版とは別の接続で、Stage 1/2共通のモデルを選びます。
+
 ---
 
 ## しくみ — 楽譜と演奏

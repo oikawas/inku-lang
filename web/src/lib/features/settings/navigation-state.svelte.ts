@@ -17,6 +17,7 @@ export type SettingsMode = 'model' | 'settings';
 export type SettingsTab =
 	| 'connection'
 	| 'models'
+	| 'chatgpt'
 	| 'db'
 	| 'plugins'
 	| 'users'
@@ -29,12 +30,14 @@ export type SettingsTab =
 	| 'limits';
 
 export type SettingsActor = {
+	id?: string;
 	permission_groups?: import('$lib/permissionGroups').PermissionGroup[];
 	settings_tab?: string | null;
 	group_id?: string | null;
 };
 
 type NavigationDeps<TActor extends SettingsActor> = {
+	chatgptAvailable?: () => boolean;
 	apiFetch: ApiFetch;
 	currentUser: () => TActor | null;
 	setCurrentUser: (actor: TActor) => void;
@@ -59,7 +62,7 @@ export type SettingsNavigation = {
 };
 
 function isSettingsContentTab(tab: string | null | undefined): tab is Exclude<SettingsTab, 'connection'> {
-	return tab === 'models' || tab === 'db' || tab === 'plugins' || tab === 'users' || tab === 'unread' || tab === 'export' || tab === 'demo' || tab === 'misc' || tab === 'server_misc' || tab === 'logs' || tab === 'limits';
+	return tab === 'chatgpt' || tab === 'models' || tab === 'db' || tab === 'plugins' || tab === 'users' || tab === 'unread' || tab === 'export' || tab === 'demo' || tab === 'misc' || tab === 'server_misc' || tab === 'logs' || tab === 'limits';
 }
 
 export function createSettingsNavigation<TActor extends SettingsActor>(
@@ -73,7 +76,7 @@ export function createSettingsNavigation<TActor extends SettingsActor>(
 	// which authorized tabs the reader asked the dialog to show.
 	function canAccessSettingsTab(tab: SettingsTab): boolean {
 		const currentUser = deps.currentUser();
-		return canAccessSettingsTabFor(tab, currentUser) && settingsTabShownAtDetail(tab, settingsDetail);
+		return canAccessSettingsTabFor(tab, currentUser, deps.chatgptAvailable?.() === true) && settingsTabShownAtDetail(tab, settingsDetail);
 	}
 
 	function defaultSettingsTab(): SettingsTab {

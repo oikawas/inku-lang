@@ -34,7 +34,7 @@ from .api_core.thumbnails import shutdown_bake_pool
 from .pipeline_api import pipeline_router, register_pipeline_errors
 from .pipeline_runtime import get_binding as _pipeline_binding, get_service as _pipeline_service, shutdown as _shutdown_pipeline
 from .api_core.deps import _current_user
-from .api_core.routers import public, auth, me, plugins, settings, users, history, lineage, render, feedback, description
+from .api_core.routers import public, auth, me, plugins, settings, users, history, lineage, render, feedback, description, chatgpt
 
 
 _DB_BACKUP_SCHEDULER_TICK_SECONDS = 60
@@ -68,6 +68,8 @@ async def _lifespan(_app: FastAPI):
     try:
         yield
     finally:
+        from .chatgpt_runtime import stop
+        stop()
         if task is not None:
             task.cancel()
             with suppress(asyncio.CancelledError):
@@ -282,6 +284,7 @@ app.include_router(auth.router)
 app.include_router(auth.authenticated_router)
 app.include_router(auth.admin_router)
 app.include_router(me.router)
+app.include_router(chatgpt.router)
 app.include_router(plugins.router)
 app.include_router(settings.router)
 app.include_router(users.router)

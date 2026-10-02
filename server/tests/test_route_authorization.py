@@ -69,7 +69,9 @@ PUBLIC = {  # every entry needs a reason
 #   the English meter and the switches for both languages (2026-09-30).
 #   +1 for PUT /api/settings/db-write-lock, the administrator's lock on every
 #   write (2026-09-30).
-EXPECTED_ROUTE_COUNT = 108
+#   +9 for owner-only ChatGPT state, authorization attempts, profile actions
+#   and the personal catalog (2026-10-02).
+EXPECTED_ROUTE_COUNT = 117
 
 
 def _guard_names(dependant, seen=None) -> set[str]:

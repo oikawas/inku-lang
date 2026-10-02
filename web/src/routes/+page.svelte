@@ -53,6 +53,7 @@
 		providerOfModel,
 		qualifiedModelId,
 		registerModelCatalog,
+		clearChatGPTModelCatalog,
 		resolveModelRefForDisplay,
 		splitModelRef,
 		type Provider,
@@ -229,6 +230,9 @@
 	// all -- are dropped; the way back to a multi-user server (changing the
 	// password) is deliberately kept.
 	let singleUserMode = $state(false);
+	let chatgptPlanAvailable = $state(false);
+	let modelCatalogOwner = $state<string | undefined>();
+	let modelCatalogRequest = 0;
 	// The work whose guest list is open, if any. Sharing is offered only when
 	// there is somebody to share with: a single-user server is one person's own,
 	// so the button is withheld there rather than opening onto an empty list.
@@ -544,6 +548,12 @@
 		pushHistory
 	});
 	const settings = createSettingsController({
+		chatgptAvailable: () => chatgptPlanAvailable && modelCatalogOwner === session.currentUser?.id,
+		invalidateChatGPTModels: () => {
+			modelCatalogRequest++;
+			clearChatGPTModelCatalog();
+			availableModelCatalog = availableModelCatalog.filter((group) => group.id !== 'chatgpt');
+		},
 		apiFetch,
 		currentUser: () => session.currentUser,
 		setCurrentUser: (actor) => session.setCurrentUser(actor),
@@ -554,6 +564,21 @@
 		requestConfirmation: (confirmation) => { confirmAction = confirmation; },
 		setRenderFanoutLimit: (limit) => { renderFanoutLimit = limit; },
 		describeApiError
+	});
+	let chatgptActor: string | undefined;
+	$effect(() => {
+		const actor = session.currentUser?.id;
+		const allowed = chatgptPlanAvailable && modelCatalogOwner === actor;
+		if (chatgptActor !== actor || !allowed) {
+			chatgptActor = actor;
+			untrack(() => {
+				settings.chatgpt.reset();
+				if (modelCatalogOwner !== actor || !chatgptPlanAvailable) {
+					clearChatGPTModelCatalog();
+					availableModelCatalog = availableModelCatalog.filter((group) => group.id !== 'chatgpt');
+				}
+			});
+		}
 	});
 
 	/** Failed response -> Error carrying the localized message, never the raw body. */
@@ -1044,6 +1069,7 @@
 	}
 
 	async function loadAvailableModels() {
+		const request = ++modelCatalogRequest;
 		const userId = session.currentUser?.id;
 		if (!userId) {
 			availableModelsLoaded = false;
@@ -1052,9 +1078,12 @@
 		try {
 			const r = await apiFetch('/api/models', { cache: 'no-store' });
 			if (!r.ok) throw new Error(`HTTP ${r.status}`);
-			const data = await r.json() as { catalog: ProviderGroup[]; llm_catalog?: ProviderGroup[]; vision_catalog?: ProviderGroup[]; settings: { model_settings?: UserModelSettings } };
-			if (session.currentUser?.id !== userId) return;
-			availableModelCatalog = data.llm_catalog ?? data.catalog;
+			const data = await r.json() as { catalog: ProviderGroup[]; llm_catalog?: ProviderGroup[]; drawing_catalog?: ProviderGroup[]; vision_catalog?: ProviderGroup[]; chatgpt_plan_available?: boolean; settings: { model_settings?: UserModelSettings } };
+			if (session.currentUser?.id !== userId || request !== modelCatalogRequest) return;
+			chatgptPlanAvailable = data.chatgpt_plan_available === true;
+			modelCatalogOwner = userId;
+			clearChatGPTModelCatalog();
+			availableModelCatalog = data.drawing_catalog ?? data.llm_catalog ?? data.catalog;
 			availableVisionModelCatalog = data.vision_catalog ?? data.catalog.filter((group) => group.models.some((model) => model.purposes?.includes('vision')));
 			availableModelsLoaded = true;
 			if (data.settings.model_settings) {
@@ -1063,13 +1092,13 @@
 					{ excludeUserSettingIds: ['text-size'] }
 				);
 			}
-			if (!modelsFor(stage1Provider).some((model) => model.id === stage1Model)) {
-				const fallbackGroup = availableModelCatalog.find((group) => group.models.length > 0);
+			if (stage1Provider !== 'chatgpt' && !modelsFor(stage1Provider).some((model) => model.id === stage1Model)) {
+				const fallbackGroup = availableModelCatalog.find((group) => group.id !== 'chatgpt' && group.models.length > 0);
 				stage1Provider = fallbackGroup?.id ?? stage1Provider;
 				stage1Model = fallbackGroup?.models[0]?.id ?? stage1Model;
 			}
-			if (!modelsFor(stage2Provider).some((model) => model.id === stage2Model)) {
-				const fallbackGroup = availableModelCatalog.find((group) => group.models.length > 0);
+			if (stage2Provider !== 'chatgpt' && !modelsFor(stage2Provider).some((model) => model.id === stage2Model)) {
+				const fallbackGroup = availableModelCatalog.find((group) => group.id !== 'chatgpt' && group.models.length > 0);
 				stage2Provider = fallbackGroup?.id ?? stage2Provider;
 				stage2Model = fallbackGroup?.models[0]?.id ?? stage2Model;
 			}
@@ -1084,7 +1113,7 @@
 			if (!okugakiModelAvailable) {
 				okugakiModel = qualifiedModelId(visionProvider, visionModel);
 			}
-			demo.reconcilePromptModel(availableModelCatalog, availableModelsLoaded);
+			demo.reconcilePromptModel(data.llm_catalog ?? data.catalog, availableModelsLoaded);
 		} catch (e) {
 			console.warn('failed to load model catalog', e);
 		}
@@ -1119,6 +1148,7 @@
 	}
 
 	async function loadPublicAppInfo() {
+		chatgptPlanAvailable = false;
 		currentRenderEngineVersion = null;
 		currentDdlVersion = null;
 		currentDdlEngineVersion = null;
@@ -1128,9 +1158,15 @@
 				credentials: 'same-origin'
 			});
 			if (!r.ok) throw new Error(`HTTP ${r.status}`);
-			const data = await r.json() as { developer_mode?: boolean; single_user_mode?: boolean; thumbnail_hidpi?: boolean; render_engine_version?: string; ddl_version?: string; ddl_engine_version?: string };
+			const data = await r.json() as { developer_mode?: boolean; single_user_mode?: boolean; chatgpt_plan_available?: boolean; thumbnail_hidpi?: boolean; render_engine_version?: string; ddl_version?: string; ddl_engine_version?: string };
 			developerMode = data.developer_mode === true;
 			singleUserMode = data.single_user_mode === true;
+			if (data.chatgpt_plan_available !== true) {
+				modelCatalogRequest++;
+				settings.chatgpt.reset();
+				clearChatGPTModelCatalog();
+				availableModelCatalog = availableModelCatalog.filter((group) => group.id !== 'chatgpt');
+			}
 			setThumbnailHidpi(data.thumbnail_hidpi === true);
 			currentRenderEngineVersion = typeof data.render_engine_version === 'string'
 				? data.render_engine_version
@@ -1186,6 +1222,10 @@
 		exportTemplateStatus = null;
 		canvasAspectId = DEFAULT_CANVAS_ASPECT_ID;
 		settings.resetForLoggedOut();
+		chatgptPlanAvailable = false;
+		modelCatalogRequest++;
+		clearChatGPTModelCatalog();
+		availableModelCatalog = availableModelCatalog.filter((group) => group.id !== 'chatgpt');
 		history.clear();
 		libraryMounted = false;
 		lineageState.reset();
@@ -2626,6 +2666,8 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 						</div>
 					{/if}
 					<InputPanel
+						chatgptPlanSelected={stage1Provider === 'chatgpt'}
+						chatgptModelAvailable={modelCatalogOwner === session.currentUser?.id && chatgptPlanAvailable && availableModelCatalog.some((group) => group.id === 'chatgpt' && group.models.some((model) => model.id === stage1Model))}
 						sketchMode={work.sketchMode}
 						onSelectSketchMode={(mode) => (work.sketchMode = mode)}
 						bind:inputMode={work.inputMode}
@@ -3139,6 +3181,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 {#if settings.opened}
 	{#await import('$lib/components/SettingsModal.svelte') then { default: SettingsModal }}
 		<SettingsModal
+			chatgptAvailable={chatgptPlanAvailable && modelCatalogOwner === session.currentUser?.id}
 			{demoContent}
 			settings={settings}
 			{singleUserMode}

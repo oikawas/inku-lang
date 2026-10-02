@@ -26,6 +26,10 @@ workflow: Japanese canonical [SWIFT_SPEC.ja.md](apple/SWIFT_SPEC.ja.md), a
 maintained [English specification](apple/SWIFT_SPEC.md), and product history in
 this paired root CHANGELOG. See [`apple/README.md`](apple/README.md) for building.
 
+### 2026-10-02 — Connect personal ChatGPT plan usage to drawing
+
+Adds account OAuth, encrypted host-owned profiles, Mac sign-in and sealed single-registration transfer to self-hosting, serialized refresh, sign-out, personal catalogs and connection settings. Explicit enablement, developer/single-user mode and validated startup are required. Reserved `chatgpt:<slug>` is separate from API keys and connects one Stage 1/2 drawing model to Responses/SSE. Rust prompts, schemas, retries and Score/SVG remain in place. Quota stops later traffic, partial responses are discarded and providers never switch implicitly. Account OAuth/import and real inference are accepted separately from implementation checks. [Guide](docs/guide/chatgpt-plan.md).
+
 ### 2026-10-02 — Configure service rate limits and pace batch requests
 
 Gemini batches retried roughly every two seconds after exhausting their allowance. Model settings now offer per-service RPM, input TPM, and RPD with explanatory tooltips. The shared pipeline counts every stage and retry, waits for minute capacity and provider cooldowns, and retains daily usage across restart. An exhausted daily allowance prevents further generation requests. Gemini starts at the recorded 30 / 16,000 / 14,400; other services start at zero (uncapped), and administrators can edit each value.

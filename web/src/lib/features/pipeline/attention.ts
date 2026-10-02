@@ -33,6 +33,7 @@ export type PipelineProviderFailure = {
 	stage?: unknown;
 	attempt?: unknown;
 	detail?: unknown;
+	chatgpt?: { code?: string; action?: string; request_id?: string; param?: string };
 };
 
 export function pipelineAttentionText(
@@ -44,6 +45,7 @@ export function pipelineAttentionText(
 	// Only a failure of the stage that stopped explains it; an earlier stage's
 	// retry that later succeeded does not.
 	if (!failure || typeof failure.failure !== 'string' || failure.stage !== STAGE_OF_REASON[reason]) return base;
+	if (failure.chatgpt?.code) return base + ' ' + strings.chatgptStatus(failure.chatgpt.code);
 	const attempts = typeof failure.attempt === 'number' ? failure.attempt : 1;
 	const detail = typeof failure.detail === 'string' ? failure.detail : null;
 	return base + strings.pipelineFailureCause(failure.failure, attempts, detail);

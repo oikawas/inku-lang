@@ -12,6 +12,10 @@ SwiftUIのmacOS Universalアプリと、同じRustを呼ぶUniFFI／XCFramework�
 
 macOSの両CPU向けlinkとApple Siliconのnative画面で生成・履歴・再演奏を確認した。iOS用Rust sliceを生成したが、iOSアプリ、camera、macOSの全機能UIとSVG性能受入は後続である。実provider通信、Intel実機の起動・性能、公開配布の受入をこの初期実装の確認へ読み替えない。Swiftの仕様はAndroid同様に[`SWIFT_SPEC.ja.md`](apple/SWIFT_SPEC.ja.md)を正本として英語を同期し、製品履歴は本CHANGELOGの日英対へ記録する。build手順は[`apple/README.ja.md`](apple/README.ja.md)を参照。
 
+### 2026-10-02 — 本人のChatGPTプランを描画へ接続する
+
+本人OAuth、host別の暗号化登録、Mac認証と自己ホストへの一登録の封印移送、refresh排他、接続解除、本人モデル一覧と設定画面を追加した。明示有効化とデベロッパー／シングルユーザーモード、検証済み起動を要求する。予約`chatgpt:<slug>`はAPIキー版と区別し、両段共通描画モデルをResponses/SSEへ接続する。Rustのprompt・schema・再試行・Score/SVGを継承し、quota後の追加送信、途中応答の採用、別providerへの暗黙切替を防ぐ。本人OAuth/import・実推論は実装確認と別に受け入れる。[手順](docs/guide/chatgpt-plan.ja.md)。
+
 ### 2026-10-02 — プロバイダのレート制限を設定し、バッチの送信を待つ
 
 Geminiのバッチで利用制限に達しても約2秒間隔で再送していた。設定にプロバイダごとのRPM・入力TPM・RPDと各項目の説明ツールチップを追加し、共有pipelineの全段階と再試行をまとめて制御する。毎分の枠が空くまで待ち、429の待機指定も反映する。日次の使用量は再起動後も保ち、上限時は生成要求を送らない。Geminiの初期値は記録済みの30・16,000・14,400、他は0（上限なし）で、管理者が変更できる。

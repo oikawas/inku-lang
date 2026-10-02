@@ -69,13 +69,16 @@
 				{#if allowVisionSelection}<span><strong>Vision</strong>{visionProviderGroups.find((group) => group.id === visionProvider)?.models.find((model) => model.id === visionModel)?.label ?? visionModel}</span>{/if}
 			</div>
 			<p class="model-selection-hint">{modelSelectionTab === 'vision' ? t().modelSelectionVisionHint : t().modelSelectionSharedHint}</p>
+			{#if stage1Provider === 'chatgpt'}
+				<p>{providerGroups.some((group) => group.id === 'chatgpt' && group.models.some((model) => model.id === stage1Model)) ? t().chatgptUsingPlan : t().chatgptModelUnavailable}</p>
+			{/if}
 			<div class="generation-model-groups">
 				{#each (modelSelectionTab === 'vision' ? visionProviderGroups : providerGroups) as provider (provider.id)}
 					{#if provider.models.length > 0}
 						<section class="generation-model-provider">
-							<h3>{provider.label}</h3>
+							<h3>{provider.id === 'chatgpt' ? t().chatgptPlanLabel : provider.label}</h3>
 							<div class="generation-model-grid">
-								{#each sortModels(provider.models, recommendationPurpose, recommendationStage) as model (model.id)}
+								{#each (provider.id === 'chatgpt' ? provider.models : sortModels(provider.models, recommendationPurpose, recommendationStage)) as model (model.id)}
 								<button
 									type="button"
 									class="model-metadata-hover"

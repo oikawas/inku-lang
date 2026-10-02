@@ -136,6 +136,8 @@ export INKU_DB_URL='sqlite:///./inku.db'
 
 API keys may be supplied through environment variables, or registered from the model settings UI after logging in as an admin user. API keys saved from the UI are encrypted in the DB and are never displayed again.
 
+For ChatGPT usage, follow the [dedicated startup, account consent and self-hosted transfer](docs/guide/chatgpt-plan.md). `INKU_CHATGPT_PLAN_ENABLED` defaults off; `INKU_CHATGPT_AUTH_DIR` selects protected storage on each host. Do not register OAuth tokens in API-key settings.
+
 ```sh
 export OPENAI_API_KEY='...'
 export ANTHROPIC_API_KEY='...'

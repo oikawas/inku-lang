@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { modelDisplayName, modelShortName, pickerSelection, type ProviderGroup } from './models.ts';
+import { modelDisplayName, modelShortName, pickerSelection, splitModelRef, type ProviderGroup } from './models.ts';
 
 const GROUPS: ProviderGroup[] = [
 	{
@@ -14,6 +14,11 @@ const GROUPS: ProviderGroup[] = [
 		],
 	} as ProviderGroup,
 ];
+
+test('a disconnected ChatGPT reference stays qualified even with an empty explicit catalog', () => {
+	assert.deepEqual(splitModelRef('chatgpt:model', []), { provider: 'chatgpt', model: 'model' });
+	assert.equal(pickerSelection(GROUPS, 'chatgpt:plain-model').selected, null);
+});
 
 test('the short name drops the provider the long name carries', () => {
 	const long = modelDisplayName('nim:plain-model', GROUPS);

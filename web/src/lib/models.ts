@@ -172,7 +172,7 @@ export function modelsForProvider(provider: Provider): ModelOption[] {
 // Retired ids join the id set and both label maps, and stay out of the owner
 // map: naming, never routing.
 let registeredProviderIds = new Set<Provider>(
-	[...PROVIDER_GROUPS, ...RETIRED_PROVIDER_GROUPS].map((group) => group.id)
+	[...PROVIDER_GROUPS, ...RETIRED_PROVIDER_GROUPS].map((group) => group.id).concat('chatgpt')
 );
 let registeredModelOwners = ownersOf(PROVIDER_GROUPS);
 let registeredProviderLabels = providerLabelsOf([...PROVIDER_GROUPS, ...RETIRED_PROVIDER_GROUPS]);
@@ -196,6 +196,7 @@ function modelLabelsOf(groups: ProviderGroup[]): Map<string, string> {
 function ownersOf(groups: ProviderGroup[]): Map<string, Set<Provider>> {
 	const owners = new Map<string, Set<Provider>>();
 	for (const group of groups) {
+		if (group.id === 'chatgpt') continue;
 		for (const model of group.models) {
 			const seen = owners.get(model.id) ?? new Set<Provider>();
 			seen.add(group.id);
@@ -212,6 +213,7 @@ export function registerModelCatalog(groups: ProviderGroup[]): void {
 	const owners = new Map<string, Set<Provider>>(registeredModelOwners);
 	for (const group of groups) {
 		ids.add(group.id);
+		if (group.id === 'chatgpt') continue;
 		for (const model of group.models) {
 			const seen = new Set<Provider>(owners.get(model.id) ?? []);
 			seen.add(group.id);
@@ -222,6 +224,11 @@ export function registerModelCatalog(groups: ProviderGroup[]): void {
 	registeredModelOwners = owners;
 	registeredProviderLabels = new Map([...registeredProviderLabels, ...providerLabelsOf(groups)]);
 	registeredModelLabels = new Map([...registeredModelLabels, ...modelLabelsOf(groups)]);
+}
+
+export function clearChatGPTModelCatalog(): void {
+	registeredModelLabels = new Map([...registeredModelLabels].filter(([key]) => !key.startsWith('chatgpt:')));
+	registeredProviderLabels.delete('chatgpt');
 }
 
 /** The provider's own name, falling back to its id when the catalog has none. */
@@ -299,7 +306,7 @@ export function splitModelRef(
 	// Retired ids are recognised whichever catalog is handed in: "ovms:gemma3-4b-api"
 	// must never be read as a bare model id whose name happens to contain a colon.
 	const known = groups
-		? new Set<Provider>([...groups.map((group) => group.id), ...retiredProviderIds])
+		? new Set<Provider>(['chatgpt', ...groups.map((group) => group.id), ...retiredProviderIds])
 		: registeredProviderIds;
 	if (rest && known.has(head)) return { provider: head, model: rest };
 	return { provider: null, model: text };

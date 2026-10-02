@@ -835,6 +835,9 @@ fn conflicts(first: &Relation, second: &Relation, exempt: impl Fn(usize) -> bool
     false
 }
 
+/// Whether the description holds the words of the i-th stated place.
+pub type Quoted<'a> = &'a dyn Fn(usize, &str) -> bool;
+
 /// Check a reading against the plan before the solver uses it.
 ///
 /// `quoted(i, words)` says whether the description holds the words of the i-th
@@ -843,7 +846,7 @@ fn conflicts(first: &Relation, second: &Relation, exempt: impl Fn(usize) -> bool
 pub fn check(
     reading: &RawReading,
     layers: &[WorkPlanLayer],
-    quoted: Option<&dyn Fn(usize, &str) -> bool>,
+    quoted: Option<Quoted<'_>>,
 ) -> Result<(CheckedReading, Vec<Finding>), CheckError> {
     let count = layers.len();
     if reading.roles.len() != count {
@@ -949,7 +952,7 @@ pub fn check(
             findings.push(finding(code, item, "dropped"));
             continue;
         }
-        if relations.iter().any(|kept| *kept == clean) {
+        if relations.contains(&clean) {
             findings.push(finding("duplicate", item, "dropped"));
             continue;
         }

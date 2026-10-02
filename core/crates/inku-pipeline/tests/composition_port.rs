@@ -255,9 +255,6 @@ fn run(limit: Option<u64>) -> Outcome {
             &case.solve.skipped,
             composition::search(&case.layers, &checked, &case.background),
         ) {
-            (Some(reason), Err(Unsolved::Corner)) if reason == "corner" => {
-                outcome.skipped_as_expected += 1
-            }
             (Some(reason), Err(Unsolved::Combinations(n))) if reason == "combinations" => {
                 if Some(n) == case.solve.combinations {
                     outcome.skipped_as_expected += 1;
@@ -294,7 +291,7 @@ fn run(limit: Option<u64>) -> Outcome {
 
 fn report(outcome: &Outcome) -> String {
     format!(
-        "{} cases, {} checked, {} solved, {} skipped as the prototype skipped them, {} left for the full run, {} differ:\n{}",
+        "{} cases, {} checked, {} solved, {} skipped as the prototype skipped them (too many combinations), {} left for the full run, {} differ:\n{}",
         outcome.cases,
         outcome.checked,
         outcome.solved,

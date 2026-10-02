@@ -113,6 +113,7 @@ const THIRDS: [Frac; 4] = [frac(0, 1), frac(1, 3), frac(2, 3), frac(1, 1)];
 const HALF: Frac = frac(1, 2);
 const TENTH: Frac = frac(1, 10);
 const TWELFTH: Frac = frac(1, 12);
+const FIFTH: Frac = frac(1, 5);
 
 fn cell(col: usize, row: usize) -> Rect {
     [THIRDS[col], THIRDS[row], THIRDS[col + 1], THIRDS[row + 1]]
@@ -1187,11 +1188,17 @@ fn regions() -> &'static Regions {
             ("named-right_edge", [frac(9, 10), zero, one, one]),
             ("named-top_edge", [zero, zero, one, TENTH]),
             ("named-bottom_edge", [zero, frac(9, 10), one, one]),
+            // A stated corner: the composition chooses which of the compiler's four
+            // corner cells (a fifth of the canvas on each side).
+            ("corner-tl", [zero, zero, FIFTH, FIFTH]),
+            ("corner-tr", [frac(4, 5), zero, one, FIFTH]),
+            ("corner-bl", [zero, frac(4, 5), FIFTH, one]),
+            ("corner-br", [frac(4, 5), frac(4, 5), one, one]),
         ] {
             push(key.to_owned(), rect);
         }
         let composed: Vec<usize> = (0..all.len())
-            .filter(|i| !all[*i].key.starts_with("named-"))
+            .filter(|i| !all[*i].key.starts_with("named-") && !all[*i].key.starts_with("corner-"))
             .collect();
         let pick = |test: &dyn Fn(&Region) -> bool| -> Vec<usize> {
             composed
@@ -1225,6 +1232,19 @@ fn named_region(place: &str) -> Option<usize> {
     regions().all.iter().position(|region| region.key == key)
 }
 
+/// The ranges a stated place allows: its named range, or the four corners.
+fn stated_regions(place: &str) -> Option<Vec<usize>> {
+    if place == "corner" {
+        let all = &regions().all;
+        return Some(
+            (0..all.len())
+                .filter(|i| all[*i].key.starts_with("corner-"))
+                .collect(),
+        );
+    }
+    named_region(place).map(|index| vec![index])
+}
+
 /// The key of a range (`cell-22`, `named-bottom`, ...).
 #[must_use]
 pub fn region_key(index: usize) -> &'static str {
@@ -1234,7 +1254,7 @@ pub fn region_key(index: usize) -> &'static str {
 fn candidates(layer: &WorkPlanLayer, role: Role, fixed: Option<&str>) -> Option<Vec<usize>> {
     let table = regions();
     if let Some(place) = fixed {
-        return named_region(place).map(|index| vec![index]);
+        return stated_regions(place);
     }
     let kind = layer_kind(layer);
     let direction = orientation(layer);
@@ -1541,8 +1561,8 @@ struct Work<'a> {
 /// Why a work is not solved.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Unsolved {
-    /// A stated corner: the compiler chooses which one, so it cannot be weighed.
-    Corner,
+    /// A stated place the solver does not know.
+    UnknownPlace(String),
     /// Too many combinations for the exhaustive search.
     Combinations(u64),
     /// A layer has no range to choose from.
@@ -1555,12 +1575,12 @@ impl<'a> Work<'a> {
         reading: &'a CheckedReading,
         background: &str,
     ) -> Result<Self, Unsolved> {
-        if reading
+        if let Some(place) = reading
             .fixed
             .values()
-            .any(|place| named_region(place).is_none())
+            .find(|place| stated_regions(place).is_none())
         {
-            return Err(Unsolved::Corner);
+            return Err(Unsolved::UnknownPlace(place.clone()));
         }
         let background_lightness = lightness(Some(background), 0.99);
         let mut tension: BTreeMap<String, String> = [("balance", "dynamic"), ("void", "strong")]
@@ -1614,7 +1634,7 @@ impl<'a> Work<'a> {
                 reading.roles[i],
                 reading.fixed.get(&i).map(String::as_str),
             )
-            .ok_or(Unsolved::Corner)?;
+            .ok_or(Unsolved::NoRanges)?;
             work.options.push(options);
         }
         Ok(work)
@@ -2253,11 +2273,20 @@ mod tests {
     }
 
     #[test]
-    fn the_regions_are_the_twenty_eight_ranges_and_seven_names() {
+    fn the_regions_are_the_twenty_eight_ranges_seven_names_and_four_corners() {
         let table = regions();
         assert_eq!(table.composed.len(), 28);
-        assert_eq!(table.all.len(), 35);
+        assert_eq!(table.all.len(), 39);
         assert_eq!(region_key(table.composed[0]), "cell-00");
         assert!(named_region("corner").is_none());
+        let corners: Vec<&str> = stated_regions("corner")
+            .expect("a corner is one of four cells")
+            .into_iter()
+            .map(region_key)
+            .collect();
+        assert_eq!(
+            corners,
+            ["corner-tl", "corner-tr", "corner-bl", "corner-br"]
+        );
     }
 }

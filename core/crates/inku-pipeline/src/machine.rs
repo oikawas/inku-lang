@@ -1229,11 +1229,7 @@ impl PipelineSnapshot {
             .take()
             .ok_or(ProtocolError::InternalInvariant)?;
         let codes: Vec<&str> = findings.iter().map(|finding| finding.code).collect();
-        self.event(
-            events,
-            "composition_read",
-            json!({"findings": codes, "thesis": parsed.thesis}),
-        )?;
+        self.event(events, "composition_read", json!({"findings": codes}))?;
         self.compose_and_commit(
             pending.document,
             pending.plan,

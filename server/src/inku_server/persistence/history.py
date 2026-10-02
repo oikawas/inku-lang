@@ -25,6 +25,7 @@ from .schema import (
     UserGroupRow,
 )
 from .description_lock import locked_history_ids
+from .ddl_source import LEGACY_EXPANDED_ORIGIN
 from .variation_authority import (
     VariationAuthorityAdapterError,
     history_pipeline_diagnostics,
@@ -1081,11 +1082,13 @@ class HistoryWriter:
             raise ValueError("lineage parent is required for a derivation")
         if not isinstance(derivation_metadata, dict):
             raise ValueError("lineage derivation metadata must be an object")
+        if item.get("ddl_source_origin") not in (None, LEGACY_EXPANDED_ORIGIN):
+            raise ValueError("invalid DDL source origin")
 
         node_id = str(uuid.uuid4())
         row = HistoryRow(
             id=item["id"], user_id=item["user_id"], at=item["at"], input=item.get("input", ""),
-            ddl=item.get("ddl"), expanded_ddl=item.get("expanded_ddl"),
+            ddl=item.get("ddl"), ddl_source_origin=item.get("ddl_source_origin"),
             score=json.dumps(item.get("score", {})), svg=item.get("svg", ""),
             output_path=item.get("output_path"), elapsed_ms=item.get("elapsed_ms", 0),
             stage1_model=item.get("stage1_model"), stage2_model=item.get("stage2_model"),
@@ -1254,7 +1257,7 @@ def row_to_dict(
         "at":           row.at,
         "input":        row.input,
         "ddl":          row.ddl,
-        "expanded_ddl": row.expanded_ddl,
+        "ddl_source_origin": row.ddl_source_origin,
         "score":        score,
         "svg":          row.svg if include_svg else "",
         "output_path":  row.output_path,

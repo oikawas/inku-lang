@@ -71,7 +71,6 @@ export type PaintResult = {
 	elapsed_stage1_ms: number;
 	elapsed_stage2_ms: number;
 	elapsed_total_ms: number;
-	source_ddl?: string | null;
 	// Compatibility diagnostics returned for older saved work.
 	plugin_warnings?: string[] | null;
 	// Which render limits took effect and where they came from. The values say

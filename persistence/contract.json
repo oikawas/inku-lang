@@ -1,5 +1,5 @@
 {
-  "contract_version": 1,
+  "contract_version": 2,
   "name": "inku-portable-persistence",
   "physical_schema_identity_required": false,
   "semantic_rules": [
@@ -14,8 +14,12 @@
     {"id": "PERSIST-CANONICAL-SVG-001", "rule": "Stored SVG is canonical artwork and is never re-rendered by persistence migration."},
     {"id": "PERSIST-DERIVED-THUMB-001", "rule": "Thumbnail data is derived and may be rebuilt from canonical SVG."},
     {"id": "PERSIST-PHYSICAL-MAPPING-001", "rule": "Host adapters map physical storage to logical fields; physical names need not match."},
-    {"id": "PERSIST-LEGACY-FINGERPRINT-001", "rule": "Unknown Server schema fingerprints fail closed before migration."}
+    {"id": "PERSIST-LEGACY-FINGERPRINT-001", "rule": "Unknown Server schema fingerprints fail closed before migration."},
+    {"id": "PERSIST-DDL-001", "rule": "ddl is the only saved instruction text. A nonempty legacy ddl wins; otherwise a nonempty legacy expanded_ddl is transferred unchanged. If neither has a body, the original ddl null or blank is preserved."},
+    {"id": "PERSIST-DDL-BODY-001", "rule": "Only the fixed Unicode White_Space code points in ddl_body_whitespace_codepoints determine an absent body. Selection never trims, normalizes, compiles or redraws the chosen string."},
+    {"id": "PERSIST-DDL-ORIGIN-001", "rule": "ddl_source_origin is null or legacy_expanded. legacy_expanded records a transfer from the retired text only; it is neither a second text nor authoring authority. Import/export preserves it, and a new pipeline work records its own document and authority."}
   ],
+  "ddl_body_whitespace_codepoints": [9, 10, 11, 12, 13, 32, 133, 160, 5760, 8192, 8193, 8194, 8195, 8196, 8197, 8198, 8199, 8200, 8201, 8202, 8232, 8233, 8239, 8287, 12288],
   "constraint_keys": [
     "history.id.primary_key",
     "history.render_hash.non_unique",
@@ -33,7 +37,7 @@
         {"name": "input", "affinity": "TEXT", "nullable": false, "classification": "required_common", "encoding": "utf8_text"},
         {"name": "source_text", "affinity": "TEXT", "nullable": true, "classification": "required_common", "encoding": "utf8_text"},
         {"name": "ddl", "affinity": "TEXT", "nullable": true, "classification": "required_common", "encoding": "utf8_text"},
-        {"name": "expanded_ddl", "affinity": "TEXT", "nullable": true, "classification": "required_common", "encoding": "utf8_text"},
+        {"name": "ddl_source_origin", "affinity": "TEXT", "nullable": true, "classification": "optional_common", "encoding": "null_or_legacy_expanded"},
         {"name": "score", "affinity": "TEXT", "nullable": false, "classification": "required_common", "encoding": "canonical_json_object"},
         {"name": "svg", "affinity": "TEXT", "nullable": false, "classification": "required_common", "encoding": "utf8_svg"},
         {"name": "elapsed_ms", "affinity": "INTEGER", "nullable": true, "classification": "required_common", "encoding": "integer_milliseconds"},
@@ -116,7 +120,7 @@
           "table": "history",
           "fields": {
             "id": {"column": "id"}, "at": {"column": "at"}, "input": {"column": "input"},
-            "source_text": {"column": "source_text"}, "ddl": {"column": "ddl"}, "expanded_ddl": {"column": "expanded_ddl"},
+            "source_text": {"column": "source_text"}, "ddl": {"column": "ddl"}, "ddl_source_origin": {"column": "ddl_source_origin"},
             "score": {"column": "score"}, "svg": {"column": "svg"}, "elapsed_ms": {"column": "elapsed_ms"},
             "stage1_model": {"column": "stage1_model"}, "stage2_model": {"column": "stage2_model"}, "catalog_id": {"column": "catalog_id"},
             "render_engine_id": {"column": "render_engine_id"}, "render_engine_version": {"column": "render_engine_version"},
@@ -150,13 +154,13 @@
       }
     },
     "android": {
-      "source": "android/app/schemas/app.inku.mobile.data.db.InkuDatabase/10.json",
+      "source": "android/app/schemas/app.inku.mobile.data.db.InkuDatabase/13.json",
       "records": {
         "history": {
           "table": "history_items",
           "fields": {
             "id": {"column": "id"}, "at": {"column": "created_at"}, "input": {"column": "original_input"},
-            "source_text": {"column": "source_text"}, "ddl": {"column": "normalized_ddl"}, "expanded_ddl": {"column": "expanded_ddl"},
+            "source_text": {"column": "source_text"}, "ddl": {"column": "normalized_ddl"}, "ddl_source_origin": {"column": "ddl_source_origin"},
             "score": {"column": "score_json"}, "svg": {"column": "display_svg"}, "elapsed_ms": {"column": "elapsed_ms"},
             "stage1_model": {"column": "stage1_model"}, "stage2_model": {"column": "stage2_model"}, "catalog_id": {"column": "color_catalog_id"},
             "render_engine_id": {"column": "render_metadata_json", "json_path": "$.render_engine_id", "adapter_encoding": "json_text"},

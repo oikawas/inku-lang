@@ -78,3 +78,17 @@ def test_a_replay_is_held_by_its_ddl_not_by_its_kind():
     everything = ["edited", "reread", "redrawn", "plain", "plain-redrawn", "plain-redrawn-touched", "unknown-ddl"]
     assert locked_history_ids(session, everything) == {"edited", "redrawn", "unknown-ddl"}
     assert node_is_locked(session, "n-plain-redrawn") is False
+
+
+def test_transferred_expanded_text_does_not_reclassify_a_historical_replay():
+    session = _session()
+    _work(session, "edited", authority="ddl_authoritative", ddl="Scene: Moon")
+    # Its historical input DDL was absent. The transferred text is not proof
+    # that this replay read the description again.
+    _work(session, "transferred", "edited", "replay", ddl="Scene: Sun")
+    session.query(HistoryRow).filter_by(id="transferred").one().ddl_source_origin = "legacy_expanded"
+    _work(session, "known-reread", "edited", "replay", ddl="Scene: Sun")
+    session.commit()
+
+    assert locked_history_ids(session, ["transferred", "known-reread"]) == {"transferred"}
+    assert session.query(HistoryRow).filter_by(id="transferred").one().ddl == "Scene: Sun"

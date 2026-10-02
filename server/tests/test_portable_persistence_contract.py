@@ -7,6 +7,8 @@ from scripts.check_portable_persistence_contract import (
     parse_server_models,
     run_checks,
     schema_fingerprint,
+    validate_reference,
+    _validate_contract_shape,
 )
 
 
@@ -17,10 +19,10 @@ def test_current_host_definitions_satisfy_the_portable_contract():
     summary = run_checks(ROOT)
 
     assert summary["logical_fields"] == 57
-    assert summary["semantic_rules"] == 12
+    assert summary["semantic_rules"] == 15
     assert summary["declared_gaps"] == 0
     assert summary["server_tables"] >= 3
-    assert summary["room_tables"] == 9
+    assert summary["room_tables"] == 13
 
 
 def test_physical_names_are_mappings_not_portable_authority():
@@ -31,12 +33,24 @@ def test_physical_names_are_mappings_not_portable_authority():
     assert server["table"] == "history"
     assert android["table"] == "history_items"
     assert contract["hosts"]["android"]["source"] == (
-        "android/app/schemas/app.inku.mobile.data.db.InkuDatabase/10.json"
+        "android/app/schemas/app.inku.mobile.data.db.InkuDatabase/13.json"
     )
     assert server["fields"]["input"]["column"] == "input"
     assert android["fields"]["input"]["column"] == "original_input"
     assert android["fields"]["render_engine_id"]["json_path"] == "$.render_engine_id"
     assert "compose_fallback" not in android["fields"]
+    assert "expanded_ddl" not in server["fields"]
+    assert "expanded_ddl" not in android["fields"]
+    assert server["fields"]["ddl_source_origin"]["column"] == "ddl_source_origin"
+
+
+def test_v2_reference_preserves_constraints_without_a_second_instruction_text():
+    contract = json.loads((ROOT / "persistence/contract.json").read_text(encoding="utf-8"))
+    records = _validate_contract_shape(contract)
+
+    assert "expanded_ddl" not in records["history"]
+    assert records["history"]["ddl_source_origin"]["classification"] == "optional_common"
+    validate_reference(ROOT, records)
 
 
 def test_current_constraints_are_enforced_by_real_host_authorities():

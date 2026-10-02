@@ -235,7 +235,6 @@ export interface LangPack {
 	sketchOffNote: string;
 	sketchFallbackNote: string;
 	sketchEditHint: string;
-	ddlExpandedLabel: string;
 	ddlEditSectionLabel: string;
 	ddlNewButton: string;
 	ddlEditButton: string;
@@ -376,7 +375,6 @@ export interface LangPack {
 	tooltipDdlNew: string;
 	tooltipDdlEdit: string;
 	tooltipSaijikiToggle: string;
-	tooltipDdlExpandedToggle: string;
 	tooltipSketchToggle: string;
 	tooltipStatsToggle: string;
 	tooltipSubmit: string;

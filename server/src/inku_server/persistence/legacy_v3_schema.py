@@ -1,4 +1,8 @@
-"""Canonical SQLAlchemy ORM schema for Server persistence."""
+"""Frozen v3 ORM for isolated restoration and old-schema fixtures.
+
+Generated from product 566716f25fa146b332d0efe9b83b8a0fbcaf7caf. This metadata
+never defines the current database or adds retired columns during startup.
+"""
 
 from sqlalchemy import (
     BigInteger,
@@ -28,8 +32,8 @@ class HistoryRow(Base):
     user_id      = Column(String,     ForeignKey("user_accounts.id"), nullable=True, index=True)
     at           = Column(BigInteger, nullable=False, index=True)
     input        = Column(Text,       nullable=False, default="")
-    ddl          = Column(Text,       nullable=True)  # The single saved instruction document.
-    ddl_source_origin = Column(Text, nullable=True)  # NULL or the factual legacy_expanded migration origin.
+    ddl          = Column(Text,       nullable=True)  # v1.98: input-side DDL (Stage 1 output / original user text)
+    expanded_ddl = Column(Text,       nullable=True)  # v1.98: expanded DDL (Stage 1.5 output = Stage 2 input)
     score        = Column(Text,       nullable=False, default="{}")
     svg          = Column(Text,       nullable=False, default="")
     output_path  = Column(Text,       nullable=True)

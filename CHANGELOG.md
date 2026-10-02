@@ -6,6 +6,25 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file retains the history from v2.5.0 (2026-07-25, render engine 12) onward.** Past records follow the recent ones in a collapsible section of this same document; expand it when needed. Viewers without collapse support show the full text. Earlier history is in the [v1.72–v2.4 archive](docs/history/changelog-v1.72-v2.4.md) and the [v0.1–v1.71 archive](docs/history/changelog-v0.1-v1.71.md).
 
+### 2026-10-02 — Unify saved instructions into DDL and align old-work redraw (I-706)
+
+Server and Web saving, display, editing, and redraw now use one `ddl`. Old
+two-text migration and JSON input prefer a DDL with a body; only an absent DDL
+body transfers the entire old expanded text verbatim. Its origin is recorded as
+`ddl_source_origin=legacy_expanded`. When neither has a body, the original NULL,
+empty string, or whitespace is retained. Web redraw uses the displayed text and
+disables the entrance only when no body exists. The expanded-text view and fold
+setting are retired.
+
+SQLite schema v4 has a standalone manual migration entry. Ordinary startup
+requires migration without modifying an old database. Migration verifies a
+WAL-safe backup, its match to the preimage under the writer lock, all protected
+values, rowids, links, FTS, and integrity, with rollback on failure. Frozen-adapter
+copy restoration for old backups and the paired portable persistence contract v2
+are included. Saved Scores/SVGs are not regenerated. Old expanded text is
+completion output from the old engine; 100% compatibility with the current
+engine is outside the guarantee.
+
 ### 2026-10-02 — Explicit drawing and Vision model references reach the common resolver (I-014)
 
 Explicit model names now retain their reference after trimming surrounding whitespace, including a bare name that matches the user's default model. Provider selection follows the common rules: explicit qualification, sole ownership, then the stage default. Omitted requests retain the user's model/provider pair, qualified defaults stay qualified once, and one drawing model still serves Stage 1/2. New records may retain an explicitly supplied bare model name; existing saved records are unchanged.

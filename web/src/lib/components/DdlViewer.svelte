@@ -3,15 +3,12 @@
 	import Tooltip from './Tooltip.svelte';
 	import type { ResolvedInstructionLang } from '$lib/instructionLang';
 	import { t } from '$lib/i18n/index.svelte';
-	import { describePanelSettings } from '$lib/features/describe-panel/settings.svelte';
+	import { hasDdlBody } from '$lib/ddl-source';
 
 	type Props = {
-		/** Input-side DDL: the Stage 1 output, or the DDL the user wrote. */
+		/** The single source used for display, editing, and replay. */
 		ddl: string;
-		/** Stage 1.5 output = what Stage 2 actually received. */
-		expandedDdl?: string | null;
 		label: string;
-		expandedLabel: string;
 		onEdit?: (() => void) | null;
 		editDisabled?: boolean;
 		/** Perform the shown DDL again through Stage 2. Omitted = no button. */
@@ -24,32 +21,18 @@
 		lang?: ResolvedInstructionLang | null;
 	};
 
-	let { ddl, expandedDdl = null, label, expandedLabel, onEdit = null, editDisabled = false, onPaint = null, paintDisabled = false, runStatus = null, lang = null }: Props = $props();
+	let { ddl, label, onEdit = null, editDisabled = false, onPaint = null, paintDisabled = false, runStatus = null, lang = null }: Props = $props();
 
-	// Artworks saved before v1.98 have no input-side DDL: their single stored text
-	// is the expanded one. Show it in the main slot and rename the label so the
-	// panel never claims to show something it does not have.
-	// LEGACY-ONLY: this branch exists for pre-v1.98 rows in the development
-	// database and can be deleted once those artworks are gone.
-	const legacyExpandedOnly = $derived(!ddl && !!expandedDdl);
-	const primary = $derived(legacyExpandedOnly ? (expandedDdl as string) : ddl);
-	const primaryLabel = $derived(legacyExpandedOnly ? expandedLabel : lang ? t().ddlLabelIn(lang) : label);
-	const showExpanded = $derived(!legacyExpandedOnly && !!expandedDdl && expandedDdl !== ddl);
-	const highlighted = $derived(highlightDDL(primary));
-	const expandedHighlighted = $derived(highlightDDL(expandedDdl ?? ''));
-	// The legacy branch shows an expanded DDL the caller cannot re-perform, so the
-	// button follows the input-side text the caller actually holds.
-	const paintBlocked = $derived(paintDisabled || !ddl.trim());
-	// The fold is the user's, not this instance's: it is restored at login and
-	// saved on every toggle, so it outlives both the artwork and the page.
-	const expandedOpen = $derived(describePanelSettings.ddlExpandedOpen);
+	const primaryLabel = $derived(lang ? t().ddlLabelIn(lang) : label);
+	const highlighted = $derived(highlightDDL(ddl));
+	const paintBlocked = $derived(paintDisabled || !hasDdlBody(ddl));
 </script>
 
 <div class="ddl-viewer">
 	<div class="ddl-viewer-head">
 		<!-- The slot, not the label, pushes the buttons right: the note wraps the label. -->
 		<span class="ddl-viewer-label-slot">
-			{#if lang && !legacyExpandedOnly}
+			{#if lang}
 				<!-- The note opens up and to the right of the heading's start: the
 				     panel clips it at its bottom edge and must not widen. -->
 				<Tooltip placement="top-right" text={t().tooltipDdlLang}>
@@ -74,19 +57,6 @@
 		</div>
 	{/if}
 	{#if runStatus}{@render runStatus()}{/if}
-	{#if showExpanded}
-		<div class="ddl-expanded">
-			<Tooltip placement="right" text={t().tooltipDdlExpandedToggle}>
-				<button class="ddl-expanded-toggle" type="button" aria-expanded={expandedOpen} onclick={describePanelSettings.toggleDdlExpanded}>
-					<span class="ddl-expanded-arrow" class:open={expandedOpen}>▶</span>
-					<span>{expandedLabel}</span>
-				</button>
-			</Tooltip>
-			{#if expandedOpen}
-				<div class="ddl-viewer-body ddl-highlight">{@html expandedHighlighted}</div>
-			{/if}
-		</div>
-	{/if}
 </div>
 
 <style>
@@ -126,31 +96,5 @@
 	.ddl-viewer-actions {
 		display: flex;
 		justify-content: flex-end;
-	}
-	.ddl-expanded {
-		display: flex;
-		flex-direction: column;
-		gap: 6px;
-	}
-	.ddl-expanded-toggle {
-		display: flex;
-		align-items: center;
-		gap: 5px;
-		padding: 6px 0;
-		border: 0;
-		background: none;
-		color: var(--fg2);
-		font-family: inherit;
-		font-size: var(--ui-font-size-12);
-		cursor: pointer;
-		text-align: left;
-	}
-	.ddl-expanded-arrow {
-		display: inline-block;
-		font-size: var(--ui-font-size-8);
-		transition: transform 0.15s ease;
-	}
-	.ddl-expanded-arrow.open {
-		transform: rotate(90deg);
 	}
 </style>

@@ -62,15 +62,28 @@ def _create_v175_database(path: Path) -> None:
 
 def test_v175_sqlite_migration_is_additive_idempotent_and_does_not_infer_edges(tmp_path: Path):
     db_path = tmp_path / "v175.db"
+    current_path = tmp_path / "current.db"
     _create_v175_database(db_path)
+    original_bytes = db_path.read_bytes()
     code = """
-import json
+import json, os, sqlite3
+from pathlib import Path
 from sqlalchemy import inspect
 from inku_server import db
+from inku_server.persistence.legacy_restore import restore_copy
+from inku_server.persistence.ddl_migration import migrate_history_ddl
 
+source = Path(os.environ['INKU_TEST_LEGACY_SOURCE'])
+current = Path(os.environ['INKU_TEST_CURRENT_COPY'])
+restored = restore_copy(source, current)
+assert restored['version'] == 3
+# The frozen restoration phase creates the lineage. The DDL move and current
+# startup must keep that same node, rather than silently rebuilding it.
+with sqlite3.connect(current) as connection:
+    first_node = connection.execute('SELECT id FROM lineage_nodes').fetchone()[0]
+migrate_history_ddl(current, source_commit='566716f25fa146b332d0efe9b83b8a0fbcaf7caf',
+                    _restored_fingerprint=restored['fingerprint'])
 db.init_db()
-with db.SessionLocal() as session:
-    first_node = session.query(db.LineageNodeRow).one().id
 db.init_db()
 with db.SessionLocal() as session:
     row = session.get(db.HistoryRow, 'history-1')
@@ -79,6 +92,8 @@ with db.SessionLocal() as session:
         'lineage_columns': sorted(column['name'] for column in inspect(db.engine).get_columns('lineage_nodes')),
         'source_text': row.source_text,
         'description_hash': row.description_hash,
+        'saved': [row.id, row.input, row.ddl, row.score, row.svg],
+        'ddl_source_origin': row.ddl_source_origin,
         'lineage_node_id': row.lineage_node_id,
         'first_node': first_node,
         'root_node_id': session.query(db.LineageNodeRow).one().root_node_id,
@@ -88,7 +103,9 @@ with db.SessionLocal() as session:
 print(json.dumps(payload, ensure_ascii=False))
 """
     env = os.environ.copy()
-    env["INKU_DB_URL"] = f"sqlite:///{db_path}"
+    env["INKU_DB_URL"] = f"sqlite:///{current_path}"
+    env["INKU_TEST_LEGACY_SOURCE"] = str(db_path)
+    env["INKU_TEST_CURRENT_COPY"] = str(current_path)
     completed = subprocess.run(
         [sys.executable, "-c", code],
         cwd=Path(__file__).parents[1],
@@ -98,6 +115,7 @@ print(json.dumps(payload, ensure_ascii=False))
         text=True,
     )
     payload = json.loads(completed.stdout.strip().splitlines()[-1])
+    assert db_path.read_bytes() == original_bytes
     required = {
         "source_text",
         "display_label",
@@ -108,6 +126,11 @@ print(json.dumps(payload, ensure_ascii=False))
         "lineage_node_id",
     }
     assert required.issubset(payload["columns"])
+    assert "expanded_ddl" not in payload["columns"]
+    assert payload["ddl_source_origin"] == "legacy_expanded"
+    assert payload["saved"] == [
+        "history-1", "#1 作者が意図した本文", "円を置く。", '{"instructions": []}', "<svg/>",
+    ]
     assert payload["source_text"] == "#1 作者が意図した本文"
     assert payload["description_hash"] == description_hash("#1 作者が意図した本文")
     assert payload["lineage_node_id"] == payload["first_node"]

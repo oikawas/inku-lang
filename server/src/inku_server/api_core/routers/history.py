@@ -512,7 +512,7 @@ def api_history_post(
         actor=actor,
         input_text=body.input,
         ddl=body.ddl,
-        expanded_ddl=body.expanded_ddl,
+        ddl_source_origin=body.ddl_source_origin,
         interpret_fallback=body.interpret_fallback,
         # Taken as the sender wrote it, including "none". Deriving it here is
         # not possible: this route never ran Stage 2, so only the client that

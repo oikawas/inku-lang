@@ -1831,7 +1831,6 @@ $effect(() => {
 		work.lineageDetached = false;
 		if (!options.preserveAuthoring) {
 			work.inputMode = 'single';
-			work.expandedDdl = projection.expandedDdl;
 			work.input = projection.sourceText;
 			work.ddl = projection.ddl;
 			work.ddlGeneratedBaseline = projection.ddl;
@@ -2778,10 +2777,8 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 						<section class="panel-section">
 							<DdlViewer
 								ddl={work.ddl}
-								expandedDdl={work.expandedDdl}
 								label={t().ddlLabel}
 								lang={shownDdlLang}
-								expandedLabel={t().ddlExpandedLabel}
 								onEdit={openCurrentDdlEditor}
 								editDisabled={!canEditCurrentDdl}
 								onPaint={() => { void work.replay(); }}

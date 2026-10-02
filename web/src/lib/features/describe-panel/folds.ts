@@ -1,6 +1,5 @@
 /**
- * The field names, defaults and parsing for the describe panel's two folds:
- * sketch from life (Stage 0.5) and expanded DDL (Stage 2 input).
+ * The field name, default and parsing for the sketch-from-life fold.
  *
  * Plain .ts (no runes), so both sides of the round trip are testable without
  * the compiler -- the same split features/color-catalog/render.ts uses.
@@ -8,33 +7,25 @@
 
 /** Keys as the server stores them inside `model_settings`. */
 export const SKETCH_FIELD = 'sketch_open';
-export const DDL_EXPANDED_FIELD = 'ddl_expanded_open';
 
 /**
- * Each section keeps its own default, and they differ.  The sketch prose was
- * always visible before it could be folded, so an account that has never
- * folded it keeps seeing what it saw; the expanded DDL has always started
- * folded, so it keeps starting folded.
+ * The sketch prose was always visible before it could be folded, so an
+ * account that has never folded it keeps seeing what it saw.
  */
 export const SKETCH_DEFAULT = true;
-export const DDL_EXPANDED_DEFAULT = false;
 
 export type DescribePanelFolds = {
 	sketchOpen: boolean;
-	ddlExpandedOpen: boolean;
 };
 
 export const DEFAULT_FOLDS: DescribePanelFolds = {
-	sketchOpen: SKETCH_DEFAULT,
-	ddlExpandedOpen: DDL_EXPANDED_DEFAULT
+	sketchOpen: SKETCH_DEFAULT
 };
 
 /**
  * A stored fold, or this section's own default when the user has none.
  *
- * The fallback is per call, not one shared constant: a section that defaults
- * open and a section that defaults folded must not collapse into each other
- * the moment a user has no stored value.
+ * Invalid legacy values must not fold prose that defaults open.
  */
 export function storedFold(
 	settings: Record<string, unknown> | null | undefined,
@@ -50,15 +41,13 @@ export function foldsFromSettings(
 	settings: Record<string, unknown> | null | undefined
 ): DescribePanelFolds {
 	return {
-		sketchOpen: storedFold(settings, SKETCH_FIELD, SKETCH_DEFAULT),
-		ddlExpandedOpen: storedFold(settings, DDL_EXPANDED_FIELD, DDL_EXPANDED_DEFAULT)
+		sketchOpen: storedFold(settings, SKETCH_FIELD, SKETCH_DEFAULT)
 	};
 }
 
-/** The fields the server stores, for a save that carries both. */
+/** The current fold field the server stores. */
 export function foldsToSettings(folds: DescribePanelFolds): Record<string, boolean> {
 	return {
-		[SKETCH_FIELD]: folds.sketchOpen,
-		[DDL_EXPANDED_FIELD]: folds.ddlExpandedOpen
+		[SKETCH_FIELD]: folds.sketchOpen
 	};
 }

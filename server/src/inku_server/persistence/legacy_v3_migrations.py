@@ -1,4 +1,9 @@
-"""Versioned, fail-closed startup coordination for the canonical SQLite DB."""
+"""Frozen v3 coordinator for explicit isolated restoration only.
+
+Generated from product 566716f25fa146b332d0efe9b83b8a0fbcaf7caf; registry names,
+checksums and recognized source fingerprints retain their original meaning.
+Never used by current application startup.
+"""
 
 from __future__ import annotations
 
@@ -14,8 +19,8 @@ from sqlalchemy import text
 from sqlalchemy.engine import Connection, Engine
 from sqlalchemy.exc import OperationalError
 
-from .backup import SQLiteSnapshot
-from .invariants import require_integrity
+from .backup import SQLiteSnapshot, create_sqlite_snapshot
+from .invariants import capture_invariants, require_integrity, verify_invariants
 
 
 class MigrationStateError(RuntimeError):
@@ -56,22 +61,11 @@ _V1_MIGRATION_CHECKSUM = hashlib.sha256(
     json.dumps(_V1_MIGRATION_MANIFEST, separators=(",", ":")).encode("utf-8")
 ).hexdigest()
 
-LEGACY_V3_VERSION = 3
-LEGACY_V3_NAME = "developer_provider_observations"
-_V3_MIGRATION_MANIFEST = (
+MIGRATION_VERSION = 3
+MIGRATION_NAME = "developer_provider_observations"
+_MIGRATION_MANIFEST = (
     *_PREVIOUS_MIGRATION_MANIFEST,
     "developer-provider-observations-v1",
-)
-LEGACY_V3_CHECKSUM = hashlib.sha256(
-    json.dumps(_V3_MIGRATION_MANIFEST, separators=(",", ":")).encode("utf-8")
-).hexdigest()
-
-MIGRATION_VERSION = 4
-MIGRATION_NAME = "single_history_ddl"
-_MIGRATION_MANIFEST = (
-    *_V3_MIGRATION_MANIFEST, "ddl-priority-unicode-white-space-v1",
-    "legacy-expanded-source-origin-v1", "drop-expanded-ddl-v1",
-    "all-persistent-values-rowid-link-and-fts-invariants-v1",
 )
 MIGRATION_CHECKSUM = hashlib.sha256(
     json.dumps(_MIGRATION_MANIFEST, separators=(",", ":")).encode("utf-8")
@@ -339,21 +333,11 @@ def _record_baseline(connection: Connection) -> None:
     )
 
 
-def _require_single_ddl_schema(connection: Connection) -> None:
-    columns = {row[1]: row for row in connection.exec_driver_sql("PRAGMA table_info(history)")}
-    if "expanded_ddl" in columns or not {"ddl", "ddl_source_origin"} <= columns.keys():
-        raise MigrationStateError("registry and single-DDL physical schema disagree")
-    for name in ("ddl", "ddl_source_origin"):
-        if columns[name][3] or columns[name][2].upper() != "TEXT":
-            raise MigrationStateError("single-DDL fields must be nullable TEXT")
-
-
 def _verify_registry(connection: Connection) -> str:
     rows = connection.exec_driver_sql(
         "SELECT version, name, checksum FROM schema_migrations ORDER BY version"
     ).fetchall()
     current = [(MIGRATION_VERSION, MIGRATION_NAME, MIGRATION_CHECKSUM)]
-    v3 = [(LEGACY_V3_VERSION, LEGACY_V3_NAME, LEGACY_V3_CHECKSUM)]
     previous = [
         (
             _PREVIOUS_MIGRATION_VERSION,
@@ -362,16 +346,68 @@ def _verify_registry(connection: Connection) -> str:
         )
     ]
     v1 = [(_V1_MIGRATION_VERSION, _V1_MIGRATION_NAME, _V1_MIGRATION_CHECKSUM)]
-    if rows == current or rows == v3 + current:
+    if rows == current:
         return "current"
-    if rows == v3:
-        return "v3"
     if rows == previous:
         return "previous"
     if rows == v1:
         return "v1"
     raise MigrationStateError(
         "schema_migrations does not match a reviewed baseline"
+    )
+
+
+def _upgrade_registered_schema(
+    *,
+    engine: Engine,
+    database_path: Path | None,
+    create_schema: Callable[[Connection], None],
+    fts_enabled: bool,
+) -> MigrationOutcome:
+    if database_path is None:
+        raise MigrationStateError(
+            "an existing in-memory database cannot be snapshotted"
+        )
+    snapshot_path = database_path.parent / "migration-backups" / (
+        f"{database_path.stem}-pre-v{MIGRATION_VERSION}-{time.time_ns()}.db"
+    )
+    snapshot = create_sqlite_snapshot(database_path, snapshot_path)
+    with engine.connect() as connection:
+        _begin_immediate(connection)
+        try:
+            previous_state = _verify_registry(connection)
+            if previous_state not in {"previous", "v1"}:
+                raise MigrationStateError(
+                    "registered schema changed before writer lock"
+                )
+            before = capture_invariants(connection)
+            create_schema(connection)
+            verify_invariants(connection, before)
+            require_integrity(connection)
+            connection.execute(
+                text(
+                    "UPDATE schema_migrations "
+                    "SET version=:version, name=:name, checksum=:checksum, "
+                    "applied_at=:applied_at "
+                    "WHERE version=:previous_version"
+                ),
+                {
+                    "version": MIGRATION_VERSION,
+                    "name": MIGRATION_NAME,
+                    "checksum": MIGRATION_CHECKSUM,
+                    "applied_at": int(time.time() * 1000),
+                    "previous_version": _PREVIOUS_MIGRATION_VERSION if previous_state == "previous" else _V1_MIGRATION_VERSION,
+                },
+            )
+            connection.commit()
+        except Exception as exc:
+            connection.rollback()
+            raise MigrationExecutionError(snapshot) from exc
+    return MigrationOutcome(
+        mode="registered_upgrade",
+        fts_enabled=fts_enabled,
+        fingerprint_name=_PREVIOUS_MIGRATION_NAME,
+        snapshot=snapshot,
     )
 
 
@@ -445,11 +481,8 @@ def ensure_current_schema(
     seed_fresh: Callable[[Connection], None],
     apply_legacy: Callable[[Connection], None],
 ) -> MigrationOutcome:
-    """Create a current DB or verify it; existing old DBs require the CLI.
-
-    The callback signature remains stable for the DB façade. Historical
-    upgrades belong to ``legacy_v3_migrations`` and the isolated restore entry.
-    """
+    """Create, verify, or migrate the canonical database exactly once."""
+    registered_upgrade_fts: bool | None = None
     with engine.connect() as connection:
         tables = _user_tables(connection)
         if not tables:
@@ -459,7 +492,6 @@ def ensure_current_schema(
                 _create_registry(connection)
                 seed_fresh(connection)
                 fts_enabled = install_history_fts(connection, rebuild=False)
-                _require_single_ddl_schema(connection)
                 require_integrity(connection)
                 _record_baseline(connection)
                 connection.commit()
@@ -474,14 +506,10 @@ def ensure_current_schema(
             if state == "partial":
                 raise MigrationStateError("history FTS objects are internally inconsistent")
             if registry_state == "current":
-                _require_single_ddl_schema(connection)
                 return MigrationOutcome(
                     mode="current", fts_enabled=state == "complete"
                 )
-            raise MigrationStateError(
-                "manual history DDL migration required; use migrate_history_ddl.py "
-                "on a verified copy before starting this release"
-            )
+            registered_upgrade_fts = state == "complete"
         else:
             fingerprint = schema_fingerprint(connection)
             fts_state = history_fts_state(connection)
@@ -498,7 +526,45 @@ def ensure_current_schema(
                     f"fingerprint={fingerprint} fts={fts_state}"
                 )
             require_integrity(connection)
-            raise MigrationStateError(
-                "manual legacy restoration and history DDL migration required; "
-                "restore an isolated copy before starting this release"
-            )
+
+    if registered_upgrade_fts is not None:
+        return _upgrade_registered_schema(
+            engine=engine,
+            database_path=database_path,
+            create_schema=create_schema,
+            fts_enabled=registered_upgrade_fts,
+        )
+
+    if database_path is None:
+        raise MigrationStateError("an existing in-memory database cannot be snapshotted")
+    snapshot_path = database_path.parent / "migration-backups" / (
+        f"{database_path.stem}-pre-v{MIGRATION_VERSION}-{time.time_ns()}.db"
+    )
+    snapshot = create_sqlite_snapshot(database_path, snapshot_path)
+
+    with engine.connect() as connection:
+        _begin_immediate(connection)
+        try:
+            if (
+                schema_fingerprint(connection) != fingerprint
+                or history_fts_state(connection) != fts_state
+            ):
+                raise MigrationStateError("pre-registry schema changed before writer lock")
+            before = capture_invariants(connection)
+            create_schema(connection)
+            apply_legacy(connection)
+            fts_enabled = install_history_fts(connection, rebuild=True)
+            verify_invariants(connection, before)
+            require_integrity(connection)
+            _create_registry(connection)
+            _record_baseline(connection)
+            connection.commit()
+        except Exception as exc:
+            connection.rollback()
+            raise MigrationExecutionError(snapshot) from exc
+    return MigrationOutcome(
+        mode="legacy",
+        fts_enabled=fts_enabled,
+        fingerprint_name=fingerprint_name,
+        snapshot=snapshot,
+    )

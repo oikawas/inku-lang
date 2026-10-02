@@ -7,6 +7,7 @@ import hashlib
 import json
 import os
 import sqlite3
+import subprocess
 import sys
 import time
 from pathlib import Path
@@ -26,12 +27,13 @@ _RUN_MARKER = ".inku-persistence-rehearsal"
 _RUN_MARKER_CONTENT = "I-372 isolated copy\n"
 
 
-def _resolve_guarded_database(run_root: Path, relative_database: Path) -> Path:
+def _resolve_guarded_database(run_root: Path, relative_database: Path, *, history_ddl: bool = False) -> Path:
     root = run_root.expanduser().resolve(strict=True)
     marker = root / _RUN_MARKER
     if marker.is_symlink() or not marker.is_file():
         raise RuntimeError("isolated rehearsal marker is missing")
-    if marker.read_text(encoding="utf-8") != _RUN_MARKER_CONTENT:
+    expected_marker = "I-706 history-ddl isolated copy\n" if history_ddl else _RUN_MARKER_CONTENT
+    if marker.read_text(encoding="utf-8") != expected_marker:
         raise RuntimeError("isolated rehearsal marker is invalid")
     if relative_database.is_absolute() or ".." in relative_database.parts:
         raise RuntimeError("rehearsal database must be a contained relative path")
@@ -119,6 +121,8 @@ def rehearse(
 ) -> dict[str, object]:
     """Run migration and idempotent restart against the guarded copy."""
     path = _resolve_guarded_database(run_root, relative_database)
+    if MIGRATION_VERSION >= 4:
+        raise RuntimeError("legacy rehearsal requires the historical source; select history-ddl for v4")
     before = _preflight(path, expected_fingerprint, expected_fts_state)
     os.environ["INKU_DB_URL"] = f"sqlite:///{path}"
     os.environ["INKU_THUMBS_DB_URL"] = "sqlite:///:memory:"
@@ -141,9 +145,11 @@ def main() -> int:
     parser.add_argument("--database", type=Path, required=True)
     parser.add_argument("--expect-fingerprint", default=PRODUCTION_STAGE0_FINGERPRINT)
     parser.add_argument("--expect-fts-state", choices=("absent", "complete"), default="complete")
+    parser.add_argument("--migration", choices=("legacy", "history-ddl"), default="legacy")
+    parser.add_argument("--source-commit")
     args = parser.parse_args()
     try:
-        result = rehearse(
+        result = rehearse_history_ddl(args.run_root, args.database, args.source_commit) if args.migration == "history-ddl" else rehearse(
             args.run_root,
             args.database,
             args.expect_fingerprint,
@@ -154,6 +160,50 @@ def main() -> int:
         return 1
     print(json.dumps(result, sort_keys=True))
     return 0
+
+
+def rehearse_history_ddl(run_root: Path, relative_database: Path, source_commit: str) -> dict[str, object]:
+    """Migrate once, verify full invariants, then boot twice in fresh processes."""
+    from inku_server.persistence.ddl_migration import inspect_database
+
+    path = _resolve_guarded_database(run_root, relative_database, history_ddl=True)
+    snapshot = json.loads((path.parent / "snapshot.json").read_text(encoding="utf-8"))
+    before = _history_evidence(path)
+    report_path = path.parent / "migration-report.json"
+    command = [sys.executable, str(Path(__file__).with_name("migrate_history_ddl.py")),
+               "--database", str(path), "--expect-version", "3", "--source-commit", source_commit,
+               "--expect-fingerprint", snapshot["source_fingerprint"], "--report", str(report_path), "--apply"]
+    completed = subprocess.run(command, capture_output=True, text=True, check=False)
+    (path.parent / "migration-stdout.json").write_text(completed.stdout, encoding="utf-8")
+    (path.parent / "migration-stderr.log").write_text(completed.stderr, encoding="utf-8")
+    if completed.returncode != 0:
+        raise RuntimeError("manual history DDL migration failed; copy and diagnostics retained")
+    report = json.loads(completed.stdout)
+    if (report != json.loads(report_path.read_text(encoding="utf-8")) or report["status"] != "migrated"
+            or report["source_commit"] != source_commit or not report["verification"]
+            or not all(value is True for value in report["verification"].values())):
+        raise RuntimeError("manual migration report is not fully verified")
+    if _history_evidence(path) != before:
+        raise RuntimeError("canonical history artifacts changed")
+    environment = dict(os.environ, INKU_DB_URL=f"sqlite:///{path}",
+                       INKU_THUMBS_DB_URL="sqlite:///:memory:", INKU_DB_BACKUP_SCHEDULER="0")
+    for _ in range(2):
+        subprocess.run([sys.executable, "-c", "from inku_server import db; db.init_db()"],
+                       env=environment, check=True, capture_output=True)
+        current = inspect_database(path, expect_version=3, source_commit=source_commit)
+        if (current["status"] != "already_current" or current["target_registry"] != report["target_registry"]
+                or current["target_fingerprint"] != report["target_fingerprint"]
+                or current["selection_digest"] != report["selection_digest"]
+                or current["rows"] != report["rows"] or current["classifications"] != report["classifications"]
+                or not all(value is True for value in current["verification"].values())
+                or _history_evidence(path) != before):
+            raise RuntimeError("startup changed or failed current schema identity")
+    result = {"ok": True, "migration": "history-ddl", "source_commit": source_commit,
+              "sqlite_version": sqlite3.sqlite_version, "startup_count": 2,
+              "migration_report": str(report_path), "candidate_copy_retained": True,
+              "canonical_history_digest_sha256": before[1], "history_rows": before[0]}
+    (path.parent / "rehearsal.json").write_text(json.dumps(result, sort_keys=True) + "\n", encoding="utf-8")
+    return result
 
 
 if __name__ == "__main__":

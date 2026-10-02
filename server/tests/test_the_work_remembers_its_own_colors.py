@@ -22,6 +22,8 @@ from __future__ import annotations
 
 import json
 import os
+import runpy
+import sqlite3
 import subprocess
 import sys
 import uuid
@@ -477,62 +479,65 @@ def test_the_rename_table_names_every_pair_that_was_renamed():
 
 
 def test_starting_the_server_migrates_a_row_that_was_already_there(tmp_path):
-    """The catalog transform is reachable from the pre-registry startup path.
+    """The explicit frozen restoration keeps the recorded colors and renames the id.
 
-    A registry-bearing current database must never replay legacy repairs. The
-    fixture therefore removes only the registry after building a complete
-    pre-registry shape, then starts the Server once through the legacy gate.
+    The accepted pre-share fixture keeps its historical physical schema. Its
+    original stays byte-identical; current startup verifies only the restored,
+    explicitly unified copy and never replays the legacy rename.
     """
     db_path = tmp_path / "startup.db"
+    current_path = tmp_path / "current.db"
+    create_pre_share = runpy.run_path(
+        str(Path(__file__).with_name("test_a_work_says_which_group_may_read_it.py"))
+    )["_create_pre_share_database"]
+    create_pre_share(db_path)
+    with sqlite3.connect(db_path) as connection:
+        connection.execute("DELETE FROM history WHERE id <> 'history-1'")
+        # Only row data changes: reuse the reviewed pre-share physical schema.
+        connection.execute(
+            "UPDATE history SET id=?, input=?, score=?, svg=?, catalog_id=?,"
+            " render_color_catalog_id=?, render_color_map=? WHERE id='history-1'",
+            ("legacy-1", "a work saved before the rename", "{}", "<svg/>",
+             "japanese", "japanese", json.dumps({"black": "#111111"})),
+        )
+    original_bytes = db_path.read_bytes()
     code = """
 import json, os, sqlite3
+from pathlib import Path
 from inku_server import db
+from inku_server.persistence.legacy_restore import restore_copy
+from inku_server.persistence.ddl_migration import migrate_history_ddl
 
+source = Path(os.environ['INKU_TEST_LEGACY_SOURCE'])
+current = Path(os.environ['INKU_TEST_CURRENT_COPY'])
+original_bytes = source.read_bytes()
+restored = restore_copy(source, current)
+assert restored['version'] == 3
+with sqlite3.connect(current) as connection:
+    restored_saved = connection.execute(
+        "SELECT id, input, score, svg, render_color_catalog_id, render_color_map"
+        " FROM history WHERE id='legacy-1'").fetchone()
+migrate_history_ddl(current, source_commit='566716f25fa146b332d0efe9b83b8a0fbcaf7caf',
+                    _restored_fingerprint=restored['fingerprint'])
 db.init_db()
-group = db.add_user_group("legacy-group")
-user = db.add_user(
-    username="legacy",
-    email="legacy@example.test",
-    password="password-123",
-    permission_groups=["users"],
-    group_id=group["id"],
-)
-db.add_item({
-    "id": "legacy-1",
-    "user_id": user["id"],
-    "at": 1,
-    "input": "a work saved before the rename",
-    "score": {},
-    "svg": "<svg/>",
-    "catalog_id": "japanese",
-    "render_color_catalog_id": "japanese",
-    "render_color_map": {"black": "#111111"},
-})
-
-# Model the last build before the registry existed. The schema and persisted row
-# remain intact; only the new coordinator metadata is absent.
-with db.engine.begin() as connection:
-    connection.exec_driver_sql("DROP TABLE schema_migrations")
-# Today's schema without its registry is a shape no release shipped, and it
-# moves with every registered migration, so it is accepted for this start
-# only -- as the legacy-path tests in test_persistence_migrations.py do --
-# rather than pinned as a fingerprint that goes stale.
-from inku_server.persistence import migrations
-with db.engine.connect() as connection:
-    shape = (migrations.schema_fingerprint(connection), migrations.history_fts_state(connection))
-migrations.ACCEPTED_LEGACY_STATES[shape] = "test-current-without-registry"
 db.init_db()
 
-connection = sqlite3.connect(os.environ["INKU_DB_PATH"])
+connection = sqlite3.connect(current)
 row = connection.execute(
     "SELECT catalog_id, render_color_catalog_id, render_color_map FROM history WHERE id='legacy-1'"
 ).fetchone()
+saved = connection.execute(
+    "SELECT id, input, score, svg, render_color_catalog_id, render_color_map"
+    " FROM history WHERE id='legacy-1'").fetchone()
 connection.close()
-print(json.dumps(row))
+assert source.read_bytes() == original_bytes
+assert saved == restored_saved
+print(json.dumps({'row': row, 'saved': saved, 'source_preserved': restored['source_preserved']}))
 """
     env = os.environ.copy()
-    env["INKU_DB_URL"] = f"sqlite:///{db_path}"
-    env["INKU_DB_PATH"] = str(db_path)
+    env["INKU_DB_URL"] = f"sqlite:///{current_path}"
+    env["INKU_TEST_LEGACY_SOURCE"] = str(db_path)
+    env["INKU_TEST_CURRENT_COPY"] = str(current_path)
     env["INKU_TEST_USE_CONFIGURED_DB"] = "1"
     completed = subprocess.run(
         [sys.executable, "-c", code],
@@ -542,8 +547,14 @@ print(json.dumps(row))
         capture_output=True,
         text=True,
     )
-    catalog_id, drawn_with, snapshot = json.loads(completed.stdout.strip().splitlines()[-1])
+    payload = json.loads(completed.stdout.strip().splitlines()[-1])
+    assert db_path.read_bytes() == original_bytes
+    catalog_id, drawn_with, snapshot = payload["row"]
 
+    assert payload["source_preserved"] is True
+    assert payload["saved"][:5] == [
+        "legacy-1", "a work saved before the rename", "{}", "<svg/>", "japanese",
+    ]
     assert catalog_id == "ink_season"
     assert drawn_with == "japanese"
     assert json.loads(snapshot) == {"black": "#111111"}

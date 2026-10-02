@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 from typing import Annotated, Literal
-from pydantic import BaseModel, Field, PlainSerializer
+from pydantic import BaseModel, Field, PlainSerializer, model_validator
+
+from ..persistence.ddl_source import select_ddl
 
 # A seed can pass 2**53 (one drawn from seed text has 64 bits), beyond what a
 # JavaScript number holds exactly, and a client that sends back a rounded seed
@@ -26,7 +28,23 @@ def json_seeds(item: dict | None) -> dict | None:
 class HistoryPostBody(BaseModel):
     input: str
     ddl: str | None = None
-    expanded_ddl: str | None = None
+    ddl_source_origin: Literal["legacy_expanded"] | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def import_legacy_ddl(cls, value):
+        """Read old JSON once, without exposing a second text in the API."""
+        if isinstance(value, dict) and "expanded_ddl" in value:
+            value = dict(value)
+            if any(value.get(key) is not None and not isinstance(value[key], str)
+                   for key in ("ddl", "expanded_ddl")):
+                raise ValueError("legacy DDL texts must be strings or null")
+            ddl, origin = select_ddl(value.get("ddl"), value.pop("expanded_ddl"))
+            value["ddl"] = ddl
+            if origin is not None:
+                value["ddl_source_origin"] = origin
+        return value
+
     focus: str | None = None
     variation_amplitude: str | None = None
     variation_seed: int | None = None

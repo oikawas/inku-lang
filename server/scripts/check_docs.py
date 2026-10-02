@@ -55,6 +55,7 @@ VERSION_PARITY_EXEMPT = frozenset({"CHANGELOG.ja.md"})
 #                    in each language but every version must appear in both.
 PAIRS: tuple[tuple[str, str, str, str | None], ...] = (
     ("README.ja.md", "README.md", "shape", None),
+    ("persistence/README.ja.md", "persistence/README.md", "shape", None),
     ("PLUGIN.ja.md", "PLUGIN.md", "shape", None),
     (
         "docs/spec/render-engine-history.ja.md",

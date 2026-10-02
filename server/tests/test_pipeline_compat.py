@@ -296,7 +296,9 @@ def test_description_pipeline_forces_typed_stage1_transport_and_renders_svg(
         "function": {"name": "submit_pipeline_response"},
     }
     assert result["description"] == description
-    assert result["source_ddl"] == normalized_ddl
+    assert result["ddl"] == normalized_ddl
+    assert "source_ddl" not in result
+    assert "expanded_ddl" not in result
     assert result["score"]["instructions"]
     assert result["svg"].startswith("<svg ")
     assert 'xmlns="http://www.w3.org/2000/svg"' in result["svg"]

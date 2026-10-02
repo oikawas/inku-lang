@@ -223,7 +223,7 @@
         parent = {
           id: result.history_id ?? parent.id,
           variationId: result.pipeline_variation_id ?? null,
-          ddl: result.source_ddl ?? result.ddl ?? parent.ddl,
+          ddl: result.ddl ?? parent.ddl,
           catalogId: result.render_color_catalog_id ?? parent.catalogId,
           renderSeed: result.render_seed ?? parent.renderSeed,
           compositionSeed: result.composition_seed ?? parent.compositionSeed,

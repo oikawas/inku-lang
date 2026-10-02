@@ -389,7 +389,7 @@ class ProductPipelineEffects:
                   "max_expanded_per_instruction": maxima["maximum_per_template_primitive_marks"],
                   "schema_count_max": maxima["maximum_resolved_count"], "max_instructions": maxima["object_templates"]}
         result = {
-            "description": context["committed_description"], "ddl": document["source"], "source_ddl": document["source"],
+            "description": context["committed_description"], "ddl": document["source"],
             "score": score, "svg": rendered["svg"], "stage1_model": settings["stage1_model"], "stage2_model": settings["stage2_model"],
             "elapsed_stage1_ms": metrics.get("stage1", 0), "elapsed_stage2_ms": metrics.get("stage2", 0),
             "elapsed_total_ms": sum(metrics.values()), "tokens_in_stage1": None, "tokens_out_stage1": None,

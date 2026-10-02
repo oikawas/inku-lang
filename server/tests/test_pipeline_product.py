@@ -456,9 +456,15 @@ def test_compact_delivery_preserves_authority_in_normal_history(tmp_path, monkey
     manifest["pipeline"]["macro_summaries"] = ["A black circle at the center"]
     effects = ProductPipelineEffects(binding, manifest)
     source = "Example.Circle."
+    legacy_parent = db.add_item({
+        "id": "legacy-parent", "user_id": "author", "at": 1,
+        "input": "Old description", "ddl": source, "ddl_source_origin": "legacy_expanded",
+        "score": {}, "svg": "<svg id='old-parent'/>",
+    })
     options, context = effects.prepare("author", "direct_ddl", source,
                                        {"canvas_aspect": "hd_monitor", "render_seed": "71"}, None)
-    context.update(description="", committed_description="", derivation_kind="new")
+    context.update(description="Old description", committed_description="Old description",
+                   derivation_kind="legacy_ddl_fork", parent_legacy_history_id=legacy_parent["id"])
     assert options["definitions"][0]["heading"] == "Circle"
     lock = context["macro_catalog"]["definition_locks"][0]
     assert lock["qualified_name"] == "Example.Circle"
@@ -528,6 +534,10 @@ def test_compact_delivery_preserves_authority_in_normal_history(tmp_path, monkey
     response = HistoryItem.model_validate(item).model_dump()
     assert response["score"] == snapshot["delivery"]["score"]
     assert response["ddl"] == snapshot["document"]["source"]
+    assert response["ddl_source_origin"] is None
+    assert "expanded_ddl" not in response
+    assert "source_ddl" not in result
+    assert response["lineage_parent_node_id"] == legacy_parent["lineage_node_id"]
     assert response["svg"] == rendered["svg"]
     assert response["pipeline_variation_id"] == snapshot["variation_id"]
     assert response["pipeline_revision"] == "1"
@@ -548,8 +558,11 @@ def test_compact_delivery_preserves_authority_in_normal_history(tmp_path, monkey
     assert damaged["svg"] == rendered["svg"]
     assert store.history_link("another", result["history_id"]) is None
     assert store.read("author", snapshot["variation_id"])["authority"]["authority"] == "ddl_authoritative"
+    unchanged_parent = db.get_items("author", [legacy_parent["id"]])[0]
+    preserved = ("id", "input", "ddl", "ddl_source_origin", "score", "svg", "lineage_node_id")
+    assert {key: unchanged_parent[key] for key in preserved} == {key: legacy_parent[key] for key in preserved}
     with engine.connect() as connection:
-        assert connection.scalar(select(func.count()).select_from(HistoryRow)) == 1
+        assert connection.scalar(select(func.count()).select_from(HistoryRow)) == 2
         assert connection.scalar(select(UserAccountRow.image_generation_count)) == 1
     engine.dispose()
 
@@ -649,19 +662,27 @@ def test_a_compact_work_saves_through_the_shared_replay(monkeypatch):
     def add(**kwargs):
         saved.append(kwargs)
         return {"id": "work", "input": kwargs["input_text"], "score": kwargs["score"], "at": kwargs["at"],
+                "ddl": kwargs["ddl"], "ddl_source_origin": kwargs["ddl_source_origin"],
                 "svg": kwargs["svg"], **kwargs["render_metadata"]}
 
     monkeypatch.setattr(pipeline_runtime, "get_service", lambda: SimpleNamespace(replay_for=replay))
     monkeypatch.setattr(history_routes, "_add_history_item", add)
     response = client.post("/api/history", json={
         "input": "a", "score": score, "svg": "<svg/>", "at": 1,
+        "ddl": "\u3000", "expanded_ddl": "\nScene: Moon \n",
         "render_seed": "1553303611486672067", "composition_seed": 5, "render_wild": True,
     })
     assert response.status_code == 200, response.text
+    assert response.json()["ddl"] == "\nScene: Moon \n"
+    assert response.json()["ddl_source_origin"] == "legacy_expanded"
+    assert "expanded_ddl" not in response.json()
     [(owner_id, payload, work)] = replays
     assert (owner_id, work) == ("author", None)
     assert (payload["render_seed"], payload["composition_seed"], payload["wild"]) == (1553303611486672067, 5, True)
     [record] = saved
     assert record["score"] == score
+    assert record["ddl"] == "\nScene: Moon \n"
+    assert record["ddl_source_origin"] == "legacy_expanded"
+    assert "expanded_ddl" not in record
     assert record["svg"] == "<svg id='replayed'/>"
     assert record["render_metadata"]["render_engine_version"] == "71"

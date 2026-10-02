@@ -276,8 +276,8 @@ def test_legacy_description_fork_and_execution_resume_keep_provenance(
                 user_id="author-1",
                 at=1,
                 input="古い記述",
-                ddl="赤い円を描く。",
-                expanded_ddl="赤い円を中央に描く。",
+                ddl="赤い円を中央に描く。",
+                ddl_source_origin="legacy_expanded",
                 score='{"instructions":[]}',
                 svg="<svg/>",
                 elapsed_ms=0,
@@ -292,8 +292,7 @@ def test_legacy_description_fork_and_execution_resume_keep_provenance(
     assert asdict(legacy) == {
         "history_id": "legacy-1",
         "description": "古い記述",
-        "source": "赤い円を描く。",
-        "expanded_source": "赤い円を中央に描く。",
+        "source": "赤い円を中央に描く。",
         "score_json": '{"instructions":[]}',
         "svg": "<svg/>",
         "authority": "legacy_unknown",
@@ -302,6 +301,7 @@ def test_legacy_description_fork_and_execution_resume_keep_provenance(
             "catalog_id": "default",
             "render_seed": "43",
             "composition_seed": "42",
+            "ddl_source_origin": "legacy_expanded",
         },
     }
     assert store.read_legacy_history("another-author", "legacy-1") is None

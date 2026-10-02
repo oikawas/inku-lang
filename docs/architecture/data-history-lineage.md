@@ -23,7 +23,7 @@ flowchart LR
     NODE -->|"explicit parent + derivation kind"| EDGE
 ```
 
-A DB row stores the input, visible DDL, Score, Server SVG, model/version/seed/color/time metadata, marks, and display state. For a work drawn through the shared pipeline, `ddl` is the saved and acknowledged visible DDL, `score` is the raw compact Score produced by the shared lowerer, and `render_limits` is a copy of the four existing limits derived from the work's operational budget. The sketch stays in `sketch_text` / `sketch_state` (`supplemented` / `not_needed` / `fallback` / `off`). The old Stage 1 / 2 fallback columns (`interpret_fallback` / `compose_fallback`), `expanded_ddl`, `score_pre_coerce`, and `coerce_trace` remain for older works; new works do not write them (NULL). In Web's reading, a new work's `compose_fallback` is "unrecorded", so no fallback mark appears. Nothing is backfilled. Disabling automatic files or overflowing their queue does not remove DB history.
+A DB row stores the input, visible DDL, Score, Server SVG, model/version/seed/color/time metadata, marks, and display state. For a work drawn through the shared pipeline, `ddl` is the saved and acknowledged visible DDL, `score` is the raw compact Score produced by the shared lowerer, and `render_limits` is a copy of the four existing limits derived from the work's operational budget. The sketch stays in `sketch_text` / `sketch_state` (`supplemented` / `not_needed` / `fallback` / `off`). Instruction text is unified into `ddl`; only a transfer from the old expanded text records `ddl_source_origin=legacy_expanded`. The old Stage 1 / 2 fallback columns (`interpret_fallback` / `compose_fallback`), `score_pre_coerce`, and `coerce_trace` remain for older works; new works do not write them (NULL). In Web's reading, a new work's `compose_fallback` is "unrecorded", so no fallback mark appears. Fallbacks are not backfilled. Disabling automatic files or overflowing their queue does not remove DB history.
 
 ## Shared pipeline state
 
@@ -105,7 +105,7 @@ flowchart LR
     MIGRATION["migrations.py\nregistry v3 / fingerprints / writer lock"]
     SNAPSHOT["backup.py\nWAL-safe SQLite snapshot"]
     INVARIANTS["invariants.py\nPK + canonical history digest"]
-    SCHEMA["schema.py / legacy_schema.py\nphysical schema / one-shot transform"]
+    SCHEMA["schema.py / ddl_migration.py / legacy_v3_*\ncurrent schema / manual migration / frozen restore"]
     DOMAIN["domain owners\naccounts / settings / history / lineage / search / variation_authority …"]
     DB[("canonical SQLite")]
 
@@ -120,7 +120,7 @@ flowchart LR
 
 `db.py` preserves existing import and call shapes; it does not own direct SQL or migrations. The 19 owner modules in `persistence/` (plus package initialization) are divided by reason for change: configuration, engine, schema, migration, backup, and invariants, and then access, accounts, groups, sessions, identities, settings, history, search, lineage, colophon, feedback, and variation authority.
 
-Startup takes these paths. A fresh DB creates schema and registry in one transaction. A DB at the current registry (version 3, `developer_provider_observations`) verifies version and checksum and starts without repeating the legacy repair scan. A DB at a previous registry (version 1 `legacy_baseline`, version 2 `candidate_authoring_sidecars`), or a pre-registry DB matching an explicit schema fingerprint and FTS state, migrates once in a single-writer transaction after a verified snapshot. Unknown, partial, future-version, and checksum-mismatched states are rejected before mutation. Migration streams primary-key identity and history `id/input/score/svg` bytes and requires SQLite quick and foreign-key checks.
+Startup takes these paths. A fresh DB creates schema and registry v4 `single_history_ddl` in one transaction. A current DB checks version/checksums, the origin column and retired column's absence, and FTS without repeating full data scans. Ordinary startup refuses old two-text databases with a manual-migration reason. Manual migration checks a known v3 fingerprint and registry, then selects text and drops the retired column in one transaction only when the verified snapshot matches the preimage under the writer lock. It compares protected values in every persistent table, history rowids, primary keys, selected text bytes, saved link digests, FTS, and quick/foreign-key checks; the v3 registry row is retained and v4 appended. Unknown, partial, future-version, and checksum-mismatched states are refused. Accepted older backups pass through the frozen v3 adapter in a new explicit copy with the original retained before unification. See the [portable persistence contract](../../persistence/README.md).
 
 Android Room v12 satisfies the same logical contract with a different physical schema. v10→v11 added shared-pipeline state while keeping existing works, and v11→v12 added the requested `catalog_mode` to history. The bounded v1–9 reset discards old DBs and derived thumbnails but preserves model files. Future or unreadable DBs remain untouched. This lifecycle difference is explicit host-adapter ownership, not a portable contract gap.
 
@@ -185,7 +185,7 @@ erDiagram
       string user_id FK
       text input
       text ddl
-      text expanded_ddl
+      text ddl_source_origin
       text score
       text svg
       string description_hash

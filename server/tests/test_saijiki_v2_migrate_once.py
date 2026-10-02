@@ -14,7 +14,7 @@ import inku_render
 import pytest
 from sqlalchemy import create_engine
 
-from inku_server.persistence import schema
+from inku_server.persistence import legacy_v3_schema, schema
 from inku_server.persistence.saijiki_migration import BlankListInvalid, MigrationAlreadyWritten, migrate_once
 from inku_server.persistence.variation_authority import VariationAuthorityStore
 
@@ -23,10 +23,10 @@ def _canonical(value: object) -> bytes:
     return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
 
 
-def _saved_database(path) -> None:
+def _saved_database(path, saved_schema=schema) -> None:
     """One work linked to its performance, its variation, and one execution snapshot."""
     engine = create_engine(f"sqlite:///{path}", future=True)
-    schema.Base.metadata.create_all(engine)
+    saved_schema.Base.metadata.create_all(engine)
     ddl = "薄墨の円を置く。"
     digest = hashlib.sha256(ddl.encode("utf-8")).hexdigest()
     context = _canonical({
@@ -36,19 +36,19 @@ def _saved_database(path) -> None:
     })
     document = {"source": ddl, "language": "ja", "macro_locks": []}
     with engine.begin() as connection:
-        connection.execute(schema.UserAccountRow.__table__.insert().values(
+        connection.execute(saved_schema.UserAccountRow.__table__.insert().values(
             id="u", username="u", email="u@example.test", password_hash="-", role="user", at=1))
-        connection.execute(schema.HistoryRow.__table__.insert().values(
+        connection.execute(saved_schema.HistoryRow.__table__.insert().values(
             id="h", user_id="u", at=1, input="description", ddl=ddl, score="{}", svg="<svg/>", elapsed_ms=0))
-        connection.execute(schema.PipelineHistoryLinkRow.__table__.insert().values(
+        connection.execute(saved_schema.PipelineHistoryLinkRow.__table__.insert().values(
             owner_id="u", history_id="h", variation_id="v", revision="1", ddl_digest=digest,
             fork_context_bytes=context, fork_context_digest=hashlib.sha256(context).hexdigest()))
-        connection.execute(schema.VariationAuthorityRow.__table__.insert().values(
+        connection.execute(saved_schema.VariationAuthorityRow.__table__.insert().values(
             owner_id="u", variation_id="v", protocol_version="inku.variation-authority.v1", revision="1",
             origin="user_authored_ddl", authority="ddl_authoritative", source=ddl,
             document_json=_canonical(document).decode(), ddl_digest=digest, authority_digest="0" * 64,
             updated_at=1))
-        connection.execute(schema.PipelineCandidateExecutionRow.__table__.insert().values(
+        connection.execute(saved_schema.PipelineCandidateExecutionRow.__table__.insert().values(
             owner_id="u", execution_id="e", variation_id="v", sequence="1", state_bytes=b"{}",
             state_digest="-", created_at=1, updated_at=1))
     engine.dispose()
@@ -81,10 +81,10 @@ def test_a_migrated_work_still_reads_and_a_second_run_refuses(tmp_path):
 
 def test_a_named_text_is_emptied_not_migrated_and_a_linked_work_keeps_its_instructions(tmp_path):
     path = tmp_path / "inku.db"
-    _saved_database(path)
+    _saved_database(path, legacy_v3_schema)
     engine = create_engine(f"sqlite:///{path}", future=True)
     with engine.begin() as connection:
-        connection.execute(schema.HistoryRow.__table__.insert().values(
+        connection.execute(legacy_v3_schema.HistoryRow.__table__.insert().values(
             id="h2", user_id="u", at=2, input="another", ddl="薄墨の円を置く。",
             expanded_ddl="以下は **正規化DDL** に変換した結果です。", score="{}", svg="<svg/>", elapsed_ms=0))
     engine.dispose()

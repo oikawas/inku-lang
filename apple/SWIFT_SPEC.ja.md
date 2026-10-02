@@ -104,7 +104,7 @@ Personal ChatGPTは通常のAPI key接続と別に扱い、既定は無効とす
 
 追加の限定確認では、制作で選んだmodelが実際のrequest両段へ反映され、保存default・開始済みtemplateが変わらず、provider呼出し0件であることを確認した。SQLiteの世代projectionはroot・child・欠落・削除祖先の1件を確認した。nativeでは1320×880と標準tileの1281×733で固定生成button・canvas・履歴、世代1／2、設定／移動／新規／読込取消し、model設定categoryへの導線、系譜focusと表示作品の分離、library2件と制作1件の書出し対象を確認した。小さい幅の全配置、VoiceOver、作者のデザイン受入をこの代表確認へ読み替えない。
 
-保存作品編集の限定mock／共通core確認では、live executionのない親の再表示、固定した保存条件・plugin lockと次のmodel、写生の生成し直し、child保存後のDDL authority、停止後の遅い応答拒否を確認した。nativeでは記述／写生dialogのdraft取消し、色カタログの取消しと次の条件への確定、日英の色名とHEX、標準panelから単一DDLを読み込む操作を確認した。親cardをscroll領域へ移した後は、同じ親の記述→取消し→写生→取消し→記述で画像・記述と元draftを確認し、history・系譜全行は不変だった。Finder dropは操作接続・DB・file選択から再試行したが、操作ツールのwindow位置エラー、またはドラッグ後の入力不変となり、成功を確認できていない。source不具合との切り分けは未完了で、標準panelの成功へ読み替えない。実providerの編集生成も未受入である。
+保存作品編集の限定mock／共通core確認では、live executionのない親の再表示、固定した保存条件・plugin lockと次のmodel、写生の生成し直し、child保存後のDDL authority、停止後の遅い応答拒否を確認した。nativeでは記述／写生dialogのdraft取消し、色カタログの取消しと次の条件への確定、日英の色名とHEX、標準panelから単一DDLを読み込む操作を確認した。親cardをscroll領域へ移した後は、同じ親の記述→取消し→写生→取消し→記述で画像・記述と元draftを確認し、history・系譜全行は不変だった。Finder dropは操作ツールでは成立しなかったが、その後、作者が最新Release Universalアプリの制作画面へ単一DDLファイルをdropし、入力が `place one green square at center.` に変わったことを確認した。画面の読取確認でも期待DDLと「DDLを読み込みました。」の通知を確認し、隔離DBのhistory・系譜node・edgeの行数は読込前の2・2・1を保持した。生成前の単一DDL読込についてFinderからの実操作を受入済みとする。実providerの編集生成は未受入である。
 
 描画要素の限定mock／共通core確認は、2^53を超える語句seed、seed0の配置fallback、保存Score／色／DDLとprovider0件、固定4案、現行変奏の同一性、読み取りmodel、採用前の通常履歴保持、二重採用・再表示後のDDL child、編集edge補助項目と旧Codable、停止の遅い応答を確認した。Rustの語句seedと新しいPyO3から実Server helperへの限定確認も成功した。Debug Universal appの一時DBでは、タッチ1案のseed表示と破棄、配置4案から選択2案だけの保存（通常履歴2件から4件）、640px幅の比較画面、候補への自動scroll、変奏の「動いたもの: なし」、閉じた後に準備中表示が残らないことを確認した。実provider・全幅・VoiceOver・作者受入は別の確認である。
 

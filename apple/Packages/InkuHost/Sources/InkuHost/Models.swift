@@ -53,6 +53,8 @@ public struct GenerationRequest: Codable, Sendable {
     public var description: String
     public var parentWorkID: String?
     public var derivationKind: String
+    public var derivationMetadata: Data?
+    public var interpretationSeed: String?
     public var saveHistory: Bool
     public var historyVisibility: String
     public var retainedDocument: Data?
@@ -63,13 +65,15 @@ public struct GenerationRequest: Codable, Sendable {
                 renderColorMaps: [String: Data] = [:],
                 description: String = "", parentWorkID: String? = nil, derivationKind: String = "new",
                 saveHistory: Bool = true, historyVisibility: String = "normal",
-                retainedDocument: Data? = nil, retainedAuthority: Data? = nil, chatGPTSession: ChatGPTPlanSession? = nil) {
+                retainedDocument: Data? = nil, retainedAuthority: Data? = nil, chatGPTSession: ChatGPTPlanSession? = nil,
+                derivationMetadata: Data? = nil, interpretationSeed: String? = nil) {
         self.authoring = authoring; self.configuration = configuration; self.renderOptions = renderOptions
         self.clipPolicy = clipPolicy; self.models = models; self.providers = providers
         self.renderColorMaps = renderColorMaps
         if case .description(let text, _, _) = authoring { self.description = description.isEmpty ? text : description }
         else { self.description = description }
         self.parentWorkID = parentWorkID; self.derivationKind = derivationKind
+        self.derivationMetadata = derivationMetadata; self.interpretationSeed = interpretationSeed
         self.saveHistory = saveHistory; self.historyVisibility = historyVisibility
         self.retainedDocument = retainedDocument; self.retainedAuthority = retainedAuthority
         self.chatGPTSession = chatGPTSession
@@ -135,6 +139,19 @@ public struct PreparedCandidate: Identifiable, Sendable {
     public init(executionID: String, work: SavedWork, authority: String) {
         self.executionID = executionID; self.work = work; self.authority = authority
     }
+}
+
+/// An owned saved-Score snapshot. Only the host constructs or interprets its payload.
+public struct SavedScoreReplayPlan: Sendable {
+    let work: SavedWork
+    let parentNode: LineageNode
+    let context: Data
+    let renderRequest: Data
+    let derivationKind: String
+    let derivationMetadata: Data?
+    let seedText: String?
+    let variationAmplitude: String?
+    let variationSeed: String?
 }
 
 /// Owned saved input data. Export and derivation never receive a mutable database handle.

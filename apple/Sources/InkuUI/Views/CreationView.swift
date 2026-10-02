@@ -6,6 +6,7 @@ struct CreationView: View {
     @Bindable var model: AppModel
     @Bindable var history: HistoryModel
     let onEditWork: (SavedWork, WorkEditMode) -> Void
+    let onAdjustWork: (SavedWork) -> Void
     @State private var showSaijiki = false
     @State private var workspaceTab = "artwork"
     @State private var sketchExpanded = false
@@ -238,7 +239,7 @@ struct CreationView: View {
                       .accessibilityLabel(savedSummary(work))
               }
             }
-            if workspaceTab == "lineage" { LineageView(model: model, onEditWork: onEditWork) }
+            if workspaceTab == "lineage" { LineageView(model: model, onEditWork: onEditWork, onAdjustWork: onAdjustWork) }
             else {
                 ArtworkCanvas(svg: model.currentSVG, renderer: model.renderer, caption: model.displayedWork?.effectiveSourceText ?? "")
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -282,6 +283,13 @@ struct CreationView: View {
 
     private func workActions(_ work: SavedWork) -> some View {
         HStack(spacing: 8) {
+            Menu(model.display.localized("推敲する")) {
+                Button(model.display.localized("描画パラメータの編集"), systemImage: "slider.horizontal.3") { onAdjustWork(work) }
+                Button(model.display.localized("記述を変える"), systemImage: "text.cursor") { onEditWork(work, .description) }
+                    .disabled(model.sourceLocked)
+                Button(model.display.localized("写生なし／ありで描き直す"), systemImage: "pencil.and.outline") { onEditWork(work, .sketch) }
+                    .disabled(model.sourceLocked)
+            }
             Button { Task { await model.library.toggleStar(work) } } label: { Image(systemName: work.starred ? "star.fill" : "star") }
                 .accessibilityLabel(model.display.localized("スター"))
                 .accessibilityValue(model.display.localized(work.starred ? "オン" : "オフ"))
@@ -331,8 +339,9 @@ struct CreationView: View {
             }
             if !model.isPreview {
                 Button(model.display.localized("次の条件で再演奏")) { Task { await model.replayWithCurrentOptions() } }.disabled(model.isBusy)
-                DisclosureGroup(model.display.localized("DDLの変奏")) {
+                DisclosureGroup(model.display.localized("変奏（いまは何も動かない）")) {
                     VStack(alignment: .leading, spacing: 8) {
+                        Text(model.display.localized("動いたもの: なし")).font(.callout).foregroundStyle(.secondary)
                         Picker(model.display.localized("変奏の幅"), selection: $model.variationAmplitude) { Text(model.display.localized("小")).tag("small"); Text(model.display.localized("中")).tag("medium"); Text(model.display.localized("大")).tag("large") }
                         TextField(model.display.localized("変奏シード（空欄で新規）"), text: $model.variationSeedText).textFieldStyle(.roundedBorder)
                         Button(model.display.localized("変奏を保存")) { Task { await model.varySelectedWork() } }

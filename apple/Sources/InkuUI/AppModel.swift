@@ -11,6 +11,18 @@ import UniformTypeIdentifiers
 import AppKit
 #endif
 
+/// A complete, immutable adjustment snapshot. Views display model facts but never interpret its operation.
+public struct DrawingAdjustmentPlan: Sendable {
+    public let stage1Model: String?
+    public let stage2Model: String?
+    fileprivate let parent: SavedWork
+    fileprivate let operation: Operation
+    fileprivate enum Operation: Sendable {
+        case replay(SavedScoreReplayPlan)
+        case author(GenerationRequest)
+    }
+}
+
 @MainActor
 @Observable
 public final class AppModel {
@@ -479,6 +491,168 @@ public final class AppModel {
             importedPlugins: mode == "ddl" && parentWorkID == nil ? importedDDL?.plugins ?? [] : [])
     }
 
+    /// Allocate the entire round before any drawing, keeping saved colors, locks, policies and source authority.
+    public func makeDrawingAdjustmentPlans(work: SavedWork, kind: String, count: Int, words: String = "",
+                                           amplitude: String = "medium", wildOverride: Bool? = nil,
+                                           modelReference: String? = nil) async throws -> [DrawingAdjustmentPlan] {
+        guard !isPreview, !stopping, let host else { throw HostError("authoring_busy_or_unavailable") }
+        guard ["layout_change", "reinterpretation", "variation", "touch_change"].contains(kind) else { throw HostError("unknown_refinement_kind") }
+        guard [1, 4].contains(count), kind != "touch_change" || count == 1 else { throw HostError("invalid_adjustment_count") }
+        let drawing = nextGenerationHostSettings
+        let source = try await checkedSavedAdjustmentParent(work)
+        let saved = try await host.savedAuthoringContext(workID: source.id)
+        try Task.checkCancellation()
+        guard ["description_authoritative", "ddl_authoritative"].contains(saved.authority) else { throw HostError("saved_authoring_context_unavailable") }
+        let baseConfiguration = try ExactJSON(data: saved.configuration)
+        let baseOptions = try ExactJSON(data: saved.renderOptions)
+        guard let catalog = baseOptions["catalog_id"].string, baseOptions["resolved_color_map"].object != nil else {
+            throw HostError("saved_refinement_options_unavailable")
+        }
+        if kind == "touch_change" {
+            let resolved = try InkuCore.renderSeedWords(fromText: words)
+            guard let placement = source.compositionSeed ?? baseOptions["composition_seed"].string ?? baseOptions["composition_seed"].number
+                    ?? source.renderSeed ?? baseOptions["render_seed"].string ?? baseOptions["render_seed"].number else {
+                throw HostError("saved_refinement_options_unavailable")
+            }
+            let from = source.renderSeed ?? baseOptions["render_seed"].string ?? baseOptions["render_seed"].number
+            let metadata: ExactJSON = .object(["render_seed_from": from.map(ExactJSON.number) ?? .null,
+                "render_seed_to": .number(resolved.seed), "seed_text": .string(resolved.text)])
+            let replay = try await host.makeSavedScoreReplayPlan(workID: source.id, renderSeed: resolved.seed,
+                compositionSeed: placement, derivationKind: kind, derivationMetadata: metadata.data, seedText: resolved.text)
+            try Task.checkCancellation()
+            return [DrawingAdjustmentPlan(stage1Model: source.stage1Model, stage2Model: source.stage2Model,
+                parent: source, operation: .replay(replay))]
+        }
+        if kind == "variation" {
+            guard ["small", "medium", "large"].contains(amplitude) else { throw HostError("invalid_variation") }
+            var seeds: Set<UInt64> = []
+            var plans: [DrawingAdjustmentPlan] = []
+            for _ in 0..<count {
+                var seed: UInt64
+                repeat { seed = UInt64.random(in: 1...((UInt64(1) << 31) - 1)) } while seeds.contains(seed)
+                seeds.insert(seed)
+                let metadata: ExactJSON = .object(["variation_amplitude": .string(amplitude), "variation_seed": .number(String(seed))])
+                // The current shared core's Stage 1.5 variation is a no-op; preserve the Score and actual model facts.
+                let replay = try await host.makeSavedScoreReplayPlan(workID: source.id, wild: wildOverride,
+                    derivationKind: kind, derivationMetadata: metadata.data, variationAmplitude: amplitude, variationSeed: String(seed))
+                try Task.checkCancellation()
+                plans.append(DrawingAdjustmentPlan(stage1Model: source.stage1Model, stage2Model: source.stage2Model,
+                    parent: source, operation: .replay(replay)))
+            }
+            return plans
+        }
+        guard let document = saved.document, let ddl = source.ddl, !ddl.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            throw HostError("saved_document_unavailable")
+        }
+        let reading = kind == "reinterpretation"
+        if reading && saved.authority != "description_authoritative" { throw HostError("description_source_locked") }
+        let description = source.effectiveSourceText.trimmingCharacters(in: .whitespacesAndNewlines)
+        if reading && description.isEmpty { throw HostError("description_required") }
+        var models = drawing.models
+        if reading {
+            // The Web's Stage 2 picker leaves Stage 1 alone. Server preparation chooses Stage 1 for a rereading.
+            try validateAdjustmentModel(models.stage1Model, providers: drawing.providers)
+            models.stage2Model = models.stage1Model
+        } else {
+            models.stage1Model = source.stage1Model ?? ""
+            models.stage2Model = modelReference ?? (drawing.models.stage2Model.isEmpty ? source.stage2Model ?? "" : drawing.models.stage2Model)
+            if let modelReference { try validateAdjustmentModel(modelReference, providers: drawing.providers) }
+        }
+        var usedSeeds = Set([source.compositionSeed].compactMap { $0 }.compactMap(UInt64.init))
+        var requests: [GenerationRequest] = []
+        for _ in 0..<count {
+            var configuration = baseConfiguration
+            var options = baseOptions
+            configuration["catalogs"] = .array([])
+            configuration["compiler"]["stage15_variation"] = .null
+            options["wild"] = .bool(wildOverride ?? source.renderWild ?? baseOptions["wild"].bool ?? false)
+            options["svg_profile"] = .string("display")
+            var metadata: ExactJSON = .object([:])
+            var interpretation: String?
+            if kind == "layout_change" {
+                var seed: UInt64
+                repeat { seed = UInt64.random(in: 0...((UInt64(1) << 53) - 1)) } while usedSeeds.contains(seed)
+                usedSeeds.insert(seed)
+                configuration["compiler"]["composition_seed"] = .string(String(seed))
+                options["composition_seed"] = .string(String(seed))
+                metadata = .object(["composition_seed": .number(String(seed))])
+            } else {
+                interpretation = UUID().uuidString.lowercased()
+                metadata = .object(["interpretation_seed": .string(interpretation!)])
+            }
+            let authoring: GenerationAuthoring = reading
+                ? .description(description, autoCatalog: false, sketch: source.sketchText.map(SketchRequest.supplied) ?? .off)
+                : .directDDL(ddl)
+            requests.append(GenerationRequest(authoring: authoring, configuration: configuration.data, renderOptions: options.data,
+                clipPolicy: saved.clipPolicy, models: models, providers: drawing.providers,
+                renderColorMaps: [catalog: baseOptions["resolved_color_map"].data], description: description,
+                parentWorkID: source.id, derivationKind: kind, saveHistory: false,
+                retainedDocument: reading ? nil : document, retainedAuthority: reading ? nil : saved.authorityJSON,
+                derivationMetadata: metadata.data, interpretationSeed: interpretation))
+        }
+        requests = try await pinPersonalPlanRequests(requests)
+        try Task.checkCancellation()
+        return requests.map { request in DrawingAdjustmentPlan(stage1Model: reading ? request.models.stage1Model : source.stage1Model,
+            stage2Model: request.models.stage2Model.isEmpty ? nil : request.models.stage2Model, parent: source, operation: .author(request)) }
+    }
+
+    public func prepareDrawingAdjustmentCandidate(plan: DrawingAdjustmentPlan, token: UUID) async throws -> PreparedCandidate {
+        guard generationToken == token, !stopping, let host else { throw CancellationError() }
+        _ = try await checkedSavedAdjustmentParent(plan.parent)
+        try Task.checkCancellation()
+        let candidate: PreparedCandidate
+        switch plan.operation {
+        case .replay(let replay): candidate = try await host.previewSavedScoreReplay(replay)
+        case .author(let request): candidate = try await generateCandidate(request: request, token: token, comparison: false)
+        }
+        try Task.checkCancellation()
+        guard generationToken == token, !stopping else { throw CancellationError() }
+        return candidate
+    }
+
+    /// The committed transaction remains authoritative if cancellation or display refresh follows it.
+    public func adoptDrawingAdjustmentCandidate(candidate: PreparedCandidate, token: UUID) async throws -> SavedWork {
+        guard generationToken == token, !stopping, let host else { throw CancellationError() }
+        let saved = try await host.saveCandidate(executionID: candidate.executionID, expectedWorkID: candidate.work.id)
+        await notifySavedWork(saved)
+        do { try await reloadWorks() } catch { report(error) }
+        guard generationToken == token, !stopping, !Task.isCancelled else { return saved }
+        do {
+            let context = try await host.savedAuthoringContext(workID: saved.id)
+            let view = try? await host.restore(executionID: candidate.executionID)
+            guard generationToken == token, !stopping, !Task.isCancelled else { return saved }
+            if let view, view.savedWorkID == saved.id { apply(view) }
+            else {
+                diagnosticsJSON = ""; promptJSON = ""; eventsJSON = ""; unreadOutputs = []
+            }
+            displayWork(saved)
+            selectedContext = context
+            authoringAuthority = context.authority; authoringOrigin = context.origin; authoringRevision = context.revision
+            authoringPhase = "completed"
+            currentExecutionID = nil; currentView = nil
+            holeIDs = []; selectedHoleIDs = []; patchProposalJSON = ""; patchCandidate = ""
+            status = "選択した候補を保存しました"
+        } catch { report(error) }
+        return saved
+    }
+
+    private func checkedSavedAdjustmentParent(_ work: SavedWork) async throws -> SavedWork {
+        guard let database, let stored = try await database.work(id: work.id), !stored.trashed,
+              stored.lineageNodeID != nil else { throw HostError("saved_work_changed_or_unavailable") }
+        var expected = work
+        expected.starred = stored.starred; expected.trashed = stored.trashed
+        guard stored == expected else { throw HostError("saved_work_changed_or_unavailable") }
+        return work
+    }
+
+    private func validateAdjustmentModel(_ reference: String, providers: [ProviderSettings]) throws {
+        if try PersonalPlanRoutingTransport.personalModel(reference, providers: providers) != nil { return }
+        if let colon = reference.firstIndex(of: ":"), let provider = providers.first(where: { $0.id == String(reference[..<colon]) }),
+           !reference[reference.index(after: colon)...].isEmpty { try provider.validate(); return }
+        if !reference.contains(":"), !reference.isEmpty, providers.count == 1 { try providers[0].validate(); return }
+        throw HostError("provider_selection_required")
+    }
+
     public func makeRefinementRequest(work: SavedWork, kind: String, direction: String = "", amplitude: String = "medium",
                                       modelReference: String? = nil, catalogIDOverride: String? = nil,
                                       readDescription: Bool? = nil, wildOverride: Bool? = nil) async throws -> GenerationRequest {
@@ -562,7 +736,11 @@ public final class AppModel {
             configuration: configuration.data, renderOptions: options.data, clipPolicy: saved.clipPolicy,
             models: drawing.models, providers: drawing.providers,
             renderColorMaps: [catalog: options["resolved_color_map"].data], description: text,
-            parentWorkID: work.id, derivationKind: mode == .description ? "description_edit" : "sketch_grain_change")
+            parentWorkID: work.id, derivationKind: mode == .description ? "description_edit" : "sketch_grain_change",
+            derivationMetadata: ExactJSON.object(mode == .description
+                ? ["edited_from_history_id": .string(work.id)]
+                : ["edited_from_history_id": .string(work.id), "from_sketch_state": work.sketchState.map(ExactJSON.string) ?? .null,
+                   "to_sketch_mode": .string(sketchMode)]).data)
         try Task.checkCancellation()
         let pinned = try await pinPersonalPlanRequests([request])[0]
         try Task.checkCancellation()
@@ -661,11 +839,15 @@ public final class AppModel {
     }
 
     @discardableResult
-    public func performComparison(status: String, operation: @escaping @MainActor (UUID) async throws -> Void) async -> Bool {
+    public func performComparison(status: String, restoreDisplayStatus: Bool = false,
+                                  operation: @escaping @MainActor (UUID) async throws -> Void) async -> Bool {
         let execution = currentExecutionID
+        let originalWorkID = selectedWorkID
+        let originalStatus = self.status
         return await performSerialized(status: status) { [weak self] token in
-            defer { self?.currentExecutionID = execution }
+            defer { self?.currentExecutionID = self?.selectedWorkID == originalWorkID ? execution : nil }
             try await operation(token)
+            if restoreDisplayStatus { self?.status = originalStatus }
         }
     }
 

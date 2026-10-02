@@ -38,7 +38,8 @@ enum SavedPerformance {
     static func acknowledgement(workID: String, context: ExactJSON) -> Data {
         ExactJSON.object(["tag": .string("saved_work_committed"), "work_id": .string(workID), "performance": context]).data
     }
-    static func renderRequest(work: SavedWork, context: ExactJSON, renderSeed: String?, wild: Bool?, replayOptions: ReplayOptions? = nil) throws -> ExactJSON {
+    static func renderRequest(work: SavedWork, context: ExactJSON, renderSeed: String?, wild: Bool?, replayOptions: ReplayOptions? = nil,
+                              compositionSeed: String? = nil) throws -> ExactJSON {
         let score = try ExactJSON(data: Data(work.score.utf8))
         guard context["schema"].string == "inku.swift-saved-performance.v1",
               context["score_sha256"].string == WorkIdentity.sha256(score.data),
@@ -49,6 +50,10 @@ enum SavedPerformance {
             options["render_seed"] = .string(renderSeed)
         }
         if let wild { options["wild"] = .bool(wild) }
+        if let compositionSeed {
+            guard let number = UInt64(compositionSeed), String(number) == compositionSeed else { throw HostError("invalid_composition_seed") }
+            options["composition_seed"] = .string(compositionSeed)
+        }
         if let replayOptions {
             let registry = try ExactJSON(data: InkuCore.canvasRegistry)
             guard let format = registry["registry"]["formats"].array?.first(where: { $0["id"].string == replayOptions.canvasID }),

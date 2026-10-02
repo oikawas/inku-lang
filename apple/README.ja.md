@@ -54,6 +54,8 @@ open apple/build/macOS/DerivedData/Build/Products/Release/Inku.app
 
 保存作品の操作から「記述を変える」「写生なし／ありで描き直す」を開くと、その作品を親とする新しい子を描けます。直接DDLや確定DDL編集の作品は記述へ戻せません。色カタログは色名・HEX・説明を見て次の生成条件へ確定します。DDLは標準panelまたは1つのfileのwindow dropから読み込み、まだ保存されていない制作draftへ反映します。
 
+「描画パラメータの編集」では配置・読み取り・変奏の1案／4案、言葉によるタッチの1案を比較し、選んだ候補だけを子として保存します。候補の準備・拡大だけでは表示作品や通常履歴を変えません。タッチは保存Scoreと共通Rustの語句seedを使い、現在の変奏は無変更であることを画面へ表示します。停止・破棄と採用を区別し、model設定へ移る場合は未保存候補を先に採用または破棄してください。
+
 作品のDBはアプリのApplication Supportに、通常のprovider設定はDBと同じdirectoryの`providers.json`に保存します。API keyはKeychainの別itemです。SQLite backupは作品・系譜・execution／ACK／snapshot、comment／mark、奥書、未読語を含むDBの整合したcopyであり、隣接設定JSONやKeychainのbackupではありません。
 
 通常の作品DBを使わずに試す場合は、実行fileへ`--database`を渡します。
@@ -93,4 +95,4 @@ uv sync --project server --frozen
 python3 apple/scripts/prepare-meter-resources.py
 ```
 
-限定したCLI確認は、artifact生成後の`apple/scripts/check-core.sh`と、resource生成後の`swift run --package-path apple InkuAppCheck`です。AppCheckの`--authoring-only`、`--comparison-only`、`--automation-only`、`--plugin-only`、`--model-selection-only`、`--work-edit-only`、`--raster-only <SVG path>`はそれぞれの変更に対応する確認だけを選びます。`--model-selection-only`は一時DBとprovider呼出し0件で、制作のmodel選択と保存default・開始時snapshotの分離を確認します。`--work-edit-only`はmock transportと共通coreで保存親の編集・写生・childのDDL authority・取消しを確認します。これらはnative画面、実provider、実機の受入を代替しません。変更が防ぐ具体的な失敗に合わせて必要な確認だけを選択してください。
+限定したCLI確認は、artifact生成後の`apple/scripts/check-core.sh`と、resource生成後の`swift run --package-path apple InkuAppCheck`です。AppCheckの`--authoring-only`、`--comparison-only`、`--automation-only`、`--plugin-only`、`--model-selection-only`、`--work-edit-only`、`--refinement-only`、`--raster-only <SVG path>`はそれぞれの変更に対応する確認だけを選びます。`--model-selection-only`は一時DBとprovider呼出し0件で、制作のmodel選択と保存default・開始時snapshotの分離を確認します。`--work-edit-only`はmock transportと共通coreで保存親の編集・写生・childのDDL authority・取消しを確認します。`--refinement-only`は語句seedと保存Score、固定4案、無変更の変奏、明示採用・再表示後のDDL child、edge metadataと遅い応答の拒否を同じ隔離境界で確認します。これらはnative画面、実provider、実機の受入を代替しません。変更が防ぐ具体的な失敗に合わせて必要な確認だけを選択してください。

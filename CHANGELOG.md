@@ -6,6 +6,12 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file retains the history from v2.5.0 (2026-07-25, render engine 12) onward.** Past records follow the recent ones in a collapsible section of this same document; expand it when needed. Viewers without collapse support show the full text. Earlier history is in the [v1.72–v2.4 archive](docs/history/changelog-v1.72-v2.4.md) and the [v0.1–v1.71 archive](docs/history/changelog-v0.1-v1.71.md).
 
+### 2026-10-03 — Compare and adopt unsaved Swift drawing-element options
+
+Added a native flow for one/four composition, reading, or variation options and one word-based touch option from a pinned saved parent. Conditions freeze before preparation; comparison/enlargement and explicit adoption are separate, and only selected options become saved lineage children. Options scroll into view automatically, and preparation status does not linger on the creation screen. Idempotent adoption, DDL edits after adoption/reopening, and drained late responses are covered. Current variation clearly states that nothing moves while retaining saved Score and actual model facts.
+
+Shared Rust now owns the word seed used by both Server's Python helper and Swift, preserving existing trim/UTF-8 hashing and exact UInt64 values. Edit edges retain Server's optional metadata without breaking old pinned requests. Selected mock/real-core checks, Debug Universal builds, native touch-option discard, and saving exactly two selected options from four composition options passed. Reopened parent-header clipping, real providers, every width, VoiceOver, and author acceptance remain incomplete. Updated the [Swift specification](apple/SWIFT_SPEC.md) and [instructions](apple/README.md).
+
 ### 2026-10-03 — Add Swift saved-work editing, color catalogs, and shared DDL import
 
 Creation, library, and lineage now open description editing or redraw with/without sketch for a reopened saved work. The parent's saved conditions, definitions, locks, and startup drawing model stay pinned while shared core saves a new child. Cancellation drains late responses and preserves the displayed work. Subsequent DDL edits create another saved child. New sketch results use Server's canonical off/supplemented states while historical records remain intact.

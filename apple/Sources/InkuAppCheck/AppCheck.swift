@@ -37,6 +37,10 @@ struct AppCheck {
             try await runWorkEditChecks(nativeFixtureURL: fixtureURL)
             return
         }
+        if CommandLine.arguments.contains("--refinement-only") {
+            try await runRefinementChecks()
+            return
+        }
         if CommandLine.arguments.contains("--plugin-only") {
             try await runPluginChecks()
             return

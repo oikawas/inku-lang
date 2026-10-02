@@ -38,12 +38,18 @@ private struct WorkEditSession {
     let mode: WorkEditMode
 }
 
+private struct RefinementSession {
+    let id = UUID()
+    let work: SavedWork
+}
+
 private enum WorkDialog: Identifiable {
-    case export(ExportSession), edit(WorkEditSession), comparison, advice, colophon
+    case export(ExportSession), edit(WorkEditSession), refinement(RefinementSession), comparison, advice, colophon
     var id: String {
         switch self {
         case .export(let session): session.id.uuidString
         case .edit(let session): session.id.uuidString
+        case .refinement(let session): session.id.uuidString
         case .comparison: "comparison"
         case .advice: "advice"
         case .colophon: "colophon"
@@ -136,9 +142,9 @@ public struct ContentView: View {
 
     @ViewBuilder private var detail: some View {
         switch section ?? .create {
-        case .create: CreationView(model: model, history: history, onEditWork: openWorkEdit).disabled(automation.running || importing)
-        case .library: LibraryView(model: model, onEditWork: openWorkEdit).disabled(automation.running || importing)
-        case .lineage: LineageView(model: model, onEditWork: openWorkEdit).disabled(automation.running || importing)
+        case .create: CreationView(model: model, history: history, onEditWork: openWorkEdit, onAdjustWork: openRefinement).disabled(automation.running || importing)
+        case .library: LibraryView(model: model, onEditWork: openWorkEdit, onAdjustWork: openRefinement).disabled(automation.running || importing)
+        case .lineage: LineageView(model: model, onEditWork: openWorkEdit, onAdjustWork: openRefinement).disabled(automation.running || importing)
         case .automation: AutomationView(model: model, automation: automation).disabled(importing)
         case .settings: SettingsView(model: model, section: $settingsSection).disabled(automation.running || importing)
         }
@@ -237,6 +243,9 @@ public struct ContentView: View {
                     .disabled(!canExport)
                     .help(model.display.preferences.showTooltips ? model.display.localized("書き出す") : "")
                 Menu(model.display.localized("作品の操作"), systemImage: "ellipsis.circle") {
+                    Button(model.display.localized("描画パラメータの編集"), systemImage: "slider.horizontal.3") {
+                        if let work = model.selectedWork { openRefinement(work) }
+                    }.disabled(!hasSavedWork)
                     Button(model.display.localized("記述を変える"), systemImage: "text.cursor") {
                         if let work = model.selectedWork { openWorkEdit(work, .description) }
                     }.disabled(!hasSavedWork || model.sourceLocked)
@@ -271,6 +280,14 @@ public struct ContentView: View {
             WorkEditView(model: model, work: session.work, mode: session.mode, onCommitted: { section = .create })
                 .id(session.id)
                 .environment(model.display)
+        case .refinement(let session):
+            RefinementView(model: model, work: session.work, onCommitted: { section = .create }, onConfigureModels: { destination in
+                dialog = nil
+                settingsSection = SettingsSection(rawValue: destination) ?? .models
+                section = .settings
+            })
+                .id(session.id)
+                .environment(model.display)
         case .comparison:
             ComparisonView(model: model).environment(model.display)
         case .advice:
@@ -283,6 +300,11 @@ public struct ContentView: View {
     private func openWorkEdit(_ work: SavedWork, _ mode: WorkEditMode) {
         guard canUseWork, !work.trashed else { return }
         dialog = .edit(WorkEditSession(work: work, mode: mode))
+    }
+
+    private func openRefinement(_ work: SavedWork) {
+        guard canUseWork, !work.trashed else { return }
+        dialog = .refinement(RefinementSession(work: work))
     }
 
     private func openExport() async {

@@ -34,6 +34,8 @@ DDLのdraft確認は読出しだけとし、変更確定を共通coreのrevision
 
 保存作品の「記述を変える」「写生なし／ありで描き直す」は、制作toolbarとlibrary／系譜cardから同じdialogを開く。開いた作品を親として固定し、保存configuration、用紙、seed、budget、定義とlockを保持して共通coreから新しいchildを保存する。開始時の次の描画modelを両段へ固定する。記述が変わった場合は親の古い写生文を再利用せず、写生「あり」を明示した場合も生成し直す。保存contextのauthorityを確認し、直接DDL・確定DDL編集の作品を記述へ戻さない。取消しは作業の終了を待ち、成功したchildの保存後にだけdialogを閉じて制作を表示する。
 
+編集childのedgeにはServerと同じ`edited_from_history_id`、写生操作では`from_sketch_state`／`to_sketch_mode`も保存する。GenerationRequestの追加項目はoptionalとし、既存の固定requestを読み出せる。
+
 ### 履歴・library・系譜
 
 履歴はSQLite全件を対象とする20件page、libraryは独立した30件pageである。最新100件のapp内一覧を検索や作品移動の母集団にしない。最新／新しい／古い／最古への移動、全文記述・全文hash・末尾4桁の検索、star・推敲・export markのAND絞込、thumbnail／listと時系列／系譜groupの独立選択を提供する。
@@ -45,6 +47,14 @@ comment、mark、trash／復元、明示した完全削除、複数選択、系�
 Swift物理schemaはv2で、v1の6tableにlocal annotation、奥書、未読語を追加した9table構成とする。正本は[bundled migration](Packages/InkuPersistence/Sources/InkuPersistence/Resources/migration-v2.sql)と[schema export](../persistence/reference/swift-schema-v2.json)。既知の完全なv1だけを原子的に移行し、作品・snapshot・ACKの値を保持する。未知schemaは引き続き拒否する。backup／restoreは全9tableを対象とし、v1 backupは隔離snapshotをv2へ移行してから復元する。Server／Android DBや旧JSONのimportは含めない。
 
 ### 比較・推敲・奥書と自動実行
+
+「描画パラメータの編集」は、明示した保存親を固定し、配置・読み取り・変奏・言葉によるタッチを別操作として選ぶ。生成前に1案／4案の全条件を固定し、候補を通常履歴・系譜へ入れずに比較する。拡大はdialog内だけで行い、制作の表示作品を替えない。選択した候補だけを子として原子的・idempotentに保存し、残りは破棄する。途中で保存を停止した場合は保存済みの印を保持し、再試行で二重保存しない。停止／closeは所有Taskと遅い応答の終了を待つ。採用後と再表示後のDDL変更も、新しい保存childを作る。
+
+配置は親の保存DDL、定義・lock・配色・タッチを保持し、新しい配置seedで共通coreから描く。dialogの描画model指定は構造化側にだけ適用し、親の読み取りmodelを保持する。読み取りは開始時の制作の次modelを両段へ固定し、元の記述と保存された写生文から新しいDDLを生成する。確定DDL権限では読み取りを拒否する。dialogのmodel選択で設定defaultを変更しない。
+
+言葉によるタッチは1案だけで、保存Score・DDL・配色・配置・ワイルドとmodel記録を保持し、providerを呼ばずに再描画する。語句のseedはRust共通境界が既存Serverと同じPython `str.strip()`の空白を除き、残るUTF-8のSHA256先頭8byteをunsigned big-endian UInt64として導く。Unicodeの正規化はせず、Swift／Pythonへtrim・hashを複製しない。seedは正確な十進文字列で境界を渡し、保存edgeのseed前後・語句にも整数の値を保持する。空の語句は共通coreが拒否する。
+
+現行の変奏は共通Stage1.5が無変更のため、保存Score・色・配置・タッチ・要素数と親modelを保ったprovider不要の再演奏とする。「変奏（いまは何も動かない）」「動いたもの: なし」を表示し、振幅と割当seedだけを来歴へ保存する。ワイルドを明示変更した場合は、そのrender条件の変更を表示する。
 
 catalog／model比較は開始時の作品・Score・設定を固定する。候補は採用前に通常履歴／系譜へ保存せず、選択した候補だけをidempotentに保存する。選べる候補の総数を4に制限せず、Swiftでは逐次生成する。停止とdialogのcloseは処理の終了を待ち、遅れて届いた候補を混入させない。
 
@@ -86,7 +96,9 @@ Personal ChatGPTは通常のAPI key接続と別に扱い、既定は無効とす
 
 追加の限定確認では、制作で選んだmodelが実際のrequest両段へ反映され、保存default・開始済みtemplateが変わらず、provider呼出し0件であることを確認した。SQLiteの世代projectionはroot・child・欠落・削除祖先の1件を確認した。nativeでは1320×880と標準tileの1281×733で固定生成button・canvas・履歴、世代1／2、設定／移動／新規／読込取消し、model設定categoryへの導線、系譜focusと表示作品の分離、library2件と制作1件の書出し対象を確認した。小さい幅の全配置、VoiceOver、作者のデザイン受入をこの代表確認へ読み替えない。
 
-保存作品編集の限定mock／共通core確認では、live executionのない親の再表示、固定した保存条件・plugin lockと次のmodel、写生の生成し直し、child保存後のDDL authority、停止後の遅い応答拒否を確認した。nativeでは記述／写生dialogのdraft取消し、色カタログの取消しと次の条件への確定、日英の色名とHEX、標準panelから単一DDLを読み込む操作を確認した。編集dialogの再表示時に親画像・記述の見出しが見えない場合を確認し、原因は未確定である。window dropの実操作と実providerの編集生成も未確認である。Serverの描画パラメーター調整にある未保存1案／4案の比較・採用、語を使ったtouch、変奏の現在の無変更表示は未接続であり、catalog／model比較で代用しない。edit系譜の補助項目`edited_from_history_id`、`from_sketch_state`、`to_sketch_mode`も追従が残る。
+保存作品編集の限定mock／共通core確認では、live executionのない親の再表示、固定した保存条件・plugin lockと次のmodel、写生の生成し直し、child保存後のDDL authority、停止後の遅い応答拒否を確認した。nativeでは記述／写生dialogのdraft取消し、色カタログの取消しと次の条件への確定、日英の色名とHEX、標準panelから単一DDLを読み込む操作を確認した。編集dialogの再表示時に親画像・記述の見出しが見えない場合を確認し、原因は未確定である。window dropの実操作と実providerの編集生成も未確認である。
+
+描画要素の限定mock／共通core確認は、2^53を超える語句seed、seed0の配置fallback、保存Score／色／DDLとprovider0件、固定4案、現行変奏の同一性、読み取りmodel、採用前の通常履歴保持、二重採用・再表示後のDDL child、編集edge補助項目と旧Codable、停止の遅い応答を確認した。Rustの語句seedと新しいPyO3から実Server helperへの限定確認も成功した。Debug Universal appの一時DBでは、タッチ1案のseed表示と破棄、配置4案から選択2案だけの保存（通常履歴2件から4件）、640px幅の比較画面、候補への自動scroll、変奏の「動いたもの: なし」、閉じた後に準備中表示が残らないことを確認した。実provider・全幅・VoiceOver・作者受入は別の確認である。
 
 ## 2026-10-02 macOS向けの共有Rust・standalone基盤（当時の記録）
 

@@ -79,6 +79,15 @@ fn renderer_reference_json() -> PyResult<String> {
     })
 }
 
+/// Derive word-touch seed text through the same portable boundary as Apple.
+#[pyfunction]
+fn render_seed_from_text(py: Python<'_>, seed_text: String) -> Option<(String, String)> {
+    py.detach(|| {
+        inku_pipeline_uniffi::render_seed_from_text(seed_text)
+            .map(|derived| (derived.render_seed, derived.seed_text))
+    })
+}
+
 /// Render one canonical coarse request and return SVG plus JSON metadata.
 #[pyfunction]
 fn render(py: Python<'_>, request_json: &str) -> PyResult<(String, String)> {
@@ -221,6 +230,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(render_engine_version, module)?)?;
     module.add_function(wrap_pyfunction!(default_color_map_json, module)?)?;
     module.add_function(wrap_pyfunction!(renderer_reference_json, module)?)?;
+    module.add_function(wrap_pyfunction!(render_seed_from_text, module)?)?;
     module.add_function(wrap_pyfunction!(render, module)?)?;
     module.add_function(wrap_pyfunction!(render_with_resources, module)?)?;
     module.add_function(wrap_pyfunction!(pipeline_version_report, module)?)?;

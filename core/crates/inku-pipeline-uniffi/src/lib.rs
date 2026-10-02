@@ -48,6 +48,24 @@ pub fn version_report() -> String {
     format!(r#"{{"binding_version":"{BINDING_VERSION}","protocol_version":"{PROTOCOL_VERSION}"}}"#)
 }
 
+/// Exact word-touch identity, carried as decimal text across every host boundary.
+#[derive(uniffi::Record)]
+pub struct TextRenderSeed {
+    pub render_seed: String,
+    pub seed_text: String,
+}
+
+/// Derive a saved-Score performance seed without interpreting the words as DDL.
+#[uniffi::export]
+pub fn render_seed_from_text(seed_text: String) -> Option<TextRenderSeed> {
+    inku_render::determinism::render_seed_from_text(&seed_text).map(|(seed, normalized)| {
+        TextRenderSeed {
+            render_seed: seed.to_string(),
+            seed_text: normalized.to_owned(),
+        }
+    })
+}
+
 /// Share the canonical registry with host settings and compatibility adapters.
 #[uniffi::export]
 pub fn canvas_registry() -> String {

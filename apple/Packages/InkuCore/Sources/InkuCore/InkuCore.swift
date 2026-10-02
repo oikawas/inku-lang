@@ -20,6 +20,7 @@ public struct RasterImage: Sendable {
 
 public enum CoreFailure: Error, Sendable {
     case rasterRefused(code: String, message: String)
+    case emptySeedText
     case internalInvariant
 }
 
@@ -51,6 +52,17 @@ public enum InkuCore {
     public static var versionReport: String { InkuCoreBindings.versionReport() }
     public static var rasterAPIVersion: String { InkuCoreBindings.rasterApiVersion() }
     public static var canvasRegistry: Data { Data(InkuCoreBindings.canvasRegistry().utf8) }
+
+    public static func renderSeedWords(fromText text: String) throws -> (seed: String, text: String) {
+        guard let derived = InkuCoreBindings.renderSeedFromText(seedText: text) else {
+            throw CoreFailure.emptySeedText
+        }
+        return (derived.renderSeed, derived.seedText)
+    }
+
+    public static func renderSeed(fromText text: String) throws -> String {
+        try renderSeedWords(fromText: text).seed
+    }
 
     public static func countDescriptionMeter(text: String, languageCode: String, dictionaryDirectory: String) -> Data {
         InkuCoreBindings.countDescriptionMeter(text: text, languageCode: languageCode, dictionaryDirectory: dictionaryDirectory)

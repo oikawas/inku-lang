@@ -34,10 +34,12 @@ public actor PipelineHost {
     }
 
     public func perform(executionID: String, command: PipelineCommand, parentWorkID: String? = nil, derivationKind: String? = nil,
+                        derivationMetadata: Data? = nil,
                         progress: @escaping PipelineProgressHandler = { _ in }) async throws -> PipelineView {
         let driver = try await execution(executionID)
         return try await withTaskCancellationHandler {
-            try await driver.perform(command, parentWorkID: parentWorkID, derivationKind: derivationKind, progress: progress)
+            try await driver.perform(command, parentWorkID: parentWorkID, derivationKind: derivationKind,
+                                     derivationMetadata: derivationMetadata, progress: progress)
         } onCancel: {
             Task { _ = try? await driver.cancel(progress: progress) }
         }
@@ -125,7 +127,17 @@ public actor PipelineHost {
 
     public func previewReplay(workID: String, renderSeed: String? = nil, wild: Bool? = nil,
                               options replayOptions: ReplayOptions? = nil, derivationKind: String = "catalog_change") async throws -> PreparedCandidate {
-        let began = Date()
+        let plan = try await makeSavedScoreReplayPlan(workID: workID, renderSeed: renderSeed, wild: wild,
+                                                     options: replayOptions, derivationKind: derivationKind)
+        return try await previewSavedScoreReplay(plan)
+    }
+
+    /// Freeze all saved rendering facts before any candidate starts, without resolving today's colors.
+    public func makeSavedScoreReplayPlan(workID: String, renderSeed: String? = nil, wild: Bool? = nil,
+                                        options replayOptions: ReplayOptions? = nil, compositionSeed: String? = nil,
+                                        derivationKind: String = "touch_change", derivationMetadata: Data? = nil,
+                                        seedText: String? = nil, variationAmplitude: String? = nil,
+                                        variationSeed: String? = nil) async throws -> SavedScoreReplayPlan {
         let source = try await restoreSavedWork(workID: workID)
         let location = try WorkIdentity.location(workID)
         guard let acknowledgement = try await database.acknowledgement(executionID: location.executionID, effectID: location.effectID) else { throw HostError("saved_performance_context_unavailable") }
@@ -133,7 +145,29 @@ public actor PipelineHost {
         guard ack["work_id"].string == workID, let parentNodeID = source.lineageNodeID,
               let parentNode = try await database.node(id: parentNodeID) else { throw HostError("saved_performance_context_invalid") }
         let context = try ack.requiredObject("performance")
-        let request = try SavedPerformance.renderRequest(work: source, context: context, renderSeed: renderSeed, wild: wild, replayOptions: replayOptions)
+        let request = try SavedPerformance.renderRequest(work: source, context: context, renderSeed: renderSeed, wild: wild,
+                                                        replayOptions: replayOptions, compositionSeed: compositionSeed)
+        _ = try metadataText(derivationMetadata)
+        if variationAmplitude != nil || variationSeed != nil {
+            guard let amplitude = variationAmplitude, ["small", "medium", "large"].contains(amplitude),
+                  let seed = variationSeed, let number = UInt64(seed), String(number) == seed else { throw HostError("invalid_variation") }
+        }
+        try Task.checkCancellation()
+        return SavedScoreReplayPlan(work: source, parentNode: parentNode, context: context.data, renderRequest: request.data,
+            derivationKind: derivationKind, derivationMetadata: derivationMetadata, seedText: seedText,
+            variationAmplitude: variationAmplitude, variationSeed: variationSeed)
+    }
+
+    public func previewSavedScoreReplay(_ plan: SavedScoreReplayPlan) async throws -> PreparedCandidate {
+        let began = Date()
+        let source = plan.work
+        guard let stored = try await database.work(id: source.id), !stored.trashed,
+              try await database.node(id: plan.parentNode.id)?.historyID == source.id else { throw HostError("lineage_parent_unavailable") }
+        var expected = source
+        expected.starred = stored.starred; expected.trashed = stored.trashed
+        guard stored == expected else { throw HostError("saved_work_changed_or_unavailable") }
+        let context = try ExactJSON(data: plan.context)
+        let request = try ExactJSON(data: plan.renderRequest)
         try Task.checkCancellation()
         let rendered = try ExactJSON(data: InkuCore.renderSaved(request.data))
         if let code = rendered["error"].string { throw HostError(code) }
@@ -149,6 +183,11 @@ public actor PipelineHost {
         work.starred = false; work.trashed = false; work.historyVisibility = "normal"
         let options = request["request"]["options"]
         work.renderSeed = options["render_seed"].number ?? options["render_seed"].string
+        work.compositionSeed = options["composition_seed"].number ?? options["composition_seed"].string
+        if let seedText = plan.seedText { work.seedText = seedText }
+        if let amplitude = plan.variationAmplitude, let seed = plan.variationSeed {
+            work.variationAmplitude = amplitude; work.variationSeed = seed
+        }
         work.renderWild = options["wild"].bool
         work.catalogID = options["catalog_id"].string
         work.renderColorCatalogID = options["catalog_id"].string
@@ -163,21 +202,32 @@ public actor PipelineHost {
         work.renderEngineVersion = rendered["metadata"]["render_engine_version"].string
         work.renderHash = WorkIdentity.render(score: request["request"]["score"], options: options, metadata: rendered["metadata"])
         let node = LineageNode(id: nodeID, historyID: id, at: now, descriptionHash: work.descriptionHash,
-                               renderHash: work.renderHash, rootNodeID: parentNode.rootNodeID ?? parentNode.id)
-        let edge = LineageEdge(id: UUID().uuidString, parentNodeID: parentNodeID, childNodeID: nodeID,
-                               derivationKind: derivationKind, at: now)
+                               renderHash: work.renderHash, rootNodeID: plan.parentNode.rootNodeID ?? plan.parentNode.id)
+        let edge = LineageEdge(id: UUID().uuidString, parentNodeID: plan.parentNode.id, childNodeID: nodeID,
+                               derivationKind: plan.derivationKind, metadataJSON: try metadataText(plan.derivationMetadata), at: now)
         var nextContext = context
         var stringOptions = options
         for key in ["render_seed", "composition_seed"] { if let number = options[key].number { stringOptions[key] = .string(number) } }
         nextContext["options"] = stringOptions
+        if let amplitude = plan.variationAmplitude, let seed = plan.variationSeed {
+            nextContext["configuration"]["compiler"]["stage15_variation"] = .object(["amplitude": .string(amplitude), "seed": .string(seed)])
+        }
         let candidate = StoredCandidate(work: work, node: node, edge: edge, context: nextContext.data)
         return try await prepareCandidate(executionID: executionID, candidate: candidate)
     }
 
+    private func metadataText(_ data: Data?) throws -> String {
+        guard let data else { return "{}" }
+        let value = try ExactJSON(data: data)
+        guard value.object != nil else { throw HostError("invalid_derivation_metadata") }
+        return value.text
+    }
+
     /// Explicit adoption is idempotent; previews never enter the history table.
-    public func saveCandidate(executionID: String) async throws -> SavedWork {
+    public func saveCandidate(executionID: String, expectedWorkID: String? = nil) async throws -> SavedWork {
         guard let record = try await database.loadExecution(id: executionID) else { throw HostError("candidate_not_found") }
         if var stored = try? JSONDecoder().decode(StandaloneCandidate.self, from: record.snapshot), stored.schema == "inku.swift-candidate.v1" {
+            guard expectedWorkID == nil || expectedWorkID == stored.candidate.work.id else { throw HostError("candidate_identity_changed") }
             if stored.saved, let work = try await database.work(id: stored.candidate.work.id) { return work }
             try Task.checkCancellation()
             stored.saved = true
@@ -188,7 +238,7 @@ public actor PipelineHost {
                 node: stored.candidate.node, edge: stored.candidate.edge)
             return stored.candidate.work
         }
-        return try await execution(executionID).saveCandidate()
+        return try await execution(executionID).saveCandidate(expectedWorkID: expectedWorkID)
     }
 
     private func prepareCandidate(executionID: String, candidate: StoredCandidate) async throws -> PreparedCandidate {
@@ -250,12 +300,14 @@ public actor PipelineHost {
         if let width = options["canvas"]["width"].number.flatMap(Double.init),
            let height = options["canvas"]["height"].number.flatMap(Double.init), height > 0 { work.renderCanvasAspectRatio = width / height }
         work.renderEngineID = rendered["metadata"]["render_engine_id"].string; work.renderEngineVersion = rendered["metadata"]["render_engine_version"].string
+        if !request.models.stage2Model.isEmpty { work.stage2Model = request.models.stage2Model }
         work.variationAmplitude = compiler["stage15_variation"]["amplitude"].string
         work.variationSeed = compiler["stage15_variation"]["seed"].string
         work.renderHash = WorkIdentity.render(score: score, options: options, metadata: rendered["metadata"])
         let node = LineageNode(id: nodeID, historyID: id, state: request.historyVisibility == "lineage_only" ? "lineage_only" : "active",
             at: now, descriptionHash: work.descriptionHash, renderHash: work.renderHash, rootNodeID: parentNode.rootNodeID ?? parentNode.id)
-        let edge = LineageEdge(id: UUID().uuidString, parentNodeID: parentNodeID, childNodeID: nodeID, derivationKind: request.derivationKind, at: now)
+        let edge = LineageEdge(id: UUID().uuidString, parentNodeID: parentNodeID, childNodeID: nodeID,
+            derivationKind: request.derivationKind, metadataJSON: try metadataText(request.derivationMetadata), at: now)
         var context = SavedPerformance.context(score: score, options: options, compiler: compiler, clip: clip)
         context["configuration"] = config; context["document"] = document; context["authority"] = authority
         let candidate = try await prepareCandidate(executionID: executionID,
@@ -301,6 +353,8 @@ private struct StoredExecution: Codable, Sendable {
     var description: String
     var parentWorkID: String?
     var derivationKind: String
+    var derivationMetadata: Data? = nil
+    var interpretationSeed: String? = nil
     var pendingProviderAction: Data?
     var savedWorkID: String?
     var prompts: Data? = nil
@@ -365,6 +419,11 @@ private actor ExecutionDriver {
         self.state.saveHistory = request.saveHistory
         self.state.historyVisibility = request.historyVisibility
         self.state.chatGPTSession = request.chatGPTSession
+        if let metadata = request.derivationMetadata {
+            guard try ExactJSON(data: metadata).object != nil else { throw HostError("invalid_derivation_metadata") }
+        }
+        self.state.derivationMetadata = request.derivationMetadata
+        self.state.interpretationSeed = request.interpretationSeed
     }
     init(record: ExecutionSnapshot, database: InkuDatabase, transport: any ProviderTransport, credentials: any CredentialStore) throws {
         let stored = try JSONDecoder().decode(StoredExecution.self, from: record.snapshot)
@@ -408,7 +467,8 @@ private actor ExecutionDriver {
         (PersonalPlanRoutingTransport.isPersonal(stage2 ? state.models.stage2Model : state.models.stage1Model, providers: state.providers), state.chatGPTSession)
     }
 
-    func perform(_ command: PipelineCommand, parentWorkID: String?, derivationKind: String?, progress: @escaping PipelineProgressHandler) async throws -> PipelineView {
+    func perform(_ command: PipelineCommand, parentWorkID: String?, derivationKind: String?, derivationMetadata: Data?,
+                 progress: @escaping PipelineProgressHandler) async throws -> PipelineView {
         if case .cancel = command { return try await cancel(progress: progress) }
         await gate.lock()
         do {
@@ -417,7 +477,12 @@ private actor ExecutionDriver {
             restored = false
             let oldState = state
             if let parentWorkID { state.parentWorkID = parentWorkID }
-            if let derivationKind { state.derivationKind = derivationKind }
+            if let derivationKind {
+                if let metadata = derivationMetadata {
+                    guard try ExactJSON(data: metadata).object != nil else { throw HostError("invalid_derivation_metadata") }
+                }
+                state.derivationKind = derivationKind; state.derivationMetadata = derivationMetadata
+            }
             if case .generateFromDescription(_, let text, _, _) = command { state.description = text }
             do { try await advance(command.payload()) }
             catch { state = oldState; throw error }
@@ -658,6 +723,7 @@ private actor ExecutionDriver {
                              renderCanvasAspectID: options["canvas_aspect_id"].string,
                              renderCanvasAspectRatio: canvasRatio(options),
                              renderSeed: renderSeed, renderWild: options["wild"].bool, compositionSeed: compositionSeed,
+                             interpretationSeed: state.interpretationSeed,
                              variationAmplitude: compiler["stage15_variation"]["amplitude"].string,
                              variationSeed: compiler["stage15_variation"]["seed"].string,
                              instructionLangResolved: snapshot["config"]["language"].string,
@@ -671,7 +737,9 @@ private actor ExecutionDriver {
             guard let parent = try await database.work(id: parentID), let parentNodeID = parent.lineageNodeID,
                   let parentNode = try await database.node(id: parentNodeID) else { throw HostError("lineage_parent_unavailable") }
             rootNodeID = parentNode.rootNodeID ?? parentNode.id
-            edge = LineageEdge(id: newID(), parentNodeID: parentNodeID, childNodeID: nodeID, derivationKind: state.derivationKind, at: now)
+            let metadata = try state.derivationMetadata.map { try ExactJSON(data: $0).text } ?? "{}"
+            edge = LineageEdge(id: newID(), parentNodeID: parentNodeID, childNodeID: nodeID,
+                               derivationKind: state.derivationKind, metadataJSON: metadata, at: now)
         }
         let node = LineageNode(id: nodeID, historyID: id, state: state.historyVisibility == "lineage_only" ? "lineage_only" : "active",
             at: now, descriptionHash: descriptionHash, renderHash: renderHash, rootNodeID: rootNodeID)
@@ -715,12 +783,18 @@ private actor ExecutionDriver {
         return (nil, "fallback")
     }
 
-    func saveCandidate() async throws -> SavedWork {
+    func saveCandidate(expectedWorkID: String? = nil) async throws -> SavedWork {
         await gate.lock(); defer { Task { await gate.unlock() } }
-        if let id = state.savedWorkID, let work = try await database.work(id: id) { return work }
+        if let id = state.savedWorkID, let work = try await database.work(id: id) {
+            guard expectedWorkID == nil || expectedWorkID == work.id else { throw HostError("candidate_identity_changed") }
+            return work
+        }
         guard let candidate = state.candidate, let revision = databaseRevision else { throw HostError("candidate_not_ready") }
+        guard expectedWorkID == nil || expectedWorkID == candidate.work.id else { throw HostError("candidate_identity_changed") }
         try Task.checkCancellation()
         var savedState = state; savedState.savedWorkID = candidate.work.id
+        // Explicit promotion makes later editor commands ordinary committed child mutations.
+        savedState.saveHistory = true
         let context = try ExactJSON(data: candidate.context)
         let committed = try await database.commitEffect(id: executionID(), expectedRevision: revision,
             effectID: "save-render:" + (try snapshot.requiredString("sequence")), snapshot: encoded(savedState),

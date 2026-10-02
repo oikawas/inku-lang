@@ -10,11 +10,11 @@ Initial local support covers source installations with the Web, API and browser 
 
 ## Connect on the same PC
 
-Run from the Server source directory with your existing DB and administrator settings:
+First synchronize locked dependencies from the Server source directory with `uv sync --frozen --inexact`, preserving the installed native wheel. The startup and authorization helpers below use `--no-sync` to avoid another synchronization. Run with your existing DB and administrator settings:
 
 ```sh
 INKU_CHATGPT_PLAN_ENABLED=1 INKU_DEVELOPER_MODE=1 \
-  uv run inku-chatgpt serve --host 127.0.0.1 --port 8100
+  uv run --frozen --no-sync inku-chatgpt serve --host 127.0.0.1 --port 8100
 ```
 
 Choose “Continue with ChatGPT” in ChatGPT plan settings, sign in and grant permission. The callback is `http://127.0.0.1:<port>/auth/callback` on that PC. Declining, cancelling or exceeding five minutes fails. If a popup is blocked, open the same authorization link on screen. Startup uses one worker without reload; direct uvicorn startup and local LAN binding do not enable it. After authorization, select your model under “Stage 1/2.” [Sign-in procedure](https://developers.openai.com/siwc/token-sharing-open-source/sign-in)
@@ -26,21 +26,21 @@ Authorize on the Mac, then let the self-hosted installation own renewal exclusiv
 Retain explicit enablement and the mode requirement, and start the self-hosted installation with:
 
 ```sh
-uv run inku-chatgpt serve --self-hosted --host 0.0.0.0 --port 8100
+uv run --frozen --no-sync inku-chatgpt serve --self-hosted --host 0.0.0.0 --port 8100
 ```
 
 The operator fixes `inku-chatgpt recipient --owner-id <verified-owner-id>` to the DB-verified account and safely returns its public recipient JSON to the Mac. Store it as a 0600 file, then authorize using this application's dedicated helper:
 
 ```sh
 INKU_CHATGPT_PLAN_ENABLED=1 INKU_DEVELOPER_MODE=1 \
-  uv run inku-chatgpt authorize --recipient recipient.json
+  uv run --frozen --no-sync inku-chatgpt authorize --recipient recipient.json
 ```
 
 Confirm the account and consent in Chrome. Seal one registration with the successful result's nonsecret `profile_id`:
 
 ```sh
 INKU_CHATGPT_PLAN_ENABLED=1 INKU_DEVELOPER_MODE=1 \
-  uv run inku-chatgpt export --recipient recipient.json \
+  uv run --frozen --no-sync inku-chatgpt export --recipient recipient.json \
   --profile-id <profile-id> --output sealed.json
 ```
 

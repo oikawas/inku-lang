@@ -132,7 +132,11 @@ def _compact_gemini_hole_variants(schema: dict[str, Any]) -> None:
 def _gemini_json_schema(
     schema: dict[str, Any], *, compact_hole_edits: bool = False
 ) -> dict[str, Any]:
-    """Project core JSON Schema into Gemini's supported transport subset."""
+    """Project core JSON Schema into Gemini's supported transport subset.
+
+    The core's JSON keeps no key order, so a schema whose order matters names it
+    in `propertyOrdering`; its properties are written in that order.
+    """
 
     def project(value: Any, *, named_schemas: bool = False) -> Any:
         if isinstance(value, list):
@@ -147,6 +151,14 @@ def _gemini_json_schema(
                 projected["enum"] = [item]
             elif key in _GEMINI_JSON_SCHEMA_KEYS:
                 projected[key] = project(item, named_schemas=key in {"$defs", "properties"})
+        ordering = projected.get("propertyOrdering")
+        properties = projected.get("properties")
+        if isinstance(ordering, list) and isinstance(properties, dict):
+            named = [name for name in ordering if name in properties]
+            projected["properties"] = {
+                **{name: properties[name] for name in named},
+                **{name: item for name, item in properties.items() if name not in named},
+            }
         return projected
 
     result = project(schema)
@@ -155,6 +167,24 @@ def _gemini_json_schema(
     if compact_hole_edits:
         _compact_gemini_hole_variants(result)
     return result
+
+
+# The composition reading is sent as the prototype measured it: with Stage 1's
+# model, limits and sampling (COMPOSITION-PRODUCT-DESIGN section 12).
+_STAGE1_SAMPLED_ACTIONS = {"generate_normalized_ddl", "read_composition"}
+
+
+def provider_stage_record(tag: str) -> str:
+    """The stage a provider action is timed and recorded under.
+
+    Hole completion is Stage 2. The composition reading is recorded apart from
+    Stage 1, whose model it uses, so neither time hides the other.
+    """
+    if tag == "complete_visible_ddl_holes":
+        return "stage2"
+    if tag == "read_composition":
+        return "composition"
+    return "stage1"
 
 
 @dataclass(frozen=True)
@@ -208,6 +238,7 @@ class SingleAttemptProvider:
             "generate_sketch": "sketch_generated",
             "select_description_catalog": "description_catalog_selected",
             "generate_normalized_ddl": "normalized_ddl_generated",
+            "read_composition": "composition_read",
             "complete_visible_ddl_holes": "visible_ddl_hole_patch_generated",
         }
         if action["tag"] not in tags:
@@ -289,7 +320,7 @@ class SingleAttemptProvider:
             headers["Authorization"] = "Bearer " + (key or "none")
             body = {"model": model, "stream": False,
                     **openai_sampling(connection, model, max_tokens=self.options.max_tokens,
-                                      temperature=0.3 if prompt["action_name"] == "generate_normalized_ddl" else 0.0),
+                                      temperature=0.3 if prompt["action_name"] in _STAGE1_SAMPLED_ACTIONS else 0.0),
                     "messages": [{"role": "system", "content": prompt["system"]},
                                  {"role": "user", "content": prompt["message"]}]}
             # Preserve the established provider-specific structured-output
@@ -356,8 +387,7 @@ class SingleAttemptProvider:
             # The durable request record is the send authorization: a failed
             # insert must leave this method before it reaches HTTPX.
             request_truncated = store.request(
-                owner_id, execution_id, action,
-                "stage2" if action["tag"] == "complete_visible_ddl_holes" else "stage1",
+                owner_id, execution_id, action, provider_stage_record(action["tag"]),
                 str(connection["id"]), model, body_bytes,
             )
             self._observation_truncated = request_truncated

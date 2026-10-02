@@ -439,3 +439,94 @@ def test_gemini_forces_one_schema_bound_function_call_with_minimal_thinking(monk
     assert request_body["generationConfig"]["thinkingConfig"] == {
         "thinkingLevel": "minimal"
     }
+
+
+def _reading_action() -> dict:
+    # Keys arrive in name order, as the core's JSON writes them; the order that
+    # matters is named in propertyOrdering.
+    schema = {
+        "properties": {
+            "relations": {"type": "array", "items": {
+                "properties": {"layers": {"type": "array", "items": {"type": "integer"}},
+                               "type": {"type": "string", "enum": ["near"]}},
+                "propertyOrdering": ["type", "layers"],
+                "required": ["type", "layers"],
+                "type": "object",
+            }},
+            "roles": {"type": "array", "items": {"type": "string", "enum": ["focal"]}},
+            "thesis": {"type": "string"},
+        },
+        "propertyOrdering": ["thesis", "roles", "relations"],
+        "required": ["thesis", "roles", "relations"],
+        "type": "object",
+    }
+    action = _action()
+    action["tag"] = "read_composition"
+    action["payload"]["prompt"]["action_name"] = "read_composition"
+    action["payload"]["prompt"]["response_schema"] = schema
+    return action
+
+
+def test_the_composition_reading_is_sent_as_stage1_with_the_schema_order(monkeypatch):
+    """The reading goes out as the prototype measured it: Stage 1's model and
+    sampling, and the properties in the order the schema names (thesis first)."""
+    models = []
+
+    def provider_for_model(model_ref, **kwargs):
+        models.append((model_ref, kwargs.get("stage")))
+        return "gemini", "gemma-4-31b-it"
+
+    monkeypatch.setattr("inku_server.pipeline_provider.provider_for_model", provider_for_model)
+    monkeypatch.setattr("inku_server.pipeline_provider.connection_for", lambda *args: {
+        "id": "gemini", "kind": "gemini", "base_url": "https://generativelanguage.invalid",
+        "api_key": "test-only", "requires_api_key": True,
+    })
+    seen = []
+
+    async def request(value):
+        seen.append(value)
+        return httpx.Response(200, json={"candidates": [{"content": {"parts": [{"functionCall": {
+            "name": "submit_pipeline_response",
+            "args": {"thesis": "t", "roles": ["focal"], "relations": []},
+        }}]}}]})
+
+    provider = SingleAttemptProvider(
+        ProviderOptions({}, "gemini:stage1-model", "gemini:stage2-model", 256, 8192),
+        transport=httpx.MockTransport(request),
+    )
+    action = _reading_action()
+    result = provider(action)
+    assert result["tag"] == "composition_read"
+    assert json.loads(result["response"]) == {"thesis": "t", "roles": ["focal"], "relations": []}
+    assert models == [("gemini:stage1-model", "stage1")]
+    parameters = json.loads(seen[0].content)["tools"][0]["functionDeclarations"][0]["parametersJsonSchema"]
+    assert list(parameters["properties"]) == ["thesis", "roles", "relations"]
+    assert list(parameters["properties"]["relations"]["items"]["properties"]) == ["type", "layers"]
+
+    monkeypatch.setattr("inku_server.pipeline_provider.provider_for_model", lambda *args, **kwargs: ("fixture", "fixture-model"))
+    monkeypatch.setattr("inku_server.pipeline_provider.connection_for", lambda *args: {
+        "id": "fixture", "kind": "openai_compatible", "base_url": "https://provider.invalid/v1",
+        "api_key": "test-only", "requires_api_key": True,
+    })
+    sent = []
+
+    async def openai_request(value):
+        sent.append(value)
+        return httpx.Response(200, json={"choices": [{"message": {"content": None, "tool_calls": [{
+            "type": "function", "function": {"name": "submit_pipeline_response", "arguments": "{}"},
+        }]}}]})
+
+    openai = SingleAttemptProvider(
+        ProviderOptions({}, "fixture-model", "fixture-model", 256, 8192),
+        transport=httpx.MockTransport(openai_request),
+    )
+    assert openai(_reading_action())["tag"] == "composition_read"
+    assert json.loads(sent[0].content)["temperature"] == 0.3
+
+
+def test_each_provider_action_is_recorded_under_its_stage():
+    from inku_server.pipeline_provider import provider_stage_record
+
+    assert provider_stage_record("generate_normalized_ddl") == "stage1"
+    assert provider_stage_record("read_composition") == "composition"
+    assert provider_stage_record("complete_visible_ddl_holes") == "stage2"

@@ -100,6 +100,9 @@ def default_manifest(binding: PipelineBinding) -> dict:
                               "max_catalog_serialized_bytes": 1024 * 1024,
                               "max_source_bytes": 400_000, "max_response_bytes": 1024 * 1024},
             "catalog_retry": deepcopy(retry), "stage1_retry": stage1_retry, "hole_retry": deepcopy(retry),
+            # Place the layers whose place the description does not state, from a
+            # reading of the description (COMPOSITION-PRODUCT-DESIGN).
+            "composition": {"read": True},
         },
         "render": {
             "options": {"canvas": {"width": CANVAS_BASE_PX, "height": CANVAS_BASE_PX}, "svg_profile": "display"},

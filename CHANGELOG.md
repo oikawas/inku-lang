@@ -6,6 +6,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file retains the history from v2.5.0 (2026-07-25, render engine 12) onward.** Past records follow the recent ones in a collapsible section of this same document; expand it when needed. Viewers without collapse support show the full text. Earlier history is in the [v1.72–v2.4 archive](docs/history/changelog-v1.72-v2.4.md) and the [v0.1–v1.71 archive](docs/history/changelog-v0.1-v1.71.md).
 
+### 2026-10-02 — A fill range written in numbers is drawn (DDL engine 56, Score 0.18.0)
+
+A sentence that writes its fill range in numbers (`右（横2/3〜1、縦0〜1）に、黄色い四角を埋める。`) now fills that range, as the position word with the same numbers does (author's decision, 2026-10-02). Before, the Score had no form for where such a range came from, so the whole sentence was left out (`unsupported_numeric_range`). The Score records the range's origin as the new `numeric_range`, with the place it was written, and a Score with that origin is version 0.18.0. The renderer reads only the numbers, so drawing and the render engine are unchanged. A fill run of colors or other fields uses the same range, and a numeric range on the shape being filled places that shape as a position word does. A numeric range on a Macro caller or a coordinated-group member stays a reported unsupported use. The Server Score schema, the JSON schema artifact, and the API surface baseline accept 0.18.0. Stage 1 and completion never write numeric ranges, so saved works are unchanged.
+
 ### 2026-10-02 — A word left out for an out-of-range count is explained on screen (I-702)
 
 A sentence left out because its count lies outside the word's range (`13枚のNature.若葉。`) is now explained as a plugin diagnostic (author's decision, 2026-10-01). The shared explainer (`explain_plugin_diagnostics`) returns the new reason `plugin_count_out_of_range`, and Web and Android say "The count written on the plugin Nature.若葉 is outside the range it takes, so this sentence was not drawn." It used to stay in the work's record only.

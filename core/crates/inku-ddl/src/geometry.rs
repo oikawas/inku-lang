@@ -26,7 +26,7 @@ const GEOMETRY_RESOLUTION_POLICY_MIDDLE: &str = concat!(
     "\"extent\":\"not_must_fit\",\"region\":\"unclipped\"},",
     "\"numeric\":{\"anchor\":\"declared_unit_interval\",\"extent\":\"must_fit\"},",
     "\"numeric_range\":{\"anchor\":\"same_as_named_range\",\"extent\":\"not_must_fit\",",
-    "\"fill_target\":\"unsupported\",\"region\":\"unclipped\",",
+    "\"fill_target\":\"same_as_named_range\",\"region\":\"unclipped\",",
     "\"values\":\"exact_decimal_or_fraction_unit_interval_nonzero_width\",\"words\":\"kept_unread\"}},",
     "\"capability\":[\"circle_radius_or_diameter\",\"ellipse_width_height\",",
     "\"cloudform_width_height\",\"square_side\",\"square_rotated_declared_rectangle\",",
@@ -135,6 +135,12 @@ pub(crate) fn named_region_bounds(
     named_region_rational_bounds(id, context)
         .map(widen)
         .map(rational_bounds_as_f64)
+}
+
+/// The whole range written in numbers, as `named_region_bounds` gives the
+/// whole range of a position word.
+pub(crate) fn numeric_range_bounds(range: &SemanticNumericRange) -> [f64; 4] {
+    rational_bounds_as_f64(range.rational_bounds())
 }
 
 pub(crate) fn named_region_rational_bounds(
@@ -1146,8 +1152,12 @@ mod tests {
             "same_as_named_range"
         );
         assert_eq!(
+            payload["bounds"]["numeric_range"]["fill_target"],
+            "same_as_named_range"
+        );
+        assert_eq!(
             geometry_resolution_policy_digest(),
-            "0567c999cfa0c5d25e8bfe65a3bd50808c7cad550273a9bb2461c0e74380d4da"
+            "7cbef1c97b2552b0b610a11d131878076069dc1c6bce8c8efe436066896ac84c"
         );
         assert_eq!(
             payload["object_placement"]["layout_direction"]["vertical"],

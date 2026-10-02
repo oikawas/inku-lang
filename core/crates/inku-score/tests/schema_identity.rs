@@ -3,7 +3,7 @@ use serde_json::Value;
 use sha2::{Digest, Sha256};
 
 const EXPECTED_SCHEMA_DIGEST: &str =
-    "39d8dd7edb23c0fd82f821737e78241baa6e7180c40c7d3f387d0e7d23ca8b95";
+    "5ac213f8c10db78ccad7816527f3c0351655b28d3b99b29436d1bd9d2b71d425";
 
 #[test]
 fn canonical_score_schema_identity_is_stable() {

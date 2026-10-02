@@ -11,6 +11,7 @@ import httpx
 _OPENAI_FIXED_TEMPERATURE = re.compile(r"^(gpt-5|o\d)")
 # gpt-5.1 and later take reasoning_effort "none"; gpt-5 itself and the o-series do not.
 _OPENAI_REASONING_OFF = re.compile(r"^gpt-5\.\d")
+_MLX_GEMMA4 = re.compile(r"^gemma[-_]?4(?:[-_]|$)", re.IGNORECASE)
 
 
 def openai_sampling(connection: dict, model: str, *, max_tokens: int, temperature: float) -> dict[str, Any]:
@@ -26,11 +27,15 @@ def openai_sampling(connection: dict, model: str, *, max_tokens: int, temperatur
     OpenAI-compatible servers (NVIDIA, Ollama and the like) keep the fields
     they have always been sent. The explicit MLX profile also disables thinking
     in the model's chat template so the answer has the full output budget.
+    Gemma 4 on MLX uses its model card's sampling settings: the generic low
+    temperature made a constrained work plan repeat layers until truncation.
     """
     if httpx.URL(str(connection["base_url"])).host != "api.openai.com":
         fields = {"max_tokens": max_tokens, "temperature": temperature}
         if connection.get("api_profile") == "mlx":
             fields["enable_thinking"] = False
+            if _MLX_GEMMA4.match(model.rsplit("/", 1)[-1]):
+                fields.update(temperature=1.0, top_p=0.95, top_k=64)
         return fields
     fields: dict[str, Any] = {"max_completion_tokens": max_tokens}
     if not _OPENAI_FIXED_TEMPERATURE.match(model):

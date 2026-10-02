@@ -1610,6 +1610,8 @@ Shared standalone grammar makes modifier phrases own their connectors but exclud
 
 Register an MLX `mlx-vlm` server with service kind `mlx` ("MLX (mlx-vlm)" in administration). Its endpoint, key and model list use the OpenAI-compatible API. Drawing sends the shared core's JSON Schema unchanged through `response_format`, omits function tools and explicitly sets `enable_thinking: false`. The core retains response validation and retry authority. An existing service can change kind while retaining its key, URL and offered models.
 
+Gemma 4 on MLX explicitly receives the [model's recommended sampling settings](https://ai.google.dev/gemma/docs/core/model_card_4): `temperature: 1.0`, `top_p: 0.95`, and `top_k: 64`. This addresses repeated layers at a low temperature that leave JSON unfinished at the output limit. The prompt, response schema, and output limit remain as supplied.
+
 **Stage 1 and Stage 2 use the same drawing model (the author's decision, 2026-09-30).** Both stages use the request's `stage1_model`, otherwise its `stage2_model`, otherwise the account's drawing model. Normalizing account settings aligns `stage2_provider` and `stage2_model` with the Stage 1 values. Vision has a separate model setting (§8.4 and the LLM/Vision catalogs of `/api/models`). The API's `stage1_model` / `stage2_model` keys and old works' model records remain. New drawings record the same actual model under both keys.
 
 **The models the server calls with its own credentials are the ones the

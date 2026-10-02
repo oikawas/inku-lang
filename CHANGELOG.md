@@ -10,6 +10,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 A sentence that writes its fill range in numbers (`右（横2/3〜1、縦0〜1）に、黄色い四角を埋める。`) now fills that range, as the position word with the same numbers does (author's decision, 2026-10-02). Before, the Score had no form for where such a range came from, so the whole sentence was left out (`unsupported_numeric_range`). The Score records the range's origin as the new `numeric_range`, with the place it was written, and a Score with that origin is version 0.18.0. The renderer reads only the numbers, so drawing and the render engine are unchanged. A fill run of colors or other fields uses the same range, and a numeric range on the shape being filled places that shape as a position word does. A numeric range on a Macro caller or a coordinated-group member stays a reported unsupported use. The Server Score schema, the JSON schema artifact, and the API surface baseline accept 0.18.0. Stage 1 and completion never write numeric ranges, so saved works are unchanged.
 
+### 2026-10-02 — Use the model's recommended sampling settings for Gemma 4 on MLX
+
+With a supplied sketch, Gemma 4 repeated the same drawing layer and reached the 2,048-token limit before closing its JSON response. Gemma 4 on MLX now receives `temperature: 1.0`, `top_p: 0.95`, and `top_k: 64`. The same prompt completed with 510 tokens and four layers. The prompt, JSON Schema and output limit are unchanged; other MLX models and other services keep their existing sampling settings.
+
 ### 2026-10-02 — Constrain MLX drawing responses with JSON Schema
 
 Added the "MLX (mlx-vlm)" service kind. With drawing's function tool, Gemma 4 repeated thought-channel markers up to its output limit and failed JSON validation. MLX now receives the shared core's response schema through structured output, with thinking explicitly disabled. Changing a service's kind retains its endpoint, API key and offered models.

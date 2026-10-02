@@ -156,6 +156,51 @@ def test_mlx_profile_survives_settings_and_requests_core_schema_without_tools(mo
     assert "tools" not in body and "tool_choice" not in body
 
 
+def test_mlx_gemma4_sampling_reaches_request_without_changing_core_contract(monkeypatch):
+    """A supplied sketch made Gemma 4 repeat the same layer at temperature 0.3.
+    Its recommended sampler must reach the wire only for the MLX Gemma 4 model.
+    """
+    target = {"model": "mlx-community/gemma-4-12B-it-4bit", "profile": "mlx"}
+    monkeypatch.setattr("inku_server.pipeline_provider.provider_for_model",
+                        lambda *args, **kwargs: ("mac-models", target["model"]))
+    monkeypatch.setattr("inku_server.pipeline_provider.connection_for", lambda *args: {
+        "id": "mac-models", "kind": "openai_compatible", "api_profile": target["profile"],
+        "base_url": "http://model.invalid/v1", "api_key": "test-only", "requires_api_key": True,
+    })
+    seen = []
+
+    async def request(value):
+        seen.append(json.loads(value.content))
+        return httpx.Response(200, json={"choices": [{"message": {
+            "content": '{"normalized_ddl":"keep these bytes"}',
+        }, "finish_reason": "stop"}]})
+
+    provider = SingleAttemptProvider(
+        ProviderOptions({}, "fixture-model", "fixture-model", 256, 8192),
+        transport=httpx.MockTransport(request),
+    )
+    action = _action()
+    assert provider(action)["response"] == '{"normalized_ddl":"keep these bytes"}'
+    body = seen[0]
+    assert (body["temperature"], body["top_p"], body["top_k"]) == (1.0, 0.95, 64)
+    assert body["max_tokens"] == 256 and body["enable_thinking"] is False
+    assert body["messages"] == [
+        {"role": "system", "content": action["payload"]["prompt"]["system"]},
+        {"role": "user", "content": action["payload"]["prompt"]["message"]},
+    ]
+    assert body["response_format"]["json_schema"]["schema"] == action["payload"]["prompt"]["response_schema"]
+    assert "tools" not in body and "tool_choice" not in body
+    for model, profile in [
+        ("mlx-community/Qwen3.6-35B-A3B-4bit", "mlx"),
+        ("google/gemma-4-31b-it", "openai_compatible"),
+    ]:
+        target.update(model=model, profile=profile)
+        assert provider(action)["tag"] == "normalized_ddl_generated"
+        assert seen[-1]["temperature"] == 0.3
+        assert "top_p" not in seen[-1] and "top_k" not in seen[-1]
+    assert len(seen) == 3  # One send per call, with no transport retry.
+
+
 def test_missing_credentials_keep_only_safe_failure_detail(monkeypatch):
     monkeypatch.setattr(
         "inku_server.pipeline_provider.provider_for_model",

@@ -4,7 +4,7 @@ This directory is the Android workspace for the native standalone app and is
 tracked by Git. Local-only artifacts, device IDs, downloaded models, logs, and
 secrets must remain outside tracked files.
 
-Last updated: 2026-10-01.
+Last updated: 2026-10-03.
 
 **Catch-up status**: Android sits at generation `2.1.4-android.80`. DDL conversion and Score → SVG
 rendering run in the shared Rust core (`core/crates/`) of the same commit, packaged with the app, so
@@ -45,6 +45,14 @@ When updating Android specifications:
    adaptation of the Japanese source.
 3. Do not introduce English-only Android requirements that are absent from
    `ANDROID_SPEC.ja.md`.
+
+## 2026-10-03 Composition and reading after the underdrawing
+
+New configurations adopt the composition in shared SPEC §12.6.2. Cloud models set `composition: {"read": true}` and send `read_composition` after the underdrawing and before the visible DDL commit, using Stage 1's model, token limit and temperature 0.0, then return `composition_read`. The shared core retries under `composition_retry`, or `catalog_retry` when absent. On-device LiteRT Gemma 4 E2B sets `read: false`, following the author's decision: it sends no reading request and composes with the default reading.
+
+Gemini response schemas write each object's `properties` in its `propertyOrdering`, with the thesis first, retaining any unnamed properties. When reading is unavailable or composition cannot be applied, the core uses the default reading or commits the printed underdrawing; the Android host continues. New snapshot fields and events remain shared-core records. The reading adds no progress display or prompt tab.
+
+Composed layers save their numeric ranges in visible DDL with `［構図］` (`[composition]` in English). Replay preserves existing saved configurations, DDL and Scores. Old configurations without composition remain absent; a new execution that changes the model from a work with composition adjusts its cloud/device read setting. DDL and rendering-core versions and the Room schema remain unchanged. Reading a specifically named corner is outside this change.
 
 ## 2026-10-02 Unify saved instructions into one DDL
 

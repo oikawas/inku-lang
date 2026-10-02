@@ -252,6 +252,7 @@ class SharedPipelineHost(
                 "select_description_catalog",
                 "generate_sketch",
                 "generate_normalized_ddl",
+                "read_composition",
                 "complete_visible_ddl_holes"
                 -> if (!runProviderEffect(session, action)) return view(session)
                 else -> throw PipelineHostException("unsupported_pipeline_effect")

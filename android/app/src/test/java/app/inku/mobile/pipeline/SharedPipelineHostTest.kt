@@ -242,6 +242,45 @@ class SharedPipelineHostTest {
     }
 
     @Test
+    fun compositionReadUsesStageOneTransportAndReachesTheVisibleCommit() = runBlocking {
+        val binding = ScriptedBinding()
+        val requests = mutableListOf<ModelRequest>()
+        val adapter = SingleAttemptModelEffectProvider(object : ModelProvider {
+            override val providerId = "fixture"
+            override suspend fun generate(request: ModelRequest): ModelResponse {
+                requests += request
+                return ModelResponse("exact response", request.modelId)
+            }
+        })
+        val commits = RecordingCommitStore()
+        val host = host(binding, adapter, commits, MemoryExecutionStore())
+        val config = JSONObject(CONFIG.toString()).put("composition", compositionForModel("gemini:model"))
+        val pending = host.start(
+            startRequest(PipelineAuthoring.Description("mist", false)).copy(configJson = config.toString()),
+        )
+
+        assertEquals("awaiting_patch_approval", pending.phaseTag)
+        assertEquals(listOf("generate_normalized_ddl", "read_composition", "complete_visible_ddl_holes"), requests.map { it.pipelineAction })
+        val reading = requests[1]
+        assertEquals(MODELS.stage1ModelId, reading.modelId)
+        assertEquals(MODELS.stage1MaxTokens, reading.maxTokens)
+        assertEquals(0.0, reading.temperature, 0.0)
+        assertEquals(1_000L, reading.timeoutMs)
+        assertEquals("system", reading.systemInstruction)
+        val result = binding.inputs.first { it.optJSONObject("result")?.optString("tag") == "composition_read" }.getJSONObject("result")
+        assertEquals("provider-composition", result.getJSONObject("identity").getString("action_id"))
+        assertEquals("exact response", result.getString("response"))
+        assertTrue(result.getString("elapsed_ms").toLong() >= 0L)
+        assertEquals(1, commits.actions.size)
+    }
+
+    @Test
+    fun compositionIsReadOnTheCloudAndUsesTheDefaultReadingOnTheDevice() {
+        assertTrue(compositionForModel("gemini:gemma-4-31b-it").getBoolean("read"))
+        assertFalse(compositionForModel("local-litert-lm:gemma-4-e2b").getBoolean("read"))
+    }
+
+    @Test
     fun singleAttemptAdapterPassesCorePromptAndTimeoutOnce() = runBlocking {
         val requests = mutableListOf<ModelRequest>()
         val adapter = SingleAttemptModelEffectProvider(object : ModelProvider {
@@ -303,6 +342,7 @@ class SharedPipelineHostTest {
             return when (tag) {
                 "generate_sketch" -> effectResult(action, "sketch_generated", "{\"sketch\":\"light over mist\"}")
                 "generate_normalized_ddl" -> effectResult(action, "normalized_ddl_generated", "{}")
+                "read_composition" -> effectResult(action, "composition_read", "{}")
                 "complete_visible_ddl_holes" -> effectResult(action, "visible_ddl_hole_patch_generated", "{}")
                 else -> error("unexpected provider action")
             }
@@ -381,6 +421,7 @@ class SharedPipelineHostTest {
             } else if (payload.optString("tag") == "generate_from_description") {
                 payload.optJSONObject("sketch")
             } else null
+            val config = if (previous == null) payload.getJSONObject("config") else previous.getJSONObject("config")
             val state = when {
                 payload.optString("tag") == "cancel" -> State.Cancelled
                 payload.optString("tag") == "approve_patch" -> State.SecondCommit
@@ -389,7 +430,8 @@ class SharedPipelineHostTest {
                 payload.optString("tag") == "generate_from_description" -> State.Stage1
                 payload.optString("tag") == "start" -> State.Stage1
                 resultTag == "sketch_generated" -> State.Stage1
-                resultTag == "normalized_ddl_generated" -> State.FirstCommit
+                resultTag == "normalized_ddl_generated" -> if (config.optJSONObject("composition")?.optBoolean("read") == true) State.Composition else State.FirstCommit
+                resultTag == "composition_read" -> State.FirstCommit
                 resultTag == "visible_ddl_hole_patch_generated" -> State.AwaitingPatch
                 resultTag == "visible_normalized_ddl_committed" && previousActionId == "commit-1" -> {
                     if (previous?.optString("origin_fixture") == "direct") State.Ready else State.Hole
@@ -398,7 +440,6 @@ class SharedPipelineHostTest {
                 payload.optString("tag") == "render" -> State.Completed
                 else -> error("unexpected transition: $payload")
             }
-            val config = if (previous == null) payload.getJSONObject("config") else previous.getJSONObject("config")
             val variationId = previous?.getString("variation_id") ?: payload.getString("variation_id")
             val origin = if (direct || previous?.optString("origin_fixture") == "direct") "direct" else "description"
             val snapshot = snapshot(state, input.getString("sequence"), variationId, config, origin)
@@ -449,26 +490,27 @@ class SharedPipelineHostTest {
         ): JSONObject {
             val direct = originFixture == "direct"
             val revision = when (state) {
-                State.Sketch, State.Stage1, State.FirstCommit -> "0"
+                State.Sketch, State.Stage1, State.Composition, State.FirstCommit -> "0"
                 State.Hole, State.AwaitingPatch, State.SecondCommit -> "1"
                 State.Ready, State.Completed -> if (direct) "1" else "2"
                 State.Cancelled -> "0"
             }
             val document = when (state) {
-                State.Sketch, State.Stage1, State.Cancelled -> null
+                State.Sketch, State.Stage1, State.Composition, State.Cancelled -> null
                 State.FirstCommit, State.Hole, State.AwaitingPatch -> if (direct) "place one circle." else "DDL with hole"
                 State.SecondCommit, State.Ready, State.Completed -> if (direct) "place one circle." else "patched DDL"
             }
             val action = when (state) {
                 State.Sketch -> providerAction("generate_sketch", "provider-sketch")
                 State.Stage1 -> providerAction("generate_normalized_ddl", "provider-1")
+                State.Composition -> providerAction("read_composition", "provider-composition")
                 State.FirstCommit -> commitAction("commit-1", document!!, revision)
                 State.Hole -> providerAction("complete_visible_ddl_holes", "provider-2")
                 State.SecondCommit -> commitAction("commit-2", document!!, revision)
                 else -> null
             }
             val phase = when (state) {
-                State.Sketch, State.Stage1, State.Hole -> JSONObject().put("tag", "awaiting_llm")
+                State.Sketch, State.Stage1, State.Composition, State.Hole -> JSONObject().put("tag", "awaiting_llm")
                 State.FirstCommit, State.SecondCommit -> JSONObject().put("tag", "awaiting_visible_ddl_commit")
                 State.AwaitingPatch -> JSONObject()
                     .put("tag", "awaiting_patch_approval")
@@ -510,6 +552,8 @@ class SharedPipelineHostTest {
                         .put("authority", if (direct) "ddl_authoritative" else "description_authoritative"),
                 )
                 .put("config", JSONObject(config.toString()))
+                .put("composition", if (config.has("composition")) JSONObject().put("state", "fixture") else JSONObject.NULL)
+                .put("stage1_fallback_plan", if (state == State.Composition) JSONObject() else JSONObject.NULL)
                 .put("document", document?.let(::visibleDocument) ?: JSONObject.NULL)
                 .put("phase", phase)
                 .put("action", action ?: JSONObject.NULL)
@@ -523,7 +567,7 @@ class SharedPipelineHostTest {
         override fun resolveMacroCatalog(inputBytes: ByteArray) = error("not used")
         override fun renderSaved(inputBytes: ByteArray) = error("not used")
 
-        private enum class State { Sketch, Stage1, FirstCommit, Hole, AwaitingPatch, SecondCommit, Ready, Completed, Cancelled }
+        private enum class State { Sketch, Stage1, Composition, FirstCommit, Hole, AwaitingPatch, SecondCommit, Ready, Completed, Cancelled }
     }
 
     private companion object {

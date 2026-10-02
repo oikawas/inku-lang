@@ -28,6 +28,7 @@ class SingleAttemptModelEffectProvider(
             "generate_sketch" -> "sketch_generated"
             "select_description_catalog" -> "description_catalog_selected"
             "generate_normalized_ddl" -> "normalized_ddl_generated"
+            "read_composition" -> "composition_read"
             "complete_visible_ddl_holes" -> "visible_ddl_hole_patch_generated"
             else -> throw PipelineHostException("unsupported_provider_effect")
         }

@@ -35,8 +35,21 @@ internal object GeminiJsonSchema {
                     key in supportedKeys -> out.put(key, projectValue(item, namedSchemas = key == "\$defs" || key == "properties"))
                 }
             }
+            val properties = out.optJSONObject("properties")
+            if (!namedSchemas && properties != null && out.optJSONArray("propertyOrdering") != null) {
+                out.put("properties", JSONObject().also { ordered ->
+                    orderedPropertyNames(out).forEach { name -> ordered.put(name, properties.get(name)) }
+                })
+            }
         }
         else -> value
+    }
+
+    internal fun orderedPropertyNames(schema: JSONObject): List<String> {
+        val properties = schema.optJSONObject("properties") ?: return emptyList()
+        val named = schema.optJSONArray("propertyOrdering")?.toList()
+            ?.filterIsInstance<String>()?.filter(properties::has).orEmpty()
+        return (named + properties.keys().asSequence().toList()).distinct()
     }
 
     private fun compactHoleVariants(schema: JSONObject) {

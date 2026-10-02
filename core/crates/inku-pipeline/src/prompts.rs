@@ -17,7 +17,7 @@ use inku_ddl::{
     VisibleDdlPatchEdit, core_modifier_surface_forms, saijiki_asset_sha256_hex,
     saijiki_derived_projection, saijiki_tool_guidance, visible_ddl_patch_available,
     work_plan::{
-        UNSPECIFIED, WorkPlanPlugin, normalize_work_plan_with_plugins,
+        UNSPECIFIED, WorkPlan, WorkPlanPlugin, normalize_work_plan_with_plugins,
         print_work_plan_with_plugins, work_plan_response_schema_with_plugins,
     },
 };
@@ -44,7 +44,8 @@ pub(crate) const LEGACY_HOLE_COMPLETION_PROMPT_ID: &str =
 const PROMPT_DIGEST_DOMAIN: &[u8] = b"inku.llm-prompt.v1";
 const CATALOG_DIGEST_DOMAIN: &[u8] = b"inku.prompt-catalog-projection.v1";
 
-/// The LLM effects accepted by I-523, plus the optional sketch before Stage 1.
+/// The LLM effects accepted by I-523, plus the optional sketch before Stage 1
+/// and the composition reading after it.
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum LlmStage {
@@ -52,6 +53,7 @@ pub enum LlmStage {
     SelectDescriptionCatalog,
     GenerateNormalizedDdl,
     CompleteVisibleDdlHoles,
+    ReadComposition,
 }
 
 impl LlmStage {
@@ -62,6 +64,7 @@ impl LlmStage {
             Self::SelectDescriptionCatalog => "select_description_catalog",
             Self::GenerateNormalizedDdl => "generate_normalized_ddl",
             Self::CompleteVisibleDdlHoles => "complete_visible_ddl_holes",
+            Self::ReadComposition => "read_composition",
         }
     }
 }
@@ -1318,17 +1321,35 @@ pub fn parse_stage1_response_with_plugins(
     language: ResolvedInstructionLanguage,
     plugins: &[WorkPlanPlugin],
 ) -> Result<Stage1Response, PromptError> {
+    parse_stage1_response_and_plan_with_plugins(response_text, limits, language, plugins)
+        .map(|(response, _)| response)
+}
+
+/// Parse a Stage 1 response and keep the normalized plan it was printed from, for
+/// the composition step. A saved response that carries visible DDL directly has no
+/// plan.
+pub fn parse_stage1_response_and_plan_with_plugins(
+    response_text: &str,
+    limits: PromptLimits,
+    language: ResolvedInstructionLanguage,
+    plugins: &[WorkPlanPlugin],
+) -> Result<(Stage1Response, Option<WorkPlan>), PromptError> {
     let value: Value = parse_bounded(response_text, limits)?;
-    let response = if value.get("normalized_ddl").is_some() {
-        serde_json::from_value::<Stage1Response>(value).map_err(|_| PromptError::InvalidJson)?
+    let (response, plan) = if value.get("normalized_ddl").is_some() {
+        (
+            serde_json::from_value::<Stage1Response>(value)
+                .map_err(|_| PromptError::InvalidJson)?,
+            None,
+        )
     } else {
         let (plan, _) = normalize_work_plan_with_plugins(&value, plugins);
         if plan.layers.is_empty() && plan.plugins.is_empty() {
             return Err(PromptError::EmptyField { field: "layers" });
         }
-        Stage1Response {
+        let response = Stage1Response {
             normalized_ddl: print_work_plan_with_plugins(&plan, language, plugins),
-        }
+        };
+        (response, Some(plan))
     };
     require_nonempty("normalized_ddl", &response.normalized_ddl)?;
     require_within(
@@ -1336,7 +1357,7 @@ pub fn parse_stage1_response_with_plugins(
         response.normalized_ddl.len(),
         limits.max_source_bytes,
     )?;
-    Ok(response)
+    Ok((response, plan))
 }
 
 /// Parse the exact visible-patch response. The caller validates it against the compilation.
@@ -1377,7 +1398,7 @@ pub fn parse_hole_completion_response(
     Ok(response)
 }
 
-fn parse_bounded<T: DeserializeOwned>(
+pub(crate) fn parse_bounded<T: DeserializeOwned>(
     response_text: &str,
     limits: PromptLimits,
 ) -> Result<T, PromptError> {
@@ -1550,7 +1571,7 @@ fn hole_response_schema(count: usize, max_replacement_bytes: usize) -> Value {
     })
 }
 
-fn finish_prompt(mut prompt: LlmPrompt) -> Result<LlmPrompt, PromptError> {
+pub(crate) fn finish_prompt(mut prompt: LlmPrompt) -> Result<LlmPrompt, PromptError> {
     let schema_text =
         serde_json::to_string(&prompt.response_schema).map_err(|_| PromptError::Serialization)?;
     let response_instruction = match prompt.instruction_language {
@@ -1612,7 +1633,7 @@ fn hash_prompt(mut prompt: LlmPrompt, schema_text: &str) -> LlmPrompt {
     prompt
 }
 
-fn require_nonempty(field: &'static str, value: &str) -> Result<(), PromptError> {
+pub(crate) fn require_nonempty(field: &'static str, value: &str) -> Result<(), PromptError> {
     if value.is_empty() {
         Err(PromptError::EmptyField { field })
     } else {
@@ -1628,7 +1649,11 @@ fn require_nonblank(field: &'static str, value: &str) -> Result<(), PromptError>
     }
 }
 
-fn require_within(field: &'static str, actual: usize, maximum: usize) -> Result<(), PromptError> {
+pub(crate) fn require_within(
+    field: &'static str,
+    actual: usize,
+    maximum: usize,
+) -> Result<(), PromptError> {
     if actual > maximum {
         Err(PromptError::LimitExceeded {
             field,

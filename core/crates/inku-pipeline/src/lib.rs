@@ -5,6 +5,7 @@
 pub mod authority;
 pub mod byte_envelope;
 pub mod composition;
+pub mod composition_reading;
 pub mod core_boundary;
 mod hole_completion;
 pub mod machine;

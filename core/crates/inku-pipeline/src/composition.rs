@@ -523,6 +523,12 @@ impl RelationKind {
         }
     }
 
+    /// The names of the layers the relation relates, in order (a, b, c).
+    #[must_use]
+    pub fn arg_names(self) -> Vec<&'static str> {
+        self.spec().0.iter().map(|(name, _)| *name).collect()
+    }
+
     /// The layer arguments (name, required) and whether `side` or `toward` applies.
     fn spec(self) -> (&'static [(&'static str, bool)], bool, bool) {
         const AB: &[(&str, bool)] = &[("a", true), ("b", true)];
@@ -556,11 +562,37 @@ pub struct Relation {
     pub toward: Option<String>,
 }
 
-const SIDES: [&str; 2] = ["above", "below"];
-const TOWARD: [&str; 2] = ["left", "right"];
+/// The roles a reading gives its layers, in the order the response schema lists them.
+pub const ROLE_NAMES: [&str; 5] = ["field", "focal", "secondary", "scattered", "accent"];
+
+/// The relations a reading may name, in the order the response schema lists them.
+pub const RELATION_NAMES: [&str; 19] = [
+    "within",
+    "around",
+    "overlap",
+    "near",
+    "apart",
+    "between",
+    "above",
+    "below",
+    "piling",
+    "rising",
+    "falling",
+    "flowing",
+    "spreading",
+    "isolated",
+    "echo",
+    "facing",
+    "parallel",
+    "deviation",
+    "dividing",
+];
+
+pub const SIDES: [&str; 2] = ["above", "below"];
+pub const TOWARD: [&str; 2] = ["left", "right"];
 
 /// The tension axes and their values.
-const TENSION: [(&str, &[&str]); 6] = [
+pub const TENSION: [(&str, &[&str]); 6] = [
     ("motion", &["still", "moving"]),
     ("focus", &["concentrated", "dispersed"]),
     ("vertical", &["rising", "falling"]),

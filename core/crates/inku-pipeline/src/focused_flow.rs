@@ -13,8 +13,8 @@ use crate::core_boundary::{
     ResolvedPaletteColorDto, ResolvedPaletteDto,
 };
 use crate::machine::{
-    AuthoringInput, PipelineConfig, PipelineInput, PipelinePhase, PipelineSnapshot, SketchRequest,
-    SketchState, StepOutput,
+    AuthoringInput, CompositionConfig, PipelineConfig, PipelineInput, PipelinePhase,
+    PipelineSnapshot, SketchRequest, SketchState, StepOutput,
 };
 use crate::prompts::PromptLimits;
 use crate::protocol::{
@@ -107,6 +107,8 @@ fn config() -> PipelineConfig {
         stage1_retry: retry,
         hole_retry: retry,
         sketch_retry: None,
+        composition: None,
+        composition_retry: None,
     }
 }
 
@@ -1600,5 +1602,196 @@ fn the_background_choices_stay_whole_when_every_colour_is_a_mark() {
             .as_str()
             .unwrap()
             .contains("When the description states the background color")
+    );
+}
+
+const COMPOSED_DESCRIPTION: &str = "A red circle above black dots scattered at the bottom";
+
+fn plan_layer(
+    action: &str,
+    shape: &str,
+    count: u32,
+    position: &str,
+    size: &str,
+    color: &str,
+) -> serde_json::Value {
+    json!({
+        "action": action, "angle": "unspecified", "bleeding": "unspecified", "color": color,
+        "continuity": "unspecified", "count": count, "handling": "dense",
+        "line_up_direction": "unspecified", "motion_amplitude": "unspecified",
+        "motion_quality": "unspecified", "position": position, "proportion": "unspecified",
+        "shape": shape, "size": size, "surface": if shape == "point" { "empty" } else { "flat" },
+        "thinness": "unspecified", "tool": "pen"
+    })
+}
+
+/// A plan as Stage 1 returns it: a field, a focal circle and dots the
+/// description places at the bottom.
+fn composed_plan_response() -> serde_json::Value {
+    json!({"ground": "paper", "background": "white", "plugins": [], "layers": [
+        plan_layer("fill", "square", 1, "unspecified", "large", "gray"),
+        plan_layer("place", "circle", 1, "center", "small", "red"),
+        plan_layer("scatter", "point", 12, "bottom", "very_small", "black"),
+    ]})
+}
+
+fn composition_start(composition: Option<CompositionConfig>) -> PipelineSnapshot {
+    let mut pipeline_config = config();
+    pipeline_config.composition = composition;
+    let start = envelope(
+        None,
+        PipelineInput::Start {
+            variation_id: "composition".into(),
+            authoring_nonce: "composition-1".into(),
+            config: Box::new(pipeline_config),
+            authority: VariationAuthorityState::new_description(),
+            authoring: AuthoringInput::Description {
+                description: COMPOSED_DESCRIPTION.into(),
+                auto_catalog: false,
+                sketch: SketchRequest::Off,
+            },
+        },
+    );
+    run(None, &start).snapshot
+}
+
+fn plan_answer(state: &PipelineSnapshot) -> StepOutput {
+    let action = state.action.as_ref().unwrap();
+    assert_eq!(action.tag, "generate_normalized_ddl");
+    let result = PipelineInput::EffectResult {
+        result: EffectResult::NormalizedDdlGenerated {
+            identity: action.identity.clone(),
+            response: composed_plan_response().to_string(),
+            elapsed_ms: DecimalU64::new(20),
+        },
+    };
+    run(Some(state), &envelope(Some(state), result))
+}
+
+fn committed_source(state: &PipelineSnapshot) -> String {
+    let action = state.action.as_ref().unwrap();
+    assert_eq!(action.tag, "commit_visible_normalized_ddl");
+    action.payload["document"]["source"]
+        .as_str()
+        .unwrap()
+        .to_owned()
+}
+
+fn tags(output: &StepOutput) -> Vec<&str> {
+    output
+        .events
+        .iter()
+        .map(|event| event.tag.as_str())
+        .collect()
+}
+
+#[test]
+fn a_composing_run_reads_the_settled_plan_and_commits_marked_ranges() {
+    let pending = composition_start(Some(CompositionConfig { read: true }));
+    let reading_requested = plan_answer(&pending);
+    let state = reading_requested.snapshot;
+    let action = state.action.as_ref().unwrap();
+    assert_eq!(action.tag, "read_composition");
+    assert!(state.composition.is_some());
+    let message = action.payload["prompt"]["message"].as_str().unwrap();
+    assert!(
+        message.starts_with("Description:\nA red circle above black dots"),
+        "{message}"
+    );
+    assert!(
+        message.contains("[place set by the work plan: bottom]"),
+        "{message}"
+    );
+    let reading = json!({
+        "thesis": "a lone circle above a floor of dots",
+        "roles": ["field", "focal", "scattered"],
+        "relations": [{"type": "above", "layers": [1, 2], "side": "unspecified", "toward": "unspecified"}],
+        "tension": {"motion": "still", "focus": "unspecified", "vertical": "unspecified",
+                    "balance": "unspecified", "symmetry": "unspecified", "void": "unspecified"},
+        "stated_places": [{"layer": 2, "words": "at the bottom", "place": "bottom"}]
+    });
+    let result = PipelineInput::EffectResult {
+        result: EffectResult::CompositionRead {
+            identity: action.identity.clone(),
+            response: reading.to_string(),
+            elapsed_ms: DecimalU64::new(30),
+        },
+    };
+    let read = run(Some(&state), &envelope(Some(&state), result));
+    assert!(
+        tags(&read).contains(&"composition_read"),
+        "{:?}",
+        tags(&read)
+    );
+    let source = committed_source(&read.snapshot);
+    let lines: Vec<&str> = source.lines().collect();
+    // The field and the circle are placed by the composition; the dots keep the
+    // place the description states.
+    assert!(lines[2].contains(" at the [composition] "), "{source}");
+    assert!(lines[3].contains(" at the [composition] "), "{source}");
+    assert!(lines[4].ends_with(" at the bottom."), "{source}");
+    assert!(read.snapshot.composition.is_none());
+    let committed = run(
+        Some(&read.snapshot),
+        &envelope(Some(&read.snapshot), ack(&read.snapshot)),
+    )
+    .snapshot;
+    assert!(
+        matches!(committed.phase, PipelinePhase::ScoreReady),
+        "{:?}",
+        committed.phase
+    );
+}
+
+#[test]
+fn a_run_that_does_not_read_composes_from_the_default_reading() {
+    let pending = composition_start(Some(CompositionConfig { read: false }));
+    let output = plan_answer(&pending);
+    let source = committed_source(&output.snapshot);
+    let lines: Vec<&str> = source.lines().collect();
+    assert!(lines[2].contains(" at the [composition] "), "{source}");
+    // Without a reading every place the plan set is kept.
+    assert!(lines[3].ends_with(" at the center."), "{source}");
+    assert!(lines[4].ends_with(" at the bottom."), "{source}");
+}
+
+#[test]
+fn a_failed_reading_composes_from_the_default_reading() {
+    let pending = composition_start(Some(CompositionConfig { read: true }));
+    let mut state = plan_answer(&pending).snapshot;
+    let mut last = None;
+    for _ in 0..2 {
+        let action = state.action.as_ref().unwrap();
+        assert_eq!(action.tag, "read_composition");
+        let result = PipelineInput::EffectResult {
+            result: EffectResult::ProviderFailed {
+                identity: action.identity.clone(),
+                failure: ProviderFailure::RateLimited,
+                elapsed_ms: DecimalU64::new(10),
+            },
+        };
+        let output = run(Some(&state), &envelope(Some(&state), result));
+        state = output.snapshot.clone();
+        last = Some(output);
+    }
+    let last = last.unwrap();
+    assert!(
+        tags(&last).contains(&"composition_fallback"),
+        "{:?}",
+        tags(&last)
+    );
+    assert!(committed_source(&state).contains(" at the [composition] "));
+}
+
+#[test]
+fn a_run_without_composition_commits_the_plan_as_printed() {
+    let pending = composition_start(None);
+    let output = plan_answer(&pending);
+    let source = committed_source(&output.snapshot);
+    assert!(!source.contains("[composition]"), "{source}");
+    assert!(
+        !tags(&output)
+            .iter()
+            .any(|tag| tag.starts_with("composition"))
     );
 }

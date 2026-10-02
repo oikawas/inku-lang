@@ -233,6 +233,11 @@ pub enum EffectResult {
         response: String,
         elapsed_ms: DecimalU64,
     },
+    CompositionRead {
+        identity: ActionEcho,
+        response: String,
+        elapsed_ms: DecimalU64,
+    },
     ProviderFailed {
         identity: ActionEcho,
         failure: ProviderFailure,
@@ -257,6 +262,7 @@ impl EffectResult {
             | Self::DescriptionCatalogSelected { identity, .. }
             | Self::NormalizedDdlGenerated { identity, .. }
             | Self::VisibleDdlHolePatchGenerated { identity, .. }
+            | Self::CompositionRead { identity, .. }
             | Self::ProviderFailed { identity, .. }
             | Self::VisibleNormalizedDdlCommitted { identity, .. }
             | Self::HostCommitFailed { identity, .. } => identity,

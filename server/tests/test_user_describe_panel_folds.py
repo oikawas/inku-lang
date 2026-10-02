@@ -1,14 +1,4 @@
-"""Whether each foldable section of the describe panel is open is per user.
-
-写生 (Stage 0.5) and 展開後 (Stage 2 input) can both be folded away.  Neither
-has anything to show without a session, so the fold belongs to the account
-rather than to the browser -- the same reason the colour catalogue does (see
-test_user_color_catalog_setting.py).
-
-The two defaults differ and must not be collapsed into one: the sketch prose
-was on screen before it could be folded, so an account that has never folded it
-keeps seeing it; the expanded DDL has always started folded.
-"""
+"""Keep the per-user sketch fold while retiring the expanded DDL setting."""
 
 from __future__ import annotations
 
@@ -26,8 +16,6 @@ from inku_server.model_settings import (
 )
 
 client = TestClient(app)
-
-FOLD_FIELDS = ("sketch_open", "ddl_expanded_open")
 
 
 @pytest.fixture
@@ -48,33 +36,33 @@ def auth_headers():
     db.delete_user_group(group["id"])
 
 
-def test_a_user_who_has_never_folded_anything_gets_each_default():
+def test_a_user_who_has_never_folded_anything_sees_the_sketch():
     default = default_user_model_settings()
     assert default["sketch_open"] is True
-    assert default["ddl_expanded_open"] is False
-    # One shared default would silently change one of the two sections.
-    assert default["sketch_open"] != default["ddl_expanded_open"]
+    assert "ddl_expanded_open" not in default
 
 
 def test_an_absent_field_is_not_a_fold():
     clean = normalize_user_model_settings({})
     assert clean["sketch_open"] is True
-    assert clean["ddl_expanded_open"] is False
+    assert "ddl_expanded_open" not in clean
 
 
-@pytest.mark.parametrize("field", FOLD_FIELDS)
 @pytest.mark.parametrize("value", [True, False])
-def test_a_stored_fold_is_kept(field, value):
-    assert normalize_user_model_settings({field: value})[field] is value
+def test_a_stored_fold_is_kept(value):
+    assert normalize_user_model_settings({"sketch_open": value})["sketch_open"] is value
 
 
-@pytest.mark.parametrize("field", FOLD_FIELDS)
-def test_each_field_moves_only_its_own_section(field):
-    other = next(f for f in FOLD_FIELDS if f != field)
-    default = default_user_model_settings()
-    patched = update_user_model_settings({}, {field: not default[field]})
-    assert patched[field] is (not default[field])
-    assert patched[other] is default[other]
+def test_a_retired_fold_is_ignored_without_resetting_current_settings():
+    stored = {"sketch_open": False, "ddl_expanded_open": True, "color_catalog_id": "auto"}
+    clean = normalize_user_model_settings(stored)
+    assert clean["sketch_open"] is False
+    assert clean["color_catalog_id"] == "auto"
+    assert "ddl_expanded_open" not in clean
+    patched = update_user_model_settings(stored, {"ddl_expanded_open": False})
+    assert patched["sketch_open"] is False
+    assert patched["color_catalog_id"] == "auto"
+    assert "ddl_expanded_open" not in patched
 
 
 def test_the_fold_survives_a_round_trip_through_the_api(auth_headers):
@@ -85,12 +73,12 @@ def test_the_fold_survives_a_round_trip_through_the_api(auth_headers):
     )
     assert patched.status_code == 200
     assert patched.json()["model_settings"]["sketch_open"] is False
-    assert patched.json()["model_settings"]["ddl_expanded_open"] is True
+    assert "ddl_expanded_open" not in patched.json()["model_settings"]
 
     current = client.get("/api/auth/me", headers=auth_headers)
     assert current.status_code == 200
     assert current.json()["model_settings"]["sketch_open"] is False
-    assert current.json()["model_settings"]["ddl_expanded_open"] is True
+    assert "ddl_expanded_open" not in current.json()["model_settings"]
 
 
 def test_unfolding_again_is_stored_too(auth_headers):
@@ -123,4 +111,4 @@ def test_patching_another_setting_does_not_unfold(auth_headers):
     )
     assert other.status_code == 200
     assert other.json()["model_settings"]["sketch_open"] is False
-    assert other.json()["model_settings"]["ddl_expanded_open"] is True
+    assert "ddl_expanded_open" not in other.json()["model_settings"]

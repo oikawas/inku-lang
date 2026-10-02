@@ -434,7 +434,6 @@ class SharedPipelinePersistenceTest {
         updatedAt = 2L,
         originalInput = "古いDDLを編集した作品",
         normalizedDdl = source,
-        expandedDdl = source,
         scoreJson = "{\"version\":\"0.10.0\",\"instructions\":[]}",
         displaySvg = "<svg/>",
         stage1Model = null,

@@ -192,7 +192,7 @@ def test_managed_api_persists_approved_patch_reload_and_legacy_fork(
         "at": 1,
         "input": "Old description",
         "ddl": "place one black circle at center.",
-        "expanded_ddl": "place one black circle at center.",
+        "ddl_source_origin": "legacy_expanded",
         "score": '{"instructions":[{"primitive":"circle"}]}',
         "svg": "<svg>old</svg>",
         "elapsed_ms": 0,
@@ -459,6 +459,7 @@ def test_managed_api_persists_approved_patch_reload_and_legacy_fork(
             select(
                 HistoryRow.input,
                 HistoryRow.ddl,
+                HistoryRow.ddl_source_origin,
                 HistoryRow.score,
                 HistoryRow.svg,
             ).where(HistoryRow.id == "legacy-1")
@@ -466,6 +467,7 @@ def test_managed_api_persists_approved_patch_reload_and_legacy_fork(
     assert unchanged == (
         legacy_values["input"],
         legacy_values["ddl"],
+        legacy_values["ddl_source_origin"],
         legacy_values["score"],
         legacy_values["svg"],
     )

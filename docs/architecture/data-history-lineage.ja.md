@@ -23,7 +23,7 @@ flowchart LR
     NODE -->|"明示parent + derivation kindのみ"| EDGE
 ```
 
-DB rowには入力、可視DDL、Score、server生成SVG、model/版/seed/色/時間、mark、表示状態が入る。共有pipelineで描いた作品では、`ddl`は保存・ACKされた可視DDL、`score`は共有lowererが作ったraw compact Scoreであり、`render_limits`は作品のoperational budgetから導いた既存4上限の写しである。写生は`sketch_text` / `sketch_state`（`supplemented` / `not_needed` / `fallback` / `off`）に残る。旧Stage 1 / 2のfallback列（`interpret_fallback` / `compose_fallback`）と`expanded_ddl`、`score_pre_coerce`、`coerce_trace`は旧作品のために残り、新作は書かない（NULL）。Webの読みでは新作の`compose_fallback`は「記録なし」となり、fallbackの印は出ない。backfillはしない。自動作品ファイルを無効化またはqueue overflowしてもDB履歴は残る。
+DB rowには入力、可視DDL、Score、server生成SVG、model/版/seed/色/時間、mark、表示状態が入る。共有pipelineで描いた作品では、`ddl`は保存・ACKされた可視DDL、`score`は共有lowererが作ったraw compact Scoreであり、`render_limits`は作品のoperational budgetから導いた既存4上限の写しである。写生は`sketch_text` / `sketch_state`（`supplemented` / `not_needed` / `fallback` / `off`）に残る。指示書本文は`ddl`に統合し、旧expanded本文を移した場合だけ`ddl_source_origin=legacy_expanded`を残す。旧Stage 1 / 2のfallback列（`interpret_fallback` / `compose_fallback`）と`score_pre_coerce`、`coerce_trace`は旧作品のために残り、新作は書かない（NULL）。Webの読みでは新作の`compose_fallback`は「記録なし」となり、fallbackの印は出ない。fallbackのbackfillはしない。自動作品ファイルを無効化またはqueue overflowしてもDB履歴は残る。
 
 ## 共有pipelineの状態
 
@@ -105,7 +105,7 @@ flowchart LR
     MIGRATION["migrations.py\nregistry v3 / fingerprint / writer lock"]
     SNAPSHOT["backup.py\nWAL-safe SQLite snapshot"]
     INVARIANTS["invariants.py\nPK + canonical history digest"]
-    SCHEMA["schema.py / legacy_schema.py\nphysical schema / one-shot transform"]
+    SCHEMA["schema.py / ddl_migration.py / legacy_v3_*\ncurrent schema / manual migration / frozen restore"]
     DOMAIN["domain owners\naccounts / settings / history / lineage / search / variation_authority …"]
     DB[("canonical SQLite")]
 
@@ -120,7 +120,7 @@ flowchart LR
 
 `db.py`は既存のimportとcall shapeを保つfaçadeで、直接SQLやmigrationのownerではない。`persistence/`の19 owner module（これにpackage初期化を加える）が、設定・engine・schema・migration・backup・invariantと、access、account、group、session、identity、settings、history、search、lineage、奥書、feedback、variation authorityの変更理由ごとに分かれる。
 
-起動時の経路は次のとおりである。fresh DBはschemaとregistryを1 transactionで作る。current registry（version 3 `developer_provider_observations`）のDBは版とchecksumを検査して通常起動し、legacy repair scanを繰り返さない。前版registry（version 1 `legacy_baseline`、version 2 `candidate_authoring_sidecars`）のDBと、registry導入前で明示されたschema fingerprintとFTS状態を満たすDBは、検証済みsnapshot作成後に単一writer transactionで一度だけ移行する。未知・部分状態・未来版・checksum不一致は変更前に拒否する。移行中はprimary key identityと履歴の`id/input/score/svg` byteをstreamingで照合し、SQLite quick checkとforeign-key checkも要求する。
+起動時の経路は次のとおりである。fresh DBはschemaとregistry v4 `single_history_ddl`を1 transactionで作る。current DBは版・checksum、由来列と旧列の不存在、FTSを検査して通常起動し、全件照合を繰り返さない。旧二本文DBは手動移行必須として通常起動を拒否する。手動移行は既知のv3 fingerprintとregistryを確認し、検証済みsnapshotがwriter lock下の移行前像と一致した場合だけ一つのtransactionで本文を選択・旧列を削除する。全persistent tableの保護値、history rowid、主キー、本文byte、保存link digest、FTS、quick/foreign-key checkを照合し、registry v3の記録を保持してv4を加える。未知・部分状態・未来版・checksum不一致は拒否する。受入済みの古いbackupは原本を保持した新しいコピーで凍結v3 adapterを通してから統合する。詳しくは[共通保存契約](../../persistence/README.ja.md)を参照。
 
 Android Room v12は同じ論理契約を別の物理schemaで満たす。v10→v11で既存作品を保持したまま共有pipelineの状態を加え、v11→v12で履歴に要求時の`catalog_mode`を加えた。v1–9限定resetは旧DBと派生thumbnailを捨てるがmodel fileを残す。未来版や読めないDBは変更しない。このlifecycle差はportable contractのgapではなくhost adapterの明示的な所有範囲である。
 
@@ -185,7 +185,7 @@ erDiagram
       string user_id FK
       text input
       text ddl
-      text expanded_ddl
+      text ddl_source_origin
       text score
       text svg
       string description_hash

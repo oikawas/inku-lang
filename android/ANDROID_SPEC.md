@@ -46,11 +46,21 @@ When updating Android specifications:
 3. Do not introduce English-only Android requirements that are absent from
    `ANDROID_SPEC.ja.md`.
 
+## 2026-10-02 Unify saved instructions into one DDL
+
+Saving, display, editing, and redraw use one DDL (SPEC §21, portable persistence contract v2). Room schema 14 retains nullable `history_items.normalized_ddl`, removes `expanded_ddl`, and adds nullable TEXT `ddl_source_origin`. Migration 13→14 copies explicit columns without resetting data. A DDL with a body wins verbatim; only an absent DDL body transfers the entire old expanded text and records `legacy_expanded`. If neither has a body, the original NULL, empty string, or whitespace remains. Body detection uses the contract's fixed Unicode White_Space set, without trimming, newline conversion, or Unicode normalization. U+001C and U+200B are body characters.
+
+Migration calls no compiler, LLM, or renderer. Saved Scores/SVGs, IDs, versions, seeds, colors, permissions, lineage, pipeline links and authority, other values, tables, and indexes are preserved. The startup gate admits 13 for non-destructive Room migration and rejects unknown, future, or unreadable databases. The old reset boundary for versions 1–9 and the historical 12→13 migration and schema remain. The post-Room Saijiki v2 migration reads and writes only the unified DDL, retaining its existing completion marker, accepted transformations, and saved Scores/SVGs.
+
+The instruction editor and redraw use the saved unified source, and drawing entrances are disabled without a body. The description never substitutes for DDL. Saved-Score replay and copying preserve the original NULL, empty string, or whitespace and its origin. New shared-pipeline drawings save their committed document.source and new authority. The transfer marker never reconstructs old input or authoring authority. Old expanded text is completion output from the old engine; 100% compatibility with the current engine is outside the guarantee.
+
+Current work JSON (`inku.history_item`, format 0.2.0) and `inku.ddl-export.v1` output `ddl` and `ddl_source_origin`, without the retired two-text keys. JSON instruction import applies the same selection rule to old `ddl`/`normalized_ddl` and `expanded_ddl` and retains origin during codec round trips. Drawing imported instructions creates a new work without restoring old authority. Screens and text exports show NULL as an empty string.
+
 ## 2026-10-01 Store an absent DDL as NULL
 
 Room schema 13 makes `history_items.normalized_ddl` and the summary field `HistoryListItem.normalizedDdl` nullable. Migration 12→13 rebuilds the work table and changes only an existing empty DDL to NULL. Nonempty DDL, descriptions, Scores, SVGs, seeds, thumbnail references, lineage, other tables, and indexes are preserved. Newly saved works without DDL also store NULL.
 
-Screens, search, copying, the instruction editor, and text exports read NULL as an empty string without displaying the word `null`. Instruction JSON exports carry an empty `ddl`; work JSON exports carry `normalized_ddl: null`. Operations requiring DDL retain their existing empty-input behavior. Display, export, and replay from saved Scores or SVGs remain available without DDL. Drawing, refinement, and forks from a description use the saved description. Replaying a saved Score never substitutes that description for an absent DDL.
+Screens, search, copying, the instruction editor, and text exports read NULL as an empty string without displaying the word `null`. At schema 13, instruction JSON exports carried an empty `ddl` and work JSON exports carried `normalized_ddl: null` (the current format is specified in the schema 14 section above). Display, export, and replay from saved Scores or SVGs remain available without DDL. Drawing, refinement, and forks from a description use the saved description. Replaying a saved Score never substitutes that description for an absent DDL.
 
 ## 2026-09-30 From a photo to a poetic description, with one model
 

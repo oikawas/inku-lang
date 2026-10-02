@@ -138,7 +138,6 @@ class LegacyHistoryRecord:
     history_id: str
     description: str
     source: str | None
-    expanded_source: str | None
     score_json: str
     svg: str
     authority: str
@@ -895,6 +894,7 @@ class VariationAuthorityStore:
             "seed_text",
             "render_limits",
             "lineage_node_id",
+            "ddl_source_origin",
         )
         # A historical schema can lack a later optional column. The read remains
         # faithful by omitting that key rather than manufacturing a default.
@@ -907,7 +907,6 @@ class VariationAuthorityStore:
             history_id=str(row["id"]),
             description=str(row["input"] or ""),
             source=row["ddl"],
-            expanded_source=row["expanded_ddl"],
             score_json=str(row["score"] or "{}"),
             svg=str(row["svg"] or ""),
             authority="legacy_unknown",

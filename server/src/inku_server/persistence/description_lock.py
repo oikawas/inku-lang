@@ -25,6 +25,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 
+from .ddl_source import LEGACY_EXPANDED_ORIGIN
 from .schema import HistoryRow, LineageEdgeRow, LineageNodeRow, PipelineHistoryLinkRow, VariationAuthorityRow
 
 # Derivations that draw from the description again. A child made this way
@@ -117,8 +118,14 @@ def _ddl_of_histories(session, history_ids: list[str | None]) -> dict[str, str]:
     wanted = [history_id for history_id in history_ids if history_id]
     if not wanted:
         return {}
-    rows = session.query(HistoryRow.id, HistoryRow.ddl).filter(HistoryRow.id.in_(wanted)).all()
-    return {row.id: " ".join(row.ddl.split()) for row in rows if row.ddl}
+    rows = session.query(
+        HistoryRow.id, HistoryRow.ddl, HistoryRow.ddl_source_origin,
+    ).filter(HistoryRow.id.in_(wanted)).all()
+    # A transferred expanded text says nothing about the historical input DDL.
+    return {
+        row.id: " ".join(row.ddl.split()) for row in rows
+        if row.ddl and row.ddl_source_origin != LEGACY_EXPANDED_ORIGIN
+    }
 
 
 def _ddl_authoritative_histories(session, history_ids: list[str]) -> set[str]:

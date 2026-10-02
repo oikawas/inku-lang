@@ -258,7 +258,7 @@ def test_root_save_maps_every_history_field_and_creates_root_and_catalog(
     writer, calls = _writer(session)
     item = _item(
         ddl="ddl",
-        expanded_ddl="expanded",
+        ddl_source_origin="legacy_expanded",
         score={"objects": [1]},
         svg="<svg/>",
         output_path="output.svg",
@@ -325,7 +325,7 @@ def test_root_save_maps_every_history_field_and_creates_root_and_catalog(
         "at": 1_777_777_777,
         "input": "input text",
         "ddl": "ddl",
-        "expanded_ddl": "expanded",
+        "ddl_source_origin": "legacy_expanded",
         "score": json.dumps({"objects": [1]}),
         "svg": "<svg/>",
         "output_path": "output.svg",
@@ -511,6 +511,11 @@ def test_child_save_reads_parent_inherits_root_and_writes_canonical_edge(
         (
             {"derivation_metadata": ["invalid"]},
             "lineage derivation metadata must be an object",
+        ),
+        pytest.param(
+            {"ddl_source_origin": "user_authored_ddl"},
+            "invalid DDL source origin",
+            id="invalid-ddl-origin",
         ),
     ],
 )

@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { readFileSync } from 'node:fs';
 
+import { hasDdlBody } from '../../ddl-source.ts';
 import type { HistoryItem } from '../../historyManagerState.svelte.ts';
 import { projectHistoryCurrentWork } from './current-work.ts';
 
@@ -9,8 +11,8 @@ test('T-295: current-work projection preserves saved source, render identity, se
 		id: 'work-1',
 		input: 'legacy input',
 		source_text: 'canonical source',
-		ddl: 'input ddl',
-		expanded_ddl: 'expanded ddl',
+		ddl: 'saved ddl',
+		ddl_source_origin: 'legacy_expanded',
 		thinking: 'thinking',
 		score: { instructions: [], canvas: 'portrait' },
 		svg: '<svg/>',
@@ -32,8 +34,8 @@ test('T-295: current-work projection preserves saved source, render identity, se
 	const projection = projectHistoryCurrentWork(item);
 
 	assert.equal(projection.sourceText, 'canonical source');
-	assert.equal(projection.ddl, 'input ddl');
-	assert.equal(projection.expandedDdl, 'expanded ddl');
+	assert.equal(projection.ddl, 'saved ddl');
+	assert.equal('expandedDdl' in projection, false);
 	assert.equal(projection.sketchText, 'sketch prose');
 	assert.equal(projection.sketchGrain, 'coarse');
 	assert.equal(projection.sketchState, 'used');
@@ -44,4 +46,22 @@ test('T-295: current-work projection preserves saved source, render identity, se
 	assert.equal(projection.result.derivation_kind, 'replay');
 	assert.equal(projection.result.elapsed_total_ms, 31);
 	assert.equal(projection.result.tokens_in_stage1, null);
+});
+
+test('I-706: the single source is replayed and fixed-contract whitespace has no body', () => {
+	for (const value of [null, undefined, '', '\t\r\n \u0085\u00a0\u1680\u2000\u200a\u2028\u2029\u202f\u205f\u3000']) {
+		assert.equal(hasDdlBody(value), false);
+	}
+	for (const value of ['\u3000saved ddl\r\n', '\u001c', '\ufeff']) {
+		assert.equal(hasDdlBody(value), true);
+	}
+	const read = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf8');
+	const state = read('../work/state.svelte.ts');
+	assert.match(state, /if \(!ddl \|\| !hasDdlBody\(ddl\) \|\| reloading\) return/);
+	assert.match(state, /const view = await authorDdl\(ddl, /);
+	assert.doesNotMatch(state, /expandedDdl|source_ddl/);
+	const viewer = read('../../components/DdlViewer.svelte');
+	assert.match(viewer, /highlightDDL\(ddl\)/);
+	assert.match(viewer, /paintDisabled \|\| !hasDdlBody\(ddl\)/);
+	assert.doesNotMatch(viewer, /legacyExpandedOnly|expandedDdl/);
 });

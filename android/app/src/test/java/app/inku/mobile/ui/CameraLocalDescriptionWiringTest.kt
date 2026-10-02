@@ -58,7 +58,7 @@ class CameraLocalDescriptionWiringTest {
         assertTrue(cameraBoundary.contains("prompt = input.description"))
         assertTrue(cameraBoundary.contains("repository.interpret("))
         assertTrue(cameraBoundary.contains("repository.composeFromDdl("))
-        assertTrue(cameraBoundary.contains("interpreted.ddlForDisplay"))
+        assertTrue(cameraBoundary.contains("interpreted.normalizedDdl"))
         assertTrue(cameraBoundary.contains("beforeSave ="))
         assertTrue(cameraBoundary.contains("serial != cameraRunSerial"))
         assertFalse(cameraBoundary.contains("CameraCaptureState.ReadyToEdit"))

@@ -69,7 +69,7 @@ export async function saveHistoryItem(
 			body: JSON.stringify({
 				input: item.input,
 				ddl: item.ddl,
-				expanded_ddl: item.expanded_ddl ?? null,
+				ddl_source_origin: item.ddl_source_origin ?? null,
 				focus: item.focus ?? null,
 				score: item.score,
 				svg,

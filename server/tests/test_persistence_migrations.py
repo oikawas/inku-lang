@@ -17,14 +17,14 @@ from sqlalchemy.exc import OperationalError
 
 import inku_server.persistence.migrations as migrations
 from inku_server.persistence import backup
-from inku_server.persistence import schema as persistence_schema
+from inku_server.persistence import legacy_v3_migrations as frozen_migrations
+from inku_server.persistence import legacy_v3_schema as frozen_schema
 from inku_server.persistence.backup import SQLiteSnapshotError, create_sqlite_snapshot
 from inku_server.persistence.migrations import (
     ACCEPTED_LEGACY_STATES,
     MIGRATION_CHECKSUM,
     MIGRATION_NAME,
     MIGRATION_VERSION,
-    MigrationExecutionError,
     MigrationStateError,
     ensure_current_schema,
     history_fts_state,
@@ -65,6 +65,7 @@ def _engine(path: Path):
 
 def _create_history_schema(connection) -> None:
     connection.exec_driver_sql(_HISTORY_DDL)
+    connection.exec_driver_sql("ALTER TABLE history ADD COLUMN ddl_source_origin TEXT")
 
 
 def _no_op(_connection) -> None:
@@ -131,10 +132,10 @@ def test_fresh_database_records_baseline_and_second_start_skips_legacy(
     engine.dispose()
 
 
-def test_registered_v2_adds_provider_observations_without_touching_history(
+def test_frozen_v3_registered_v2_adds_provider_observations_without_touching_history(
     tmp_path: Path,
 ) -> None:
-    path = tmp_path / "registered-v1.db"
+    path = tmp_path / "registered-v2.db"
     engine = _engine(path)
     candidate_tables = {
         "variation_authority",
@@ -145,11 +146,11 @@ def test_registered_v2_adds_provider_observations_without_touching_history(
     }
     legacy_tables = [
         table
-        for table in persistence_schema.Base.metadata.sorted_tables
-        if table.name not in candidate_tables
+        for table in frozen_schema.Base.metadata.sorted_tables
+        if table.name != "provider_observations"
     ]
     with engine.begin() as connection:
-        persistence_schema.Base.metadata.create_all(
+        frozen_schema.Base.metadata.create_all(
             connection, tables=legacy_tables
         )
         connection.exec_driver_sql(migrations._REGISTRY_DDL)
@@ -166,7 +167,7 @@ def test_registered_v2_adds_provider_observations_without_touching_history(
             },
         )
         connection.execute(
-            persistence_schema.HistoryRow.__table__.insert().values(
+            frozen_schema.HistoryRow.__table__.insert().values(
                 id="legacy-work",
                 at=1,
                 input="original description",
@@ -177,15 +178,15 @@ def test_registered_v2_adds_provider_observations_without_touching_history(
             )
         )
 
-    outcome = ensure_current_schema(
+    outcome = frozen_migrations.ensure_current_schema(
         engine=engine,
         database_path=path,
         create_schema=lambda connection: (
-            persistence_schema.Base.metadata.create_all(connection)
+            frozen_schema.Base.metadata.create_all(connection)
         ),
         seed_fresh=_no_op,
         apply_legacy=lambda _connection: pytest.fail(
-            "registered v1 replayed pre-registry transforms"
+            "registered v2 replayed pre-registry transforms"
         ),
     )
 
@@ -216,9 +217,9 @@ def test_registered_v2_adds_provider_observations_without_touching_history(
         "<svg/>",
     )
     assert _registry_row(engine) == (
-        MIGRATION_VERSION,
-        MIGRATION_NAME,
-        MIGRATION_CHECKSUM,
+        frozen_migrations.MIGRATION_VERSION,
+        frozen_migrations.MIGRATION_NAME,
+        frozen_migrations.MIGRATION_CHECKSUM,
     )
     engine.dispose()
 
@@ -283,7 +284,7 @@ def test_unknown_legacy_schema_fails_before_snapshot_or_mutation(tmp_path: Path)
     engine.dispose()
 
 
-def test_legacy_failure_rolls_back_source_and_retains_verified_snapshot(
+def test_frozen_legacy_failure_rolls_back_source_and_retains_verified_snapshot(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -297,14 +298,14 @@ def test_legacy_failure_rolls_back_source_and_retains_verified_snapshot(
     engine = _engine(path)
     with engine.connect() as connection:
         fingerprint = schema_fingerprint(connection)
-    monkeypatch.setitem(ACCEPTED_LEGACY_STATES, (fingerprint, "absent"), "test-legacy")
+    monkeypatch.setitem(frozen_migrations.ACCEPTED_LEGACY_STATES, (fingerprint, "absent"), "test-legacy")
 
     def fail_after_write(connection) -> None:
         connection.exec_driver_sql("UPDATE history SET input='mutated'")
         raise RuntimeError("injected migration failure")
 
-    with pytest.raises(MigrationExecutionError) as failure:
-        ensure_current_schema(
+    with pytest.raises(frozen_migrations.MigrationExecutionError) as failure:
+        frozen_migrations.ensure_current_schema(
             engine=engine,
             database_path=path,
             create_schema=_no_op,
@@ -324,7 +325,7 @@ def test_legacy_failure_rolls_back_source_and_retains_verified_snapshot(
     engine.dispose()
 
 
-def test_legacy_success_preserves_canonical_bytes_and_becomes_current(
+def test_frozen_legacy_success_preserves_canonical_bytes_and_becomes_v3(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -339,16 +340,16 @@ def test_legacy_success_preserves_canonical_bytes_and_becomes_current(
     engine = _engine(path)
     with engine.connect() as connection:
         fingerprint = schema_fingerprint(connection)
-    monkeypatch.setitem(ACCEPTED_LEGACY_STATES, (fingerprint, "absent"), "test-legacy")
+    monkeypatch.setitem(frozen_migrations.ACCEPTED_LEGACY_STATES, (fingerprint, "absent"), "test-legacy")
 
-    first = ensure_current_schema(
+    first = frozen_migrations.ensure_current_schema(
         engine=engine,
         database_path=path,
         create_schema=_no_op,
         seed_fresh=_no_op,
         apply_legacy=_no_op,
     )
-    second = ensure_current_schema(
+    second = frozen_migrations.ensure_current_schema(
         engine=engine,
         database_path=path,
         create_schema=_no_op,
@@ -497,7 +498,7 @@ def test_rehearsal_cli_requires_marker_guarded_containment(tmp_path: Path) -> No
         ).fetchone() == (0,)
 
 
-def test_rehearsal_cli_migrates_only_the_marked_copy(tmp_path: Path) -> None:
+def test_legacy_rehearsal_cli_refuses_v4_source_without_mutating_the_copy(tmp_path: Path) -> None:
     database = tmp_path / "candidate.db"
     _create_v175_database(database)
     (tmp_path / ".inku-persistence-rehearsal").write_text(
@@ -520,16 +521,15 @@ def test_rehearsal_cli_migrates_only_the_marked_copy(tmp_path: Path) -> None:
             "--expect-fts-state",
             "absent",
         ],
-        check=True,
+        check=False,
         capture_output=True,
         text=True,
         env=env,
     )
 
     result = json.loads(completed.stdout)
-    assert result["ok"] is True
-    assert result["history_rows"] == 1
-    assert result["migration_version"] == MIGRATION_VERSION
-    assert result["migration_checksum"] == MIGRATION_CHECKSUM
+    assert completed.returncode == 1
+    assert result == {"ok": False, "error": "RuntimeError"}
     with sqlite3.connect(database) as connection:
-        assert connection.execute("SELECT count(*) FROM schema_migrations").fetchone() == (1,)
+        assert connection.execute("SELECT ddl FROM history").fetchone() == ("円を置く。",)
+        assert connection.execute("SELECT count(*) FROM sqlite_master WHERE name='schema_migrations'").fetchone() == (0,)

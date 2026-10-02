@@ -24,7 +24,6 @@ class HistorySourceTextTest {
         updatedAt = 0L,
         originalInput = originalInput,
         normalizedDdl = "",
-        expandedDdl = null,
         scoreJson = "{}",
         displaySvg = "",
         stage1Model = null,

@@ -198,8 +198,8 @@ def _logical_fields(contract: dict[str, Any], record_name: str) -> dict[str, dic
 
 
 def _validate_contract_shape(contract: dict[str, Any]) -> dict[str, dict[str, dict[str, Any]]]:
-    if contract.get("contract_version") != 1:
-        raise ContractError("contract_version must be 1")
+    if contract.get("contract_version") != 2:
+        raise ContractError("contract_version must be 2")
     if contract.get("physical_schema_identity_required") is not False:
         raise ContractError("physical schema identity must not be required")
 
@@ -424,7 +424,7 @@ def _insert_dict(connection: sqlite3.Connection, table: str, row: dict[str, Any]
 def validate_reference(root: Path, logical_records: dict[str, dict[str, dict[str, Any]]]) -> None:
     connection = sqlite3.connect(":memory:")
     connection.executescript(
-        (root / "persistence/reference/logical-projection-v1.sql").read_text(encoding="utf-8")
+        (root / "persistence/reference/logical-projection-v2.sql").read_text(encoding="utf-8")
     )
     for record_name, logical_fields in logical_records.items():
         actual = {
@@ -625,7 +625,7 @@ def main() -> int:
         return 1
     print(
         "portable persistence contract: OK "
-        f"v1 fields={summary['logical_fields']} rules={summary['semantic_rules']} "
+        f"v2 fields={summary['logical_fields']} rules={summary['semantic_rules']} "
         f"declared_gaps={summary['declared_gaps']} "
         f"server_tables={summary['server_tables']} room_tables={summary['room_tables']}"
     )

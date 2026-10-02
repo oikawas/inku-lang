@@ -1,6 +1,7 @@
 package app.inku.mobile.data.db
 
 import androidx.sqlite.db.SupportSQLiteDatabase
+import app.inku.mobile.data.DdlSource
 import app.inku.mobile.data.lineage.LineagePlanner
 import java.security.MessageDigest
 import java.util.Base64
@@ -27,8 +28,8 @@ import org.json.JSONObject
  * - the definitions and locks frozen with each performance
  *   (`pipeline_history_links.fork_context_bytes`), with the digests that bind
  *   them to the work's instructions;
- * - the instructions of each saved work (`history_items.normalized_ddl` and
- *   `expanded_ddl`); its description, Score and SVG are never touched;
+ * - the single instructions of each saved work (`history_items.normalized_ddl`);
+ *   its description, transfer origin, Score and SVG are never touched;
  * - the execution snapshots (`pipeline_candidate_executions`) are discarded
  *   when [discardExecutions] says so, not migrated.
  *
@@ -232,13 +233,12 @@ internal class SaijikiV1Migration(
         // Each work's instructions, one unit with its performance's link.
         val present = mutableSetOf<String>()
         db.query(
-            "SELECT id, normalized_ddl, expanded_ddl, instruction_lang_resolved FROM history_items",
+            "SELECT id, normalized_ddl, instruction_lang_resolved FROM history_items",
         ).use { cursor ->
             while (cursor.moveToNext()) {
                 val historyId = cursor.getString(0)
                 val ddl = if (cursor.isNull(1)) null else cursor.getString(1)
-                val expandedDdl = if (cursor.isNull(2)) null else cursor.getString(2)
-                val language = cursor.getString(3)?.takeIf { it == "ja" || it == "en" } ?: "ja"
+                val language = cursor.getString(2)?.takeIf { it == "ja" || it == "en" } ?: "ja"
                 present += historyId
                 count("history", "rows")
                 val link = links[historyId]
@@ -247,18 +247,18 @@ internal class SaijikiV1Migration(
                 val definitions = link?.let { locked(it.definitions, locks) }.orEmpty()
                 val migratedTexts = linkedMapOf<String, String>()
                 var refusedWork = false
-                for ((column, source) in listOf("ddl" to ddl, "expanded_ddl" to expandedDdl)) {
-                    if (source.isNullOrEmpty()) continue
-                    count("history", "${column}_present")
+                if (DdlSource.hasBody(ddl)) {
+                    val source = checkNotNull(ddl)
+                    count("history", "ddl_present")
                     val answer = documentAnswer(
-                        "history", "$historyId:$column", documentUnit(source, language, locks, definitions),
+                        "history", "$historyId:ddl", documentUnit(source, language, locks, definitions),
                         source, link?.catalogLocks?.length() ?: 0,
                     )
                     if (answer == null) {
                         refusedWork = true
                     } else {
                         val migratedSource = answer.getJSONObject("document").getString("source")
-                        if (migratedSource != source) migratedTexts[column] = migratedSource
+                        if (migratedSource != source) migratedTexts["ddl"] = migratedSource
                     }
                 }
                 val newDdl = migratedTexts["ddl"] ?: ddl
@@ -282,8 +282,8 @@ internal class SaijikiV1Migration(
                     continue
                 }
                 if (migratedTexts.isNotEmpty()) {
-                    statements += "UPDATE history_items SET normalized_ddl = ?, expanded_ddl = ? WHERE id = ?" to
-                        arrayOf<Any?>(newDdl, migratedTexts["expanded_ddl"] ?: expandedDdl, historyId)
+                    statements += "UPDATE history_items SET normalized_ddl = ? WHERE id = ?" to
+                        arrayOf<Any?>(newDdl, historyId)
                     count("history", "rows_written")
                 }
                 if (link != null) {

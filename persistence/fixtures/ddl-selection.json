@@ -1,0 +1,9 @@
+[
+  {"id": "ddl-wins-exact", "ddl": " \ncenter: circle\n ", "expanded_ddl": "center: square", "selected": " \ncenter: circle\n ", "ddl_source_origin": null},
+  {"id": "null-transfer", "ddl": null, "expanded_ddl": "\ncenter: circle \n", "selected": "\ncenter: circle \n", "ddl_source_origin": "legacy_expanded"},
+  {"id": "unicode-blank-transfer", "ddl": "\u0085\u00a0\u3000", "expanded_ddl": "circle", "selected": "circle", "ddl_source_origin": "legacy_expanded"},
+  {"id": "both-blank-preserve", "ddl": "\u3000\t", "expanded_ddl": "\u00a0", "selected": "\u3000\t", "ddl_source_origin": null},
+  {"id": "both-null-preserve", "ddl": null, "expanded_ddl": null, "selected": null, "ddl_source_origin": null},
+  {"id": "non-whitespace-control-wins", "ddl": "\u001c", "expanded_ddl": "circle", "selected": "\u001c", "ddl_source_origin": null},
+  {"id": "zero-width-wins", "ddl": "\u200b", "expanded_ddl": "circle", "selected": "\u200b", "ddl_source_origin": null}
+]

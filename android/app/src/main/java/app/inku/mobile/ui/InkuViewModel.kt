@@ -24,6 +24,7 @@ import app.inku.mobile.data.model.CatalogSelection
 import app.inku.mobile.data.model.ColorCatalogs
 import app.inku.mobile.data.model.CompatibilityConstants
 import app.inku.mobile.data.DdlExport
+import app.inku.mobile.data.DdlSource
 import app.inku.mobile.data.model.CameraInputProvenance
 import app.inku.mobile.data.model.CameraInputOrigin
 import app.inku.mobile.data.lineage.LineageDeclaration
@@ -1207,7 +1208,7 @@ class InkuViewModel @JvmOverloads constructor(
         val route = input.route
         repository.composeFromDdl(
             input.description,
-            interpreted.ddlForDisplay,
+            interpreted.normalizedDdl,
             route.catalogId,
             input.canvasAspect,
             route.stage1ModelId,
@@ -1409,7 +1410,7 @@ class InkuViewModel @JvmOverloads constructor(
             return
         }
         localState.value = localState.value.copy(
-            ddl = parsed.ddl,
+            ddl = parsed.ddl.orEmpty(),
             ddlEditedAfterGeneration = true,
             lineageDetached = true,
             pipelineView = null,
@@ -2542,7 +2543,8 @@ class InkuViewModel @JvmOverloads constructor(
             localState.value = localState.value.copy(message = REFINEMENT_IN_PROGRESS(strings()))
             return
         }
-        val ddl = current.ddl.ifBlank { current.prompt }
+        val ddl = current.ddl
+        if (!DdlSource.hasBody(ddl)) return
         val declared = ddlLineage(current)
         val runId = beginDrawingRun()
         drawingJob = viewModelScope.launch {
@@ -3106,7 +3108,7 @@ class InkuViewModel @JvmOverloads constructor(
                             plan = job.plan,
                             displaySvg = result.displaySvg,
                             scoreJson = result.scoreJson,
-                            normalizedDdl = result.normalizedDdl,
+                            normalizedDdl = result.normalizedDdl.orEmpty(),
                             renderHash = result.renderHash,
                             renderHashShort = result.renderHashShort,
                             renderMetadataJson = result.renderMetadataJson,
@@ -3220,7 +3222,6 @@ class InkuViewModel @JvmOverloads constructor(
         result = candidate.pipelineResult ?: PaintResult(
             originalInput = sourceTextOf(parentItem),
             normalizedDdl = candidate.normalizedDdl,
-            expandedDdl = candidate.normalizedDdl,
             scoreJson = candidate.scoreJson,
             displaySvg = candidate.displaySvg,
             renderMetadataJson = candidate.renderMetadataJson,

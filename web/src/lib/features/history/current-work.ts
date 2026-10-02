@@ -5,7 +5,6 @@ import type { PaintResult } from '../run/current-work.ts';
 export type HistoryCurrentWorkProjection = {
 	sourceText: string;
 	ddl: string;
-	expandedDdl: string | null;
 	thinking: string | null;
 	sketchText: string | null;
 	sketchGrain: string | null | undefined;
@@ -19,7 +18,6 @@ export function projectHistoryCurrentWork(item: HistoryItem): HistoryCurrentWork
 	return {
 		sourceText,
 		ddl: item.ddl ?? '',
-		expandedDdl: item.expanded_ddl ?? null,
 		thinking: item.thinking ?? null,
 		sketchText: item.sketch_text ?? null,
 		sketchGrain: item.sketch_grain,

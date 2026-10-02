@@ -34,8 +34,8 @@ export type HistoryItem = {
 	derivation_kind?: string | null;
 	derivation_metadata?: Record<string, unknown>;
 	ddl: string | null;
-	// v1.98: Expanded DDL (Stage 2 input). Works before v1.98 do not have it.
-	expanded_ddl?: string | null;
+	// Migration provenance only; this does not identify an author or pipeline stage.
+	ddl_source_origin?: 'legacy_expanded' | null;
 	focus?: string | null;
 	variation_amplitude?: string | null;
 	variation_seed?: number | string | null;

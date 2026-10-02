@@ -25,8 +25,8 @@ author and the draw session agreed on the same day):
   (``pipeline_history_links.fork_context_bytes``: ``config.definitions`` and
   ``macro_catalog.definition_locks``), with the digests that bind them to the
   work's instructions;
-- the instructions of each saved work (``history.ddl`` and
-  ``history.expanded_ddl``); its description, Score and SVG are never touched;
+- the instructions of each saved work (``history.ddl`` and, only in old
+  schemas, ``history.expanded_ddl``); its description, Score and SVG are never touched;
 - the execution snapshots (``pipeline_candidate_executions``) are discarded,
   not migrated (the author, 2026-09-30).
 
@@ -450,7 +450,11 @@ def _plan(connection: Any, core: _Core, *, sample: int | None, history_ids: Iter
         variation_rows = list(_rows(
             connection, "SELECT owner_id, variation_id, revision, document_json, ddl_digest"
                         " FROM variation_authority" + limit))
-    for row in _rows(connection, "SELECT id, ddl, expanded_ddl, instruction_lang_resolved FROM history" + limit):
+    history_columns = {row[1] for row in _rows(connection, "PRAGMA table_info(history)")}
+    has_expanded_ddl = "expanded_ddl" in history_columns
+    expanded_projection = "expanded_ddl" if has_expanded_ddl else "NULL"
+    for row in _rows(connection, "SELECT id, ddl, " + expanded_projection +
+                     ", instruction_lang_resolved FROM history" + limit):
         if only is None or row[0] in only:
             history_rows.append(row)
 
@@ -461,6 +465,8 @@ def _plan(connection: Any, core: _Core, *, sample: int | None, history_ids: Iter
         history_id, _, column = record_id.partition(":")
         if column not in {"ddl", "expanded_ddl"}:
             raise BlankListInvalid(f"{record_id}: not a history text")
+        if column == "expanded_ddl" and not has_expanded_ddl:
+            raise BlankListInvalid(f"{record_id}: not a history text in this schema")
         row = by_id.get(history_id)
         if row is None:
             if only is None and not sample:
@@ -595,9 +601,13 @@ def _plan(connection: Any, core: _Core, *, sample: int | None, history_ids: Iter
             continue
 
         if migrated_texts:
-            result.statements.append((
-                "UPDATE history SET ddl=?, expanded_ddl=? WHERE id=?",
-                (new_ddl, migrated_texts.get("expanded_ddl", expanded_ddl), history_id)))
+            if has_expanded_ddl:
+                result.statements.append((
+                    "UPDATE history SET ddl=?, expanded_ddl=? WHERE id=?",
+                    (new_ddl, migrated_texts.get("expanded_ddl", expanded_ddl), history_id)))
+            else:
+                result.statements.append((
+                    "UPDATE history SET ddl=? WHERE id=?", (new_ddl, history_id)))
             tally["rows_written"] += 1
         if link:
             statement = _link_statement(link, link_definitions, new_ddl, definition_answer)

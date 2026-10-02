@@ -28,8 +28,8 @@ class HistoryRow(Base):
     user_id      = Column(String,     ForeignKey("user_accounts.id"), nullable=True, index=True)
     at           = Column(BigInteger, nullable=False, index=True)
     input        = Column(Text,       nullable=False, default="")
-    ddl          = Column(Text,       nullable=True)  # v1.98: input-side DDL (Stage 1 output / original user text)
-    expanded_ddl = Column(Text,       nullable=True)  # v1.98: expanded DDL (Stage 1.5 output = Stage 2 input)
+    ddl          = Column(Text,       nullable=True)  # The single saved instruction document.
+    ddl_source_origin = Column(Text, nullable=True)  # NULL or the factual legacy_expanded migration origin.
     score        = Column(Text,       nullable=False, default="{}")
     svg          = Column(Text,       nullable=False, default="")
     output_path  = Column(Text,       nullable=True)

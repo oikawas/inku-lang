@@ -226,7 +226,6 @@ class GenerationInfoSheetTest {
         updatedAt = 1_722_470_400_000L,
         originalInput = "雲を描く",
         normalizedDdl = "雲",
-        expandedDdl = null,
         scoreJson = "{}",
         displaySvg = "<svg/>",
         stage1Model = stage1Model,

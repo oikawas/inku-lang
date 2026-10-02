@@ -163,10 +163,10 @@ test('T-7: without the index the output is byte-identical to the branch point', 
 	assert.equal(declared, 12, 'the declared changes cover twelve cases, no more and no fewer');
 });
 
-test('T-7: the four callers pass no index, and the editor passes one', () => {
+test('T-7: display callers pass no index, and the editor passes one', () => {
 	const viewer = read('components/DdlViewer.svelte');
-	assert.match(viewer, /highlightDDL\(primary\)/);
-	assert.match(viewer, /highlightDDL\(expandedDdl \?\? ''\)/);
+	assert.match(viewer, /highlightDDL\(ddl\)/);
+	assert.doesNotMatch(viewer, /expandedDdl/);
 	const page = read('../routes/+page.svelte');
 	assert.match(page, /highlightDDL\(batch\.activeDdl\)/);
 	assert.match(page, /highlightDDL\(demo\.generatedDdl\)/);

@@ -10,6 +10,37 @@ This file records changes chronologically. If a historical note conflicts with t
 
 Gemini batches retried roughly every two seconds after exhausting their allowance. Model settings now offer per-service RPM, input TPM, and RPD with explanatory tooltips. The shared pipeline counts every stage and retry, waits for minute capacity and provider cooldowns, and retains daily usage across restart. An exhausted daily allowance prevents further generation requests. Gemini starts at the recorded 30 / 16,000 / 14,400; other services start at zero (uncapped), and administrators can edit each value.
 
+### 2026-10-02 — Android: Unify saved instructions into one DDL (I-706)
+
+Room migration 13→14 prefers DDL with a body and transfers old expanded text verbatim only when DDL has no body. It records `ddl_source_origin=legacy_expanded` and removes the old column. When neither has a body, the original NULL, empty string, or whitespace remains. Legacy JSON input, editing, and redraw use the fixed Unicode whitespace set. Migration preserves saved Scores/SVGs, lineage, and authority. Startup Saijiki migration now handles the single DDL, and work and instruction JSON export DDL with origin. Drawing entrances are disabled without a body; saved-Score replay preserves DDL and origin.
+
+### 2026-10-02 — Unify saved instructions into DDL and align old-work redraw (I-706)
+
+Server and Web saving, display, editing, and redraw now use one `ddl`. Old
+two-text migration and JSON input prefer a DDL with a body; only an absent DDL
+body transfers the entire old expanded text verbatim. Its origin is recorded as
+`ddl_source_origin=legacy_expanded`. When neither has a body, the original NULL,
+empty string, or whitespace is retained. Web redraw uses the displayed text and
+disables the entrance only when no body exists. The expanded-text view and fold
+setting are retired.
+
+SQLite schema v4 has a standalone manual migration entry. Ordinary startup
+requires migration without modifying an old database. Migration verifies a
+WAL-safe backup, its match to the preimage under the writer lock, all protected
+values, rowids, links, FTS, and integrity, with rollback on failure. Frozen-adapter
+copy restoration for old backups and the paired portable persistence contract v2
+are included. Saved Scores/SVGs are not regenerated. Old expanded text is
+completion output from the old engine; 100% compatibility with the current
+engine is outside the guarantee.
+
+The Android mapping in portable persistence contract v2 uses the generated Room
+schema 14, verifying nullable DDL and origin and the retired column's absence
+against both hosts' physical schemas.
+
+### 2026-10-02 — Explicit drawing and Vision model references reach the common resolver (I-014)
+
+Explicit model names now retain their reference after trimming surrounding whitespace, including a bare name that matches the user's default model. Provider selection follows the common rules: explicit qualification, sole ownership, then the stage default. Omitted requests retain the user's model/provider pair, qualified defaults stay qualified once, and one drawing model still serves Stage 1/2. New records may retain an explicitly supplied bare model name; existing saved records are unchanged.
+
 ### 2026-10-02 — Clear a previous single-work error when a batch starts
 
 Starting a batch after a failed single-work draw kept showing the old failure reason and attempt count even while the batch succeeded. Starting or resuming a batch now clears that execution state; failed batch lines remain in the batch failure report. This applies to every model and provider.

@@ -1,4 +1,5 @@
 import { pipelineDescription } from '$lib/description-labels';
+import { hasDdlBody } from '$lib/ddl-source';
 import { pluginWarningsToShow } from '$lib/plugin-names';
 import { limitNotesToShow } from '$lib/limitNotes';
 import { t, getLang } from '$lib/i18n/index.svelte';
@@ -106,11 +107,6 @@ export function createWorkState(deps: WorkStateDeps) {
 
 	// ── Result ──────────────────────────────────────────────
 	let ddl = $state<string | null>(null);
-
-	// v1.98: ddl is the input side (Stage 1 output or author-written DDL), while
-	// expandedDdl is the expanded side (Stage 1.5 output and Stage 2 input).
-	// Older records have no input-side value and therefore expose null.
-	let expandedDdl = $state<string | null>(null);
 
 	let ddlGeneratedBaseline = $state<string | null>(null);
 
@@ -253,7 +249,7 @@ export function createWorkState(deps: WorkStateDeps) {
 		if (!view) return;
 		input = view.description;
 		stage1UserPrompt = view.description;
-		if (view.document?.source) {
+		if (view.document) {
 			ddl = view.document.source;
 			ddlGeneratedBaseline = view.document.source;
 		}
@@ -261,7 +257,6 @@ export function createWorkState(deps: WorkStateDeps) {
 		const painted = view.result;
 		result = painted;
 		adoptSketch(painted.sketch_text ?? null, painted.sketch_grain, view.description, painted.sketch_state);
-		expandedDdl = painted.ddl ?? view.document?.source ?? null;
 		thinking = painted.thinking ?? null;
 		elapsedStage1Ms = painted.elapsed_stage1_ms;
 		elapsedStage2Ms = painted.elapsed_stage2_ms;
@@ -550,9 +545,8 @@ export function createWorkState(deps: WorkStateDeps) {
 	async function composeOne(currentDdl: string, originalText: string, signal?: AbortSignal, modelOverride?: string, langOverride?: InstructionLang, renderOptions: { canvasAspectId?: CanvasAspectId; lineageParentNodeId?: string | null; renderOverrides?: RenderOverrides; } = {}): Promise<{
 		score: Score;
 		svg: string;
-		// Expanded DDL passed to Stage 2 (v1.98).
+		// The persisted source used for display, editing, and replay.
 		ddl?: string | null;
-		source_ddl?: string | null;
 		stage2_model?: string | null;
 		render_build_number?: string | null;
 		render_color_profile?: Record<string, string> | null;
@@ -647,10 +641,8 @@ export function createWorkState(deps: WorkStateDeps) {
 			}),
 			paintInstruction: (prompt, paintOptions) => paintOne(prompt, paintOptions),
 			onLatestResult: (painted) => {
-				const sourceDdl = painted.source_ddl ?? painted.ddl;
-				ddl = sourceDdl;
-				expandedDdl = painted.ddl;
-				ddlGeneratedBaseline = sourceDdl;
+				ddl = painted.ddl;
+				ddlGeneratedBaseline = painted.ddl;
 				thinking = painted.thinking;
 				result = painted;
 				deps.showCanvas();
@@ -747,7 +739,7 @@ export function createWorkState(deps: WorkStateDeps) {
 
 		loading = true; error = null;
 		activeRunMode = 'single';
-		ddl = null; expandedDdl = null; ddlGeneratedBaseline = null; thinking = null;
+		ddl = null; ddlGeneratedBaseline = null; thinking = null;
 		displayedHistoryItem = null;
 		deps.history().clearSelection();
 		elapsedStage1Ms = 0; elapsedStage2Ms = 0; elapsedTotalMs = 0;
@@ -791,7 +783,7 @@ export function createWorkState(deps: WorkStateDeps) {
 		pipelineController.clear();
 		loading = true; error = null;
 		activeRunMode = 'batch';
-		ddl = null; expandedDdl = null; ddlGeneratedBaseline = null; thinking = null;
+		ddl = null; ddlGeneratedBaseline = null; thinking = null;
 		displayedHistoryItem = null;
 		deps.history().clearSelection();
 		elapsedStage1Ms = 0; elapsedStage2Ms = 0; elapsedTotalMs = 0;
@@ -876,7 +868,7 @@ export function createWorkState(deps: WorkStateDeps) {
 
 	// ── Replay (Stage 2 only) ───────────────────────────────
 	async function replay() {
-		if (!ddl || reloading) return;
+		if (!ddl || !hasDdlBody(ddl) || reloading) return;
 		if (submitWouldRefine() && !(await confirmFallbackRefine(currentRefineParent()))) return;
 		resetTargetScopedState();
 		try {
@@ -940,7 +932,6 @@ export function createWorkState(deps: WorkStateDeps) {
 		pipelineController.clear();
 		pendingCanvasAspectDerivation = null;
 		ddl = inputMode === 'single' ? '' : null;
-		expandedDdl = null;
 		ddlGeneratedBaseline = inputMode === 'single' ? '' : null;
 		thinking = null;
 		result = null;
@@ -1018,8 +1009,6 @@ export function createWorkState(deps: WorkStateDeps) {
 		set replayComparison(value) { replayComparison = value; },
 		get ddl() { return ddl; },
 		set ddl(value) { ddl = value; },
-		get expandedDdl() { return expandedDdl; },
-		set expandedDdl(value) { expandedDdl = value; },
 		get ddlGeneratedBaseline() { return ddlGeneratedBaseline; },
 		set ddlGeneratedBaseline(value) { ddlGeneratedBaseline = value; },
 		get thinking() { return thinking; },

@@ -94,8 +94,7 @@ class ComposeRequest(BaseModel):
 
 class ComposeResponse(BaseModel):
     ddl: str
-    # 入力側 DDL (展開前)。ddl は Stage 2 に渡った展開後。
-    source_ddl: str | None = None
+    # The committed pipeline document, also used when this work is saved.
     plugin_provenance: list[dict[str, str]] = Field(default_factory=list)
     plugin_warnings: list[str] = Field(default_factory=list)
     carriage_warnings: list[str] | None = None  # v1.94 B: 搬送契約の鏡（検査のみ）
@@ -243,8 +242,7 @@ class PaintRequest(BaseModel):
 class PaintResponse(BaseModel):
     description: str
     ddl: str
-    # 入力側 DDL (展開前)。ddl は Stage 2 に渡った展開後。
-    source_ddl: str | None = None
+    # The committed pipeline document, also used when this work is saved.
     plugin_provenance: list[dict[str, str]] = Field(default_factory=list)
     plugin_warnings: list[str] = Field(default_factory=list)
     carriage_warnings: list[str] | None = None  # v1.94 B: 搬送契約の鏡（検査のみ）

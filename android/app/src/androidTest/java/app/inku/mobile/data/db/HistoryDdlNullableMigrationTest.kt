@@ -41,7 +41,7 @@ class HistoryDdlNullableMigrationTest {
     }
 
     @Test
-    fun v12WorksKeepEveryColumnAndEmptyDdlBecomesNullableThroughRoom() = runBlocking {
+    fun v12WorksKeepEveryColumnAndEmptyDdlBecomesNullableAtV13() = runBlocking {
         lateinit var before: List<Map<String, Any?>>
         migrationHelper.createDatabase(databaseName, 12).use { db ->
             val columns = db.query("PRAGMA table_info(history_items)").use { cursor ->
@@ -99,7 +99,30 @@ class HistoryDdlNullableMigrationTest {
             }
         }
 
+    }
+
+    @Test
+    fun v13ExpandedOnlyTransfersAndBothAbsentStaysNullableThroughRoom() = runBlocking {
+        migrationHelper.createDatabase(databaseName, 13).use { db ->
+            for ((id, expanded) in listOf("expanded-only" to "\n赤い円を描く。 \n", "without-ddl" to null)) {
+                db.execSQL(
+                    "INSERT INTO history_items (id, created_at, updated_at, original_input, normalized_ddl, expanded_ddl, " +
+                        "score_json, display_svg, render_metadata_json, render_hash, render_hash_short, " +
+                        "color_catalog_id, canvas_aspect, starred, trashed) " +
+                        "VALUES (?, 1, 1, '保存した記述', NULL, ?, '{}', '<svg/>', '{}', ?, '0000', 'default', 'square', 0, 0)",
+                    arrayOf<Any?>(id, expanded, id),
+                )
+            }
+        }
+        assertEquals(
+            RoomV10ResetCoordinator.Result.Ready(resetPerformed = false),
+            RoomV10ResetCoordinator.prepare(context, databaseName, File(context.filesDir, "$databaseName-thumbnails")),
+        )
+        migrationHelper.runMigrationsAndValidate(databaseName, 14, true, InkuDatabase.MIGRATION_13_14).close()
         val opened = InkuDatabase.openPrepared(context, databaseName).also { database = it }
+        val transferred = checkNotNull(opened.historyDao().getById("expanded-only"))
+        assertEquals("\n赤い円を描く。 \n", transferred.normalizedDdl)
+        assertEquals("legacy_expanded", transferred.ddlSourceOrigin)
         val absent = checkNotNull(opened.historyDao().getById("without-ddl"))
         assertNull(absent.normalizedDdl)
         assertEquals("", RefinementParent.of(absent, absent.originalInput).ddl)

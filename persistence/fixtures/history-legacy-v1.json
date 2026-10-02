@@ -1,0 +1,15 @@
+{
+  "id": "history-minimal",
+  "at": 1787580000000,
+  "input": "Place one circle in the center.",
+  "source_text": "Place one circle in the center.",
+  "ddl": "center: circle",
+  "expanded_ddl": "center: circle",
+  "score": "{\"instructions\":[]}",
+  "svg": "<svg xmlns=\"http://www.w3.org/2000/svg\"></svg>",
+  "render_hash": "rh3:portable-fixture",
+  "starred": 0,
+  "trashed": 0,
+  "history_visibility": "normal",
+  "lineage_node_id": "node-minimal"
+}

@@ -1,6 +1,11 @@
 package app.inku.mobile.pipeline
 
 import app.inku.mobile.llm.ModelProvider
+import app.inku.mobile.data.DdlSource
+import app.inku.mobile.data.db.HistoryItemEntity
+import app.inku.mobile.data.db.ManagedHistoryRead
+import app.inku.mobile.render.SvgRenderer
+import app.inku.mobile.render.RenderResult
 import app.inku.mobile.llm.ModelRequest
 import app.inku.mobile.llm.ModelResponse
 import java.util.concurrent.ConcurrentHashMap
@@ -14,10 +19,59 @@ import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
+import org.junit.Assert.fail
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class SharedPipelineHostTest {
+    @Test
+    fun savedScoreReplayKeepsTheUnifiedSourceAndOriginAndBlankDdlNeverFallsBackToDescription() = runBlocking {
+        var saved = HistoryItemEntity(
+            id = "legacy", createdAt = 1, updatedAt = 2, originalInput = "description",
+            normalizedDdl = " \ncenter: circle\n ", ddlSourceOrigin = DdlSource.LEGACY_EXPANDED,
+            scoreJson = "{}", displaySvg = "<svg/>", stage1Model = null, stage2Model = null,
+            renderMetadataJson = "{}", renderHash = "hash", renderHashShort = "0000",
+            colorCatalogId = "default", canvasAspect = "pixel9_landscape_safe",
+            starred = false, trashed = false, elapsedMs = null, tokenMetadataJson = null,
+        )
+        val pipeline = AndroidWorkPipeline(
+            binding = ScriptedBinding(),
+            modelProvider = object : ModelProvider {
+                override val providerId: String = "test"
+                override suspend fun generate(request: ModelRequest): ModelResponse = error("no model call expected")
+            },
+            commitStore = RecordingCommitStore(),
+            executionStore = MemoryExecutionStore(),
+            readHistory = { ManagedHistoryRead(saved, "legacy_unknown") },
+            legacyRenderer = object : SvgRenderer {
+                override fun render(request: RenderRequest): RenderResult {
+                    assertEquals(saved.scoreJson, request.scoreJson)
+                    return RenderResult("<svg/>", "{}", "test")
+                }
+            },
+        )
+        val request = PaintRequest(
+            description = "never use this description as DDL", stage1Model = "test", stage2Model = "test",
+            colorCatalogId = "default", canvasAspect = "pixel9_landscape_safe", autoRepair = false,
+            parentHistoryId = saved.id,
+        )
+        val replay = pipeline.renderFromScore(saved.scoreJson, request)
+        assertEquals(saved.normalizedDdl, replay.normalizedDdl)
+        assertEquals(saved.ddlSourceOrigin, replay.ddlSourceOrigin)
+        assertEquals("{}", replay.scoreJson)
+        saved = saved.copy(normalizedDdl = null, ddlSourceOrigin = null)
+        val absent = pipeline.renderFromScore(saved.scoreJson, request)
+        assertNull(absent.normalizedDdl)
+        assertNull(absent.ddlSourceOrigin)
+        try {
+            pipeline.composeFromDdl("\u0085\u00a0\u3000", request)
+            fail("A DDL without a body must not start a drawing")
+        } catch (error: IllegalArgumentException) {
+            assertEquals("ddl_body_required", error.message)
+        }
+    }
+
     @Test
     fun sketchChoiceReachesCoreAndGeneratedRecordSurvivesReloadAndRegeneration() = runBlocking {
         val binding = ScriptedBinding()

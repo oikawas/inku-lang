@@ -91,12 +91,12 @@ def test_t317_save_captures_hidden_trace_non_save_writes_nothing_and_replay_is_i
             trace=trace,
         )
         stored = _add_history_item(
-            actor=actor, input_text="night", ddl="night", expanded_ddl="night", score=post,
+            actor=actor, input_text="night", ddl="night", score=post,
             svg="<svg/>", at=1, save_artifacts=False, idempotency_key="i331-replay",
             coerce_observability=trace.persistable(),
         )
         replay = _add_history_item(
-            actor=actor, input_text="changed", ddl="changed", expanded_ddl="changed", score=score,
+            actor=actor, input_text="changed", ddl="changed", score=score,
             svg="<svg changed/>", at=2, save_artifacts=False, idempotency_key="i331-replay",
             coerce_observability={"complete": False},
         )

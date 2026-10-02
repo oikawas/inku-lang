@@ -1040,8 +1040,8 @@ loaded plugins.  The open/close toggle sits in the toolbar below the canvas.
 ### 7.6 Interpretation Feedback
 
 Current feedback is an observation surface for the transformation, not a score
-on the writer's source text. It shows normalized DDL, expanded DDL when a
-compatibility path produced one, plugin warnings, limit notes, and
+on the writer's source text. It shows the single DDL used for saving and redraw,
+plugin warnings, limit notes, and
 interpretation differences. Stage 1 may arrive first over the stream, but early
 display is not a judgment of correctness.
 
@@ -1140,8 +1140,8 @@ Major UI areas:
 - App rail: compact navigation with an explicit expand/collapse toggle, user
   menu, profile, settings, language and theme controls
 - Input panel: description and batch modes
-- DDL display and editing: read-only normalized DDL in the drawing flow, with
-  word highlighting, expanded DDL display, and `Draw from DDL`; editing happens
+- DDL display and editing: one read-only DDL in the drawing flow, with
+  word highlighting and `Draw from DDL`. Redraw is disabled for an absent body; editing happens
   in a DDL editor dialog with line numbers, inline Saijiki, and a short syntax guide
 - Canvas panel: SVG display, zoom, pan, output tabs, work-conditions header,
   and work actions and export at the bottom
@@ -3645,7 +3645,7 @@ context.
 History is stored in the server DB.  The DB record is the source of truth for:
 
 - original input
-- input-side normalized DDL (Stage 1 `ddl`) and effective Stage 1.5 DDL (`expanded_ddl`, the Stage 2 input)
+- one DDL (`ddl`) for saving, display, editing, and redraw, with the legacy-text origin (`ddl_source_origin`) recorded only where needed
 - JSON Score
 - SVG rendered by the server
 - model metadata
@@ -3653,6 +3653,30 @@ History is stored in the server DB.  The DB record is the source of truth for:
 - timing and token metadata
 - star state
 - trash state
+
+The old two-text format is unified at manual migration and old JSON input
+boundaries. A `ddl` with a non-whitespace body wins; only if it has no body is
+the entire old `expanded_ddl` transferred verbatim. If neither has a body, the
+original `ddl` NULL, empty string, or whitespace is retained. Absence uses the
+fixed Unicode whitespace set in the [portable persistence contract](persistence/README.md),
+without trimming the selected text, converting newlines, or normalizing Unicode.
+Only a transfer from the old expanded text records `ddl_source_origin=legacy_expanded`;
+NULL implies no author or generation stage.
+
+`expanded_ddl` is completion output from the old engine; 100% compatibility with
+the current engine is not guaranteed. Migration does not compile, complete, or
+redraw. It preserves saved Scores, SVGs, edition identities, permissions, lineage,
+and pipeline links. Ordinary redraw sends the unified `ddl` to the shared pipeline
+and saves a new work with the current document and authority, leaving the old
+work's text and saved drawing intact. Works without a body can still display
+and replay their saved Score/SVG.
+
+A fresh Server DB uses schema registry v4 `single_history_ddl`. Ordinary startup
+refuses old two-text databases with a manual-migration reason. After migration it
+checks the retired column's absence, origin column, registry, and FTS. Rollback to
+an older release restores the pre-migration database and old code together. Old
+backups are restored only into an explicit copy with the original retained. See
+[the migration entry and guards](persistence/README.md#manual-server-migration).
 
 The web UI does not send client-generated SVG back as trusted history content.
 `/api/paint` generates and saves server-side history directly.  Compatibility

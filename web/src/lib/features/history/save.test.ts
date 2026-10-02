@@ -24,6 +24,8 @@ test('T-292/T-293: save owns the payload and selects the saved identity after re
 	const order: string[] = [];
 	const saved = item({ id: 'saved-2', svg: '<svg>saved</svg>' });
 	const result = await saveHistoryItem(item({
+		ddl: '\u3000saved ddl\r\n',
+		ddl_source_origin: 'legacy_expanded',
 		render_seed: '7',
 		composition_seed: '8',
 		variation_seed: '9',
@@ -66,6 +68,9 @@ test('T-292/T-293: save owns the payload and selects the saved identity after re
 	assert.equal(calls[0]?.path, '/api/history');
 	const body = JSON.parse(String(calls[0]?.init?.body)) as Record<string, unknown>;
 	assert.equal(body.svg, '<svg>full</svg>');
+	assert.equal(body.ddl, '\u3000saved ddl\r\n');
+	assert.equal(body.ddl_source_origin, 'legacy_expanded');
+	assert.equal('expanded_ddl' in body, false);
 	assert.equal(body.catalog_id, 'catalog-default');
 	assert.equal(body.catalog_mode, 'auto');
 	assert.equal(body.canvas_aspect, 'portrait');

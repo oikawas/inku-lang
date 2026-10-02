@@ -1,16 +1,9 @@
-// Run with: npm run test:unit  (node:test, no test dependency)
-//
-// Acceptance for the two folds of the describe panel -- 写生 (Stage 0.5) and
-// 展開後 (Stage 2 input).  T-16 (the round trip and the two defaults), T-17
-// (the viewer stopped owning its own fold), T-18 (the sketch body is inside
-// the fold and its head is not), T-19 (the folds reach the server).
+// Acceptance for the retained sketch fold and the retired expanded DDL fold.
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 
 import {
-	DDL_EXPANDED_DEFAULT,
-	DDL_EXPANDED_FIELD,
 	DEFAULT_FOLDS,
 	foldsFromSettings,
 	foldsToSettings,
@@ -23,13 +16,9 @@ const read = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf
 
 // ------------------------------------------------- T-16 (round trip, defaults)
 
-test('T-16: the two sections do not share a default', () => {
-	// The sketch prose was on screen before it could be folded; the expanded
-	// DDL was not. One shared default would silently change one of them.
+test('T-16: the retained sketch section defaults open', () => {
 	assert.equal(SKETCH_DEFAULT, true);
-	assert.equal(DDL_EXPANDED_DEFAULT, false);
-	assert.notEqual(SKETCH_DEFAULT, DDL_EXPANDED_DEFAULT);
-	assert.deepEqual(DEFAULT_FOLDS, { sketchOpen: true, ddlExpandedOpen: false });
+	assert.deepEqual(DEFAULT_FOLDS, { sketchOpen: true });
 });
 
 test('T-16: a user who has never folded anything gets each default, not one of them', () => {
@@ -41,22 +30,16 @@ test('T-16: a user who has never folded anything gets each default, not one of t
 });
 
 test('T-16: a fold survives the round trip in both directions', () => {
-	const folded = { sketchOpen: false, ddlExpandedOpen: true };
+	const folded = { sketchOpen: false };
 	assert.deepEqual(foldsFromSettings(foldsToSettings(folded)), folded);
-	const opened = { sketchOpen: true, ddlExpandedOpen: false };
+	const opened = { sketchOpen: true };
 	assert.deepEqual(foldsFromSettings(foldsToSettings(opened)), opened);
 });
 
-test('T-16: each field carries only its own section', () => {
-	// A save that names one section must not move the other one.
-	assert.deepEqual(foldsFromSettings({ [SKETCH_FIELD]: false }), {
-		sketchOpen: false,
-		ddlExpandedOpen: DDL_EXPANDED_DEFAULT
-	});
-	assert.deepEqual(foldsFromSettings({ [DDL_EXPANDED_FIELD]: true }), {
-		sketchOpen: SKETCH_DEFAULT,
-		ddlExpandedOpen: true
-	});
+test('T-16: a retired expanded key cannot move the sketch section or return on save', () => {
+	assert.deepEqual(foldsFromSettings({ sketch_open: false, ddl_expanded_open: true }), { sketchOpen: false });
+	assert.deepEqual(foldsFromSettings({ ddl_expanded_open: false }), DEFAULT_FOLDS);
+	assert.deepEqual(foldsToSettings(foldsFromSettings({ ddl_expanded_open: true })), { sketch_open: true });
 });
 
 test('T-16: a stored value that is not a boolean falls back to that section, not to false', () => {
@@ -65,22 +48,17 @@ test('T-16: a stored value that is not a boolean falls back to that section, not
 	assert.equal(storedFold({ [SKETCH_FIELD]: 'yes' }, SKETCH_FIELD, SKETCH_DEFAULT), true);
 	assert.equal(storedFold({ [SKETCH_FIELD]: 1 }, SKETCH_FIELD, SKETCH_DEFAULT), true);
 	assert.equal(storedFold({ [SKETCH_FIELD]: null }, SKETCH_FIELD, SKETCH_DEFAULT), true);
-	assert.equal(
-		storedFold({ [DDL_EXPANDED_FIELD]: 'yes' }, DDL_EXPANDED_FIELD, DDL_EXPANDED_DEFAULT),
-		false
-	);
 	// A real stored false is a fold, not an absence.
 	assert.equal(storedFold({ [SKETCH_FIELD]: false }, SKETCH_FIELD, SKETCH_DEFAULT), false);
 });
 
 // -------------------------------------------------- T-17 (the viewer's fold)
 
-test("T-17: the expanded DDL fold is the user's, not the viewer instance's", () => {
+test('T-17: the viewer has one visible source and no expanded fold', () => {
 	const viewer = read('../../components/DdlViewer.svelte');
 	// The instance-local fold is what made it forget on every reload.
-	assert.doesNotMatch(viewer, /let expandedOpen = \$state/);
-	assert.match(viewer, /describePanelSettings\.ddlExpandedOpen/);
-	assert.match(viewer, /onclick=\{describePanelSettings\.toggleDdlExpanded\}/);
+	assert.match(viewer, /highlightDDL\(ddl\)/);
+	assert.doesNotMatch(viewer, /expandedDdl|expandedOpen|toggleDdlExpanded/);
 });
 
 // ------------------------------------------- T-18 (what the sketch fold hides)
@@ -117,7 +95,7 @@ test('T-18: opening the editor unfolds the prose it edits', () => {
 
 // ------------------------------------------------ T-19 (the folds are saved)
 
-test("T-19: both folds are registered as the user's settings, not the browser's", () => {
+test("T-19: the sketch fold is registered as the user's settings, not the browser's", () => {
 	const settings = read('./settings.svelte.ts');
 	assert.match(settings, /registerUserSettingsContributor\(\{/);
 	assert.match(settings, /id: 'describe-panel'/);
@@ -134,7 +112,7 @@ test("T-19: both folds are registered as the user's settings, not the browser's"
 test('T-19: every toggle writes its own field to the server', () => {
 	const settings = read('./settings.svelte.ts');
 	assert.match(settings, /toggleSketch = \(\) => \{[\s\S]*?persist\(\{ \[SKETCH_FIELD\]/);
-	assert.match(settings, /toggleDdlExpanded = \(\) => \{[\s\S]*?persist\(\{ \[DDL_EXPANDED_FIELD\]/);
+	assert.doesNotMatch(settings, /DDL_EXPANDED_FIELD|toggleDdlExpanded/);
 
 	const page = read('../../../routes/+page.svelte');
 	const writer = page.slice(
@@ -148,7 +126,7 @@ test('T-19: every toggle writes its own field to the server', () => {
 	assert.match(page, /bindDescribePanelPersist\(/);
 });
 
-test('T-19: the server keeps both fields, so the save is not silently dropped', () => {
+test('T-19: the server keeps the sketch fold and ignores the retired field', () => {
 	// Unknown keys do not survive normalize_user_model_settings: a web-only
 	// change here would round-trip to the default on the next login.
 	const model = readFileSync(
@@ -156,7 +134,6 @@ test('T-19: the server keeps both fields, so the save is not silently dropped', 
 		'utf8'
 	);
 	assert.match(model, /"sketch_open": True/);
-	assert.match(model, /"ddl_expanded_open": False/);
 	assert.match(model, /clean\["sketch_open"\] = settings\.get\("sketch_open"\) is not False/);
-	assert.match(model, /clean\["ddl_expanded_open"\] = settings\.get\("ddl_expanded_open"\) is True/);
+	assert.doesNotMatch(model, /ddl_expanded_open/);
 });

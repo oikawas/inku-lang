@@ -99,8 +99,7 @@ fun drawingModelOf(stage1Model: String, stage2Model: String): String = stage1Mod
  */
 data class PaintResult(
     val originalInput: String,
-    val normalizedDdl: String,
-    val expandedDdl: String,
+    val normalizedDdl: String?,
     val scoreJson: String,
     val displaySvg: String,
     val renderMetadataJson: String,
@@ -144,13 +143,12 @@ data class PaintResult(
     val managedHistoryReplay: ManagedHistoryReplayInput? = null,
     val pipelineView: PipelineView? = null,
     val inputProvenance: app.inku.mobile.data.model.CameraInputProvenance? = null,
+    val ddlSourceOrigin: String? = null,
 )
 
 data class InterpretResult(
     val originalInput: String,
     val normalizedDdl: String,
-    val expandedDdl: String,
-    val ddlForDisplay: String,
     val instructionLangRequested: String? = null,
     val instructionLangResolved: String? = null,
     val tokensIn: Int? = null,

@@ -31,7 +31,6 @@ export type UserModelSettings = {
 	ui_text_size?: number;
 	color_catalog_id?: string;
 	sketch_open?: boolean;
-	ddl_expanded_open?: boolean;
 	generation_info_follows_selection?: boolean;
 };
 

@@ -106,7 +106,7 @@ def _create_pre_share_database(path: Path) -> None:
 
 
 def test_t190_an_old_database_gains_two_closed_columns(tmp_path: Path) -> None:
-    """Opening a database that predates the columns adds them and closes every row.
+    """Explicitly restoring an old copy adds closed columns and preserves its rows.
 
     Measured in a child process against a real file, not against the suite's own
     database: the migration is what runs on the production copy, and the only way
@@ -116,18 +116,32 @@ def test_t190_an_old_database_gains_two_closed_columns(tmp_path: Path) -> None:
     the untouched values beside them.
     """
     db_path = tmp_path / "pre-share.db"
+    current_path = tmp_path / "current.db"
     _create_pre_share_database(db_path)
+    original_bytes = db_path.read_bytes()
     before = {
         "count": 3,
         "marks": [("history-1", 1, 0, "a"), ("history-2", 0, 1, None), ("history-3", 0, 0, "c")],
     }
     code = """
-import json
+import json, os
+from pathlib import Path
 from sqlalchemy import inspect, text
 from inku_server import db
+from inku_server.persistence.legacy_restore import restore_copy
+from inku_server.persistence.ddl_migration import migrate_history_ddl
+
+source = Path(os.environ['INKU_TEST_LEGACY_SOURCE'])
+current = Path(os.environ['INKU_TEST_CURRENT_COPY'])
+restored = restore_copy(source, current)
+assert restored['version'] == 3
+with db.engine.connect() as connection:
+    restored_rows = [list(row) for row in connection.exec_driver_sql(
+        'SELECT id, input, score, svg FROM history ORDER BY id')]
+migrate_history_ddl(current, source_commit='566716f25fa146b332d0efe9b83b8a0fbcaf7caf',
+                    _restored_fingerprint=restored['fingerprint'])
 db.init_db()
-# Twice: the first accepted legacy start records the registry; the second start
-# must validate that registry without replaying ALTER or other legacy repairs.
+# Current startup verifies the migrated copy twice without replaying repairs.
 db.init_db()
 with db.SessionLocal() as session:
     rows = session.execute(text(
@@ -138,11 +152,16 @@ with db.SessionLocal() as session:
         'columns': sorted(c['name'] for c in inspect(db.engine).get_columns('history')),
         'indexes': sorted(i['name'] for i in inspect(db.engine).get_indexes('history')),
         'rows': [list(row) for row in rows],
+        'saved': [list(row) for row in session.execute(text(
+            'SELECT id, input, score, svg FROM history ORDER BY id'))],
+        'restored_saved': restored_rows,
     }
 print(json.dumps(payload, ensure_ascii=False))
 """
     env = os.environ.copy()
-    env["INKU_DB_URL"] = f"sqlite:///{db_path}"
+    env["INKU_DB_URL"] = f"sqlite:///{current_path}"
+    env["INKU_TEST_LEGACY_SOURCE"] = str(db_path)
+    env["INKU_TEST_CURRENT_COPY"] = str(current_path)
     completed = subprocess.run(
         [sys.executable, "-c", code],
         cwd=Path(__file__).parents[1],
@@ -152,6 +171,13 @@ print(json.dumps(payload, ensure_ascii=False))
         text=True,
     )
     payload = json.loads(completed.stdout.strip().splitlines()[-1])
+    assert db_path.read_bytes() == original_bytes
+    assert payload["saved"] == payload["restored_saved"] == [
+        ["history-1", "松を描く", '{"instructions": []}', "<svg/>"],
+        ["history-2", "竹を描く", '{"instructions": []}', "<svg/>"],
+        ["history-3", "梅を描く", '{"instructions": []}', "<svg/>"],
+    ]
+    assert "expanded_ddl" not in payload["columns"]
 
     assert "for_share" in payload["columns"], "the bit was not added"
     assert "share_group_id" in payload["columns"], "the destination was not added"

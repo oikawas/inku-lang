@@ -59,8 +59,7 @@ object RoomV10ResetCoordinator {
             ?: return Result.Refused(RefusalReason.UnreadableDatabase)
 
         return when {
-            version == InkuDatabase.SCHEMA_VERSION -> Result.Ready(resetPerformed = false)
-            version == 10 || version == 11 || version == 12 -> Result.Ready(resetPerformed = false)
+            isNonDestructiveVersion(version) -> Result.Ready(resetPerformed = false)
             version in RESETTABLE_VERSIONS -> resetPreV10Database(
                 context = applicationContext,
                 databaseName = databaseName,
@@ -73,6 +72,9 @@ object RoomV10ResetCoordinator {
             )
         }
     }
+
+    internal fun isNonDestructiveVersion(version: Int): Boolean =
+        version == InkuDatabase.SCHEMA_VERSION || version in 10..13
 
     private fun readUserVersion(databaseFile: File): Int? = runCatching {
         SQLiteDatabase.openDatabase(

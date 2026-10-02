@@ -1,0 +1,4010 @@
+{
+ "schema": "inku.composition-reading-prompt-fixture.v1",
+ "placeholder": {
+  "ja": "（記述）",
+  "en": "(description)"
+ },
+ "system": {
+  "ja": "あなたは、言葉から絵を作るアプリinkuの構図の読み手です。記述と、その記述から作った下絵の層の一覧を読み、構図の読みを、決まった値だけで返します。座標や数値は書きません。配置は、あなたの読みから、別の仕組みが計算します。\n\n# 構図の理論\n画面は中立ではない。場所には性格がある。上は軽く自由、下は重く凝縮。中心と縦横の軸と対角線は安定し、そこから外れた場所と縁の近くは緊張する。左右には性格の差を持たせない。\n重さは、大きさ・数・濃さ・面の密度・孤立で決まる。均衡は重さの釣り合いで、対称は静、等しくない量の対置は動く均衡、意図した不均衡は不安を語る。\n主は一つ。場・主・従・散在・添えの役割と、大小と疎密の対比で画を立てる。\n向きは動きを作る。水平は静、垂直は高さ、斜めは動き。動くものは、進む先に空きを持つ。\n余白は空きではなく働く場所。白も墨として数える。主を片隅や片側に寄せて広く空ける（一角・半辺）、全面に均して中心を消す（all-over）、横の帯を重ねる、場を分ける線、格子、群れと一つの逸脱、不等辺の三角（主・従・添え）。\n規則には小さな揺らぎを。秩序だけでも乱雑だけでも画は痩せる。\n\n# 層の種類（下絵の描き方で決まる）\n- 束: 範囲の中の1か所に描く。数が多くても、その1か所に集まる。\n- 面: 範囲に広げて描く（散らす・埋める・敷き詰める）。\n- 列: 範囲の中心を通って、画面の端から端まで並べる。\n- 全幅の線: 範囲の中心の高さで、画面の幅いっぱいに引く。\n\n# 返す値\nthesis（最初に書く）: 構図の命題。この記述の絵を、画面の上でどう組むかを言う1文。記述と同じ言語で書く。記述を写したり言い換えたりしない。\nroles（層ごとに1つ、層の番号の順）:\n- field（場）: ほかの層を受けとめる地。大きな面、または画面を横切る列・線。\n- focal（主）: 目が最初に行く、ただ一つのもの。主は多くても1つ。\n- secondary（従）: 主を支える、二番目のもの。\n- scattered（散在）: 範囲に散らばる多くの小さなもの。散らす・敷き詰めるの層に限る。\n- accent（添え）: 主と従に添える、小さなもの。\nrelations（層どうしの関係）: typeと、layers（層の番号を、a・b・cの順に）。\n- within（包む） [a, b]: aがbの中にある（bがaを包む）。bは面に限る。\n- around（囲む） [a, b]: aがbのまわりを囲む。aは面か、bより小さくない図形の束。\n- overlap（重なる） [a, b]: aとbが同じ場所に重なる（線の上に乗る、も含む）。\n- near（近い） [a, b]: aがbのすぐ近くにある。sideで上か下かを言える。\n- apart（離れる） [a, b]: aとbが遠く離れている。\n- between（間に） [a, b, c]: aがbとcの間にある。\n- above（上に） [a, b]: aがbより上にある。縦の列には使えない。\n- below（下に） [a, b]: aがbより下にある。縦の列には使えない。\n- piling（積もる） [a]: aが画面の底に溜まる。縦の列には使えない。\n- rising（昇る） [a]: aが上へ動く。束は上に空きを残して置き、面は縦に長くする。横の列・全幅の線には使えない。\n- falling（降る） [a]: aが下へ動く。束は下に空きを残して置き、面は縦に長くする。横の列・全幅の線には使えない。\n- flowing（流れる） [a]: aが横へ動く。束は進む先に空きを残して片側に置き、面は横に長くする。縦の列には使えない。towardで左右を言える（記述が言うときだけ）。\n- spreading（広がる） [a, b?]: aが広く広がる（bから）。aは面に限る（束は1か所に描くので広がらない）。\n- isolated（孤立） [a]: aが広い空きの中に一つだけある。場と、列・全幅の線には使えない。\n- echo（呼応） [a, b]: 離れたaとbが似た大きさで呼び合う。同じ種類の層どうし。\n- facing（対峙） [a, b]: aとbが画面の中心をはさんで向き合う。束か面どうし。\n- parallel（並走） [a, b]: 細長いaとbが、触れずに同じ向きに並ぶ。列・線・面どうし。\n- deviation（逸脱） [a, b]: 一つのaが、群れbから外れる。aは束、bは面か列。\n- dividing（分ける） [a, b?]: aがb（無ければ画面）を二つに分ける。aは列・全幅の線、または細長い面。\nside（nearとechoのとき）: above・below・unspecified。toward（flowingのとき、記述が言うときだけ）: left・right・unspecified。\ntension（全体の張り）。言わなくてよいものはunspecified:\n- motion（still / moving）: 静（still）か動（moving）か。\n- focus（concentrated / dispersed）: 場を除いて描くものが寄り集まる（concentrated）か、画面に広く散る（dispersed）か。孤立・逸脱と読んだものは、集まりの外にあってよい。\n- vertical（rising / falling）: 画全体の重心が上がる（rising）か下がる（falling）か。言わなくてよい。\n- balance（static / dynamic / unbalanced）: 静かな均衡（static）、等しくない量の釣り合い（dynamic）、意図した不均衡（unbalanced）。\n- symmetry（symmetric / asymmetric）: 左右対称（symmetric、静かな均衡のときだけ）か、非対称か。言わなくてよい。\n- void（strong / medium / weak）: 描かない場所の強さ。strong（広く空ける）、medium、weak（画面全体を使ってよい）。\nstated_places: 記述が、ある層を画面のどこに置くかを、位置の言葉で言うときだけ。位置の言葉は、画面の部分を指す言葉（上・下・中央・左・右・隅・端など）。描く物や情景の名前は、位置の言葉ではない。layer（層の番号）と、位置の言葉を含む記述の部分をそのまま短く引いたwordsと、その言葉が言う場所を下絵の場所の値から1つ選んだplace（top＝上、bottom＝下、center＝中心、left_edge＝左端、right_edge＝右端、top_edge＝上端、bottom_edge＝下端、corner＝隅）。下絵に場所が無い層でも、記述が言うなら書く。無ければ空にする。\n\n# 決まり\n- 記述全体を読んで決める。記述の語から、関係・張り・場所を決まった対応で引かない。\n- 層の種類で使えない値は選ばない。\n- 記述から読めない関係は書かない。関係は0個でもよい。\n- 記述から読めない張りは unspecified にする（作者が決めた既定が使われる）。\n- rolesは、層の数と同じ数だけ、層の番号の順に書く。\n- 下絵の層の〔下絵が付けた場所〕は、下絵を作ったときの推測で、記述の言葉とは限らない。記述がその場所をはっきり言うときだけ、stated_placesに書く。",
+  "en": "You are the composition reader of inku, an app that makes pictures from words. Read a description and the layers of the work plan made from it, and return a composition reading using fixed values only. Do not write coordinates or numbers; another part of the app computes the placement from your reading.\n\n# Composition theory\nThe canvas is not neutral; every place has a character. The top is light and free, the bottom heavy and condensed. The center, the vertical and horizontal axes and the diagonals are stable; places off them and near the edges are tense. Left and right have no difference of character.\nWeight comes from size, number, darkness, density of surface and isolation. Balance is the equilibrium of weights: symmetry is still, unequal weights set against each other make a dynamic balance, and intended imbalance speaks of unease.\nThere is one focal thing. Build the picture with the roles of field, focal, secondary, scattered and accent, and with contrasts of large and small, sparse and dense.\nDirection makes movement: horizontal is still, vertical is height, diagonal is motion. A moving thing has open space ahead of it.\nEmpty space is not a gap but a working place; count the white as ink. Push the focal thing into a corner or to one side and leave wide space (one corner, half side), spread evenly and erase the center (all-over), stack horizontal bands, divide the field with a line, a grid, a flock and one that strays, an unequal triangle of focal, secondary and accent.\nGive the rules a small wavering. Order alone, or disorder alone, makes a thin picture.\n\n# Kinds of layer (fixed by how the plan draws)\n- bundle: Drawn at one spot inside the range; several marks gather at that spot.\n- area: Spread over the range (scatter, fill, tile).\n- row: A row from edge to edge of the canvas through the range center.\n- full-width line: Drawn across the whole width at the height of the range center.\n\n# Values to return\nthesis (write it first): the composition's proposition, one sentence on how this picture is built on the canvas, in the description's language. Do not copy or paraphrase the description.\nroles (one per layer, in layer order):\n- field: The ground that holds the others: a large area, or a row or line across the canvas.\n- focal: The one thing the eye goes to first. At most one layer.\n- secondary: Supports the focal thing.\n- scattered: Many small marks spread over a range. Only for scatter or tile layers.\n- accent: A small touch that completes the focal and secondary things.\nrelations (between layers): a type, and layers (the layer numbers, as a, b, c in order).\n- within [a, b]: a lies inside b (b holds a). b must be an area.\n- around [a, b]: a surrounds b. a is an area, or a bundle of marks no smaller than b.\n- overlap [a, b]: a and b share a place (also: a sits on a line b).\n- near [a, b]: a is close to b. side can say above or below.\n- apart [a, b]: a and b are far apart.\n- between [a, b, c]: a lies between b and c.\n- above [a, b]: a is higher than b. Not for vertical rows.\n- below [a, b]: a is lower than b. Not for vertical rows.\n- piling [a]: a settles at the bottom of the canvas. Not for vertical rows.\n- rising [a]: a moves up. A bundle keeps open space above it; an area runs tall. Not for horizontal rows or full-width lines.\n- falling [a]: a moves down. A bundle keeps open space below it; an area runs tall. Not for horizontal rows or full-width lines.\n- flowing [a]: a moves sideways. A bundle sits to one side with open space ahead; an area runs wide. Not for vertical rows. toward can say left or right (only when the description does).\n- spreading [a, b?]: a spreads widely (from b). a must be an area (a bundle is drawn at one spot).\n- isolated [a]: a stands alone in wide empty space. Not for the field, rows or full-width lines.\n- echo [a, b]: a and b answer each other across a distance, at similar weight. Layers of the same kind.\n- facing [a, b]: a and b face each other across the center of the canvas. Bundles or areas.\n- parallel [a, b]: Long a and b run side by side in the same direction without touching. Rows, lines or areas.\n- deviation [a, b]: A single a strays from the group b. a is a bundle; b is an area or a row.\n- dividing [a, b?]: a divides b (or the whole canvas) in two. a is a row, a full-width line, or a long area.\nside (for near and echo): above, below or unspecified. toward (for flowing, only when the description says): left, right or unspecified.\ntension (the whole picture). Use unspecified where you have nothing to say:\n- motion (still / moving): still or moving.\n- focus (concentrated / dispersed): whether what is drawn, apart from the field, gathers (concentrated) or spreads over the canvas (dispersed). A thing read as isolated or straying may stay outside the gathering.\n- vertical (rising / falling): the whole picture's weight rises or falls. May be left out.\n- balance (static / dynamic / unbalanced): static balance, dynamic balance of unequal weights, or intended imbalance.\n- symmetry (symmetric / asymmetric): left-right symmetric (only with static balance) or asymmetric. May be left out.\n- void (strong / medium / weak): how strongly empty space works: strong (wide empty space), medium, or weak (the whole canvas may be used).\nstated_places: only when the description says, in words of position, where on the canvas a layer is. Words of position name a part of the picture (top, bottom, center, left, right, corner, edge and the like); the names of things or of the scene are not words of position. layer (its number); words, a short verbatim quote of the part of the description that contains the words of position; and place, the place those words name, chosen from the work plan's place values (top, bottom, center, left_edge, right_edge, top_edge, bottom_edge, corner). Write it even when the plan has no place for that layer, if the description states one. Leave it empty when there are none.\n\n# Rules\n- Decide from the whole description. Do not look up relations, tension or places from words of the description by a fixed correspondence.\n- Do not choose a value that the kind of layer cannot take.\n- Do not write relations the description does not let you read. Zero relations is fine.\n- Use unspecified for any tension the description does not let you read (the author's defaults apply).\n- Write exactly one role per layer, in layer order.\n- A layer's [place set by the work plan] was guessed when the plan was made; it is not necessarily the description's words. Only when the description clearly states that place, write it in stated_places."
+ },
+ "response_schemas": {
+  "1": {
+   "type": "object",
+   "propertyOrdering": [
+    "thesis",
+    "roles",
+    "relations",
+    "tension",
+    "stated_places"
+   ],
+   "properties": {
+    "thesis": {
+     "type": "string"
+    },
+    "roles": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "enum": [
+       "field",
+       "focal",
+       "secondary",
+       "scattered",
+       "accent"
+      ]
+     },
+     "minItems": 1,
+     "maxItems": 1
+    },
+    "relations": {
+     "type": "array",
+     "items": {
+      "type": "object",
+      "properties": {
+       "type": {
+        "type": "string",
+        "enum": [
+         "within",
+         "around",
+         "overlap",
+         "near",
+         "apart",
+         "between",
+         "above",
+         "below",
+         "piling",
+         "rising",
+         "falling",
+         "flowing",
+         "spreading",
+         "isolated",
+         "echo",
+         "facing",
+         "parallel",
+         "deviation",
+         "dividing"
+        ]
+       },
+       "layers": {
+        "type": "array",
+        "items": {
+         "type": "integer",
+         "minimum": 0
+        },
+        "minItems": 1,
+        "maxItems": 3
+       },
+       "side": {
+        "type": "string",
+        "enum": [
+         "above",
+         "below",
+         "unspecified"
+        ]
+       },
+       "toward": {
+        "type": "string",
+        "enum": [
+         "left",
+         "right",
+         "unspecified"
+        ]
+       }
+      },
+      "required": [
+       "type",
+       "layers",
+       "side",
+       "toward"
+      ]
+     }
+    },
+    "tension": {
+     "type": "object",
+     "properties": {
+      "motion": {
+       "type": "string",
+       "enum": [
+        "still",
+        "moving",
+        "unspecified"
+       ]
+      },
+      "focus": {
+       "type": "string",
+       "enum": [
+        "concentrated",
+        "dispersed",
+        "unspecified"
+       ]
+      },
+      "vertical": {
+       "type": "string",
+       "enum": [
+        "rising",
+        "falling",
+        "unspecified"
+       ]
+      },
+      "balance": {
+       "type": "string",
+       "enum": [
+        "static",
+        "dynamic",
+        "unbalanced",
+        "unspecified"
+       ]
+      },
+      "symmetry": {
+       "type": "string",
+       "enum": [
+        "symmetric",
+        "asymmetric",
+        "unspecified"
+       ]
+      },
+      "void": {
+       "type": "string",
+       "enum": [
+        "strong",
+        "medium",
+        "weak",
+        "unspecified"
+       ]
+      }
+     },
+     "required": [
+      "motion",
+      "focus",
+      "vertical",
+      "balance",
+      "symmetry",
+      "void"
+     ]
+    },
+    "stated_places": {
+     "type": "array",
+     "items": {
+      "type": "object",
+      "properties": {
+       "layer": {
+        "type": "integer",
+        "minimum": 0
+       },
+       "words": {
+        "type": "string"
+       },
+       "place": {
+        "type": "string",
+        "enum": [
+         "top",
+         "bottom",
+         "center",
+         "left_edge",
+         "right_edge",
+         "top_edge",
+         "bottom_edge",
+         "corner"
+        ]
+       }
+      },
+      "required": [
+       "layer",
+       "words",
+       "place"
+      ]
+     }
+    }
+   },
+   "required": [
+    "thesis",
+    "roles",
+    "relations",
+    "tension",
+    "stated_places"
+   ]
+  },
+  "2": {
+   "type": "object",
+   "propertyOrdering": [
+    "thesis",
+    "roles",
+    "relations",
+    "tension",
+    "stated_places"
+   ],
+   "properties": {
+    "thesis": {
+     "type": "string"
+    },
+    "roles": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "enum": [
+       "field",
+       "focal",
+       "secondary",
+       "scattered",
+       "accent"
+      ]
+     },
+     "minItems": 2,
+     "maxItems": 2
+    },
+    "relations": {
+     "type": "array",
+     "items": {
+      "type": "object",
+      "properties": {
+       "type": {
+        "type": "string",
+        "enum": [
+         "within",
+         "around",
+         "overlap",
+         "near",
+         "apart",
+         "between",
+         "above",
+         "below",
+         "piling",
+         "rising",
+         "falling",
+         "flowing",
+         "spreading",
+         "isolated",
+         "echo",
+         "facing",
+         "parallel",
+         "deviation",
+         "dividing"
+        ]
+       },
+       "layers": {
+        "type": "array",
+        "items": {
+         "type": "integer",
+         "minimum": 0
+        },
+        "minItems": 1,
+        "maxItems": 3
+       },
+       "side": {
+        "type": "string",
+        "enum": [
+         "above",
+         "below",
+         "unspecified"
+        ]
+       },
+       "toward": {
+        "type": "string",
+        "enum": [
+         "left",
+         "right",
+         "unspecified"
+        ]
+       }
+      },
+      "required": [
+       "type",
+       "layers",
+       "side",
+       "toward"
+      ]
+     }
+    },
+    "tension": {
+     "type": "object",
+     "properties": {
+      "motion": {
+       "type": "string",
+       "enum": [
+        "still",
+        "moving",
+        "unspecified"
+       ]
+      },
+      "focus": {
+       "type": "string",
+       "enum": [
+        "concentrated",
+        "dispersed",
+        "unspecified"
+       ]
+      },
+      "vertical": {
+       "type": "string",
+       "enum": [
+        "rising",
+        "falling",
+        "unspecified"
+       ]
+      },
+      "balance": {
+       "type": "string",
+       "enum": [
+        "static",
+        "dynamic",
+        "unbalanced",
+        "unspecified"
+       ]
+      },
+      "symmetry": {
+       "type": "string",
+       "enum": [
+        "symmetric",
+        "asymmetric",
+        "unspecified"
+       ]
+      },
+      "void": {
+       "type": "string",
+       "enum": [
+        "strong",
+        "medium",
+        "weak",
+        "unspecified"
+       ]
+      }
+     },
+     "required": [
+      "motion",
+      "focus",
+      "vertical",
+      "balance",
+      "symmetry",
+      "void"
+     ]
+    },
+    "stated_places": {
+     "type": "array",
+     "items": {
+      "type": "object",
+      "properties": {
+       "layer": {
+        "type": "integer",
+        "minimum": 0
+       },
+       "words": {
+        "type": "string"
+       },
+       "place": {
+        "type": "string",
+        "enum": [
+         "top",
+         "bottom",
+         "center",
+         "left_edge",
+         "right_edge",
+         "top_edge",
+         "bottom_edge",
+         "corner"
+        ]
+       }
+      },
+      "required": [
+       "layer",
+       "words",
+       "place"
+      ]
+     }
+    }
+   },
+   "required": [
+    "thesis",
+    "roles",
+    "relations",
+    "tension",
+    "stated_places"
+   ]
+  },
+  "3": {
+   "type": "object",
+   "propertyOrdering": [
+    "thesis",
+    "roles",
+    "relations",
+    "tension",
+    "stated_places"
+   ],
+   "properties": {
+    "thesis": {
+     "type": "string"
+    },
+    "roles": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "enum": [
+       "field",
+       "focal",
+       "secondary",
+       "scattered",
+       "accent"
+      ]
+     },
+     "minItems": 3,
+     "maxItems": 3
+    },
+    "relations": {
+     "type": "array",
+     "items": {
+      "type": "object",
+      "properties": {
+       "type": {
+        "type": "string",
+        "enum": [
+         "within",
+         "around",
+         "overlap",
+         "near",
+         "apart",
+         "between",
+         "above",
+         "below",
+         "piling",
+         "rising",
+         "falling",
+         "flowing",
+         "spreading",
+         "isolated",
+         "echo",
+         "facing",
+         "parallel",
+         "deviation",
+         "dividing"
+        ]
+       },
+       "layers": {
+        "type": "array",
+        "items": {
+         "type": "integer",
+         "minimum": 0
+        },
+        "minItems": 1,
+        "maxItems": 3
+       },
+       "side": {
+        "type": "string",
+        "enum": [
+         "above",
+         "below",
+         "unspecified"
+        ]
+       },
+       "toward": {
+        "type": "string",
+        "enum": [
+         "left",
+         "right",
+         "unspecified"
+        ]
+       }
+      },
+      "required": [
+       "type",
+       "layers",
+       "side",
+       "toward"
+      ]
+     }
+    },
+    "tension": {
+     "type": "object",
+     "properties": {
+      "motion": {
+       "type": "string",
+       "enum": [
+        "still",
+        "moving",
+        "unspecified"
+       ]
+      },
+      "focus": {
+       "type": "string",
+       "enum": [
+        "concentrated",
+        "dispersed",
+        "unspecified"
+       ]
+      },
+      "vertical": {
+       "type": "string",
+       "enum": [
+        "rising",
+        "falling",
+        "unspecified"
+       ]
+      },
+      "balance": {
+       "type": "string",
+       "enum": [
+        "static",
+        "dynamic",
+        "unbalanced",
+        "unspecified"
+       ]
+      },
+      "symmetry": {
+       "type": "string",
+       "enum": [
+        "symmetric",
+        "asymmetric",
+        "unspecified"
+       ]
+      },
+      "void": {
+       "type": "string",
+       "enum": [
+        "strong",
+        "medium",
+        "weak",
+        "unspecified"
+       ]
+      }
+     },
+     "required": [
+      "motion",
+      "focus",
+      "vertical",
+      "balance",
+      "symmetry",
+      "void"
+     ]
+    },
+    "stated_places": {
+     "type": "array",
+     "items": {
+      "type": "object",
+      "properties": {
+       "layer": {
+        "type": "integer",
+        "minimum": 0
+       },
+       "words": {
+        "type": "string"
+       },
+       "place": {
+        "type": "string",
+        "enum": [
+         "top",
+         "bottom",
+         "center",
+         "left_edge",
+         "right_edge",
+         "top_edge",
+         "bottom_edge",
+         "corner"
+        ]
+       }
+      },
+      "required": [
+       "layer",
+       "words",
+       "place"
+      ]
+     }
+    }
+   },
+   "required": [
+    "thesis",
+    "roles",
+    "relations",
+    "tension",
+    "stated_places"
+   ]
+  },
+  "4": {
+   "type": "object",
+   "propertyOrdering": [
+    "thesis",
+    "roles",
+    "relations",
+    "tension",
+    "stated_places"
+   ],
+   "properties": {
+    "thesis": {
+     "type": "string"
+    },
+    "roles": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "enum": [
+       "field",
+       "focal",
+       "secondary",
+       "scattered",
+       "accent"
+      ]
+     },
+     "minItems": 4,
+     "maxItems": 4
+    },
+    "relations": {
+     "type": "array",
+     "items": {
+      "type": "object",
+      "properties": {
+       "type": {
+        "type": "string",
+        "enum": [
+         "within",
+         "around",
+         "overlap",
+         "near",
+         "apart",
+         "between",
+         "above",
+         "below",
+         "piling",
+         "rising",
+         "falling",
+         "flowing",
+         "spreading",
+         "isolated",
+         "echo",
+         "facing",
+         "parallel",
+         "deviation",
+         "dividing"
+        ]
+       },
+       "layers": {
+        "type": "array",
+        "items": {
+         "type": "integer",
+         "minimum": 0
+        },
+        "minItems": 1,
+        "maxItems": 3
+       },
+       "side": {
+        "type": "string",
+        "enum": [
+         "above",
+         "below",
+         "unspecified"
+        ]
+       },
+       "toward": {
+        "type": "string",
+        "enum": [
+         "left",
+         "right",
+         "unspecified"
+        ]
+       }
+      },
+      "required": [
+       "type",
+       "layers",
+       "side",
+       "toward"
+      ]
+     }
+    },
+    "tension": {
+     "type": "object",
+     "properties": {
+      "motion": {
+       "type": "string",
+       "enum": [
+        "still",
+        "moving",
+        "unspecified"
+       ]
+      },
+      "focus": {
+       "type": "string",
+       "enum": [
+        "concentrated",
+        "dispersed",
+        "unspecified"
+       ]
+      },
+      "vertical": {
+       "type": "string",
+       "enum": [
+        "rising",
+        "falling",
+        "unspecified"
+       ]
+      },
+      "balance": {
+       "type": "string",
+       "enum": [
+        "static",
+        "dynamic",
+        "unbalanced",
+        "unspecified"
+       ]
+      },
+      "symmetry": {
+       "type": "string",
+       "enum": [
+        "symmetric",
+        "asymmetric",
+        "unspecified"
+       ]
+      },
+      "void": {
+       "type": "string",
+       "enum": [
+        "strong",
+        "medium",
+        "weak",
+        "unspecified"
+       ]
+      }
+     },
+     "required": [
+      "motion",
+      "focus",
+      "vertical",
+      "balance",
+      "symmetry",
+      "void"
+     ]
+    },
+    "stated_places": {
+     "type": "array",
+     "items": {
+      "type": "object",
+      "properties": {
+       "layer": {
+        "type": "integer",
+        "minimum": 0
+       },
+       "words": {
+        "type": "string"
+       },
+       "place": {
+        "type": "string",
+        "enum": [
+         "top",
+         "bottom",
+         "center",
+         "left_edge",
+         "right_edge",
+         "top_edge",
+         "bottom_edge",
+         "corner"
+        ]
+       }
+      },
+      "required": [
+       "layer",
+       "words",
+       "place"
+      ]
+     }
+    }
+   },
+   "required": [
+    "thesis",
+    "roles",
+    "relations",
+    "tension",
+    "stated_places"
+   ]
+  },
+  "5": {
+   "type": "object",
+   "propertyOrdering": [
+    "thesis",
+    "roles",
+    "relations",
+    "tension",
+    "stated_places"
+   ],
+   "properties": {
+    "thesis": {
+     "type": "string"
+    },
+    "roles": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "enum": [
+       "field",
+       "focal",
+       "secondary",
+       "scattered",
+       "accent"
+      ]
+     },
+     "minItems": 5,
+     "maxItems": 5
+    },
+    "relations": {
+     "type": "array",
+     "items": {
+      "type": "object",
+      "properties": {
+       "type": {
+        "type": "string",
+        "enum": [
+         "within",
+         "around",
+         "overlap",
+         "near",
+         "apart",
+         "between",
+         "above",
+         "below",
+         "piling",
+         "rising",
+         "falling",
+         "flowing",
+         "spreading",
+         "isolated",
+         "echo",
+         "facing",
+         "parallel",
+         "deviation",
+         "dividing"
+        ]
+       },
+       "layers": {
+        "type": "array",
+        "items": {
+         "type": "integer",
+         "minimum": 0
+        },
+        "minItems": 1,
+        "maxItems": 3
+       },
+       "side": {
+        "type": "string",
+        "enum": [
+         "above",
+         "below",
+         "unspecified"
+        ]
+       },
+       "toward": {
+        "type": "string",
+        "enum": [
+         "left",
+         "right",
+         "unspecified"
+        ]
+       }
+      },
+      "required": [
+       "type",
+       "layers",
+       "side",
+       "toward"
+      ]
+     }
+    },
+    "tension": {
+     "type": "object",
+     "properties": {
+      "motion": {
+       "type": "string",
+       "enum": [
+        "still",
+        "moving",
+        "unspecified"
+       ]
+      },
+      "focus": {
+       "type": "string",
+       "enum": [
+        "concentrated",
+        "dispersed",
+        "unspecified"
+       ]
+      },
+      "vertical": {
+       "type": "string",
+       "enum": [
+        "rising",
+        "falling",
+        "unspecified"
+       ]
+      },
+      "balance": {
+       "type": "string",
+       "enum": [
+        "static",
+        "dynamic",
+        "unbalanced",
+        "unspecified"
+       ]
+      },
+      "symmetry": {
+       "type": "string",
+       "enum": [
+        "symmetric",
+        "asymmetric",
+        "unspecified"
+       ]
+      },
+      "void": {
+       "type": "string",
+       "enum": [
+        "strong",
+        "medium",
+        "weak",
+        "unspecified"
+       ]
+      }
+     },
+     "required": [
+      "motion",
+      "focus",
+      "vertical",
+      "balance",
+      "symmetry",
+      "void"
+     ]
+    },
+    "stated_places": {
+     "type": "array",
+     "items": {
+      "type": "object",
+      "properties": {
+       "layer": {
+        "type": "integer",
+        "minimum": 0
+       },
+       "words": {
+        "type": "string"
+       },
+       "place": {
+        "type": "string",
+        "enum": [
+         "top",
+         "bottom",
+         "center",
+         "left_edge",
+         "right_edge",
+         "top_edge",
+         "bottom_edge",
+         "corner"
+        ]
+       }
+      },
+      "required": [
+       "layer",
+       "words",
+       "place"
+      ]
+     }
+    }
+   },
+   "required": [
+    "thesis",
+    "roles",
+    "relations",
+    "tension",
+    "stated_places"
+   ]
+  },
+  "8": {
+   "type": "object",
+   "propertyOrdering": [
+    "thesis",
+    "roles",
+    "relations",
+    "tension",
+    "stated_places"
+   ],
+   "properties": {
+    "thesis": {
+     "type": "string"
+    },
+    "roles": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "enum": [
+       "field",
+       "focal",
+       "secondary",
+       "scattered",
+       "accent"
+      ]
+     },
+     "minItems": 8,
+     "maxItems": 8
+    },
+    "relations": {
+     "type": "array",
+     "items": {
+      "type": "object",
+      "properties": {
+       "type": {
+        "type": "string",
+        "enum": [
+         "within",
+         "around",
+         "overlap",
+         "near",
+         "apart",
+         "between",
+         "above",
+         "below",
+         "piling",
+         "rising",
+         "falling",
+         "flowing",
+         "spreading",
+         "isolated",
+         "echo",
+         "facing",
+         "parallel",
+         "deviation",
+         "dividing"
+        ]
+       },
+       "layers": {
+        "type": "array",
+        "items": {
+         "type": "integer",
+         "minimum": 0
+        },
+        "minItems": 1,
+        "maxItems": 3
+       },
+       "side": {
+        "type": "string",
+        "enum": [
+         "above",
+         "below",
+         "unspecified"
+        ]
+       },
+       "toward": {
+        "type": "string",
+        "enum": [
+         "left",
+         "right",
+         "unspecified"
+        ]
+       }
+      },
+      "required": [
+       "type",
+       "layers",
+       "side",
+       "toward"
+      ]
+     }
+    },
+    "tension": {
+     "type": "object",
+     "properties": {
+      "motion": {
+       "type": "string",
+       "enum": [
+        "still",
+        "moving",
+        "unspecified"
+       ]
+      },
+      "focus": {
+       "type": "string",
+       "enum": [
+        "concentrated",
+        "dispersed",
+        "unspecified"
+       ]
+      },
+      "vertical": {
+       "type": "string",
+       "enum": [
+        "rising",
+        "falling",
+        "unspecified"
+       ]
+      },
+      "balance": {
+       "type": "string",
+       "enum": [
+        "static",
+        "dynamic",
+        "unbalanced",
+        "unspecified"
+       ]
+      },
+      "symmetry": {
+       "type": "string",
+       "enum": [
+        "symmetric",
+        "asymmetric",
+        "unspecified"
+       ]
+      },
+      "void": {
+       "type": "string",
+       "enum": [
+        "strong",
+        "medium",
+        "weak",
+        "unspecified"
+       ]
+      }
+     },
+     "required": [
+      "motion",
+      "focus",
+      "vertical",
+      "balance",
+      "symmetry",
+      "void"
+     ]
+    },
+    "stated_places": {
+     "type": "array",
+     "items": {
+      "type": "object",
+      "properties": {
+       "layer": {
+        "type": "integer",
+        "minimum": 0
+       },
+       "words": {
+        "type": "string"
+       },
+       "place": {
+        "type": "string",
+        "enum": [
+         "top",
+         "bottom",
+         "center",
+         "left_edge",
+         "right_edge",
+         "top_edge",
+         "bottom_edge",
+         "corner"
+        ]
+       }
+      },
+      "required": [
+       "layer",
+       "words",
+       "place"
+      ]
+     }
+    }
+   },
+   "required": [
+    "thesis",
+    "roles",
+    "relations",
+    "tension",
+    "stated_places"
+   ]
+  }
+ },
+ "cases": [
+  {
+   "id": "en-01",
+   "lang": "en",
+   "plan": {
+    "background": "white",
+    "ground": "paper",
+    "layers": [
+     {
+      "action": "scatter",
+      "attributes": {
+       "color": "black",
+       "continuity": "solid",
+       "handling": "dense",
+       "motion_amplitude": "broadly",
+       "motion_quality": "swaying",
+       "motion_spacing": "loosely",
+       "size": "small",
+       "surface": "sweep",
+       "thinness": "thin",
+       "tool": "pen"
+      },
+      "count": 7,
+      "proportion": null,
+      "shape": "line"
+     }
+    ],
+    "plugins": []
+   },
+   "message": "Description:\n(description)\n\nFirst lines of the work plan: Paper. Fill the background with white.\n\nLayers of the work plan (number (kind): instruction):\n0 (area): Scatter 7 broadly loosely swaying black thin pen solid dense sweep small lines."
+  },
+  {
+   "id": "en-02",
+   "lang": "en",
+   "plan": {
+    "background": "white",
+    "ground": "paper",
+    "layers": [
+     {
+      "action": "scatter",
+      "attributes": {
+       "color": "orange",
+       "handling": "temperate",
+       "motion_amplitude": "broadly",
+       "motion_quality": "swaying",
+       "motion_spacing": "loosely",
+       "size": "small",
+       "surface": "sweep",
+       "thinness": "thin",
+       "tool": "fine_brush"
+      },
+      "count": 20,
+      "proportion": null,
+      "shape": "arc"
+     },
+     {
+      "action": "scatter",
+      "attributes": {
+       "color": "blue",
+       "handling": "faint",
+       "motion_amplitude": "narrowly",
+       "motion_quality": "swaying",
+       "motion_spacing": "tightly",
+       "size": "small",
+       "surface": "grain",
+       "thinness": "extra_fine",
+       "tool": "pencil"
+      },
+      "count": 15,
+      "proportion": null,
+      "shape": "line"
+     },
+     {
+      "action": "draw",
+      "attributes": {
+       "color": "black",
+       "handling": "dense",
+       "position": "center",
+       "size": "large",
+       "surface": "flat",
+       "thinness": "thick",
+       "tool": "thick_brush"
+      },
+      "count": 1,
+      "proportion": null,
+      "shape": "line"
+     },
+     {
+      "action": "line_up",
+      "attributes": {
+       "color": "gray",
+       "handling": "faint",
+       "motion_amplitude": "narrowly",
+       "motion_quality": "swaying",
+       "motion_spacing": "tightly",
+       "position": "bottom",
+       "size": "slightly_small",
+       "surface": "grain",
+       "thinness": "thin",
+       "tool": "crayon"
+      },
+      "count": 2,
+      "proportion": null,
+      "shape": "ellipse"
+     }
+    ],
+    "plugins": []
+   },
+   "message": "Description:\n(description)\n\nFirst lines of the work plan: Paper. Fill the background with white.\n\nLayers of the work plan (number (kind): instruction):\n0 (area): Scatter 20 broadly loosely swaying orange thin fine-brush temperate sweep small arcs.\n1 (area): Scatter 15 narrowly tightly swaying blue extra-fine pencil faint grain small lines.\n2 (bundle): Draw one black thick thick-brush dense flat large line. [place set by the work plan: center]\n3 (row): Line up 2 narrowly tightly swaying gray thin crayon faint grain slightly small ellipses. [place set by the work plan: bottom]"
+  },
+  {
+   "id": "en-03",
+   "lang": "en",
+   "plan": {
+    "background": "white",
+    "ground": "paper",
+    "layers": [
+     {
+      "action": "line_up",
+      "attributes": {
+       "angle": "horizontal",
+       "color": "gray",
+       "handling": "faint",
+       "line_up_direction": "horizontal",
+       "motion_amplitude": "narrowly",
+       "motion_quality": "swaying",
+       "motion_spacing": "loosely",
+       "position": "bottom",
+       "surface": "sweep",
+       "thinness": "thin",
+       "tool": "pencil"
+      },
+      "count": 15,
+      "proportion": "full_width",
+      "shape": "line"
+     },
+     {
+      "action": "place",
+      "attributes": {
+       "color": "red",
+       "handling": "dense",
+       "size": "very_small",
+       "surface": "flat",
+       "tool": "pen"
+      },
+      "count": 1,
+      "proportion": null,
+      "shape": "circle"
+     }
+    ],
+    "plugins": []
+   },
+   "message": "Description:\n(description)\n\nFirst lines of the work plan: Paper. Fill the background with white.\n\nLayers of the work plan (number (kind): instruction):\n0 (row): Line up 15 narrowly loosely swaying gray thin pencil faint sweep horizontal full-width lines horizontally. [place set by the work plan: bottom]\n1 (bundle): Place one red pen dense flat very small circle."
+  },
+  {
+   "id": "en-04",
+   "lang": "en",
+   "plan": {
+    "background": "white",
+    "ground": "paper",
+    "layers": [
+     {
+      "action": "draw",
+      "attributes": {
+       "color": "gray",
+       "handling": "dense",
+       "motion_amplitude": "narrowly",
+       "motion_quality": "swaying",
+       "position": "bottom",
+       "size": "small",
+       "surface": "sweep",
+       "thinness": "thin",
+       "tool": "fine_brush"
+      },
+      "count": 1,
+      "proportion": null,
+      "shape": "line"
+     },
+     {
+      "action": "draw",
+      "attributes": {
+       "color": "gray",
+       "handling": "faint",
+       "motion_amplitude": "broadly",
+       "motion_quality": "undulating",
+       "size": "large",
+       "surface": "sweep",
+       "thinness": "thin",
+       "tool": "fine_brush"
+      },
+      "count": 1,
+      "proportion": null,
+      "shape": "arc"
+     }
+    ],
+    "plugins": []
+   },
+   "message": "Description:\n(description)\n\nFirst lines of the work plan: Paper. Fill the background with white.\n\nLayers of the work plan (number (kind): instruction):\n0 (bundle): Draw one narrowly swaying gray thin fine-brush dense sweep small line. [place set by the work plan: bottom]\n1 (bundle): Draw one broadly undulating gray thin fine-brush faint sweep large arc."
+  },
+  {
+   "id": "en-05",
+   "lang": "en",
+   "plan": {
+    "background": "white",
+    "ground": "paper",
+    "layers": [
+     {
+      "action": "scatter",
+      "attributes": {
+       "color": "yellow",
+       "handling": "temperate",
+       "motion_amplitude": "broadly",
+       "motion_quality": "swaying",
+       "motion_spacing": "loosely",
+       "position": "top",
+       "size": "normal_sized",
+       "surface": "flat",
+       "tool": "fine_brush"
+      },
+      "count": 40,
+      "proportion": "tall",
+      "shape": "ellipse"
+     },
+     {
+      "action": "scatter",
+      "attributes": {
+       "color": "yellow",
+       "handling": "dense",
+       "motion_amplitude": "narrowly",
+       "motion_quality": "undulating",
+       "motion_spacing": "tightly",
+       "position": "bottom",
+       "size": "slightly_small",
+       "surface": "sweep",
+       "tool": "thick_brush"
+      },
+      "count": 30,
+      "proportion": "wide",
+      "shape": "ellipse"
+     },
+     {
+      "action": "scatter",
+      "attributes": {
+       "color": "gray",
+       "handling": "faint",
+       "size": "very_small",
+       "tool": "pencil"
+      },
+      "count": 20,
+      "proportion": null,
+      "shape": "point"
+     }
+    ],
+    "plugins": []
+   },
+   "message": "Description:\n(description)\n\nFirst lines of the work plan: Paper. Fill the background with white.\n\nLayers of the work plan (number (kind): instruction):\n0 (area): Scatter 40 broadly loosely swaying yellow fine-brush temperate flat tall normal-sized ellipses. [place set by the work plan: top]\n1 (area): Scatter 30 narrowly tightly undulating yellow thick-brush dense sweep wide slightly small ellipses. [place set by the work plan: bottom]\n2 (area): Scatter 20 gray pencil faint very small points."
+  },
+  {
+   "id": "en-07",
+   "lang": "en",
+   "plan": {
+    "background": "white",
+    "ground": "paper",
+    "layers": [
+     {
+      "action": "fill",
+      "attributes": {
+       "color": "gray",
+       "handling": "faint",
+       "motion_quality": "undulating",
+       "position": "bottom",
+       "surface": "grain",
+       "tool": "chalk"
+      },
+      "count": 1,
+      "proportion": "full_width",
+      "shape": "ellipse"
+     },
+     {
+      "action": "draw",
+      "attributes": {
+       "angle": "vertical",
+       "color": "white",
+       "continuity": "solid",
+       "handling": "dense",
+       "motion_amplitude": "narrowly",
+       "motion_quality": "swaying",
+       "motion_spacing": "tightly",
+       "position": "center",
+       "size": "large",
+       "surface": "sweep",
+       "thinness": "thick",
+       "tool": "thick_brush"
+      },
+      "count": 3,
+      "proportion": null,
+      "shape": "line"
+     }
+    ],
+    "plugins": []
+   },
+   "message": "Description:\n(description)\n\nFirst lines of the work plan: Paper. Fill the background with white.\n\nLayers of the work plan (number (kind): instruction):\n0 (area): Fill one undulating gray chalk faint grain full-width ellipse. [place set by the work plan: bottom]\n1 (bundle): Draw 3 narrowly tightly swaying white thick thick-brush solid dense sweep vertical large lines. [place set by the work plan: center]"
+  },
+  {
+   "id": "en-08",
+   "lang": "en",
+   "plan": {
+    "background": "white",
+    "ground": "paper",
+    "layers": [
+     {
+      "action": "scatter",
+      "attributes": {
+       "color": "gray",
+       "continuity": "solid",
+       "handling": "temperate",
+       "motion_amplitude": "broadly",
+       "motion_quality": "undulating",
+       "motion_spacing": "loosely",
+       "size": "large",
+       "surface": "sweep",
+       "thinness": "thin",
+       "tool": "fine_brush"
+      },
+      "count": 12,
+      "proportion": null,
+      "shape": "arc"
+     },
+     {
+      "action": "scatter",
+      "attributes": {
+       "color": "black",
+       "continuity": "solid",
+       "handling": "dense",
+       "motion_amplitude": "narrowly",
+       "motion_quality": "swaying",
+       "motion_spacing": "tightly",
+       "size": "normal_sized",
+       "surface": "flat",
+       "tool": "thick_brush"
+      },
+      "count": 8,
+      "proportion": null,
+      "shape": "ellipse"
+     },
+     {
+      "action": "scatter",
+      "attributes": {
+       "color": "gray",
+       "continuity": "solid",
+       "handling": "faint",
+       "motion_amplitude": "narrowly",
+       "motion_quality": "swaying",
+       "motion_spacing": "loosely",
+       "size": "small",
+       "surface": "grain",
+       "tool": "crayon"
+      },
+      "count": 15,
+      "proportion": null,
+      "shape": "circle"
+     }
+    ],
+    "plugins": []
+   },
+   "message": "Description:\n(description)\n\nFirst lines of the work plan: Paper. Fill the background with white.\n\nLayers of the work plan (number (kind): instruction):\n0 (area): Scatter 12 broadly loosely undulating gray thin fine-brush solid temperate sweep large arcs.\n1 (area): Scatter 8 narrowly tightly swaying black thick-brush solid dense flat normal-sized ellipses.\n2 (area): Scatter 15 narrowly loosely swaying gray crayon solid faint grain small circles."
+  },
+  {
+   "id": "en-09",
+   "lang": "en",
+   "plan": {
+    "background": "white",
+    "ground": "paper",
+    "layers": [
+     {
+      "action": "draw",
+      "attributes": {
+       "color": "black",
+       "handling": "dense",
+       "position": "center",
+       "size": "large",
+       "surface": "sweep",
+       "thinness": "thick",
+       "tool": "thick_brush"
+      },
+      "count": 1,
+      "proportion": null,
+      "shape": "line"
+     },
+     {
+      "action": "scatter",
+      "attributes": {
+       "color": "gray",
+       "handling": "temperate",
+       "size": "very_small",
+       "tool": "pen"
+      },
+      "count": 30,
+      "proportion": null,
+      "shape": "point"
+     },
+     {
+      "action": "draw",
+      "attributes": {
+       "color": "gray",
+       "handling": "faint",
+       "motion_amplitude": "broadly",
+       "motion_quality": "swaying",
+       "motion_spacing": "tightly",
+       "size": "extra_large",
+       "surface": "sweep",
+       "thinness": "thin",
+       "tool": "fine_brush"
+      },
+      "count": 3,
+      "proportion": "semicircle",
+      "shape": "arc"
+     }
+    ],
+    "plugins": []
+   },
+   "message": "Description:\n(description)\n\nFirst lines of the work plan: Paper. Fill the background with white.\n\nLayers of the work plan (number (kind): instruction):\n0 (bundle): Draw one black thick thick-brush dense sweep large line. [place set by the work plan: center]\n1 (area): Scatter 30 gray pen temperate very small points.\n2 (bundle): Draw 3 broadly tightly swaying gray thin fine-brush faint sweep semicircle extra-large arcs."
+  },
+  {
+   "id": "en-10",
+   "lang": "en",
+   "plan": {
+    "background": "black",
+    "ground": "paper",
+    "layers": [
+     {
+      "action": "draw",
+      "attributes": {
+       "angle": "rotated",
+       "color": "white",
+       "handling": "dense",
+       "motion_amplitude": "narrowly",
+       "motion_quality": "swaying",
+       "motion_spacing": "tightly",
+       "size": "normal_sized",
+       "surface": "flat",
+       "thinness": "thin",
+       "tool": "fine_brush"
+      },
+      "count": 1,
+      "proportion": "crescent",
+      "shape": "arc"
+     }
+    ],
+    "plugins": []
+   },
+   "message": "Description:\n(description)\n\nFirst lines of the work plan: Paper. Fill the background with black.\n\nLayers of the work plan (number (kind): instruction):\n0 (bundle): Draw one narrowly tightly swaying white thin fine-brush dense flat rotated crescent normal-sized arc."
+  },
+  {
+   "id": "en-11",
+   "lang": "en",
+   "plan": {
+    "background": "white",
+    "ground": "paper",
+    "layers": [
+     {
+      "action": "fill",
+      "attributes": {
+       "color": "green",
+       "handling": "faint",
+       "motion_amplitude": "broadly",
+       "motion_quality": "undulating",
+       "motion_spacing": "loosely",
+       "size": "large",
+       "surface": "sweep",
+       "tool": "thick_brush"
+      },
+      "count": 40,
+      "proportion": "wide",
+      "shape": "cloudform"
+     },
+     {
+      "action": "scatter",
+      "attributes": {
+       "color": "black",
+       "handling": "temperate",
+       "motion_amplitude": "narrowly",
+       "motion_quality": "swaying",
+       "motion_spacing": "tightly",
+       "size": "small",
+       "surface": "grain",
+       "thinness": "thin",
+       "tool": "pen"
+      },
+      "count": 15,
+      "proportion": null,
+      "shape": "line"
+     },
+     {
+      "action": "draw",
+      "attributes": {
+       "angle": "vertical",
+       "color": "black",
+       "continuity": "solid",
+       "handling": "dense",
+       "position": "center",
+       "size": "very_large",
+       "surface": "sweep",
+       "thinness": "thick",
+       "tool": "thick_brush"
+      },
+      "count": 1,
+      "proportion": null,
+      "shape": "line"
+     }
+    ],
+    "plugins": []
+   },
+   "message": "Description:\n(description)\n\nFirst lines of the work plan: Paper. Fill the background with white.\n\nLayers of the work plan (number (kind): instruction):\n0 (area): Fill 40 broadly loosely undulating green thick-brush faint sweep wide large cloudforms.\n1 (area): Scatter 15 narrowly tightly swaying black thin pen temperate grain small lines.\n2 (bundle): Draw one black thick thick-brush solid dense sweep vertical very large line. [place set by the work plan: center]"
+  },
+  {
+   "id": "en-12",
+   "lang": "en",
+   "plan": {
+    "background": "yellow",
+    "ground": "paper",
+    "layers": [
+     {
+      "action": "fill",
+      "attributes": {
+       "angle": "horizontal",
+       "color": "yellow",
+       "handling": "faint",
+       "motion_amplitude": "broadly",
+       "motion_quality": "undulating",
+       "motion_spacing": "loosely",
+       "position": "bottom",
+       "surface": "grain",
+       "tool": "crayon"
+      },
+      "count": 1,
+      "proportion": "full_width",
+      "shape": "cloudform"
+     },
+     {
+      "action": "line_up",
+      "attributes": {
+       "angle": "vertical",
+       "color": "black",
+       "continuity": "solid",
+       "handling": "dense",
+       "line_up_direction": "horizontal",
+       "motion_amplitude": "narrowly",
+       "motion_quality": "swaying",
+       "motion_spacing": "tightly",
+       "size": "normal_sized",
+       "surface": "sweep",
+       "thinness": "thin",
+       "tool": "pen"
+      },
+      "count": 8,
+      "proportion": null,
+      "shape": "line"
+     }
+    ],
+    "plugins": []
+   },
+   "message": "Description:\n(description)\n\nFirst lines of the work plan: Paper. Fill the background with yellow.\n\nLayers of the work plan (number (kind): instruction):\n0 (area): Fill one broadly loosely undulating yellow crayon faint grain horizontal full-width cloudform. [place set by the work plan: bottom]\n1 (row): Line up 8 narrowly tightly swaying black thin pen solid dense sweep vertical normal-sized lines horizontally."
+  },
+  {
+   "id": "en-13",
+   "lang": "en",
+   "plan": {
+    "background": "white",
+    "ground": "paper",
+    "layers": [
+     {
+      "action": "scatter",
+      "attributes": {
+       "angle": "falling",
+       "color": "black",
+       "handling": "faint",
+       "motion_amplitude": "broadly",
+       "motion_quality": "swaying",
+       "motion_spacing": "loosely",
+       "size": "small",
+       "surface": "grain",
+       "thinness": "extra_fine",
+       "tool": "pen"
+      },
+      "count": 40,
+      "proportion": null,
+      "shape": "line"
+     }
+    ],
+    "plugins": [
+     {
+      "count": null,
+      "name": "Nature.FallenLeaves"
+     }
+    ]
+   },
+   "message": "Description:\n(description)\n\nFirst lines of the work plan: Paper. Fill the background with white. Nature.FallenLeaves.\n\nLayers of the work plan (number (kind): instruction):\n0 (area): Scatter 40 broadly loosely swaying black extra-fine pen faint grain falling small lines."
+  },
+  {
+   "id": "en-14",
+   "lang": "en",
+   "plan": {
+    "background": "white",
+    "ground": "paper",
+    "layers": [
+     {
+      "action": "fill",
+      "attributes": {
+       "angle": "diagonal",
+       "color": "orange",
+       "handling": "faint",
+       "motion_amplitude": "narrowly",
+       "motion_quality": "swaying",
+       "motion_spacing": "loosely",
+       "size": "large",
+       "surface": "sweep",
+       "thinness": "thin",
+       "tool": "fine_brush"
+      },
+      "count": 4,
+      "proportion": null,
+      "shape": "line"
+     }
+    ],
+    "plugins": []
+   },
+   "message": "Description:\n(description)\n\nFirst lines of the work plan: Paper. Fill the background with white.\n\nLayers of the work plan (number (kind): instruction):\n0 (area): Fill 4 narrowly loosely swaying orange thin fine-brush faint sweep diagonal large lines."
+  },
+  {
+   "id": "en-15",
+   "lang": "en",
+   "plan": {
+    "background": "gray",
+    "ground": "paper",
+    "layers": [
+     {
+      "action": "fill",
+      "attributes": {
+       "handling": "faint",
+       "surface": "grain",
+       "tool": "crayon"
+      },
+      "count": 1,
+      "proportion": "full_width",
+      "shape": "square"
+     }
+    ],
+    "plugins": [
+     {
+      "count": null,
+      "name": "Nature.Undergrowth"
+     }
+    ]
+   },
+   "message": "Description:\n(description)\n\nFirst lines of the work plan: Paper. Fill the background with gray. Nature.Undergrowth.\n\nLayers of the work plan (number (kind): instruction):\n0 (area): Fill one crayon faint grain full-width square."
+  },
+  {
+   "id": "en-16",
+   "lang": "en",
+   "plan": {
+    "background": "gray",
+    "ground": "paper",
+    "layers": [
+     {
+      "action": "scatter",
+      "attributes": {
+       "angle": "horizontal",
+       "color": "white",
+       "handling": "faint",
+       "motion_amplitude": "broadly",
+       "motion_quality": "undulating",
+       "motion_spacing": "loosely",
+       "surface": "sweep",
+       "thinness": "thin",
+       "tool": "fine_brush"
+      },
+      "count": 12,
+      "proportion": "full_width",
+      "shape": "line"
+     },
+     {
+      "action": "place",
+      "attributes": {
+       "color": "red",
+       "handling": "dense",
+       "motion_amplitude": "narrowly",
+       "motion_quality": "swaying",
+       "position": "center",
+       "size": "normal_sized",
+       "surface": "flat",
+       "thinness": "thick",
+       "tool": "thick_brush"
+      },
+      "count": 1,
+      "proportion": null,
+      "shape": "circle"
+     }
+    ],
+    "plugins": []
+   },
+   "message": "Description:\n(description)\n\nFirst lines of the work plan: Paper. Fill the background with gray.\n\nLayers of the work plan (number (kind): instruction):\n0 (area): Scatter 12 broadly loosely undulating white thin fine-brush faint sweep horizontal full-width lines.\n1 (bundle): Place one narrowly swaying red thick thick-brush dense flat normal-sized circle. [place set by the work plan: center]"
+  },
+  {
+   "id": "en-17",
+   "lang": "en",
+   "plan": {
+    "background": "white",
+    "ground": "paper",
+    "layers": [
+     {
+      "action": "draw",
+      "attributes": {
+       "color": "gray",
+       "handling": "dense",
+       "motion_amplitude": "narrowly",
+       "motion_quality": "swaying",
+       "position": "bottom",
+       "size": "small",
+       "surface": "sweep",
+       "thinness": "thin",
+       "tool": "fine_brush"
+      },
+      "count": 1,
+      "proportion": null,
+      "shape": "line"
+     },
+     {
+      "action": "draw",
+      "attributes": {
+       "color": "gray",
+       "handling": "temperate",
+       "motion_amplitude": "broadly",
+       "motion_quality": "undulating",
+       "size": "large",
+       "surface": "sweep",
+       "thinness": "thick",
+       "tool": "thick_brush"
+      },
+      "count": 1,
+      "proportion": null,
+      "shape": "arc"
+     }
+    ],
+    "plugins": []
+   },
+   "message": "Description:\n(description)\n\nFirst lines of the work plan: Paper. Fill the background with white.\n\nLayers of the work plan (number (kind): instruction):\n0 (bundle): Draw one narrowly swaying gray thin fine-brush dense sweep small line. [place set by the work plan: bottom]\n1 (bundle): Draw one broadly undulating gray thick thick-brush temperate sweep large arc."
+  },
+  {
+   "id": "en-18",
+   "lang": "en",
+   "plan": {
+    "background": "white",
+    "ground": "paper",
+    "layers": [
+     {
+      "action": "fill",
+      "attributes": {
+       "color": "white",
+       "handling": "faint",
+       "motion_quality": "undulating",
+       "surface": "flat",
+       "tool": "chalk"
+      },
+      "count": 1,
+      "proportion": "full_width",
+      "shape": "cloudform"
+     },
+     {
+      "action": "scatter",
+      "attributes": {
+       "color": "gray",
+       "handling": "temperate",
+       "motion_quality": "swaying",
+       "motion_spacing": "loosely",
+       "size": "small",
+       "surface": "stipple",
+       "thinness": "thin",
+       "tool": "pencil"
+      },
+      "count": 20,
+      "proportion": null,
+      "shape": "ellipse"
+     },
+     {
+      "action": "place",
+      "attributes": {
+       "color": "black",
+       "handling": "dense",
+       "position": "center",
+       "size": "normal_sized",
+       "thinness": "extra_thick",
+       "tool": "thick_brush"
+      },
+      "count": 1,
+      "proportion": null,
+      "shape": "point"
+     }
+    ],
+    "plugins": []
+   },
+   "message": "Description:\n(description)\n\nFirst lines of the work plan: Paper. Fill the background with white.\n\nLayers of the work plan (number (kind): instruction):\n0 (area): Fill one undulating white chalk faint flat full-width cloudform.\n1 (area): Scatter 20 loosely swaying gray thin pencil temperate stipple small ellipses.\n2 (bundle): Place one black extra-thick thick-brush dense normal-sized point. [place set by the work plan: center]"
+  },
+  {
+   "id": "en-19",
+   "lang": "en",
+   "plan": {
+    "background": "white",
+    "ground": "paper",
+    "layers": [
+     {
+      "action": "fill",
+      "attributes": {
+       "angle": "horizontal",
+       "color": "gray",
+       "handling": "faint",
+       "motion_amplitude": "narrowly",
+       "motion_quality": "swaying",
+       "motion_spacing": "loosely",
+       "size": "large",
+       "surface": "sweep",
+       "thinness": "thin",
+       "tool": "pencil"
+      },
+      "count": 3,
+      "proportion": null,
+      "shape": "line"
+     },
+     {
+      "action": "scatter",
+      "attributes": {
+       "color": "black",
+       "handling": "temperate",
+       "motion_amplitude": "broadly",
+       "motion_quality": "undulating",
+       "motion_spacing": "tightly",
+       "size": "small",
+       "surface": "flat",
+       "tool": "thick_brush"
+      },
+      "count": 1,
+      "proportion": null,
+      "shape": "cloudform"
+     },
+     {
+      "action": "scatter",
+      "attributes": {
+       "color": "gray",
+       "handling": "faint",
+       "motion_amplitude": "broadly",
+       "motion_quality": "undulating",
+       "motion_spacing": "tightly",
+       "size": "small",
+       "surface": "flat",
+       "tool": "crayon"
+      },
+      "count": 1,
+      "proportion": null,
+      "shape": "cloudform"
+     }
+    ],
+    "plugins": []
+   },
+   "message": "Description:\n(description)\n\nFirst lines of the work plan: Paper. Fill the background with white.\n\nLayers of the work plan (number (kind): instruction):\n0 (area): Fill 3 narrowly loosely swaying gray thin pencil faint sweep horizontal large lines.\n1 (bundle): Scatter one broadly tightly undulating black thick-brush temperate flat small cloudform.\n2 (bundle): Scatter one broadly tightly undulating gray crayon faint flat small cloudform."
+  },
+  {
+   "id": "en-20",
+   "lang": "en",
+   "plan": {
+    "background": "black",
+    "ground": "paper",
+    "layers": [
+     {
+      "action": "scatter",
+      "attributes": {
+       "color": "gray",
+       "handling": "faint",
+       "size": "very_small",
+       "thinness": "extra_fine",
+       "tool": "pencil"
+      },
+      "count": 40,
+      "proportion": null,
+      "shape": "point"
+     },
+     {
+      "action": "place",
+      "attributes": {
+       "color": "white",
+       "handling": "dense",
+       "motion_amplitude": "broadly",
+       "motion_quality": "undulating",
+       "size": "normal_sized",
+       "surface": "stipple",
+       "tool": "fine_brush"
+      },
+      "count": 1,
+      "proportion": null,
+      "shape": "circle"
+     },
+     {
+      "action": "draw",
+      "attributes": {
+       "color": "gray",
+       "handling": "dense",
+       "size": "large",
+       "surface": "sweep",
+       "thinness": "thick",
+       "tool": "thick_brush"
+      },
+      "count": 3,
+      "proportion": null,
+      "shape": "line"
+     }
+    ],
+    "plugins": []
+   },
+   "message": "Description:\n(description)\n\nFirst lines of the work plan: Paper. Fill the background with black.\n\nLayers of the work plan (number (kind): instruction):\n0 (area): Scatter 40 gray extra-fine pencil faint very small points.\n1 (bundle): Place one broadly undulating white fine-brush dense stipple normal-sized circle.\n2 (bundle): Draw 3 gray thick thick-brush dense sweep large lines."
+  },
+  {
+   "id": "en-21",
+   "lang": "en",
+   "plan": {
+    "background": "white",
+    "ground": "paper",
+    "layers": [
+     {
+      "action": "line_up",
+      "attributes": {
+       "angle": "horizontal",
+       "color": "gray",
+       "handling": "faint",
+       "line_up_direction": "horizontal",
+       "motion_amplitude": "narrowly",
+       "motion_quality": "undulating",
+       "motion_spacing": "tightly",
+       "surface": "sweep",
+       "thinness": "thin",
+       "tool": "fine_brush"
+      },
+      "count": 4,
+      "proportion": "full_width",
+      "shape": "line"
+     },
+     {
+      "action": "scatter",
+      "attributes": {
+       "color": "black",
+       "handling": "temperate",
+       "motion_amplitude": "broadly",
+       "motion_quality": "swaying",
+       "motion_spacing": "loosely",
+       "size": "small",
+       "surface": "stipple",
+       "tool": "crayon"
+      },
+      "count": 15,
+      "proportion": null,
+      "shape": "ellipse"
+     }
+    ],
+    "plugins": []
+   },
+   "message": "Description:\n(description)\n\nFirst lines of the work plan: Paper. Fill the background with white.\n\nLayers of the work plan (number (kind): instruction):\n0 (row): Line up 4 narrowly tightly undulating gray thin fine-brush faint sweep horizontal full-width lines horizontally.\n1 (area): Scatter 15 broadly loosely swaying black crayon temperate stipple small ellipses."
+  },
+  {
+   "id": "en-22",
+   "lang": "en",
+   "plan": {
+    "background": "white",
+    "ground": "paper",
+    "layers": [
+     {
+      "action": "scatter",
+      "attributes": {
+       "color": "blue",
+       "handling": "temperate",
+       "motion_amplitude": "broadly",
+       "motion_quality": "swaying",
+       "motion_spacing": "loosely",
+       "size": "large",
+       "surface": "sweep",
+       "thinness": "thin",
+       "tool": "fine_brush"
+      },
+      "count": 12,
+      "proportion": null,
+      "shape": "line"
+     },
+     {
+      "action": "scatter",
+      "attributes": {
+       "color": "gray",
+       "handling": "dense",
+       "motion_amplitude": "narrowly",
+       "motion_quality": "undulating",
+       "motion_spacing": "tightly",
+       "size": "small",
+       "surface": "grain",
+       "thinness": "extra_fine",
+       "tool": "pencil"
+      },
+      "count": 15,
+      "proportion": null,
+      "shape": "line"
+     }
+    ],
+    "plugins": []
+   },
+   "message": "Description:\n(description)\n\nFirst lines of the work plan: Paper. Fill the background with white.\n\nLayers of the work plan (number (kind): instruction):\n0 (area): Scatter 12 broadly loosely swaying blue thin fine-brush temperate sweep large lines.\n1 (area): Scatter 15 narrowly tightly undulating gray extra-fine pencil dense grain small lines."
+  },
+  {
+   "id": "en-23",
+   "lang": "en",
+   "plan": {
+    "background": "white",
+    "ground": "paper",
+    "layers": [
+     {
+      "action": "fill",
+      "attributes": {
+       "color": "gray",
+       "handling": "dense",
+       "position": "bottom",
+       "size": "extra_large",
+       "surface": "flat",
+       "tool": "thick_brush"
+      },
+      "count": 1,
+      "proportion": "wide",
+      "shape": "square"
+     },
+     {
+      "action": "tile",
+      "attributes": {
+       "color": "red",
+       "handling": "temperate",
+       "motion_amplitude": "narrowly",
+       "motion_quality": "swaying",
+       "motion_spacing": "tightly",
+       "size": "small",
+       "surface": "flat",
+       "tool": "crayon"
+      },
+      "count": 12,
+      "proportion": null,
+      "shape": "square"
+     },
+     {
+      "action": "tile",
+      "attributes": {
+       "color": "blue",
+       "handling": "temperate",
+       "motion_amplitude": "narrowly",
+       "motion_quality": "swaying",
+       "motion_spacing": "tightly",
+       "size": "small",
+       "surface": "flat",
+       "tool": "crayon"
+      },
+      "count": 12,
+      "proportion": null,
+      "shape": "square"
+     },
+     {
+      "action": "tile",
+      "attributes": {
+       "color": "green",
+       "handling": "temperate",
+       "motion_amplitude": "narrowly",
+       "motion_quality": "swaying",
+       "motion_spacing": "tightly",
+       "size": "small",
+       "surface": "flat",
+       "tool": "crayon"
+      },
+      "count": 12,
+      "proportion": null,
+      "shape": "square"
+     },
+     {
+      "action": "tile",
+      "attributes": {
+       "color": "gray",
+       "handling": "temperate",
+       "motion_amplitude": "narrowly",
+       "motion_quality": "swaying",
+       "motion_spacing": "tightly",
+       "size": "small",
+       "surface": "flat",
+       "tool": "crayon"
+      },
+      "count": 12,
+      "proportion": null,
+      "shape": "square"
+     }
+    ],
+    "plugins": []
+   },
+   "message": "Description:\n(description)\n\nFirst lines of the work plan: Paper. Fill the background with white.\n\nLayers of the work plan (number (kind): instruction):\n0 (area): Fill one gray thick-brush dense flat wide extra-large square. [place set by the work plan: bottom]\n1 (area): Tile 12 narrowly tightly swaying red crayon temperate flat small squares.\n2 (area): Tile 12 narrowly tightly swaying blue crayon temperate flat small squares.\n3 (area): Tile 12 narrowly tightly swaying green crayon temperate flat small squares.\n4 (area): Tile 12 narrowly tightly swaying gray crayon temperate flat small squares."
+  },
+  {
+   "id": "en-24",
+   "lang": "en",
+   "plan": {
+    "background": "white",
+    "ground": "paper",
+    "layers": [
+     {
+      "action": "fill",
+      "attributes": {
+       "angle": "horizontal",
+       "color": "gray",
+       "handling": "faint",
+       "motion_amplitude": "broadly",
+       "motion_quality": "undulating",
+       "motion_spacing": "loosely",
+       "position": "bottom",
+       "surface": "grain",
+       "thinness": "thin",
+       "tool": "pencil"
+      },
+      "count": 1,
+      "proportion": "full_width",
+      "shape": "cloudform"
+     },
+     {
+      "action": "scatter",
+      "attributes": {
+       "color": "gray",
+       "handling": "dense",
+       "motion_amplitude": "broadly",
+       "motion_quality": "swaying",
+       "motion_spacing": "tightly",
+       "position": "top",
+       "size": "small",
+       "surface": "flat",
+       "thinness": "thin",
+       "tool": "fine_brush"
+      },
+      "count": 40,
+      "proportion": null,
+      "shape": "ellipse"
+     }
+    ],
+    "plugins": []
+   },
+   "message": "Description:\n(description)\n\nFirst lines of the work plan: Paper. Fill the background with white.\n\nLayers of the work plan (number (kind): instruction):\n0 (area): Fill one broadly loosely undulating gray thin pencil faint grain horizontal full-width cloudform. [place set by the work plan: bottom]\n1 (area): Scatter 40 broadly tightly swaying gray thin fine-brush dense flat small ellipses. [place set by the work plan: top]"
+  },
+  {
+   "id": "en-25",
+   "lang": "en",
+   "plan": {
+    "background": "gray",
+    "ground": "canvas",
+    "layers": [
+     {
+      "action": "fill",
+      "attributes": {
+       "color": "gray",
+       "handling": "faint",
+       "surface": "stipple",
+       "tool": "chalk"
+      },
+      "count": 1,
+      "proportion": "full_width",
+      "shape": "square"
+     },
+     {
+      "action": "scatter",
+      "attributes": {
+       "color": "white",
+       "handling": "temperate",
+       "motion_quality": "swaying",
+       "size": "small",
+       "surface": "grain",
+       "thinness": "thin",
+       "tool": "chalk"
+      },
+      "count": 12,
+      "proportion": null,
+      "shape": "line"
+     }
+    ],
+    "plugins": []
+   },
+   "message": "Description:\n(description)\n\nFirst lines of the work plan: Canvas. Fill the background with gray.\n\nLayers of the work plan (number (kind): instruction):\n0 (area): Fill one gray chalk faint stipple full-width square.\n1 (area): Scatter 12 swaying white thin chalk temperate grain small lines."
+  },
+  {
+   "id": "ja-01",
+   "lang": "ja",
+   "plan": {
+    "background": "white",
+    "ground": "paper",
+    "layers": [
+     {
+      "action": "place",
+      "attributes": {
+       "color": "gray",
+       "handling": "faint",
+       "position": "center",
+       "size": "large",
+       "surface": "empty",
+       "tool": "pencil"
+      },
+      "count": 1,
+      "proportion": "wide",
+      "shape": "square"
+     },
+     {
+      "action": "draw",
+      "attributes": {
+       "angle": "vertical",
+       "color": "black",
+       "continuity": "solid",
+       "handling": "dense",
+       "motion_amplitude": "narrowly",
+       "motion_quality": "swaying",
+       "motion_spacing": "tightly",
+       "position": "bottom",
+       "size": "normal_sized",
+       "surface": "grain",
+       "thinness": "thin",
+       "tool": "fine_brush"
+      },
+      "count": 1,
+      "proportion": null,
+      "shape": "line"
+     },
+     {
+      "action": "scatter",
+      "attributes": {
+       "color": "green",
+       "handling": "temperate",
+       "size": "very_small",
+       "tool": "pen"
+      },
+      "count": 5,
+      "proportion": null,
+      "shape": "point"
+     }
+    ],
+    "plugins": []
+   },
+   "message": "記述:\n（記述）\n\n下絵のはじめの行: 紙。 背景を白で埋める。\n\n下絵の層（番号（種類）: 指示）:\n0（束）: 灰の鉛筆の薄い空の横長の大きな四角を1個置く。〔下絵が付けた場所: 中心〕\n1（束）: 細かく小刻みに揺れる黒の細い細筆の実線の濃い粒の垂直の普通の大きさの線を1個引く。〔下絵が付けた場所: 下〕\n2（面）: 緑のペンの程よいとても小さな点を5個散らす。"
+  },
+  {
+   "id": "ja-02",
+   "lang": "ja",
+   "plan": {
+    "background": "black",
+    "ground": "mezzotint",
+    "layers": [
+     {
+      "action": "draw",
+      "attributes": {
+       "angle": "vertical",
+       "color": "gray",
+       "continuity": "solid",
+       "handling": "temperate",
+       "motion_amplitude": "narrowly",
+       "motion_quality": "swaying",
+       "motion_spacing": "tightly",
+       "position": "center",
+       "size": "large",
+       "surface": "grain",
+       "thinness": "thin",
+       "tool": "silverpoint"
+      },
+      "count": 1,
+      "proportion": null,
+      "shape": "line"
+     },
+     {
+      "action": "draw",
+      "attributes": {
+       "color": "gray",
+       "continuity": "solid",
+       "handling": "faint",
+       "motion_amplitude": "broadly",
+       "motion_quality": "undulating",
+       "motion_spacing": "loosely",
+       "size": "small",
+       "surface": "sweep",
+       "thinness": "extra_fine",
+       "tool": "pencil"
+      },
+      "count": 20,
+      "proportion": null,
+      "shape": "arc"
+     }
+    ],
+    "plugins": []
+   },
+   "message": "記述:\n（記述）\n\n下絵のはじめの行: メゾチント。 背景を黒で埋める。\n\n下絵の層（番号（種類）: 指示）:\n0（束）: 細かく小刻みに揺れる灰の細い銀筆の実線の程よい粒の垂直の大きな線を1個引く。〔下絵が付けた場所: 中心〕\n1（束）: 大きくゆるやかに波打つ灰のごく細い鉛筆の実線の薄い刷きの小さな弧を20個引く。"
+  },
+  {
+   "id": "ja-03",
+   "lang": "ja",
+   "plan": {
+    "background": "black",
+    "ground": "washi",
+    "layers": [
+     {
+      "action": "draw",
+      "attributes": {
+       "angle": "vertical",
+       "color": "gray",
+       "handling": "faint",
+       "motion_amplitude": "broadly",
+       "motion_quality": "undulating",
+       "motion_spacing": "loosely",
+       "size": "huge",
+       "surface": "sweep",
+       "thinness": "thick",
+       "tool": "thick_brush"
+      },
+      "count": 1,
+      "proportion": null,
+      "shape": "line"
+     },
+     {
+      "action": "draw",
+      "attributes": {
+       "angle": "vertical",
+       "color": "black",
+       "handling": "dense",
+       "motion_amplitude": "narrowly",
+       "motion_quality": "swaying",
+       "motion_spacing": "tightly",
+       "position": "center",
+       "size": "large",
+       "surface": "grain",
+       "thinness": "thick",
+       "tool": "thick_brush"
+      },
+      "count": 3,
+      "proportion": null,
+      "shape": "line"
+     },
+     {
+      "action": "place",
+      "attributes": {
+       "color": "white",
+       "handling": "temperate",
+       "position": "center",
+       "size": "large",
+       "surface": "flat",
+       "tool": "oil_paint"
+      },
+      "count": 1,
+      "proportion": null,
+      "shape": "circle"
+     },
+     {
+      "action": "scatter",
+      "attributes": {
+       "color": "white",
+       "handling": "dense",
+       "size": "very_small",
+       "tool": "pen"
+      },
+      "count": 30,
+      "proportion": null,
+      "shape": "point"
+     }
+    ],
+    "plugins": []
+   },
+   "message": "記述:\n（記述）\n\n下絵のはじめの行: 和紙。 背景を黒で埋める。\n\n下絵の層（番号（種類）: 指示）:\n0（束）: 大きくゆるやかに波打つ灰の太い太筆の薄い刷きの垂直の巨大な線を1個引く。\n1（束）: 細かく小刻みに揺れる黒の太い太筆の濃い粒の垂直の大きな線を3個引く。〔下絵が付けた場所: 中心〕\n2（束）: 白の油彩の程よい塗りの大きな円を1個置く。〔下絵が付けた場所: 中心〕\n3（面）: 白のペンの濃いとても小さな点を30個散らす。"
+  },
+  {
+   "id": "ja-04",
+   "lang": "ja",
+   "plan": {
+    "background": "white",
+    "ground": "paper",
+    "layers": [
+     {
+      "action": "draw",
+      "attributes": {
+       "angle": "rising",
+       "color": "gray",
+       "continuity": "solid",
+       "handling": "dense",
+       "motion_amplitude": "narrowly",
+       "motion_quality": "undulating",
+       "motion_spacing": "tightly",
+       "surface": "grain",
+       "thinness": "thick",
+       "tool": "thick_brush"
+      },
+      "count": 1,
+      "proportion": "full_width",
+      "shape": "line"
+     },
+     {
+      "action": "place",
+      "attributes": {
+       "color": "black",
+       "handling": "temperate",
+       "size": "small",
+       "surface": "flat",
+       "tool": "pen"
+      },
+      "count": 3,
+      "proportion": "tall",
+      "shape": "ellipse"
+     },
+     {
+      "action": "draw",
+      "attributes": {
+       "angle": "vertical",
+       "color": "black",
+       "handling": "faint",
+       "motion_amplitude": "broadly",
+       "motion_quality": "swaying",
+       "motion_spacing": "loosely",
+       "position": "top_edge",
+       "size": "normal_sized",
+       "surface": "empty",
+       "thinness": "thin",
+       "tool": "pencil"
+      },
+      "count": 5,
+      "proportion": null,
+      "shape": "line"
+     }
+    ],
+    "plugins": []
+   },
+   "message": "記述:\n（記述）\n\n下絵のはじめの行: 紙。 背景を白で埋める。\n\n下絵の層（番号（種類）: 指示）:\n0（全幅の線）: 細かく小刻みに波打つ灰の太い太筆の実線の濃い粒の右上がりの全幅の線を1個引く。\n1（束）: 黒のペンの程よい塗りの縦長の小さな楕円を3個置く。\n2（束）: 大きくゆるやかに揺れる黒の細い鉛筆の薄い空の垂直の普通の大きさの線を5個引く。〔下絵が付けた場所: 上端〕"
+  },
+  {
+   "id": "ja-05",
+   "lang": "ja",
+   "plan": {
+    "background": "white",
+    "ground": "washi",
+    "layers": [
+     {
+      "action": "draw",
+      "attributes": {
+       "angle": "horizontal",
+       "color": "gray",
+       "handling": "faint",
+       "motion_amplitude": "narrowly",
+       "motion_quality": "undulating",
+       "motion_spacing": "loosely",
+       "position": "bottom",
+       "surface": "sweep",
+       "thinness": "thin",
+       "tool": "fine_brush"
+      },
+      "count": 1,
+      "proportion": "full_width",
+      "shape": "line"
+     },
+     {
+      "action": "place",
+      "attributes": {
+       "color": "gray",
+       "handling": "temperate",
+       "position": "bottom",
+       "size": "extra_large",
+       "surface": "flat",
+       "tool": "thick_brush"
+      },
+      "count": 1,
+      "proportion": "wide",
+      "shape": "cloudform"
+     },
+     {
+      "action": "scatter",
+      "attributes": {
+       "angle": "vertical",
+       "color": "white",
+       "handling": "dense",
+       "motion_amplitude": "narrowly",
+       "motion_quality": "swaying",
+       "motion_spacing": "tightly",
+       "position": "center",
+       "size": "normal_sized",
+       "surface": "flat",
+       "tool": "oil_paint"
+      },
+      "count": 7,
+      "proportion": "tall",
+      "shape": "square"
+     }
+    ],
+    "plugins": []
+   },
+   "message": "記述:\n（記述）\n\n下絵のはじめの行: 和紙。 背景を白で埋める。\n\n下絵の層（番号（種類）: 指示）:\n0（全幅の線）: 細かくゆるやかに波打つ灰の細い細筆の薄い刷きの水平の全幅の線を1個引く。〔下絵が付けた場所: 下〕\n1（束）: 灰の太筆の程よい塗りの横長の特大のの雲形を1個置く。〔下絵が付けた場所: 下〕\n2（面）: 細かく小刻みに揺れる白の油彩の濃い塗りの垂直の縦長の普通の大きさの四角を7個散らす。〔下絵が付けた場所: 中心〕"
+  },
+  {
+   "id": "ja-06",
+   "lang": "ja",
+   "plan": {
+    "background": "white",
+    "ground": "drawing_paper",
+    "layers": [
+     {
+      "action": "fill",
+      "attributes": {
+       "angle": "vertical",
+       "color": "gray",
+       "handling": "faint",
+       "position": "bottom",
+       "size": "extra_large",
+       "surface": "flat",
+       "tool": "thick_brush"
+      },
+      "count": 1,
+      "proportion": "wide",
+      "shape": "square"
+     },
+     {
+      "action": "draw",
+      "attributes": {
+       "color": "black",
+       "continuity": "solid",
+       "handling": "dense",
+       "motion_amplitude": "narrowly",
+       "motion_quality": "undulating",
+       "motion_spacing": "tightly",
+       "position": "center",
+       "size": "small",
+       "surface": "grain",
+       "thinness": "thin",
+       "tool": "pen"
+      },
+      "count": 12,
+      "proportion": null,
+      "shape": "line"
+     },
+     {
+      "action": "draw",
+      "attributes": {
+       "angle": "rotated",
+       "color": "yellow",
+       "continuity": "solid",
+       "handling": "temperate",
+       "motion_amplitude": "broadly",
+       "motion_quality": "swaying",
+       "motion_spacing": "loosely",
+       "position": "center",
+       "size": "very_small",
+       "surface": "empty",
+       "thinness": "extra_fine",
+       "tool": "silverpoint"
+      },
+      "count": 40,
+      "proportion": null,
+      "shape": "arc"
+     },
+     {
+      "action": "place",
+      "attributes": {
+       "color": "yellow",
+       "continuity": "solid",
+       "handling": "dense",
+       "position": "center",
+       "size": "normal_sized",
+       "tool": "crayon"
+      },
+      "count": 6,
+      "proportion": null,
+      "shape": "point"
+     }
+    ],
+    "plugins": []
+   },
+   "message": "記述:\n（記述）\n\n下絵のはじめの行: 画用紙。 背景を白で埋める。\n\n下絵の層（番号（種類）: 指示）:\n0（面）: 灰の太筆の薄い塗りの垂直の横長の特大のの四角を1個埋める。〔下絵が付けた場所: 下〕\n1（束）: 細かく小刻みに波打つ黒の細いペンの実線の濃い粒の小さな線を12個引く。〔下絵が付けた場所: 中心〕\n2（束）: 大きくゆるやかに揺れる黄のごく細い銀筆の実線の程よい空の回転のとても小さな弧を40個引く。〔下絵が付けた場所: 中心〕\n3（束）: 黄のクレヨンの実線の濃い普通の大きさの点を6個置く。〔下絵が付けた場所: 中心〕"
+  },
+  {
+   "id": "ja-07",
+   "lang": "ja",
+   "plan": {
+    "background": "black",
+    "ground": "paper",
+    "layers": [
+     {
+      "action": "fill",
+      "attributes": {
+       "angle": "horizontal",
+       "color": "gray",
+       "handling": "faint",
+       "motion_amplitude": "narrowly",
+       "motion_quality": "undulating",
+       "motion_spacing": "tightly",
+       "position": "bottom",
+       "size": "large",
+       "surface": "sweep",
+       "tool": "thick_brush"
+      },
+      "count": 1,
+      "proportion": "wide",
+      "shape": "ellipse"
+     },
+     {
+      "action": "draw",
+      "attributes": {
+       "angle": "horizontal",
+       "color": "red",
+       "continuity": "solid",
+       "handling": "dense",
+       "motion_amplitude": "broadly",
+       "motion_quality": "swaying",
+       "motion_spacing": "loosely",
+       "position": "center",
+       "size": "small",
+       "surface": "grain",
+       "thinness": "thin",
+       "tool": "pencil"
+      },
+      "count": 1,
+      "proportion": null,
+      "shape": "line"
+     },
+     {
+      "action": "place",
+      "attributes": {
+       "color": "red",
+       "handling": "dense",
+       "position": "center",
+       "size": "very_small",
+       "surface": "flat",
+       "tool": "oil_paint"
+      },
+      "count": 1,
+      "proportion": null,
+      "shape": "circle"
+     }
+    ],
+    "plugins": []
+   },
+   "message": "記述:\n（記述）\n\n下絵のはじめの行: 紙。 背景を黒で埋める。\n\n下絵の層（番号（種類）: 指示）:\n0（面）: 細かく小刻みに波打つ灰の太筆の薄い刷きの水平の横長の大きな楕円を1個埋める。〔下絵が付けた場所: 下〕\n1（束）: 大きくゆるやかに揺れる赤の細い鉛筆の実線の濃い粒の水平の小さな線を1個引く。〔下絵が付けた場所: 中心〕\n2（束）: 赤の油彩の濃い塗りのとても小さな円を1個置く。〔下絵が付けた場所: 中心〕"
+  },
+  {
+   "id": "ja-08",
+   "lang": "ja",
+   "plan": {
+    "background": "black",
+    "ground": "washi",
+    "layers": [
+     {
+      "action": "fill",
+      "attributes": {
+       "color": "gray",
+       "handling": "dense",
+       "motion_amplitude": "narrowly",
+       "motion_quality": "swaying",
+       "motion_spacing": "tightly",
+       "position": "bottom",
+       "size": "large",
+       "surface": "grain",
+       "tool": "chalk"
+      },
+      "count": 1,
+      "proportion": "wide",
+      "shape": "cloudform"
+     },
+     {
+      "action": "scatter",
+      "attributes": {
+       "color": "orange",
+       "handling": "temperate",
+       "size": "very_small",
+       "tool": "fine_brush"
+      },
+      "count": 10,
+      "proportion": null,
+      "shape": "point"
+     }
+    ],
+    "plugins": []
+   },
+   "message": "記述:\n（記述）\n\n下絵のはじめの行: 和紙。 背景を黒で埋める。\n\n下絵の層（番号（種類）: 指示）:\n0（面）: 細かく小刻みに揺れる灰のチョークの濃い粒の横長の大きな雲形を1個埋める。〔下絵が付けた場所: 下〕\n1（面）: 橙の細筆の程よいとても小さな点を10個散らす。"
+  },
+  {
+   "id": "ja-09",
+   "lang": "ja",
+   "plan": {
+    "background": "black",
+    "ground": null,
+    "layers": [
+     {
+      "action": "fill",
+      "attributes": {
+       "angle": "vertical",
+       "color": "yellow",
+       "handling": "faint",
+       "motion_amplitude": "narrowly",
+       "motion_quality": "undulating",
+       "motion_spacing": "loosely",
+       "position": "center",
+       "size": "extra_large",
+       "surface": "sweep",
+       "tool": "thick_brush"
+      },
+      "count": 1,
+      "proportion": "tall",
+      "shape": "square"
+     },
+     {
+      "action": "scatter",
+      "attributes": {
+       "color": "white",
+       "handling": "dense",
+       "size": "very_small",
+       "tool": "pencil"
+      },
+      "count": 40,
+      "proportion": null,
+      "shape": "point"
+     }
+    ],
+    "plugins": []
+   },
+   "message": "記述:\n（記述）\n\n下絵のはじめの行: 背景を黒で埋める。\n\n下絵の層（番号（種類）: 指示）:\n0（面）: 細かくゆるやかに波打つ黄の太筆の薄い刷きの垂直の縦長の特大のの四角を1個埋める。〔下絵が付けた場所: 中心〕\n1（面）: 白の鉛筆の濃いとても小さな点を40個散らす。"
+  },
+  {
+   "id": "ja-10",
+   "lang": "ja",
+   "plan": {
+    "background": "white",
+    "ground": "washi",
+    "layers": [
+     {
+      "action": "fill",
+      "attributes": {
+       "color": "gray",
+       "handling": "faint",
+       "surface": "sweep",
+       "tool": "thick_brush"
+      },
+      "count": 1,
+      "proportion": "full_width",
+      "shape": "cloudform"
+     },
+     {
+      "action": "draw",
+      "attributes": {
+       "angle": "diagonal",
+       "color": "orange",
+       "continuity": "solid",
+       "handling": "dense",
+       "motion_amplitude": "narrowly",
+       "motion_quality": "swaying",
+       "motion_spacing": "tightly",
+       "position": "center",
+       "size": "large",
+       "surface": "grain",
+       "thinness": "thick",
+       "tool": "thick_brush"
+      },
+      "count": 2,
+      "proportion": null,
+      "shape": "line"
+     },
+     {
+      "action": "place",
+      "attributes": {
+       "angle": "rotated",
+       "color": "black",
+       "continuity": "solid",
+       "handling": "dense",
+       "position": "center",
+       "size": "small",
+       "surface": "flat",
+       "tool": "pen"
+      },
+      "count": 1,
+      "proportion": "wide",
+      "shape": "ellipse"
+     },
+     {
+      "action": "scatter",
+      "attributes": {
+       "color": "gray",
+       "handling": "temperate",
+       "size": "very_small",
+       "tool": "pencil"
+      },
+      "count": 15,
+      "proportion": null,
+      "shape": "point"
+     }
+    ],
+    "plugins": [
+     {
+      "count": null,
+      "name": "Nature.FallenLeaves"
+     }
+    ]
+   },
+   "message": "記述:\n（記述）\n\n下絵のはじめの行: 和紙。 背景を白で埋める。 Nature.落葉。\n\n下絵の層（番号（種類）: 指示）:\n0（面）: 灰の太筆の薄い刷きの全幅の雲形を1個埋める。\n1（束）: 細かく小刻みに揺れる橙の太い太筆の実線の濃い粒の斜めの大きな線を2個引く。〔下絵が付けた場所: 中心〕\n2（束）: 黒のペンの実線の濃い塗りの回転の横長の小さな楕円を1個置く。〔下絵が付けた場所: 中心〕\n3（面）: 灰の鉛筆の程よいとても小さな点を15個散らす。"
+  },
+  {
+   "id": "ja-11",
+   "lang": "ja",
+   "plan": {
+    "background": "black",
+    "ground": "washi",
+    "layers": [
+     {
+      "action": "fill",
+      "attributes": {
+       "color": "gray",
+       "handling": "faint",
+       "position": "bottom",
+       "size": "extra_large",
+       "surface": "sweep",
+       "tool": "thick_brush"
+      },
+      "count": 1,
+      "proportion": "wide",
+      "shape": "cloudform"
+     },
+     {
+      "action": "draw",
+      "attributes": {
+       "angle": "vertical",
+       "color": "white",
+       "continuity": "solid",
+       "handling": "dense",
+       "motion_amplitude": "narrowly",
+       "motion_quality": "swaying",
+       "motion_spacing": "tightly",
+       "position": "center",
+       "size": "large",
+       "surface": "grain",
+       "thinness": "thick",
+       "tool": "rotring"
+      },
+      "count": 2,
+      "proportion": null,
+      "shape": "line"
+     },
+     {
+      "action": "scatter",
+      "attributes": {
+       "color": "blue",
+       "handling": "faint",
+       "size": "very_small",
+       "tool": "pencil"
+      },
+      "count": 12,
+      "proportion": null,
+      "shape": "point"
+     },
+     {
+      "action": "draw",
+      "attributes": {
+       "angle": "rotated",
+       "color": "white",
+       "handling": "temperate",
+       "motion_amplitude": "narrowly",
+       "motion_quality": "swaying",
+       "motion_spacing": "tightly",
+       "position": "top",
+       "size": "small",
+       "surface": "grain",
+       "thinness": "thin",
+       "tool": "fine_brush"
+      },
+      "count": 8,
+      "proportion": null,
+      "shape": "arc"
+     }
+    ],
+    "plugins": []
+   },
+   "message": "記述:\n（記述）\n\n下絵のはじめの行: 和紙。 背景を黒で埋める。\n\n下絵の層（番号（種類）: 指示）:\n0（面）: 灰の太筆の薄い刷きの横長の特大のの雲形を1個埋める。〔下絵が付けた場所: 下〕\n1（束）: 細かく小刻みに揺れる白の太いロットリングの実線の濃い粒の垂直の大きな線を2個引く。〔下絵が付けた場所: 中心〕\n2（面）: 青の鉛筆の薄いとても小さな点を12個散らす。\n3（束）: 細かく小刻みに揺れる白の細い細筆の程よい粒の回転の小さな弧を8個引く。〔下絵が付けた場所: 上〕"
+  },
+  {
+   "id": "ja-12",
+   "lang": "ja",
+   "plan": {
+    "background": "white",
+    "ground": "washi",
+    "layers": [
+     {
+      "action": "fill",
+      "attributes": {
+       "color": "gray",
+       "handling": "faint",
+       "motion_amplitude": "broadly",
+       "motion_quality": "undulating",
+       "motion_spacing": "loosely",
+       "surface": "aquatint",
+       "tool": "thick_brush"
+      },
+      "count": 1,
+      "proportion": "full_width",
+      "shape": "cloudform"
+     },
+     {
+      "action": "place",
+      "attributes": {
+       "angle": "rising",
+       "color": "blue",
+       "continuity": "solid",
+       "handling": "temperate",
+       "motion_amplitude": "narrowly",
+       "motion_quality": "swaying",
+       "motion_spacing": "tightly",
+       "position": "center",
+       "size": "large",
+       "surface": "grain",
+       "thinness": "thick",
+       "tool": "pencil"
+      },
+      "count": 3,
+      "proportion": "tall",
+      "shape": "triangle"
+     },
+     {
+      "action": "scatter",
+      "attributes": {
+       "color": "black",
+       "handling": "faint",
+       "position": "bottom",
+       "size": "very_small",
+       "thinness": "extra_fine",
+       "tool": "silverpoint"
+      },
+      "count": 12,
+      "proportion": null,
+      "shape": "point"
+     }
+    ],
+    "plugins": []
+   },
+   "message": "記述:\n（記述）\n\n下絵のはじめの行: 和紙。 背景を白で埋める。\n\n下絵の層（番号（種類）: 指示）:\n0（面）: 大きくゆるやかに波打つ灰の太筆の薄いアクアチントの全幅の雲形を1個埋める。\n1（束）: 細かく小刻みに揺れる青の太い鉛筆の実線の程よい粒の右上がりの縦長の大きな三角を3個置く。〔下絵が付けた場所: 中心〕\n2（面）: 黒のごく細い銀筆の薄いとても小さな点を12個散らす。〔下絵が付けた場所: 下〕"
+  },
+  {
+   "id": "ja-13",
+   "lang": "ja",
+   "plan": {
+    "background": "black",
+    "ground": "canvas",
+    "layers": [
+     {
+      "action": "fill",
+      "attributes": {
+       "angle": "horizontal",
+       "color": "blue",
+       "handling": "faint",
+       "motion_amplitude": "narrowly",
+       "motion_quality": "undulating",
+       "motion_spacing": "loosely",
+       "position": "bottom",
+       "size": "large",
+       "surface": "flat",
+       "tool": "thick_brush"
+      },
+      "count": 1,
+      "proportion": "wide",
+      "shape": "square"
+     },
+     {
+      "action": "place",
+      "attributes": {
+       "color": "white",
+       "handling": "dense",
+       "position": "top",
+       "size": "large",
+       "surface": "flat",
+       "tool": "thick_brush"
+      },
+      "count": 1,
+      "proportion": null,
+      "shape": "circle"
+     },
+     {
+      "action": "draw",
+      "attributes": {
+       "angle": "diagonal",
+       "color": "white",
+       "handling": "temperate",
+       "motion_amplitude": "broadly",
+       "motion_quality": "swaying",
+       "motion_spacing": "loosely",
+       "size": "small",
+       "surface": "sweep",
+       "thinness": "thin",
+       "tool": "pencil"
+      },
+      "count": 12,
+      "proportion": null,
+      "shape": "line"
+     },
+     {
+      "action": "draw",
+      "attributes": {
+       "angle": "diagonal",
+       "color": "white",
+       "handling": "dense",
+       "motion_amplitude": "narrowly",
+       "motion_quality": "undulating",
+       "motion_spacing": "tightly",
+       "position": "center",
+       "size": "normal_sized",
+       "surface": "grain",
+       "thinness": "extra_thick",
+       "tool": "crayon"
+      },
+      "count": 8,
+      "proportion": null,
+      "shape": "line"
+     }
+    ],
+    "plugins": []
+   },
+   "message": "記述:\n（記述）\n\n下絵のはじめの行: カンバス。 背景を黒で埋める。\n\n下絵の層（番号（種類）: 指示）:\n0（面）: 細かくゆるやかに波打つ青の太筆の薄い塗りの水平の横長の大きな四角を1個埋める。〔下絵が付けた場所: 下〕\n1（束）: 白の太筆の濃い塗りの大きな円を1個置く。〔下絵が付けた場所: 上〕\n2（束）: 大きくゆるやかに揺れる白の細い鉛筆の程よい刷きの斜めの小さな線を12個引く。\n3（束）: 細かく小刻みに波打つ白のごく太いクレヨンの濃い粒の斜めの普通の大きさの線を8個引く。〔下絵が付けた場所: 中心〕"
+  },
+  {
+   "id": "ja-14",
+   "lang": "ja",
+   "plan": {
+    "background": "black",
+    "ground": "paper",
+    "layers": [
+     {
+      "action": "scatter",
+      "attributes": {
+       "color": "white",
+       "handling": "dense",
+       "size": "very_small",
+       "tool": "chalk"
+      },
+      "count": 40,
+      "proportion": null,
+      "shape": "point"
+     },
+     {
+      "action": "draw",
+      "attributes": {
+       "angle": "vertical",
+       "color": "gray",
+       "continuity": "solid",
+       "handling": "temperate",
+       "motion_amplitude": "narrowly",
+       "motion_quality": "swaying",
+       "position": "center",
+       "size": "normal_sized",
+       "surface": "grain",
+       "thinness": "thin",
+       "tool": "pencil"
+      },
+      "count": 3,
+      "proportion": null,
+      "shape": "line"
+     },
+     {
+      "action": "place",
+      "attributes": {
+       "color": "white",
+       "handling": "faint",
+       "size": "very_small",
+       "surface": "empty",
+       "tool": "fine_brush"
+      },
+      "count": 1,
+      "proportion": null,
+      "shape": "circle"
+     }
+    ],
+    "plugins": []
+   },
+   "message": "記述:\n（記述）\n\n下絵のはじめの行: 紙。 背景を黒で埋める。\n\n下絵の層（番号（種類）: 指示）:\n0（面）: 白のチョークの濃いとても小さな点を40個散らす。\n1（束）: 細かく揺れる灰の細い鉛筆の実線の程よい粒の垂直の普通の大きさの線を3個引く。〔下絵が付けた場所: 中心〕\n2（束）: 白の細筆の薄い空のとても小さな円を1個置く。"
+  },
+  {
+   "id": "ja-15",
+   "lang": "ja",
+   "plan": {
+    "background": "white",
+    "ground": "drawing_paper",
+    "layers": [
+     {
+      "action": "fill",
+      "attributes": {
+       "color": "gray",
+       "handling": "faint",
+       "position": "bottom",
+       "size": "extra_large",
+       "surface": "flat",
+       "tool": "thick_brush"
+      },
+      "count": 1,
+      "proportion": "wide",
+      "shape": "square"
+     },
+     {
+      "action": "draw",
+      "attributes": {
+       "angle": "vertical",
+       "color": "black",
+       "continuity": "solid",
+       "handling": "dense",
+       "motion_amplitude": "narrowly",
+       "motion_quality": "swaying",
+       "motion_spacing": "tightly",
+       "size": "large",
+       "surface": "grain",
+       "thinness": "thick",
+       "tool": "rotring"
+      },
+      "count": 6,
+      "proportion": null,
+      "shape": "line"
+     },
+     {
+      "action": "scatter",
+      "attributes": {
+       "color": "yellow",
+       "handling": "dense",
+       "motion_amplitude": "narrowly",
+       "motion_quality": "undulating",
+       "motion_spacing": "tightly",
+       "position": "center",
+       "size": "small",
+       "surface": "flat",
+       "tool": "crayon"
+      },
+      "count": 24,
+      "proportion": null,
+      "shape": "circle"
+     },
+     {
+      "action": "draw",
+      "attributes": {
+       "angle": "rotated",
+       "color": "yellow",
+       "continuity": "solid",
+       "handling": "temperate",
+       "motion_amplitude": "narrowly",
+       "motion_quality": "swaying",
+       "motion_spacing": "loosely",
+       "position": "center",
+       "size": "slightly_small",
+       "surface": "grain",
+       "thinness": "thin",
+       "tool": "fine_brush"
+      },
+      "count": 40,
+      "proportion": null,
+      "shape": "arc"
+     }
+    ],
+    "plugins": []
+   },
+   "message": "記述:\n（記述）\n\n下絵のはじめの行: 画用紙。 背景を白で埋める。\n\n下絵の層（番号（種類）: 指示）:\n0（面）: 灰の太筆の薄い塗りの横長の特大のの四角を1個埋める。〔下絵が付けた場所: 下〕\n1（束）: 細かく小刻みに揺れる黒の太いロットリングの実線の濃い粒の垂直の大きな線を6個引く。\n2（面）: 細かく小刻みに波打つ黄のクレヨンの濃い塗りの小さな円を24個散らす。〔下絵が付けた場所: 中心〕\n3（束）: 細かくゆるやかに揺れる黄の細い細筆の実線の程よい粒の回転の小さめの弧を40個引く。〔下絵が付けた場所: 中心〕"
+  },
+  {
+   "id": "ja-16",
+   "lang": "ja",
+   "plan": {
+    "background": "white",
+    "ground": "paper",
+    "layers": [
+     {
+      "action": "draw",
+      "attributes": {
+       "angle": "horizontal",
+       "color": "gray",
+       "continuity": "solid",
+       "handling": "faint",
+       "motion_amplitude": "narrowly",
+       "motion_quality": "swaying",
+       "position": "center",
+       "surface": "grain",
+       "thinness": "thin",
+       "tool": "pencil"
+      },
+      "count": 1,
+      "proportion": "half_width",
+      "shape": "line"
+     },
+     {
+      "action": "place",
+      "attributes": {
+       "color": "white",
+       "handling": "temperate",
+       "position": "top_edge",
+       "size": "large",
+       "surface": "flat",
+       "tool": "chalk"
+      },
+      "count": 1,
+      "proportion": null,
+      "shape": "circle"
+     }
+    ],
+    "plugins": []
+   },
+   "message": "記述:\n（記述）\n\n下絵のはじめの行: 紙。 背景を白で埋める。\n\n下絵の層（番号（種類）: 指示）:\n0（束）: 細かく揺れる灰の細い鉛筆の実線の薄い粒の水平の半幅の線を1個引く。〔下絵が付けた場所: 中心〕\n1（束）: 白のチョークの程よい塗りの大きな円を1個置く。〔下絵が付けた場所: 上端〕"
+  },
+  {
+   "id": "ja-17",
+   "lang": "ja",
+   "plan": {
+    "background": "white",
+    "ground": "paper",
+    "layers": [
+     {
+      "action": "draw",
+      "attributes": {
+       "angle": "horizontal",
+       "color": "black",
+       "handling": "dense",
+       "motion_amplitude": "narrowly",
+       "motion_quality": "undulating",
+       "motion_spacing": "tightly",
+       "position": "center",
+       "surface": "flat",
+       "thinness": "thick",
+       "tool": "rotring"
+      },
+      "count": 1,
+      "proportion": "full_width",
+      "shape": "line"
+     },
+     {
+      "action": "place",
+      "attributes": {
+       "color": "red",
+       "handling": "dense",
+       "position": "corner",
+       "size": "small",
+       "surface": "flat",
+       "tool": "crayon"
+      },
+      "count": 1,
+      "proportion": null,
+      "shape": "ellipse"
+     },
+     {
+      "action": "scatter",
+      "attributes": {
+       "color": "gray",
+       "handling": "faint",
+       "size": "very_small",
+       "tool": "pencil"
+      },
+      "count": 30,
+      "proportion": null,
+      "shape": "point"
+     }
+    ],
+    "plugins": []
+   },
+   "message": "記述:\n（記述）\n\n下絵のはじめの行: 紙。 背景を白で埋める。\n\n下絵の層（番号（種類）: 指示）:\n0（全幅の線）: 細かく小刻みに波打つ黒の太いロットリングの濃い塗りの水平の全幅の線を1個引く。〔下絵が付けた場所: 中心〕\n1（束）: 赤のクレヨンの濃い塗りの小さな楕円を1個置く。〔下絵が付けた場所: 隅〕\n2（面）: 灰の鉛筆の薄いとても小さな点を30個散らす。"
+  },
+  {
+   "id": "ja-18",
+   "lang": "ja",
+   "plan": {
+    "background": "white",
+    "ground": "washi",
+    "layers": [
+     {
+      "action": "scatter",
+      "attributes": {
+       "color": "gray",
+       "handling": "faint",
+       "size": "very_small",
+       "tool": "pencil"
+      },
+      "count": 40,
+      "proportion": null,
+      "shape": "point"
+     },
+     {
+      "action": "draw",
+      "attributes": {
+       "angle": "horizontal",
+       "color": "black",
+       "continuity": "solid",
+       "handling": "temperate",
+       "motion_amplitude": "broadly",
+       "motion_quality": "undulating",
+       "motion_spacing": "loosely",
+       "surface": "sweep",
+       "thinness": "thin",
+       "tool": "fine_brush"
+      },
+      "count": 3,
+      "proportion": "full_width",
+      "shape": "line"
+     },
+     {
+      "action": "place",
+      "attributes": {
+       "color": "black",
+       "handling": "dense",
+       "position": "bottom",
+       "size": "large",
+       "surface": "flat",
+       "tool": "thick_brush"
+      },
+      "count": 1,
+      "proportion": "wide",
+      "shape": "cloudform"
+     },
+     {
+      "action": "scatter",
+      "attributes": {
+       "angle": "rising",
+       "color": "black",
+       "handling": "temperate",
+       "motion_amplitude": "narrowly",
+       "motion_quality": "swaying",
+       "motion_spacing": "tightly",
+       "size": "small",
+       "surface": "flat",
+       "tool": "fine_brush"
+      },
+      "count": 15,
+      "proportion": null,
+      "shape": "ellipse"
+     }
+    ],
+    "plugins": []
+   },
+   "message": "記述:\n（記述）\n\n下絵のはじめの行: 和紙。 背景を白で埋める。\n\n下絵の層（番号（種類）: 指示）:\n0（面）: 灰の鉛筆の薄いとても小さな点を40個散らす。\n1（全幅の線）: 大きくゆるやかに波打つ黒の細い細筆の実線の程よい刷きの水平の全幅の線を3個引く。\n2（束）: 黒の太筆の濃い塗りの横長の大きな雲形を1個置く。〔下絵が付けた場所: 下〕\n3（面）: 細かく小刻みに揺れる黒の細筆の程よい塗りの右上がりの小さな楕円を15個散らす。"
+  },
+  {
+   "id": "ja-19",
+   "lang": "ja",
+   "plan": {
+    "background": "white",
+    "ground": "paper",
+    "layers": [
+     {
+      "action": "fill",
+      "attributes": {
+       "color": "gray",
+       "handling": "faint",
+       "motion_amplitude": "narrowly",
+       "motion_quality": "undulating",
+       "motion_spacing": "loosely",
+       "position": "bottom",
+       "size": "extra_large",
+       "surface": "sweep",
+       "tool": "thick_brush"
+      },
+      "count": 1,
+      "proportion": "wide",
+      "shape": "cloudform"
+     },
+     {
+      "action": "draw",
+      "attributes": {
+       "angle": "vertical",
+       "color": "black",
+       "continuity": "solid",
+       "handling": "dense",
+       "motion_amplitude": "narrowly",
+       "motion_quality": "swaying",
+       "motion_spacing": "tightly",
+       "position": "center",
+       "size": "small",
+       "surface": "grain",
+       "thinness": "thin",
+       "tool": "pencil"
+      },
+      "count": 2,
+      "proportion": null,
+      "shape": "line"
+     },
+     {
+      "action": "place",
+      "attributes": {
+       "color": "black",
+       "continuity": "solid",
+       "handling": "temperate",
+       "position": "center",
+       "size": "very_small",
+       "surface": "flat",
+       "tool": "pen"
+      },
+      "count": 2,
+      "proportion": null,
+      "shape": "circle"
+     },
+     {
+      "action": "draw",
+      "attributes": {
+       "angle": "horizontal",
+       "color": "black",
+       "continuity": "solid",
+       "handling": "faint",
+       "motion_amplitude": "narrowly",
+       "motion_quality": "swaying",
+       "position": "center",
+       "surface": "sweep",
+       "thinness": "extra_fine",
+       "tool": "silverpoint"
+      },
+      "count": 1,
+      "proportion": "half_width",
+      "shape": "arc"
+     }
+    ],
+    "plugins": []
+   },
+   "message": "記述:\n（記述）\n\n下絵のはじめの行: 紙。 背景を白で埋める。\n\n下絵の層（番号（種類）: 指示）:\n0（面）: 細かくゆるやかに波打つ灰の太筆の薄い刷きの横長の特大のの雲形を1個埋める。〔下絵が付けた場所: 下〕\n1（束）: 細かく小刻みに揺れる黒の細い鉛筆の実線の濃い粒の垂直の小さな線を2個引く。〔下絵が付けた場所: 中心〕\n2（束）: 黒のペンの実線の程よい塗りのとても小さな円を2個置く。〔下絵が付けた場所: 中心〕\n3（束）: 細かく揺れる黒のごく細い銀筆の実線の薄い刷きの水平の半幅の弧を1個引く。〔下絵が付けた場所: 中心〕"
+  },
+  {
+   "id": "ja-20",
+   "lang": "ja",
+   "plan": {
+    "background": "white",
+    "ground": "paper",
+    "layers": [
+     {
+      "action": "draw",
+      "attributes": {
+       "angle": "horizontal",
+       "color": "black",
+       "handling": "dense",
+       "position": "center",
+       "surface": "flat",
+       "thinness": "extra_thick",
+       "tool": "rotring"
+      },
+      "count": 1,
+      "proportion": "full_width",
+      "shape": "line"
+     }
+    ],
+    "plugins": []
+   },
+   "message": "記述:\n（記述）\n\n下絵のはじめの行: 紙。 背景を白で埋める。\n\n下絵の層（番号（種類）: 指示）:\n0（全幅の線）: 黒のごく太いロットリングの濃い塗りの水平の全幅の線を1個引く。〔下絵が付けた場所: 中心〕"
+  },
+  {
+   "id": "ja-21",
+   "lang": "ja",
+   "plan": {
+    "background": "white",
+    "ground": "washi",
+    "layers": [
+     {
+      "action": "fill",
+      "attributes": {
+       "color": "gray",
+       "handling": "faint",
+       "motion_amplitude": "narrowly",
+       "motion_quality": "undulating",
+       "motion_spacing": "loosely",
+       "position": "bottom",
+       "size": "large",
+       "surface": "sweep",
+       "tool": "thick_brush"
+      },
+      "count": 1,
+      "proportion": "wide",
+      "shape": "cloudform"
+     },
+     {
+      "action": "scatter",
+      "attributes": {
+       "color": "white",
+       "handling": "dense",
+       "size": "very_small",
+       "tool": "pencil"
+      },
+      "count": 40,
+      "proportion": null,
+      "shape": "point"
+     },
+     {
+      "action": "scatter",
+      "attributes": {
+       "color": "black",
+       "handling": "temperate",
+       "size": "small",
+       "tool": "pen"
+      },
+      "count": 15,
+      "proportion": null,
+      "shape": "point"
+     }
+    ],
+    "plugins": []
+   },
+   "message": "記述:\n（記述）\n\n下絵のはじめの行: 和紙。 背景を白で埋める。\n\n下絵の層（番号（種類）: 指示）:\n0（面）: 細かくゆるやかに波打つ灰の太筆の薄い刷きの横長の大きな雲形を1個埋める。〔下絵が付けた場所: 下〕\n1（面）: 白の鉛筆の濃いとても小さな点を40個散らす。\n2（面）: 黒のペンの程よい小さな点を15個散らす。"
+  },
+  {
+   "id": "ja-22",
+   "lang": "ja",
+   "plan": {
+    "background": "white",
+    "ground": "paper",
+    "layers": [
+     {
+      "action": "draw",
+      "attributes": {
+       "angle": "horizontal",
+       "color": "gray",
+       "handling": "faint",
+       "motion_amplitude": "narrowly",
+       "motion_quality": "swaying",
+       "motion_spacing": "loosely",
+       "position": "center",
+       "size": "large",
+       "surface": "grain",
+       "thinness": "thin",
+       "tool": "pencil"
+      },
+      "count": 1,
+      "proportion": null,
+      "shape": "line"
+     },
+     {
+      "action": "place",
+      "attributes": {
+       "color": "white",
+       "handling": "temperate",
+       "position": "top_edge",
+       "size": "normal_sized",
+       "surface": "flat",
+       "tool": "chalk"
+      },
+      "count": 1,
+      "proportion": null,
+      "shape": "circle"
+     }
+    ],
+    "plugins": []
+   },
+   "message": "記述:\n（記述）\n\n下絵のはじめの行: 紙。 背景を白で埋める。\n\n下絵の層（番号（種類）: 指示）:\n0（束）: 細かくゆるやかに揺れる灰の細い鉛筆の薄い粒の水平の大きな線を1個引く。〔下絵が付けた場所: 中心〕\n1（束）: 白のチョークの程よい塗りの普通の大きさの円を1個置く。〔下絵が付けた場所: 上端〕"
+  },
+  {
+   "id": "ja-23",
+   "lang": "ja",
+   "plan": {
+    "background": "yellow",
+    "ground": "paper",
+    "layers": [
+     {
+      "action": "fill",
+      "attributes": {
+       "color": "orange",
+       "handling": "faint",
+       "surface": "aquatint",
+       "tool": "thick_brush"
+      },
+      "count": 1,
+      "proportion": "full_width",
+      "shape": "cloudform"
+     },
+     {
+      "action": "scatter",
+      "attributes": {
+       "color": "red",
+       "handling": "dense",
+       "motion_amplitude": "broadly",
+       "motion_quality": "swaying",
+       "motion_spacing": "loosely",
+       "size": "normal_sized",
+       "surface": "flat",
+       "tool": "oil_paint"
+      },
+      "count": 12,
+      "proportion": "tall",
+      "shape": "ellipse"
+     },
+     {
+      "action": "draw",
+      "attributes": {
+       "angle": "horizontal",
+       "color": "black",
+       "continuity": "solid",
+       "handling": "temperate",
+       "size": "large",
+       "surface": "sweep",
+       "thinness": "thick",
+       "tool": "thick_brush"
+      },
+      "count": 1,
+      "proportion": null,
+      "shape": "line"
+     },
+     {
+      "action": "draw",
+      "attributes": {
+       "angle": "diagonal",
+       "color": "gray",
+       "handling": "faint",
+       "motion_amplitude": "narrowly",
+       "motion_quality": "undulating",
+       "motion_spacing": "tightly",
+       "position": "bottom",
+       "size": "small",
+       "surface": "grain",
+       "thinness": "thin",
+       "tool": "pencil"
+      },
+      "count": 4,
+      "proportion": null,
+      "shape": "line"
+     }
+    ],
+    "plugins": []
+   },
+   "message": "記述:\n（記述）\n\n下絵のはじめの行: 紙。 背景を黄で埋める。\n\n下絵の層（番号（種類）: 指示）:\n0（面）: 橙の太筆の薄いアクアチントの全幅の雲形を1個埋める。\n1（面）: 大きくゆるやかに揺れる赤の油彩の濃い塗りの縦長の普通の大きさの楕円を12個散らす。\n2（束）: 黒の太い太筆の実線の程よい刷きの水平の大きな線を1個引く。\n3（束）: 細かく小刻みに波打つ灰の細い鉛筆の薄い粒の斜めの小さな線を4個引く。〔下絵が付けた場所: 下〕"
+  },
+  {
+   "id": "ja-24",
+   "lang": "ja",
+   "plan": {
+    "background": "white",
+    "ground": "washi",
+    "layers": [
+     {
+      "action": "fill",
+      "attributes": {
+       "color": "gray",
+       "handling": "faint",
+       "position": "center",
+       "size": "huge",
+       "surface": "aquatint",
+       "tool": "thick_brush"
+      },
+      "count": 1,
+      "proportion": "wide",
+      "shape": "cloudform"
+     },
+     {
+      "action": "draw",
+      "attributes": {
+       "angle": "falling",
+       "color": "black",
+       "continuity": "solid",
+       "handling": "temperate",
+       "motion_amplitude": "narrowly",
+       "motion_quality": "swaying",
+       "motion_spacing": "loosely",
+       "size": "large",
+       "surface": "grain",
+       "thinness": "thin",
+       "tool": "pencil"
+      },
+      "count": 15,
+      "proportion": null,
+      "shape": "line"
+     },
+     {
+      "action": "place",
+      "attributes": {
+       "color": "black",
+       "handling": "dense",
+       "position": "bottom",
+       "size": "very_small",
+       "tool": "pen"
+      },
+      "count": 3,
+      "proportion": null,
+      "shape": "point"
+     },
+     {
+      "action": "draw",
+      "attributes": {
+       "color": "gray",
+       "continuity": "dashed",
+       "handling": "faint",
+       "motion_amplitude": "broadly",
+       "motion_quality": "undulating",
+       "motion_spacing": "tightly",
+       "size": "small",
+       "surface": "sweep",
+       "thinness": "extra_fine",
+       "tool": "silverpoint"
+      },
+      "count": 20,
+      "proportion": null,
+      "shape": "arc"
+     }
+    ],
+    "plugins": []
+   },
+   "message": "記述:\n（記述）\n\n下絵のはじめの行: 和紙。 背景を白で埋める。\n\n下絵の層（番号（種類）: 指示）:\n0（面）: 灰の太筆の薄いアクアチントの横長の巨大な雲形を1個埋める。〔下絵が付けた場所: 中心〕\n1（束）: 細かくゆるやかに揺れる黒の細い鉛筆の実線の程よい粒の右下がりの大きな線を15個引く。\n2（束）: 黒のペンの濃いとても小さな点を3個置く。〔下絵が付けた場所: 下〕\n3（束）: 大きく小刻みに波打つ灰のごく細い銀筆の破線の薄い刷きの小さな弧を20個引く。"
+  },
+  {
+   "id": "ja-25",
+   "lang": "ja",
+   "plan": {
+    "background": "white",
+    "ground": "paper",
+    "layers": [
+     {
+      "action": "draw",
+      "attributes": {
+       "angle": "horizontal",
+       "color": "gray",
+       "handling": "faint",
+       "position": "center",
+       "size": "normal_sized",
+       "surface": "grain",
+       "thinness": "thin",
+       "tool": "pencil"
+      },
+      "count": 1,
+      "proportion": null,
+      "shape": "line"
+     },
+     {
+      "action": "place",
+      "attributes": {
+       "color": "white",
+       "handling": "temperate",
+       "position": "top_edge",
+       "size": "normal_sized",
+       "surface": "flat",
+       "tool": "chalk"
+      },
+      "count": 1,
+      "proportion": null,
+      "shape": "circle"
+     },
+     {
+      "action": "draw",
+      "attributes": {
+       "handling": "faint",
+       "motion_amplitude": "narrowly",
+       "motion_quality": "swaying",
+       "position": "right_edge",
+       "size": "small",
+       "surface": "sweep",
+       "thinness": "thin",
+       "tool": "fine_brush"
+      },
+      "count": 1,
+      "proportion": null,
+      "shape": "arc"
+     },
+     {
+      "action": "place",
+      "attributes": {
+       "color": "green",
+       "handling": "dense",
+       "position": "bottom",
+       "size": "large",
+       "surface": "flat",
+       "tool": "thick_brush"
+      },
+      "count": 1,
+      "proportion": "wide",
+      "shape": "ellipse"
+     },
+     {
+      "action": "place",
+      "attributes": {
+       "angle": "rotated",
+       "handling": "temperate",
+       "position": "bottom_edge",
+       "size": "small",
+       "surface": "grain",
+       "tool": "crayon"
+      },
+      "count": 1,
+      "proportion": null,
+      "shape": "square"
+     },
+     {
+      "action": "place",
+      "attributes": {
+       "color": "black",
+       "handling": "dense",
+       "position": "top",
+       "size": "very_small",
+       "tool": "burin"
+      },
+      "count": 1,
+      "proportion": null,
+      "shape": "point"
+     },
+     {
+      "action": "draw",
+      "attributes": {
+       "angle": "vertical",
+       "color": "yellow",
+       "handling": "dense",
+       "position": "top_edge",
+       "size": "large",
+       "surface": "sweep",
+       "thinness": "extra_thick",
+       "tool": "thick_brush"
+      },
+      "count": 1,
+      "proportion": null,
+      "shape": "line"
+     },
+     {
+      "action": "draw",
+      "attributes": {
+       "angle": "horizontal",
+       "handling": "temperate",
+       "motion_amplitude": "narrowly",
+       "motion_quality": "undulating",
+       "motion_spacing": "tightly",
+       "position": "bottom",
+       "size": "normal_sized",
+       "surface": "grain",
+       "thinness": "thin",
+       "tool": "drypoint"
+      },
+      "count": 1,
+      "proportion": null,
+      "shape": "line"
+     }
+    ],
+    "plugins": []
+   },
+   "message": "記述:\n（記述）\n\n下絵のはじめの行: 紙。 背景を白で埋める。\n\n下絵の層（番号（種類）: 指示）:\n0（束）: 灰の細い鉛筆の薄い粒の水平の普通の大きさの線を1個引く。〔下絵が付けた場所: 中心〕\n1（束）: 白のチョークの程よい塗りの普通の大きさの円を1個置く。〔下絵が付けた場所: 上端〕\n2（束）: 細かく揺れる細い細筆の薄い刷きの小さな弧を1個引く。〔下絵が付けた場所: 右端〕\n3（束）: 緑の太筆の濃い塗りの横長の大きな楕円を1個置く。〔下絵が付けた場所: 下〕\n4（束）: クレヨンの程よい粒の回転の小さな四角を1個置く。〔下絵が付けた場所: 下端〕\n5（束）: 黒のビュランの濃いとても小さな点を1個置く。〔下絵が付けた場所: 上〕\n6（束）: 黄のごく太い太筆の濃い刷きの垂直の大きな線を1個引く。〔下絵が付けた場所: 上端〕\n7（束）: 細かく小刻みに波打つ細いドライポイントの程よい粒の水平の普通の大きさの線を1個引く。〔下絵が付けた場所: 下〕"
+  }
+ ]
+}

@@ -418,7 +418,12 @@ pub fn materialize_selected_composition(
         }
     }
     let score = Score {
-        version: if instructions
+        version: if fill_groups
+            .iter()
+            .any(|group| group.target.requires_edition_0_18())
+        {
+            inku_score::ScoreEdition::V0_18
+        } else if instructions
             .iter()
             .any(inku_score::Instruction::requires_edition_0_17)
         {
@@ -792,6 +797,9 @@ fn saved_target(region: &ResolvedFillRegion) -> Result<FillTarget, ScoreMaterial
             source,
         } => FillTargetOwner::InlineShape {
             source_instruction_index: *source_instruction_index,
+            source: saved_site(source),
+        },
+        FillRegionOwner::NumericRange(source) => FillTargetOwner::NumericRange {
             source: saved_site(source),
         },
     };

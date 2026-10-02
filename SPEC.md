@@ -1608,6 +1608,10 @@ Shared standalone grammar makes modifier phrases own their connectors but exclud
 
 ### 12.5 Drawing and Vision Models
 
+Register an MLX `mlx-vlm` server with service kind `mlx` ("MLX (mlx-vlm)" in administration). Its endpoint, key and model list use the OpenAI-compatible API. Drawing sends the shared core's JSON Schema unchanged through `response_format`, omits function tools and explicitly sets `enable_thinking: false`. The core retains response validation and retry authority. An existing service can change kind while retaining its key, URL and offered models.
+
+Gemma 4 on MLX explicitly receives the [model's recommended sampling settings](https://ai.google.dev/gemma/docs/core/model_card_4): `temperature: 1.0`, `top_p: 0.95`, and `top_k: 64`. This addresses repeated layers at a low temperature that leave JSON unfinished at the output limit. The prompt, response schema, and output limit remain as supplied.
+
 **Stage 1 and Stage 2 use the same drawing model (the author's decision, 2026-09-30).** Both stages use the request's `stage1_model`, otherwise its `stage2_model`, otherwise the account's drawing model. Normalizing account settings aligns `stage2_provider` and `stage2_model` with the Stage 1 values. Vision has a separate model setting (§8.4 and the LLM/Vision catalogs of `/api/models`). The API's `stage1_model` / `stage2_model` keys and old works' model records remain. New drawings record the same actual model under both keys.
 
 **The models the server calls with its own credentials are the ones the
@@ -3216,8 +3220,9 @@ Numeric ranges (DDL Spec 15, DDL engine 52): a position may be written as a rang
 - Language mode: the Japanese forms are read only in a Japanese instruction and the English forms only in an English one. Japanese accepts full-width and ASCII parentheses, the wave dash `〜`, the full-width tilde `～`, and the ASCII tilde `~` as the range mark, `、`, `，`, or `,` between the axes, and full-width digits, periods, and slashes. English accepts ASCII parentheses, `to` for the range, `,` between the axes, and ASCII digits only; `~` is not a range there.
 - Values: a decimal with at most six places, or a fraction with a denominator from 1 to 1,000,000. Every bound lies in 0 to 1 and each start is below its end (a zero width is refused). A range outside these limits is `invalid_numeric_range` (blocking).
 - Meaning: the four bounds are exact rationals and draw by the same rules as a named position (the list above). A named position and a numeric range with the same numbers give the same plan. The original words stay in provenance only, not in the meaning or its digest, so rewording them leaves the drawing unchanged.
-- Conflicts and unsupported uses: two or more of a named position, a numeric position, and a numeric range on one mark conflict. A numeric range on a fill target, a Macro caller, or a coordinated-group member has no Score form yet and is reported as unsupported.
-- The Score format is unchanged. The numbers from the range fill `at.region` and the `anchor` (a `named` region) and `domain` of `arrangement.resolved`.
+- Conflicts and unsupported uses: two or more of a named position, a numeric position, and a numeric range on one mark conflict. A numeric range on a Macro caller or a coordinated-group member has no Score form yet and is reported as unsupported.
+- In the Score, the numbers from the range fill `at.region` and the `anchor` (a `named` region) and `domain` of `arrangement.resolved`.
+- Fill (DDL engine 56, 2026-10-02): a fill range written in numbers (`右（横2/3〜1、縦0〜1）に、黄色い四角を埋める。`) fills that whole range, as the position word with the same numbers does; a fill run of colors or other fields does the same. The Score puts the numbers in the fill rectangle's `bounds` and records the range's origin (`fill_groups[].target.owner`) as `numeric_range`, with the `source` where it was written. A Score with that origin is version 0.18.0. The renderer reads only the numbers, so the drawing matches the position word with the same numbers. A numeric range on the shape being filled places that shape as a position word does, with no change to the Score form.
 Unsupported noncenter relations remain unsupported and are never silently discarded. The normal shared runtime,
 UI, and persistence path uses this delivery.
 
@@ -3538,6 +3543,12 @@ eight to greet you.  The mascot is switched in the settings dialog.  **No screen
 shows a mascot of its own.**
 
 ### Batch Drawing
+
+Starting or resuming a batch clears the previous single-work execution from
+the screen. A failed line is reported with its line number, input, and reason
+in the batch failure report, rather than the single-work attention notice.
+A successful batch does not keep showing a previous work's failure reason or
+attempt count.
 
 The batch panel groups the input, next-work conditions, progress, and resume for
 multiple instruction lines. During execution, the active line is highlighted

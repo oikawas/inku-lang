@@ -431,6 +431,7 @@
 					<span>{t().settingsModelServiceKind}</span>
 					<select bind:value={newProviderKind}>
 						<option value="openai_compatible">OpenAI compatible</option>
+						<option value="mlx">MLX (mlx-vlm)</option>
 						<option value="anthropic">Claude API</option>
 						<option value="gemini">Gemini API</option>
 					</select>

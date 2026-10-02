@@ -292,6 +292,8 @@ pub enum FillRegionOwner {
         source_instruction_index: usize,
         source: crate::SourceOccurrence,
     },
+    /// A range written in numbers; the bounds are its exact rectangle.
+    NumericRange(crate::SourceOccurrence),
 }
 
 #[derive(Clone, Debug, PartialEq)]

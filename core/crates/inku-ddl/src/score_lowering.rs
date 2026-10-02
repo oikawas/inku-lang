@@ -2360,6 +2360,7 @@ fn lower_verified_stage15_shared<'a>(
         let fill_region = if action == PlacementAction::Fill {
             let input = ScoreLoweringInput {
                 fill_target: project_fill_target(view, instruction.fill_target.as_ref()),
+                numeric_range: instruction.entity.numeric_range.as_ref(),
                 has_named_position: instruction.position.is_some(),
                 named_position: instruction
                     .position
@@ -5285,11 +5286,6 @@ fn resolve_fill_region(
     input: ScoreLoweringInput<'_>,
     context: ScoreLoweringContext,
 ) -> Result<ResolvedFillRegion, ScoreFieldGap> {
-    // A fill region is saved in the Score by its owner, which has no form for
-    // a range written in numbers yet.
-    if input.numeric_range.is_some() {
-        return Err(ScoreFieldGap::UnsupportedNumericRange);
-    }
     let (cw, ch) = context.canvas_format.integer_ratio();
     let short = cw.min(ch);
     let canvas_area =
@@ -5301,6 +5297,7 @@ fn resolve_fill_region(
             source_instruction_index,
         }) => {
             if input.has_named_position
+                || input.numeric_range.is_some()
                 || instruction
                     .entity
                     .quantity
@@ -5358,15 +5355,20 @@ fn resolve_fill_region(
             angle_context.occurrence = ScoreAngleOccurrence::Direct {
                 logical_ordinal: source_instruction_index as u64,
             };
-            if entity.numeric_range.is_some() {
-                return Err(ScoreFieldGap::UnsupportedNumericRange);
-            }
             let anchor = match (
                 entity.numeric_position.as_ref(),
                 instruction.position.as_ref(),
+                entity.numeric_range.as_ref(),
             ) {
-                (Some(_), Some(_)) => return Err(ScoreFieldGap::NamedAndNumericPositionConflict),
-                (Some(position), None) => {
+                // A range written in numbers anchors the target as the whole
+                // range of a position word does.
+                (None, None, Some(range)) => {
+                    ObjectAnchor::Named(crate::geometry::numeric_range_bounds(range))
+                }
+                (Some(_), Some(_), _) | (_, _, Some(_)) => {
+                    return Err(ScoreFieldGap::NamedAndNumericPositionConflict);
+                }
+                (Some(position), None, None) => {
                     let exact: crate::geometry::ExactPosition = position.into();
                     if !Rational::from_decimal(exact.x)?.in_unit_interval()
                         || !Rational::from_decimal(exact.y)?.in_unit_interval()
@@ -5375,11 +5377,13 @@ fn resolve_fill_region(
                     }
                     ObjectAnchor::Numeric(Box::new(position.clone()))
                 }
-                (None, Some(position)) => ObjectAnchor::Named(
+                (None, Some(position), None) => ObjectAnchor::Named(
                     named_region_bounds(&position.identity.id, angle_context)
                         .ok_or(ScoreFieldGap::UnsupportedNamedPosition)?,
                 ),
-                (None, None) => ObjectAnchor::Named(crate::geometry::omitted_position_bounds()),
+                (None, None, None) => {
+                    ObjectAnchor::Named(crate::geometry::omitted_position_bounds())
+                }
             };
             let rotation_degrees = instruction
                 .entity
@@ -5433,7 +5437,22 @@ fn resolve_fill_region(
             })
         }
         canvas_target => {
-            let (owner, bounds) = if let Some(position) = input.named_position {
+            let (owner, bounds) = if let Some(range) = input.numeric_range {
+                if input.named_position.is_some() {
+                    return Err(ScoreFieldGap::NamedAndNumericPositionConflict);
+                }
+                if canvas_target.is_some() {
+                    return Err(ScoreFieldGap::InvalidFillTarget);
+                }
+                let mut bounds = [Rational::from_ratio(0, 1)?; 4];
+                for (output, (n, d)) in bounds.iter_mut().zip(range.rational_bounds()) {
+                    *output = Rational::from_ratio(i128::from(n), i128::from(d))?;
+                }
+                (
+                    FillRegionOwner::NumericRange(range.source().clone()),
+                    bounds,
+                )
+            } else if let Some(position) = input.named_position {
                 if canvas_target.is_some() {
                     return Err(ScoreFieldGap::InvalidFillTarget);
                 }
@@ -5958,9 +5977,7 @@ fn resolve_complete_object<'a>(
     let position_sources = usize::from(input.has_named_position)
         + usize::from(input.exact_position().is_some())
         + usize::from(input.numeric_range.is_some());
-    let named_region = if input.numeric_range.is_some()
-        && (input.group_region.is_some() || action == PlacementAction::Fill)
-    {
+    let named_region = if input.numeric_range.is_some() && input.group_region.is_some() {
         gaps.push(ScoreFieldGap::UnsupportedNumericRange);
         None
     } else if position_sources > 1 {

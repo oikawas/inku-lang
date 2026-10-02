@@ -1157,8 +1157,8 @@ fn numeric_ranges_are_checked_kept_to_their_language_and_limited_to_shared_paths
             ScoreFieldGap::NamedAndNumericPositionConflict,
         ),
         (
-            "右下（横0.5〜1、縦0.5〜1）に、赤い円を埋める。",
-            ScoreFieldGap::UnsupportedNumericRange,
+            "中心に、赤い円を右下（横0.5〜1、縦0.5〜1）に埋める。",
+            ScoreFieldGap::NamedAndNumericPositionConflict,
         ),
     ] {
         let transformed = stage(source, ResolvedInstructionLanguage::Ja, &[]);

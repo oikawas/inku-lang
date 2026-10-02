@@ -322,7 +322,10 @@
 # keep their definitions.
 # 55: A count outside a word's range is a reported omission, not a hole, so
 # LLM completion is never asked to repair it and the rest of the work draws.
-DDL_ENGINE_VERSION = "55"
+# 56: A fill range written in numbers is drawn as the position word with the
+# same numbers instead of omitted. Its Score records the range's origin as
+# `numeric_range` (Score 0.18.0).
+DDL_ENGINE_VERSION = "56"
 # 4 (2026-07-30): yellow, orange, and purple become abstract Score colors, and
 # coerce recognizes the corresponding Japanese and English DDL markers.
 # 3 (2026-07-30): 黄 / 橙 / 紫 joined the saijiki color words, so an author can write

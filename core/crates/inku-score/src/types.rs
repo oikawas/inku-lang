@@ -623,10 +623,11 @@ pub enum ScoreEdition {
     V0_15,
     V0_16,
     V0_17,
+    V0_18,
 }
 
 impl ScoreEdition {
-    pub const ALL: [Self; 17] = [
+    pub const ALL: [Self; 18] = [
         Self::V0_1,
         Self::V0_2,
         Self::V0_3,
@@ -644,6 +645,7 @@ impl ScoreEdition {
         Self::V0_15,
         Self::V0_16,
         Self::V0_17,
+        Self::V0_18,
     ];
 
     /// The edition a version string names.
@@ -674,6 +676,7 @@ impl ScoreEdition {
             Self::V0_15 => "0.15.0",
             Self::V0_16 => "0.16.0",
             Self::V0_17 => "0.17.0",
+            Self::V0_18 => "0.18.0",
         }
     }
 }
@@ -1493,6 +1496,11 @@ pub enum FillTargetOwner {
         source_instruction_index: usize,
         source: ScoreSourceSite,
     },
+    /// A range the author wrote in numbers (Score 0.18.0). The bounds are the
+    /// target's rectangle; this records where the numbers were written.
+    NumericRange {
+        source: ScoreSourceSite,
+    },
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -1542,6 +1550,14 @@ pub struct FillTarget {
     pub geometry: FillTargetGeometry,
     /// Stable geometry reference area in canvas-short-edge units squared.
     pub reference_area: f64,
+}
+
+impl FillTarget {
+    /// Whether the target needs Score 0.18.0: a range written in numbers.
+    #[must_use]
+    pub fn requires_edition_0_18(&self) -> bool {
+        matches!(self.owner, FillTargetOwner::NumericRange { .. })
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -2153,6 +2169,9 @@ impl Score {
                 Self::validate_cycle_members(cycle, &group.members, group.logical_count)?;
             } else if first_instance != group.logical_count {
                 return Err("fill members must cover the group and its logical count");
+            }
+            if group.target.requires_edition_0_18() && !self.edition_at_least(ScoreEdition::V0_18) {
+                return Err("fill target numeric_range requires Score version 0.18.0");
             }
             Self::validate_fill_target(&group.target)?;
             previous_fill_start = group.start;

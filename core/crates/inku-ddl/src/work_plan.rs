@@ -302,7 +302,7 @@ pub fn work_plan_capabilities() -> &'static WorkPlanCapabilities {
 }
 
 /// One drawing layer: a single standalone DDL sentence.
-#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
 pub struct WorkPlanLayer {
     pub shape: String,
     pub proportion: Option<String>,
@@ -352,7 +352,7 @@ impl WorkPlanPlugin {
 
 /// A normalized plan. Background and ground are optional document sentences.
 /// Plugins are installed qualified macro names, each printed as its own sentence.
-#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
 pub struct WorkPlan {
     pub ground: Option<String>,
     pub background: Option<String>,
@@ -362,7 +362,7 @@ pub struct WorkPlan {
 
 /// One chosen plugin and the count the description wrote for it. A count is
 /// kept only for a plugin whose definition receives it.
-#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
 pub struct WorkPlanPluginCall {
     pub name: String,
     pub count: Option<u64>,

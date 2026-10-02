@@ -1021,6 +1021,20 @@ Stage 1 は自由記述を、書き手が観察・編集できる正規化 DDL �
 
 共有pipelineでは、写生はStage 1前の任意effect `generate_sketch`（結果`sketch_generated`、prompt `inku.sketch-supplement-prompt.v1`、応答は`sketch`文字列だけ）である。開始入力と記述からの再生成は`sketch`（`off`／`on`／`supplied`）を持てる。snapshotの`sketch`記録（`pending`／`supplemented`／`not_needed`／`fallback`／`supplied`）が写生の結果を示し、保存列`sketch_state`は`supplemented`（写生文あり、`sketch_grain`は空）・`not_needed`・`fallback`・`off`になる。再試行予算は`sketch_retry`（無ければ色カタログ選択の予算）。旧写生層（§12.15）の`fine`／`coarse`の区切りは保存互換の表示だけに残り、新しい写生では使わない。
 
+### 12.6.2 構図（下絵の後の置き場所、draw-system05）
+
+構図を行う実行では、下絵が決まった後、commitの前に**構図**を一度だけ置く。構図は、記述が場所を言わない層を、画面の三分割に沿った範囲（28種と四隅）へ置く。記述が言葉で場所を言う層は、その言葉のまま残す。
+
+- 下絵: 構図を行う実行のStage 1は、位置を、記述が場所を言葉で言う層にだけ選び、ほかの層を未指定にする（下絵の決まり8）。構図を行わない実行は、前の決まり（全層を中心に集めず、位置・大きさ・個数で重心と空いた部分を作る）のままである。
+- 読み: 共有pipelineのeffect `read_composition`（結果`composition_read`、prompt `inku.composition-reading-prompt.v1`）。記述と、場所を外して印字した下絵の層（下絵が付けた場所は添え書き）を読み、層ごとの役割、層どうしの関係、張り（動き・焦点・上下・均衡・対称・余白）、記述が言う場所（記述から引いた言葉と場所の値）、一文の命題を、決まった値だけで返す。座標や数は返さない。応答schemaは各objectの項目の順を`propertyOrdering`で名指し、system promptには書き足さない（schemaは輸送の構造化出力だけで渡す）。読みはStage 1と同じmodel・上限で送る。再試行の予算は`composition_retry`（無ければ色カタログ選択の予算）。
+- 検査: 読みを下絵に照らし、画面で示せない値を落として所見を記録する（出来事`composition_read`は所見のcodeだけを持つ）。記述が言う場所は、引いた言葉が記述にあり、位置の言葉（日本語は上・下・中央・中心・真ん中・左・右・隅・端を部分一致、英語はtop・bottom・center・centre・middle・left・right・corner(s)・edge(s)・above・below・upper・lowerを単語として）を含むときだけ残す。
+- 解き: 各層の範囲の組み合わせを総当たりで探し（上限3,000,000）、読みと作者の既定（動的な均衡、多めの余白、左右は同等）に照らした点で比べる。最良の点の1.03倍＋0.02以内の答えから、作品の`composition_seed`（無ければ1）と、構図を入れる前の文書のdigestで一つを選ぶ。記述が「隅」と言う層は四隅の範囲から選び、記述が名指す隅（右下など）はまだ読まない。
+- 印字: 構図が置いた層は数値の範囲（§18）で書き、範囲の前に印「［構図］」（英語は`[composition]`）を置く（`［構図］右下（横2/3〜1、縦2/3〜1）に、…`、`… at the [composition] bottom right (horizontal 2/3 to 1, vertical 2/3 to 1)`）。記述が場所を言う層は、その場所の語のまま書く。構図を入れた文書が診断なしで組めることを確かめてから、Stage 1の理由のままcommitする。
+- 読みが使えないとき: 読みの要求が予算を使い切ったとき、読めない応答の再試行が尽きたとき、要求を組めないときは、既定の読み（関係なし、作者の既定、下絵の場所はすべて残す）で解く（出来事`composition_fallback`）。組み合わせが上限を超える、置ける範囲が無い、構図を入れた文書が組めないときは、構図を入れずにStage 1が印字したままcommitする（出来事`composition_skipped`）。残りを描く道（`stage1_residual_execution`）と、`normalized_ddl`を持つ保存済み応答の再生には構図を入れない。
+- 設定: `PipelineConfig.composition`（`{read}`）。無ければ構図を行わない。`read: false`は読みを送らず、既定の読みで解く。Serverの既定のmanifestは`{read: true}`で、保存した設定で描き直す作品はその設定のままである。Androidは、取り込むまで構図を行わない。
+- Serverは読みの時間をStage 1と分けて`metrics.composition`に数え（履歴の列は増やさず、合計にだけ入る）、読みの失敗の段を`composition`と記録する。読みのsystem promptはプロンプトのタブに出さない。
+- 構図は保存済みの作品を変えない。作品は構図を入れた可視DDLとScoreを保存し、描き直しと「別の構図」は保存したDDLを読む（DDLに書いた範囲は動かない）。
+
 ### 12.7 第二段階（補完）と決定的な構造化
 
 Stage 2 LLMは、保存済み可視DDLにcompilerが明示したknown holeがある場合だけ、範囲を限定したpatch候補を返す。要求は共通pipelineが自動で作り、採用には作者承認と可視DDLのCAS保存を必要とする。LLMはScoreを出力しない。Lock検証済みtyped meaningからScoreへの構造化は共有lowererが一度だけ行い、色、素材、数量、運動、配置path、回転、canvas、明示relationを保つ。
@@ -1941,6 +1955,7 @@ semantic schemaの新versionを意味しない。未指定位置は補わず、n
 - 衝突と未対応: 同じ図形に、名前の位置・数値の位置・数値の範囲のうち二つ以上があれば衝突とする。Macroの呼び出しとまとまりの成員に書いた数値の範囲は、Scoreへ届ける形がまだ無いので、未対応として診断する。
 - Scoreでは、範囲から求めた数が、`at.region`、`arrangement.resolved`の`anchor`（`named`の領域）と`domain`に入る。
 - 埋める（DDL engine 56、2026-10-02）: 埋める範囲を数値の範囲で書く（`右（横2/3〜1、縦0〜1）に、黄色い四角を埋める。`）と、同じ数の名前の位置と同じく、その範囲そのものを埋める。色などの列で埋める文も同じ。Scoreは、埋める範囲の長方形`bounds`にその数を入れ、範囲の出どころ（`fill_groups[].target.owner`）を`numeric_range`（書いた場所`source`を持つ）として記録する。この出どころを持つScoreは版0.18.0である。描画は範囲の数だけを読むので、同じ数の名前の位置と同じ画になる。埋める対象の図形に書いた数値の範囲は、名前の位置と同じく、その図形を置く範囲になる（Scoreの形は変わらない）。
+- 構図の印（2026-10-03）: 構図（§12.6.2）が書く範囲は、範囲の前に印「［構図］」（英語は`[composition]`）を置く。印は括弧の前の言葉と同じく読まれない語で、意味とdigestに入らない（`［構図］右下（横2/3〜1、縦2/3〜1）に`は`右下（横2/3〜1、縦2/3〜1）に`と同じ計画になる）。
 Noncenterとrelationの未対応境界は広げず、relationを黙って落とさない。このdeliveryは通常の共有runtime / UI / 保存経路から使用される。
 
 JSON Score は共有lowererが検証済みmeaningから作る機械可読の楽譜である。**最終的な作品ではない** — renderer が演奏する構造である。

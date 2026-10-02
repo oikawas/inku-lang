@@ -35,6 +35,7 @@ _ACTION_STAGES = {
     "generate_sketch": "sketch",
     "select_description_catalog": "catalog",
     "generate_normalized_ddl": "stage1",
+    "read_composition": "composition",
     "complete_visible_ddl_holes": "stage2",
 }
 

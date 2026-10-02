@@ -54,11 +54,16 @@ digests, not authenticated bearer tokens for an untrusted client.
 
 ## Effects and commit authority
 
-The five effect tags are `select_description_catalog`, `generate_sketch`,
-`generate_normalized_ddl`, `commit_visible_normalized_ddl`, and
-`complete_visible_ddl_holes`. `generate_sketch` runs only when the start or a
+The six effect tags are `select_description_catalog`, `generate_sketch`,
+`generate_normalized_ddl`, `read_composition`, `commit_visible_normalized_ddl`,
+and `complete_visible_ddl_holes`. `generate_sketch` runs only when the start or a
 regeneration asks for a sketch; its failure continues Stage 1 with the
-description alone. Each result echoes action ID, attempt, and request
+description alone. `read_composition` runs only when the configuration's
+`composition` sets `read`: it asks how the settled Stage 1 plan is composed, and
+the core places the layers whose place the description does not state on ranges
+of the thirds grid before the commit. With `read` false the default reading
+places them without a request; without `composition` Stage 1 is committed as it
+printed it. Each result echoes action ID, attempt, and request
 digest. Retries preserve the logical action ID and increase its attempt; a new
 action receives a new identity. Corrective Stage 1 normalization is a new action
 because compiler feedback changes its payload and request digest. The host
@@ -72,6 +77,7 @@ provider attempt, but not a delay already accounted for by the core.
 | Provider rejection or any other semantic validation failure | No retry |
 | Catalog selection exhausted or rejected | Resolve `default`, record `auto_fallback_default`, then construct Stage 1 |
 | Stage 1 exhausted or rejected | Fail without a new semantic artifact |
+| Composition reading exhausted or rejected | Place the layers from the default reading and commit; a plan that cannot be composed is committed as Stage 1 printed it |
 | Hole completion exhausted or rejected | Keep committed DDL and require user editing |
 | Host commit failure | Fail and retain the last acknowledged document and authority |
 | Cancellation | Invalidate the outstanding action; later results are stale |

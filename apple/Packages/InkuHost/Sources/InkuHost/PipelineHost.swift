@@ -567,7 +567,7 @@ private actor ExecutionDriver {
                 if tag == "commit_visible_normalized_ddl" {
                     do { try await commitVisibleDDL(action); progress(.changed(try makeView())); await gate.unlock() }
                     catch { await gate.unlock(); throw error }
-                } else if ["generate_sketch", "select_description_catalog", "generate_normalized_ddl", "complete_visible_ddl_holes"].contains(tag) {
+                } else if ["generate_sketch", "select_description_catalog", "generate_normalized_ddl", "read_composition", "complete_visible_ddl_holes"].contains(tag) {
                     if !allowProvider {
                         restored = true; driving = false
                         do {
@@ -579,9 +579,13 @@ private actor ExecutionDriver {
                         guard providerTask == nil, state.pendingProviderAction == nil else { throw HostError("provider_effect_in_flight") }
                         // Persist the send claim before starting transport; restore can never infer a safe resend.
                         var claimed = state; claimed.pendingProviderAction = action.data
-                        var prompts = (try claimed.prompts.map { try ExactJSON(data: $0).array } ?? nil) ?? []
-                        prompts.append(.object(["action": action["tag"], "identity": action["identity"], "prompt": action["payload"]["prompt"]]))
-                        claimed.prompts = ExactJSON.array(prompts).data
+                        // The composition reading belongs to its private effect
+                        // snapshot, never to the author-facing prompt tabs.
+                        if tag != "read_composition" {
+                            var prompts = (try claimed.prompts.map { try ExactJSON(data: $0).array } ?? nil) ?? []
+                            prompts.append(.object(["action": action["tag"], "identity": action["identity"], "prompt": action["payload"]["prompt"]]))
+                            claimed.prompts = ExactJSON.array(prompts).data
+                        }
                         let record = try await database.compareAndSwapExecution(id: executionID(), expectedRevision: databaseRevision, snapshot: encoded(claimed))
                         state = claimed; databaseRevision = record.revision
                         let began = Date()

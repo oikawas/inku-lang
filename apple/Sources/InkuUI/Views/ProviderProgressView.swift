@@ -42,7 +42,7 @@ public struct ProviderProgressView: View {
             } else {
                 Image(systemName: symbol(snapshot.outcome)).foregroundStyle(snapshot.outcome == .failed ? Color.red : Color.secondary)
             }
-            Text(model.display.localized(stageKey(snapshot.action))).font(.caption.weight(.semibold))
+            Text(model.display.localized(snapshot.stageTitleKey)).font(.caption.weight(.semibold))
             if snapshot.comparison { Text(model.display.localized("比較候補")).font(.caption).foregroundStyle(.secondary) }
             if snapshot.outcome != .running {
                 Text(model.display.localized(outcomeKey(snapshot.outcome))).font(.caption).foregroundStyle(.secondary)
@@ -76,15 +76,6 @@ public struct ProviderProgressView: View {
             .fixedSize(horizontal: true, vertical: false)
     }
 
-    private func stageKey(_ action: String) -> String {
-        switch action {
-        case "generate_sketch": "写生"
-        case "select_description_catalog": "色カタログの選択"
-        case "generate_normalized_ddl": "解釈"
-        case "complete_visible_ddl_holes": "指示書の補完"
-        default: "モデルの応答"
-        }
-    }
     private func outcomeKey(_ outcome: ProviderProgressSnapshot.Outcome) -> String {
         switch outcome {
         case .running: "応答待ち"

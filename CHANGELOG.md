@@ -6,6 +6,12 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file retains the history from v2.5.0 (2026-07-25, render engine 12) onward.** Past records follow the recent ones in a collapsible section of this same document; expand it when needed. Viewers without collapse support show the full text. Earlier history is in the [v1.72–v2.4 archive](docs/history/changelog-v1.72-v2.4.md) and the [v0.1–v1.71 archive](docs/history/changelog-v0.1-v1.71.md).
 
+### 2026-10-03 — Adopt composition reading in Swift
+
+Generated Server defaults now connect the shared Rust `read_composition`/`composition_read` effects to ordinary APIs and Personal ChatGPT. The underdrawing's Stage 1 model/cap and action identity are retained; shared Rust owns retries, fallback, and placement. Composition has a separate progress stage and stage clock. Its prompt remains in durable snapshots and is excluded from the work's Stage 1/2 prompt history.
+
+Focused real-Rust/mock/temporary-DB checks confirmed composition saves, finite fallback, retained legacy settings/saved-Score replay, progress, and unconnected Personal ChatGPT refusal. A separate isolated window of the updated Release Universal app also confirmed loopback-mock composition/DDL/work saves while retaining existing DB rows. Actual provider/OAuth acceptance and Server-style per-stage usage/raw SSE observations remain incomplete. The [Swift specification](apple/SWIFT_SPEC.md) records behavior and verification scope.
+
 ### v2.15.79 — Draw with a composition after the underdrawing (Build 1155, 2026-10-03)
 
 Description drawing reads the composition with the same model after the underdrawing, then places layers whose place is unstated on ranges along the canvas thirds. The numeric ranges remain in the visible DDL. Saved works, DDL-to-Score compilation and layer versions remain unchanged. The following record for the same date gives the rules and acceptance results.

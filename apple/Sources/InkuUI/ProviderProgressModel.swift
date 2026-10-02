@@ -4,8 +4,31 @@ import InkuHost
 /// Presentation facts from one provider stage. Usage stays absent until a host reports it.
 public struct ProviderProgressSnapshot: Sendable, Equatable {
     public enum Outcome: Sendable, Equatable { case running, succeeded, failed, cancelled, awaitingReview }
+    public enum Stage: Sendable, Equatable {
+        case sketch, catalog, interpretation, composition, completion
+        init?(action: String) {
+            switch action {
+            case "generate_sketch": self = .sketch
+            case "select_description_catalog": self = .catalog
+            case "generate_normalized_ddl": self = .interpretation
+            case "read_composition": self = .composition
+            case "complete_visible_ddl_holes": self = .completion
+            default: return nil
+            }
+        }
+        var titleKey: String {
+            switch self {
+            case .sketch: "写生"
+            case .catalog: "色カタログの選択"
+            case .interpretation: "解釈"
+            case .composition: "構図の読み"
+            case .completion: "指示書の補完"
+            }
+        }
+    }
     public let executionID: String
     public let action: String
+    public let stage: Stage?
     public let attempt: Int
     public let maxAttempts: Int
     public let modelReference: String?
@@ -21,6 +44,7 @@ public struct ProviderProgressSnapshot: Sendable, Equatable {
     public let tokensIn: UInt64? = nil
     public let tokensOut: UInt64? = nil
 
+    public var stageTitleKey: String { stage?.titleKey ?? "モデルの応答" }
     public var clockRunning: Bool { outcome == .running && stageEndedAt == nil }
     public func stageElapsed(at date: Date) -> TimeInterval {
         max(0, (stageEndedAt ?? date).timeIntervalSince(stageBeganAt))
@@ -37,8 +61,14 @@ public struct ProviderProgressSnapshot: Sendable, Equatable {
         let sameStage = previous?.executionID == executionID && previous?.action == action
         if sameStage, let previous,
            beganAt < previous.attemptBeganAt || (attempt == previous.attempt && previous.outcome != .running) { return nil }
-        let reference = action == "complete_visible_ddl_holes" ? models?.stage2Model : models?.stage1Model
-        return Self(executionID: executionID, action: action, attempt: attempt, maxAttempts: maximum,
+        let stage = Stage(action: action)
+        let reference: String?
+        switch stage {
+        case .some(.completion): reference = models?.stage2Model
+        case .some(.sketch), .some(.catalog), .some(.interpretation), .some(.composition): reference = models?.stage1Model
+        case .none: reference = nil
+        }
+        return Self(executionID: executionID, action: action, stage: stage, attempt: attempt, maxAttempts: maximum,
             modelReference: reference.flatMap { $0.isEmpty ? nil : $0 }, comparison: comparison,
             stageBeganAt: sameStage ? previous!.stageBeganAt : beganAt, attemptBeganAt: beganAt, deadline: deadline)
     }

@@ -27,7 +27,7 @@ public enum ProviderWire {
             body = .object(["model": .string(model), "stream": .bool(false),
                             "messages": .array([.object(["role": .string("system"), "content": .string(system)]),
                                                  .object(["role": .string("user"), "content": .string(message)])])])
-            let temperature = actionName == "generate_normalized_ddl" ? "0.3" : "0.0"
+            let temperature = ["generate_normalized_ddl", "read_composition"].contains(actionName) ? "0.3" : "0.0"
             if provider.baseURL.host?.lowercased() == "api.openai.com" {
                 body["max_completion_tokens"] = .integer(maxTokens)
                 if !(model.hasPrefix("gpt-5") || model.range(of: "^o[0-9]", options: .regularExpression) != nil) { body["temperature"] = .number(temperature) }

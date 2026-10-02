@@ -57,6 +57,18 @@ struct AppCheck {
             try await runModelGuidanceChecks()
             return
         }
+        if CommandLine.arguments.contains("--composition-host-only") {
+            try await runCompositionHostChecks()
+            return
+        }
+        if CommandLine.arguments.contains("--composition-personal-plan-gate-only") {
+            try await runCompositionPersonalPlanGateChecks()
+            return
+        }
+        if CommandLine.arguments.contains("--composition-progress-only") {
+            try await runCompositionProgressChecks()
+            return
+        }
         if CommandLine.arguments.contains("--plugin-only") {
             try await runPluginChecks()
             return

@@ -12,7 +12,7 @@ M1のSwift／Rust基盤、M2のstandalone host／SQLite保存境界に続き、m
 
 更新したUniversal appの隔離DBで、DDL生成→編集child→libraryのcomment／star→trash／復元→restart、日英切替と系譜表示、複数選択2作品のPNG2160保存を確認しています。機能のsource接続、限定したoffline確認、native操作、作者の通常利用の受入は別に記録します。旧Server／Android物理DBのimport、実provider／OAuth、他exportのnative・性能、Intel／macOS14実機、署名・配布は未完了です。廃止済みhistory.json移行utilityの配列は現行Webの復元形式ではありません。iOSは共通packageと初期Rust artifactまでで、最新APIのartifact再生成、iPad／iPhone app、camera、shareと実機受入は未完了です。
 
-Personal ChatGPTは設定の専用画面で明示して有効化・接続し、提供されたmodelを描画用に選びます。通常のAPI key接続とは別で、初期状態は無効です。発行済みclient IDと本人の接続同意が必要で、実本人認証・model取得・推論は未受入です。記述、写生、自動配色、DDL補完に対応し、Vision推敲・奥書等の未対応用途は画面で説明します。詳細は[Swift仕様](SWIFT_SPEC.ja.md#personal-chatgpt)を参照してください。
+Personal ChatGPTは設定の専用画面で明示して有効化・接続し、提供されたmodelを描画用に選びます。通常のAPI key接続とは別で、初期状態は無効です。発行済みclient IDと本人の接続同意が必要で、実本人認証・model取得・推論は未受入です。記述、写生、自動配色、構図の読み、DDL補完に対応し、Vision推敲・奥書等の未対応用途は画面で説明します。詳細は[Swift仕様](SWIFT_SPEC.ja.md#personal-chatgpt)を参照してください。
 
 ## 対応OSとbuild環境
 
@@ -100,5 +100,7 @@ python3 apple/scripts/prepare-meter-resources.py
 ```
 
 追加のAppCheck選択は`--provider-progress-only`と`--model-guidance-only`です。前者はmock／共通Rustで再試行の表示・時計・停止と遅いcallback、後者は生成したServer評価資料と一時DBで適性・未登録境界・選択とsnapshotの保持を確認します。実providerへの呼出しは行いません。
+
+構図への追随は`--composition-host-only`と`--composition-progress-only`で確認します。hostは実Rust／mock／一時DBで構図要求・固定Stage 1 modelと上限・schema・保存・有限retry／fallback・旧設定／保存Score再生を、progressは段階時計・再試行・日英表示・prompt履歴の分離・停止を確認します。`--composition-personal-plan-gate-only`は未接続の有効UUIDと空の一時vaultでPersonal ChatGPTの最終routing拒否だけを確認し、実HTTP／OAuth／Keychainを使いません。
 
 限定したCLI確認は、artifact生成後の`apple/scripts/check-core.sh`と、resource生成後の`swift run --package-path apple InkuAppCheck`です。AppCheckの`--authoring-only`、`--comparison-only`、`--automation-only`、`--plugin-only`、`--model-selection-only`、`--work-edit-only`、`--refinement-only`、`--replay-comparison-only`、`--auxiliary-provenance-only`、`--raster-only <SVG path>`はそれぞれの変更に対応する確認だけを選びます。`--model-selection-only`は一時DBとprovider呼出し0件で、制作のmodel選択と保存default・開始時snapshotの分離を確認します。`--work-edit-only`はmock transportと共通coreで保存親の編集・写生・childのDDL authority・取消しを確認します。`--refinement-only`は語句seedと保存Score、固定4案、無変更の変奏、明示採用・再表示後のDDL child、edge metadataと遅い応答の拒否を同じ隔離境界で確認します。`--replay-comparison-only`はprovider0件の再現比較が保存・表示を変えないこととseed・停止の境界、`--auxiliary-provenance-only`はmockによる世代ごとのVision／random来歴を確認します。これらはnative画面、実provider、実機の受入を代替しません。変更が防ぐ具体的な失敗に合わせて必要な確認だけを選択してください。

@@ -29,7 +29,8 @@ public final class URLSessionProviderTransport: ProviderTransport, Sendable {
         let identity = try effect.requiredObject("identity")
         let tag = try effect.requiredString("tag")
         let results = ["generate_sketch": "sketch_generated", "select_description_catalog": "description_catalog_selected",
-                       "generate_normalized_ddl": "normalized_ddl_generated", "complete_visible_ddl_holes": "visible_ddl_hole_patch_generated"]
+                       "generate_normalized_ddl": "normalized_ddl_generated", "read_composition": "composition_read",
+                       "complete_visible_ddl_holes": "visible_ddl_hole_patch_generated"]
         guard let resultTag = results[tag],
               let timeoutMS = UInt64(try effect.requiredString("timeout_ms")), timeoutMS > 0,
               timeoutMS <= UInt64.max / 1_000_000 else { throw HostError("pipeline_schema_violation") }

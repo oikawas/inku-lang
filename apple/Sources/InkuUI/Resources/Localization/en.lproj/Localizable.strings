@@ -875,3 +875,8 @@
 "完了" = "Complete";
 "確認待ち" = "Awaiting your review";
 "停止済み" = "Stopped";
+"構図の読み" = "Composition reading";
+"構図を読んでいます" = "Reading the composition";
+"比較候補の構図を読んでいます" = "Reading the comparison option's composition";
+"構図の応答を受信中" = "Receiving the composition reply";
+"比較候補の構図の応答を受信中" = "Receiving the comparison option's composition reply";

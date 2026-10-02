@@ -1316,8 +1316,9 @@ public final class AppModel {
         switch progress {
         case .changed(let view): apply(view)
         case .providerAttempt(_, _, _, let deadline):
-            status = "モデルの応答待ち（期限 \(deadline.formatted(date: .omitted, time: .standard))）"
-        case .transportBytes(_, let count): status = "応答を受信中（\(count) bytes）"
+            status = providerProgress?.stage == .composition ? "構図を読んでいます" : "モデルの応答待ち（期限 \(deadline.formatted(date: .omitted, time: .standard))）"
+        case .transportBytes(_, let count):
+            status = providerProgress?.stage == .composition ? "構図の応答を受信中" : "応答を受信中（\(count) bytes）"
         case .providerDiagnostic(_, let diagnostic): errorText = "ChatGPTプラン: \(diagnostic.code)（\(diagnostic.action)）"
         case .saved(_, _): status = "作品を保存しました"
         }
@@ -1327,8 +1328,12 @@ public final class AppModel {
         receiveProviderProgress(progress, models: models, comparison: comparison)
         switch progress {
         case .changed(let view): currentExecutionID = view.executionID
-        case .providerAttempt(_, _, _, let deadline): status = comparison ? "比較候補のモデル応答待ち（期限 \(deadline.formatted(date: .omitted, time: .standard))）" : "モデルの応答待ち（期限 \(deadline.formatted(date: .omitted, time: .standard))）"
-        case .transportBytes(_, let count): status = comparison ? "比較候補を受信中（\(count) bytes）" : "応答を受信中（\(count) bytes）"
+        case .providerAttempt(_, _, _, let deadline):
+            if providerProgress?.stage == .composition { status = comparison ? "比較候補の構図を読んでいます" : "構図を読んでいます" }
+            else { status = comparison ? "比較候補のモデル応答待ち（期限 \(deadline.formatted(date: .omitted, time: .standard))）" : "モデルの応答待ち（期限 \(deadline.formatted(date: .omitted, time: .standard))）" }
+        case .transportBytes(_, let count):
+            if providerProgress?.stage == .composition { status = comparison ? "比較候補の構図の応答を受信中" : "構図の応答を受信中" }
+            else { status = comparison ? "比較候補を受信中（\(count) bytes）" : "応答を受信中（\(count) bytes）" }
         case .providerDiagnostic(_, let diagnostic): errorText = "ChatGPTプラン: \(diagnostic.code)（\(diagnostic.action)）"
         case .saved: break
         }

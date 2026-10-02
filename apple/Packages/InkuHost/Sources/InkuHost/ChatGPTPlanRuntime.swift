@@ -231,7 +231,7 @@ public actor ChatGPTPlanRuntime {
     public func perform(action: Data, session: ChatGPTPlanSession, model: String, argumentLimit: Int,
                         onBytes: @escaping @Sendable (Int) -> Void) async throws -> String {
         let effect = try ExactJSON(data: action), tag = try effect.requiredString("tag")
-        guard ["generate_sketch", "select_description_catalog", "generate_normalized_ddl", "complete_visible_ddl_holes"].contains(tag) else {
+        guard ["generate_sketch", "select_description_catalog", "generate_normalized_ddl", "read_composition", "complete_visible_ddl_holes"].contains(tag) else {
             throw HostError("chatgpt_operation_not_supported")
         }
         guard let timeout = Double(try effect.requiredString("timeout_ms")), timeout.isFinite, timeout > 0,

@@ -55,7 +55,8 @@ public final class PersonalPlanRoutingTransport: ChatGPTPlanEffectTransport, Aux
         let began = Date()
         var result: ExactJSON = .object(["identity": try effect.requiredObject("identity")])
         let results = ["generate_sketch": "sketch_generated", "select_description_catalog": "description_catalog_selected",
-            "generate_normalized_ddl": "normalized_ddl_generated", "complete_visible_ddl_holes": "visible_ddl_hole_patch_generated"]
+            "generate_normalized_ddl": "normalized_ddl_generated", "read_composition": "composition_read",
+            "complete_visible_ddl_holes": "visible_ddl_hole_patch_generated"]
         guard let resultTag = results[try effect.requiredString("tag")] else { throw HostError("chatgpt_operation_not_supported") }
         do {
             let answer = try await runtime.perform(action: action, session: session,

@@ -6,6 +6,12 @@
 
 **本書は v2.5.0（2026-07-25、render engine 12）以降の履歴を保持する。** 最近の記録に続く過去の履歴は、同じ文書内で折りたたんである。必要なときに展開して読める。折りたたみに対応しないビューアでは全文を表示する。それより前の履歴は [v1.72〜v2.4の書庫](docs/history/changelog-v1.72-v2.4.ja.md) と [v0.1〜v1.71の書庫](docs/history/changelog-v0.1-v1.71.ja.md) にある。
 
+### 2026-10-03 — Swiftへ構図の読みを反映
+
+Serverの新規生成既定を取り込み、共通Rustの`read_composition`／`composition_read`を通常APIとPersonal ChatGPTへ接続した。下絵と同じStage 1 model・上限とaction identityを保持し、retry／fallbackと配置は共通Rustが担当する。構図を独立した進行段階として表示し、段階時計を切り替える。構図promptは耐久snapshotへ保持し、作品のStage 1／2 prompt履歴へ混ぜない。
+
+実Rust・mock・一時DBによる構図保存、有限fallback、旧設定／保存Score再生の保持、進行表示とPersonal ChatGPTの未接続拒否を限定確認した。更新したRelease Universalの別隔離画面でもloopback mockによる構図・DDL・作品保存を確認し、既存DB行を保持した。実provider／OAuthの受入、Server相当の段階別usage・raw SSE観測保存は残る。[Swift仕様](apple/SWIFT_SPEC.ja.md)に実装と確認範囲を記した。
+
 ### v2.15.79 — 下絵から構図を決めて描く（Build 1155、2026-10-03）
 
 記述からの描画は、下絵の後に同じモデルで構図を読み、記述が場所を言わない層を画面の三分割に沿って置く。構図の数値範囲は可視DDLに残る。保存済みの作品、DDLからScoreへの組み立て、各層の版は変わらない。詳しい規則と受入結果は次の同日記録に示す。

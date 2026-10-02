@@ -20,7 +20,7 @@ const FIXTURE: &str = include_str!("data/composition-port-v1.json");
 
 /// Works with more combinations are solved only by the full run, which is slow
 /// without optimisation.
-const QUICK_LIMIT: u64 = 2_000;
+const QUICK_LIMIT: u64 = 20_000;
 
 #[derive(Deserialize)]
 struct Fixture {
@@ -311,7 +311,7 @@ fn the_check_and_the_solver_answer_as_the_prototype_on_small_works() {
     println!("{}", report(&outcome));
     assert!(outcome.failures.is_empty(), "{}", report(&outcome));
     assert_eq!(outcome.checked, outcome.cases, "{}", report(&outcome));
-    assert!(outcome.solved >= 130, "{}", report(&outcome));
+    assert!(outcome.solved >= 200, "{}", report(&outcome));
 }
 
 #[test]

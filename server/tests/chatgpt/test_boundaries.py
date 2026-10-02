@@ -261,6 +261,70 @@ def test_four_effect_tags_and_quota_blocks_fallback_http(isolated, monkeypatch):
     assert len(calls) == before
 
 
+def test_composition_effect_preserves_wire_and_separate_observation(isolated, tmp_path, monkeypatch):
+    from sqlalchemy import create_engine
+    from inku_server.model_settings import default_model_settings
+    from inku_server.persistence.schema import ProviderObservationRow
+    from inku_server.pipeline_provider import ProviderOptions, SingleAttemptProvider
+    from inku_server.provider_observation import ProviderObservationStore
+
+    value = profile(catalog={"expires_at": time.time() + 300, "models": [{"id": "model", "label": "Model"}]})
+    seed(isolated, value)
+    schema = {"type": "object", "properties": {
+        "relations": {"type": "array", "items": {"type": "string"}},
+        "roles": {"type": "array", "items": {"type": "string"}},
+        "thesis": {"type": "string"},
+    }, "propertyOrdering": ["thesis", "roles", "relations"], "required": ["thesis", "roles", "relations"]}
+    action = {"tag": "read_composition", "identity": {"action_id": "composition-1", "attempt": "1", "request_digest": "reading-1"},
+              "timeout_ms": "5000", "payload": {"prompt": {
+                  "action_name": "read_composition", "system": "Rust composition system", "message": "赤い円の下絵。",
+                  "response_schema": schema,
+              }}}
+    arguments = json.dumps({"thesis": "赤い円が焦点。", "roles": ["focal"], "relations": []}, ensure_ascii=False)
+    item = {"type": "function_call", "id": "fc_composition", "call_id": "call_composition",
+            "name": "submit_pipeline_response", "namespace": "inku"}
+    events = [{"type": "response.output_item.added", "item": {**item, "arguments": ""}},
+              {"type": "response.function_call_arguments.delta", "item_id": item["id"], "delta": arguments},
+              {"type": "response.function_call_arguments.done", "item_id": item["id"], "arguments": arguments},
+              {"type": "response.completed", "response": {"status": "completed", "output": [{**item, "arguments": arguments}],
+                  "usage": {"input_tokens": 3, "output_tokens": 2, "total_tokens": 5}}}]
+    wire = b"".join(b"data: " + canonical(event) + b"\r\n\r\n" for event in events)
+    sent = []
+    real_client = httpx.AsyncClient
+
+    def handle(request):
+        assert str(request.url) == auth.RESOURCE + "/responses"
+        sent.append(json.loads(request.content))
+        return httpx.Response(200, content=wire, headers={"content-type": "text/event-stream"})
+
+    monkeypatch.setattr(httpx, "AsyncClient", lambda **kwargs: real_client(transport=httpx.MockTransport(handle), **kwargs))
+    engine = create_engine(f"sqlite:///{tmp_path / 'composition-observation.db'}")
+    ProviderObservationRow.__table__.create(engine)
+    capture = ProviderObservationStore(engine, limit=16384)
+    try:
+        transport = SingleAttemptProvider(ProviderOptions(settings=default_model_settings(), stage1_model="chatgpt:model", stage2_model="chatgpt:model",
+            max_tokens=1, max_response_bytes=4096, chatgpt_owner="owner", chatgpt_profile=value["id"], chatgpt_generation=1),
+            observation=(capture, "owner", "composition-execution"))
+        result = transport(action)
+        assert result["tag"] == "composition_read"
+        assert result["identity"] == action["identity"] and result["response"] == arguments
+        assert len(sent) == 1
+        assert sent[0]["model"] == "model" and sent[0]["instructions"] == action["payload"]["prompt"]["system"]
+        assert sent[0]["input"] == [{"role": "user", "content": action["payload"]["prompt"]["message"]}]
+        assert sent[0]["tools"][0]["tools"][0]["parameters"] == schema
+        saved, = capture.read_execution("owner", "composition-execution")
+        assert saved["stage"] == "composition" and saved["action_tag"] == "read_composition"
+        assert saved["provider_id"] == "chatgpt" and saved["model"] == "model"
+        assert saved["outcome"] == "completed" and saved["failure"] is None and saved["capture_complete"]
+        assert saved["elapsed_ms"] == int(result["elapsed_ms"])
+        assert json.loads(saved["usage_json"]) == {"input_tokens": 3, "output_tokens": 2, "total_tokens": 5}
+        assert json.loads(saved["request_body"]) == sent[0] and saved["response_body"] == wire.decode()
+        assert not saved["request_truncated"] and not saved["response_truncated"]
+        assert "fixture-access" not in json.dumps(saved)
+    finally:
+        engine.dispose()
+
+
 def test_runtime_cancel_closes_blocked_stream_and_releases_slot(isolated, monkeypatch):
     from inku_server.chatgpt_provider import request
     value = profile(catalog={"expires_at": time.time() + 300, "models": [{"id": "model"}]})

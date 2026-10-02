@@ -58,7 +58,7 @@ quota時は同じ登録の後続送信を止めます。「利用枠を確認」
 
 ## 生成と接続解除
 
-写生文、色カタログ選択、記述からのDDL、可視holeの補完へ同じ描画モデルを使います。Rustのprompt/schema・検証・再試行・Score/SVGは継承します。Responsesは`store:false`・SSEで、温度や出力tokenの旧パラメータを流用せず、必要なJSONを一つのnamespaced function callで受け取ります。正しい`response.completed`だけを採用し、途中切断、refusal、未知tool、サイズ超過、後続quotaでは部分JSONがあっても失敗です。
+写生文、色カタログ選択、記述からのDDL、構図の読み、可視holeの補完へ同じ描画モデルを使います。構図の読みは`read_composition`を受け、観測の時間とusageはStage 1から分けて`composition`へ記録します。読みが使えないときの既定fallbackは共有Rustが決めます。Rustのprompt/schema・検証・再試行・Score/SVGは継承します。Responsesは`store:false`・SSEで、温度や出力tokenの旧パラメータを流用せず、必要なJSONを一つのnamespaced function callで受け取ります。正しい`response.completed`だけを採用し、途中切断、refusal、未知tool、サイズ超過、後続quotaでは部分JSONがあっても失敗です。
 
 実行は開始時profile/generationへ固定し、別profile選択は次の実行に適用します。cancel、sign-out、inku logout、モード変更、Server終了は新規通信と遅い結果の採用を止めます。profileごとに一通信slot、owner単位でrefresh排他を持ちます。sign-outはローカルtokenを直ちに消し、登録identity・host IDを残します。remote revocation失敗は未確認と表示します。[セッション](https://developers.openai.com/siwc/token-sharing-open-source/profiles-and-sessions)
 

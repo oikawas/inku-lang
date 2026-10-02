@@ -1,4 +1,4 @@
-"""Responses/SSE adapter for the four shared-pipeline effects; no retries."""
+"""Responses/SSE adapter for shared-pipeline effects; no retries."""
 
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ from .chatgpt_auth import RESOURCE, access_token, read_limited
 from .chatgpt_runtime import check_session, guarded
 from .chatgpt_store import ChatGPTError, CredentialStore, canonical
 
-EFFECTS = {"generate_sketch", "select_description_catalog", "generate_normalized_ddl", "complete_visible_ddl_holes"}
+EFFECTS = {"generate_sketch", "select_description_catalog", "generate_normalized_ddl", "read_composition", "complete_visible_ddl_holes"}
 PUBLIC_CODES = {
     "subscription_sharing_usage_limit_exceeded", "subscription_sharing_user_not_eligible",
     "subscription_sharing_unsupported_capability", "subscription_sharing_route_not_supported",
@@ -221,8 +221,9 @@ async def request(owner: str, profile_id: str, generation: int, model: str, acti
             token = await access_token(owner, profile_id, generation, deadline, cancel)
             body = request_body(model, action["payload"]["prompt"])
             if observation:
+                from .pipeline_provider import provider_stage_record
                 capture, execution = observation
-                truncated = capture.request(owner, execution, action, "stage2" if action["tag"] == "complete_visible_ddl_holes" else "stage1", "chatgpt", model, canonical(body))
+                truncated = capture.request(owner, execution, action, provider_stage_record(action["tag"]), "chatgpt", model, canonical(body))
                 if truncated:
                     raise ChatGPTError("chatgpt_observation_incomplete")
             decoder = SSEDecoder(limit)

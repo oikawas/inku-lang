@@ -6,6 +6,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file retains the history from v2.5.0 (2026-07-25, render engine 12) onward.** Past records follow the recent ones in a collapsible section of this same document; expand it when needed. Viewers without collapse support show the full text. Earlier history is in the [v1.72–v2.4 archive](docs/history/changelog-v1.72-v2.4.md) and the [v0.1–v1.71 archive](docs/history/changelog-v0.1-v1.71.md).
 
+### 2026-10-02 — Explicit drawing and Vision model references reach the common resolver (I-014)
+
+Explicit model names now retain their reference after trimming surrounding whitespace, including a bare name that matches the user's default model. Provider selection follows the common rules: explicit qualification, sole ownership, then the stage default. Omitted requests retain the user's model/provider pair, qualified defaults stay qualified once, and one drawing model still serves Stage 1/2. New records may retain an explicitly supplied bare model name; existing saved records are unchanged.
+
 ### 2026-10-02 — A word left out for an out-of-range count is explained on screen (I-702)
 
 A sentence left out because its count lies outside the word's range (`13枚のNature.若葉。`) is now explained as a plugin diagnostic (author's decision, 2026-10-01). The shared explainer (`explain_plugin_diagnostics`) returns the new reason `plugin_count_out_of_range`, and Web and Android say "The count written on the plugin Nature.若葉 is outside the range it takes, so this sentence was not drawn." It used to stay in the work's record only.

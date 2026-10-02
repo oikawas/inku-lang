@@ -93,16 +93,12 @@ def _is_qualified_model_id(model: str) -> bool:
 
 
 def _resolved_vision_model(model: str | None, actor: dict | None = None) -> str:
+    """Keep explicit references for the resolver; qualify only the actor's default."""
     settings = (actor or {}).get("model_settings") or {}
     provider = str(settings.get("vision_provider", "nvidia") or "nvidia")
     model_id = str(settings.get("vision_model", DEFAULT_OKUGAKI_MODEL) or DEFAULT_OKUGAKI_MODEL)
     if model:
-        requested = str(model).strip()
-        if _is_qualified_model_id(requested):
-            return requested
-        if requested == model_id:
-            return f"{provider}:{requested}"
-        return requested
+        return str(model).strip()
     return model_id if _is_qualified_model_id(model_id) else f"{provider}:{model_id}"
 
 

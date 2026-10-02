@@ -166,7 +166,7 @@ class ProviderOptions:
 
 
 def resolved_drawing_model(model: str | None, actor: dict | None) -> str:
-    """Resolve a request model against the actor's drawing model.
+    """Keep explicit references for the common provider resolver.
 
     One model draws both stages (2026-09-30), so this reads the Stage 1 keys; a
     stored Stage 2 choice that still differs is not consulted.
@@ -176,12 +176,7 @@ def resolved_drawing_model(model: str | None, actor: dict | None) -> str:
     provider = str(settings.get("stage1_provider", "nvidia") or "nvidia")
     model_id = str(settings.get("stage1_model", default_model) or default_model)
     if model:
-        requested = str(model).strip()
-        if _is_qualified_model_id(requested):
-            return requested
-        if requested == model_id:
-            return f"{provider}:{requested}"
-        return requested
+        return str(model).strip()
     return model_id if _is_qualified_model_id(model_id) else f"{provider}:{model_id}"
 
 

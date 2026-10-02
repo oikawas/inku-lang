@@ -29,6 +29,10 @@ are included. Saved Scores/SVGs are not regenerated. Old expanded text is
 completion output from the old engine; 100% compatibility with the current
 engine is outside the guarantee.
 
+The Android mapping in portable persistence contract v2 uses the generated Room
+schema 14, verifying nullable DDL and origin and the retired column's absence
+against both hosts' physical schemas.
+
 ### 2026-10-02 — Explicit drawing and Vision model references reach the common resolver (I-014)
 
 Explicit model names now retain their reference after trimming surrounding whitespace, including a bare name that matches the user's default model. Provider selection follows the common rules: explicit qualification, sole ownership, then the stage default. Omitted requests retain the user's model/provider pair, qualified defaults stay qualified once, and one drawing model still serves Stage 1/2. New records may retain an explicitly supplied bare model name; existing saved records are unchanged.

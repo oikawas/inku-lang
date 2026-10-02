@@ -154,7 +154,7 @@
       }
     },
     "android": {
-      "source": "android/app/schemas/app.inku.mobile.data.db.InkuDatabase/13.json",
+      "source": "android/app/schemas/app.inku.mobile.data.db.InkuDatabase/14.json",
       "records": {
         "history": {
           "table": "history_items",

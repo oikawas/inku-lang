@@ -10,6 +10,8 @@
 
 論理recordは`history`、`lineage_nodes`、`lineage_edges`。Serverの`history`に対しAndroidは`history_items`、`at`に対し`created_at`、`input`に対し`original_input`、`ddl`に対し`normalized_ddl`、`score`に対し`score_json`、`svg`に対し`display_svg`を使う。物理名の一致でなく、意味・NULL区別・encoding・制約が一致することを要求する。
 
+Androidの現行物理正本は生成済み[Room schema 14](../android/app/schemas/app.inku.mobile.data.db.InkuDatabase/14.json)。`history_items.normalized_ddl`と`ddl_source_origin`はともにNULL可のTEXTであり、旧`expanded_ddl`列を持たない。共通checkerはこのschemaとServerの現行schemaを契約v2へ照合する。
+
 `required_common`は両hostが保存または決定的に公開する事実、`optional_common`は共通の意味を予約しproducerのないhostによる省略を許す項目。認証・管理・端末固有のprovider/model/cacheはhost拡張である。
 
 Androidの`render_seed`、`composition_seed`、`render_wild`は専用列が正本。`render_metadata_json`の一致値はrender identity用の整合性echoであり第二の書込authorityではない。専用列のない色map等は既存JSON pathで対応付ける。

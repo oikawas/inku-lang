@@ -24,11 +24,14 @@ The logical record names are `history`, `lineage_nodes`, and `lineage_edges`. Ph
 | `at` | `at` | `created_at` |
 | `input` | `input` | `original_input` |
 | `ddl` | `ddl` | `normalized_ddl` |
+| `ddl_source_origin` | `ddl_source_origin` | `ddl_source_origin` |
 | `score` | `score` | `score_json` |
 | `svg` | `svg` | `display_svg` |
 | `render_engine_id` | dedicated column | `render_metadata_json` path |
 
 The mapping is deliberate. Portability requires equal meaning, NULL distinctions, encoding, and constraints at the adapter boundary; it does not require equal physical names.
+
+Android's current physical authority is the generated [Room schema 14](../android/app/schemas/app.inku.mobile.data.db.InkuDatabase/14.json). Both `history_items.normalized_ddl` and `ddl_source_origin` are nullable TEXT, and the retired `expanded_ddl` column is absent. The portable checker verifies this schema and the current Server schema against contract v2.
 
 The Server owns a SQLAlchemy/SQLite schema, Android owns a Room/SQLite schema,
 and a possible future iOS client would own another physical adapter. Server-only

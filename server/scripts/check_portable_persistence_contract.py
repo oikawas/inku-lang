@@ -625,7 +625,7 @@ def main() -> int:
         return 1
     print(
         "portable persistence contract: OK "
-        f"v1 fields={summary['logical_fields']} rules={summary['semantic_rules']} "
+        f"v2 fields={summary['logical_fields']} rules={summary['semantic_rules']} "
         f"declared_gaps={summary['declared_gaps']} "
         f"server_tables={summary['server_tables']} room_tables={summary['room_tables']}"
     )

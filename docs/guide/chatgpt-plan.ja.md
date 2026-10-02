@@ -10,11 +10,11 @@
 
 ## 同じPCで接続する
 
-Serverのソースディレクトリで、既存のDB・管理者設定とともに起動します。
+Serverのソースディレクトリで、先に`uv sync --frozen --inexact`でlock済み依存を同期します。既存のnative wheelを保持し、以下の起動・認証helperでは`--no-sync`で再同期を避けます。既存のDB・管理者設定とともに起動します。
 
 ```sh
 INKU_CHATGPT_PLAN_ENABLED=1 INKU_DEVELOPER_MODE=1 \
-  uv run inku-chatgpt serve --host 127.0.0.1 --port 8100
+  uv run --frozen --no-sync inku-chatgpt serve --host 127.0.0.1 --port 8100
 ```
 
 設定「ChatGPTプラン」の「Continue with ChatGPT」から本人がサインイン・同意します。callbackは同じPCの`http://127.0.0.1:<port>/auth/callback`です。拒否・中止・5分の期限切れは失敗として表示します。popupを遮断した場合は画面の同じ認可リンクを開けます。1 worker・reloadなしで、通常の直uvicorn起動やlocal LAN bindでは有効にしません。認証後、モデル選択の「Stage 1/2」から本人のモデルを選びます。[認証手順](https://developers.openai.com/siwc/token-sharing-open-source/sign-in)
@@ -26,21 +26,21 @@ Macで認証し、自己ホストだけが更新を所有します。Web全体�
 自己ホストは明示有効化とモード条件を維持し、次の入口で起動します。
 
 ```sh
-uv run inku-chatgpt serve --self-hosted --host 0.0.0.0 --port 8100
+uv run --frozen --no-sync inku-chatgpt serve --self-hosted --host 0.0.0.0 --port 8100
 ```
 
 運用者はDBで検証済みの本人ownerへ固定した`inku-chatgpt recipient --owner-id <verified-owner-id>`を実行し、公開recipient JSONをMacへ安全に渡します。Macで0600ファイルとして保存し、このアプリ専用の認証を行います。
 
 ```sh
 INKU_CHATGPT_PLAN_ENABLED=1 INKU_DEVELOPER_MODE=1 \
-  uv run inku-chatgpt authorize --recipient recipient.json
+  uv run --frozen --no-sync inku-chatgpt authorize --recipient recipient.json
 ```
 
 本人がChromeのアカウントと許可内容を確認します。成功結果の非秘密`profile_id`で一登録だけを封印します。
 
 ```sh
 INKU_CHATGPT_PLAN_ENABLED=1 INKU_DEVELOPER_MODE=1 \
-  uv run inku-chatgpt export --recipient recipient.json \
+  uv run --frozen --no-sync inku-chatgpt export --recipient recipient.json \
   --profile-id <profile-id> --output sealed.json
 ```
 

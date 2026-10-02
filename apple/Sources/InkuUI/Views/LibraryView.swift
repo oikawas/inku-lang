@@ -4,6 +4,7 @@ import SwiftUI
 @MainActor
 struct LibraryView: View {
     @Bindable var model: AppModel
+    let onEditWork: (SavedWork, WorkEditMode) -> Void
     @State private var deletion: LibraryDeletion?
     @State private var loadingGroups: Set<String> = []
     @FocusState private var focusedWorkID: String?
@@ -316,6 +317,10 @@ struct LibraryView: View {
         Button(model.display.localized("制作で編集"), systemImage: "pencil") {
             Task { await model.selectWork(work); NotificationCenter.default.post(name: .inkuOpenSection, object: "create") }
         }.disabled(model.isBusy || work.trashed)
+        Button(model.display.localized("記述を変える"), systemImage: "text.cursor") { onEditWork(work, .description) }
+            .disabled(model.isBusy || work.trashed)
+        Button(model.display.localized("写生なし／ありで描き直す"), systemImage: "pencil.and.outline") { onEditWork(work, .sketch) }
+            .disabled(model.isBusy || work.trashed)
         if work.lineageNodeID != nil { Button(model.display.localized("系譜"), systemImage: "point.3.connected.trianglepath.dotted") { openLineage(work) }.disabled(model.isBusy) }
         Divider()
         Button(model.display.localized(library.selectedIDs.contains(work.id) ? "チェックを外す" : "複数選択に追加"), systemImage: "checkmark.square") { library.toggleSelection(work.id) }

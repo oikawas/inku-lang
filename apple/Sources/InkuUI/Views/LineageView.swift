@@ -4,6 +4,7 @@ import SwiftUI
 @MainActor
 struct LineageView: View {
     @Bindable var model: AppModel
+    let onEditWork: (SavedWork, WorkEditMode) -> Void
     @State private var details: LineageItem?
     @State private var scrollToFocus = 0
     @FocusState private var focusedNodeID: String?
@@ -310,6 +311,10 @@ struct LineageView: View {
             Button(model.display.localized("制作で編集"), systemImage: "pencil") {
                 Task { await model.selectWork(work); NotificationCenter.default.post(name: .inkuOpenSection, object: "create") }
             }.disabled(model.isBusy || work.trashed)
+            Button(model.display.localized("記述を変える"), systemImage: "text.cursor") { onEditWork(work, .description) }
+                .disabled(model.isBusy || work.trashed)
+            Button(model.display.localized("写生なし／ありで描き直す"), systemImage: "pencil.and.outline") { onEditWork(work, .sketch) }
+                .disabled(model.isBusy || work.trashed)
             Button(model.display.localized(library.selectedIDs.contains(work.id) ? "チェックを外す" : "複数選択に追加"), systemImage: "checkmark.square") { library.toggleSelection(work.id) }
                 .disabled(library.mutating || model.isBusy)
             Button(model.display.localized(work.starred ? "お気に入りを解除" : "お気に入り"), systemImage: "star") { Task { await library.toggleStar(work) } }

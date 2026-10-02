@@ -28,6 +28,15 @@ struct AppCheck {
             try await runModelSelectionChecks()
             return
         }
+        if CommandLine.arguments.contains("--work-edit-only") {
+            let fixtureURL: URL?
+            if let index = CommandLine.arguments.firstIndex(of: "--work-edit-native-fixture") {
+                guard CommandLine.arguments.indices.contains(index + 1) else { throw CheckFailure.message("Missing work-edit fixture path") }
+                fixtureURL = URL(fileURLWithPath: CommandLine.arguments[index + 1])
+            } else { fixtureURL = nil }
+            try await runWorkEditChecks(nativeFixtureURL: fixtureURL)
+            return
+        }
         if CommandLine.arguments.contains("--plugin-only") {
             try await runPluginChecks()
             return

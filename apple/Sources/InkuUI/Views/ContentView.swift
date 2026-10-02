@@ -32,11 +32,18 @@ private struct ExportSession {
     let preserveOrder: Bool
 }
 
+private struct WorkEditSession {
+    let id = UUID()
+    let work: SavedWork
+    let mode: WorkEditMode
+}
+
 private enum WorkDialog: Identifiable {
-    case export(ExportSession), comparison, advice, colophon
+    case export(ExportSession), edit(WorkEditSession), comparison, advice, colophon
     var id: String {
         switch self {
         case .export(let session): session.id.uuidString
+        case .edit(let session): session.id.uuidString
         case .comparison: "comparison"
         case .advice: "advice"
         case .colophon: "colophon"
@@ -85,6 +92,9 @@ public struct ContentView: View {
             }
         }
         #if os(macOS)
+        .ddlImportDropTarget(model: model,
+                             enabled: !model.isBusy && !automation.running && dialog == nil && !presentation,
+                             onImported: { section = .create })
         .environment(importer)
         .onDisappear { importer.cancel() }
         #endif
@@ -126,10 +136,10 @@ public struct ContentView: View {
 
     @ViewBuilder private var detail: some View {
         switch section ?? .create {
-        case .create: CreationView(model: model, history: history).disabled(automation.running || importing)
-        case .library: LibraryView(model: model).disabled(automation.running || importing)
-        case .lineage: LineageView(model: model).disabled(automation.running || importing)
-        case .automation: AutomationView(model: model, automation: automation)
+        case .create: CreationView(model: model, history: history, onEditWork: openWorkEdit).disabled(automation.running || importing)
+        case .library: LibraryView(model: model, onEditWork: openWorkEdit).disabled(automation.running || importing)
+        case .lineage: LineageView(model: model, onEditWork: openWorkEdit).disabled(automation.running || importing)
+        case .automation: AutomationView(model: model, automation: automation).disabled(importing)
         case .settings: SettingsView(model: model, section: $settingsSection).disabled(automation.running || importing)
         }
     }
@@ -173,7 +183,11 @@ public struct ContentView: View {
     private func performCommand(_ action: InkuCommandAction) {
         guard commandContext.isEnabled(action) else { return }
         switch action {
-        case .newWork: model.newWork(); section = .create
+        case .newWork:
+            #if os(macOS)
+            importer.clearMessage()
+            #endif
+            model.newWork(); section = .create
         case .openDDL:
             #if os(macOS)
             section = .create
@@ -223,6 +237,13 @@ public struct ContentView: View {
                     .disabled(!canExport)
                     .help(model.display.preferences.showTooltips ? model.display.localized("書き出す") : "")
                 Menu(model.display.localized("作品の操作"), systemImage: "ellipsis.circle") {
+                    Button(model.display.localized("記述を変える"), systemImage: "text.cursor") {
+                        if let work = model.selectedWork { openWorkEdit(work, .description) }
+                    }.disabled(!hasSavedWork || model.sourceLocked)
+                    Button(model.display.localized("写生なし／ありで描き直す"), systemImage: "pencil.and.outline") {
+                        if let work = model.selectedWork { openWorkEdit(work, .sketch) }
+                    }.disabled(!hasSavedWork || model.sourceLocked)
+                    Divider()
                     Button(model.display.localized("配色・モデルを比較")) { dialog = .comparison }.disabled(!hasSavedWork)
                     Button(model.display.localized("AIの助言・自律推敲")) { dialog = .advice }.disabled(!hasSavedWork)
                     Button(model.display.localized("系譜の奥書")) { dialog = .colophon }.disabled(!hasSavedWork)
@@ -246,6 +267,10 @@ public struct ContentView: View {
             #else
             Text(model.display.localized("書き出し")).padding()
             #endif
+        case .edit(let session):
+            WorkEditView(model: model, work: session.work, mode: session.mode, onCommitted: { section = .create })
+                .id(session.id)
+                .environment(model.display)
         case .comparison:
             ComparisonView(model: model).environment(model.display)
         case .advice:
@@ -253,6 +278,11 @@ public struct ContentView: View {
         case .colophon:
             AuxiliaryView(model: model, mode: .colophon).environment(model.display)
         }
+    }
+
+    private func openWorkEdit(_ work: SavedWork, _ mode: WorkEditMode) {
+        guard canUseWork, !work.trashed else { return }
+        dialog = .edit(WorkEditSession(work: work, mode: mode))
     }
 
     private func openExport() async {

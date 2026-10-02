@@ -527,6 +527,106 @@ public final class AppModel {
         return request
     }
 
+    /// A saved-work edit starts a child from its pinned configuration, independently of editor restoration.
+    public func makeSavedWorkEditRequest(work: SavedWork, mode: WorkEditMode, description: String,
+                                        sketchMode: String = "off", wildOverride: Bool? = nil) async throws -> GenerationRequest {
+        guard !isBusy, !isPreview, database != nil else { throw HostError("authoring_busy_or_unavailable") }
+        let drawing = nextGenerationHostSettings
+        let selectedLanguage = language
+        guard hasNextDrawingModel else { throw HostError("model_reference_missing") }
+        guard ["ja", "en"].contains(selectedLanguage) else { throw HostError("invalid_instruction_language") }
+        let saved = try await savedWorkEditContext(work)
+        let text = (mode == .description ? description : work.effectiveSourceText).trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty else { throw HostError("description_required") }
+        var configuration = try ExactJSON(data: saved.configuration)
+        var options = try ExactJSON(data: saved.renderOptions)
+        guard let catalog = options["catalog_id"].string,
+              options["resolved_color_map"].object != nil,
+              options["canvas_aspect_id"].string != nil else { throw HostError("saved_refinement_options_unavailable") }
+        configuration["language"] = .string(selectedLanguage)
+        // The Server applies Stage 1.5 only when this operation explicitly asks for it.
+        configuration["compiler"]["stage15_variation"] = .null
+        configuration["catalogs"] = .array([])
+        options["wild"] = .bool(mode == .description ? wildOverride ?? work.renderWild ?? options["wild"].bool ?? false
+                                                    : work.renderWild ?? options["wild"].bool ?? false)
+        options["svg_profile"] = .string("display")
+        let sketch: SketchRequest
+        if mode == .sketch {
+            guard ["off", "on"].contains(sketchMode) else { throw HostError("invalid_sketch_mode") }
+            // Explicitly asking for the layer runs it anew; it never replays saved prose.
+            sketch = sketchMode == "on" ? .on : .off
+        } else if let prose = work.sketchText, !prose.isEmpty {
+            sketch = text == work.effectiveSourceText.trimmingCharacters(in: .whitespacesAndNewlines) ? .supplied(prose) : .on
+        } else { sketch = .off }
+        let request = GenerationRequest(authoring: .description(text, autoCatalog: false, sketch: sketch),
+            configuration: configuration.data, renderOptions: options.data, clipPolicy: saved.clipPolicy,
+            models: drawing.models, providers: drawing.providers,
+            renderColorMaps: [catalog: options["resolved_color_map"].data], description: text,
+            parentWorkID: work.id, derivationKind: mode == .description ? "description_edit" : "sketch_grain_change")
+        try Task.checkCancellation()
+        let pinned = try await pinPersonalPlanRequests([request])[0]
+        try Task.checkCancellation()
+        return pinned
+    }
+
+    /// Menu availability is read from saved authority, never inferred from a model label or DDL contents.
+    public func canEditSavedWork(_ work: SavedWork) async -> Bool {
+        guard !isBusy, !isPreview, hasNextDrawingModel else { return false }
+        let available = (try? await savedWorkEditContext(work)) != nil
+        return available && !isBusy && !isPreview && hasNextDrawingModel
+    }
+
+    private func savedWorkEditContext(_ work: SavedWork) async throws -> SavedAuthoringContext {
+        guard let database, let stored = try await database.work(id: work.id), !stored.trashed,
+              stored.lineageNodeID != nil else { throw HostError("saved_work_changed_or_unavailable") }
+        var expected = work
+        // Stars are mutable annotations, while the saved source and performance remain immutable.
+        expected.starred = stored.starred
+        expected.trashed = stored.trashed
+        guard stored == expected else { throw HostError("saved_work_changed_or_unavailable") }
+        try Task.checkCancellation()
+        let context = try await savedConfiguration(workID: work.id)
+        try Task.checkCancellation()
+        guard ["description_authoritative", "ddl_authoritative"].contains(context.authority) else { throw HostError("saved_authoring_context_unavailable") }
+        guard context.authority == "description_authoritative" else { throw HostError("description_source_locked") }
+        guard !work.effectiveSourceText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { throw HostError("description_required") }
+        return context
+    }
+
+    /// Keep the displayed workspace intact until this dialog's child is actually committed.
+    public func runSavedWorkEdit(request: GenerationRequest) async -> SavedWork? {
+        guard let host, request.parentWorkID != nil,
+              ["description_edit", "sketch_grain_change"].contains(request.derivationKind),
+              request.retainedDocument == nil, case .description = request.authoring else { return nil }
+        let previousExecution = currentExecutionID
+        let previousView = currentView
+        var result: SavedWork?
+        var adopted = false
+        _ = await performSerialized(status: "生成中") { [weak self] token in
+            guard let self else { return }
+            defer {
+                if !adopted { self.currentExecutionID = previousExecution; self.currentView = previousView }
+            }
+            let candidate = try await self.generateCandidate(request: request, token: token, comparison: false)
+            try Task.checkCancellation()
+            let saved = try await self.saveComparisonCandidate(executionID: candidate.executionID, token: token)
+            result = saved
+            guard self.generationToken == token, !self.stopping, !Task.isCancelled else { return }
+            let view = try await host.restore(executionID: candidate.executionID)
+            let context = try await host.savedAuthoringContext(workID: saved.id)
+            guard self.generationToken == token, !self.stopping, !Task.isCancelled else { return }
+            self.apply(view)
+            self.displayWork(saved)
+            self.selectedContext = context
+            // This execution remains a preview writer. Future edits must fork the committed saved context.
+            self.currentExecutionID = nil
+            self.currentView = nil
+            adopted = true
+            self.status = "作品を保存しました"
+        }
+        return result
+    }
+
     public func makeDemoRequest(template: GenerationRequest, description: String, randomizeSeed: Bool) throws -> GenerationRequest {
         guard case .description(_, let auto, let sketch) = template.authoring,
               template.retainedDocument == nil else { throw HostError("demo_requires_description_template") }
@@ -569,12 +669,12 @@ public final class AppModel {
         }
     }
 
-    public func generateCandidate(request: GenerationRequest, token: UUID) async throws -> PreparedCandidate {
+    public func generateCandidate(request: GenerationRequest, token: UUID, comparison: Bool = true) async throws -> PreparedCandidate {
         guard generationToken == token, !stopping, let host else { throw CancellationError() }
         var request = request; request.saveHistory = false; request.historyVisibility = "normal"
         try await validatePinnedRequest(request)
         let view = try await host.generate(request) { [weak self] progress in
-            Task { @MainActor in self?.receiveCandidate(progress, token: token) }
+            Task { @MainActor in self?.receiveCandidate(progress, token: token, comparison: comparison) }
         }
         await recordDescriptionFeedback(request: request, view: view)
         try Task.checkCancellation()
@@ -664,6 +764,7 @@ public final class AppModel {
 
     public func newWork() {
         guard !isBusy else { return }
+        status = "準備完了"
         selectedWork = nil
         selectedWorkID = nil
         previewWork = nil
@@ -1011,12 +1112,12 @@ public final class AppModel {
         case .saved(_, _): status = "作品を保存しました"
         }
     }
-    private func receiveCandidate(_ progress: PipelineProgress, token: UUID) {
+    private func receiveCandidate(_ progress: PipelineProgress, token: UUID, comparison: Bool = true) {
         guard generationToken == token, !stopping else { return }
         switch progress {
         case .changed(let view): currentExecutionID = view.executionID
-        case .providerAttempt(_, _, _, let deadline): status = "比較候補のモデル応答待ち（期限 \(deadline.formatted(date: .omitted, time: .standard))）"
-        case .transportBytes(_, let count): status = "比較候補を受信中（\(count) bytes）"
+        case .providerAttempt(_, _, _, let deadline): status = comparison ? "比較候補のモデル応答待ち（期限 \(deadline.formatted(date: .omitted, time: .standard))）" : "モデルの応答待ち（期限 \(deadline.formatted(date: .omitted, time: .standard))）"
+        case .transportBytes(_, let count): status = comparison ? "比較候補を受信中（\(count) bytes）" : "応答を受信中（\(count) bytes）"
         case .providerDiagnostic(_, let diagnostic): errorText = "ChatGPTプラン: \(diagnostic.code)（\(diagnostic.action)）"
         case .saved: break
         }

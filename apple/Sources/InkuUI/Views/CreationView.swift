@@ -5,12 +5,17 @@ import SwiftUI
 struct CreationView: View {
     @Bindable var model: AppModel
     @Bindable var history: HistoryModel
+    let onEditWork: (SavedWork, WorkEditMode) -> Void
     @State private var showSaijiki = false
     @State private var workspaceTab = "artwork"
     @State private var sketchExpanded = false
     @State private var outputExpanded = false
     @State private var conditionsExpanded = false
     @State private var showWorkInfo = false
+    @State private var showColorCatalogs = false
+    #if os(macOS)
+    @Environment(DDLImportController.self) private var importer
+    #endif
 
     var body: some View {
         VStack(spacing: 0) {
@@ -54,6 +59,13 @@ struct CreationView: View {
                 SaijikiView(model: model)
             }.frame(minWidth: 560, minHeight: 620)
         }
+        .sheet(isPresented: $showColorCatalogs) { ColorCatalogView(model: model) }
+        .onAppear {
+            if model.inputMode == "ddl", model.catalogMode == "auto" { model.catalogMode = "fixed" }
+        }
+        .onChange(of: model.inputMode) { _, mode in
+            if mode == "ddl", model.catalogMode == "auto" { model.catalogMode = "fixed" }
+        }
         .onChange(of: model.displayedWork?.id) { _, _ in
             if !model.display.preferences.keepGenerationInfo {
                 sketchExpanded = false; outputExpanded = false; conditionsExpanded = false
@@ -66,7 +78,12 @@ struct CreationView: View {
             HStack {
                 Text(model.display.localized("作品を作る")).font(.title2.weight(.semibold))
                 Spacer()
-                Button(model.display.localized("新規")) { model.newWork() }.disabled(model.isBusy)
+                Button(model.display.localized("新規")) {
+                    #if os(macOS)
+                    importer.clearMessage()
+                    #endif
+                    model.newWork()
+                }.disabled(model.isBusy)
             }
             Picker(model.display.localized("入力"), selection: $model.inputMode) {
                 Text(model.display.localized("記述")).tag("description")
@@ -113,10 +130,14 @@ struct CreationView: View {
                 Text(model.display.localized("ランダム")).tag("random")
                 if model.inputMode == "description" { Text(model.display.localized("記述から選択")).tag("auto") }
             }.disabled(model.isBusy)
-            Picker(model.display.localized("配色"), selection: $model.catalogID) {
-                ForEach(model.catalogs, id: \.id) { item in Text(item.name).tag(item.id) }
+            Button { showColorCatalogs = true } label: {
+                ColorCatalogPreview(catalog: model.catalogs.first { $0.id == model.catalogID }, mode: model.catalogMode, display: model.display)
             }
-            .disabled(model.isBusy || model.catalogMode != "fixed")
+            .buttonStyle(.plain)
+            .disabled(model.isBusy || model.catalogs.isEmpty)
+            .accessibilityLabel(model.display.localized("色カタログを開く"))
+            .accessibilityValue(model.catalogMode == "fixed" ? model.catalogs.first { $0.id == model.catalogID }?.name ?? model.catalogID : model.display.localized(model.catalogMode == "random" ? "ランダム" : "記述から選択"))
+            .help(model.display.preferences.showTooltips ? model.display.localized("色カタログを開く") : "")
             Picker(model.display.localized("用紙"), selection: $model.canvasID) {
                 ForEach(model.canvases, id: \.id) { item in Text(item.name).tag(item.id) }
             }
@@ -217,7 +238,7 @@ struct CreationView: View {
                       .accessibilityLabel(savedSummary(work))
               }
             }
-            if workspaceTab == "lineage" { LineageView(model: model) }
+            if workspaceTab == "lineage" { LineageView(model: model, onEditWork: onEditWork) }
             else {
                 ArtworkCanvas(svg: model.currentSVG, renderer: model.renderer, caption: model.displayedWork?.effectiveSourceText ?? "")
                     .frame(maxWidth: .infinity, maxHeight: .infinity)

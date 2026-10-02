@@ -26,7 +26,13 @@ macOS menuはactive sceneの操作可否を使う。⌘Nは新規制作、⌘O�
 
 同梱の歳時記、13色catalog、11用紙と7語のMacro／plugin定義はServer sourceから生成し、共通Rustで定義とdigest lockを解決する。pluginの有効切替は新作品へ適用し、保存作品の定義を置き換えない。DDL packageのimportは`inku.ddl-export.v1`の本文・付属定義・lock・整数表現を検証し、次の新作品へ添える。4MiB／64定義を超える入力や不完全な定義は拒否し、途中結果を採用しない。
 
+色カタログのnative chooserはID、言語に応じた説明、順序付き色見本、HEXと日英の色名を表示する。固定／random／記述から自動選択をdraftとして編集し、「決定」で次の条件だけへ適用する。取消し・closeでは条件を保持する。直接DDLでは記述からの自動選択を使わず、入力をDDLへ切り替えた時に既存auto選択をfixedへ戻す。
+
+macOSでは1つのDDL fileをwindowへdropでき、標準panelと同じURL読込・検証を通す。読込中の生成／batch開始を抑止し、取消し、scene終了、制作内容の変更後に遅い結果を採用しない。成功後に制作を表示し、定義を伴うimportの表示は現在のdraftへ結び付ける。「新規」または保存作品を開いた後は古い完了表示を消す。
+
 DDLのdraft確認は読出しだけとし、変更確定を共通coreのrevision／authorityへ渡す。最初の確定DDL変更後は記述の権限へ戻さず、新しい作品と系譜childを保存する。補完は候補の表示と採用・却下を分け、採用前の本文を書き換えない。保存Scoreの再演奏では保存条件か明示した次の条件を使用し、元作品のScore／SVGを保持する。保存欄`ddl_source_origin`は従来どおりNULLまたは`legacy_expanded`だけであり、編集authorityをこの欄へ保存しない。
+
+保存作品の「記述を変える」「写生なし／ありで描き直す」は、制作toolbarとlibrary／系譜cardから同じdialogを開く。開いた作品を親として固定し、保存configuration、用紙、seed、budget、定義とlockを保持して共通coreから新しいchildを保存する。開始時の次の描画modelを両段へ固定する。記述が変わった場合は親の古い写生文を再利用せず、写生「あり」を明示した場合も生成し直す。保存contextのauthorityを確認し、直接DDL・確定DDL編集の作品を記述へ戻さない。取消しは作業の終了を待ち、成功したchildの保存後にだけdialogを閉じて制作を表示する。
 
 ### 履歴・library・系譜
 
@@ -79,6 +85,8 @@ Personal ChatGPTは通常のAPI key接続と別に扱い、既定は無効とす
 更新したunsigned Universal appは両CPUでlinkし、最低OS14を保持した。Apple Silicon／macOS27.0.1の一時DBでDDL生成、編集child、libraryのcomment／star、trash／復元、restart後の保持、日英切替、親子の系譜と全体表示、Stringの正しい改訂番号、複数選択2作品のPNG2160書出しを実画面で確認した。出力2fileは両方2160×2160で、画像の質感も視覚確認した。起動時のページサイズ再帰、シートの空選択、Foundationの保存option組合せによる終了を修正した。作者の通常利用、他exportのnative・性能、実provider／OAuth、Intel／macOS14実機、署名・配布、iOS app／cameraの受入は残る。
 
 追加の限定確認では、制作で選んだmodelが実際のrequest両段へ反映され、保存default・開始済みtemplateが変わらず、provider呼出し0件であることを確認した。SQLiteの世代projectionはroot・child・欠落・削除祖先の1件を確認した。nativeでは1320×880と標準tileの1281×733で固定生成button・canvas・履歴、世代1／2、設定／移動／新規／読込取消し、model設定categoryへの導線、系譜focusと表示作品の分離、library2件と制作1件の書出し対象を確認した。小さい幅の全配置、VoiceOver、作者のデザイン受入をこの代表確認へ読み替えない。
+
+保存作品編集の限定mock／共通core確認では、live executionのない親の再表示、固定した保存条件・plugin lockと次のmodel、写生の生成し直し、child保存後のDDL authority、停止後の遅い応答拒否を確認した。nativeでは記述／写生dialogのdraft取消し、色カタログの取消しと次の条件への確定、日英の色名とHEX、標準panelから単一DDLを読み込む操作を確認した。編集dialogの再表示時に親画像・記述の見出しが見えない場合を確認し、原因は未確定である。window dropの実操作と実providerの編集生成も未確認である。Serverの描画パラメーター調整にある未保存1案／4案の比較・採用、語を使ったtouch、変奏の現在の無変更表示は未接続であり、catalog／model比較で代用しない。edit系譜の補助項目`edited_from_history_id`、`from_sketch_state`、`to_sketch_mode`も追従が残る。
 
 ## 2026-10-02 macOS向けの共有Rust・standalone基盤（当時の記録）
 

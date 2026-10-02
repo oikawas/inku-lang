@@ -641,6 +641,7 @@ private actor ExecutionDriver {
         let compiler = delivery["compiler_options"]
         let compositionSeed = score["composition_seed"].string ?? score["composition_seed"].number ?? compiler["composition_seed"].string
         let renderSeed = options["render_seed"].string ?? compiler["host"]["palette"]["render_seed"].string
+        let sketch = savedSketchResult()
         let work = SavedWork(id: id, at: now, input: state.description, score: score.text, svg: svg,
                              sourceText: state.description, ddl: snapshot["document"]["source"].string,
                              // This portable field records legacy body migration, not pipeline authority.
@@ -660,7 +661,7 @@ private actor ExecutionDriver {
                              variationAmplitude: compiler["stage15_variation"]["amplitude"].string,
                              variationSeed: compiler["stage15_variation"]["seed"].string,
                              instructionLangResolved: snapshot["config"]["language"].string,
-                             sketchText: snapshot["sketch"]["text"].string, sketchState: snapshot["sketch"]["state"].string,
+                             sketchText: sketch.text, sketchState: sketch.state,
                              renderLimits: legacyRenderLimits(compiler["operational_resource_budget"]),
                              renderHash: renderHash, descriptionHash: descriptionHash,
                              historyVisibility: state.historyVisibility ?? "normal", lineageNodeID: nodeID)
@@ -699,6 +700,19 @@ private actor ExecutionDriver {
                                                        snapshot: encoded(savedState), acknowledgement: acknowledgement, work: work, node: node, edge: edge)
         state = savedState; databaseRevision = committed.execution.revision
         progress(.saved(executionID: try executionID(), workID: id)); progress(.changed(try makeView()))
+    }
+
+    /// Current Server pipeline_product.sketch_result maps only this run's new result.
+    /// Historical NULL/not_applicable metadata remains untouched in saved-work replay.
+    private func savedSketchResult() -> (text: String?, state: String) {
+        let record = snapshot["sketch"]
+        guard record.object != nil else { return (nil, "off") }
+        let state = record["state"].string
+        if ["supplemented", "supplied"].contains(state ?? ""), let text = record["text"].string, !text.isEmpty {
+            return (text, "supplemented")
+        }
+        if state == "not_needed" { return (nil, "not_needed") }
+        return (nil, "fallback")
     }
 
     func saveCandidate() async throws -> SavedWork {

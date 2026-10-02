@@ -6,6 +6,12 @@
 
 **本書は v2.5.0（2026-07-25、render engine 12）以降の履歴を保持する。** 最近の記録に続く過去の履歴は、同じ文書内で折りたたんである。必要なときに展開して読める。折りたたみに対応しないビューアでは全文を表示する。それより前の履歴は [v1.72〜v2.4の書庫](docs/history/changelog-v1.72-v2.4.ja.md) と [v0.1〜v1.71の書庫](docs/history/changelog-v0.1-v1.71.ja.md) にある。
 
+### 2026-10-03 — Swiftの保存作品編集・色カタログ・DDL読込を追加
+
+再表示した保存作品から記述を変え、写生なし／ありで描き直すdialogを制作・library・系譜へ追加した。親の保存条件・定義・lockと開始時の描画modelを固定し、新しい子を共通coreから保存する。取消しは遅い応答の終了を待って表示作品を保持する。編集後のDDL変更も保存した子を親とする別の子になる。新しい描画結果の写生状態をServer同様のoff／supplemented等へ保存し、過去の記録は保持する。
+
+色見本、HEX、日英の色名と説明を持つ13色カタログのnative chooserを追加し、取消しと次回条件への確定を分けた。DDLのpanelとwindow dropを同じ単一URL読込へ接続し、読込中の生成・batchを抑止、取消し・制作内容変更後の採用を防ぐ。新規時の古い読込表示と状態文言も解除する。保存作品編集の限定mock／共通core確認、更新Universal build、nativeのdialog取消し・配色選択・標準panel読込を確認した。親見出しの再表示、描画要素の1案／4案選択、dropの実操作、実providerと作者受入は残る。[Swift仕様](apple/SWIFT_SPEC.ja.md)へ反映した。
+
 ### 2026-10-03 — Swiftの制作画面とmacOS標準操作を整える
 
 制作の入力・次の条件・保存情報をpanelへまとめ、生成／停止をscrollの外へ固定した。保存条件をcompactな要約と詳細へ移し、canvasを広げた。登録済みservice／modelの選択を記述解釈・構造化の両段へ渡し、保存defaultと開始済みbatch／demoの固定条件を保持する。active sceneに従う新規・DDL読込・設定・画面移動・copy・書出しmenuとshortcut、system sidebarの設定categoryを追加した。
@@ -29,6 +35,8 @@ macOSの両CPU向けlinkとApple Siliconのnative画面で生成・履歴・再�
 ### 2026-10-02 — 本人のChatGPTプランを描画へ接続する
 
 本人OAuth、host別の暗号化登録、Mac認証と自己ホストへの一登録の封印移送、refresh排他、接続解除、本人モデル一覧と設定画面を追加した。明示有効化とデベロッパー／シングルユーザーモード、検証済み起動を要求する。予約`chatgpt:<slug>`はAPIキー版と区別し、両段共通描画モデルをResponses/SSEへ接続する。Rustのprompt・schema・再試行・Score/SVGを継承し、quota後の追加送信、途中応答の採用、別providerへの暗黙切替を防ぐ。本人OAuth/import・実推論は実装確認と別に受け入れる。[手順](docs/guide/chatgpt-plan.ja.md)。
+
+依存は`uv sync --frozen --inexact`で同期し、起動と認証helperは`uv run --frozen --no-sync`を使う手順とした。導入済みnative wheelを後の暗黙同期で失わないようにする。
 
 ### 2026-10-02 — プロバイダのレート制限を設定し、バッチの送信を待つ
 

@@ -5,6 +5,19 @@ import InkuHost
 public struct ColorCatalogOption: Identifiable, Sendable {
     public let id: String
     public let name: String
+    public let detail: String
+    public let japaneseDetail: String?
+    public let palette: [ColorCatalogSwatch]
+
+    public func localizedDetail(language: String) -> String {
+        language == "ja" ? japaneseDetail ?? detail : detail
+    }
+}
+
+public struct ColorCatalogSwatch: Sendable {
+    public let code: String
+    public let name: String
+    public let japaneseName: String?
 }
 
 public struct CanvasOption: Identifiable, Sendable {
@@ -91,7 +104,12 @@ struct Bootstrap {
     var catalogs: [ColorCatalogOption] {
         catalogRecords.compactMap { item in
             guard let id = item["id"] as? String, let name = item["name"] as? String else { return nil }
-            return ColorCatalogOption(id: id, name: name)
+            let palette = (item["palette"] as? [[String: Any]] ?? []).compactMap { color -> ColorCatalogSwatch? in
+                guard let code = color["code"] as? String, let name = color["name"] as? String else { return nil }
+                return ColorCatalogSwatch(code: code, name: name, japaneseName: color["name_ja"] as? String)
+            }
+            return ColorCatalogOption(id: id, name: name, detail: item["sub"] as? String ?? "",
+                japaneseDetail: item["sub_ja"] as? String, palette: palette)
         }
     }
 

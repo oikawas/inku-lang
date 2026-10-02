@@ -52,6 +52,8 @@ The initial input is direct English DDL, so generation can be tried without a mo
 
 Choose the next service/model in the creation screen's Next generation settings. This does not change saved Settings defaults or running batch/demo requests. Generate/Stop remains outside the input scroll area. Command-N creates a new work, Command-O imports DDL, Command-comma opens Settings, Command-1 through 4 navigate screens, and Shift-Command-E opens export. Library checkboxes are distinct from the displayed work; creation exports its displayed saved work.
 
+Saved-work actions offer Change description and Redraw with/without sketch to draw a new child of that work. Direct-DDL and committed DDL-edited works cannot return to description authority. The catalog chooser shows color names, HEX values and explanations before applying the next generation settings. Import one DDL file through the standard panel or a window drop to update an unsaved creation draft.
+
 The database is stored in the application's Application Support directory. Ordinary provider settings are stored beside it in `providers.json`; API keys are separate Keychain items. SQLite backup contains works, lineage, executions/ACKs/snapshots, comments/marks, colophons, and unread words. It does not back up adjacent settings JSON or Keychain items.
 
 To try the application with a temporary database, pass `--database` to its executable:
@@ -91,4 +93,4 @@ uv sync --project server --frozen
 python3 apple/scripts/prepare-meter-resources.py
 ```
 
-Bounded CLI checks are available through `apple/scripts/check-core.sh` after artifact generation and `swift run --package-path apple InkuAppCheck` after resource generation. Select `--authoring-only`, `--comparison-only`, `--automation-only`, `--plugin-only`, `--model-selection-only`, or `--raster-only <SVG path>` for the relevant change. `--model-selection-only` uses a temporary DB and zero provider calls to verify creation model selection separately from saved defaults and startup snapshots. These do not replace native screen, real-provider, or device acceptance. Run only checks needed for the concrete failure a change prevents.
+Bounded CLI checks are available through `apple/scripts/check-core.sh` after artifact generation and `swift run --package-path apple InkuAppCheck` after resource generation. Select `--authoring-only`, `--comparison-only`, `--automation-only`, `--plugin-only`, `--model-selection-only`, `--work-edit-only`, or `--raster-only <SVG path>` for the relevant change. `--model-selection-only` uses a temporary DB and zero provider calls to verify creation model selection separately from saved defaults and startup snapshots. `--work-edit-only` uses mock transport and the shared core for saved-parent editing, sketch changes, a child's DDL authority, and cancellation. These do not replace native screen, real-provider, or device acceptance. Run only checks needed for the concrete failure a change prevents.

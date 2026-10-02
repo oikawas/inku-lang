@@ -6,6 +6,12 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file retains the history from v2.5.0 (2026-07-25, render engine 12) onward.** Past records follow the recent ones in a collapsible section of this same document; expand it when needed. Viewers without collapse support show the full text. Earlier history is in the [v1.72–v2.4 archive](docs/history/changelog-v1.72-v2.4.md) and the [v0.1–v1.71 archive](docs/history/changelog-v0.1-v1.71.md).
 
+### 2026-10-03 — Add Swift saved-work editing, color catalogs, and shared DDL import
+
+Creation, library, and lineage now open description editing or redraw with/without sketch for a reopened saved work. The parent's saved conditions, definitions, locks, and startup drawing model stay pinned while shared core saves a new child. Cancellation drains late responses and preserves the displayed work. Subsequent DDL edits create another saved child. New sketch results use Server's canonical off/supplemented states while historical records remain intact.
+
+Added a native chooser for 13 color catalogs with swatches, HEX values, English/Japanese names, and descriptions; cancellation is separate from applying upcoming conditions. The file panel and window drop share a single-URL DDL reader, disabling drawing/batch starts and excluding results after cancellation or changed draft context. New clears stale import messages and status. Selected mock/shared-core editing checks, updated Universal build, and native dialog cancellation, color selection, and standard-panel import passed. Reliable reopened parent headers, one/four-candidate drawing-element selection, actual file-drop gestures, real providers, and author acceptance remain incomplete. Updated the [Swift specification](apple/SWIFT_SPEC.md).
+
 ### 2026-10-03 — Refine Swift creation views and standard macOS actions
 
 Grouped creation input, upcoming conditions, and saved information into panels, with Generate/Stop outside scrolling. Compact saved facts and a detail popover leave more room for the canvas. Registered service/model choices reach both interpretation and structure stages while preserving saved defaults and running batch/demo snapshots. Added active-scene New, DDL import, Settings, navigation, copy, and export menus/shortcuts plus system-sidebar Settings categories.
@@ -43,6 +49,8 @@ this paired root CHANGELOG. See [`apple/README.md`](apple/README.md) for buildin
 ### 2026-10-02 — Connect personal ChatGPT plan usage to drawing
 
 Adds account OAuth, encrypted host-owned profiles, Mac sign-in and sealed single-registration transfer to self-hosting, serialized refresh, sign-out, personal catalogs and connection settings. Explicit enablement, developer/single-user mode and validated startup are required. Reserved `chatgpt:<slug>` is separate from API keys and connects one Stage 1/2 drawing model to Responses/SSE. Rust prompts, schemas, retries and Score/SVG remain in place. Quota stops later traffic, partial responses are discarded and providers never switch implicitly. Account OAuth/import and real inference are accepted separately from implementation checks. [Guide](docs/guide/chatgpt-plan.md).
+
+Synchronize dependencies with `uv sync --frozen --inexact`, then run startup and authorization helpers with `uv run --frozen --no-sync` so later implicit synchronization cannot remove an installed native wheel.
 
 ### 2026-10-02 — Configure service rate limits and pace batch requests
 

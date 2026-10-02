@@ -186,7 +186,7 @@
         "lineage_nodes": {"table": "lineage_nodes", "fields": {"id": {"column": "id"}, "history_id": {"column": "history_id"}, "state": {"column": "state"}, "description_hash": {"column": "description_hash"}, "render_hash": {"column": "render_hash"}, "at": {"column": "at"}, "deleted_at": {"column": "deleted_at"}, "root_node_id": {"column": "root_node_id"}}},
         "lineage_edges": {"table": "lineage_edges", "fields": {"id": {"column": "id"}, "parent_node_id": {"column": "parent_node_id"}, "child_node_id": {"column": "child_node_id"}, "derivation_kind": {"column": "derivation_kind"}, "metadata_json": {"column": "metadata_json"}, "at": {"column": "at"}}}
       },
-      "host_only_history_extensions": ["updated_at", "render_metadata_json", "render_hash_short", "token_metadata_json", "thumbnail_path", "thumbnail_width", "thumbnail_height"],
+      "host_only_history_extensions": ["updated_at", "render_metadata_json", "render_hash_short", "catalog_mode", "token_metadata_json", "thumbnail_path", "thumbnail_width", "thumbnail_height"],
       "constraint_coverage": {
         "history.id.primary_key": {"status": "enforced", "mechanism": "database", "authority": "HistoryItemEntity.id"},
         "history.render_hash.non_unique": {"status": "enforced", "mechanism": "database", "authority": "index_history_items_render_hash"},

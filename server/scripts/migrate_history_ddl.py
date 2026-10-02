@@ -58,6 +58,16 @@ def main() -> int:
         json.dump({"status": "failed", "error": type(error).__name__}, sys.stderr, sort_keys=True)
         sys.stderr.write("\n")
         return 1
+    except RuntimeError as error:
+        # Frozen restoration and invariant failures have their own exception
+        # types. Keep their retained snapshot address without exposing SQL
+        # parameters or old row contents in a traceback.
+        snapshot = getattr(error, "snapshot", None)
+        json.dump({"status": "failed", "error": type(error).__name__,
+                   "backup": str(snapshot.path) if snapshot is not None else None},
+                  sys.stderr, sort_keys=True)
+        sys.stderr.write("\n")
+        return 1
     json.dump(report, sys.stdout, sort_keys=True)
     sys.stdout.write("\n")
     return 0

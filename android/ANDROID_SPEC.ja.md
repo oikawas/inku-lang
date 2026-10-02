@@ -3,7 +3,7 @@
 このディレクトリは、ネイティブ単体 Android アプリのワークスペースであり、Git 管理対象とする。
 ローカル専用成果物、端末ID、ダウンロード済みモデル、ログ、秘密情報は追跡対象に含めない。
 
-最終更新: 2026-09-30。
+最終更新: 2026-10-01。
 
 **追随状況**: Android は `2.1.4-android.80` の世代にある。DDLの変換とScore → SVGの描画は、
 同じcommitの共有Rust core（`core/crates/`）を同梱してServerと同じ実装で行い、Android独自の版定数を持たない。
@@ -29,6 +29,12 @@ runtime fallbackを持たない。保存済みSVG、Room schema、Score schema�
 - `ANDROID_SPEC.md` は英語版として、`ANDROID_SPEC.ja.md` の意図を保った翻訳・要約として更新する。
 - Android 仕様を更新するときは、先に `ANDROID_SPEC.ja.md` を更新し、その後で `ANDROID_SPEC.md` を同期する。
 - 英語版だけに存在する仕様・要件を追加してはならない。
+
+## 2026-10-01 DDLの無い作品をNULLで保存
+
+Room schema 13では、`history_items.normalized_ddl`と一覧用の`HistoryListItem.normalizedDdl`をNULL可とする。12→13の移行は作品の表を作り直し、既存の空文字だけをNULLへ変える。通常のDDL、記述、Score、SVG、seed、サムネイルの参照、系譜、その他の表とindexは保持する。新たにDDLの無い作品を保存するときもNULLにする。
+
+画面・検索・コピー・指示書編集欄・テキスト書き出しではNULLを空文字として扱い、文字列`null`を表示しない。指示書のJSON書き出しは空の`ddl`、作品のJSON書き出しは`normalized_ddl: null`を持つ。DDLを必要とする操作は既存の空入力の扱いを維持し、保存Score・SVGを使う表示・書き出し・再演はDDLが無くても行える。記述からの描画・推敲・フォークは保存した記述を使う。保存Scoreの再演で、記述を欠けたDDLの代わりに保存しない。
 
 ## 2026-09-30 撮影から詩的な記述へ・モデルの統一
 

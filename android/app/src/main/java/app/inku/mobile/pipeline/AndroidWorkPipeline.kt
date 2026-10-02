@@ -453,8 +453,10 @@ class AndroidWorkPipeline(
         metadata.put("render_hash", hash).put("render_hash_short", hash.takeLast(4).uppercase())
         return PaintResult(
             originalInput = request.originalText,
-            normalizedDdl = source?.history?.normalizedDdl ?: request.description,
-            expandedDdl = source?.history?.expandedDdl ?: source?.history?.normalizedDdl ?: request.description,
+            normalizedDdl = if (source != null) source.history.normalizedDdl.orEmpty() else request.description,
+            expandedDdl = if (source != null) {
+                source.history.expandedDdl ?: source.history.normalizedDdl.orEmpty()
+            } else request.description,
             scoreJson = JSONObject(scoreJson).toString(),
             displaySvg = svg,
             renderMetadataJson = metadata.toString(),

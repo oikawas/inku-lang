@@ -236,7 +236,7 @@ internal class SaijikiV1Migration(
         ).use { cursor ->
             while (cursor.moveToNext()) {
                 val historyId = cursor.getString(0)
-                val ddl = cursor.getString(1)
+                val ddl = if (cursor.isNull(1)) null else cursor.getString(1)
                 val expandedDdl = if (cursor.isNull(2)) null else cursor.getString(2)
                 val language = cursor.getString(3)?.takeIf { it == "ja" || it == "en" } ?: "ja"
                 present += historyId

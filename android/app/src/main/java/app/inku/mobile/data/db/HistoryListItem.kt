@@ -12,7 +12,7 @@ data class HistoryListItem(
     @ColumnInfo(name = "original_input")
     val originalInput: String,
     @ColumnInfo(name = "normalized_ddl")
-    val normalizedDdl: String,
+    val normalizedDdl: String?,
     @ColumnInfo(name = "stage1_model")
     val stage1Model: String?,
     @ColumnInfo(name = "stage2_model")
@@ -37,7 +37,7 @@ data class HistoryListItem(
     @Ignore
     val searchText: String = listOf(
         originalInput,
-        normalizedDdl,
+        normalizedDdl.orEmpty(),
         renderHash,
         renderHashShort,
         stage1Model.orEmpty(),

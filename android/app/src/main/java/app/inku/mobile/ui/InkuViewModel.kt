@@ -655,7 +655,7 @@ class InkuViewModel @JvmOverloads constructor(
                 adoptSavedHistory(item, activeExecution = true, isCurrent = { isCurrentDrawingRun(runId) }) { current ->
                     current.copy(
                         prompt = item.originalInput,
-                        ddl = item.normalizedDdl,
+                        ddl = item.normalizedDdl.orEmpty(),
                         descriptionForkRequested = false,
                         lineageDetached = false,
                         isDrawing = false,
@@ -1244,7 +1244,7 @@ class InkuViewModel @JvmOverloads constructor(
         adoptSavedHistory(item, activeExecution = true, isCurrent = { serial == cameraRunSerial }) { current ->
             current.copy(
                 prompt = item.originalInput,
-                ddl = item.normalizedDdl,
+                ddl = item.normalizedDdl.orEmpty(),
                 ddlEditedAfterGeneration = false,
                 confirmDdlOverwrite = false,
                 lineageDetached = false,
@@ -2057,7 +2057,7 @@ class InkuViewModel @JvmOverloads constructor(
                 // Only an explicit work operation establishes a parent.
                 lineageDetached = !asParent,
                 prompt = item.originalInput,
-                ddl = item.normalizedDdl,
+                ddl = item.normalizedDdl.orEmpty(),
                 ddlEditedAfterGeneration = false,
                 confirmDdlOverwrite = false,
                 cameraCaptureState = current.cameraCaptureState.clearCameraOrigin(),
@@ -2513,7 +2513,7 @@ class InkuViewModel @JvmOverloads constructor(
                 adoptSavedHistory(item, activeExecution = true, isCurrent = { isCurrentDrawingRun(runId) }) { latest ->
                     latest.copy(
                         prompt = item.originalInput,
-                        ddl = item.normalizedDdl,
+                        ddl = item.normalizedDdl.orEmpty(),
                         ddlEditedAfterGeneration = false,
                         confirmDdlOverwrite = false,
                         descriptionForkRequested = false,
@@ -2569,7 +2569,7 @@ class InkuViewModel @JvmOverloads constructor(
                 adoptSavedHistory(item, activeExecution = true, isCurrent = { isCurrentDrawingRun(runId) }) { latest ->
                     latest.copy(
                         prompt = item.originalInput,
-                        ddl = item.normalizedDdl,
+                        ddl = item.normalizedDdl.orEmpty(),
                         ddlEditedAfterGeneration = false,
                         confirmDdlOverwrite = false,
                         descriptionForkRequested = false,
@@ -2672,11 +2672,11 @@ class InkuViewModel @JvmOverloads constructor(
                             // -- but the work now on screen is one, and web lowers
                             // this flag on every saved paint (:2883).
                             lineageDetached = false,
-                            ddl = item.normalizedDdl,
+                            ddl = item.normalizedDdl.orEmpty(),
                             ddlEditedAfterGeneration = false,
                             batchSuccess = success,
                             batchFailures = failures,
-                            batchActiveDdl = item.normalizedDdl,
+                            batchActiveDdl = item.normalizedDdl.orEmpty(),
                             batchActiveElapsedMs = System.currentTimeMillis() - itemStartedAt,
                             batchElapsedMs = System.currentTimeMillis() - startedAt,
                             batchLatestHashShort = item.renderHashShort,
@@ -2803,9 +2803,9 @@ class InkuViewModel @JvmOverloads constructor(
                             latest.copy(
                                 lineageDetached = false,
                                 prompt = item.originalInput.removePrefix(DemoHistoryInputPrefix),
-                                ddl = item.normalizedDdl,
+                                ddl = item.normalizedDdl.orEmpty(),
                                 ddlEditedAfterGeneration = false,
-                                demoGeneratedDdl = item.normalizedDdl,
+                                demoGeneratedDdl = item.normalizedDdl.orEmpty(),
                                 demoCurrentElapsedMs = elapsed,
                                 demoTotalElapsedMs = latest.demoTotalElapsedMs + elapsed,
                                 demoRenderCount = latest.demoRenderCount + 1,

@@ -194,7 +194,7 @@ class HeadlessRenderActivity : Activity() {
 
             withContext(Dispatchers.IO) {
                 File(outputDir, "input.txt").writeText(text)
-                File(outputDir, "normalized.ddl").writeText(item.normalizedDdl)
+                File(outputDir, "normalized.ddl").writeText(item.normalizedDdl.orEmpty())
                 File(outputDir, "score.json").writeText(JSONObject(item.scoreJson).toString(2))
                 File(outputDir, "output.svg").writeText(item.displaySvg)
                 val metadata = JSONObject(item.renderMetadataJson)
@@ -221,7 +221,7 @@ class HeadlessRenderActivity : Activity() {
                     .put("canvas_aspect", item.canvasAspect)
                     .put("input_mode", inputMode)
                     .put("elapsed_ms", item.elapsedMs)
-                    .put("normalized_ddl", item.normalizedDdl)
+                    .put("normalized_ddl", item.normalizedDdl ?: JSONObject.NULL)
                     .put("score_path", "files/headless/$runId/score.json")
                     .put("svg_path", "files/headless/$runId/output.svg")
                     .put("metadata_path", "files/headless/$runId/metadata.json")

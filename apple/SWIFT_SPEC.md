@@ -2,7 +2,7 @@
 
 This directory contains the native SwiftUI client, developed for macOS first, and the shared Apple packages. [SWIFT_SPEC.ja.md](SWIFT_SPEC.ja.md) is the canonical specification for Swift host behavior; this document is its maintained English version. The [product specification](../SPEC.md) defines shared DDL, Score, prompts, authoring authority, pipeline transitions, seeds, and rendering semantics. Server remains the primary development host, and Swift follows the same Rust core without duplicating semantic processing.
 
-Last updated: 2026-10-02.
+Last updated: 2026-10-03.
 
 Binding and protocol identities come from the bundled Rust core's version report; rendering layer identities use render metadata and the [Server layer definitions](../server/src/inku_server/layer_versions.py). Do not duplicate shared engine version constants in this document. The Swift app's product version follows formal version management; this initial implementation does not allocate a new version. Matching shared layer versions does not establish that host features and the native UI port are complete.
 
@@ -14,7 +14,65 @@ Binding and protocol identities come from the bundled Rust core's version report
 - Update the relevant canonical document when shared semantics or persistence contracts change. This document explains how the Swift host applies them; it does not establish an independent shared specification.
 - Public documentation describes source and reproducible procedures. Generated binaries, models, logs, credentials, device identifiers, and private operating records are not tracked product material.
 
-## 2026-10-02 Shared Rust and standalone foundations for macOS
+## 2026-10-03 macOS creation, whole-database history, and surrounding features
+
+### Creation and saved-work display
+
+The left column contains description/direct DDL, upcoming generation conditions, and the saved sketch/DDL inspector. Displayed-work facts and work/lineage occupy the right. Saved model, catalog, canvas, and size are distinct from upcoming settings. Captions, vertical/horizontal writing, placement, pan/zoom, and presentation are native display composition and do not alter saved SVG.
+
+Server-derived resources include the saijiki, 13 color catalogs, 11 canvas formats, and seven Macro/plugin words. Shared Rust resolves definitions and digest locks. Plugin preferences affect new works; saved definitions remain pinned. `inku.ddl-export.v1` imports validate text, definitions, locks, and exact integer representation before attaching the package to a new work. Inputs beyond 4 MiB/64 definitions or with incomplete definitions are refused without adopting partial results.
+
+Draft inspection is read-only. Committed changes pass through core revision/authority rules, create a new work and lineage child, and never restore description authority after the first committed DDL mutation. Hole proposals remain separate from approval/decline. Saved Score replay uses saved or explicitly selected conditions while preserving the parent. `ddl_source_origin` remains null or `legacy_expanded`, never an authoring-authority field.
+
+### History, library, and lineage
+
+History uses whole-database 20-item pages; library has independent 30-item pages. The app's latest-100 list is not the population for search or navigation. Latest/newer/older/oldest navigation, full-description/full-hash/final-four search, AND-combined star/refinement/export filters, and independent thumbnail/list and chronological/lineage grouping are available.
+
+Comments, marks, trash/restore, explicit permanent deletion, multiple selection, and lineage graph/path use SQLite. Permanent deletion removes work content while retaining node identity, root, time, and parent relationships as tombstones. Server ACL and user/group administration are excluded.
+
+Swift physical schema v2 adds annotations, colophons, and unread words to v1's six tables, for nine tables. Its sources are the [bundled migration](Packages/InkuPersistence/Sources/InkuPersistence/Resources/migration-v2.sql) and [schema export](../persistence/reference/swift-schema-v2.json). Only a known complete v1 migrates atomically, preserving works/snapshots/ACKs. Unknown schemas still fail closed. Backup/restore includes all nine tables; v1 backups migrate in an isolated snapshot before restoration. Server/Android DB and legacy JSON import are not included.
+
+### Comparison, refinement, colophons, and automation
+
+Catalog/model comparison pins its source work, Score, and settings. Candidates enter normal history/lineage only through explicit, idempotent selection. Total candidates are not capped at four; Swift generates them sequentially. Stop and dialog close await completion and exclude late results.
+
+Model advice, random/Vision refinement, and colophons share the normal provider transport and rate budget. Adopting editable advice and generating a new variation are separate; DDL-authoritative works do not receive description overwrites. Intermediate refinements use `lineage_only`. Colophons retain original and adopted text separately and are included in DB backups.
+
+Batch accepts at most 1,000 nonblank inputs and pins original line numbers, models, providers, definitions, seeds, and settings at start. Only failed rows retry after a full pass, default zero and maximum five retries. Explicit resume preserves pinned settings. Crash-ambiguous rows require an explicit retry/skip decision and never resend automatically. Demo pins starting settings, displays generated descriptions/works, defaults to no history saves, uses intervals of 1–3,600 seconds and duration of 60–86,400 seconds, and stops on cancellation or expiry.
+
+### Dictionaries and local settings
+
+Japanese counting uses the Server's Sudachi small dictionary and English counting uses the same CMUdict pronunciation data through a thin Rust boundary. The [resource manifest](scripts/description-meter-resources.json) pins dictionaries, configuration, licenses, and hashes for build-time generation; the app has no Python runtime. Up to 4,000 characters are assessed with a 300 ms debounce. SQLite retains unread-word counts, dates, and contexts. Disabling assessment shows character/line counts.
+
+Local preferences cover Japanese/English, theme, five text scales, full/simple/custom UI, captions, up to three history fields, tooltips, mascots, clipboard, rendering limits, and export templates/destinations. Multiple API services share the drawing model across pipeline stages and support explicit model discovery plus RPM/input TPM/RPD. Ordinary settings are adjacent JSON and API keys are in Keychain. Saving settings alone does not generate a work.
+
+Automatic backup defaults off, runs only while the app is open, and waits for generation/restore/automation. A successful verified backup is recorded before rotating only app-owned generations; manual backups are excluded. Optional result logs record actual committed works, not merely opened old works.
+
+### Personal ChatGPT
+
+Personal ChatGPT is separate from API key connections and disabled by default. The user explicitly enables it, connects and selects an offered drawing model. Stage1 and Stage2 share that model. Several saved personal connections still use one local work library; they do not add multi-user behavior.
+
+Sign-in uses a temporary listener on 127.0.0.1 with `/auth/callback`, state/nonce/PKCE, an issued client ID, verified identity and granted scopes. Credentials occupy an atomically committed AES-GCM vault capped at 1MiB, with a device-local 32-byte key in Keychain. There is no plaintext token fallback, and SQLite backups exclude credentials. The initial disabled state starts neither authentication nor inference.
+
+Requests pin profile ID and generation at startup and never switch connections while queued or resuming batch/demo work. Disconnects, connection changes and quota failures invalidate old refreshes and late responses without implicit fallback to another provider. Responses/SSE carries only the shared Rust description, sketch, automatic-color and DDL-hole effects. Vision refinement, colophons, demo-description generation and model inspection explicitly remain unsupported for this connection. Actual sign-in, model discovery and inference acceptance are separate from offline checks.
+
+### Export and native raster
+
+[InkuExport](Packages/InkuExport/Package.swift) provides Display/Editable/Compat/Live SVG, PNG, DDL with definitions, share cards, review/AI contact sheets, and APNG/GIF. Display uses canonical saved SVG; other SVG profiles pass saved Score/context to the shared core. PNG retains canvas ratio at heights 1080/2160/4320 or custom 64–12000 pixels. Region raster tiles use the original scene without dropping filters or clips. Limits are 144,000,000 pixels for static images and 600,000,000 aggregate animation pixels. Cancelled output is not published.
+
+Single-work animation supports layer progression and restart/reverse/once; multiple works support cut/crossfade/fade_white/slide. Chronological order and explicit lineage-path order remain distinct. The Server's Noto Serif JP and license are bundled. Destination bookmarks and PNG templates persist; multiple outputs use a new folder, with Finder and OS sharing actions.
+
+An immutable prepared scene reuses SVG parsing across resolutions and export tiles. Native caches have estimated scene-cost limits of 16 MiB/eight entries and image limits of 64 MiB/256 entries without modifying saved SVG or material effects. Display follows Retina scale, a 120 ms resize debounce, and an 8-megapixel requested-size budget. Focused Release measurements for 6,000 paths at four resolutions improved about 20% including preparation; heavy pencil filters improved little. The same gain is not promised for every work or operation.
+
+### Verification boundaries
+
+Focused real-core/temporary-DB checks passed for authoring, explicit comparison saves/cancellation, pinned batch resume/ambiguous rows, saved-plugin definitions, and prepared scene/image caches. Dictionary, library, SQLite migration/backup, export and tiling checks address concrete failures. Personal identity, SSE, loopback, refresh cancellation, quota and model resolution were checked with synthetic signatures and mock transport, not actual personal sign-in.
+
+The updated unsigned Universal app linked both architectures and retained minimum macOS 14. On Apple Silicon/macOS27.0.1, isolated native checks confirmed DDL generation, an edited child, library comments/stars, Trash/restore, persistence after restart, Japanese/English switching, parent/child lineage and overview, correct String revisions, and PNG2160 export of two checkbox-selected works. Both files are 2160×2160 and the texture was visually inspected. Startup page-size recursion, empty sheet selection and an invalid Foundation write-option combination were fixed. Author acceptance, other native export recipes/performance, real providers/OAuth, physical Intel/macOS14, signing/distribution and iOS app/camera remain incomplete.
+
+## 2026-10-02 Shared Rust and standalone foundations for macOS (historical)
+
+The following records the initial implementation. The dated section above defines the currently connected features.
 
 ### Platforms and implementation stage
 

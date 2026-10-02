@@ -12,7 +12,7 @@ let package = Package(
         .target(
             name: "InkuPersistence",
             dependencies: [.product(name: "GRDB", package: "GRDB.swift")],
-            resources: [.copy("Resources/schema-v1.sql")]),
+            resources: [.copy("Resources/schema-v1.sql"), .copy("Resources/migration-v2.sql")]),
         .testTarget(name: "InkuPersistenceTests", dependencies: [
             "InkuPersistence", .product(name: "GRDB", package: "GRDB.swift")
         ])

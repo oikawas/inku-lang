@@ -6,9 +6,9 @@ enum ExportKind { case svg, png }
 
 @MainActor
 enum NativeFilePanels {
-    static func export(kind: ExportKind) -> URL? {
+    static func export(kind: ExportKind, language: String = "ja") -> URL? {
         let panel = NSSavePanel()
-        panel.title = "作品を書き出す"
+        panel.title = InkuLocalization.string("作品を書き出す", language: language)
         switch kind {
         case .svg:
             panel.allowedContentTypes = [.svg]
@@ -20,17 +20,17 @@ enum NativeFilePanels {
         return panel.runModal() == .OK ? panel.url : nil
     }
 
-    static func backup() -> URL? {
+    static func backup(language: String = "ja") -> URL? {
         let panel = NSSavePanel()
-        panel.title = "バックアップを保存"
+        panel.title = InkuLocalization.string("バックアップを保存", language: language)
         panel.allowedContentTypes = [UTType(filenameExtension: "sqlite") ?? .data]
         panel.nameFieldStringValue = "inku-backup.sqlite"
         return panel.runModal() == .OK ? panel.url : nil
     }
 
-    static func restore() -> URL? {
+    static func restore(language: String = "ja") -> URL? {
         let panel = NSOpenPanel()
-        panel.title = "復元するバックアップを選択"
+        panel.title = InkuLocalization.string("復元するバックアップを選択", language: language)
         panel.allowedContentTypes = [UTType(filenameExtension: "sqlite") ?? .data]
         panel.allowsMultipleSelection = false
         panel.canChooseDirectories = false

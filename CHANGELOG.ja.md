@@ -6,6 +6,14 @@
 
 **本書は v2.5.0（2026-07-25、render engine 12）以降の履歴を保持する。** 最近の記録に続く過去の履歴は、同じ文書内で折りたたんである。必要なときに展開して読める。折りたたみに対応しないビューアでは全文を表示する。それより前の履歴は [v1.72〜v2.4の書庫](docs/history/changelog-v1.72-v2.4.ja.md) と [v0.1〜v1.71の書庫](docs/history/changelog-v0.1-v1.71.ja.md) にある。
 
+### 2026-10-03 — SwiftのmacOS画面・全件履歴・書き出しをServerに合わせる
+
+制作の入力と表示作品の条件を分け、DDL編集・補完案の承認、歳時記／plugin、SQLite全件の履歴とlibrary、印・comment・trash／復元、系譜graph、比較候補の明示保存、model助言・奥書、batch／demo、表示／言語／export／backup設定を接続した。Swift schemaをv2／9tableへ進め、既知v1の移行とbackup復元で保存本文・Score／SVG・ACKを保持する。日本語のSudachi辞書と英語のCMUdictをnative共通境界で読み、runtimeにPythonを要求しない。
+
+SVGの4方式、PNG template／custom、DDL＋plugin、共有カード・contact sheet、APNG／GIFを追加した。共通Rustのimmutable prepared SVGをnative表示とexport tileで再利用し、保存画像の意味を変えずにparseを省く。限定Release計測で6000path・4サイズは準備込み約20%短縮したが、filter主体の作品では同じ改善を示していない。Personal ChatGPTは明示有効化、暗号化資格情報、同じ描画model、開始時の接続固定とquota／取消しを実装した。本人OAuth・実推論は別の受入とする。
+
+unsigned Universalの実画面でDDL生成・編集child、comment／star、trash／復元・restart、日英切替・系譜、複数選択2作品のPNG2160保存を確認した。起動再帰、改訂番号の誤表示、空の書き出し選択、Mac保存optionの終了を修正した。実provider、他exportのnative・性能、作者通常受入、Intel／macOS14、署名・配布、iOS app／cameraは引き続き未受入。[Swift仕様](apple/SWIFT_SPEC.ja.md)と[build手順](apple/README.ja.md)を同期した。
+
 ### 2026-10-02 — SwiftクライアントのmacOS初期基盤
 
 SwiftUIのmacOS Universalアプリと、同じRustを呼ぶUniFFI／XCFramework、standalone host、GRDB／SQLite adapterを追加した。最低OSはmacOS 14／iOS 17。直接DDLからScore／SVGを作り、保存・再表示・再演奏と新しい系譜childの保存、native画像表示、SVG／PNG書出し、手動DB backup／restoreを接続する。provider通信・Keychain・opaque snapshot・CAS／ACK・取消しとlocal-only再開もhostに実装した。Serverが開発正本であること、単一利用者であること、macOSにcameraを設けないことを維持する。

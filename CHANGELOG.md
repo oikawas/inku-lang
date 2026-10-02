@@ -6,6 +6,14 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file retains the history from v2.5.0 (2026-07-25, render engine 12) onward.** Past records follow the recent ones in a collapsible section of this same document; expand it when needed. Viewers without collapse support show the full text. Earlier history is in the [v1.72–v2.4 archive](docs/history/changelog-v1.72-v2.4.md) and the [v0.1–v1.71 archive](docs/history/changelog-v0.1-v1.71.md).
 
+### 2026-10-03 — Align Swift macOS views, whole-database history and export with Server
+
+Connected creation inputs and independent saved-work facts, DDL editing and patch approval, Saijiki/plugins, whole-database history/library, marks/comments/Trash/restore, lineage graphs, explicit comparison saves, model advice/colophons, batch/demo and display/language/export/backup settings. Swift schema v2 has nine tables; known-v1 migration and backup restoration preserve source text, Score/SVG and ACKs. Native shared boundaries use the Sudachi Japanese dictionary and English CMUdict without a runtime Python dependency.
+
+Added four SVG profiles, PNG templates/custom sizes, DDL/plugins, cards/contact sheets and APNG/GIF. Immutable prepared SVG scenes from shared Rust are reused for native display and export tiles without changing saved rendering semantics. Bounded Release measurements reduced 6000-path/four-size work by about 20% including preparation; filter-heavy artwork showed no comparable improvement. Personal ChatGPT adds explicit enablement, encrypted credentials, one drawing model, startup connection pins, quota handling and cancellation. Actual personal OAuth/inference require separate acceptance.
+
+Unsigned Universal native checks confirmed DDL generation/an edited child, comments/stars, Trash/restore/restart, Japanese/English switching, lineage and PNG2160 saving of two selected works. Fixed startup recursion, incorrect revision formatting, empty export selection and a fatal Mac write-option combination. Real providers, other native export recipes/performance, author acceptance, Intel/macOS14, signing/distribution and iOS app/camera remain unaccepted. Updated the [Swift specification](apple/SWIFT_SPEC.md) and [build guide](apple/README.md).
+
 ### 2026-10-02 — Initial macOS foundation for Swift clients
 
 Added a SwiftUI Universal macOS app, UniFFI/XCFramework access to the same Rust

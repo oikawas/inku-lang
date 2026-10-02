@@ -1,58 +1,238 @@
+import InkuHost
 import SwiftUI
 
-@MainActor
-struct SettingsView: View {
+enum SettingsSection: String, CaseIterable, Identifiable {
+    case display, making, models, personalPlan, database, export, clipboard, plugins, unread, limits, about
+    var id: String { rawValue }
+    var title: String {
+        switch self {
+        case .display: "表示と操作"; case .making: "制作"; case .models: "モデル設定"
+        case .personalPlan: "Personal ChatGPT"
+        case .database: "DB設定"; case .clipboard: "クリップボード"; case .plugins: "プラグイン・歳時記"
+        case .export: "エクスポート"
+        case .unread: "未読語台帳"
+        case .limits: "制限値"; case .about: "inkuについて"
+        }
+    }
+}
+
+@MainActor struct SettingsView: View {
     @Bindable var model: AppModel
+    @State private var settings = SettingsModel()
+    @State private var section = SettingsSection.display
     @State private var confirmRestore = false
+    @State private var confirmClearKey = false
 
     var body: some View {
-        Form {
-            Section("生成モデル") {
-                Picker("接続方式", selection: $model.providerKind) {
-                    Text("OpenAI互換").tag("openai_compatible")
-                    Text("MLX (mlx-vlm)").tag("mlx")
-                    Text("Anthropic").tag("anthropic")
-                    Text("Gemini").tag("gemini")
+        HStack(alignment: .top, spacing: 0) {
+            List(SettingsSection.allCases, selection: $section) { item in Text(model.display.localized(item.title)).tag(item) }.frame(width: 190)
+            Divider()
+            Form {
+                switch section {
+                case .display: appearance
+                case .making: making
+                case .models: providers
+                case .personalPlan: ChatGPTPlanSettingsView(model: model)
+                case .database: database
+                case .export: ExportSettingsView(model: model)
+                case .clipboard: clipboard
+                case .plugins:
+                    PluginSettingsView(model: model)
+                    Section(model.display.localized("歳時記")) { SaijikiView(model: model).frame(minHeight: 480) }
+                case .unread: Section { UnreadWordsView(model: model) }
+                case .limits: OperationalLimitsView(model: model)
+                case .about: about
                 }
-                TextField("接続先URL", text: $model.providerURL)
-                    .autocorrectionDisabled()
-                TextField("モデル", text: $model.providerModel)
-                    .autocorrectionDisabled()
-                SecureField("APIキー", text: $model.providerKey)
-                Button("接続設定を保存") { Task { await model.saveProvider() } }
-                    .disabled(model.isBusy)
-                Text("記述から作品を生成するときに、このモデルへ直接接続します。DDLからの生成にはモデル接続は不要です。")
-                    .font(.callout).foregroundStyle(.secondary)
-            }
-            #if os(macOS)
-            Section("保存データ") {
-                Button("バックアップを保存…") {
-                    guard let url = NativeFilePanels.backup() else { return }
-                    Task { await model.backup(to: url) }
-                }
-                Button("バックアップから復元…") { confirmRestore = true }
-                Text("バックアップには保存作品と作業状態を含みます。復元すると現在の保存データを置き換えます。")
-                    .font(.callout).foregroundStyle(.secondary)
-            }
-            .disabled(model.isBusy)
-            #endif
-            Section("inku") {
-                Text(model.versionSummary).textSelection(.enabled)
-                Text("単一利用者のローカルアプリです。作品と設定をこの端末に保存します。")
-                    .font(.callout).foregroundStyle(.secondary)
-            }
+            }.formStyle(.grouped).frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .formStyle(.grouped)
-        .confirmationDialog("現在の保存データを置き換えます", isPresented: $confirmRestore, titleVisibility: .visible) {
-            #if os(macOS)
-            Button("復元するバックアップを選択…", role: .destructive) {
-                guard let url = NativeFilePanels.restore() else { return }
-                Task { await model.restore(from: url) }
-            }
-            #endif
-            Button("キャンセル", role: .cancel) {}
+        .task(id: section) { await settings.load(model: model) }
+        .onDisappear { settings.cancelDiscovery() }
+        .alert(model.display.localized("設定を変更できませんでした"), isPresented: Binding(get: { settings.error != nil }, set: { if !$0 { settings.error = nil } })) {
+            Button(model.display.localized("閉じる"), role: .cancel) { settings.error = nil }
         } message: {
-            Text("現在のデータを残す場合は、先にバックアップを保存してください。")
+            Text(settings.error == "Personal ChatGPTのモデルは専用の設定画面で取得してください。" ? model.display.localized(settings.error ?? "") : settings.error ?? "")
         }
+        .confirmationDialog(model.display.localized("現在の保存データを置き換えます"), isPresented: $confirmRestore, titleVisibility: .visible) {
+            #if os(macOS)
+            Button(model.display.localized("復元するバックアップを選択…"), role: .destructive) {
+                if let url = NativeFilePanels.restore(language: model.display.preferences.language) { Task { await model.restore(from: url) } }
+            }
+            #endif
+            Button(model.display.localized("キャンセル"), role: .cancel) {}
+        } message: { Text(model.display.localized("現在のデータを残す場合は、先にバックアップを保存してください。")) }
+        .confirmationDialog(model.display.localized("この接続のAPIキーを削除します"), isPresented: $confirmClearKey, titleVisibility: .visible) {
+            Button(model.display.localized("APIキーを削除"), role: .destructive) { Task { await settings.clearCredential() } }
+            Button(model.display.localized("キャンセル"), role: .cancel) {}
+        }
+    }
+
+    private var appearance: some View {
+        @Bindable var display = model.display
+        return Group {
+            Section(model.display.localized("表示")) {
+                Picker(model.display.localized("テーマ"), selection: $display.preferences.theme) {
+                    Text(model.display.localized("システム")).tag("system"); Text(model.display.localized("ライト")).tag("light"); Text(model.display.localized("ダーク")).tag("dark")
+                }
+                Picker(model.display.localized("表示言語"), selection: $display.preferences.language) { Text(model.display.localized("日本語")).tag("ja"); Text("English").tag("en") }
+                Picker(model.display.localized("文字サイズ"), selection: $display.preferences.textSizeStep) {
+                    ForEach(0..<5) { step in Text("\(Int([0.9, 1, 1.1, 1.2, 1.3][step] * 100))%").tag(step) }
+                }
+                Picker(model.display.localized("UIモード"), selection: $display.preferences.uiMode) {
+                    Text(model.display.localized("シンプル")).tag("simple"); Text(model.display.localized("カスタム")).tag("custom"); Text(model.display.localized("フル")).tag("full")
+                }
+                if display.preferences.uiMode == "custom" {
+                    ForEach([("history", "履歴"), ("diagnostics", "指示書と生成情報"), ("automation", "バッチ・デモ"), ("saijiki", "歳時記")], id: \.0) { feature in
+                        Toggle(display.localized(feature.1), isOn: membership(feature.0, in: $display.preferences.customFeatures))
+                    }
+                }
+                Toggle(model.display.localized("ツールチップ"), isOn: $display.preferences.showTooltips)
+            }
+            DescriptionMeterSettingsView(meter: model.descriptionMeter)
+            Section(model.display.localized("詞書き")) {
+                Toggle(model.display.localized("作品に詞書きを表示"), isOn: $display.preferences.captionVisible)
+                Toggle(model.display.localized("縦書き"), isOn: $display.preferences.captionVertical)
+                Picker(model.display.localized("表示位置"), selection: $display.preferences.captionPosition) { Text(model.display.localized("左")).tag("left"); Text(model.display.localized("右")).tag("right") }
+            }
+            Section(model.display.localized("履歴と生成情報")) {
+                ForEach([("generation", "世代"), ("model", "モデル"), ("engine", "描画版"), ("size", "ファイル容量")], id: \.0) { field in
+                    Toggle(display.localized(field.1), isOn: membership(field.0, in: $display.preferences.historyFields, maximum: 3))
+                        .disabled(!display.preferences.historyFields.contains(field.0) && display.preferences.historyFields.count >= 3)
+                }
+                Toggle(model.display.localized("作品を切り替えても生成情報を開いたままにする"), isOn: $display.preferences.keepGenerationInfo)
+                Picker(model.display.localized("描画中のマスコット"), selection: $display.preferences.mascot) { Text(model.display.localized("Incu（立方体）")).tag("incu"); Text(model.display.localized("Yuragi（蟹）")).tag("yuragi") }
+            }
+            if let error = display.saveError { Text(display.message(error)).foregroundStyle(.red) }
+        }
+    }
+    private var making: some View {
+        @Bindable var display = model.display
+        return Group {
+            Section(model.display.localized("バッチの再試行")) {
+                Stepper(display.localizedFormat("失敗行の再試行: %ld回", display.preferences.batchRetries), value: $display.preferences.batchRetries, in: 0...5)
+                Text(model.display.localized("一巡したあと失敗した行だけを再試行します。0なら再試行せず、中断したときも再試行しません。"))
+                    .font(.callout).foregroundStyle(.secondary)
+            }
+            Section(model.display.localized("結果ログ")) {
+                Toggle(model.display.localized("生成結果のログを保存"), isOn: $display.preferences.saveResultLog)
+                Text(model.display.localized("指示書・Score・生成情報を端末内へ記録します。APIキーは記録しません。"))
+                    .font(.callout).foregroundStyle(.secondary)
+            }
+        }
+    }
+    private var providers: some View {
+        @Bindable var state = settings
+        return Group {
+            Section(model.display.localized("AIサービス接続")) {
+                Picker(model.display.localized("サービス"), selection: $state.selectedProviderID) {
+                    Text(model.display.localized("選択してください")).tag(String?.none)
+                    ForEach(state.host.providers.filter { $0.kind != .chatGPTPlan }) { provider in Text(provider.id).tag(Optional(provider.id)) }
+                }.onChange(of: state.selectedProviderID) { _, _ in Task { await state.inspectCredential() } }
+                HStack {
+                    Button(model.display.localized("サービス追加")) { state.addProvider() }
+                    Button(model.display.localized("削除"), role: .destructive) { state.removeProvider() }.disabled(state.selectedProvider == nil)
+                }
+                if let index = state.providerIndex {
+                    Text(model.display.localizedFormat("サービスID: %@", state.host.providers[index].id)).font(.caption).foregroundStyle(.secondary)
+                    Picker(model.display.localized("接続方式"), selection: $state.host.providers[index].kind) {
+                        Text(model.display.localized("OpenAI互換 / Ollama / MLX")).tag(ProviderKind.openAICompatible)
+                        Text("Claude API").tag(ProviderKind.anthropic); Text("Gemini API").tag(ProviderKind.gemini)
+                    }
+                    TextField(model.display.localized("接続先URL"), text: Binding(get: { state.host.providers[index].baseURL.absoluteString }, set: { if let url = URL(string: $0) { state.host.providers[index].baseURL = url } }))
+                        .autocorrectionDisabled()
+                    if state.host.providers[index].kind == .openAICompatible {
+                        Toggle("MLX JSON schema profile", isOn: Binding(get: { state.host.providers[index].apiProfile == "mlx" }, set: { state.host.providers[index].apiProfile = $0 ? "mlx" : nil }))
+                    }
+                    Toggle(model.display.localized("APIキーを使用"), isOn: $state.host.providers[index].requiresAPIKey)
+                    SecureField(model.display.localized(state.credentialConfigured ? "APIキーを更新（設定済み）" : "APIキー"), text: $state.credentialDraft)
+                    if state.credentialConfigured { Button(model.display.localized("APIキーを削除…"), role: .destructive) { confirmClearKey = true } }
+                    DisclosureGroup(model.display.localized("レート制限")) {
+                        limitField("RPM（毎分のリクエスト）", index: index, key: \.requestsPerMinute)
+                        limitField("入力TPM（毎分のtoken）", index: index, key: \.tokensPerMinute)
+                        limitField("RPD（毎日のリクエスト）", index: index, key: \.requestsPerDay)
+                        Text(model.display.localized("0は上限なし。毎分の枠を待ち、日次上限では生成を開始しません。"))
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                }
+            }
+            Section(model.display.localized("描画モデル")) {
+                TextField(model.display.localized("サービスID:モデルID"), text: $state.host.models.stage1Model).autocorrectionDisabled()
+                Button(model.display.localized(state.isLoadingModels ? "取得中…" : "接続先からモデル一覧を取得")) { Task { await state.discoverModels() } }
+                    .disabled(state.selectedProvider == nil || state.isLoadingModels)
+                if !state.modelCatalog.isEmpty {
+                    Picker(model.display.localized("モデル"), selection: $state.host.models.stage1Model) {
+                        Text(state.host.models.stage1Model).tag(state.host.models.stage1Model)
+                        ForEach(state.modelCatalog) { item in Text(item.name).tag(item.id) }
+                    }
+                    if let item = state.modelCatalog.first(where: { $0.id == state.host.models.stage1Model }) {
+                        if let limit = item.contextLimit { Text(model.display.localizedFormat("入力上限: %ld tokens", limit)) }
+                        if !item.capabilities.isEmpty { Text(item.capabilities.joined(separator: " · ")).font(.caption) }
+                    }
+                }
+                Stepper(model.display.localizedFormat("解釈の出力上限: %ld", state.host.models.stage1MaxTokens), value: $state.host.models.stage1MaxTokens, in: 256...65536, step: 256)
+                Stepper(model.display.localizedFormat("補完の出力上限: %ld", state.host.models.holeMaxTokens), value: $state.host.models.holeMaxTokens, in: 256...65536, step: 256)
+                Text(model.display.localized("解釈と構造化に同じモデルを使います。接続設定の保存では生成を開始しません。"))
+                    .font(.callout).foregroundStyle(.secondary)
+                Button(model.display.localized("接続設定を保存")) {
+                    state.host.models.stage2Model = state.host.models.stage1Model
+                    Task { await state.save(model: model) }
+                }.disabled(model.isBusy)
+                if !state.status.isEmpty { Text(model.display.message(state.status)).foregroundStyle(.secondary) }
+            }
+        }
+    }
+    private var database: some View {
+        @Bindable var display = model.display
+        return Group {
+            #if os(macOS)
+            Section(model.display.localized("保存データ")) {
+                if let directory = model.localDataDirectory() { Text(directory.path).font(.caption).textSelection(.enabled) }
+                Button(model.display.localized("バックアップを保存…")) { if let url = NativeFilePanels.backup(language: model.display.preferences.language) { Task { await model.backup(to: url) } } }
+                Button(model.display.localized("バックアップから復元…")) { confirmRestore = true }
+                Text(model.display.localized("作品・系譜・作業状態をSQLiteへ保存します。接続設定とKeychainのAPIキーは別です。"))
+                    .font(.callout).foregroundStyle(.secondary)
+            }.disabled(model.isBusy)
+            Section(model.display.localized("自動バックアップ")) {
+                Toggle(model.display.localized("自動バックアップ"), isOn: $display.preferences.automaticBackup)
+                Stepper(display.localizedFormat("間隔: %ld時間", display.preferences.backupIntervalHours), value: $display.preferences.backupIntervalHours, in: 1...168)
+                Stepper(display.localizedFormat("保持: %ld世代", display.preferences.backupGenerations), value: $display.preferences.backupGenerations, in: 1...30)
+                Text(model.display.localized("アプリの起動中に実行し、生成中・復元中は待ちます。"))
+                    .font(.callout).foregroundStyle(.secondary)
+            }
+            #endif
+        }
+    }
+    private var clipboard: some View {
+        @Bindable var display = model.display
+        return Section(model.display.localized("画像コピー")) {
+            Picker(model.display.localized("Y軸の高さ"), selection: $display.preferences.clipboardHeight) {
+                Text("1080 px").tag(1080); Text("2160 px").tag(2160); Text("4320 px").tag(4320)
+            }
+            Text(model.display.localized("表示中作品の保存SVGから画像を作り、OSのクリップボードへコピーします。"))
+                .font(.callout).foregroundStyle(.secondary)
+        }
+    }
+    private var about: some View {
+        Section("inku") {
+            Text(model.display.localized("視覚的な短歌を書く")).font(.title3)
+            Text(model.versionSummary).textSelection(.enabled)
+            Text(model.display.localized("macOS 14以降 · Universal · 単一利用者のローカルアプリ"))
+            Link(model.display.localized("画像作成マニュアル"), destination: URL(string: "https://github.com/oikawas/inku-lang/blob/main/manual/ja/image-creation.md")!)
+            Text(model.display.localized("Serverを開発の正本とし、描画・指示書に同じRust coreを使用します。"))
+                .font(.callout).foregroundStyle(.secondary)
+        }
+    }
+    private func membership(_ item: String, in selection: Binding<Set<String>>, maximum: Int = .max) -> Binding<Bool> {
+        Binding(get: { selection.wrappedValue.contains(item) }, set: { enabled in
+            var next = selection.wrappedValue
+            if enabled && next.count < maximum { next.insert(item) } else if !enabled { next.remove(item) }
+            selection.wrappedValue = next
+        })
+    }
+    private func limitField(_ title: String, index: Int, key: WritableKeyPath<ProviderRateLimits, Int?>) -> some View {
+        TextField(model.display.localized(title), value: Binding(get: { settings.host.providers[index].rateLimits?[keyPath: key] ?? 0 }, set: { value in
+            var limits = settings.host.providers[index].rateLimits ?? ProviderRateLimits()
+            limits[keyPath: key] = value > 0 ? value : nil
+            settings.host.providers[index].rateLimits = limits
+        }), format: .number)
     }
 }

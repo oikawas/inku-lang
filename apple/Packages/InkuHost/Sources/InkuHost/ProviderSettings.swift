@@ -4,6 +4,7 @@ import Security
 public enum ProviderKind: String, Codable, Sendable {
     case openAICompatible = "openai_compatible"
     case anthropic, gemini
+    case chatGPTPlan = "chatgpt"
 }
 
 public struct ProviderRateLimits: Codable, Sendable, Equatable {
@@ -34,6 +35,12 @@ public struct ProviderSettings: Codable, Sendable, Equatable, Identifiable {
     }
 
     public func validate() throws {
+        if kind == .chatGPTPlan {
+            guard id == "chatgpt", baseURL.absoluteString == "https://api.openai.com/v1",
+                  !requiresAPIKey, apiProfile == nil, credentialID == "chatgpt", rateLimits == nil else {
+                throw HostError("chatgpt_provider_settings_invalid")
+            }
+        }
         guard !id.isEmpty, !credentialID.isEmpty,
               let parts = URLComponents(url: baseURL, resolvingAgainstBaseURL: false),
               let host = parts.host, !host.isEmpty,
@@ -44,6 +51,9 @@ public struct ProviderSettings: Codable, Sendable, Equatable, Identifiable {
             guard [limits.requestsPerMinute, limits.tokensPerMinute, limits.requestsPerDay].compactMap({ $0 }).allSatisfy({ $0 > 0 })
             else { throw HostError("invalid_provider_rate_limits") }
         }
+    }
+    public static var personalPlan: ProviderSettings {
+        .init(id: "chatgpt", kind: .chatGPTPlan, baseURL: URL(string: "https://api.openai.com/v1")!, requiresAPIKey: false)
     }
 }
 
@@ -90,8 +100,13 @@ public actor KeychainCredentialStore: CredentialStore {
 public struct HostSettings: Codable, Sendable, Equatable {
     public var providers: [ProviderSettings]
     public var models: ModelSelection
-    public init(providers: [ProviderSettings] = [], models: ModelSelection = .init()) {
+    public var operationalLimits: [String: UInt32]?
+    public var plugins: PluginPreferences?
+    public init(providers: [ProviderSettings] = [], models: ModelSelection = .init(), operationalLimits: [String: UInt32]? = nil,
+                plugins: PluginPreferences? = nil) {
         self.providers = providers; self.models = models
+        self.operationalLimits = operationalLimits
+        self.plugins = plugins
     }
 }
 

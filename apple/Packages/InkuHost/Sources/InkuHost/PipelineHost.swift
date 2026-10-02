@@ -15,6 +15,12 @@ public actor PipelineHost {
     }
 
     public func generate(_ request: GenerationRequest, progress: @escaping PipelineProgressHandler = { _ in }) async throws -> PipelineView {
+        guard ["normal", "lineage_only"].contains(request.historyVisibility) else { throw HostError("invalid_history_visibility") }
+        if !request.authoring.isDirect, let parentID = request.parentWorkID,
+           try await savedAuthoringContext(workID: parentID).authority == "ddl_authoritative" { throw HostError("description_source_locked") }
+        if request.retainedDocument != nil || request.retainedAuthority != nil {
+            return try await generateRetained(request, progress: progress)
+        }
         let report = try ExactJSON(data: Data(InkuCore.versionReport.utf8))
         guard report["binding_version"].string == "1.1.0", report["protocol_version"].string == "1.0.0" else { throw HostError("binding_protocol_mismatch") }
         let driver = try ExecutionDriver(request: request, database: database, transport: transport, credentials: credentials)
@@ -27,16 +33,39 @@ public actor PipelineHost {
         }
     }
 
-    public func perform(executionID: String, command: PipelineCommand, progress: @escaping PipelineProgressHandler = { _ in }) async throws -> PipelineView {
+    public func perform(executionID: String, command: PipelineCommand, parentWorkID: String? = nil, derivationKind: String? = nil,
+                        progress: @escaping PipelineProgressHandler = { _ in }) async throws -> PipelineView {
         let driver = try await execution(executionID)
         return try await withTaskCancellationHandler {
-            try await driver.perform(command, progress: progress)
+            try await driver.perform(command, parentWorkID: parentWorkID, derivationKind: derivationKind, progress: progress)
         } onCancel: {
             Task { _ = try? await driver.cancel(progress: progress) }
         }
     }
     public func cancel(executionID: String) async throws -> PipelineView {
-        try await execution(executionID).cancel(progress: { _ in })
+        if let record = try await database.loadExecution(id: executionID),
+           let stored = try? JSONDecoder().decode(StandaloneCandidate.self, from: record.snapshot), stored.schema == "inku.swift-candidate.v1" {
+            // Pure replay/compilation has already completed; it has no live provider effect to cancel.
+            let context = try ExactJSON(data: stored.candidate.context)
+            let authority = try context.requiredObject("authority")
+            return PipelineView(executionID: executionID, variationID: executionID, sequence: "0",
+                revision: try authority.requiredString("revision"), phase: "completed",
+                authority: try authority.requiredString("authority"), origin: try authority.requiredString("origin"),
+                visibleDDL: stored.candidate.work.ddl, scoreJSON: Data(stored.candidate.work.score.utf8), renderedJSON: nil,
+                svg: stored.candidate.work.svg, savedWorkID: stored.saved ? stored.candidate.work.id : nil,
+                patchProposalJSON: nil, eventsJSON: Data("[]".utf8), busy: false, interruptedProvider: false,
+                description: stored.candidate.work.effectiveSourceText, configurationJSON: context["configuration"].data,
+                documentJSON: context["document"].data, deliveryJSON: nil, promptJSON: nil, holeIDs: [], candidateWork: stored.candidate.work)
+        }
+        return try await execution(executionID).cancel(progress: { _ in })
+    }
+
+    /// An explicit editor action can bind a previously unbound execution; an old pin is never replaced.
+    public func bindPersonalPlanSession(executionID: String, session: ChatGPTPlanSession) async throws {
+        try await execution(executionID).bindPersonalPlanSession(session)
+    }
+    public func personalPlanContext(executionID: String, stage2: Bool) async throws -> (required: Bool, session: ChatGPTPlanSession?) {
+        try await execution(executionID).personalPlanContext(stage2: stage2)
     }
 
     /// Restore is read-only: an unfinished paid call is never automatically repeated.
@@ -53,8 +82,49 @@ public actor PipelineHost {
         return work
     }
 
+    public func savedAuthoringContext(workID: String) async throws -> SavedAuthoringContext {
+        let context = try await savedPerformanceContext(workID: workID)
+        guard context["configuration"].object != nil, context["options"].object != nil,
+              context["clip"].object != nil, context["authority"].object != nil else {
+            throw HostError("saved_authoring_context_unavailable")
+        }
+        return SavedAuthoringContext(configuration: context["configuration"].data,
+            renderOptions: context["options"].data, clipPolicy: context["clip"].data,
+            document: context["document"].object == nil ? nil : context["document"].data,
+            authority: try context["authority"].requiredString("authority"),
+            origin: try context["authority"].requiredString("origin"), revision: try context["authority"].requiredString("revision"), authorityJSON: context["authority"].data)
+    }
+
+    public func exportSVG(workID: String, profile: String) async throws -> String {
+        guard ["display", "editable", "compat", "live"].contains(profile) else { throw HostError("invalid_svg_profile") }
+        let work = try await restoreSavedWork(workID: workID)
+        let context = try await savedPerformanceContext(workID: workID)
+        var request = try SavedPerformance.renderRequest(work: work, context: context, renderSeed: nil, wild: nil)
+        request["request"]["options"]["svg_profile"] = .string(profile)
+        try Task.checkCancellation()
+        let rendered = try ExactJSON(data: InkuCore.renderSaved(request.data))
+        if let code = rendered["error"].string { throw HostError(code) }
+        return try rendered.requiredString("svg")
+    }
+
+    private func savedPerformanceContext(workID: String) async throws -> ExactJSON {
+        let location = try WorkIdentity.location(workID)
+        guard let bytes = try await database.acknowledgement(executionID: location.executionID, effectID: location.effectID) else {
+            throw HostError("saved_performance_context_unavailable")
+        }
+        let ack = try ExactJSON(data: bytes)
+        guard ack["work_id"].string == workID else { throw HostError("saved_performance_context_invalid") }
+        return try ack.requiredObject("performance")
+    }
+
     /// Draws the saved Score with its attested policies and saves one new lineage child.
-    public func replay(workID: String, renderSeed: String? = nil, wild: Bool? = nil) async throws -> SavedWork {
+    public func replay(workID: String, renderSeed: String? = nil, wild: Bool? = nil, options replayOptions: ReplayOptions? = nil) async throws -> SavedWork {
+        let candidate = try await previewReplay(workID: workID, renderSeed: renderSeed, wild: wild, options: replayOptions, derivationKind: "replay")
+        return try await saveCandidate(executionID: candidate.executionID)
+    }
+
+    public func previewReplay(workID: String, renderSeed: String? = nil, wild: Bool? = nil,
+                              options replayOptions: ReplayOptions? = nil, derivationKind: String = "catalog_change") async throws -> PreparedCandidate {
         let began = Date()
         let source = try await restoreSavedWork(workID: workID)
         let location = try WorkIdentity.location(workID)
@@ -63,7 +133,7 @@ public actor PipelineHost {
         guard ack["work_id"].string == workID, let parentNodeID = source.lineageNodeID,
               let parentNode = try await database.node(id: parentNodeID) else { throw HostError("saved_performance_context_invalid") }
         let context = try ack.requiredObject("performance")
-        let request = try SavedPerformance.renderRequest(work: source, context: context, renderSeed: renderSeed, wild: wild)
+        let request = try SavedPerformance.renderRequest(work: source, context: context, renderSeed: renderSeed, wild: wild, replayOptions: replayOptions)
         try Task.checkCancellation()
         let rendered = try ExactJSON(data: InkuCore.renderSaved(request.data))
         if let code = rendered["error"].string { throw HostError(code) }
@@ -80,23 +150,128 @@ public actor PipelineHost {
         let options = request["request"]["options"]
         work.renderSeed = options["render_seed"].number ?? options["render_seed"].string
         work.renderWild = options["wild"].bool
+        work.catalogID = options["catalog_id"].string
+        work.renderColorCatalogID = options["catalog_id"].string
+        work.renderColorMap = options["resolved_color_map"].text
+        work.renderCanvasAspectID = options["canvas_aspect_id"].string
+        work.renderCanvasAspect = options["canvas_aspect_id"].string
+        if let width = options["canvas"]["width"].number.flatMap(Double.init),
+           let height = options["canvas"]["height"].number.flatMap(Double.init), height > 0 {
+            work.renderCanvasAspectRatio = width / height
+        }
         work.renderEngineID = rendered["metadata"]["render_engine_id"].string
         work.renderEngineVersion = rendered["metadata"]["render_engine_version"].string
         work.renderHash = WorkIdentity.render(score: request["request"]["score"], options: options, metadata: rendered["metadata"])
         let node = LineageNode(id: nodeID, historyID: id, at: now, descriptionHash: work.descriptionHash,
                                renderHash: work.renderHash, rootNodeID: parentNode.rootNodeID ?? parentNode.id)
         let edge = LineageEdge(id: UUID().uuidString, parentNodeID: parentNodeID, childNodeID: nodeID,
-                               derivationKind: "render_seed_change", at: now)
+                               derivationKind: derivationKind, at: now)
         var nextContext = context
         var stringOptions = options
         for key in ["render_seed", "composition_seed"] { if let number = options[key].number { stringOptions[key] = .string(number) } }
         nextContext["options"] = stringOptions
-        let initial = ExactJSON.object(["schema": .string("inku.swift-saved-performance-execution.v1"), "source_work_id": .string(workID), "request": request, "phase": .string("rendered")])
-        let execution = try await database.compareAndSwapExecution(id: executionID, expectedRevision: nil, snapshot: initial.data)
-        let completed = ExactJSON.object(["schema": .string("inku.swift-saved-performance-execution.v1"), "source_work_id": .string(workID), "saved_work_id": .string(id), "phase": .string("completed")])
-        _ = try await database.commitEffect(id: executionID, expectedRevision: execution.revision, effectID: "save-render:0", snapshot: completed.data,
-                                            acknowledgement: SavedPerformance.acknowledgement(workID: id, context: nextContext), work: work, node: node, edge: edge)
-        return work
+        let candidate = StoredCandidate(work: work, node: node, edge: edge, context: nextContext.data)
+        return try await prepareCandidate(executionID: executionID, candidate: candidate)
+    }
+
+    /// Explicit adoption is idempotent; previews never enter the history table.
+    public func saveCandidate(executionID: String) async throws -> SavedWork {
+        guard let record = try await database.loadExecution(id: executionID) else { throw HostError("candidate_not_found") }
+        if var stored = try? JSONDecoder().decode(StandaloneCandidate.self, from: record.snapshot), stored.schema == "inku.swift-candidate.v1" {
+            if stored.saved, let work = try await database.work(id: stored.candidate.work.id) { return work }
+            try Task.checkCancellation()
+            stored.saved = true
+            let encoder = JSONEncoder(); encoder.outputFormatting = [.sortedKeys]
+            _ = try await database.commitEffect(id: executionID, expectedRevision: record.revision, effectID: "save-render:0",
+                snapshot: encoder.encode(stored), acknowledgement: SavedPerformance.acknowledgement(workID: stored.candidate.work.id,
+                    context: try ExactJSON(data: stored.candidate.context)), work: stored.candidate.work,
+                node: stored.candidate.node, edge: stored.candidate.edge)
+            return stored.candidate.work
+        }
+        return try await execution(executionID).saveCandidate()
+    }
+
+    private func prepareCandidate(executionID: String, candidate: StoredCandidate) async throws -> PreparedCandidate {
+        try Task.checkCancellation()
+        let stored = StandaloneCandidate(candidate: candidate)
+        let encoder = JSONEncoder(); encoder.outputFormatting = [.sortedKeys]
+        let bytes = try encoder.encode(stored)
+        let execution = try await database.compareAndSwapExecution(id: executionID, expectedRevision: nil, snapshot: bytes)
+        let ack: ExactJSON = .object(["tag": .string("rendered_candidate_prepared"), "candidate_id": .string(executionID)])
+        _ = try await database.commitEffect(id: executionID, expectedRevision: execution.revision, effectID: "prepare-candidate:0",
+            snapshot: bytes, acknowledgement: ack.data)
+        let context = try ExactJSON(data: candidate.context)
+        return PreparedCandidate(executionID: executionID, work: candidate.work, authority: context["authority"]["authority"].string ?? "legacy_unknown")
+    }
+
+    private func generateRetained(_ request: GenerationRequest, progress: PipelineProgressHandler) async throws -> PipelineView {
+        let began = Date()
+        guard let documentBytes = request.retainedDocument, let authorityBytes = request.retainedAuthority,
+              let parentID = request.parentWorkID, let parent = try await database.work(id: parentID),
+              let parentNodeID = parent.lineageNodeID, let parentNode = try await database.node(id: parentNodeID) else {
+            throw HostError("retained_source_context_unavailable")
+        }
+        let document = try ExactJSON(data: documentBytes)
+        let authority = try ExactJSON(data: authorityBytes)
+        let saved = try await savedAuthoringContext(workID: parentID)
+        guard let savedDocument = saved.document, document == (try ExactJSON(data: savedDocument)),
+              authority == (try ExactJSON(data: saved.authorityJSON)), document["source"].string == parent.ddl,
+              ["description_authoritative", "ddl_authoritative"].contains(authority["authority"].string ?? "") else {
+            throw HostError("retained_source_changed")
+        }
+        let config = try ExactJSON(data: request.configuration)
+        let compiler = try config.requiredObject("compiler")
+        let compileInput: ExactJSON = .object(["document": document, "definitions": config["definitions"], "compiler": compiler])
+        try Task.checkCancellation()
+        let delivery = try ExactJSON(data: InkuCore.compile(compileInput.data))
+        if let code = delivery["error"].string { throw HostError(code) }
+        guard delivery["score"].object != nil else { throw HostError("retained_source_requires_edit") }
+        let options = try ExactJSON(data: request.renderOptions)
+        let clip = try ExactJSON(data: request.clipPolicy)
+        let renderInput: ExactJSON = .object(["delivery": delivery, "options": options, "compiler": compiler, "clip": clip])
+        try Task.checkCancellation()
+        let rendered = try ExactJSON(data: InkuCore.renderCompiled(renderInput.data))
+        if let code = rendered["error"].string { throw HostError(code) }
+        let executionID = UUID().uuidString.replacingOccurrences(of: "-", with: "").lowercased()
+        let nodeID = UUID().uuidString.replacingOccurrences(of: "-", with: "").lowercased()
+        let id = WorkIdentity.savedID(executionID: executionID, sequence: "0")
+        let now = Int64(Date().timeIntervalSince1970 * 1000)
+        let score = delivery["score"]
+        var work = parent
+        work.id = id; work.at = now; work.svg = try rendered.requiredString("svg"); work.score = score.text
+        work.elapsedMS = max(0, Int64(Date().timeIntervalSince(began) * 1000)); work.lineageNodeID = nodeID
+        work.starred = false; work.trashed = false; work.historyVisibility = request.historyVisibility
+        work.renderSeed = options["render_seed"].string ?? options["render_seed"].number
+        work.compositionSeed = score["composition_seed"].string ?? score["composition_seed"].number ?? compiler["composition_seed"].string
+        work.renderWild = options["wild"].bool
+        work.catalogID = options["catalog_id"].string; work.renderColorCatalogID = options["catalog_id"].string
+        work.renderColorMap = options["resolved_color_map"].text
+        work.renderCanvasAspectID = options["canvas_aspect_id"].string; work.renderCanvasAspect = options["canvas_aspect_id"].string
+        if let width = options["canvas"]["width"].number.flatMap(Double.init),
+           let height = options["canvas"]["height"].number.flatMap(Double.init), height > 0 { work.renderCanvasAspectRatio = width / height }
+        work.renderEngineID = rendered["metadata"]["render_engine_id"].string; work.renderEngineVersion = rendered["metadata"]["render_engine_version"].string
+        work.variationAmplitude = compiler["stage15_variation"]["amplitude"].string
+        work.variationSeed = compiler["stage15_variation"]["seed"].string
+        work.renderHash = WorkIdentity.render(score: score, options: options, metadata: rendered["metadata"])
+        let node = LineageNode(id: nodeID, historyID: id, state: request.historyVisibility == "lineage_only" ? "lineage_only" : "active",
+            at: now, descriptionHash: work.descriptionHash, renderHash: work.renderHash, rootNodeID: parentNode.rootNodeID ?? parentNode.id)
+        let edge = LineageEdge(id: UUID().uuidString, parentNodeID: parentNodeID, childNodeID: nodeID, derivationKind: request.derivationKind, at: now)
+        var context = SavedPerformance.context(score: score, options: options, compiler: compiler, clip: clip)
+        context["configuration"] = config; context["document"] = document; context["authority"] = authority
+        let candidate = try await prepareCandidate(executionID: executionID,
+            candidate: StoredCandidate(work: work, node: node, edge: edge, context: context.data))
+        let savedID: String?
+        if request.saveHistory { savedID = try await saveCandidate(executionID: executionID).id }
+        else { savedID = nil }
+        let view = PipelineView(executionID: executionID, variationID: executionID, sequence: "0",
+            revision: try authority.requiredString("revision"), phase: "completed", authority: try authority.requiredString("authority"),
+            origin: try authority.requiredString("origin"), visibleDDL: document["source"].string,
+            scoreJSON: score.data, renderedJSON: rendered.data, svg: work.svg, savedWorkID: savedID,
+            patchProposalJSON: nil, eventsJSON: Data("[]".utf8), busy: false, interruptedProvider: false,
+            description: work.effectiveSourceText, configurationJSON: config.data, documentJSON: document.data,
+            deliveryJSON: delivery.data, promptJSON: nil, holeIDs: [], candidateWork: candidate.work)
+        progress(.changed(view))
+        return view
     }
 
     public func cancelAll() async throws {
@@ -128,7 +303,25 @@ private struct StoredExecution: Codable, Sendable {
     var derivationKind: String
     var pendingProviderAction: Data?
     var savedWorkID: String?
+    var prompts: Data? = nil
+    var saveHistory: Bool? = nil
+    var historyVisibility: String? = nil
+    var candidate: StoredCandidate? = nil
+    var chatGPTSession: ChatGPTPlanSession? = nil
     var startedAt: Date
+}
+
+private struct StoredCandidate: Codable, Sendable {
+    var work: SavedWork
+    var node: LineageNode
+    var edge: LineageEdge?
+    var context: Data
+}
+
+private struct StandaloneCandidate: Codable, Sendable {
+    var schema = "inku.swift-candidate.v1"
+    var candidate: StoredCandidate
+    var saved = false
 }
 
 private actor AsyncGate {
@@ -169,6 +362,9 @@ private actor ExecutionDriver {
                                      description: request.description, parentWorkID: request.parentWorkID,
                                      derivationKind: request.derivationKind, startedAt: Date())
         self.snapshot = .null; self.initialRequest = request
+        self.state.saveHistory = request.saveHistory
+        self.state.historyVisibility = request.historyVisibility
+        self.state.chatGPTSession = request.chatGPTSession
     }
     init(record: ExecutionSnapshot, database: InkuDatabase, transport: any ProviderTransport, credentials: any CredentialStore) throws {
         let stored = try JSONDecoder().decode(StoredExecution.self, from: record.snapshot)
@@ -200,18 +396,31 @@ private actor ExecutionDriver {
         await gate.lock(); defer { Task { await gate.unlock() } }
         return try makeView()
     }
+    func bindPersonalPlanSession(_ session: ChatGPTPlanSession) async throws {
+        await gate.lock(); defer { Task { await gate.unlock() } }
+        guard providerTask == nil, state.pendingProviderAction == nil else { throw HostError("provider_effect_in_flight") }
+        guard state.chatGPTSession == nil || state.chatGPTSession == session else { throw HostError("chatgpt_session_changed") }
+        var changed = state; changed.chatGPTSession = session
+        let record = try await database.compareAndSwapExecution(id: executionID(), expectedRevision: databaseRevision, snapshot: encoded(changed))
+        state = changed; databaseRevision = record.revision
+    }
+    func personalPlanContext(stage2: Bool) async throws -> (required: Bool, session: ChatGPTPlanSession?) {
+        (PersonalPlanRoutingTransport.isPersonal(stage2 ? state.models.stage2Model : state.models.stage1Model, providers: state.providers), state.chatGPTSession)
+    }
 
-    func perform(_ command: PipelineCommand, progress: @escaping PipelineProgressHandler) async throws -> PipelineView {
+    func perform(_ command: PipelineCommand, parentWorkID: String?, derivationKind: String?, progress: @escaping PipelineProgressHandler) async throws -> PipelineView {
         if case .cancel = command { return try await cancel(progress: progress) }
         await gate.lock()
         do {
             guard !(restored && snapshot["action"].object != nil) else { throw HostError("interrupted_execution_requires_cancel") }
             guard providerTask == nil else { throw HostError("provider_effect_in_flight") }
             restored = false
-            let oldDescription = state.description
+            let oldState = state
+            if let parentWorkID { state.parentWorkID = parentWorkID }
+            if let derivationKind { state.derivationKind = derivationKind }
             if case .generateFromDescription(_, let text, _, _) = command { state.description = text }
             do { try await advance(command.payload()) }
-            catch { state.description = oldDescription; throw error }
+            catch { state = oldState; throw error }
             progress(.changed(try makeView()))
             await gate.unlock()
         } catch { await gate.unlock(); throw error }
@@ -275,6 +484,9 @@ private actor ExecutionDriver {
                         guard providerTask == nil, state.pendingProviderAction == nil else { throw HostError("provider_effect_in_flight") }
                         // Persist the send claim before starting transport; restore can never infer a safe resend.
                         var claimed = state; claimed.pendingProviderAction = action.data
+                        var prompts = (try claimed.prompts.map { try ExactJSON(data: $0).array } ?? nil) ?? []
+                        prompts.append(.object(["action": action["tag"], "identity": action["identity"], "prompt": action["payload"]["prompt"]]))
+                        claimed.prompts = ExactJSON.array(prompts).data
                         let record = try await database.compareAndSwapExecution(id: executionID(), expectedRevision: databaseRevision, snapshot: encoded(claimed))
                         state = claimed; databaseRevision = record.revision
                         let began = Date()
@@ -283,6 +495,11 @@ private actor ExecutionDriver {
                         progress(.providerAttempt(executionID: try executionID(), report: InkuCore.providerAttempt(snapshot: state.snapshot), beganAt: began,
                                                   deadline: began.addingTimeInterval(Double(delayMS) / 1000 + Double(timeoutMS) / 1000)))
                         let bytes = action.data; let models = state.models; let providers = state.providers
+                        let personalSession = state.chatGPTSession
+                        let limitValue = snapshot["config"]["prompt_limits"]["max_response_bytes"]
+                        guard let argumentLimit = (limitValue.number ?? limitValue.string).flatMap(Int.init), argumentLimit > 0 else {
+                            throw HostError("pipeline_schema_violation")
+                        }
                         let id = try executionID(); let transport = self.transport; let credentials = self.credentials
                         task = Task {
                             if delayMS > 0 {
@@ -290,6 +507,14 @@ private actor ExecutionDriver {
                                 try await Task.sleep(nanoseconds: delayMS * 1_000_000)
                             }
                             try Task.checkCancellation()
+                            if let personal = transport as? any ChatGPTPlanEffectTransport {
+                                return try await personal.performPersonalPlan(action: bytes, models: models, providers: providers,
+                                    session: personalSession, argumentLimit: argumentLimit, credentials: credentials,
+                                    onBytes: { count in progress(.transportBytes(executionID: id, count: count)) },
+                                    onDiagnostic: { diagnostic in progress(.providerDiagnostic(executionID: id, diagnostic: diagnostic)) })
+                            }
+                            let reference = tag == "complete_visible_ddl_holes" ? models.stage2Model : models.stage1Model
+                            if PersonalPlanRoutingTransport.isPersonal(reference, providers: providers) { throw HostError("chatgpt_transport_unavailable") }
                             return try await transport.perform(action: bytes, models: models, providers: providers, credentials: credentials,
                                                                onBytes: { count in progress(.transportBytes(executionID: id, count: count)) })
                         }
@@ -349,10 +574,12 @@ private actor ExecutionDriver {
         if let current { guard nextSnapshot["execution_id"] == current["execution_id"] else { throw HostError("pipeline_execution_identity_changed") } }
         try within(nextSnapshot.data.count, limit: limits["max_snapshot_bytes"])
         guard result["events"].array != nil else { throw HostError("pipeline_schema_violation") }
-        var next = state; next.snapshot = nextSnapshot.data; next.events = result["events"].data
-        if result["rendered"].object != nil { next.rendered = result["rendered"].data; next.savedWorkID = nil }
+        var next = state; next.snapshot = nextSnapshot.data
+        let priorEvents = try ExactJSON(data: state.events).array ?? []
+        next.events = ExactJSON.array(priorEvents + (result["events"].array ?? [])).data
+        if result["rendered"].object != nil { next.rendered = result["rendered"].data; next.savedWorkID = nil; next.candidate = nil }
         else if current?["document"] != nextSnapshot["document"] || nextSnapshot["delivery"].object == nil {
-            next.rendered = nil; next.savedWorkID = nil
+            next.rendered = nil; next.savedWorkID = nil; next.candidate = nil
         }
         if clearProvider { next.pendingProviderAction = nil }
         return NextState(state: next, snapshot: nextSnapshot)
@@ -399,6 +626,7 @@ private actor ExecutionDriver {
     }
 
     private func saveRendered(progress: PipelineProgressHandler) async throws {
+        if state.saveHistory == false && state.candidate != nil { return }
         guard let renderedBytes = state.rendered, let revision = databaseRevision else { throw HostError("render_not_ready") }
         let rendered = try ExactJSON(data: renderedBytes)
         let svg = try rendered.requiredString("svg")
@@ -415,6 +643,8 @@ private actor ExecutionDriver {
         let renderSeed = options["render_seed"].string ?? compiler["host"]["palette"]["render_seed"].string
         let work = SavedWork(id: id, at: now, input: state.description, score: score.text, svg: svg,
                              sourceText: state.description, ddl: snapshot["document"]["source"].string,
+                             // This portable field records legacy body migration, not pipeline authority.
+                             ddlSourceOrigin: nil,
                              elapsedMS: max(0, Int64(Date().timeIntervalSince(state.startedAt) * 1000)),
                              stage1Model: state.models.stage1Model.isEmpty ? nil : state.models.stage1Model,
                              stage2Model: state.models.stage2Model.isEmpty ? nil : state.models.stage2Model,
@@ -432,7 +662,8 @@ private actor ExecutionDriver {
                              instructionLangResolved: snapshot["config"]["language"].string,
                              sketchText: snapshot["sketch"]["text"].string, sketchState: snapshot["sketch"]["state"].string,
                              renderLimits: legacyRenderLimits(compiler["operational_resource_budget"]),
-                             renderHash: renderHash, descriptionHash: descriptionHash, lineageNodeID: nodeID)
+                             renderHash: renderHash, descriptionHash: descriptionHash,
+                             historyVisibility: state.historyVisibility ?? "normal", lineageNodeID: nodeID)
         var edge: LineageEdge?
         var rootNodeID = nodeID
         if let parentID = state.parentWorkID {
@@ -441,15 +672,48 @@ private actor ExecutionDriver {
             rootNodeID = parentNode.rootNodeID ?? parentNode.id
             edge = LineageEdge(id: newID(), parentNodeID: parentNodeID, childNodeID: nodeID, derivationKind: state.derivationKind, at: now)
         }
-        let node = LineageNode(id: nodeID, historyID: id, at: now, descriptionHash: descriptionHash, renderHash: renderHash, rootNodeID: rootNodeID)
+        let node = LineageNode(id: nodeID, historyID: id, state: state.historyVisibility == "lineage_only" ? "lineage_only" : "active",
+            at: now, descriptionHash: descriptionHash, renderHash: renderHash, rootNodeID: rootNodeID)
         var savedState = state; savedState.savedWorkID = id
         let effectID = "save-render:" + (try snapshot.requiredString("sequence"))
-        let performance = SavedPerformance.context(score: score, options: options, compiler: compiler, clip: try ExactJSON(data: state.clipPolicy))
+        var performance = SavedPerformance.context(score: score, options: options, compiler: compiler, clip: try ExactJSON(data: state.clipPolicy))
+        performance["configuration"] = snapshot["config"]
+        performance["document"] = snapshot["document"]
+        performance["authority"] = snapshot["authority"]
+        if let session = state.chatGPTSession {
+            performance["personal_provider_context"] = .object(["provider": .string("chatgpt"),
+                "profile_id": .string(session.profileID), "generation": .string(String(session.generation))])
+        }
+        savedState.candidate = StoredCandidate(work: work, node: node, edge: edge, context: performance.data)
+        if state.saveHistory == false {
+            savedState.savedWorkID = nil
+            let acknowledgement: ExactJSON = .object(["tag": .string("rendered_candidate_prepared"), "candidate_id": .string(try executionID())])
+            let committed = try await database.commitEffect(id: executionID(), expectedRevision: revision,
+                effectID: "prepare-candidate:" + (try snapshot.requiredString("sequence")), snapshot: encoded(savedState), acknowledgement: acknowledgement.data)
+            state = savedState; databaseRevision = committed.execution.revision
+            progress(.changed(try makeView()))
+            return
+        }
         let acknowledgement = SavedPerformance.acknowledgement(workID: id, context: performance)
         let committed = try await database.commitEffect(id: executionID(), expectedRevision: revision, effectID: effectID,
                                                        snapshot: encoded(savedState), acknowledgement: acknowledgement, work: work, node: node, edge: edge)
         state = savedState; databaseRevision = committed.execution.revision
         progress(.saved(executionID: try executionID(), workID: id)); progress(.changed(try makeView()))
+    }
+
+    func saveCandidate() async throws -> SavedWork {
+        await gate.lock(); defer { Task { await gate.unlock() } }
+        if let id = state.savedWorkID, let work = try await database.work(id: id) { return work }
+        guard let candidate = state.candidate, let revision = databaseRevision else { throw HostError("candidate_not_ready") }
+        try Task.checkCancellation()
+        var savedState = state; savedState.savedWorkID = candidate.work.id
+        let context = try ExactJSON(data: candidate.context)
+        let committed = try await database.commitEffect(id: executionID(), expectedRevision: revision,
+            effectID: "save-render:" + (try snapshot.requiredString("sequence")), snapshot: encoded(savedState),
+            acknowledgement: SavedPerformance.acknowledgement(workID: candidate.work.id, context: context),
+            work: candidate.work, node: candidate.node, edge: candidate.edge)
+        state = savedState; databaseRevision = committed.execution.revision
+        return candidate.work
     }
 
     private func makeView() throws -> PipelineView {
@@ -464,7 +728,11 @@ private actor ExecutionDriver {
                             patchProposalJSON: phase == "awaiting_patch_approval" ? snapshot["phase"].data : nil,
                             eventsJSON: state.events, busy: snapshot["action"].object != nil || providerTask != nil,
                             interruptedProvider: restored && snapshot["action"].object != nil,
-                            description: state.description)
+                            description: state.description, configurationJSON: snapshot["config"].data,
+                            documentJSON: snapshot["document"].object == nil ? nil : snapshot["document"].data,
+                            deliveryJSON: snapshot["delivery"].object == nil ? nil : snapshot["delivery"].data,
+                            promptJSON: state.prompts,
+                            holeIDs: snapshot["delivery"]["compiler_lock"]["hole_identities"].array?.compactMap(\.string) ?? [], candidateWork: state.candidate?.work)
     }
     private func executionID() throws -> String { try snapshot.requiredString("execution_id") }
     private func canonicalUnsigned(_ value: ExactJSON, key: String) throws -> UInt64 {

@@ -14,10 +14,37 @@ public struct CanvasOption: Identifiable, Sendable {
     public let heightRatio: UInt32
 }
 
+public struct SaijikiWord: Identifiable, Sendable {
+    public let id: String
+    public let japanese: String
+    public let english: String?
+    public let detail: String
+    public let isDefault: Bool
+}
+
+public struct SaijikiCategory: Identifiable, Sendable {
+    public let id: String
+    public let name: String
+    public let words: [SaijikiWord]
+}
+
+public struct PluginWord: Identifiable, Sendable {
+    public let id: String
+    public let aliases: [String]
+    public let japanese: [String]
+    public let english: [String]
+    public let note: String
+    public let previewURL: URL?
+    public let packageID: String?
+}
+
 struct Bootstrap {
     private let manifest: [String: Any]
     private let catalogRecords: [[String: Any]]
     private let registry: [String: Any]
+    private let macroSources: [String: Any]
+    let saijiki: [SaijikiCategory]
+    let pluginWords: [PluginWord]
 
     init() throws {
         func resource(_ name: String) throws -> Data {
@@ -32,6 +59,33 @@ struct Bootstrap {
         }
         catalogRecords = records
         registry = try Self.object(InkuCore.canvasRegistry)
+        macroSources = try Self.object(resource("macro-sources"))
+        let vocabulary = try Self.object(resource("saijiki"))
+        guard vocabulary["asset_id"] as? String == "inku.saijiki.v2",
+              let categories = vocabulary["categories"] as? [[String: Any]],
+              let plugins = try JSONSerialization.jsonObject(with: resource("plugin-words")) as? [[String: Any]] else {
+            throw HostError("bundled_vocabulary_invalid")
+        }
+        saijiki = try categories.map { category in
+            guard let id = category["key"] as? String, let name = category["name_ja"] as? String,
+                  let words = category["words"] as? [[String: Any]] else { throw HostError("bundled_vocabulary_invalid") }
+            return SaijikiCategory(id: id, name: name, words: try words.filter { $0["display"] as? Bool == true }.map { word in
+                guard let japanese = word["surface_ja"] as? String else { throw HostError("bundled_vocabulary_invalid") }
+                let description = word["physical_description"] as? [String: String]
+                return SaijikiWord(id: id + ":" + japanese, japanese: japanese,
+                    english: word["surface_en"] as? String, detail: description?["ja"] ?? "",
+                    isDefault: word["default"] as? Bool ?? false)
+            })
+        }
+        pluginWords = try plugins.map { item in
+            guard let id = item["id"] as? String, let surfaces = item["surfaces"] as? [String: [String]],
+                  let notes = item["notes"] as? [String: String] else { throw HostError("bundled_plugins_invalid") }
+            let preview = (item["preview"] as? String).flatMap {
+                Bundle.module.url(forResource: $0, withExtension: nil, subdirectory: "plugin-previews")
+            }
+            return PluginWord(id: id, aliases: item["aliases"] as? [String] ?? [], japanese: surfaces["ja"] ?? [],
+                english: surfaces["en"] ?? [], note: notes["ja"] ?? "", previewURL: preview, packageID: item["package_id"] as? String)
+        }
     }
 
     var catalogs: [ColorCatalogOption] {
@@ -53,12 +107,22 @@ struct Bootstrap {
 
     func request(inputMode: String, source: String, description: String, language: String,
                  catalogID: String, canvasID: String, seed: String, wild: Bool,
-                 settings: HostSettings, parentWorkID: String? = nil) throws -> GenerationRequest {
+                 settings: HostSettings, parentWorkID: String? = nil, derivationKind: String = "new",
+                 catalogMode: String = "fixed", sketch: SketchRequest = .off,
+                 variationAmplitude: String? = nil, variationSeed: String? = nil,
+                 savedConfiguration: Data? = nil, importedPlugins: [ImportedMacroDefinition] = []) throws -> GenerationRequest {
+        let selectedID: String
+        if catalogMode == "random" {
+            guard let option = catalogs.filter({ $0.id != catalogID }).randomElement() else { throw HostError("catalog_selection_unavailable") }
+            selectedID = option.id
+        } else { selectedID = catalogID }
+        let saved = try savedConfiguration.map(Self.object)
         guard ["en", "ja"].contains(language),
-              let record = catalogRecords.first(where: { $0["id"] as? String == catalogID }),
+              ["fixed", "auto", "random"].contains(catalogMode),
+              let record = catalogRecords.first(where: { $0["id"] as? String == selectedID }),
               let colorMap = record["map"] as? [String: String],
               let canvas = canvases.first(where: { $0.id == canvasID }),
-              let originalPipeline = manifest["pipeline"] as? [String: Any],
+              let originalPipeline = saved ?? manifest["pipeline"] as? [String: Any],
               let originalCompiler = originalPipeline["compiler"] as? [String: Any],
               let originalHost = originalCompiler["host"] as? [String: Any],
               let render = manifest["render"] as? [String: Any],
@@ -77,35 +141,114 @@ struct Bootstrap {
         host["canvas_format_id"] = canvasID
         host["canvas_format_registry_id"] = registryBody["schema"]
         host["canvas_format_registry_digest"] = registry["digest"]
-        host["resolved_catalog_id"] = catalogID
-        host["catalog_mode"] = catalogID == "default" ? "default" : "explicit"
+        host["resolved_catalog_id"] = selectedID
+        host["catalog_mode"] = selectedID == "default" ? "default" : "explicit"
         host["palette"] = try Self.object(InkuCore.resolvePalette(Self.bytes([
-            "color_map": colorMap, "catalog_id": catalogID, "render_seed": actualSeed,
+            "color_map": colorMap, "catalog_id": selectedID, "render_seed": actualSeed,
             "background": host["background"] ?? "white",
         ])))
         compiler["host"] = host
         compiler["composition_seed"] = actualSeed
+        if saved == nil, let selectedLimits = settings.operationalLimits {
+            let bounds = try operationalLimitDefaults()
+            guard selectedLimits.allSatisfy({ key, value in bounds[key].map { value <= $0 } ?? false }) else { throw HostError("invalid_operational_limits") }
+            var budget = originalCompiler["operational_resource_budget"] as? [String: Any] ?? [:]
+            var maximum = budget["maximum"] as? [String: Any] ?? [:]
+            for (key, value) in selectedLimits { maximum[key] = value }
+            budget["maximum"] = maximum
+            compiler["operational_resource_budget"] = budget
+        }
+        if (variationAmplitude == nil) != (variationSeed == nil) { throw HostError("variation_pair_required") }
+        compiler["stage15_variation"] = NSNull()
+        if let variationAmplitude, let variationSeed {
+            guard ["small", "medium", "large"].contains(variationAmplitude),
+                  let seed = UInt64(variationSeed), String(seed) == variationSeed else { throw HostError("invalid_variation") }
+            compiler["stage15_variation"] = ["amplitude": variationAmplitude, "seed": variationSeed]
+        }
         config["language"] = language
         config["compiler"] = compiler
+        let exactCatalog = saved == nil ? try macroCatalogValue(language: language, settings: settings, importedPlugins: importedPlugins) : nil
+        config["catalogs"] = [] as [Any]
+        if catalogMode == "auto" {
+            config["catalogs"] = try catalogRecords.map { record in
+                guard let id = record["id"] as? String, let map = record["map"] as? [String: String],
+                      let name = record["name"] as? String else { throw HostError("color_catalogs_invalid") }
+                var resolved = host
+                resolved["resolved_catalog_id"] = id
+                resolved["catalog_mode"] = id == "default" ? "default" : "explicit"
+                resolved["palette"] = try Self.object(InkuCore.resolvePalette(Self.bytes([
+                    "color_map": map, "catalog_id": id, "render_seed": actualSeed, "background": host["background"] ?? "white",
+                ])))
+                return ["prompt": ["catalog_id": id, "label": name,
+                                    "description": record[language == "ja" ? "sub_ja" : "sub"] ?? ""], "resolved": resolved]
+            }
+        }
         let height = baseWidth * Double(canvas.heightRatio) / Double(canvas.widthRatio)
         let options: [String: Any] = [
-            "resolved_color_map": colorMap, "catalog_id": catalogID,
+            "resolved_color_map": colorMap, "catalog_id": selectedID,
             "canvas": ["width": baseWidth, "height": height],
             "canvas_aspect_id": canvasID, "svg_profile": "display",
             "render_seed": actualSeed, "composition_seed": actualSeed,
             "wild": wild, "error_policy": compiler["error_policy"] ?? "omit_and_continue",
         ]
         let authoring: GenerationAuthoring = inputMode == "ddl"
-            ? .directDDL(source) : .description(description, autoCatalog: false)
+            ? .directDDL(source) : .description(description, autoCatalog: catalogMode == "auto", sketch: sketch)
         let colorMaps = try Dictionary(uniqueKeysWithValues: catalogRecords.compactMap { item -> (String, Data)? in
             guard let id = item["id"] as? String, let map = item["map"] as? [String: String] else { return nil }
             return (id, try Self.bytes(map))
         })
-        return GenerationRequest(authoring: authoring, configuration: try Self.bytes(config),
+        var exactConfiguration = try ExactJSON(data: Self.bytes(config))
+        if let entries = exactCatalog?["entries"].array {
+            exactConfiguration["definitions"] = .array(entries.map { $0["definition"] })
+            exactConfiguration["macro_summaries"] = .array(entries.map { $0["summary"] })
+        }
+        return GenerationRequest(authoring: authoring, configuration: exactConfiguration.data,
             renderOptions: try Self.bytes(options), clipPolicy: try Self.bytes(clip),
             models: settings.models, providers: settings.providers, renderColorMaps: colorMaps,
             description: description, parentWorkID: parentWorkID,
-            derivationKind: parentWorkID == nil ? "new" : "ddl_edit")
+            derivationKind: derivationKind)
+    }
+
+    func macroCatalog(language: String, settings: HostSettings = .init(), importedPlugins: [ImportedMacroDefinition] = []) throws -> [String: Any] {
+        try Self.object(macroCatalogValue(language: language, settings: settings, importedPlugins: importedPlugins).data)
+    }
+
+    func macroCatalogValue(language: String, settings: HostSettings = .init(), importedPlugins: [ImportedMacroDefinition] = []) throws -> ExactJSON {
+        var request = macroSources
+        request["language"] = language
+        let disabled = settings.plugins?.disabledPackageIDs ?? []
+        request["bundled_packages"] = (macroSources["bundled_packages"] as? [String] ?? []).filter { !disabled.contains($0) }
+        request["legacy"] = (macroSources["legacy"] as? [[String: Any]] ?? []).filter {
+            guard let source = $0["source_id"] as? String, source.hasPrefix("bundled:") else { return true }
+            return !disabled.contains(String(source.dropFirst("bundled:".count)))
+        }
+        var exact = try ExactJSON(data: Self.bytes(request))
+        exact["canonical"] = .array(importedPlugins.enumerated().map { $0.element.canonicalCandidate(index: $0.offset) } + (exact["canonical"].array ?? []))
+        let output = try ExactJSON(data: InkuCore.resolveMacroCatalog(exact.data))
+        guard output["schema"].string == "inku.macro-catalog-resolution.v1", output["error"] == .null else {
+            throw HostError(output["error"].string ?? "macro_catalog_invalid")
+        }
+        let diagnostics = output["diagnostics"].array ?? []
+        guard !diagnostics.contains(where: { $0["reason"].string == "catalog_entry_limit" || $0["source_id"].string?.hasPrefix("imported:") == true && $0["disposition"].string == "omitted" }) else {
+            throw HostError("imported_macro_catalog_incomplete")
+        }
+        return output
+    }
+
+    func operationalLimitDefaults() throws -> [String: UInt32] {
+        guard let pipeline = manifest["pipeline"] as? [String: Any], let compiler = pipeline["compiler"] as? [String: Any],
+              let policy = compiler["hard_resource_policy"] as? [String: Any], let budget = policy["budget"] as? [String: Any],
+              let maximum = budget["maximum"] as? [String: UInt32] else { throw HostError("installation_defaults_invalid") }
+        return maximum
+    }
+
+    func replayOptions(catalogID: String, canvasID: String) throws -> ReplayOptions {
+        guard let record = catalogRecords.first(where: { $0["id"] as? String == catalogID }),
+              let map = record["map"] as? [String: String], let canvas = canvases.first(where: { $0.id == canvasID }) else {
+            throw HostError("replay_options_invalid")
+        }
+        return ReplayOptions(catalogID: catalogID, colorMap: try Self.bytes(map), canvasID: canvasID,
+            widthRatio: canvas.widthRatio, heightRatio: canvas.heightRatio)
     }
 
     static func object(_ data: Data) throws -> [String: Any] {

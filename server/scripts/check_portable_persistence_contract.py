@@ -427,6 +427,8 @@ def export_swift_schema(root: Path, contract: dict[str, Any]) -> dict[str, Any]:
     sql_path = root / host["schema_sql"]
     try:
         sql_bytes = sql_path.read_bytes()
+        for migration in host.get("schema_migration_sql", []):
+            sql_bytes += b"\n" + (root / migration).read_bytes()
         sql = sql_bytes.decode("utf-8")
     except (OSError, UnicodeDecodeError) as exc:
         raise ContractError("cannot read Swift SQL authority") from exc
@@ -467,6 +469,7 @@ def export_swift_schema(root: Path, contract: dict[str, Any]) -> dict[str, Any]:
             "schema_version": connection.execute("PRAGMA user_version").fetchone()[0],
             "contract_version": contract["contract_version"],
             "sql_source": host["schema_sql"],
+            "sql_migration_sources": host.get("schema_migration_sql", []),
             "sql_sha256": hashlib.sha256(sql_bytes).hexdigest(),
             "tables": tables,
         }
@@ -485,8 +488,8 @@ def _validate_swift(
     actual = export_swift_schema(root, contract)
     if actual != _load_json(root / host["source"]):
         raise ContractError("Swift schema export differs from the bundled SQL authority")
-    if actual["schema_version"] != 1 or host["schema_version"] != 1:
-        raise ContractError("Swift schema must start at independent version 1")
+    if actual["schema_version"] != 2 or host["schema_version"] != 2:
+        raise ContractError("Swift schema must use independent version 2")
     tables = actual["tables"]
     source = (root / host["records_source"]).read_text(encoding="utf-8")
     for record_name, mapping in host["records"].items():
@@ -738,7 +741,7 @@ def main() -> int:
         except (ContractError, OSError) as exc:
             print(f"portable persistence Swift contract: FAIL: {exc}")
             return 1
-        print(f"portable persistence Swift contract: OK v2 schema=1 tables={len(swift_tables)}")
+        print(f"portable persistence Swift contract: OK v2 schema=2 tables={len(swift_tables)}")
         return 0
     if args.fingerprint_stdin:
         try:

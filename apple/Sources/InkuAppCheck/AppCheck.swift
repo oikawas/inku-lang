@@ -8,6 +8,26 @@ import InkuHost
 struct AppCheck {
     @MainActor
     static func main() async throws {
+        if let index = CommandLine.arguments.firstIndex(of: "--raster-only"), CommandLine.arguments.indices.contains(index + 1) {
+            try await runRasterChecks(fixtureURL: URL(fileURLWithPath: CommandLine.arguments[index + 1]))
+            return
+        }
+        if CommandLine.arguments.contains("--authoring-only") {
+            try await runAuthoringChecks()
+            return
+        }
+        if CommandLine.arguments.contains("--comparison-only") {
+            try await runComparisonChecks()
+            return
+        }
+        if CommandLine.arguments.contains("--automation-only") {
+            try await runAutomationChecks()
+            return
+        }
+        if CommandLine.arguments.contains("--plugin-only") {
+            try await runPluginChecks()
+            return
+        }
         if CommandLine.arguments.contains("--cancel-only") {
             try await checkControllerCancellation()
             return

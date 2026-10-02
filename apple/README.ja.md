@@ -6,17 +6,19 @@ Swift固有の仕様正本は[SWIFT_SPEC.ja.md](SWIFT_SPEC.ja.md)、対応英語
 
 ## 現在の範囲
 
-M1のSwift／Rust基盤と、M2のstandalone host／SQLite保存境界、初期macOS画面を実装しています。DDLからの生成、保存作品の選択と再演奏、DDL／Score表示、canvasの拡大・移動、最近の作品、library検索、provider設定、SVG／PNG書出し、画像コピー、DB backup／restoreを接続しています。
+M1のSwift／Rust基盤、M2のstandalone host／SQLite保存境界に続き、macOSの制作・全件履歴／library・系譜、DDL編集／補完承認、plugin／歳時記、比較／助言／奥書、batch／demo、表示／接続設定、全export方式を接続しています。保存作品の条件を次の入力条件と分け、通常表示と明示した再演奏を区別します。詳細と確認の範囲は[Swift SPEC](SWIFT_SPEC.ja.md)の2026-10-03節を参照してください。
 
 限定した確認で、DDL→Score／SVG→SQLite保存→アプリモデルの再作成後の読出し、native CGImage生成、保存canonical SVGの書出しが成立しています。Swift／Rust境界ではowned pixel buffer、入力エラーとUInt64のseed保持を確認しています。macOSのarm64／x86_64 Rust sliceとx86_64 Swift executableのlink、iOS device／simulatorのRust artifact生成も確認しています。Intel実機での性能・起動、実providerへのLLM送信、作者による通常画面操作の受入は別の確認です。
 
-M3のフル機能UIは未完了です。系譜graph、favorite／trash操作、plugin／model助言dialog、batch／demo、custom・animated exportや共有card等は今後の実装です。系譜画面は未接続であることを明示しています。iOSは共通packageとRust artifactの基盤までで、iPad／iPhone app、camera、shareと実機受入は未完了です。
+更新したUniversal appの隔離DBで、DDL生成→編集child→libraryのcomment／star→trash／復元→restart、日英切替と系譜表示、複数選択2作品のPNG2160保存を確認しています。機能のsource接続、限定したoffline確認、native操作、作者の通常利用の受入は別に記録します。旧Server／Android物理DBのimport、実provider／OAuth、他exportのnative・性能、Intel／macOS14実機、署名・配布は未完了です。廃止済みhistory.json移行utilityの配列は現行Webの復元形式ではありません。iOSは共通packageと初期Rust artifactまでで、最新APIのartifact再生成、iPad／iPhone app、camera、shareと実機受入は未完了です。
+
+Personal ChatGPTは設定の専用画面で明示して有効化・接続し、提供されたmodelを描画用に選びます。通常のAPI key接続とは別で、初期状態は無効です。発行済みclient IDと本人の接続同意が必要で、実本人認証・model取得・推論は未受入です。記述、写生、自動配色、DDL補完に対応し、Vision推敲・奥書等の未対応用途は画面で説明します。詳細は[Swift仕様](SWIFT_SPEC.ja.md#personal-chatgpt)を参照してください。
 
 ## 対応OSとbuild環境
 
 最低OSはmacOS 14／iOS 17です。SDKの版は最低OSとは別です。確認した環境はXcode 27.0／Swift 6.4、Rust 1.95.0、XcodeGen 2.46.0です。Swift packageはtools 6.1、projectはXcodeGen 2.44.0以上を要求します。
 
-buildにはmacOS、XcodeのCLI tools、XcodeGen、Python 3.11以上、公式rustupが必要です。PythonはServer正本からbuild用resourceを生成するためにだけ使い、アプリへ組み込みません。初回はCargoとSwiftPMの固定依存を取得するnetwork接続が必要です。
+buildにはmacOS、XcodeのCLI tools、XcodeGen、Python 3.11以上、uv、公式rustupが必要です。PythonとuvはServer正本からbuild用resourceと固定辞書を生成するためにだけ使い、アプリへ組み込みません。初回はCargo、SwiftPMとServerのuv.lock依存を取得するnetwork接続が必要です。
 
 主な固定依存はUniFFI 0.32.0、GRDB 7.11.1です。Rustのtoolchain／依存は`core/rust-toolchain.toml`と`core/Cargo.lock`、GRDBは`Packages/InkuPersistence/Package.swift`とSwiftPMの解決記録で管理します。UniFFI generatorは同じcheckoutのCargo.lockからbuildし、そのRust archiveのmetadataを読みます。
 
@@ -30,7 +32,7 @@ rustup target add --toolchain 1.95.0 aarch64-apple-darwin x86_64-apple-darwin
 apple/scripts/build-macos.sh Release
 ```
 
-`build-macos.sh`はServer sourceからresourceを生成し、共通RustとSwift binding／XCFrameworkを生成し、`project.yml`からXcode projectを作ってmacOS appをbuildします。generic Mac destination、`ARCHS=arm64 x86_64`、`ONLY_ACTIVE_ARCH=NO`を指定し、最後に両sliceの存在を検査します。Apple account、Team、証明書を使わないunsigned local buildです。署名、notarization、配布はこの手順に含みません。
+`build-macos.sh`はServer sourceからdefault・catalog・歳時記・plugin resourceを生成し、`uv sync --project server --frozen`で固定したbuild用依存を用意します。[辞書準備script](scripts/prepare-meter-resources.py)がSudachi small（約113MiB）、読み設定とCMUdictをhash検証し、licenseと共にInkuHost resourceへコピーします。共通RustとSwift binding／XCFrameworkを生成し、`project.yml`からXcode projectを作ってmacOS appをbuildします。generic Mac destination、`ARCHS=arm64 x86_64`、`ONLY_ACTIVE_ARCH=NO`を指定し、最後に両sliceの存在を検査します。Apple account、Team、証明書を使わないunsigned local buildです。署名、notarization、配布はこの手順に含みません。
 
 defaultはRelease appとrelease Rustです。XcodeのDebug appを選んでも、Rustは明示指定しない限りreleaseのままです。両方をdebugにする場合は次を使います。
 
@@ -46,9 +48,9 @@ open apple/build/macOS/DerivedData/Build/Products/Release/Inku.app
 
 ## 通常利用と隔離した試行
 
-初期入力は英語の直接DDLです。モデル接続なしで生成を試せます。記述から生成する場合は「設定」でprovider方式、base URL、model、必要なAPI keyを保存してから「作成」の記述modeを使います。現在の設定画面は一つの接続先と、Stage1／Stage2で同じmodelを選ぶ基盤です。接続を保存するだけではLLM requestを送りません。
+初期入力は英語の直接DDLです。モデル接続なしで生成を試せます。記述から生成する場合は「設定」でprovider方式、base URL、model、必要なAPI keyを保存してから制作画面の記述modeを使います。複数のAPIサービスを登録でき、Stage1／Stage2は共通の描画modelを使用します。model一覧の取得は明示したボタン操作で行います。接続を保存するだけではLLM requestを送りません。
 
-作品のDBはアプリのApplication Supportに、通常のprovider設定はDBと同じdirectoryの`providers.json`に保存します。API keyはKeychainの別itemです。SQLite backupは作品・系譜・execution／ACK／snapshotを含むDBの整合したcopyであり、provider JSONやKeychainのbackupではありません。
+作品のDBはアプリのApplication Supportに、通常のprovider設定はDBと同じdirectoryの`providers.json`に保存します。API keyはKeychainの別itemです。SQLite backupは作品・系譜・execution／ACK／snapshot、comment／mark、奥書、未読語を含むDBの整合したcopyであり、隣接設定JSONやKeychainのbackupではありません。
 
 通常の作品DBを使わずに試す場合は、実行fileへ`--database`を渡します。
 
@@ -62,7 +64,7 @@ apple/build/macOS/DerivedData/Build/Products/Release/Inku.app/Contents/MacOS/Ink
 
 ## 共通packageとiOS artifact
 
-`Packages/InkuCore`がowned `Data` APIとgenerated UniFFI binding、`Packages/InkuHost`がprovider transportとexecution actor、`Packages/InkuPersistence`がGRDB／SQLite adapter、`Sources/InkuUI`がnative画面とapp modelです。public Swift sourceから意味処理を複製しません。
+`Packages/InkuCore`がowned `Data` APIとgenerated UniFFI binding、`Packages/InkuHost`がprovider transportとexecution actor、`Packages/InkuPersistence`がGRDB／SQLite adapter、`Packages/InkuExport`が保存作品のSVG／PNG／DDL／card／sheet／animation、`Sources/InkuUI`がnative画面とapp modelです。public Swift sourceから意味処理を複製しません。
 
 共通Rustだけを生成する場合は次を使います。Swift packageを直接buildする場合も、先にartifact生成が必要です。
 
@@ -79,4 +81,12 @@ apple/scripts/build-core.sh all
 
 XCFrameworkはmacOS arm64／x86_64、iOS arm64 device、iOS arm64／x86_64 simulatorを別variantに保持します。異なるplatformのsliceをlipoで混ぜません。`Packages/InkuCore/Artifacts/build-manifest.json`にproduct commit、core source fingerprint、toolchain／generator、archive hash、profileと最低OSを記録します。`macos`を再実行するとMacのみのartifactへ置き換わるため、iOS build前には`all`を実行してください。
 
-限定したCLI確認は、artifact生成後の`apple/scripts/check-core.sh`と、resource生成後の`swift run --package-path apple InkuAppCheck`です。これらはnative画面、実provider、実機の受入を代替しません。変更が防ぐ具体的な失敗に合わせて必要な確認だけを選択してください。
+Swift packageを直接buildする場合は、Rust artifactに加えてresourceも先に用意してください。
+
+```sh
+python3 apple/scripts/export-server-resources.py
+uv sync --project server --frozen
+python3 apple/scripts/prepare-meter-resources.py
+```
+
+限定したCLI確認は、artifact生成後の`apple/scripts/check-core.sh`と、resource生成後の`swift run --package-path apple InkuAppCheck`です。AppCheckの`--authoring-only`、`--comparison-only`、`--automation-only`、`--plugin-only`、`--raster-only <SVG path>`はそれぞれの変更に対応する確認だけを選びます。これらはnative画面、実provider、実機の受入を代替しません。変更が防ぐ具体的な失敗に合わせて必要な確認だけを選択してください。

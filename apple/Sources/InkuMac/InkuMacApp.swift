@@ -13,7 +13,7 @@ struct InkuMacApp: App {
     }
 
     var body: some Scene {
-        WindowGroup("Inku") {
+        Window("Inku", id: "main") {
             ContentView(model: model)
                 .frame(minWidth: 1000, minHeight: 680)
         }

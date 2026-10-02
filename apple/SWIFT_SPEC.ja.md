@@ -2,7 +2,7 @@
 
 このディレクトリは、macOS先行のnative SwiftUIクライアントとApple向け共通packageのworkspaceである。本書をSwift host固有の仕様正本とし、[SWIFT_SPEC.md](SWIFT_SPEC.md)を対応英語版とする。共有DDL、Score、prompt、authoring authority、pipeline状態遷移、seed、描画の意味は[製品仕様](../SPEC.ja.md)を正本とし、Serverを開発上のprimaryとして同じRust coreへ追随する。Swift側に意味処理を複製しない。
 
-最終更新: 2026-10-02。
+最終更新: 2026-10-03。
 
 binding／protocolの版は同梱Rust coreのversion report、描画層の版はrender metadataと[Serverの層定義](../server/src/inku_server/layer_versions.py)を参照する。本書へ共通engineの版定数を複製しない。Swiftアプリの製品版は正式な版管理に従い、この初期実装では新しい版を採番しない。共有層の版が一致しても、host機能とnative UIの移植が完了したことにはならない。
 
@@ -14,7 +14,65 @@ binding／protocolの版は同梱Rust coreのversion report、描画層の版は
 - 共通の意味や保存契約を変更する場合は、それぞれの正本を更新する。本書はSwift hostの適用範囲を説明し、独自の共通仕様を作らない。
 - sourceと再現手順を公開文書に記す。生成binary、model、log、credential、端末識別子や非公開の作業記録を追跡対象に含めない。
 
-## 2026-10-02 macOS向けの共有Rust・standalone基盤
+## 2026-10-03 macOSの制作・全件履歴・周辺機能
+
+### 制作と保存作品の表示
+
+制作画面は左に記述／直接DDLと次に描く条件、保存作品の写生・指示書を置き、右に表示中作品の条件と作品／系譜canvasを置く。保存作品のmodel、色catalog、用紙、サイズを次の入力条件と区別する。画面上の記述caption、縦書き／横書き、配置、pan／zoom、プレゼンテーションは表示合成であり、保存SVGを変更しない。
+
+同梱の歳時記、13色catalog、11用紙と7語のMacro／plugin定義はServer sourceから生成し、共通Rustで定義とdigest lockを解決する。pluginの有効切替は新作品へ適用し、保存作品の定義を置き換えない。DDL packageのimportは`inku.ddl-export.v1`の本文・付属定義・lock・整数表現を検証し、次の新作品へ添える。4MiB／64定義を超える入力や不完全な定義は拒否し、途中結果を採用しない。
+
+DDLのdraft確認は読出しだけとし、変更確定を共通coreのrevision／authorityへ渡す。最初の確定DDL変更後は記述の権限へ戻さず、新しい作品と系譜childを保存する。補完は候補の表示と採用・却下を分け、採用前の本文を書き換えない。保存Scoreの再演奏では保存条件か明示した次の条件を使用し、元作品のScore／SVGを保持する。保存欄`ddl_source_origin`は従来どおりNULLまたは`legacy_expanded`だけであり、編集authorityをこの欄へ保存しない。
+
+### 履歴・library・系譜
+
+履歴はSQLite全件を対象とする20件page、libraryは独立した30件pageである。最新100件のapp内一覧を検索や作品移動の母集団にしない。最新／新しい／古い／最古への移動、全文記述・全文hash・末尾4桁の検索、star・推敲・export markのAND絞込、thumbnail／listと時系列／系譜groupの独立選択を提供する。
+
+comment、mark、trash／復元、明示した完全削除、複数選択、系譜graph／pathをSQLiteへ接続する。完全削除後は作品本文を消し、nodeのidentity、root、日時と親子関係をtombstoneとして保持する。ACL、group利用者やServerの共有権限は追加しない。
+
+Swift物理schemaはv2で、v1の6tableにlocal annotation、奥書、未読語を追加した9table構成とする。正本は[bundled migration](Packages/InkuPersistence/Sources/InkuPersistence/Resources/migration-v2.sql)と[schema export](../persistence/reference/swift-schema-v2.json)。既知の完全なv1だけを原子的に移行し、作品・snapshot・ACKの値を保持する。未知schemaは引き続き拒否する。backup／restoreは全9tableを対象とし、v1 backupは隔離snapshotをv2へ移行してから復元する。Server／Android DBや旧JSONのimportは含めない。
+
+### 比較・推敲・奥書と自動実行
+
+catalog／model比較は開始時の作品・Score・設定を固定する。候補は採用前に通常履歴／系譜へ保存せず、選択した候補だけをidempotentに保存する。選べる候補の総数を4に制限せず、Swiftでは逐次生成する。停止とdialogのcloseは処理の終了を待ち、遅れて届いた候補を混入させない。
+
+model助言、random／Vision推敲、奥書は通常生成と同じprovider transportとrate予算を使う。記述の編集採用と新variation生成を分け、DDL権限の作品へ記述を上書きしない。中間の推敲作品は`lineage_only`として保持する。奥書は生成した原文と採用本文を別に保存し、DB backupへ含める。
+
+batchは空行を除く最大1000入力を受け、元の行番号とmodel、provider、定義、seed等を開始時に固定する。一巡後の失敗行だけを既定0／最大5回再実行する。明示した再開でも固定条件を保持する。再起動時に実行結果が不明な行は利用者の再試行／省略選択を待ち、自動再送しない。demoは開始時の設定を固定し、生成記述と作品を表示する。保存は既定で無効、間隔1〜3600秒、実行時間60〜86400秒で、停止・満了後の処理を継続しない。
+
+### 辞書・表示・接続設定
+
+日本語はServerと同じSudachi small辞書、英語は同じCMUdictの読みを使用し、Rustの薄い境界で音数・音節を数える。辞書・設定・license・hashを[resource manifest](scripts/description-meter-resources.json)で固定し、build時に生成する。Python runtimeはアプリへ含めない。4000文字までの判定を300ms debounceし、未読語の頻度・日時・文脈をSQLiteへ保存する。判定を無効にした場合は文字数／行数を表示する。
+
+日本語／英語、theme、5段階text倍率、full／simple／custom、caption、履歴情報最大3項目、tooltip、mascot、clipboard、描画制限、export template／保存先をlocal設定とする。複数APIサービスの設定、用途共通の描画model、明示したmodel一覧取得とRPM／入力TPM／RPDを提供する。通常設定は隣接JSON、API keyはKeychainであり、接続設定を保存するだけでは生成しない。
+
+自動backupは既定で無効であり、アプリ起動中に生成・復元・自動実行の終了を待つ。検証済みbackupの成功後にmanifestを確定し、アプリ自身が記録した世代だけを削除する。手動backupを自動世代管理へ含めない。任意の生成結果logは実際に保存した作品だけを記録し、古い作品を開くだけでは作らない。
+
+### Personal ChatGPT
+
+Personal ChatGPTは通常のAPI key接続と別に扱い、既定は無効とする。利用者が明示して有効化・接続し、提供されたmodelを描画modelとして選ぶ。Stage1／Stage2は同じ描画modelを使用する。本人の接続を複数保存しても、作品DBは一つのローカルlibraryであり、multi-user機能を追加しない。
+
+本人認証は127.0.0.1の一時listenerと`/auth/callback`、state／nonce／PKCE、発行済みclient ID、検証したidentityと許可scopeを使用する。資格情報は最大1MiBのAES-GCM暗号化vaultへ原子的に保存し、device-localの32byte keyをKeychainへ置く。平文token fallbackを持たず、SQLite backupに資格情報を含めない。初期無効状態で認証や推論を開始しない。
+
+開始時にprofile ID／generationを固定し、queued要求やbatch／demoの再開で接続を付け替えない。接続解除・切替・quota後は古いrefreshや遅延応答を採用せず、別providerへ暗黙に切り替えない。共有Rustの記述解釈、写生、自動配色、DDL補完だけをResponses／SSEへ接続する。Vision推敲、奥書、demo用記述、model検査はこの接続では未対応として表示する。実本人OAuth、model取得、推論の受入はoffline確認と分ける。
+
+### 保存作品の書出しとnative raster
+
+[InkuExport](Packages/InkuExport/Package.swift)はDisplay／Editable／Compat／Live SVG、PNG、定義付きDDL、共有card、review／AI contact sheet、APNG／GIFを扱う。Displayは保存canonical SVGをそのまま使用し、ほかのSVGは保存Scoreと固定contextを共通coreへ渡す。PNGはY軸1080／2160／4320、custom 64〜12000pxと用紙比率を保持する。大きい画像は元のsceneを用いるregion rasterで分割し、filter／clipを落とさない。静止画は144,000,000pixel、animationは合計600,000,000pixelを上限とし、取消し後の結果を公開しない。
+
+単作品animationのlayer進行／restart・reverse・once、複数作品のcut・crossfade・fade_white・slide、保存日時順と明示系譜path順を区別する。日本語文字はServerと同じNoto Serif JPをlicenseと共に同梱する。保存先folderのbookmarkとPNG templateを保持し、複数出力は新規folderへ保存する。Finder表示とOS共有へ接続する。
+
+共通rasterにimmutableなprepared sceneを追加し、SVG parse結果を解像度間とexport tile間で再利用する。native rendererはscene推定cost16MiB／8件、image64MiB／256件を上限とし、保存SVGや画材効果を変更しない。表示はRetina scale、120ms resize debounce、要求寸法の8Mpixel枠に合わせる。限定したRelease計測では6000 pathの4解像度で準備時間込み約20%短縮し、pencilの重いfilterは改善が小さかった。全作品・全処理の同じ改善率を保証しない。
+
+### 確認範囲
+
+実coreと一時DBによるauthoring、比較候補の明示保存／取消し、batchの固定条件と不明行、保存pluginの固定、prepared scene／image cacheの限定確認は成功した。辞書、library、SQLite移行・backup、exportとtileの境界も具体的な失敗に対応する確認で扱った。Personal接続のidentity、SSE、loopback、refresh取消し・quota・model解決はsynthetic署名とmock transportで確認し、実本人認証へ読み替えない。
+
+更新したunsigned Universal appは両CPUでlinkし、最低OS14を保持した。Apple Silicon／macOS27.0.1の一時DBでDDL生成、編集child、libraryのcomment／star、trash／復元、restart後の保持、日英切替、親子の系譜と全体表示、Stringの正しい改訂番号、複数選択2作品のPNG2160書出しを実画面で確認した。出力2fileは両方2160×2160で、画像の質感も視覚確認した。起動時のページサイズ再帰、シートの空選択、Foundationの保存option組合せによる終了を修正した。作者の通常利用、他exportのnative・性能、実provider／OAuth、Intel／macOS14実機、署名・配布、iOS app／cameraの受入は残る。
+
+## 2026-10-02 macOS向けの共有Rust・standalone基盤（当時の記録）
+
+以下は初期実装時点の記録であり、現在の接続機能は上の日付付き節を優先する。
 
 ### 対象と実装段階
 

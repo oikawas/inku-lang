@@ -1,12 +1,20 @@
 import CoreGraphics
+import CoreText
 import InkuPersistence
 import SwiftUI
+#if os(macOS)
+import AppKit
+#elseif os(iOS)
+import UIKit
+#endif
 
 @MainActor
 struct ArtworkCanvas: View {
     let svg: String
     let renderer: ArtworkRenderer
     var caption = ""
+    @Environment(DisplaySettings.self) private var display
+    @Environment(\.displayScale) private var displayScale
     @State private var image: CGImage?
     @State private var error: String?
     @State private var loading = false
@@ -16,8 +24,9 @@ struct ArtworkCanvas: View {
     @State private var dragOrigin = CGSize.zero
 
     var body: some View {
-        VStack(spacing: 10) {
-            ZStack {
+        VStack(spacing: 8) {
+            GeometryReader { geometry in
+              ZStack {
                 RoundedRectangle(cornerRadius: 10).fill(.quaternary.opacity(0.3))
                 if let image {
                     Image(decorative: image, scale: 1)
@@ -33,52 +42,113 @@ struct ArtworkCanvas: View {
                                                 height: dragOrigin.height + value.translation.height)
                             }
                             .onEnded { _ in dragOrigin = offset })
-                        .accessibilityLabel("作品")
+                        .accessibilityLabel(display.localized("作品"))
                 } else if loading {
-                    ProgressView("作品を表示中")
+                    ProgressView(display.localized("作品を表示中"))
                 } else if let error {
-                    ContentUnavailableView("作品を表示できません", systemImage: "exclamationmark.triangle", description: Text(error))
+                    ContentUnavailableView(display.localized("作品を表示できません"), systemImage: "exclamationmark.triangle", description: Text(error))
                 } else {
-                    ContentUnavailableView("作品", systemImage: "paintpalette", description: Text("生成した作品や保存作品をここに表示します。"))
+                    ContentUnavailableView(display.localized("作品"), systemImage: "paintpalette", description: Text(display.localized("生成した作品や保存作品をここに表示します。")))
                 }
+                if image != nil, display.preferences.captionVisible, !caption.isEmpty {
+                    captionOverlay(size: geometry.size)
+                }
+                if loading && image != nil { ProgressView().controlSize(.small).padding(12).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing) }
+              }
+              .clipped()
+              .task(id: requestKey(size: geometry.size)) { await render(size: geometry.size) }
             }
             .frame(minHeight: 280, maxHeight: .infinity)
-            .clipped()
 
             HStack(spacing: 12) {
-                if !caption.isEmpty { Text(caption).font(.callout).lineLimit(2).textSelection(.enabled) }
                 Spacer(minLength: 12)
                 Button { setScale(scale / 1.25) } label: { Image(systemName: "minus.magnifyingglass") }
-                    .accessibilityLabel("縮小")
+                    .accessibilityLabel(display.localized("縮小"))
                 Text(Double(scale).formatted(.percent.precision(.fractionLength(0)))).font(.caption.monospacedDigit())
                 Button { setScale(scale * 1.25) } label: { Image(systemName: "plus.magnifyingglass") }
-                    .accessibilityLabel("拡大")
-                Button("全体") { reset() }
+                    .accessibilityLabel(display.localized("拡大"))
+                Button(display.localized("全体")) { reset() }
             }
             .buttonStyle(.borderless)
             .disabled(image == nil)
         }
-        .task(id: svg) {
-            image = nil
-            error = nil
-            reset()
-            guard !svg.isEmpty else { loading = false; return }
-            loading = true
-            do {
-                let rendered = try await renderer.image(svg: svg, targetWidth: 1600, targetHeight: 1600)
-                guard !Task.isCancelled else { return }
-                image = rendered
-            } catch {
-                guard !Task.isCancelled else { return }
-                self.error = error.localizedDescription
-            }
-            loading = false
+        .onChange(of: svg) { _, _ in image = nil; error = nil; reset() }
+    }
+
+    private struct RequestKey: Hashable { let svg: String; let width: UInt32; let height: UInt32 }
+    private func requestKey(size: CGSize) -> RequestKey {
+        let magnification = min(3, max(1, scale))
+        var width = max(128, min(4096, ceil(max(1, size.width - 36) * displayScale * magnification / 128) * 128))
+        var height = max(128, min(4096, ceil(max(1, size.height - 36) * displayScale * magnification / 128) * 128))
+        let factor = min(1, sqrt(8_000_000 / (width * height)))
+        width *= factor; height *= factor
+        return RequestKey(svg: svg, width: UInt32(width), height: UInt32(height))
+    }
+    private func render(size: CGSize) async {
+        guard !svg.isEmpty else { image = nil; loading = false; return }
+        // Coalesce resize and pinch events; the old frame stays visible until its replacement is ready.
+        do {
+            try await Task.sleep(for: .milliseconds(120))
+            let request = requestKey(size: size)
+            loading = true; error = nil
+            let frame = try await renderer.image(svg: svg, targetWidth: request.width, targetHeight: request.height)
+            try Task.checkCancellation()
+            image = frame; loading = false
+        } catch is CancellationError {} catch {
+            guard !Task.isCancelled else { return }
+            self.error = error.localizedDescription; loading = false
         }
+    }
+    private func captionOverlay(size: CGSize) -> some View {
+        HStack(alignment: .bottom) {
+            if display.preferences.captionPosition == "right" { Spacer(minLength: 0) }
+            Group {
+                if display.preferences.captionVertical {
+                    VerticalCaption(text: caption)
+                        .frame(width: min(170, size.width * 0.28), height: min(320, size.height * 0.8))
+                } else {
+                    Text(caption).font(.system(.callout, design: .serif)).lineLimit(7)
+                        .textSelection(.enabled).frame(maxWidth: min(360, size.width * 0.5), alignment: .leading)
+                }
+            }
+            .foregroundStyle(.primary).padding(12)
+            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 6))
+            if display.preferences.captionPosition != "right" { Spacer(minLength: 0) }
+        }.padding(24).frame(maxHeight: .infinity, alignment: .bottom)
     }
 
     private func bounded(_ value: CGFloat) -> CGFloat { min(8, max(0.25, value)) }
     private func setScale(_ value: CGFloat) { scale = bounded(value); gestureScale = scale }
     private func reset() { scale = 1; gestureScale = 1; offset = .zero; dragOrigin = .zero }
+}
+
+private struct VerticalCaption: View {
+    let text: String
+    var body: some View {
+        Canvas { context, size in
+            context.withCGContext { cg in
+                let font = CTFontCreateWithName("HiraginoMincho-W3" as CFString, 15, nil)
+                let attributes: [NSAttributedString.Key: Any] = [
+                    NSAttributedString.Key(kCTFontAttributeName as String): font,
+                    NSAttributedString.Key(kCTVerticalFormsAttributeName as String): true,
+                    NSAttributedString.Key(kCTForegroundColorFromContextAttributeName as String): true,
+                ]
+                let string = NSAttributedString(string: text, attributes: attributes)
+                let setter = CTFramesetterCreateWithAttributedString(string)
+                let frame = CTFramesetterCreateFrame(setter, CFRange(location: 0, length: 0),
+                    CGPath(rect: CGRect(origin: .zero, size: size), transform: nil),
+                    [kCTFrameProgressionAttributeName: CTFrameProgression.rightToLeft.rawValue] as CFDictionary)
+                cg.saveGState()
+                #if os(macOS)
+                cg.setFillColor(NSColor.labelColor.cgColor)
+                #elseif os(iOS)
+                cg.setFillColor(UIColor.label.cgColor)
+                #endif
+                cg.translateBy(x: 0, y: size.height); cg.scaleBy(x: 1, y: -1)
+                CTFrameDraw(frame, cg); cg.restoreGState()
+            }
+        }.accessibilityLabel(text)
+    }
 }
 
 @MainActor
@@ -99,7 +169,8 @@ struct ArtworkThumbnail: View {
                 ProgressView().controlSize(.small)
             }
         }
-        .task(id: work.id) {
+        .task(id: work.svg) {
+            image = nil; failed = false
             do {
                 let rendered = try await renderer.image(svg: work.svg, targetWidth: 160, targetHeight: 160)
                 guard !Task.isCancelled else { return }

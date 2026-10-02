@@ -20,6 +20,7 @@ public enum ProviderWire {
         var endpoint: String
         var headers = ["Content-Type": "application/json"]
         switch provider.kind {
+        case .chatGPTPlan: throw HostError("chatgpt_session_pin_required")
         case .openAICompatible:
             endpoint = base + "/chat/completions"
             headers["Authorization"] = "Bearer " + ((key ?? "").isEmpty ? "none" : key!)
@@ -76,6 +77,7 @@ public enum ProviderWire {
         let value = try ExactJSON(data: data)
         var text: String?
         switch kind {
+        case .chatGPTPlan: throw HostError("chatgpt_operation_not_supported")
         case .openAICompatible:
             guard let message = value["choices"].array?.first?["message"] else { throw HostError("malformed_payload") }
             let calls = message["tool_calls"].array ?? []

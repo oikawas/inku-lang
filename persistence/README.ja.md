@@ -12,7 +12,7 @@
 
 Androidの現行物理正本は生成済み[Room schema 14](../android/app/schemas/app.inku.mobile.data.db.InkuDatabase/14.json)。`history_items.normalized_ddl`と`ddl_source_origin`はともにNULL可のTEXTであり、旧`expanded_ddl`列を持たない。共通checkerはServer、Android、Swiftの現行schemaを契約v2へ照合する。
 
-Swiftの実装は[InkuPersistence](../apple/Packages/InkuPersistence/Package.swift)。GRDB 7.11.1を[SwiftPMの解決記録](../apple/Packages/InkuPersistence/Package.resolved)で固定する。[物理schema v1のSQL](../apple/Packages/InkuPersistence/Sources/InkuPersistence/Resources/schema-v1.sql)と[生成済みschema export](reference/swift-schema-v1.json)が正本であり、Room 14やServer registry v4とは独立した版を持つ。[SavedWork／LineageNode／LineageEdge](../apple/Packages/InkuPersistence/Sources/InkuPersistence/Records.swift)は論理recordと同名のtable／columnへ対応し、optional commonも含む全共通項目を保持する。各Apple hostのDBはローカルのApplication Supportに置き、Server／AndroidのDBをSwift DBとして直接開いたり、macOS／iOSでlive DBファイルを共有したりしない。
+Swiftの実装は[InkuPersistence](../apple/Packages/InkuPersistence/Package.swift)。GRDB 7.11.1を[SwiftPMの解決記録](../apple/Packages/InkuPersistence/Package.resolved)で固定する。[物理schema v1のSQL](../apple/Packages/InkuPersistence/Sources/InkuPersistence/Resources/schema-v1.sql)に[移行v2](../apple/Packages/InkuPersistence/Sources/InkuPersistence/Resources/migration-v2.sql)を適用した[現行schema export](reference/swift-schema-v2.json)が正本である。v2はannotation・奥書・未読語を含む9tableで、Room 14やServer registry v4とは独立した版を持つ。[SavedWork／LineageNode／LineageEdge](../apple/Packages/InkuPersistence/Sources/InkuPersistence/Records.swift)は論理recordと同名のtable／columnへ対応し、optional commonも含む全共通項目を保持する。各Apple hostのDBはローカルのApplication Supportに置き、Server／AndroidのDBをSwift DBとして直接開いたり、macOS／iOSでlive DBファイルを共有したりしない。
 
 `required_common`は宣言した全hostが保存または決定的に公開する事実、`optional_common`は共通の意味を予約しproducerのないhostによる省略を許す項目。認証・管理・端末固有のprovider/model/cacheはhost拡張である。
 
@@ -41,13 +41,13 @@ ServerはSQLAlchemy/SQLite、AndroidはRoom/SQLiteの物理schemaを所有する
 
 Serverの`db.add_item()`、Androidの`InkuRepository.saveResult()`、Swiftの[InkuDatabase.save／commitEffect](../apple/Packages/InkuPersistence/Sources/InkuPersistence/InkuDatabase.swift)はhistory・lineage node・任意edgeを1 transactionで保存する。thumbnailはcanonical保存後の派生物。全hostはhistory/nodeの一対一、childごとの親1つ、self-edge拒否、非unique render hash、主キー衝突拒否を保存境界で強制する。Androidのv1–9だけの一度きりresetと、v10以降の非破壊移行を区別する。
 
-Swiftは一つの`InkuDatabase` actorとGRDB `DatabaseQueue`がwriterを所有する。新規DBだけを物理schema v1で作り、既存DBはwriterを開く前に読み取り専用で`user_version`、schema object、適用記録`swift-v1-contract-v2`を照合する。未知・将来・部分schemaは版番号から推定せず拒否し、destructive fallbackを設けない。
+Swiftは一つの`InkuDatabase` actorとGRDB `DatabaseQueue`がwriterを所有する。新規DBは物理schema v2で作る。既存DBはwriterを開く前に読み取り専用で`user_version`、schema object、適用記録を照合し、既知の完全なv1だけを保存値・snapshot・ACKを保持して原子的にv2へ移行する。未知・将来・部分schemaは版番号から推定せず拒否し、destructive fallbackを設けない。
 
 Swiftの[PipelineHost](../apple/Packages/InkuHost/Sources/InkuHost/PipelineHost.swift)が扱うdocumentとauthoring authorityはopaqueなexecution snapshotに保持する。`ddl_source_origin`からauthorityを補わず、authorityのrevisionとSQLite保存revisionを混同しない。`compareAndSwapExecution`は保存revisionの一致を要求する。`commitEffect`は次snapshot／revision、ACK、任意のhistory／node／edgeを一つのtransactionで確定し、成功ACKはDB commit後に返す。同じeffect IDの同一snapshot・ACK・保存payloadによる再試行は元の結果を返し、保存を重複させない。同じIDの異なる内容、および新しい書込みの古い保存revisionはconflictとして拒否する。実行状態の読出しだけで中断したprovider requestを自動再送しない。
 
 Swiftのmanual backupはSQLite Backup APIでWALを含む整合snapshotを作り、schema／integrity／保存値を検証した後、sidecar不要の単一SQLiteファイルとして新規保存先へ公開する。既存backupを上書きしない。restoreはpipelineを止め、原backupを読み取り専用で保持したまま隔離snapshotを検証し、Backup APIでactive DBを置き換える。DB本体だけのfile copyをbackupとして扱わない。
 
-SQLite backupは作品・系譜・execution／snapshot／ACK等のDB内容を含む。DBに隣接する現在の`providers.json`は[ProviderSettingsStore](../apple/Packages/InkuHost/Sources/InkuHost/ProviderSettings.swift)が別に保存し、API keyはKeychainの別itemに保持するため、SQLite backup／restoreにこれらのファイル・credentialは含まれない。Swiftの自動backup世代管理、FTS検索、旧Server／Android DBや旧JSONのimportは未実装である。`DDLSource`の旧本文選択helperは、これらのimport機能が完成したことを意味しない。
+SQLite backupは作品・系譜・execution／snapshot／ACK、annotation・奥書・未読語を含む全9tableを対象とする。v1 backupは隔離snapshotをv2へ移行してから復元する。DBに隣接する現在の`providers.json`は[ProviderSettingsStore](../apple/Packages/InkuHost/Sources/InkuHost/ProviderSettings.swift)が別に保存し、API keyはKeychain、Personal ChatGPTの資格情報は別の暗号化vaultに保持するため、SQLite backup／restoreにこれらのファイル・credentialは含まれない。Swiftの自動backupは検証成功したsnapshotだけを世代管理し、検索は全件SQLで行う。専用FTS indexと旧Server／Android物理DBのimportは未対応。旧history.json配列は現行Webの復元形式ではなく、`DDLSource`の旧本文選択helperやDDL＋plugin package importとは別の境界である。
 
 ## Serverの手動移行
 

@@ -24,7 +24,7 @@ public actor InkuDatabase {
         if exists {
             // Inspect existing bytes read-only before enabling any writer configuration.
             let inspection = try Self.readOnlyQueue(at: self.url)
-            try inspection.read { try Self.validateSchema($0) }
+            try inspection.read { try Self.validateRestore($0) }
             try inspection.close()
         } else {
             try FileManager.default.createDirectory(
@@ -36,6 +36,13 @@ public actor InkuDatabase {
         self.queue = try DatabaseQueue(path: self.url.path, configuration: configuration)
         if !exists {
             try queue.write { db in try db.execute(sql: Self.schemaSQL()) }
+        } else {
+            try queue.write { db in
+                if try Int.fetchOne(db, sql: "PRAGMA user_version") == 1 {
+                    try Self.validateSchema(db)
+                    try db.execute(sql: Self.resourceSQL("migration-v2"))
+                }
+            }
         }
         try queue.read { try Self.validateSchema($0) }
     }
@@ -81,6 +88,400 @@ public actor InkuDatabase {
             try LineageEdge.fetchOne($0, sql: "SELECT * FROM lineage_edges WHERE child_node_id = ?",
                                      arguments: [childNodeID])
         }
+    }
+
+    /// Count and select the same database predicate in one consistent read.
+    public func libraryPage(query: LibraryQuery = LibraryQuery(), limit: Int = 24,
+                            offset: Int = 0, rootNodeID: String? = nil) throws -> LibraryPage {
+        try Self.validatePage(limit: limit, offset: offset)
+        return try queue.read { db in
+            var filter = Self.libraryFilter(query)
+            if let rootNodeID {
+                guard let root = try LineageNode.fetchOne(db, key: rootNodeID),
+                      (root.rootNodeID ?? root.id) == rootNodeID else {
+                    return LibraryPage(items: [], total: 0)
+                }
+                filter.sql += " AND coalesce(n.root_node_id, n.id) = ?"
+                filter.arguments += [rootNodeID]
+            }
+            let total = try Int.fetchOne(db, sql: "SELECT count(*) \(Self.libraryJoin) WHERE \(filter.sql)",
+                                         arguments: filter.arguments) ?? 0
+            let rows = try Row.fetchAll(db, sql: """
+                SELECT h.*, a.note AS library_note,
+                       coalesce(a.for_revision, 0) AS library_revision,
+                       coalesce(a.for_share, 0) AS library_share
+                \(Self.libraryJoin) WHERE \(filter.sql)
+                ORDER BY h.at \(query.order == .newest ? "DESC" : "ASC"), h.id ASC LIMIT ? OFFSET ?
+                """, arguments: filter.arguments + [limit, offset])
+            return LibraryPage(items: try rows.map(Self.libraryItem), total: total)
+        }
+    }
+
+    /// Zero-based position under the exact library predicate and ordering.
+    public func libraryIndex(id: String, query: LibraryQuery = LibraryQuery()) throws -> Int? {
+        try queue.read { db in
+            let filter = Self.libraryFilter(query)
+            return try Int.fetchOne(db, sql: """
+                SELECT position FROM (
+                    SELECT h.id AS history_id,
+                           row_number() OVER (ORDER BY h.at \(query.order == .newest ? "DESC" : "ASC"), h.id ASC) - 1 AS position
+                    \(Self.libraryJoin) WHERE \(filter.sql)
+                ) WHERE history_id = ?
+                """, arguments: filter.arguments + [id])
+        }
+    }
+
+    public func recordUnreadWords(_ words: [String], context: String, at: Int64) throws {
+        let words = Set(words.map { String(String.UnicodeScalarView($0.trimmingCharacters(in: .whitespacesAndNewlines).unicodeScalars.prefix(120))) }
+            .filter { !$0.isEmpty }).sorted()
+        guard !words.isEmpty else { return }
+        let context = String(String.UnicodeScalarView(context.trimmingCharacters(in: .whitespacesAndNewlines).unicodeScalars.prefix(1000)))
+        try queue.write { db in
+            for word in words {
+                try db.execute(sql: """
+                    INSERT INTO unread_words (id, word, context, frequency, first_at, last_at) VALUES (?, ?, ?, 1, ?, ?)
+                    ON CONFLICT (word, context) DO UPDATE SET frequency = frequency + 1, last_at = excluded.last_at
+                    """, arguments: [UUID().uuidString, word, context, at, at])
+            }
+        }
+    }
+
+    public func unreadWords(limit: Int = 500) throws -> [UnreadWord] {
+        guard (1...2000).contains(limit) else { throw PersistenceError.invalidRecord("invalid unread word limit") }
+        return try queue.read { db in
+            let rows = try Row.fetchAll(db, sql: """
+                SELECT word, sum(frequency) AS frequency, min(first_at) AS first_at, max(last_at) AS last_at
+                FROM unread_words GROUP BY word ORDER BY frequency DESC, last_at DESC, word COLLATE BINARY ASC LIMIT ?
+                """, arguments: [limit])
+            return try rows.map { row in
+                let word: String = row["word"]
+                // Match the Server's first three distinct nonempty contexts in insertion order.
+                let contexts = try String.fetchAll(db, sql: """
+                    SELECT context FROM unread_words WHERE word = ? AND context <> '' ORDER BY rowid ASC LIMIT 3
+                    """, arguments: [word])
+                return UnreadWord(word: word, frequency: row["frequency"], firstAt: row["first_at"], lastAt: row["last_at"], contexts: contexts)
+            }
+        }
+    }
+
+    /// Group filtering and pagination happen before fetching representative SVGs.
+    public func libraryGroups(query: LibraryQuery = LibraryQuery(), limit: Int = 12,
+                              offset: Int = 0, minimumItemCount: Int = 1) throws -> LibraryGroupPage {
+        try Self.validatePage(limit: limit, offset: offset)
+        guard minimumItemCount >= 1 else { throw PersistenceError.invalidRecord("invalid group size") }
+        return try queue.read { db in
+            let filter = Self.libraryFilter(query)
+            let grouped = """
+                SELECT coalesce(n.root_node_id, n.id) AS root_id, count(*) AS item_count,
+                       sum(h.starred) AS starred_count, sum(coalesce(a.for_revision, 0)) AS revision_count,
+                       max(h.at) AS latest_at
+                \(Self.libraryJoin) WHERE \(filter.sql) AND n.id IS NOT NULL
+                GROUP BY coalesce(n.root_node_id, n.id) HAVING count(*) >= ?
+                """
+            let arguments = filter.arguments + [minimumItemCount]
+            let total = try Int.fetchOne(db, sql: "SELECT count(*) FROM (\(grouped))", arguments: arguments) ?? 0
+            let rows = try Row.fetchAll(db, sql: """
+                \(grouped) ORDER BY latest_at \(query.order == .newest ? "DESC" : "ASC"), root_id ASC
+                LIMIT ? OFFSET ?
+                """, arguments: arguments + [limit, offset])
+            let groups = try rows.map { row -> LibraryGroup in
+                let root: String = row["root_id"]
+                guard let representative = try Row.fetchOne(db, sql: """
+                    SELECT h.*, a.note AS library_note, coalesce(a.for_revision, 0) AS library_revision,
+                           coalesce(a.for_share, 0) AS library_share
+                    \(Self.libraryJoin) WHERE \(filter.sql) AND coalesce(n.root_node_id, n.id) = ?
+                    ORDER BY h.at DESC, h.id ASC LIMIT 1
+                    """, arguments: filter.arguments + [root]) else {
+                    throw PersistenceError.corruptDatabase
+                }
+                return LibraryGroup(rootNodeID: root, representative: try Self.libraryItem(representative),
+                                    itemCount: row["item_count"], starredCount: row["starred_count"],
+                                    revisionCount: row["revision_count"], latestAt: row["latest_at"])
+            }
+            return LibraryGroupPage(groups: groups, total: total)
+        }
+    }
+
+    public func trashCount() throws -> Int {
+        try queue.read {
+            try Int.fetchOne($0, sql: "SELECT count(*) FROM history WHERE trashed = 1 AND history_visibility = 'normal'") ?? 0
+        }
+    }
+
+    /// Preserve caller order and reject stale, deleted, hidden or trashed export selections.
+    public func exportWorks(ids: [String]) throws -> [SavedWork] {
+        try queue.read { db in
+            try ids.map { id in
+                guard let work = try SavedWork.fetchOne(db, key: id), !work.trashed,
+                      work.historyVisibility == "normal" else {
+                    throw PersistenceError.invalidRecord("selection is no longer exportable")
+                }
+                return work
+            }
+        }
+    }
+
+    @discardableResult
+    public func setStarred(ids: [String], starred: Bool) throws -> Int {
+        try queue.write { db in
+            var count = 0
+            for id in Set(ids) {
+                try db.execute(sql: "UPDATE history SET starred = ? WHERE id = ?", arguments: [starred, id])
+                count += db.changesCount
+            }
+            return count
+        }
+    }
+
+    public func setAnnotation(id: String, note: String? = nil,
+                              forRevision: Bool? = nil, forShare: Bool? = nil) throws {
+        try queue.write { db in
+            guard try SavedWork.fetchOne(db, key: id) != nil else {
+                throw PersistenceError.invalidRecord("work no longer exists")
+            }
+            try db.execute(sql: "INSERT OR IGNORE INTO library_annotations (history_id) VALUES (?)", arguments: [id])
+            if let note {
+                // Python's [:240] counts Unicode scalar values, rather than grapheme clusters.
+                let trimmed = note.trimmingCharacters(in: .whitespacesAndNewlines)
+                let clean = String(String.UnicodeScalarView(trimmed.unicodeScalars.prefix(240)))
+                try db.execute(sql: "UPDATE library_annotations SET note = ? WHERE history_id = ?",
+                               arguments: [clean.isEmpty ? nil : clean, id])
+            }
+            if let forRevision {
+                try db.execute(sql: "UPDATE library_annotations SET for_revision = ? WHERE history_id = ?",
+                               arguments: [forRevision, id])
+            }
+            if let forShare {
+                try db.execute(sql: "UPDATE library_annotations SET for_share = ? WHERE history_id = ?",
+                               arguments: [forShare, id])
+            }
+        }
+    }
+
+    @discardableResult
+    public func setTrashed(ids: [String], trashed: Bool) throws -> Int {
+        try queue.write { db in
+            var count = 0
+            for id in Set(ids) {
+                try db.execute(sql: "UPDATE history SET trashed = ? WHERE id = ? AND trashed <> ?",
+                               arguments: [trashed, id, trashed])
+                count += db.changesCount
+            }
+            return count
+        }
+    }
+
+    /// A tombstone retains the original node and every connection, never a substitute identity.
+    @discardableResult
+    public func permanentlyDelete(ids: [String], requireTrashed: Bool = true,
+                                  deletedAt: Int64 = Int64(Date().timeIntervalSince1970 * 1000)) throws -> Int {
+        try queue.write { db in
+            var count = 0
+            for id in Set(ids) {
+                guard let work = try SavedWork.fetchOne(db, key: id), !requireTrashed || work.trashed else { continue }
+                if let nodeID = work.lineageNodeID {
+                    try db.execute(sql: """
+                        UPDATE lineage_nodes SET state = 'tombstone', history_id = NULL,
+                            description_hash = NULL, render_hash = NULL, deleted_at = ? WHERE id = ?
+                        """, arguments: [deletedAt, nodeID])
+                    try db.execute(sql: """
+                        UPDATE lineage_edges SET metadata_json = '{}' WHERE parent_node_id = ? OR child_node_id = ?
+                        """, arguments: [nodeID, nodeID])
+                }
+                try db.execute(sql: "DELETE FROM history WHERE id = ?", arguments: [id])
+                count += db.changesCount
+            }
+            return count
+        }
+    }
+
+    @discardableResult
+    public func emptyTrash() throws -> Int {
+        let ids = try queue.read { try String.fetchAll($0, sql: "SELECT id FROM history WHERE trashed = 1") }
+        return try permanentlyDelete(ids: ids)
+    }
+
+    /// Both the original reader response and the user's adopted wording travel in backups.
+    public func colophons(targetNodeID: String? = nil) throws -> [ColophonRecord] {
+        try queue.read { db in
+            let rows = try Row.fetchAll(db, sql: """
+                SELECT * FROM auxiliary_colophons \(targetNodeID == nil ? "" : "WHERE target_node_id = ?")
+                ORDER BY at DESC, id ASC
+                """, arguments: targetNodeID.map { StatementArguments([$0]) } ?? StatementArguments())
+            return try rows.map(Self.colophon)
+        }
+    }
+
+    public func saveColophon(_ record: ColophonRecord) throws {
+        try Self.validate(record)
+        try queue.write { db in
+            if let priorRow = try Row.fetchOne(db, sql: "SELECT * FROM auxiliary_colophons WHERE id = ?", arguments: [record.id]) {
+                var prior = try Self.colophon(priorRow)
+                prior.adoptedBody = record.adoptedBody
+                guard prior == record else { throw PersistenceError.invalidRecord("colophon source is immutable") }
+                try db.execute(sql: "UPDATE auxiliary_colophons SET adopted_body = ? WHERE id = ?", arguments: [record.adoptedBody, record.id])
+            } else {
+                let encoder = JSONEncoder()
+                let branch = String(decoding: try encoder.encode(record.branchSnapshot), as: UTF8.self)
+                let warnings = String(decoding: try encoder.encode(record.warnings), as: UTF8.self)
+                try db.execute(sql: """
+                    INSERT INTO auxiliary_colophons
+                    (id, target_node_id, branch_snapshot, model, at, language, generated_body, adopted_body,
+                     signature, warnings_json, fact_sheet_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """, arguments: [record.id, record.targetNodeID, branch, record.model, record.at,
+                                       record.language, record.generatedBody, record.adoptedBody, record.signature,
+                                       warnings, record.factSheetJSON])
+            }
+        }
+    }
+
+    public func deleteColophon(id: String) throws {
+        try queue.write { try $0.execute(sql: "DELETE FROM auxiliary_colophons WHERE id = ?", arguments: [id]) }
+    }
+
+    private static func colophon(_ row: Row) throws -> ColophonRecord {
+        let branch: String = row["branch_snapshot"]
+        let warnings: String = row["warnings_json"]
+        return ColophonRecord(id: row["id"], targetNodeID: row["target_node_id"],
+            branchSnapshot: try JSONDecoder().decode([String].self, from: Data(branch.utf8)),
+            model: row["model"], at: row["at"], language: row["language"], generatedBody: row["generated_body"],
+            adoptedBody: row["adopted_body"], signature: row["signature"],
+            warnings: try JSONDecoder().decode([String].self, from: Data(warnings.utf8)), factSheetJSON: row["fact_sheet_json"])
+    }
+
+    private static func validate(_ record: ColophonRecord) throws {
+        guard !record.id.isEmpty, !record.model.isEmpty, ["ja", "en"].contains(record.language),
+              !record.generatedBody.isEmpty, !record.branchSnapshot.isEmpty,
+              record.branchSnapshot.last == record.targetNodeID else {
+            throw PersistenceError.invalidRecord("invalid colophon")
+        }
+        try validateJSONObject(record.factSheetJSON)
+    }
+
+    /// Promotion changes visibility, without changing any of the saved work's content.
+    public func promoteLineageNode(id: String) throws {
+        try queue.write { db in
+            guard let node = try LineageNode.fetchOne(db, key: id), node.state == "lineage_only",
+                  let historyID = node.historyID else { throw PersistenceError.invalidRecord("node cannot be promoted") }
+            try db.execute(sql: "UPDATE lineage_nodes SET state = 'active' WHERE id = ?", arguments: [id])
+            try db.execute(sql: "UPDATE history SET history_visibility = 'normal' WHERE id = ?", arguments: [historyID])
+        }
+    }
+
+    /// Web's explicit overview reads from the root, keeping the selected focus.
+    public func lineageOverview(focusNodeID: String, nodeLimit: Int = 200) throws -> LineageGraph? {
+        guard let rootID = try queue.read({ db in
+            try LineageNode.fetchOne(db, key: focusNodeID)?.rootNodeID
+        }), let overview = try lineage(focusNodeID: rootID, descendantDepth: 200, nodeLimit: nodeLimit) else { return nil }
+        return LineageGraph(focusNodeID: focusNodeID, nodes: overview.nodes, edges: overview.edges,
+                            truncated: overview.truncated, pathOnly: false)
+    }
+
+    public func lineage(focusNodeID: String, descendantDepth: Int = 2,
+                        nodeLimit: Int = 200, pathOnly: Bool = false) throws -> LineageGraph? {
+        let depth = min(200, max(0, descendantDepth))
+        let limit = min(200, max(1, nodeLimit))
+        return try queue.read { db in
+            guard try LineageNode.fetchOne(db, key: focusNodeID) != nil else { return nil }
+            var selectedEdges: [LineageEdge] = []
+            var selectedIDs: Set<String> = [focusNodeID]
+            var current = focusNodeID
+            var ancestorIDs = [focusNodeID]
+            var truncated = false
+            while let edge = try LineageEdge.fetchOne(db, sql: "SELECT * FROM lineage_edges WHERE child_node_id = ?",
+                                                     arguments: [current]) {
+                guard !selectedIDs.contains(edge.parentNodeID) else { break }
+                guard pathOnly || selectedIDs.count < limit else { truncated = true; break }
+                selectedEdges.append(edge); selectedIDs.insert(edge.parentNodeID)
+                ancestorIDs.append(edge.parentNodeID); current = edge.parentNodeID
+            }
+            if !pathOnly {
+                var frontier = [focusNodeID]
+                for level in 0..<depth {
+                    var next: [String] = []
+                    let edges = try frontier.flatMap { parent in
+                        try LineageEdge.fetchAll(db, sql: "SELECT * FROM lineage_edges WHERE parent_node_id = ? ORDER BY id ASC",
+                                                 arguments: [parent])
+                    }.sorted { $0.id < $1.id }
+                    for edge in edges where !selectedIDs.contains(edge.childNodeID) {
+                        guard selectedIDs.count < limit else { truncated = true; break }
+                        selectedEdges.append(edge); selectedIDs.insert(edge.childNodeID); next.append(edge.childNodeID)
+                    }
+                    frontier = next
+                    if frontier.isEmpty { break }
+                    if level == depth - 1 {
+                        for id in frontier where try Int.fetchOne(db, sql: "SELECT count(*) FROM lineage_edges WHERE parent_node_id = ?",
+                                                                  arguments: [id]) ?? 0 > 0 { truncated = true }
+                    }
+                }
+            }
+            let orderedIDs = pathOnly ? ancestorIDs.reversed().map { $0 } : selectedIDs.sorted()
+            let items = try orderedIDs.map { id -> LineageItem in
+                guard let node = try LineageNode.fetchOne(db, key: id) else { throw PersistenceError.corruptDatabase }
+                let work = try node.historyID.flatMap { try SavedWork.fetchOne(db, key: $0) }
+                let annotation = try node.historyID.map { try Self.annotation(id: $0, in: db) } ?? LibraryAnnotation()
+                let childCount = try Int.fetchOne(db, sql: "SELECT count(*) FROM lineage_edges WHERE parent_node_id = ?",
+                                                 arguments: [id]) ?? 0
+                return LineageItem(node: node, work: work, annotation: annotation,
+                                   generation: try Self.generation(id: id, in: db), childCount: childCount)
+            }
+            return LineageGraph(focusNodeID: focusNodeID,
+                                nodes: pathOnly ? items : items.sorted { ($0.node.at, $0.id) < ($1.node.at, $1.id) },
+                                edges: selectedEdges.sorted { ($0.at, $0.id) < ($1.at, $1.id) },
+                                truncated: truncated, pathOnly: pathOnly)
+        }
+    }
+
+    private static let libraryJoin = """
+        FROM history h LEFT JOIN library_annotations a ON a.history_id = h.id
+        LEFT JOIN lineage_nodes n ON n.id = h.lineage_node_id
+        """
+
+    private static func validatePage(limit: Int, offset: Int) throws {
+        guard (1...1000).contains(limit), offset >= 0 else { throw PersistenceError.invalidRecord("invalid page") }
+    }
+
+    private static func libraryFilter(_ query: LibraryQuery) -> (sql: String, arguments: StatementArguments) {
+        var clauses = ["h.history_visibility = 'normal'", "h.trashed = ?"]
+        var arguments: StatementArguments = [query.trashed]
+        if query.starred { clauses.append("h.starred = 1") }
+        if query.forRevision { clauses.append("coalesce(a.for_revision, 0) = 1") }
+        if query.forShare { clauses.append("coalesce(a.for_share, 0) = 1") }
+        let search = query.text.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !search.isEmpty {
+            var searchClauses = ["h.input LIKE ?", "h.ddl LIKE ?", "h.stage1_model LIKE ?", "h.stage2_model LIKE ?", "h.catalog_id LIKE ?"]
+            for _ in searchClauses { arguments += ["%\(search)%"] }
+            let shortHash = search.utf8.count == 4 && search.utf8.allSatisfy {
+                (48...57).contains($0) || (65...90).contains($0) || (97...122).contains($0)
+            }
+            let wholeHash = search.range(of: "^(?:[a-z0-9]+:)?[0-9a-f]{64}$", options: [.regularExpression, .caseInsensitive]) != nil
+            if shortHash || wholeHash { searchClauses.append("h.render_hash LIKE ?"); arguments += ["%\(search)"] }
+            clauses.append("(" + searchClauses.joined(separator: " OR ") + ")")
+        }
+        return (clauses.joined(separator: " AND "), arguments)
+    }
+
+    private static func libraryItem(_ row: Row) throws -> LibraryItem {
+        LibraryItem(work: try SavedWork(row: row), annotation: LibraryAnnotation(
+            note: row["library_note"], forRevision: row["library_revision"], forShare: row["library_share"]))
+    }
+
+    private static func annotation(id: String, in db: Database) throws -> LibraryAnnotation {
+        guard let row = try Row.fetchOne(db, sql: "SELECT * FROM library_annotations WHERE history_id = ?", arguments: [id]) else {
+            return LibraryAnnotation()
+        }
+        return LibraryAnnotation(note: row["note"], forRevision: row["for_revision"], forShare: row["for_share"])
+    }
+
+    private static func generation(id: String, in db: Database) throws -> Int {
+        var seen: Set<String> = [id]
+        var current = id
+        var generation = 1
+        while let parent = try String.fetchOne(db, sql: "SELECT parent_node_id FROM lineage_edges WHERE child_node_id = ?",
+                                               arguments: [current]), seen.insert(parent).inserted {
+            generation += 1; current = parent
+        }
+        return generation
     }
 
     public func loadExecution(id: String) throws -> ExecutionSnapshot? {
@@ -205,6 +606,12 @@ public actor InkuDatabase {
         }
         try original.backup(to: isolated)
         try isolated.read { try Self.validateRestore($0) }
+        try isolated.write { db in
+            if try Int.fetchOne(db, sql: "PRAGMA user_version") == 1 {
+                try db.execute(sql: Self.resourceSQL("migration-v2"))
+            }
+        }
+        try isolated.read { try Self.validateRestore($0) }
         try isolated.backup(to: queue)
     }
 
@@ -283,11 +690,16 @@ public actor InkuDatabase {
         return try DatabaseQueue(path: url.path, configuration: configuration)
     }
 
-    private static func schemaSQL() throws -> String {
-        guard let resource = Bundle.module.url(forResource: "schema-v1", withExtension: "sql") else {
+    private static func resourceSQL(_ name: String) throws -> String {
+        guard let resource = Bundle.module.url(forResource: name, withExtension: "sql") else {
             throw PersistenceError.unknownSchema
         }
         return try String(contentsOf: resource, encoding: .utf8)
+    }
+
+    private static func schemaSQL(version: Int = 2) throws -> String {
+        let baseline = try resourceSQL("schema-v1")
+        return version == 1 ? baseline : baseline + "\n" + (try resourceSQL("migration-v2"))
     }
 
     private struct SchemaObject: Equatable {
@@ -309,13 +721,17 @@ public actor InkuDatabase {
     }
 
     private static func validateSchema(_ db: Database) throws {
+        guard let version = try Int.fetchOne(db, sql: "PRAGMA user_version"), [1, 2].contains(version) else {
+            throw PersistenceError.unknownSchema
+        }
         let expected = try DatabaseQueue()
-        try expected.write { try $0.execute(sql: schemaSQL()) }
+        try expected.write { try $0.execute(sql: schemaSQL(version: version)) }
         let expectedObjects = try expected.read { try schemaObjects(in: $0) }
-        guard try Int.fetchOne(db, sql: "PRAGMA user_version") == 1,
-              try schemaObjects(in: db) == expectedObjects,
+        let identifiers = version == 1 ? ["swift-v1-contract-v2"]
+            : ["swift-v1-contract-v2", "swift-v2-library-annotations"]
+        guard try schemaObjects(in: db) == expectedObjects,
               try String.fetchAll(db, sql: "SELECT identifier FROM schema_migrations ORDER BY identifier")
-                == ["swift-v1-contract-v2"] else {
+                == identifiers else {
             throw PersistenceError.unknownSchema
         }
     }
@@ -328,6 +744,14 @@ public actor InkuDatabase {
         }
         for work in try SavedWork.fetchAll(db) { try validate(work) }
         for edge in try LineageEdge.fetchAll(db) { try validateJSONObject(edge.metadataJSON) }
+        if try Int.fetchOne(db, sql: "PRAGMA user_version") == 2 {
+            for row in try Row.fetchAll(db, sql: "SELECT * FROM auxiliary_colophons") { try validate(colophon(row)) }
+            let invalidUnread = try Int.fetchOne(db, sql: """
+                SELECT count(*) FROM unread_words WHERE length(word) = 0 OR length(word) > 120
+                OR length(context) > 1000 OR frequency <= 0
+                """)
+            guard invalidUnread == 0 else { throw PersistenceError.corruptDatabase }
+        }
         let inconsistent = try Int.fetchOne(db, sql: """
             SELECT count(*) FROM history AS h LEFT JOIN lineage_nodes AS n ON n.id = h.lineage_node_id
             WHERE h.lineage_node_id IS NOT NULL AND (n.id IS NULL OR n.history_id IS NULL OR n.history_id <> h.id)

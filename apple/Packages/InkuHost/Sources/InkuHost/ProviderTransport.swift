@@ -108,6 +108,55 @@ public final class URLSessionProviderTransport: ProviderTransport, Sendable {
         throw HostError("provider_selection_required")
     }
 
+    /// Auxiliary calls share the pipeline transport's reservations and HTTP boundary.
+    public func performAuxiliary(prompt: AuxiliaryPrompt, modelReference: String, settings: HostSettings,
+                                 credentials: any CredentialStore,
+                                 onBytes: @escaping @Sendable (Int) -> Void) async throws -> String {
+        let (provider, model) = try resolve(modelReference, providers: settings.providers)
+        let key = try await credentials.key(for: provider.credentialID)
+        let request = try AuxiliaryWire.request(prompt: prompt, provider: provider, model: model, key: key)
+        do {
+            let raw = try await withThrowingTaskGroup(of: Data.self) { group in
+                group.addTask { [self] in
+                    var inputTokens = (request.httpBody?.count ?? 0) + 128
+                    if provider.kind == .gemini, provider.rateLimits?.tokensPerMinute != nil {
+                        inputTokens = try await self.countGeminiTokens(request)
+                    }
+                    let reservation = try await self.budget.reserve(provider: provider, inputTokens: inputTokens)
+                    do {
+                        let bytes = try await self.read(request, maximum: self.maximumResponseBytes, onBytes: onBytes)
+                        let value = try ExactJSON(data: bytes)
+                        let usage = provider.kind == .gemini ? value["usageMetadata"] : value["usage"]
+                        let key = provider.kind == .gemini ? "promptTokenCount" : (provider.kind == .anthropic ? "input_tokens" : "prompt_tokens")
+                        try await self.budget.settle(providerID: provider.id, reservation: reservation,
+                                                   used: usage[key].number.flatMap(Int.init))
+                        return bytes
+                    } catch {
+                        if let failure = error as? HTTPFailure, failure.status == 429 {
+                            try await self.budget.coolDown(providerID: provider.id, seconds: failure.retryAfter)
+                        }
+                        throw error
+                    }
+                }
+                group.addTask {
+                    try await Task.sleep(for: .seconds(prompt.timeoutSeconds))
+                    throw HostError("transport_timeout")
+                }
+                defer { group.cancelAll() }
+                guard let bytes = try await group.next() else { throw HostError("transport_unavailable") }
+                return bytes
+            }
+            try Task.checkCancellation()
+            return try AuxiliaryWire.responseText(raw, kind: provider.kind)
+        } catch is CancellationError { throw CancellationError() }
+        catch let error as HTTPFailure {
+            throw HostError(error.status == 429 ? "rate_limited" : error.status >= 500 ? "transport_unavailable" : "provider_rejected")
+        } catch let error as URLError {
+            if error.code == .cancelled && Task.isCancelled { throw CancellationError() }
+            throw HostError(error.code == .timedOut ? "transport_timeout" : "transport_unavailable")
+        }
+    }
+
     private func countGeminiTokens(_ original: URLRequest) async throws -> Int {
         guard let originalURL = original.url,
               let originalBody = original.httpBody,

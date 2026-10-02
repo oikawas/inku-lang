@@ -1,4 +1,5 @@
 import Foundation
+import InkuPersistence
 
 public struct HostError: Error, LocalizedError, Sendable, Equatable {
     public let code: String
@@ -6,7 +7,7 @@ public struct HostError: Error, LocalizedError, Sendable, Equatable {
     public var errorDescription: String? { code }
 }
 
-public enum SketchRequest: Sendable {
+public enum SketchRequest: Codable, Sendable {
     case off, on, supplied(String)
     var json: ExactJSON {
         switch self {
@@ -17,7 +18,7 @@ public enum SketchRequest: Sendable {
     }
 }
 
-public enum GenerationAuthoring: Sendable {
+public enum GenerationAuthoring: Codable, Sendable {
     case directDDL(String)
     case description(String, autoCatalog: Bool, sketch: SketchRequest = .off)
     var json: ExactJSON {
@@ -41,7 +42,7 @@ public struct ModelSelection: Codable, Sendable, Equatable {
     }
 }
 
-public struct GenerationRequest: Sendable {
+public struct GenerationRequest: Codable, Sendable {
     public var authoring: GenerationAuthoring
     public var configuration: Data
     public var renderOptions: Data
@@ -52,16 +53,26 @@ public struct GenerationRequest: Sendable {
     public var description: String
     public var parentWorkID: String?
     public var derivationKind: String
+    public var saveHistory: Bool
+    public var historyVisibility: String
+    public var retainedDocument: Data?
+    public var retainedAuthority: Data?
+    public var chatGPTSession: ChatGPTPlanSession?
     public init(authoring: GenerationAuthoring, configuration: Data, renderOptions: Data, clipPolicy: Data,
                 models: ModelSelection = .init(), providers: [ProviderSettings] = [],
                 renderColorMaps: [String: Data] = [:],
-                description: String = "", parentWorkID: String? = nil, derivationKind: String = "new") {
+                description: String = "", parentWorkID: String? = nil, derivationKind: String = "new",
+                saveHistory: Bool = true, historyVisibility: String = "normal",
+                retainedDocument: Data? = nil, retainedAuthority: Data? = nil, chatGPTSession: ChatGPTPlanSession? = nil) {
         self.authoring = authoring; self.configuration = configuration; self.renderOptions = renderOptions
         self.clipPolicy = clipPolicy; self.models = models; self.providers = providers
         self.renderColorMaps = renderColorMaps
         if case .description(let text, _, _) = authoring { self.description = description.isEmpty ? text : description }
         else { self.description = description }
         self.parentWorkID = parentWorkID; self.derivationKind = derivationKind
+        self.saveHistory = saveHistory; self.historyVisibility = historyVisibility
+        self.retainedDocument = retainedDocument; self.retainedAuthority = retainedAuthority
+        self.chatGPTSession = chatGPTSession
     }
 }
 
@@ -108,12 +119,53 @@ public struct PipelineView: Sendable {
     public let busy: Bool
     public let interruptedProvider: Bool
     public let description: String
+    public let configurationJSON: Data
+    public let documentJSON: Data?
+    public let deliveryJSON: Data?
+    public let promptJSON: Data?
+    public let holeIDs: [String]
+    public let candidateWork: SavedWork?
+}
+
+public struct PreparedCandidate: Identifiable, Sendable {
+    public let executionID: String
+    public let work: SavedWork
+    public let authority: String
+    public var id: String { executionID }
+    public init(executionID: String, work: SavedWork, authority: String) {
+        self.executionID = executionID; self.work = work; self.authority = authority
+    }
+}
+
+/// Owned saved input data. Export and derivation never receive a mutable database handle.
+public struct SavedAuthoringContext: Sendable {
+    public let configuration: Data
+    public let renderOptions: Data
+    public let clipPolicy: Data
+    public let document: Data?
+    public let authority: String
+    public let origin: String
+    public let revision: String
+    public let authorityJSON: Data
+}
+
+public struct ReplayOptions: Sendable {
+    public let catalogID: String
+    public let colorMap: Data
+    public let canvasID: String
+    public let widthRatio: UInt32
+    public let heightRatio: UInt32
+    public init(catalogID: String, colorMap: Data, canvasID: String, widthRatio: UInt32, heightRatio: UInt32) {
+        self.catalogID = catalogID; self.colorMap = colorMap; self.canvasID = canvasID
+        self.widthRatio = widthRatio; self.heightRatio = heightRatio
+    }
 }
 
 public enum PipelineProgress: Sendable {
     case changed(PipelineView)
     case providerAttempt(executionID: String, report: Data, beganAt: Date, deadline: Date)
     case transportBytes(executionID: String, count: Int)
+    case providerDiagnostic(executionID: String, diagnostic: ChatGPTPlanDiagnostic)
     case saved(executionID: String, workID: String)
 }
 

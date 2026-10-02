@@ -198,11 +198,12 @@
       }
     },
     "swift": {
-      "source": "persistence/reference/swift-schema-v1.json",
+      "source": "persistence/reference/swift-schema-v2.json",
       "schema_sql": "apple/Packages/InkuPersistence/Sources/InkuPersistence/Resources/schema-v1.sql",
+      "schema_migration_sql": ["apple/Packages/InkuPersistence/Sources/InkuPersistence/Resources/migration-v2.sql"],
       "adapter_source": "apple/Packages/InkuPersistence/Sources/InkuPersistence/InkuDatabase.swift",
       "records_source": "apple/Packages/InkuPersistence/Sources/InkuPersistence/Records.swift",
-      "schema_version": 1,
+      "schema_version": 2,
       "records": {
         "history": {
           "model": "SavedWork",

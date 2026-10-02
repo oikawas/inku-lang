@@ -15,12 +15,14 @@ usage() {
 
 [[ $# -le 1 && ( "$CONFIGURATION" == Debug || "$CONFIGURATION" == Release ) ]] || { usage; exit 2; }
 [[ "$(uname -s)" == Darwin ]] || { printf 'The macOS application build requires macOS and Xcode.\n' >&2; exit 2; }
-for tool in python3 xcodegen xcodebuild xcrun; do
+for tool in python3 uv xcodegen xcodebuild xcrun; do
     command -v "$tool" >/dev/null || { printf 'Missing build prerequisite: %s\n' "$tool" >&2; exit 2; }
 done
 python3 -c 'import sys; sys.exit(0 if sys.version_info >= (3, 11) else "Python 3.11 or newer is required")'
 
 python3 "$APPLE/scripts/export-server-resources.py"
+uv sync --project "$ROOT/server" --frozen
+python3 "$APPLE/scripts/prepare-meter-resources.py"
 "$APPLE/scripts/build-core.sh" macos
 xcodegen generate --spec "$APPLE/project.yml" --project "$APPLE" --project-root "$APPLE"
 

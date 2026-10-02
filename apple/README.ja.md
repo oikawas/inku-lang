@@ -54,6 +54,8 @@ open apple/build/macOS/DerivedData/Build/Products/Release/Inku.app
 
 制作画面の「次の生成条件」で次に使うservice／modelを選びます。この選択は設定の保存defaultや開始済みbatch／demoを変えません。生成／停止buttonは入力のscroll領域の外にあります。⌘Nで新規、⌘OでDDL読込、⌘,で設定、⌘1〜4で画面移動、⇧⌘Eで書出しを開けます。libraryのcheckboxと表示作品を区別し、制作からの書出しは表示中の保存作品を使います。
 
+制作とモデル設定で「モデルの適性・用途」を開くと、Serverの登録評価・用途・commentと接続先から取得した情報を別々に読めます。未登録のservice／modelは推測で評価しません。処理中は段階・呼出しmodel・試行回数・経過時間を表示し、未取得token数は「記録なし」とします。停止で時間が確定し、新規制作で前の進行表示を消します。
+
 保存作品の操作から「記述を変える」「写生なし／ありで描き直す」を開くと、その作品を親とする新しい子を描けます。直接DDLや確定DDL編集の作品は記述へ戻せません。色カタログは色名・HEX・説明を見て次の生成条件へ確定します。DDLは標準panelまたは1つのfileのwindow dropから読み込み、まだ保存されていない制作draftへ反映します。
 
 「描画パラメータの編集」では配置・読み取り・変奏の1案／4案、言葉によるタッチの1案を比較し、選んだ候補だけを子として保存します。候補の準備・拡大だけでは表示作品や通常履歴を変えません。タッチは保存Scoreと共通Rustの語句seedを使い、現在の変奏は無変更であることを画面へ表示します。停止・破棄と採用を区別し、model設定へ移る場合は未保存候補を先に採用または破棄してください。
@@ -96,5 +98,7 @@ python3 apple/scripts/export-server-resources.py
 uv sync --project server --frozen
 python3 apple/scripts/prepare-meter-resources.py
 ```
+
+追加のAppCheck選択は`--provider-progress-only`と`--model-guidance-only`です。前者はmock／共通Rustで再試行の表示・時計・停止と遅いcallback、後者は生成したServer評価資料と一時DBで適性・未登録境界・選択とsnapshotの保持を確認します。実providerへの呼出しは行いません。
 
 限定したCLI確認は、artifact生成後の`apple/scripts/check-core.sh`と、resource生成後の`swift run --package-path apple InkuAppCheck`です。AppCheckの`--authoring-only`、`--comparison-only`、`--automation-only`、`--plugin-only`、`--model-selection-only`、`--work-edit-only`、`--refinement-only`、`--replay-comparison-only`、`--auxiliary-provenance-only`、`--raster-only <SVG path>`はそれぞれの変更に対応する確認だけを選びます。`--model-selection-only`は一時DBとprovider呼出し0件で、制作のmodel選択と保存default・開始時snapshotの分離を確認します。`--work-edit-only`はmock transportと共通coreで保存親の編集・写生・childのDDL authority・取消しを確認します。`--refinement-only`は語句seedと保存Score、固定4案、無変更の変奏、明示採用・再表示後のDDL child、edge metadataと遅い応答の拒否を同じ隔離境界で確認します。`--replay-comparison-only`はprovider0件の再現比較が保存・表示を変えないこととseed・停止の境界、`--auxiliary-provenance-only`はmockによる世代ごとのVision／random来歴を確認します。これらはnative画面、実provider、実機の受入を代替しません。変更が防ぐ具体的な失敗に合わせて必要な確認だけを選択してください。

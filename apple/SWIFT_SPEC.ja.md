@@ -22,6 +22,10 @@ binding／protocolの版は同梱Rust coreのversion report、描画層の版は
 
 制作画面で登録済みのserviceと描画modelを選択する。設定したmodelと明示取得したmodel一覧を表示し、一覧取得は利用者のbutton操作だけで始める。選択した次のmodelは記述解釈と構造化の両段へ渡し、設定画面の保存defaultや親作品のmodelを書き換えない。新しい生成要求・推敲・比較の初期選択は次のmodelを使い、開始済みbatch／demoのmodelはそのsnapshotへ固定する。未接続時はモデル設定へ案内する。
 
+制作とモデル設定の「モデルの適性・用途」はServerの登録資料をbuild時に取り込み、用途、解釈／構造化と両段の評価、Visionの評価、日英comment、更新日時と提供状態を表示する。両段の評価は弱い段階の値、段階別評価がない場合はLLM評価を使う。正確なcatalog service ID・接続方式・model IDで照合し、Ollama tagの`:`を保持する。custom serviceや未登録modelを名前やURLから推測で評価しない。Serverのdeveloper専用速度情報は公開環境と同じく表示しない。登録資料と接続先から明示取得した入力上限・対応機能は別欄にし、案内を読むだけで選択・保存default・開始時snapshotを変更しない。
+
+状態欄は共通coreの試行回数とhostの開始時刻を用い、providerの段階、固定要求の呼出しmodel、試行／再試行、段階全体と今回の経過時間を表示する。同じ段階の再試行は段階の時計を保持し、今回の時計を開始し直す。完了・失敗・確認待ち・停止で時計を確定し、停止は遅い応答の終了を待つ。現行境界が取得しない入力／出力token数は「記録なし」とし、推定しない。通常生成と比較候補は同じ表示を使い、古いtokenの応答を除外する。新規・保存作品の選択・新しい処理開始は古い表示を消し、provider不要の再現比較へ持ち込まない。
+
 macOS menuはactive sceneの操作可否を使う。⌘Nは新規制作、⌘Oは画面buttonと共通のDDL file読込、⌘,は設定、⌘1〜4は制作／library／系譜／batch・demo、⇧⌘Eは書出し、⇧⌘Cは画像copy。既存の⌘Return生成、Escape停止、⇧⌘Fプレゼンテーションと併用する。生成・自動実行・読込・dialog・presentationの状態に合わせて対象操作を無効化し、menu経由で別の書込みを割り込ませない。設定はsystem sidebarとgrouped formを使い、モデル設定への導線は該当categoryを開く。
 
 同梱の歳時記、13色catalog、11用紙と7語のMacro／plugin定義はServer sourceから生成し、共通Rustで定義とdigest lockを解決する。pluginの有効切替は新作品へ適用し、保存作品の定義を置き換えない。DDL packageのimportは`inku.ddl-export.v1`の本文・付属定義・lock・整数表現を検証し、次の新作品へ添える。4MiB／64定義を超える入力や不完全な定義は拒否し、途中結果を採用しない。
@@ -106,7 +110,9 @@ Personal ChatGPTは通常のAPI key接続と別に扱い、既定は無効とす
 
 追加の`--replay-comparison-only`は実Rust・一時SQLite・provider0件で、保存／現行SVG・版、seedの優先順と暫定0、未設定composition、履歴・系譜・表示・execution不変、古い親／tokenと停止後の応答拒否を確認した。`--auxiliary-provenance-only`は実Rustとmockで、2世代のVision来歴、randomへの古い助言混入防止、親子・中間作品・固定条件と呼出し予算を確認した。Release Universalのnative画面では制作と系譜の保存情報から比較を開き、狭い画面で両画像と版をscrollして確認した。close後もhistory2件・節点2件・edge1件・execution2件の全行が一致した。
 
-Rust 1.95のmacOS host proc-macro stripによるLINKEDIT alignment失敗は、release buildのhost build dependencyだけ`strip="none"`へ変更して回避した。target archiveの最適化とstrip設定は保持し、最新Mac coreとunsigned Release Universal appの両CPU buildが成功した。最低OS14を保持する。これはIntel実機、macOS14実機、最新iOS artifactやRelease性能の受入ではない。再試行ごとの経過時間・実model／token表示と、modelの適性・用途案内は引き続きServerとの差分として残る。
+Rust 1.95のmacOS host proc-macro stripによるLINKEDIT alignment失敗は、release buildのhost build dependencyだけ`strip="none"`へ変更して回避した。target archiveの最適化とstrip設定は保持し、最新Mac coreとunsigned Release Universal appの両CPU buildが成功した。最低OS14を保持する。これはIntel実機、macOS14実機、最新iOS artifactやRelease性能の受入ではない。
+
+追加の`--provider-progress-only`は実Rustとmockで最初の失敗後の1回の再試行、固定model・段階／試行時計・未記録usage、完了／停止の時間確定、比較callback・終了待ち・古いtoken拒否と表示解除を確認した。`--model-guidance-only`は一時DBとprovider0件でServerの段階別評価、LLM／Visionの区別、日英comment、速度の公開範囲、未登録境界、両画面のIDと選択・保存default・既存snapshot保持を確認した。更新したRelease Universalの隔離画面では制作と設定の評価5／2・両段2、登録資料と未取得の接続先情報、loopback模擬providerの429後の再試行2／4と経過表示を確認した。停止後に時計が確定し、新規で状態cardが消え、history2件・節点2件・edge1件の全行が一致した。これは実providerの性能・model取得・推論や全幅の受入ではない。
 
 ## 2026-10-02 macOS向けの共有Rust・standalone基盤（当時の記録）
 

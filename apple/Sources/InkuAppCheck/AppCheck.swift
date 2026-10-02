@@ -49,6 +49,14 @@ struct AppCheck {
             try await runAuxiliaryProvenanceChecks()
             return
         }
+        if CommandLine.arguments.contains("--provider-progress-only") {
+            try await runProviderProgressChecks()
+            return
+        }
+        if CommandLine.arguments.contains("--model-guidance-only") {
+            try await runModelGuidanceChecks()
+            return
+        }
         if CommandLine.arguments.contains("--plugin-only") {
             try await runPluginChecks()
             return

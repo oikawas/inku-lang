@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import ast
 import json
+import runpy
 import shutil
 import sys
 from copy import deepcopy
@@ -26,6 +27,47 @@ def literal_assignment(path: Path, name: str):
         if isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name) and node.target.id == name:
             return ast.literal_eval(node.value)
     raise ValueError(f"Server constant unavailable: {name}")
+
+
+def model_guidance() -> dict:
+    # This versioned module contains data expressions only; loading it does not
+    # import Server settings, inspect credentials or contact a provider.
+    catalog = runpy.run_path(str(SERVER / "verified_model_catalog.py"))
+
+    def resolve(node):
+        if isinstance(node, ast.Name):
+            return catalog[node.id]
+        if isinstance(node, ast.List):
+            return [resolve(item) for item in node.elts]
+        if isinstance(node, ast.Dict):
+            return {resolve(key): resolve(value) for key, value in zip(node.keys, node.values)}
+        return ast.literal_eval(node)
+
+    source = ast.parse((SERVER / "model_settings.py").read_text())
+    definition = next(node.value for node in source.body if isinstance(node, ast.AnnAssign)
+                      and isinstance(node.target, ast.Name) and node.target.id == "PROVIDER_DEFINITIONS")
+    model_keys = {
+        "id", "label", "purposes", "recommendation_llm", "recommendation_vision",
+        "recommendation_stage1", "recommendation_stage2", "recommendation_level",
+        "speed_class", "speed_label", "comment_ja", "comment_en", "eol", "eol_date",
+        "requires_subscription",
+    }
+    providers = []
+    for provider in resolve(definition):
+        hide_speed = bool(provider.get("speed_developer_only"))
+        models = []
+        for model in provider["models"]:
+            shown = {key: value for key, value in model.items() if key in model_keys}
+            # Match the release Server catalog's speed visibility. The evaluation
+            # comments remain verbatim, including their measurement caveats.
+            if hide_speed:
+                shown.pop("speed_class", None)
+                shown.pop("speed_label", None)
+            models.append(shown)
+        providers.append({"id": provider["id"], "label": provider["label"],
+                          "kind": provider["kind"], "speed_hidden": hide_speed, "models": models})
+    return {"schema": "inku.model-guidance.v1", "version": catalog["MODEL_CONFIG_VERSION"],
+            "updated": catalog["MODEL_CONFIG_LAST_UPDATED"], "providers": providers}
 
 
 class BindingPlaceholder:
@@ -71,6 +113,7 @@ def main() -> None:
     module = ast.fix_missing_locations(ast.Module(body=selected, type_ignores=[]))
     exec(compile(module, "server/pipeline_defaults.py", "exec"), environment)  # noqa: S102
     manifest = environment["default_manifest"](BindingPlaceholder())
+    manifest["model_guidance"] = model_guidance()
     # Parse versioned documents with the Server's data-only parser. Never load
     # user installations or execute the Markdown expansion prose.
     sys.path.insert(0, str(ROOT / "server/src"))

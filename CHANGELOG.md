@@ -6,6 +6,12 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file retains the history from v2.5.0 (2026-07-25, render engine 12) onward.** Past records follow the recent ones in a collapsible section of this same document; expand it when needed. Viewers without collapse support show the full text. Earlier history is in the [v1.72–v2.4 archive](docs/history/changelog-v1.72-v2.4.md) and the [v0.1–v1.71 archive](docs/history/changelog-v0.1-v1.71.md).
 
+### 2026-10-03 — Swift retry progress and model guidance
+
+Generation and comparison now show provider stage, pinned requested model, attempt counts, and elapsed time. Retry keeps the stage clock and resets the attempt clock; Stop/completion freeze time, old callbacks are excluded, and New clears the card. Unavailable token counts remain Not recorded.
+
+Creation and model settings now use generated Server purposes, stage suitability, Japanese/English comments, and public speed visibility. Registered evaluation is separate from service-discovered facts; custom/unregistered models receive no guessed rating. Choices, saved defaults, and captured requests stay unchanged. Selected mock/shared-core checks, Release Universal builds, native evaluation display and retry/Stop after a mock 429 passed with unchanged history/lineage rows. Finder drop and real-provider acceptance remain incomplete. Updated the [Swift specification](apple/SWIFT_SPEC.md).
+
 ### 2026-10-03 — Swift read-only replay comparison, refinement provenance, and Mac Release builds
 
 Ordinary Replay now compares stored SVG with current-engine output without changing work, history, or lineage. Creation, library, lineage, and work menus share the comparison with render-engine versions and provisional-seed notices. Replay with next conditions still saves a new child. Autonomous refinement records each generation's Vision/random provenance without copying stale advice into random mode.

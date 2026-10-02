@@ -66,6 +66,8 @@ struct CreationModelPicker: View {
                 if !model.nextDrawingModelReference.isEmpty {
                     Text(model.display.localizedFormat("次のモデル: %@", model.nextDrawingModelReference))
                         .font(.caption).foregroundStyle(.secondary).textSelection(.enabled)
+                    ModelGuidanceView(reference: model.nextDrawingModelReference, providers: settings.host.providers,
+                                      discovered: models.first { $0.id == model.nextDrawingModelReference }, display: model.display)
                 }
             } else {
                 Button(model.display.localized("モデル設定"), systemImage: "plus.circle") { openSettings() }

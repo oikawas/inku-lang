@@ -48,6 +48,7 @@ public final class AppModel {
     public private(set) var visibleDDL = ""
     public private(set) var scoreJSON = ""
     public private(set) var status = "準備中"
+    public private(set) var providerProgress: ProviderProgressSnapshot?
     public private(set) var isBusy = false
     public var errorText: String?
     public var providerURL = "http://localhost:8080/v1"
@@ -101,6 +102,7 @@ public final class AppModel {
     @ObservationIgnored private var selectedContext: SavedAuthoringContext?
     @ObservationIgnored private var currentView: PipelineView?
     @ObservationIgnored private var importedDDL: DDLPackageImport?
+    @ObservationIgnored private var providerModelsByExecution: [String: ModelSelection] = [:]
 
     public init(databaseURL: URL? = nil, transport: any ProviderTransport = URLSessionProviderTransport()) {
         self.databaseURL = databaseURL
@@ -179,6 +181,7 @@ public final class AppModel {
         guard canGenerate, let host, let bootstrap else { return }
         let token = UUID()
         generationToken = token
+        providerProgress = nil
         currentExecutionID = nil
         stopping = false
         isBusy = true
@@ -199,7 +202,7 @@ public final class AppModel {
                 derivationKind: selectedWorkID == nil ? "new" : inputMode == "ddl" ? "ddl_edit" : "description_edit")
             let request = try await pinPersonalPlanRequests([freshRequest])[0]
             let view = try await host.generate(request) { [weak self] progress in
-                Task { @MainActor in self?.receive(progress, token: token) }
+                Task { @MainActor in self?.receive(progress, token: token, models: request.models) }
             }
             await recordDescriptionFeedback(request: request, view: view)
             await notifyCommittedWork(view)
@@ -219,6 +222,7 @@ public final class AppModel {
     public func cancel() async {
         guard let operation = activeOperation, !stopping else { return }
         stopping = true
+        providerProgress?.finish(.cancelled, at: Date())
         status = "停止中"
         operation.cancel()
         if let id = currentExecutionID, let host {
@@ -230,6 +234,7 @@ public final class AppModel {
 
     public func selectWork(_ work: SavedWork) async {
         guard !isBusy else { return }
+        providerProgress = nil
         errorText = nil
         displayWork(work)
         currentExecutionID = nil
@@ -279,6 +284,7 @@ public final class AppModel {
         guard !isBusy, let host else { return }
         let token = UUID()
         generationToken = token
+        providerProgress = nil
         currentExecutionID = nil
         stopping = false
         isBusy = true
@@ -312,6 +318,8 @@ public final class AppModel {
 
     private func finishOperation(token: UUID) {
         guard generationToken == token else { return }
+        if stopping || activeOperation?.isCancelled == true { providerProgress?.finish(.cancelled, at: Date()) }
+        else if providerProgress?.outcome == .running { providerProgress?.finish(.succeeded, at: Date()) }
         if stopping { status = "停止しました" }
         activeOperation = nil
         generationToken = nil
@@ -855,9 +863,11 @@ public final class AppModel {
         guard generationToken == token, !stopping, let host else { throw CancellationError() }
         var request = request; request.saveHistory = false; request.historyVisibility = "normal"
         try await validatePinnedRequest(request)
+        let models = request.models
         let view = try await host.generate(request) { [weak self] progress in
-            Task { @MainActor in self?.receiveCandidate(progress, token: token, comparison: comparison) }
+            Task { @MainActor in self?.receiveCandidate(progress, token: token, comparison: comparison, models: models) }
         }
+        if generationToken == token, !stopping, !Task.isCancelled { finishProviderStage(view) }
         await recordDescriptionFeedback(request: request, view: view)
         try Task.checkCancellation()
         guard generationToken == token, let work = view.candidateWork else { throw HostError("comparison_candidate_requires_edit") }
@@ -906,6 +916,7 @@ public final class AppModel {
         guard !isBusy, activeOperation == nil, database != nil else { return false }
         let token = UUID()
         generationToken = token
+        providerProgress = nil
         currentExecutionID = nil
         stopping = false
         isBusy = true
@@ -934,7 +945,7 @@ public final class AppModel {
             guard let self else { return }
             try await self.validatePinnedRequest(request)
             let view = try await host.generate(request) { [weak self] progress in
-                Task { @MainActor in self?.receive(progress, token: token) }
+                Task { @MainActor in self?.receive(progress, token: token, models: request.models) }
             }
             await self.recordDescriptionFeedback(request: request, view: view)
             await self.notifyCommittedWork(view)
@@ -961,6 +972,7 @@ public final class AppModel {
 
     public func newWork() {
         guard !isBusy else { return }
+        providerProgress = nil
         status = "準備完了"
         selectedWork = nil
         selectedWorkID = nil
@@ -1298,8 +1310,9 @@ public final class AppModel {
         // A separate task makes the committed snapshot independent of later caller cancellation.
         await Task { @MainActor in await callback(work) }.value
     }
-    private func receive(_ progress: PipelineProgress, token: UUID) {
+    private func receive(_ progress: PipelineProgress, token: UUID, models: ModelSelection? = nil) {
         guard generationToken == token, !stopping else { return }
+        receiveProviderProgress(progress, models: models, comparison: false)
         switch progress {
         case .changed(let view): apply(view)
         case .providerAttempt(_, _, _, let deadline):
@@ -1309,8 +1322,9 @@ public final class AppModel {
         case .saved(_, _): status = "作品を保存しました"
         }
     }
-    private func receiveCandidate(_ progress: PipelineProgress, token: UUID, comparison: Bool = true) {
+    private func receiveCandidate(_ progress: PipelineProgress, token: UUID, comparison: Bool = true, models: ModelSelection? = nil) {
         guard generationToken == token, !stopping else { return }
+        receiveProviderProgress(progress, models: models, comparison: comparison)
         switch progress {
         case .changed(let view): currentExecutionID = view.executionID
         case .providerAttempt(_, _, _, let deadline): status = comparison ? "比較候補のモデル応答待ち（期限 \(deadline.formatted(date: .omitted, time: .standard))）" : "モデルの応答待ち（期限 \(deadline.formatted(date: .omitted, time: .standard))）"
@@ -1319,7 +1333,27 @@ public final class AppModel {
         case .saved: break
         }
     }
+    private func receiveProviderProgress(_ progress: PipelineProgress, models: ModelSelection?, comparison: Bool) {
+        switch progress {
+        case .providerAttempt(let id, let report, let beganAt, let deadline):
+            if let models { providerModelsByExecution[id] = models }
+            if let next = ProviderProgressSnapshot.start(executionID: id, report: report, beganAt: beganAt,
+                deadline: deadline, models: models ?? providerModelsByExecution[id], comparison: comparison, previous: providerProgress) {
+                providerProgress = next
+            }
+        case .changed(let view):
+            if let models { providerModelsByExecution[view.executionID] = models }
+            finishProviderStage(view)
+        case .transportBytes(let id, let bytes):
+            if providerProgress?.executionID == id { providerProgress?.receive(bytes: bytes) }
+        case .providerDiagnostic, .saved: break
+        }
+    }
+    private func finishProviderStage(_ view: PipelineView) {
+        if providerProgress?.executionID == view.executionID { providerProgress?.changed(phase: view.phase, at: Date()) }
+    }
     private func apply(_ view: PipelineView) {
+        finishProviderStage(view)
         currentView = view
         currentExecutionID = view.executionID
         if let ddl = view.visibleDDL, ddl != visibleDDL {
@@ -1360,6 +1394,7 @@ public final class AppModel {
         ][view.phase] ?? "処理中"
     }
     private func report(_ error: Error) {
+        if generationToken != nil, !stopping { providerProgress?.finish(.failed, at: Date()) }
         errorText = error.localizedDescription
         status = "処理を完了できませんでした"
     }

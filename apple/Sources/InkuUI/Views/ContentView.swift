@@ -217,17 +217,20 @@ public struct ContentView: View {
     }
 
     private var statusBar: some View {
-        HStack(spacing: 8) {
-            if model.isBusy { NativeMascot(kind: model.display.preferences.mascot).frame(width: 28, height: 28) }
-            VStack(alignment: .leading, spacing: 2) {
-                Text(model.display.message(automation.running ? automation.status : model.status)).lineLimit(2)
-                if !maintenance.backupStatus.isEmpty { Text(model.display.message(maintenance.backupStatus)).font(.caption2) }
-                if !maintenance.logStatus.isEmpty { Text(model.display.message(maintenance.logStatus)).font(.caption2) }
-            }
-            Spacer()
-            if automation.running {
-                Button(model.display.localized(automation.stopping ? "停止中" : "停止")) { Task { await automation.stop(app: model) } }
-                    .disabled(automation.stopping).keyboardShortcut(.escape, modifiers: [])
+        VStack(alignment: .leading, spacing: 6) {
+            ProviderProgressView(model: model)
+            HStack(spacing: 8) {
+                if model.isBusy { NativeMascot(kind: model.display.preferences.mascot).frame(width: 28, height: 28) }
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(model.display.message(automation.running ? automation.status : model.status)).lineLimit(2)
+                    if !maintenance.backupStatus.isEmpty { Text(model.display.message(maintenance.backupStatus)).font(.caption2) }
+                    if !maintenance.logStatus.isEmpty { Text(model.display.message(maintenance.logStatus)).font(.caption2) }
+                }
+                Spacer()
+                if automation.running {
+                    Button(model.display.localized(automation.stopping ? "停止中" : "停止")) { Task { await automation.stop(app: model) } }
+                        .disabled(automation.stopping).keyboardShortcut(.escape, modifiers: [])
+                }
             }
         }.font(.callout).foregroundStyle(.secondary).padding(.horizontal, 16).padding(.vertical, 8)
     }

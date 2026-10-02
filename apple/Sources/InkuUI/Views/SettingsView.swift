@@ -175,10 +175,10 @@ enum SettingsSection: String, CaseIterable, Identifiable {
                         Text(state.host.models.stage1Model).tag(state.host.models.stage1Model)
                         ForEach(state.modelCatalog) { item in Text(item.name).tag(item.id) }
                     }
-                    if let item = state.modelCatalog.first(where: { $0.id == state.host.models.stage1Model }) {
-                        if let limit = item.contextLimit { Text(model.display.localizedFormat("入力上限: %ld tokens", limit)) }
-                        if !item.capabilities.isEmpty { Text(item.capabilities.joined(separator: " · ")).font(.caption) }
-                    }
+                }
+                if !state.host.models.stage1Model.isEmpty {
+                    ModelGuidanceView(reference: state.host.models.stage1Model, providers: state.host.providers,
+                                      discovered: state.modelCatalog.first { $0.id == state.host.models.stage1Model }, display: model.display)
                 }
                 Stepper(model.display.localizedFormat("解釈の出力上限: %ld", state.host.models.stage1MaxTokens), value: $state.host.models.stage1MaxTokens, in: 256...65536, step: 256)
                 Stepper(model.display.localizedFormat("補完の出力上限: %ld", state.host.models.holeMaxTokens), value: $state.host.models.holeMaxTokens, in: 256...65536, step: 256)

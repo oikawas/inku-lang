@@ -1029,9 +1029,14 @@ pub fn work_plan_source_compiles_cleanly(
         && result.downstream_diagnostics().is_empty()
 }
 
+/// Proportion and angle pairs a plan never takes although they compile. An
+/// angle turns the shape, so `vertical` turns a `tall` shape 90° and the two
+/// words that each say upright draw it lying down (I-710).
+const AVOIDED_ANGLES: [(&str, &str); 1] = [("tall", "vertical")];
+
 /// Derive the per-form capability matrix by compiling one printed sentence per
-/// value. The embedded asset must equal this derivation for the current
-/// vocabulary and compiler.
+/// value, leaving out the angles in [`AVOIDED_ANGLES`]. The embedded asset must
+/// equal this derivation for the current vocabulary and compiler.
 #[must_use]
 pub fn derive_work_plan_capabilities() -> WorkPlanCapabilities {
     let vocabulary = work_plan_vocabulary();
@@ -1072,6 +1077,13 @@ pub fn derive_work_plan_capabilities() -> WorkPlanCapabilities {
             for slot in WorkPlanSlot::LAYER_ATTRIBUTES {
                 let mut values = Vec::new();
                 for term in vocabulary.terms(slot) {
+                    if slot == WorkPlanSlot::Angle
+                        && proportion.as_deref().is_some_and(|value| {
+                            AVOIDED_ANGLES.contains(&(value, term.id.as_str()))
+                        })
+                    {
+                        continue;
+                    }
                     let mut layer = base.clone();
                     if slot == WorkPlanSlot::Action {
                         layer.action = term.id.clone();

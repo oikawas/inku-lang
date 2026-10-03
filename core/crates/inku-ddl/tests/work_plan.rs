@@ -12,6 +12,46 @@ fn embedded_capabilities_match_the_current_compiler() {
     assert_eq!(&derive_work_plan_capabilities(), work_plan_capabilities());
 }
 
+/// `vertical` turns a shape 90°, so a tall shape that took it would lie down
+/// although both words say upright. The plan drops the angle there and keeps
+/// it where the turn and the proportion do not contradict each other (I-710).
+#[test]
+fn a_tall_shape_does_not_take_vertical() {
+    let layer = |proportion: &str, angle: &str| {
+        json!({"shape": "square", "proportion": proportion, "action": "fill", "count": 1,
+               "angle": angle})
+    };
+    let (plan, diagnostics) = normalize_work_plan(&json!({"layers": [
+        layer("tall", "vertical"), layer("tall", "rising"), layer("wide", "vertical"),
+    ]}));
+    let angles: Vec<Option<&str>> = plan
+        .layers
+        .iter()
+        .map(|layer| {
+            layer
+                .attributes
+                .get(&WorkPlanSlot::Angle)
+                .map(String::as_str)
+        })
+        .collect();
+    assert_eq!(angles, [None, Some("rising"), Some("vertical")]);
+    let dropped: Vec<_> = diagnostics
+        .iter()
+        .map(|item| {
+            (
+                item.layer,
+                item.field.as_str(),
+                item.value.as_str(),
+                item.reason,
+            )
+        })
+        .collect();
+    assert_eq!(
+        dropped,
+        [(Some(0), "angle", "vertical", "unsupported_for_form")]
+    );
+}
+
 struct SplitMix(u64);
 
 impl SplitMix {

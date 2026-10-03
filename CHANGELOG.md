@@ -6,6 +6,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file retains the history from v2.5.0 (2026-07-25, render engine 12) onward.** Past records follow the recent ones in a collapsible section of this same document; expand it when needed. Viewers without collapse support show the full text. Earlier history is in the [v1.72–v2.4 archive](docs/history/changelog-v1.72-v2.4.md) and the [v0.1–v1.71 archive](docs/history/changelog-v0.1-v1.71.md).
 
+### 2026-10-03 — A tall shape no longer takes vertical (I-710)
+
+When an underdrawing gave a tall shape the angle `vertical`, the shape turned 90° and lay down. `vertical` is the angle that turns a shape 90° (the specification's angle rule), and a tall shape is already long upright, so the two words that each say upright drew the opposite. The capability matrix no longer offers `vertical` to tall shapes; the function that derives the matrix lists the pair as one a plan never takes although it compiles. When a response still writes `vertical` on a tall shape, normalization drops that field alone (`unsupported_for_form`) and the shape stands as tall. The meaning of `vertical` does not change, and other pairs (wide with vertical, tall with rising, and so on) stay as they are. DDL an author writes directly is read with the full grammar and is unchanged. In the rule-8 measurement's underdrawings (50 works in Japanese and English, Gemma 4 31B), 15 tall layers had `vertical`. Saved works are unchanged.
+
 ### v2.15.81 — Fix named-corner composition and Japanese printing (Build 1157, 2026-10-03)
 
 The composition reading distinguishes the four corners a description names and places the layer there when the corner agrees with the underdrawing's place (I-712). Japanese underdrawing printing writes an extra-large shape as 特大の四角, without doubling の (I-709). Saved works and the DDL, Score and render engine versions are unchanged. The entries for the same date give each fix's rules and checks.

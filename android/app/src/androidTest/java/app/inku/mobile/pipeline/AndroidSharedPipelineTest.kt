@@ -13,6 +13,7 @@ import app.inku.mobile.data.refinement.RefinementPlanner
 import app.inku.mobile.llm.ModelProvider
 import app.inku.mobile.llm.ModelRequest
 import app.inku.mobile.llm.ModelResponse
+import app.inku.mobile.llm.GeminiJsonSchema
 import java.io.File
 import kotlinx.coroutines.runBlocking
 import org.json.JSONObject
@@ -35,6 +36,17 @@ class AndroidSharedPipelineTest {
     fun tearDown(): Unit = runBlocking {
         repository?.close()
         database?.close()
+    }
+
+    @Test
+    fun geminiCompositionPropertiesUseTheDeclaredOrderOnAndroid() {
+        val schema = GeminiJsonSchema.project(JSONObject("""{
+            "type":"object","propertyOrdering":["thesis","roles"],
+            "properties":{"roles":{"type":"array","items":{"type":"string"}},"thesis":{"type":"string"}}
+        }"""))
+        val properties = schema.getJSONObject("properties")
+        assertEquals(listOf("thesis", "roles"), properties.keys().asSequence().toList())
+        assertTrue(properties.toString().indexOf("\"thesis\"") < properties.toString().indexOf("\"roles\""))
     }
 
     @Test
@@ -332,6 +344,9 @@ class AndroidSharedPipelineTest {
 
         override suspend fun generate(request: ModelRequest): ModelResponse {
             requests += request
+            if (request.pipelineAction == "read_composition") {
+                return ModelResponse(COMPOSITION_READING, request.modelId)
+            }
             val ddl = if (request.prompt.contains("Young leaves and a mirror pair")) {
                 STEP16_DDL
             } else if (request.prompt.contains("One quiet blue circle")) {
@@ -349,6 +364,9 @@ class AndroidSharedPipelineTest {
 
         override suspend fun generate(request: ModelRequest): ModelResponse {
             requests += request
+            if (request.pipelineAction == "read_composition") {
+                return ModelResponse(COMPOSITION_READING, request.modelId)
+            }
             val response = if (request.tool?.parametersJson?.contains("\"sketch\"") == true) {
                 JSONObject().put("sketch", "The river is wide in the low light of dusk.")
             } else {
@@ -360,6 +378,7 @@ class AndroidSharedPipelineTest {
 
     private companion object {
         const val MODEL = "fixture:model"
+        const val COMPOSITION_READING = """{"thesis":"One quiet circle","roles":["focal"],"relations":[],"tension":{"motion":"still","focus":"unspecified","vertical":"unspecified","balance":"unspecified","symmetry":"unspecified","void":"unspecified"},"stated_places":[]}"""
         const val EDITED_DDL = "place one red circle at center."
         const val STEP16_DDL = "Nature.若葉. Place a small diagonal red arc at top. Place a blue arc at bottom, mirrored with the previous shape."
     }

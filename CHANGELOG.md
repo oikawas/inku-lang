@@ -20,6 +20,18 @@ Generated Server defaults now connect the shared Rust `read_composition`/`compos
 
 Focused real-Rust/mock/temporary-DB checks confirmed composition saves, finite fallback, retained legacy settings/saved-Score replay, progress, and unconnected Personal ChatGPT refusal. A separate isolated window of the updated Release Universal app also confirmed loopback-mock composition/DDL/work saves while retaining existing DB rows. Actual provider/OAuth acceptance and Server-style per-stage usage/raw SSE observations remain incomplete. The [Swift specification](apple/SWIFT_SPEC.md) records behavior and verification scope.
 
+### v2.15.80 — Connect ChatGPT composition reading to the shared pipeline (Build 1156, 2026-10-03)
+
+The ChatGPT transport accepts `read_composition` and records its time and usage separately from Stage 1. The shared source also includes Android composition adoption. Saved works and the DDL, Score and render engine versions remain unchanged. Account authorization and live model acceptance are separate checks after setup.
+
+### 2026-10-03 — Android adopts the composition reading
+
+New configurations enable shared-core composition. Cloud models read with Stage 1's model, token limit and temperature; on-device LiteRT Gemma 4 E2B sends no reading and composes with the default reading. The Android host dispatches the new effect and result, leaving continuation after a reading failure to the core. Gemini writes schema properties in propertyOrdering order. Composed numeric ranges and their mark remain in visible DDL; replay preserves existing works' DDL, Scores and settings. No progress or prompt-tab display is added.
+
+### 2026-10-03 — Align ChatGPT composition reading and measurement with the shared pipeline
+
+Registers `read_composition` as a ChatGPT effect and returns the reading as `composition_read`. Observations use the shared classification and record time, usage, requests and responses under `composition`, separately from Stage 1. Rust prompts, schemas and the default fallback remain in place.
+
 ### v2.15.79 — Draw with a composition after the underdrawing (Build 1155, 2026-10-03)
 
 Description drawing reads the composition with the same model after the underdrawing, then places layers whose place is unstated on ranges along the canvas thirds. The numeric ranges remain in the visible DDL. Saved works, DDL-to-Score compilation and layer versions remain unchanged. The following record for the same date gives the rules and acceptance results.

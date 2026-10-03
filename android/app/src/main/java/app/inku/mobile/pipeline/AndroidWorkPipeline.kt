@@ -570,6 +570,7 @@ class AndroidWorkPipeline(
                     variationSeed = request.variationSeed,
                     bundledPluginsEnabled = bundledPluginsEnabled(),
                     importedPlugins = request.importedPlugins,
+                    drawingModelId = request.drawingModel,
                 ),
             )
         } else {
@@ -664,6 +665,11 @@ class AndroidWorkPipeline(
                 .put("catalog_mode", if (catalogId == "default") "default" else "explicit")
                 .put("background", "white")
                 .put("palette", palette)
+        }
+        // Old saved configurations keep composition absent. A new fork that
+        // changes the model retains composition but must respect the local limit.
+        if (config.has("composition")) {
+            config.put("composition", compositionForModel(request.drawingModel))
         }
         compiler
             .put("host", resolvedHost(selectedCatalogId))

@@ -15,6 +15,26 @@ import org.junit.Test
 
 class GeminiModelProviderTest {
     @Test
+    fun compositionSchemaKeepsTheThesisFirstAndOrdersNestedObjectsWithoutDroppingProperties() {
+        val projected = GeminiJsonSchema.project(JSONObject("""{
+            "type":"object","propertyOrdering":["thesis","roles","missing"],
+            "properties":{
+                "roles":{"type":"array","items":{"type":"object",
+                    "propertyOrdering":["kind","detail"],"properties":{
+                        "detail":{"type":"string"},"kind":{"const":"focal"}
+                    }}},
+                "thesis":{"type":"string"},"extra":{"type":"string"}
+            }
+        }"""))
+        // The JVM org.json uses HashMap; Android writes these names in insertion order.
+        assertEquals(listOf("thesis", "roles", "extra"), GeminiJsonSchema.orderedPropertyNames(projected))
+        val nested = projected.getJSONObject("properties").getJSONObject("roles").getJSONObject("items")
+        assertEquals(listOf("kind", "detail"), GeminiJsonSchema.orderedPropertyNames(nested))
+        assertEquals("focal", nested.getJSONObject("properties").getJSONObject("kind").getJSONArray("enum").getString(0))
+        assertEquals("string", projected.getJSONObject("properties").getJSONObject("extra").getString("type"))
+    }
+
+    @Test
     fun gemmaPipelineUsesNativeEndpointCredentialsAndFunctionArguments() = runBlocking {
         lateinit var connection: GeminiConnection
         val provider = GeminiModelProvider("gemini", "https://generativelanguage.googleapis.com", "test-key") { url ->

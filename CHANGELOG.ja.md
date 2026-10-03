@@ -20,6 +20,18 @@ Serverの新規生成既定を取り込み、共通Rustの`read_composition`／`
 
 実Rust・mock・一時DBによる構図保存、有限fallback、旧設定／保存Score再生の保持、進行表示とPersonal ChatGPTの未接続拒否を限定確認した。更新したRelease Universalの別隔離画面でもloopback mockによる構図・DDL・作品保存を確認し、既存DB行を保持した。実provider／OAuthの受入、Server相当の段階別usage・raw SSE観測保存は残る。[Swift仕様](apple/SWIFT_SPEC.ja.md)に実装と確認範囲を記した。
 
+### v2.15.80 — ChatGPTの構図読みを共有pipelineへ接続（Build 1156、2026-10-03）
+
+ChatGPTの専用経路が`read_composition`を受け取り、読みの時間とusageをStage 1とは別に記録する。共有ソースにはAndroidの構図取り込みも含む。保存済み作品とDDL・Score・render engineの版は変わらない。本人認可と実モデルの受入は、導入後の確認として別に行う。
+
+### 2026-10-03 — Androidへ構図の読みを取り込む
+
+新規設定で共有coreの構図を有効にした。雲のモデルはStage 1と同じモデル・最大token・温度で構図を読み、端末のLiteRT Gemma 4 E2Bは読みを送らず既定の読みで構図を入れる。Android hostは新しいeffectと結果を配送し、読み失敗時の継続はcoreの判断を使う。Geminiの応答の型はpropertyOrderingの順に書く。構図の数値範囲と印を可視DDLへ保存し、既存作品のDDL・Score・設定は再演時に保つ。進み具合とプロンプトのタブの表示は追加しない。
+
+### 2026-10-03 — ChatGPTの構図読みと計測を共有pipelineへ合わせる
+
+ChatGPTのeffectに`read_composition`を登録し、構図の読みを`composition_read`として返す。観測は共有分類を使い、Stage 1とは別の`composition`へ時間・usage・要求と応答を記録する。Rustのprompt/schemaと既定fallbackを継承する。
+
 ### v2.15.79 — 下絵から構図を決めて描く（Build 1155、2026-10-03）
 
 記述からの描画は、下絵の後に同じモデルで構図を読み、記述が場所を言わない層を画面の三分割に沿って置く。構図の数値範囲は可視DDLに残る。保存済みの作品、DDLからScoreへの組み立て、各層の版は変わらない。詳しい規則と受入結果は次の同日記録に示す。

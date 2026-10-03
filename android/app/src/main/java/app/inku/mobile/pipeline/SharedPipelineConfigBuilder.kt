@@ -3,9 +3,13 @@ package app.inku.mobile.pipeline
 import app.inku.mobile.data.model.CatalogSelection
 import app.inku.mobile.data.model.ColorCatalog
 import app.inku.mobile.data.model.ColorCatalogs
+import app.inku.mobile.llm.isLocalVisionModel
 import java.security.MessageDigest
 import org.json.JSONArray
 import org.json.JSONObject
+
+internal fun compositionForModel(modelId: String): JSONObject =
+    JSONObject().put("read", !isLocalVisionModel(modelId))
 
 data class PipelineCanonicalMacro(
     val sourceId: String,
@@ -40,6 +44,7 @@ data class SharedPipelineConfigRequest(
     val bundledPluginsEnabled: Boolean = true,
     /** Definitions from an imported DDL export; they win their names for this work. */
     val importedPlugins: List<ImportedPluginDefinition> = emptyList(),
+    val drawingModelId: String = "",
 )
 
 data class PipelineResourceLimits(
@@ -173,6 +178,7 @@ class SharedPipelineConfigBuilder(
                     .put("max_output_bytes", policy.maxOutputBytes),
             )
             .put("language", request.resolvedLanguage)
+            .put("composition", compositionForModel(request.drawingModelId))
             .put("compiler", compiler)
             .put("definitions", JSONArray().also { output ->
                 entries.objects().forEach { output.put(it.requiredObject("definition")) }

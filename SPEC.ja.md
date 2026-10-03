@@ -983,7 +983,7 @@ Stage 1、camera projection、hole補完は既存の共有grammar helperを使�
 
 ### 12.5 描画とVisionのモデル
 
-予約provider `chatgpt`（ChatGPTプラン）は本人OAuth・scope・本人catalogによる共有pipeline専用接続である。明示有効化、`developer_mode || single_user_mode`、検証済みlocal/self-hosted起動を要求し、管理者にも迂回を許さない。`chatgpt:<slug>`を共有APIキー接続やbare名の所有へ混ぜず、利用不可でも保存指定を保持する。両段共通の描画、写生文、カタログ選択、可視hole補完をResponses/SSEへ接続し、Rustのprompt/schema/retry・Score/SVGは変えない。実行のowner/profile/generationを固定し、quota・cancel・sign-out・モード変更で追加通信と遅い結果を停止する。Vision・奥書・デモ指示生成・モデル検査へは提供しない。[接続・移送・復旧](docs/guide/chatgpt-plan.ja.md)を参照。
+予約provider `chatgpt`（ChatGPTプラン）は本人OAuth・scope・本人catalogによる共有pipeline専用接続である。明示有効化、`developer_mode || single_user_mode`、検証済みlocal/self-hosted起動を要求し、管理者にも迂回を許さない。`chatgpt:<slug>`を共有APIキー接続やbare名の所有へ混ぜず、利用不可でも保存指定を保持する。両段共通の描画、写生文、カタログ選択、構図の読み、可視hole補完をResponses/SSEへ接続し、Rustのprompt/schema/retry・Score/SVGは変えない。構図の読みは観測をStage 1から分けて`composition`に記録し、読みが使えないときの既定fallbackは共有Rustへ委ねる。実行のowner/profile/generationを固定し、quota・cancel・sign-out・モード変更で追加通信と遅い結果を停止する。Vision・奥書・デモ指示生成・モデル検査へは提供しない。[接続・移送・復旧](docs/guide/chatgpt-plan.ja.md)を参照。
 
 MLXの`mlx-vlm`サーバーはサービス種別`mlx`（管理画面の「MLX (mlx-vlm)」）で登録する。接続先・キー・モデル一覧はOpenAI互換APIとして扱い、描画の応答は共有コアが渡すJSON Schemaをそのまま`response_format`へ渡して制約する。関数ツールは送らず、`enable_thinking: false`を明示する。コアによる応答検証と再試行の権限は継続する。登録済みサービスは種別だけを変更でき、キー・URL・公開モデルを保持する。
 
@@ -1033,7 +1033,7 @@ Stage 1 は自由記述を、書き手が観察・編集できる正規化 DDL �
 - 解き: 各層の範囲の組み合わせを総当たりで探し（上限3,000,000）、読みと作者の既定（動的な均衡、多めの余白、左右は同等）に照らした点で比べる。最良の点の1.03倍＋0.02以内の答えから、作品の`composition_seed`（無ければ1）と、構図を入れる前の文書のdigestで一つを選ぶ。記述が「隅」と言う層は四隅の範囲から選び、記述が名指す隅（右下など）はまだ読まない。
 - 印字: 構図が置いた層は数値の範囲（§18）で書き、範囲の前に印「［構図］」（英語は`[composition]`）を置く（`［構図］右下（横2/3〜1、縦2/3〜1）に、…`、`… at the [composition] bottom right (horizontal 2/3 to 1, vertical 2/3 to 1)`）。記述が場所を言う層は、その場所の語のまま書く。構図を入れた文書が診断なしで組めることを確かめてから、Stage 1の理由のままcommitする。
 - 読みが使えないとき: 読みの要求が予算を使い切ったとき、読めない応答の再試行が尽きたとき、要求を組めないときは、既定の読み（関係なし、作者の既定、下絵の場所はすべて残す）で解く（出来事`composition_fallback`）。組み合わせが上限を超える、置ける範囲が無い、構図を入れた文書が組めないときは、構図を入れずにStage 1が印字したままcommitする（出来事`composition_skipped`）。残りを描く道（`stage1_residual_execution`）と、`normalized_ddl`を持つ保存済み応答の再生には構図を入れない。
-- 設定: `PipelineConfig.composition`（`{read}`）。無ければ構図を行わない。`read: false`は読みを送らず、既定の読みで解く。Serverの既定のmanifestは`{read: true}`で、保存した設定で描き直す作品はその設定のままである。Androidは、取り込むまで構図を行わない。
+- 設定: `PipelineConfig.composition`（`{read}`）。無ければ構図を行わない。`read: false`は読みを送らず、既定の読みで解く。Serverの既定のmanifestは`{read: true}`で、保存した設定で描き直す作品はその設定のままである。Androidの新規設定は雲のモデルで`read: true`、端末のLiteRT Gemma 4 E2Bで`read: false`とする。
 - Serverは読みの時間をStage 1と分けて`metrics.composition`に数え（履歴の列は増やさず、合計にだけ入る）、読みの失敗の段を`composition`と記録する。読みのsystem promptはプロンプトのタブに出さない。
 - 構図は保存済みの作品を変えない。作品は構図を入れた可視DDLとScoreを保存し、描き直しと「別の構図」は保存したDDLを読む（DDLに書いた範囲は動かない）。
 

@@ -3,7 +3,7 @@
 このディレクトリは、ネイティブ単体 Android アプリのワークスペースであり、Git 管理対象とする。
 ローカル専用成果物、端末ID、ダウンロード済みモデル、ログ、秘密情報は追跡対象に含めない。
 
-最終更新: 2026-10-01。
+最終更新: 2026-10-03。
 
 **追随状況**: Android は `2.1.4-android.80` の世代にある。DDLの変換とScore → SVGの描画は、
 同じcommitの共有Rust core（`core/crates/`）を同梱してServerと同じ実装で行い、Android独自の版定数を持たない。
@@ -29,6 +29,14 @@ runtime fallbackを持たない。保存済みSVG、Room schema、Score schema�
 - `ANDROID_SPEC.md` は英語版として、`ANDROID_SPEC.ja.md` の意図を保った翻訳・要約として更新する。
 - Android 仕様を更新するときは、先に `ANDROID_SPEC.ja.md` を更新し、その後で `ANDROID_SPEC.md` を同期する。
 - 英語版だけに存在する仕様・要件を追加してはならない。
+
+## 2026-10-03 下絵の後の構図と読み
+
+共有SPEC §12.6.2の構図を新規設定へ取り込む。雲のモデルは `composition: {"read": true}` とし、下絵の後・可視DDLのcommit前に `read_composition` を同じStage 1モデル・最大token・温度0.0で送り、`composition_read` を返す。読みの再試行は共有coreが `composition_retry`、無ければ `catalog_retry` の予算で行う。端末のLiteRT Gemma 4 E2Bは作者の判断どおり `read: false` とし、読みの要求を送らず既定の読みで構図を入れる。
+
+Geminiへ渡す応答の型は、各objectの `propertyOrdering` に沿って `properties` を書き、要旨 `thesis` を先頭にする。指名されない項目も残す。読みが使えない場合と構図を入れられない場合はcoreの既定の読み／下絵のままのcommitへ進み、Android hostは止めない。新しいsnapshot欄と出来事は共有coreの記録として保持し、読みの段を進み具合やプロンプトのタブへ加えない。
+
+構図が置いた層の数値範囲は、可視DDLに `［構図］`（英語は `[composition]`）の印付きで保存する。既存の保存config・DDL・Scoreを再演時に書き換えない。compositionの無い古い設定はそのまま使い、既存compositionを持つ作品からモデルを変更して新しい実行を作る場合は端末／雲のreadを合わせる。DDLの版・描画coreの版・Room schemaは変更しない。記述が名指す隅を読む変更は含めない。
 
 ## 2026-10-02 保存指示書を一つのDDLに統合
 

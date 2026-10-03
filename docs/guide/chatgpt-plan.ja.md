@@ -21,6 +21,12 @@ INKU_CHATGPT_PLAN_ENABLED=1 INKU_DEVELOPER_MODE=1 \
 
 ## 別hostの自己ホストで接続する
 
+設定の独立した「ChatGPTプラン」タブで「Continue with ChatGPT」を押すと、このMacにセットアップした「inku ChatGPT」helperを開きます。Chromeがアプリを開く確認を表示したら許可します。開かない場合は画面の同じリンクから再度開けます。helper未導入の場合は、運用者がこのMacへ専用helperをセットアップしてから進めます。
+
+Macの確認画面には保護された接続で取得したinku本人の名前・IDと移送先host IDが表示されます。接続先を確認して「続ける」を押すと、ChromeのOpenAI認証・利用同意へ進みます。認証後の封印と移送はhelperが一回ずつ行います。完了したらWebの「接続状態を確認」を押します。失敗時は固定理由を表示して止まり、自動再試行しません。既に別のinku本人へ固定したMacではその接続を拒否します。
+
+起動リンクの`inku-chatgpt://connect`には本人ID・選択登録ID・同意指定だけを載せます。OAuth URL/code/tokenや転送する登録の本文をリンクへ含めません。「表示・操作」「描画」「その他（サーバー）」などの既存設定は元のページに残ります。以下は運用者向けの同じ接続手順です。
+
 Macで認証し、自己ホストだけが更新を所有します。Web全体のHTTPS化は前提条件にしません。code/tokenはLAN HTTPへ送らず、OpenAI通信は固定HTTPS、callbackはMacのHTTP loopback、選択登録の移送は運用者の保護された専用SSH経路です。[公式手順](https://developers.openai.com/siwc/token-sharing-open-source/self-hosted-vms)
 
 自己ホストは明示有効化とモード条件を維持し、次の入口で起動します。

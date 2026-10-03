@@ -20,6 +20,9 @@
 		<a href={connection.authorizationUrl} target="_blank" rel="noopener noreferrer">{t().chatgptContinue}</a>
 		<button class="ghost-btn" onclick={() => void connection.cancel()}>{t().pipelineCancel}</button>
 	{/if}
+	{#if connection.helperUrl}
+		<a href={connection.helperUrl}>{t().chatgptContinue}</a>
+	{/if}
 	{#each connection.state?.pending_registrations ?? [] as pending (pending.id)}
 		<button class="ghost-btn" disabled={connection.busy} onclick={() => void connection.authorize(pending.id)}>{t().chatgptReconnect} ({pending.client_id})</button>
 	{/each}

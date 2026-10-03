@@ -280,8 +280,13 @@
 					<div class="settings-category-label">{t().settingsCategoryMaking}</div>
 					<button aria-current={settingsTab === 'misc' && appearanceSection === 'making' ? 'page' : undefined} class:active={settingsTab === 'misc' && appearanceSection === 'making'} onclick={() => selectAppearanceSection('making')}>{t().settingsBatchRetryLabel}</button>
 					<button aria-current={settingsTab === 'demo' ? 'page' : undefined} class:active={settingsTab === 'demo'} onclick={() => onSelectSettingsTab('demo')}>{t().modeDemo}</button>
-					{#if reaches('chatgpt')}<button aria-current={settingsTab === 'chatgpt' ? 'page' : undefined} class:active={settingsTab === 'chatgpt'} onclick={() => onSelectSettingsTab('chatgpt')}>{t().chatgptPlanLabel}</button>{/if}
 				</section>
+				{#if reaches('chatgpt')}
+					<section class="settings-category">
+						<div class="settings-category-label">{t().chatgptPlanLabel}</div>
+						<button aria-current={settingsTab === 'chatgpt' ? 'page' : undefined} class:active={settingsTab === 'chatgpt'} onclick={() => onSelectSettingsTab('chatgpt')}>{t().chatgptPlanLabel}</button>
+					</section>
+				{/if}
 				<section class="settings-category">
 					<div class="settings-category-label">{t().settingsTabExport}</div>
 					<button aria-current={settingsTab === 'export' && exportSection === 'files' ? 'page' : undefined} class:active={settingsTab === 'export' && exportSection === 'files'} onclick={() => selectExportSection('files')}>{t().settingsTabExport}</button>
@@ -329,8 +334,9 @@
 					<p>{settingsPage.hint}</p>
 				</header>
 			<div class:limits-body={settingsTab === 'limits'} class="settings-body">
-				{#if settingsTab === 'chatgpt' && reaches('chatgpt')}<ChatGPTSettings connection={settings.chatgpt} />{/if}
-			{#if settingsTab === 'models'}
+			{#if settingsTab === 'chatgpt'}
+				{#if reaches('chatgpt')}<ChatGPTSettings connection={settings.chatgpt} />{/if}
+			{:else if settingsTab === 'models'}
 				<ModelAdministrationSettings administration={settings.modelAdministration} {providerGroups} />
 		{:else if settingsTab === 'db'}
 			<DatabaseAdministrationSettings

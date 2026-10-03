@@ -21,6 +21,12 @@ Choose “Continue with ChatGPT” in ChatGPT plan settings, sign in and grant p
 
 ## Connect a self-hosted installation on another host
 
+Choose Continue with ChatGPT on the independent ChatGPT plan tab to open the inku ChatGPT helper installed on this Mac. Allow Chrome to open the application. If it does not open, use the same link shown on screen. The operator must set up the dedicated helper on this Mac first.
+
+The Mac confirmation shows the inku account name and ID and the destination host ID, obtained through the protected connection. Confirm the destination to open OpenAI sign-in and consent in Chrome. The helper seals and transfers the registration once after authorization. Then press Check connection in the Web settings. A failure shows a fixed reason and stops without an automatic retry. A Mac already bound to another inku account rejects the connection.
+
+The `inku-chatgpt://connect` launch link carries only the account ID, selected registration ID and consent action. It contains no OAuth URL, code, token or registration payload. Existing display, drawing and server settings stay on their original pages. The following describes the same connection for operators.
+
 Authorize on the Mac, then let the self-hosted installation own renewal exclusively. Migrating the entire Web to HTTPS is not required. Codes and tokens do not pass through LAN HTTP. OpenAI uses fixed HTTPS endpoints, the Mac callback uses HTTP loopback, and the selected registration moves through the operator's protected, dedicated SSH transport. [Official procedure](https://developers.openai.com/siwc/token-sharing-open-source/self-hosted-vms)
 
 Retain explicit enablement and the mode requirement, and start the self-hosted installation with:

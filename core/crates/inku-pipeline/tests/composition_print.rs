@@ -11,7 +11,21 @@ use inku_ddl::work_plan::{
 use inku_pipeline::composition;
 use serde::Deserialize;
 
-const FIXTURE: &str = include_str!("data/composition-port-v1.json");
+/// The works of the measurements, and the works whose reading names a corner (I-712).
+const FIXTURES: [&str; 2] = [
+    include_str!("data/composition-port-v1.json"),
+    include_str!("data/composition-port-corners-v1.json"),
+];
+
+fn fixture_cases() -> Vec<Case> {
+    FIXTURES
+        .iter()
+        .flat_map(|text| {
+            let fixture: Fixture = serde_json::from_str(text).expect("the fixture is JSON");
+            fixture.cases
+        })
+        .collect()
+}
 
 #[derive(Deserialize)]
 struct Fixture {
@@ -66,9 +80,9 @@ fn composed_source(
 
 #[test]
 fn composed_placements_print_as_the_prototype_and_compile_cleanly() {
-    let fixture: Fixture = serde_json::from_str(FIXTURE).expect("the fixture is JSON");
+    let cases = fixture_cases();
     let (mut printed, mut failures) = (0, Vec::new());
-    for case in &fixture.cases {
+    for case in &cases {
         let language = language(&case.lang);
         for (seed, solved) in [("s1", &case.solve.s1), ("s2", &case.solve.s2)] {
             let Some(solved) = solved else { continue };
@@ -104,9 +118,9 @@ fn composed_placements_print_as_the_prototype_and_compile_cleanly() {
 /// fixture holds, compiles with no diagnostic in both languages.
 #[test]
 fn every_range_and_corner_compiles_cleanly_for_each_action() {
-    let fixture: Fixture = serde_json::from_str(FIXTURE).expect("the fixture is JSON");
+    let cases = fixture_cases();
     let mut examples: Vec<WorkPlanLayer> = Vec::new();
-    for case in &fixture.cases {
+    for case in &cases {
         for layer in &case.layers {
             if !examples.iter().any(|seen| seen.action == layer.action) {
                 examples.push(layer.clone());

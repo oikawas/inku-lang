@@ -601,8 +601,10 @@ pub const TENSION: [(&str, &[&str]); 6] = [
     ("void", &["strong", "medium", "weak"]),
 ];
 
-/// The places a work-plan layer can take; a reading names a stated place with one.
-pub const PLACES: [&str; 8] = [
+/// The places a reading can name for a stated place: the places a work-plan layer
+/// can take, then the four corners a description may name (I-712), which the plan
+/// cannot say; `corner` alone leaves the choice to the composition.
+pub const PLACES: [&str; 12] = [
     "top",
     "bottom",
     "center",
@@ -611,7 +613,55 @@ pub const PLACES: [&str; 8] = [
     "top_edge",
     "bottom_edge",
     "corner",
+    "top_left_corner",
+    "top_right_corner",
+    "bottom_left_corner",
+    "bottom_right_corner",
 ];
+
+/// The corners a reading can name, with the corner range each is solved to.
+pub const NAMED_CORNERS: [(&str, &str); 4] = [
+    ("top_left_corner", "corner-tl"),
+    ("top_right_corner", "corner-tr"),
+    ("bottom_left_corner", "corner-bl"),
+    ("bottom_right_corner", "corner-br"),
+];
+
+/// The plan places a named corner refines: `corner`, or a side the corner lies on.
+/// Any other plan place stays, since a reading may tie the words to the wrong layer.
+const CORNER_SIDES: [(&str, [&str; 4]); 4] = [
+    (
+        "top_left_corner",
+        ["corner", "top", "top_edge", "left_edge"],
+    ),
+    (
+        "top_right_corner",
+        ["corner", "top", "top_edge", "right_edge"],
+    ),
+    (
+        "bottom_left_corner",
+        ["corner", "bottom", "bottom_edge", "left_edge"],
+    ),
+    (
+        "bottom_right_corner",
+        ["corner", "bottom", "bottom_edge", "right_edge"],
+    ),
+];
+
+fn corner_refines(corner: &str, plan_place: Option<&str>) -> bool {
+    plan_place.is_none_or(|plan| {
+        CORNER_SIDES
+            .iter()
+            .any(|(name, sides)| *name == corner && sides.contains(&plan))
+    })
+}
+
+fn named_corner(place: &str) -> Option<&'static str> {
+    NAMED_CORNERS
+        .iter()
+        .find(|(name, _)| *name == place)
+        .map(|(_, key)| *key)
+}
 
 /// Words of position, as the reading prompt lists them. A stated place must quote
 /// one: the words of a scene or of a thing are not a place. Japanese is matched as
@@ -1083,6 +1133,22 @@ pub fn check(
             findings.push(finding("stated_place_unquoted", item, "dropped"));
         } else if !names_a_position(words) {
             findings.push(finding("stated_place_not_positional", item, "dropped"));
+        } else if let (Some(index), Some(place)) = (
+            index,
+            read_place
+                .filter(|place| named_corner(place).is_some() && corner_refines(place, plan_place)),
+        ) {
+            // The plan cannot say which corner; the description's words do (I-712).
+            fixed.insert(index, place.to_owned());
+            findings.push(finding("stated_corner_from_reading", item, "kept"));
+        } else if let (Some(index), Some(plan), Some(_)) = (
+            index,
+            plan_place,
+            read_place.filter(|place| named_corner(place).is_some()),
+        ) {
+            // The corner is not on the plan place's side: the plan's place stays.
+            fixed.insert(index, plan.to_owned());
+            findings.push(finding("stated_corner_conflict", item, "dropped"));
         } else if let (Some(index), None, Some(place)) = (index, plan_place, read_place) {
             fixed.insert(index, place.to_owned());
             findings.push(finding("stated_place_from_reading", item, "kept"));
@@ -1264,8 +1330,16 @@ fn named_region(place: &str) -> Option<usize> {
     regions().all.iter().position(|region| region.key == key)
 }
 
-/// The ranges a stated place allows: its named range, or the four corners.
+/// The ranges a stated place allows: its named range, the four corners, or the one
+/// corner the description names.
 fn stated_regions(place: &str) -> Option<Vec<usize>> {
+    if let Some(key) = named_corner(place) {
+        return regions()
+            .all
+            .iter()
+            .position(|region| region.key == key)
+            .map(|index| vec![index]);
+    }
     if place == "corner" {
         let all = &regions().all;
         return Some(
@@ -2396,6 +2470,84 @@ mod tests {
         }
     }
 
+    fn plan_layer(action: &str, shape: &str, position: Option<&str>) -> WorkPlanLayer {
+        let mut layer = WorkPlanLayer {
+            shape: shape.into(),
+            action: action.into(),
+            count: 1,
+            ..WorkPlanLayer::default()
+        };
+        if let Some(position) = position {
+            layer
+                .attributes
+                .insert(WorkPlanSlot::Position, position.into());
+        }
+        layer
+    }
+
+    /// I-712: the plan can only say "corner"; a corner the description names is
+    /// kept over it and solved to that corner, while "corner" alone still lets the
+    /// composition choose among the four.
+    #[test]
+    fn a_named_corner_is_kept_over_the_plans_corner_and_solved_there() {
+        let layers = [
+            plan_layer("fill", "square", None),
+            plan_layer("place", "ellipse", Some("corner")),
+        ];
+        let reading = |place: &str| RawReading {
+            roles: vec!["field".into(), "focal".into()],
+            stated_places: vec![(
+                "1".into(),
+                RawStatedPlace {
+                    words: Some("右下の隅には".into()),
+                    place: Some(place.into()),
+                },
+            )],
+            ..RawReading::default()
+        };
+        let quoted = |_: usize, _: &str| true;
+        let (named, findings) =
+            check(&reading("bottom_right_corner"), &layers, Some(&quoted)).expect("checked");
+        assert_eq!(
+            named.fixed.get(&1).map(String::as_str),
+            Some("bottom_right_corner")
+        );
+        let codes: Vec<&str> = findings.iter().map(|finding| finding.code).collect();
+        assert!(codes.contains(&"stated_corner_from_reading"), "{codes:?}");
+        let searched = search(&layers, &named, "white").expect("searched");
+        for seed in [1, 2, 3] {
+            let solution =
+                solve(&layers, &named, "white", &searched, seed, "work").expect("solved");
+            assert_eq!(region_key(solution.regions[1]), "corner-br", "seed {seed}");
+        }
+        let (plain, _) = check(&reading("corner"), &layers, Some(&quoted)).expect("checked");
+        assert_eq!(plain.fixed.get(&1).map(String::as_str), Some("corner"));
+        // A named corner off the plan place's side (a reading may tie the words to
+        // the wrong layer) leaves the plan's place; one on its side refines it.
+        for (plan, kept, code) in [
+            ("center", "center", "stated_corner_conflict"),
+            (
+                "bottom_edge",
+                "bottom_right_corner",
+                "stated_corner_from_reading",
+            ),
+        ] {
+            let layers = [
+                plan_layer("fill", "square", None),
+                plan_layer("place", "ellipse", Some(plan)),
+            ];
+            let (checked, findings) =
+                check(&reading("bottom_right_corner"), &layers, Some(&quoted)).expect("checked");
+            assert_eq!(
+                checked.fixed.get(&1).map(String::as_str),
+                Some(kept),
+                "{plan}"
+            );
+            let codes: Vec<&str> = findings.iter().map(|finding| finding.code).collect();
+            assert!(codes.contains(&code), "{plan}: {codes:?}");
+        }
+    }
+
     #[test]
     fn the_regions_are_the_twenty_eight_ranges_seven_names_and_four_corners() {
         let table = regions();
@@ -2412,5 +2564,13 @@ mod tests {
             corners,
             ["corner-tl", "corner-tr", "corner-bl", "corner-br"]
         );
+        for (name, key) in NAMED_CORNERS {
+            let chosen: Vec<&str> = stated_regions(name)
+                .expect("a named corner is one cell")
+                .into_iter()
+                .map(region_key)
+                .collect();
+            assert_eq!(chosen, [key], "{name}");
+        }
     }
 }

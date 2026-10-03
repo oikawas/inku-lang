@@ -1,0 +1,1185 @@
+{
+ "cases": [
+  {
+   "background": "white",
+   "case": "ja-16",
+   "checked": {
+    "findings": [
+     "field_isolated",
+     "stated_corner_from_reading"
+    ],
+    "fixed": {
+     "0": "center",
+     "1": "top_left_corner"
+    },
+    "relations": [
+     {
+      "a": 1,
+      "type": "isolated"
+     },
+     {
+      "a": 0,
+      "b": 1,
+      "type": "apart"
+     }
+    ],
+    "roles": [
+     "field",
+     "focal"
+    ],
+    "tension": {
+     "balance": "dynamic",
+     "focus": "dispersed",
+     "motion": "still",
+     "symmetry": "asymmetric",
+     "void": "strong"
+    }
+   },
+   "defaults": {
+    "balance": "dynamic",
+    "left_right": "symmetric",
+    "void": "strong"
+   },
+   "id": "k1/ja-16-k1",
+   "lang": "ja",
+   "layers": [
+    {
+     "action": "draw",
+     "attributes": {
+      "angle": "horizontal",
+      "color": "gray",
+      "continuity": "solid",
+      "handling": "faint",
+      "motion_amplitude": "narrowly",
+      "motion_quality": "swaying",
+      "position": "center",
+      "surface": "grain",
+      "thinness": "thin",
+      "tool": "pencil"
+     },
+     "count": 1,
+     "proportion": "half_width",
+     "shape": "line"
+    },
+    {
+     "action": "place",
+     "attributes": {
+      "color": "white",
+      "handling": "temperate",
+      "position": "top_edge",
+      "size": "large",
+      "surface": "flat",
+      "tool": "chalk"
+     },
+     "count": 1,
+     "proportion": null,
+     "shape": "circle"
+    }
+   ],
+   "reading": {
+    "relations": [
+     {
+      "a": 0,
+      "type": "isolated"
+     },
+     {
+      "a": 1,
+      "type": "isolated"
+     },
+     {
+      "a": 0,
+      "b": 1,
+      "type": "apart"
+     }
+    ],
+    "roles": [
+     "field",
+     "focal"
+    ],
+    "stated_places": [
+     [
+      "0",
+      {
+       "place": "center",
+       "quoted": true,
+       "words": "上"
+      }
+     ],
+     [
+      "1",
+      {
+       "place": "top_left_corner",
+       "quoted": true,
+       "words": "上"
+      }
+     ]
+    ],
+    "tension": [
+     [
+      "balance",
+      "dynamic"
+     ],
+     [
+      "void",
+      "strong"
+     ],
+     [
+      "focus",
+      "dispersed"
+     ],
+     [
+      "motion",
+      "still"
+     ],
+     [
+      "symmetry",
+      "asymmetric"
+     ]
+    ]
+   },
+   "solve": {
+    "combinations": 1,
+    "s1": {
+     "best": 5.108876562561156,
+     "ddl_layers": [
+      "中心に、細かく揺れる灰の細い鉛筆の実線の薄い粒の水平の半幅の線を1個引く。",
+      "［構図］左上の隅（横0〜1/5、縦0〜1/5）に、白のチョークの程よい塗りの大きな円を1個置く。"
+     ],
+     "near_best": 1,
+     "regions": [
+      "named-center",
+      "corner-tl"
+     ],
+     "terms": [
+      [
+       "balance",
+       2.2920398101555493
+      ],
+      [
+       "asymmetry",
+       0.0
+      ],
+      [
+       "off_axis",
+       0.0
+      ],
+      [
+       "focal_locus",
+       0.3
+      ],
+      [
+       "focus",
+       2.1835034190722737
+      ],
+      [
+       "void",
+       0.0
+      ],
+      [
+       "relation0:isolated",
+       0.0
+      ],
+      [
+       "relation1:apart",
+       0.0
+      ],
+      [
+       "field_size",
+       0.3333333333333333
+      ]
+     ],
+     "total": 5.108876562561156
+    },
+    "s2": {
+     "best": 5.108876562561156,
+     "ddl_layers": [
+      "中心に、細かく揺れる灰の細い鉛筆の実線の薄い粒の水平の半幅の線を1個引く。",
+      "［構図］左上の隅（横0〜1/5、縦0〜1/5）に、白のチョークの程よい塗りの大きな円を1個置く。"
+     ],
+     "near_best": 1,
+     "regions": [
+      "named-center",
+      "corner-tl"
+     ],
+     "terms": [
+      [
+       "balance",
+       2.2920398101555493
+      ],
+      [
+       "asymmetry",
+       0.0
+      ],
+      [
+       "off_axis",
+       0.0
+      ],
+      [
+       "focal_locus",
+       0.3
+      ],
+      [
+       "focus",
+       2.1835034190722737
+      ],
+      [
+       "void",
+       0.0
+      ],
+      [
+       "relation0:isolated",
+       0.0
+      ],
+      [
+       "relation1:apart",
+       0.0
+      ],
+      [
+       "field_size",
+       0.3333333333333333
+      ]
+     ],
+     "total": 5.108876562561156
+    }
+   }
+  },
+  {
+   "background": "white",
+   "case": "ja-17",
+   "checked": {
+    "findings": [
+     "stated_corner_from_reading"
+    ],
+    "fixed": {
+     "0": "center",
+     "1": "bottom_right_corner"
+    },
+    "relations": [
+     {
+      "a": 0,
+      "b": 2,
+      "type": "dividing"
+     },
+     {
+      "a": 1,
+      "b": 0,
+      "type": "apart"
+     }
+    ],
+    "roles": [
+     "field",
+     "focal",
+     "secondary"
+    ],
+    "tension": {
+     "balance": "dynamic",
+     "focus": "concentrated",
+     "motion": "still",
+     "symmetry": "asymmetric",
+     "vertical": "falling",
+     "void": "strong"
+    }
+   },
+   "defaults": {
+    "balance": "dynamic",
+    "left_right": "symmetric",
+    "void": "strong"
+   },
+   "id": "k1/ja-17-k1",
+   "lang": "ja",
+   "layers": [
+    {
+     "action": "draw",
+     "attributes": {
+      "angle": "horizontal",
+      "color": "black",
+      "handling": "dense",
+      "motion_amplitude": "narrowly",
+      "motion_quality": "undulating",
+      "motion_spacing": "tightly",
+      "position": "center",
+      "surface": "flat",
+      "thinness": "thick",
+      "tool": "rotring"
+     },
+     "count": 1,
+     "proportion": "full_width",
+     "shape": "line"
+    },
+    {
+     "action": "place",
+     "attributes": {
+      "color": "red",
+      "handling": "dense",
+      "position": "corner",
+      "size": "small",
+      "surface": "flat",
+      "tool": "crayon"
+     },
+     "count": 1,
+     "proportion": null,
+     "shape": "ellipse"
+    },
+    {
+     "action": "scatter",
+     "attributes": {
+      "color": "gray",
+      "handling": "faint",
+      "size": "very_small",
+      "tool": "pencil"
+     },
+     "count": 30,
+     "proportion": null,
+     "shape": "point"
+    }
+   ],
+   "reading": {
+    "relations": [
+     {
+      "a": 0,
+      "b": 2,
+      "type": "dividing"
+     },
+     {
+      "a": 1,
+      "b": 0,
+      "type": "apart"
+     }
+    ],
+    "roles": [
+     "field",
+     "focal",
+     "secondary"
+    ],
+    "stated_places": [
+     [
+      "0",
+      {
+       "place": "center",
+       "quoted": true,
+       "words": "上"
+      }
+     ],
+     [
+      "1",
+      {
+       "place": "bottom_right_corner",
+       "quoted": true,
+       "words": "上"
+      }
+     ]
+    ],
+    "tension": [
+     [
+      "symmetry",
+      "asymmetric"
+     ],
+     [
+      "vertical",
+      "falling"
+     ],
+     [
+      "motion",
+      "still"
+     ],
+     [
+      "focus",
+      "concentrated"
+     ],
+     [
+      "balance",
+      "dynamic"
+     ],
+     [
+      "void",
+      "strong"
+     ]
+    ]
+   },
+   "solve": {
+    "combinations": 28,
+    "s1": {
+     "best": 1.8284902266525918,
+     "ddl_layers": [
+      "中心に、細かく小刻みに波打つ黒の太いロットリングの濃い塗りの水平の全幅の線を1個引く。",
+      "［構図］右下の隅（横4/5〜1、縦4/5〜1）に、赤のクレヨンの濃い塗りの小さな楕円を1個置く。",
+      "［構図］右中央（横2/3〜1、縦1/3〜2/3）に、灰の鉛筆の薄いとても小さな点を30個散らす。"
+     ],
+     "near_best": 1,
+     "regions": [
+      "named-center",
+      "corner-br",
+      "cell-21"
+     ],
+     "terms": [
+      [
+       "balance",
+       0.0
+      ],
+      [
+       "asymmetry",
+       0.0
+      ],
+      [
+       "off_axis",
+       0.0
+      ],
+      [
+       "vertical",
+       0.3388620472510129
+      ],
+      [
+       "focal_locus",
+       0.3
+      ],
+      [
+       "focus",
+       0.11740595717935676
+      ],
+      [
+       "void",
+       0.0
+      ],
+      [
+       "relation0:dividing",
+       0.6
+      ],
+      [
+       "relation1:apart",
+       0.22222222222222215
+      ],
+      [
+       "field_size",
+       0.25
+      ]
+     ],
+     "total": 1.8284902266525918
+    },
+    "s2": {
+     "best": 1.8284902266525918,
+     "ddl_layers": [
+      "中心に、細かく小刻みに波打つ黒の太いロットリングの濃い塗りの水平の全幅の線を1個引く。",
+      "［構図］右下の隅（横4/5〜1、縦4/5〜1）に、赤のクレヨンの濃い塗りの小さな楕円を1個置く。",
+      "［構図］右中央（横2/3〜1、縦1/3〜2/3）に、灰の鉛筆の薄いとても小さな点を30個散らす。"
+     ],
+     "near_best": 1,
+     "regions": [
+      "named-center",
+      "corner-br",
+      "cell-21"
+     ],
+     "terms": [
+      [
+       "balance",
+       0.0
+      ],
+      [
+       "asymmetry",
+       0.0
+      ],
+      [
+       "off_axis",
+       0.0
+      ],
+      [
+       "vertical",
+       0.3388620472510129
+      ],
+      [
+       "focal_locus",
+       0.3
+      ],
+      [
+       "focus",
+       0.11740595717935676
+      ],
+      [
+       "void",
+       0.0
+      ],
+      [
+       "relation0:dividing",
+       0.6
+      ],
+      [
+       "relation1:apart",
+       0.22222222222222215
+      ],
+      [
+       "field_size",
+       0.25
+      ]
+     ],
+     "total": 1.8284902266525918
+    }
+   }
+  },
+  {
+   "background": "white",
+   "case": "ja-22",
+   "checked": {
+    "findings": [
+     "stated_corner_conflict"
+    ],
+    "fixed": {
+     "0": "center"
+    },
+    "relations": [
+     {
+      "a": 1,
+      "b": 0,
+      "type": "apart"
+     }
+    ],
+    "roles": [
+     "focal",
+     "secondary"
+    ],
+    "tension": {
+     "balance": "dynamic",
+     "focus": "dispersed",
+     "motion": "still",
+     "symmetry": "asymmetric",
+     "void": "strong"
+    }
+   },
+   "defaults": {
+    "balance": "dynamic",
+    "left_right": "symmetric",
+    "void": "strong"
+   },
+   "id": "k1/ja-22-k1",
+   "lang": "ja",
+   "layers": [
+    {
+     "action": "draw",
+     "attributes": {
+      "angle": "horizontal",
+      "color": "gray",
+      "handling": "faint",
+      "motion_amplitude": "narrowly",
+      "motion_quality": "swaying",
+      "motion_spacing": "loosely",
+      "position": "center",
+      "size": "large",
+      "surface": "grain",
+      "thinness": "thin",
+      "tool": "pencil"
+     },
+     "count": 1,
+     "proportion": null,
+     "shape": "line"
+    },
+    {
+     "action": "place",
+     "attributes": {
+      "color": "white",
+      "handling": "temperate",
+      "position": "top_edge",
+      "size": "normal_sized",
+      "surface": "flat",
+      "tool": "chalk"
+     },
+     "count": 1,
+     "proportion": null,
+     "shape": "circle"
+    }
+   ],
+   "reading": {
+    "relations": [
+     {
+      "a": 1,
+      "b": 0,
+      "type": "apart"
+     }
+    ],
+    "roles": [
+     "focal",
+     "secondary"
+    ],
+    "stated_places": [
+     [
+      "0",
+      {
+       "place": "top_left_corner",
+       "quoted": true,
+       "words": "上"
+      }
+     ]
+    ],
+    "tension": [
+     [
+      "symmetry",
+      "asymmetric"
+     ],
+     [
+      "motion",
+      "still"
+     ],
+     [
+      "void",
+      "strong"
+     ],
+     [
+      "balance",
+      "dynamic"
+     ],
+     [
+      "focus",
+      "dispersed"
+     ]
+    ]
+   },
+   "solve": {
+    "combinations": 13,
+    "s1": {
+     "best": 3.278344730240913,
+     "ddl_layers": [
+      "中心に、細かくゆるやかに揺れる灰の細い鉛筆の薄い粒の水平の大きな線を1個引く。",
+      "［構図］左下（横0〜1/3、縦2/3〜1）に、白のチョークの程よい塗りの普通の大きさの円を1個置く。"
+     ],
+     "near_best": 4,
+     "regions": [
+      "named-center",
+      "cell-02"
+     ],
+     "terms": [
+      [
+       "balance",
+       0.0
+      ],
+      [
+       "asymmetry",
+       1.0
+      ],
+      [
+       "off_axis",
+       1.0
+      ],
+      [
+       "centered_focus",
+       1
+      ],
+      [
+       "focal_locus",
+       0
+      ],
+      [
+       "focus",
+       0.2783447302409131
+      ],
+      [
+       "void",
+       0.0
+      ],
+      [
+       "relation0:apart",
+       0.0
+      ]
+     ],
+     "total": 3.278344730240913
+    },
+    "s2": {
+     "best": 3.278344730240913,
+     "ddl_layers": [
+      "中心に、細かくゆるやかに揺れる灰の細い鉛筆の薄い粒の水平の大きな線を1個引く。",
+      "［構図］右上（横2/3〜1、縦0〜1/3）に、白のチョークの程よい塗りの普通の大きさの円を1個置く。"
+     ],
+     "near_best": 4,
+     "regions": [
+      "named-center",
+      "cell-20"
+     ],
+     "terms": [
+      [
+       "balance",
+       0.0
+      ],
+      [
+       "asymmetry",
+       1.0
+      ],
+      [
+       "off_axis",
+       1.0
+      ],
+      [
+       "centered_focus",
+       1
+      ],
+      [
+       "focal_locus",
+       0
+      ],
+      [
+       "focus",
+       0.2783447302409131
+      ],
+      [
+       "void",
+       0.0
+      ],
+      [
+       "relation0:apart",
+       0.0
+      ]
+     ],
+     "total": 3.278344730240913
+    }
+   }
+  },
+  {
+   "background": "white",
+   "case": "ja-25",
+   "checked": {
+    "findings": [
+     "field_isolated",
+     "one_spot",
+     "stated_corner_from_reading",
+     "stated_corner_from_reading",
+     "stated_corner_from_reading"
+    ],
+    "fixed": {
+     "0": "center",
+     "1": "top_left_corner",
+     "2": "right_edge",
+     "3": "bottom",
+     "4": "bottom_left_corner",
+     "5": "top",
+     "6": "top_right_corner",
+     "7": "bottom"
+    },
+    "relations": [
+     {
+      "a": 3,
+      "type": "isolated"
+     },
+     {
+      "a": 1,
+      "type": "isolated"
+     },
+     {
+      "a": 6,
+      "type": "isolated"
+     },
+     {
+      "a": 4,
+      "type": "isolated"
+     }
+    ],
+    "roles": [
+     "field",
+     "focal",
+     "secondary",
+     "secondary",
+     "accent",
+     "accent",
+     "secondary",
+     "accent"
+    ],
+    "tension": {
+     "balance": "unbalanced",
+     "focus": "dispersed",
+     "motion": "still",
+     "symmetry": "asymmetric",
+     "void": "strong"
+    }
+   },
+   "defaults": {
+    "balance": "dynamic",
+    "left_right": "symmetric",
+    "void": "strong"
+   },
+   "id": "k1/ja-25-k1",
+   "lang": "ja",
+   "layers": [
+    {
+     "action": "draw",
+     "attributes": {
+      "angle": "horizontal",
+      "color": "gray",
+      "handling": "faint",
+      "position": "center",
+      "size": "normal_sized",
+      "surface": "grain",
+      "thinness": "thin",
+      "tool": "pencil"
+     },
+     "count": 1,
+     "proportion": null,
+     "shape": "line"
+    },
+    {
+     "action": "place",
+     "attributes": {
+      "color": "white",
+      "handling": "temperate",
+      "position": "top_edge",
+      "size": "normal_sized",
+      "surface": "flat",
+      "tool": "chalk"
+     },
+     "count": 1,
+     "proportion": null,
+     "shape": "circle"
+    },
+    {
+     "action": "draw",
+     "attributes": {
+      "handling": "faint",
+      "motion_amplitude": "narrowly",
+      "motion_quality": "swaying",
+      "position": "right_edge",
+      "size": "small",
+      "surface": "sweep",
+      "thinness": "thin",
+      "tool": "fine_brush"
+     },
+     "count": 1,
+     "proportion": null,
+     "shape": "arc"
+    },
+    {
+     "action": "place",
+     "attributes": {
+      "color": "green",
+      "handling": "dense",
+      "position": "bottom",
+      "size": "large",
+      "surface": "flat",
+      "tool": "thick_brush"
+     },
+     "count": 1,
+     "proportion": "wide",
+     "shape": "ellipse"
+    },
+    {
+     "action": "place",
+     "attributes": {
+      "angle": "rotated",
+      "handling": "temperate",
+      "position": "bottom_edge",
+      "size": "small",
+      "surface": "grain",
+      "tool": "crayon"
+     },
+     "count": 1,
+     "proportion": null,
+     "shape": "square"
+    },
+    {
+     "action": "place",
+     "attributes": {
+      "color": "black",
+      "handling": "dense",
+      "position": "top",
+      "size": "very_small",
+      "tool": "burin"
+     },
+     "count": 1,
+     "proportion": null,
+     "shape": "point"
+    },
+    {
+     "action": "draw",
+     "attributes": {
+      "angle": "vertical",
+      "color": "yellow",
+      "handling": "dense",
+      "position": "top_edge",
+      "size": "large",
+      "surface": "sweep",
+      "thinness": "extra_thick",
+      "tool": "thick_brush"
+     },
+     "count": 1,
+     "proportion": null,
+     "shape": "line"
+    },
+    {
+     "action": "draw",
+     "attributes": {
+      "angle": "horizontal",
+      "handling": "temperate",
+      "motion_amplitude": "narrowly",
+      "motion_quality": "undulating",
+      "motion_spacing": "tightly",
+      "position": "bottom",
+      "size": "normal_sized",
+      "surface": "grain",
+      "thinness": "thin",
+      "tool": "drypoint"
+     },
+     "count": 1,
+     "proportion": null,
+     "shape": "line"
+    }
+   ],
+   "reading": {
+    "relations": [
+     {
+      "a": 0,
+      "type": "isolated"
+     },
+     {
+      "a": 3,
+      "type": "isolated"
+     },
+     {
+      "a": 1,
+      "type": "isolated"
+     },
+     {
+      "a": 6,
+      "type": "isolated"
+     },
+     {
+      "a": 4,
+      "type": "isolated"
+     },
+     {
+      "a": 5,
+      "type": "spreading"
+     }
+    ],
+    "roles": [
+     "field",
+     "focal",
+     "secondary",
+     "secondary",
+     "accent",
+     "accent",
+     "secondary",
+     "accent"
+    ],
+    "stated_places": [
+     [
+      "0",
+      {
+       "place": "center",
+       "quoted": true,
+       "words": "上"
+      }
+     ],
+     [
+      "1",
+      {
+       "place": "top_left_corner",
+       "quoted": true,
+       "words": "上"
+      }
+     ],
+     [
+      "2",
+      {
+       "place": "right_edge",
+       "quoted": true,
+       "words": "上"
+      }
+     ],
+     [
+      "3",
+      {
+       "place": "bottom",
+       "quoted": true,
+       "words": "上"
+      }
+     ],
+     [
+      "4",
+      {
+       "place": "bottom_left_corner",
+       "quoted": true,
+       "words": "上"
+      }
+     ],
+     [
+      "5",
+      {
+       "place": "top",
+       "quoted": true,
+       "words": "上"
+      }
+     ],
+     [
+      "6",
+      {
+       "place": "top_right_corner",
+       "quoted": true,
+       "words": "上"
+      }
+     ],
+     [
+      "7",
+      {
+       "place": "bottom",
+       "quoted": true,
+       "words": "上"
+      }
+     ]
+    ],
+    "tension": [
+     [
+      "balance",
+      "unbalanced"
+     ],
+     [
+      "symmetry",
+      "asymmetric"
+     ],
+     [
+      "motion",
+      "still"
+     ],
+     [
+      "void",
+      "strong"
+     ],
+     [
+      "focus",
+      "dispersed"
+     ]
+    ]
+   },
+   "solve": {
+    "combinations": 1,
+    "s1": {
+     "best": 11.541215509786307,
+     "ddl_layers": [
+      "中心に、灰の細い鉛筆の薄い粒の水平の普通の大きさの線を1個引く。",
+      "［構図］左上の隅（横0〜1/5、縦0〜1/5）に、白のチョークの程よい塗りの普通の大きさの円を1個置く。",
+      "右端に、細かく揺れる細い細筆の薄い刷きの小さな弧を1個引く。",
+      "下に、緑の太筆の濃い塗りの横長の大きな楕円を1個置く。",
+      "［構図］左下の隅（横0〜1/5、縦4/5〜1）に、クレヨンの程よい粒の回転の小さな四角を1個置く。",
+      "上に、黒のビュランの濃いとても小さな点を1個置く。",
+      "［構図］右上の隅（横4/5〜1、縦0〜1/5）に、黄のごく太い太筆の濃い刷きの垂直の大きな線を1個引く。",
+      "下に、細かく小刻みに波打つ細いドライポイントの程よい粒の水平の普通の大きさの線を1個引く。"
+     ],
+     "near_best": 1,
+     "regions": [
+      "named-center",
+      "corner-tl",
+      "named-right_edge",
+      "named-bottom",
+      "corner-bl",
+      "named-top",
+      "corner-tr",
+      "named-bottom"
+     ],
+     "terms": [
+      [
+       "balance",
+       1.2545488431196399
+      ],
+      [
+       "focal_locus",
+       0.3
+      ],
+      [
+       "focus",
+       0.0
+      ],
+      [
+       "void",
+       0.5700000000000002
+      ],
+      [
+       "relation0:isolated",
+       3.0
+      ],
+      [
+       "relation1:isolated",
+       0.0
+      ],
+      [
+       "relation2:isolated",
+       2.0
+      ],
+      [
+       "relation3:isolated",
+       2.0
+      ],
+      [
+       "overlap",
+       2.083333333333333
+      ],
+      [
+       "field_size",
+       0.3333333333333333
+      ]
+     ],
+     "total": 11.541215509786307
+    },
+    "s2": {
+     "best": 11.541215509786307,
+     "ddl_layers": [
+      "中心に、灰の細い鉛筆の薄い粒の水平の普通の大きさの線を1個引く。",
+      "［構図］左上の隅（横0〜1/5、縦0〜1/5）に、白のチョークの程よい塗りの普通の大きさの円を1個置く。",
+      "右端に、細かく揺れる細い細筆の薄い刷きの小さな弧を1個引く。",
+      "下に、緑の太筆の濃い塗りの横長の大きな楕円を1個置く。",
+      "［構図］左下の隅（横0〜1/5、縦4/5〜1）に、クレヨンの程よい粒の回転の小さな四角を1個置く。",
+      "上に、黒のビュランの濃いとても小さな点を1個置く。",
+      "［構図］右上の隅（横4/5〜1、縦0〜1/5）に、黄のごく太い太筆の濃い刷きの垂直の大きな線を1個引く。",
+      "下に、細かく小刻みに波打つ細いドライポイントの程よい粒の水平の普通の大きさの線を1個引く。"
+     ],
+     "near_best": 1,
+     "regions": [
+      "named-center",
+      "corner-tl",
+      "named-right_edge",
+      "named-bottom",
+      "corner-bl",
+      "named-top",
+      "corner-tr",
+      "named-bottom"
+     ],
+     "terms": [
+      [
+       "balance",
+       1.2545488431196399
+      ],
+      [
+       "focal_locus",
+       0.3
+      ],
+      [
+       "focus",
+       0.0
+      ],
+      [
+       "void",
+       0.5700000000000002
+      ],
+      [
+       "relation0:isolated",
+       3.0
+      ],
+      [
+       "relation1:isolated",
+       0.0
+      ],
+      [
+       "relation2:isolated",
+       2.0
+      ],
+      [
+       "relation3:isolated",
+       2.0
+      ],
+      [
+       "overlap",
+       2.083333333333333
+      ],
+      [
+       "field_size",
+       0.3333333333333333
+      ]
+     ],
+     "total": 11.541215509786307
+    }
+   }
+  }
+ ],
+ "note": "Composition prototype answers for the core port (internal draw-system05 tools). No description text, quote or thesis; stated-place words are stand-ins.",
+ "schema": "inku.composition-port-fixture.v1"
+}

@@ -16,7 +16,12 @@ use inku_pipeline::composition::{
 use serde::Deserialize;
 use serde_json::Value;
 
-const FIXTURE: &str = include_str!("data/composition-port-v1.json");
+/// The works of the measurements, and the works whose reading names a corner
+/// (I-712, one reading of 2026-10-03).
+const FIXTURES: [&str; 2] = [
+    include_str!("data/composition-port-v1.json"),
+    include_str!("data/composition-port-corners-v1.json"),
+];
 
 /// Works with more combinations are solved only by the full run, which is slow
 /// without optimisation.
@@ -221,14 +226,24 @@ fn compare_seed(
     differences
 }
 
+fn fixture_cases() -> Vec<Case> {
+    FIXTURES
+        .iter()
+        .flat_map(|text| {
+            let fixture: Fixture = serde_json::from_str(text).expect("the fixture is JSON");
+            assert_eq!(fixture.schema, "inku.composition-port-fixture.v1");
+            fixture.cases
+        })
+        .collect()
+}
+
 fn run(limit: Option<u64>) -> Outcome {
-    let fixture: Fixture = serde_json::from_str(FIXTURE).expect("the fixture is JSON");
-    assert_eq!(fixture.schema, "inku.composition-port-fixture.v1");
+    let cases = fixture_cases();
     let mut outcome = Outcome {
-        cases: fixture.cases.len(),
+        cases: cases.len(),
         ..Outcome::default()
     };
-    for case in &fixture.cases {
+    for case in &cases {
         let (checked, findings) = match checked_reading(case) {
             Ok(value) => value,
             Err(error) => {

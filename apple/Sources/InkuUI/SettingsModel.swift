@@ -71,7 +71,11 @@ public final class SettingsModel {
             host = latest
             await inspectCredential()
             status = "接続設定を保存しました。"
-        } catch { self.error = error.localizedDescription }
+        } catch {
+            self.error = (error as? HostError)?.code == "invalid_provider_rate_limits"
+                ? "レート制限には0から1,000,000,000までの整数を設定してください。"
+                : error.localizedDescription
+        }
     }
     public func clearCredential() async {
         guard let provider = selectedProvider else { return }

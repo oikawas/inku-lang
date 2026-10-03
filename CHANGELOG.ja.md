@@ -6,6 +6,14 @@
 
 **本書は v2.5.0（2026-07-25、render engine 12）以降の履歴を保持する。** 最近の記録に続く過去の履歴は、同じ文書内で折りたたんである。必要なときに展開して読める。折りたたみに対応しないビューアでは全文を表示する。それより前の履歴は [v1.72〜v2.4の書庫](docs/history/changelog-v1.72-v2.4.ja.md) と [v0.1〜v1.71の書庫](docs/history/changelog-v0.1-v1.71.ja.md) にある。
 
+### 2026-10-03 — Swiftの送信予算をServerへ揃えて耐久化
+
+通常APIの描画pipelineを同じserviceの62秒／90%予算へ統合し、構図を含む各段階と再試行の予約をSQLiteへ送信前に保存する。Geminiの日次切替は太平洋時間、ほかはUTCを使用し、不明な入力usage、429のRetry-After／RetryInfoと有限の試行期限を扱う。補助要求の集計範囲もServerへ揃えた。
+
+Swift物理schemaをv3へ非破壊移行し、旧JSONの送信記録を一度だけ取り込む。古い作品backupを復元しても、現在の送信予算・待機時間を保守的に保持する。設定は標準Geminiの未設定時の30／16,000／14,400、明示0と旧objectの欠落値を区別し、各項目の説明をnative画面へ追加した。[Swift仕様](apple/SWIFT_SPEC.ja.md)、[利用手順](apple/README.ja.md)、[保存契約](persistence/README.ja.md)を同期した。
+
+限定XCTest1件と保存契約照合が成功。更新Universalアプリの隔離画面でも説明の開閉、0保存と再表示、負値の保存拒否を確認し、既存作品・系譜・executionの全行を保持した。実providerの利用枠・OAuthの受入は未実施。
+
 ### 2026-10-03 — Swiftの構図・下絵の実測記録を分離
 
 通常APIとPersonal ChatGPTの呼出し時間・実token数・結果をactionごとに記録し、構図をStage 1と分けた。未取得と明示0を区別し、制作・比較候補・保存作品の再表示で記録を読む。保存時の生成情報を固定し、再演奏比較へ新たなprovider要求を加えない。

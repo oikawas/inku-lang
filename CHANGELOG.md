@@ -6,6 +6,14 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file retains the history from v2.5.0 (2026-07-25, render engine 12) onward.** Past records follow the recent ones in a collapsible section of this same document; expand it when needed. Viewers without collapse support show the full text. Earlier history is in the [v1.72–v2.4 archive](docs/history/changelog-v1.72-v2.4.md) and the [v0.1–v1.71 archive](docs/history/changelog-v0.1-v1.71.md).
 
+### 2026-10-03 — Align and persist Swift request budgets
+
+Ordinary API drawing stages, including composition and retries, share each service's 62-second/90% budget through SQLite reservations committed before sending. Gemini daily accounting uses Pacific time, other services UTC. Unknown input usage, 429 Retry-After/RetryInfo, and finite attempt deadlines follow Server, as does the exclusion of auxiliary requests.
+
+Swift physical schema migrates nondestructively to v3 and imports legacy JSON accounting once. Restoring older backups conservatively retains live request budgets/cooldowns. Native Settings distinguishes the standard Gemini defaults of 30/16,000/14,400 from explicit zero and absent values in legacy objects, with explanations beside each field. Updated the [Swift specification](apple/SWIFT_SPEC.md), [usage guide](apple/README.md), and [persistence contract](persistence/README.md).
+
+One selected XCTest and the persistence-contract check passed. The updated isolated Universal app also confirmed opening/closing explanations, zero save/reopening, and negative-value refusal while retaining every existing work/lineage/execution row. Actual provider quota/OAuth acceptance was not performed.
+
 ### 2026-10-03 — Separate Swift composition and underdrawing measurements
 
 Ordinary APIs and Personal ChatGPT record call time, reported tokens, and outcomes per action, with composition separate from Stage 1. Missing usage and explicit zero remain distinct. Creation, comparison options, and reopened works show metrics frozen at save time; replay comparison sends no additional provider request.

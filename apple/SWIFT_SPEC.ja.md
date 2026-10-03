@@ -64,7 +64,7 @@ comment、mark、trash／復元、明示した完全削除、複数選択、系�
 
 履歴の世代はServerと同じくrootを1とし、primary parentのedgeごとに1加算する。削除済みの祖先も数え、nodeのない作品は独立作品と表示する。初期表示は世代とmodel、保存済みの表示項目は保持する。世代をvariationの種類や幅で代用しない。libraryでは表示中の作品と複数選択のcheckbox、系譜では表示作品と範囲を決めるfocusを区別する。記述のないDDL作品は保存DDLの先頭行を表示名へ使い、保存本文を補わない。hash、comment、mark、親子への移動はcardとmenuから操作できる。
 
-Swift物理schemaはv2で、v1の6tableにlocal annotation、奥書、未読語を追加した9table構成とする。正本は[bundled migration](Packages/InkuPersistence/Sources/InkuPersistence/Resources/migration-v2.sql)と[schema export](../persistence/reference/swift-schema-v2.json)。既知の完全なv1だけを原子的に移行し、作品・snapshot・ACKの値を保持する。未知schemaは引き続き拒否する。backup／restoreは全9tableを対象とし、v1 backupは隔離snapshotをv2へ移行してから復元する。Server／Android DBや旧JSONのimportは含めない。
+Swift物理schemaはv3で、v2の作品・系譜・execution、local annotation、奥書、未読語の9tableへ`provider_rate_state`を追加した10table構成とする。正本は[bundled migration](Packages/InkuPersistence/Sources/InkuPersistence/Resources/migration-v3.sql)と[schema export](../persistence/reference/swift-schema-v3.json)。既知の完全なv1／v2だけを原子的に移行し、作品・snapshot・ACKの値を保持する。未知schemaは引き続き拒否する。backup／restoreは全10tableを対象とし、旧backupは隔離snapshotをv3へ移行してから復元する。復元先の送信予算・待機期限も保守的に引き継ぎ、古い作品backupで当日の上限をリセットしない。Server／Android DBや旧作品JSONのimportは含めない。
 
 ### 比較・推敲・奥書と自動実行
 
@@ -78,7 +78,7 @@ Swift物理schemaはv2で、v1の6tableにlocal annotation、奥書、未読語�
 
 catalog／model比較は開始時の作品・Score・設定を固定する。候補は採用前に通常履歴／系譜へ保存せず、選択した候補だけをidempotentに保存する。選べる候補の総数を4に制限せず、Swiftでは逐次生成する。停止とdialogのcloseは処理の終了を待ち、遅れて届いた候補を混入させない。
 
-model助言、random／Vision推敲、奥書は通常生成と同じprovider transportとrate予算を使う。記述の編集採用と新variation生成を分け、DDL権限の作品へ記述を上書きしない。中間の推敲作品は`lineage_only`として保持する。自動推敲の各child edgeはWebと同じ`autonomous_refine_mode`を記録し、Visionではその世代の`vision_model`／`vision_observation`／`vision_next_direction`も記録する。randomの来歴へ以前の画面上のVision助言を混ぜない。奥書は生成した原文と採用本文を別に保存し、DB backupへ含める。
+model助言、random／Vision推敲、奥書は通常生成と同じprovider transportを使う。通常pipeline外の補助要求はServerと同じく描画pipelineの共有rate予算へ加算しない。記述の編集採用と新variation生成を分け、DDL権限の作品へ記述を上書きしない。中間の推敲作品は`lineage_only`として保持する。自動推敲の各child edgeはWebと同じ`autonomous_refine_mode`を記録し、Visionではその世代の`vision_model`／`vision_observation`／`vision_next_direction`も記録する。randomの来歴へ以前の画面上のVision助言を混ぜない。奥書は生成した原文と採用本文を別に保存し、DB backupへ含める。
 
 batchは空行を除く最大1000入力を受け、元の行番号とmodel、provider、定義、seed等を開始時に固定する。一巡後の失敗行だけを既定0／最大5回再実行する。明示した再開でも固定条件を保持する。再起動時に実行結果が不明な行は利用者の再試行／省略選択を待ち、自動再送しない。demoは開始時の設定を固定し、生成記述と作品を表示する。保存は既定で無効、間隔1〜3600秒、実行時間60〜86400秒で、停止・満了後の処理を継続しない。
 
@@ -87,6 +87,12 @@ batchは空行を除く最大1000入力を受け、元の行番号とmodel、pro
 日本語はServerと同じSudachi small辞書、英語は同じCMUdictの読みを使用し、Rustの薄い境界で音数・音節を数える。辞書・設定・license・hashを[resource manifest](scripts/description-meter-resources.json)で固定し、build時に生成する。Python runtimeはアプリへ含めない。4000文字までの判定を300ms debounceし、未読語の頻度・日時・文脈をSQLiteへ保存する。判定を無効にした場合は文字数／行数を表示する。
 
 日本語／英語、theme、5段階text倍率、full／simple／custom、caption、履歴情報最大3項目、tooltip、mascot、clipboard、描画制限、export template／保存先をlocal設定とする。複数APIサービスの設定、用途共通の描画model、明示したmodel一覧取得とRPM／入力TPM／RPDを提供する。通常設定は隣接JSON、API keyはKeychainであり、接続設定を保存するだけでは生成しない。
+
+通常APIのrate制限は[製品仕様](../SPEC.ja.md)とServerの共有描画pipelineへ従う。同じservice IDの写生文、解釈、辞書選択、構図、補完と各再試行を集計し、送信前に作品DBのSQLite transactionで要求数・入力token予算を予約する。複数Host・接続・processからの要求も同じDBの状態を使い、待機中はtransactionを保持しない。旧`provider-usage.json`の該当serviceの予約・待機期限を一度だけ原子的に取り込み、原本を変更しない。読めない状態や保存失敗は送信前に拒否する。旧Gemini記録からPacific日次の残量を証明できない場合は、次のPacific午前0時まで日次上限を消費済みとして扱う。
+
+RPM／入力TPMは62秒windowで設定値の90%を使用し、正の小さい設定は最低1とする。Geminiはsystem／本文／schemaを含むcountTokensに10%の余裕を加え、他方式は実際の送信JSONのUTF-8 byte数に128を加えた保守的な予算を用いる。成功時は実入力usageで精算し、入力usageや送信状態が不明な場合は入力TPMが有効なときだけ予約を保って62秒待つ。日次要求数は既知429と再試行も含み、GeminiはAmerica/Los_Angeles、他方式はUTCの午前0時に切り替える。429は62秒、Retry-Afterの秒数／HTTP日時、Gemini RetryInfoの最大値を待ち、既存の待機期限を短縮しない。待機は共通coreが定めた有限の試行期限へ含め、Host独自の再試行を追加しない。
+
+設定値は0〜1,000,000,000の整数で、0は上限なし。rate設定全体がない標準`gemini` serviceは30／16,000／14,400を使い、他serviceは0を使う。既存のrate設定objectで個々の値が欠落している場合は、従来の「0＝上限なし」を保持する。設定画面は3値と隣接する説明buttonを表示し、0を明示保存できる。
 
 自動backupは既定で無効であり、アプリ起動中に生成・復元・自動実行の終了を待つ。検証済みbackupの成功後にmanifestを確定し、アプリ自身が記録した世代だけを削除する。手動backupを自動世代管理へ含めない。任意の生成結果logは実際に保存した作品だけを記録し、古い作品を開くだけでは作らない。
 
@@ -131,6 +137,10 @@ Rust 1.95のmacOS host proc-macro stripによるLINKEDIT alignment失敗は、re
 追加の`--provider-observation-only`は実Rust・mock・一時SQLiteで下絵／構図の別time・実usageと明示0、作品保存・Host再作成／再表示、rawを持たない通常metric、旧optional欠落の読出し、保存Scoreの再演奏／再現比較で新provider要求がないことを確認した。送信前CAS失敗はHTTP0／retryなし／restore時の自動再送なしで、開発者モード外の明示要求もtransport前に拒否した。通信側は限定XCTest1件で通常JSONとPersonalの完了SSE、実schema／上限／identity、既知credentialのescapeを含む除去、送信前保存失敗と途中SSEのstatus／受信prefixを確認した。記録確定時のSwift排他アクセス衝突を修正し、同じ1件が成功した。64MiB超過の実行確認や実provider／OAuthの受入は含まない。
 
 更新したunsigned Release Universalの別隔離アプリでは、loopbackの下絵266ms／usage11・7、構図757ms／usage13・0を独立表示し、開発者欄の2件の通信記録と構図応答本文を読めた。「新規」で進行表示を解除し、保存作品の再表示で同じ実測値を保持した。history／node／executionは3件から4件、edgeは1件のままで、既存全行が一致した。元の作者手動drop用アプリとFinderは保持した。両CPU build・最低OS14を確認したが、Intel／macOS14実機・全幅・VoiceOver・作者の通常利用の受入は別である。
+
+送信予算の限定XCTest1件は模擬HTTP・時計・一時SQLiteで成功した。既知schema2の作品保持とv3移行、別接続の最終枠の排他予約、62秒／90%・Gemini入力計測と精算、unknown usage、429・日次、旧JSONの一度限りの取込と旧backup復元時の予算保持を確認した。入力超過・期限・破損記録・書込失敗の代表ケースは生成HTTPを出さない。論理保存契約v2とSwift物理schema3／10tableの照合も成功し、既存9tableの定義を保った。
+
+更新したunsigned Release Universalの隔離画面（1320×880）でGeminiの未設定時の30／16,000／14,400、独立した説明buttonとpopover／Escape、明示0の保存・設定再表示と負値の拒否を確認した。負値の保存試行は設定JSONを変更せず、作品4件・node4件・edge1件・execution4件・ACK8件を含む既存全行を保持した。送信予算tableは0行で、新しい生成や一覧取得を要求しなかった。両CPU・最低macOS14を保持し、実providerの利用枠・Intel／macOS14実機・全幅・VoiceOver・作者の受入は未確認である。
 
 ## 2026-10-02 macOS向けの共有Rust・standalone基盤（当時の記録）
 

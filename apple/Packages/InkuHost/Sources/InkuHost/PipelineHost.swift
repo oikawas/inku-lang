@@ -9,9 +9,12 @@ public actor PipelineHost {
     private let transport: any ProviderTransport
     private let credentials: any CredentialStore
     private var executions: [String: ExecutionDriver] = [:]
-    public init(database: InkuDatabase, transport: any ProviderTransport = URLSessionProviderTransport(),
+    public init(database: InkuDatabase, transport: (any ProviderTransport)? = nil,
                 credentials: any CredentialStore = KeychainCredentialStore()) {
-        self.database = database; self.transport = transport; self.credentials = credentials
+        self.database = database
+        if let native = transport as? URLSessionProviderTransport { self.transport = native.withRateDatabase(database) }
+        else { self.transport = transport ?? URLSessionProviderTransport(database: database) }
+        self.credentials = credentials
     }
 
     public func generate(_ request: GenerationRequest, progress: @escaping PipelineProgressHandler = { _ in }) async throws -> PipelineView {

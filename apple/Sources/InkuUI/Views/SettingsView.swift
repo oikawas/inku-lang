@@ -32,6 +32,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
     @Binding var section: SettingsSection
     @State private var confirmRestore = false
     @State private var confirmClearKey = false
+    @State private var rateHelp: String?
 
     var body: some View {
         HStack(alignment: .top, spacing: 0) {
@@ -62,7 +63,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         .alert(model.display.localized("設定を変更できませんでした"), isPresented: Binding(get: { settings.error != nil }, set: { if !$0 { settings.error = nil } })) {
             Button(model.display.localized("閉じる"), role: .cancel) { settings.error = nil }
         } message: {
-            Text(settings.error == "Personal ChatGPTのモデルは専用の設定画面で取得してください。" ? model.display.localized(settings.error ?? "") : settings.error ?? "")
+            Text(model.display.localized(settings.error ?? ""))
         }
         .confirmationDialog(model.display.localized("現在の保存データを置き換えます"), isPresented: $confirmRestore, titleVisibility: .visible) {
             #if os(macOS)
@@ -168,10 +169,12 @@ enum SettingsSection: String, CaseIterable, Identifiable {
                     SecureField(model.display.localized(state.credentialConfigured ? "APIキーを更新（設定済み）" : "APIキー"), text: $state.credentialDraft)
                     if state.credentialConfigured { Button(model.display.localized("APIキーを削除…"), role: .destructive) { confirmClearKey = true } }
                     DisclosureGroup(model.display.localized("レート制限")) {
-                        limitField("RPM（毎分のリクエスト）", index: index, key: \.requestsPerMinute)
-                        limitField("入力TPM（毎分のtoken）", index: index, key: \.tokensPerMinute)
-                        limitField("RPD（毎日のリクエスト）", index: index, key: \.requestsPerDay)
+                        limitField("毎分の要求数（RPM）", help: "このアプリが同じ接続先へ送る要求数です。写生文・解釈・辞書選択・構図・補完・再試行を含みます。0は上限なしです。", index: index, key: \.requestsPerMinute)
+                        limitField("毎分の入力トークン数（TPM）", help: "指示・記述・応答の型を含む入力の上限です。Geminiは送る前に計測し、ほかの接続先は安全側に見積もります。0は上限なしです。", index: index, key: \.tokensPerMinute)
+                        limitField("日次の要求数（RPD）", help: "再試行を含む1日当たりの要求数です。Geminiは太平洋時間、ほかの接続先はUTCの0時にリセットします。0は上限なしです。", index: index, key: \.requestsPerDay)
                         Text(model.display.localized("0は上限なし。毎分の枠を待ち、日次上限では生成を開始しません。"))
+                            .font(.caption).foregroundStyle(.secondary)
+                        Text(model.display.localized("未設定の標準Gemini接続は30／16,000／14,400、ほかの接続先は0が初期値です。契約の利用枠に合わせて設定してください。"))
                             .font(.caption).foregroundStyle(.secondary)
                     }
                 }
@@ -250,11 +253,38 @@ enum SettingsSection: String, CaseIterable, Identifiable {
             selection.wrappedValue = next
         })
     }
-    private func limitField(_ title: String, index: Int, key: WritableKeyPath<ProviderRateLimits, Int?>) -> some View {
-        TextField(model.display.localized(title), value: Binding(get: { settings.host.providers[index].rateLimits?[keyPath: key] ?? 0 }, set: { value in
-            var limits = settings.host.providers[index].rateLimits ?? ProviderRateLimits()
-            limits[keyPath: key] = value > 0 ? value : nil
-            settings.host.providers[index].rateLimits = limits
-        }), format: .number)
+    private func limitField(_ title: String, help: String, index: Int,
+                            key: WritableKeyPath<ProviderRateLimits, Int?>) -> some View {
+        let providerID = settings.host.providers[index].id
+        return HStack {
+            HStack(spacing: 6) {
+                Text(model.display.localized(title))
+                Button { rateHelp = title } label: { Image(systemName: "info.circle") }
+                    .buttonStyle(.plain).foregroundStyle(.secondary)
+                    .accessibilityLabel(model.display.localizedFormat("%@の説明", model.display.localized(title)))
+                    .help(model.display.preferences.showTooltips ? model.display.localized(help) : "")
+                    .popover(isPresented: Binding(get: { rateHelp == title }, set: { if !$0 { rateHelp = nil } })) {
+                        Text(model.display.localized(help)).font(.callout).padding()
+                            .frame(maxWidth: 320).fixedSize(horizontal: false, vertical: true)
+                    }
+            }
+            Spacer(minLength: 16)
+            TextField(model.display.localized(title), value: Binding(get: {
+                guard settings.host.providers.indices.contains(index),
+                      settings.host.providers[index].id == providerID else { return 0 }
+                let provider = settings.host.providers[index]
+                return (provider.rateLimits ?? ProviderRateLimits.defaults(providerID: provider.id))[keyPath: key] ?? 0
+            }, set: { value in
+                guard settings.host.providers.indices.contains(index),
+                      settings.host.providers[index].id == providerID else { return }
+                let provider = settings.host.providers[index]
+                var limits = provider.rateLimits ?? ProviderRateLimits.defaults(providerID: provider.id)
+                limits[keyPath: key] = value
+                settings.host.providers[index].rateLimits = limits
+            }), format: .number)
+            .labelsHidden().multilineTextAlignment(.trailing).frame(maxWidth: 180)
+            .accessibilityLabel(model.display.localized(title))
+            .accessibilityHint(model.display.localized(help))
+        }
     }
 }

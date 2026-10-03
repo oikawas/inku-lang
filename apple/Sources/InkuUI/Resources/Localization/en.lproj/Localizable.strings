@@ -3,7 +3,7 @@
 "ライブラリ" = "Library";
 "バッチ・デモ" = "Batch & Demo";
 "設定" = "Settings";
-"0は上限なし。毎分の枠を待ち、日次上限では生成を開始しません。" = "0 means unlimited. Generation waits for the per-minute budget and stops at the daily limit.";
+"0は上限なし。毎分の枠を待ち、日次上限では生成を開始しません。" = "0 means unlimited. Drawing waits for the per-minute budget and stops at the daily limit.";
 "1作品では描画要素を順に表示します。合計6億画素を超える設定は書き出す前に確認します。" = "For one work, drawing elements appear in sequence. Settings exceeding 600 million total pixels are checked before export.";
 "1作品の再生" = "Single-work playback";
 "1回のみ" = "Once";
@@ -898,3 +898,12 @@
 "表示は本文の先頭だけです。保存された全文は共有できます。" = "Only the beginning is shown. You can share the full stored body.";
 "記録した本文を共有" = "Share stored body";
 "記録を更新" = "Refresh records";
+"毎分の要求数（RPM）" = "Requests per minute (RPM)";
+"毎分の入力トークン数（TPM）" = "Input tokens per minute (TPM)";
+"日次の要求数（RPD）" = "Requests per day (RPD)";
+"このアプリが同じ接続先へ送る要求数です。写生文・解釈・辞書選択・構図・補完・再試行を含みます。0は上限なしです。" = "Requests this app sends to the same service, including text for sketch from life, interpretation, vocabulary selection, composition, hole completion, and retries. 0 means unlimited.";
+"指示・記述・応答の型を含む入力の上限です。Geminiは送る前に計測し、ほかの接続先は安全側に見積もります。0は上限なしです。" = "Input limits include instructions, your description, and the response schema. Gemini measures input before sending; other services use a conservative estimate. 0 means unlimited.";
+"再試行を含む1日当たりの要求数です。Geminiは太平洋時間、ほかの接続先はUTCの0時にリセットします。0は上限なしです。" = "Daily requests include retries. Gemini resets at midnight Pacific time; other services reset at midnight UTC. 0 means unlimited.";
+"%@の説明" = "About %@";
+"未設定の標準Gemini接続は30／16,000／14,400、ほかの接続先は0が初期値です。契約の利用枠に合わせて設定してください。" = "The standard Gemini service defaults to 30/16,000/14,400 when unset; other services default to 0. Set limits to match your plan.";
+"レート制限には0から1,000,000,000までの整数を設定してください。" = "Set each rate limit to a whole number from 0 to 1,000,000,000.";

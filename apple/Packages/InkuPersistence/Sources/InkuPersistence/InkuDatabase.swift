@@ -15,7 +15,7 @@ public enum PersistenceError: Error, Sendable, Equatable {
 /// One actor owns one SQLite writer. No database handle escapes this boundary.
 public actor InkuDatabase {
     public nonisolated let url: URL
-    private let queue: DatabaseQueue
+    let queue: DatabaseQueue
 
     public init(url: URL) throws {
         guard url.isFileURL else { throw PersistenceError.invalidFileURL }
@@ -41,6 +41,10 @@ public actor InkuDatabase {
                 if try Int.fetchOne(db, sql: "PRAGMA user_version") == 1 {
                     try Self.validateSchema(db)
                     try db.execute(sql: Self.resourceSQL("migration-v2"))
+                }
+                if try Int.fetchOne(db, sql: "PRAGMA user_version") == 2 {
+                    try Self.validateSchema(db)
+                    try db.execute(sql: Self.resourceSQL("migration-v3"))
                 }
             }
         }
@@ -622,7 +626,13 @@ public actor InkuDatabase {
             if try Int.fetchOne(db, sql: "PRAGMA user_version") == 1 {
                 try db.execute(sql: Self.resourceSQL("migration-v2"))
             }
+            if try Int.fetchOne(db, sql: "PRAGMA user_version") == 2 {
+                try db.execute(sql: Self.resourceSQL("migration-v3"))
+            }
         }
+        try isolated.read { try Self.validateRestore($0) }
+        // Artwork rollback must not reopen reservations already charged by this DB.
+        try retainLiveProviderRates(in: isolated)
         try isolated.read { try Self.validateRestore($0) }
         try isolated.backup(to: queue)
     }
@@ -709,9 +719,11 @@ public actor InkuDatabase {
         return try String(contentsOf: resource, encoding: .utf8)
     }
 
-    private static func schemaSQL(version: Int = 2) throws -> String {
+    private static func schemaSQL(version: Int = 3) throws -> String {
         let baseline = try resourceSQL("schema-v1")
-        return version == 1 ? baseline : baseline + "\n" + (try resourceSQL("migration-v2"))
+        if version == 1 { return baseline }
+        let second = baseline + "\n" + (try resourceSQL("migration-v2"))
+        return version == 2 ? second : second + "\n" + (try resourceSQL("migration-v3"))
     }
 
     private struct SchemaObject: Equatable {
@@ -733,14 +745,15 @@ public actor InkuDatabase {
     }
 
     private static func validateSchema(_ db: Database) throws {
-        guard let version = try Int.fetchOne(db, sql: "PRAGMA user_version"), [1, 2].contains(version) else {
+        guard let version = try Int.fetchOne(db, sql: "PRAGMA user_version"), [1, 2, 3].contains(version) else {
             throw PersistenceError.unknownSchema
         }
         let expected = try DatabaseQueue()
         try expected.write { try $0.execute(sql: schemaSQL(version: version)) }
         let expectedObjects = try expected.read { try schemaObjects(in: $0) }
-        let identifiers = version == 1 ? ["swift-v1-contract-v2"]
-            : ["swift-v1-contract-v2", "swift-v2-library-annotations"]
+        var identifiers = ["swift-v1-contract-v2"]
+        if version >= 2 { identifiers.append("swift-v2-library-annotations") }
+        if version >= 3 { identifiers.append("swift-v3-provider-rate-state") }
         guard try schemaObjects(in: db) == expectedObjects,
               try String.fetchAll(db, sql: "SELECT identifier FROM schema_migrations ORDER BY identifier")
                 == identifiers else {
@@ -756,13 +769,21 @@ public actor InkuDatabase {
         }
         for work in try SavedWork.fetchAll(db) { try validate(work) }
         for edge in try LineageEdge.fetchAll(db) { try validateJSONObject(edge.metadataJSON) }
-        if try Int.fetchOne(db, sql: "PRAGMA user_version") == 2 {
+        if (try Int.fetchOne(db, sql: "PRAGMA user_version") ?? 0) >= 2 {
             for row in try Row.fetchAll(db, sql: "SELECT * FROM auxiliary_colophons") { try validate(colophon(row)) }
             let invalidUnread = try Int.fetchOne(db, sql: """
                 SELECT count(*) FROM unread_words WHERE length(word) = 0 OR length(word) > 120
                 OR length(context) > 1000 OR frequency <= 0
                 """)
             guard invalidUnread == 0 else { throw PersistenceError.corruptDatabase }
+        }
+        if try Int.fetchOne(db, sql: "PRAGMA user_version") == 3 {
+            for row in try Row.fetchAll(db, sql: "SELECT provider_id, state_json FROM provider_rate_state") {
+                let provider: String = row["provider_id"]
+                guard !provider.isEmpty else { throw PersistenceError.corruptDatabase }
+                let data: Data = row["state_json"]
+                try ProviderRateState.decode(data).validate()
+            }
         }
         let inconsistent = try Int.fetchOne(db, sql: """
             SELECT count(*) FROM history AS h LEFT JOIN lineage_nodes AS n ON n.id = h.lineage_node_id

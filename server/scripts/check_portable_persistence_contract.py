@@ -488,8 +488,8 @@ def _validate_swift(
     actual = export_swift_schema(root, contract)
     if actual != _load_json(root / host["source"]):
         raise ContractError("Swift schema export differs from the bundled SQL authority")
-    if actual["schema_version"] != 2 or host["schema_version"] != 2:
-        raise ContractError("Swift schema must use independent version 2")
+    if actual["schema_version"] != 3 or host["schema_version"] != 3:
+        raise ContractError("Swift schema must use independent version 3")
     tables = actual["tables"]
     source = (root / host["records_source"]).read_text(encoding="utf-8")
     for record_name, mapping in host["records"].items():
@@ -741,7 +741,7 @@ def main() -> int:
         except (ContractError, OSError) as exc:
             print(f"portable persistence Swift contract: FAIL: {exc}")
             return 1
-        print(f"portable persistence Swift contract: OK v2 schema=2 tables={len(swift_tables)}")
+        print(f"portable persistence Swift contract: OK v2 schema=3 tables={len(swift_tables)}")
         return 0
     if args.fingerprint_stdin:
         try:

@@ -87,7 +87,7 @@ public final class AppModel {
     }()
 
     @ObservationIgnored private let databaseURL: URL?
-    @ObservationIgnored private let transport: any ProviderTransport
+    @ObservationIgnored private let transport: (any ProviderTransport)?
     @ObservationIgnored private var managedTransport: (any ProviderTransport)?
     @ObservationIgnored private var personalRuntime: ChatGPTPlanRuntime?
     @ObservationIgnored private let credentials = KeychainCredentialStore()
@@ -106,7 +106,7 @@ public final class AppModel {
     @ObservationIgnored private var importedDDL: DDLPackageImport?
     @ObservationIgnored private var providerModelsByExecution: [String: ModelSelection] = [:]
 
-    public init(databaseURL: URL? = nil, transport: any ProviderTransport = URLSessionProviderTransport()) {
+    public init(databaseURL: URL? = nil, transport: (any ProviderTransport)? = nil) {
         self.databaseURL = databaseURL
         self.transport = transport
     }
@@ -148,7 +148,10 @@ public final class AppModel {
             let bootstrap = try Bootstrap()
             self.database = database
             let personalRuntime = ChatGPTPlanRuntime(directory: url.deletingLastPathComponent().appendingPathComponent("personal-chatgpt", isDirectory: true))
-            let routed = PersonalPlanRoutingTransport(ordinary: transport, runtime: personalRuntime)
+            let ordinary: any ProviderTransport
+            if let native = transport as? URLSessionProviderTransport { ordinary = native.withRateDatabase(database) }
+            else { ordinary = transport ?? URLSessionProviderTransport(database: database) }
+            let routed = PersonalPlanRoutingTransport(ordinary: ordinary, runtime: personalRuntime)
             self.personalRuntime = personalRuntime
             self.managedTransport = routed
             self.host = PipelineHost(database: database, transport: routed, credentials: credentials)
@@ -406,7 +409,8 @@ public final class AppModel {
     }
 
     public func auxiliaryProvider() throws -> AuxiliaryProvider {
-        guard let auxiliaryTransport = (managedTransport ?? transport) as? any AuxiliaryTransport else { throw HostError("auxiliary_transport_unavailable") }
+        guard let selectedTransport = managedTransport ?? transport,
+              let auxiliaryTransport = selectedTransport as? any AuxiliaryTransport else { throw HostError("auxiliary_transport_unavailable") }
         return AuxiliaryProvider(transport: auxiliaryTransport, credentials: credentials)
     }
 

@@ -1,4 +1,5 @@
 import Foundation
+import InkuPersistence
 
 public protocol ProviderTransport: Sendable {
     /// Performs one attempt. Retries and schema validation belong to the shared core.
@@ -10,18 +11,28 @@ public final class URLSessionProviderTransport: ObservedProviderTransport, Senda
     private let session: URLSession
     private let budget: ProviderRateBudget
     private let http: (any ProviderHTTPClient)?
+    private let legacyUsageURL: URL
     public let maximumResponseBytes: Int
     public convenience init(maximumResponseBytes: Int = 1_048_576, usageURL: URL? = nil) {
-        self.init(maximumResponseBytes: maximumResponseBytes, usageURL: usageURL, http: nil)
+        self.init(maximumResponseBytes: maximumResponseBytes, usageURL: usageURL, http: nil, database: nil)
     }
-    init(maximumResponseBytes: Int = 1_048_576, usageURL: URL? = nil, http: (any ProviderHTTPClient)?) {
+    public convenience init(database: InkuDatabase, maximumResponseBytes: Int = 1_048_576, usageURL: URL? = nil) {
+        self.init(maximumResponseBytes: maximumResponseBytes, usageURL: usageURL, http: nil, database: database)
+    }
+    init(maximumResponseBytes: Int = 1_048_576, usageURL: URL? = nil, http: (any ProviderHTTPClient)?,
+         database: InkuDatabase? = nil, environment: ProviderRateEnvironment = .live) {
         self.maximumResponseBytes = max(1, maximumResponseBytes)
-        self.budget = ProviderRateBudget(url: usageURL ?? Self.defaultUsageURL)
+        self.legacyUsageURL = usageURL ?? Self.defaultUsageURL
+        self.budget = ProviderRateBudget(database: database, legacyURL: legacyUsageURL, environment: environment)
         self.http = http
         let configuration = URLSessionConfiguration.ephemeral
         configuration.urlCache = nil; configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
         configuration.httpCookieStorage = nil; configuration.httpShouldSetCookies = false
         self.session = URLSession(configuration: configuration, delegate: RejectRedirects(), delegateQueue: nil)
+    }
+    public func withRateDatabase(_ database: InkuDatabase) -> URLSessionProviderTransport {
+        URLSessionProviderTransport(maximumResponseBytes: maximumResponseBytes, usageURL: legacyUsageURL,
+                                    http: http, database: database, environment: budget.environment)
     }
     private static var defaultUsageURL: URL {
         FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
@@ -55,6 +66,7 @@ public final class URLSessionProviderTransport: ObservedProviderTransport, Senda
               let timeoutMS = UInt64(try effect.requiredString("timeout_ms")), timeoutMS > 0,
               timeoutMS <= UInt64.max / 1_000_000 else { throw HostError("pipeline_schema_violation") }
         let began = ContinuousClock.now
+        let deadline = budget.now().addingTimeInterval(Double(timeoutMS) / 1000)
         let modelReference = tag == "complete_visible_ddl_holes" ? models.stage2Model : models.stage1Model
         let maxTokens = tag == "complete_visible_ddl_holes" ? models.holeMaxTokens : models.stage1MaxTokens
         var failure: String?
@@ -70,37 +82,47 @@ public final class URLSessionProviderTransport: ObservedProviderTransport, Senda
                 // This gate precedes inference and Gemini's optional token-count HTTP call.
                 try await recorder.saveRequest(willSend)
             }
+            let remaining = deadline.timeIntervalSince(budget.now())
+            guard remaining > 0 else { throw HostError("transport_timeout") }
             let raw = try await withThrowingTaskGroup(of: Data.self) { group in
                 group.addTask { [self] in
-                    var inputTokens = (boundedRequest.httpBody?.count ?? 0) + 128
+                    let limits = provider.effectiveRateLimits
+                    var inputTokens = limits.tokensPerMinute > 0 ? (boundedRequest.httpBody?.count ?? 0) + 128 : 0
                     // Gemini token accounting asks the provider for the same exact request.
-                    if provider.kind == .gemini, provider.rateLimits?.tokensPerMinute != nil {
-                        inputTokens = try await self.countGeminiTokens(boundedRequest)
+                    if provider.kind == .gemini, limits.tokensPerMinute > 0 {
+                        try await self.budget.prepare(provider: provider)
+                        do { inputTokens = try await self.countGeminiTokens(boundedRequest) }
+                        catch {
+                            if let status = error as? HTTPFailure, status.status == 429 {
+                                try await self.budget.coolDown(providerID: provider.id, seconds: status.retryAfter)
+                            }
+                            throw error
+                        }
                     }
-                    let reservation = try await self.budget.reserve(provider: provider, inputTokens: inputTokens)
+                    let reservation = try await self.budget.reserve(provider: provider, inputTokens: inputTokens, deadline: deadline)
+                    var bytes: Data?, used: Int?, attemptError: (any Error)?
                     do {
-                        let bytes: Data
-                        if let recorder {
-                            bytes = try await self.readObserved(boundedRequest, maximum: self.maximumResponseBytes, onBytes: onBytes,
-                                onResponse: { recorder.receive($0) })
-                        } else { bytes = try await self.read(boundedRequest, maximum: self.maximumResponseBytes, onBytes: onBytes) }
-                        let value = try ExactJSON(data: bytes)
+                        try Task.checkCancellation()
+                        guard self.budget.now() < deadline else { throw HostError("rate_limited") }
+                        bytes = try await self.readObserved(boundedRequest, maximum: self.maximumResponseBytes, onBytes: onBytes,
+                            onResponse: { recorder?.receive($0) })
+                        let value = try ExactJSON(data: bytes!)
                         recorder?.report(value)
                         let usage = provider.kind == .gemini ? value["usageMetadata"] : value["usage"]
                         let tokenKey = provider.kind == .gemini ? "promptTokenCount" : (provider.kind == .anthropic ? "input_tokens" : "prompt_tokens")
-                        let used = usage[tokenKey].number.flatMap(Int.init)
-                        try await self.budget.settle(providerID: provider.id, reservation: reservation, used: used)
-                        return bytes
-                    } catch {
-                        if let status = error as? HTTPFailure, status.status == 429 {
-                            try await self.budget.coolDown(providerID: provider.id, seconds: status.retryAfter)
-                        }
-                        // An uncertain attempt retains its reservation to avoid over-admission.
-                        throw error
+                        used = usage[tokenKey].number.flatMap(Int.init).flatMap { $0 >= 0 ? $0 : nil }
+                    } catch { attemptError = error }
+                    if let status = attemptError as? HTTPFailure, status.status == 429 {
+                        try await self.budget.coolDown(providerID: provider.id, seconds: status.retryAfter)
                     }
+                    // Unknown TPM retains its reservation and closes admission for 62 seconds.
+                    try await self.budget.settle(providerID: provider.id, reservation: reservation,
+                                                used: used ?? (limits.tokensPerMinute == 0 ? 0 : nil))
+                    if let attemptError { throw attemptError }
+                    return bytes!
                 }
                 group.addTask {
-                    try await Task.sleep(nanoseconds: timeoutMS * 1_000_000)
+                    try await Task.sleep(for: .seconds(remaining))
                     throw HostError("transport_timeout")
                 }
                 defer { group.cancelAll() }
@@ -144,7 +166,10 @@ public final class URLSessionProviderTransport: ObservedProviderTransport, Senda
         if let http {
             onResponse(ProviderHTTPRead(status: nil, data: nil, sent: true, complete: false, truncated: false))
             let response = try await http.send(request, maximumBytes: maximum, onBytes: onBytes, onResponse: onResponse)
-            guard (200...299).contains(response.status) else { throw HTTPFailure(status: response.status, retryAfter: response.retryAfter) }
+            guard (200...299).contains(response.status) else {
+                throw HTTPFailure(status: response.status,
+                    retryAfter: ProviderRateBudget.retryAfter(String(response.retryAfter), raw: response.data, now: budget.now()))
+            }
             return response.data
         }
         var data = Data(), status: Int?, complete = false, truncated = false
@@ -166,7 +191,7 @@ public final class URLSessionProviderTransport: ObservedProviderTransport, Senda
         } catch {
             if !success && !Task.isCancelled {
                 throw HTTPFailure(status: response.statusCode,
-                    retryAfter: response.value(forHTTPHeaderField: "Retry-After").flatMap(Double.init) ?? 60)
+                    retryAfter: ProviderRateBudget.retryAfter(response.value(forHTTPHeaderField: "Retry-After"), raw: data, now: budget.now()))
             }
             throw error
         }
@@ -174,7 +199,7 @@ public final class URLSessionProviderTransport: ObservedProviderTransport, Senda
         complete = !truncated
         if !success {
             throw HTTPFailure(status: response.statusCode,
-                retryAfter: response.value(forHTTPHeaderField: "Retry-After").flatMap(Double.init) ?? 60)
+                retryAfter: ProviderRateBudget.retryAfter(response.value(forHTTPHeaderField: "Retry-After"), raw: data, now: budget.now()))
         }
         guard !truncated else { throw HostError("malformed_payload") }
         return data
@@ -188,7 +213,7 @@ public final class URLSessionProviderTransport: ObservedProviderTransport, Senda
         throw HostError("provider_selection_required")
     }
 
-    /// Auxiliary calls share the pipeline transport's reservations and HTTP boundary.
+    /// Vision and other auxiliary routes share HTTP policy, not pipeline accounting.
     public func performAuxiliary(prompt: AuxiliaryPrompt, modelReference: String, settings: HostSettings,
                                  credentials: any CredentialStore,
                                  onBytes: @escaping @Sendable (Int) -> Void) async throws -> String {
@@ -198,25 +223,7 @@ public final class URLSessionProviderTransport: ObservedProviderTransport, Senda
         do {
             let raw = try await withThrowingTaskGroup(of: Data.self) { group in
                 group.addTask { [self] in
-                    var inputTokens = (request.httpBody?.count ?? 0) + 128
-                    if provider.kind == .gemini, provider.rateLimits?.tokensPerMinute != nil {
-                        inputTokens = try await self.countGeminiTokens(request)
-                    }
-                    let reservation = try await self.budget.reserve(provider: provider, inputTokens: inputTokens)
-                    do {
-                        let bytes = try await self.read(request, maximum: self.maximumResponseBytes, onBytes: onBytes)
-                        let value = try ExactJSON(data: bytes)
-                        let usage = provider.kind == .gemini ? value["usageMetadata"] : value["usage"]
-                        let key = provider.kind == .gemini ? "promptTokenCount" : (provider.kind == .anthropic ? "input_tokens" : "prompt_tokens")
-                        try await self.budget.settle(providerID: provider.id, reservation: reservation,
-                                                   used: usage[key].number.flatMap(Int.init))
-                        return bytes
-                    } catch {
-                        if let failure = error as? HTTPFailure, failure.status == 429 {
-                            try await self.budget.coolDown(providerID: provider.id, seconds: failure.retryAfter)
-                        }
-                        throw error
-                    }
+                    try await self.read(request, maximum: self.maximumResponseBytes, onBytes: onBytes)
                 }
                 group.addTask {
                     try await Task.sleep(for: .seconds(prompt.timeoutSeconds))
@@ -247,7 +254,8 @@ public final class URLSessionProviderTransport: ObservedProviderTransport, Senda
         inner["model"] = .string("models/" + modelPath)
         var request = original; request.url = url
         request.httpBody = ExactJSON.object(["generateContentRequest": inner]).data
-        let value = try ExactJSON(data: await read(request, maximum: min(16384, maximumResponseBytes), onBytes: { _ in }))
+        let value = try ExactJSON(data: await readObserved(request, maximum: min(16384, maximumResponseBytes),
+            onBytes: { _ in }, onResponse: { _ in }))
         guard let count = value["totalTokens"].number.flatMap(Int.init), count >= 0, count <= (Int.max - 9) / 11 else { throw HostError("rate_limited") }
         return (count * 11 + 9) / 10
     }
@@ -277,60 +285,4 @@ private struct HTTPFailure: Error { let status: Int; let retryAfter: Double }
 private final class RejectRedirects: NSObject, URLSessionTaskDelegate, Sendable {
     func urlSession(_ session: URLSession, task: URLSessionTask, willPerformHTTPRedirection response: HTTPURLResponse,
                     newRequest request: URLRequest, completionHandler: @escaping @Sendable (URLRequest?) -> Void) { completionHandler(nil) }
-}
-
-/// Reservations and cooldowns are durable before a paid request leaves the host.
-private actor ProviderRateBudget {
-    struct Reservation: Codable, Sendable { var id: String; var at: Date; var tokens: Int }
-    struct State: Codable { var reservations: [String: [Reservation]] = [:]; var cooldowns: [String: Date] = [:] }
-    let url: URL
-    var loaded = false
-    var state = State()
-    init(url: URL) { self.url = url }
-    func reserve(provider: ProviderSettings, inputTokens: Int) async throws -> String? {
-        let limits = provider.rateLimits ?? ProviderRateLimits()
-        try load()
-        if let tpm = limits.tokensPerMinute, inputTokens > tpm { throw HostError("rate_limited") }
-        while true {
-            try Task.checkCancellation()
-            let now = Date()
-            var calendar = Calendar(identifier: .iso8601)
-            calendar.timeZone = TimeZone(secondsFromGMT: 0)!
-            let dayStart = calendar.startOfDay(for: now)
-            let reservations = (state.reservations[provider.id] ?? []).filter { $0.at >= min(dayStart, now.addingTimeInterval(-60)) }
-            state.reservations[provider.id] = reservations
-            let recent = reservations.filter { now.timeIntervalSince($0.at) < 60 }
-            if let daily = limits.requestsPerDay, reservations.filter({ $0.at >= dayStart }).count >= daily { throw HostError("rate_limited") }
-            let minuteFull = limits.requestsPerMinute.map { recent.count >= $0 } ?? false
-            let tokensFull = limits.tokensPerMinute.map { recent.reduce(0) { $0 + $1.tokens } + inputTokens > $0 } ?? false
-            let cooldown = max(0, state.cooldowns[provider.id]?.timeIntervalSince(now) ?? 0)
-            if !minuteFull && !tokensFull && cooldown <= 0 {
-                let id = UUID().uuidString
-                state.reservations[provider.id, default: []].append(.init(id: id, at: now, tokens: inputTokens))
-                try persist(); return id
-            }
-            let minuteWait = (minuteFull || tokensFull) ? max(0.01, 60 - now.timeIntervalSince(recent.first?.at ?? now)) : 0
-            try await Task.sleep(for: .seconds(max(cooldown, minuteWait)))
-        }
-    }
-    func settle(providerID: String, reservation: String?, used: Int?) throws {
-        guard let reservation, let used, used >= 0 else { return }
-        if let index = state.reservations[providerID]?.firstIndex(where: { $0.id == reservation }) {
-            state.reservations[providerID]![index].tokens = used; try persist()
-        }
-    }
-    func coolDown(providerID: String, seconds: Double) throws {
-        try load()
-        state.cooldowns[providerID] = Date().addingTimeInterval(seconds.isFinite ? min(seconds, 86400) : 60)
-        try persist()
-    }
-    func load() throws {
-        guard !loaded else { return }
-        if FileManager.default.fileExists(atPath: url.path) { state = try JSONDecoder().decode(State.self, from: Data(contentsOf: url)) }
-        loaded = true
-    }
-    func persist() throws {
-        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
-        try JSONEncoder().encode(state).write(to: url, options: .atomic)
-    }
 }

@@ -7,6 +7,17 @@ public enum ProviderKind: String, Codable, Sendable {
     case chatGPTPlan = "chatgpt"
 }
 
+public struct EffectiveProviderRateLimits: Sendable, Equatable {
+    public let requestsPerMinute: Int
+    public let tokensPerMinute: Int
+    public let requestsPerDay: Int
+    public init(requestsPerMinute: Int, tokensPerMinute: Int, requestsPerDay: Int) {
+        self.requestsPerMinute = requestsPerMinute; self.tokensPerMinute = tokensPerMinute; self.requestsPerDay = requestsPerDay
+    }
+    public var minuteRequestBudget: Int { requestsPerMinute == 0 ? 0 : max(1, requestsPerMinute * 9 / 10) }
+    public var minuteInputTokenBudget: Int { tokensPerMinute == 0 ? 0 : max(1, tokensPerMinute * 9 / 10) }
+}
+
 public struct ProviderRateLimits: Codable, Sendable, Equatable {
     public var requestsPerMinute: Int?
     public var tokensPerMinute: Int?
@@ -14,6 +25,14 @@ public struct ProviderRateLimits: Codable, Sendable, Equatable {
     public init(requestsPerMinute: Int? = nil, tokensPerMinute: Int? = nil, requestsPerDay: Int? = nil) {
         self.requestsPerMinute = requestsPerMinute; self.tokensPerMinute = tokensPerMinute
         self.requestsPerDay = requestsPerDay
+    }
+    public static func defaults(providerID: String) -> ProviderRateLimits {
+        providerID == "gemini" ? .init(requestsPerMinute: 30, tokensPerMinute: 16_000, requestsPerDay: 14_400)
+            : .init(requestsPerMinute: 0, tokensPerMinute: 0, requestsPerDay: 0)
+    }
+    /// Older settings saved zero as a missing member in an existing object.
+    public func effective(providerID: String) -> EffectiveProviderRateLimits {
+        .init(requestsPerMinute: requestsPerMinute ?? 0, tokensPerMinute: tokensPerMinute ?? 0, requestsPerDay: requestsPerDay ?? 0)
     }
 }
 
@@ -26,6 +45,9 @@ public struct ProviderSettings: Codable, Sendable, Equatable, Identifiable {
     public var requiresAPIKey: Bool
     public var credentialID: String
     public var rateLimits: ProviderRateLimits?
+    public var effectiveRateLimits: EffectiveProviderRateLimits {
+        (rateLimits ?? ProviderRateLimits.defaults(providerID: id)).effective(providerID: id)
+    }
     public init(id: String, kind: ProviderKind = .openAICompatible, baseURL: URL,
                 apiProfile: String? = nil, requiresAPIKey: Bool = true,
                 credentialID: String? = nil, rateLimits: ProviderRateLimits? = nil) {
@@ -48,7 +70,7 @@ public struct ProviderSettings: Codable, Sendable, Equatable, Identifiable {
               parts.scheme == "https" || parts.scheme == "http"
         else { throw HostError("provider_base_url_invalid") }
         if let limits = rateLimits {
-            guard [limits.requestsPerMinute, limits.tokensPerMinute, limits.requestsPerDay].compactMap({ $0 }).allSatisfy({ $0 > 0 })
+            guard [limits.requestsPerMinute, limits.tokensPerMinute, limits.requestsPerDay].compactMap({ $0 }).allSatisfy({ (0...1_000_000_000).contains($0) })
             else { throw HostError("invalid_provider_rate_limits") }
         }
     }

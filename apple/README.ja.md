@@ -62,7 +62,9 @@ open apple/build/macOS/DerivedData/Build/Products/Release/Inku.app
 
 「描画パラメータの編集」では配置・読み取り・変奏の1案／4案、言葉によるタッチの1案を比較し、選んだ候補だけを子として保存します。候補の準備・拡大だけでは表示作品や通常履歴を変えません。タッチは保存Scoreと共通Rustの語句seedを使い、現在の変奏は無変更であることを画面へ表示します。停止・破棄と採用を区別し、model設定へ移る場合は未保存候補を先に採用または破棄してください。
 
-作品のDBはアプリのApplication Supportに、通常のprovider設定はDBと同じdirectoryの`providers.json`に保存します。API keyはKeychainの別itemです。SQLite backupは作品・系譜・execution／ACK／snapshot、comment／mark、奥書、未読語を含むDBの整合したcopyであり、隣接設定JSONやKeychainのbackupではありません。
+モデル設定の「レート制限」は、毎分の要求数（RPM）、毎分の入力トークン数（TPM）、日次の要求数（RPD）を設定します。隣の説明buttonで対象や日次の切替時刻を読めます。0は上限なしで、標準Geminiの未設定時は30／16,000／14,400です。契約プランに合わせ、0〜1,000,000,000の整数を設定してください。描画と再試行の予約はSQLiteへ保存し、再起動や古い作品backupの復元で当日の上限・待機時間をリセットしません。待機は生成の試行期限へ含まれます。
+
+作品のDBはアプリのApplication Supportに、通常のprovider設定はDBと同じdirectoryの`providers.json`に保存します。API keyはKeychainの別itemです。SQLite backupは作品・系譜・execution／ACK／snapshot、comment／mark、奥書、未読語と送信予算を含むDBの整合したcopyであり、隣接設定JSONやKeychainのbackupではありません。
 
 通常の作品DBを使わずに試す場合は、実行fileへ`--database`を渡します。
 
@@ -104,5 +106,7 @@ python3 apple/scripts/prepare-meter-resources.py
 追加のAppCheck選択は`--provider-progress-only`と`--model-guidance-only`です。前者はmock／共通Rustで再試行の表示・時計・停止と遅いcallback、後者は生成したServer評価資料と一時DBで適性・未登録境界・選択とsnapshotの保持を確認します。実providerへの呼出しは行いません。
 
 構図への追随は`--composition-host-only`と`--composition-progress-only`で確認します。hostは実Rust／mock／一時DBで構図要求・固定Stage 1 modelと上限・schema・保存・有限retry／fallback・旧設定／保存Score再生を、progressは段階時計・再試行・日英表示・prompt履歴の分離・停止を確認します。`--composition-personal-plan-gate-only`は未接続の有効UUIDと空の一時vaultでPersonal ChatGPTの最終routing拒否だけを確認し、実HTTP／OAuth／Keychainを使いません。
+
+送信予算の限定確認は`swift test --package-path apple/Packages/InkuHost --filter ProviderRateLimitChecks/testDurableAdmissionDeadlineAndRetryAccounting`です。一時SQLite、模擬HTTPと時計で同時接続の予約、期限・日次・入力上限、旧記録の取込とbackup／restoreを扱い、実provider、認証情報、通常作品DBを使いません。
 
 限定したCLI確認は、artifact生成後の`apple/scripts/check-core.sh`と、resource生成後の`swift run --package-path apple InkuAppCheck`です。AppCheckの`--authoring-only`、`--comparison-only`、`--automation-only`、`--plugin-only`、`--model-selection-only`、`--work-edit-only`、`--refinement-only`、`--replay-comparison-only`、`--auxiliary-provenance-only`、`--raster-only <SVG path>`はそれぞれの変更に対応する確認だけを選びます。`--model-selection-only`は一時DBとprovider呼出し0件で、制作のmodel選択と保存default・開始時snapshotの分離を確認します。`--work-edit-only`はmock transportと共通coreで保存親の編集・写生・childのDDL authority・取消しを確認します。`--refinement-only`は語句seedと保存Score、固定4案、無変更の変奏、明示採用・再表示後のDDL child、edge metadataと遅い応答の拒否を同じ隔離境界で確認します。`--replay-comparison-only`はprovider0件の再現比較が保存・表示を変えないこととseed・停止の境界、`--auxiliary-provenance-only`はmockによる世代ごとのVision／random来歴を確認します。これらはnative画面、実provider、実機の受入を代替しません。変更が防ぐ具体的な失敗に合わせて必要な確認だけを選択してください。

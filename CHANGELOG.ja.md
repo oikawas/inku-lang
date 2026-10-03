@@ -6,6 +6,14 @@
 
 **本書は v2.5.0（2026-07-25、render engine 12）以降の履歴を保持する。** 最近の記録に続く過去の履歴は、同じ文書内で折りたたんである。必要なときに展開して読める。折りたたみに対応しないビューアでは全文を表示する。それより前の履歴は [v1.72〜v2.4の書庫](docs/history/changelog-v1.72-v2.4.ja.md) と [v0.1〜v1.71の書庫](docs/history/changelog-v0.1-v1.71.ja.md) にある。
 
+### 2026-10-03 — Swiftの構図・下絵の実測記録を分離
+
+通常APIとPersonal ChatGPTの呼出し時間・実token数・結果をactionごとに記録し、構図をStage 1と分けた。未取得と明示0を区別し、制作・比較候補・保存作品の再表示で記録を読む。保存時の生成情報を固定し、再演奏比較へ新たなprovider要求を加えない。
+
+開発者モードで明示した場合だけ、送受信本文をprivate executionへ保存し、専用の折りたたみ欄から読む。既定は無効、送信前の保存失敗はHTTPを出さず、送信後の保存失敗は通常retryへ変えない。不完全な応答と省略を示し、接続先・header・認証情報を除く。[Swift仕様](apple/SWIFT_SPEC.ja.md)と[利用手順](apple/README.ja.md)へ反映した。
+
+限定mock／実Rust／一時DBの保存・再読込と通信XCTest1件が成功。更新Universalアプリの隔離画面でも下絵／構図の異なる時間・token数、通信本文、新規での解除と保存作品の再表示を確認し、既存作品・系譜・execution全行を保持した。実provider／OAuthの受入は未実施。
+
 ### 2026-10-03 — Swiftへ構図の読みを反映
 
 Serverの新規生成既定を取り込み、共通Rustの`read_composition`／`composition_read`を通常APIとPersonal ChatGPTへ接続した。下絵と同じStage 1 model・上限とaction identityを保持し、retry／fallbackと配置は共通Rustが担当する。構図を独立した進行段階として表示し、段階時計を切り替える。構図promptは耐久snapshotへ保持し、作品のStage 1／2 prompt履歴へ混ぜない。

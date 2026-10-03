@@ -333,6 +333,7 @@ struct CreationView: View {
             if let grain = work.sketchGrain { Text(model.display.localizedFormat("旧写生の区切り: %@（保存記録）", grain)).font(.caption).foregroundStyle(.secondary) }
             if model.inputMode == "description", !model.visibleDDL.isEmpty && !model.isPreview { DdlAuthoringView(model: model) }
             if model.display.visible("diagnostics") {
+                ProviderObservationView(model: model, metrics: model.providerMetrics, workID: work.id)
                 DisclosureGroup(model.display.localized("指示書・Score"), isExpanded: $outputExpanded) { OutputView(ddl: model.visibleDDL, score: model.scoreJSON).frame(height: 230) }
                 DisclosureGroup(model.display.localized("保存条件"), isExpanded: $conditionsExpanded) {
                     savedFacts(work).padding(.top, 8)

@@ -230,6 +230,18 @@ public actor ChatGPTPlanRuntime {
     }
     public func perform(action: Data, session: ChatGPTPlanSession, model: String, argumentLimit: Int,
                         onBytes: @escaping @Sendable (Int) -> Void) async throws -> String {
+        try await performAttempt(action: action, session: session, model: model, argumentLimit: argumentLimit,
+                                 recorder: nil, willSend: { _ in }, onBytes: onBytes)
+    }
+    func performObserved(action: Data, session: ChatGPTPlanSession, model: String, providerID: String, argumentLimit: Int,
+                         recorder: ProviderAttemptRecorder, willSend: @escaping ProviderObservationHandler,
+                         onBytes: @escaping @Sendable (Int) -> Void) async throws -> String {
+        try await performAttempt(action: action, session: session, model: model, providerID: providerID,
+                                 argumentLimit: argumentLimit, recorder: recorder, willSend: willSend, onBytes: onBytes)
+    }
+    private func performAttempt(action: Data, session: ChatGPTPlanSession, model: String, providerID: String = "chatgpt",
+                                argumentLimit: Int, recorder: ProviderAttemptRecorder?, willSend: @escaping ProviderObservationHandler,
+                                onBytes: @escaping @Sendable (Int) -> Void) async throws -> String {
         let effect = try ExactJSON(data: action), tag = try effect.requiredString("tag")
         guard ["generate_sketch", "select_description_catalog", "generate_normalized_ddl", "read_composition", "complete_visible_ddl_holes"].contains(tag) else {
             throw HostError("chatgpt_operation_not_supported")
@@ -242,20 +254,46 @@ public actor ChatGPTPlanRuntime {
         let lease = try await store.lease("wire-" + session.profileID, deadline: deadline, check: { try await self.validate(session, operationEpoch: operationEpoch) })
         defer { _ = lease }
         do {
+            // The body does not depend on authentication. Durably save it before any
+            // model-discovery or token-refresh HTTP, as well as before the paid request.
+            let body: ExactJSON?
+            if let recorder {
+                let profile = try checkedProfile(session)
+                let prepared = try Self.requestBody(model: model, prompt: effect.requiredObject("payload").requiredObject("prompt"))
+                recorder.prepare(body: prepared.data, providerID: providerID, model: model,
+                    secrets: [profile.accessToken, profile.refreshToken, profile.idToken].compactMap { $0 })
+                try await recorder.saveRequest(willSend)
+                body = prepared
+            } else { body = nil }
             let offered = try await offeredModels(session: session, force: false, deadline: deadline, operationEpoch: operationEpoch)
             guard offered.contains(where: { $0.id == model }) else { throw HostError("chatgpt_model_not_offered") }
             let token = try await accessToken(session, deadline: deadline, operationEpoch: operationEpoch)
-            let body = try Self.requestBody(model: model, prompt: effect.requiredObject("payload").requiredObject("prompt"))
-            var request = URLRequest(url: ChatGPTEndpoints.responses); request.httpMethod = "POST"; request.httpBody = body.data
+            if let recorder {
+                let profile = try checkedProfile(session)
+                recorder.addSecrets([token, profile.refreshToken, profile.idToken].compactMap { $0 })
+            }
+            let sentBody = try body ?? Self.requestBody(model: model, prompt: effect.requiredObject("payload").requiredObject("prompt"))
+            var request = URLRequest(url: ChatGPTEndpoints.responses); request.httpMethod = "POST"; request.httpBody = sentBody.data
             request.timeoutInterval = max(0.001, deadline.timeIntervalSinceNow)
             request.setValue("application/json", forHTTPHeaderField: "Content-Type"); request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
             request.setValue("Bearer " + token, forHTTPHeaderField: "Authorization")
             let boundedRequest = request
             let result = try await guarded(deadline: deadline, check: { try await self.validate(session, operationEpoch: operationEpoch) }) {
-                try await self.http.send(boundedRequest, maximumBytes: max(1_048_576, argumentLimit * 6 + 524_288), onBytes: onBytes)
+                if let recorder {
+                    recorder.receive(ProviderHTTPRead(status: nil, data: nil, sent: true, complete: false, truncated: false))
+                    if let observed = self.http as? any ObservedChatGPTHTTPClient {
+                        return try await observed.sendObserved(boundedRequest, maximumBytes: max(1_048_576, argumentLimit * 6 + 524_288),
+                            onBytes: onBytes, onResponse: { recorder.receive($0) })
+                    }
+                    let response = try await self.http.send(boundedRequest, maximumBytes: max(1_048_576, argumentLimit * 6 + 524_288), onBytes: onBytes)
+                    recorder.receive(ProviderHTTPRead(status: response.status, data: response.data, sent: true, complete: true, truncated: false))
+                    return response
+                }
+                return try await self.http.send(boundedRequest, maximumBytes: max(1_048_576, argumentLimit * 6 + 524_288), onBytes: onBytes)
             }
             if !(200...299).contains(result.status) { throw Self.responseFailure(result) }
             var decoder = ChatGPTResponseDecoder(argumentLimit: argumentLimit)
+            defer { if let terminal = decoder.terminalResponse { recorder?.report(terminal) } }
             // EOF is required: a failure following a completed frame invalidates that frame.
             try decoder.feed(result.data)
             let answer = try decoder.finish(); try validate(session, operationEpoch: operationEpoch); return answer

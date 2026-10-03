@@ -12,7 +12,13 @@ public protocol ChatGPTHTTPClient: Sendable {
     func send(_ request: URLRequest, maximumBytes: Int, onBytes: @escaping @Sendable (Int) -> Void) async throws -> ChatGPTHTTPResponse
 }
 
-public final class ChatGPTURLSessionClient: ChatGPTHTTPClient, Sendable {
+/// Additive response observation. Existing authentication clients remain compatible.
+protocol ObservedChatGPTHTTPClient: ChatGPTHTTPClient {
+    func sendObserved(_ request: URLRequest, maximumBytes: Int, onBytes: @escaping @Sendable (Int) -> Void,
+                      onResponse: @escaping ProviderHTTPReadHandler) async throws -> ChatGPTHTTPResponse
+}
+
+public final class ChatGPTURLSessionClient: ObservedChatGPTHTTPClient, Sendable {
     private let session: URLSession
     public init() {
         let configuration = URLSessionConfiguration.ephemeral
@@ -22,21 +28,32 @@ public final class ChatGPTURLSessionClient: ChatGPTHTTPClient, Sendable {
     }
     public func send(_ request: URLRequest, maximumBytes: Int,
                      onBytes: @escaping @Sendable (Int) -> Void) async throws -> ChatGPTHTTPResponse {
+        try await read(request, maximumBytes: maximumBytes, onBytes: onBytes, observed: false, onResponse: { _ in })
+    }
+    func sendObserved(_ request: URLRequest, maximumBytes: Int, onBytes: @escaping @Sendable (Int) -> Void,
+                      onResponse: @escaping ProviderHTTPReadHandler) async throws -> ChatGPTHTTPResponse {
+        try await read(request, maximumBytes: maximumBytes, onBytes: onBytes, observed: true, onResponse: onResponse)
+    }
+    private func read(_ request: URLRequest, maximumBytes: Int, onBytes: @escaping @Sendable (Int) -> Void,
+                      observed: Bool, onResponse: @escaping ProviderHTTPReadHandler) async throws -> ChatGPTHTTPResponse {
         guard let url = request.url, maximumBytes > 0 else { throw HostError("chatgpt_endpoint_invalid") }
         try ChatGPTEndpoints.validate(url)
+        var data = Data(), status: Int?, complete = false, truncated = false
+        defer { onResponse(ProviderHTTPRead(status: status, data: data, sent: true, complete: complete, truncated: truncated)) }
         let (bytes, response) = try await session.bytes(for: request)
         defer { bytes.task.cancel() }
         guard let response = response as? HTTPURLResponse else { throw HostError("chatgpt_transport_unavailable") }
+        status = response.statusCode
         let maximum = (200...299).contains(response.statusCode) ? maximumBytes : min(maximumBytes, 65_536)
-        guard response.expectedContentLength <= Int64(maximum) else { throw HostError("chatgpt_response_too_large") }
-        var data = Data()
+        if !observed, response.expectedContentLength > Int64(maximum) { truncated = true; throw HostError("chatgpt_response_too_large") }
         for try await byte in bytes {
             try Task.checkCancellation()
-            guard data.count < maximum else { throw HostError("chatgpt_response_too_large") }
+            guard data.count < maximum else { truncated = true; throw HostError("chatgpt_response_too_large") }
             data.append(byte)
             if data.count % 4096 == 0 { onBytes(data.count) }
         }
         onBytes(data.count)
+        complete = true
         return .init(status: response.statusCode, requestID: response.value(forHTTPHeaderField: "x-request-id"), data: data)
     }
 }

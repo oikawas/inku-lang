@@ -24,13 +24,19 @@ binding／protocolの版は同梱Rust coreのversion report、描画層の版は
 
 制作とモデル設定の「モデルの適性・用途」はServerの登録資料をbuild時に取り込み、用途、解釈／構造化と両段の評価、Visionの評価、日英comment、更新日時と提供状態を表示する。両段の評価は弱い段階の値、段階別評価がない場合はLLM評価を使う。正確なcatalog service ID・接続方式・model IDで照合し、Ollama tagの`:`を保持する。custom serviceや未登録modelを名前やURLから推測で評価しない。Serverのdeveloper専用速度情報は公開環境と同じく表示しない。登録資料と接続先から明示取得した入力上限・対応機能は別欄にし、案内を読むだけで選択・保存default・開始時snapshotを変更しない。
 
-状態欄は共通coreの試行回数とhostの開始時刻を用い、providerの段階、固定要求の呼出しmodel、試行／再試行、段階全体と今回の経過時間を表示する。同じ段階の再試行は段階の時計を保持し、今回の時計を開始し直す。完了・失敗・確認待ち・停止で時計を確定し、停止は遅い応答の終了を待つ。現行境界が取得しない入力／出力token数は「記録なし」とし、推定しない。通常生成と比較候補は同じ表示を使い、古いtokenの応答を除外する。新規・保存作品の選択・新しい処理開始は古い表示を消し、provider不要の再現比較へ持ち込まない。
+状態欄は共通coreの試行回数とhostの開始時刻を用い、providerの段階、固定要求の呼出しmodel、試行／再試行、段階全体と今回の経過時間を表示する。同じ段階の再試行は段階の時計を保持し、今回の時計を開始し直す。完了・失敗・確認待ち・停止で時計を確定し、停止は遅い応答の終了を待つ。入力／出力token数はproviderが返した実usageを使い、未取得は「記録なし」、明示0は0と表示する。文字数や予算用の推定tokenを実usageへ置き換えない。通常生成と比較候補は同じ表示を使い、古いtokenの応答を除外する。新規・保存作品の選択・新しい処理開始は古い表示を消し、provider不要の再現比較へ持ち込まない。
 
 新規生成の設定はServerから生成した`composition: {read: true}`を使用する。構造化した下絵の後、共通Rustが要求する`read_composition`を通常API／Personal ChatGPTへ渡し、同じaction identityの`composition_read`を返す。構図の読みは下絵と同じStage 1 modelと上限を使い、再試行・既定値へのfallback・可視DDLへの構図反映は共通Rustが所有する。構図の意味と`［構図］`／`[composition]`の規則は[製品仕様](../SPEC.ja.md)に従う。
 
 保存設定のcomposition欠落と`read:false`はそのまま保持する。欠落は従来の下絵、`read:false`はLLMの読みを行わない既定の構図として扱う。直接DDL、構造化済み応答からの継続、保存Scoreの再演奏へ構図要求を追加せず、既存の保存SVG・Score・DDLを変更しない。構図promptは耐久execution snapshotに保持し、作品のStage 1／2送信prompt履歴へ混ぜない。
 
-構図は独立した進行段階として表示し、下絵から切り替えた時に段階時計を開始し直す。通常生成と比較候補の両方で固定Stage 1 model、試行、経過時間を表示する。保存`elapsedMS`は構図待ちを含む実行全体の経過時間であり、Serverの独立した`metrics.composition` mapをSwiftの履歴へ保存する形式ではない。Personal ChatGPTのraw SSEと段階別usageを保存する観測表も現行nativeにはなく、Serverとの残る機能差である。
+構図は独立した進行段階として表示し、下絵から切り替えた時に段階時計を開始し直す。通常生成と比較候補の両方で固定Stage 1 model、試行、経過時間を表示する。保存`elapsedMS`は構図待ちを含む実行全体の経過時間であり、個々のprovider呼出し時間とは区別する。
+
+通常APIとPersonal ChatGPTは、action identityごとの実呼出し時間、実usage、要求model／応答model、HTTP statusと結果を記録する。段階はServerと同じく`read_composition`を`composition`、補完を`stage2`、そのほかのprovider actionを`stage1`へ分ける。通常の生成情報は本文を持たない`ProviderAttemptMetric`だけとし、作品保存時のperformance contextへ固定する。後のexecution更新で過去作品の記録を置き換えない。保存作品の再表示と読出し専用の再演奏比較は保存時の記録を読み、provider要求を追加しない。古いsnapshot／作品で記録が欠落していても読める。これはSwiftの型付きrecord形式であり、Serverの`metrics.composition`と物理JSON形式を同一とするものではない。
+
+通信本文は、`INKU_DEVELOPER_MODE=1`で起動し、設定の「生成時の送受信を記録」を有効にした場合だけ端末内へ保存する。独立したdefault-offの設定を開始時requestへ固定し、通常環境での明示要求と記録に対応しないtransportは送信前に拒否する。実request本文の耐久記録を送信前にSQLiteへ保存し、保存失敗時はHTTP要求を出さない。送信後の記録失敗を成功や通常のprovider retryへ読み替えない。共通coreのprompt／schema／有限retry／fallbackと結果のidentityを変更しない。
+
+private executionの`ProviderAttemptObservation`は本文を任意に持ち、通常の履歴・prompt欄・結果logへ露出させない。開発者向けの折りたたみ欄を明示して開いた時だけ読み出し、処理中に開いた記録は「記録を更新」で再読込できる。request／response本文はそれぞれ16MiB以内で、途中切断・上限超過・取消しは不完全／省略の事実を残し、完全な記録とは表示しない。Swiftでは同じexecutionの本文UTF-8 byte合計を64MiB以内とし、送信前に応答16MiB分の余地を確保する。超過は送信前に拒否し、以前の記録を削除・省略しない。この予算は本文の合計であり、encoded snapshotやapp memory全体の上限ではない。接続先URL、header、認証情報、接続設定、例外本文は保存せず、既知のcredentialが本文へ返された場合も除く。画面は先頭32KiBのpreviewを表示し、保存されている本文全体の共有は開発者が明示した操作だけで行う。通常生成情報のAPIはraw本文を返さず、開発者モード外ではraw読出しを拒否する。
 
 macOS menuはactive sceneの操作可否を使う。⌘Nは新規制作、⌘Oは画面buttonと共通のDDL file読込、⌘,は設定、⌘1〜4は制作／library／系譜／batch・demo、⇧⌘Eは書出し、⇧⌘Cは画像copy。既存の⌘Return生成、Escape停止、⇧⌘Fプレゼンテーションと併用する。生成・自動実行・読込・dialog・presentationの状態に合わせて対象操作を無効化し、menu経由で別の書込みを割り込ませない。設定はsystem sidebarとgrouped formを使い、モデル設定への導線は該当categoryを開く。
 
@@ -120,7 +126,11 @@ Rust 1.95のmacOS host proc-macro stripによるLINKEDIT alignment失敗は、re
 
 追加の`--provider-progress-only`は実Rustとmockで最初の失敗後の1回の再試行、固定model・段階／試行時計・未記録usage、完了／停止の時間確定、比較callback・終了待ち・古いtoken拒否と表示解除を確認した。`--model-guidance-only`は一時DBとprovider0件でServerの段階別評価、LLM／Visionの区別、日英comment、速度の公開範囲、未登録境界、両画面のIDと選択・保存default・既存snapshot保持を確認した。更新したRelease Universalの隔離画面では制作と設定の評価5／2・両段2、登録資料と未取得の接続先情報、loopback模擬providerの429後の再試行2／4と経過表示を確認した。停止後に時計が確定し、新規で状態cardが消え、history2件・節点2件・edge1件の全行が一致した。これは実providerの性能・model取得・推論や全幅の受入ではない。
 
-構図のhost確認は実Rust／mock／一時DBでStage 1から構図・保存への接続、modelと上限、schemaの`propertyOrdering`、有限retry／fallback、欠落／`read:false`設定と保存Score再生の保持を確認した。最終Personal ChatGPT guardは非UUIDのfixtureを修正し、`--composition-personal-plan-gate-only`だけで未接続の拒否、action identity保持とHTTP／credential呼出し0件を確認した。`--composition-progress-only`は段階切替、構図の再試行、日英表示、prompt履歴からの除外と停止後の遅延応答拒否を確認した。更新したRelease Universalの別隔離画面ではloopback mockの2要求で構図の応答待ち・完了、固定model、構図印と明示した場所を含むDDL、作品と履歴への保存を確認した。historyとnodeは2件から3件へ、edgeは1件のままで、既存全行と既存execution2件を保持した。実ChatGPT／API providerによる構図の受入とServer相当のusage／raw SSE保存は未完了である。
+構図のhost確認は実Rust／mock／一時DBでStage 1から構図・保存への接続、modelと上限、schemaの`propertyOrdering`、有限retry／fallback、欠落／`read:false`設定と保存Score再生の保持を確認した。最終Personal ChatGPT guardは非UUIDのfixtureを修正し、`--composition-personal-plan-gate-only`だけで未接続の拒否、action identity保持とHTTP／credential呼出し0件を確認した。`--composition-progress-only`は段階切替、構図の再試行、日英表示、prompt履歴からの除外と停止後の遅延応答拒否を確認した。更新したRelease Universalの別隔離画面ではloopback mockの2要求で構図の応答待ち・完了、固定model、構図印と明示した場所を含むDDL、作品と履歴への保存を確認した。historyとnodeは2件から3件へ、edgeは1件のままで、既存全行と既存execution2件を保持した。この構図接続確認の時点では、実ChatGPT／API providerの受入と段階別usage／raw SSE保存は未完了だった。
+
+追加の`--provider-observation-only`は実Rust・mock・一時SQLiteで下絵／構図の別time・実usageと明示0、作品保存・Host再作成／再表示、rawを持たない通常metric、旧optional欠落の読出し、保存Scoreの再演奏／再現比較で新provider要求がないことを確認した。送信前CAS失敗はHTTP0／retryなし／restore時の自動再送なしで、開発者モード外の明示要求もtransport前に拒否した。通信側は限定XCTest1件で通常JSONとPersonalの完了SSE、実schema／上限／identity、既知credentialのescapeを含む除去、送信前保存失敗と途中SSEのstatus／受信prefixを確認した。記録確定時のSwift排他アクセス衝突を修正し、同じ1件が成功した。64MiB超過の実行確認や実provider／OAuthの受入は含まない。
+
+更新したunsigned Release Universalの別隔離アプリでは、loopbackの下絵266ms／usage11・7、構図757ms／usage13・0を独立表示し、開発者欄の2件の通信記録と構図応答本文を読めた。「新規」で進行表示を解除し、保存作品の再表示で同じ実測値を保持した。history／node／executionは3件から4件、edgeは1件のままで、既存全行が一致した。元の作者手動drop用アプリとFinderは保持した。両CPU build・最低OS14を確認したが、Intel／macOS14実機・全幅・VoiceOver・作者の通常利用の受入は別である。
 
 ## 2026-10-02 macOS向けの共有Rust・standalone基盤（当時の記録）
 

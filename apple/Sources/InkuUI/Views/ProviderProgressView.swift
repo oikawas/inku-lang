@@ -66,6 +66,9 @@ public struct ProviderProgressView: View {
             if snapshot.attempt > 1 {
                 Text(model.display.localizedFormat("今回 %.1f秒", snapshot.attemptElapsed(at: date)))
             }
+            if let elapsed = snapshot.providerElapsedMS {
+                Text(model.display.localizedFormat("呼出し %.1f秒", Double(elapsed) / 1_000))
+            }
         }.fixedSize(horizontal: true, vertical: false)
     }
 

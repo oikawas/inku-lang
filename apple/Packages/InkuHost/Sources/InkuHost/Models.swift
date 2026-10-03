@@ -60,13 +60,15 @@ public struct GenerationRequest: Codable, Sendable {
     public var retainedDocument: Data?
     public var retainedAuthority: Data?
     public var chatGPTSession: ChatGPTPlanSession?
+    /// Independent developer opt-in. Missing and false preserve ordinary requests.
+    public var captureProviderIO: Bool?
     public init(authoring: GenerationAuthoring, configuration: Data, renderOptions: Data, clipPolicy: Data,
                 models: ModelSelection = .init(), providers: [ProviderSettings] = [],
                 renderColorMaps: [String: Data] = [:],
                 description: String = "", parentWorkID: String? = nil, derivationKind: String = "new",
                 saveHistory: Bool = true, historyVisibility: String = "normal",
                 retainedDocument: Data? = nil, retainedAuthority: Data? = nil, chatGPTSession: ChatGPTPlanSession? = nil,
-                derivationMetadata: Data? = nil, interpretationSeed: String? = nil) {
+                derivationMetadata: Data? = nil, interpretationSeed: String? = nil, captureProviderIO: Bool? = nil) {
         self.authoring = authoring; self.configuration = configuration; self.renderOptions = renderOptions
         self.clipPolicy = clipPolicy; self.models = models; self.providers = providers
         self.renderColorMaps = renderColorMaps
@@ -77,6 +79,7 @@ public struct GenerationRequest: Codable, Sendable {
         self.saveHistory = saveHistory; self.historyVisibility = historyVisibility
         self.retainedDocument = retainedDocument; self.retainedAuthority = retainedAuthority
         self.chatGPTSession = chatGPTSession
+        self.captureProviderIO = captureProviderIO
     }
 }
 
@@ -129,15 +132,18 @@ public struct PipelineView: Sendable {
     public let promptJSON: Data?
     public let holeIDs: [String]
     public let candidateWork: SavedWork?
+    public let providerMetrics: [ProviderAttemptMetric]
 }
 
 public struct PreparedCandidate: Identifiable, Sendable {
     public let executionID: String
     public let work: SavedWork
     public let authority: String
+    public let providerMetrics: [ProviderAttemptMetric]
     public var id: String { executionID }
-    public init(executionID: String, work: SavedWork, authority: String) {
+    public init(executionID: String, work: SavedWork, authority: String, providerMetrics: [ProviderAttemptMetric] = []) {
         self.executionID = executionID; self.work = work; self.authority = authority
+        self.providerMetrics = providerMetrics
     }
 }
 
@@ -149,11 +155,13 @@ public struct ReplayComparisonSnapshot: Sendable {
     public let recordedVersion: String?
     public let currentVersion: String
     public let provisionalSeed: String?
+    public let providerMetrics: [ProviderAttemptMetric]
     public init(workID: String, originalSVG: String, replayedSVG: String, recordedVersion: String?,
-                currentVersion: String, provisionalSeed: String?) {
+                currentVersion: String, provisionalSeed: String?, providerMetrics: [ProviderAttemptMetric] = []) {
         self.workID = workID; self.originalSVG = originalSVG; self.replayedSVG = replayedSVG
         self.recordedVersion = recordedVersion; self.currentVersion = currentVersion
         self.provisionalSeed = provisionalSeed
+        self.providerMetrics = providerMetrics
     }
 }
 
@@ -199,6 +207,8 @@ public enum PipelineProgress: Sendable {
     case providerAttempt(executionID: String, report: Data, beganAt: Date, deadline: Date)
     case transportBytes(executionID: String, count: Int)
     case providerDiagnostic(executionID: String, diagnostic: ChatGPTPlanDiagnostic)
+    /// Actual transport facts only; the public progress path never contains raw IO.
+    case providerMetric(executionID: String, metric: ProviderAttemptMetric)
     case saved(executionID: String, workID: String)
 }
 

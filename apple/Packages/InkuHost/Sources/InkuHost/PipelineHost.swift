@@ -15,6 +15,9 @@ public actor PipelineHost {
     }
 
     public func generate(_ request: GenerationRequest, progress: @escaping PipelineProgressHandler = { _ in }) async throws -> PipelineView {
+        if request.captureProviderIO == true, !ProviderObservationPolicy.developerModeEnabled {
+            throw HostError("developer_provider_observations_not_available")
+        }
         guard ["normal", "lineage_only"].contains(request.historyVisibility) else { throw HostError("invalid_history_visibility") }
         if !request.authoring.isDirect, let parentID = request.parentWorkID,
            try await savedAuthoringContext(workID: parentID).authority == "ddl_authoritative" { throw HostError("description_source_locked") }
@@ -57,7 +60,8 @@ public actor PipelineHost {
                 svg: stored.candidate.work.svg, savedWorkID: stored.saved ? stored.candidate.work.id : nil,
                 patchProposalJSON: nil, eventsJSON: Data("[]".utf8), busy: false, interruptedProvider: false,
                 description: stored.candidate.work.effectiveSourceText, configurationJSON: context["configuration"].data,
-                documentJSON: context["document"].data, deliveryJSON: nil, promptJSON: nil, holeIDs: [], candidateWork: stored.candidate.work)
+                documentJSON: context["document"].data, deliveryJSON: nil, promptJSON: nil, holeIDs: [], candidateWork: stored.candidate.work,
+                providerMetrics: try metrics(in: context))
         }
         return try await execution(executionID).cancel(progress: { _ in })
     }
@@ -82,6 +86,45 @@ public actor PipelineHost {
     public func restoreSavedWork(workID: String) async throws -> SavedWork {
         guard let work = try await database.work(id: workID) else { throw HostError("work_not_found") }
         return work
+    }
+
+    /// Metrics are safe for ordinary presentation. Raw records have a separate developer-only boundary.
+    public func providerMetrics(executionID: String) async throws -> [ProviderAttemptMetric] {
+        guard let record = try await database.loadExecution(id: executionID) else { throw HostError("execution_not_found") }
+        if let stored = try? JSONDecoder().decode(StandaloneCandidate.self, from: record.snapshot) {
+            return try metrics(in: ExactJSON(data: stored.candidate.context))
+        }
+        return try JSONDecoder().decode(StoredMetricRead.self, from: record.snapshot).providerObservations?.map(\.metric) ?? []
+    }
+
+    public func savedProviderMetrics(workID: String) async throws -> [ProviderAttemptMetric] {
+        try metrics(in: await savedPerformanceContext(workID: workID))
+    }
+
+    public func providerObservations(executionID: String) async throws -> [ProviderAttemptObservation] {
+        guard ProviderObservationPolicy.developerModeEnabled else { throw HostError("developer_provider_observations_not_available") }
+        guard let record = try await database.loadExecution(id: executionID) else { throw HostError("execution_not_found") }
+        if let stored = try? JSONDecoder().decode(StandaloneCandidate.self, from: record.snapshot) {
+            return try await observations(in: ExactJSON(data: stored.candidate.context))
+        }
+        return try JSONDecoder().decode(StoredExecution.self, from: record.snapshot).providerObservations?.filter { $0.raw != nil } ?? []
+    }
+
+    public func savedProviderObservations(workID: String) async throws -> [ProviderAttemptObservation] {
+        guard ProviderObservationPolicy.developerModeEnabled else { throw HostError("developer_provider_observations_not_available") }
+        return try await observations(in: savedPerformanceContext(workID: workID))
+    }
+
+    private func metrics(in context: ExactJSON) throws -> [ProviderAttemptMetric] {
+        guard context["provider_metrics"].array != nil else { return [] }
+        return try JSONDecoder().decode([ProviderAttemptMetric].self, from: context["provider_metrics"].data)
+    }
+
+    private func observations(in context: ExactJSON) async throws -> [ProviderAttemptObservation] {
+        guard let executionID = context["provider_observation_execution_id"].string else { return [] }
+        let fixed = try metrics(in: context)
+        let records = try await providerObservations(executionID: executionID)
+        return records.filter { observation in fixed.contains { $0.identity == observation.metric.identity } }
     }
 
     public func savedAuthoringContext(workID: String) async throws -> SavedAuthoringContext {
@@ -131,7 +174,7 @@ public actor PipelineHost {
         let snapshot = ReplayComparisonSnapshot(workID: work.id, originalSVG: work.svg,
             replayedSVG: try rendered.requiredString("svg"), recordedVersion: work.renderEngineVersion,
             currentVersion: try rendered["metadata"].requiredString("render_engine_version"),
-            provisionalSeed: comparison.provisionalSeed)
+            provisionalSeed: comparison.provisionalSeed, providerMetrics: try metrics(in: context))
         try Task.checkCancellation()
         try await checkReplayComparisonParent(work)
         try Task.checkCancellation()
@@ -281,7 +324,8 @@ public actor PipelineHost {
         _ = try await database.commitEffect(id: executionID, expectedRevision: execution.revision, effectID: "prepare-candidate:0",
             snapshot: bytes, acknowledgement: ack.data)
         let context = try ExactJSON(data: candidate.context)
-        return PreparedCandidate(executionID: executionID, work: candidate.work, authority: context["authority"]["authority"].string ?? "legacy_unknown")
+        return PreparedCandidate(executionID: executionID, work: candidate.work, authority: context["authority"]["authority"].string ?? "legacy_unknown",
+            providerMetrics: try metrics(in: context))
     }
 
     private func generateRetained(_ request: GenerationRequest, progress: PipelineProgressHandler) async throws -> PipelineView {
@@ -351,7 +395,8 @@ public actor PipelineHost {
             scoreJSON: score.data, renderedJSON: rendered.data, svg: work.svg, savedWorkID: savedID,
             patchProposalJSON: nil, eventsJSON: Data("[]".utf8), busy: false, interruptedProvider: false,
             description: work.effectiveSourceText, configurationJSON: config.data, documentJSON: document.data,
-            deliveryJSON: delivery.data, promptJSON: nil, holeIDs: [], candidateWork: candidate.work)
+            deliveryJSON: delivery.data, promptJSON: nil, holeIDs: [], candidateWork: candidate.work,
+            providerMetrics: try metrics(in: context))
         progress(.changed(view))
         return view
     }
@@ -392,7 +437,15 @@ private struct StoredExecution: Codable, Sendable {
     var historyVisibility: String? = nil
     var candidate: StoredCandidate? = nil
     var chatGPTSession: ChatGPTPlanSession? = nil
+    var captureProviderIO: Bool? = nil
+    var providerObservations: [ProviderAttemptObservation]? = nil
     var startedAt: Date
+}
+
+/// Normal metric reads skip private bodies during decoding as well as in their returned type.
+private struct StoredMetricRead: Decodable {
+    struct Record: Decodable { let metric: ProviderAttemptMetric }
+    let providerObservations: [Record]?
 }
 
 private struct StoredCandidate: Codable, Sendable {
@@ -434,6 +487,8 @@ private actor ExecutionDriver {
     var driving = false
     var restored = false
     let maximumEffectSteps = 32
+    // A native private-capture lifetime budget; normal metrics do not consume this budget.
+    let maximumExecutionRawBodyBytes = 64 * 1_024 * 1_024
 
     init(request: GenerationRequest, database: InkuDatabase, transport: any ProviderTransport, credentials: any CredentialStore) throws {
         guard try ExactJSON(data: request.configuration).object != nil,
@@ -449,6 +504,8 @@ private actor ExecutionDriver {
         self.state.saveHistory = request.saveHistory
         self.state.historyVisibility = request.historyVisibility
         self.state.chatGPTSession = request.chatGPTSession
+        self.state.captureProviderIO = request.captureProviderIO
+        self.state.providerObservations = []
         if let metadata = request.derivationMetadata {
             guard try ExactJSON(data: metadata).object != nil else { throw HostError("invalid_derivation_metadata") }
         }
@@ -600,12 +657,32 @@ private actor ExecutionDriver {
                             throw HostError("pipeline_schema_violation")
                         }
                         let id = try executionID(); let transport = self.transport; let credentials = self.credentials
+                        let observation = ProviderObservationOptions(captureRaw: state.captureProviderIO == true)
                         task = Task {
                             if delayMS > 0 {
                                 guard delayMS <= UInt64.max / 1_000_000 else { throw HostError("pipeline_schema_violation") }
                                 try await Task.sleep(nanoseconds: delayMS * 1_000_000)
                             }
                             try Task.checkCancellation()
+                            let willSend: ProviderObservationHandler = { value in
+                                try await self.persistObservation(value, action: action, final: false, progress: progress)
+                            }
+                            let didFinish: ProviderObservationHandler = { value in
+                                try await self.persistObservation(value, action: action, final: true, progress: progress)
+                            }
+                            if let personal = transport as? any ObservedChatGPTPlanEffectTransport {
+                                return try await personal.performPersonalPlanObserved(action: bytes, models: models, providers: providers,
+                                    session: personalSession, argumentLimit: argumentLimit, credentials: credentials,
+                                    observation: observation, willSend: willSend, didFinish: didFinish,
+                                    onBytes: { count in progress(.transportBytes(executionID: id, count: count)) },
+                                    onDiagnostic: { diagnostic in progress(.providerDiagnostic(executionID: id, diagnostic: diagnostic)) })
+                            }
+                            if let observed = transport as? any ObservedProviderTransport {
+                                return try await observed.performObserved(action: bytes, models: models, providers: providers, credentials: credentials,
+                                    observation: observation, willSend: willSend, didFinish: didFinish,
+                                    onBytes: { count in progress(.transportBytes(executionID: id, count: count)) })
+                            }
+                            guard !observation.captureRaw else { throw ProviderObservationFailure.unsupportedTransport }
                             if let personal = transport as? any ChatGPTPlanEffectTransport {
                                 return try await personal.performPersonalPlan(action: bytes, models: models, providers: providers,
                                     session: personalSession, argumentLimit: argumentLimit, credentials: credentials,
@@ -646,6 +723,84 @@ private actor ExecutionDriver {
             await gate.lock(); driving = false; await gate.unlock()
             throw error
         }
+    }
+
+    private func persistObservation(_ observation: ProviderAttemptObservation, action: ExactJSON, final: Bool,
+                                    progress: PipelineProgressHandler) async throws {
+        await gate.lock()
+        do {
+            let identity = try ProviderActionIdentity(action: action.data)
+            let cancelledFinal = final && observation.metric.outcome == .cancelled
+                && snapshot["phase"]["tag"].string == "cancelled"
+                && state.providerObservations?.contains(where: { $0.metric.identity == identity && $0.metric.outcome == .requestSaved }) == true
+            if !cancelledFinal { try Task.checkCancellation() }
+            guard cancelledFinal || (snapshot["action"] == action && state.pendingProviderAction == action.data) else { throw CancellationError() }
+            let reference = action["tag"].string == "complete_visible_ddl_holes" ? state.models.stage2Model : state.models.stage1Model
+            guard observation.metric.identity == identity, observation.metric.action == action["tag"].string,
+                  ProviderObservationStage(action: observation.metric.action) == observation.metric.stage,
+                  observation.metric.requestedModelReference == reference,
+                  observation.metric.timeoutMS == (try canonicalUnsigned(action, key: "timeout_ms")),
+                  (final ? observation.metric.outcome != .requestSaved : observation.metric.outcome == .requestSaved) else {
+                throw HostError("provider_observation_identity_mismatch")
+            }
+            if !final, state.captureProviderIO == true, !ProviderObservationPolicy.developerModeEnabled {
+                throw HostError("developer_provider_observations_not_available")
+            }
+            var stored = observation
+            if state.captureProviderIO != true { stored.raw = nil }
+            if state.captureProviderIO == true, !final, stored.raw?.requestBody == nil {
+                throw HostError("provider_observation_request_missing")
+            }
+            if let raw = stored.raw {
+                guard (raw.requestBody?.utf8.count ?? 0) <= ProviderObservationPolicy.maximumRawBytes,
+                      (raw.responseBody?.utf8.count ?? 0) <= ProviderObservationPolicy.maximumRawBytes else {
+                    throw HostError("provider_observation_body_too_large")
+                }
+            }
+            var changed = state
+            var records = changed.providerObservations ?? []
+            if state.captureProviderIO == true, !final {
+                guard stored.raw?.responseBody == nil else { throw HostError("provider_observation_response_before_send") }
+                let prior = try rawBodyBytes(in: records)
+                let requestBytes = stored.raw?.requestBody?.utf8.count ?? 0
+                // Reserve a full bounded response before HTTP, preserving every earlier capture.
+                guard requestBytes <= maximumExecutionRawBodyBytes - prior,
+                      ProviderObservationPolicy.maximumRawBytes <= maximumExecutionRawBodyBytes - prior - requestBytes else {
+                    throw HostError("provider_observation_capture_budget_exhausted")
+                }
+            }
+            if let index = records.firstIndex(where: { $0.metric.identity == identity }) {
+                guard final, records[index].metric.outcome == .requestSaved else { throw HostError("provider_observation_already_finished") }
+                records[index] = stored
+            } else {
+                // A classified rejection before HTTP can finish without a request body.
+                guard !final || !stored.metric.sent else { throw HostError("provider_observation_request_missing") }
+                records.append(stored)
+            }
+            if state.captureProviderIO == true { _ = try rawBodyBytes(in: records) }
+            changed.providerObservations = records
+            let saved = try await database.compareAndSwapExecution(id: executionID(), expectedRevision: databaseRevision,
+                                                                  snapshot: encoded(changed))
+            state = changed; databaseRevision = saved.revision
+            progress(.providerMetric(executionID: try executionID(), metric: stored.metric))
+            await gate.unlock()
+        } catch is CancellationError {
+            await gate.unlock(); throw CancellationError()
+        } catch {
+            await gate.unlock()
+            throw final ? ProviderObservationFailure.outcomeSaveFailed : ProviderObservationFailure.requestSaveFailed
+        }
+    }
+
+    private func rawBodyBytes(in observations: [ProviderAttemptObservation]) throws -> Int {
+        var total = 0
+        for observation in observations {
+            for bytes in [observation.raw?.requestBody?.utf8.count ?? 0, observation.raw?.responseBody?.utf8.count ?? 0] {
+                guard bytes <= maximumExecutionRawBodyBytes - total else { throw HostError("provider_observation_capture_budget_exhausted") }
+                total += bytes
+            }
+        }
+        return total
     }
 
     private struct NextState { let state: StoredExecution; let snapshot: ExactJSON }
@@ -783,6 +938,9 @@ private actor ExecutionDriver {
         performance["configuration"] = snapshot["config"]
         performance["document"] = snapshot["document"]
         performance["authority"] = snapshot["authority"]
+        // Freeze only public metrics at this save identity. Raw stays in the private execution snapshot.
+        performance["provider_metrics"] = try ExactJSON(data: JSONEncoder().encode(state.providerObservations?.map(\.metric) ?? []))
+        performance["provider_observation_execution_id"] = .string(try executionID())
         if let session = state.chatGPTSession {
             performance["personal_provider_context"] = .object(["provider": .string("chatgpt"),
                 "profile_id": .string(session.profileID), "generation": .string(String(session.generation))])
@@ -854,7 +1012,8 @@ private actor ExecutionDriver {
                             documentJSON: snapshot["document"].object == nil ? nil : snapshot["document"].data,
                             deliveryJSON: snapshot["delivery"].object == nil ? nil : snapshot["delivery"].data,
                             promptJSON: state.prompts,
-                            holeIDs: snapshot["delivery"]["compiler_lock"]["hole_identities"].array?.compactMap(\.string) ?? [], candidateWork: state.candidate?.work)
+                            holeIDs: snapshot["delivery"]["compiler_lock"]["hole_identities"].array?.compactMap(\.string) ?? [], candidateWork: state.candidate?.work,
+                            providerMetrics: state.providerObservations?.map(\.metric) ?? [])
     }
     private func executionID() throws -> String { try snapshot.requiredString("execution_id") }
     private func canonicalUnsigned(_ value: ExactJSON, key: String) throws -> UInt64 {

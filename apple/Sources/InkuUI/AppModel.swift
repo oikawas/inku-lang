@@ -49,6 +49,8 @@ public final class AppModel {
     public private(set) var scoreJSON = ""
     public private(set) var status = "準備中"
     public private(set) var providerProgress: ProviderProgressSnapshot?
+    /// Metrics of the displayed saved work, frozen to that work's save identity.
+    public private(set) var providerMetrics: [ProviderAttemptMetric] = []
     public private(set) var isBusy = false
     public var errorText: String?
     public var providerURL = "http://localhost:8080/v1"
@@ -110,6 +112,7 @@ public final class AppModel {
     }
 
     public var sourceLocked: Bool { authoringAuthority == "ddl_authoritative" }
+    public var developerModeEnabled: Bool { ProviderObservationPolicy.developerModeEnabled }
     /// Names actually pinned to the visible authoring document, independent of next-work plugin preferences.
     public var authoringMacroNames: [String] {
         guard let data = currentView?.configurationJSON ?? selectedContext?.configuration,
@@ -248,6 +251,9 @@ public final class AppModel {
         promptJSON = ""
         eventsJSON = ""
         guard let host else { return }
+        let recordedMetrics = (try? await host.savedProviderMetrics(workID: work.id)) ?? []
+        guard selectedWorkID == work.id else { return }
+        providerMetrics = recordedMetrics
         do {
             let context = try await host.savedAuthoringContext(workID: work.id)
             selectedContext = context
@@ -273,6 +279,14 @@ public final class AppModel {
         previewWork = nil
         selectedWorkID = work.id
         selectedWork = work
+        providerMetrics = currentView?.savedWorkID == work.id ? currentView?.providerMetrics ?? [] : []
+        if currentView?.savedWorkID != work.id, let host {
+            Task { @MainActor [weak self] in
+                let metrics = (try? await host.savedProviderMetrics(workID: work.id)) ?? []
+                guard let self, self.selectedWorkID == work.id, self.previewWork == nil else { return }
+                self.providerMetrics = metrics
+            }
+        }
         currentSVG = work.svg
         visibleDDL = work.ddl ?? ""
         scoreJSON = work.score
@@ -412,6 +426,12 @@ public final class AppModel {
         var freshPin: ChatGPTPlanSession?
         var pinned: [GenerationRequest] = []
         for var request in requests {
+            if request.captureProviderIO == nil {
+                request.captureProviderIO = developerModeEnabled && display.preferences.captureProviderIO == true
+            }
+            if request.captureProviderIO == true, !developerModeEnabled {
+                throw HostError("developer_provider_observations_not_available")
+            }
             let stage1 = try PersonalPlanRoutingTransport.personalModel(request.models.stage1Model, providers: request.providers)
             let stage2 = try PersonalPlanRoutingTransport.personalModel(request.models.stage2Model, providers: request.providers)
             let usesPersonal = stage1 != nil || stage2 != nil
@@ -434,6 +454,9 @@ public final class AppModel {
         return pinned
     }
     private func validatePinnedRequest(_ request: GenerationRequest) async throws {
+        if request.captureProviderIO == true, !developerModeEnabled {
+            throw HostError("developer_provider_observations_not_available")
+        }
         guard request.retainedDocument == nil else { return }
         let stage1 = try PersonalPlanRoutingTransport.personalModel(request.models.stage1Model, providers: request.providers)
         let stage2 = try PersonalPlanRoutingTransport.personalModel(request.models.stage2Model, providers: request.providers)
@@ -491,12 +514,14 @@ public final class AppModel {
         if parentWorkID != nil && mode == "description" && (selectedContext?.authority == "ddl_authoritative" || sourceLocked) { throw HostError("description_source_locked") }
         let sketch: SketchRequest = sketchMode == "on" ? .on : sketchMode == "supplied" ? .supplied(sketchText) : .off
         let savedConfig = parentWorkID == selectedWorkID && parentWorkID != nil ? selectedContext?.configuration : nil
-        return try bootstrap.request(inputMode: mode, source: source ?? ddlText,
+        var request = try bootstrap.request(inputMode: mode, source: source ?? ddlText,
             description: description ?? descriptionText, language: language, catalogID: catalogID,
             canvasID: canvasID, seed: seedText, wild: wild, settings: nextGenerationHostSettings,
             parentWorkID: parentWorkID, derivationKind: derivationKind, catalogMode: catalogMode,
             sketch: sketch, savedConfiguration: savedConfig,
             importedPlugins: mode == "ddl" && parentWorkID == nil ? importedDDL?.plugins ?? [] : [])
+        request.captureProviderIO = developerModeEnabled && display.preferences.captureProviderIO == true
+        return request
     }
 
     /// Allocate the entire round before any drawing, keeping saved colors, locks, policies and source authority.
@@ -871,7 +896,7 @@ public final class AppModel {
         await recordDescriptionFeedback(request: request, view: view)
         try Task.checkCancellation()
         guard generationToken == token, let work = view.candidateWork else { throw HostError("comparison_candidate_requires_edit") }
-        return PreparedCandidate(executionID: view.executionID, work: work, authority: view.authority)
+        return PreparedCandidate(executionID: view.executionID, work: work, authority: view.authority, providerMetrics: view.providerMetrics)
     }
 
     public func prepareReplayComparison(work: SavedWork, token: UUID) async throws -> ReplayComparisonSnapshot {
@@ -963,6 +988,7 @@ public final class AppModel {
                 result = work
             } else if !request.saveHistory, let work = view.candidateWork {
                 self.previewWork = work
+                self.providerMetrics = view.providerMetrics
                 self.status = "未保存の候補を表示しています"
                 result = work
             }
@@ -973,6 +999,7 @@ public final class AppModel {
     public func newWork() {
         guard !isBusy else { return }
         providerProgress = nil
+        providerMetrics = []
         status = "準備完了"
         selectedWork = nil
         selectedWorkID = nil
@@ -1320,6 +1347,7 @@ public final class AppModel {
         case .transportBytes(_, let count):
             status = providerProgress?.stage == .composition ? "構図の応答を受信中" : "応答を受信中（\(count) bytes）"
         case .providerDiagnostic(_, let diagnostic): errorText = "ChatGPTプラン: \(diagnostic.code)（\(diagnostic.action)）"
+        case .providerMetric: break
         case .saved(_, _): status = "作品を保存しました"
         }
     }
@@ -1335,6 +1363,7 @@ public final class AppModel {
             if providerProgress?.stage == .composition { status = comparison ? "比較候補の構図の応答を受信中" : "構図の応答を受信中" }
             else { status = comparison ? "比較候補を受信中（\(count) bytes）" : "応答を受信中（\(count) bytes）" }
         case .providerDiagnostic(_, let diagnostic): errorText = "ChatGPTプラン: \(diagnostic.code)（\(diagnostic.action)）"
+        case .providerMetric: break
         case .saved: break
         }
     }
@@ -1351,16 +1380,34 @@ public final class AppModel {
             finishProviderStage(view)
         case .transportBytes(let id, let bytes):
             if providerProgress?.executionID == id { providerProgress?.receive(bytes: bytes) }
+        case .providerMetric(let id, let metric):
+            if providerProgress?.executionID == id { providerProgress?.receive(metric: metric) }
         case .providerDiagnostic, .saved: break
         }
     }
     private func finishProviderStage(_ view: PipelineView) {
-        if providerProgress?.executionID == view.executionID { providerProgress?.changed(phase: view.phase, at: Date()) }
+        if providerProgress?.executionID == view.executionID {
+            if let metric = view.providerMetrics.last(where: { $0.action == providerProgress?.action && Int($0.identity.attempt) == providerProgress?.attempt }) {
+                providerProgress?.receive(metric: metric)
+            }
+            providerProgress?.changed(phase: view.phase, at: Date())
+        }
+    }
+
+    /// Raw IO is fetched only by an explicit developer inspector action, never by the normal metric path.
+    public func savedProviderObservations(workID: String) async throws -> [ProviderAttemptObservation] {
+        guard developerModeEnabled, let host else { throw HostError("developer_provider_observations_not_available") }
+        return try await host.savedProviderObservations(workID: workID)
+    }
+    public func providerObservations(executionID: String) async throws -> [ProviderAttemptObservation] {
+        guard developerModeEnabled, let host else { throw HostError("developer_provider_observations_not_available") }
+        return try await host.providerObservations(executionID: executionID)
     }
     private func apply(_ view: PipelineView) {
         finishProviderStage(view)
         currentView = view
         currentExecutionID = view.executionID
+        if isBusy, view.savedWorkID == displayedWork?.id { providerMetrics = view.providerMetrics }
         if let ddl = view.visibleDDL, ddl != visibleDDL {
             visibleDDL = ddl
             ddlText = ddl

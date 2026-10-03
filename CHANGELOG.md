@@ -6,6 +6,14 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file retains the history from v2.5.0 (2026-07-25, render engine 12) onward.** Past records follow the recent ones in a collapsible section of this same document; expand it when needed. Viewers without collapse support show the full text. Earlier history is in the [v1.72–v2.4 archive](docs/history/changelog-v1.72-v2.4.md) and the [v0.1–v1.71 archive](docs/history/changelog-v0.1-v1.71.md).
 
+### 2026-10-03 — Separate Swift composition and underdrawing measurements
+
+Ordinary APIs and Personal ChatGPT record call time, reported tokens, and outcomes per action, with composition separate from Stage 1. Missing usage and explicit zero remain distinct. Creation, comparison options, and reopened works show metrics frozen at save time; replay comparison sends no additional provider request.
+
+Only explicit opt-in in developer mode stores provider bodies in private executions for a dedicated disclosure. Capture defaults off. A pre-send save failure prevents HTTP, and a post-send save failure cannot become a normal retry. Partial/truncated replies are identified, and endpoints, headers, and credentials are excluded. Updated the [Swift specification](apple/SWIFT_SPEC.md) and [usage guide](apple/README.md).
+
+Selected mock/real-Rust/temporary-DB save/reopen checks and one transport XCTest passed. An isolated window of the updated Universal app also confirmed separate underdrawing/composition time and tokens, IO bodies, clearing with New, and reopened metrics while retaining every existing work/lineage/execution row. Real-provider/OAuth acceptance was not performed.
+
 ### 2026-10-03 — Adopt composition reading in Swift
 
 Generated Server defaults now connect the shared Rust `read_composition`/`composition_read` effects to ordinary APIs and Personal ChatGPT. The underdrawing's Stage 1 model/cap and action identity are retained; shared Rust owns retries, fallback, and placement. Composition has a separate progress stage and stage clock. Its prompt remains in durable snapshots and is excluded from the work's Stage 1/2 prompt history.

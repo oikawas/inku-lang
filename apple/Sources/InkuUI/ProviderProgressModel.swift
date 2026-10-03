@@ -41,8 +41,10 @@ public struct ProviderProgressSnapshot: Sendable, Equatable {
     public private(set) var outcome: Outcome = .running
     public private(set) var awaitingReply = true
     public private(set) var receivedBytes: Int?
-    public let tokensIn: UInt64? = nil
-    public let tokensOut: UInt64? = nil
+    public private(set) var tokensIn: UInt64?
+    public private(set) var tokensOut: UInt64?
+    public private(set) var providerElapsedMS: UInt64?
+    public private(set) var actionIdentity: ProviderActionIdentity?
 
     public var stageTitleKey: String { stage?.titleKey ?? "モデルの応答" }
     public var clockRunning: Bool { outcome == .running && stageEndedAt == nil }
@@ -76,6 +78,14 @@ public struct ProviderProgressSnapshot: Sendable, Equatable {
     mutating func receive(bytes: Int) {
         guard outcome == .running, awaitingReply, bytes >= 0 else { return }
         receivedBytes = bytes
+    }
+    mutating func receive(metric: ProviderAttemptMetric) {
+        guard outcome == .running, metric.action == action, Int(metric.identity.attempt) == attempt,
+              actionIdentity == nil || actionIdentity == metric.identity else { return }
+        actionIdentity = metric.identity
+        tokensIn = metric.usage?.inputTokens
+        tokensOut = metric.usage?.outputTokens
+        providerElapsedMS = metric.elapsedMS
     }
     mutating func changed(phase: String, at date: Date) {
         guard outcome == .running else { return }

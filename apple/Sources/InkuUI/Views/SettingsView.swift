@@ -129,6 +129,16 @@ enum SettingsSection: String, CaseIterable, Identifiable {
                 Text(model.display.localized("指示書・Score・生成情報を端末内へ記録します。APIキーは記録しません。"))
                     .font(.callout).foregroundStyle(.secondary)
             }
+            if model.developerModeEnabled {
+                Section(model.display.localized("開発用の応答記録")) {
+                    Toggle(model.display.localized("生成時の送受信を記録"), isOn: Binding(
+                        get: { display.preferences.captureProviderIO == true },
+                        set: { display.preferences.captureProviderIO = $0 }))
+                        .disabled(model.isBusy)
+                    Text(model.display.localized("モデルへ送った本文と受け取った応答を端末内に保存します。接続先・ヘッダー・認証情報は記録しません。"))
+                        .font(.callout).foregroundStyle(.secondary)
+                }
+            }
         }
     }
     private var providers: some View {

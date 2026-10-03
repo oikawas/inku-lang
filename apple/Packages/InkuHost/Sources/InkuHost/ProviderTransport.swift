@@ -6,13 +6,18 @@ public protocol ProviderTransport: Sendable {
                  credentials: any CredentialStore, onBytes: @escaping @Sendable (Int) -> Void) async throws -> Data
 }
 
-public final class URLSessionProviderTransport: ProviderTransport, Sendable {
+public final class URLSessionProviderTransport: ObservedProviderTransport, Sendable {
     private let session: URLSession
     private let budget: ProviderRateBudget
+    private let http: (any ProviderHTTPClient)?
     public let maximumResponseBytes: Int
-    public init(maximumResponseBytes: Int = 1_048_576, usageURL: URL? = nil) {
+    public convenience init(maximumResponseBytes: Int = 1_048_576, usageURL: URL? = nil) {
+        self.init(maximumResponseBytes: maximumResponseBytes, usageURL: usageURL, http: nil)
+    }
+    init(maximumResponseBytes: Int = 1_048_576, usageURL: URL? = nil, http: (any ProviderHTTPClient)?) {
         self.maximumResponseBytes = max(1, maximumResponseBytes)
         self.budget = ProviderRateBudget(url: usageURL ?? Self.defaultUsageURL)
+        self.http = http
         let configuration = URLSessionConfiguration.ephemeral
         configuration.urlCache = nil; configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
         configuration.httpCookieStorage = nil; configuration.httpShouldSetCookies = false
@@ -25,6 +30,21 @@ public final class URLSessionProviderTransport: ProviderTransport, Sendable {
 
     public func perform(action: Data, models: ModelSelection, providers: [ProviderSettings],
                         credentials: any CredentialStore, onBytes: @escaping @Sendable (Int) -> Void) async throws -> Data {
+        try await performAttempt(action: action, models: models, providers: providers, credentials: credentials,
+                                 recorder: nil, willSend: { _ in }, didFinish: { _ in }, onBytes: onBytes)
+    }
+    public func performObserved(action: Data, models: ModelSelection, providers: [ProviderSettings], credentials: any CredentialStore,
+                                observation: ProviderObservationOptions, willSend: @escaping ProviderObservationHandler,
+                                didFinish: @escaping ProviderObservationHandler, onBytes: @escaping @Sendable (Int) -> Void) async throws -> Data {
+        let effect = try ExactJSON(data: action)
+        let reference = effect["tag"].string == "complete_visible_ddl_holes" ? models.stage2Model : models.stage1Model
+        let recorder = try ProviderAttemptRecorder(action: action, reference: reference, options: observation)
+        return try await performAttempt(action: action, models: models, providers: providers, credentials: credentials,
+                                        recorder: recorder, willSend: willSend, didFinish: didFinish, onBytes: onBytes)
+    }
+    private func performAttempt(action: Data, models: ModelSelection, providers: [ProviderSettings], credentials: any CredentialStore,
+                                recorder: ProviderAttemptRecorder?, willSend: @escaping ProviderObservationHandler,
+                                didFinish: @escaping ProviderObservationHandler, onBytes: @escaping @Sendable (Int) -> Void) async throws -> Data {
         let effect = try ExactJSON(data: action)
         let identity = try effect.requiredObject("identity")
         let tag = try effect.requiredString("tag")
@@ -45,6 +65,11 @@ public final class URLSessionProviderTransport: ProviderTransport, Sendable {
             var request = try ProviderWire.request(action: action, provider: provider, model: model, maxTokens: maxTokens, key: key)
             request.timeoutInterval = Double(timeoutMS) / 1000
             let boundedRequest = request
+            if let recorder {
+                recorder.prepare(body: boundedRequest.httpBody ?? Data(), providerID: provider.id, model: model, secrets: key.map { [$0] } ?? [])
+                // This gate precedes inference and Gemini's optional token-count HTTP call.
+                try await recorder.saveRequest(willSend)
+            }
             let raw = try await withThrowingTaskGroup(of: Data.self) { group in
                 group.addTask { [self] in
                     var inputTokens = (boundedRequest.httpBody?.count ?? 0) + 128
@@ -54,8 +79,13 @@ public final class URLSessionProviderTransport: ProviderTransport, Sendable {
                     }
                     let reservation = try await self.budget.reserve(provider: provider, inputTokens: inputTokens)
                     do {
-                        let bytes = try await self.read(boundedRequest, maximum: self.maximumResponseBytes, onBytes: onBytes)
+                        let bytes: Data
+                        if let recorder {
+                            bytes = try await self.readObserved(boundedRequest, maximum: self.maximumResponseBytes, onBytes: onBytes,
+                                onResponse: { recorder.receive($0) })
+                        } else { bytes = try await self.read(boundedRequest, maximum: self.maximumResponseBytes, onBytes: onBytes) }
                         let value = try ExactJSON(data: bytes)
+                        recorder?.report(value)
                         let usage = provider.kind == .gemini ? value["usageMetadata"] : value["usage"]
                         let tokenKey = provider.kind == .gemini ? "promptTokenCount" : (provider.kind == .anthropic ? "input_tokens" : "prompt_tokens")
                         let used = usage[tokenKey].number.flatMap(Int.init)
@@ -78,11 +108,18 @@ public final class URLSessionProviderTransport: ProviderTransport, Sendable {
                 return result
             }
             response = try ProviderWire.responseText(raw, kind: provider.kind)
-        } catch is CancellationError { throw CancellationError() }
+        } catch let error as ProviderObservationFailure { throw error }
+        catch is CancellationError {
+            try await recorder?.finish(failure: nil, cancelled: true, callback: didFinish)
+            throw CancellationError()
+        }
         catch let error as HTTPFailure {
             failure = error.status == 429 ? "rate_limited" : (error.status >= 500 ? "transport_unavailable" : "provider_rejected")
         } catch let error as URLError {
-            if error.code == .cancelled && Task.isCancelled { throw CancellationError() }
+            if error.code == .cancelled && Task.isCancelled {
+                try await recorder?.finish(failure: nil, cancelled: true, callback: didFinish)
+                throw CancellationError()
+            }
             failure = error.code == .timedOut ? "transport_timeout" : "transport_unavailable"
         } catch let error as HostError {
             switch error.code {
@@ -94,11 +131,53 @@ public final class URLSessionProviderTransport: ProviderTransport, Sendable {
         let elapsed = began.duration(to: .now)
         let parts = elapsed.components
         let milliseconds = max(0, parts.seconds * 1000 + parts.attoseconds / 1_000_000_000_000_000)
+        try await recorder?.finish(failure: failure, callback: didFinish)
         var result: ExactJSON = .object(["tag": .string(failure == nil ? resultTag : "provider_failed"), "identity": identity,
                                         "elapsed_ms": .string(String(milliseconds))])
         if let failure { result["failure"] = .string(failure) }
         else { result["response"] = .string(response!) }
         return result.data
+    }
+
+    private func readObserved(_ request: URLRequest, maximum: Int, onBytes: @escaping @Sendable (Int) -> Void,
+                              onResponse: @escaping ProviderHTTPReadHandler) async throws -> Data {
+        if let http {
+            onResponse(ProviderHTTPRead(status: nil, data: nil, sent: true, complete: false, truncated: false))
+            let response = try await http.send(request, maximumBytes: maximum, onBytes: onBytes, onResponse: onResponse)
+            guard (200...299).contains(response.status) else { throw HTTPFailure(status: response.status, retryAfter: response.retryAfter) }
+            return response.data
+        }
+        var data = Data(), status: Int?, complete = false, truncated = false
+        defer { onResponse(ProviderHTTPRead(status: status, data: data, sent: true, complete: complete, truncated: truncated)) }
+        let (bytes, response) = try await session.bytes(for: request)
+        defer { bytes.task.cancel() }
+        guard let response = response as? HTTPURLResponse else { throw HostError("transport_unavailable") }
+        status = response.statusCode
+        let success = (200...299).contains(response.statusCode)
+        let limit = success ? maximum : min(maximum, 65_536)
+        // Keep the received prefix and status even when the server advertises an oversized body.
+        do {
+            for try await byte in bytes {
+                try Task.checkCancellation()
+                guard data.count < limit else { truncated = true; break }
+                data.append(byte)
+                if data.count % 4096 == 0 { onBytes(data.count) }
+            }
+        } catch {
+            if !success && !Task.isCancelled {
+                throw HTTPFailure(status: response.statusCode,
+                    retryAfter: response.value(forHTTPHeaderField: "Retry-After").flatMap(Double.init) ?? 60)
+            }
+            throw error
+        }
+        onBytes(data.count)
+        complete = !truncated
+        if !success {
+            throw HTTPFailure(status: response.statusCode,
+                retryAfter: response.value(forHTTPHeaderField: "Retry-After").flatMap(Double.init) ?? 60)
+        }
+        guard !truncated else { throw HostError("malformed_payload") }
+        return data
     }
 
     private func resolve(_ reference: String, providers: [ProviderSettings]) throws -> (ProviderSettings, String) {

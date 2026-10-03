@@ -23,6 +23,9 @@ public struct ReplayComparisonView: View {
                 VStack(alignment: .leading, spacing: 18) {
                     sourceSummary
                     warnings
+                    if let snapshot = comparison.snapshot {
+                        ProviderObservationView(model: model, metrics: snapshot.providerMetrics, workID: snapshot.workID)
+                    }
                     if let error = comparison.errorText {
                         Label {
                             Text(model.display.message(error)).textSelection(.enabled)

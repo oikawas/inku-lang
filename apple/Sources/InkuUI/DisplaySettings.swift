@@ -27,6 +27,8 @@ public struct DisplayPreferences: Codable, Sendable, Equatable {
     public var exportConfiguration: ExportConfiguration?
     public var exportTemplates: [ExportTemplate]?
     public var saveResultLog = false
+    /// Older preference files omit this field. Capture always starts disabled.
+    public var captureProviderIO: Bool?
     public init() {}
 
     public var textScale: Double { [0.9, 1, 1.1, 1.2, 1.3][min(4, max(0, textSizeStep))] }

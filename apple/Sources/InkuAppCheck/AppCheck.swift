@@ -69,6 +69,10 @@ struct AppCheck {
             try await runCompositionProgressChecks()
             return
         }
+        if CommandLine.arguments.contains("--provider-observation-only") {
+            try await runProviderObservationChecks()
+            return
+        }
         if CommandLine.arguments.contains("--plugin-only") {
             try await runPluginChecks()
             return

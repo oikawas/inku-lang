@@ -103,6 +103,8 @@ public struct ComparisonView: View {
                 VStack(alignment: .leading, spacing: 10) {
                     ArtworkThumbnail(work: candidate.work, renderer: model.renderer).frame(height: 185)
                     Text(candidate.label).font(.headline).textSelection(.enabled)
+                    ProviderObservationView(model: model, metrics: candidate.prepared.providerMetrics,
+                        workID: candidate.savedWork?.id, executionID: candidate.prepared.executionID)
                     if let saved = candidate.savedWork {
                         HStack {
                             Label(model.display.localized("保存済み"), systemImage: "checkmark.circle").foregroundStyle(.secondary)

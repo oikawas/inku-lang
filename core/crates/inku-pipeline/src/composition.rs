@@ -627,6 +627,35 @@ pub const NAMED_CORNERS: [(&str, &str); 4] = [
     ("bottom_right_corner", "corner-br"),
 ];
 
+/// The plan places a named corner refines: `corner`, or a side the corner lies on.
+/// Any other plan place stays, since a reading may tie the words to the wrong layer.
+const CORNER_SIDES: [(&str, [&str; 4]); 4] = [
+    (
+        "top_left_corner",
+        ["corner", "top", "top_edge", "left_edge"],
+    ),
+    (
+        "top_right_corner",
+        ["corner", "top", "top_edge", "right_edge"],
+    ),
+    (
+        "bottom_left_corner",
+        ["corner", "bottom", "bottom_edge", "left_edge"],
+    ),
+    (
+        "bottom_right_corner",
+        ["corner", "bottom", "bottom_edge", "right_edge"],
+    ),
+];
+
+fn corner_refines(corner: &str, plan_place: Option<&str>) -> bool {
+    plan_place.is_none_or(|plan| {
+        CORNER_SIDES
+            .iter()
+            .any(|(name, sides)| *name == corner && sides.contains(&plan))
+    })
+}
+
 fn named_corner(place: &str) -> Option<&'static str> {
     NAMED_CORNERS
         .iter()
@@ -1106,11 +1135,20 @@ pub fn check(
             findings.push(finding("stated_place_not_positional", item, "dropped"));
         } else if let (Some(index), Some(place)) = (
             index,
-            read_place.filter(|place| named_corner(place).is_some()),
+            read_place
+                .filter(|place| named_corner(place).is_some() && corner_refines(place, plan_place)),
         ) {
             // The plan cannot say which corner; the description's words do (I-712).
             fixed.insert(index, place.to_owned());
             findings.push(finding("stated_corner_from_reading", item, "kept"));
+        } else if let (Some(index), Some(plan), Some(_)) = (
+            index,
+            plan_place,
+            read_place.filter(|place| named_corner(place).is_some()),
+        ) {
+            // The corner is not on the plan place's side: the plan's place stays.
+            fixed.insert(index, plan.to_owned());
+            findings.push(finding("stated_corner_conflict", item, "dropped"));
         } else if let (Some(index), None, Some(place)) = (index, plan_place, read_place) {
             fixed.insert(index, place.to_owned());
             findings.push(finding("stated_place_from_reading", item, "kept"));
@@ -2484,6 +2522,30 @@ mod tests {
         }
         let (plain, _) = check(&reading("corner"), &layers, Some(&quoted)).expect("checked");
         assert_eq!(plain.fixed.get(&1).map(String::as_str), Some("corner"));
+        // A named corner off the plan place's side (a reading may tie the words to
+        // the wrong layer) leaves the plan's place; one on its side refines it.
+        for (plan, kept, code) in [
+            ("center", "center", "stated_corner_conflict"),
+            (
+                "bottom_edge",
+                "bottom_right_corner",
+                "stated_corner_from_reading",
+            ),
+        ] {
+            let layers = [
+                plan_layer("fill", "square", None),
+                plan_layer("place", "ellipse", Some(plan)),
+            ];
+            let (checked, findings) =
+                check(&reading("bottom_right_corner"), &layers, Some(&quoted)).expect("checked");
+            assert_eq!(
+                checked.fixed.get(&1).map(String::as_str),
+                Some(kept),
+                "{plan}"
+            );
+            let codes: Vec<&str> = findings.iter().map(|finding| finding.code).collect();
+            assert!(codes.contains(&code), "{plan}: {codes:?}");
+        }
     }
 
     #[test]

@@ -6,6 +6,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file retains the history from v2.5.0 (2026-07-25, render engine 12) onward.** Past records follow the recent ones in a collapsible section of this same document; expand it when needed. Viewers without collapse support show the full text. Earlier history is in the [v1.72–v2.4 archive](docs/history/changelog-v1.72-v2.4.md) and the [v0.1–v1.71 archive](docs/history/changelog-v0.1-v1.71.md).
 
+### 2026-10-04 — Bound Android on-device underdrawings to eight layers (I-713)
+
+Only the underdrawing response schema sent to LiteRT adds maxItems 8 to its layers array. A test keeps the adapter's value equal to the shared core's layer limit. Gemini rejects the bounded schema, so the shared schema, cloud providers and other requests, including composition reading, remain unchanged. SDK 0.17.1, ResponseFormat.json, disabled speculative decoding, GPU, the token window and sampling remain in place.
+
 ### 2026-10-04 — Disable speculative decoding for the Android on-device model (I-713)
 
 Following the author's decision after a constrained response still produced invalid JSON, speculative decoding is disabled for the entire LiteRT-LM Engine. SDK 0.17.1, ResponseFormat.json, GPU, the token window, sampling and the default on-device composition reading remain in place. The SDK reads this setting only at Engine creation, so schema and plain-text requests use the same setting.

@@ -32,7 +32,9 @@ runtime fallbackを持たない。保存済みSVG、Room schema、Score schema�
 
 ## 2026-10-03 端末モデルの応答をJSONの型へ沿わせる（I-713、2026-10-04更新）
 
-LiteRT-LMは0.17.1を使う。端末providerは `ModelRequest.tool.parametersJson` を変換せず `ResponseFormat.json(schema)` へ渡す。応答の型を持つ要求だけ、会話の `enableResponseFormat` と送信時の `responseFormat` を同時に設定して、SDKのJSON Schema制約を使う。型の無い文章の要求と写真の観察文ではこの制約を有効にしない。
+LiteRT-LMは0.17.1を使う。端末providerは `ModelRequest.tool.parametersJson` を `ResponseFormat.json(schema)` へ渡す。応答の型を持つ要求だけ、会話の `enableResponseFormat` と送信時の `responseFormat` を同時に設定して、SDKのJSON Schema制約を使う。型の無い文章の要求と写真の観察文ではこの制約を有効にしない。
+
+2026-10-04の作者裁定により、端末の `generate_normalized_ddl` だけ、SDKへ渡す型のコピーの `properties.layers` に `maxItems` を付ける。値8はcoreの `MAX_WORK_PLAN_LAYERS` の写しであり、JVM試験で正本との一致を守る。元のModelRequestと共有coreの型、構図読みなど他の要求の型は変更しない。Geminiがこの上限を拒むため、雲providerへは付けない。
 
 共有coreのprompt/schemaと再試行の判断を使い、GPU、4096 tokenの窓、temperature0.0を含む既存sampling設定を維持する。端末Gemma 4 E2Bの構図は `read: false` のままで、既定の読みを使う。
 

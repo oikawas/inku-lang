@@ -231,7 +231,7 @@ fn row_pool() -> Option<&'static rayon::ThreadPool> {
                 None
             } else {
                 rayon::ThreadPoolBuilder::new()
-                    .num_threads(available.min(2))
+                    .num_threads(available.min(if cfg!(target_os = "macos") { 4 } else { 2 }))
                     .build()
                     .ok()
             }

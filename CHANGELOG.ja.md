@@ -6,6 +6,10 @@
 
 **本書は v2.5.0（2026-07-25、render engine 12）以降の履歴を保持する。** 最近の記録に続く過去の履歴は、同じ文書内で折りたたんである。必要なときに展開して読める。折りたたみに対応しないビューアでは全文を表示する。それより前の履歴は [v1.72〜v2.4の書庫](docs/history/changelog-v1.72-v2.4.ja.md) と [v0.1〜v1.71の書庫](docs/history/changelog-v0.1-v1.71.ja.md) にある。
 
+### 2026-10-03 — macOSの高解像度SVG質感描画を短縮
+
+macOSの共通resvg描画で質感処理の共有pool上限を4へ広げ、描画計算順と出力を保持した。公開pencilの4320px書き出しを9tileで描く限定Release比較では、warm平均が約3.75秒から約3.04秒へ19%短縮。全tileを固定順に連結したraw pixel digestと、選択した独立upstream比較の全pixelが一致した。Androidの逐次描画と他OSの上限を保持し、全作品・実画面の同率改善は保証しない。[Swift仕様](apple/SWIFT_SPEC.ja.md)を同期した。
+
 ### 2026-10-03 — Swiftの送信予算をServerへ揃えて耐久化
 
 通常APIの描画pipelineを同じserviceの62秒／90%予算へ統合し、構図を含む各段階と再試行の予約をSQLiteへ送信前に保存する。Geminiの日次切替は太平洋時間、ほかはUTCを使用し、不明な入力usage、429のRetry-After／RetryInfoと有限の試行期限を扱う。補助要求の集計範囲もServerへ揃えた。

@@ -6,6 +6,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file retains the history from v2.5.0 (2026-07-25, render engine 12) onward.** Past records follow the recent ones in a collapsible section of this same document; expand it when needed. Viewers without collapse support show the full text. Earlier history is in the [v1.72–v2.4 archive](docs/history/changelog-v1.72-v2.4.md) and the [v0.1–v1.71 archive](docs/history/changelog-v0.1-v1.71.md).
 
+### 2026-10-03 — Reduce high-resolution SVG texture rendering time on macOS
+
+Raised the shared resvg texture-filter pool cap to four on macOS while preserving calculation order and output. A focused Release comparison of one public pencil SVG at 4320 pixels with nine tiles reduced the warm mean from about 3.75 to 3.04 seconds, a 19% reduction. The combined raw-pixel digest of all nine tiles in fixed order matched, as did every pixel in the selected independent upstream comparison. Android's sequential rendering and other platforms' caps remain unchanged; the same gain is not promised for every work or native-screen operation. Updated the [Swift specification](apple/SWIFT_SPEC.md).
+
 ### 2026-10-03 — Align and persist Swift request budgets
 
 Ordinary API drawing stages, including composition and retries, share each service's 62-second/90% budget through SQLite reservations committed before sending. Gemini daily accounting uses Pacific time, other services UTC. Unknown input usage, 429 Retry-After/RetryInfo, and finite attempt deadlines follow Server, as does the exclusion of auxiliary requests.

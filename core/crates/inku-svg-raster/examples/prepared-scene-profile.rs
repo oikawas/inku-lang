@@ -1,5 +1,5 @@
 //! Bounded native release comparison for repeated sizes and export tiles.
-//! Usage: prepared-scene-profile <public-filter-fixture.svg> [iterations=3]
+//! Usage: prepared-scene-profile <public-filter-fixture.svg> [iterations=3] [--pencil-tiles-only]
 
 use std::{env, fs, time::Instant};
 use inku_svg_raster::{RasterOptions, RasterRegionOptions, prepare_scene, rasterize, rasterize_region};
@@ -50,12 +50,50 @@ fn profile(svg: &str, label: &str, iterations: usize, tile_height: u32, tile_sid
     }
 }
 
+// Failure under comparison: the macOS two-worker cap may limit large pencil
+// filters. Keep this one workload fixed so worker policies can be compared.
+fn profile_pencil_tiles(svg: &str, iterations: usize) {
+    const SIDE: u32 = 4320;
+    const TILE_SIDE: u32 = 2048;
+    let source_sha256 = digest(svg.as_bytes());
+    for iteration in 0..iterations {
+        let started = Instant::now();
+        let scene = prepare_scene(svg).expect("prepared scene");
+        let prepare_ms = started.elapsed().as_secs_f64() * 1000.0;
+        let mut render_ms = 0.0;
+        let mut tiles = 0;
+        let mut pixels = Sha256::new();
+        // Hash raw tile bytes in fixed top-to-bottom, left-to-right tile order.
+        // Hashing is outside each region timer and retains no extra tile buffer.
+        for y in (0..SIDE).step_by(TILE_SIDE as usize) {
+            for x in (0..SIDE).step_by(TILE_SIDE as usize) {
+                let region = RasterRegionOptions { full_width: SIDE, full_height: SIDE, x, y,
+                    width: TILE_SIDE.min(SIDE - x), height: TILE_SIDE.min(SIDE - y) };
+                let started = Instant::now();
+                let raster = scene.region(region).expect("prepared pencil tile");
+                render_ms += started.elapsed().as_secs_f64() * 1000.0;
+                pixels.update(&raster.pixels);
+                tiles += 1;
+            }
+        }
+        let tiles_sha256: String = pixels.finalize().iter().map(|byte| format!("{byte:02x}")).collect();
+        println!("label=public-pencil-filter workload=prepared-tiles iteration={iteration} size={SIDE}x{SIDE} tile_side={TILE_SIDE} tiles={tiles} tile_order=row-major source_bytes={} source_sha256={source_sha256} cache_cost_bytes={} prepare_ms={prepare_ms:.3} render_ms={render_ms:.3} tiles_sha256={tiles_sha256}",
+                 scene.source_bytes(), scene.cache_cost_bytes());
+    }
+}
+
 fn main() {
-    let args: Vec<_> = env::args().collect();
+    let mut args: Vec<_> = env::args().collect();
+    let selector = args.iter().skip(1).position(|arg| arg == "--pencil-tiles-only");
+    if let Some(index) = selector { args.remove(index + 1); }
     assert!((2..=3).contains(&args.len()), "see source usage");
     let iterations: usize = args.get(2).map(|text| text.parse().expect("iterations")).unwrap_or(3);
     assert!((1..=3).contains(&iterations), "bounded measurement: 1-3 iterations");
     let fixture = fs::read_to_string(&args[1]).expect("public reference SVG");
+    if selector.is_some() {
+        profile_pencil_tiles(&fixture, iterations);
+        return;
+    }
     profile(&fixture, "public-pencil-filter", iterations, 4320, 2048);
     profile(&dense_public_scene(), "synthetic-6000-paths-clip", iterations, 4320, 2048);
 }

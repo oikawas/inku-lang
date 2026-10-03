@@ -114,6 +114,8 @@ Personal ChatGPTは通常のAPI key接続と別に扱い、既定は無効とす
 
 共通rasterにimmutableなprepared sceneを追加し、SVG parse結果を解像度間とexport tile間で再利用する。native rendererはscene推定cost16MiB／8件、image64MiB／256件を上限とし、保存SVGや画材効果を変更しない。表示はRetina scale、120ms resize debounce、要求寸法の8Mpixel枠に合わせる。限定したRelease計測では6000 pathの4解像度で準備時間込み約20%短縮し、pencilの重いfilterは改善が小さかった。全作品・全処理の同じ改善率を保証しない。
 
+質感filterの共有worker poolはmacOSで最大4、他OSで最大2とし、利用可能なCPU並列数へ制限する。Androidの逐次実行、並列化の閾値、axis table上限と描画計算順を保持する。Apple Siliconの公開pencil一例を4320²・2048側・9tileで描く限定Release計測では、warm2回の平均が約3.75秒から約3.04秒へ19%短縮し、全tileを固定順に連結したraw pixel digestが一致した。独立したupstreamとの並列region1caseも全pixel一致。全作品の同率改善、実画面のp95、app全体memory、Intel実機の最適値を保証するものではない。[resvg改修記録](../core/vendor/resvg/INKU_PATCHES.md)に条件と再現入口を記す。
+
 ### 確認範囲
 
 実coreと一時DBによるauthoring、比較候補の明示保存／取消し、batchの固定条件と不明行、保存pluginの固定、prepared scene／image cacheの限定確認は成功した。辞書、library、SQLite移行・backup、exportとtileの境界も具体的な失敗に対応する確認で扱った。Personal接続のidentity、SSE、loopback、refresh取消し・quota・model解決はsynthetic署名とmock transportで確認し、実本人認証へ読み替えない。

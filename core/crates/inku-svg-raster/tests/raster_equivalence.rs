@@ -1,4 +1,5 @@
 //! Run on the Linux testbox: compare the vendored renderer with pinned upstream.
+//! INKU_RASTER_EQUIVALENCE_CASE optionally selects one named case below.
 
 use std::time::Instant;
 
@@ -38,7 +39,14 @@ fn optimized_turbulence_preserves_upstream_images() {
         ),
     ];
 
+    let selected = std::env::var_os("INKU_RASTER_EQUIVALENCE_CASE")
+        .map(|value| value.into_string().expect("INKU_RASTER_EQUIVALENCE_CASE must be UTF-8"));
+    if let Some(selected) = selected.as_deref() {
+        assert!(cases.iter().any(|(name, _, _)| *name == selected),
+                "unknown INKU_RASTER_EQUIVALENCE_CASE: {selected}");
+    }
     for (name, svg, side) in cases {
+        if selected.as_deref().is_some_and(|selected| selected != name) { continue; }
         let started = Instant::now();
         let tree = usvg::Tree::from_str(svg, &usvg::Options::default()).expect("upstream parse");
         let intrinsic = tree.size();

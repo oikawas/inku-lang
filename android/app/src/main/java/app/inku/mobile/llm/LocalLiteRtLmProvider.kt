@@ -184,13 +184,14 @@ class LocalLiteRtLmProvider(
         // engine rather than find this closed one still registered.
         closeEngine()
         Engine.setNativeMinLogSeverity(LogSeverity.ERROR)
-        ExperimentalFlags.enableSpeculativeDecoding = true
+        // The SDK reads this flag only when creating an Engine, not per request.
+        ExperimentalFlags.enableSpeculativeDecoding = false
         val cacheDir = File(context.cacheDir, ENGINE_CACHE_DIR).also { it.mkdirs() }.absolutePath
         val initStarted = System.currentTimeMillis()
         val newEngine = createInitializedEngine(modelPath, Backend.GPU(), maxNumTokens, cacheDir)
         Log.i(
             PERF_TAG,
-            "litert_engine_init model_id=$modelId backend=${Backend.GPU().name} speculative_decoding=true " +
+            "litert_engine_init model_id=$modelId backend=${Backend.GPU().name} speculative_decoding=false " +
                 "engine_init_ms=${System.currentTimeMillis() - initStarted} max_tokens=$maxNumTokens",
         )
         loadedModelId = modelId

@@ -6,6 +6,10 @@
 
 **本書は v2.5.0（2026-07-25、render engine 12）以降の履歴を保持する。** 最近の記録に続く過去の履歴は、同じ文書内で折りたたんである。必要なときに展開して読める。折りたたみに対応しないビューアでは全文を表示する。それより前の履歴は [v1.72〜v2.4の書庫](docs/history/changelog-v1.72-v2.4.ja.md) と [v0.1〜v1.71の書庫](docs/history/changelog-v0.1-v1.71.ja.md) にある。
 
+### 2026-10-04 — Androidの端末モデルのspeculative decodingを無効にする（I-713）
+
+型を指定した応答でも不正なJSONが出たため、作者の裁定に従いLiteRT-LMのEngine全体でspeculative decodingを無効にする。SDK 0.17.1とResponseFormat.json、GPU、token枠とsampling、端末の構図の既定の読みは維持する。SDKはこの設定をEngine生成時だけ読むため、型のある要求と型のない要求に同じ設定を使う。
+
 ### 2026-10-03 — Androidの端末モデルへ応答の型を渡す（I-713）
 
 LiteRT-LMを0.17.1に上げ、端末providerが共有coreの応答schemaをResponseFormat.jsonでSDKへ渡す。型を持つ要求だけ会話と送信のJSON制約を有効にし、型の無い文章の要求はこれまでどおり送る。既存sampling設定と端末の構図の既定の読みを使い、保存済みDDL・Scoreの契約は変わらない。

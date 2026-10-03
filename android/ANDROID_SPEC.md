@@ -4,7 +4,7 @@ This directory is the Android workspace for the native standalone app and is
 tracked by Git. Local-only artifacts, device IDs, downloaded models, logs, and
 secrets must remain outside tracked files.
 
-Last updated: 2026-10-03.
+Last updated: 2026-10-04.
 
 **Catch-up status**: Android sits at generation `2.1.4-android.80`. DDL conversion and Score → SVG
 rendering run in the shared Rust core (`core/crates/`) of the same commit, packaged with the app, so
@@ -46,11 +46,13 @@ When updating Android specifications:
 3. Do not introduce English-only Android requirements that are absent from
    `ANDROID_SPEC.ja.md`.
 
-## 2026-10-03 Constrain on-device responses to their JSON schema (I-713)
+## 2026-10-03 Constrain on-device responses to their JSON schema (I-713, updated 2026-10-04)
 
 LiteRT-LM uses version 0.17.1. The on-device provider passes `ModelRequest.tool.parametersJson` unchanged to `ResponseFormat.json(schema)`. Only requests with a response schema enable the conversation's `enableResponseFormat` and the message's `responseFormat` together, using the SDK's JSON Schema constraint. Plain-text requests and photo observations leave this constraint disabled.
 
-The shared core supplies the prompt/schema and decides retries. GPU, speculative decoding, the 4096-token window and existing sampling settings, including temperature 0.0, remain in place. On-device Gemma 4 E2B composition keeps `read: false` and uses the default reading.
+The shared core supplies the prompt/schema and decides retries. GPU, the 4096-token window and existing sampling settings, including temperature 0.0, remain in place. On-device Gemma 4 E2B composition keeps `read: false` and uses the default reading.
+
+The author's decision on 2026-10-04 sets `ExperimentalFlags.enableSpeculativeDecoding = false` before creating the Engine. The SDK reads it only at Engine creation, so it is disabled for the entire Engine, including schema requests, plain-text requests and photo observations. SDK 0.17.1 and response schema configuration remain in place.
 
 ## 2026-10-03 Composition and reading after the underdrawing
 
@@ -833,6 +835,8 @@ These removals are intentional Android-specific product differences, not
 unfinished implementation gaps.
 
 ## 2026-05-07 LiteRT-LM MTP And Gemma 4 Re-Download Flow
+
+This section records the MTP setting at that time. From 2026-10-04, the I-713 section above governs Engine configuration and disables speculative decoding.
 
 The Android LiteRT-LM integration requires the GPU backend. It must not fall
 back to CPU. For local Gemma 4 E2B / E4B execution, LiteRT-LM speculative

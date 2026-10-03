@@ -3,13 +3,20 @@ import InkuUI
 
 @main
 struct InkuMacApp: App {
-    @State private var model = AppModel()
+    @State private var model: AppModel
 
     init() {
         let arguments = ProcessInfo.processInfo.arguments
+        let databaseURL: URL?
         if let index = arguments.firstIndex(of: "--database"), arguments.indices.contains(index + 1) {
-            _model = State(initialValue: AppModel(databaseURL: URL(fileURLWithPath: arguments[index + 1])))
+            databaseURL = URL(fileURLWithPath: arguments[index + 1])
+        } else if let path = Bundle.main.object(forInfoDictionaryKey: "InkuDatabasePath") as? String,
+                  path.hasPrefix("/"), !path.contains("\0") {
+            databaseURL = URL(fileURLWithPath: path)
+        } else {
+            databaseURL = nil
         }
+        _model = State(initialValue: AppModel(databaseURL: databaseURL))
     }
 
     var body: some Scene {

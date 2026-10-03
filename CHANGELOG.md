@@ -6,6 +6,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file retains the history from v2.5.0 (2026-07-25, render engine 12) onward.** Past records follow the recent ones in a collapsible section of this same document; expand it when needed. Viewers without collapse support show the full text. Earlier history is in the [v1.72–v2.4 archive](docs/history/changelog-v1.72-v2.4.md) and the [v0.1–v1.71 archive](docs/history/changelog-v0.1-v1.71.md).
 
+### 2026-10-04 — Add the macOS incu icon and a fixed Dock application
+
+The existing incu image now supplies the macOS app icon. Rebuilds can update a fixed installation while retaining its app directory, bundle ID, and database choice, keeping one Dock entry. A bundle setting points to an existing trial database so an argument-free Dock launch opens the same works. Synchronized the Japanese/English [Swift specification](apple/SWIFT_SPEC.md) and [build/install guide](apple/README.md).
+
 ### 2026-10-03 — Fix Swift off-page marks and historical prompt display
 
 Revision/export marks are read from saved values even outside the current library page, so one toggle can remove an existing mark. SQLite performs the toggle atomically, and page refresh retains the selected work's annotation.

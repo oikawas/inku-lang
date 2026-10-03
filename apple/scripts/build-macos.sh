@@ -5,21 +5,36 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 APPLE="$ROOT/apple"
 BUILD="$APPLE/build/macOS"
-CONFIGURATION="${1:-Release}"
+CONFIGURATION=Release
+INSTALL_APP=false
 
 usage() {
-    printf 'usage: apple/scripts/build-macos.sh [Debug|Release]\n' >&2
+    printf 'usage: apple/scripts/build-macos.sh [Debug|Release] [--install]\n' >&2
     printf 'Default: Release application and release Rust archives.\n' >&2
     printf 'Set INKU_APPLE_PROFILE=debug to explicitly select debug Rust archives.\n' >&2
+    printf 'With --install, update the fixed ~/Applications/Inku.app after quitting it.\n' >&2
 }
 
-[[ $# -le 1 && ( "$CONFIGURATION" == Debug || "$CONFIGURATION" == Release ) ]] || { usage; exit 2; }
+configuration_selected=false
+for argument in "$@"; do
+    case "$argument" in
+        Debug|Release)
+            [[ "$configuration_selected" == false ]] || { usage; exit 2; }
+            CONFIGURATION="$argument"
+            configuration_selected=true
+            ;;
+        --install) INSTALL_APP=true ;;
+        *) usage; exit 2 ;;
+    esac
+done
 [[ "$(uname -s)" == Darwin ]] || { printf 'The macOS application build requires macOS and Xcode.\n' >&2; exit 2; }
 for tool in python3 uv xcodegen xcodebuild xcrun; do
     command -v "$tool" >/dev/null || { printf 'Missing build prerequisite: %s\n' "$tool" >&2; exit 2; }
 done
 python3 -c 'import sys; sys.exit(0 if sys.version_info >= (3, 11) else "Python 3.11 or newer is required")'
 
+mkdir -p "$BUILD"
+xcrun swift -module-cache-path "$BUILD/IconModuleCache" "$APPLE/scripts/prepare-macos-icon.swift"
 python3 "$APPLE/scripts/export-server-resources.py"
 uv sync --project "$ROOT/server" --frozen
 python3 "$APPLE/scripts/prepare-meter-resources.py"
@@ -45,3 +60,6 @@ APP="$BUILD/DerivedData/Build/Products/$CONFIGURATION/Inku.app"
 # A successful build for only the active architecture is insufficient here.
 xcrun lipo -verify_arch arm64 x86_64 "$APP/Contents/MacOS/Inku"
 printf 'Built unsigned Universal application: %s\n' "$APP"
+if [[ "$INSTALL_APP" == true ]]; then
+    python3 "$APPLE/scripts/install-macos.py" --app "$APP"
+fi

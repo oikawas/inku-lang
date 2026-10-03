@@ -21,6 +21,8 @@ targets:
     deploymentTarget: "14.0"
     sources:
       - path: Sources/InkuMac
+      - path: Resources/AppIcon.icns
+        buildPhase: resources
     dependencies:
       - package: InkuApple
         product: InkuUI

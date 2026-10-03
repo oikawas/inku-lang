@@ -6,6 +6,10 @@
 
 **本書は v2.5.0（2026-07-25、render engine 12）以降の履歴を保持する。** 最近の記録に続く過去の履歴は、同じ文書内で折りたたんである。必要なときに展開して読める。折りたたみに対応しないビューアでは全文を表示する。それより前の履歴は [v1.72〜v2.4の書庫](docs/history/changelog-v1.72-v2.4.ja.md) と [v0.1〜v1.71の書庫](docs/history/changelog-v0.1-v1.71.ja.md) にある。
 
+### 2026-10-04 — macOSのincuアイコンとDock用の固定アプリを追加
+
+既存incu画像からmacOS用アイコンを生成してappへ割り当て、固定install先をrebuild後も更新できるようにした。app directory、bundle IDとDB指定を保持し、Dock登録を継続利用する。既存の試行DBはbundle設定で指定でき、Dockの引数なし起動でも同じ作品を開く。[Swift仕様](apple/SWIFT_SPEC.ja.md)と[build・install手順](apple/README.ja.md)の日英を同期した。
+
 ### 2026-10-03 — Swiftのページ外作品の印と過去プロンプト表示を修正
 
 libraryの現在pageにない保存作品でも推敲／書き出し用の印を保存値から読み、1回の操作で解除できるようにした。印の反転をSQLiteで原子的に行い、選択作品の注釈をpage更新後も保持する。

@@ -48,6 +48,27 @@ Release appは`apple/build/macOS/DerivedData/Build/Products/Release/Inku.app`に
 open apple/build/macOS/DerivedData/Build/Products/Release/Inku.app
 ```
 
+### Dockから同じアプリを起動する
+
+既存のincu画像からmacOS用アイコンを生成し、appに含めます。固定先へinstallして使う場合は次を実行します。
+
+```sh
+apple/scripts/build-macos.sh Release --install
+open ~/Applications/Inku.app
+```
+
+最初にこの固定appをDockへ登録すれば、その後も同じ登録を使えます。rebuild前にInkuを終了してください。installは既存app directoryを保持して中身を更新し、bundle IDとDB指定を引き継ぎます。通常のbuildだけではinstall先を更新しません。
+
+build済みappを既存の試行DBへ接続してinstallする場合は、[install helper](scripts/install-macos.py)へDBの絶対pathを渡します。
+
+```sh
+python3 apple/scripts/install-macos.py \
+  --app apple/build/macOS/DerivedData/Build/Products/Release/Inku.app \
+  --database /absolute/path/to/inku.sqlite
+```
+
+DBのcopyや移動は行いません。指定はbundleの`InkuDatabasePath`へ保持し、Dock起動でも同じDBを開きます。明示した`--database`起動はbundle指定より優先します。
+
 ## 通常利用と隔離した試行
 
 初期入力は英語の直接DDLです。モデル接続なしで生成を試せます。記述から生成する場合は「設定」でprovider方式、base URL、model、必要なAPI keyを保存してから制作画面の記述modeを使います。複数のAPIサービスを登録でき、Stage1／Stage2は共通の描画modelを使用します。model一覧の取得は明示したボタン操作で行います。接続を保存するだけではLLM requestを送りません。

@@ -2,7 +2,7 @@
 
 This directory contains the native SwiftUI client, developed for macOS first, and the shared Apple packages. [SWIFT_SPEC.ja.md](SWIFT_SPEC.ja.md) is the canonical specification for Swift host behavior; this document is its maintained English version. The [product specification](../SPEC.md) defines shared DDL, Score, prompts, authoring authority, pipeline transitions, seeds, and rendering semantics. Server remains the primary development host, and Swift follows the same Rust core without duplicating semantic processing.
 
-Last updated: 2026-10-03.
+Last updated: 2026-10-04.
 
 Binding and protocol identities come from the bundled Rust core's version report; rendering layer identities use render metadata and the [Server layer definitions](../server/src/inku_server/layer_versions.py). Do not duplicate shared engine version constants in this document. The Swift app's product version follows formal version management; this initial implementation does not allocate a new version. Matching shared layer versions does not establish that host features and the native UI port are complete.
 
@@ -13,6 +13,14 @@ Binding and protocol identities come from the bundled Rust core's version report
 - Record confirmed implementation changes and remaining scope in dated sections of this specification. Maintain product history in the shared [CHANGELOG.ja.md](../CHANGELOG.ja.md) and [CHANGELOG.md](../CHANGELOG.md). Do not create a separate Swift changelog.
 - Update the relevant canonical document when shared semantics or persistence contracts change. This document explains how the Swift host applies them; it does not establish an independent shared specification.
 - Public documentation describes source and reproducible procedures. Generated binaries, models, logs, credentials, device identifiers, and private operating records are not tracked product material.
+
+## 2026-10-04 macOS app icon and a fixed installation
+
+The macOS app icon is generated from the existing [incu image](../docs/assets/incu-icon-512.png). Its pixel colors, dark background, and transparent corners are retained in an icns bundle resource referenced by Info.plist. The standard build procedure regenerates it.
+
+`build-macos.sh --install` updates the successfully built app at `~/Applications/Inku.app`. It retains the installed bundle ID and database choice and updates the contents of the fixed app directory, so the Dock entry continues across rebuilds. Running apps and unknown existing apps are not overwritten; quit or resolve the target first. The work database stays outside the app bundle.
+
+Database selection resolves `--database`, the optional `InkuDatabasePath` bundle setting, then the existing Application Support default, creating AppModel once. The bundle setting uses an absolute file path. Supplying an existing trial database during installation lets an argument-free Dock launch use that database and adjacent settings. Shared Rust semantics and persistence contracts remain unchanged.
 
 ## 2026-10-03 macOS creation, whole-database history, and surrounding features
 

@@ -48,6 +48,27 @@ The Release application is generated at `apple/build/macOS/DerivedData/Build/Pro
 open apple/build/macOS/DerivedData/Build/Products/Release/Inku.app
 ```
 
+### Keep one app in the Dock
+
+The macOS icon is generated from the existing incu image and bundled with the app. Build and install at a fixed location with:
+
+```sh
+apple/scripts/build-macos.sh Release --install
+open ~/Applications/Inku.app
+```
+
+Add this fixed app to the Dock once and keep using the same entry. Quit Inku before rebuilding. Installation retains the app directory while updating its contents, bundle ID, and database choice. A build without `--install` does not update the installed app.
+
+To install an already built app against an existing trial database, pass its absolute path to the [installer](scripts/install-macos.py):
+
+```sh
+python3 apple/scripts/install-macos.py \
+  --app apple/build/macOS/DerivedData/Build/Products/Release/Inku.app \
+  --database /absolute/path/to/inku.sqlite
+```
+
+The database is not copied or moved. Its path is retained in the `InkuDatabasePath` bundle setting, so Dock launches use the same database. An explicit `--database` launch argument takes precedence.
+
 ## Normal use and an isolated trial
 
 The initial input is direct English DDL, so generation can be tried without a model connection. For description input, save a provider type, base URL, model, and any required API key in Settings, then select description mode in the creation screen. Multiple API services can be registered; Stage1/Stage2 share the drawing model. Model discovery uses an explicit button. Saving a connection does not send an LLM request.

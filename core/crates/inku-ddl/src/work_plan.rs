@@ -700,11 +700,13 @@ fn surface(slot: WorkPlanSlot, id: &str, language: ResolvedInstructionLanguage) 
 }
 
 fn ja_modifier(surface: &str) -> String {
-    // Adjectival core forms attach directly; noun forms take の.
-    if surface.ends_with('な') || surface.ends_with('い') {
+    // Adjectival core forms attach directly; noun forms take の, which a form
+    // such as 特大の already carries (I-709).
+    let no = MarkerId::JaNo.surface();
+    if surface.ends_with('な') || surface.ends_with('い') || surface.ends_with(no) {
         surface.to_owned()
     } else {
-        format!("{surface}{}", MarkerId::JaNo.surface())
+        format!("{surface}{no}")
     }
 }
 

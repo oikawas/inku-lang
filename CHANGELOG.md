@@ -6,6 +6,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file retains the history from v2.5.0 (2026-07-25, render engine 12) onward.** Past records follow the recent ones in a collapsible section of this same document; expand it when needed. Viewers without collapse support show the full text. Earlier history is in the [v1.72–v2.4 archive](docs/history/changelog-v1.72-v2.4.md) and the [v0.1–v1.71 archive](docs/history/changelog-v0.1-v1.71.md).
 
+### 2026-10-03 — The Japanese underdrawing no longer prints 特大のの (I-709)
+
+When an underdrawing layer was printed as Japanese visible DDL, a layer of extra-large size was written with a doubled particle, 特大のの四角: the size word 特大の carries の, and the modifier printer added another. A word that already ends in の now gets none, so the layer reads 特大の四角. The compiled Score is the same as before and saved works are unchanged; the English printing (`extra-large`) was already right. A test checks that no value of any field prints のの in Japanese, and the expected lines of the composition print and reading request controls now write one の as well.
+
 ### 2026-10-03 — Android adopts the composition reading
 
 New configurations enable shared-core composition. Cloud models read with Stage 1's model, token limit and temperature; on-device LiteRT Gemma 4 E2B sends no reading and composes with the default reading. The Android host dispatches the new effect and result, leaving continuation after a reading failure to the core. Gemini writes schema properties in propertyOrdering order. Composed numeric ranges and their mark remain in visible DDL; replay preserves existing works' DDL, Scores and settings. No progress or prompt-tab display is added.

@@ -30,6 +30,12 @@ runtime fallbackを持たない。保存済みSVG、Room schema、Score schema�
 - Android 仕様を更新するときは、先に `ANDROID_SPEC.ja.md` を更新し、その後で `ANDROID_SPEC.md` を同期する。
 - 英語版だけに存在する仕様・要件を追加してはならない。
 
+## 2026-10-03 端末モデルの応答をJSONの型へ沿わせる（I-713）
+
+LiteRT-LMは0.17.1を使う。端末providerは `ModelRequest.tool.parametersJson` を変換せず `ResponseFormat.json(schema)` へ渡す。応答の型を持つ要求だけ、会話の `enableResponseFormat` と送信時の `responseFormat` を同時に設定して、SDKのJSON Schema制約を使う。型の無い文章の要求と写真の観察文ではこの制約を有効にしない。
+
+共有coreのprompt/schemaと再試行の判断を使い、GPU、speculative decoding、4096 tokenの窓、temperature0.0を含む既存sampling設定を維持する。端末Gemma 4 E2Bの構図は `read: false` のままで、既定の読みを使う。
+
 ## 2026-10-03 下絵の後の構図と読み
 
 共有SPEC §12.6.2の構図を新規設定へ取り込む。雲のモデルは `composition: {"read": true}` とし、下絵の後・可視DDLのcommit前に `read_composition` を同じStage 1モデル・最大token・温度0.0で送り、`composition_read` を返す。読みの再試行は共有coreが `composition_retry`、無ければ `catalog_retry` の予算で行う。端末のLiteRT Gemma 4 E2Bは作者の判断どおり `read: false` とし、読みの要求を送らず既定の読みで構図を入れる。

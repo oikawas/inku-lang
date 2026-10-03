@@ -46,6 +46,12 @@ When updating Android specifications:
 3. Do not introduce English-only Android requirements that are absent from
    `ANDROID_SPEC.ja.md`.
 
+## 2026-10-03 Constrain on-device responses to their JSON schema (I-713)
+
+LiteRT-LM uses version 0.17.1. The on-device provider passes `ModelRequest.tool.parametersJson` unchanged to `ResponseFormat.json(schema)`. Only requests with a response schema enable the conversation's `enableResponseFormat` and the message's `responseFormat` together, using the SDK's JSON Schema constraint. Plain-text requests and photo observations leave this constraint disabled.
+
+The shared core supplies the prompt/schema and decides retries. GPU, speculative decoding, the 4096-token window and existing sampling settings, including temperature 0.0, remain in place. On-device Gemma 4 E2B composition keeps `read: false` and uses the default reading.
+
 ## 2026-10-03 Composition and reading after the underdrawing
 
 New configurations adopt the composition in shared SPEC §12.6.2. Cloud models set `composition: {"read": true}` and send `read_composition` after the underdrawing and before the visible DDL commit, using Stage 1's model, token limit and temperature 0.0, then return `composition_read`. The shared core retries under `composition_retry`, or `catalog_retry` when absent. On-device LiteRT Gemma 4 E2B sets `read: false`, following the author's decision: it sends no reading request and composes with the default reading.

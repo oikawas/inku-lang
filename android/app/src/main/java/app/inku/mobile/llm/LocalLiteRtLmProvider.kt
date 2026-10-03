@@ -13,6 +13,7 @@ import com.google.ai.edge.litertlm.EngineConfig
 import com.google.ai.edge.litertlm.ExperimentalApi
 import com.google.ai.edge.litertlm.ExperimentalFlags
 import com.google.ai.edge.litertlm.LogSeverity
+import com.google.ai.edge.litertlm.ResponseFormat
 import com.google.ai.edge.litertlm.SamplerConfig
 import java.io.File
 import kotlinx.coroutines.CancellationException
@@ -45,17 +46,18 @@ class LocalLiteRtLmProvider(
             val modelPath = resolveModelPath(request.modelId)
             val maxNumTokens = ENGINE_MAX_NUM_TOKENS
             val prompt = request.prompt
+            val generation = localLiteRtLmGenerationConfig(request)
             Log.i(
                 PERF_TAG,
                 "litert_request_start model_id=${request.modelId} prompt_chars=${prompt.length} " +
                     "system_chars=${request.systemInstruction?.length ?: 0} max_tokens=${request.maxTokens} engine_max_tokens=$maxNumTokens",
             )
             val activeEngine = engineFor(request.modelId, modelPath, maxNumTokens)
-            val response = activeEngine.createConversation(conversationConfig(request)).use { conversation ->
+            val response = activeEngine.createConversation(generation.conversationConfig).use { conversation ->
                 val text = StringBuilder()
                 try {
                     withTimeout(REQUEST_TIMEOUT_MS) {
-                        conversation.sendMessageAsync(prompt).collect { message ->
+                        conversation.sendMessageAsync(prompt, responseFormat = generation.responseFormat).collect { message ->
                             val chunk = message.contents.contents
                                 .filterIsInstance<Content.Text>()
                                 .joinToString("") { it.text }
@@ -219,19 +221,6 @@ class LocalLiteRtLmProvider(
         return newEngine
     }
 
-    private fun conversationConfig(request: ModelRequest): ConversationConfig {
-        return ConversationConfig(
-            systemInstruction = request.systemInstruction
-                ?.takeIf { it.isNotBlank() }
-                ?.let { Contents.of(it) },
-            samplerConfig = SamplerConfig(
-                topK = 10,
-                topP = 0.95,
-                temperature = request.temperature,
-            ),
-        )
-    }
-
     private fun visionConversationConfig(): ConversationConfig = ConversationConfig(
         samplerConfig = SamplerConfig(
             topK = 10,
@@ -271,6 +260,30 @@ class LocalLiteRtLmProvider(
         // maxTokens is not passed to LiteRT-LM; this window bounds the answer.
         private const val ENGINE_MAX_NUM_TOKENS = 4096
     }
+}
+
+internal data class LocalLiteRtLmGenerationConfig(
+    val conversationConfig: ConversationConfig,
+    val responseFormat: ResponseFormat?,
+)
+
+/** Enable the conversation constraint and its per-message schema together. */
+internal fun localLiteRtLmGenerationConfig(request: ModelRequest): LocalLiteRtLmGenerationConfig {
+    val responseFormat = request.tool?.let { ResponseFormat.json(it.parametersJson) }
+    return LocalLiteRtLmGenerationConfig(
+        conversationConfig = ConversationConfig(
+            systemInstruction = request.systemInstruction
+                ?.takeIf { it.isNotBlank() }
+                ?.let { Contents.of(it) },
+            samplerConfig = SamplerConfig(
+                topK = 10,
+                topP = 0.95,
+                temperature = request.temperature,
+            ),
+            enableResponseFormat = responseFormat != null,
+        ),
+        responseFormat = responseFormat,
+    )
 }
 
 /**

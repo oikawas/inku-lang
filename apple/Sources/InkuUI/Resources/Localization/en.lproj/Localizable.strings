@@ -314,7 +314,7 @@
 "表示中作品の写生と指示書" = "Displayed work's sketch & DDL";
 "表示位置" = "Position";
 "表示用" = "Display";
-"表示用は保存済みSVGをそのまま保存します。各プロファイルは作品の保存条件で描画します。" = "Display saves the stored SVG unchanged. Other profiles render using the work's saved settings.";
+"表示用は保存時の記述をSVGへ添えます。ほかのプロファイルは作品の保存条件で描画します。" = "Display includes the work's saved description. Other profiles render using its saved settings.";
 "表示範囲の外にも系譜があります。節点を選ぶか、子孫の深さを増やしてください。" = "More lineage lies outside the displayed range. Select a node or increase descendant depth.";
 "表示言語" = "Display language";
 "補助モデル（サービスID:モデルID）" = "Auxiliary model (service ID:model ID)";

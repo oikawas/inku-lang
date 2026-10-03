@@ -20,7 +20,18 @@ public struct ExportSource: Sendable {
     }
 
     public func svg(profile: String) throws -> String {
-        if profile == "display" || profile == "canonical" { return work.svg }
+        if profile == "canonical" { return work.svg }
+        if profile == "display" {
+            guard let opening = work.svg.range(of: "(<svg[^>]*>)", options: .regularExpression) else { return work.svg }
+            let description = (work.sourceText ?? work.input)
+                .replacingOccurrences(of: "&", with: "&amp;")
+                .replacingOccurrences(of: "<", with: "&lt;")
+                .replacingOccurrences(of: ">", with: "&gt;")
+                .replacingOccurrences(of: "\"", with: "&quot;")
+            var svg = work.svg
+            svg.insert(contentsOf: "<desc>" + description + "</desc>", at: opening.upperBound)
+            return svg
+        }
         guard let svg = profiles[profile], !svg.isEmpty else { throw ExportFailure("保存時の条件から \(profile) SVG を準備できませんでした。") }
         return svg
     }

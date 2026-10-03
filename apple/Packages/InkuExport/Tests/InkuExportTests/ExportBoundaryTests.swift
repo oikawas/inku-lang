@@ -79,6 +79,49 @@ final class ExportBoundaryTests: XCTestCase, @unchecked Sendable {
         XCTAssertThrowsError(try ExportService.render(sources: [source(), source(blue, id: "two"), source(id: "three")], options: options))
     }
 
+    // Failure: Display SVG omits the saved description even though canonical SVG must remain unchanged.
+    func testDisplaySVGUsesSavedDescriptionAndKeepsCanonicalIdentity() throws {
+        let canonical = #"<?xml version="1.0"?><svg xmlns="http://www.w3.org/2000/svg" width="64" height="64"><desc>original SVG note</desc><rect width="64" height="64" fill="red"/></svg>"#
+        let description = "保存した & < > \" ' 説明\n二行目"
+        let work = SavedWork(id: "saved-display", at: 42, input: "saved fallback\nsecond line", score: "{}", svg: canonical,
+                             sourceText: description, renderEngineVersion: "saved-engine", renderHash: "saved-render-hash",
+                             lineageNodeID: "saved-node")
+        let saved = ExportSource(work: work)
+        var options = ExportOptions(); options.format = .svg
+
+        func display(_ source: ExportSource) throws -> (ExportArtifact, DisplaySVGDescriptionDecoder) {
+            let artifact = try XCTUnwrap(ExportService.render(sources: [source], options: options).first)
+            let decoded = DisplaySVGDescriptionDecoder()
+            let parser = XMLParser(data: artifact.data)
+            parser.shouldResolveExternalEntities = false
+            parser.delegate = decoded
+            XCTAssertTrue(parser.parse(), parser.parserError?.localizedDescription ?? "Display SVG did not parse")
+            return (artifact, decoded)
+        }
+
+        let (artifact, decoded) = try display(saved)
+        XCTAssertEqual(decoded.descriptions, [description, "original SVG note"])
+        XCTAssertEqual(decoded.rootChildren, ["desc", "desc", "rect"])
+        var displayedSVG = String(decoding: artifact.data, as: UTF8.self)
+        XCTAssertTrue(displayedSVG.contains("保存した &amp; &lt; &gt; &quot; ' 説明\n二行目"))
+        let descriptionStart = try XCTUnwrap(displayedSVG.range(of: "<desc>"))
+        let descriptionEnd = try XCTUnwrap(displayedSVG.range(of: "</desc>", range: descriptionStart.upperBound..<displayedSVG.endIndex))
+        displayedSVG.removeSubrange(descriptionStart.lowerBound..<descriptionEnd.upperBound)
+        XCTAssertEqual(Data(displayedSVG.utf8), Data(canonical.utf8))
+        XCTAssertEqual(artifact.name, "inku-saved-display.svg")
+        XCTAssertEqual(saved.work, work)
+        XCTAssertEqual(try saved.svg(profile: "canonical"), canonical)
+        options.svgProfile = "canonical"
+        XCTAssertEqual(try ExportService.render(sources: [saved], options: options)[0].data, Data(canonical.utf8))
+        XCTAssertEqual(saved.work, work)
+
+        options.svgProfile = "display"
+        var fallback = work; fallback.sourceText = nil
+        XCTAssertEqual(try display(ExportSource(work: fallback)).1.descriptions, [work.input, "original SVG note"])
+        var empty = work; empty.sourceText = ""
+        XCTAssertEqual(try display(ExportSource(work: empty)).1.descriptions, ["", "original SVG note"])
+    }
+
     // Failure: the DDL envelope loses aliases, includes unused plugins, or rounds a u64 definition value.
     func testDDLExportRetainsOnlyNamedDefinitionsWithoutRounding() throws {
         let definition = try ExactJSON(data: Data(#"{"schema":"inku.macro-definition.v1","namespace":"Nature","heading":"leaves","aliases":["foliage"],"seed":18446744073709551615}"#.utf8))
@@ -92,7 +135,7 @@ final class ExportBoundaryTests: XCTestCase, @unchecked Sendable {
         XCTAssertEqual(plugins.count, 1)
         XCTAssertEqual(plugins[0]["definition"]["seed"].number, "18446744073709551615")
         XCTAssertEqual(plugins[0]["summary"].string, "saved definition")
-        var options = ExportOptions(); options.format = .svg
+        var options = ExportOptions(); options.format = .svg; options.svgProfile = "canonical"
         XCTAssertEqual(try ExportService.render(sources: [ExportSource(work: work)], options: options)[0].data, Data(originalSVG.utf8))
         options.svgProfile = "compat"
         XCTAssertThrowsError(try ExportService.render(sources: [ExportSource(work: work)], options: options))
@@ -119,5 +162,32 @@ final class ExportBoundaryTests: XCTestCase, @unchecked Sendable {
         let decoder = try XCTUnwrap(CGImageSourceCreateWithData(card[0].data as CFData, nil))
         let cardImage = try XCTUnwrap(CGImageSourceCreateImageAtIndex(decoder, 0, nil))
         XCTAssertEqual(cardImage.width, 240); XCTAssertEqual(cardImage.height, 300)
+    }
+}
+
+private final class DisplaySVGDescriptionDecoder: NSObject, XMLParserDelegate {
+    var descriptions: [String] = []
+    var rootChildren: [String] = []
+    private var depth = 0
+    private var descriptionIndex: Int?
+
+    func parser(_ parser: XMLParser, didStartElement elementName: String, namespaceURI: String?, qualifiedName qName: String?, attributes attributeDict: [String: String]) {
+        if depth == 1 {
+            rootChildren.append(elementName)
+            if elementName == "desc" {
+                descriptionIndex = descriptions.count
+                descriptions.append("")
+            }
+        }
+        depth += 1
+    }
+
+    func parser(_ parser: XMLParser, foundCharacters string: String) {
+        if let descriptionIndex { descriptions[descriptionIndex] += string }
+    }
+
+    func parser(_ parser: XMLParser, didEndElement elementName: String, namespaceURI: String?, qualifiedName qName: String?) {
+        if depth == 2, elementName == "desc" { descriptionIndex = nil }
+        depth -= 1
     }
 }

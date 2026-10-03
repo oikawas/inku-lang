@@ -76,7 +76,7 @@ struct ExportView: View {
                             Text(model.display.localized("互換用")).tag("compat")
                             Text(model.display.localized("ライブ用")).tag("live")
                         }
-                        Text(model.display.localized("表示用は保存済みSVGをそのまま保存します。各プロファイルは作品の保存条件で描画します。"))
+                        Text(model.display.localized("表示用は保存時の記述をSVGへ添えます。ほかのプロファイルは作品の保存条件で描画します。"))
                             .font(.caption).foregroundStyle(.secondary)
                     }
                     if options.format == .png || options.format == .shareCard || animation {

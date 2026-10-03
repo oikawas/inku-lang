@@ -16,6 +16,14 @@ struct AppCheck {
             try await runAuthoringChecks()
             return
         }
+        if CommandLine.arguments.contains("--saved-output-availability-only") {
+            try await runSavedOutputAvailabilityChecks()
+            return
+        }
+        if CommandLine.arguments.contains("--saved-annotation-selection-only") {
+            try await runSavedAnnotationSelectionChecks()
+            return
+        }
         if CommandLine.arguments.contains("--comparison-only") {
             try await runComparisonChecks()
             return

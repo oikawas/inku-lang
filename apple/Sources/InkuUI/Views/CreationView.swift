@@ -295,14 +295,8 @@ struct CreationView: View {
                 .accessibilityLabel(model.display.localized("スター"))
                 .accessibilityValue(model.display.localized(work.starred ? "オン" : "オフ"))
                 .help(model.display.preferences.showTooltips ? model.display.localized("スター") : "")
-            Button { Task { await model.library.toggleRevision(work) } } label: { Image(systemName: model.library.annotation(for: work.id).forRevision ? "pencil.circle.fill" : "pencil.circle") }
-                .accessibilityLabel(model.display.localized("推敲の印"))
-                .accessibilityValue(model.display.localized(model.library.annotation(for: work.id).forRevision ? "オン" : "オフ"))
-                .help(model.display.preferences.showTooltips ? model.display.localized("推敲の印") : "")
-            Button { Task { await model.library.toggleShare(work) } } label: { Image(systemName: model.library.annotation(for: work.id).forShare ? "square.and.arrow.up.fill" : "square.and.arrow.up") }
-                .accessibilityLabel(model.display.localized("書き出し用の印"))
-                .accessibilityValue(model.display.localized(model.library.annotation(for: work.id).forShare ? "オン" : "オフ"))
-                .help(model.display.preferences.showTooltips ? model.display.localized("書き出し用の印") : "")
+            LibraryAnnotationMarkButton(model: model, work: work, mark: .revision)
+            LibraryAnnotationMarkButton(model: model, work: work, mark: .share)
             Button(model.display.localized("再演奏"), systemImage: "arrow.clockwise") { onReplayWork(work) }.disabled(model.isBusy)
         }
     }

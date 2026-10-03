@@ -16,6 +16,12 @@ Binding and protocol identities come from the bundled Rust core's version report
 
 ## 2026-10-03 macOS creation, whole-database history, and surrounding features
 
+### Saved-work marks and prompt availability
+
+Revision and export marks are read by saved-work ID even when the work is outside the current library page. Page refresh retains the selected work's annotation. Mark toggles read and invert the durable SQLite value in one write transaction rather than treating a page-cache miss as an unmarked work. The schema and saved work content remain unchanged.
+
+The sent-prompt pane distinguishes loading, recorded, not recorded, and unavailable. Selecting an older parent after a DDL edit creates a child in the same execution does not reuse that child's latest output for the parent. Missing or unavailable records do not establish that no model request was sent. Core editing authority and saved DDL/Score/SVG remain intact; selecting a work sends no provider request and creates no history entry.
+
 ### Creation and saved-work display
 
 The left column contains description/direct DDL, upcoming generation conditions, and the saved sketch/DDL inspector. Displayed-work facts and work/lineage occupy the right. Input, upcoming conditions, and saved information use grouped panels; Generate/Stop remain outside the input scroll area. Narrow widths switch to a vertical arrangement. A compact summary and detail popover distinguish saved model, catalog, canvas, and size from upcoming settings. Captions, vertical/horizontal writing, placement, pan/zoom, and presentation are native display composition and do not alter saved SVG. Fit canvas resets zoom and position.

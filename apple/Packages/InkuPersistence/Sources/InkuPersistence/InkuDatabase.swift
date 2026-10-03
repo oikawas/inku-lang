@@ -12,6 +12,10 @@ public enum PersistenceError: Error, Sendable, Equatable {
     case backupAlreadyExists
 }
 
+public enum LibraryAnnotationMark: Sendable {
+    case revision, share
+}
+
 /// One actor owns one SQLite writer. No database handle escapes this boundary.
 public actor InkuDatabase {
     public nonisolated let url: URL
@@ -246,6 +250,33 @@ public actor InkuDatabase {
                 count += db.changesCount
             }
             return count
+        }
+    }
+
+    public func libraryAnnotation(id: String) throws -> LibraryAnnotation {
+        try queue.read { db in
+            guard try SavedWork.fetchOne(db, key: id) != nil else {
+                throw PersistenceError.invalidRecord("work no longer exists")
+            }
+            return try Self.annotation(id: id, in: db)
+        }
+    }
+
+    /// Read and invert the durable mark together, independent of any visible page cache.
+    public func toggleAnnotation(id: String, mark: LibraryAnnotationMark) throws -> LibraryAnnotation {
+        let column: String
+        switch mark {
+        case .revision: column = "for_revision"
+        case .share: column = "for_share"
+        }
+        return try queue.write { db in
+            guard try SavedWork.fetchOne(db, key: id) != nil else {
+                throw PersistenceError.invalidRecord("work no longer exists")
+            }
+            try db.execute(sql: "INSERT OR IGNORE INTO library_annotations (history_id) VALUES (?)", arguments: [id])
+            try db.execute(sql: "UPDATE library_annotations SET \(column) = NOT \(column) WHERE history_id = ?",
+                           arguments: [id])
+            return try Self.annotation(id: id, in: db)
         }
     }
 

@@ -32,6 +32,9 @@ public final class LibraryModel {
     public var selectedIDs: Set<String> = []
     public private(set) var works: [SavedWork] = []
     public private(set) var annotations: [String: LibraryAnnotation] = [:]
+    public private(set) var selectedAnnotationID: String?
+    public private(set) var selectedAnnotation: LibraryAnnotation?
+    public private(set) var selectedAnnotationLoading = false
     public private(set) var groups: [LibraryGroup] = []
     public private(set) var groupMembers: [String: [InkuPersistence.LibraryItem]] = [:]
     public private(set) var groupMemberTotals: [String: Int] = [:]
@@ -53,6 +56,7 @@ public final class LibraryModel {
     @ObservationIgnored private var database: InkuDatabase?
     @ObservationIgnored private var refreshTask: Task<Void, Never>?
     @ObservationIgnored private var refreshToken = UUID()
+    @ObservationIgnored private var selectedAnnotationToken = UUID()
     @ObservationIgnored private var lineageToken = UUID()
     @ObservationIgnored private var lineageFocusID: String?
     @ObservationIgnored private var lineageOverviewRequested = false
@@ -60,6 +64,7 @@ public final class LibraryModel {
     public init() {}
 
     public func connect(database: InkuDatabase) async {
+        refreshTask?.cancel()
         self.database = database
         await refresh()
     }
@@ -131,7 +136,57 @@ public final class LibraryModel {
         }
     }
 
-    public func annotation(for id: String) -> LibraryAnnotation { annotations[id] ?? LibraryAnnotation() }
+    public func loadedAnnotation(for id: String) -> LibraryAnnotation? {
+        if selectedAnnotationID == id { return selectedAnnotation }
+        return annotations[id]
+    }
+
+    public func annotation(for id: String) -> LibraryAnnotation {
+        loadedAnnotation(for: id) ?? LibraryAnnotation()
+    }
+
+    public func isAnnotationLoading(for id: String) -> Bool {
+        selectedAnnotationID == id && selectedAnnotationLoading
+    }
+
+    public func clearSelectedAnnotation() {
+        selectedAnnotationToken = UUID()
+        selectedAnnotationID = nil
+        selectedAnnotation = nil
+        selectedAnnotationLoading = false
+    }
+
+    public func loadSelectedAnnotation(workID: String?) async {
+        clearSelectedAnnotation()
+        guard let workID else { return }
+        selectedAnnotationID = workID
+        selectedAnnotation = annotations[workID]
+        guard let database else { return }
+        let token = UUID()
+        selectedAnnotationToken = token
+        selectedAnnotationLoading = true
+        defer {
+            if selectedAnnotationToken == token { selectedAnnotationLoading = false }
+        }
+        do {
+            let value = try await database.libraryAnnotation(id: workID)
+            guard selectedAnnotationToken == token, selectedAnnotationID == workID, !Task.isCancelled else { return }
+            selectedAnnotation = value
+        } catch {
+            guard selectedAnnotationToken == token, selectedAnnotationID == workID, !Task.isCancelled else { return }
+            selectedAnnotation = nil
+            errorText = error.localizedDescription
+        }
+    }
+
+    private func rememberAnnotation(_ value: LibraryAnnotation, id: String) {
+        annotations[id] = value
+        if selectedAnnotationID == id {
+            selectedAnnotationToken = UUID()
+            selectedAnnotationLoading = false
+            selectedAnnotation = value
+        }
+    }
 
     public func toggleSelection(_ id: String) {
         if selectedIDs.contains(id) { selectedIDs.remove(id) } else { selectedIDs.insert(id) }
@@ -162,17 +217,28 @@ public final class LibraryModel {
     }
 
     public func toggleRevision(_ work: SavedWork) async {
-        let next = !annotation(for: work.id).forRevision
-        await mutate { try await $0.setAnnotation(id: work.id, forRevision: next); return "推敲の印を更新しました" }
+        await toggleAnnotation(work, mark: .revision, status: "推敲の印を更新しました")
     }
 
     public func toggleShare(_ work: SavedWork) async {
-        let next = !annotation(for: work.id).forShare
-        await mutate { try await $0.setAnnotation(id: work.id, forShare: next); return "書き出し用の印を更新しました" }
+        await toggleAnnotation(work, mark: .share, status: "書き出し用の印を更新しました")
+    }
+
+    private func toggleAnnotation(_ work: SavedWork, mark: LibraryAnnotationMark, status: String) async {
+        await mutate { database in
+            let value = try await database.toggleAnnotation(id: work.id, mark: mark)
+            self.rememberAnnotation(value, id: work.id)
+            return status
+        }
     }
 
     public func saveNote(id: String, note: String) async {
-        await mutate { try await $0.setAnnotation(id: id, note: note); return "コメントを保存しました" }
+        await mutate { database in
+            try await database.setAnnotation(id: id, note: note)
+            let value = try await database.libraryAnnotation(id: id)
+            self.rememberAnnotation(value, id: id)
+            return "コメントを保存しました"
+        }
     }
 
     public func trash(ids: [String]? = nil) async {

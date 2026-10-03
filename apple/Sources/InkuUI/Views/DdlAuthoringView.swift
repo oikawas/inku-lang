@@ -116,10 +116,18 @@ struct DdlAuthoringView: View {
     }
     private var displayedOutput: String {
         switch output {
-        case "prompt": model.promptJSON.isEmpty ? model.display.localized("この処理ではモデルへ送信していません。") : model.promptJSON
+        case "prompt": promptOutput
         case "events": model.eventsJSON
         case "plugins": model.macroDiagnostics
         default: model.diagnosticsJSON
+        }
+    }
+    private var promptOutput: String {
+        switch model.promptAvailability {
+        case .loading: model.display.localized("送信プロンプトを読み込んでいます。")
+        case .recorded: model.promptJSON
+        case .notRecorded: model.display.localized("送信プロンプトの記録はありません。")
+        case .unavailable: model.display.localized("この保存作品の送信プロンプトを取得できません。")
         }
     }
     private func sourcePane(_ title: String, _ source: String) -> some View {

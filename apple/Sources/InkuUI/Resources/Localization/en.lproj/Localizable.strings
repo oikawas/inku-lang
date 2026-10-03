@@ -907,3 +907,8 @@
 "%@の説明" = "About %@";
 "未設定の標準Gemini接続は30／16,000／14,400、ほかの接続先は0が初期値です。契約の利用枠に合わせて設定してください。" = "The standard Gemini service defaults to 30/16,000/14,400 when unset; other services default to 0. Set limits to match your plan.";
 "レート制限には0から1,000,000,000までの整数を設定してください。" = "Set each rate limit to a whole number from 0 to 1,000,000,000.";
+"送信プロンプトを読み込んでいます。" = "Loading the sent prompt.";
+"送信プロンプトの記録はありません。" = "No sent prompt was recorded.";
+"この保存作品の送信プロンプトを取得できません。" = "The sent prompt for this saved work is unavailable.";
+"印を読み込み中" = "Loading marks";
+"印を取得できません" = "Marks unavailable";

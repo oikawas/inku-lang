@@ -11,6 +11,11 @@ import UniformTypeIdentifiers
 import AppKit
 #endif
 
+/// Availability of the author-facing prompt journal, independent of whether a provider was called.
+public enum PromptAvailability: Sendable, Equatable {
+    case loading, recorded, notRecorded, unavailable
+}
+
 /// A complete, immutable adjustment snapshot. Views display model facts but never interpret its operation.
 public struct DrawingAdjustmentPlan: Sendable {
     public let stage1Model: String?
@@ -71,6 +76,7 @@ public final class AppModel {
     public private(set) var authoringPhase = ""
     public private(set) var diagnosticsJSON = ""
     public private(set) var promptJSON = ""
+    public private(set) var promptAvailability: PromptAvailability = .notRecorded
     public private(set) var eventsJSON = ""
     public private(set) var holeIDs: [String] = []
     public private(set) var patchProposalJSON = ""
@@ -242,7 +248,7 @@ public final class AppModel {
         guard !isBusy else { return }
         providerProgress = nil
         errorText = nil
-        displayWork(work)
+        displayWork(work, loadSelectedAnnotation: false)
         currentExecutionID = nil
         currentView = nil
         selectedContext = nil
@@ -252,23 +258,35 @@ public final class AppModel {
         patchCandidate = ""
         diagnosticsJSON = ""
         promptJSON = ""
+        promptAvailability = .loading
+        unreadOutputs.remove("prompt")
         eventsJSON = ""
-        guard let host else { return }
+        await library.loadSelectedAnnotation(workID: work.id)
+        guard selectedWorkID == work.id, !isBusy else { return }
+        guard let host else { promptAvailability = .unavailable; return }
         let recordedMetrics = (try? await host.savedProviderMetrics(workID: work.id)) ?? []
-        guard selectedWorkID == work.id else { return }
+        guard selectedWorkID == work.id, !isBusy else { return }
         providerMetrics = recordedMetrics
         do {
             let context = try await host.savedAuthoringContext(workID: work.id)
+            guard selectedWorkID == work.id, !isBusy else { return }
             selectedContext = context
             authoringAuthority = context.authority
             authoringOrigin = context.origin
             authoringRevision = context.revision
             authoringPhase = "completed"
             let location = work.id.split(separator: "_").dropLast().joined(separator: "_")
-            if let view = try? await host.restore(executionID: location), view.savedWorkID == work.id {
+            let restored = try? await host.restore(executionID: location)
+            guard selectedWorkID == work.id, !isBusy else { return }
+            if let view = restored, view.savedWorkID == work.id {
                 apply(view)
+            } else {
+                // A later save on this execution is not the selected work's output record.
+                promptAvailability = .unavailable
             }
         } catch {
+            guard selectedWorkID == work.id, !isBusy else { return }
+            promptAvailability = .unavailable
             authoringAuthority = "legacy_unknown"
             authoringOrigin = work.ddlSourceOrigin ?? "legacy_unknown"
             authoringRevision = "0"
@@ -277,16 +295,29 @@ public final class AppModel {
         }
     }
 
-    private func displayWork(_ work: SavedWork) {
+    private func displayWork(_ work: SavedWork, loadSelectedAnnotation: Bool = true) {
         importedDDL = nil; importedMacroNames = []
         previewWork = nil
         selectedWorkID = work.id
         selectedWork = work
+        if loadSelectedAnnotation {
+            Task { @MainActor [weak self] in
+                guard let self, self.selectedWorkID == work.id, self.previewWork == nil else { return }
+                await self.library.loadSelectedAnnotation(workID: work.id)
+            }
+        }
+        if currentView?.savedWorkID != work.id {
+            promptJSON = ""
+            promptAvailability = .unavailable
+            unreadOutputs.remove("prompt")
+        }
         providerMetrics = currentView?.savedWorkID == work.id ? currentView?.providerMetrics ?? [] : []
+        let displayedGenerationToken = generationToken
         if currentView?.savedWorkID != work.id, let host {
             Task { @MainActor [weak self] in
                 let metrics = (try? await host.savedProviderMetrics(workID: work.id)) ?? []
-                guard let self, self.selectedWorkID == work.id, self.previewWork == nil else { return }
+                guard let self, self.selectedWorkID == work.id, self.previewWork == nil,
+                      !self.isBusy || self.generationToken == displayedGenerationToken else { return }
                 self.providerMetrics = metrics
             }
         }
@@ -661,6 +692,7 @@ public final class AppModel {
             if let view, view.savedWorkID == saved.id { apply(view) }
             else {
                 diagnosticsJSON = ""; promptJSON = ""; eventsJSON = ""; unreadOutputs = []
+                promptAvailability = .unavailable
             }
             displayWork(saved)
             selectedContext = context
@@ -1002,6 +1034,7 @@ public final class AppModel {
 
     public func newWork() {
         guard !isBusy else { return }
+        library.clearSelectedAnnotation()
         providerProgress = nil
         providerMetrics = []
         status = "準備完了"
@@ -1025,6 +1058,7 @@ public final class AppModel {
         selectedHoleIDs = []
         diagnosticsJSON = ""
         promptJSON = ""
+        promptAvailability = .notRecorded
         eventsJSON = ""
         errorText = nil
         unreadOutputs = []
@@ -1438,7 +1472,12 @@ public final class AppModel {
         }
         if let bytes = view.promptJSON {
             let prompt = (try? Self.pretty(bytes)) ?? String(decoding: bytes, as: UTF8.self)
+            promptAvailability = prompt.isEmpty ? .notRecorded : .recorded
             if prompt != promptJSON { promptJSON = prompt; unreadOutputs.insert("prompt") }
+        } else {
+            promptJSON = ""
+            promptAvailability = .notRecorded
+            unreadOutputs.remove("prompt")
         }
         eventsJSON = (try? Self.pretty(view.eventsJSON)) ?? String(decoding: view.eventsJSON, as: UTF8.self)
         status = [

@@ -46,23 +46,67 @@ struct LibraryWorkMarks: View {
             }
             .accessibilityLabel(model.display.localized(work.starred ? "お気に入りを解除" : "お気に入り"))
             .help(model.display.preferences.showTooltips ? model.display.localized("お気に入り") : "")
-            Button { Task { await library.toggleRevision(work) } } label: {
-                Image(systemName: library.annotation(for: work.id).forRevision ? "pencil.circle.fill" : "pencil.circle")
-                    .foregroundStyle(library.annotation(for: work.id).forRevision ? Color.accentColor : Color.secondary)
-            }
-            .accessibilityLabel(model.display.localized("推敲の印"))
-            .accessibilityValue(model.display.localized(library.annotation(for: work.id).forRevision ? "選択済み" : "未選択"))
-            .help(model.display.preferences.showTooltips ? model.display.localized("推敲の印") : "")
-            Button { Task { await library.toggleShare(work) } } label: {
-                Image(systemName: library.annotation(for: work.id).forShare ? "square.and.arrow.up.fill" : "square.and.arrow.up")
-                    .foregroundStyle(library.annotation(for: work.id).forShare ? Color.accentColor : Color.secondary)
-            }
-            .accessibilityLabel(model.display.localized("書き出し用の印"))
-            .accessibilityValue(model.display.localized(library.annotation(for: work.id).forShare ? "選択済み" : "未選択"))
-            .help(model.display.preferences.showTooltips ? model.display.localized("書き出し用の印") : "")
+            LibraryAnnotationMarkButton(model: model, work: work, mark: .revision)
+            LibraryAnnotationMarkButton(model: model, work: work, mark: .share)
         }
         .buttonStyle(.borderless)
         .disabled(library.mutating || model.isBusy)
+    }
+}
+
+@MainActor
+struct LibraryAnnotationMarkButton: View {
+    @Bindable var model: AppModel
+    let work: SavedWork
+    let mark: LibraryAnnotationMark
+    private var library: LibraryModel { model.library }
+    private var loading: Bool { library.isAnnotationLoading(for: work.id) }
+    private var marked: Bool? {
+        guard let annotation = library.loadedAnnotation(for: work.id) else { return nil }
+        switch mark {
+        case .revision: return annotation.forRevision
+        case .share: return annotation.forShare
+        }
+    }
+    private var title: String {
+        switch mark {
+        case .revision: return "推敲の印"
+        case .share: return "書き出し用の印"
+        }
+    }
+    private var symbol: String {
+        guard let marked else { return "questionmark.circle" }
+        switch mark {
+        case .revision: return marked ? "pencil.circle.fill" : "pencil.circle"
+        case .share: return marked ? "square.and.arrow.up.fill" : "square.and.arrow.up"
+        }
+    }
+    private var accessibilityState: String {
+        if loading { return "印を読み込み中" }
+        guard let marked else { return "印を取得できません" }
+        return marked ? "オン" : "オフ"
+    }
+
+    var body: some View {
+        Button {
+            Task {
+                switch mark {
+                case .revision: await library.toggleRevision(work)
+                case .share: await library.toggleShare(work)
+                }
+            }
+        } label: {
+            if loading {
+                ProgressView().controlSize(.small).frame(width: 16, height: 16)
+            } else {
+                Image(systemName: symbol)
+                    .foregroundStyle(marked == true ? Color.accentColor : Color.secondary)
+            }
+        }
+        .accessibilityLabel(model.display.localized(title))
+        .accessibilityValue(model.display.localized(accessibilityState))
+        .help(model.display.preferences.showTooltips ? model.display.localized(title) : "")
+        .disabled(loading || marked == nil || library.mutating || model.isBusy)
     }
 }
 

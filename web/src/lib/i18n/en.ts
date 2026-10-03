@@ -15,9 +15,12 @@ export const en: LangPack = {
 	chatgptRetry: 'Check usage and retry',
 	chatgptSignOut: 'Sign out',
 	chatgptRefreshModels: 'Refresh models',
+	chatgptModelsLoaded: (count) => `Loaded ${count} models. Choose a drawing model with Select model.`,
+	chatgptModelsEmpty: 'No selectable models are offered for this account. Check the connection and plan usage permission.',
 	chatgptUsingPlan: 'Using ChatGPT plan',
 	chatgptModelUnavailable: 'The selected ChatGPT model is unavailable. Check the connection or choose a model explicitly.',
 	chatgptStatus: (code) => ({
+		chatgpt_models_loading: 'Loading models…',
 		chatgpt_connected: 'Connected', chatgpt_signed_out: 'Not connected', chatgpt_exported: 'The receiving host renews this account.',
 		chatgpt_scope_required: 'Connected. Plan usage needs your permission.',
 		chatgpt_mode_not_allowed: 'Developer mode or single-user mode is required.',

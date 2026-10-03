@@ -985,6 +985,8 @@ Stage 1、camera projection、hole補完は既存の共有grammar helperを使�
 
 設定「ChatGPTプラン」は独立したタブで、表示・操作などの既存設定を同時表示しない。自己ホストの「Continue with ChatGPT」はブラウザ側Macの専用helperを開く。起動リンクにはinku本人ID・選択登録ID・明示同意の指定だけを載せ、Macで接続先を確認してから認証し、保護された経路で一登録を移送する。OAuth code/tokenをLAN HTTPへ載せない。
 
+「モデル一覧を更新」は取得中の表示と、取得した件数・モデル名を同じ設定タブへ返す。空の一覧と通信・認可の失敗も表示する。取得後の「モデル選択」は既存の描画モデル選択画面を開き、Stage 1/2を共通のモデルとして明示選択する。一覧の表示はowner・選択登録・generationへ固定し、更新だけでモデルを自動選択しない。
+
 予約provider `chatgpt`（ChatGPTプラン）は本人OAuth・scope・本人catalogによる共有pipeline専用接続である。明示有効化、`developer_mode || single_user_mode`、検証済みlocal/self-hosted起動を要求し、管理者にも迂回を許さない。`chatgpt:<slug>`を共有APIキー接続やbare名の所有へ混ぜず、利用不可でも保存指定を保持する。両段共通の描画、写生文、カタログ選択、構図の読み、可視hole補完をResponses/SSEへ接続し、Rustのprompt/schema/retry・Score/SVGは変えない。構図の読みは観測をStage 1から分けて`composition`に記録し、読みが使えないときの既定fallbackは共有Rustへ委ねる。実行のowner/profile/generationを固定し、quota・cancel・sign-out・モード変更で追加通信と遅い結果を停止する。Vision・奥書・デモ指示生成・モデル検査へは提供しない。[接続・移送・復旧](docs/guide/chatgpt-plan.ja.md)を参照。
 
 MLXの`mlx-vlm`サーバーはサービス種別`mlx`（管理画面の「MLX (mlx-vlm)」）で登録する。接続先・キー・モデル一覧はOpenAI互換APIとして扱い、描画の応答は共有コアが渡すJSON Schemaをそのまま`response_format`へ渡して制約する。関数ツールは送らず、`enable_thinking: false`を明示する。コアによる応答検証と再試行の権限は継続する。登録済みサービスは種別だけを変更でき、キー・URL・公開モデルを保持する。

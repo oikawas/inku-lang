@@ -15,9 +15,12 @@ export const ja: LangPack = {
 	chatgptRetry: '利用枠を確認して再試行',
 	chatgptSignOut: '接続を解除',
 	chatgptRefreshModels: 'モデル一覧を更新',
+	chatgptModelsLoaded: (count) => `${count}件のモデルを取得しました。「モデル選択」で描画モデルを選んでください。`,
+	chatgptModelsEmpty: 'この登録で選択できるモデルはありません。接続とプラン利用の許可を確認してください。',
 	chatgptUsingPlan: 'ChatGPTプランを使用中',
 	chatgptModelUnavailable: '選択したChatGPTモデルは利用できません。接続状態を確認するか、モデルを明示的に選び直してください。',
 	chatgptStatus: (code) => ({
+		chatgpt_models_loading: 'モデル一覧を取得しています…',
 		chatgpt_connected: '接続済み', chatgpt_signed_out: '未接続', chatgpt_exported: 'この登録の更新は移送先が担当します。',
 		chatgpt_scope_required: '接続済みですが、プラン利用の許可が必要です。',
 		chatgpt_mode_not_allowed: 'デベロッパーモードまたはシングルユーザーモードが必要です。',

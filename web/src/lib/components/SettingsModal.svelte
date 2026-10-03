@@ -72,6 +72,7 @@
 		onUpdateExportTemplate: (id: string, patch: Partial<ExportTemplate>) => boolean | Promise<boolean>;
 		onRemoveExportTemplate: (id: string) => boolean | Promise<boolean>;
 		onConfirmModelSelection: () => void;
+		onOpenModelSelection: () => void;
 	};
 
 	let {
@@ -120,6 +121,7 @@
 		onUpdateExportTemplate,
 		onRemoveExportTemplate,
 		onConfirmModelSelection,
+		onOpenModelSelection,
 	}: Props = $props();
 
 	const settingsMode = $derived(settings.mode);
@@ -335,7 +337,7 @@
 				</header>
 			<div class:limits-body={settingsTab === 'limits'} class="settings-body">
 			{#if settingsTab === 'chatgpt'}
-				{#if reaches('chatgpt')}<ChatGPTSettings connection={settings.chatgpt} />{/if}
+				{#if reaches('chatgpt')}<ChatGPTSettings connection={settings.chatgpt} {onOpenModelSelection} />{/if}
 			{:else if settingsTab === 'models'}
 				<ModelAdministrationSettings administration={settings.modelAdministration} {providerGroups} />
 		{:else if settingsTab === 'db'}

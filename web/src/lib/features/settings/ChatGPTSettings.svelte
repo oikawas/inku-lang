@@ -2,12 +2,12 @@
 	import { onDestroy, onMount } from 'svelte';
 	import { t } from '$lib/i18n/index.svelte';
 	import type { ChatGPTSettingsController } from './chatgpt.svelte';
-	let { connection }: { connection: ChatGPTSettingsController } = $props();
+	let { connection, onOpenModelSelection }: { connection: ChatGPTSettingsController; onOpenModelSelection: () => void } = $props();
 	onMount(() => { void connection.load(); });
 	onDestroy(() => { void connection.cancel(); });
 </script>
 
-<section class="chatgpt-connection">
+<section class="chatgpt-connection" aria-busy={connection.busy}>
 	<p>{t().chatgptPlanNotice}</p>
 	{#if connection.state?.self_hosted}<p>{t().chatgptLocalHelperHint}</p>{/if}
 	{#if connection.code}<p role="status">{t().chatgptStatus(connection.code)}</p>{/if}
@@ -41,7 +41,16 @@
 			</div>
 		</section>
 	{/each}
-	<button class="ghost-btn" disabled={connection.busy || !connection.state?.active_profile_id} onclick={() => void connection.refreshModels()}>{t().chatgptRefreshModels}</button>
+	<button class="ghost-btn" disabled={connection.busy || !connection.state?.active_profile_id} onclick={() => void connection.refreshModels()}>{connection.code === 'chatgpt_models_loading' ? t().chatgptStatus('chatgpt_models_loading') : t().chatgptRefreshModels}</button>
+	{#if connection.models !== null}
+		{#if connection.models.length > 0}
+			<p role="status">{t().chatgptModelsLoaded(connection.models.length)}</p>
+			<ul>{#each connection.models as model (model.id)}<li>{model.label}</li>{/each}</ul>
+			<button class="ghost-btn" disabled={connection.busy} onclick={onOpenModelSelection}>{t().modelSelectButton}</button>
+		{:else}
+			<p role="status">{t().chatgptModelsEmpty}</p>
+		{/if}
+	{/if}
 </section>
 
 <style>

@@ -56,6 +56,8 @@ Export removes the Mac's tokens and relinquishes renewal ownership before comple
 
 ## Registrations, models and usage
 
+After connecting, press Refresh models. The settings tab shows progress followed by the count and model names. Select model opens the existing Stage 1/2 picker; choose a drawing model under ChatGPT plan. An empty catalog or error shows a reason. Refreshing alone does not change the drawing model.
+
 Settings show your registration label, state, scopes and active profile. Tokens, PKCE verifiers and ID tokens never enter screens, logs or browser storage. Limits are eight profiles, one pending authorization per owner and four overall. Storage defaults to `~/.config/ddl-server/chatgpt`, overridden by `INKU_CHATGPT_AUTH_DIR`, with a 0700 directory and 0600 files. A dedicated `credential.key` encrypts `enc:v1:` records. Plaintext compatibility and silently ignored decryption failures are unsupported. Existing API-key encryption is unchanged.
 
 Models with `models[].visibility=list` retain OpenAI's order and `display_name` and are saved as `chatgpt:<slug>`. They do not enter shared API-key providers or bare-name ownership. Catalogs last five minutes per owner/profile/generation. Disconnecting, switching profiles or changing modes discards candidates. Missing selections stay unavailable; another provider requires an explicit choice.

@@ -3223,6 +3223,7 @@ async function ensureVisibleLineageParentId(): Promise<string | null> {
 			onLogin={() => session.login()}
 			onLogout={() => session.logout()}
 			onConfirmModelSelection={confirmModelSelection}
+			onOpenModelSelection={() => openModelSelection()}
 			onAddExportTemplate={addExportTemplate}
 			onUpdateExportTemplate={updateExportTemplate}
 			onRemoveExportTemplate={removeExportTemplate}

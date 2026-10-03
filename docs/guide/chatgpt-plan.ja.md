@@ -56,6 +56,8 @@ exportはMacのtokenを消し、更新所有権を手放してから完了しま
 
 ## 登録・モデル・利用枠
 
+接続後に「モデル一覧を更新」を押すと、取得中の表示に続いて、件数とモデル名がこの設定タブへ表示されます。「モデル選択」で既存のStage 1/2の選択画面へ進み、ChatGPTプランから描画モデルを選びます。空の一覧やエラーは理由を表示します。更新だけでは描画モデルは変わりません。
+
 画面は本人の登録ラベル、状態、scope、選択中profileを表示します。token、PKCE verifier、ID tokenを画面・log・browser storageへ出しません。最大8 profile、認可はownerごとに1件・全体4件です。保存先は既定`~/.config/ddl-server/chatgpt`（`INKU_CHATGPT_AUTH_DIR`で変更）、0700 directoryと0600 fileです。専用`credential.key`による`enc:v1:`暗号化を使い、平文互換や復号失敗の黙認はありません。既存APIキーの鍵は変更しません。
 
 本人の`models[].visibility=list`をOpenAIの順序と`display_name`で表示し、`chatgpt:<slug>`として保存します。共有APIキーproviderやbare名の所有者へ混ぜません。cacheはowner/profile/generationごとに5分です。接続解除・profile切替・モード変更で候補を破棄し、消えた指定は利用不可として保持します。別providerへの変更は明示選択が必要です。

@@ -29,6 +29,19 @@ SCOPES = "openid profile email offline_access resource.invoke chatgpt.tokens.use
 USAGE_URL = "https://chatgpt.com/settings/usage"
 
 
+def callback_page(language: str, *, completed: bool) -> bytes:
+    if language == "ja":
+        title = "ChatGPTの認証が完了しました" if completed else "ChatGPTの認証は完了していません"
+        message = ("このタブを閉じ、inkuへ戻って「接続状態を確認」を押してください。別のホストへ接続する場合は、Macの登録移送完了を待ってから確認してください。"
+                   if completed else "inkuへ戻り、接続の案内を確認してください。この画面から認証を自動でやり直すことはありません。")
+    else:
+        title = "ChatGPT authorization completed" if completed else "ChatGPT authorization did not complete"
+        message = ("Close this tab, return to inku and press Check connection. For a remote host, wait until the Mac registration transfer finishes first."
+                   if completed else "Return to inku and check the connection message. This page does not retry authorization automatically.")
+    return (f'<!doctype html><html lang="{language}"><head><meta charset="utf-8"><title>{title}</title></head>'
+            f'<body><main><h1>{title}</h1><p>{message}</p></main></body></html>').encode("utf-8")
+
+
 def auth_endpoint(url: str) -> str:
     parsed = urlsplit(url)
     if parsed.scheme != "https" or parsed.netloc != "auth.openai.com" or parsed.fragment:
@@ -232,7 +245,9 @@ class AuthorizationAttempts:
                 attempt["cancel"].set()
         return self.public(owner, attempt_id)
 
-    def begin(self, owner: str, profile_id: str | None, consent: bool, guard, *, registration_host_id: str | None = None) -> dict:
+    def begin(self, owner: str, profile_id: str | None, consent: bool, guard, *, registration_host_id: str | None = None, language: str = "en") -> dict:
+        if language not in {"ja", "en"}:
+            raise ChatGPTError("chatgpt_language_invalid")
         guard()
         with self.lock:
             self.attempts = {key: value for key, value in self.attempts.items() if time.monotonic() < value["retain_until"]}
@@ -294,10 +309,11 @@ class AuthorizationAttempts:
                         if attempt["used"]:
                             attempt.update(status="failed", code=error.code if isinstance(error, ChatGPTError) else "chatgpt_auth_unavailable")
                     self.send_response(status)
-                    self.send_header("Content-Type", "text/plain; charset=utf-8")
+                    self.send_header("Content-Type", "text/html; charset=utf-8")
                     self.send_header("Cache-Control", "no-store")
+                    self.send_header("Referrer-Policy", "no-referrer")
                     self.end_headers()
-                    self.wfile.write(b"Return to inku. The connection status is shown there.")
+                    self.wfile.write(callback_page(language, completed=status == 200))
             server = Listener(("127.0.0.1", 0), Callback)
             server.timeout = 0.2
             attempt["redirect_uri"] = f"http://127.0.0.1:{server.server_port}/auth/callback"

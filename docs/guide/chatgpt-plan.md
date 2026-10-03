@@ -17,15 +17,15 @@ INKU_CHATGPT_PLAN_ENABLED=1 INKU_DEVELOPER_MODE=1 \
   uv run --frozen --no-sync inku-chatgpt serve --host 127.0.0.1 --port 8100
 ```
 
-Choose “Continue with ChatGPT” in ChatGPT plan settings, sign in and grant permission. The callback is `http://127.0.0.1:<port>/auth/callback` on that PC. Declining, cancelling or exceeding five minutes fails. If a popup is blocked, open the same authorization link on screen. Startup uses one worker without reload; direct uvicorn startup and local LAN binding do not enable it. After authorization, select your model under “Stage 1/2.” [Sign-in procedure](https://developers.openai.com/siwc/token-sharing-open-source/sign-in)
+Choose “Continue with ChatGPT” in ChatGPT plan settings, sign in and grant permission. The callback is `http://127.0.0.1:<port>/auth/callback` on that PC. The return page follows the settings language and distinguishes completed authorization from failure. Declining, cancelling or exceeding five minutes fails. If a popup is blocked, open the same authorization link on screen. Startup uses one worker without reload; direct uvicorn startup and local LAN binding do not enable it. After authorization, select your model under “Stage 1/2.” [Sign-in procedure](https://developers.openai.com/siwc/token-sharing-open-source/sign-in)
 
 ## Connect a self-hosted installation on another host
 
-Choose Continue with ChatGPT on the independent ChatGPT plan tab to open the inku ChatGPT helper installed on this Mac. Allow Chrome to open the application. If it does not open, use the same link shown on screen. The operator must set up the dedicated helper on this Mac first.
+Choose Continue with ChatGPT on the independent ChatGPT plan tab to open the inku ChatGPT helper installed on this Mac. Allow Chrome or Brave to open the application. If it does not open, use the same link shown on screen. The operator must set up the dedicated helper on this Mac first.
 
-The Mac confirmation shows the inku account name and ID and the destination host ID, obtained through the protected connection. Confirm the destination to open OpenAI sign-in and consent in Chrome. The helper seals and transfers the registration once after authorization. Then press Check connection in the Web settings. A failure shows a fixed reason and stops without an automatic retry. A Mac already bound to another inku account rejects the connection.
+The Mac confirmation shows the inku account name and ID and the destination host ID, obtained through the protected connection. Confirm the destination to open OpenAI sign-in and consent in the Chrome or Brave browser where setup began, then return to the callback in that browser. Failure to open the browser does not switch to another one. The helper seals and transfers the registration once after authorization. Then press Check connection in the Web settings. Mac confirmation, completion and failure messages follow the settings language; OpenAI supplies its own sign-in page text. A failure shows a reason and stops without an automatic retry. A Mac already bound to another inku account rejects the connection.
 
-The `inku-chatgpt://connect` launch link carries only the account ID, selected registration ID and consent action. It contains no OAuth URL, code, token or registration payload. Existing display, drawing and server settings stay on their original pages. The following describes the same connection for operators.
+The `inku-chatgpt://connect` launch link carries the account ID, selected registration ID, consent action, a fixed browser choice (`chrome` or `brave`) and display language (`ja` or `en`). It accepts no arbitrary application or command. Brave is identified through its public `navigator.brave.isBrave()` API. [Official Brave guidance](https://github.com/brave/brave-browser/wiki/Detecting-Brave-(for-Websites)). The link contains no OAuth URL, code, token or registration payload. Existing display, drawing and server settings stay on their original pages. The following describes the same connection for operators.
 
 Authorize on the Mac, then let the self-hosted installation own renewal exclusively. Migrating the entire Web to HTTPS is not required. Codes and tokens do not pass through LAN HTTP. OpenAI uses fixed HTTPS endpoints, the Mac callback uses HTTP loopback, and the selected registration moves through the operator's protected, dedicated SSH transport. [Official procedure](https://developers.openai.com/siwc/token-sharing-open-source/self-hosted-vms)
 
@@ -39,10 +39,11 @@ The operator fixes `inku-chatgpt recipient --owner-id <verified-owner-id>` to th
 
 ```sh
 INKU_CHATGPT_PLAN_ENABLED=1 INKU_DEVELOPER_MODE=1 \
-  uv run --frozen --no-sync inku-chatgpt authorize --recipient recipient.json
+  uv run --frozen --no-sync inku-chatgpt authorize --recipient recipient.json \
+  --browser brave --language ja
 ```
 
-Confirm the account and consent in Chrome. Seal one registration with the successful result's nonsecret `profile_id`:
+The CLI accepts only `chrome` or `brave` for `--browser` and `ja` or `en` for `--language`. Legacy CLI calls that omit these retain Chrome and English. Confirm the ChatGPT account and consent in the selected browser. Seal one registration with the successful result's nonsecret `profile_id`:
 
 ```sh
 INKU_CHATGPT_PLAN_ENABLED=1 INKU_DEVELOPER_MODE=1 \

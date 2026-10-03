@@ -4,12 +4,22 @@ export type ChatGPTProfile = { id: string; label: string; email: string; state: 
 export type ChatGPTState = { available: boolean; reason: string | null; self_hosted: boolean; active_profile_id: string | null; profiles: ChatGPTProfile[]; pending_registrations?: { id: string; client_id: string }[] };
 export type ChatGPTModel = { id: string; label: string };
 
+async function helperBrowser(): Promise<'brave' | 'chrome'> {
+	const brave = typeof navigator === 'undefined' ? undefined : (navigator as Navigator & { brave?: { isBrave: () => Promise<boolean> } }).brave;
+	if (brave && typeof brave.isBrave === 'function') {
+		try { return await brave.isBrave() ? 'brave' : 'chrome'; }
+		catch { throw new Error('chatgpt_browser_unavailable'); }
+	}
+	return 'chrome';
+}
+
 export function createChatGPTSettings(deps: {
 	apiFetch: ApiFetch;
 	owner: () => string | undefined;
 	available: () => boolean;
 	invalidate: () => void;
 	changed: () => void | Promise<void>;
+	language?: () => string;
 }) {
 	let state = $state<ChatGPTState | null>(null);
 	let code = $state<string | null>(null);
@@ -114,7 +124,8 @@ export function createChatGPTSettings(deps: {
 		boundOwner = owner;
 		abort = new AbortController(); busy = true; code = null;
 		try {
-			const result = await call('/authorize', { profile_id: profileId ?? null, consent });
+			const language = deps.language?.() === 'en' ? 'en' : 'ja';
+			const result = await call('/authorize', { profile_id: profileId ?? null, consent, language });
 			if (!current(owner, stamp)) return;
 			if (result.action === 'local_helper') {
 				const identifier = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
@@ -123,6 +134,9 @@ export function createChatGPTSettings(deps: {
 				url.searchParams.set('owner_id', owner);
 				url.searchParams.set('consent', consent ? '1' : '0');
 				if (profileId) url.searchParams.set('profile_id', profileId);
+				url.searchParams.set('browser', await helperBrowser());
+				url.searchParams.set('language', language);
+				if (!current(owner, stamp)) return;
 				helperUrl = url.href;
 				code = 'chatgpt_helper_requested'; busy = false;
 				window.location.assign(url.href);

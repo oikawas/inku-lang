@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import time
+from typing import Literal
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException
@@ -48,6 +49,7 @@ class AuthorizeBody(BaseModel):
     model_config = ConfigDict(extra="forbid")
     profile_id: str | None = Field(default=None, max_length=128)
     consent: bool = False
+    language: Literal["ja", "en"] = "en"
 
 
 @router.post("/authorize")
@@ -55,7 +57,7 @@ def authorize(body: AuthorizeBody, actor: str = Depends(owner)) -> dict:
     if runtime._startup and runtime._startup.self_hosted:
         return {"status": "local_authorization_required", "action": "local_helper"}
     try:
-        return attempts.begin(actor, body.profile_id, body.consent, lambda: runtime.check_owner(actor))
+        return attempts.begin(actor, body.profile_id, body.consent, lambda: runtime.check_owner(actor), language=body.language)
     except ChatGPTError as error:
         raise _error(error) from None
 

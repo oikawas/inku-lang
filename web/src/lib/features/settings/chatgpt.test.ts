@@ -17,11 +17,13 @@ const { createChatGPTSettings } = await import('data:text/javascript;base64,' + 
 const response = (value: unknown) => new Response(JSON.stringify(value), { headers: { 'Content-Type': 'application/json' } });
 const state = (label: string) => ({ available: true, reason: null, self_hosted: true, active_profile_id: 'profile', profiles: [{ id: 'profile', label, state: 'connected' }] });
 
-test('self-hosted authorization opens the Mac helper with only the current owner and requested action', async () => {
+test('self-hosted authorization keeps Brave and Japanese in the public Mac helper action', async () => {
 	const owner = '00000000-0000-4000-8000-000000000001';
 	const profile = '00000000-0000-4000-8000-000000000002';
 	const launched: string[] = [];
 	const previous = globalThis.window;
+	const previousNavigator = Object.getOwnPropertyDescriptor(globalThis, 'navigator');
+	Object.defineProperty(globalThis, 'navigator', { configurable: true, value: { brave: { isBrave: async () => true } } });
 	(globalThis as any).window = { location: { assign: (url: string) => launched.push(url) } };
 	try {
 		const connection = createChatGPTSettings({
@@ -33,12 +35,18 @@ test('self-hosted authorization opens the Mac helper with only the current owner
 		const url = new URL(launched[0]);
 		assert.equal(url.protocol, 'inku-chatgpt:');
 		assert.equal(url.hostname, 'connect');
-		assert.deepEqual([...url.searchParams], [['owner_id', owner], ['consent', '1'], ['profile_id', profile]]);
+		assert.deepEqual([...url.searchParams], [['owner_id', owner], ['consent', '1'], ['profile_id', profile], ['browser', 'brave'], ['language', 'ja']]);
+		assert.equal(ja.chatgptContinue, 'ChatGPTで続ける');
+		assert.doesNotMatch(ja.chatgptLocalHelperHint, /Chrome|helper|Continue with/);
 		assert.equal(connection.helperUrl, url.href);
 		assert.equal(connection.busy, false);
 		connection.reset();
 		assert.equal(connection.helperUrl, null);
-	} finally { (globalThis as any).window = previous; }
+	} finally {
+		(globalThis as any).window = previous;
+		if (previousNavigator) Object.defineProperty(globalThis, 'navigator', previousNavigator);
+		else Reflect.deleteProperty(globalThis, 'navigator');
+	}
 });
 
 test('owner changes hide saved profiles and discard a late response; unconfirmed revocation stays visible', async () => {

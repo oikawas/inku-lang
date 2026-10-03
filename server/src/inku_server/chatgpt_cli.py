@@ -16,6 +16,8 @@ from .chatgpt_runtime import configure_startup, enabled, mode_allowed
 from .chatgpt_store import ChatGPTError, canonical, protected_read
 from .chatgpt_transfer import export_profile, import_profile, recipient, validate_request
 
+BROWSER_IDS = {"chrome": "com.google.Chrome", "brave": "com.brave.Browser"}
+
 
 def _local_gate(request: dict) -> None:
     if not enabled() or not mode_allowed():
@@ -35,6 +37,8 @@ def main() -> None:
     authorize.add_argument("--profile-id")
     authorize.add_argument("--consent", action="store_true")
     authorize.add_argument("--no-browser", action="store_true")
+    authorize.add_argument("--browser", choices=BROWSER_IDS, default="chrome")
+    authorize.add_argument("--language", choices=("ja", "en"), default="en")
     export = commands.add_parser("export")
     export.add_argument("--recipient", type=Path, required=True)
     export.add_argument("--profile-id", required=True)
@@ -76,15 +80,19 @@ def main() -> None:
                     os.fsync(handle.fileno())
                 result = {"status": "exported", "profile_id": args.profile_id, "request_id": request["request_id"]}
             else:
-                print("Continue with ChatGPT: " + request["owner_label"] + " / " + request["host_id"], file=sys.stderr)
+                print(("ChatGPTで続ける: " if args.language == "ja" else "Continue with ChatGPT: ") + request["owner_label"] + " / " + request["host_id"], file=sys.stderr)
                 start = attempts.begin(request["owner_id"], args.profile_id, args.consent, lambda: _local_gate(request),
-                                       registration_host_id=request["host_id"])
+                                       registration_host_id=request["host_id"], language=args.language)
                 failed_profile_id = start["profile_id"]
                 try:
                     if args.no_browser:
                         print(start["authorization_url"], file=sys.stderr)
                     elif sys.platform == "darwin":
-                        subprocess.run(["open", "-a", "Google Chrome", start["authorization_url"]], check=True, capture_output=True)
+                        try:
+                            subprocess.run(["/usr/bin/open", "-b", BROWSER_IDS[args.browser], start["authorization_url"]],
+                                           check=True, capture_output=True, timeout=30)
+                        except (OSError, subprocess.SubprocessError) as error:
+                            raise ChatGPTError("chatgpt_browser_unavailable") from error
                     else:
                         raise ChatGPTError("chatgpt_browser_required")
                     while True:

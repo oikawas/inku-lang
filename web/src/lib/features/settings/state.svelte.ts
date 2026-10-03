@@ -1,6 +1,7 @@
 import type { ApiFetch } from '$lib/transport/api-fetch';
 import type { SettingsDetailLevel } from '$lib/settingsDetail';
 import type { Provider, ProviderGroup } from '$lib/models';
+import { getLang } from '$lib/i18n/index.svelte';
 import { createChatGPTSettings, type ChatGPTSettingsController } from './chatgpt.svelte';
 import {
 	createSettingsNavigation,
@@ -69,7 +70,7 @@ export function createSettingsController<TActor extends SettingsActor>(
 	deps: SettingsControllerDeps<TActor>
 ): SettingsController {
 	const chatgpt = createChatGPTSettings({ apiFetch: deps.apiFetch, owner: () => deps.currentUser()?.id,
-		available: () => deps.chatgptAvailable?.() === true, invalidate: () => deps.invalidateChatGPTModels?.(), changed: deps.loadAvailableModels });
+		available: () => deps.chatgptAvailable?.() === true, invalidate: () => deps.invalidateChatGPTModels?.(), changed: deps.loadAvailableModels, language: getLang });
 	const serverAdministration = createServerAdministration({
 		apiFetch: deps.apiFetch,
 		currentUser: deps.currentUser,

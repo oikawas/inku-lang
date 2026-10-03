@@ -44,6 +44,52 @@ def seed(store, value):
         store.save_profile("owner", value)
 
 
+def test_cli_opens_only_the_selected_brave_and_passes_japanese_to_callback(monkeypatch, capsys):
+    from inku_server import chatgpt_cli as cli
+    from unittest.mock import Mock
+    request = {"owner_id": "owner", "owner_label": "Fixture", "host_id": "fixture-host"}
+    start = {"profile_id": "profile", "attempt_id": "attempt", "authorization_url": auth.AUTHORIZE + "?state=fixture"}
+    monkeypatch.setattr(cli, "protected_read", lambda _: json.dumps(request))
+    monkeypatch.setattr(cli, "_local_gate", lambda _: None)
+    monkeypatch.setattr(cli.sys, "platform", "darwin")
+    begin = Mock(return_value=start)
+    monkeypatch.setattr(cli.attempts, "begin", begin)
+    monkeypatch.setattr(cli.attempts, "public", lambda *_: {"status": "completed"})
+    monkeypatch.setattr(cli.attempts, "cancel", lambda *_: None)
+    opened = Mock()
+    monkeypatch.setattr(cli.subprocess, "run", opened)
+    monkeypatch.setattr(cli.sys, "argv", ["inku-chatgpt", "authorize", "--recipient", "fixture.json", "--browser", "brave", "--language", "ja"])
+    cli.main()
+    assert begin.call_args.kwargs["language"] == "ja"
+    opened.assert_called_once_with(["/usr/bin/open", "-b", "com.brave.Browser", start["authorization_url"]], check=True, capture_output=True, timeout=30)
+    assert "ChatGPTで続ける" in capsys.readouterr().err
+    monkeypatch.setattr(cli.sys, "argv", ["inku-chatgpt", "authorize", "--recipient", "fixture.json", "--browser", "/fixture/app"])
+    with pytest.raises(SystemExit):
+        cli.main()
+    assert opened.call_count == 1
+
+
+def test_japanese_callback_explains_success_and_failure_without_echoing_code(isolated, monkeypatch):
+    coordinator = auth.AuthorizationAttempts()
+    async def exchange(attempt, *_args):
+        attempt.update(status="completed", code=None)
+    monkeypatch.setattr(coordinator, "_exchange", exchange)
+    started = coordinator.begin("owner", None, False, lambda: runtime.check_owner("owner"), language="ja")
+    params = parse_qs(urlsplit(started["authorization_url"]).query)
+    with httpx.Client() as client:
+        rejected = client.get(params["redirect_uri"][0], params={"state": "wrong", "code": "private-code"})
+        assert rejected.status_code == 400
+        assert "認証は完了していません" in rejected.text
+        assert "private-code" not in rejected.text
+        completed = client.get(params["redirect_uri"][0], params={"state": params["state"][0], "code": "private-code", "client_id": "oaiapp_fixture"})
+        assert completed.status_code == 200
+        assert 'lang="ja"' in completed.text
+        assert "認証が完了しました" in completed.text
+        assert "接続状態を確認" in completed.text
+        assert "private-code" not in completed.text
+        assert completed.headers["cache-control"] == "no-store"
+
+
 def test_sealed_handoff_rejects_changed_owner_and_is_one_time(isolated, tmp_path, monkeypatch):
     remote_host = isolated.host_id()
     request = transfer.recipient("owner")

@@ -1,6 +1,8 @@
 //! A composed placement prints as the prototype printed it, and the printed DDL
 //! compiles with no diagnostic: a range replaces a guessed place, a stated place
 //! keeps its word, and every composition range and corner reads in both languages.
+//! The expected lines write the size 特大の with one の (I-709); the prototype's
+//! output, printed before that fix, had 特大のの.
 
 use inku_ddl::ResolvedInstructionLanguage;
 use inku_ddl::work_plan::{

@@ -4,7 +4,8 @@
 //!
 //! The fixture holds the normalized plans of the run and the prototype's message for
 //! each, with a placeholder for the description (the message holds the description
-//! verbatim at its head). It holds no description text.
+//! verbatim at its head). It holds no description text. The expected messages
+//! write the size 特大の with one の (I-709); the measured requests had 特大のの.
 
 use std::collections::BTreeMap;
 

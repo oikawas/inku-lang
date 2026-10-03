@@ -280,3 +280,58 @@ fn plan_values_are_the_words_english_with_one_meaning_each() {
         assert!(!values(field).contains(value), "{field} {value}");
     }
 }
+
+/// Every value of every layer field prints in Japanese with a single の after it
+/// (I-709: the size 特大の, whose word already carries の, printed as 特大のの).
+#[test]
+fn japanese_layers_never_double_the_particle_no() {
+    let vocabulary = work_plan_vocabulary();
+    let quality = vocabulary.terms(WorkPlanSlot::MotionQuality)[0].id.clone();
+    let (mut printed, mut doubled) = (0, Vec::new());
+    for slot in WorkPlanSlot::LAYER_ATTRIBUTES
+        .into_iter()
+        .chain([WorkPlanSlot::Proportion])
+    {
+        let terms = vocabulary.terms(slot);
+        assert!(!terms.is_empty(), "{slot:?} has no values to print");
+        for term in terms {
+            let mut layer = WorkPlanLayer {
+                shape: "square".into(),
+                action: "place".into(),
+                count: 1,
+                ..WorkPlanLayer::default()
+            };
+            match slot {
+                WorkPlanSlot::Action => layer.action = term.id.clone(),
+                WorkPlanSlot::Proportion => layer.proportion = Some(term.id.clone()),
+                _ => {
+                    layer.attributes.insert(slot, term.id.clone());
+                }
+            }
+            // Amplitude and spacing are printed only beside a motion quality.
+            if matches!(
+                slot,
+                WorkPlanSlot::MotionAmplitude | WorkPlanSlot::MotionSpacing
+            ) {
+                layer
+                    .attributes
+                    .insert(WorkPlanSlot::MotionQuality, quality.clone());
+            }
+            let plan = WorkPlan {
+                layers: vec![layer],
+                ..WorkPlan::default()
+            };
+            let source = print_work_plan(&plan, ResolvedInstructionLanguage::Ja);
+            if source.contains("のの") {
+                doubled.push(format!("{slot:?} {}: {source}", term.id));
+            }
+            printed += 1;
+        }
+    }
+    assert!(
+        doubled.is_empty(),
+        "{} of {printed} layers double の:\n{}",
+        doubled.len(),
+        doubled.join("\n")
+    );
+}

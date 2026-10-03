@@ -4,7 +4,7 @@ import { groupDigits } from '../formatNumber';
 export const ja: LangPack = {
 	chatgptPlanLabel: 'ChatGPTプラン',
 	chatgptPlanNotice: '本人のChatGPTプランを使用します。ChatGPTで許可したcreditsが使われる場合があります。APIキーの接続へ自動では切り替えません。',
-	chatgptLocalHelperHint: '認証と利用同意は、ブラウザの動くMacの専用helperで行います。接続後にこの画面で状態を確認してください。',
+	chatgptLocalHelperHint: '「Continue with ChatGPT」で、このMacの「inku ChatGPT」を開きます。接続先を確認して続けると、Chromeに認証と利用同意の画面が開きます。完了後、「接続状態を確認」を押してください。',
 	chatgptContinue: 'Continue with ChatGPT',
 	chatgptCheckConnection: '接続状態を確認',
 	chatgptManageUsage: '利用枠を管理',
@@ -24,6 +24,7 @@ export const ja: LangPack = {
 		chatgpt_disabled: 'ChatGPT接続は無効です。', chatgpt_owner_not_allowed: 'このアカウントは接続の所有者ではありません。',
 		chatgpt_startup_unverified: 'ChatGPT対応の起動入口を使用してください。',
 		chatgpt_local_authorization_required: 'Macの専用helperで認証し、保護された経路で登録を移送してください。',
+		chatgpt_helper_requested: 'Chromeの確認画面で「inku ChatGPT」を開いてください。開かない場合は下のリンクで再度開くか、このMacに専用helperをセットアップしてください。',
 		chatgpt_reauthentication_required: '保存した登録で再認証してください。', chatgpt_session_changed: '登録が変更されました。状態を確認してください。',
 		chatgpt_not_connected: 'ChatGPTへ接続してください。', chatgpt_quota: 'プラン利用の上限に達しました。利用枠を確認してください。',
 		subscription_sharing_usage_limit_exceeded: 'プラン利用の上限に達しました。利用枠を確認してください。',

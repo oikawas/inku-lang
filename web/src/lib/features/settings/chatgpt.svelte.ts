@@ -14,6 +14,7 @@ export function createChatGPTSettings(deps: {
 	let code = $state<string | null>(null);
 	let busy = $state(false);
 	let authorizationUrl = $state<string | null>(null);
+	let helperUrl = $state<string | null>(null);
 	let boundOwner = $state<string | undefined>();
 	let attemptId: string | null = null;
 	let timer: ReturnType<typeof setTimeout> | null = null;
@@ -27,6 +28,7 @@ export function createChatGPTSettings(deps: {
 		timer = null;
 		attemptId = null;
 		authorizationUrl = null;
+		helperUrl = null;
 		busy = false;
 	}
 
@@ -103,7 +105,18 @@ export function createChatGPTSettings(deps: {
 		try {
 			const result = await call('/authorize', { profile_id: profileId ?? null, consent });
 			if (!current(owner, stamp)) return;
-			if (result.action === 'local_helper') { code = 'chatgpt_local_authorization_required'; busy = false; return; }
+			if (result.action === 'local_helper') {
+				const identifier = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+				if (!identifier.test(owner) || (profileId && !identifier.test(profileId))) throw new Error('chatgpt_owner_not_allowed');
+				const url = new URL('inku-chatgpt://connect');
+				url.searchParams.set('owner_id', owner);
+				url.searchParams.set('consent', consent ? '1' : '0');
+				if (profileId) url.searchParams.set('profile_id', profileId);
+				helperUrl = url.href;
+				code = 'chatgpt_helper_requested'; busy = false;
+				window.location.assign(url.href);
+				return;
+			}
 			const url = new URL(result.authorization_url);
 			if (url.origin !== 'https://auth.openai.com' || url.pathname !== '/api/accounts/authorize' || url.searchParams.has('id_token_hint')) throw new Error('chatgpt_operation_failed');
 			authorizationUrl = url.href; attemptId = result.attempt_id;
@@ -124,6 +137,7 @@ export function createChatGPTSettings(deps: {
 	return {
 		get state() { return visible() ? state : null; }, get code() { return visible() ? code : null; }, get busy() { return visible() && busy; },
 		get authorizationUrl() { return visible() ? authorizationUrl : null; },
+		get helperUrl() { return visible() ? helperUrl : null; },
 		load, reset, stop, cancel, authorize,
 		select: (id: string) => mutate('/profiles/' + encodeURIComponent(id) + '/select'),
 		signOut: (id: string) => mutate('/profiles/' + encodeURIComponent(id) + '/sign-out'),

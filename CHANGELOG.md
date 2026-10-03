@@ -6,6 +6,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file retains the history from v2.5.0 (2026-07-25, render engine 12) onward.** Past records follow the recent ones in a collapsible section of this same document; expand it when needed. Viewers without collapse support show the full text. Earlier history is in the [v1.72–v2.4 archive](docs/history/changelog-v1.72-v2.4.md) and the [v0.1–v1.71 archive](docs/history/changelog-v0.1-v1.71.md).
 
+### v2.15.80 — Connect ChatGPT composition reading to the shared pipeline (Build 1156, 2026-10-03)
+
+The ChatGPT transport accepts `read_composition` and records its time and usage separately from Stage 1. The shared source also includes Android composition adoption. Saved works and the DDL, Score and render engine versions remain unchanged. Account authorization and live model acceptance are separate checks after setup.
+
 ### 2026-10-03 — Android adopts the composition reading
 
 New configurations enable shared-core composition. Cloud models read with Stage 1's model, token limit and temperature; on-device LiteRT Gemma 4 E2B sends no reading and composes with the default reading. The Android host dispatches the new effect and result, leaving continuation after a reading failure to the core. Gemini writes schema properties in propertyOrdering order. Composed numeric ranges and their mark remain in visible DDL; replay preserves existing works' DDL, Scores and settings. No progress or prompt-tab display is added.

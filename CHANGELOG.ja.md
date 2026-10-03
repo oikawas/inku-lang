@@ -6,6 +6,10 @@
 
 **本書は v2.5.0（2026-07-25、render engine 12）以降の履歴を保持する。** 最近の記録に続く過去の履歴は、同じ文書内で折りたたんである。必要なときに展開して読める。折りたたみに対応しないビューアでは全文を表示する。それより前の履歴は [v1.72〜v2.4の書庫](docs/history/changelog-v1.72-v2.4.ja.md) と [v0.1〜v1.71の書庫](docs/history/changelog-v0.1-v1.71.ja.md) にある。
 
+### v2.15.80 — ChatGPTの構図読みを共有pipelineへ接続（Build 1156、2026-10-03）
+
+ChatGPTの専用経路が`read_composition`を受け取り、読みの時間とusageをStage 1とは別に記録する。共有ソースにはAndroidの構図取り込みも含む。保存済み作品とDDL・Score・render engineの版は変わらない。本人認可と実モデルの受入は、導入後の確認として別に行う。
+
 ### 2026-10-03 — Androidへ構図の読みを取り込む
 
 新規設定で共有coreの構図を有効にした。雲のモデルはStage 1と同じモデル・最大token・温度で構図を読み、端末のLiteRT Gemma 4 E2Bは読みを送らず既定の読みで構図を入れる。Android hostは新しいeffectと結果を配送し、読み失敗時の継続はcoreの判断を使う。Geminiの応答の型はpropertyOrderingの順に書く。構図の数値範囲と印を可視DDLへ保存し、既存作品のDDL・Score・設定は再演時に保つ。進み具合とプロンプトのタブの表示は追加しない。

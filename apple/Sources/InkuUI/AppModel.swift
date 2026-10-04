@@ -153,8 +153,8 @@ public final class AppModel {
             let url = try databaseURL ?? InkuDatabase.applicationSupportURL(hostIdentifier: "app.inku.macos")
             let database = try InkuDatabase(url: url)
             let store = ProviderSettingsStore(url: url.deletingLastPathComponent().appendingPathComponent("providers.json"))
-            let settings = try await store.load()
             let bootstrap = try Bootstrap()
+            let settings = try await store.load(installingDefaults: BundledProviderDefaults.loadBundled())
             self.database = database
             let personalRuntime = ChatGPTPlanRuntime(directory: url.deletingLastPathComponent().appendingPathComponent("personal-chatgpt", isDirectory: true))
             let ordinary: any ProviderTransport
@@ -409,6 +409,7 @@ public final class AppModel {
     public func updateHostSettings(_ settings: HostSettings) async throws {
         guard !isBusy, let settingsStore else { throw HostError("settings_busy_or_unavailable") }
         var settings = settings
+        if self.settings.providerDefaultsInstalled == true { settings.providerDefaultsInstalled = true }
         if let limits = settings.drawingLimits {
             guard let drawingLimitDefinition else { throw HostError("installation_unavailable") }
             settings.drawingLimits = drawingLimitDefinition.normalized(limits)

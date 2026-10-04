@@ -39,21 +39,27 @@ public struct ProviderRateLimits: Codable, Sendable, Equatable {
 /// Secrets are separate Keychain items; this value is safe to persist in app settings.
 public struct ProviderSettings: Codable, Sendable, Equatable, Identifiable {
     public var id: String
+    public var label: String?
     public var kind: ProviderKind
     public var baseURL: URL
     public var apiProfile: String?
     public var requiresAPIKey: Bool
     public var credentialID: String
     public var rateLimits: ProviderRateLimits?
+    public var displayName: String {
+        if let label, !label.isEmpty { return label }
+        return id
+    }
     public var effectiveRateLimits: EffectiveProviderRateLimits {
         (rateLimits ?? ProviderRateLimits.defaults(providerID: id)).effective(providerID: id)
     }
     public init(id: String, kind: ProviderKind = .openAICompatible, baseURL: URL,
                 apiProfile: String? = nil, requiresAPIKey: Bool = true,
-                credentialID: String? = nil, rateLimits: ProviderRateLimits? = nil) {
+                credentialID: String? = nil, rateLimits: ProviderRateLimits? = nil, label: String? = nil) {
         self.id = id; self.kind = kind; self.baseURL = baseURL; self.apiProfile = apiProfile
         self.requiresAPIKey = requiresAPIKey; self.credentialID = credentialID ?? id
         self.rateLimits = rateLimits
+        self.label = label
     }
 
     public func validate() throws {
@@ -125,12 +131,15 @@ public struct HostSettings: Codable, Sendable, Equatable {
     public var operationalLimits: [String: UInt32]?
     public var plugins: PluginPreferences?
     public var drawingLimits: [String: UInt32]?
+    public var providerDefaultsInstalled: Bool?
     public init(providers: [ProviderSettings] = [], models: ModelSelection = .init(), operationalLimits: [String: UInt32]? = nil,
-                plugins: PluginPreferences? = nil, drawingLimits: [String: UInt32]? = nil) {
+                plugins: PluginPreferences? = nil, drawingLimits: [String: UInt32]? = nil,
+                providerDefaultsInstalled: Bool? = nil) {
         self.providers = providers; self.models = models
         self.operationalLimits = operationalLimits
         self.plugins = plugins
         self.drawingLimits = drawingLimits
+        self.providerDefaultsInstalled = providerDefaultsInstalled
     }
 }
 
@@ -141,6 +150,17 @@ public actor ProviderSettingsStore {
         guard FileManager.default.fileExists(atPath: url.path) else { return .init() }
         let settings = try JSONDecoder().decode(HostSettings.self, from: Data(contentsOf: url))
         try settings.providers.forEach { try $0.validate() }
+        return settings
+    }
+    public func load(installingDefaults defaults: [ProviderSettings]) throws -> HostSettings {
+        var settings = try load()
+        guard settings.providerDefaultsInstalled != true else { return settings }
+        try defaults.forEach { try $0.validate() }
+        guard Set(defaults.map(\.id)).count == defaults.count else { throw HostError("duplicate_provider") }
+        let existingIDs = Set(settings.providers.map(\.id))
+        settings.providers.append(contentsOf: defaults.filter { !existingIDs.contains($0.id) })
+        settings.providerDefaultsInstalled = true
+        try save(settings)
         return settings
     }
     public func save(_ settings: HostSettings) throws {

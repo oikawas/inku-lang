@@ -7,25 +7,85 @@ public struct ProviderModelInfo: Identifiable, Sendable {
     public let name: String
     public let contextLimit: Int?
     public let capabilities: [String]
+    public init(id: String, name: String, contextLimit: Int?, capabilities: [String]) {
+        self.id = id; self.name = name; self.contextLimit = contextLimit; self.capabilities = capabilities
+    }
 }
 
 /// Editable service settings contain no readable credential value.
 @MainActor @Observable
 public final class SettingsModel {
     public var host = HostSettings()
-    public var selectedProviderID: String?
+    public var selectedProviderID: String? {
+        didSet {
+            guard oldValue != selectedProviderID else { return }
+            cancelDiscovery()
+            discoveredModelCatalog = []
+            modelCatalogProvider = nil
+            credentialDraft = ""
+            credentialConfigured = false
+            status = ""
+        }
+    }
     public var credentialDraft = ""
-    public private(set) var modelCatalog: [ProviderModelInfo] = []
+    public var modelCatalog: [ProviderModelInfo] {
+        modelCatalogProvider == selectedProvider ? discoveredModelCatalog : []
+    }
     public private(set) var isLoadingModels = false
     public private(set) var status = ""
     public private(set) var credentialConfigured = false
     public var error: String?
+    private var discoveredModelCatalog: [ProviderModelInfo] = []
+    private var modelCatalogProvider: ProviderSettings?
     @ObservationIgnored private let credentials = KeychainCredentialStore()
     @ObservationIgnored private var discovery: Task<Void, Never>?
     public init() {}
 
     public var providerIndex: Int? { host.providers.firstIndex { $0.id == selectedProviderID && $0.kind != .chatGPTPlan } }
     public var selectedProvider: ProviderSettings? { providerIndex.map { host.providers[$0] } }
+
+    public func availableModels(for provider: ProviderSettings, configuredReferences: [String] = [],
+                                discoveredModels: [ProviderModelInfo]? = nil) -> [ProviderModelInfo] {
+        let catalog = ModelGuidanceCatalog.bundled
+        let prefix = provider.id + ":"
+        let configured = ([host.models.stage1Model, host.models.stage2Model] + configuredReferences)
+            .filter { $0.hasPrefix(prefix) && $0.count > prefix.count }
+        let configuredIDs = Set(configured)
+        let discovered = discoveredModels ?? (modelCatalogProvider == provider ? discoveredModelCatalog : [])
+        let offered = discovered.filter {
+            $0.id.hasPrefix(prefix) && $0.id.count > prefix.count
+                && (configuredIDs.contains($0.id) || catalog?.guidance(for: $0.id, providers: [provider])?.endOfLife != true)
+        }
+        let retained = configured.map {
+            ProviderModelInfo(id: $0, name: catalog?.guidance(for: $0, providers: [provider])?.label ?? String($0.dropFirst(prefix.count)),
+                              contextLimit: nil, capabilities: [])
+        }
+        var seen: Set<String> = []
+        // Advertised metadata takes precedence; saved references remain selectable.
+        return (offered + (catalog?.registeredModels(for: provider) ?? []) + retained)
+            .filter { seen.insert($0.id).inserted }
+    }
+
+    public nonisolated static func modelCatalogURL(for provider: ProviderSettings) throws -> URL {
+        try provider.validate()
+        let version: String?
+        switch provider.kind {
+        case .openAICompatible: version = nil
+        case .anthropic: version = "v1"
+        case .gemini: version = "v1beta"
+        case .chatGPTPlan: throw HostError("personal_plan_model_catalog_requires_runtime")
+        }
+        var base = provider.baseURL
+        if let version, base.lastPathComponent != version { base.appendPathComponent(version) }
+        let endpoint = base.appendingPathComponent("models")
+        guard provider.kind == .gemini else { return endpoint }
+        guard var parts = URLComponents(url: endpoint, resolvingAgainstBaseURL: false) else {
+            throw HostError("provider_base_url_invalid")
+        }
+        parts.queryItems = [URLQueryItem(name: "pageSize", value: "1000")]
+        guard let url = parts.url else { throw HostError("provider_base_url_invalid") }
+        return url
+    }
 
     public func load(model: AppModel) async {
         host = await model.hostSettings()
@@ -44,7 +104,8 @@ public final class SettingsModel {
         selectedProviderID = id
         credentialDraft = ""
         credentialConfigured = false
-        modelCatalog = []
+        discoveredModelCatalog = []
+        modelCatalogProvider = nil
     }
     public func removeProvider() {
         guard let id = selectedProvider?.id else { return }
@@ -53,7 +114,8 @@ public final class SettingsModel {
         if host.models.stage1Model.hasPrefix(id + ":") { host.models.stage1Model = "" }
         if host.models.stage2Model.hasPrefix(id + ":") { host.models.stage2Model = "" }
         selectedProviderID = host.providers.first?.id
-        modelCatalog = []
+        discoveredModelCatalog = []
+        modelCatalogProvider = nil
         credentialDraft = ""
     }
     public func save(model: AppModel) async {
@@ -92,20 +154,14 @@ public final class SettingsModel {
             error = "Personal ChatGPTのモデルは専用の設定画面で取得してください。"
             return
         }
-        let id = provider.id
-        modelCatalog = []
+        discoveredModelCatalog = []
+        modelCatalogProvider = nil
         isLoadingModels = true
         error = nil
         let operation = Task { @MainActor [weak self] in
             guard let self else { return }
             do {
-                try provider.validate()
-                var url = provider.baseURL.appendingPathComponent("models")
-                if provider.kind == .gemini {
-                    var parts = URLComponents(url: url, resolvingAgainstBaseURL: false)!
-                    parts.queryItems = [URLQueryItem(name: "pageSize", value: "1000")]
-                    url = parts.url!
-                }
+                let url = try Self.modelCatalogURL(for: provider)
                 var request = URLRequest(url: url)
                 request.timeoutInterval = 30
                 let key = provider.requiresAPIKey ? try await self.credentials.key(for: provider.credentialID) : nil
@@ -142,11 +198,12 @@ public final class SettingsModel {
                         contextLimit: row["inputTokenLimit"] as? Int,
                         capabilities: row["supportedGenerationMethods"] as? [String] ?? [])
                 }.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
-                guard self.selectedProviderID == id, !Task.isCancelled else { return }
-                self.modelCatalog = catalog
+                guard self.selectedProvider == provider, !Task.isCancelled else { return }
+                self.modelCatalogProvider = provider
+                self.discoveredModelCatalog = catalog
                 self.status = "\(catalog.count)個のモデルを取得しました。"
             } catch {
-                guard self.selectedProviderID == id, !Task.isCancelled else { return }
+                guard self.selectedProvider == provider, !Task.isCancelled else { return }
                 self.error = "モデル一覧を取得できませんでした: \(error.localizedDescription)"
             }
         }

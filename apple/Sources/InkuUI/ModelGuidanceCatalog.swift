@@ -22,6 +22,13 @@ public struct ModelGuidanceCatalog: Decodable, Sendable {
         return envelope.modelGuidance
     }
 
+    public func registeredModels(for connection: ProviderSettings) -> [ProviderModelInfo] {
+        guard let provider = providers.first(where: { $0.id == connection.id && $0.kind == connection.kind.rawValue }) else { return [] }
+        return provider.models.filter { $0.eol != true }.map {
+            ProviderModelInfo(id: connection.id + ":" + $0.id, name: $0.label, contextLimit: nil, capabilities: [])
+        }
+    }
+
     public func guidance(for reference: String, providers configured: [ProviderSettings]) -> ModelGuidance? {
         guard let separator = reference.firstIndex(of: ":") else { return nil }
         let providerID = String(reference[..<separator])

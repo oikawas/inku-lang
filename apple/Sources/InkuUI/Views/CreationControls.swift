@@ -24,12 +24,8 @@ struct CreationModelPicker: View {
     private var loading: Bool { settings.isLoadingModels || loadingPersonalModels }
     private var models: [ProviderModelInfo] {
         guard let provider else { return [] }
-        var seen: Set<String> = []
-        let configured = [model.nextDrawingModelReference, settings.host.models.stage1Model, settings.host.models.stage2Model]
-            .filter { $0.hasPrefix(provider.id + ":") && $0.count > provider.id.count + 1 }
-            .map { ProviderModelInfo(id: $0, name: String($0.dropFirst(provider.id.count + 1)), contextLimit: nil, capabilities: []) }
-        let discovered = provider.kind == .chatGPTPlan ? personalModels : settings.modelCatalog
-        return (discovered + configured).filter { $0.id.hasPrefix(provider.id + ":") && seen.insert($0.id).inserted }
+        return settings.availableModels(for: provider, configuredReferences: [model.nextDrawingModelReference],
+                                        discoveredModels: provider.kind == .chatGPTPlan ? personalModels : nil)
     }
 
     var body: some View {
@@ -45,7 +41,7 @@ struct CreationModelPicker: View {
             }
             if !settings.host.providers.isEmpty {
                 Picker(model.display.localized("サービス"), selection: $providerID) {
-                    ForEach(settings.host.providers) { item in Text(item.id).tag(Optional(item.id)) }
+                    ForEach(settings.host.providers) { item in Text(item.displayName).tag(Optional(item.id)) }
                 }
                 .disabled(model.isBusy || loading)
                 .help(tip("次の作品のモデルを提供するサービスを選びます。"))
@@ -93,8 +89,14 @@ struct CreationModelPicker: View {
             catalogError = nil
             providerID = refreshed.host.providers.first(where: { model.nextDrawingModelReference.hasPrefix($0.id + ":") })?.id
                 ?? refreshed.host.providers.first?.id
+            settings.selectedProviderID = providerID
         }
-        .onChange(of: providerID) { _, _ in catalogError = nil }
+        .onChange(of: providerID) { _, id in
+            discovery?.cancel()
+            settings.selectedProviderID = id
+            personalModels = []
+            catalogError = nil
+        }
         .onDisappear { discovery?.cancel(); settings.cancelDiscovery() }
     }
 

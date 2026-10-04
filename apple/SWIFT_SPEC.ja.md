@@ -14,6 +14,16 @@ binding／protocolの版は同梱Rust coreのversion report、描画層の版は
 - 共通の意味や保存契約を変更する場合は、それぞれの正本を更新する。本書はSwift hostの適用範囲を説明し、独自の共通仕様を作らない。
 - sourceと再現手順を公開文書に記す。生成binary、model、log、credential、端末識別子や非公開の作業記録を追跡対象に含めない。
 
+## 2026-10-04 Server準拠の標準providerセット
+
+同じcheckoutのServerの公開provider定義から、OpenAI API Platform、Claude API、Gemini API、NVIDIA NIM、Ollama、Ollama Cloudの6接続を同梱する。表示名、接続方式、default URLとAPIキー要否はServer sourceから生成し、環境変数やServerの実設定・credentialは取り込まない。Personal ChatGPTは専用設定で明示して有効にする。
+
+新規設定と旧設定の初回読込で不足するIDだけを追加し、既存接続のURL・方式・credential ID・制限値、モデル選択、plugin・描画設定を保持する。`providers.json`に追加済みmarkerを原子的に保存し、以後の起動で重複追加や設定再保存を行わない。作者が削除した標準接続も自動で復活させない。APIキーは作者が設定画面で入力してKeychainへ保存する。追加処理はKeychainへアクセスせず、HTTP・モデル取得・生成を開始しない。
+
+設定と制作・バッチのモデルchooserは、同じServerの同梱catalogを候補として表示する。同じprovider IDと接続方式に限って使用し、カスタム接続へ流用しない。提供終了モデルは新選択候補から除くが、既存の選択値と手入力を保持する。明示して取得した接続先の候補を優先して併合し、サービスが現在提供するモデルや契約の利用可否を同梱候補から保証しない。Claudeは`/v1/models`、Geminiは`/v1beta/models?pageSize=1000`、OpenAI互換は`/models`へ明示取得する。
+
+限定確認は`InkuAppCheck --provider-defaults-only`を使用する。一時設定とSQLiteで新規追加、旧設定の保持、再読込と明示削除、offline候補・一覧取得URLを確認する。実APIキーの入力・モデル取得・推論とnative画面の受入は別に行う。共有Rustと作品DB schemaは変更しない。
+
 ## 2026-10-04 バッチUIのWebへの追随
 
 バッチ画面で、次の描画モデル、色カタログ、写生、Wildと用紙を選ぶ。制作と同じ次の条件を使用し、既存chooserの確定・取消と明示したモデル一覧取得を共有する。macOSでは入力・条件の列と作品canvasを横へ配置し、狭い幅では縦へ戻す。全行の結果は折りたたんで閲覧し、入力から描画までの操作を長い結果一覧の下へ押し出さない。

@@ -30,7 +30,7 @@ def literal_assignment(path: Path, name: str):
     raise ValueError(f"Server constant unavailable: {name}")
 
 
-def model_guidance() -> dict:
+def provider_catalog() -> tuple[dict, list[dict]]:
     # This versioned module contains data expressions only; loading it does not
     # import Server settings, inspect credentials or contact a provider.
     catalog = runpy.run_path(str(SERVER / "verified_model_catalog.py"))
@@ -47,6 +47,28 @@ def model_guidance() -> dict:
     source = ast.parse((SERVER / "model_settings.py").read_text())
     definition = next(node.value for node in source.body if isinstance(node, ast.AnnAssign)
                       and isinstance(node.target, ast.Name) and node.target.id == "PROVIDER_DEFINITIONS")
+    return catalog, resolve(definition)
+
+
+def provider_defaults() -> dict:
+    # Allowlist public versioned fields only. Do not call default_model_settings:
+    # that factory also reads installation URLs and API keys from the environment.
+    _, definitions = provider_catalog()
+    return {
+        "schema": "inku.provider-defaults.v1",
+        "providers": [{
+            "id": provider["id"],
+            "label": provider["label"],
+            "kind": provider["kind"],
+            "baseURL": provider["default_base_url"],
+            "requiresAPIKey": provider["requires_api_key"],
+            "credentialID": provider["id"],
+        } for provider in definitions],
+    }
+
+
+def model_guidance() -> dict:
+    catalog, definitions = provider_catalog()
     model_keys = {
         "id", "label", "purposes", "recommendation_llm", "recommendation_vision",
         "recommendation_stage1", "recommendation_stage2", "recommendation_level",
@@ -54,7 +76,7 @@ def model_guidance() -> dict:
         "requires_subscription",
     }
     providers = []
-    for provider in resolve(definition):
+    for provider in definitions:
         hide_speed = bool(provider.get("speed_developer_only"))
         models = []
         for model in provider["models"]:
@@ -115,6 +137,7 @@ def main() -> None:
     exec(compile(module, "server/pipeline_defaults.py", "exec"), environment)  # noqa: S102
     manifest = environment["default_manifest"](BindingPlaceholder())
     manifest["model_guidance"] = model_guidance()
+    manifest["provider_defaults"] = provider_defaults()
     rules = []
     normalization = next(node for node in limit_source.body if isinstance(node, ast.FunctionDef)
                          and node.name == "normalize_limits")

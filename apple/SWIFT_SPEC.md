@@ -14,6 +14,16 @@ Binding and protocol identities come from the bundled Rust core's version report
 - Update the relevant canonical document when shared semantics or persistence contracts change. This document explains how the Swift host applies them; it does not establish an independent shared specification.
 - Public documentation describes source and reproducible procedures. Generated binaries, models, logs, credentials, device identifiers, and private operating records are not tracked product material.
 
+## 2026-10-04 Server-aligned default providers
+
+The same checkout's public Server definitions supply six bundled connections: OpenAI API Platform, Claude API, Gemini API, NVIDIA NIM, Ollama, and Ollama Cloud. Display names, connection kinds, default URLs, and API-key requirements are generated from Server source without reading environment variables, installation settings, or credentials. Personal ChatGPT remains an explicit opt-in through its dedicated settings.
+
+The first settings load adds missing provider IDs to new or older installations while preserving existing URLs, kinds, credential IDs, rate limits, model selections, plugin preferences, and drawing settings. An installation marker is saved atomically in `providers.json`; subsequent launches neither duplicate entries nor rewrite settings. Intentionally deleted default connections stay deleted. The author enters API keys in Settings for storage in Keychain. Preset installation does not access Keychain, send HTTP requests, discover models, or generate works.
+
+Settings and the shared Creation/Batch model chooser offer the same Server's bundled catalog for matching provider IDs and connection kinds, without applying it to custom connections. End-of-life models are excluded from new candidates, while existing selections and manual input remain available. Explicitly discovered service candidates take precedence during merging. Bundled candidates do not guarantee current availability or subscription access. Explicit discovery uses `/v1/models` for Claude, `/v1beta/models?pageSize=1000` for Gemini, and `/models` for OpenAI-compatible connections.
+
+The bounded `InkuAppCheck --provider-defaults-only` check uses temporary settings and SQLite for fresh installation, legacy settings preservation, repeated loads and intentional deletion, offline candidates, and discovery URLs. Actual key entry, model discovery, inference, and native UI acceptance are separate checks. Shared Rust and the work-database schema remain unchanged.
+
 ## 2026-10-04 Batch UI parity with Web
 
 Batch exposes the next drawing model, color catalog, sketch, Wild, and canvas. It shares the upcoming conditions and existing choosers with Paint, including explicit apply/cancel and model discovery. On macOS the input/conditions column sits beside the work canvas, with a vertical layout at narrow widths. Full row results are a disclosure, keeping a long result list from pushing the drawing actions down.

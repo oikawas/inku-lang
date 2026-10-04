@@ -8,6 +8,9 @@ import InkuHost
 struct AppCheck {
     @MainActor
     static func main() async throws {
+        if CommandLine.arguments.contains("--provider-defaults-only") {
+            try await runProviderDefaultsChecks(); return
+        }
         if CommandLine.arguments.contains("--batch-ui-only") {
             try await runBatchUIPresentationChecks(); return
         }

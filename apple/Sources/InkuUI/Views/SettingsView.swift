@@ -144,11 +144,12 @@ enum SettingsSection: String, CaseIterable, Identifiable {
     }
     private var providers: some View {
         @Bindable var state = settings
+        let availableModels = state.selectedProvider.map { state.availableModels(for: $0) } ?? []
         return Group {
             Section(model.display.localized("AIサービス接続")) {
                 Picker(model.display.localized("サービス"), selection: $state.selectedProviderID) {
                     Text(model.display.localized("選択してください")).tag(String?.none)
-                    ForEach(state.host.providers.filter { $0.kind != .chatGPTPlan }) { provider in Text(provider.id).tag(Optional(provider.id)) }
+                    ForEach(state.host.providers.filter { $0.kind != .chatGPTPlan }) { provider in Text(provider.displayName).tag(Optional(provider.id)) }
                 }.onChange(of: state.selectedProviderID) { _, _ in Task { await state.inspectCredential() } }
                 HStack {
                     Button(model.display.localized("サービス追加")) { state.addProvider() }
@@ -183,10 +184,13 @@ enum SettingsSection: String, CaseIterable, Identifiable {
                 TextField(model.display.localized("サービスID:モデルID"), text: $state.host.models.stage1Model).autocorrectionDisabled()
                 Button(model.display.localized(state.isLoadingModels ? "取得中…" : "接続先からモデル一覧を取得")) { Task { await state.discoverModels() } }
                     .disabled(state.selectedProvider == nil || state.isLoadingModels)
-                if !state.modelCatalog.isEmpty {
+                if !availableModels.isEmpty {
                     Picker(model.display.localized("モデル"), selection: $state.host.models.stage1Model) {
-                        Text(state.host.models.stage1Model).tag(state.host.models.stage1Model)
-                        ForEach(state.modelCatalog) { item in Text(item.name).tag(item.id) }
+                        Text(model.display.localized("選択してください")).tag("")
+                        if !state.host.models.stage1Model.isEmpty, !availableModels.contains(where: { $0.id == state.host.models.stage1Model }) {
+                            Text(state.host.models.stage1Model).tag(state.host.models.stage1Model)
+                        }
+                        ForEach(availableModels) { item in Text(item.name).tag(item.id) }
                     }
                 }
                 if !state.host.models.stage1Model.isEmpty {

@@ -29,6 +29,8 @@ data class ModelRequest(
     val imageJpeg: ByteArray? = null,
     /** Gemini `thinkingLevel` for a non-pipeline request; null keeps the model default. */
     val thinkingLevel: String? = null,
+    /** Non-secret registration pinned when this shared-pipeline run began. */
+    val chatGptSession: ChatGptSessionRef? = null,
 )
 
 class ModelProviderHttpException(

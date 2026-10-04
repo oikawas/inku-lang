@@ -46,6 +46,20 @@ When updating Android specifications:
 3. Do not introduce English-only Android requirements that are absent from
    `ANDROID_SPEC.ja.md`.
 
+## 2026-10-04 Connect a personal ChatGPT plan
+
+Android is a local single-user host and connects directly to a personal ChatGPT plan. Settings has an independent ChatGPT plan pane. Continue with ChatGPT opens Chrome on the phone for authorization, without a Mac transfer helper or an API key. Return to inku, acknowledge the first-use plan notice, then open Model settings.
+
+In Settings → Models → ChatGPT plan, Model selection explicitly fetches the personal catalog; select models and save. Fetching alone publishes nothing. Only published models present in that catalog enter the drawing picker, with one `chatgpt:<slug>` for both stages. Retired publication references and saved work model IDs remain. Opening settings does not fetch models. This connection is excluded from API-key settings, bare-name ownership, photo observation, model inspection, colophons and demo instruction generation.
+
+Multiple registrations retain separate publication preferences and labels identifying the verified account and issued client ID. Users can select a registration, reauthorize, explicitly consent again, cancel authorization, disconnect and manage usage. The drawing screen also identifies the plan and registration in use. Identity alone does not authorize plan usage: both `resource.invoke` and `chatgpt.tokens.use.direct` scopes are required. Quota exhaustion stops more drawing calls; explicitly refreshing the catalog can check renewed availability. Disconnect removes local tokens first and reports unconfirmed remote revocation, retaining registration metadata and published models.
+
+OAuth opens a temporary `127.0.0.1` listener before the browser, using dynamic registration, PKCE S256, state and nonce. ID token signatures are verified against OpenAI JWKS, with issuer, audience and expiration checks. A host UUID stays in app storage and the issued client ID is reused for authorization and refresh. Refresh is serialized, retaining rotated refresh tokens and `earliest_refresh_at`. Tokens, identity and personal publications are encrypted through Android Keystore in an AtomicFile under `noBackupFilesDir`. URLs and tokens do not enter Logcat, work JSON or Room. Room14 and existing work data are unchanged.
+
+The five shared-pipeline effects use dedicated Responses/SSE requests with `store:false`, `stream:true` and one required `inku.submit_pipeline_response` function. The shared core owns prompts, response schemas, composition reading, retry and fallback. There is no automatic API-key or device-model switch. Empty, null or missing terminal output can use a finalized function item; deltas or assistant text alone cannot. Only registration ID/generation is saved with an execution, preventing old results from surviving account switching, reauthorization or sign-out. A DDL without holes can render while disconnected when no model call is needed.
+
+The connection follows the official [sign-in](https://developers.openai.com/siwc/token-sharing-open-source/sign-in), [models and inference](https://developers.openai.com/siwc/token-sharing-open-source/models-and-inference) and [profiles and sessions](https://developers.openai.com/siwc/token-sharing-open-source/profiles-and-sessions) contracts. Real OpenAI acceptance requires the user's Chrome authorization and remains distinct from local checks.
+
 ## 2026-10-03 Constrain on-device responses to their JSON schema (I-713, updated 2026-10-04)
 
 LiteRT-LM uses version 0.17.1. The on-device provider passes `ModelRequest.tool.parametersJson` to `ResponseFormat.json(schema)`. Only requests with a response schema enable the conversation's `enableResponseFormat` and the message's `responseFormat` together, using the SDK's JSON Schema constraint. Plain-text requests and photo observations leave this constraint disabled.

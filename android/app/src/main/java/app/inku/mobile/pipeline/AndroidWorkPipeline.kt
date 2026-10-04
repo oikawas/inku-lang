@@ -36,6 +36,7 @@ class AndroidWorkPipeline(
     private val bundledPluginsEnabled: suspend () -> Boolean = { true },
     /** Told which model call a run waits on (see [SharedPipelineHost]). */
     onProviderAttempt: (executionId: String, attempt: ProviderAttempt?) -> Unit = { _, _ -> },
+    private val pinModelSession: (PipelineModelSelection) -> PipelineModelSelection = { it },
 ) {
     private val configBuilder = SharedPipelineConfigBuilder(binding)
     private val host = SharedPipelineHost(
@@ -609,7 +610,7 @@ class AndroidWorkPipeline(
                 text = text,
                 originalInput = request.originalText,
                 config = config,
-                models = PipelineModelSelection(request.drawingModel, request.drawingModel),
+                models = pinModelSession(PipelineModelSelection(request.drawingModel, request.drawingModel)),
                 context = context,
                 renderSeed = renderSeed,
                 wild = request.renderWild == true,

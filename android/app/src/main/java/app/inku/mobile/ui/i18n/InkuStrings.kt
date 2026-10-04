@@ -35,6 +35,27 @@ interface InkuStrings {
     val code: String
     val label: String
 
+    // Personal ChatGPT-plan connection; never provider API-key settings.
+    val chatGptPlan: String
+    val chatGptConnectionSubtitle: String
+    val chatGptPlanDescription: String
+    val chatGptContinue: String
+    val chatGptAddAccount: String
+    val chatGptReauthenticate: String
+    val chatGptEnablePlan: String
+    val chatGptSignOut: String
+    val chatGptManageUsage: String
+    val chatGptPending: String
+    val chatGptConnected: String
+    val chatGptNotConnected: String
+    val chatGptPlanDisabled: String
+    val chatGptOpenModels: String
+    val chatGptUsingPlan: String
+    val chatGptNoticeTitle: String
+    val chatGptNoticeAccept: String
+    val chatGptRevocationUnconfirmed: String
+    val chatGptError: (String) -> String
+
     // --- Settings: language -------------------------------------------------
     val settingsLanguageTitle: String
     val settingsLanguageSubtitle: String

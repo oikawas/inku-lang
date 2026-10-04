@@ -104,9 +104,12 @@ class InkuRepository(
     }
     private val providerModelCandidatePrefix = "provider_model_candidates:"
     private val localLiteRtProvider = LocalLiteRtLmProvider(context.applicationContext, database.modelAssetDao())
+    val chatGptPlan: app.inku.mobile.llm.ChatGptPlanManager
+        get() = (context.applicationContext as app.inku.mobile.InkuApplication).chatGptPlan
     private val modelRouter = RoutingModelProvider(
         database = database,
         localProvider = localLiteRtProvider,
+        chatGptPlan = { chatGptPlan },
     )
     // Every model call in this class goes through this one, so an override
     // reaches Stage 1, Stage 2 and the demo prompt alike.
@@ -129,6 +132,13 @@ class InkuRepository(
             executionStore = sharedPipelineStore,
             readHistory = { id -> sharedPipelineStore.readHistory(AndroidWorkPipeline.OWNER_ID, id) },
             bundledPluginsEnabled = { isBundledPluginPackageEnabled() },
+            pinModelSession = { models ->
+                if ((models.stage1ModelId.startsWith("chatgpt:") || models.stage2ModelId.startsWith("chatgpt:")) && modelProviderOverride == null) {
+                    // A DDL with no holes can render without credentials. The provider
+                    // checks this fixed reference if the run actually needs a model.
+                    models.copy(chatGptSession = chatGptPlan.state.value.activeSession)
+                } else models
+            },
             onProviderAttempt = { executionId, attempt ->
                 providerAttemptState.update { current ->
                     attempt ?: current.takeIf { it?.executionId != executionId }
@@ -155,7 +165,16 @@ class InkuRepository(
 
     fun modelAssets(): Flow<List<ModelAssetEntity>> = database.modelAssetDao().observeAll()
 
-    fun providerSettings(): Flow<List<ProviderSettingEntity>> = database.providerSettingDao().observeAll()
+    fun providerSettings(): Flow<List<ProviderSettingEntity>> = kotlinx.coroutines.flow.combine(
+        database.providerSettingDao().observeAll(), chatGptPlan.state,
+    ) { providers, plan ->
+        providers.filter { it.providerId != "chatgpt" } + ProviderSettingEntity(
+            providerId = "chatgpt", displayName = "ChatGPT", kind = "chatgpt-responses",
+            baseUrl = "https://api.openai.com/v1", encryptedApiKey = null,
+            publishedModelsJson = JSONArray(plan.publishedModels).toString(),
+            isEnabled = plan.canUsePlan, isDefaultLocal = false, updatedAt = 0,
+        )
+    }
 
     fun providerModelCandidates(): Flow<Map<String, List<String>>> =
         database.settingsDao().observeLike("$providerModelCandidatePrefix%").map { rows ->
@@ -517,6 +536,7 @@ class InkuRepository(
         enabled: Boolean = true,
     ) {
         val cleanId = providerId.trim().lowercase()
+        if (cleanId == "chatgpt") throw app.inku.mobile.llm.ChatGptException("chatgpt_reserved_provider")
         if (!cleanId.matches(Regex("[a-z0-9][a-z0-9_-]*"))) inkuError { it.errorServiceIdFormat }
         val cleanBaseUrl = baseUrl?.trim()?.ifBlank { null }
         if (cleanId != "local-litert-lm" && cleanBaseUrl != null) {
@@ -543,11 +563,13 @@ class InkuRepository(
     }
 
     suspend fun clearProviderApiKey(providerId: String) {
+        if (providerId == "chatgpt") throw app.inku.mobile.llm.ChatGptException("chatgpt_reserved_provider")
         val existing = database.providerSettingDao().get(providerId) ?: return
         database.providerSettingDao().upsert(existing.copy(encryptedApiKey = null, updatedAt = System.currentTimeMillis()))
     }
 
     suspend fun fetchProviderModels(providerId: String): List<String> {
+        if (providerId == "chatgpt") return chatGptPlan.refreshModels()
         ensureDefaultProviderSettings()
         val models = modelRouter.fetchModels(providerId)
         val existing = database.providerSettingDao().get(providerId) ?: inkuError { it.errorServiceNotFound(providerId) }
@@ -577,6 +599,7 @@ class InkuRepository(
      * id brings it back.
      */
     suspend fun deleteProvider(providerId: String) {
+        if (providerId == "chatgpt") throw app.inku.mobile.llm.ChatGptException("chatgpt_reserved_provider")
         val builtIn = defaultProviderSettings().any { it.providerId == providerId && !it.isDefaultLocal }
         if (!builtIn) {
             database.providerSettingDao().deleteCustom(providerId)

@@ -35,6 +35,7 @@ fun inkuError(text: (InkuStrings) -> String): Nothing = throw InkuFailure(text)
 fun messageFor(error: Throwable, strings: InkuStrings, fallback: String): String =
     when (error) {
         is InkuFailure -> DisplaySanitizer.redact(error.text(strings))
+        is app.inku.mobile.llm.ChatGptException -> strings.chatGptError(error.code)
         else -> safeErrorMessage(error, fallback)
     }
 

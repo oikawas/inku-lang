@@ -8,6 +8,17 @@ import org.junit.Test
 
 class RoutingModelProviderTest {
     @Test
+    fun `ChatGPT never falls back to a key provider or owns a bare model`() {
+        val local = provider("local-litert-lm", isDefaultLocal = true)
+        val api = provider("openai", models = "[\"personal-model\"]")
+        val plan = provider("chatgpt", models = "[\"plan-only\"]")
+        assertNull(RoutingModelProvider.resolveProviderForRouting(listOf(local, api), "chatgpt:personal-model"))
+        assertNull(RoutingModelProvider.resolveProviderForRouting(listOf(local, api), "ChatGPT:personal-model"))
+        assertSame(local, RoutingModelProvider.resolveProviderForRouting(listOf(local, plan), "plan-only"))
+        assertSame(api, RoutingModelProvider.resolveProviderForRouting(listOf(local, plan, api), "personal-model"))
+    }
+
+    @Test
     fun `an enabled provider named by an explicit prefix wins`() {
         val local = provider("local-litert-lm", isDefaultLocal = true)
         val ollama = provider("ollama", models = "[\"qwen3.5:4b-q4_K_M\"]")

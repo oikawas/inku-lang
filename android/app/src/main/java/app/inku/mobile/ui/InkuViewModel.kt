@@ -185,6 +185,7 @@ data class InkuUiState(
     val modelDownloadState: String = "not downloaded",
     val modelAssets: List<ModelAssetEntity> = emptyList(),
     val providerSettings: List<ProviderSettingEntity> = emptyList(),
+    val chatGptPlan: app.inku.mobile.llm.ChatGptPlanView = app.inku.mobile.llm.ChatGptPlanView(),
     val providerModelCandidates: Map<String, List<String>> = emptyMap(),
     val providerModelFetchStates: Map<String, ProviderModelFetchState> = emptyMap(),
     val exportTemplates: List<ExportTemplateEntity> = emptyList(),
@@ -393,6 +394,7 @@ enum class AppTab {
 enum class SettingsPane {
     Home,
     Models,
+    ChatGpt,
     Demo,
     Export,
     Misc,
@@ -461,6 +463,8 @@ class InkuViewModel @JvmOverloads constructor(
     val cameraCaptureRequests: SharedFlow<CameraCaptureRequest> = mutableCameraCaptureRequests.asSharedFlow()
     private val mutablePhotoPickerRequests = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
     val photoPickerRequests: SharedFlow<Unit> = mutablePhotoPickerRequests.asSharedFlow()
+    private val mutableChatGptAuthorizationRequests = MutableSharedFlow<String>()
+    val chatGptAuthorizationRequests: SharedFlow<String> = mutableChatGptAuthorizationRequests.asSharedFlow()
     private var drawingRunSerial: Long = 0L
     private var promptEditedByUser = false
     private var modelSelectionSnapshot: Pair<String, String>? = null
@@ -468,18 +472,20 @@ class InkuViewModel @JvmOverloads constructor(
     private var lastHistorySwipeAt = 0L
     private var presentationNavigationSerial = 0L
 
-    private val providerConfig = combine(providerSettings, providerModelCandidates) { providers, candidates ->
-        providers to candidates
+    private val providerConfig = combine(providerSettings, providerModelCandidates, repository.chatGptPlan.state) { providers, candidates, plan ->
+        val personalCandidates = candidates - "chatgpt" + (plan.models?.let { mapOf("chatgpt" to it.map { model -> model.id }) } ?: emptyMap())
+        Triple(providers, personalCandidates, plan)
     }
 
     val state: StateFlow<InkuUiState> = combine(localState, history, modelAssets, providerConfig, exportTemplates) { state, items, assets, providerPair, templates ->
-        val (providers, candidates) = providerPair
+        val (providers, candidates, plan) = providerPair
         val selectedModel = assets.firstOrNull { it.modelId == state.selectedModelId }
         val modelState = selectedModel?.let { modelStatusText(it) } ?: "model catalog initializing"
         state.copy(
             modelAssets = assets,
             providerSettings = providers,
             providerModelCandidates = candidates,
+            chatGptPlan = plan,
             exportTemplates = templates,
             modelLicenseAccepted = selectedModel?.licenseAcceptedAt != null,
             modelDownloadState = modelState,
@@ -547,6 +553,7 @@ class InkuViewModel @JvmOverloads constructor(
     }
 
     override fun onCleared() {
+        repository.chatGptPlan.cancelAuthorization()
         drawingRunSerial += 1
         drawingJob?.cancel()
         lineageJob?.cancel()
@@ -1489,6 +1496,7 @@ class InkuViewModel @JvmOverloads constructor(
     }
 
     fun setTab(tab: AppTab) {
+        if (tab != AppTab.Settings) repository.chatGptPlan.cancelAuthorization()
         val current = localState.value
         if (current.tab == AppTab.History && tab != AppTab.History) presentationNavigationSerial++
         localState.value = current.copy(
@@ -1543,6 +1551,7 @@ class InkuViewModel @JvmOverloads constructor(
     }
 
     fun closeSettings() {
+        repository.chatGptPlan.cancelAuthorization()
         localState.value = localState.value.copy(tab = localState.value.settingsReturnTab, settingsPane = SettingsPane.Home)
     }
 
@@ -1671,7 +1680,53 @@ class InkuViewModel @JvmOverloads constructor(
     )
 
     fun setSettingsPane(panel: SettingsPane) {
+        if (panel != SettingsPane.ChatGpt) repository.chatGptPlan.cancelAuthorization()
         localState.value = localState.value.copy(settingsPane = panel, message = null)
+    }
+
+    fun authorizeChatGpt(profileId: String? = null, consent: Boolean = false) {
+        viewModelScope.launch {
+            try {
+                val url = withContext(Dispatchers.IO) { repository.chatGptPlan.authorize(profileId, consent, !state.value.uiLanguage.isEnglish) }
+                mutableChatGptAuthorizationRequests.emit(url)
+            } catch (cancelled: CancellationException) { throw cancelled }
+            catch (error: Exception) { localState.value = localState.value.copy(message = strings().chatGptError((error as? app.inku.mobile.llm.ChatGptException)?.code ?: "chatgpt_auth_unavailable")) }
+        }
+    }
+
+    fun cancelChatGptAuthorization() = repository.chatGptPlan.cancelAuthorization()
+    fun chatGptBrowserUnavailable() = repository.chatGptPlan.browserUnavailable()
+    fun acknowledgeChatGptPlan() {
+        viewModelScope.launch {
+            try { withContext(Dispatchers.IO) { repository.chatGptPlan.acknowledgePlanNotice() } }
+            catch (error: app.inku.mobile.llm.ChatGptException) { localState.value = localState.value.copy(message = strings().chatGptError(error.code)) }
+        }
+    }
+
+    fun selectChatGptProfile(id: String) {
+        viewModelScope.launch {
+            try {
+                withContext(Dispatchers.IO) { repository.chatGptPlan.selectProfile(id) }
+                localState.value = localState.value.copy(providerModelFetchStates = localState.value.providerModelFetchStates - "chatgpt", message = null)
+            } catch (error: app.inku.mobile.llm.ChatGptException) { localState.value = localState.value.copy(message = strings().chatGptError(error.code)) }
+        }
+    }
+
+    fun signOutChatGpt(id: String) {
+        viewModelScope.launch {
+            try { repository.chatGptPlan.signOut(id) }
+            catch (cancelled: CancellationException) { throw cancelled }
+            catch (error: app.inku.mobile.llm.ChatGptException) { localState.value = localState.value.copy(message = strings().chatGptError(error.code)) }
+        }
+    }
+
+    fun publishChatGptModels(session: app.inku.mobile.llm.ChatGptSessionRef, models: List<String>) {
+        viewModelScope.launch {
+            try {
+                withContext(Dispatchers.IO) { repository.chatGptPlan.publishModels(session, models) }
+                localState.value = localState.value.copy(message = strings().modelSettingsSaved)
+            } catch (error: app.inku.mobile.llm.ChatGptException) { localState.value = localState.value.copy(message = strings().chatGptError(error.code)) }
+        }
     }
 
     fun openModelSelection() {

@@ -26,6 +26,23 @@ import org.junit.Test
 
 class SharedPipelineHostTest {
     @Test
+    fun chatGptRegistrationIsPinnedAcrossProviderEffectsAndHostReloadWithoutCredentials() = runBlocking {
+        val ref = app.inku.mobile.llm.ChatGptSessionRef("personal-registration", 7)
+        val executions = MemoryExecutionStore()
+        val provider = PipelineProviderEffect { actionJson, models ->
+            assertEquals(ref, models.chatGptSession)
+            RecordingEffectProvider().perform(actionJson, models)
+        }
+        val first = host(ScriptedBinding(), provider, RecordingCommitStore(), executions)
+            .start(startRequest(PipelineAuthoring.Description("mist", false)).copy(models = MODELS.copy(chatGptSession = ref)))
+        val resumed = host(ScriptedBinding(), provider, RecordingCommitStore(), executions).view(OWNER, first.executionId)
+        assertEquals(ref, resumed.models?.chatGptSession)
+        val saved = executions.load(OWNER, first.executionId)!!.toString(Charsets.UTF_8)
+        assertTrue(saved.contains("personal-registration"))
+        assertFalse(saved.contains("access_token")); assertFalse(saved.contains("refresh_token"))
+    }
+
+    @Test
     fun savedScoreReplayKeepsTheUnifiedSourceAndOriginAndBlankDdlNeverFallsBackToDescription() = runBlocking {
         var saved = HistoryItemEntity(
             id = "legacy", createdAt = 1, updatedAt = 2, originalInput = "description",

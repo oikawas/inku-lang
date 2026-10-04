@@ -1524,11 +1524,11 @@
    ],
    "principled": {
     "outcome": "unchanged",
-    "reason": "no_other_answer"
+    "reason": "nothing_to_move"
    },
    "chance": {
     "outcome": "unchanged",
-    "reason": "same_ranges"
+    "reason": "nothing_to_move"
    }
   },
   {
@@ -1856,11 +1856,11 @@
    ],
    "principled": {
     "outcome": "unchanged",
-    "reason": "no_other_answer"
+    "reason": "nothing_to_move"
    },
    "chance": {
     "outcome": "unchanged",
-    "reason": "same_ranges"
+    "reason": "nothing_to_move"
    }
   },
   {
@@ -1998,11 +1998,11 @@
    ],
    "principled": {
     "outcome": "unchanged",
-    "reason": "no_other_answer"
+    "reason": "nothing_to_move"
    },
    "chance": {
     "outcome": "unchanged",
-    "reason": "same_ranges"
+    "reason": "nothing_to_move"
    }
   },
   {
@@ -3081,11 +3081,11 @@
    ],
    "principled": {
     "outcome": "unchanged",
-    "reason": "no_other_answer"
+    "reason": "nothing_to_move"
    },
    "chance": {
     "outcome": "unchanged",
-    "reason": "same_ranges"
+    "reason": "nothing_to_move"
    }
   },
   {

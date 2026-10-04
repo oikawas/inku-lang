@@ -9,10 +9,14 @@ import org.json.JSONArray
 class RoutingModelProvider(
     private val database: InkuDatabase,
     private val localProvider: LocalLiteRtLmProvider,
+    private val chatGptPlan: (() -> ChatGptPlanManager)? = null,
 ) : ModelProvider {
     override val providerId: String = "routing"
 
     override suspend fun generate(request: ModelRequest): ModelResponse {
+        if (request.modelId.startsWith("chatgpt:", ignoreCase = true)) {
+            return (chatGptPlan?.invoke() ?: throw ChatGptException("chatgpt_not_connected")).generate(request)
+        }
         val provider = resolveProvider(request.modelId)
         if (!canGenerateWith(provider)) {
             inkuError { it.errorProviderNotFoundForModel(request.modelId) }
@@ -67,9 +71,11 @@ class RoutingModelProvider(
             providers: List<ProviderSettingEntity>,
             modelId: String,
         ): ProviderSettingEntity? {
+            // The reserved identity never falls through to a paid API or the device.
+            if (modelId.startsWith("chatgpt:", ignoreCase = true)) return providers.firstOrNull { it.providerId == "chatgpt" }
             providers.firstOrNull { modelId.startsWith("${it.providerId}:") }?.let { return it }
             val owners = providers.filter { provider ->
-                provider.isEnabled && parsePublishedModelIds(provider.publishedModelsJson).contains(modelId)
+                provider.providerId != "chatgpt" && provider.isEnabled && parsePublishedModelIds(provider.publishedModelsJson).contains(modelId)
             }
             return owners.singleOrNull() ?: providers.firstOrNull { it.isDefaultLocal }
         }

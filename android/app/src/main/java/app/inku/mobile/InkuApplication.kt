@@ -19,6 +19,9 @@ internal const val MIGRATION_REPORT = "saijiki-v2-migration.json"
 
 class InkuApplication : Application() {
     val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    val chatGptPlan by lazy {
+        app.inku.mobile.llm.ChatGptPlanManager(app.inku.mobile.llm.AndroidChatGptCredentialStore(this), applicationScope)
+    }
     private val databaseLock = Any()
 
     @Volatile

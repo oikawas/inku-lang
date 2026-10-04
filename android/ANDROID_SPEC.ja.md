@@ -30,6 +30,20 @@ runtime fallbackを持たない。保存済みSVG、Room schema、Score schema�
 - Android 仕様を更新するときは、先に `ANDROID_SPEC.ja.md` を更新し、その後で `ANDROID_SPEC.md` を同期する。
 - 英語版だけに存在する仕様・要件を追加してはならない。
 
+## 2026-10-04 ChatGPTプランの本人接続
+
+Androidは端末で本人が使うsingle-user hostとして、Serverを介さずChatGPTプランへ直接接続する。設定の独立した「ChatGPTプラン」から「ChatGPTで続ける」を押し、端末のChromeで本人認証を行う。Macの移送アプリやAPIキーは使わない。接続が完了したらinkuへ戻り、初回の利用枠の案内を確認して「モデル設定を開く」へ進む。
+
+設定「モデル」のChatGPTプランで「モデル選択」から本人の一覧を取得し、使うモデルを選んで保存する。取得だけでは公開しない。公開済みかつ本人の一覧にあるモデルだけが描画候補に現れ、Stage 1/2に同じ`chatgpt:<slug>`を使う。提供終了の公開指定や保存済み作品のモデルIDは保持する。設定画面を開くだけではモデル一覧を取得しない。共有のAPIキー設定、bare名の所有、写真の観察、モデル検分、奥書、デモ指示文の生成にはこの接続を提供しない。
+
+登録を複数保持でき、本人確認済みのアカウントと発行client IDをラベルで見分けて選ぶ。再認証と明示した再同意、認証中止、切断、利用枠を管理するリンクを提供する。描画画面にも利用中のプランと登録を示す。本人確認だけではプラン利用を許可せず、`resource.invoke`と`chatgpt.tokens.use.direct`のscopeを確認する。上限に達した後は追加描画を止め、一覧の明示した再取得で利用可能性を確認できる。切断は端末のtokenを先に除去し、遠隔の失効が確認できない場合はその旨を示す。公開モデルと登録の識別情報は保持する。
+
+OAuthは端末の`127.0.0.1`の一時listenerを先に開き、dynamic registration、PKCE S256、state、nonce、OpenAIのJWKSによるID token署名とissuer/audience/期限の照合を行う。host UUIDはアプリの保存領域で固定し、発行されたclient IDを再認証・refreshに使う。refreshは直列化し、更新されたrefresh tokenと`earliest_refresh_at`を保持する。token・本人情報・本人の公開モデルはAndroid Keystoreで暗号化した`noBackupFilesDir`内のAtomicFileへ保存する。URLやtokenをLogcat、作品JSON、Roomへ書かない。Room14と既存の作品データは変更しない。
+
+描画は五つの共有pipeline effectを専用のResponses/SSEへ送り、`store:false`・`stream:true`と、一つの`inku.submit_pipeline_response`関数を要求する。promptと応答の型、構図の読み、retryとfallbackは共有coreに委ねる。APIキーや端末モデルへ自動で切り替えない。完了イベントのoutputが空・NULL・省略なら完了itemの関数を採用するが、途中のdeltaやassistant本文だけでは採用しない。実行に保存するのは登録ID/generationだけで、アカウント切替・再認証・切断後に古い実行の応答を採用しない。DDLに穴がなくmodel呼出しが不要な描画は、プランの切断中も行える。
+
+公式の[認証](https://developers.openai.com/siwc/token-sharing-open-source/sign-in)、[モデル一覧と推論](https://developers.openai.com/siwc/token-sharing-open-source/models-and-inference)、[登録とsession](https://developers.openai.com/siwc/token-sharing-open-source/profiles-and-sessions)の契約に沿う。実際のOpenAIへの接続には本人のChromeでの認可が必要で、局所の試験成功とは区別する。
+
 ## 2026-10-03 端末モデルの応答をJSONの型へ沿わせる（I-713、2026-10-04更新）
 
 LiteRT-LMは0.17.1を使う。端末providerは `ModelRequest.tool.parametersJson` を `ResponseFormat.json(schema)` へ渡す。応答の型を持つ要求だけ、会話の `enableResponseFormat` と送信時の `responseFormat` を同時に設定して、SDKのJSON Schema制約を使う。型の無い文章の要求と写真の観察文ではこの制約を有効にしない。

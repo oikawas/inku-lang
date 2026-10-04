@@ -987,6 +987,8 @@ Stage 1、camera projection、hole補完は既存の共有grammar helperを使�
 
 接続完了後は「モデル設定を開く」と案内し、設定「モデル」のChatGPTプランで、他providerと同じ「公開モデルを選択」から一覧を取得・選択・保存する。取得中、件数、モデル名、空の一覧と通信・認可の失敗を表示する。取得しただけでは公開せず、保存した公開モデルだけが本人の描画モデル選択に現れる。Stage 1/2は共通のモデルを明示選択する。公開設定はowner・登録ごとに暗号化保存し、登録の同一identityへの再認証・再importで保持する。普通の利用者にも本人のモデル設定だけを提供し、共有providerのAPIキー・接続・rate設定の管理者権限は維持する。共有registry、Vision候補、bare名所有へ混ぜない。一覧と保存はowner・選択登録・generationを照合し、画面を開くだけでは外部一覧取得しない。未公開・提供終了モデルの保存指定は利用不可として保持する。
 
+Androidは端末内の本人single-user hostとして、設定「ChatGPTプラン」から端末のChromeとloopback callbackで直接認証する。Macからの移送やServerの資格情報を使わず、本人のscopeと登録ごとの公開catalogを検証してResponsesへ接続する。tokenと公開設定はKeystoreで暗号化したbackup対象外のアプリ領域へ保存する。独立した設定、初回の利用枠の案内、本人のモデル公開、固定した登録ID/generation、切断時の停止を同じ意味で扱う。Androidの詳細は[ANDROID_SPEC.ja.md](android/ANDROID_SPEC.ja.md)に記す。
+
 Responses/SSEは補助のassistant message・reasoningと、必要な一つの`inku` namespaceの`submit_pipeline_response`を区別する。描画には完了応答の関数引数だけを採用する。本文だけの応答、refusal、未知tool、複数関数・部分応答は拒否し、形式不一致では再接続を促さず診断を案内する。形式診断logはtype/name/namespaceだけで本文・引数を含めない。
 
 完了イベントのoutputが空・NULL・省略の場合は、先行する`response.output_item.done`で確定した一つの関数を使う。deltaだけでは採用せず、`response.completed`の成功状態と引数の一致・サイズ上限を要求する。形式診断にはstream中と確定済みの関数件数も含める。新しい描画の開始時は前の失敗表示を外し、現在の選択モデルで実行する。共有pipelineの親作品とauthorityは保持する。

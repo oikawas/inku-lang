@@ -183,6 +183,9 @@ class SharedPipelineHost(
                 stage2ModelId = models.requiredString("stage2_model_id"),
                 stage1MaxTokens = models.getInt("stage1_max_tokens"),
                 holeMaxTokens = models.getInt("hole_max_tokens"),
+                chatGptSession = models.optJSONObject("chatgpt_session")?.let {
+                    app.inku.mobile.llm.ChatGptSessionRef(it.requiredString("profile_id"), it.getLong("generation"))
+                },
             ),
             context = AuthoringContext(
                 description = context.optString("description"),
@@ -460,7 +463,10 @@ class SharedPipelineHost(
                 .put("stage1_model_id", session.models.stage1ModelId)
                 .put("stage2_model_id", session.models.stage2ModelId)
                 .put("stage1_max_tokens", session.models.stage1MaxTokens)
-                .put("hole_max_tokens", session.models.holeMaxTokens),
+                .put("hole_max_tokens", session.models.holeMaxTokens)
+                .apply { session.models.chatGptSession?.let {
+                    put("chatgpt_session", JSONObject().put("profile_id", it.profileId).put("generation", it.generation))
+                } },
         )
         .put(
             "context",

@@ -511,6 +511,11 @@ fun InkuApp(viewModel: InkuViewModel = androidx.lifecycle.viewmodel.compose.view
     // The in-app camera is the normal capture; the system camera app is the
     // fallback when the permission is refused or CameraX cannot start.
     val appContext = LocalContext.current
+    LaunchedEffect(viewModel, appContext) {
+        viewModel.chatGptAuthorizationRequests.collect { url ->
+            if (!openChatGptBrowser(appContext, url)) viewModel.chatGptBrowserUnavailable()
+        }
+    }
     var inAppCapture by remember { mutableStateOf<CameraCaptureRequest?>(null) }
     var permissionCapture by remember { mutableStateOf<CameraCaptureRequest?>(null) }
     val launchSystemCamera: (CameraCaptureRequest) -> Unit = { request ->
@@ -584,6 +589,14 @@ fun InkuApp(viewModel: InkuViewModel = androidx.lifecycle.viewmodel.compose.view
         LocalUiTextScale provides state.uiTextScale,
     ) {
     MaterialTheme(colorScheme = InkuColors, typography = inkuTypography(state.uiTextScale)) {
+        if (state.chatGptPlan.showPlanNotice) {
+            AlertDialog(
+                onDismissRequest = {},
+                title = { Text(S.chatGptNoticeTitle) },
+                text = { Text(S.chatGptPlanDescription) },
+                confirmButton = { TextButton(onClick = viewModel::acknowledgeChatGptPlan) { Text(S.chatGptNoticeAccept) } },
+            )
+        }
         Scaffold(
             bottomBar = {
                 // While the description is being written the destinations
@@ -1685,6 +1698,7 @@ private fun ComposeScreen(state: InkuUiState, viewModel: InkuViewModel) {
                 showTools = state.workContextId == null,
                 onBack = if (state.workContextId != null) viewModel::closeWorkContext else null,
             )
+            ChatGptDrawingStatus(state, viewModel)
             RunStatusRow(state, viewModel)
             if (editingWork) {
                 state.selectedHistory?.let { item ->
@@ -3980,7 +3994,7 @@ private fun RefinementAdjustControls(
  */
 @Composable
 private fun ModelInspectionControls(state: InkuUiState, viewModel: InkuViewModel) {
-    val choices = remember(state.modelAssets, state.providerSettings) { modelChoicesFor(state) }
+    val choices = remember(state.modelAssets, state.providerSettings) { modelChoicesFor(state, includeChatGpt = false) }
     Text(S.modelsToCompare(MAX_COMPARE_SELECTION), style = MaterialTheme.typography.labelMedium)
     WrapRow(horizontal = Dimens.spaceM, vertical = Dimens.spaceM) {
         choices.forEach { choice ->
@@ -4290,6 +4304,7 @@ private fun SettingsPanel(state: InkuUiState, viewModel: InkuViewModel, modifier
     when (state.settingsPane) {
         SettingsPane.Home -> SettingsHomePanel(state, viewModel, modifier)
         SettingsPane.Models -> ModelSettingsPanel(state, viewModel, modifier)
+        SettingsPane.ChatGpt -> ChatGptSettingsPanel(state, viewModel, modifier)
         SettingsPane.Demo -> DemoSettingsPanel(state, viewModel, modifier)
         SettingsPane.Export -> ExportSettingsPanel(state, viewModel, modifier)
         SettingsPane.Misc -> MiscSettingsPanel(state, viewModel, modifier)
@@ -4314,6 +4329,7 @@ private fun SettingsHomePanel(state: InkuUiState, viewModel: InkuViewModel, modi
             Text(S.settings, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Medium)
         }
         SettingsListItem(mark = "◇", title = S.modelSettings, sub = "OpenAI / Claude / Gemini / NVIDIA", onClick = { viewModel.setSettingsPane(SettingsPane.Models) })
+        SettingsListItem(mark = "◎", title = S.chatGptPlan, sub = S.chatGptConnectionSubtitle, onClick = { viewModel.setSettingsPane(SettingsPane.ChatGpt) })
         SettingsListItem(mark = "◉", title = S.demo, sub = S.demoRunAndSeed, onClick = { viewModel.setSettingsPane(SettingsPane.Demo) })
         SettingsListItem(mark = "⬚", title = S.export, sub = "PNG 1080 / 2160 / 4320", onClick = { viewModel.setSettingsPane(SettingsPane.Export) })
         SettingsListItem(mark = "◐", title = S.settingsMisc, sub = S.miscSubtitle, onClick = { viewModel.setSettingsPane(SettingsPane.Misc) })
@@ -4525,6 +4541,97 @@ private fun VersionInfoRow(label: String, value: String) {
 }
 
 @Composable
+internal fun ChatGptSettingsPanel(state: InkuUiState, viewModel: InkuViewModel, modifier: Modifier = Modifier) {
+    val context = LocalContext.current
+    val plan = state.chatGptPlan
+    Column(
+        modifier = modifier.testTag("ChatGPTPlanSettings").verticalScroll(rememberScrollState()).padding(horizontal = Dimens.spaceXs),
+        verticalArrangement = Arrangement.spacedBy(Dimens.spaceL),
+    ) {
+        SettingsHeader(SettingsPane.ChatGpt, viewModel)
+        SettingsCard(S.chatGptPlan, S.chatGptPlanDescription, chatGptConnectionStatus(plan, S)) {
+            plan.profiles.forEach { profile ->
+                Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceXs)) {
+                    TextButton(onClick = { viewModel.selectChatGptProfile(profile.id) }, enabled = !plan.pending) {
+                        Text((if (plan.activeProfileId == profile.id) "● " else "○ ") + profile.label)
+                    }
+                    if (plan.activeProfileId == profile.id) {
+                        WrapRow {
+                            SecondarySmallButton(S.chatGptReauthenticate, onClick = { viewModel.authorizeChatGpt(profile.id) }, enabled = !plan.pending)
+                            if (!profile.planAllowed) SecondarySmallButton(S.chatGptEnablePlan, onClick = { viewModel.authorizeChatGpt(profile.id, consent = true) }, enabled = !plan.pending)
+                            SecondarySmallButton(S.chatGptSignOut, onClick = { viewModel.signOutChatGpt(profile.id) }, enabled = !plan.pending)
+                        }
+                    }
+                }
+            }
+            if (plan.pending) {
+                Text(S.chatGptPending, style = MaterialTheme.typography.bodyMedium)
+                SecondarySmallButton(S.cancel, onClick = viewModel::cancelChatGptAuthorization)
+            } else {
+                SecondarySmallButton(if (plan.profiles.isEmpty()) S.chatGptContinue else S.chatGptAddAccount, onClick = { viewModel.authorizeChatGpt() })
+            }
+            if (plan.canUsePlan || plan.active?.let { it.status == "quota" && it.planAllowed } == true) SecondarySmallButton(S.chatGptOpenModels, onClick = { viewModel.setSettingsPane(SettingsPane.Models) })
+            SecondarySmallButton(S.chatGptManageUsage, onClick = { if (!openChatGptBrowser(context, app.inku.mobile.llm.CHATGPT_USAGE)) viewModel.chatGptBrowserUnavailable() })
+            plan.errorCode?.let { Text(S.chatGptError(it), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error) }
+            state.message?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
+            if (plan.revocationUnconfirmed) Text(S.chatGptRevocationUnconfirmed, style = MaterialTheme.typography.bodyMedium)
+        }
+    }
+}
+
+private fun chatGptConnectionStatus(plan: app.inku.mobile.llm.ChatGptPlanView, strings: InkuStrings): String = when {
+    plan.pending -> strings.chatGptPending
+    plan.active == null || plan.active?.status == "signed_out" -> strings.chatGptNotConnected
+    plan.active?.status == "quota" -> strings.chatGptError("subscription_sharing_usage_limit_exceeded")
+    plan.active?.status == "reauthentication_required" -> strings.chatGptError("chatgpt_reauthentication_required")
+    !plan.canUsePlan -> strings.chatGptPlanDisabled
+    else -> strings.chatGptConnected
+}
+
+/** Explicit Chrome launch, without logging the authorization URL. */
+private fun openChatGptBrowser(context: Context, url: String): Boolean = try {
+    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)).setPackage("com.android.chrome").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+    true
+} catch (_: Exception) { false }
+
+@Composable
+private fun ChatGptDrawingStatus(state: InkuUiState, viewModel: InkuViewModel) {
+    if (!state.selectedModelId.startsWith("chatgpt:")) return
+    val context = LocalContext.current
+    Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceXs)) {
+        Text(if (state.chatGptPlan.canUsePlan) S.chatGptUsingPlan else chatGptConnectionStatus(state.chatGptPlan, S), style = MaterialTheme.typography.labelMedium)
+        state.chatGptPlan.active?.label?.let { Text(it, style = MaterialTheme.typography.labelSmall) }
+        state.chatGptPlan.errorCode?.let { Text(S.chatGptError(it), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error) }
+        TextButton(onClick = { if (!openChatGptBrowser(context, app.inku.mobile.llm.CHATGPT_USAGE)) viewModel.chatGptBrowserUnavailable() }) { Text(S.chatGptManageUsage) }
+    }
+}
+
+@Composable
+private fun ChatGptModelCard(state: InkuUiState, viewModel: InkuViewModel) {
+    val plan = state.chatGptPlan
+    val session = plan.activeSession
+    val provider = state.providerSettings.firstOrNull { it.providerId == "chatgpt" } ?: return
+    var picker by remember(session) { mutableStateOf(false) }
+    SettingsCard(S.chatGptPlan, plan.active?.label.orEmpty(), chatGptConnectionStatus(plan, S)) {
+        Text(S.publishedModels, style = MaterialTheme.typography.labelSmall)
+        if (plan.publishedModels.isEmpty()) Text(S.noPublishedModels, style = MaterialTheme.typography.bodySmall)
+        else plan.publishedModels.forEach { id -> Text(plan.models?.firstOrNull { it.id == id }?.label ?: id, style = MaterialTheme.typography.bodySmall) }
+        SecondarySmallButton(S.modelSelection, onClick = { picker = true }, enabled = session != null && (plan.canUsePlan || plan.active?.let { it.status == "quota" && it.planAllowed } == true))
+        SecondarySmallButton(S.chatGptPlan, onClick = { viewModel.setSettingsPane(SettingsPane.ChatGpt) })
+    }
+    if (picker && session != null) {
+        ProviderModelPickerDialog(
+            provider = provider.copy(displayName = S.chatGptPlan),
+            candidateModelIds = plan.models?.map { it.id }, selectedModels = plan.publishedModels,
+            candidateLabels = plan.models?.associate { it.id to it.label }.orEmpty(),
+            onDismiss = { picker = false }, onFetchModels = { viewModel.fetchProviderModels("chatgpt") },
+            fetchState = state.providerModelFetchStates["chatgpt"],
+            onSave = { models -> picker = false; viewModel.publishChatGptModels(session, models) },
+        )
+    }
+}
+
+@Composable
 private fun ModelSettingsPanel(state: InkuUiState, viewModel: InkuViewModel, modifier: Modifier = Modifier) {
     Column(
         modifier = modifier
@@ -4537,7 +4644,10 @@ private fun ModelSettingsPanel(state: InkuUiState, viewModel: InkuViewModel, mod
         Column(verticalArrangement = Arrangement.spacedBy(Dimens.spaceXs)) {
             // A deleted built-in service stays in the table switched off (see
             // `InkuRepository.deleteProvider`); it is not listed.
-            state.providerSettings.filter { it.isEnabled || it.isDefaultLocal }.forEach { provider ->
+            state.providerSettings.filter { it.isEnabled || it.isDefaultLocal || (it.providerId == "chatgpt" && state.chatGptPlan.active != null) }.forEach { provider ->
+                if (provider.providerId == "chatgpt") {
+                    ChatGptModelCard(state, viewModel)
+                } else {
                 ProviderConnectionCard(
                     provider = provider,
                     candidateModelIds = state.providerModelCandidates[provider.providerId],
@@ -4552,6 +4662,12 @@ private fun ModelSettingsPanel(state: InkuUiState, viewModel: InkuViewModel, mod
                     statusMessage = state.message,
                     fetchState = state.providerModelFetchStates[provider.providerId],
                 )
+                }
+            }
+            if (state.chatGptPlan.active == null) {
+                SettingsCard(S.chatGptPlan, S.chatGptConnectionSubtitle, chatGptConnectionStatus(state.chatGptPlan, S)) {
+                    SecondarySmallButton(S.chatGptContinue, onClick = { viewModel.setSettingsPane(SettingsPane.ChatGpt) })
+                }
             }
             AddProviderCard(onAdd = viewModel::saveProviderSetting)
         }
@@ -4841,12 +4957,15 @@ private fun ProviderModelPickerDialog(
     onDismiss: () -> Unit,
     onFetchModels: () -> Unit,
     fetchState: ProviderModelFetchState?,
+    candidateLabels: Map<String, String> = emptyMap(),
     onSave: (List<String>) -> Unit,
 ) {
     var search by remember(provider.providerId) { mutableStateOf("") }
     var selected by remember(provider.providerId, provider.publishedModelsJson) { mutableStateOf(selectedModels.toSet()) }
-    val candidateModels = remember(provider.providerId, provider.publishedModelsJson, candidateModelIds) {
-        providerModelCandidates(provider, candidateModelIds)
+    val candidateModels = remember(provider.providerId, provider.publishedModelsJson, candidateModelIds, candidateLabels) {
+        if (provider.providerId == "chatgpt") {
+            (candidateModelIds.orEmpty() + selectedModels).distinct().map { id -> ProviderModelCandidate(id, candidateLabels[id] ?: id, id) }
+        } else providerModelCandidates(provider, candidateModelIds)
     }
     val candidateIds = candidateModels.map { it.id }.toSet()
     val selectionChanged = selected != selectedModels.toSet()
@@ -5200,6 +5319,7 @@ private fun SettingsListItem(mark: String, title: String, sub: String, onClick: 
 private fun settingsPaneTitle(pane: SettingsPane): String = when (pane) {
     SettingsPane.Home -> S.settings
     SettingsPane.Models -> S.modelSettings
+    SettingsPane.ChatGpt -> S.chatGptPlan
     SettingsPane.Demo -> S.demo
     SettingsPane.Export -> S.export
     SettingsPane.Misc -> S.settingsMisc
@@ -5210,6 +5330,7 @@ private fun settingsPaneTitle(pane: SettingsPane): String = when (pane) {
 private fun settingsPaneSubtitle(pane: SettingsPane): String = when (pane) {
     SettingsPane.Home -> "List + Detail"
     SettingsPane.Models -> "OpenAI / Claude / Gemini / NVIDIA"
+    SettingsPane.ChatGpt -> S.chatGptConnectionSubtitle
     SettingsPane.Demo -> S.demoSubtitle
     SettingsPane.Export -> "PNG / SVG templates"
     SettingsPane.Misc -> S.miscSubtitle
@@ -5343,17 +5464,18 @@ private fun providerModelCandidates(provider: app.inku.mobile.data.db.ProviderSe
     return ((if (fetchedModelIds == null) defaults else fetched) + stored).distinctBy { it.id }
 }
 
-private fun modelChoicesFor(state: InkuUiState): List<ModelChoice> {
+private fun modelChoicesFor(state: InkuUiState, includeChatGpt: Boolean = true): List<ModelChoice> {
     val choices = mutableListOf<ModelChoice>()
     state.modelAssets.forEach { asset ->
         choices += ModelChoice(asset.modelId, "${asset.displayName} ${asset.qualityTier}", "LiteRT-LM")
     }
     state.providerSettings
-        .filter { it.isEnabled && !it.isDefaultLocal }
+        .filter { it.isEnabled && !it.isDefaultLocal && !((state.modelSelectionForCamera || !includeChatGpt) && it.providerId == "chatgpt") }
         .forEach { provider ->
-            parsePublishedModelIds(provider.publishedModelsJson).forEach { modelId ->
+            availablePublishedModels(provider, state).forEach { modelId ->
                 val qualified = qualifyModelId(provider.providerId, modelId)
-                choices += ModelChoice(qualified, modelDisplayName(modelId), provider.displayName)
+                val label = if (provider.providerId == "chatgpt") state.chatGptPlan.models?.firstOrNull { it.id == modelId }?.label ?: modelId else modelDisplayName(modelId)
+                choices += ModelChoice(qualified, label, if (provider.providerId == "chatgpt") stringsFor(state.uiLanguage).chatGptPlan else provider.displayName)
             }
         }
     return choices.distinctBy { it.id }
@@ -5361,7 +5483,7 @@ private fun modelChoicesFor(state: InkuUiState): List<ModelChoice> {
 
 private fun modelProviderGroupsFor(state: InkuUiState): List<app.inku.mobile.data.db.ProviderSettingEntity> {
     val local = state.providerSettings.filter { it.isDefaultLocal }
-    val remote = state.providerSettings.filter { it.isEnabled && !it.isDefaultLocal }
+    val remote = state.providerSettings.filter { it.isEnabled && !it.isDefaultLocal && !(state.modelSelectionForCamera && it.providerId == "chatgpt") }
     return (local + remote).distinctBy { it.providerId }
 }
 
@@ -5382,11 +5504,11 @@ private fun modelOptionsForProvider(state: InkuUiState, providerId: String, stri
         }
     }
     val provider = state.providerSettings.firstOrNull { it.providerId == providerId } ?: return emptyList()
-    return parsePublishedModelIds(provider.publishedModelsJson).map { id ->
+    return availablePublishedModels(provider, state).map { id ->
         ModelOptionChoice(
             rawId = id,
             qualifiedId = qualifyModelId(provider.providerId, id),
-            label = modelDisplayName(id),
+            label = if (providerId == "chatgpt") state.chatGptPlan.models?.firstOrNull { it.id == id }?.label ?: id else modelDisplayName(id),
             notes = id,
         )
     }
@@ -5395,9 +5517,16 @@ private fun modelOptionsForProvider(state: InkuUiState, providerId: String, stri
 private fun providerOfModelId(modelId: String, state: InkuUiState): String {
     state.providerSettings.firstOrNull { modelId.startsWith("${it.providerId}:") }?.let { return it.providerId }
     state.providerSettings.firstOrNull { provider ->
-        parsePublishedModelIds(provider.publishedModelsJson).contains(modelId)
+        provider.providerId != "chatgpt" && parsePublishedModelIds(provider.publishedModelsJson).contains(modelId)
     }?.let { return it.providerId }
     return "local-litert-lm"
+}
+
+private fun availablePublishedModels(provider: app.inku.mobile.data.db.ProviderSettingEntity, state: InkuUiState): List<String> {
+    val published = parsePublishedModelIds(provider.publishedModelsJson)
+    if (provider.providerId != "chatgpt") return published
+    val offered = state.chatGptPlan.models.orEmpty().map { it.id }.toSet()
+    return published.filter { it in offered }
 }
 
 private fun modelChoiceStatusLabel(downloadState: String, strings: InkuStrings): String {

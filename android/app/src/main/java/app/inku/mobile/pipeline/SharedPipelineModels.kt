@@ -37,6 +37,7 @@ data class PipelineModelSelection(
     // Same bound as the server manifest's `stage1_max_tokens`.
     val stage1MaxTokens: Int = 2048,
     val holeMaxTokens: Int = 2048,
+    val chatGptSession: app.inku.mobile.llm.ChatGptSessionRef? = null,
 )
 
 sealed interface PipelineAuthoring {

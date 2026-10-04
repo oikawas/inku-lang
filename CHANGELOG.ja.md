@@ -14,6 +14,10 @@
 
 単独利用モードでもsession Cookieを先に照合していたため、無効Cookieがあると固定ownerへ進まず401になり、Webがログイン画面を出した。明示Bearerの照合を先に保ち、その後は単独利用の固定owner、通常モードではCookieを使う。別の利用者の有効Cookieでも単独利用のownerは切り替わらない。無効Bearer・固定owner不在の拒否、通常のsession認証、CSRF境界と本人ChatGPTのbindingを保持する。Cookie削除や他portログアウト、保存済み作品・認証登録の移行は行わない。
 
+### 2026-10-04 — 変奏を廃止する
+
+変奏は、2026-09-27に焦点の読み替えを外してから動かすものが無く、語が推敲と紛らわしかった。作者の判断で廃止する。coreは明示変奏（強度と`variation_seed`の組）の型と引数を外し、`transform_stage15`と`compile_ddl_to_score`系の入口は変奏を受けない。保存済みの設定や古いhostが送るcompiler optionsの`stage15_variation`（nullでも組でも）は読んで捨て、新しく書かない。SPEC日英（§7.8・§8.4・§12.11・§12.13ほか）、訳語の対応表、手引き、設計の文書、README、画像の作成方法から変奏を外した。作品の版の意味で使っていた「変奏」は「variation」（画面では「作品」）、揺らぎの意味で使っていた「変奏」は「揺らぎ」と書く。保存済みの作品の記録（系譜の辺`variation`、変奏 seed・強度・焦点）は書き換えない。系譜の辺の札は「変奏（旧）」とし、古い作品の生成情報にだけ変奏 seed と強度を示す。Server・Web・CLI・Androidの選択肢と受け口は、それぞれの変更で外す。DDL engine・render engine・Scoreの版とlockの既知の値は変わらない。
+
 ### v2.15.84 — 現行契約に合わせてCIを修正する（Build 1160、2026-10-04）
 
 v2.15.83の公開時に残ったServer・CLIの試験の期待値と試験用データ、Androidのデザイン資料を訂正した版。描画・保存・認証の動作とDDL engine 57・render engine 73・Score 0.19.0を保持する。既存の公開tagを変更せず、修正版として公開する。

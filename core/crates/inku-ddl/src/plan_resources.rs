@@ -1204,7 +1204,7 @@ mod tests {
                 max_total_nodes: 64,
             },
         );
-        transform_stage15(stage15_transformation_input(&compiled).unwrap(), None).unwrap()
+        transform_stage15(stage15_transformation_input(&compiled).unwrap()).unwrap()
     }
 
     fn plan(stage: &Stage15TransformationResult) -> CompositionPlanResult<'_> {

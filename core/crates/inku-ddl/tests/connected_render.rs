@@ -29,7 +29,6 @@ fn actual_compiler_touching_reaches_render_and_stop_continue() {
             Some(23),
             LIMITS,
             ScoreLoweringContext::resolve("wide", Color::White).unwrap(),
-            None,
             ScoreErrorPolicy::Stop,
         );
         assert_eq!(execution.outcome(), ScoreLoweringOutcome::Complete);
@@ -80,7 +79,6 @@ fn actual_compiler_score_reaches_checked_connected_render_and_exact_owner_join()
         Some(23),
         LIMITS,
         ScoreLoweringContext::resolve("wide", Color::White).unwrap(),
-        None,
         ScoreErrorPolicy::Stop,
     );
     assert_eq!(execution.outcome(), ScoreLoweringOutcome::Complete);

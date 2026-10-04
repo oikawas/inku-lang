@@ -25,7 +25,7 @@
 ### F-04 Long historical Stage 1.5 description (resolved)
 
 - In the earlier snapshot, `SPEC.ja.md` §12.11 described an old design that added mathematical, musical, and painterly candidates.
-- The current §12.11 is rewritten as a typed transformation that takes only `CanonicalReady` typed meaning and changes only focus and explicit variation.
+- The current §12.11 is rewritten as a typed transformation that takes only `CanonicalReady` typed meaning, verifies it, and only fixes the identity of effective meaning (focus was removed on 2026-09-27 and explicit variation on 2026-10-04).
 - Result: **resolved**.
 
 ### F-05 Stale statements in the Project Context (resolved)

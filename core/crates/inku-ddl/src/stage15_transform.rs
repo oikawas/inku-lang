@@ -1,14 +1,14 @@
 //! CanonicalReady-only verification boundary over typed DDL meaning.
 //!
 //! Stage 1.5 used to reinterpret `place:center` as one of six off-center focus
-//! regions and let an explicit variation move that focus. Both were removed:
-//! `center` is now an ordinary named region (see `geometry.rs`), and an explicit
-//! variation is accepted for wire compatibility but has no axis to move. What
-//! remains is the lock-verified, source-independent view the Score lowerer reads.
+//! regions and let an explicit variation move that focus. The focus was removed
+//! on 2026-09-27, leaving `center` an ordinary named region (see `geometry.rs`),
+//! and the variation, which then had nothing to move, was retired on 2026-10-04.
+//! What remains is the lock-verified, source-independent view the Score lowerer
+//! reads.
 
 use std::collections::BTreeMap;
 
-use serde::{Deserialize, Serialize};
 use serde_json::{Number, Value};
 use sha2::{Digest, Sha256};
 
@@ -29,35 +29,6 @@ use crate::{
 
 /// Stable identity for the effective typed Stage 1.5 overlay.
 pub const STAGE15_TRANSFORMATION_SCHEMA_ID: &str = "inku.typed-stage15-transformation.v7";
-/// Closed explicit variation amplitude. Partial or unknown values cannot enter the core.
-/// No axis currently moves; the request is accepted so saved and in-flight clients keep working.
-#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
-#[serde(rename_all = "snake_case")]
-pub enum Stage15VariationAmplitude {
-    Small,
-    Medium,
-    Large,
-}
-
-impl Stage15VariationAmplitude {
-    pub const ALL: [Self; 3] = [Self::Small, Self::Medium, Self::Large];
-
-    pub const fn as_str(self) -> &'static str {
-        match self {
-            Self::Small => "small",
-            Self::Medium => "medium",
-            Self::Large => "large",
-        }
-    }
-}
-
-/// One complete explicit variation request.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub struct Stage15Variation {
-    pub amplitude: Stage15VariationAmplitude,
-    pub seed: u64,
-}
-
 /// Complete, validated input owned independently from the source-bearing compilation envelope.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Stage15TransformationInput {
@@ -416,10 +387,9 @@ pub(crate) fn stage15_execution_projection_input(
 }
 
 /// Detach the verified view the Score lowerer reads. The original typed graph is
-/// not changed. An explicit variation is accepted but moves nothing.
+/// not changed.
 pub fn transform_stage15(
     input: Stage15TransformationInput,
-    _variation: Option<Stage15Variation>,
 ) -> Result<Stage15TransformationResult, Stage15TransformError> {
     let composition_seed = input.composition_seed();
     let geometry_policy_id = input.geometry_policy_id();

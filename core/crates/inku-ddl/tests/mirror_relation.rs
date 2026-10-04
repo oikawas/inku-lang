@@ -155,7 +155,6 @@ fn execute(
             ),
         )
         .unwrap(),
-        None,
         ScoreErrorPolicy::OmitAndContinue,
         HardResourcePolicy {
             identity: "mirror-relation-test.v1".into(),

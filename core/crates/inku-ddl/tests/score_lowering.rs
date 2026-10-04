@@ -6,12 +6,11 @@ use inku_ddl::{
     ScoreDiagnosticOwner, ScoreErrorPolicy, ScoreFieldGap, ScoreInstructionField,
     ScoreInstructionOrigin, ScoreLoweringCandidate, ScoreLoweringContext, ScoreLoweringOutcome,
     ScoreMacroCallerField, ScoreOmissionUnit, SemanticHead, SemanticIdentity,
-    SemanticPreviousReference, SemanticRelationKind, Stage15TransformationResult, Stage15Variation,
-    Stage15VariationAmplitude, VerifiedStage15EffectiveView, compile_typed_ddl,
-    geometry_resolution_policy_digest, lower_verified_stage15_score,
-    lower_verified_stage15_score_with_policy, lower_verified_stage15_view, plan_verified_stage15,
-    plan_verified_stage15_with_policy, score_primitive_from_semantic_identity,
-    stage15_transformation_input, transform_stage15,
+    SemanticPreviousReference, SemanticRelationKind, Stage15TransformationResult,
+    VerifiedStage15EffectiveView, compile_typed_ddl, geometry_resolution_policy_digest,
+    lower_verified_stage15_score, lower_verified_stage15_score_with_policy,
+    lower_verified_stage15_view, plan_verified_stage15, plan_verified_stage15_with_policy,
+    score_primitive_from_semantic_identity, stage15_transformation_input, transform_stage15,
 };
 use inku_render::palette::{default_color_map, work_palette_context};
 use inku_render::placement::region_in_short_side_units;
@@ -601,7 +600,6 @@ fn shared_shape_macro_parameters_and_locals_use_the_same_consumer() {
                     Some(19),
                     LIMITS,
                     ScoreLoweringContext::resolve("wide", Color::White).unwrap(),
-                    None,
                     policy,
                 );
                 // An undeclared or missing caller value is never accepted
@@ -686,7 +684,6 @@ fn shared_shape_numeric_anchors_and_conflicts_are_never_repaired() {
                 None,
                 LIMITS,
                 context,
-                None,
                 policy,
             );
             assert!(result.score().is_none(), "{source}: {policy:?}");
@@ -953,35 +950,8 @@ fn noncenter_macro_relation_is_delivered_in_both_modes() {
 }
 
 #[test]
-fn corner_uses_original_meaning_and_occurrence_not_source_or_variation() {
+fn corner_uses_original_meaning_and_occurrence_not_source() {
     let context = ScoreLoweringContext::resolve("square", Color::White).unwrap();
-    let compilation = compile_typed_ddl(
-        NormalizedDdlDocument::new(
-            "place one red circle at center. place one blue circle at corner.",
-            ResolvedInstructionLanguage::En,
-            Vec::new(),
-        )
-        .unwrap(),
-        &[],
-        Some(41),
-        LIMITS,
-    );
-    let baseline =
-        transform_stage15(stage15_transformation_input(&compilation).unwrap(), None).unwrap();
-    let varied = transform_stage15(
-        stage15_transformation_input(&compilation).unwrap(),
-        Some(Stage15Variation {
-            amplitude: Stage15VariationAmplitude::Large,
-            seed: 99,
-        }),
-    )
-    .unwrap();
-    let a = lower_verified_stage15_score(baseline.verified_effective_view(), context);
-    let b = lower_verified_stage15_score(varied.verified_effective_view(), context);
-    assert_eq!(
-        a.score().unwrap().instructions[1],
-        b.score().unwrap().instructions[1]
-    );
     for seed in [None, Some(0), Some(1), Some(19)] {
         let inline = stage15_seeded("赤い円を隅に置く。", ResolvedInstructionLanguage::Ja, seed);
         let continued = stage15_seeded(
@@ -1385,7 +1355,7 @@ fn direct_horizontal_angle_reaches_actual_score_rotation() {
 }
 
 #[test]
-fn seeded_angles_are_reproducible_bilingual_and_stage15_variation_invariant() {
+fn seeded_angles_are_reproducible_and_bilingual() {
     let source = "place one red diagonal circle at center.";
     let compilation = compile_typed_ddl(
         NormalizedDdlDocument::new(source, ResolvedInstructionLanguage::En, Vec::new()).unwrap(),
@@ -1393,25 +1363,13 @@ fn seeded_angles_are_reproducible_bilingual_and_stage15_variation_invariant() {
         Some(41),
         LIMITS,
     );
-    let baseline =
-        transform_stage15(stage15_transformation_input(&compilation).unwrap(), None).unwrap();
-    let varied = transform_stage15(
-        stage15_transformation_input(&compilation).unwrap(),
-        Some(Stage15Variation {
-            amplitude: Stage15VariationAmplitude::Large,
-            seed: 99,
-        }),
-    )
-    .unwrap();
+    let baseline = transform_stage15(stage15_transformation_input(&compilation).unwrap()).unwrap();
     let context = ScoreLoweringContext::resolve("wide", Color::White).unwrap();
     let baseline_lowered =
         lower_verified_stage15_score(baseline.verified_effective_view(), context);
-    let varied_lowered = lower_verified_stage15_score(varied.verified_effective_view(), context);
     let baseline_score = baseline_lowered.score().unwrap();
-    let varied_score = varied_lowered.score().unwrap();
     let rotation = baseline_score.instructions[0].rotation.unwrap();
     assert!([45.0, 135.0, 225.0, 315.0].contains(&rotation));
-    assert_eq!(varied_score.instructions[0].rotation, Some(rotation));
 
     let japanese = stage15_seeded(
         "赤い左上がりの円を中心に置く。",
@@ -4931,7 +4889,7 @@ fn stage15_seeded(
             compilation.holes, compilation.conflicts, compilation.blocking_diagnostics
         )
     });
-    transform_stage15(input, None).unwrap()
+    transform_stage15(input).unwrap()
 }
 
 fn stage15_locked(
@@ -4952,7 +4910,7 @@ fn stage15_locked(
             compilation.holes, compilation.conflicts, compilation.blocking_diagnostics
         )
     });
-    transform_stage15(input, None).unwrap()
+    transform_stage15(input).unwrap()
 }
 
 fn lock_for(definition: &MacroDefinition) -> MacroLock {

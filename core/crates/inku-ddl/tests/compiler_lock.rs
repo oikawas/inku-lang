@@ -6,11 +6,10 @@ use inku_ddl::{
     RelationReferenceEvidenceAvailability, ResolvedInstructionLanguage,
     SEMANTIC_DOCUMENT_SCHEMA_ID, SEMANTIC_SOURCE_PROVENANCE_SCHEMA_ID, SemanticContinuationTarget,
     SemanticDeliveryOwner, SemanticHead, SemanticIssueCausalProvenance,
-    SemanticUpstreamCausalRelation, Stage15Variation, Stage15VariationAmplitude,
-    TYPED_DDL_COMPILATION_SCHEMA_ID, TYPED_DDL_COMPILER_LOCK_SCHEMA_ID, bind_macro_parameters,
-    compile_typed_ddl, expanded_generated_provenance_canonical_bytes,
-    expanded_meaning_canonical_bytes, saijiki_asset, semantic_source_provenance_canonical_bytes,
-    stage15_transformation_input, transform_stage15,
+    SemanticUpstreamCausalRelation, TYPED_DDL_COMPILATION_SCHEMA_ID,
+    TYPED_DDL_COMPILER_LOCK_SCHEMA_ID, bind_macro_parameters, compile_typed_ddl,
+    expanded_generated_provenance_canonical_bytes, expanded_meaning_canonical_bytes, saijiki_asset,
+    semantic_source_provenance_canonical_bytes, stage15_transformation_input, transform_stage15,
 };
 use serde::Deserialize;
 use serde_json::Value;
@@ -2392,9 +2391,8 @@ fn step9h_macro_parameter_continuations_preserve_equal_and_block_different_meani
             .expanded_meaning_digest
     );
     let inline_effective =
-        transform_stage15(stage15_transformation_input(&inline).unwrap(), None).unwrap();
-    let equal_effective =
-        transform_stage15(stage15_transformation_input(&equal).unwrap(), None).unwrap();
+        transform_stage15(stage15_transformation_input(&inline).unwrap()).unwrap();
+    let equal_effective = transform_stage15(stage15_transformation_input(&equal).unwrap()).unwrap();
     assert_eq!(
         inline_effective.effective_canonical_bytes(),
         equal_effective.effective_canonical_bytes()
@@ -2716,7 +2714,7 @@ fn semantic_macro_execution_owner_preserves_continuation_binding_and_stage15_del
         );
 
         let transformed =
-            transform_stage15(stage15_transformation_input(&result).unwrap(), None).unwrap();
+            transform_stage15(stage15_transformation_input(&result).unwrap()).unwrap();
         assert_eq!(
             transformed.original_semantic_document(),
             &semantic.ast,
@@ -2804,26 +2802,12 @@ fn macro_source_gap_shares_seed_expanded_and_effective_meaning_without_losing_so
     });
     assert_eq!(expanded_meaning[0], expanded_meaning[1]);
 
-    let baseline = results.each_ref().map(|result| {
-        transform_stage15(stage15_transformation_input(result).unwrap(), None).unwrap()
-    });
+    let baseline = results
+        .each_ref()
+        .map(|result| transform_stage15(stage15_transformation_input(result).unwrap()).unwrap());
     assert_eq!(
         baseline[0].effective_canonical_bytes(),
         baseline[1].effective_canonical_bytes()
-    );
-    let varied = results.each_ref().map(|result| {
-        transform_stage15(
-            stage15_transformation_input(result).unwrap(),
-            Some(Stage15Variation {
-                amplitude: Stage15VariationAmplitude::Medium,
-                seed: 7,
-            }),
-        )
-        .unwrap()
-    });
-    assert_eq!(
-        varied[0].effective_canonical_bytes(),
-        varied[1].effective_canonical_bytes()
     );
 
     let locks = results

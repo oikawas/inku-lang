@@ -2,6 +2,10 @@
 
 This file records revisions to user and operations documents under `manual/`. See `SPEC.ja.md` for the detailed product change history.
 
+## 2026-10-04 — Variation retired
+
+Variation is retired (the author's decision), so its row leaves the refinement table of Creating Images in both languages and 8.1 now tells of the retirement. Variation is also gone from the refinement elements, autonomous refinement, held works, provenance, lineage, and the troubleshooting table, and the held work's button reads `Start a new work from this description`. Works made by an earlier variation keep a "Variation (retired)" edge and the variation seed and amplitude of that time.
+
 ## 2026-10-01 — Locking writes to the database
 
 Administrators can now lock writes to the database in `Other (server)`. The output section of Server Configuration describes the switch and what still works while writes are locked.

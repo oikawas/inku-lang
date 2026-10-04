@@ -175,7 +175,6 @@ fn compile(request: Request) -> Result<Response, String> {
                 Some(request.composition_seed),
                 LIMITS,
                 context,
-                None,
                 request.error_policy,
                 resources.hard_policy,
                 resources.operational_budget,
@@ -199,7 +198,6 @@ fn compile(request: Request) -> Result<Response, String> {
                 Some(request.composition_seed),
                 LIMITS,
                 context,
-                None,
                 request.error_policy,
             );
             (

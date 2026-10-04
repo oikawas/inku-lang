@@ -38,7 +38,7 @@ fn score(source: &str) -> Score {
         compiled.blocking_diagnostics
     );
     let input = stage15_transformation_input(&compiled).unwrap();
-    let transformed = transform_stage15(input, None).unwrap();
+    let transformed = transform_stage15(input).unwrap();
     let plan = plan_verified_stage15(
         transformed.verified_effective_view(),
         ScoreLoweringContext::resolve("square", Color::White).unwrap(),

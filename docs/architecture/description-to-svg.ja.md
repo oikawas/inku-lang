@@ -158,9 +158,9 @@ coreは可視DDLとauthorityの次状態を1つのCAS保存effectとしてhost�
 
 互換route（`/api/paint`等）は承認待ちに達すると409と現在のviewを返し、承認・辞退は`/api/pipeline/executions/{id}/commands`で行う。
 
-## Stage 1.5 — 焦点と明示変奏
+## Stage 1.5 — 意味の確定
 
-LLMを呼ばない。`canonical_ready`のmeaningだけを入力とし（それ以外はsealed projectionを経る）、`place:center`を閉じた6つの焦点候補の1つへ写すことと、明示変奏（amplitude + `variation_seed`の組）で焦点だけを動かすことだけを行う。焦点の選択はlock検証済みのpre / expanded meaning digestとattested optional `composition_seed`に束縛し、render seedやsource spellingを混ぜない。同じ入力と同じseedは同じeffective meaningを生む。
+LLMを呼ばない。`canonical_ready`のmeaningだけを入力とし（それ以外はsealed projectionを経る）、入力を検証してeffective meaningの同一性を固定する。2026-09-27に`place:center`を焦点候補へ写すことを外し、2026-10-04に明示変奏を廃止した。保存済みの設定や古いhostが送る`stage15_variation`は読んで捨てる。effective meaningの同一性はlock検証済みのpre / expanded meaning digestとattested optional `composition_seed`に束縛し、render seedやsource spellingを混ぜない。同じ入力と同じseedは同じeffective meaningを生む。
 
 ## Plan・資源選択・materialize
 

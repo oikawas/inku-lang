@@ -266,7 +266,7 @@ fn stage(
             compilation.holes, compilation.conflicts, compilation.blocking_diagnostics
         )
     });
-    transform_stage15(input, None).unwrap()
+    transform_stage15(input).unwrap()
 }
 
 fn context(canvas: &str) -> ScoreLoweringContext {

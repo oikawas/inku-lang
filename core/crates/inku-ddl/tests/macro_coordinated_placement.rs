@@ -50,7 +50,7 @@ fn stage(source: &str, definition: &MacroDefinition) -> Stage15TransformationRes
             compiled.conflicts, compiled.blocking_diagnostics
         )
     });
-    transform_stage15(input, None).unwrap()
+    transform_stage15(input).unwrap()
 }
 
 fn context() -> ScoreLoweringContext {

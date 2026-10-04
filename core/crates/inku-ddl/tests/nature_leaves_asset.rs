@@ -129,7 +129,6 @@ fn bundled_nature_leaves_are_valid_bounded_definitions_that_reach_normal_score_l
             Some(37),
             limits,
             ScoreLoweringContext::resolve("square", Color::White).unwrap(),
-            None,
             ScoreErrorPolicy::Stop,
         );
         assert_eq!(
@@ -292,7 +291,6 @@ fn migrate_and_compile(
         Some(37),
         MIGRATION_LIMITS,
         ScoreLoweringContext::resolve("square", Color::White).unwrap(),
-        None,
         ScoreErrorPolicy::Stop,
     );
     assert_eq!(
@@ -541,7 +539,6 @@ fn a_bundled_word_draws_the_same_score_by_its_canonical_name_or_its_alias() {
             Some(37),
             limits,
             ScoreLoweringContext::resolve("square", Color::White).unwrap(),
-            None,
             ScoreErrorPolicy::Stop,
         );
         assert_eq!(
@@ -630,7 +627,6 @@ fn every_bundled_word_expands_without_omission_at_many_placement_seeds() {
                 Some(seed),
                 limits,
                 ScoreLoweringContext::resolve("square", Color::White).unwrap(),
-                None,
                 ScoreErrorPolicy::Stop,
             );
             assert_eq!(
@@ -673,7 +669,6 @@ fn counted_words_take_the_written_count_inside_the_word() {
             Some(37),
             MIGRATION_LIMITS,
             ScoreLoweringContext::resolve("square", Color::White).unwrap(),
-            None,
             ScoreErrorPolicy::OmitAndContinue,
         )
     };
@@ -789,7 +784,6 @@ fn every_counted_word_expands_without_omission_at_its_maximum_count() {
                 Some(seed),
                 MIGRATION_LIMITS,
                 ScoreLoweringContext::resolve("square", Color::White).unwrap(),
-                None,
                 ScoreErrorPolicy::Stop,
             );
             assert_eq!(

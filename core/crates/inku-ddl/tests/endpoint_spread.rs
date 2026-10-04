@@ -84,7 +84,7 @@ fn consolidated_words_carry_their_meaning_and_self_endpoint_is_not_retargeted() 
         },
     );
     if let Ok(input) = stage15_transformation_input(&compiled) {
-        let transformed = transform_stage15(input, None).unwrap();
+        let transformed = transform_stage15(input).unwrap();
         let lowered = lower_verified_stage15_score(
             transformed.verified_effective_view(),
             ScoreLoweringContext::resolve("square", Color::White).unwrap(),
@@ -119,7 +119,7 @@ fn compile(
             )
         )
     });
-    transform_stage15(input, None).unwrap()
+    transform_stage15(input).unwrap()
 }
 
 fn typed_compilation(

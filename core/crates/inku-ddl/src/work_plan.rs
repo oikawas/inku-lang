@@ -1018,7 +1018,6 @@ pub fn work_plan_source_compiles_cleanly(
             max_total_nodes: 500,
         },
         context,
-        None,
         ScoreErrorPolicy::OmitAndContinue,
         hard,
         operational,

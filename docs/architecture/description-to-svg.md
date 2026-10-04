@@ -158,9 +158,9 @@ When the lock of the saved DDL carries known holes, core requests the hole compl
 
 A compatibility route (such as `/api/paint`) answers 409 with the current view when it reaches the approval wait; approval and decline go through `/api/pipeline/executions/{id}/commands`.
 
-## Stage 1.5 — focus and explicit variation
+## Stage 1.5 — settling meaning
 
-No model call. It takes only `canonical_ready` meaning (anything else goes through the sealed projection) and does only two things: maps `place:center` to one of six closed focus candidates, and moves only the focus for an explicit variation (the pair of amplitude and `variation_seed`). The focus choice is bound to the lock-verified pre and expanded meaning digests and the attested optional `composition_seed`; it never mixes in the render seed or the source spelling. The same input and the same seeds give the same effective meaning.
+No model call. It takes only `canonical_ready` meaning (anything else goes through the sealed projection), verifies its input, and fixes the identity of effective meaning. Mapping `place:center` to focus candidates was removed on 2026-09-27, and explicit variation was retired on 2026-10-04; a `stage15_variation` that a saved configuration or an older host still carries is read and ignored. The identity of effective meaning is bound to the lock-verified pre and expanded meaning digests and the attested optional `composition_seed`; it never mixes in the render seed or the source spelling. The same input and the same seeds give the same effective meaning.
 
 ## Plan, resource selection, materialization
 

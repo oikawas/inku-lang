@@ -152,7 +152,7 @@ fn stage(
             compilation.holes, compilation.conflicts, compilation.blocking_diagnostics
         )
     });
-    transform_stage15(input, None).unwrap()
+    transform_stage15(input).unwrap()
 }
 
 fn context(canvas: &str) -> ScoreLoweringContext {
@@ -681,7 +681,7 @@ fn exact_counts_default_and_object_dimensions_are_independent() {
             &[],
         );
         if let Ok(input) = stage15_transformation_input(&compilation) {
-            let transformed = transform_stage15(input, None).unwrap();
+            let transformed = transform_stage15(input).unwrap();
             let result =
                 plan_verified_stage15(transformed.verified_effective_view(), context("square"));
             assert_eq!(

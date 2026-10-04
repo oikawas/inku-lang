@@ -60,20 +60,20 @@
 | 点呼（送り手の検査） | **roll call** | 名詞。全 sender が値を送っていることの検査 | — |
 | 実況（stream の途中経過） | **commentary** | 名詞。`sketch` / `stage1` / `score` event の総称 | ~~progress~~ 単独 |
 
-## 3. 推敲・変奏・系譜
+## 3. 推敲・系譜
 
 | 日本語（正本） | 英語 | 用法 | 退けた訳・注 |
 |---|---|---|---|
 | 推敲 | **refinement** / **refine** | 名詞／動詞 | ~~revision~~（事務的）、~~iteration~~（工学的） |
-| 言葉でタッチを変える | **Another performance** | **lint 固定**。五操作は Another + 名詞で統一 | — |
+| 言葉でタッチを変える | **Another performance** | **lint 固定**。四操作は Another + 名詞で統一 | — |
 | 配置を変える | **Another composition** | **lint 固定** | — |
 | 読み取りを変える | **Another reading** | **lint 固定** | — |
 | 色カタログを変える | **Another catalog** | **lint 固定** | — |
-| 変奏 | **Variation** | **lint 固定**。音楽術語を単独で。**変奏（Stage 1.5 の振り）だけに使う** | 推敲の候補は **option** |
-| 変奏の強度 小／中／大 | **Subtle / Moderate / Sweeping** | **lint 固定**（2026-07-25 作者裁定）。`Moderate` は変奏の強度に予約 | 速度表示に使わない |
-| 候補・案 | **option** / **candidate** | 名詞 | ~~variation~~（変奏と衝突） |
+| 変奏（旧） | **Variation (retired)** | 2026-10-04 に廃止した（作者裁定）。古い系譜の辺の札と、古い作品の生成情報の行にだけ使う。強度の Subtle／Moderate／Sweeping も廃止した | — |
+| 作品（新しい作品として保存） | **work** | 名詞。pipeline の variation（記述や設定を変えて保存する新しい単位）を画面で言う語（2026-10-04 作者裁定）。変奏とは言わない | ~~variation~~ |
+| 候補・案 | **option** / **candidate** | 名詞 | ~~variation~~（pipeline の variation と紛れる） |
 | AI 自律推敲 | **autonomous refinement** | 名詞句。**AI を頭に付けない** | ~~AI refinement~~、~~AI-powered~~ |
-| 配置・構図 | **composition** | 名詞。五操作でも provenance でも同語 | ~~layout~~（UI 文中） |
+| 配置・構図 | **composition** | 名詞。四操作でも provenance でも同語 | ~~layout~~（UI 文中） |
 | 系譜 | **lineage** | 名詞 | — |
 | 系譜全体図 | **lineage map**（ボタンは **Map**） | 名詞句 | ~~Overview~~ |
 | 世代 | **generation**（略 **Gen.**） | 名詞。**世代の意味のときだけ generation を使ってよい** | — |
@@ -88,7 +88,7 @@
 系譜の辺の札（web `derivation.ts` の写し。**正本は実装**で、本表は 2026-08-17 に写した）:
 タッチ = Touch ／ 構図 = Layout ／ 色 = Color ／ 解釈 = Reading ／ モデル = Model ／ 言語 = Language ／
 DDL編集 = DDL edit ／ 記述編集 = Description edit ／ 再描画 = Replay ／ キャンバス変更 = Canvas change ／
-変奏 = Variation ／ 写生の区切り = Sketch grain。
+変奏（旧） = Variation (retired) ／ 写生の区切り = Sketch grain。
 **注**: 辺の札は 1 語の短札という別の register で、`Layout` / `Color` は §3 の
 composition / color catalog と食い違って見える（→ §8）。
 

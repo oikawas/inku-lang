@@ -7671,7 +7671,6 @@ mod tests {
                 None,
                 limits,
                 context,
-                None,
             )
         else {
             panic!("expected typed independent survivor")
@@ -7679,7 +7678,6 @@ mod tests {
         assert!(!ready.diagnostics.is_empty());
         let transformed = crate::transform_stage15(
             crate::stage15_transform::stage15_execution_projection_input(ready.projection),
-            None,
         )
         .unwrap();
         let plan = resolve_composition_plan(
@@ -7706,8 +7704,7 @@ mod tests {
                 &[],
                 None,
                 limits,
-                context,
-                None
+                context
             ),
             crate::execution_projection::ExecutionProjectionResult::Stopped(_)
         ));
@@ -7847,7 +7844,6 @@ mod tests {
                     );
                     let transformed = crate::transform_stage15(
                         crate::stage15_transformation_input(&compilation).unwrap(),
-                        None,
                     )
                     .unwrap();
                     let view = transformed.verified_effective_view();
@@ -7888,23 +7884,6 @@ mod tests {
                         }
                         other => panic!("{other:?}"),
                     }
-                    let variation = crate::transform_stage15(
-                        crate::stage15_transformation_input(&compilation).unwrap(),
-                        Some(crate::Stage15Variation {
-                            amplitude: crate::Stage15VariationAmplitude::Large,
-                            seed: 234,
-                        }),
-                    )
-                    .unwrap();
-                    let varied = resolve_composition_plan(
-                        variation.verified_effective_view(),
-                        context,
-                        ScoreErrorPolicy::Stop,
-                    );
-                    assert_eq!(
-                        object.layout_direction(),
-                        varied.objects().unwrap()[0].layout_direction()
-                    );
                 }
             }
         }

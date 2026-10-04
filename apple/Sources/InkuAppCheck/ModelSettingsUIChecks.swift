@@ -119,6 +119,8 @@ func runModelSettingsUIChecks() async throws {
         guard error.code == "drawing_model_not_available" else { throw error }
     }
     app.inputMode = "ddl"
+    app.ddlText = "place one green square at center."
+    app.seedText = "42"
     guard app.canGenerate else { throw CheckFailure.message("Model usage unexpectedly blocked direct DDL") }
 
     try await editor.addProvider(id: "custom-ui", label: "Custom", kind: .openAICompatible,

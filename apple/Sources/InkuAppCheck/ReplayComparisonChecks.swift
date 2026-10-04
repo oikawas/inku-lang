@@ -13,6 +13,8 @@ func runReplayComparisonChecks() async throws {
     let provider = ReplayComparisonProvider()
     let app = AppModel(databaseURL: databaseURL, transport: provider)
     await app.initialize()
+    app.inputMode = "ddl"
+    app.ddlText = "place one green square at center."
     app.seedText = "42"; app.wild = true
     await app.generate()
     guard app.errorText == nil, let original = app.selectedWork, let originalNodeID = original.lineageNodeID,

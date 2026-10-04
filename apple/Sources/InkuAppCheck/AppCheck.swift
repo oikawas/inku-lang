@@ -8,6 +8,24 @@ import InkuHost
 struct AppCheck {
     @MainActor
     static func main() async throws {
+        if CommandLine.arguments.contains("--palette-alias-parity-only") {
+            func path(_ argument: String) throws -> URL? {
+                guard let index = CommandLine.arguments.firstIndex(of: argument) else { return nil }
+                guard CommandLine.arguments.indices.contains(index + 1) else { throw CheckFailure.message("Missing palette fixture path") }
+                return URL(fileURLWithPath: CommandLine.arguments[index + 1])
+            }
+            guard let expected = try path("--expected-color-map") else { throw CheckFailure.message("Missing observed Server color map") }
+            try await runPaletteAliasParityChecks(expectedMap: Data(contentsOf: expected),
+                fixtureDirectory: path("--parity-native-fixture"), legacyDirectory: path("--previous-parity-native-fixture")); return
+        }
+        if CommandLine.arguments.contains("--resource-policy-parity-only") {
+            let folder: URL?
+            if let index = CommandLine.arguments.firstIndex(of: "--parity-native-fixture") {
+                guard CommandLine.arguments.indices.contains(index + 1) else { throw CheckFailure.message("Missing resource policy fixture path") }
+                folder = URL(fileURLWithPath: CommandLine.arguments[index + 1])
+            } else { folder = nil }
+            try await runResourcePolicyParityChecks(fixtureDirectory: folder); return
+        }
         if CommandLine.arguments.contains("--app-parity-contract-only") {
             let folder: URL?
             if let index = CommandLine.arguments.firstIndex(of: "--parity-native-fixture"), CommandLine.arguments.indices.contains(index + 1) {
@@ -128,10 +146,12 @@ struct AppCheck {
         let databaseURL = directory.appendingPathComponent("inku.sqlite")
         let model = AppModel(databaseURL: databaseURL)
         await model.initialize()
+        model.inputMode = "ddl"
+        model.ddlText = "place one green square at center."
+        model.seedText = "42"
         guard model.canvases.count == 11, !model.catalogs.isEmpty, model.canGenerate else {
             throw CheckFailure.message("Bundled Server defaults or Rust registry failed: \(model.errorText ?? model.status)")
         }
-        model.seedText = "42"
         await model.generate()
         guard model.errorText == nil, model.works.count == 1, let work = model.selectedWork,
               !work.svg.isEmpty, !work.score.isEmpty, work.renderSeed == "42" else {

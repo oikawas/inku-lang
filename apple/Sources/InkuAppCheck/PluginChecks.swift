@@ -10,6 +10,7 @@ func runPluginChecks() async throws {
     defer { try? FileManager.default.removeItem(at: folder) }
     let model = AppModel(databaseURL: folder.appendingPathComponent("works.sqlite"))
     await model.initialize()
+    model.inputMode = "ddl"
     model.language = "ja"
     model.ddlText = "Nature.若葉 を置く"
     model.seedText = "42"

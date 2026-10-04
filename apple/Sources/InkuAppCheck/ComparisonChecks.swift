@@ -12,6 +12,8 @@ func runComparisonChecks() async throws {
     let databaseURL = folder.appendingPathComponent("works.sqlite")
     let model = AppModel(databaseURL: databaseURL, transport: transport)
     await model.initialize()
+    model.inputMode = "ddl"
+    model.ddlText = "place one green square at center."
     model.seedText = "42"
     await model.generate()
     guard model.errorText == nil, let original = model.selectedWork else { throw CheckFailure.message("Comparison source generation failed") }

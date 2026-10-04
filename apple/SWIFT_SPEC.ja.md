@@ -24,6 +24,10 @@ binding／protocolの版は同梱Rust coreのversion report、描画層の版は
 
 共通coreのauthoring originは正式な `stage1_generated`／`user_authored_ddl` を使い、portable欄 `ddl_source_origin` の移行情報とは混同しない。render seedはcanonicalなUInt64十進文字列、composition seedは独立したnullable文字列として境界を渡す。保存時の未設定をrender seedで埋めず、新操作のcompilerとrenderのcomposition seedが違う場合は拒否する。旧保存requestや作品本文はこの入口正規化で書き直さない。
 
+新規requestの描画制限は、設定未記録でも9項目の既定値へ正規化し、実効hard budgetのcanonical JSONから `host-settings:SHA256` のpolicy identityを常に作る。既定値を明示した設定と未記録の設定で同じ制限なのにauthority／Score／描画hashが異なる分岐を除く。custom値も新規requestへ適用する。保存作品の凍結configはこの正規化の対象にせず、旧policyと再演条件を保持する。限定checkで既定値の一致・custom値の反映・保存条件の保持を確認した。
+
+新しい描画用color mapは基本色のfallbackに加え、catalogの各named palette色を `palette:<name>` の別名として含める。名前をそのまま保持し、同名が重なるときは後の色を優先する。`Deep Red`等もseedによる色候補へ入るため、基本9色だけが一致しても同じ配色条件とはしない。選択catalog、自動配色候補、render用catalog mapと明示したreplay用の新mapに共通処理を使い、既存作品に保存された9色mapや履歴・書出し条件は書き換えない。限定checkで旧mapの保持を確認し、赤い正方形・seed43のCLI比較でServer1162とScore・SVG・19色map・描画条件の13項目が一致した。provider品質や全UIの受入をこの結果へ含めない。
+
 「思考を表示」はmodel dialogのdraftと表示設定へ保存する。閉じる／取消しでは元へ戻し、確定したrequestへoptional値を保持する。現行Serverと同じくprovider reasoningへの接続はなく、この選択が推論結果や実token数を変えるとは表示しない。
 
 ### 保存作品を開くときの固定情報

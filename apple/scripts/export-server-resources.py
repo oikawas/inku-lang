@@ -129,7 +129,14 @@ def main() -> None:
         for node in limit_class.body
         if isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name) and node.value is not None
     }
-    catalog_maps = {item["id"]: item["map"] for item in catalogs}
+    # Match Server render_color_map_for_catalog without loading installation
+    # settings: palette names are verbatim and later duplicate names win.
+    catalog_maps = {}
+    for item in catalogs:
+        color_map = dict(item["map"])
+        for color in item["palette"]:
+            color_map[f"palette:{color['name']}"] = color["code"]
+        catalog_maps[item["id"]] = color_map
     environment = {
         "json": json,
         "deepcopy": deepcopy,

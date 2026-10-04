@@ -158,6 +158,23 @@ struct Bootstrap {
         }
     }
 
+    // Server color_catalogs.render_color_map_for_catalog uses the base map for
+    // fallbacks and every named palette entry for seeded work-color assignment.
+    // Keep names verbatim and later duplicate names authoritative, as on Server.
+    private static func renderColorMap(for record: [String: Any]) throws -> [String: String] {
+        guard var map = record["map"] as? [String: String],
+              let palette = record["palette"] as? [[String: Any]] else {
+            throw HostError("color_catalogs_invalid")
+        }
+        for color in palette {
+            guard let name = color["name"] as? String, let code = color["code"] as? String else {
+                throw HostError("color_catalogs_invalid")
+            }
+            map["palette:" + name] = code
+        }
+        return map
+    }
+
     func request(inputMode: String, source: String, description: String, language: String,
                  catalogID: String, canvasID: String, seed: String, wild: Bool,
                  settings: HostSettings, parentWorkID: String? = nil, derivationKind: String = "new",
@@ -177,7 +194,6 @@ struct Bootstrap {
         guard ["en", "ja"].contains(language),
               ["fixed", "auto", "random"].contains(catalogMode),
               let record = catalogRecords.first(where: { $0["id"] as? String == selectedID }),
-              let colorMap = record["map"] as? [String: String],
               let canvas = canvases.first(where: { $0.id == canvasID }),
               let originalPipeline = saved ?? manifest["pipeline"] as? [String: Any],
               let originalCompiler = originalPipeline["compiler"] as? [String: Any],
@@ -190,6 +206,7 @@ struct Bootstrap {
               let registryBody = registry["registry"] as? [String: Any] else {
             throw HostError("installation_defaults_invalid")
         }
+        let colorMap = try Self.renderColorMap(for: record)
         let actualSeed = seed.isEmpty ? String(UInt64.random(in: 0...((UInt64(1) << 53) - 1))) : seed
         guard let parsedSeed = UInt64(actualSeed), String(parsedSeed) == actualSeed else { throw HostError("invalid_seed") }
         if let compositionSeed {
@@ -218,8 +235,8 @@ struct Bootstrap {
             budget["maximum"] = maximum
             compiler["operational_resource_budget"] = budget
         }
-        if saved == nil, let selected = settings.drawingLimits {
-            let limits = drawingLimitDefinition.normalized(selected)
+        if saved == nil {
+            let limits = drawingLimitDefinition.normalized(settings.drawingLimits ?? [:])
             var hardPolicy = compiler["hard_resource_policy"] as? [String: Any] ?? [:]
             var hardBudget = hardPolicy["budget"] as? [String: Any] ?? [:]
             var hardMaximum = hardBudget["maximum"] as? [String: Any] ?? [:]
@@ -244,8 +261,9 @@ struct Bootstrap {
         config["catalogs"] = [] as [Any]
         if catalogMode == "auto" {
             config["catalogs"] = try catalogRecords.map { record in
-                guard let id = record["id"] as? String, let map = record["map"] as? [String: String],
+                guard let id = record["id"] as? String,
                       let name = record["name"] as? String else { throw HostError("color_catalogs_invalid") }
+                let map = try Self.renderColorMap(for: record)
                 var resolved = host
                 resolved["resolved_catalog_id"] = id
                 resolved["catalog_mode"] = id == "default" ? "default" : "explicit"
@@ -266,8 +284,9 @@ struct Bootstrap {
         ]
         let authoring: GenerationAuthoring = inputMode == "ddl"
             ? .directDDL(source) : .description(description, autoCatalog: catalogMode == "auto", sketch: sketch)
-        let colorMaps = try Dictionary(uniqueKeysWithValues: catalogRecords.compactMap { item -> (String, Data)? in
-            guard let id = item["id"] as? String, let map = item["map"] as? [String: String] else { return nil }
+        let colorMaps = try Dictionary(uniqueKeysWithValues: catalogRecords.map { item -> (String, Data) in
+            guard let id = item["id"] as? String else { throw HostError("color_catalogs_invalid") }
+            let map = try Self.renderColorMap(for: item)
             return (id, try Self.bytes(map))
         })
         var exactConfiguration = try ExactJSON(data: Self.bytes(config))
@@ -324,9 +343,10 @@ struct Bootstrap {
 
     func replayOptions(catalogID: String, canvasID: String) throws -> ReplayOptions {
         guard let record = catalogRecords.first(where: { $0["id"] as? String == catalogID }),
-              let map = record["map"] as? [String: String], let canvas = canvases.first(where: { $0.id == canvasID }) else {
+              let canvas = canvases.first(where: { $0.id == canvasID }) else {
             throw HostError("replay_options_invalid")
         }
+        let map = try Self.renderColorMap(for: record)
         return ReplayOptions(catalogID: catalogID, colorMap: try Self.bytes(map), canvasID: canvasID,
             widthRatio: canvas.widthRatio, heightRatio: canvas.heightRatio)
     }

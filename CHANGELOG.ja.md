@@ -6,6 +6,12 @@
 
 **本書は v2.5.0（2026-07-25、render engine 12）以降の履歴を保持する。** 最近の記録に続く過去の履歴は、同じ文書内で折りたたんである。必要なときに展開して読める。折りたたみに対応しないビューアでは全文を表示する。それより前の履歴は [v1.72〜v2.4の書庫](docs/history/changelog-v1.72-v2.4.ja.md) と [v0.1〜v1.71の書庫](docs/history/changelog-v0.1-v1.71.ja.md) にある。
 
+### 2026-10-05 — Swift新規requestの描画policyと配色mapを整合
+
+描画制限の設定が未記録の場合も9項目を既定値へ正規化し、現行Serverと同じく実効hard budgetから `host-settings:SHA256` のidentityを常に作る。未記録と明示した既定値で同じ制限なのにauthority／Score／描画hashが異なる分岐を修正した。custom制限は新規requestへ適用し、旧保存作品の凍結policy／再演条件は変更しない。限定checkで未記録／明示保存の一致と保存条件の保持を確認した。[Swift仕様](apple/SWIFT_SPEC.ja.md)の日英へ反映した。
+
+描画用mapに基本色だけでなくcatalog全named色の `palette:<name>` 別名を加え、`Deep Red`等のseedによる候補選択をServerへ揃えた。選択／自動配色／render catalog／明示replay用の新mapを共通展開し、旧作品の保存map・履歴・書出し条件を保持する。限定checkで旧9色mapの保持を確認し、赤い正方形・seed43のCLI比較ではServer1162とScore・SVG・19色map・描画条件の13項目が一致した。同Scoreのrender比較であり、provider品質や全UIの受入は別に確認する。
+
 ### 2026-10-04 — Swiftを現行Serverのcore・保存作品・全体操作へ追随
 
 Stage 1確定後のfallback清掃、構図prompt v2と明示した隅、Cells・DDLエンジン57／Score 0.19.0／描画エンジン73、日本語修飾語と縦長角度の共通semanticを取り込んだ。Swift facade・meter・native rasterを保持し、新variationを退役した。旧作品・来歴は読めるままとし、既存不正snapshotの自動修復・pending要求の自動再送は追加しない。

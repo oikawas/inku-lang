@@ -15,6 +15,7 @@ func runAuthoringChecks() async throws {
     guard model.errorText == nil else { throw CheckFailure.message("Authoring initialization: \(model.errorText ?? model.status)") }
 
     // Failure: the installation sent an empty macro registry, silently omitting Nature's words.
+    model.inputMode = "ddl"
     model.language = "ja"
     model.ddlText = "Nature.若葉 を置く"
     model.seedText = "42"

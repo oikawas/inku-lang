@@ -13,6 +13,8 @@ func runDrawingLimitsEditingChecks() async throws {
     let transport = DrawingLimitsNoProvider()
     let app = AppModel(databaseURL: url, transport: transport)
     await app.initialize()
+    app.inputMode = "ddl"
+    app.ddlText = "place one green square at center."
     app.seedText = "42"
     await app.generate()
     guard app.errorText == nil, let work = app.selectedWork, let definition = app.drawingLimitDefinition else {

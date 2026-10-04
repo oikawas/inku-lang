@@ -49,6 +49,29 @@ test('self-hosted authorization keeps Brave and Japanese in the public Mac helpe
 	}
 });
 
+test('only the fixed server-selected container target enters the helper URI', async () => {
+	const owner = '00000000-0000-4000-8000-000000000001';
+	const launched: string[] = [];
+	const previous = globalThis.window;
+	(globalThis as any).window = { location: { assign: (url: string) => launched.push(url) } };
+	try {
+		let helperTarget: string | undefined = 'container';
+		const connection = createChatGPTSettings({
+			owner: () => owner, available: () => true, invalidate() {}, changed() {},
+			apiFetch: async () => response({ action: 'local_helper', helper_target: helperTarget })
+		});
+		await connection.authorize();
+		assert.equal(new URL(launched[0]).searchParams.get('target'), 'container');
+		helperTarget = undefined;
+		await connection.authorize();
+		assert.equal(new URL(launched[1]).searchParams.has('target'), false);
+		helperTarget = 'https://arbitrary.example/command';
+		await connection.authorize();
+		assert.equal(launched.length, 2);
+		assert.equal(connection.code, 'chatgpt_operation_failed');
+	} finally { (globalThis as any).window = previous; }
+});
+
 test('owner changes hide saved profiles and discard a late response; unconfirmed revocation stays visible', async () => {
 	let owner = 'A', available = true, changes = 0;
 	let deferred: ((response: Response) => void) | undefined;

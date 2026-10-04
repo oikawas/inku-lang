@@ -117,6 +117,7 @@ export function createChatGPTSettings(deps: {
 			const result = await call('/authorize', { profile_id: profileId ?? null, consent, language });
 			if (!current(owner, stamp)) return;
 			if (result.action === 'local_helper') {
+				if (result.helper_target !== undefined && result.helper_target !== 'container') throw new Error('chatgpt_operation_failed');
 				const identifier = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 				if (!identifier.test(owner) || (profileId && !identifier.test(profileId))) throw new Error('chatgpt_owner_not_allowed');
 				const url = new URL('inku-chatgpt://connect');
@@ -125,6 +126,7 @@ export function createChatGPTSettings(deps: {
 				if (profileId) url.searchParams.set('profile_id', profileId);
 				url.searchParams.set('browser', await helperBrowser());
 				url.searchParams.set('language', language);
+				if (result.helper_target === 'container') url.searchParams.set('target', 'container');
 				if (!current(owner, stamp)) return;
 				helperUrl = url.href;
 				code = 'chatgpt_helper_requested'; busy = false;

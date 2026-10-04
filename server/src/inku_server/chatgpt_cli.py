@@ -25,6 +25,15 @@ def _local_gate(request: dict) -> None:
     validate_request(request)
 
 
+def serve_api(host: str, port: int, *, self_hosted: bool) -> None:
+    configure_startup(host, port, self_hosted=self_hosted)
+    import uvicorn
+    from .api import app
+    from .logging_setup import configure_logging
+    configure_logging()
+    uvicorn.run(app, host=host, port=port, workers=1, reload=False)
+
+
 def main() -> None:
     failed_profile_id = None
     parser = argparse.ArgumentParser(description="inku ChatGPT plan connection")
@@ -50,12 +59,7 @@ def main() -> None:
     args = parser.parse_args()
     try:
         if args.command == "serve":
-            configure_startup(args.host, args.port, self_hosted=args.self_hosted)
-            import uvicorn
-            from .api import app
-            from .logging_setup import configure_logging
-            configure_logging()
-            uvicorn.run(app, host=args.host, port=args.port, workers=1, reload=False)
+            serve_api(args.host, args.port, self_hosted=args.self_hosted)
             return
         if args.command in {"recipient", "import"}:
             from . import db

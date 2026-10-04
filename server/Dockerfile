@@ -54,7 +54,8 @@ COPY web/BUILD_NUMBER /app/web/BUILD_NUMBER
 COPY web/APP_VERSION /app/web/APP_VERSION
 
 RUN useradd --create-home --uid 10001 inku \
-    && mkdir -p /data/outputs /data/db-backups /data/logs /data/cache \
+    && mkdir -p /data/outputs /data/db-backups /data/logs /data/cache /data/chatgpt \
+    && chmod 0700 /data/chatgpt \
     && chown -R inku:inku /data
 
 USER inku
@@ -67,6 +68,7 @@ ENV PATH="/app/server/.venv/bin:${PATH}" \
     INKU_OUTPUT_DIR=/data/outputs \
     INKU_DB_BACKUP_DIR=/data/db-backups \
     INKU_LOG_DIR=/data/logs \
+    INKU_CHATGPT_AUTH_DIR=/data/chatgpt \
     UV_CACHE_DIR=/data/cache
 
 EXPOSE 8100

@@ -66,6 +66,8 @@ flowchart LR
 
 ## Development and distribution
 
+Explicitly enabling ChatGPT plan with `INKU_CHATGPT_PLAN_ENABLED=1` and `INKU_CHATGPT_SELF_HOSTED=1` makes the API image's `inku-server` use the same verified entrypoint as `inku-chatgpt serve --self-hosted`, with one worker and no reload. Published-image Compose retains ordinary account sign-in without developer mode. OAuth callbacks run on the Mac's loopback; one registration is securely transferred. The container owns refresh exclusively and UID 10001 owns credentials at `/data/chatgpt` on the volume (0700 directory, 0600 files). Host ID and dedicated encryption key survive container recreation. See the [connection procedure](../guide/chatgpt-plan.md).
+
 | Aspect | Development | Compose distribution | Evidence |
 |---|---|---|---|
 | Web | Vite/SvelteKit process proxies `/api` to the backend | Node runs the adapter-node build | `vite.config.ts`; `web/Dockerfile` |

@@ -4,7 +4,7 @@
 
 ## 利用条件
 
-`INKU_CHATGPT_PLAN_ENABLED=1`を明示し、デベロッパーモードまたはシングルユーザーモードを有効にします。両方無効では使用できません。管理者にも本人の接続と`chatgpt.tokens.use.direct`の許可が必要です。single-user中は固定accountだけがownerです。画面表示はOAuth完了を意味しません。
+`INKU_CHATGPT_PLAN_ENABLED=1`を明示し、デベロッパーモード、シングルユーザーモード、または明示した`INKU_CHATGPT_SELF_HOSTED=1`と検証済み自己ホスト起動を使います。通常ログインのリリース版コンテナも最後の条件で利用でき、developer modeは不要です。管理者にも本人の接続と`chatgpt.tokens.use.direct`の許可が必要です。single-user中は固定accountだけがownerです。画面表示はOAuth完了を意味しません。
 
 初版のlocal接続はWeb・API・ブラウザが同じPCで動くソース版を対象とします。Android、Docker内のlocal callback、Vision、奥書、デモ指示生成、モデル検査は対象外です。
 
@@ -54,6 +54,43 @@ INKU_CHATGPT_PLAN_ENABLED=1 INKU_DEVELOPER_MODE=1 \
 専用SSH経路は封印JSONだけを自己ホストの`inku-chatgpt import`の標準入力へ渡します。一般source配備やLAN API uploadには含めません。recipientは30分有効です。同じ封印の再送は同じ受領結果を返し、内容の違う再送は拒否します。
 
 exportはMacのtokenを消し、更新所有権を手放してから完了します。importは受信hostのinstallation IDを保ち、そのhost専用鍵で再暗号化します。Macの鍵を共有せず、export後の失敗を理由に旧refresh tokenを復活させません。再認証は保存した`profile_id`、利用許可の追加は明示`--consent`を使います。初回交換失敗でも発行済みclient IDを保存し、失敗結果の`profile_id`で再試行できます。
+
+## リリース版・ソースbuildのコンテナで接続する
+
+使用するComposeの`.env`で`INKU_CHATGPT_PLAN_ENABLED=1`と`INKU_CHATGPT_SELF_HOSTED=1`を設定します。リリース版`deploy/compose.yaml`は通常ログインと`INKU_DEVELOPER_MODE=0`を保持します。ソースbuildの`compose.yaml`も同じChatGPT設定を受けます。API imageの`inku-server`は両方が有効なとき、`inku-chatgpt serve --self-hosted`と同じ検証入口で1 worker・reloadなしのAPIを起動します。環境変数だけでは直uvicorn起動を有効にしません。
+
+コンテナの保存先はAPIの永続volume内の`/data/chatgpt`です。実行UID 10001が所有する0700 directory・0600 fileで、再作成後もhost IDと専用暗号鍵を保持します。他のソース版の認証directoryや鍵をコピーせず、コンテナ用に新規認証します。volumeを削除するとこのidentityと認証も失います。既存volumeに同directoryを手作業で用意した場合も所有者・permissionを合わせます。
+
+専用Mac helperを使う場合、サーバーが固定の`helper_target=container`を返したときだけ起動リンクに`target=container`を付けます。運用者はhelperのcontainer接続先を事前に固定します。リンクでhost、path、commandを選べません。ソース版の既定リンクはtargetを省略します。
+
+汎用の運用手順では、コンテナhost上のCompose directoryで本人IDを検証し、公開recipientを作ります。
+
+```sh
+umask 077
+docker compose exec -T --user 10001:10001 api \
+  inku-chatgpt recipient --owner-id <verified-owner-id> > recipient.json
+```
+
+recipientを保護されたSSH等でMacへ渡し、0600 fileとして保存します。Macではコンテナ専用の認証保存先を使い、作者がChromeで認証・同意します。callbackはMacの`127.0.0.1`であり、Docker内では受けません。
+
+```sh
+INKU_CHATGPT_PLAN_ENABLED=1 INKU_DEVELOPER_MODE=1 \
+  INKU_CHATGPT_AUTH_DIR="$HOME/.config/inku-chatgpt-container" \
+  uv run --frozen --no-sync inku-chatgpt authorize --recipient recipient.json \
+  --browser chrome --language ja --consent
+INKU_CHATGPT_PLAN_ENABLED=1 INKU_DEVELOPER_MODE=1 \
+  INKU_CHATGPT_AUTH_DIR="$HOME/.config/inku-chatgpt-container" \
+  uv run --frozen --no-sync inku-chatgpt export --recipient recipient.json \
+  --profile-id <profile-id> --output sealed.json
+```
+
+封印JSONだけを保護された経路でコンテナhostへ渡し、0600 fileからAPIの標準入力へimportします。
+
+```sh
+docker compose exec -T --user 10001:10001 api inku-chatgpt import < sealed.json
+```
+
+recipient/importはDBの本人とmodeを検証しますが、CLI実行をAPI起動済みとは扱いません。import後のrefreshはコンテナだけが所有します。Webの「接続状態を確認」後に公開モデルを選択・保存し、描画モデルを明示選択します。
 
 ## 登録・モデル・利用枠
 

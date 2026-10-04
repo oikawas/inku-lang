@@ -6,6 +6,11 @@ services:
     environment:
       INKU_DEVELOPER_MODE: ${INKU_DEVELOPER_MODE:-1}
       INKU_ENV: production
+      # Opt in to verified self-hosted startup; OAuth stays on the operator's PC.
+      INKU_CHATGPT_PLAN_ENABLED: ${INKU_CHATGPT_PLAN_ENABLED:-0}
+      INKU_CHATGPT_SELF_HOSTED: ${INKU_CHATGPT_SELF_HOSTED:-0}
+      INKU_CHATGPT_AUTH_DIR: /data/chatgpt
+      INKU_CHATGPT_HELPER_TARGET: container
       INKU_SESSION_COOKIE_SECURE: ${INKU_SESSION_COOKIE_SECURE:-0}
       INKU_CORS_ORIGINS: ${INKU_CORS_ORIGINS:-}
       # A distributed inku belongs to whoever installed it, so it opens without

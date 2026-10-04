@@ -66,6 +66,8 @@ flowchart LR
 
 ## 開発時と配布時
 
+ChatGPTプランを`INKU_CHATGPT_PLAN_ENABLED=1`と`INKU_CHATGPT_SELF_HOSTED=1`で明示有効化すると、API imageの`inku-server`は`inku-chatgpt serve --self-hosted`と共通の検証入口を使い、1 worker・reloadなしで起動する。公開imageのComposeは通常ログイン・非developerのまま使用できる。OAuth callbackはMacのloopbackで受け、一登録だけを保護移送する。コンテナがrefreshを単独所有し、認証はUID 10001が所有するvolume上の`/data/chatgpt`（0700 directory・0600 file）に保存する。host IDと専用鍵はコンテナ再作成後も保持する。[接続手順](../guide/chatgpt-plan.ja.md)を参照。
+
 | 観点 | 開発時 | Compose配布時 | 根拠 |
 |---|---|---|---|
 | Web | Vite/SvelteKit process、`/api`をbackendへproxy | adapter-node buildをNodeで実行 | `vite.config.ts`; `web/Dockerfile` |

@@ -14,6 +14,11 @@ services:
     environment:
       INKU_DEVELOPER_MODE: ${INKU_DEVELOPER_MODE:-0}
       INKU_ENV: production
+      # Account sign-in stays enabled; no developer mode is required.
+      INKU_CHATGPT_PLAN_ENABLED: ${INKU_CHATGPT_PLAN_ENABLED:-0}
+      INKU_CHATGPT_SELF_HOSTED: ${INKU_CHATGPT_SELF_HOSTED:-0}
+      INKU_CHATGPT_AUTH_DIR: /data/chatgpt
+      INKU_CHATGPT_HELPER_TARGET: container
       INKU_SESSION_COOKIE_SECURE: ${INKU_SESSION_COOKIE_SECURE:-0}
       INKU_CORS_ORIGINS: ${INKU_CORS_ORIGINS:-}
       # The first startup creates this administrator on an empty database.

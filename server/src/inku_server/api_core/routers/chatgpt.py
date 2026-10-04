@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import os
 import time
 from typing import Annotated, Literal
 
@@ -56,7 +57,8 @@ class AuthorizeBody(BaseModel):
 @router.post("/authorize")
 def authorize(body: AuthorizeBody, actor: str = Depends(owner)) -> dict:
     if runtime._startup and runtime._startup.self_hosted:
-        return {"status": "local_authorization_required", "action": "local_helper"}
+        return {"status": "local_authorization_required", "action": "local_helper",
+                **({"helper_target": "container"} if os.getenv("INKU_CHATGPT_HELPER_TARGET") == "container" else {})}
     try:
         return attempts.begin(actor, body.profile_id, body.consent, lambda: runtime.check_owner(actor), language=body.language)
     except ChatGPTError as error:

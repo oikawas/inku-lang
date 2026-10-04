@@ -28,9 +28,15 @@ def enabled() -> bool:
     return os.getenv("INKU_CHATGPT_PLAN_ENABLED", "").lower() in {"1", "true", "yes", "on"}
 
 
-def mode_allowed() -> bool:
+def self_hosted_enabled() -> bool:
+    return os.getenv("INKU_CHATGPT_SELF_HOSTED", "").lower() in {"1", "true", "yes", "on"}
+
+
+def mode_allowed(*, cli: bool = False) -> bool:
     from . import db
-    return os.getenv("INKU_DEVELOPER_MODE", "").lower() in {"1", "true", "yes", "on"} or db.single_user_mode_enabled()
+    return (os.getenv("INKU_DEVELOPER_MODE", "").lower() in {"1", "true", "yes", "on"}
+            or db.single_user_mode_enabled()
+            or (self_hosted_enabled() and (cli or bool(_startup and _startup.self_hosted))))
 
 
 def configure_startup(host: str, port: int, *, self_hosted: bool) -> None:
@@ -56,7 +62,7 @@ def availability() -> tuple[bool, str | None]:
 def check_owner(owner: str, *, cli: bool = False) -> None:
     from . import db
     if cli:
-        if not enabled() or not mode_allowed():
+        if not enabled() or not mode_allowed(cli=True):
             raise ChatGPTError("chatgpt_mode_not_allowed", action="settings")
     else:
         available, reason = availability()

@@ -4,7 +4,7 @@ Draw using the allowance granted when you sign in to ChatGPT. Its credentials an
 
 ## Requirements
 
-Explicitly set `INKU_CHATGPT_PLAN_ENABLED=1` and enable developer mode or single-user mode. Both off means unavailable. Administrators also need their own connection and `chatgpt.tokens.use.direct` permission. In single-user mode, only the fixed account owns it. A visible screen does not mean OAuth is complete.
+Explicitly set `INKU_CHATGPT_PLAN_ENABLED=1` and use developer mode, single-user mode, or explicit `INKU_CHATGPT_SELF_HOSTED=1` with verified self-hosted startup. The last option supports released containers with ordinary account sign-in and no developer mode. Administrators also need their own connection and `chatgpt.tokens.use.direct` permission. In single-user mode, only the fixed account owns it. A visible screen does not mean OAuth is complete.
 
 Initial local support covers source installations with the Web, API and browser on one PC. Android, local callbacks inside Docker, Vision, colophons, demo instruction generation and model inspection are outside scope.
 
@@ -54,6 +54,43 @@ INKU_CHATGPT_PLAN_ENABLED=1 INKU_DEVELOPER_MODE=1 \
 The dedicated SSH transport sends only the sealed JSON to the receiving `inku-chatgpt import` through standard input. It does not enter general source deployment or LAN API upload. A recipient lasts 30 minutes. An identical envelope replay returns the same receipt; a changed replay is rejected.
 
 Export removes the Mac's tokens and relinquishes renewal ownership before completing. Import retains the receiving installation's host ID and encrypts with its own host key. Keys are not shared, and a failed export does not revive an old refresh token. Reauthorize with the saved `profile_id`; explicitly add `--consent` to grant usage permission. A failed initial exchange retains the issued client ID; retry with the failure result's `profile_id`.
+
+## Connect released or source-built containers
+
+Set `INKU_CHATGPT_PLAN_ENABLED=1` and `INKU_CHATGPT_SELF_HOSTED=1` in the selected Compose installation's `.env`. Released `deploy/compose.yaml` retains ordinary account sign-in and `INKU_DEVELOPER_MODE=0`. Source-build `compose.yaml` accepts the same ChatGPT settings. When both flags are enabled, the API image's `inku-server` uses the same verified entrypoint as `inku-chatgpt serve --self-hosted`, with one worker and no reload. Environment flags alone never enable direct uvicorn startup.
+
+Container storage is `/data/chatgpt` on the API's persistent volume. UID 10001 owns its 0700 directory and 0600 files; recreating the container retains its host ID and dedicated encryption key. Authorize anew for this container instead of copying another source installation's credential directory or key. Deleting the volume loses this identity and its credentials. A manually prepared directory on an existing volume must have the same owner and permissions.
+
+For the dedicated Mac helper, the launch link adds `target=container` only when the server returns the fixed `helper_target=container`. The operator must configure the helper's fixed container destination first. Links cannot select a host, path or command. The source installation's default link omits the target.
+
+For a generic operator workflow, verify the owner ID and create a public recipient in the Compose directory on the container host:
+
+```sh
+umask 077
+docker compose exec -T --user 10001:10001 api \
+  inku-chatgpt recipient --owner-id <verified-owner-id> > recipient.json
+```
+
+Send the recipient to the Mac through protected SSH or an equivalent secure connection and save it as a 0600 file. On the Mac, use a dedicated credential directory for this container; the author signs in and consents in Chrome. The callback is on the Mac's `127.0.0.1`, outside Docker.
+
+```sh
+INKU_CHATGPT_PLAN_ENABLED=1 INKU_DEVELOPER_MODE=1 \
+  INKU_CHATGPT_AUTH_DIR="$HOME/.config/inku-chatgpt-container" \
+  uv run --frozen --no-sync inku-chatgpt authorize --recipient recipient.json \
+  --browser chrome --language en --consent
+INKU_CHATGPT_PLAN_ENABLED=1 INKU_DEVELOPER_MODE=1 \
+  INKU_CHATGPT_AUTH_DIR="$HOME/.config/inku-chatgpt-container" \
+  uv run --frozen --no-sync inku-chatgpt export --recipient recipient.json \
+  --profile-id <profile-id> --output sealed.json
+```
+
+Send only the sealed JSON to the container host through the protected connection, then import from its 0600 file into the API's standard input:
+
+```sh
+docker compose exec -T --user 10001:10001 api inku-chatgpt import < sealed.json
+```
+
+Recipient/import verify the DB owner and configured mode; a CLI invocation does not claim a running API process. After import, only the container owns refresh. Press Check connection in the Web, select and save published models, then explicitly select a drawing model.
 
 ## Registrations, models and usage
 

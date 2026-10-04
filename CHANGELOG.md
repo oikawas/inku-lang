@@ -6,6 +6,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file retains the history from v2.5.0 (2026-07-25, render engine 12) onward.** Past records follow the recent ones in a collapsible section of this same document; expand it when needed. Viewers without collapse support show the full text. Earlier history is in the [v1.72–v2.4 archive](docs/history/changelog-v1.72-v2.4.md) and the [v0.1–v1.71 archive](docs/history/changelog-v0.1-v1.71.md).
 
+### 2026-10-04 — Preserve the Small dictionary's full UniDic notice in API distributions
+
+The locked sudachidict-small 20260723.1 binary wheel contains Apache terms but omits the UniDic BSD copyright, conditions and disclaimer. The Server now bundles the complete LEGAL file, byte-identical in the exact v20260723.1 source tag and that version's PyPI source archive. THIRD_PARTY_NOTICES records its provenance and API location, and the API image build checks that it is present. Dependencies, dictionary contents, drawing and versions are unchanged.
+
 ### 2026-10-04 — Align surface and handling previews with Saijiki v2
 
 Sweep fell through to a generic Web preview, while dense and faint still described the old surface density. The eight surface words and three handling words now have current bilingual explanations and drawings. Sweep shows two passes at half the tool opacity; handling shows opacity relative to the tool, with temperate retaining its own opacity. Comparison marks keep their count, shape and positions. One drawing per word, the shared contour, only empty being unmarked, and hatch, crosshatch and aquatint meaning checks are preserved. Vocabulary, core, saved works and versions are unchanged.

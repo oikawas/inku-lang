@@ -12,6 +12,23 @@ https://pypi.org/project/certifi/2026.2.25/#files . For the MPL-2.0 and
 MIT-covered `tqdm 4.67.3`, source is available from
 https://pypi.org/project/tqdm/4.67.3/#files . These packages are not modified
 by inku.
+
+The locked `sudachidict-small 20260723.1` contains the Small dictionary, whose
+vocabulary is derived from UniDic (Copyright (c) 2011-2013, The UniDic
+Consortium). The installed binary wheel supplies Apache-2.0 terms but omits
+the additional UniDic BSD copyright, conditions and disclaimer. The API
+distribution therefore preserves the complete upstream `LEGAL` unchanged in
+`src/inku_server/notices/sudachidict-small-20260723.1-LEGAL.txt`; the image keeps
+it at `/app/server/src/inku_server/notices/sudachidict-small-20260723.1-LEGAL.txt`.
+The upstream file also records notices for the other dictionary editions.
+It is from the exact
+[v20260723.1 source](https://github.com/WorksApplications/SudachiDict/blob/3e49051e71011cac7d74df779e80ef1dab818e56/LEGAL),
+commit `3e49051e71011cac7d74df779e80ef1dab818e56`, and is byte-identical to
+`LEGAL` in the [20260723.1 source archive](https://pypi.org/project/SudachiDict-small/20260723.1/#files).
+That archive's `INFO.json` identifies edition `small`, dictionary version
+`20260723`, and format `v1`. Apache-2.0 terms remain alongside the installed
+distribution under its `dist-info/licenses/LICENSE-2.0.txt`.
+
 The Noto Serif JP copyright and SIL OFL 1.1 text are in
 `src/inku_server/fonts/OFL.txt` beside the font.
 The Carnegie Mellon Pronouncing Dictionary (Copyright (C) 1993-2015 Carnegie

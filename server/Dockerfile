@@ -43,6 +43,7 @@ RUN cd /app/server \
     && rm -rf /tmp/wheelhouse \
     && test -s /app/LICENSE \
     && test -s /app/server/THIRD_PARTY_NOTICES.md \
+    && test -s /app/server/src/inku_server/notices/sudachidict-small-20260723.1-LEGAL.txt \
     && test -s /app/licenses/RUST_THIRD_PARTY_NOTICES.txt \
     && test -s /app/server/src/inku_server/fonts/OFL.txt
 

@@ -16,6 +16,8 @@ Binding and protocol identities come from the bundled Rust core's version report
 
 ## 2026-10-04 Batch clipping and layout repair
 
+The full-width history selector is at least 28 points high, and the new-batch drawing button also has a larger target. They do not shrink to the small macOS menu-button height.
+
 The macOS editor explicitly clips its scroll view, content view, ruler, and SwiftUI host to the viewport. Ruler background and line numbers draw only within the intersection of the dirty region and visible gutter. This prevents long inputs from painting over the conditions below. Physical numbering, UTF-16 editing, undo/IME, and two-axis scrolling retain their existing contracts.
 
 At ordinary widths, a 410-point input column contains a 220-point editor followed by the count, full-width history selector, previous-run resume card when present, next conditions, new-batch action, and results. The start action immediately follows conditions. Model and catalog rows put their label and Change button above the value; sketch from life, Wild, canvas, and New form a compact row, with language, seed, and supplied sketch under Details. Narrow layouts scroll as one page through the work area, and short wide windows allow the work area to scroll.

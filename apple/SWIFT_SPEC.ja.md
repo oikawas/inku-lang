@@ -16,6 +16,8 @@ binding／protocolの版は同梱Rust coreのversion report、描画層の版は
 
 ## 2026-10-04 バッチの表示崩れと画面構成の修正
 
+入力履歴は全幅で最低28ポイントの高さを確保し、新しいバッチの描画ボタンにも十分な高さを設ける。macOSの小型メニューボタンの高さへ縮んで操作箇所が見づらくならないようにする。
+
 macOSのバッチ入力はNSScrollView、NSClipView、NSRulerViewとSwiftUI hostの描画境界を明示する。行番号と背景の描画は入力viewportとの交差領域へclipし、多数の行や横scrollで下の描画条件へ漏れない。本文、UTF-16の元行番号、IME・undoと2軸scrollの保存契約は保持する。
 
 通常幅は左410ptの入力列と右の作品領域を使用する。入力220pt、件数、幅いっぱいの履歴、前回の再開card、次の描画条件、新しいバッチの操作、結果の順へWebと揃える。開始buttonは条件の直後に置き、結果一覧の後やpane底へ固定しない。モデル／色カタログはlabelと変更button、その下に選択値を表示し、compact操作は幅に応じて折り返す。狭い幅は全体を縦scrollし、低い通常幅では右側もscrollできる。

@@ -151,7 +151,7 @@ struct BatchPanelView: View {
         }
         .menuStyle(.borderlessButton)
         .menuIndicator(.hidden)
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxWidth: .infinity, minHeight: 28, alignment: .leading)
         .background(Color.secondary.opacity(0.04), in: RoundedRectangle(cornerRadius: 6))
         .overlay(RoundedRectangle(cornerRadius: 6).stroke(.quaternary))
         .controlSize(.small)
@@ -239,7 +239,7 @@ struct BatchPanelView: View {
             else { startNewBatch() }
         } label: {
             Label(model.display.localized("新しいバッチを描く"), systemImage: "play.fill")
-                .frame(maxWidth: .infinity)
+                .frame(maxWidth: .infinity, minHeight: 28)
         }
         .buttonStyle(.borderedProminent)
         .disabled(!canStartNewBatch)

@@ -211,7 +211,7 @@ struct BatchPanelView: View {
                     VStack(alignment: .leading, spacing: 6) { newBatchLabel; newBatchButton }
                 }
                 if !model.hasAvailableBatchDrawingModel {
-                    Text(model.display.message("drawing_model_not_available"))
+                    Text(model.display.localized("使用中のLLMモデルを選択してから描いてください。"))
                         .font(.caption).foregroundStyle(.secondary)
                 }
             }

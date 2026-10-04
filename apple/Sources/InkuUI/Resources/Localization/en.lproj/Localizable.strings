@@ -1145,3 +1145,4 @@
 "オススメ度 / Stage 1" = "Recommendation / Stage 1";
 "オススメ度 / Stage 2" = "Recommendation / Stage 2";
 "描くたびに記述を読んで選ぶ" = "Read the description and select for each drawing";
+"使用中のLLMモデルを選択してから描いてください。" = "Choose an enabled LLM model before drawing.";

@@ -6,6 +6,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file retains the history from v2.5.0 (2026-07-25, render engine 12) onward.** Past records follow the recent ones in a collapsible section of this same document; expand it when needed. Viewers without collapse support show the full text. Earlier history is in the [v1.72–v2.4 archive](docs/history/changelog-v1.72-v2.4.md) and the [v0.1–v1.71 archive](docs/history/changelog-v0.1-v1.71.md).
 
+### v2.15.85 — Keep cookies from blocking single-user entry (Build 1161, 2026-10-04)
+
+Single-user mode now reaches its pinned owner even when an invalid session cookie or another account's cookie is present. Explicit Bearer, ordinary sign-in and CSRF boundaries remain, and cookies need not be deleted. DDL engine 57, render engine 73, Score 0.19.0, saved works and registrations are unchanged.
+
 ### 2026-10-04 — Keep another port's cookie from closing single-user entry
 
 Session cookies were checked before the pinned single-user owner, so an invalid cookie produced 401 and opened the Web sign-in form. Explicit Bearer authentication stays first; otherwise single-user mode uses its pinned owner and ordinary mode uses the session cookie. A valid cookie for another account cannot switch the single-user owner either. Invalid Bearer and missing-owner rejection, ordinary session authentication, CSRF boundaries and personal ChatGPT binding remain. The fix does not delete cookies, sign out other ports or migrate saved works and registrations.

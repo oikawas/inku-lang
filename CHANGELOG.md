@@ -6,6 +6,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file retains the history from v2.5.0 (2026-07-25, render engine 12) onward.** Past records follow the recent ones in a collapsible section of this same document; expand it when needed. Viewers without collapse support show the full text. Earlier history is in the [v1.72–v2.4 archive](docs/history/changelog-v1.72-v2.4.md) and the [v0.1–v1.71 archive](docs/history/changelog-v0.1-v1.71.md).
 
+### v2.15.84 — Align CI with current contracts (Build 1160, 2026-10-04)
+
+This version corrects Server and CLI test expectations and fixtures, and the Android design record left inconsistent when v2.15.83 was published. Drawing, persistence and authentication behaviour, DDL engine 57, render engine 73 and Score 0.19.0 are retained. It is a new corrective release; the preceding public tag remains unchanged.
+
 ### 2026-10-04 — Align CI checks and Android design records with current contracts
 
 Server and CLI checks retained expectations from before single DDL, Room14, personal ChatGPT model publication, description locks and the shared drawing model for both stages. Their expectations and test dependencies now follow the accepted contracts. The image inclusion check resolves the actual parent directory of each Python source instead of reporting an already bundled plugin as absent. Android's colour design HTML is regenerated from the current tokens. Failure checks remain enabled; drawing, persistence, authentication, DDL and Score behaviour are unchanged.

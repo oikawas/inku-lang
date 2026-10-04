@@ -10,9 +10,8 @@ enum class ComposeFromDdlProgress {
 }
 
 /**
- * The five seeds are the server's, with its names and its types
- * (`api_core/models.py:14-15`, `:42-45`): `interpretation_seed` is a string,
- * `variation_amplitude` is a string, the other three are numbers. `null` means
+ * Render and composition seeds are numbers; interpretation_seed is a string.
+ * Retired variation seed/amplitude are not drawing requests. `null` means
  * "not given" for every one of them, which is the server's `None`; a caller that
  * wants a specific value says so.
  *
@@ -34,8 +33,6 @@ data class PaintRequest(
     val renderSeed: Long? = null,
     val compositionSeed: Long? = null,
     val interpretationSeed: String? = null,
-    val variationAmplitude: String? = null,
-    val variationSeed: Long? = null,
     val seedText: String? = null,
     /**
      * The instruction language the caller asks for, with the server's key name
@@ -95,7 +92,7 @@ fun drawingModelOf(stage1Model: String, stage2Model: String): String = stage1Mod
  * [renderSeed] is what the drawing was actually performed with, not what was
  * asked for: the request may leave it out, and the layer above the renderer
  * allocates one, the way `_render_with_metadata` does (`rendering.py:294`). The
- * other four are carried back unchanged so the save can record them.
+ * composition and interpretation seeds are carried back so the save can record them.
  */
 data class PaintResult(
     val originalInput: String,
@@ -108,8 +105,6 @@ data class PaintResult(
     val renderSeed: Long? = null,
     val compositionSeed: Long? = null,
     val interpretationSeed: String? = null,
-    val variationAmplitude: String? = null,
-    val variationSeed: Long? = null,
     val seedText: String? = null,
     /**
      * What was asked for and what it resolved to, carried back so the save can

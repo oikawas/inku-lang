@@ -90,7 +90,7 @@ class AndroidWorkPipeline(
 
     /**
      * Draws edited DDL. Without an execution it starts a direct-DDL run. With
-     * one, changed run options (models, colors, canvas, seeds, Wild, variation,
+     * one, changed run options (models, colors, canvas, seeds, Wild,
      * language) fork a new variation from the saved policy. Otherwise the edit
      * is committed to the same execution, declining a pending patch proposal
      * first. Unchanged DDL is drawn without a commit, unless a patch proposal
@@ -417,8 +417,6 @@ class AndroidWorkPipeline(
             renderSeed = hostOptions.optionalUnsignedLong("render_seed"),
             compositionSeed = compiler.optionalUnsignedLong("composition_seed"),
             interpretationSeed = resultOptions.optionalString("interpretation_seed"),
-            variationAmplitude = resultOptions.optionalString("variation_amplitude"),
-            variationSeed = resultOptions.optionalUnsignedLong("variation_seed"),
             seedText = resultOptions.optionalString("seed_text"),
             instructionLangRequested = resultOptions.optionalString("instruction_lang_requested"),
             instructionLangResolved = resultOptions.optionalString("instruction_lang_resolved"),
@@ -463,8 +461,6 @@ class AndroidWorkPipeline(
             renderSeed = request.renderSeed,
             compositionSeed = request.compositionSeed,
             interpretationSeed = request.interpretationSeed,
-            variationAmplitude = request.variationAmplitude,
-            variationSeed = request.variationSeed,
             seedText = request.seedText,
             sketchText = request.sketch.text,
             sketchGrain = request.sketch.grain,
@@ -567,8 +563,6 @@ class AndroidWorkPipeline(
                     catalogSelectionId = request.colorCatalogId,
                     renderSeed = renderSeed,
                     compositionSeed = request.compositionSeed,
-                    variationAmplitude = request.variationAmplitude,
-                    variationSeed = request.variationSeed,
                     bundledPluginsEnabled = bundledPluginsEnabled(),
                     importedPlugins = request.importedPlugins,
                     drawingModelId = request.drawingModel,
@@ -615,8 +609,6 @@ class AndroidWorkPipeline(
                 renderSeed = renderSeed,
                 wild = request.renderWild == true,
                 interpretationSeed = request.interpretationSeed,
-                variationAmplitude = request.variationAmplitude,
-                variationSeed = request.variationSeed,
                 seedText = request.seedText,
                 instructionLangRequested = requestedLang,
                 instructionLangResolved = resolvedLang,
@@ -636,6 +628,9 @@ class AndroidWorkPipeline(
     ): PreparedPipelineConfig {
         val config = JSONObject(saved.configJson)
         val compiler = config.requiredObject("compiler")
+        // A new fork must not inherit a retired request from its saved parent.
+        // The original saved configuration remains untouched.
+        compiler.remove("stage15_variation")
         val registryReport = JSONObject(binding.canvasRegistry())
         val registry = registryReport.requiredObject("registry")
         if (registry.requiredArray("formats").objects().none { it.requiredString("id") == request.canvasAspect }) {
@@ -680,17 +675,6 @@ class AndroidWorkPipeline(
                     ?: compiler.opt("composition_seed")
                     ?: JSONObject.NULL,
             )
-        if (request.variationAmplitude != null || request.variationSeed != null) {
-            if ((request.variationAmplitude == null) != (request.variationSeed == null)) {
-                throw PipelineHostException("variation_pair_required")
-            }
-            compiler.put(
-                "stage15_variation",
-                JSONObject()
-                    .put("amplitude", request.variationAmplitude)
-                    .put("seed", request.variationSeed?.let(java.lang.Long::toUnsignedString)),
-            )
-        }
         if (request.instructionLang != null) {
             config.put(
                 "language",
@@ -784,10 +768,6 @@ class AndroidWorkPipeline(
             (request.renderWild != null && request.renderWild != stored.wild) ||
             (request.compositionSeed != null &&
                 request.compositionSeed != options.optionalUnsignedLong("composition_seed")) ||
-            (request.variationAmplitude != null &&
-                request.variationAmplitude != stored.resultOptions.optionalString("variation_amplitude")) ||
-            (request.variationSeed != null &&
-                request.variationSeed != stored.resultOptions.optionalUnsignedLong("variation_seed")) ||
             (request.instructionLang != null &&
                 InstructionLanguages.normalize(request.instructionLang) !=
                 stored.resultOptions.optionalString("instruction_lang_requested"))

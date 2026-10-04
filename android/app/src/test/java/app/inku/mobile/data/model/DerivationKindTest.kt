@@ -47,7 +47,7 @@ class DerivationKindTest {
         }
         assertEquals(17, DerivationKindRegistry.ALL_INFOS.size)
 
-        // The eleven that were already labelled keep their wording.
+        // Active kinds keep their wording; the retired kind remains readable.
         assertEquals("タッチ", InkuStringsJa.derivationLabel("touch_change"))
         assertEquals("構図", InkuStringsJa.derivationLabel("layout_change"))
         assertEquals("色", InkuStringsJa.derivationLabel("catalog_change"))
@@ -58,7 +58,8 @@ class DerivationKindTest {
         assertEquals("記述編集", InkuStringsJa.derivationLabel("description_edit"))
         assertEquals("再描画", InkuStringsJa.derivationLabel("replay"))
         assertEquals("キャンバス変更", InkuStringsJa.derivationLabel("canvas_aspect_change"))
-        assertEquals("変奏", InkuStringsJa.derivationLabel("variation"))
+        assertEquals("変奏（旧）", InkuStringsJa.derivationLabel("variation"))
+        assertEquals("Variation (retired)", InkuStringsEn.derivationLabel("variation"))
 
         // The five this contract added.
         assertEquals("描画エンジン", InkuStringsJa.derivationLabel("render_engine_change"))

@@ -370,7 +370,7 @@ class RefinementScreenTest {
     @Test
     fun theChosenElementIsRemembered() {
         openPanel()
-        composeTestRule.runOnIdle { vm().setRefinementElement(RefinementElement.Variation) }
+        composeTestRule.runOnIdle { vm().setRefinementElement(RefinementElement.Layout) }
         composeTestRule.waitUntil(20_000) {
             settingOffMainThread(SETTING_KEY_REFINEMENT_ELEMENT) != null
         }
@@ -383,9 +383,9 @@ class RefinementScreenTest {
         subscriber.launch { second.state.collect { } }
         try {
             composeTestRule.waitUntil(30_000) {
-                second.state.value.refinementElement == RefinementElement.Variation
+                second.state.value.refinementElement == RefinementElement.Layout
             }
-            assertTrue(second.state.value.refinementElement == RefinementElement.Variation)
+            assertTrue(second.state.value.refinementElement == RefinementElement.Layout)
         } finally {
             subscriber.cancel()
         }

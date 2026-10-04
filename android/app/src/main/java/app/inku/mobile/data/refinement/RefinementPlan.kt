@@ -10,8 +10,8 @@ import app.inku.mobile.ui.i18n.inkuError
 /**
  * The one intervention a round of refinement makes.
  *
- * SPEC `:614` and `:678`: 「推敲要素はタッチ・配置・読み取り・色カタログ・変奏の
- * 5 種類から一度に 1 種類だけを選択する」. That is why this is an enum and not a set
+ * A refinement selects one of touch, layout, reading, or color catalog.
+ * That is why this is an enum and not a set
  * of flags -- 「系譜の各辺を単一の介入として説明可能にするため」, and a lineage edge
  * whose cause is two things at once cannot be labelled with one kind.
  */
@@ -20,26 +20,10 @@ enum class RefinementElement(val id: String, val derivationKind: String) {
     Layout("layout", "layout_change"),
     Reading("reading", "reinterpretation"),
     Color("color", "catalog_change"),
-    Variation("variation", "variation"),
     ;
 
     companion object {
         fun byId(id: String?): RefinementElement? = entries.firstOrNull { it.id == id }
-    }
-}
-
-/** Intensity. Shown only under the variation radio, and only there (SPEC `:614`). */
-enum class VariationAmplitude(val id: String) {
-    Small("small"),
-    Medium("medium"),
-    Large("large"),
-    ;
-
-    companion object {
-        /** Medium is the default. */
-        val Default = Medium
-
-        fun byId(id: String?): VariationAmplitude = entries.firstOrNull { it.id == id } ?: Default
     }
 }
 
@@ -124,7 +108,7 @@ data class RefinementParent(
  * one thing this round varies. There is no second place where a seed is decided.
  */
 data class RefinementPlan(
-    /** `null` for a comparison candidate: it varies the model, which is not one of the five elements. */
+    /** `null` for a comparison candidate: it varies the model, which is not one of the four elements. */
     val element: RefinementElement?,
     val route: RefinementRoute,
     val catalogId: String,
@@ -153,13 +137,11 @@ object RefinementPlanner {
      * @param element the single intervention. One value, never a collection:
      *   there is no way to spell "touch and colour" here, which is what makes
      *   the exclusivity a property of the type rather than of a check.
-     * @param amplitude read only when [element] is [RefinementElement.Variation].
      * @param newCatalogId the catalogue to apply, for the colour refinement only.
      */
     fun plan(
         element: RefinementElement,
         parent: RefinementParent,
-        amplitude: VariationAmplitude = VariationAmplitude.Default,
         newCatalogId: String? = null,
         seedText: String? = null,
     ): RefinementPlan = when (element) {
@@ -238,28 +220,6 @@ object RefinementPlanner {
             )
         }
 
-        // 「variation_amplitude と variation_seed は揃って初めて有効」: the pair goes
-        // to Stage 1.5 together or the expander builds no plan at all.
-        RefinementElement.Variation -> {
-            val seed = SeedFactory.newVariationSeeds(1).first()
-            RefinementPlan(
-                element = element,
-                route = RefinementRoute.ComposeFromDdl,
-                catalogId = parent.catalogId,
-                canvasAspect = parent.canvasAspect,
-                seeds = PaintSeeds(
-                    compositionSeed = parent.seeds.compositionSeed,
-                    interpretationSeed = parent.seeds.interpretationSeed,
-                    variationAmplitude = amplitude.id,
-                    variationSeed = seed,
-                ),
-                derivationKind = element.derivationKind,
-                derivationMetadata = mapOf(
-                    "variation_amplitude" to amplitude.id,
-                    "variation_seed" to seed,
-                ),
-            )
-        }
     }
 
     /**

@@ -66,6 +66,26 @@ class GenerationInfoSheetTest {
     }
 
     @Test
+    fun retiredVariationIsShownOnlyWhenItsSavedValuesExist() {
+        val oldItem = historyItem(renderMetadataJson = "{}")
+        val oldRows = generationInfoSections(oldItem).flatMap { it.rows }
+        val amplitude = oldRows.single { it.field == GenerationInfoField.VariationAmplitude }
+        assertEquals("medium", amplitude.value)
+        assertEquals("202", oldRows.single { it.field == GenerationInfoField.VariationSeed }.value)
+        assertEquals("中庸", generationInfoDisplayValue(amplitude, InkuStringsJa))
+        assertEquals("Moderate", generationInfoDisplayValue(amplitude, InkuStringsEn))
+        assertEquals("変奏（旧）", InkuStringsJa.generationInfoVariationAmplitude)
+        assertEquals("変奏（旧） seed", InkuStringsJa.generationInfoVariationSeed)
+        assertEquals("Variation (retired)", InkuStringsEn.generationInfoVariationAmplitude)
+        assertEquals("Variation (retired) seed", InkuStringsEn.generationInfoVariationSeed)
+
+        val newItem = oldItem.copy(variationAmplitude = null, variationSeed = null)
+        val newFields = generationInfoSections(newItem).flatMap { it.rows }.map { it.field }
+        assertFalse(newFields.contains(GenerationInfoField.VariationAmplitude))
+        assertFalse(newFields.contains(GenerationInfoField.VariationSeed))
+    }
+
+    @Test
     fun brokenMetadataReturnsFallbacksWithoutDroppingTheSections() {
         val sections = generationInfoSections(
             historyItem(

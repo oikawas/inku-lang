@@ -34,8 +34,6 @@ data class SharedPipelineConfigRequest(
     val catalogSelectionId: String,
     val renderSeed: Long? = null,
     val compositionSeed: Long? = null,
-    val variationAmplitude: String? = null,
-    val variationSeed: Long? = null,
     val errorPolicy: String = "omit_and_continue",
     val resourceLimits: PipelineResourceLimits = PipelineResourceLimits(),
     val canonicalMacros: List<PipelineCanonicalMacro> = emptyList(),
@@ -96,10 +94,6 @@ class SharedPipelineConfigBuilder(
         requireCompatibleBinding()
         require(request.resolvedLanguage in setOf("ja", "en")) { "resolved pipeline language required" }
         require(request.errorPolicy in setOf("stop", "omit_and_continue")) { "unknown error policy" }
-        if ((request.variationAmplitude == null) != (request.variationSeed == null)) {
-            throw PipelineHostException("variation_pair_required")
-        }
-
         val registryReport = JSONObject(binding.canvasRegistry())
         val registry = registryReport.requiredObject("registry")
         val registryId = registry.requiredString("schema")
@@ -149,16 +143,6 @@ class SharedPipelineConfigBuilder(
                     .put("max_evaluation_steps", "8192")
                     .put("max_nodes_per_invocation", "128")
                     .put("max_total_nodes", "128"),
-            )
-            .put(
-                "stage15_variation",
-                if (request.variationAmplitude == null) {
-                    JSONObject.NULL
-                } else {
-                    JSONObject()
-                        .put("amplitude", request.variationAmplitude)
-                        .put("seed", request.variationSeed.wireUnsignedOrNull())
-                },
             )
             .put("error_policy", request.errorPolicy)
             .put(

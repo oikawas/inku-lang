@@ -123,8 +123,6 @@ class HeadlessRenderActivity : Activity() {
                 renderSeed = intent.longExtraOrNull("render_seed"),
                 compositionSeed = intent.longExtraOrNull("composition_seed"),
                 interpretationSeed = intent.getStringExtra("interpretation_seed")?.takeIf { it.isNotBlank() },
-                variationAmplitude = intent.getStringExtra("variation_amplitude")?.takeIf { it.isNotBlank() },
-                variationSeed = intent.longExtraOrNull("variation_seed"),
                 seedText = intent.getStringExtra("seed_text")?.takeIf { it.isNotBlank() },
             )
 

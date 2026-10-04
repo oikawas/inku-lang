@@ -28,8 +28,9 @@ data class LineageWrite(
 /**
  * Decides what a save writes to `lineage_nodes` / `lineage_edges`.
  *
- * A one-for-one port of the lineage part of the server's `db.add_item`
- * (`server/src/inku_server/db.py:2018-2145`). The server is the canonical
+ * Based on the lineage part of the server's `db.add_item`
+ * (`server/src/inku_server/db.py:2018-2145`). Retired variation edges remain
+ * readable, but cannot be declared by a new save. The server is the canonical
  * source; nothing is decided differently here because it looked better on the
  * client. Two consequences of that are easy to lose in translation and are
  * kept deliberately:
@@ -82,7 +83,9 @@ object LineagePlanner {
         val metadata = if (isTruthy(declaration.derivationMetadata)) declaration.derivationMetadata else emptyMap<String, Any?>()
 
         // db.py:2036-2041, in this order.
-        require(!hasParent || DerivationKindRegistry.KINDS.contains(derivationKind)) { INVALID_KIND }
+        require(!hasParent || (derivationKind != "variation" && DerivationKindRegistry.KINDS.contains(derivationKind))) {
+            INVALID_KIND
+        }
         require(hasParent || !isTruthy(derivationKind)) { PARENT_REQUIRED }
         require(isObject(metadata)) { METADATA_NOT_AN_OBJECT }
 

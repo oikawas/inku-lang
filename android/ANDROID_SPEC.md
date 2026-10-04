@@ -46,6 +46,14 @@ When updating Android specifications:
 3. Do not introduce English-only Android requirements that are absent from
    `ANDROID_SPEC.ja.md`.
 
+## 2026-10-04 Retiring variation refinement
+
+Refinement offers four elements: touch, layout, reading and color catalog. The variation choice, notice, amplitude and seed allocation/input are removed. New drawing requests, results and saves carry no variation values. The compiler configuration omits `stage15_variation`, and `variation_pair_required` is no longer checked. A new work derived from a saved configuration removes the retired field from its copy; the original saved configuration remains intact.
+
+Room schema 14 retains the `variation_amplitude` and `variation_seed` columns, their saved values, historical schemas and migrations. This retirement adds no database migration. New works leave the old columns NULL. Saved lineage edges of kind `variation` remain readable as “変奏（旧） / Variation (retired)”, while new saves cannot declare that kind. Generation information shows a recorded amplitude and seed with the retired label only when each value exists; works without these values have no corresponding rows.
+
+The DDL authority and description-based creation messages use “work”. Work-version identifiers such as `pipeline_variation_id`, authority records and Score variation for line tremor retain their meaning. A remembered refinement choice of `variation` displays touch instead, without deleting the old setting or saved works. This supersedes the 2026-09-27 decision to keep the inactive variation choice and notice.
+
 ## 2026-10-04 Connect a personal ChatGPT plan
 
 Android is a local single-user host and connects directly to a personal ChatGPT plan. Settings has an independent ChatGPT plan pane. Continue with ChatGPT opens Chrome on the phone for authorization, without a Mac transfer helper or an API key. Return to inku, acknowledge the first-use plan notice, then open Model settings.

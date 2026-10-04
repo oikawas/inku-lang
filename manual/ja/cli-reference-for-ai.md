@@ -36,7 +36,7 @@ uv run inku-cli paint "白い余白に、黒い太筆の波線を一本引く。
 作成した作品を親ノードとし、特定の要素（タッチ・構図・解釈・色）を変動させた推敲作品を生成して系譜に繋げます。
 
 ```sh
-# 親ID: PARENT_ID (例: d5989732-9f3a-4dd2-82df-c49c50761119) に対して構図のバリエーションを生成
+# 親ID: PARENT_ID (例: d5989732-9f3a-4dd2-82df-c49c50761119) の配置を推敲
 uv run inku-cli refine perform PARENT_ID --kind layout -o ./test_output --png
 ```
 * **パラメータ `--kind` の選択基準**:
@@ -58,9 +58,9 @@ uv run inku-cli lineage show PARENT_ID
   ```text
   Work lineage:
   - (Root) dfced380 [Displayed] : 白い余白に、黒い太筆の波線を一本引く。
-    - (layout_variation) b91ae625  : 白い余白に、黒い太筆の波線を一本引く。
+    - (layout_change) b91ae625  : 白い余白に、黒い太筆の波線を一本引く。
   ```
-* **AIの判断ロジック**: 親ノード（`dfced380`）の配下に、指定した `derivation_kind`（例: `layout_variation`）のエッジで子ノード（`b91ae625`）がネストされていることをパースし、系譜が正しく成長していることを検証します。
+* **AIの判断ロジック**: 親ノード（`dfced380`）の配下に、指定した `derivation_kind`（例: `layout_change`）のエッジで子ノード（`b91ae625`）がネストされていることをパースし、系譜が正しく成長していることを検証します。
 
 ### ステップ 5: 視覚的評価（review）による選定
 生成された派生作品の画像（PNG）を Vision LLM に送信し、画の出来栄えや美的整合性を評価させます。
@@ -110,7 +110,7 @@ uv run inku-cli review evaluate ./test_output/refine-layout-xxxx.png --model nvi
 uv run inku-cli paint "TEXT" --sketch --catalog-mode auto -o ./out --png
 ```
 
-変奏は `--variation-amplitude` と `--variation-seed` の**両方が揃ったときだけ**効きます。片方だけ渡しても展開層の軸は動かず、応答は既定のまま返るので、旗を渡したこと自体は成功の証拠になりません。**動いたかどうかは作品の`variation`と`variation_seed`を読んで確かめてください。**
+変奏は廃止しました。旧強度・seedの旗を使わないでください。推敲はタッチ・配置・読み取り・色カタログの4操作です。保存済みの変奏情報は旧作品の記録として保持し、新規要求や保存には渡しません。pipelineの作品IDとScoreの揺らぎは別の契約で、変更しません。
 
 ### 1. `lineage`
 * **`lineage show <ITEM_ID> [--depth D] [--limit L] [--json]`**

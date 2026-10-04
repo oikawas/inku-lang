@@ -89,7 +89,7 @@ Before the first LLM call, the request and the host settle the following.
 - **Resource limits** — the manifest's hard policy and operational budget (four existing limits plus six new ones) are combined with the administrator's limit settings; a derivation from a saved work keeps that work's budget.
 - **Color catalog** — `fixed` uses the explicit ID, `random` picks one other than the current one, and `auto` delegates to the color catalog selection effect. Every catalog's colors are resolved with the render seed in advance, and only the selected one is used.
 - **Seeds** — with `seed_text` (words that change the touch), `render_seed` is derived deterministically. Otherwise an explicit `render_seed` is used, or a new 63-bit seed is drawn; either way it is recorded. `composition_seed` is set only when given.
-- **Explicit variation** — `variation_amplitude` and `variation_seed` are accepted only as a pair; one alone is rejected as `variation_pair_required`. The variation applies to that operation only and is not inherited by derived works.
+- **Retired variation** — new requests carry no amplitude or seed, and there is no seed allocation API. Old focus, amplitude and seed remain only in history reads and are never written by new saves. Saved configurations are preserved; only the copy for the next execution omits `stage15_variation`.
 - **Retry budgets** — color catalog selection and hole completion default to 120 seconds per attempt and up to 4 attempts; Stage 1 to 300 seconds per attempt, 540 seconds in total, and up to 4 attempts (overridable with `INKU_LLM_*`). The sketch uses the color catalog budget unless it has its own. In developer mode, `developer_disable_llm_retries` limits every stage to one attempt.
 
 ## Automatic color catalog selection
@@ -203,7 +203,6 @@ The host supplies trusted render options (resolved color map, render seed, wild,
 | 1 | Entry | Whitespace-only description | 422; nothing runs | — |
 | 1a | Entry | Description that is empty once labels are cut | 400; nothing runs | — |
 | 2 | Entry | `Idempotency-Key` matches a saved work | Returns the saved work (409 if the description differs) | — |
-| 3 | Entry | Only one half of the variation pair | 422 `variation_pair_required` | — |
 | 4 | Entry | `seed_text` present | Derives `render_seed` deterministically | Both recorded |
 | 5 | Pool | Retained runs at the limit and all busy | 429 `pipeline_capacity_reached` | — |
 | 6 | Color catalog | Selection failure or budget spent | Continues with `default` | `catalog_mode=auto_fallback_default` |

@@ -79,8 +79,6 @@ export type PipelineOptions = {
 	render_seed?: Seed;
 	composition_seed?: Seed;
 	wild?: boolean;
-	variation_amplitude?: string;
-	variation_seed?: number;
 	interpretation_seed?: string;
 	seed_text?: string;
 	history_display_label?: string;

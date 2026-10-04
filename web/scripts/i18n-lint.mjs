@@ -25,17 +25,16 @@ const JA = join(SRC, 'lib/i18n/ja.ts');
 const listMode = process.argv.includes('--list');
 
 // ── the dictionary the UI must hold to ────────────────────────────────────
-// Fixed English for the five refinement operations and the variation amplitudes.
+// Fixed English for the four refinement operations and the historical variation amplitudes.
 // These are the labels the author ruled on; drift here is a real regression.
 const FIXED = {
 	canvasVaryPerformance: 'Another performance',
 	canvasVaryComposition: 'Another composition',
 	canvasVaryInterpretation: 'Another reading',
 	canvasVaryColor: 'Another catalog',
-	variationTitle: 'Variation',
-	variationSmall: 'Subtle',
-	variationMedium: 'Moderate',
-	variationLarge: 'Sweeping',
+	retiredVariationSmall: 'Subtle',
+	retiredVariationMedium: 'Moderate',
+	retiredVariationLarge: 'Sweeping',
 	submitBtn: 'Paint',
 	wildButton: 'Wild',
 };
@@ -105,9 +104,9 @@ const RESTRICTED = [
 		texts: [],
 	},
 	{
-		// One word, one sense: Moderate is the middle variation amplitude and nothing else.
+		// One word, one sense: Moderate is the historical middle variation amplitude and nothing else.
 		word: 'Moderate', re: /\bmoderate\b/i, instead: 'for speed use Medium',
-		keys: ['variationMedium'],
+		keys: ['retiredVariationMedium'],
 		texts: [],
 	},
 ];

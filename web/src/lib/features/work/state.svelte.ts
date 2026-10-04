@@ -227,8 +227,6 @@ export function createWorkState(deps: WorkStateDeps) {
 			render_seed: options.renderSeed,
 			composition_seed: options.compositionSeed,
 			wild: typeof render.wild === 'boolean' ? render.wild : undefined,
-			variation_amplitude: options.variationAmplitude,
-			variation_seed: options.variationSeed,
 			interpretation_seed: options.interpretationSeed,
 			seed_text: options.seedText,
 			history_display_label: options.displayLabel,

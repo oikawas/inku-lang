@@ -91,7 +91,7 @@ def default_manifest(binding: PipelineBinding) -> dict:
                 "macro_expansion_limits": {"max_invocations": "64", "max_depth": "16",
                                            "max_evaluation_steps": "8192", "max_nodes_per_invocation": "128",
                                            "max_total_nodes": "128"},
-                "stage15_variation": None, "error_policy": "omit_and_continue",
+                "error_policy": "omit_and_continue",
                 "hard_resource_policy": {"identity": "installation-default.v1", "budget": deepcopy(budget)},
                 "operational_resource_budget": deepcopy(budget),
             },

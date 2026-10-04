@@ -54,6 +54,7 @@ export function projectHistoryCurrentWork(item: HistoryItem): HistoryCurrentWork
 			render_seed: item.render_seed ?? null,
 			composition_seed: item.composition_seed ?? null,
 			interpretation_seed: item.interpretation_seed ?? null,
+			focus: item.focus ?? null,
 			variation_amplitude: item.variation_amplitude ?? null,
 			variation_seed: item.variation_seed == null ? null : Number(item.variation_seed),
 			elapsed_stage1_ms: 0,

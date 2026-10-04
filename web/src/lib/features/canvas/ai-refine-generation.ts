@@ -1,7 +1,7 @@
 // The seeds of an autonomous refinement generation drawn from its parent's DDL
 // (a work its edited DDL holds). Only what the kind changes is drawn anew: the
-// performance for a touch, the placement for a layout; color and variation keep
-// both, and change the catalog or the variation instead.
+// performance for a touch, the placement for a layout; color keeps both and
+// changes the catalog instead.
 
 type Seed = number | string;
 

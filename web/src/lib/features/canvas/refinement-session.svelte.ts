@@ -1,8 +1,7 @@
 import { createElapsed, type Elapsed } from '../../elapsed.svelte.ts';
 import type { PaintResult } from '../run/current-work.ts';
 
-export type RefineKind = 'touch' | 'layout' | 'reading' | 'color' | 'variation';
-export type VariationAmplitude = 'small' | 'medium' | 'large';
+export type RefineKind = 'touch' | 'layout' | 'reading' | 'color';
 /** Which dialog the refinement modal shows: drawing elements, models, or the color catalog change. */
 export type RefinementView = 'adjust' | 'compare' | 'color';
 

@@ -81,7 +81,6 @@ export type PaintResult = {
 	focus?: string | null;
 	variation_amplitude?: string | null;
 	variation_seed?: number | null;
-	variation_moved_axes?: Array<{ axis: string; from: string; to: string }>;
 	interpret_fallback_used?: boolean;
 	interpret_fallback_reasons?: string[];
 	// Stage 2's counterpart. It exists only in the response, so a saved work
@@ -107,9 +106,6 @@ export type PaintOptions = {
 	/** Per-feature overrides for the render request; built by the features. */
 	renderOverrides?: RenderOverrides;
 	compositionSeed?: Seed;
-	// Variation shifts the expansion layer only when both values exist.
-	variationAmplitude?: string;
-	variationSeed?: number;
 	interpretationSeed?: string;
 	seedText?: string;
 	signal?: AbortSignal;
@@ -203,8 +199,6 @@ export async function runCurrentWork(
 			canvas_aspect: options.canvasAspectId ?? defaults.canvasAspectId,
 			render_seed: options.renderSeed,
 			composition_seed: options.compositionSeed,
-			variation_amplitude: options.variationAmplitude ?? null,
-			variation_seed: options.variationSeed ?? null,
 			interpretation_seed: options.interpretationSeed,
 			seed_text: options.seedText,
 			save_history: options.saveHistory ?? true,

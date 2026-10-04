@@ -207,9 +207,9 @@
 	const detailBatchLine = $derived(statusHistoryItem?.batch_line_number ?? null);
 	const detailNote = $derived((statusHistoryItem?.note ?? '').trim());
 	const variationAmplitudeLabel = (amplitude: string) =>
-		amplitude === 'small' ? t().variationSmall
-		: amplitude === 'medium' ? t().variationMedium
-		: amplitude === 'large' ? t().variationLarge
+		amplitude === 'small' ? t().retiredVariationSmall
+		: amplitude === 'medium' ? t().retiredVariationMedium
+		: amplitude === 'large' ? t().retiredVariationLarge
 		: amplitude;
 	// Hide provenance when the work has no lineage, derivation, batch, or note.
 	const hasOriginDetails = $derived(
@@ -272,7 +272,7 @@
 					<dl>
 						{@render term(`Stage 2 (${isJapanese ? '描画' : 'Performance'})`, t().provenanceHintStage2Model)}<dd>{statusStage2Model}</dd>
 						{@render term(`Stage 2 ${isJapanese ? '言語' : 'Language'}`, t().provenanceHintStage2Lang)}<dd>{displayLanguageName(detailStage2Lang)}</dd>
-						{@render term(t().provenanceLabelFocus, t().provenanceHintFocus)}<dd>{detailFocus || '-'}</dd>
+						{#if detailFocus}{@render term(t().provenanceLabelFocus, t().provenanceHintFocus)}<dd>{detailFocus}</dd>{/if}
 						{#if detailVariationAmplitude}
 							{@render term(t().provenanceLabelVariation, t().provenanceHintVariation)}<dd>{variationAmplitudeLabel(detailVariationAmplitude)}</dd>
 						{/if}

@@ -1980,8 +1980,6 @@ def _paint_payload(
         "sketch": bool(getattr(args, "sketch", False)) or None,
         "sketch_grain": getattr(args, "sketch_grain", None),
         "sketch_text": getattr(args, "sketch_text", None),
-        "variation_amplitude": getattr(args, "variation_amplitude", None),
-        "variation_seed": getattr(args, "variation_seed", None),
         "wild": bool(getattr(args, "wild", False)) or None,
         # None when the flag is absent, so the filter below drops the key: the
         # server must see no `limits` at all to run at its own settings.
@@ -3371,7 +3369,7 @@ def command_refine(args: argparse.Namespace) -> int:
             # work's edited DDL away; the server refuses it as well.
             raise CliError(
                 f"history item {args.item_id} is held by its edited DDL, so it is not redrawn from its "
-                "description; refine it in the web app, or start a new variation from its description there"
+                "description; refine it in the web app, or start a new work from its description there"
             )
         
         derivation_kind = _DERIVATION_KIND_BY_REFINE_KIND[args.kind]
@@ -3950,16 +3948,6 @@ def _add_paint_args(parser: argparse.ArgumentParser, *, batch: bool = False) -> 
         help="use this sketch text as it stands instead of asking for one (replay of a saved or hand-edited sketch)",
     )
     parser.add_argument(
-        "--variation-amplitude",
-        choices=["small", "medium", "large"],
-        help="how far the variation layer moves the expansion axes; takes effect only together with --variation-seed",
-    )
-    parser.add_argument(
-        "--variation-seed",
-        type=int,
-        help="which axes the variation layer moves and in which direction; takes effect only together with --variation-amplitude",
-    )
-    parser.add_argument(
         "--wild",
         action="store_true",
         help="remove the amplitude ceiling on the stroke performance, letting the renderer swing further",
@@ -3992,7 +3980,7 @@ def _add_paint_args(parser: argparse.ArgumentParser, *, batch: bool = False) -> 
     if batch:
         parser.add_argument("--continue-on-error", action="store_true")
         parser.add_argument("--summary-json", help="write batch summary JSON to this path (default: OUT_DIR/analysis-summary.json)")
-        parser.add_argument("--composition-count", type=int, default=1, help="generate N Stage 1.5 variations per description")
+        parser.add_argument("--composition-count", type=int, default=1, help="draw N works with different placements per description")
     else:
         parser.add_argument("--full-json", action="store_true", help="print the full paint response")
 
@@ -4351,7 +4339,7 @@ def build_parser() -> argparse.ArgumentParser:
     def add_refine_perform_arguments(command: argparse.ArgumentParser) -> None:
         command.add_argument("item_id", help="target history item ID to refine")
         command.add_argument("--kind", choices=("touch", "layout", "reading", "color"), required=True, help="refinement element type")
-        command.add_argument("--description", help="override the description for layout/reading variations; without it the parent's Sketch from life prose is carried over, and with it that prose is written again")
+        command.add_argument("--description", help="override the description for layout/reading works; without it the parent's Sketch from life prose is carried over, and with it that prose is written again")
         command.add_argument("--save-history", action="store_true", default=True, help="automatically save the result to history")
         command.add_argument("--no-save", dest="save_history", action="store_false", help="do not save the result to history")
         command.add_argument("-o", "--out-dir", help="save outputs (svg/json) to this directory")

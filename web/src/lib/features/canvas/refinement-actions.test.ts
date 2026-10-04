@@ -21,7 +21,7 @@ function candidate(
 			stage1_model: 'provider/stage-1',
 			stage2_model: 'provider/stage-2',
 			lineage_parent_node_id: 'parent-1',
-			derivation_kind: 'variation',
+			derivation_kind: 'layout_change',
 			derivation_metadata: { candidate: id },
 			elapsed_stage1_ms: 11,
 			elapsed_stage2_ms: 13,
@@ -92,7 +92,7 @@ test('T-316/T-318: candidates save sequentially with canonical fields and only c
 		countGeneration: true,
 		sourceText: 'source one',
 		lineageParentNodeId: 'parent-1',
-		derivationKind: 'variation',
+		derivationKind: 'layout_change',
 		derivationMetadata: { candidate: 'first' },
 		reconcile: false
 	});

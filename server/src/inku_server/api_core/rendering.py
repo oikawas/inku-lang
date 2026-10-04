@@ -19,7 +19,7 @@ from ..limits import (
 )
 from ..plugins import canvas_aspect_ids, canvas_aspect_ratio_for_aspect, normalize_canvas_aspect_id
 from ..render_engines import SVG_PROFILES, current_render_engine, new_render_seed
-from ..saved_score_compat import VARIATION_AMPLITUDES, coerce_saved_score
+from ..saved_score_compat import coerce_saved_score
 from ..schema import CanvasSpec, Score
 from .. import db as _db
 from .common import _build_number, _model_metadata
@@ -161,17 +161,6 @@ def _render_hash_metadata(
         "render_hash": render_hash,
         "render_hash_short": _db.render_hash_short(render_hash) or "",
     }
-
-
-def _validated_variation_amplitude(value: str | None) -> str | None:
-    """変奏 (v2.0): 未指定・未知の強度は None にして変奏なしへ戻す。
-
-    変奏は系譜継承しない（作者裁定 2026-07-20）。明示された作品だけが
-    (強度, seed) を持ち、未指定の派生は変奏前と同じ展開になる。
-    """
-    if value in VARIATION_AMPLITUDES:
-        return value
-    return None
 
 
 def _validated_svg_profile(svg_profile: str | None) -> str:

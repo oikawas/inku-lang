@@ -52,16 +52,6 @@
 								<span class="variation-card-meta">
 									<span>{candidate.label}</span>
 									<span>r {candidate.result.render_seed ?? "-"} / v {candidate.result.composition_seed ?? t().seedBaseLabel}{candidate.result.interpretation_seed ? ` / i ${candidate.result.interpretation_seed.slice(0, 8)}` : ""}</span>
-									{#if candidate.result.variation_moved_axes?.length}
-										<span class="variation-card-moved">
-											{#each candidate.result.variation_moved_axes as moved (moved.axis)}
-												<span class="variation-moved-axis">{t().variationAxis(moved.axis)} {moved.to}</span>
-											{/each}
-										</span>
-									{:else if candidate.kind === 'variation'}
-										<!-- The core has no axis to move since center stopped being a focus. -->
-										<span class="variation-card-moved">{t().variationMovedNothing}</span>
-									{/if}
 								</span>
 							</button>
 						{#if refinementSession.gridIncludesReading}<pre class="variation-ddl-popup">{candidate.result.ddl}</pre>{/if}

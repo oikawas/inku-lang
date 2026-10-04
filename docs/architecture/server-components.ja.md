@@ -197,18 +197,20 @@ flowchart LR
 | `public` | 9 | health、info、catalog、models、saijiki、plugin preview、reference、client config、demo | なし。`/health`と`/api/info`以外は個別guard |
 | `auth` | 4 | auth config、login/logout | なし。login以外は個別guard |
 | `me` | 13 | profile、user settings、各user storage | `_current_user` |
-| `plugins` | 8 | plugin閲覧・検証・CRUD・enable | `_current_user`、変更はadmin |
-| `settings` | 16 | server-wide settings、backup | `_admin_user` |
+| `plugins` | 5 | plugin閲覧・検証・CRUD・enable | `_current_user`、変更はadmin |
+| `settings` | 18 | server-wide settings、backup | `_admin_user` |
 | `users` | 8 | user/group管理 | `_user_manager` |
 | `history` | 17 | 履歴、SVG、thumbnail、mark、trash、共有、artifact再作成、animation・card書き出し | `_current_user` |
 | `lineage` | 8 | lineage graph/group、promote、colophon | `_current_user` |
-| `render` | 8 | variation seed、compose、interpret、render-score/svg、paint、paint stream、vision advice | `_current_user` |
+| `render` | 7 | compose、interpret、render-score/svg、paint、paint stream、vision advice | `_current_user` |
 | `feedback` | 3 | unread words | `_current_user` |
+| `description` | 2 | 記述の音数・音節 | `_current_user` |
+| `chatgpt` | 11 | 本人の接続状態・認可・profile・モデル公開設定 | `_current_user`、操作は本人owner判定 |
 | `pipeline` | 13 | canvas形式、variationの開始・取得・fork、variationが送ったsystem prompt、execution command、author DDL、history link・fork、作品のDDL書き出し（名指すplugin定義つき）、旧作品の読取・fork、provider観測 | 各routeで`_current_user`。provider観測はさらにdeveloper modeだけ |
 
-合計107。公開allowlistは `/health`、`/api/info`、`/api/auth/login` の3 pathである（`test_route_authorization.py`）。ログインに要らないものは残さない、が基準である。
+合計118。推敲の変奏seed採番は廃止した。公開allowlistは `/health`、`/api/info`、`/api/auth/login` の3 pathである（`test_route_authorization.py`）。ログインに要らないものは残さない、が基準である。
 
-**⚠ router別の件数は手で写したもので、赤くする検査は無い。** 合計の正本は`test_route_authorization.py`の`EXPECTED_ROUTE_COUNT`（107）で、live appのOpenAPIから作った`tests/data/api-surface-baseline.json`も107 operationを記録する。
+router別の件数は現行API基準表の操作とrouteの宣言を照合したもの（2026-10-04）。合計の正本は`test_route_authorization.py`の`EXPECTED_ROUTE_COUNT`（118）で、live appのOpenAPIから作った`tests/data/api-surface-baseline.json`も118 operationを記録する。
 
 ## 主要flow
 

@@ -5,7 +5,6 @@ from __future__ import annotations
 import itertools
 import json
 import logging
-import secrets
 from collections.abc import AsyncIterator, Callable, Iterator
 from typing import Literal
 
@@ -37,7 +36,6 @@ from ..rendering import (
     _score_canvas_aspect_value,
     _score_with_canvas,
     _validated_canvas_aspect_override,
-    _validated_variation_amplitude,
     _work_for_color_snapshot,
 )
 
@@ -65,8 +63,6 @@ class ComposeRequest(BaseModel):
     catalog_id: str | None = Field(default=None, description="使用するサーバー側色カタログID")
     canvas_aspect: str | None = Field(default=None, description="Canvas aspect plugin selection")
     auto_repair: bool = Field(default=True, description="Deprecated compatibility field; ignored")
-    variation_amplitude: str | None = Field(default=None, description="変奏強度 small / medium / large。variation_seed と揃って初めて有効")
-    variation_seed: int | None = Field(default=None, description="変奏 (v2.0): どの軸がどう動くかを決める seed。variation_amplitude と揃って初めて有効")
     render_seed: int | None = Field(default=None, description="Renderer performance seed for reproducible replay")
     wild: bool = Field(default=False, description="Unleash the stroke performance (removes the amplitude ceiling); recorded and replayed like the seed")
     composition_seed: int | None = Field(default=None, description="Composition seed for shared-pipeline layout; omitted means the placement follows the performance seed")
@@ -133,10 +129,6 @@ class ComposeResponse(BaseModel):
     render_seed: JsonSeed | None = None
     render_wild: bool | None = None
     composition_seed: JsonSeed | None = None
-    focus: str | None = None
-    variation_amplitude: str | None = None
-    variation_seed: int | None = None
-    variation_moved_axes: list[dict[str, str]] = Field(default_factory=list)
     interpretation_seed: str | None = None
     seed_text: str | None = None
     instruction_lang_requested: str | None = None
@@ -224,8 +216,6 @@ class PaintRequest(BaseModel):
     catalog_id: str | None = Field(default=None, description="使用する色カタログID。auto では失敗時の落とし先、random では除外する直前ID")
     catalog_mode: Literal["fixed", "auto", "random"] = Field(default="fixed", description="色カタログの決め方。fixed=catalog_id をそのまま使う / auto=記述を読んでサーバーが選ぶ / random=catalog_id 以外から抽選 (推敲専用)")
     auto_repair: bool = Field(default=True, description="Deprecated compatibility field; ignored")
-    variation_amplitude: str | None = Field(default=None, description="変奏強度 small / medium / large。variation_seed と揃って初めて有効")
-    variation_seed: int | None = Field(default=None, description="変奏 (v2.0): どの軸がどう動くかを決める seed。variation_amplitude と揃って初めて有効")
     render_seed: int | None = Field(default=None, description="Renderer performance seed for reproducible replay")
     wild: bool = Field(default=False, description="Unleash the stroke performance (removes the amplitude ceiling); recorded and replayed like the seed")
     composition_seed: int | None = Field(default=None, description="Composition seed: it re-salts the intermediate expansion (Stage 1.5) and, from render engine 23, decides where the renderer places the marks; omitted means the placement follows the performance seed")
@@ -270,10 +260,6 @@ class PaintResponse(BaseModel):
     render_seed: JsonSeed | None = None
     render_wild: bool | None = None
     composition_seed: JsonSeed | None = None
-    focus: str | None = None
-    variation_amplitude: str | None = None
-    variation_seed: int | None = None
-    variation_moved_axes: list[dict[str, str]] = Field(default_factory=list)
     interpretation_seed: str | None = None
     seed_text: str | None = None
     instruction_lang_requested: str | None = None
@@ -411,7 +397,7 @@ class VisionRefineAdviceBody(BaseModel):
     model: str | None = Field(default=None, min_length=1, max_length=200)
     instruction: str = Field(..., min_length=1, max_length=100_000)
     direction: str = Field(default="", max_length=2000)
-    enabled_kinds: list[str] = Field(..., min_length=1, max_length=5)
+    enabled_kinds: list[str] = Field(..., min_length=1, max_length=4)
     language: str = Field(default="ja", pattern="^(ja|en)$")
 
 
@@ -420,36 +406,6 @@ class VisionRefineAdviceResponse(BaseModel):
     next_direction: str
     suggested_kind: str
     model: str
-
-class VariationSeedsRequest(BaseModel):
-    amplitude: str = Field(..., description="変奏の強度 small / medium / large")
-    count: int = Field(default=4, ge=1, le=8, description="採番する候補数")
-
-
-class VariationSeedsResponse(BaseModel):
-    amplitude: str
-    seeds: list[int]
-
-
-@router.post("/api/variation/seeds", response_model=VariationSeedsResponse)
-def api_variation_seeds(
-    req: VariationSeedsRequest
-) -> VariationSeedsResponse:
-    """変奏候補の seed を採番する。
-
-    採番をサーバー側に置くのは、seed 空間の管理と重複回避を UI に持ち込まない
-    ため（契約 §3.4）。展開は決定的なので、返した seed をそのまま /api/compose
-    へ渡せば候補が再現できる。
-    """
-    amplitude = _validated_variation_amplitude(req.amplitude)
-    if amplitude is None:
-        raise HTTPException(status_code=422, detail="unknown variation amplitude")
-    seeds: list[int] = []
-    while len(seeds) < req.count:
-        candidate = secrets.randbelow(2**31 - 1) + 1
-        if candidate not in seeds:
-            seeds.append(candidate)
-    return VariationSeedsResponse(amplitude=amplitude, seeds=seeds)
 
 @router.post("/api/render-score", response_model=RenderScoreResponse, response_model_exclude_none=True)
 def api_render_score(req: RenderScoreRequest, actor: dict = Depends(_current_user)) -> RenderScoreResponse:

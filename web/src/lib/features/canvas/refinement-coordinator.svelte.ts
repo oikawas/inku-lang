@@ -7,7 +7,7 @@ import type { HistoryItem } from '$lib/historyManagerState.svelte';
 import type { SaveHistoryOptions } from '$lib/features/history/save';
 import type { PaintResult } from '$lib/features/run/current-work';
 import type { WorkState } from '$lib/features/work/state.svelte';
-import { RefinementSessionState, type RefineKind, type VariationAmplitude, type VariationCandidate } from '$lib/features/canvas/refinement-session.svelte';
+import { RefinementSessionState, type RefineKind, type VariationCandidate } from '$lib/features/canvas/refinement-session.svelte';
 import { saveRefinementCandidates } from '$lib/features/canvas/refinement-actions';
 import { otherCatalogIds, planRefinementCandidates, runRefinementFanout } from '$lib/features/canvas/refinement-fanout';
 
@@ -146,6 +146,9 @@ export function createRefinementCoordinator(deps: RefinementCoordinatorDeps) {
 			selected: false,
 			result: {
 				...work.result,
+				focus: undefined,
+				variation_amplitude: undefined,
+				variation_seed: undefined,
 				...data,
 				ddl: work.ddl ?? '',
 				thinking: work.thinking,
@@ -230,6 +233,9 @@ export function createRefinementCoordinator(deps: RefinementCoordinatorDeps) {
 			selected: false,
 			result: {
 				...work.result,
+				focus: undefined,
+				variation_amplitude: undefined,
+				variation_seed: undefined,
 				...data,
 				ddl: work.ddl ?? "",
 				thinking: work.thinking,
@@ -279,54 +285,6 @@ export function createRefinementCoordinator(deps: RefinementCoordinatorDeps) {
 		};
 	}
 
-	async function variationCandidateLabel(amplitude: VariationAmplitude, seed: number, label: string, signal?: AbortSignal): Promise<VariationCandidate> {
-		const source = work.input.trim();
-		const baseDdl = work.ddl ?? "";
-		const r = await apiFetch("/api/compose", {
-			method: "POST",
-			signal,
-			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify({
-				ddl: baseDdl,
-				description: source,
-				...work.sketchPayloadFor(source),
-				model: deps.models.stage2(),
-				instruction_lang: work.instructionLang,
-				ui_lang: getLang(),
-				canvas_aspect: refinementCanvasAspectId(),
-				variation_amplitude: amplitude,
-				variation_seed: seed,
-				...renderSettingsPayload('compose', refinementRenderOverrides()),
-				...(deps.lineageParentId() ? { lineage_parent_node_id: deps.lineageParentId() } : {}),
-			})
-		});
-		if (!r.ok) throw await work.pipelineCompatibilityError(r);
-		const data = await r.json();
-		return {
-			id: `variation-${amplitude}-${seed}`,
-			kind: 'variation',
-			label,
-			selected: false,
-			result: {
-				...composeCandidateResult(source, baseDdl, data),
-				lineage_parent_node_id: deps.lineageParentId(),
-				derivation_kind: deps.lineageParentId() ? 'variation' : null,
-				derivation_metadata: { variation_amplitude: amplitude, variation_seed: seed },
-			},
-		};
-	}
-
-	// The Server allocates variation seeds; seed-space ownership and deduplication stay out of the UI.
-	async function allocateVariationSeeds(amplitude: VariationAmplitude, count: number): Promise<number[]> {
-		const r = await apiFetch("/api/variation/seeds", {
-			method: "POST",
-			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify({ amplitude, count })
-		});
-		if (!r.ok) throw await apiError(r);
-		return (await r.json()).seeds as number[];
-	}
-
 	/** The work in every other catalog; the color change dialog starts it on open. */
 	async function generateColorCatalogCandidates() {
 		const others = otherCatalogIds(deps.catalog.available().map((catalog) => catalog.id), refinementCatalogId());
@@ -337,7 +295,7 @@ export function createRefinementCoordinator(deps: RefinementCoordinatorDeps) {
 		await generateVariationCandidates('color', others.length);
 	}
 
-	async function generateVariationCandidates(kind: RefineKind, count: number, touchWords?: string, amplitude?: VariationAmplitude) {
+	async function generateVariationCandidates(kind: RefineKind, count: number, touchWords?: string) {
 		if (!work.result || refinementSession.gridBusy || work.loading) return;
 		const source = work.input.trim();
 		// Say why nothing is made instead of returning in silence: a work drawn
@@ -371,9 +329,7 @@ export function createRefinementCoordinator(deps: RefinementCoordinatorDeps) {
 				? t().canvasVaryComposition
 				: kind === "reading"
 					? t().canvasVaryInterpretation
-					: kind === "variation"
-						? t().variationTitle
-						: t().canvasVaryColor;
+					: t().canvasVaryColor;
 		const abortController = refinementSession.beginGrid({
 			includesReading: kind === 'reading',
 			taskLabel,
@@ -387,13 +343,11 @@ export function createRefinementCoordinator(deps: RefinementCoordinatorDeps) {
 				kind,
 				count,
 				touchWords: normalizedTouchWords,
-				amplitude,
 				signal: abortController.signal,
 				labels: {
 					touch: t().canvasVaryPerformance,
 					layout: t().canvasVaryComposition,
 					reading: t().canvasVaryInterpretation,
-					variation: t().variationTitle,
 					noAlternateCatalog: t().refineNoAlternateCatalog
 				},
 				currentCompositionSeed: work.result.composition_seed,
@@ -402,12 +356,10 @@ export function createRefinementCoordinator(deps: RefinementCoordinatorDeps) {
 				currentCatalogId: refinementCatalogId()
 			}, {
 				createCompositionSeed: deps.seeds.composition,
-				allocateVariationSeeds,
 				catalogName: deps.catalog.name,
 				renderTouch: renderWordTouchCandidate,
 				renderLayout: composeVariationCandidate,
 				renderReading: interpretationVariationCandidate,
-				renderVariation: variationCandidateLabel,
 				renderColor: renderColorCatalogCandidate
 			});
 			refinementSession.setPlans(abortController, plans.map((plan) => plan.label));

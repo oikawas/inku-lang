@@ -278,9 +278,9 @@ Stage 0.5が動いたとき、**写生文は記述の代わりに三つの消費
 
 ## 6. Rendererと再現性
 
-`render_seed`はタッチ、`composition_seed`は配置、`variation_seed`は変奏、`interpretation_seed`は読み取りの再現補助です。render engine 23以降、配置は`composition_seed`が決め、省略したときだけ`render_seed`に従います。判定は`is not None`なので、`0`は「指定なし」ではなく0というseedです。`seed_text`は明示語を決定的にhashし、Rendererのperformance seedだけへ作用します。解釈、DDL、JSON Score、配置へ作用させません。
+`render_seed`はタッチ、`composition_seed`は配置、`interpretation_seed`は読み取りの再現補助です。render engine 23以降、配置は`composition_seed`が決め、省略したときだけ`render_seed`に従います。判定は`is not None`なので、`0`は「指定なし」ではなく0というseedです。`seed_text`は明示語を決定的にhashし、Rendererのperformance seedだけへ作用します。解釈、DDL、JSON Score、配置へ作用させません。
 
-`variation_seed`は`variation_amplitude`と揃って初めて効きます。片方だけでは展開層の軸は動きません。
+変奏は廃止しました。旧seed・強度・focusのDB欄と保存済み値は保持しますが、新規作品へ書きません。新しい組み立ての設定は`stage15_variation`を送らず、保存済み設定も次の実行へ渡すコピーからだけその欄を外します。DBの移行は行いません。
 
 APIのJSONの応答は、`render_seed`と`composition_seed`を10進の文字列（`"1553303611486672067"`）で返します。`seed_text`から作るseedは64bitで、JavaScriptの数では正確に持てず、丸めたseedを送り返すと別の絵になるためです。seedは受け取ったまま送り返してください。要求は数と10進の文字列のどちらも受けます。
 

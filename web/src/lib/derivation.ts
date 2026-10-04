@@ -27,7 +27,7 @@ const JA: Record<string, string> = {
 	description_edit: '記述編集',
 	replay: '再描画',
 	canvas_aspect_change: 'キャンバス変更',
-	variation: '変奏',
+	variation: '変奏（旧）',
 	sketch_grain_change: '写生の有無'
 };
 
@@ -42,7 +42,7 @@ const EN: Record<string, string> = {
 	description_edit: 'Description edit',
 	replay: 'Replay',
 	canvas_aspect_change: 'Canvas change',
-	variation: 'Variation',
+	variation: 'Variation (retired)',
 	sketch_grain_change: 'Sketch from life'
 };
 

@@ -32,11 +32,11 @@ uv run inku-cli paint "Draw one wave line with a thick black brush on white spac
   * `paths.json`, `paths.svg`, `paths.png`: Local paths for exported files
 * **AI Decision Logic**: Extract the `"history_id"` and store it as the `PARENT_ID` variable.
 
-### Step 3: Make a Variation (Refinement)
-Create a localized variation of the work and attach it as a child node in the lineage tree.
+### Step 3: Refine the Work
+Refine one element of the work and attach the resulting work as a child node in the lineage tree.
 
 ```sh
-# Generate a layout variation for the PARENT_ID (e.g., d5989732-9f3a-4dd2-82df-c49c50761119)
+# Refine the placement of PARENT_ID (e.g., d5989732-9f3a-4dd2-82df-c49c50761119)
 uv run inku-cli refine perform PARENT_ID --kind layout -o ./test_output --png
 ```
 * **Choosing the `--kind` parameter**:
@@ -58,7 +58,7 @@ uv run inku-cli lineage show PARENT_ID
   ```text
   Work lineage:
   - (Root) dfced380 [Displayed] : Draw one wave line with a thick black brush on white space.
-    - (layout_variation) b91ae625  : Draw one wave line with a thick black brush on white space.
+    - (layout_change) b91ae625  : Draw one wave line with a thick black brush on white space.
   ```
 * **AI Decision Logic**: Parse the output to verify that a child node (e.g., `b91ae625`) is nested under the parent (e.g., `dfced380`) with the expected `derivation_kind` edge label.
 
@@ -110,7 +110,7 @@ uv run inku-cli review evaluate ./test_output/refine-layout-xxxx.png --model nvi
 uv run inku-cli paint "TEXT" --sketch --catalog-mode auto -o ./out --png
 ```
 
-Variation takes effect **only when both** `--variation-amplitude` and `--variation-seed` are given. Passing one alone moves no axis of the expansion layer, and the response comes back under the defaults, so having passed a flag is not evidence it took effect. **Read the work's `variation` and `variation_seed` to confirm.**
+Variation is retired. Do not use the old amplitude or seed flags. Refinement has four operations: touch, placement, reading and color catalog. Saved variation metadata remains a historical record and is never sent in new requests or saves. Pipeline work IDs and Score variation are separate contracts and are unchanged.
 
 ### 1. `lineage`
 * **`lineage show <ITEM_ID> [--depth D] [--limit L] [--json]`**

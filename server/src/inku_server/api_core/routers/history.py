@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field, ValidationError
 from ...animation_export import build_animation, build_layer_animation
 from ...card_export import build_card
 from ...limits import limits_as_dict
-from ...saved_score_compat import SAVED_FOCUS_IDS, coerce_saved_score
+from ...saved_score_compat import coerce_saved_score
 from ...schema import Score
 from ...sketch import SketchDetail, normalize_sketch_grain, sketch_state_of
 from ... import db as _db
@@ -18,7 +18,7 @@ from ..common import DESCRIPTION_LOCKED_DETAIL, _unexpected_http_error
 from ...persistence.description_lock import DESCRIPTION_READING_KINDS
 from ..deps import _current_user
 from ..models import HistoryItem, HistoryListResponse, HistoryPostBody
-from ..rendering import _COMPACT_SCORE_VERSIONS, _capture_history_coerce_observability, _effective_limits, _add_history_item, _output_save_settings, _render_metadata, _render_score_svg, _render_seed_from_text, _render_with_metadata, _resolved_catalog_id, _save_history_artifacts, _score_canvas_aspect_value, _score_with_canvas, _validated_canvas_aspect_override, _validated_svg_profile, _validated_variation_amplitude
+from ..rendering import _COMPACT_SCORE_VERSIONS, _capture_history_coerce_observability, _effective_limits, _add_history_item, _output_save_settings, _render_metadata, _render_score_svg, _render_seed_from_text, _render_with_metadata, _resolved_catalog_id, _save_history_artifacts, _score_canvas_aspect_value, _score_with_canvas, _validated_canvas_aspect_override, _validated_svg_profile
 
 
 router = APIRouter(dependencies=[Depends(_current_user)])
@@ -452,9 +452,6 @@ def api_history_post(
             "instruction_lang_requested": body.instruction_lang_requested,
             "instruction_lang_resolved": body.instruction_lang_resolved,
             "ui_lang": body.ui_lang,
-            "focus": body.focus if body.focus in SAVED_FOCUS_IDS else None,
-            "variation_amplitude": _validated_variation_amplitude(body.variation_amplitude),
-            "variation_seed": body.variation_seed,
             "interpretation_seed": body.interpretation_seed,
         }
     else:
@@ -493,9 +490,6 @@ def api_history_post(
                 "ui_lang": body.ui_lang,
                 "render_seed": render_seed,
                 "composition_seed": body.composition_seed,
-                "focus": body.focus if body.focus in SAVED_FOCUS_IDS else None,
-                "variation_amplitude": _validated_variation_amplitude(body.variation_amplitude),
-                "variation_seed": body.variation_seed,
                 "seed_text": seed_text,
                 "interpretation_seed": body.interpretation_seed,
                 # What actually governed this work. Without it a per-install setting

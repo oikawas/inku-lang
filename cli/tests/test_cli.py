@@ -1811,7 +1811,7 @@ def test_refine_perform_follows_the_parent_sketch(monkeypatch):
 # `/api/paint` has always accepted them; the CLI simply left them out of the    #
 # request body, so every CLI run took the server default while the web UI sent  #
 # its own. The result was that no CLI drawing ever went through Stage 0.5, and  #
-# `--wild` / variation / `catalog_mode` were unreachable from the command line. #
+# `--wild` / `catalog_mode` were unreachable from the command line.             #
 # --------------------------------------------------------------------------- #
 
 # (argv fragment, request key, the value the key must carry)
@@ -1819,15 +1819,13 @@ SENDER_PARITY_FLAGS = [
     (["--sketch"], "sketch", True),
     (["--sketch-grain", "coarse"], "sketch_grain", "coarse"),
     (["--sketch-text", "a wet black line"], "sketch_text", "a wet black line"),
-    (["--variation-amplitude", "large"], "variation_amplitude", "large"),
-    (["--variation-seed", "7"], "variation_seed", 7),
     (["--wild"], "wild", True),
     (["--catalog-mode", "auto"], "catalog_mode", "auto"),
     (["--interpretation-seed", "reading-2"], "interpretation_seed", "reading-2"),
 ]
 
 # What a bare `paint TEXT` puts on the wire today. Frozen deliberately: the whole
-# point of the change is that adding the eight keys must not alter the request of
+# point of the change is that adding the six keys must not alter the request of
 # a run that names none of them, or every past bench stops being comparable.
 PAYLOAD_KEYS_WITHOUT_FLAGS = {
     "catalog_id",
@@ -1889,7 +1887,7 @@ def test_paint_payload_carries_each_layer_flag(argv, key, value):
 
 
 def test_paint_payload_without_the_new_flags_is_byte_for_byte_the_old_request():
-    """Without this, an implementation that always sends all eight passes above.
+    """Without this, an implementation that always sends all six passes above.
 
     `False` is not `None`, so a bare `"wild": args.wild` survives the drop-None
     filter and puts an eighteenth key on the wire for every existing bench run.
@@ -1902,8 +1900,8 @@ def test_paint_payload_without_the_new_flags_is_byte_for_byte_the_old_request():
         assert key not in payload, f"{key} を渡していないのに送っている"
 
 
-def test_paint_payload_grows_by_exactly_the_eight_keys():
-    """15 keys before, 23 after -- and the 15 are the same 15.
+def test_paint_payload_grows_by_exactly_the_six_keys():
+    """15 keys before, 21 after -- and the 15 are the same 15.
 
     It was 17 and 25 until the staffage level was folded away (v2.11.0) and
     `tenkei` left the request body with the `--staffage` flag, and 16 and 24
@@ -1917,8 +1915,21 @@ def test_paint_payload_grows_by_exactly_the_eight_keys():
 
     new_flags = [item for argv_fragment, _, _ in SENDER_PARITY_FLAGS for item in argv_fragment]
     everything = cli._paint_payload(parser.parse_args([*argv, *new_flags]), "一滴の墨")
-    assert len(everything) == 23
+    assert len(everything) == 21
     assert set(everything) - PAYLOAD_KEYS_BEFORE == {key for _, key, _ in SENDER_PARITY_FLAGS}
+
+
+def test_retired_variation_flags_are_rejected_and_never_sent():
+    parser = cli.build_parser()
+    for flag, value in (("--variation-amplitude", "small"), ("--variation-seed", "7")):
+        with pytest.raises(SystemExit) as error:
+            parser.parse_args(["paint", "one circle", flag, value])
+        assert error.value.code == 2
+    args = parser.parse_args(["paint", "one circle", "--render-seed", "17"])
+    args.variation_amplitude, args.variation_seed = "small", 7
+    payload = cli._paint_payload(args, "one circle")
+    assert "variation_amplitude" not in payload and "variation_seed" not in payload
+    assert payload["render_seed"] == 17
 
 
 def _subparser(name: str) -> argparse.ArgumentParser:

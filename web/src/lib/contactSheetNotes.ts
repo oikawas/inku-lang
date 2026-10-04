@@ -67,7 +67,7 @@ export function buildContactSheetNotes(entries: ContactSheetNoteEntry[], options
 		field(lines, 'canvas', entry.canvas);
 		field(lines, 'engine', entry.engine);
 		field(lines, 'models', entry.models);
-		field(lines, 'variation', entry.variation);
+		field(lines, 'Variation (retired)', entry.variation);
 		field(lines, 'render hash', entry.renderHash);
 		field(lines, 'created', entry.created);
 		const ddl = (entry.ddl ?? '').trim();

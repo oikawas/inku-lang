@@ -43,7 +43,7 @@ def _fixture_config() -> dict:
             },
             "composition_seed": "17",
             "macro_expansion_limits": {"max_invocations": "16", "max_depth": "16", "max_evaluation_steps": "1000", "max_nodes_per_invocation": "100", "max_total_nodes": "500"},
-            "stage15_variation": None, "error_policy": "omit_and_continue",
+            "error_policy": "omit_and_continue",
             "hard_resource_policy": {"identity": "pipeline-fixture.v1", "budget": budget},
             "operational_resource_budget": budget,
         },

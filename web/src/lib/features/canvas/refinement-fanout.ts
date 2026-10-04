@@ -1,6 +1,5 @@
 import type {
 	RefineKind,
-	VariationAmplitude,
 	VariationCandidate
 } from './refinement-session.svelte.ts';
 import type { Seed } from '../run/current-work.ts';
@@ -14,7 +13,6 @@ export type RefinementFanoutLabels = {
 	touch: string;
 	layout: string;
 	reading: string;
-	variation: string;
 	noAlternateCatalog: string;
 };
 
@@ -23,7 +21,6 @@ export type RefinementFanoutInput = {
 	/** Ignored for color: that plan offers every other catalog. */
 	count: number;
 	touchWords: string;
-	amplitude?: VariationAmplitude;
 	signal: AbortSignal;
 	labels: RefinementFanoutLabels;
 	currentCompositionSeed: Seed | null | undefined;
@@ -34,17 +31,10 @@ export type RefinementFanoutInput = {
 
 export type RefinementFanoutCapabilities = {
 	createCompositionSeed(excluded: Set<number>): number;
-	allocateVariationSeeds(amplitude: VariationAmplitude, count: number): Promise<number[]>;
 	catalogName(id: string): string;
 	renderTouch(words: string, label: string, signal: AbortSignal): Promise<VariationCandidate>;
 	renderLayout(seed: number, label: string, signal: AbortSignal): Promise<VariationCandidate>;
 	renderReading(label: string, signal: AbortSignal): Promise<VariationCandidate>;
-	renderVariation(
-		amplitude: VariationAmplitude,
-		seed: number,
-		label: string,
-		signal: AbortSignal
-	): Promise<VariationCandidate>;
 	renderColor(catalogId: string, label: string, signal: AbortSignal): Promise<VariationCandidate>;
 };
 
@@ -71,12 +61,6 @@ export async function planRefinementCandidates(
 	const catalogIds = input.kind === 'color' ? otherCatalogIds(input.availableCatalogIds, input.currentCatalogId) : [];
 	if (input.kind === 'color' && catalogIds.length === 0) throw new Error(input.labels.noAlternateCatalog);
 	const planCount = input.kind === 'color' ? catalogIds.length : input.count;
-	const resolvedAmplitude = input.amplitude ?? 'medium';
-	// Allocate the complete seed sequence before planning jobs because the Server
-	// owns variation numbering and candidate order follows the returned indexes.
-	const variationSeeds = input.kind === 'variation'
-		? await capabilities.allocateVariationSeeds(resolvedAmplitude, input.count)
-		: [];
 
 	return Array.from({ length: planCount }, (_, index) => {
 		const sequence = index + 1;
@@ -101,18 +85,6 @@ export async function planRefinementCandidates(
 			return {
 				label,
 				run: () => capabilities.renderReading(label, input.signal)
-			};
-		}
-		if (input.kind === 'variation') {
-			const label = `${input.labels.variation} ${sequence}`;
-			return {
-				label,
-				run: () => capabilities.renderVariation(
-					resolvedAmplitude,
-					variationSeeds[index],
-					label,
-					input.signal
-				)
 			};
 		}
 		const catalogId = catalogIds[index];

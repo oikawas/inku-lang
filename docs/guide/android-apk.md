@@ -22,13 +22,14 @@ Works are stored on the device. This guide describes distribution with the new p
 
 ## Build a public APK from source
 
-Prepare Java 21, Android SDK 36, NDK 29.0.14206865, the pinned Rust toolchain and Android target. Use clean source with finalized Android version and Build values.
+Prepare Java 21, Python 3.11 or newer, Android SDK 36, NDK 29.0.14206865, the pinned Rust toolchain and Android target. Use clean source with finalized Android version and Build values.
 
 ```sh
 cd android
+rustup component add rust-docs --toolchain 1.95.0
 ./gradlew :app:assembleRelease -PinkuAndroidReproducibleRelease=true
 ```
 
-This option uses the finalized `android/BUILD_NUMBER` without changing it. Ordinary debug and development packaging keep their automatic Build increment. The release resolves its runtime dependencies and bundles upstream LICENSE and NOTICE files, including LiteRT-LM's complete JNI notices, together with the Rust license inventory.
+This option uses the finalized `android/BUILD_NUMBER` without changing it. Ordinary debug and development packaging keep their automatic Build increment. The release resolves its runtime dependencies and bundles upstream LICENSE and NOTICE files, including LiteRT-LM's complete JNI notices, together with the Rust dependency and standard-library license inventories. The pinned toolchain's standard-library copyright information requires `rust-docs`.
 
 Align the unsigned APK with the SDK's `zipalign`, then sign it with `apksigner` using a dedicated distribution key stored outside Git. Never put the private key or password in source, build logs or GitHub. Keep the key secure: future updates need it. Before publishing, verify the signature, non-debuggable flag, version and Build, arm64 native libraries and bundled notices.

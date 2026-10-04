@@ -7,6 +7,7 @@ import json
 import re
 import subprocess
 import sys
+import tomllib
 import urllib.error
 import urllib.request
 import xml.etree.ElementTree as ET
@@ -115,12 +116,25 @@ def main():
     subprocess.run([sys.executable, str(ROOT / "server/scripts/build_rust_notices.py"),
                     str(ROOT / "core/Cargo.lock"), str(rust_output)], check=True)
     files[rust_output.name] = hashlib.sha256(rust_output.read_bytes()).hexdigest()
+    toolchain = tomllib.loads((ROOT / "core/rust-toolchain.toml").read_text())["toolchain"]["channel"]
+    sysroot = Path(subprocess.check_output(
+        ["rustup", "run", toolchain, "rustc", "--print", "sysroot"], text=True).strip())
+    rust_docs = sysroot / "share/doc/rust"
+    copyright_file = rust_docs / "COPYRIGHT-library.html"
+    if not copyright_file.is_file():
+        raise ValueError(f"Rust standard-library notices need rust-docs for toolchain {toolchain}")
+    write("rust-stdlib/COPYRIGHT-library.html", copyright_file.read_bytes())
+    for license_file in sorted((rust_docs / "licenses").iterdir()):
+        if license_file.is_file():
+            write(f"rust-stdlib/licenses/{license_file.name}", license_file.read_bytes())
     write("README.txt", (
         "inku Android release third-party notices.\n"
         "The Maven inventory identifies the exact release runtime artifacts, their\n"
         "declared licenses and source archives. Embedded LICENSE and NOTICE files,\n"
         "including LiteRT-LM's complete native THIRD_PARTY_NOTICE, are retained.\n"
         "The Rust inventory conservatively includes Cargo.lock registry sources.\n"
+        f"Rust {toolchain}'s standard-library copyright and license collection is included.\n"
+        f"Standard-library source: https://github.com/rust-lang/rust/tree/{toolchain}/library\n"
         "UniFFI 0.32.0 is MPL-2.0; terms: https://www.mozilla.org/en-US/MPL/2.0/\n"
         "Exact sources: https://crates.io/api/v1/crates/<name>/<version>/download\n"
         "cesu8 1.1.0, jni-sys-macros 0.4.1 and r-efi 6.0.0 have no standalone\n"

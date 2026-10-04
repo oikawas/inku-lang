@@ -22,13 +22,14 @@ ChatGPTプランを使う場合、設定のChatGPTプランで本人のChrome認
 
 ## ソースから公開APKを作る
 
-Java 21、Android SDK 36、NDK 29.0.14206865、固定Rust toolchainとAndroid targetを用意し、Androidの版とBuildを確定したcleanなソースから実行します。
+Java 21、Python 3.11以降、Android SDK 36、NDK 29.0.14206865、固定Rust toolchainとAndroid targetを用意し、Androidの版とBuildを確定したcleanなソースから実行します。
 
 ```sh
 cd android
+rustup component add rust-docs --toolchain 1.95.0
 ./gradlew :app:assembleRelease -PinkuAndroidReproducibleRelease=true
 ```
 
-この指定は確定済みの`android/BUILD_NUMBER`を使い、値を書き換えません。通常のdebugや開発用パッケージ作成の自動採番は維持します。releaseの依存を解決し、上流のLICENSE・NOTICE（LiteRT-LM JNIの全文を含む）とRustのライセンス集を生成して同梱します。
+この指定は確定済みの`android/BUILD_NUMBER`を使い、値を書き換えません。通常のdebugや開発用パッケージ作成の自動採番は維持します。releaseの依存を解決し、上流のLICENSE・NOTICE（LiteRT-LM JNIの全文を含む）、Rustの依存と標準ライブラリのライセンス集を生成して同梱します。`rust-docs`は固定toolchainの標準ライブラリの著作権情報を取得するために必要です。
 
 生成されたunsigned APKをSDKの`zipalign`で整列し、Git外の専用公開鍵を使って`apksigner`で署名します。秘密鍵とパスワードをソース、ビルドログ、GitHubへ入れないでください。署名鍵は今後の更新にも必要なので、安全に保管してください。公開前に署名検証、非debuggable、版・Build、arm64のnativeとライセンスの同梱を確認します。

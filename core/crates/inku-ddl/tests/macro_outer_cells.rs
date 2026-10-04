@@ -8,7 +8,7 @@ use inku_ddl::{
     NormalizedDdlDocument, ResolvedInstructionLanguage, ScoreErrorPolicy, ScoreLoweringContext,
     ScoreLoweringOutcome, compile_ddl_to_score_with_resources,
 };
-use inku_render::checked_performance::resolve_checked_performance;
+use inku_render::checked_performance::resolve_checked_performance_with_resources;
 use inku_render::performance::PerformanceRequest;
 use inku_score::{
     Color, GroupLayout, HardResourcePolicy, OperationalResourceBudget, Point, Primitive,
@@ -42,6 +42,13 @@ fn budget() -> ResourceBudget {
     }
 }
 
+fn hard_policy() -> HardResourcePolicy {
+    HardResourcePolicy {
+        identity: "macro-outer-cells-test.v1".into(),
+        budget: budget(),
+    }
+}
+
 fn execute(source: &str) -> CompilerResourceExecutionResult {
     let package: Value = serde_json::from_str(ASSET).expect("Nature package must be JSON");
     let definitions = package["entries"]
@@ -72,10 +79,7 @@ fn execute(source: &str) -> CompilerResourceExecutionResult {
         ScoreLoweringContext::resolve("square", Color::White).unwrap(),
         None,
         ScoreErrorPolicy::OmitAndContinue,
-        HardResourcePolicy {
-            identity: "macro-outer-cells-test.v1".into(),
-            budget: budget(),
-        },
+        hard_policy(),
         OperationalResourceBudget(budget()),
     )
 }
@@ -192,7 +196,7 @@ fn a_cells_group_and_a_later_coordinated_group_stay_in_source_order() {
 fn performed_copies_of_a_maple_leaf_take_separate_cells() {
     let source = "Nature.紅葉を3枚置く。";
     let score = complete_score(source, &execute(source));
-    let plan = resolve_checked_performance(
+    let plan = resolve_checked_performance_with_resources(
         PerformanceRequest {
             score: &score,
             performance_seed: Some(71),
@@ -200,6 +204,8 @@ fn performed_copies_of_a_maple_leaf_take_separate_cells() {
             canvas: None,
         },
         ScoreErrorPolicy::Stop,
+        &hard_policy(),
+        OperationalResourceBudget(budget()),
     )
     .unwrap();
     // Each leaf has one stem. The copies are the same body, so the difference

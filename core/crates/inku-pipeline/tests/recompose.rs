@@ -8,7 +8,7 @@
 
 use std::collections::BTreeMap;
 
-use inku_ddl::{MacroExpansionLimits, ResolvedInstructionLanguage};
+use inku_ddl::{MacroDefinition, MacroExpansionLimits, ResolvedInstructionLanguage};
 use inku_pipeline::recompose::{RecomposeMode, Recomposition, composition_layers, recompose};
 use serde_json::Value;
 
@@ -20,6 +20,23 @@ const LIMITS: MacroExpansionLimits = MacroExpansionLimits {
     max_total_nodes: 128,
 };
 const MARKS: [&str; 2] = ["［構図］", "[composition]"];
+
+/// The bundled Nature words: three works draw a plugin word beside their layers,
+/// and a host recomposes with the definitions it draws with.
+fn definitions() -> Vec<MacroDefinition> {
+    let package: Value =
+        serde_json::from_str(include_str!("../../inku-ddl/assets/nature-leaves-v1.json"))
+            .expect("the Nature package is JSON");
+    package["entries"]
+        .as_array()
+        .expect("package entries")
+        .iter()
+        .map(|entry| {
+            MacroDefinition::from_json(&entry["definition"].to_string())
+                .expect("a bundled definition")
+        })
+        .collect()
+}
 
 fn fixture() -> Value {
     serde_json::from_str(include_str!("data/recompose-v1.json")).expect("the fixture is JSON")
@@ -43,10 +60,11 @@ fn the_instructions_give_back_the_layers_the_composition_reads() {
     let data = fixture();
     let cases = data["cases"].as_array().expect("cases");
     assert_eq!(cases.len(), 49);
+    let definitions = definitions();
     for case in cases {
         let id = text(case, "id");
         let (layers, background) =
-            composition_layers(text(case, "source"), language(case), &[], LIMITS)
+            composition_layers(text(case, "source"), language(case), &definitions, LIMITS)
                 .unwrap_or_else(|reason| panic!("{id}: {reason}"));
         assert_eq!(background, text(case, "background"), "{id}");
         let expected = case["layers"].as_array().expect("layers");
@@ -80,13 +98,13 @@ fn the_instructions_give_back_the_layers_the_composition_reads() {
     }
 }
 
-fn check(case: &Value, mode: RecomposeMode, key: &str) {
+fn check(case: &Value, definitions: &[MacroDefinition], mode: RecomposeMode, key: &str) {
     let id = text(case, "id");
     let want = &case[key];
     let got = recompose(
         text(case, "source"),
         language(case),
-        &[],
+        definitions,
         LIMITS,
         mode,
         1,
@@ -130,27 +148,30 @@ fn check(case: &Value, mode: RecomposeMode, key: &str) {
 
 #[test]
 fn a_principled_recomposition_gives_the_prototypes_other_answer() {
+    let definitions = definitions();
     for case in fixture()["cases"].as_array().expect("cases") {
-        check(case, RecomposeMode::Principled, "principled");
+        check(case, &definitions, RecomposeMode::Principled, "principled");
     }
 }
 
 #[test]
 fn a_chance_recomposition_gives_the_prototypes_chance_ranges() {
+    let definitions = definitions();
     for case in fixture()["cases"].as_array().expect("cases") {
-        check(case, RecomposeMode::Chance, "chance");
+        check(case, &definitions, RecomposeMode::Chance, "chance");
     }
 }
 
 #[test]
 fn only_the_marked_ranges_change() {
     let mut recomposed = 0;
+    let definitions = definitions();
     for case in fixture()["cases"].as_array().expect("cases") {
         let id = text(case, "id");
         let source = text(case, "source");
         for mode in [RecomposeMode::Principled, RecomposeMode::Chance] {
             let Recomposition::Recomposed { source: after, .. } =
-                recompose(source, language(case), &[], LIMITS, mode, 1, id)
+                recompose(source, language(case), &definitions, LIMITS, mode, 1, id)
             else {
                 continue;
             };

@@ -1306,15 +1306,17 @@ mod tests {
     #[test]
     fn macro_internal_counts_and_outer_occurrences_are_separate() {
         let definition = motif(2);
-        for (source, logical, marks, placement, fill) in [
-            ("Test.Pair", 1, 4, 0, 0),
-            ("three Test.Pair", 3, 12, 0, 0),
+        // Three copies alone are one member of a cells group (I-708).
+        for (source, logical, marks, placement, fill, nodes) in [
+            ("Test.Pair", 1, 4, 0, 0, 3),
+            ("three Test.Pair", 3, 12, 1, 0, 4),
             (
                 "scatter three Test.Pair and five blue circles at center.",
                 8,
                 17,
                 1,
                 0,
+                5,
             ),
             (
                 "fill with three Test.Pair and five blue circles.",
@@ -1322,6 +1324,7 @@ mod tests {
                 17,
                 0,
                 1,
+                5,
             ),
         ] {
             let stage = stage(source, std::slice::from_ref(&definition));
@@ -1341,7 +1344,7 @@ mod tests {
                 (exact.placement_instances, exact.fill_instances),
                 (placement, fill)
             );
-            assert_eq!(exact.template_nodes, if logical <= 3 { 3 } else { 5 });
+            assert_eq!(exact.template_nodes, nodes, "{source}");
         }
     }
 

@@ -325,7 +325,11 @@
 # 56: A fill range written in numbers is drawn as the position word with the
 # same numbers instead of omitted. Its Score records the range's origin as
 # `numeric_range` (Score 0.18.0).
-DDL_ENGINE_VERSION = "56"
+# 57: A count written on a word that receives none no longer stacks every copy
+# in one place. The copies become one member of a placement group: `cells`
+# for no action, placing, scattering or drawing (Score 0.19.0), the line-up
+# or tile layout for those actions.
+DDL_ENGINE_VERSION = "57"
 # 4 (2026-07-30): yellow, orange, and purple become abstract Score colors, and
 # coerce recognizes the corresponding Japanese and English DDL markers.
 # 3 (2026-07-30): 黄 / 橙 / 紫 joined the saijiki color words, so an author can write

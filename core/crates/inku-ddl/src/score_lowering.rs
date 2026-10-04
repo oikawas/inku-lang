@@ -1409,7 +1409,23 @@ fn append_macro_caller_diagnostics(
             reason,
         });
     }
-    if instruction.entity.thinness.is_some()
+    if macro_caller_has_unbound_geometry(instruction) {
+        invalid = true;
+        append_macro_invocation_diagnostic(
+            source_instruction_index,
+            head,
+            ScoreFieldGap::UnboundMacroCallerMeaning,
+            error_policy,
+            diagnostics,
+        );
+    }
+    invalid
+}
+
+/// Geometry or a position written on a Macro caller has no binding in the
+/// intact body, so the whole call is left out.
+fn macro_caller_has_unbound_geometry(instruction: &SemanticInstruction) -> bool {
+    instruction.entity.thinness.is_some()
         || instruction.entity.relative_scale.is_some()
         || instruction.entity.explicit_geometry.is_some()
         || instruction.entity.numeric_position.is_some()
@@ -1425,17 +1441,27 @@ fn append_macro_caller_diagnostics(
         || instruction.entity.proportion.arc_form.is_some()
         || instruction.layout_direction.is_some()
         || instruction.position.is_some()
-    {
-        invalid = true;
-        append_macro_invocation_diagnostic(
-            source_instruction_index,
-            head,
-            ScoreFieldGap::UnboundMacroCallerMeaning,
-            error_policy,
-            diagnostics,
-        );
-    }
-    invalid
+}
+
+/// Whether a mirror takes this instruction's body as its target: a mirror
+/// relation on the next instruction, or on the group that starts there.
+fn mirror_takes_body_of(document: &crate::SemanticDocumentAst, projected_index: usize) -> bool {
+    let mirrored = |relation: Option<&SemanticRelation>| {
+        relation.is_some_and(|relation| relation.kind == SemanticRelationKind::Mirrored)
+    };
+    let next = projected_index + 1;
+    document
+        .instructions
+        .get(next)
+        .is_some_and(|instruction| mirrored(instruction.relation.as_ref()))
+        || document.group_predicates.iter().any(|predicate| {
+            mirrored(predicate.relation.as_ref())
+                && document
+                    .coordinated_head_groups
+                    .get(predicate.group_index)
+                    .and_then(|group| group.member_instruction_indices.first())
+                    == Some(&next)
+        })
 }
 
 const MACRO_SCORE_FIELD_KEYS: [&str; 32] = [
@@ -2525,6 +2551,75 @@ fn lower_verified_stage15_shared<'a>(
         });
     }
 
+    // A word that receives no count repeats as a whole. Its copies become a
+    // one-member group that the caller's action lays out once: one copy per
+    // cell for no action, placing, scattering or drawing, and the action's
+    // own layout for a line-up or a tile. Performance sizes the cells from
+    // the drawn copies. A caller with a position, a fill, an order, a
+    // relation, or a mirror after it keeps the outer repetition in place.
+    if objects.is_some() {
+        for (projected_index, instruction) in document.instructions.iter().enumerate() {
+            if !matches!(instruction.entity.head, SemanticHead::MacroInvocation(_)) {
+                continue;
+            }
+            let Some(count) = instruction
+                .entity
+                .quantity
+                .as_ref()
+                .map(|quantity| quantity.value)
+                .filter(|count| (2..=u64::from(u32::MAX)).contains(count))
+            else {
+                continue;
+            };
+            if instruction.fill_target.is_some()
+                || instruction.sequence.is_some()
+                || instruction.relation.is_some()
+                || macro_caller_has_unbound_geometry(instruction)
+                || mirror_takes_body_of(document, projected_index)
+                || group_members.contains_key(&projected_index)
+                || omitted_group_members.contains(&projected_index)
+            {
+                continue;
+            }
+            let layout = match instruction
+                .action
+                .as_ref()
+                .map(|term| term.identity.id.as_str())
+            {
+                None | Some("place" | "scatter" | "draw") => inku_score::GroupLayout::Cells,
+                Some("line_up") => inku_score::GroupLayout::HorizontalSourceOrder,
+                Some("tile") => inku_score::GroupLayout::Tile,
+                Some(_) => continue,
+            };
+            let source_index = view
+                .source_instruction_index(projected_index)
+                .expect("verified source");
+            let Some(bounds) = crate::geometry::position_range(
+                crate::geometry::RangeSource::Omitted,
+                group_range_use(layout),
+                ScoreAngleContext {
+                    composition_seed: view.composition_seed(),
+                    original_pre_expansion_digest: view.original_pre_expansion_digest(),
+                    original_expanded_meaning_digest: view.original_expanded_meaning_digest(),
+                    occurrence: ScoreAngleOccurrence::Direct {
+                        logical_ordinal: source_index as u64,
+                    },
+                },
+            ) else {
+                continue;
+            };
+            let region = group_anchor_region(layout, bounds);
+            group_members.insert(projected_index, (region, count));
+            supported_groups.push((
+                document.coordinated_head_groups.len() + projected_index,
+                vec![source_index],
+                layout,
+                region,
+                bounds,
+            ));
+        }
+    }
+
     let mut instructions = Vec::new();
     let mut anchors = Vec::new();
     let mut anchor_origins = Vec::new();
@@ -3272,23 +3367,25 @@ fn lower_verified_stage15_shared<'a>(
         ];
         if matches!(
             layout,
-            inku_score::GroupLayout::Scatter | inku_score::GroupLayout::Tile
+            inku_score::GroupLayout::Scatter
+                | inku_score::GroupLayout::Tile
+                | inku_score::GroupLayout::Cells
         ) {
             scale_domain_to_range(&mut domain, bounds).expect("a closed range scales exactly");
         }
-        let recipe = placement_recipe(
-            match layout {
-                inku_score::GroupLayout::Overlap => PlacementAction::Place,
-                inku_score::GroupLayout::HorizontalSourceOrder => PlacementAction::LineUp,
-                inku_score::GroupLayout::Scatter => PlacementAction::Scatter,
-                inku_score::GroupLayout::Tile => PlacementAction::Tile,
-            },
-            logical_count,
-            domain,
-            [1, 0],
-            false,
-        )
-        .expect("bounded validated group recipe");
+        let action = match layout {
+            inku_score::GroupLayout::Overlap => Some(PlacementAction::Place),
+            inku_score::GroupLayout::HorizontalSourceOrder => Some(PlacementAction::LineUp),
+            inku_score::GroupLayout::Scatter => Some(PlacementAction::Scatter),
+            inku_score::GroupLayout::Tile => Some(PlacementAction::Tile),
+            // Performance sizes the cells from the drawn copies.
+            inku_score::GroupLayout::Cells => None,
+        };
+        let recipe = match action {
+            Some(action) => placement_recipe(action, logical_count, domain, [1, 0], false)
+                .expect("bounded validated group recipe"),
+            None => PlacementRecipe::Cells,
+        };
         // These are local coordinates; only the group carries the semantic placement.
         for member in &members {
             if member.kind == PlacementMemberKind::Primitive {
@@ -3325,6 +3422,9 @@ fn lower_verified_stage15_shared<'a>(
             },
         });
     }
+    // Groups made by different paths are pushed path by path; the Score keeps
+    // them in source order.
+    placement_groups.sort_by_key(|group| group.placement.start);
     if let Some(plan_objects) = objects.as_deref() {
         mirror_relations = collect_mirror_relation_plans(
             view,
@@ -6137,13 +6237,14 @@ fn group_range_use(layout: inku_score::GroupLayout) -> crate::geometry::RangeUse
         inku_score::GroupLayout::Overlap => crate::geometry::RangeUse::Place,
         inku_score::GroupLayout::HorizontalSourceOrder
         | inku_score::GroupLayout::Scatter
-        | inku_score::GroupLayout::Tile => crate::geometry::RangeUse::Distribute,
+        | inku_score::GroupLayout::Tile
+        | inku_score::GroupLayout::Cells => crate::geometry::RangeUse::Distribute,
     }
 }
 
 /// The group's anchor region over its range: the shrunk range for overlapping
-/// members, the range itself for a tile, and the range's center for a line-up
-/// or scatter.
+/// members, the range itself for a tile or cells, and the range's center for a
+/// line-up or scatter.
 fn group_anchor_region(
     layout: inku_score::GroupLayout,
     range: crate::geometry::RationalRange,
@@ -6151,7 +6252,7 @@ fn group_anchor_region(
     let as_f64 = |bounds: crate::geometry::RationalRange| bounds.map(|(n, d)| n as f64 / d as f64);
     match layout {
         inku_score::GroupLayout::Overlap => as_f64(crate::geometry::place_anchor_bounds(range)),
-        inku_score::GroupLayout::Tile => as_f64(range),
+        inku_score::GroupLayout::Tile | inku_score::GroupLayout::Cells => as_f64(range),
         inku_score::GroupLayout::HorizontalSourceOrder | inku_score::GroupLayout::Scatter => {
             distribution_anchor(PlacementAction::Scatter, as_f64(range))
         }

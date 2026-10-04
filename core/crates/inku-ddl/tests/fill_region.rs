@@ -166,12 +166,21 @@ fn selected_score_keeps_macro_outer_envelope_and_inner_count() {
             std::slice::from_ref(&definition),
         );
         assert_eq!(delivered.score.instructions.len(), 2);
-        assert_eq!(delivered.score.repetition_groups.len(), 1);
-        let symbolic = delivered.score.repetition_groups[0]
-            .member
-            .symbolic
-            .as_ref()
-            .unwrap();
+        // One copy stays a repetition; several copies are one member of a
+        // cells group, which places each copy in a cell of its own (I-708).
+        let member = if count == 1 {
+            assert!(delivered.score.placement_groups.is_empty());
+            assert_eq!(delivered.score.repetition_groups.len(), 1);
+            &delivered.score.repetition_groups[0].member
+        } else {
+            assert!(delivered.score.repetition_groups.is_empty());
+            assert_eq!(delivered.score.placement_groups.len(), 1);
+            let group = &delivered.score.placement_groups[0];
+            assert_eq!(group.layout, inku_score::GroupLayout::Cells);
+            assert_eq!(group.members.len(), 1);
+            &group.members[0]
+        };
+        let symbolic = member.symbolic.as_ref().unwrap();
         assert_eq!(symbolic.instance_count, count);
         assert_eq!(
             symbolic.count_origin,

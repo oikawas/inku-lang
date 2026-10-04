@@ -161,6 +161,11 @@ pub fn materialize_selected_composition(
                         "fill count cannot be partially executed",
                     ));
                 }
+                PlacementRecipe::Cells => {
+                    return Err(ScoreMaterializationError::InvalidContract(
+                        "cells recipes belong to placement groups",
+                    ));
+                }
             };
             let translate_to_numeric_anchor = matches!(
                 object.recipe(),
@@ -418,7 +423,12 @@ pub fn materialize_selected_composition(
         }
     }
     let score = Score {
-        version: if fill_groups
+        version: if placement_groups
+            .iter()
+            .any(|group| group.layout == inku_score::GroupLayout::Cells)
+        {
+            inku_score::ScoreEdition::V0_19
+        } else if fill_groups
             .iter()
             .any(|group| group.target.requires_edition_0_18())
         {
@@ -721,6 +731,7 @@ fn saved_recipe(
         PlacementRecipe::ScatterUniformWithCentroidTranslation => {
             ResolvedPlacementRecipe::ScatterUniformWithCentroidTranslation
         }
+        PlacementRecipe::Cells => ResolvedPlacementRecipe::Cells,
         PlacementRecipe::FillUniformInRegionAndClip { .. } => {
             return Err(ScoreMaterializationError::InvalidContract(
                 "fill requires target group",

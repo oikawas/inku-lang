@@ -10,8 +10,7 @@
 	import RefinementCandidateGrid from './RefinementCandidateGrid.svelte';
 	import type {
 		RefinementSession,
-		RefineKind,
-		VariationAmplitude
+		RefineKind
 	} from '$lib/features/canvas/refinement-session.svelte';
 
 	type Props = {
@@ -25,7 +24,6 @@
 		statusDdlOrigin: boolean;
 		statusDescriptionLocked: boolean;
 		refineKind: RefineKind;
-		variationAmplitude: VariationAmplitude;
 		touchSeedText: string;
 		statusStage1Model: string;
 		statusStage2Model: string;
@@ -34,7 +32,7 @@
 		refineWildValue: boolean;
 		refineWildInherited: boolean;
 		onSetRefineKind: (kind: RefineKind) => void;
-		onGenerateVariationCandidates: (kind: RefineKind, count: 1 | 4, touchWords?: string, amplitude?: VariationAmplitude) => void | Promise<void>;
+		onGenerateVariationCandidates: (kind: RefineKind, count: 1 | 4, touchWords?: string) => void | Promise<void>;
 		/** Save the chosen options, then leave; the rest are dropped. */
 		onSaveAndClose: () => void | Promise<void>;
 		/** Drop every unsaved option, then leave. */
@@ -54,7 +52,6 @@
 		statusDdlOrigin,
 		statusDescriptionLocked,
 		refineKind,
-		variationAmplitude = $bindable('medium'),
 		touchSeedText = $bindable(''),
 		statusStage1Model,
 		statusStage2Model,
@@ -75,9 +72,7 @@
 			? t().refineCostReading
 			: refineKind === 'layout'
 				? t().refineCostLayout
-				: refineKind === 'variation'
-					? t().refineCostLayout
-					: t().refineCostTouch
+				: t().refineCostTouch
 	);
 </script>
 
@@ -117,32 +112,6 @@
 								</Tooltip>
 							</label>
 						{/if}
-						<label class="model-choice" class:checked={refineKind === 'variation'}>
-							<input type="radio" name="refine-kind" value="variation" checked={refineKind === 'variation'} onchange={() => onSetRefineKind('variation')} disabled={refinementSession.busy || refinementSession.gridBusy} />
-							<Tooltip placement="bottom" text={t().tooltipVariation}>
-								<span class="refine-choice-label">
-									<strong>{t().variationRadioLabel}</strong>
-									<span class="refine-info-mark" aria-hidden="true">i</span>
-								</span>
-							</Tooltip>
-						</label>
-						{#if refineKind === 'variation'}
-							<div class="variation-amplitude-field">
-								<div class="model-choice-grid variation-amplitude-grid" role="radiogroup" aria-label={t().variationTitle}>
-									{#each [['small', t().variationSmall, t().variationTooltipSmall, 'bottom-right'], ['medium', t().variationMedium, t().variationTooltipMedium, 'bottom'], ['large', t().variationLarge, t().variationTooltipLarge, 'bottom-left']] as [level, label, hint, place] (level)}
-										<label class="model-choice" class:checked={variationAmplitude === level}>
-											<input type="radio" name="variation-amplitude" value={level} checked={variationAmplitude === level} onchange={() => (variationAmplitude = level as VariationAmplitude)} disabled={refinementSession.busy || refinementSession.gridBusy} />
-											<Tooltip placement={place as 'bottom' | 'bottom-left' | 'bottom-right'} text={hint}>
-												<span class="refine-choice-label">
-													<strong>{label}</strong>
-													<span class="refine-info-mark" aria-hidden="true">i</span>
-												</span>
-											</Tooltip>
-										</label>
-									{/each}
-								</div>
-							</div>
-						{/if}
 						<label class="model-choice" class:checked={refineKind === 'touch'}>
 							<input type="radio" name="refine-kind" value="touch" checked={refineKind === 'touch'} onchange={() => onSetRefineKind('touch')} disabled={refinementSession.busy || refinementSession.gridBusy} />
 							<Tooltip placement="bottom" text={t().tooltipCanvasVaryPerformance}>
@@ -165,7 +134,7 @@
 						<Tooltip text={t().tooltipRefineSingle}>
 							<div class="refine-action-wrap">
 								<PaintButton
-								onclick={() => onGenerateVariationCandidates(refineKind, 1, refineKind === 'touch' ? touchSeedText : undefined, refineKind === 'variation' ? variationAmplitude : undefined)}
+								onclick={() => onGenerateVariationCandidates(refineKind, 1, refineKind === 'touch' ? touchSeedText : undefined)}
 								disabled={!resultAvailable || refinementSession.busy || refinementSession.gridBusy || (refineKind === 'touch' && !touchSeedText.trim())}
 								>
 									{t().refineSingleButton}
@@ -175,7 +144,7 @@
 						<Tooltip text={t().tooltipVariationGridDefault}>
 							<div class="refine-action-wrap">
 								<PaintButton
-								onclick={() => onGenerateVariationCandidates(refineKind, 4, undefined, refineKind === 'variation' ? variationAmplitude : undefined)}
+								onclick={() => onGenerateVariationCandidates(refineKind, 4, undefined)}
 								disabled={!resultAvailable || refinementSession.busy || refinementSession.gridBusy || refineKind === 'touch'}
 								>
 									{t().variationGridDefault}

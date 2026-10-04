@@ -24,9 +24,9 @@ test('T-326: coordinator delegates refinement planning and fan-out but keeps tra
 	assert.match(coordinator, /async function renderWordTouchCandidate\(/);
 	assert.match(coordinator, /async function composeVariationCandidate\(/);
 	assert.match(coordinator, /async function interpretationVariationCandidate\(/);
-	assert.match(coordinator, /async function variationCandidateLabel\(/);
+	assert.doesNotMatch(coordinator, /async function variationCandidateLabel\(/);
 	assert.match(coordinator, /async function renderColorCatalogCandidate\(/);
-	assert.match(coordinator, /async function allocateVariationSeeds\(/);
+	assert.doesNotMatch(coordinator, /async function allocateVariationSeeds\(/);
 
 	const generateStart = coordinator.indexOf('async function generateVariationCandidates');
 	const saveStart = coordinator.indexOf('async function saveSelectedVariationCandidates', generateStart);

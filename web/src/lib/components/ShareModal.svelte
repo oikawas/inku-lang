@@ -257,8 +257,8 @@
 
 				<p class="share-help">
 					{isJapanese
-						? '「編集できる」を渡すと、星・ゴミ箱・削除もできるようになります。共有を外すと相手の一覧から消えますが、その人が作った変奏は残ります。'
-						: '“Can edit” also allows starring, trashing and deleting. Removing someone takes the work out of their listing; any variation they made from it stays theirs.'}
+						? '「編集できる」を渡すと、星・ゴミ箱・削除もできるようになります。共有を外すと相手の一覧から消えますが、その人が作った作品は残ります。'
+						: '“Can edit” also allows starring, trashing and deleting. Removing someone takes the work out of their listing; any work they made from it stays theirs.'}
 				</p>
 			{/if}
 

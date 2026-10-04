@@ -43,11 +43,10 @@ export function noteEntryFor(
 	const ratio = work.render_canvas_aspect_ratio;
 	const engineName = [work.render_engine_id, work.render_engine_version].filter(Boolean).join(" ");
 	const models = [work.stage1_model, work.stage2_model].filter(Boolean).join(" -> ");
-	const variation = work.variation_amplitude
-		? work.variation_seed == null
-			? work.variation_amplitude
-			: `${work.variation_amplitude} (seed ${work.variation_seed})`
-		: "";
+	const variation = [
+		work.variation_amplitude,
+		work.variation_seed == null ? "" : `(seed ${work.variation_seed})`,
+	].filter(Boolean).join(" ");
 	return {
 		description: work.source_text || work.input || "",
 		colorCatalog: catalog,

@@ -75,8 +75,8 @@ permission to hand it on. Sharing takes an ID; `history peers` is where to find
 one, and it answers with your own organisation only. The full member directory
 stays where it was, readable by a member manager.
 
-A work you can read can be varied, and the variation keeps the connection rather
-than copying anything: `inku-cli refine perform <their_item_id> …` records their
+A work you can read can be refined, and the child work keeps the connection
+rather than copying anything: `inku-cli refine perform <their_item_id> …` records their
 work as your work's parent. In `inku-cli lineage show`, a parent you cannot read
 prints as `[Private]` rather than `[Deleted]` — it still exists, and its owner
 can still give it to you.
@@ -330,8 +330,7 @@ usage: inku-cli paint [-h] [--base-url BASE_URL]
                       [--seed-text SEED_TEXT] [--sketch]
                       [--sketch-grain {fine,coarse}]
                       [--sketch-text SKETCH_TEXT]
-                      [--variation-amplitude {small,medium,large}]
-                      [--variation-seed VARIATION_SEED] [--wild]
+                      [--wild]
                       [--limits KEY=VALUE [KEY=VALUE ...]]
                       [--catalog-mode {fixed,auto,random}]
                       [--interpretation-seed INTERPRETATION_SEED]
@@ -390,13 +389,6 @@ options:
   --sketch-text SKETCH_TEXT
                         use this sketch text as it stands instead of asking
                         for one (replay of a saved or hand-edited sketch)
-  --variation-amplitude {small,medium,large}
-                        how far the variation layer moves the expansion axes;
-                        takes effect only together with --variation-seed
-  --variation-seed VARIATION_SEED
-                        which axes the variation layer moves and in which
-                        direction; takes effect only together with
-                        --variation-amplitude
   --wild                remove the amplitude ceiling on the stroke
                         performance, letting the renderer swing further
   --limits KEY=VALUE [KEY=VALUE ...]
@@ -441,8 +433,7 @@ usage: inku-cli batch [-h] [--base-url BASE_URL]
                       [--seed-text SEED_TEXT] [--sketch]
                       [--sketch-grain {fine,coarse}]
                       [--sketch-text SKETCH_TEXT]
-                      [--variation-amplitude {small,medium,large}]
-                      [--variation-seed VARIATION_SEED] [--wild]
+                      [--wild]
                       [--limits KEY=VALUE [KEY=VALUE ...]]
                       [--catalog-mode {fixed,auto,random}]
                       [--interpretation-seed INTERPRETATION_SEED]
@@ -499,13 +490,6 @@ options:
   --sketch-text SKETCH_TEXT
                         use this sketch text as it stands instead of asking
                         for one (replay of a saved or hand-edited sketch)
-  --variation-amplitude {small,medium,large}
-                        how far the variation layer moves the expansion axes;
-                        takes effect only together with --variation-seed
-  --variation-seed VARIATION_SEED
-                        which axes the variation layer moves and in which
-                        direction; takes effect only together with
-                        --variation-amplitude
   --wild                remove the amplitude ceiling on the stroke
                         performance, letting the renderer swing further
   --limits KEY=VALUE [KEY=VALUE ...]
@@ -532,7 +516,7 @@ options:
                         write batch summary JSON to this path (default:
                         OUT_DIR/analysis-summary.json)
   --composition-count COMPOSITION_COUNT
-                        generate N Stage 1.5 variations per description
+                        draw N works with different placements per description
 
 ```
 
@@ -1199,7 +1183,7 @@ options:
                         refinement element type
   --description DESCRIPTION
                         override the description for layout/reading
-                        variations; without it the parent's Sketch from life
+                        works; without it the parent's Sketch from life
                         prose is carried over, and with it that prose is
                         written again
   --save-history        automatically save the result to history
@@ -1227,7 +1211,7 @@ options:
                         refinement element type
   --description DESCRIPTION
                         override the description for layout/reading
-                        variations; without it the parent's Sketch from life
+                        works; without it the parent's Sketch from life
                         prose is carried over, and with it that prose is
                         written again
   --save-history        automatically save the result to history

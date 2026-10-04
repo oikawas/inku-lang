@@ -33,8 +33,7 @@
 	import type {
 		RefinementSession,
 		RefinementView,
-		RefineKind,
-		VariationAmplitude
+		RefineKind
 	} from '$lib/features/canvas/refinement-session.svelte';
 
 	type OutputTab = 'canvas' | 'refine' | 'lineage';
@@ -137,7 +136,7 @@
 		/** The whole feature, so a new field costs no line here. */
 		modelInspection: ModelInspection;
 		touchSeedText: string;
-		onGenerateVariationCandidates: (kind: RefineKind, count: 1 | 4, touchWords?: string, amplitude?: VariationAmplitude) => void | Promise<void>;
+		onGenerateVariationCandidates: (kind: RefineKind, count: 1 | 4, touchWords?: string) => void | Promise<void>;
 		onGenerateColorCatalogCandidates: () => void | Promise<void>;
 		/** Draws the work with each model picked in the "change the model" dialog. */
 		onGenerateModelCandidates: () => void | Promise<void>;
@@ -425,9 +424,8 @@
 	// Refinement dimensions retain the previous selection.
 	const REFINE_KIND_KEY = 'inku-refine-kind';
 	// The color change has a dialog of its own, so it is not a remembered choice here.
-	const REFINE_KINDS: RefineKind[] = ['touch', 'layout', 'reading', 'variation'];
+	const REFINE_KINDS: RefineKind[] = ['touch', 'layout', 'reading'];
 	let refineKind = $state<RefineKind>('touch');
-	let variationAmplitude = $state<VariationAmplitude>('medium');
 	onMount(() => {
 		try {
 			const stored = localStorage.getItem(REFINE_KIND_KEY) as RefineKind | null;
@@ -855,7 +853,6 @@
 					{statusDdlOrigin}
 					{statusDescriptionLocked}
 					{refineKind}
-					bind:variationAmplitude
 					bind:touchSeedText
 					{statusStage1Model}
 					{statusStage2Model}

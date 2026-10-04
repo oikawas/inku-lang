@@ -110,8 +110,6 @@ def _options(data: dict[str, Any], *, save_history: bool) -> dict:
         "render_seed": "render_seed",
         "composition_seed": "composition_seed",
         "wild": "wild",
-        "variation_amplitude": "variation_amplitude",
-        "variation_seed": "variation_seed",
         "interpretation_seed": "interpretation_seed",
         "seed_text": "seed_text",
         "history_input": "history_input",

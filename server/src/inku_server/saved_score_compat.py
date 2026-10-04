@@ -16,17 +16,6 @@ from .limits import DEFAULT_LIMITS, Limits, note_limit, using_limits
 from .schema import CLOSED_SHAPES, Instruction, Score, SurfaceSpec
 
 
-SAVED_FOCUS_IDS = frozenset(
-    {
-        "upper_right",
-        "upper_left",
-        "lower_right",
-        "lower_left",
-        "upper_edge",
-        "right_half",
-    }
-)
-VARIATION_AMPLITUDES = frozenset({"small", "medium", "large"})
 SAVED_SCORE_BRANCH_ORDER = (
     "structural_defaults",
     "legacy_fill_spelling",

@@ -93,10 +93,9 @@ def test_the_cli_names_every_paint_field_or_excuses_it():
     # State how many were looked at. An enumeration that silently empties out --
     # a renamed model, a parser that finds no dict -- would otherwise pass by
     # asserting nothing at all.
-    # 36 since the staffage level was folded away (v2.11.0) -- `tenkei` left the
-    # request model, and the `--staffage` flag left the CLI with it.
-    assert len(fields) >= 36, f"PaintRequest のフィールドが {len(fields)} 件しか見えていない"
-    assert len(sent) >= 24, f"_paint_payload の鍵が {len(sent)} 件しか読めていない"
+    # Variation amplitude and seed left both senders when variation was retired.
+    assert len(fields) >= 34, f"PaintRequest のフィールドが {len(fields)} 件しか見えていない"
+    assert len(sent) >= 22, f"_paint_payload の鍵が {len(sent)} 件しか読めていない"
 
     missing = sorted(fields - sent - set(EXCUSED))
     assert not missing, (

@@ -138,14 +138,6 @@
 	.refine-paint-actions { align-items: stretch; }
 	/* Keep the speed estimate on its own row directly below the draw button. */
 	.refine-paint-actions .refine-cost-indicator { flex: 0 0 100%; min-height: 0; }
-	/* Indent amplitude below Variation to make the parent-child relation visible. */
-	.variation-amplitude-field { display: grid; gap: 5px; grid-column: 1 / -1; margin: -2px 0 2px 18px; padding-left: 10px; border-left: 2px solid var(--border2); }
-	/* Small, medium, and large stay in three columns; beat the later model grid. */
-	.variation-amplitude-field .model-choice-grid.variation-amplitude-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
-	.variation-amplitude-field .model-choice { padding: 6px; gap: 5px; }
-	.variation-amplitude-field .refine-info-mark { width: 13px; height: 13px; font-size: var(--ui-font-size-9); }
-	.variation-card-moved { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 2px; }
-	.variation-moved-axis { padding: 1px 5px; border: 1px solid var(--line); border-radius: 3px; font-size: var(--ui-font-size-10); color: var(--fg2); white-space: nowrap; }
 	.refine-action-wrap { width: min(210px, 100%); }
 	.refine-action-wrap .tooltip-wrap,
 	.refine-action-wrap .paint-btn { width: 100%; }

@@ -72,14 +72,7 @@ JSON成果物は、その絵を描いたDDL層の版を `ddl_version` と `ddl_e
 | `--sketch-grain {fine,coarse}` | 区切りの大きさ。`fine` がサーバー既定 |
 | `--sketch-text TEXT` | Stage 0.5を呼ばず、この写生文を使う（保存済みまたは手で直した写生の再演） |
 
-### 変奏（Stage 1.5）
-
-| 旗 | 内容 |
-|---|---|
-| `--variation-amplitude {small,medium,large}` | 展開層の軸をどこまで動かすか |
-| `--variation-seed SEED` | どの軸をどちら向きに動かすか |
-
-**変奏は2つの旗が揃ったときだけ効きます。**片方だけでは何も動きません。
+変奏は廃止しました。旧強度・seedの旗は受け付けません。保存済みの変奏情報はDBに保持し、新しい描画要求へ渡しません。
 
 ### 演奏と色
 

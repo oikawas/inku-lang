@@ -286,7 +286,6 @@ def _config(native: Any, spec: dict[str, Any]) -> dict[str, Any]:
                 "max_nodes_per_invocation": str(max_nodes),
                 "max_total_nodes": str(max_total),
             },
-            "stage15_variation": None,
             "error_policy": "omit_and_continue",
             "hard_resource_policy": {"identity": identity, "budget": budget},
             "operational_resource_budget": copy.deepcopy(budget),

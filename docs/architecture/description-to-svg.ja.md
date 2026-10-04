@@ -89,7 +89,7 @@ flowchart TD
 - **資源上限** — manifestのhard policyとoperational budget（既存4上限 + 新6上限）に管理者の上限設定を重ね、保存済み作品からの派生はその作品のbudgetを保つ。
 - **色カタログ** — `fixed`は明示ID、`random`は現在以外から1つ、`auto`は色カタログ選択effectへ委ねる。全カタログの色をrender seedでpaletteへ解決しておき、選ばれたものだけを使う。
 - **seed** — `seed_text`（言葉でタッチを変える）があれば`render_seed`を決定的に導出する。無ければ明示の`render_seed`、それも無ければ63 bitの新しいseedを採り、必ず記録する。`composition_seed`は明示されたときだけ設定する。
-- **明示変奏** — `variation_amplitude`と`variation_seed`は組でだけ受け、片方だけなら`variation_pair_required`で断る。変奏はその操作だけに効き、派生作品へ継承しない。
+- **変奏の廃止** — 新規要求は強度・seedを持たず、採番APIも無い。旧focus・強度・seedは履歴読取りだけに残し、新規保存へ書かない。保存済みの設定は保持し、次の実行用コピーからだけ`stage15_variation`を外す。
 - **再試行予算** — 色カタログ選択とhole補完は既定1回120秒・4回まで、Stage 1は1回300秒・合計540秒・4回まで（`INKU_LLM_*`で上書き）。写生は専用予算が無ければ色カタログ選択の予算を使う。developer modeでは`developer_disable_llm_retries`で全段を1回に限定できる。
 
 ## 色カタログの自動選択
@@ -203,7 +203,6 @@ hostは信頼済みのrender option（解決済みcolor map、render seed、wild
 | 1 | 入口 | 空白だけの記述 | 422、何も走らない | — |
 | 1a | 入口 | 札を切ると空になる記述 | 400、何も走らない | — |
 | 2 | 入口 | `Idempotency-Key`が保存済み作品に一致 | 保存済み作品を返す（記述が違えば409） | — |
-| 3 | 入口 | 変奏の組が片方だけ | 422 `variation_pair_required` | — |
 | 4 | 入口 | `seed_text`あり | `render_seed`を決定的に導出 | 両方を記録 |
 | 5 | pool | 保持runが上限で全て実行中 | 429 `pipeline_capacity_reached` | — |
 | 6 | 色カタログ | 選択失敗・予算切れ | `default`で続行 | `catalog_mode=auto_fallback_default` |

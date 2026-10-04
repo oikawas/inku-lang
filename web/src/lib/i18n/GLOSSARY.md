@@ -65,12 +65,13 @@ no-git-sync/fable5/claude_code/tasks/en-terminology.md（2026-07-25 の作者裁
 
 ---
 
-## 3. 五つの推敲操作と変奏の強度（**固定値。lint が一致を強制する**）
+## 3. 四つの推敲操作と古い変奏の強度（**固定値。lint が一致を強制する**）
 
-**語の対応表は `docs/i18n/glossary.md` §3 にある**（Another + 名詞の五操作と、強度 Subtle / Moderate / Sweeping）。
+**四操作の語の対応表は `docs/i18n/glossary.md` §3 にある**（Another + 名詞）。古い作品の強度 Subtle / Moderate / Sweeping は、生成情報にだけ残す固定ラベルである。
+変奏の推敲操作は廃止した。古い系譜の辺と生成情報は「変奏（旧）」／`Variation (retired)` と表示し、強度は値を持つ古い作品にだけ表示する。作品の版を意味する画面の語は「作品」／`work` とする。
 lint が一字一句を強制する事実と、次の 2 つの規則は本書が持つ。
 
-> **`Moderate` は変奏の強度に予約されている。** 速度の表示に使わない（コストは
+> **`Moderate` は古い作品の変奏の強度の表示に予約されている。** 速度の表示に使わない（コストは
 > `Very fast (no LLM)` / `Medium (Stage 2 LLM and API)` / `Slow (LLM and API)`）。
 
 tooltip の型: 一文目に「何が起きるか」、二文目に「何が保たれるか」。一〜二文で止める。
@@ -110,7 +111,7 @@ tooltip の型: 一文目に「何が起きるか」、二文目に「何が保�
 | `image` | **Vision が実際に画像を見る**文脈、またはInfoの作者指定文で心にある像を指す用法 | `appInfoConceptBody` / `modelSelectionVisionHint` / `aiRefineVisionModeHint` / `aiRefineVisionReading` / `aiRefineVisionSourceError` |
 | `render*` | **サーバー側の技術設定・DB フィールド名・置換トークン** | `canvasSeedSummary`(`{render}`) / `settingsRenderConcurrency*`(5 件) / `historyReplayMissingSeed`(`render_seed`) / `replayComparisonTitle`(Renderer) |
 | `kotobagaki` | **例外なし**（v2.9.15 で語彙ダイアログの詞書の行が消え、英語表示に残る用例は 0 件） | — |
-| `Moderate` | **変奏の強度・中** | `variationMedium` |
+| `Moderate` | **古い作品の変奏の強度・中** | `retiredVariationMedium` |
 
 **新しく例外を足すときは、`i18n-lint.mjs` の該当リストとこの表を同じ commit で更新する。**
 例外に足す前に、まず訳語を変えられないかを考えること。
@@ -184,7 +185,7 @@ DB 列 `history.tenkei`、`tenkei_for_node()` 等の内部識別子、web の `t
    **決めた語と退けた候補を `docs/i18n/glossary.md` の表に追記する**（辞書に無い語を黙って使わない）。
 4. **§4 の文体規則を当てる**（Sentence case、`…`、感嘆符なし）。
 5. `npm run lint:i18n` と `npm run check` を通す。
-6. 語そのものの新設・変更（五操作の名前、強度の名前、コア用語の差し替え）は**作者裁定が要る**。
+6. 語そのものの新設・変更（四操作の名前、古い作品の強度の名前、コア用語の差し替え）は**作者裁定が要る**。
    実装セッションの判断で決めない。
 
 ---
@@ -194,7 +195,7 @@ DB 列 `history.tenkei`、`tenkei_for_node()` 等の内部識別子、web の `t
 `web/scripts/i18n-lint.mjs`（error は 1 件でも exit 1）:
 
 1. `en.ts` と `ja.ts` の**鍵集合が完全一致**すること
-2. §3 の固定ラベル（五操作・強度・`Paint`・`Wild`）が**一字一句その語**であること
+2. §3 の固定ラベル（四操作・古い作品の強度・`Paint`・`Wild`）が**一字一句その語**であること
 3. §5-1 の禁止語が**どこにも無い**こと
 4. §5-2 の制限語が**許容キー以外に無い**こと
 5. `...`（三点）と感嘆符が無いこと

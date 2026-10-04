@@ -9,8 +9,7 @@
 	import type {
 		RefinementSession,
 		RefinementView,
-		RefineKind,
-		VariationAmplitude
+		RefineKind
 	} from '$lib/features/canvas/refinement-session.svelte';
 
 	type ModelInspection = ReturnType<typeof createModelInspection>;
@@ -28,7 +27,6 @@
 		statusDdlOrigin: boolean;
 		statusDescriptionLocked: boolean;
 		refineKind: RefineKind;
-		variationAmplitude: VariationAmplitude;
 		touchSeedText: string;
 		statusStage1Model: string;
 		statusStage2Model: string;
@@ -40,7 +38,7 @@
 		catalogName: string;
 		onClose: () => void;
 		onSetRefineKind: (kind: RefineKind) => void;
-		onGenerateVariationCandidates: (kind: RefineKind, count: 1 | 4, touchWords?: string, amplitude?: VariationAmplitude) => void | Promise<void>;
+		onGenerateVariationCandidates: (kind: RefineKind, count: 1 | 4, touchWords?: string) => void | Promise<void>;
 		onGenerateColorCatalogCandidates: () => void | Promise<void>;
 		onGenerateModelCandidates: () => void | Promise<void>;
 		onSaveAndClose: () => void | Promise<void>;
@@ -63,7 +61,6 @@
 		statusDdlOrigin,
 		statusDescriptionLocked,
 		refineKind,
-		variationAmplitude = $bindable('medium'),
 		touchSeedText = $bindable(''),
 		statusStage1Model,
 		statusStage2Model,
@@ -114,7 +111,6 @@
 			{statusDdlOrigin}
 			{statusDescriptionLocked}
 			{refineKind}
-			bind:variationAmplitude
 			bind:touchSeedText
 			{statusStage1Model}
 			{statusStage2Model}

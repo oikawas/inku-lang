@@ -15,7 +15,6 @@ const labels: RefinementFanoutLabels = {
 	touch: 'Touch',
 	layout: 'Layout',
 	reading: 'Reading',
-	variation: 'Variation',
 	noAlternateCatalog: 'No alternate catalog'
 };
 
@@ -37,12 +36,10 @@ function capabilities(
 ): RefinementFanoutCapabilities {
 	return {
 		createCompositionSeed: () => 1,
-		allocateVariationSeeds: async (_amplitude, count) => Array.from({ length: count }, (_, index) => index),
 		catalogName: (id) => id.toUpperCase(),
 		renderTouch: async (_words, label) => candidate(label),
 		renderLayout: async (_seed, label) => candidate(label),
 		renderReading: async (label) => candidate(label),
-		renderVariation: async (_amplitude, _seed, label) => candidate(label),
 		renderColor: async (_catalogId, label) => candidate(label),
 		...overrides
 	};
@@ -106,49 +103,6 @@ test('T-321: layout plan excludes displayed, existing, and newly allocated seeds
 		{ seed: 60, label: 'Layout 4' }
 	]);
 	assert.ok(rendered.every((entry) => entry.signal === signal));
-});
-
-test('T-322: variation plan allocates once and preserves amplitude, seed, and label order', async () => {
-	const allocations: Array<{ amplitude: string; count: number }> = [];
-	const renders: Array<{ amplitude: string; seed: number; label: string }> = [];
-	const makePlans = async (amplitude?: 'small' | 'medium' | 'large') => planRefinementCandidates(
-		input({ kind: 'variation', count: 4, amplitude }),
-		capabilities({
-			allocateVariationSeeds: async (resolvedAmplitude, count) => {
-				allocations.push({ amplitude: resolvedAmplitude, count });
-				return resolvedAmplitude === 'small' ? [7, 8, 9, 10] : [9, 10, 11, 12];
-			},
-			renderVariation: async (resolvedAmplitude, seed, label) => {
-				renders.push({ amplitude: resolvedAmplitude, seed, label });
-				return candidate(label);
-			}
-		})
-	);
-
-	const defaultPlans = await makePlans();
-	const explicitPlans = await makePlans('small');
-	await Promise.all([...defaultPlans, ...explicitPlans].map((plan) => plan.run()));
-
-	assert.deepEqual(allocations, [
-		{ amplitude: 'medium', count: 4 },
-		{ amplitude: 'small', count: 4 }
-	]);
-	assert.deepEqual(defaultPlans.map((plan) => plan.label), [
-		'Variation 1',
-		'Variation 2',
-		'Variation 3',
-		'Variation 4'
-	]);
-	assert.deepEqual(renders, [
-		{ amplitude: 'medium', seed: 9, label: 'Variation 1' },
-		{ amplitude: 'medium', seed: 10, label: 'Variation 2' },
-		{ amplitude: 'medium', seed: 11, label: 'Variation 3' },
-		{ amplitude: 'medium', seed: 12, label: 'Variation 4' },
-		{ amplitude: 'small', seed: 7, label: 'Variation 1' },
-		{ amplitude: 'small', seed: 8, label: 'Variation 2' },
-		{ amplitude: 'small', seed: 9, label: 'Variation 3' },
-		{ amplitude: 'small', seed: 10, label: 'Variation 4' }
-	]);
 });
 
 test('T-323: color plan offers every other catalog in list order and rejects no alternate', async () => {

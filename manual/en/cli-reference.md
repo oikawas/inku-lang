@@ -72,14 +72,7 @@ For limits they record the values used in `render_limits`, where those came from
 | `--sketch-grain {fine,coarse}` | The grain. `fine` is the server default |
 | `--sketch-text TEXT` | Use this sketch text instead of calling Stage 0.5, replaying a saved or hand-edited sketch |
 
-### Variation (Stage 1.5)
-
-| Flag | Contents |
-|---|---|
-| `--variation-amplitude {small,medium,large}` | How far the variation layer moves the expansion axes |
-| `--variation-seed SEED` | Which axes move, and in which direction |
-
-**Variation takes effect only when both flags are given.** Either one alone moves nothing.
+Variation is retired. The old amplitude and seed flags are rejected. Saved variation metadata stays in the database and is never sent in a new drawing request.
 
 ### Performance and color
 

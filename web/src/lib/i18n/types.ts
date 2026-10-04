@@ -339,18 +339,9 @@ export interface LangPack {
 	canvasVaryComposition: string;
 	canvasVaryInterpretation: string;
 	canvasVaryColor: string;
-	variationTitle: string;
-	variationRadioLabel: string;
-	variationSmall: string;
-	variationMedium: string;
-	variationLarge: string;
-	variationTooltipSmall: string;
-	variationTooltipMedium: string;
-	variationTooltipLarge: string;
-	variationMovedTitle: string;
-	/** On a variation option whose moved axes are empty: nothing moved. */
-	variationMovedNothing: string;
-	variationAxis: (axis: string) => string;
+	retiredVariationSmall: string;
+	retiredVariationMedium: string;
+	retiredVariationLarge: string;
 	variationGridDefault: string;
 	variationGridWithInterpretation: string;
 	refineSaveAndClose: string;
@@ -412,7 +403,6 @@ export interface LangPack {
 	tooltipCanvasVaryComposition: string;
 	tooltipCanvasVaryInterpretation: string;
 	tooltipCanvasVaryColor: string;
-	tooltipVariation: string;
 	tooltipCanvasNavNewer: string;
 	tooltipCanvasNavOlder: string;
 	tooltipCanvasNavLatest: string;

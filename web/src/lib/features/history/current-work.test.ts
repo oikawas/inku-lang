@@ -23,6 +23,8 @@ test('T-295: current-work projection preserves saved source, render identity, se
 		render_seed: '17',
 		composition_seed: '23',
 		variation_seed: '29',
+		variation_amplitude: 'small',
+		focus: 'center',
 		lineage_node_id: 'node-1',
 		lineage_parent_node_id: 'node-0',
 		derivation_kind: 'replay',
@@ -42,6 +44,8 @@ test('T-295: current-work projection preserves saved source, render identity, se
 	assert.equal(projection.result.render_seed, '17');
 	assert.equal(projection.result.composition_seed, '23');
 	assert.equal(projection.result.variation_seed, 29);
+	assert.equal(projection.result.variation_amplitude, 'small');
+	assert.equal(projection.result.focus, 'center');
 	assert.equal(projection.result.lineage_node_id, 'node-1');
 	assert.equal(projection.result.derivation_kind, 'replay');
 	assert.equal(projection.result.elapsed_total_ms, 31);

@@ -197,18 +197,20 @@ In `inku-render`, `render.rs` is the only overall orchestrator. `render_with_res
 | `public` | 9 | Health, info, catalog, models, saijiki, plugin preview, reference, client config, demo | None; routes other than `/health` and `/api/info` have explicit guards |
 | `auth` | 4 | Auth config and login/logout | None; routes other than login have explicit guards |
 | `me` | 13 | Profile, user settings, per-user storage | `_current_user` |
-| `plugins` | 8 | Plugin read/validation/CRUD/enable | `_current_user`; mutation requires admin |
-| `settings` | 16 | Server-wide settings and backup | `_admin_user` |
+| `plugins` | 5 | Plugin read/validation/CRUD/enable | `_current_user`; mutation requires admin |
+| `settings` | 18 | Server-wide settings and backup | `_admin_user` |
 | `users` | 8 | User/group management | `_user_manager` |
 | `history` | 17 | History, SVG, thumbnails, marks, trash, sharing, artifact rebuild, animation and card export | `_current_user` |
 | `lineage` | 8 | Lineage graph/group, promote, colophon | `_current_user` |
-| `render` | 8 | Variation seeds, compose, interpret, render-score/svg, paint, paint stream, vision advice | `_current_user` |
+| `render` | 7 | Compose, interpret, render-score/svg, paint, paint stream, vision advice | `_current_user` |
 | `feedback` | 3 | Unread words | `_current_user` |
+| `description` | 2 | Description mora and syllable counts | `_current_user` |
+| `chatgpt` | 11 | Personal connection state, authorization, profiles, and model publication settings | `_current_user`; actions also check the owner |
 | `pipeline` | 13 | Canvas formats; start, read, and fork variations; the system prompts a variation sent; execution commands; author DDL; history links and forks; DDL export of a work (with the plugin definitions it names); reading and forking older works; provider observations | `_current_user` on each route; provider observations also require developer mode |
 
-Total: 107. The public allowlist contains three paths: `/health`, `/api/info`, and `/api/auth/login` (`test_route_authorization.py`). The standard is to leave out anything login does not need.
+Total: 118. Refinement variation seed allocation is retired. The public allowlist contains three paths: `/health`, `/api/info`, and `/api/auth/login` (`test_route_authorization.py`). The standard is to leave out anything login does not need.
 
-**⚠ The per-router counts were copied by hand, and no check turns them red.** The total's source of truth is `EXPECTED_ROUTE_COUNT` (107) in `test_route_authorization.py`, and `tests/data/api-surface-baseline.json`, generated from the live app's OpenAPI, also records 107 operations.
+The per-router counts match the current API baseline operations to their route declarations (2026-10-04). The total's source of truth is `EXPECTED_ROUTE_COUNT` (118) in `test_route_authorization.py`, and `tests/data/api-surface-baseline.json`, generated from the live app's OpenAPI, also records 118 operations.
 
 ## Main flows
 

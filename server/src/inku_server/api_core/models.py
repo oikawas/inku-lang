@@ -45,9 +45,6 @@ class HistoryPostBody(BaseModel):
                 value["ddl_source_origin"] = origin
         return value
 
-    focus: str | None = None
-    variation_amplitude: str | None = None
-    variation_seed: int | None = None
     interpret_fallback: str | None = None
     # Stage 2's counterpart. Three readings, not two: a reason means compose
     # fell over, "none" means a sender said it did not, and NULL means the row
@@ -116,6 +113,10 @@ class HistoryPostBody(BaseModel):
 
 class HistoryItem(HistoryPostBody):
     id: str
+    # Read-only historical metadata: new authoring no longer records variation.
+    focus: str | None = None
+    variation_amplitude: str | None = None
+    variation_seed: int | None = None
     pipeline_variation_id: str | None = None
     # True when the work is held by its DDL (edited, or derived from an edited
     # work without reading the description again): it is not redrawn from its

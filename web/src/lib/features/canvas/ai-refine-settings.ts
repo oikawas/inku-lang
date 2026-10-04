@@ -4,7 +4,6 @@
 // The wild switch is not kept: it follows the work being refined.
 
 export type AiRefineMode = 'random' | 'vision';
-export type AiRefineAmplitude = 'small' | 'medium' | 'large';
 
 export type AiRefineSettings = {
 	mode: AiRefineMode;
@@ -13,8 +12,6 @@ export type AiRefineSettings = {
 	color: boolean;
 	layout: boolean;
 	touch: boolean;
-	variation: boolean;
-	amplitude: AiRefineAmplitude;
 	direction: string;
 };
 
@@ -25,8 +22,6 @@ export const DEFAULT_AI_REFINE_SETTINGS: AiRefineSettings = {
 	color: true,
 	layout: true,
 	touch: true,
-	variation: true,
-	amplitude: 'medium',
 	direction: ''
 };
 
@@ -51,8 +46,6 @@ export function parseAiRefineSettings(raw: string | null): AiRefineSettings {
 		color: flag('color', d.color),
 		layout: flag('layout', d.layout),
 		touch: flag('touch', d.touch),
-		variation: flag('variation', d.variation),
-		amplitude: stored.amplitude === 'small' || stored.amplitude === 'medium' || stored.amplitude === 'large' ? stored.amplitude : d.amplitude,
 		direction: typeof stored.direction === 'string' ? stored.direction : d.direction
 	};
 }

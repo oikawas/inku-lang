@@ -360,9 +360,9 @@ def test_root_save_maps_every_history_field_and_creates_root_and_catalog(
         "render_wild": "0",
         "composition_seed": "23",
         "tenkei": "tenkei",
-        "focus": "focus",
-        "variation_amplitude": "high",
-        "variation_seed": "29",
+        "focus": None,
+        "variation_amplitude": None,
+        "variation_seed": None,
         "interpret_fallback": "fallback",
         "compose_fallback": "none",
         "interpretation_seed": "31",
@@ -511,6 +511,11 @@ def test_child_save_reads_parent_inherits_root_and_writes_canonical_edge(
         (
             {"derivation_metadata": ["invalid"]},
             "lineage derivation metadata must be an object",
+        ),
+        pytest.param(
+            {"lineage_parent_node_id": "parent", "derivation_kind": "variation"},
+            "invalid lineage derivation kind",
+            id="retired-variation",
         ),
         pytest.param(
             {"ddl_source_origin": "user_authored_ddl"},

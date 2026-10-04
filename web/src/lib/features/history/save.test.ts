@@ -29,6 +29,8 @@ test('T-292/T-293: save owns the payload and selects the saved identity after re
 		render_seed: '7',
 		composition_seed: '8',
 		variation_seed: '9',
+		variation_amplitude: 'medium',
+		focus: 'center',
 		compose_fallback_used: true,
 		sketch_state: 'used'
 	}), {
@@ -76,7 +78,9 @@ test('T-292/T-293: save owns the payload and selects the saved identity after re
 	assert.equal(body.canvas_aspect, 'portrait');
 	assert.equal(body.render_seed, '7');
 	assert.equal(body.composition_seed, '8');
-	assert.equal(body.variation_seed, 9);
+	assert.equal('variation_seed' in body, false);
+	assert.equal('variation_amplitude' in body, false);
+	assert.equal('focus' in body, false);
 	assert.equal(body.compose_fallback, 'retry');
 	assert.equal(body.sketch_state, 'used');
 	assert.equal(body.source_text, 'source');

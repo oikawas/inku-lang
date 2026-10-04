@@ -102,8 +102,6 @@ class RunOptions(BaseModel):
     # stands, without a request.
     sketch: Literal["off", "on"] | None = None
     sketch_text: str | None = Field(default=None, max_length=100_000)
-    variation_amplitude: Literal["small", "medium", "large"] | None = None
-    variation_seed: int | str | None = None
     interpretation_seed: str | None = None
     seed_text: str | None = None
     history_display_label: str | None = None
@@ -198,6 +196,8 @@ class ProductPipelineEffects:
             raise CandidateHostError("invalid_authoring_options") from error
         requested_limits = options.pop("limits", None)
         previous = deepcopy((work or {}).get("host_options", {}))
+        for retired in ("variation_amplitude", "variation_seed"):
+            previous.pop(retired, None)
         metadata = (work or {}).get("metadata", {})
         for name in ("stage1_model", "stage2_model", "catalog_id", "catalog_mode", "composition_seed", "render_seed",
                      "instruction_lang_requested", "ui_lang"):
@@ -233,14 +233,9 @@ class ProductPipelineEffects:
         seed = new_render_seed() if seed is None else int(seed)
         composition_seed = selected.get("composition_seed")
         config["compiler"]["composition_seed"] = None if composition_seed is None else str(int(composition_seed))
-        # Stage 1.5 variation applies only when this operation explicitly asks
-        # for it; deriving a work does not inherit a previous variation request.
-        amplitude, variation_seed = options.get("variation_amplitude"), options.get("variation_seed")
-        config["compiler"]["stage15_variation"] = None
-        if (amplitude is None) != (variation_seed is None):
-            raise CandidateHostError("variation_pair_required")
-        if amplitude is not None:
-            config["compiler"]["stage15_variation"] = {"amplitude": amplitude, "seed": str(int(variation_seed))}
+        # Remove the retired option only from this execution's copy; saved
+        # configurations and historical metadata remain untouched.
+        config["compiler"].pop("stage15_variation", None)
         catalogs = color_catalogs()
         catalog_id = selected.get("catalog_id") or config["compiler"]["host"]["resolved_catalog_id"]
         mode = selected.get("catalog_mode") or "fixed"

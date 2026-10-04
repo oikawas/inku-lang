@@ -48,7 +48,6 @@ LINEAGE_DERIVATION_KINDS = {
     "renga_reply",
     "external_seed_change",
     "canvas_aspect_change",
-    "variation",  # Stage 1.5 variation, renamed from hensou in v2.8.0.
     # Sketching (Stage 0.5, v2.10). Fires when the grain differs from the parent's,
     # which includes switching the layer on or off (the grain is fine, coarse
     # or absent). The web client has sent this since v2.9.37; until v2.11.3 the
@@ -1113,9 +1112,8 @@ class HistoryWriter:
             render_seed=str(item.get("render_seed")) if item.get("render_seed") is not None else None,
             render_wild=("1" if item.get("render_wild") else "0") if item.get("render_wild") is not None else None,
             composition_seed=str(item.get("composition_seed")) if item.get("composition_seed") is not None else None,
-            tenkei=item.get("tenkei"), focus=item.get("focus"),
-            variation_amplitude=item.get("variation_amplitude"),
-            variation_seed=str(item.get("variation_seed")) if item.get("variation_seed") is not None else None,
+            # Legacy focus/variation columns stay readable; new works leave them NULL.
+            tenkei=item.get("tenkei"),
             interpret_fallback=item.get("interpret_fallback"),
             # Carried through, never derived: an absent key means the writer said
             # nothing, and guessing "none" here would put a claim in the row that

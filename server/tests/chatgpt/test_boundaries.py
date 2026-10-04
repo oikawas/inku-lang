@@ -276,7 +276,7 @@ def test_four_effect_tags_and_quota_blocks_fallback_http(isolated, monkeypatch):
     from inku_server.chatgpt_provider import EFFECTS
     from inku_server.pipeline_provider import ProviderOptions, SingleAttemptProvider
     from inku_server.model_settings import default_model_settings
-    value = profile(catalog={"expires_at": time.time() + 300, "models": [{"id": "model", "label": "Model"}]})
+    value = profile(published_models=["model"], catalog={"expires_at": time.time() + 300, "models": [{"id": "model", "label": "Model"}]})
     seed(isolated, value)
     calls = []
     quota = {"value": False}
@@ -314,7 +314,7 @@ def test_composition_effect_preserves_wire_and_separate_observation(isolated, tm
     from inku_server.pipeline_provider import ProviderOptions, SingleAttemptProvider
     from inku_server.provider_observation import ProviderObservationStore
 
-    value = profile(catalog={"expires_at": time.time() + 300, "models": [{"id": "model", "label": "Model"}]})
+    value = profile(published_models=["model"], catalog={"expires_at": time.time() + 300, "models": [{"id": "model", "label": "Model"}]})
     seed(isolated, value)
     schema = {"type": "object", "properties": {
         "relations": {"type": "array", "items": {"type": "string"}},
@@ -373,7 +373,7 @@ def test_composition_effect_preserves_wire_and_separate_observation(isolated, tm
 
 def test_runtime_cancel_closes_blocked_stream_and_releases_slot(isolated, monkeypatch):
     from inku_server.chatgpt_provider import request
-    value = profile(catalog={"expires_at": time.time() + 300, "models": [{"id": "model"}]})
+    value = profile(published_models=["model"], catalog={"expires_at": time.time() + 300, "models": [{"id": "model"}]})
     seed(isolated, value)
     runtime.begin_execution("owner", "execution")
     cancel = runtime.execution_cancel("owner", "execution")

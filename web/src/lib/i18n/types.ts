@@ -17,6 +17,9 @@ export interface LangPack {
 	chatgptRefreshModels: string;
 	chatgptModelsLoaded: (count: number) => string;
 	chatgptModelsEmpty: string;
+	chatgptModelSettingsGuide: string;
+	chatgptOpenModelSettings: string;
+	chatgptPersonalModels: string;
 	chatgptUsingPlan: string;
 	chatgptModelUnavailable: string;
 	chatgptStatus: (code: string) => string;

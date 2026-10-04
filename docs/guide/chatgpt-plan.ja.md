@@ -17,7 +17,7 @@ INKU_CHATGPT_PLAN_ENABLED=1 INKU_DEVELOPER_MODE=1 \
   uv run --frozen --no-sync inku-chatgpt serve --host 127.0.0.1 --port 8100
 ```
 
-設定「ChatGPTプラン」の「ChatGPTで続ける」から本人がサインイン・同意します。callbackは同じPCの`http://127.0.0.1:<port>/auth/callback`です。戻り画面は設定の表示言語に合わせ、認証の完了と失敗を区別します。拒否・中止・5分の期限切れは失敗として表示します。popupを遮断した場合は画面の同じ認可リンクを開けます。1 worker・reloadなしで、通常の直uvicorn起動やlocal LAN bindでは有効にしません。認証後、モデル選択の「Stage 1/2」から本人のモデルを選びます。[認証手順](https://developers.openai.com/siwc/token-sharing-open-source/sign-in)
+設定「ChatGPTプラン」の「ChatGPTで続ける」から本人がサインイン・同意します。callbackは同じPCの`http://127.0.0.1:<port>/auth/callback`です。戻り画面は設定の表示言語に合わせ、認証の完了と失敗を区別します。拒否・中止・5分の期限切れは失敗として表示します。popupを遮断した場合は画面の同じ認可リンクを開けます。1 worker・reloadなしで、通常の直uvicorn起動やlocal LAN bindでは有効にしません。認証後は下の「登録・モデル・利用枠」で公開モデルを設定し、Stage 1/2共通のモデルを選びます。[認証手順](https://developers.openai.com/siwc/token-sharing-open-source/sign-in)
 
 ## 別hostの自己ホストで接続する
 
@@ -57,11 +57,15 @@ exportはMacのtokenを消し、更新所有権を手放してから完了しま
 
 ## 登録・モデル・利用枠
 
-接続後に「モデル一覧を更新」を押すと、取得中の表示に続いて、件数とモデル名がこの設定タブへ表示されます。「モデル選択」で既存のStage 1/2の選択画面へ進み、ChatGPTプランから描画モデルを選びます。空の一覧やエラーは理由を表示します。更新だけでは描画モデルは変わりません。
+接続完了後の案内から「モデル設定を開く」を押します。設定「モデル」で「ChatGPTプラン」を選び、「公開モデルを選択」→「モデル一覧を取得」の順に進みます。取得中の表示と件数・モデル名を確認し、描画に使うモデルへチェックを付けて「保存」します。他providerと同じ選択画面を使いますが、公開先は接続した本人だけです。APIキーや接続先URLの設定はありません。空の一覧やエラーは理由を表示します。既存の接続でも、この公開設定を一度保存します。
+
+保存後に描画の「モデル選択」を開き、ChatGPTプランからStage 1/2共通のモデルを選びます。一覧の取得だけではモデルを公開・自動選択しません。普通の利用者は本人のChatGPTモデルだけ、管理者は既存の共有providerも管理できます。
 
 画面は本人の登録ラベル、状態、scope、選択中profileを表示します。token、PKCE verifier、ID tokenを画面・log・browser storageへ出しません。最大8 profile、認可はownerごとに1件・全体4件です。保存先は既定`~/.config/ddl-server/chatgpt`（`INKU_CHATGPT_AUTH_DIR`で変更）、0700 directoryと0600 fileです。専用`credential.key`による`enc:v1:`暗号化を使い、平文互換や復号失敗の黙認はありません。既存APIキーの鍵は変更しません。
 
-本人の`models[].visibility=list`をOpenAIの順序と`display_name`で表示し、`chatgpt:<slug>`として保存します。共有APIキーproviderやbare名の所有者へ混ぜません。cacheはowner/profile/generationごとに5分です。接続解除・profile切替・モード変更で候補を破棄し、消えた指定は利用不可として保持します。別providerへの変更は明示選択が必要です。
+本人の`models[].visibility=list`をOpenAIの順序と`display_name`で表示し、公開したモデルを`chatgpt:<slug>`として選びます。inkuの公開設定はOpenAIのvisibilityとは別で、owner/profileごとに暗号化保存します。同一identityの再認証・受信hostでの再importは公開設定を保持します。共有APIキーproviderやbare名の所有者へ混ぜません。外部catalogのcacheはowner/profile/generationごとに5分で、設定・描画候補を開くだけでは外部取得せず、保存した一覧を読みます。接続解除・profile切替・モード変更で候補を破棄し、消えた指定や未公開の指定は利用不可として保持します。別providerへの変更は明示選択が必要です。
+
+応答に補助的なメッセージが含まれていても、正しい完了関数呼出しの引数だけを採用します。メッセージ本文からJSONを推測しません。「描画用の関数呼出し形式と一致しませんでした」は応答形式の診断で、再認証の指示ではありません。
 
 quota時は同じ登録の後続送信を止めます。「利用枠を確認」からChatGPT usage画面へ進み、回復後に本人が「再試行」を選びます。401/403だけでtokenを削除せず、認可・quota・未対応機能・一時通信失敗を区別します。[モデルと推論](https://developers.openai.com/siwc/token-sharing-open-source/models-and-inference)・[復旧](https://developers.openai.com/siwc/token-sharing-open-source/errors-and-recovery)
 

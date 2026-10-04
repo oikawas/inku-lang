@@ -45,6 +45,7 @@ export function managesListedUser(viewer: MemberLike, listed: { id: string }): b
 
 export function canAccessSettingsTab(tab: string, user: MemberLike, chatgptAvailable = false): boolean {
 	if (tab === 'chatgpt') return !!user?.id && chatgptAvailable;
+	if (tab === 'models' && user?.id && chatgptAvailable) return true;
 	if ((ADMIN_ONLY_SETTINGS_TABS as readonly string[]).includes(tab)) {
 		return holdsPermissionGroup(user, 'admins');
 	}

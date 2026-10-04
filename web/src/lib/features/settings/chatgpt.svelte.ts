@@ -2,7 +2,6 @@ import type { ApiFetch } from '../../transport/api-fetch';
 
 export type ChatGPTProfile = { id: string; label: string; email: string; state: string; generation: number; scopes: string[] };
 export type ChatGPTState = { available: boolean; reason: string | null; self_hosted: boolean; active_profile_id: string | null; profiles: ChatGPTProfile[]; pending_registrations?: { id: string; client_id: string }[] };
-export type ChatGPTModel = { id: string; label: string };
 
 async function helperBrowser(): Promise<'brave' | 'chrome'> {
 	const brave = typeof navigator === 'undefined' ? undefined : (navigator as Navigator & { brave?: { isBrave: () => Promise<boolean> } }).brave;
@@ -26,7 +25,6 @@ export function createChatGPTSettings(deps: {
 	let busy = $state(false);
 	let authorizationUrl = $state<string | null>(null);
 	let helperUrl = $state<string | null>(null);
-	let modelCatalog = $state<{ profileId: string; generation: number; models: ChatGPTModel[] } | null>(null);
 	let boundOwner = $state<string | undefined>();
 	let attemptId: string | null = null;
 	let timer: ReturnType<typeof setTimeout> | null = null;
@@ -41,7 +39,6 @@ export function createChatGPTSettings(deps: {
 		attemptId = null;
 		authorizationUrl = null;
 		helperUrl = null;
-		modelCatalog = null;
 		busy = false;
 	}
 
@@ -84,20 +81,12 @@ export function createChatGPTSettings(deps: {
 		const stamp = epoch, owner = deps.owner();
 		if (!owner || !deps.available()) return;
 		boundOwner = owner;
-		const updatingModels = path === '/models/refresh';
-		abort = new AbortController(); busy = true; code = updatingModels ? 'chatgpt_models_loading' : null;
+		abort = new AbortController(); busy = true; code = null;
 		try {
 			const result = await call(path, {});
 			if (!current(owner, stamp)) return;
-			await refresh(owner, stamp, updatingModels ? 'chatgpt_models_loading' : result.status === 'signed_out' && !result.revocation_confirmed ? 'chatgpt_revocation_unconfirmed' : null);
+			await refresh(owner, stamp, result.status === 'signed_out' && !result.revocation_confirmed ? 'chatgpt_revocation_unconfirmed' : null);
 			if (current(owner, stamp)) await deps.changed();
-			if (updatingModels && current(owner, stamp)) {
-				const profile = state?.profiles.find((profile) => profile.id === state?.active_profile_id);
-				if (profile?.id !== result.profile_id || profile?.generation !== result.generation || profile?.state !== 'connected') throw new Error('chatgpt_session_changed');
-				if (!Array.isArray(result.models) || !result.models.every((model: ChatGPTModel) => typeof model?.id === 'string' && typeof model?.label === 'string')) throw new Error('chatgpt_response_invalid');
-				modelCatalog = { profileId: result.profile_id, generation: result.generation, models: result.models };
-				code = null;
-			}
 		} catch (error) {
 			if (current(owner, stamp)) code = error instanceof Error ? error.message : 'chatgpt_operation_failed';
 		} finally { if (current(owner, stamp)) busy = false; }
@@ -163,15 +152,10 @@ export function createChatGPTSettings(deps: {
 		get state() { return visible() ? state : null; }, get code() { return visible() ? code : null; }, get busy() { return visible() && busy; },
 		get authorizationUrl() { return visible() ? authorizationUrl : null; },
 		get helperUrl() { return visible() ? helperUrl : null; },
-		get models() {
-			const profile = state?.profiles.find((profile) => profile.id === state?.active_profile_id);
-			return visible() && profile?.state === 'connected' && profile.id === modelCatalog?.profileId && profile.generation === modelCatalog?.generation ? modelCatalog.models : null;
-		},
 		load, reset, stop, cancel, authorize,
 		select: (id: string) => mutate('/profiles/' + encodeURIComponent(id) + '/select'),
 		signOut: (id: string) => mutate('/profiles/' + encodeURIComponent(id) + '/sign-out'),
-		retry: (id: string) => mutate('/profiles/' + encodeURIComponent(id) + '/retry'),
-		refreshModels: () => mutate('/models/refresh')
+		retry: (id: string) => mutate('/profiles/' + encodeURIComponent(id) + '/retry')
 	};
 }
 

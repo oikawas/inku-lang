@@ -17,7 +17,7 @@ INKU_CHATGPT_PLAN_ENABLED=1 INKU_DEVELOPER_MODE=1 \
   uv run --frozen --no-sync inku-chatgpt serve --host 127.0.0.1 --port 8100
 ```
 
-Choose “Continue with ChatGPT” in ChatGPT plan settings, sign in and grant permission. The callback is `http://127.0.0.1:<port>/auth/callback` on that PC. The return page follows the settings language and distinguishes completed authorization from failure. Declining, cancelling or exceeding five minutes fails. If a popup is blocked, open the same authorization link on screen. Startup uses one worker without reload; direct uvicorn startup and local LAN binding do not enable it. After authorization, select your model under “Stage 1/2.” [Sign-in procedure](https://developers.openai.com/siwc/token-sharing-open-source/sign-in)
+Choose “Continue with ChatGPT” in ChatGPT plan settings, sign in and grant permission. The callback is `http://127.0.0.1:<port>/auth/callback` on that PC. The return page follows the settings language and distinguishes completed authorization from failure. Declining, cancelling or exceeding five minutes fails. If a popup is blocked, open the same authorization link on screen. Startup uses one worker without reload; direct uvicorn startup and local LAN binding do not enable it. After authorization, configure published models as described under Profiles, models and usage below, then select a shared Stage 1/2 drawing model. [Sign-in procedure](https://developers.openai.com/siwc/token-sharing-open-source/sign-in)
 
 ## Connect a self-hosted installation on another host
 
@@ -57,11 +57,15 @@ Export removes the Mac's tokens and relinquishes renewal ownership before comple
 
 ## Registrations, models and usage
 
-After connecting, press Refresh models. The settings tab shows progress followed by the count and model names. Select model opens the existing Stage 1/2 picker; choose a drawing model under ChatGPT plan. An empty catalog or error shows a reason. Refreshing alone does not change the drawing model.
+After connecting, follow the guide to Open Model settings. Select ChatGPT plan in Settings → Models, then Select models → Fetch model list. Check the retrieved count and names, select models to publish and Save. This is the same dialog as other providers, but publication applies only to the connected owner. No API key or endpoint URL is configured. Empty catalogs and failures show a reason. Existing connections also need to save this publication choice once.
+
+Then open the drawing model picker and choose one ChatGPT plan model for Stage 1/2. Fetching alone neither publishes nor selects models. Ordinary users manage only their own ChatGPT models; administrators also retain shared provider administration.
 
 Settings show your registration label, state, scopes and active profile. Tokens, PKCE verifiers and ID tokens never enter screens, logs or browser storage. Limits are eight profiles, one pending authorization per owner and four overall. Storage defaults to `~/.config/ddl-server/chatgpt`, overridden by `INKU_CHATGPT_AUTH_DIR`, with a 0700 directory and 0600 files. A dedicated `credential.key` encrypts `enc:v1:` records. Plaintext compatibility and silently ignored decryption failures are unsupported. Existing API-key encryption is unchanged.
 
-Models with `models[].visibility=list` retain OpenAI's order and `display_name` and are saved as `chatgpt:<slug>`. They do not enter shared API-key providers or bare-name ownership. Catalogs last five minutes per owner/profile/generation. Disconnecting, switching profiles or changing modes discards candidates. Missing selections stay unavailable; another provider requires an explicit choice.
+Models with `models[].visibility=list` retain OpenAI's order and `display_name`; published models can be selected as `chatgpt:<slug>`. inku publication is separate from OpenAI visibility and is encrypted per owner/profile. Reauthorization and recipient-host reimport of the same verified identity retain these choices. Models do not enter shared API-key providers or bare-name ownership. External catalogs have a five-minute cache per owner/profile/generation; opening settings or the drawing picker reads the saved list without fetching externally. Disconnecting, switching profiles or changing modes discards candidates. Missing or unpublished selections stay unavailable; another provider requires an explicit choice.
+
+Supplementary messages may accompany the required completed function call; only its arguments are used. Message text is never interpreted as pipeline JSON. A drawing function-call format mismatch requests response diagnostics, rather than reauthorization.
 
 Quota blocks subsequent requests for that registration. “Manage usage” opens ChatGPT usage settings; choose “Retry” after recovery. A 401/403 alone does not delete tokens. Authorization, quota, unsupported capabilities and temporary transport errors remain distinct. [Models and inference](https://developers.openai.com/siwc/token-sharing-open-source/models-and-inference), [recovery](https://developers.openai.com/siwc/token-sharing-open-source/errors-and-recovery).
 

@@ -10,6 +10,12 @@ This file records changes chronologically. If a historical note conflicts with t
 
 On-device LiteRT Gemma 4 E2B uses LiteRT-LM 0.17.1 and ResponseFormat.json, disables speculative decoding and limits Stage 1 responses to eight layers (I-713). When an underdrawing gives a tall shape the angle vertical, normalization removes that angle alone so the shape stands upright (I-710). The angle semantics of directly written DDL, saved works, and DDL, Score and render engine versions are unchanged.
 
+### 2026-10-04 — Configure ChatGPT published models in Model settings and accept supplementary response messages
+
+ChatGPT plan list fetching and published-model selection now use the same Model settings dialog as other providers. After connecting, a guide opens that page. Only models explicitly selected and saved for the owner's registration enter the drawing picker; fetching alone publishes nothing. Shared API-key and rate administration retains its existing permissions.
+
+Responses/SSE previously rejected supplementary assistant messages as unknown tools. It now distinguishes them from the one required completed function call without using message text as drawing data. Refusals, unknown tools, multiple calls and partial responses remain failures. Format mismatches request diagnostics rather than reconnection, with tool-shape metadata logged without text or arguments.
+
 ### 2026-10-04 — Localize ChatGPT setup and retain Brave for authorization
 
 The Mac authorization CLI explicitly opened Chrome even when setup began in Brave, so sign-in and the return page used Chrome. Settings now pass the starting Chrome or Brave browser and display language to the dedicated helper, which opens that fixed browser. Japanese setup includes the Continue with ChatGPT label, usage and helper guidance, destination confirmation, completion and failure reasons and the callback page. A browser launch failure does not switch browsers; existing authorization and transfer contracts remain.

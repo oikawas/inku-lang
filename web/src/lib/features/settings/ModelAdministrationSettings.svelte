@@ -9,9 +9,10 @@
 	type Props = {
 		administration: ModelAdministration;
 		providerGroups: ProviderGroup[];
+		personalOnly?: boolean;
 	};
 
-	let { administration, providerGroups }: Props = $props();
+	let { administration, providerGroups, personalOnly = false }: Props = $props();
 	const modelSettings = $derived(administration.modelSettings);
 	const modelSettingsStatus = $derived(administration.modelSettingsStatus);
 	const modelFetchResults = $derived(administration.modelFetchResults);
@@ -310,10 +311,8 @@
 	}
 
 	function selectedModels(provider: ProviderGroup, setting: ModelProviderSetting, purpose: 'llm' | 'vision') {
-		return sortModels(
-			provider.models.filter((model) => modelEnabled(setting, model.id) && (model.purposes ?? ['llm']).includes(purpose)),
-			purpose
-		);
+		const models = provider.models.filter((model) => modelEnabled(setting, model.id) && (model.purposes ?? ['llm']).includes(purpose));
+		return provider.id === 'chatgpt' ? models : sortModels(models, purpose);
 	}
 
 	const settingsProviderGroups = $derived.by(() => {
@@ -347,16 +346,15 @@
 		const provider = modelPickerProvider;
 		if (!provider) return [];
 		const query = modelPickerSearch.trim().toLowerCase();
-		return sortModels(
-			provider.models.filter((model) => {
+		const models = provider.models.filter((model) => {
 				const text = `${model.id} ${model.label ?? ''} ${model.notes ?? ''} ${model.speed_label ?? ''} ${model.comment_ja ?? ''} ${model.comment_en ?? ''}`.toLowerCase();
 				if (!text.includes(query)) return false;
 				if (modelPickerFilter === 'published') return modelPickerDraftEnabled(model.id);
 				if (modelPickerFilter === 'unpublished') return !modelPickerDraftEnabled(model.id);
 				if (modelPickerFilter === 'llm' || modelPickerFilter === 'vision') return modelPurposeSelected(model.id, modelPickerFilter);
 				return true;
-			})
-		);
+			});
+		return provider.id === 'chatgpt' ? models : sortModels(models);
 	});
 
 </script>
@@ -371,7 +369,7 @@
 			<div class="popover-group">
 				<div class="model-connections-heading">
 					<div class="popover-group-label">{t().settingsModelConnectionsTitle}</div>
-					<div class="model-security-note">{t().settingsModelSecurityNote}</div>
+					<div class="model-security-note">{personalOnly ? t().chatgptPersonalModels : t().settingsModelSecurityNote}</div>
 				</div>
 				<div class="model-provider-selector" aria-label={t().settingsModelConnectionsTitle}>
 					{#each settingsProviderGroups as provider (provider.id)}
@@ -383,8 +381,8 @@
 							aria-pressed={activeProvider?.id === provider.id}
 							onclick={() => (activeProviderId = provider.id)}
 						>
-							<span class="model-provider-choice-label">{provider.label}</span>
-							<span class="model-provider-choice-meta">{provider.id} · {setting.api_key_set ? t().settingsModelApiKeySet : t().settingsModelApiKeyUnset}</span>
+							<span class="model-provider-choice-label">{provider.id === 'chatgpt' ? t().chatgptPlanLabel : provider.label}</span>
+							<span class="model-provider-choice-meta">{provider.id} · {provider.id === 'chatgpt' ? t().chatgptStatus('chatgpt_connected') : setting.api_key_set ? t().settingsModelApiKeySet : t().settingsModelApiKeyUnset}</span>
 							<span class="model-provider-choice-count">{t().settingsModelPublishedCount(publishedModelCount(provider, setting))}</span>
 						</button>
 					{/each}
@@ -393,8 +391,9 @@
 					<div class="model-provider-editor">
 						<div class="model-provider-editor-head">
 							<div><strong>{activeProvider.label}</strong><span>{serviceIdLabel(activeProvider.id)}</span></div>
-							<button class="ghost-btn model-provider-edit" onclick={() => openEditProvider(activeProvider)} disabled={modelSettingsLoading}>{t().editButton}</button>
+							{#if activeProvider.id !== 'chatgpt'}<button class="ghost-btn model-provider-edit" onclick={() => openEditProvider(activeProvider)} disabled={modelSettingsLoading}>{t().editButton}</button>{/if}
 						</div>
+						{#if activeProvider.id === 'chatgpt'}<p>{t().chatgptPersonalModels}</p>{/if}
 						<section class="model-publish-summary" aria-label={t().settingsModelPublishedModels}>
 							<div class="model-publish-head">
 								<div><div class="model-publish-title">{t().settingsModelPublishedModels}</div><strong>{t().settingsModelPublishedCount(publishedModelCount(activeProvider, activeProviderSetting))}</strong></div>
@@ -419,6 +418,7 @@
 								</div>
 							{:else}<div class="model-publish-empty">{t().settingsModelNoPublishedModels}</div>{/if}
 						</section>
+						{#if activeProvider.id !== 'chatgpt'}
 						<details class="model-connection-details">
 							<summary>{t().settingsModelRateLimits}</summary>
 							<div class="model-connection-fields model-rate-fields">
@@ -441,15 +441,16 @@
 								<div class="model-connection-actions"><button class="ghost-btn" onclick={() => openMemoProvider(activeProvider!)} disabled={modelSettingsLoading}>{t().settingsModelServiceMemoButton}</button><button class="ghost-btn model-service-delete" onclick={() => onAskDeleteModelProvider(activeProvider!.id)} disabled={modelSettingsLoading}>{t().settingsModelDeleteService}</button></div>
 							</div>
 						</details>
+						{/if}
 					</div>
 				{/if}
 				{#if modelSettingsStatus}
 						<div class="inline-message">{modelSettingsStatus}</div>
 					{/if}
 				</div>
-				<div class="settings-inline-actions model-settings-footer-actions">
+				{#if !personalOnly}<div class="settings-inline-actions model-settings-footer-actions">
 				<button class="ghost-btn" onclick={() => { serviceDialogError = null; showAddServiceDialog = true; }} disabled={modelSettingsLoading}>{t().settingsModelAddServiceButton}</button>
-				</div>
+				</div>{/if}
 			{/if}
 {#if showAddServiceDialog}
 	<div class="modal-backdrop add-service-backdrop" onclick={() => (showAddServiceDialog = false)} aria-hidden="true"></div>
@@ -573,7 +574,7 @@
 					spellcheck="false"
 					data-dialog-focus
 				/>
-				<label class="model-picker-filter"><span>{t().settingsModelFilterLabel}</span><select bind:value={modelPickerFilter}><option value="all">{t().settingsModelFilterAll}</option><option value="published">{t().settingsModelFilterPublished}</option><option value="unpublished">{t().settingsModelFilterUnpublished}</option><option value="llm">{t().settingsModelFilterLlm}</option><option value="vision">{t().settingsModelFilterVision}</option></select></label>
+				<label class="model-picker-filter"><span>{t().settingsModelFilterLabel}</span><select bind:value={modelPickerFilter}><option value="all">{t().settingsModelFilterAll}</option><option value="published">{t().settingsModelFilterPublished}</option><option value="unpublished">{t().settingsModelFilterUnpublished}</option><option value="llm">{t().settingsModelFilterLlm}</option>{#if modelPickerProvider.id !== 'chatgpt'}<option value="vision">{t().settingsModelFilterVision}</option>{/if}</select></label>
 				<div class="model-picker-actions">
 					<button class="ghost-btn" title={modelPickerDirty ? t().settingsModelFetchDisabledWhileDirty : undefined} onclick={fetchModelPickerModels} disabled={modelSettingsLoading || modelPickerDirty}>{t().settingsModelFetchModels}</button>
 					<button class="ghost-btn" onclick={() => setAllPublishedModels(filteredModelPickerModels, true)} disabled={modelSettingsLoading}>{t().settingsModelSelectVisible}</button>
@@ -600,12 +601,12 @@
 								/>
 									<span><strong>{model.label}</strong><small>{model.id}</small>{#if modelStatusLabel(model, t().code === 'ja')}<em class="model-picker-status">{modelStatusLabel(model, t().code === 'ja')}</em>{/if}{#if model.notes}<em>{model.notes}</em>{/if}</span>
 								</label>
-								<div class="model-purpose-controls" aria-label={`${model.label} LLM / Vision`}>
+								{#if modelPickerProvider.id !== 'chatgpt'}<div class="model-purpose-controls" aria-label={`${model.label} LLM / Vision`}>
 									<button type="button" class:active={modelPurposeSelected(model.id, 'llm')} aria-pressed={modelPurposeSelected(model.id, 'llm')} onclick={() => toggleModelPurpose(model.id, 'llm')}>LLM</button>
 									<button type="button" class:active={modelPurposeSelected(model.id, 'vision')} aria-pressed={modelPurposeSelected(model.id, 'vision')} onclick={() => toggleModelPurpose(model.id, 'vision')}>Vision</button>
-								</div>
+								</div>{/if}
 							</div>
-							<details class="model-metadata-editor">
+							{#if modelPickerProvider.id !== 'chatgpt'}<details class="model-metadata-editor">
 								<summary>{t().settingsModelMetadataDetails}</summary>
 							<div class="model-metadata-fields">
 								<label><span>オススメ度 / Recommendation</span><select value={modelDraft(model).recommendation_level ?? 0} onchange={(event) => updateModelMetadata(model, { recommendation_level: Number(event.currentTarget.value) || undefined })}><option value="0">—</option>{#each [1, 2, 3, 4, 5] as level}<option value={level}>{level} / 5</option>{/each}</select></label>
@@ -614,7 +615,7 @@
 								<label class="wide"><span>評価コメント（日本語）</span><textarea rows="2" value={modelDraft(model).comment_ja ?? ''} oninput={(event) => updateModelMetadata(model, { comment_ja: event.currentTarget.value })}></textarea></label>
 								<label class="wide"><span>Evaluation comment (English)</span><textarea rows="2" value={modelDraft(model).comment_en ?? ''} oninput={(event) => updateModelMetadata(model, { comment_en: event.currentTarget.value })}></textarea></label>
 								</div>
-							</details>
+							</details>{/if}
 						</article>
 					{/each}
 			</div>

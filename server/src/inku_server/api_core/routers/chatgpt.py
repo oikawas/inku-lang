@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import time
-from typing import Literal
+from typing import Annotated, Literal
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException
@@ -12,6 +12,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from ... import chatgpt_runtime as runtime
 from ...chatgpt_auth import USAGE_URL, attempts, sign_out
+from ...chatgpt_models import save_publication, saved_publication
 from ...chatgpt_provider import catalog, pin
 from ...chatgpt_store import ChatGPTError, CredentialStore
 from ..deps import _current_user
@@ -120,8 +121,8 @@ def retry(profile_id: str, actor: str = Depends(owner)) -> dict:
 def models(actor: str, *, force: bool = False) -> dict:
     try:
         profile_id, generation = pin(actor)
-        result = asyncio.run(catalog(actor, profile_id, generation, time.monotonic() + 15, force=force))
-        return {"profile_id": profile_id, "generation": generation, "models": result}
+        asyncio.run(catalog(actor, profile_id, generation, time.monotonic() + 15, force=force))
+        return saved_publication(actor, profile_id, generation)
     except ChatGPTError as error:
         raise _error(error) from None
     except (httpx.HTTPError, TimeoutError, ValueError, KeyError):
@@ -136,3 +137,27 @@ def get_models(actor: str = Depends(owner)) -> dict:
 @router.post("/models/refresh")
 def refresh_models(actor: str = Depends(owner)) -> dict:
     return models(actor, force=True)
+
+
+class PublishedModelsBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    profile_id: str = Field(min_length=1, max_length=128)
+    generation: int = Field(ge=1)
+    published_models: list[Annotated[str, Field(min_length=1, max_length=256)]] = Field(max_length=1024)
+
+
+@router.get("/models/settings")
+def model_settings(actor: str = Depends(owner)) -> dict:
+    try:
+        profile_id, generation = pin(actor)
+        return saved_publication(actor, profile_id, generation)
+    except ChatGPTError as error:
+        raise _error(error) from None
+
+
+@router.put("/models/settings")
+def publish_models(body: PublishedModelsBody, actor: str = Depends(owner)) -> dict:
+    try:
+        return save_publication(actor, body.profile_id, body.generation, body.published_models)
+    except ChatGPTError as error:
+        raise _error(error) from None

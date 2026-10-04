@@ -39,6 +39,7 @@ export type SettingsConfirmation = {
 type ModelAdministrationDeps<TActor extends SettingsActor> = {
 	apiFetch: ApiFetch;
 	currentUser: () => TActor | null;
+	chatgptAvailable?: () => boolean;
 	loadAvailableModels: () => void | Promise<void>;
 	requestConfirmation: (confirmation: SettingsConfirmation) => void;
 	describeApiError: (detail: unknown, status: number) => string;
@@ -60,6 +61,14 @@ export type ModelAdministration = {
 	saveModelProvider: (provider: Provider, patch?: Partial<ModelProviderSetting>) => Promise<boolean>;
 	saveModelSettings: () => Promise<void>;
 	loadModelSettings: () => Promise<void>;
+	resetForLoggedOut: () => void;
+};
+
+type ChatGPTPublication = {
+	profile_id: string;
+	generation: number;
+	models: ModelOption[];
+	enabled_models: Record<string, boolean>;
 };
 
 export function createModelAdministration<TActor extends SettingsActor>(
@@ -70,9 +79,52 @@ export function createModelAdministration<TActor extends SettingsActor>(
 	let modelFetchResults = $state<Record<string, ModelFetchResult>>({});
 	let modelSettingsLoading = $state(false);
 	let modelCatalog = $state<ProviderGroup[]>(PROVIDER_GROUPS.filter((group) => group.id !== 'nvidia'));
+	let chatgptPublication = $state<ChatGPTPublication | null>(null);
+	let boundOwner = $state<string | undefined>(undefined);
+	let revision = 0;
+
+	function personalModelsAllowed(): boolean {
+		return !!deps.currentUser()?.id && deps.chatgptAvailable?.() === true;
+	}
+
+	function resetForLoggedOut(): void {
+		revision++;
+		boundOwner = undefined;
+		chatgptPublication = null;
+		modelSettings = null;
+		modelSettingsStatus = null;
+		modelFetchResults = {};
+		modelSettingsLoading = false;
+		modelCatalog = [];
+	}
+
+	function sameOwner(owner: string | undefined, version: number): boolean {
+		return deps.currentUser() !== null && deps.currentUser()?.id === owner && revision === version;
+	}
+
+	function acceptChatGPT(data: ChatGPTPublication): void {
+		chatgptPublication = data;
+		const provider: ProviderGroup = { id: 'chatgpt', label: t().chatgptPlanLabel,
+			kind: 'chatgpt_responses', requires_api_key: false, models: data.models };
+		modelCatalog = [...modelCatalog.filter((group) => group.id !== 'chatgpt'), provider];
+		modelSettings = { providers: { ...modelSettings?.providers, chatgpt: {
+			base_url: '', api_key_set: false, api_key_hint: null, models: data.models,
+			enabled_models: data.enabled_models
+		} } };
+	}
+
+	async function personalResponse(response: Response): Promise<ChatGPTPublication> {
+		const body = await response.json();
+		if (!response.ok) throw new Error(t().chatgptStatus(body.detail?.code ?? 'chatgpt_transport_unavailable'));
+		return body as ChatGPTPublication;
+	}
 
 	function isAdministrator(): boolean {
 		return deps.currentUser()?.permission_groups?.includes('admins') === true;
+	}
+
+	function visibleProvider(provider: string): boolean {
+		return provider === 'chatgpt' ? personalModelsAllowed() : isAdministrator();
 	}
 
 	// The Server response is authoritative for both catalog metadata and stored
@@ -80,25 +132,48 @@ export function createModelAdministration<TActor extends SettingsActor>(
 	function acceptModelResponse(data: { catalog: ProviderGroup[]; settings: ModelSettings }, status: string): void {
 		modelCatalog = data.catalog;
 		modelSettings = data.settings;
+		if (personalModelsAllowed() && chatgptPublication) acceptChatGPT(chatgptPublication);
 		modelSettingsStatus = status;
 	}
 
 	async function loadModelSettings(): Promise<void> {
-		if (!isAdministrator()) {
+		if (!isAdministrator() && !personalModelsAllowed()) {
 			modelSettings = null;
 			modelSettingsStatus = t().settingsAdminOnlyMessage;
 			return;
 		}
+		const owner = deps.currentUser()?.id;
+		if (owner !== boundOwner) resetForLoggedOut();
+		boundOwner = owner;
+		const version = revision;
 		modelSettingsLoading = true;
 		try {
-			const response = await deps.apiFetch('/api/settings/models', { cache: 'no-store' });
-			if (!response.ok) throw new Error(`HTTP ${response.status}`);
-			acceptModelResponse(await response.json(), '');
+			if (isAdministrator()) {
+				const response = await deps.apiFetch('/api/settings/models', { cache: 'no-store' });
+				if (!response.ok) throw new Error(`HTTP ${response.status}`);
+				const data = await response.json();
+				if (!sameOwner(owner, version)) return;
+				acceptModelResponse(data, '');
+			} else {
+				modelCatalog = [];
+				modelSettings = { providers: {} };
+			}
+			if (personalModelsAllowed()) {
+				const response = await deps.apiFetch('/api/me/chatgpt/models/settings', { cache: 'no-store' });
+				const data = await response.json();
+				if (!sameOwner(owner, version) || !personalModelsAllowed()) return;
+				if (response.ok) acceptChatGPT(data);
+				else {
+					chatgptPublication = null;
+					modelCatalog = modelCatalog.filter((group) => group.id !== 'chatgpt');
+					if (!isAdministrator()) throw new Error(t().chatgptStatus(data.detail?.code ?? 'chatgpt_transport_unavailable'));
+				}
+			}
 			modelSettingsStatus = null;
 		} catch (error) {
-			modelSettingsStatus = error instanceof Error ? error.message : String(error);
+			if (sameOwner(owner, version)) modelSettingsStatus = error instanceof Error ? error.message : String(error);
 		} finally {
-			modelSettingsLoading = false;
+			if (sameOwner(owner, version)) modelSettingsLoading = false;
 		}
 	}
 
@@ -170,6 +245,24 @@ export function createModelAdministration<TActor extends SettingsActor>(
 	}
 
 	async function fetchProviderModels(provider: Provider): Promise<void> {
+		if (provider === 'chatgpt') {
+			if (!personalModelsAllowed()) return;
+			const owner = deps.currentUser()?.id, version = revision;
+			modelSettingsLoading = true;
+			modelFetchResults = { ...modelFetchResults, chatgpt: { type: 'success', message: t().chatgptStatus('chatgpt_models_loading') } };
+			try {
+				const data = await personalResponse(await deps.apiFetch('/api/me/chatgpt/models/refresh', { method: 'POST' }));
+				if (!sameOwner(owner, version) || !personalModelsAllowed()) return;
+				acceptChatGPT(data);
+				modelFetchResults = { ...modelFetchResults, chatgpt: { type: 'success', message: data.models.length ? t().chatgptModelsLoaded(data.models.length) : t().chatgptModelsEmpty } };
+				await deps.loadAvailableModels();
+			} catch (error) {
+				if (sameOwner(owner, version)) modelFetchResults = { ...modelFetchResults, chatgpt: { type: 'error', message: error instanceof Error ? error.message : String(error) } };
+			} finally {
+				if (sameOwner(owner, version)) modelSettingsLoading = false;
+			}
+			return;
+		}
 		if (!isAdministrator()) return;
 		modelSettingsLoading = true;
 		const nextResults = { ...modelFetchResults };
@@ -289,6 +382,30 @@ export function createModelAdministration<TActor extends SettingsActor>(
 	}
 
 	async function saveModelProvider(provider: Provider, patch: Partial<ModelProviderSetting> = {}): Promise<boolean> {
+		if (provider === 'chatgpt') {
+			if (!personalModelsAllowed() || !chatgptPublication) return false;
+			const owner = deps.currentUser()?.id, version = revision;
+			const selected = patch.enabled_models ?? modelSettings?.providers.chatgpt?.enabled_models ?? {};
+			modelSettingsLoading = true;
+			try {
+				const data = await personalResponse(await deps.apiFetch('/api/me/chatgpt/models/settings', {
+					method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
+						profile_id: chatgptPublication.profile_id, generation: chatgptPublication.generation,
+						published_models: chatgptPublication.models.filter((model) => selected[model.id] === true).map((model) => model.id)
+					})
+				}));
+				if (!sameOwner(owner, version) || !personalModelsAllowed()) return false;
+				acceptChatGPT(data);
+				modelSettingsStatus = t().settingsModelSaved;
+				await deps.loadAvailableModels();
+				return true;
+			} catch (error) {
+				if (sameOwner(owner, version)) modelSettingsStatus = error instanceof Error ? error.message : String(error);
+				return false;
+			} finally {
+				if (sameOwner(owner, version)) modelSettingsLoading = false;
+			}
+		}
 		if (!modelSettings || !isAdministrator()) return false;
 		const current = modelSettings.providers[provider];
 		if (!current) return false;
@@ -308,7 +425,7 @@ export function createModelAdministration<TActor extends SettingsActor>(
 		if (!modelSettings || !isAdministrator()) return;
 		modelSettingsLoading = true;
 		try {
-			const providers = Object.fromEntries(Object.entries(modelSettings.providers).map(([id, provider]) => [id, modelProviderPayload(id, provider)]));
+			const providers = Object.fromEntries(Object.entries(modelSettings.providers).filter(([id]) => id !== 'chatgpt').map(([id, provider]) => [id, modelProviderPayload(id, provider)]));
 			const response = await deps.apiFetch('/api/settings/models', {
 				method: 'PUT',
 				headers: { 'Content-Type': 'application/json' },
@@ -325,11 +442,16 @@ export function createModelAdministration<TActor extends SettingsActor>(
 	}
 
 	return {
-		get modelSettings() { return modelSettings; },
-		get modelSettingsStatus() { return modelSettingsStatus; },
-		get modelFetchResults() { return modelFetchResults; },
-		get modelSettingsLoading() { return modelSettingsLoading; },
-		get modelCatalog() { return modelCatalog; },
+		get modelSettings() {
+			if (!deps.currentUser() || deps.currentUser()?.id !== boundOwner || !modelSettings) return null;
+			return { providers: Object.fromEntries(Object.entries(modelSettings.providers).filter(([id]) => visibleProvider(id))) };
+		},
+		get modelSettingsStatus() { return deps.currentUser()?.id === boundOwner ? modelSettingsStatus : null; },
+		get modelFetchResults() {
+			return deps.currentUser()?.id === boundOwner ? Object.fromEntries(Object.entries(modelFetchResults).filter(([id]) => visibleProvider(id))) : {};
+		},
+		get modelSettingsLoading() { return deps.currentUser()?.id === boundOwner && modelSettingsLoading; },
+		get modelCatalog() { return deps.currentUser()?.id === boundOwner ? modelCatalog.filter((provider) => visibleProvider(provider.id)) : []; },
 		updateModelProvider,
 		addModelProvider,
 		askDeleteModelProvider,
@@ -339,6 +461,7 @@ export function createModelAdministration<TActor extends SettingsActor>(
 		saveModelProviderMemo,
 		saveModelProvider,
 		saveModelSettings,
-		loadModelSettings
+		loadModelSettings,
+		resetForLoggedOut
 	};
 }

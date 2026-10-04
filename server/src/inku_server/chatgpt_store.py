@@ -181,6 +181,9 @@ class CredentialStore:
                 raise ChatGPTError("chatgpt_session_changed")
             if previous and any(previous[key] != profile[key] for key in ("issuer", "sub", "client_id")):
                 raise ChatGPTError("chatgpt_identity_mismatch")
+            if previous:
+                # Token refresh and reauthorization must not replace newer model choices.
+                profile = {**profile, "published_models": previous.get("published_models", [])}
             if not previous and len(value["profiles"]) >= 8:
                 raise ChatGPTError("chatgpt_profile_limit")
             value["profiles"][profile["id"]] = profile

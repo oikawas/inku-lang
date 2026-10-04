@@ -115,18 +115,16 @@ def api_models(actor: dict = Depends(_current_user)) -> ModelSettingsResponse:
     profile_id = generation = None
     chatgpt_available = False
     from ...chatgpt_runtime import check_owner
-    from ...chatgpt_provider import pin, catalog
+    from ...chatgpt_provider import pin
+    from ...chatgpt_models import saved_publication
     from ...chatgpt_store import ChatGPTError
-    import asyncio
-    import time
-    import httpx
     try:
         check_owner(actor["id"])
         chatgpt_available = True
         profile_id, generation = pin(actor["id"])
-        models = asyncio.run(catalog(actor["id"], profile_id, generation, time.monotonic() + 15))
+        models = [model for model in saved_publication(actor["id"], profile_id, generation)["models"] if model["enabled"]]
         drawing.append({"id": "chatgpt", "label": "ChatGPT plan", "kind": "chatgpt_responses", "requires_api_key": False, "models": models})
-    except (ChatGPTError, httpx.HTTPError, TimeoutError, ValueError, KeyError):
+    except (ChatGPTError, ValueError, KeyError):
         profile_id = generation = None
     return ModelSettingsResponse(
         drawing_catalog=drawing, chatgpt_profile_id=profile_id, chatgpt_generation=generation,

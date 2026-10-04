@@ -14,6 +14,10 @@ Binding and protocol identities come from the bundled Rust core's version report
 - Update the relevant canonical document when shared semantics or persistence contracts change. This document explains how the Swift host applies them; it does not establish an independent shared specification.
 - Public documentation describes source and reproducible procedures. Generated binaries, models, logs, credentials, device identifiers, and private operating records are not tracked product material.
 
+## 2026-10-04 macOS operation error presentation
+
+On macOS, global operation errors appear in a dismissible notice at the bottom of the view. The message supports selection and vertical scrolling; when a work dialog is open, the notice appears inside it. AppModel remains the sole error-state owner. Dismissal or the next operation clears it. Clearing an error at drawing start and immediately reporting another error no longer closes and reopens an NSAlert sheet. iOS alerts and explicit deletion/restoration confirmations remain unchanged.
+
 ## 2026-10-04 Drawing failure diagnostics and execution logs
 
 The toolbar's Drawing log shows the latest 100 pipeline executions, newest first. Executions without saved works retain their start time, description, pinned models, completion/failure/cancellation state, failed stage and classification, each attempt's timing/HTTP facts/measurements, and core progress. Reading uses existing SQLite snapshots without resuming drivers, sending provider requests, or changing works. Ordinary log decoding and result types exclude raw provider bodies and frozen provider settings.

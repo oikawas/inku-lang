@@ -6,6 +6,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file retains the history from v2.5.0 (2026-07-25, render engine 12) onward.** Past records follow the recent ones in a collapsible section of this same document; expand it when needed. Viewers without collapse support show the full text. Earlier history is in the [v1.72–v2.4 archive](docs/history/changelog-v1.72-v2.4.md) and the [v0.1–v1.71 archive](docs/history/changelog-v0.1-v1.71.md).
 
+### 2026-10-04 — Avoid macOS drawing-start and error-presentation conflicts
+
+Global operation errors now use a dismissible inline notice, preventing error clearing and replacement at drawing start from updating an NSAlert sheet. Messages support selection and scrolling, including within an open work dialog. iOS alerts, deletion/restoration confirmations, and drawing/persistence contracts remain intact. Synchronized the Japanese/English [Swift specification](apple/SWIFT_SPEC.md).
+
 ### 2026-10-04 — Add Swift drawing failure diagnostics and readable execution logs
 
 Drawing log can reopen failed or stopped SQLite executions even when no work was saved. It shows descriptions, pinned models, failed stages, attempts, retries and fallbacks. Ordinary API metrics retain connection errors and HTTP refusal reasons with secrets removed, and the result-log setting also writes accumulated failure/cancellation files. Reading neither resends requests nor changes works. Older records and shared core failure/retry contracts remain intact. Synchronized the Japanese/English [Swift specification](apple/SWIFT_SPEC.md) and [usage guide](apple/README.md).

@@ -143,14 +143,51 @@ public struct ContentView: View {
                 section = target
             }
         }
+        #if os(macOS)
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            if dialog == nil { errorNotice }
+        }
+        #endif
         .sheet(item: $dialog) { item in
             dialogView(item).environment(\.locale, Locale(identifier: model.display.preferences.language))
+                #if os(macOS)
+                .safeAreaInset(edge: .bottom, spacing: 0) { errorNotice }
+                #endif
         }
+        #if !os(macOS)
         .alert(model.display.localized("処理できませんでした"), isPresented: Binding(get: { model.errorText != nil }, set: { if !$0 { model.errorText = nil } })) {
             Button(model.display.localized("閉じる"), role: .cancel) { model.errorText = nil }
         } message: { Text(model.errorText ?? "") }
+        #endif
         .focusedSceneValue(\.inkuCommandContext, commandContext)
     }
+
+    #if os(macOS)
+    @ViewBuilder private var errorNotice: some View {
+        // Starting another operation may clear and replace this error in one update.
+        // Keep its presentation in SwiftUI instead of dismissing/reopening an NSAlert sheet.
+        if let error = model.errorText {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Label(model.display.localized("処理できませんでした"), systemImage: "exclamationmark.triangle")
+                        .font(.headline).foregroundStyle(.red)
+                    Spacer()
+                    Button(model.display.localized("閉じる")) { model.errorText = nil }
+                }
+                ScrollView {
+                    Text(error).font(.callout).textSelection(.enabled)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .frame(maxHeight: 120)
+            }
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(.bar)
+            .overlay(alignment: .top) { Divider() }
+        }
+    }
+    #endif
 
     @ViewBuilder private var detail: some View {
         switch section ?? .create {

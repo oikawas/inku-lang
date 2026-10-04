@@ -1542,6 +1542,7 @@ mod tests {
                 "position_y":{"expr":"exact_decimal","value":"0.5"}
             }}]
         }).to_string()).unwrap();
+        // Three copies are one member of a cells group, its own template node (I-708).
         let stage = stage("three Test.Anchor", &[definition]);
         let mut plan = plan(&stage);
         let exact = demand(&plan);
@@ -1552,9 +1553,9 @@ mod tests {
                 exact.anchor_instances,
                 exact.template_nodes
             ),
-            (3, 0, 3, 1)
+            (3, 0, 3, 2)
         );
-        plan.standalone_macro_repetitions[0].member.anchor_indices[0] = usize::MAX;
+        plan.placement_groups[0].members[0].member.anchor_indices[0] = usize::MAX;
         let error =
             preflight_composition_plan(&plan, hard(100), OperationalResourceBudget(budget(100)))
                 .err()
@@ -1703,7 +1704,8 @@ mod tests {
             selected.omissions()[0].cause.reason,
             PlanResourceFailure::ArithmeticOverflow(ResourceDimension::PrimitiveMarks)
         ));
-        plan.standalone_macro_repetitions[0].member.end = usize::MAX;
+        // The counted word is one member of a cells group (I-708).
+        plan.placement_groups[0].members[0].member.end = usize::MAX;
         let error =
             select_composition_plan_resources(&plan, hard(0), OperationalResourceBudget(budget(0)))
                 .err()

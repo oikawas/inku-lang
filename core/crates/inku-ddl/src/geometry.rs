@@ -1157,7 +1157,7 @@ mod tests {
         );
         assert_eq!(
             geometry_resolution_policy_digest(),
-            "7cbef1c97b2552b0b610a11d131878076069dc1c6bce8c8efe436066896ac84c"
+            "db954d1dcf37b4fa33d49c01d1b0cd720fc1e869ccb9761e42b9c49730e720b1"
         );
         assert_eq!(
             payload["object_placement"]["layout_direction"]["vertical"],

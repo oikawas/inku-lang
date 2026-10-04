@@ -13,6 +13,7 @@ import com.google.ai.edge.litertlm.EngineConfig
 import com.google.ai.edge.litertlm.ExperimentalApi
 import com.google.ai.edge.litertlm.ExperimentalFlags
 import com.google.ai.edge.litertlm.LogSeverity
+import com.google.ai.edge.litertlm.ResponseFormat
 import com.google.ai.edge.litertlm.SamplerConfig
 import java.io.File
 import kotlinx.coroutines.CancellationException
@@ -23,6 +24,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
+import org.json.JSONObject
 
 @OptIn(ExperimentalApi::class)
 class LocalLiteRtLmProvider(
@@ -45,17 +47,18 @@ class LocalLiteRtLmProvider(
             val modelPath = resolveModelPath(request.modelId)
             val maxNumTokens = ENGINE_MAX_NUM_TOKENS
             val prompt = request.prompt
+            val generation = localLiteRtLmGenerationConfig(request)
             Log.i(
                 PERF_TAG,
                 "litert_request_start model_id=${request.modelId} prompt_chars=${prompt.length} " +
                     "system_chars=${request.systemInstruction?.length ?: 0} max_tokens=${request.maxTokens} engine_max_tokens=$maxNumTokens",
             )
             val activeEngine = engineFor(request.modelId, modelPath, maxNumTokens)
-            val response = activeEngine.createConversation(conversationConfig(request)).use { conversation ->
+            val response = activeEngine.createConversation(generation.conversationConfig).use { conversation ->
                 val text = StringBuilder()
                 try {
                     withTimeout(REQUEST_TIMEOUT_MS) {
-                        conversation.sendMessageAsync(prompt).collect { message ->
+                        conversation.sendMessageAsync(prompt, responseFormat = generation.responseFormat).collect { message ->
                             val chunk = message.contents.contents
                                 .filterIsInstance<Content.Text>()
                                 .joinToString("") { it.text }
@@ -182,13 +185,14 @@ class LocalLiteRtLmProvider(
         // engine rather than find this closed one still registered.
         closeEngine()
         Engine.setNativeMinLogSeverity(LogSeverity.ERROR)
-        ExperimentalFlags.enableSpeculativeDecoding = true
+        // The SDK reads this flag only when creating an Engine, not per request.
+        ExperimentalFlags.enableSpeculativeDecoding = false
         val cacheDir = File(context.cacheDir, ENGINE_CACHE_DIR).also { it.mkdirs() }.absolutePath
         val initStarted = System.currentTimeMillis()
         val newEngine = createInitializedEngine(modelPath, Backend.GPU(), maxNumTokens, cacheDir)
         Log.i(
             PERF_TAG,
-            "litert_engine_init model_id=$modelId backend=${Backend.GPU().name} speculative_decoding=true " +
+            "litert_engine_init model_id=$modelId backend=${Backend.GPU().name} speculative_decoding=false " +
                 "engine_init_ms=${System.currentTimeMillis() - initStarted} max_tokens=$maxNumTokens",
         )
         loadedModelId = modelId
@@ -217,19 +221,6 @@ class LocalLiteRtLmProvider(
         )
         newEngine.initialize()
         return newEngine
-    }
-
-    private fun conversationConfig(request: ModelRequest): ConversationConfig {
-        return ConversationConfig(
-            systemInstruction = request.systemInstruction
-                ?.takeIf { it.isNotBlank() }
-                ?.let { Contents.of(it) },
-            samplerConfig = SamplerConfig(
-                topK = 10,
-                topP = 0.95,
-                temperature = request.temperature,
-            ),
-        )
     }
 
     private fun visionConversationConfig(): ConversationConfig = ConversationConfig(
@@ -271,6 +262,44 @@ class LocalLiteRtLmProvider(
         // maxTokens is not passed to LiteRT-LM; this window bounds the answer.
         private const val ENGINE_MAX_NUM_TOKENS = 4096
     }
+}
+
+internal data class LocalLiteRtLmGenerationConfig(
+    val conversationConfig: ConversationConfig,
+    val responseFormat: ResponseFormat?,
+)
+
+// Keep this adapter-only limit equal to inku_ddl::work_plan::MAX_WORK_PLAN_LAYERS.
+internal const val LITERT_STAGE1_MAX_LAYERS = 8
+
+/** Enable the conversation constraint and its per-message schema together. */
+internal fun localLiteRtLmGenerationConfig(request: ModelRequest): LocalLiteRtLmGenerationConfig {
+    val responseFormat = request.tool?.let {
+        val schema = if (request.pipelineAction == "generate_normalized_ddl") {
+            // Gemini rejects maxItems, so leave the shared request schema untouched.
+            JSONObject(it.parametersJson).apply {
+                getJSONObject("properties").getJSONObject("layers")
+                    .put("maxItems", LITERT_STAGE1_MAX_LAYERS)
+            }.toString()
+        } else {
+            it.parametersJson
+        }
+        ResponseFormat.json(schema)
+    }
+    return LocalLiteRtLmGenerationConfig(
+        conversationConfig = ConversationConfig(
+            systemInstruction = request.systemInstruction
+                ?.takeIf { it.isNotBlank() }
+                ?.let { Contents.of(it) },
+            samplerConfig = SamplerConfig(
+                topK = 10,
+                topP = 0.95,
+                temperature = request.temperature,
+            ),
+            enableResponseFormat = responseFormat != null,
+        ),
+        responseFormat = responseFormat,
+    )
 }
 
 /**

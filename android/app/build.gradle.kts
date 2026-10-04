@@ -329,7 +329,7 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.10.0")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.10.0")
 
-    implementation("com.google.ai.edge.litertlm:litertlm-android:0.11.0")
+    implementation("com.google.ai.edge.litertlm:litertlm-android:0.17.1")
     // In-app capture replaces the system camera round trip for the camera input.
     val cameraxVersion = "1.6.2"
     implementation("androidx.camera:camera-camera2:$cameraxVersion")

@@ -14,6 +14,18 @@ The Mac authorization CLI explicitly opened Chrome even when setup began in Brav
 
 Refresh models retrieved choices without displaying the result, leaving even a successful update with no visible feedback. Settings now show progress, model count and names, empty catalogs and failures, with a button to open the existing model picker. Refreshing does not select a model; the existing picker retains the shared Stage 1/2 drawing choice.
 
+### 2026-10-04 — Bound Android on-device underdrawings to eight layers (I-713)
+
+Only the underdrawing response schema sent to LiteRT adds maxItems 8 to its layers array. A test keeps the adapter's value equal to the shared core's layer limit. Gemini rejects the bounded schema, so the shared schema, cloud providers and other requests, including composition reading, remain unchanged. SDK 0.17.1, ResponseFormat.json, disabled speculative decoding, GPU, the token window and sampling remain in place.
+
+### 2026-10-04 — Disable speculative decoding for the Android on-device model (I-713)
+
+Following the author's decision after a constrained response still produced invalid JSON, speculative decoding is disabled for the entire LiteRT-LM Engine. SDK 0.17.1, ResponseFormat.json, GPU, the token window, sampling and the default on-device composition reading remain in place. The SDK reads this setting only at Engine creation, so schema and plain-text requests use the same setting.
+
+### 2026-10-03 — Pass response schemas to the Android on-device model (I-713)
+
+LiteRT-LM is upgraded to 0.17.1, and the on-device provider passes the shared core's response schema to the SDK through ResponseFormat.json. Requests with a schema enable the conversation and message JSON constraints together; plain-text requests keep their existing path. Existing sampling settings and the on-device default composition reading remain in use, with saved DDL and Score contracts unchanged.
+
 ### v2.15.81 — Fix named-corner composition and Japanese printing (Build 1157, 2026-10-03)
 
 The composition reading distinguishes the four corners a description names and places the layer there when the corner agrees with the underdrawing's place (I-712). Japanese underdrawing printing writes an extra-large shape as 特大の四角, without doubling の (I-709). Saved works and the DDL, Score and render engine versions are unchanged. The entries for the same date give each fix's rules and checks.

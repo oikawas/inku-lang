@@ -3,7 +3,7 @@
 このディレクトリは、ネイティブ単体 Android アプリのワークスペースであり、Git 管理対象とする。
 ローカル専用成果物、端末ID、ダウンロード済みモデル、ログ、秘密情報は追跡対象に含めない。
 
-最終更新: 2026-10-03。
+最終更新: 2026-10-04。
 
 **追随状況**: Android は `2.1.4-android.80` の世代にある。DDLの変換とScore → SVGの描画は、
 同じcommitの共有Rust core（`core/crates/`）を同梱してServerと同じ実装で行い、Android独自の版定数を持たない。
@@ -29,6 +29,16 @@ runtime fallbackを持たない。保存済みSVG、Room schema、Score schema�
 - `ANDROID_SPEC.md` は英語版として、`ANDROID_SPEC.ja.md` の意図を保った翻訳・要約として更新する。
 - Android 仕様を更新するときは、先に `ANDROID_SPEC.ja.md` を更新し、その後で `ANDROID_SPEC.md` を同期する。
 - 英語版だけに存在する仕様・要件を追加してはならない。
+
+## 2026-10-03 端末モデルの応答をJSONの型へ沿わせる（I-713、2026-10-04更新）
+
+LiteRT-LMは0.17.1を使う。端末providerは `ModelRequest.tool.parametersJson` を `ResponseFormat.json(schema)` へ渡す。応答の型を持つ要求だけ、会話の `enableResponseFormat` と送信時の `responseFormat` を同時に設定して、SDKのJSON Schema制約を使う。型の無い文章の要求と写真の観察文ではこの制約を有効にしない。
+
+2026-10-04の作者裁定により、端末の `generate_normalized_ddl` だけ、SDKへ渡す型のコピーの `properties.layers` に `maxItems` を付ける。値8はcoreの `MAX_WORK_PLAN_LAYERS` の写しであり、JVM試験で正本との一致を守る。元のModelRequestと共有coreの型、構図読みなど他の要求の型は変更しない。Geminiがこの上限を拒むため、雲providerへは付けない。
+
+共有coreのprompt/schemaと再試行の判断を使い、GPU、4096 tokenの窓、temperature0.0を含む既存sampling設定を維持する。端末Gemma 4 E2Bの構図は `read: false` のままで、既定の読みを使う。
+
+2026-10-04の作者裁定により、Engine生成前に `ExperimentalFlags.enableSpeculativeDecoding = false` を設定する。SDKはEngine生成時だけこの値を読むため、Engine全体（型のある要求、文章の要求、写真の観察）で無効にする。SDK 0.17.1と応答の型の指定は維持する。
 
 ## 2026-10-03 下絵の後の構図と読み
 
@@ -745,6 +755,8 @@ Android 版は Pixel 9 以上を想定したシングルユーザー用ネイテ
 この削除は未実装ではなく、Android 版のモバイル UI とシングルユーザー前提に基づく意図的な仕様差分である。
 
 ## 2026-05-07 LiteRT-LM MTP と Gemma 4 再取得導線
+
+この節のMTP有効化は当時の記録である。2026-10-04以降のEngine設定は上のI-713節に従い、speculative decodingを無効にする。
 
 Android 版の LiteRT-LM は GPU backend を必須とし、CPU fallback は行わない。
 Gemma 4 E2B / E4B のローカル実行では、LiteRT-LM の speculative decoding / Multi-Token Prediction (MTP) を有効化する。

@@ -258,9 +258,9 @@ def test_db_facades_keep_exact_signatures_and_resolve_dependencies_at_call_time(
     assert db.get_lineage_branch("user", "target") == "get_lineage_branch"
     assert initializations == [dependencies] * 8
     assert [name for name, _, _ in calls] == list(signatures)
-    assert calls[5] == ("get_lineage", ("user", "focus", 4, 5), {"include_svg": True})
+    assert calls[5] == ("get_lineage", ("user", "focus", 4, 5, True), {})
     assert db.get_lineage("user", "focus", include_svg=False) == "get_lineage"
-    assert calls[-1] == ("get_lineage", ("user", "focus", 2, 200), {"include_svg": False})
+    assert calls[-1] == ("get_lineage", ("user", "focus", 2, 200, False), {})
 
 
 def test_edge_metadata_and_node_redaction_payloads_are_exact() -> None:

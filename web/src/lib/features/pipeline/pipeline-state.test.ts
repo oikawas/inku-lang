@@ -140,7 +140,8 @@ test('normal authoring keeps approval, fork, stale CAS, and legacy parent on the
 		value: { source: 'edited circle', options: { canvas_aspect: 'square' } },
 	});
 	assert.equal(controller.current?.variation_id, 'variation-2');
-	assert.equal(observed.at(-1)?.variation_id, 'variation-2');
+	assert.equal(observed.at(-2)?.variation_id, 'variation-2');
+	assert.equal(observed.at(-1), null, 'new authoring hides the preceding status even when CAS rejects it');
 
 	rejectNextCommand = false;
 	const loadsBeforeHistorySelection = calls.filter((call) => call.method === 'load').length;

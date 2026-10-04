@@ -35,6 +35,7 @@ test('the browser owns every module-scoped reactive setting', () => {
 		'features/history/browsing-state.svelte.ts',
 		'features/history/lineage-state.svelte.ts',
 		'features/session/state.svelte.ts',
+		'features/settings/chatgpt.svelte.ts',
 		'features/settings/model-administration.svelte.ts',
 		'features/settings/navigation-state.svelte.ts',
 		'features/settings/server-administration.svelte.ts',

@@ -109,16 +109,16 @@ test('T-47  the detailed mode hides none of them', () => {
 
 // ------------------------------------------------------------------- T-48
 
-test('T-48  the Settings owner asks both gates, and still asks the old one unchanged', () => {
+test('T-48  the Settings owner asks both permission and detail gates with personal plan availability', () => {
 	assert.match(SETTINGS, /from '\$lib\/settingsDetail'/);
-	// The permission call is untouched -- the two gates compose rather than one
-	// swallowing the other, so a member outside the administrators group cannot
-	// reach an administrator tab by turning the switch on.
+	// Personal plan availability reaches the permission gate. The detail gate
+	// still composes with it, so showing more tabs cannot grant administration.
 	assert.match(
 		SETTINGS,
-		/canAccessSettingsTabFor\(tab, currentUser\) && settingsTabShownAtDetail\(tab, settingsDetail\)/
+		/canAccessSettingsTabFor\(tab, currentUser, deps\.chatgptAvailable\?\.\(\) === true\) && settingsTabShownAtDetail\(tab, settingsDetail\)/
 	);
 	assert.equal(canAccessSettingsTab('server_misc', { permission_groups: ['users'] }), false);
+	assert.equal(canAccessSettingsTab('server_misc', { id: 'member-1', permission_groups: ['users'] }, true), false);
 });
 
 // ------------------------------------------------------------------- T-49

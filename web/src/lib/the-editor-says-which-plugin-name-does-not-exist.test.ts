@@ -129,8 +129,9 @@ test('T-5: the English phrases fire too, and each name is listed once', () => {
 // one of its seven words. Same shape as 薄墨 above -- the vocabulary grew, the
 // plugin-name index did not move -- and declared the same way rather than
 // rebaked, so any drift that is not this substitution still fails.
+// 2026-09-30, saijiki v2: 薄墨 left the vocabulary, so its four cases now
+// reproduce the frozen bytes without a substitution. Only paper remains.
 const DECLARED_SUBSTITUTIONS: readonly [RegExp, string][] = [
-	[/<span class="ddl-token ddl-token-word">薄墨<\/span>/g, '薄墨'],
 	[/<span class="ddl-token ddl-token-word">paper<\/span>/g, 'paper']
 ];
 // 2026-09-14: the place 中央 became an older spelling that the parser reads as
@@ -160,7 +161,7 @@ test('T-7: without the index the output is byte-identical to the branch point', 
 		);
 		declared += 1;
 	}
-	assert.equal(declared, 12, 'the declared changes cover twelve cases, no more and no fewer');
+	assert.equal(declared, 8, 'the declared changes cover four paper and four 中央 cases, no more and no fewer');
 });
 
 test('T-7: display callers pass no index, and the editor passes one', () => {

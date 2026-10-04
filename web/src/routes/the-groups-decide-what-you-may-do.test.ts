@@ -55,7 +55,7 @@ test('the users group opens none of them, and neither does a leader', () => {
 	// two checks above would pass over a decision nothing calls.
 	const owner = readFileSync(join(ROUTES_DIR, '..', 'lib', 'features', 'settings', 'navigation-state.svelte.ts'), 'utf8');
 	assert.match(owner, /from '\$lib\/permissionGroups'/);
-	assert.match(owner, /canAccessSettingsTabFor\(tab, currentUser\)/);
+	assert.match(owner, /canAccessSettingsTabFor\(tab, currentUser, deps\.chatgptAvailable\?\.\(\) === true\)/);
 });
 
 test('a leader opens the users tab, and a plain member does not', () => {

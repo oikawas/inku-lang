@@ -3,6 +3,76 @@ import XCTest
 @testable import InkuHost
 
 final class ProviderObservationTransportChecks: XCTestCase, @unchecked Sendable {
+    // Failure: a refused connection loses its OS cause, or an ordinary HTTP failure
+    // persists a credential/body instead of bounded diagnostics. No real HTTP is used.
+    func testSafeFailureDiagnosticsWithoutRawCapture() async throws {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("inku-provider-failure-" + UUID().uuidString)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let models = ModelSelection(stage1Model: "fixture:offered", stage2Model: "fixture:unused")
+        let action = Self.action(secret: "fixture-system")
+        let connectionSink = ObservationSink(url: folder.appendingPathComponent("connection.json"))
+        let connection = URLSessionProviderTransport(usageURL: folder.appendingPathComponent("connection-usage.json"),
+            http: ObservationCannotConnectHTTP())
+        let local = ProviderSettings(id: "fixture", baseURL: URL(string: "http://127.0.0.1:1/private-path")!, requiresAPIKey: false)
+        let failed = try ExactJSON(data: await connection.performObserved(action: action, models: models, providers: [local],
+            credentials: ObservationCredentials(secret: nil), observation: .init(),
+            willSend: { try await connectionSink.save($0) }, didFinish: { try await connectionSink.save($0) }, onBytes: { _ in }))
+        XCTAssertEqual(failed["tag"].string, "provider_failed")
+        XCTAssertEqual(failed["failure"].string, "transport_unavailable")
+        let connectionRecord = try JSONDecoder().decode(ProviderAttemptObservation.self, from: Data(contentsOf: connectionSink.url))
+        let network = try XCTUnwrap(connectionRecord.metric.diagnostic)
+        XCTAssertEqual(network.kind, .network)
+        XCTAssertEqual(network.errorDomain, NSURLErrorDomain)
+        XCTAssertEqual(network.errorCode, URLError.cannotConnectToHost.rawValue)
+        XCTAssertEqual(network.reason, "Could not connect to the provider host.")
+        XCTAssertEqual(network.endpoint, "http://127.0.0.1:1")
+        XCTAssertFalse(connectionRecord.metric.sent)
+        XCTAssertNil(connectionRecord.metric.httpStatus)
+        XCTAssertNil(connectionRecord.raw)
+
+        // The old on-disk metric has no diagnostic member, rather than a null value.
+        var legacy = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(connectionRecord.metric)) as? [String: Any])
+        legacy.removeValue(forKey: "diagnostic")
+        XCTAssertNil(try JSONDecoder().decode(ProviderAttemptMetric.self, from: JSONSerialization.data(withJSONObject: legacy)).diagnostic)
+
+        let secret = "fixture-key-quote\"-slash\\-end"
+        let secretLike = "AIzaFixtureSecret123456"
+        let refusalBody = ExactJSON.object(["error": .object(["code": .string("invalid-" + secret),
+            "type": .string("authentication_error"), "param": .string("keyABCDEF123456"), "status": .integer(401),
+            "message": .string("Denied " + secret + " and " + secretLike + ". " + String(repeating: "x", count: 300)),
+            "private": .string("must-not-persist-response-body")])]).data
+        let refusalSink = ObservationSink(url: folder.appendingPathComponent("refusal.json"))
+        let refusal = URLSessionProviderTransport(usageURL: folder.appendingPathComponent("refusal-usage.json"),
+            http: ObservationRefusalHTTP(body: refusalBody))
+        let remote = ProviderSettings(id: "fixture", baseURL: URL(string: "https://fixture.invalid/private-api/v1")!)
+        let rejected = try ExactJSON(data: await refusal.performObserved(action: action, models: models, providers: [remote],
+            credentials: ObservationCredentials(secret: secret), observation: .init(),
+            willSend: { try await refusalSink.save($0) }, didFinish: { try await refusalSink.save($0) }, onBytes: { _ in }))
+        XCTAssertEqual(rejected["failure"].string, "provider_rejected")
+        let stored = try Data(contentsOf: refusalSink.url)
+        let refusalRecord = try JSONDecoder().decode(ProviderAttemptObservation.self, from: stored)
+        let http = try XCTUnwrap(refusalRecord.metric.diagnostic)
+        XCTAssertEqual(http.kind, .http)
+        XCTAssertEqual(http.httpStatus, 401)
+        XCTAssertEqual(http.endpoint, "https://fixture.invalid")
+        XCTAssertEqual(http.providerCode, "invalid-[redacted]")
+        XCTAssertEqual(http.providerType, "authentication_error")
+        XCTAssertEqual(http.providerParameter, "[redacted]")
+        XCTAssertEqual(http.providerStatus, "401")
+        XCTAssertLessThanOrEqual(try XCTUnwrap(http.providerMessage).count, 240)
+        XCTAssertTrue(http.providerMessage?.contains("[redacted]") == true)
+        XCTAssertTrue(refusalRecord.metric.sent)
+        XCTAssertEqual(refusalRecord.metric.httpStatus, 401)
+        XCTAssertNil(refusalRecord.raw)
+        let savedText = String(decoding: stored, as: UTF8.self)
+        XCTAssertFalse(savedText.contains("fixture-key-quote"))
+        XCTAssertFalse(savedText.contains(secretLike))
+        XCTAssertFalse(savedText.contains("keyABCDEF123456"))
+        XCTAssertFalse(savedText.contains("must-not-persist-response-body"))
+        XCTAssertFalse(savedText.contains("private-api"))
+    }
+
     // Failure: composition used Stage1's metric bucket, actual usage was estimated,
     // or provider IO bypassed durable saving / lost received bytes on a failed read.
     func testJSONSSEDurabilityAndPartialBoundary() async throws {
@@ -135,6 +205,20 @@ private actor ObservationSink {
 private struct ObservationCredentials: CredentialStore {
     let secret: String?
     func key(for credentialID: String) async throws -> String? { secret }
+}
+private struct ObservationCannotConnectHTTP: ProviderHTTPClient {
+    func send(_ request: URLRequest, maximumBytes: Int, onBytes: @escaping @Sendable (Int) -> Void,
+              onResponse: @escaping ProviderHTTPReadHandler) async throws -> ProviderHTTPResponse {
+        throw URLError(.cannotConnectToHost)
+    }
+}
+private struct ObservationRefusalHTTP: ProviderHTTPClient {
+    let body: Data
+    func send(_ request: URLRequest, maximumBytes: Int, onBytes: @escaping @Sendable (Int) -> Void,
+              onResponse: @escaping ProviderHTTPReadHandler) async throws -> ProviderHTTPResponse {
+        onResponse(.init(status: 401, data: body, sent: true, complete: true, truncated: false))
+        return .init(status: 401, data: body)
+    }
 }
 private actor ObservationJSONHTTP: ProviderHTTPClient {
     let recordURL: URL

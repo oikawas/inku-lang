@@ -14,6 +14,12 @@ Isolated native checks of the updated Universal app confirmed DDL generation, an
 
 Personal ChatGPT is explicitly enabled and connected in its dedicated settings page, where an offered drawing model is selected. It is separate from API key connections and disabled by default. An issued client ID and personal consent are required; actual sign-in, model discovery and inference remain unaccepted. Description, sketch, automatic color, composition reading and DDL hole filling are supported; unavailable uses such as Vision refinement and colophons are explained in the UI. See the [Swift specification](SWIFT_SPEC.md#personal-chatgpt).
 
+## When a drawing fails
+
+Open Drawing log in the toolbar and select the execution matching the failed description. It shows the time, pinned models, failed stage, retries and fallbacks. New ordinary API executions also retain OS connection error codes and HTTP refusal reasons. Details absent from older records are identified as unrecorded rather than invented. Opening logs does not perform or resend requests.
+
+Enable result logging in Settings → Create to also save accumulated JSON through completion, failure or cancellation in `drawing-logs/` beside the DB. SQLite execution records remain readable in Drawing log when file logging is off. Ordinary logs exclude provider bodies, API keys, endpoint paths/queries and headers. Full body capture requires the separate explicit developer setting.
+
 ## Operating systems and build environment
 
 Minimum deployment versions are macOS 14 and iOS 17. SDK versions are independent of deployment minimums. The checked environment uses Xcode 27.0/Swift 6.4, Rust 1.95.0, and XcodeGen 2.46.0. Swift packages require tools 6.1, and the project requires XcodeGen 2.44.0 or newer.

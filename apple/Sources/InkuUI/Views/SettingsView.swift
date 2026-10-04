@@ -127,6 +127,8 @@ enum SettingsSection: String, CaseIterable, Identifiable {
             }
             Section(model.display.localized("結果ログ")) {
                 Toggle(model.display.localized("生成結果のログを保存"), isOn: $display.preferences.saveResultLog)
+                Text(model.display.localized("成功・失敗・停止の経過を描画ログへ保存します。ファイル保存を切っても端末の実行記録は確認できます。"))
+                    .font(.caption).foregroundStyle(.secondary)
                 Text(model.display.localized("指示書・Score・生成情報を端末内へ記録します。APIキーは記録しません。"))
                     .font(.callout).foregroundStyle(.secondary)
             }

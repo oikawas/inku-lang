@@ -49,7 +49,7 @@ private struct ReplaySession {
 }
 
 private enum WorkDialog: Identifiable {
-    case export(ExportSession), edit(WorkEditSession), refinement(RefinementSession), replay(ReplaySession), comparison, advice, colophon
+    case export(ExportSession), edit(WorkEditSession), refinement(RefinementSession), replay(ReplaySession), comparison, advice, colophon, drawingLogs
     var id: String {
         switch self {
         case .export(let session): session.id.uuidString
@@ -59,6 +59,7 @@ private enum WorkDialog: Identifiable {
         case .comparison: "comparison"
         case .advice: "advice"
         case .colophon: "colophon"
+        case .drawingLogs: "drawingLogs"
         }
     }
 }
@@ -123,6 +124,10 @@ public struct ContentView: View {
             model.onSavedWork = { [weak model = model, weak maintenance = maintenance] work in
                 guard let model, let maintenance else { return }
                 await maintenance.log(work: work, enabled: model.display.preferences.saveResultLog)
+            }
+            model.onDrawingLog = { [weak model = model, weak maintenance = maintenance] record in
+                guard let model, let maintenance else { return }
+                await maintenance.log(execution: record, enabled: model.display.preferences.saveResultLog)
             }
             while !Task.isCancelled {
                 await maintenance.checkBackup(app: model, automationRunning: automation.isOccupied || dialog != nil)
@@ -238,6 +243,9 @@ public struct ContentView: View {
 
     @ToolbarContentBuilder private var toolbar: some ToolbarContent {
         ToolbarItemGroup(placement: .primaryAction) {
+            Button(model.display.localized("描画ログ"), systemImage: "list.bullet.rectangle") { dialog = .drawingLogs }
+                .disabled(dialog != nil || importing)
+                .help(model.display.preferences.showTooltips ? model.display.localized("成功・失敗・停止した描画の記録を確認します。") : "")
             Button {
                 model.display.preferences.showTooltips.toggle()
             } label: {
@@ -318,6 +326,8 @@ public struct ContentView: View {
             AuxiliaryView(model: model, mode: .advice).environment(model.display)
         case .colophon:
             AuxiliaryView(model: model, mode: .colophon).environment(model.display)
+        case .drawingLogs:
+            DrawingLogView(model: model).environment(model.display)
         }
     }
 

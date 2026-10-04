@@ -73,7 +73,9 @@ public final class URLSessionProviderTransport: ObservedProviderTransport, Senda
         var response: String?
         do {
             let (provider, model) = try resolve(modelReference, providers: providers)
+            recorder?.setEndpoint(provider.baseURL)
             let key = try await credentials.key(for: provider.credentialID)
+            recorder?.addSecrets(key.map { [$0] } ?? [])
             var request = try ProviderWire.request(action: action, provider: provider, model: model, maxTokens: maxTokens, key: key)
             request.timeoutInterval = Double(timeoutMS) / 1000
             let boundedRequest = request
@@ -136,20 +138,26 @@ public final class URLSessionProviderTransport: ObservedProviderTransport, Senda
             throw CancellationError()
         }
         catch let error as HTTPFailure {
+            recorder?.recordFailure(error, httpStatus: error.status, httpBody: error.body)
             failure = error.status == 429 ? "rate_limited" : (error.status >= 500 ? "transport_unavailable" : "provider_rejected")
         } catch let error as URLError {
             if error.code == .cancelled && Task.isCancelled {
                 try await recorder?.finish(failure: nil, cancelled: true, callback: didFinish)
                 throw CancellationError()
             }
+            recorder?.recordFailure(error)
             failure = error.code == .timedOut ? "transport_timeout" : "transport_unavailable"
         } catch let error as HostError {
+            recorder?.recordFailure(error)
             switch error.code {
             case "transport_timeout", "rate_limited", "transport_unavailable": failure = error.code
             case "malformed_payload", "invalid_json", "duplicate_json_key": failure = "malformed_payload"
             default: failure = "provider_rejected"
             }
-        } catch { failure = "transport_unavailable" }
+        } catch {
+            recorder?.recordFailure(error)
+            failure = "transport_unavailable"
+        }
         let elapsed = began.duration(to: .now)
         let parts = elapsed.components
         let milliseconds = max(0, parts.seconds * 1000 + parts.attoseconds / 1_000_000_000_000_000)
@@ -164,16 +172,18 @@ public final class URLSessionProviderTransport: ObservedProviderTransport, Senda
     private func readObserved(_ request: URLRequest, maximum: Int, onBytes: @escaping @Sendable (Int) -> Void,
                               onResponse: @escaping ProviderHTTPReadHandler) async throws -> Data {
         if let http {
-            onResponse(ProviderHTTPRead(status: nil, data: nil, sent: true, complete: false, truncated: false))
+            // Calling a client does not prove it connected or sent a request.
+            onResponse(ProviderHTTPRead(status: nil, data: nil, sent: false, complete: false, truncated: false))
             let response = try await http.send(request, maximumBytes: maximum, onBytes: onBytes, onResponse: onResponse)
             guard (200...299).contains(response.status) else {
                 throw HTTPFailure(status: response.status,
-                    retryAfter: ProviderRateBudget.retryAfter(String(response.retryAfter), raw: response.data, now: budget.now()))
+                    retryAfter: ProviderRateBudget.retryAfter(String(response.retryAfter), raw: response.data, now: budget.now()), body: response.data)
             }
             return response.data
         }
         var data = Data(), status: Int?, complete = false, truncated = false
-        defer { onResponse(ProviderHTTPRead(status: status, data: data, sent: true, complete: complete, truncated: truncated)) }
+        // An HTTP response proves a send; a connection error before response headers does not.
+        defer { onResponse(ProviderHTTPRead(status: status, data: data, sent: status != nil, complete: complete, truncated: truncated)) }
         let (bytes, response) = try await session.bytes(for: request)
         defer { bytes.task.cancel() }
         guard let response = response as? HTTPURLResponse else { throw HostError("transport_unavailable") }
@@ -191,7 +201,7 @@ public final class URLSessionProviderTransport: ObservedProviderTransport, Senda
         } catch {
             if !success && !Task.isCancelled {
                 throw HTTPFailure(status: response.statusCode,
-                    retryAfter: ProviderRateBudget.retryAfter(response.value(forHTTPHeaderField: "Retry-After"), raw: data, now: budget.now()))
+                    retryAfter: ProviderRateBudget.retryAfter(response.value(forHTTPHeaderField: "Retry-After"), raw: data, now: budget.now()), body: data)
             }
             throw error
         }
@@ -199,7 +209,7 @@ public final class URLSessionProviderTransport: ObservedProviderTransport, Senda
         complete = !truncated
         if !success {
             throw HTTPFailure(status: response.statusCode,
-                retryAfter: ProviderRateBudget.retryAfter(response.value(forHTTPHeaderField: "Retry-After"), raw: data, now: budget.now()))
+                retryAfter: ProviderRateBudget.retryAfter(response.value(forHTTPHeaderField: "Retry-After"), raw: data, now: budget.now()), body: data)
         }
         guard !truncated else { throw HostError("malformed_payload") }
         return data
@@ -281,7 +291,7 @@ public final class URLSessionProviderTransport: ObservedProviderTransport, Senda
     }
 }
 
-private struct HTTPFailure: Error { let status: Int; let retryAfter: Double }
+private struct HTTPFailure: Error { let status: Int; let retryAfter: Double; var body: Data? = nil }
 private final class RejectRedirects: NSObject, URLSessionTaskDelegate, Sendable {
     func urlSession(_ session: URLSession, task: URLSessionTask, willPerformHTTPRedirection response: HTTPURLResponse,
                     newRequest request: URLRequest, completionHandler: @escaping @Sendable (URLRequest?) -> Void) { completionHandler(nil) }

@@ -1,5 +1,6 @@
 import CryptoKit
 import Foundation
+import InkuHost
 import InkuPersistence
 import Observation
 
@@ -43,6 +44,22 @@ private actor LocalMaintenanceStore {
         guard !FileManager.default.fileExists(atPath: file.path) else { return }
         try JSONEncoder().encode(work).write(to: file, options: .atomic)
     }
+
+    func log(execution: DrawingLogRecord) throws {
+        let folder = directory.appendingPathComponent("drawing-logs", isDirectory: true)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true,
+                                               attributes: [.posixPermissions: 0o700])
+        let name = SHA256.hash(data: Data(execution.id.utf8)).map { String(format: "%02x", $0) }.joined()
+        let file = folder.appendingPathComponent(name + ".json")
+        let decoder = JSONDecoder(); decoder.dateDecodingStrategy = .iso8601
+        if FileManager.default.fileExists(atPath: file.path),
+           let previous = try? decoder.decode(DrawingLogRecord.self, from: Data(contentsOf: file)),
+           previous.databaseRevision >= execution.databaseRevision { return }
+        let encoder = JSONEncoder(); encoder.dateEncodingStrategy = .iso8601
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        try encoder.encode(execution).write(to: file, options: .atomic)
+        try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: file.path)
+    }
 }
 
 @MainActor @Observable
@@ -74,5 +91,11 @@ public final class LocalMaintenance {
         guard let store, enabled, let work, work.lineageNodeID != nil else { return }
         do { try await store.log(work: work); logStatus = "" }
         catch { logStatus = "生成結果のログを保存できませんでした: \(error.localizedDescription)" }
+    }
+
+    public func log(execution: DrawingLogRecord, enabled: Bool) async {
+        guard let store, enabled else { return }
+        do { try await store.log(execution: execution); logStatus = "" }
+        catch { logStatus = "描画ログのファイルを保存できませんでした。" }
     }
 }

@@ -68,6 +68,16 @@ public struct ProviderObservationView: View {
                 } else { Text(model.display.localized("時間: 記録なし")) }
                 Text(model.display.localized(outcome(metric.outcome)))
             }.foregroundStyle(.secondary).monospacedDigit()
+            if let status = metric.httpStatus ?? metric.diagnostic?.httpStatus { Text("HTTP \(status)").font(.caption.monospaced()) }
+            if let failure = metric.failure { Text(failure).font(.caption.monospaced()).foregroundStyle(.secondary) }
+            if let diagnostic = metric.diagnostic {
+                if let endpoint = diagnostic.endpoint { Text(endpoint).font(.caption.monospaced()) }
+                if let domain = diagnostic.errorDomain, let code = diagnostic.errorCode {
+                    Text("\(domain) \(code)").font(.caption.monospaced()).foregroundStyle(.secondary)
+                }
+                if let code = diagnostic.hostCode { Text(code).font(.caption.monospaced()).foregroundStyle(.secondary) }
+                if let message = diagnostic.providerMessage { Text(message).font(.caption) }
+            }
             Text(model.display.localizedFormat("トークン 入力 %@・出力 %@",
                 metric.usage?.inputTokens.map(String.init) ?? absent,
                 metric.usage?.outputTokens.map(String.init) ?? absent)).foregroundStyle(.secondary).monospacedDigit()

@@ -14,6 +14,12 @@ M1のSwift／Rust基盤、M2のstandalone host／SQLite保存境界に続き、m
 
 Personal ChatGPTは設定の専用画面で明示して有効化・接続し、提供されたmodelを描画用に選びます。通常のAPI key接続とは別で、初期状態は無効です。発行済みclient IDと本人の接続同意が必要で、実本人認証・model取得・推論は未受入です。記述、写生、自動配色、構図の読み、DDL補完に対応し、Vision推敲・奥書等の未対応用途は画面で説明します。詳細は[Swift仕様](SWIFT_SPEC.ja.md#personal-chatgpt)を参照してください。
 
+## 描画が失敗したとき
+
+toolbarの「描画ログ」を開き、失敗した記述の実行を選んでください。日時、使ったmodel、失敗した段階、再試行やfallbackの経過を確認できます。新しい通常APIの実行には通信のOS error codeやHTTP拒否理由も残ります。古い記録にない詳細は追加せず、未記録と表示します。ログを開いても生成・再送信は行いません。
+
+設定→制作の「生成結果のログを保存」を有効にすると、成功・失敗・停止の累積JSONもDBと同じdirectoryの `drawing-logs/` に保存します。切ってもSQLiteの実行記録は「描画ログ」で読めます。通常logに通信本文、APIキー、接続先のpath／queryやheadersは含めません。詳しい本文保存は開発者用の明示設定に限ります。
+
 ## 対応OSとbuild環境
 
 最低OSはmacOS 14／iOS 17です。SDKの版は最低OSとは別です。確認した環境はXcode 27.0／Swift 6.4、Rust 1.95.0、XcodeGen 2.46.0です。Swift packageはtools 6.1、projectはXcodeGen 2.44.0以上を要求します。

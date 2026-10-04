@@ -89,6 +89,7 @@ public final class AppModel {
     public let descriptionMeter = DescriptionMeterModel()
     public let renderer = ArtworkRenderer()
     @ObservationIgnored public var onSavedWork: (@MainActor (SavedWork) async -> Void)?
+    @ObservationIgnored public var onDrawingLog: (@MainActor (DrawingLogRecord) async -> Void)?
     public let versionSummary: String = {
         let report = try? JSONSerialization.jsonObject(with: Data(InkuCore.versionReport.utf8)) as? [String: String]
         return "共通コア接続 \(report?["binding_version"] ?? "不明") · 描画接続 \(InkuCore.rasterAPIVersion)"
@@ -257,6 +258,7 @@ public final class AppModel {
             catch { report(error) }
         }
         await operation.value
+        if let id = currentExecutionID { recordDrawingLog(executionID: id) }
     }
 
     public func selectWork(_ work: SavedWork) async {
@@ -972,6 +974,7 @@ public final class AppModel {
         let view = try await host.generate(request) { [weak self] progress in
             Task { @MainActor in self?.receiveCandidate(progress, token: token, comparison: comparison, models: models) }
         }
+        recordDrawingLog(executionID: view.executionID)
         if generationToken == token, !stopping, !Task.isCancelled { finishProviderStage(view) }
         await recordDescriptionFeedback(request: request, view: view)
         try Task.checkCancellation()
@@ -1420,6 +1423,7 @@ public final class AppModel {
         await Task { @MainActor in await callback(work) }.value
     }
     private func receive(_ progress: PipelineProgress, token: UUID, models: ModelSelection? = nil) {
+        recordDrawingProgress(progress)
         guard generationToken == token, !stopping else { return }
         receiveProviderProgress(progress, models: models, comparison: false)
         switch progress {
@@ -1434,6 +1438,7 @@ public final class AppModel {
         }
     }
     private func receiveCandidate(_ progress: PipelineProgress, token: UUID, comparison: Bool = true, models: ModelSelection? = nil) {
+        recordDrawingProgress(progress)
         guard generationToken == token, !stopping else { return }
         receiveProviderProgress(progress, models: models, comparison: comparison)
         switch progress {
@@ -1467,6 +1472,30 @@ public final class AppModel {
         case .providerDiagnostic, .saved: break
         }
     }
+
+    public func drawingLogs() async throws -> [DrawingLogRecord] {
+        guard let host else { throw HostError("database_unavailable") }
+        return try await host.drawingLogs()
+    }
+
+    private func recordDrawingProgress(_ progress: PipelineProgress) {
+        // Durable logs outlive the UI token, including delayed terminal callbacks after Stop.
+        switch progress {
+        case .changed(let view): recordDrawingLog(executionID: view.executionID)
+        case .providerMetric(let id, _): recordDrawingLog(executionID: id)
+        default: break
+        }
+    }
+
+    private func recordDrawingLog(executionID: String) {
+        guard let host, let callback = onDrawingLog else { return }
+        // Read durable public facts, independent of UI selection and the caller's cancellation.
+        Task { @MainActor in
+            do {
+                if let record = try await host.drawingLog(executionID: executionID) { await callback(record) }
+            } catch { self.errorText = "描画ログを読み込めませんでした。" }
+        }
+    }
     private func finishProviderStage(_ view: PipelineView) {
         if providerProgress?.executionID == view.executionID {
             if let metric = view.providerMetrics.last(where: { $0.action == providerProgress?.action && Int($0.identity.attempt) == providerProgress?.attempt }) {
@@ -1487,6 +1516,7 @@ public final class AppModel {
     }
     private func apply(_ view: PipelineView) {
         finishProviderStage(view)
+        recordDrawingLog(executionID: view.executionID)
         currentView = view
         currentExecutionID = view.executionID
         if isBusy, view.savedWorkID == displayedWork?.id { providerMetrics = view.providerMetrics }

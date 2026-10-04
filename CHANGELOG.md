@@ -6,6 +6,10 @@ This file records changes chronologically. If a historical note conflicts with t
 
 **This file retains the history from v2.5.0 (2026-07-25, render engine 12) onward.** Past records follow the recent ones in a collapsible section of this same document; expand it when needed. Viewers without collapse support show the full text. Earlier history is in the [v1.72–v2.4 archive](docs/history/changelog-v1.72-v2.4.md) and the [v0.1–v1.71 archive](docs/history/changelog-v0.1-v1.71.md).
 
+### 2026-10-04 — Add Swift drawing failure diagnostics and readable execution logs
+
+Drawing log can reopen failed or stopped SQLite executions even when no work was saved. It shows descriptions, pinned models, failed stages, attempts, retries and fallbacks. Ordinary API metrics retain connection errors and HTTP refusal reasons with secrets removed, and the result-log setting also writes accumulated failure/cancellation files. Reading neither resends requests nor changes works. Older records and shared core failure/retry contracts remain intact. Synchronized the Japanese/English [Swift specification](apple/SWIFT_SPEC.md) and [usage guide](apple/README.md).
+
 ### 2026-10-04 — Align Swift batch choices and dialogs with Web
 
 New batches use descriptions only, removing direct DDL and supplied-sketch choices. Sketch from life offers Off/On with explanations, and Wild uses Off/On. Model selection now uses a shared Stage 1/2 dialog with service cards, draft selection, and confirmation, without inserting unknown mock references as candidates or next values. Color selection uses an automatic card and catalog rows with ten samples; new random selection is removed. Saved settings, works, and frozen legacy resume conditions remain intact. Synchronized the Japanese/English [Swift specification](apple/SWIFT_SPEC.md) and [usage guide](apple/README.md).

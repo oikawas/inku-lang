@@ -74,15 +74,16 @@ public struct ProviderAttemptMetric: Codable, Sendable, Equatable {
     public var outcome: ProviderAttemptOutcome
     public var failure: String?
     public var sent: Bool
+    public var diagnostic: ProviderAttemptDiagnostic?
     public init(identity: ProviderActionIdentity, action: String, stage: ProviderObservationStage,
                 requestedModelReference: String, providerID: String? = nil, model: String? = nil,
                 responseModel: String? = nil, timeoutMS: UInt64, elapsedMS: UInt64? = nil,
                 usage: ProviderUsage? = nil, httpStatus: Int? = nil, outcome: ProviderAttemptOutcome = .requestSaved,
-                failure: String? = nil, sent: Bool = false) {
+                failure: String? = nil, sent: Bool = false, diagnostic: ProviderAttemptDiagnostic? = nil) {
         self.identity = identity; self.action = action; self.stage = stage; self.requestedModelReference = requestedModelReference
         self.providerID = providerID; self.model = model; self.responseModel = responseModel; self.timeoutMS = timeoutMS
         self.elapsedMS = elapsedMS; self.usage = usage; self.httpStatus = httpStatus; self.outcome = outcome
-        self.failure = failure; self.sent = sent
+        self.failure = failure; self.sent = sent; self.diagnostic = diagnostic
     }
 }
 
@@ -165,6 +166,7 @@ final class ProviderAttemptRecorder: @unchecked Sendable {
     private var value: ProviderAttemptObservation
     private var secrets: [String] = []
     private var received: ProviderHTTPRead?
+    private var endpoint: URL?
 
     init(action: Data, reference: String, options: ProviderObservationOptions) throws {
         let effect = try ExactJSON(data: action), tag = try effect.requiredString("tag")
@@ -189,6 +191,13 @@ final class ProviderAttemptRecorder: @unchecked Sendable {
         }
     }
     func addSecrets(_ secrets: [String]) { lock.withLock { self.secrets += secrets.filter { !$0.isEmpty } } }
+    func setEndpoint(_ endpoint: URL) { lock.withLock { self.endpoint = endpoint } }
+    func recordFailure(_ error: any Error, httpStatus: Int? = nil, httpBody: Data? = nil) {
+        lock.withLock {
+            value.metric.diagnostic = ProviderDiagnosticSanitizer.diagnostic(error: error, endpoint: endpoint,
+                secrets: secrets, httpStatus: httpStatus, httpBody: httpBody)
+        }
+    }
     func receive(_ response: ProviderHTTPRead) {
         lock.withLock {
             received = response

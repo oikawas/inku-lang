@@ -14,6 +14,16 @@ Binding and protocol identities come from the bundled Rust core's version report
 - Update the relevant canonical document when shared semantics or persistence contracts change. This document explains how the Swift host applies them; it does not establish an independent shared specification.
 - Public documentation describes source and reproducible procedures. Generated binaries, models, logs, credentials, device identifiers, and private operating records are not tracked product material.
 
+## 2026-10-04 Drawing failure diagnostics and execution logs
+
+The toolbar's Drawing log shows the latest 100 pipeline executions, newest first. Executions without saved works retain their start time, description, pinned models, completion/failure/cancellation state, failed stage and classification, each attempt's timing/HTTP facts/measurements, and core progress. Reading uses existing SQLite snapshots without resuming drivers, sending provider requests, or changing works. Ordinary log decoding and result types exclude raw provider bodies and frozen provider settings.
+
+Ordinary API failure metrics include backward-compatible optional diagnostics: OS network error domain/code and a fixed explanation, known host errors, and HTTP refusal code/type/param/status with a message bounded to 240 characters. Endpoints contain only scheme/host/port, excluding path/query/userinfo/headers. Actual credentials and secret-shaped strings are masked before shortening. A failed connection without an HTTP response is not assumed to have sent a request. Older records remain readable and are explicitly marked when detailed reasons were not recorded. Shared Rust failure classifications, retries, and fallbacks stay unchanged.
+
+Enabling the existing result-log setting also writes an accumulated JSON file per execution to `drawing-logs/` beside the DB, alongside legacy saved-work logs. Atomic updates contain core progress and ordinary metrics through completion, failure, or cancellation; an older callback cannot overwrite a newer revision. File logging defaults off, while SQLite execution records remain durable. Automatic file rotation or day-based purging is not implemented. Full provider bodies retain their separate developer-only, explicit opt-in boundary.
+
+The focused `InkuAppCheck --drawing-failure-log-only` check covers one failed execution, SQLite, reading after restart, a terminal file log, and no resend. `ProviderObservationTransportChecks.testSafeFailureDiagnosticsWithoutRawCapture` covers one connection refusal, one HTTP refusal, secret removal, and reading an older metric. Real provider success, native interaction, and physical-OS acceptance are separate checks.
+
 ## 2026-10-04 Web-aligned batch input and selection dialogs
 
 New batches take one description per work on each line. They offer no direct-DDL input and do not inherit Creation's input mode, DDL, or supplied sketch. The independent batch sketch-from-life choice defaults to Off and offers Off/On with the same explanations as Web. Wild toggles Off/On and its starting value is frozen for every row. Language and seed remain under Details.

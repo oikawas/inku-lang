@@ -14,6 +14,16 @@ binding／protocolの版は同梱Rust coreのversion report、描画層の版は
 - 共通の意味や保存契約を変更する場合は、それぞれの正本を更新する。本書はSwift hostの適用範囲を説明し、独自の共通仕様を作らない。
 - sourceと再現手順を公開文書に記す。生成binary、model、log、credential、端末識別子や非公開の作業記録を追跡対象に含めない。
 
+## 2026-10-04 描画失敗の診断と実行ログ
+
+toolbarの「描画ログ」で直近100件のpipeline実行を新しい順に表示する。成功作品がない実行も、開始日時、記述、固定したモデル、完了・失敗・停止等の状態、失敗段階・分類、各試行の時間・HTTP状態・実測記録とcoreの経過を確認できる。読出しはSQLiteの既存snapshotだけを使い、driverの再開・provider送信・作品の変更を行わない。raw本文や凍結したprovider設定を通常logのdecode対象にも返却型にも含めない。
+
+通常APIの失敗metricへ後方互換optionalの診断を付ける。OS通信errorのdomain／codeと固定した説明、既知host error、HTTP拒否のcode／type／param／statusと240文字以内のmessageを保存する。接続先はscheme／host／portだけとし、path／query／userinfo／headersを含めない。実credentialと秘密らしい文字列を切取り前にmaskする。HTTP応答を得られない通信では、要求を送れたと推測しない。古い実行には新しい詳細を補作せず、記録されなかった理由を明示する。共通Rustの失敗分類・再試行・fallbackは変更しない。
+
+既存の「生成結果のログを保存」を有効にすると、成功作品の従来logに加えて、DBと同じdirectoryの `drawing-logs/` へ実行ごとの累積JSONを原子的に保存する。成功・失敗・停止までのcore経過と通常metricを含み、古いcallbackで新しいrevisionを上書きしない。file logは既定で無効、SQLiteの実行記録は従来どおり保存される。file logの自動rotation／日数purgeはまだ設けない。詳細本文は従来の開発者専用・明示opt-inへ分離する。
+
+限定確認は `InkuAppCheck --drawing-failure-log-only` の1失敗実行でSQLite・再起動後の読出し・terminal file logと再送信なしを確認する。hostの `ProviderObservationTransportChecks.testSafeFailureDiagnosticsWithoutRawCapture` は接続拒否1件とHTTP拒否1件、秘密除去と旧metricの読出しを確認する。実providerの再描画成功・native操作・OS実機の確認はそれぞれ分ける。
+
 ## 2026-10-04 バッチの入力・選択ダイアログをWebへ揃える
 
 新規バッチは1行に1作品分の記述を入力する。DDLからの新規バッチ描画を選択できず、制作の入力mode・DDL・指定写生を引き継がない。写生はバッチ独立の「なし／あり」で既定は「なし」、各選択にWebと同じ説明を表示する。暴れるは「切／入」を切り替え、開始時の値を全行に固定する。言語とseedは詳細から変更する。

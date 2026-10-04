@@ -535,6 +535,14 @@ public actor InkuDatabase {
         try queue.read { try Self.execution(id: id, in: $0) }
     }
 
+    /// Read stored executions without restoring drivers or repeating provider effects.
+    public func listExecutionIDs(limit: Int = 100) throws -> [String] {
+        try queue.read { db in
+            try String.fetchAll(db, sql: "SELECT id FROM execution_snapshots ORDER BY rowid DESC LIMIT ?",
+                                arguments: [min(100, max(1, limit))])
+        }
+    }
+
     /// nil expects absence and creates revision 0. Existing revisions advance by one.
     public func compareAndSwapExecution(
         id: String, expectedRevision: Int64?, snapshot: Data
